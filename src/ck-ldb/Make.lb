@@ -32,6 +32,8 @@ ALL_LDBS=\
    $(L)/libmoduleRefineTopoLB.a \
    $(L)/libmoduleTopoCentLB.a \
    $(L)/libmoduleTopoLB.a \
+   $(L)/libmoduleAdaptiveLB.a \
+   $(L)/libmoduleMetisLB.a \
    manager.o
 
 
@@ -227,6 +229,18 @@ $(L)/libmoduleTopoLB.a: TopoLB.o
 LBHEADERS += TopoLB.h TopoLB.decl.h
 
 
+$(L)/libmoduleAdaptiveLB.a: AdaptiveLB.o 
+	$(CHARMC) -o $(L)/libmoduleAdaptiveLB.a AdaptiveLB.o 
+	
+LBHEADERS += AdaptiveLB.h AdaptiveLB.decl.h
+
+
+$(L)/libmoduleMetisLB.a: MetisLB.o 
+	$(CHARMC) -o $(L)/libmoduleMetisLB.a MetisLB.o 
+	cp -f libmoduleMetisLB.dep $(L)/
+LBHEADERS += MetisLB.h MetisLB.decl.h
+
+
 $(L)/libmoduleTempAwareGreedyLB.a: TempAwareGreedyLB.o 
 	$(CHARMC) -o $(L)/libmoduleTempAwareGreedyLB.a TempAwareGreedyLB.o 
 	
@@ -291,6 +305,8 @@ ALL_LB_OBJS=EveryLB.o \
     RefineTopoLB.o \
     TopoCentLB.o \
     TopoLB.o \
+    AdaptiveLB.o \
+    MetisLB.o \
     TempAwareGreedyLB.o \
     MetisLB.o \
     ScotchLB.o \
@@ -335,6 +351,8 @@ EVERYLB_DEPS=EveryLB.o \
     RefineTopoLB.o \
     TopoCentLB.o \
     TopoLB.o \
+    AdaptiveLB.o \
+    MetisLB.o \
     manager.o \
     tm_tree.o  \
     tm_timings.o  \

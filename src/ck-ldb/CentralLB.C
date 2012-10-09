@@ -984,7 +984,7 @@ void CentralLB::LoadBalance()
   for (proc = 0; proc < clients; proc++) statsMsgsList[proc] = NULL;
 #endif
 
-  theLbdb->ResetAdaptive();
+//NOTE  theLbdb->ResetAdaptive();
   if (!_lb_args.samePeSpeed()) statsData->normalize_speed();
 
   if (_lb_args.debug()) 
@@ -1452,7 +1452,7 @@ void CentralLB::CheckMigrationComplete()
     }
 
     //FIX ME!!! adaptive_struct.lb_migration_cost = (CkWallTimer() - start_lb_time);
-    theLbdb->SetMigrationCost(CkWallTimer() - start_lb_time);
+//NOTE    theLbdb->SetMigrationCost(CkWallTimer() - start_lb_time);
 
     lbdone = 0;
     future_migrates_expected = -1;
@@ -1506,7 +1506,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   info.getSummary(mLoad, mCpuLoad, totalLoad);
   //CkPrintf("CharmLB> Max load w/o comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
   //info.print();
-  theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
+//NOTE!!  theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
 
   //getPredictedLoadWithMsg(stats, clients, msg, info,1);
   //info.getSummary(mLoad, mCpuLoad, totalLoadWComm);
@@ -1536,7 +1536,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
     CkPrintf("CharmLB> %s: PE [%d] strategy finished at %f duration %f s\n",
 	      lbname, cur_ld_balancer, strat_end_time, strat_end_time-strat_start_time);
     //CkPrintf("Strategy cost %f %f %f\n", strat_end_time, strat_start_time, adaptive_struct.lb_strategy_cost);
-    theLbdb->SetStrategyCost(strat_end_time - strat_start_time);
+//NOTE    theLbdb->SetStrategyCost(strat_end_time - strat_start_time);
   }
   return msg;
 #else

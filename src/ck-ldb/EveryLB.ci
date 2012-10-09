@@ -33,6 +33,8 @@ module EveryLB {
   extern module RefineTopoLB;
   extern module TopoCentLB;
   extern module TopoLB;
+  extern module AdaptiveLB;
+  extern module MetisLB;
 
   initnode void initEveryLB(void);
 };

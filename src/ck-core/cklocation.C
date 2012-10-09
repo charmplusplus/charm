@@ -18,6 +18,7 @@
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
+#include "MetaBalancer.h"
 #endif // CMK_LBDB_ON
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -977,7 +978,7 @@ void CkMigratable::commonInit(void) {
   local_state = OFF;
   prev_load = 0.0;
   can_reset = false;
-  atsync_iteration = myRec->getLBDB()->get_iteration();
+  atsync_iteration = myRec->getMetaBalancer()->get_iteration();
 
 	/*
 	FAULT_EVAC
@@ -1098,7 +1099,7 @@ void CkMigratable::recvLBPeriod(void *data) {
 
   bool is_tentative;
   if (local_state == LOAD_BALANCE) {
-    CkAssert(lb_period == myRec->getLBDB()->getPredictedLBPeriod(is_tentative));
+    CkAssert(lb_period == myRec->getMetaBalancer()->getPredictedLBPeriod(is_tentative));
     return;
   }
 
@@ -1146,7 +1147,8 @@ void CkMigratable::AtSync(int waitForMigration)
   // model-based load balancing, ask user to provide cpu load
   if (usesAutoMeasure == CmiFalse) UserSetLBLoad();
   
-  //	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+//  myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+
   if (atsync_iteration == -1) {
     can_reset = false;
     local_state = OFF;
@@ -1156,23 +1158,23 @@ void CkMigratable::AtSync(int waitForMigration)
   atsync_iteration++;
   // CkPrintf("[pe %s] atsync_iter %d && predicted period %d state: %d\n",
   //     idx2str(thisIndexMax), atsync_iteration,
-  //     myRec->getLBDB()->getPredictedLBPeriod(), local_state);
+  //     myRec->getMetaBalancer()->getPredictedLBPeriod(), local_state);
   double tmp = prev_load;
   prev_load = myRec->getObjTime();
   double current_load = prev_load - tmp;
-  if (atsync_iteration < myRec->getLBDB()->get_iteration()) {
+  if (atsync_iteration < myRec->getMetaBalancer()->get_iteration()) {
     CkPrintf("[%d:%s] Error!! Contributing to iter %d < current iter %d\n",
       CkMyPe(), idx2str(thisIndexMax), atsync_iteration,
-      myRec->getLBDB()->get_iteration());
+      myRec->getMetaBalancer()->get_iteration());
     CkAbort("Not contributing to the right iteration\n");
   }
 
   if (atsync_iteration != 0) {
-    myRec->getLBDB()->AddLoad(atsync_iteration, current_load);
+    myRec->getMetaBalancer()->AddLoad(atsync_iteration, current_load);
   }
 
   bool is_tentative;
-  if (atsync_iteration < myRec->getLBDB()->getPredictedLBPeriod(is_tentative)) {
+  if (atsync_iteration < myRec->getMetaBalancer()->getPredictedLBPeriod(is_tentative)) {
     ResumeFromSync();
   } else if (is_tentative) {
     local_state = PAUSE;
@@ -1320,6 +1322,7 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
         enable_measure = CmiTrue;
 	bounced  = CmiFalse;
 	the_lbdb=mgr->getLBDB();
+  the_metalb=mgr->getMetaBalancer();
 	ldHandle=the_lbdb->RegisterObj(mgr->getOMHandle(),
 		idx2LDObjid(idx),(void *)this,1);
 	if (fromMigration) {
@@ -1925,7 +1928,7 @@ void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 #endif
 
 /*************************** LocMgr: CREATION *****************************/
-CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndex& numInitial)
+CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkGroupID metalbID_,CkArrayIndex& numInitial)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
 {
@@ -1949,7 +1952,8 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndex& numInitial)
 
 //Find and register with the load balancer
 	lbdbID = lbdbID_;
-	initLB(lbdbID_);
+  metalbID = metalbID_;
+	initLB(lbdbID_, metalbID_);
 	hashImmLock = CmiCreateImmediateLock();
 }
 
@@ -1971,6 +1975,7 @@ void CkLocMgr::pup(PUP::er &p){
 	p|mapID;
 	p|mapHandle;
 	p|lbdbID;
+  p|metalbID;
 	mapID = _defaultArrayMapID;
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;
@@ -1982,7 +1987,7 @@ void CkLocMgr::pup(PUP::er &p){
                 CkArrayIndex emptyIndex;
 		map->registerArray(emptyIndex,thisgroup);
 		// _lbdb is the fixed global groupID
-		initLB(lbdbID);
+		initLB(lbdbID, metalbID);
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         int count;
@@ -3020,7 +3025,7 @@ unsigned int CkLocMgr::numLocalElements()
 
 #if !CMK_LBDB_ON
 //Empty versions of all load balancer calls
-void CkLocMgr::initLB(CkGroupID lbdbID_) {}
+void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_) {}
 void CkLocMgr::startInserting(void) {}
 void CkLocMgr::doneInserting(void) {}
 void CkLocMgr::dummyAtSync(void) {}
@@ -3028,12 +3033,15 @@ void CkLocMgr::dummyAtSync(void) {}
 
 
 #if CMK_LBDB_ON
-void CkLocMgr::initLB(CkGroupID lbdbID_)
+void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 { //Find and register with the load balancer
 	the_lbdb = (LBDatabase *)CkLocalBranch(lbdbID_);
 	if (the_lbdb == 0)
 		CkAbort("LBDatabase not yet created?\n");
 	DEBL((AA"Connected to load balancer %p\n"AB,the_lbdb));
+  the_metalb = (MetaBalancer *)CkLocalBranch(metalbID_);
+	if (the_metalb == 0)
+		CkAbort("MetaBalancer not yet created?\n");
 
 	// Register myself as an object manager
 	LDOMid myId;

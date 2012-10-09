@@ -28,7 +28,9 @@ public:
 /* Utility */
 //#if CMK_LBDB_ON
 #include "LBDatabase.h"
+#include "MetaBalancer.h"
 class LBDatabase;
+class MetaBalancer;
 //#endif
 
 //Forward declarations
@@ -216,6 +218,7 @@ public:
 #if CMK_LBDB_ON
 public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
+  inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
   inline LDObjHandle getLdHandle() const{return ldHandle;}
   static void staticMigrate(LDObjHandle h, int dest);
   static void staticAdaptResumeSync(LDObjHandle h, int lb_ideal_period);
@@ -234,6 +237,7 @@ public:
   inline void setMeasure(CmiBool status) { enable_measure = status; }
 private:
   LBDatabase *the_lbdb;
+  MetaBalancer *the_metalb;
   LDObjHandle ldHandle;
   CmiBool  asyncMigrate;  /// if readyMove is inited
   CmiBool  readyMigrate;    /// status whether it is ready to migrate
@@ -306,6 +310,7 @@ public:
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
   inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
+  inline MetaBalancer *getMetaBalancer(void) const {return myRec->getMetaBalancer();}
 #else
   inline void ckStopTiming(void) { }
   inline void ckStartTiming(void) { }
@@ -539,7 +544,7 @@ typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
-	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndex& numInitial);
+	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkGroupID _metalb,CkArrayIndex& numInitial);
 	CkLocMgr(CkMigrateMessage *m);
 	inline CmiBool isLocMgr(void) { return CmiTrue; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
@@ -604,6 +609,7 @@ public:
 
 #if CMK_LBDB_ON
 	LBDatabase *getLBDB(void) const { return the_lbdb; }
+  MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
 	const LDOMHandle &getOMHandle(void) const { return myLBHandle; }
 #endif
 
@@ -757,8 +763,10 @@ CkLocRec_local *createLocal(const CkArrayIndex &idx,
 	CkArrayMap *map;
 
 	CkGroupID lbdbID;
+	CkGroupID metalbID;
 #if CMK_LBDB_ON
 	LBDatabase *the_lbdb;
+  MetaBalancer *the_metalb;
 	LDBarrierClient dummyBarrierHandle;
 	static void staticDummyResumeFromSync(void* data);
 	void dummyResumeFromSync(void);
@@ -766,7 +774,7 @@ CkLocRec_local *createLocal(const CkArrayIndex &idx,
 	void recvAtSync(void);
 	LDOMHandle myLBHandle;
 #endif
-	void initLB(CkGroupID lbdbID);
+	void initLB(CkGroupID lbdbID, CkGroupID metalbID);
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 public:
