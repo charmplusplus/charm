@@ -160,6 +160,7 @@ int storedDetsSize;
 float MLOGFT_totalLogSize = 0.0;
 float MLOGFT_totalMessages = 0.0;
 float MLOGFT_totalMcastLogSize = 0.0;
+float MLOGFT_totalReductionLogSize = 0.0;
 #endif
 
 static double adjustChkptPeriod=0.0; //in ms
@@ -740,6 +741,10 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 			if(entry->env->flags & CK_MULTICAST_MSG_MLOG){
 				MLOGFT_totalMcastLogSize += entry->env->getTotalsize();	
 			}
+			if(entry->env->flags & CK_REDUCTION_MSG_MLOG){
+				MLOGFT_totalReductionLogSize += entry->env->getTotalsize();	
+			}
+
 #endif
 		}else{
 			// the message has to be deleted after it has been sent
@@ -3623,6 +3628,7 @@ void _messageLoggingExit(){
 	printf("[%d] LOGGED MESSAGES: %.0f\n",CkMyPe(),MLOGFT_totalMessages);
 	printf("[%d] MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalLogSize/(float)MEGABYTE);
 	printf("[%d] MULTICAST MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalMcastLogSize/(float)MEGABYTE);
+	printf("[%d] REDUCTION MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalReductionLogSize/(float)MEGABYTE);
 #endif
 
 #if COLLECT_STATS_MSGS

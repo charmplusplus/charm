@@ -1063,6 +1063,11 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
     msg->callback           = cb;
     msg->userFlag           = userFlag;
 
+#if CMK_MESSAGE_LOGGING
+	envelope *env = UsrToEnv(msg);
+	env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
+#endif
+
     mCastGrp[mpe].recvRedMsg(msg);
 
     data = (void*)(((char*)data) + fSize);
