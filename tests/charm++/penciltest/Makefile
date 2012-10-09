@@ -1,12 +1,12 @@
 #Set FFTW_HOME home to the fftw-2.1.5 local installation
 
 #FFTW_HOME=/bgl/local/fftw-2.1.5/
-FFTW_HOME=$(HOME)/fftw
+FFTW_HOME=$(HOME)/fftw-bgq
 OPTS=-g -O3 
 
 CHARMC=../../../bin/charmc $(OPTS)
 INCLUDES=-I$(FFTW_HOME)/include -I$(CHARMBASE)/include/fftlib \
-	 -DFFTW_ENABLE_FLOAT=1
+	 -DFFTW_ENABLE_FLOAT=1 -DUSE_FFTW_DECLS=1
 
 LIBS=-module PencilFFT -L$(FFTW_HOME)/lib -language charm++ -lsfftw -lsrfftw
 

@@ -3,12 +3,26 @@ module PencilFFT {
 
 	message LineFFTMsg     {complex   data[];};
 	message LineFFTGridMsg {fftw_real data[];};
+	message LineFFTCompleteMsg;
 
 	array [2D] LineFFTArray {
 		entry LineFFTArray (LineFFTInfo info, int phase);
 		entry void receiveGridMessage (LineFFTGridMsg *msg);
 		entry void setNumGridMessages (int n, CkCallback cb);
 		entry void receiveFFTMessage  (LineFFTMsg *msg);
+		entry void many_to_many_recvFFT  (LineFFTCompleteMsg *msg);
      		entry void startFFT (void);
 	};
+
+	group PencilMapX : CkArrayMap {
+		entry  PencilMapX(LineFFTInfo  info);
+ 	}
+
+	group PencilMapY : CkArrayMap {
+		entry  PencilMapY(LineFFTInfo  info);
+ 	}
+
+	group PencilMapZ : CkArrayMap {
+		entry  PencilMapZ(LineFFTInfo  info);
+ 	}	
 };
