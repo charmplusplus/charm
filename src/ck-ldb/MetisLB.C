@@ -10,7 +10,7 @@
 
 #include "MetisLB.h"
 #include "ckgraph.h"
-//#include "metis.h"
+#include "metis.h"
 
 typedef int idxtype;
 
