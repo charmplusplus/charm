@@ -33,7 +33,6 @@ ALL_LDBS=\
    $(L)/libmoduleTopoCentLB.a \
    $(L)/libmoduleTopoLB.a \
    $(L)/libmoduleAdaptiveLB.a \
-   $(L)/libmoduleMetisLB.a \
    manager.o
 
 
