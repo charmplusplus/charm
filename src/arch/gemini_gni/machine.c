@@ -47,7 +47,9 @@
 #include "cmidirect.h"
 #endif
 
+#if !defined(LARGEPAGE)
 #define     LARGEPAGE              0
+#endif
 
 #if CMK_SMP
 #define MULTI_THREAD_SEND          0
