@@ -647,7 +647,7 @@ cat > $t <<EOT
 #include <stdlib.h>
 long long foo(void) { return 17; }
 EOT
-test_cxx "whether long long works" "ok" "no" ""
+test_cxx "whether long long works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_LONG_LONG_DEFINED, $pass, [whether long long works])
 
 #### Check __int64 ####
@@ -655,15 +655,19 @@ cat > $t <<EOT
 #include <stdlib.h>
 __int64 foo(void) { return 17; }
 EOT
-test_cxx "whether __int64 works" "ok" "no" ""
+test_cxx "whether __int64 works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int64_DEFINED], $pass, [whether __int64 works])
 
 #### Check __int128 ####
 cat > $t <<EOT
 #include <stdlib.h>
-__int128 foo(void) { return 17; }
+int foo(void) {
+  __int128   a;
+  int x[[(int)(sizeof(__int128) - 15)]]={0};
+  return x[[0]];
+}
 EOT
-test_cxx "whether __int128 works" "ok" "no" ""
+test_cxx "whether __int128 (128-bit integer) works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int128_DEFINED], $pass, [whether __int128 works])
 
 #### Check long double ####
@@ -671,7 +675,7 @@ cat > $t <<EOT
 #include <stdlib.h>
 long double foo(void) { return 17.0; }
 EOT
-test_cxx "whether long double works" "ok" "no" ""
+test_cxx "whether long double works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_LONG_DOUBLE_DEFINED, $strictpass, [whether long double works])
 
 #### Check ucontext and FPU pointer ####
