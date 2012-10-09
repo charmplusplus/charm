@@ -11,7 +11,6 @@ using std::list;
 using std::for_each;
 #include <functional>
 using std::mem_fun;
-using std::bind2nd;
 
 namespace xi {
 
@@ -306,12 +305,12 @@ void SdagConstruct::generateConnectEntries(XStr& decls) {
    decls << "  }\n";
 }
 
-void SdagConstruct::generateConnectEntryList(std::list<SdagConstruct*>& ConnectEList) {
+void SdagConstruct::generateConnectEntryList(list<SdagConstruct*>& ConnectEList) {
   if (type == SCONNECT)
      ConnectEList.push_back(this);
   if (constructs != 0) {
-    for_each(constructs->begin(), constructs->end(),
-             bind2nd(mem_fun(&SdagConstruct::generateConnectEntryList), ConnectEList));
+    for (list<SdagConstruct*>::iterator iter = constructs->begin(); iter != constructs->end(); ++iter)
+      (*iter)->generateConnectEntryList(ConnectEList);
   }
 }
 
@@ -337,7 +336,7 @@ void SdagConstruct::propagateState(int uniqueVarNum)
 
 #if CMK_BIGSIM_CHARM
   // adding _bgParentLog as the last extra parameter for tracing
-  stateVarsChildren = new list<CStateVar*>(stateVars);
+  stateVarsChildren = new list<CStateVar*>(*stateVars);
   sv = new CStateVar(0, "void *", 0,"_bgParentLog", 0, NULL, 1);  
   stateVarsChildren->push_back(sv);
 #else
@@ -1562,8 +1561,8 @@ void SdagConstruct::generateRegisterEp(XStr& defs)
     defs << "    (void)_sdag_idx_" << traceName << "();\n";
   }
 
-  for_each(constructs->begin(), constructs->end(),
-           bind2nd(mem_fun(&SdagConstruct::generateRegisterEp), defs));
+  for (list<SdagConstruct*>::iterator iter = constructs->begin(); iter != constructs->end(); ++iter)
+    (*iter)->generateRegisterEp(defs);
   if (con1) con1->generateRegisterEp(defs);
   if (con2) con2->generateRegisterEp(defs);
   if (con3) con3->generateRegisterEp(defs);
