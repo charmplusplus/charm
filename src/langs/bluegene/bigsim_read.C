@@ -30,7 +30,8 @@ int BgReadProc(int procNum, int numWth ,int numEmulatingPes, int totalWorkerProc
 //  PUP::fromDisk p(f);
   PUP::fromDisk pd(f);
   PUP::machineInfo machInfo;
-  pd((char *)&machInfo, sizeof(machInfo));
+  //pd((char *)&machInfo, sizeof(machInfo));
+  pd | machInfo;
   if (!machInfo.valid()) CmiAbort("Invalid machineInfo on disk file!\n");
   PUP::xlater p(machInfo, pd);
 
@@ -66,7 +67,8 @@ int BgReadProcWindow(int procNum, int numWth ,int numEmulatingPes, int totalWork
   }
   PUP::fromDisk pd(f);
   PUP::machineInfo machInfo;
-  pd((char *)&machInfo, sizeof(machInfo));
+  //pd((char *)&machInfo, sizeof(machInfo));
+  pd | machInfo;
   if (!machInfo.valid()) CmiAbort("Invalid machineInfo on disk file!\n");
   PUP::xlater p(machInfo, pd);
 
@@ -117,7 +119,8 @@ int* BgLoadOffsets(int totalProcs, int numPes){
       CmiAbort("BgLoadOffsets failed!\n");
     }  
     PUP::fromDisk pd(f);
-    pd((char *)&machInfo, sizeof(machInfo));
+    //pd((char *)&machInfo, sizeof(machInfo));
+    pd | machInfo;
     PUP::xlater p(machInfo, pd);
     if (!machInfo.valid()) CmiAbort("Invalid machineInfo on disk file!\n");
     p|procsInPe;
@@ -143,7 +146,8 @@ int BgLoadTraceSummary(const char *fname, int &totalWorkerProcs, int &numX, int 
   }
 
   PUP::fromDisk pd(f);
-  pd((char *)&machInfo, sizeof(machInfo));	// load machine info
+//  pd((char *)&machInfo, sizeof(machInfo));	// load machine info
+  pd | machInfo;
   if (!machInfo.valid()) CmiAbort("Invalid machineInfo on disk file!\n");
   PUP::xlater p(machInfo, pd);
   p|totalWorkerProcs;

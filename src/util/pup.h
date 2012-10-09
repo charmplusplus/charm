@@ -564,7 +564,7 @@ class machineInfo {
   myByte boolBytes;
   myByte pointerBytes;
 
-  myByte padding[1];//Padding to 16 bytes
+//  myByte padding[1];//Padding to 16 bytes
 
   //Return true if our magic number is valid.
   CmiBool valid(void) const;
@@ -573,6 +573,19 @@ class machineInfo {
   
   //Get a machineInfo for the current machine
   static const machineInfo &current(void);
+
+  void pup(er &p) {
+      myByte  padding;
+
+      p(magic, 4);
+      p(version);
+      if (version == 0) p(intBytes, 4);
+      else p(intBytes, 5);
+      p(intFormat);
+      p(floatBytes); p(doubleBytes); p(floatFormat);
+      p(boolBytes); p(pointerBytes);
+      if (version == 0) p(padding);
+  }
 };
 
 /// "Wrapped" PUP::er: forwards requests to another PUP::er.

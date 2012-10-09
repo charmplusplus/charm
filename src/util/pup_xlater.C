@@ -90,7 +90,7 @@ const PUP::machineInfo &PUP::machineInfo::current(void)
 		m=new machineInfo();
 		for (int i=0;i<4;i++)
 			m->magic[i]=machInfo_magic[i];
-		m->version=0;
+		m->version=1;
 		m->intBytes[0]=sizeof(char);
 		m->intBytes[1]=sizeof(short);
 		m->intBytes[2]=sizeof(int);
@@ -104,7 +104,7 @@ const PUP::machineInfo &PUP::machineInfo::current(void)
 		m->floatFormat=getFloatFormat();
 		m->boolBytes=sizeof(CmiBool);
 		m->pointerBytes=sizeof(void*);
-		m->padding[0]=0;
+		//m->padding[0]=0;
 	}
 	return *m;
 }
