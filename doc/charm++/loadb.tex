@@ -116,6 +116,10 @@ and their brief descriptions:
 \item {\bf GreedyCommLB}:  Extends the greedy algorithm to take the communication graph into account.
 \item {\bf TopoCentLB}:    Extends the greedy algorithm to take processor topology into account.
 \item {\bf RefineLB}:     Moves objects away from the most overloaded processors to reach average, limits the number of objects migrated.
+\item {\bf RefineSwapLB}:     Moves objects away from the most overloaded processors
+to reach average. In case it cannot migrate an object from an overloaded
+processor to an underloaded processor, it swaps objects to reduce the load on
+the overloaded processor. This strategy limits the number of objects migrated.
 \item {\bf RefineCommLB}:     Same idea as in RefineLB, but takes communication into account.
 \item {\bf RefineTopoLB}:       Same idea as in RefineLB, but takes processor topology into account.
 \item {\bf ComboCentLB}:  A special load balancer that can be used to combine any number of centralized load balancers mentioned above.
