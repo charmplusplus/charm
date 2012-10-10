@@ -25,6 +25,8 @@ module CkReduction {
 	//A late migrating contributor will never contribute
 	entry  void MigrantDied(CkReductionNumberMsg *);
 
+	entry [expedited] void Barrier_RecvMsg(CkReductionMsg *);
+
 	//call back for using NodeGroup Reductions added by sayantan
 	entry void ArrayReductionHandler(CkReductionMsg *m);
 	entry void contributeViaMessage(CkReductionMsg *m);

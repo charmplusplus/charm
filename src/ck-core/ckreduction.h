@@ -305,6 +305,8 @@ private:
   void contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);\
   void contribute(CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);\
 
+#define CK_BARRIER_CONTRIBUTE_METHODS_DECL \
+  void barrier(const CkCallback &cb);\
 
 class CkNodeReductionMgr : public IrrGroup {
 public:
@@ -532,6 +534,12 @@ public:
 	void ArrayReductionHandler(CkReductionMsg *m);
 	void endArrayReduction();
 
+// simple barrier for FT
+        void barrier(CkReductionMsg * msg);
+        void Barrier_RecvMsg(CkReductionMsg *m);
+        void addBarrier(CkReductionMsg *m);
+        void finishBarrier(void);
+
 	virtual CmiBool isReductionMgr(void){ return CmiTrue; }
 	virtual void flushStates(int isgroup);
 	/*FAULT_EVAC: used to get the gcount on a processor when 
@@ -585,6 +593,13 @@ private:
 
 	//Current local and remote contributions
 	int nContrib,nRemote;
+
+        // simple barrier
+        CkCallback barrier_storedCallback;
+        int barrier_gCount;
+        int barrier_nSource;
+        int barrier_nContrib,barrier_nRemote;
+
 	//Contributions queued for the current reduction
 	CkMsgQ<CkReductionMsg> msgs;
 
@@ -600,7 +615,6 @@ private:
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
 
-#if GROUP_LEVEL_REDUCTION
 //Reduction tree utilities
 	unsigned upperSize;
 	unsigned label;
@@ -618,7 +632,6 @@ private:
 	int treeParent(void);//My parent PE
 	int firstKid(void);//My first child PE
 	int treeKids(void);//Number of children in tree
-#endif
 
 	//Combine (& free) the current message vector.
 	CkReductionMsg *reduceMessages(void);
@@ -711,6 +724,15 @@ void me::contribute(CMK_REFNUM_TYPE userFlag)\
     myRednMgr->contribute(&myRednInfo,msg);\
 }\
 
+#define CK_BARRIER_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo,migratable) \
+void me::barrier(const CkCallback &cb)\
+{\
+    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
+    msg->setCallback(cb);\
+    msg->setMigratableContributor(migratable);\
+    myRednMgr->barrier(msg);\
+}\
+
 
 //A group that can contribute to reductions
 class Group : public CkReductionMgr
@@ -728,6 +750,7 @@ class Group : public CkReductionMgr
 	virtual void CkAddThreadListeners(CthThread tid, void *msg);
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
+        CK_BARRIER_CONTRIBUTE_METHODS_DECL
 };
 
 #ifdef _PIPELINED_ALLREDUCE_

@@ -113,6 +113,10 @@ CK_REDUCTION_CONTRIBUTE_METHODS_DEF(Group,
 				    reductionInfo,false)
 CK_REDUCTION_CLIENT_DEF(CProxy_Group,(CkReductionMgr *)CkLocalBranch(_ck_gid))
 
+CK_BARRIER_CONTRIBUTE_METHODS_DEF(Group,
+                                   ((CkReductionMgr *)this),
+                                   reductionInfo,false)
+
 
 
 CkGroupInitCallback::CkGroupInitCallback(void) {}
@@ -177,12 +181,10 @@ they're passed to the user's client function.
 CkReductionMgr::CkReductionMgr()//Constructor
   : thisProxy(thisgroup)
 { 
-#if GROUP_LEVEL_REDUCTION
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
 #else
   init_BinaryTree();
-#endif
 #endif
   redNo=0;
   completedRedNo = -1;
@@ -197,6 +199,11 @@ CkReductionMgr::CkReductionMgr()//Constructor
 	numEmigrantRecObjs = 0;
 #endif
   disableNotifyChildrenStart = CmiFalse;
+
+  barrier_gCount=0;
+  barrier_nSource=0;
+  barrier_nContrib=barrier_nRemote=0;
+
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
 }
 
@@ -211,9 +218,14 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   nContrib=nRemote=0;
   maxStartRequest=0;
   DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
+
+  barrier_gCount=0;
+  barrier_nSource=0;
+  barrier_nContrib=barrier_nRemote=0;
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	numImmigrantRecObjs = 0;
-	numEmigrantRecObjs = 0;
+  numImmigrantRecObjs = 0;
+  numEmigrantRecObjs = 0;
 #endif
 
 }
@@ -934,12 +946,10 @@ void CkReductionMgr::pup(PUP::er &p)
   if(p.isUnpacking()){
     thisProxy = thisgroup;
     maxStartRequest=0;
-#if GROUP_LEVEL_REDUCTION
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
     init_BinaryTree();
-#endif
 #endif
   }
 
@@ -1097,8 +1107,6 @@ void CkReductionMgr :: endArrayReduction(){
 	endArrayReduction();
 }
 
-#if GROUP_LEVEL_REDUCTION
-
 void CkReductionMgr::init_BinaryTree(){
 	parent = (CkMyPe()-1)/TREE_WID;
 	int firstkid = CkMyPe()*TREE_WID+1;
@@ -1171,7 +1179,70 @@ int CkReductionMgr::treeKids(void)//Number of children in tree
   return numKids;
 }
 
-#endif
+
+//                simple "stateless" barrier
+//                no state checkpointed, for FT purpose
+//                require no overlapping barriers
+void CkReductionMgr::barrier(CkReductionMsg *m)
+{
+  barrier_nContrib++;
+  barrier_nSource++;
+  if(!m->callback.isInvalid())
+      barrier_storedCallback=m->callback;
+  finishBarrier();
+  delete m;
+}
+
+void CkReductionMgr::finishBarrier(void)
+{
+       if(barrier_nContrib<lcount){//need more local message
+               DEBR(("[%d] current contrib:%d,lcount:%d\n",CkMyPe(),barrier_nContrib,lcount));
+               return;
+       }
+       if(barrier_nRemote<treeKids()){//need more remote messages
+               DEBR(("[%d] current remote:%d,kids:%d\n",CkMyPe(),barrier_nRemote,treeKids()));
+               return;
+       }
+       CkReductionMsg * result = CkReductionMsg::buildNew(0,NULL);
+       result->callback=barrier_storedCallback;
+       result->sourceFlag=barrier_nSource;
+       result->gcount=barrier_gCount;
+       if(hasParent())
+       {
+               DEBR(("[%d]send to parent:%d\n",CkMyPe(),treeParent()));
+               result->gcount+=gcount;
+               thisProxy[treeParent()].Barrier_RecvMsg(result);
+       }
+       else{
+               int totalElements=result->gcount+gcount;
+               DEBR(("[%d]root,totalElements:%d,source:%d\n",CkMyPe(),totalElements,result->nSources()));
+               if(totalElements<result->nSources()){
+                       CkAbort("ERROR! Too many contributions at barrier root\n");
+               }
+               CkSetRefNum(result,result->getUserFlag());
+               if(!result->callback.isInvalid())
+                       result->callback.send(result);
+               else if(!barrier_storedCallback.isInvalid())
+                               barrier_storedCallback.send(result);
+               else 
+                       CkAbort("No reduction client!\n");
+       }
+       barrier_nRemote=barrier_nContrib=0;
+       barrier_gCount=0;
+       barrier_nSource=0;
+}
+
+void CkReductionMgr::Barrier_RecvMsg(CkReductionMsg *m)
+{
+       barrier_nRemote++;
+       barrier_gCount+=m->gcount;
+       barrier_nSource+=m->nSources();
+       if(!m->callback.isInvalid())
+               barrier_storedCallback=m->callback;
+       finishBarrier();
+}
+
+
 
 /////////////////////////////////////////////////////////////////////////
 
