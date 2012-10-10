@@ -101,6 +101,60 @@ private:
   double alpha_beta_cost_to_load;
   int is_prev_lb_refine;
 
+  struct AdaptiveData {
+    double iteration;
+    double max_load;
+    double avg_load;
+    double utilization;
+    double idle_time;
+  };
+
+  struct AdaptiveMetaBalancer {
+    std::vector<AdaptiveData> history_data;
+    int lb_iter_no;
+  } adaptive_lbdb;
+
+  struct AdaptiveLBInfo {
+    AdaptiveLBInfo() {
+      max_avg_ratio = 1;
+      remote_local_ratio = 1;
+    }
+    double max_avg_ratio;
+    double remote_local_ratio;
+  };
+
+  // TODO: Separate out the datastructure required by just the central and on all
+  // processors
+  struct AdaptiveLBStructure {
+    int tentative_period;
+    int final_lb_period;
+    // This is based on the linear extrapolation
+    int lb_calculated_period;
+    int lb_iteration_no;
+    // This is set when all the processor sends the maximum iteration no
+    int global_max_iter_no;
+    // This keeps track of what was the max iteration no we had previously
+    // received. TODO: Mostly global_max_iter_no should be sufficied.
+    int tentative_max_iter_no;
+    // TODO: Use reduction to collect max iteration. Then we don't need this
+    // counter.
+    int global_recv_iter_counter;
+    // true indicates it is in Inform->ReceiveMaxIter->FinalLBPeriod stage.
+    bool in_progress;
+    double lb_strategy_cost;
+    double lb_migration_cost;
+    bool doCommStrategy;
+    int lb_msg_send_no;
+    int lb_msg_recv_no;
+    // Total AtSync calls from all the chares residing on the processor
+    int total_syncs_called;
+    int last_lb_type;
+    AdaptiveLBInfo greedy_info;
+    AdaptiveLBInfo refine_info;
+    AdaptiveLBInfo comm_info;
+    AdaptiveLBInfo comm_refine_info;
+  } adaptive_struct;
+
 public:
   bool lb_in_progress;
 

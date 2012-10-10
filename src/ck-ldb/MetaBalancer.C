@@ -24,61 +24,6 @@
 #   define DEBAD(x) /*CkPrintf x*/
 #   define EXTRA_FEATURE 0
 
-struct AdaptiveData {
-  double iteration;
-  double max_load;
-  double avg_load;
-  double utilization;
-  double idle_time;
-};
-
-struct AdaptiveMetaBalancer {
-  std::vector<AdaptiveData> history_data;
-  int lb_iter_no;
-};
-
-struct AdaptiveLBInfo {
-  AdaptiveLBInfo() {
-    max_avg_ratio = 1;
-    remote_local_ratio = 1;
-  }
-  double max_avg_ratio;
-  double remote_local_ratio;
-};
-
-// TODO: Separate out the datastructure required by just the central and on all
-// processors
-struct AdaptiveLBStructure {
-  int tentative_period;
-  int final_lb_period;
-  // This is based on the linear extrapolation
-  int lb_calculated_period;
-  int lb_iteration_no;
-  // This is set when all the processor sends the maximum iteration no
-  int global_max_iter_no;
-  // This keeps track of what was the max iteration no we had previously
-  // received. TODO: Mostly global_max_iter_no should be sufficied.
-  int tentative_max_iter_no;
-  // TODO: Use reduction to collect max iteration. Then we don't need this
-  // counter.
-  int global_recv_iter_counter;
-  // true indicates it is in Inform->ReceiveMaxIter->FinalLBPeriod stage.
-  bool in_progress;
-  double lb_strategy_cost;
-  double lb_migration_cost;
-  bool doCommStrategy;
-  int lb_msg_send_no;
-  int lb_msg_recv_no;
-  // Total AtSync calls from all the chares residing on the processor
-  int total_syncs_called;
-  int last_lb_type;
-  AdaptiveLBInfo greedy_info;
-  AdaptiveLBInfo refine_info;
-  AdaptiveLBInfo comm_info;
-  AdaptiveLBInfo comm_refine_info;
-};
-
-
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   double lb_data[8];
   lb_data[1] = 0.0; // total number of processors contributing
@@ -130,9 +75,6 @@ CkGroupID _metalb;
 
 CkpvDeclare(int, metalbInited);  /**< true if metabalancer is inited */
 
-CkpvDeclare(AdaptiveMetaBalancer, adaptive_lbdb);
-CkpvDeclare(AdaptiveLBStructure, adaptive_struct);
-
 // mainchare
 MetaLBInit::MetaLBInit(CkArgMsg *m)
 {
@@ -166,26 +108,23 @@ void MetaBalancer::init(void)
   prev_idle = 0.0;
   alpha_beta_cost_to_load = 1.0; // Some random value. TODO: Find the actual
 
-  CkpvInitialize(AdaptiveMetaBalancer, adaptive_lbdb);
-  CkpvInitialize(AdaptiveLBStructure, adaptive_struct);
-
-  CkpvAccess(adaptive_lbdb).lb_iter_no = -1;
+  adaptive_lbdb.lb_iter_no = -1;
 
   // If metabalancer enabled, initialize the variables
-  CkpvAccess(adaptive_struct).tentative_period =  INT_MAX;
-  CkpvAccess(adaptive_struct).final_lb_period =  INT_MAX;
-  CkpvAccess(adaptive_struct).lb_calculated_period = INT_MAX;
-  CkpvAccess(adaptive_struct).lb_iteration_no = -1;
-  CkpvAccess(adaptive_struct).global_max_iter_no = 0;
-  CkpvAccess(adaptive_struct).tentative_max_iter_no = -1;
-  CkpvAccess(adaptive_struct).global_recv_iter_counter = 0;
-  CkpvAccess(adaptive_struct).in_progress = false;
-  CkpvAccess(adaptive_struct).lb_strategy_cost = 0.0;
-  CkpvAccess(adaptive_struct).lb_migration_cost = 0.0;
-  CkpvAccess(adaptive_struct).lb_msg_send_no = 0;
-  CkpvAccess(adaptive_struct).lb_msg_recv_no = 0;
-  CkpvAccess(adaptive_struct).total_syncs_called = 0;
-  CkpvAccess(adaptive_struct).last_lb_type = -1;
+  adaptive_struct.tentative_period =  INT_MAX;
+  adaptive_struct.final_lb_period =  INT_MAX;
+  adaptive_struct.lb_calculated_period = INT_MAX;
+  adaptive_struct.lb_iteration_no = -1;
+  adaptive_struct.global_max_iter_no = 0;
+  adaptive_struct.tentative_max_iter_no = -1;
+  adaptive_struct.global_recv_iter_counter = 0;
+  adaptive_struct.in_progress = false;
+  adaptive_struct.lb_strategy_cost = 0.0;
+  adaptive_struct.lb_migration_cost = 0.0;
+  adaptive_struct.lb_msg_send_no = 0;
+  adaptive_struct.lb_msg_recv_no = 0;
+  adaptive_struct.total_syncs_called = 0;
+  adaptive_struct.last_lb_type = -1;
 
 
   // This is indicating if the load balancing strategy and migration started.
@@ -210,21 +149,21 @@ void MetaBalancer::pup(PUP::er& p)
 
 void MetaBalancer::ResumeClients() {
   // If metabalancer enabled, initialize the variables
-  CkpvAccess(adaptive_lbdb).history_data.clear();
+  adaptive_lbdb.history_data.clear();
 
-  CkpvAccess(adaptive_struct).tentative_period =  INT_MAX;
-  CkpvAccess(adaptive_struct).final_lb_period =  INT_MAX;
-  CkpvAccess(adaptive_struct).lb_calculated_period = INT_MAX;
-  CkpvAccess(adaptive_struct).lb_iteration_no = -1;
-  CkpvAccess(adaptive_struct).global_max_iter_no = 0;
-  CkpvAccess(adaptive_struct).tentative_max_iter_no = -1;
-  CkpvAccess(adaptive_struct).global_recv_iter_counter = 0;
-  CkpvAccess(adaptive_struct).in_progress = false;
-  CkpvAccess(adaptive_struct).lb_strategy_cost = 0.0;
-  CkpvAccess(adaptive_struct).lb_migration_cost = 0.0;
-  CkpvAccess(adaptive_struct).lb_msg_send_no = 0;
-  CkpvAccess(adaptive_struct).lb_msg_recv_no = 0;
-  CkpvAccess(adaptive_struct).total_syncs_called = 0;
+  adaptive_struct.tentative_period =  INT_MAX;
+  adaptive_struct.final_lb_period =  INT_MAX;
+  adaptive_struct.lb_calculated_period = INT_MAX;
+  adaptive_struct.lb_iteration_no = -1;
+  adaptive_struct.global_max_iter_no = 0;
+  adaptive_struct.tentative_max_iter_no = -1;
+  adaptive_struct.global_recv_iter_counter = 0;
+  adaptive_struct.in_progress = false;
+  adaptive_struct.lb_strategy_cost = 0.0;
+  adaptive_struct.lb_migration_cost = 0.0;
+  adaptive_struct.lb_msg_send_no = 0;
+  adaptive_struct.lb_msg_recv_no = 0;
+  adaptive_struct.total_syncs_called = 0;
 
   prev_idle = 0.0;
   if (lb_in_progress) {
@@ -240,22 +179,22 @@ void MetaBalancer::ResumeClients() {
 }
 
 int MetaBalancer::get_iteration() {
-  return CkpvAccess(adaptive_struct).lb_iteration_no;
+  return adaptive_struct.lb_iteration_no;
 }
 
 bool MetaBalancer::AddLoad(int it_n, double load) {
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
-  CkpvAccess(adaptive_struct).total_syncs_called++;
+  adaptive_struct.total_syncs_called++;
   DEBAD(("At PE %d Total contribution for iteration %d is %d total objs %d\n",
       CkMyPe(), it_n, total_count_vec[index],
       lbdatabase->getLBDB()->ObjDataCount()));
 
-  if (it_n < CkpvAccess(adaptive_struct).lb_iteration_no) {
+  if (it_n < adaptive_struct.lb_iteration_no) {
     CkAbort("Error!! Received load for previous iteration\n");
   }
-  if (it_n > CkpvAccess(adaptive_struct).lb_iteration_no) {
-    CkpvAccess(adaptive_struct).lb_iteration_no = it_n;
+  if (it_n > adaptive_struct.lb_iteration_no) {
+    adaptive_struct.lb_iteration_no = it_n;
   }
   total_load_vec[index] += load;
   if (total_count_vec[index] > lbdatabase->getLBDB()->ObjDataCount()) {
@@ -269,7 +208,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     lbdatabase->IdleTime(&idle_time);
     lbdatabase->BackgroundLoad(&bg_walltime, &cpu_bgtime);
 
-    int sync_for_bg = CkpvAccess(adaptive_struct).total_syncs_called +
+    int sync_for_bg = adaptive_struct.total_syncs_called +
         lbdatabase->getLBDB()->ObjDataCount();
     bg_walltime = bg_walltime * lbdatabase->getLBDB()->ObjDataCount() / sync_for_bg;
 
@@ -280,7 +219,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
 
     // The chares do not contribute their 0th iteration load. So the total syncs
     // in reality is total_syncs_called + obj_counts
-    int total_countable_syncs = CkpvAccess(adaptive_struct).total_syncs_called +
+    int total_countable_syncs = adaptive_struct.total_syncs_called +
         (1 - NEGLECT_IDLE) * lbdatabase->getLBDB()->ObjDataCount(); // TODO: Fix me! weird!
     if (total_countable_syncs != 0) {
       idle_time = idle_time * lbdatabase->getLBDB()->ObjDataCount() / total_countable_syncs;
@@ -328,7 +267,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   delete msg;
 
 #if EXTRA_FEATURE
-  if (CkpvAccess(adaptive_struct).final_lb_period != iteration_n) {
+  if (adaptive_struct.final_lb_period != iteration_n) {
     for (int i = 0; i < lbdb_no_obj_callback.size(); i++) {
       thisProxy[lbdb_no_obj_callback[i]].TriggerAdaptiveReduction();
     }
@@ -336,20 +275,20 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
 #endif
 
   // Store the data for this iteration
-  CkpvAccess(adaptive_lbdb).lb_iter_no = iteration_n;
+  adaptive_lbdb.lb_iter_no = iteration_n;
   AdaptiveData data;
-  data.iteration = CkpvAccess(adaptive_lbdb).lb_iter_no;
+  data.iteration = adaptive_lbdb.lb_iter_no;
   data.max_load = max;
   data.avg_load = avg;
   data.utilization = utilization;
   data.idle_time = avg_idle;
-  CkpvAccess(adaptive_lbdb).history_data.push_back(data);
+  adaptive_lbdb.history_data.push_back(data);
 
   // If lb period inform is in progress, dont inform again.
   // If this is the lb data corresponding to the final lb period informed, then
   // don't recalculate as some of the processors might have already gone into
   // LB_STAGE.
-  if (CkpvAccess(adaptive_struct).in_progress || (CkpvAccess(adaptive_struct).final_lb_period == iteration_n)) {
+  if (adaptive_struct.in_progress || (adaptive_struct.final_lb_period == iteration_n)) {
     return;
   }
 
@@ -378,8 +317,8 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
 
   if (generatePlan(period, ratio_at_t)) {
     DEBAD(("Generated period and calculated %d and period %d max iter %d\n",
-      CkpvAccess(adaptive_struct).lb_calculated_period, period,
-      CkpvAccess(adaptive_struct).tentative_max_iter_no));
+      adaptive_struct.lb_calculated_period, period,
+      adaptive_struct.tentative_max_iter_no));
     // set the imbalance tolerance to be ratio_at_calculated_lb_period
     if (ratio_at_t != 1.0) {
       CkPrintf("Changed tolerance to %lf after line eq whereas max/avg is %lf\n", ratio_at_t, max/avg);
@@ -391,7 +330,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
     CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio);
 
     if ((utilization < utilization_threshold || max/avg >= tolerate_imb) &&
-          CkpvAccess(adaptive_lbdb).history_data.size() > MIN_STATS) {
+          adaptive_lbdb.history_data.size() > MIN_STATS) {
       CkPrintf("Trigger soon even though we calculated lbperiod max/avg(%lf) and utilization ratio (%lf)\n", max/avg, utilization);
       TriggerSoon(iteration_n, max/avg, tolerate_imb);
       return;
@@ -400,15 +339,15 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
     // If the new lb period from linear extrapolation is greater than maximum
     // iteration known from previously collected data, then inform all the
     // processors about the new calculated period.
-    if (period > CkpvAccess(adaptive_struct).tentative_max_iter_no && period !=
-          CkpvAccess(adaptive_struct).final_lb_period) {
-      CkpvAccess(adaptive_struct).doCommStrategy = false;
-      CkpvAccess(adaptive_struct).lb_calculated_period = period;
-      CkpvAccess(adaptive_struct).in_progress = true;
+    if (period > adaptive_struct.tentative_max_iter_no && period !=
+          adaptive_struct.final_lb_period) {
+      adaptive_struct.doCommStrategy = false;
+      adaptive_struct.lb_calculated_period = period;
+      adaptive_struct.in_progress = true;
       CkPrintf("Sticking to the calculated period %d\n",
-        CkpvAccess(adaptive_struct).lb_calculated_period);
-      thisProxy.LoadBalanceDecision(CkpvAccess(adaptive_struct).lb_msg_send_no++,
-        CkpvAccess(adaptive_struct).lb_calculated_period);
+        adaptive_struct.lb_calculated_period);
+      thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++,
+        adaptive_struct.lb_calculated_period);
       return;
     }
     // TODO: Shouldn't we return from here??
@@ -417,7 +356,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio);
 
   // This would be called when the datasize is not enough to calculate lb period
-  if ((utilization < utilization_threshold || max/avg >= tolerate_imb) && CkpvAccess(adaptive_lbdb).history_data.size() > 4) {
+  if ((utilization < utilization_threshold || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
     CkPrintf("Carry out load balancing step at iter max/avg(%lf) and utilization ratio (%lf)\n", max/avg, utilization);
     TriggerSoon(iteration_n, max/avg, tolerate_imb);
     return;
@@ -431,27 +370,27 @@ void MetaBalancer::TriggerSoon(int iteration_n, double imbalance_ratio,
   // If the previously calculated_period (not the final decision) is greater
   // than the iter +1 and if it is greater than the maximum iteration we have
   // seen so far, then we can inform this
-  if ((iteration_n + 1 > CkpvAccess(adaptive_struct).tentative_max_iter_no) &&
-      (iteration_n+1 < CkpvAccess(adaptive_struct).lb_calculated_period) &&
-      (iteration_n + 1 != CkpvAccess(adaptive_struct).final_lb_period)) {
+  if ((iteration_n + 1 > adaptive_struct.tentative_max_iter_no) &&
+      (iteration_n+1 < adaptive_struct.lb_calculated_period) &&
+      (iteration_n + 1 != adaptive_struct.final_lb_period)) {
     if (imbalance_ratio < tolerate_imb) {
-      CkpvAccess(adaptive_struct).doCommStrategy = true;
+      adaptive_struct.doCommStrategy = true;
       CkPrintf("No load imbalance but idle time\n");
     } else {
-      CkpvAccess(adaptive_struct).doCommStrategy = false;
+      adaptive_struct.doCommStrategy = false;
       CkPrintf("load imbalance \n");
     }
-    CkpvAccess(adaptive_struct).lb_calculated_period = iteration_n + 1;
-    CkpvAccess(adaptive_struct).in_progress = true;
+    adaptive_struct.lb_calculated_period = iteration_n + 1;
+    adaptive_struct.in_progress = true;
     CkPrintf("Informing everyone the lb period is %d\n",
-        CkpvAccess(adaptive_struct).lb_calculated_period);
-    thisProxy.LoadBalanceDecision(CkpvAccess(adaptive_struct).lb_msg_send_no++,
-        CkpvAccess(adaptive_struct).lb_calculated_period);
+        adaptive_struct.lb_calculated_period);
+    thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++,
+        adaptive_struct.lb_calculated_period);
   }
 }
 
 bool MetaBalancer::generatePlan(int& period, double& ratio_at_t) {
-  if (CkpvAccess(adaptive_lbdb).history_data.size() <= 4) {
+  if (adaptive_lbdb.history_data.size() <= 4) {
     return false;
   }
 
@@ -461,15 +400,15 @@ bool MetaBalancer::generatePlan(int& period, double& ratio_at_t) {
   double max = 0.0;
   double avg = 0.0;
   AdaptiveData data;
-  for (int i = 0; i < CkpvAccess(adaptive_lbdb).history_data.size(); i++) {
-    data = CkpvAccess(adaptive_lbdb).history_data[i];
+  for (int i = 0; i < adaptive_lbdb.history_data.size(); i++) {
+    data = adaptive_lbdb.history_data[i];
     max += data.max_load;
     avg += data.avg_load;
     //DEBAD(("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load));
     //CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
   }
-//  max /= (adaptive_struct.lb_iteration_no - CkpvAccess(adaptive_lbdb).history_data[0].iteration);
-//  avg /= (adaptive_struct.lb_iteration_no - CkpvAccess(adaptive_lbdb).history_data[0].iteration);
+//  max /= (adaptive_struct.lb_iteration_no - adaptive_lbdb.history_data[0].iteration);
+//  avg /= (adaptive_struct.lb_iteration_no - adaptive_lbdb.history_data[0].iteration);
 
   // If linearly varying load, then find lb_period
   // area between the max and avg curve
@@ -512,20 +451,20 @@ bool MetaBalancer::generatePlan(int& period, double& ratio_at_t) {
 
   max = 0.0;
   avg = 0.0;
-  for (int i = 0; i < CkpvAccess(adaptive_lbdb).history_data.size(); i++) {
-    data = CkpvAccess(adaptive_lbdb).history_data[i];
+  for (int i = 0; i < adaptive_lbdb.history_data.size(); i++) {
+    data = adaptive_lbdb.history_data[i];
     max += data.max_load;
     avg += data.avg_load*tolerate_imb;
     //DEBAD(("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load));
     //CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
   }
-  max /= CkpvAccess(adaptive_lbdb).history_data.size();
-  avg /= CkpvAccess(adaptive_lbdb).history_data.size();
-  double cost = CkpvAccess(adaptive_struct).lb_strategy_cost + CkpvAccess(adaptive_struct).lb_migration_cost;
+  max /= adaptive_lbdb.history_data.size();
+  avg /= adaptive_lbdb.history_data.size();
+  double cost = adaptive_struct.lb_strategy_cost + adaptive_struct.lb_migration_cost;
   period = cost/(max - avg); 
   CkPrintf("Obtained period %d from constant prediction\n", period);
   if (period < 0) { 
-    period = CkpvAccess(adaptive_struct).final_lb_period;
+    period = adaptive_struct.final_lb_period;
     CkPrintf("Obtained -ve period from constant prediction so changing to prev %d\n", period);
   } 
   ratio_at_t = max / avg;
@@ -540,8 +479,8 @@ bool MetaBalancer::getPeriodForStrategy(double new_load_percent,
   CkPrintf("\n max: %fx + %f; avg: %fx + %f\n", mslope, mc, aslope, ac);
   double a = (mslope - aslope)/2;
   double b = (mc - ac);
-  double c = -(CkpvAccess(adaptive_struct).lb_strategy_cost +
-      CkpvAccess(adaptive_struct).lb_migration_cost) * overhead_percent;
+  double c = -(adaptive_struct.lb_strategy_cost +
+      adaptive_struct.lb_migration_cost) * overhead_percent;
   bool got_period = getPeriodForLinear(a, b, c, period);
   if (!got_period) {
     return false;
@@ -601,9 +540,9 @@ bool MetaBalancer::getPeriodForLinear(double a, double b, double c, int& period)
 }
 
 bool MetaBalancer::getLineEq(double new_load_percent, double& aslope, double& ac, double& mslope, double& mc) {
-  int total = CkpvAccess(adaptive_lbdb).history_data.size();
-  int iterations = 1 + CkpvAccess(adaptive_lbdb).history_data[total - 1].iteration -
-      CkpvAccess(adaptive_lbdb).history_data[0].iteration;
+  int total = adaptive_lbdb.history_data.size();
+  int iterations = 1 + adaptive_lbdb.history_data[total - 1].iteration -
+      adaptive_lbdb.history_data[0].iteration;
   double a1 = 0;
   double m1 = 0;
   double a2 = 0;
@@ -611,7 +550,7 @@ bool MetaBalancer::getLineEq(double new_load_percent, double& aslope, double& ac
   AdaptiveData data;
   int i = 0;
   for (i = 0; i < total/2; i++) {
-    data = CkpvAccess(adaptive_lbdb).history_data[i];
+    data = adaptive_lbdb.history_data[i];
     m1 += data.max_load;
     a1 += data.avg_load;
     CkPrintf("max (%d, %lf) avg (%d, %lf) adjusted_avg (%d, %lf)\n", i, data.max_load, i, data.avg_load, i, new_load_percent*data.avg_load);
@@ -620,7 +559,7 @@ bool MetaBalancer::getLineEq(double new_load_percent, double& aslope, double& ac
   a1 = (a1 * new_load_percent) / i;
 
   for (i = total/2; i < total; i++) {
-    data = CkpvAccess(adaptive_lbdb).history_data[i];
+    data = adaptive_lbdb.history_data[i];
     m2 += data.max_load;
     a2 += data.avg_load;
     CkPrintf("max (%d, %lf) avg (%d, %lf) adjusted_avg (%d, %lf)\n", i, data.max_load, i, data.avg_load, i, new_load_percent*data.avg_load);
@@ -630,36 +569,36 @@ bool MetaBalancer::getLineEq(double new_load_percent, double& aslope, double& ac
 
   aslope = 2 * (a2 - a1) / iterations;
   mslope = 2 * (m2 - m1) / iterations;
-  ac = CkpvAccess(adaptive_lbdb).history_data[0].avg_load * new_load_percent;
-  mc = CkpvAccess(adaptive_lbdb).history_data[0].max_load;
+  ac = adaptive_lbdb.history_data[0].avg_load * new_load_percent;
+  mc = adaptive_lbdb.history_data[0].max_load;
 
   ac = a1 - ((aslope * total)/4);
   mc = m1 - ((mslope * total)/4);
 
-  //ac = (CkpvAccess(adaptive_lbdb).history_data[1].avg_load * new_load_percent - aslope);
-  //mc = (CkpvAccess(adaptive_lbdb).history_data[1].max_load - mslope);
+  //ac = (adaptive_lbdb.history_data[1].avg_load * new_load_percent - aslope);
+  //mc = (adaptive_lbdb.history_data[1].max_load - mslope);
 
   return true;
 }
 
 void MetaBalancer::LoadBalanceDecision(int req_no, int period) {
-  if (req_no < CkpvAccess(adaptive_struct).lb_msg_recv_no) {
+  if (req_no < adaptive_struct.lb_msg_recv_no) {
     CkPrintf("Error!!! Received a request which was already sent or old\n");
     return;
   }
-  CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d\n",CkMyPe(), CkpvAccess(adaptive_struct).lb_iteration_no, period);
-  CkpvAccess(adaptive_struct).tentative_period = period;
-  CkpvAccess(adaptive_struct).lb_msg_recv_no = req_no;
-  thisProxy[0].ReceiveIterationNo(req_no, CkpvAccess(adaptive_struct).lb_iteration_no);
+  CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d\n",CkMyPe(), adaptive_struct.lb_iteration_no, period);
+  adaptive_struct.tentative_period = period;
+  adaptive_struct.lb_msg_recv_no = req_no;
+  thisProxy[0].ReceiveIterationNo(req_no, adaptive_struct.lb_iteration_no);
 }
 
 void MetaBalancer::LoadBalanceDecisionFinal(int req_no, int period) {
-  if (req_no < CkpvAccess(adaptive_struct).lb_msg_recv_no) {
+  if (req_no < adaptive_struct.lb_msg_recv_no) {
     return;
   }
-  DEBAD(("[%d] Final Load balance decision made cur iteration: %d period:%d \n",CkMyPe(), CkpvAccess(adaptive_struct).lb_iteration_no, period));
-  CkpvAccess(adaptive_struct).tentative_period = period;
-  CkpvAccess(adaptive_struct).final_lb_period = period;
+  DEBAD(("[%d] Final Load balance decision made cur iteration: %d period:%d \n",CkMyPe(), adaptive_struct.lb_iteration_no, period));
+  adaptive_struct.tentative_period = period;
+  adaptive_struct.final_lb_period = period;
   // NOTE LDOMAdaptResumeSync(myLDHandle, period);
   lbdatabase->AdaptResumeSync(period);
 }
@@ -668,30 +607,30 @@ void MetaBalancer::LoadBalanceDecisionFinal(int req_no, int period) {
 void MetaBalancer::ReceiveIterationNo(int req_no, int local_iter_no) {
   CmiAssert(CkMyPe() == 0);
 
-  CkpvAccess(adaptive_struct).global_recv_iter_counter++;
-  if (local_iter_no > CkpvAccess(adaptive_struct).global_max_iter_no) {
-    CkpvAccess(adaptive_struct).global_max_iter_no = local_iter_no;
+  adaptive_struct.global_recv_iter_counter++;
+  if (local_iter_no > adaptive_struct.global_max_iter_no) {
+    adaptive_struct.global_max_iter_no = local_iter_no;
   }
 
   int period;
-  if (CkNumPes() == CkpvAccess(adaptive_struct).global_recv_iter_counter) {
+  if (CkNumPes() == adaptive_struct.global_recv_iter_counter) {
 
-    if (CkpvAccess(adaptive_struct).global_max_iter_no > CkpvAccess(adaptive_struct).tentative_max_iter_no) {
-      CkpvAccess(adaptive_struct).tentative_max_iter_no = CkpvAccess(adaptive_struct).global_max_iter_no;
+    if (adaptive_struct.global_max_iter_no > adaptive_struct.tentative_max_iter_no) {
+      adaptive_struct.tentative_max_iter_no = adaptive_struct.global_max_iter_no;
     }
-    period = (CkpvAccess(adaptive_struct).tentative_period > CkpvAccess(adaptive_struct).global_max_iter_no) ? CkpvAccess(adaptive_struct).tentative_period : CkpvAccess(adaptive_struct).global_max_iter_no + 1;
+    period = (adaptive_struct.tentative_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.tentative_period : adaptive_struct.global_max_iter_no + 1;
     // If no one has gone into load balancing stage, then we can safely change
     // the period otherwise keep the old period.
-    if (CkpvAccess(adaptive_struct).global_max_iter_no < CkpvAccess(adaptive_struct).final_lb_period) {
-      CkpvAccess(adaptive_struct).tentative_period = period;
-      CkPrintf("Final lb_period CHANGED!%d\n", CkpvAccess(adaptive_struct).tentative_period);
+    if (adaptive_struct.global_max_iter_no < adaptive_struct.final_lb_period) {
+      adaptive_struct.tentative_period = period;
+      CkPrintf("Final lb_period CHANGED!%d\n", adaptive_struct.tentative_period);
     } else {
-      CkpvAccess(adaptive_struct).tentative_period = CkpvAccess(adaptive_struct).final_lb_period;
-      CkPrintf("Final lb_period NOT CHANGED!%d\n", CkpvAccess(adaptive_struct).tentative_period);
+      adaptive_struct.tentative_period = adaptive_struct.final_lb_period;
+      CkPrintf("Final lb_period NOT CHANGED!%d\n", adaptive_struct.tentative_period);
     }
-    thisProxy.LoadBalanceDecisionFinal(req_no, CkpvAccess(adaptive_struct).tentative_period);
-    CkpvAccess(adaptive_struct).in_progress = false;
-    CkpvAccess(adaptive_struct).global_recv_iter_counter = 0;
+    thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.tentative_period);
+    adaptive_struct.in_progress = false;
+    adaptive_struct.global_recv_iter_counter = 0;
   }
 }
 
@@ -699,28 +638,28 @@ int MetaBalancer::getPredictedLBPeriod(bool& is_tentative) {
   // If tentative and final_lb_period are the same, then the decision has been
   // made but if not, they are in the middle of consensus, hence return the
   // lease of the two
-  if (CkpvAccess(adaptive_struct).tentative_period != CkpvAccess(adaptive_struct).final_lb_period) {
+  if (adaptive_struct.tentative_period != adaptive_struct.final_lb_period) {
     is_tentative = true;
   } else {
     is_tentative = false;
   }
-  if (CkpvAccess(adaptive_struct).tentative_period < CkpvAccess(adaptive_struct).final_lb_period) {
-    return CkpvAccess(adaptive_struct).tentative_period;
+  if (adaptive_struct.tentative_period < adaptive_struct.final_lb_period) {
+    return adaptive_struct.tentative_period;
    } else {
-     return CkpvAccess(adaptive_struct).final_lb_period;
+     return adaptive_struct.final_lb_period;
    }
 }
 
 // Called by CentralLB to indicate that the LB strategy and migration is in
 // progress.
 void MetaBalancer::ResetAdaptive() {
-  CkpvAccess(adaptive_lbdb).lb_iter_no = -1;
+  adaptive_lbdb.lb_iter_no = -1;
   lb_in_progress = true;
 }
 
 void MetaBalancer::HandleAdaptiveNoObj() {
 #if EXTRA_FEATURE
-  CkpvAccess(adaptive_struct).lb_iteration_no++;
+  adaptive_struct.lb_iteration_no++;
   //CkPrintf("HandleAdaptiveNoObj %d\n", adaptive_struct.lb_iteration_no);
   thisProxy[0].RegisterNoObjCallback(CkMyPe());
   TriggerAdaptiveReduction();
@@ -739,7 +678,7 @@ void MetaBalancer::RegisterNoObjCallback(int index) {
 
   // If collection has already happened and this is second iteration, then
   // trigger reduction.
-  if (CkpvAccess(adaptive_lbdb).lb_iter_no != -1) {
+  if (adaptive_lbdb.lb_iter_no != -1) {
     //CkPrintf("Collection already started now %d so kick in\n", adaptive_struct.lb_iteration_no);
     thisProxy[index].TriggerAdaptiveReduction();
   }
@@ -748,10 +687,10 @@ void MetaBalancer::RegisterNoObjCallback(int index) {
 
 void MetaBalancer::TriggerAdaptiveReduction() {
 #if EXTRA_FEATURE
-  CkpvAccess(adaptive_struct).lb_iteration_no++;
-  //CkPrintf("Trigger adaptive for %d\n", CkpvAccess(adaptive_struct).lb_iteration_no);
+  adaptive_struct.lb_iteration_no++;
+  //CkPrintf("Trigger adaptive for %d\n", adaptive_struct.lb_iteration_no);
   double lb_data[8];
-  lb_data[0] = CkpvAccess(adaptive_struct).lb_iteration_no;
+  lb_data[0] = adaptive_struct.lb_iteration_no;
   lb_data[1] = 1;
   lb_data[2] = 0.0;
   lb_data[3] = 0.0;
@@ -771,47 +710,47 @@ void MetaBalancer::TriggerAdaptiveReduction() {
 
 
 bool MetaBalancer::isStrategyComm() {
-  return CkpvAccess(adaptive_struct).doCommStrategy;
+  return adaptive_struct.doCommStrategy;
 }
 
 void MetaBalancer::SetMigrationCost(double lb_migration_cost) {
-  CkpvAccess(adaptive_struct).lb_migration_cost = lb_migration_cost;
+  adaptive_struct.lb_migration_cost = lb_migration_cost;
 }
 
 void MetaBalancer::SetStrategyCost(double lb_strategy_cost) {
-  CkpvAccess(adaptive_struct).lb_strategy_cost = lb_strategy_cost;
+  adaptive_struct.lb_strategy_cost = lb_strategy_cost;
 }
 
 void MetaBalancer::UpdateAfterLBData(int lb, double lb_max, double lb_avg, double
     local_comm, double remote_comm) {
-  CkpvAccess(adaptive_struct).last_lb_type = lb;
+  adaptive_struct.last_lb_type = lb;
   if (lb == 0) {
-    CkpvAccess(adaptive_struct).greedy_info.max_avg_ratio = lb_max/lb_avg;
+    adaptive_struct.greedy_info.max_avg_ratio = lb_max/lb_avg;
   } else if (lb == 1) {
-    CkpvAccess(adaptive_struct).refine_info.max_avg_ratio = lb_max/lb_avg;
+    adaptive_struct.refine_info.max_avg_ratio = lb_max/lb_avg;
   } else if (lb == 2) {
-    CkpvAccess(adaptive_struct).comm_info.remote_local_ratio = remote_comm/local_comm;
+    adaptive_struct.comm_info.remote_local_ratio = remote_comm/local_comm;
   } else if (lb == 3) {
-    CkpvAccess(adaptive_struct).comm_refine_info.remote_local_ratio =
+    adaptive_struct.comm_refine_info.remote_local_ratio =
     remote_comm/local_comm;
   }
 }
 
 void MetaBalancer::UpdateAfterLBData(double max_load, double max_cpu, double
 avg_load) {
-  if (CkpvAccess(adaptive_struct).last_lb_type == -1) {
-    CkpvAccess(adaptive_struct).last_lb_type = 0;
+  if (adaptive_struct.last_lb_type == -1) {
+    adaptive_struct.last_lb_type = 0;
   }
-  int lb = CkpvAccess(adaptive_struct).last_lb_type;
+  int lb = adaptive_struct.last_lb_type;
   //CkPrintf("Storing data after lb ratio %lf for lb %d\n", max_load/avg_load, lb);
   if (lb == 0) {
-    CkpvAccess(adaptive_struct).greedy_info.max_avg_ratio = max_load/avg_load;
+    adaptive_struct.greedy_info.max_avg_ratio = max_load/avg_load;
   } else if (lb == 1) {
-    CkpvAccess(adaptive_struct).refine_info.max_avg_ratio = max_load/avg_load;
+    adaptive_struct.refine_info.max_avg_ratio = max_load/avg_load;
   } else if (lb == 2) {
-    CkpvAccess(adaptive_struct).comm_info.max_avg_ratio = max_load/avg_load;
+    adaptive_struct.comm_info.max_avg_ratio = max_load/avg_load;
   } else if (lb == 3) {
-    CkpvAccess(adaptive_struct).comm_refine_info.max_avg_ratio = max_load/avg_load;
+    adaptive_struct.comm_refine_info.max_avg_ratio = max_load/avg_load;
   }
 }
 
@@ -823,7 +762,7 @@ void MetaBalancer::UpdateAfterLBComm(double alpha_beta_to_load) {
 
 void MetaBalancer::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio, double&
     remote_local_comm_ratio) {
-  lb_type = CkpvAccess(adaptive_struct).last_lb_type;
+  lb_type = adaptive_struct.last_lb_type;
   lb_max_avg_ratio = 1;
   remote_local_comm_ratio = 1;
   GetLBDataForLB(lb_type, lb_max_avg_ratio, remote_local_comm_ratio);
@@ -832,14 +771,14 @@ void MetaBalancer::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio, double&
 void MetaBalancer::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio, double&
     remote_local_comm_ratio) {
   if (lb_type == 0) {
-    lb_max_avg_ratio = CkpvAccess(adaptive_struct).greedy_info.max_avg_ratio;
+    lb_max_avg_ratio = adaptive_struct.greedy_info.max_avg_ratio;
   } else if (lb_type == 1) {
-    lb_max_avg_ratio = CkpvAccess(adaptive_struct).refine_info.max_avg_ratio;
+    lb_max_avg_ratio = adaptive_struct.refine_info.max_avg_ratio;
   } else if (lb_type == 2) {
-    remote_local_comm_ratio = CkpvAccess(adaptive_struct).comm_info.remote_local_ratio;
+    remote_local_comm_ratio = adaptive_struct.comm_info.remote_local_ratio;
   } else if (lb_type == 3) {
     remote_local_comm_ratio =
-       CkpvAccess(adaptive_struct).comm_refine_info.remote_local_ratio;
+       adaptive_struct.comm_refine_info.remote_local_ratio;
   }
 }
 

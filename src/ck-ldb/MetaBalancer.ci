@@ -1,14 +1,11 @@
 module MetaBalancer {
-  //extern module CkMarshall;
-  //extern module NullLB;
-
   readonly CkGroupID _metalb;
 
   mainchare MetaLBInit {
     entry MetaLBInit(CkArgMsg *m);
   };
 
-  initcall void registerLBDataCollection(void);
+  initproc void registerLBDataCollection(void);
   group [migratable] MetaBalancer {
     entry void MetaBalancer(void);  
     initnode void initnodeFn();
