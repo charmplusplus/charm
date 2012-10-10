@@ -541,7 +541,8 @@ Module::generate()
   declstr <<
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
-  "#include \"charm++.h\"\n";
+  "#include \"charm++.h\"\n"
+  "#include <memory>\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
   declstr << "extern void _register"<<name<<"(void);\n";
@@ -4443,10 +4444,6 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
     }
     else {//Normal case: unmarshall parameters (or just pass message)
         str<<"("; param->unmarshall(str); str<<");\n";
-    }
-
-    if (isConstructor() && container->hasSdag()) {
-      str << "  impl_obj->_sdag_init();\n";
     }
   }
 }
