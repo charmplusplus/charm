@@ -160,7 +160,10 @@ void CParsedFile::generatePupFunction(XStr& decls)
 {
   decls << "public:\n";
   decls << "  void __sdag_pup(PUP::er& p) {\n";
-  decls << "    if (__cDep.get()) { __cDep->pup(p); }\n";
+  decls << "    bool hasSDAG = __cDep.get();\n";
+  decls << "    p|hasSDAG;\n";
+  decls << "    if (p.isUnpacking() && hasSDAG) _sdag_init();\n";
+  decls << "    if (hasSDAG) { __cDep->pup(p); }\n";
   decls << "  }\n";
 }
 
