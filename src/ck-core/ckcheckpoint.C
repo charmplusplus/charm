@@ -165,7 +165,8 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
 	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),0,thisgroup);
-	contribute(0,NULL,CkReduction::sum_int,localcb);
+	//contribute(0,NULL,CkReduction::sum_int,localcb);
+	barrier(localcb);
 }
 
 void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){ 
