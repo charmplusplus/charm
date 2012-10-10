@@ -21,7 +21,7 @@ class CParsedFile {
     void generateEntries(XStr& decls, XStr& defs);
     void generateConnectEntries(XStr& output);
     void generateInitFunction(XStr& decls, XStr& defs);
-    void generatePupFunction(XStr& output);
+    void generatePupFunction(XStr& decls, XStr& defs);
     void generateTraceEp(XStr& decls, XStr& defs);
     void generateRegisterEp(XStr& decls, XStr& defs);
     void generateDependencyMergePoints(XStr& output);

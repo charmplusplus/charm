@@ -61,7 +61,7 @@ void CParsedFile::doProcess(XStr& classname, XStr& decls, XStr& defs) {
   generateCode(decls, defs);
   generateEntries(decls, defs);
   generateInitFunction(decls, defs);
-  generatePupFunction(decls);
+  generatePupFunction(decls, defs);
   generateRegisterEp(decls, defs);
   generateTraceEp(decls, defs);
 
@@ -156,15 +156,21 @@ void CParsedFile::generateDependencyMergePoints(XStr& decls)
   }
 }
 
-void CParsedFile::generatePupFunction(XStr& decls)
+void CParsedFile::generatePupFunction(XStr& decls, XStr& defs)
 {
   decls << "public:\n";
-  decls << "  void __sdag_pup(PUP::er& p) {\n";
-  decls << "    bool hasSDAG = __cDep.get();\n";
-  decls << "    p|hasSDAG;\n";
-  decls << "    if (p.isUnpacking() && hasSDAG) _sdag_init();\n";
-  decls << "    if (hasSDAG) { __cDep->pup(p); }\n";
-  decls << "  }\n";
+  XStr signature = "__sdag_pup(PUP::er &p)";
+  decls << "  void " << signature << ";\n";
+
+  templateGuardBegin(false, defs);
+  defs << container->tspec()
+       << "void " << container->baseName() << "::" << signature << " {\n"
+       << "    bool hasSDAG = __cDep.get();\n"
+       << "    p|hasSDAG;\n"
+       << "    if (p.isUnpacking() && hasSDAG) _sdag_init();\n"
+       << "    if (hasSDAG) { __cDep->pup(p); }\n"
+       << "}\n";
+  templateGuardEnd(defs);
 }
 
 void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
