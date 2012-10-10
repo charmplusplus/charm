@@ -97,6 +97,8 @@ const PUP::machineInfo &PUP::machineInfo::current(void)
 		m->intBytes[3]=sizeof(long);
 #if CMK___int128_DEFINED
 		m->intBytes[4]=sizeof(__int128);
+#else
+		m->intBytes[4]=0;
 #endif
 		m->intFormat=getIntFormat();
 		m->floatBytes=sizeof(float);
@@ -104,7 +106,7 @@ const PUP::machineInfo &PUP::machineInfo::current(void)
 		m->floatFormat=getFloatFormat();
 		m->boolBytes=sizeof(CmiBool);
 		m->pointerBytes=sizeof(void*);
-		//m->padding[0]=0;
+		//m->padding[0]=0;    // version 1 does not have padding field
 	}
 	return *m;
 }
