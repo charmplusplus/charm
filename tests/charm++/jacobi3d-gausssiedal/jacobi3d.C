@@ -36,6 +36,7 @@
 #include <omp.h>
 #endif
 
+#define THRESHOLD 0.01
 // See README for documentation
 
 /*readonly*/ CProxy_Main mainProxy;
@@ -119,16 +120,16 @@ class Main : public CBase_Main {
       mainProxy = thisProxy;
 	
       if(m->argc == 3) {
-	arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
-        blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]); 
+          arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
+          blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]); 
       }
       else if (m->argc == 7) {
-        arrayDimX = atoi(m->argv[1]);
-	arrayDimY = atoi(m->argv[2]);
-	arrayDimZ = atoi(m->argv[3]);
-        blockDimX = atoi(m->argv[4]); 
-	blockDimY = atoi(m->argv[5]); 
-	blockDimZ = atoi(m->argv[6]);
+          arrayDimX = atoi(m->argv[1]);
+          arrayDimY = atoi(m->argv[2]);
+          arrayDimZ = atoi(m->argv[3]);
+          blockDimX = atoi(m->argv[4]); 
+          blockDimY = atoi(m->argv[5]); 
+          blockDimZ = atoi(m->argv[6]);
       }
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
@@ -197,6 +198,22 @@ class Main : public CBase_Main {
       array.doStep();
     }
 
+    void converge(double maxDiff)
+    {
+        iterations++;
+        if(maxDiff <= THRESHOLD)
+        {
+            CkPrintf("Completed %d iterations with diff %lf\n", iterations, maxDiff);
+            endTime = CmiWallTimer();
+            CkPrintf("Time elapsed per iteration: %lf  total time:%lf\n", (endTime - startTime)/(MAX_ITER-1-WARM_ITER), endTime - startTime);
+            CkExit();
+        }else
+        {
+            if(iterations % PRINT_FREQ== 0)
+                CkPrintf("iteration %d  diff=%f\n", iterations, maxDiff); 
+			array.doStep();
+        }
+    }
     // Each worker reports back to here when it completes an iteration
 	void report() {
         iterations += CKP_FREQ;
@@ -230,7 +247,7 @@ class Jacobi: public CBase_Jacobi {
 
     double *temperature;
 	double timing,average;
-
+    int neighbors;
     // Constructor, initialize values
     Jacobi() {
       // This call is an anachronism - the need to call __sdag_init() has been
@@ -251,10 +268,24 @@ class Jacobi: public CBase_Jacobi {
 
       iterations = 0;
       imsg = 0;
-      constrainBC();
+      if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z ==0)
+          constrainBC();
 
       usesAtSync = CmiTrue;
-
+      neighbors = 6;
+      if(thisIndex.x == 0) 
+          neighbors--;
+      if( thisIndex.x== num_chare_x-1)
+          neighbors--;
+      if(thisIndex.y == 0) 
+          neighbors--;
+      if( thisIndex.y== num_chare_y-1)
+          neighbors--;
+      if(thisIndex.z == 0) 
+          neighbors--;
+      if( thisIndex.z== num_chare_z-1)
+          neighbors--;
+       // CkPrintf("neighbor = %d \n", neighbors);
     }
 
     Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) { }
@@ -290,6 +321,7 @@ class Jacobi: public CBase_Jacobi {
 
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
+        /*  
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
 //          CkPrintf("Start of iteration %d\n", iterations);
 			if(iterations % PRINT_FREQ == 0){
@@ -298,60 +330,99 @@ class Jacobi: public CBase_Jacobi {
 				average = (timing - average)/(double)PRINT_FREQ;
 				CkPrintf("time=%.2f it=%d avg=%.4f\n",timing,iterations,average);
 			}
-      }
+      }*/
       iterations++;
 
       // Copy different faces into messages
-      ghostMsg *leftMsg = new (blockDimY*blockDimZ) ghostMsg(RIGHT, blockDimY, blockDimZ);
-      ghostMsg *rightMsg = new (blockDimY*blockDimZ) ghostMsg(LEFT, blockDimY, blockDimZ);
-      ghostMsg *topMsg = new (blockDimX*blockDimZ) ghostMsg(BOTTOM, blockDimX, blockDimZ);
-      ghostMsg *bottomMsg = new (blockDimX*blockDimZ) ghostMsg(TOP, blockDimX, blockDimZ);
-      ghostMsg *frontMsg = new (blockDimX*blockDimY) ghostMsg(BACK, blockDimX, blockDimY);
-      ghostMsg *backMsg = new (blockDimX*blockDimY) ghostMsg(FRONT, blockDimX, blockDimY);
+       ghostMsg *leftMsg ;
+       ghostMsg *rightMsg; 
+       ghostMsg *topMsg ;
+       ghostMsg *bottomMsg;
+       ghostMsg *frontMsg ;
+       ghostMsg *backMsg ;
+     
+       
+      if(thisIndex.x-1 >= 0)
+      {
+          leftMsg = new (blockDimY*blockDimZ) ghostMsg(RIGHT, blockDimY, blockDimZ);
+          for(int j=0; j<blockDimY; ++j) 
+              for(int k=0; k<blockDimZ; ++k) {
+                  leftMsg->gh[k*blockDimY+j] = temperature[index(1, j+1, k+1)];
+              }
+          CkSetRefNum(leftMsg, iterations);
+          thisProxy(wrap_x(thisIndex.x-1), thisIndex.y, thisIndex.z).receiveGhosts(leftMsg);
+      }
 
-      CkSetRefNum(leftMsg, iterations);
-      CkSetRefNum(rightMsg, iterations);
-      CkSetRefNum(topMsg, iterations);
-      CkSetRefNum(bottomMsg, iterations);
-      CkSetRefNum(frontMsg, iterations);
-      CkSetRefNum(backMsg, iterations);
+      if(thisIndex.x+1 <num_chare_x) 
+      {
+          rightMsg = new (blockDimY*blockDimZ) ghostMsg(LEFT, blockDimY, blockDimZ);
+          for(int j=0; j<blockDimY; ++j) 
+              for(int k=0; k<blockDimZ; ++k) {
+                  rightMsg->gh[k*blockDimY+j] = temperature[index(blockDimX, j+1, k+1)];}
+          CkSetRefNum(rightMsg, iterations);
+          thisProxy(wrap_x(thisIndex.x+1), thisIndex.y, thisIndex.z).receiveGhosts(rightMsg);
+      }
 
-      for(int j=0; j<blockDimY; ++j) 
+      if(thisIndex.y-1 >= 0)
+      {
+          topMsg = new (blockDimX*blockDimZ) ghostMsg(BOTTOM, blockDimX, blockDimZ);
+          for(int i=0; i<blockDimX; ++i) 
+              for(int k=0; k<blockDimZ; ++k) {
+                  topMsg->gh[k*blockDimX+i] = temperature[index(i+1, 1, k+1)];
+              }
+
+          CkSetRefNum(topMsg, iterations);
+          thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z).receiveGhosts(topMsg);
+      }
+
+      if(thisIndex.y+1 <num_chare_y)
+      {
+          bottomMsg = new (blockDimX*blockDimZ) ghostMsg(TOP, blockDimX, blockDimZ);
+          for(int i=0; i<blockDimX; ++i) 
           for(int k=0; k<blockDimZ; ++k) {
-              leftMsg->gh[k*blockDimY+j] = temperature[index(1, j+1, k+1)];
-              rightMsg->gh[k*blockDimY+j] = temperature[index(blockDimX, j+1, k+1)];
-          }
-
-      for(int i=0; i<blockDimX; ++i) 
-          for(int k=0; k<blockDimZ; ++k) {
-              topMsg->gh[k*blockDimX+i] = temperature[index(i+1, 1, k+1)];
               bottomMsg->gh[k*blockDimX+i] = temperature[index(i+1, blockDimY, k+1)];
           }
+          CkSetRefNum(bottomMsg, iterations);
+          thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z).receiveGhosts(bottomMsg);
+      }
 
-      for(int i=0; i<blockDimX; ++i) 
-          for(int j=0; j<blockDimY; ++j) {
-              frontMsg->gh[j*blockDimX+i] = temperature[index(i+1, j+1, 1)];
-              backMsg->gh[j*blockDimX+i] = temperature[index(i+1, j+1, blockDimZ)];
-          }
+      if(thisIndex.z-1 >= 0)
+      {
+          frontMsg = new (blockDimX*blockDimY) ghostMsg(BACK, blockDimX, blockDimY);
+          for(int i=0; i<blockDimX; ++i) 
+              for(int j=0; j<blockDimY; ++j) {
+                  frontMsg->gh[j*blockDimX+i] = temperature[index(i+1, j+1, 1)];
+              }
+          CkSetRefNum(frontMsg, iterations);
+          thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1)).receiveGhosts(frontMsg);
+      }
+      
+      if(thisIndex.z+1 <num_chare_z)
+      {
+          backMsg = new (blockDimX*blockDimY) ghostMsg(FRONT, blockDimX, blockDimY);
+          for(int i=0; i<blockDimX; ++i) 
+              for(int j=0; j<blockDimY; ++j) {
+                  backMsg->gh[j*blockDimX+i] = temperature[index(i+1, j+1, blockDimZ)];
+              }
+          CkSetRefNum(backMsg, iterations);
+          thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1)).receiveGhosts(backMsg);
+      }
 
-      // Send my left face
-       thisProxy(wrap_x(thisIndex.x-1), thisIndex.y, thisIndex.z).receiveGhosts(leftMsg);
-      // Send my right face
-      thisProxy(wrap_x(thisIndex.x+1), thisIndex.y, thisIndex.z).receiveGhosts(rightMsg);
-      // Send my top face
-      thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z).receiveGhosts(topMsg);
-      // Send my bottom face
-      thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z).receiveGhosts(bottomMsg);
-      // Send my front face
-      thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1)).receiveGhosts(frontMsg);
-      // Send my back face
-      thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1)).receiveGhosts(backMsg);
+
+
     }
 
     void processGhosts(ghostMsg *gmsg) {
       int height = gmsg->height;
       int width = gmsg->width;
 
+      /*CkPrintf("[%d,%d,%d] received %d msg from %d ", thisIndex.x, thisIndex.y, thisIndex.z, height*width, gmsg->dir);
+      for(int j=0; j<height; ++j) 
+          for(int k=0; k<width; ++k) {
+          CkPrintf(" %f ", gmsg->gh[k*height+j]);
+          }
+      CkPrintf("\n\n");
+      */
       switch(gmsg->dir) {
       case LEFT:
           for(int j=0; j<height; ++j) 
@@ -380,13 +451,13 @@ class Jacobi: public CBase_Jacobi {
       case FRONT:
           for(int i=0; i<height; ++i) 
               for(int j=0; j<width; ++j) {
-                  temperature[index(i+1, j+1, blockDimZ+1)] = gmsg->gh[j*height+i];
+                  temperature[index(i+1, j+1,0)] = gmsg->gh[j*height+i];
               }
           break;
       case BACK:
           for(int i=0; i<height; ++i) 
               for(int j=0; j<width; ++j) {
-                  temperature[index(i+1, j+1, 0)] = gmsg->gh[j*height+i];
+                  temperature[index(i+1, j+1, blockDimZ+1)] = gmsg->gh[j*height+i];
               }
           break;
       default:
@@ -398,13 +469,13 @@ class Jacobi: public CBase_Jacobi {
 
 
 	void check_and_compute() {
-		compute_kernel();
+		double maxDiff = compute_kernel();
 
 		// calculate error
 		// not being done right now since we are doing a fixed no. of iterations
 
-		constrainBC();
-
+		//constrainBC();
+        //CkPrintf("[%d,%d,%d] max = %f\n", thisIndex.x, thisIndex.y, thisIndex.z, maxDiff);
 		if (iterations % CKP_FREQ == 0 || iterations > MAX_ITER){
 #ifdef CMK_MEM_CHECKPOINT
 			contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
@@ -414,10 +485,13 @@ class Jacobi: public CBase_Jacobi {
 			else
 				AtSync();
 #else
-            contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+            CkCallback cb(CkReductionTarget(Main, converge), mainProxy);
+            contribute(sizeof(double), &maxDiff, CkReduction::max_double, cb);
 #endif
         } else {
-			doStep();
+            CkCallback cb(CkReductionTarget(Main, converge), mainProxy);
+            contribute(sizeof(double), &maxDiff, CkReduction::max_double, cb);
+			//doStep();
         }
     }
 
@@ -428,38 +502,76 @@ class Jacobi: public CBase_Jacobi {
 
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
-    void compute_kernel() {     //Gauss-Siedal compute
+    double compute_kernel() {     //Gauss-Siedal compute
         int i;
+        double maxDiff=0;
+        double tmp, update=0;
+        int count=1;
   #pragma omp parallel for schedule(dynamic) 
         for(i=1; i<blockDimX+1; ++i) {
           //printf("[%d] did  %d iteration out of %d \n", omp_get_thread_num(), i, blockDimX+1); 
           for(int j=1; j<blockDimY+1; ++j) {
               for(int k=1; k<blockDimZ+1; ++k) {
-                  // update my value based on the surrounding values
-                   temperature[index(i, j, k)] = (temperature[index(i-1, j, k)] 
-					    +  temperature[index(i+1, j, k)]
-					    +  temperature[index(i, j-1, k)]
-					    +  temperature[index(i, j+1, k)]
-					    +  temperature[index(i, j, k-1)]
-					    +  temperature[index(i, j, k+1)]
-					    +  temperature[index(i, j, k)] ) * DIVIDEBY7;
+                  update = temperature[index(i, j, k)];
+                  count = 1;
+                  //CkPrintf("{%f, ", update);
+                  if(!(thisIndex.x+1>=num_chare_x&&i==blockDimX))
+                  {
+                      update += temperature[index(i+1, j, k)];
+                      count++;
+                  }
+                  if(!(thisIndex.x-1<0&&i==1))
+                  {
+                      update += temperature[index(i-1, j, k)];
+                      count++;
+                  }
+                  if(!(thisIndex.y+1>=num_chare_y&&j==blockDimY))
+                  {
+                      update += temperature[index(i, j+1, k)];
+                      count++;
+                  }
+                  if(!(thisIndex.y-1<0&&j==1))
+                  {
+                      update += temperature[index(i, j-1, k)];
+                      count++;
+                  }
+                  if(!(thisIndex.z+1>=num_chare_z&&k==blockDimZ))
+                  {
+                      update += temperature[index(i, j, k+1)];
+                      count++;
+                  }
+                  if(!(thisIndex.z-1<0&&k==1))
+                  {
+                      update += temperature[index(i, j, k-1)];
+                      count++;
+                  }
+                  update /= count;
+                  double diff = temperature[index(i, j, k)] - update;
+                  if(diff<0) diff = -1*diff;
+                  if(diff>maxDiff) maxDiff = diff;
+                  temperature[index(i, j, k)] = update;
+                  //CkPrintf(" %d:%f }", count, update);
               }
           }
       }
+        //CkPrintf("[%d:%d:%d]\n\n", thisIndex.x, thisIndex.y, thisIndex.z);
+    return maxDiff;
     }
 
     // Enforce some boundary conditions
     void constrainBC() {
-      // Heat left, top and front faces of each chare's block
-      for(int i=1; i<blockDimX+1; ++i)
+      
+        temperature[index(1, 1, 1)] = 255.0;
+        // Heat left, top and front faces of each chare's block
+      /*  for(int i=1; i<blockDimX+1; ++i)
       for(int k=1; k<blockDimZ+1; ++k)
               temperature[index(i, 1, k)] = 255.0;
-      for(int j=1; j<blockDimY+1; ++j)
+        for(int j=1; j<blockDimY+1; ++j)
           for(int k=1; k<blockDimZ+1; ++k)
               temperature[index(1, j, k)] = 255.0;
       for(int i=1; i<blockDimX+1; ++i)
           for(int j=1; j<blockDimY+1; ++j)
-              temperature[index(i, j, 1)] = 255.0;
+              temperature[index(i, j, 1)] = 255.0; */
     }
 
 };

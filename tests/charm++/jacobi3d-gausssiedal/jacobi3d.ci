@@ -22,6 +22,7 @@ mainmodule jacobi3d {
     entry Main(CkArgMsg *m);
     entry void start();
     entry void report();
+    entry [reductiontarget] void converge(double m);
   };
 
   array [3D] Jacobi {
@@ -35,7 +36,7 @@ mainmodule jacobi3d {
       serial "begin_iteration" {
 	begin_iteration();
       }
-      for(imsg = 0; imsg < 6; imsg++) {
+      for(imsg = 0; imsg < neighbors; imsg++) {
 	// "iterations" keeps track of messages across steps
 	when receiveGhosts[iterations] (ghostMsg *gmsg)
 	  serial "process ghosts" { processGhosts(gmsg); }
