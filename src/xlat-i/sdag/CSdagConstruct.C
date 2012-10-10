@@ -1270,6 +1270,8 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
   if (!entry->getContainer()->isGroup() || !entry->isConstructor())
     generateTraceEndCall(defs);
 
+  defs << "    if (!__cDep.get())\n"
+       << "        _sdag_init();\n";
   defs << "    ";
   generateCall(defs, *stateVarsChildren, constructs->front()->label);
 

@@ -115,11 +115,11 @@ void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
 {
   decls << "public:\n";
-  decls << "  CDep *__cDep;\n";
+  decls << "  std::auto_ptr<CDep> __cDep;\n";
 
   XStr name = "_sdag_init";
   generateSignature(decls, defs, container, false, "void", &name, false, NULL);
-  defs << "    __cDep = new CDep(" << numEntries << "," << numWhens << ");\n";
+  defs << "    __cDep.reset(new CDep(" << numEntries << "," << numWhens << "));\n";
   CEntry *en;
   for(list<CEntry*>::iterator en=entryList.begin(); en != entryList.end(); ++en) {
     (*en)->generateDeps(defs);
@@ -160,7 +160,7 @@ void CParsedFile::generatePupFunction(XStr& decls)
 {
   decls << "public:\n";
   decls << "  void __sdag_pup(PUP::er& p) {\n";
-  decls << "    if (__cDep) { __cDep->pup(p); }\n";
+  decls << "    if (__cDep.get()) { __cDep->pup(p); }\n";
   decls << "  }\n";
 }
 

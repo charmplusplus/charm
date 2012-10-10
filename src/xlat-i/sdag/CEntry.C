@@ -69,6 +69,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
 #endif
 
   defs << "    CMsgBuffer* cmsgbuf;\n";
+  defs << "    if (!__cDep.get()) _sdag_init();\n";
 
   int hasArrays = 0;
   int paramMarshalling = 0;
