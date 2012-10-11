@@ -20,12 +20,13 @@
 #define UTILIZATION_THRESHOLD 0.7
 #define NEGLECT_IDLE 2 // Should never be == 1
 #define MIN_STATS 6
+#define STATS_COUNT 8 // The number of stats collected during reduction
 
 #   define DEBAD(x) /*CkPrintf x*/
 #   define EXTRA_FEATURE 0
 
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
-  double lb_data[8];
+  double lb_data[STATS_COUNT];
   lb_data[1] = 0.0; // total number of processors contributing
   lb_data[2] = 0.0; // total load
   lb_data[3] = 0.0; // max load
@@ -34,8 +35,8 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   lb_data[6] = 0.0; // total load with bg
   lb_data[7] = 0.0; // max load with bg
   for (int i = 0; i < nMsg; i++) {
-    CkAssert(msgs[i]->getSize() == 8*sizeof(double));
-    if (msgs[i]->getSize() != 8*sizeof(double)) {
+    CkAssert(msgs[i]->getSize() == STATS_COUNT*sizeof(double));
+    if (msgs[i]->getSize() != STATS_COUNT*sizeof(double)) {
       CkPrintf("Error!!! Reduction not correct. Msg size is %d\n", msgs[i]->getSize());
     }
     double* m = (double *)msgs[i]->getData();
@@ -63,7 +64,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
       CkAbort("Intermingling iterations\n");
     }
   }
-  return CkReductionMsg::buildNew(8*sizeof(double), lb_data);
+  return CkReductionMsg::buildNew(STATS_COUNT*sizeof(double), lb_data);
 }
 
 /*global*/ CkReduction::reducerType lbDataCollectionType;
@@ -76,30 +77,24 @@ CkGroupID _metalb;
 CkpvDeclare(int, metalbInited);  /**< true if metabalancer is inited */
 
 // mainchare
-MetaLBInit::MetaLBInit(CkArgMsg *m)
-{
+MetaLBInit::MetaLBInit(CkArgMsg *m) {
 #if CMK_LBDB_ON
   _metalb = CProxy_MetaBalancer::ckNew();
 #endif
-  CkPrintf("META LB Init Called\n");
   delete m;
 }
 
 // called from init.C
-void _metabalancerInit()
-{
+void _metabalancerInit() {
   CkpvInitialize(int, metalbInited);
   CkpvAccess(metalbInited) = 0;
 }
 
-void MetaBalancer::initnodeFn()
-{
+void MetaBalancer::initnodeFn() {
 }
 
-// called my constructor
-void MetaBalancer::init(void)
-{
-  CkPrintf("Metabalancer init %d lbdb\n", _lbdb);
+// called by my constructor
+void MetaBalancer::init(void) {
   lbdatabase = (LBDatabase *)CkLocalBranch(_lbdb);
   CkpvAccess(metalbInited) = 1;
   total_load_vec.resize(VEC_SIZE, 0.0);
@@ -137,8 +132,8 @@ void MetaBalancer::init(void)
   is_prev_lb_refine = -1;
 }
 
-void MetaBalancer::pup(PUP::er& p)
-{
+void MetaBalancer::pup(PUP::er& p) {
+  CkPrintf("[%d] Metabalancer getting pupped\n", CkMyPe());
 	IrrGroup::pup(p);
   if (p.isUnpacking()) {
     lbdatabase = (LBDatabase *)CkLocalBranch(_lbdb);
@@ -179,6 +174,7 @@ void MetaBalancer::ResumeClients() {
 }
 
 int MetaBalancer::get_iteration() {
+  CkPrintf("[%d] get iteration %d\n", CkMyPe(), adaptive_struct.lb_iteration_no);
   return adaptive_struct.lb_iteration_no;
 }
 
@@ -226,7 +222,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     }
     //CkPrintf("[%d] Idle time %lf and countable %d for iteration %d\n", CkMyPe(), idle_time, total_countable_syncs, iteration);
 
-    double lb_data[8];
+    double lb_data[STATS_COUNT];
     lb_data[0] = it_n;
     lb_data[1] = 1;
     lb_data[2] = total_load_vec[index]; // For average load
@@ -248,7 +244,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     //    idle_time/total_load_vec[iteration], adaptive_struct.lb_iteration_no);
 
     CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
-    contribute(8*sizeof(double), lb_data, lbDataCollectionType, cb);
+    contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
   }
   return true;
 }
@@ -689,7 +685,7 @@ void MetaBalancer::TriggerAdaptiveReduction() {
 #if EXTRA_FEATURE
   adaptive_struct.lb_iteration_no++;
   //CkPrintf("Trigger adaptive for %d\n", adaptive_struct.lb_iteration_no);
-  double lb_data[8];
+  double lb_data[STATS_COUNT];
   lb_data[0] = adaptive_struct.lb_iteration_no;
   lb_data[1] = 1;
   lb_data[2] = 0.0;
@@ -704,7 +700,7 @@ void MetaBalancer::TriggerAdaptiveReduction() {
   //     idle_time/total_load_vec[iteration], adaptive_struct.lb_iteration_no);
 
   CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
-  contribute(8*sizeof(double), lb_data, lbDataCollectionType, cb);
+  contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
 #endif
 }
 

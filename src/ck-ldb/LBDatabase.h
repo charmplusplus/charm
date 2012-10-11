@@ -12,15 +12,11 @@
 #include "lbdb.h"
 #include "LBDBManager.h"
 #include "lbdb++.h"
-#include "MetaBalancer.h"
-
-#include <vector>
 
 #define LB_FORMAT_VERSION     2
 
+class MetaBalancer;
 extern int _lb_version;
-
-
 
 // command line options
 class CkLBArgs
@@ -363,7 +359,6 @@ public:
     LDOMAdaptResumeSync(myLDHandle, lb_period);
   }
 
-  void RegisterMetaBalancer();
 
 private:
   int mystep;

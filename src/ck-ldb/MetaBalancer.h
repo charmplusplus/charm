@@ -93,6 +93,7 @@ private:
   // Keeps track of how many local chares contributed
   std::vector<int> total_count_vec;
   std::vector<int> lbdb_no_obj_callback;
+
   int max_iteration;
 
   double after_lb_max;
@@ -110,7 +111,7 @@ private:
   };
 
   struct AdaptiveMetaBalancer {
-    std::vector<AdaptiveData> history_data;
+    CkVec<AdaptiveData> history_data;
     int lb_iter_no;
   } adaptive_lbdb;
 

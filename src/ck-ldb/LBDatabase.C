@@ -353,6 +353,7 @@ void LBDatabase::init(void)
   mystep = 0;
   nloadbalancers = 0;
   new_ld_balancer = 0;
+  metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
 
   CkpvAccess(lbdatabaseInited) = 1;
 #if CMK_LBDB_ON
@@ -491,16 +492,16 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 #endif
 }
 
-void LBDatabase::RegisterMetaBalancer() {
-  metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
-}
-
-
 void LBDatabase::ResumeClients() {
+#if CMK_LBDB_ON
   if (metabalancer == NULL) {
-    RegisterMetaBalancer();
+    CkPrintf("%d Metabalancer was null\n", CkMyPe());
+    metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
   }
-  metabalancer->ResumeClients();
+  if (metabalancer != NULL) {
+    metabalancer->ResumeClients();
+  }
+#endif
   LDResumeClients(myLDHandle);
 }
 
