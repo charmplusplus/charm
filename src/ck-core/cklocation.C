@@ -1081,12 +1081,12 @@ double CkMigratable::getObjTime() {
 }
 
 void CkMigratable::clearAdaptiveData() {
-  if (can_reset) {
+//  if (can_reset) {
     local_state = OFF;
     atsync_iteration = -1;
     prev_load = 0.0;
     can_reset = false;
-  }
+//  }
 }
 
 void CkMigratable::recvLBPeriod(void *data) {

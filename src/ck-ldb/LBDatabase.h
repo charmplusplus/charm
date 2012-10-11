@@ -358,7 +358,8 @@ public:
   inline void AdaptResumeSync(int lb_period) {
     LDOMAdaptResumeSync(myLDHandle, lb_period);
   }
-
+  void SetMigrationCost(double cost);
+  void SetStrategyCost(double cost);
 
 private:
   int mystep;

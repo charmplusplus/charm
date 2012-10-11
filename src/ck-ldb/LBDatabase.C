@@ -495,7 +495,6 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 void LBDatabase::ResumeClients() {
 #if CMK_LBDB_ON
   if (metabalancer == NULL) {
-    CkPrintf("%d Metabalancer was null\n", CkMyPe());
     metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
   }
   if (metabalancer != NULL) {
@@ -503,6 +502,24 @@ void LBDatabase::ResumeClients() {
   }
 #endif
   LDResumeClients(myLDHandle);
+}
+
+void LBDatabase::SetMigrationCost(double cost) {
+  if (metabalancer == NULL) {
+    metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+  }
+  if (metabalancer != NULL)  {
+    metabalancer->SetMigrationCost(cost);
+  }
+}
+
+void LBDatabase::SetStrategyCost(double cost) {
+  if (metabalancer == NULL) {
+    metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+  }
+  if (metabalancer != NULL)  {
+    metabalancer->SetStrategyCost(cost);
+  }
 }
 
 /*
