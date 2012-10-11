@@ -237,8 +237,8 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     total_count_vec[index] = 0;
 
     DEBAD(("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n",
-        CkMyPe(), total_load_vec[iteration], idle_time,
-        idle_time/total_load_vec[iteration], adaptive_struct.lb_iteration_no));
+        CkMyPe(), total_load_vec[index], idle_time,
+        idle_time/total_load_vec[index], adaptive_struct.lb_iteration_no));
 
     CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
     contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
