@@ -168,7 +168,6 @@ LBDBInit::LBDBInit(CkArgMsg *m)
 // called from init.C
 void _loadbalancerInit()
 {
-  CkPrintf("loadbalancerInit\n");
   CkpvInitialize(int, lbdatabaseInited);
   CkpvAccess(lbdatabaseInited) = 0;
   CkpvInitialize(int, numLoadBalancers);
@@ -489,6 +488,18 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 
   CmiAssert(obj != NULL);
   obj->setTiming(cputime);
+#endif
+}
+
+void LBDatabase::DoneRegisteringObjects() {
+	LDDoneRegisteringObjects(_om);
+#if CMK_LBDB_ON
+	if (metabalancer == NULL) {
+		metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
+	}
+	if (metabalancer != NULL) {
+		metabalancer->HandleAdaptiveNoObj();
+	}
 #endif
 }
 

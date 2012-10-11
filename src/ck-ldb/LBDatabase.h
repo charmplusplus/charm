@@ -194,9 +194,7 @@ public:
     LDRegisteringObjects(_om);
   };
 
-  inline void DoneRegisteringObjects(LDOMHandle _om) {
-    LDDoneRegisteringObjects(_om);
-  };
+  void DoneRegisteringObjects(LDOMHandle _om);
 
   inline LDObjHandle RegisterObj(LDOMHandle h, LDObjid id,
 			  void *userptr,int migratable) {

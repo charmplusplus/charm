@@ -252,7 +252,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   double max = load[3];
   double avg_idle = load[4]/load[1];
   double utilization = load[5];
-  int iteration_n = load[0];
+  int iteration_n = (int) load[0];
   double avg_load_bg = load[6]/load[1];
   double max_load_bg = load[7];
   DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf \
@@ -453,7 +453,7 @@ bool MetaBalancer::generatePlan(int& period, double& ratio_at_t) {
   max /= adaptive_lbdb.history_data.size();
   avg /= adaptive_lbdb.history_data.size();
   double cost = adaptive_struct.lb_strategy_cost + adaptive_struct.lb_migration_cost;
-  period = cost/(max - avg); 
+  period = (int) cost/(max - avg); 
   CkPrintf("Obtained period %d from constant prediction\n", period);
   if (period < 0) { 
     period = adaptive_struct.final_lb_period;
@@ -494,7 +494,7 @@ bool MetaBalancer::getPeriodForStrategy(double new_load_percent,
     }
   }
 
-  int intersection_t = (mc-ac) / (aslope - mslope);
+  int intersection_t = (int) (mc-ac) / (aslope - mslope);
   if (intersection_t > 0 && period > intersection_t) {
     CkPrintf("Avg | Max Period set when curves intersect\n");
     return false;
@@ -507,7 +507,7 @@ bool MetaBalancer::getPeriodForStrategy(double new_load_percent,
 bool MetaBalancer::getPeriodForLinear(double a, double b, double c, int& period) {
   CkPrintf("Quadratic Equation %lf X^2 + %lf X + %lf\n", a, b, c);
   if (a == 0.0) {
-    period = (-c / b);
+    period = (int) (-c / b);
     if (period < 0) {
       CkPrintf("-ve period for -c/b (%d)\n", period);
       return false;
@@ -522,7 +522,7 @@ bool MetaBalancer::getPeriodForLinear(double a, double b, double c, int& period)
     return false;
   }
   t = (-b + sqrt(t)) / (2*a);
-  x = t;
+  x = (int) t;
   if (x < 0) {
     CkPrintf("boo!!! x (%d) < 0\n", x);
     x = 0;
@@ -535,8 +535,8 @@ bool MetaBalancer::getPeriodForLinear(double a, double b, double c, int& period)
 
 bool MetaBalancer::getLineEq(double new_load_percent, double& aslope, double& ac, double& mslope, double& mc) {
   int total = adaptive_lbdb.history_data.size();
-  int iterations = 1 + adaptive_lbdb.history_data[total - 1].iteration -
-      adaptive_lbdb.history_data[0].iteration;
+  int iterations = (int) (1 + adaptive_lbdb.history_data[total - 1].iteration -
+      adaptive_lbdb.history_data[0].iteration);
   double a1 = 0;
   double m1 = 0;
   double a2 = 0;
