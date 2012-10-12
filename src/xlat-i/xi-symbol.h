@@ -1026,6 +1026,7 @@ class Entry : public Member {
     int isSync(void) { return (attribs & SSYNC); }
     int isIget(void) { return (attribs & SIGET); }
     int isConstructor(void) { return !strcmp(name, container->baseName(0).get_string());}
+    bool isMigrationConstructor() { return isConstructor() && (attribs & SMIGRATE); }
     int isExclusive(void) { return (attribs & SLOCKED); }
     int isImmediate(void) { return (attribs & SIMMEDIATE); }
     int isSkipscheduler(void) { return (attribs & SSKIPSCHED); }
