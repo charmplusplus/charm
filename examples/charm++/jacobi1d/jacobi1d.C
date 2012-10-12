@@ -32,13 +32,11 @@
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_y(a)  (((a)+num_chares)%num_chares)
-#define index(a,b) ((b) + (a)*(arrayDimY))
 
-#define MAX_ITER	100
+#define MAX_ITER	26
 #define WARM_ITER	5
 #define TOP		1
 #define BOTTOM		2
-#define LBPERIOD 5
 
 double startTime;
 double endTime;
@@ -83,19 +81,15 @@ class Main : public CBase_Main
     void report(CkReductionMsg *msg) {
       iterations++;
       if(iterations == WARM_ITER)
-        startTime = CmiWallTimer();
+	startTime = CkWallTimer();
       double error = *((double *)msg->getData());
 
       if(iterations < MAX_ITER) {
-        if (iterations % LBPERIOD == 0) {
-          array.pause_for_lb();
-        } else {
-          CkPrintf("Start of iteration %d\n", iterations);
-          array.begin_iteration();
-        }
+	CkPrintf("Start of iteration %d\n", iterations);
+	array.begin_iteration();
       } else {
-        CkPrintf("Completed %d iterations\n", MAX_ITER-1);
-        endTime = CmiWallTimer();
+	CkPrintf("Completed %d iterations\n", MAX_ITER-1);
+        endTime = CkWallTimer();
         CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-1-WARM_ITER));
         CkExit();
       }
@@ -108,158 +102,129 @@ class Jacobi: public CBase_Jacobi {
     int arrived_top;
     int arrived_bottom;
 
-    double *temperature;
-    double *new_temperature;
+    double **temperature;
+    double **new_temperature;
     void *sendLogs[4];
     void *ackLogs[5];
-    int work;
+    int iterations;
 
     // Constructor, initialize values
     Jacobi() {
-      usesAtSync=CmiTrue;
       int i,j;
       // allocate two dimensional arrays
-      temperature = new double[(blockDimX+2) * arrayDimY];
-      new_temperature = new double[(blockDimX+2) * arrayDimY];
-     // for (i=0; i<blockDimX+2; i++) {
-     //   temperature[i] = new double[arrayDimY];
-     //   new_temperature[i] = new double[arrayDimY];
-     // }
+      temperature = new double*[blockDimX+2];
+      new_temperature = new double*[blockDimX+2];
+      for (i=0; i<blockDimX+2; i++) {
+	temperature[i] = new double[arrayDimY];
+	new_temperature[i] = new double[arrayDimY];
+      }
       for(i=0;i<blockDimX+2; i++) {
-        for(j=0;j<arrayDimY; j++) {
-          temperature[index(i,j)] = 0.5;
-          new_temperature[index(i,j)] = 0.5;
-        }
+	for(j=0;j<arrayDimY; j++) {
+	  temperature[i][j] = 0.5;
+	  new_temperature[i][j] = 0.5;
+	}
       }
 
       arrived_top = 0;
       arrived_bottom = 0;
-
-      work = thisIndex/num_chares * 10 + 1;
-      work = 1;
+      iterations = 0;
       constrainBC();
     }
 
     Jacobi(CkMigrateMessage* m) {}
 
     ~Jacobi() { 
-     // for (int i=0; i<blockDimX+2; i++) {
-     //   delete [] temperature[i];
-     //   delete [] new_temperature[i];
-     // }
+      for (int i=0; i<blockDimX+2; i++) {
+        delete [] temperature[i];
+        delete [] new_temperature[i];
+      }
       delete [] temperature; 
       delete [] new_temperature; 
     }
 
-    void pup(PUP::er &p) {
-      CBase_Jacobi::pup(p);
-      if (p.isUnpacking()) {
-        temperature = new double[(blockDimX+2) * arrayDimY];
-        new_temperature = new double[(blockDimX+2) * arrayDimY];
-      }
-      p|arrived_top;
-      p|arrived_bottom;
-      p(temperature, (blockDimX+2) * arrayDimY);
-      p(new_temperature, (blockDimX+2) * arrayDimY);
-
-      p|work;
-    }
-
-    void ResumeFromSync() {
-      double max_error = 0.0;
-      contribute(sizeof(double), &max_error, CkReduction::max_double,
-          CkCallback(CkIndex_Main::report(NULL), mainProxy));
-    }
-
     // Perform one iteration of work
     void begin_iteration(void) {
+      iterations++;
+	
       // Send my top edge
-    //  thisProxy(wrap_y(thisIndex)).receiveGhosts(BOTTOM, arrayDimY, &temperature[index(1, 1)]);
-    //  // Send my bottom edge
-    //  thisProxy(wrap_y(thisIndex)).receiveGhosts(TOP, arrayDimY, &temperature[index(blockDimX,1)]);
-    check_and_compute();
+      thisProxy(wrap_y(thisIndex)).receiveGhosts(BOTTOM, arrayDimY, &temperature[1][1]);
+      // Send my bottom edge
+      thisProxy(wrap_y(thisIndex)).receiveGhosts(TOP, arrayDimY, &temperature[blockDimX][1]);
     }
 
     void receiveGhosts(int dir, int size, double gh[]) {
       int i, j;
 
       switch(dir) {
-        case TOP:
-          arrived_top++;
-          for(j=0; j<(size-1); j++)
-            temperature[index(0,j+1)] = gh[j];
+	case TOP:
+	  arrived_top++;
+	  for(j=0; j<size; j++)
+            temperature[0][j+1] = gh[j];
+	  break;
+	case BOTTOM:
+	  arrived_bottom++;
+	  for(j=0; j<size; j++)
+            temperature[blockDimX+1][j+1] = gh[j];
           break;
-        case BOTTOM:
-          arrived_bottom++;
-          for(j=0; j<(size-1); j++)
-            temperature[index(blockDimX+1,j+1)] = gh[j];
-          break;
-        default:
-          CkAbort("ERROR\n");
+	default:
+	  CkAbort("ERROR\n");
       }
       check_and_compute();
     }
 
-    void pause_for_lb() {
-      AtSync();
-    }
-
     void check_and_compute() {
       double error = 0.0, max_error = 0.0;
-      arrived_top = 1; arrived_bottom = 1;
 
       if (arrived_top >=1 && arrived_bottom >= 1) {
-        arrived_top--;
-        arrived_bottom--;
+	arrived_top--;
+	arrived_bottom--;
 
-        compute_kernel();	
+	compute_kernel();	
 
-        for(int k = 0; k< work; k++) {
-          for(int i=1; i<blockDimX+1; i++) {
-            for(int j=0; j<arrayDimY; j++) {
-              error = fabs(new_temperature[index(i,j)] - temperature[index(i,j)]);
-              if(error > max_error) {
-                max_error = error;
-              }
-            }
-          }
-        }
+	for(int i=1; i<blockDimX+1; i++) {
+	  for(int j=0; j<arrayDimY; j++) {
+	    error = fabs(new_temperature[i][j] - temperature[i][j]);
+	    if(error > max_error) {
+	      max_error = error;
+	    }
+	  }
+	}
 
-        double *tmp;
-        tmp = temperature;
-        temperature = new_temperature;
-        new_temperature = tmp;
+	double **tmp;
+	tmp = temperature;
+	temperature = new_temperature;
+	new_temperature = tmp;
 
-        constrainBC();
+	constrainBC();
 
-        contribute(sizeof(double), &max_error, CkReduction::max_double,
-            CkCallback(CkIndex_Main::report(NULL), mainProxy));
+	contribute(sizeof(double), &max_error, CkReduction::max_double,
+	      CkCallback(CkIndex_Main::report(NULL), mainProxy));
       }
-    } 
+    }
+
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
     void compute_kernel()
     {
       for(int i=1; i<blockDimX+1; i++) {
-        for(int j=0; j<arrayDimY; j++) {
-          // update my value based on the surrounding values
-          new_temperature[index(i,j)] =
-          (temperature[index(i-1,j)]+temperature[index(i+1,j)]+temperature[index(i,j-1)]+temperature[index(i,j+1)]+temperature[index(i,j)]) * 0.2;
-        }
+	for(int j=0; j<arrayDimY; j++) {
+	  // update my value based on the surrounding values
+	  new_temperature[i][j] = (temperature[i-1][j]+temperature[i+1][j]+temperature[i][j-1]+temperature[i][j+1]+temperature[i][j]) * 0.2;
+	}
       }
     }
 
     // Enforce some boundary conditions
     void constrainBC()
     {
-      if(thisIndex <= num_chares/2) {
-        for(int i=1; i<=blockDimX; i++)
-          temperature[index(i,1)] = 1.0;
+     if(thisIndex <= num_chares/2) {
+	for(int i=1; i<=blockDimX; i++)
+	  temperature[i][1] = 1.0;
       }
 
       if(thisIndex == num_chares-1) {
-        for(int j=arrayDimY/2; j<arrayDimY; j++)
-          temperature[index(blockDimX,j)] = 0.0;
+	for(int j=arrayDimY/2; j<arrayDimY; j++)
+	  temperature[blockDimX][j] = 0.0;
       }
     }
 

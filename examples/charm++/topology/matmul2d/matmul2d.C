@@ -57,7 +57,7 @@ Main::Main(CkArgMsg* m) {
   compute = CProxy_Compute::ckNew(num_chares_per_dim, num_chares_per_dim);
 
   // Start the computation
-  startTime = CmiWallTimer();
+  startTime = CkWallTimer();
   if(num_chares_per_dim == 1){
     compute(0,0).compute();
   }
@@ -68,7 +68,7 @@ Main::Main(CkArgMsg* m) {
 }
 
 void Main::done(){
-  endTime = CmiWallTimer();
+  endTime = CkWallTimer();
   CkPrintf("Fin: %f sec\n", endTime-startTime);
   CkExit();
 }

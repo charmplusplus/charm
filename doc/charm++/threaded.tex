@@ -1,0 +1,18 @@
+\section{Threaded Entry Methods}
+\label{threaded}
+
+Typically, entry methods run in the same thread of execution as the \charmpp
+scheduler. This prevents them from undertaking any actions that would cause
+their thread to block, as blocking would prevent the receiving and processing of
+incoming messages.
+
+However, entry methods with the \kw{threaded} attribute run in their own
+user-level nonpreemptible thread, and are therefore able to block without
+interrupting the runtime system. This allows them to undertake blocking
+operations or explicitly suspend themselves, which is necessary to use some
+\charmpp features, such as \kw{sync} entry methods and futures.
+
+For details on the threads API available to threaded entry methods, see chapter
+3 of the Converse programming manual. The use of threaded entry methods is
+demonstrated in an example program located in
+\examplerefdir{threaded\_ring}.

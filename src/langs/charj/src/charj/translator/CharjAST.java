@@ -161,4 +161,11 @@ public class CharjAST extends CommonTree
             e.printStackTrace();
         }
     }
+
+    // Does this subtree contain an accelerator modifier?
+    public boolean hasAccelModifier()
+    {
+        return false;
+    }
+
 }

@@ -267,8 +267,10 @@ void ArrayElement::initBasics(void)
 			  l->ckElementCreating(this));
   }
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        mlogData->objID.type = TypeArray;
-        mlogData->objID.data.array.id = (CkGroupID)thisArrayID;
+	if(mlogData == NULL)
+		mlogData = new ChareMlogData();
+	mlogData->objID.type = TypeArray;
+	mlogData->objID.data.array.id = (CkGroupID)thisArrayID;
 #endif
 #ifdef _PIPELINED_ALLREDUCE_
 	allredMgr = NULL;
@@ -645,12 +647,45 @@ CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
   return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,CkArrayOptions());
 }
 
+extern IrrGroup *lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkGroupID &groupID);
+
+struct CkInsertIdxMsg {
+  char core[CmiReservedHeaderSize];
+  CkArrayIndex idx;
+  CkArrayMessage *m;
+  int ctor;
+  int onPe;
+  CkArrayID _aid;
+};
+
+static int ckinsertIdxHdl;
+
+void ckinsertIdxFunc(void *m)
+{
+  CkInsertIdxMsg *msg = (CkInsertIdxMsg *)m;
+  CProxy_ArrayBase   ca(msg->_aid);
+  ca.ckInsertIdx(msg->m, msg->ctor, msg->onPe, msg->idx);
+  CmiFree(msg);
+}
+
 void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,
 	const CkArrayIndex &idx)
 {
   if (m==NULL) m=(CkArrayMessage *)CkAllocSysMsg();
   m->array_ep()=ctor;
-  ckLocalBranch()->prepareCtorMsg(m,onPe,idx);
+  CkArray *ca = ckLocalBranch();
+  if (ca == NULL) {
+      CkInsertIdxMsg *msg = (CkInsertIdxMsg *)CmiAlloc(sizeof(CkInsertIdxMsg));
+      msg->idx = idx;
+      msg->m = m;
+      msg->ctor = ctor;
+      msg->onPe = onPe;
+      msg->_aid = _aid;
+      CmiSetHandler(msg, ckinsertIdxHdl);
+      ca = (CkArray *)lookupGroupAndBufferIfNotThere(CkpvAccess(_coreState), (envelope*)msg,_aid);
+      if (ca == NULL) return;
+  }
+  ca->prepareCtorMsg(m,onPe,idx);
   if (ckIsDelegated()) {
   	ckDelegatedTo()->ArrayCreate(ckDelegatedPtr(),ctor,m,idx,onPe,_aid);
   	return;
@@ -705,6 +740,7 @@ void _ckArrayInit(void)
     // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
   // by default anytime migration is allowed
+  ckinsertIdxHdl = CkRegisterHandler(ckinsertIdxFunc);
 }
 
 CkArray::CkArray(CkArrayOptions &opts,
@@ -919,9 +955,20 @@ void CProxy_ArrayBase::doneInserting(void)
   CProxy_CkArray(_aid).remoteDoneInserting();
 }
 
+void CProxy_ArrayBase::beginInserting(void)
+{
+  DEBC((AA"Broadcasting a beginInserting request\n"AB));
+  CProxy_CkArray(_aid).remoteBeginInserting();
+}
+
 void CkArray::doneInserting(void)
 {
   thisProxy[CkMyPe()].remoteDoneInserting();
+}
+
+void CkArray::beginInserting(void)
+{
+  thisProxy[CkMyPe()].remoteBeginInserting();
 }
 
 /// This is called on every processor after the last array insertion.
@@ -933,6 +980,18 @@ void CkArray::remoteDoneInserting(void)
     DEBC((AA"Done inserting objects\n"AB));
     for (int l=0;l<listeners.size();l++) listeners[l]->ckEndInserting();
     locMgr->doneInserting();
+  }
+}
+
+void CkArray::remoteBeginInserting(void)
+{
+  CK_MAGICNUMBER_CHECK;
+
+  if (!isInserting) {
+    isInserting = CmiTrue;
+    DEBC((AA"Begin inserting objects\n"AB));
+    for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
+    locMgr->startInserting();
   }
 }
 
@@ -1327,7 +1386,10 @@ void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index
         CkArrayMessage *copy = (CkArrayMessage *)   CkCopyMsg((void **)&bcast);
         envelope *env = UsrToEnv(copy);
         env->sender.data.group.onPE = CkMyPe();
-        env->TN  = env->SN=0;
+#if defined(_FAULT_CAUSAL_)
+        env->TN = 0;
+#endif
+		env->SN = 0;
         env->piggyBcastIdx = epIdx;
         env->setEpIdx(CkIndex_ArrayElement::recvBroadcast(0));
         env->getsetArrayMgr() = thisgroup;

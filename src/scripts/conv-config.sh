@@ -29,12 +29,15 @@ CMK_LD_SHARED="-shared"
 
 . $CHARMINC/conv-mach.sh
 
-[ -z "$CMK_C_OPTIMIZE" ] && CMK_C_OPTIMIZE="-O"
+[ -z "$CMK_C_OPTIMIZE" ] && CMK_C_OPTIMIZE="-O2"
 [ -z "$CMK_C_DEBUG" ] && CMK_C_DEBUG="-g"
 [ -z "$CMK_CXX_OPTIMIZE" ] && CMK_CXX_OPTIMIZE="$CMK_C_OPTIMIZE"
 [ -z "$CMK_CXX_DEBUG" ] && CMK_CXX_DEBUG="$CMK_C_DEBUG"
-[ -z "$CMK_F90_OPTIMIZE" ] && CMK_F90_OPTIMIZE="-O"
+[ -z "$CMK_F90_OPTIMIZE" ] && CMK_F90_OPTIMIZE="-O2"
 [ -z "$CMK_F90_DEBUG" ] && CMK_F90_DEBUG="-O"
+
+[ -z "$CMK_ENABLE_C11" ] && CMK_ENABLE_C11="-std=c1x"
+[ -z "$CMK_ENABLE_CPP11" ] && CMK_ENABLE_CPP11="-std=c++0x"
 
 [ -z "$CMK_CC" ] && CMK_CC='cc '
 [ -z "$CMK_CXX" ] && CMK_CXX='c++ '
@@ -116,4 +119,8 @@ CMK_LDXX="$CMK_LDXX $CMK_LIBDIR "
 #CMK_NATIVE_LD="$CMK_NATIVE_LD $CMK_LIBDIR "
 #CMK_NATIVE_LDXX="$CMK_NATIVE_LDXX $CMK_LIBDIR "
 
+if [ -n "$GEMINI_CRAYXE" -a -z "$CMK_SMP" ]
+then
+  . $CHARMINC/conv-mach-pxshm.sh
+fi
 

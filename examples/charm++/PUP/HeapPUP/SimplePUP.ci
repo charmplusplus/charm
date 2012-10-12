@@ -1,0 +1,23 @@
+////////////////////////////////////////////////
+//
+//  SimplePUP.ci
+//
+//  Interface file for SimplePUP
+//
+//  Author: Eric Bohm
+//  Date: 2012/7/30
+//
+////////////////////////////////////////////////
+
+mainmodule SimplePUP {
+  include "HeapObject.h";
+  mainchare main {
+    entry main(CkArgMsg *m);
+  };
+
+  array [1D] SimpleArray{
+    entry SimpleArray();
+    entry void acceptData(HeapObject &inData);
+  };
+
+};

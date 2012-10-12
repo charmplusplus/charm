@@ -165,7 +165,8 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
 	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),0,thisgroup);
-	contribute(0,NULL,CkReduction::sum_int,localcb);
+	//contribute(0,NULL,CkReduction::sum_int,localcb);
+	barrier(localcb);
 }
 
 void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){ 
@@ -348,8 +349,6 @@ void CkPupNodeGroupData(PUP::er &p, CmiBool create)
 	  if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
 	  else { CksvAccess(_numNodeGroups) = 1; }
 	}
-	if(CkMyPe() == 3)
-	CkPrintf("[%d] CkPupNodeGroupData %s: numNodeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
 
 	GroupInfo *tmpInfo = new GroupInfo [numNodeGroups];
 	if (!p.isUnpacking()) {
@@ -381,9 +380,6 @@ void CkPupNodeGroupData(PUP::er &p, CmiBool create)
 		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(gID);
 		IrrGroup *obj = ent2.getObj();
 		obj->pup(p);
-		if(CkMyPe() == 3) CkPrintf("Nodegroup PUP'ed: gid = %d, name = %s\n",
-			obj->ckGetGroupID().idx,
-			_chareTable[ent2.getcIdx()]->name);
 	}
 	delete [] tmpInfo;
 }

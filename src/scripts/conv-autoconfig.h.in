@@ -18,6 +18,12 @@
 /* enable charmdebug */
 #undef CMK_CHARMDEBUG
 
+/* whether c compiler knows of the c11 standard */
+#undef CMK_COMPILER_KNOWS_C11
+
+/* whether c++ compiler knows of the cpp11 standard */
+#undef CMK_COMPILER_KNOWS_CPP11
+
 /* whether ucontext has pointer */
 #undef CMK_CONTEXT_FPU_POINTER
 
@@ -33,8 +39,14 @@
 /* C++ *_casts<> work */
 #undef CMK_CPP_CAST_LEGAL
 
+/* Cray MAXNID */
+#undef CMK_CRAY_MAXNID
+
 /* whether C inline works in C */
 #undef CMK_C_INLINE
+
+/* whether synchronization primitives works in C */
+#undef CMK_C_SYNC_PRIMITIVES
 
 /* whether C++ allows declaration of variable sized array */
 #undef CMK_DECLARE_VARSIZE_ARRAY
@@ -77,6 +89,9 @@
 
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
+
+/* whether anon structs are permitted */
+#undef CMK_HAS_ANON_STRUCTS
 
 /* whether has asctime */
 #undef CMK_HAS_ASCTIME
@@ -165,6 +180,9 @@
 /* whether Cray rca library is available */
 #undef CMK_HAS_RCALIB
 
+/* whether Cray rca has rca_get_max_dimension */
+#undef CMK_HAS_RCA_MAX_DIMENSION
+
 /* whether has regex.h */
 #undef CMK_HAS_REGEX_H
 
@@ -201,6 +219,9 @@
 /* whether std::inserter works */
 #undef CMK_HAS_STD_INSERTER
 
+/* whether std::unordered_map works */
+#undef CMK_HAS_STD_UNORDERED_MAP
+
 /* whether has strings.h */
 #undef CMK_HAS_STRINGS_H
 
@@ -224,6 +245,9 @@
 
 /* whether has values.h */
 #undef CMK_HAS_VALUES_H
+
+/* whether ibv_port_attr has link_layer field */
+#undef CMK_IBV_PORT_ATTR_HAS_LINK_LAYER
 
 /* Setting load balancing timer type */
 #undef CMK_LBTIME_TYPE
@@ -305,6 +329,9 @@
 
 /* enable statistics collection */
 #undef CMK_WITH_STATS
+
+/* whether __int128 works */
+#undef CMK___int128_DEFINED
 
 /* whether __int64 works */
 #undef CMK___int64_DEFINED

@@ -122,7 +122,7 @@ class Main : public CBase_Main {
       array = CProxy_Stencil::ckNew(num_chare_x, num_chare_y, num_chare_z);
 
       //Start the computation
-      startTime = CmiWallTimer();
+      startTime = CkWallTimer();
       array.doStep();
     }
 
@@ -148,7 +148,6 @@ class Stencil: public CBase_Stencil {
 
     // Constructor, initialize values
     Stencil() {
-      __sdag_init();
       usesAtSync = CmiTrue;
 
       int i, j, k;
@@ -182,7 +181,7 @@ class Stencil: public CBase_Stencil {
       p(new_temperature, size);
     }
 
-    Stencil(CkMigrateMessage* m) { __sdag_init(); }
+    Stencil(CkMigrateMessage* m) { }
 
     ~Stencil() { 
       delete [] temperature; 
@@ -304,7 +303,7 @@ class Stencil: public CBase_Stencil {
       constrainBC();
 
       if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
-	endTime = CmiWallTimer();
+	endTime = CkWallTimer();
 	CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
       }
 
@@ -312,7 +311,7 @@ class Stencil: public CBase_Stencil {
 	contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
       else {
 	if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
-	  startTime = CmiWallTimer();
+	  startTime = CkWallTimer();
 	if(iterations % LBPERIOD == 0)
 	  {
 	    // auto tune the LBPeriod to half as long as it takes to run the iters between LB steps

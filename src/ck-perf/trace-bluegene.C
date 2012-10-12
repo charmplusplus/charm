@@ -28,9 +28,8 @@ void _createTracebluegene(char** argv)
 // this PE must be trace-enabled(in trace-common.C) to be able to do bgPrint()
 static void writeData(void *data, double t, double recvT, void *ptr)
 {
-  FILE *fp = (FILE *)ptr;
   TraceBluegene *traceBluegene = (TraceBluegene *)ptr;
-  CmiAssert(fp && traceBluegene);
+  CmiAssert(traceBluegene);
   traceBluegene->writePrint((char*)data, t);
 }
 

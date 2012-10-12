@@ -170,7 +170,12 @@ struct MigrateInfo {
     int from_pe;
     int to_pe;
     int async_arrival;	    // if an object is available for immediate migrate
-    MigrateInfo():  async_arrival(0) {}
+    MigrateInfo():  async_arrival(0) {
+#if CMK_GLOBAL_LOCATION_UPDATE
+      obj.id.isArrayElement = 0; 
+#endif
+    }
+
     void pup(PUP::er &p) {
       p | index;
       p | obj;

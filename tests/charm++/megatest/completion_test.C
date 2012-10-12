@@ -12,7 +12,7 @@ void completion_test_moduleinit(void){}
 
 struct completion_tester : public CBase_completion_tester {
     CProxy_CompletionDetector detector;
-    completion_tester() { __sdag_init(); thisProxy.run_test(); }
+    completion_tester() { thisProxy.run_test(); }
 
     completion_tester_SDAG_CODE
 };

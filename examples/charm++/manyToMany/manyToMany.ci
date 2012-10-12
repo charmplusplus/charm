@@ -1,0 +1,40 @@
+mainmodule manyToMany {
+
+	readonly CProxy_Main mainProxy;
+    readonly int max_iter;
+    readonly int numChares;
+    readonly int msgSize;
+
+	message manyToManyMsg {
+		char data[];
+	};
+
+	mainchare Main {
+		entry Main(CkArgMsg *m);
+		entry [reductiontarget] void manyToManyReady();
+		entry [reductiontarget] void nextmanyToMany();
+	};
+
+	array [2D] manyToMany {
+		entry manyToMany();
+        entry void sendmanyToMany();
+		entry void getmanyToMany(manyToManyMsg *m);
+	
+        entry void domanyToMany() {
+           
+            atomic {
+                sendmanyToMany();
+            }
+
+            for(count = 0; count < numChares; ++count){
+                when getmanyToMany[iter](manyToManyMsg *m) atomic {
+                    processmanyToMany(m);
+                }
+            }
+            atomic {
+			    iter++;
+				finish();
+            }
+		};
+	};
+};

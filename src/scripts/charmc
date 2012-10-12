@@ -79,6 +79,7 @@ USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
 PROG_EXT=""
 GENDEPENDS="no"
+COUNTTOKENS="no"
 
 COPY_CHARMRUN=true
 USE_BUILD_OPTIONS=0
@@ -632,10 +633,15 @@ do
 		OPTS="$OPTS $arg"
 		;;
 	"-M")
+		PREPROCESS=""
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		GENDEPENDS="yes"
 		;;
+    "-count-tokens")
+		OPTS="$OPTS $arg"
+        COUNTTOKENS="yes"
+        ;;
 	"-default-to-aout")
 		if [ "$EXPLICIT_OBJECT $EXPLICIT_COMPILATION" = "no no" ]
 		then
@@ -692,6 +698,14 @@ do
         -Wno-error)
                 WERROR="0"
                 ;;
+
+	"-use-new-std")
+        USE_NEW_STD="1"
+		;;
+
+	"-no-use-new-std")
+		USE_NEW_STD="0"
+		;;
 
 	-LANG*)
 		Warning "passing unrecognized option $arg to all compilers and linkers"
@@ -834,12 +848,28 @@ then
     OPTS="$OPTS $CMK_WARNINGS_ARE_ERRORS"
 fi
 
+# If the user has asked for the latest language standards (C11 or CPP11)
+if [ "$USE_NEW_STD" = "1" ]
+then
+    # and if configure confirmed that the underlying compiler knows abt C11, enable it
+    if [ "$CMK_COMPILER_KNOWS_C11" = "1" ]
+    then
+        OPTS_CC="$OPTS $CMK_ENABLE_C11"
+    fi
+    # and if configure confirmed that the underlying compiler knows abt CPP11, enable it
+    if [ "$CMK_COMPILER_KNOWS_CPP11" = "1" ]
+    then
+        OPTS_CXX="$OPTS $CMK_ENABLE_CPP11"
+    fi
+fi
+
 # Look up and add the dependencies for module $1
 findModuleDep() {
 	M=$1
 	notInList $M $PROCESSED_MODULES || return
 	PROCESSED_MODULES="$PROCESSED_MODULES $M"
-	PRE_LIBRARIES=`AddList $PRE_LIBRARIES -lmodule$M`
+	#PRE_LIBRARIES=`AddList $PRE_LIBRARIES -lmodule$M`
+	PRE_LIBRARIES=`AddList -lmodule$M $PRE_LIBRARIES`
 # HACK: add modules to both ends of library list, to avoid
 #  undefined symbol CkRegisterMainModule when it's in a module file.
 	POST_LIBRARIES=`AddList $POST_LIBRARIES -lmodule$M`
@@ -1046,6 +1076,11 @@ fi
 if [ "$GENDEPENDS" = "yes" ]
 then
     CMK_XIOPTS="$CMK_XIOPTS -M"
+fi
+
+if [ "$COUNTTOKENS" = "yes" ]
+then
+    CMK_XIOPTS="$CMK_XIOPTS -count-tokens"
 fi
 
 if test "$CMK_WITH_TAU" = "true"

@@ -131,6 +131,11 @@ extern void CldModuleInit(char **);
 #endif
 
 #include "quiescence.h"
+
+#if USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+#include <mpi.h>
+#endif
+
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
@@ -212,6 +217,10 @@ void infi_freeMultipleSend(void *ptr);
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
+#if CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+void * CmiAlloc_bgq (int     size);
+void   CmiFree_bgq  (void  * buf);
+#endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvDeclare(void *, CkGridObject);
@@ -222,6 +231,9 @@ CpvDeclare(void *, CsdGridQueue);
 void* LrtsAlloc(int, int);
 void  LrtsFree(void*);
 #endif
+
+CpvStaticDeclare(int, cmiMyPeIdle);
+int CmiIsMyNodeIdle();
 
 /*****************************************************************************
  *
@@ -1233,7 +1245,7 @@ void CmiTimerInit(char **argv)
   uint32_t clockMhz = pers.Kernel_Config.FreqMHz;
   CpvAccess(clocktick) = 1.0 / (clockMhz * 1e6); 
 
-  fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);
+  /*fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);*/
 
   /* try to synchronize calling barrier */
   CmiBarrier();
@@ -1556,6 +1568,9 @@ void CsdBeginIdle(void)
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_IDLE(); 	/* projector */
 #endif
+
+  CpvAccess(cmiMyPeIdle) = 1;
+
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
@@ -1569,6 +1584,9 @@ void CsdEndIdle(void)
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_BUSY(); 	/* projector */
 #endif
+
+  CpvAccess(cmiMyPeIdle) = 0;
+
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
@@ -2837,6 +2855,10 @@ void *CmiAlloc(int size)
   res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
+#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+  MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
+#elif CMK_SMP && CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+  res = (char *) CmiAlloc_bgq(size+sizeof(CmiChunkHeader));
 #else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
 #endif
@@ -2938,6 +2960,10 @@ void CmiFree(void *blk)
     LrtsFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));
+#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+    MPI_Free_mem(parentBlk);
+#elif CMK_SMP && CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+    CmiFree_bgq(BLKSTART(parentBlk));
 #else
     free_nomigrate(BLKSTART(parentBlk));
 #endif
@@ -3520,6 +3546,10 @@ void ConverseCommonInit(char **argv)
 #endif
   if (CmiMyPe() == 0)
       CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+
+  CpvInitialize(int, cmiMyPeIdle);
+  CpvAccess(cmiMyPeIdle) = 0;
+
 /* #if CONVERSE_POOL */
   CmiPoolAllocInit(30);  
 /* #endif */
@@ -3800,6 +3830,14 @@ double CmiReadSize(const char *str)
         val = atof(str);
     }
     return val;
+}
+
+int CmiIsMyNodeIdle(){
+    int i;
+    for(i=0; i<CmiMyNodeSize(); i++){
+        if(CpvAccessOther(cmiMyPeIdle, i)) return 1;
+    }
+    return 0;
 }
 
 /*@}*/

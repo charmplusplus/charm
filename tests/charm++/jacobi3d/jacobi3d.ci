@@ -1,0 +1,33 @@
+mainmodule jacobi3d {
+
+  readonly CProxy_Main mainProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int arrayDimZ;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int blockDimZ;
+
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int num_chare_z;
+
+  readonly int globalBarrier;
+
+  message ghostMsg {
+    double gh[];
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void report(CkReductionMsg *msg);
+  };
+
+  array [3D] Jacobi {
+    // Normal Charm++ entry methods
+    entry Jacobi(void);
+    entry void receiveGhosts(ghostMsg *gmsg);
+    entry void doStep();
+  };
+
+};

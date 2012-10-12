@@ -22,6 +22,16 @@ void CldHandler(char *msg)
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
 }
 
+void CldNodeHandler(char *msg)
+{
+  int len, queueing, priobits;
+  unsigned int *prioptr; CldInfoFn ifn; CldPackFn pfn;
+  CldRestoreHandler(msg);
+  ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
+}
+
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
 {
   int len, queueing, priobits,i; unsigned int *prioptr;
@@ -120,7 +130,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
-    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CldSwitchHandler(msg, CpvAccess(CldNodeHandlerIndex));
     CmiSetInfo(msg,infofn);
     if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, msg); }
     else if (node==CLD_BROADCAST_ALL){CmiSyncNodeBroadcastAllAndFree(len,msg);}
@@ -132,6 +142,8 @@ void CldModuleInit(char **argv)
 {
   CpvInitialize(int, CldHandlerIndex);
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler((CmiHandler)CldHandler);
+  CpvInitialize(int, CldNodeHandlerIndex);
+  CpvAccess(CldNodeHandlerIndex) = CmiRegisterHandler((CmiHandler)CldNodeHandler);
   CpvInitialize(int, CldRelocatedMessages);
   CpvInitialize(int, CldLoadBalanceMessages);
   CpvInitialize(int, CldMessageChunks);

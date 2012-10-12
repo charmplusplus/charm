@@ -3,6 +3,9 @@
 
 #define CMK_CRAYXE                                         1
 
+// for cray xe we use the known conflict free counter set from the SPP project
+#define USE_SPP_PAPI                                       1
+
 #define XE6_TOPOLOGY					   1
 
 /* 1 if the machine has a function called "getpagesize()", 0 otherwise .
@@ -52,7 +55,7 @@
 #define CMK_THREADS_USE_JCONTEXT                           0
 #define CMK_THREADS_USE_PTHREADS                           0
 
-#define CMK_USE_SPINLOCK                                   0
+#define CMK_USE_SPINLOCK                                   1
 
 /* Specifies what kind of timer to use, and the correspondent headers will be
    included in convcore.c. If none is selected, then the machine.c file needs to
@@ -101,7 +104,5 @@ In fault tolerant architectures, CK_MEM_CHECKPOINT can be set. In this case the
 extended header must contain also another field called "pn" (phase number).
 
 */
-
-#include "conv-mach-pxshm.h"
 
 #endif

@@ -1,0 +1,98 @@
+mainmodule leanmd {
+
+  readonly CProxy_Main mainProxy;       //central controller
+  readonly CProxy_Cell cellArray;     //array that houses atoms
+  readonly CProxy_Compute computeArray; //computational kernels
+
+  readonly int cellArrayDimX;		// X dimension of the Cell array
+  readonly int cellArrayDimY;		// Y dimension of the Cell array
+  readonly int cellArrayDimZ;		// Y dimension of the Cell array
+  readonly int finalStepCount;		// number of steps in the simulaion
+
+  //central controller chare
+  mainchare [migratable] Main {
+    entry Main(CkArgMsg* msg);
+    entry [reductiontarget] void computesCreated(); //called when computes have been created
+    entry [reductiontarget] void done(); //called when computes have been created
+
+    //this get called after the main constructor has called cell array constructor
+    entry void run() {
+      //compute array created, call for section creation
+      when computesCreated() atomic {
+        computeArray.doneInserting();
+        CkPrintf("Starting simulation .... \n\n");
+        cellArray.run();
+        computeArray.run();
+      }
+      //when all chares are done
+      when done() atomic {
+        CkPrintf("Simulation completed\n");
+        CkExit();
+      }
+    };
+  };
+
+  //message used to convey particle to computes
+  message ParticleDataMsg{
+    vec3 part[];
+  };
+
+  //chares to house atoms
+  array [3D] Cell {
+    entry Cell();  
+    entry void createComputes();    //call to insert computes that I need  
+    entry void receiveParticles(CkVec<Particle> updates);   //receive atoms that have migrated to neighboring cells to me
+    entry void receiveForces(int iter, vec3 forces[n], int n);   //receives forces from my computes on my atoms
+
+    //function to perform iterations for Cells
+    entry void run() {
+      for(stepCount = 1; stepCount <= finalStepCount; stepCount++) {
+        //send current atom positions to my computes 
+        atomic { sendPositions(); } 
+
+        //update properties of atoms using new force values 
+        // when reduceForces(vec3 forces[n], int n) atomic { updateProperties(forces, n); }
+        for(forceCount=0; forceCount < inbrs; forceCount++){
+        	when receiveForces[stepCount](int iter, vec3 forces[n], int n) atomic { addForces(forces); }
+		}
+
+		atomic { updateProperties(); }
+
+        if ((stepCount %  MIGRATE_STEPCOUNT) == 0) {
+          //send atoms that have moved beyond my cell to neighbors
+          atomic { migrateParticles(); } 
+    
+          //receive particles from my neighbors
+          for(updateCount = 0; updateCount < inbrs; updateCount++) {
+            when receiveParticles(CkVec<Particle> &updates) atomic {
+              for(int i=0; i < updates.length(); i++) {
+                particles.push_back(updates[i]);    //add particles that have moved from neighboring cells to my cell
+              }
+            }
+          }
+        }
+      }
+      //everything done, reduction on kinetic energy
+      atomic { contribute(0,NULL,CkReduction::nop,CkCallback(CkReductionTarget(Main,done),mainProxy)); }
+    };
+  };
+
+  //chares that do force computations for pair of cells
+  array [6D] Compute {
+    entry Compute();
+    entry void calculateForces(ParticleDataMsg *msg);
+
+    entry void run() {
+      for(stepCount = 1; stepCount <= finalStepCount; stepCount++) {
+        //self interaction check
+        if(thisIndex.x1==thisIndex.x2 && thisIndex.y1==thisIndex.y2 && thisIndex.z1==thisIndex.z2) {
+          when calculateForces[stepCount](ParticleDataMsg *msg) atomic { selfInteract(msg); }
+        } else {
+          //receive positions from two cells - buffer the first one
+          when calculateForces[stepCount](ParticleDataMsg *msg) atomic { bufferedMsg = msg; }
+          when calculateForces[stepCount](ParticleDataMsg *msg) atomic { interact(msg); }
+        }
+      }
+    };
+  };
+};

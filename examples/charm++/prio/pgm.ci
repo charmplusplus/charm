@@ -1,0 +1,17 @@
+mainmodule prio {
+  readonly CProxy_Main mainProxy;
+
+  message TestMsg;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void finished();
+  }
+
+  chare Chare1 {
+    entry Chare1();
+    entry void prioMarshalling(int test);
+    entry void prioMessage(TestMsg* msg);
+    entry void normalPrio(int test2);
+  }
+}

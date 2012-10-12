@@ -11,7 +11,7 @@ extern unsigned char in_comment;
 void yyerror(const char *);
 extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
-extern TList<Entry *> *connectEntries;
+extern std::list<Entry *> connectEntries;
 ModuleList *modlist;
 namespace xi {
 extern int macroDefined(const char *str, int istrue);
@@ -107,7 +107,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %type <modlist>		ModuleEList File
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
-%type <construct>	Construct
+%type <construct>	Construct ConstructSemi
 %type <strval>		Name QualName CCode CPROGRAM_List OptNameInit 
 %type <strval>		OptTraceName
 %type <val>		OptStackSize
@@ -136,7 +136,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %type <accelBlock>      AccelBlock
 %type <typelist>	BaseList OptBaseList
 %type <mbrlist>		MemberEList MemberList
-%type <member>		Member NonEntryMember InitNode InitProc
+%type <member>		Member MemberBody NonEntryMember InitNode InitProc UnexpectedToken
 %type <pupable>		PUPableClass
 %type <includeFile>	IncludeFile
 %type <tvar>		TVar
@@ -212,37 +212,55 @@ ConstructList	: /* Empty */
 		{ $$ = new ConstructList(lineno, $1, $2); }
 		;
 
-Construct	: OptExtern '{' ConstructList '}' OptSemiColon
-		{ if($3) $3->setExtern($1); $$ = $3; }
-                | NAMESPACE Name '{' ConstructList '}'
-                { $$ = new Scope($2, $4); }
-                | USING NAMESPACE QualName ';'
+ConstructSemi   : USING NAMESPACE QualName
                 { $$ = new UsingScope($3, false); }
-                | USING QualName ';'
+                | USING QualName
                 { $$ = new UsingScope($2, true); }
-		| OptExtern Module
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern NonEntryMember 
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Message ';'
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Chare
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Group
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern NodeGroup
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Array
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Template
-		{ $2->setExtern($1); $$ = $2; }
-		| HashIFComment
-		{ $$ = NULL; }
-		| HashIFDefComment
-		{ $$ = NULL; }
-                | AccelBlock
-                { $$ = $1; }
-		;
+                | OptExtern NonEntryMember
+                { $2->setExtern($1); $$ = $2; }
+                | OptExtern Message
+                { $2->setExtern($1); $$ = $2; }
+                | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters
+                {
+                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, 0, 0);
+                  int isExtern = 1;
+                  e->setExtern(isExtern);
+                  e->targs = $6;
+                  e->label = new XStr;
+                  $4->print(*e->label);
+                  $$ = e;
+                }
+                ;
+
+Construct	: OptExtern '{' ConstructList '}' OptSemiColon
+        { if($3) $3->setExtern($1); $$ = $3; }
+        | NAMESPACE Name '{' ConstructList '}'
+        { $$ = new Scope($2, $4); }
+        | ConstructSemi ';'
+        { $$ = $1; }
+        | ConstructSemi UnexpectedToken
+        { yyerror("The preceding construct must be semicolon terminated"); YYABORT; }
+        | OptExtern Module
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Chare
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Group
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern NodeGroup
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Array
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Template
+        { $2->setExtern($1); $$ = $2; }
+        | HashIFComment
+        { $$ = NULL; }
+        | HashIFDefComment
+        { $$ = NULL; }
+        | AccelBlock
+        { $$ = $1; }
+        | error
+        { printf("Invalid construct\n"); YYABORT; }
+        ;
 
 TParam		: Type
 		{ $$ = new TParamType($1); }
@@ -589,20 +607,9 @@ MemberEList	: ';'
 
 MemberList	: /* Empty */
 		{ 
-		  Entry *tempEntry;
-		  if (!connectEntries->empty()) {
-		    tempEntry = connectEntries->begin();
-		    MemberList *ml;
-		    ml = new MemberList(tempEntry, 0);
-		    tempEntry = connectEntries->next();
-		    for(; !connectEntries->end(); tempEntry = connectEntries->next()) {
-                      ml->appendMember(tempEntry); 
-		    }
-		    while (!connectEntries->empty())
-		      connectEntries->pop();
-                    $$ = ml; 
-		  }
-		  else {
+                  if (!connectEntries.empty()) {
+                    $$ = new MemberList(connectEntries);
+		  } else {
 		    $$ = 0; 
                   }
 		}
@@ -610,18 +617,18 @@ MemberList	: /* Empty */
 		{ $$ = new MemberList($1, $2); }
 		;
 
-NonEntryMember  : Readonly ';'
+NonEntryMember  : Readonly
 		{ $$ = $1; }
-		| ReadonlyMsg ';'
+		| ReadonlyMsg
 		{ $$ = $1; }
-		| InitProc ';'
-		| InitNode ';'
+		| InitProc
+		| InitNode
 		{ $$ = $1; }
-		| PUPABLE PUPableClass ';'
+		| PUPABLE PUPableClass
 		{ $$ = $2; }
-		| INCLUDE IncludeFile ';'
+		| INCLUDE IncludeFile
 		{ $$ = $2; }
-		| CLASS Name ';'
+		| CLASS Name
 		{ $$ = new ClassDeclaration(lineno,$2); } 
 		;
 
@@ -670,20 +677,52 @@ IncludeFile    : LITERAL
 		{ $$ = new IncludeFile(lineno,$1); } 
 		;
 
-Member		: Entry ';'
+Member          : MemberBody ';'
+                { $$ = $1; }
+                // Error constructions
+                | MemberBody UnexpectedToken
+                { yyerror("The preceding entry method declaration must be semicolon-terminated."); YYABORT; }
+                ;
+
+MemberBody	: Entry
 		{ $$ = $1; }
+                | TemplateSpec Entry
+                {
+                  $2->tspec = $1;
+                  $$ = $2;
+                }
 		| NonEntryMember
 		{ $$ = $1; }
 		;
+
+UnexpectedToken : ENTRY
+                { $$ = 0; }
+                | '}'
+                { $$ = 0; }
+                | INITCALL
+                { $$ = 0; }
+                | INITNODE
+                { $$ = 0; }
+                | INITPROC
+                { $$ = 0; }
+                | CHARE
+                { $$ = 0; }
+                | MAINCHARE
+                { $$ = 0; }
+                | ARRAY
+                { $$ = 0; }
+                | GROUP
+                { $$ = 0; }
+                | NODEGROUP
+                { $$ = 0; }
+                | READONLY
+                { $$ = 0; }
 
 Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
 		  if ($7 != 0) { 
 		    $7->con1 = new SdagConstruct(SIDENT, $4);
-  		    if ($5 != 0)
-                      $7->param = new ParamList($5);
- 		    else 
- 	 	      $7->param = new ParamList(new Parameter(0, new BuiltinType("void")));
+                    $7->param = new ParamList($5);
                   }
 		  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, 0, 0); 
 		}
@@ -691,10 +730,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
 		  if ($5 != 0) {
 		    $5->con1 = new SdagConstruct(SIDENT, $3);
-		    if ($4 != 0)
-                      $5->param = new ParamList($4);
-		    else
-                      $5->param = new ParamList(new Parameter(0, new BuiltinType("void")));
+                    $5->param = new ParamList($4);
                   }
 		  Entry *e = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0);
 		  if (e->param && e->param->isCkMigMsgPtr()) {
@@ -737,6 +773,8 @@ EAttribs	: /* Empty */
 		{ $$ = 0; }
 		| '[' EAttribList ']'
 		{ $$ = $2; }
+                | error
+                { printf("Invalid entry method attribute list\n"); YYABORT; }
 		;
 
 EAttribList	: EAttrib
@@ -773,8 +811,10 @@ EAttrib		: THREADED
                 { $$ = SPYTHON; }
 		| MEMCRITICAL
 		{ $$ = SMEM; }
-        | REDUCTIONTARGET
-        { $$ = SREDUCE; }
+                | REDUCTIONTARGET
+                { $$ = SREDUCE; }
+		| error
+		{ printf("Invalid entry method attribute: %s\n", yylval); YYABORT; }
 		;
 
 DefaultParameter: LITERAL
@@ -934,7 +974,7 @@ AccelParamList	: AccelParameter
 EParameters	: '(' ParamList ')'
 		{ $$ = $2; }
 		| '(' ')'
-		{ $$ = 0; }
+		{ $$ = new ParamList(new Parameter(0, new BuiltinType("void"))); }
 		;
 
 AccelEParameters  : '[' AccelParamList ']'
@@ -996,21 +1036,21 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		   in_braces = 0;
 		   if (($4->isVoid() == 0) && ($4->isMessage() == 0))
                    {
-		      connectEntries->append(new Entry(0, 0, new BuiltinType("void"), $3, 
+		      connectEntries.push_back(new Entry(0, 0, new BuiltinType("void"), $3,
 	 	 			new ParamList(new Parameter(lineno, new PtrType( 
                                         new NamedType("CkMarshallMsg")), "_msg")), 0, 0, 0, 1, $4));
 		   }
 		   else  {
-		      connectEntries->append(new Entry(0, 0, new BuiltinType("void"), $3, $4, 0, 0, 0, 1, $4));
+		      connectEntries.push_back(new Entry(0, 0, new BuiltinType("void"), $3, $4, 0, 0, 0, 1, $4));
                    }
                    $$ = new SdagConstruct(SCONNECT, $3, $7, $4);
 		}
 		| WHEN SEntryList '{' '}'
-		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, 0,  $2); }
+		{ $$ = new WhenConstruct($2, 0); }
 		| WHEN SEntryList SingleConstruct
-		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, $3, $2); }
+		{ $$ = new WhenConstruct($2, $3); }
 		| WHEN SEntryList '{' Slist '}'
-		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, $4, $2); }
+		{ $$ = new WhenConstruct($2, $4); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new SdagConstruct(SOVERLAP,0, 0,0,0,0,$3, 0); }	
 		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr '{' Slist '}'
@@ -1037,6 +1077,11 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		{ $$ = $2; }
 		| ParamBraceStart CCode ParamBraceEnd
 		{ $$ = buildAtomic($2, NULL, NULL); }
+                | error
+                { printf("Unknown SDAG construct or malformed entry method definition.\n"
+                         "You may have forgotten to terminate an entry method definition with a"
+                         " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'\n"); YYABORT; }
+                ;
 
 HasElse		: /* Empty */
 		{ $$ = 0; }
@@ -1060,19 +1105,9 @@ StartIntExpr	: '('
 		;
 
 SEntry		: IDENT EParameters
-		{ 
-		  if ($2 != 0)
-		     $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, 0); 
-		  else
-		     $$ = new Entry(lineno, 0, 0, $1, 
-				new ParamList(new Parameter(0, new BuiltinType("void"))), 0, 0, 0, 0); 
-		}
+		{ $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, 0); }
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
-		{ if ($5 != 0)
-		    $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, 0); 
-		  else
-		    $$ = new Entry(lineno, 0, 0, $1, new ParamList(new Parameter(0, new BuiltinType("void"))), 0, 0, $3, 0); 
-		}
+		{ $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, 0); }
 		;
 
 SEntryList	: SEntry 

@@ -2,11 +2,65 @@
 #include <stdlib.h>
 #include "sdag-globals.h"
 #include "xi-symbol.h"
-//#include "CParsedFile.h"
+#include "CParsedFile.h"
 #include "EToken.h"
 #include "CStateVar.h"
+#include <list>
+using std::list;
+#include <algorithm>
+using std::for_each;
+#include <functional>
+using std::mem_fun;
 
 namespace xi {
+
+SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
+{
+  con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
+  type = t;
+  traceName=NULL;
+  publishesList = new list<SdagConstruct*>();
+  constructs = new list<SdagConstruct*>();
+  constructs->push_back(construct1);
+}
+
+SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList)
+{
+  con1=0; con2=0; con3=0; con4=0;
+  type = t;
+  traceName=NULL;
+  publishesList = new list<SdagConstruct*>();
+  constructs = new list<SdagConstruct*>();
+  constructs->push_back(construct1);
+  constructs->insert(constructs->end(), aList->constructs->begin(), aList->constructs->end());
+}
+
+SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
+			     SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el)
+{
+  text = txt;
+  type = t;
+  traceName=NULL;
+  con1 = c1; con2 = c2; con3 = c3; con4 = c4;
+  publishesList = new list<SdagConstruct*>();
+  constructs = new list<SdagConstruct*>();
+  if (constructAppend != 0) {
+    constructs->push_back(constructAppend);
+  }
+  elist = el;
+}
+
+SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl)
+{
+  type = t;
+  traceName=NULL;
+  text = new XStr(codeStr);
+  connectEntry = new XStr(entryStr);
+  con1 = 0; con2 = 0; con3 = 0; con4 =0;
+  publishesList = new list<SdagConstruct*>();
+  constructs = new list<SdagConstruct*>();
+  param = pl;
+}
 
 SdagConstruct *buildAtomic(const char* code,
 			   SdagConstruct *pub_list,
@@ -51,9 +105,7 @@ void SdagConstruct::numberNodes(void)
   }
   SdagConstruct *cn;
   if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->numberNodes();
-    }
+    for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::numberNodes));
   }
 }
 
@@ -127,13 +179,11 @@ void SdagConstruct::labelNodes(void)
   }
   SdagConstruct *cn;
   if (constructs != 0) {
-    for(cn=(SdagConstruct *)(constructs->begin()); !constructs->end(); cn=(SdagConstruct *)(constructs->next())) {
-      cn->labelNodes();
-    }
+    for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::labelNodes));
   }
 }
 
-void EntryList::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
 {
    EntryList *el;
    el = this;
@@ -144,21 +194,21 @@ void EntryList::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thi
    }
 }
 
-void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+void Entry::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
 {
    // case SENTRY:
-   CEntry *entry;
    bool found = false;
    
-   for(entry=CEntrylist.begin(); !CEntrylist.end(); entry=CEntrylist.next()) {
-     if(*(entry->entry) == (const char *)name) 
+   for(list<CEntry *>::iterator entry=CEntrylist.begin(); 
+       entry != CEntrylist.end(); ++entry) {
+     if(*((*entry)->entry) == (const char *)name) 
      {
         ParamList *epl;
-	epl = entry->paramlist;
+	epl = (*entry)->paramlist;
         ParamList *pl;
         pl = param;
         found = false;
-	if ((entry->paramlist->isVoid() == 1) && (pl->isVoid() == 1)) {
+	if (((*entry)->paramlist->isVoid() == 1) && (pl->isVoid() == 1)) {
 	   found = true;
 	}
 	while ((pl != NULL) && (epl != NULL))
@@ -181,54 +231,56 @@ void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhe
           found = false;
 	if (found) {
           // check to see if thisWhen is already in entry's whenList
-          int whenFound = 0;
-          TList<SdagConstruct*> *tmpList = &(entry->whenList);
-          SdagConstruct *tmpNode;
-          for(tmpNode = tmpList->begin(); !tmpList->end(); tmpNode = tmpList->next()) {
-            if(tmpNode->nodeNum == thisWhen->nodeNum)
-               whenFound = 1;
+          bool whenFound = false;
+          for(list<WhenConstruct*>::iterator it = (*entry)->whenList.begin();
+              it != (*entry)->whenList.end(); ++it) {
+            if ((*it)->nodeNum == thisWhen->nodeNum)
+              whenFound = true;
           }
           if(!whenFound)
-            entry->whenList.append(thisWhen);
-          entryPtr = entry;
+            (*entry)->whenList.push_back(thisWhen);
+          entryPtr = *entry;
           if(intExpr != 0)
-            entry->refNumNeeded = 1; 
+            (*entry)->refNumNeeded = 1; 
 	 } 
      }
    }
    if(!found) {
      CEntry *newEntry;
      newEntry = new CEntry(new XStr(name), param, estateVars, paramIsMarshalled() );
-     CEntrylist.append(newEntry);
+     CEntrylist.push_back(newEntry);
      entryPtr = newEntry;
-     newEntry->whenList.append(thisWhen);
+     newEntry->whenList.push_back(thisWhen);
      if(intExpr != 0)
        newEntry->refNumNeeded = 1; 
    }
       //break;
 }
 
-void SdagConstruct::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+void SdagConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
 {
-  SdagConstruct *cn;
-  switch(type) {
-    case SWHEN:
-      elist->generateEntryList(CEntrylist, this);  /* con1 is the WHEN's ELIST */
-      break;
-    case SIF:
-	/* con2 is the ELSE corresponding to this IF */
-      if(con2!=0) con2->generateEntryList(CEntrylist, thisWhen); 
-      break;
-  }
+  if (SIF == type && con2 != 0)
+    con2->generateEntryList(CEntrylist, thisWhen);
+  generateChildrenEntryList(CEntrylist, thisWhen);
+}
+
+void WhenConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
+{
+  elist->generateEntryList(CEntrylist, this);  /* con1 is the WHEN's ELIST */
+  generateChildrenEntryList(CEntrylist, thisWhen);
+}
+
+void SdagConstruct::generateChildrenEntryList(list<CEntry*>& CEntrylist,
+                                              WhenConstruct *thisWhen) {
   if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->generateEntryList(CEntrylist,thisWhen);
-    }
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it)
+      (*it)->generateEntryList(CEntrylist, thisWhen);
   }
 }
- 
+
 void SdagConstruct::generateConnectEntries(XStr& decls) {
-   decls << "  void " <<connectEntry->charstar() << "(";
+   decls << "  void " <<connectEntry << "(";
    ParamList *pl = param;
    XStr msgParams;
    if (pl->isVoid() == 1) {
@@ -238,7 +290,7 @@ void SdagConstruct::generateConnectEntries(XStr& decls) {
      decls << pl->getBaseName() <<" *" <<pl->getGivenName();
    }
    else {
-    decls << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg";
+    decls << "CkMarshallMsg *" /*<< connectEntry*/ <<"_msg";
    }
    decls << ") {\n";
 
@@ -247,22 +299,19 @@ void SdagConstruct::generateConnectEntries(XStr& decls) {
     param->beginUnmarshall(msgParams);
    }
 
-   decls << msgParams.charstar() <<"\n"; 
-   decls << "  " <<text->charstar() <<"\n";
+   decls << msgParams <<"\n";
+   decls << "  " <<text <<"\n";
 
    decls << "  }\n";
 }
 
-void SdagConstruct::generateConnectEntryList(TList<SdagConstruct*>& ConnectEList) {
+void SdagConstruct::generateConnectEntryList(list<SdagConstruct*>& ConnectEList) {
   if (type == SCONNECT)
-     ConnectEList.append(this);
+     ConnectEList.push_back(this);
   if (constructs != 0) {
-    SdagConstruct *cn;
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->generateConnectEntryList(ConnectEList);
-    }
+    for (list<SdagConstruct*>::iterator iter = constructs->begin(); iter != constructs->end(); ++iter)
+      (*iter)->generateConnectEntryList(ConnectEList);
   }
-
 }
 
 void SdagConstruct::propagateState(int uniqueVarNum)
@@ -272,120 +321,67 @@ void SdagConstruct::propagateState(int uniqueVarNum)
     fprintf(stderr, "use of non-entry as the outermost construct..\n");
     exit(1);
   }*/
-  stateVars = new TList<CStateVar*>();
+  stateVars = new list<CStateVar*>();
   ParamList *pl = param;
   if (pl->isVoid() == 1) {
      sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
-     stateVars->append(sv);
+     stateVars->push_back(sv);
   }
   else {
     while (pl != NULL) {
-      stateVars->append(new CStateVar(pl));
+      stateVars->push_back(new CStateVar(pl));
       pl = pl->next;
     }
   }
 
 #if CMK_BIGSIM_CHARM
   // adding _bgParentLog as the last extra parameter for tracing
-  stateVarsChildren = new TList<CStateVar*>();
-
-  for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next())
-    stateVarsChildren->append(sv);
+  stateVarsChildren = new list<CStateVar*>(*stateVars);
   sv = new CStateVar(0, "void *", 0,"_bgParentLog", 0, NULL, 1);  
-  stateVarsChildren->append(sv);
+  stateVarsChildren->push_back(sv);
 #else
   stateVarsChildren = stateVars; 
 #endif
 
-  SdagConstruct *cn;
-  TList<CStateVar*> *whensEntryMethodStateVars; 
-  whensEntryMethodStateVars = new TList<CStateVar*>();
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-     cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars , *publishesList, uniqueVarNum);
-  }
+  list<CStateVar*> whensEntryMethodStateVars;
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it)
+    (*it)->propagateState(*stateVarsChildren, whensEntryMethodStateVars, *publishesList, uniqueVarNum);
 }
 
-
-void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
+void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum)
 {
   CStateVar *sv;
-  TList<CStateVar*> *whensEntryMethodStateVars; 
-  stateVars = new TList<CStateVar*>();
+  list<CStateVar*> *whensEntryMethodStateVars = NULL;
+  stateVars = new list<CStateVar*>();
   switch(type) {
     case SFORALL:
-      stateVarsChildren = new TList<CStateVar*>();
-      for(sv=list.begin(); !list.end(); sv=list.next()) {
-        stateVars->append(sv);
-        stateVarsChildren->append(sv);
-      }
+      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
+      stateVarsChildren = new list<CStateVar*>(plist);
       sv = new CStateVar(0,"int", 0, con1->text->charstar(), 0,NULL, 0);
-      stateVarsChildren->append(sv);
+      stateVarsChildren->push_back(sv);
       {
         char txt[128];
         sprintf(txt, "_cf%d", nodeNum);
         counter = new XStr(txt);
         sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
-        stateVarsChildren->append(sv);
-      }
-      break;
-    case SWHEN:
-      whensEntryMethodStateVars = new TList<CStateVar*>();
-      stateVarsChildren = new TList<CStateVar*>();
-      for(sv=list.begin(); !list.end(); sv=list.next()) {
-        stateVars->append(sv);
-        stateVarsChildren->append(sv);
-      }
-     
-      {  
-        EntryList *el;
-	el = elist;
-        ParamList *pl;
-	while (el != NULL) {
-          pl = el->entry->param;
-	  el->entry->stateVars = new TList<CStateVar*>();
-          if (pl->isVoid()) {
-            sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
-            //stateVars->append(sv);
-              stateVarsChildren->append(sv);
-              whensEntryMethodStateVars->append(sv); 
- 	      el->entry->estateVars.append(sv);
- 	      el->entry->stateVars->append(sv);
-          }
-          else {
-            while(pl != NULL) {
-              sv = new CStateVar(pl);
-              stateVarsChildren->append(sv);
-              whensEntryMethodStateVars->append(sv); 
- 	      el->entry->estateVars.append(sv);
- 	      el->entry->stateVars->append(sv);
-
-              pl = pl->next;
-	    }
-	  }
-	  el = el->next;
-
-	}
+        stateVarsChildren->push_back(sv);
       }
       break;
     case SIF:
-      for(sv=list.begin(); !list.end(); sv=list.next()) {
-        stateVars->append(sv);
-      }
+      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
-      if(con2 != 0) con2->propagateState(list, wlist,publist, uniqueVarNum);
+      if(con2 != 0) con2->propagateState(plist, wlist, publist, uniqueVarNum);
       break;
     case SOLIST:
-      stateVarsChildren = new TList<CStateVar*>();
-      for(sv=list.begin(); !list.end(); sv=list.next()) {
-        stateVars->append(sv);
-        stateVarsChildren->append(sv);
-      }
+      stateVarsChildren = new list<CStateVar*>(plist);
+      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       {
         char txt[128];
         sprintf(txt, "_co%d", nodeNum);
         counter = new XStr(txt);
         sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
-        stateVarsChildren->append(sv);
+        stateVarsChildren->push_back(sv);
       }
       break;
     case SFOR:
@@ -393,18 +389,14 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
     case SELSE:
     case SSLIST:
     case SOVERLAP:
-      for(sv=list.begin(); !list.end(); sv=list.next()) {
-        stateVars->append(sv);
-      }
+      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
       break;
     case SATOMIC:
-      for(sv=list.begin(); !list.end(); sv=list.next()) {
-        stateVars->append(sv);
-      }
+      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
       if (con1 != 0) {
-        publist.append(con1);
+        publist.push_back(con1);
         /*SdagConstruct *sc;
         SdagConstruct *sc1;
         for(sc =publist.begin(); !publist.end(); sc=publist.next()) {
@@ -414,14 +406,8 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
       }
       break;
     case SFORWARD:
-      stateVarsChildren = new TList<CStateVar*>();
-      for(sv=list.begin(); !list.end(); sv=list.next()) { 
-        stateVars->append(sv);
-      }
-      for(sv=wlist.begin(); !wlist.end(); sv=wlist.next()) { 
-        stateVarsChildren->append(sv);
-      }
-
+      stateVarsChildren = new list<CStateVar*>(wlist);
+      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       break;
     case SCONNECT: 
     case SINT_EXPR:
@@ -434,15 +420,57 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
       exit(1);
       break;
   }
-  SdagConstruct *cn;
-  if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      if (type == SWHEN)
-         cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars, publist,  uniqueVarNum);
-      else
-         cn->propagateState(*stateVarsChildren, wlist, publist,  uniqueVarNum);
+
+  propagateStateToChildren(*stateVarsChildren, wlist, publist, uniqueVarNum);
+  delete whensEntryMethodStateVars;
+}
+
+void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
+  CStateVar *sv;
+  list<CStateVar*> whensEntryMethodStateVars;
+  stateVars = new list<CStateVar*>();
+  stateVarsChildren = new list<CStateVar*>();
+
+  for (list<CStateVar*>::iterator iter = plist.begin(); iter != plist.end(); ++iter) {
+    sv = *iter;
+    stateVars->push_back(sv);
+    stateVarsChildren->push_back(sv);
+  }
+
+  EntryList *el;
+  el = elist;
+  ParamList *pl;
+  while (el != NULL) {
+    pl = el->entry->param;
+    if (pl->isVoid()) {
+      sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
+      //stateVars->push_back(sv);
+      stateVarsChildren->push_back(sv);
+      whensEntryMethodStateVars.push_back(sv);
+      el->entry->addEStateVar(sv);
     }
- } 
+    else {
+      while(pl != NULL) {
+        sv = new CStateVar(pl);
+        stateVarsChildren->push_back(sv);
+        whensEntryMethodStateVars.push_back(sv);
+        el->entry->addEStateVar(sv);
+
+        pl = pl->next;
+      }
+    }
+    el = el->next;
+  }
+
+  propagateStateToChildren(*stateVarsChildren, whensEntryMethodStateVars, publist, uniqueVarNum);
+}
+
+void SdagConstruct::propagateStateToChildren(list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
+  if (constructs != 0) {
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it)
+      (*it)->propagateState(stateVarsChildren, wlist, publist, uniqueVarNum);
+  }
 }
 
 void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
@@ -480,9 +508,6 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
     case SOVERLAP:
       generateOverlap(decls, defs, entry);
       break;
-    case SWHEN:
-      generateWhen(decls, defs, entry);
-      break;
     case SFORWARD:
       generateForward(decls, defs, entry);
       break;
@@ -492,12 +517,100 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
     default:
       break;
   }
-  SdagConstruct *cn;
+  generateChildrenCode(decls, defs, entry);
+}
+
+void SdagConstruct::generateChildrenCode(XStr& decls, XStr& defs, Entry* entry) {
   if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->generateCode(decls, defs, entry);
-    }
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it)
+      (*it)->generateCode(decls, defs, entry);
   }
+}
+
+void SdagConstruct::generateWhenCode(XStr& op)
+{
+  SdagConstruct *cn = this;
+  XStr whenParams = "";
+  int i = 0;
+  int iArgs = 0;
+  bool lastWasVoid = false;
+  bool paramMarshalling = false;
+
+#if CMK_BIGSIM_CHARM
+  // bgLog2 stores the parent dependence of when, e.g. for, olist
+  op <<"  cmsgbuf->bgLog2 = (void*)tr->args[1];\n";
+#endif
+
+  for (list<CStateVar*>::iterator iter = stateVars->begin();
+       iter != stateVars->end();
+       ++iter, ++i) {
+    CStateVar *sv = *iter;
+    if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
+      paramMarshalling =1;
+      op << "        CkMarshallMsg *impl_msg" <<cn->nodeNum <<" = (CkMarshallMsg *) tr->args["<<iArgs++<<"];\n";
+      op << "        char *impl_buf" <<cn->nodeNum <<"=((CkMarshallMsg *)impl_msg" <<cn->nodeNum <<")->msgBuf;\n";
+      op << "        PUP::fromMem implP" <<cn->nodeNum <<"(impl_buf" <<cn->nodeNum <<");\n";
+    }
+    if (sv->isMsg == 1) {
+      if((i!=0) && (lastWasVoid == 0))
+        whenParams.append(", ");
+#if CMK_BIGSIM_CHARM
+      if(i==1) {
+        whenParams.append(" NULL ");
+        lastWasVoid=0;
+        // skip this arg which is supposed to be _bgParentLog
+        iArgs++;
+        continue;
+      }
+#endif
+      whenParams.append("(");
+      whenParams.append(sv->type->charstar());
+      whenParams.append(") tr->args[");
+      whenParams<<iArgs;
+      whenParams.append("]");
+      iArgs++;
+    }
+    else if (sv->isVoid == 1)
+      // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+      op <<"        tr->args[" <<iArgs++ <<"] = 0;\n";
+    else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
+      if((i > 0) && (lastWasVoid == 0))
+        whenParams.append(", ");
+      whenParams.append(*(sv->name));
+      if (sv->arrayLength != 0)
+        op << "        int impl_off" << cn->nodeNum << "_" << sv->name << "; implP"
+          <<cn->nodeNum << "|impl_off" <<cn->nodeNum  << "_" << sv->name << ";\n";
+      else
+        op << "        " << sv->type << " " << sv->name << "; implP"
+          <<cn->nodeNum << "|" << sv->name << ";\n";
+    }
+    lastWasVoid = sv->isVoid;
+  }
+  if (paramMarshalling == 1)
+    op << "        impl_buf"<<cn->nodeNum << "+=CK_ALIGN(implP" <<cn->nodeNum <<".size(),16);\n";
+  for (list<CStateVar*>::iterator iter = stateVars->begin();
+       iter != stateVars->end();
+       ++iter) {
+    CStateVar *sv = *iter;
+    if (sv->arrayLength != 0)
+      op << "        " << sv->type << " *" << sv->name << "=(" << sv->type << " *)(impl_buf" <<cn->nodeNum
+        << "+impl_off" <<cn->nodeNum << "_" << sv->name << ");\n";
+  }
+  if (paramMarshalling == 1)
+    op << "        delete (CkMarshallMsg *)impl_msg" <<cn->nodeNum <<";\n";
+  op << "        " << cn->label << "(" << whenParams;
+  op << ");\n";
+  op << "        delete tr;\n";
+
+#if CMK_BIGSIM_CHARM
+  cn->generateTlineEndCall(op);
+  cn->generateBeginExec(op, "sdagholder");
+#endif
+  op << "    ";
+  cn->generateDummyBeginExecute(op);
+
+  op << "        return;\n";
 }
 
 void SdagConstruct::generateConnect(XStr& decls, XStr& defs, Entry* entry) {
@@ -505,37 +618,37 @@ void SdagConstruct::generateConnect(XStr& decls, XStr& defs, Entry* entry) {
   defs << "    int index;\n";
   if ((param->isVoid() == 0) && (param->isMessage() == 0)) {
      defs << "    CkMarshallMsg *x;\n";
-     defs << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
+     defs << "    index = CkIndex_Ar1::" <<connectEntry <<"(x);\n";  //replace
      defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
   }
   else if (param->isVoid() == 1) {
-     defs << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(void);\n";  //replace
+     defs << "    index = CkIndex_Ar1::" <<connectEntry <<"(void);\n";  //replace
      defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
   }
   else {
      defs << "    " << param->getBaseName() <<" *x;\n";  // replace
-     defs << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
+     defs << "    index = CkIndex_Ar1::" <<connectEntry <<"(x);\n";  //replace
      defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
   }
-  defs << "    myPublish->get_" <<connectEntry->charstar() <<"(cb);\n";  //replace - myPublish
+  defs << "    myPublish->get_" <<connectEntry <<"(cb);\n";  //replace - myPublish
 
   endMethod(defs);
 }
 
 void SdagConstruct::generateForward(XStr& decls, XStr& defs, Entry* entry) {
-  SdagConstruct *cn;
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it) {
     defs << "    { ";
-    generateCall(defs, *stateVarsChildren, cn->text->charstar());
+    generateCall(defs, *stateVarsChildren, (*it)->text);
     defs<<" }\n";
   }
-  generateCall(defs, *stateVarsChildren, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVarsChildren, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
 
-void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
+void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   generateSignature(decls, defs, entry, false, "int", label, false, stateVars);
@@ -559,11 +672,12 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
                         e->getEntryName() << "_msg;\n";
     }
     else {
-        for(sv=e->stateVars->begin(); !e->stateVars->end(); e->stateVars->next()) {
-          defs << "    CMsgBuffer *"<<sv->name->charstar()<<"_buf;\n";
-          defs << "    " << sv->type->charstar() << " " <<
-                          sv->name->charstar() << ";\n";
-        } 
+      for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end();
+           ++it) {
+        sv = *it;
+        defs << "    CMsgBuffer *" << sv->name << "_buf;\n"
+             << "    " << sv->type << " " << sv->name << ";\n";
+      }
     }
     el = el->next;
   }
@@ -577,11 +691,11 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
      if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1))
        defs << e->getEntryName();
      else
-       defs << sv->name->charstar();
+       defs << sv->name;
      defs << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum;
      if (e->intExpr)
        defs << ", " << e->intExpr;
-     defs << "); // SEGFAULT? __cDep = 0x0? Did you call __sdag_init() in your constructor?\n";
+     defs << ");\n";
 
     el = el->next;
   }
@@ -595,8 +709,8 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
         defs << "(" << e->getEntryName() << "_buf != 0)";
      }
      else {
-        sv = e->stateVars->begin();
-        defs << "(" << sv->name->charstar() << "_buf != 0)";
+       sv = *(e->stateVars.begin());
+       defs << "(" << sv->name << "_buf != 0)";
      }
      el = el->next;
      if (el != NULL)
@@ -616,13 +730,13 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
   for(el=elist; el!=NULL; el=elist->next) {
     e = el->entry;
        if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() ==1)) {
-	defs << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog1; \n";
-	defs << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog2; \n";
+	defs << "       logs1[" << localnum << "] = " << /*el->con4->text sv->type*/e->getEntryName() << "_buf->bgLog1; \n";
+	defs << "       logs2[" << localnum << "] = " << /*el->con4->text sv->type*/e->getEntryName() << "_buf->bgLog2; \n";
 	localnum++;
       }
       else{
-	defs << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar()<< "_buf->bgLog1; \n";
-	defs << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar() << "_buf->bgLog2; \n";
+	defs << "       logs1[" << localnum << "] = " << /*el->con4->text*/ sv->name<< "_buf->bgLog1; \n";
+	defs << "       logs2[" << localnum << "] = " << /*el->con4->text*/ sv->name << "_buf->bgLog2; \n";
 	localnum++;
       }
   }
@@ -649,53 +763,57 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
         defs <<"       PUP::fromMem " <<e->getEntryName() <<"_implP("
 	   <<e->getEntryName() <<"_impl_buf);\n";
 
-        for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
+        for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end();
+             ++it) {
+        CStateVar *sv = *it;
            if (sv->arrayLength != NULL)
-              defs <<"       int impl_off_"<<sv->name->charstar()
+              defs <<"       int impl_off_"<<sv->name
 	         <<"; "<<e->getEntryName() <<"_implP|impl_off_"
-		 <<sv->name->charstar()<<";\n";
+		 <<sv->name<<";\n";
            else
-               defs <<"       "<<sv->type->charstar()<<" "<<sv->name->charstar()
+               defs <<"       "<<sv->type<<" "<<sv->name
 	       <<"; " <<e->getEntryName() <<"_implP|"
-	       <<sv->name->charstar()<<";\n";
+	       <<sv->name<<";\n";
 	}
         defs << "       " <<e->getEntryName() <<"_impl_buf+=CK_ALIGN("
 	   <<e->getEntryName() <<"_implP.size(),16);\n";
-        for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
+        for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end();
+             ++it) {
+          CStateVar *sv = *it;
            if (sv->arrayLength != NULL)
-              defs << "       "<<sv->type->charstar()<< " *" <<sv->name->charstar() <<"=(" <<sv->type->charstar()
+              defs << "       "<<sv->type<< " *" <<sv->name <<"=(" <<sv->type
 		 <<" *)(" <<e->getEntryName() <<"_impl_buf+" <<"impl_off_"
-		 <<sv->name->charstar()<<");\n";
+		 <<sv->name<<");\n";
         }
         defs << "       __cDep->removeMessage(" << e->getEntryName() <<
               "_buf);\n";
         defs << "       delete " << e->getEntryName() << "_buf;\n";
      }
      else {  // There was a message as the only parameter
-        sv = e->stateVars->begin();
-        defs << "       " << sv->name->charstar() << " = (" <<
-              sv->type->charstar() << ") " <<
-              sv->name->charstar() << "_buf->msg;\n";
-        defs << "       __cDep->removeMessage(" << sv->name->charstar() <<
+        sv = *e->stateVars.begin();
+        defs << "       " << sv->name << " = (" <<
+              sv->type << ") " <<
+              sv->name << "_buf->msg;\n";
+        defs << "       __cDep->removeMessage(" << sv->name <<
               "_buf);\n";
-        defs << "       delete " << sv->name->charstar() << "_buf;\n";
+        defs << "       delete " << sv->name << "_buf;\n";
      }
      el = el->next;
   }
 
   // max(current,merge) --> current, then reset the mergepath
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  defs << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
-  defs << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
-  defs << "       " << label->charstar()  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+  defs << "       " << label  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
+  defs << "       currentlyExecutingPath = " << label  << "_PathMergePoint; /* Critical Path Detection */ \n";
+  defs << "       " << label  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
   defs << "       ";
 
   if (constructs && !constructs->empty()) {
-    generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+    generateCall(defs, *stateVarsChildren, constructs->front()->label);
   } else {
-    generateCall(defs, *stateVarsChildren, label->charstar(), "_end");
+    generateCall(defs, *stateVarsChildren, label, "_end");
   }
 
   el = elist;
@@ -725,7 +843,7 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
 #define MAXANY 8
 #define MAXREF 8
 
-  if(stateVars->length() > MAXARG) {
+  if(stateVars->size() > MAXARG) {
     fprintf(stderr, "numStateVars more that %d, contact developers.\n",
 		     MAXARG);
     exit(1);
@@ -742,21 +860,24 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
   }
   defs << "       CWhenTrigger *tr;\n";
   defs << "       tr = new CWhenTrigger(" << nodeNum << ", " <<
-        stateVars->length() << ", " << nRefs << ", " << nAny << ");\n";
+    (int)(stateVars->size()) << ", " << nRefs << ", " << nAny << ");\n";
   int iArgs=0;
  
 //  defs << "       int impl_off=0;\n";
   int hasArray = 0;
   int numParamsNeedingMarshalling = 0;
   int paramIndex =0;
-  for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+  for (list<CStateVar*>::iterator iter = stateVars->begin();
+       iter != stateVars->end();
+       ++iter) {
+    CStateVar *sv = *iter;
     if (sv->isVoid == 1) {
        // defs <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
        defs <<"       tr->args[" <<iArgs++ <<"] = (size_t)0xFF;\n";
     }
     else {
       if (sv->isMsg == 1) {
-         defs << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name->charstar()<<";\n";
+         defs << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name<<";\n";
       }
       else {
          numParamsNeedingMarshalling++;
@@ -770,20 +891,23 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
          hasArray++;
          if (hasArray == 1)
            defs<< "       int impl_arrstart=0;\n";
-         defs <<"       int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
-         defs <<"       impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type->charstar()<<"));\n";
-         defs <<"       impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
+         defs <<"       int impl_off_"<<sv->name<<", impl_cnt_"<<sv->name<<";\n";
+         defs <<"       impl_off_"<<sv->name<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type<<"));\n";
+         defs <<"       impl_off+=(impl_cnt_"<<sv->name<<"=sizeof("<<sv->type<<")*("<<sv->arrayLength<<"));\n";
       }
     }
   }
   if (numParamsNeedingMarshalling > 0) {
      defs << "       { \n";
      defs << "         PUP::sizer implP;\n";
-     for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+     for (list<CStateVar*>::iterator iter = stateVars->begin();
+          iter != stateVars->end();
+          ++iter) {
+       CStateVar *sv = *iter;
        if (sv->arrayLength !=NULL)
-         defs << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+         defs << "         implP|impl_off_" <<sv->name <<";\n";
        else if ((sv->isMsg != 1) && (sv->isVoid !=1)) 
-         defs << "         implP|" <<sv->name->charstar() <<";\n";
+         defs << "         implP|" <<sv->name <<";\n";
      }
      if (hasArray > 0) {
         defs <<"         impl_arrstart=CK_ALIGN(implP.size(),16);\n";
@@ -797,19 +921,25 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
      defs << "       impl_msg = CkAllocateMarshallMsg(impl_off,NULL);\n";
      defs << "       {\n";
      defs << "         PUP::toMem implP((void *)impl_msg->msgBuf);\n";
-     for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
+     for (list<CStateVar*>::iterator iter = stateVars->begin();
+          iter != stateVars->end();
+          ++iter) {
+       CStateVar *sv = *iter;
        if (sv->arrayLength !=NULL)
-          defs << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+          defs << "         implP|impl_off_" <<sv->name <<";\n";
        else if ((sv->isMsg != 1) && (sv->isVoid != 1))  
-          defs << "         implP|" <<sv->name->charstar() <<";\n";
+          defs << "         implP|" <<sv->name <<";\n";
      }
      defs << "       }\n";
      if (hasArray > 0) {
         defs <<"       char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
-        for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
-           if (sv->arrayLength !=NULL)
-              defs << "       memcpy(impl_buf+impl_off_"<<sv->name->charstar()<<
-	                 ","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
+        for (list<CStateVar*>::iterator iter = stateVars->begin();
+             iter != stateVars->end();
+             ++iter) {
+          CStateVar *sv = *iter;
+          if (sv->arrayLength !=NULL)
+            defs << "       memcpy(impl_buf+impl_off_" << sv->name <<
+              "," << sv->name << ",impl_cnt_" << sv->name << ");\n";
         }  
      }
   defs << "       tr->args[" <<paramIndex <<"] = (size_t) impl_msg;\n";
@@ -833,8 +963,8 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   // max(current,merge) --> current
-  defs << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
-  defs << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
+  defs << "       " << label  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
+  defs << "       currentlyExecutingPath = " << label  << "_PathMergePoint; /* Critical Path Detection */ \n";
 #endif
 
   defs << "       __cDep->Register(tr);\n";
@@ -853,41 +983,43 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs, SWHEN_END);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   
   el = elist;
   while (el) {
     e = el->entry;
     if (e->param->isMessage() == 1) {
-      sv = e->stateVars->begin();
-      defs << "    CmiFree(UsrToEnv(" << sv->name->charstar() << "));\n";
+      sv = *e->stateVars.begin();
+      defs << "    CmiFree(UsrToEnv(" << sv->name << "));\n";
     }
 
     el = el->next;
   }
 
   endMethod(defs);
+
+  generateChildrenCode(decls, defs, entry);
 }
 
 void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry)
 {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  defs << "    if (" << con1->text->charstar() << ") {\n";
+  defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 
   generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
-  defs << "    if (" << con1->text->charstar() << ") {\n";
+  defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
@@ -900,17 +1032,17 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
 #endif
-  defs << "    " << con1->text->charstar() << ";\n";
+  defs << "    " << con1->text << ";\n";
   //Record only the beginning for FOR
 #if CMK_BIGSIM_CHARM
   generateEventBracket(defs, SFOR);
 #endif
-  defs << "    if (" << con2->text->charstar() << ") {\n";
+  defs << "    if (" << con2->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 
@@ -922,16 +1054,16 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
 #endif
-  defs << "   " << con3->text->charstar() << ";\n";
-  defs << "    if (" << con2->text->charstar() << ") {\n";
+  defs << "   " << con3->text << ";\n";
+  defs << "    if (" << con2->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
 #if CMK_BIGSIM_CHARM
   generateEventBracket(defs, SFOR_END);
 #endif
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
@@ -944,15 +1076,15 @@ void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry)
   generateBeginTime(defs);
   generateEventBracket(defs, SIF);
 #endif
-  defs << "    if (" << con1->text->charstar() << ") {\n";
+  defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
   if (con2 != 0) {
-    generateCall(defs, *stateVarsChildren, con2->label->charstar());
+    generateCall(defs, *stateVarsChildren, con2->label);
   } else {
-    generateCall(defs, *stateVarsChildren, label->charstar(), "_end");
+    generateCall(defs, *stateVarsChildren, label, "_end");
   }
   defs << "    }\n";
   endMethod(defs);
@@ -965,7 +1097,7 @@ void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs,SIF_END);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
@@ -977,7 +1109,7 @@ void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
   generateBeginTime(defs);
   generateEventBracket(defs, SELSE);
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   endMethod(defs);
 
   // trace
@@ -989,36 +1121,36 @@ void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs,SELSE_END);
 #endif
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
 void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry)
 {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  defs << "    int __first = (" << con2->text->charstar() <<
-        "), __last = (" << con3->text->charstar() << 
-        "), __stride = (" << con4->text->charstar() << ");\n";
+  defs << "    int __first = (" << con2->text <<
+        "), __last = (" << con3->text << 
+        "), __stride = (" << con4->text << ");\n";
   defs << "    if (__first > __last) {\n";
   defs << "      int __tmp=__first; __first=__last; __last=__tmp;\n";
   defs << "      __stride = -__stride;\n";
   defs << "    }\n";
-  defs << "    CCounter *" << counter->charstar() <<
+  defs << "    CCounter *" << counter <<
         " = new CCounter(__first,__last,__stride);\n"; 
-  defs << "    for(int " << con1->text->charstar() <<
-        "=__first;" << con1->text->charstar() <<
-        "<=__last;" << con1->text->charstar() << "+=__stride) {\n";
+  defs << "    for(int " << con1->text <<
+        "=__first;" << con1->text <<
+        "<=__last;" << con1->text << "+=__stride) {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    }\n";
   endMethod(defs);
 
   generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
-  defs << "    " << counter->charstar() << "->decrement(); /* DECREMENT 1 */ \n";
-  defs << "    if (" << counter->charstar() << "->isDone()) {\n";
-  defs << "      delete " << counter->charstar() << ";\n";
+  defs << "    " << counter << "->decrement(); /* DECREMENT 1 */ \n";
+  defs << "    if (" << counter << "->isDone()) {\n";
+  defs << "      delete " << counter << ";\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
@@ -1027,49 +1159,49 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
 {
   SdagConstruct *cn;
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  defs << "    CCounter *" << counter->charstar() << "= new CCounter(" <<
-        constructs->length() << ");\n";
-  for(cn=constructs->begin(); 
-                     !constructs->end(); cn=constructs->next()) {
+  defs << "    CCounter *" << counter << "= new CCounter(" <<
+    (int)constructs->size() << ");\n";
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it) {
     defs << "    ";
-    generateCall(defs, *stateVarsChildren, cn->label->charstar());
+    generateCall(defs, *stateVarsChildren, (*it)->label);
   }
   endMethod(defs);
 
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
 #if CMK_BIGSIM_CHARM
-  defs << "  CkVec<void*> " <<label->charstar() << "_bgLogList;\n";
+  defs << "  CkVec<void*> " <<label << "_bgLogList;\n";
 #endif
 
   generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
-  defs << "    " <<label->charstar() << "_bgLogList.insertAtEnd(_bgParentLog);\n";
+  defs << "    " <<label << "_bgLogList.insertAtEnd(_bgParentLog);\n";
 #endif
   //Accumulate all the bgParent pointers that the calling when_end functions give
-  defs << "    " << counter->charstar() << "->decrement();\n";
+  defs << "    " << counter << "->decrement();\n";
  
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
- defs << "    olist_" << counter->charstar() << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
+ defs << "    olist_" << counter << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
 #endif
 
-  defs << "    if (" << counter->charstar() << "->isDone()) {\n";
+  defs << "    if (" << counter << "->isDone()) {\n";
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  defs << "      currentlyExecutingPath = olist_" << counter->charstar() << "_PathMergePoint; /* Critical Path Detection */ \n";
-  defs << "      olist_" << counter->charstar() << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+  defs << "      currentlyExecutingPath = olist_" << counter << "_PathMergePoint; /* Critical Path Detection */ \n";
+  defs << "      olist_" << counter << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
-  defs << "      delete " << counter->charstar() << ";\n";
+  defs << "      delete " << counter << ";\n";
 
 #if CMK_BIGSIM_CHARM
   generateListEventBracket(defs, SOLIST_END);
-  defs << "       "<< label->charstar() <<"_bgLogList.length()=0;\n";
+  defs << "       "<< label <<"_bgLogList.length()=0;\n";
 #endif
 
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
@@ -1083,7 +1215,7 @@ void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs, SOVERLAP);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   endMethod(defs);
 
   // trace
@@ -1095,7 +1227,7 @@ void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs, SOVERLAP_END);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
@@ -1103,24 +1235,33 @@ void SdagConstruct::generateSlist(XStr& decls, XStr& defs, Entry* entry)
 {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   endMethod(defs);
 
   generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
 void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
 {
+  if (entry->isConstructor()) {
+    std::cerr << cur_file << ":" << entry->getLine()
+              << ": Chare constructor cannot be defined with SDAG code" << std::endl;
+    exit(1);
+  }
+
   decls << "public:\n";
   generateSignature(decls, defs, entry, false, "void", con1->text, false, stateVars);
-  SdagConstruct *sc;
-  SdagConstruct *sc1;
-  for(sc =publishesList->begin(); !publishesList->end(); sc=publishesList->next()) {
-     for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
-        defs << "    _connect_" << sc1->text->charstar() <<"();\n";
+  for (list<SdagConstruct*>::iterator pubIter = publishesList->begin();
+       pubIter != publishesList->end();
+       ++pubIter) {
+    SdagConstruct *sc = *pubIter;
+    for (list<SdagConstruct*>::iterator it = sc->constructs->begin();
+         it != sc->constructs->end();
+         ++it)
+       defs << "    _connect_" << (*it)->text <<"();\n";
   }
 
 #if CMK_BIGSIM_CHARM
@@ -1129,8 +1270,10 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
   if (!entry->getContainer()->isGroup() || !entry->isConstructor())
     generateTraceEndCall(defs);
 
+  defs << "    if (!__cDep.get())\n"
+       << "        _sdag_init();\n";
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
 
 #if CMK_BIGSIM_CHARM
   generateTlineEndCall(defs);
@@ -1162,7 +1305,7 @@ void SdagConstruct::generateAtomic(XStr& decls, XStr& defs, Entry* entry)
 #endif
   generateTraceBeginCall(defs);
 
-  defs << "    " << text->charstar() << "\n";
+  defs << "    " << text << "\n";
 
   generateTraceEndCall(defs);
 #if CMK_BIGSIM_CHARM
@@ -1170,14 +1313,20 @@ void SdagConstruct::generateAtomic(XStr& decls, XStr& defs, Entry* entry)
 #endif
 
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
+void generateSignature(XStr& str,
+                       const XStr* name, const char* suffix,
+                       list<CStateVar*>* params)
+{
+
+}
 void generateSignature(XStr& decls, XStr& defs,
                        const Entry* entry, bool declareStatic, const char* returnType,
                        const XStr* name, bool isEnd,
-                       TList<CStateVar*>* params)
+                       list<CStateVar*>* params)
 {
   generateSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
                     name, isEnd, params);
@@ -1185,7 +1334,7 @@ void generateSignature(XStr& decls, XStr& defs,
 void generateSignature(XStr& decls, XStr& defs,
                        const Chare* chare, bool declareStatic, const char* returnType,
                        const XStr* name, bool isEnd,
-                       TList<CStateVar*>* params)
+                       list<CStateVar*>* params)
 {
   decls << "  " << (declareStatic ? "static " : "") << returnType << " ";
 
@@ -1202,24 +1351,25 @@ void generateSignature(XStr& decls, XStr& defs,
   if (params) {
     CStateVar *sv;
     int count = 0;
-    for (sv = params->begin(); !params->end(); ) {
+    for (list<CStateVar*>::iterator iter = params->begin();
+         iter != params->end();
+         ++iter) {
+      CStateVar *sv = *iter;
       if (sv->isVoid != 1) {
         if (count != 0)
           op << ", ";
 
         if (sv->type != 0) 
-          op <<sv->type->charstar() <<" ";
+          op <<sv->type <<" ";
         if (sv->byRef != 0)
           op <<" &";
         if (sv->arrayLength != NULL) 
           op <<"* ";
         if (sv->name != 0)
-          op <<sv->name->charstar();
+          op <<sv->name;
 
         count++;
       }
-
-      sv = params->next();
     }
   }
 
@@ -1235,23 +1385,23 @@ void endMethod(XStr& op)
   op << "\n\n";
 }
 
-void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list,
-                                 const char* name, const char* nameSuffix) {
+void SdagConstruct::generateCall(XStr& op, list<CStateVar*>& alist,
+                                 const XStr* name, const char* nameSuffix) {
   op << name << (nameSuffix ? nameSuffix : "") << "(";
 
   CStateVar *sv;
   int isVoid;
   int count;
   count = 0;
-  for(sv=list.begin(); !list.end(); ) {
-     isVoid = sv->isVoid;
-     if ((count != 0) && (isVoid != 1))
-        op << ", ";
-     if (sv->name != 0) 
-       op << sv->name->charstar();
+  for (list<CStateVar*>::iterator iter = alist.begin(); iter != alist.end(); ++iter) {
+    CStateVar *sv = *iter;
+    isVoid = sv->isVoid;
+    if ((count != 0) && (isVoid != 1))
+      op << ", ";
+    if (sv->name != 0) 
+      op << sv->name;
     if (sv->isVoid != 1)
-       count++;
-    sv = list.next();
+      count++;
   }
 
   op << ");\n";
@@ -1266,16 +1416,19 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
       next = n;
       nextBeginOrEnd = boe;
       {
-        SdagConstruct *cn=constructs->begin();
-        if (cn==0) // empty slist
+        if (constructs->empty())
           return;
 
-        for(SdagConstruct *nextNode=constructs->next(); nextNode != 0; nextNode = constructs->next()) {
-	  if (nextNode->type == SCONNECT)
+        list<SdagConstruct*>::iterator it = constructs->begin();
+        SdagConstruct *cn = *it;
+        ++it;
+
+        for(; it != constructs->end(); ++it) {
+	  if ((*it)->type == SCONNECT)
 	    continue;
 
-          cn->setNext(nextNode, 1);
-          cn = nextNode;
+          cn->setNext(*it, 1);
+          cn = *it;
         }
         cn->setNext(this, 0);
       }
@@ -1306,8 +1459,9 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
   }
   SdagConstruct *cn;
   if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->setNext(n, boe);
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it) {
+      (*it)->setNext(n, boe);
     }
   }
 }
@@ -1335,10 +1489,7 @@ void SdagConstruct::generateTrace()
     break;
   }
 
-  SdagConstruct *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateTrace();
-  }
+  for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::generateTrace));
   if (con1) con1->generateTrace();
   if (con2) con2->generateTrace();
   if (con3) con3->generateTrace();
@@ -1347,7 +1498,7 @@ void SdagConstruct::generateTrace()
 void SdagConstruct::generateTraceBeginCall(XStr& op)          // for trace
 {
   if(traceName)
-    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, " << "_sdag_idx_" << traceName->charstar() << "(), CkMyPe(), 0, NULL); \n";
+    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, NULL); \n";
 }
 
 void SdagConstruct::generateDummyBeginExecute(XStr& op)
@@ -1402,7 +1553,7 @@ void SdagConstruct::generateListEventBracket(XStr& op, int eventType)
 {
   (void) eventType;
   op << "    _TRACE_BGLIST_USER_EVENT_BRACKET(\"" << nameStr
-     << "\",__begintime,CkVTimer(),&_bgParentLog, " << label->charstar()
+     << "\",__begintime,CkVTimer(),&_bgParentLog, " << label
      << "_bgLogList);\n";
 }
 
@@ -1412,10 +1563,8 @@ void SdagConstruct::generateRegisterEp(XStr& defs)
     defs << "    (void)_sdag_idx_" << traceName << "();\n";
   }
 
-  SdagConstruct *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateRegisterEp(defs);
-  }
+  for (list<SdagConstruct*>::iterator iter = constructs->begin(); iter != constructs->end(); ++iter)
+    (*iter)->generateRegisterEp(defs);
   if (con1) con1->generateRegisterEp(defs);
   if (con2) con2->generateRegisterEp(defs);
   if (con3) con3->generateRegisterEp(defs);
@@ -1440,9 +1589,9 @@ void SdagConstruct::generateTraceEp(XStr& decls, XStr& defs, Chare* chare)
     endMethod(defs);
   }
 
-  SdagConstruct *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateTraceEp(decls, defs, chare);
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it) {
+    (*it)->generateTraceEp(decls, defs, chare);
   }
   if (con1) con1->generateTraceEp(decls, defs, chare);
   if (con2) con2->generateTraceEp(decls, defs, chare);

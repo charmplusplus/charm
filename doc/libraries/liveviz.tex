@@ -108,13 +108,18 @@ from your main chare:
 
 \begin{enumerate}
 \item Create your chare array (array proxy object 'a') with the entry 
-      method 'functionName' (described above).
+      method 'functionName' (described above). You must create the chare array
+      using a CkArrayOptions 'opts' parameter. For instance,
+\begin{alltt}
+	CkArrayOptions opts(rows, cols);
+	array = CProxy_Type::ckNew(opts);
+\end{alltt}
 \item Create a CkCallback object ('c'), specifying 'functionName' as the 
       callback function.  This callback will be invoked whenever the
       client requests a new image.
 \item Create a liveVizConfig object ('cfg').  LiveVizConfig takes a number
      of parameters, as described below.
-\item Call liveVizInit (cfg, a, c).
+\item Call liveVizInit (cfg, a, c, opts).
 \end{enumerate}
 
 The liveVizConfig parameters are:
@@ -193,3 +198,11 @@ The differences in Poll Mode may be apparent. There is no callback function whic
 The server should call Deposit with the same global size and combiner type on all of the array elements which correspond to the ``this'' parameter.
 
 The latest version of liveVizPoll is not backwards compatable with older versions. The old version had some fundamental problems which would occur if a server generated an image before a client requested it. Thus the new version buffers server generated images until requested by a client. Furthermore the client requests are also buffered if they arrive before the server generates the images. Problems could also occur during migration with the old version.
+
+\section{Caveats}
+If you use the old version of ``liveVizInit" method that only receives 3 parameters, you will find a known bug caused by how ``liveVizDeposit'' internally uses a reduction to build the image.
+
+Using that version of the ``liveVizInit" method, its contribute call is handled as if it were the chare calling ``liveVizDeposit'' that actually contributed to the liveViz reduction.
+If there is any other reduction going on elsewhere in this chare, some liveViz contribute calls might be issued before the corresponding non-liveViz contribute is reached.
+This would imply that image data would be treated as if were part of the non-liveViz reduction, leading to unexpected behavior potentially anywhere in the non-liveViz code.
+

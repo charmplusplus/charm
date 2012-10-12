@@ -190,11 +190,11 @@ class Main : public CBase_Main {
     void report() {
       if (iterations == 0) {
 	iterations++;
-	startTime = CmiWallTimer();
+	startTime = CkWallTimer();
 	array.begin_iteration();
       }
       else {
-	endTime = CmiWallTimer();
+	endTime = CkWallTimer();
 	CkPrintf("TIME : %f\n", (endTime - startTime)/(MAX_ITER-1));
         CkExit();
       }

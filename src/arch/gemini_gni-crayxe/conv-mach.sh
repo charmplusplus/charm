@@ -1,3 +1,4 @@
+GEMINI_CRAYXE=1
 PMI_CFLAGS=`pkg-config --cflags cray-pmi`
 PMI_LIBS=`pkg-config --libs cray-pmi`
 UGNI_CFLAGS=`pkg-config --cflags cray-ugni`
@@ -21,10 +22,10 @@ CMK_QT="generic64"
 if test -n "$PGCC"
 then
 CMK_CC="$CMK_CC -DCMK_FIND_FIRST_OF_PREDICATE=1 "
-CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 "
+CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc "
-CMK_SEQ_CXX="pgCC "
+CMK_SEQ_CXX="pgCC  --no_using_std "
 elif test -n "$ICPC"
 then
 CMK_SEQ_CC="icc -fPIC "
@@ -54,4 +55,3 @@ CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
 CMK_MOD_EXT="mod"
 
-. $CHARMINC/conv-mach-pxshm.sh

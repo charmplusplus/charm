@@ -113,6 +113,10 @@ CK_REDUCTION_CONTRIBUTE_METHODS_DEF(Group,
 				    reductionInfo,false)
 CK_REDUCTION_CLIENT_DEF(CProxy_Group,(CkReductionMgr *)CkLocalBranch(_ck_gid))
 
+CK_BARRIER_CONTRIBUTE_METHODS_DEF(Group,
+                                   ((CkReductionMgr *)this),
+                                   reductionInfo,false)
+
 
 
 CkGroupInitCallback::CkGroupInitCallback(void) {}
@@ -177,12 +181,10 @@ they're passed to the user's client function.
 CkReductionMgr::CkReductionMgr()//Constructor
   : thisProxy(thisgroup)
 { 
-#if GROUP_LEVEL_REDUCTION
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
 #else
   init_BinaryTree();
-#endif
 #endif
   redNo=0;
   completedRedNo = -1;
@@ -192,19 +194,16 @@ CkReductionMgr::CkReductionMgr()//Constructor
   gcount=lcount=0;
   nContrib=nRemote=0;
   maxStartRequest=0;
-#if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_)
-    if(CkMyPe() != 0){
-        perProcessorCounts = NULL;
-    }else{
-        perProcessorCounts = new int[CmiNumPes()];
-        for(int i=0;i<CmiNumPes();i++){
-            perProcessorCounts[i] = -1;
-        }
-    }
-    totalCount = 0;
-    processorCount = 0;
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	numImmigrantRecObjs = 0;
+	numEmigrantRecObjs = 0;
 #endif
   disableNotifyChildrenStart = CmiFalse;
+
+  barrier_gCount=0;
+  barrier_nSource=0;
+  barrier_nContrib=barrier_nRemote=0;
+
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
 }
 
@@ -219,6 +218,16 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   nContrib=nRemote=0;
   maxStartRequest=0;
   DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
+
+  barrier_gCount=0;
+  barrier_nSource=0;
+  barrier_nContrib=barrier_nRemote=0;
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  numImmigrantRecObjs = 0;
+  numEmigrantRecObjs = 0;
+#endif
+
 }
 
 void CkReductionMgr::flushStates(int isgroup)
@@ -395,52 +404,39 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
 
-#if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_)
-    if(lcount == 0){
-        m->sourceProcessorCount = 1;
-    }else{
-        m->sourceProcessorCount = lcount;
-    }
-    m->fromPE = CmiMyPe();
-    Chare *oldObj =CpvAccess(_currentObj);
-    char currentObjName[100];
-    DEBR(("[%d] contribute called with currentObj %s redNo %d lcount %d\n",CkMyPe(),oldObj->mlogData->objID.toString(currentObjName),m->redNo,lcount));
-    thisProxy[0].contributeViaMessage(m);
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+
+	// if object is an immigrant recovery object, we send the contribution to the source PE
+	if(CpvAccess(_currentObj)->mlogData->immigrantRecFlag){
+		
+		// turning on the message-logging bypass flag
+		envelope *env = UsrToEnv(m);
+		env->flags = env->flags | CK_BYPASS_DET_MLOG;
+    	thisProxy[CpvAccess(_currentObj)->mlogData->immigrantSourcePE].contributeViaMessage(m);
+		return;
+	}
+
+    Chare *oldObj = CpvAccess(_currentObj);
+    CpvAccess(_currentObj) = this;
+
+	// adding contribution
+	addContribution(m);
+
+    CpvAccess(_currentObj) = oldObj;
 #else
   addContribution(m);
 #endif
 }
 
-#if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_)
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){
-    CmiAssert(CmiMyPe() == 0);
-    DEBR(("[%d] contributeViaMessage fromPE %d\n",CmiMyPe(),m->fromPE));
-    if(redNo == 0){
-        if(perProcessorCounts[m->fromPE] == -1){
-            processorCount++;
-            perProcessorCounts[m->fromPE] = m->sourceProcessorCount;
-            DEBR(("[%d] Group %d processorCount %d fromPE %d sourceProcessorCount %d\n",CmiMyPe(),thisgroup.idx,processorCount,m->fromPE,m->sourceProcessorCount));
-        }else{
-            if(perProcessorCounts[m->fromPE] < m->sourceProcessorCount){
-                DEBR(("[%d] Group %d processorCount %d fromPE %d sourceProcessorCount %d\n",CmiMyPe(),thisgroup.idx,processorCount,m->fromPE,m->sourceProcessorCount));
-                perProcessorCounts[m->fromPE] = m->sourceProcessorCount;
-            }
-        }
-        if(processorCount == CmiNumPes()){
-            totalCount = 0;
-            for(int i=0;i<CmiNumPes();i++){
-                CmiAssert(perProcessorCounts[i] != -1);
-                totalCount += perProcessorCounts[i];
-            }
-            DEBR(("[%d] Group %d totalCount %d\n",CmiMyPe(),thisgroup.idx,totalCount));
-        }
-        if(m->sourceProcessorCount == 0){
-            if(processorCount == CmiNumPes()){
-                finishReduction();
-            }
-            return;
-        }
-    }
+	//if(CkMyPe() == 2) CkPrintf("[%d] ---> Contributing Via Message\n",CkMyPe());
+	
+	// turning off bypassing flag
+	envelope *env = UsrToEnv(m);
+	env->flags = env->flags & ~CK_BYPASS_DET_MLOG;
+
+	// adding contribution
     addContribution(m);
 }
 #else
@@ -458,7 +454,6 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
  }
  DEBR((AA" Group ReductionStarting called for redNo %d\n"AB,m->num));
  int srcPE = (UsrToEnv(m))->getSrcPe();
-#if (!defined(_FAULT_MLOG_) || !_MLOG_REDUCE_P2P_)
   if (isPresent(m->num) && !inProgress)
   {
     DEBR((AA"Starting reduction #%d at parent's request\n"AB,m->num));
@@ -476,18 +471,6 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
   else //is Past
     DEBR((AA"Ignoring parent's late request to start #%d\n"AB,m->num));
   delete m;
-#else
-    if(redNo == 0){
-        if(lcount == 0){
-            DEBR(("[%d] Group %d Sending dummy contribute to get totalCount\n",CmiMyPe(),thisgroup.idx));
-            CkReductionMsg *dummy = CkReductionMsg::buildNew(0,NULL);
-            dummy->fromPE = CmiMyPe();
-            dummy->sourceProcessorCount = 0;
-            dummy->redNo = 0;
-            thisProxy[0].contributeViaMessage(dummy);
-        }
-    }
-#endif
 }
 
 //Sent to root of reduction tree with reduction contribution
@@ -552,26 +535,6 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 
   if(disableNotifyChildrenStart) return;
  
-#if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_) 
-  if(CmiMyPe() == 0 && redNo == 0){
-            for(int j=0;j<CkNumPes();j++){
-                if(j != CkMyPe() && j != srcPE){
-                        thisProxy[j].ReductionStarting(new CkReductionNumberMsg(number));
-                }
-            }
-            if(lcount == 0){
-                CkReductionMsg *dummy = CkReductionMsg::buildNew(0,NULL);
-                dummy->fromPE = CmiMyPe();
-                dummy->sourceProcessorCount = 0;
-                dummy->redNo = 0;
-                thisProxy[0].contributeViaMessage(dummy);
-            }
-    }   else{
-        thisProxy[0].ReductionStarting(new CkReductionNumberMsg(number));
-    }
-
-
-#else
   //Sent start requests to our kids (in case they don't already know)
 #if GROUP_LEVEL_REDUCTION
   for (int k=0;k<treeKids();k++)
@@ -581,7 +544,6 @@ void CkReductionMgr::startReduction(int number,int srcPE)
   }
 #else
   nodeProxy[CkMyNode()].ckLocalBranch()->startNodeGroupReduction(number,thisgroup);
-#endif
 #endif
 	
 	/*
@@ -672,51 +634,37 @@ void CkReductionMgr::finishReduction(void)
   	return;
   }
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
-#if (!defined(_FAULT_MLOG_) || !_MLOG_REDUCE_P2P_)
-
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	if (nContrib<(lcount+adj(redNo).lcount) - numImmigrantRecObjs + numEmigrantRecObjs){
+        DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
+		return;//Need more local messages
+	}
+#else
   if (nContrib<(lcount+adj(redNo).lcount)){
          DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
 	 return;//Need more local messages
   }
+#endif
+
 #if GROUP_LEVEL_REDUCTION
-  if (nRemote<treeKids()) return;//Need more remote messages
+  if (nRemote<treeKids())  return;//Need more remote messages
+	
 #endif
  
-#else
-
-    if(CkMyPe() != 0){
-        if(redNo != 0){
-            return;
-        }else{
-            CmiAssert(lcount == 0);
-            CkReductionMsg *dummy = reduceMessages();
-            dummy->fromPE = CmiMyPe();
-            dummy->sourceProcessorCount = 0;
-            thisProxy[0].contributeViaMessage(dummy);
-            return;
-        }
-    }
-    if (CkMyPe() == 0 && nContrib<numberReductionMessages()){
-        DEBR((AA"Need more messages %d %d\n"AB,nContrib,numberReductionMessages()));
-         return;//Need more local messages
-  }else{
-        DEBR(("[%d] Group %d nContrib %d numberReductionMessages() %d totalCount %d\n",CmiMyPe(),thisgroup.idx,nContrib,numberReductionMessages(),totalCount));
-    }
-
-
-#endif
-
   DEBR((AA"Reducing data... %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
   CkReductionMsg *result=reduceMessages();
   result->redNo=redNo;
-#if (!defined(_FAULT_MLOG_) || !_MLOG_REDUCE_P2P_)
 
 #if GROUP_LEVEL_REDUCTION
   if (hasParent())
   {//Pass data up tree to parent
     DEBR((AA"Passing reduced data up to parent node %d.\n"AB,treeParent()));
     DEBR((AA"Message gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     result->gcount+=gcount+adj(redNo).gcount;
+#else
+    result->gcount+=gcount+adj(redNo).gcount;
+#endif
     thisProxy[treeParent()].RecvMsg(result);
   }
   else 
@@ -730,7 +678,9 @@ void CkReductionMgr::finishReduction(void)
       return; // Wait for migrants to contribute
     } else if (totalElements<result->nSources()) {
       DEBR((AA"Got %d of %d contributions\n"AB,result->nSources(),totalElements));
+#if !defined(_FAULT_CAUSAL_)
       CkAbort("ERROR! Too many contributions at root!\n");
+#endif
     }
     DEBR((AA"Passing result to client function\n"AB));
     CkSetRefNum(result, result->getUserFlag());
@@ -758,29 +708,12 @@ void CkReductionMgr::finishReduction(void)
   CkArrayReductionMgr *nodeMgr=nodeProxy[CkMyNode()].ckLocalBranch();
   nodeMgr->contributeArrayReduction(result);
 #endif
-#else                // _FAULT_MLOG_
-  DEBR(("~~~~~~~~~~~~~~~~~ About to call callback from end of SIMPLIFIED GROUP REDUCTION %d at %.6f\n",redNo,CmiWallTimer()));
-
-    CkSetRefNum(result, result->getUserFlag());
-    if (!result->callback.isInvalid())
-        result->callback.send(result);
-    else if (!storedCallback.isInvalid())
-        storedCallback.send(result);
-    else{
-      DEBR(("No reduction client for group %d \n",thisgroup.idx));
-        CkAbort("No reduction client!\n"
-            "You must register a client with either SetReductionClient or during contribute.\n");
-    }
-
-    DEBR(("[%d,%d]------------END OF SIMPLIFIED GROUP REDUCTION %d for group %d at %.6f\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,CkWallTimer()));
-
-#endif               // _FAULT_MLOG_
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
-#if (!defined(_FAULT_MLOG_) || !_MLOG_REDUCE_P2P_) && !GROUP_LEVEL_REDUCTION
+#if !GROUP_LEVEL_REDUCTION
     /* nodegroup reduction will adjust adjVec in endArrayReduction on PE 0 */
   if(CkMyPe()!=0)
 #endif
@@ -815,13 +748,12 @@ void CkReductionMgr::finishReduction(void)
   }
 #endif
 
-#if (!defined(_FAULT_MLOG_) || !_MLOG_REDUCE_P2P_)
   if(maxStartRequest >= redNo){
 	  startReduction(redNo,CkMyPe());
 	  finishReduction();
   }
  
-#endif
+
 }
 
 //Sent up the reduction tree with reduced data
@@ -1008,20 +940,16 @@ void CkReductionMgr::pup(PUP::er &p)
   // we can not pup because inserting array elems will add the counters again
 //  p|lcount;
 //  p|gcount;
-#if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_)
 //  p|lcount;
 //  //  p|gcount;
 //  //  printf("[%d] nodeProxy nodeGroup %d pupped in group %d \n",CkMyPe(),(nodeProxy.ckGetGroupID()).idx,thisgroup.idx);
-#endif
   if(p.isUnpacking()){
     thisProxy = thisgroup;
     maxStartRequest=0;
-#if GROUP_LEVEL_REDUCTION
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
     init_BinaryTree();
-#endif
 #endif
   }
 
@@ -1179,8 +1107,6 @@ void CkReductionMgr :: endArrayReduction(){
 	endArrayReduction();
 }
 
-#if GROUP_LEVEL_REDUCTION
-
 void CkReductionMgr::init_BinaryTree(){
 	parent = (CkMyPe()-1)/TREE_WID;
 	int firstkid = CkMyPe()*TREE_WID+1;
@@ -1253,7 +1179,70 @@ int CkReductionMgr::treeKids(void)//Number of children in tree
   return numKids;
 }
 
-#endif
+
+//                simple "stateless" barrier
+//                no state checkpointed, for FT purpose
+//                require no overlapping barriers
+void CkReductionMgr::barrier(CkReductionMsg *m)
+{
+  barrier_nContrib++;
+  barrier_nSource++;
+  if(!m->callback.isInvalid())
+      barrier_storedCallback=m->callback;
+  finishBarrier();
+  delete m;
+}
+
+void CkReductionMgr::finishBarrier(void)
+{
+       if(barrier_nContrib<lcount){//need more local message
+               DEBR(("[%d] current contrib:%d,lcount:%d\n",CkMyPe(),barrier_nContrib,lcount));
+               return;
+       }
+       if(barrier_nRemote<treeKids()){//need more remote messages
+               DEBR(("[%d] current remote:%d,kids:%d\n",CkMyPe(),barrier_nRemote,treeKids()));
+               return;
+       }
+       CkReductionMsg * result = CkReductionMsg::buildNew(0,NULL);
+       result->callback=barrier_storedCallback;
+       result->sourceFlag=barrier_nSource;
+       result->gcount=barrier_gCount;
+       if(hasParent())
+       {
+               DEBR(("[%d]send to parent:%d\n",CkMyPe(),treeParent()));
+               result->gcount+=gcount;
+               thisProxy[treeParent()].Barrier_RecvMsg(result);
+       }
+       else{
+               int totalElements=result->gcount+gcount;
+               DEBR(("[%d]root,totalElements:%d,source:%d\n",CkMyPe(),totalElements,result->nSources()));
+               if(totalElements<result->nSources()){
+                       CkAbort("ERROR! Too many contributions at barrier root\n");
+               }
+               CkSetRefNum(result,result->getUserFlag());
+               if(!result->callback.isInvalid())
+                       result->callback.send(result);
+               else if(!barrier_storedCallback.isInvalid())
+                               barrier_storedCallback.send(result);
+               else 
+                       CkAbort("No reduction client!\n");
+       }
+       barrier_nRemote=barrier_nContrib=0;
+       barrier_gCount=0;
+       barrier_nSource=0;
+}
+
+void CkReductionMgr::Barrier_RecvMsg(CkReductionMsg *m)
+{
+       barrier_nRemote++;
+       barrier_gCount+=m->gcount;
+       barrier_nSource+=m->nSources();
+       if(!m->callback.isInvalid())
+               barrier_storedCallback=m->callback;
+       finishBarrier();
+}
+
+
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -1770,6 +1759,9 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
 void CkNodeReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 {
   CmiLock(lockEverything);
+	/*
+		FAULT_EVAC
+	*/
   if(blocked){
 	delete m;
   	CmiUnlock(lockEverything);
@@ -1865,6 +1857,9 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	//If none of these cases, we need to start the reduction--
 	DEBR((AA"Starting Node reduction #%d on %p srcNode %d\n"AB,redNo,this,srcNode));
 	inProgress=CmiTrue;
+
+	if(!_isNotifyChildInRed) return;
+
 	//Sent start requests to our kids (in case they don't already know)
 	
 	for (int k=0;k<treeKids();k++)
@@ -1932,9 +1927,14 @@ void CkNodeReductionMgr::addContribution(CkReductionMsg *m)
 }
 
 void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
+        CmiLock(lockEverything);   
+	/*
+		FAULT_EVAC
+	*/
 	if(blocked){
 		DEBR(("[%d] This node is blocked, so local message is being buffered as no %d\n",CkMyNode(),bufferedMsgs.length()));
 		bufferedMsgs.enq(m);
+                CmiUnlock(lockEverything);   
 		return;
 	}
 	
@@ -1948,6 +1948,7 @@ void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
 		msgs.enq(m);
 		finishReduction();
 	}
+        CmiUnlock(lockEverything);   
 }
 
 

@@ -4,6 +4,7 @@ using std::list;
 using std::for_each;
 #include <stdlib.h>
 #include "xi-symbol.h"
+#include "CParsedFile.h"
 #include <ctype.h> // for tolower()
 #include <iostream>
 using std::cerr;
@@ -166,6 +167,35 @@ void perElemGen(list<T*> &l, A* arg_, void (U::*fn_)(A*))
     perElemGenC<T, U, A*>(l, arg_, fn_, NULL);
 }
 
+/**
+   Apply fn_ on each non-NULL element in the list l.
+   If between_ is passed, do that between each element.
+ */
+template<typename T, typename U>
+class perElemC
+{
+    void (U::*fn)();
+public:
+    perElemC(list<T*> &l,
+	       void (U::*fn_)())
+	: fn(fn_)
+	{
+	    for_each(l.begin(), l.end(), *this);
+	}
+    void operator()(T* m)
+	{
+	    if (m) {
+		(m->*fn)();
+	    }
+	}
+};
+
+template<typename T, typename U>
+void perElem(list<T*> &l, void (U::*fn_)())
+{
+    perElemC<T, U>(l, fn_);
+}
+
 void newLine(XStr &str)
 {
     str << endx;
@@ -314,6 +344,11 @@ MemberList::MemberList(Member *m, MemberList *n)
 	members.insert(members.end(), n->members.begin(), n->members.end());
 }
 
+MemberList::MemberList(list<Entry*>&l)
+{
+  members.insert(members.begin(), l.begin(), l.end());
+  l.clear();
+}
 
 void
 MemberList::print(XStr& str)
@@ -458,6 +493,39 @@ Module::print(XStr& str)
   }
 }
 
+void Module::check() {
+  if (clist)
+    clist->check();
+}
+
+void ConstructList::check() {
+  perElem(constructs, &Construct::check);
+}
+
+void Scope::check() {
+  if (contents_)
+    contents_->check();
+}
+
+void Entry::check() {
+  if (!external) {
+    if(isConstructor() && retType && !retType->isVoid())
+      die("Constructors cannot return a value",line);
+
+    if (!isConstructor() && !retType)
+      die("Non-constructor entry methods must specify a return type (probably void)", line);
+  }
+}
+
+void Chare::check() {
+  if (list)
+    list->check();
+}
+
+void MemberList::check() {
+  perElem(members, &Member::check);
+}
+
 void
 Module::generate()
 {
@@ -473,7 +541,8 @@ Module::generate()
   declstr <<
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
-  "#include \"charm++.h\"\n";
+  "#include \"charm++.h\"\n"
+  "#include <memory>\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
   declstr << "extern void _register"<<name<<"(void);\n";
@@ -548,9 +617,9 @@ Module::generate()
   decl<<declstr.get_string();
   def<<defstr.get_string();
   if (connectPresent == 1) {
-    decl << pubDeclStr.charstar();
-    def << pubDefConstr.charstar();
-    def << pubDefStr.charstar();
+    decl << pubDeclStr;
+    def << pubDefConstr;
+    def << pubDefStr;
   }
 
   // DMK - Accel Support
@@ -629,15 +698,19 @@ ModuleList::print(XStr& str)
 void
 ModuleList::generate()
 {
-    for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
-	(*i)->generate();
+  perElem(modules, &Module::generate);
+}
+
+void
+ModuleList::check()
+{
+  perElem(modules, &Module::check);
 }
 
 void
 ModuleList::preprocess()
 {
-    for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
-	(*i)->preprocess();
+  perElem(modules, &Module::preprocess);
 }
 
 void
@@ -703,10 +776,7 @@ ConstructList::genReg(XStr& str)
 void
 ConstructList::preprocess()
 {
-    for (list<Construct*>::iterator i = constructs.begin(); 
-	 i != constructs.end(); ++i)
-	if (*i)
-	    (*i)->preprocess();
+  perElem(constructs, &Construct::preprocess);
 }
 
 XStr Chare::proxyName(int withTemplates)
@@ -1851,6 +1921,8 @@ Chare::genDefs(XStr& str)
     if(!external) str << "=0";
     str << ";\n";
   }
+  templateGuardEnd(str);
+
   if(list)
   {//Add definitions for all entry points
     list->genDefs(str);
@@ -1865,6 +1937,8 @@ Chare::genDefs(XStr& str)
       forElement=forIndividual;
     }
   }
+
+  templateGuardBegin(isTemplated(), str);
   // define the python routines
   if (isPython()) {
     str << "/* ---------------- python wrapper -------------- */\n";
@@ -2212,14 +2286,23 @@ Template::genVars(XStr& str)
   str << " > ";
 }
 
+XStr generateTemplateSpec(TVarList* tspec)
+{
+  XStr str;
+
+  if(tspec) {
+    str << "template < ";
+    tspec->genLong(str);
+    str << " > ";
+  }
+
+  return str;
+}
+
 void
 Template::genSpec(XStr& str)
 {
-  str << "template ";
-  str << "< ";
-  if(tspec)
-    tspec->genLong(str);
-  str << " >\n";
+  str << generateTemplateSpec(tspec);
 }
 
 void
@@ -2394,7 +2477,7 @@ void
 Module::genReg(XStr& str)
 {
   if(external) {
-    str << "      _register"<<name<<"();"<<endx;
+    str << "  _register"<<name<<"();"<<endx;
   } else {
     if (clist) clist->genDefs(str);
   }
@@ -2652,9 +2735,7 @@ void MemberList::genReg(XStr& str)
 
 void MemberList::preprocess()
 {
-    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
-	if (*i)
-	    (*i)->preprocess();
+  perElem(members, &Member::preprocess);
 }
 
 void MemberList::lookforCEntry(CEntry *centry)
@@ -2703,220 +2784,6 @@ void Chare::lookforCEntry(CEntry *centry)
   }
 }
 
-///////////////////////////// CPARSEDFILE //////////////////////
-/*void CParsedFile::print(int indent)
-{
-  for(CEntry *ce=entryList.begin(); !entryList.end(); ce=entryList.next())
-  {
-    ce->print(indent);
-    printf("\n");
-  }
-  for(SdagConstruct *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next())
-  {
-    cn->print(indent);
-    printf("\n");
-  }
-}
-*/
-XStr *CParsedFile::className = NULL;
-
-void CParsedFile::numberNodes(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->numberNodes();
-    }
-  }
-}
-
-void CParsedFile::labelNodes(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->labelNodes();
-    }
-  }
-}
-
-void CParsedFile::propagateState(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->propagateState(0);
-  }
-}
-
-void CParsedFile::mapCEntry(void)
-{
-  CEntry *en;
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    container->lookforCEntry(en);
-  }
-}
-
-void CParsedFile::generateEntryList(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->generateEntryList(entryList, 0);
-  }
-}
-
-void CParsedFile::generateConnectEntryList(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->generateConnectEntryList(connectEntryList);
-  }
-}
-
-void CParsedFile::generateCode(XStr& decls, XStr& defs)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->setNext(0,0);
-    cn->sdagCon->generateCode(decls, defs, cn);
-  }
-}
-
-void CParsedFile::generateEntries(XStr& decls, XStr& defs)
-{
-  CEntry *en;
-  SdagConstruct *sc;
-  decls << "public:\n";
-  for(sc=connectEntryList.begin(); !connectEntryList.end(); sc=connectEntryList.next())
-     sc->generateConnectEntries(decls);
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateCode(decls, defs);
-  }
-}
-
-void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
-{
-  decls << "private:\n";
-  decls << "  CDep *__cDep;\n";
-
-  XStr name = "__sdag_init";
-  generateSignature(decls, defs, container, false, "void", &name, false, NULL);
-  defs << "    __cDep = new CDep(" << numEntries << "," << numWhens << ");\n";
-  CEntry *en;
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateDeps(defs);
-  }
-  endMethod(defs);
-}
-
-
-/**
-    Create a merging point for each of the places where multiple
-    dependencies lead into some future task.
-
-    Used by Isaac's critical path detection
-*/
-void CParsedFile::generateDependencyMergePoints(XStr& decls) 
-{
-  decls << " \n";
-
-  // Each when statement will have a set of message dependencies, and
-  // also the dependencies from completion of previous task
-  for(int i=0;i<numWhens;i++){
-    decls << "  MergeablePathHistory _when_" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
-  }
-  
-  // The end of each overlap block will have multiple paths that merge
-  // before the subsequent task is executed
-  for(int i=0;i<numOlists;i++){
-    decls << "  MergeablePathHistory olist__co" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
-  }
-}
-
-void CParsedFile::generatePupFunction(XStr& decls)
-{
-  decls << "public:\n";
-  decls << "  void __sdag_pup(PUP::er& p) {\n";
-  decls << "    if (__cDep) { __cDep->pup(p); }\n";
-  decls << "  }\n";
-}
-
-void CParsedFile::generateTrace()
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTrace();
-    }
-  }
-}
-
-void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
-{
-  XStr name = "__sdag_register";
-  generateSignature(decls, defs, container, true, "void", &name, false, NULL);
-
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateRegisterEp(defs);
-    }
-  }
-  endMethod(defs);
-}
-
-void CParsedFile::generateTraceEp(XStr& decls, XStr& defs)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTraceEp(decls, defs, container);
-    }
-  }
-}
-
-////////////////////////// SDAGCONSTRUCT ///////////////////////
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
-{
-  con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
-  type = t;
-  traceName=NULL;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
-}
-
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList)
-{
-  con1=0; con2=0; con3=0; con4=0;
-  type = t;
-  traceName=NULL;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
-  SdagConstruct *sc;
-  for(sc = aList->constructs->begin(); !aList->constructs->end(); sc=aList->constructs->next())
-    constructs->append(sc);
-}
-
-SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
-			     SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el)
-{
-  text = txt;
-  type = t;
-  traceName=NULL;
-  con1 = c1; con2 = c2; con3 = c3; con4 = c4;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  if (constructAppend != 0) {
-    constructs->append(constructAppend);
-  }
-  elist = el;
-}
-
-SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl)
-{
-  type = t;
-  traceName=NULL;
-  text = new XStr(codeStr);
-  connectEntry = new XStr(entryStr);
-  con1 = 0; con2 = 0; con3 = 0; con4 =0;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  param = pl;
-
-}
-
 ///////////////////////////// ENTRY ////////////////////////////
 
 void ParamList::checkParamList(){
@@ -2927,7 +2794,7 @@ void ParamList::checkParamList(){
 }
 
 Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int connect, ParamList *connectPList) :
-      attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), intExpr(e), param(p), connectParam(connectPList), isConnect(connect)
+      attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), connectParam(connectPList), isConnect(connect)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -2941,8 +2808,8 @@ Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, Sdag
   if(!isLocal() && p){
     p->checkParamList();
   }
-
 }
+
 void Entry::setChare(Chare *c) {
 	Member::setChare(c);
         // mainchare constructor parameter is not allowed
@@ -2953,16 +2820,13 @@ void Entry::setChare(Chare *c) {
 	Removed old treatment for CkArgMsg to allow argc, argv or void
 	constructors for mainchares.
 	* **************************************************************/
-	if (param==NULL)
-	{//Fake a parameter list of the appropriate type
-		Type *t;
-		if (isConstructor()&&container->isMainChare())
-			//Main chare always magically takes CkArgMsg
-			t=new PtrType(new NamedType("CkArgMsg"));
-		else
-			t=new BuiltinType("void");
-		param=new ParamList(new Parameter(line,t));
-	}
+        if (isConstructor() && container->isMainChare() && param->isVoid()) {
+          //Main chare always magically takes CkArgMsg
+          Type *t = new PtrType(new NamedType("CkArgMsg"));
+          param=new ParamList(new Parameter(line,t));
+          std::cerr << "Charmxi> " << line << ": Deprecation warning: mainchare constructors should explicitly take CkArgMsg* if that's how they're implemented.\n";
+        }
+
 	entryCount=c->nextEntry();
 
 	//Make a special "callmarshall" method, for communication optimizations to use:
@@ -3005,7 +2869,7 @@ void Entry::collectSdagCode(CParsedFile *pf, int& sdagPresent)
 {
   if (isSdag()) {
     sdagPresent = 1;
-    pf->nodeList.append(this);
+    pf->addNode(this);
   }
 }
 
@@ -3017,34 +2881,50 @@ XStr Entry::marshallMsg(void)
   return ret;
 }
 
-XStr Entry::epStr(void)
+XStr Entry::epStr(bool isForRedn, bool templateCall)
 {
   XStr str;
+  if (isForRedn)
+    str<<"redn_wrapper_";
   str << name << "_";
+
   if (param->isMessage()) {
     str<<param->getBaseName();
     str.replace(':', '_');
   }
-  else if (param->isVoid()) str<<"void";
-  else str<<"marshall"<<entryCount;
+  else if (param->isVoid())
+    str<<"void";
+  else
+    str<<"marshall"<<entryCount;
+
+  if (tspec && templateCall) {
+    str << "< ";
+    tspec->genShort(str);
+    str << " >";
+  }
+
   return str;
 }
 
-XStr Entry::epIdx(int fromProxy)
+XStr Entry::epIdx(int fromProxy, bool isForRedn)
 {
   XStr str;
-  if (fromProxy)
+  if (fromProxy) {
     str << indexName()<<"::";
-  str << "idx_"<<epStr()<<"()";
+    // If the chare is also templated, then we must avoid a parsing ambiguity
+    if (tspec)
+      str << "template ";
+  }
+  str << "idx_" << epStr(isForRedn, true) << "()";
   return str;
 }
 
-XStr Entry::epRegFn(int fromProxy)
+XStr Entry::epRegFn(int fromProxy, bool isForRedn)
 {
   XStr str;
   if (fromProxy)
     str << indexName() << "::";
-  str << "reg_"<<epStr()<<"()";
+  str << "reg_" << epStr(isForRedn, true) << "()";
   return str;
 }
 
@@ -3061,12 +2941,15 @@ XStr Entry::chareIdx(int fromProxy)
 // this Member's container with the given return type, e.g.
 // template<int N,class foo> void CProxy_bar<N,foo>
 // Works with non-templated Chares as well.
-XStr Member::makeDecl(const XStr &returnType,int forProxy)
+XStr Member::makeDecl(const XStr &returnType, int forProxy, bool isStatic)
 {
   XStr str;
 
   if (container->isTemplated())
-    str << container->tspec() << " ";
+    str << container->tspec() << "\n";
+  str << generateTemplateSpec(tspec) << "\n";
+  if (isStatic)
+    str << "static ";
   str << returnType<<" ";
   if (forProxy)
   	str<<container->proxyName();
@@ -3092,7 +2975,8 @@ void Entry::genChareDecl(XStr& str)
     genChareStaticConstructorDecl(str);
   } else {
     // entry method declaration
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
+    str << "    " << generateTemplateSpec(tspec) << "\n"
+        << "    " << retType << " " << name << "(" << paramType(1,1) << ");\n";
   }
 }
 
@@ -3169,9 +3053,11 @@ void Entry::genChareStaticConstructorDefs(XStr& str)
 void Entry::genArrayDecl(XStr& str)
 {
   if(isConstructor()) {
+    str << "    " << generateTemplateSpec(tspec) << "\n";
     genArrayStaticConstructorDecl(str);
   } else {
     if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
+    str << "    " << generateTemplateSpec(tspec) << "\n";
     if(isIget())
       str << "    "<<"CkFutureID"<<" "<<name<<"("<<paramType(1,1)<<") ;\n"; //no const
     else if(isLocal())
@@ -3219,8 +3105,8 @@ void Entry::genArrayDefs(XStr& str)
       str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
       str << "#endif\n";
       if (!isNoTrace())
-	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg," << epIdx()
-	      << ",CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
+	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
+	      << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
@@ -3353,16 +3239,20 @@ void Entry::genGroupDecl(XStr& str)
   }
 
   if(isConstructor()) {
+    str << "    " << generateTemplateSpec(tspec) << "\n";
     genGroupStaticConstructorDecl(str);
   } else {
     if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
+    str << "    " << generateTemplateSpec(tspec) << "\n";
     if (isLocal())
       str << "    "<<retType<<" "<<name<<"("<<paramType(1,1,0)<<");\n";
     else
       str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
     // entry method on multiple PEs declaration
     if(!container->isForElement() && !container->isForSection() && !isSync() && !isLocal() && !container->isNodeGroup()) {
+      str << "    " << generateTemplateSpec(tspec) << "\n";
       str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(1)<<");\n";
+      str << "    " << generateTemplateSpec(tspec) << "\n";
       str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"CmiGroup &grp"<<eo(1)<<");\n";
     }
   }
@@ -3402,7 +3292,7 @@ void Entry::genGroupDefs(XStr& str)
       XStr unmarshallStr; param->unmarshall(unmarshallStr);
       str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
       str << "  CkAssert(obj);\n";
-      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,"<<epIdx()<<",CkMyPe(),0,NULL);\n";
+      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL);\n";
       str << "#if CMK_LBDB_ON\n"
 "  // if there is a running obj being measured, stop it temporarily\n"
 "  LDObjHandle objHandle;\n"
@@ -4205,16 +4095,33 @@ void Entry::genAccels_ppe_c_regFuncs(XStr& str) {
 /******************* Shared Entry Point Code **************************/
 void Entry::genIndexDecls(XStr& str)
 {
-  str << "/* DECLS: "; print(str); str << " */";
+  str << "    /* DECLS: "; print(str); str << "     */";
+
+  XStr templateSpecLine;
+  templateSpecLine << "\n    " << generateTemplateSpec(tspec);
 
   // Entry point index storage
   str << "\n    // Entry point registration at startup"
-      << "\n    static int "<<epRegFn(0)<<";" ///< @note: Should this be generated as private?
+      << templateSpecLine
+      << "\n    static int reg_" << epStr() << "();" ///< @note: Should this be generated as private?
       << "\n    // Entry point index lookup"
-      << "\n    inline static int "<<epIdx(0)<<"{"
+      << templateSpecLine
+      << "\n    inline static int idx_" << epStr() << "() {"
       << "\n      static int epidx = " << epRegFn(0) << ";"
       << "\n      return epidx;"
       << "\n    }\n";
+
+  if (!isConstructor()) {
+    str << templateSpecLine
+        << "\n    inline static int idx_" << name << "("
+        << retType
+        << " (" << container->baseName() << "::*)(";
+    if (param)
+      param->print(str);
+    str << ") ) {"
+        << "\n      return " << epIdx(0) << ";"
+        << "\n    }\n\n";
+  }
 
   // DMK - Accel Support - Also declare the function index for the Offload API call
   #if CMK_CELL != 0
@@ -4224,10 +4131,11 @@ void Entry::genIndexDecls(XStr& str)
   #endif
 
   // Index function, so user can find the entry point number
-  str << "    static int ";
+  str << templateSpecLine
+      << "\n    static int ";
   if (isConstructor()) str <<"ckNew";
   else str <<name;
-  str << "("<<paramType(1,0)<<") { return "<<epIdx(0)<<"; }\n";
+  str << "("<<paramType(1,0)<<") { return "<<epIdx(0)<<"; }";
 
   // DMK - Accel Support
   if (isAccel()) {
@@ -4239,54 +4147,60 @@ void Entry::genIndexDecls(XStr& str)
 
   if (isReductionTarget()) {
       str << "\n    // Entry point registration at startup"
-          << "\n    static int reg_"<<name<<"_redn_wrapper();" ///< @note: Should this be generated as private?
+          << templateSpecLine
+          << "\n    static int reg_"<< epStr(true) <<"();" ///< @note: Should this be generated as private?
           << "\n    // Entry point index lookup"
-          << "\n    inline static int idx_" << name << "_redn_wrapper() {"
-          << "\n      static int epidx = reg_"<<name<<"_redn_wrapper();"
+          << templateSpecLine
+          << "\n    inline static int idx_" << epStr(true) << "() {"
+          << "\n      static int epidx = "<< epRegFn(0, true) <<";"
           << "\n      return epidx;"
           << "\n    }"
-          << "\n    static int " << name << "_redn_wrapper"
-          << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }"
-          << "\n    static void _" << name << "_redn_wrapper(void* impl_msg, "
-          << container->baseName() <<"* impl_obj);\n";
+          << templateSpecLine
+          << "\n    static int " << "redn_wrapper_" << name
+          << "(CkReductionMsg* impl_msg) { return " << epIdx(0, true) << "; }"
+          << templateSpecLine
+          << "\n    static void _call_" << epStr(true) << "(void* impl_msg, void* impl_obj_void);";
   }
 
   // call function declaration
-  str << "    static void _call_"<<epStr()<<"(void* impl_msg,"<<
-    container->baseName()<<"* impl_obj);\n";
+  str << templateSpecLine
+      << "\n    static void _call_" << epStr() << "(void* impl_msg, void* impl_obj);";
   if(isThreaded()) {
-    str << "    static void _callthr_"<<epStr()<<"(CkThrCallArg *);\n";
+    str  << templateSpecLine
+         << "\n    static void _callthr_"<<epStr()<<"(CkThrCallArg *);";
   }
   if (hasCallMarshall) {
-    str << "    static int _callmarshall_"<<epStr()<<"(char* impl_buf,"<<
-      container->baseName()<<"* impl_obj);\n";
+    str << templateSpecLine
+        << "\n    static int _callmarshall_" << epStr()
+        << "(char* impl_buf, void* impl_obj_void);";
   }
   if (param->isMarshalled()) {
-    str << "    static void _marshallmessagepup_"<<epStr()<<"(PUP::er &p,void *msg);\n";
+    str << templateSpecLine
+        << "\n    static void _marshallmessagepup_"<<epStr()<<"(PUP::er &p,void *msg);";
   }
 }
 
 void Entry::genDecls(XStr& str)
 {
-  if(isConstructor() && retType && !retType->isVoid())
-    die("Constructors cannot return a value",line);
+  if (external)
+    return;
 
   str << "/* DECLS: "; print(str); str << " */\n";
   if(retType==0 && !isConstructor())
-      die("Entry methods must specify a return type-- \n"
-      	"use void if necessary",line);
+    die("Entry methods must specify a return type-- \n"
+        "use void if necessary",line);
 
   if (attribs&SMIGRATE)
     {} //User cannot call the migration constructor
   else if(container->isGroup()) {
-      genGroupDecl(str);
+    genGroupDecl(str);
   } else if(container->isArray()) {
-      if(!isIget())
-        genArrayDecl(str);
-      else if(container->isForElement())
-	genArrayDecl(str);
+    if(!isIget())
+      genArrayDecl(str);
+    else if(container->isForElement())
+      genArrayDecl(str);
   } else { // chare or mainchare
-      genChareDecl(str);
+    genChareDecl(str);
   }
 }
 
@@ -4373,7 +4287,7 @@ void Entry::genPub(XStr &declstr, XStr& defstr, XStr& defconstr, int& connectPre
      declstr << "      int publishflag_" << getEntryName() << ";\n";
      declstr << "      int getflag_" << getEntryName() << ";\n";
      declstr << "      CkCallback " << getEntryName() << "_cb;\n";
-     declstr << parameters->charstar();
+     declstr << parameters;
 
      // Following generates the def publish::connectFunction code
 
@@ -4514,7 +4428,12 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
     if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
   	str << "  new (impl_obj) "<<container->baseName();
     } else {//Regular entry method: call "obj->bar(parameters)"
-  	str << "  impl_obj->"<<name;
+      str << "  impl_obj->" << (tspec ? "template " : "") << name;
+      if (tspec) {
+        str << "< ";
+        tspec->genShort(str);
+        str << " >";
+      }
     }
 
     if (isArgcArgv) { //Extract parameters from CkArgMsg (should be parameter marshalled)
@@ -4531,9 +4450,12 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
 
 void Entry::genDefs(XStr& str)
 {
+  if (external)
+    return;
   XStr containerType=container->baseName();
   XStr preMarshall,preCall,postCall;
 
+  templateGuardBegin(tspec || container->isTemplated(), str);
   str << "/* DEFS: "; print(str); str << " */\n";
 
   if (attribs&SMIGRATE)
@@ -4548,9 +4470,12 @@ void Entry::genDefs(XStr& str)
   if (container->isMainChare() || container->isChare() || container->isForElement()) {
       if (isReductionTarget()) {
           XStr retStr; retStr<<retType;
-          str << retType << " " << indexName(); //makeDecl(retStr, 1)
-          str << "::_" << name << "_redn_wrapper(void* impl_msg, "
-              << container->baseName() << "* impl_obj)\n{\n"
+          str << makeDecl(retStr);
+          //str << retType << " " << indexName(); //makeDecl(retStr, 1)
+          str << "::_call_" << epStr(true) << "(void* impl_msg, void* impl_obj_void)"
+              << "\n{"
+              << "\n  " << container->baseName() << "* impl_obj = static_cast<"
+              << container->baseName() << "*> (impl_obj_void);\n"
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
           XStr precall;
           genCall(str, precall, true);
@@ -4560,21 +4485,34 @@ void Entry::genDefs(XStr& str)
 
 
   //Prevents repeated call and __idx definitions:
-  if (container->getForWhom()!=forAll) return;
+  if (container->getForWhom()!=forAll) {
+    templateGuardEnd(str);
+    return;
+  }
 
   // Define the entry point registration functions
   str << "\n// Entry point registration function"
-      << "\n" << makeDecl("int") << "::" << epRegFn(0) << " {"
-      << "\n  return " << genRegEp() << ";"
+      << "\n" << makeDecl("int") << "::reg_" << epStr() << "() {"
+      << "\n  int epidx = " << genRegEp() << ";";
+  if (hasCallMarshall)
+    str << "\n  CkRegisterMarshallUnpackFn(epidx, "
+        << "_callmarshall_" << epStr(false, true) << ");";
+  if (param->isMarshalled()) {
+    str << "\n  CkRegisterMessagePupFn(epidx, "
+        << "_marshallmessagepup_" << epStr(false, true) << ");\n";
+  }
+  else if (param->isMessage() && !attribs&SMIGRATE) {
+    str << "\n  CkRegisterMessagePupFn(epidx, (CkMessagePupFn)"
+        << param->param->getType()->getBaseName() << "::ckDebugPup);";
+  }
+  str << "\n  return epidx;"
       << "\n}\n\n";
 
   if (isReductionTarget())
   {
     str << "\n// Redn wrapper registration function"
-        << "\n" << makeDecl("int") << "::reg_"<< name <<"_redn_wrapper() {"
-        << "\n  return CkRegisterEp(\""  << name << "_redn_wrapper(CkReductionMsg* impl_msg)\","
-        << "\n        (CkCallFnPtr)_" << name << "_redn_wrapper,"
-        << " CMessage_CkReductionMsg::__idx, __idx, 0);"
+        << "\n" << makeDecl("int") << "::reg_"<< epStr(true) <<"() {"
+        << "\n  return " << genRegEp(true) << ";"
         << "\n}\n\n";
   }
 
@@ -4665,8 +4603,10 @@ void Entry::genDefs(XStr& str)
   }
 
   //Generate the call-method body
-  str << makeDecl("void")<<"::_call_"<<epStr()<<"(void* impl_msg,"<<containerType<<" * impl_obj)\n";
-  str << "{\n";
+  str << makeDecl("void")<<"::_call_"<<epStr()<<"(void* impl_msg, void* impl_obj_void)\n";
+  str << "{\n"
+      << "  " << container->baseName() << "* impl_obj = static_cast<"
+      << container->baseName() << " *>(impl_obj_void);\n";
   if (!isLocal()) {
     if(isThreaded()) str << callThread(epStr());
     str << preMarshall;
@@ -4685,7 +4625,9 @@ void Entry::genDefs(XStr& str)
   str << "}\n";
 
   if (hasCallMarshall) {
-    str << makeDecl("int")<<"::_callmarshall_"<<epStr()<<"(char* impl_buf,"<<containerType<<" * impl_obj) {\n";
+    str << makeDecl("int") << "::_callmarshall_" << epStr()
+        <<"(char* impl_buf, void* impl_obj_void) {\n";
+    str << "  " << containerType << "* impl_obj = static_cast< " << containerType << " *>(impl_obj_void);\n";
     if (!isLocal()) {
       if (!param->hasConditional()) {
         genCall(str,preCall);
@@ -4719,13 +4661,19 @@ void Entry::genDefs(XStr& str)
      }
      str << "}\n";
   }
+  templateGuardEnd(str);
 }
 
-XStr Entry::genRegEp()
+XStr Entry::genRegEp(bool isForRedn)
 {
   XStr str;
-  str << "CkRegisterEp(\"" << name << "("<<paramType(0)<<")\",\n"
-      << "      (CkCallFnPtr)_call_" << epStr() << ", ";
+  str << "CkRegisterEp(\"";
+  if (isForRedn)
+      str << "redn_wrapper_" << name << "(CkReductionMsg *impl_msg)\",\n";
+  else
+      str << name << "("<<paramType(0)<<")\",\n";
+  str << "      _call_" << epStr(isForRedn, true);
+  str << ", ";
   /* messageIdx: */
   if (param->isMarshalled()) {
     if (param->hasConditional())  str<<"MarshallMsg_"<<epStr()<<"::__idx";
@@ -4733,6 +4681,8 @@ XStr Entry::genRegEp()
   } else if(!param->isVoid() && !(attribs&SMIGRATE)) {
     param->genMsgProxyName(str);
     str <<"::__idx";
+  } else if (isForRedn) {
+    str << "CMessage_CkReductionMsg::__idx";
   } else {
     str << "0";
   }
@@ -4740,7 +4690,11 @@ XStr Entry::genRegEp()
   str << ", __idx";
   /* attributes */
   str << ", 0";
-  if (attribs & SNOKEEP) str << "+CK_EP_NOKEEP";
+  // reductiontarget variants should not be nokeep. The actual ep will be
+  // parameter marshalled (and hence flagged as nokeep), but we'll delete the
+  // CkReductionMsg in generated code, not runtime code. (so that we can cast
+  // it to CkReductionMsg not CkMarshallMsg)
+  if ( !isForRedn && (attribs & SNOKEEP) ) str << "+CK_EP_NOKEEP";
   if (attribs & SNOTRACE) str << "+CK_EP_TRACEDISABLE";
   if (attribs & SIMMEDIATE) str << "+CK_EP_TRACEDISABLE";
 
@@ -4754,10 +4708,22 @@ XStr Entry::genRegEp()
 
 void Entry::genReg(XStr& str)
 {
+  if (tspec)
+    return;
+
+  if (external) {
+    str << "  CkIndex_" << label << "::idx_" << name;
+    if (targs)
+        str << "< " << targs << " >";
+    str << "( static_cast< "
+        << retType << " (" << label << "::*)(" << paramType(0,0) << ") >(NULL) );\n";
+    return;
+  }
+
   str << "  // REG: "<<*this;
   str << "  " << epIdx(0) << ";\n";
   if (isReductionTarget())
-    str << "  idx_" << name << "_redn_wrapper();\n";
+    str << "  " << epIdx(0, true) << ";\n";
   if (isConstructor()) {
     if(container->isMainChare()&&!(attribs&SMIGRATE))
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
@@ -4765,18 +4731,6 @@ void Entry::genReg(XStr& str)
       str << "  CkRegisterDefaultCtor(__idx, "<<epIdx(0)<<");\n";
     if(attribs&SMIGRATE)
       str << "  CkRegisterMigCtor(__idx, "<<epIdx(0)<<");\n";
-  }
-  if (hasCallMarshall)
-      str << "  CkRegisterMarshallUnpackFn("<<epIdx(0)<<
-            ",(CkMarshallUnpackFn)_callmarshall_"<<epStr()<<");\n";
-
-  if (param->isMarshalled()) {
-      str << "  CkRegisterMessagePupFn("<<epIdx(0)<<
-  	    ",(CkMessagePupFn)_marshallmessagepup_"<<epStr()<<");\n";
-  }
-  else if (param->isMessage() && !attribs&SMIGRATE) {
-      str << "  CkRegisterMessagePupFn("<<epIdx(0)<<", (CkMessagePupFn)";
-      str << param->param->getType()->getBaseName() <<"::ckDebugPup);\n";
   }
 }
 
@@ -5124,7 +5078,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
                 callEach(&Parameter::beginUnmarshall,str);
             }
         } else {
-            str << "/* non two-param case */\n";
+            str << "  /* non two-param case */\n";
             callEach(&Parameter::beginUnmarshall,str);
             str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
             str<<"  /*Unmarshall arrays:*/\n";
@@ -5235,7 +5189,7 @@ void InitCall::print(XStr& str)
 }
 void InitCall::genReg(XStr& str)
 {
-	str<<"      _registerInitCall(";
+	str<<"  _registerInitCall(";
 	if (container)
 		str<<container->baseName()<<"::";
 	str<<name;

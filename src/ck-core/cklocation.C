@@ -19,6 +19,10 @@
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
 #include "MetaBalancer.h"
+#if CMK_GLOBAL_LOCATION_UPDATE
+#include "BaseLB.h"
+#include "init.h"
+#endif
 #endif // CMK_LBDB_ON
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -38,7 +42,7 @@ static const char *idx2str(const CkArrayMessage *m) {
 #   define DEBS(x) CkPrintf x  //Send/recv/broadcast debug messages
 #   define DEBM(x) CkPrintf x  //Migration debug messages
 #   define DEBL(x) CkPrintf x  //Load balancing debug messages
-#   define DEBK(x) //CkPrintf x  //Spring Cleaning debug messages
+#   define DEBK(x) CkPrintf x  //Spring Cleaning debug messages
 #   define DEBB(x) CkPrintf x  //Broadcast debug messages
 #   define AA "LocMgr on %d: "
 #   define AB ,CkMyPe()
@@ -57,6 +61,9 @@ static const char *idx2str(const CkArrayMessage *m) {
 #   define DEBUG(x)   /**/
 #   define DEBAD(x) /*CkPrintf x*/
 #endif
+
+//whether to use block mapping in the SMP node level
+bool useNodeBlkMapping;
 
 #if CMK_LBDB_ON
 /*LBDB object handles are fixed-sized, and not necc.
@@ -82,8 +89,38 @@ LDObjid idx2LDObjid(const CkArrayIndex &idx)
         r.id[j]+=circleShift(data[i],22+11*i*(j+1))+
           circleShift(data[i],21-9*i*(j+1));
   }
+
+#if CMK_GLOBAL_LOCATION_UPDATE
+  r.dimension = idx.dimension;
+  r.nInts = idx.nInts; 
+  r.isArrayElement = 1; 
+#endif
+
   return r;
 }
+
+#if CMK_GLOBAL_LOCATION_UPDATE
+void UpdateLocation(MigrateInfo& migData) {
+
+  if (migData.obj.id.isArrayElement == 0) {
+    return;
+  }
+
+  CkArrayIndex idx; 
+  idx.dimension = migData.obj.id.dimension; 
+  idx.nInts = migData.obj.id.nInts; 
+
+  for (int i = 0; i < idx.nInts; i++) {
+    idx.data()[i] = migData.obj.id.id[i];    
+  }
+
+  CkGroupID locMgrGid;
+  locMgrGid.idx = migData.obj.id.locMgrGid;
+  CkLocMgr *localLocMgr = (CkLocMgr *) CkLocalBranch(locMgrGid);
+  localLocMgr->updateLocation(idx, migData.to_pe); 
+}
+#endif
+
 #endif
 
 /*********************** Array Messages ************************/
@@ -233,6 +270,12 @@ public:
   int _numFirstSet;		/* _remChares X (_binSize + 1) -- number of
 				   chares in the first set */
 
+  int _nBinSizeFloor;           /* floor of numChares/numNodes */
+  int _nRemChares;              /* numChares % numNodes -- equals the number of
+                                   nodes in the first set */
+  int _nNumFirstSet;            /* _remChares X (_binSize + 1) -- number of
+                                   chares in the first set of nodes */
+
   /** All processors are divided into two sets. Processors in the first set
    *  have one chare more than the processors in the second set. */
 
@@ -247,6 +290,8 @@ public:
   void compute_binsize()
   {
     int numPes = CkNumPes();
+    //Now assuming homogenous nodes where each node has the same number of PEs
+    int numNodes = CkNumNodes();
 
     if (_nelems.nInts == 1) {
       _numChares = _nelems.data()[0];
@@ -260,6 +305,10 @@ public:
     _binSizeFloor = (int)floor((double)_numChares/(double)numPes);
     _binSizeCeil = (int)ceil((double)_numChares/(double)numPes);
     _numFirstSet = _remChares * (_binSizeFloor + 1);
+
+    _nRemChares = _numChares % numNodes;
+    _nBinSizeFloor = _numChares/numNodes;
+    _nNumFirstSet = _nRemChares * (_nBinSizeFloor +1);
   }
 
   void pup(PUP::er& p){
@@ -269,8 +318,11 @@ public:
     p|_numChares;
     p|_remChares;
     p|_numFirstSet;
+    p|_nRemChares;
+    p|_nBinSizeFloor;
+    p|_nNumFirstSet;
   }
-};
+}c;
 
 
 /**
@@ -318,6 +370,31 @@ public:
     }
 #endif
 
+    if(useNodeBlkMapping){
+      if(flati < amaps[arrayHdl]->_numChares){
+        int numCharesOnNode = amaps[arrayHdl]->_nBinSizeFloor;
+        int startNodeID, offsetInNode;
+        if(flati < amaps[arrayHdl]->_nNumFirstSet){
+          numCharesOnNode++;
+          startNodeID = flati/numCharesOnNode;
+          offsetInNode = flati%numCharesOnNode;
+        }else{
+          startNodeID = amaps[arrayHdl]->_nRemChares+(flati-amaps[arrayHdl]->_nNumFirstSet)/numCharesOnNode;
+          offsetInNode = (flati-amaps[arrayHdl]->_nNumFirstSet)%numCharesOnNode;
+        }
+        int nodeSize = CkMyNodeSize(); //assuming every node has same number of PEs
+        int elemsPerPE = numCharesOnNode/nodeSize;
+        int remElems = numCharesOnNode%nodeSize;
+        int firstSetPEs = remElems*(elemsPerPE+1);
+        if(offsetInNode<firstSetPEs){
+          return CkNodeFirst(startNodeID)+offsetInNode/(elemsPerPE+1);
+        }else{
+          return CkNodeFirst(startNodeID)+remElems+(offsetInNode-firstSetPEs)/elemsPerPE;
+        }
+      } else
+          return (flati % CkNumPes());
+    }
+    //regular PE-based block mapping
     if(flati < amaps[arrayHdl]->_numFirstSet)
       return (flati / (amaps[arrayHdl]->_binSizeFloor + 1));
     else if (flati < amaps[arrayHdl]->_numChares)
@@ -1323,8 +1400,12 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
 	bounced  = CmiFalse;
 	the_lbdb=mgr->getLBDB();
   the_metalb=mgr->getMetaBalancer();
+        LDObjid ldid = idx2LDObjid(idx);
+#if CMK_GLOBAL_LOCATION_UPDATE
+        ldid.locMgrGid = mgr->getGroupID().idx;
+#endif        
 	ldHandle=the_lbdb->RegisterObj(mgr->getOMHandle(),
-		idx2LDObjid(idx),(void *)this,1);
+		ldid,(void *)this,1);
 	if (fromMigration) {
 		DEBL((AA"Element %s migrated in\n"AB,idx2str(idx)));
 		if (!ignoreArrival)  {
@@ -1915,15 +1996,18 @@ void CkLocMgr::flushAllRecs(void)
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
-    void *objp;
-    void *keyp;
+	void *objp;
+	void *keyp;
 
-    CkHashtableIterator *it = hash.iterator();
-  while (NULL!=(objp=it->next(&keyp))) {
-    CkLocRec *rec=*(CkLocRec **)objp;
-    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-        fnPointer(arr,data,rec,&idx);
-    }
+	CkHashtableIterator *it = hash.iterator();
+	while (NULL!=(objp=it->next(&keyp))) {
+		CkLocRec *rec=*(CkLocRec **)objp;
+		CkArrayIndex &idx=*(CkArrayIndex *)keyp;
+		fnPointer(arr,data,rec,&idx);
+	}
+
+	// releasing iterator memory
+	delete it;
 }
 #endif
 
@@ -1942,7 +2026,9 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkGroupID metalbID_,CkArra
 	firstFree=localLen=0;
 	duringMigration=CmiFalse;
 	nSprings=0;
+#if !CMK_GLOBAL_LOCATION_UPDATE
 	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+#endif
 
 //Register with the map object
 	mapID=mapID_;
@@ -1966,7 +2052,9 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	firstFree=localLen=0;
 	duringMigration=CmiFalse;
 	nSprings=0;
+#if !CMK_GLOBAL_LOCATION_UPDATE
 	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+#endif
 	hashImmLock = CmiCreateImmediateLock();
 }
 
@@ -2035,6 +2123,9 @@ void CkLocMgr::pup(PUP::er &p){
         p | count;
         DEBUG(CmiPrintf("[%d] Packing Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
 
+		// releasing iterator memory
+		delete it;
+
         it = hash.iterator();
       while (NULL!=(objp=it->next(&keyp))) {
       CkLocRec *rec=*(CkLocRec **)objp;
@@ -2051,6 +2142,9 @@ void CkLocMgr::pup(PUP::er &p){
             }
         }
         CmiAssert(count == count1);
+
+		// releasing iterator memory
+		delete it;
 
 #endif
 
@@ -2132,11 +2226,11 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 		//Let this element's home Pe know it lives here now
 		DEBC((AA"  Telling %s's home %d that it lives on %d.\n"AB,idx2str(idx),home,nowOnPe));
 //#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#if defined(_FAULT_MLOG_)
-        informLocationHome(thisgroup,idx,home,CkMyPe());
-#else
+//#if defined(_FAULT_MLOG_)
+//        informLocationHome(thisgroup,idx,home,CkMyPe());
+//#else
 		thisProxy[home].updateLocation(idx,nowOnPe);
-#endif
+//#endif
 	}
 }
 
@@ -2180,6 +2274,14 @@ CmiBool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 	if (oldRec==NULL||oldRec->type()!=CkLocRec::local) 
 	{ //This is the first we've heard of that element-- add new local record
 		rec=createLocal(idx,CmiFalse,CmiFalse,CmiTrue);
+#if CMK_GLOBAL_LOCATION_UPDATE
+                if (homePe(idx) != CkMyPe()) {
+                  DEBC((AA"Global location broadcast for new element idx %s "
+                        "assigned to %d \n"AB, idx2str(idx), CkMyPe()));
+                  thisProxy.updateLocation(idx, CkMyPe());  
+                }
+#endif
+                
 	} else 
 	{ //rec is *already* local-- must not be the first insertion	
 		rec=((CkLocRec_local *)oldRec);
@@ -2302,16 +2404,21 @@ int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 		DEBS((AA"deliver %s rec is null\n"AB,idx2str(idx)));
 	}
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-#if !defined(_FAULT_MLOG_)
+//#if !defined(_FAULT_MLOG_)
 #if CMK_LBDB_ON
+
+        LDObjid ldid = idx2LDObjid(idx);
+#if CMK_GLOBAL_LOCATION_UPDATE
+        ldid.locMgrGid = thisgroup.idx;
+#endif        
 	if (type==CkDeliver_queue) {
 		if (!(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats()) {
-		if(rec!=NULL) the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor(), 1);
-		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()), 1);
+		if(rec!=NULL) the_lbdb->Send(myLBHandle,ldid,UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor(), 1);
+		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,ldid,UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()), 1);
 		}
 	}
 #endif
-#endif
+//#endif
 #if CMK_GRID_QUEUE_AVAILABLE
 	int gridSrcPE;
 	int gridSrcCluster;
@@ -2483,6 +2590,7 @@ CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t t
 //This message took several hops to reach us-- fix it
 void CkLocMgr::multiHop(CkArrayMessage *msg)
 {
+
 	CK_MAGICNUMBER_CHECK
 	int srcPe=msg->array_getSrcPe();
 	if (srcPe==CkMyPe())
@@ -2732,12 +2840,12 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	DEBM((AA"Migrated index size %s to %d \n"AB,idx2str(idx),toPe));	
 
 //#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#if defined(_FAULT_MLOG_)
-    sendMlogLocation(toPe,UsrToEnv(msg));
-#else
+//#if defined(_FAULT_MLOG_)
+//    sendMlogLocation(toPe,UsrToEnv(msg));
+//#else
 	//Send off message and delete old copy
 	thisProxy[toPe].immigrate(msg);
-#endif
+//#endif
 
 	duringMigration=CmiTrue;
 	delete rec; //Removes elements, hashtable entries, local index
@@ -2747,9 +2855,16 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	//The element now lives on another processor-- tell ourselves and its home
 	inform(idx,toPe);
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
-#if !defined(_FAULT_MLOG_)    
+//#if !defined(_FAULT_MLOG_)    
 	informHome(idx,toPe);
+//#endif
+
+#if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+        DEBM((AA"Global location update. idx %s " 
+              "assigned to %d \n"AB,idx2str(idx),toPe));
+        thisProxy.updateLocation(idx, toPe);                        
 #endif
+
 	CK_MAGICNUMBER_CHECK
 }
 
@@ -2779,11 +2894,11 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 
 	//Create a record for this element
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
-#if !defined(_FAULT_MLOG_)     
+//#if !defined(_FAULT_MLOG_)     
 	CkLocRec_local *rec=createLocal(idx,CmiTrue,msg->ignoreArrival,CmiFalse /* home told on departure */ );
-#else
-    CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue,CmiFalse /* home told on departure */ );
-#endif
+//#else
+//    CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue,CmiFalse /* home told on departure */ );
+//#endif
 	
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_migrate);

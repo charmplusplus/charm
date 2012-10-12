@@ -1,0 +1,482 @@
+The basic array features described previously (creation, messaging,
+broadcasts, and reductions) are needed in almost every
+\charmpp{} program.  The more advanced techniques that follow
+are not universally needed, but represent many useful optimisations.
+
+\section{Local Access}
+
+\index{ckLocal for arrays}
+\label{ckLocal for arrays}
+It is possible to get direct access to a local array element using the
+proxy's \kw{ckLocal} method, which returns an ordinary \CC\ pointer
+to the element if it exists on the local processor, and NULL if
+the element does not exist or is on another processor.
+
+\begin{alltt}
+A1 *a=a1[i].ckLocal();
+if (a==NULL) //...is remote-- send message
+else //...is local-- directly use members and methods of a
+\end{alltt}
+
+Note that if the element migrates or is deleted, any pointers 
+obtained with \kw{ckLocal} are no longer valid.  It is best,
+then, to either avoid \kw{ckLocal} or else call \kw{ckLocal} 
+each time the element may have migrated; e.g., at the start 
+of each entry method.
+
+An example of this usage is available
+in \examplerefdir{topology/matmul3d}.
+
+\section{Advanced Array Creation}
+\label{advanced array create}
+
+There are several ways to control the array creation process.
+You can adjust the map and bindings before creation, change
+the way the initial array elements are created, create elements
+explicitly during the computation, and create elements implicitly,
+``on demand''.  
+
+You can create all of an arrays elements using any one of these methods,
+or create different elements using different methods.  
+An array element has the same syntax and semantics no matter
+how it was created.  
+
+
+
+\subsection{Configuring Array Characteristics Using CkArrayOptions}
+\index{CkArrayOptions}
+\label{CkArrayOptions}
+
+The array creation method \kw{ckNew} actually takes a parameter
+of type \kw{CkArrayOptions}.  This object describes several
+optional attributes of the new array.
+
+The most common form of \kw{CkArrayOptions} is to set the number
+of initial array elements.  A \kw{CkArrayOptions} object will be 
+constructed automatically in this special common case.  Thus
+the following code segments all do exactly the same thing:
+
+\begin{alltt}
+//Implicit CkArrayOptions
+  a1=CProxy_A1::ckNew(\uw{parameters},nElements);
+
+//Explicit CkArrayOptions
+  a1=CProxy_A1::ckNew(\uw{parameters},CkArrayOptions(nElements));
+
+//Separate CkArrayOptions
+  CkArrayOptions opts(nElements);
+  a1=CProxy_A1::ckNew(\uw{parameters},opts);
+\end{alltt}
+
+
+Note that the ``numElements'' in an array element is simply the
+numElements passed in when the array was created.  The true number of
+array elements may grow or shrink during the course of the
+computation, so numElements can become out of date.  This ``bulk''
+constructor approach should be preferred where possible, especially
+for large arrays.  Bulk construction is handled via a broadcast which
+will be significantly more efficient in the number of messages
+required than inserting each element individually, which will require
+one message send per element.
+
+Examples of bulk construction are commonplace, see
+\examplerefdir{jacobi3d-sdag}
+for a demonstration of the slightly more complicated case of
+multidimensional chare array bulk construction.
+
+\kw{CkArrayOptions} contains a few flags that the runtime can use to
+optimize handling of a given array. If the array elements will only
+migrate at controlled points (such as periodic load balancing with
+{\tt AtASync()}), this is signalled to the runtime by calling {\tt
+  opts.setAnytimeMigration(false)}\footnote{At present, this optimizes
+broadcasts to not save old messages for immigrating chares.}. If all
+array elements will be inserted by bulk creation or by {\tt
+  fooArray[x].insert()} calls, signal this by calling {\tt
+  opts.setStaticInsertion(true)} \footnote{This can enable a slightly
+  faster default mapping scheme.}.
+
+\subsection{Initial Placement Using Map Objects}
+\index{array map}
+\label{array map}
+
+You can use \kw{CkArrayOptions} to specify a ``map object'' for an
+array.  The map object is used by the array manager to determine the
+``home'' PE of each element.  The home PE is the PE upon which it is
+initially placed, which will retain responsibility for maintaining the
+location of the element.
+
+There is a default map object, which maps 1D array indices
+in a block fashion to processors, and maps other array
+indices based on a hash function. Some other mappings such as round-robin
+(\kw{RRMap}) also exist, which can be used
+similar to custom ones described below.
+
+A custom map object is implemented as a group which inherits from
+\kw{CkArrayMap} and defines these virtual methods:
+
+\begin{alltt}
+class CkArrayMap : public Group
+\{
+public:
+  //...
+  
+  //Return an ``arrayHdl'', given some information about the array
+  virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
+  //Return the home processor number for this element of this array
+  virtual int procNum(int arrayHdl,const CkArrayIndex &element);
+\}
+\end{alltt}
+
+For example, a simple 1D blockmapping scheme.  Actual mapping is
+handled in the procNum function.
+
+\begin{alltt}
+class BlockMap : public CkArrayMap 
+\{
+ public:
+  BlockMap(void) \{\}
+  BlockMap(CkMigrateMessage *m)\{\}
+  int registerArray(CkArrayIndex& numElements,CkArrayID aid) \{
+    return 0;
+  \}
+  int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) \{
+    int elem=*(int *)idx.data();
+    int penum =  (elem/(32/CkNumPes()));
+    return penum;
+  \}
+\};
+
+\end{alltt}
+
+Note that the first argument to the \kw{procNum} method exists for reasons
+internal to the runtime system and is not used in the calculation of processor
+numbers.
+
+Once you've instantiated a custom map object, you can use it to
+control the location of a new array's elements using the
+\kw{setMap} method of the \kw{CkArrayOptions} object described above.
+For example, if you've declared a map object named ``BlockMap'':
+
+\begin{alltt}
+//Create the map group
+  CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
+//Make a new array using that map
+  CkArrayOptions opts(nElements);
+  opts.setMap(myMap);
+  a1=CProxy_A1::ckNew(\uw{parameters},opts);
+\end{alltt}
+
+An example which contructs one element per physical node may be found in
+\examplerefdir{PUP/pupDisk}
+
+Other 3D Torus network oriented map examples are in
+\examplerefdir{topology}
+
+\subsection{Initial Elements}
+\index{array initial}
+\label{array initial}
+
+The map object described above can also be used to create
+the initial set of array elements in a distributed fashion.
+An array's initial elements are created by its map object,
+by making a call to \kw{populateInitial} on each processor.
+
+You can create your own set of elements by creating your
+own map object and overriding this virtual function of \kw{CkArrayMap}:
+
+\begin{alltt}
+  virtual void populateInitial(int arrayHdl,int numInitial,
+	void *msg,CkArrMgr *mgr)
+\end{alltt}
+
+In this call, \kw{arrayHdl} is the value returned by \kw{registerArray},
+\kw{numInitial} is the number of elements passed to \kw{CkArrayOptions},
+\kw{msg} is the constructor message to pass, and \kw{mgr} is the
+array to create.
+
+\kw{populateInitial} creates new array elements using the method
+\kw{void CkArrMgr::insertInitial(CkArrayIndex idx,void *ctorMsg)}.
+For example, to create one row of 2D array elements on each processor,
+you would write:
+
+\begin{alltt}
+void xyElementMap::populateInitial(int arrayHdl,int numInitial,
+	void *msg,CkArrMgr *mgr)
+\{
+  if (numInitial==0) return; //No initial elements requested
+	
+  //Create each local element
+  int y=CkMyPe();
+  for (int x=0;x<numInitial;x++) \{
+    mgr->insertInitial(CkArrayIndex2D(x,y),CkCopyMsg(&msg));
+  \}
+  mgr->doneInserting();
+  CkFreeMsg(msg);
+\}
+\end{alltt}
+
+Thus calling \kw{ckNew(10)} on a 3-processor machine would result in
+30 elements being created.
+
+
+\subsection{Bound Arrays}
+\index{bound arrays} \index{bindTo}
+\label{bound arrays}
+
+You can ``bind'' a new array to an existing array
+using the \kw{bindTo} method of \kw{CkArrayOptions}.  Bound arrays
+act like separate arrays in all ways except for migration--
+corresponding elements of bound arrays always migrate together.
+For example, this code creates two arrays A and B which are
+bound together-- A[i] and B[i] will always be on the same processor.
+
+\begin{alltt}
+//Create the first array normally
+  aProxy=CProxy_A::ckNew(\uw{parameters},nElements);
+//Create the second array bound to the first
+  CkArrayOptions opts(nElements);
+  opts.bindTo(aProxy);
+  bProxy=CProxy_B::ckNew(\uw{parameters},opts);
+\end{alltt}
+
+An arbitrary number of arrays can be bound together--
+in the example above, we could create yet another array
+C and bind it to A or B.  The result would be the same
+in either case-- A[i], B[i], and C[i] will always be
+on the same processor.
+
+There is no relationship between the types of bound arrays--
+it is permissible to bind arrays of different types or of the
+same type.  It is also permissible to have different numbers
+of elements in the arrays, although elements of A which have
+no corresponding element in B obey no special semantics.
+Any method may be used to create the elements of any bound
+array.
+
+Bound arrays are often useful if A[i] and B[i] perform different 
+aspects of the same computation, and thus will run most efficiently 
+if they lie on the same processor.  Bound array elements are guaranteed
+to always be able to interact using \kw{ckLocal} (see 
+section~\ref{ckLocal for arrays}), although the local pointer must
+be refreshed after any migration. This should be done during the \kw{pup}
+routine. When migrated, all elements that are bound together will be created
+at the new processor before \kw{pup} is called on any of them, ensuring that
+a valid local pointer to any of the bound objects can be obtained during the
+\kw{pup} routine of any of the others.
+
+For example, an array {\it Alibrary} is implemented as a library module.
+It implements a certain functionality by operating on a data array {\it dest}
+which is just a pointer to some user provided data.
+A user defined array {\it UserArray} is created and bound to 
+the array {\it Alibrary} to take advanatage of the functionality provided 
+by the library.
+When bound array element migrated, the {\it data} pointer in {\it UserArray}
+is re-allocated in {\it pup()}, thus {\it UserArray} is responsible to refresh
+the pointer {\it dest} stored in {\it Alibrary}.
+
+\begin{alltt}
+class Alibrary: public CProxy_Alibrary \{
+public:
+  ...
+  void set_ptr(double *ptr) \{ dest = ptr; \}
+  virtual void pup(PUP::er &p);
+private:
+  double *dest;           // point to user data in user defined bound array
+\};
+
+class UserArray: public CProxy_UserArray \{
+public:
+  virtual void pup(PUP::er &p) \{
+                p|len;
+                if(p.isUnpacking()) \{ 
+                  data = new double[len];
+                  Alibrary *myfellow = AlibraryProxy(thisIndex).ckLocal();
+                  myfellow->set_ptr(data);    // refresh data in bound array
+                \}
+                p(data, len);
+  \}
+private:
+  CProxy_Alibrary  AlibraryProxy;   // proxy to my bound array
+  double *data;          // user allocated data pointer
+  int len;
+\};
+\end{alltt}
+
+A demonstration of bound arrays can be found in
+\testrefdir{startupTest}
+
+
+\subsection{Dynamic Insertion}
+\label{dynamic_insertion}
+
+In addition to creating initial array elements using ckNew,
+you can also
+create array elements during the computation.
+
+You insert elements into the array by indexing the proxy
+and calling insert.  The insert call optionally takes 
+parameters, which are passed to the constructor; and a
+processor number, where the element will be created.
+Array elements can be inserted in any order from 
+any processor at any time.  Array elements need not 
+be contiguous.
+
+If using \kw{insert} to create all the elements of the array,
+you must call \kw{CProxy\_Array::doneInserting} before using
+the array.
+
+\begin{alltt}
+//In the .C file:
+int x,y,z;
+CProxy_A1 a1=CProxy_A1::ckNew();  //Creates a new, empty 1D array
+for (x=...) \{
+   a1[x  ].insert(\uw{parameters});  //Bracket syntax
+   a1(x+1).insert(\uw{parameters});  // or equivalent parenthesis syntax
+\}
+a1.doneInserting();
+
+CProxy_A2 a2=CProxy_A2::ckNew();   //Creates 2D array
+for (x=...) for (y=...)
+   a2(x,y).insert(\uw{parameters});  //Can't use brackets!
+a2.doneInserting();
+
+CProxy_A3 a3=CProxy_A3::ckNew();   //Creates 3D array
+for (x=...) for (y=...) for (z=...)
+   a3(x,y,z).insert(\uw{parameters});
+a3.doneInserting();
+
+CProxy_AF aF=CProxy_AF::ckNew();   //Creates user-defined index array
+for (...) \{
+   aF[CkArrayIndexFoo(...)].insert(\uw{parameters}); //Use brackets...
+   aF(CkArrayIndexFoo(...)).insert(\uw{parameters}); //  ...or parenthesis
+\}
+aF.doneInserting();
+
+\end{alltt}
+
+The \kw{doneInserting} call starts the reduction manager (see ``Array
+Reductions'') and load balancer (see ~\ref{lbFramework})-- since
+these objects need to know about all the array's elements, they
+must be started after the initial elements are inserted.
+You may call \kw{doneInserting} multiple times, but only the first
+call actually does anything.  You may even \kw{insert} or \kw{destroy}
+elements after a call to \kw{doneInserting}, with different semantics-- 
+see the reduction manager and load balancer sections for details.
+
+If you do not specify one, the system will choose a processor to 
+create an array element on based on the current map object.
+
+A demonstration of dynamic insertion is available:
+\examplerefdir{hello/fancyarray}
+
+\subsection{Demand Creation}
+
+Demand Creation is a specialized form of dynamic insertion. Normally, invoking an entry method on a nonexistant array
+element is an error.  But if you add the attribute
+\index{createhere} \index{createhome}
+\kw{[createhere]} or \kw{[createhome]} to an entry method,
+ the array manager will 
+``demand create'' a new element to handle the message. 
+
+With \kw{[createhome]}, the new element
+will be created on the home processor, which is most efficient when messages for
+the element may arrive from anywhere in the machine. With \kw{[createhere]},
+the new element is created on the sending processor, which is most efficient
+if when messages will often be sent from that same processor.
+
+The new element is created by calling its default (taking no
+parameters) constructor, which must exist and be listed in the .ci file.
+A single array can have a mix of demand-creation and
+classic entry methods; and demand-created and normally 
+created elements. 
+
+A simple example of demand creation
+\testrefdir{demand\_creation}
+
+\section{User-defined Array Indices}
+\label{user-defined array index type}
+\index{Array index type, user-defined}
+
+\charmpp{} array indices are arbitrary collections of integers.
+To define a new array index, you create an ordinary C++ class 
+which inherits from \kw{CkArrayIndex} and sets the ``nInts'' member
+to the length, in integers, of the array index.
+
+For example, if you have a structure or class named ``Foo'', you 
+can use a \uw{Foo} object as an array index by defining the class:
+
+\begin{alltt}
+#include <charm++.h>
+class CkArrayIndexFoo:public CkArrayIndex \{
+    Foo f;
+public:
+    CkArrayIndexFoo(const Foo \&in) 
+    \{
+        f=in;
+        nInts=sizeof(f)/sizeof(int);
+    \}
+    //Not required, but convenient: cast-to-foo operators
+    operator Foo &() \{return f;\}
+    operator const Foo &() const \{return f;\}
+\};
+\end{alltt}
+
+Note that \uw{Foo}'s size must be an integral number of integers--
+you must pad it with zero bytes if this is not the case.
+Also, \uw{Foo} must be a simple class-- it cannot contain 
+pointers, have virtual functions, or require a destructor.
+Finally, there is a \charmpp\ configuration-time option called
+CK\_ARRAYINDEX\_MAXLEN \index{CK\_ARRAYINDEX\_MAXLEN} 
+which is the largest allowable number of 
+integers in an array index.  The default is 3; but you may 
+override this to any value by passing ``-DCK\_ARRAYINDEX\_MAXLEN=n'' 
+to the \charmpp\ build script as well as all user code. Larger 
+values will increase the size of each message.
+
+You can then declare an array indexed by \uw{Foo} objects with
+
+\begin{alltt}
+//in the .ci file:
+array [Foo] AF \{ entry AF(); ... \}
+
+//in the .h file:
+class AF : public CBase\_AF
+\{ public: AF() \{\} ... \}
+
+//in the .C file:
+    Foo f;
+    CProxy_AF a=CProxy_AF::ckNew();
+    a[CkArrayIndexFoo(f)].insert();
+    ...
+\end{alltt}
+
+Note that since our CkArrayIndexFoo constructor is not declared
+with the explicit keyword, we can equivalently write the last line as:
+
+\begin{alltt}
+    a[f].insert();
+\end{alltt}
+
+When you implement your array element class, as shown above you 
+can inherit from \kw{CBase}\_\uw{ClassName}, 
+a class templated by the index type \uw{Foo}. In the old syntax,
+you could also inherit directly from \kw{ArrayElementT}.
+The array index (an object of type \uw{Foo}) is then accessible as 
+``thisIndex''. For example:
+
+\begin{alltt}
+
+//in the .C file:
+AF::AF()
+\{
+    Foo myF=thisIndex;
+    functionTakingFoo(myF);
+\}
+\end{alltt}
+
+A demonstration of user defined indices can be seen in
+\examplerefdir{hello/fancyarray}
+
+%\section{Load Balancing Chare Arrays}
+%see section~\ref{lbFramework}
+

@@ -90,18 +90,23 @@ const PUP::machineInfo &PUP::machineInfo::current(void)
 		m=new machineInfo();
 		for (int i=0;i<4;i++)
 			m->magic[i]=machInfo_magic[i];
-		m->version=0;
+		m->version=1;
 		m->intBytes[0]=sizeof(char);
 		m->intBytes[1]=sizeof(short);
 		m->intBytes[2]=sizeof(int);
 		m->intBytes[3]=sizeof(long);
+#if CMK___int128_DEFINED
+		m->intBytes[4]=sizeof(__int128);
+#else
+		m->intBytes[4]=0;
+#endif
 		m->intFormat=getIntFormat();
 		m->floatBytes=sizeof(float);
 		m->doubleBytes=sizeof(double);
 		m->floatFormat=getFloatFormat();
 		m->boolBytes=sizeof(CmiBool);
 		m->pointerBytes=sizeof(void*);
-		m->padding[0]=0;
+		//m->padding[0]=0;    // version 1 does not have padding field
 	}
 	return *m;
 }
@@ -255,6 +260,10 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 		convertFn[Tlonglong]=convertFn[Tulonglong]=cvt_null;
 	else
 		convertFn[Tlonglong]=convertFn[Tulonglong]=cvt_swap;
+#if CMK___int128_DEFINED
+	setConverterInt(src,cur,0,4,Tint128);
+	setConverterInt(src,cur,1,4,Tuint128);
+#endif
 	convertFn[Tfloat]=converterFloat(src,cur,src.floatBytes,cur.floatBytes);
 	convertFn[Tdouble]=converterFloat(src,cur,src.doubleBytes,cur.doubleBytes);
 	convertFn[Tlongdouble]=cvt_null; //<- a lie, but no better alternative

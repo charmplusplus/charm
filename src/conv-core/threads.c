@@ -440,7 +440,12 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
     th->aliasStackHandle=CthAliasCreate(*stackSize);
     ret=CMK_THREADS_ALIAS_LOCATION;
 #else /* isomalloc */
+#if defined(__APPLE__) && CMK_64BIT
+      /* MAC OS needs 16-byte aligned stack */
+    ret=CmiIsomallocAlign(16, *stackSize, (CthThread)th);
+#else
     ret=CmiIsomalloc(*stackSize, (CthThread)th);
+#endif
 #endif
   }
   _MEMCHECK(ret);
@@ -1942,7 +1947,7 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
   }
 
 #if CMK_THREADS_BUILD_TLS
-  allocNewTLSSeg(&B(result)->tlsseg);
+  allocNewTLSSeg(&B(result)->tlsseg, result);
 #endif
 
   return result;

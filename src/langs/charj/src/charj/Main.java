@@ -15,6 +15,7 @@ public class Main
     public static boolean m_printAST;
     public static boolean m_stdout;
     public static boolean m_translate_only;
+    public static boolean m_count_tokens;
 
     public static void main(String[] args) throws Exception
     {
@@ -28,7 +29,9 @@ public class Main
                 m_stdlib,
                 m_usrlibs);
         for (String filename : files) { 
-            if (!m_stdout) {
+            if (m_count_tokens) {
+                System.out.println(t.tokenCount(filename));
+            } else if (!m_stdout) {
                 t.translate(filename);
             } else {
                 String header = "\n\n" + filename + "\n";
@@ -95,6 +98,12 @@ public class Main
         _translate_only.setHelp("translate to C++, but do not compile");
         processor.registerParameter(_translate_only);
 
+        Switch _count_tokens= new Switch("count-tokens")
+            .setShortFlag(JSAP.NO_SHORTFLAG)
+            .setLongFlag("count-tokens");
+        _count_tokens.setHelp("report number of tokens in the input and exit");
+        processor.registerParameter(_count_tokens);
+
         UnflaggedOption fileList = new UnflaggedOption("file")
             .setStringParser(JSAP.STRING_PARSER)
             .setRequired(true)
@@ -120,6 +129,7 @@ public class Main
         m_printAST = config.getBoolean("printAST", false);
         m_stdout = config.getBoolean("stdout", false);
         m_translate_only = config.getBoolean("translate-only", false);
+        m_count_tokens = config.getBoolean("count-tokens", false);
         
         String usrlib = config.getString("usrlib");
         if (usrlib != null) {

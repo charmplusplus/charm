@@ -1,4 +1,4 @@
-DIRS=megatest pingpong simplearrayhello load_balancing chkpt delegation queue sdag ckAllocSysMsgTest
+DIRS=megatest pingpong simplearrayhello load_balancing chkpt delegation queue sdag ckAllocSysMsgTest method_templates
 
 all:
 	for d in $(DIRS); do \
@@ -15,6 +15,12 @@ bgtest:
 	for d in pingpong simplearrayhello load_balancing chkpt delegation; do \
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
+
+syncfttest causalfttest:
+	for d in jacobi3d jacobi3d-sdag; do \
+		(cd $$d; $(MAKE) $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
+	done
+
 
 clean:
 	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done

@@ -1,0 +1,20 @@
+mainmodule client  {
+  extern module mylib;
+  include "utils.h";
+
+  initnode register_instantiations();
+  extern entry void libArray doSomething(cntType&, CkReduction::reducerType&, CkCallback&);
+  extern entry void libArray doSomething(avg&, CkReduction::reducerType&, CkCallback&);
+
+  initnode register_reducers();
+
+  mainchare pgm {
+    entry pgm (CkArgMsg *m);
+
+    entry void startTest();
+    template <typename T>
+    entry[reductiontarget] void acceptResults(T t);
+  };
+
+}
+

@@ -88,19 +88,19 @@ Main::Main(CkArgMsg* m) {
 
   // Start the computation
   numIterations = 0;
-  startTime = CmiWallTimer();
+  startTime = CkWallTimer();
   compute.beginCopying();
 }
 
 void Main::done() {
   numIterations++;
   if(numIterations == 1) {
-    firstTime = CmiWallTimer();
+    firstTime = CkWallTimer();
     CkPrintf("FIRST ITER TIME %f secs\n", firstTime - startTime);
   }
 
   if(numIterations == NUM_ITER) {
-    endTime = CmiWallTimer();
+    endTime = CkWallTimer();
     CkPrintf("AVG TIME %f secs\n", (endTime - firstTime)/(NUM_ITER-1));
     CkExit();
   } else {

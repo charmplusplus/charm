@@ -56,6 +56,12 @@ TopoManager::TopoManager() {
   dimNY = bgqtm.getDimNY();
   dimNZ = bgqtm.getDimNZ();
   dimNT = bgqtm.getDimNT();
+  
+  dimNA = bgqtm.getDimNA();
+  dimNB = bgqtm.getDimNB();
+  dimNC = bgqtm.getDimNC();
+  dimND = bgqtm.getDimND();
+  dimNE = bgqtm.getDimNE();
 
   procsPerNode = bgqtm.getProcsPerNode();
   int *torus;
@@ -299,7 +305,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 
 #if CMK_BLUEGENEQ
 int TopoManager::coordinatesToRank(int a, int b, int c, int d, int e, int t) {
-  CmiAssert( a>=0 && x<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT );
+  CmiAssert( a>=0 && a<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT );
   return bgqtm.coordinatesToRank(a, b, c, d, e, t);
 }
 #endif
@@ -414,15 +420,34 @@ int TopoManager::partition(int pe, int *pes, int *idx, int left, int right) {
   }
 }
 
-void TopoManager::printAllocation() 
+void TopoManager::printAllocation(FILE *fp)
 {
 	int i,x,y,z,t;
-	printf("Printing topology Info-\n");
-	printf("NumPes -  %d\n",numPes);
-	printf("Dims - %d %d %d\n",dimNX,dimNY,dimNZ);
-	printf("Rank - x y z t\n");
+	fprintf(fp, "Topology Info-\n");
+	fprintf(fp, "NumPes -  %d\n", numPes);
+	fprintf(fp, "Dims - %d %d %d\n",dimNX,dimNY,dimNZ);
+	fprintf(fp, "Rank - x y z t\n");
 	for(i=0; i<numPes; i++) {
 		rankToCoordinates(i,x,y,z,t);
-		printf("%d - %d %d %d %d\n",i,x,y,z,t);
+		fprintf(fp, "%d - %d %d %d %d\n",i,x,y,z,t);
 	}
 }
+
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+extern "C" void craynid_init();
+#endif
+
+void TopoManager_init()
+{
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+    craynid_init();
+#endif
+}
+
+extern "C" int CmiGetHopsBetweenRanks(int pe1, int pe2)
+{
+    TopoManager topomgr;
+    return topomgr.getHopsBetweenRanks(pe1, pe2);
+}
+
+

@@ -3,26 +3,26 @@ CHARMC=../../../bin/charmc $(OPTS)
 all: jacobi3D maxReduce prime ping octo line ring
 	cd littleMD; $(MAKE)
 
-jacobi3D: jacobi3D.C
-	$(CHARMC) -language bigsim -o jacobi3D jacobi3D.C 
+jacobi3D: jacobi3D.C common.C
+	$(CHARMC) -language bigsim -o jacobi3D $^
 
-maxReduce: maxReduce.C
-	$(CHARMC) -language bigsim -o maxReduce maxReduce.C
+maxReduce: maxReduce.C common.C
+	$(CHARMC) -language bigsim -o maxReduce $^
 
-prime: prime.C
-	$(CHARMC) -language bigsim -o prime prime.C
+prime: prime.C common.C
+	$(CHARMC) -language bigsim -o prime $^
 
-ping: ping.C
-	$(CHARMC) -language bigsim -o ping ping.C
+ping: ping.C common.C
+	$(CHARMC) -language bigsim -o ping $^
 
-octo: octo.C
-	$(CHARMC) -language bigsim -o octo octo.C
+octo: octo.C common.C
+	$(CHARMC) -language bigsim -o octo $^
 
-line: line.C
-	$(CHARMC) -language bigsim -o line line.C
+line: line.C common.C
+	$(CHARMC) -language bigsim -o line $^
 
-ring: ring.C
-	$(CHARMC) -language bigsim -o ring ring.C
+ring: ring.C common.C
+	$(CHARMC) -language bigsim -o ring $^
 
 test: all
 	./charmrun ./maxReduce +p4 +cth3 +wth10 +bgstacksize 102400 $(TESTOPTS)

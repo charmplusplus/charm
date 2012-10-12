@@ -1,12 +1,21 @@
-\subsection{Futures}
-
+\section{Futures}
 \label{futures}
 
-Similar to Multilisp and other functional programming languages, \charmpp\ provides the abstraction of {\em futures}. In simple terms, a {\em future} is a contract with the runtime system to evaluate an expression asynchronously with the calling program. This mechanism promotes the evaluation of expressions in parallel as several threads concurrently evaluate the futures created by a program.
+Similar to Multilisp and other functional programming languages, \charmpp\
+provides the abstraction of {\em futures}. In simple terms, a {\em future} is a
+contract with the runtime system to evaluate an expression asynchronously with
+the calling program. This mechanism promotes the evaluation of expressions in
+parallel as several threads concurrently evaluate the futures created by a
+program.
 
-In some ways, a future resembles lazy evaluation. Each future is assigned to a particular thread (or to a chare, in \charmpp\ ) and its value will be eventually delivered to the calling program. Once the future is created, a reference is returned immediately. If the value is needed, however, the calling program blocks until the value is available.
+In some ways, a future resembles lazy evaluation. Each future is assigned to a
+particular thread (or to a chare, in \charmpp) and, eventually, its value is
+delivered to the calling program. Once a future is created, a {\em
+reference} is returned immediately. However, if the {\em value} calculated by the future
+is needed, the calling program blocks until the value is available.
 
-\charmpp\ provides all the necessary infrastructure to use futures by means of the following functions: 
+\charmpp\ provides all the necessary infrastructure to use futures by means of
+the following functions: 
 
 \begin{alltt}
  CkFuture CkCreateFuture(void)
@@ -16,30 +25,31 @@ In some ways, a future resembles lazy evaluation. Each future is assigned to a p
  void  CkSendToFuture(CkFuture fut, void *msg)
 \end{alltt}
 
-To illustrate the use of all these functions, a Fibonacci example in \charmpp\ using futures in presented below:
+To illustrate the use of all these functions, a Fibonacci example in \charmpp\
+using futures in presented below:
 
 \begin{alltt}
 chare fib \{
-  entry fib(int amIroot, int n, CkFuture f);
-  entry  [threaded] void run(int amIroot, int n, CkFuture f);
+  entry fib(bool amIroot, int n, CkFuture f);
+  entry  [threaded] void run(bool amIroot, int n, CkFuture f);
 \};
 \end{alltt}
 
 \begin{alltt}
-void  fib::run(int AmIRoot, int n, CkFuture f) \{
-   if (n< THRESHOLD)
-    result =seqFib(n);
+void  fib::run(bool amIRoot, int n, CkFuture f) \{
+   if (n < THRESHOLD)
+    result = seqFib(n);
   else \{
     CkFuture f1 = CkCreateFuture();
     CkFuture f2 = CkCreateFuture();
-    CProxy_fib::ckNew(0,n-1,  f1);
-    CProxy_fib::ckNew(0,n-2,  f2);
+    CProxy_fib::ckNew(0, n-1, f1);
+    CProxy_fib::ckNew(0, n-2, f2);
     ValueMsg * m1 = (ValueMsg *) CkWaitFuture(f1);
     ValueMsg * m2 = (ValueMsg *) CkWaitFuture(f2);
     result = m1->value + m2->value;
     delete m1; delete m2;
   \}
-  if (AmIRoot) \{
+  if (amIRoot) \{
     CkPrintf("The requested Fibonacci number is : \%d\\n", result);
     CkExit();  
   \} else \{
@@ -50,9 +60,21 @@ void  fib::run(int AmIRoot, int n, CkFuture f) \{
 \}
 \end{alltt}
 
-The constant {\em THRESHOLD} sets a limit value for computing the Fibonacci number with futures or just with the sequential procedure. Given value {\em n}, the program creates two futures using {\em CkCreateFuture}. Those futures are used to create two new chares that will carry on the computation. Next, the program blocks until the two values of the Fibonacci's recurrence have been evaluated. Function {\em CkWaitFuture} is used for that purpose. Finally, the program checks whether it is the root of the evaluation or not. The very first chare created with a future is going to be the root. If a chare is not a root, it must indicate its future has finished computing the value. {\em CkSendToFuture} is meant to return the value for the current future.
+The constant {\em THRESHOLD} sets a limit value for computing the Fibonacci
+number with futures or just with the sequential procedure. Given value {\em n},
+the program creates two futures using {\em CkCreateFuture}. Those futures are
+used to create two new chares that will carry out the computation. Next, the
+program blocks until the two component values of the recurrence have been
+evaluated. Function {\em CkWaitFuture} is used for that purpose. Finally, the
+program checks whether or not it is the root of the recursive evaluation. The very first
+chare created with a future is the root. If a chare is not the root,
+it must indicate that its future has finished computing the value. {\em
+CkSendToFuture} is meant to return the value for the current future.
 
-Other functions complete the API for futures. {\em CkReleaseFuture} destroys a future. {\em CkProbeFuture} test if the future has already finished computing the value of the expression.
+Other functions complete the API for futures. {\em CkReleaseFuture} destroys a
+future. {\em CkProbeFuture} tests whether the future has already finished computing
+the value of the expression.
 
-The \converse\ version of future functions can be found in the \converse\ \htmladdnormallink{manual}{http://charm.cs.illinois.edu/manuals/html/convext/manual.html}.
+The \converse\ version of future functions can be found in the
+\htmladdnormallink{\converse{} manual}{http://charm.cs.illinois.edu/manuals/html/convext/manual.html}.
 

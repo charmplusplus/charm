@@ -27,6 +27,8 @@ public class MethodSymbol
     public boolean isCtor = false;
     public boolean isTraced = false;
     public boolean hasSDAG = false;
+    public boolean hasMSA = false;
+    public boolean accel = false;
 
     public CharjAST sdagFPL;
 
@@ -174,5 +176,17 @@ public class MethodSymbol
             inits.add(type + "* " + name + " = &__" + name + ";");
         }
         return inits;
+    }
+
+    public void addAccelIdent(CharjAST ast)
+    {
+    }
+
+    public void addMSASync(CharjAST ast)
+    {
+    }
+
+    public void addMSAAccess(CharjAST ast)
+    {
     }
 }

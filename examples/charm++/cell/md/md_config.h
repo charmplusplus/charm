@@ -114,9 +114,9 @@
   #if ENABLE_USER_EVENTS != 0
     #define NetworkProgress  \
       {  \
-        double __start_time__ = CmiWallTimer();  \
+        double __start_time__ = CkWallTimer();  \
         CmiMachineProgressImpl();  \
-        traceUserBracketEvent(PROJ_USER_EVENT_MACHINEPROGRESS, __start_time__, CmiWallTimer());  \
+        traceUserBracketEvent(PROJ_USER_EVENT_MACHINEPROGRESS, __start_time__, CkWallTimer());  \
       }
   #else
     #define NetworkProgress  CmiMachineProgressImpl();

@@ -27,10 +27,6 @@
    /* can not handle reduction in inmem FT */
 #define USE_REDUCTION         0
 #define USE_LDB_SPANNING_TREE 0
-#elif defined(_FAULT_MLOG_)
-/* can not handle reduction in inmem FT */
-#define USE_REDUCTION         0
-#define USE_LDB_SPANNING_TREE 0
 #else
 #define USE_REDUCTION         1
 #define USE_LDB_SPANNING_TREE 1
@@ -46,6 +42,10 @@ extern void sendDummyMigrationCounts(int *);
 
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvExtern(void *, CkGridObject);
+#endif
+
+#if CMK_GLOBAL_LOCATION_UPDATE      
+extern void UpdateLocation(MigrateInfo& migData); 
 #endif
 
 CkGroupID loadbalancer;
@@ -865,7 +865,7 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
   storedMigrateMsg = m;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	ProcessReceiveMigration((CkReductionMsg*)NULL);
+	restoreParallelRecovery(&resumeAfterRestoreParallelRecovery,(void *)this);
 #else
   CkCallback cb(CkIndex_CentralLB::ProcessReceiveMigration((CkReductionMsg*)NULL),
                   thisProxy);
@@ -890,7 +890,6 @@ void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
 	if(step() > m->step){
 		char str[100];
 		envelope *env = UsrToEnv(m);
-		CmiPrintf("[%d] Object %s tProcessed %d m->TN %d\n",CmiMyPe(),mlogData->objID.toString(str),mlogData->tProcessed,env->TN);
 		return;
 	}
 	lbDecisionCount = m->lbDecisionCount;
@@ -948,6 +947,12 @@ void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
     }
+    else {
+#if CMK_GLOBAL_LOCATION_UPDATE      
+      UpdateLocation(move); 
+#endif
+    }
+
   }
   DEBUGF(("[%d] in ReceiveMigration %d moves expected: %d future expected: %d\n",CkMyPe(),m->n_moves, migrates_expected, future_migrates_expected));
   // if (_lb_debug) CkPrintf("[%d] expecting %d objects migrating.\n", CkMyPe(), migrates_expected);
@@ -1059,6 +1064,10 @@ void resumeCentralLbAfterChkpt(void *_lb){
     CentralLB *lb= (CentralLB *)_lb;
     CpvAccess(_currentObj)=lb;
     lb->endMigrationDone(lb->savedBalancing);
+}
+void resumeAfterRestoreParallelRecovery(void *_lb){
+    CentralLB *lb= (CentralLB *)_lb;
+	lb->ProcessReceiveMigration((CkReductionMsg*)NULL);
 }
 #endif
 

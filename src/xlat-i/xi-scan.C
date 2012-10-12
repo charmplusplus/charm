@@ -821,19 +821,20 @@ char *yytext;
 #include <string.h>
 #include "xi-symbol.h"
 #include <ctype.h>
-#include "CList.h"
 using namespace xi;
 #include "xi-grammar.tab.h"
+#include <list>
 
 /* Global Variables and Functions - used in grammar.y */
 unsigned int lineno = 1;
 int in_bracket=0; /*Horrific hack to get "array length" code snippets (between []'s)*/
 int in_braces=0; /*Horrific hack to get SDAG entry code snippets (between {}'s)*/
 int in_int_expr=0;
-TList<Entry *> *connectEntries = new TList<Entry *>();
+std::list<Entry *> connectEntries;
 /* Local to file */
 unsigned char in_comment=0;
 int search(char *s);
+int count_newlines(char *s);
 
 /* We return Tokens only when not in a comment. */
 #define Return if (!in_comment) return
@@ -844,7 +845,7 @@ int search(char *s);
 #undef yywrap
 #endif
 
-#line 848 "lex.yy.c"
+#line 849 "lex.yy.c"
 
 #define INITIAL 0
 
@@ -1031,9 +1032,9 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 57 "xi-scan.l"
+#line 58 "xi-scan.l"
 
-#line 1037 "lex.yy.c"
+#line 1038 "lex.yy.c"
 
 	if ( !(yy_init) )
 		{
@@ -1128,94 +1129,94 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 58 "xi-scan.l"
+#line 59 "xi-scan.l"
 { if (in_bracket) {Yval;return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 59 "xi-scan.l"
-{ if (in_braces) {Yval;return Token(CPROGRAM);} else REJECT;}
+#line 60 "xi-scan.l"
+{ if (in_braces) {Yval; lineno += count_newlines(yytext); return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 60 "xi-scan.l"
+#line 61 "xi-scan.l"
 { if (in_int_expr) {Yval;return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 61 "xi-scan.l"
+#line 62 "xi-scan.l"
 { /* ignore single line comments */ }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 62 "xi-scan.l"
+#line 63 "xi-scan.l"
 { /* ignore ^M characters for dos-unix compat */ }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 63 "xi-scan.l"
+#line 64 "xi-scan.l"
 { in_comment = 1; /* Single line C-style comments */ }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 64 "xi-scan.l"
+#line 65 "xi-scan.l"
 { in_comment = 0; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 65 "xi-scan.l"
+#line 66 "xi-scan.l"
 { Return Token(HASHIF); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 66 "xi-scan.l"
+#line 67 "xi-scan.l"
 { Return Token(HASHIFDEF); }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 67 "xi-scan.l"
+#line 68 "xi-scan.l"
 { in_comment = 0; /* comments */ }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 68 "xi-scan.l"
+#line 69 "xi-scan.l"
 { /* ignore white space */ }
 	YY_BREAK
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 69 "xi-scan.l"
+#line 70 "xi-scan.l"
 { lineno++;}
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 70 "xi-scan.l"
+#line 71 "xi-scan.l"
 { Yval; Return Token(NUMBER); }
 	YY_BREAK
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 71 "xi-scan.l"
+#line 72 "xi-scan.l"
 { Yval; Return Token(LITERAL); }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 72 "xi-scan.l"
+#line 73 "xi-scan.l"
 { Return Token(search(yytext)); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 73 "xi-scan.l"
+#line 74 "xi-scan.l"
 { Return Token(yytext[0]); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 74 "xi-scan.l"
+#line 75 "xi-scan.l"
 ECHO;
 	YY_BREAK
-#line 1219 "lex.yy.c"
+#line 1220 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -2187,7 +2188,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 74 "xi-scan.l"
+#line 75 "xi-scan.l"
 
 
 
@@ -2244,6 +2245,7 @@ struct rwtable rwtable[] = {
 {  "void",	VOID },
 {  "const",	CONST },
 {  "atomic", 	ATOMIC },
+{  "serial",    ATOMIC },
 {  "forward", 	FORWARD },
 {  "when", 	WHEN },
 {  "while", 	WHILE },
@@ -2275,6 +2277,18 @@ int search(char *s)
   }
   yylval.strval = strcpy(new char[yyleng+1], s);
   return IDENT;
+}
+
+// Oh my $DEITY...
+int count_newlines(char *s) {
+    int count = 0;
+
+    while (*s != '\0') {
+        if (*s == '\n') count++;
+        s++;
+    }
+
+    return count;
 }
 
 int yywrap() { return 1; }

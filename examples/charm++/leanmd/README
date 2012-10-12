@@ -1,0 +1,28 @@
+TO COMPILE-
+Do a make in this folder
+
+TO RUN-
+Either provide no arguments or provide all
+./charmrun +p<Procs> ./leanmd <dimX,dimY,dimZ,steps>
+Example - ./charmrun +p4 ./leanmd 2 2 2 1001 
+Example - ./charmrun +p4 ./leanmd 2 2 2 1001 
+
+READ ORDER
+leanmd.ci - contains the most important aspects of the program, look for run() 
+function for each chare which is called right after constructor call for each
+chare. It contains most of the parallel flow and control flow information.
+
+Cell.* - contains the implementation of important functions attached with
+Cell; focus on sendPositions() and updateProperties()
+
+Compute.* - contains the implementation for Compute; the interact() function
+is important as it does the force computation.
+
+Main.* - contains the constructor for Main chare; also the starting point 
+of the application; main chare passes control to run() of Main chare and
+constructors of Cell.
+
+physics.h - contains physics equation implementation for force computation; also
+contains the contribute for reduction of forces.
+
+defs.h - #define for constant values and some class declaration

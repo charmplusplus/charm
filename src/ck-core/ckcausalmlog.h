@@ -10,6 +10,7 @@
 #endif
 
 CpvExtern(Chare *,_currentObj);
+CpvExtern(int, _numImmigrantRecObjs);
 
 //states of a ticket sent as a reply to a request
 #define NEW_TICKET 1
@@ -60,7 +61,6 @@ typedef struct {
 	int phase;
 	int index;
 } RemoveDeterminantsHeader;
-
 
 /**
  * @brief Struct for the header of the storeDeterminants handler
@@ -208,6 +208,8 @@ public:
 
 	int toResumeOrNot;
 	int resumeCount;
+	int immigrantRecFlag;
+	int immigrantSourcePE;
 
 private:
 
@@ -237,6 +239,7 @@ public:
 		resendReplyRecvd=0;
 		toResumeOrNot=0;
 		resumeCount=0;
+		immigrantRecFlag = 0;
 	};
 	inline MCount nextSN(const CkObjID &recver);
 	inline Ticket next_ticket(CkObjID &sender,MCount SN);
@@ -279,15 +282,6 @@ public:
 		}
 	}
 	virtual void pup(PUP::er &p);
-};
-
-/**
- * @brief 
- */
-class LocationID{
-public:
-	CkArrayIndexMax idx;
-	CkGroupID gid;
 };
 
 /**
@@ -362,6 +356,12 @@ typedef struct{
 	int PE;
 	int dataSize;
 } CheckPointDataMsg;
+
+typedef struct{
+    char header[CmiMsgHeaderSizeBytes];
+    int PE;
+} DistributeObjectMsg;
+
 
 /*typedef struct{
 	char header[CmiMsgHeaderSizeBytes];
@@ -509,10 +509,11 @@ void _messageLoggingInit();
 //Methods for sending ticket requests
 void sendGroupMsg(envelope *env,int destPE,int _infoIdx);
 void sendArrayMsg(envelope *env,int destPE,int _infoIdx);
+void sendChareMsg(envelope *env,int destPE,int _infoIdx, const CkChareID *pCid);
 void sendNodeGroupMsg(envelope *env,int destNode,int _infoIdx);
 void sendCommonMsg(CkObjID &recver,envelope *env,int destPE,int _infoIdx);
 void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,MCount TN,int resend);
-void sendLocalMsg(MlogEntry *entry);
+void sendLocalMsg(envelope *env, int _infoIdx);
 
 //handler functions
 void _ticketRequestHandler(TicketRequest *);
@@ -577,10 +578,12 @@ void CkMlogRestartLocal();
 void _getCheckpointHandler(RestartRequest *restartMsg);
 void _recvCheckpointHandler(char *_restartData);
 void _resendMessagesHandler(char *msg);
-void _resendReplyHandler(char *msg);
+void _sendDetsHandler(char *msg);
+void _sendDetsReplyHandler(char *msg);
 void _receivedTNDataHandler(ReceivedTNData *msg);
 void _receivedDetDataHandler(ReceivedDetData *msg);
 void _distributedLocationHandler(char *receivedMsg);
+void _sendBackLocationHandler(char *receivedMsg);
 void _updateHomeRequestHandler(RestartRequest *updateRequest);
 void _updateHomeAckHandler(RestartRequest *updateHomeAck);
 void _verifyAckRequestHandler(VerifyAckMsg *verifyRequest);
@@ -596,7 +599,8 @@ void _recvRestartCheckpointHandler(char *_restartData);
 extern int _getCheckpointHandlerIdx;
 extern int _recvCheckpointHandlerIdx;
 extern int _resendMessagesHandlerIdx;
-extern int _resendReplyHandlerIdx;
+extern int _sendDetsHandlerIdx;
+extern int _sendDetsReplyHandlerIdx;
 extern int _receivedTNDataHandlerIdx;
 extern int _receivedDetDataHandlerIdx;
 extern int _distributedLocationHandlerIdx;
@@ -613,6 +617,7 @@ void startLoadBalancingMlog(void (*fnPtr)(void *),void *_centralLb);
 void finishedCheckpointLoadBalancing();
 void sendMlogLocation(int targetPE,envelope *env);
 void resumeFromSyncRestart(void *data,ChareMlogData *mlogData);
+void restoreParallelRecovery(void (*fnPtr)(void *),void *_centralLb);
 
 //handlers for Load Balancing
 void _receiveMlogLocationHandler(void *buf);

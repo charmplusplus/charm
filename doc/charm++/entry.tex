@@ -1,31 +1,4 @@
-\subsection{Entry Methods}
-
-\label{entry}
-
-In \charmpp, \index{chare}chares, \index{group}groups and \index{nodegroup}
-nodegroups communicate using remote method invocation.  These ``remote entry'' methods may either take marshalled parameters, described in the next section; or special objects called messages.  Messages are lower level, more efficient, more flexible, and more difficult to use than parameter marshalling.
-
-An entry method is always a part of a chare--
-there are no global entry methods in \charmpp{}.
-Entry methods are declared in the the interface file as:
-
-\begin{alltt}
-entry void \uw{Entry1}(\uw{parameters});
-\end{alltt}
-
-\uw{Parameters} is either a list of marshalled parameters,
-(e.g., ``int i, double x''), or a message description (e.g.,
-``MyMessage *msg'').  See section~\ref{marshalling} and
-section~\ref{messages} for details on these types of
-parameters.
-
-Entry methods typically do not return data-- in \CC, they have
-return type ``void''.  An entry method with the same name
-as its enclosing class is a constructor.  Constructors in \CC
-have no return type.  Finally, sync methods, described below,
-may return a message.
-
-\subsubsection{Entry Method Attributes}
+\section{Entry Method Attributes}
 
 \label{attributes}
 
@@ -44,77 +17,106 @@ an entry method:
 \kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local}, \kw{python}.
 
 \begin{description}
-\index{threaded}\item[threaded] \index{entry method}entry methods are
-entry methods which are run in their own nonpreemptible threads. These
+\index{threaded}\item[threaded] \index{entry method}entry methods 
+run in their own non-preemptible threads. These
 entry methods may perform blocking operations, such as calls to a
-\kw{sync} entry method, or explicitly suspend themselves.
+\kw{sync} entry method, or explicitly suspending themselves. For more
+details, refer to section~\ref{threaded}.
 
-\index{sync}\item[sync] \index{entry method}entry methods are special in that calls to
-sync entry methods are blocking - they do not return control to the caller
-until the method is finished executing completely.  Sync methods may have
-return values; however, they may only return messages. Callers must run in a
-thread separate from the runtime scheduler, e.g. a \kw{threaded} entry methods.
+\index{sync}\item[sync] \index{entry method}entry methods are special in that
+calls to them are blocking--they do not return control to the caller until the
+method finishes execution completely. Sync methods may have return values;
+however, they may only return messages. Callers must run in a thread separate
+from the runtime scheduler, e.g. a \kw{threaded} entry methods.  Calls
+expecting a return value will receive it as the return from the proxy
+invocation:
+\begin{alltt}
+ ReturnMsg* m;
+ m = A[i].foo(a, b, c);
+\end{alltt}
+For more details, refer to section~\ref{sync}.
 
-\index{exclusive}\item[exclusive] entry methods, which exist only on node groups, are
-\index{entry method}entry methods that do not execute while other exclusive
-\index{entry method}entry methods of its node group are executing in the same
-node.  If one exclusive method of a node group is executing on node 0, and
-another one is scheduled to run on that same node, the second exclusive method
-will wait for the first to finish before it executes.
+\index{exclusive}\item[exclusive] \index{entry method} entry methods should
+only exist on NodeGroup objects. One such entry method will not execute while
+some other exclusive entry methods belonging to the same NodeGroup object are
+executing on the same node. In other words, if one exclusive method of a
+NodeGroup object is executing on node N, and another one is scheduled to run on
+the same node, the second exclusive method will wait to execute until the first
+one finishes. An example can be found in \testrefdir{pingpong}.
 
-\index{nokeep}\item[nokeep] entry methods tells Charm++ that messages passed to
-these user entry methods will not be kept by the calls. Charm++ runtime
-may be able to adopt optimization for reusing the message memory.
+\index{nokeep}\item[nokeep] entry methods only take a message as the argument,
+and the memory buffer for this message will be managed by the \charmpp{}
+runtime rather than the user calls. This means that user has to guarantee that
+the message should not be buffered for a later usage or be freed in the user 
+codes. Otherwise, a runtime error will be caused. 
+Such entry methods entail runtime 
+optimizations such as reusing the message memory. An example can be found in
+\examplerefdir{histogram\_group}.
+%these user entry methods will not be kept by the calls. Charm++ runtime
+%may be able to adopt optimization for reusing the message memory.
 
-\index{notrace}\item[notrace] entry methods simply tells Charm++ that calls to 
-these entry methods should be not traced in trace projections or summary mode.
+\index{notrace}\item[notrace] entry methods will not be traced during execution. As a result, they will not be considered and displayed in Projections for
+performance analysis.
 
-\index{immediate}\item[immediate] entry methods are entry functions in which 
-short messages can be executed in an ``immediate'' fashion when they are
-received either by an interrupt (Network version) or by a communication thread
-(in SMP version). Such messages can be useful for implementing
-multicasts/reductions as well as data lookup, in which case processing of
-critical messages won't be delayed (in the scheduler queue) by entry functions
-that could take long time to finish. Immediate messages are only available for
-nodegroup entry methods. Immediate messages are implicitly ``exclusive'' on each
-node, that is one execution of immediate message will not be interrupted by
-another. Function \kw{CmiProbeImmediateMsg()} can be called in users code to
-probe and process immediate messages periodically.
+\index{immediate}\item[immediate] entry methods are executed in an
+``immediate'' fashion as they skip the message scheduling while other normal
+entry methods donot. Immediate entry methods should be only associcated with
+NodeGroup objects although it is not checked during compilation. If the
+destination of such entry method is on the local node, then the method will be
+executed in the context of the regular PE regardless the execution mode of
+\charmpp{} runtime. However, in the SMP mode, if the destination of the method
+is on the remote node, then the method will be executed in the context of the
+communication thread.  
+%are entry functions in which 
+%short messages can be executed in an ``immediate'' fashion when they are
+%received either by an interrupt (Network version) or by a communication thread
+%(in SMP version). 
+Such entry methods can be useful for implementing multicasts/reductions as well
+as data lookup when such operations are on the performance critical path. On a
+certain \charmpp{} PE, skipping the normal message scheduling prevents the
+execution of immediate entry methods from being delayed by entry functions that
+could take a long time to finish. Immediate entry methods are implicitly
+``exclusive'' on each node, meaning that one execution of immediate message
+will not be interrupted by another. Function \kw{CmiProbeImmediateMsg()} can be
+called in user codes to probe and process immediate messages periodically. An
+example ``immediatering'' can be found in \testrefdir{megatest}.
 
-\index{expedited}\item[expedited] entry methods are entry functions 
-that skip Charm++'s priority-based message queue. It is useful for messages that
-require prompt processing however in the situation when immediate message does
-not apply. Compared with immediate message, it provides a more general solution
-that works for all Charm++ objects, i.e. Chare, Group, NodeGroup and Chare
-Array. However, expedited message still needs to be scheduled in low level
-Converse message queue and be processed in the order of arrival. It may still
-suffer from long running entry methods.
+\index{expedited}\item[expedited] entry methods skip the priority-based message
+queue in \charmpp{} runtime. It is useful for messages that require prompt
+processing when adding the immediate attribute to the message does not apply.
+Compared with the immediate attribute, the expedited attribute provides a more
+general solution that works for all types of \charmpp{} objects, i.e. Chare,
+Group, NodeGroup and Chare Array. However, expedited entry methods will still
+be scheduled in the lower-level Converse message queue, and be processed in the
+order of message arrival. Therefore, they may still suffer from delays caused
+by long running entry methods. An example can be found in 
+\examplerefdir{satisfiability}.
 
-\index{inline}\item[inline] entry methods are entry functions in which the
-message is delivered immediately to the recipient if it happens to reside on the
-same processor. Therefore, these entry methods need to be reentrant, as they
-could be called multiple times recursively. If the recipient reside on another
-processor, a regular message is sent, and \kw{inline} has no effect.
+\index{inline}\item[inline] entry methods will be immediately invoked if the
+message recipient happens to be on the same PE. These entry methods need to be
+re-entrant as they could be called multiple times recursively. If the recipient
+resides on a non-local PE, a regular message is sent, and \kw{inline} has no
+effect. An example ``inlineem'' can be found in \testrefdir{megatest}.
 
-\index{local}\item[local] entry methods are equivalent to function calls: the
-entry method is always called immediately. This feature is available only for
-Groups and Chare Arrays. The user has to guarantee that the recipient chare
-element reside on the same processor, a failure will result in the application
-to abort. In contrast will all other entry methods where input parameters are
-marshalled into a message, \kw{local} entry methods pass them direcly to the
-callee. This implies that the callee can modify the caller data if this is
-passed by pointer or reference. Furthermore, the input parameters do not require
-to be PUPable. Being these entry methods always called immediately, they are
-allowed to have a non-void return type. Nevertheless, the returned type must be
-a pointer.
+\index{local}\item[local] entry methods are equivalent to normal function
+calls: the entry method is always executed immediately. This feature is
+available only for Group objects and Chare Array objects. The user has to
+guarantee that the recipient chare element reside on the same PE. Otherwise,
+the application will abort on a failure. If the \kw{local} entry method uses
+parameter marshalling, instead of marshalling input parameters into a message,
+it will pass them direcly to the callee. This implies that the callee can
+modify the caller data if method parameters are passed by pointer or reference.
+Furthermore, input parameters do not require to be PUPable. Considering that
+these entry methods always execute immediately, they are allowed to have a
+non-void return value. Nevertheless, the return type of the method must be a
+pointer. An example can be found in \examplerefdir{hello/local}.
 
-\index{python}\item[python] entry methods are methods which are enabled to be
-called from python scripts running as explained in section~\ref{python}. In
-order to work, the object owning the method must also be declared with the
-keyword \kw{python}.
+\index{python}\item[python] entry methods are enabled to be
+called from python scripts as explained in chapter~\ref{python}. Note that the object owning the method must also be declared with the
+keyword \kw{python}. Refer to chapter~\ref{python} for more details.
 
 \index{reductiontarget}\item[reductiontarget] entry methods may be used as the
 target of reductions, despite not taking CkReductionMsg as an argument.
-See~\ref{typed_reductions}.
+See section~\ref{reductions} for more references.
 
 \end{description}

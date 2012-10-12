@@ -415,6 +415,8 @@ void LBSetPeriod(double second);
 
 extern "C" void LBTurnInstrumentOn();
 extern "C" void LBTurnInstrumentOff();
+extern "C" void LBTurnCommOn();
+extern "C" void LBTurnCommOff();
 void LBClearLoads();
 
 inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }

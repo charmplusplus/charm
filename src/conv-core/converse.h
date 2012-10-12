@@ -170,6 +170,8 @@ typedef int CmiNodeLock;
 #define CmiTryLock(lock)  ((lock)?1:((lock)=1,0))
 #define CmiDestroyLock(lock) /*empty*/
 
+#define CmiInCommThread() (0)
+
 #endif
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
@@ -224,12 +226,25 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
 
+#if CMK_BLUEGENEQ && CMK_ENABLE_ASYNC_PROGRESS
+extern __thread int32_t _cmi_bgq_incommthread;
+#define CmiInCommThread()  (_cmi_bgq_incommthread)
+#else
+#define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
 #endif
+
+#endif //POSIX_THREADS_SMP
 
 #include "string.h"
 
 #if CMK_BLUEGENEL || CMK_BLUEGENEP
 #include "cmimemcpy.h"
+#elif CMK_BLUEGENEQ && CMK_BLUEGENEQ_OPTCOPY  
+void CmiMemcpy_qpx (void *dst, const void *src, size_t n);
+#define CmiMemcpy(dst,src,n)         				\
+  if ( (n > 512+32) &&  ((((size_t)dst|(size_t)src) & 0x1F)==0) ) \
+    CmiMemcpy_qpx(dst, src, n);			\
+  else memcpy(dst,src,n);
 #else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 #endif
@@ -435,9 +450,14 @@ for each processor in the node.
        } \
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
-#define CpvAccess(v) (*CMK_TAG(Cpv_,v))
-#define CpvAccessOther(v, r) (*(CMK_TAG(Cpv_addr_,v)[r]))
 
+#if CMK_BLUEGENEQ && CMK_ENABLE_ASYNC_PROGRESS && CMK_IMMEDIATE_MSG
+  #define CpvAccess(v) (*(CMK_TAG(Cpv_addr_,v)[CmiMyRank()]))
+#else
+#define CpvAccess(v) (*CMK_TAG(Cpv_,v))
+#endif
+
+#define CpvAccessOther(v, r) (*(CMK_TAG(Cpv_addr_,v)[r]))
 #else
 
 #define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
@@ -617,10 +637,6 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 	}
 #else
 #define MESSAGE_PHASE_CHECK(msg)
-#endif
-
-#if CMK_CONVERSE_GEMINI_UGNI && !CMK_SEQUENTIAL
-#include "gni_pub.h"
 #endif
 
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
@@ -1703,8 +1719,8 @@ extern int _immRunning;
   __asm__ __volatile__("fetchadd4.rel %0=[%1],-1": "=r" (someInt_private): "r"(&someInt) :"memory"); }
 #define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (output): "r"(&input) :"memory")
 #elif CMK_PPC_ASM
-#define CmiMemoryReadFence()               __asm__ __volatile__("eieio":::"memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("eieio":::"memory")
+#define CmiMemoryReadFence()               __asm__ __volatile__("sync":::"memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("sync":::"memory")
 #define CmiMemoryAtomicIncrement(someInt)   { int someInt_private; \
      __asm__ __volatile__ (      \
         "loop%=:\n\t"       /* repeat until this succeeds */    \
@@ -1848,6 +1864,11 @@ void CmiTurnOffStats();
 extern int CharmLibInterOperate;
 CpvExtern(int,charmLibExitFlag);
 
+/*
+ *         Topology C wrapper
+ */
+extern int CmiGetHopsBetweenRanks(int pe1, int pe2);
+
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
 #endif
@@ -1921,6 +1942,18 @@ EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 #endif
 
 CpvCExtern(int, _urgentSend);
+#if CMK_USE_OOB
 #define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
+#else
+#define CmiEnableUrgentSend(yn)   
+#endif
+
+#if defined(__cplusplus)
+extern "C" int CmiIsMyNodeIdle();
+#else
+extern int CmiIsMyNodeIdle();
+#endif
 
 #endif /* CONVERSE_H */
+
+

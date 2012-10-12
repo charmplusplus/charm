@@ -129,6 +129,9 @@ bgtest: bigsim AMPI
 	cd ../tests ; $(MAKE) bgtest OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) bgtest OPTS='$(OPTS)'
 
+syncfttest causalfttest: charm++ AMPI
+	cd ../tests ; $(MAKE) $@ OPTS='$(OPTS)'
+
 test: bigsim AMPI
 	cd ../tests ; $(MAKE) test OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) test OPTS='$(OPTS)'
@@ -710,7 +713,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
            tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
-	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o\
+	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o ckobjid.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o \
            ckgraph.o LButil.o Refiner.o RefinerApprox.o  \
@@ -923,9 +926,8 @@ conv-cpm.o: conv-cpm.c $(CVHEADERS)
 
 XIHEADERS=conv-autoconfig.h xi-symbol.h xi-util.h xi-grammar.tab.h
 CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
-SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o
-SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
-	sdag-globals.h CEntry.h
+SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o CParsedFile.o
+SDAGHEADERS= CToken.h EToken.h CParsedFile.h sdag-globals.h CEntry.h
 
 charmxi: ../bin/charmxi
 
@@ -955,6 +957,12 @@ CSdagConstruct.o: CSdagConstruct.C $(XIHEADERS) $(SDAGHEADERS)
 
 CEntry.o: CEntry.C $(XIHEADERS) $(SDAGHEADERS)
 	$(NATIVECHARMC) -c CEntry.C
+
+CParsedFile.o: CParsedFile.C $(XIHEADERS) $(SDAGHEADERS)
+	$(NATIVECHARMC) -c $<
+
+xi-clean:
+	rm $(CHARMXIOBJ) $(SDAGOBJ)
 
 ###############################################################################
 #
@@ -1021,9 +1029,10 @@ install:
 	@test ! -d $(DESTDIR)/lib && mkdir -p $(DESTDIR)/lib || true
 	@test ! -d $(DESTDIR)/lib_so && mkdir -p $(DESTDIR)/lib_so || true
 	@test ! -d $(DESTDIR)/bin && mkdir -p $(DESTDIR)/bin || true
-	cp -f ../include/*   $(DESTDIR)/include
+	# cp -f ../include/*   $(DESTDIR)/include
+	for f in ../include/*; do if test -f $$f; then cp -f $$f $(DESTDIR)/include; fi; done
 	cp -f ../lib/*       $(DESTDIR)/lib
-	cp -f ../lib_so/*    $(DESTDIR)/lib_so
+	cp -f ../lib_so/*    $(DESTDIR)/lib_so || true
 #	cp -f ../bin/*       $(DESTDIR)/bin
 	for f in ../bin/*; do if test -f $$f; then cp -f $$f $(DESTDIR)/bin; fi; done
 
@@ -1128,5 +1137,11 @@ dependsCaseSensitive: cidepends
         done;  \
         rm -f metis.h  scotch.h
 
-
+# The build script should have spit out the build options into this makefile
+-include buildopts.mk
+# If OPTS was not defined, use the build time options
+OPTS ?= $(OPTSATBUILDTIME)
+ifeq ($(strip $(OPTS)),)
+$(warning Variable OPTS is defined to an empty string. Are you sure this is what you want?)
+endif
 

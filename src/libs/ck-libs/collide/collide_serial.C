@@ -288,6 +288,7 @@ static void simpleFindCollisions(const CollideOctant &o,CollisionList &dest)
 
 void CollideOctant::findCollisions(int splitAxis,CollisionList &dest)
 {
+	if (getHome()==0) return; /* nothing to do */
 #if COLLIDE_IS_RECURSIVE
 	STATS(recursiveCalls++)
 	

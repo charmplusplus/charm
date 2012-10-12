@@ -1,0 +1,44 @@
+# List of charm API calls
+# Use # for a comment to the end of the line
+# Blank lines are ok
+# Do not use () to denote a function call. Just use the name
+
+CkMyPe
+CkNumPes
+
+CkMyNode
+CkNumNodes
+CkMyRank
+
+CkAssert
+CkAbort
+CkExit
+
+CkPrintf
+CkError
+CkScanf
+CmiPrintf
+ckout
+ckerr
+cklog
+
+CkWallTimer
+CmiWallTimer
+
+CkCallback
+contribute
+CkReductionTarget
+
+ckNew
+ckLocal
+thisIndex
+CkArrayIndex
+
+__sdag_init
+__sdag_pup
+
+PUP
+PUP::toDisk
+PUP::seekBlock
+PUP::able
+

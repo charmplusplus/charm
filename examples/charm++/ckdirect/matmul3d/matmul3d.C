@@ -90,7 +90,7 @@ Main::Main(CkArgMsg* m) {
 
   // Start the computation
   numIterations = 0;
-  startTime = CmiWallTimer();
+  startTime = CkWallTimer();
 #if USE_CKDIRECT
   compute.setupChannels();
 #else
@@ -101,7 +101,7 @@ Main::Main(CkArgMsg* m) {
 void Main::done() {
   numIterations++;
   if(numIterations == 1) {
-    firstTime = CmiWallTimer();
+    firstTime = CkWallTimer();
 #if USE_CKDIRECT
     CkPrintf("FIRST ITER TIME %f secs\n", firstTime - setupTime);
 #else
@@ -110,7 +110,7 @@ void Main::done() {
     compute.resetArrays();
   } else {
     if(numIterations == NUM_ITER) {
-      endTime[numIterations-2] = CmiWallTimer() - firstTime;
+      endTime[numIterations-2] = CkWallTimer() - firstTime;
       double sum = 0;
       for(int i=0; i<NUM_ITER-1; i++)
 	sum += endTime[i];
@@ -121,19 +121,19 @@ void Main::done() {
 #endif
       CkExit();
     } else {
-      endTime[numIterations-2] = CmiWallTimer() - firstTime;
+      endTime[numIterations-2] = CkWallTimer() - firstTime;
       compute.resetArrays();
     }
   }
 }
 
 void Main::resetDone() {
-  firstTime = CmiWallTimer();
+  firstTime = CkWallTimer();
   compute.beginCopying();
 }
 
 void Main::setupDone() {
-  setupTime = CmiWallTimer();
+  setupTime = CkWallTimer();
   CkPrintf("SETUP TIME %f secs\n", setupTime - startTime);
   compute.beginCopying();
 }

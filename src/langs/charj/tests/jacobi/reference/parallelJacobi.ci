@@ -1,0 +1,58 @@
+mainmodule parallelJacobi {
+
+    message Msg{
+	double strip[];	
+    };
+
+    message MaxMsg;
+    message VoidMsg;
+
+    mainchare Main {
+        entry Main(CkArgMsg *m);
+	    entry void finished();
+    };
+
+    readonly CProxy_Main globalMainProxy;
+    readonly CProxy_Chunk chunk_arr;
+    readonly int numFinished;
+    readonly double startTime;
+
+   array[1D] Chunk{
+
+	entry Chunk(int,int,int);
+        entry void getStripfromleft(Msg* aMessage);
+        entry void getStripfromright(Msg* aMessage);	
+	entry void processStripfromleft(Msg* aMessage);
+	entry void processStripfromright(Msg* aMessage);
+	entry void startWork();
+	
+	entry void singleStep(VoidMsg* msg){
+		atomic "startwork" {	 		
+			/*delete msg;*/ 
+			startWork();
+		}
+		overlap{
+			when getStripfromleft(Msg *aMessage){
+				atomic "fromLeft" {processStripfromleft(aMessage);}
+			}
+			when getStripfromright(Msg *aMessage){
+				atomic "fromRight" {processStripfromright(aMessage);}
+			}
+		}
+        atomic "doWork" {
+            doWork();
+            if(iterations == ITER)
+				{ /*BgPrint0("Real Iter: %e\n"); */}
+			else
+				thisProxy[thisIndex].singleStep(new VoidMsg);
+			testEnd();
+
+		}
+		};
+     };
+
+};
+
+
+
+

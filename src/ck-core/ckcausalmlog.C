@@ -24,20 +24,21 @@
 #define COLLECT_STATS_DETS 0
 #define COLLECT_STATS_DETS_DUP 0
 #define COLLECT_STATS_MEMORY 0
-#define COLLECT_STATS_TEAM 0
+#define COLLECT_STATS_LOGGING 0
 
 #define RECOVERY_SEND "SEND"
 #define RECOVERY_PROCESS "PROCESS"
 
 #define DEBUG_MEM(x)  //x
 #define DEBUG(x) // x
-#define DEBUG_RESTART(x) // x
+#define DEBUG_RESTART(x)  //x
 #define DEBUGLB(x)   // x
 #define DEBUG_TEAM(x)  // x
 #define DEBUG_PERF(x) // x
 #define DEBUG_CHECKPOINT 1
 #define DEBUG_NOW(x) x
-#define DEBUG_PE(x,y) if(CkMyPe() == x) y
+#define DEBUG_PE(x,y) // if(CkMyPe() == x) y
+#define DEBUG_PE_NOW(x,y)  if(CkMyPe() == x) y
 #define DEBUG_RECOVERY(x) //x
 
 extern const char *idx2str(const CkArrayIndex &ind);
@@ -121,6 +122,21 @@ int _maxBufferedDets;
 // stores the incarnation number from every other processor
 CpvDeclare(char *, _incarnation);
 
+// storage for remove determinants header
+CpvDeclare(RemoveDeterminantsHeader *, _removeDetsHeader);
+// storage for store determinants header
+CpvDeclare(StoreDeterminantsHeader *, _storeDetsHeader);
+// storage for the sizes in vector-send to store determinants
+CpvDeclare(int *, _storeDetsSizes);
+// storage for the pointers in vector-send to store determinants
+CpvDeclare(char **, _storeDetsPtrs);
+
+/***** *****/
+
+/***** VARIABLES FOR PARALLEL RECOVERY *****/
+CpvDeclare(int, _numEmigrantRecObjs);
+CpvDeclare(int, _numImmigrantRecObjs);
+CpvDeclare(CkVec<CkLocation *> *, _immigrantRecObjs);
 /***** *****/
 
 #if COLLECT_STATS_MSGS
@@ -140,9 +156,11 @@ int bufferedDetsSize;
 int storedDetsSize;
 #endif
 //TML: variables for measuring savings with teams in message logging
-#if COLLECT_STATS_TEAM
+#if COLLECT_STATS_LOGGING
 float MLOGFT_totalLogSize = 0.0;
 float MLOGFT_totalMessages = 0.0;
+float MLOGFT_totalMcastLogSize = 0.0;
+float MLOGFT_totalReductionLogSize = 0.0;
 #endif
 
 static double adjustChkptPeriod=0.0; //in ms
@@ -170,10 +188,12 @@ int	_recvGlobalStepHandlerIdx;
 int _updateHomeRequestHandlerIdx;
 int _updateHomeAckHandlerIdx;
 int _resendMessagesHandlerIdx;
-int _resendReplyHandlerIdx;
+int _sendDetsHandlerIdx;
+int _sendDetsReplyHandlerIdx;
 int _receivedTNDataHandlerIdx;
 int _receivedDetDataHandlerIdx;
 int _distributedLocationHandlerIdx;
+int _sendBackLocationHandlerIdx;
 int _storeDeterminantsHandlerIdx;
 int _removeDeterminantsHandlerIdx;
 
@@ -196,7 +216,7 @@ int _falseRestart =0; /**
 													a porcessor without actually starting it
 													1 -> false restart
 													0 -> restart after an actual crash
-												*/		
+												*/
 
 //Load balancing globals
 int onGoingLoadBalancing=0;
@@ -225,6 +245,7 @@ double lastRestart=0;
 //update location globals
 int _receiveLocationHandlerIdx;
 
+
 /** 
  * @brief Initialize message logging data structures and register handlers
  */
@@ -247,10 +268,12 @@ void _messageLoggingInit(){
 	_updateHomeRequestHandlerIdx =CkRegisterHandler((CmiHandler)_updateHomeRequestHandler);
 	_updateHomeAckHandlerIdx =  CkRegisterHandler((CmiHandler) _updateHomeAckHandler);
 	_resendMessagesHandlerIdx = CkRegisterHandler((CmiHandler)_resendMessagesHandler);
-	_resendReplyHandlerIdx = CkRegisterHandler((CmiHandler)_resendReplyHandler);
+	_sendDetsHandlerIdx = CkRegisterHandler((CmiHandler)_sendDetsHandler);
+	_sendDetsReplyHandlerIdx = CkRegisterHandler((CmiHandler)_sendDetsReplyHandler);
 	_receivedTNDataHandlerIdx=CkRegisterHandler((CmiHandler)_receivedTNDataHandler);
 	_receivedDetDataHandlerIdx = CkRegisterHandler((CmiHandler)_receivedDetDataHandler);
 	_distributedLocationHandlerIdx=CkRegisterHandler((CmiHandler)_distributedLocationHandler);
+	_sendBackLocationHandlerIdx=CkRegisterHandler((CmiHandler)_sendBackLocationHandler);
 	_verifyAckRequestHandlerIdx = CkRegisterHandler((CmiHandler)_verifyAckRequestHandler);
 	_verifyAckHandlerIdx = CkRegisterHandler((CmiHandler)_verifyAckHandler);
 	_dummyMigrationHandlerIdx = CkRegisterHandler((CmiHandler)_dummyMigrationHandler);
@@ -300,13 +323,30 @@ void _messageLoggingInit(){
 	CpvInitialize(char *, _localDets);
 	CpvInitialize((CkHashtableT<CkHashtableAdaptorT<CkObjID>, CkVec<Determinant> *> *),_remoteDets);
 	CpvInitialize(char *, _incarnation);
+	CpvInitialize(RemoveDeterminantsHeader *, _removeDetsHeader);
+	CpvInitialize(StoreDeterminantsHeader *, _storeDetsHeader);
+	CpvInitialize(int *, _storeDetsSizes);
+	CpvInitialize(char **, _storeDetsPtrs);
 	CpvAccess(_localDets) = (char *) CmiAlloc(_maxBufferedDets * sizeof(Determinant));
 	CpvAccess(_remoteDets) = new CkHashtableT<CkHashtableAdaptorT<CkObjID>, CkVec<Determinant> *>(100, 0.4);
 	CpvAccess(_incarnation) = (char *) CmiAlloc(CmiNumPes() * sizeof(int));
 	for(int i=0; i<CmiNumPes(); i++){
 		CpvAccess(_incarnation)[i] = 0;
 	}
-	
+	CpvAccess(_removeDetsHeader) = (RemoveDeterminantsHeader *) CmiAlloc(sizeof(RemoveDeterminantsHeader));
+	CpvAccess(_storeDetsHeader) = (StoreDeterminantsHeader *) CmiAlloc(sizeof(StoreDeterminantsHeader));
+	CpvAccess(_storeDetsSizes) = (int *) CmiAlloc(sizeof(int) * 2);
+	CpvAccess(_storeDetsPtrs) = (char **) CmiAlloc(sizeof(char *) * 2);
+
+	// Cpv variables for parallel recovery
+	CpvInitialize(int, _numEmigrantRecObjs);
+    CpvAccess(_numEmigrantRecObjs) = 0;
+    CpvInitialize(int, _numImmigrantRecObjs);
+    CpvAccess(_numImmigrantRecObjs) = 0;
+
+    CpvInitialize(CkVec<CkLocation *> *, _immigrantRecObjs);
+    CpvAccess(_immigrantRecObjs) = new CkVec<CkLocation *>;
+
 	//Cpv variables for checkpoint
 	CpvInitialize(StoredCheckpoint *,_storedCheckpointData);
 	CpvAccess(_storedCheckpointData) = new StoredCheckpoint;
@@ -538,6 +578,27 @@ void sendArrayMsg(envelope *env,int destPE,int _infoIdx){
 };
 
 /**
+ * Sends a message to a singleton chare.
+ */
+void sendChareMsg(envelope *env,int destPE,int _infoIdx, const CkChareID *pCid){
+	CkObjID recver;
+	recver.type = TypeChare;
+	recver.data.chare.id = *pCid;
+
+	if(CpvAccess(_currentObj)!=NULL &&  CpvAccess(_currentObj)->mlogData->objID.type != TypeArray){
+		char recverString[100],senderString[100];
+		
+		DEBUG(printf("[%d] %s being sent message from non-array %s \n",CkMyPe(),recver.toString(recverString),CpvAccess(_currentObj)->mlogData->objID.toString(senderString)));
+	}
+
+	// initializing values of envelope
+	env->SN = 0;
+	env->TN = 0;
+
+	sendCommonMsg(recver,env,destPE,_infoIdx);
+};
+
+/**
  * A method to generate the actual ticket requests for groups, nodegroups or arrays.
  */
 void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
@@ -545,6 +606,7 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 	MCount ticketNumber = 0;
 	int resend=0; //is it a resend
 	char recverName[100];
+	char senderString[100];
 	double _startTime=CkWallTimer();
 	
 	DEBUG_MEM(CmiMemoryCheck());
@@ -555,14 +617,23 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 		generalCldEnqueue(destPE,env,_infoIdx);
 		return;
 	}
+
+	// checking if this message should bypass determinants in message-logging
+	if(env->flags & CK_BYPASS_DET_MLOG){
+	 	env->sender = CpvAccess(_currentObj)->mlogData->objID;
+		env->recver = recver;
+		DEBUG(CkPrintf("[%d] Bypassing determinants from %s to %s PE %d\n",CkMyPe(),CpvAccess(_currentObj)->mlogData->objID.toString(senderString),recver.toString(recverName),destPE));
+		generalCldEnqueue(destPE,env,_infoIdx);
+		return;
+	}
 	
 	// setting message logging data in the envelope
 	env->incarnation = CpvAccess(_incarnation)[CkMyPe()];
 	if(env->sender.type == TypeInvalid){
 	 	env->sender = CpvAccess(_currentObj)->mlogData->objID;
 	}else{
-		envelope *copyEnv = copyEnvelope(env);
-		env = copyEnv;
+//		envelope *copyEnv = copyEnvelope(env);
+//		env = copyEnv;
 		env->sender = CpvAccess(_currentObj)->mlogData->objID;
 		env->SN = 0;
 	}
@@ -581,7 +652,6 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 		resend = 1;
 	}
 	
-	char senderString[100];
 //	if(env->SN != 1){
 		DEBUG(printf("[%d] Generate Ticket Request to %s from %s PE %d SN %d \n",CkMyPe(),env->recver.toString(recverName),env->sender.toString(senderString),destPE,env->SN));
 	//	CmiPrintStackTrace(0);
@@ -589,7 +659,6 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 		DEBUG_RESTART(printf("[%d] Generate Ticket Request to %s from %s PE %d SN %d \n",CkMyPe(),env->recver.toString(recverName),env->sender.toString(senderString),destPE,env->SN));
 	}*/
 		
-	MlogEntry *mEntry = new MlogEntry(env,destPE,_infoIdx);
 //	CkPackMessage(&(mEntry->env));
 //	traceUserBracketEvent(32,_startTime,CkWallTimer());
 	
@@ -597,7 +666,7 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 
 	// uses the proper ticketing mechanism for local, team and general messages
 	if(isLocal(destPE)){
-		sendLocalMsg(mEntry);
+		sendLocalMsg(env, _infoIdx);
 	}else{
 		if((teamSize > 1) && isTeamLocal(destPE)){
 
@@ -614,6 +683,7 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 		}
 		
 		// sending the message
+		MlogEntry *mEntry = new MlogEntry(env,destPE,_infoIdx);
 		sendMsg(sender,recver,destPE,mEntry,env->SN,ticketNumber,resend);
 		
 	}
@@ -648,13 +718,10 @@ inline bool isTeamLocal(int destPE){
  * Method that does the actual send by creating a ticket request filling it up and sending it.
  */
 void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,MCount TN,int resend){
-	DEBUG(char recverString[100]);
-	DEBUG(char senderString[100]);
+	DEBUG_NOW(char recverString[100]);
+	DEBUG_NOW(char senderString[100]);
 
 	int totalSize;
-	StoreDeterminantsHeader header;
-	int sizes[2];
-	char *ptrs[2];
 
 	envelope *env = entry->env;
 	DEBUG(printf("[%d] Sending message to %s from %s PE %d SN %d time %.6lf \n",CkMyPe(),env->recver.toString(recverString),env->sender.toString(senderString),destPE,env->SN,CkWallTimer()));
@@ -668,13 +735,20 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 		//TML: only stores message if either it goes to this processor or to a processor in a different group
 		if(!isTeamLocal(entry->destPE)){
 			obj->mlogData->addLogEntry(entry);
-#if COLLECT_STATS_TEAM
+#if COLLECT_STATS_LOGGING
 			MLOGFT_totalMessages += 1.0;
 			MLOGFT_totalLogSize += entry->env->getTotalsize();
+			if(entry->env->flags & CK_MULTICAST_MSG_MLOG){
+				MLOGFT_totalMcastLogSize += entry->env->getTotalsize();	
+			}
+			if(entry->env->flags & CK_REDUCTION_MSG_MLOG){
+				MLOGFT_totalReductionLogSize += entry->env->getTotalsize();	
+			}
+
 #endif
 		}else{
 			// the message has to be deleted after it has been sent
-			entry->env->freeMsg = true;
+			entry->env->flags = entry->env->flags | CK_FREE_MSG_MLOG;
 		}
 	}
 
@@ -682,19 +756,19 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 	if(_numBufferedDets > 0){
 
 		// modifying the actual number of determinants sent in message
-		header.number = _numBufferedDets;
-		header.index = _indexBufferedDets;
-		header.phase = _phaseBufferedDets;
-		header.PE = CmiMyPe();
+		CpvAccess(_storeDetsHeader)->number = _numBufferedDets;
+		CpvAccess(_storeDetsHeader)->index = _indexBufferedDets;
+		CpvAccess(_storeDetsHeader)->phase = _phaseBufferedDets;
+		CpvAccess(_storeDetsHeader)->PE = CmiMyPe();
 	
 		// sending the message
-		sizes[0] = sizeof(StoreDeterminantsHeader);
-		sizes[1] = _numBufferedDets * sizeof(Determinant);
-		ptrs[0] = (char *) &header;
-		ptrs[1] = CpvAccess(_localDets) + (_indexBufferedDets - _numBufferedDets) * sizeof(Determinant);
+		CpvAccess(_storeDetsSizes)[0] = sizeof(StoreDeterminantsHeader);
+		CpvAccess(_storeDetsSizes)[1] = _numBufferedDets * sizeof(Determinant);
+		CpvAccess(_storeDetsPtrs)[0] = (char *) CpvAccess(_storeDetsHeader);
+		CpvAccess(_storeDetsPtrs)[1] = CpvAccess(_localDets) + (_indexBufferedDets - _numBufferedDets) * sizeof(Determinant);
 		DEBUG(CkPrintf("[%d] Sending %d determinants\n",CkMyPe(),_numBufferedDets));
-		CmiSetHandler(&header, _storeDeterminantsHandlerIdx);
-		CmiSyncVectorSend(destPE, 2, &sizes[0], &ptrs[0]);
+		CmiSetHandler(CpvAccess(_storeDetsHeader), _storeDeterminantsHandlerIdx);
+		CmiSyncVectorSend(destPE, 2, CpvAccess(_storeDetsSizes), CpvAccess(_storeDetsPtrs));
 	}
 
 	// updating its message log entry
@@ -728,18 +802,18 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
  * then enqueues the message. If we are recovering, then the message 
  * is enqueued in a delay queue.
  */
-void sendLocalMsg(MlogEntry *entry){
+void sendLocalMsg(envelope *env, int _infoIdx){
 	DEBUG_PERF(double _startTime=CkWallTimer());
 	DEBUG_MEM(CmiMemoryCheck());
-	DEBUG(Chare *senderObj = (Chare *)entry->env->sender.getObject();)
+	DEBUG(Chare *senderObj = (Chare *)env->sender.getObject();)
 	DEBUG(char senderString[100]);
 	DEBUG(char recverString[100]);
 	Ticket ticket;
 
-	DEBUG(printf("[%d] Local Message being sent for SN %d sender %s recver %s \n",CmiMyPe(),entry->env->SN,entry->env->sender.toString(senderString),entry->env->recver.toString(recverString)));
+	DEBUG(printf("[%d] Local Message being sent for SN %d sender %s recver %s \n",CmiMyPe(),env->SN,env->sender.toString(senderString),env->recver.toString(recverString)));
 
 	// getting the receiver local object
-	Chare *recverObj = (Chare *)entry->env->recver.getObject();
+	Chare *recverObj = (Chare *)env->recver.getObject();
 
 	// if receiver object is not NULL, we will ask it for a ticket
 	if(recverObj){
@@ -779,7 +853,7 @@ void sendLocalMsg(MlogEntry *entry){
 		addBufferedDeterminant(entry->env->sender, entry->env->recver, entry->env->SN, entry->env->TN);
 */
 		// sends the local message
-		_skipCldEnqueue(CmiMyPe(),entry->env,entry->_infoIdx);	
+		_skipCldEnqueue(CmiMyPe(),env,_infoIdx);	
 
 		DEBUG_MEM(CmiMemoryCheck());
 	}else{
@@ -826,11 +900,9 @@ void _removeDeterminantsHandler(char *buffer){
  */
 void _storeDeterminantsHandler(char *buffer){
 	StoreDeterminantsHeader *header;
-	RemoveDeterminantsHeader removeHeader;
-	Determinant *detPtr, *det;
+	Determinant *detPtr, det;
 	int i, n, index, phase, destPE;
 	CkVec<Determinant> *vec;
-
 
 	// getting the header from the message and pointing to the first determinant
 	header = (StoreDeterminantsHeader *)buffer;
@@ -845,22 +917,21 @@ void _storeDeterminantsHandler(char *buffer){
 
 	// going through all determinants and storing them into _remoteDets
 	for(i = 0; i < n; i++){
-		det = new Determinant();
-		det->sender = detPtr->sender;
-		det->receiver = detPtr->receiver;
-		det->SN = detPtr->SN;
-		det->TN = detPtr->TN;
+		det.sender = detPtr->sender;
+		det.receiver = detPtr->receiver;
+		det.SN = detPtr->SN;
+		det.TN = detPtr->TN;
 
 		// getting the determinant array
-		vec = CpvAccess(_remoteDets)->get(det->receiver);
+		vec = CpvAccess(_remoteDets)->get(det.receiver);
 		if(vec == NULL){
 			vec = new CkVec<Determinant>();
-			CpvAccess(_remoteDets)->put(det->receiver) = vec;
+			CpvAccess(_remoteDets)->put(det.receiver) = vec;
 		}
 #if COLLECT_STATS_DETS
 #if COLLECT_STATS_DETS_DUP
 		for(int j=0; j<vec->size(); j++){
-			if(isSameDet(&(*vec)[j],det)){
+			if(isSameDet(&(*vec)[j],&det)){
 				numDupDets++;
 				break;
 			}
@@ -870,7 +941,7 @@ void _storeDeterminantsHandler(char *buffer){
 #if COLLECT_STATS_MEMORY
 		storedDetsSize++;
 #endif
-		vec->push_back(*det);
+		vec->push_back(det);
 		detPtr = detPtr++;
 	}
 
@@ -880,10 +951,10 @@ void _storeDeterminantsHandler(char *buffer){
 	CmiFree(buffer);
 
 	// sending the ACK back to the sender
-	removeHeader.index = index;
-	removeHeader.phase = phase;
-	CmiSetHandler(&removeHeader,_removeDeterminantsHandlerIdx);
-	CmiSyncSend(destPE, sizeof(RemoveDeterminantsHeader), (char *)&removeHeader);
+	CpvAccess(_removeDetsHeader)->index = index;
+	CpvAccess(_removeDetsHeader)->phase = phase;
+	CmiSetHandler(CpvAccess(_removeDetsHeader),_removeDeterminantsHandlerIdx);
+	CmiSyncSend(destPE, sizeof(RemoveDeterminantsHeader), (char *)CpvAccess(_removeDetsHeader));
 	
 }
 
@@ -962,7 +1033,7 @@ inline bool _getTicket(envelope *env, int *flag){
 bool fault_aware(CkObjID &recver){
 	switch(recver.type){
 		case TypeChare:
-			return false;
+			return true;
 		case TypeMainChare:
 			return false;
 		case TypeGroup:
@@ -984,37 +1055,48 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 
 	// getting the receiver object
 	CkObjID recver = env->recver;
-	if(!fault_aware(recver))
-		return 1;
-
 	Chare *obj = (Chare *)recver.getObject();
 	*objPointer = obj;
+
+	// checking for determinants bypass in message logging
+	if(env->flags & CK_BYPASS_DET_MLOG){
+		DEBUG(printf("[%d] Bypassing message sender %s recver %s \n",CkMyPe(),env->sender.toString(senderString), recver.toString(recverString)));
+		return 1;	
+	}
+
+	// checking if receiver is fault aware
+	if(!fault_aware(recver)){
+		CkPrintf("[%d] Receiver NOT fault aware\n",CkMyPe());
+		return 1;
+	}
+
+	// checking if receiver is NULL
 	if(obj == NULL){
-		int possiblePE = recver.guessPE();
+		return 1;
+
+/*		int possiblePE = recver.guessPE();
 		if(possiblePE != CkMyPe()){
 			int totalSize = env->getTotalsize();
-			CmiSyncSend(possiblePE,totalSize,(char *)env);
-			
-			DEBUG(printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
+			CmiSyncSendAndFree(possiblePE,totalSize,(char *)env);
+			DEBUG_PE(0,printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
 		}else{
 			// this is the case where a message is received and the object has not been initialized
 			// we delayed the delivery of the message
 			CqsEnqueue(CpvAccess(_outOfOrderMessageQueue),env);
-			
-			DEBUG(printf("[%d] Message SN %d TN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString)));
+			DEBUG_PE(0,printf("[%d] Message SN %d TN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString)));
 		}
-		return 0;
+		return 0;*/
+
 	}
 
-	// checking if message comes from an old incarnation
-	// message must be discarded
+	// checking if message comes from an old incarnation (if so, message must be discarded)
 	if(env->incarnation < CpvAccess(_incarnation)[env->getSrcPe()]){
 		CmiFree(env);
 		return 0;
 	}
 
 	DEBUG_MEM(CmiMemoryCheck());
-	DEBUG(printf("[%d] Message received, sender = %s SN %d TN %d tProcessed %d for recver %s stored for future time %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
+	DEBUG_PE(2,printf("[%d] Message received, sender = %s SN %d TN %d tProcessed %d for recver %s at %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
 
 	// getting a ticket for this message
 	ticketSuccess = _getTicket(env,&flag);
@@ -1043,7 +1125,7 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 //env->sender.updatePosition(env->getSrcPe());
 	if(env->TN == obj->mlogData->tProcessed+1){
 		//the message that needs to be processed now
-		DEBUG(printf("[%d] Message SN %d TN %d sender %s recver %s being processed recvPointer %p\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString),obj));
+		DEBUG_PE(2,printf("[%d] Message SN %d TN %d sender %s recver %s being processed recvPointer %p\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString),obj));
 		// once we find a message that we can process we put back all the messages in the out of order queue
 		// back into the main scheduler queue. 
 	DEBUG_MEM(CmiMemoryCheck());
@@ -1064,14 +1146,14 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 	// checking if message has already been processed
 	// message must be discarded
 	if(env->TN <= obj->mlogData->tProcessed){
-		DEBUG(printf("[%d] Message SN %d TN %d sender %s for recver %s being ignored tProcessed %d \n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString),recver.toString(recverString),obj->mlogData->tProcessed));
+		DEBUG_PE(3,printf("[%d] Message SN %d TN %d sender %s for recver %s being ignored tProcessed %d \n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString),recver.toString(recverString),obj->mlogData->tProcessed));
 		
 		CmiFree(env);
 		return 0;
 	}
 	//message that needs to be processed in the future
 
-	DEBUG(printf("[%d] Early Message sender = %s SN %d TN %d tProcessed %d for recver %s stored for future time %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
+	DEBUG_PE(3,printf("[%d] Early Message sender = %s SN %d TN %d tProcessed %d for recver %s stored for future time %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
 	//the message cant be processed now put it back in the out of order message Q, 
 	//It will be transferred to the main queue later
 	CqsEnqueue(CpvAccess(_outOfOrderMessageQueue),env);
@@ -2042,17 +2124,33 @@ void _recvCheckpointHandler(char *_restartData){
 	_initDone();
 
 	getGlobalStep(globalLBID);
+
+	// sending request to send determinants
+	_numRestartResponses = 0;
 	
-	countUpdateHomeAcks = 0;
-	RestartRequest updateHomeRequest;
-	updateHomeRequest.PE = CmiMyPe();
-	CmiSetHandler (&updateHomeRequest,_updateHomeRequestHandlerIdx);
-	for(int i=0;i<CmiNumPes();i++){
-		if(i != CmiMyPe()){
-			CmiSyncSend(i,sizeof(RestartRequest),(char *)&updateHomeRequest);
+	// Send out the request to resend logged determinants to all other processors
+	CkVec<TProcessedLog> objectVec;
+	forAllCharesDo(createObjIDList, (void *)&objectVec);
+	int numberObjects = objectVec.size();
+	
+	//	resendMsg layout: |ResendRequest|Array of TProcessedLog|
+	int totalSize = sizeof(ResendRequest)+numberObjects*sizeof(TProcessedLog);
+	char *resendMsg = (char *)CmiAlloc(totalSize);	
+
+	ResendRequest *resendReq = (ResendRequest *)resendMsg;
+	resendReq->PE =CkMyPe(); 
+	resendReq->numberObjects = numberObjects;
+	char *objList = &resendMsg[sizeof(ResendRequest)];
+	memcpy(objList,objectVec.getVec(),numberObjects*sizeof(TProcessedLog));	
+
+	CmiSetHandler(resendMsg,_sendDetsHandlerIdx);
+	for(int i=0;i<CkNumPes();i++){
+		if(i != CkMyPe()){
+			CmiSyncSend(i,totalSize,resendMsg);
 		}
 	}
-
+	CmiFree(resendMsg);
+	
 }
 
 /**
@@ -2311,13 +2409,15 @@ void resendMessageForChare(void *data, ChareMlogData *mlogData){
 }
 
 /**
- * Resends messages since last checkpoint to the list of objects included in the 
- * request. It also sends stored remote determinants to the particular failed PE.
+ * Send all remote determinants to a particular failed PE.
+ * It only sends determinants to those objects on the list.
  */
-void _resendMessagesHandler(char *msg){
+void _sendDetsHandler(char *msg){
 	ResendData d;
 	CkVec<Determinant> *detVec;
 	ResendRequest *resendReq = (ResendRequest *)msg;
+
+	// CkPrintf("[%d] Sending determinants\n",CkMyPe());
 
 	// building the reply message
 	char *listObjects = &msg[sizeof(ResendRequest)];
@@ -2327,67 +2427,8 @@ void _resendMessagesHandler(char *msg){
 	d.ticketVecs = new CkVec<MCount>[d.numberObjects];
 	detVec = new CkVec<Determinant>[d.numberObjects];
 
-	//Check if any of the retained objects need to be recreated
-	//If they have not been recreated on the restarted processor
-	//they need to be recreated on this processor
-	int count=0;
-	for(int i=0;i<retainedObjectList.size();i++){
-		if(retainedObjectList[i]->migRecord.toPE == d.PE){
-			count++;
-			int recreate=1;
-			for(int j=0;j<d.numberObjects;j++){
-				if(d.listObjects[j].recver.type != TypeArray ){
-					continue;
-				}
-				CkArrayID aid(d.listObjects[j].recver.data.array.id);		
-				CkLocMgr *locMgr = aid.ckLocalBranch()->getLocMgr();
-				if(retainedObjectList[i]->migRecord.gID == locMgr->getGroupID()){
-					if(retainedObjectList[i]->migRecord.idx == d.listObjects[j].recver.data.array.idx.asChild()){
-						recreate = 0;
-						break;
-					}
-				}
-			}
-			CmiPrintf("[%d] Object migrated away but did not checkpoint recreate %d locmgrid %d idx %s\n",CmiMyPe(),recreate,retainedObjectList[i]->migRecord.gID.idx,idx2str(retainedObjectList[i]->migRecord.idx));
-			if(recreate){
-				donotCountMigration=1;
-				_receiveMlogLocationHandler(retainedObjectList[i]->msg);
-				donotCountMigration=0;
-				CkLocMgr *locMgr =  (CkLocMgr*)CkpvAccess(_groupTable)->find(retainedObjectList[i]->migRecord.gID).getObj();
-				int homePE = locMgr->homePe(retainedObjectList[i]->migRecord.idx);
-				informLocationHome(retainedObjectList[i]->migRecord.gID,retainedObjectList[i]->migRecord.idx,homePE,CmiMyPe());
-				sendDummyMigration(d.PE,globalLBID,retainedObjectList[i]->migRecord.gID,retainedObjectList[i]->migRecord.idx,CmiMyPe());
-				CkLocRec *rec = locMgr->elementRec(retainedObjectList[i]->migRecord.idx);
-				CmiAssert(rec->type() == CkLocRec::local);
-				CkVec<CkMigratable *> eltList;
-				locMgr->migratableList((CkLocRec_local *)rec,eltList);
-				for(int j=0;j<eltList.size();j++){
-					if(eltList[j]->mlogData->toResumeOrNot == 1 && eltList[j]->mlogData->resumeCount < globalResumeCount){
-						CpvAccess(_currentObj) = eltList[j];
-						eltList[j]->ResumeFromSync();
-					}
-				}
-				retainedObjectList[i]->msg=NULL;	
-			}
-		}
-	}
-	
-	if(count > 0){
-//		CmiAbort("retainedObjectList for restarted processor not empty");
-	}
-	
-	DEBUG(printf("[%d] Received request to Resend Messages to processor %d numberObjects %d at %.6lf\n",CkMyPe(),resendReq->PE,resendReq->numberObjects,CmiWallTimer()));
-
-
-	//TML: examines the origin processor to determine if it belongs to the same group.
-	// In that case, it only returns the maximum ticket received for each object in the list.
-	if(isTeamLocal(resendReq->PE) && CkMyPe() != resendReq->PE)
-		forAllCharesDo(fillTicketForChare,&d);
-	else
-		forAllCharesDo(resendMessageForChare,&d);
-
-	// adding the stored determinants to the resendReplyMsg
-	// traversing all the stored determinants
+	// adding the remote determinants to the resendReplyMsg
+	// traversing all the remote determinants
 	CkVec<Determinant> *vec;
 	for(int i=0; i<d.numberObjects; i++){
 		vec = CpvAccess(_remoteDets)->get(d.listObjects[i].recver);
@@ -2454,23 +2495,46 @@ void _resendMessagesHandler(char *msg){
 		ticketList = &ticketList[sizeof(Determinant)*vecsize];
 	}
 
-	CmiSetHandler(resendReplyMsg,_resendReplyHandlerIdx);
+	CmiSetHandler(resendReplyMsg,_sendDetsReplyHandlerIdx);
 	CmiSyncSendAndFree(d.PE,totalSize,(char *)resendReplyMsg);
-	
-/*	
-	if(verifyAckRequestsUnacked){
-		CmiPrintf("[%d] verifyAckRequestsUnacked %d call dummy migrates\n",CmiMyPe(),verifyAckRequestsUnacked);
-		for(int i=0;i<verifyAckRequestsUnacked;i++){
-			CentralLB *lb = (CentralLB *)CkpvAccess(_groupTable)->find(globalLBID).getObj();
-			LDObjHandle h;
-			lb->Migrated(h,1);
-		}
-	}
-	
-	verifyAckRequestsUnacked=0;*/
-	
-	delete [] d.ticketVecs;
+
 	delete [] detVec;
+	delete [] d.ticketVecs;
+
+	DEBUG_MEM(CmiMemoryCheck());
+
+	if(resendReq->PE != CkMyPe()){
+		CmiFree(msg);
+	}	
+//	CmiPrintf("[%d] End of resend Request \n",CmiMyPe());
+	lastRestart = CmiWallTimer();
+
+}
+
+/**
+ * Resends messages since last checkpoint to the list of objects included in the 
+ * request. It also sends stored remote determinants to the particular failed PE.
+ */
+void _resendMessagesHandler(char *msg){
+	ResendData d;
+	ResendRequest *resendReq = (ResendRequest *)msg;
+
+	//CkPrintf("[%d] Resending messages\n",CkMyPe());
+
+	// building the reply message
+	char *listObjects = &msg[sizeof(ResendRequest)];
+	d.numberObjects = resendReq->numberObjects;
+	d.PE = resendReq->PE;
+	d.listObjects = (TProcessedLog *)listObjects;
+	
+	DEBUG(printf("[%d] Received request to Resend Messages to processor %d numberObjects %d at %.6lf\n",CkMyPe(),resendReq->PE,resendReq->numberObjects,CmiWallTimer()));
+
+	//TML: examines the origin processor to determine if it belongs to the same group.
+	// In that case, it only returns the maximum ticket received for each object in the list.
+	if(isTeamLocal(resendReq->PE) && CkMyPe() != resendReq->PE)
+		forAllCharesDo(fillTicketForChare,&d);
+	else
+		forAllCharesDo(resendMessageForChare,&d);
 
 	DEBUG_MEM(CmiMemoryCheck());
 
@@ -2481,6 +2545,7 @@ void _resendMessagesHandler(char *msg){
 	lastRestart = CmiWallTimer();
 }
 
+MCount maxVec(CkVec<MCount> *TNvec);
 void sortVec(CkVec<MCount> *TNvec);
 int searchVec(CkVec<MCount> *TNVec,MCount searchTN);
 
@@ -2506,13 +2571,14 @@ void processDelayedRemoteMsgQueue(){
  * Message format: |Header|ObjID list|TN list|Determinant list|
  * TN list = |number of TNs|list of TNs|...|
  */
-void _resendReplyHandler(char *msg){
+void _sendDetsReplyHandler(char *msg){
 	ResendRequest *resendReply = (ResendRequest *)msg;
 	CkObjID *listObjects = (CkObjID *)(&msg[sizeof(ResendRequest)]);
 	char *listTickets = (char *)(&listObjects[resendReply->numberObjects]);
 	
 //	DEBUG_RESTART(printf("[%d] _resendReply from %d \n",CmiMyPe(),resendReply->PE));
 	DEBUG_TEAM(printf("[%d] _resendReply from %d \n",CmiMyPe(),resendReply->PE));
+	
 	for(int i =0; i< resendReply->numberObjects;i++){
 		Chare *obj = (Chare *)listObjects[i].getObject();
 		
@@ -2569,12 +2635,51 @@ void _resendReplyHandler(char *msg){
 
 	}
 
-	// checking if the restart is over
+	// checking if we have received all replies
 	_numRestartResponses++;
-	if(_numRestartResponses == CkNumPes()){
+	if(_numRestartResponses != CkNumPes())
+		return;
+	else 
 		_numRestartResponses = 0;
-		processDelayedRemoteMsgQueue();
+
+	// continuing with restart process; send out the request to resend logged messages to all other processors
+	CkVec<TProcessedLog> objectVec;
+	forAllCharesDo(createObjIDList, (void *)&objectVec);
+	int numberObjects = objectVec.size();
+	
+	//	resendMsg layout: |ResendRequest|Array of TProcessedLog|
+	int totalSize = sizeof(ResendRequest)+numberObjects*sizeof(TProcessedLog);
+	char *resendMsg = (char *)CmiAlloc(totalSize);	
+
+	ResendRequest *resendReq = (ResendRequest *)resendMsg;
+	resendReq->PE =CkMyPe(); 
+	resendReq->numberObjects = numberObjects;
+	char *objList = &resendMsg[sizeof(ResendRequest)];
+	memcpy(objList,objectVec.getVec(),numberObjects*sizeof(TProcessedLog));	
+
+	CentralLB *lb = (CentralLB *)CkpvAccess(_groupTable)->find(globalLBID).getObj();
+	CpvAccess(_currentObj) = lb;
+	lb->ReceiveDummyMigration(restartDecisionNumber);
+
+//HERE	sleep(10);
+//	CkPrintf("[%d] RESUMING RECOVERY with %d \n",CkMyPe(),restartDecisionNumber);
+	
+	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
+	for(int i=0;i<CkNumPes();i++){
+		if(i != CkMyPe()){
+			CmiSyncSend(i,totalSize,resendMsg);
+		}
 	}
+	_resendMessagesHandler(resendMsg);
+	CmiFree(resendMsg);
+
+	/* test for parallel restart migrate away object**/
+	if(fastRecovery){
+		distributeRestartedObjects();
+		printf("[%d] Redistribution of objects done at %.6lf \n",CkMyPe(),CmiWallTimer());
+	}
+
+//	processDelayedRemoteMsgQueue();
 
 };
 
@@ -2623,6 +2728,7 @@ void processReceivedDet(Chare *obj, int listSize, Determinant *listDets){
 	// traversing the whole list of determinants
 	for(int i=0; i<listSize; i++){
 		det = &listDets[i];
+		if(CkMyPe() == 4) printDet(det,"RECOVERY");
 		obj->mlogData->verifyTicket(det->sender, det->SN, det->TN);
 		DEBUG_RECOVERY(printDet(det,RECOVERY_PROCESS));
 	}
@@ -2653,8 +2759,10 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 	//that senders know about. Those less than the ticket number processed 
 	//by the receiver can be thrown away. The rest need not be consecutive
 	// ie there can be holes in the list of ticket numbers seen by senders
-	if(obj->mlogData->resendReplyRecvd == CkNumPes()){
+	if(obj->mlogData->resendReplyRecvd == (CkNumPes() -1)){
 		obj->mlogData->resendReplyRecvd = 0;
+
+#if VERIFY_DETS
 		//sort the received TNS
 		sortVec(obj->mlogData->receivedTNs);
 	
@@ -2699,14 +2807,18 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 				obj->mlogData->currentHoles = numberHoles;
 			}
 		}
-	
+#else
+		if(obj->mlogData->receivedTNs->size() > 0){
+			obj->mlogData->tCount = maxVec(obj->mlogData->receivedTNs);
+		}
+#endif
 		// cleaning up structures and getting ready to continue execution	
 		delete obj->mlogData->receivedTNs;
 		DEBUG(CkPrintf("[%d] Resetting receivedTNs\n",CkMyPe()));
 		obj->mlogData->receivedTNs = NULL;
 		obj->mlogData->restartFlag = 0;
 
-		processDelayedRemoteMsgQueue();
+		// processDelayedRemoteMsgQueue();
 
 		DEBUG_RESTART(char objString[100]);
 		DEBUG_RESTART(CkPrintf("[%d] Can restart handing out tickets again at %.6lf for %s\n",CkMyPe(),CmiWallTimer(),obj->mlogData->objID.toString(objString)));
@@ -2714,6 +2826,15 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 
 }
 
+/** @brief Returns the maximum ticket from a vector */
+MCount maxVec(CkVec<MCount> *TNvec){
+	MCount max = 0;
+	for(int i=0; i<TNvec->size(); i++){
+		if((*TNvec)[i] > max)
+			max = (*TNvec)[i];
+	}
+	return max;
+}
 
 void sortVec(CkVec<MCount> *TNvec){
 	//sort it ->its bloddy bubble sort
@@ -2812,19 +2933,29 @@ public:
 			
 		CkArrayIndexMax idx = loc.getIndex();
 		CkLocRec_local *rec = loc.getLocalRecord();
+		CkLocMgr *locMgr = loc.getManager();
+		CkVec<CkMigratable *> eltList;
 			
 		CkPrintf("[%d] Distributing objects to Processor %d: ",CkMyPe(),*targetPE);
 		idx.print();
-			
-		//TODO: an element that is being moved should leave some trace behind so that
-		// the arraybroadcaster can forward messages to it
-			
+
+		// incrementing number of emigrant objects
+		CpvAccess(_numEmigrantRecObjs)++;
+    	locMgr->migratableList((CkLocRec_local *)rec,eltList);
+		CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[0]->mlogData->objID.data.array.id).getObj();
+		
+		// let everybody else know the object is leaving
+		locMgr->callMethod(rec,&CkMigratable::ckAboutToMigrate);
+		reductionMgr->incNumEmigrantRecObjs();
+	
 		//pack up this location and send it across
 		PUP::sizer psizer;
 		pupLocation(loc,psizer);
-		int totalSize = psizer.size()+CmiMsgHeaderSizeBytes;
+		int totalSize = psizer.size() + sizeof(DistributeObjectMsg);
 		char *msg = (char *)CmiAlloc(totalSize);
-		char *buf = &msg[CmiMsgHeaderSizeBytes];
+		DistributeObjectMsg *distributeMsg = (DistributeObjectMsg *)msg;
+		distributeMsg->PE = CkMyPe();
+		char *buf = &msg[sizeof(DistributeObjectMsg)];
 		PUP::toMem pmem(buf);
 		pmem.becomeDeleting();
 		pupLocation(loc,pmem);
@@ -2859,11 +2990,50 @@ void distributeRestartedObjects(){
 };
 
 /**
+ * Handler to receive back a location.
+ */
+void _sendBackLocationHandler(char *receivedMsg){
+	printf("Array element received at processor %d after recovery\n",CkMyPe());
+	DistributeObjectMsg *distributeMsg = (DistributeObjectMsg *)receivedMsg;
+	int sourcePE = distributeMsg->PE;
+	char *buf = &receivedMsg[sizeof(DistributeObjectMsg)];
+	PUP::fromMem pmem(buf);
+	CkGroupID gID;
+	CkArrayIndexMax idx;
+	pmem |gID;
+	pmem |idx;
+	CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
+	donotCountMigration=1;
+	mgr->resume(idx,pmem,CmiTrue);
+	donotCountMigration=0;
+	informLocationHome(gID,idx,mgr->homePe(idx),CkMyPe());
+	printf("Array element inserted at processor %d after parallel recovery\n",CkMyPe());
+	idx.print();
+
+	// decrementing number of emigrant objects at reduction manager
+	CkVec<CkMigratable *> eltList;
+	CkLocRec *rec = mgr->elementRec(idx);
+	mgr->migratableList((CkLocRec_local *)rec,eltList);
+	CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[0]->mlogData->objID.data.array.id).getObj();
+	reductionMgr->decNumEmigrantRecObjs();
+	reductionMgr->decGCount();
+
+	// checking if it has received all emigrant recovering objects
+	CpvAccess(_numEmigrantRecObjs)--;
+	if(CpvAccess(_numEmigrantRecObjs) == 0){
+		(*resumeLbFnPtr)(centralLb);
+	}
+
+}
+
+/**
  * Handler to update information about an object just received.
  */
 void _distributedLocationHandler(char *receivedMsg){
 	printf("Array element received at processor %d after distribution at restart\n",CkMyPe());
-	char *buf = &receivedMsg[CmiMsgHeaderSizeBytes];
+	DistributeObjectMsg *distributeMsg = (DistributeObjectMsg *)receivedMsg;
+	int sourcePE = distributeMsg->PE;
+	char *buf = &receivedMsg[sizeof(DistributeObjectMsg)];
 	PUP::fromMem pmem(buf);
 	CkGroupID gID;
 	CkArrayIndexMax idx;
@@ -2879,12 +3049,24 @@ void _distributedLocationHandler(char *receivedMsg){
 
 	CkLocRec *rec = mgr->elementRec(idx);
 	CmiAssert(rec->type() == CkLocRec::local);
+
+	// adding object to the list of immigrant recovery objects
+	CpvAccess(_immigrantRecObjs)->push_back(new CkLocation(mgr,(CkLocRec_local *)rec));
+	CpvAccess(_numImmigrantRecObjs)++;
 	
 	CkVec<CkMigratable *> eltList;
 	mgr->migratableList((CkLocRec_local *)rec,eltList);
 	for(int i=0;i<eltList.size();i++){
 		if(eltList[i]->mlogData->toResumeOrNot == 1 && eltList[i]->mlogData->resumeCount < globalResumeCount){
 			CpvAccess(_currentObj) = eltList[i];
+			eltList[i]->mlogData->immigrantRecFlag = 1;
+			eltList[i]->mlogData->immigrantSourcePE = sourcePE;
+
+			// incrementing immigrant counter at reduction manager
+			CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[i]->mlogData->objID.data.array.id).getObj();
+			reductionMgr->incNumImmigrantRecObjs();
+			reductionMgr->decGCount();
+
 			eltList[i]->ResumeFromSync();
 		}
 	}
@@ -3018,16 +3200,115 @@ void initMlogLBStep(CkGroupID gid){
 #endif
 }
 
+/**
+ * Pups a location
+ */
+void pupLocation(CkLocation *loc, CkLocMgr *locMgr, PUP::er &p){
+	CkArrayIndexMax idx = loc->getIndex();
+	CkGroupID gID = locMgr->ckGetGroupID();
+	p|gID;	    // store loc mgr's GID as well for easier restore
+	p|idx;
+	p|*loc;
+};
+
+/**
+ * Sends back the immigrant recovering object to their origin PE.
+ */
+void sendBackImmigrantRecObjs(){
+	CkLocation *loc;
+	CkLocMgr *locMgr;
+	CkArrayIndexMax idx;
+	CkLocRec_local *rec;
+	PUP::sizer psizer;
+	int targetPE;
+	CkVec<CkMigratable *> eltList;
+	CkReductionMgr *reductionMgr;
+ 
+	// looping through all elements in immigrant recovery objects vector
+	for(int i=0; i<CpvAccess(_numImmigrantRecObjs); i++){
+
+		// getting the components of each location
+		loc = (*CpvAccess(_immigrantRecObjs))[i];
+		idx = loc->getIndex();
+		rec = loc->getLocalRecord();
+		locMgr = loc->getManager();
+    	locMgr->migratableList((CkLocRec_local *)rec,eltList);
+		targetPE = eltList[i]->mlogData->immigrantSourcePE;
+
+		// decrement counter at array manager
+		reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[i]->mlogData->objID.data.array.id).getObj();
+		reductionMgr->decNumImmigrantRecObjs();
+
+		CkPrintf("[%d] Sending back object to %d: ",CkMyPe(),targetPE);
+		idx.print();
+
+		// let everybody else know the object is leaving
+		locMgr->callMethod(rec,&CkMigratable::ckAboutToMigrate);
+			
+		//pack up this location and send it across
+		pupLocation(loc,locMgr,psizer);
+		int totalSize = psizer.size() + sizeof(DistributeObjectMsg);
+		char *msg = (char *)CmiAlloc(totalSize);
+		DistributeObjectMsg *distributeMsg = (DistributeObjectMsg *)msg;
+		distributeMsg->PE = CkMyPe();
+		char *buf = &msg[sizeof(DistributeObjectMsg)];
+		PUP::toMem pmem(buf);
+		pmem.becomeDeleting();
+		pupLocation(loc,locMgr,pmem);
+		
+		locMgr->setDuringMigration(CmiTrue);
+		delete rec;
+		locMgr->setDuringMigration(CmiFalse);
+		locMgr->inform(idx,targetPE);
+
+		// sending the object
+		CmiSetHandler(msg,_sendBackLocationHandlerIdx);
+		CmiSyncSendAndFree(targetPE,totalSize,msg);
+
+		// freeing memory
+		delete loc;
+
+		CmiAssert(locMgr->lastKnown(idx) == targetPE);
+		
+	}
+
+	// cleaning up all data structures
+	CpvAccess(_immigrantRecObjs)->removeAll();
+	CpvAccess(_numImmigrantRecObjs) = 0;
+
+}
+
+/**
+ * Restores objects after parallel recovery, either by sending back the immigrant objects or 
+ * by waiting for all emigrant objects to be back.
+ */
+void restoreParallelRecovery(void (*_fnPtr)(void *),void *_centralLb){
+	resumeLbFnPtr = _fnPtr;
+	centralLb = _centralLb;
+
+	// sending back the immigrant recovering objects
+	if(CpvAccess(_numImmigrantRecObjs) > 0){
+		sendBackImmigrantRecObjs();	
+	}
+
+	// checking whether it needs to wait for emigrant recovery objects
+	if(CpvAccess(_numEmigrantRecObjs) > 0)
+		return;
+
+	// otherwise, load balancing process is finished
+	(*resumeLbFnPtr)(centralLb);
+}
+
 void startLoadBalancingMlog(void (*_fnPtr)(void *),void *_centralLb){
 	DEBUGLB(printf("[%d] start Load balancing section of message logging \n",CmiMyPe()));
 	DEBUG_TEAM(printf("[%d] start Load balancing section of message logging \n",CmiMyPe()));
-	
+
 	resumeLbFnPtr = _fnPtr;
 	centralLb = _centralLb;
 	migrationDoneCalled = 1;
 	if(countLBToMigrate == countLBMigratedAway){
 		DEBUGLB(printf("[%d] calling startMlogCheckpoint in startLoadBalancingMlog countLBToMigrate %d countLBMigratedAway %d \n",CmiMyPe(),countLBToMigrate,countLBMigratedAway));
-		startMlogCheckpoint(NULL,CmiWallTimer());	
+		startMlogCheckpoint(NULL,CmiWallTimer());
 	}
 };
 
@@ -3316,11 +3597,22 @@ void _getGlobalStepHandler(LBStepMsg *msg){
 	CmiSyncSend(msg->fromPE,sizeof(LBStepMsg),(char *)msg);
 };
 
+/**
+ * @brief Receives the global step handler from PE 0
+ */
 void _recvGlobalStepHandler(LBStepMsg *msg){
 	
-	restartDecisionNumber=msg->step;
-	RestartRequest *dummyAck = (RestartRequest *)CmiAlloc(sizeof(RestartRequest));
-	_updateHomeAckHandler(dummyAck);
+	// updating restart decision number
+	restartDecisionNumber = msg->step;
+	CmiFree(msg);
+
+	CmiPrintf("[%d] recvGlobalStepHandler \n",CmiMyPe());
+
+	// sending a dummy message to sendDetsReplyHandler
+	ResendRequest *resendReplyMsg = (ResendRequest *)CmiAlloc(sizeof(ResendRequest));
+	resendReplyMsg->PE = CkMyPe();
+	resendReplyMsg->numberObjects = 0;
+	_sendDetsReplyHandler((char *)resendReplyMsg);
 };
 
 /**
@@ -3332,10 +3624,11 @@ void _messageLoggingExit(){
 	if(CkMyPe() == 0)
 		printf("[%d] _causalMessageLoggingExit \n",CmiMyPe());
 
-	//TML: printing some statistics for group approach
-#if COLLECT_STATS_TEAM
+#if COLLECT_STATS_LOGGING
 	printf("[%d] LOGGED MESSAGES: %.0f\n",CkMyPe(),MLOGFT_totalMessages);
 	printf("[%d] MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalLogSize/(float)MEGABYTE);
+	printf("[%d] MULTICAST MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalMcastLogSize/(float)MEGABYTE);
+	printf("[%d] REDUCTION MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalReductionLogSize/(float)MEGABYTE);
 #endif
 
 #if COLLECT_STATS_MSGS
@@ -3365,141 +3658,6 @@ void _messageLoggingExit(){
 #endif
 
 }
-
-/**
-	The method for returning the actual object pointed to by an id
-	If the object doesnot exist on the processor it returns NULL
-**/
-
-void* CkObjID::getObject(){
-	
-		switch(type){
-			case TypeChare:	
-				return CkLocalChare(&data.chare.id);
-			case TypeMainChare:
-				return CkLocalChare(&data.chare.id);
-			case TypeGroup:
-	
-				CkAssert(data.group.onPE == CkMyPe());
-				return CkLocalBranch(data.group.id);
-			case TypeNodeGroup:
-				CkAssert(data.group.onPE == CkMyNode());
-				//CkLocalNodeBranch(data.group.id);
-				{
-					CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-				  void *retval = CksvAccess(_nodeGroupTable)->find(data.group.id).getObj();
-				  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));					
-	
-					return retval;
-				}	
-			case TypeArray:
-				{
-	
-	
-					CkArrayID aid(data.array.id);
-	
-					if(aid.ckLocalBranch() == NULL){ return NULL;}
-	
-					CProxyElement_ArrayBase aProxy(aid,data.array.idx.asChild());
-	
-					return aProxy.ckLocal();
-				}
-			default:
-				CkAssert(0);
-		}
-}
-
-
-int CkObjID::guessPE(){
-		switch(type){
-			case TypeChare:
-			case TypeMainChare:
-				return data.chare.id.onPE;
-			case TypeGroup:
-			case TypeNodeGroup:
-				return data.group.onPE;
-			case TypeArray:
-				{
-					CkArrayID aid(data.array.id);
-					if(aid.ckLocalBranch() == NULL){
-						return -1;
-					}
-					return aid.ckLocalBranch()->lastKnown(data.array.idx.asChild());
-				}
-			default:
-				CkAssert(0);
-		}
-};
-
-char *CkObjID::toString(char *buf) const {
-	
-	switch(type){
-		case TypeChare:
-			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);
-			break;
-		case TypeMainChare:
-			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);	
-			break;
-		case TypeGroup:
-			sprintf(buf,"Group %d	PE %d \0",data.group.id.idx,data.group.onPE);
-			break;
-		case TypeNodeGroup:
-			sprintf(buf,"NodeGroup %d	Node %d \0",data.group.id.idx,data.group.onPE);
-			break;
-		case TypeArray:
-			{
-				const CkArrayIndexMax &idx = data.array.idx.asChild();
-				const int *indexData = idx.data();
-				sprintf(buf,"Array |%d %d %d| id %d \0",indexData[0],indexData[1],indexData[2],data.array.id.idx);
-				break;
-			}
-		default:
-			CkAssert(0);
-	}
-	
-	return buf;
-};
-
-void CkObjID::updatePosition(int PE){
-	if(guessPE() == PE){
-		return;
-	}
-	switch(type){
-		case TypeArray:
-			{
-					CkArrayID aid(data.array.id);
-					if(aid.ckLocalBranch() == NULL){
-						
-					}else{
-						char str[100];
-						CkLocMgr *mgr = aid.ckLocalBranch()->getLocMgr();
-//						CmiPrintf("[%d] location for object %s is %d\n",CmiMyPe(),toString(str),PE);
-						CkLocRec *rec = mgr->elementNrec(data.array.idx.asChild());
-						if(rec != NULL){
-							if(rec->type() == CkLocRec::local){
-								CmiPrintf("[%d] local object %s can not exist on another processor %d\n",CmiMyPe(),str,PE);
-								return;
-							}
-						}
-						mgr->inform(data.array.idx.asChild(),PE);
-					}	
-				}
-
-			break;
-		case TypeChare:
-		case TypeMainChare:
-			CkAssert(data.chare.id.onPE == PE);
-			break;
-		case TypeGroup:
-		case TypeNodeGroup:
-			CkAssert(data.group.onPE == PE);
-			break;
-		default:
-			CkAssert(0);
-	}
-}
-
-
 
 void MlogEntry::pup(PUP::er &p){
 	p | destPE;
@@ -3540,22 +3698,13 @@ void RestoredLocalMap::pup(PUP::er &p){
 	p(TNArray,count);
 };
 
-
-
-
 /**********************************
 	* The methods of the message logging
 	* data structure stored in each chare
 	********************************/
 
 MCount ChareMlogData::nextSN(const CkObjID &recver){
-/*	MCount SN = snTable.get(recver);
-	snTable.put(recver) = SN+1;
-	return SN+1;*/
-	DEBUG_MEM(CmiMemoryCheck());
-	double _startTime = CmiWallTimer();
 	MCount *SN = snTable.getPointer(recver);
-	DEBUG_MEM(CmiMemoryCheck());
 	if(SN==NULL){
 		snTable.put(recver) = 1;
 		return 1;
@@ -3563,7 +3712,6 @@ MCount ChareMlogData::nextSN(const CkObjID &recver){
 		(*SN)++;
 		return *SN;
 	}
-//	traceUserBracketEvent(34,_startTime,CkWallTimer());
 };
  
 /**

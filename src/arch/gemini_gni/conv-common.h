@@ -37,6 +37,8 @@
 
 #define NODE_0_IS_CONVHOST                                 1
 
+#define CMK_USE_OOB                                        0
+
 #define CMK_IMMEDIATE_MSG				   1
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
 

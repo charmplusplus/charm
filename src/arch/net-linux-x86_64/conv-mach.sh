@@ -16,6 +16,7 @@ CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
 CMK_CC64=true
 CMK_WARNINGS_ARE_ERRORS="-Werror"
+CMK_CXX_OPTIMIZE="-O3"
 
 # native compiler for compiling charmxi, etc
 CMK_NATIVE_CC="$CMK_CC $CMK_AMD64 -fPIC $CMK_DEFS "

@@ -16,6 +16,11 @@ bgtest:
 		(cd $$d && $(MAKE) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
+syncfttest causalfttest:
+	for d in jacobi3d; do \
+        (cd $$d && $(MAKE) $@ OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
+    done
+
 clean:
 	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done
 	rm -f TAGS #*#

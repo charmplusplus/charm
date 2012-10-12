@@ -32,7 +32,7 @@ module selfCompute {
 
       // DMK - DEBUG
       #if (ENABLE_USER_EVENTS != 0) && defined(CMK_CELL) && (CMK_CELL == 0)
-        double __start_time__ = CmiWallTimer();
+        double __start_time__ = CkWallTimer();
       #endif
 
       // Calculate the electrostatic force (coulumb's law) between the particles
@@ -176,7 +176,7 @@ module selfCompute {
 
       // DMK - DEBUG
       #if (ENABLE_USER_EVENTS != 0) && defined(CMK_CELL) && (CMK_CELL == 0)
-        double __end_time__ = CmiWallTimer();
+        double __end_time__ = CkWallTimer();
         traceUserBracketEvent(PROJ_USER_EVENT_SELFCOMPUTE_DOCALC_WORK, __start_time__, __end_time__);
       #endif
 

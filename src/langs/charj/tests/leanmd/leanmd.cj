@@ -1,30 +1,98 @@
 
+#define HYDROGEN_MASS         (1.67 * pow( 10.0,-24))
+#define VDW_A                        (1.60694452 * pow(10.0, -134))
+#define VDW_B            (1.031093844 * pow(10.0, -77))
+
+#define ENERGY_VAR        (1.0 * pow(10.0,-5))
+#define PARTICLES_PER_CELL   300
+
+#define DEFAULT_DELTA         1// interact femtoseconds
+
+#define DEFAULT_FIRST_LDB     20
+#define DEFAULT_LDB_PERIOD    20
+#define DEFAULT_FT_PERIOD     100000
+
+#define KAWAY_X               1
+#define KAWAY_Y               1
+#define KAWAY_Z               1
+#define NBRS_X                (2*KAWAY_X+1)
+#define NBRS_Y                  (2*KAWAY_Y+1)
+#define NBRS_Z                  (2*KAWAY_Z+1)
+#define NUM_NEIGHBORS        (NBRS_X * NBRS_Y * NBRS_Z)
+
+#define CELLARRAY_DIM_X       3
+#define CELLARRAY_DIM_Y       3
+#define CELLARRAY_DIM_Z       3
+#define PTP_CUT_OFF             12
+#define CELL_MARGIN             4  
+#define CELL_SIZE_Y             ((PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Y)
+#define CELL_SIZE_Z             ((PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Z)
+#define CELL_ORIGIN_X             0
+#define CELL_ORIGIN_Y             0
+#define CELL_ORIGIN_Z             0
+
+#define MIGRATE_STEPCOUNT    20
+#define DEFAULT_FINALSTEPCOUNT 1001
+#define MAX_VELOCITY      30.0
+
+#define WRAP_X(a)(((a)+cellArrayDimX)%cellArrayDimX)
+#define WRAP_Y(a)(((a)+cellArrayDimY)%cellArrayDimXDimY)
+#define WRAP_Z(a)(((a)+cellArrayDimZ)%cellArrayDimZ)
+#define BLOCK_SIZE 512
+
+extern srand48;
+extern drand48;
+extern pow;
+extern fabs;
+extern abs;
+extern atoi;
+extern CkSectionInfo;
+extern ParticleDataMsg;
 
 readonly Main@ mainProxy;       //central controller
-readonly Cell@ cellArray;       //array that houses atoms
-readonly Compute@ computeArray; //computational kernels
-readonly CkGroupID mCastGrpID;  //multicast group handle
+//readonly Cell@ cellArray;       //array that houses atoms
+//readonly Compute@ computeArray; //computational kernels
+//readonly CkGroupID mCastGrpID;  //multicast group handle
 
 readonly int cellArrayDimX;         // X dimension of the Cell array
 readonly int cellArrayDimY;         // Y dimension of the Cell array
-readonly int cellArrayDimYArrayDimZ;// Z dimension of the Cell array
+readonly int cellArrayDimZ;         // Z dimension of the Cell array
 readonly int finalStepCount;        // number of steps in the simulaion
 readonly int firstLdbStep;          // begin load balancing after this many steps
 readonly int ldbPeriod;             // load balancing period
 
-
 class vec3 {
     double x, y, z;
+    void copy(vec3 v2) {
+        x = v2.x; y = v2.y; z = v2.z;
+    }
+    void mult(double s) {
+        x *= s; y *= s; z *= s;        
+    }
+    void sub(vec3 v2) {
+        x -= v2.x; y -= v2.y; z -= v2.z;
+    }
+    void add(vec3 v2) {
+        x += v2.x; y += v2.y; z += v2.z;
+    }
+    double dot(vec3 v2) {
+        return x*v2.x + y*v2.y + z*v2.z;
+    }
+}
+
+multicast_message ParticleDataMsg {
+    Array<vec3> part;
 }
 
 class Particle {
     double mass;
-    vec3 pos, acc, vel;
+    vec3 pos;
+    vec3 acc;
+    vec3 vel;
 }
-        
-mainchare Main {
-    entry Main(CkArgMsg m) {
-        /*
+
+public mainchare Main {
+    public entry Main(CkArgMsg[~]@ m) {
         CkPrintf("\nLENNARD JONES MOLECULAR DYNAMICS START UP ...\n");
 
         //set variable values to a default set
@@ -34,44 +102,46 @@ mainchare Main {
         finalStepCount = DEFAULT_FINALSTEPCOUNT;
         firstLdbStep = DEFAULT_FIRST_LDB;
         ldbPeriod = DEFAULT_LDB_PERIOD;
+/*
 
         mainProxy = thisProxy;
 
         //branch factor for spanning tree of multicast
         int bFactor = 4;
         //creating the multicast spanning tree
-        mCastGrpID = CProxy_CkMulticastMgr::ckNew(bFactor);
+        mCastGrpID = CkMulticastMgr@.ckNew(bFactor);
 
         int numPes = CkNumPes();
-        int currPe = -1, pe;
+        int currPe = -1;
         int cur_arg = 1;
 
         CkPrintf("\nInput Parameters...\n");
 
         //read user parameters
         //number of celles/cells in each dimension
-        if (m->argc > cur_arg) {
-            cellArrayDimX=atoi(m->argv[cur_arg++]);
-            cellArrayDimY=atoi(m->argv[cur_arg++]);
-            cellArrayDimZ=atoi(m->argv[cur_arg++]);
+        if (m.argc > cur_arg) {
+            cellArrayDimX = atoi(m.argv[cur_arg++]);
+        }
+            cellArrayDimY=atoi(m.argv[cur_arg++]);
+            cellArrayDimZ=atoi(m.argv[cur_arg++]);
             CkPrintf("Cell Array Dimension X:%d Y:%d Z:%d of size %d %d %d\n",cellArrayDimX,cellArrayDimY,cellArrayDimZ,CELL_SIZE_X,CELL_SIZE_Y,CELL_SIZE_Z);
         }
 
         //number of steps in simulation
-        if (m->argc > cur_arg) {
-            finalStepCount=atoi(m->argv[cur_arg++]);
+        if (m.argc > cur_arg) {
+            finalStepCount=atoi(m.argv[cur_arg++]);
             CkPrintf("Final Step Count:%d\n",finalStepCount);
         }
 
         //step after which load balancing starts
-        if (m->argc > cur_arg) {
-            firstLdbStep=atoi(m->argv[cur_arg++]);
+        if (m.argc > cur_arg) {
+            firstLdbStep=atoi(m.argv[cur_arg++]);
             CkPrintf("First LB Step:%d\n",firstLdbStep);
         }
 
         //periodicity of load balancing
-        if (m->argc > cur_arg) {
-            ldbPeriod=atoi(m->argv[cur_arg++]);
+        if (m.argc > cur_arg) {
+            ldbPeriod=atoi(m.argv[cur_arg++]);
             CkPrintf("LB Period:%d\n",ldbPeriod);
         }
 
@@ -94,26 +164,23 @@ mainchare Main {
                 for (int z=0; z<cellArrayDimZ; z++)
                     cellArray(x, y, z).createComputes();
 
-        thisProxy.run();
+        thisProxy@run();
         delete m;
         */
     }
 
-    sdagentry void computesCreated();
-    sdagentry void sectionsCreated();
-    sdagentry void energySumP(double iP, double fP);
-    sdagentry void energySumK(double iK, double fK);
-    sdagentry void run() {
+    entry void run() {
+        /*
         when computesCreated() {
-            computeArray.doneInserting();
+            computeArray@doneInserting();
             CkPrintf("Computes: %d .... created\n", (NUM_NEIGHBORS/2+1)*cellArrayDimX*cellArrayDimY*cellArrayDimZ);
-            cellArray.createSection();
+            cellArray@createSection();
         }
         when sectionsCreated() {
             CkPrintf("Multicast sections .... created\n");
             CkPrintf("Starting simulation .... \n\n");
-            cellArray.run();
-            computeArray.run();
+            cellArray@run();
+            computeArray@run();
         }
         when energySumP(double fP, double iP), energySumK(double fK, double iK) {
             if(abs(fP + fK - iP - iK)>ENERGY_VAR) {
@@ -124,42 +191,37 @@ mainchare Main {
             }
             CkExit();
         }
+        */
     }
 }
 
-/*
-MulticastMsg
-message ParticleDataMsg {
-    vec3 part[];
-};
-*/
-
 chare_array [3d] Cell {
-    Array<Particle, 1> particles;
+    Array<Particle> particles;
     int stepCount;
     int myNumParts;
     int inbrs;
     int stepTime;
     int updateCount;
-    Array<double, 1> energy;
-
-    // CProxySection_Compute mCastSecProxy;
+    Array<double> energy;
+//    Compute[%]@ mCastSecProxy;
 
     entry Cell() {
-        /*
+    /*
         int i;
         inbrs = NUM_NEIGHBORS;
-        //load balancing to be called when AtSync is called
-        usesAtSync = CmiTrue;
 
         myNumParts = PARTICLES_PER_CELL;
         // starting random generator
         srand48(thisIndex.x+cellArrayDimX*(thisIndex.y+thisIndex.z*cellArrayDimY));
 
         // Particle initialization
-        for(i=0; i < myNumParts; i++) {
-            particles.push_back(Particle());
+        particles = new Array<Particle>([myNumParts]);
+        for (i=0; i < myNumParts; i++) {
+            particles[i] = new Particle();
             particles[i].mass = HYDROGEN_MASS;
+
+            //FIXME: for some reason these array accesses are not type-checked to
+            // be PointerType. Figure out why and fix.
 
             //give random values for position and velocity
             particles[i].pos.x = drand48() * CELL_SIZE_X + thisIndex.x * CELL_SIZE_X;
@@ -173,12 +235,13 @@ chare_array [3d] Cell {
         stepCount = 1;
         updateCount = 0;
         stepTime = 0; 
+        energy = new Array<double>([2]);
         energy[0] = energy[1] = 0;
-        */
+    */
     }
 
+/*
     entry void createComputes() {
-        /*
         int num;  
 
         int x = thisIndex.x;
@@ -190,11 +253,7 @@ chare_array [3d] Cell {
         int numPes = CkNumPes();
         int currPe = CkMyPe();
 
-        computesList = new int*[inbrs];
-        for (int i =0; i < inbrs; i++){
-            computesList[i] = new int[6];
-        }
-
+        computesList = new Array<int, 2>([inbrs, 6]);
         for (num=0; NUM_NEIGHBORS<inbrs; num++) {
             dx = num / (NBRS_Y * NBRS_Z)            - NBRS_X/2;
             dy = (num % (NBRS_Y * NBRS_Z)) / NBRS_Z   - NBRS_Y/2;
@@ -229,12 +288,10 @@ chare_array [3d] Cell {
                 computesList[num][3] = px1; computesList[num][4] = py1; computesList[num][5] = pz1;
             }
         } // end of for loop
-        contribute(0,NULL,CkReduction::nop,CkCallback(CkReductionTarget(Main,computesCreated),mainProxy));
-        */
+        contribute(0,CkReduction.nop,CkCallback(Main.computesCreated,mainProxy));
     }
 
     entry void createSection() {
-        /*
         CkVec<CkArrayIndex6D> elems;
         //create a vector list of my computes
         for (int num=0; num<inbrs; num++)
@@ -242,58 +299,51 @@ chare_array [3d] Cell {
 
         CkArrayID computeArrayID = computeArray.ckGetArrayID();
         //knit the computes into a section
-        mCastSecProxy = CProxySection_Compute::ckNew(computeArrayID, elems.getVec(), elems.size()); 
+        mCastSecProxy = Compute[%]@ckNew(computeArrayID, elems.getVec(), elems.size()); 
 
         //delegate the communication responsibility for this section to multicast library
-        CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpID).ckLocalBranch();
+        CkMulticastMgr mCastGrp = CkMulticastMgr@(mCastGrpID).ckLocalBranch();
         mCastSecProxy.ckSectionDelegate(mCastGrp);
-        mCastGrp->setReductionClient(mCastSecProxy, new CkCallback(CkReductionTarget(Cell,reduceForces), thisProxy(thisIndex.x, thisIndex.y, thisIndex.z)));
-        contribute(0,NULL,CkReduction::nop,CkCallback(CkReductionTarget(Main,sectionsCreated),mainProxy));
-        */
+        mCastGrp.setReductionClient(mCastSecProxy, new CkCallback(Cell.reduceForces, thisProxy(thisIndex.x, thisIndex.y, thisIndex.z)));
+        contribute(0,CkReduction.nop,CkCallback(Main.sectionsCreated,mainProxy));
     }
 
     void sendPositions() {
-        /*
-        int len = particles.length();
-
         //create the particle and control message to be sent to computes
-        ParticleDataMsg* msg = new (len) ParticleDataMsg;
-        msg->x = thisIndex.x;
-        msg->y = thisIndex.y;
-        msg->z = thisIndex.z;
-        msg->lengthAll = len;
-
-        for (int i = 0; i < len; i++)
-            msg->part[i] = particles[i].pos;
-
-        mCastSecProxy.calculateForces(msg);
-        */
+        Array<vec3> particle_data = new Array<vec3>([particles.size(0)]);
+        for (int i = 0; i < particles.size(0); i++)
+            particle_data[i].copy(particles[i].pos);
+        ParticleDataMsg m = new ParticleDataMsg();
+        m.part = particle_data;
+        mCastSecProxy@calculateForces(m);
     }
 
     void migrateParticles() {
-        /*
         int i, x1, y1, z1;
-        CkVec<Particle> *outgoing = new CkVec<Particle>[inbrs];
+        vec3 dest = new vec3();
+        Array<Particle> outgoing = new Array<Particle>([inbrs]);
+        for(i=0; i<inbrs; i++) outgoing[i] = new Particle();
 
-        for(i=0; i<particles.length(); i++) {
-            migrateToCell(particles[i], x1, y1, z1);
+        for(i=0; i<particles.size(0); i++) {
+            dest = migrateToCell(particles[i], x1, y1, z1);
+            x1 = dest.x; y1 = dest.y; z1 = dest.z;
+            delete dest;
             if(x1!=0 || y1!=0 || z1!=0) {
-                outgoing[(x1+1)*NBRS_Y*NBRS_Z + (y1+1)*NBRS_Z + (z1+1)].push_back(wrapAround(particles[i]));
-                particles.remove(i);
+                outgoing[(x1+1)*NBRS_Y*NBRS_Z + (y1+1)*NBRS_Z + (z1+1)][i].copy(wrapAround(particles[i]));
             }
         }
         for(int num=0; num<inbrs; num++) {
             x1 = num / (NBRS_Y * NBRS_Z)            - NBRS_X/2;
             y1 = (num % (NBRS_Y * NBRS_Z)) / NBRS_Z - NBRS_Y/2;
             z1 = num % NBRS_Z                       - NBRS_Z/2;
-            cellArray(WRAP_X(thisIndex.x+x1), WRAP_Y(thisIndex.y+y1), WRAP_Z(thisIndex.z+z1)).receiveParticles(outgoing[num]);
+            cellArray(WRAP_X(thisIndex.x+x1), WRAP_Y(thisIndex.y+y1), WRAP_Z(thisIndex.z+z1))@receiveParticles(outgoing[num]);
         }
-        delete [] outgoing;
-        */
+
+        for(i=0; i<inbrs; i++) delete outgoing[i];
+        delete outgoing;
     }
 
-    void migrateToCell(Particle p, int px, int py, int pz) {
-        /*
+    vec3 migrateToCell(Particle p, int px, int py, int pz) {
         // currently this is assuming that particles are
         // migrating only to the immediate neighbors
         int x = thisIndex.x * CELL_SIZE_X + CELL_ORIGIN_X;
@@ -309,38 +359,42 @@ chare_array [3d] Cell {
 
         if (p.pos.z < z) pz = -1;
         else if (p.pos.z > z+CELL_SIZE_Z) pz = 1;
-        */
+        return new vec3(px, py, pz);
     }
 
-    void updateProperties(vec3 forces, int lengthUp) {
-        /*
+    void updateProperties(Array<vec3> forces, int lengthUp) {
         int i;
         double powTen, powFteen, realTimeDelta, invMassParticle;
         powTen = pow(10.0, -10);
         powFteen = pow(10.0, -15);
         realTimeDelta = DEFAULT_DELTA * powFteen;
-        for(i = 0; i < particles.length(); i++) {
+        for(i = 0; i < particles.size(0); i++) {
             //calculate energy only in begining and end
             if(stepCount == 1) {
-                energy[0] += (0.5 * particles[i].mass * dot(particles[i].vel, particles[i].vel));
+                energy[0] += (0.5 * particles[i].mass * particles[i].vel.dot(particles[i].vel));
             } else if(stepCount == finalStepCount) { 
-                energy[1] += (0.5 * particles[i].mass * dot(particles[i].vel, particles[i].vel));
+                energy[1] += (0.5 * particles[i].mass * particles[i].vel.dot(particles[i].vel));
             }
             // applying kinetic equations
             invMassParticle = 1 / particles[i].mass;
             particles[i].acc = forces[i] * invMassParticle;
-            particles[i].vel += particles[i].acc * realTimeDelta;
+            particles[i].acc.copy(forces[i];
+            particles[i].mult(invMassParticle);
+            particles[i].vel.copy(particles[i].acc);
+            particles[i].vel.mult(realTimeDelta);
 
             limitVelocity(particles[i]);
 
-            particles[i].pos += particles[i].vel * realTimeDelta;
+            vec3 tmp = new vec3();
+            tmp.copy(particles[i].vel);
+            tmp.mult(realTimeDelta);
+            particles[i].pos.add(tmp);
+            delete tmp;
         }
-        */
     }
 
     double velocityCheck(double inVelocity) {
-        /*
-        if(fabs(inVelocity) > MAX_VELOCITY) {
+        if (fabs(inVelocity) > MAX_VELOCITY) {
             if(inVelocity < 0.0 )
                 return -MAX_VELOCITY;
             else
@@ -348,19 +402,15 @@ chare_array [3d] Cell {
         } else {
             return inVelocity;
         }
-        */
     }
 
     void limitVelocity(Particle p) {
-        /*
         p.vel.x = velocityCheck(p.vel.x);
         p.vel.y = velocityCheck(p.vel.y);
         p.vel.z = velocityCheck(p.vel.z);
-        */
     }
 
     Particle wrapAround(Particle p) {
-        /*
         if(p.pos.x < CELL_ORIGIN_X) p.pos.x += CELL_SIZE_X*cellArrayDimX;
         if(p.pos.y < CELL_ORIGIN_Y) p.pos.y += CELL_SIZE_Y*cellArrayDimY;
         if(p.pos.z < CELL_ORIGIN_Z) p.pos.z += CELL_SIZE_Z*cellArrayDimZ;
@@ -368,13 +418,9 @@ chare_array [3d] Cell {
         if(p.pos.y > CELL_ORIGIN_Y + CELL_SIZE_Y*cellArrayDimY) p.pos.y -= CELL_SIZE_Y*cellArrayDimY;
         if(p.pos.z > CELL_ORIGIN_Z + CELL_SIZE_Z*cellArrayDimZ) p.pos.z -= CELL_SIZE_Z*cellArrayDimZ;
         return p;
-        */
     }
 
-    sdagentry void receiveParticles(Array<Particle, 1> updates);
-    sdagentry void ResumeFromSync();
-    sdagentry void reduceForces(Array<vec3, 1> forces);
-    sdagentry void run() {
+    entry void run() {
         if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) {
             stepTime = CkWallTimer();
         }
@@ -384,7 +430,7 @@ chare_array [3d] Cell {
             sendPositions();
 
             //update properties of atoms using new force values 
-            when reduceForces(Array<vec3, 1> forces) updateProperties(forces);
+            when reduceForces(Array<vec3> forces) updateProperties(forces);
 
             if ((stepCount %  MIGRATE_STEPCOUNT) == 0) {
                 //send atoms that have moved beyond my cell to neighbors
@@ -392,10 +438,16 @@ chare_array [3d] Cell {
 
                 //receive particles from my neighbors
                 for(int updateCount = 0; updateCount < inbrs; updateCount++) {
-                    when receiveParticles(Array<Particle, 1> updates) {
-                        for(int i=0; i < updates.length(); i++) {
-                            particles.push_back(updates[i]);    //add particles that have moved from neighboring celles to my cell
+                    when receiveParticles(Array<Particle> updates) {
+                        Array<Particle> tmp = new Array<Particle>([particles.size(0) + updates.size(0)]);
+                        for(int i=0; i < particles.size(0); i++) {
+                            tmp[i] = particles[i];
                         }
+                        for(int i=0; i < updates.size(0); i++) {
+                            tmp[i + particles.size(0)] = updates[i];
+                        }
+                        delete particles;
+                        particles = tmp;
                     }
                 }
             }
@@ -405,36 +457,44 @@ chare_array [3d] Cell {
                 stepTime = CkWallTimer();
             }
             //periodically call load balancer
-            if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod == 0) {
-                AtSync();
-                when ResumeFromSync() stepTime = CkWallTimer();
-            }
+            //if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod == 0) {
+            //    AtSync();
+            //    when ResumeFromSync() stepTime = CkWallTimer();
+            //}
         }
         //everything done, reduction on kinetic energy
-        /*
-        contribute(2*sizeof(double),
-                energy,
-                CkReduction::sum_double,
-                CkCallback(CkReductionTarget(Main,energySumK),
-                mainProxy));
-        */
+        contribute(energy,
+                CkReduction.sum_double,
+                CkCallback(Main.energySumK, mainProxy));
     } 
+*/
 }
 
 chare_array [6d] Compute {
+    Array<double> energy;
+    int stepCount, cellCount;
+    // FIXME: CkSectionInfo mcast1, mcast2;
+    //CkSectionInfo mcast1;
+    //CkSectionInfo mcast2;
+    ParticleDataMsg bufferedMsg;
+
     entry Compute() {
         cellCount = 0;
-        energy[0] = energy[1] = 0;
+        stepCount = 0;
+        energy = new Array<double>([2]);
+        // FIXME: energy[0] = energy[1] = 0;
+        energy[0] = 0;
+        energy[1] = 0;
     }
 
-   // void interact(ParticleDataMsg msg) {
-        /*
+/*
+    void interact(ParticleDataMsg msg) {
         double energyP = 0;
 
         //self interaction check
         if (thisIndex.x1 ==thisIndex.x2 && thisIndex.y1 ==thisIndex.y2 && thisIndex.z1 ==thisIndex.z2) {
             CkGetSectionInfo(mcast1,msg);
-            energyP = calcInternalForces(msg, &mcast1, stepCount);
+            energyP = calcInternalForces(msg, mcast1, stepCount);
         } else {
             //check if this is the first message or second
             if (cellCount == 0) {
@@ -444,18 +504,28 @@ chare_array [6d] Compute {
             }
             // Both particle sets have been received, so compute interaction
             cellCount = 0;
-            ParticleDataMsg *msgA = msg, *msgB = bufferedMsg;
-            CkSectionInfo *handleA = &mcast1, *handleB = &mcast2;
-            if (bufferedMsg->x*cellArrayDimY*cellArrayDimZ + bufferedMsg->y*cellArrayDimZ + bufferedMsg->z < msg->x*cellArrayDimY*cellArrayDimZ + msg->y*cellArrayDimZ + msg->z){ 
-                swap(handleA, handleB);
+            ParticleDataMsg msgA = msg;
+            ParticleDataMsg msgB = bufferedMsg;
+            CkSectionInfo handleA = mcast1;
+            CkSectionInfo handleB = mcast2;
+            if (bufferedMsg.x*cellArrayDimY*cellArrayDimZ + bufferedMsg.y*cellArrayDimZ + bufferedMsg.z < msg.x*cellArrayDimY*cellArrayDimZ + msg.y*cellArrayDimZ + msg.z){ 
+                CkSectionInfo tmp = handleA;
+                handleA = handleB;
+                handleB = tmp;
             }
-            if (bufferedMsg->lengthAll <= msg->lengthAll) {
-                swap(msgA, msgB);
-                swap(handleA, handleB);
+            if (bufferedMsg.lengthAll <= msg.lengthAll) {
+                {
+                    ParticleDataMsg tmp = msgA;
+                    msgA = msgB;
+                    msgB = tmp;
+                }
+                CkSectionInfo tmp = handleA;
+                handleA = handleB;
+                handleB = tmp;
             }
 
             energyP = calcPairForces(msgA, msgB, handleA, handleB, stepCount);
-            bufferedMsg = NULL;
+            bufferedMsg = null;
         }
         //energy assignment only in begining and end
         if(stepCount == 1) {
@@ -463,255 +533,158 @@ chare_array [6d] Compute {
         } else if(stepCount == finalStepCount) {
             energy[1] = energyP;
         }
-        */
-    //}
+    }
 
-    sdagentry void ResumeFromSync();
-    //sdagentry void calculateForces(ParticleDataMsg msg);
-    sdagentry void calculateForces_dummy();
-    sdagentry void run() {
+    entry void run() {
         for (stepCount = 1; stepCount <= finalStepCount; stepCount++) {
             //self interaction check
             if (thisIndex.x1==thisIndex.x2 && thisIndex.y1==thisIndex.y2 && thisIndex.z1==thisIndex.z2) {
-                //when calculateForces(ParticleDataMsg *msg) interact(msg);
-                when calculateForces_dummy() { }
+                when calculateForces(ParticleDataMsg msg) interact(msg);
             } else {
                 //receive positions from two cells
-                //when calculateForces(ParticleDataMsg *msg) interact(msg);
-                //when calculateForces(ParticleDataMsg *msg) interact(msg);
-                when calculateForces_dummy() { }
-                when calculateForces_dummy() { }
+                when calculateForces(ParticleDataMsg msg) interact(msg);
+                when calculateForces(ParticleDataMsg msg) interact(msg);
             }
             //periodically call load balancer
-            if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod == 0) {
-                AtSync();
-                when ResumeFromSync() { }
-            }
+            //if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod == 0) {
+            //    AtSync();
+            //    when ResumeFromSync() { }
+            //}
         }
         //everything done, reduction on potential energy
-        /*
-        contribute(2*sizeof(double),
-            energy,
-            CkReduction::sum_double,
-            CkCallback(CkReductionTarget(Main,energySumP),
-            mainProxy));
-        */
+        contribute(energy,
+            CkReduction.sum_double,
+            CkCallback(Main.energySumP, mainProxy));
     }
-}
 
-/* defs.h */
-/*
-#ifndef __DEFS__
-#define __DEFS__
+    double calcInternalForces(ParticleDataMsg first, CkSectionInfo mcast1, int stepCount) {
+        int i, j, ptpCutOffSqd;
+        int firstLen = first.lengthAll;
+        double powTwenty, powTen, firstx, firsty, firstz, rx, ry, rz, r, rsqd, fx, fy, fz, f, fr;
+        vec3 separation = new vec3();
+        vec3 force = new vec3();
+        double rSix, rTwelve;
+        double energy = 0;
+        int doEnergy = 0;
+        if(stepCount == 1 || stepCount == finalStepCount)
+            doEnergy = 1;
+        Array<vec3> firstmsg = new Array<vec3>([firstLen]);
 
-#include "pup.h"
+        ptpCutOffSqd = PTP_CUT_OFF * PTP_CUT_OFF;
+        powTen = pow(10.0, -10);
+        powTwenty = pow(10.0, -20);
+        for(i = 0; i < firstLen; i++){
+            for(j = i+1; j < firstLen; j++) {
+                // computing base values
+                separation.copy(first.part[i]);
+                separation.sub(first.part[j];
+                rsqd = separation.dot(separation);
+                if(rsqd >= 0.001 && rsqd < ptpCutOffSqd) {
+                    rsqd = rsqd * powTwenty;
+                    r = sqrt(rsqd);
+                    rSix = ((double)rsqd) * rsqd * rsqd;
+                    rTwelve = rSix * rSix;
+                    f = (double)(VDW_A / rTwelve - VDW_B / rSix);
+                    if(doEnergy)
+                        energy += (double)( VDW_A / (12*rTwelve) - VDW_B / (6*rSix));
 
-#define HYDROGEN_MASS         (1.67 * pow( 10.0,-24))
-#define VDW_A                        (1.60694452 * pow(10.0, -134))
-#define VDW_B            (1.031093844 * pow(10.0, -77))
-
-#define ENERGY_VAR        (1.0 * pow(10.0,-5))
-#powdefine PARTICLES_PER_CELL   300
-
-#define DEFAULT_DELTA         1// interact femtoseconds
-
-#define DEFAULT_FIRST_LDB     20
-#define DEFAULT_LDB_PERIOD    20
-#define DEFAULT_FT_PERIOD     100000
-
-#define KAWAY_X               1
-#define KAWAY_Y               1
-#define KAWAY_Z               1
-#define NBRS_X              (2*KAWAY_X+1)
-#define NBRS_Y            (2*KAWAY_YWAY_Y+1)
-#define NBRS_Z            (2*KAWAY_Z+1)
-#define NUM_NEIGHBORS        (NBRS_X * NBRS_Y * NBRS_Z)
-
-#define CELLARRAY_DIM_X      3
-#definedefine CELLARRAY_DIM_Y      3
-#define CELLARRAY_DIM_Z      3
-#define         PTP_CUT_OFF        12 // cut off for atom to atom interactions
-#definedefinee CELL_MARGIN        4  // constant diff between cutoff and cell size#define CELL_SIZE_X        (PTP_CUT_OFF + CELL_MARGIN)/KAWAY_X
-#definedefineene CELL_SIZE_Y        (PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Y
-#define CELL_SIZE_YL_SIZE_Z        (PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Z
-#define CELL_ORIGIN_YIN_X      0
-#define CELL_ORIGIN_Y      0
-#define CELL_ORIGIN_Z                              0
-
-#define MIGRATE_STEPCOUNT    20
-#define DEFAULT_FINALSTEPCOUNT1001
-#define MAX_VELOCITY      30.0
-
-#define WRAP_X(a)(((a)+cellArrayyDimX)%cellArrayDimX)
-#define WRAP_Y(a)(((a)+cellArrayDimY)%cellArrayDimXDimY)
-#define WRAP_Z(a)(((a)+cellArrayDimZ)%cellArrayDimZ)
-
-struct velc3 {
-  double x, y, z;
-
-  vec3(double d = 0.0) : x(d), y(d), z(d) { }
-  vec3(double x_, double y_, double z_) : x(x_), y(y_), z(z_) { }
-
-  inline vec3& operator += (const vec3 &rhs) {
-    x += rhs.x; y += rhs.y; z += rhs.z;
-    return *this;
-  }
-  inline vec3& operator -= (const vec3 &rhs) {
-    return *this += (rhs * -1.0);
-  }
-  inline vec3 operator* (const double d) const {
-    return vec3(d*x, d*y, d*z);
-  }
-  inline vec3 operator- (const vec3& rhs) const {
-    return vec3(x - rhs.x, y - rhs.y, z - rhs.z);
-  }
-};
-inline double dot(const vec3& a, const vec3& b) {
-  return a.x*b.x + a.y*b.y + a.z*b.z;
-}
-PUPbytes(vec3)
-
-//class for keeping track of the properties for a particle
-struct Particle {
-  double mass;
-  //   Position, acceleration, velocity
-  vec3 pos,acc,vel;
-
-  // Function for pupping properties
-  void pup(PUP::er &p) {
-    p | mass;
-    p | pos;
-    p | acc;
-    p | vel;
-  }
-};
-#endif
-*/
-
-/* physics.h */
-/*
-#define BLOCK_SIZE512
-
-//function to calculate forces among 2 limitVelocitysts of atoms
-inline double calcPairForces(ParticleDataMsg* first, ParticleDataMsg* second, CkSectionInfo* mcast1, CkSectionInfo* mcast2, int stepCount) {
-  int i, j, jpart, ptpCutOffSqd, diff;
-  int firstLen = first->lengthAll;
-  int secondLen = second->lengthAll;
-  double powTwenty, powTen, r, rsqd, f, fr;
-  vec3 separation, force;
-  double rSix, rTwelve;
-  double energy = 0;
-  int doEnergy = 0;
-  if(stepCount == 1 || stepCount == finalStepCount)
-    doEnergy = 1;
-
-  vec3 *firstmsg = new vec3[firstLen];
-  vec3 *secondmsg = new vec3[secondLen];
-  //check for wrap around and adjust locations accordingly
-  if (abs(first->x - second->x) > 1){
-    diff = CELL_SIZE_X * cellArrayDimX;
-    if (second->x < first->x)
-      diff = -1 * diff; 
-    for (i = 0; i < firstLen; i++)
-      first->part[i].x += diff;
-  }
-  if (abs(first->y - second->y) > 1){
-    diff = CELL_SIZE_Y * cellArrayDimY;
-    if (second->y < first->y)
-      diff = -1 * diff; 
-    for (i = 0; i < firstLen; i++)
-      first->part[i].y += diff;
-  }
-  if (abs(first->z - second->z) > 1){
-    diff = CELL_SIZE_Z * cellArrayDimZ;
-    if (second->z < first->z)
-      diff = -1 * diff; 
-    for (i = 0; i < firstLen; i++)
-      first->part[i].z += diff;
-  } 
-  ptpCutOffSqd = PTP_CUT_OFF * PTP_CUT_OFF;
-  powTen = pow(10.0, -10);
-  powTwenty = pow(10.0, -20);
-
-  int i1, j1;
-  for(i1 = 0; i1 < firstLen; i1=i1+BLOCK_SIZE)
-    for(j1 = 0; j1 < secondLen; j1=j1+BLOCK_SIZE)
-      for(i = i1; i < i1+BLOCK_SIZE && i < firstLen; i++) {
-        for(jpart = j1; jpart < j1+BLOCK_SIZE && jpart < secondLen; jpart++) {
-          separation = first->part[i] - second->part[jpart];
-          rsqd = dot(separation, separation);
-          if (rsqd >= 0.001 && rsqd < ptpCutOffSqd) {
-            rsqd = rsqd * powTwenty;
-            r = sqrt(rsqd);
-            rSix = ((double)rsqd) * rsqd * rsqd;
-            rTwelve = rSix * rSix;
-            f = (double)(VDW_A / rTwelve - VDW_B / rSix);
-            if(doEnergy)
-              energy += (double)( VDW_A / (12*rTwelve) - VDW_B / (6*rSix));
-            fr = f /r;
-            force = separation * (fr * powTen);
-            firstmsg[i] += force;
-            secondmsg[jpart] -= force;
-          }
+                    fr = f / r;
+                    force.copy(separation);
+                    force.mult(fr * powTen);
+                    firstmsg[j].add(force);
+                    firstmsg[i].sub(force);
+                }
+            }
         }
-      }
-
-  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpID).ckLocalBranch();
-  CkGetSectionInfo(*mcast1, first);
-  mCastGrp->contribute(sizeof(vec3)*firstLen, firstmsg, CkReduction::sum_double, *mcast1);
-  CkGetSectionInfo(*mcast2, second);
-  mCastGrp->contribute(sizeof(vec3)*secondLen, secondmsg, CkReduction::sum_double, *mcast2);
-
-  delete [] firstmsg;
-  delete [] secondmsg;
-  delete first;
-  delete second;
-  return energy;
-}
-
-//function to calculate forces among atoms in a single list
-inline double calcInternalForces(ParticleDataMsg* first, CkSectionInfo *mcast1, int stepCount) {
-  int i, j, ptpCutOffSqd;
-  int firstLen = first->lengthAll;
-  double powTwenty, powTen, firstx, firsty, firstz, rx, ry, rz, r, rsqd, fx, fy, fz, f, fr;
-  vec3 firstpos, separation, force;
-  double rSix, rTwelve;
-  double energy = 0;
-  int doEnergy = 0;
-  if(stepCount == 1 || stepCount == finalStepCount)
-    doEnergy = 1;
-  vec3 *firstmsg = new vec3[firstLen];
-
-  ptpCutOffSqd = PTP_CUT_OFF * PTP_CUT_OFF;
-  powTen = pow(10.0, -10);
-  powTwenty = pow(10.0, -20);
-  for(i = 0; i < firstLen; i++){
-    firstpos = first->part[i];
-    for(j = i+1; j < firstLen; j++) {
-      // computing base values
-      separation = firstpos - first->part[j];
-      rsqd = dot(separation, separation);
-      if(rsqd >= 0.001 && rsqd < ptpCutOffSqd){
-        rsqd = rsqd * powTwenty;
-        r = sqrt(rsqd);
-        rSix = ((double)rsqd) * rsqd * rsqd;
-        rTwelve = rSix * rSix;
-        f = (double)(VDW_A / rTwelve - VDW_B / rSix);
-        if(doEnergy)
-          energy += (double)( VDW_A / (12*rTwelve) - VDW_B / (6*rSix));
-
-        fr = f /r;
-        force = separation * (fr * powTen);
-        firstmsg[j] += force;
-        firstmsg[i] -= force;
-      }
+        CkMulticastMgr mCastGrp = CkMulticastMgr@(mCastGrpID).ckLocalBranch();
+        mCastGrp.contribute(firstmsg, CkReduction.sum_double, mcast1);
+        delete firstmsg;
+        delete first;
+        delete separation;
+        delete force;
+        return energy;
     }
-  }
-  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpID).ckLocalBranch();
-  mCastGrp->contribute(sizeof(vec3)*firstLen, firstmsg, CkReduction::sum_double, *mcast1);
-  delete [] firstmsg;
-  delete first;
-  return energy;
-}
-#endif
+
+    double calcPairForces(ParticleDataMsg first, ParticleDataMsg second,
+            CkSectionInfo mcast1, CkSectionInfo mcast2, int stepCount) {
+        int i, j, jpart, ptpCutOffSqd, diff;
+        int firstLen = first.lengthAll;
+        int secondLen = second.lengthAll;
+        double powTwenty, powTen, r, rsqd, f, fr;
+        vec3 separation = new vec3();
+        vec3 force = new vec3();
+        double rSix, rTwelve;
+        double energy = 0;
+        int doEnergy = 0;
+        if(stepCount == 1 || stepCount == finalStepCount)
+            doEnergy = 1;
+
+        Array<vec3> firstmsg = new Array<vec3>([firstLen]);
+        Array<vec3> secondmsg = new Array<vec3>([secondLen]);
+        //check for wrap around and adjust locations accordingly
+        if (abs(first.x - second.x) > 1){
+            diff = CELL_SIZE_X * cellArrayDimX;
+            if (second.x < first.x)
+                diff = -1 * diff; 
+            for (i = 0; i < firstLen; i++)
+                first.part[i].x += diff;
+        }
+        if (abs(first.y - second.y) > 1){
+            diff = CELL_SIZE_Y * cellArrayDimY;
+            if (second.y < first.y)
+                diff = -1 * diff; 
+            for (i = 0; i < firstLen; i++)
+                first.part[i].y += diff;
+        }
+        if (abs(first.z - second.z) > 1){
+            diff = CELL_SIZE_Z * cellArrayDimZ;
+            if (second.z < first.z)
+                diff = -1 * diff; 
+            for (i = 0; i < firstLen; i++)
+                first.part[i].z += diff;
+        } 
+        ptpCutOffSqd = PTP_CUT_OFF * PTP_CUT_OFF;
+        powTen = pow(10.0, -10);
+        powTwenty = pow(10.0, -20);
+
+        int i1, j1;
+        for(i1 = 0; i1 < firstLen; i1=i1+BLOCK_SIZE)
+            for(j1 = 0; j1 < secondLen; j1=j1+BLOCK_SIZE)
+                for(i = i1; i < i1+BLOCK_SIZE && i < firstLen; i++) {
+                    for(jpart = j1; jpart < j1+BLOCK_SIZE && jpart < secondLen; jpart++) {
+                        separation.copy(first.part[i]);
+                        separation.sub(second.part[j]);
+                        rsqd = separation.dot(separation);
+                        if (rsqd >= 0.001 && rsqd < ptpCutOffSqd) {
+                            rsqd = rsqd * powTwenty;
+                            r = sqrt(rsqd);
+                            rSix = ((double)rsqd) * rsqd * rsqd;
+                            rTwelve = rSix * rSix;
+                            f = (double)(VDW_A / rTwelve - VDW_B / rSix);
+                            if(doEnergy)
+                                energy += (double)( VDW_A / (12*rTwelve) - VDW_B / (6*rSix));
+                            fr = f / r;
+                            force.copy(separation);
+                            force.mult(fr * powTen);
+                            firstmsg[i].add(force);
+                            secondmsg[jpart].sub(force);
+                        }
+                    }
+                }
+
+        CkMulticastMgr mCastGrp = CkMulticastMgr@(mCastGrpID).ckLocalBranch();
+        CkGetSectionInfo(mcast1, first);
+        mCastGrp.contribute(firstmsg, CkReduction.sum_double, mcast1);
+        CkGetSectionInfo(mcast2, second);
+        mCastGrp.contribute(secondmsg, CkReduction.sum_double, mcast2);
+
+        delete firstmsg;
+        delete secondmsg;
+        delete first;
+        delete second;
+        delete force;
+        delete separation;
+        return energy;
+    }
 */
+}

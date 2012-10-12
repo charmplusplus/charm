@@ -222,6 +222,8 @@ static int _raiseEvac=0;
 static char *_raiseEvacFile;
 void processRaiseEvacFile(char *raiseEvacFile);
 
+extern bool useNodeBlkMapping;
+
 static inline void _parseCommandLineOpts(char **argv)
 {
   if (CmiGetArgFlagDesc(argv,"+cs", "Print extensive statistics at shutdown"))
@@ -302,17 +304,6 @@ static inline void _parseCommandLineOpts(char **argv)
     }
 #endif
 
-#if defined(_FAULT_MLOG_)
-    if(!CmiGetArgIntDesc(argv,"+mlog_local_buffer",&_maxBufferedMessages,"# of local messages buffered in the message logging protoocl")){
-        _maxBufferedMessages = 2;
-    }
-    if(!CmiGetArgIntDesc(argv,"+mlog_remote_buffer",&_maxBufferedTicketRequests,"# of remote ticket requests buffered in the message logging protoocl")){
-        _maxBufferedTicketRequests = 2;
-    }
-    if(!CmiGetArgIntDesc(argv,"+mlog_buffer_time",&BUFFER_TIME,"# Time spent waiting for messages to be buffered in the message logging protoocl")){
-        BUFFER_TIME = 2;
-    }
-#endif	
 	/* Anytime migration flag */
 	_isAnytimeMigration = true;
 	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {
@@ -328,6 +319,11 @@ static inline void _parseCommandLineOpts(char **argv)
 	if (CmiGetArgFlagDesc(argv,"+staticInsertion","Array elements are only inserted at construction")) {
 	  _isStaticInsertion = true;
 	}
+
+        useNodeBlkMapping = false;
+        if (CmiGetArgFlagDesc(argv,"+useNodeBlkMapping","Array elements are block-mapped in SMP-node level")) {
+          useNodeBlkMapping = true;
+        }
 
 #if ! CMK_WITH_CONTROLPOINT
 	// Display a warning if charm++ wasn't compiled with control point support but user is expecting it
@@ -888,6 +884,8 @@ extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
 extern "C" void CmiInitPxshm(char **argv);
 
+extern void TopoManager_init();
+
 //extern "C" void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
@@ -951,13 +949,6 @@ void CpdBreakPointInit();
 void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
-
-	if(CmiMyNode() == 0 && CmiMyRank() == 0) {
-    if(CmiGetArgFlag(argv, "+printTopo")) {
-			TopoManager tmgr;
-			tmgr.printAllocation();
-		}
-	}
 
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 
@@ -1252,6 +1243,9 @@ void _initCharm(int unused_argc, char **argv)
 		}*/
 	}	
 
+    TopoManager_init();
+    CmiNodeAllBarrier();
+
     if (!_replaySystem) {
         if (faultFunc == NULL) {         // this is not restart
             // these two are blocking calls for non-bigsim
@@ -1261,6 +1255,32 @@ void _initCharm(int unused_argc, char **argv)
 #endif
         }
         CmiInitCPUTopology(argv);
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+        if (CmiCpuTopologyEnabled()) {
+            int *pelist;
+            int num;
+            CmiGetPesOnPhysicalNode(0, &pelist, &num);
+            if (CkMyPe()==0 && !_Cmi_noprocforcommthread && num+num/CmiMyNodeSize() > CmiNumCores()) {
+                CkPrintf("\nCharm++> Warning: the number of SMP threads is greater than the number of physical cores, use +CmiNoProcForComThread runtime option.\n\n");
+            }
+        }
+#endif
+    }
+
+    if(CmiMyPe() == 0) {
+        char *topoFilename;
+        if(CmiGetArgStringDesc(argv,"+printTopo",&topoFilename,"topo file name")) 
+        {
+	    TopoManager tmgr;
+            FILE *fp;
+            fp = fopen(topoFilename, "w");
+            if (fp == NULL) {
+              CkPrintf("Error opening topology.Info.txt file, writing to stdout\n");
+              fp = stdout;
+            }
+	    tmgr.printAllocation(fp);
+            fclose(fp);
+        }
     }
 
 #if CMK_USE_PXSHM && CMK_CRAYXE && CMK_SMP

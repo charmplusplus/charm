@@ -174,6 +174,14 @@ typeDeclaration
             ext={$su.st},
             csds={$csds})
         -> 
+    |   ^(MESSAGE IDENT (msds+=messageScopeDeclaration)*)
+        -> {emitH()}? message_h(basename={basename()}, ident={$IDENT.text}, msds={$msds})
+        -> {emitCI()}? message_ci(ident={$IDENT.text}, msds={$msds})
+        ->
+    |   ^(MULTICAST_MESSAGE IDENT (msds+=messageScopeDeclaration)*)
+        -> {emitH()}? multicastMessage_h(basename={basename()}, ident={$IDENT.text}, msds={$msds})
+        -> {emitCI()}? multicastMessage_ci(ident={$IDENT.text}, msds={$msds})
+        ->
     |   ^(INTERFACE IDENT (^('extends' type+))? interfaceScopeDeclaration*)
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
     |   ^(ENUM IDENT (^('implements' type+))? classScopeDeclaration*)
@@ -231,6 +239,22 @@ enumConstant
     :   ^(IDENT arguments?)
         -> template(t={$text}) "/*enumConstant-not implemented*/ <t>"
     ;
+
+messageScopeDeclaration
+    :   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[null])
+        -> {!emitCC()}? class_var_decl(
+            modl={$modifierList.st},
+            type={$simpleType.st},
+            declList={$variableDeclaratorList.st})
+        ->
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st])
+        -> {!emitCC()}? class_var_decl(
+            modl={$modifierList.st},
+            type={$objectType.st},
+            declList={$variableDeclaratorList.st})
+        ->
+    ;
+
 
 classScopeDeclaration
 @init
@@ -449,6 +473,7 @@ rangeListAccess
 
 rangeExpressionAccess
     :   ^(RANGE_EXPRESSION (ri+=rangeItem)*)
+        -> {$ri.size() > 1}? template(t={$ri}) "Range(<t; separator=\",\">)"
         -> template(t={$ri}) "<t; separator=\",\">"
     ;
 
@@ -513,6 +538,8 @@ returns [List names]
     :   ^(CHARJ_MODIFIER_LIST (m+=charjModifier)*)
         {
             $names = $m;
+            // Strip out null entries so we can detect empty modifier lists in the template
+            while ($names.remove(null)) {}
         }
     ;
 
@@ -548,9 +575,12 @@ accessModifier
     ;
 
 charjModifier
-    :   ENTRY -> {%{$ENTRY.text}}
-    |   SDAGENTRY -> template() "entry"
+    :   ENTRY
+    |   SDAGENTRY
     |   TRACED
+    |   ACCELERATED -> template() "accel"
+    |   THREADED -> template() "threaded"
+    |   REDUCTIONTARGET -> template() "reductiontarget"
     ;
 
 otherModifier
@@ -569,18 +599,6 @@ type
         -> {$objectType.st}
     |   VOID { $st = %{"void"}; }
     ;
-
-typeInEntryDecl
-    :   ^(SIMPLE_TYPE primitiveType domainExpression[null]?)
-        -> simple_type(typeID={$primitiveType.st}, arrDeclList={$domainExpression.st})
-    |   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression[null]?)
-        -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
-    |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression[null]?)
-        -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
-    |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression[null]?)
-        -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
-    ;
-
 
 simpleType
     :   ^(SIMPLE_TYPE primitiveType domainExpression[null]?)
@@ -604,6 +622,8 @@ nonProxyType
 proxyType
     :   ^(PROXY_TYPE qualifiedTypeIdent domainExpression[null]?)
         -> proxy_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
+	|	^(MESSAGE_TYPE qualifiedTypeIdent)
+		-> template(type={$qualifiedTypeIdent.st}) "<type>*"
 	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression[null]?)
 		-> template(type={$qualifiedTypeIdent.st}) "CProxySection_<type>"
     ;
@@ -674,8 +694,16 @@ entryFormalParameterList
 
 
 entryFormalParameter
-    :   ^(FORMAL_PARAM_STD_DECL t=typeInEntryDecl vdid=variableDeclaratorId)
-        -> entry_formal_param_decl(type={$t.st}, declID={$vdid.st})
+    :   ^(FORMAL_PARAM_STD_DECL ^(SIMPLE_TYPE primitiveType domainExpression[null]?) vdid=variableDeclaratorId)
+        -> template(type={$primitiveType.st}, declID={$vdid.st}) "<type> <declID>"
+    |   ^(FORMAL_PARAM_STD_DECL ^((OBJECT_TYPE|POINTER_TYPE|REFERENCE_TYPE) qualifiedTypeIdent domainExpression[null]?) vdid=variableDeclaratorId)
+        -> template(type={$qualifiedTypeIdent.st}, declID={$vdid.st}) "<type> __<declID>"
+    |   ^(FORMAL_PARAM_STD_DECL ^(PROXY_TYPE qualifiedTypeIdent domainExpression[null]?) vdid=variableDeclaratorId)
+        -> template(type={$qualifiedTypeIdent.st}, declID={$vdid.st}) "CProxy_<type> <declID>"
+    |   ^(FORMAL_PARAM_STD_DECL ^(MESSAGE_TYPE qualifiedTypeIdent) vdid=variableDeclaratorId)
+        -> template(type={$qualifiedTypeIdent.st}, declID={$vdid.st}) "<type>* <declID>"
+    |   ^(FORMAL_PARAM_STD_DECL ^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression[null]?) vdid=variableDeclaratorId)
+        -> template(type={$qualifiedTypeIdent.st}, declID={$vdid.st}) "CProxySection_<type> <declID>"
     ;
 
 
@@ -843,6 +871,8 @@ nonBlockStatement
         ->  exit(expr = {$expression.st})
     |   EXITALL
         ->  exitall()
+    |   ^(CONTRIBUTE e1=expression q=qualifiedIdentifier e2=expression)
+        -> contribute(data={$e1.st}, type={$q.st}, target={$e2.st})
     ;
         
 switchCaseLabel
@@ -972,8 +1002,39 @@ expr
     ;
 
 primaryExpression
-@init { int dims = 1; }
-    :   ^(DOT prim=primaryExpression
+@init { int dims = 1; boolean isValueType = true; }
+    :   ^(DOT ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) IDENT)
+         -> template(pe={$pe.st}, ex={$ex.st}, id={$IDENT.text}) "(*((*(<pe>))[<ex>])).<id>"
+    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {
+            if ($pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType) {
+                PointerType p = (PointerType)($pe.start.symbolType);
+                if (p.baseType instanceof ClassSymbol) {
+                    ClassSymbol cs = (ClassSymbol)(p.baseType);
+                    if (cs.templateArgs != null && cs.templateArgs.size() > 1 &&
+                        cs.templateArgs.get(1) instanceof LiteralType) {
+                        LiteralType l = (LiteralType)(cs.templateArgs.get(1));
+                        dims = Integer.valueOf(l.literal);
+                    }
+                }
+            }
+            if ($pe.start.symbolType instanceof PointerType) {
+              PointerType pt = (PointerType)($pe.start.symbolType);
+              ClassSymbol cs = (ClassSymbol)(pt.baseType);
+              if (cs != null && cs.templateArgs != null && cs.templateArgs.size() > 0) {
+                List<TypeName> list = new ArrayList<TypeName>();
+                list.add(new TypeName(cs.templateArgs.get(0).getTypeName()));
+                isValueType = symtab.lookupPrimitive(list) != null;
+              }
+            }
+        }
+        -> {/*isValueType && */$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
+               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
+        //-> {!isValueType && $pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
+               //template(pe={$pe.st}, ex={$ex.st}) "(*((*(<pe>))[<ex>]))"
+        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 2}?
+               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>)).access(<ex>)"
+        -> template(pe={$pe.st}, ex={$ex.st}) "(<pe>)[<ex>]"
+    |   ^(DOT prim=primaryExpression
             ( IDENT   -> template(id={$IDENT.text}, prim={$prim.st}) "<prim>.<id>"
             | THIS    -> template(prim={$prim.st}) "<prim>.this"
             | SUPER   -> template(prim={$prim.st}) "<prim>.super"
@@ -999,24 +1060,6 @@ primaryExpression
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}
-    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {
-            if ($pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType) {
-                PointerType p = (PointerType)($pe.start.symbolType);
-                if (p.baseType instanceof ClassSymbol) {
-                    ClassSymbol cs = (ClassSymbol)(p.baseType);
-                    if (cs.templateArgs != null && cs.templateArgs.size() > 1 &&
-                        cs.templateArgs.get(1) instanceof LiteralType) {
-                        LiteralType l = (LiteralType)(cs.templateArgs.get(1));
-                        dims = Integer.valueOf(l.literal);
-                    }
-                }
-            }
-        }
-        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
-               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
-        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 2}?
-               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>)).access(<ex>)"
-        -> template(pe={$pe.st}, ex={$ex.st}) "(<pe>)[<ex>]"
     |   literal
         -> {$literal.st}
     |   newExpression[null]

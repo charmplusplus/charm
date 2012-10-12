@@ -2,8 +2,8 @@ CHARMC=../../../../bin/charmc $(OPTS)
 
 all: bgMD
 
-bgMD: bgMD.o Handlers.o 
-	$(CHARMC) -language bigsim -o bgMD bgMD.o Handlers.o
+bgMD: bgMD.o Handlers.o ../common.C
+	$(CHARMC) -language bigsim -o bgMD $^
 
 bgMD.o: bgMD.C bgMD.h Atom.h Cell.h SimParams.h
 	$(CHARMC) -c bgMD.C

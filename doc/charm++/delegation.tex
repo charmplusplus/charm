@@ -1,8 +1,3 @@
-\subsection{Delegation}
-
-\index{Delegation}
-\label{delegation}
-
 {\em Delegation} is a means by which a library writer can 
 intercept messages sent via a proxy.  This is typically
 used to construct communication libraries.
@@ -15,7 +10,7 @@ very small client-side interface to enable delegation,
 and a more complex manager-side interface to handle
 the resulting redirected messages.
 
-\subsubsection{Client Interface}
+\section{Client Interface}
 
 All proxies (Chare, Group, Array, ...) in \charmpp\ 
 support the following delegation routines.
@@ -67,7 +62,7 @@ and messages for virtual chares that have not yet been created
 are never delegated.  Instead, these kinds of entry methods
 execute as usual, even if the proxy is delegated.
 
-\subsubsection{Manager Interface}
+\section{Manager Interface}
 
 A delegation manager is a group which inherits from
 \kw{CkDelegateMgr} and overrides certain virtual methods. 

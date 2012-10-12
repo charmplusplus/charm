@@ -16,7 +16,11 @@
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
+#ifdef USE_SPP_PAPI
+#define NUMPAPIEVENTS 6
+#else
 #define NUMPAPIEVENTS 2
+#endif
 #endif
 
 #if CMK_PROJECTIONS_USE_ZLIB
@@ -261,6 +265,7 @@ class LogPool {
     FILE *deltafp;
     FILE *stsfp;
     FILE *rcfp;
+    FILE *topofp;
     char *fname;
     char *dfname;
     char *pgmname;
@@ -297,6 +302,7 @@ class LogPool {
 #endif
     void createFile(const char *fix="");
     void createSts(const char *fix="");
+    void createTopo(const char *fix="");
     void createRC();
     void openLog(const char *mode);
     void closeLog(void);
@@ -305,6 +311,7 @@ class LogPool {
     void writeSts(void);
     void writeSts(TraceProjections *traceProj);
     void writeRC(void);
+    void writeTopo();
 
     void initializePhases() {
       keepPhase = new bool[numPhases];

@@ -1,0 +1,56 @@
+mainmodule fft1d {
+  include "fftmacro.h";
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_FuncCkLoop ckLoopProxy;
+  readonly int numChunks;
+  readonly int numTasks;
+  readonly uint64_t N;
+  initnode void initplanlock();
+  message fftMsg {
+    fft_complex data[];
+  };
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void initDone(CkQdMsg *m);
+    entry void startFFT();
+    entry void doneFFT();
+
+    entry [reductiontarget] void printResidual(realType residual);
+  };
+
+  array [1D] fft {
+    entry fft();
+    entry void getTranspose(fftMsg *m);
+    entry void initValidation();
+    entry void doFFT() {
+      for(iteration = 0; iteration < 3; ++iteration) {
+        atomic "transpose" {
+          if(thisIndex == 0)
+            CkPrintf("TRANSPOSING\n");
+          sendTranspose(iteration == 0 ? in : out);
+        }
+
+        for(count = 0; count < numChunks; ++count)
+          when getTranspose[iteration] (fftMsg *m) atomic {
+            applyTranspose(m);
+          }
+
+        if (iteration < 2) atomic "compute" {
+	  fftHelperLaunch();
+          if(iteration == 0)
+              twiddle(validating ? 1 : -1);
+        }
+      }	
+      atomic {
+        if(!validating)
+          contribute(CkCallback(CkIndex_Main::doneFFT(), mainProxy));
+        else {
+          char filename[80];
+          sprintf(filename, "%d-%ld.dump%d", numChunks, N, thisIndex);
+          writeCommFile(n, in, filename);
+          calcResidual();
+        }
+      }
+    };
+  };
+};

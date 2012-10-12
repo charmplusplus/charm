@@ -1,14 +1,21 @@
 module liveViz {
-message liveVizRequestMsg {
-	char data[];
-};
-extern module liveVizPoll;
+	message liveVizRequestMsg {
+		char data[];
+	};
 
-initcall void liveVizNodeInit(void);
+	extern module liveVizPoll;
 
-readonly CProxy_liveVizGroup lvG;
-group [migratable] liveVizGroup {
-	entry liveVizGroup(const liveVizConfig &cfg);
-};
+	initcall void liveVizNodeInit(void);
 
+	readonly CProxy_liveVizGroup lvG;
+	group [migratable] liveVizGroup {
+		entry liveVizGroup(const liveVizConfig &cfg);
+	};
+
+	readonly CProxy_LiveVizBoundElement lvBoundArray;
+	readonly bool usingBoundArray;
+	array [Max] LiveVizBoundElement {
+		entry LiveVizBoundElement();
+		entry [local] void deposit(CkReductionMsg *msg);
+	}; 
 }

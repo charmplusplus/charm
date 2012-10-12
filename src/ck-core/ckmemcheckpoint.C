@@ -63,7 +63,7 @@ void noopck(const char*, ...)
 #if CMK_CONVERSE_MPI
 #define CK_NO_PROC_POOL				0
 #else
-#define CK_NO_PROC_POOL				1
+#define CK_NO_PROC_POOL				0
 #endif
 
 #define STREAMING_INFORMHOME                    1
@@ -588,7 +588,7 @@ void CkMemCheckPT::report()
     objsize += entry->getSize();
   }
   CmiAssert(CpvAccess(procChkptBuf));
-  CkPrintf("[%d] Checkpoint object size: %d len: %d Processor data: %d \n", CkMyPe(), objsize, len, CpvAccess(procChkptBuf)->len);
+//  CkPrintf("[%d] Checkpoint object size: %d len: %d Processor data: %d \n", CkMyPe(), objsize, len, CpvAccess(procChkptBuf)->len);
 }
 
 /*****************************************************************************
@@ -862,7 +862,7 @@ void CkMemCheckPT::recoverArrayElements()
 {
   double curTime = CmiWallTimer();
   int len = ckTable.length();
-  CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
+  //CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
   stage = (char *)"recoverArrayElements";
   if (CkMyPe() == thisFailedPe)
   CkPrintf("[%d] CkMemCheckPT ----- %s starts at %f \n",CkMyPe(), stage, curTime);
@@ -1117,9 +1117,10 @@ static void askProcDataHandler(char *msg)
 #if CMK_MEM_CHECKPOINT
     int diePe = *(int *)(msg+CmiMsgHeaderSizeBytes);
     CkPrintf("[%d] restartBcastHandler called with '%d' cur_restart_phase:%d at time %f.\n",CmiMyPe(),diePe, CpvAccess(_curRestartPhase), CkWallTimer());
-    if (CpvAccess(procChkptBuf) == NULL) 
+    if (CpvAccess(procChkptBuf) == NULL)  {
       CkPrintf("[%d] no checkpoint found for processor %d. This could be due to a crash before the first checkpointing.\n", CkMyPe(), diePe);
-    CmiAssert(CpvAccess(procChkptBuf)!=NULL);
+      CkAbort("no checkpoint found");
+    }
     envelope *env = (envelope *)(UsrToEnv(CpvAccess(procChkptBuf)));
     CmiAssert(CpvAccess(procChkptBuf)->pe == diePe);
 
@@ -1367,7 +1368,7 @@ void CkRegisterRestartHandler( )
 
 #if ! CMK_CONVERSE_MPI
   // print pid to kill
-  CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
+//  CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
 //  sleep(4);
 #endif
 #endif
@@ -1392,8 +1393,12 @@ void killLocal(void *_dummy,double curWallTime){
         printf("[%d] KillLocal called at %.6lf \n",CkMyPe(),CmiWallTimer());          
         if(CmiWallTimer()<killTime-1){
                 CcdCallFnAfter(killLocal,NULL,(killTime-CmiWallTimer())*1000);        
-        }else{  
+        }else{ 
+#if CMK_CONVERSE_MPI
+				CkDieNow();
+#else 
                 kill(getpid(),SIGKILL);                                               
+#endif
         }              
 } 
 #else
@@ -1410,6 +1415,7 @@ void killLocal(void *_dummy,double curWallTime){
 void readKillFile(){
         FILE *fp=fopen(killFile,"r");
         if(!fp){
+                printf("[%d] Cannot open file %s (MEMCKPT) \n",CkMyPe(),killFile);
                 return;
         }
         int proc;

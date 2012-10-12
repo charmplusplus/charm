@@ -71,7 +71,7 @@ public:
         liveVizInit(cfg,a,c);
 
         //Start the computation
-        startTime = CmiWallTimer();
+        startTime = CkWallTimer();
         recieve_count = 0;
         array.begin_iteration();
     }
@@ -79,7 +79,7 @@ public:
     // Each worker reports back to here when it completes an iteration
     void report(int row, int col) {
         recieve_count++;
-        double totaltime = CmiWallTimer() - startTime;
+        double totaltime = CkWallTimer() - startTime;
         if (num_chares == recieve_count) {
             if (iterations == total_iterations) {
                 CkPrintf("Completed %d iterations; last iteration time: %.6lf\n", iterations, totaltime);
@@ -89,7 +89,7 @@ public:
                 recieve_count=0;
                 iterations++;
                 // Call begin_iteration on all worker chares in array
-                startTime = CmiWallTimer();
+                startTime = CkWallTimer();
                 array.begin_iteration();
             }
         }

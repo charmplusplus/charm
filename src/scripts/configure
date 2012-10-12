@@ -1679,7 +1679,7 @@ test -r ./conv-config.sh && . ./conv-config.sh
 # Decimal representation of Charm++ release line and API revision
 # Increment the last 2 digits when making an API change
 # Increase the first three after branching for a release
-VERSION=60400
+VERSION=60401
 echo $VERSION > ../include/VERSION
 
 cat >>confdefs.h <<_ACEOF
@@ -2286,6 +2286,62 @@ then
   fi
 fi
 
+# Figure out if the user has asked to enable the latest language standards
+USER_ASKED_FOR_NEW_STD=`echo "$BUILDOPTS" | grep "-use-new-std" | wc -l`
+
+# If the user has asked for the newer standards, check if the compilers know about them
+if test $USER_ASKED_FOR_NEW_STD -ge 1
+then
+
+#### check if c compiler supports c11 compilation flags ####
+cat > $tc <<EOT
+#include <stdio.h>
+
+int foo()
+{
+  return 0;
+}
+EOT
+test_cc "whether c compiler knows of the c11 standard" "ok" "no" "$CMK_ENABLE_C11"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_COMPILER_KNOWS_C11 $pass
+_ACEOF
+
+if test $pass -eq 1
+then
+        # Record results for charmc's future use
+        add_flag 'CMK_COMPILER_KNOWS_C11="1"' "c11"
+        # For the rest of configure, append this to compilation flags
+        OPTS_CC="$CMK_ENABLE_C11 $OPTS"
+fi
+
+#### check if C++ compiler supports cpp11 compilation flags ####
+cat > $t <<EOT
+#include <iostream>
+
+int foo()
+{
+  return 0;
+}
+EOT
+test_cxx "whether c++ compiler knows of the cpp11 standard" "ok" "no" "$CMK_ENABLE_CPP11"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_COMPILER_KNOWS_CPP11 $pass
+_ACEOF
+
+if test $pass -eq 1
+then
+        # Record results for charmc's future use
+        add_flag 'CMK_COMPILER_KNOWS_CPP11="1"' "cpp11"
+        # For the rest of configure, append this to compilation flags
+        OPTS_CXX="$CMK_ENABLE_CPP11 $OPTS"
+fi
+
+fi # endif USER_ASKED_FOR_NEW_STD
+
+
 # Perform the tests
 
 
@@ -2445,7 +2501,7 @@ cat > $t <<EOT
 #include <stdlib.h>
 long long foo(void) { return 17; }
 EOT
-test_cxx "whether long long works" "ok" "no" ""
+test_cxx "whether long long works" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_LONG_LONG_DEFINED $pass
@@ -2457,10 +2513,26 @@ cat > $t <<EOT
 #include <stdlib.h>
 __int64 foo(void) { return 17; }
 EOT
-test_cxx "whether __int64 works" "ok" "no" ""
+test_cxx "whether __int64 works" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK___int64_DEFINED $pass
+_ACEOF
+
+
+#### Check __int128 ####
+cat > $t <<EOT
+#include <stdlib.h>
+int foo(void) {
+  __int128   a;
+  int x[(int)(sizeof(__int128) - 15)]={0};
+  return x[0];
+}
+EOT
+test_cxx "whether __int128 (128-bit integer) works" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK___int128_DEFINED $pass
 _ACEOF
 
 
@@ -2469,7 +2541,7 @@ cat > $t <<EOT
 #include <stdlib.h>
 long double foo(void) { return 17.0; }
 EOT
-test_cxx "whether long double works" "ok" "no" ""
+test_cxx "whether long double works" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_LONG_DOUBLE_DEFINED $strictpass
@@ -2523,6 +2595,26 @@ test_cxx "whether ucontext has pointer (v_regs) of vector type" "yes" "no" ""
 cat >>confdefs.h <<_ACEOF
 #define CMK_CONTEXT_V_REGS $pass
 _ACEOF
+
+
+#### Check ucontext and FPU pointer ####
+cat > $t <<EOT
+#include <infiniband/verbs.h>
+void test()
+{
+    struct ibv_context    *context;
+    int ibPort;
+    struct ibv_port_attr attr;
+    if (ibv_query_port(context, ibPort, &attr) != 0) return;
+    if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND)  return;
+}
+EOT
+test_cxx "whether ibverbs ibv_port_attr has link_layer field" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_IBV_PORT_ATTR_HAS_LINK_LAYER $pass
+_ACEOF
+
 
 
 ###################### C++ Compiler Features #####################
@@ -2693,6 +2785,64 @@ _ACEOF
 
 
 
+####### Check support for features added by the new C11 and CPP11 standards ########
+
+#### check if std::unordered_map is defined #####
+cat > $t <<EOT
+#include <unordered_map>
+
+int foo()
+{
+  std::unordered_map<int,int> myhashtbl;
+  myhashtbl[0] = 42;
+  myhashtbl[1234] = 0;
+  return myhashtbl[1234];
+}
+EOT
+test_cxx "whether std::unordered_map is defined" "ok" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_STD_UNORDERED_MAP $pass
+_ACEOF
+
+
+
+#### check if anon structs are permitted #####
+cat > $t <<EOT
+#include <iostream>
+using std::cout;
+
+struct idx
+{
+    const static int dims = 3;
+    union
+    {
+        int data[dims];
+        struct { int x, y, z; };
+    };
+
+    idx(const int i=0, const int j=0, const int k=0): x(i), y(j), z(k) {}
+};
+
+int main()
+{
+    cout<<"Hello World!\n";
+    idx myidx(1, 2, 3);
+    cout<< "idx = ("
+        << myidx.data[0] << ","
+        << myidx.data[1] << ","
+        << myidx.z << ")\n";
+    return (myidx.data[0] == 1 && myidx.y == 2 && myidx.data[2] == 3);
+}
+EOT
+test_cxx "whether anon structs are permitted" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_ANON_STRUCTS $pass
+_ACEOF
+
+
+
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
 class foo {
@@ -2734,7 +2884,7 @@ _ACEOF
 cat > $t <<EOT
 double foo(void)
 {
-  unsigned long long int v;
+  unsigned long long int v=0;
   int *lo=0+(int *)&v;
   int *hi=1+(int *)&v;
   __asm__ __volatile__(
@@ -2822,6 +2972,23 @@ test_cxx "whether __thread (Thread Local Storage) is supported" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_TLS_VARIABLES $strictpass
+_ACEOF
+
+
+#### check __sync_add_and_fetch ####
+cat > $tc <<EOT
+#include <stdio.h>
+int main()
+{
+  int t=1;
+  __sync_add_and_fetch(&t, 1);
+  return 1;
+}
+EOT
+test_linkc "whether synchronization primitives (__sync_add_and_fetch) works in C" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_C_SYNC_PRIMITIVES $pass
 _ACEOF
 
 
@@ -3865,6 +4032,48 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_RCALIB $pass
 _ACEOF
 
+
+#### test if Cray mesh dimension query function will work ####
+cat > $tc <<EOT
+#include <rca_lib.h>
+
+int main() {
+    rca_mesh_coord_t xyz;
+    rca_get_max_dimension(&xyz);
+
+    return 0;
+}
+EOT
+test_linkc "whether Cray rca_has get_max_dimension" "yes" "no" "-lrca"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_RCA_MAX_DIMENSION $pass
+_ACEOF
+
+
+#### query Cray machine max NID ####
+
+cmd=`which xtprocadmin 2>/dev/null`
+if test -n "$cmd"
+then
+    #maxnid=`xtprocadmin  | tail -1  | awk '{print $1}'`
+    # workaround for hopper
+    (export SHELL=/bin/csh; xtprocadmin >& t.$$)
+    maxnid=`cat t.$$  | tail -1  | awk '{print $1}'`
+    /bin/rm -f t.$$
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking Cray machine maxnid" >&5
+$as_echo_n "checking Cray machine maxnid... " >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: \"$maxnid\"" >&5
+$as_echo "\"$maxnid\"" >&6; }
+    if test -n "$maxnid"
+    then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CRAY_MAXNID $maxnid
+_ACEOF
+
+    fi
+fi
 
 fi
 

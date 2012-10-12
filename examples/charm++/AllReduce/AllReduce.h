@@ -15,7 +15,7 @@ public:
 	  static int checkIn=0;
 	  checkIn++;
 	  if (checkIn==units) {
-		  CkPrintf("All done in %lf seconds\n",(CmiWallTimer()-startTime));
+		  CkPrintf("All done in %lf seconds\n",(CkWallTimer()-startTime));
 		  CkExit();  
 	  }
   }

@@ -15,11 +15,15 @@
 #ifdef __GNUC__
 #define CMK_NOT_USE_TLS_THREAD                             0
 #else
-#define CMK_NOT_USE_TLS_THREAD                             1
+#define CMK_NOT_USE_TLS_THREAD                             0
 #endif
 
 #define CMK_PCQUEUE_LOCK                                   1
+/*#define PCQUEUE_MULTIQUEUE                                 1*/
 
 #define CMK_SMP_NO_COMMTHD                                 1
 
 #define CMK_FAKE_SCHED_YIELD                               1
+
+#define CMK_USE_L2ATOMICS                                  1
+

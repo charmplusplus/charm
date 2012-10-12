@@ -4,6 +4,7 @@
 #define MAXMSGBFRSIZE 100000
 
 CpvExtern(int, CldHandlerIndex);
+CpvExtern(int, CldNodeHandlerIndex);
 CpvExtern(int, CldBalanceHandlerIndex);
 
 CpvExtern(int, CldRelocatedMessages);

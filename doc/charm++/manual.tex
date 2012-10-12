@@ -1,7 +1,8 @@
-\documentclass[10pt]{article}
+\documentclass[10pt]{report}
 
 \usepackage{../pplmanual} \input{../pplmanual} \usepackage{html}
 \usepackage{listings}
+\usepackage{textcomp}
 %sadly latex2html does not understand listings
 %this hack will at least give you the program listing instead of garbage
 \begin{htmlonly}
@@ -10,113 +11,173 @@
   \providecommand{\lstset}[2][]{}
 \end{htmlonly}
 
-
-\title{The\\ \charmpp\\ Programming Language\\ Manual} \version{6.0
-  (Release 1)} \credits{ {\small The Charm software was developed as a
-    group effort.  The earliest prototype, Chare Kernel(1.0), was
-    developed by Wennie Shu and Kevin Nomura working with Laxmikant
-    Kale.  The second prototype, Chare Kernel(2.0), a complete
-    re-write with major design changes, was developed by a team
-    consisting of Wayne Fenton, Balkrishna Ramkumar, Vikram Saletore,
-    Amitabh B. Sinha and Laxmikant Kale. The translator for Chare
-    Kernel(2.0) was written by Manish Gupta.  Charm(3.0), with
-    significant design changes, was developed by a team consisting of
-    Attila Gursoy, Balkrishna Ramkumar, Amitabh B.  Sinha and
-    Laxmikant Kale, with a new translator written by Nimish Shah.  The
-    \charmpp\ implementation was done by Sanjeev Krishnan.  Charm(4.0)
-    included \charmpp\ and was released in fall 1993.  Charm(4.5) was
-    developed by Attila Gursoy, Sanjeev Krishnan, Milind Bhandarkar,
-    Joshua Yelon, Narain Jagathesan and Laxmikant Kale.  Charm(4.8),
-    developed by the same team included Converse, a parallel runtime
-    system that allows interoperability among modules written using
-    different paradigms within a single application. \charmpp\ runtime
-    system was re-targetted at Converse. Syntactic extensions in
-    \charmpp\ were dropped, and a simple interface translator was
-    developed (by Sanjeev Krishnan and Jay DeSouza) that, along with
-    the \charmpp\ runtime, became the \charmpp\ language.  Charm
-    (5.4R1) included the following: a complete rewrite of the
-    \charmpp\ runtime system (using \CC) and the interface translator
-    (done by Milind Bhandarkar), several new features such as Chare
-    Arrays (developed by Robert Brunner and Orion Lawlor), various
-    libraries (written by Terry Wilmarth, Gengbin Zheng, Laxmikant
-    Kale, Zehra Sura, Milind Bhandarkar, Robert Brunner, and Krishnan
-    Varadarajan.) A coordination language ``Structured Dagger'' was
-    been implemented on top of \charmpp\ (Milind Bhandarkar), dynamic
-    seed-based load balancing (Terry Wilmarth and Joshua Yelon), a
-    client-server interface for Converse programs, and debugging
-    support by Parthasarathy Ramachandran, Jeff Wright, and Milind
-    Bhandarkar, Projections, the performance visualization and
-    analysis tool, was redesigned and rewritten using Java by Michael
-    Denardo. The test suite for \charmpp\ was developed by Michael
-    Lang, Jackie Wang, and Fang Hu. Converse was been ported to ASCI
-    Red (Joshua Yelon), Cray T3E (Robert Brunner), and SGI Origin2000
-    (Milind Bhandarkar). For the current version Charm 6.0 (R1),
-    Converse has been ported to new platforms including BlueGene/[LP]
-    (Kumar, Huang, Bhatele), Cray XT3/4 (Zheng), Apple G5, Myrinet
-    (Zheng), and Infiniband (Chakravorty).  Charm 6.0 introduces a
-    dedicated no network SMP multicore Converse layer for stand-alone
-    workstation experimenters (Zheng, Chakravorty, Kale, Jetley).
-    Charm 6.0 also includes cross platform network topology aware
-    chare placement for 3D tori and mesh networks (Kumar, Huang,
-    Bhatele, Bohm). The test suite was extended for automated testing
-    on all supported platforms by Gengbin Zheng.  The Projection tool
-    was substantially improved by Chee Wai Lee and Isaac Dooley. The
-    Control Point performance tuning framework was created by Isaac
-    Dooley. Debugging support was enhanced with memory inspection
-    features by Filippo Gioachin. The Charisma orchestration language
-    was implemented on top of Charm++ by Chao Huang and Sanjay Kale.
-    Sanjay Kale, Orion Lawlor, Gengbin Zheng, Terry Wilmarth, Filippo
-    Gioachin, Sayantan Chakravorty, Chao Huang, David Kunzman, Isaac
-    Dooley, Eric Bohm, Sameer Kumar, Chao Mei, Pritish Jetley, and
-    Abhinav Bhatele, have been responsible for the changes to the
-    system since the last release.  } }
-
 \begin{document}
 
+\title{The\\ \charm\\ Parallel Programming System\\ Manual}
+\version{6.4.0}
+\credits{\hspace{0 in}}
 \maketitle
 
+
+\chapter{Basic Concepts}
 \input{intro}
-
 \input{overview}
+\input{machineModel}
 
-\section{The \charmpp\ Language}
+\part{Basic \charm Programming}
+
+\chapter{Program Structure, Compilation and Utilities}
   \input{modules}	
-  \input{entry}
+  \input{utilities}
+  \input{helloworld}
+
+\chapter{Basic Syntax}
   \input{marshalling}	
-  \input{messages}
-  \input{order.tex}
   \input{chares}
-  \input{readonly}    
+  \input{readonly}
+
+\chapter{Chare Arrays}
   \input{arrays}
+
+\chapter{Structured Control Flow: Structured Dagger}
+\label{sec:sdag}
+  \input{sdag}
+
+\chapter{Serialization Using the PUP Framework}
+  \input{pup}
+
+\chapter{Load Balancing}
+\label{loadbalancing}
+  \input{loadb}
+
+\chapter{Processor-Aware Chare Collections}
   \input{groups}
   \input{nodegroups}
-  \input{loadb}
-  \input{advancedlb}
+
+\chapter{Initializations at Program Startup}
+  \input{startuporder}
+
+\part{Advanced Programming Techniques}
+
+\chapter{Optimizing Entry Method Invocation}
+  \input{messages}
+  \input{entry}
+  \input{order}
+
+\chapter{Callbacks}
+  \input{callbacks}
+
+\chapter{Waiting for Completion}
+  %\section{Asynchronous Barriers}
+  \input{threaded}
+  \input{sync}
   \input{futures}
   \input{quiesce}
+
+\chapter{More Chare Array Features}
+\label{advanced arrays}
+  \input{advancedarrays}
+
+\chapter{Sections: Subsets of a Chare Array}
+\label{array section}
+  \input{sections}
+
+\chapter{Chare Inheritance and Templates}
+\label{inheritance and templates}
+  \input{inhertmplt}
+
+\chapter{Collectives}
   \input{reductions}
-  \input{callbacks}
-  \input{pup}
-  \input{io}
-  \input{othercalls}    
-  \input{delegation}    
-  \input{commlib}
-  \input{alltoall}
+%  \input{alltoall} TO BE UPDATED WITH NDMESHSTREAMER INTERFACE
+
+\chapter{Serializing Complex Types}
+  \input{advancedpup}
+
+\chapter{Querying Network Topology}
+\index{topomanager}
+\index{cputopology}
+\label{topo}
+  \input{topology}
+
+\chapter{Checkpoint/Restart-Based Fault Tolerance}
+\index{Checkpoint/Restart}
+\label{sec:checkpoint}
+  \input{checkpoint}
+
+%chapter{Managing Hardware Heterogeneity}
+%\index{accel}
+%\label{sec:hetero}
+%  input{hetero}
+
+
+\part{Expert-Level Functionality}
+
+\chapter{Tuning and Developing Load Balancers}
+\label{advancedlb}
+  \input{advancedlb}
+
+\chapter{Dynamic Code Injection}
+\label{python}
   \input{python}
-\input{inhertmplt}
 
-\input{msa.tex}
+\chapter{Intercepting Messages via Delegation}
+\index{Delegation}
+\label{delegation}
+  \input{delegation}
 
-\input{checkpoint}
+% TO BE MOVED TO ITS OWN MANUAL
+%\input{msa.tex}
 
-\input{controlpoints}
 
+\part{Experimental Features}
 
+\chapter{Control Point Automatic Tuning}
+\index{Control Point Automatic Tuning}
+\label{sec:controlpoint}
+  \input{controlpoints}
+
+\chapter{Support for Loop-level Parallelism}
+\index{ckloop}
+\label{sec:ckloop}
+\input{ckloop}
+
+\chapter{Charm-MPI Interoperation}
+\index{MPI Interoperation}
+\label{sec:interop}
+  \input{mpi-interop}
+
+\part{Appendix}
 \appendix
 
-\input{sdag}
+% TO BE MOVED TO ITS OWN MANUAL
+%\input{quickbigsim}
 
-\input{further}
+\chapter{Installing \charm}
+\label{sec:install}
+  \index{build}
+  \input{install}
+
+\chapter{Compiling \charm Programs}
+\label{sec:compile}
+  \index{charmc}
+  \input{compile}
+
+\chapter{Running \charm Programs}
+\label{sec:run}
+  \index{charmrun}
+  \input{run}
+
+\chapter{Performance Tracing for Analysis}
+\index{projections}
+\label{sec:trace-projections}
+  \input{../projections/tracing}
+
+
+\chapter{History}
+  \input{history}
+
+\chapter {Acknowledgements}
+  \input{credits}
 
 \input{index}
 

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include <string>
+#include <list>
 
 using std::cout;
 using std::endl;
@@ -11,6 +12,7 @@ extern FILE *yyin;
 extern void yyrestart ( FILE *input_file );
 extern int yyparse (void);
 extern int yyerror(char *);
+extern int yylex(void);
 
 extern xi::ModuleList *modlist;
 
@@ -41,13 +43,13 @@ public:
   char *match(const char *k) { if (!strcmp(k, key)) return val; return NULL; }
 };
 
-static TList<MacroDefinition *> macros;
+static std::list<MacroDefinition *> macros;
 
 int macroDefined(const char *str, int istrue)
 {
-  MacroDefinition *def;
-  for (def = macros.begin(); !macros.end(); def=macros.next()) {
-    char *val = def->match(str);
+  std::list<MacroDefinition *>::iterator def;
+  for (def = macros.begin(); def != macros.end(); ++def) {
+    char *val = (*def)->match(str);
     if (val) {
       if (!istrue) return 1;
       else return atoi(val);
@@ -119,6 +121,13 @@ ModuleList *Parse(FILE *fp)
   return modlist;
 }
 
+int count_tokens(FILE* fp)
+{
+    yyin = fp;
+    int count = 0;
+    while (yylex()) count++;
+    return count;
+}
 
 void abortxi(char *name)
 {
@@ -136,14 +145,16 @@ int main(int argc, char *argv[])
   fortranMode = 0;
   internalMode = 0;
   bool dependsMode = false;
+  bool countTokens = false;
 
   for (int i=1; i<argc; i++) {
     if (*argv[i]=='-') {
       if (strcmp(argv[i],"-ansi")==0);
       else if (strcmp(argv[i],"-f90")==0)  fortranMode = 1;
       else if (strcmp(argv[i],"-intrinsic")==0)  internalMode = 1;
-      else if (strncmp(argv[i],"-D", 2)==0)  macros.append(new MacroDefinition(argv[i]+2));
+      else if (strncmp(argv[i],"-D", 2)==0)  macros.push_back(new MacroDefinition(argv[i]+2));
       else if (strncmp(argv[i], "-M", 2)==0) dependsMode = true;
+      else if (strcmp(argv[i], "-count-tokens")==0) countTokens = true;
       else abortxi(argv[0]);
     }
     else
@@ -151,9 +162,15 @@ int main(int argc, char *argv[])
   }
   //if (fname==NULL) abortxi(argv[0]);
 
+  if (countTokens) {
+      cout << count_tokens(openFile(fname)) << endl;
+      return 0;
+  }
+
   ModuleList *m = Parse(openFile(fname)) ;
   if (!m) return 0;
   m->preprocess();
+  m->check();
   if (dependsMode)
   {
       std::string ciFileBaseName = fname;

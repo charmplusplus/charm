@@ -66,7 +66,7 @@ extern "C" void LDUnregisterObj(LDObjHandle _h)
   return;
 }
 
-extern "C" const LDObjHandle &LDGetObjHandle(LDHandle h, int oh)
+const LDObjHandle &LDGetObjHandle(LDHandle h, int oh)
 {
   LBDB *const db = (LBDB*)(h.handle);
   LBObj *const obj = db->LbObjIdx(oh);

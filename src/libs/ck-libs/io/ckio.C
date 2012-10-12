@@ -5,7 +5,6 @@
 
 namespace Ck { namespace IO {
     Manager::Manager() : nextToken(0) {
-      __sdag_init();
       run();
     }
 

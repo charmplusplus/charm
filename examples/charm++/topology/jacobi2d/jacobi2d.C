@@ -104,14 +104,14 @@ class Main : public CBase_Main
     void report(CkReductionMsg *msg) {
       iterations++;
       if(iterations == 5)
-	startTime = CmiWallTimer();
+	startTime = CkWallTimer();
       double error = *((double *)msg->getData());
 
       if (error > 0.001 && iterations < MAX_ITER) {
 	array.begin_iteration();
       } else {
 	CkPrintf("Completed %d iterations\n", iterations);
-        endTime = CmiWallTimer();
+        endTime = CkWallTimer();
         CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-5));
         CkExit();
       }

@@ -576,6 +576,19 @@ extern "C" void LBTurnInstrumentOff() {
     _lb_args.statsOn() = 0;
 #endif
 }
+
+extern "C" void LBTurnCommOn() {
+#if CMK_LBDB_ON
+  _lb_args.traceComm() = 1;
+#endif
+}
+
+extern "C" void LBTurnCommOff() {
+#if CMK_LBDB_ON
+  _lb_args.traceComm() = 0;
+#endif
+}
+
 void LBClearLoads() {
 #if CMK_LBDB_ON
   LBDatabase::Object()->ClearLoads();

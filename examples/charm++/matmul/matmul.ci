@@ -1,0 +1,52 @@
+mainmodule matmul {
+  readonly CProxy_Main mainProxy;
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done();
+  };
+
+  array [2D] Block {
+    entry Block(unsigned int blockSize, unsigned int numBlocks);
+    entry void pdgemmSendInput(CProxy_Block output, bool aOrB) {
+      atomic {
+        if (aOrB)
+          output[thisIndex].inputA(0, data, blockSize, blockSize);
+        else
+          output[thisIndex].inputB(0, data, blockSize, blockSize);
+      }
+    };
+
+    entry void pdgemmRun(double alpha, double beta, CkCallback done) {
+      forall [block] (0:numBlocks-1,1) {
+        when
+          inputA[block](int blockIdA, double blockA[M*KA], unsigned int M, unsigned int KA),
+          inputB[block](int blockIdB, double blockB[KB*N], unsigned int KB, unsigned int N)
+          atomic {
+          CkAssert(KA == KB);
+
+          cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                      M, N, KA,
+                      alpha,
+                      blockA, KA, blockB, N,
+                      beta, data, N);
+
+          if (blockIdA != numBlocks) {
+            int destX = (thisIndex.x + 1) % numBlocks;
+            int destY = thisIndex.y;
+            thisProxy(destX, destY).inputA(blockIdA+1, blockA, M, KA);
+          }
+          if (blockIdB != numBlocks) {
+            int destX = thisIndex.x;
+            int destY = (thisIndex.y + 1) % numBlocks;
+            thisProxy(destX, destY).inputB(blockIdB+1, blockB, KB, N);
+          }
+        }
+      }
+      atomic {
+        contribute(done);
+      }
+    };
+    entry void inputA(int blockIdA, double blockA[M*KA], unsigned int M, unsigned int KA);
+    entry void inputB(int blockIdB, double blockB[KB*N], unsigned int KB, unsigned int N);
+  };
+};

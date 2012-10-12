@@ -1,7 +1,7 @@
 module groupring {
   message groupring_message;
   mainchare groupring_main {
-    entry groupring_main();
+    entry groupring_main(CkArgMsg *m);
   };
   group groupring_group {
     entry groupring_group(void);

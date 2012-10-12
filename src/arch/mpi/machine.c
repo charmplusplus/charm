@@ -56,13 +56,14 @@ static int CMI_DYNAMIC_RECV_CAPSIZE=3;
 /* initial values, -1 indiates there's no cap */
 static int dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
 static int dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
+MPI_Comm charmComm;
 
 #if CMI_EXERT_SEND_CAP
-#define SEND_CAP 3
+static int SEND_CAP=3;
 #endif
 
 #if CMI_EXERT_RECV_CAP
-#define RECV_CAP 2
+static int RECV_CAP=2;
 #endif
 /* ###End of flow control related macros ### */
 
@@ -197,13 +198,24 @@ static void reportMsgHistogramInfo();
 
 #endif /* end of MPI_POST_RECV defined */
 
+/* to avoid MPI's in order delivery, changing MPI Tag all the time */
+#define TAG     1375
+#if MPI_POST_RECV
+#define POST_RECV_TAG       (TAG+1)
+#define BARRIER_ZERO_TAG  TAG
+#else
+#define BARRIER_ZERO_TAG   (TAG-1)
+#endif
+
+#define USE_MPI_CTRLMSG_SCHEME 0
+
 /* Defining this macro will use MPI_Irecv instead of MPI_Recv for
  * large messages. This could save synchronization overhead caused by
  * the rzv protocol used by MPI
  */
 #define USE_ASYNC_RECV_FUNC 0
 
-#ifdef USE_ASYNC_RECV_FUNC
+#if USE_ASYNC_RECV_FUNC || USE_MPI_CTRLMSG_SCHEME
 static int IRECV_MSG_THRESHOLD = 8000;
 typedef struct IRecvListEntry{
     MPI_Request req;
@@ -232,7 +244,7 @@ static void irecvListEntryFree(IRecvList used){
     freedIrecvList = used;
 }
 
-#endif /* end of USE_ASYNC_RECV_FUNC */
+#endif /* end of USE_ASYNC_RECV_FUNC || USE_MPI_CTRLMSG_SCHEME */
 
 /* Providing functions for external usage to set up the dynamic recv buffer
  * when the user is aware that it's safe to call such function
@@ -248,14 +260,6 @@ static void recordMsgHistogramInfo(int size);
 static void reportMsgHistogramInfo();
 #endif
 
-/* to avoid MPI's in order delivery, changing MPI Tag all the time */
-#define TAG     1375
-#if MPI_POST_RECV
-#define POST_RECV_TAG       (TAG+1)
-#define BARRIER_ZERO_TAG  TAG
-#else
-#define BARRIER_ZERO_TAG   (TAG-1)
-#endif
 /* ###End of POST_RECV related related macros ### */
 
 #if CMK_BLUEGENEL
@@ -331,7 +335,7 @@ static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
 #endif
 /* =====End of Declarations of Machine Specific Variables===== */
 
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
 #define FAIL_TAG   1200
 int num_workpes, total_pes;
 int *petorank = NULL;
@@ -356,37 +360,11 @@ static int SendMsgBuf();
 static  void EnqueueMsg(void *m, int size, int node, int mode);
 #endif
 
-/* The machine-specific send function */
-static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg, int mode);
-#define LrtsSendFunc MachineSpecificSendForMPI
-
-/* ### Beginning of Machine-startup Related Functions ### */
-static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNodeID);
-#define LrtsInit MachineInitForMPI
-
-static void MachinePreCommonInitForMPI(int everReturn);
-static void MachinePostCommonInitForMPI(int everReturn);
-#define LrtsPreCommonInit MachinePreCommonInitForMPI
-#define LrtsPostCommonInit MachinePostCommonInitForMPI
-/* ### End of Machine-startup Related Functions ### */
-
-/* ### Beginning of Machine-running Related Functions ### */
-static void AdvanceCommunicationForMPI(int whenidle);
-#define LrtsAdvanceCommunication AdvanceCommunicationForMPI
-
-static void DrainResourcesForMPI(); /* used when exit */
-#define LrtsDrainResources DrainResourcesForMPI
-
-static void MachineExitForMPI();
-#define LrtsExit MachineExitForMPI
 /* ### End of Machine-running Related Functions ### */
 
 /* ### Beginning of Idle-state Related Functions ### */
 void CmiNotifyIdleForMPI(void);
 /* ### End of Idle-state Related Functions ### */
-
-static void MachinePostNonLocalForMPI();
-#define LrtsPostNonLocal MachinePostNonLocalForMPI
 
 /* =====End of Declarations of Machine Specific Functions===== */
 
@@ -399,6 +377,10 @@ static void MachinePostNonLocalForMPI();
 #define CMK_HAS_SIZE_IN_MSGHDR 0
 #include "machine-lrts.h"
 #include "machine-common-core.c"
+
+#if USE_MPI_CTRLMSG_SCHEME
+#include "machine-ctrlmsg.c"
+#endif
 
 /* The machine specific msg-sending function */
 
@@ -444,31 +426,33 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
 #if MPI_DYNAMIC_POST_RECV
         int sendTagOffset = (size-MPI_POST_RECV_LOWERSIZE)/MPI_POST_RECV_INC+1;
         START_TRACE_SENDCOMM(msg);
-        if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG+sendTagOffset,MPI_COMM_WORLD,&(smsg->req)))
+        if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG+sendTagOffset,charmComm,&(smsg->req)))
             CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
         END_TRACE_SENDCOMM(msg);
 #else
         START_TRACE_SENDCOMM(msg);
-        if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG,MPI_COMM_WORLD,&(smsg->req)))
+        if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG,charmComm,&(smsg->req)))
             CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
         END_TRACE_SENDCOMM(msg);
 #endif
     } else {
         START_TRACE_SENDCOMM(msg);
-	    if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(smsg->req)))
+	    if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,charmComm,&(smsg->req)))
             CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
         END_TRACE_SENDCOMM(msg);
     }
+#elif USE_MPI_CTRLMSG_SCHEME
+	sendViaCtrlMsg(node, size, msg, smsg);
 #else
-/* branch not using MPI_POST_RECV */
+/* branch not using MPI_POST_RECV or USE_MPI_CTRLMSG_SCHEME */
 
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
 	dstrank = petorank[node];
 #else
 	dstrank=node;
 #endif
     START_TRACE_SENDCOMM(msg)
-    if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,dstrank,TAG,MPI_COMM_WORLD,&(smsg->req)))
+    if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,dstrank,TAG,charmComm,&(smsg->req)))
         CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
     END_TRACE_SENDCOMM(msg)
 #endif /* end of #if MPI_POST_RECV */
@@ -494,9 +478,10 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     return (CmiCommHandle) &(smsg->req);
 }
 
-static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg, int mode) {
+CmiCommHandle LrtsSendFunc(int destPE, int size, char *msg, int mode) {
     /* Ignoring the mode for MPI layer */
 
+    int destNode = CmiNodeOf(destPE);
     CmiState cs = CmiGetState();
     SMSG_LIST *msg_tmp;
     int  rank;
@@ -636,9 +621,12 @@ static int PumpMsgs(void) {
 #endif
 
         START_TRACE_RECVCOMM(NULL);
-
-        /* First check posted recvs then do  probe unmatched outstanding messages */
-#if MPI_POST_RECV
+#if USE_MPI_CTRLMSG_SCHEME
+	doSyncRecv = 0;
+	nbytes = recvViaCtrlMsg();
+	if(nbytes == -1) break;
+#elif MPI_POST_RECV
+		/* First check posted recvs then do  probe unmatched outstanding messages */
         MPIPostRecvList *postedOne = NULL;
         int completed_index = -1;
         flg = 0;
@@ -679,7 +667,7 @@ static int PumpMsgs(void) {
             CpvAccess(Cmi_posted_recv_total)++;
         } else {
             START_EVENT();
-            res = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flg, &sts);
+            res = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, charmComm, &flg, &sts);
             if (res != MPI_SUCCESS)
                 CmiAbort("MPI_Iprobe failed\n");
             if (!flg) break;
@@ -694,28 +682,30 @@ static int PumpMsgs(void) {
 #endif            
             if(doSyncRecv){
                 START_EVENT();
-                if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
+                if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, charmComm,&sts))
                     CmiAbort("PumpMsgs: MPI_Recv failed!\n");                
             }
 #if USE_ASYNC_RECV_FUNC        
             else {
                 START_EVENT();
                 IRecvList one = irecvListEntryAllocate();
-                if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, MPI_COMM_WORLD, &(one->req));
+                if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, charmComm, &(one->req)))
                     CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
+		/*printf("[%d]: irecv msg=%p, nbytes=%d, src=%d, tag=%d\n", CmiMyPe(), msg, nbytes, sts.MPI_SOURCE, sts.MPI_TAG);*/
                 one->msg = msg;
                 one->size = nbytes;
                 one->next = NULL;
                 waitIrecvListTail->next = one;
+		waitIrecvListTail = one;
                 CONDITIONAL_TRACE_USER_EVENT(50); /* MPI_Irecv related user events */
             }
 #endif
             CpvAccess(Cmi_unposted_recv_total)++;
         }
 #else
-        /* Original version */
+        /* Original version of not using MPI_POST_RECV and USE_MPI_CTRLMSG_SCHEME */
         START_EVENT();
-        res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
+        res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, charmComm, &flg, &sts);
         if (res != MPI_SUCCESS)
             CmiAbort("MPI_Iprobe failed\n");
 
@@ -731,14 +721,14 @@ static int PumpMsgs(void) {
 #endif        
         if(doSyncRecv){
             START_EVENT();
-            if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
+            if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, charmComm,&sts))
                 CmiAbort("PumpMsgs: MPI_Recv failed!\n");            
         }
 #if USE_ASYNC_RECV_FUNC        
         else {
             START_EVENT();
             IRecvList one = irecvListEntryAllocate();
-            if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, MPI_COMM_WORLD, &(one->req)))
+            if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, charmComm, &(one->req)))
                 CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
             one->msg = msg;
             one->size = nbytes;
@@ -750,20 +740,20 @@ static int PumpMsgs(void) {
         }
 #endif
 
-#endif /*end of not MPI_POST_RECV */
+#endif /*end of !MPI_POST_RECV and !USE_MPI_CTRLMSG_SCHEME*/
 
-        MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
-        CMI_CHECK_CHECKSUM(msg, nbytes);
-#if CMK_ERROR_CHECKING
-        if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
-            CmiPrintf("Charm++ Abort: Non Charm++ Message Received of size %d. \n", nbytes);
-            CmiFree(msg);
-            CmiAbort("Abort!\n");
-            continue;
-        }
-#endif
-
-        if(doSyncRecv){
+		if(doSyncRecv){
+			MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
+			CMI_CHECK_CHECKSUM(msg, nbytes);
+	#if CMK_ERROR_CHECKING
+			if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
+				CmiPrintf("Charm++ Abort: Non Charm++ Message Received of size %d. \n", nbytes);
+				CmiFree(msg);
+				CmiAbort("Abort!\n");
+				continue;
+			}
+	#endif
+        
             END_TRACE_RECVCOMM(msg);
             handleOneRecvedMsg(nbytes, msg);
         }
@@ -790,7 +780,7 @@ static int PumpMsgs(void) {
                                          MPI_BYTE,
                                          MPI_ANY_SOURCE,
                                          postRecvTag,
-                                         MPI_COMM_WORLD,
+                                         charmComm,
                                          &((postedOne->postedRecvReqs)[completed_index])  ))
                 CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
             CONDITIONAL_TRACE_USER_EVENT(50); /* MPI_Irecv related user events */
@@ -807,7 +797,7 @@ static int PumpMsgs(void) {
                                          MPI_BYTE,
                                          MPI_ANY_SOURCE,
                                          POST_RECV_TAG,
-                                         MPI_COMM_WORLD,
+                                         charmComm,
                                          &((postedOne->postedRecvReqs)[completed_index])  ))
                 CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
             CONDITIONAL_TRACE_USER_EVENT(50); /* MPI_Irecv related user events */
@@ -842,9 +832,10 @@ static int PumpMsgs(void) {
 
     }
 
-#if USE_ASYNC_RECV_FUNC
+#if USE_ASYNC_RECV_FUNC || USE_MPI_CTRLMSG_SCHEME
 /* Another loop to check the irecved msgs list */
 {
+	/*TODO: msg cap (throttling) is not exerted here */
     IRecvList irecvEnt;
     int irecvDone = 0;
     MPI_Status sts;
@@ -906,7 +897,7 @@ static void PumpMsgsBlocking(void) {
 #endif
 
     START_TRACE_RECVCOMM(NULL);
-    if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts))
+    if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, charmComm,&sts))
         CmiAbort("PumpMsgs: PMP_Recv failed!\n");    
 
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
@@ -1009,7 +1000,7 @@ static double sendtime = 0.0;
 
 #endif //end of CMK_SMP
 
-static void AdvanceCommunicationForMPI(int whenidle) {
+void LrtsAdvanceCommunication(int whenidle) {
 #if REPORT_COMM_METRICS
     double t1, t2, t3, t4;
     t1 = CmiWallTimer();
@@ -1054,11 +1045,11 @@ static void AdvanceCommunicationForMPI(int whenidle) {
 }
 /* ######End of functions related with communication progress ###### */
 
-static void MachinePostNonLocalForMPI() {
+void LrtsPostNonLocal() {
 #if !CMK_SMP
     if (no_outstanding_sends) {
         while (CpvAccess(MsgQueueLen)>0) {
-            AdvanceCommunicationForMPI(0);
+            LrtsAdvanceCommunication(0);
         }
     }
 
@@ -1110,7 +1101,7 @@ void CmiMachineProgressImpl() {
 #endif
 
 /* ######Beginning of functions related with exiting programs###### */
-void DrainResourcesForMPI() {
+void LrtsDrainResources() {
 #if !CMK_SMP
     while (!CmiAllAsyncMsgsSent()) {
         PumpMsgs();
@@ -1129,18 +1120,18 @@ void DrainResourcesForMPI() {
         }
     }
 #endif
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
     if (CmiMyPe() == 0) mpi_end_spare();
 #endif
     MACHSTATE(2, "Machine exit barrier begin {");
     START_EVENT();
-    if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
-        CmiAbort("DrainResourcesForMPI: MPI_Barrier failed!\n");
+    if (MPI_SUCCESS != MPI_Barrier(charmComm))
+        CmiAbort("LrtsDrainResources: MPI_Barrier failed!\n");
     END_EVENT(10);
     MACHSTATE(2, "} Machine exit barrier end");
 }
 
-void MachineExitForMPI() {
+void LrtsExit() {
     int i;
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     int doPrint = 0;
@@ -1192,9 +1183,9 @@ static void machine_exit(char *m) {
     fflush(stdout);
     CmiNodeBarrier();
     if (CmiMyRank() == 0) {
-        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Barrier(charmComm);
         /*printf("==> %d: passed barrier\n",CmiMyPe());*/
-        MPI_Abort(MPI_COMM_WORLD, 1);
+        MPI_Abort(charmComm, 1);
     } else {
         while (1) CmiYield();
     }
@@ -1203,7 +1194,7 @@ static void machine_exit(char *m) {
 static void KillOnAllSigs(int sigNo) {
     static int already_in_signal_handler = 0;
     char *m;
-    if (already_in_signal_handler) return;   /* MPI_Abort(MPI_COMM_WORLD,1); */
+    if (already_in_signal_handler) return;   /* MPI_Abort(charmComm,1); */
     already_in_signal_handler = 1;
 #if CMK_CCS_AVAILABLE
     if (CpvAccess(cmiArgDebugFlag)) {
@@ -1269,7 +1260,7 @@ static char *thread_level_tostring(int thread_level) {
  *  Obtain the number of nodes, my node id, and consuming machine layer
  *  specific arguments
  */
-static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNodeID) {
+void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     int n,i;
     int ver, subver;
     int provided;
@@ -1295,6 +1286,8 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #endif
     }
 
+    *argc = CmiGetArgc(largv);     /* update it in case it is out of sync */
+
     if(!CharmLibInterOperate) {
 #if CMK_MPI_INIT_THREAD
 #if CMK_SMP
@@ -1317,9 +1310,12 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     largc = *argc;
     largv = *argv;
     if(!CharmLibInterOperate) {
-      MPI_Comm_size(MPI_COMM_WORLD, numNodes);
-      MPI_Comm_rank(MPI_COMM_WORLD, myNodeID);
+			MPI_Comm_dup(MPI_COMM_WORLD,&charmComm);
+      MPI_Comm_size(charmComm, numNodes);
+			MPI_Comm_rank(charmComm, myNodeID);
     }
+
+    MPI_Bcast(&_Cmi_mynodesize, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     myNID = *myNodeID;
 
@@ -1356,7 +1352,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     }
 
 
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
     if (CmiGetArgInt(largv,"+wp",&num_workpes)) {
        CmiAssert(num_workpes <= *numNodes);
        total_pes = *numNodes;
@@ -1373,19 +1369,19 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     if (*myNodeID >= num_workpes) {    /* is spare processor */
       MPI_Status sts;
       int vals[2];
-      MPI_Recv(vals,2,MPI_INT,MPI_ANY_SOURCE,FAIL_TAG, MPI_COMM_WORLD,&sts);
+      MPI_Recv(vals,2,MPI_INT,MPI_ANY_SOURCE,FAIL_TAG, charmComm,&sts);
       int newpe = vals[0];
       CpvAccess(_curRestartPhase) = vals[1];
 
       if (newpe == -1) {
-          MPI_Barrier(MPI_COMM_WORLD);
+          MPI_Barrier(charmComm);
           MPI_Finalize();
           exit(0);
       }
 
       CmiPrintf("Charm++> Spare MPI rank %d is activated for PE %d.\n", *myNodeID, newpe);
         /* update petorank */
-      MPI_Recv(petorank, num_workpes, MPI_INT,MPI_ANY_SOURCE,FAIL_TAG,MPI_COMM_WORLD, &sts);
+      MPI_Recv(petorank, num_workpes, MPI_INT,MPI_ANY_SOURCE,FAIL_TAG,charmComm, &sts);
       nextrank = *myNodeID + 1;
       *myNodeID = newpe;
       myNID = newpe;
@@ -1463,8 +1459,27 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
                MPI_POST_RECV_MSG_CNT_THRESHOLD, MPI_POST_RECV_INC, MPI_POST_RECV_MSG_INC, MPI_POST_RECV_FREQ);
     }
 #endif
+	
+#if USE_MPI_CTRLMSG_SCHEME
+	CmiGetArgInt(largv, "+ctrlMsgCnt", &MPI_CTRL_MSG_CNT);
+	if(myNID == 0){
+		printf("Charm++: using the alternative ctrl msg scheme with %d pre-posted ctrl msgs\n", MPI_CTRL_MSG_CNT);
+	}
+#endif
 
-#if CMI_DYNAMIC_EXERT_CAP
+#if CMI_EXERT_SEND_CAP
+    CmiGetArgInt(largv, "+dynCapSend", &SEND_CAP);
+    if (myNID==0) {
+        printf("Charm++: using static send cap %d\n", SEND_CAP);
+    }
+#endif
+#if CMI_EXERT_RECV_CAP
+    CmiGetArgInt(largv, "+dynCapRecv", &RECV_CAP);
+    if (myNID==0) {
+        printf("Charm++: using static recv cap %d\n", RECV_CAP);
+    }
+#endif
+#if CMI_DYNAMIC_EXERT_CAP 
     CmiGetArgInt(largv, "+dynCapThreshold", &CMI_DYNAMIC_OUTGOING_THRESHOLD);
     CmiGetArgInt(largv, "+dynCapSend", &CMI_DYNAMIC_SEND_CAPSIZE);
     CmiGetArgInt(largv, "+dynCapRecv", &CMI_DYNAMIC_RECV_CAPSIZE);
@@ -1506,9 +1521,15 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #endif
 }
 
-static void MachinePreCommonInitForMPI(int everReturn) {
+void LrtsPreCommonInit(int everReturn) {
 
-#if MPI_POST_RECV
+#if USE_MPI_CTRLMSG_SCHEME
+	#if CMK_SMP
+		if(CmiMyRank() == CmiMyNodeSize()) createCtrlMsgIrecvBufs();
+	#else
+		createCtrlMsgIrecvBufs();
+	#endif
+#elif MPI_POST_RECV
     int doInit = 1;
     int i;
 
@@ -1574,21 +1595,21 @@ static void MachinePreCommonInitForMPI(int everReturn) {
                                          MPI_BYTE,
                                          MPI_ANY_SOURCE,
                                          POST_RECV_TAG,
-                                         MPI_COMM_WORLD,
+                                         charmComm,
                                          CpvAccess(postRecvListHdr)->postedRecvReqs+i  ))
                 CmiAbort("MPI_Irecv failed\n");
         }
 #endif
     }
-#endif /* end of MPI_POST_RECV */
-
+#endif /* end of MPI_POST_RECV  and USE_MPI_CTRLMSG_SCHEME */
+	
 #if CAPTURE_MSG_HISTOGRAM && !MPI_DYNAMIC_POST_RECV
     CpvInitialize(int *, MSG_HISTOGRAM_ARRAY);
     CpvAccess(MSG_HISTOGRAM_ARRAY) = (int *)malloc(sizeof(int)*MAX_HISTOGRAM_BUCKETS);
     memset(CpvAccess(MSG_HISTOGRAM_ARRAY), 0, sizeof(int)*MAX_HISTOGRAM_BUCKETS);
 #endif
 
-#if USE_ASYNC_RECV_FUNC
+#if USE_ASYNC_RECV_FUNC || USE_MPI_CTRLMSG_SCHEME
 #if CMK_SMP
     /* allocate the guardian entry only on comm thread considering NUMA */
     if(CmiMyRank() == CmiMyNodeSize()) {
@@ -1602,7 +1623,7 @@ static void MachinePreCommonInitForMPI(int everReturn) {
 #endif
 }
 
-static void MachinePostCommonInitForMPI(int everReturn) {
+void LrtsPostCommonInit(int everReturn) {
 
     CmiIdleState *s=CmiNotifyGetState();
 
@@ -1666,7 +1687,7 @@ void LrtsAbort(const char *message) {
     CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
     machine_exit(m);
     /* Program never reaches here */
-    MPI_Abort(MPI_COMM_WORLD, 1);
+    MPI_Abort(charmComm, 1);
 }
 
 /**************************  TIMER FUNCTIONS **************************/
@@ -1683,7 +1704,7 @@ int CmiTimerIsSynchronized() {
     void *v;
 
     /*  check if it using synchronized timer */
-    if (MPI_SUCCESS != MPI_Attr_get(MPI_COMM_WORLD, MPI_WTIME_IS_GLOBAL, &v, &flag))
+    if (MPI_SUCCESS != MPI_Attr_get(charmComm, MPI_WTIME_IS_GLOBAL, &v, &flag))
         printf("MPI_WTIME_IS_GLOBAL not valid!\n");
     if (flag) {
         _is_global = *(int*)v;
@@ -1710,7 +1731,7 @@ void CmiTimerInit(char **argv) {
     if (_absoluteTime && CmiMyPe() == 0)
         printf("Charm++> absolute MPI timer is used\n");
 
-#if ! CMK_MEM_CHECKPOINT
+#if ! CMK_MEM_CHECKPOINT && ! CMK_MESSAGE_LOGGING
     _is_global = CmiTimerIsSynchronized();
 #else
     _is_global = 0;
@@ -1726,11 +1747,11 @@ void CmiTimerInit(char **argv) {
 #endif
 
             MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN,
-                          MPI_COMM_WORLD );
+                          charmComm );
             starttimer = minTimer;
         }
     } else { /* we don't have a synchronous timer, set our own start time */
-#if ! CMK_MEM_CHECKPOINT
+#if ! CMK_MEM_CHECKPOINT && ! CMK_MESSAGE_LOGGING
         CmiBarrier();
         CmiBarrier();
         CmiBarrier();
@@ -1829,7 +1850,7 @@ int CmiBarrier() {
          */
         /*START_EVENT();*/
 
-        if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+        if (MPI_SUCCESS != MPI_Barrier(charmComm))
             CmiAbort("Timernit: MPI_Barrier failed!\n");
 
         /*END_EVENT(10);*/
@@ -1853,7 +1874,7 @@ int CmiBarrierZero() {
             for (i=0; i<CmiNumNodes()-1; i++) {
                 START_EVENT();
 
-                if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,BARRIER_ZERO_TAG, MPI_COMM_WORLD,&sts))
+                if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,BARRIER_ZERO_TAG, charmComm,&sts))
                     CmiPrintf("MPI_Recv failed!\n");
 
                 END_EVENT(30);
@@ -1861,7 +1882,7 @@ int CmiBarrierZero() {
         } else {
             START_EVENT();
 
-            if (MPI_SUCCESS != MPI_Send((void *)msg,1,MPI_BYTE,0,BARRIER_ZERO_TAG,MPI_COMM_WORLD))
+            if (MPI_SUCCESS != MPI_Send((void *)msg,1,MPI_BYTE,0,BARRIER_ZERO_TAG,charmComm))
                 printf("MPI_Send failed!\n");
 
             END_EVENT(20);
@@ -1872,15 +1893,15 @@ int CmiBarrierZero() {
 }
 
 
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
 
 void mpi_restart_crashed(int pe, int rank)
 {
     int vals[2];
     vals[0] = pe;
     vals[1] = CpvAccess(_curRestartPhase)+1;
-    MPI_Send((void *)vals,2,MPI_INT,rank,FAIL_TAG,MPI_COMM_WORLD);
-    MPI_Send(petorank, num_workpes, MPI_INT,rank,FAIL_TAG,MPI_COMM_WORLD);
+    MPI_Send((void *)vals,2,MPI_INT,rank,FAIL_TAG,charmComm);
+    MPI_Send(petorank, num_workpes, MPI_INT,rank,FAIL_TAG,charmComm);
 }
 
 /* notify spare processors to exit */
@@ -1889,7 +1910,7 @@ void mpi_end_spare()
     int i;
     for (i=nextrank; i<total_pes; i++) {
         int vals[2] = {-1,-1};
-        MPI_Send((void *)vals,2,MPI_INT,i,FAIL_TAG,MPI_COMM_WORLD);
+        MPI_Send((void *)vals,2,MPI_INT,i,FAIL_TAG,charmComm);
     }
 }
 
@@ -1912,7 +1933,7 @@ void CkDieNow()
         PumpMsgs();
         CmiReleaseSentMessages();
     }
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(charmComm);
     MPI_Finalize();
     exit(0);
 }
@@ -2080,7 +2101,7 @@ static void buildDynamicRecvBuffers()
                         ptr->postedRecvBufs[j] = (char *)CmiAlloc(bufSize);
                         if (MPI_SUCCESS != MPI_Irecv(ptr->postedRecvBufs[j], bufSize, MPI_BYTE,
                                                      MPI_ANY_SOURCE, POST_RECV_TAG+ptr->msgSizeIdx,
-                                                     MPI_COMM_WORLD, ptr->postedRecvReqs+j))
+                                                     charmComm, ptr->postedRecvReqs+j))
                             CmiAbort("MPI_Irecv failed in buildDynamicRecvBuffers!\n");
                     }
 
@@ -2115,7 +2136,7 @@ static void buildDynamicRecvBuffers()
                     one->postedRecvBufs[j] = (char *)CmiAlloc(bufSize);
                     if (MPI_SUCCESS != MPI_Irecv(one->postedRecvBufs[j], bufSize, MPI_BYTE,
                                                  MPI_ANY_SOURCE, POST_RECV_TAG+one->msgSizeIdx,
-                                                 MPI_COMM_WORLD, one->postedRecvReqs+j))
+                                                 charmComm, one->postedRecvReqs+j))
                         CmiAbort("MPI_Irecv failed in buildDynamicRecvBuffers!\n");
                 }
             } /* end if notFound */
@@ -2172,7 +2193,7 @@ static void recordMsgHistogramInfo(int size)
 }
 #endif /* end of MPI_DYNAMIC_POST_RECV */
 
-static void reportMsgHistogramInfo()
+void reportMsgHistogramInfo()
 {
 #if MPI_DYNAMIC_POST_RECV
     int i, count;

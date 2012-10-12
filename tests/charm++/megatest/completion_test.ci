@@ -14,6 +14,7 @@ module completion_test {
       	detector.start_detection(0,
       				 CkCallback(CkIndex_completion_tester::start_test(0),
       					    thisProxy),
+                                 CkCallback(),
       				 CkCallback(CkIndex_completion_tester::finish_test(0),
       					    thisProxy), 0);
       }
@@ -23,6 +24,7 @@ module completion_test {
       	detector.start_detection(1,
       				 CkCallback(CkIndex_completion_tester::start_test(0),
       					    thisProxy),
+                                 CkCallback(),
       				 CkCallback(CkIndex_completion_tester::finish_test(0),
       					    thisProxy), 0);
       }
@@ -32,6 +34,7 @@ module completion_test {
       	detector.start_detection(1,
       				 CkCallback(CkIndex_completion_tester::start_test(0),
       					    thisProxy),
+                                 CkCallback(),
       				 CkCallback(CkIndex_completion_tester::finish_test(0),
       					    thisProxy), 0);
 	detector.ckLocalBranch()->produce();
@@ -44,7 +47,7 @@ module completion_test {
       when finish_test(CkReductionMsg *m) atomic {
 	  int num = 10;
 	  CProxy_completion_array::ckNew(detector, num, num);
-	  detector.start_detection(num, CkCallback(),
+	  detector.start_detection(num, CkCallback(), CkCallback(),
 				   CkCallback(CkIndex_completion_tester::finish_test(0),
 					      thisProxy), 0);
       }

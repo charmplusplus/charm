@@ -1,0 +1,24 @@
+# Entry method prototype.
+snippet entry
+	entry [${3:flags}] void ${1:name}(${2:args});
+# Entry method definition.
+snippet def
+	entry void ${1:name}(${2:args}) {
+		${3:/* code */}
+	};
+# When.
+snippet when
+	when ${1:name}${3:[iter]}(${2:CkReductionMsg *msg}) {
+		${4:/* code */}
+	};
+# main
+snippet main
+	mainmodule ${1:main} {
+		mainchare ${2:Main} {
+			entry $2(${3});
+			${4}
+		};
+	};
+# contribute
+snippet contribute
+	contribute(${1:sizeof(struct)}, ${2:ptr}, CkReduction::${3:client});

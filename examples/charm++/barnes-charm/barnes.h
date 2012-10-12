@@ -257,8 +257,8 @@ class TreePiece : public CBase_TreePiece {
   vector rmin;
 
   public:
-  TreePiece(CmiUInt8 parent, int whichChild, int level, CkArrayIndex1D parent);
-  TreePiece(CmiUInt8 p, int which, int level, real rx, real ry, real rz, real rs, CkArrayIndex1D parent); 
+  TreePiece(CmiUInt8 p, int whichChild, int level, CkArrayIndex1D parent);
+  TreePiece(CmiUInt8 p, int whichChild, int level, real rx, real ry, real rz, real rs, CkArrayIndex1D parent); 
   TreePiece(CkMigrateMessage *m){
   }
   void recvRootFromParent(CmiUInt8 r, real rx, real ry, real rz, real rs);

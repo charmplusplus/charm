@@ -1,12 +1,12 @@
 include ../common.mk
 
-FFTW_HOME=$(HOME)/fftw
+FFTW_HOME=$(HOME)/fftw-bgq
 
 FFTW_LIBDIR=$(FFTW_HOME)/lib
 
 OPTS=-g -O3
 
-INCLUDE=-I$(FFTW_HOME)/include -DFFTW_ENABLE_FLOAT=1
+INCLUDE=-I$(FFTW_HOME)/include -DFFTW_ENABLE_FLOAT=1 -DUSE_FFTW_DECLS=1
 COMPILER=$(CHARMC) $(INCLUDE)
 
 LIB=libmodulePencilFFT.a

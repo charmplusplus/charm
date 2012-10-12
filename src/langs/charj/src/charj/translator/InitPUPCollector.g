@@ -27,6 +27,7 @@ topdown
 
 bottomup
     :   exitMethod
+    |   exitClass
     ;
 
 classType
@@ -50,6 +51,17 @@ enterClass
         }
     ;
 
+exitClass
+    :   ^(TYPE classType IDENT
+        (^('extends' .*))?
+        (^('implements' .*))?
+        (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION | DIVCON_METHOD_DECL |
+            OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
+        {
+            currentClass = null;
+        }
+    ;
+
 enterDefaultConstructor
     :   FORMAL_PARAM_LIST
         {
@@ -62,7 +74,7 @@ enterDefaultConstructor
 
 enterMigrationConstructor
     :    ^(FORMAL_PARAM_LIST ^(FORMAL_PARAM_STD_DECL
-                ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT IDENT)) .
+                ^(MESSAGE_TYPE ^(QUALIFIED_TYPE_IDENT IDENT)) .
             ))
         {
             if (($FORMAL_PARAM_LIST.hasParentOfType(CONSTRUCTOR_DECL) ||

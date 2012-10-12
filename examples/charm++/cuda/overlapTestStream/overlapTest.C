@@ -20,14 +20,14 @@ Main::Main(CkArgMsg *m) {
 
   workers = CProxy_Workers::ckNew(numChares); 
 
-  startTime = CmiWallTimer(); 
+  startTime = CkWallTimer(); 
     
   workers.beginWork(); 
 }
 
 void Main::finishWork(CkReductionMsg *m) {
   delete m;
-  CkPrintf("Elapsed time: %f s\n", CmiWallTimer() - startTime);  
+  CkPrintf("Elapsed time: %f s\n", CkWallTimer() - startTime);  
   CkExit(); 
 }
 

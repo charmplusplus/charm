@@ -65,6 +65,12 @@ typedef struct {
 
 typedef struct _LDObjid {
   int id[OBJ_ID_SZ];
+#if CMK_GLOBAL_LOCATION_UPDATE
+  char dimension;
+  char nInts;
+  char isArrayElement;
+  char locMgrGid; 
+#endif
   CmiBool operator==(const struct _LDObjid& objid) const {
     for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return CmiFalse;
     return CmiTrue;
@@ -248,7 +254,6 @@ void LDDoneRegisteringObjects(LDOMHandle _h);
 LDObjHandle LDRegisterObj(LDOMHandle h, LDObjid id, void *userptr,
 			  int migratable);
 void LDUnregisterObj(LDObjHandle h);
-const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
 
 void * LDObjUserData(LDObjHandle &_h);
 void LDObjTime(LDObjHandle &h, LBRealType walltime, LBRealType cputime);
@@ -355,6 +360,8 @@ int LDMemusage(LDHandle _db);
 }
 #endif /* _cplusplus */
 
+const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
+
 #if CMK_LBDB_ON
 PUPbytes(LDHandle)
 #endif
@@ -366,6 +373,12 @@ PUPmarshall(LDOMid)
 
 inline void LDObjid::pup(PUP::er &p) {
   for (int i=0; i<OBJ_ID_SZ; i++) p|id[i];
+#if CMK_GLOBAL_LOCATION_UPDATE
+  p|dimension;
+  p|nInts;
+  p|isArrayElement;
+  p|locMgrGid;
+#endif
 }
 PUPmarshall(LDObjid)
 

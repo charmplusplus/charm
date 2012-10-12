@@ -1,0 +1,55 @@
+mainmodule jacobi {
+
+// interface for jacobi
+//mainmodule Main {
+    //
+    mainchare Main {
+        entry Main(CkArgMsg* m);
+        entry void finished();
+    };
+//}
+
+    readonly CProxy_Main main_proxy;
+    readonly CProxy_Chunk chunks;
+    readonly double start_time;
+
+
+// interface for chunk
+//module Chunk {
+    //
+    array [1D] Chunk {
+        entry Chunk(int t, int x, int y);
+        entry [reductiontarget] void jacobi(){
+            for (_sdag_jacobi_i = 0; _sdag_jacobi_i < ITER; ++_sdag_jacobi_i) {
+                atomic {
+                    sendStrips();
+                }
+
+                overlap {
+                    when getStripFromLeft(Array<double> s) {
+                        atomic {
+                            processStripFromLeft(s);
+                        }
+
+                    }
+                    when getStripFromRight(Array<double> s) {
+                        atomic {
+                            processStripFromRight(s);
+                        }
+
+                    }
+                }
+                atomic {
+                    for (int j=0; j<WORK; ++j) doStencil();
+                }
+
+            }
+            atomic {
+                main_proxy.finished();
+            }
+        };
+        entry void getStripFromLeft(Array<double> s);
+        entry void getStripFromRight(Array<double> s);
+    };
+//}
+}

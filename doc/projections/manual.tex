@@ -1,5 +1,5 @@
 %\documentclass[10pt,dvips]{article}
-\documentclass[10pt]{article}
+\documentclass[10pt]{report}
 \usepackage{../pplmanual}
 \usepackage[pdftex]{graphicx}
 \usepackage{subfigure}
@@ -26,313 +26,11 @@ Chee Wai Lee, Isaac Dooley, and Sindhura Bandhakavi
 \begin{document}
 \maketitle
 
-\section{Introduction}
+\chapter{Generating Performance Traces}
+\input{tracing}
 
-\projections{} is a performance analysis/visualization framework that
-helps you understand and investigate performance-related problems in
-your parallel (\charmpp{}) application. It is a framework with an
-event tracing component with features that allow you to control the
-amount of information generated and to a lesser degree the amount of
-perturbation the tracing activities introduce into the application. It
-also has a Java-based visualization and analysis component with
-various views that will help present the performance information in a
-visually useful manner.
 
-Performance analysis with \projections{} typically involves 2 simple
-steps:
-
-\begin{enumerate}
-\item 
-Prepare your application code by linking with the appropriate trace
-generation modules and executing it to generate trace data. (see
-section \ref{sec::preparation})
-\item
-Using the Java-based tool to visually study various aspects of the
-performance information to locate application execution performance
-problems. (see section \ref{sec::visualization})
-\end{enumerate}
-
-\section{Preparing the \charmpp{} Application}
-\label{sec::preparation}
-
-The \charmpp{} runtime automatically records pertinent performance
-data at performance-related events encountered by the runtime. These
-events include the start and end of entry method execution, message
-sends from entry methods and scheduler idle time. This means {\em
-most} users will not need to manually insert code into their
-applications in order to generate trace data. In scenarios where
-special performance information not captured by the runtime is
-required, an API (see section \ref{sec::api}) is available for
-user-specific events with some support for visualization by the
-Java-based tool. If greater control over tracing activities
-(e.g. dynamically turning instrumentation on and off) is desired, the
-API also allows users to insert code into their applications for such
-purposes.
-
-The automatic recording of events by the \projections{} framework
-introduces the overhead of an if-statement for each runtime event,
-even if no performance analysis traces are desired. Developers of
-\charmpp{} applications who consider such an overhead to be
-unacceptable (e.g. for a production application which requires the
-absolute best performance) may recompile the \charmpp{} runtime with
-the {\tt -{}-with-production} flag which removes the instrumentation
-stubs.
-
-To enable performance tracing of your application, users simply need
-to link the appropriate trace data generation module(s) (also referred
-to as {\em tracemode(s)}). (see section \ref{sec::trace modules})
-
-\subsection{\projections{} Tracing Modules at Application Link Time}
-\label{sec::trace modules}
-
-\projections{} tracing modules dictate the type of performance data,
-data detail and data format each processor will record. They are also
-refered to as ``tracemodes''. There are currently 2 tracemodes
-available. Zero or more tracemodes may be specified at link-time. When
-no tracemodes are specified, no trace data is generated.
-
-\subsubsection{Tracemode {\tt projections}}
-
-Link time option: {\tt -tracemode projections}
-
-This tracemode generates detailed event log files that contain
-information about all \charmpp{} events like entry method calls and
-message packing during the execution of the program.  The data will be
-used by \projections{} in visualization and analysis.
-
-This tracemode will generate a single symbol table file and $p$ ASCII
-log files for $p$ processors. The names of the log files will be
-NAME.\#.log where NAME is the name of your executable and \# is the
-processor \#. The name of the symbol table file is NAME.sts where NAME
-is the name of your executable.
-
-This is the main source of data expected by the performance
-visualizer. Certain tools like timeline will not work without the
-detailed data from this tracemode.
-
-The following is a list of runtime options available under this tracemode:
-
-\begin{itemize}
-\item
-{\tt +logsize NUM}: keep only NUM log entries in the memory of each
-processor. The logs are emptied and flushed to disk when filled.
-\item
-{\tt +binary-trace}:  generate projections log in binary form.
-\item
-{\tt +gz-trace}:      generate gzip (if available) compressed log files.
-\item
-{\tt +checknested}: a debug option. Checks if events are improperly nested
-while recorded and issue a warning immediately.
-
-\item {\tt +trace-subdirs NUM}: divide the generated log files among
-  {\tt NUM} subdirectories of the trace root, each named {\tt
-    PROGNAME.projdir.K}
-\end{itemize}
-
-\subsubsection{Tracemode {\tt summary}}
-
-Compile option: {\tt -tracemode summary}
-
-In this tracemode, execution time across all entry points for each
-processor is partitioned into a fixed number of equally sized
-time-interval bins. These bins are globally resized whenever they are
-all filled in order to accomodate longer execution times while keeping
-the amount of space used constant.
-
-Additional data like the total number of calls made to each entry
-point is summarised within each processor.
-
-This tracemode will generate a single symbol table file and $p$ ASCII
-summary files for $p$ processors. The names of the summary files will
-be NAME.\#.sum where NAME is the name of your executable and \# is the
-processor \#. The name of the symbol table file is NAME.sum.sts where NAME
-is the name of your executable.
-
-This tracemode can be used to control the amount of output generated
-in a run. It is typically used in scenarios where a quick look at the
-overall utilization graph of the application is desired to identify
-smaller regions of time for more detailed study. Attempting to
-generate the same graph using the detailed logs of the prior tracemode
-may be unnecessarily time consuming or impossible.
-
-The following is a list of runtime options available under this tracemode:
-
-\begin{itemize}
-\item
-{\tt +bincount NUM}:   use NUM time-interval bins. The bins are resized and compacted when filled.
-\item
-{\tt +binsize TIME}:   sets the initial time quantum each bin represents.
-\item
-{\tt +version}:        set summary version to generate.
-%\item
-%{\tt +epThreshold}: DOESNT DO ANYTHING YET. LEFT COMMENTED FOR DOC PURPOSES
-%\item
-%{\tt +epInterval}: DOESNT DO ANYTHING YET. LEFT COMMENTED FOR DOC PURPOSES
-\item
-{\tt +sumDetail}: Generates a additional set of files, one per processor,
-that stores the time spent by each entry method associated with each 
-time-bin. The names of ``summary detail'' files will be NAME.\#.sumd where
-NAME is the name of your executable and \# is the processor \#.
-\item
-{\tt +sumOnly}: Generates an additional file that stores a single
-utilization value per time-bin, averaged across all processors. This
-file bears the name NAME.sum where NAME is the name of your
-executable. This runtime option currently overrides the {\tt
-+sumDetail} option.
-\end{itemize}
-
-\subsection{General Runtime Options}
-\label{sec::general options}
-
-The following is a list of runtime options available with the same
-semantics for all tracemodes:
-
-\begin{itemize}
-\item
-{\tt +traceroot DIR}: place all generated files in DIR.
-\item
-{\tt +traceoff}: trace generation is turned off when the application
-is started. The user is expected to insert code to turn tracing on at
-some point in the run.
-\item
-{\tt +traceWarn}: By default, warning messages from the framework are
-not displayed. This option enables warning messages to be printed to
-screen. However, on large numbers of processors, they can overwhelm
-the terminal I/O system of the machine and result in unacceptable
-perturbation of the application.
-\end{itemize}
-
-
-\subsection{\projections{} API for \charmpp{} Applications}
-\label{sec::api}
-
-\subsubsection{Selective Tracing}
-\label{sec::selective tracing}
-
-\charmpp{} allows user to start/stop tracing the execution at certain
-points in time on the local processor. Users are advised to make these
-calls on all processors and at well-defined points in the application.
-
-Users may choose to have instrumentation turned off at first (by
-command line option {\tt +traceoff} - see section \ref{sec::general options}) if some period of time in middle of the
-application\'s execution is of interest to the user.
-
-Alternatively, users may start the application with instrumentation
-turned on (default) and turn off tracing for specific sections of the
-application.
-
-Again, users are advised to be consistent as the {\tt +traceoff}
-runtime option applies to all processors in the application.
-
-\begin{itemize}
-\item
-{\tt void traceBegin()}
-
-Enables the runtime to trace events (including all user events) on the local processor where {\tt traceBegin} is called.
-
-\item
-{\tt void traceEnd()}
-
-Prevents the runtime from tracing events (including all user events) on the local processor where {\tt traceEnd} is called.
-
-\end{itemize}
-
-\subsubsection{User Events}
-\label{sec::user events}
-
-\projections{} has the ability to visualize traceable user
-specified events. User events are usually displayed in the Timeline view as vertical bars above the entry methods. Alternatively the user event can be displayed as a vertical bar that vertically spans the timelines for all processors. Follow these following basic steps for creating user events in a charm++ program:
-
-\begin{enumerate}
-\item
-Register an event with an identifying string and either specify or acquire
-a globally unique event identifier. All user events that are not registered will be displayed in white.
-
-\item
-Use the event identifier to specify trace points in your code of interest to you.
-\end{enumerate}
-
-The functions available are as follows:
-
-\begin{itemize}
-\item
-{\tt int traceRegisterUserEvent(char* EventDesc, int EventNum=-1) }
-
-This function registers a user event by associating {\tt EventNum} to
-{\tt EventDesc}. If {\tt EventNum} is not specified, a globally unique
-event identifier is obtained from the runtime and returned. The string {\tt EventDesc} must either be a constant string, or it can be a dynamically allocated string that is {\bf NOT} freed by the program. If the {\tt EventDesc} contains a substring ``***'' then the Projections Timeline tool will draw the event vertically spanning all PE timelines.
-
-{\tt EventNum} has to be the same on all processors. Therefore use one of the following methods to ensure the same value for any PEs generating the user events:
-
-\begin{enumerate}
-\item
-Call {\tt traceRegisterUserEvent} on PE 0 in main::main without specifying
-an event number, and store returned event number into a readonly variable.
-\item
-Call {\tt traceRegisterUserEvent} and specify the event number on
-processor 0. Doing this on other processors would have no
-effect. Afterwards, the event number can be used in the following user
-event calls.
-\end{enumerate}
-
-Eg. {\tt traceRegisterUserEvent("Time Step Begin", 10);}
-
-Eg. {\tt eventID = traceRegisterUserEvent(``Time Step Begin'');}
-
-\end{itemize}
-
-
-
-There are two main types of user events, bracketed and non bracketed. Non-bracketed user events mark a specific point in time. Bracketed user events span an arbitrary contiguous time range. Additionally, the user can supply a short user supplied text string that is recorded with the event in the log file. These strings should not contain newline characters, but they may contain simple html formatting tags such as \texttt{<br>}, \texttt{<b>}, \texttt{<i>}, \texttt{<font color=\#ff00ff>}, etc.
-
-The calls for recording user events are the following:
-
-\begin{itemize}
-
-
-\item
-{\tt void traceUserEvent(int EventNum) }
-
-This function creates a user event that marks a specific point in time.
-
-Eg. {\tt traceUserEvent(10);}
-
-\item
-{\tt void traceUserBracketEvent(int EventNum, double StartTime, double EndTime) }
-
-This function records a user event spanning a time interval from {\tt StartTime} to {\tt EndTime}. Both {\tt StartTime} and {\tt EndTime} should be obtained from a call to {\tt CmiWallTimer()} at the appropriate point in the program.
-
-Eg.
-\begin{verbatim}
-   traceRegisterUserEvent("Critical Code", 20); // on PE 0
-   double critStart = CmiWallTimer();;  // start time
-   // do the critical code
-   traceUserBracketEvent(20, critStart,CmiWallTimer());
-\end{verbatim}
-
-
-
-
-
-\item
-{\tt void traceUserSuppliedNote(char * note) }
-
-This function records a user specified text string at the current time.
-
-
-
-
-\item
-{\tt void traceUserSuppliedBracketedNote(char *note, int EventNum, double StartTime, double EndTime)}
-
-This function records a user event spanning a time interval from {\tt StartTime} to {\tt EndTime}. Both {\tt StartTime} and {\tt EndTime} should be obtained from a call to {\tt CmiWallTimer()} at the appropriate point in the program.
-
-Additionally, a user supplied text string is recorded, and the  {\tt EventNum} is recorded. These events are therefore displayed with colors determined by the {\tt EventNum}, just as those generated with {\tt traceUserBracketEvent} are.
-
-\end{itemize}
-
-
-\subsubsection{Function-level Tracing for Adaptive MPI Applications}
+\subsection{Function-level Tracing for Adaptive MPI Applications}
 \label{sec::AMPI functions}
 
 Adaptive MPI (AMPI) is an implementation of the MPI interface on top
@@ -410,7 +108,7 @@ AMPI function events captured by the use of this API are recognized by
 the visualization system and used for special AMPI-specific views in
 addition to standard \charmpp{} entry methods.
 
-%\subsubsection{Tracing POSE Parallel Discrete Event Simulation Abstractions}
+%\subsection{Tracing POSE Parallel Discrete Event Simulation Abstractions}
 %\label{sec::POSE}
 %
 %Parallel Object-oriented Simulation Environment (POSE) is a parallel
@@ -426,57 +124,18 @@ addition to standard \charmpp{} entry methods.
 %is executed with the {\tt +dop\_pose} runtime option. No additional
 %user intervention is required.
 
-\section{Advanced Tracing Features}
-\label{sec::advanced tracing features}
-
-\subsection{End-of-run Analysis for Data Reduction}
-\label{sec::data reduction}
-
-As applications are scaled to thousands or hundreds of thousands of
-processors, the amount of data generated becomes extremely large and
-potentially unmanagable by the visualization tool. At the time of this
-documentation, \projections{} is capable of handling data from 8000+
-processors but with somewhat severe tool responsiveness issues. We
-have developed an approach to mitigate this data size problem with
-options to trim-off ``uninteresting'' processors' data by not writing
-such data at the end of an application's execution.
-
-This is currently done through heuristics to pick out interesting
-extremal (i.e. poorly behaved) processors and at the same time using a
-k-means clustering to pick out exemplar processors from equivalence
-classes to form a representative subset of processor data. The analyst
-is advised to also link in the summary module via {\tt +tracemode
-summary} and enable the {\tt +sumDetail} option in order to retain
-some profile data for processors whose data were dropped.
-
-\begin{itemize}
-\item
-{\tt +extrema}: enables extremal processor identification analysis at
-the end of the application's execution.
-\item
-{\tt +numClusters}: determines the number of clusters (equivalence
-classes) to be used by the k-means clustering algorithm for
-determining exemplar processors. Analysts should take advantage of
-their knowledge of natural application decomposition to guess at a
-good value for this.
-\end{itemize}
-
-This feature is still being developed and refined as part of our
-research. It would be appreciated if users of this feature could
-contact the developers if you have input or suggestions.
-
 \newpage
 
-\section{The \projections{} Performance Visualization Tool}
+\chapter{The \projections{} Performance Visualization Tool}
 \label{sec::visualization}
 
-The \projections{} Java-based visualization tool (henceforth refered
+The \projections{} Java-based visualization tool (henceforth refereed
 to as simply \projections{}) comes pre-built with the \charmpp{}
 source release. It can be located at \\ {\tt
-CHARM\_LOCATION/tools/projections} which will henceforth be refered to
+CHARM\_LOCATION/tools/projections} which will henceforth be refereed to
 as {\tt PROJECTIONS\_LOCATION}.
 
-\subsection{Building \projections{}}
+\section{Building \projections{}}
 
 To rebuild \projections{} (optional) from the source:
 
@@ -498,9 +157,9 @@ To rebuild \projections{} (optional) from the source:
       {\tt projections.jar}       : archive of all the java and image files
 \end{enumerate}
 
-\subsection{Visualization and Analysis using \projections{}}
+\section{Visualization and Analysis using \projections{}}
 
-\subsubsection{Starting Up}
+\subsection{Starting Up}
 \label{sec:startingUp}
 From any location, type: \\
 {\tt > PROJECTIONS\_LOCATION/bin/projections [NAME.sts]} \\
@@ -601,7 +260,7 @@ its available features.
 There should not be any serious performance issues involved in the
 loading of summary data on the main window.
 
-\subsubsection{Available Tools}
+\subsection{Available Tools}
 \label{sec::available tools}
 
 The following tools and views become available to you after a dataset
@@ -652,9 +311,9 @@ interval. While the {\bf Graphs} view can show the same data, it is
 unable to stack the entry points, which proves useful in some cases.
 \end{itemize}
 
-\subsection{Performance Views}
+\section{Performance Views}
 
-\subsubsection{Graphs}
+\subsection{Graphs}
 \label{sec::graph view}
 
 %{\bf Introduction}
@@ -815,7 +474,7 @@ The Graph Window has 3 components in its display:
    \end{itemize}
 \end{enumerate}
 
-\subsubsection{Timelines}
+\subsection{Timelines}
 \label{sec::timeline view}
 
 %{\bf Introduction}
@@ -927,7 +586,7 @@ event bars in the display area. If the name of the user event contains a substri
 
 Message pack times and send points can be displayed below the event
 bars. The message sends are small white tick marks, while the message
-pack times are small pink bars usually occurring immediatly after the
+pack times are small pink bars usually occurring immediately after the
 message send point. If zoomed in to a point where each microsecond
 takes more than one pixel, the message send point and the following
 packing time may appear disconnected. This is an inherent problem with
@@ -989,7 +648,7 @@ over the desired time-period before proceeding to use this view. If
 choose a smaller time range or fewer processors. We expect to add features to alleviate
 this problem in future releases.
 
-\subsubsection{Usage Profile}
+\subsection{Usage Profile}
 \label{sec::usage profile}
 The Usage Profile window (see figure \ref{usage profile}) lets you see
 percentage-wise what each processor spends its time on during a
@@ -1071,7 +730,7 @@ through Java's garbage collection system.
 
 \end{itemize}
 
-\subsubsection{Communication}
+\subsection{Communication}
 \label{sec::communication}
 
 The communication tool (see figure \ref{communication}) visualizes
@@ -1111,7 +770,7 @@ by an entry methods. This is available when the runtime option {\tt -bgsize}
 
 This view uses memory proportional to the number of processors selected.
 
-\subsubsection{Communication vs Time}
+\subsection{Communication vs Time}
 
 The communication over time tool (see figure \ref{communication-time})
 visualizes communication properties over all processors and displayed
@@ -1150,7 +809,7 @@ Bluegene machine).
 
 This view has no known problems loading any range or volume of data.
 
-\subsubsection{View Log Files}
+\subsection{View Log Files}
 
 This window (see figure \ref{viewlog}) lets you see a translation of a
 log file from a bunch of numbers to a verbose version.  A dialog box
@@ -1190,7 +849,7 @@ The tool has 2 buttons. ``Open File'' reloads the dialog box (described
 above) and allows the user to select a new processor's data to be loaded.
 ``Close Window'' closes the current window.
 
-\subsubsection{Histograms}
+\subsection{Histograms}
 
 This module (see figure \ref{histogram}) allows you to examine the
 performance property distribution of all your entry points (EP). It
@@ -1288,7 +947,7 @@ The performance of this view is affected by the number of bins the
 user wishes to analyze. We recommend the user limits the analysis to
 1,000 bins or less.
 
-\subsubsection{Overview}
+\subsection{Overview}
 
 Overview (see figure \ref{overview}) gives users an overview of the
 utilization of all processors during the execution over a
@@ -1366,7 +1025,7 @@ skipping processors (e.g. {\tt 0-8191:2} instead of {\tt
 0-8191}). This should show the general application structure almost as
 well as using the full processor range.
 
-\subsubsection{Animations}
+\subsection{Animations}
 
 This window (see figure \ref{animation}) animates the processor usage
 over a specified range of time and a specified interval size.
@@ -1383,7 +1042,7 @@ that of the Graph tool (see section \ref{sec::graph view}).
 \end{figure}
 
 A color temperature bar serves as a legend for displaying different
-processor utilizations as the animation progresses. Each time interval
+processor utilization as the animation progresses. Each time interval
 will have its data rendered as a frame. A frame displays in text on
 the top of the display the currently represented execution time of the
 application and what the size of an interval is.
@@ -1408,7 +1067,7 @@ view via the dialog box.
 
 This view has no known performance issues.
 
-\subsubsection{Time Profile Graph}
+\subsection{Time Profile Graph}
 
 The Time Profile view (see figure \ref{time profile}) is a
 visualization of the amount of time contributed by each entry method
@@ -1455,7 +1114,7 @@ This tool's performance is tied to the number of intervals desired by
 the user. We recommend that the user stick to visualizing 1,000
 intervals or less.
 
-\subsubsection{User Events Profile}
+\subsection{User Events Profile}
 
 The User Events view is essentially a usage profile (See section
 \ref{sec::usage profile}) of bracketed user events (if any) that were
@@ -1477,9 +1136,9 @@ proportional to the number of processors to be displayed.
 
 \input{View_Outlier}
 
-\subsubsection{Multirun Analysis}
+\subsection{Multirun Analysis}
 
-\subsubsection{Function Tool}
+\subsection{Function Tool}
 \label{sec::function tool}
 The Function Tool view presents a graph that is a usage profile (See
 section \ref{sec::usage profile}) of AMPI function information. This
@@ -1496,9 +1155,9 @@ time} (i.e. time within functions are computed by subtracting the
 measured time spent minus the time spent by any calls to nested
 functions).
 
-%\subsubsection{POSE Analysis}
+%\subsection{POSE Analysis}
 
-\subsubsection{AMPI Usage Profile}
+\subsection{AMPI Usage Profile}
 
 The AMPI Usage Profile view presents a graph similar to Function
 Tool's (See section \ref{sec::function tool}) with several
@@ -1519,10 +1178,10 @@ showing the percentage utilization for a different AMPI function.
 
 \input{View_NoiseMiner}
 
-\subsection{Miscellaneous features}
+\section{Miscellaneous features}
 \label{sec::misc}
 
-\subsubsection{Standard Graph Display Interface} 
+\subsection{Standard Graph Display Interface} 
 
 A standard graph display (an example of which can be found with the
 Main Summary Graph - figure \ref{mainwindow}) has the following
@@ -1555,7 +1214,7 @@ similarly to the {\bf x-scale} feature where the buttons and fields are
 concerned.
 \end{itemize}
 
-\subsubsection{Standard Dialog Features}
+\subsection{Standard Dialog Features}
 
 \begin{figure}[htb]
 \center
@@ -1609,7 +1268,7 @@ list. Clicking on any one item changes the start and end times on the
 dialog box.
 \end{itemize}
 
-\subsubsection{Data Fields}
+\subsection{Data Fields}
 
 Throughout \projections{} tools and dialog boxes (see sample figure
 \ref{standard dialog}), data entry fields are provided. Unless

@@ -288,9 +288,10 @@ MulticastAgent::MulticastAgent(BaseLB::LDStats* stats, int p): Agent(p)
     LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
     for (int i=0; i<nobjs; i++) {
        int receiver = stats->getHash(objs[i]);
-       if((sender == -1)||(receiver == -1))
+       if((sender == -1)||(receiver == -1)) {
          if (_lb_args.migObjOnly()) continue;
          else CkAbort("Error in search\n");
+       }
        objmap[receiver].push_back(mID);
        minfo.objs.push_back(receiver);
     }
