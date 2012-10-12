@@ -195,6 +195,7 @@ public:
   };
 
   void DoneRegisteringObjects(LDOMHandle _om);
+  void ResetAdaptive();
 
   inline LDObjHandle RegisterObj(LDOMHandle h, LDObjid id,
 			  void *userptr,int migratable) {

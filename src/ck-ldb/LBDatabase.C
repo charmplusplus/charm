@@ -491,13 +491,22 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 #endif
 }
 
-void LBDatabase::DoneRegisteringObjects() {
+void LBDatabase::ResetAdaptive() {
+	if (metabalancer == NULL) {
+		metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
+	}
+	if (metabalancer != NULL) {
+		metabalancer->ResetAdaptive();
+	}
+}
+
+void LBDatabase::DoneRegisteringObjects(LDOMHandle _om) {
 	LDDoneRegisteringObjects(_om);
 #if CMK_LBDB_ON
 	if (metabalancer == NULL) {
 		metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
 	}
-	if (metabalancer != NULL) {
+	if (metabalancer != NULL && getLBDB()->ObjDataCount() == 0) {
 		metabalancer->HandleAdaptiveNoObj();
 	}
 #endif
