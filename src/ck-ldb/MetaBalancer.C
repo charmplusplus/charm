@@ -21,9 +21,9 @@
 #define MIN_STATS 6
 #define STATS_COUNT 8 // The number of stats collected during reduction
 
-#   define DEBAD(x) CkPrintf x
-#   define DEBADDETAIL(x) /*CkPrintf x*/
-#   define EXTRA_FEATURE 0
+#define DEBAD(x) CkPrintf x
+#define DEBADDETAIL(x) /*CkPrintf x*/
+#define EXTRA_FEATURE 0
 
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   double lb_data[STATS_COUNT];
@@ -232,7 +232,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     total_load_vec[index] = 0.0;
     total_count_vec[index] = 0;
 
-    DEBAD(("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n",
+    DEBADDETAIL(("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n",
         CkMyPe(), total_load_vec[index], idle_time,
         idle_time/total_load_vec[index], adaptive_struct.lb_iteration_no));
 
@@ -579,7 +579,8 @@ void MetaBalancer::LoadBalanceDecision(int req_no, int period) {
     DEBAD(("Error!!! Received a request which was already sent or old\n"));
     return;
   }
-  DEBAD(("[%d] Load balance decision made cur iteration: %d period:%d\n",CkMyPe(), adaptive_struct.lb_iteration_no, period));
+  DEBADDETAIL(("[%d] Load balance decision made cur iteration: %d period:%d\n",
+			CkMyPe(), adaptive_struct.lb_iteration_no, period));
   adaptive_struct.tentative_period = period;
   adaptive_struct.lb_msg_recv_no = req_no;
   thisProxy[0].ReceiveIterationNo(req_no, adaptive_struct.lb_iteration_no);
@@ -589,7 +590,8 @@ void MetaBalancer::LoadBalanceDecisionFinal(int req_no, int period) {
   if (req_no < adaptive_struct.lb_msg_recv_no) {
     return;
   }
-  DEBAD(("[%d] Final Load balance decision made cur iteration: %d period:%d \n",CkMyPe(), adaptive_struct.lb_iteration_no, period));
+  DEBADDETAIL(("[%d] Final Load balance decision made cur iteration: %d \
+			period:%d \n",CkMyPe(), adaptive_struct.lb_iteration_no, period));
   adaptive_struct.tentative_period = period;
   adaptive_struct.final_lb_period = period;
   lbdatabase->AdaptResumeSync(period);
@@ -610,7 +612,8 @@ void MetaBalancer::ReceiveIterationNo(int req_no, int local_iter_no) {
     if (adaptive_struct.global_max_iter_no > adaptive_struct.tentative_max_iter_no) {
       adaptive_struct.tentative_max_iter_no = adaptive_struct.global_max_iter_no;
     }
-    period = (adaptive_struct.tentative_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.tentative_period : adaptive_struct.global_max_iter_no + 1;
+    period = (adaptive_struct.tentative_period > adaptive_struct.global_max_iter_no) ?
+				adaptive_struct.tentative_period : adaptive_struct.global_max_iter_no + 1;
     // If no one has gone into load balancing stage, then we can safely change
     // the period otherwise keep the old period.
     if (adaptive_struct.global_max_iter_no < adaptive_struct.final_lb_period) {
