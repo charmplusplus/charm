@@ -131,7 +131,9 @@ void MetaBalancer::init(void) {
   lb_in_progress = false;
 
   is_prev_lb_refine = -1;
-  periodicCall((void *) this);
+  if (_lb_args.metaLbOn()) {
+    periodicCall((void *) this);
+  }
 }
 
 void MetaBalancer::pup(PUP::er& p) {

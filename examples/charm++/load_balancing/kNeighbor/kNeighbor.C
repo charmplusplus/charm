@@ -121,16 +121,18 @@ class Main: public CBase_Main {
 	return;
       }
 
-      gStarttime = CkWallTimer();
-	array.commWithNeighbors();
+      gStarttime = CmiWallTimer();
+      for (int i=0; i<num_chares; i++)
+	array[i].commWithNeighbors();
     }
 
     void resumeIter() {
 #if DEBUG
       CkPrintf("Resume iteration at step %d\n", currentStep);
 #endif
-      gStarttime = CkWallTimer();
-	array.commWithNeighbors();
+      gStarttime = CmiWallTimer();
+      for (int i=0; i<num_chares; i++)
+	array[i].commWithNeighbors();
     }
 
     void terminate(CkReductionMsg *msg) {
@@ -156,7 +158,7 @@ class Main: public CBase_Main {
     void nextStep(CkReductionMsg  *msg) {
       maxTime = *((double *)msg->getData());
       delete msg;
-      double wholeStepTime = CkWallTimer() - gStarttime;
+      double wholeStepTime = CmiWallTimer() - gStarttime;
       timeRec[currentStep] = wholeStepTime/CALCPERSTEP;
       if(currentStep % 10 == 0)
 	CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
@@ -281,7 +283,7 @@ class Block: public CBase_Block {
 
       // Send msgs to neighbors
       for (int i=0; i<numNeighbors; i++) {
-	//double memtimer = CkWallTimer();
+	//double memtimer = CmiWallTimer();
 
 	toNeighborMsg *msg = iterMsg[i];
 
@@ -289,9 +291,9 @@ class Block: public CBase_Block {
 	CkPrintf("[%d]: send msg to neighbor[%d]=%d\n", thisIndex, i, neighbors[i]);
 #endif
 	msg->setMsgSrc(thisIndex, i);
-	//double entrytimer = CkWallTimer();
+	//double entrytimer = CmiWallTimer();
 	thisProxy(neighbors[i]).recvMsgs(msg);
-	//double entrylasttimer = CkWallTimer();
+	//double entrylasttimer = CmiWallTimer();
 	//if(thisIndex==0){
 	//	CkPrintf("At current step %d to neighbor %d, msg creation time: %f, entrymethod fire time: %f\n", internalStepCnt, neighbors[i], entrytimer-memtimer, entrylasttimer-entrytimer);
 	//}
@@ -310,7 +312,7 @@ class Block: public CBase_Block {
 	  iterMsg[i] = new(curIterMsgSize/4, 0) toNeighborMsg(curIterMsgSize/4);
       }
 
-      startTime = CkWallTimer();
+      startTime = CmiWallTimer();
       startInternalIteration();
     }
 
@@ -322,14 +324,14 @@ class Block: public CBase_Block {
 #endif
 
       iterMsg[fromNID] = m;
-      //recvTimes[fromNID] += (CkWallTimer() - startTime);
+      //recvTimes[fromNID] += (CmiWallTimer() - startTime);
 
       //get one step time and send it back to mainProxy
       numNborsRcvd++;
       if (numNborsRcvd == numNeighbors) {
 	internalStepCnt++;
 	if (internalStepCnt==CALCPERSTEP) {
-	  double iterCommTime = CkWallTimer() - startTime;
+	  double iterCommTime = CmiWallTimer() - startTime;
 	  contribute(sizeof(double), &iterCommTime, CkReduction::max_double);
 	  /*if(thisIndex==0){
 	    for(int i=0; i<numNeighbors; i++){

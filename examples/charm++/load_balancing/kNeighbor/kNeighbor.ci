@@ -3,7 +3,6 @@ mainmodule kNeighbor {
   readonly int num_chares;
   readonly int gMsgSize;
   readonly int gLBFreq;
-  readonly int numSteps;
 
   message toNeighborMsg {
     int data[];
