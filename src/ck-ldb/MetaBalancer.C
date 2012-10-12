@@ -111,6 +111,7 @@ void MetaBalancer::init(void) {
   adaptive_struct.final_lb_period =  INT_MAX;
   adaptive_struct.lb_calculated_period = INT_MAX;
   adaptive_struct.lb_iteration_no = -1;
+  adaptive_struct.finished_iteration_no = -1;
   adaptive_struct.global_max_iter_no = 0;
   adaptive_struct.tentative_max_iter_no = -1;
   adaptive_struct.global_recv_iter_counter = 0;
@@ -156,6 +157,7 @@ void MetaBalancer::ResumeClients() {
   adaptive_struct.final_lb_period =  INT_MAX;
   adaptive_struct.lb_calculated_period = INT_MAX;
   adaptive_struct.lb_iteration_no = -1;
+  adaptive_struct.finished_iteration_no = -1;
   adaptive_struct.global_max_iter_no = 0;
   adaptive_struct.tentative_max_iter_no = -1;
   adaptive_struct.global_recv_iter_counter = 0;
@@ -178,6 +180,10 @@ int MetaBalancer::get_iteration() {
   return adaptive_struct.lb_iteration_no;
 }
 
+int MetaBalancer::get_finished_iteration() {
+  return adaptive_struct.finished_iteration_no;
+}
+
 bool MetaBalancer::AddLoad(int it_n, double load) {
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
@@ -186,8 +192,8 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
       total objs %d\n", CkMyPe(), it_n, total_count_vec[index],
       lbdatabase->getLBDB()->ObjDataCount()));
 
-  if (it_n < adaptive_struct.lb_iteration_no) {
-    CkAbort("Error!! Received load for previous iteration\n");
+  if (it_n <= adaptive_struct.finished_iteration_no) {
+    CkAbort("Error!! Received load for iteration that has contributed\n");
   }
   if (it_n > adaptive_struct.lb_iteration_no) {
     adaptive_struct.lb_iteration_no = it_n;
@@ -238,9 +244,10 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     total_load_vec[index] = 0.0;
     total_count_vec[index] = 0;
 
+    adaptive_struct.finished_iteration_no = it_n;
     DEBADDETAIL(("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n",
         CkMyPe(), total_load_vec[index], idle_time,
-        idle_time/total_load_vec[index], adaptive_struct.lb_iteration_no));
+        idle_time/total_load_vec[index], adaptive_struct.finished_iteration_no));
 
     CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
     contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
@@ -676,9 +683,9 @@ void MetaBalancer::checkForNoObj(void *ad) {
 // Called by LBDatabase to indicate that no objs are there in this processor
 void MetaBalancer::HandleAdaptiveNoObj() {
   if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
-    adaptive_struct.lb_iteration_no++;
+    adaptive_struct.finished_iteration_no++;
     DEBAD(("(%d) --HandleAdaptiveNoObj %d\n", CkMyPe(),
-          adaptive_struct.lb_iteration_no));
+          adaptive_struct.finished_iteration_no));
     thisProxy[0].RegisterNoObjCallback(CkMyPe());
     TriggerAdaptiveReduction();
   }
@@ -700,16 +707,16 @@ void MetaBalancer::RegisterNoObjCallback(int index) {
   // trigger reduction.
   if (adaptive_lbdb.lb_iter_no != -1) {
     DEBAD(("Collection already started now %d so kick in\n",
-        adaptive_struct.lb_iteration_no));
+        adaptive_struct.finished_iteration_no));
     thisProxy[index].TriggerAdaptiveReduction();
   }
 }
 
 void MetaBalancer::TriggerAdaptiveReduction() {
   if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
-    adaptive_struct.lb_iteration_no++;
+    adaptive_struct.finished_iteration_no++;
     double lb_data[STATS_COUNT];
-    lb_data[0] = adaptive_struct.lb_iteration_no;
+    lb_data[0] = adaptive_struct.finished_iteration_no;
     lb_data[1] = 1;
     lb_data[2] = 0.0;
     lb_data[3] = 0.0;
@@ -719,7 +726,7 @@ void MetaBalancer::TriggerAdaptiveReduction() {
     lb_data[7] = 0.0;
 
     DEBAD(("[%d] Triggered adaptive reduction for noobj %d\n", CkMyPe(),
-          adaptive_struct.lb_iteration_no));
+          adaptive_struct.finished_iteration_no));
 
     CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL),
         thisProxy[0]);

@@ -84,21 +84,14 @@ public:
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
-  //void ProcessAtSyncMin(void);
   void SendStats();
-  //void SendMinStats();
   void ReceiveCounts(CkReductionMsg *);
-  //void ReceiveMinStats(CkReductionMsg *);
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
   void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
   
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
   void ResumeClients(int);                      // Resuming clients needs
-
- // void LoadBalanceDecision(int, int);
- // void LoadBalanceDecisionFinal(int, int);
- // void ReceiveIterationNo(int, int); // Receives the current iter no
 
   void ResumeClients(CkReductionMsg *); // to be resumed via message
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
@@ -239,24 +232,6 @@ protected:
   void findSimResults(LDStats* stats, int count, 
                       LBMigrateMsg* msg, LBSimulation* simResults);
   void removeNonMigratable(LDStats* statsDataList, int count);
-
-  virtual void UpdateLBDBWithData(int is_prev_lb_refine, double lb_max,
-      double lb_avg, double local_comm, double remote_comm) {
-//NOTE    theLbdb->UpdateAfterLBData(is_prev_lb_refine, lb_max, lb_avg, local_comm,
-//        remote_comm);
-  }
-
-  virtual void GetPrevLBData(int& is_prev_lb_refine, double& lb_max_avg_ratio,
-      double& local_remote_comm_ratio) {
-// NOTE    theLbdb->GetPrevLBData(is_prev_lb_refine, lb_max_avg_ratio,
-//        local_remote_comm_ratio);
-  }
-
-  virtual void GetLBDataForLB(int prev_lb, double& lb_max_avg_ratio, double&
-      local_remote_comm_ratio) {
-// NOTE    theLbdb->GetLBDataForLB(prev_lb, lb_max_avg_ratio, local_remote_comm_ratio);
-  }
-
 
 private:  
   CProxy_CentralLB thisProxy;

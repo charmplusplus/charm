@@ -44,6 +44,7 @@ public:
 
   void ResetAdaptive();
   int get_iteration();
+  int get_finished_iteration();
   bool AddLoad(int iteration, double load);
   void ReceiveMinStats(CkReductionMsg *);
   void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);
@@ -120,7 +121,10 @@ private:
     int final_lb_period;
     // This is based on the linear extrapolation
     int lb_calculated_period;
+    // Current maximum iteration no of any chare on this processor
     int lb_iteration_no;
+    // This corresponds to the last iteration that was contributed
+    int finished_iteration_no;
     // This is set when all the processor sends the maximum iteration no
     int global_max_iter_no;
     // This keeps track of what was the max iteration no we had previously

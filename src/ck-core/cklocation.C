@@ -1246,7 +1246,7 @@ void CkMigratable::AtSync(int waitForMigration)
   double tmp = prev_load;
   prev_load = myRec->getObjTime();
   double current_load = prev_load - tmp;
-  if (atsync_iteration < myRec->getMetaBalancer()->get_iteration()) {
+  if (atsync_iteration <= myRec->getMetaBalancer()->get_finished_iteration()) {
     CkPrintf("[%d:%s] Error!! Contributing to iter %d < current iter %d\n",
       CkMyPe(), idx2str(thisIndexMax), atsync_iteration,
       myRec->getMetaBalancer()->get_iteration());

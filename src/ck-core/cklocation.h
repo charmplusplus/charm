@@ -30,7 +30,6 @@ public:
 #include "LBDatabase.h"
 #include "MetaBalancer.h"
 class LBDatabase;
-class MetaBalancer;
 //#endif
 
 //Forward declarations

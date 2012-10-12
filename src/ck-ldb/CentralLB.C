@@ -11,17 +11,8 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
-//#include "limits.h"
-#include <vector>
-
-#define alpha 4.0e-6
-#define beta 2.67e-9
-#define percent_overhead 10
-
-
 #define  DEBUGF(x)       // CmiPrintf x;
 #define  DEBUG(x)        // x;
-#define  DEBAD(x)        // CmiPrintf x
 
 #if CMK_MEM_CHECKPOINT
    /* can not handle reduction in inmem FT */
@@ -52,77 +43,10 @@ CkGroupID loadbalancer;
 int * lb_ptr;
 int load_balancer_created;
 
-//struct AdaptiveData {
-//  int iteration;
-//  double max_load;
-//  double avg_load;
-//};
-//
-//struct AdaptiveLBDatabase {
-//  std::vector<AdaptiveData> history_data;
-//} adaptive_lbdb;
-//
-//enum state {
-//  OFF,
-//  ON,
-//  PAUSE,
-//  DECIDED,
-//  LOAD_BALANCE
-//} local_state;
-//
-//struct AdaptiveLBStructure {
-//  int lb_ideal_period;
-//  int lb_calculated_period;
-//  int lb_no_iterations;
-//  int global_max_iter_no;
-//  int global_recv_iter_counter;
-//  bool in_progress;
-//  double prev_load;
-//  double lb_strategy_cost;
-//  double lb_migration_cost;
-//  bool lb_period_informed;
-//  int lb_msg_send_no;
-//  int lb_msg_recv_no;
-//} adaptive_struct;
-
 CreateLBFunc_Def(CentralLB, "CentralLB base class")
 
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
-
-//CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
-//  double lb_data[4];
-//  lb_data[0] = 0;
-//  lb_data[1] = 0;
-//  lb_data[2] = 0;
-//  for (int i = 0; i < nMsg; i++) {
-//    CkAssert(msgs[i]->getSize() == 4*sizeof(double));
-//    double* m = (double *)msgs[i]->getData();
-//    lb_data[0] += m[0];
-//    lb_data[1] = ((m[1] > lb_data[1])? m[1] : lb_data[1]);
-//    lb_data[2] += m[2];
-//    if (i == 0) {
-//      lb_data[3] = m[3];
-//    }
-//    if (m[3] != lb_data[3]) {
-//      CkPrintf("Error!!! Reduction is intermingled between iteration %lf and\
-//      %lf\n", lb_data[3], m[3]);
-//    }
-//  }
-//  return CkReductionMsg::buildNew(4*sizeof(double), lb_data);
-//}
-//
-///*global*/ CkReduction::reducerType lbDataCollectionType;
-///*initcall*/ void registerLBDataCollection(void) {
-//  lbDataCollectionType = CkReduction::addReducer(lbDataCollection);
-//}
-
-/*
-void CreateCentralLB()
-{
-  CProxy_CentralLB::ckNew(0);
-}
-*/
 
 void CentralLB::staticStartLB(void* data)
 {
@@ -245,9 +169,8 @@ void CentralLB::turnOff()
 
 void CentralLB::AtSync()
 {
-//  CkPrintf("AtSync CEntral LB [%d]\n", CkMyPe());
 #if CMK_LBDB_ON
-//  DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
+  DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	CpvAccess(_currentObj)=this;
@@ -278,17 +201,6 @@ void CentralLB::ProcessAtSync()
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
   }
- double total_load;
- double idle_time;
- double bg_walltime;
- theLbdb->GetTime(&total_load,&total_load, &idle_time, &bg_walltime, &bg_walltime);
- theLbdb->IdleTime(&idle_time);
- DEBAD(("Total walltime [%d] %lf: %lf: %lf final laod: %lf\n", CkMyPe(),
-    total_load, idle_time, bg_walltime, (total_load - idle_time - bg_walltime)));
-
-// CkPrintf("Total walltime [%d] %lf: %lf: %lf final laod: %lf\n", CkMyPe(),
-//    total_load, idle_time, bg_walltime, (total_load - idle_time - bg_walltime));
-
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	initMlogLBStep(thisgroup);
@@ -1178,26 +1090,6 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   getPredictedLoadWithMsg(stats, clients, msg, info, 0);
   LBRealType mLoad, mCpuLoad, totalLoad, totalLoadWComm;
   info.getSummary(mLoad, mCpuLoad, totalLoad);
-  //CkPrintf("CharmLB> Max load w/o comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
-  //info.print();
-//NOTE!!  theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
-
-  //getPredictedLoadWithMsg(stats, clients, msg, info,1);
-  //info.getSummary(mLoad, mCpuLoad, totalLoadWComm);
-  //info.print();
-  //CkPrintf("CharmLB> Max load with comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
-  //int nmsgs, nbytes;
-  //stats->computeNonlocalComm(nmsgs, nbytes);
-  //CkPrintf("CharmLB> Non local communication %d msg and %d bytes\n", nmsgs, nbytes);
-
-
-  //long msg_n;
-  //long long bytes_n;
-  //stats->computeComm(msg_n, bytes_n);
-  //CkPrintf("CharmLB> Total communication %ld msg and %lld bytes\n", nmsgs, nbytes);
-
-  //double alpha_beta_cost = (msg_n * alpha) + (bytes_n * beta);
-  //theLbdb->UpdateAfterLBComm(alpha_beta_cost/totalLoad);
 
   if (_lb_args.debug()) {
     double strat_end_time = CkWallTimer();
@@ -1209,7 +1101,6 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
     CkPrintf("CharmLB> %s: PE [%d] #Objects migrating: %d, LBMigrateMsg size: %.2f MB\n", lbname, cur_ld_balancer, msg->n_moves, env->getTotalsize()/1024.0/1024.0);
     CkPrintf("CharmLB> %s: PE [%d] strategy finished at %f duration %f s\n",
 	      lbname, cur_ld_balancer, strat_end_time, strat_end_time-strat_start_time);
-    //CkPrintf("Strategy cost %f %f %f\n", strat_end_time, strat_start_time, adaptive_struct.lb_strategy_cost);
     theLbdb->SetStrategyCost(strat_end_time - strat_start_time);
   }
   return msg;
