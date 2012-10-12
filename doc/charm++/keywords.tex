@@ -1,5 +1,16 @@
 The following words are reserved for the \charm interface translator, and
 cannot appear as variable or entry method names in a {\tt .ci} file:
+
+% NOTE:
+% This list is also duplicated (albeit, not exactly) in /www/codemirror/mode/clike/clike.js
+% This helps the html version of the charm manual display syntax highlighting correctly.
+%
+% Any additions or modifications to this list should also be reflected there.
+% In that file, it should be sufficient to only list ci keywords that are NOT
+% already C++ keywords For eg, class and namespace are already cpp reserved
+% words and need not be included in the list of permitted ci file reserved
+% words.
+
 \begin{itemize}
 \item module
 \item mainmodule
