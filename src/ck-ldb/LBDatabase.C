@@ -462,7 +462,6 @@ const char *LBDatabase::loadbalancer(int seq) {
 
 void LBDatabase::pup(PUP::er& p)
 {
-  // NOTE if unpacking set metabalancer using the id
 	IrrGroup::pup(p);
 	// the memory should be already allocated
 	int np;
@@ -482,6 +481,7 @@ void LBDatabase::pup(PUP::er& p)
 	if(p.isUnpacking()) {
     nloadbalancers = 0;
 		if (_lb_args.metaLbOn()) {
+  		// if unpacking set metabalancer using the id
     	metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
 		}
   }

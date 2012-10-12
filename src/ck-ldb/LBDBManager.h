@@ -138,7 +138,7 @@ public:
   inline void GetCommData(LDCommData *data) 
        { if (commTable) commTable->GetCommData(data); };
 
-  void AdaptResumeSync(int lb_ideal_period);
+  void MetaLBResumeWaitingChares(int lb_ideal_period);
   int  Migrate(LDObjHandle h, int dest);
   void Migrated(LDObjHandle h, int waitBarrier=1);
   int  NotifyMigrated(LDMigratedFn fn, void* data);

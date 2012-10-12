@@ -360,8 +360,8 @@ public:
   inline void SetLBPeriod(double s) { LDSetLBPeriod(myLDHandle, s);}
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
 
-  inline void AdaptResumeSync(int lb_period) {
-    LDOMAdaptResumeSync(myLDHandle, lb_period);
+  inline void MetaLBResumeWaitingChares(int lb_period) {
+    LDOMMetaLBResumeWaitingChares(myLDHandle, lb_period);
   }
   void SetMigrationCost(double cost);
   void SetStrategyCost(double cost);

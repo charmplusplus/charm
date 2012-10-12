@@ -29,9 +29,9 @@ extern "C" LDOMHandle LDRegisterOM(LDHandle _db, LDOMid _userID,
   return db->AddOM(_userID, _userptr, _callbacks);
 }
 
-extern "C" void LDOMAdaptResumeSync(LDHandle _db, int lb_ideal_period) {
+extern "C" void LDOMMetaLBResumeWaitingChares(LDHandle _db, int lb_ideal_period) {
   LBDB *const db = (LBDB*)(_db.handle);
-  db->AdaptResumeSync(lb_ideal_period);
+  db->MetaLBResumeWaitingChares(lb_ideal_period);
 }
 
 extern "C" void * LDOMUserData(LDOMHandle &_h)

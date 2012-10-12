@@ -1,6 +1,5 @@
-OPTS	= -g
+OPTS	= -O3
 CHARMC	= ../../../../bin/charmc $(OPTS)
-#CHARMC	= $(HOME)/charm/bin/charmc $(OPTS)
 
 OBJS	= kNeighbor.o
 

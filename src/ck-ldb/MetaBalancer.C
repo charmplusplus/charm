@@ -37,7 +37,8 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   for (int i = 0; i < nMsg; i++) {
     CkAssert(msgs[i]->getSize() == STATS_COUNT*sizeof(double));
     if (msgs[i]->getSize() != STATS_COUNT*sizeof(double)) {
-      CkPrintf("Error!!! Reduction not correct. Msg size is %d\n", msgs[i]->getSize());
+      CkPrintf("Error!!! Reduction not correct. Msg size is %d\n",
+          msgs[i]->getSize());
       CkAbort("Incorrect Reduction size in MetaBalancer\n");
     }
     double* m = (double *)msgs[i]->getData();
@@ -100,7 +101,6 @@ void MetaBalancer::init(void) {
   CkpvAccess(metalbInited) = 1;
   total_load_vec.resize(VEC_SIZE, 0.0);
   total_count_vec.resize(VEC_SIZE, 0);
-  max_iteration = -1;
   prev_idle = 0.0;
   alpha_beta_cost_to_load = 1.0; // Some random value. TODO: Find the actual
 
@@ -141,6 +141,10 @@ void MetaBalancer::pup(PUP::er& p) {
   if (p.isUnpacking()) {
     lbdatabase = (LBDatabase *)CkLocalBranch(_lbdb);
   }
+  p|prev_idle;
+  p|alpha_beta_cost_to_load;
+  p|is_prev_lb_refine;
+  p|lb_in_progress;
 }
 
 
@@ -178,8 +182,8 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
   adaptive_struct.total_syncs_called++;
-  DEBADDETAIL(("At PE %d Total contribution for iteration %d is %d total objs %d\n",
-      CkMyPe(), it_n, total_count_vec[index],
+  DEBADDETAIL(("At PE %d Total contribution for iteration %d is %d \
+      total objs %d\n", CkMyPe(), it_n, total_count_vec[index],
       lbdatabase->getLBDB()->ObjDataCount()));
 
   if (it_n < adaptive_struct.lb_iteration_no) {
@@ -212,7 +216,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     // The chares do not contribute their 0th iteration load. So the total syncs
     // in reality is total_syncs_called + obj_counts
     int total_countable_syncs = adaptive_struct.total_syncs_called +
-        (1 - NEGLECT_IDLE) * lbdatabase->getLBDB()->ObjDataCount(); // TODO: Fix me! weird!
+        (1 - NEGLECT_IDLE) * lbdatabase->getLBDB()->ObjDataCount(); // TODO: Fix me!
     if (total_countable_syncs != 0) {
       idle_time = idle_time * lbdatabase->getLBDB()->ObjDataCount() / total_countable_syncs;
     }
@@ -279,7 +283,8 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   // If this is the lb data corresponding to the final lb period informed, then
   // don't recalculate as some of the processors might have already gone into
   // LB_STAGE.
-  if (adaptive_struct.in_progress || (adaptive_struct.final_lb_period == iteration_n)) {
+  if (adaptive_struct.in_progress || 
+      (adaptive_struct.final_lb_period == iteration_n)) {
     return;
   }
 
@@ -290,7 +295,8 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   if (alpha_beta_cost_to_load < 0.1) {
     // Ignore the effect of idle time and there by lesser utilization. So we
     // assign utilization threshold to be 0.0
-    DEBAD(("Changing the idle load tolerance coz this isn't communication intensive benchmark\n"));
+    DEBAD(("Changing the idle load tolerance coz this isn't \
+        communication intensive benchmark\n"));
     utilization_threshold = 0.0;
   }
 #endif
@@ -312,13 +318,15 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
       adaptive_struct.tentative_max_iter_no));
     // set the imbalance tolerance to be ratio_at_calculated_lb_period
     if (ratio_at_t != 1.0) {
-      DEBAD(("Changed tolerance to %lf after line eq whereas max/avg is %lf\n", ratio_at_t, max/avg));
+      DEBAD(("Changed tolerance to %lf after line eq whereas max/avg is %lf\n",
+        ratio_at_t, max/avg));
       // Since ratio_at_t is shifter up, max/(tmp_max_avg_ratio * avg) should be
       // compared with the tolerance
       tolerate_imb = ratio_at_t * tmp_max_avg_ratio * OUTOFWAY_TOLERANCE;
     }
 
-    DEBAD(("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio));
+    DEBAD(("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n",
+      tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio));
 
     if ((utilization < utilization_threshold || max/avg >= tolerate_imb) &&
           adaptive_lbdb.history_data.size() > MIN_STATS) {
@@ -336,7 +344,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
       adaptive_struct.lb_calculated_period = period;
       adaptive_struct.in_progress = true;
       DEBAD(("Sticking to the calculated period %d\n",
-        adaptive_struct.lb_calculated_period));
+          adaptive_struct.lb_calculated_period));
       thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++,
         adaptive_struct.lb_calculated_period);
       return;
@@ -596,7 +604,7 @@ void MetaBalancer::LoadBalanceDecisionFinal(int req_no, int period) {
 			period:%d \n",CkMyPe(), adaptive_struct.lb_iteration_no, period));
   adaptive_struct.tentative_period = period;
   adaptive_struct.final_lb_period = period;
-  lbdatabase->AdaptResumeSync(period);
+  lbdatabase->MetaResumeWaitingChares(period);
 }
 
 
@@ -654,6 +662,7 @@ void MetaBalancer::ResetAdaptive() {
   lb_in_progress = true;
 }
 
+// This is required for PEs with no objs
 void MetaBalancer::periodicCall(void *ad) {
   MetaBalancer *s = (MetaBalancer *)ad;
   CcdCallFnAfterOnPE((CcdVoidFn)checkForNoObj, (void *)s, 1, CkMyPe());
@@ -746,8 +755,8 @@ void MetaBalancer::UpdateAfterLBData(int lb, double lb_max, double lb_avg, doubl
   }
 }
 
-void MetaBalancer::UpdateAfterLBData(double max_load, double max_cpu, double
-avg_load) {
+void MetaBalancer::UpdateAfterLBData(double max_load, double max_cpu,
+    double avg_load) {
   if (adaptive_struct.last_lb_type == -1) {
     adaptive_struct.last_lb_type = 0;
   }
@@ -769,16 +778,16 @@ void MetaBalancer::UpdateAfterLBComm(double alpha_beta_to_load) {
 }
 
 
-void MetaBalancer::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio, double&
-    remote_local_comm_ratio) {
+void MetaBalancer::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio,
+    double& remote_local_comm_ratio) {
   lb_type = adaptive_struct.last_lb_type;
   lb_max_avg_ratio = 1;
   remote_local_comm_ratio = 1;
   GetLBDataForLB(lb_type, lb_max_avg_ratio, remote_local_comm_ratio);
 }
 
-void MetaBalancer::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio, double&
-    remote_local_comm_ratio) {
+void MetaBalancer::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio,
+    double& remote_local_comm_ratio) {
   if (lb_type == 0) {
     lb_max_avg_ratio = adaptive_struct.greedy_info.max_avg_ratio;
   } else if (lb_type == 1) {

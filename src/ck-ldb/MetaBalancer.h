@@ -6,13 +6,6 @@
 #ifndef METABALANCER_H
 #define METABALANCER_H
 
-
-//#include <charm++.h>
-//#include "ckreduction.h" 
-
-//#include "lbdb.h"
-//#include "LBDBManager.h"
-//#include "lbdb++.h"
 #include "LBDatabase.h"
 
 #include <vector>
@@ -49,9 +42,6 @@ public:
 
   void ResumeClients();
 
-/*  inline void SetLBPeriod(double s) { LDSetLBPeriod(myLDHandle, s);}
-  inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}*/ //NOTE
-
   void ResetAdaptive();
   int get_iteration();
   bool AddLoad(int iteration, double load);
@@ -67,9 +57,11 @@ public:
   void TriggerAdaptiveReduction();
 
   bool generatePlan(int& period, double& ratio_at_t);
-  bool getLineEq(double new_load_percent, double& aslope, double& ac, double& mslope, double& mc);
+  bool getLineEq(double new_load_percent, double& aslope, double& ac,
+      double& mslope, double& mc);
   bool getPeriodForLinear(double a, double b, double c, int& period);
-  bool getPeriodForStrategy(double new_load, double overhead_percent, int& period, double& ratio_at_t);
+  bool getPeriodForStrategy(double new_load, double overhead_percent,
+      int& period, double& ratio_at_t);
   int getPredictedLBPeriod(bool& is_tentative);
 
   bool isStrategyComm();
@@ -90,16 +82,11 @@ public:
 private:
   //CProxy_MetaBalancer thisProxy;
   LBDatabase* lbdatabase;
-  int mystep;
   std::vector<double> total_load_vec;
   // Keeps track of how many local chares contributed
   std::vector<int> total_count_vec;
   std::vector<int> lbdb_no_obj_callback;
 
-  int max_iteration;
-
-  double after_lb_max;
-  double after_lb_avg;
   double prev_idle;
   double alpha_beta_cost_to_load;
   int is_prev_lb_refine;

@@ -14,7 +14,6 @@ mainmodule jacobi1d {
     entry Jacobi(void);
     entry void begin_iteration(void);
     entry void receiveGhosts(int dir, int size, double gh[size]);
-    entry void pause_for_lb(void);
   };
 
 };

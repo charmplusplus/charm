@@ -225,13 +225,13 @@ void LBCollectStatsOff(void);
 typedef void (*LDMigrateFn)(LDObjHandle handle, int dest);
 typedef void (*LDStatsFn)(LDOMHandle h, int state);
 typedef void (*LDQueryEstLoadFn)(LDOMHandle h);
-typedef void (*LDAdaptResumeSyncFn) (LDObjHandle handle, int lb_ideal_period);
+typedef void (*LDMetaLBResumeWaitingCharesFn) (LDObjHandle handle, int lb_ideal_period);
 
 typedef struct {
   LDMigrateFn migrate;
   LDStatsFn setStats;
   LDQueryEstLoadFn queryEstLoad;
-  LDAdaptResumeSyncFn adaptResumeSync;
+  LDMetaLBResumeWaitingCharesFn metaLBResumeWaitingChares;
 } LDCallbacks;
 
 /*
@@ -246,7 +246,7 @@ LDHandle LDCreate(void);
 LDOMHandle LDRegisterOM(LDHandle _lbdb, LDOMid userID, 
 			void *userptr, LDCallbacks cb);
 
-void LDOMAdaptResumeSync(LDHandle _h, int lb_ideal_period);
+void LDOMMetaLBResumeWaitingChares(LDHandle _h, int lb_ideal_period);
 void * LDOMUserData(LDOMHandle &_h);
 void LDRegisteringObjects(LDOMHandle _h);
 void LDDoneRegisteringObjects(LDOMHandle _h);

@@ -1159,7 +1159,7 @@ double CkMigratable::getObjTime() {
 	return myRec->getObjTime();
 }
 
-void CkMigratable::clearAdaptiveData() {
+void CkMigratable::clearMetaLBData() {
 //  if (can_reset) {
     local_state = OFF;
     atsync_iteration = -1;
@@ -1294,7 +1294,7 @@ void CkMigratable::staticResumeFromSync(void* data)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = el;
 #endif
-  el->clearAdaptiveData();
+  el->clearMetaLBData();
 	el->ResumeFromSync();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     el->mlogData->resumeCount++;
@@ -1669,13 +1669,13 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 
 #if CMK_LBDB_ON
 
-void CkLocRec_local::staticAdaptResumeSync(LDObjHandle h, int lb_ideal_period) {
+void CkLocRec_local::staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period) {
 	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
 	DEBL((AA"Load balancer wants to migrate %s to %d\n"AB,idx2str(el->idx),dest));
-	el->adaptResumeSync(lb_ideal_period);
+	el->metaLBResumeWaitingChares(lb_ideal_period);
 }
 
-void CkLocRec_local::adaptResumeSync(int lb_ideal_period) {
+void CkLocRec_local::metaLBResumeWaitingChares(int lb_ideal_period) {
   informIdealLBPeriod(lb_ideal_period);
 }
 
@@ -3176,8 +3176,8 @@ void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 	myCallbacks.migrate = (LDMigrateFn)CkLocRec_local::staticMigrate;
 	myCallbacks.setStats = NULL;
 	myCallbacks.queryEstLoad = NULL;
-  myCallbacks.adaptResumeSync =
-      (LDAdaptResumeSyncFn)CkLocRec_local::staticAdaptResumeSync;
+  myCallbacks.metaLBResumeWaitingChares =
+      (LDMetaLBResumeWaitingCharesFn)CkLocRec_local::staticMetaLBResumeWaitingChares;
 	myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);
 
 	// Tell the lbdb that I'm registering objects

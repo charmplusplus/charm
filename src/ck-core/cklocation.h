@@ -221,8 +221,8 @@ public:
   inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
   inline LDObjHandle getLdHandle() const{return ldHandle;}
   static void staticMigrate(LDObjHandle h, int dest);
-  static void staticAdaptResumeSync(LDObjHandle h, int lb_ideal_period);
-  void adaptResumeSync(int lb_ideal_period);
+  static void staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period);
+  void metaLBResumeWaitingChares(int lb_ideal_period);
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
   void AsyncMigrate(CmiBool use);
@@ -328,7 +328,7 @@ public:
   virtual void ckJustMigrated(void); /*default is empty*/
 
   void recvLBPeriod(void *data);
-  void clearAdaptiveData(void);
+  void clearMetaLBData(void);
 
   //used for out-of-core emulation
   virtual void ckJustRestored(void); /*default is empty*/
@@ -545,6 +545,7 @@ class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
 	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkGroupID _metalb,CkArrayIndex& numInitial);
+	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndex& numInitial);
 	CkLocMgr(CkMigrateMessage *m);
 	inline CmiBool isLocMgr(void) { return CmiTrue; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
