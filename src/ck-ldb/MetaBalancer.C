@@ -604,7 +604,7 @@ void MetaBalancer::LoadBalanceDecisionFinal(int req_no, int period) {
 			period:%d \n",CkMyPe(), adaptive_struct.lb_iteration_no, period));
   adaptive_struct.tentative_period = period;
   adaptive_struct.final_lb_period = period;
-  lbdatabase->MetaResumeWaitingChares(period);
+  lbdatabase->MetaLBResumeWaitingChares(period);
 }
 
 

@@ -2052,6 +2052,17 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkGroupID metalbID_,CkArra
 	hashImmLock = CmiCreateImmediateLock();
 }
 
+CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndex& numInitial)
+	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
+	 hash(17,0.3)
+{
+#if !CMK_LBDB_ON
+	CkGroupID _metalb;
+#endif
+	CkLocMgr(mapID_, lbdbID_, _metalb, numInitial);
+}
+
+
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	:IrrGroup(m),thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),hash(17,0.3)
 {
