@@ -39,6 +39,7 @@ private:
   int _lb_central_pe;           // processor number for centralized startegy
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
   int _lb_teamSize;		// specifies the team size for TeamLB
+  int _lb_metaLbOn;
 public:
   CkLBArgs() {
 #if CMK_BIGSIM_CHARM
@@ -53,6 +54,7 @@ public:
     _lb_loop = 0;
     _lb_central_pe = 0;
     _lb_teamSize = 1;
+    _lb_metaLbOn = 0;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
@@ -72,6 +74,7 @@ public:
   inline double & alpha() { return _lb_alpha; }
   inline double & beeta() { return _lb_beeta; }
   inline int & percentMovesAllowed() { return _lb_percentMovesAllowed;}
+  inline int & metaLbOn() {return _lb_metaLbOn;}
 };
 
 extern CkLBArgs _lb_args;

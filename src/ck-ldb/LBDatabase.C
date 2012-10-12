@@ -289,6 +289,10 @@ void _loadbalancerInit()
   _lb_args.traceComm() = !CmiGetArgFlagDesc(argv, "+LBCommOff",
 		"Turn load balancer instrumentation of communication off");
 
+	// turn on MetaBalancer if set
+	_lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB",
+		"Turn on MetaBalancer");
+
   // set alpha and beeta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
   _lb_args.beeta() = PER_BYTE_SEND_OVERHEAD_DEFAULT;
@@ -352,7 +356,9 @@ void LBDatabase::init(void)
   mystep = 0;
   nloadbalancers = 0;
   new_ld_balancer = 0;
-  metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+	if (_lb_args.metaLbOn()) {
+  	metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+	}
 
   CkpvAccess(lbdatabaseInited) = 1;
 #if CMK_LBDB_ON
@@ -475,7 +481,9 @@ void LBDatabase::pup(PUP::er& p)
 	p|mystep;
 	if(p.isUnpacking()) {
     nloadbalancers = 0;
-    metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
+		if (_lb_args.metaLbOn()) {
+    	metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
+		}
   }
 }
 
@@ -492,42 +500,56 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 }
 
 void LBDatabase::ResetAdaptive() {
-	if (metabalancer == NULL) {
-		metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
+#if CMK_LBDB_ON
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
+		}
+		if (metabalancer != NULL) {
+			metabalancer->ResetAdaptive();
+		}
 	}
-	if (metabalancer != NULL) {
-		metabalancer->ResetAdaptive();
-	}
+#endif
 }
 
 void LBDatabase::ResumeClients() {
 #if CMK_LBDB_ON
-  if (metabalancer == NULL) {
-    metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
-  }
-  if (metabalancer != NULL) {
-    metabalancer->ResumeClients();
-  }
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
+		}
+		if (metabalancer != NULL) {
+			metabalancer->ResumeClients();
+		}
+	}
 #endif
   LDResumeClients(myLDHandle);
 }
 
 void LBDatabase::SetMigrationCost(double cost) {
-  if (metabalancer == NULL) {
-    metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
-  }
-  if (metabalancer != NULL)  {
-    metabalancer->SetMigrationCost(cost);
-  }
+#if CMK_LBDB_ON
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+		}
+		if (metabalancer != NULL)  {
+			metabalancer->SetMigrationCost(cost);
+		}
+	}
+#endif
 }
 
 void LBDatabase::SetStrategyCost(double cost) {
-  if (metabalancer == NULL) {
-    metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
-  }
-  if (metabalancer != NULL)  {
-    metabalancer->SetStrategyCost(cost);
-  }
+#if CMK_LBDB_ON
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+		}
+		if (metabalancer != NULL)  {
+			metabalancer->SetStrategyCost(cost);
+		}
+	}
+#endif
 }
 
 /*

@@ -1055,7 +1055,9 @@ void CkMigratable::commonInit(void) {
   local_state = OFF;
   prev_load = 0.0;
   can_reset = false;
-  atsync_iteration = myRec->getMetaBalancer()->get_iteration();
+  if (_lb_args.metaLbOn()) {
+    atsync_iteration = myRec->getMetaBalancer()->get_iteration();
+  }
 
 	/*
 	FAULT_EVAC
@@ -1224,7 +1226,12 @@ void CkMigratable::AtSync(int waitForMigration)
   // model-based load balancing, ask user to provide cpu load
   if (usesAutoMeasure == CmiFalse) UserSetLBLoad();
   
-//  myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+  if (!_lb_args.metaLbOn()) {
+    myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+    return;
+  }
+
+  // When MetaBalancer is turned on
 
   if (atsync_iteration == -1) {
     can_reset = false;
@@ -1399,7 +1406,9 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
         enable_measure = CmiTrue;
 	bounced  = CmiFalse;
 	the_lbdb=mgr->getLBDB();
-  the_metalb=mgr->getMetaBalancer();
+  if (_lb_args.metaLbOn()) {
+    the_metalb=mgr->getMetaBalancer();
+  }
         LDObjid ldid = idx2LDObjid(idx);
 #if CMK_GLOBAL_LOCATION_UPDATE
         ldid.locMgrGid = mgr->getGroupID().idx;
@@ -3154,9 +3163,11 @@ void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 	if (the_lbdb == 0)
 		CkAbort("LBDatabase not yet created?\n");
 	DEBL((AA"Connected to load balancer %p\n"AB,the_lbdb));
-  the_metalb = (MetaBalancer *)CkLocalBranch(metalbID_);
-	if (the_metalb == 0)
-		CkAbort("MetaBalancer not yet created?\n");
+  if (_lb_args.metaLbOn()) {
+    the_metalb = (MetaBalancer *)CkLocalBranch(metalbID_);
+    if (the_metalb == 0)
+      CkAbort("MetaBalancer not yet created?\n");
+  }
 
 	// Register myself as an object manager
 	LDOMid myId;
