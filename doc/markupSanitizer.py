@@ -30,6 +30,10 @@ for p in soup('pre'):
     for s in p('span'):
         s.unwrap()
 
+# Remove all useless class 'arabic' spans
+for s in soup('span','arabic'):
+    s.unwrap()
+
 # Extract the navigation bar
 navmenu = soup.find('div', 'navigation')
 if navmenu:
