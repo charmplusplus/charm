@@ -21,7 +21,8 @@
 #define MIN_STATS 6
 #define STATS_COUNT 8 // The number of stats collected during reduction
 
-#   define DEBAD(x) /*CkPrintf x*/
+#   define DEBAD(x) CkPrintf x
+#   define DEBADDETAIL(x) /*CkPrintf x*/
 #   define EXTRA_FEATURE 0
 
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
@@ -130,6 +131,7 @@ void MetaBalancer::init(void) {
   lb_in_progress = false;
 
   is_prev_lb_refine = -1;
+  periodicCall((void *) this);
 }
 
 void MetaBalancer::pup(PUP::er& p) {
@@ -163,6 +165,7 @@ void MetaBalancer::ResumeClients() {
     lbdb_no_obj_callback.clear();
     lb_in_progress = false;
   }
+  HandleAdaptiveNoObj();
 }
 
 int MetaBalancer::get_iteration() {
@@ -173,7 +176,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
   adaptive_struct.total_syncs_called++;
-  DEBAD(("At PE %d Total contribution for iteration %d is %d total objs %d\n",
+  DEBADDETAIL(("At PE %d Total contribution for iteration %d is %d total objs %d\n",
       CkMyPe(), it_n, total_count_vec[index],
       lbdatabase->getLBDB()->ObjDataCount()));
 
@@ -330,8 +333,8 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
       adaptive_struct.doCommStrategy = false;
       adaptive_struct.lb_calculated_period = period;
       adaptive_struct.in_progress = true;
-      CkPrintf("Sticking to the calculated period %d\n",
-        adaptive_struct.lb_calculated_period);
+      DEBAD(("Sticking to the calculated period %d\n",
+        adaptive_struct.lb_calculated_period));
       thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++,
         adaptive_struct.lb_calculated_period);
       return;
@@ -449,7 +452,7 @@ bool MetaBalancer::generatePlan(int& period, double& ratio_at_t) {
   max /= adaptive_lbdb.history_data.size();
   avg /= adaptive_lbdb.history_data.size();
   double cost = adaptive_struct.lb_strategy_cost + adaptive_struct.lb_migration_cost;
-  period = (int) cost/(max - avg); 
+  period = (int) (cost/(max - avg));
   DEBAD(("Obtained period %d from constant prediction\n", period));
   if (period < 0) { 
     period = adaptive_struct.final_lb_period;
@@ -469,7 +472,7 @@ bool MetaBalancer::getPeriodForStrategy(double new_load_percent,
   double b = (mc - ac);
   double c = -(adaptive_struct.lb_strategy_cost +
       adaptive_struct.lb_migration_cost) * overhead_percent;
-      CkPrintf("cost %f\n",
+  CkPrintf("cost %f\n",
       (adaptive_struct.lb_strategy_cost+adaptive_struct.lb_migration_cost));
   bool got_period = getPeriodForLinear(a, b, c, period);
   if (!got_period) {
@@ -490,7 +493,7 @@ bool MetaBalancer::getPeriodForStrategy(double new_load_percent,
     }
   }
 
-  int intersection_t = (int) (mc-ac) / (aslope - mslope);
+  int intersection_t = (int) ((mc-ac) / (aslope - mslope));
   if (intersection_t > 0 && period > intersection_t) {
     DEBAD(("Avg | Max Period set when curves intersect\n"));
     return false;
@@ -646,13 +649,25 @@ void MetaBalancer::ResetAdaptive() {
   lb_in_progress = true;
 }
 
+void MetaBalancer::periodicCall(void *ad) {
+  MetaBalancer *s = (MetaBalancer *)ad;
+  CcdCallFnAfterOnPE((CcdVoidFn)checkForNoObj, (void *)s, 1, CkMyPe());
+}
+
+void MetaBalancer::checkForNoObj(void *ad) {
+  MetaBalancer *s = (MetaBalancer *) ad;
+  s->HandleAdaptiveNoObj();
+}
+
 // Called by LBDatabase to indicate that no objs are there in this processor
 void MetaBalancer::HandleAdaptiveNoObj() {
-  adaptive_struct.lb_iteration_no++;
-  DEBAD(("(%d) --HandleAdaptiveNoObj %d\n", CkMyPe(),
-      adaptive_struct.lb_iteration_no));
-  thisProxy[0].RegisterNoObjCallback(CkMyPe());
-  TriggerAdaptiveReduction();
+  if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
+    adaptive_struct.lb_iteration_no++;
+    DEBAD(("(%d) --HandleAdaptiveNoObj %d\n", CkMyPe(),
+          adaptive_struct.lb_iteration_no));
+    thisProxy[0].RegisterNoObjCallback(CkMyPe());
+    TriggerAdaptiveReduction();
+  }
 }
 
 void MetaBalancer::RegisterNoObjCallback(int index) {
@@ -677,23 +692,25 @@ void MetaBalancer::RegisterNoObjCallback(int index) {
 }
 
 void MetaBalancer::TriggerAdaptiveReduction() {
-  adaptive_struct.lb_iteration_no++;
-  double lb_data[STATS_COUNT];
-  lb_data[0] = adaptive_struct.lb_iteration_no;
-  lb_data[1] = 1;
-  lb_data[2] = 0.0;
-  lb_data[3] = 0.0;
-  lb_data[4] = 0.0;
-  lb_data[5] = 0.0;
-  lb_data[6] = 0.0;
-  lb_data[7] = 0.0;
+  if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
+    adaptive_struct.lb_iteration_no++;
+    double lb_data[STATS_COUNT];
+    lb_data[0] = adaptive_struct.lb_iteration_no;
+    lb_data[1] = 1;
+    lb_data[2] = 0.0;
+    lb_data[3] = 0.0;
+    lb_data[4] = 0.0;
+    lb_data[5] = 0.0;
+    lb_data[6] = 0.0;
+    lb_data[7] = 0.0;
 
-  DEBAD(("[%d] Triggered adaptive reduction for noobj %d\n", CkMyPe(),
-      adaptive_struct.lb_iteration_no));
+    DEBAD(("[%d] Triggered adaptive reduction for noobj %d\n", CkMyPe(),
+          adaptive_struct.lb_iteration_no));
 
-  CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL),
-      thisProxy[0]);
-  contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
+    CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL),
+        thisProxy[0]);
+    contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
+  }
 }
 
 

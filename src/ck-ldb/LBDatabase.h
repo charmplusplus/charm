@@ -194,7 +194,10 @@ public:
     LDRegisteringObjects(_om);
   };
 
-  void DoneRegisteringObjects(LDOMHandle _om);
+  inline void DoneRegisteringObjects(LDOMHandle _om) {
+    LDDoneRegisteringObjects(_om);
+  };
+
   void ResetAdaptive();
 
   inline LDObjHandle RegisterObj(LDOMHandle h, LDObjid id,

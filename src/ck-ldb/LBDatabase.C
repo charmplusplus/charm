@@ -500,18 +500,6 @@ void LBDatabase::ResetAdaptive() {
 	}
 }
 
-void LBDatabase::DoneRegisteringObjects(LDOMHandle _om) {
-	LDDoneRegisteringObjects(_om);
-#if CMK_LBDB_ON
-	if (metabalancer == NULL) {
-		metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
-	}
-	if (metabalancer != NULL && getLBDB()->ObjDataCount() == 0) {
-		metabalancer->HandleAdaptiveNoObj();
-	}
-#endif
-}
-
 void LBDatabase::ResumeClients() {
 #if CMK_LBDB_ON
   if (metabalancer == NULL) {

@@ -60,6 +60,8 @@ public:
   void LoadBalanceDecision(int, int);
   void LoadBalanceDecisionFinal(int, int);
   void ReceiveIterationNo(int, int); // Receives the current iter no
+  static void periodicCall(void *ad);
+  static void checkForNoObj(void *ad);
   void HandleAdaptiveNoObj();
   void RegisterNoObjCallback(int index);
   void TriggerAdaptiveReduction();
