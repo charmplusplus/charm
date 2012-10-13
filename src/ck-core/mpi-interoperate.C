@@ -5,7 +5,10 @@ extern "C" void CkExit(void);
 static int   _libExitStarted = 0;
 int    _libExitHandlerIdx;
 
+#if CMK_CONVERSE_MPI
 extern "C" { MPI_Comm charmComm; }
+#endif
+
 extern int _ringexit;		    // for charm exit
 extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
