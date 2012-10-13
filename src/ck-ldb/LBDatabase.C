@@ -552,6 +552,18 @@ void LBDatabase::SetStrategyCost(double cost) {
 #endif
 }
 
+void LBDatabase::UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad) {
+#if CMK_LBDB_ON
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+		}
+		if (metabalancer != NULL)  {
+			metabalancer->UpdateAfterLBData(mLoad, mCpuLoad, avgLoad);
+		}
+	}
+#endif
+}
 /*
   callable from user's code
 */

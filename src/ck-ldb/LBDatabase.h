@@ -365,6 +365,7 @@ public:
   }
   void SetMigrationCost(double cost);
   void SetStrategyCost(double cost);
+	void UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad);
 
 private:
   int mystep;

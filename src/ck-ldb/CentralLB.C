@@ -1090,6 +1090,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   getPredictedLoadWithMsg(stats, clients, msg, info, 0);
   LBRealType mLoad, mCpuLoad, totalLoad, totalLoadWComm;
   info.getSummary(mLoad, mCpuLoad, totalLoad);
+  theLbdb->UpdateDataAfterLB(mLoad, mCpuLoad, totalLoad/clients);
 
   if (_lb_args.debug()) {
     double strat_end_time = CkWallTimer();
