@@ -222,6 +222,7 @@ class PtrType : public Type {
     void indirect(void) { numstars++; }
     int getNumStars(void) const {return numstars; }
     void print(XStr& str);
+    Type* deref(void) { return type; }
     const char *getBaseName(void) const { return type->getBaseName(); }
     const char *getScope(void) const { return NULL; }
     virtual void genMsgProxyName(XStr& str) { 

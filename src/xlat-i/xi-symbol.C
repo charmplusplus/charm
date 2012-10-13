@@ -4502,8 +4502,9 @@ void Entry::genDefs(XStr& str)
         << "_marshallmessagepup_" << epStr(false, true) << ");\n";
   }
   else if (param->isMessage() && !isMigrationConstructor()) {
-    str << "\n  CkRegisterMessagePupFn(epidx, (CkMessagePupFn)"
-        << param->param->getType()->getBaseName() << "::ckDebugPup);";
+    str << "\n  CkRegisterMessagePupFn(epidx, (CkMessagePupFn)";
+    param->param->getType()->deref()->print(str);
+    str << "::ckDebugPup);";
   }
   str << "\n  return epidx;"
       << "\n}\n\n";
