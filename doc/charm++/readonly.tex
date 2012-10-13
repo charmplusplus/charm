@@ -30,8 +30,8 @@ type \uw{Type}. \uw{Type} must be a single token and not a type expression.
 \end{alltt}
 
 The variable \uw{ReadonlyMsgName} is declared to be a read-only message of type
-\uw{MessageType}. Pointers are not allowed to be readonly variables unless they
 are pointers to message types. In this case, the message will be initialized on
+\uw{MessageType}. Pointers are not allowed to be readonly variables unless they
 every PE.
 
 \begin{alltt}
@@ -62,5 +62,5 @@ assignments occur in the program outside of the mainchare constructor.
 
 For concrete examples for using read-only variables, please refer to Travelling
 Salesman Problem (TSP) in
-\examplerefdir{hello\/1darrays}, and GaussSeidel
+\examplerefdir{hello}, and GaussSeidel
 elimination in \examplerefdir{gaussSeidel3D}.
