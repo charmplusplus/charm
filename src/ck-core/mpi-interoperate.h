@@ -7,25 +7,14 @@
 
 #if CMK_CONVERSE_MPI
 #include <mpi.h>
-#ifdef __cplusplus
-extern "C" { MPI_Comm charmComm; }
-#else 
-extern MPI_Comm charmComm;
-#endif
-
-void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
+extern "C" void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
 #else
-void CharmLibInit(int userComm, int argc, char **argv);
+extern "C" void CharmLibInit(int userComm, int argc, char **argv);
 #endif
 
-void CharmLibExit();
+extern "C" void CharmLibExit();
 
 extern "C" void LibCkExit(void);
-
-extern int _ringexit;		    // for charm exit
-extern int _ringtoken;
-extern void _initCharm(int unused_argc, char **argv);
-extern void CkExit(void);
 
 #define CkExit LibCkExit
 
