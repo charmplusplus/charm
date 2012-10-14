@@ -1249,7 +1249,7 @@ void CkMigratable::AtSync(int waitForMigration)
   if (atsync_iteration <= myRec->getMetaBalancer()->get_finished_iteration()) {
     CkPrintf("[%d:%s] Error!! Contributing to iter %d < current iter %d\n",
       CkMyPe(), idx2str(thisIndexMax), atsync_iteration,
-      myRec->getMetaBalancer()->get_iteration());
+      myRec->getMetaBalancer()->get_finished_iteration());
     CkAbort("Not contributing to the right iteration\n");
   }
 
