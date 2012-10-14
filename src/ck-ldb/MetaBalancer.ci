@@ -1,5 +1,6 @@
 module MetaBalancer {
   readonly CkGroupID _metalb;
+  readonly CkGroupID _metalbred;
 
   mainchare MetaLBInit {
     entry MetaLBInit(CkArgMsg *m);
@@ -13,9 +14,19 @@ module MetaBalancer {
     entry [immediate] void ReceiveMinStats(CkReductionMsg *msg);
     entry [immediate] void LoadBalanceDecision(int req_no, int period);
     entry [immediate] void LoadBalanceDecisionFinal(int req_no, int period);
-    entry [immediate] void ReceiveIterationNo(int, int);
+    entry [immediate] void ReceiveIterationNo(int);
     entry [immediate] void RegisterNoObjCallback(int);
     entry [immediate] void TriggerAdaptiveReduction();
+  }
+
+  // This group is used only to handle reduction to obtain the maximum
+  // iteration. This reduction cannot incorporated in MetaBalancer class because
+  // there exists a reduction to collect minimum stats and this would overlap
+  // with that as there is no specific order.
+  group [migratable] MetaBalancerRedn {
+    entry void MetaBalancerRedn(void);
+    entry [immediate, reductiontarget] void ReceiveIterNo(int max_iter);
+    entry void getMaxIter(int);
   }
 
 };

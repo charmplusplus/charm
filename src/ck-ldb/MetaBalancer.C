@@ -75,6 +75,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
 }
 
 CkGroupID _metalb;
+CkGroupID _metalbred;
 
 CkpvDeclare(int, metalbInited);  /**< true if metabalancer is inited */
 
@@ -82,6 +83,7 @@ CkpvDeclare(int, metalbInited);  /**< true if metabalancer is inited */
 MetaLBInit::MetaLBInit(CkArgMsg *m) {
 #if CMK_LBDB_ON
   _metalb = CProxy_MetaBalancer::ckNew();
+  _metalbred = CProxy_MetaBalancerRedn::ckNew();
 #endif
   delete m;
 }
@@ -104,6 +106,8 @@ void MetaBalancer::init(void) {
   prev_idle = 0.0;
   alpha_beta_cost_to_load = 1.0; // Some random value. TODO: Find the actual
 
+  metaRdnGroup = (MetaBalancerRedn*)CkLocalBranch(_metalbred);
+
   adaptive_lbdb.lb_iter_no = -1;
 
   // If metabalancer enabled, initialize the variables
@@ -114,7 +118,6 @@ void MetaBalancer::init(void) {
   adaptive_struct.finished_iteration_no = -1;
   adaptive_struct.global_max_iter_no = 0;
   adaptive_struct.tentative_max_iter_no = -1;
-  adaptive_struct.global_recv_iter_counter = 0;
   adaptive_struct.in_progress = false;
   adaptive_struct.lb_strategy_cost = 0.0;
   adaptive_struct.lb_migration_cost = 0.0;
@@ -141,6 +144,7 @@ void MetaBalancer::pup(PUP::er& p) {
 	IrrGroup::pup(p);
   if (p.isUnpacking()) {
     lbdatabase = (LBDatabase *)CkLocalBranch(_lbdb);
+    metaRdnGroup = (MetaBalancerRedn*)CkLocalBranch(_metalbred);
   }
   p|prev_idle;
   p|alpha_beta_cost_to_load;
@@ -160,7 +164,6 @@ void MetaBalancer::ResumeClients() {
   adaptive_struct.finished_iteration_no = -1;
   adaptive_struct.global_max_iter_no = 0;
   adaptive_struct.tentative_max_iter_no = -1;
-  adaptive_struct.global_recv_iter_counter = 0;
   adaptive_struct.in_progress = false;
   adaptive_struct.lb_strategy_cost = 0.0;
   adaptive_struct.lb_migration_cost = 0.0;
@@ -600,7 +603,12 @@ void MetaBalancer::LoadBalanceDecision(int req_no, int period) {
 			CkMyPe(), adaptive_struct.lb_iteration_no, period));
   adaptive_struct.tentative_period = period;
   adaptive_struct.lb_msg_recv_no = req_no;
-  thisProxy[0].ReceiveIterationNo(req_no, adaptive_struct.lb_iteration_no);
+  if (metaRdnGroup == NULL) {
+    metaRdnGroup = (MetaBalancerRedn*)CkLocalBranch(_metalbred);
+  }
+  if (metaRdnGroup != NULL) {
+    metaRdnGroup->getMaxIter(adaptive_struct.lb_iteration_no);
+  }
 }
 
 void MetaBalancer::LoadBalanceDecisionFinal(int req_no, int period) {
@@ -615,16 +623,14 @@ void MetaBalancer::LoadBalanceDecisionFinal(int req_no, int period) {
 }
 
 
-void MetaBalancer::ReceiveIterationNo(int req_no, int local_iter_no) {
+void MetaBalancer::ReceiveIterationNo(int local_iter_no) {
   CmiAssert(CkMyPe() == 0);
 
-  adaptive_struct.global_recv_iter_counter++;
   if (local_iter_no > adaptive_struct.global_max_iter_no) {
     adaptive_struct.global_max_iter_no = local_iter_no;
   }
 
   int period;
-  if (CkNumPes() == adaptive_struct.global_recv_iter_counter) {
 
     if (adaptive_struct.global_max_iter_no > adaptive_struct.tentative_max_iter_no) {
       adaptive_struct.tentative_max_iter_no = adaptive_struct.global_max_iter_no;
@@ -640,10 +646,8 @@ void MetaBalancer::ReceiveIterationNo(int req_no, int local_iter_no) {
       adaptive_struct.tentative_period = adaptive_struct.final_lb_period;
       DEBAD(("Final lb_period NOT CHANGED!%d\n", adaptive_struct.tentative_period));
     }
-    thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.tentative_period);
+    thisProxy.LoadBalanceDecisionFinal(adaptive_struct.lb_msg_recv_no, adaptive_struct.tentative_period);
     adaptive_struct.in_progress = false;
-    adaptive_struct.global_recv_iter_counter = 0;
-  }
 }
 
 int MetaBalancer::getPredictedLBPeriod(bool& is_tentative) {
@@ -805,6 +809,25 @@ void MetaBalancer::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio,
     remote_local_comm_ratio =
        adaptive_struct.comm_refine_info.remote_local_ratio;
   }
+}
+
+void MetaBalancerRedn::init() {
+  metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+}
+
+void MetaBalancerRedn::ReceiveIterNo(int max_iter) {
+  CkAssert(CkMyPe() == 0);
+  if (metabalancer == NULL) {
+    metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
+  }
+  if (metabalancer != NULL) {
+    metabalancer->ReceiveIterationNo(max_iter);
+  }
+}
+
+void MetaBalancerRedn::getMaxIter(int max_iter) {
+  CkCallback cb(CkReductionTarget(MetaBalancerRedn, ReceiveIterNo), thisProxy[0]);
+  contribute(sizeof(int), &max_iter, CkReduction::max_int, cb);
 }
 
 #include "MetaBalancer.def.h"

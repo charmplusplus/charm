@@ -13,6 +13,7 @@
 #include "MetaBalancer.decl.h"
 
 extern CkGroupID _metalb;
+extern CkGroupID _metalbred;
 
 CkpvExtern(int, metalbInited);
 
@@ -33,6 +34,8 @@ public:
   
 private:
   void init();
+  MetaBalancerRedn* metaRdnGroup;
+
 public:
   inline static MetaBalancer * Object() { return CkpvAccess(metalbInited)?(MetaBalancer *)CkLocalBranch(_metalb):NULL; }
 
@@ -50,7 +53,7 @@ public:
   void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);
   void LoadBalanceDecision(int, int);
   void LoadBalanceDecisionFinal(int, int);
-  void ReceiveIterationNo(int, int); // Receives the current iter no
+  void ReceiveIterationNo(int); // Receives the current iter no
   static void periodicCall(void *ad);
   static void checkForNoObj(void *ad);
   void HandleAdaptiveNoObj();
@@ -130,9 +133,6 @@ private:
     // This keeps track of what was the max iteration no we had previously
     // received. TODO: Mostly global_max_iter_no should be sufficied.
     int tentative_max_iter_no;
-    // TODO: Use reduction to collect max iteration. Then we don't need this
-    // counter.
-    int global_recv_iter_counter;
     // true indicates it is in Inform->ReceiveMaxIter->FinalLBPeriod stage.
     bool in_progress;
     double lb_strategy_cost;
@@ -152,7 +152,19 @@ private:
 public:
   bool lb_in_progress;
 
-public:
+};
+
+class MetaBalancerRedn : public CBase_MetaBalancerRedn {
+  public:
+    MetaBalancerRedn(void) {init();}
+    MetaBalancerRedn(CkMigrateMessage *m)  {init();}
+    ~MetaBalancerRedn()  {}
+    void ReceiveIterNo(int max_iter);
+    void getMaxIter(int);
+
+  private:
+    MetaBalancer* metabalancer;
+    void init();
 };
 
 inline MetaBalancer* MetaBalancerObj() { return MetaBalancer::Object(); }
