@@ -289,6 +289,10 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   data.idle_time = avg_idle;
   adaptive_lbdb.history_data.push_back(data);
 
+  if (iteration_n == 1) {
+    adaptive_struct.info_first_iter.max_avg_ratio = max/avg;
+  }
+
   // If lb period inform is in progress, dont inform again.
   // If this is the lb data corresponding to the final lb period informed, then
   // don't recalculate as some of the processors might have already gone into
@@ -320,6 +324,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   int tmp_lb_type;
   double tmp_max_avg_ratio, tmp_comm_ratio;
   GetPrevLBData(tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio);
+
   double tolerate_imb = IMB_TOLERANCE * tmp_max_avg_ratio;
 
   if (generatePlan(period, ratio_at_t)) {
@@ -795,6 +800,9 @@ void MetaBalancer::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio,
   lb_max_avg_ratio = 1;
   remote_local_comm_ratio = 1;
   GetLBDataForLB(lb_type, lb_max_avg_ratio, remote_local_comm_ratio);
+
+  // Based on the first iteration
+  lb_max_avg_ratio = adaptive_struct.info_first_iter.max_avg_ratio;
 }
 
 void MetaBalancer::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio,

@@ -147,6 +147,7 @@ private:
     AdaptiveLBInfo refine_info;
     AdaptiveLBInfo comm_info;
     AdaptiveLBInfo comm_refine_info;
+    AdaptiveLBInfo info_first_iter;
   } adaptive_struct;
 
 public:

@@ -99,11 +99,11 @@ void AdaptiveLB::work(LDStats* stats)
   int lb_type;
   double comm_ratio, comm_refine_ratio;
 
-  GetPrevLBData(lb_type, lb_max_avg_ratio, tmp);
-  GetLBDataForLB(1, refine_max_avg_ratio, tmp);
-  GetLBDataForLB(0, greedy_max_avg_ratio, tmp);
-  GetLBDataForLB(2, tmp, comm_ratio);
-  GetLBDataForLB(3, tmp, comm_refine_ratio);
+//  GetPrevLBData(lb_type, lb_max_avg_ratio, tmp);
+//  GetLBDataForLB(1, refine_max_avg_ratio, tmp);
+//  GetLBDataForLB(0, greedy_max_avg_ratio, tmp);
+//  GetLBDataForLB(2, tmp, comm_ratio);
+//  GetLBDataForLB(3, tmp, comm_refine_ratio);
 
   CkPrintf("AdaptiveLB> Previous LB %d\n", lb_type);
 
@@ -149,8 +149,8 @@ void AdaptiveLB::work(LDStats* stats)
       CkPrintf("---REFINE LB\n");
     }
   }
-  UpdateLBDBWithData(lb_type, stats->after_lb_max, stats->after_lb_avg,
-      stats->local_comm, stats->remote_comm);
+//  UpdateLBDBWithData(lb_type, stats->after_lb_max, stats->after_lb_avg,
+//      stats->local_comm, stats->remote_comm);
 
   delete parr;
   delete ogr;
