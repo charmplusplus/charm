@@ -6,9 +6,6 @@
 #ifndef LBDATABASE_H
 #define LBDATABASE_H
 
-
-//#include <charm++.h>
-//#include "ckreduction.h" 
 #include "lbdb.h"
 #include "LBDBManager.h"
 #include "lbdb++.h"
@@ -168,7 +165,7 @@ class DefaultFunction : public LBPredictorFunction {
 };
 
 
-class LBDatabase : public CBase_LBDatabase {
+class LBDatabase : public IrrGroup {
 public:
   LBDatabase(void)  { init(); }
   LBDatabase(CkMigrateMessage *m)  { init(); }

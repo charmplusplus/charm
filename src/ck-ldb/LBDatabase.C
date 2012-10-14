@@ -13,19 +13,7 @@
 #include "LBSimulation.h"
 #include "topology.h"
 
-#include "limits.h"
-
 #include "NullLB.h"
-
-#define VEC_SIZE 50
-#define IMB_TOLERANCE 1.1
-#define OUTOFWAY_TOLERANCE 2
-#define UTILIZATION_THRESHOLD 0.7
-#define NEGLECT_IDLE 2 // Should never be == 1
-#define MIN_STATS 6
-
-#   define DEBAD(x) /*CkPrintf x*/
-#   define EXTRA_FEATURE 0
 
 CkGroupID _lbdb;
 
@@ -113,9 +101,6 @@ LBAllocFn getLBAllocFn(char *lbname) {
     return lbRegistry.getLBAllocFn(lbname);
 }
 
-LBCreateFn getLBCreateFn(const char *lbname) {
-    return lbRegistry.search(lbname);
-}
 // create a load balancer group using the strategy name
 static void createLoadBalancer(const char *lbname)
 {
@@ -344,14 +329,11 @@ void LBDatabase::initnodeFn()
 
   _expectedLoad = new LBRealType[num_proc];
   for (proc=0; proc<num_proc; proc++) _expectedLoad[proc]=0.0;
-
-  //CkPrintf("Total objs in %d is %d\n", CkMyPe(), getLBDB()->ObjDataCount());
 }
 
 // called my constructor
 void LBDatabase::init(void)
 {
-  //thisProxy = CProxy_LBDatabase(thisgroup);
   myLDHandle = LDCreate();
   mystep = 0;
   nloadbalancers = 0;
@@ -364,7 +346,6 @@ void LBDatabase::init(void)
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
-
 }
 
 LBDatabase::LastLBInfo::LastLBInfo()
@@ -481,8 +462,8 @@ void LBDatabase::pup(PUP::er& p)
 	if(p.isUnpacking()) {
     nloadbalancers = 0;
 		if (_lb_args.metaLbOn()) {
-  		// if unpacking set metabalancer using the id
-    	metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
+      // if unpacking set metabalancer using the id
+      metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
 		}
   }
 }

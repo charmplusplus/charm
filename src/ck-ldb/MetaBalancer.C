@@ -141,7 +141,7 @@ void MetaBalancer::init(void) {
 }
 
 void MetaBalancer::pup(PUP::er& p) {
-	IrrGroup::pup(p);
+	CBase_MetaBalancer::pup(p);
   if (p.isUnpacking()) {
     lbdatabase = (LBDatabase *)CkLocalBranch(_lbdb);
     metaRdnGroup = (MetaBalancerRedn*)CkLocalBranch(_metalbred);
@@ -821,6 +821,10 @@ void MetaBalancer::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio,
 
 void MetaBalancerRedn::init() {
   metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+}
+
+void MetaBalancerRedn::pup(PUP::er& p) {
+	CBase_MetaBalancerRedn::pup(p);
 }
 
 void MetaBalancerRedn::ReceiveIterNo(int max_iter) {

@@ -28,8 +28,8 @@ class MetaLBInit : public Chare {
 
 class MetaBalancer : public CBase_MetaBalancer {
 public:
-  MetaBalancer(void)  { init(); }
-  MetaBalancer(CkMigrateMessage *m)  { init(); }
+  MetaBalancer(void) { init(); }
+  MetaBalancer(CkMigrateMessage *m) : CBase_MetaBalancer(m) { init(); }
   ~MetaBalancer()  {}
   
 private:
@@ -158,8 +158,9 @@ public:
 class MetaBalancerRedn : public CBase_MetaBalancerRedn {
   public:
     MetaBalancerRedn(void) {init();}
-    MetaBalancerRedn(CkMigrateMessage *m)  {init();}
+    MetaBalancerRedn(CkMigrateMessage *m) : CBase_MetaBalancerRedn(m)  {init();}
     ~MetaBalancerRedn()  {}
+    void pup(PUP::er& p);
     void ReceiveIterNo(int max_iter);
     void getMaxIter(int);
 
