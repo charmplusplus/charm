@@ -1,0 +1,91 @@
+The following words are reserved for the \charm interface translator, and
+cannot appear as variable or entry method names in a {\tt .ci} file:
+
+% NOTE:
+% This list is also duplicated (albeit, not exactly) in /www/codemirror/mode/clike/clike.js
+% This helps the html version of the charm manual display syntax highlighting correctly.
+%
+% Any additions or modifications to this list should also be reflected there.
+% In that file, it should be sufficient to only list ci keywords that are NOT
+% already C++ keywords For eg, class and namespace are already cpp reserved
+% words and need not be included in the list of permitted ci file reserved
+% words.
+
+\begin{itemize}
+\item module
+\item mainmodule
+\item chare
+\item mainchare
+\item group
+\item nodegroup
+\item namespace
+\item array
+\item message
+\item conditional
+\item extern
+\item initcall
+\item initnode
+\item initproc
+\item readonly
+\item PUPable
+\item pupable
+\item template
+\item class
+\item include
+\item virtual
+\item packed
+\item varsize
+\item entry
+\item using
+\item Entry method attributes
+\begin{itemize}
+\item stacksize
+\item threaded
+\item migratable
+\item createhere
+\item createhome
+\item sync
+\item iget
+\item exclusive
+\item immediate
+\item expedited
+\item inline
+\item local
+\item nokeep
+\item notrace
+\item python
+\item accel
+\item readwrite
+\item writeonly
+\item accelblock
+\item memcritical
+\item reductiontarget
+\end{itemize}
+\item Basic C++ types
+\begin{itemize}
+\item int
+\item short
+\item long
+\item char
+\item float
+\item double
+\item unsigned
+\item void
+\item const
+\end{itemize}
+\item SDAG constructs
+\begin{itemize}
+\item atomic
+\item serial
+\item forward
+\item when
+\item while
+\item for
+\item forall
+\item if
+\item else
+\item overlap
+\item connect
+\item publishes
+\end{itemize}
+\end{itemize}

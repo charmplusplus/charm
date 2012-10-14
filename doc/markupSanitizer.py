@@ -23,10 +23,16 @@ for d in soup('div','alltt'):
     d.wrap( soup.new_tag('pre') )
     d.unwrap()
 
-# Remove br tags required within pre sections
+# Remove br and span tags from within pre sections
 for p in soup('pre'):
     for b in p('br'):
         b.extract()
+    for s in p('span'):
+        s.unwrap()
+
+# Remove all useless class 'arabic' spans
+for s in soup('span','arabic'):
+    s.unwrap()
 
 # Extract the navigation bar
 navmenu = soup.find('div', 'navigation')

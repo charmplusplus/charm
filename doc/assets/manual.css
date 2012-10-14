@@ -122,10 +122,10 @@ pre {
 		padding: 8px;
 		margin: 10px auto;
 		display: block;
-		width: 650px;
+		width: 750px;
 		overflow-x: auto;
 		border-radius: 3px;
-		font-size: 110%;
+		font-size: 95%;
 }
 
 span.textit		{ font-style: italic  }

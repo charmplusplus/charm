@@ -4190,7 +4190,7 @@ void Entry::genDecls(XStr& str)
     die("Entry methods must specify a return type-- \n"
         "use void if necessary",line);
 
-  if (attribs&SMIGRATE)
+  if (isMigrationConstructor())
     {} //User cannot call the migration constructor
   else if(container->isGroup()) {
     genGroupDecl(str);
@@ -4458,7 +4458,7 @@ void Entry::genDefs(XStr& str)
   templateGuardBegin(tspec || container->isTemplated(), str);
   str << "/* DEFS: "; print(str); str << " */\n";
 
-  if (attribs&SMIGRATE)
+  if(isMigrationConstructor())
     {} //User cannot call the migration constructor
   else if(container->isGroup()){
     genGroupDefs(str);
@@ -4501,9 +4501,10 @@ void Entry::genDefs(XStr& str)
     str << "\n  CkRegisterMessagePupFn(epidx, "
         << "_marshallmessagepup_" << epStr(false, true) << ");\n";
   }
-  else if (param->isMessage() && !attribs&SMIGRATE) {
-    str << "\n  CkRegisterMessagePupFn(epidx, (CkMessagePupFn)"
-        << param->param->getType()->getBaseName() << "::ckDebugPup);";
+  else if (param->isMessage() && !isMigrationConstructor()) {
+    str << "\n  CkRegisterMessagePupFn(epidx, (CkMessagePupFn)";
+    param->param->getType()->deref()->print(str);
+    str << "::ckDebugPup);";
   }
   str << "\n  return epidx;"
       << "\n}\n\n";
@@ -4678,7 +4679,7 @@ XStr Entry::genRegEp(bool isForRedn)
   if (param->isMarshalled()) {
     if (param->hasConditional())  str<<"MarshallMsg_"<<epStr()<<"::__idx";
     else str<<"CkMarshallMsg::__idx";
-  } else if(!param->isVoid() && !(attribs&SMIGRATE)) {
+  } else if(!param->isVoid() && !isMigrationConstructor()) {
     param->genMsgProxyName(str);
     str <<"::__idx";
   } else if (isForRedn) {
@@ -4725,11 +4726,11 @@ void Entry::genReg(XStr& str)
   if (isReductionTarget())
     str << "  " << epIdx(0, true) << ";\n";
   if (isConstructor()) {
-    if(container->isMainChare()&&!(attribs&SMIGRATE))
+    if(container->isMainChare() && !isMigrationConstructor())
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
     if(param->isVoid())
       str << "  CkRegisterDefaultCtor(__idx, "<<epIdx(0)<<");\n";
-    if(attribs&SMIGRATE)
+    if(isMigrationConstructor())
       str << "  CkRegisterMigCtor(__idx, "<<epIdx(0)<<");\n";
   }
 }

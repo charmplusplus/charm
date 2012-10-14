@@ -222,6 +222,7 @@ class PtrType : public Type {
     void indirect(void) { numstars++; }
     int getNumStars(void) const {return numstars; }
     void print(XStr& str);
+    Type* deref(void) { return type; }
     const char *getBaseName(void) const { return type->getBaseName(); }
     const char *getScope(void) const { return NULL; }
     virtual void genMsgProxyName(XStr& str) { 
@@ -1026,6 +1027,7 @@ class Entry : public Member {
     int isSync(void) { return (attribs & SSYNC); }
     int isIget(void) { return (attribs & SIGET); }
     int isConstructor(void) { return !strcmp(name, container->baseName(0).get_string());}
+    bool isMigrationConstructor() { return isConstructor() && (attribs & SMIGRATE); }
     int isExclusive(void) { return (attribs & SLOCKED); }
     int isImmediate(void) { return (attribs & SIMMEDIATE); }
     int isSkipscheduler(void) { return (attribs & SSKIPSCHED); }

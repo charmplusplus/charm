@@ -967,6 +967,8 @@ class CkQdMsg {
     }
     static void *pack(CkQdMsg *m) { return (void*) m; }
     static CkQdMsg *unpack(void *buf) { return (CkQdMsg*) buf; }
+    /// This is used to display message contents in the debugger.
+    static void ckDebugPup(PUP::er &p,void *msg) { }
 };
 
 class CkThrCallArg {
