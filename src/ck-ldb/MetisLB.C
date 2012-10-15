@@ -12,9 +12,7 @@
 #include "ckgraph.h"
 #include "metis.h"
 
-typedef int idxtype;
-
-extern "C" void METIS_PartGraphRecursive(int*, int*, int*, int*, int*,
+/*extern "C" void METIS_PartGraphRecursive(int*, int*, int*, int*, int*,
 			      int*, int*, int*, int*, int*, int*);
 extern "C" void METIS_PartGraphKway(int*, int*, int*, int*, int*,
                               int*, int*, int*, int*, int*, int*);
@@ -33,7 +31,7 @@ extern "C" void METIS_mCPartGraphRecursive(int*, int*, int*, int*, int*, int*,
 			      int*, int*, int*, int*, int*, int*);
 extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
                               int*, int*, int*, int*, int*, int*, int*);
-
+*/
 
 CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
 
@@ -60,7 +58,6 @@ void MetisLB::work(LDStats* stats)
   int numEdges = 0;				// number of edges
 
   double maxLoad = 0.0;
-  long maxBytes = 1;
   int i, j, k, vert;
 
   /** remove duplicate edges from recvFrom */
@@ -81,19 +78,6 @@ void MetisLB::work(LDStats* stats)
     if(ogr->vertices[i].getVertexLoad() > maxLoad)
       maxLoad = ogr->vertices[i].getVertexLoad();
     numEdges = numEdges + ogr->vertices[i].sendToList.size() + ogr->vertices[i].recvFromList.size();
-
-    /** the num of Bytes is normalized to an integer between 0 and 1024 */
-    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
-      if (ogr->vertices[i].sendToList[j].getNumBytes() > maxBytes) {
-        maxBytes = ogr->vertices[i].sendToList[j].getNumBytes();
-      }
-    }
-
-    for(j = 0; j < ogr->vertices[i].recvFromList.size(); j++) {
-      if (ogr->vertices[i].recvFromList[j].getNumBytes() > maxBytes) {
-        maxBytes = ogr->vertices[i].recvFromList[j].getNumBytes();
-      }
-    }
   }
 
   /* adjacency list */
@@ -107,21 +91,18 @@ void MetisLB::work(LDStats* stats)
 
   int edgeNum = 0;
   double ratio = 256.0/maxLoad;
-  double byte_ratio = 1024.0/maxBytes;
 
   for(i = 0; i < numVertices; i++) {
     xadj[i] = edgeNum;
     vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
     for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
       adjncy[edgeNum] = ogr->vertices[i].sendToList[j].getNeighborId();
-      adjwgt[edgeNum] = (int)ceil(ogr->vertices[i].sendToList[j].getNumBytes() *
-          byte_ratio);
+      adjwgt[edgeNum] = ogr->vertices[i].sendToList[j].getNumBytes();
       edgeNum++;
     }
     for(j = 0; j < ogr->vertices[i].recvFromList.size(); j++) {
       adjncy[edgeNum] = ogr->vertices[i].recvFromList[j].getNeighborId();
-      adjwgt[edgeNum] = (int)ceil(ogr->vertices[i].recvFromList[j].getNumBytes()
-          * byte_ratio);
+      adjwgt[edgeNum] = ogr->vertices[i].recvFromList[j].getNumBytes();
       edgeNum++;
     }
   }
@@ -189,26 +170,6 @@ void MetisLB::work(LDStats* stats)
     if(pemap[i] != ogr->vertices[i].getCurrentPe())
       ogr->vertices[i].setNewPe(pemap[i]);
   }
-
-  int local_comm = 0;
-  int remote_comm = 0;
-  for (int i=0; i< numVertices; i++) {
-    for(int j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
-      vert = ogr->vertices[i].sendToList[j].getNeighborId();
-      if(pemap[i] == pemap[vert]) {
-        local_comm++;
-      } else {
-        remote_comm++;
-      }
-    }
-  }
-  CkPrintf("Local communication: %d Remote communication: %d\n", local_comm, remote_comm);
-  stats->local_comm = local_comm;
-  stats->remote_comm = remote_comm;
-
-  stats->is_prev_lb_refine = 2;
-  stats->after_lb_max = 0;
-  stats->after_lb_avg = 0;
 
   delete[] pemap;
 

@@ -49,8 +49,6 @@ typedef enum {
 	CkDeliver_inline=1  //Deliver via a regular call
 } CkDeliver_t;
 
-
-
 #include "CkLocation.decl.h"
 
 /************************** Array Messages ****************************/

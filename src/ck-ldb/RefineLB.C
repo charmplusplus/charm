@@ -12,7 +12,7 @@ CreateLBFunc_Def(RefineLB, "Move objects away from overloaded processor to reach
 RefineLB::RefineLB(const CkLBOptions &opt): CentralLB(opt)
 {
   lbname = (char *)"RefineLB";
-//  if (CkMyPe() == 0)
+  if (CkMyPe() == 0)
     CkPrintf("[%d] RefineLB created\n",CkMyPe());
 }
 

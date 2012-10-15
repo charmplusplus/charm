@@ -548,7 +548,7 @@ bool MetaBalancer::getPeriodForLinear(double a, double b, double c, int& period)
   t = (-b + sqrt(t)) / (2*a);
   x = (int) t;
   if (x < 0) {
-    DEBAD(("boo!!! x (%d) < 0\n", x));
+    DEBAD(("Oops!!! x (%d) < 0\n", x));
     x = 0;
     return false;
   }

@@ -31,7 +31,7 @@ public:
   MetaBalancer(void) { init(); }
   MetaBalancer(CkMigrateMessage *m) : CBase_MetaBalancer(m) { init(); }
   ~MetaBalancer()  {}
-  
+ 
 private:
   void init();
   MetaBalancerRedn* metaRdnGroup;

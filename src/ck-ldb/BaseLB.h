@@ -100,13 +100,11 @@ public:
     int  hashSize;
 
     int complete_flag;		// if this ocg is complete, eg in HybridLB,
-				// this LDStats may not be complete
+    // this LDStats may not be complete
 
     int is_prev_lb_refine;
     double after_lb_max;
     double after_lb_avg;
-    double local_comm;
-    double remote_comm;
 
     LDStats(int c=0, int complete_flag=1);
     /// the functions below should be used to obtain the number of processors
