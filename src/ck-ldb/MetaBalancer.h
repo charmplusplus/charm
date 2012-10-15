@@ -37,7 +37,9 @@ private:
   MetaBalancerRedn* metaRdnGroup;
 
 public:
-  inline static MetaBalancer * Object() { return CkpvAccess(metalbInited)?(MetaBalancer *)CkLocalBranch(_metalb):NULL; }
+  inline static MetaBalancer * Object() {
+    return CkpvAccess(metalbInited)?(MetaBalancer *)CkLocalBranch(_metalb):NULL;
+  }
 
   static void initnodeFn(void);
 

@@ -224,7 +224,8 @@ void LBInfo::print()
   CmiPrintf("Min : %f Max : %f  Average: %f AvgBgLoad: %f\n", minLoad, maxLoad, average, avgBgLoad);
   CmiPrintf("ProcObjLoad  Max : %f  Average: %f\n", maxProcObjLoad, avgProcObjLoad);
   CmiPrintf("CommLoad  Max : %f  Average: %f\n", maxComLoad, avgComLoad);
-  CmiPrintf("[%d] is Maxloaded maxload: %f ObjLoad %f BgLoad %f\n", max_loaded_proc, peLoads[max_loaded_proc], objLoads[max_loaded_proc], bgLoads[max_loaded_proc]);
+  CmiPrintf("[%d] is Maxloaded maxload: %f ObjLoad %f BgLoad %f\n",
+			max_loaded_proc, peLoads[max_loaded_proc], objLoads[max_loaded_proc], bgLoads[max_loaded_proc]);
   // the min and max object (calculated in getLoadInfo)
   CmiPrintf("MinObj : %f  MaxObj : %f\n", minObjLoad, maxObjLoad, average);
   CmiPrintf("Non-local comm: %d msgs %lld bytes\n", msgCount, msgBytes);

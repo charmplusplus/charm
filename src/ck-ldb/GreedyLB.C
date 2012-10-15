@@ -58,7 +58,6 @@ void GreedyLB::work(LDStats* stats)
   int *map = new int[n_pes];
 
   ProcArray *parr = new ProcArray(stats);
-  double bg_load = 0.0;
 
   std::vector<ProcInfo>  procs;
   for(pe = 0; pe < n_pes; pe++) {
@@ -66,7 +65,6 @@ void GreedyLB::work(LDStats* stats)
     if (stats->procs[pe].available) {
       map[pe] = procs.size();
       procs.push_back(ProcInfo(pe, stats->procs[pe].bg_walltime, 0.0, stats->procs[pe].pe_speed, true));
-      bg_load = stats->procs[pe].bg_walltime;
     }
   }
 
@@ -89,16 +87,6 @@ void GreedyLB::work(LDStats* stats)
     procs[pe].totalLoad() +=  procs[pe].overhead();
     procs[pe].totalLoad() *= procs[pe].pe_speed();
   }
-
-  double max_load = 0;
-  double avg_load = 0;
-  for (pe = 0; pe<parr->procs.size(); pe++) {
-    if (parr->procs[pe].totalLoad() > max_load) {
-      max_load = parr->procs[pe].totalLoad();
-    }
-    avg_load += parr->procs[pe].totalLoad();
-  }
-  CkPrintf("Before GreedyLB max load: %lf avg load: %lf bg load: %lf\n", max_load, avg_load/procs.size(), bg_load/procs.size());
 
   // build object array
   std::vector<Vertex> objs;
@@ -154,16 +142,6 @@ void GreedyLB::work(LDStats* stats)
   if (_lb_args.debug()>0) 
     CkPrintf("[%d] %d objects migrating.\n", CkMyPe(), nmoves);
 
-  max_load = 0;
-  avg_load = 0;
-  for (pe = 0; pe<procs.size(); pe++) {
-    if (procs[pe].totalLoad() > max_load) {
-      max_load = procs[pe].totalLoad();
-    }
-    avg_load += procs[pe].totalLoad();
-  }
-  CkPrintf("GreedyLB> After lb max load: %lf avg load: %lf\n", max_load, avg_load/procs.size());
-
   if (_lb_args.debug()>1)  {
     CkPrintf("CharmLB> Min obj: %f  Max obj: %f\n", objs[objs.size()-1].getVertexLoad(), objs[0].getVertexLoad());
     CkPrintf("CharmLB> PE speed:\n");
@@ -176,10 +154,22 @@ void GreedyLB::work(LDStats* stats)
     CkPrintf("\n");
   }
 
-  stats->after_lb_max = max_load;
-  stats->after_lb_avg = avg_load/procs.size();
-  stats->is_prev_lb_refine = 0;
+  if (_lb_args.metaLbOn()) {
+    double max_load = 0;
+    double avg_load = 0;
+    for (pe = 0; pe<procs.size(); pe++) {
+      if (procs[pe].totalLoad() > max_load) {
+        max_load = procs[pe].totalLoad();
+      }
+      avg_load += procs[pe].totalLoad();
+    }
 
+    stats->after_lb_max = max_load;
+    stats->after_lb_avg = avg_load/procs.size();
+    stats->is_prev_lb_refine = 0;
+    if (_lb_args.debug() > 0)
+      CkPrintf("GreedyLB> After lb max load: %lf avg load: %lf\n", max_load, avg_load/procs.size());
+  }
 }
 
 #include "GreedyLB.def.h"
