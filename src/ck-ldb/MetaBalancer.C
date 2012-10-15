@@ -478,7 +478,8 @@ bool MetaBalancer::generatePlan(int& period, double& ratio_at_t) {
   avg /= adaptive_lbdb.history_data.size();
   double cost = adaptive_struct.lb_strategy_cost + adaptive_struct.lb_migration_cost;
   period = (int) (cost/(max - avg));
-  DEBAD(("Obtained period %d from constant prediction\n", period));
+  DEBAD(("Obtained period %d from constant prediction tolerated \
+			imbalance(%f)\n", period, tolerate_imb));
   if (period < 0) { 
     period = adaptive_struct.final_lb_period;
     DEBAD(("Obtained -ve period from constant prediction so changing to prev %d\n", period));
