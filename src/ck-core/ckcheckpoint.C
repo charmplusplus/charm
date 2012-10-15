@@ -17,8 +17,8 @@ More documentation goes here...
 void noopit(const char*, ...)
 {}
 
-//#define DEBCHK  // CkPrintf
-#define DEBCHK noopit
+#define DEBCHK   CkPrintf
+//#define DEBCHK noopit
 
 #define DEBUGC(x) x
 //#define DEBUGC(x) 
@@ -666,6 +666,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	
         _inrestart = 1;
 	_restarted = 1;
+	CkMemCheckPT::inRestarting = 1;
 
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
@@ -759,9 +760,10 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
         _inrestart = 0;
 
    	_initDone();
-
+	CkMemCheckPT::inRestarting = 0;
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
+		
 		cb.send();
 	}
 }
