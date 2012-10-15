@@ -253,9 +253,6 @@ private:
 
   void BuildStatsMsg();
   void buildStats();
-  bool generatePlan(int& period);
-  bool getLineEq(double& aslope, double& ac, double& mslope, double& mc);
-  bool getPeriodForLinear(double a, double b, double c, int& period);
 
 public:
   int useMem();

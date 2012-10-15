@@ -1225,7 +1225,7 @@ void CkMigratable::AtSync(int waitForMigration)
   DEBL((AA"Element %s going to sync\n"AB,idx2str(thisIndexMax)));
   // model-based load balancing, ask user to provide cpu load
   if (usesAutoMeasure == CmiFalse) UserSetLBLoad();
-  
+
   if (!_lb_args.metaLbOn()) {
     myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
     return;

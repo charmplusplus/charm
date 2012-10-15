@@ -48,6 +48,13 @@ CreateLBFunc_Def(CentralLB, "CentralLB base class")
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
 
+/*
+   void CreateCentralLB()
+   {
+   CProxy_CentralLB::ckNew(0);
+   }
+ */
+
 void CentralLB::staticStartLB(void* data)
 {
   CentralLB *me = (CentralLB*)(data);
@@ -111,20 +118,6 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
   load_balancer_created = 1;
-
-  // If metabalancer enabled, initialize the variables
- // adaptive_struct.lb_ideal_period =  INT_MAX;
- // adaptive_struct.lb_calculated_period = INT_MAX;
- // adaptive_struct.lb_no_iterations = -1;
- // adaptive_struct.global_max_iter_no = 0;
- // adaptive_struct.global_recv_iter_counter = 0;
- // adaptive_struct.in_progress = false;
- // adaptive_struct.prev_load = 0.0;
- // adaptive_struct.lb_strategy_cost = 0.0;
- // adaptive_struct.lb_migration_cost = 0.0;
- // adaptive_struct.lb_msg_send_no = 0;
- // adaptive_struct.lb_msg_recv_no = 0;
- // local_state = OFF;
 #endif
 }
 
@@ -191,9 +184,6 @@ void CentralLB::AtSync()
 
 void CentralLB::ProcessAtSync()
 {
-
-
-
 #if CMK_LBDB_ON
   if (reduction_started) return;              // reducton in progress
 
@@ -782,7 +772,6 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   CkCallback cb(CkIndex_CentralLB::ProcessReceiveMigration((CkReductionMsg*)NULL),
                   thisProxy);
   contribute(0, NULL, CkReduction::max_int, cb);
-
 #endif
 }
 
