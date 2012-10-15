@@ -21,7 +21,7 @@
 #define MIN_STATS 6
 #define STATS_COUNT 8 // The number of stats collected during reduction
 
-#define DEBAD(x) CkPrintf x
+#define DEBAD(x) /*CkPrintf x*/
 #define DEBADDETAIL(x) /*CkPrintf x*/
 #define EXTRA_FEATURE 0
 

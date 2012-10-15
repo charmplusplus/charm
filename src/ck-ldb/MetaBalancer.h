@@ -1,7 +1,28 @@
 /**
- * \addtogroup CkLdb
+* Meta-Balancer is for automating the load balancing decisions based on the
+* application characteristics. The decision of when to call the load balancer is
+* handled by the MetaBalancer if +MetaLB flag is set when launching the
+* application. AtSync should be called very often (every couple of iterations).
+*
+* Meta-Balancer is not aware of the application iteration so it depends on
+* AtSync calls to count the iterations. At every AtSync call, if +MetaLB is
+* set, the chare sends its object load to the MetaBalancer on its local
+* processor and resumes its work. Once all the chares residing on the processor
+* has contributed their load information, this information is collected at the
+* central processor(root) using reduction. The root calculates the ideal period
+* based on linear extrapolation and informs a tentative lb period to all the
+* processors via broadcast. The Meta-Balancer residing on each processor then
+* informs the root about the maximum iteration of any chare on their processor.
+* The root then informs the final lb period, which is the max of calculated and
+* max. Meanwhile, chares can be in various states. Chare goes to LOAD_BALANCE
+* state when it enters load balancing phase. It goes to PAUSE state when the
+* chare has reached the tentative period and is waiting for the final period to
+* be announced.
+*
+* To handle the case of no objects on a particular processor, a timer call is
+* set which checks for the number of objects and if found to be == 0,
+* contributes to the reduction which collects minimum statistics.
 */
-/*@{*/
 
 #ifndef METABALANCER_H
 #define METABALANCER_H
