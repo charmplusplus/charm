@@ -14,7 +14,7 @@
 #ifdef __GNUC__
 #define CMK_NOT_USE_TLS_THREAD                             0
 #else
-#define CMK_NOT_USE_TLS_THREAD                             0
+#define CMK_NOT_USE_TLS_THREAD                             1
 #endif
 
 #define CMK_PCQUEUE_LOCK                                   1
