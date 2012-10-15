@@ -23,7 +23,7 @@ public:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual void work(LDStats* stats);
-  void computeNonlocalComm(long long &nmsgs, long long &nbytes);
+//  void computeNonlocalComm(long long &nmsgs, long long &nbytes);
 
 private:  
 //  CProxy_CentralLB thisProxy;

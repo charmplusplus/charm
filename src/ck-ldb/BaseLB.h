@@ -137,7 +137,6 @@ public:
       for (int i=0; i<nprocs(); i++) procs[i].clearBgLoad();
     }
     void computeNonlocalComm(int &nmsgs, int &nbytes);
-    void computeComm(long &nmsgs, long long &nbytes);
     double computeAverageLoad();
     void normalize_speed();
     void print();
