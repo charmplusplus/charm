@@ -498,8 +498,8 @@ bool MetaBalancer::getPeriodForStrategy(double new_load_percent,
   double b = (mc - ac);
   double c = -(adaptive_struct.lb_strategy_cost +
       adaptive_struct.lb_migration_cost) * overhead_percent;
-  CkPrintf("cost %f\n",
-      (adaptive_struct.lb_strategy_cost+adaptive_struct.lb_migration_cost));
+  DEBAD(("cost %f\n",
+      (adaptive_struct.lb_strategy_cost+adaptive_struct.lb_migration_cost)));
   bool got_period = getPeriodForLinear(a, b, c, period);
   if (!got_period) {
     return false;
