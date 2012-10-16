@@ -118,7 +118,6 @@ private:
   double prev_idle;
   double alpha_beta_cost_to_load;
   int is_prev_lb_refine;
-  bool resume_client_called;
 
   struct AdaptiveData {
     double iteration;
