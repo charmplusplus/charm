@@ -1,16 +1,22 @@
-CHARMC=../../../bin/charmc $(OPTS) $(MOPTS)
+CHARMC=../../../bin/charmc $(OPTS) $(MOPTS) -O3 -g
 
-OBJS = jacobi3d.o
+OBJS = jacobi3d.o 
+OBJS_J = jacobi3d_j.o
 
 OBJS_OMP = jacobi3d_omp.o
 
 OMP_FLAG = -DJACOBI_OPENMP -fopenmp
 
-all: jacobi3d
+all: jacobi3d jacobi3d.j jacobi3d.ckloop
 
 jacobi3d: $(OBJS)
 	$(CHARMC) -language charm++ -module DummyLB -o jacobi3d $(OBJS)
-#	$(CHARMC) -language charm++ -module EveryLB -memory paranoid -o jacobi3d $(OBJS)
+
+jacobi3d.j: $(OBJS_J)
+	$(CHARMC) -language charm++ -module DummyLB -o jacobi3d.j $(OBJS_J)
+
+jacobi3d.ckloop: jacobi3d_ckloop.o
+	$(CHARMC) -language charm++ -module DummyLB -module CkLoop -o jacobi3d.ckloop jacobi3d_ckloop.o
 
 jacobi3d_omp: $(OBJS_OMP)
 	$(CHARMC) -language charm++ -module DummyLB $(OMP_FLAG) -o jacobi3d_omp $(OBJS_OMP)
@@ -22,7 +28,7 @@ summary: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode summary -lz -o jacobi3d.sum $(OBJS)
 
 jacobi3d.decl.h: jacobi3d.ci
-	$(CHARMC)  jacobi3d.ci
+	$(CHARMC)  -E jacobi3d.ci
 
 syncfttest causalfttest: fttest
 fttest: jacobi3d
@@ -37,6 +43,12 @@ clean:
 
 jacobi3d.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) -c jacobi3d.C
+
+jacobi3d_j.o: jacobi3d.C jacobi3d.decl.h
+	$(CHARMC) -DJACOBI=1 -c jacobi3d.C -o jacobi3d_j.o
+
+jacobi3d_ckloop.o: jacobi3d.C jacobi3d.decl.h
+	$(CHARMC) -DCKLOOP=1 -c jacobi3d.C -o jacobi3d_ckloop.o
 
 jacobi3d_omp.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) $(OMP_FLAG) -o $(OBJS_OMP) -c jacobi3d.C

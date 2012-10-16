@@ -1,6 +1,9 @@
 mainmodule jacobi3d {
 
   readonly CProxy_Main mainProxy;
+#if CKLOOP
+  readonly CProxy_FuncCkLoop ckLoopProxy;
+#endif
   readonly int arrayDimX;
   readonly int arrayDimY;
   readonly int arrayDimZ;
@@ -31,7 +34,7 @@ mainmodule jacobi3d {
     entry void begin_iteration(void);
     entry void receiveGhosts(ghostMsg *gmsg);
     entry void processGhosts(ghostMsg *gmsg);
-
+    entry void print();
     entry void doStep() {
       serial "begin_iteration" {
 	begin_iteration();

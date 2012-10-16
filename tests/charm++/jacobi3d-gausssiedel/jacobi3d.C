@@ -31,19 +31,31 @@
  */
 
 #include "jacobi3d.decl.h"
+#include "jacobi3d.h"
 #include "TopoManager.h"
+
+#if CKLOOP
+#include "CkLoopAPI.h"
+CProxy_FuncCkLoop ckLoopProxy;
+#endif
 #ifdef JACOBI_OPENMP
 #include <omp.h>
 #endif
 
-#define THRESHOLD 0.01
+//#define PRINT_DEBUG 0
+#define  LOW_VALUE 0 
+#define  HIGH_VALUE 255 
+//#define JACOBI  1 
+
+int GAUSS_ITER=1; 
+#define THRESHOLD 0.0001 
 // See README for documentation
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int arrayDimX;
 /*readonly*/ int arrayDimY;
-/*readonly*/ int arrayDimZ;
 /*readonly*/ int blockDimX;
+/*readonly*/ int arrayDimZ;
 /*readonly*/ int blockDimY;
 /*readonly*/ int blockDimZ;
 
@@ -69,9 +81,9 @@ int myrand(int numpes) {
 
 #define index(a, b, c)	( (a)*(blockDimY+2)*(blockDimZ+2) + (b)*(blockDimZ+2) + (c) )
 
-#define PRINT_FREQ      100
+#define PRINT_FREQ      400
 #define CKP_FREQ		100
-#define MAX_ITER	 400	
+#define MAX_ITER	 10	
 #define WARM_ITER		5
 #define LEFT			1
 #define RIGHT			2
@@ -105,11 +117,10 @@ class Main : public CBase_Main {
   public:
     CProxy_Jacobi array;
     int iterations;
-
     Main(CkArgMsg* m) {
-      if ( (m->argc != 3) && (m->argc != 7) ) {
-        CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
-        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z]\n", m->argv[0]);
+      if ( (m->argc != 3) && (m->argc < 7) ) {
+        CkPrintf("%s [array_size] [block_size] gauss-iteration\n", m->argv[0]);
+        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z] [gauss-iter]\n", m->argv[0]);
         CkAbort("Abort");
       }
 
@@ -119,18 +130,22 @@ class Main : public CBase_Main {
       // store the main proxy
       mainProxy = thisProxy;
 	
-      if(m->argc == 3) {
+      if(m->argc == 3 ||  m->argc == 4) {
           arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
           blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]); 
+          if(m->argc == 4 )
+              GAUSS_ITER = atoi(m->argv[3]);
       }
-      else if (m->argc == 7) {
+      else if (m->argc >= 7) {
           arrayDimX = atoi(m->argv[1]);
           arrayDimY = atoi(m->argv[2]);
           arrayDimZ = atoi(m->argv[3]);
           blockDimX = atoi(m->argv[4]); 
           blockDimY = atoi(m->argv[5]); 
           blockDimZ = atoi(m->argv[6]);
-      }
+          if(m->argc > 7)
+              GAUSS_ITER = atoi(m->argv[7]);
+      } 
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
         CkAbort("array_size_X % block_size_X != 0!");
@@ -183,34 +198,38 @@ class Main : public CBase_Main {
 	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][j][wrap_z(k-1)]);
 	  }
       CkPrintf("Total Hops: %d\n", hops);
-	
+
+#if CKLOOP
+      ckLoopProxy = CkLoop_Init();
+#endif
 #ifdef JACOBI_OPENMP 
       CProxy_OmpInitializer ompInit = 
         CProxy_OmpInitializer::ckNew(4);
 #else    
-      //Start the computation
+      //Start the computationi
       start();
 #endif
     }
 
     void start() {
-      startTime = CmiWallTimer();                
       array.doStep();
     }
 
     void converge(double maxDiff)
     {
         iterations++;
-        if(maxDiff <= THRESHOLD)
+        if(iterations == WARM_ITER)
+            startTime = CmiWallTimer();                
+        if(maxDiff <= THRESHOLD )
         {
-            CkPrintf("Completed %d iterations with diff %lf\n", iterations, maxDiff);
             endTime = CmiWallTimer();
-            CkPrintf("Time elapsed per iteration: %lf  total time:%lf\n", (endTime - startTime)/(MAX_ITER-1-WARM_ITER), endTime - startTime);
+            CkPrintf("Completed: <x,y,z>chares iterations, times, timeperstep(ms)\n benchmark [ %d %d %d ] \t\t %d \t\t %d\t\t %.3f \t\t %.3f \n", num_chare_x, num_chare_y, num_chare_z, num_chare_x *num_chare_y * num_chare_z, iterations*GAUSS_ITER, endTime - startTime, (endTime - startTime)/(iterations-WARM_ITER)/GAUSS_ITER*1000);
+            //array.print();
             CkExit();
         }else
         {
             if(iterations % PRINT_FREQ== 0)
-                CkPrintf("iteration %d  diff=%f\n", iterations, maxDiff); 
+                CkPrintf("iteration %d  diff=%e\n", iterations, maxDiff); 
 			array.doStep();
         }
     }
@@ -230,26 +249,66 @@ class Main : public CBase_Main {
             CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-1-WARM_ITER));
             CkExit();
         }
+            CkExit();
     }
-
 };
 
 /** \class Jacobi
  *
  */
 
-class Jacobi: public CBase_Jacobi {
-  Jacobi_SDAG_CODE
+extern "C" void doCalc(int first,int last, void *result, int paramNum, void * param)
+{
+#if JACOBI
+    int i;
+    double maxDiff=0;
+    double tmp, update=0;
+    maxDiff = 0;
 
-  public:
-    int iterations;
-    int imsg;
+    Jacobi  *obj = (Jacobi*)param;
+    int x_c = arrayDimX/2/blockDimX;
+    int y_c = arrayDimY/2/blockDimY;
+    int z_c = arrayDimZ/2/blockDimZ;
+    int x_p = (arrayDimX/2)%blockDimX+1;
+    int y_p = (arrayDimY/2)%blockDimY+1;
+    int z_p = (arrayDimZ/2)%blockDimZ+1;
+    for(i=first; i<last; ++i) {
+          for(int j=1; j<blockDimY+1; ++j) {
+              for(int k=1; k<blockDimZ+1; ++k) {
+                  if(obj->thisIndex_x == x_c && y_c == obj->thisIndex_y && z_c == obj->thisIndex_z && i==x_p && j==y_p && k==z_p)
+                      continue;
+                  update = 0;//temperature[index(i, j, k)];
+                  update += obj->temperature[index(i+1, j, k)];
+                  update += obj->temperature[index(i-1, j, k)];
+                  update += obj->temperature[index(i, j+1, k)];
+                  update += obj->temperature[index(i, j-1, k)];
+                  update += obj->temperature[index(i, j, k+1)];
+                  update += obj->temperature[index(i, j, k-1)];
+                  update /= 6;
+                 
+                  double diff = obj->temperature[index(i, j, k)] - update;
+                  if(diff<0) diff = -1*diff;
+                  if(diff>maxDiff) maxDiff = diff;
+                  obj->new_temperature[index(i, j, k)] = update;
+              }
+          }
+        }
+        for(i=1; i<blockDimX+1; ++i) {
+            for(int j=1; j<blockDimY+1; ++j) {
+                for(int k=1; k<blockDimZ+1; ++k) {
+                  if(obj->thisIndex_x == x_c && y_c == obj->thisIndex_y && z_c == obj->thisIndex_z && i==x_p && j==y_p && k==z_p)
+                      continue;
+                    obj->temperature[index(i, j, k)] = obj->new_temperature[index(i, j, k)];
+                }
+            }
+        }
+        *((double*)result) = maxDiff;
+#else
+#endif
+}
 
-    double *temperature;
-	double timing,average;
-    int neighbors;
-    // Constructor, initialize values
-    Jacobi() {
+
+Jacobi::Jacobi() {
       // This call is an anachronism - the need to call __sdag_init() has been
       // removed. We still call it here to test backward compatibility.
       __sdag_init();
@@ -257,19 +316,25 @@ class Jacobi: public CBase_Jacobi {
       int i, j, k;
       // allocate a three dimensional array
       temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-
+#if  JACOBI
+      new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
+#endif
       for(i=0; i<blockDimX+2; ++i) {
           for(j=0; j<blockDimY+2; ++j) {
               for(k=0; k<blockDimZ+2; ++k) {
                   temperature[index(i, j, k)] = 0.0;
+#if  JACOBI
+                  new_temperature[index(i, j, k)] = 0.0;
+#endif
               }
           } 
       }
-
+      thisIndex_x = thisIndex.x;
+      thisIndex_y = thisIndex.y;
+      thisIndex_z = thisIndex.z;
       iterations = 0;
       imsg = 0;
-      if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z ==0)
-          constrainBC();
+      constrainBC();
 
       usesAtSync = CmiTrue;
       neighbors = 6;
@@ -287,50 +352,23 @@ class Jacobi: public CBase_Jacobi {
           neighbors--;
        // CkPrintf("neighbor = %d \n", neighbors);
     }
-
-    Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) { }
-
-    ~Jacobi() { 
-        delete [] temperature; 
-    }
-
-	// Pupping function for migration and fault tolerance
-	// Condition: assuming the 3D Chare Arrays are NOT used
-	void pup(PUP::er &p){
+void Jacobi::pup(PUP::er &p){
 		
 		// calling parent's pup
 		CBase_Jacobi::pup(p);
-	
 		__sdag_pup(p);
-	
 		// pupping properties of this class
 		p | iterations;
 		p | imsg;
-
 		// if unpacking, allocate the memory space
 		if(p.isUnpacking()){
 			temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-	
 		}
-
 		// pupping the arrays
 		p((char *)temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
-
 	}
-
-
     // Send ghost faces to the six neighbors
-    void begin_iteration(void) {
-        /*  
-      if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
-//          CkPrintf("Start of iteration %d\n", iterations);
-			if(iterations % PRINT_FREQ == 0){
-				average = timing;
-				timing = CmiWallTimer();
-				average = (timing - average)/(double)PRINT_FREQ;
-				CkPrintf("time=%.2f it=%d avg=%.4f\n",timing,iterations,average);
-			}
-      }*/
+    void Jacobi::begin_iteration(void) {
       iterations++;
 
       // Copy different faces into messages
@@ -407,22 +445,11 @@ class Jacobi: public CBase_Jacobi {
           CkSetRefNum(backMsg, iterations);
           thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1)).receiveGhosts(backMsg);
       }
-
-
-
     }
 
-    void processGhosts(ghostMsg *gmsg) {
+    void Jacobi::processGhosts(ghostMsg *gmsg) {
       int height = gmsg->height;
       int width = gmsg->width;
-
-      /*CkPrintf("[%d,%d,%d] received %d msg from %d ", thisIndex.x, thisIndex.y, thisIndex.z, height*width, gmsg->dir);
-      for(int j=0; j<height; ++j) 
-          for(int k=0; k<width; ++k) {
-          CkPrintf(" %f ", gmsg->gh[k*height+j]);
-          }
-      CkPrintf("\n\n");
-      */
       switch(gmsg->dir) {
       case LEFT:
           for(int j=0; j<height; ++j) 
@@ -468,14 +495,17 @@ class Jacobi: public CBase_Jacobi {
     }
 
 
-	void check_and_compute() {
-		double maxDiff = compute_kernel();
-
+	void Jacobi::check_and_compute() {
+        double maxDiff;
+#if CKLOOP
+        CkLoop_Parallelize(doCalc, 1,  (void*)this, CkMyNodeSize(), 0, blockDimX, 1, &maxDiff, CKLOOP_DOUBLE_MAX);
+#else
+		maxDiff = compute_kernel();
+#endif
 		// calculate error
 		// not being done right now since we are doing a fixed no. of iterations
-
+        //CkPrintf(" iteration %d [%d,%d,%d] max=%e\n", iterations, thisIndex.x, thisIndex.y, thisIndex.z, maxDiff);
 		//constrainBC();
-        //CkPrintf("[%d,%d,%d] max = %f\n", thisIndex.x, thisIndex.y, thisIndex.z, maxDiff);
 		if (iterations % CKP_FREQ == 0 || iterations > MAX_ITER){
 #ifdef CMK_MEM_CHECKPOINT
 			contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
@@ -495,87 +525,186 @@ class Jacobi: public CBase_Jacobi {
         }
     }
 
-	void ResumeFromSync(){
+	void Jacobi::ResumeFromSync(){
 		doStep();
 	}
 
 
-    // Check to see if we have received all neighbor values yet
-    // If all neighbor values have been received, we update our values and proceed
-    double compute_kernel() {     //Gauss-Siedal compute
+#if JACOBI
+    double Jacobi::compute_kernel() {     //Gauss-Siedal compute
         int i;
         double maxDiff=0;
         double tmp, update=0;
-        int count=1;
+        maxDiff = 0;
+
+        int x_c = arrayDimX/2/blockDimX;
+        int y_c = arrayDimY/2/blockDimY;
+        int z_c = arrayDimZ/2/blockDimZ;
+        int x_p = (arrayDimX/2)%blockDimX+1;
+        int y_p = (arrayDimY/2)%blockDimY+1;
+        int z_p = (arrayDimZ/2)%blockDimZ+1;
   #pragma omp parallel for schedule(dynamic) 
         for(i=1; i<blockDimX+1; ++i) {
           //printf("[%d] did  %d iteration out of %d \n", omp_get_thread_num(), i, blockDimX+1); 
           for(int j=1; j<blockDimY+1; ++j) {
               for(int k=1; k<blockDimZ+1; ++k) {
-                  update = temperature[index(i, j, k)];
-                  count = 1;
-                  //CkPrintf("{%f, ", update);
-                  if(!(thisIndex.x+1>=num_chare_x&&i==blockDimX))
-                  {
-                      update += temperature[index(i+1, j, k)];
-                      count++;
-                  }
-                  if(!(thisIndex.x-1<0&&i==1))
-                  {
-                      update += temperature[index(i-1, j, k)];
-                      count++;
-                  }
-                  if(!(thisIndex.y+1>=num_chare_y&&j==blockDimY))
-                  {
-                      update += temperature[index(i, j+1, k)];
-                      count++;
-                  }
-                  if(!(thisIndex.y-1<0&&j==1))
-                  {
-                      update += temperature[index(i, j-1, k)];
-                      count++;
-                  }
-                  if(!(thisIndex.z+1>=num_chare_z&&k==blockDimZ))
-                  {
-                      update += temperature[index(i, j, k+1)];
-                      count++;
-                  }
-                  if(!(thisIndex.z-1<0&&k==1))
-                  {
-                      update += temperature[index(i, j, k-1)];
-                      count++;
-                  }
-                  update /= count;
+        
+                  if(thisIndex.x == x_c && y_c == thisIndex.y && z_c == thisIndex.z && i==x_p && j==y_p && k==z_p)
+                      continue;
+                  update = 0;//temperature[index(i, j, k)];
+                  update += temperature[index(i+1, j, k)];
+                  update += temperature[index(i-1, j, k)];
+                  update += temperature[index(i, j+1, k)];
+                  update += temperature[index(i, j-1, k)];
+                  update += temperature[index(i, j, k+1)];
+                  update += temperature[index(i, j, k-1)];
+                  update /= 6;
+                 
+                  double diff = temperature[index(i, j, k)] - update;
+                  if(diff<0) diff = -1*diff;
+                  if(diff>maxDiff) maxDiff = diff;
+                  new_temperature[index(i, j, k)] = update;
+              }
+          }
+        }
+        for(i=1; i<blockDimX+1; ++i) {
+            for(int j=1; j<blockDimY+1; ++j) {
+                for(int k=1; k<blockDimZ+1; ++k) {
+                  if(thisIndex.x == x_c && y_c == thisIndex.y && z_c == thisIndex.z && i==x_p && j==y_p && k==z_p)
+                      continue;
+                    temperature[index(i, j, k)] = new_temperature[index(i, j, k)];
+                }
+            }
+        }
+#if     PRINT_DEBUG
+        CkPrintf("[%d:%d:%d] iteration=%d max:%.3f ==== ", thisIndex.x, thisIndex.y, thisIndex.z, iterations, maxDiff); 
+        for(i=0; i<blockDimX+2; ++i) {
+          for(int j=0; j<blockDimY+2; ++j) {
+              for(int k=0; k<blockDimZ+2; ++k) {
+                  CkPrintf("([%d:%d:%d]: %.2f )", i, j, k, temperature[index(i, j, k)]); 
+              }
+          }
+        }
+        CkPrintf("\n\n");
+#endif
+        return maxDiff;
+    }
+
+#else
+
+    // Check to see if we have received all neighbor values yet
+    // If all neighbor values have been received, we update our values and proceed
+    double Jacobi::compute_kernel() {     //Gauss-Siedal compute
+        int i=1;
+        double maxDiff=0;
+        double tmp, update=0;
+        int count=1;
+        int gg;
+
+        int x_c = arrayDimX/2/blockDimX;
+        int y_c = arrayDimY/2/blockDimY;
+        int z_c = arrayDimZ/2/blockDimZ;
+        int x_p = (arrayDimX/2)%blockDimX+1;
+        int y_p = (arrayDimY/2)%blockDimY+1;
+        int z_p = (arrayDimZ/2)%blockDimZ+1;
+            //CkPrintf("\n\n START %d [%d:%d:%d] \n", iterations, thisIndex.x, thisIndex.y, thisIndex.z);
+  #pragma omp parallel for schedule(dynamic) 
+        for(gg=0; gg<GAUSS_ITER; gg++){
+            maxDiff = 0;
+            for(i=1; i<blockDimX+1; ++i) {
+          //printf("[%d] did  %d iteration out of %d \n", omp_get_thread_num(), i, blockDimX+1); 
+          for(int j=1; j<blockDimY+1; ++j) {
+              for(int k=1; k<blockDimZ+1; ++k) {
+                  if(thisIndex.x == x_c && y_c == thisIndex.y && z_c == thisIndex.z && i==x_p && j==y_p && k==z_p)
+                      continue;
+                  update = 0;//temperature[index(i, j, k)];
+                  update += temperature[index(i+1, j, k)];
+                  update += temperature[index(i-1, j, k)];
+                  update += temperature[index(i, j+1, k)];
+                  update += temperature[index(i, j-1, k)];
+                  update += temperature[index(i, j, k+1)];
+                  update += temperature[index(i, j, k-1)];
+                  update /= 6;
+                 
                   double diff = temperature[index(i, j, k)] - update;
                   if(diff<0) diff = -1*diff;
                   if(diff>maxDiff) maxDiff = diff;
                   temperature[index(i, j, k)] = update;
-                  //CkPrintf(" %d:%f }", count, update);
               }
           }
-      }
-        //CkPrintf("[%d:%d:%d]\n\n", thisIndex.x, thisIndex.y, thisIndex.z);
-    return maxDiff;
+        }
+        }
+#if     PRINT_DEBUG
+        CkPrintf("[%d:%d:%d] iteration=%d max:%.3f ==== ", thisIndex.x, thisIndex.y, thisIndex.z, iterations, maxDiff); 
+        for(i=0; i<blockDimX+2; ++i) {
+          for(int j=0; j<blockDimY+2; ++j) {
+              for(int k=0; k<blockDimZ+2; ++k) {
+                  CkPrintf("([%d:%d:%d]: %.2f )", i, j, k, temperature[index(i, j, k)]); 
+              }
+          }
+        }
+        CkPrintf("\n\n");
+#endif
+        return maxDiff;
     }
-
+#endif
     // Enforce some boundary conditions
-    void constrainBC() {
+    void Jacobi::constrainBC() {
       
-        temperature[index(1, 1, 1)] = 255.0;
-        // Heat left, top and front faces of each chare's block
-      /*  for(int i=1; i<blockDimX+1; ++i)
-      for(int k=1; k<blockDimZ+1; ++k)
-              temperature[index(i, 1, k)] = 255.0;
-        for(int j=1; j<blockDimY+1; ++j)
-          for(int k=1; k<blockDimZ+1; ++k)
-              temperature[index(1, j, k)] = 255.0;
-      for(int i=1; i<blockDimX+1; ++i)
-          for(int j=1; j<blockDimY+1; ++j)
-              temperature[index(i, j, 1)] = 255.0; */
+        // Heat right, left
+        if(thisIndex.x == 0 || thisIndex.x == num_chare_x-1)
+            for(int j=0; j<blockDimY+2; ++j)
+                for(int k=0; k<blockDimZ+2; ++k)
+                {   
+                    if(thisIndex.x == 0)
+                        temperature[index(0, j, k)] = LOW_VALUE;
+                    else
+                        temperature[index(blockDimX+1, j, k)] = LOW_VALUE;
+                }
+        if(thisIndex.y == 0 || thisIndex.y == num_chare_y-1)
+            for(int j=0; j<blockDimX+2; ++j)
+                for(int k=0; k<blockDimZ+2; ++k)
+                {   
+                    if(thisIndex.y == 0)
+                        temperature[index(j,0, k)] = LOW_VALUE;
+                    else
+                        temperature[index(j, blockDimY+1, k)] = LOW_VALUE;
+                }
+        if(thisIndex.z == 0 || thisIndex.z == num_chare_z-1)
+            for(int j=0; j<blockDimX+2; ++j)
+                for(int k=0; k<blockDimY+2; ++k)
+                {   
+                    if(thisIndex.z == 0)
+                        temperature[index(j, k, 0)] = LOW_VALUE;
+                    else
+                        temperature[index(j, k, blockDimZ+1)] = LOW_VALUE;
+                }
+        int x_c = arrayDimX/2/blockDimX;
+        int y_c = arrayDimY/2/blockDimY;
+        int z_c = arrayDimZ/2/blockDimZ;
+        int x_p = (arrayDimX/2)%blockDimX+1;
+        int y_p = (arrayDimY/2)%blockDimY+1;
+        int z_p = (arrayDimZ/2)%blockDimZ+1;
+        if(thisIndex.x == x_c && y_c == thisIndex.y && z_c == thisIndex.z)
+        {
+            temperature[index(x_p, y_p, z_p)] = HIGH_VALUE;
+        }
+
     }
 
-};
-
+    void Jacobi::print()
+    {
+        CkPrintf(" print %d:%d:%d ", thisIndex.x, thisIndex.y, thisIndex.z); 
+          //printf("[%d] did  %d iteration out of %d \n", omp_get_thread_num(), i, blockDimX+1); 
+          for(int i=1; i<blockDimX+1;++i){CkPrintf("==\n");
+              for(int j=1;j<blockDimY+1;++j)
+              for(int k=1; k<blockDimZ+1; ++k) {
+                  CkPrintf(" %e ",  temperature[index(i, j, k)]) ;
+              }
+              CkPrintf("------\n-----\n");
+          }
+              contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+    }
 /** \class JacobiMap
  *
  */
