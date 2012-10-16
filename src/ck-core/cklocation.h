@@ -175,6 +175,7 @@ public:
   	const CkArrayIndex &idx_,int localIdx_);
   void migrateMe(int toPe); //Leave this processor
   void informIdealLBPeriod(int lb_ideal_period);
+  void metaLBCallLB();
   void destroy(void); //User called destructor
   virtual ~CkLocRec_local();
 
@@ -219,7 +220,9 @@ public:
   inline LDObjHandle getLdHandle() const{return ldHandle;}
   static void staticMigrate(LDObjHandle h, int dest);
   static void staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period);
+  static void staticMetaLBCallLBOnChares(LDObjHandle h);
   void metaLBResumeWaitingChares(int lb_ideal_period);
+  void metaLBCallLBOnChares();
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
   void AsyncMigrate(CmiBool use);
@@ -325,6 +328,7 @@ public:
   virtual void ckJustMigrated(void); /*default is empty*/
 
   void recvLBPeriod(void *data);
+  void metaLBCallLB();
   void clearMetaLBData(void);
 
   //used for out-of-core emulation
@@ -604,6 +608,7 @@ public:
 	//Migrate us to another processor
 	void emigrate(CkLocRec_local *rec,int toPe);
   void informLBPeriod(CkLocRec_local *rec, int lb_ideal_period);
+  void metaLBCallLB(CkLocRec_local *rec);
 
 #if CMK_LBDB_ON
 	LBDatabase *getLBDB(void) const { return the_lbdb; }

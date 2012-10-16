@@ -38,6 +38,9 @@ private:
   void MetaLBResumeWaitingChares(LDObjHandle _h, int lb_ideal_period) {
     callbacks.metaLBResumeWaitingChares(_h, lb_ideal_period);
   }
+  void MetaLBCallLBOnChares(LDObjHandle _h) {
+    callbacks.metaLBCallLBOnChares(_h);
+  }
   CmiBool RegisteringObjs() { return registering_objs; };
   void SetRegisteringObjs(CmiBool _set) { registering_objs = _set; };
 

@@ -34,6 +34,11 @@ extern "C" void LDOMMetaLBResumeWaitingChares(LDHandle _db, int lb_ideal_period)
   db->MetaLBResumeWaitingChares(lb_ideal_period);
 }
 
+extern "C" void LDOMMetaLBCallLBOnChares(LDHandle _db) {
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->MetaLBCallLBOnChares();
+}
+
 extern "C" void * LDOMUserData(LDOMHandle &_h)
 {
   LBDB *const db = (LBDB*)(_h.ldb.handle);

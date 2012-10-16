@@ -17,6 +17,7 @@ module MetaBalancer {
     entry [immediate] void ReceiveIterationNo(int);
     entry [immediate] void RegisterNoObjCallback(int);
     entry [immediate] void TriggerAdaptiveReduction();
+    entry [immediate] void MetaLBCallLBOnChares();
   }
 
   // This group is used only to handle reduction to obtain the maximum

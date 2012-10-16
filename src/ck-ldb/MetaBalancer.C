@@ -155,6 +155,9 @@ void MetaBalancer::pup(PUP::er& p) {
 
 void MetaBalancer::ResumeClients() {
   // If metabalancer enabled, initialize the variables
+  if (!resume_client_called) {
+    resume_client_called = true;
+  CkPrintf("[%d] Metabalancer ResumeClient\n", CkMyPe());
   adaptive_lbdb.history_data.clear();
 
   adaptive_struct.tentative_period =  INT_MAX;
@@ -177,6 +180,7 @@ void MetaBalancer::ResumeClients() {
     lb_in_progress = false;
   }
   HandleAdaptiveNoObj();
+  }
 }
 
 int MetaBalancer::get_iteration() {
@@ -254,6 +258,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
 
     CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
     contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
+    resume_client_called = false;
   }
   return true;
 }
@@ -291,6 +296,11 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
 
   if (iteration_n == 1) {
     adaptive_struct.info_first_iter.max_avg_ratio = max/avg;
+  }
+
+
+  if (adaptive_struct.final_lb_period == iteration_n) {
+    thisProxy.MetaLBCallLBOnChares();
   }
 
   // If lb period inform is in progress, dont inform again.
@@ -628,6 +638,9 @@ void MetaBalancer::LoadBalanceDecisionFinal(int req_no, int period) {
   lbdatabase->MetaLBResumeWaitingChares(period);
 }
 
+void MetaBalancer::MetaLBCallLBOnChares() {
+  lbdatabase->MetaLBCallLBOnChares();
+}
 
 void MetaBalancer::ReceiveIterationNo(int local_iter_no) {
   CmiAssert(CkMyPe() == 0);
@@ -677,6 +690,7 @@ int MetaBalancer::getPredictedLBPeriod(bool& is_tentative) {
 void MetaBalancer::ResetAdaptive() {
   adaptive_lbdb.lb_iter_no = -1;
   lb_in_progress = true;
+  CkPrintf("[%d] In Meta Reset Adapt\n", CkMyPe());
 }
 
 // This is required for PEs with no objs
@@ -693,7 +707,9 @@ void MetaBalancer::checkForNoObj(void *ad) {
 // Called by LBDatabase to indicate that no objs are there in this processor
 void MetaBalancer::HandleAdaptiveNoObj() {
   if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
+    resume_client_called = false;
     adaptive_struct.finished_iteration_no++;
+    adaptive_struct.lb_iteration_no++;
     DEBAD(("(%d) --HandleAdaptiveNoObj %d\n", CkMyPe(),
           adaptive_struct.finished_iteration_no));
     thisProxy[0].RegisterNoObjCallback(CkMyPe());
@@ -718,13 +734,14 @@ void MetaBalancer::RegisterNoObjCallback(int index) {
   if (adaptive_lbdb.lb_iter_no != -1) {
     DEBAD(("Collection already started now %d so kick in\n",
         adaptive_struct.finished_iteration_no));
-    thisProxy[index].TriggerAdaptiveReduction();
+    //thisProxy[index].TriggerAdaptiveReduction();
   }
 }
 
 void MetaBalancer::TriggerAdaptiveReduction() {
   if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
     adaptive_struct.finished_iteration_no++;
+    adaptive_struct.lb_iteration_no++;
     double lb_data[STATS_COUNT];
     lb_data[0] = adaptive_struct.finished_iteration_no;
     lb_data[1] = 1;

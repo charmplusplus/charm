@@ -72,10 +72,10 @@ class Main: public CBase_Main {
       }
 
       num_chares = atoi(m->argv[1]);
-      if(num_chares < CkNumPes()) {
-	printf("Warning: #elements is forced to be equal to #pes\n");
-	num_chares = CkNumPes();
-      }
+//      if(num_chares < CkNumPes()) {
+//	printf("Warning: #elements is forced to be equal to #pes\n");
+//	num_chares = CkNumPes();
+//      }
 
       numSteps = atoi(m->argv[2]);
       currentMsgSize = atoi(m->argv[3]);

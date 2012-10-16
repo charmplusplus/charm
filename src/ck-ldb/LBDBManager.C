@@ -335,6 +335,17 @@ void LBDB::MetaLBResumeWaitingChares(int lb_ideal_period) {
   }
 }
 
+void LBDB::MetaLBCallLBOnChares() {
+  for (int i = 0; i < objs.length(); i++) {
+    LBObj* obj = objs[i];
+    if (obj) {
+      LBOM *om = oms[obj->parentOM().handle];
+      LDObjHandle h = obj->GetLDObjHandle();
+      om->MetaLBCallLBOnChares(h);
+    }
+  }
+}
+
 void LBDB::Migrated(LDObjHandle h, int waitBarrier)
 {
   // Object migrated, inform load balancers

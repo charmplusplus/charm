@@ -360,6 +360,11 @@ public:
   inline void MetaLBResumeWaitingChares(int lb_period) {
     LDOMMetaLBResumeWaitingChares(myLDHandle, lb_period);
   }
+
+  inline void MetaLBCallLBOnChares() {
+    LDOMMetaLBCallLBOnChares(myLDHandle);
+  }
+
   void SetMigrationCost(double cost);
   void SetStrategyCost(double cost);
 	void UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad);

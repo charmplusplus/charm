@@ -76,6 +76,7 @@ public:
   void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);
   void LoadBalanceDecision(int, int);
   void LoadBalanceDecisionFinal(int, int);
+  void MetaLBCallLBOnChares();
   void ReceiveIterationNo(int); // Receives the current iter no
   static void periodicCall(void *ad);
   static void checkForNoObj(void *ad);
@@ -117,6 +118,7 @@ private:
   double prev_idle;
   double alpha_beta_cost_to_load;
   int is_prev_lb_refine;
+  bool resume_client_called;
 
   struct AdaptiveData {
     double iteration;

@@ -1165,6 +1165,7 @@ void CkMigratable::clearMetaLBData() {
     atsync_iteration = -1;
     prev_load = 0.0;
     can_reset = false;
+    myRec->getMetaBalancer()->ResumeClients();
 //  }
 }
 
@@ -1191,10 +1192,14 @@ void CkMigratable::recvLBPeriod(void *data) {
     local_state = LOAD_BALANCE;
 
     can_reset = true;
-    myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+    //myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
     return;
   }
   local_state = DECIDED;
+}
+
+void CkMigratable::metaLBCallLB() {
+	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
 }
 
 void CkMigratable::ckFinishConstruction(void)
@@ -1240,9 +1245,9 @@ void CkMigratable::AtSync(int waitForMigration)
   }
 
   atsync_iteration++;
-  // CkPrintf("[pe %s] atsync_iter %d && predicted period %d state: %d\n",
-  //     idx2str(thisIndexMax), atsync_iteration,
-  //     myRec->getMetaBalancer()->getPredictedLBPeriod(), local_state);
+  //CkPrintf("[pe %s] atsync_iter %d && predicted period %d state: %d\n",
+  //    idx2str(thisIndexMax), atsync_iteration,
+  //    myRec->getMetaBalancer()->getPredictedLBPeriod(), local_state);
   double tmp = prev_load;
   prev_load = myRec->getObjTime();
   double current_load = prev_load - tmp;
@@ -1266,7 +1271,7 @@ void CkMigratable::AtSync(int waitForMigration)
     DEBAD(("[%d:%s] Went to load balance iter %d\n", CkMyPe(), idx2str(thisIndexMax), atsync_iteration));
     local_state = LOAD_BALANCE;
     can_reset = true;
-    myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+    //myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
   } else {
     DEBAD(("[%d:%s] Went to pause state iter %d\n", CkMyPe(), idx2str(thisIndexMax), atsync_iteration));
     local_state = PAUSE;
@@ -1448,6 +1453,10 @@ void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 
 void CkLocRec_local::informIdealLBPeriod(int lb_ideal_period) {
   myLocMgr->informLBPeriod(this, lb_ideal_period);
+}
+
+void CkLocRec_local::metaLBCallLB() {
+	myLocMgr->metaLBCallLB(this);
 }
 
 #if CMK_LBDB_ON
@@ -1671,12 +1680,22 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 
 void CkLocRec_local::staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period) {
 	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
-	DEBL((AA"Load balancer wants to migrate %s to %d\n"AB,idx2str(el->idx),dest));
+	DEBL((AA"MetaBalancer wants to resume waiting chare %s\n"AB,idx2str(el->idx)));
 	el->metaLBResumeWaitingChares(lb_ideal_period);
 }
 
 void CkLocRec_local::metaLBResumeWaitingChares(int lb_ideal_period) {
   informIdealLBPeriod(lb_ideal_period);
+}
+
+void CkLocRec_local::staticMetaLBCallLBOnChares(LDObjHandle h) {
+	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
+	DEBL((AA"MetaBalancer wants to call LoadBalance on chare %s\n"AB,idx2str(el->idx)));
+	el->metaLBCallLBOnChares();
+}
+
+void CkLocRec_local::metaLBCallLBOnChares() {
+  metaLBCallLB();
 }
 
 void CkLocRec_local::staticMigrate(LDObjHandle h, int dest)
@@ -2892,6 +2911,10 @@ void CkLocMgr::informLBPeriod(CkLocRec_local *rec, int lb_ideal_period) {
 	callMethod(rec,&CkMigratable::recvLBPeriod, (void *)&lb_ideal_period);
 }
 
+void CkLocMgr::metaLBCallLB(CkLocRec_local *rec) {
+	callMethod(rec, &CkMigratable::metaLBCallLB);
+}
+
 /**
   Migrating array element is arriving on this processor.
 */
@@ -3189,6 +3212,8 @@ void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 	myCallbacks.queryEstLoad = NULL;
   myCallbacks.metaLBResumeWaitingChares =
       (LDMetaLBResumeWaitingCharesFn)CkLocRec_local::staticMetaLBResumeWaitingChares;
+  myCallbacks.metaLBCallLBOnChares =
+      (LDMetaLBCallLBOnCharesFn)CkLocRec_local::staticMetaLBCallLBOnChares;
 	myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);
 
 	// Tell the lbdb that I'm registering objects
