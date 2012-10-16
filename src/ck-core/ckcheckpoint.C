@@ -17,8 +17,8 @@ More documentation goes here...
 void noopit(const char*, ...)
 {}
 
-#define DEBCHK   CkPrintf
-//#define DEBCHK noopit
+//#define DEBCHK   CkPrintf
+#define DEBCHK noopit
 
 #define DEBUGC(x) x
 //#define DEBUGC(x) 

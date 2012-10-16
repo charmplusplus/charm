@@ -54,9 +54,6 @@ void noopck(const char*, ...)
 //#define DEBUGF       CkPrintf
 #define DEBUGF noopck
 
-//use CmiReduce in converse restart
-#define CMK_USE_BARRIER	1	
-
 // pick buddy processor from a different physical node
 #define NODE_CHECKPOINT                        0
 
@@ -1031,15 +1028,6 @@ static void restartBeginHandler(char *msg)
 {
 #if CMK_MEM_CHECKPOINT
   CmiFree(msg);
-#if	CMK_USE_BARRIER
-	if(CkMyPe()!=_diePE){
-		char *restartmsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
-		CmiSetHandler(restartmsg, restartBeginHandlerIdx);
-		CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
-	}else{
-		CkRestartCheckPointCallback(NULL,NULL);
-	}
-#else
   static int count = 0;
   CmiAssert(CkMyPe() == _diePE);
   count ++;
@@ -1047,7 +1035,6 @@ static void restartBeginHandler(char *msg)
     CkRestartCheckPointCallback(NULL, NULL);
     count = 0;
   }
-#endif
 #endif
 }
 
@@ -1086,11 +1073,7 @@ static void restartBcastHandler(char *msg)
     // reduction
   char *restartmsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(restartmsg, restartBeginHandlerIdx);
-#if CMK_USE_BARRIER
-	CmiReduce(restartmsg,CmiMsgHeaderSizeBytes,doNothingMsg);
-#else
   CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
-#endif
   checkpointed = 0;
 #endif
 }
