@@ -696,7 +696,7 @@ void MetaBalancer::ResetAdaptive() {
 // This is required for PEs with no objs
 void MetaBalancer::periodicCall(void *ad) {
   MetaBalancer *s = (MetaBalancer *)ad;
-  CcdCallFnAfterOnPE((CcdVoidFn)checkForNoObj, (void *)s, 1000, CkMyPe());
+  CcdCallFnAfterOnPE((CcdVoidFn)checkForNoObj, (void *)s, 500, CkMyPe());
 }
 
 void MetaBalancer::checkForNoObj(void *ad) {

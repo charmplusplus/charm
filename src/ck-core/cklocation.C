@@ -1165,7 +1165,6 @@ void CkMigratable::clearMetaLBData() {
     atsync_iteration = -1;
     prev_load = 0.0;
     can_reset = false;
-    myRec->getMetaBalancer()->ResumeClients();
 //  }
 }
 
@@ -1299,7 +1298,10 @@ void CkMigratable::staticResumeFromSync(void* data)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = el;
 #endif
-  el->clearMetaLBData();
+
+  if (_lb_args.metaLbOn()) {
+  	el->clearMetaLBData();
+	}
 	el->ResumeFromSync();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     el->mlogData->resumeCount++;
