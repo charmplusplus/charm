@@ -34,21 +34,19 @@
 #include "jacobi3d.h"
 #include "TopoManager.h"
 
-#if CKLOOP
 #include "CkLoopAPI.h"
 CProxy_FuncCkLoop ckLoopProxy;
-#endif
 #ifdef JACOBI_OPENMP
 #include <omp.h>
 #endif
 
-//#define PRINT_DEBUG 0
+//#define PRINT_DEBUG 1
 #define  LOW_VALUE 0 
 #define  HIGH_VALUE 255 
 //#define JACOBI  1 
 
 int GAUSS_ITER=1; 
-#define THRESHOLD 0.0001 
+#define THRESHOLD 0.001 
 // See README for documentation
 
 /*readonly*/ CProxy_Main mainProxy;
@@ -81,7 +79,9 @@ int myrand(int numpes) {
 
 #define index(a, b, c)	( (a)*(blockDimY+2)*(blockDimZ+2) + (b)*(blockDimZ+2) + (c) )
 
-#define PRINT_FREQ      400
+#define  START_ITER     10
+#define   END_ITER      20
+#define PRINT_FREQ     100 
 #define CKP_FREQ		100
 #define MAX_ITER	 10	
 #define WARM_ITER		5
@@ -116,6 +116,7 @@ class ghostMsg: public CMessage_ghostMsg {
 class Main : public CBase_Main {
   public:
     CProxy_Jacobi array;
+    CProxy_TraceControl _traceControl;
     int iterations;
     Main(CkArgMsg* m) {
       if ( (m->argc != 3) && (m->argc < 7) ) {
@@ -172,7 +173,14 @@ class Main : public CBase_Main {
       opts.setMap(map);
       array = CProxy_Jacobi::ckNew(opts);
 #else
+#if CKLOOP
+      CProxy_JacobiNodeMap map = CProxy_JacobiNodeMap::ckNew();
+      CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
+      opts.setMap(map);
+      array = CProxy_Jacobi::ckNew(opts);
+#else
       array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);
+#endif
 #endif
 
       TopoManager tmgr;
@@ -199,16 +207,11 @@ class Main : public CBase_Main {
 	  }
       CkPrintf("Total Hops: %d\n", hops);
 
+      _traceControl = CProxy_TraceControl::ckNew();
 #if CKLOOP
-      ckLoopProxy = CkLoop_Init();
+      ckLoopProxy = CkLoop_Init(CkMyNodeSize());
 #endif
-#ifdef JACOBI_OPENMP 
-      CProxy_OmpInitializer ompInit = 
-        CProxy_OmpInitializer::ckNew(4);
-#else    
-      //Start the computationi
       start();
-#endif
     }
 
     void start() {
@@ -218,12 +221,18 @@ class Main : public CBase_Main {
     void converge(double maxDiff)
     {
         iterations++;
+        if(iterations == START_ITER)
+            _traceControl.startTrace();
+        if(iterations == END_ITER)
+            _traceControl.endTrace();
+
         if(iterations == WARM_ITER)
             startTime = CmiWallTimer();                
+        //if(maxDiff <= THRESHOLD || iterations > 20)
         if(maxDiff <= THRESHOLD )
         {
             endTime = CmiWallTimer();
-            CkPrintf("Completed: <x,y,z>chares iterations, times, timeperstep(ms)\n benchmark [ %d %d %d ] \t\t %d \t\t %d\t\t %.3f \t\t %.3f \n", num_chare_x, num_chare_y, num_chare_z, num_chare_x *num_chare_y * num_chare_z, iterations*GAUSS_ITER, endTime - startTime, (endTime - startTime)/(iterations-WARM_ITER)/GAUSS_ITER*1000);
+            CkPrintf("Completed:<x,y,z>chares  msgbytes iterations, times, timeperstep(ms)\n benchmark[%d:%d] [ %d %d %d ] \t\t %d \t\t %d \t\t %d\t\t %.3f \t\t %.3f \n", CkNumPes(), CkNumNodes(), num_chare_x, num_chare_y, num_chare_z, num_chare_x *num_chare_y * num_chare_z, sizeof(double) * blockDimX*blockDimY, iterations*GAUSS_ITER, endTime - startTime, (endTime - startTime)/(iterations-WARM_ITER)/GAUSS_ITER*1000);
             //array.print();
             CkExit();
         }else
@@ -272,7 +281,8 @@ extern "C" void doCalc(int first,int last, void *result, int paramNum, void * pa
     int x_p = (arrayDimX/2)%blockDimX+1;
     int y_p = (arrayDimY/2)%blockDimY+1;
     int z_p = (arrayDimZ/2)%blockDimZ+1;
-    for(i=first; i<last; ++i) {
+    //CkPrintf(" ckloop on %d  first last %d %d \n", CkMyPe(), first, last);  
+    for(i=first; i<=last; ++i) {
           for(int j=1; j<blockDimY+1; ++j) {
               for(int k=1; k<blockDimZ+1; ++k) {
                   if(obj->thisIndex_x == x_c && y_c == obj->thisIndex_y && z_c == obj->thisIndex_z && i==x_p && j==y_p && k==z_p)
@@ -293,16 +303,31 @@ extern "C" void doCalc(int first,int last, void *result, int paramNum, void * pa
               }
           }
         }
-        for(i=1; i<blockDimX+1; ++i) {
+        *((double*)result) = maxDiff;
+#else
+#endif 
+}
+extern "C" void doUpdate(int first,int last, void *result, int paramNum, void *param){
+#if JACOBI
+        int i;
+        Jacobi  *obj = (Jacobi*)param;
+        int x_c = arrayDimX/2/blockDimX;
+        int y_c = arrayDimY/2/blockDimY;
+        int z_c = arrayDimZ/2/blockDimZ;
+        int x_p = (arrayDimX/2)%blockDimX+1;
+        int y_p = (arrayDimY/2)%blockDimY+1;
+        int z_p = (arrayDimZ/2)%blockDimZ+1;
+        //CkPrintf("\n {%d:%d:%d  %d:%d:%d  %d:%d:%d }", obj->thisIndex_x, obj->thisIndex_y, obj->thisIndex_z, x_c, y_c, z_c, x_p, y_p, z_p);
+        for(i=first; i<=last; ++i) {
             for(int j=1; j<blockDimY+1; ++j) {
                 for(int k=1; k<blockDimZ+1; ++k) {
-                  if(obj->thisIndex_x == x_c && y_c == obj->thisIndex_y && z_c == obj->thisIndex_z && i==x_p && j==y_p && k==z_p)
-                      continue;
-                    obj->temperature[index(i, j, k)] = obj->new_temperature[index(i, j, k)];
+                    if(!(obj->thisIndex_x == x_c && y_c == obj->thisIndex_y && z_c == obj->thisIndex_z && i==x_p && j==y_p && k==z_p))
+                        obj->temperature[index(i, j, k)] = obj->new_temperature[index(i, j, k)];
+                    //CkPrintf("[ %d:%d:%d  .%2f ]", i, j, k, obj->temperature[index(i, j, k)]); 
                 }
             }
         }
-        *((double*)result) = maxDiff;
+       //CkPrintf("\n\n");
 #else
 #endif
 }
@@ -322,9 +347,9 @@ Jacobi::Jacobi() {
       for(i=0; i<blockDimX+2; ++i) {
           for(j=0; j<blockDimY+2; ++j) {
               for(k=0; k<blockDimZ+2; ++k) {
-                  temperature[index(i, j, k)] = 0.0;
+                  temperature[index(i, j, k)] = 1.0;
 #if  JACOBI
-                  new_temperature[index(i, j, k)] = 0.0;
+                  new_temperature[index(i, j, k)] = 1.0;
 #endif
               }
           } 
@@ -498,7 +523,8 @@ void Jacobi::pup(PUP::er &p){
 	void Jacobi::check_and_compute() {
         double maxDiff;
 #if CKLOOP
-        CkLoop_Parallelize(doCalc, 1,  (void*)this, CkMyNodeSize(), 0, blockDimX, 1, &maxDiff, CKLOOP_DOUBLE_MAX);
+        CkLoop_Parallelize(doCalc, 1,  (void*)this, 4*CkMyNodeSize(), 1, blockDimX, 1, &maxDiff, CKLOOP_DOUBLE_MAX);
+        CkLoop_Parallelize(doUpdate, 1,  (void*)this, CkMyNodeSize(), 1, blockDimX, 1);
 #else
 		maxDiff = compute_kernel();
 #endif
@@ -545,7 +571,9 @@ void Jacobi::pup(PUP::er &p){
         int z_p = (arrayDimZ/2)%blockDimZ+1;
   #pragma omp parallel for schedule(dynamic) 
         for(i=1; i<blockDimX+1; ++i) {
-          //printf("[%d] did  %d iteration out of %d \n", omp_get_thread_num(), i, blockDimX+1); 
+#ifdef JACOBI_OPENMP
+          printf("[%d] did  %d iteration out of %d \n", omp_get_thread_num(), i, blockDimX+1); 
+#endif
           for(int j=1; j<blockDimY+1; ++j) {
               for(int k=1; k<blockDimZ+1; ++k) {
         
@@ -567,6 +595,7 @@ void Jacobi::pup(PUP::er &p){
               }
           }
         }
+  #pragma omp parallel for schedule(dynamic) 
         for(i=1; i<blockDimX+1; ++i) {
             for(int j=1; j<blockDimY+1; ++j) {
                 for(int k=1; k<blockDimZ+1; ++k) {
@@ -577,10 +606,10 @@ void Jacobi::pup(PUP::er &p){
             }
         }
 #if     PRINT_DEBUG
-        CkPrintf("[%d:%d:%d] iteration=%d max:%.3f ==== ", thisIndex.x, thisIndex.y, thisIndex.z, iterations, maxDiff); 
-        for(i=0; i<blockDimX+2; ++i) {
-          for(int j=0; j<blockDimY+2; ++j) {
-              for(int k=0; k<blockDimZ+2; ++k) {
+        CkPrintf("\n {%d:%d:%d  %d:%d:%d  %d:%d:%d %f}", thisIndex_x, thisIndex_y, thisIndex_z, x_c, y_c, z_c, x_p, y_p, z_p, maxDiff);
+        for(i=1; i<blockDimX+1; ++i) {
+          for(int j=1; j<blockDimY+1; ++j) {
+              for(int k=1; k<blockDimZ+1; ++k) {
                   CkPrintf("([%d:%d:%d]: %.2f )", i, j, k, temperature[index(i, j, k)]); 
               }
           }
@@ -709,6 +738,19 @@ void Jacobi::pup(PUP::er &p){
  *
  */
 
+class JacobiNodeMap : public CkArrayMap {
+
+public:
+    JacobiNodeMap() {}
+    ~JacobiNodeMap() { 
+    }
+
+    int procNum(int, const CkArrayIndex &idx) {
+      int *index = (int *)idx.data();
+      return (CkMyNodeSize() * (index[0]*num_chare_x*num_chare_y + index[1]*num_chare_y + index[2]))%CkNumPes(); 
+    }
+
+};
 class JacobiMap : public CkArrayMap {
   public:
     int X, Y, Z;
@@ -820,5 +862,14 @@ public:
 	}
 };
 
+class TraceControl : public Group 
+{
+public:
+    TraceControl() {}
+
+    void startTrace() { traceBegin(); }
+    
+    void endTrace() { traceEnd(); }
+};
 
 #include "jacobi3d.def.h"
