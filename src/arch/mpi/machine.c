@@ -1926,6 +1926,7 @@ int find_spare_mpirank(int pe)
 
 void CkDieNow()
 {
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CmiPrintf("[%d] die now.\n", CmiMyPe());
 
       /* release old messages */
@@ -1936,6 +1937,7 @@ void CkDieNow()
     MPI_Barrier(charmComm);
     MPI_Finalize();
     exit(0);
+#endif
 }
 
 #endif
