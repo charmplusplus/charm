@@ -767,8 +767,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 					    must_query_md,
 					    num_algorithm[1]);
     
-    int opt_alg = 0;
-    for (int nalg = 0; nalg < num_algorithm[0]; ++nalg) 
+    int opt_alg = 0, nalg = 0;
+    for (nalg = 0; nalg < num_algorithm[0]; ++nalg)
       if (strstr(always_works_md[nalg].name, "GI") != NULL) {
 	opt_alg = nalg;
 	break;
