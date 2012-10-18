@@ -21,6 +21,14 @@ public:
 	int cp_flag;          // 1: from checkpoint 0: from recover
 };
 
+class CkCheckPTMessage: public CMessage_CkArrayCheckPTMessage {
+public:
+	double *packData;
+	int bud1, bud2;
+	int len;
+	int cp_flag;          // 1: from checkpoint 0: from recover
+};
+
 class CkProcCheckPTMessage: public CMessage_CkProcCheckPTMessage {
 public:
 	int pe;
@@ -81,6 +89,10 @@ public:
   void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe);
   void resetLB(int diepe);
   int  isFailed(int pe);
+  void pupAllElements(PUP::er &p);
+  void startArrayCheckpoint();
+  void recvArrayCheckpoint(CkArrayCheckPTMessage *m);
+  void recoverAll(CkArrayCheckPTMessage * msg, CkVec<CkGroupID> * gmap, CkVec<CkArrayIndex> * imap);
 public:
   static CkCallback  cpCallback;
 
@@ -89,6 +101,7 @@ public:
   static char*  stage;
 private:
   CkVec<CkCheckPTInfo *> ckTable;
+  CkArrayCheckPTMessage * chkpTable[2];
 
   int recvCount, peCount;
   int expectCount, ackCount;

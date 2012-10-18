@@ -2627,6 +2627,24 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 #endif
                 }
 	}
+#if CMK_MEM_CHECKPOINT
+	if(CkInRestarting()){
+	  ArrayElement *elt;
+	  CkVec<CkMigratable *> list;
+	  migratableList(rec, list);
+	  CmiAssert(list.length() > 0);
+	  for (int l=0; l<list.length(); l++) {
+		//    reset, may not needed now
+		// for now.
+		for (int i=0; i<CK_ARRAYLISTENER_MAXLEN; i++) {
+			ArrayElement * elt = (ArrayElement *)list[l];
+		  contributorInfo *c=(contributorInfo *)&elt->listenerData[i];
+		  if (c) c->redNo = 0;
+		}
+	  }
+		
+	}
+#endif
 }
 #endif
 
