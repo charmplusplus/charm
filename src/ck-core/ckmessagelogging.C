@@ -968,7 +968,7 @@ void pupArrayElementsSkip(PUP::er &p, CmiBool create, MigrationRecord *listToSki
 void writeCheckpointToDisk(int size,char *chkpt){
 	char fNameTemp[100];
 	sprintf(fNameTemp,"%s/mlogCheckpoint%d_tmp",checkpointDirectory,CkMyPe());
-	int fd = creat(fNameTemp,S_IRWXU);
+	int fd = fopen(fNameTemp,"w");
 	int ret = write(fd,chkpt,size);
 	CkAssert(ret == size);
 	close(fd);
