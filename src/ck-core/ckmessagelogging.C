@@ -966,18 +966,18 @@ void pupArrayElementsSkip(PUP::er &p, CmiBool create, MigrationRecord *listToSki
 
 
 void writeCheckpointToDisk(int size,char *chkpt){
-	char fNameTemp[100];
-	sprintf(fNameTemp,"%s/mlogCheckpoint%d_tmp",checkpointDirectory,CkMyPe());
-	int fd = fopen(fNameTemp,"w");
-	int ret = write(fd,chkpt,size);
-	CkAssert(ret == size);
-	close(fd);
-	
-	char fName[100];
-	sprintf(fName,"%s/mlogCheckpoint%d",checkpointDirectory,CkMyPe());
-	unlink(fName);
-
-	rename(fNameTemp,fName);
+      char fNameTemp[100];
+      sprintf(fNameTemp,"%s/mlogCheckpoint%d_tmp",checkpointDirectory,CkMyPe());
+      FILE *fd = fopen(fNameTemp,"w");
+      int ret = fwrite(chkpt,size,1,fd);
+      CkAssert(ret == size);
+      fclose(fd);
+  
+      char fName[100];
+      sprintf(fName,"%s/mlogCheckpoint%d",checkpointDirectory,CkMyPe());
+      unlink(fName);
+  
+      rename(fNameTemp,fName);
 }
 
 //handler that receives the checkpoint from a processor
