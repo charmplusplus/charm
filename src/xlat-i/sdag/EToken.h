@@ -71,6 +71,9 @@ enum EToken {
   ,SELIST=104
   ,SOLIST=105
   ,SOLIST_END=106
+
+  ,SCASE=107
+  ,SCASELIST=108
 };
 
 }
