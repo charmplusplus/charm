@@ -1271,6 +1271,7 @@ private:
   void generateAtomic(XStr& decls, XStr& defs, Entry* entry);
   void generateForward(XStr& decls, XStr& defs, Entry* entry);
   void generateConnect(XStr& decls, XStr& defs, Entry* entry);
+  void generateCaseList(XStr& decls, XStr& defs, Entry* entry);
 
 protected:
   void generateCall(XStr& defs, std::list<CStateVar*>& args,
@@ -1347,9 +1348,11 @@ public:
 
 class WhenConstruct : public SdagConstruct {
 public:
+  CStateVar* speculativeState;
   void generateCode(XStr& decls, XStr& defs, Entry *entry);
   WhenConstruct(EntryList *el, SdagConstruct *body)
     : SdagConstruct(SWHEN, 0, 0, 0,0,0, body, el)
+    , speculativeState(0)
   { }
   void generateEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
   void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);

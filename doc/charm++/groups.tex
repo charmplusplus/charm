@@ -50,40 +50,21 @@ class Foo : public CBase\_Foo \{
 \subsection{Group Creation}
 \label{sec:groups/creation}
 
-Groups are created in a manner similar to chares and chare arrays, i.e. 
-through \kw{ckNew}. Given the declarations and definitions of group {\tt Foo}
+Groups are created using {\kw ckNew} like chares and chare arrays. 
+Given the declarations and definitions of group {\tt Foo}
 from above, we can create a group in the following manner:
+
+\begin{alltt}
+CProxy_Foo fooProxy = CProxy_Foo::ckNew(\uw{parameters1});
+\end{alltt}
+
+One can also use {\kw ckNew} to get a CkGroupID as shown below
 
 \begin{alltt}
 CkGroupID fooGroupID = CProxy_Foo::ckNew(\uw{parameters1});
 \end{alltt}
 
-In the above, \kw{ckNew} returns an object of type \kw{CkGroupID},
-which is the globally unique identifier of the corresponding instance
-of the group.  This identifier is common to all of the group's
-branches and can be obtained in the group's methods by accessing the variable
-\kw{thisgroup}, which is a public data member of the \kw{Group}
-superclass.
-
-A group can also be identified through its proxy, which can be obtained in one of three ways:
-(a) as the inherited {\tt thisProxy} data member of the class; (b) when creating a group,
-you can obtain a proxy to it from a call to \kw{ckNew} 
-as shown below:
-
-\begin{alltt}
-CProxy fooProxy = CProxy_Foo::ckNew(\uw{parameters1});
-\end{alltt}
-
-or (c) by using a group identifier to create a proxy, as shown below:
-
-\begin{alltt}
-// Assume that we have obtained `fooGroupID' as the CkGroupID for the group
-
-// Obtain a proxy to the group from its group ID
-CProxy_Foo anotherFooProxy = CProxy_Foo(fooGroupID);
-\end{alltt}
-
-It is possible to specify the dependence of group creations using
+A \kw{CkGroupID} is useful to specify dependence in group creations using
 \uw{CkEntryOptions}. For example, in the following code, the creation of group
 {\tt GroupB} on each PE depends on the creation of {\tt GroupA} on that PE.
 

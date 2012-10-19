@@ -1,6 +1,7 @@
 mainmodule jacobi3d {
 
   readonly CProxy_Main mainProxy;
+  readonly CProxy_FuncCkLoop ckLoopProxy;
   readonly int arrayDimX;
   readonly int arrayDimY;
   readonly int arrayDimZ;
@@ -31,7 +32,7 @@ mainmodule jacobi3d {
     entry void begin_iteration(void);
     entry void receiveGhosts(ghostMsg *gmsg);
     entry void processGhosts(ghostMsg *gmsg);
-
+    entry void print();
     entry void doStep() {
       serial "begin_iteration" {
 	begin_iteration();
@@ -51,8 +52,16 @@ mainmodule jacobi3d {
     entry JacobiMap(int x, int y, int z);
   };
 
+  group JacobiNodeMap : CkArrayMap {
+    entry JacobiNodeMap();
+  };
   nodegroup OmpInitializer {
     entry OmpInitializer(int numThreads); 
   };
 
+  group TraceControl {
+      entry TraceControl();
+      entry void startTrace();
+      entry void endTrace();
+  };
 };

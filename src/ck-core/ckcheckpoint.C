@@ -17,8 +17,8 @@ More documentation goes here...
 void noopit(const char*, ...)
 {}
 
-#define DEBCHK   CkPrintf
-//#define DEBCHK noopit
+//#define DEBCHK   CkPrintf
+#define DEBCHK noopit
 
 #define DEBUGC(x) x
 //#define DEBUGC(x) 
@@ -646,6 +646,7 @@ void CkTestArrayElements()
 
 void CkStartCheckpoint(const char* dirname,const CkCallback& cb)
 {
+
 	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	
 	// hand over to checkpoint managers for per-processor checkpointing

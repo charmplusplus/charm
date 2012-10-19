@@ -147,6 +147,7 @@ struct rwtable rwtable[] = {
 {  "accelblock", ACCELBLOCK },
 {  "memcritical", MEMCRITICAL },
 {  "reductiontarget", REDUCTIONTARGET },
+{  "case",       CASE },
 {  "",		0 }
 };
 

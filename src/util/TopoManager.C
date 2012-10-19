@@ -420,6 +420,20 @@ int TopoManager::partition(int pe, int *pes, int *idx, int left, int right) {
   }
 }
 
+#if CMK_BLUEGENEQ
+void TopoManager::printAllocation(FILE *fp)
+{
+	int i,a,b,c,d,e,t;
+	fprintf(fp, "Topology Info-\n");
+	fprintf(fp, "NumPes -  %d\n", numPes);
+	fprintf(fp, "Dims - %d %d %d %d %d\n",dimNA,dimNB,dimNC,dimND,dimNE);
+	fprintf(fp, "Rank - a b c d e t\n");
+	for(i=0; i<numPes; i++) {
+		rankToCoordinates(i,a,b,c,d,e,t);
+		fprintf(fp, "%d - %d %d %d %d %d %d\n",i,a,b,c,d,e,t);
+	}
+}
+#else
 void TopoManager::printAllocation(FILE *fp)
 {
 	int i,x,y,z,t;
@@ -432,6 +446,7 @@ void TopoManager::printAllocation(FILE *fp)
 		fprintf(fp, "%d - %d %d %d %d\n",i,x,y,z,t);
 	}
 }
+#endif
 
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 extern "C" void craynid_init();
