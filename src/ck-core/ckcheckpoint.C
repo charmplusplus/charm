@@ -646,6 +646,7 @@ void CkTestArrayElements()
 
 void CkStartCheckpoint(const char* dirname,const CkCallback& cb)
 {
+
 	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	
 	// hand over to checkpoint managers for per-processor checkpointing
