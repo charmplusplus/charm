@@ -40,7 +40,8 @@ class BGQTorusManager {
     int thdsPerProc; //the number of threads per process (the value of +ppn)
     int procsPerNode; //the number of processes per node
     int torus[5];    
-//    char *mapping; //temporarily only conside default mapping ABCDET
+    int order[6], dims[6];
+    char *mapping; //temporarily only conside default mapping ABCDET
 
   public:
     BGQTorusManager() {
@@ -55,7 +56,19 @@ class BGQTorusManager {
 
       procsPerNode = Kernel_ProcessCount();
       thdsPerProc = CmiMyNodeSize();
-      
+        
+      order[0] = 5;
+      order[1] = 4;
+      order[2] = 3;
+      order[3] = 2;
+      order[4] = 1;
+      order[5] = 0;
+
+      mapping = getenv("RANK_ORDER");
+      if(mapping != NULL) {
+        sscanf(mapping,"%d %d %d %d %d %d",&order[5],&order[4],&order[3],&order[2],&order[1],&order[0]);
+      }
+      //printf("Mapping %d %d %d %d %d %d\n",order[0],order[1],order[2],order[3],order[4],order[5]);
       hw_NT = procsPerNode*thdsPerProc;      
       int numPes = CmiNumPes();
 
@@ -116,16 +129,20 @@ class BGQTorusManager {
       dimD = rn_ND;
       dimE = rn_NE;  
       dimA = dimA * hw_NT;	// assuming TABCDE
-
+    
+      dims[0] = rn_NA;
+      dims[1] = rn_NB;
+      dims[2] = rn_NC;
+      dims[3] = rn_ND;
+      dims[4] = rn_NE;
+      dims[5] = hw_NT; 
+      
       torus[0] = ((rn_NA % 4) == 0)? true:false;
       torus[1] = ((rn_NB % 4) == 0)? true:false;
       torus[2] = ((rn_NC % 4) == 0)? true:false;
       torus[3] = ((rn_ND % 4) == 0)? true:false;
       torus[4] = true;
 
-//      mapping = NULL; //getenv("BG_MAPPING");      
-      
-      //printf("DimN[X,Y,Z,T]=[%d,%d,%d,%d], Dim[X,Y,Z]=[%d,%d,%d]\n", rn_NX,rn_NY,rn_NZ,hw_NT,dimX, dimY, dimZ);    
     }
 
     ~BGQTorusManager() {
@@ -189,12 +206,29 @@ class BGQTorusManager {
     }
 
     inline void rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) {
-        t = pe % (thdsPerProc*procsPerNode);
+        int tempdims[6];
+
+        tempdims[order[0]] = pe % dims[order[0]];
+        tempdims[order[1]] = (pe / dims[order[0]]) % dims[order[1]];
+        tempdims[order[2]] = (pe / (dims[order[0]]*dims[order[1]])) % dims[order[2]];
+        tempdims[order[3]] = (pe / (dims[order[0]]*dims[order[1]]*dims[order[2]])) % dims[order[3]];
+        tempdims[order[4]] = (pe / (dims[order[0]]*dims[order[1]]*dims[order[2]]*dims[order[3]])) % dims[order[4]];
+        tempdims[order[5]] = (pe / (dims[order[0]]*dims[order[1]]*dims[order[2]]*dims[order[3]]*dims[order[4]])) % dims[order[5]];
+        
+        a = tempdims[0];
+        b = tempdims[1];
+        c = tempdims[2];
+        d = tempdims[3];
+        e = tempdims[4];
+        t = tempdims[5];
+
+        /*t = pe % (thdsPerProc*procsPerNode);
         e = pe / (thdsPerProc*procsPerNode) % rn_NE;
         d = pe / (thdsPerProc*procsPerNode*rn_NE) % (rn_ND);
         c = pe / (thdsPerProc*procsPerNode*rn_NE*rn_ND) % (rn_NC);
         b = pe / (thdsPerProc*procsPerNode*rn_NE*rn_ND*rn_NC) % (rn_NB);
         a = pe / (thdsPerProc*procsPerNode*rn_NE*rn_ND*rn_NC*rn_NB);
+        */
     }
    
     inline int coordinatesToRank(int x, int y, int z, int t) {  //3D logic mapping to 5D torus, don't know if it is useful!
@@ -217,13 +251,31 @@ class BGQTorusManager {
 
     inline int coordinatesToRank(int a, int b, int c, int d, int e, int t) {
         int pe;
+        int tempdims[6];
+        tempdims[0] = a;
+        tempdims[1] = b;
+        tempdims[2] = c;
+        tempdims[3] = d;
+        tempdims[4] = e;
+        tempdims[5] = t;
 
+        pe = 0;
+
+        pe += tempdims[order[0]];
+        pe += (tempdims[order[1]]*dims[order[0]]);
+        pe += (tempdims[order[2]]*dims[order[0]]*dims[order[1]]);
+        pe += (tempdims[order[3]]*dims[order[0]]*dims[order[1]]*dims[order[2]]);
+        pe += (tempdims[order[4]]*dims[order[0]]*dims[order[1]]*dims[order[2]]*dims[order[3]]);
+        pe += (tempdims[order[5]]*dims[order[0]]*dims[order[1]]*dims[order[2]]*dims[order[3]]*dims[order[4]]);
+
+        /*
         int a_mult = rn_NB * rn_NC * rn_ND * rn_NE;
         int b_mult = rn_NC * rn_ND * rn_NE;
         int c_mult = rn_ND * rn_NE;
         int d_mult = rn_NE;
 
         pe = (a * a_mult + b * b_mult + c * c_mult + d * d_mult + e) * thdsPerProc * procsPerNode + t;
+        */
 
         return pe;
     }
