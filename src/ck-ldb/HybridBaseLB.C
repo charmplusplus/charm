@@ -1145,8 +1145,8 @@ void HybridBaseLB::ResumeClients(int balancing)
 #if CMK_LBDB_ON
   DEBUGF(("[%d] ResumeClients. \n", CkMyPe()));
 
+  double end_lb_time = CkWallTimer();
   if (CkMyPe() == 0 && balancing) {
-    double end_lb_time = CkWallTimer();
     if (_lb_args.debug())
       CkPrintf("[%s] Load balancing step %d finished at %f duration %f\n",
 	        lbName(), step()-1,end_lb_time,end_lb_time - start_lb_time);
@@ -1156,6 +1156,7 @@ void HybridBaseLB::ResumeClients(int balancing)
   theLbdb->ClearLoads();
 
   theLbdb->ResumeClients();
+	theLbdb->SetMigrationCost(end_lb_time - start_lb_time);
 #endif
 }
 
