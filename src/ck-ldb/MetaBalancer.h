@@ -123,8 +123,8 @@ private:
     double iteration;
     double max_load;
     double avg_load;
-    double utilization;
-    double idle_time;
+    double min_utilization;
+    double avg_utilization;
   };
 
   struct AdaptiveMetaBalancer {

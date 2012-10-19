@@ -235,11 +235,12 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     lb_data[1] = 1;
     lb_data[2] = total_load_vec[index]; // For average load
     lb_data[3] = total_load_vec[index]; // For max load
-    lb_data[4] = idle_time;
     // Set utilization
     if (total_load_vec[index] == 0.0) {
+    	lb_data[4] = 0.0;
       lb_data[5] = 0.0;
     } else {
+      lb_data[4] = total_load_vec[index]/(idle_time + total_load_vec[index]);
       lb_data[5] = total_load_vec[index]/(idle_time + total_load_vec[index]);
     }
     lb_data[6] = lb_data[2] + bg_walltime; // For Avg load with bg
@@ -248,9 +249,9 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     total_count_vec[index] = 0;
 
     adaptive_struct.finished_iteration_no = it_n;
-    DEBADDETAIL(("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n",
+    DEBADDETAIL(("[%d] sends total load %lf idle time %lf utilization %lf at iter %d\n",
         CkMyPe(), total_load_vec[index], idle_time,
-        idle_time/total_load_vec[index], adaptive_struct.finished_iteration_no));
+        lb_data[5], adaptive_struct.finished_iteration_no));
 
     CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
     contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
@@ -262,14 +263,14 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   double* load = (double *) msg->getData();
   double avg = load[2]/load[1];
   double max = load[3];
-  double avg_idle = load[4]/load[1];
-  double utilization = load[5];
+  double avg_utilization = load[4]/load[1];
+  double min_utilization = load[5];
   int iteration_n = (int) load[0];
   double avg_load_bg = load[6]/load[1];
   double max_load_bg = load[7];
-  DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf \
-      Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle,
-      utilization, load[1]));
+  DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Util : %lf \
+      Min Util : %lf for %lf procs\n",iteration_n, avg, max, avg_idle,
+      min_utilization, load[1]));
   delete msg;
 
   // For processors with  no  objs, trigger MetaBalancer reduction
@@ -285,8 +286,8 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   data.iteration = adaptive_lbdb.lb_iter_no;
   data.max_load = max;
   data.avg_load = avg;
-  data.utilization = utilization;
-  data.idle_time = avg_idle;
+  data.min_utilization = min_utilization;
+  data.avg_utilization = avg_utilization;
   adaptive_lbdb.history_data.push_back(data);
 
   if (iteration_n == 1) {
@@ -348,9 +349,10 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
     DEBAD(("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n",
       tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio));
 
-    if ((utilization < utilization_threshold || max/avg >= tolerate_imb) &&
+    if ((avg_utilization < utilization_threshold || max/avg >= tolerate_imb) &&
           adaptive_lbdb.history_data.size() > MIN_STATS) {
-      DEBAD(("Trigger soon even though we calculated lbperiod max/avg(%lf) and utilization ratio (%lf)\n", max/avg, utilization));
+      DEBAD(("Trigger soon even though we calculated lbperiod max/avg(%lf) and \
+					utilization ratio (%lf)\n", max/avg, avg_utilization));
       TriggerSoon(iteration_n, max/avg, tolerate_imb);
       return;
     }
@@ -377,9 +379,10 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
 
   // This would be called when linear extrapolation did not provide suitable
   // period provided there is enough  historical data 
-  if ((utilization < utilization_threshold || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
+  if ((avg_utilization < utilization_threshold || max/avg >= tolerate_imb) &&
+			adaptive_lbdb.history_data.size() > 4) {
     DEBAD(("Carry out load balancing step at iter max/avg(%lf) and utilization \
-      ratio (%lf)\n", max/avg, utilization));
+      ratio (%lf)\n", max/avg, avg_utilization));
     TriggerSoon(iteration_n, max/avg, tolerate_imb);
     return;
   }
