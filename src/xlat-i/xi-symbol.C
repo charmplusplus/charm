@@ -1076,7 +1076,18 @@ Chare::genDecls(XStr& str)
   str << ", CProxy_" << type;
   if (templat) {
     templat->genVars(str);
-    str << " > { };\n";
+    str << " > {\npublic:\n\tCBase_" << type << "() : ";
+    str << "CBaseT" << b->length() << "<" << b << ", CProxy_" << type;
+    templat->genVars(str);
+    str << ">() {}\n";
+    str << "\tCBase_" << type << "(CkMigrateMessage* m) : ";
+    str << "CBaseT" << b->length() << "<" << b << ", CProxy_" << type;
+    templat->genVars(str);
+    str << ">(m) {}\n";
+    str << "\tvoid pup(PUP::er& p) {\n";
+    str << "\t\tCBaseT" << b->length() << "<" << b << ", CProxy_" << type;
+    templat->genVars(str);
+    str << ">::pup(p);\n\t}\n};\n";
   } else {
     str << "> CBase_" << type << ";\n";
   }
