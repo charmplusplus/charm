@@ -98,6 +98,8 @@ void SdagConstruct::numberNodes(void)
     case SATOMIC: nodeNum = numAtomics++; break;
     case SFORWARD: nodeNum = numForwards++; break;
     case SCONNECT: nodeNum = numConnects++; break;
+    case SCASE: nodeNum = numCases++; break;
+    case SCASELIST: nodeNum = numCaseLists++; break;
     case SINT_EXPR:
     case SIDENT: 
     default:
@@ -170,6 +172,14 @@ void SdagConstruct::labelNodes(void)
       break;
     case SCONNECT:
       sprintf(text, "_connect_%s",connectEntry->charstar()); 
+      label = new XStr(text);
+      break;
+    case SCASE:
+      sprintf(text, "_case_%d", nodeNum);
+      label = new XStr(text);
+      break;
+    case SCASELIST:
+      sprintf(text, "_caselist_%d", nodeNum);
       label = new XStr(text);
       break;
     case SINT_EXPR:
@@ -373,6 +383,23 @@ void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
       stateVarsChildren = stateVars;
       if(con2 != 0) con2->propagateState(plist, wlist, publist, uniqueVarNum);
       break;
+    case SCASELIST:
+      stateVarsChildren = new list<CStateVar*>(plist);
+      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
+      {
+        char txt[128];
+        sprintf(txt, "_cs%d", nodeNum);
+        counter = new XStr(txt);
+        sv = new CStateVar(0, "CSpeculator *", 0, txt, 0, NULL, 1);
+        stateVarsChildren->push_back(sv);
+
+        for (std::list<SdagConstruct *>::iterator iter = constructs->begin();
+             iter != constructs->end();
+             ++iter) {
+          dynamic_cast<WhenConstruct*>(*iter)->speculativeState = sv;
+        }
+      }
+      break;
     case SOLIST:
       stateVarsChildren = new list<CStateVar*>(plist);
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
@@ -389,6 +416,7 @@ void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
     case SELSE:
     case SSLIST:
     case SOVERLAP:
+    case SCASE:
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
       break;
@@ -505,6 +533,7 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
     case SFOR:
       generateFor(decls, defs, entry);
       break;
+    case SCASE:
     case SOVERLAP:
       generateOverlap(decls, defs, entry);
       break;
@@ -513,6 +542,9 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
       break;
     case SCONNECT:
       generateConnect(decls, defs, entry);
+      break;
+    case SCASELIST:
+      generateCaseList(decls, defs, entry);
       break;
     default:
       break;
@@ -651,7 +683,7 @@ void SdagConstruct::generateForward(XStr& decls, XStr& defs, Entry* entry) {
 void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  generateSignature(decls, defs, entry, false, "int", label, false, stateVars);
+  generateSignature(decls, defs, entry, false, "CWhenTrigger*", label, false, stateVars);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
 #endif
@@ -808,6 +840,10 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
   defs << "       " << label  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
+  if (speculativeState) {
+    defs << "       __cDep->removeAllSpeculationIndex(" << speculativeState->name << "->speculationIndex);\n";
+  }
+
   defs << "       ";
 
   if (constructs && !constructs->empty()) {
@@ -824,7 +860,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
     }
     el = el->next;
   }
-  defs << "       return 1;\n";
+  defs << "       return 0;\n";
   defs << "    } else {\n";
 
   int nRefs=0, nAny=0;
@@ -968,7 +1004,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 #endif
 
   defs << "       __cDep->Register(tr);\n";
-  defs << "       return 0;\n";
+  defs << "       return tr;\n";
   defs << "    }\n";
 
   endMethod(defs);
@@ -1231,6 +1267,30 @@ void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry)
   endMethod(defs);
 }
 
+void SdagConstruct::generateCaseList(XStr& decls, XStr& defs, Entry* entry) {
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  defs << "    CSpeculator* " << counter << " = new CSpeculator(__cDep->getAndIncrementSpeculationIndex());\n";
+  defs << "    CWhenTrigger* tr = 0;\n";
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it) {
+    defs << "    tr = ";
+    generateCall(defs, *stateVarsChildren, (*it)->label);
+    defs << "    if (!tr) return;\n";
+    defs << "    else tr->speculationIndex = " << counter << "->speculationIndex;\n";
+  }
+  endMethod(defs);
+
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+  strcat(nameStr,"_end");
+
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+
+  defs << "    delete " << counter << ";\n";
+  defs << "    ";
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  endMethod(defs);
+}
+
 void SdagConstruct::generateSlist(XStr& decls, XStr& defs, Entry* entry)
 {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
@@ -1433,6 +1493,18 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
         cn->setNext(this, 0);
       }
       return;
+    case SCASELIST:
+      next = n;
+      nextBeginOrEnd = boe;
+      {
+        for(list<SdagConstruct*>::iterator it = constructs->begin();
+            it != constructs->end();
+            ++it) {
+          (*it)->setNext(this, 0);
+        }
+      }
+      return;
+    case SCASE:
     case SSDAGENTRY:
     case SOVERLAP:
     case SOLIST:

@@ -24,6 +24,8 @@ int numAtomics=0;
 int numForwards=0;
 int numForalls=0;
 int numConnects=0;
+int numCases=0;
+int numCaseLists=0;
 
 void resetNumbers(void)
 {
@@ -41,6 +43,8 @@ void resetNumbers(void)
   numForwards=0;
   numForalls=0;
   numConnects=0;
+  numCases=0;
+  numCaseLists=0;
 }
 
 }
