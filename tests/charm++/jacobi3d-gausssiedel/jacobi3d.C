@@ -36,18 +36,16 @@
 
 #include "CkLoopAPI.h"
 CProxy_FuncCkLoop ckLoopProxy;
-#ifdef JACOBI_OPENMP
 #include <omp.h>
-#endif
 
 //#define PRINT_DEBUG 1
 #define  LOW_VALUE 0 
 #define  HIGH_VALUE 255 
 //#define JACOBI  1 
 
-int GAUSS_ITER=1; 
-#define THRESHOLD 0.001 
-// See README for documentation
+/*readonly*/ int GAUSS_ITER;  
+/*readonly*/ double THRESHOLD;
+/*readonly*/ int threadNums;
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int arrayDimX;
@@ -118,53 +116,67 @@ class Main : public CBase_Main {
     CProxy_Jacobi array;
     CProxy_TraceControl _traceControl;
     int iterations;
+    
+    void processCommandlines(int argc, char** argv)
+    {
+        GAUSS_ITER = 1;
+        THRESHOLD = 0.01;
+        threadNums = 1;
+        for (int i=0; i<argc; i++) {
+            if (argv[i][0]=='-') {
+                switch (argv[i][1]) {
+                case 'X':
+                    arrayDimX = atoi(argv[++i]);
+                    break;
+                case 'Y':
+                    arrayDimY = atoi(argv[++i]);
+                    break;
+                case 'Z':
+                    arrayDimZ = atoi(argv[++i]);
+                    break;
+                case 'x':
+                    blockDimX = atoi(argv[++i]);
+                    break;
+                case 'y': 
+                    blockDimY = atoi(argv[++i]);
+                    break;
+                case 'z': 
+                    blockDimZ = atoi(argv[++i]);
+                    break;
+                case 'g':
+                    GAUSS_ITER =  atoi(argv[++i]);
+                    break;
+                case 't':
+                   THRESHOLD = atof(argv[++i]);
+                   break;
+                case 'r':
+                   threadNums = atoi(argv[++i]);
+                   break;
+                }   
+            }       
+        }       
+        if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
+            CkAbort("array_size_X % block_size_X != 0!");
+        if (arrayDimY < blockDimY || arrayDimY % blockDimY != 0)
+            CkAbort("array_size_Y % block_size_Y != 0!");
+        if (arrayDimZ < blockDimZ || arrayDimZ % blockDimZ != 0)
+            CkAbort("array_size_Z % block_size_Z != 0!");
+
+        num_chare_x = arrayDimX / blockDimX;
+        num_chare_y = arrayDimY / blockDimY;
+        num_chare_z = arrayDimZ / blockDimZ;
+
+        // print info
+        CkPrintf("\nSTENCIL COMPUTATION WITH NO BARRIERS\n");
+        CkPrintf("Running Jacobi on %d processors with (%d, %d, %d) chares threshold=%f\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z, THRESHOLD);
+        CkPrintf("Array Dimensions: %d %d %d\n", arrayDimX, arrayDimY, arrayDimZ);
+        CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
+    } 
     Main(CkArgMsg* m) {
-      if ( (m->argc != 3) && (m->argc < 7) ) {
-        CkPrintf("%s [array_size] [block_size] gauss-iteration\n", m->argv[0]);
-        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z] [gauss-iter]\n", m->argv[0]);
-        CkAbort("Abort");
-      }
-
-      // set iteration counter to zero
       iterations = 0;
-
-      // store the main proxy
       mainProxy = thisProxy;
-	
-      if(m->argc == 3 ||  m->argc == 4) {
-          arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
-          blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]); 
-          if(m->argc == 4 )
-              GAUSS_ITER = atoi(m->argv[3]);
-      }
-      else if (m->argc >= 7) {
-          arrayDimX = atoi(m->argv[1]);
-          arrayDimY = atoi(m->argv[2]);
-          arrayDimZ = atoi(m->argv[3]);
-          blockDimX = atoi(m->argv[4]); 
-          blockDimY = atoi(m->argv[5]); 
-          blockDimZ = atoi(m->argv[6]);
-          if(m->argc > 7)
-              GAUSS_ITER = atoi(m->argv[7]);
-      } 
-
-      if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
-        CkAbort("array_size_X % block_size_X != 0!");
-      if (arrayDimY < blockDimY || arrayDimY % blockDimY != 0)
-        CkAbort("array_size_Y % block_size_Y != 0!");
-      if (arrayDimZ < blockDimZ || arrayDimZ % blockDimZ != 0)
-        CkAbort("array_size_Z % block_size_Z != 0!");
-
-      num_chare_x = arrayDimX / blockDimX;
-      num_chare_y = arrayDimY / blockDimY;
-      num_chare_z = arrayDimZ / blockDimZ;
-
-      // print info
-      CkPrintf("\nSTENCIL COMPUTATION WITH NO BARRIERS\n");
-      CkPrintf("Running Jacobi on %d processors with (%d, %d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z);
-      CkPrintf("Array Dimensions: %d %d %d\n", arrayDimX, arrayDimY, arrayDimZ);
-      CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
-
+      processCommandlines(m->argc, m->argv);
+      delete m;
       // Create new array of worker chares
 #if USE_TOPOMAP
       CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
@@ -559,9 +571,6 @@ void Jacobi::pup(PUP::er &p){
 #if JACOBI
     double Jacobi::compute_kernel() {     //Gauss-Siedal compute
         int i;
-        double maxDiff=0;
-        double tmp, update=0;
-        maxDiff = 0;
 
         int x_c = arrayDimX/2/blockDimX;
         int y_c = arrayDimY/2/blockDimY;
@@ -569,17 +578,28 @@ void Jacobi::pup(PUP::er &p){
         int x_p = (arrayDimX/2)%blockDimX+1;
         int y_p = (arrayDimY/2)%blockDimY+1;
         int z_p = (arrayDimZ/2)%blockDimZ+1;
-  #pragma omp parallel for schedule(dynamic) 
+#ifdef JACOBI_OPENMP
+        double *maxDiffSub = new double[threadNums];
+        for(i=0; i<threadNums; i++)
+            maxDiffSub[i] = 0;
+#endif
+        double maxDiff=0;
+  //#pragma omp parallel for shared(temperature, new_temperature, maxDiff) 
+  #pragma omp parallel  
+        {  
+        double t1 = CkWallTimer();
+        #pragma omp for 
         for(i=1; i<blockDimX+1; ++i) {
 #ifdef JACOBI_OPENMP
-          printf("[%d] did  %d iteration out of %d \n", omp_get_thread_num(), i, blockDimX+1); 
+            int tid = omp_get_thread_num();
+          //printf("[%d] did  %d iteration out of %d \n", omp_get_thread_num(), i, blockDimX+1); 
 #endif
           for(int j=1; j<blockDimY+1; ++j) {
               for(int k=1; k<blockDimZ+1; ++k) {
         
                   if(thisIndex.x == x_c && y_c == thisIndex.y && z_c == thisIndex.z && i==x_p && j==y_p && k==z_p)
                       continue;
-                  update = 0;//temperature[index(i, j, k)];
+                  double update = 0;//temperature[index(i, j, k)];
                   update += temperature[index(i+1, j, k)];
                   update += temperature[index(i-1, j, k)];
                   update += temperature[index(i, j+1, k)];
@@ -590,12 +610,25 @@ void Jacobi::pup(PUP::er &p){
                  
                   double diff = temperature[index(i, j, k)] - update;
                   if(diff<0) diff = -1*diff;
+#ifdef JACOBI_OPENMP
+                  if(diff>maxDiffSub[tid]) maxDiffSub[tid] = diff;
+#else
                   if(diff>maxDiff) maxDiff = diff;
+#endif
                   new_temperature[index(i, j, k)] = update;
               }
           }
         }
-  #pragma omp parallel for schedule(dynamic) 
+        //printf(" timecost [%d out of %d ]  %f\n", omp_get_thread_num(), omp_get_num_threads(), (CkWallTimer()-t1)*1e6);
+      }
+#ifdef JACOBI_OPENMP
+        maxDiff= maxDiffSub[0];
+        for(i=1; i<threadNums; i++)
+            if(maxDiff < maxDiffSub[i]) maxDiff = maxDiffSub[i];
+#endif
+  #pragma omp parallel  
+        {  
+        #pragma omp for 
         for(i=1; i<blockDimX+1; ++i) {
             for(int j=1; j<blockDimY+1; ++j) {
                 for(int k=1; k<blockDimZ+1; ++k) {
@@ -605,6 +638,7 @@ void Jacobi::pup(PUP::er &p){
                 }
             }
         }
+      }
 #if     PRINT_DEBUG
         CkPrintf("\n {%d:%d:%d  %d:%d:%d  %d:%d:%d %f}", thisIndex_x, thisIndex_y, thisIndex_z, x_c, y_c, z_c, x_p, y_p, z_p, maxDiff);
         for(i=1; i<blockDimX+1; ++i) {
@@ -865,7 +899,7 @@ public:
 class TraceControl : public Group 
 {
 public:
-    TraceControl() {}
+    TraceControl() { omp_set_num_threads(threadNums);}
 
     void startTrace() { traceBegin(); }
     
