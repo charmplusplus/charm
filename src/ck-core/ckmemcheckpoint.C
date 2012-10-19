@@ -71,6 +71,7 @@ CpvDeclare(int, _crashedNode);
 
 // static, so that it is accessible from Converse part
 int CkMemCheckPT::inRestarting = 0;
+int CkMemCheckPT::inLoadbalancing = 0;
 double CkMemCheckPT::startTime;
 char *CkMemCheckPT::stage;
 CkCallback CkMemCheckPT::cpCallback;
@@ -1349,6 +1350,27 @@ int CkInRestarting()
 #endif
 }
 
+extern "C"
+void CkSetInLdb(){
+#if CMK_MEM_CHECKPOINT
+	CkMemCheckPT::inLoadbalancing = 1;
+#endif
+}
+
+extern "C"
+int CkInLdb(){
+#if CMK_MEM_CHECKPOINT
+	return CkMemCheckPT::inLoadbalancing;
+#endif
+}
+
+extern "C"
+void CkResetInLdb(){
+#if CMK_MEM_CHECKPOINT
+	CkMemCheckPT::inLoadbalancing = 0;
+#endif
+}
+
 /*****************************************************************************
                 module initialization
 *****************************************************************************/
@@ -1457,7 +1479,7 @@ void pingCheckHandler()
 {
 #if CMK_MEM_CHECKPOINT
   double now = CmiWallTimer();
-  if (lastPingTime > 0 && now - lastPingTime > 4) {
+  if (lastPingTime > 0 && now - lastPingTime > 4 && (!CkInLdb()||buddy!=0)) {
     int i, pe, buddy;
     // tell everyone the buddy dies
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();

@@ -97,6 +97,7 @@ public:
   static CkCallback  cpCallback;
 
   static int inRestarting;
+  static int inLoadbalancing;
   static double startTime;
   static char*  stage;
 private:
@@ -130,6 +131,10 @@ void CkStartMemCheckpoint(CkCallback &cb);
 
 // true if inside a restarting phase
 extern "C" int CkInRestarting(); 
+extern "C" int CkInLdb(); 
+extern "C" void CkSetInLdb(); 
+extern "C" void CkResetInLdb();
+
 extern "C" int CkHasCheckpoints();
 
 extern "C" void CkDieNow();
