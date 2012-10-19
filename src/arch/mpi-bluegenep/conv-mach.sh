@@ -12,10 +12,12 @@ then
   BGP_INSTALL=$BGP_TYPICAL_FLOOR
 fi
 
-BGP_BIN=$BGP_FLOOR/gnu-linux/bin
-BGP_INC="-I$BGP_INSTALL/comm/include -I$BGP_INSTALL/arch/include"
+BGP_ZLIB=/soft/apps/zlib-1.2.3
 
-BGP_LIB="-L$BGP_INSTALL/comm/lib -L$BGP_INSTALL/runtime/SPI"
+BGP_BIN=$BGP_FLOOR/gnu-linux/bin
+BGP_INC="-I$BGP_INSTALL/comm/include -I$BGP_INSTALL/arch/include -I$BGP_ZLIB/include "
+
+BGP_LIB="-L$BGP_INSTALL/comm/lib -L$BGP_INSTALL/runtime/SPI -L$BGP_ZLIB/lib "
 
 # test if compiler binary present
 if test ! -x $BGP_BIN/powerpc-bgp-linux-g++
