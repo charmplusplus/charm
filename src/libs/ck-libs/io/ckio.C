@@ -16,7 +16,7 @@ namespace Ck { namespace IO {
 
     void Manager::write(Token token, const char *data, size_t bytes, size_t offset) {
       Options &opts = files[token].opts;
-      do {
+      while (bytes > 0) {
         size_t stripeIndex = offset / opts.peStripe;
         int peIndex = stripeIndex % opts.activePEs;
         int pe = opts.basePE + peIndex * opts.skipPEs;
@@ -25,7 +25,7 @@ namespace Ck { namespace IO {
 	data += bytesToSend;
 	offset += bytesToSend;
 	bytes -= bytesToSend;
-      } while (bytes > 0);
+      }
     }
 
     void Manager::write_forwardData(Token token, const char *data, size_t bytes,
