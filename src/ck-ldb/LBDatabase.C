@@ -338,9 +338,7 @@ void LBDatabase::init(void)
   mystep = 0;
   nloadbalancers = 0;
   new_ld_balancer = 0;
-	if (_lb_args.metaLbOn()) {
-		metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
-	}
+	metabalancer = NULL;
 
   CkpvAccess(lbdatabaseInited) = 1;
 #if CMK_LBDB_ON

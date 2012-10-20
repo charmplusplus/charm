@@ -82,8 +82,8 @@ CkpvDeclare(int, metalbInited);  /**< true if metabalancer is inited */
 // mainchare
 MetaLBInit::MetaLBInit(CkArgMsg *m) {
 #if CMK_LBDB_ON
-  _metalb = CProxy_MetaBalancer::ckNew();
   _metalbred = CProxy_MetaBalancerRedn::ckNew();
+  _metalb = CProxy_MetaBalancer::ckNew();
 #endif
   delete m;
 }
@@ -701,7 +701,7 @@ void MetaBalancer::ResetAdaptive() {
 // This is required for PEs with no objs
 void MetaBalancer::periodicCall(void *ad) {
   MetaBalancer *s = (MetaBalancer *)ad;
-  CcdCallFnAfterOnPE((CcdVoidFn)checkForNoObj, (void *)s, 500, CkMyPe());
+  CcdCallFnAfterOnPE((CcdVoidFn)checkForNoObj, (void *)s, 10, CkMyPe());
 }
 
 void MetaBalancer::checkForNoObj(void *ad) {
@@ -842,7 +842,8 @@ void MetaBalancer::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio,
 }
 
 void MetaBalancerRedn::init() {
-  metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+//  metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+  metabalancer = NULL;
 }
 
 void MetaBalancerRedn::pup(PUP::er& p) {

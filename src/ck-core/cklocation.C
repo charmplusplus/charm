@@ -1413,10 +1413,8 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
         enable_measure = CmiTrue;
 	bounced  = CmiFalse;
 	the_lbdb=mgr->getLBDB();
-  if (_lb_args.metaLbOn()) {
-    the_metalb=mgr->getMetaBalancer();
-  }
-        LDObjid ldid = idx2LDObjid(idx);
+	the_metalb=mgr->getMetaBalancer();
+	LDObjid ldid = idx2LDObjid(idx);
 #if CMK_GLOBAL_LOCATION_UPDATE
         ldid.locMgrGid = mgr->getGroupID().idx;
 #endif        
@@ -3199,11 +3197,9 @@ void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 	if (the_lbdb == 0)
 		CkAbort("LBDatabase not yet created?\n");
 	DEBL((AA"Connected to load balancer %p\n"AB,the_lbdb));
-  if (_lb_args.metaLbOn()) {
-    the_metalb = (MetaBalancer *)CkLocalBranch(metalbID_);
-    if (the_metalb == 0)
-      CkAbort("MetaBalancer not yet created?\n");
-  }
+	the_metalb = (MetaBalancer *)CkLocalBranch(metalbID_);
+	if (the_metalb == 0)
+		CkAbort("MetaBalancer not yet created?\n");
 
 	// Register myself as an object manager
 	LDOMid myId;

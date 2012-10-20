@@ -57,8 +57,6 @@ void GreedyLB::work(LDStats* stats)
   int n_pes = stats->nprocs();
   int *map = new int[n_pes];
 
-  ProcArray *parr = new ProcArray(stats);
-
   std::vector<ProcInfo>  procs;
   for(pe = 0; pe < n_pes; pe++) {
     map[pe] = -1;
