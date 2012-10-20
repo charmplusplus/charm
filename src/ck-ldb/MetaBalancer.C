@@ -268,8 +268,11 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   int iteration_n = (int) load[0];
   double avg_load_bg = load[6]/load[1];
   double max_load_bg = load[7];
+	// Set the max and avg to be the load with background
+	max = max_load_bg;
+	avg = avg_load_bg;
   DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Util : %lf \
-      Min Util : %lf for %lf procs\n",iteration_n, avg, max, avg_idle,
+      Min Util : %lf for %lf procs\n",iteration_n, avg, max, avg_utilization,
       min_utilization, load[1]));
   delete msg;
 
@@ -307,6 +310,11 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
       (adaptive_struct.final_lb_period == iteration_n)) {
     return;
   }
+
+	// If the utilization is beyond 90%, then do nothing
+	if (data.avg_utilization >= 0.90) {
+		return;
+	}
 
   double utilization_threshold = UTILIZATION_THRESHOLD;
 
