@@ -1248,10 +1248,11 @@ void CmiTimerInit(char **argv)
   /*fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);*/
 
   /* try to synchronize calling barrier */
+#if !CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
-
+#endif
   CpvAccess(inittime) = GetTimeBase (); 
 }
 
