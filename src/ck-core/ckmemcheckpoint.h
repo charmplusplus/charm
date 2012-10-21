@@ -85,6 +85,7 @@ public:
   void quiescence(CkCallback &);
   void resetReductionMgr();
   void finishUp();
+  void gotReply();
   void inmem_restore(CkArrayCheckPTMessage *m);
   void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe);
   void resetLB(int diepe);

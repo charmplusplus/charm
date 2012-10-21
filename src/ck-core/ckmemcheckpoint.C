@@ -66,6 +66,7 @@ void noopck(const char*, ...)
 #endif
 
 #define CMK_CHKP_ALL		1
+#define CMK_USE_BARRIER		1
 #define STREAMING_INFORMHOME                    1
 CpvDeclare(int, _crashedNode);
 
@@ -969,7 +970,7 @@ void CkMemCheckPT::recoverArrayElements()
   if (CkMyPe() == thisFailedPe)
   CkPrintf("[%d] CkMemCheckPT ----- %s starts at %f \n",CkMyPe(), stage, curTime);
   startTime = curTime;
-
+ int flag = 0;
   // recover all array elements
   int count = 0;
 #if STREAMING_INFORMHOME
@@ -1012,11 +1013,16 @@ void CkMemCheckPT::recoverArrayElements()
 	recoverAll(msg,gmap,imap);
     CkFreeMsg(msg);
 #endif
+  curTime = CmiWallTimer();
+  if (CkMyPe() == thisFailedPe)
+  	CkPrintf("[%d] CkMemCheckPT ----- %s streams at %f \n",CkMyPe(), stage, curTime);
 #if STREAMING_INFORMHOME
   for (int i=0; i<CkNumPes(); i++) {
-    if (gmap[i].size() && i!=CkMyPe()) {
+    if (gmap[i].size() && i!=CkMyPe()&& i==thisFailedPe) {
       thisProxy[i].updateLocations(gmap[i].size(), gmap[i].getVec(), imap[i].getVec(), CkMyPe());
-    }
+    	CkPrintf("[%d] send to %d\n",CkMyPe(),i);
+	flag++;	
+	}
   }
   delete [] imap;
   delete [] gmap;
@@ -1025,12 +1031,20 @@ void CkMemCheckPT::recoverArrayElements()
 
   CKLOCMGR_LOOP(mgr->doneInserting(););
 
-  inRestarting = 0;
   // _crashedNode = -1;
   CpvAccess(_crashedNode) = -1;
+if(CkMyPe()!=thisFailedPe)
+  inRestarting = 0;
+ // if (CkMyPe() == 0)
+   // CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
+if(flag == 0)
+{
+    contribute(CkCallback(CkReductionTarget(CkMemCheckPT, finishUp), thisProxy));
+}
+}
 
-  if (CkMyPe() == 0)
-    CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
+void CkMemCheckPT::gotReply(){
+    contribute(CkCallback(CkReductionTarget(CkMemCheckPT, finishUp), thisProxy));
 }
 
 void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gmap, CkVec<CkArrayIndex> * imap){
@@ -1087,6 +1101,7 @@ void CkMemCheckPT::finishUp()
   
   if (CkMyPe() == thisFailedPe)
   {
+	inRestarting=0;
        CkPrintf("[%d] CkMemCheckPT ----- %s in %f seconds, callback triggered\n",CkMyPe(), stage, CmiWallTimer()-startTime);
        //CkStartQD(cpCallback);
        cpCallback.send();
@@ -1175,8 +1190,19 @@ static int notifyHandlerIdx;
 // called on crashed PE
 static void restartBeginHandler(char *msg)
 {
-#if CMK_MEM_CHECKPOINT
   CmiFree(msg);
+#if CMK_MEM_CHECKPOINT
+#if CMK_USE_BARRIER
+	if(CkMyPe()!=_diePE){
+		printf("restar begin on %d\n",CkMyPe());
+  		char *restartmsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+  		CmiSetHandler(restartmsg, restartBeginHandlerIdx);
+  		CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
+	}else{
+  	CkPrintf("[%d] restartBeginHandler cur_restart_phase=%d _diePE:%d at %f.\n", CkMyPe(), CpvAccess(_curRestartPhase), _diePE, CkWallTimer());
+    	CkRestartCheckPointCallback(NULL, NULL);
+	}
+#else
   static int count = 0;
   CmiAssert(CkMyPe() == _diePE);
   count ++;
@@ -1184,6 +1210,7 @@ static void restartBeginHandler(char *msg)
     CkRestartCheckPointCallback(NULL, NULL);
     count = 0;
   }
+#endif
 #endif
 }
 
@@ -1222,8 +1249,14 @@ static void restartBcastHandler(char *msg)
     // reduction
   char *restartmsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(restartmsg, restartBeginHandlerIdx);
+#if CMK_USE_BARRIER
+	//CmiPrintf("before reduce\n");	
+  	CmiReduce(restartmsg,CmiMsgHeaderSizeBytes,doNothingMsg);
+	//CmiPrintf("after reduce\n");	
+#else
   CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
-  checkpointed = 0;
+#endif 
+ checkpointed = 0;
 #endif
 }
 
@@ -1290,7 +1323,7 @@ static void askProcDataHandler(char *msg)
 // called on PE 0
 void qd_callback(void *m)
 {
-   CmiPrintf("[%d] callback after QD for crashed node: %d. \n", CkMyPe(), CpvAccess(_crashedNode));
+   CmiPrintf("[%d] callback after QD for crashed node: %d. at %lf\n", CkMyPe(), CpvAccess(_crashedNode),CmiWallTimer());
    CkFreeMsg(m);
 #ifdef CMK_SMP
    for(int i=0;i<CmiMyNodeSize();i++){
@@ -1479,7 +1512,7 @@ void pingCheckHandler()
 {
 #if CMK_MEM_CHECKPOINT
   double now = CmiWallTimer();
-  if (lastPingTime > 0 && now - lastPingTime > 4 && (!CkInLdb()||buddy!=0)) {
+  if (lastPingTime > 0 && now - lastPingTime > 4 && !CkInLdb()) {
     int i, pe, buddy;
     // tell everyone the buddy dies
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();

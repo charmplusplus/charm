@@ -1873,9 +1873,9 @@ void CkLocMgr::flushAllRecs(void)
       //the meta data in the location manager are not deleted so we need
       //this condition
       if(_BgOutOfCoreFlag!=1){
-        hash.remove(*(CkArrayIndex *)&idx);
-        delete rec;
-        it->seek(-1);//retry this hash slot
+      //  hash.remove(*(CkArrayIndex *)&idx);
+       // delete rec;
+       // it->seek(-1);//retry this hash slot
       }
     }
     else {
@@ -2208,6 +2208,9 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 }
 void CkLocMgr::updateLocation(const CkArrayIndex &idx,int nowOnPe) {
 	inform(idx,nowOnPe);
+	CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
+	if(CkInRestarting())
+	checkptMgr[nowOnPe].gotReply();
 }
 
 /*************************** LocMgr: DELETION *****************************/
