@@ -460,10 +460,15 @@ class CDep {
    void removeAllSpeculationIndex(int speculationIndex) {
      for (int i = 0; i < numWhens; i++) {
        TListCWhenTrigger *wlist = whens[i];
-       for (CWhenTrigger *elem = wlist->begin(); !wlist->end(); elem = wlist->next()) {
-         if (elem == 0) break;
+       CWhenTrigger *elem = wlist->begin();
+       while (elem && !wlist->end()) {
          if (elem->speculationIndex == speculationIndex) {
-           elem = deRegister(elem);
+           CWhenTrigger *cancelled = elem;
+           deRegister(elem);
+           elem = wlist->next();
+           delete cancelled;
+         } else {
+           elem = wlist->next();
          }
        }
      }
