@@ -22,7 +22,7 @@ Orion Sky Lawlor, olawlor@acm.org, 2003/8/25
 */
 int testStack(int nKB,int useKB) {
 	int i;
-#define buf1KB 1024-sizeof(i)
+#define buf1KB (1024-sizeof(i))
 	char buf[buf1KB];
 	for (i=0;i<buf1KB;i++)
 		buf[i]=0;

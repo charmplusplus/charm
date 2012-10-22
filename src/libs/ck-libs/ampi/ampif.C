@@ -148,6 +148,9 @@ FDECL {
 #define mpi_checkpoint FTN_NAME( MPI_CHECKPOINT , mpi_checkpoint )
 #define mpi_memcheckpoint FTN_NAME( MPI_MEMCHECKPOINT , mpi_memcheckpoint )
 
+#define mpi_get_argc FTN_NAME( MPI_GET_ARGC , mpi_get_argc )
+#define mpi_get_argv FTN_NAME( MPI_GET_ARGV , mpi_get_argv )
+
 /* MPI-2 */
 #define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
 #define mpi_type_get_contents FTN_NAME ( MPI_TYPE_GET_CONTENTS , mpi_type_get_contents )
@@ -897,6 +900,27 @@ void mpi_checkpoint(char *dname){
 
 void mpi_memcheckpoint(){
   AMPI_MemCheckpoint();
+}
+
+void mpi_get_argc(int *c, int *ierr)
+{
+  *c = CkGetArgc();
+  *ierr = 0;
+}
+
+void mpi_get_argv(int *c, char *str, int *ierr, int len)
+{
+  char ** argv = CkGetArgv();
+  int nc = CkGetArgc();
+  if (*c < nc) {
+    strncpy(str, argv[*c], strlen(argv[*c]));
+    for (int j=strlen(argv[*c]); j<len; j++)  str[j] = ' ';
+    *ierr = 0;
+  }
+  else {
+    memset(str, ' ', len);
+    *ierr = 1;
+  }
 }
 
 void mpi_comm_remote_size(int *comm, int *size, int *ierr){
