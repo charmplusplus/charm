@@ -124,16 +124,16 @@ class TListCWhenTrigger
       return first;
     }
 
-    CWhenTrigger* remove(CWhenTrigger *data)
+    void remove(CWhenTrigger *data)
     {
       // case 1: empty list
       if (first == 0)
-        return 0;
+        return;
       // case 2: first element to be removed
       if(first == data) {
         first = first->next;
 	if(first==0) last=0;
-        return first;
+        return;
       }
       // case 3: middle or last element to be removed
       CWhenTrigger *nn;
@@ -143,7 +143,7 @@ class TListCWhenTrigger
           prev->next = nn->next;
 	  if(nn==last)
 	    last=prev;
-          return prev;
+          return;
         }
         prev = nn;
       }
@@ -369,8 +369,8 @@ class CDep {
 
    // deregister trigger from all
    // the entries it is registered for
-   CWhenTrigger* deRegister(CWhenTrigger *trigger) {
-     return whens[trigger->whenID]->remove(trigger);
+   void deRegister(CWhenTrigger *trigger) {
+     whens[trigger->whenID]->remove(trigger);
    }
 
    // buffer a message for a specific entry point with a specified
