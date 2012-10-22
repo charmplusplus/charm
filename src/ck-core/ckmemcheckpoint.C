@@ -67,7 +67,7 @@ void noopck(const char*, ...)
 
 #define CMK_CHKP_ALL		1
 #define CMK_USE_BARRIER		1
-#define STREAMING_INFORMHOME                    1
+#define STREAMING_INFORMHOME                    0
 CpvDeclare(int, _crashedNode);
 
 // static, so that it is accessible from Converse part
@@ -960,6 +960,7 @@ void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int no
   }
 }
 
+#include "dcmf.h"
 // restore array elements
 void CkMemCheckPT::recoverArrayElements()
 {
@@ -973,10 +974,10 @@ void CkMemCheckPT::recoverArrayElements()
  int flag = 0;
   // recover all array elements
   int count = 0;
-#if STREAMING_INFORMHOME
+//#if STREAMING_INFORMHOME
   CkVec<CkGroupID> * gmap = new CkVec<CkGroupID>[CkNumPes()];
   CkVec<CkArrayIndex> * imap = new CkVec<CkArrayIndex>[CkNumPes()];
-#endif
+//#endif
 #if !CMK_CHKP_ALL
   for (int idx=0; idx<len; idx++)
   {
@@ -1020,13 +1021,13 @@ void CkMemCheckPT::recoverArrayElements()
   for (int i=0; i<CkNumPes(); i++) {
     if (gmap[i].size() && i!=CkMyPe()&& i==thisFailedPe) {
       thisProxy[i].updateLocations(gmap[i].size(), gmap[i].getVec(), imap[i].getVec(), CkMyPe());
-    	CkPrintf("[%d] send to %d\n",CkMyPe(),i);
+    	CkPrintf("[%d] send to %d at %lf\n",CkMyPe(),i,DCMF_Timer());
 	flag++;	
 	}
   }
+#endif
   delete [] imap;
   delete [] gmap;
-#endif
   DEBUGF("[%d] recoverArrayElements restore %d objects\n", CkMyPe(), count);
 
   CKLOCMGR_LOOP(mgr->doneInserting(););
@@ -1044,6 +1045,7 @@ if(flag == 0)
 }
 
 void CkMemCheckPT::gotReply(){
+    	CkPrintf("[%d] got reply at %lf\n",CkMyPe(),DCMF_Timer());
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, finishUp), thisProxy));
 }
 
@@ -1059,10 +1061,14 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 			p|gID;
 			p|idx;
 			CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
+    			int homePe = mgr->homePe(idx);
 #if STREAMING_INFORMHOME
 			mgr->resume(idx,p,CmiFalse);
 #else
-			mgr->resume(idx,p,CmiTrue);
+			if(homePe == thisFailedPe && homePe!=CkMyPe())
+				mgr->resume(idx,p,CmiTrue);
+			else
+				mgr->resume(idx,p,CmiFalse);
 #endif
 			  /*CkLocRec_local *rec = loc.getLocalRecord();
 			  CmiAssert(rec);

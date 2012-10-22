@@ -2206,11 +2206,14 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	
 	return CmiTrue;
 }
+#include "dcmf.h"
 void CkLocMgr::updateLocation(const CkArrayIndex &idx,int nowOnPe) {
 	inform(idx,nowOnPe);
 	CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
-	if(CkInRestarting())
-	checkptMgr[nowOnPe].gotReply();
+	if(CkInRestarting()){
+	//	CkPrintf("[%d] reply to %d at %lf\n",CkMyPe(),nowOnPe,DCMF_Timer());
+	//	checkptMgr[nowOnPe].gotReply();
+	}
 }
 
 /*************************** LocMgr: DELETION *****************************/
