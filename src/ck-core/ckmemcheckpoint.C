@@ -520,6 +520,7 @@ void CkMemCheckPT::pupAllElements(PUP::er &p){
 	}
 	p | numElements;
 	if(!p.isUnpacking()){
+		//CKLOCMGR_LOOP(mgr->checkpointRemoteIdx(p););
 		CKLOCMGR_LOOP(MemElementPacker packer(mgr,p);mgr->iterate(packer););
 	}
 #endif
@@ -534,6 +535,7 @@ void CkMemCheckPT::startArrayCheckpoint(){
 		size = psizer.size();
 	}
 	int packSize = size/sizeof(double)+1;
+ // CkPrintf("[%d]checkpoint size :%d\n",CkMyPe(),packSize);
 	CkArrayCheckPTMessage * msg = new (packSize,0) CkArrayCheckPTMessage;
 	msg->len = size;
 	msg->cp_flag = 1;
@@ -960,7 +962,6 @@ void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int no
   }
 }
 
-#include "dcmf.h"
 // restore array elements
 void CkMemCheckPT::recoverArrayElements()
 {
@@ -1021,9 +1022,9 @@ void CkMemCheckPT::recoverArrayElements()
   for (int i=0; i<CkNumPes(); i++) {
     if (gmap[i].size() && i!=CkMyPe()&& i==thisFailedPe) {
       thisProxy[i].updateLocations(gmap[i].size(), gmap[i].getVec(), imap[i].getVec(), CkMyPe());
-    	CkPrintf("[%d] send to %d at %lf\n",CkMyPe(),i,DCMF_Timer());
+    	//CkPrintf("[%d] send to %d at %lf\n",CkMyPe(),i,CmiWallTimer());
 	flag++;	
-	}
+	  }
   }
 #endif
   delete [] imap;
@@ -1045,7 +1046,7 @@ if(flag == 0)
 }
 
 void CkMemCheckPT::gotReply(){
-    	CkPrintf("[%d] got reply at %lf\n",CkMyPe(),DCMF_Timer());
+    	//CkPrintf("[%d] got reply at %lf\n",CkMyPe(),CmiWallTimer());
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, finishUp), thisProxy));
 }
 
@@ -1065,9 +1066,11 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 #if STREAMING_INFORMHOME
 			mgr->resume(idx,p,CmiFalse);
 #else
-			if(homePe == thisFailedPe && homePe!=CkMyPe())
+			if(homePe == thisFailedPe && homePe!=CkMyPe()){
 				mgr->resume(idx,p,CmiTrue);
-			else
+       // CkPrintf("[%d] send to crashed pe %d\n",CkMyPe(),thisFailedPe);
+      }
+      else
 				mgr->resume(idx,p,CmiFalse);
 #endif
 			  /*CkLocRec_local *rec = loc.getLocalRecord();
@@ -1085,7 +1088,7 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 				}
 			  }*/
 #if STREAMING_INFORMHOME
-			int homePe = mgr->homePe(idx);
+			homePe = mgr->homePe(idx);
 			if (homePe != CkMyPe()) {
 			  gmap[homePe].push_back(gID);
 			  imap[homePe].push_back(idx);
@@ -1267,6 +1270,7 @@ static void restartBcastHandler(char *msg)
 }
 
 extern void _initDone();
+#include "hwi/include/bqc/A2_inlines.h"
 
 // called on crashed processor
 static void recoverProcDataHandler(char *msg)
@@ -1323,6 +1327,7 @@ static void askProcDataHandler(char *msg)
     CmiSetHandler(env, recoverProcDataHandlerIdx);
     CmiSyncSendAndFree(CpvAccess(procChkptBuf)->pe, env->getTotalsize(), (char *)env);
     CpvAccess(procChkptBuf) = NULL;
+    CkPrintf("[%d] askProcDataHandler called with '%d' cur_restart_phase:%d done at time %f.\n",CmiMyPe(),diePe, CpvAccess(_curRestartPhase), CkWallTimer());
 #endif
 }
 
@@ -1362,12 +1367,20 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
   CpvAccess( _crashedNode )= CmiMyNode();
 	
   _discard_charm_message();
+    restartT = CmiWallTimer();
+   CmiPrintf("[%d] I am restarting  cur_restart_phase:%d discard charm message at time: %f\n",CmiMyPe(), CpvAccess(_curRestartPhase), restartT);
   
-  if(CmiMyRank()==0){
+  /*if(CmiMyRank()==0){
     CkCallback cb(qd_callback);
     CkStartQD(cb);
     CkPrintf("crash_node:%d\n",CpvAccess( _crashedNode));
-  }
+  }*/
+   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
+   *(int *)(msg+CmiMsgHeaderSizeBytes) = CpvAccess(_crashedNode);
+   // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.c
+   CmiSetHandler(msg, askProcDataHandlerIdx);
+   int pe = ChkptOnPe(CpvAccess(_crashedNode));
+   CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
 #else
    CmiAbort("Fault tolerance is not support, rebuild charm++ with 'syncft' option");
 #endif
@@ -1451,6 +1464,7 @@ static void notifyHandler(char *msg)
   CpvAccess(_curRestartPhase) ++;
   CpvAccess(_qd)->flushStates();
   _discard_charm_message();
+
 #endif
 }
 
@@ -1518,7 +1532,7 @@ void pingCheckHandler()
 {
 #if CMK_MEM_CHECKPOINT
   double now = CmiWallTimer();
-  if (lastPingTime > 0 && now - lastPingTime > 4 && !CkInLdb()) {
+  if (lastPingTime > 0 && now - lastPingTime > 20 && !CkInLdb()) {
     int i, pe, buddy;
     // tell everyone the buddy dies
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
@@ -1528,13 +1542,17 @@ void pingCheckHandler()
     }
     buddy = pe;
     CmiPrintf("[%d] detected buddy processor %d died %f %f. \n", CmiMyPe(), buddy, now, lastPingTime);
-    for (int pe = 0; pe < CmiNumPes(); pe++) {
+    /*for (int pe = 0; pe < CmiNumPes(); pe++) {
       if (obj->isFailed(pe) || pe == buddy) continue;
       char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
       *(int *)(msg+CmiMsgHeaderSizeBytes) = buddy;
       CmiSetHandler(msg, buddyDieHandlerIdx);
       CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
-    }
+    }*/
+    char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
+    *(int *)(msg+CmiMsgHeaderSizeBytes) = buddy;
+    CmiSetHandler(msg, buddyDieHandlerIdx);
+    CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
   }
   else 
     CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);

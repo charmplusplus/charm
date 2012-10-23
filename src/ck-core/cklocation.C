@@ -1887,6 +1887,27 @@ void CkLocMgr::flushAllRecs(void)
   CmiImmediateUnlock(hashImmLock);
 }
 
+
+void CkLocMgr::checkpointRemoteIdx(PUP::er &p)
+{
+  void *objp;
+  void *keyp;
+  int flag = 0;
+  CkHashtableIterator *it=hash.iterator();
+  CmiImmediateLock(hashImmLock);
+  while (NULL!=(objp=it->next(&keyp))) {
+    CkLocRec *rec=*(CkLocRec **)objp;
+    if (rec->type() != CkLocRec::local) {
+      CkArrayIndexMax &idx=*(CkArrayIndex *)keyp;
+      p|idx;
+      int onPe = ((CkLocRec_remote *)rec)->lookupProcessor();
+      p|onPe;
+      flag++;
+    }
+  }
+ // CkPrintf("[%d] has %d remote elements\n",CkMyPe(),flag);
+}
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 	void *objp;
@@ -2206,13 +2227,12 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	
 	return CmiTrue;
 }
-#include "dcmf.h"
 void CkLocMgr::updateLocation(const CkArrayIndex &idx,int nowOnPe) {
 	inform(idx,nowOnPe);
 	CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
 	if(CkInRestarting()){
-	//	CkPrintf("[%d] reply to %d at %lf\n",CkMyPe(),nowOnPe,DCMF_Timer());
-	//	checkptMgr[nowOnPe].gotReply();
+		//CkPrintf("[%d] reply to %d at %lf\n",CkMyPe(),nowOnPe,CmiWallTimer());
+		//checkptMgr[nowOnPe].gotReply();
 	}
 }
 
