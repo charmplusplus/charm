@@ -2548,12 +2548,12 @@ yyreduce:
 
   case 73:
 #line 364 "xi-grammar.y"
-    { (yyval.type) = (yyvsp[(2) - (2)].type); }
+    { (yyval.type) = new ConstType((yyvsp[(2) - (2)].type)); }
     break;
 
   case 74:
 #line 366 "xi-grammar.y"
-    { (yyval.type) = (yyvsp[(1) - (2)].type); }
+    { (yyval.type) = new ConstType((yyvsp[(1) - (2)].type)); }
     break;
 
   case 75:

@@ -156,6 +156,7 @@ class Type : public Printable {
     virtual int isCkMigMsgPtr(void) const {return 0;}
     virtual int isCkMigMsg(void) const {return 0;}
     virtual int isReference(void) const {return 0;}
+    virtual bool isConst(void) const {return false;}
     virtual Type *deref(void) {return this;}
     virtual const char *getBaseName(void) const = 0;
     virtual const char *getScope(void) const = 0;
@@ -246,6 +247,18 @@ class ReferenceType : public Type {
     const char *getScope(void) const { return NULL; }
 };
 
+class ConstType : public Type {
+private:
+  Type *constType;
+public:
+  ConstType(Type *t) : constType(t) {}
+  void print(XStr& str) {str << "const " << constType;}
+  virtual bool isConst(void) const {return true;}
+  virtual Type *deref(void) {return constType;}
+  const char *getBaseName(void) const { return constType->getBaseName(); }
+  const char *getScope(void) const { return NULL; }
+};
+
 //This is used as a list of base classes
 class TypeList : public Printable {
     Type *type;
@@ -271,6 +284,7 @@ class Parameter {
     int line;
     int byReference; //Fake a pass-by-reference (for efficiency)
     int conditional; //If the parameter is conditionally packed
+    bool byConst;
 
     // DMK - Added field for accelerator options
     int accelBufferType;
@@ -356,6 +370,7 @@ class ParamList {
     const char *getArrayLen(void) const {return param->getArrayLen();}
     int isArray(void) const {return param->isArray();}
     int isReference(void) const {return param->type->isReference() || param->byReference;}
+    bool isConst(void) const {return param->type->isConst() || param->byConst;}
     int isVoid(void) const {
     	return (next==NULL) && param->isVoid();
     }

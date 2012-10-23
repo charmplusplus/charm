@@ -34,6 +34,8 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
     if ((sv->isMsg != 1) && (sv->isVoid != 1)) {
        if (i >0)
          signature <<", ";
+       if (sv->byConst)
+         signature << "const ";
        signature << sv->type << " ";
        if (sv->arrayLength != 0)
          signature << "*";

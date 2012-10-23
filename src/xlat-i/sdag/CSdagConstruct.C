@@ -1419,6 +1419,9 @@ void generateSignature(XStr& decls, XStr& defs,
         if (count != 0)
           op << ", ";
 
+        // @TODO uncommenting this requires that PUP work on const types
+        //if (sv->byConst)
+        //op << "const ";
         if (sv->type != 0) 
           op <<sv->type <<" ";
         if (sv->byRef != 0)

@@ -14,6 +14,7 @@ struct CStateVar {
     int numPtrs;
     XStr *name;
     XStr *byRef;
+    bool byConst;
     XStr *arrayLength;
     int isMsg;
 
@@ -28,9 +29,14 @@ struct CStateVar {
 	}
 
 CStateVar(ParamList *pl)
-      : isVoid(0), type(new XStr(*(pl->param->getType()))), numPtrs(0),
-      name(new XStr(pl->getGivenName())), byRef(pl->isReference() ? new XStr("&") : NULL),
-      arrayLength(pl->isArray() ? new XStr(pl->getArrayLen()) : NULL), isMsg(pl->isMessage())
+      : isVoid(0)
+      , type(new XStr(*(pl->param->getType())))
+      , numPtrs(0)
+      , name(new XStr(pl->getGivenName()))
+      , byRef(pl->isReference() ? new XStr("&") : NULL)
+      , byConst(pl->isConst())
+      , arrayLength(pl->isArray() ? new XStr(pl->getArrayLen()) : NULL)
+      , isMsg(pl->isMessage())
       { }
 };
 
