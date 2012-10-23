@@ -63,5 +63,21 @@ module NDMeshStreamer {
 	  double progressPeriodInMs = -1.0);
   };
 
+  template<class dtype>
+    group GroupChunkMeshStreamer : GroupMeshStreamer<ChunkDataItem> {
+    entry GroupChunkMeshStreamer(
+	  int maxNumDataItemsBuffered, int numDimensions, 
+	  int dimensionSizes[numDimensions], 
+	  const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
+	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
+
+    entry GroupChunkMeshStreamer(
+          int numDimensions, int dimensionSizes[numDimensions], 
+	  const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
+	  int bufferSize, bool yieldFlag = 0, 
+	  double progressPeriodInMs = -1.0);
+
+  };
+
 };
 

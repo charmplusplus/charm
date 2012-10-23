@@ -95,7 +95,11 @@ class MeshStreamerGroupClient : public CBase_MeshStreamerGroupClient<dtype>{
 
 public:
   virtual void process(const dtype& data) = 0;
-
+  virtual void receiveArray(dtype *data, int numItems) {
+    for (int i = 0; i < numItems; i++) {
+      process(data[i]);
+    }
+  }
 };
 
 template <class dtype>
@@ -1302,6 +1306,113 @@ public:
   }
 
 };
+
+template <class dtype>
+class GroupChunkMeshStreamer : 
+  public GroupMeshStreamer<ChunkDataItem> {
+
+private:
+  ChunkDataItem **receiveBuffers;
+  int *receivedChunks;
+
+public:
+
+  GroupChunkMeshStreamer(
+       int maxNumDataItemsBuffered, int numDimensions,
+       int *dimensionSizes, 
+       const CProxy_MeshStreamerGroupClient<dtype>& clientProxy,
+       bool yieldFlag = 0, double progressPeriodInMs = -1.0)
+    :GroupMeshStreamer<ChunkDataItem>(maxNumDataItemsBuffered, 
+                                      numDimensions, dimensionSizes,
+                                      0, yieldFlag, progressPeriodInMs) {
+    
+    receiveBuffers = new ChunkDataItem*[CkNumPes()];
+    receivedChunks = new int[CkNumPes()]; 
+    memset(receivedChunks, 0, CkNumPes() * sizeof(int));
+    memset(receiveBuffers, 0, CkNumPes() * sizeof(ChunkDataItem*)); 
+  }
+
+  GroupChunkMeshStreamer(
+       int numDimensions, int *dimensionSizes, 
+       const CProxy_MeshStreamerGroupClient<dtype>& clientProxy,
+       int bufferSize, bool yieldFlag = 0, 
+       double progressPeriodInMs = -1.0)
+    :GroupMeshStreamer<ChunkDataItem>(0, numDimensions, dimensionSizes, 
+                                      bufferSize, yieldFlag, 
+                                      progressPeriodInMs) {}
+
+  void insertData(dtype *dataArray, int numElements, int destinationPe) {
+
+    char *inputData = (char *) dataArray; 
+    int arraySizeInBytes = numElements * sizeof(dtype); 
+    ChunkDataItem chunk;
+    int chunkNumber = 0; 
+    chunk.sourcePe = CkMyPe();
+    chunk.chunkNumber = 0; 
+    chunk.chunkSize = CHUNK_SIZE;
+    chunk.numChunks = numElements * sizeof(dtype) / CHUNK_SIZE; 
+    chunk.numItems = numElements; 
+    for (int offset = 0; offset < arraySizeInBytes; offset += CHUNK_SIZE) {
+
+      if (offset + CHUNK_SIZE > arraySizeInBytes) {
+        chunk.chunkSize = arraySizeInBytes - offset; 
+        memset(chunk.rawData, 0, CHUNK_SIZE);
+        memcpy(chunk.rawData + offset, inputData + offset, chunk.chunkSize); 
+      }
+      else {
+        memcpy(chunk.rawData, inputData + offset, CHUNK_SIZE);
+      }
+
+    }
+
+    insertData(chunk, destinationPe); 
+
+  }
+
+  void receiveAtDestination(
+       MeshStreamerMessage<ChunkDataItem> *msg) {
+
+    for (int i = 0; i < msg->numDataItems; i++) {
+      const ChunkDataItem& chunk = msg->getDataItem(i);
+      
+      if (receiveBuffers[chunk.sourcePe] == NULL) {
+        receiveBuffers[chunk.sourcePe] = new dtype[chunk.numItems]; 
+      }      
+
+      char *receiveBuffer = &receiveBuffers[chunk.sourcePe];
+
+      memcpy(receiveBuffer + chunk.chunkNumber * sizeof(dtype), 
+             chunk.rawData, chunk.chunkSize);
+      if (++receivedChunks[chunk.sourcePe] == chunk.numChunks) {
+
+        clientObj_->receiveArray((dtype *) receiveBuffer, chunk.numItems);
+        receivedChunks[chunk.sourcePe] = 0;        
+        delete [] receiveBuffers[chunk.sourcePe]; 
+        receiveBuffers[chunk.sourcePe] = NULL;
+      }
+      
+    }
+
+    if (MeshStreamer<dtype>::useStagedCompletion_) {
+#ifdef STREAMER_VERBOSE_OUTPUT
+      envelope *env = UsrToEnv(msg);
+      CkPrintf("[%d] received at dest from %d %d items finalMsgCount: %d\n", 
+               CkMyPe(), env->getSrcPe(), msg->numDataItems, 
+               msg->finalMsgCount);  
+#endif
+      markMessageReceived(msg->dimension, msg->finalMsgCount); 
+    }
+    else {
+      this->detectorLocalObj_->consume(msg->numDataItems);    
+    }
+
+    delete msg;
+    
+  }
+
+};
+
+
 
 #define CK_TEMPLATES_ONLY
 #include "NDMeshStreamer.def.h"
