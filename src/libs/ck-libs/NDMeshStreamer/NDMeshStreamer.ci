@@ -64,7 +64,7 @@ module NDMeshStreamer {
   };
 
   template<class dtype>
-    group GroupChunkMeshStreamer : GroupMeshStreamer<ChunkDataItem> {
+    group GroupChunkMeshStreamer : MeshStreamer<ChunkDataItem> {
     entry GroupChunkMeshStreamer(
 	  int maxNumDataItemsBuffered, int numDimensions, 
 	  int dimensionSizes[numDimensions], 
