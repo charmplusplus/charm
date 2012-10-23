@@ -355,7 +355,7 @@ class ParamList {
     }
     const char *getArrayLen(void) const {return param->getArrayLen();}
     int isArray(void) const {return param->isArray();}
-    int isReference(void) const {return param->type->isReference();}
+    int isReference(void) const {return param->type->isReference() || param->byReference;}
     int isVoid(void) const {
     	return (next==NULL) && param->isVoid();
     }
