@@ -18,7 +18,7 @@ $(LIBDEST): $(LIBOBJ)
 CkCache.def.h CkCache.decl.h: INTERFACE
 
 INTERFACE: $(CIFILES)
-	$(CHARMC) -c CkCache.ci
+	$(CHARMC) -E -c CkCache.ci
 	touch INTERFACE
 
 CkCache.o: CkCache.C $(HEADERS)
