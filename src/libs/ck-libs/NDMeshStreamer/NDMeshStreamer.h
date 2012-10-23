@@ -1350,7 +1350,7 @@ public:
     chunk.sourcePe = CkMyPe();
     chunk.chunkNumber = 0; 
     chunk.chunkSize = CHUNK_SIZE;
-    chunk.numChunks = numElements * sizeof(dtype) / CHUNK_SIZE; 
+    chunk.numChunks = ceil ( (float) numElements * sizeof(dtype) / CHUNK_SIZE); 
     chunk.numItems = numElements; 
     for (int offset = 0; offset < arraySizeInBytes; offset += CHUNK_SIZE) {
 
