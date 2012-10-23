@@ -95,7 +95,7 @@ class MeshStreamerGroupClient : public CBase_MeshStreamerGroupClient<dtype>{
 
 public:
   virtual void process(const dtype& data) = 0;
-  virtual void receiveArray(dtype *data, int numItems) {
+  virtual void receiveArray(dtype *data, int numItems, int sourcePe) {
     for (int i = 0; i < numItems; i++) {
       process(data[i]);
     }
@@ -1211,7 +1211,7 @@ public:
     delete msg;
   }
 
-  void broadcast(const dtype& dataItem) {
+  inline void broadcast(const dtype& dataItem) {
     const static bool copyIndirectly = true;
 
     // no data items should be submitted after all local contributors call done
@@ -1239,7 +1239,7 @@ public:
       broadcast(&tempHandle, numDimensions - 1, copyIndirectly);
   }
 
-  void insertData(const dtype& dataItem, itype arrayIndex) {
+  inline void insertData(const dtype& dataItem, itype arrayIndex) {
 
     // no data items should be submitted after all local contributors call done
     // and staged completion has begun
@@ -1282,7 +1282,7 @@ public:
 
   }
 
-  int copyDataItemIntoMessage(
+  inline int copyDataItemIntoMessage(
       MeshStreamerMessage<ArrayDataItem <dtype, itype> > *destinationBuffer, 
       const void *dataItemHandle, bool copyIndirectly) {
 
@@ -1341,7 +1341,7 @@ public:
                                       bufferSize, yieldFlag, 
                                       progressPeriodInMs) {}
 
-  void insertData(dtype *dataArray, int numElements, int destinationPe) {
+  inline void insertData(dtype *dataArray, int numElements, int destinationPe) {
 
     char *inputData = (char *) dataArray; 
     int arraySizeInBytes = numElements * sizeof(dtype); 
@@ -1369,28 +1369,38 @@ public:
 
   }
 
-  void receiveAtDestination(
+  inline void processChunk(const ChunkDataItem& chunk) {
+
+    if (receiveBuffers[chunk.sourcePe] == NULL) {
+      receiveBuffers[chunk.sourcePe] = new dtype[chunk.numItems]; 
+    }      
+
+    char *receiveBuffer = &receiveBuffers[chunk.sourcePe];
+
+    memcpy(receiveBuffer + chunk.chunkNumber * sizeof(dtype), 
+           chunk.rawData, chunk.chunkSize);
+    if (++receivedChunks[chunk.sourcePe] == chunk.numChunks) {
+      clientObj_->receiveArray((dtype *) receiveBuffer, chunk.numItems, chunk.sourcePe);
+      receivedChunks[chunk.sourcePe] = 0;        
+      delete [] receiveBuffers[chunk.sourcePe]; 
+      receiveBuffers[chunk.sourcePe] = NULL;
+    }
+
+  }
+
+  inline void localDeliver(const ChunkDataItem& chunk) {
+    processChunk(chunk);
+    if (MeshStreamer<dtype>::useStagedCompletion_ == false) {
+      MeshStreamer<dtype>::detectorLocalObj_->consume();
+    }
+  }
+
+  inline void receiveAtDestination(
        MeshStreamerMessage<ChunkDataItem> *msg) {
 
     for (int i = 0; i < msg->numDataItems; i++) {
       const ChunkDataItem& chunk = msg->getDataItem(i);
-      
-      if (receiveBuffers[chunk.sourcePe] == NULL) {
-        receiveBuffers[chunk.sourcePe] = new dtype[chunk.numItems]; 
-      }      
-
-      char *receiveBuffer = &receiveBuffers[chunk.sourcePe];
-
-      memcpy(receiveBuffer + chunk.chunkNumber * sizeof(dtype), 
-             chunk.rawData, chunk.chunkSize);
-      if (++receivedChunks[chunk.sourcePe] == chunk.numChunks) {
-
-        clientObj_->receiveArray((dtype *) receiveBuffer, chunk.numItems);
-        receivedChunks[chunk.sourcePe] = 0;        
-        delete [] receiveBuffers[chunk.sourcePe]; 
-        receiveBuffers[chunk.sourcePe] = NULL;
-      }
-      
+      processChunk(chunk);             
     }
 
     if (MeshStreamer<dtype>::useStagedCompletion_) {
