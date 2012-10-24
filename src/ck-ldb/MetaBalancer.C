@@ -79,6 +79,8 @@ CkGroupID _metalbred;
 
 CkpvDeclare(int, metalbInited);  /**< true if metabalancer is inited */
 
+double _nobj_timer = 10.0;
+
 // mainchare
 MetaLBInit::MetaLBInit(CkArgMsg *m) {
 #if CMK_LBDB_ON
@@ -92,6 +94,9 @@ MetaLBInit::MetaLBInit(CkArgMsg *m) {
 void _metabalancerInit() {
   CkpvInitialize(int, metalbInited);
   CkpvAccess(metalbInited) = 0;
+  char **argv = CkGetArgv();
+	CmiGetArgDoubleDesc(argv, "+MetaLBNoObjTimer", &_nobj_timer,
+			"Time in seconds before triggering reduction for no objs");
 }
 
 void MetaBalancer::initnodeFn() {
@@ -357,6 +362,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
     DEBAD(("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n",
       tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio));
 
+#if EXTRA_FEATURE
     if ((avg_utilization < utilization_threshold || max/avg >= tolerate_imb) &&
           adaptive_lbdb.history_data.size() > MIN_STATS) {
       DEBAD(("Trigger soon even though we calculated lbperiod max/avg(%lf) and \
@@ -364,6 +370,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
       TriggerSoon(iteration_n, max/avg, tolerate_imb);
       return;
     }
+#endif
 
     // If the new lb period from linear extrapolation is greater than maximum
     // iteration known from previously collected data, then inform all the
@@ -385,6 +392,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   DEBAD(("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp_lb_type,
       tmp_max_avg_ratio, tmp_comm_ratio));
 
+#if EXTRA_FEATURE
   // This would be called when linear extrapolation did not provide suitable
   // period provided there is enough  historical data 
   if ((avg_utilization < utilization_threshold || max/avg >= tolerate_imb) &&
@@ -394,6 +402,7 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
     TriggerSoon(iteration_n, max/avg, tolerate_imb);
     return;
   }
+#endif
 
 }
 
@@ -701,7 +710,7 @@ void MetaBalancer::ResetAdaptive() {
 // This is required for PEs with no objs
 void MetaBalancer::periodicCall(void *ad) {
   MetaBalancer *s = (MetaBalancer *)ad;
-  CcdCallFnAfterOnPE((CcdVoidFn)checkForNoObj, (void *)s, 10, CkMyPe());
+  CcdCallFnAfterOnPE((CcdVoidFn)checkForNoObj, (void *)s, _nobj_timer, CkMyPe());
 }
 
 void MetaBalancer::checkForNoObj(void *ad) {

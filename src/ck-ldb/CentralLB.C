@@ -1074,6 +1074,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 
   LBMigrateMsg *msg = createMigrateMsg(stats);
 
+	/* Extra feature for MetaBalancer
   if (_lb_args.metaLbOn()) {
     int clients = CkNumPes();
     LBInfo info(clients);
@@ -1082,6 +1083,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
     info.getSummary(mLoad, mCpuLoad, totalLoad);
     theLbdb->UpdateDataAfterLB(mLoad, mCpuLoad, totalLoad/clients);
   }
+	*/
 
   if (_lb_args.debug()) {
     double strat_end_time = CkWallTimer();
