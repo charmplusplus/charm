@@ -440,8 +440,6 @@ void CkPupGroupData(PUP::er &p)
           gobj->pup(p);
           DEBCHK("Group PUP'ed: gid = %d, name = %s\n",
 			gobj->ckGetGroupID().idx, tmpInfo[i].name);
-      //   CkPrintf("Group PUP'ed: gid = %d, name = %s\n",
-			//gobj->ckGetGroupID().idx, tmpInfo[i].name);
 	}
 	delete [] tmpInfo;
 }

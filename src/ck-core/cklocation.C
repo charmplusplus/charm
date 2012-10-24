@@ -1875,7 +1875,8 @@ void CkLocMgr::flushAllRecs(void)
       //this condition
       
       if(_BgOutOfCoreFlag!=1){
-        //hash.remove(*(CkArrayIndex *)&idx);
+		  //TODO doesn't delete if there is actual pe
+		  //hash.remove(*(CkArrayIndex *)&idx);
         //delete rec;
         //it->seek(-1);//retry this hash slot
         flag_remote++;
@@ -1887,8 +1888,6 @@ void CkLocMgr::flushAllRecs(void)
         flag_local++;
     }
   }
-  if(CkMyPe()==33)
-    CkPrintf("[%d] local:%d remote:%d\n",CkMyPe(),flag_local,flag_remote);
   delete it;
   CmiImmediateUnlock(hashImmLock);
 }
@@ -1994,15 +1993,13 @@ void CkLocMgr::pup(PUP::er &p){
 		map->registerArray(emptyIndex,thisgroup);
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID);
-  //  CkPrintf("unpacking loca manager\n");
-//#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) ||CMK_MEM_CHECKPOINT    
-#if 1
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) ||CMK_MEM_CHECKPOINT    
         int count;
         p | count;
         DEBUG(CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
-    //    CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count);
-        //homeElementCount = count;
-
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))    
+        homeElementCount = count;
+#endif
         for(int i=0;i<count;i++){
             CkArrayIndex idx;
             int pe;
@@ -2026,18 +2023,13 @@ void CkLocMgr::pup(PUP::er &p){
  * indexes of local elements dont need to be packed
  * since they will be recreated later anyway
  */
- //   CkPrintf("packing loca manager\n");
-//#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))  || CMK_MEM_CHECKPOINT   
-#if 1
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))  || CMK_MEM_CHECKPOINT   
         int count=0,count1=0;
         void *objp;
         void *keyp;
         CkVec<int> pe_list;
-        //std::vector<CkArrayIndex> idx_list;
         CkVec<CkArrayIndex> idx_list;
         CkHashtableIterator *it = hash.iterator();
-     // if(CkMyPe()==0)
-       // CmiPrintf("before first %lf\n",CmiWallTimer());
       while (NULL!=(objp=it->next(&keyp))) {
           CkLocRec *rec=*(CkLocRec **)objp;
           CkArrayIndex &idx=*(CkArrayIndex *)keyp;
@@ -2052,16 +2044,11 @@ void CkLocMgr::pup(PUP::er &p){
                 }
             }
         }
-      //if(CkMyPe()==0)
-       // CmiPrintf("after first %lf %d\n",CmiWallTimer(),count);
         p | count;
-    //    CmiPrintf("[%d] Packing Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count);
 
 		// releasing iterator memory
 		delete it;
 
-    //  if(CkMyPe()==0)
-   //     CmiPrintf("before second %lf\n",CmiWallTimer());
       for(int i=0;i<pe_list.length();i++){
         CkArrayIndex max = idx_list[i];
         max.pup(p);
@@ -2082,8 +2069,6 @@ void CkLocMgr::pup(PUP::er &p){
                 }
             }
         }
-      if(CkMyPe()==0)
-        CmiPrintf("after second %lf\n",CmiWallTimer());
       //  CmiAssert(count == count1);
 
 		// releasing iterator memory

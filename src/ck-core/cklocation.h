@@ -640,7 +640,6 @@ public:
 	void migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list);
 
 	void flushAllRecs(void);
-	void checkpointRemoteIdx(PUP::er &p);
 	void pup(PUP::er &p);
 	
 	//Look up array element in hash table.  Index out-of-bounds if not found.
