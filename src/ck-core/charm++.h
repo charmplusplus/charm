@@ -117,13 +117,14 @@ public:
 		}
 	}
 	
-	inline void setPriority(prio_t integerPrio) {
+	inline CkEntryOptions& setPriority(prio_t integerPrio) {
 		queueingtype=CK_QUEUEING_IFIFO;
 		prioBits=8*sizeof(integerPrio);
 		prioPtr=&prioStore;
 		prioStore=integerPrio;
+        return *this;
 	}
-	inline void setPriority(int prioBits_,const prio_t *prioPtr_) {
+	inline CkEntryOptions& setPriority(int prioBits_,const prio_t *prioPtr_) {
 		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
                      queueingtype != CK_QUEUEING_ILIFO ) {
 			delete [] prioPtr;
@@ -135,8 +136,9 @@ public:
 		                 (sizeof(prio_t)*8);
 		prioPtr = new prio_t[dataLength];
 		memcpy((void *)prioPtr, prioPtr_, dataLength*sizeof(unsigned int));
+        return *this;
 	}
-	inline void setPriority(const CkBitVector &cbv) {
+	inline CkEntryOptions& setPriority(const CkBitVector &cbv) {
 		if ( cbv.data != NULL ) {
 			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
                              queueingtype != CK_QUEUEING_ILIFO ) {
@@ -156,10 +158,11 @@ public:
 			prioPtr = new prio_t[dataLength];
 			prioPtr[0] = 0;
 		}
+        return *this;
 	}
 	
-	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
-	inline void setGroupDepID(const CkGroupID &gid) { depGroupID = gid; }
+	inline CkEntryOptions& setQueueing(int queueingtype_) { queueingtype=queueingtype_; return *this; }
+	inline CkEntryOptions& setGroupDepID(const CkGroupID &gid) { depGroupID = gid; return *this; }
 
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
