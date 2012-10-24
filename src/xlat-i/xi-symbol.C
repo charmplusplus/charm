@@ -4878,6 +4878,7 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 		sprintf((char *)name,"impl_noname_%x",unnamedCount++);
 	}
 	byReference=false;
+        declaredReference = false;
 	if ((arrLen==NULL)&&(val==NULL))
 	{ /* Consider passing type by reference: */
 		if (type->isNamed())
@@ -4886,6 +4887,7 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 		}
 		if (type->isReference()) {
 			byReference=true;
+                        declaredReference = true;
 			/* Clip off the ampersand--we'll add
 			   it back ourselves in Parameter::print. */
 			type=type->deref();

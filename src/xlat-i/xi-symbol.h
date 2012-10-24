@@ -283,6 +283,7 @@ class Parameter {
     Value *val; /*Initial value, if any*/
     int line;
     int byReference; //Fake a pass-by-reference (for efficiency)
+    bool declaredReference; // Actually was declared a reference
     int conditional; //If the parameter is conditionally packed
     bool byConst;
 
@@ -370,6 +371,7 @@ class ParamList {
     const char *getArrayLen(void) const {return param->getArrayLen();}
     int isArray(void) const {return param->isArray();}
     int isReference(void) const {return param->type->isReference() || param->byReference;}
+    int declaredReference(void) const {return param->type->isReference() || param->declaredReference; }
     bool isConst(void) const {return param->type->isConst() || param->byConst;}
     int isVoid(void) const {
     	return (next==NULL) && param->isVoid();

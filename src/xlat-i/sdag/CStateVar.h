@@ -13,7 +13,7 @@ struct CStateVar {
     XStr *type;
     int numPtrs;
     XStr *name;
-    XStr *byRef;
+    XStr *byRef, *declaredRef;
     bool byConst;
     XStr *arrayLength;
     int isMsg;
@@ -34,6 +34,7 @@ CStateVar(ParamList *pl)
       , numPtrs(0)
       , name(new XStr(pl->getGivenName()))
       , byRef(pl->isReference() ? new XStr("&") : NULL)
+      , declaredRef(pl->declaredReference() ? new XStr("&") : NULL)
       , byConst(pl->isConst())
       , arrayLength(pl->isArray() ? new XStr(pl->getArrayLen()) : NULL)
       , isMsg(pl->isMessage())

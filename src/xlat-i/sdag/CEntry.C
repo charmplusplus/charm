@@ -39,7 +39,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
        signature << sv->type << " ";
        if (sv->arrayLength != 0)
          signature << "*";
-       else if (sv->byRef != 0) {
+       else if (sv->declaredRef) {
          signature <<"&";
        }
        if (sv->numPtrs != 0) {
