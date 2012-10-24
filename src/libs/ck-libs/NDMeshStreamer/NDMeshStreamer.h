@@ -16,7 +16,7 @@
 // #define CACHE_LOCATIONS
 // #define SUPPORT_INCOMPLETE_MESH
 // #define CACHE_ARRAY_METADATA // only works for 1D array clients
-#define STREAMER_VERBOSE_OUTPUT
+// #define STREAMER_VERBOSE_OUTPUT
 
 #define TRAM_BROADCAST (-100)
 
@@ -313,14 +313,15 @@ MeshStreamer<dtype>::MeshStreamer(
   // a bufferSize input of 0 indicates it should be calculated by the library
   if (bufferSize_ == 0) {
     CkAssert(maxNumDataItemsBuffered_ > 0);
-    // except for personalized messages, the buffers for dimensions with the 
-    //   same index as the sender's are not used
+    // buffers for dimensions with the 
+    //   same index as the sender's are not allocated/used
     bufferSize_ = OVERALLOCATION_FACTOR * maxNumDataItemsBuffered_ 
       / (sumAlongAllDimensions - numDimensions_ + 1); 
   }
   else {
     maxNumDataItemsBuffered_ = 
-      bufferSize_ * (sumAlongAllDimensions - numDimensions_ + 1);
+      bufferSize_ * (sumAlongAllDimensions - numDimensions_ + 1) 
+      / OVERALLOCATION_FACTOR;
   }
 
   if (bufferSize_ <= 0) {
@@ -1382,9 +1383,9 @@ public:
         memcpy(chunk.rawData, inputData + offset, CHUNK_SIZE);
       }
 
+      MeshStreamer<ChunkDataItem>::insertData(chunk, destinationPe); 
+      chunk.chunkNumber++; 
     }
-
-    MeshStreamer<ChunkDataItem>::insertData(chunk, destinationPe); 
 
   }
 
@@ -1394,9 +1395,9 @@ public:
       receiveBuffers[chunk.sourcePe] = new dtype[chunk.numItems]; 
     }      
 
-    char *receiveBuffer = (char *) &receiveBuffers[chunk.sourcePe];
+    char *receiveBuffer = (char *) receiveBuffers[chunk.sourcePe];
 
-    memcpy(receiveBuffer + chunk.chunkNumber * sizeof(dtype), 
+    memcpy(receiveBuffer + chunk.chunkNumber * CHUNK_SIZE, 
            chunk.rawData, chunk.chunkSize);
     if (++receivedChunks[chunk.sourcePe] == chunk.numChunks) {
       clientObj_->receiveArray((dtype *) receiveBuffer, chunk.numItems, chunk.sourcePe);
