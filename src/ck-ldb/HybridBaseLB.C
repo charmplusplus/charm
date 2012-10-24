@@ -27,6 +27,9 @@ void HybridBaseLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 
 void HybridBaseLB::staticAtSync(void* data)
 {
+#if CMK_MEM_CHECKPOINT	
+  CkSetInLdb();
+#endif
   HybridBaseLB *me = (HybridBaseLB*)(data);
 
   me->AtSync();
@@ -553,6 +556,9 @@ LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats)
 void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
 {
 #if CMK_LBDB_ON
+#if CMK_MEM_CHECKPOINT
+  CkResetInLdb();
+#endif
   FindNeighbors();
 
   int atlevel = msg->level - 1;

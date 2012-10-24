@@ -13,7 +13,7 @@
 #include "ck.h"
 #include "trace.h"
 #include "TopoManager.h"
-
+#include <vector>
 #include<sstream>
 
 #if CMK_LBDB_ON
@@ -1862,7 +1862,8 @@ void CkLocMgr::flushAllRecs(void)
 {
   void *objp;
   void *keyp;
-    
+  int flag_local = 0;  
+  int flag_remote = 0;  
   CkHashtableIterator *it=hash.iterator();
   CmiImmediateLock(hashImmLock);
   while (NULL!=(objp=it->next(&keyp))) {
@@ -1872,17 +1873,22 @@ void CkLocMgr::flushAllRecs(void)
       //In the case of taking core out of memory (in BigSim's emulation)
       //the meta data in the location manager are not deleted so we need
       //this condition
+      
       if(_BgOutOfCoreFlag!=1){
-      //  hash.remove(*(CkArrayIndex *)&idx);
-       // delete rec;
-       // it->seek(-1);//retry this hash slot
+        //hash.remove(*(CkArrayIndex *)&idx);
+        //delete rec;
+        //it->seek(-1);//retry this hash slot
+        flag_remote++;
       }
     }
     else {
         callMethod((CkLocRec_local*)rec, &CkMigratable::ckDestroy);
         it->seek(-1);//retry this hash slot
+        flag_local++;
     }
   }
+  if(CkMyPe()==33)
+    CkPrintf("[%d] local:%d remote:%d\n",CkMyPe(),flag_local,flag_remote);
   delete it;
   CmiImmediateUnlock(hashImmLock);
 }
@@ -1988,19 +1994,21 @@ void CkLocMgr::pup(PUP::er &p){
 		map->registerArray(emptyIndex,thisgroup);
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID);
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
+  //  CkPrintf("unpacking loca manager\n");
+//#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) ||CMK_MEM_CHECKPOINT    
+#if 1
         int count;
         p | count;
         DEBUG(CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
-        homeElementCount = count;
+    //    CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count);
+        //homeElementCount = count;
 
         for(int i=0;i<count;i++){
             CkArrayIndex idx;
             int pe;
             idx.pup(p);
             p | pe;
-            DEBUG(CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe));
+  //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
             inform(idx,pe);
             CkLocRec *rec = elementNrec(idx);
             CmiAssert(rec!=NULL);
@@ -2018,27 +2026,48 @@ void CkLocMgr::pup(PUP::er &p){
  * indexes of local elements dont need to be packed
  * since they will be recreated later anyway
  */
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
+ //   CkPrintf("packing loca manager\n");
+//#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))  || CMK_MEM_CHECKPOINT   
+#if 1
         int count=0,count1=0;
         void *objp;
         void *keyp;
+        CkVec<int> pe_list;
+        //std::vector<CkArrayIndex> idx_list;
+        CkVec<CkArrayIndex> idx_list;
         CkHashtableIterator *it = hash.iterator();
+     // if(CkMyPe()==0)
+       // CmiPrintf("before first %lf\n",CmiWallTimer());
       while (NULL!=(objp=it->next(&keyp))) {
-      CkLocRec *rec=*(CkLocRec **)objp;
-        CkArrayIndex &idx=*(CkArrayIndex *)keyp;
+          CkLocRec *rec=*(CkLocRec **)objp;
+          CkArrayIndex &idx=*(CkArrayIndex *)keyp;
             if(rec->type() != CkLocRec::local){
                 if(homePe(idx) == CmiMyPe()){
+                  int pe;
+                  CkArrayIndex max = idx;
+                  pe = rec->lookupProcessor();
+                  idx_list.push_back(max);
+                  pe_list.push_back(pe);
                     count++;
                 }
             }
         }
+      //if(CkMyPe()==0)
+       // CmiPrintf("after first %lf %d\n",CmiWallTimer(),count);
         p | count;
-        DEBUG(CmiPrintf("[%d] Packing Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
+    //    CmiPrintf("[%d] Packing Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count);
 
 		// releasing iterator memory
 		delete it;
 
-        it = hash.iterator();
+    //  if(CkMyPe()==0)
+   //     CmiPrintf("before second %lf\n",CmiWallTimer());
+      for(int i=0;i<pe_list.length();i++){
+        CkArrayIndex max = idx_list[i];
+        max.pup(p);
+        p|pe_list[i];
+      }
+    /*    it = hash.iterator();
       while (NULL!=(objp=it->next(&keyp))) {
       CkLocRec *rec=*(CkLocRec **)objp;
         CkArrayIndex &idx=*(CkArrayIndex *)keyp;
@@ -2053,10 +2082,12 @@ void CkLocMgr::pup(PUP::er &p){
                 }
             }
         }
-        CmiAssert(count == count1);
+      if(CkMyPe()==0)
+        CmiPrintf("after second %lf\n",CmiWallTimer());
+      //  CmiAssert(count == count1);
 
 		// releasing iterator memory
-		delete it;
+		delete it;*/
 
 #endif
 
@@ -2228,12 +2259,8 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	return CmiTrue;
 }
 void CkLocMgr::updateLocation(const CkArrayIndex &idx,int nowOnPe) {
-	inform(idx,nowOnPe);
+  inform(idx,nowOnPe);
 	CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
-	if(CkInRestarting()){
-		//CkPrintf("[%d] reply to %d at %lf\n",CkMyPe(),nowOnPe,CmiWallTimer());
-		//checkptMgr[nowOnPe].gotReply();
-	}
 }
 
 /*************************** LocMgr: DELETION *****************************/

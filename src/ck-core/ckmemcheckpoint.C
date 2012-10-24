@@ -603,6 +603,8 @@ static inline void _handleProcData(PUP::er &p)
 
 void CkMemCheckPT::sendProcData()
 {
+  if(CkMyPe()==0)
+     CkPrintf("begin send proc checkpoint data at %lf\n",CmiWallTimer()); 
   // find out size of buffer
   int size;
   {
@@ -620,11 +622,15 @@ void CkMemCheckPT::sendProcData()
   msg->pe = CkMyPe();
   msg->len = size;
   msg->reportPe = cpStarter;  //in case other processor isn't in checkpoint mode
+  if(CkMyPe()==0)
+     CkPrintf("end packing proc checkpoint data at %lf\n",CmiWallTimer()); 
   thisProxy[ChkptOnPe(CkMyPe())].recvProcData(msg);
 }
 
 void CkMemCheckPT::recvProcData(CkProcCheckPTMessage *msg)
 {
+  if(CkMyPe()==1)
+     CkPrintf("recv proc checkpoint data from 0 at %lf\n",CmiWallTimer()); 
   if (CpvAccess(procChkptBuf)) delete CpvAccess(procChkptBuf);
   CpvAccess(procChkptBuf) = msg;
   DEBUGF("[%d] CkMemCheckPT::recvProcData report to %d\n", CkMyPe(), msg->reportPe);
@@ -683,15 +689,14 @@ void CkMemCheckPT::cpFinish()
     CmiPrintf("[%d] Checkpoint finished in %f seconds, sending callback ... \n", CkMyPe(), CmiWallTimer()-startTime);
     cpCallback.send();
     peCount = 0;
-#if !CMK_CHKP_ALL
     thisProxy.report();
-#endif
   }
 }
 
 // for debugging, report checkpoint info
 void CkMemCheckPT::report()
 {
+#if !CMK_CHKP_ALL
   int objsize = 0;
   int len = ckTable.length();
   for (int i=0; i<len; i++) {
@@ -700,7 +705,10 @@ void CkMemCheckPT::report()
     objsize += entry->getSize();
   }
   CmiAssert(CpvAccess(procChkptBuf));
-//  CkPrintf("[%d] Checkpoint object size: %d len: %d Processor data: %d \n", CkMyPe(), objsize, len, CpvAccess(procChkptBuf)->len);
+  //CkPrintf("[%d] Checkpoint object size: %d len: %d Processor data: %d \n", CkMyPe(), objsize, len, CpvAccess(procChkptBuf)->len);
+#else
+  CkPrintf("[%d] Checkpoint Processor data: %d \n", CkMyPe(), CpvAccess(procChkptBuf)->len);
+#endif
 }
 
 /*****************************************************************************
@@ -956,10 +964,14 @@ void CkMemCheckPT::gotData()
 
 void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe)
 {
+
+	  CkPrintf("[%d] receive from %d at %lf\n",CkMyPe(),nowOnPe,CmiWallTimer());
   for (int i=0; i<n; i++) {
     CkLocMgr *mgr = CProxy_CkLocMgr(g[i]).ckLocalBranch();
     mgr->updateLocation(idx[i], nowOnPe);
   }
+	thisProxy[nowOnPe].gotReply();
+		CkPrintf("[%d] reply to %d at %lf\n",CkMyPe(),nowOnPe,CmiWallTimer());
 }
 
 // restore array elements
@@ -1022,7 +1034,7 @@ void CkMemCheckPT::recoverArrayElements()
   for (int i=0; i<CkNumPes(); i++) {
     if (gmap[i].size() && i!=CkMyPe()&& i==thisFailedPe) {
       thisProxy[i].updateLocations(gmap[i].size(), gmap[i].getVec(), imap[i].getVec(), CkMyPe());
-    	//CkPrintf("[%d] send to %d at %lf\n",CkMyPe(),i,CmiWallTimer());
+    	CkPrintf("[%d] send to %d at %lf\n",CkMyPe(),i,CmiWallTimer());
 	flag++;	
 	  }
   }
@@ -1046,7 +1058,7 @@ if(flag == 0)
 }
 
 void CkMemCheckPT::gotReply(){
-    	//CkPrintf("[%d] got reply at %lf\n",CkMyPe(),CmiWallTimer());
+    CkPrintf("[%d] got reply at %lf\n",CkMyPe(),CmiWallTimer());
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, finishUp), thisProxy));
 }
 
@@ -1067,7 +1079,8 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 			mgr->resume(idx,p,CmiFalse);
 #else
 			if(homePe == thisFailedPe && homePe!=CkMyPe()){
-				mgr->resume(idx,p,CmiTrue);
+				mgr->resume(idx,p,CmiFalse);
+				//mgr->resume(idx,p,CmiTrue);
        // CkPrintf("[%d] send to crashed pe %d\n",CkMyPe(),thisFailedPe);
       }
       else
