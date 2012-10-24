@@ -292,7 +292,12 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
      /*CkPrintf("CkLoop Reduce: %d\n", result);*/ \
     }\
 }
-
+#define COMPUTE_REDUCTION_MAX(T) {\
+    for(int i=0; i<numChunks; i++) {\
+     if( *((T *)(redBufs[i])) > result ) result = *((T *)(redBufs[i])); \
+     /*CkPrintf("CkLoop Reduce: %d\n", result);*/ \
+    }\
+}
 void FuncCkLoop::reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int numChunks) {
     switch (type) {
     case CKLOOP_INT_SUM: {
@@ -310,6 +315,12 @@ void FuncCkLoop::reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int n
     case CKLOOP_DOUBLE_SUM: {
         double result=0;
         COMPUTE_REDUCTION(double)
+        *((double *)redBuf) = result;
+        break;
+    }
+    case CKLOOP_DOUBLE_MAX: {
+        double result=0;
+        COMPUTE_REDUCTION_MAX(double)
         *((double *)redBuf) = result;
         break;
     }

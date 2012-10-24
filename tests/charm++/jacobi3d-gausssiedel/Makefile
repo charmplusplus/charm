@@ -5,9 +5,11 @@ OBJS_J = jacobi3d_j.o
 
 OBJS_OMP = jacobi3d_omp.o
 
-OMP_FLAG = -DJACOBI_OPENMP -fopenmp
+OMP_FLAG = -DJACOBI=1 -DJACOBI_OPENMP -fopenmp
 
 all: jacobi3d jacobi3d.j jacobi3d.ckloop
+
+projections: jacobi3d.ckloop.prj jacobi3d.j.prj
 
 jacobi3d: $(OBJS)
 	$(CHARMC) -language charm++ -module DummyLB -o jacobi3d $(OBJS)
@@ -15,8 +17,14 @@ jacobi3d: $(OBJS)
 jacobi3d.j: $(OBJS_J)
 	$(CHARMC) -language charm++ -module DummyLB -o jacobi3d.j $(OBJS_J)
 
+jacobi3d.j.prj: $(OBJS_J)
+	$(CHARMC) -language charm++ -module DummyLB -tracemode projections -o jacobi3d.j.prj $(OBJS_J)
+
 jacobi3d.ckloop: jacobi3d_ckloop.o
 	$(CHARMC) -language charm++ -module DummyLB -module CkLoop -o jacobi3d.ckloop jacobi3d_ckloop.o
+
+jacobi3d.ckloop.prj: jacobi3d_ckloop.o
+	$(CHARMC) -language charm++ -tracemode projections  -module DummyLB -module CkLoop -o jacobi3d.ckloop.prj jacobi3d_ckloop.o
 
 jacobi3d_omp: $(OBJS_OMP)
 	$(CHARMC) -language charm++ -module DummyLB $(OMP_FLAG) -o jacobi3d_omp $(OBJS_OMP)
@@ -48,7 +56,7 @@ jacobi3d_j.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) -DJACOBI=1 -c jacobi3d.C -o jacobi3d_j.o
 
 jacobi3d_ckloop.o: jacobi3d.C jacobi3d.decl.h
-	$(CHARMC) -DCKLOOP=1 -c jacobi3d.C -o jacobi3d_ckloop.o
+	$(CHARMC) -DJACOBI=1 -DCKLOOP=1 -c jacobi3d.C -o jacobi3d_ckloop.o
 
 jacobi3d_omp.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) $(OMP_FLAG) -o $(OBJS_OMP) -c jacobi3d.C

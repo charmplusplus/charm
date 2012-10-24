@@ -12,6 +12,7 @@
 
 #define LB_FORMAT_VERSION     2
 
+class MetaBalancer;
 extern int _lb_version;
 
 // command line options
@@ -35,6 +36,7 @@ private:
   int _lb_central_pe;           // processor number for centralized startegy
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
   int _lb_teamSize;		// specifies the team size for TeamLB
+  int _lb_metaLbOn;
 public:
   CkLBArgs() {
 #if CMK_BIGSIM_CHARM
@@ -49,6 +51,7 @@ public:
     _lb_loop = 0;
     _lb_central_pe = 0;
     _lb_teamSize = 1;
+    _lb_metaLbOn = 0;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
@@ -68,6 +71,7 @@ public:
   inline double & alpha() { return _lb_alpha; }
   inline double & beeta() { return _lb_beeta; }
   inline int & percentMovesAllowed() { return _lb_percentMovesAllowed;}
+  inline int & metaLbOn() {return _lb_metaLbOn;}
 };
 
 extern CkLBArgs _lb_args;
@@ -193,6 +197,8 @@ public:
   inline void DoneRegisteringObjects(LDOMHandle _om) {
     LDDoneRegisteringObjects(_om);
   };
+
+  void ResetAdaptive();
 
   inline LDObjHandle RegisterObj(LDOMHandle h, LDObjid id,
 			  void *userptr,int migratable) {
@@ -321,7 +327,9 @@ public:
   inline void ClearLoads(void) { LDClearLoads(myLDHandle); };
   inline int Migrate(LDObjHandle h, int dest) { return LDMigrate(h,dest); };
 
-  inline void Migrated(LDObjHandle h, int waitBarrier=1) { LDMigrated(h, waitBarrier); };
+  inline void Migrated(LDObjHandle h, int waitBarrier=1) {
+    LDMigrated(h, waitBarrier);
+  };
 
   inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) {
     return LDAddLocalBarrierClient(myLDHandle,fn,data);
@@ -339,14 +347,27 @@ public:
     LDRemoveLocalBarrierReceiver(myLDHandle,h);
   };
 
-  inline void AtLocalBarrier(LDBarrierClient h) { LDAtLocalBarrier(myLDHandle,h); }
+  inline void AtLocalBarrier(LDBarrierClient h) {
+    LDAtLocalBarrier(myLDHandle,h);
+  }
   inline void LocalBarrierOn(void) { LDLocalBarrierOn(myLDHandle); };
   inline void LocalBarrierOff(void) { LDLocalBarrierOn(myLDHandle); };
-  inline void ResumeClients() { LDResumeClients(myLDHandle); }
-
+  void ResumeClients();
   inline int ProcessorSpeed() { return LDProcessorSpeed(); };
   inline void SetLBPeriod(double s) { LDSetLBPeriod(myLDHandle, s);}
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
+
+  inline void MetaLBResumeWaitingChares(int lb_period) {
+    LDOMMetaLBResumeWaitingChares(myLDHandle, lb_period);
+  }
+
+  inline void MetaLBCallLBOnChares() {
+    LDOMMetaLBCallLBOnChares(myLDHandle);
+  }
+
+  void SetMigrationCost(double cost);
+  void SetStrategyCost(double cost);
+	void UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad);
 
 private:
   int mystep;
@@ -355,6 +376,7 @@ private:
   int new_ld_balancer;		// for Node 0
   CkVec<BaseLB *>   loadbalancers;
   int nloadbalancers;
+  MetaBalancer* metabalancer;
 
 public:
   BaseLB** getLoadBalancers() {return loadbalancers.getVec();}

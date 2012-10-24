@@ -1249,7 +1249,7 @@ void CmiTimerInit(char **argv)
 
   /* try to synchronize calling barrier */
 #if !CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
- CmiBarrier();
+  CmiBarrier();
   CmiBarrier();
   CmiBarrier();
 #endif

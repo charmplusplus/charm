@@ -225,7 +225,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckobjQ.h readonly.h charisma.h \
           comlib.h ComlibArrayListener.h ComlibStrategy.h \
 	  ComlibLearner.h $(UTILHEADERS) \
-	  tempo.h waitqd.h LBDatabase.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
+	  tempo.h waitqd.h LBDatabase.h MetaBalancer.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
           LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
 	  Refiner.h RefinerApprox.h RefinerComm.h ckgraph.h ckheap.h \
           elements.h CommLBHeap.h topology.h manager.h \
@@ -237,7 +237,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           CkReduction.decl.h CkArrayReductionMgr.decl.h\
           tempo.decl.h waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkMemCheckpoint.decl.h \
-          LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h \
+          LBDatabase.decl.h MetaBalancer.decl.h CentralLB.decl.h NullLB.decl.h \
           BaseLB.decl.h \
 	  NborBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
@@ -712,7 +712,7 @@ CK_LIBS_CORE=$(L)/libck.a
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
-           tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
+           tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o ckobjid.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o \
@@ -773,8 +773,8 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
   CkReduction.decl.h CkArrayReductionMgr.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
-  cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
-  LBMachineUtil.h lbdb++.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
+  cklocation.h LBDatabase.h MetaBalancer.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h lbdb++.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h envelope-path.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \

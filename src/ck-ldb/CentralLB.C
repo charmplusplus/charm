@@ -1,3 +1,4 @@
+
 /**
  * \addtogroup CkLdb
 */
@@ -193,7 +194,6 @@ void CentralLB::ProcessAtSync()
     start_lb_time = CkWallTimer();
   }
 
-
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	initMlogLBStep(thisgroup);
 #endif
@@ -289,6 +289,7 @@ void CentralLB::BuildStatsMsg()
   statsMsg = msg;
 #endif
 }
+
 
 // called on every processor
 void CentralLB::SendStats()
@@ -553,6 +554,7 @@ void CentralLB::LoadBalance()
   for (proc = 0; proc < clients; proc++) statsMsgsList[proc] = NULL;
 #endif
 
+  theLbdb->ResetAdaptive();
   if (!_lb_args.samePeSpeed()) statsData->normalize_speed();
 
   if (_lb_args.debug()) 
@@ -1000,6 +1002,7 @@ void CentralLB::ResumeClients(int balancing)
 
   theLbdb->ResumeClients();
   if (balancing)  {
+
     CheckMigrationComplete();
     if (future_migrates_expected == 0 || 
             future_migrates_expected == future_migrates_completed) {
@@ -1022,15 +1025,20 @@ void CentralLB::CheckMigrationComplete()
 #if CMK_LBDB_ON
   lbdone ++;
   if (lbdone == 2) {
+    double end_lb_time = CkWallTimer();
     if (_lb_args.debug() && CkMyPe()==0) {
-      double end_lb_time = CkWallTimer();
       CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
                 lbname, cur_ld_balancer, step()-1, end_lb_time,
 		end_lb_time-start_lb_time);
     }
+
+    theLbdb->SetMigrationCost(end_lb_time - start_lb_time);
+
     lbdone = 0;
     future_migrates_expected = -1;
     future_migrates_completed = 0;
+
+
     DEBUGF(("[%d] Migration Complete\n", CkMyPe()));
     // release local barrier  so that the next load balancer can go
     LDOMHandle h;
@@ -1062,6 +1070,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 
   work(stats);
 
+
   if (_lb_args.debug()>2)  {
     CkPrintf("CharmLB> Obj Map:\n");
     for (int i=0; i<stats->n_objs; i++) CkPrintf("%d ", stats->to_proc[i]);
@@ -1069,6 +1078,17 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   }
 
   LBMigrateMsg *msg = createMigrateMsg(stats);
+
+	/* Extra feature for MetaBalancer
+  if (_lb_args.metaLbOn()) {
+    int clients = CkNumPes();
+    LBInfo info(clients);
+    getPredictedLoadWithMsg(stats, clients, msg, info, 0);
+    LBRealType mLoad, mCpuLoad, totalLoad, totalLoadWComm;
+    info.getSummary(mLoad, mCpuLoad, totalLoad);
+    theLbdb->UpdateDataAfterLB(mLoad, mCpuLoad, totalLoad/clients);
+  }
+	*/
 
   if (_lb_args.debug()) {
     double strat_end_time = CkWallTimer();
@@ -1080,8 +1100,8 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
     CkPrintf("CharmLB> %s: PE [%d] #Objects migrating: %d, LBMigrateMsg size: %.2f MB\n", lbname, cur_ld_balancer, msg->n_moves, env->getTotalsize()/1024.0/1024.0);
     CkPrintf("CharmLB> %s: PE [%d] strategy finished at %f duration %f s\n",
 	      lbname, cur_ld_balancer, strat_end_time, strat_end_time-strat_start_time);
+    theLbdb->SetStrategyCost(strat_end_time - strat_start_time);
   }
-
   return msg;
 #else
   return NULL;

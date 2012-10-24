@@ -28,6 +28,7 @@ public:
 /* Utility */
 //#if CMK_LBDB_ON
 #include "LBDatabase.h"
+#include "MetaBalancer.h"
 class LBDatabase;
 //#endif
 
@@ -173,6 +174,8 @@ public:
   CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,CmiBool ignoreArrival,
   	const CkArrayIndex &idx_,int localIdx_);
   void migrateMe(int toPe); //Leave this processor
+  void informIdealLBPeriod(int lb_ideal_period);
+  void metaLBCallLB();
   void destroy(void); //User called destructor
   virtual ~CkLocRec_local();
 
@@ -213,8 +216,13 @@ public:
 #if CMK_LBDB_ON
 public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
+  inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
   inline LDObjHandle getLdHandle() const{return ldHandle;}
   static void staticMigrate(LDObjHandle h, int dest);
+  static void staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period);
+  static void staticMetaLBCallLBOnChares(LDObjHandle h);
+  void metaLBResumeWaitingChares(int lb_ideal_period);
+  void metaLBCallLBOnChares();
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
   void AsyncMigrate(CmiBool use);
@@ -229,6 +237,7 @@ public:
   inline void setMeasure(CmiBool status) { enable_measure = status; }
 private:
   LBDatabase *the_lbdb;
+  MetaBalancer *the_metalb;
   LDObjHandle ldHandle;
   CmiBool  asyncMigrate;  /// if readyMove is inited
   CmiBool  readyMigrate;    /// status whether it is ready to migrate
@@ -271,6 +280,18 @@ private:
   int thisChareType;//My chare type
   void commonInit(void);
   CmiBool asyncEvacuate;
+  int atsync_iteration;
+
+  enum state {
+    OFF,
+    ON,
+    PAUSE,
+    DECIDED,
+    LOAD_BALANCE
+  } local_state;
+  double  prev_load;
+  bool can_reset;
+
 public:
   CkArrayIndex thisIndexMax;
 
@@ -289,6 +310,7 @@ public:
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
   inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
+  inline MetaBalancer *getMetaBalancer(void) const {return myRec->getMetaBalancer();}
 #else
   inline void ckStopTiming(void) { }
   inline void ckStartTiming(void) { }
@@ -304,6 +326,10 @@ public:
   /// Called by the system just before and after migration to another processor:  
   virtual void ckAboutToMigrate(void); /*default is empty*/
   virtual void ckJustMigrated(void); /*default is empty*/
+
+  void recvLBPeriod(void *data);
+  void metaLBCallLB();
+  void clearMetaLBData(void);
 
   //used for out-of-core emulation
   virtual void ckJustRestored(void); /*default is empty*/
@@ -519,6 +545,7 @@ typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
+	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkGroupID _metalb,CkArrayIndex& numInitial);
 	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndex& numInitial);
 	CkLocMgr(CkMigrateMessage *m);
 	inline CmiBool isLocMgr(void) { return CmiTrue; }
@@ -582,9 +609,12 @@ public:
 
 	//Migrate us to another processor
 	void emigrate(CkLocRec_local *rec,int toPe);
+  void informLBPeriod(CkLocRec_local *rec, int lb_ideal_period);
+  void metaLBCallLB(CkLocRec_local *rec);
 
 #if CMK_LBDB_ON
 	LBDatabase *getLBDB(void) const { return the_lbdb; }
+  MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
 	const LDOMHandle &getOMHandle(void) const { return myLBHandle; }
 #endif
 
@@ -674,6 +704,9 @@ private:
 	/// Call this member function on each element of this location:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
 
+	typedef void (CkMigratable::* CkMigratable_voidfn_arg_t)(void*);
+	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_arg_t fn, void*);
+
 	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts);
 
 	/// Create a new local record at this array index.
@@ -739,8 +772,10 @@ public:
 	CkArrayMap *map;
 
 	CkGroupID lbdbID;
+	CkGroupID metalbID;
 #if CMK_LBDB_ON
 	LBDatabase *the_lbdb;
+  MetaBalancer *the_metalb;
 	LDBarrierClient dummyBarrierHandle;
 	static void staticDummyResumeFromSync(void* data);
 	void dummyResumeFromSync(void);
@@ -748,7 +783,7 @@ public:
 	void recvAtSync(void);
 	LDOMHandle myLBHandle;
 #endif
-	void initLB(CkGroupID lbdbID);
+	void initLB(CkGroupID lbdbID, CkGroupID metalbID);
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 public:

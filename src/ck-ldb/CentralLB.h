@@ -84,7 +84,6 @@ public:
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
-
   void SendStats();
   void ReceiveCounts(CkReductionMsg *);
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
@@ -93,8 +92,8 @@ public:
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
   void ResumeClients(int);                      // Resuming clients needs
-	                                        // to be resumed via message
-  void ResumeClients(CkReductionMsg *);
+
+  void ResumeClients(CkReductionMsg *); // to be resumed via message
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ProcessReceiveMigration(CkReductionMsg  *);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -248,6 +247,7 @@ private:
   double start_lb_time;
   LBMigrateMsg   *storedMigrateMsg;
   int  reduction_started;
+
 
   FutureModel *predicted_model;
 

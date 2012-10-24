@@ -864,6 +864,7 @@ static void _nullFn(void *, void *)
 }
 
 extern void _registerLBDatabase(void);
+extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
 extern void _registerControlPoints(void);
@@ -872,6 +873,7 @@ extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
+extern void _metabalancerInit();
 extern void _initChareTables();
 #if CMK_MEM_CHECKPOINT
 extern void init_memcheckpt(char **argv);
@@ -1052,6 +1054,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
+  _metabalancerInit();
 	
 #if CMK_MEM_CHECKPOINT
         init_memcheckpt(argv);
@@ -1107,6 +1110,7 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkFutures();
 		_registerCkArray();
 		_registerLBDatabase();
+    _registerMetaBalancer();
 		_registerCkCallback();
 		_registertempo();
 		_registerwaitqd();

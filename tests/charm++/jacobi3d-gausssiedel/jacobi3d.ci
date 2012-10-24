@@ -1,15 +1,16 @@
 mainmodule jacobi3d {
 
   readonly CProxy_Main mainProxy;
-#if CKLOOP
   readonly CProxy_FuncCkLoop ckLoopProxy;
-#endif
   readonly int arrayDimX;
   readonly int arrayDimY;
   readonly int arrayDimZ;
   readonly int blockDimX;
   readonly int blockDimY;
   readonly int blockDimZ;
+  readonly int GAUSS_ITER;
+  readonly int threadNums;
+  readonly double THRESHOLD;
 
   readonly int num_chare_x;
   readonly int num_chare_y;
@@ -54,8 +55,16 @@ mainmodule jacobi3d {
     entry JacobiMap(int x, int y, int z);
   };
 
+  group JacobiNodeMap : CkArrayMap {
+    entry JacobiNodeMap();
+  };
   nodegroup OmpInitializer {
     entry OmpInitializer(int numThreads); 
   };
 
+  group TraceControl {
+      entry TraceControl();
+      entry void startTrace();
+      entry void endTrace();
+  };
 };

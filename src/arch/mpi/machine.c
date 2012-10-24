@@ -442,7 +442,7 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
         END_TRACE_SENDCOMM(msg);
     }
 #elif USE_MPI_CTRLMSG_SCHEME
-	sendViaCtrlMsg(node, size, msg, smsg);
+    sendViaCtrlMsg(node, size, msg, smsg);
 #else
 /* branch not using MPI_POST_RECV or USE_MPI_CTRLMSG_SCHEME */
 
@@ -461,8 +461,9 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     CpvAccess(MsgQueueLen)++;
     if (CpvAccess(sent_msgs)==0)
         CpvAccess(sent_msgs) = smsg;
-    else
+    else {
         CpvAccess(end_sent)->next = smsg;
+    }
     CpvAccess(end_sent) = smsg;
 
 #if !CMI_DYNAMIC_EXERT_CAP && !CMI_EXERT_SEND_CAP
@@ -624,6 +625,7 @@ static int PumpMsgs(void) {
 #if USE_MPI_CTRLMSG_SCHEME
 	doSyncRecv = 0;
 	nbytes = recvViaCtrlMsg();
+  recd = 1;
 	if(nbytes == -1) break;
 #elif MPI_POST_RECV
 		/* First check posted recvs then do  probe unmatched outstanding messages */
@@ -841,7 +843,6 @@ static int PumpMsgs(void) {
     MPI_Status sts;
     while(waitIrecvListHead->next) {
         IRecvList irecvEnt = waitIrecvListHead->next;
-
         START_EVENT();
                 
         /*printf("PE[%d]: check irecv entry=%p\n", CmiMyPe(), irecvEnt);*/
@@ -855,7 +856,7 @@ static int PumpMsgs(void) {
         handleOneRecvedMsg(irecvEnt->size, irecvEnt->msg);
         waitIrecvListHead->next = irecvEnt->next;
         irecvListEntryFree(irecvEnt);
-        recd = 1;        
+        //recd = 1;        
     }
     if(waitIrecvListHead->next == NULL)
         waitIrecvListTail = waitIrecvListHead;
@@ -1873,7 +1874,6 @@ int CmiBarrierZero() {
         if (CmiMyNode() == 0)  {
             for (i=0; i<CmiNumNodes()-1; i++) {
                 START_EVENT();
-
                 if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,BARRIER_ZERO_TAG, charmComm,&sts))
                     CmiPrintf("MPI_Recv failed!\n");
 
@@ -1926,6 +1926,7 @@ int find_spare_mpirank(int pe)
 
 void CkDieNow()
 {
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CmiPrintf("[%d] die now.\n", CmiMyPe());
 
       /* release old messages */
@@ -1936,6 +1937,7 @@ void CkDieNow()
     MPI_Barrier(charmComm);
     MPI_Finalize();
     exit(0);
+#endif
 }
 
 #endif

@@ -22,6 +22,8 @@ extern int numForwards;
 extern int numAtomics;
 extern int numForalls;
 extern int numConnects;
+extern int numCases;
+extern int numCaseLists;
 
 extern FILE *fh;
 

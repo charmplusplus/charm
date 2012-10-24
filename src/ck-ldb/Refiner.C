@@ -83,6 +83,11 @@ void  Refiner::deAssign(computeInfo *c, processorInfo *p)
    p->load = p->computeLoad + p->backgroundLoad;
 }
 
+double Refiner::computeAverageLoad() {
+  computeAverage();
+  return averageLoad;
+}
+
 void Refiner::computeAverage()
 {
   int i;

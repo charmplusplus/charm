@@ -50,6 +50,7 @@ HybridLB::~HybridLB()
 void HybridLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
+	theLbdb->ResetAdaptive();
   LevelData *lData = levelData[currentLevel];
 
   // TODO: let's generate LBMigrateMsg ourself

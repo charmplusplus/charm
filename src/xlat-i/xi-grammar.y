@@ -54,6 +54,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
   int intval;
   Chare::attrib_t cattr;
   SdagConstruct *sc;
+  WhenConstruct *when;
   XStr* xstrptr;
   AccelBlock* accelBlock;
 }
@@ -103,6 +104,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %token ACCELBLOCK
 %token MEMCRITICAL
 %token REDUCTIONTARGET
+%token CASE
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
@@ -146,7 +148,8 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %type <mv>		Var
 %type <mvlist>		VarList
 %type <intval>		ParamBraceStart ParamBraceEnd SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
-%type <sc>		Slist SingleConstruct Olist OptSdagCode HasElse ForwardList PublishesList OptPubList
+%type <sc>		Slist SingleConstruct Olist OptSdagCode HasElse ForwardList PublishesList OptPubList CaseList
+%type <when>            WhenConstruct NonWhenConstruct
 %type <intval>		PythonOptions
 
 %%
@@ -358,9 +361,9 @@ BaseType	: SimpleType
 		{ $$ = $1; }
 		//{ $$ = $1; }
 		| CONST BaseType 
-		{ $$ = $2; }
+		{ $$ = new ConstType($2); }
 		| BaseType CONST
-		{ $$ = $1; }
+		{ $$ = new ConstType($1); }
 		;
 
 Type		: BaseType '&'
@@ -1009,6 +1012,14 @@ Olist		: SingleConstruct
 		{ $$ = new SdagConstruct(SOLIST, $1, $2); } 
 		;
 
+CaseList        : WhenConstruct
+                { $$ = new SdagConstruct(SCASELIST, $1); }
+		| WhenConstruct CaseList
+		{ $$ = new SdagConstruct(SCASELIST, $1, $2); }
+                | NonWhenConstruct
+                { yyerror("Case blocks in SDAG can only contain when clauses."); YYABORT; }
+		;
+
 OptPubList	: /* Empty */
 		{ $$ = 0; }
 		| PUBLISHES '(' PublishesList ')'
@@ -1026,6 +1037,32 @@ OptTraceName	: LITERAL
 		|
 		 { $$ = 0; }
 		;
+
+WhenConstruct   : WHEN SEntryList '{' '}'
+		{ $$ = new WhenConstruct($2, 0); }
+		| WHEN SEntryList SingleConstruct
+		{ $$ = new WhenConstruct($2, $3); }
+		| WHEN SEntryList '{' Slist '}'
+		{ $$ = new WhenConstruct($2, $4); }
+                ;
+
+NonWhenConstruct : ATOMIC
+                 { $$ = 0; }
+                 | CONNECT
+                 { $$ = 0; }
+                 | OVERLAP
+                 { $$ = 0; }
+                 | FOR
+                 { $$ = 0; }
+                 | FORALL
+                 { $$ = 0; }
+                 | IF
+                 { $$ = 0; }
+                 | WHILE
+                 { $$ = 0; }
+                 | FORWARD
+                 { $$ = 0; }
+                 ;
 
 SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPubList 
                  {
@@ -1045,14 +1082,12 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
                    }
                    $$ = new SdagConstruct(SCONNECT, $3, $7, $4);
 		}
-		| WHEN SEntryList '{' '}'
-		{ $$ = new WhenConstruct($2, 0); }
-		| WHEN SEntryList SingleConstruct
-		{ $$ = new WhenConstruct($2, $3); }
-		| WHEN SEntryList '{' Slist '}'
-		{ $$ = new WhenConstruct($2, $4); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new SdagConstruct(SOVERLAP,0, 0,0,0,0,$3, 0); }	
+                | WhenConstruct
+                { $$ = $1; }
+		| CASE '{' CaseList '}'
+		{ $$ = new SdagConstruct(SCASE, 0, 0, 0, 0, 0, $3, 0); }
 		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr '{' Slist '}'
 		{ $$ = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5),
 		             new SdagConstruct(SINT_EXPR, $7), 0, $10, 0); }

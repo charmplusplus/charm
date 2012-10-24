@@ -51,6 +51,16 @@ void RefineLB::work(LDStats* stats)
       }
   }
 
+  if (_lb_args.metaLbOn()) {
+    stats->is_prev_lb_refine = 1;
+    stats->after_lb_avg = refiner.computeAverageLoad();
+    stats->after_lb_max = refiner.computeMax();
+
+    if (_lb_args.debug() > 0)
+      CkPrintf("RefineLB> Max load %lf Avg load %lf\n", stats->after_lb_max,
+          stats->after_lb_avg);
+  }
+
   // Free the refine buffers
   Refiner::FreeProcs(from_procs);
   Refiner::FreeProcs(to_procs);

@@ -1163,6 +1163,7 @@ void CkStartMemCheckpoint(CkCallback &cb)
   checkptMgr.doItNow(CkMyPe(), cb);
 #else
   // when mem checkpoint is disabled, invike cb immediately
+  CkPrintf("Warning: In-Memory checkpoint has been disabled! Please use -syncft when build Charm++\n");
   cb.send();
 #endif
 }
@@ -1662,10 +1663,12 @@ void readKillFile(){
 #if ! CMK_CONVERSE_MPI
 void CkDieNow()
 {
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
          // ignored for non-mpi version
         CmiPrintf("[%d] die now.\n", CmiMyPe());
         killTime = CmiWallTimer()+0.001;
         CcdCallFnAfter(killLocal,NULL,1);
+#endif
 }
 #endif
 
