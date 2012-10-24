@@ -1260,8 +1260,7 @@ double CmiWallTimer()
 {
   unsigned long long currenttime;
   currenttime = GetTimeBase();
-  //return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
-  return CpvAccess(clocktick)*(currenttime);
+  return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
 }
 
 double CmiCpuTimer()

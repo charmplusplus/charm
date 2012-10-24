@@ -513,7 +513,7 @@ class MemElementPacker : public CkLocIterator{
 };
 
 void CkMemCheckPT::pupAllElements(PUP::er &p){
-#if CMK_CHKP_ALL
+#if CMK_CHKP_ALL && CMK_MEM_CHECKPOINT
 	int numElements;
 	if(!p.isUnpacking()){
 		numElements = CkCountArrayElements();
@@ -1268,7 +1268,6 @@ static void restartBcastHandler(char *msg)
 }
 
 extern void _initDone();
-#include "hwi/include/bqc/A2_inlines.h"
 
 // called on crashed processor
 static void recoverProcDataHandler(char *msg)
