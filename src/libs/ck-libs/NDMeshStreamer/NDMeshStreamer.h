@@ -69,7 +69,7 @@ public:
   virtual void process(const dtype& data) {
     CkAbort("Error. MeshStreamerArrayClient::process() is being called. "
             "This virtual function should have been defined by the user.\n");
-  };     
+  }     
   void setDetector(CompletionDetector *detectorLocalObj) {
     detectorLocalObj_ = detectorLocalObj;
   }
@@ -94,7 +94,11 @@ template <class dtype>
 class MeshStreamerGroupClient : public CBase_MeshStreamerGroupClient<dtype>{
 
 public:
-  virtual void process(const dtype& data) = 0;
+  virtual void process(const dtype& data) {
+    CkAbort("Error. MeshStreamerGroupClient::process() is being called. "
+            "This virtual function should have been defined by the user.\n");
+  }     
+
   virtual void receiveArray(dtype *data, int numItems, int sourcePe) {
     for (int i = 0; i < numItems; i++) {
       process(data[i]);
