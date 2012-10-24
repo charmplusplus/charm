@@ -17,9 +17,7 @@ struct Main : CBase_Main {
     CProxy_Chare1 c1 = CProxy_Chare1::ckNew();
 
     for (int i = 0; i < numToSend; i += 3) {
-      CkEntryOptions opts;
-      opts.setPriority(-1);
-      c1.prioMarshalling(10, &opts);
+      c1.prioMarshalling(10, & CkEntryOptions().setPriority(-1) );
 
       TestMsg* msg = new (8*sizeof(int)) TestMsg;
       *(int*)CkPriorityPtr(msg) = -2;
