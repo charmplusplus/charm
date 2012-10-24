@@ -1105,7 +1105,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		| IF StartIntExpr CCode EndIntExpr '{' Slist '}' HasElse
 		{ $$ = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, $3), $8,0,0,$6,0); }
 		| WHILE StartIntExpr CCode EndIntExpr SingleConstruct 
-		{ $$ = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$5,0); }
+		{ $$ = new SdagConstruct(SWHILE, 0, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$5,0); }
 		| WHILE StartIntExpr CCode EndIntExpr '{' Slist '}' 
 		{ $$ = new SdagConstruct(SWHILE, 0, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$6,0); }
 		| FORWARD ForwardList ';'
