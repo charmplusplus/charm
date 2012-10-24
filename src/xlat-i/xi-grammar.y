@@ -361,9 +361,9 @@ BaseType	: SimpleType
 		{ $$ = $1; }
 		//{ $$ = $1; }
 		| CONST BaseType 
-		{ $$ = $2; }
+		{ $$ = new ConstType($2); }
 		| BaseType CONST
-		{ $$ = $1; }
+		{ $$ = new ConstType($1); }
 		;
 
 Type		: BaseType '&'

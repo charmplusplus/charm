@@ -4858,11 +4858,16 @@ into the message data-- so there's no copy on the receive side.
 The message is freed after the user entry returns.
 */
 Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
-	const char *NarrLen,Value *Nvalue)
-    	:type(Ntype), name(Nname), arrLen(NarrLen), val(Nvalue),line(Nline)
+                     const char *NarrLen,Value *Nvalue)
+  : type(Ntype)
+  , name(Nname)
+  , arrLen(NarrLen)
+  , val(Nvalue)
+  , line(Nline)
+  , byConst(false)
+  , conditional(0)
+  , given_name(Nname)
 {
-        conditional=0;
-        given_name = Nname;
 	if (isMessage()) {
 		name="impl_msg";
         }
@@ -4885,6 +4890,10 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 			   it back ourselves in Parameter::print. */
 			type=type->deref();
 		}
+                if (type->isConst()) {
+                  byConst = true;
+                  type = type->deref();
+                }
 	}
 }
 
@@ -4910,12 +4919,14 @@ void Parameter::print(XStr &str,int withDefaultValues,int useConst)
 	    }
 	    else if (byReference)
 		{ //Pass named types by const C++ reference
-			if (useConst) str<<"const ";
+                        if (useConst || byConst) str<<"const ";
 			str<<type<<" &";
 		        if (name!=NULL) str<<name;
 		}
 		else
 		{ //Pass everything else by value
+                  // @TODO uncommenting this requires that PUP work on const types
+                  //if (byConst) str << "const ";
 			str<<type;
 			if (name!=NULL) str<<" "<<name;
 			if (withDefaultValues && val!=NULL)

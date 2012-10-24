@@ -22,12 +22,15 @@
 #if USE_MPI_CTRLMSG_SCHEME
 
 #define CTRL_MSG_TAG         (TAG-13)
+#define USE_NUM_TAGS            1000
 
-static int MPI_CTRL_MSG_CNT=10;
+static int MPI_CTRL_MSG_CNT=100;
+static int tags;
 
 typedef struct MPICtrlMsgEntry{
 	int src;
 	int size;
+        int tag;
 }MPICtrlMsgEntry;
 
 typedef struct RecvCtrlMsgEntry{
@@ -43,6 +46,8 @@ static void createCtrlMsgIrecvBufs(){
 	MPICtrlMsgEntry *bufPtr = NULL;
 	MPI_Request *reqPtr = NULL;
 	int count = MPI_CTRL_MSG_CNT;
+
+        tags = 0;
 	
 	recvCtrlMsgList.bufCnt = count;
 	recvCtrlMsgList.ctrlReqs = (MPI_Request *)malloc(sizeof(MPI_Request)*count);
@@ -53,7 +58,7 @@ static void createCtrlMsgIrecvBufs(){
 	
 	for(i=0; i<count; i++, bufPtr++, reqPtr++){
 		if(MPI_SUCCESS != MPI_Irecv(bufPtr, sizeof(MPICtrlMsgEntry), 
-													 MPI_BYTE, MPI_ANY_SOURCE, CTRL_MSG_TAG, charmComm, reqPtr)){
+                              MPI_BYTE, MPI_ANY_SOURCE, CTRL_MSG_TAG, charmComm, reqPtr)){
 			CmiAbort("MPI_Irecv failed in creating pre-posted ctrl msg buffers\n");
 		}
 	}
@@ -64,14 +69,15 @@ static void sendViaCtrlMsg(int node, int size, char *msg, SMSG_LIST *smsg){
 
 	one.src = CmiMyNode();
 	one.size = size;
+        one.tag = TAG + 100 + tags;
+
+        tags = (tags+1)%USE_NUM_TAGS;
 	
 	START_TRACE_SENDCOMM(msg);
-	if(MPI_SUCCESS != MPI_Send((void *)&one, sizeof(MPICtrlMsgEntry), MPI_BYTE, node, 
-												   CTRL_MSG_TAG, charmComm)){
+	if(MPI_SUCCESS != MPI_Send((void *)&one, sizeof(MPICtrlMsgEntry), MPI_BYTE, node, CTRL_MSG_TAG, charmComm)){
 		CmiAbort("MPI_Send failed in sending ctrl msg\n");
 	}
-	
-	if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,charmComm,&(smsg->req)))
+	if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,one.tag,charmComm,&(smsg->req)))
             CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
 	END_TRACE_SENDCOMM(msg);
 }
@@ -86,7 +92,6 @@ static int recvViaCtrlMsg(){
 	int flg = 0;
 	int nbytes = -1;
 	MPI_Status sts;
-	
 	if(MPI_SUCCESS != MPI_Testany(count, ctrlReqs, &completed_index, &flg, &sts)){
 		CmiAbort("MPI_Testany failed for checking if ctrl msg is received\n");
 	}
@@ -106,7 +111,7 @@ static int recvViaCtrlMsg(){
 		}
 		
 		/* irecv the actual msg */
-		if(MPI_SUCCESS != MPI_Irecv(actualMsg, msgsize, MPI_BYTE, src, TAG, charmComm, &(one->req))){
+		if(MPI_SUCCESS != MPI_Irecv(actualMsg, msgsize, MPI_BYTE, src, ctrlMsgs[completed_index].tag, charmComm, &(one->req))){
 			CmiAbort("MPI_Irecv failed after a ctrl msg is received\n");
 		}
 		one->msg = actualMsg;
