@@ -1424,7 +1424,7 @@ void generateSignature(XStr& decls, XStr& defs,
         //op << "const ";
         if (sv->type != 0) 
           op <<sv->type <<" ";
-        if (sv->byRef != 0)
+        if (sv->declaredRef)
           op <<" &";
         if (sv->arrayLength != NULL) 
           op <<"* ";
