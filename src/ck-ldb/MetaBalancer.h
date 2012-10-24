@@ -1,4 +1,7 @@
 /**
+* Author: Harshitha Menon
+* Date: 2012
+*
 * Meta-Balancer is for automating the load balancing decisions based on the
 * application characteristics. The decision of when to call the load balancer is
 * handled by the MetaBalancer if +MetaLB flag is set when launching the

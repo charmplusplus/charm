@@ -1,5 +1,6 @@
 /**
- * 
+ * Author: Harshitha Menon
+ * Date created: 2012
 */
 /*@{*/
 
@@ -193,6 +194,7 @@ int MetaBalancer::get_finished_iteration() {
 }
 
 bool MetaBalancer::AddLoad(int it_n, double load) {
+#if CMK_LBDB_ON
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
   adaptive_struct.total_syncs_called++;
@@ -261,6 +263,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
     CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
     contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
   }
+#endif
   return true;
 }
 
@@ -720,6 +723,7 @@ void MetaBalancer::checkForNoObj(void *ad) {
 
 // Called by LBDatabase to indicate that no objs are there in this processor
 void MetaBalancer::HandleAdaptiveNoObj() {
+#if CMK_LBDB_ON
   if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
     adaptive_struct.finished_iteration_no++;
     adaptive_struct.lb_iteration_no++;
@@ -728,6 +732,7 @@ void MetaBalancer::HandleAdaptiveNoObj() {
     thisProxy[0].RegisterNoObjCallback(CkMyPe());
     TriggerAdaptiveReduction();
   }
+#endif
 }
 
 void MetaBalancer::RegisterNoObjCallback(int index) {
@@ -752,6 +757,7 @@ void MetaBalancer::RegisterNoObjCallback(int index) {
 }
 
 void MetaBalancer::TriggerAdaptiveReduction() {
+#if CMK_LBDB_ON
   if (lbdatabase->getLBDB()->ObjDataCount() == 0) {
     adaptive_struct.finished_iteration_no++;
     adaptive_struct.lb_iteration_no++;
@@ -772,6 +778,7 @@ void MetaBalancer::TriggerAdaptiveReduction() {
         thisProxy[0]);
     contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
   }
+#endif
 }
 
 

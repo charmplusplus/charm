@@ -1055,9 +1055,12 @@ void CkMigratable::commonInit(void) {
   local_state = OFF;
   prev_load = 0.0;
   can_reset = false;
+
+#if CMK_LBDB_ON
   if (_lb_args.metaLbOn()) {
     atsync_iteration = myRec->getMetaBalancer()->get_iteration();
   }
+#endif
 
 	/*
 	FAULT_EVAC
