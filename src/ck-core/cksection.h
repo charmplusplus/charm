@@ -111,6 +111,7 @@ class CkSectionInfo {
     inline char  &get_type() { return info.type; }
     inline int   &get_pe()    { return info.pe; }
     inline int   &get_redNo() { CmiAssert(info.type==MulticastMsg); return info.sInfo.sCookie.redNo; }
+    inline void  set_redNo(int redNo) { CmiAssert(info.type==MulticastMsg); info.sInfo.sCookie.redNo = redNo; }
     inline void* &get_val()   { CmiAssert(info.type==MulticastMsg); return info.sInfo.sCookie.val; }
     inline CkGroupID   &get_aid()    { return info.aid; }
     inline CkGroupID   get_aid() const   { return info.aid; }
