@@ -65,7 +65,7 @@ ARMCI: charm++ LIBS
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: completion multicast pythonCCS mpi-main
+default_libs: completion NDMeshStreamer multicast pythonCCS mpi-main
 
 ChaNGa: charm++ cache liveViz
 
@@ -83,6 +83,9 @@ pythonCCS: charmxi
 
 completion: charmxi
 	cd libs/ck-libs/completion && $(MAKE)
+
+NDMeshStreamer: charm++ completion
+	cd libs/ck-libs/NDMeshStreamer && $(MAKE)
 
 mpi-main: mpi-mainmodule.o
 	cp mpi-mainmodule.o ../lib
