@@ -602,6 +602,8 @@ public:
 		if (managers.find(arrayID)->mgr==NULL)
 			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
 #endif
+		if (managers.find(arrayID)->mgr==NULL)
+			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
 		return managers.find(arrayID)->elts.get(localIdx);
 	}
 
@@ -668,6 +670,7 @@ public:
 	void migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list);
 
 	void flushAllRecs(void);
+	void flushLocalRecs(void);
 	void pup(PUP::er &p);
 	
 	//Look up array element in hash table.  Index out-of-bounds if not found.
@@ -690,6 +693,7 @@ private:
 
 	friend class CkLocation; //so it can call pupElementsFor
 	friend class ArrayElement;
+	friend class MemElementPacker;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
         CkElementCreation_t type, CmiBool create=CmiTrue, int dummy=0);

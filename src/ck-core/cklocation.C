@@ -13,7 +13,7 @@
 #include "ck.h"
 #include "trace.h"
 #include "TopoManager.h"
-
+#include <vector>
 #include<sstream>
 
 #if CMK_LBDB_ON
@@ -1994,13 +1994,30 @@ void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
 	DEBK((AA"Starting spring cleaning at %.2f\n"AB,CkWallTimer()));
 	((CkLocMgr *)forWhom)->springCleaning();
 }
+//doesn't delete if there is extra pe
+void CkLocMgr::flushLocalRecs(void)
+{
+  void *objp;
+  void *keyp;
+  CkHashtableIterator *it=hash.iterator();
+  CmiImmediateLock(hashImmLock);
+  while (NULL!=(objp=it->next(&keyp))) {
+    CkLocRec *rec=*(CkLocRec **)objp;
+    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
+    if (rec->type() == CkLocRec::local) {
+        callMethod((CkLocRec_local*)rec, &CkMigratable::ckDestroy);
+        it->seek(-1);//retry this hash slot
+    }
+  }
+  delete it;
+  CmiImmediateUnlock(hashImmLock);
+}
 
 // clean all buffer'ed messages and also free local objects
 void CkLocMgr::flushAllRecs(void)
 {
   void *objp;
   void *keyp;
-    
   CkHashtableIterator *it=hash.iterator();
   CmiImmediateLock(hashImmLock);
   while (NULL!=(objp=it->next(&keyp))) {
@@ -2010,8 +2027,9 @@ void CkLocMgr::flushAllRecs(void)
       //In the case of taking core out of memory (in BigSim's emulation)
       //the meta data in the location manager are not deleted so we need
       //this condition
+      
       if(_BgOutOfCoreFlag!=1){
-        hash.remove(*(CkArrayIndex *)&idx);
+	hash.remove(*(CkArrayIndex *)&idx);
         delete rec;
         it->seek(-1);//retry this hash slot
       }
@@ -2024,6 +2042,7 @@ void CkLocMgr::flushAllRecs(void)
   delete it;
   CmiImmediateUnlock(hashImmLock);
 }
+
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
@@ -2118,19 +2137,19 @@ void CkLocMgr::pup(PUP::er &p){
 		map->registerArray(emptyIndex,thisgroup);
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID, metalbID);
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) ||CMK_MEM_CHECKPOINT    
         int count;
         p | count;
         DEBUG(CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))    
         homeElementCount = count;
-
+#endif
         for(int i=0;i<count;i++){
             CkArrayIndex idx;
             int pe;
             idx.pup(p);
             p | pe;
-            DEBUG(CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe));
+  //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
             inform(idx,pe);
             CkLocRec *rec = elementNrec(idx);
             CmiAssert(rec!=NULL);
@@ -2148,27 +2167,38 @@ void CkLocMgr::pup(PUP::er &p){
  * indexes of local elements dont need to be packed
  * since they will be recreated later anyway
  */
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))  || CMK_MEM_CHECKPOINT   
         int count=0,count1=0;
         void *objp;
         void *keyp;
+        CkVec<int> pe_list;
+        CkVec<CkArrayIndex> idx_list;
         CkHashtableIterator *it = hash.iterator();
       while (NULL!=(objp=it->next(&keyp))) {
-      CkLocRec *rec=*(CkLocRec **)objp;
-        CkArrayIndex &idx=*(CkArrayIndex *)keyp;
+          CkLocRec *rec=*(CkLocRec **)objp;
+          CkArrayIndex &idx=*(CkArrayIndex *)keyp;
             if(rec->type() != CkLocRec::local){
                 if(homePe(idx) == CmiMyPe()){
+                  int pe;
+                  CkArrayIndex max = idx;
+                  pe = rec->lookupProcessor();
+                  idx_list.push_back(max);
+                  pe_list.push_back(pe);
                     count++;
                 }
             }
         }
         p | count;
-        DEBUG(CmiPrintf("[%d] Packing Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
 
 		// releasing iterator memory
 		delete it;
 
-        it = hash.iterator();
+      for(int i=0;i<pe_list.length();i++){
+        CkArrayIndex max = idx_list[i];
+        max.pup(p);
+        p|pe_list[i];
+      }
+    /*    it = hash.iterator();
       while (NULL!=(objp=it->next(&keyp))) {
       CkLocRec *rec=*(CkLocRec **)objp;
         CkArrayIndex &idx=*(CkArrayIndex *)keyp;
@@ -2183,10 +2213,10 @@ void CkLocMgr::pup(PUP::er &p){
                 }
             }
         }
-        CmiAssert(count == count1);
+      //  CmiAssert(count == count1);
 
 		// releasing iterator memory
-		delete it;
+		delete it;*/
 
 #endif
 
@@ -2358,7 +2388,8 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	return CmiTrue;
 }
 void CkLocMgr::updateLocation(const CkArrayIndex &idx,int nowOnPe) {
-	inform(idx,nowOnPe);
+  inform(idx,nowOnPe);
+	CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
 }
 
 /*************************** LocMgr: DELETION *****************************/
@@ -2778,6 +2809,24 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 #endif
                 }
 	}
+#if CMK_MEM_CHECKPOINT
+	if(CkInRestarting()){
+	  ArrayElement *elt;
+	  CkVec<CkMigratable *> list;
+	  migratableList(rec, list);
+	  CmiAssert(list.length() > 0);
+	  for (int l=0; l<list.length(); l++) {
+		//    reset, may not needed now
+		// for now.
+		for (int i=0; i<CK_ARRAYLISTENER_MAXLEN; i++) {
+			ArrayElement * elt = (ArrayElement *)list[l];
+		  contributorInfo *c=(contributorInfo *)&elt->listenerData[i];
+		  if (c) c->redNo = 0;
+		}
+	  }
+		
+	}
+#endif
 }
 #endif
 

@@ -21,6 +21,14 @@ public:
 	int cp_flag;          // 1: from checkpoint 0: from recover
 };
 
+class CkCheckPTMessage: public CMessage_CkArrayCheckPTMessage {
+public:
+	double *packData;
+	int bud1, bud2;
+	int len;
+	int cp_flag;          // 1: from checkpoint 0: from recover
+};
+
 class CkProcCheckPTMessage: public CMessage_CkProcCheckPTMessage {
 public:
 	int pe;
@@ -77,18 +85,25 @@ public:
   void quiescence(CkCallback &);
   void resetReductionMgr();
   void finishUp();
+  void gotReply();
   void inmem_restore(CkArrayCheckPTMessage *m);
   void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe);
   void resetLB(int diepe);
   int  isFailed(int pe);
+  void pupAllElements(PUP::er &p);
+  void startArrayCheckpoint();
+  void recvArrayCheckpoint(CkArrayCheckPTMessage *m);
+  void recoverAll(CkArrayCheckPTMessage * msg, CkVec<CkGroupID> * gmap=NULL, CkVec<CkArrayIndex> * imap=NULL);
 public:
   static CkCallback  cpCallback;
 
   static int inRestarting;
+  static int inLoadbalancing;
   static double startTime;
   static char*  stage;
 private:
   CkVec<CkCheckPTInfo *> ckTable;
+  CkArrayCheckPTMessage * chkpTable[2];
 
   int recvCount, peCount;
   int expectCount, ackCount;
@@ -117,6 +132,10 @@ void CkStartMemCheckpoint(CkCallback &cb);
 
 // true if inside a restarting phase
 extern "C" int CkInRestarting(); 
+extern "C" int CkInLdb(); 
+extern "C" void CkSetInLdb(); 
+extern "C" void CkResetInLdb();
+
 extern "C" int CkHasCheckpoints();
 
 extern "C" void CkDieNow();

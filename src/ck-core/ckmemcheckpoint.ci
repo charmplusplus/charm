@@ -18,6 +18,7 @@ module CkMemCheckpoint {
  	// checkpointing
         entry [expedited] void doItNow(int spe, CkCallback &);  //checkpointing
  	entry void recvData(CkArrayCheckPTMessage *);
+ 	entry void recvArrayCheckpoint(CkArrayCheckPTMessage *);
  	entry void gotData();
 	entry void recvProcData(CkProcCheckPTMessage *);
 	entry void syncFiles(CkReductionMsg *);
@@ -30,7 +31,8 @@ module CkMemCheckpoint {
  	entry [reductiontarget] void recoverBuddies();
 	entry void recoverEntry(CkArrayCheckPTMessage *msg);
  	entry [reductiontarget] void recoverArrayElements();
-	entry void finishUp();
+	entry [reductiontarget] void finishUp();
+	entry void gotReply();
 	entry void quiescence(CkCallback&);
         entry void inmem_restore(CkArrayCheckPTMessage *m);
 	entry void updateLocations(int n, CkGroupID g[n], CkArrayIndex idx[n],int nowOnPe);

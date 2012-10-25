@@ -164,7 +164,9 @@ void CentralLB::AtSync()
 {
 #if CMK_LBDB_ON
   DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
-
+#if CMK_MEM_CHECKPOINT	
+  CkSetInLdb();
+#endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	CpvAccess(_currentObj)=this;
 #endif
@@ -766,6 +768,9 @@ extern int restarted;
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
   storedMigrateMsg = m;
+#if CMK_MEM_CHECKPOINT
+  CkResetInLdb();
+#endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	restoreParallelRecovery(&resumeAfterRestoreParallelRecovery,(void *)this);
 #else
