@@ -2168,7 +2168,7 @@ void CkLocMgr::pup(PUP::er &p){
  * since they will be recreated later anyway
  */
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))  || CMK_MEM_CHECKPOINT   
-        int count=0,count1=0;
+  		int count=0,count1=0;
         void *objp;
         void *keyp;
         CkVec<int> pe_list;
@@ -2773,7 +2773,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 }
 #else
 void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-		CkElementCreation_t type)
+		CkElementCreation_t type,CmiBool rebuild)
 {
 	p.comment("-------- Array Location --------");
 	register ManagerRec *m;
@@ -2810,7 +2810,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
                 }
 	}
 #if CMK_MEM_CHECKPOINT
-	if(CkInRestarting()){
+	if(rebuild){
 	  ArrayElement *elt;
 	  CkVec<CkMigratable *> list;
 	  migratableList(rec, list);
@@ -3087,12 +3087,12 @@ void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, CmiBool create, int d
     }
 }
 #else
-void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify)
+void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify,CmiBool rebuild)
 {
 	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiFalse,notify /* home doesn't know yet */ );
 
 	//Create the new elements as we unpack the message
-	pupElementsFor(p,rec,CkElementCreation_resume);
+	pupElementsFor(p,rec,CkElementCreation_resume,rebuild);
 
 	callMethod(rec,&CkMigratable::ckJustMigrated);
 }

@@ -66,7 +66,7 @@ void noopck(const char*, ...)
 #endif
 
 #define CMK_CHKP_ALL		1
-#define CMK_USE_BARRIER		1
+#define CMK_USE_BARRIER		0
 
 //stream remote records happned only if CK_NO_PROC_POOL =1 which means the chares to pe map will change
 #define STREAMING_INFORMHOME                    1
@@ -1080,9 +1080,9 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 			CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
     			int homePe = mgr->homePe(idx);
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
-			mgr->resume(idx,p,CmiTrue);
+			mgr->resume(idx,p,CmiTrue,CmiTrue);
 #else
-			mgr->resume(idx,p,CmiFalse);
+			mgr->resume(idx,p,CmiFalse,CmiTrue);
 #endif
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
 			homePe = mgr->homePe(idx);

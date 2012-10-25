@@ -602,8 +602,6 @@ public:
 		if (managers.find(arrayID)->mgr==NULL)
 			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
 #endif
-		if (managers.find(arrayID)->mgr==NULL)
-			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
 		return managers.find(arrayID)->elts.get(localIdx);
 	}
 
@@ -657,7 +655,7 @@ public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool create, int dummy=0);
 #else
-	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify=CmiTrue);
+	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify=CmiTrue,CmiBool=CmiFalse);
 #endif
 
 //Communication:
@@ -699,7 +697,7 @@ private:
         CkElementCreation_t type, CmiBool create=CmiTrue, int dummy=0);
 #else
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-		CkElementCreation_t type);
+		CkElementCreation_t type,CmiBool rebuild = CmiFalse);
 #endif
 
 	/// Call this member function on each element of this location:
