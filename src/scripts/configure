@@ -2536,6 +2536,23 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### Check __int128_t ####
+cat > $t <<EOT
+#include <stdlib.h>
+int foo(void) {
+  __int128_t   a;
+  __uint128_t   b;
+  int x[(int)(sizeof(__int128_t) - 15)]={0};
+  return x[0];
+}
+EOT
+test_cxx "whether __int128_t (128-bit integer) works" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK___int128_t_DEFINED $pass
+_ACEOF
+
+
 #### Check long double ####
 cat > $t <<EOT
 #include <stdlib.h>

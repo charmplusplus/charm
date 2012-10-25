@@ -333,6 +333,9 @@
 /* whether __int128 works */
 #undef CMK___int128_DEFINED
 
+/* whether __int128_t works */
+#undef CMK___int128_t_DEFINED
+
 /* whether __int64 works */
 #undef CMK___int64_DEFINED
 
