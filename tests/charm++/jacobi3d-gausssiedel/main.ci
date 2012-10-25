@@ -1,0 +1,27 @@
+mainmodule main{
+  extern module jacobi3d;
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_FuncCkLoop ckLoopProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int arrayDimZ;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int blockDimZ;
+  readonly int gaussIter;
+  readonly double convergeDelta;
+  readonly int threadNums;
+
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int num_chare_z;
+
+  readonly int globalBarrier;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void converge(double m);
+  };
+
+};
