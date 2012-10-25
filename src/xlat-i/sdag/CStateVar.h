@@ -18,7 +18,7 @@ struct CStateVar {
     XStr *arrayLength;
     int isMsg;
 
-    CStateVar(int v, const char *t, int np, const char *n, XStr *r, const char *a, int m) : isVoid(v), numPtrs(np),  byRef(r), isMsg(m)
+    CStateVar(int v, const char *t, int np, const char *n, XStr *r, const char *a, int m) : isVoid(v), numPtrs(np),  byRef(r), isMsg(m), declaredRef(NULL), byConst(false)
  	{ 
 	  if (t != NULL) { type = new XStr(t); } 
 	  else {type = NULL;}
