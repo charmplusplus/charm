@@ -1,63 +1,66 @@
 CHARMC=../../../bin/charmc $(OPTS) $(MOPTS) -O3 -g
 
-OBJS = jacobi3d.o 
-OBJS_J = jacobi3d_j.o
+OBJS = main.o 
+OBJS_J = main.o
 
-OBJS_OMP = jacobi3d_omp.o
+OBJS_OMP = main_omp.o
 
 OMP_FLAG = -DJACOBI=1 -DJACOBI_OPENMP -fopenmp
 
-all: jacobi3d jacobi3d.j jacobi3d.ckloop
+all: main main.j main.ckloop
 
-projections: jacobi3d.ckloop.prj jacobi3d.j.prj
+projections: main.ckloop.prj main.j.prj
 
-jacobi3d: $(OBJS)
-	$(CHARMC) -language charm++ -module DummyLB -o jacobi3d $(OBJS)
+main: $(OBJS)
+	$(CHARMC) -language charm++ -module DummyLB -o main $(OBJS)
 
-jacobi3d.j: $(OBJS_J)
-	$(CHARMC) -language charm++ -module DummyLB -o jacobi3d.j $(OBJS_J)
+main.j: $(OBJS_J)
+	$(CHARMC) -language charm++ -module DummyLB -o main.j $(OBJS_J)
 
-jacobi3d.j.prj: $(OBJS_J)
-	$(CHARMC) -language charm++ -module DummyLB -tracemode projections -o jacobi3d.j.prj $(OBJS_J)
+main.j.prj: $(OBJS_J)
+	$(CHARMC) -language charm++ -module DummyLB -tracemode projections -o main.j.prj $(OBJS_J)
 
-jacobi3d.ckloop: jacobi3d_ckloop.o
-	$(CHARMC) -language charm++ -module DummyLB -module CkLoop -o jacobi3d.ckloop jacobi3d_ckloop.o
+main.ckloop: main_ckloop.o
+	$(CHARMC) -language charm++ -module DummyLB -module CkLoop -o main.ckloop main_ckloop.o
 
-jacobi3d.ckloop.prj: jacobi3d_ckloop.o
-	$(CHARMC) -language charm++ -tracemode projections  -module DummyLB -module CkLoop -o jacobi3d.ckloop.prj jacobi3d_ckloop.o
+main.ckloop.prj: main_ckloop.o
+	$(CHARMC) -language charm++ -tracemode projections  -module DummyLB -module CkLoop -o main.ckloop.prj main_ckloop.o
 
-jacobi3d_omp: $(OBJS_OMP)
-	$(CHARMC) -language charm++ -module DummyLB $(OMP_FLAG) -o jacobi3d_omp $(OBJS_OMP)
+main_omp: $(OBJS_OMP)
+	$(CHARMC) -language charm++ -module DummyLB $(OMP_FLAG) -o main_omp $(OBJS_OMP)
 
 projections: $(OBJS)
-	$(CHARMC) -language charm++ -tracemode projections -lz -o jacobi3d.prj $(OBJS)
+	$(CHARMC) -language charm++ -tracemode projections -lz -o main.prj $(OBJS)
 
 summary: $(OBJS)
-	$(CHARMC) -language charm++ -tracemode summary -lz -o jacobi3d.sum $(OBJS)
+	$(CHARMC) -language charm++ -tracemode summary -lz -o main.sum $(OBJS)
+
+main.decl.h: main.ci
+	$(CHARMC)  -E main.ci
 
 jacobi3d.decl.h: jacobi3d.ci
-	$(CHARMC)  -E jacobi3d.ci
+	$(CHARMC)   jacobi3d.ci
 
 syncfttest causalfttest: fttest
-fttest: jacobi3d
-	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB $(TESTOPTS)
-	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB +killFile kill_01.txt $(TESTOPTS)
-	./charmrun ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_02.txt $(TESTOPTS)
-	./charmrun ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_03.txt $(TESTOPTS)
+fttest: main
+	./charmrun ./main 256 128 +p8 +balancer DummyLB $(TESTOPTS)
+	./charmrun ./main 256 128 +p8 +balancer DummyLB +killFile kill_01.txt $(TESTOPTS)
+	./charmrun ./main 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_02.txt $(TESTOPTS)
+	./charmrun ./main 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_03.txt $(TESTOPTS)
 
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o jacobi3d jacobi3d.prj charmrun *~
+	rm -f *.decl.h *.def.h conv-host *.o $(all) main main.prj charmrun *~
 
-jacobi3d.o: jacobi3d.C jacobi3d.decl.h
-	$(CHARMC) -c jacobi3d.C
+main.o: main.cc jacobi3d.decl.h main.decl.h
+	$(CHARMC) -c main.cc
 
-jacobi3d_j.o: jacobi3d.C jacobi3d.decl.h
-	$(CHARMC) -DJACOBI=1 -c jacobi3d.C -o jacobi3d_j.o
+main_j.o: main.cc main.decl.h  jacobi3d.decl.h
+	$(CHARMC) -DJACOBI=1 -c main.cc -o main_j.o
 
-jacobi3d_ckloop.o: jacobi3d.C jacobi3d.decl.h
-	$(CHARMC) -DJACOBI=1 -DCKLOOP=1 -c jacobi3d.C -o jacobi3d_ckloop.o
+main_ckloop.o: main.cc main.decl.h  jacobi3d.decl.h
+	$(CHARMC) -DJACOBI=1 -DCKLOOP=1 -c main.cc -o main_ckloop.o
 
-jacobi3d_omp.o: jacobi3d.C jacobi3d.decl.h
-	$(CHARMC) $(OMP_FLAG) -o $(OBJS_OMP) -c jacobi3d.C
+main_omp.o: main.cc main.decl.h  jacobi3d.decl.h
+	$(CHARMC) $(OMP_FLAG) -o $(OBJS_OMP) -c main.cc
 

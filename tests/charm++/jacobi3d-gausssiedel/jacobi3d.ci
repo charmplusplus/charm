@@ -1,32 +1,7 @@
-mainmodule jacobi3d {
-
-  readonly CProxy_Main mainProxy;
-  readonly CProxy_FuncCkLoop ckLoopProxy;
-  readonly int arrayDimX;
-  readonly int arrayDimY;
-  readonly int arrayDimZ;
-  readonly int blockDimX;
-  readonly int blockDimY;
-  readonly int blockDimZ;
-  readonly int GAUSS_ITER;
-  readonly int threadNums;
-  readonly double THRESHOLD;
-
-  readonly int num_chare_x;
-  readonly int num_chare_y;
-  readonly int num_chare_z;
-
-  readonly int globalBarrier;
+module jacobi3d {
 
   message ghostMsg {
     double gh[];
-  };
-
-  mainchare Main {
-    entry Main(CkArgMsg *m);
-    entry void start();
-    entry void report();
-    entry [reductiontarget] void converge(double m);
   };
 
   array [3D] Jacobi {
@@ -37,17 +12,17 @@ mainmodule jacobi3d {
     entry void processGhosts(ghostMsg *gmsg);
     entry void print();
     entry void doStep() {
-      serial "begin_iteration" {
-	begin_iteration();
-      }
-      for(imsg = 0; imsg < neighbors; imsg++) {
-	// "iterations" keeps track of messages across steps
-	when receiveGhosts[iterations] (ghostMsg *gmsg)
-	  serial "process ghosts" { processGhosts(gmsg); }
-      }
-      serial "doWork" {
-	check_and_compute();
-      }
+        serial "begin_iteration" {
+            begin_iteration();
+        }
+        for(imsg = 0; imsg < neighbors; imsg++) {
+            // "iterations" keeps track of messages across steps
+            when receiveGhosts[iterations] (ghostMsg *gmsg)
+                serial "process ghosts" { processGhosts(gmsg); }
+        }
+        serial "doWork" {
+            check_and_compute();
+        }
     };
   };
 
@@ -57,9 +32,6 @@ mainmodule jacobi3d {
 
   group JacobiNodeMap : CkArrayMap {
     entry JacobiNodeMap();
-  };
-  nodegroup OmpInitializer {
-    entry OmpInitializer(int numThreads); 
   };
 
   group TraceControl {

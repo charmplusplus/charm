@@ -11,9 +11,8 @@ class Jacobi: public CBase_Jacobi {
 	double timing,average;
     int neighbors;
     int thisIndex_x, thisIndex_y, thisIndex_z;
-    // Constructor, initialize values
+    
     Jacobi() ;
- 
     Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) { }
     ~Jacobi() { 
         delete [] temperature; }
@@ -24,11 +23,7 @@ class Jacobi: public CBase_Jacobi {
     double compute_kernel() ;     //Gauss-Siedal compute
     void constrainBC() ;
     void print();
-	// Pupping function for migration and fault tolerance
-	// Condition: assuming the 3D Chare Arrays are NOT used
-	
 	void ResumeFromSync();
     void pup(PUP::er &p);
-    //void doStep();
 };
 
