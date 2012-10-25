@@ -93,7 +93,7 @@ public:
   void pupAllElements(PUP::er &p);
   void startArrayCheckpoint();
   void recvArrayCheckpoint(CkArrayCheckPTMessage *m);
-  void recoverAll(CkArrayCheckPTMessage * msg, CkVec<CkGroupID> * gmap, CkVec<CkArrayIndex> * imap);
+  void recoverAll(CkArrayCheckPTMessage * msg, CkVec<CkGroupID> * gmap=NULL, CkVec<CkArrayIndex> * imap=NULL);
 public:
   static CkCallback  cpCallback;
 

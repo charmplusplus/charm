@@ -670,6 +670,7 @@ public:
 	void migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list);
 
 	void flushAllRecs(void);
+	void flushLocalRecs(void);
 	void pup(PUP::er &p);
 	
 	//Look up array element in hash table.  Index out-of-bounds if not found.

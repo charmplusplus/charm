@@ -1994,14 +1994,30 @@ void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
 	DEBK((AA"Starting spring cleaning at %.2f\n"AB,CkWallTimer()));
 	((CkLocMgr *)forWhom)->springCleaning();
 }
+//doesn't delete if there is extra pe
+void CkLocMgr::flushLocalRecs(void)
+{
+  void *objp;
+  void *keyp;
+  CkHashtableIterator *it=hash.iterator();
+  CmiImmediateLock(hashImmLock);
+  while (NULL!=(objp=it->next(&keyp))) {
+    CkLocRec *rec=*(CkLocRec **)objp;
+    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
+    if (rec->type() == CkLocRec::local) {
+        callMethod((CkLocRec_local*)rec, &CkMigratable::ckDestroy);
+        it->seek(-1);//retry this hash slot
+    }
+  }
+  delete it;
+  CmiImmediateUnlock(hashImmLock);
+}
 
 // clean all buffer'ed messages and also free local objects
 void CkLocMgr::flushAllRecs(void)
 {
   void *objp;
   void *keyp;
-  int flag_local = 0;  
-  int flag_remote = 0;  
   CkHashtableIterator *it=hash.iterator();
   CmiImmediateLock(hashImmLock);
   while (NULL!=(objp=it->next(&keyp))) {
@@ -2013,17 +2029,14 @@ void CkLocMgr::flushAllRecs(void)
       //this condition
       
       if(_BgOutOfCoreFlag!=1){
-		  //TODO doesn't delete if there is actual pe
-		  //hash.remove(*(CkArrayIndex *)&idx);
-        //delete rec;
-        //it->seek(-1);//retry this hash slot
-        flag_remote++;
+	hash.remove(*(CkArrayIndex *)&idx);
+        delete rec;
+        it->seek(-1);//retry this hash slot
       }
     }
     else {
         callMethod((CkLocRec_local*)rec, &CkMigratable::ckDestroy);
         it->seek(-1);//retry this hash slot
-        flag_local++;
     }
   }
   delete it;
