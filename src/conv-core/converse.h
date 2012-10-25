@@ -528,7 +528,11 @@ typedef CMK_TYPEDEF_INT8      CmiInt8;
 typedef CMK_TYPEDEF_UINT2     CmiUInt2;
 typedef CMK_TYPEDEF_UINT4     CmiUInt4;
 typedef CMK_TYPEDEF_UINT8     CmiUInt8;
-#if CMK___int128_DEFINED
+#if CMK___int128_t_DEFINED
+typedef __int128_t            CmiInt16;
+typedef __uint128_t           CmiUInt16;
+#define CMK_HAS_INT16         1
+#elif CMK___int128_DEFINED
 typedef __int128              CmiInt16;
 typedef unsigned __int128     CmiUInt16;
 #define CMK_HAS_INT16         1
