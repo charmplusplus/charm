@@ -1412,6 +1412,7 @@ int CkInLdb(){
 #if CMK_MEM_CHECKPOINT
 	return CkMemCheckPT::inLoadbalancing;
 #endif
+	return 0;
 }
 
 extern "C"
