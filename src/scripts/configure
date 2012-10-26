@@ -2535,6 +2535,10 @@ cat >>confdefs.h <<_ACEOF
 #define CMK___int128_DEFINED $pass
 _ACEOF
 
+if test $pass -eq 1
+then
+  add_flag CMK_HAS_INT16=1
+fi
 
 #### Check __int128_t ####
 cat > $t <<EOT
@@ -2552,6 +2556,10 @@ cat >>confdefs.h <<_ACEOF
 #define CMK___int128_t_DEFINED $pass
 _ACEOF
 
+if test $pass -eq 1
+then
+  add_flag CMK_HAS_INT16=1
+fi
 
 #### Check long double ####
 cat > $t <<EOT
