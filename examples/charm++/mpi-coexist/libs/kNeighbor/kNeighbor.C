@@ -351,6 +351,6 @@ void kNeighbor(int numchares, int numsteps, int msgsize, int lbfreq)
 	if(CkMyPe() == 0) {
 		mainProxy.beginWork(numsteps,msgsize,lbfreq);
 	}
-  CsdScheduler(-1);
+  StartCharmScheduler();
 }
 #include "kNeighbor.def.h"
