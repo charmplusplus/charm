@@ -669,6 +669,10 @@ int foo(void) {
 EOT
 test_cxx "whether __int128 (128-bit integer) works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int128_DEFINED], $pass, [whether __int128 works])
+if test $pass -eq 1
+then
+  add_flag CMK_HAS_INT16=1
+fi
 
 #### Check __int128_t ####
 cat > $t <<EOT
@@ -682,6 +686,10 @@ int foo(void) {
 EOT
 test_cxx "whether __int128_t (128-bit integer) works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int128_t_DEFINED], $pass, [whether __int128_t works])
+if test $pass -eq 1
+then
+  add_flag CMK_HAS_INT16=1
+fi
 
 #### Check long double ####
 cat > $t <<EOT
