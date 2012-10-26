@@ -1454,6 +1454,7 @@ void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 	myLocMgr->emigrate(this,toPe);
 }
 
+#if CMK_LBDB_ON
 void CkLocRec_local::informIdealLBPeriod(int lb_ideal_period) {
   myLocMgr->informLBPeriod(this, lb_ideal_period);
 }
@@ -1462,7 +1463,6 @@ void CkLocRec_local::metaLBCallLB() {
 	myLocMgr->metaLBCallLB(this);
 }
 
-#if CMK_LBDB_ON
 void CkLocRec_local::startTiming(int ignore_running) {
   	if (!ignore_running) running=CmiTrue;
 	DEBL((AA"Start timing for %s at %.3fs {\n"AB,idx2str(idx),CkWallTimer()));
@@ -2959,6 +2959,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	CK_MAGICNUMBER_CHECK
 }
 
+#if CMK_LBDB_ON
 void CkLocMgr::informLBPeriod(CkLocRec_local *rec, int lb_ideal_period) {
 	callMethod(rec,&CkMigratable::recvLBPeriod, (void *)&lb_ideal_period);
 }
@@ -2966,6 +2967,7 @@ void CkLocMgr::informLBPeriod(CkLocRec_local *rec, int lb_ideal_period) {
 void CkLocMgr::metaLBCallLB(CkLocRec_local *rec) {
 	callMethod(rec, &CkMigratable::metaLBCallLB);
 }
+#endif
 
 /**
   Migrating array element is arriving on this processor.
