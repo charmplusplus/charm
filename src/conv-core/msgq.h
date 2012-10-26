@@ -13,9 +13,16 @@
 
 namespace conv {
 
+// Some day, messages may be handled as something other than void* within the runtime.
+// Prepare for that day.This also enhances readability
 typedef void msg_t;
 
-
+/**
+ * Charm Message Queue: Holds msg pointers and returns the next message to execute on a PE
+ *
+ * Templated on the type of the priority field. Defaults to int priority.
+ * All scheduling policies are encapsulated behind this queue interface.
+ */
 template <typename P = int>
 class msgQ
 {
@@ -23,27 +30,44 @@ class msgQ
         /// The datatype for msg priorities
         typedef P prio_t;
 
-        ///
+        /// Hardly any initialization required
         msgQ(): qSize(0) {}
-        ///
+
+        /// Given a message (optionally with a priority and queuing policy), enqueue it for delivery
         void enq(const msg_t *msg
                 ,const prio_t &prio = prio_t()
                 ,const bool isFifo = true
                 );
-        ///
+
+        /// Pop (and return) the next message to deliver
         const msg_t* deq();
-        ///
-        const msg_t* front() const;
-        ///
+
+        /// Return ptr to message that is next in line for delivery. Does not deq() the msg
+        const msg_t* front() const
+        {
+            if (prioQ.empty())
+                return NULL;
+            return msgbuckets[prioQ.top().second].front();
+        }
+
+        /// Number of messages in the queue
         inline size_t size() const { return qSize; }
-        ///
+
+        /// Is the queue empty?
         inline bool empty() const { return (0 == qSize); }
-        ///
+
+        /** Returns the value of the highest priority amongst all the messages in the queue
+         *
+         * @note: Depending on scheduling policy, this may or may not be the priority of the
+         * next msg in line delivery. However, the default scheduling policy does return a msg
+         * of this priority.
+         */
         inline prio_t top_priority() const { return prioQ.top().first; }
 
-        ///
+        /// Just so that we can support CqsEnumerateQueue()
         void enumerate(msg_t **first, msg_t **last) const;
-        ///
+
+        /// An ostream operator overload, that currently just prints q size
         friend std::ostream& operator<< (std::ostream &out, const msgQ &q)
         {
             out <<"\nmsgQ[" << q.qSize << "]:";
@@ -52,18 +76,21 @@ class msgQ
         }
 
     private:
-        /// The datatype of the index of the container storing msgs of a given priority
+        /// Maintains the size of this message queue
+        size_t qSize;
+
+        /// Collection of msg buckets, each holding msgs of a given priority
+        std::vector< std::deque<const msg_t*> > msgbuckets;
+
+        /// The type of the index into the container of message buckets
         typedef short bktidx_t;
-        /// Yet another typedef. Just for terseness
+        /// A key-val pair of a priority value and the index to the bucket of msgs of that priority
         typedef typename std::pair<prio_t, bktidx_t> prioidx_t;
 
-        ///
-        size_t qSize;
-        /// Vector of msg buckets (each of them a deq)
-        std::vector< std::deque<const msg_t*> > msgbuckets;
-        /// A heap of distinct msg priorities
+        /// A _min_ heap of distinct msg priorities along with the matching bucket indices
         std::priority_queue<prioidx_t, std::vector<prioidx_t>, std::greater<prioidx_t> > prioQ;
-        /// A mapping between priority values and the bucket indices
+
+        /// A mapping between priority values and bucket indices, to locate buckets given a priority
         #if CMK_HAS_STD_UNORDERED_MAP
         std::unordered_map<prio_t, int> prio2bktidx;
         #else
@@ -128,16 +155,6 @@ const msg_t* msgQ<P>::deq()
     // Decrement the total number of msgs in this container
     qSize--;
     return msg;
-}
-
-
-
-template <typename P>
-const msg_t* msgQ<P>::front() const
-{
-    if (prioQ.empty())
-        return NULL;
-    return msgbuckets[prioQ.top().second].front();
 }
 
 
