@@ -16,6 +16,7 @@ extern "C" void CharmLibExit();
 
 extern "C" void LibCkExit(void);
 
+extern "C" void StartCharmScheduler();
 #define CkExit LibCkExit
 
 #endif //_MPI_INTEROPERATE_

@@ -67,7 +67,7 @@ void HiStart(int elems)
   if(CkMyPe() == 0) {
     mainHi.StartHi(elems);
   }
-  CsdScheduler(-1);
+  StartCharmScheduler();
 }
 
 #include "hi.def.h"
