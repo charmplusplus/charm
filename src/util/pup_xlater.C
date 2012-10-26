@@ -95,8 +95,8 @@ const PUP::machineInfo &PUP::machineInfo::current(void)
 		m->intBytes[1]=sizeof(short);
 		m->intBytes[2]=sizeof(int);
 		m->intBytes[3]=sizeof(long);
-#if CMK___int128_DEFINED
-		m->intBytes[4]=sizeof(__int128);
+#if CMK_HAS_INT16
+		m->intBytes[4]=sizeof(CmiInt16);
 #else
 		m->intBytes[4]=0;
 #endif
@@ -260,7 +260,7 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 		convertFn[Tlonglong]=convertFn[Tulonglong]=cvt_null;
 	else
 		convertFn[Tlonglong]=convertFn[Tulonglong]=cvt_swap;
-#if CMK___int128_DEFINED
+#if CMK_HAS_INT16
 	setConverterInt(src,cur,0,4,Tint128);
 	setConverterInt(src,cur,1,4,Tuint128);
 #endif

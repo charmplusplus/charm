@@ -88,7 +88,7 @@ typedef enum {
 //(this list must exactly match that in PUPer_xlate)
   Tchar=0,Tshort, Tint, Tlong, Tlonglong,
   Tuchar,Tushort,Tuint,Tulong, Tulonglong,
-#if CMK___int128_DEFINED
+#if CMK_HAS_INT16
   Tint128, Tuint128,
 #endif
   Tfloat,Tdouble,Tlongdouble,
@@ -204,9 +204,9 @@ class er {
   void operator()(CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
   void operator()(unsigned CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
 #endif
-#if CMK___int128_DEFINED
-  void operator()(__int128 &v) {(*this)(&v,1);}
-  void operator()(unsigned __int128 &v) {(*this)(&v,1);}
+#if CMK_HAS_INT16
+  void operator()(CmiInt16 &v) {(*this)(&v,1);}
+  void operator()(CmiUInt16 &v) {(*this)(&v,1);}
 #endif
   void operator()(void* &v,void* sig) {(*this)(&v,1,sig);}
   
@@ -256,11 +256,11 @@ class er {
   void operator()(unsigned CMK_PUP_LONG_LONG *a,int nItems)
     {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
 #endif
-#if CMK___int128_DEFINED
-  void operator()(__int128 *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(__int128),Tint128);}
-  void operator()(unsigned __int128 *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(unsigned __int128),Tuint128);}
+#if CMK_HAS_INT16
+  void operator()(CmiInt16 *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(CmiInt16),Tint128);}
+  void operator()(CmiUInt16 *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(CmiUInt16),Tuint128);}
 #endif
 
   //For pointers: the last parameter is to make it more difficult to call
@@ -970,9 +970,9 @@ PUP_BUILTIN_SUPPORT(long double)
 PUP_BUILTIN_SUPPORT(CMK_PUP_LONG_LONG)
 PUP_BUILTIN_SUPPORT(unsigned CMK_PUP_LONG_LONG)
 #endif
-#if CMK___int128_DEFINED
-PUP_BUILTIN_SUPPORT(__int128)
-PUP_BUILTIN_SUPPORT(unsigned __int128)
+#if CMK_HAS_INT16
+PUP_BUILTIN_SUPPORT(CmiInt16)
+PUP_BUILTIN_SUPPORT(CmiUInt16)
 #endif
 
 
