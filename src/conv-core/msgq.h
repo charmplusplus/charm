@@ -90,11 +90,11 @@ class msgQ
         /// A _min_ heap of distinct msg priorities along with the matching bucket indices
         std::priority_queue<prioidx_t, std::vector<prioidx_t>, std::greater<prioidx_t> > prioQ;
 
-        /// A mapping between priority values and bucket indices, to locate buckets given a priority
+        /// A mapping between priority values and bucket indices, to locate buckets given a priority (used in enq)
         #if CMK_HAS_STD_UNORDERED_MAP
-        std::unordered_map<prio_t, int> prio2bktidx;
+        std::unordered_map<prio_t, bktidx_t> prio2bktidx;
         #else
-        std::map<prio_t, int> prio2bktidx;
+        std::map<prio_t, bktidx_t> prio2bktidx;
         #endif
 };
 
@@ -107,7 +107,7 @@ void msgQ<P>::enq(const msg_t *msg
                  )
 {
     // Find index of / create the bucket holding msgs of this priority
-    typename std::map<prio_t, int>::iterator itr = prio2bktidx.find(prio);
+    typename std::map<prio_t, bktidx_t>::iterator itr = prio2bktidx.find(prio);
     bktidx_t bktidx;
     if (prio2bktidx.end() != itr)
         bktidx = itr->second;
