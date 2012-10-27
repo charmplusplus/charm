@@ -146,7 +146,9 @@ const msg_t* msgQ<P>::deq()
     std::deque<const msg_t*> &bkt = msgbuckets[bktidx];
 
     // Assert that there is at least one msg corresponding to this priority
-    if (bkt.empty()) throw;
+    //if (bkt.empty()) throw;
+
+    // Pop msg from the front of the deque
     const msg_t *msg = bkt.front();
     bkt.pop_front();
     // If all msgs of the highest priority have been consumed, pop that priority from the priority Q
