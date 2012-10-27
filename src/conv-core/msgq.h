@@ -76,7 +76,7 @@ class msgQ
         }
 
     private:
-        /// Maintains the size of this message queue
+        /// The size of this message queue
         size_t qSize;
 
         /// Collection of msg buckets, each holding msgs of a given priority
@@ -119,16 +119,16 @@ void msgQ<P>::enq(const msg_t *msg
     }
 
     // Access deq holding msgs of this priority
-    std::deque<const msg_t*> &q = msgbuckets[bktidx];
+    std::deque<const msg_t*> &bkt = msgbuckets[bktidx];
     // If this deq is empty, insert corresponding priority into prioQ
-    if (q.empty())
+    if (bkt.empty())
         prioQ.push( std::make_pair(prio, bktidx) );
 
     // Enq msg either at front or back of deq
     if (isFifo)
-        q.push_back(msg);
+        bkt.push_back(msg);
     else
-        q.push_front(msg);
+        bkt.push_front(msg);
     // Increment the total number of msgs in this container
     qSize++;
 }
@@ -143,14 +143,14 @@ const msg_t* msgQ<P>::deq()
 
     // Get the index of the bucket holding the highest priority msgs
     const bktidx_t &bktidx = prioQ.top().second;
-    std::deque<const msg_t*> &q = msgbuckets[bktidx];
+    std::deque<const msg_t*> &bkt = msgbuckets[bktidx];
 
     // Assert that there is at least one msg corresponding to this priority
-    if (q.empty()) throw;
-    const msg_t *msg = q.front();
-    q.pop_front();
+    if (bkt.empty()) throw;
+    const msg_t *msg = bkt.front();
+    bkt.pop_front();
     // If all msgs of the highest priority have been consumed, pop that priority from the priority Q
-    if (q.empty())
+    if (bkt.empty())
         prioQ.pop();
     // Decrement the total number of msgs in this container
     qSize--;
