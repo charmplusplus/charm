@@ -14,7 +14,7 @@
 namespace conv {
 
 // Some day, messages may be handled as something other than void* within the runtime.
-// Prepare for that day.This also enhances readability
+// Prepare for that day, while enhancing readability today.
 typedef void msg_t;
 
 /**
@@ -22,6 +22,17 @@ typedef void msg_t;
  *
  * Templated on the type of the priority field. Defaults to int priority.
  * All scheduling policies are encapsulated behind this queue interface.
+ *
+ * All messages of a given priority p are stored in a single container. Since
+ * each message can be enqueued either to the front or back of this container,
+ * a dequeue is used. Each such dequeue is referred to as a bucket.
+ * The set of priority values of all the messages in the container is stored in
+ * a min-heap. A deq() operation simply peeks at the most important prio
+ * value, and finds the bucket associated with that value. It then dequeues the
+ * message at the front of this bucket.
+ * A mapping between the priority values and the corresponding buckets is
+ * maintained. enq() operations simply find the bucket corresponding to a prio
+ * value and place the msg into it.
  */
 template <typename P = int>
 class msgQ
@@ -34,10 +45,7 @@ class msgQ
         msgQ(): qSize(0) {}
 
         /// Given a message (optionally with a priority and queuing policy), enqueue it for delivery
-        void enq(const msg_t *msg
-                ,const prio_t &prio = prio_t()
-                ,const bool isFifo = true
-                );
+        void enq(const msg_t *msg, const prio_t &prio = prio_t(), const bool isFifo = true);
 
         /// Pop (and return) the next message to deliver
         const msg_t* deq();
@@ -56,12 +64,7 @@ class msgQ
         /// Is the queue empty?
         inline bool empty() const { return (0 == qSize); }
 
-        /** Returns the value of the highest priority amongst all the messages in the queue
-         *
-         * @note: Depending on scheduling policy, this may or may not be the priority of the
-         * next msg in line delivery. However, the default scheduling policy does return a msg
-         * of this priority.
-         */
+        /// Returns the value of the highest priority amongst all the messages in the queue
         inline prio_t top_priority() const { return prioQ.top().first; }
 
         /// Just so that we can support CqsEnumerateQueue()
@@ -101,10 +104,7 @@ class msgQ
 
 
 template <typename P>
-void msgQ<P>::enq(const msg_t *msg
-                 ,const prio_t &prio
-                 ,const bool isFifo
-                 )
+void msgQ<P>::enq(const msg_t *msg, const prio_t &prio, const bool isFifo)
 {
     // Find index of / create the bucket holding msgs of this priority
     #if CMK_HAS_STD_UNORDERED_MAP
@@ -130,10 +130,7 @@ void msgQ<P>::enq(const msg_t *msg
         prioQ.push( std::make_pair(prio, bktidx) );
 
     // Enq msg either at front or back of deq
-    if (isFifo)
-        bkt.push_back(msg);
-    else
-        bkt.push_front(msg);
+    isFifo ? bkt.push_back(msg) : bkt.push_front(msg);
     // Increment the total number of msgs in this container
     qSize++;
 }
