@@ -107,7 +107,12 @@ void msgQ<P>::enq(const msg_t *msg
                  )
 {
     // Find index of / create the bucket holding msgs of this priority
-    typename std::map<prio_t, bktidx_t>::iterator itr = prio2bktidx.find(prio);
+    #if CMK_HAS_STD_UNORDERED_MAP
+    typename std::unordered_map<prio_t, bktidx_t>::iterator
+    #else
+    typename std::map<prio_t, bktidx_t>::iterator
+    #endif
+    itr = prio2bktidx.find(prio);
     bktidx_t bktidx;
     if (prio2bktidx.end() != itr)
         bktidx = itr->second;
