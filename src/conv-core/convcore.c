@@ -2121,6 +2121,9 @@ void CsdInit(argv)
     }
   CpvAccess(CsdLocalCounter) = CsdLocalMax;
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
+   #if CMK_USE_STL_MSGQ
+   if (CmiMyPe() == 0) CmiPrintf("Charm++> Using STL-based msgQ:\n");
+   #endif
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
   CpvInitialize(void *,CsdObjQueue);

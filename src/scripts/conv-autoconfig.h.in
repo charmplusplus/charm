@@ -288,6 +288,12 @@
 /* envelope refnum field set to UInt */
 #undef CMK_REFNUM_TYPE
 
+/* Should charm use an STL-based msg q */
+#undef CMK_USE_STL_MSGQ
+
+/* expected size of message priorities fields */
+#undef CMK_MSG_PRIO_TYPE
+
 /* disable replay */
 #undef CMK_REPLAYSYSTEM
 

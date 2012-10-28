@@ -195,7 +195,7 @@ include Make.extlib
 ###############################################################################
 
 CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
-      queueing.h conv-cpath.h conv-cpm.h persistent.h\
+      msgq.h queueing.h conv-cpath.h conv-cpm.h persistent.h\
       trace.h trace-common.h trace-bluegene.h trace-projections.h  \
       trace-simple.h trace-controlPoints.h charm-api.h \
       conv-ccs.h ccs-client.c ccs-client.h \

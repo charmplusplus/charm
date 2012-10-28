@@ -241,6 +241,11 @@ private:
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
       CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
+#if CMK_USE_STL_MSGQ
+      // Ideally, this should be a static compile-time assert. However we need API changes for that
+      CkAssert(sizeof(CMK_MSG_PRIO_TYPE) >= sizeof(int)*CkPriobitsToInts(prio));
+#endif
+
       register UInt tsize = sizeof(envelope)+ 
             CkMsgAlignLength(size)+
 	    sizeof(int)*CkPriobitsToInts(prio);
