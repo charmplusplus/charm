@@ -111,6 +111,29 @@ void msgQ<P>::enq(const msg_t *msg, const prio_t &prio, const bool isFifo)
 
 
 
+// Iterative applications typically have a set of msg priority values that just
+// repeat over time. However, the arrival pattern of messages at a given PE is
+// unknown. Within a single iteration, the size of a bucket holding msgs of a
+// given priority may fluctuate. It may become empty as these messages are
+// delivered. Instead of deleting the bucket every time it becomes empty (which
+// could be several times in a single iteration), we choose to leave it around
+// because it will eventually get filled again. This avoids the costs of
+// repeatedly constructing / destroying buckets (dequeues).
+//
+// However, for non-iterative applications, a given priority value may not
+// recur later in the execution. Not deleting buckets may increase container
+// sizes, degrading performance over time. Hence, buckets should be deleted
+// whenever they become empty (or with a small timeout).
+//
+// The choice between the two execution modes should be a compile-time
+// decision. Ideally, this should be a decision during application compilation
+// and be specified programmatically by the application (think template
+// parameter). However, since this Q is buried so deep within charm, the
+// decision has to be made during charm compilation.
+//
+// Assume by default that the application is iterative
+#define CMK_ITERATIVE_MSG_PRIOS 1
+
 template <typename P>
 const msg_t* msgQ<P>::deq()
 {
@@ -121,9 +144,16 @@ const msg_t* msgQ<P>::deq()
     // Pop msg from the front of the deque
     const msg_t *msg = bkt.front();
     bkt.pop_front();
-    // If all msgs in the bucket have been consumed, pop that priority from the priority Q
+    // If all msgs in the bucket have been consumed
     if (bkt.empty())
+    {
+        #if ! CMK_ITERATIVE_MSG_PRIOS
+        // remove the empty bucket from the collection of buckets
+        msgbuckets.erase( prioQ.top().first );
+        #endif
+        // pop corresponding priority from the priority Q
         prioQ.pop();
+    }
     // Decrement the total number of msgs in this container
     qSize--;
     return msg;
