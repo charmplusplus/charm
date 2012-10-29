@@ -49,6 +49,9 @@ void traceEndFuncIndexProj(int idx) {}
 void traceBeginFuncProj(char *name,char *file,int line){}
 void traceEndFuncProj(char *name){}
 void traceUserSuppliedNote(char *note) {}
+void traceUserSuppliedData(int data) {}
+void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et) {}
+void traceMemoryUsage() {}
 
 #if CMK_SMP_TRACE_COMMTHREAD
 int traceBeginCommOp(char *msg){}
