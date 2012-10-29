@@ -491,6 +491,11 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeSendFn(destPE, size, dupmsg);
 }
+//remote replica send
+void CmiRemoteSyncSendFn(int destPE, int partition, int size, char *msg) {
+    char *dupmsg = CopyMsg(msg, size);
+    CmiRemoteFreeSendFn(destPE, partition, size, dupmsg);
+}
 
 #if CMK_USE_PXSHM
 #include "machine-pxshm.c"
@@ -505,30 +510,34 @@ static int refcount = 0;
 CpvExtern(int, _urgentSend);
 #endif
 
-/* a wrapper of LrtsSendFunc */
-#if CMK_C_INLINE
-inline 
-#endif
-CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode)
+//declaration so that it can be used
+CmiCommHandle CmiRemoteSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode);
+//I am changing this function to offload task to a generic function - the one
+//that handles sending to any replica
+INLINE_KEYWORD CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode) {
+  return CmiRemoteSendNetworkFunc(destPE, CmiMyPartition(), size, msg, mode);
+}
+//the generic function that replaces the older one
+CmiCommHandle CmiRemoteSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode)
 {
         int rank;
         int destLocalNode = CmiNodeOf(destPE); 
-        int destNode = CmiGetNodeGlobal(CmiNodeOf(destPE),partitionInfo.myPartition); 
-#if CMK_USE_PXSHM
+        int destNode = CmiGetNodeGlobal(destLocalNode,partition); 
+#if CMK_USE_PXSHM       //not handled yet correctly
         if (CmiValidPxshm(destLocalNode, size)) {
           CmiSendMessagePxshm(msg, size, destLocalNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
         }
 #endif
-#if CMK_USE_XPMEM
+#if CMK_USE_XPMEM       //not handled yet correctly
         if (CmiValidXpmem(destLocalNode, size)) {
           CmiSendMessageXpmem(msg, size, destLocalNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
         }
 #endif
-#if CMK_PERSISTENT_COMM
+#if CMK_PERSISTENT_COMM //not handled yet correctly
         if (CpvAccess(phs)) {
           if (size > PERSIST_MIN_SIZE) {
             CmiAssert(CpvAccess(curphs) < CpvAccess(phsSize));
@@ -552,10 +561,17 @@ if (MSG_STATISTIC)
     return LrtsSendFunc(destNode, destPE, size, msg, mode);
 }
 
-void CmiFreeSendFn(int destPE, int size, char *msg) {
+//I am changing this function to offload task to a generic function - the one
+//that handles sending to any replica
+INLINE_KEYWORD void CmiFreeSendFn(int destPE, int size, char *msg) {
+    CmiRemoteFreeSendFn(destPE, CmiMyPartition(), size, msg);
+}
+//and the generic implementation - I may be in danger of making the frequent
+//case slower - two extra comparisons may happen
+void CmiRemoteFreeSendFn(int destPE, int partition, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
     CQdCreate(CpvAccess(cQdState), 1);
-    if (CmiMyPe()==destPE) {
+    if (CmiMyPe()==destPE && partition == CmiMyPartition()) {
         CmiSendSelf(msg);
 #if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) CpvAccess(curphs)++;
@@ -565,7 +581,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         int destNode = CmiNodeOf(destPE);
         int destRank = CmiRankOf(destPE);
 #if CMK_SMP
-        if (CmiMyNode()==destNode) {
+        if (CmiMyNode()==destNode && partition == CmiMyPartition()) {
             CmiPushPE(destRank, msg);
 #if CMK_PERSISTENT_COMM
             if (CpvAccess(phs)) CpvAccess(curphs)++;
@@ -574,7 +590,8 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = destRank;
-        CmiSendNetworkFunc(destPE, size, msg, P2P_SYNC);
+        CmiRemoteSendNetworkFunc(destPE, partition, size, msg, P2P_SYNC);
+
 #if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) CpvAccess(curphs)++;
 #endif
@@ -583,6 +600,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
 #endif
 
 #if USE_COMMON_ASYNC_P2P
+//not implementing it for replica
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg) {
     int destNode = CmiNodeOf(destPE);
     if (destNode == CmiMyNode()) {
@@ -616,17 +634,28 @@ static void CmiSendNodeSelf(char *msg) {
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
 }
 
-#if USE_COMMON_ASYNC_P2P
-void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
+//I think this #if is incorrect - should be SYNC_P2P
+#if USE_COMMON_SYNC_P2P
+INLINE_KEYWORD void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeNodeSendFn(destNode, size, dupmsg);
 }
+//send to remote replica
+void CmiRemoteSyncNodeSendFn(int destNode, int partition, int size, char *msg) {
+    char *dupmsg = CopyMsg(msg, size);
+    CmiRemoteFreeNodeSendFn(destNode, partition, size, dupmsg);
+}
 
-void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
+//again, offloading the task to a generic function
+INLINE_KEYWORD void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
+  CmiRemoteFreeNodeSendFn(destNode, CmiMyPartition(), size, msg);
+}
+//and the remote replica function
+void CmiRemoteFreeNodeSendFn(int destNode, int partition, int size, char *msg) {
     CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
     CQdCreate(CpvAccess(cQdState), 1);
     CMI_SET_BROADCAST_ROOT(msg, 0);
-    if (destNode == CmiMyNode()) {
+    if (destNode == CmiMyNode() && CmiMyPartition() == partition) {
         CmiSendNodeSelf(msg);
     } else {
 #if CMK_WITH_STATS
@@ -637,7 +666,7 @@ if (  MSG_STATISTIC)
     msg_histogram[ret_log]++;
 }
 #endif
-        CmiSendNetworkFunc(CmiNodeFirst(destNode), size, msg, P2P_SYNC);
+        CmiRemoteSendNetworkFunc(CmiNodeFirst(destNode), partition, size, msg, P2P_SYNC);
     }
 #if CMK_PERSISTENT_COMM
     if (CpvAccess(phs)) CpvAccess(curphs)++;
@@ -646,6 +675,7 @@ if (  MSG_STATISTIC)
 #endif
 
 #if USE_COMMON_ASYNC_P2P
+//not implementing it for replica
 CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg) {
     if (destNode == CmiMyNode()) {
         CmiSyncNodeSendFn(destNode, size, msg);
@@ -1130,6 +1160,4 @@ static char *CopyMsg(char *msg, int len) {
     memcpy(copy, msg, len);
     return copy;
 }
-
-
 

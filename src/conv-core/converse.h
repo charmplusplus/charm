@@ -1063,6 +1063,10 @@ void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
 void          CmiFreeMulticastFn(CmiGroup, int, char*);
 
+//remote replica send counterparts
+void          CmiRemoteSyncSendFn(int, int, int, char *);
+void          CmiRemoteFreeSendFn(int, int, int, char *);
+
 typedef void * (*CmiReduceMergeFn)(int*,void*,void**,int);
 typedef void (*CmiReducePupFn)(void*,void*);
 typedef void (*CmiReduceDeleteFn)(void*);
@@ -1150,6 +1154,13 @@ void          CmiReleaseCommHandle(CmiCommHandle);
 #define CmiAsyncMulticast(g,s,m)        (CmiAsyncMulticastFn((g),(s),(char*)(m)))
 #define CmiSyncMulticastAndFree(g,s,m)  (CmiFreeMulticastFn((g),(s),(char*)(m)))
 
+
+//adding functions for sending to remote replicas - only the sync ones because
+//we do not use the async ones
+#define CmiRemoteSyncSend(pe,p,s,m)              (CmiRemoteSyncSendFn((pe),(p),(s),(char *)(m)))
+#define CmiRemoteSyncSendAndFree(pe,p,s,m)       (CmiRemoteFreeSendFn((pe),(p),(s),(char *)(m)))
+//support for rest may come later if required
+
 #if CMK_NODE_QUEUE_AVAILABLE
 void          CmiSyncNodeSendFn(int, int, char *);
 CmiCommHandle CmiAsyncNodeSendFn(int, int, char *);
@@ -1162,6 +1173,10 @@ void          CmiFreeNodeBroadcastFn(int, char *);
 void          CmiSyncNodeBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int, char *);
 void          CmiFreeNodeBroadcastAllFn(int, char *);
+
+//if node queue is available, adding remote replica counterparts
+void          CmiRemoteSyncNodeSendFn(int, int, int, char *);
+void          CmiRemoteFreeNodeSendFn(int, int, int, char *);
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -1174,6 +1189,11 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 #define CmiSyncNodeBroadcastAll(s,m)        (CmiSyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
+
+//counterparts of remote replica
+#define CmiRemoteSyncNodeSend(pe,p,s,m)         (CmiRemoteSyncNodeSendFn((pe),(p),(s),(char *)(m)))
+#define CmiRemoteSyncNodeSendAndFree(pe,p,s,m)  (CmiRemoteFreeNodeSendFn((pe),(p),(s),(char *)(m)))
+
 #else
 
 #define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
@@ -1209,6 +1229,9 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
 #define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
 #endif
+//and the remote replica counterparts
+#define CmiRemoteSyncNodeSend(n,p,s,m)          CmiRemoteSyncSend(CmiNodeFirst(n),p,s,m)
+#define CmiRemoteSyncNodeSendAndFree(n,p,s,m)   CmiRemoteSyncSendAndFree(CmiNodeFirst(n),p,s,m)
 #endif
 
 /******** CMI MESSAGE RECEPTION ********/
