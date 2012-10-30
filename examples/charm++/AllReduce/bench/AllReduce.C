@@ -39,7 +39,7 @@ main::main(CkArgMsg* m)
 	     CkNumPes(),units,allredSize);
 
     arr.init();
-    startTime = CmiWallTimer();
+    startTime = CkWallTimer();
     arr.dowork(baseSize);
   }
 

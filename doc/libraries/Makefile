@@ -4,6 +4,7 @@ TEX=$(FILE).tex barrier.tex ddt.tex intro.tex irecv.tex liveviz.tex tempo.tex ff
 
 DEST=libraries
 LATEX2HTML=$(L2H) -split 5
+DOCTITLE='Converse and Charm++ Libraries Manual'
 
 include ../Makefile.common
 

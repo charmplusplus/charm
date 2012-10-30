@@ -189,30 +189,45 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 
 void LBInfo::print()
 {
-  int i;
-  double minLoad, maxLoad, maxProcObjLoad, maxComLoad, sum, average;
+  int i;  
+  double minLoad, maxLoad, maxProcObjLoad, avgProcObjLoad, maxComLoad, sum, average, avgComLoad;
+  double avgBgLoad;
+  int max_loaded_proc = 0;
   sum = .0;
   sum = minLoad = maxLoad = peLoads[0];
-  maxProcObjLoad = objLoads[0];
-  maxComLoad = comLoads[0];
+  avgProcObjLoad = maxProcObjLoad = objLoads[0];
+  avgComLoad = maxComLoad = comLoads[0];
+  avgBgLoad = bgLoads[0];
   for (i = 1; i < numPes; i++) {
     double load = peLoads[i];
-    if (load>maxLoad) maxLoad=load;
-    else if (peLoads[i]<minLoad) minLoad=load;
+    if (load>maxLoad) {
+      maxLoad=load;
+      max_loaded_proc = i;
+    } else if (peLoads[i]<minLoad) minLoad=load;
     if (objLoads[i]>maxProcObjLoad) maxProcObjLoad = objLoads[i];
     if (comLoads[i]>maxComLoad) maxComLoad = comLoads[i];
     sum += load;
+    avgProcObjLoad += objLoads[i];
+    avgBgLoad += bgLoads[i];
+    avgComLoad += comLoads[i];
   }
   average = sum/numPes;
+  avgProcObjLoad /= numPes; 
+  avgBgLoad /= numPes; 
+  avgComLoad /= numPes;
   CmiPrintf("The processor loads are: \n");
   CmiPrintf("PE   (Total Load) (Obj Load) (Comm Load) (BG Load)\n");
   if (_lb_args.debug() > 3)
     for(i = 0; i < numPes; i++)
       CmiPrintf("%-4d %10f %10f %10f %10f\n", i, peLoads[i], objLoads[i], comLoads[i], bgLoads[i]);
   CmiPrintf("max: %10f %10f %10f\n", maxLoad, maxProcObjLoad, maxComLoad);
-  CmiPrintf("Min : %f	Max : %f	Average: %f\n", minLoad, maxLoad, average);
-    // the min and max object (calculated in getLoadInfo)
-  CmiPrintf("MinObj : %f	MaxObj : %f\n", minObjLoad, maxObjLoad, average);
+  CmiPrintf("Min : %f Max : %f  Average: %f AvgBgLoad: %f\n", minLoad, maxLoad, average, avgBgLoad);
+  CmiPrintf("ProcObjLoad  Max : %f  Average: %f\n", maxProcObjLoad, avgProcObjLoad);
+  CmiPrintf("CommLoad  Max : %f  Average: %f\n", maxComLoad, avgComLoad);
+  CmiPrintf("[%d] is Maxloaded maxload: %f ObjLoad %f BgLoad %f\n",
+			max_loaded_proc, peLoads[max_loaded_proc], objLoads[max_loaded_proc], bgLoads[max_loaded_proc]);
+  // the min and max object (calculated in getLoadInfo)
+  CmiPrintf("MinObj : %f  MaxObj : %f\n", minObjLoad, maxObjLoad, average);
   CmiPrintf("Non-local comm: %d msgs %lld bytes\n", msgCount, msgBytes);
 }
 

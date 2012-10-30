@@ -23,7 +23,6 @@ int numFinished;
 Chunk::Chunk(int t, int x, int y){
 
   int xdim,ydim;
-  __sdag_init();
   xdim = x;
   ydim = y;
   total = t; 

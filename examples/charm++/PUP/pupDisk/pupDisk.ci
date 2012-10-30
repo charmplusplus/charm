@@ -1,0 +1,48 @@
+////////////////////////////////////////////////
+//
+//  pupDisk.ci
+//
+//  Interface file for pupDisk
+//
+//  Author: Eric Bohm
+//  Date: 2012/1/23
+//
+////////////////////////////////////////////////
+
+mainmodule pupDisk {
+  include "someData.h";
+  readonly CkCallback icb;
+  readonly CkCallback wcb;
+  readonly CkCallback rcb;
+  readonly CkCallback vcb;
+  readonly CProxy_userData userDataProxy;
+  readonly CProxy_pupDisk pupDiskProxy;
+  readonly int numElementsPer;
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void done(CkReductionMsg *);
+    entry void initialized(CkReductionMsg *);
+    entry void written(CkReductionMsg *);
+    entry void read(CkReductionMsg *);
+
+  };
+  group pupDiskMap : CkArrayMap {
+	   entry pupDiskMap(int maxFiles);
+  };
+
+  array [1D] userData{
+    entry userData(int howbig, int numElements, int maxFiles);
+    entry void init();
+    entry void write();
+    entry void read();
+    entry void verify();    
+    entry void acceptData(someData &inData);
+  };
+
+  array [1D] pupDisk{
+    entry pupDisk(int howbig, int numElements, int maxFiles);
+    entry void write(int sender, someData &data);
+    entry void read(int sender);
+  };
+
+};

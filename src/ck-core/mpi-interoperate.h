@@ -5,16 +5,18 @@
 #include "ck.h"
 #include "trace.h"
 
-void CharmLibInit(int peid, int numpes, int argc, char **argv);
-void CharmLibExit();
+#if CMK_CONVERSE_MPI
+#include <mpi.h>
+extern "C" void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
+#else
+extern "C" void CharmLibInit(int userComm, int argc, char **argv);
+#endif
+
+extern "C" void CharmLibExit();
 
 extern "C" void LibCkExit(void);
 
-extern int _ringexit;		    // for charm exit
-extern int _ringtoken;
-extern void _initCharm(int unused_argc, char **argv);
-extern void CkExit(void);
-
+extern "C" void StartCharmScheduler();
 #define CkExit LibCkExit
 
 #endif //_MPI_INTEROPERATE_

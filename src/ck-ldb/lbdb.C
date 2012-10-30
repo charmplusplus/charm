@@ -29,6 +29,16 @@ extern "C" LDOMHandle LDRegisterOM(LDHandle _db, LDOMid _userID,
   return db->AddOM(_userID, _userptr, _callbacks);
 }
 
+extern "C" void LDOMMetaLBResumeWaitingChares(LDHandle _db, int lb_ideal_period) {
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->MetaLBResumeWaitingChares(lb_ideal_period);
+}
+
+extern "C" void LDOMMetaLBCallLBOnChares(LDHandle _db) {
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->MetaLBCallLBOnChares();
+}
+
 extern "C" void * LDOMUserData(LDOMHandle &_h)
 {
   LBDB *const db = (LBDB*)(_h.ldb.handle);
@@ -61,7 +71,7 @@ extern "C" void LDUnregisterObj(LDObjHandle _h)
   return;
 }
 
-extern "C" const LDObjHandle &LDGetObjHandle(LDHandle h, int oh)
+const LDObjHandle &LDGetObjHandle(LDHandle h, int oh)
 {
   LBDB *const db = (LBDB*)(h.handle);
   LBObj *const obj = db->LbObjIdx(oh);

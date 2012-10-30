@@ -1,0 +1,15 @@
+module hi {
+
+  readonly CProxy_MainHi mainHi;
+
+  mainchare MainHi {
+    entry MainHi(CkArgMsg *m);
+    entry void StartHi(int elems);
+    entry void done(void);
+  };
+
+  array [1D] Hi {
+    entry Hi(CProxy_MainHi mp, int nElems);
+    entry void SayHi(int hiNo);
+  };        	
+};

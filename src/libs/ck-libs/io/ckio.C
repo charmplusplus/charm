@@ -5,7 +5,6 @@
 
 namespace Ck { namespace IO {
     Manager::Manager() : nextToken(0) {
-      __sdag_init();
       run();
     }
 
@@ -17,15 +16,16 @@ namespace Ck { namespace IO {
 
     void Manager::write(Token token, const char *data, size_t bytes, size_t offset) {
       Options &opts = files[token].opts;
-      do {
-	size_t stripe = offset / opts.peStripe;
-	int pe = opts.basePE + stripe * opts.skipPEs;
-	size_t bytesToSend = std::min(bytes, opts.peStripe - offset % opts.peStripe);
+      while (bytes > 0) {
+        size_t stripeIndex = offset / opts.peStripe;
+        int peIndex = stripeIndex % opts.activePEs;
+        int pe = opts.basePE + peIndex * opts.skipPEs;
+        size_t bytesToSend = std::min(bytes, opts.peStripe - offset % opts.peStripe);
 	thisProxy[pe].write_forwardData(token, data, bytesToSend, offset);
 	data += bytesToSend;
 	offset += bytesToSend;
 	bytes -= bytesToSend;
-      } while (bytes > 0);
+      }
     }
 
     void Manager::write_forwardData(Token token, const char *data, size_t bytes,

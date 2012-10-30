@@ -40,7 +40,7 @@ module pairCompute {
       // DMK - DEBUG
       #if (ENABLE_USER_EVENTS != 0) && defined(CMK_CELL) && (CMK_CELL == 0)
         if (numParticles != 256) { CkPrintf("[DEBUG] :: PairCompute::doCalc() - Called with numParticles:%d...\n", numParticles); }
-        double __start_time__ = CmiWallTimer();
+        double __start_time__ = CkWallTimer();
       #endif
 
       // Calculate the electrostatic force (coulumb's law) between the particles
@@ -373,7 +373,7 @@ module pairCompute {
 
       // DMK - DEBUG
       #if (ENABLE_USER_EVENTS != 0) && defined(CMK_CELL) && (CMK_CELL == 0)
-        double __end_time__ = CmiWallTimer();
+        double __end_time__ = CkWallTimer();
         double deltaTime = __end_time__ - __start_time__;
         traceUserBracketEvent(PROJ_USER_EVENT_PAIRCOMPUTE_DOCALC_WORK, __start_time__, __end_time__);
         if (deltaTime > 0.002) {

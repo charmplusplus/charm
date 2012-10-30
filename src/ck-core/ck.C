@@ -1398,24 +1398,33 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))             
-                        CmiSyncBroadcast(len, (char *)env);
+#if CMK_MESSAGE_LOGGING
+	if(env->flags & CK_FREE_MSG_MLOG)
+		CmiSyncBroadcastAndFree(len, (char *)env); 
+	else
+		CmiSyncBroadcast(len, (char *)env);
 #else
  			CmiSyncBroadcastAndFree(len, (char *)env); 
 #endif
 
 }
     else if (pe==CLD_BROADCAST_ALL) { 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))             
-                        CmiSyncBroadcastAll(len, (char *)env);
+#if CMK_MESSAGE_LOGGING
+	if(env->flags & CK_FREE_MSG_MLOG)
+		CmiSyncBroadcastAllAndFree(len, (char *)env);
+	else
+		CmiSyncBroadcastAll(len, (char *)env);
 #else
                         CmiSyncBroadcastAllAndFree(len, (char *)env);
 #endif
 
 }
     else{
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))             
-                        CmiSyncSend(pe, len, (char *)env);
+#if CMK_MESSAGE_LOGGING
+	if(env->flags & CK_FREE_MSG_MLOG)
+		CmiSyncSendAndFree(pe, len, (char *)env);
+	else
+		CmiSyncSend(pe, len, (char *)env);
 #else
                         CmiSyncSendAndFree(pe, len, (char *)env);
 #endif
@@ -1480,23 +1489,32 @@ void _noCldNodeEnqueue(int node, envelope *env)
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (node==CLD_BROADCAST) { 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CmiSyncNodeBroadcast(len, (char *)env);
+#if CMK_MESSAGE_LOGGING
+	if(env->flags & CK_FREE_MSG_MLOG)
+		CmiSyncNodeBroadcastAndFree(len, (char *)env); 
+	else
+		CmiSyncNodeBroadcast(len, (char *)env);
 #else
 	CmiSyncNodeBroadcastAndFree(len, (char *)env); 
 #endif
 }
   else if (node==CLD_BROADCAST_ALL) { 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-                CmiSyncNodeBroadcastAll(len, (char *)env);
+#if CMK_MESSAGE_LOGGING
+	if(env->flags & CK_FREE_MSG_MLOG)
+		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
+	else
+		CmiSyncNodeBroadcastAll(len, (char *)env);
 #else
 		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
 #endif
 
 }
   else {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CmiSyncNodeSend(node, len, (char *)env);
+#if CMK_MESSAGE_LOGGING
+	if(env->flags & CK_FREE_MSG_MLOG)
+		CmiSyncNodeSendAndFree(node, len, (char *)env);
+	else
+		CmiSyncNodeSend(node, len, (char *)env);
 #else
 	CmiSyncNodeSendAndFree(node, len, (char *)env);
 #endif
@@ -1588,7 +1606,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
   // VidBlock was not yet filled). The problem is that the creation was never
   // traced later when the VidBlock was filled. One solution is to trace the
   // creation here, the other to trace it in VidBlock->msgDeliver().
-#if defined(_FAULT_CAUSAL_)
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	sendChareMsg(env,destPE,_infoIdx,pCid);
 #else
   _TRACE_CREATION_1(env);
@@ -1673,9 +1691,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
-#if defined(_FAULT_MLOG_) 
-  sendTicketGroupRequest(env,pe,_infoIdx);
-#elif defined(_FAULT_CAUSAL_)
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	sendGroupMsg(env,pe,_infoIdx);
 #else
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
@@ -1823,9 +1839,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-#if defined(_FAULT_MLOG_)
-        sendTicketNodeGroupRequest(env,node,_infoIdx);
-#elif defined(_FAULT_CAUSAL_)
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	sendNodeGroupMsg(env,node,_infoIdx);
 #else
   numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1);
@@ -2004,9 +2018,7 @@ extern "C"
 void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   register envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
-#if defined(_FAULT_MLOG_)
-   sendTicketArrayRequest(env,pe,_infoIdx);
-#elif defined(_FAULT_CAUSAL_)
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	sendArrayMsg(env,pe,_infoIdx);
 #else
   if (opts & CK_MSG_IMMEDIATE)

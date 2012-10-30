@@ -9,7 +9,8 @@ inline void configureLineFFTInfo (LineFFTInfo *info,
 				  int grainX, int grainY, int grainZ,
 				  CkCallback  *kcallback,
 				  LineFFTCompletion complid,
-				  bool              normalize) 
+				  bool              normalize,
+				  int               numiter) 
 {  
   info->sizeX   =  sizeX;
   info->sizeY   =  sizeY;
@@ -24,6 +25,7 @@ inline void configureLineFFTInfo (LineFFTInfo *info,
   
   info->completionId = complid;
   info->normalize    = normalize;
+  info->numIter      = numiter;
 }
 
 
@@ -37,50 +39,58 @@ inline void  createLineFFTArray (LineFFTInfo *info) {
   CkAssert (info->grainY > 0);
   CkAssert (info->grainZ > 0);
   
-  info->xProxy = CProxy_LineFFTArray::ckNew();
-  info->yProxy = CProxy_LineFFTArray::ckNew();
-  info->zProxy = CProxy_LineFFTArray::ckNew();
+  int nx, ny, nz;
 
-  int x, y, z;
+  nx = info->sizeX / info->grainX;
+  ny = info->sizeY / info->grainY;
+  nz = info->sizeZ / info->grainZ;
 
-  double pe = 0.0;
-  double stride = 
-    (1.0 *CkNumPes() * info->grainZ * info->grainY)/
-    (info->sizeZ * info->sizeY);  
+  printf ("Creating Line FFT Array (%dx%dx%d, %dx%dx%d) on %d nodes, %d PEs\n",
+	  info->sizeX, 
+	  info->sizeY, 
+	  info->sizeZ, 
+	  info->grainX, 
+	  info->grainY, 
+	  info->grainZ,
+	  CmiNumNodes(),
+	  CkNumPes());
 
-  for (pe = 0.0, z = 0; z < (info->sizeZ)/(info->grainZ); z ++) {
-    for (y = 0; y < (info->sizeY)/(info->grainY); y++) {
-      if(pe >= CkNumPes()) pe = pe - CkNumPes();
-      info->xProxy(y, z).insert(*info, (int) PHASE_X, (int) pe);
-      pe +=  stride;
-    }
-  }
+  info->mapx =  CProxy_PencilMapX::ckNew(*info);
+  info->mapy =  CProxy_PencilMapY::ckNew(*info);
+  info->mapz =  CProxy_PencilMapZ::ckNew(*info);
+  
+  CkArrayOptions optsx;
+  optsx.setMap (info->mapx);
+  info->xProxy = CProxy_LineFFTArray::ckNew(*info, 
+					    (int) PHASE_X, optsx);
+
+  CkArrayOptions optsy;
+  optsy.setMap (info->mapy);
+  info->yProxy = CProxy_LineFFTArray::ckNew(*info, 
+					    (int) PHASE_Y, optsy);
+
+  CkArrayOptions optsz;
+  optsz.setMap (info->mapz);
+  info->zProxy = CProxy_LineFFTArray::ckNew(*info, 
+					    (int) PHASE_Z, optsz);
+  
+  int x,y,z;
+  for (z = 0; z < (info->sizeZ)/(info->grainZ); z ++) 
+    for (y = 0; y < (info->sizeY)/(info->grainY); y++)
+      info->xProxy(y, z).insert(*info, (int) PHASE_X);
+  
   info->xProxy.doneInserting();
-
-  stride = 
-    (1.0 *CkNumPes() * info->grainX * info->grainZ)/
-    (info->sizeX * info->sizeZ);  
-
-  for (pe=1.0, x = 0; x < (info->sizeX)/(info->grainX); x ++) {
-    for (z = 0; z < (info->sizeZ)/(info->grainZ); z ++) {
-      if(pe >= CkNumPes()) pe = pe - CkNumPes();
-      info->yProxy(z, x).insert(*info, (int) PHASE_Y, (int) pe);
-      pe += stride;
-    }
-  }
+  
+  for (x = 0; x < (info->sizeX)/(info->grainX); x ++)
+    for (z = 0; z < (info->sizeZ)/(info->grainZ); z ++) 
+      info->yProxy(z, x).insert(*info, (int) PHASE_Y);
+  
   info->yProxy.doneInserting();
   
-  stride = 
-    (1.0 *CkNumPes() * info->grainY * info->grainX)/
-    (info->sizeY * info->sizeX);  
-
-  for (pe=0.0, y = 0; y < (info->sizeY)/(info->grainY); y ++) {
-    for (x = 0; x < (info->sizeX)/(info->grainX); x ++) {
-      if(pe >= CkNumPes()) pe = pe - CkNumPes();
-      info->zProxy(x, y).insert(*info, (int) PHASE_Z, (int) pe);
-      pe += stride;
-    }
-  }
+  for (y = 0; y < (info->sizeY)/(info->grainY); y ++) 
+    for (x = 0; x < (info->sizeX)/(info->grainX); x ++) 
+      info->zProxy(x, y).insert(*info, (int) PHASE_Z);
+  
   info->zProxy.doneInserting();
 }
 

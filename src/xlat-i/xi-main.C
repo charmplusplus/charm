@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include <string>
+#include <list>
 
 using std::cout;
 using std::endl;
@@ -42,13 +43,13 @@ public:
   char *match(const char *k) { if (!strcmp(k, key)) return val; return NULL; }
 };
 
-static TList<MacroDefinition *> macros;
+static std::list<MacroDefinition *> macros;
 
 int macroDefined(const char *str, int istrue)
 {
-  MacroDefinition *def;
-  for (def = macros.begin(); !macros.end(); def=macros.next()) {
-    char *val = def->match(str);
+  std::list<MacroDefinition *>::iterator def;
+  for (def = macros.begin(); def != macros.end(); ++def) {
+    char *val = (*def)->match(str);
     if (val) {
       if (!istrue) return 1;
       else return atoi(val);
@@ -151,7 +152,7 @@ int main(int argc, char *argv[])
       if (strcmp(argv[i],"-ansi")==0);
       else if (strcmp(argv[i],"-f90")==0)  fortranMode = 1;
       else if (strcmp(argv[i],"-intrinsic")==0)  internalMode = 1;
-      else if (strncmp(argv[i],"-D", 2)==0)  macros.append(new MacroDefinition(argv[i]+2));
+      else if (strncmp(argv[i],"-D", 2)==0)  macros.push_back(new MacroDefinition(argv[i]+2));
       else if (strncmp(argv[i], "-M", 2)==0) dependsMode = true;
       else if (strcmp(argv[i], "-count-tokens")==0) countTokens = true;
       else abortxi(argv[0]);
@@ -169,6 +170,7 @@ int main(int argc, char *argv[])
   ModuleList *m = Parse(openFile(fname)) ;
   if (!m) return 0;
   m->preprocess();
+  m->check();
   if (dependsMode)
   {
       std::string ciFileBaseName = fname;

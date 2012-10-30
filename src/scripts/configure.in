@@ -552,6 +552,27 @@ else
   test_finish 1
 fi
 
+
+AC_ARG_WITH([prio-type],
+            [AS_HELP_STRING([--with-prio-type=type],
+                            [size of expected message priorities])],
+            [], [with_prio_type=bitvec])
+
+if test "$with_prio_type" = "char" -o "$with_prio_type" = "short" -o "$with_prio_type" = "int" -o "$with_prio_type" = "long" -o "$with_prio_type" = "float" -o "$with_prio_type" = "double"
+then
+  Echo "Configuring support for message priorities of sizeof type $with_prio_type"
+  AC_DEFINE_UNQUOTED(CMK_USE_STL_MSGQ, 1, [whether charm scheduler should use an STL-based msg q])
+  AC_DEFINE_UNQUOTED(CMK_MSG_PRIO_TYPE, $with_prio_type, [expected message priorities are sizeof $with_prio_type])
+elif test "$with_prio_type" = "bitvec"
+then
+  Echo "Configuring support for message priorities of arbitrary size (bitvectors)"
+  AC_DEFINE_UNQUOTED(CMK_USE_STL_MSGQ, 0, [whether charm scheduler should use an STL-based msg q])
+  AC_DEFINE_UNQUOTED(CMK_MSG_PRIO_TYPE, $with_prio_type, [expected message priorities are arbitrarily sized])
+else
+  Echo "Invalid size ($with_prio_type) specified for message priorities. Can only accept char, short, int, long, float, double and bitvec"
+  test_finish 1
+fi
+
 #### Check if compiler if 64 bit ####
 cat > $t <<EOT
 #include <stdio.h>
@@ -647,7 +668,7 @@ cat > $t <<EOT
 #include <stdlib.h>
 long long foo(void) { return 17; }
 EOT
-test_cxx "whether long long works" "ok" "no" ""
+test_cxx "whether long long works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_LONG_LONG_DEFINED, $pass, [whether long long works])
 
 #### Check __int64 ####
@@ -655,15 +676,48 @@ cat > $t <<EOT
 #include <stdlib.h>
 __int64 foo(void) { return 17; }
 EOT
-test_cxx "whether __int64 works" "ok" "no" ""
+test_cxx "whether __int64 works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int64_DEFINED], $pass, [whether __int64 works])
+
+#### Check __int128 ####
+cat > $t <<EOT
+#include <stdlib.h>
+int foo(void) {
+  __int128   a;
+  int x[[(int)(sizeof(__int128) - 15)]]={0};
+  return x[[0]];
+}
+EOT
+test_cxx "whether __int128 (128-bit integer) works" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK___int128_DEFINED], $pass, [whether __int128 works])
+if test $pass -eq 1
+then
+  add_flag CMK_HAS_INT16=1
+fi
+
+#### Check __int128_t ####
+cat > $t <<EOT
+#include <stdlib.h>
+int foo(void) {
+  __int128_t   a;
+  __uint128_t   b;
+  int x[[(int)(sizeof(__int128_t) - 15)]]={0};
+  return x[[0]];
+}
+EOT
+test_cxx "whether __int128_t (128-bit integer) works" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK___int128_t_DEFINED], $pass, [whether __int128_t works])
+if test $pass -eq 1
+then
+  add_flag CMK_HAS_INT16=1
+fi
 
 #### Check long double ####
 cat > $t <<EOT
 #include <stdlib.h>
 long double foo(void) { return 17.0; }
 EOT
-test_cxx "whether long double works" "ok" "no" ""
+test_cxx "whether long double works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_LONG_DOUBLE_DEFINED, $strictpass, [whether long double works])
 
 #### Check ucontext and FPU pointer ####
@@ -861,6 +915,38 @@ test_cxx "whether std::unordered_map is defined" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STD_UNORDERED_MAP, $pass, [whether std::unordered_map works])
 
 
+#### check if anon structs are permitted #####
+cat > $t <<EOT
+#include <iostream>
+using std::cout;
+
+struct idx
+{
+    const static int dims = 3;
+    union
+    {
+        int data[[dims]];
+        struct { int x, y, z; };
+    };
+
+    idx(const int i=0, const int j=0, const int k=0): x(i), y(j), z(k) {}
+};
+
+int main()
+{
+    cout<<"Hello World!\n";
+    idx myidx(1, 2, 3);
+    cout<< "idx = ("
+        << myidx.data[[0]] << ","
+        << myidx.data[[1]] << ","
+        << myidx.z << ")\n";
+    return (myidx.data[[0]] == 1 && myidx.y == 2 && myidx.data[[2]] == 3);
+}
+EOT
+test_cxx "whether anon structs are permitted" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_ANON_STRUCTS, $pass, [whether anon structs are permitted])
+
+
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
 class foo {
@@ -894,7 +980,7 @@ AC_DEFINE_UNQUOTED(CMK_HAS_OFFSETOF, $pass, [whether offsetof exists])
 cat > $t <<EOT
 double foo(void)
 {
-  unsigned long long int v;
+  unsigned long long int v=0;
   int *lo=0+(int *)&v;
   int *hi=1+(int *)&v;
   __asm__ __volatile__(
@@ -1812,6 +1898,38 @@ int main() {
 EOT
 test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
 AC_DEFINE_UNQUOTED(CMK_HAS_RCALIB, $pass, [whether Cray rca library is available])
+
+#### test if Cray mesh dimension query function will work ####
+cat > $tc <<EOT
+#include <rca_lib.h>
+
+int main() {
+    rca_mesh_coord_t xyz;
+    rca_get_max_dimension(&xyz);
+
+    return 0;
+}
+EOT
+test_linkc "whether Cray rca_has get_max_dimension" "yes" "no" "-lrca"
+AC_DEFINE_UNQUOTED(CMK_HAS_RCA_MAX_DIMENSION, $pass, [whether Cray rca has rca_get_max_dimension])
+
+#### query Cray machine max NID ####
+
+cmd=`which xtprocadmin 2>/dev/null`
+if test -n "$cmd"
+then
+    #maxnid=`xtprocadmin  | tail -1  | awk '{print $1}'`
+    # workaround for hopper
+    (export SHELL=/bin/csh; xtprocadmin >& t.$$)
+    maxnid=`cat t.$$  | tail -1  | awk '{print $1}'`
+    /bin/rm -f t.$$
+    AC_MSG_CHECKING(Cray machine maxnid)
+    AC_MSG_RESULT("$maxnid")
+    if test -n "$maxnid"
+    then
+    AC_DEFINE_UNQUOTED(CMK_CRAY_MAXNID, $maxnid, [Cray MAXNID])
+    fi
+fi
 
 fi
 

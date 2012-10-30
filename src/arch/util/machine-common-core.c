@@ -487,9 +487,10 @@ CpvExtern(int, _urgentSend);
 #if CMK_C_INLINE
 inline 
 #endif
-CmiCommHandle CmiSendNetworkFunc(int destNode, int size, char *msg, int mode)
+CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode)
 {
         int rank;
+        int destNode = CmiNodeOf(destPE); 
 #if CMK_USE_PXSHM
         if (CmiValidPxshm(destNode, size)) {
           CmiSendMessagePxshm(msg, size, destNode, &refcount);
@@ -525,7 +526,7 @@ if (MSG_STATISTIC)
 #if CMK_USE_OOB
     if (CpvAccess(_urgentSend)) mode |= OUT_OF_BAND;
 #endif
-    return LrtsSendFunc(destNode, size, msg, mode);
+    return LrtsSendFunc(destPE, size, msg, mode);
 }
 
 void CmiFreeSendFn(int destPE, int size, char *msg) {
@@ -550,7 +551,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = destRank;
-        CmiSendNetworkFunc(destNode, size, msg, P2P_SYNC);
+        CmiSendNetworkFunc(destPE, size, msg, P2P_SYNC);
 #if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) CpvAccess(curphs)++;
 #endif
@@ -613,7 +614,7 @@ if (  MSG_STATISTIC)
     msg_histogram[ret_log]++;
 }
 #endif
-        CmiSendNetworkFunc(destNode, size, msg, P2P_SYNC);
+        CmiSendNetworkFunc(CmiNodeFirst(destNode), size, msg, P2P_SYNC);
     }
 #if CMK_PERSISTENT_COMM
     if (CpvAccess(phs)) CpvAccess(curphs)++;
@@ -635,7 +636,7 @@ if (  MSG_STATISTIC)
         msg_histogram[ret_log]++;
 }
 #endif
-        return CmiSendNetworkFunc(destNode, size, msg, P2P_ASYNC);
+        return CmiSendNetworkFunc(CmiNodeFirst(destNode), size, msg, P2P_ASYNC);
     }
 }
 #endif

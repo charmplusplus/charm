@@ -21,7 +21,7 @@ using std::sprintf;
 // length of 0
 bool test_empty()
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
   bool result = (0 == q.size()) && (q.empty());
   return result;
 }
@@ -32,7 +32,7 @@ bool test_empty()
 // The queue is not allowed to dereference the void* we give it
 bool test_one()
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
   void *p = 0;
   q.enq(p);
   bool result = (1 == q.size()) && (!q.empty());
@@ -47,7 +47,7 @@ bool test_one()
 // Put two in, see if we get the same two back. Order unspecified
 bool test_two()
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
   void *i = 0, *j = (char *)1;
   void *r, *s;
   q.enq(i);
@@ -62,7 +62,7 @@ bool test_two()
 
 bool test_fifo()
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
   void *i = (char *)1, *j = (char *)2, *k = (char *)3;
   void *r, *s, *t;
   q.enq(i);
@@ -77,7 +77,7 @@ bool test_fifo()
 
 bool test_lifo()
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
   void *i = (char *)1, *j = (char *)2, *k = (char *)3;
   void *r, *s, *t;
   q.enq(i, 0, false);
@@ -92,7 +92,7 @@ bool test_lifo()
 
 bool test_enqueue_mixed()
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
   void *i = (char *)1, *j = (char *)2, *k = (char *)3;
   void *r, *s, *t;
   q.enq(i);
@@ -117,7 +117,7 @@ static bool findEntry(void ** const e, int num, void * const t)
 
 bool test_enumerate()
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
   void *i = (char *)1, *j = (char *)2, *k = (char *)3;
   q.enq(i);
   q.enq(j);
@@ -131,7 +131,7 @@ bool test_enumerate()
 
 bool test_stl_ififo()
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
   void *i = (char *)1, *j = (char *)2, *k = (char *)3, *l = (char*)4;
   unsigned int a = -1, b = 0, c = 1, d = -1;
   q.enq(i, d, true);
@@ -159,10 +159,10 @@ std::vector<unsigned int> prios(qSizeMax + numMsgs);
 
 double timePerOp_stlQ(int qBaseSize = 256)
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
 
   for (int i = 0; i < qBaseSize; i++)
-      q.enq((msg_t*)&msgs[i], prios[i]);
+      q.enq((conv::msg_t*)&msgs[i], prios[i]);
 
   double startTime = CmiWallTimer();
   for (int i = 0; i < numIters; i++)
@@ -170,7 +170,7 @@ double timePerOp_stlQ(int qBaseSize = 256)
     for (int strt = qBaseSize; strt < qBaseSize + numMsgs; strt += qBatchSize)
     {
       for (int j = strt; j < strt + qBatchSize; j++)
-        q.enq((msg_t*)&msgs[j], prios[j]);
+        q.enq((conv::msg_t*)&msgs[j], prios[j]);
       void *m;
       for (int j = 0; j < qBatchSize; j++)
         q.deq();
@@ -183,6 +183,19 @@ double timePerOp_stlQ(int qBaseSize = 256)
 
 bool perftest_general_ififo()
 {
+  std::vector<double> timings;
+  timings.reserve(256);
+  // Charm applications typically have a small/moderate number of different message priorities
+  for (int hl = 16; hl <= 128; hl *=2)
+  {
+    std::srand(42);
+    for (int i = 0; i < qSizeMax + numMsgs; i++)
+      prios[i] = std::rand() % hl;
+
+    for (int i = qSizeMin; i <= qSizeMax; i *= 2)
+      timings.push_back( timePerOp_stlQ(i) );
+  }
+
   #if CMK_HAS_STD_UNORDERED_MAP
   CkPrintf("The STL variant of the msg q is using a std::unordered_map\n");
   #else
@@ -198,16 +211,11 @@ bool perftest_general_ififo()
   for (int i = qSizeMin; i <= qSizeMax; i*=2)
     CkPrintf("%10d", i);
 
-  // Charm applications typically have a small/moderate number of different message priorities
-  for (int hl = 16; hl <= 128; hl *=2)
+  for (int hl = 16, j=0; hl <= 128; hl *=2)
   {
-    std::srand(42);
-    for (int i = 0; i < qSizeMax + numMsgs; i++)
-      prios[i] = std::rand() % hl;
-
     CkPrintf("\n    stl %7d", hl);
-    for (int i = qSizeMin; i <= qSizeMax; i *= 2)
-      CkPrintf("%10.4f", timePerOp_stlQ(i));
+    for (int i = qSizeMin; i <= qSizeMax; i *= 2, j++)
+      CkPrintf("%10.4f", timings[j]);
   }
 
   CkPrintf("\n");
@@ -219,7 +227,7 @@ bool perftest_general_ififo()
 // Template for new harness-driven tests
 bool test_foo()
 {
-  msgQ<int> q;
+  conv::msgQ<int> q;
 
   bool result = ;
   return result;

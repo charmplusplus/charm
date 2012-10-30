@@ -11,7 +11,7 @@ extern unsigned char in_comment;
 void yyerror(const char *);
 extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
-extern TList<Entry *> *connectEntries;
+extern std::list<Entry *> connectEntries;
 ModuleList *modlist;
 namespace xi {
 extern int macroDefined(const char *str, int istrue);
@@ -54,6 +54,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
   int intval;
   Chare::attrib_t cattr;
   SdagConstruct *sc;
+  WhenConstruct *when;
   XStr* xstrptr;
   AccelBlock* accelBlock;
 }
@@ -103,11 +104,12 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %token ACCELBLOCK
 %token MEMCRITICAL
 %token REDUCTIONTARGET
+%token CASE
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
-%type <construct>	Construct
+%type <construct>	Construct ConstructSemi
 %type <strval>		Name QualName CCode CPROGRAM_List OptNameInit 
 %type <strval>		OptTraceName
 %type <val>		OptStackSize
@@ -136,7 +138,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %type <accelBlock>      AccelBlock
 %type <typelist>	BaseList OptBaseList
 %type <mbrlist>		MemberEList MemberList
-%type <member>		Member NonEntryMember InitNode InitProc
+%type <member>		Member MemberBody NonEntryMember InitNode InitProc UnexpectedToken
 %type <pupable>		PUPableClass
 %type <includeFile>	IncludeFile
 %type <tvar>		TVar
@@ -146,7 +148,8 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %type <mv>		Var
 %type <mvlist>		VarList
 %type <intval>		ParamBraceStart ParamBraceEnd SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
-%type <sc>		Slist SingleConstruct Olist OptSdagCode HasElse ForwardList PublishesList OptPubList
+%type <sc>		Slist SingleConstruct Olist OptSdagCode HasElse ForwardList PublishesList OptPubList CaseList
+%type <when>            WhenConstruct NonWhenConstruct
 %type <intval>		PythonOptions
 
 %%
@@ -212,19 +215,35 @@ ConstructList	: /* Empty */
 		{ $$ = new ConstructList(lineno, $1, $2); }
 		;
 
+ConstructSemi   : USING NAMESPACE QualName
+                { $$ = new UsingScope($3, false); }
+                | USING QualName
+                { $$ = new UsingScope($2, true); }
+                | OptExtern NonEntryMember
+                { $2->setExtern($1); $$ = $2; }
+                | OptExtern Message
+                { $2->setExtern($1); $$ = $2; }
+                | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters
+                {
+                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, 0, 0);
+                  int isExtern = 1;
+                  e->setExtern(isExtern);
+                  e->targs = $6;
+                  e->label = new XStr;
+                  $4->print(*e->label);
+                  $$ = e;
+                }
+                ;
+
 Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         { if($3) $3->setExtern($1); $$ = $3; }
         | NAMESPACE Name '{' ConstructList '}'
         { $$ = new Scope($2, $4); }
-        | USING NAMESPACE QualName ';'
-        { $$ = new UsingScope($3, false); }
-        | USING QualName ';'
-        { $$ = new UsingScope($2, true); }
+        | ConstructSemi ';'
+        { $$ = $1; }
+        | ConstructSemi UnexpectedToken
+        { yyerror("The preceding construct must be semicolon terminated"); YYABORT; }
         | OptExtern Module
-        { $2->setExtern($1); $$ = $2; }
-        | OptExtern NonEntryMember
-        { $2->setExtern($1); $$ = $2; }
-        | OptExtern Message ';'
         { $2->setExtern($1); $$ = $2; }
         | OptExtern Chare
         { $2->setExtern($1); $$ = $2; }
@@ -236,22 +255,14 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         { $2->setExtern($1); $$ = $2; }
         | OptExtern Template
         { $2->setExtern($1); $$ = $2; }
-        | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters ';'
-        {
-          Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, 0, 0);
-          int isExtern = 1;
-          e->setExtern(isExtern);
-          e->targs = $6;
-          e->label = new XStr;
-          $4->print(*e->label);
-          $$ = e;
-        }
         | HashIFComment
         { $$ = NULL; }
         | HashIFDefComment
         { $$ = NULL; }
         | AccelBlock
         { $$ = $1; }
+        | error
+        { printf("Invalid construct\n"); YYABORT; }
         ;
 
 TParam		: Type
@@ -350,9 +361,9 @@ BaseType	: SimpleType
 		{ $$ = $1; }
 		//{ $$ = $1; }
 		| CONST BaseType 
-		{ $$ = $2; }
+		{ $$ = new ConstType($2); }
 		| BaseType CONST
-		{ $$ = $1; }
+		{ $$ = new ConstType($1); }
 		;
 
 Type		: BaseType '&'
@@ -599,20 +610,9 @@ MemberEList	: ';'
 
 MemberList	: /* Empty */
 		{ 
-		  Entry *tempEntry;
-		  if (!connectEntries->empty()) {
-		    tempEntry = connectEntries->begin();
-		    MemberList *ml;
-		    ml = new MemberList(tempEntry, 0);
-		    tempEntry = connectEntries->next();
-		    for(; !connectEntries->end(); tempEntry = connectEntries->next()) {
-                      ml->appendMember(tempEntry); 
-		    }
-		    while (!connectEntries->empty())
-		      connectEntries->pop();
-                    $$ = ml; 
-		  }
-		  else {
+                  if (!connectEntries.empty()) {
+                    $$ = new MemberList(connectEntries);
+		  } else {
 		    $$ = 0; 
                   }
 		}
@@ -620,18 +620,18 @@ MemberList	: /* Empty */
 		{ $$ = new MemberList($1, $2); }
 		;
 
-NonEntryMember  : Readonly ';'
+NonEntryMember  : Readonly
 		{ $$ = $1; }
-		| ReadonlyMsg ';'
+		| ReadonlyMsg
 		{ $$ = $1; }
-		| InitProc ';'
-		| InitNode ';'
+		| InitProc
+		| InitNode
 		{ $$ = $1; }
-		| PUPABLE PUPableClass ';'
+		| PUPABLE PUPableClass
 		{ $$ = $2; }
-		| INCLUDE IncludeFile ';'
+		| INCLUDE IncludeFile
 		{ $$ = $2; }
-		| CLASS Name ';'
+		| CLASS Name
 		{ $$ = new ClassDeclaration(lineno,$2); } 
 		;
 
@@ -680,9 +680,16 @@ IncludeFile    : LITERAL
 		{ $$ = new IncludeFile(lineno,$1); } 
 		;
 
-Member		: Entry ';'
+Member          : MemberBody ';'
+                { $$ = $1; }
+                // Error constructions
+                | MemberBody UnexpectedToken
+                { yyerror("The preceding entry method declaration must be semicolon-terminated."); YYABORT; }
+                ;
+
+MemberBody	: Entry
 		{ $$ = $1; }
-                | TemplateSpec Entry ';'
+                | TemplateSpec Entry
                 {
                   $2->tspec = $1;
                   $$ = $2;
@@ -690,6 +697,29 @@ Member		: Entry ';'
 		| NonEntryMember
 		{ $$ = $1; }
 		;
+
+UnexpectedToken : ENTRY
+                { $$ = 0; }
+                | '}'
+                { $$ = 0; }
+                | INITCALL
+                { $$ = 0; }
+                | INITNODE
+                { $$ = 0; }
+                | INITPROC
+                { $$ = 0; }
+                | CHARE
+                { $$ = 0; }
+                | MAINCHARE
+                { $$ = 0; }
+                | ARRAY
+                { $$ = 0; }
+                | GROUP
+                { $$ = 0; }
+                | NODEGROUP
+                { $$ = 0; }
+                | READONLY
+                { $$ = 0; }
 
 Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
@@ -746,6 +776,8 @@ EAttribs	: /* Empty */
 		{ $$ = 0; }
 		| '[' EAttribList ']'
 		{ $$ = $2; }
+                | error
+                { printf("Invalid entry method attribute list\n"); YYABORT; }
 		;
 
 EAttribList	: EAttrib
@@ -782,8 +814,10 @@ EAttrib		: THREADED
                 { $$ = SPYTHON; }
 		| MEMCRITICAL
 		{ $$ = SMEM; }
-        | REDUCTIONTARGET
-        { $$ = SREDUCE; }
+                | REDUCTIONTARGET
+                { $$ = SREDUCE; }
+		| error
+		{ printf("Invalid entry method attribute: %s\n", yylval); YYABORT; }
 		;
 
 DefaultParameter: LITERAL
@@ -978,6 +1012,14 @@ Olist		: SingleConstruct
 		{ $$ = new SdagConstruct(SOLIST, $1, $2); } 
 		;
 
+CaseList        : WhenConstruct
+                { $$ = new SdagConstruct(SCASELIST, $1); }
+		| WhenConstruct CaseList
+		{ $$ = new SdagConstruct(SCASELIST, $1, $2); }
+                | NonWhenConstruct
+                { yyerror("Case blocks in SDAG can only contain when clauses."); YYABORT; }
+		;
+
 OptPubList	: /* Empty */
 		{ $$ = 0; }
 		| PUBLISHES '(' PublishesList ')'
@@ -996,6 +1038,32 @@ OptTraceName	: LITERAL
 		 { $$ = 0; }
 		;
 
+WhenConstruct   : WHEN SEntryList '{' '}'
+		{ $$ = new WhenConstruct($2, 0); }
+		| WHEN SEntryList SingleConstruct
+		{ $$ = new WhenConstruct($2, $3); }
+		| WHEN SEntryList '{' Slist '}'
+		{ $$ = new WhenConstruct($2, $4); }
+                ;
+
+NonWhenConstruct : ATOMIC
+                 { $$ = 0; }
+                 | CONNECT
+                 { $$ = 0; }
+                 | OVERLAP
+                 { $$ = 0; }
+                 | FOR
+                 { $$ = 0; }
+                 | FORALL
+                 { $$ = 0; }
+                 | IF
+                 { $$ = 0; }
+                 | WHILE
+                 { $$ = 0; }
+                 | FORWARD
+                 { $$ = 0; }
+                 ;
+
 SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPubList 
                  {
 		   $$ = buildAtomic($4, $6, $2);
@@ -1005,23 +1073,21 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		   in_braces = 0;
 		   if (($4->isVoid() == 0) && ($4->isMessage() == 0))
                    {
-		      connectEntries->append(new Entry(0, 0, new BuiltinType("void"), $3, 
+		      connectEntries.push_back(new Entry(0, 0, new BuiltinType("void"), $3,
 	 	 			new ParamList(new Parameter(lineno, new PtrType( 
                                         new NamedType("CkMarshallMsg")), "_msg")), 0, 0, 0, 1, $4));
 		   }
 		   else  {
-		      connectEntries->append(new Entry(0, 0, new BuiltinType("void"), $3, $4, 0, 0, 0, 1, $4));
+		      connectEntries.push_back(new Entry(0, 0, new BuiltinType("void"), $3, $4, 0, 0, 0, 1, $4));
                    }
                    $$ = new SdagConstruct(SCONNECT, $3, $7, $4);
 		}
-		| WHEN SEntryList '{' '}'
-		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, 0,  $2); }
-		| WHEN SEntryList SingleConstruct
-		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, $3, $2); }
-		| WHEN SEntryList '{' Slist '}'
-		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, $4, $2); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new SdagConstruct(SOVERLAP,0, 0,0,0,0,$3, 0); }	
+                | WhenConstruct
+                { $$ = $1; }
+		| CASE '{' CaseList '}'
+		{ $$ = new SdagConstruct(SCASE, 0, 0, 0, 0, 0, $3, 0); }
 		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr '{' Slist '}'
 		{ $$ = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5),
 		             new SdagConstruct(SINT_EXPR, $7), 0, $10, 0); }
@@ -1039,13 +1105,18 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		| IF StartIntExpr CCode EndIntExpr '{' Slist '}' HasElse
 		{ $$ = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, $3), $8,0,0,$6,0); }
 		| WHILE StartIntExpr CCode EndIntExpr SingleConstruct 
-		{ $$ = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$5,0); }
+		{ $$ = new SdagConstruct(SWHILE, 0, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$5,0); }
 		| WHILE StartIntExpr CCode EndIntExpr '{' Slist '}' 
 		{ $$ = new SdagConstruct(SWHILE, 0, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$6,0); }
 		| FORWARD ForwardList ';'
 		{ $$ = $2; }
 		| ParamBraceStart CCode ParamBraceEnd
 		{ $$ = buildAtomic($2, NULL, NULL); }
+                | error
+                { printf("Unknown SDAG construct or malformed entry method definition.\n"
+                         "You may have forgotten to terminate an entry method definition with a"
+                         " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'\n"); YYABORT; }
+                ;
 
 HasElse		: /* Empty */
 		{ $$ = 0; }

@@ -94,7 +94,7 @@ int maxY = -1;
 int maxZ = -1;
 int maxNID = -1;
 #if CMK_HAS_RCALIB
-rca_mesh_coord_t  *coords = NULL;
+rca_mesh_coord_t  *rca_coords = NULL;
 #endif
 
 void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim);
@@ -105,7 +105,7 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim);
  */
 int getMeshCoord(int nid, int *x, int *y, int *z) {
 #if CMK_HAS_RCALIB
-  if (coords == NULL) {
+  if (rca_coords == NULL) {
   rca_mesh_coord_t xyz;
   int ret = -1;
   ret = rca_get_meshcoord(nid, &xyz);
@@ -116,9 +116,9 @@ int getMeshCoord(int nid, int *x, int *y, int *z) {
   return ret;
   }
   else {
-  *x = coords[nid].mesh_x;
-  *y = coords[nid].mesh_y;
-  *z = coords[nid].mesh_z;
+  *x = rca_coords[nid].mesh_x;
+  *y = rca_coords[nid].mesh_y;
+  *z = rca_coords[nid].mesh_z;
   return *x==-1?-1:0;
   }
 #else
@@ -185,16 +185,16 @@ void pidtonid(int numpes) {
 
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   int i, nid, ret;
-  CmiAssert(coords == NULL);
-  coords = (rca_mesh_coord_t *)malloc(sizeof(rca_mesh_coord_t)*(maxNID+1));
+  CmiAssert(rca_coords == NULL);
+  rca_coords = (rca_mesh_coord_t *)malloc(sizeof(rca_mesh_coord_t)*(maxNID+1));
   for (i=0; i<maxNID; i++) {
-    coords[i].mesh_x = coords[i].mesh_y = coords[i].mesh_z = -1;
+    rca_coords[i].mesh_x = rca_coords[i].mesh_y = rca_coords[i].mesh_z = -1;
   }
   for (i=0; i<numpes; i++) {
     PMI_Get_nid(CmiNodeOf(i), &nid);
     pid2nid[i] = nid;
     CmiAssert(nid < maxNID);
-    ret = rca_get_meshcoord(nid, &coords[nid]);
+    ret = rca_get_meshcoord(nid, &rca_coords[nid]);
     CmiAssert(ret != -1);
   }
 #endif
@@ -205,6 +205,8 @@ void pidtonid(int numpes) {
 void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 {
   int i = 0, ret;
+  rca_mesh_coord_t dimsize;
+
   CmiLock(cray_lock2);
 
   if(maxNID != -1) {
@@ -216,11 +218,31 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 	return;
   }
 
+#if CMK_HAS_RCA_MAX_DIMENSION
+  // rca_get_meshtopology(&mnid);
+  rca_get_max_dimension(&dimsize);
+  maxX = *xdim = dimsize.mesh_x+1;
+  maxY = *ydim = dimsize.mesh_y+1;
+  maxZ = *zdim = dimsize.mesh_z+1;
+  maxNID = *maxnid = *xdim * *ydim * *zdim * 2;
+
+#else
+
   *xdim = *ydim = *zdim = 0;
     /* loop until fails to find the max */ 
   do {
       int x, y, z;
       ret = getMeshCoord(i, &x, &y, &z);
+      if (ret == -1) {
+#if CMK_CRAY_MAXNID
+          if (i<=CMK_CRAY_MAXNID) {
+              i++;
+              ret = 0;
+              continue;
+          }
+#endif
+          break;
+      }
       if (x>*xdim) *xdim = x;
       if (y>*ydim) *ydim = y;
       if (z>*zdim) *zdim = z;
@@ -230,7 +252,11 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   maxX = *xdim = *xdim+1;
   maxY = *ydim = *ydim+1;
   maxZ = *zdim = *zdim+1;
+#endif
+
   CmiUnlock(cray_lock2);
+
+  /* printf("%d %d %d %d\n", *maxnid, *xdim, *ydim, *zdim); */
 }
 
 void craynid_init()

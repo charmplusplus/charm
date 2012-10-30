@@ -2,7 +2,6 @@
 
 CompletionDetector::CompletionDetector()
 {
-    __sdag_init();
     init();
 }
 

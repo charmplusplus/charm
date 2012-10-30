@@ -646,6 +646,11 @@ void LogPool::flushLogBuffer()
     numEntries = 0;
     new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
     new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
+    //CkPrintf("Warning: Projections log flushed to disk on PE %d.\n", CkMyPe());
+    if (!traceProjectionsGID.isZero()) {    // report flushing events to PE 0
+      CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
+      bocProxy[0].flush_warning(CkMyPe());
+    }
   }
 }
 
@@ -1236,6 +1241,9 @@ void TraceProjections::traceClose(void)
   delete _logPool;              // will write
   // remove myself from traceArray so that no tracing will be called.
   CkpvAccess(_traces)->removeTrace(this);
+
+  CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
+  bocProxy.ckLocalBranch()->print_warning();
 #endif
 }
 
@@ -1253,8 +1261,12 @@ void TraceProjections::closeTrace() {
     _logPool->writeRC();
     _logPool->writeTopo();
     // CkPrintf("Pe 0 has now written sts and projrc files\n");
+
+    CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
+    bocProxy.ckLocalBranch()->print_warning();
   }
   delete _logPool;	 // will write logs to file
+
 }
 
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -1978,6 +1990,29 @@ void TraceProjectionsBOC::traceProjectionsParallelShutdown(int pe) {
   bocProxy[CkMyPe()].startTimeAnalysis();
   else
   bocProxy[CkMyPe()].startEndTimeAnalysis();
+}
+
+// handle flush log warnings
+void TraceProjectionsBOC::flush_warning(int pe) 
+{
+    CmiAssert(CkMyPe() == 0);
+    std::set<int>::iterator it;
+    it = list.find(pe);
+    if (it == list.end())    list.insert(pe);
+    flush_count++;
+}
+
+void TraceProjectionsBOC::print_warning() 
+{
+    CmiAssert(CkMyPe() == 0);
+    std::set<int>::iterator it;
+    CkPrintf("*************************************************************\n");
+    CkPrintf("Warning: Projections log flushed to disk %d times on %d cores: ", flush_count, list.size());
+    for (it=list.begin(); it!=list.end(); it++)
+      CkPrintf("%d ", *it);
+    CkPrintf(".\n");
+    CkPrintf("Warning: The performance data is likely invalid, unless the flushes have been explicitly synchronized by your program. \n");
+    CkPrintf("*************************************************************\n");
 }
 
 // Called on each processor

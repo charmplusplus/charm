@@ -2,6 +2,7 @@
 #define _sdag_H_
 
 #include "charm++.h"
+#include <vector>
 
 class CMsgBuffer {
   public:
@@ -38,10 +39,11 @@ class CWhenTrigger {
     int nEntries;
     int entries[MAXREF];
     int refnums[MAXREF];
+    int speculationIndex;
 
     CWhenTrigger *next;
     CWhenTrigger(int id, int na, int ne, int nae) :
-       whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne), next(NULL) {}
+      whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne), next(NULL), speculationIndex(-1) {}
     CWhenTrigger(): next(NULL) {}
     void pup(PUP::er& p) {
       p|whenID;
@@ -57,6 +59,7 @@ class CWhenTrigger {
       // as well as checkpointing
       p(args, MAXARG);
       //if (p.isUnpacking()) args[0]=0;            // HACK for load balancer
+      p|speculationIndex;
     }
 };
 
@@ -267,6 +270,7 @@ class CDep {
    int *numEntryDepends;
    TListCMsgBuffer ***whenDepends;
    TListCWhenTrigger ***entryDepends;
+   int curSpeculationIndex;
 
  public:
    void pup(PUP::er& p) {
@@ -283,6 +287,7 @@ class CDep {
      p(numWhenDepends, numWhens);
      p(numEntryDepends, numEntries);
 
+     p | curSpeculationIndex;
 /*
      // don't actually pack this info because it gets created once 
      // the addDepends() in the initialization scheme are called for this class
@@ -304,7 +309,7 @@ class CDep {
 */
    }
 
-   CDep(int ne, int nw) : numEntries(ne), numWhens(nw) { initMem(); }
+   CDep(int ne, int nw) : numEntries(ne), numWhens(nw), curSpeculationIndex(0) { initMem(); }
 
    ~CDep() {
      int i;
@@ -364,8 +369,7 @@ class CDep {
 
    // deregister trigger from all
    // the entries it is registered for
-   void deRegister(CWhenTrigger *trigger)
-   {
+   void deRegister(CWhenTrigger *trigger) {
      whens[trigger->whenID]->remove(trigger);
    }
 
@@ -448,6 +452,28 @@ class CDep {
      }
      return 1;
    }
+
+   int getAndIncrementSpeculationIndex() {
+     return curSpeculationIndex++;
+   }
+
+   void removeAllSpeculationIndex(int speculationIndex) {
+     for (int i = 0; i < numWhens; i++) {
+       TListCWhenTrigger *wlist = whens[i];
+       CWhenTrigger *elem = wlist->begin();
+       while (elem && !wlist->end()) {
+         if (elem->speculationIndex == speculationIndex) {
+           CWhenTrigger *cancelled = elem;
+           deRegister(elem);
+           elem = wlist->next();
+           delete cancelled;
+         } else {
+           elem = wlist->next();
+         }
+       }
+     }
+   }
+
 };
 
 
@@ -553,12 +579,18 @@ class CCounter {
   private:
     unsigned int count;
   public:
-    CCounter(int c) : count(c) {}
+    CCounter(int c) : count(c) { }
     CCounter(int first, int last, int stride) {
       count = ((last-first)/stride)+1;
     }
     void decrement(void) {count--;}
     int isDone(void) {return (count==0);}
+};
+
+struct CSpeculator {
+  int speculationIndex;
+  CSpeculator(int speculationIndex_)
+    : speculationIndex(speculationIndex_) { }
 };
 
 #endif

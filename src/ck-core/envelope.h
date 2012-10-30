@@ -26,9 +26,11 @@
 // silly ancient name: for backward compatability only.
 #define PW(x) CkPriobitsToInts(x) 
 
-#if defined(_FAULT_CAUSAL_)
+#if CMK_MESSAGE_LOGGING
 #define CK_FREE_MSG_MLOG 	0x1
 #define CK_BYPASS_DET_MLOG 	0x2
+#define CK_MULTICAST_MSG_MLOG 	0x4
+#define CK_REDUCTION_MSG_MLOG 	0x8
 #endif
 
 //#define USE_CRITICAL_PATH_HEADER_ARRAY
@@ -182,14 +184,6 @@ public:
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
     };
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CkObjID sender;
-    CkObjID recver;
-    MCount SN;
-    MCount TN;
-    int incarnation;
-	int flags;
-#endif
 private:
     u_type type;           ///< Depends on message type (attribs.mtype)
     CMK_REFNUM_TYPE ref;            ///< Used by futures
@@ -205,6 +199,14 @@ private:
     
   public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    CkObjID sender;
+    CkObjID recver;
+    MCount SN;
+#if defined(_FAULT_CAUSAL_)
+    MCount TN;
+#endif
+    int incarnation;
+	int flags;
     UInt piggyBcastIdx;
 #endif
     void pup(PUP::er &p);
@@ -226,7 +228,7 @@ private:
     void   setMsgIdx(const UChar idx) { attribs.msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
-    UInt   getUsersize(void) const { return totalsize - priobits - sizeof(envelope); }
+    UInt   getUsersize(void) const { return totalsize - getPrioBytes() - sizeof(envelope); }
     UChar  isPacked(void) const { return attribs.isPacked; }
     void   setPacked(const UChar p) { attribs.isPacked = p; }
     UShort getPriobits(void) const { return priobits; }
@@ -239,6 +241,11 @@ private:
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
       CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
+#if CMK_USE_STL_MSGQ
+      // Ideally, this should be a static compile-time assert. However we need API changes for that
+      CkAssert(sizeof(CMK_MSG_PRIO_TYPE) >= sizeof(int)*CkPriobitsToInts(prio));
+#endif
+
       register UInt tsize = sizeof(envelope)+ 
             CkMsgAlignLength(size)+
 	    sizeof(int)*CkPriobitsToInts(prio);
@@ -265,7 +272,9 @@ private:
       env->sender.type = TypeInvalid;
       env->recver.type = TypeInvalid;
       env->SN = 0;
+#if defined(_FAULT_CAUSAL_)
       env->TN = 0;
+#endif
 	  env->incarnation = -1;
 #endif
 

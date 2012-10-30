@@ -21,7 +21,11 @@
 #define DEBUGF(x)  // CkPrintf x;
 
 // turn on or off fragmentation in multicast
+#if CMK_MESSAGE_LOGGING
+#define SPLIT_MULTICAST  0
+#else
 #define SPLIT_MULTICAST  1
+#endif
 
 // maximum number of fragments into which a message can be broken
 #define MAXFRAGS 100
@@ -705,6 +709,11 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
 
 void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *sid, int opts)
 {
+#if CMK_MESSAGE_LOGGING
+	envelope *env = UsrToEnv(m);
+	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
+#endif
+
     for (int snum = 0; snum < nsid; snum++) {
         void *msgCopy = m;
         if (nsid - snum > 1)
@@ -1053,6 +1062,11 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
     msg->rebuilt            = (mpe == CkMyPe())?0:1;
     msg->callback           = cb;
     msg->userFlag           = userFlag;
+
+#if CMK_MESSAGE_LOGGING
+	envelope *env = UsrToEnv(msg);
+	env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
+#endif
 
     mCastGrp[mpe].recvRedMsg(msg);
 

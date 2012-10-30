@@ -1,0 +1,109 @@
+\section{Utility Functions}
+
+\label{basic utility fns}
+
+The following calls provide basic rank information and utilities
+useful when running a Charm++ program.
+
+\function{void CkAssert(int expression)} \desc{Aborts the program 
+if expression is 0.}
+
+\function{void CkAbort(const char *message)} \index{CkAbort}
+\desc{Causes the program to abort, printing the given error message.
+  This function never returns.}
+
+\function{void CkExit()} \index{CkExit} \desc{This call informs the
+  Charm RTS that computation on all processors should terminate.  This
+  routine never returns, so any code after the call to CkExit() inside
+  the function that calls it will not execute. Other processors will
+  continue executing until they receive notification to stop, so it is
+  a good idea to ensure through synchronization that all useful work
+  has finished before calling CkExit().  }
+
+\function{double CkWallTimer()} \index{CkWallTimer} \index{timers}
+\desc{Returns the elapsed time in seconds since the start of the program.}
+
+\subsection{Information about Logical Machine Entities}
+As described in section~\ref{machineModel}, \charmpp{} recoginizes two
+logical machine entities: ``node'' and PE (processing element). 
+The following functions provide basic information about such logical machine 
+that a \charmpp{} program runs on. PE and ``node'' are numbered starting
+from zero.
+
+\function{int CkNumPes()} \index{CkNumPes} \desc{returns the total
+  number of PEs across all nodes.}
+
+\function{int CkMyPe()} \index{CkMyPe} \desc{returns the index of the
+  PE on which the call was made.}
+
+\function{int CkNumNodes()} \index{CkMyNodes}
+\desc{returns the total number of logical \charmpp{} nodes.}
+
+\function{int CkMyNode()} \index{CkMyNode}
+\desc{returns the index of the ``node'' on which the call was made.}
+
+\function{int CkMyRank()} \index{CkMyRank}
+\desc{returns the rank number of the PE on a ``node'' on which the call 
+was made. PEs within a ``node'' are also ranked starting from zero.}
+
+\function{int CkNodeFirst(int nd)} \index{CkNodeFirst}
+\desc{returns the index of the first PE on the logical node $nd$.}
+
+\function{int CkNodeSize(int nd)} \index{CkNodeSize}
+\desc{returns the number of PEs on the logical node $nd$ on which the call was made.}
+
+\function{int CkNodeOf(int pe)} \index{CkNodeOf}
+\desc{returns the ``node'' number that PE $pe$ belongs to.}
+
+\function{int CkRankOf(int pe)} \index{CkRankOf}
+\desc{returns the rank of the given PE within its node.}
+
+\subsection{Terminal I/O}
+
+\index{input/output}
+\charmpp\ provides both C and \CC\ style methods of doing terminal I/O.  
+
+In place of C-style printf and scanf, \charmpp\ provides
+\kw{CkPrintf} and \kw{CkScanf}.  These functions have
+interfaces that are identical to their C counterparts, but there are some
+differences in their behavior that should be mentioned.
+
+\charmpp\ also supports all forms of printf,
+cout, etc. in addition to the special forms shown below.  The special
+forms below are still useful, however, since they obey well-defined
+(but still lax) ordering requirements.
+
+\function{int CkPrintf(format [, arg]*)} \index{CkPrintf}
+\index{input/output} \desc{This call is used for atomic terminal
+  output. Its usage is similar to \texttt{printf} in C.  However,
+  \kw{CkPrintf} has some special properties that make it more suited
+  for parallel programming.  \kw{CkPrintf} routes all terminal output
+  to a single end point which prints the output. This guarantees that
+  the output for a single call to CkPrintf will be printed completely
+  without being interleaved with other calls to CkPrintf. Note that
+  CkPrintf is implemented using an asynchronous send, meaning that the
+  call to \kw{CkPrintf} returns immediately after the message has been
+  sent, and most likely before the message has actually been received,
+  processed, and displayed. As such, there is no guarantee of order in
+  which the output for concurrent calls to CkPrintf is
+  printed. Imposing such an order requires proper synchronization
+  between the calls to CkPrintf in the parallel application.
+}
+
+\function{void CkError(format [, arg]*))} \index{CkError} \index{input/output} 
+\desc{Like \kw{CkPrintf}, but used to print error messages on \texttt{stderr}.}
+
+\function{int CkScanf(format [, arg]*)} \index{CkScanf} \index{input/output}
+\desc{This call is used for atomic terminal input. Its usage is similar to
+{\tt scanf} in C.  A call to \kw{CkScanf}, unlike \kw{CkPrintf},
+blocks all execution on the processor it is called from, and returns
+only after all input has been retrieved.
+}
+
+For \CC\ style stream-based I/O, \charmpp\ offers 
+\kw{ckout} and \kw{ckerr} in place of cout and cerr.  The
+\CC\ streams and their \charmpp\ equivalents are related in the same
+manner as printf and scanf are to \kw{CkPrintf} and \kw{CkScanf}.  The
+\charmpp\ streams are all used through the same interface as the \CC\ 
+streams, and all behave in a slightly different way, just like C-style
+I/O.

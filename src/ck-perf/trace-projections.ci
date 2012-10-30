@@ -63,6 +63,8 @@ module TraceProjections {
     entry void finalize(void);
     entry void closingTraces(void);
     entry void closeParallelShutdown(CkReductionMsg *);
+
+    entry void flush_warning(int pe);
   };
 
 };

@@ -1,0 +1,16 @@
+module mpicollide {
+
+  readonly CProxy_MpiCollisionClient myClient;
+  readonly CollideHandle collision_detector;
+  readonly CProxy_MainCollide mainProxy;
+
+  mainchare MainCollide {
+    entry MainCollide(CkArgMsg *m);
+    entry [reductiontarget] void done(int numColls);
+  };
+
+  group MpiCollisionClient : collideClient{
+	   entry MpiCollisionClient();
+  }
+
+};

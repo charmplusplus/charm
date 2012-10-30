@@ -29,7 +29,7 @@ double B = 1.0;			// Force Calculation parameter 2
 
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* msg) {
-  stepTime = CmiWallTimer();
+  stepTime = CkWallTimer();
   CkPrintf("\nLENNARD JONES MOLECULAR DYNAMICS RUNNING ...\n");
 
   numParts = DEFAULT_PARTICLES;
@@ -252,7 +252,7 @@ void Patch::checkNextStep(){
     incomingParticles.removeAll();
 
     if (thisIndex.x==0 && thisIndex.y==0 && stepCount%10==0) {
-      timer = CmiWallTimer();
+      timer = CkWallTimer();
       CkPrintf("Step %d Benchmark Time %f ms/step\n", stepCount, ((timer - stepTime)/10)*1000);
       stepTime = timer;
     }

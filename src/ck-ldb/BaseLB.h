@@ -100,7 +100,11 @@ public:
     int  hashSize;
 
     int complete_flag;		// if this ocg is complete, eg in HybridLB,
-				// this LDStats may not be complete
+    // this LDStats may not be complete
+
+    int is_prev_lb_refine;
+    double after_lb_max;
+    double after_lb_avg;
 
     LDStats(int c=0, int complete_flag=1);
     /// the functions below should be used to obtain the number of processors
@@ -163,7 +167,12 @@ struct MigrateInfo {
     int from_pe;
     int to_pe;
     int async_arrival;	    // if an object is available for immediate migrate
-    MigrateInfo():  async_arrival(0) {}
+    MigrateInfo():  async_arrival(0) {
+#if CMK_GLOBAL_LOCATION_UPDATE
+      obj.id.isArrayElement = 0; 
+#endif
+    }
+
     void pup(PUP::er &p) {
       p | index;
       p | obj;

@@ -304,17 +304,6 @@ static inline void _parseCommandLineOpts(char **argv)
     }
 #endif
 
-#if defined(_FAULT_MLOG_)
-    if(!CmiGetArgIntDesc(argv,"+mlog_local_buffer",&_maxBufferedMessages,"# of local messages buffered in the message logging protoocl")){
-        _maxBufferedMessages = 2;
-    }
-    if(!CmiGetArgIntDesc(argv,"+mlog_remote_buffer",&_maxBufferedTicketRequests,"# of remote ticket requests buffered in the message logging protoocl")){
-        _maxBufferedTicketRequests = 2;
-    }
-    if(!CmiGetArgIntDesc(argv,"+mlog_buffer_time",&BUFFER_TIME,"# Time spent waiting for messages to be buffered in the message logging protoocl")){
-        BUFFER_TIME = 2;
-    }
-#endif	
 	/* Anytime migration flag */
 	_isAnytimeMigration = true;
 	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {
@@ -875,6 +864,7 @@ static void _nullFn(void *, void *)
 }
 
 extern void _registerLBDatabase(void);
+extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
 extern void _registerControlPoints(void);
@@ -883,6 +873,7 @@ extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
+extern void _metabalancerInit();
 extern void _initChareTables();
 #if CMK_MEM_CHECKPOINT
 extern void init_memcheckpt(char **argv);
@@ -1063,6 +1054,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
+  _metabalancerInit();
 	
 #if CMK_MEM_CHECKPOINT
         init_memcheckpt(argv);
@@ -1118,6 +1110,7 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkFutures();
 		_registerCkArray();
 		_registerLBDatabase();
+    _registerMetaBalancer();
 		_registerCkCallback();
 		_registertempo();
 		_registerwaitqd();

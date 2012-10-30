@@ -3,6 +3,8 @@
 #include "trace-common.h"
 #include "ckcallback-ccs.h"
 
+#include <set>
+
 #ifndef PROJ_ANALYSIS
 // NOTE: Needed to handle the automatically-generated method so 
 //   trace-projections would build correctly while ignoring any of the 
@@ -137,9 +139,11 @@ class TraceProjectionsBOC : public CBase_TraceProjectionsBOC {
   double endTime;
   double analysisStartTime;
   int endPe;                          // end PE which calls CkExit()
+  std::set<int> list;
+  int          flush_count;
  public:
- TraceProjectionsBOC(bool _findOutliers, bool _findStartTime) : findOutliers(_findOutliers), findStartTime(_findStartTime), parModulesRemaining(0), endPe(-1) {};
- TraceProjectionsBOC(CkMigrateMessage *m):CBase_TraceProjectionsBOC(m), parModulesRemaining(0), endPe(-1) {};
+ TraceProjectionsBOC(bool _findOutliers, bool _findStartTime) : findOutliers(_findOutliers), findStartTime(_findStartTime), parModulesRemaining(0), endPe(-1), flush_count(0) {};
+ TraceProjectionsBOC(CkMigrateMessage *m):CBase_TraceProjectionsBOC(m), parModulesRemaining(0), endPe(-1), flush_count(0) {};
 
   void traceProjectionsParallelShutdown(int);
   void startTimeAnalysis();
@@ -154,5 +158,8 @@ class TraceProjectionsBOC : public CBase_TraceProjectionsBOC {
   void closeParallelShutdown(CkReductionMsg *);
 
   void ccsOutlierRequest(CkCcsRequestMsg *);
+
+  void flush_warning(int pe);
+  void print_warning();
 };
 #endif

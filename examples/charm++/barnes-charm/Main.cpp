@@ -225,11 +225,11 @@ void Main::startSimulation(){
     CkPrintf("[main] rmin: (%f,%f,%f), rsize: %f\n", rmin[0], rmin[1], rmin[2], rsize);
     CkPrintf("**********************************\n");
 #ifndef NO_TIME
-    start = CmiWallTimer();
-    iterationStart = CmiWallTimer();
+    start = CkWallTimer();
+    iterationStart = CkWallTimer();
 #endif
     if(i == 2){
-      totalStart = CmiWallTimer();
+      totalStart = CkWallTimer();
     }
     CkCallback cb(CkIndex_TreePiece::doBuildTree(), pieces);
     CkStartQD(cb);
@@ -243,7 +243,7 @@ void Main::startSimulation(){
     // completed calculating theirs
     updateTopLevelMoments();
 #ifndef NO_TIME
-    end = CmiWallTimer();
+    end = CkWallTimer();
 #endif
     CkPrintf("[main] Tree building ... %f s\n", (end-start));
 #ifdef PRINT_TREE
@@ -251,47 +251,47 @@ void Main::startSimulation(){
 #endif
 #ifndef NO_PARTITION
 #ifndef NO_TIME
-    start = CmiWallTimer();
+    start = CkWallTimer();
 #endif
     chunks.partition(CkCallbackResumeThread());
 #ifndef NO_TIME
-    end = CmiWallTimer();
+    end = CkWallTimer();
 #endif
     CkPrintf("[main] Partitioning ...  %f s\n", (end-start));
 #endif
 #ifndef NO_FORCES
 #ifndef NO_TIME
-    start = CmiWallTimer();
+    start = CkWallTimer();
 #endif
     chunks.ComputeForces(CkCallbackResumeThread());
 #ifndef NO_TIME
-    end = CmiWallTimer();
+    end = CkWallTimer();
 #endif
     CkPrintf("[main] Forces ...  %f s\n", (end-start));
 #endif
 #ifndef NO_ADVANCE
 #ifndef NO_TIME
-    start = CmiWallTimer();
+    start = CkWallTimer();
 #endif
     chunks.advance(CkCallbackResumeThread());
 #ifndef NO_TIME
-    end = CmiWallTimer();
+    end = CkWallTimer();
 #endif
     CkPrintf("[main] Advance ... %f s\n", (end-start));
 #endif
 #ifndef NO_CLEANUP
 #ifndef NO_TIME
-    start = CmiWallTimer();
+    start = CkWallTimer();
 #endif
     pieces.cleanup(CkCallbackResumeThread());
 #ifndef NO_TIME
-    end = CmiWallTimer();
+    end = CkWallTimer();
 #endif
     CkPrintf("[main] Clean up ... %f s\n", (end-start));
 #endif
     i++;
 #ifndef NO_TIME
-    totalEnd = CmiWallTimer();
+    totalEnd = CkWallTimer();
 #endif
     CkPrintf("[main] Total ... %f s\n", (totalEnd-iterationStart));
 #ifndef NO_LB
@@ -304,7 +304,7 @@ void Main::startSimulation(){
     topLevelRoots.length() = 0;
     tnow = tnow + dtime;
   }
-  totalEnd = CmiWallTimer();
+  totalEnd = CkWallTimer();
 
   CkPrintf("[main] Completed simulation: %f s\n", (totalEnd-totalStart));
 #ifdef OUTPUT_ACC

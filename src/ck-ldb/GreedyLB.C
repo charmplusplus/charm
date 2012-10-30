@@ -152,6 +152,22 @@ void GreedyLB::work(LDStats* stats)
     CkPrintf("\n");
   }
 
+  if (_lb_args.metaLbOn()) {
+    double max_load = 0;
+    double avg_load = 0;
+    for (pe = 0; pe<procs.size(); pe++) {
+      if (procs[pe].totalLoad() > max_load) {
+        max_load = procs[pe].totalLoad();
+      }
+      avg_load += procs[pe].totalLoad();
+    }
+
+    stats->after_lb_max = max_load;
+    stats->after_lb_avg = avg_load/procs.size();
+    stats->is_prev_lb_refine = 0;
+    if (_lb_args.debug() > 0)
+      CkPrintf("GreedyLB> After lb max load: %lf avg load: %lf\n", max_load, avg_load/procs.size());
+  }
 }
 
 #include "GreedyLB.def.h"

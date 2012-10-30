@@ -24,10 +24,13 @@ module NDMeshStreamer {
 		    CkCallback endCb, int prio, 
 		    bool usePeriodicFlushing);
 
-    entry void associateCallback(int numContributors, 
-				 CkCallback startCb, CkCallback endCb, 
-				 CProxy_CompletionDetector detector,
-				 int prio, bool usePeriodicFlushing);
+    entry void init(int numContributors, CkCallback startCb, 
+		    CkCallback endCb, CProxy_CompletionDetector detector,
+		    int prio, bool usePeriodicFlushing);   
+    entry void init(CkArrayID senderArrayID, CkCallback startCb, 
+		    CkCallback endCb, int prio, 
+		    bool usePeriodicFlushing); 
+
     entry void receiveAtDestination(MeshStreamerMessage<dtype> *msg);
   };
 
@@ -58,10 +61,22 @@ module NDMeshStreamer {
 	  const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
 	  int bufferSize, bool yieldFlag = 0, 
 	  double progressPeriodInMs = -1.0);
+  };
 
-    entry void init(CkArrayID senderArrayID, CkCallback startCb, 
-		    CkCallback endCb, int prio, 
-		    bool usePeriodicFlushing); 
+  template<class dtype>
+    group GroupChunkMeshStreamer : MeshStreamer<ChunkDataItem> {
+    entry GroupChunkMeshStreamer(
+	  int maxNumDataItemsBuffered, int numDimensions, 
+	  int dimensionSizes[numDimensions], 
+	  const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
+	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
+
+    entry GroupChunkMeshStreamer(
+          int numDimensions, int dimensionSizes[numDimensions], 
+	  const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
+	  int bufferSize, bool yieldFlag = 0, 
+	  double progressPeriodInMs = -1.0);
+
   };
 
 };

@@ -1,0 +1,528 @@
+This section describes advanced functionality in the PUP framework.
+The first subsections describes features supporting complex objects,
+with multiple levels of inheritance, or with dynamic changes in heap
+usage.  The latter subsections describe additional language bindings,
+and features supporting PUP modes which can be used to copy object
+state from and to long term storage for checkpointing, or other
+application level purposes.
+
+\section{Dynamic Allocation}
+\label{sec:pupdynalloc}
+
+If your class has fields that are dynamically allocated, when unpacking
+these need to be allocated (in the usual way) before you pup them.
+Deallocation should be left to the class destructor as usual.
+
+\subsection{No allocation}
+
+The simplest case is when there is no dynamic allocation.
+\begin{alltt}
+class keepsFoo : public mySuperclass \{
+private:
+    foo f; /* simple foo object*/
+public:
+    keepsFoo(void) \{ \}
+    void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
+      p|f; // pup f's fields (calls f.pup(p);) 
+    \}
+    ~keepsFoo() \{ \}
+\};
+\end{alltt}
+
+\subsection{Allocation outside pup}
+
+The next simplest case is when we contain a class 
+that is always allocated during our constructor,
+and deallocated during our destructor.  Then no allocation
+is needed within the pup routine.
+\begin{alltt}
+class keepsHeapFoo : public mySuperclass \{
+private:
+    foo *f; /*Heap-allocated foo object*/
+public:
+    keepsHeapFoo(void) \{
+      f=new foo;
+    \}
+    void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
+      p|*f; // pup f's fields (calls f->pup(p))
+    \}
+    ~keepsHeapFoo() \{delete f;\}
+\};
+\end{alltt}
+
+\subsection{Allocation during pup}
+
+If we need values obtained during the pup routine
+before we can allocate the class, we must 
+allocate the class inside the pup routine.
+Be sure to protect the allocation with ``if (p.isUnpacking())''.
+\begin{alltt}
+class keepsOneFoo : public mySuperclass \{
+private:
+    foo *f; /*Heap-allocated foo object*/
+public:
+    keepsOneFoo(...) \{f=new foo(...);\}
+    keepsOneFoo() \{f=NULL;\} /* pup constructor */
+    void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
+      ...
+      if (p.isUnpacking()) /* must allocate foo now */
+         f=new foo(...);
+      p|*f;//pup f's fields
+    \}
+    ~keepsOneFoo() \{delete f;\}
+\};
+\end{alltt}
+
+\subsection{Allocatable array}
+
+For example, if we keep an array of doubles,
+we need to know how many doubles there are 
+before we can allocate the array.  Hence we must
+first pup the array length, do our allocation,
+and then pup the array data.  We could allocate memory using 
+malloc/free or other allocators in exactly the same way.
+\begin{alltt}
+class keepsDoubles : public mySuperclass \{
+private:
+    int n;
+    double *arr;/*new'd array of n doubles*/
+public:
+    keepsDoubles(int n_) \{
+      n=n_;
+      arr=new double[n];
+    \}
+    keepsDoubles() \{ \} 
+    
+    void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
+      p|n;//pup the array length n
+      if (p.isUnpacking())  arr=new double[n];
+      PUParray(p,arr,n); //pup data in the array
+    \}
+    
+    ~keepsDoubles() \{delete[] arr;\}
+\};
+\end{alltt}
+
+\subsection{NULL object pointer}
+
+If our allocated object may be NULL, our allocation
+becomes much more complicated.  We must first check
+and pup a flag to indicate whether the object exists, 
+then depending on the flag, pup the object.
+\begin{alltt}
+class keepsNullFoo : public mySuperclass \{
+private:
+    foo *f; /*Heap-allocated foo object, or NULL*/
+public:
+    keepsNullFoo(...) \{ if (...) f=new foo(...);\}
+    keepsNullFoo() \{f=NULL;\}
+    void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
+      int has_f=(f!=NULL);
+      p|has_f;
+      if (has_f) \{
+        if (p.isUnpacking()) f=new foo;
+        p|*f;
+      \} else \{
+        f=NULL;
+      \}
+    \}
+    ~keepsNullFoo() \{delete f;\}
+\};
+\end{alltt}
+
+This sort of code is normally much longer and more
+error-prone if split into the various packing/unpacking cases.
+
+\subsection{Array of classes}
+
+An array of actual classes can be treated exactly the same way
+as an array of basic types.  PUParray will pup each 
+element of the array properly, calling the appropriate \verb.operator|..
+\begin{alltt}
+class keepsFoos : public mySuperclass \{
+private:
+    int n;
+    foo *arr;/*new'd array of n foos*/
+public:
+    keepsFoos(int n_) \{
+      n=n_;
+      arr=new foo[n];
+    \}
+    keepsFoos() \{ arr=NULL; \} 
+    
+    void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
+      p|n;//pup the array length n
+      if (p.isUnpacking())  arr=new foo[n];
+      PUParray(p,arr,n); //pup each foo in the array
+    \}
+    
+    ~keepsFoos() \{delete[] arr;\}
+\};
+\end{alltt}
+
+
+\subsection{Array of pointers to classes}
+
+An array of pointers to classes must handle each element
+separately, since the PUParray routine does not work with 
+pointers.  An ``allocate'' routine to set up the array
+could simplify this code.  More ambitious is to construct
+a ``smart pointer'' class that includes a pup routine.
+\begin{alltt}
+class keepsFooPtrs : public mySuperclass \{
+private:
+    int n;
+    foo **arr;/*new'd array of n pointer-to-foos*/
+public:
+    keepsFooPtrs(int n_) \{
+      n=n_;
+      arr=new foo*[n]; // allocate array
+      for (int i=0;i<n;i++) arr[i]=new foo(...); // allocate i'th foo
+    \}
+    keepsFooPtrs() \{ arr=NULL; \} 
+    
+    void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
+      p|n;//pup the array length n
+      if (p.isUnpacking()) arr=new foo*[n]; // allocate array
+      for (int i=0;i<n;i++) \{
+        if (p.isUnpacking()) arr[i]=new foo(...); // allocate i'th foo
+        p|*arr[i];  //pup the i'th foo
+      \}
+    \}
+    
+    ~keepsFooPtrs() \{
+       for (int i=0;i<n;i++) delete arr[i];
+       delete[] arr;
+     \}
+\};
+\end{alltt}
+
+Note that this will not properly handle the case where
+some elements of the array are actually subclasses of foo,
+with virtual methods.  The PUP::able framework described
+in the next section can be helpful in this case.
+
+
+\section{Subclass allocation via PUP::able}
+
+\label{sec:pup::able}
+If the class \uw{foo} above might have been a subclass, instead of
+simply using \uw{new foo} above we would have had to allocate 
+an object of the appropriate subclass.  Since determining the
+proper subclass and calling the appropriate constructor yourself can be 
+difficult, the PUP framework provides a scheme for automatically
+determining and dynamically allocating subobjects of the appropriate type.
+
+Your superclass must inherit from \kw{PUP::able}, which provides 
+the basic machinery used to move the class.  
+A concrete superclass and all its concrete subclasses require these
+four features:
+
+\begin{itemize}
+\item A line declaring \kw{PUPable \uw{className};} in the .ci file.
+This registers the class's constructor.
+
+\item A call to the macro \kw{PUPable\_decl(\uw{className})} in the
+class's declaration, in the header file.  This adds a virtual 
+method to your class to allow \kw{PUP::able} to determine your class's type.
+
+\item A migration constructor---a constructor that takes \kw{CkMigrateMessage *}.
+This is used to create the new object on the receive side, immediately
+before calling the new object's \kw{pup} routine.
+
+\item A working, virtual \kw{pup} method.  You can omit this if your
+class has no data that needs to be packed.
+\end{itemize}
+
+An abstract superclass---a superclass that will never actually be 
+packed---only needs to inherit from \kw{PUP::able} and include a 
+\kw{PUPable\_abstract(\uw{className})} macro in their body.  For
+these abstract classes, the 
+.ci file, \kw{PUPable\_decl} macro, and constructor are not needed.
+
+For example, if \uw{parent} is a concrete superclass and \uw{child} its
+subclass,
+
+\begin{alltt}
+//In the .ci file:
+   PUPable parent;
+   PUPable child; //Could also have said ``PUPable parent, child;''
+
+//In the .h file:
+class parent : public PUP::able \{
+    ... data members ...
+public:
+    ... other methods ...
+    parent() \{...\}
+    
+    //PUP::able support: decl, migration constructor, and pup
+    PUPable\_decl(parent);  
+    parent(CkMigrateMessage *m) : PUP::able(m) \{\}
+    virtual void pup(PUP::er &p) \{
+        PUP::able::pup(p);//Call base class
+        ... pup data members as usual ...
+    \}  
+\};
+class child : public parent \{
+    ... more data members ...
+public:    ... more methods, possibly virtual ...
+    child() \{...\}
+    
+    //PUP::able support: decl, migration constructor, and pup
+    PUPable\_decl(child);  
+    child(CkMigrateMessage *m) : parent(m) \{\}
+    virtual void pup(PUP::er &p) \{
+        parent::pup(p);//Call base class
+        ... pup child's data members as usual ...
+    \}  
+\};
+
+\end{alltt}
+
+With these declarations, then, we can automatically 
+allocate and pup a pointer to a parent or child
+using the vertical bar \kw{PUP::er} syntax, which on the receive
+side will create a new object of the appropriate type:
+
+\begin{alltt}
+class keepsParent \{
+    parent *obj; //May actually point to a child class (or be NULL)
+public:
+    ...
+    ~keepsParent() \{
+        delete obj;
+    \}
+    void pup(PUP::er &p) 
+    \{
+        p|obj;
+    \}
+\};
+
+\end{alltt}
+
+This will properly pack, allocate, and unpack obj whether
+it is actually a parent or child object.  The child class 
+can use all the usual \CC\ features, such as virtual functions
+and extra private data.
+
+If obj is NULL when packed, it will be restored to NULL when unpacked.
+For example, if the nodes of a binary tree are \kw{PUP::able},
+one may write a recursive pup routine for the tree quite easily:
+
+\begin{alltt}
+// In the .ci file:
+    PUPable treeNode;
+
+// In the .h file
+class treeNode : public PUP::able \{
+    treeNode *left;//Left subtree
+    treeNode *right;//Right subtree
+    ... other fields ...
+public:
+    treeNode(treeNode *l=NULL, treeNode *r=NULL);
+    ~treeNode() \{delete left; delete right;\}
+    
+    // The usual PUP::able support:
+    PUPable\_decl(treeNode);
+    treeNode(CkMigrateMessage *m) : PUP::able(m) \{ left=right=NULL; \}
+    void pup(PUP::er &p) \{
+        PUP::able::pup(p);//Call base class
+        p|left;
+        p|right;
+        ... pup other fields as usual ...
+    \}
+\};
+\end{alltt}
+
+This same implementation will also work properly even if the tree's
+internal nodes are actually subclasses of treeNode.
+
+You may prefer to use the macros \kw{PUPable\_def(\uw{className})}
+and \kw{PUPable\_reg(\uw{className})} rather than using \kw{PUPable}
+in the .ci file.  \kw{PUPable\_def} provides routine definitions used
+by the \kw{PUP::able} machinery, and should be included in exactly one
+source file at file scope.  \kw{PUPable\_reg} registers this class
+with the runtime system, and should be executed exactly once per node 
+during program startup.
+
+Finally, a \kw{PUP::able} superclass like \uw{parent} above 
+must normally be passed around via a pointer or reference, because the object
+might actually be some subclass like \uw{child}.  Because
+pointers and references cannot be passed across processors,
+for parameter marshalling you must use the special templated 
+smart pointer classes \kw{CkPointer} and \kw{CkReference},
+which only need to be listed in the .ci file.
+
+A \kw{CkReference} is a read-only reference to a \kw{PUP::able} object---it
+is only valid for the duration of the method call.  A \kw{CkPointer}
+transfers ownership of the unmarshalled \kw{PUP::able} to the method, so the 
+pointer can be kept and the object used indefinitely.  
+
+For example, if the entry method \uw{bar} needs a \kw{PUP::able} \uw{parent}
+object for in-call processing, you would use a \kw{CkReference} like this:
+
+\begin{alltt}
+// In the .ci file:
+    entry void barRef(int x,CkReference<parent> p);
+
+// In the .h file:
+    void barRef(int x,parent &p) \{
+      // can use p here, but only during this method invocation
+    \}
+\end{alltt}
+
+If the entry method needs to keep its parameter, use a \kw{CkPointer} like this:
+\begin{alltt}
+// In the .ci file:
+    entry void barPtr(int x,CkPointer<parent> p);
+
+// In the .h file:
+    void barPtr(int x,parent *p) \{
+      // can keep this pointer indefinitely, but must eventually delete it
+    \}
+\end{alltt}
+
+Both \kw{CkReference} and \kw{CkPointer} are read-only from the send 
+side---unlike messages, which are consumed when sent, the same object 
+can be passed to several parameter marshalled entry methods.
+In the example above, we could do:
+
+\begin{alltt}
+   parent *p=new child;
+   someProxy.barRef(x,*p);
+   someProxy.barPtr(x,p); // Makes a copy of p
+   delete p; // We allocated p, so we destroy it.
+\end{alltt}
+
+
+\section{C and Fortran bindings}
+
+C and Fortran programmers can use a limited subset of the
+\kw{PUP::er} capability.  The routines all take a 
+handle named \kw{pup\_er}.  The routines 
+have the prototype:
+\begin{alltt}
+void pup\_\kw{type}(pup\_er p,\kw{type} *val);
+void pup\_\kw{type}s(pup\_er p,\kw{type} *vals,int nVals);
+\end{alltt}
+The first call is for use with a single element;
+the second call is for use with an array.
+The supported types are char, short, int, long,
+uchar, ushort, uint, ulong, float, and double,
+which all have the usual C meanings.
+
+A byte-packing routine
+\begin{alltt}
+void pup\_bytes(pup\_er p,void *data,int nBytes);
+\end{alltt}
+is also provided, but its use is discouraged
+for cross-platform puping.
+
+\kw{pup\_isSizing}, \kw{pup\_isPacking}, \kw{pup\_isUnpacking},
+and \kw{pup\_isDeleting} calls are also available.
+Since C and Fortran have no destructors, you should 
+actually deallocate all data when passed a deleting \kw{pup\_er}.
+
+C and Fortran users cannot use \kw{PUP::able} objects, 
+seeking, or write custom \kw{PUP::er}s. Using the \CC\
+interface is recommended.
+
+
+
+\section{Common PUP::ers}
+\label{sec:PUP:CommonPUPers}
+The most common \kw{PUP::er}s used are \kw{PUP::sizer},
+\kw{PUP::toMem}, and \kw{PUP::fromMem}.  These are sizing,
+packing, and unpacking \kw{PUP::er}s, respectively.
+
+\kw{PUP::sizer} simply sums up the sizes of the native
+binary representation of the objects it is passed.
+\kw{PUP::toMem} copies the binary representation of the
+objects passed into a preallocated contiguous memory buffer.
+\kw{PUP::fromMem} copies binary data from a contiguous memory
+buffer into the objects passed.  All three support the
+\kw{size} method, which returns the number of bytes used
+by the objects seen so far.
+
+Other common \kw{PUP::er}s are \kw{PUP::toDisk}, 
+\kw{PUP::fromDisk}, and \kw{PUP::xlater}.  The first
+two are simple filesystem variants of the \kw{PUP::toMem} 
+and \kw{PUP::fromMem} classes; \kw{PUP::xlater} translates
+binary data from an unpacking PUP::er into the machine's
+native binary format, based on a \kw{machineInfo} structure
+that describes the format used by the source machine.
+
+An example of \kw{PUP::toDisk} is available in \examplerefdir{PUP/pupDisk}
+
+\section{PUP::seekBlock}
+
+It may rarely occur that you require items to be unpacked
+in a different order than they are packed.  That is, you
+want a seek capability.  \kw{PUP::er}s support a limited 
+form of seeking.
+
+To begin a seek block, create a \kw{PUP::seekBlock} object
+with your current PUP::er and the number of ``sections'' to 
+create.  Seek to a (0-based) section number
+with the seek method, and end the seeking with the endBlock method.
+For example, if we have two objects A and B, where A's pup
+depends on and affects some object B, we can pup the two with:
+
+\begin{alltt}
+void pupAB(PUP::er &p)
+\{
+  ... other fields ...
+  PUP::seekBlock s(p,2); //2 seek sections
+  if (p.isUnpacking()) 
+  \{//In this case, pup B first
+    s.seek(1);
+    B.pup(p);
+  \}
+  s.seek(0);
+  A.pup(p,B);
+  
+  if (!p.isUnpacking()) 
+  \{//In this case, pup B last
+    s.seek(1);
+    B.pup(p);
+  \}
+  s.endBlock(); //End of seeking block
+  ... other fields ...
+\};
+\end{alltt}
+
+Note that without the seek block, A's fields would be unpacked
+over B's memory, with disasterous consequences.
+The packing or sizing path must traverse the seek sections
+in numerical order; the unpack path may traverse them in any
+order.  There is currently a small fixed limit of 3 on the 
+maximum number of seek sections.
+
+
+\section{Writing a PUP::er}
+
+System-level programmers may occasionally find it useful to define
+their own \kw{PUP::er} objects.  The system \kw{PUP::er} class is 
+an abstract base class that funnels all incoming pup requests
+to a single subroutine:
+
+\begin{alltt}
+    virtual void bytes(void *p,int n,size\_t itemSize,dataType t);
+\end{alltt}
+
+The parameters are, in order, the field address, the number of items,
+the size of each item, and the type of the items. The \kw{PUP::er}
+is allowed to use these fields in any way.  However, an isSizing
+or isPacking PUP::er may not modify the referenced user data; 
+while an isUnpacking PUP::er may not read the original values of 
+the user data.  If your PUP::er is not clearly packing (saving values
+to some format) or unpacking (restoring values), declare it as 
+sizing \kw{PUP::er}.
+

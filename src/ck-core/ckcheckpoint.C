@@ -17,7 +17,7 @@ More documentation goes here...
 void noopit(const char*, ...)
 {}
 
-//#define DEBCHK  // CkPrintf
+//#define DEBCHK   CkPrintf
 #define DEBCHK noopit
 
 #define DEBUGC(x) x
@@ -165,7 +165,8 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
 	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),0,thisgroup);
-	contribute(0,NULL,CkReduction::sum_int,localcb);
+	//contribute(0,NULL,CkReduction::sum_int,localcb);
+	barrier(localcb);
 }
 
 void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){ 
@@ -541,7 +542,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	}
 }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) ||CMK_MEM_CHECKPOINT
 int  CkCountArrayElements(){
     int numGroups = CkpvAccess(_groupIDTable)->size();
     int i;
@@ -645,6 +646,7 @@ void CkTestArrayElements()
 
 void CkStartCheckpoint(const char* dirname,const CkCallback& cb)
 {
+
 	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	
 	// hand over to checkpoint managers for per-processor checkpointing
@@ -665,6 +667,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	
         _inrestart = 1;
 	_restarted = 1;
+	CkMemCheckPT::inRestarting = 1;
 
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
@@ -758,9 +761,10 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
         _inrestart = 0;
 
    	_initDone();
-
+	CkMemCheckPT::inRestarting = 0;
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
+		
 		cb.send();
 	}
 }

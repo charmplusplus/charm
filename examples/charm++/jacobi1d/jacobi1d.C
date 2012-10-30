@@ -81,7 +81,7 @@ class Main : public CBase_Main
     void report(CkReductionMsg *msg) {
       iterations++;
       if(iterations == WARM_ITER)
-	startTime = CmiWallTimer();
+	startTime = CkWallTimer();
       double error = *((double *)msg->getData());
 
       if(iterations < MAX_ITER) {
@@ -89,7 +89,7 @@ class Main : public CBase_Main
 	array.begin_iteration();
       } else {
 	CkPrintf("Completed %d iterations\n", MAX_ITER-1);
-        endTime = CmiWallTimer();
+        endTime = CkWallTimer();
         CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-1-WARM_ITER));
         CkExit();
       }

@@ -24,7 +24,7 @@
 #define COLLECT_STATS_DETS 0
 #define COLLECT_STATS_DETS_DUP 0
 #define COLLECT_STATS_MEMORY 0
-#define COLLECT_STATS_TEAM 0
+#define COLLECT_STATS_LOGGING 0
 
 #define RECOVERY_SEND "SEND"
 #define RECOVERY_PROCESS "PROCESS"
@@ -53,6 +53,7 @@ inline bool isLocal(int destPE);
 inline bool isTeamLocal(int destPE);
 void printLog(TProcessedLog *log);
 
+int _recoveryFlag=0;
 int _restartFlag=0;
 int _numRestartResponses=0;
 
@@ -156,9 +157,11 @@ int bufferedDetsSize;
 int storedDetsSize;
 #endif
 //TML: variables for measuring savings with teams in message logging
-#if COLLECT_STATS_TEAM
+#if COLLECT_STATS_LOGGING
 float MLOGFT_totalLogSize = 0.0;
 float MLOGFT_totalMessages = 0.0;
+float MLOGFT_totalMcastLogSize = 0.0;
+float MLOGFT_totalReductionLogSize = 0.0;
 #endif
 
 static double adjustChkptPeriod=0.0; //in ms
@@ -722,7 +725,7 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 	int totalSize;
 
 	envelope *env = entry->env;
-	DEBUG_PE(3,printf("[%d] Sending message to %s from %s PE %d SN %d time %.6lf \n",CkMyPe(),env->recver.toString(recverString),env->sender.toString(senderString),destPE,env->SN,CkWallTimer()));
+	DEBUG(printf("[%d] Sending message to %s from %s PE %d SN %d time %.6lf \n",CkMyPe(),env->recver.toString(recverString),env->sender.toString(senderString),destPE,env->SN,CkWallTimer()));
 
 	// setting all the information
 	Chare *obj = (Chare *)entry->env->sender.getObject();
@@ -733,9 +736,16 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 		//TML: only stores message if either it goes to this processor or to a processor in a different group
 		if(!isTeamLocal(entry->destPE)){
 			obj->mlogData->addLogEntry(entry);
-#if COLLECT_STATS_TEAM
+#if COLLECT_STATS_LOGGING
 			MLOGFT_totalMessages += 1.0;
 			MLOGFT_totalLogSize += entry->env->getTotalsize();
+			if(entry->env->flags & CK_MULTICAST_MSG_MLOG){
+				MLOGFT_totalMcastLogSize += entry->env->getTotalsize();	
+			}
+			if(entry->env->flags & CK_REDUCTION_MSG_MLOG){
+				MLOGFT_totalReductionLogSize += entry->env->getTotalsize();	
+			}
+
 #endif
 		}else{
 			// the message has to be deleted after it has been sent
@@ -1059,27 +1069,29 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 		return 1;
 	}
 
+	// checking if receiver is NULL
 	Chare *obj = (Chare *)recver.getObject();
 	*objPointer = obj;
 	if(obj == NULL){
-		int possiblePE = recver.guessPE();
-		if(possiblePE != CkMyPe()){
-			int totalSize = env->getTotalsize();
-			CmiSyncSend(possiblePE,totalSize,(char *)env);
-			
-			DEBUG_PE(0,printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
-		}else{
-			// this is the case where a message is received and the object has not been initialized
-			// we delayed the delivery of the message
-			CqsEnqueue(CpvAccess(_outOfOrderMessageQueue),env);
-			
-			DEBUG_PE(0,printf("[%d] Message SN %d TN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString)));
+		if(_recoveryFlag){
+			int possiblePE = recver.guessPE();
+			if(possiblePE != CkMyPe()){
+				int totalSize = env->getTotalsize();
+				CmiSyncSendAndFree(possiblePE,totalSize,(char *)env);
+				DEBUG_PE(0,printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
+			}else{
+				// this is the case where a message is received and the object has not been initialized
+				// we delayed the delivery of the message
+				CqsEnqueue(CpvAccess(_outOfOrderMessageQueue),env);
+				DEBUG_PE(0,printf("[%d] Message SN %d TN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString)));
+			}
+			return 0;
+		} else {
+			return 1;
 		}
-		return 0;
-	}
+	} 
 
-	// checking if message comes from an old incarnation
-	// message must be discarded
+	// checking if message comes from an old incarnation (if so, message must be discarded)
 	if(env->incarnation < CpvAccess(_incarnation)[env->getSrcPe()]){
 		CmiFree(env);
 		return 0;
@@ -1241,6 +1253,7 @@ void startMlogCheckpoint(void *_dummy, double curWallTime){
 
 	// increasing the checkpoint counter
 	checkpointCount++;
+	_recoveryFlag = 0;
 	
 #if DEBUG_CHECKPOINT
 	if(CmiMyPe() == 0){
@@ -1405,10 +1418,10 @@ void pupArrayElementsSkip(PUP::er &p, CmiBool create, MigrationRecord *listToSki
 void writeCheckpointToDisk(int size,char *chkpt){
 	char fNameTemp[100];
 	sprintf(fNameTemp,"%s/mlogCheckpoint%d_tmp",checkpointDirectory,CkMyPe());
-	int fd = creat(fNameTemp,S_IRWXU);
-	int ret = write(fd,chkpt,size);
+	FILE *fd = fopen(fNameTemp,"w"); 
+	int ret = fwrite(chkpt,size,1,fd);
 	CkAssert(ret == size);
-	close(fd);
+	fclose(fd);
 	
 	char fName[100];
 	sprintf(fName,"%s/mlogCheckpoint%d",checkpointDirectory,CkMyPe());
@@ -1692,6 +1705,7 @@ void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg){
 
 	// setting the restart flag
 	_restartFlag = 1;
+	_recoveryFlag = 1;
 	_numRestartResponses = 0;
 
 	// if we are using team-based message logging, all members of the group have to be restarted
@@ -3614,10 +3628,11 @@ void _messageLoggingExit(){
 	if(CkMyPe() == 0)
 		printf("[%d] _causalMessageLoggingExit \n",CmiMyPe());
 
-	//TML: printing some statistics for group approach
-#if COLLECT_STATS_TEAM
+#if COLLECT_STATS_LOGGING
 	printf("[%d] LOGGED MESSAGES: %.0f\n",CkMyPe(),MLOGFT_totalMessages);
 	printf("[%d] MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalLogSize/(float)MEGABYTE);
+	printf("[%d] MULTICAST MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalMcastLogSize/(float)MEGABYTE);
+	printf("[%d] REDUCTION MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalReductionLogSize/(float)MEGABYTE);
 #endif
 
 #if COLLECT_STATS_MSGS
@@ -3647,141 +3662,6 @@ void _messageLoggingExit(){
 #endif
 
 }
-
-/**
-	The method for returning the actual object pointed to by an id
-	If the object doesnot exist on the processor it returns NULL
-**/
-
-void* CkObjID::getObject(){
-	
-		switch(type){
-			case TypeChare:	
-				return CkLocalChare(&data.chare.id);
-			case TypeMainChare:
-				return CkLocalChare(&data.chare.id);
-			case TypeGroup:
-	
-				CkAssert(data.group.onPE == CkMyPe());
-				return CkLocalBranch(data.group.id);
-			case TypeNodeGroup:
-				CkAssert(data.group.onPE == CkMyNode());
-				//CkLocalNodeBranch(data.group.id);
-				{
-					CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-				  void *retval = CksvAccess(_nodeGroupTable)->find(data.group.id).getObj();
-				  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));					
-	
-					return retval;
-				}	
-			case TypeArray:
-				{
-	
-	
-					CkArrayID aid(data.array.id);
-	
-					if(aid.ckLocalBranch() == NULL){ return NULL;}
-	
-					CProxyElement_ArrayBase aProxy(aid,data.array.idx.asChild());
-	
-					return aProxy.ckLocal();
-				}
-			default:
-				CkAssert(0);
-		}
-}
-
-
-int CkObjID::guessPE(){
-		switch(type){
-			case TypeChare:
-			case TypeMainChare:
-				return data.chare.id.onPE;
-			case TypeGroup:
-			case TypeNodeGroup:
-				return data.group.onPE;
-			case TypeArray:
-				{
-					CkArrayID aid(data.array.id);
-					if(aid.ckLocalBranch() == NULL){
-						return -1;
-					}
-					return aid.ckLocalBranch()->lastKnown(data.array.idx.asChild());
-				}
-			default:
-				CkAssert(0);
-		}
-};
-
-char *CkObjID::toString(char *buf) const {
-	
-	switch(type){
-		case TypeChare:
-			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);
-			break;
-		case TypeMainChare:
-			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);	
-			break;
-		case TypeGroup:
-			sprintf(buf,"Group %d	PE %d \0",data.group.id.idx,data.group.onPE);
-			break;
-		case TypeNodeGroup:
-			sprintf(buf,"NodeGroup %d	Node %d \0",data.group.id.idx,data.group.onPE);
-			break;
-		case TypeArray:
-			{
-				const CkArrayIndexMax &idx = data.array.idx.asChild();
-				const int *indexData = idx.data();
-				sprintf(buf,"Array |%d %d %d| id %d \0",indexData[0],indexData[1],indexData[2],data.array.id.idx);
-				break;
-			}
-		default:
-			CkAssert(0);
-	}
-	
-	return buf;
-};
-
-void CkObjID::updatePosition(int PE){
-	if(guessPE() == PE){
-		return;
-	}
-	switch(type){
-		case TypeArray:
-			{
-					CkArrayID aid(data.array.id);
-					if(aid.ckLocalBranch() == NULL){
-						
-					}else{
-						char str[100];
-						CkLocMgr *mgr = aid.ckLocalBranch()->getLocMgr();
-//						CmiPrintf("[%d] location for object %s is %d\n",CmiMyPe(),toString(str),PE);
-						CkLocRec *rec = mgr->elementNrec(data.array.idx.asChild());
-						if(rec != NULL){
-							if(rec->type() == CkLocRec::local){
-								CmiPrintf("[%d] local object %s can not exist on another processor %d\n",CmiMyPe(),str,PE);
-								return;
-							}
-						}
-						mgr->inform(data.array.idx.asChild(),PE);
-					}	
-				}
-
-			break;
-		case TypeChare:
-		case TypeMainChare:
-			CkAssert(data.chare.id.onPE == PE);
-			break;
-		case TypeGroup:
-		case TypeNodeGroup:
-			CkAssert(data.group.onPE == PE);
-			break;
-		default:
-			CkAssert(0);
-	}
-}
-
-
 
 void MlogEntry::pup(PUP::er &p){
 	p | destPE;

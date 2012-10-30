@@ -261,7 +261,7 @@ Main::Main(CkArgMsg* msg)
 
     /* read file */
 
-    starttimer = CmiWallTimer();
+    starttimer = CkWallTimer();
 
     /*read information from file */
     gzFile in = gzopen(msg->argv[1], "rb");
@@ -300,7 +300,7 @@ Main::Main(CkArgMsg* msg)
         CkPrintf(" This problem is solved by pre-processing\n");
         CkExit();
     }
-    readfiletimer = CmiWallTimer();
+    readfiletimer = CkWallTimer();
     /*fire the first chare */
     /* 1)Which variable is assigned which value this time, (variable, 1), current clauses status vector(), literal array activities */
 
@@ -385,7 +385,7 @@ Main::Main(CkMigrateMessage* msg) {}
 void Main::done(CkVec<int> assignment)
 {
 
-    double endtimer = CmiWallTimer();
+    double endtimer = CkWallTimer();
 
     CkPrintf("\nFile reading and processing time:         %f\n", readfiletimer-starttimer);
     CkPrintf("Solving time:                             %f\n", endtimer - readfiletimer);

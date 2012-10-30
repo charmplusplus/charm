@@ -1,6 +1,12 @@
-XLC_TYPICAL_PRE=/soft/compilers/ibmcmp-feb2012/vacpp/bg/12.1
+XLC_TYPICAL_PRE=/opt/ibmcmp/
+if test -d /soft/compilers/ibmcmp-may2012
+then
+XLC_TYPICAL_PRE=/soft/compilers/ibmcmp-may2012
+fi
+
+XLC_PRE=$XLC_TYPICAL_PRE/vacpp/bg/12.1
+
 XLF_TYPICAL_PRE=/soft/compilers/ibmcmp-feb2012/xlf/bg/14.1
-XLC_PRE=$XLC_TYPICAL_PRE
 
 XLC_TYPICAL_POST=bin/bg
 XLC_POST=$XLC_TYPICAL_POST
@@ -12,13 +18,13 @@ then
 fi
 
 XLC_F=$XLF_TYPICAL_PRE
-CMK_CC="$XLC_PRE/${XLC_POST}xlc -qcpluscmt -qhalt=e $BGQ_INC"
-CMK_CXX="$XLC_PRE/${XLC_POST}xlC -qhalt=e $BGQ_INC"
+CMK_CC="$XLC_PRE/${XLC_POST}xlc_r -qcpluscmt -qhalt=e $BGQ_INC -qnokeyword=__int128"
+CMK_CXX="$XLC_PRE/${XLC_POST}xlC_r -qhalt=e $BGQ_INC -qnokeyword=__int128"
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
-CMK_CF77="$XLC_F/${XLC_POST}xlf "
-CMK_CF90="$XLC_F/${XLC_POST}xlf90  -qsuffix=f=f90" 
-CMK_CF90_FIXED="$XLC_F/${XLC_POST}xlf90 " 
+CMK_CF77="$XLC_F/${XLC_POST}xlf_r "
+CMK_CF90="$XLC_F/${XLC_POST}xlf90_r  -qsuffix=f=f90" 
+CMK_CF90_FIXED="$XLC_F/${XLC_POST}xlf90_r " 
 CMK_C_OPTIMIZE='-O3 -Q'
 CMK_CXX_OPTIMIZE='-O3 -Q'
 CMK_AR='ar cq'

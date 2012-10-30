@@ -4,7 +4,7 @@ OBJS = jacobi3d.o
 
 OBJS_OMP = jacobi3d_omp.o
 
-OMP_FLAG = -DJACOBI_OPENMP
+OMP_FLAG = -DJACOBI_OPENMP -fopenmp
 
 all: jacobi3d
 
@@ -13,7 +13,7 @@ jacobi3d: $(OBJS)
 #	$(CHARMC) -language charm++ -module EveryLB -memory paranoid -o jacobi3d $(OBJS)
 
 jacobi3d_omp: $(OBJS_OMP)
-	$(CHARMC) -language charm++ -module DummyLB -fopenmp -o jacobi3d $(OBJS)
+	$(CHARMC) -language charm++ -module DummyLB $(OMP_FLAG) -o jacobi3d_omp $(OBJS_OMP)
 
 projections: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode projections -lz -o jacobi3d.prj $(OBJS)
@@ -24,6 +24,7 @@ summary: $(OBJS)
 jacobi3d.decl.h: jacobi3d.ci
 	$(CHARMC)  jacobi3d.ci
 
+syncfttest causalfttest: fttest
 fttest: jacobi3d
 	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB $(TESTOPTS)
 	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB +killFile kill_01.txt $(TESTOPTS)
@@ -38,5 +39,5 @@ jacobi3d.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) -c jacobi3d.C
 
 jacobi3d_omp.o: jacobi3d.C jacobi3d.decl.h
-	$(CHARMC) $(OMP_FLAG) -c jacobi3d.C
+	$(CHARMC) $(OMP_FLAG) -o $(OBJS_OMP) -c jacobi3d.C
 

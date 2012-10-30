@@ -68,6 +68,7 @@ void* CkCopyMsg(void **pMsg)
   register int size = UsrToEnv(srcMsg)->getTotalsize();
   register envelope *newenv = (envelope *) CmiAlloc(size);
   CmiMemcpy(newenv, UsrToEnv(srcMsg), size);
+  //memcpy(newenv, UsrToEnv(srcMsg), size);
   if(UsrToEnv(srcMsg)->isPacked() && _msgTable[msgidx]->unpack) {
     srcMsg = _msgTable[msgidx]->unpack(srcMsg);
     UsrToEnv(srcMsg)->setPacked(0);

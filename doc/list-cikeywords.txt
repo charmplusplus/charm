@@ -1,0 +1,29 @@
+# List of charm API calls
+# Use # for a comment to the end of the line
+# Blank lines are ok
+
+module
+mainmodule
+mainchare
+chare
+array
+group
+nodegroup
+message
+entry
+readonly
+
+when
+overlap
+atomic
+serial
+forall
+
+reductiontarget
+nokeep
+local
+immediate
+expedited
+sync
+notrace
+exclusive

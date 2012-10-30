@@ -1,0 +1,136 @@
+/* Century Schoolbook font is very similar to Computer Modern Math: cmmi */
+.MATH    { font-family: "Century Schoolbook", serif; }
+.MATH I  { font-family: "Century Schoolbook", serif; font-style: italic }
+.BOLDMATH { font-family: "Century Schoolbook", serif; font-weight: bold }
+
+/* implement both fixed-size and relative sizes */
+SMALL.XTINY		{ font-size : xx-small }
+SMALL.TINY		{ font-size : x-small  }
+SMALL.SCRIPTSIZE	{ font-size : smaller  }
+SMALL.FOOTNOTESIZE	{ font-size : small    }
+SMALL.SMALL		{  }
+BIG.LARGE		{  }
+BIG.XLARGE		{ font-size : large    }
+BIG.XXLARGE		{ font-size : x-large  }
+BIG.HUGE		{ font-size : larger   }
+BIG.XHUGE		{ font-size : xx-large }
+
+/* heading styles */
+h1		{ color: #7b2e2e; margin: 2px auto; text-align:center; }
+h2		{ color: #7b2e2e; padding: 8pt; }
+h3		{ padding: 5pt; }
+h4		{ padding: 3pt;  }
+
+/* Remove the annoying underlines, but still keep it accessible */
+a { text-decoration: none; }
+a:hover { color:#a00; border-bottom: 1px dotted #a00; }
+
+
+
+/* mathematics styles */
+DIV.displaymath		{ }	/* math displays */
+TD.eqno			{ }	/* equation-number cells */
+
+
+/* document-specific styles come next */
+body { font-family: "Droid Sans", Arial, sans-serif; }
+h1, h2, h3 { font-family: Puritan, Verdana, Helvetica sans-serif; }
+code, pre { font-family: "Courier New" Courier monospace; }
+
+body {
+		background: #ffffff;
+		background: url(hatchbkgd.png) repeat;
+}
+
+#maincontainer {
+		background: #efefef; color: black;
+		margin:5em auto 20px;
+		padding:30px;
+		width: 900px;
+		-moz-border-radius: 20px; -webkit-border-radius: 20px; border-radius: 20px;
+		box-shadow: 0px 2px #aaa;
+		border: 1px solid #ccc;
+}
+
+div.navigation {
+		position: fixed;
+		top:0; left:0;
+		width: 100%;
+		text-align: left;
+		margin:0; padding: 2px;
+		border-bottom: 1px #555555 solid;
+		background: #dfdfdf;
+		font-size: 80%;
+}
+
+ul.manual-toc {
+		-moz-column-width: 32em;
+		-webkit-column-width: 32em;
+		display: none;
+}
+
+ul.manual-toc > li { font-weight: bold; }
+ul.manual-toc > li > ul { font-weight: normal; }
+ul.manual-toc,
+ul.manual-toc ul { list-style-type: none; }
+ul.manual-toc li a { color: #000; text-decoration: none; }
+ul.manual-toc li a:hover { color: #7b2e2e; }
+
+
+#nav-quicklinks {
+		display:inline-block;
+		padding: 0px 10px;
+		margin: 5px;
+		float: right;
+}
+
+#nav-quicklinks li {
+		display: inline;
+		padding:0px 2px;
+		margin: 0px 1em;
+}
+
+#nav-quicklinks a { text-decoration: none; }
+#nav-quicklinks a:hover { color: #7b2e2e; }
+
+.navsymbol {
+		font-weight:bold;
+		font-size: 130%;
+		line-height:70%;
+}
+
+div.manualtitle	{
+		display: inline-block;
+		margin: 5px;
+		text-align: center;
+		font-weight: bold;
+}
+
+#pulldowntab {
+	position: absolute;
+	left: 50%; top: 0.75em;
+	color: #999;
+	-webkit-transform: rotate(90deg);
+	-moz-transform: rotate(90deg);
+	-o-transform: rotate(90deg);
+	writing-mode: tb-rl;
+}
+
+pre {
+		background: #262626;
+		color: #d9bf8c;
+		padding: 8px;
+		margin: 10px auto;
+		display: block;
+		width: 750px;
+		overflow-x: auto;
+		border-radius: 3px;
+		font-size: 95%;
+}
+
+span.textit		{ font-style: italic  }
+span.textsl		{ font-style: italic  }
+span.arabic		{   }
+span.textbf		{ font-weight: bold  }
+span.textsf		{ font-style: italic  }
+

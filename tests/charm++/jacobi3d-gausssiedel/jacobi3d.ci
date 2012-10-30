@@ -1,0 +1,42 @@
+module jacobi3d {
+
+  message ghostMsg {
+    double gh[];
+  };
+
+  array [3D] Jacobi {
+    // Normal Charm++ entry methods
+    entry Jacobi(void);
+    entry void begin_iteration(void);
+    entry void receiveGhosts(ghostMsg *gmsg);
+    entry void processGhosts(ghostMsg *gmsg);
+    entry void print();
+    entry void doStep() {
+        serial "begin_iteration" {
+            begin_iteration();
+        }
+        for(imsg = 0; imsg < neighbors; imsg++) {
+            // "iterations" keeps track of messages across steps
+            when receiveGhosts[iterations] (ghostMsg *gmsg)
+                serial "process ghosts" { processGhosts(gmsg); }
+        }
+        serial "doWork" {
+            check_and_compute();
+        }
+    };
+  };
+
+  group JacobiMap : CkArrayMap {
+    entry JacobiMap(int x, int y, int z);
+  };
+
+  group JacobiNodeMap : CkArrayMap {
+    entry JacobiNodeMap();
+  };
+
+  group TraceControl {
+      entry TraceControl();
+      entry void startTrace();
+      entry void endTrace();
+  };
+};

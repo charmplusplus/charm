@@ -23,14 +23,14 @@ main::main(CkArgMsg * m)
   nc = atoi(m->argv[2]);
   delete m;
 
-  starttime = CmiWallTimer();
+  starttime = CkWallTimer();
 
   //FIXME
   //CkGroupID gid = CkCreatePropMap();
   //CProxy_piPart  arr = CProxy_piPart::ckNew(nc, gid);
   CProxy_piPart  arr = CProxy_piPart::ckNew(nc);
 
-  CkPrintf("At time %lf, array created.\n", (CmiWallTimer()-starttime));
+  CkPrintf("At time %lf, array created.\n", (CkWallTimer()-starttime));
 
 #if USE_REDUCTION
   arr.setReductionClient(reductionHandler,(void *)NULL);
@@ -39,7 +39,7 @@ main::main(CkArgMsg * m)
   responders = nc;
   count = 0;
   mainhandle = thishandle; // readonly initialization
-  CkPrintf("At time %lf, main exits.\n", (CmiWallTimer()-starttime));
+  CkPrintf("At time %lf, main exits.\n", (CkWallTimer()-starttime));
 }
 
 void main::results(int cnt) 
@@ -49,7 +49,7 @@ void main::results(int cnt)
   if (0 == --responders) 
 #endif
   {
-    endtime = CmiWallTimer();
+    endtime = CkWallTimer();
     CkPrintf("At time %lf, pi=: %f \n", (endtime-starttime), 4.0*count/(ns*nc));
     CkExit();
   }

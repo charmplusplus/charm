@@ -41,7 +41,7 @@ private:
     int 	shown;		// if 0, donot show in help page
     LBDBEntry(): name(0), cfn(0), afn(0), help(0), shown(1) {}
     LBDBEntry(int) {}
-    LBDBEntry(const char *n, LBCreateFn cf, LBAllocFn af, 
+    LBDBEntry(const char *n, LBCreateFn cf, LBAllocFn af,
               const char *h, int show=1):
       name(n), cfn(cf), afn(af), help(h), shown(show) {};
   };
@@ -63,10 +63,10 @@ public:
     lbtables.push_back(LBDBEntry(name, fn, afn, help, shown));
   }
   void addCompiletimeBalancer(const char *name) {
-    compile_lbs.push_back(name); 
+    compile_lbs.push_back(name);
   }
   void addRuntimeBalancer(const char *name) {
-    runtime_lbs.push_back(name); 
+    runtime_lbs.push_back(name);
   }
   LBCreateFn search(const char *name) {
     char *ptr = strpbrk((char *)name, ":,");
@@ -110,7 +110,7 @@ static void createLoadBalancer(const char *lbname)
       lbRegistry.displayLBs();    // display help page
       CkAbort("Abort");
     }
-    // invoke function to create load balancer 
+    // invoke function to create load balancer
     fn();
 }
 
@@ -136,7 +136,7 @@ LBDBInit::LBDBInit(CkArgMsg *m)
   else {
     // NullLB is the default when none of above lb created
     // note user may create his own load balancer in his code manually like
-    // in NAMD, but never mind NullLB can disable itself if there is 
+    // in NAMD, but never mind NullLB can disable itself if there is
     // a non NULL LB.
     createLoadBalancer("NullLB");
   }
@@ -164,7 +164,7 @@ void _loadbalancerInit()
   char *balancer = NULL;
   CmiArgGroup("Charm++","Load Balancer");
   while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
-    if (CkMyRank() == 0)                
+    if (CkMyRank() == 0)
       lbRegistry.addRuntimeBalancer(balancer);   /* lbRegistry is a static */
   }
 
@@ -223,22 +223,22 @@ void _loadbalancerInit()
   LBSimulation::simProcs = 0;
   CmiGetArgIntDesc(argv, "+LBSimProcs", &LBSimulation::simProcs, "Number of target processors.");
 
-  LBSimulation::showDecisionsOnly = 
+  LBSimulation::showDecisionsOnly =
     CmiGetArgFlagDesc(argv, "+LBShowDecisions",
 		      "Write to File: Load Balancing Object to Processor Map decisions during LB Simulation");
 
   // force a global barrier after migration done
-  _lb_args.syncResume() = CmiGetArgFlagDesc(argv, "+LBSyncResume", 
+  _lb_args.syncResume() = CmiGetArgFlagDesc(argv, "+LBSyncResume",
                   "LB performs a barrier after migration is finished");
 
   // both +LBDebug and +LBDebug level should work
-  if (!CmiGetArgIntDesc(argv, "+LBDebug", &_lb_args.debug(), 
+  if (!CmiGetArgIntDesc(argv, "+LBDebug", &_lb_args.debug(),
                                           "Turn on LB debugging printouts"))
-    _lb_args.debug() = CmiGetArgFlagDesc(argv, "+LBDebug", 
+    _lb_args.debug() = CmiGetArgFlagDesc(argv, "+LBDebug",
   					     "Turn on LB debugging printouts");
 
   // getting the size of the team with +teamSize
-  if (!CmiGetArgIntDesc(argv, "+teamSize", &_lb_args.teamSize(), 
+  if (!CmiGetArgIntDesc(argv, "+teamSize", &_lb_args.teamSize(),
                                           "Team size"))
     _lb_args.teamSize() = 1;
 
@@ -247,23 +247,23 @@ void _loadbalancerInit()
 		"Print load balancing result summary");
 
   // to ignore baclground load
-  _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBNoBackground", 
+  _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBNoBackground",
                       "Load balancer ignores the background load.");
 #ifdef __BIGSIM__
   _lb_args.ignoreBgLoad() = 1;
 #endif
-  _lb_args.migObjOnly() = CmiGetArgFlagDesc(argv, "+LBObjOnly", 
+  _lb_args.migObjOnly() = CmiGetArgFlagDesc(argv, "+LBObjOnly",
                       "Only load balancing migratable objects, ignoring all others.");
   if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = 1;
 
   // assume all CPUs are identical
-  _lb_args.testPeSpeed() = CmiGetArgFlagDesc(argv, "+LBTestPESpeed", 
+  _lb_args.testPeSpeed() = CmiGetArgFlagDesc(argv, "+LBTestPESpeed",
                       "Load balancer test all CPUs speed.");
-  _lb_args.samePeSpeed() = CmiGetArgFlagDesc(argv, "+LBSameCpus", 
+  _lb_args.samePeSpeed() = CmiGetArgFlagDesc(argv, "+LBSameCpus",
                       "Load balancer assumes all CPUs are of same speed.");
   if (!_lb_args.testPeSpeed()) _lb_args.samePeSpeed() = 1;
 
-  _lb_args.useCpuTime() = CmiGetArgFlagDesc(argv, "+LBUseCpuTime", 
+  _lb_args.useCpuTime() = CmiGetArgFlagDesc(argv, "+LBUseCpuTime",
                       "Load balancer uses CPU time instead of wallclock time.");
 
   // turn instrumentation off at startup
@@ -273,6 +273,10 @@ void _loadbalancerInit()
   // turn instrumentation of communicatin off at startup
   _lb_args.traceComm() = !CmiGetArgFlagDesc(argv, "+LBCommOff",
 		"Turn load balancer instrumentation of communication off");
+
+	// turn on MetaBalancer if set
+	_lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB",
+		"Turn on MetaBalancer");
 
   // set alpha and beeta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
@@ -328,12 +332,13 @@ void LBDatabase::initnodeFn()
 }
 
 // called my constructor
-void LBDatabase::init(void) 
+void LBDatabase::init(void)
 {
   myLDHandle = LDCreate();
   mystep = 0;
   nloadbalancers = 0;
   new_ld_balancer = 0;
+	metabalancer = NULL;
 
   CkpvAccess(lbdatabaseInited) = 1;
 #if CMK_LBDB_ON
@@ -379,12 +384,12 @@ void LBDatabase::set_avail_vector(char * bitmap, int new_ld){
 // called in CreateFooLB() when multiple load balancers are created
 // on PE0, BaseLB of each load balancer applies a ticket number
 // and broadcast the ticket number to all processors
-int LBDatabase::getLoadbalancerTicket()  { 
+int LBDatabase::getLoadbalancerTicket()  {
   int seq = nloadbalancers;
   nloadbalancers ++;
-  loadbalancers.resize(nloadbalancers); 
+  loadbalancers.resize(nloadbalancers);
   loadbalancers[seq] = NULL;
-  return seq; 
+  return seq;
 }
 
 void LBDatabase::addLoadbalancer(BaseLB *lb, int seq) {
@@ -435,8 +440,8 @@ const char *LBDatabase::loadbalancer(int seq) {
 }
 
 void LBDatabase::pup(PUP::er& p)
-{ 
-	IrrGroup::pup(p); 
+{
+	IrrGroup::pup(p);
 	// the memory should be already allocated
 	int np;
 	if (!p.isUnpacking()) np = CkNumPes();
@@ -452,7 +457,13 @@ void LBDatabase::pup(PUP::er& p)
 	}
 	p(avail_vector, np);
 	p|mystep;
-	if(p.isUnpacking()) nloadbalancers = 0;
+	if(p.isUnpacking()) {
+    nloadbalancers = 0;
+		if (_lb_args.metaLbOn()) {
+      // if unpacking set metabalancer using the id
+      metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
+		}
+  }
 }
 
 
@@ -467,6 +478,71 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 #endif
 }
 
+void LBDatabase::ResetAdaptive() {
+#if CMK_LBDB_ON
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
+		}
+		if (metabalancer != NULL) {
+			metabalancer->ResetAdaptive();
+		}
+	}
+#endif
+}
+
+void LBDatabase::ResumeClients() {
+#if CMK_LBDB_ON
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = CProxy_MetaBalancer(_metalb).ckLocalBranch();
+		}
+		if (metabalancer != NULL) {
+			metabalancer->ResumeClients();
+		}
+	}
+  LDResumeClients(myLDHandle);
+#endif
+}
+
+void LBDatabase::SetMigrationCost(double cost) {
+#if CMK_LBDB_ON
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+		}
+		if (metabalancer != NULL)  {
+			metabalancer->SetMigrationCost(cost);
+		}
+	}
+#endif
+}
+
+void LBDatabase::SetStrategyCost(double cost) {
+#if CMK_LBDB_ON
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+		}
+		if (metabalancer != NULL)  {
+			metabalancer->SetStrategyCost(cost);
+		}
+	}
+#endif
+}
+
+void LBDatabase::UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad) {
+#if CMK_LBDB_ON
+	if (_lb_args.metaLbOn()) {
+		if (metabalancer == NULL) {
+			metabalancer = (MetaBalancer *)CkLocalBranch(_metalb);
+		}
+		if (metabalancer != NULL)  {
+			metabalancer->UpdateAfterLBData(mLoad, mCpuLoad, avgLoad);
+		}
+	}
+#endif
+}
 /*
   callable from user's code
 */
@@ -496,26 +572,39 @@ void TurnManualLBOff()
 #endif
 }
 
-extern "C" void LBTurnInstrumentOn() { 
+extern "C" void LBTurnInstrumentOn() {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbdatabaseInited))
-    LBDatabase::Object()->CollectStatsOn(); 
+    LBDatabase::Object()->CollectStatsOn();
   else
     _lb_args.statsOn() = 1;
 #endif
 }
 
-extern "C" void LBTurnInstrumentOff() { 
+extern "C" void LBTurnInstrumentOff() {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbdatabaseInited))
-    LBDatabase::Object()->CollectStatsOff(); 
+    LBDatabase::Object()->CollectStatsOff();
   else
     _lb_args.statsOn() = 0;
 #endif
 }
+
+extern "C" void LBTurnCommOn() {
+#if CMK_LBDB_ON
+  _lb_args.traceComm() = 1;
+#endif
+}
+
+extern "C" void LBTurnCommOff() {
+#if CMK_LBDB_ON
+  _lb_args.traceComm() = 0;
+#endif
+}
+
 void LBClearLoads() {
 #if CMK_LBDB_ON
-  LBDatabase::Object()->ClearLoads(); 
+  LBDatabase::Object()->ClearLoads();
 #endif
 }
 
@@ -546,7 +635,7 @@ void LBChangePredictor(LBPredictorFunction *model) {
 void LBSetPeriod(double second) {
 #if CMK_LBDB_ON
   if (CkpvAccess(lbdatabaseInited))
-    LBDatabase::Object()->SetLBPeriod(second); 
+    LBDatabase::Object()->SetLBPeriod(second);
   else
     _lb_args.lbperiod() = second;
 #endif

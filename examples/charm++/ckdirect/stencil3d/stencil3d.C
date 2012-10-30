@@ -39,7 +39,7 @@ class Main : public CBase_Main {
     CProxy_StencilPoint array = 
         CProxy_StencilPoint::ckNew(charesx*charesy*charesz);
     CkPrintf("main: dim: %d,%d,%d charedim: %d,%d,%d num_iterations: %d\n", dimx, dimy, dimz, charesx, charesy, charesz, num_iterations);
-    startSetup = CmiWallTimer();
+    startSetup = CkWallTimer();
 #ifdef USE_CKDIRECT
     array.setupChannels();
 #else
@@ -48,11 +48,11 @@ class Main : public CBase_Main {
   }
 
   void doneSetup(){
-    start = CmiWallTimer();
+    start = CkWallTimer();
   }
   
   void done(CkReductionMsg *msg){
-    end = CmiWallTimer();
+    end = CkWallTimer();
     CkPrintf("Total time: %f sec\n", end-startSetup);
     CkPrintf("Computation time per iteration: %f sec\n", (end-start)/(num_iterations-1));
     CkPrintf("Total computations: %f\n", *(double *)msg->getData());

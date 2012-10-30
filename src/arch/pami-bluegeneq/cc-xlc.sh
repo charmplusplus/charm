@@ -1,4 +1,10 @@
+
+XLC_TYPICAL_PRE=/opt/ibmcmp/
+if test -d /soft/compilers/ibmcmp-may2012
+then
 XLC_TYPICAL_PRE=/soft/compilers/ibmcmp-may2012
+fi
+
 XLC_PRE=$XLC_TYPICAL_PRE/vacpp/bg/12.1
 
 XLC_TYPICAL_POST=bin/bg
@@ -11,8 +17,8 @@ then
 fi
 
 XLC_F=$XLC_TYPICAL_PRE/xlf/bg/14.1
-CMK_CC="$XLC_PRE/${XLC_POST}xlc_r -qcpluscmt -qhalt=e $BGQ_INC"
-CMK_CXX="$XLC_PRE/${XLC_POST}xlC_r -qhalt=e $BGQ_INC"
+CMK_CC="$XLC_PRE/${XLC_POST}xlc_r -qcpluscmt -qhalt=e $BGQ_INC -qnokeyword=__int128"
+CMK_CXX="$XLC_PRE/${XLC_POST}xlC_r -qhalt=e $BGQ_INC -qnokeyword=__int128"
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
 CMK_CF77="$XLC_F/${XLC_POST}xlf "

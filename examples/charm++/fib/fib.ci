@@ -1,0 +1,22 @@
+mainmodule fib {
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+  };
+
+  chare Fib {
+    entry Fib(int n, bool isRoot, CProxy_Fib parent);
+    entry void calc(int n) {
+      if (n < THRESHOLD) atomic { respond(seqFib(n)); }
+      else {
+        atomic {
+          CProxy_Fib::ckNew(n - 1, false, thisProxy);
+          CProxy_Fib::ckNew(n - 2, false, thisProxy);
+        }
+        when response(int val)
+          when response(int val2)
+            atomic { respond(val + val2); }
+      }
+    };
+    entry void response(int val);
+  };
+};

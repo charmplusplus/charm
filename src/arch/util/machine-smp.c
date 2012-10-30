@@ -285,11 +285,10 @@ static CmiState     Cmi_state_vector;
 #define CmiGetState() ((CmiState)pthread_getspecific(Cmi_state_key))
 #else
 CmiState CmiGetState() {
-	CmiState ret=(CmiState)pthread_getspecific(Cmi_state_key);
-	if (ret==NULL || Cmi_state_key == (pthread_key_t)(-1)) {
-		return &Cmi_default_state;
-	}
-	return ret;
+	CmiState ret;
+	if (Cmi_state_key == (pthread_key_t)(-1)) return &Cmi_default_state;
+	ret=(CmiState)pthread_getspecific(Cmi_state_key);
+	return (ret==NULL)? &Cmi_default_state : ret;
 }
 
 #endif

@@ -1,0 +1,341 @@
+\section{Launching Programs with \kw{charmrun}}
+\label{charmrun}
+
+When compiling \charmpp{} programs, the charmc linker produces 
+both an executable file and an utility called {\tt charmrun},
+which is used to load the executable onto the parallel machine.
+
+To run a \charmpp{} program named ``pgm'' on four processors, type:
+\begin{alltt}
+charmrun pgm +p4
+\end{alltt}
+
+Execution on platforms which use platform specific launchers, (i.e.,
+{\bf aprun}, {\bf ibrun}), can proceed without charmrun, or charmrun can be used
+in coordination with those launchers via the {\tt ++mpiexec} (see
+\ref{mpiexec} parameter.
+
+Programs built using the network version of \charmpp{} can be run
+alone, without charmrun.  This restricts you to using the processors
+on the local machine, but it is convenient and often useful for
+debugging.  For example, a \charmpp{} program can be run on one
+processor in the debugger using:
+
+\begin{alltt}
+gdb pgm
+\end{alltt}
+
+If the program needs some environment variables
+to be set for its execution on compute nodes
+(such as library paths), they can be set in
+.charmrunrc under home directory. charmrun
+will run that shell script before running the executable.
+
+\section[Command Line Options]{Command Line Options}
+\label{command line options}
+\index{command line options}
+
+A \charmpp{} program accepts the following command line options:
+\begin{description}
+
+\item[{\tt +pN}] Run the program with N processors. The default is 1.
+
+\item[{\tt +ss}] Print summary statistics about chare creation.  This option
+prints the total number of chare creation requests, and the total number of
+chare creation requests processed across all processors.
+
+\item[{\tt +cs}] Print statistics about the number of create chare messages
+requested and processed, the number of messages for chares requested and 
+processed, and the number of messages for branch office chares requested and
+processed, on a per processor basis.  Note that the number of messages 
+created and processed for a particular type of message on a given node 
+may not be the same, since a message may be processed by a different
+processor from the one originating the request.
+
+\item[{\tt user\_options}] Options that are be interpreted by the user
+program may be included mixed with the system options. 
+However, {\tt user\_options} cannot start with +.
+The {\tt user\_options} will be passed as arguments to the user program 
+via the usual {\tt argc/argv} construct to the {\tt main}
+entry point of the main chare. 
+\charmpp{} system options will not appear in {\tt argc/argv}.
+
+\end{description}
+
+
+
+\subsection{Additional Network Options}
+\label{network command line options}
+
+The following {\tt ++} command line options are available in
+the network version:
+\begin{description}
+
+\item[{\tt ++local}] Run charm program only on local machines. No 
+ remote shell invocation is needed in this case. It starts node programs 
+ right on your local machine. This could be useful if you just want to 
+ run small program on only one machine, for example, your laptop.
+
+
+\item[{\tt ++mpiexec}]
+\label{mpiexec}
+Use the cluster's {\tt mpiexec} job launcher instead of the built in rsh/ssh
+method.
+
+This will pass {\tt -n \$P} to indicate how many processes to
+launch. An executable named something other than {\tt mpiexec} can be
+used with the additional argument {\tt ++remote-shell} {\it runmpi},
+with `runmpi' replaced by the necessary name.
+
+Use of this option can potentially provide a few benefits:
+
+\begin{itemize}
+\item Faster startup compared to the SSH/RSH approach charmrun would
+  otherwise use
+\item No need to generate a nodelist file
+\item Multi-node job startup on clusters that do not allow connections
+  from the head/login nodes to the compute nodes
+\end{itemize}
+
+At present, this option depends on the environment variables for some
+common MPI implementations. It supports OpenMPI ({\tt OMPI\_COMM\_WORLD\_RANK} and
+{\tt OMPI\_COMM\_WORLD\_SIZE}) and M(VA)PICH ({\tt MPIRUN\_RANK} and {\tt
+  MPIRUN\_NPROCS} or {\tt PMI\_RANK} and {\tt PMI\_SIZE}).
+
+\item[{\tt ++debug}] Run each node under gdb in an xterm window, prompting
+the user to begin execution.
+
+\item[{\tt ++debug-no-pause}] Run each node under gdb in an xterm window
+immediately (i.e. without prompting the user to begin execution).
+
+If using one of the {\tt ++debug} or {\tt ++debug-no-pause} options,
+the user must ensure the following:
+\begin{enumerate}
+
+\item The {\tt DISPLAY} environment variable points to your terminal.
+SSH's X11 forwarding does not work properly with \charmpp{}.
+
+\item The nodes must be authorized to create windows on the host machine (see
+man pages for {\tt xhost} and {\tt xauth}).
+
+\item {\tt xterm}, {\tt xdpyinfo},  and {\tt gdb} must be in
+the user's path.
+
+\item The path must be set in the {\tt .cshrc} file, not the {\tt .login}
+file, because {\tt rsh} does not run the {\tt .login} file. 
+
+\end{enumerate}
+
+\item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a
+time.
+
+\item[{\tt ++nodelist}] File containing list of nodes.
+
+
+\item[{\tt ++ppn}]              number of pes per node
+
+\item[{\tt ++help}]             print help messages
+
+\item[{\tt ++runscript}]        script to run node-program with
+
+\item[{\tt ++xterm}]            which xterm to use
+
+\item[{\tt ++in-xterm}]         Run each node in an xterm window
+
+\item[{\tt ++display}]          X Display for xterm
+
+\item[{\tt ++debugger}]         which debugger to use
+
+\item[{\tt ++remote-shell}]     which remote shell to use
+
+\item[{\tt ++useip}]            Use IP address provided for charmrun IP
+
+\item[{\tt ++usehostname}]      Send nodes our symbolic hostname instead of IP address
+
+\item[{\tt ++server-auth}]      CCS Authentication file
+
+\item[{\tt ++server-port}]      Port to listen for CCS requests
+
+\item[{\tt ++server}]           Enable client-server (CCS) mode
+
+\item[{\tt ++nodegroup}]        which group of nodes to use
+
+\item[{\tt ++verbose}]          Print diagnostic messages
+
+\item[{\tt ++timeout}]          seconds to wait per host connection
+
+\item[{\tt ++p}]                number of processes to create
+
+\end{description}
+
+\subsection{Multicore Options}
+
+On multicore platforms, operating systems (by default) are free to move
+processes and threads among cores to balance load. This however sometimes can
+degrade the performance of Charm++ applications due to the extra overhead of
+moving processes and threads, especailly when Charm++ applications has already
+implemented its own dynamic load balancing.
+
+Charm++ provides the following runtime options to set the processor affinity
+automatically so that processes or threads no longer move. When cpu affinity
+is supported by an operating system (tested at Charm++ configuration time),
+same runtime options can be used for all flavors of Charm++ versions including
+network and MPI versions, smp and non-smp versions.
+
+\begin{description}
+
+\item[{\tt +setcpuaffinity}]             set cpu affinity automatically for processes (when Charm++ is based on non-smp versions) or threads (when smp)
+
+\item[{\tt +excludecore <core \#>}]       does not set cpu affinity for the given core number. One can use this option multiple times to provide a list of core numbers to avoid.
+
+\item[{\tt +pemap L[-U[:S[.R]]][,...]}] Bind the execution threads to
+  the sequence of cores described by the arguments using the operating
+  system's CPU affinity functions.
+
+A single number identifies a particular core. Two numbers separated by
+a dash identify an inclusive range (\emph{lower bound} and \emph{upper
+  bound}). If they are followed by a colon and another number (a
+\emph{stride}), that range will be stepped through in increments of
+the additional number. Within each stride, a dot followed by a
+\emph{run} will indicate how many cores to use from that starting
+point.
+
+For example, the sequence {\tt 0-8:2,16,20-24} includes cores 0, 2, 4,
+6, 8, 16, 20, 21, 22, 23, 24. On a 4-way quad-core system, if one
+wanted to use 3 cores from each socket, one could write this as {\tt
+  0-15:4.3}.
+
+\item[{\tt +commap p[,q,...]}] Bind communication threads to the
+  listed cores, one per process.
+
+\end{description}
+
+\subsection{IO buffering options}
+\label{io buffer options}
+There may be circumstances where a \charmpp{} application may want to take
+or relinquish control of stdout buffer flushing. Most systems default to
+giving the \charmpp{} runtime control over stdout but a few default to
+giving the application that control. The user can override these system
+defaults with the following runtime options:
+
+\begin{description}
+\item[{\tt +io\_flush\_user}]     User (application) controls stdout flushing
+\item[{\tt +io\_flush\_system}]   The \charmpp{} runtime controls flushing
+\end{description}
+
+
+\section{Nodelist file}
+
+For network of workstations,
+the list of machines to run the program can be specified in a file.  
+Without a nodelist file, \charmpp{} runs the program only on the 
+local machine.
+
+The format of this file
+allows you to define groups of machines, giving each group a name.
+Each line of the nodes file is a command.  The most important command
+is:
+
+\begin{alltt}
+host <hostname> <qualifiers>
+\end{alltt}
+
+which specifies a host.  The other commands are qualifiers: they modify
+the properties of all hosts that follow them.  The qualifiers are:
+
+
+\begin{tabbing}
+{\tt group <groupname>}~~~\= - subsequent hosts are members of specified group\\
+{\tt login <login>  }     \> - subsequent hosts use the specified login\\
+{\tt shell <shell>  }     \> - subsequent hosts use the specified remote 
+shell\\
+%{\tt passwd <passwd>}     \> - subsequent hosts use the specified password\\
+{\tt setup <cmd>  }       \> - subsequent hosts should execute cmd\\
+{\tt pathfix <dir1> <dir2>}         \> - subsequent hosts should replace dir1 with dir2 in the program path\\
+{\tt cpus <n>}            \> - subsequent hosts should use N light-weight processes\\
+{\tt speed <s>}           \> - subsequent hosts have relative speed rating\\
+{\tt ext <extn>}          \> - subsequent hosts should append extn to the pgm name\\
+\end{tabbing}
+
+{\bf Note:}
+By default, charmrun uses a remote shell ``rsh'' to spawn node processes
+on the remote hosts. The {\tt shell} qualifier can be used to override
+it with say, ``ssh''. One can set the {\tt CONV\_RSH} environment variable
+or use charmrun option {\tt ++remote-shell} to override the default remote 
+shell for all hosts with unspecified {\tt shell} qualifier.
+
+All qualifiers accept ``*'' as an argument, this resets the modifier to
+its default value.  Note that currently, the passwd, cpus, and speed
+factors are ignored.  Inline qualifiers are also allowed:
+
+\begin{alltt}
+host beauty ++cpus 2 ++shell ssh
+\end{alltt}
+
+Except for ``group'', every other qualifier can be inlined, with the
+restriction that if the ``setup'' qualifier is inlined, it should be
+the last qualifier on the ``host'' or ``group'' statement line.
+
+Here is a simple nodes file:
+
+\begin{alltt}
+        group kale-sun ++cpus 1
+          host charm.cs.illinois.edu ++shell ssh
+          host dp.cs.illinois.edu
+          host grace.cs.illinois.edu
+          host dagger.cs.illinois.edu
+        group kale-sol
+          host beauty.cs.illinois.edu ++cpus 2
+        group main
+          host localhost
+\end{alltt}
+
+This defines three groups of machines: group kale-sun, group kale-sol,
+and group main.  The ++nodegroup option is used to specify which group
+of machines to use.  Note that there is wraparound: if you specify
+more nodes than there are hosts in the group, it will reuse
+hosts. Thus,
+
+\begin{alltt}
+        charmrun pgm ++nodegroup kale-sun +p6
+\end{alltt}
+
+uses hosts (charm, dp, grace, dagger, charm, dp) respectively as
+nodes (0, 1, 2, 3, 4, 5).
+
+If you don't specify a ++nodegroup, the default is ++nodegroup main.
+Thus, if one specifies
+
+\begin{alltt}
+        charmrun pgm +p4
+\end{alltt}
+
+it will use ``localhost'' four times.  ``localhost'' is a Unix
+trick; it always find a name for whatever machine you're on.
+
+The user is required to set up remote login permissions on all nodes
+using the ``.rhosts'' file in the home directory if ``rsh'' is used for remote
+login into the hosts. If ``ssh'' is used, the user will have to setup
+password-less login to remote hosts using
+RSA authentication based on a key-pair and adding public keys to 
+``.ssh/authorized\_keys'' file. See ``ssh'' documentation for more information.
+
+In a network environment, {\tt charmrun} must
+be able to locate the directory of the executable.  If all workstations
+share a common file name space this is trivial.  If they don't, {\tt charmrun}
+will attempt to find the executable in a directory with the same path
+from the {\bf \$HOME} directory.  Pathname resolution is performed as 
+follows:
+\begin{enumerate}
+	\item The system computes the absolute path of {\tt pgm}.
+	\item If the absolute path starts with the equivalent of {\bf \$HOME} 
+	or the current working directory, the beginning part of the 
+        path 
+	is replaced with the environment variable {\bf \$HOME} or the 
+	current working directory. However, if {\tt ++pathfix dir1 dir2} is 
+        specified in the nodes file (see above), the part of
+        the path matching {\tt dir1} is replaced with {\tt dir2}.
+	\item The system tries to locate this program (with modified 
+	pathname and appended extension if specified) on all nodes.
+\end{enumerate}
+

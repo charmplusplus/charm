@@ -21,6 +21,9 @@ public:
   static void FreeProcs(int* bufs);
   void Refine(int count, BaseLB::LDStats* stats, int* cur_p, int* new_p);
 
+  double computeAverageLoad();
+  double computeMax();
+
 protected:
   void create(int count, BaseLB::LDStats* stats, int* cur_p);
   virtual int refine();
@@ -29,7 +32,6 @@ protected:
   void assign(computeInfo *c, processorInfo *p);
   void deAssign(computeInfo *c, processorInfo *pRec);
   virtual void computeAverage();
-  double computeMax();
   int isHeavy(processorInfo *p);
   int isLight(processorInfo *p);
   void removeComputes();

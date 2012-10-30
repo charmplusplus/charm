@@ -11,7 +11,6 @@ class main : public CBase_main {
   CProxy_tchare<double> cdouble;
 public:
   main(CkArgMsg *m) {
-    __sdag_init();
     delete m;
     thisProxy.run();
   }
@@ -21,7 +20,7 @@ template <typename T>
 class tchare : public CBase_tchare<T> {
   tchare_SDAG_CODE;
   T val;
-  tchare(T arg) : val(arg) { __sdag_init(); }
+  tchare(T arg) : val(arg) { }
 };
 
 #include "pgm.def.h"

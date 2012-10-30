@@ -1,0 +1,100 @@
+Libraries written in \charmpp{} can also be used with pure MPI programs. Currently this
+functionality is supported only if \charmpp{} is built using MPI as the network layer
+(e.g. mpi-linux-x86\_64 build). An example program to demonstrate the
+interoperation is available in examples/charm++/mpi-coexist. We will be
+referring to this example program for ease of understanding.
+
+\section{Control Flow and Memory Structure}
+The control flow and memory structure of a \charmpp{}-MPI interoperable program  is
+similar to that of a pure MPI program that uses external MPI libraries. The
+execution of program begins with pure MPI code's {\em main}. At some point after 
+MPI\_Init() has been invoked, the following function call should be made to initialize
+\charmpp{}: \\
+
+{\bf void CharmLibInit(MPI\_Comm newComm, int argc, char **argv)}\\
+
+\noindent Here, {\em newComm} is the MPI communicator that \charmpp{} will use for
+the setup and communication. All the MPI ranks that belong to {\em newComm} should 
+make this call. A collection of MPI ranks that make the CharmLibInit call defines a 
+new \charmpp{} instance. Different MPI ranks that belong to different communicators can 
+make this call independently, and separate \charmpp{} instances (that are not aware of each other) 
+will be created. As of now, a particular MPI rank can only be part of one unique \charmpp{} 
+instance. Arguments {\em argc and argv} should contain the information required by \charmpp{} 
+such as the load balancing strategy etc.
+
+During the initialization the control is transferred from MPI to \charmpp{}
+RTS on the MPI ranks that made the call. Along with basic setup, \charmpp{} RTS also invokes
+the constructors of all mainchares during initialization. Once the intial set up
+is done, control is transferred back to MPI as if returning from a function call. 
+Since \charmpp{} initialization is made via a function call from the pure MPI
+program, \charmpp{} resides in the same memory space as the pure MPI program. This
+makes transfer of data from MPI to \charmpp{} convenient (using pointers).
+
+\section{Writing Interoperable \charmpp{} Libraries}
+Minor modifications are required to make a \charmpp{} program interoperable with a pure
+MPI program:
+\begin{itemize}
+\item An interoperable \charmpp{} library should not contain a main module.
+\item {\em CkExit} should be used the same way {\em return} statement is used for returning
+back from a function call. It is advisable to make sure that only one chare
+invokes {\em CkExit}.
+\item Include {\em mpi-interoperate.h} - if not included, invoking {\em CkExit} will result 
+in random output.
+\item Since the CharmLibInit call invokes the constructors of mainchares, the
+constructors of mainchares should only perform basic set up such as creation of chare
+arrays etc. The set up should not result in invocation of actual work, which
+should be done using interface functions (when desired from the pure MPI
+program). One may avoid use of mainchares, and perform the necessary
+initializations in an interface function as demonstrated in the interoperable
+library examples/charm++/mpi-coexist/libs/hello.
+\item Interface functions - Every library needs to define interface function(s) 
+that can be invoked from pure MPI programs, and transfers the control to the 
+\charmpp{} RTS. The interface functions are simple functions whose task is to
+start work for the \charmpp{} libraries. Here is an example interface function for the
+{\em hello} library. 
+\begin{alltt}
+void HelloStart(int elems)
+\{
+  if(CkMyPe() == 0) \{
+  CkPrintf("HelloStart - Starting lib by calling constructor of MainHello\\n");
+  CProxy\_MainHello mainhello = CProxy\_MainHello::ckNew(elems);
+  \}
+  StartCharmScheduler(-1);
+\}
+\end{alltt}
+
+This function creates a new chare (mainHello) defined in the {\em hello} library which
+subsequently results in work being done in {\em hello} library.
+More examples of such interface functions can 
+be found in hi (HiStart) and kNeighbor (kNeighbor) directories in 
+examples/charm++/mpi-coexist/libs. Note that a scheduler call {\em
+StartCharmScheduler()} should be made from the interface functions to start the
+message reception by \charmpp{} RTS.
+\end{itemize}
+
+\section{Writing Interoperable MPI Programs}
+An MPI program that invokes \charmpp{} libraries should include {\em mpi-interoperate.h}. 
+As mentioned earlier, an initialization call, {\em CharmLibInit} is 
+required after invoking MPI\_Init to perform the initial set up of \charmpp{}. 
+It is advisable to call an MPI\_Barrier after a control transfer between \charmpp{} 
+and MPI to avoid any side effects. Thereafter, a \charmpp{} library can be invoked at
+any point using the interface functions. One may look at
+examples/charm++/mpi-coexist/multirun.cpp for a working example. Based on the
+way interfaces are defined, a library can be invoked multiple times. In the end,
+one should call {\em CharmLibExit} to free resources reserved by \charmpp{}.
+
+\section{Compilation}
+An interoperable \charmpp{} library can be compiled as usual using {\em charmc}.
+Instead of producing an executable in the end, one should create a library (*.a)
+as shown in examples/charm++/mpi-coexist/libs/hi/Makefile. The compilation
+process of the MPI program, however, needs modification. One has to include the
+charm directory (-I\$(CHARMDIR)/include) to help the compiler find the location of
+included {\em mpi-interoperate.h}. The linking step to create the executable
+should be done using {\em charmc}, which in turn uses the compiler used to build
+charm. In the linking step, it is required to pass {\em -mpi} as an argument
+because of which {\em charmc} performs the linking for interoperation. The charm
+libraries, which one wants to be linked, should be passed using {\em -module}
+option. Refer to examples/charm++/mpi-coexist/Makefile to view a working
+example.
+
+

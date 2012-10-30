@@ -619,10 +619,11 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   { //Create a new location manager
 #if !CMK_LBDB_ON
     CkGroupID _lbdb;
+    CkGroupID _metalb;
 #endif
     CkEntryOptions  e_opts;
     e_opts.setGroupDepID(opts.getMap());       // group creation dependence
-    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(),_lbdb,opts.getNumInitial(),&e_opts);
+    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(),_lbdb,_metalb,opts.getNumInitial(),&e_opts);
     opts.setLocationManager(locMgr);
   }
   //Create the array manager
@@ -1385,7 +1386,10 @@ void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index
         CkArrayMessage *copy = (CkArrayMessage *)   CkCopyMsg((void **)&bcast);
         envelope *env = UsrToEnv(copy);
         env->sender.data.group.onPE = CkMyPe();
-        env->TN  = env->SN=0;
+#if defined(_FAULT_CAUSAL_)
+        env->TN = 0;
+#endif
+		env->SN = 0;
         env->piggyBcastIdx = epIdx;
         env->setEpIdx(CkIndex_ArrayElement::recvBroadcast(0));
         env->getsetArrayMgr() = thisgroup;

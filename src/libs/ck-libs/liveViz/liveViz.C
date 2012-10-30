@@ -12,6 +12,8 @@ PUPbytes(liveVizConfig)
 liveVizConfig lv_config;
 CkReduction::reducerType image_combine_reducer;
 CProxy_liveVizGroup lvG;
+CProxy_LiveVizBoundElement lvBoundArray;
+bool usingBoundArray;
 CkCallback clientGetImageCallback;
 
 //Called by clients to start liveViz.
@@ -23,6 +25,30 @@ void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c)
   //  lv_config can't be a readonly because we may be called after
   //  main::main (because, e.g., communication is needed to find the
   //  bounding box inside cfg).
+  usingBoundArray = false;
+  lvG = CProxy_liveVizGroup::ckNew(cfg);
+}
+
+//Called by clients to start liveViz.
+void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c, CkArrayOptions &opts)
+{
+  if (CkMyPe()!=0) CkAbort("liveVizInit must be called only on processor 0!");
+  clientGetImageCallback=c;
+  //Broadcast the liveVizConfig object via our group:
+  //  lv_config can't be a readonly because we may be called after
+  //  main::main (because, e.g., communication is needed to find the
+  //  bounding box inside cfg).
+  usingBoundArray = true;
+  CkArrayOptions boundOpts;
+  int dimension = opts.getNumInitial().dimension;
+  switch(dimension){
+  case 1: boundOpts.setNumInitial(opts.getNumInitial().data()[0]); break;
+  case 2: boundOpts.setNumInitial(opts.getNumInitial().data()[0],opts.getNumInitial().data()[1]); break;
+  case 3: boundOpts.setNumInitial(opts.getNumInitial().data()[0],opts.getNumInitial().data()[1],opts.getNumInitial().data()[2]); break;
+  default: CmiAbort("Arrays with more than 3 dimensions are not currently supported by liveViz");
+  }
+  boundOpts.bindTo(a);
+  lvBoundArray = CProxy_LiveVizBoundElement::ckNew(boundOpts);
   lvG = CProxy_liveVizGroup::ckNew(cfg);
 }
 
@@ -91,8 +117,12 @@ void liveVizDeposit(const liveVizRequest &req,
 
   //Contribute this image to the reduction
   msg->setCallback(CkCallback(vizReductionHandler));
-  
-  client->contribute(msg);
+ 
+  if(usingBoundArray){
+    lvBoundArray[client->thisIndexMax].deposit(msg);
+  }else {
+    client->contribute(msg);
+  }
 }
 
 
@@ -215,6 +245,7 @@ void liveVizDeposit(const liveVizRequest &req,
 
 //Contribute this image to the reduction
   msg->setCallback(CkCallback(vizReductionHandler));
+
   client->contribute(msg);
 }
 

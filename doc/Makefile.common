@@ -7,6 +7,7 @@
 #   TEX: all TeX files to depend on (often just "manual.tex")
 #   DEST: destination manual name (e.g., "fem")
 #   LATEX2HTML: call to latex2html, which should be "$(L2H) <args>"
+#   DOCTITLE: title of the manual
 # (optional) PROJECT_LINK: HTML to include at bottom of page
 
 # Destination directory for local copy of files (e.g., on user machine)
@@ -20,10 +21,11 @@ L2H=latex2html -white -antialias -local_icons \
 	-long_titles 1 \
 	-show_section_numbers \
 	-top_navigation \
-	-address '<p align="right">'"`/bin/date +"%B %d, %Y"`"'<br> \
-            '$(PROJECT_LINK)'<a href="http://charm.cs.uiuc.edu/">Charm Homepage</a>'
+	-address ''
 
 DEPTEX=$(TEX) $(FILE).aux index.tex
+
+.PHONY: setup html1page
 
 # Default target: build postscript, pdf, and html:
 
@@ -49,19 +51,31 @@ $(FILE).pdf: $(TEX) $(FILE).aux
 	pdflatex $(FILE).tex
 
 # HTML Target:
-html: $(FILE)
+html: html1page $(FILE)
 
-$(FILE): $(TEX) $(FILE).aux
+tmpFile = tmp-navmenu.html
+
+$(FILE): setup $(TEX) $(FILE).aux
+	export MANUALTITLE=$(DOCTITLE) && $(LATEX2HTML) $(FILE).tex && unset MANUALTITLE
+	../navmenuGenerator.py $@/index.html > $(tmpFile)
+	for f in $@/*.html; do echo "Sanitizing $$f"; sed -i -e 's!'`pwd`'/!!g' $$f; ../markupSanitizer.py $$f $(tmpFile) > tmpop && cat tmpop > $$f && rm tmpop; done
+	rm -f $(tmpFile)
+
+l2h1pagecfg = ./l2h-1page-init
+
+html1page: setup $(TEX) $(FILE).aux
+	cp ../dot.latex2html-init $(l2h1pagecfg)
+	sed -i -e "s|MAX_SPLIT_DEPTH[ ]*=|MAX_SPLIT_DEPTH = 0; #|g" $(l2h1pagecfg)
+	$(L2H) -init_file $(l2h1pagecfg) $(FILE).tex
+	-@mv $(FILE)/$(FILE).html $(FILE)/$(FILE)-1p.html
+	rm -f $(l2h1pagecfg)
+
+setup:
 	-@ln -s ../pplmanual.* .
 	-@ln -s ../dot.latex2html-init .latex2html-init
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
 	-@mkdir $(FILE)
-	-@ln -s ../../manual.css $(FILE)
-	-/bin/cp title.html $(FILE)
-	$(L2H) -split 0 $(FILE).tex
-	-@mv $(FILE)/$(FILE).html $(FILE)/$(FILE)-1p.html
-	$(LATEX2HTML) $(FILE).tex
-	../latex2html_fixpaths.sh
+	-@/bin/cp -r ../assets fig figs $(FILE)
 
 # LaTeX Index and link support
 $(FILE).aux: $(TEX) index.tex $(FIG_TARGET)

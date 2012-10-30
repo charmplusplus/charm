@@ -13,11 +13,12 @@
 // take advantage of nonuniform filling of buffers
 #define OVERALLOCATION_FACTOR 4
 
-// #define DEBUG_STREAMER
 // #define CACHE_LOCATIONS
 // #define SUPPORT_INCOMPLETE_MESH
 // #define CACHE_ARRAY_METADATA // only works for 1D array clients
 // #define STREAMER_VERBOSE_OUTPUT
+
+#define TRAM_BROADCAST (-100)
 
 struct MeshLocation {
   int dimension; 
@@ -39,16 +40,16 @@ public:
     finalMsgCount = -1; 
   }
 
-  int addDataItem(const dtype &dataItem) {
+  inline int addDataItem(const dtype& dataItem) {
     dataItems[numDataItems] = dataItem;
     return ++numDataItems; 
   }
 
-  void markDestination(const int index, const int destinationPe) {
+  inline void markDestination(const int index, const int destinationPe) {
     destinationPes[index] = destinationPe;
   }
 
-  dtype &getDataItem(const int index) {
+  inline const dtype& getDataItem(const int index) {
     return dataItems[index];
   }
 
@@ -59,26 +60,31 @@ class MeshStreamerArrayClient : public CBase_MeshStreamerArrayClient<dtype>{
 private:
   CompletionDetector *detectorLocalObj_;
 public:
-  MeshStreamerArrayClient(){}
+  MeshStreamerArrayClient(){
+    detectorLocalObj_ = NULL; 
+  }
   MeshStreamerArrayClient(CkMigrateMessage *msg) {}
   // would like to make it pure virtual but charm will try to
   // instantiate the abstract class, leading to errors
-  virtual void process(dtype &data) {
+  virtual void process(const dtype& data) {
     CkAbort("Error. MeshStreamerArrayClient::process() is being called. "
             "This virtual function should have been defined by the user.\n");
-  };     
-  void setDetector(CompletionDetector *detectorLocalObj) {
+  }     
+  inline void setDetector(CompletionDetector *detectorLocalObj) {
     detectorLocalObj_ = detectorLocalObj;
   }
   void receiveRedeliveredItem(dtype data) {
 #ifdef STREAMER_VERBOSE_OUTPUT
-    CkPrintf("[%d] redelivered to index %d\n", CkMyPe(), this->thisIndex.data[0]);
+    CkPrintf("[%d] redelivered to index %d\n", 
+             CkMyPe(), this->thisIndex.data[0]);
 #endif
-    detectorLocalObj_->consume();
+    if (detectorLocalObj_ != NULL) {
+      detectorLocalObj_->consume();
+    }
     process(data);
   }
 
-  void pup(PUP::er &p) {
+  void pup(PUP::er& p) {
     CBase_MeshStreamerArrayClient<dtype>::pup(p);
    }  
 
@@ -88,8 +94,16 @@ template <class dtype>
 class MeshStreamerGroupClient : public CBase_MeshStreamerGroupClient<dtype>{
 
 public:
-  virtual void process(dtype &data) = 0;
+  virtual void process(const dtype& data) {
+    CkAbort("Error. MeshStreamerGroupClient::process() is being called. "
+            "This virtual function should have been defined by the user.\n");
+  }     
 
+  virtual void receiveArray(dtype *data, int numItems, int sourcePe) {
+    for (int i = 0; i < numItems; i++) {
+      process(data[i]);
+    }
+  }
 };
 
 template <class dtype>
@@ -101,7 +115,6 @@ private:
   int numDataItemsBuffered_;
 
   int numMembers_; 
-  int numDimensions_;
   int *individualDimensionSizes_;
   int *combinedDimensionSizes_;
 
@@ -138,10 +151,10 @@ private:
   int numLocalContributors_;
 
   void storeMessage(int destinationPe, 
-                    const MeshLocation &destinationCoordinates, 
-                    void *dataItem, bool copyIndirectly = false);
-  virtual void localDeliver(dtype &dataItem) = 0; 
-
+                    const MeshLocation& destinationCoordinates, 
+                    const void *dataItem, bool copyIndirectly = false);
+  virtual void localDeliver(const dtype& dataItem) = 0; 
+  virtual void localBroadcast(const dtype& dataItem) = 0; 
   virtual int numElementsInClient() = 0;
   virtual int numLocalElementsInClient() = 0; 
 
@@ -150,16 +163,21 @@ private:
   void sendLargestBuffer();
   void flushToIntermediateDestinations();
   void flushDimension(int dimension, bool sendMsgCounts = false); 
+  MeshLocation determineLocation(int destinationPe, 
+                                 int dimensionReceivedAlong);
 
 protected:
 
+  int numDimensions_;
   bool useStagedCompletion_;
   CompletionDetector *detectorLocalObj_;
   virtual int copyDataItemIntoMessage(
               MeshStreamerMessage<dtype> *destinationBuffer, 
-              void *dataItemHandle, bool copyIndirectly = false);
-  MeshLocation determineLocation(int destinationPe, 
-                                 int dimensionReceivedAlong);
+              const void *dataItemHandle, bool copyIndirectly = false);
+  void insertData(const void *dataItemHandle, int destinationPe);
+  void broadcast(const void *dataItemHandle, int dimension, 
+                 bool copyIndirectly);
+
 public:
 
   MeshStreamer(int maxNumDataItemsBuffered, int numDimensions, 
@@ -168,31 +186,35 @@ public:
   ~MeshStreamer();
 
   // entry
+  void init(int numLocalContributors, CkCallback startCb, CkCallback endCb, 
+            int prio, bool usePeriodicFlushing);
+  void init(int numContributors, CkCallback startCb, CkCallback endCb, 
+            CProxy_CompletionDetector detector,
+            int prio, bool usePeriodicFlushing);
+  void init(CkArrayID senderArrayID, CkCallback startCb, CkCallback endCb, 
+            int prio, bool usePeriodicFlushing);
+
   void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
   virtual void receiveAtDestination(MeshStreamerMessage<dtype> *msg) = 0;
   void flushIfIdle();
   void finish();
 
   // non entry
-  bool isPeriodicFlushEnabled() {
+  inline bool isPeriodicFlushEnabled() {
     return isPeriodicFlushEnabled_;
   }
-  virtual void insertData(dtype &dataItem, int destinationPe); 
-  void insertData(void *dataItemHandle, int destinationPe);
-  void associateCallback(int numContributors, 
-                         CkCallback startCb, CkCallback endCb, 
-                         CProxy_CompletionDetector detector,
-                         int prio, bool usePeriodicFlushing);
+  virtual void insertData(const dtype& dataItem, int destinationPe); 
+  virtual void broadcast(const dtype& dataItem); 
   void registerPeriodicProgressFunction();
 
   // flushing begins only after enablePeriodicFlushing has been invoked
 
-  void enablePeriodicFlushing(){
+  inline void enablePeriodicFlushing(){
     isPeriodicFlushEnabled_ = true; 
     registerPeriodicProgressFunction();
   }
 
-  void done(int numContributorsFinished = 1) {
+  inline void done(int numContributorsFinished = 1) {
 
     if (useStagedCompletion_) {
       numLocalDone_ += numContributorsFinished; 
@@ -204,11 +226,12 @@ public:
       detectorLocalObj_->done(numContributorsFinished);
     }
   }
-
-  void init(int numLocalContributors, CkCallback startCb, CkCallback endCb, 
-            int prio, bool usePeriodicFlushing);
   
-  void startStagedCompletion() {          
+  inline bool stagedCompletionStarted() {
+    return (useStagedCompletion_ && dimensionToFlush_ != numDimensions_ - 1); 
+  }
+
+  inline void startStagedCompletion() {
     if (individualDimensionSizes_[dimensionToFlush_] != 1) {
       flushDimension(dimensionToFlush_, true);
     }
@@ -217,7 +240,7 @@ public:
     checkForCompletedStages();
   }
 
-  void markMessageReceived(int dimension, int finalCount) {
+  inline void markMessageReceived(int dimension, int finalCount) {
     cntMsgReceived_[dimension]++;
     if (finalCount != -1) {
       cntFinished_[dimension]++; 
@@ -234,7 +257,7 @@ public:
     }
   }
 
-  void checkForCompletedStages() {
+  inline void checkForCompletedStages() {
 
     while (cntFinished_[dimensionToFlush_ + 1] == 
            individualDimensionSizes_[dimensionToFlush_ + 1] - 1 &&
@@ -244,10 +267,12 @@ public:
 #ifdef STREAMER_VERBOSE_OUTPUT
         CkPrintf("[%d] contribute\n", CkMyPe()); 
 #endif
-#ifdef DEBUG_STREAMER
         CkAssert(numDataItemsBuffered_ == 0); 
-#endif
-        this->contribute(userCallback_);
+        isPeriodicFlushEnabled_ = false; 
+        if (!userCallback_.isInvalid()) {
+          this->contribute(userCallback_);
+          userCallback_ = CkCallback();
+        }
         return; 
       }
       else if (individualDimensionSizes_[dimensionToFlush_] != 1) {
@@ -287,17 +312,20 @@ MeshStreamer<dtype>::MeshStreamer(
       combinedDimensionSizes_[i] * individualDimensionSizes_[i];
   }
 
+  CkAssert(combinedDimensionSizes_[numDimensions] == CkNumPes()); 
+
   // a bufferSize input of 0 indicates it should be calculated by the library
   if (bufferSize_ == 0) {
     CkAssert(maxNumDataItemsBuffered_ > 0);
-    // except for personalized messages, the buffers for dimensions with the 
-    //   same index as the sender's are not used
+    // buffers for dimensions with the 
+    //   same index as the sender's are not allocated/used
     bufferSize_ = OVERALLOCATION_FACTOR * maxNumDataItemsBuffered_ 
       / (sumAlongAllDimensions - numDimensions_ + 1); 
   }
   else {
     maxNumDataItemsBuffered_ = 
-      bufferSize_ * (sumAlongAllDimensions - numDimensions_ + 1);
+      bufferSize_ * (sumAlongAllDimensions - numDimensions_ + 1) 
+      / OVERALLOCATION_FACTOR;
   }
 
   if (bufferSize_ <= 0) {
@@ -325,7 +353,8 @@ MeshStreamer<dtype>::MeshStreamer(
     myLocationIndex_[i] = remainder / combinedDimensionSizes_[i];
     int dimensionOffset = combinedDimensionSizes_[i] * myLocationIndex_[i];
     remainder -= dimensionOffset; 
-    startingIndexAtDimension_[i] = startingIndexAtDimension_[i+1] + dimensionOffset; 
+    startingIndexAtDimension_[i] = 
+      startingIndexAtDimension_[i+1] + dimensionOffset; 
   }
 
   isPeriodicFlushEnabled_ = false; 
@@ -389,7 +418,8 @@ MeshLocation MeshStreamer<dtype>::determineLocation(
 #endif
 
   MeshLocation destinationLocation;
-  int remainder = destinationPe - startingIndexAtDimension_[dimensionReceivedAlong];
+  int remainder = 
+    destinationPe - startingIndexAtDimension_[dimensionReceivedAlong];
   int dimensionIndex; 
   for (int i = dimensionReceivedAlong - 1; i >= 0; i--) {        
     dimensionIndex = remainder / combinedDimensionSizes_[i];
@@ -417,8 +447,8 @@ template <class dtype>
 inline 
 int MeshStreamer<dtype>::copyDataItemIntoMessage(
 			 MeshStreamerMessage<dtype> *destinationBuffer,
-			 void *dataItemHandle, bool copyIndirectly) {
-  return destinationBuffer->addDataItem(*((dtype *)dataItemHandle)); 
+			 const void *dataItemHandle, bool copyIndirectly) {
+  return destinationBuffer->addDataItem(*((const dtype *)dataItemHandle)); 
 }
 
 template <class dtype>
@@ -426,7 +456,7 @@ inline
 void MeshStreamer<dtype>::storeMessage(
 			  int destinationPe, 
 			  const MeshLocation& destinationLocation,
-			  void *dataItem, bool copyIndirectly) {
+			  const void *dataItem, bool copyIndirectly) {
 
   int dimension = destinationLocation.dimension;
   int bufferIndex = destinationLocation.bufferIndex; 
@@ -446,9 +476,7 @@ void MeshStreamer<dtype>::storeMessage(
     }
     *(int *) CkPriorityPtr(messageBuffers[bufferIndex]) = prio_;
     CkSetQueueing(messageBuffers[bufferIndex], CK_QUEUEING_IFIFO);
-#ifdef DEBUG_STREAMER
     CkAssert(messageBuffers[bufferIndex] != NULL);
-#endif
   }
   
   MeshStreamerMessage<dtype> *destinationBuffer = messageBuffers[bufferIndex];
@@ -456,7 +484,7 @@ void MeshStreamer<dtype>::storeMessage(
     copyDataItemIntoMessage(destinationBuffer, dataItem, copyIndirectly);
   if (dimension != 0) {
     destinationBuffer->markDestination(numBuffered-1, destinationPe);
-  }  
+  }
   numDataItemsBuffered_++;
 
   // send if buffer is full
@@ -476,7 +504,8 @@ void MeshStreamer<dtype>::storeMessage(
     }
     else {
 #ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending intermediate to %d\n", CkMyPe(), destinationIndex); 
+      CkPrintf("[%d] sending intermediate to %d\n", 
+               CkMyPe(), destinationIndex); 
 #endif
       this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
     }
@@ -497,10 +526,61 @@ void MeshStreamer<dtype>::storeMessage(
   }
 
 }
+template <class dtype>
+inline
+void MeshStreamer<dtype>::broadcast(const dtype& dataItem) {
+  const static bool copyIndirectly = true;
+
+  // no data items should be submitted after all local contributors call done 
+  // and staged completion has begun
+  CkAssert(stagedCompletionStarted() == false);
+
+  // produce and consume once per PE
+  if (!useStagedCompletion_) {
+    detectorLocalObj_->produce(CkNumPes());
+  }
+
+  // deliver locally
+  localBroadcast(dataItem);
+
+  broadcast(&dataItem, numDimensions_ - 1, copyIndirectly); 
+}
 
 template <class dtype>
 inline
-void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
+void MeshStreamer<dtype>::broadcast(const void *dataItemHandle, int dimension, 
+                                    bool copyIndirectly) {
+
+  MeshLocation destinationLocation;
+  destinationLocation.dimension = dimension; 
+
+  while (destinationLocation.dimension != -1) {
+    for (int i = 0; 
+         i < individualDimensionSizes_[destinationLocation.dimension]; 
+         i++) {
+
+      if (i != myLocationIndex_[destinationLocation.dimension]) {
+        destinationLocation.bufferIndex = i; 
+        storeMessage(TRAM_BROADCAST, destinationLocation, 
+                     dataItemHandle, copyIndirectly); 
+      }
+      // release control to scheduler if requested by the user, 
+      //   assume caller is threaded entry
+      if (yieldFlag_ && ++yieldCount_ == 1024) {
+        yieldCount_ = 0; 
+        CthYield();
+      }
+    }
+    destinationLocation.dimension--; 
+  }
+
+}
+
+
+template <class dtype>
+inline
+void MeshStreamer<dtype>::insertData(const void *dataItemHandle, 
+                                     int destinationPe) {
   const static bool copyIndirectly = true;
 
   // treat newly inserted items as if they were received along
@@ -520,20 +600,21 @@ void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
 
 template <class dtype>
 inline
-void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
+void MeshStreamer<dtype>::insertData(const dtype& dataItem, int destinationPe) {
+
+  // no data items should be submitted after all local contributors call done 
+  // and staged completion has begun
+  CkAssert(stagedCompletionStarted() == false);
 
   if (!useStagedCompletion_) {
     detectorLocalObj_->produce();
   }
   if (destinationPe == CkMyPe()) {
-    // copying here is necessary - user code should not be 
-    // passed back a reference to the original item
-    dtype dataItemCopy = dataItem;
-    localDeliver(dataItemCopy);
+    localDeliver(dataItem);
     return;
   }
 
-  insertData((void *) &dataItem, destinationPe);
+  insertData((const void *) &dataItem, destinationPe);
 }
 
 template <class dtype>
@@ -584,11 +665,10 @@ void MeshStreamer<dtype>::init(int numLocalContributors, CkCallback startCb,
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::associateCallback(
-			  int numContributors,
-			  CkCallback startCb, CkCallback endCb, 
-			  CProxy_CompletionDetector detector, 
-			  int prio, bool usePeriodicFlushing) {
+void MeshStreamer<dtype>::init(int numContributors,	  
+                               CkCallback startCb, CkCallback endCb,
+                               CProxy_CompletionDetector detector, 
+                               int prio, bool usePeriodicFlushing) {
 
   useStagedCompletion_ = false; 
   yieldCount_ = 0; 
@@ -620,6 +700,15 @@ void MeshStreamer<dtype>::associateCallback(
 }
 
 template <class dtype>
+void MeshStreamer<dtype>::init(CkArrayID senderArrayID, CkCallback startCb, 
+            CkCallback endCb, int prio, bool usePeriodicFlushing) {
+    CkArray *senderArrayMgr = senderArrayID.ckLocalBranch();
+    int numLocalElements = senderArrayMgr->getLocMgr()->numLocalElements();
+    init(numLocalElements, startCb, endCb, prio, usePeriodicFlushing); 
+  }
+
+
+template <class dtype>
 void MeshStreamer<dtype>::finish() {
   isPeriodicFlushEnabled_ = false; 
 
@@ -639,16 +728,20 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
   lastDestinationPe = -1;
   for (int i = 0; i < msg->numDataItems; i++) {
     destinationPe = msg->destinationPes[i];
-    dtype &dataItem = msg->getDataItem(i);
+    const dtype& dataItem = msg->getDataItem(i);
     if (destinationPe == CkMyPe()) {
       localDeliver(dataItem);
     }
-    else {
+    else if (destinationPe != TRAM_BROADCAST) {
       if (destinationPe != lastDestinationPe) {
         // do this once per sequence of items with the same destination
         destinationLocation = determineLocation(destinationPe, msg->dimension);
       }
       storeMessage(destinationPe, destinationLocation, &dataItem);   
+    }
+    else /* if (destinationPe == TRAM_BROADCAST) */ {
+      localBroadcast(dataItem);       
+      broadcast(&dataItem, msg->dimension - 1, false); 
     }
     lastDestinationPe = destinationPe; 
   }
@@ -662,6 +755,7 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
 }
 
 template <class dtype>
+inline
 void MeshStreamer<dtype>::sendLargestBuffer() {
 
   int flushDimension, flushIndex, maxSize, destinationIndex, numBuffers;
@@ -708,7 +802,8 @@ void MeshStreamer<dtype>::sendLargestBuffer() {
       }
       else {
 #ifdef STREAMER_VERBOSE_OUTPUT
-        CkPrintf("[%d] sending intermediate flush to %d\n", CkMyPe(), destinationIndex); 
+        CkPrintf("[%d] sending intermediate flush to %d\n", 
+                 CkMyPe(), destinationIndex); 
 #endif
 	this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
       }
@@ -725,6 +820,7 @@ void MeshStreamer<dtype>::sendLargestBuffer() {
 }
 
 template <class dtype>
+inline
 void MeshStreamer<dtype>::flushToIntermediateDestinations() {
   
   for (int i = 0; i < numDimensions_; i++) {
@@ -735,7 +831,8 @@ void MeshStreamer<dtype>::flushToIntermediateDestinations() {
 template <class dtype>
 void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
 #ifdef STREAMER_VERBOSE_OUTPUT
-  CkPrintf("[%d] flushDimension: %d, sendMsgCounts: %d\n", CkMyPe(), dimension, sendMsgCounts); 
+  CkPrintf("[%d] flushDimension: %d, sendMsgCounts: %d\n", 
+           CkMyPe(), dimension, sendMsgCounts); 
 #endif
   MeshStreamerMessage<dtype> **messageBuffers; 
   MeshStreamerMessage<dtype> *destinationBuffer; 
@@ -781,13 +878,15 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
 
     if (dimension == 0) {
 #ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending dimension flush to %d\n", CkMyPe(), destinationIndex); 
+      CkPrintf("[%d] sending dimension flush to %d\n", 
+               CkMyPe(), destinationIndex); 
 #endif
       this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
     }
     else {
 #ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending intermediate dimension flush to %d\n", CkMyPe(), destinationIndex); 
+      CkPrintf("[%d] sending intermediate dimension flush to %d\n", 
+               CkMyPe(), destinationIndex); 
 #endif
       this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
     }
@@ -807,9 +906,7 @@ void MeshStreamer<dtype>::flushIfIdle(){
     if (numDataItemsBuffered_ != 0) {
       flushToIntermediateDestinations();
     }    
-#ifdef DEBUG_STREAMER
     CkAssert(numDataItemsBuffered_ == 0); 
-#endif
     
   }
 
@@ -845,14 +942,16 @@ private:
 
   void receiveAtDestination(MeshStreamerMessage<dtype> *msg) {
     for (int i = 0; i < msg->numDataItems; i++) {
-      dtype &data = msg->getDataItem(i);
+      const dtype& data = msg->getDataItem(i);
       clientObj_->process(data);
     }
 
     if (MeshStreamer<dtype>::useStagedCompletion_) {
 #ifdef STREAMER_VERBOSE_OUTPUT
       envelope *env = UsrToEnv(msg);
-      CkPrintf("[%d] received at dest from %d %d items finalMsgCount: %d\n", CkMyPe(), env->getSrcPe(), msg->numDataItems, msg->finalMsgCount);  
+      CkPrintf("[%d] received at dest from %d %d items finalMsgCount: %d\n", 
+               CkMyPe(), env->getSrcPe(), msg->numDataItems, 
+               msg->finalMsgCount);  
 #endif
       markMessageReceived(msg->dimension, msg->finalMsgCount); 
     }
@@ -863,23 +962,27 @@ private:
     delete msg;
   }
 
-  void localDeliver(dtype &dataItem) {
+  inline void localDeliver(const dtype& dataItem) {
     clientObj_->process(dataItem);
     if (MeshStreamer<dtype>::useStagedCompletion_ == false) {
       MeshStreamer<dtype>::detectorLocalObj_->consume();
     }
   }
 
-  int numElementsInClient() {
+  inline void localBroadcast(const dtype& dataItem) {
+    localDeliver(dataItem); 
+  }
+
+  inline int numElementsInClient() {
     // client is a group - there is one element per PE
     return CkNumPes();
   }
 
-  int numLocalElementsInClient() {
+  inline int numLocalElementsInClient() {
     return 1; 
   }
 
-  void initLocalClients() {
+  inline void initLocalClients() {
     // no action required
   }
 
@@ -887,51 +990,68 @@ public:
 
   GroupMeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
 		    int *dimensionSizes, 
-		    const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
+		    const CProxy_MeshStreamerGroupClient<dtype>& clientProxy,
 		    bool yieldFlag = 0, double progressPeriodInMs = -1.0)
    :MeshStreamer<dtype>(maxNumDataItemsBuffered, numDimensions, dimensionSizes,
                         0, yieldFlag, progressPeriodInMs) 
   {
     clientProxy_ = clientProxy; 
-    clientObj_ = 
-      ((MeshStreamerGroupClient<dtype> *)CkLocalBranch(clientProxy_));
+    clientObj_ = clientProxy_.ckLocalBranch();
   }
 
   GroupMeshStreamer(int numDimensions, int *dimensionSizes, 
-		    const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
+		    const CProxy_MeshStreamerGroupClient<dtype>& clientProxy,
 		    int bufferSize, bool yieldFlag = 0, 
                     double progressPeriodInMs = -1.0)
    :MeshStreamer<dtype>(0, numDimensions, dimensionSizes, bufferSize, 
                         yieldFlag, progressPeriodInMs) 
   {
     clientProxy_ = clientProxy; 
-    clientObj_ = 
-      ((MeshStreamerGroupClient<dtype> *)CkLocalBranch(clientProxy_));
+    clientObj_ = clientProxy_.ckLocalBranch();
   }
 
 };
 
 template <class dtype>
-class MeshStreamerClientIterator : public CkLocIterator {
+class ClientInitializer : public CkLocIterator {
 
 public:
   
   CompletionDetector *detectorLocalObj_;
   CkArray *clientArrMgr_;
-  MeshStreamerClientIterator(CompletionDetector *detectorObj, 
+  ClientInitializer(CompletionDetector *detectorObj, 
 			     CkArray *clientArrMgr) 
     : detectorLocalObj_(detectorObj), clientArrMgr_(clientArrMgr) {}
 
   // CkLocMgr::iterate will call addLocation on all elements local to this PE
-  void addLocation(CkLocation &loc) {
+  inline void addLocation(CkLocation& loc) {
 
     MeshStreamerArrayClient<dtype> *clientObj = 
       (MeshStreamerArrayClient<dtype> *) clientArrMgr_->lookup(loc.getIndex());
 
-#ifdef DEBUG_STREAMER
     CkAssert(clientObj != NULL); 
-#endif
     clientObj->setDetector(detectorLocalObj_); 
+  }
+
+};
+
+template <class dtype>
+class LocalBroadcaster : public CkLocIterator {
+
+public:
+  CkArray *clientArrMgr_;
+  const dtype *dataItem_; 
+
+  LocalBroadcaster(CkArray *clientArrMgr, const dtype *dataItem) 
+   : clientArrMgr_(clientArrMgr), dataItem_(dataItem) {}
+
+  void addLocation(CkLocation& loc) {
+    MeshStreamerArrayClient<dtype> *clientObj = 
+      (MeshStreamerArrayClient<dtype> *) clientArrMgr_->lookup(loc.getIndex());
+
+    CkAssert(clientObj != NULL); 
+
+    clientObj->process(*dataItem_); 
   }
 
 };
@@ -951,9 +1071,13 @@ private:
   bool *isCachedArrayMetadata_;
 #endif
 
-  void localDeliver(ArrayDataItem<dtype, itype> &packedDataItem) {
+  inline 
+  void localDeliver(const ArrayDataItem<dtype, itype>& packedDataItem) {
     itype arrayId = packedDataItem.arrayIndex; 
-
+    if (arrayId == itype(TRAM_BROADCAST)) {
+      localBroadcast(packedDataItem);
+      return;
+    }
     MeshStreamerArrayClient<dtype> *clientObj;
 #ifdef CACHE_ARRAY_METADATA
     clientObj = clientObjs_[arrayId];
@@ -975,15 +1099,31 @@ private:
     }
   }
 
-  int numElementsInClient() {
+  inline 
+  void localBroadcast(const ArrayDataItem<dtype, itype>& packedDataItem) {
+
+    LocalBroadcaster<dtype> clientIterator(clientProxy_.ckLocalBranch(), 
+                                           &packedDataItem.dataItem);
+    CkLocMgr *clientLocMgr = clientProxy_.ckLocMgr(); 
+    clientLocMgr->iterate(clientIterator);
+
+    if (MeshStreamer<ArrayDataItem<dtype, itype> >
+         ::useStagedCompletion_ == false) {
+        MeshStreamer<ArrayDataItem<dtype, itype> >
+         ::detectorLocalObj_->consume();      
+    }
+
+  }
+
+  inline int numElementsInClient() {
     return numArrayElements_;
   }
 
-  int numLocalElementsInClient() {
+  inline int numLocalElementsInClient() {
     return numLocalArrayElements_;
   }
 
-  void initLocalClients() {
+  inline void initLocalClients() {
     if (MeshStreamer<ArrayDataItem<dtype, itype> >
          ::useStagedCompletion_ == false) {
 #ifdef CACHE_ARRAY_METADATA
@@ -1000,7 +1140,7 @@ private:
 #else
       // set completion detector in local elements of the client
       CkLocMgr *clientLocMgr = clientProxy_.ckLocMgr(); 
-      MeshStreamerClientIterator<dtype> clientIterator(
+      ClientInitializer<dtype> clientIterator(
           MeshStreamer<ArrayDataItem<dtype, itype> >::detectorLocalObj_, 
           clientProxy_.ckLocalBranch());
       clientLocMgr->iterate(clientIterator);
@@ -1011,7 +1151,7 @@ private:
     }
   }
 
-  void commonInit() {
+  inline void commonInit() {
 #ifdef CACHE_ARRAY_METADATA
     numArrayElements_ = (clientArrayMgr_->getNumInitial()).data()[0];
     clientObjs_ = new MeshStreamerArrayClient<dtype>*[numArrayElements_];
@@ -1026,12 +1166,12 @@ public:
 
   struct DataItemHandle {
     itype arrayIndex; 
-    dtype *dataItem;
+    const dtype *dataItem;
   };
 
   ArrayMeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
 		    int *dimensionSizes, 
-                    const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
+                    const CProxy_MeshStreamerArrayClient<dtype>& clientProxy,
 		    bool yieldFlag = 0, double progressPeriodInMs = -1.0)
     :MeshStreamer<ArrayDataItem<dtype, itype> >(
                   maxNumDataItemsBuffered, numDimensions, dimensionSizes, 
@@ -1043,7 +1183,7 @@ public:
   }
 
   ArrayMeshStreamer(int numDimensions, int *dimensionSizes, 
-		    const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
+		    const CProxy_MeshStreamerArrayClient<dtype>& clientProxy,
 		    int bufferSize, bool yieldFlag = 0, 
                     double progressPeriodInMs = -1.0)
     :MeshStreamer<ArrayDataItem<dtype,itype> >(
@@ -1064,20 +1204,11 @@ public:
 #endif
   }
 
-  void init(CkArrayID senderArrayID, CkCallback startCb, 
-            CkCallback endCb, int prio, bool usePeriodicFlushing) {
-    CkArray *senderArrayMgr = senderArrayID.ckLocalBranch();
-    int numLocalElements = senderArrayMgr->getLocMgr()->numLocalElements();
-    MeshStreamer<ArrayDataItem<dtype, itype> >::init(
-                 numLocalElements, startCb, endCb, prio,
-                 usePeriodicFlushing); 
-  }
-
   void receiveAtDestination(
        MeshStreamerMessage<ArrayDataItem<dtype, itype> > *msg) {
 
     for (int i = 0; i < msg->numDataItems; i++) {
-      ArrayDataItem<dtype, itype> &packedData = msg->getDataItem(i);
+      const ArrayDataItem<dtype, itype>& packedData = msg->getDataItem(i);
       localDeliver(packedData);
     }
     if (MeshStreamer<ArrayDataItem<dtype, itype> >::useStagedCompletion_) {
@@ -1087,7 +1218,41 @@ public:
     delete msg;
   }
 
-  void insertData(dtype &dataItem, itype arrayIndex) {
+  inline void broadcast(const dtype& dataItem) {
+    const static bool copyIndirectly = true;
+
+    // no data items should be submitted after all local contributors call done
+    // and staged completion has begun
+    CkAssert((MeshStreamer<ArrayDataItem<dtype, itype> >
+               ::stagedCompletionStarted()) == false);
+
+    if (MeshStreamer<ArrayDataItem<dtype, itype> >
+         ::useStagedCompletion_ == false) {
+      MeshStreamer<ArrayDataItem<dtype, itype> >
+        ::detectorLocalObj_->produce(CkNumPes());
+    }
+
+    // deliver locally
+    ArrayDataItem<dtype, itype>& packedDataItem(TRAM_BROADCAST, dataItem);
+    localBroadcast(packedDataItem);
+
+    DataItemHandle tempHandle; 
+    tempHandle.dataItem = &dataItem;
+    tempHandle.arrayIndex = TRAM_BROADCAST;
+
+    int numDimensions = 
+      MeshStreamer<ArrayDataItem<dtype, itype> >::numDimensions_;
+    MeshStreamer<ArrayDataItem<dtype, itype> >::
+      broadcast(&tempHandle, numDimensions - 1, copyIndirectly);
+  }
+
+  inline void insertData(const dtype& dataItem, itype arrayIndex) {
+
+    // no data items should be submitted after all local contributors call done
+    // and staged completion has begun
+    CkAssert((MeshStreamer<ArrayDataItem<dtype, itype> >
+               ::stagedCompletionStarted()) == false);
+
     if (MeshStreamer<ArrayDataItem<dtype, itype> >
          ::useStagedCompletion_ == false) {
       MeshStreamer<ArrayDataItem<dtype, itype> >::detectorLocalObj_->produce();
@@ -1108,18 +1273,13 @@ public:
     clientArrayMgr_->lastKnown(clientProxy_[arrayIndex].ckGetIndex());
 #endif
 
-  ArrayDataItem<dtype, itype> packedDataItem;
     if (destinationPe == CkMyPe()) {
-      // copying here is necessary - user code should not be 
-      // passed back a reference to the original item
-      packedDataItem.arrayIndex = arrayIndex; 
-      packedDataItem.dataItem = dataItem;
+      ArrayDataItem<dtype, itype> packedDataItem(arrayIndex, dataItem);
       localDeliver(packedDataItem);
       return;
     }
 
     // this implementation avoids copying an item before transfer into message
-
     DataItemHandle tempHandle; 
     tempHandle.arrayIndex = arrayIndex; 
     tempHandle.dataItem = &dataItem;
@@ -1129,14 +1289,15 @@ public:
 
   }
 
-  int copyDataItemIntoMessage(
+  inline int copyDataItemIntoMessage(
       MeshStreamerMessage<ArrayDataItem <dtype, itype> > *destinationBuffer, 
-      void *dataItemHandle, bool copyIndirectly) {
+      const void *dataItemHandle, bool copyIndirectly) {
 
     if (copyIndirectly == true) {
       // newly inserted items are passed through a handle to avoid copying
       int numDataItems = destinationBuffer->numDataItems;
-      DataItemHandle *tempHandle = (DataItemHandle *) dataItemHandle;
+      const DataItemHandle *tempHandle = 
+        (const DataItemHandle *) dataItemHandle;
       (destinationBuffer->dataItems)[numDataItems].dataItem = 
 	*(tempHandle->dataItem);
       (destinationBuffer->dataItems)[numDataItems].arrayIndex = 
@@ -1152,6 +1313,158 @@ public:
   }
 
 };
+
+template <class dtype>
+class GroupChunkMeshStreamer : 
+  public MeshStreamer<ChunkDataItem> {
+
+private:
+  dtype **receiveBuffers;
+  int *receivedChunks;
+  CProxy_MeshStreamerGroupClient<dtype> clientProxy_;
+  MeshStreamerGroupClient<dtype> *clientObj_;
+
+
+public:
+
+  GroupChunkMeshStreamer(
+       int maxNumDataItemsBuffered, int numDimensions,
+       int *dimensionSizes, 
+       const CProxy_MeshStreamerGroupClient<dtype>& clientProxy,
+       bool yieldFlag = 0, double progressPeriodInMs = -1.0)
+    :MeshStreamer<ChunkDataItem>(maxNumDataItemsBuffered, 
+                                 numDimensions, dimensionSizes,
+                                 0, yieldFlag, progressPeriodInMs) {
+
+    clientProxy_ = clientProxy; 
+    clientObj_ = clientProxy_.ckLocalBranch();    
+    commonInit();
+  }
+
+  GroupChunkMeshStreamer(
+       int numDimensions, int *dimensionSizes, 
+       const CProxy_MeshStreamerGroupClient<dtype>& clientProxy,
+       int bufferSize, bool yieldFlag = 0, 
+       double progressPeriodInMs = -1.0)
+    :MeshStreamer<ChunkDataItem>(0, numDimensions, dimensionSizes, 
+                                 bufferSize, yieldFlag, 
+                                 progressPeriodInMs) {
+
+    clientProxy_ = clientProxy; 
+    clientObj_ = clientProxy_.ckLocalBranch();
+    commonInit();
+  }
+
+  inline void commonInit() {
+
+    receiveBuffers = new dtype*[CkNumPes()];
+    receivedChunks = new int[CkNumPes()]; 
+    memset(receivedChunks, 0, CkNumPes() * sizeof(int));
+    memset(receiveBuffers, 0, CkNumPes() * sizeof(dtype*)); 
+
+  }
+
+  inline void insertData(dtype *dataArray, int numElements, int destinationPe) {
+
+    char *inputData = (char *) dataArray; 
+    int arraySizeInBytes = numElements * sizeof(dtype); 
+    ChunkDataItem chunk;
+    int chunkNumber = 0; 
+    chunk.sourcePe = CkMyPe();
+    chunk.chunkNumber = 0; 
+    chunk.chunkSize = CHUNK_SIZE;
+    chunk.numChunks = 
+      (int) ceil ( (float) numElements * sizeof(dtype) / CHUNK_SIZE); 
+    chunk.numItems = numElements; 
+    for (int offset = 0; offset < arraySizeInBytes; offset += CHUNK_SIZE) {
+
+      if (offset + CHUNK_SIZE > arraySizeInBytes) {
+        chunk.chunkSize = arraySizeInBytes - offset; 
+        memset(chunk.rawData, 0, CHUNK_SIZE);
+        memcpy(chunk.rawData, inputData + offset, chunk.chunkSize); 
+      }
+      else {
+        memcpy(chunk.rawData, inputData + offset, CHUNK_SIZE);
+      }
+
+      MeshStreamer<ChunkDataItem>::insertData(chunk, destinationPe); 
+      chunk.chunkNumber++; 
+    }
+
+  }
+
+  inline void processChunk(const ChunkDataItem& chunk) {
+
+    if (receiveBuffers[chunk.sourcePe] == NULL) {
+      receiveBuffers[chunk.sourcePe] = new dtype[chunk.numItems]; 
+    }      
+
+    char *receiveBuffer = (char *) receiveBuffers[chunk.sourcePe];
+
+    memcpy(receiveBuffer + chunk.chunkNumber * CHUNK_SIZE, 
+           chunk.rawData, chunk.chunkSize);
+    if (++receivedChunks[chunk.sourcePe] == chunk.numChunks) {
+      clientObj_->receiveArray(
+                  (dtype *) receiveBuffer, chunk.numItems, chunk.sourcePe);
+      receivedChunks[chunk.sourcePe] = 0;        
+      delete [] receiveBuffers[chunk.sourcePe]; 
+      receiveBuffers[chunk.sourcePe] = NULL;
+    }
+
+  }
+
+  inline void localDeliver(const ChunkDataItem& chunk) {
+    processChunk(chunk);
+    if (MeshStreamer<ChunkDataItem>::useStagedCompletion_ == false) {
+      MeshStreamer<ChunkDataItem>::detectorLocalObj_->consume();
+    }
+  }
+
+  inline void receiveAtDestination(
+       MeshStreamerMessage<ChunkDataItem> *msg) {
+
+    for (int i = 0; i < msg->numDataItems; i++) {
+      const ChunkDataItem& chunk = msg->getDataItem(i);
+      processChunk(chunk);             
+    }
+
+    if (MeshStreamer<ChunkDataItem>::useStagedCompletion_) {
+#ifdef STREAMER_VERBOSE_OUTPUT
+      envelope *env = UsrToEnv(msg);
+      CkPrintf("[%d] received at dest from %d %d items finalMsgCount: %d\n", 
+               CkMyPe(), env->getSrcPe(), msg->numDataItems, 
+               msg->finalMsgCount);  
+#endif
+      markMessageReceived(msg->dimension, msg->finalMsgCount); 
+    }
+    else {
+      this->detectorLocalObj_->consume(msg->numDataItems);    
+    }
+
+    delete msg;
+    
+  }
+
+  inline void localBroadcast(const ChunkDataItem& dataItem) {
+    localDeliver(dataItem); 
+  }
+
+  inline int numElementsInClient() {
+    // client is a group - there is one element per PE
+    return CkNumPes();
+  }
+
+  inline int numLocalElementsInClient() {
+    return 1; 
+  }
+
+  inline void initLocalClients() {
+    // no action required
+  }
+
+};
+
+
 
 #define CK_TEMPLATES_ONLY
 #include "NDMeshStreamer.def.h"

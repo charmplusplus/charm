@@ -1,0 +1,39 @@
+The {\sc Charm} software was developed as a group effort of the Parallel
+Programming Laboratory at the University of Illinois at Urbana-Champaign.
+Researchers at the Parallel Programming Laboratory keep \charmpp\ updated for
+the new machines, new programming paradigms, and for supporting and simplifying
+development of emerging applications for parallel processing.  The earliest
+prototype, Chare Kernel(1.0), was developed in the late eighties. It consisted
+only of basic remote method invocation constructs available as a library.  The
+second prototype, Chare Kernel(2.0), a complete re-write with major design
+changes.  This included C language extensions to denote Chares, messages and
+asynchronous remote method invocation.  {\sc Charm}(3.0) improved on this
+syntax, and contained important features such as information sharing
+abstractions, and chare groups (called Branch Office Chares).  {\sc Charm}(4.0)
+included \charmpp\ and was released in fall 1993.  \charmpp\ in its initial
+version consisted of syntactic changes to \CC\ and employed a special
+translator that parsed the entire \CC\ code while translating the syntactic
+extensions.  {\sc Charm}(4.5)  had a major change that resulted from a
+significant shift in the research agenda of the Parallel Programming
+Laboratory. The message-driven runtime system code of the \charmpp\ was
+separated from the actual language implementation, resulting in an
+interoperable parallel runtime system called {\sc
+Converse}. The \charmpp\ runtime system was
+retargetted on top of {\sc Converse}, and popular programming paradigms such as
+MPI and PVM were also implemented on {\sc Converse}. This allowed
+interoperability between these paradigms and \charmpp. This release also
+eliminated the full-fledged \charmpp\ translator by replacing syntactic
+extensions to \CC\ with \CC\ macros, and instead contained a small language and
+a translator for describing the interfaces of \charmpp\ entities to the runtime
+system.  This version of \charmpp, which, in earlier releases was known as {\em
+Interface Translator \charmpp}, is the default version of \charmpp\ now, and
+hence referred simply as {\bf \charmpp}.  In early 1999, the runtime system of
+\charmpp\ 
+%was formally named the Charm Kernel, and 
+was rewritten in \CC.
+Several new features were added. The interface language underwent significant
+changes, and the macros that replaced the syntactic extensions in original
+\charmpp, were replaced by natural \CC\ constructs. Late 1999, and early
+2000 reflected several additions to \charmpp{}, when a load balancing
+framework and migratable objects were added to \charmpp{}.
+

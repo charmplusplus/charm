@@ -39,6 +39,9 @@
 /* C++ *_casts<> work */
 #undef CMK_CPP_CAST_LEGAL
 
+/* Cray MAXNID */
+#undef CMK_CRAY_MAXNID
+
 /* whether C inline works in C */
 #undef CMK_C_INLINE
 
@@ -86,6 +89,9 @@
 
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
+
+/* whether anon structs are permitted */
+#undef CMK_HAS_ANON_STRUCTS
 
 /* whether has asctime */
 #undef CMK_HAS_ASCTIME
@@ -173,6 +179,9 @@
 
 /* whether Cray rca library is available */
 #undef CMK_HAS_RCALIB
+
+/* whether Cray rca has rca_get_max_dimension */
+#undef CMK_HAS_RCA_MAX_DIMENSION
 
 /* whether has regex.h */
 #undef CMK_HAS_REGEX_H
@@ -279,6 +288,12 @@
 /* envelope refnum field set to UInt */
 #undef CMK_REFNUM_TYPE
 
+/* Should charm use an STL-based msg q */
+#undef CMK_USE_STL_MSGQ
+
+/* expected size of message priorities fields */
+#undef CMK_MSG_PRIO_TYPE
+
 /* disable replay */
 #undef CMK_REPLAYSYSTEM
 
@@ -320,6 +335,12 @@
 
 /* enable statistics collection */
 #undef CMK_WITH_STATS
+
+/* whether __int128 works */
+#undef CMK___int128_DEFINED
+
+/* whether __int128_t works */
+#undef CMK___int128_t_DEFINED
 
 /* whether __int64 works */
 #undef CMK___int64_DEFINED

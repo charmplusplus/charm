@@ -88,6 +88,9 @@ typedef enum {
 //(this list must exactly match that in PUPer_xlate)
   Tchar=0,Tshort, Tint, Tlong, Tlonglong,
   Tuchar,Tushort,Tuint,Tulong, Tulonglong,
+#if CMK_HAS_INT16
+  Tint128, Tuint128,
+#endif
   Tfloat,Tdouble,Tlongdouble,
   Tbool,
   Tbyte,
@@ -201,6 +204,10 @@ class er {
   void operator()(CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
   void operator()(unsigned CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
 #endif
+#if CMK_HAS_INT16
+  void operator()(CmiInt16 &v) {(*this)(&v,1);}
+  void operator()(CmiUInt16 &v) {(*this)(&v,1);}
+#endif
   void operator()(void* &v,void* sig) {(*this)(&v,1,sig);}
   
 //For arrays:
@@ -248,6 +255,12 @@ class er {
     {bytes((void *)a,nItems,sizeof(CMK_PUP_LONG_LONG),Tlonglong);}
   void operator()(unsigned CMK_PUP_LONG_LONG *a,int nItems)
     {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
+#endif
+#if CMK_HAS_INT16
+  void operator()(CmiInt16 *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(CmiInt16),Tint128);}
+  void operator()(CmiUInt16 *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(CmiUInt16),Tuint128);}
 #endif
 
   //For pointers: the last parameter is to make it more difficult to call
@@ -541,7 +554,7 @@ class machineInfo {
   myByte magic[4];//Magic number (to identify machineInfo structs)
   myByte version;//0-- current version
 
-  myByte intBytes[4]; //<- sizeof(char,short,int,long)
+  myByte intBytes[5]; //<- sizeof(char,short,int,long,int128)
   myByte intFormat;//0-- big endian.  1-- little endian.
 
   myByte floatBytes; //<- sizeof(...)
@@ -551,7 +564,7 @@ class machineInfo {
   myByte boolBytes;
   myByte pointerBytes;
 
-  myByte padding[1];//Padding to 16 bytes
+//  myByte padding[1];//Padding to 16 bytes
 
   //Return true if our magic number is valid.
   CmiBool valid(void) const;
@@ -560,6 +573,19 @@ class machineInfo {
   
   //Get a machineInfo for the current machine
   static const machineInfo &current(void);
+
+  void pup(er &p) {
+      myByte  padding;
+
+      p(magic, 4);
+      p(version);
+      if (version == 0) p(intBytes, 4);
+      else p(intBytes, 5);
+      p(intFormat);
+      p(floatBytes); p(doubleBytes); p(floatFormat);
+      p(boolBytes); p(pointerBytes);
+      if (version == 0) p(padding);
+  }
 };
 
 /// "Wrapped" PUP::er: forwards requests to another PUP::er.
@@ -943,6 +969,10 @@ PUP_BUILTIN_SUPPORT(long double)
 #ifdef CMK_PUP_LONG_LONG
 PUP_BUILTIN_SUPPORT(CMK_PUP_LONG_LONG)
 PUP_BUILTIN_SUPPORT(unsigned CMK_PUP_LONG_LONG)
+#endif
+#if CMK_HAS_INT16
+PUP_BUILTIN_SUPPORT(CmiInt16)
+PUP_BUILTIN_SUPPORT(CmiUInt16)
 #endif
 
 

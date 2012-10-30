@@ -5,8 +5,6 @@
 #include "EToken.h"
 #include "CEntry.h"
 #include "sdag-globals.h"
-#include "CList.h"
-#include "CParsedFile.h"
 
 #include <iostream>
 #include <stdio.h>
@@ -17,14 +15,17 @@
 
 namespace xi {
 
+class Chare;
+class CParsedFile;
+
 extern void generateSignature(XStr& decls, XStr& defs,
                               const Entry* entry, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
-                              TList<CStateVar*>* params);
+                              std::list<CStateVar*>* params);
 extern void generateSignature(XStr& decls, XStr& defs,
                               const Chare* chare, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
-                              TList<CStateVar*>* params);
+                              std::list<CStateVar*>* params);
 extern void endMethod(XStr& op);
 
 class CStateVar;
@@ -106,6 +107,7 @@ class Construct : public Printable {
     virtual void genDefs(XStr& str) { (void)str; }
     virtual void genReg(XStr& str) { (void)str; }
     virtual void preprocess() { }
+    virtual void check() { }
 
     // DMK - Accel Support
     virtual int genAccels_spe_c_funcBodies(XStr& str) { (void)str; return 0; }
@@ -123,6 +125,7 @@ class ConstructList : public Construct {
     void setExtern(int e);
     void setModule(Module *m);
     void print(XStr& str);
+    void check();
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
@@ -153,6 +156,7 @@ class Type : public Printable {
     virtual int isCkMigMsgPtr(void) const {return 0;}
     virtual int isCkMigMsg(void) const {return 0;}
     virtual int isReference(void) const {return 0;}
+    virtual bool isConst(void) const {return false;}
     virtual Type *deref(void) {return this;}
     virtual const char *getBaseName(void) const = 0;
     virtual const char *getScope(void) const = 0;
@@ -170,6 +174,7 @@ class Type : public Printable {
     int operator==(const Type &tp) const {
       return  (strcmp(getBaseName(), tp.getBaseName())==0);
     }
+    virtual ~Type() { }
 };
 
 class BuiltinType : public Type {
@@ -218,6 +223,7 @@ class PtrType : public Type {
     void indirect(void) { numstars++; }
     int getNumStars(void) const {return numstars; }
     void print(XStr& str);
+    Type* deref(void) { return type; }
     const char *getBaseName(void) const { return type->getBaseName(); }
     const char *getScope(void) const { return NULL; }
     virtual void genMsgProxyName(XStr& str) { 
@@ -239,6 +245,18 @@ class ReferenceType : public Type {
     virtual Type *deref(void) {return referant;}
     const char *getBaseName(void) const { return referant->getBaseName(); }
     const char *getScope(void) const { return NULL; }
+};
+
+class ConstType : public Type {
+private:
+  Type *constType;
+public:
+  ConstType(Type *t) : constType(t) {}
+  void print(XStr& str) {str << "const " << constType;}
+  virtual bool isConst(void) const {return true;}
+  virtual Type *deref(void) {return constType;}
+  const char *getBaseName(void) const { return constType->getBaseName(); }
+  const char *getScope(void) const { return NULL; }
 };
 
 //This is used as a list of base classes
@@ -265,7 +283,9 @@ class Parameter {
     Value *val; /*Initial value, if any*/
     int line;
     int byReference; //Fake a pass-by-reference (for efficiency)
+    bool declaredReference; // Actually was declared a reference
     int conditional; //If the parameter is conditionally packed
+    bool byConst;
 
     // DMK - Added field for accelerator options
     int accelBufferType;
@@ -350,7 +370,9 @@ class ParamList {
     }
     const char *getArrayLen(void) const {return param->getArrayLen();}
     int isArray(void) const {return param->isArray();}
-    int isReference(void) const {return param->type->isReference();}
+    int isReference(void) const {return param->type->isReference() || param->byReference;}
+    int declaredReference(void) const {return param->type->isReference() || param->declaredReference; }
+    bool isConst(void) const {return param->type->isConst() || param->byConst;}
     int isVoid(void) const {
     	return (next==NULL) && param->isVoid();
     }
@@ -486,6 +508,7 @@ class Scope : public Construct {
         contents_->print(str);
         str << "} // namespace " << name_ << "\n";
     }
+    void check();
 
     // DMK - Accel Support
     virtual int genAccels_spe_c_funcBodies(XStr& str) {
@@ -650,6 +673,8 @@ class MemberList : public Printable {
     std::list<Member*> members;
   public:
     MemberList(Member *m, MemberList *n=0);
+    MemberList(std::list<Entry*>&);
+
     void appendMember(Member *m);
     void print(XStr& str);
     void setChare(Chare *c);
@@ -660,6 +685,7 @@ class MemberList : public Printable {
     void genDefs(XStr& str);
     void genReg(XStr& str);
     void preprocess();
+    void check();
 
     // DMK - Accel Support
     int genAccels_spe_c_funcBodies(XStr& str);
@@ -738,6 +764,7 @@ class Chare : public TEntity {
     void  setSdag(int f) { hasSdagEntry = f; }
     forWhom getForWhom(void) const {return forElement;}
     void print(XStr& str);
+    void check();
     void genDefs(XStr& str);
     void genReg(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
@@ -968,6 +995,10 @@ class Entry : public Member {
     XStr syncReturn(void);
     XStr marshallMsg(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
+
+    // SDAG support
+    std::list<CStateVar *> estateVars;
+
   public:
     XStr *label;
     char *name;
@@ -975,15 +1006,18 @@ class Entry : public Member {
 
     // SDAG support
     SdagConstruct *sdagCon;
-    TList<CStateVar *> *stateVars;
-    TList<CStateVar *> *stateVarsChildren;
-    TList<CStateVar *> estateVars;
+    std::list<CStateVar *> stateVars;
     CEntry *entryPtr;
     const char *intExpr;
     ParamList *param;
     ParamList *connectParam;
     int isConnect;
     int isWhenEntry;
+
+    void addEStateVar(CStateVar *sv) {
+      estateVars.push_back(sv);
+      stateVars.push_back(sv);
+    }
 
     // DMK - Accel Support
     ParamList* accelParam;
@@ -1010,6 +1044,7 @@ class Entry : public Member {
     int isSync(void) { return (attribs & SSYNC); }
     int isIget(void) { return (attribs & SIGET); }
     int isConstructor(void) { return !strcmp(name, container->baseName(0).get_string());}
+    bool isMigrationConstructor() { return isConstructor() && (attribs & SMIGRATE); }
     int isExclusive(void) { return (attribs & SLOCKED); }
     int isImmediate(void) { return (attribs & SIMMEDIATE); }
     int isSkipscheduler(void) { return (attribs & SSKIPSCHED); }
@@ -1030,6 +1065,7 @@ class Entry : public Member {
     int isReductionTarget(void) { return (attribs & SREDUCE); }
 
     void print(XStr& str);
+    void check();
     void genIndexDecls(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
@@ -1038,10 +1074,11 @@ class Entry : public Member {
     XStr genRegEp(bool isForRedn = false);
     void preprocess();
     char *getEntryName() { return name; }
-    void generateEntryList(TList<CEntry*>&, SdagConstruct *);
+    void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
     void collectSdagCode(CParsedFile *pf, int& sdagPresent);
     void propagateState(int);
     void lookforCEntry(CEntry *centry);
+    int getLine() { return line; }
 };
 
 class EntryList {
@@ -1050,7 +1087,7 @@ class EntryList {
     EntryList *next;
     EntryList(Entry *e,EntryList *elist=NULL):
     	entry(e), next(elist) {}
-    void generateEntryList(TList<CEntry*>&, SdagConstruct *);
+    void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
 };
 
 
@@ -1103,6 +1140,7 @@ class Module : public Construct {
 	    if (clist!=NULL) clist->setModule(this);
     }
     void print(XStr& str);
+    void check();
     void generate();
     void setModule();
     void prependConstruct(Construct *c) { clist = new ConstructList(-1, c, clist); }
@@ -1136,6 +1174,7 @@ class ModuleList : public Printable {
 			       n->modules.begin(), n->modules.end());
 	}
     void print(XStr& str);
+    void check();
     void generate();
     void preprocess();
     void genDepends(std::string ciFileBaseName);
@@ -1237,7 +1276,6 @@ public:
 /******************* Structured Dagger Constructs ***************/
 class SdagConstruct { 
 private:
-  void generateWhen(XStr& decls, XStr& defs, Entry* entry);
   void generateOverlap(XStr& decls, XStr& defs, Entry* entry);
   void generateWhile(XStr& decls, XStr& defs, Entry* entry);
   void generateFor(XStr& decls, XStr& defs, Entry* entry);
@@ -1250,13 +1288,24 @@ private:
   void generateAtomic(XStr& decls, XStr& defs, Entry* entry);
   void generateForward(XStr& decls, XStr& defs, Entry* entry);
   void generateConnect(XStr& decls, XStr& defs, Entry* entry);
-  void generateCall(XStr& defs, TList<CStateVar*>& args,
-                    const char* name, const char* nameSuffix = 0);
+  void generateCaseList(XStr& decls, XStr& defs, Entry* entry);
+
+protected:
+  void generateCall(XStr& defs, std::list<CStateVar*>& args,
+                    const XStr* name, const char* nameSuffix = 0);
 
   void generateTraceBeginCall(XStr& defs);          // for trace
   void generateBeginTime(XStr& defs);               //for Event Bracket
   void generateEventBracket(XStr& defs, int eventType);     //for Event Bracket
   void generateListEventBracket(XStr& defs, int eventType);
+  void generateChildrenCode(XStr& decls, XStr& defs, Entry* entry);
+  void generateChildrenEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
+  void propagateStateToChildren(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  std::list<SdagConstruct *> *constructs;
+  std::list<SdagConstruct *> *publishesList;
+  std::list<CStateVar *> *stateVars;
+  std::list<CStateVar *> *stateVarsChildren;
+
 public:
   int nodeNum;
   XStr *label;
@@ -1264,10 +1313,6 @@ public:
   EToken type;
   char nameStr[128];
   XStr *traceName;	
-  TList<SdagConstruct *> *constructs;
-  TList<SdagConstruct *> *publishesList;
-  TList<CStateVar *> *stateVars;
-  TList<CStateVar *> *stateVarsChildren;
   SdagConstruct *next;
   ParamList *param;
   XStr *text;
@@ -1283,26 +1328,27 @@ public:
               SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el);
 
  SdagConstruct(EToken t, const char *str) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0)
-		{ text = new XStr(str); constructs = new TList<SdagConstruct*>(); 
-                  publishesList = new TList<SdagConstruct*>(); }
+  { text = new XStr(str); constructs = new std::list<SdagConstruct*>();
+    publishesList = new std::list<SdagConstruct*>(); }
                                              
  
   SdagConstruct(EToken t) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0) 
-		{ publishesList = new TList<SdagConstruct*>();
-		  constructs = new TList<SdagConstruct*>(); }
+  { publishesList = new std::list<SdagConstruct*>();
+		  constructs = new std::list<SdagConstruct*>(); }
 
   SdagConstruct(EToken t, XStr *txt) : type(t), traceName(NULL), text(txt), con1(0), con2(0), con3(0), con4(0) 
-                { publishesList = new TList<SdagConstruct*>();
-		  constructs = new TList<SdagConstruct*>();  }
+  { publishesList = new std::list<SdagConstruct*>();
+		  constructs = new std::list<SdagConstruct*>();  }
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
   void numberNodes(void);
   void labelNodes(void);
-  void generateConnectEntryList(TList<SdagConstruct*>&);
+  void generateConnectEntryList(std::list<SdagConstruct*>&);
   void generateConnectEntries(XStr&);
-  void generateEntryList(TList<CEntry*>&, SdagConstruct *);
+  virtual void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
   void propagateState(int);
-  void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
-  void generateCode(XStr& decls, XStr& defs, Entry *entry);
+  virtual void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  virtual void generateCode(XStr& decls, XStr& defs, Entry *entry);
+  void generateWhenCode(XStr& op);
   void setNext(SdagConstruct *, int);
 
   // for trace
@@ -1315,7 +1361,18 @@ public:
   static void generateEndExec(XStr& defs);
   static void generateEndSeq(XStr& defs);
   static void generateDummyBeginExecute(XStr& defs);
+};
 
+class WhenConstruct : public SdagConstruct {
+public:
+  CStateVar* speculativeState;
+  void generateCode(XStr& decls, XStr& defs, Entry *entry);
+  WhenConstruct(EntryList *el, SdagConstruct *body)
+    : SdagConstruct(SWHEN, 0, 0, 0,0,0, body, el)
+    , speculativeState(0)
+  { }
+  void generateEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
+  void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
 };
 
 SdagConstruct *buildAtomic(const char* code,

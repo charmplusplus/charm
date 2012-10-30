@@ -216,7 +216,6 @@ class Jacobi: public CBase_Jacobi {
 
     // Constructor, initialize values
     Jacobi() {
-      __sdag_init();
 
       int i, j, k;
       // allocate a three dimensional array

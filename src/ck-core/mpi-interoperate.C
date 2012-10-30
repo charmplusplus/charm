@@ -1,7 +1,23 @@
+extern "C" void CkExit(void);
+
 #include "mpi-interoperate.h"
 
 static int   _libExitStarted = 0;
 int    _libExitHandlerIdx;
+
+#if CMK_CONVERSE_MPI
+extern "C" { MPI_Comm charmComm; }
+#endif
+
+extern int _ringexit;		    // for charm exit
+extern int _ringtoken;
+extern void _initCharm(int unused_argc, char **argv);
+
+
+extern "C"
+void StartCharmScheduler() {
+  CsdScheduler(-1);
+}
 
 // triger LibExit on PE 0,
 extern "C"
@@ -61,21 +77,27 @@ void _libExitHandler(envelope *env)
 	}
 }
 
-void CharmLibInit(int peid, int numpes, int argc, char **argv){
 #if CMK_CONVERSE_MPI
+extern "C"
+void CharmLibInit(MPI_Comm userComm, int argc, char **argv){
 	//note CmiNumNodes and CmiMyNode should just be macros
-	_Cmi_numnodes = numpes;
-	_Cmi_mynode = peid;
+  charmComm = userComm;
+  MPI_Comm_size(charmComm, &_Cmi_numnodes);
+  MPI_Comm_rank(charmComm, &_Cmi_mynode);
 
 	CharmLibInterOperate = 1;
 	ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-#else
-        CmiAbort("mpi-interoperate only supports MPI machine layer");
-#endif
 }
+#else
+extern "C"
+void CharmLibInit(int userComm, int argc, char **argv){
+    CmiAbort("mpi-interoperate only supports MPI machine layer");
+}
+#endif
 
 #undef CkExit
 #define CkExit CkExit
+extern "C"
 void CharmLibExit() {
 	if(CkMyPe() == 0) {
 		CkExit();

@@ -131,6 +131,11 @@ extern void CldModuleInit(char **);
 #endif
 
 #include "quiescence.h"
+
+#if USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+#include <mpi.h>
+#endif
+
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
@@ -212,6 +217,10 @@ void infi_freeMultipleSend(void *ptr);
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
+#if CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+void * CmiAlloc_bgq (int     size);
+void   CmiFree_bgq  (void  * buf);
+#endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvDeclare(void *, CkGridObject);
@@ -1239,10 +1248,11 @@ void CmiTimerInit(char **argv)
   /*fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);*/
 
   /* try to synchronize calling barrier */
+#if !CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
-
+#endif
   CpvAccess(inittime) = GetTimeBase (); 
 }
 
@@ -2111,6 +2121,9 @@ void CsdInit(argv)
     }
   CpvAccess(CsdLocalCounter) = CsdLocalMax;
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
+   #if CMK_USE_STL_MSGQ
+   if (CmiMyPe() == 0) CmiPrintf("Charm++> Using STL-based msgQ:\n");
+   #endif
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
   CpvInitialize(void *,CsdObjQueue);
@@ -2846,6 +2859,10 @@ void *CmiAlloc(int size)
   res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
+#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+  MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
+#elif CMK_SMP && CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+  res = (char *) CmiAlloc_bgq(size+sizeof(CmiChunkHeader));
 #else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
 #endif
@@ -2947,6 +2964,10 @@ void CmiFree(void *blk)
     LrtsFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));
+#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+    MPI_Free_mem(parentBlk);
+#elif CMK_SMP && CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+    CmiFree_bgq(BLKSTART(parentBlk));
 #else
     free_nomigrate(BLKSTART(parentBlk));
 #endif

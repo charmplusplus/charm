@@ -3,17 +3,21 @@
 
 #include "xi-util.h"
 #include "sdag-globals.h"
-#include "CList.h"
+
+#include <list>
 
 namespace xi {
 
 class Entry;
 class SdagConstruct;
+class WhenConstruct;
 class ParamList;
 class CStateVar;
 
 class CEntry{
-  public:
+  std::list<CStateVar*> myParameters;
+
+public:
     XStr *entry;
     Entry *decl_entry;			// point to the real Entry of the Chare
     //CParseNode *paramlist;
@@ -21,15 +25,10 @@ class CEntry{
     int entryNum;
     int needsParamMarshalling;
     int refNumNeeded;
-    TList<CStateVar*> *myParameters;
-    //TList<CParseNode*> whenList;
-    TList<SdagConstruct*> whenList;
-    CEntry(XStr *e, ParamList *p, TList<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
-       myParameters = new TList<CStateVar*>();
+    std::list<WhenConstruct*> whenList;
+    CEntry(XStr *e, ParamList *p, const std::list<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
        CStateVar *sv;
-       for(sv=list.begin(); !list.end(); sv=list.next()) {
-	  myParameters->append(sv);
-       }
+       myParameters = list;
        entryNum = numEntries++;
        refNumNeeded =0;
        decl_entry = NULL;

@@ -1,0 +1,308 @@
+\charmpp{} supports defining and addressing subsets of the elements of a chare
+array.  This entity is called a chare array section (section). These section
+elements are addressed via a section proxy.
+\charmpp{} also supports array sections which are a subset of array elements in
+multiple chare arrays of the same type \ref{cross array section}.
+Multicast operations, a broadcast to all members of a section, are directly supported in array section proxy with
+an unoptimized direct-sending implementation.
+Section reduction is not directly supported by the section proxy. 
+However, an optimized section multicast/reduction 
+library called ''CkMulticast'' is provided as a separate library module,
+which can be plugged in as a delegation of a section proxy for performing
+section-based multicasts and reductions using optimized spanning trees. 
+
+\section{Section Creation}
+
+For each chare array "A" declared in a ci file, a section proxy 
+of type "CProxySection\_A" is automatically generated in the decl and def 
+header files. 
+In order to create an array section, the user needs to provide array indexes 
+of all the array section members through either explicit enumeration, or an index range expression.
+You can create an array section proxy in your application by 
+invoking ckNew() function of the CProxySection.
+For example, for a 3D array:
+
+\begin{alltt}
+  CkVec<CkArrayIndex3D> elems;    // add array indices
+  for (int i=0; i<10; i++)
+    for (int j=0; j<20; j+=2)
+      for (int k=0; k<30; k+=2)
+         elems.push_back(CkArrayIndex3D(i, j, k));
+  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems.getVec(), elems.size());
+\end{alltt}
+
+Alternatively, one can do the same thing by providing the index range [lbound:ubound:stride] 
+for each dimension:
+
+\begin{alltt}
+  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, 0, 9, 1, 0, 19, 2, 0, 29, 2);
+\end{alltt}
+
+The above codes create a section proxy that contains array elements of 
+[0:9, 0:19:2, 0:29:2].
+
+For user-defined array index other than CkArrayIndex1D to CkArrayIndex6D,
+one needs to use the generic array index type: CkArrayIndex.
+
+\begin{alltt}
+  CkArrayIndex *elems;    // add array indices
+  int numElems;
+  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
+\end{alltt}
+
+
+\section{Section Multicasts: via CkMulticast}
+\label {array_section_multicast}
+
+Once you have the array section proxy, you can broadcast to all the 
+section members, or send messages to one member using its offset index within the section, like these:
+
+\begin{alltt}
+  CProxySection_Hello proxy;
+  proxy.someEntry(...)          // section broadcast
+  proxy[0].someEntry(...)       // send to the first element in the section.
+\end{alltt}
+
+You can send the section proxy in a message to another processor, and still 
+safely invoke the entry functions on the section proxy.
+
+In the broadcast example above, for a section with k members, a total
+number of k messages will be sent, one to each member, which is
+inefficient when several members are on a same processor, in which
+case only one message needs to be sent to that processor and delivered
+to all section members on that processor locally. To support this
+optimization, a separate library called CkMulticast is provided as a
+target for delegation to an optimized implementation. This library
+also supports section based reduction.
+
+Note: Use of the bulk array constructor (dimensions given in the CkNew
+or CkArrayOptions rather than individual insertion) will allow
+construction to race ahead of several other startup procedures, this
+creates some limitation on the construction delegation and use of
+array section proxies.  For safety, array sections should be
+created in a post constructor entry method.
+
+To use the library, you need to compile and install CkMulticast library and 
+link your applications against the library using -module:
+
+\begin{alltt}
+  # compile and install the CkMulticast library, do this only once
+  # assuming a net-linux-x86\_64 build
+  cd charm/net-linux-x86\_64/tmp
+  make multicast
+
+  # link CkMulticast library using -module when compiling application
+  charmc  -o hello hello.o -module CkMulticast -language charm++ 
+\end{alltt}
+
+The CkMulticast library is implemented using delegation(Sec. ~\ref{delegation}). 
+A special ''CkMulticastMgr'' Chare Group is created as a 
+delegation for section multicast/reduction - all the messages sent
+by the section proxy will be passed to the local delegation branch.
+
+To use the CkMulticast delegation, one needs to create the CkMulticastMgr Group 
+first, and then setup the delegation relationship between the section proxy and 
+CkMulticastMgr Group. 
+One only needs to create one CkMulticastMgr Group globally.
+CkMulticastMgr group can serve all multicast/reduction delegations
+for different array sections in an application:
+
+\begin{alltt}
+  CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(...);
+  CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
+  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+
+  sectProxy.ckSectionDelegate(mCastGrp);  // initialize section proxy
+
+  sectProxy.someEntry(...)           //multicast via delegation library as before
+\end{alltt}
+
+By default, CkMulticastMgr group builds a spanning tree for multicast/reduction
+with a factor of 2 (binary tree).
+One can specify a different factor when creating a CkMulticastMgr group.
+For example,
+
+\begin{alltt}
+  CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew(3);   // factor is 3
+\end{alltt}
+
+Note, to use CkMulticast library, all multicast messages must inherit from 
+CkMcastBaseMsg, as the following.
+Note that CkMcastBaseMsg must come first, this is IMPORTANT for CkMulticast 
+library to retrieve section information out of the message.
+
+
+\begin{alltt}
+class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
+\{
+public:
+  int *data;
+\};
+\end{alltt}
+
+Due to this restriction, you must define message explicitly for multicast 
+entry functions and no parameter marshalling can be used for multicast with 
+CkMulticast library.
+
+\section{Section Reductions} 
+
+Since an array element can be a member of multiple array sections, 
+it is necessary to disambiguate between which array
+section reduction it is participating in each time it contributes to one. For this purpose, a data structure 
+called ''CkSectionInfo'' is created by CkMulticastMgr for each 
+array section that the array element belongs to.
+During a section reduction, the array element must pass the 
+\kw{CkSectionInfo} as a parameter in the \kw{contribute()}. 
+The \kw{CkSectionInfo} for a section can be retrieved
+from a message in a multicast entry point using function call 
+\kw{CkGetSectionInfo}:
+
+\begin{alltt}
+  CkSectionInfo cookie;
+
+  void SayHi(HiMsg *msg)
+  \{
+    CkGetSectionInfo(cookie, msg);     // update section cookie every time
+    int data = thisIndex;
+    mcastGrp->contribute(sizeof(int), &data, CkReduction::sum_int, cookie);
+  \}
+\end{alltt}
+
+Note that the cookie cannot be used as a one-time local variable in the 
+function, the same cookie is needed for the next contribute. This is 
+because the cookie includes some context sensive information (e.g., the 
+reduction counter). Subsequent invocations of \kw{CkGetSectionInfo()} only updates part of the data in the cookie, rather than creating a brand new one.
+
+Similar to array reduction, to use section based reduction, a
+reduction client CkCallback object must be created. You may pass the
+client callback as an additional parameter to \kw{contribute}. If
+different contribute calls to the same reduction operation pass
+different callbacks, some (unspecified, unreliable) callback will be
+chosen for use. 
+
+See the following example:
+
+\begin{alltt}
+    CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL),thisProxy); 
+    mcastGrp->contribute(sizeof(int), &data, CkReduction::sum_int, cookie, cb);
+\end{alltt}
+
+If no member passes a callback to contribute, the reduction will use the 
+default callback. You set the default callback for an array section using the 
+\kw{setReductionClient} call in the section root member. A 
+{\bf CkReductionMsg} message will be passed to this callback, which 
+must delete the message when done.
+
+\begin{alltt}
+  CProxySection_Hello sectProxy;
+  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+  mcastGrp->setReductionClient(sectProxy, new CkCallback(...));
+\end{alltt}
+
+As in an array reduction, users can use built-in reduction 
+types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
+(Section~\ref{new_type_reduction}).
+
+\section{Section Collectives when Migration Happens}
+
+Using multicast/reduction, you don't need to worry about array migrations.
+When migration happens, array element in the array section can still use 
+the \kw{CkSectionInfo} it stored previously for doing reduction. 
+Reduction messages will be correctly delivered but may not be as efficient 
+until a new multicast spanning tree is rebuilt internally 
+in \kw{CkMulticastMgr} library. 
+When a new spanning tree is rebuilt, a updated \kw{CkSectionInfo} is 
+passed along with a multicast message, 
+so it is recommended that 
+\kw{CkGetSectionInfo()} function is always called when a multicast 
+message arrives (as shown in the above SayHi example).
+
+In case when a multicast root migrates, the library must reconstruct the 
+spanning tree to get optimal performance. One will get the following
+warning message if not doing so:
+"Warning: Multicast not optimized after multicast root migrated."
+In current implementation, user needs to initiate the rebuilding process
+using \kw{resetSection}.
+
+\begin{alltt}
+void Foo::pup(PUP::er & p) {
+    // if I am multicast root and it is unpacking
+   if (ismcastroot && p.isUnpacking()) {
+      CProxySection_Foo   fooProxy;    // proxy for the section
+      CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+      mg->resetSection(fooProxy);
+        // you may want to reset reduction client to root
+      CkCallback *cb = new CkCallback(...);
+      mg->setReductionClient(mcp, cb);
+   }
+}
+\end{alltt}
+
+\section{Cross Array Sections}
+\label{cross array section}
+\experimental{}
+
+Cross array sections contain elements from multiple arrays.
+Construction and use of cross array sections is similar to normal
+array sections with the following restrictions.  
+
+\begin{itemize}
+
+\item Arrays in a section my all be of the same type.
+
+\item Each array must be enumerated by array ID
+
+\item The elements within each array must be enumerated explicitly
+
+\item No existing modules currently support delegation of cross
+  section proxies.  Therefore reductions are not currently supported.
+
+\end{itemize}
+
+Note: cross section logic also works for groups with analogous characteristics.
+
+Given three arrays declared thusly:
+
+\begin{alltt}
+	  CkArrayID *aidArr= new CkArrayID[3];
+	  CProxy\_multisectiontest\_array1d *Aproxy= new CProxy\_multisectiontest\_array1d[3];
+	  for(int i=0;i<3;i++)
+	    \{
+	      Aproxy[i]=CProxy\_multisectiontest\_array1d::ckNew(masterproxy.ckGetGroupID(),ArraySize);	  
+	      aidArr[i]=Aproxy[i].ckGetArrayID();
+	    \}
+\end{alltt}
+
+One can make a section including the  lower half elements of all three
+arrays as follows:
+
+\begin{alltt}
+	  int aboundary=ArraySize/2;
+	  int afloor=aboundary;
+	  int aceiling=ArraySize-1;
+	  int asectionSize=aceiling-afloor+1;
+	  // cross section lower half of each array
+	  CkArrayIndex **aelems= new CkArrayIndex*[3];
+	  aelems[0]= new CkArrayIndex[asectionSize];
+	  aelems[1]= new CkArrayIndex[asectionSize];
+	  aelems[2]= new CkArrayIndex[asectionSize];
+	  int *naelems=new int[3];
+	  for(int k=0;k<3;k++)
+	    \{
+	      naelems[k]=asectionSize;
+	      for(int i=afloor,j=0;i<=aceiling;i++,j++)
+	        aelems[k][j]=CkArrayIndex1D(i);
+	    \}
+	  CProxySection\_multisectiontest\_array1d arrayLowProxy(3,aidArr,aelems,naelems);
+\end{alltt}
+
+The resulting cross section proxy, as in the example \uw{arrayLowProxy},
+can then be used for multicasts in the same way as a normal array
+section.
+
+Note: For simplicity the example has all arrays and sections of uniform
+size.  The size of each array and the number of elements in each array
+within a section can all be set independently.
+
+
+

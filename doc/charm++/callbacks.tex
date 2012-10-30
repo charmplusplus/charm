@@ -1,120 +1,136 @@
-\subsection{Callbacks}
-
 \label{callbacks}
 
-A callback is a generic way to transfer control back to a client
-after a \charmpp{} library has finished.  For example, after finishing a reduction,
-you might want the results passed to some chare's entry method.
-To do this, you create an object of type \kw{CkCallback} with
-the chare's \kw{CkChareID} and entry method index, then pass the
-callback object to the reduction library.
+Callbacks provide a generic way to store the information required to
+invoke a communication target, such as a chare's entry method, at a
+future time. Callbacks are often encountered when writing library
+code, where they provide a simple way to transfer control back to a
+client after the library has finished. For example, after finishing a
+reduction, you may want the results passed to some chare's entry
+method.  To do this, you would create an object of type
+\kw{CkCallback} with the chare's \kw{CkChareID} and entry method
+index, and pass this callback object to the reduction library.
 
-
-\subsubsection{Client Interface}
+\section{Creating a CkCallback Object}
+\label{sec:callbacks/creating}
 
 \index{CkCallback}
 
-You can create a \kw{CkCallback} object in a number of ways,
-depending on what you want to have happen when the callback is
-finally invoked.  The callback will be invoked with a \charmpp{}
-message; but the message type will depend on the \charmpp{} library that 
-actually invokes the callback.  Check the library documentation
-to see what kind of message the library will send to your callback.
-In any case, you are required to free the message passed to you via
-the callback.
+There are several different types of \kw{CkCallback} objects; the type
+of the callback specifies the intended behavior upon invocation of the
+callback. Callbacks must be invoked with the \charmpp{} message of the
+type specified when creating the callback. If the callback is being
+passed into a library which will return its result through the
+callback, it is the user's responsibility to ensure that the type of
+the message delivered by the library is the same as that specified in
+the callback. Messages delivered through a callback are not
+automatically freed by the Charm RTS. They should be freed or stored
+for future use by the user.
 
-The callbacks that go to chares require an ``entry method index'',
-an integer that identifies which entry method will be called.
-You can get an entry method index using the syntax:
+Callbacks that target chares require an ``entry method index'', an
+integer that identifies which entry method will be called.  An entry
+method index is the \charmpp{} version of a function pointer.  The
+entry method index can be obtained using the syntax:
 
 \begin{alltt}
-\kw{myIdx}=CkIndex_\uw{ChareName}::\uw{EntryMethod}(\uw{parameters});
+\uw{int myIdx} = CkIndex_\uw{ChareName}::\uw{EntryMethod}(\uw{parameters});
 \end{alltt}
 
-Here, \uw{ChareName} is the name of the chare (group, or array) containing
-the desired entry method, \uw{EntryMethod} is the name of that entry method,
-and \uw{parameters} are the parameters taken by the method.
-These parameters are only used to resolve the proper \uw{EntryMethod};
-they are otherwise ignored.  An entry method index is the \charmpp{}
-version of a function pointer.
+Here, \uw{ChareName} is the name of the chare (group, or array)
+containing the desired entry method, \uw{EntryMethod} is the name of
+that entry method, and \uw{parameters} are the parameters taken by the
+method.  These parameters are only used to resolve the proper
+\uw{EntryMethod}; they are otherwise ignored. 
 
+Under most circumstances, entry methods to be invoked through a
+CkCallback must take a single message pointer as argument. As such, if
+the entry method specified in the callback is not overloaded, using
+NULL in place of parameters will suffice in fully specifying the
+intended target. If the entry method is overloaded, a message pointer
+of the appropriate type should be defined and passed in as a parameter
+when specifying the entry method. The pointer does not need to be
+initialized as the argument is only used to resolve the target entry
+method.
 
-There are a number of ways to build callbacks, depending on what you
-want to have happen when the callback is invoked:
+The intended behavior upon a callback's invocation is specified
+through the choice of callback constructor used when creating the callback. 
+Possible constructors are: 
 
 \begin{enumerate}
-\item \kw{CkCallback(CkCallbackFn fn,void *param)} When invoked, the
-callback will pass \uw{param} and the result message to the given C function,
-which should have a prototype like:
+\item \kw{CkCallback(void (*CallbackFn)(void *, void *), void *param)} - 
+When invoked, the callback will pass \uw{param} and the result message
+to the given C function, which should have a prototype
+like:
 
 \begin{alltt}
-void \uw{myCallbackFn}(void *param,void *message)
+void \uw{myCallbackFn}(void *param, void *message)
 \end{alltt}
 
 This function will be called on the processor where the callback was created,
-so \uw{param} is allowed to point to heap-allocated data.  Of course, you
+so \uw{param} is allowed to point to heap-allocated data.  Hence, this 
+constructor should be used only when it is known that the callback target (which by definition here
+is just a C-like function) will be on the same processor as from where the constructor was called. 
+Of course, you
 are required to free any storage referenced by \uw{param}.
 
-\item \kw{CkCallback(CkCallback::ignore)} When invoked, the callback
-will do nothing.  This can be useful if the \charmpp{} library requires a callback,
-but you don't care when it finishes, or will find out some other way.
+\item \kw{CkCallback(CkCallback::ignore)} - When invoked, the callback
+will do nothing.  This can be useful if a \charmpp{} library requires
+a callback, but you don't care when it finishes, or will find out some
+other way.
 
-\item \kw{CkCallback(CkCallback::ckExit)} When invoked, the callback
+\item \kw{CkCallback(CkCallback::ckExit)} - When invoked, the callback
 will call CkExit(), ending the Charm++ program.
 
-\item \kw{CkCallback(int ep,const CkChareID \&id)} When invoked, the 
-callback will send its message to the given entry method of the given
-Chare.  Note that a chare proxy will also work in place of a chare id:
+\item \kw{CkCallback(int ep, const CkChareID \&id)} - When invoked, the 
+callback will send its message to the given entry method (specified by the 
+entry point index - \kw{ep}) of the given
+Chare (specified by the chare \kw{id}).  Note that a chare proxy will also work in place of a chare id:
 
 \begin{alltt}
-	CkCallback myCB(CkIndex_myChare::myEntry(NULL),myChareProxy);
+	CkCallback myCB(CkIndex_myChare::myEntry(NULL), myChareProxy);
 \end{alltt}
 
-\item \kw{CkCallback(int ep,const CkArrayID \&id)} 
+\item \kw{CkCallback(int ep, const CkArrayID \&id)} - 
 When invoked,
 the callback will broadcast its message to the given entry method
 of the given array.  An array proxy will work in the place of an array id.
 
-\item \kw{CkCallback(int ep,const CkArrayIndex \&idx,const CkArrayID \&id)}
+\item \kw{CkCallback(int ep, const CkArrayIndex \&idx, const CkArrayID \&id)} - 
 When invoked,
 the callback will send its message to the given entry method
 of the given array element. 
 
-\item \kw{CkCallback(int ep,const CkGroupID \&id)} 
+\item \kw{CkCallback(int ep, const CkGroupID \&id)} - 
 When invoked,
 the callback will broadcast its message to the given entry method
 of the given group.
 
-\item \kw{CkCallback(int ep,int onPE,const CkGroupID \&id)}
-When invoked,
-the callback will send its message to the given entry method
-of the given group member. 
+\item \kw{CkCallback(int ep, int onPE, const CkGroupID \&id)} - 
+When invoked, the callback will send its message to the given entry
+method of the given group member.
 
 \end{enumerate}
 
-One final type of callback, a \kw{CkCallback(CkCallback::resumeThread)}, 
-can only be used from within threaded entry methods.  This type of callback
-is typically hidden within a thread-capable library, so is discussed further
-in the library section.
+One final type of callback, \kw{CkCallbackResumeThread()}, can only be
+used from within threaded entry methods.  This callback type is
+discussed in section \ref{sec:ckcallbackresumethread}.
 
-
-\subsubsection{Library Interface}
+\section{CkCallback Invocation}
 
 \label{libraryInterface}
 
-Here, a ``library'' is simply any \charmpp{} code which can be called from several
-different places.  From the point of view of a library, a \kw{CkCallback}
-is a destination for the library's result.  \kw{CkCallback} objects can
-be freely copied, marshalled, or even sent in messages.
-
-Postponing the discussion on threads for a moment, the only thing you can do 
-with a CkCallback is to move it around or send a message to it:
+A properly initialized \kw{CkCallback} object stores a global
+destination identifier, and as such can be freely copied, marshalled,
+and sent in messages. Invocation of a CkCallback is done by calling
+the function \kw{send} on the callback with the result message as an
+argument. As an example, a library which accepts a CkCallback object
+from the user and then invokes it to return a result may have the
+following interface:
 
 \begin{alltt}
 //Main library entry point, called by asynchronous users:
 void myLibrary(...library parameters...,const CkCallback \&cb) 
 \{
-  ..start some parallel computation, dragging cb along...
+  ..start some parallel computation, store cb to be passed to myLibraryDone later...
 \}
 
 //Internal library routine, called when computation is done
@@ -126,24 +142,32 @@ void myLibraryDone(...parameters...,const CkCallback \&cb)
 \end{alltt}
 
 A \kw{CkCallback} will accept any message type, or even NULL.  The
-message is immediately sent to the user's client function or entry point,
-so you {\em do} need to document the type of message you will send to the 
-callback so the user knows what to expect.
+message is immediately sent to the user's client function or entry
+point.  A library which returns its result through a callback should
+have a clearly documented return message type. The type of the message
+returned by the library must be the same as the type accepted by the
+entry method specified in the callback. 
 
-As an alternative to ``send'', the callback can be used in a {\em contribute}
-collective operation. This will internally invoke the ``send'' method on the
-callback when the contribute operation has finished.
+As an alternative to ``send'', the callback can be used in a {\em
+  contribute} collective operation. This will internally invoke the
+``send'' method on the callback when the contribute operation has
+finished.
 
-Threaded entry methods can be suspended and resumed through the 
-%are a bit more complicated as they must be suspended while waiting
-%for the invoked operation to finish. 
-{\em CkCallbackResumeThread} class. {\em CkCallbackResumeThread}
-is derived from {\em CkCallback} and has specific functionality for threads.
-This class automatically suspends the thread when the destructor of the callback is called. 
-A suspended threaded client will resume when the ``send'' method is
-invoked on the associated callback.
-It can be used in situations when the return value is not needed, and only the
-synchronization is important. For example:
+For examples of how to use the various callback types, please
+see \testreffile{megatest/callback.C}
+
+\section{Synchronous Execution with CkCallbackResumeThread}
+
+\label{sec:ckcallbackresumethread}
+
+Threaded entry methods can be suspended and resumed through the {\em
+  CkCallbackResumeThread} class. {\em CkCallbackResumeThread} is
+derived from {\em CkCallback} and has specific functionality for
+threads.  This class automatically suspends the thread when the
+destructor of the callback is called.  A suspended threaded client
+will resume when the ``send'' method is invoked on the associated
+callback.  It can be used in situations when the return value is not
+needed, and only the synchronization is important. For example:
 
 \begin{alltt}
 // Call the "doWork" method and wait until it has completed
@@ -153,7 +177,7 @@ void mainControlFlow() \{
   doWork(...,CkCallbackResumeThread());
   // or send a broadcast to a chare collection
   myProxy.doWork(...,CkCallbackResumeThread());
-  // The thread is suspended until doWork calls 'send' on the callback
+  // callback goes out of scope; the thread is suspended until doWork calls 'send' on the callback
   
   ...some more work...
 \}
@@ -221,9 +245,9 @@ void mainControlFlow() \{
 \}
 \end{alltt}
 
-{\em N.B.}: a {\em CkCallbackResumeThread} can be used to suspend a thread
-only once.
-
+In all cases a {\em CkCallbackResumeThread} can be used to suspend a thread
+only once.\\
+(See \examplerefdir{barnes-charm} for a complete example).\\
 {\em Deprecated usage}: in the past, ``thread\_delay'' was used to retrieve the
 incoming message from the callback. While that is still allowed for backward
 compatibility, its usage is deprecated. The old usage is subject to memory

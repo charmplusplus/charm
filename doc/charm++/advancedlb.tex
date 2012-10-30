@@ -1,16 +1,145 @@
+\section{Load Balancing Simulation}
 
-\subsection{Advanced Load Balancing}
+The simulation feature of the load balancing framework allows the users to collect information
+about the compute WALL/CPU time and communication of the chares during a particular run of
+the program and use this information later to test the different load balancing strategies to
+see which one is suitable for the program behavior. Currently, this feature is supported only for
+the centralized load balancing strategies. For this, the load balancing framework
+accepts the following command line options:
+\begin{enumerate}
+\item {\em +LBDump StepStart}\\
+        This will dump the compute and the communication data collected by the load balancing framework
+	starting from the load balancing step {\em StepStart} into a file on the disk. The name of the file
+	is given by the {\em +LBDumpFile} option. The load balancing step in the
+  program is numbered starting from 0. Negative value for {\em StepStart} will be converted to 0.
+\item {\em +LBDumpSteps StepsNo}\\
+        This option specifies the number of load balancing steps for which data will be dumped to disk.
+        If omitted, its default value is 1. The program will exit after {\em StepsNo} files are created.
+\item {\em +LBDumpFile FileName}\\
+        This option specifies the base name of the file created with the load balancing data. If this
+	option is not specified, the framework uses the default file {\tt lbdata.dat}. Since multiple steps are allowed,
+	a number correspoding to the step number is appended to the filename in the form {\tt Filename.\#};
+  this applies to both dump and simulation.
+\item {\em +LBSim StepStart}\\
+	This option instructs the framework to do the simulation starting from {\em StepStart} step.
+	When this option is specified, the load balancing data along with the step
+  number will be read from the file specified in the {\em +LBDumpFile}
+	option. The program will print the results of the balancing for a number of steps given
+  by the {\em +LBSimSteps} option, and then will exit.
+\item {\em +LBSimSteps StepsNo}\\
+        This option is applicable only to the simulation mode. It specifies the number of
+  load balancing steps for which the data will be dumped. The default value is 1.
+\item {\em +LBSimProcs}\\
+        With this option, the user can change the number of processors
+  specified to the load balancing strategy. It may be used to test
+	the strategy in the cases where some processor crashes or a new processor becomes available. If this number is not
+	changed since the original run, starting from the second step file, the program will print other additional
+	information about how the simulated load differs from the real load during the run (considering all
+	strategies that were applied while running). This may be used to test the validity of a load balancer
+	prediction over the reality. If the strategies used during run and simulation differ, the additional data
+	printed may not be useful.
+\end{enumerate}
+Here is an example which collects the data for a 1000 processor run of a program
+\begin{alltt}
+./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile lbsim.dat
+\end{alltt}
+This will collect data on files lbsim.dat.{2,3,4,5}. We can use this data to
+analyze the performance of various centralized strategies using:
+\begin{alltt}
+./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile lbsim.dat
+[+LBSimProcs 900]
+\end{alltt}
+Please note that this does not invoke the real application. In fact,
+ ''pgm'' can be replaced with any generic application which calls centralized load balancer.
+An example can be found in \testrefdir{load\_balancing/lb\_test}.
 
-\label{advancedlb}
+\section{Future load predictor}
 
-\subsubsection{Control CPU Load Statistics}
+When objects do not follow the assumption that the future workload will be the
+same as the past, the load balancer might not have the right information to do
+a good rebalancing job. To prevent this, the user can provide a transition
+function to the load balancer to predict what will be the future workload, given
+the past instrumented one. For this, the user can provide a specific class
+which inherits from {\tt LBPredictorFunction} and implement the appropriate functions. 
+Here is the abstract class:
+\begin{alltt}
+class LBPredictorFunction \{
+public:
+  int num_params;
+ 
+  virtual void initialize_params(double *x);
 
-Charm++ programmers can control CPU load data in the load balancing database
-before a load balancing phase is started (which is the time when load balancing
+  virtual double predict(double x, double *params) =0;
+  virtual void print(double *params) {PredictorPrintf("LB: unknown model");};
+  virtual void function(double x, double *param, double &y, double *dyda) =0;
+\};
+\end{alltt}
+\begin{itemize}
+\item {\tt initialize\_params} by default initializes the parameters randomly. If the user
+knows how they should be, this function can be re-implemented.
+\item {\tt predict} is the function that predicts the future load based on the function parameters.
+An example for the {\em predict} function is given below.
+\begin{verbatim}
+double predict(double x, double *param) {return (param[0]*x + param[1]);}
+\end{verbatim}
+\item {\tt print} is useful for debugging and it can be re-implemented to have a meaningful
+print of the learnt model
+\item {\tt function} is a function internally needed to learn the parameters, {\tt x} and
+{\tt param} are input, {\tt y} and {\tt dyda} are output (the computed function and
+all its derivatives with respect to the parameters, respectively).
+For the function in the example should look like:
+\begin{verbatim}
+void function(double x, double *param, double &y, double *dyda) {
+  y = predict(x, param);
+  dyda[0] = x;
+  dyda[1] = 1;
+}
+\end{verbatim}
+\end{itemize}
+Other than these functions, the user should provide a constructor which must initialize
+{\tt num\_params} to the number of parameters the model has to learn. This number is
+the dimension of {\tt param} and {\tt dyda} in the previous functions. For the given
+example, the constructor is {\tt \{num\_params = 2;\}}.
+
+If the model for computation is not known, the user can leave the system to
+use the default function.
+
+As seen, the function can have several parameters which will be learned during
+the execution of the program. For this, user can be add the following command
+line arguments to specify the learning behavior:
+\begin{enumerate}
+\item {\em +LBPredictorWindow size}\\
+This parameter specifies the number of statistics steps the load balancer will
+store.  The greater this number is, the better the
+approximation of the workload will be, but more memory is required to store
+the intermediate information. The default is 20.
+\item {\em +LBPredictorDelay steps}\\
+This will tell how many load balancer steps to wait before considering the
+function parameters learnt and starting to use the mode. The load balancer will
+collect statistics for a {\em +LBPredictorWindow} steps, but it will start using
+the model as soon as {\em +LBPredictorDelay} information are collected. The
+default is 10.
+\end{enumerate}
+Moreover, another flag can be set to enable the predictor from command line: {\em
++LBPredictor}.\\
+Other than the command line options, there are some methods
+which can be called from the user program to modify the predictor. These methods are:
+\begin{itemize}
+\item {\tt void PredictorOn(LBPredictorFunction *model);}
+\item {\tt void PredictorOn(LBPredictorFunction *model,int window);}
+\item {\tt void PredictorOff();}
+\item {\tt void ChangePredictor(LBPredictorFunction *model);}
+\end{itemize}
+
+An example can be found in \testrefdir{load\_balancing/lb\_test/predictor}.
+\section{Control CPU Load Statistics}
+
+\charmpp{} programmers can modify the CPU load data in the load balancing database
+before a load balancing phase starts (which is the time when load balancing
 database is collected and used by load balancing strategies).
 
 In an array element, the following function can be invoked to overwrite the 
-CPU load that is measured by load balancing framework.
+CPU load that is measured by the load balancing framework.
 
 \begin{alltt}
    double newTiming;
@@ -21,7 +150,7 @@ CPU load that is measured by load balancing framework.
 the superclass of all array elements.
 
 The users can also retrieve the current timing that the load balancing runtime
-has measured for the current array element. 
+has measured for the current array element using {\em getObjTime()}. 
  
 \begin{alltt} 
    double measuredTiming; 
@@ -31,44 +160,42 @@ has measured for the current array element.
 This is useful when the users want to derive a new CPU load based on the 
 existing one.
 
-\subsubsection{Model-based Load Balancing}
+\section{Model-based Load Balancing}
 
-Charm++ programmers can also choose to feed load balancer with their own CPU
-timing of each Chare based on certain computational model of the applications.
+The user can choose to feed load balancer with their own CPU
+timing for each Chare based on certain computational model of the applications.
 
-To do so, first turn off automatic CPU load measurement completely
-by setting:
+To do so, in the array element's constructor, the user first needs to turn off 
+automatic CPU load measurement completely by setting
 
 \begin{alltt}
    usesAutoMeasure = CmiFalse;
 \end{alltt}
 
-in array element's constructor.
-
-Then the users need to implement the following function to the chare array
+The user must also implement the following function to the chare array
 classes:
 
 \begin{alltt}
    virtual void CkMigratable::UserSetLBLoad();      // defined in base class
 \end{alltt}
 
-This function served as a callback that is called on each chare object when
+This function serves as a callback that is called on each chare object when
 {\em AtSync()} is called and ready to do load balancing. The implementation of
-{\em UserSetLBLoad()} is simply to set the current chare object's CPU load to
-load balancer framework. {\em setObjTime()} described above can be used for
+{\em UserSetLBLoad()} is simply to set the current chare object's CPU load in
+load balancing framework. {\em setObjTime()} described above can be used for
 this.
 
-\subsubsection{Writing a communication-aware load balancing strategy}
+\section{Writing a new load balancing strategy}
 
-Charm++ programmers can choose an existing load balancing strategy from
-Charm++'s built-in strategies(see ~\ref{lbStrategy}) for the best performance
+\charmpp{} programmers can choose an existing load balancing strategy from
+\charmpp{}'s built-in strategies(see ~\ref{lbStrategy}) for the best performance
 based on the characteristics of their applications. However, they can also
 choose to write their own load balancing strategies.
 
-The Charm++ load balancing framework provides a simple scheme to incorporate
+The \charmpp{} load balancing framework provides a simple scheme to incorporate
 new load balancing strategies. The programmer needs to write their strategy for
-load balancing based on a instrumented ProcArray and ObjGraph provided by the
-load balancing framework. This strategy is to be incorporated within this
+load balancing based on the instrumented ProcArray and ObjGraph provided by the
+load balancing framework. This strategy is implemented within this
 function:
 
 \begin{alltt}
@@ -90,9 +217,9 @@ void FooLB::work(LDStats *stats) \{
 \end{alltt}
 
 Figure~\ref{fig:ckgraph} explains the two data structures available to the
-strategy: ProcArray and ObjGraph. Using these, the strategy should assign new
-processors for objects it wants to be migrated through the setNewPe() method.
-
+strategy: ProcArray and ObjGraph. Using them, the strategy should assign objects 
+to new processors  where it wants to be migrated through the setNewPe() method.
+{\tt src/ck-ldb/GreedyLB.C} can be referred.
 \begin{figure}[h]
 \centering
 \includegraphics[width=6.0in]{fig/ckgraph.png}
@@ -101,18 +228,18 @@ balancing strategy}
 \label{fig:ckgraph}
 \end{figure}
 
-Incorporating this strategy into the Charm++ build framework is explained in
+Incorporating this strategy into the \charmpp{} build framework is explained in
 the next section.
 
-\subsubsection{Adding a load balancer to Charm++}
+\section{Adding a load balancer to \charmpp{}}
 
 Let us assume that we are writing a new centralized load balancer called FooLB.
-The next few steps explain the addition of the load balancer to the Charm++
+The next few steps explain the steps of adding the load balancer to the \charmpp{}
 build system:
 
 \begin{enumerate}
-\item Create files named {\em FooLB.ci, FooLB.h and FooLB.C}. One can choose to
-copy and rename the files GraphPartLB.* and rename the class name in those
+\item Create files named {\em FooLB.ci, FooLB.h and FooLB.C} in directory of {\tt src/ck-ldb}.
+One can choose to copy and rename the files GraphPartLB.* and rename the class name in those
 files.
 
 \item Implement the strategy in the {\em FooLB} class method --- {\bf
@@ -131,22 +258,21 @@ link time, you also need to create the dependency file called
 libmoduleFooLB.dep. Run the script in charm/tmp, which creates the new Makefile
 named ``Make.lb''.
 
-\item Run ``make depends'' to update dependence rule of Charm++ files.  And run
-``make charm++'' to compile Charm++ which includes the new load balancing
+\item Run ``make depends'' to update dependence rule of \charmpp{} files.  And run
+``make charm++'' to compile \charmpp{} which includes the new load balancing
 strategy files.
 \end{enumerate}
 
 
-\subsubsection{Understand Load Balancing Database Data Structure}
-
+\section{Understand Load Balancing Database Data Structure}
 \label{lbdatabase}
 
-To write a load balancing strategy, one may want to know 
+To write a load balancing strategy, you need to know 
 what information is measured during the runtime and how it is represented in
-the load balancing database data structure?
+the load balancing database data structure.
 
 There are mainly 3 categories of information: a) processor information including processor speed, background load; b) object information including per object
-cpu/wallclock compute time and c) communication information .
+CPU/WallClock compute time and c) communication information .
 
 The database data structure named {\kw LDStats} is defined in {\em CentralLB.h}:
 
@@ -181,7 +307,7 @@ The database data structure named {\kw LDStats} is defined in {\em CentralLB.h}:
 \end{verbatim}
 
 \begin{enumerate}
-\item {\em LBRealType} is the data type for load balancer measured time. It is "double" by default. User can specify the type to float if wanted at Charm++ compile time. For example, ./build charm++ net-linux-x86\_64 {-}{-}with-lbtime-type=float;
+\item {\em LBRealType} is the data type for load balancer measured time. It is "double" by default. User can specify the type to float at \charmpp{} compile time if want. For example, ./build charm++ net-linux-x86\_64 {-}{-}with-lbtime-type=float;
 \item {\em procs} array defines processor attributes and usage data for each
 processor;
 \item {\em objData} array records per object information, {\em LDObjData} is defined in {\em lbdb.h};

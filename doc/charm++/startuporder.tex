@@ -1,0 +1,44 @@
+\section{\kw{initnode} and \kw{initproc} Routines}
+\input{othercalls}
+
+\section{Event Sequence During \charmpp{} Startup}
+
+%describe the order in which entities are constructed on PE 0 and other PEs
+%what assumptions can user program make about entity availability:
+%ie groups are available in any chare array constructor, but not vice versa etc.
+
+%A \charmpp{} program starts with the following sequence:
+At startup, every \charmpp{} program performs the following actions, in sequence:
+\begin{enumerate}
+\item Module Registration: all modules given in the \kw{.ci} files are registered in the order
+of their specification in the linking stage of program compilation.
+For example, if you specified ``{\tt -module A -module B}'' while linking your \charmpp{} program,
+then module {\tt A} is registered before module {\tt B} at runtime.
+
+\item \kw{initnode}, \kw{initproc} Calls: all initnode and initproc functions are invoked before the
+creation of \charmpp{} data structures, and before the invocation of any
+mainchares' \kw{main()} methods.
+
+\item \kw{readonly} Variables: \kw{readonly} variables are initialized on PE 0 in the \kw{mainchare},
+following program order as given in the {\tt main()} method. After initialization, they
+are broadcast to all other PEs making them available in the constructors
+groups, chares, chare arrays, etc. (see below.)
+
+\item \kw{Group} and \kw{NodeGroup} Creation: on PE 0, constructors of these
+objects are invoked in program order. However, on all other PEs, their
+creation is triggered by messages. Since message order is not guaranteed
+in \charmpp{} program, constructors of groups and nodegroups should \textbf{not} depend 
+on other Group or NodeGroup objects on a PE. However, if your program structure requires
+it, you can explicitly specify that the creation of certain Groups/NodeGroups depends
+on the creation of others, as described in \S~\ref{sec:groups/creation}.
+In addition, since those objects are initialized
+after the initialization of readonly variables, readonly variables can be used
+in the constructors of Groups and NodeGroups.
+
+\item \charmpp{} Array Creation: the order in which array constructors are called on PEs is
+similar to that described for groups and nodegroups, above.
+%the same mechanism with that of Group and NodeGroup as described above.
+Therefore, the creation of one array should \textbf{not} depend on other arrays.
+As Array objects are initialized last, their constructors can use 
+readonly variables and local branches of Group or NodeGroup objects.
+\end{enumerate}

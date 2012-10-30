@@ -3,24 +3,34 @@
 \usepackage{fancyvrb}
 \usepackage{makeidx}
 \usepackage{alltt}
-%\usepackage{html}
+\usepackage{html}
+\usepackage{hyphenat}
 \usepackage{listings}
-\usepackage[linkbordercolor={0 0 1},citebordercolor={0 1 0}]{hyperref}
+\usepackage{xspace} %<- creates problems with other hyperlink packages like "html"
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,%
+    citecolor=black,%
+    filecolor=black,%
+    linkcolor=black,%
+    urlcolor=magenta
+}
 
-%%\usepackage{xspace} <- creates problems with other hyperlink packages like "html"
 
 %%% Commands for uniform looks of C++, Charm++, and Projections
-\newcommand{\CC}{C\hbox{++}}
+\newcommand{\CC}{C\hbox{++}\xspace}
 \newcommand{\emCC}{C\hbox{\em++}}
-\newcommand{\charmpp}{\textsc{Charm++}}
+\newcommand{\charmpp}{Charm++}
+\newcommand{\charm}{Charm++\xspace}
 \newcommand{\charmc}{\texttt{charmc}}
-\newcommand{\projections}{\textsc{Projections}}
-\newcommand{\converse}{\textsc{Converse}}
-\newcommand{\ampi}{\textsc{AMPI}}
+\newcommand{\projections}{\textrm{Projections}}
+\newcommand{\converse}{Converse}
+\newcommand{\ampi}{\textup{AMPI}}
 \newcommand{\tempo}{\textsc{TeMPO}}
 \newcommand{\irecv}{\textsl{iRecv}}
 \newcommand{\sdag}{\textsl{Structured Dagger}}
 \newcommand{\jade}{Jade}
+\newcommand{\ci}{\emph{ci}\xspace}
 
 %%% Commands to produce margin symbols
 \newcommand{\new}{\marginpar{\fbox{\bf$\mathcal{NEW}$}}}
@@ -34,10 +44,31 @@
 \newcommand{\args}[1]{\hspace*{2em}{\texttt{#1}}\\}
 \newcommand{\prototype}[1]{\vspace{0.2in}\index{#1}}
 \newcommand{\param}[1]{{\texttt{#1}}}
-\newcommand{\kw}[1]{{\textsf{#1}\index{#1}}}
-\newcommand{\uw}[1]{{\textsl{#1}}}
+\newcommand{\kw}[1]{{\nohyphens{\textsf{#1}}\index{#1}}}
+\newcommand{\uw}[1]{#1}
 \newcommand{\desc}[1]{\indent{#1}}
 \newcommand{\note}[1]{(\textbf{Note:} #1)}
 \newcommand{\term}[1]{{\bf #1}\index{#1}}
 
+% Explicitly state that part numbering uses uppercase roman numerals
+% This is just to keep latex2html from barfing and causing a filename
+% collision between part II and chapter 2 etc. This will work as long
+% as we don't have an appendix section 9 (which would be alphabetized
+% to I (and again conflict with part 1).
+\renewcommand{\thepart}{\Roman{part}}
+
+\newcommand{\gitweb}[2]{http://charm.cs.illinois.edu/cgi-bin/gitweb2.cgi?p=charm.git;hb=HEAD;a=#1;f=#2}
+
+\newcommand{\gitwebref}[3]{\href{\gitweb{#1}{#2/charm\%2B\%2B/#3}}{\tt #2/charm++/#3}}
+\newcommand{\examplereffile}[1]{\gitwebref{blob}{examples}{#1}}
+\newcommand{\examplerefdir}[1]{\gitwebref{tree}{examples}{#1}}
+\newcommand{\testreffile}[1]{\gitwebref{blob}{tests}{#1}}
+\newcommand{\testrefdir}[1]{\gitwebref{tree}{tests}{#1}}
+
+\begin{htmlonly}
+\renewcommand{\examplereffile}[1]{\texttt{\emph{examples/charm++/#1}}}
+\renewcommand{\examplerefdir}[1]{\texttt{examples/charm++/#1}}
+\renewcommand{\testreffile}[1]{\texttt{\emph{tests/charm++/#1}}}
+\renewcommand{\testrefdir}[1]{\texttt{tests/charm++/#1}}
+\end{htmlonly}
 \makeindex

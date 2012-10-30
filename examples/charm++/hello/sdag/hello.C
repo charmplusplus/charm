@@ -46,7 +46,6 @@ public:
   int i,sum;
   Hello()
   {
-    __sdag_init();
     sum=0;
     CkPrintf("Hello %d created\n",thisIndex);
   }

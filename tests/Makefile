@@ -1,3 +1,7 @@
+# Temporary hack that needs to be removed / replaced
+-include ../tmp/buildopts.mk
+OPTS += $(OPTSATBUILDTIME)
+
 DIRS=util charm++ converse ampi fem
 
 all:
@@ -15,9 +19,9 @@ bgtest:
 		(cd $$d && $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
-fttest:
+syncfttest causalfttest:
 	for d in charm++ ampi; do \
-		(cd $$d && $(MAKE) fttest OPTS='$(OPTS)' || exit 1) || exit 1; \
+		(cd $$d && $(MAKE) $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 test-converse:

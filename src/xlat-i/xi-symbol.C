@@ -4,6 +4,7 @@ using std::list;
 using std::for_each;
 #include <stdlib.h>
 #include "xi-symbol.h"
+#include "CParsedFile.h"
 #include <ctype.h> // for tolower()
 #include <iostream>
 using std::cerr;
@@ -166,6 +167,35 @@ void perElemGen(list<T*> &l, A* arg_, void (U::*fn_)(A*))
     perElemGenC<T, U, A*>(l, arg_, fn_, NULL);
 }
 
+/**
+   Apply fn_ on each non-NULL element in the list l.
+   If between_ is passed, do that between each element.
+ */
+template<typename T, typename U>
+class perElemC
+{
+    void (U::*fn)();
+public:
+    perElemC(list<T*> &l,
+	       void (U::*fn_)())
+	: fn(fn_)
+	{
+	    for_each(l.begin(), l.end(), *this);
+	}
+    void operator()(T* m)
+	{
+	    if (m) {
+		(m->*fn)();
+	    }
+	}
+};
+
+template<typename T, typename U>
+void perElem(list<T*> &l, void (U::*fn_)())
+{
+    perElemC<T, U>(l, fn_);
+}
+
 void newLine(XStr &str)
 {
     str << endx;
@@ -314,6 +344,11 @@ MemberList::MemberList(Member *m, MemberList *n)
 	members.insert(members.end(), n->members.begin(), n->members.end());
 }
 
+MemberList::MemberList(list<Entry*>&l)
+{
+  members.insert(members.begin(), l.begin(), l.end());
+  l.clear();
+}
 
 void
 MemberList::print(XStr& str)
@@ -458,6 +493,39 @@ Module::print(XStr& str)
   }
 }
 
+void Module::check() {
+  if (clist)
+    clist->check();
+}
+
+void ConstructList::check() {
+  perElem(constructs, &Construct::check);
+}
+
+void Scope::check() {
+  if (contents_)
+    contents_->check();
+}
+
+void Entry::check() {
+  if (!external) {
+    if(isConstructor() && retType && !retType->isVoid())
+      die("Constructors cannot return a value",line);
+
+    if (!isConstructor() && !retType)
+      die("Non-constructor entry methods must specify a return type (probably void)", line);
+  }
+}
+
+void Chare::check() {
+  if (list)
+    list->check();
+}
+
+void MemberList::check() {
+  perElem(members, &Member::check);
+}
+
 void
 Module::generate()
 {
@@ -473,7 +541,8 @@ Module::generate()
   declstr <<
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
-  "#include \"charm++.h\"\n";
+  "#include \"charm++.h\"\n"
+  "#include <memory>\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
   declstr << "extern void _register"<<name<<"(void);\n";
@@ -548,9 +617,9 @@ Module::generate()
   decl<<declstr.get_string();
   def<<defstr.get_string();
   if (connectPresent == 1) {
-    decl << pubDeclStr.charstar();
-    def << pubDefConstr.charstar();
-    def << pubDefStr.charstar();
+    decl << pubDeclStr;
+    def << pubDefConstr;
+    def << pubDefStr;
   }
 
   // DMK - Accel Support
@@ -629,15 +698,19 @@ ModuleList::print(XStr& str)
 void
 ModuleList::generate()
 {
-    for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
-	(*i)->generate();
+  perElem(modules, &Module::generate);
+}
+
+void
+ModuleList::check()
+{
+  perElem(modules, &Module::check);
 }
 
 void
 ModuleList::preprocess()
 {
-    for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
-	(*i)->preprocess();
+  perElem(modules, &Module::preprocess);
 }
 
 void
@@ -703,10 +776,7 @@ ConstructList::genReg(XStr& str)
 void
 ConstructList::preprocess()
 {
-    for (list<Construct*>::iterator i = constructs.begin(); 
-	 i != constructs.end(); ++i)
-	if (*i)
-	    (*i)->preprocess();
+  perElem(constructs, &Construct::preprocess);
 }
 
 XStr Chare::proxyName(int withTemplates)
@@ -1006,7 +1076,18 @@ Chare::genDecls(XStr& str)
   str << ", CProxy_" << type;
   if (templat) {
     templat->genVars(str);
-    str << " > { };\n";
+    str << " > {\npublic:\n\tCBase_" << type << "() : ";
+    str << "CBaseT" << b->length() << "<" << b << ", CProxy_" << type;
+    templat->genVars(str);
+    str << ">() {}\n";
+    str << "\tCBase_" << type << "(CkMigrateMessage* m) : ";
+    str << "CBaseT" << b->length() << "<" << b << ", CProxy_" << type;
+    templat->genVars(str);
+    str << ">(m) {}\n";
+    str << "\tvoid pup(PUP::er& p) {\n";
+    str << "\t\tCBaseT" << b->length() << "<" << b << ", CProxy_" << type;
+    templat->genVars(str);
+    str << ">::pup(p);\n\t}\n};\n";
   } else {
     str << "> CBase_" << type << ";\n";
   }
@@ -2665,9 +2746,7 @@ void MemberList::genReg(XStr& str)
 
 void MemberList::preprocess()
 {
-    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
-	if (*i)
-	    (*i)->preprocess();
+  perElem(members, &Member::preprocess);
 }
 
 void MemberList::lookforCEntry(CEntry *centry)
@@ -2716,220 +2795,6 @@ void Chare::lookforCEntry(CEntry *centry)
   }
 }
 
-///////////////////////////// CPARSEDFILE //////////////////////
-/*void CParsedFile::print(int indent)
-{
-  for(CEntry *ce=entryList.begin(); !entryList.end(); ce=entryList.next())
-  {
-    ce->print(indent);
-    printf("\n");
-  }
-  for(SdagConstruct *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next())
-  {
-    cn->print(indent);
-    printf("\n");
-  }
-}
-*/
-XStr *CParsedFile::className = NULL;
-
-void CParsedFile::numberNodes(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->numberNodes();
-    }
-  }
-}
-
-void CParsedFile::labelNodes(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->labelNodes();
-    }
-  }
-}
-
-void CParsedFile::propagateState(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->propagateState(0);
-  }
-}
-
-void CParsedFile::mapCEntry(void)
-{
-  CEntry *en;
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    container->lookforCEntry(en);
-  }
-}
-
-void CParsedFile::generateEntryList(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->generateEntryList(entryList, 0);
-  }
-}
-
-void CParsedFile::generateConnectEntryList(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->generateConnectEntryList(connectEntryList);
-  }
-}
-
-void CParsedFile::generateCode(XStr& decls, XStr& defs)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->setNext(0,0);
-    cn->sdagCon->generateCode(decls, defs, cn);
-  }
-}
-
-void CParsedFile::generateEntries(XStr& decls, XStr& defs)
-{
-  CEntry *en;
-  SdagConstruct *sc;
-  decls << "public:\n";
-  for(sc=connectEntryList.begin(); !connectEntryList.end(); sc=connectEntryList.next())
-     sc->generateConnectEntries(decls);
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateCode(decls, defs);
-  }
-}
-
-void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
-{
-  decls << "private:\n";
-  decls << "  CDep *__cDep;\n";
-
-  XStr name = "__sdag_init";
-  generateSignature(decls, defs, container, false, "void", &name, false, NULL);
-  defs << "    __cDep = new CDep(" << numEntries << "," << numWhens << ");\n";
-  CEntry *en;
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateDeps(defs);
-  }
-  endMethod(defs);
-}
-
-
-/**
-    Create a merging point for each of the places where multiple
-    dependencies lead into some future task.
-
-    Used by Isaac's critical path detection
-*/
-void CParsedFile::generateDependencyMergePoints(XStr& decls) 
-{
-  decls << " \n";
-
-  // Each when statement will have a set of message dependencies, and
-  // also the dependencies from completion of previous task
-  for(int i=0;i<numWhens;i++){
-    decls << "  MergeablePathHistory _when_" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
-  }
-  
-  // The end of each overlap block will have multiple paths that merge
-  // before the subsequent task is executed
-  for(int i=0;i<numOlists;i++){
-    decls << "  MergeablePathHistory olist__co" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
-  }
-}
-
-void CParsedFile::generatePupFunction(XStr& decls)
-{
-  decls << "public:\n";
-  decls << "  void __sdag_pup(PUP::er& p) {\n";
-  decls << "    if (__cDep) { __cDep->pup(p); }\n";
-  decls << "  }\n";
-}
-
-void CParsedFile::generateTrace()
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTrace();
-    }
-  }
-}
-
-void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
-{
-  XStr name = "__sdag_register";
-  generateSignature(decls, defs, container, true, "void", &name, false, NULL);
-
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateRegisterEp(defs);
-    }
-  }
-  endMethod(defs);
-}
-
-void CParsedFile::generateTraceEp(XStr& decls, XStr& defs)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTraceEp(decls, defs, container);
-    }
-  }
-}
-
-////////////////////////// SDAGCONSTRUCT ///////////////////////
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
-{
-  con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
-  type = t;
-  traceName=NULL;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
-}
-
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList)
-{
-  con1=0; con2=0; con3=0; con4=0;
-  type = t;
-  traceName=NULL;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
-  SdagConstruct *sc;
-  for(sc = aList->constructs->begin(); !aList->constructs->end(); sc=aList->constructs->next())
-    constructs->append(sc);
-}
-
-SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
-			     SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el)
-{
-  text = txt;
-  type = t;
-  traceName=NULL;
-  con1 = c1; con2 = c2; con3 = c3; con4 = c4;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  if (constructAppend != 0) {
-    constructs->append(constructAppend);
-  }
-  elist = el;
-}
-
-SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl)
-{
-  type = t;
-  traceName=NULL;
-  text = new XStr(codeStr);
-  connectEntry = new XStr(entryStr);
-  con1 = 0; con2 = 0; con3 = 0; con4 =0;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  param = pl;
-
-}
-
 ///////////////////////////// ENTRY ////////////////////////////
 
 void ParamList::checkParamList(){
@@ -2954,8 +2819,8 @@ Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, Sdag
   if(!isLocal() && p){
     p->checkParamList();
   }
-
 }
+
 void Entry::setChare(Chare *c) {
 	Member::setChare(c);
         // mainchare constructor parameter is not allowed
@@ -3015,7 +2880,7 @@ void Entry::collectSdagCode(CParsedFile *pf, int& sdagPresent)
 {
   if (isSdag()) {
     sdagPresent = 1;
-    pf->nodeList.append(this);
+    pf->addNode(this);
   }
 }
 
@@ -4331,15 +4196,12 @@ void Entry::genDecls(XStr& str)
   if (external)
     return;
 
-  if(isConstructor() && retType && !retType->isVoid())
-    die("Constructors cannot return a value",line);
-
   str << "/* DECLS: "; print(str); str << " */\n";
   if(retType==0 && !isConstructor())
     die("Entry methods must specify a return type-- \n"
         "use void if necessary",line);
 
-  if (attribs&SMIGRATE)
+  if (isMigrationConstructor())
     {} //User cannot call the migration constructor
   else if(container->isGroup()) {
     genGroupDecl(str);
@@ -4436,7 +4298,7 @@ void Entry::genPub(XStr &declstr, XStr& defstr, XStr& defconstr, int& connectPre
      declstr << "      int publishflag_" << getEntryName() << ";\n";
      declstr << "      int getflag_" << getEntryName() << ";\n";
      declstr << "      CkCallback " << getEntryName() << "_cb;\n";
-     declstr << parameters->charstar();
+     declstr << parameters;
 
      // Following generates the def publish::connectFunction code
 
@@ -4607,7 +4469,7 @@ void Entry::genDefs(XStr& str)
   templateGuardBegin(tspec || container->isTemplated(), str);
   str << "/* DEFS: "; print(str); str << " */\n";
 
-  if (attribs&SMIGRATE)
+  if(isMigrationConstructor())
     {} //User cannot call the migration constructor
   else if(container->isGroup()){
     genGroupDefs(str);
@@ -4650,9 +4512,10 @@ void Entry::genDefs(XStr& str)
     str << "\n  CkRegisterMessagePupFn(epidx, "
         << "_marshallmessagepup_" << epStr(false, true) << ");\n";
   }
-  else if (param->isMessage() && !attribs&SMIGRATE) {
-    str << "\n  CkRegisterMessagePupFn(epidx, (CkMessagePupFn)"
-        << param->param->getType()->getBaseName() << "::ckDebugPup);";
+  else if (param->isMessage() && !isMigrationConstructor()) {
+    str << "\n  CkRegisterMessagePupFn(epidx, (CkMessagePupFn)";
+    param->param->getType()->deref()->print(str);
+    str << "::ckDebugPup);";
   }
   str << "\n  return epidx;"
       << "\n}\n\n";
@@ -4827,7 +4690,7 @@ XStr Entry::genRegEp(bool isForRedn)
   if (param->isMarshalled()) {
     if (param->hasConditional())  str<<"MarshallMsg_"<<epStr()<<"::__idx";
     else str<<"CkMarshallMsg::__idx";
-  } else if(!param->isVoid() && !(attribs&SMIGRATE)) {
+  } else if(!param->isVoid() && !isMigrationConstructor()) {
     param->genMsgProxyName(str);
     str <<"::__idx";
   } else if (isForRedn) {
@@ -4874,11 +4737,11 @@ void Entry::genReg(XStr& str)
   if (isReductionTarget())
     str << "  " << epIdx(0, true) << ";\n";
   if (isConstructor()) {
-    if(container->isMainChare()&&!(attribs&SMIGRATE))
+    if(container->isMainChare() && !isMigrationConstructor())
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
     if(param->isVoid())
       str << "  CkRegisterDefaultCtor(__idx, "<<epIdx(0)<<");\n";
-    if(attribs&SMIGRATE)
+    if(isMigrationConstructor())
       str << "  CkRegisterMigCtor(__idx, "<<epIdx(0)<<");\n";
   }
 }
@@ -4995,11 +4858,16 @@ into the message data-- so there's no copy on the receive side.
 The message is freed after the user entry returns.
 */
 Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
-	const char *NarrLen,Value *Nvalue)
-    	:type(Ntype), name(Nname), arrLen(NarrLen), val(Nvalue),line(Nline)
+                     const char *NarrLen,Value *Nvalue)
+  : type(Ntype)
+  , name(Nname)
+  , arrLen(NarrLen)
+  , val(Nvalue)
+  , line(Nline)
+  , byConst(false)
+  , conditional(0)
+  , given_name(Nname)
 {
-        conditional=0;
-        given_name = Nname;
 	if (isMessage()) {
 		name="impl_msg";
         }
@@ -5010,6 +4878,7 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 		sprintf((char *)name,"impl_noname_%x",unnamedCount++);
 	}
 	byReference=false;
+        declaredReference = false;
 	if ((arrLen==NULL)&&(val==NULL))
 	{ /* Consider passing type by reference: */
 		if (type->isNamed())
@@ -5018,10 +4887,15 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 		}
 		if (type->isReference()) {
 			byReference=true;
+                        declaredReference = true;
 			/* Clip off the ampersand--we'll add
 			   it back ourselves in Parameter::print. */
 			type=type->deref();
 		}
+                if (type->isConst()) {
+                  byConst = true;
+                  type = type->deref();
+                }
 	}
 }
 
@@ -5047,12 +4921,14 @@ void Parameter::print(XStr &str,int withDefaultValues,int useConst)
 	    }
 	    else if (byReference)
 		{ //Pass named types by const C++ reference
-			if (useConst) str<<"const ";
+                        if (useConst || byConst) str<<"const ";
 			str<<type<<" &";
 		        if (name!=NULL) str<<name;
 		}
 		else
 		{ //Pass everything else by value
+                  // @TODO uncommenting this requires that PUP work on const types
+                  //if (byConst) str << "const ";
 			str<<type;
 			if (name!=NULL) str<<" "<<name;
 			if (withDefaultValues && val!=NULL)

@@ -68,9 +68,9 @@ int myrand(int numpes) {
 
 #define index(a, b, c)	( (a)*(blockDimY+2)*(blockDimZ+2) + (b)*(blockDimZ+2) + (c) )
 
-#define PRINT_FREQ      10
-#define CKP_FREQ		200
-#define MAX_ITER		1000
+#define PRINT_FREQ      100
+#define CKP_FREQ		100
+#define MAX_ITER	 400	
 #define WARM_ITER		5
 #define LEFT			1
 #define RIGHT			2
@@ -184,15 +184,8 @@ class Main : public CBase_Main {
       CkPrintf("Total Hops: %d\n", hops);
 	
 #ifdef JACOBI_OPENMP 
-      int numOmpThreads = 
-        CkNumPes() / (num_chare_x * num_chare_y * num_chare_z);
-      if (numOmpThreads <= 1) {
-        numOmpThreads = 1; 
-      }
-      CkPrintf("Computation loop will be parallelized"
-               " with %d OpenMP threads\n", numOmpThreads);
       CProxy_OmpInitializer ompInit = 
-        CProxy_OmpInitializer::ckNew(numOmpThreads);
+        CProxy_OmpInitializer::ckNew(4);
 #else    
       //Start the computation
       start();
@@ -241,6 +234,8 @@ class Jacobi: public CBase_Jacobi {
 
     // Constructor, initialize values
     Jacobi() {
+      // This call is an anachronism - the need to call __sdag_init() has been
+      // removed. We still call it here to test backward compatibility.
       __sdag_init();
 
       int i, j, k;
@@ -264,9 +259,7 @@ class Jacobi: public CBase_Jacobi {
 
     }
 
-    Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) {
-		__sdag_init();
-	}
+    Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) { }
 
     ~Jacobi() { 
       delete [] temperature; 
@@ -431,7 +424,7 @@ class Jacobi: public CBase_Jacobi {
 			else
 				AtSync();
 #else
-			doStep();
+            contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
 #endif
 		} else {
 			doStep();
@@ -446,23 +439,22 @@ class Jacobi: public CBase_Jacobi {
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
     void compute_kernel() {
-#pragma unroll    
-#ifdef JACOBI_OPENMP
-  #pragma omp parallel for
-#endif
-      for(int i=1; i<blockDimX+1; ++i) {
-	for(int j=1; j<blockDimY+1; ++j) {
-	  for(int k=1; k<blockDimZ+1; ++k) {
-	    // update my value based on the surrounding values
-	    new_temperature[index(i, j, k)] = (temperature[index(i-1, j, k)] 
+        int i;
+  #pragma omp parallel for schedule(dynamic) 
+      for(i=1; i<blockDimX+1; ++i) {
+          //printf("[%d] did  %d iteration out of %d \n", omp_get_thread_num(), i, blockDimX+1); 
+          for(int j=1; j<blockDimY+1; ++j) {
+              for(int k=1; k<blockDimZ+1; ++k) {
+                  // update my value based on the surrounding values
+                   new_temperature[index(i, j, k)] = (temperature[index(i-1, j, k)] 
 					    +  temperature[index(i+1, j, k)]
 					    +  temperature[index(i, j-1, k)]
 					    +  temperature[index(i, j+1, k)]
 					    +  temperature[index(i, j, k-1)]
 					    +  temperature[index(i, j, k+1)]
 					    +  temperature[index(i, j, k)] ) * DIVIDEBY7;
-	  }
-	}
+              }
+          }
       }
     }
 
@@ -583,7 +575,15 @@ public:
           if (numThreads < 1) {
             numThreads = 1; 
           }
-          omp_set_num_threads(numThreads);
+          //omp_set_num_threads(numThreads);
+          if(CkMyPe() == 0)
+          {
+#pragma omp parallel
+              { if(omp_get_thread_num() == 0 )
+                  CkPrintf("Computation loop will be parallelized"
+               " with %d OpenMP threads\n", omp_get_num_threads());
+              }
+          }
 #endif
           mainProxy.start();
 	}

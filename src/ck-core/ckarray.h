@@ -482,6 +482,7 @@ void CkBroadcastMsgSection(int entryIndex, void *msg, CkSectionID sID, int opts=
 class ArrayElement : public CkMigratable
 {
   friend class CkArray;
+
   friend class CkArrayListener;
   int numInitialElements; // Number of elements created by ckNew(numElements)
   void initBasics(void);
@@ -544,6 +545,7 @@ private:
 
 #if CMK_MEM_CHECKPOINT
 friend class CkMemCheckPT;
+friend class CkLocMgr;
 protected:
   int budPEs[2];
 private:
