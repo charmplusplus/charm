@@ -256,7 +256,10 @@ at build time:
 
 At present, only a few of the machine layers underlying the \charmpp{}
 runtime system support resilient execution. These include the
-TCP-based \texttt{net} builds on Linux and Mac OS X.
+TCP-based \texttt{net} builds on Linux and Mac OS X. For clusters overbearing 
+job-schedulers that kill a job if a node goes down, the way to demonstrate the killing 
+of a process is show in Section~\ref{ft:inject} . 
+\charmpp{} runtime system can automatically detect failures and restart from checkpoint.
 
 \subsection{Failure Injection}
 To test that your application is able to successfully recover from
@@ -275,3 +278,13 @@ line along with the file name:
 
 An example of this usage can be found in the \texttt{syncfttest}
 targets in \testrefdir{jacobi3d}.
+
+\subsection{Failure Demonstration}
+\label{ft:inject}
+For HPC clusters, the job-schedulers usually kills a job if a node goes down. To demonstrate
+restarting after failures on such clusters, \code{CkDieNow()} function can be used. You just need to place it at any place
+in the code. When it is called by a processor, the processor will hang and stop responding to any communicataion.
+A spare processor will replace the crashed processor and continue execution after getting the checkpoint of the crashed processor. 
+To make it work, you need to add the command line option
+\emph{+wp}, the number following that option is the working processors and the remaining 
+are the spare processors in the system.
