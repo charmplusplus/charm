@@ -5,7 +5,7 @@ readonly Main@ m;
 
 public mainchare Main {
 
-    public entry Main(CkArgMsg m) {
+    public entry Main(CkArgMsg[~]@ m) {
     }
 }
 
@@ -21,10 +21,6 @@ public chare SDAG_Test{
 
     public void x(int i) {
     }
-
-    public entry void first(int f);
-    public entry void second(int s);
-    public entry void third(int t);
 
     public entry void test1() {
         int xx, yy = 1;
