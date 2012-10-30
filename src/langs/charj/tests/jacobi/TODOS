@@ -1,11 +1,9 @@
 
 chunks and main in same file gives weird emitter bug
-(void) argument in sdag triggers codegen
 .decl.h include should come after other includes, not before
     also after 'using' statements (for CharjArray::Array)
 multiple pointer types declared together are wrong
     ie X x, y => X* x, y;, which is wrong
-single literal for array element index gives error
 we're dereferencing chare array ids as though they were local pointers
 only the first array access in an expression rhs gets translated correctly
     eg, B[i] = 0.5 * (A[i] + A[j]) leaves A[j] untranslated to an access call

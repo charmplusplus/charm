@@ -96,7 +96,7 @@ boolean entry = false;
             type IDENT .*)
         {
             assert currentScope != null;
-            System.out.println("entering method scope " + $IDENT.text + " " + currentScope);
+            //System.out.println("entering method scope " + $IDENT.text + " " + currentScope);
             boolean isTraced = false;
             boolean sdagEntry = false;
             if ($MODIFIER_LIST != null) {
@@ -164,7 +164,7 @@ boolean entry = false;
 
 exitMethod
     :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*) {
-            System.out.println("method " + currentScope);
+            //System.out.println("method " + currentScope);
             assert currentScope != null;
             currentScope = currentScope.getEnclosingScope();
             currentMethod = null;

@@ -143,7 +143,10 @@ assignment
                     $IDENT.hasParentOfType(CharjParser.ENTRY_CONSTRUCTOR_DECL))) {
                     System.out.println("Warning: assignment to readonly variable " +
                         $IDENT.text + " on line " + $IDENT.getLine());
-               }
+                }
+                if (currentMethod != null) {
+                    currentMethod.vars_written.add(vs);
+                }
             }
         }
     ;
@@ -235,6 +238,12 @@ primaryExpression returns [Type type]
                     System.out.println("ERROR: Couldn't resolve IDENT type: " + $IDENT.text);
                 }
             }
+            if ($IDENT.def instanceof VariableSymbol) {
+                VariableSymbol vs = (VariableSymbol)$IDENT.def;
+                if (currentMethod != null) {
+                    currentMethod.vars_read.add(vs);
+                }
+            }
         }
     |   THIS {
             $THIS.def = symtab.getEnclosingClass($THIS.scope);
@@ -286,6 +295,13 @@ primaryExpression returns [Type type]
     |   ^(METHOD_CALL e=expr .*) {
             $type = $e.type; // Type of a method is its return type.
             $METHOD_CALL.symbolType = $type;
+
+            if ($METHOD_CALL.def instanceof MethodSymbol) {
+                MethodSymbol ms = (MethodSymbol)$METHOD_CALL.def;
+                if (currentMethod != null) {
+                    currentMethod.methods_called.add(ms);
+                }
+            }
         }
     |   ^(ENTRY_METHOD_CALL e=expr .*) {
             $type = $e.type; // Type of a method is its return type.

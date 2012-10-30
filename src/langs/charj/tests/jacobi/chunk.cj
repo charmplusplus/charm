@@ -32,18 +32,18 @@ chare_array [1D] Chunk {
 
         if(thisIndex > 0) {
             for(int i=0;i<myydim;i++) strip[i] = A[1,i];
-            chunks[thisIndex-1]@getStripFromRight(strip);
+            thisProxy[thisIndex-1]@getStripFromRight(strip);
         } else {
             //Send dummy if thisIndex==0 for dagger to work
-            chunks[total-1]@getStripFromRight(strip);
+            thisProxy[total-1]@getStripFromRight(strip);
         }
 
         if(thisIndex < total-1) {
             for(int i=0;i<myydim;i++) strip[i] = A[myxdim,i];
-            chunks[thisIndex+1]@getStripFromLeft(strip);
+            thisProxy[thisIndex+1]@getStripFromLeft(strip);
         } else {
             //Send dummy if thisIndex==total-1:For dagger to work
-            chunks[0+0]@getStripFromLeft(strip);
+            thisProxy[0+0]@getStripFromLeft(strip);
         }
     }
 
