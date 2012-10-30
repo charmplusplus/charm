@@ -2,7 +2,7 @@
 public mainchare ArrayTest {
   Array<int, 2> foobar = new Array<int, 2>([5, 3]);
 
-  public entry ArrayTest(CkArgMsg msg) {
+  public entry ArrayTest(CkArgMsg[~]@ msg) {
     thisProxy@entry1();
   }
 
