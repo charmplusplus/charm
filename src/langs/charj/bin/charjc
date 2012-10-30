@@ -28,6 +28,9 @@ processArgs() {
         shift
 
         case "$arg" in
+        "-h"|"--help")
+            ARGS="$ARGS $arg"
+            ;;
         "-v"|"-V"|"--verbose")
             VERBOSE=true
             ARGS="$ARGS $arg"
@@ -98,3 +101,6 @@ for file in $CJFILES; do
     fi
 done
 
+if [ -z "$CJFILES" ]; then
+    java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB $ARGS
+fi

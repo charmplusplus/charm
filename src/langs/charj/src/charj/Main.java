@@ -104,6 +104,12 @@ public class Main
         _count_tokens.setHelp("report number of tokens in the input and exit");
         processor.registerParameter(_count_tokens);
 
+        Switch _help = new Switch("help")
+            .setShortFlag('h')
+            .setLongFlag("help");
+        _help.setHelp("Display this help message");
+        processor.registerParameter(_help);
+
         UnflaggedOption fileList = new UnflaggedOption("file")
             .setStringParser(JSAP.STRING_PARSER)
             .setRequired(true)
@@ -112,6 +118,12 @@ public class Main
         processor.registerParameter(fileList);
 
         JSAPResult config = processor.parse(args);
+
+        if (config.getBoolean("help", false)) {
+            System.out.println(processor.getHelp());
+            System.exit(0);
+        }
+
         String charmcFlags = "";
         if (!config.success()) {
             for (Iterator errs = config.getErrorMessageIterator(); 
