@@ -792,7 +792,7 @@ divconExpr
 sdagStatement
     :   ^(OVERLAP sdagBlock)
         -> template(b={$sdagBlock.st}) "overlap <b>"
-    |   ^(WHEN (wa+=whenArgument)* sdagBlock)
+    |   ^(WHEN (wa+=whenArgument)+ sdagBlock)
         -> template(w={wa}, b={$sdagBlock.st}) "when <w> <b>"
     |   ^(SDAG_IF pe=parenthesizedExpression
             ifblock=sdagBlock elseblock=sdagBlock?)
@@ -809,7 +809,7 @@ sdagStatement
 
 whenArgument
     :   IDENT expression? entryFormalParameterList
-        -> template(i={$IDENT}, e={$expression.st}, f={$entryFormalParameterList.st}) "<i> <if(e)>[<e>] <endif><f>"
+        -> template(i={$IDENT.text}, e={$expression.st}, f={$entryFormalParameterList.st}) "<i> <if(e)>[<e>] <endif><f>"
     ;
 
 nonBlockStatement
