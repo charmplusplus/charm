@@ -1,5 +1,5 @@
 SRC=../../../src
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc $(OPTS) -O3
 
 OBJS = ping.o
 

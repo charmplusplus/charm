@@ -12,7 +12,14 @@ mainmodule ping {
 
   array [1D] Ping1 {
     entry Ping1();
-    entry void start(void);
+    entry void start(int n);
     entry void recv(PingMsg *);
-  };        	
+  };        
+
+  group TraceControl {
+      entry TraceControl();
+      entry void startTrace();
+      entry void endTrace();
+  };
+
 };
