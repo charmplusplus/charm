@@ -73,13 +73,17 @@ Structured Dagger. The basic constructs of Structured Dagger (SDAG) provide for
 define. These definitions appear in the {\tt .ci} file definition of the
 enclosing chare class as a `body' of an entry method following its signature.
 
-The most basic construct in SDAG is the {\tt atomic} block. Atomic blocks
-contain sequential \CC code.  They're called atomic because the code within
+The most basic construct in SDAG is the {\tt serial} (aka the {\tt atomic}) block.
+Serial blocks
+contain sequential \CC code.  They're also called atomic because the code within
 them executes without returning control to the \charmpp\ runtime scheduler, and
-thus avoiding interruption from incoming messages. Typically atomic blocks hold
+thus avoiding interruption from incoming messages. The keywords atomic and serial
+are synonymous, and you can find example programs that use atomic. However, we
+recommend the use of serial and are considering the deprecation of the atomic keyword.
+Typically serial blocks hold
 the code that actually deals with incoming messages in a {\tt when} statement,
 or to do local operations before a message is sent or after it's received. The
-earlier example can be adapted to use atomic blocks as follows:
+earlier example can be adapted to use serial blocks as follows:
 \begin{center}
 \begin{alltt}
 // in .ci file
@@ -87,14 +91,14 @@ chare ComputeObject \{
   entry void ComputeObject();
   entry void startStep();
   entry void firstInput(Input i) \{
-    atomic \{
+    serial \{
       first = i;
       if (--expectedMessageCount == 0)
         computeInteractions(first, second);
     \}
   \};
   entry void secondInput(Input j) \{
-    atomic \{
+    serial \{
       second = j;
       if (--expectedMessageCount == 0)
         computeInteractions(first, second);
@@ -131,12 +135,12 @@ Note that chare classes containing SDAG code must include a few additional decla
 in addition to inheriting from their {\tt CBase\_Foo} class, by incorporating the
 {\tt Foo\_SDAG\_CODE} generated-code macro in the class.
 
-Atomic blocks can also specify a textual `label' that will appear in traces, as
+Serial blocks can also specify a textual `label' that will appear in traces, as
 follows:
 \begin{center}
 \begin{alltt}
   entry void firstInput(Input i) \{
-    atomic "process first" \{
+    serial "process first" \{
       first = i;
       if (--expectedMessageCount == 0)
         computeInteractions(first, second);
@@ -169,7 +173,7 @@ chare ComputeObject \{
   entry void startStep() \{
     when firstInput(Input first)
       when secondInput(Input second)
-        atomic \{
+        serial \{
           computeInteractions(first, second);
         \}
   \};
@@ -216,7 +220,7 @@ commas:
 entry void startStep() \{
   when firstInput(Input first),
        secondInput(Input second)
-    atomic \{
+    serial \{
       computeInteractions(first, second);
     \}
 \};
@@ -260,7 +264,7 @@ chare ComputeObject \{
   entry void runForever() \{
     while(true) \{
       when firstInput(Input first),
-           secondInput(Input second) atomic \{
+           secondInput(Input second) serial \{
           computeInteractions(first, second);
       \}
     \}
@@ -298,7 +302,7 @@ chare ComputeObject \{
     for(iter = 0; iter < n; ++iter) \{
       // Match to only accept inputs for the current iteration
       when firstInput[iter](int a, Input first),
-           secondInput[iter](int b, Input second) atomic \{
+           secondInput[iter](int b, Input second) serial \{
         computeInteractions(first, second);
       \}
     \}
@@ -336,7 +340,7 @@ SDAG also supports conditional execution of statements and blocks with {\tt if}
 statements. The syntax of SDAG {\tt if} statements matches that of C and
 C++. However, if one encounters a syntax error on correct-looking code in a
 loop or conditional statement, try assigning the condition expression to a
-boolean variable in an atomic preceding the statement and then testing that
+boolean variable in a serial block preceding the statement and then testing that
 boolean's value. This can be necessary because of the complexity of parsing C++
 code.
 
@@ -360,11 +364,11 @@ chare ComputeObject \{
   entry void startStep() \{
     overlap \{
       when firstInput(Input i)
-        atomic \{ first = preprocess(i); \}
+        serial \{ first = preprocess(i); \}
       when secondInput(Input j)
-        atomic \{ second = preprocess(j); \}
+        serial \{ second = preprocess(j); \}
      \}
-     atomic \{
+     serial \{
        computeInteractions(first, second);
      \}
   \};
@@ -495,15 +499,15 @@ adding any significant overhead.
     entry void recv_first(Patch *first);
     entry void recv_second(Patch *first);
     entry void compute_object(MSG *msg)\{
-      atomic \{
+      serial \{
          PatchManager->Get(msg->first_index,\dots);
          PatchManager->Get(msg->second_index,\dots);
       \}
       overlap \{
-        when recv_first(Patch *first) atomic \{ filter(first); \}
-        when recv_second(Patch *second) atomic \{ filter(second); \}
+        when recv_first(Patch *first) serial \{ filter(first); \}
+        when recv_second(Patch *second) serial \{ filter(second); \}
       \}
-      atomic \{ computeInteractions(first, second); \}
+      serial \{ computeInteractions(first, second); \}
     \}
   \}
 \end{alltt}
@@ -547,7 +551,7 @@ adding any significant overhead.
 
 <overlap-stmt> := "overlap" <body> 
 
-<atomic-stmt> := "atomic" "\{" <\CC-code> "\}" 
+<atomic-stmt> := "serial" "\{" <\CC-code> "\}" 
 
 <if-stmt> := "if" "(" <int-expr> ")" <body> [<else-stmt>] 
 
@@ -604,7 +608,7 @@ SDAG constructs of the following kinds:
     \item {\tt if}, {\tt for}, and {\tt while} statements: these statements have
         the same meaning as the normal {\tt if}, {\tt for}, and {\tt while}
         loops in sequential \CC programs. This allows the programmer to use
-        common control flow constructs outside the context of atomic blocks.
+        common control flow constructs outside the context of serial blocks.
 \end{itemize}
 
 \sdag{} code can be inserted into the .ci file for any array, group, or chare's entry methods.

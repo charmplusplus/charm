@@ -358,11 +358,15 @@ public:
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
 
   inline void MetaLBResumeWaitingChares(int lb_period) {
+#if CMK_LBDB_ON
     LDOMMetaLBResumeWaitingChares(myLDHandle, lb_period);
+#endif
   }
 
   inline void MetaLBCallLBOnChares() {
+#if CMK_LBDB_ON
     LDOMMetaLBCallLBOnChares(myLDHandle);
+#endif
   }
 
   void SetMigrationCost(double cost);

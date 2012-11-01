@@ -59,7 +59,7 @@ void HelloStart(int elems)
   CkPrintf("HelloStart - Starting lib by calling constructor of MainHello\\n");
   CProxy\_MainHello mainhello = CProxy\_MainHello::ckNew(elems);
   \}
-  CsdScheduler(-1);
+  StartCharmScheduler(-1);
 \}
 \end{alltt}
 
@@ -68,7 +68,7 @@ subsequently results in work being done in {\em hello} library.
 More examples of such interface functions can 
 be found in hi (HiStart) and kNeighbor (kNeighbor) directories in 
 examples/charm++/mpi-coexist/libs. Note that a scheduler call {\em
-CsdScheduler(-1)} should be made from the interface functions to start the
+StartCharmScheduler()} should be made from the interface functions to start the
 message reception by \charmpp{} RTS.
 \end{itemize}
 

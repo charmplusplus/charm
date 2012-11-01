@@ -11,6 +11,8 @@
     @{
  */
 
+#include "conv-config.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -127,6 +129,9 @@ typedef struct Queue_struct
   struct deq_struct zeroprio; /**< A double ended queue for zero priority messages */
   struct prioq_struct negprioq; /**< A priority queue for negative priority messages */
   struct prioq_struct posprioq; /**< A priority queue for negative priority messages */
+#if CMK_USE_STL_MSGQ
+  void *stlQ; /**< An STL-based alternative to charm's msg queues */
+#endif
 }
 *Queue;
 /*#else

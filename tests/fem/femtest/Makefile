@@ -15,7 +15,7 @@ fpgm.o: fpgm.f90
 	$(CHARMC) -c fpgm.f90
 
 clean:
-	rm -f pgm fpgm *.o conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f pgm fpgm *.o conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk FEMVERSION
 
 test: pgm
 	./charmrun ./pgm +p1 +vp1 $(TESTOPTS)

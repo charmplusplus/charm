@@ -501,8 +501,8 @@ void LBDatabase::ResumeClients() {
 			metabalancer->ResumeClients();
 		}
 	}
-#endif
   LDResumeClients(myLDHandle);
+#endif
 }
 
 void LBDatabase::SetMigrationCost(double cost) {

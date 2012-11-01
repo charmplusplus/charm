@@ -13,6 +13,12 @@ extern int _ringexit;		    // for charm exit
 extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
 
+
+extern "C"
+void StartCharmScheduler() {
+  CsdScheduler(-1);
+}
+
 // triger LibExit on PE 0,
 extern "C"
 void LibCkExit(void)

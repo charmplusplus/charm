@@ -12,11 +12,11 @@ conv-conds.o: conv-conds.c converse.h conv-config.h conv-autoconfig.h \
  persistent.h debug-conv.h
 	$(CHARMC) -c -I. conv-conds.c
 
-queueing.o: queueing.c queueing.h converse.h conv-config.h \
+queueing.o: queueing.C queueing.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
  queueing.h conv-cpm.h converse.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h debug-conv.h
-	$(CHARMC) -c -I. queueing.c
+	$(CHARMC) -c -I. queueing.C
 
 msgmgr.o: msgmgr.c converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h queueing.h conv-cpm.h \

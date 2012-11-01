@@ -24,7 +24,7 @@
 #define CTRL_MSG_TAG         (TAG-13)
 #define USE_NUM_TAGS            1000
 
-static int MPI_CTRL_MSG_CNT=100;
+static int MPI_CTRL_MSG_CNT=10;
 static int tags;
 
 typedef struct MPICtrlMsgEntry{
@@ -104,16 +104,17 @@ static int recvViaCtrlMsg(){
 		
 		IRecvList one = irecvListEntryAllocate();
 		
+		/* irecv the actual msg */
+		if(MPI_SUCCESS != MPI_Irecv(actualMsg, msgsize, MPI_BYTE, src, ctrlMsgs[completed_index].tag, charmComm, &(one->req))){
+			CmiAbort("MPI_Irecv failed after a ctrl msg is received\n");
+		}
+
 		/* repost the ctrl msg */
 		if(MPI_SUCCESS != MPI_Irecv(ctrlMsgs+completed_index, sizeof(MPICtrlMsgEntry), MPI_BYTE,
 			                                          MPI_ANY_SOURCE, CTRL_MSG_TAG, charmComm, ctrlReqs+completed_index)){
 			CmiAbort("MPI_Irecv failed in re-posting a ctrl msg is received\n");
 		}
 		
-		/* irecv the actual msg */
-		if(MPI_SUCCESS != MPI_Irecv(actualMsg, msgsize, MPI_BYTE, src, ctrlMsgs[completed_index].tag, charmComm, &(one->req))){
-			CmiAbort("MPI_Irecv failed after a ctrl msg is received\n");
-		}
 		one->msg = actualMsg;
 		one->size = msgsize;
 		one->next = NULL;

@@ -7,6 +7,7 @@ HEADERS = $(CDIR)/include/CkCache.decl.h \
           $(CDIR)/include/CkCache.def.h \
           $(CDIR)/include/CkCache.h 
 LIBDEST =  $(LIBDIR)/$(LIB)
+CHARMXI_FLAGS = -E
 
 CIFILES = CkCache.ci
 
@@ -17,8 +18,14 @@ $(LIBDEST): $(LIBOBJ)
 
 CkCache.def.h CkCache.decl.h: INTERFACE
 
+BUILD_INT16=$(shell CHARMINC=../../../; if test -f ../../../conv-config.sh; then . ../../../conv-config.sh; echo $$CMK_HAS_INT16; fi )
+
+ifeq "$(BUILD_INT16)" "1"
+CHARMXI_FLAGS += -DCMK_HAS_INT16=1
+endif
+
 INTERFACE: $(CIFILES)
-	$(CHARMC) -E -c CkCache.ci
+	$(CHARMC) $(CHARMXI_FLAGS) -c CkCache.ci
 	touch INTERFACE
 
 CkCache.o: CkCache.C $(HEADERS)

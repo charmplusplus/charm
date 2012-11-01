@@ -35,12 +35,14 @@ private:
 
   void DepositHandle(LDOMHandle _h) { myhandle = _h; };
   void Migrate(LDObjHandle _h, int dest) { callbacks.migrate(_h,dest); };
+#if CMK_LBDB_ON
   void MetaLBResumeWaitingChares(LDObjHandle _h, int lb_ideal_period) {
     callbacks.metaLBResumeWaitingChares(_h, lb_ideal_period);
   }
   void MetaLBCallLBOnChares(LDObjHandle _h) {
     callbacks.metaLBCallLBOnChares(_h);
   }
+#endif
   CmiBool RegisteringObjs() { return registering_objs; };
   void SetRegisteringObjs(CmiBool _set) { registering_objs = _set; };
 

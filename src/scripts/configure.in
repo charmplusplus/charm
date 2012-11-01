@@ -552,6 +552,27 @@ else
   test_finish 1
 fi
 
+
+AC_ARG_WITH([prio-type],
+            [AS_HELP_STRING([--with-prio-type=type],
+                            [size of expected message priorities])],
+            [], [with_prio_type=bitvec])
+
+if test "$with_prio_type" = "char" -o "$with_prio_type" = "short" -o "$with_prio_type" = "int" -o "$with_prio_type" = "long" -o "$with_prio_type" = "float" -o "$with_prio_type" = "double"
+then
+  Echo "Configuring support for message priorities of sizeof type $with_prio_type"
+  AC_DEFINE_UNQUOTED(CMK_USE_STL_MSGQ, 1, [whether charm scheduler should use an STL-based msg q])
+  AC_DEFINE_UNQUOTED(CMK_MSG_PRIO_TYPE, $with_prio_type, [expected message priorities are sizeof $with_prio_type])
+elif test "$with_prio_type" = "bitvec"
+then
+  Echo "Configuring support for message priorities of arbitrary size (bitvectors)"
+  AC_DEFINE_UNQUOTED(CMK_USE_STL_MSGQ, 0, [whether charm scheduler should use an STL-based msg q])
+  AC_DEFINE_UNQUOTED(CMK_MSG_PRIO_TYPE, $with_prio_type, [expected message priorities are arbitrarily sized])
+else
+  Echo "Invalid size ($with_prio_type) specified for message priorities. Can only accept char, short, int, long, float, double and bitvec"
+  test_finish 1
+fi
+
 #### Check if compiler if 64 bit ####
 cat > $t <<EOT
 #include <stdio.h>
@@ -669,6 +690,10 @@ int foo(void) {
 EOT
 test_cxx "whether __int128 (128-bit integer) works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int128_DEFINED], $pass, [whether __int128 works])
+if test $pass -eq 1
+then
+  add_flag CMK_HAS_INT16=1
+fi
 
 #### Check __int128_t ####
 cat > $t <<EOT
@@ -682,6 +707,10 @@ int foo(void) {
 EOT
 test_cxx "whether __int128_t (128-bit integer) works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int128_t_DEFINED], $pass, [whether __int128_t works])
+if test $pass -eq 1
+then
+  add_flag CMK_HAS_INT16=1
+fi
 
 #### Check long double ####
 cat > $t <<EOT
