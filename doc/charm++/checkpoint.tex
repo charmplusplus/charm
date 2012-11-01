@@ -282,7 +282,7 @@ targets in \testrefdir{jacobi3d}.
 \subsection{Failure Demonstration}
 \label{ft:inject}
 For HPC clusters, the job-schedulers usually kills a job if a node goes down. To demonstrate
-restarting after failures on such clusters, \texttt{CkDieNow()} function can be used. You just need to place it at any place
+restarting after failures on such clusters, \tt{CkDieNow()} function can be used. You just need to place it at any place
 in the code. When it is called by a processor, the processor will hang and stop responding to any communicataion.
 A spare processor will replace the crashed processor and continue execution after getting the checkpoint of the crashed processor. 
 To make it work, you need to add the command line option
