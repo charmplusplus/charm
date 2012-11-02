@@ -182,8 +182,6 @@ typeDeclaration
         -> {emitH()}? multicastMessage_h(basename={basename()}, ident={$IDENT.text}, msds={$msds})
         -> {emitCI()}? multicastMessage_ci(ident={$IDENT.text}, msds={$msds})
         ->
-    |   ^(INTERFACE IDENT (^('extends' type+))? interfaceScopeDeclaration*)
-        -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
     |   ^(ENUM IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
     |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
@@ -398,15 +396,6 @@ classScopeDeclaration
         ->
     ;
     
-interfaceScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT formalParameterList)
-        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[$simpleType.st])
-        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st])
-        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    ;
-
 variableDeclaratorList[StringTemplate obtype]
     :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype])+ )
         -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
@@ -439,10 +428,8 @@ variableInitializer[StringTemplate obtype]
     ;
 
 rangeItem
-    :   dl=DECIMAL_LITERAL
-        -> template(t={$dl.text}) "<t>"
-    |   IDENT
-        -> template(t={$IDENT.text}) "<t>"
+    :   e=expression
+        -> template(e={$e.st}) "<e>"
     ;
 
 rangeExpression
@@ -708,19 +695,14 @@ entryFormalParameter
 
 
 formalParameterList
-    :   ^(FORMAL_PARAM_LIST (fpsd+=formalParameterStandardDecl)* fpvd=formalParameterVarargDecl?)
-        -> formal_param_list(sdecl={$fpsd}, vdecl={$fpvd.st})
+    :   ^(FORMAL_PARAM_LIST (fpsd+=formalParameterStandardDecl)*)
+        -> formal_param_list(sdecl={$fpsd})
     ;
 
     
 formalParameterStandardDecl
     :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList? t=type vdid=variableDeclaratorId)
         -> formal_param_decl(modList={$lms.st}, type={$t.st}, declID={$vdid.st})
-    ;
-    
-formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
-        -> template(t={$text}) "/*formal parameter varargs not implemented*/ <t>"
     ;
     
 qualifiedIdentifier
@@ -810,7 +792,7 @@ divconExpr
 sdagStatement
     :   ^(OVERLAP sdagBlock)
         -> template(b={$sdagBlock.st}) "overlap <b>"
-    |   ^(WHEN (wa+=whenArgument)* sdagBlock)
+    |   ^(WHEN (wa+=whenArgument)+ sdagBlock)
         -> template(w={wa}, b={$sdagBlock.st}) "when <w> <b>"
     |   ^(SDAG_IF pe=parenthesizedExpression
             ifblock=sdagBlock elseblock=sdagBlock?)
@@ -827,7 +809,7 @@ sdagStatement
 
 whenArgument
     :   IDENT expression? entryFormalParameterList
-        -> template(i={$IDENT}, e={$expression.st}, f={$entryFormalParameterList.st}) "<i> <if(e)>[<e>] <endif><f>"
+        -> template(i={$IDENT.text}, e={$expression.st}, f={$entryFormalParameterList.st}) "<i> <if(e)>[<e>] <endif><f>"
     ;
 
 nonBlockStatement
@@ -863,14 +845,6 @@ nonBlockStatement
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
     |   ';' // Empty statement.
         -> {%{$start.getText()}}
-    |   ^(PRINT (exprs += expression)*)
-        ->  print(exprs = {$exprs})
-    |   ^(PRINTLN (exprs += expression)*)
-        ->  println(exprs = {$exprs})
-    |   ^(EXIT expression?)
-        ->  exit(expr = {$expression.st})
-    |   EXITALL
-        ->  exitall()
     |   ^(CONTRIBUTE e1=expression q=qualifiedIdentifier e2=expression)
         -> contribute(data={$e1.st}, type={$q.st}, target={$e2.st})
     ;
@@ -1070,16 +1044,6 @@ primaryExpression
         -> {$arrayTypeDeclarator.st}
     |   SUPER
         -> {%{$start.getText()}}
-    |   GETNUMPES
-        ->  template() "CkNumPes()"
-    |   GETNUMNODES
-        ->  template() "CkNumNodes()"
-    |   GETMYPE
-        ->  template() "CkMyPe()"
-    |   GETMYNODE
-        ->  template() "CkMyNode()"
-    |   GETMYRANK
-        ->  template() "CkMyRank()"
 	|	THISINDEX
 		->	template() "thisIndex"
 	|	THISPROXY

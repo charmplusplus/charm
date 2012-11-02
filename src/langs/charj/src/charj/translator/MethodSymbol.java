@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 
 public class MethodSymbol
     extends SymbolWithScope
@@ -29,6 +31,14 @@ public class MethodSymbol
     public boolean hasSDAG = false;
     public boolean hasMSA = false;
     public boolean accel = false;
+
+    public Set<VariableSymbol> vars_read = new HashSet<VariableSymbol>();
+    public Set<VariableSymbol> vars_written = new HashSet<VariableSymbol>();
+    public Set<MethodSymbol> methods_called = new HashSet<MethodSymbol>();
+
+    public Set<CharjAST> accel_ids = new HashSet<CharjAST>();
+    public Set<CharjAST> msa_syncs = new HashSet<CharjAST>();
+    public Set<CharjAST> msa_accesses = new HashSet<CharjAST>();
 
     public CharjAST sdagFPL;
 
@@ -118,6 +128,59 @@ public class MethodSymbol
         return st.toString();
     }
 
+    public void addAccelIdent(CharjAST ast)
+    {
+        accel_ids.add(ast);
+    }
+
+    public void addMSASync(CharjAST ast)
+    {
+        msa_syncs.add(ast);
+    }
+
+    public void addMSAAccess(CharjAST ast)
+    {
+        msa_accesses.add(ast);
+    }
+
+    public Set<VariableSymbol> readClosure()
+    {
+        return closure(true, new HashSet<MethodSymbol>());
+    }
+
+    public Set<VariableSymbol> writeClosure()
+    {
+        return closure(false, new HashSet<MethodSymbol>());
+    }
+
+    private Set<VariableSymbol> closure(boolean is_read, Set<MethodSymbol> seen)
+    {
+        Set<VariableSymbol> base_set = is_read ? vars_read : vars_written;
+        Set<VariableSymbol> s = new HashSet<VariableSymbol>();
+        s.addAll(base_set);
+        for (MethodSymbol m : methods_called) {
+            if (seen.contains(m)) continue;
+            seen.add(m);
+            s.addAll(m.closure(is_read, seen));
+        }
+        return s;
+    }
+
+    public Set<MethodSymbol> reachable_methods()
+    {
+        return reachable_methods_internal(new HashSet<MethodSymbol>());
+    }
+
+    private Set<MethodSymbol> reachable_methods_internal(Set<MethodSymbol> seen)
+    {
+         for (MethodSymbol m : methods_called) {
+            if (seen.contains(m)) continue;
+            seen.add(m);
+            seen.addAll(m.reachable_methods_internal(seen));
+         }
+        return seen;
+    }
+
     public String toString()
     {
         StringTemplate st = new StringTemplate(
@@ -178,15 +241,4 @@ public class MethodSymbol
         return inits;
     }
 
-    public void addAccelIdent(CharjAST ast)
-    {
-    }
-
-    public void addMSASync(CharjAST ast)
-    {
-    }
-
-    public void addMSAAccess(CharjAST ast)
-    {
-    }
 }

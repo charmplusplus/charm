@@ -59,6 +59,7 @@ enterPackage
                 symtab.addScope(ps);
             }
             currentScope = ps;
+            assert currentScope != null;
         }
     ;
 
@@ -74,6 +75,7 @@ enterBlock
             $BLOCK.scope = new LocalScope(symtab, currentScope);
             $BLOCK.def = (LocalScope)$BLOCK.scope;
             currentScope = $BLOCK.scope;
+            assert currentScope != null;
         }
     ;
 
@@ -93,7 +95,8 @@ boolean entry = false;
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
             type IDENT .*)
         {
-            //System.out.println("entering method scope " + $IDENT.text);
+            assert currentScope != null;
+            //System.out.println("entering method scope " + $IDENT.text + " " + currentScope);
             boolean isTraced = false;
             boolean sdagEntry = false;
             if ($MODIFIER_LIST != null) {
@@ -124,7 +127,7 @@ boolean entry = false;
             $IDENT.def = sym;
             $IDENT.symbolType = sym.type;
             $IDENT.scope = currentScope;
-            //System.out.println(currentScope);
+            System.out.println(currentScope);
         }
     |   ^((CONSTRUCTOR_DECL
           | ENTRY_CONSTRUCTOR_DECL {
@@ -134,6 +137,7 @@ boolean entry = false;
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
             IDENT .*)
         {
+            assert currentScope != null;
             //System.out.println("entering constructor scope " + $IDENT.text);
             boolean isTraced = false;
             CharjAST charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
@@ -161,6 +165,7 @@ boolean entry = false;
 exitMethod
     :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*) {
             //System.out.println("method " + currentScope);
+            assert currentScope != null;
             currentScope = currentScope.getEnclosingScope();
             currentMethod = null;
         }
@@ -390,7 +395,7 @@ sdagTrigger
          sym.hasSDAG = true;
          sym.definitionTokenStream = input.getTokenStream();
          currentScope.define($IDENT.text, sym);
-         currentScope = sym;
+         //currentScope = sym;
          //currentMethod = sym;
          $IDENT.def = sym;
          $IDENT.symbolType = sym.type;

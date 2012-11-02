@@ -1,4 +1,29 @@
 
+extern atoi;
+extern CkAbort;
+
+readonly Main@ main;
+readonly Chunk@ chunks;
+readonly int num_finished;
+
+mainchare Main {
+    public entry Main(CkArgMsg[~]@ m) {
+        if (m.argc != 4) CkAbort("Wrong parameters\n");
+
+        int x = atoi(m.argv[1]);
+        int y = atoi(m.argv[2]);
+        int k = atoi(m.argv[3]);
+
+        if (x < k) CkAbort("Xdim must be greater than k");
+        if (k < CkNumPes() || k % CkNumPes()) CkAbort("k must be a multiple of numPes.");
+        
+        chunks = new Chunk@(k, x, y, k);
+        chunks@jacobi();
+        num_finished = 0;
+    }
+}
+
+
 chare_array [1D] Chunk {
     Array<double, 2> A, B;
     double myMax;
@@ -27,23 +52,44 @@ chare_array [1D] Chunk {
         B.fill(0);
     }
 
+    /*
+    void sendStrips() {
+        Array<double> dummy = new Array<double>(0);
+        int left = thisIndex-1;
+        int right = thisIndex+1;
+        int max = total-1;
+
+        if(thisIndex > 0) {
+            chunks[left]@getStripfromright(A[1, 0:myydim]);
+        } else {
+            chunks[max]@getStripfromright(dummy);
+        }
+
+        if(thisIndex < total-1) {
+            chunks[right]@getStripfromleft(A[myxdim, 0:myydim]);
+        } else {
+            chunks[0]@getStripfromleft(dummy);
+        }
+    }
+    */
+
     void sendStrips() {
         Array<double> strip = new Array<double>(myydim);
 
         if(thisIndex > 0) {
             for(int i=0;i<myydim;i++) strip[i] = A[1,i];
-            thisProxy[thisIndex-1]@getStripFromRight(strip);
+            chunks[thisIndex-1]@getStripFromRight(strip);
         } else {
             //Send dummy if thisIndex==0 for dagger to work
-            thisProxy[total-1]@getStripFromRight(strip);
+            chunks[total-1]@getStripFromRight(strip);
         }
 
         if(thisIndex < total-1) {
             for(int i=0;i<myydim;i++) strip[i] = A[myxdim,i];
-            thisProxy[thisIndex+1]@getStripFromLeft(strip);
+            chunks[thisIndex+1]@getStripFromLeft(strip);
         } else {
             //Send dummy if thisIndex==total-1:For dagger to work
-            thisProxy[0+0]@getStripFromLeft(strip);
+            chunks[0]@getStripFromLeft(strip);
         }
     }
 

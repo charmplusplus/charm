@@ -9,7 +9,7 @@ public chare_array [1d] SimpleChareArray {
 }
 
 public mainchare Main {
-    public entry Main(CkArgMsg m) {
+    public entry Main(CkArgMsg[~]@ m) {
         SimpleChareArray@ a = new SimpleChareArray@(10);
         a@test();
     }

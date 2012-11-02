@@ -90,7 +90,6 @@ typeDeclaration returns [ClassSymbol sym]
     :   ^(TYPE classType IDENT { currentClass = (ClassSymbol) $IDENT.def.type; }
             (^(EXTENDS parent=type))? (^('implements' type+))?
                 classScopeDeclaration*)
-    |   ^('interface' IDENT (^(EXTENDS type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     |   ^(MESSAGE IDENT messageScopeDeclaration*)
     |   ^(MULTICAST_MESSAGE IDENT messageScopeDeclaration*)
@@ -142,16 +141,6 @@ field [ClassSymbol type]
     :   ^(VAR_DECLARATOR ^(IDENT domainExpression?) variableInitializer?)
     ;
     
-interfaceScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
-            type IDENT formalParameterList domainExpression?)
-        // Interface constant declarations have been switched to variable
-        // declarations by Charj.g; the parser has already checked that
-        // there's an obligatory initializer.
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
-    ;
-
 variableDeclaratorList
     :   ^(VAR_DECLARATOR_LIST variableDeclarator+)
     ;
@@ -333,7 +322,7 @@ genericTypeArgument
     ;
 
 formalParameterList
-    :   ^(FORMAL_PARAM_LIST formalParameterStandardDecl* formalParameterVarargDecl?) 
+    :   ^(FORMAL_PARAM_LIST formalParameterStandardDecl*) 
     ;
 
 formalParameterStandardDecl
@@ -341,15 +330,11 @@ formalParameterStandardDecl
     ;
 
 entryFormalParameterList
-    :   ^(FORMAL_PARAM_LIST entryFormalParameterStandardDecl* formalParameterVarargDecl?) 
+    :   ^(FORMAL_PARAM_LIST entryFormalParameterStandardDecl*) 
     ;
 
 entryFormalParameterStandardDecl
     :   ^(FORMAL_PARAM_STD_DECL localModifierList? entryArgType variableDeclaratorId)
-    ;
-    
-formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
@@ -433,10 +418,6 @@ nonBlockStatement returns [boolean sdag]
     |   ^('delete' expression)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
-    |   ^(PRINT expression*)
-    |   ^(PRINTLN expression*)
-    |   ^(EXIT expression?)
-    |   EXITALL
     |   ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;
         
@@ -558,11 +539,6 @@ primaryExpression returns [Type type]
 		{
 			$type = $SUPER.symbolType;
 		}
-    |   GETNUMPES
-    |   GETNUMNODES
-    |   GETMYPE
-    |   GETMYNODE
-    |   GETMYRANK
 	|	THISINDEX
 	|	THISPROXY
 		{
@@ -706,8 +682,7 @@ literal
     ;
 
 rangeItem returns [Object item]
-    :   DECIMAL_LITERAL { $item = $DECIMAL_LITERAL; }
-    |   IDENT			{ $item = $IDENT; }
+    :   ^(EXPR expr){ $item = $EXPR; }
     ;
 
 rangeExpression returns [ArrayList<Object> range]
@@ -715,9 +690,11 @@ rangeExpression returns [ArrayList<Object> range]
 {
 	$range = new ArrayList<Object>();
 }
-    :   ^(RANGE_EXPRESSION rangeItem)								{ $range.add($rangeItem.item); }	
-    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem)				{ $range.add($i1.item); $range.add($i2.item); }
-    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem i3=rangeItem)	{ $range.add($i1.item); $range.add($i2.item); $range.add($i3.item); }
+    :   ^(RANGE_EXPRESSION i1=rangeItem (i2=rangeItem)? (i3=rangeItem)?) {
+            $range.add($i1.item);
+            if (i2 != null) $range.add($i2.item);
+            if (i3 != null) $range.add($i3.item);
+        }
     ;
 
 rangeList returns [ArrayList<ArrayList<Object>> ranges]

@@ -80,7 +80,6 @@ typeDeclaration
         -> ^(TYPE typeOfType IDENT
             (^('extends' type))? (^('implements' type+))? classScopeDeclaration* 
         )
-    |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     |   ^(MESSAGE IDENT messageScopeDeclaration*)
     |   ^(MULTICAST_MESSAGE IDENT messageScopeDeclaration*)
@@ -155,16 +154,7 @@ classScopeDeclaration
         -> ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
             ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
     ;
-    
-interfaceScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
-            type IDENT formalParameterList domainExpression?)
-        // Interface constant declarations have been switched to variable
-        // declarations by Charj.g; the parser has already checked that
-        // there's an obligatory initializer.
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
-    ;
+
 
 variableDeclaratorList
     :   ^(VAR_DECLARATOR_LIST variableDeclarator+)
@@ -173,7 +163,7 @@ variableDeclaratorList
 variableDeclarator
     :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
     ;
-    
+
 variableDeclaratorId
     :   ^(IDENT domainExpression?)
     ;
@@ -304,16 +294,13 @@ genericTypeArgument
     ;
 
 formalParameterList
-    :   ^(FORMAL_PARAM_LIST formalParameterStandardDecl* formalParameterVarargDecl?) 
+    :   ^(FORMAL_PARAM_LIST formalParameterStandardDecl*) 
     ;
     
 formalParameterStandardDecl
     :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
     ;
     
-formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
-    ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
 // IDENT (^(DOT qualifiedIdentifier IDENT))*
@@ -390,10 +377,6 @@ nonBlockStatement
     |   ^('delete' expression)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
-    |   ^(PRINT expression*)
-    |   ^(PRINTLN expression*)
-    |   ^(EXIT expression?)
-    |   EXITALL
     |   ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;
         
@@ -482,11 +465,6 @@ primaryExpression
     |   THIS
     |   arrayTypeDeclarator
     |   SUPER
-    |   GETNUMPES
-    |   GETNUMNODES
-    |   GETMYPE
-    |   GETMYNODE
-    |   GETMYRANK
 	|	THISINDEX
 	|	THISPROXY
     |   domainExpression
@@ -523,15 +501,8 @@ literal
     |   NULL
     ;
 
-rangeItem
-    :   DECIMAL_LITERAL
-    |   IDENT
-    ;
-
 rangeExpression
-    :   ^(RANGE_EXPRESSION rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    :   ^(RANGE_EXPRESSION expression expression? expression?)
     ;
 
 rangeList
