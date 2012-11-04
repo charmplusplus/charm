@@ -11,8 +11,10 @@
 /*====Beginning of pthread-related variables and impelementation====*/
 //__thread is not portable, but it works almost everywhere if pthread works
 //After C++11, this should be thread_local
+#if !CMK_SMP
 static __thread pthread_cond_t thdCondition; //the signal var of each pthread to be notified
 static __thread pthread_mutex_t thdLock; //the lock associated with the condition variables
+#endif
 
 static FuncCkLoop *mainHelper = NULL;
 static int mainHelperPhyRank = 0;
@@ -45,6 +47,7 @@ static int HelperOnCore() {
 }
 
 static void *ndhThreadWork(void *id) {
+#if !CMK_SMP
     size_t myId = (size_t) id;
 
     //further improvement of this affinity setting!!
@@ -81,6 +84,7 @@ static void *ndhThreadWork(void *id) {
         }
         pthdLoop->stealWork();
     }
+#endif
 }
 
 void FuncCkLoop::createPThreads() {
