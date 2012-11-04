@@ -15,7 +15,6 @@ CProxy_FuncCkLoop ckLoopProxy;
 int totalElems; //the number of test instances
 int loopTimes;
 int numChunks;
-int runningMode;
 
 int threadNum; //number of threads to be used in non-SMP
 
@@ -65,7 +64,6 @@ Main::Main(CkArgMsg* m) {
     totalElems = 1;
 	numChunks = CkMyNodeSize();
 	loopTimes = 1000;
-	runningMode = CKLOOP_USECHARM; 
 	
     mainStep = 0;
 	numElemFinished = 0;
@@ -86,10 +84,10 @@ Main::Main(CkArgMsg* m) {
 	mainTimes = new double[TEST_REPEAT_TIMES];
 	memset(mainTimes, 0, sizeof(double)*TEST_REPEAT_TIMES);
 	
-	CkPrintf("Using CkLoop Lib with mode: %d, nodesize=%d\n", runningMode, CkMyNodeSize());
+	CkPrintf("Using CkLoop Lib: nodesize=%d\n", CkMyNodeSize());
 	CkPrintf("Testcase info: %d test instances where the loop iterates %d times, each work is partitioned into %d tasks\n", totalElems, loopTimes, numChunks);
 	
-	ckLoopProxy = CkLoop_Init(runningMode, threadNum);
+	ckLoopProxy = CkLoop_Init(threadNum);
 	//ckLoopProxy = CkLoop_Init();
     mainProxy = thishandle;
     
@@ -193,9 +191,6 @@ void Main::processCommandLine(int argc,char ** argv) {
                 break;
             case 'c':
                 numChunks = atoi(argv[++i]);
-                break;
-            case 'm':
-                runningMode = atoi(argv[++i]);
                 break;
             case 'a':
                 totalElems = atoi(argv[++i]);

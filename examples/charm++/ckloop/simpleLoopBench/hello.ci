@@ -5,7 +5,6 @@ mainmodule hello {
   readonly int totalElems;
   readonly int loopTimes;
   readonly int numChunks;
-  readonly int runningMode;
   
   mainchare Main {
     entry Main(CkArgMsg *m);
