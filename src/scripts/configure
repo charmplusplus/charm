@@ -2357,7 +2357,7 @@ fi
 
 if test "$with_refnum_type" = "no" -o "$with_refnum_type" = "short"
 then
-  Echo "Setting charm++ envelop refnum field to unsigned short"
+  Echo "Setting charm++ envelope refnum field to unsigned short"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_REFNUM_TYPE unsigned short
@@ -2365,7 +2365,7 @@ _ACEOF
 
 elif test "$with_refnum_type" = "int"
 then
-  Echo "Setting charm++ envelop refnum field to unsigned int"
+  Echo "Setting charm++ envelope refnum field to unsigned int"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_REFNUM_TYPE unsigned int
