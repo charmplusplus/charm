@@ -205,10 +205,12 @@ public:
   }
   virtual void insertData(const dtype& dataItem, int destinationPe); 
   virtual void broadcast(const dtype& dataItem); 
+
+  void sendMeshStreamerMessage(MeshStreamerMessage<dtype> *destinationBuffer,
+                               int dimension, int destinationIndex); 
+
   void registerPeriodicProgressFunction();
-
   // flushing begins only after enablePeriodicFlushing has been invoked
-
   inline void enablePeriodicFlushing(){
     isPeriodicFlushEnabled_ = true; 
     registerPeriodicProgressFunction();
@@ -452,6 +454,28 @@ int MeshStreamer<dtype>::copyDataItemIntoMessage(
 }
 
 template <class dtype>
+inline 
+void MeshStreamer<dtype>::sendMeshStreamerMessage(
+                         MeshStreamerMessage<dtype> *destinationBuffer,
+                         int dimension, int destinationIndex) {
+
+    if (dimension == 0) {
+#ifdef STREAMER_VERBOSE_OUTPUT
+      CkPrintf("[%d] sending to %d\n", CkMyPe(), destinationIndex); 
+#endif
+      this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
+    }
+    else {
+#ifdef STREAMER_VERBOSE_OUTPUT
+      CkPrintf("[%d] sending intermediate to %d\n", 
+               CkMyPe(), destinationIndex); 
+#endif
+      this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
+    }
+
+}
+
+template <class dtype>
 inline
 void MeshStreamer<dtype>::storeMessage(
 			  int destinationPe, 
@@ -496,19 +520,7 @@ void MeshStreamer<dtype>::storeMessage(
       (bufferIndex - myLocationIndex_[dimension]) * 
       combinedDimensionSizes_[dimension];
 
-    if (dimension == 0) {
-#ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending to %d\n", CkMyPe(), destinationIndex); 
-#endif
-      this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
-    }
-    else {
-#ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending intermediate to %d\n", 
-               CkMyPe(), destinationIndex); 
-#endif
-      this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
-    }
+    sendMeshStreamerMessage(destinationBuffer, dimension, destinationIndex); 
 
     if (useStagedCompletion_) {
       cntMsgSent_[dimension][bufferIndex]++; 
@@ -793,20 +805,8 @@ void MeshStreamer<dtype>::sendLargestBuffer() {
 
       numDataItemsBuffered_ -= destinationBuffer->numDataItems;
 
-      if (flushDimension == 0) {
-#ifdef STREAMER_VERBOSE_OUTPUT
-        CkPrintf("[%d] sending flush to %d\n", CkMyPe(), destinationIndex); 
-#endif
-        this->thisProxy[destinationIndex].
-          receiveAtDestination(destinationBuffer);
-      }
-      else {
-#ifdef STREAMER_VERBOSE_OUTPUT
-        CkPrintf("[%d] sending intermediate flush to %d\n", 
-                 CkMyPe(), destinationIndex); 
-#endif
-	this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
-      }
+      sendMeshStreamerMessage(destinationBuffer, flushDimension, 
+                              destinationIndex); 
 
       if (useStagedCompletion_) {
         cntMsgSent_[i][flushIndex]++; 
@@ -876,20 +876,8 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
       }
     }
 
-    if (dimension == 0) {
-#ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending dimension flush to %d\n", 
-               CkMyPe(), destinationIndex); 
-#endif
-      this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
-    }
-    else {
-#ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending intermediate dimension flush to %d\n", 
-               CkMyPe(), destinationIndex); 
-#endif
-      this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
-    }
+    sendMeshStreamerMessage(destinationBuffer, dimension, 
+                            destinationIndex);
     messageBuffers[j] = NULL;
   }
   
@@ -1420,7 +1408,7 @@ public:
     }
   }
 
-  inline void receiveAtDestination(
+  void receiveAtDestination(
        MeshStreamerMessage<ChunkDataItem> *msg) {
 
     for (int i = 0; i < msg->numDataItems; i++) {
