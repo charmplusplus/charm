@@ -941,7 +941,7 @@ private:
                CkMyPe(), env->getSrcPe(), msg->numDataItems, 
                msg->finalMsgCount);  
 #endif
-      markMessageReceived(msg->dimension, msg->finalMsgCount); 
+      this->markMessageReceived(msg->dimension, msg->finalMsgCount); 
     }
     else {
       this->detectorLocalObj_->consume(msg->numDataItems);    
@@ -1200,7 +1200,7 @@ public:
       localDeliver(packedData);
     }
     if (MeshStreamer<ArrayDataItem<dtype, itype> >::useStagedCompletion_) {
-      markMessageReceived(msg->dimension, msg->finalMsgCount);
+      this->markMessageReceived(msg->dimension, msg->finalMsgCount);
     }
 
     delete msg;
@@ -1423,7 +1423,7 @@ public:
                CkMyPe(), env->getSrcPe(), msg->numDataItems, 
                msg->finalMsgCount);  
 #endif
-      markMessageReceived(msg->dimension, msg->finalMsgCount); 
+      this->markMessageReceived(msg->dimension, msg->finalMsgCount); 
     }
     else {
       this->detectorLocalObj_->consume(msg->numDataItems);    
