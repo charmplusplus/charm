@@ -92,11 +92,11 @@ public:
     }
     void reportFinished(int counter) {
         if (counter==0) return;
-#if !CMK_SMP
+//#if !CMK_SMP
         __sync_add_and_fetch(&finishFlag, counter);
-#else
-	CmiMemoryAtomicFetchAndInc(finishFlag, counter);
-#endif
+//#else
+//	CmiMemoryAtomicFetchAndInc(finishFlag, counter);
+//#endif
     }
 
     int isFree() {
