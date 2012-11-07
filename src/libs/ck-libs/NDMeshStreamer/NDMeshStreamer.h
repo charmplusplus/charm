@@ -491,12 +491,13 @@ void MeshStreamer<dtype>::storeMessage(
     if (dimension == 0) {
       // personalized messages do not require destination indices
       messageBuffers[bufferIndex] = 
-        new (0, bufferSize_, sizeof(int)) MeshStreamerMessage<dtype>(dimension);
+        new (0, bufferSize_, 8 * sizeof(int)) 
+         MeshStreamerMessage<dtype>(dimension);
     }
     else {
       messageBuffers[bufferIndex] = 
-        new (bufferSize_, bufferSize_, sizeof(int)) 
-        MeshStreamerMessage<dtype>(dimension);
+        new (bufferSize_, bufferSize_, 8 * sizeof(int)) 
+         MeshStreamerMessage<dtype>(dimension);
     }
     *(int *) CkPriorityPtr(messageBuffers[bufferIndex]) = prio_;
     CkSetQueueing(messageBuffers[bufferIndex], CK_QUEUEING_IFIFO);
@@ -846,7 +847,7 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
     if(messageBuffers[j] == NULL) {      
       if (sendMsgCounts && j != myLocationIndex_[dimension]) {
         messageBuffers[j] = 
-          new (0, 0, sizeof(int)) MeshStreamerMessage<dtype>(dimension);
+          new (0, 0, 8 * sizeof(int)) MeshStreamerMessage<dtype>(dimension);
         *(int *) CkPriorityPtr(messageBuffers[j]) = prio_;
         CkSetQueueing(messageBuffers[j], CK_QUEUEING_IFIFO);
       }
