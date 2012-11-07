@@ -43,7 +43,7 @@ class CWhenTrigger {
 
     CWhenTrigger *next;
     CWhenTrigger(int id, int na, int ne, int nae) :
-      whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne), next(NULL), speculationIndex(-1) {}
+    whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne), speculationIndex(-1), next(NULL) {}
     CWhenTrigger(): next(NULL) {}
     void pup(PUP::er& p) {
       p|whenID;
