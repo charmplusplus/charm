@@ -5241,16 +5241,17 @@ void PUPableClass::print(XStr& str)
 }
 void PUPableClass::genDefs(XStr& str)
 {
-        if (type->isTemplated()) {
-                templateGuardBegin(true, str);
-                str << "  #define _CHARMXI_CLASS_NAME " << type << "\n";
-                str << "  PUPable_def_template(_CHARMXI_CLASS_NAME)\n";
-                str << "  #undef _CHARMXI_CLASS_NAME\n";
-                templateGuardEnd(str);
-        } else {
-                str<<"  PUPable_def(" << type << ")\n";
-        }
-	if (next) next->genDefs(str);
+  bool isTemplate = type->isTemplated();
+  templateGuardBegin(isTemplate, str);
+  if (isTemplate) {
+    str << "  #define _CHARMXI_CLASS_NAME " << type << "\n";
+    str << "  PUPable_def_template(_CHARMXI_CLASS_NAME)\n";
+    str << "  #undef _CHARMXI_CLASS_NAME\n";
+  } else {
+    str<<"  PUPable_def(" << type << ")\n";
+  }
+  templateGuardEnd(str);
+  if (next) next->genDefs(str);
 }
 void PUPableClass::genReg(XStr& str)
 {
