@@ -14,9 +14,6 @@ static CmiNodeLock fft_plan_lock;
 #include "fftmacro.h"
 
 CProxy_FuncCkLoop ckLoopProxy;
-/** called by initnode once per node to support node level locking for
-    fftw plan create/destroy operations */
-#define CKLOOP_MODE CKLOOP_STATIC 
 
 extern "C" void doCalc(int first,int last, void *result, int paramNum, void * param)
 {
@@ -81,7 +78,9 @@ struct Main : public CBase_Main {
     fftProxy = CProxy_fft::ckNew(numChunks);
 
     // Construct a ckloop to do the calculation
-    //ckLoopProxy = CkLoop_Init(CKLOOP_MODE, numTasks);
+    // WARNING: In non-SMP mode, the number of threads to be created
+    // should be passed in as a parameter for CkLoop initialization!
+    // -Chao Mei
     ckLoopProxy = CkLoop_Init();
     
     CkStartQD(CkIndex_Main::initDone((CkQdMsg *)0), &thishandle);

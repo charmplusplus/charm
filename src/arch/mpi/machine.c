@@ -207,7 +207,7 @@ static void reportMsgHistogramInfo();
 #define BARRIER_ZERO_TAG   (TAG-1)
 #endif
 
-#define USE_MPI_CTRLMSG_SCHEME 1
+#define USE_MPI_CTRLMSG_SCHEME 0
 
 /* Defining this macro will use MPI_Irecv instead of MPI_Recv for
  * large messages. This could save synchronization overhead caused by

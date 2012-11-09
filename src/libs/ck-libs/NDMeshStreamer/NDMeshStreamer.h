@@ -205,10 +205,12 @@ public:
   }
   virtual void insertData(const dtype& dataItem, int destinationPe); 
   virtual void broadcast(const dtype& dataItem); 
+
+  void sendMeshStreamerMessage(MeshStreamerMessage<dtype> *destinationBuffer,
+                               int dimension, int destinationIndex); 
+
   void registerPeriodicProgressFunction();
-
   // flushing begins only after enablePeriodicFlushing has been invoked
-
   inline void enablePeriodicFlushing(){
     isPeriodicFlushEnabled_ = true; 
     registerPeriodicProgressFunction();
@@ -452,6 +454,28 @@ int MeshStreamer<dtype>::copyDataItemIntoMessage(
 }
 
 template <class dtype>
+inline 
+void MeshStreamer<dtype>::sendMeshStreamerMessage(
+                         MeshStreamerMessage<dtype> *destinationBuffer,
+                         int dimension, int destinationIndex) {
+
+    if (dimension == 0) {
+#ifdef STREAMER_VERBOSE_OUTPUT
+      CkPrintf("[%d] sending to %d\n", CkMyPe(), destinationIndex); 
+#endif
+      this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
+    }
+    else {
+#ifdef STREAMER_VERBOSE_OUTPUT
+      CkPrintf("[%d] sending intermediate to %d\n", 
+               CkMyPe(), destinationIndex); 
+#endif
+      this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
+    }
+
+}
+
+template <class dtype>
 inline
 void MeshStreamer<dtype>::storeMessage(
 			  int destinationPe, 
@@ -467,12 +491,13 @@ void MeshStreamer<dtype>::storeMessage(
     if (dimension == 0) {
       // personalized messages do not require destination indices
       messageBuffers[bufferIndex] = 
-        new (0, bufferSize_, sizeof(int)) MeshStreamerMessage<dtype>(dimension);
+        new (0, bufferSize_, 8 * sizeof(int)) 
+         MeshStreamerMessage<dtype>(dimension);
     }
     else {
       messageBuffers[bufferIndex] = 
-        new (bufferSize_, bufferSize_, sizeof(int)) 
-        MeshStreamerMessage<dtype>(dimension);
+        new (bufferSize_, bufferSize_, 8 * sizeof(int)) 
+         MeshStreamerMessage<dtype>(dimension);
     }
     *(int *) CkPriorityPtr(messageBuffers[bufferIndex]) = prio_;
     CkSetQueueing(messageBuffers[bufferIndex], CK_QUEUEING_IFIFO);
@@ -496,19 +521,7 @@ void MeshStreamer<dtype>::storeMessage(
       (bufferIndex - myLocationIndex_[dimension]) * 
       combinedDimensionSizes_[dimension];
 
-    if (dimension == 0) {
-#ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending to %d\n", CkMyPe(), destinationIndex); 
-#endif
-      this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
-    }
-    else {
-#ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending intermediate to %d\n", 
-               CkMyPe(), destinationIndex); 
-#endif
-      this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
-    }
+    sendMeshStreamerMessage(destinationBuffer, dimension, destinationIndex); 
 
     if (useStagedCompletion_) {
       cntMsgSent_[dimension][bufferIndex]++; 
@@ -793,20 +806,8 @@ void MeshStreamer<dtype>::sendLargestBuffer() {
 
       numDataItemsBuffered_ -= destinationBuffer->numDataItems;
 
-      if (flushDimension == 0) {
-#ifdef STREAMER_VERBOSE_OUTPUT
-        CkPrintf("[%d] sending flush to %d\n", CkMyPe(), destinationIndex); 
-#endif
-        this->thisProxy[destinationIndex].
-          receiveAtDestination(destinationBuffer);
-      }
-      else {
-#ifdef STREAMER_VERBOSE_OUTPUT
-        CkPrintf("[%d] sending intermediate flush to %d\n", 
-                 CkMyPe(), destinationIndex); 
-#endif
-	this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
-      }
+      sendMeshStreamerMessage(destinationBuffer, flushDimension, 
+                              destinationIndex); 
 
       if (useStagedCompletion_) {
         cntMsgSent_[i][flushIndex]++; 
@@ -846,7 +847,7 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
     if(messageBuffers[j] == NULL) {      
       if (sendMsgCounts && j != myLocationIndex_[dimension]) {
         messageBuffers[j] = 
-          new (0, 0, sizeof(int)) MeshStreamerMessage<dtype>(dimension);
+          new (0, 0, 8 * sizeof(int)) MeshStreamerMessage<dtype>(dimension);
         *(int *) CkPriorityPtr(messageBuffers[j]) = prio_;
         CkSetQueueing(messageBuffers[j], CK_QUEUEING_IFIFO);
       }
@@ -876,20 +877,8 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
       }
     }
 
-    if (dimension == 0) {
-#ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending dimension flush to %d\n", 
-               CkMyPe(), destinationIndex); 
-#endif
-      this->thisProxy[destinationIndex].receiveAtDestination(destinationBuffer);
-    }
-    else {
-#ifdef STREAMER_VERBOSE_OUTPUT
-      CkPrintf("[%d] sending intermediate dimension flush to %d\n", 
-               CkMyPe(), destinationIndex); 
-#endif
-      this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
-    }
+    sendMeshStreamerMessage(destinationBuffer, dimension, 
+                            destinationIndex);
     messageBuffers[j] = NULL;
   }
   
@@ -953,7 +942,7 @@ private:
                CkMyPe(), env->getSrcPe(), msg->numDataItems, 
                msg->finalMsgCount);  
 #endif
-      markMessageReceived(msg->dimension, msg->finalMsgCount); 
+      this->markMessageReceived(msg->dimension, msg->finalMsgCount); 
     }
     else {
       this->detectorLocalObj_->consume(msg->numDataItems);    
@@ -1212,7 +1201,7 @@ public:
       localDeliver(packedData);
     }
     if (MeshStreamer<ArrayDataItem<dtype, itype> >::useStagedCompletion_) {
-      markMessageReceived(msg->dimension, msg->finalMsgCount);
+      this->markMessageReceived(msg->dimension, msg->finalMsgCount);
     }
 
     delete msg;
@@ -1420,7 +1409,7 @@ public:
     }
   }
 
-  inline void receiveAtDestination(
+  void receiveAtDestination(
        MeshStreamerMessage<ChunkDataItem> *msg) {
 
     for (int i = 0; i < msg->numDataItems; i++) {
@@ -1435,7 +1424,7 @@ public:
                CkMyPe(), env->getSrcPe(), msg->numDataItems, 
                msg->finalMsgCount);  
 #endif
-      markMessageReceived(msg->dimension, msg->finalMsgCount); 
+      this->markMessageReceived(msg->dimension, msg->finalMsgCount); 
     }
     else {
       this->detectorLocalObj_->consume(msg->numDataItems);    
