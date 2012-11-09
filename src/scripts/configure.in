@@ -1913,8 +1913,10 @@ EOT
 test_linkc "whether Cray rca_has get_max_dimension" "yes" "no" "-lrca"
 AC_DEFINE_UNQUOTED(CMK_HAS_RCA_MAX_DIMENSION, $pass, [whether Cray rca has rca_get_max_dimension])
 
-#### query Cray machine max NID ####
+#### query Cray machine max NID if get_max_dimension not exist ####
 
+if test $pass -eq 0
+then
 cmd=`which xtprocadmin 2>/dev/null`
 if test -n "$cmd"
 then
@@ -1930,8 +1932,9 @@ then
     AC_DEFINE_UNQUOTED(CMK_CRAY_MAXNID, $maxnid, [Cray MAXNID])
     fi
 fi
-
 fi
+
+fi  # end of Cray specific test
 
 #### test if it can build shared library ####
 cat > $t <<EOT

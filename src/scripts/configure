@@ -4121,6 +4121,8 @@ _ACEOF
 
 #### query Cray machine max NID ####
 
+if test $pass -eq 0
+then
 cmd=`which xtprocadmin 2>/dev/null`
 if test -n "$cmd"
 then
@@ -4142,8 +4144,9 @@ _ACEOF
 
     fi
 fi
-
 fi
+
+fi  # end of Cray specific test
 
 #### test if it can build shared library ####
 cat > $t <<EOT

@@ -264,6 +264,9 @@
 /* Allows MPI_Init_thread. */
 #undef CMK_MPI_INIT_THREAD
 
+/* expected message priorities are arbitrarily sized */
+#undef CMK_MSG_PRIO_TYPE
+
 /* whether operator delete can be overloaded in same class */
 #undef CMK_MULTIPLE_DELETE
 
@@ -287,12 +290,6 @@
 
 /* envelope refnum field set to UInt */
 #undef CMK_REFNUM_TYPE
-
-/* Should charm use an STL-based msg q */
-#undef CMK_USE_STL_MSGQ
-
-/* expected size of message priorities fields */
-#undef CMK_MSG_PRIO_TYPE
 
 /* disable replay */
 #undef CMK_REPLAYSYSTEM
@@ -329,6 +326,9 @@
 
 /* whether the poll syscall exists */
 #undef CMK_USE_POLL
+
+/* whether charm scheduler should use an STL-based msg q */
+#undef CMK_USE_STL_MSGQ
 
 /* disable controlpoint */
 #undef CMK_WITH_CONTROLPOINT
