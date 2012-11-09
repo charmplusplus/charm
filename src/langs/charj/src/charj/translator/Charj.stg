@@ -600,6 +600,10 @@ class_var_decl(modl, type, declList) ::=
 <modl><type> <declList>;
 >>
 
+obj_var_decl_list(var_decls) ::=
+<<
+<var_decls; separator=", *">
+>>
 
 var_decl_list(var_decls) ::=
 <<

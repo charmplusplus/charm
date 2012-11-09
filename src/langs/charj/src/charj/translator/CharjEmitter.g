@@ -400,7 +400,9 @@ variableDeclaratorList[StringTemplate obtype]
     :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype])+ )
         -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
                 var_decl_list_sdag_ci(var_decls={$var_decls})
-        -> var_decl_list(var_decls={$var_decls})
+        -> {obtype == null ||
+            obtype.toString().indexOf("CProxy_") == 0}? var_decl_list(var_decls={$var_decls})
+        -> obj_var_decl_list(var_decls={$var_decls})
     ;
 
 variableDeclarator[StringTemplate obtype]
