@@ -439,7 +439,6 @@ rangeExpression
 
 rangeList returns [int len]
     :   (r+=rangeExpression)*
-        { $len = $r.size(); }
         -> template(t={$r}) "<t; separator=\", \">"
     ;
 
@@ -845,8 +844,6 @@ nonBlockStatement
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
     |   ';' // Empty statement.
         -> {%{$start.getText()}}
-    |   ^(CONTRIBUTE e1=expression q=qualifiedIdentifier e2=expression)
-        -> contribute(data={$e1.st}, type={$q.st}, target={$e2.st})
     ;
         
 switchCaseLabel

@@ -127,7 +127,7 @@ boolean entry = false;
             $IDENT.def = sym;
             $IDENT.symbolType = sym.type;
             $IDENT.scope = currentScope;
-            System.out.println(currentScope);
+            //System.out.println(currentScope);
         }
     |   ^((CONSTRUCTOR_DECL
           | ENTRY_CONSTRUCTOR_DECL {

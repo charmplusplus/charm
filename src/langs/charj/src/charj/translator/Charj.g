@@ -62,7 +62,6 @@ tokens {
 
     OVERLAP                 = 'overlap'         ;
     WHEN                    = 'when'            ;
-    CONTRIBUTE              = 'contribute'      ;
 
     THISINDEX		        = 'thisIndex'	;
     THISPROXY		        = 'thisProxy'	;
@@ -679,8 +678,6 @@ nonBlockStatement
         ->  ^('embed' STRING_LITERAL EMBED_BLOCK)
     |   expression ';'!
     |   ';' // Preserve empty statements.
-    |   CONTRIBUTE '(' expression ',' qualifiedIdentifier ',' expression ')' ';'
-        -> ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;           
         
 

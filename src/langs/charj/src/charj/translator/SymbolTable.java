@@ -90,6 +90,9 @@ public class SymbolTable {
         defaultPkg.define("CkMyPe", new MethodSymbol(this, "CkMyPe"));
         defaultPkg.define("CkExit", new MethodSymbol(this, "CkExit"));
         defaultPkg.define("CkWallTimer", new MethodSymbol(this, "CkWallTimer"));
+        defaultPkg.define("contribute", new MethodSymbol(this, "contribute"));
+        defaultPkg.define("CkCallback", new MethodSymbol(this, "CkCallback"));
+        defaultPkg.define("CkReductionTarget", new ExternalSymbol(this, "CkReductionTarget"));
     }
 
     public ClassSymbol lookupPrimitive(List<TypeName> type) {

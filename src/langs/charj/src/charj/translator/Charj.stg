@@ -824,11 +824,6 @@ arguments(exprs) ::=
 <exprs; separator=", ">
 >>
 
-contribute(data, type, target) ::=
-<<
-    contribute(<data>, CkCallback(CkReductionTarget(<type>)), <target>);
->>
-
 range_constructor(range, others, len) ::=
 <<
 <if(range)>

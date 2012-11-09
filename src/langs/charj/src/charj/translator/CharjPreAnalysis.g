@@ -377,7 +377,6 @@ nonBlockStatement
     |   ^('delete' expression)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
-    |   ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;
         
 switchCaseLabel
