@@ -2,6 +2,7 @@
 #define NDMESH_STREAMER_H
 
 #include <algorithm>
+#include <list>
 #include "NDMeshStreamer.decl.h"
 #include "DataItemTypes.h"
 #include "completion.h"
@@ -1303,13 +1304,39 @@ public:
 
 };
 
+struct ChunkReceiveBuffer {
+  int bufferNumber;
+  int receivedChunks;
+  char *buffer;
+};
+
+struct ChunkOutOfOrderBuffer {
+  int bufferNumber;
+  int receivedChunks;
+  int sourcePe;
+  char *buffer;
+
+  ChunkOutOfOrderBuffer(int b, int s, char *buf)
+    : bufferNumber(b), receivedChunks(0), sourcePe(s), buffer(buf) {}
+
+  bool operator==(const ChunkDataItem &chunk) {
+    return ( (chunk.bufferNumber == bufferNumber) && 
+             (chunk.sourcePe == sourcePe) );
+  }
+  
+};
+
 template <class dtype>
 class GroupChunkMeshStreamer : 
   public MeshStreamer<ChunkDataItem> {
 
 private:
-  dtype **receiveBuffers;
-  int *receivedChunks;
+  // implementation assumes very few buffers will be received out of order
+  // if this is not the case a different data structure may be preferable
+  std::list<ChunkOutOfOrderBuffer> outOfOrderBuffers;
+  ChunkReceiveBuffer *lastReceived; 
+  int *currentBufferNumbers; 
+  
   CProxy_MeshStreamerGroupClient<dtype> clientProxy_;
   MeshStreamerGroupClient<dtype> *clientObj_;
 
@@ -1345,12 +1372,10 @@ public:
   }
 
   inline void commonInit() {
-
-    receiveBuffers = new dtype*[CkNumPes()];
-    receivedChunks = new int[CkNumPes()]; 
-    memset(receivedChunks, 0, CkNumPes() * sizeof(int));
-    memset(receiveBuffers, 0, CkNumPes() * sizeof(dtype*)); 
-
+    lastReceived = new ChunkReceiveBuffer[CkNumPes()];
+    currentBufferNumbers = new int[CkNumPes()]; 
+    memset(lastReceived, 0, CkNumPes() * sizeof(ChunkReceiveBuffer)); 
+    memset(currentBufferNumbers, 0, CkNumPes() * sizeof(int)); 
   }
 
   inline void insertData(dtype *dataArray, int numElements, int destinationPe) {
@@ -1359,12 +1384,14 @@ public:
     int arraySizeInBytes = numElements * sizeof(dtype); 
     ChunkDataItem chunk;
     int chunkNumber = 0; 
+    chunk.bufferNumber = currentBufferNumbers[destinationPe]++; 
     chunk.sourcePe = CkMyPe();
     chunk.chunkNumber = 0; 
     chunk.chunkSize = CHUNK_SIZE;
-    chunk.numChunks = 
+    chunk.numChunks =  
       (int) ceil ( (float) numElements * sizeof(dtype) / CHUNK_SIZE); 
     chunk.numItems = numElements; 
+
     for (int offset = 0; offset < arraySizeInBytes; offset += CHUNK_SIZE) {
 
       if (offset + CHUNK_SIZE > arraySizeInBytes) {
@@ -1379,25 +1406,67 @@ public:
       MeshStreamer<ChunkDataItem>::insertData(chunk, destinationPe); 
       chunk.chunkNumber++; 
     }
-
   }
 
   inline void processChunk(const ChunkDataItem& chunk) {
 
-    if (receiveBuffers[chunk.sourcePe] == NULL) {
-      receiveBuffers[chunk.sourcePe] = new dtype[chunk.numItems]; 
-    }      
+    ChunkReceiveBuffer &last = lastReceived[chunk.sourcePe]; 
 
-    char *receiveBuffer = (char *) receiveBuffers[chunk.sourcePe];
+    if (last.buffer == NULL) {
+      if (outOfOrderBuffers.size() == 0) {
+        // make common case fast
+        last.buffer = (char *) new dtype[chunk.numItems]; 
+      }
+      else {
+        // check if chunks for this buffer have been received previously
+        std::list<ChunkOutOfOrderBuffer>::iterator storedBuffer = 
+          find(outOfOrderBuffers.begin(), outOfOrderBuffers.end(), chunk);
+        if (storedBuffer != outOfOrderBuffers.end()) {
+          last.buffer = storedBuffer->buffer;           
+          outOfOrderBuffers.erase(storedBuffer); 
+        }
+        else {
+          last.buffer = (char *) new dtype[chunk.numItems];
+        }
+      }
+      last.bufferNumber = chunk.bufferNumber; 
+      last.receivedChunks = 0; 
+    }
+    else if (last.bufferNumber != chunk.bufferNumber) {
+      // add last to list of out of order buffers 
+      ChunkOutOfOrderBuffer lastOutOfOrderBuffer(last.bufferNumber, 
+                                                 chunk.sourcePe, last.buffer); 
+      outOfOrderBuffers.push_front(lastOutOfOrderBuffer);
+ 
+      //search through list of out of order buffers for this chunk's buffer
+      std::list<ChunkOutOfOrderBuffer >::iterator storedBuffer = 
+        find(outOfOrderBuffers.begin(), outOfOrderBuffers.end(), chunk); 
+
+      if (storedBuffer == outOfOrderBuffers.end() ) {
+        // allocate new buffer
+        last.bufferNumber = chunk.bufferNumber; 
+        last.receivedChunks = 0; 
+        last.buffer = (char *) new dtype[chunk.numItems]; 
+      }
+      else {
+        // use existing buffer
+        last.bufferNumber = storedBuffer->bufferNumber; 
+        last.receivedChunks = storedBuffer->receivedChunks;
+        last.buffer = storedBuffer->buffer; 
+        outOfOrderBuffers.erase(storedBuffer); 
+      }
+    }
+
+    char *receiveBuffer = last.buffer;
 
     memcpy(receiveBuffer + chunk.chunkNumber * CHUNK_SIZE, 
            chunk.rawData, chunk.chunkSize);
-    if (++receivedChunks[chunk.sourcePe] == chunk.numChunks) {
+    if (++last.receivedChunks == chunk.numChunks) {
       clientObj_->receiveArray(
                   (dtype *) receiveBuffer, chunk.numItems, chunk.sourcePe);
-      receivedChunks[chunk.sourcePe] = 0;        
-      delete [] receiveBuffers[chunk.sourcePe]; 
-      receiveBuffers[chunk.sourcePe] = NULL;
+      last.receivedChunks = 0; 
+      delete [] last.buffer; 
+      last.buffer = NULL;
     }
 
   }

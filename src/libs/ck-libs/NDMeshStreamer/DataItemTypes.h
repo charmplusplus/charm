@@ -17,6 +17,7 @@ class ChunkDataItem {
 
 public:
   short chunkSize;
+  int bufferNumber;
   int sourcePe; 
   int chunkNumber; 
   int numChunks;  
@@ -27,6 +28,7 @@ public:
     
     if (this != &rhs) {      
       chunkSize = rhs.chunkSize; 
+      bufferNumber = rhs.bufferNumber;
       sourcePe = rhs.sourcePe;
       chunkNumber = rhs.chunkNumber; 
       numChunks = rhs.numChunks;
