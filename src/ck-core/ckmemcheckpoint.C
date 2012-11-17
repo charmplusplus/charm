@@ -332,6 +332,8 @@ CkMemCheckPT::CkMemCheckPT(int w)
   CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
   CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
+	chkpTable[0] = NULL;
+	chkpTable[1] = NULL;
 }
 
 CkMemCheckPT::~CkMemCheckPT()
@@ -548,6 +550,7 @@ void CkMemCheckPT::startArrayCheckpoint(){
 		pupAllElements(p);
 	}
 	thisProxy[msg->bud2].recvArrayCheckpoint((CkArrayCheckPTMessage *)CkCopyMsg((void **)&msg));
+    if (chkpTable[0]) delete chkpTable[0];
 	chkpTable[0] = msg;
 	recvCount++;
 #endif
@@ -561,6 +564,7 @@ void CkMemCheckPT::recvArrayCheckpoint(CkArrayCheckPTMessage *msg)
 		idx = 0;
 	}
 	int isChkpting = msg->cp_flag;
+    if (chkpTable[idx]) delete chkpTable[idx];
 	chkpTable[idx] = msg;
 	if(isChkpting){
 		recvCount++;
