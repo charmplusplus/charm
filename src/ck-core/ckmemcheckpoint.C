@@ -65,7 +65,7 @@ void noopck(const char*, ...)
 #define CK_NO_PROC_POOL				0
 #endif
 
-#define CMK_CHKP_ALL		1
+#define CMK_CHKP_ALL		0
 #define CMK_USE_BARRIER		0
 
 //stream remote records happned only if CK_NO_PROC_POOL =1 which means the chares to pe map will change
@@ -460,6 +460,8 @@ void CkMemCheckPT::recoverEntry(CkArrayCheckPTMessage *msg)
     // ack
   thisProxy[buddy].gotData();
 #else
+  chkpTable[0] = NULL;
+  chkpTable[1] = NULL;
   recvArrayCheckpoint(msg);
   thisProxy[msg->bud2].gotData();
 #endif
@@ -564,7 +566,9 @@ void CkMemCheckPT::recvArrayCheckpoint(CkArrayCheckPTMessage *msg)
 		idx = 0;
 	}
 	int isChkpting = msg->cp_flag;
-    if (chkpTable[idx]) delete chkpTable[idx];
+    if (isChkpting == 1){
+		if (chkpTable[idx]) delete chkpTable[idx];
+	}
 	chkpTable[idx] = msg;
 	if(isChkpting){
 		recvCount++;
