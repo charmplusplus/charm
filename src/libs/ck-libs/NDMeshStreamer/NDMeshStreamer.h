@@ -1378,34 +1378,52 @@ public:
     memset(currentBufferNumbers, 0, CkNumPes() * sizeof(int)); 
   }
 
-  inline void insertData(dtype *dataArray, int numElements, int destinationPe) {
+  inline void insertData(dtype *dataArray, int numElements, int destinationPe, void *extraData = NULL, int extraDataSize = 0) {
 
     char *inputData = (char *) dataArray; 
     int arraySizeInBytes = numElements * sizeof(dtype); 
+    int totalSizeInBytes = arraySizeInBytes + extraDataSize; 
     ChunkDataItem chunk;
+    int offset;
     int chunkNumber = 0; 
     chunk.bufferNumber = currentBufferNumbers[destinationPe]++; 
     chunk.sourcePe = CkMyPe();
     chunk.chunkNumber = 0; 
     chunk.chunkSize = CHUNK_SIZE;
-    chunk.numChunks =  
-      (int) ceil ( (float) numElements * sizeof(dtype) / CHUNK_SIZE); 
+    chunk.numChunks =  (int) ceil ( (float) totalSizeInBytes / CHUNK_SIZE); 
     chunk.numItems = numElements; 
 
-    for (int offset = 0; offset < arraySizeInBytes; offset += CHUNK_SIZE) {
-
-      if (offset + CHUNK_SIZE > arraySizeInBytes) {
-        chunk.chunkSize = arraySizeInBytes - offset; 
-        memset(chunk.rawData, 0, CHUNK_SIZE);
-        memcpy(chunk.rawData, inputData + offset, chunk.chunkSize); 
-      }
-      else {
+    // loop over full chunks - handle leftovers and extra data later
+    for (offset = 0; offset < arraySizeInBytes - CHUNK_SIZE; 
+         offset += CHUNK_SIZE) {
         memcpy(chunk.rawData, inputData + offset, CHUNK_SIZE);
-      }
+        MeshStreamer<ChunkDataItem>::insertData(chunk, destinationPe); 
+        chunk.chunkNumber++; 
+    }
 
+    // final (possibly incomplete) array chunk 
+    if (offset + CHUNK_SIZE > arraySizeInBytes) {
+      chunk.chunkSize = arraySizeInBytes - offset; 
+      memset(chunk.rawData, 0, CHUNK_SIZE);
+      memcpy(chunk.rawData, inputData + offset, chunk.chunkSize); 
+    }
+
+    // extra data (place in last chunk if possible)
+    int remainingToSend = extraDataSize; 
+    int tempOffset = chunk.chunkSize; 
+    char *extraOffset = (char *) extraData;
+    do {     
+      chunk.chunkSize = min(tempOffset + remainingToSend, CHUNK_SIZE);
+      memcpy(chunk.rawData + tempOffset, extraOffset, 
+             chunk.chunkSize - tempOffset); 
+      
       MeshStreamer<ChunkDataItem>::insertData(chunk, destinationPe); 
       chunk.chunkNumber++; 
-    }
+      offset += CHUNK_SIZE; 
+      remainingToSend -= (chunk.chunkSize - tempOffset); 
+      tempOffset = 0; 
+    } while (offset < totalSizeInBytes); 
+
   }
 
   inline void processChunk(const ChunkDataItem& chunk) {
@@ -1415,7 +1433,7 @@ public:
     if (last.buffer == NULL) {
       if (outOfOrderBuffers.size() == 0) {
         // make common case fast
-        last.buffer = (char *) new dtype[chunk.numItems]; 
+        last.buffer = new char[chunk.numChunks * CHUNK_SIZE]; 
       }
       else {
         // check if chunks for this buffer have been received previously
@@ -1426,7 +1444,7 @@ public:
           outOfOrderBuffers.erase(storedBuffer); 
         }
         else {
-          last.buffer = (char *) new dtype[chunk.numItems];
+          last.buffer = new char[chunk.numChunks * CHUNK_SIZE];
         }
       }
       last.bufferNumber = chunk.bufferNumber; 
@@ -1446,7 +1464,7 @@ public:
         // allocate new buffer
         last.bufferNumber = chunk.bufferNumber; 
         last.receivedChunks = 0; 
-        last.buffer = (char *) new dtype[chunk.numItems]; 
+        last.buffer = new char[chunk.numChunks * CHUNK_SIZE];
       }
       else {
         // use existing buffer
