@@ -355,7 +355,9 @@ void CkMemCheckPT::pup(PUP::er& p)
   p|where;			// where to checkpoint
   p|peCount;
   if (p.isUnpacking()) {
-    recvCount = 0;
+  	recvCount = peCount = 0;
+ 	ackCount = 0;
+  	expectCount = -1;
 #if CMK_CONVERSE_MPI
     void pingBuddy();
     void pingCheckHandler();
@@ -1672,7 +1674,7 @@ void readKillFile(){
 #if ! CMK_CONVERSE_MPI
 void CkDieNow()
 {
-#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
          // ignored for non-mpi version
         CmiPrintf("[%d] die now.\n", CmiMyPe());
         killTime = CmiWallTimer()+0.001;
