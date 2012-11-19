@@ -47,7 +47,7 @@ class CkCacheStatistics {
   CkCacheStatistics() : dataArrived(0), dataTotalArrived(0),
     dataMisses(0), dataLocal(0), dataError(0),
     totalDataRequested(0), maxData(0), index(-1) { }
-
+  
  public:
   CkCacheStatistics(CmiUInt8 pa, CmiUInt8 pta, CmiUInt8 pm,
           CmiUInt8 pl, CmiUInt8 pe, CmiUInt8 tpr,
@@ -66,7 +66,7 @@ class CkCacheStatistics {
     os << "  Cache: Maximum of " << maxData << " data stored at a time in processor " << index << endl;
     os << "  Cache: local Chares made " << totalDataRequested << " requests" << endl;
   }
-
+  
   static CkReduction::reducerType sum;
 
   static CkReductionMsg *sumFn(int nMsg, CkReductionMsg **msgs) {
@@ -287,6 +287,8 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
   void * requestData(CkCacheKey what, CkArrayIndex &toWhom, int chunk, CkCacheEntryType<CkCacheKey> *type, CkCacheRequestorData<CkCacheKey> &req);
   void * requestDataNoFetch(CkCacheKey key, int chunk);
   CkCacheEntry<CkCacheKey> * requestCacheEntryNoFetch(CkCacheKey key, int chunk);
+  void recvData(CkCacheKey key, void *data, 
+                CkCacheFillMsg<CkCacheKey> *msg);
   void recvData(CkCacheFillMsg<CkCacheKey> *msg);
   void recvData(CkCacheKey key, CkArrayIndex &from, CkCacheEntryType<CkCacheKey> *type, int chunk, void *data);
 
@@ -446,21 +448,26 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
     return cacheTable;
   }
 
-  template<class CkCacheKey>
-  void CkCacheManager<CkCacheKey>::recvData(CkCacheFillMsg<CkCacheKey> *msg) {
-    CkCacheKey key = msg->key;
+template <class CkCacheKey> 
+inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkCacheFillMsg<CkCacheKey> *msg = NULL) {
+
     typename std::map<CkCacheKey,int>::iterator pchunk = outStandingRequests.find(key);
     CkAssert(pchunk != outStandingRequests.end());
     int chunk = pchunk->second;
     CkAssert(chunk >= 0 && chunk < numChunks);
     CkAssert(chunkAck[chunk] > 0);
     outStandingRequests.erase(pchunk);
-    
+
     typename std::map<CkCacheKey,CkCacheEntry<CkCacheKey>*>::iterator p;
     p = cacheTable[chunk].find(key);
     CkAssert(p != cacheTable[chunk].end());
     CkCacheEntry<CkCacheKey> *e = p->second;
-    e->data = e->type->unpack(msg, chunk, e->home);
+    if (msg != NULL) {
+      e->data = e->type->unpack(msg, chunk, e->home);
+    }
+    else {
+      e->data = data; 
+    }
     storedData += e->type->size(e->data);
     
     typename std::vector<CkCacheRequestorData<CkCacheKey> >::iterator caller;
@@ -468,6 +475,13 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
       caller->deliver(key, e->data, chunk);
     }
     e->requestorVec.clear();
+
+}
+
+  template<class CkCacheKey>
+  void CkCacheManager<CkCacheKey>::recvData(CkCacheFillMsg<CkCacheKey> *msg) {
+    CkCacheKey key = msg->key;
+    recvData(key, NULL, msg);     
   }
   
   template<class CkCacheKey>
