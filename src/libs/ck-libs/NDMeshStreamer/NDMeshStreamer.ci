@@ -69,13 +69,15 @@ module NDMeshStreamer {
 	  int maxNumDataItemsBuffered, int numDimensions, 
 	  int dimensionSizes[numDimensions], 
 	  const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
-	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
+	  bool yieldFlag = 0, double progressPeriodInMs = -1.0, 
+	  bool userHandlesFreeing = false);
 
     entry GroupChunkMeshStreamer(
           int numDimensions, int dimensionSizes[numDimensions], 
 	  const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
 	  int bufferSize, bool yieldFlag = 0, 
-	  double progressPeriodInMs = -1.0);
+	  double progressPeriodInMs = -1.0, 
+	  bool userHandlesFreeing = false);
 
   };
 
