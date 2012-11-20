@@ -1406,24 +1406,23 @@ public:
     }
 
     // final (possibly incomplete) array chunk 
-    if (offset + CHUNK_SIZE > arraySizeInBytes) {
-      chunk.chunkSize = arraySizeInBytes - offset; 
-      memset(chunk.rawData, 0, CHUNK_SIZE);
-      memcpy(chunk.rawData, inputData + offset, chunk.chunkSize); 
-    }
+    chunk.chunkSize = arraySizeInBytes - offset; 
+    memset(chunk.rawData, 0, CHUNK_SIZE);
+    memcpy(chunk.rawData, inputData + offset, chunk.chunkSize); 
 
     // extra data (place in last chunk if possible)
     int remainingToSend = extraDataSize; 
     int tempOffset = chunk.chunkSize; 
-    char *extraOffset = (char *) extraData;
+    int extraOffset = 0;
     do {     
       chunk.chunkSize = std::min(tempOffset + remainingToSend, CHUNK_SIZE);
-      memcpy(chunk.rawData + tempOffset, extraOffset, 
+      memcpy(chunk.rawData + tempOffset, (char *) extraData + extraOffset, 
              chunk.chunkSize - tempOffset); 
       
       MeshStreamer<ChunkDataItem>::insertData(chunk, destinationPe); 
       chunk.chunkNumber++; 
       offset += CHUNK_SIZE; 
+      extraOffset += (chunk.chunkSize - tempOffset); 
       remainingToSend -= (chunk.chunkSize - tempOffset); 
       tempOffset = 0; 
     } while (offset < totalSizeInBytes); 
