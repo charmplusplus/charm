@@ -288,7 +288,7 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
   void * requestDataNoFetch(CkCacheKey key, int chunk);
   CkCacheEntry<CkCacheKey> * requestCacheEntryNoFetch(CkCacheKey key, int chunk);
   void recvData(CkCacheKey key, void *data, 
-                CkCacheFillMsg<CkCacheKey> *msg);
+                CkCacheFillMsg<CkCacheKey> *msg = NULL);
   void recvData(CkCacheFillMsg<CkCacheKey> *msg);
   void recvData(CkCacheKey key, CkArrayIndex &from, CkCacheEntryType<CkCacheKey> *type, int chunk, void *data);
 
@@ -449,7 +449,7 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
   }
 
 template <class CkCacheKey> 
-inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkCacheFillMsg<CkCacheKey> *msg = NULL) {
+inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkCacheFillMsg<CkCacheKey> *msg) {
 
     typename std::map<CkCacheKey,int>::iterator pchunk = outStandingRequests.find(key);
     CkAssert(pchunk != outStandingRequests.end());
