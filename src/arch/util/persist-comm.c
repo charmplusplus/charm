@@ -9,8 +9,8 @@
 /*@{*/
 
 #include "converse.h"
+#if CMK_PERSISTENT_COMM
 #include "compress.h"
-
 #include "machine-persistent.h"
 
 CpvDeclare(PersistentSendsTable *, persistentSendsTableHead);
@@ -443,8 +443,8 @@ static void persistentReqGrantedHandler(void *env)
 */
 PersistentReq CmiCreateReceiverPersistent(int maxBytes)
 {
-  PersistentReq ret;
-  int i;
+    PersistentReq ret;
+    int i;
 
   PersistentHandle h = getFreeRecvSlot();
   PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
@@ -643,5 +643,5 @@ void CmiPersistentOneSend()
   if (CpvAccess(phs)) CpvAccess(curphs)++;
 }
 
-
+#endif
 /*@}*/
