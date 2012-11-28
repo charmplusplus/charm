@@ -9,10 +9,14 @@
 /*@{*/
 
 #include "gni_pub.h"
-
 #define PERSIST_MIN_SIZE                SMSG_MAX_MSG
 
+// one is for receive one is to store the previous msg
+#if DELTA_COMPRESS
+#define PERSIST_BUFFERS_NUM             2
+#else
 #define PERSIST_BUFFERS_NUM             1
+#endif
 
 #define PERSIST_SEQ                     0xFFFFFFF
 
@@ -27,22 +31,30 @@ typedef struct  _PersistentBuf {
 typedef struct _PersistentSendsTable {
   int destPE;
   int sizeMax;
-  PersistentHandle   destHandle;  
+  PersistentHandle   destHandle; 
   PersistentBuf     destBuf[PERSIST_BUFFERS_NUM];
   void *messageBuf;
   int messageSize;
   struct _PersistentSendsTable *prev, *next;
+#if DELTA_COMPRESS
+  PersistentHandle destDataHandle;
+  void  *previousMsg;
+  int   compressStart;
+  int   compressSize;
+#endif
+  int addrIndex;
 } PersistentSendsTable;
 
 typedef struct _PersistentReceivesTable {
-#if 0
-  void *messagePtr[PERSIST_BUFFERS_NUM];      /* preallocated message buffer of size "sizeMax" */
-  unsigned int *recvSizePtr[PERSIST_BUFFERS_NUM];   /* pointer to the size */
-#endif
   PersistentBuf     destBuf[PERSIST_BUFFERS_NUM];
   int sizeMax;
   size_t               index;
   struct _PersistentReceivesTable *prev, *next;
+  int           addrIndex;
+#if DELTA_COMPRESS
+  int   compressStart;
+  int   compressSize;
+#endif
 } PersistentReceivesTable;
 
 CpvExtern(PersistentReceivesTable *, persistentReceivesTableHead);

@@ -22,7 +22,7 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
     gni_post_descriptor_t *pd;
     gni_return_t status;
     RDMA_REQUEST        *rdma_request_msg;
-    
+    int         destIndex; 
     PersistentSendsTable *slot = (PersistentSendsTable *)h;
     if (h==NULL) {
         printf("[%d] LrtsSendPersistentMsg: handle from node %d to node %d is NULL. \n", CmiMyPe(), myrank, destNode);
@@ -34,10 +34,16 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         CmiAbort("Abort: Invalid size\n");
     }
 
-    if (slot->destBuf[0].destAddress) {
-        // CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
+    destIndex = slot->addrIndex;
+    if (slot->destBuf[destIndex].destAddress) {
+         //CmiPrintf("[%d===%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), destNode, h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
 
         // uGNI part
+    
+        slot->addrIndex = (destIndex+1)%PERSIST_BUFFERS_NUM;
+#if  DELTA_COMPRESS 
+        size = CompressPersistentMsg(h, size, m);
+#endif
         MallocPostDesc(pd);
         if(size <= LRTS_GNI_RDMA_THRESHOLD) {
             pd->type            = GNI_POST_FMA_PUT;
@@ -51,8 +57,8 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         pd->length          = ALIGN64(size);
         pd->local_addr      = (uint64_t) m;
        
-        pd->remote_addr     = (uint64_t)slot->destBuf[0].destAddress;
-        pd->remote_mem_hndl = slot->destBuf[0].mem_hndl;
+        pd->remote_addr     = (uint64_t)slot->destBuf[destIndex].destAddress;
+        pd->remote_mem_hndl = slot->destBuf[destIndex].mem_hndl;
 #if MULTI_THREAD_SEND
         pd->src_cq_hndl     = rdma_tx_cqh;
 #else
@@ -67,6 +73,7 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 #endif
         SetMemHndlZero(pd->local_mem_hndl);
 
+        //CmiPrintf("[%d] sending   %p  with handler=%p\n", CmiMyPe(), m, ((CmiMsgHeaderExt*)m)-> persistRecvHandler);
         //TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)pd->local_addr);
          /* always buffer */
 #if CMK_SMP || 1
@@ -292,8 +299,10 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     slot->destBuf[i].destAddress = buf;
       /* note: assume first integer in elan converse header is the msg size */
     slot->destBuf[i].destSizeAddress = (unsigned int*)buf;
+    memset(buf, 0, maxBytes+sizeof(int)*2);
   }
   slot->sizeMax = maxBytes;
+  slot->addrIndex = 0;
 #if REMOTE_EVENT
 #if !MULTI_THREAD_SEND
   CmiLock(persistPool.lock);    /* lock in function */
