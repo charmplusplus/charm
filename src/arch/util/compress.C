@@ -21,12 +21,13 @@
 #include <math.h>
 #include "compress.h"
 #include "charm++.h"
+#include <limits.h>
 
 #define     SETBIT(dest, i)  (dest[i>>3]) |= (1 << i%8 )
 #define     TESTBIT(dest, i) ((dest[i>>3]) >>  (i%8)) & 1 
 //#define     COMPRESS 1 
 #define     DEBUG  1
-#define     CHAR_BIT 8
+//#define     CHAR_BIT 8
 #define     FLOAT_BIT CHAR_BIT*sizeof(float)
 #define     FLOAT_BYTE sizeof(float)
 
