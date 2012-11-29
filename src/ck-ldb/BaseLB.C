@@ -47,6 +47,7 @@ void BaseLB::pup(PUP::er &p) {
 }
 
 void BaseLB::flushStates() {
+  Group::flushStates();
   theLbdb->ClearLoads();
 }
 
