@@ -48,7 +48,7 @@
 #endif
 
 #if !defined(LARGEPAGE)
-#define     LARGEPAGE              1
+#define     LARGEPAGE              0
 #endif
 
 #if CMK_SMP
