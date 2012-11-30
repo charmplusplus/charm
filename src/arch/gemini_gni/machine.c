@@ -48,7 +48,7 @@
 #endif
 
 #if !defined(LARGEPAGE)
-#define     LARGEPAGE              0
+#define     LARGEPAGE              1
 #endif
 
 #if CMK_SMP
@@ -2686,7 +2686,7 @@ static void PumpRemoteTransactions(gni_cq_handle_t rx_cqh)
             PersistentReceivesTable *slot = GetIndexAddress(persistPool, index);
             CmiUnlock(persistPool.lock);
             START_EVENT();
-            msg = slot->destBuf[0].destAddress;
+            msg = slot->destBuf[slot->addrIndex].destAddress;
             size = CmiGetMsgSize(msg);
             CmiReference(msg);
             CMI_CHECK_CHECKSUM(msg, size);

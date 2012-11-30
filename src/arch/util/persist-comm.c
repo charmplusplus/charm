@@ -10,7 +10,7 @@
 
 #include "converse.h"
 #if CMK_PERSISTENT_COMM
-#include "compress.h"
+#include "compress.c"
 #include "machine-persistent.h"
 
 CpvDeclare(PersistentSendsTable *, persistentSendsTableHead);
@@ -345,6 +345,7 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
             newSize = size-slot->compressSize+compressSize;
             (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
             CldSwitchHandler(msg, persistentDecompressHandlerIdx);
+            //CmiPrintf("\n[%d ] finish compressing \n", CmiMyPe() );
         }
         free(dest);
     }
