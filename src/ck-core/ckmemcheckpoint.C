@@ -65,7 +65,7 @@ void noopck(const char*, ...)
 #define CK_NO_PROC_POOL				0
 #endif
 
-#define CMK_CHKP_ALL		0
+#define CMK_CHKP_ALL		1
 #define CMK_USE_BARRIER		0
 
 //stream remote records happned only if CK_NO_PROC_POOL =1 which means the chares to pe map will change
@@ -930,7 +930,7 @@ void CkMemCheckPT::recoverBuddies()
   }
 #else
   //send to failed pe
-  if(CkMyPe()!=thisFailedPe&&chkpTable[1]->bud1==thisFailedPe){
+  if(CkMyPe()!=thisFailedPe&&chkpTable[1]!=NULL&&chkpTable[1]->bud1==thisFailedPe){
 #if CK_NO_PROC_POOL
       // find a new buddy
       int budPe = BuddyPE(CkMyPe());
