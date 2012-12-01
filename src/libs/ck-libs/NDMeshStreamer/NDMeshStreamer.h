@@ -218,9 +218,9 @@ public:
   }
 
   inline void done(int numContributorsFinished = 1) {
-
     if (useStagedCompletion_) {
       numLocalDone_ += numContributorsFinished; 
+      CkAssert(numLocalDone_ <= numLocalContributors_);
       if (numLocalDone_ == numLocalContributors_) {
         startStagedCompletion();
       }
@@ -1437,21 +1437,23 @@ public:
       if (outOfOrderBuffers_.size() == 0) {
         // make common case fast
         last.buffer = new char[chunk.numChunks * CHUNK_SIZE]; 
+        last.receivedChunks = 0;
       }
       else {
         // check if chunks for this buffer have been received previously
         std::list<ChunkOutOfOrderBuffer>::iterator storedBuffer = 
           find(outOfOrderBuffers_.begin(), outOfOrderBuffers_.end(), chunk);
         if (storedBuffer != outOfOrderBuffers_.end()) {
-          last.buffer = storedBuffer->buffer;           
-          outOfOrderBuffers_.erase(storedBuffer); 
+          last.buffer = storedBuffer->buffer;
+          last.receivedChunks = storedBuffer->receivedChunks;
+          outOfOrderBuffers_.erase(storedBuffer);
         }
         else {
           last.buffer = new char[chunk.numChunks * CHUNK_SIZE];
+          last.receivedChunks = 0;
         }
       }
       last.bufferNumber = chunk.bufferNumber; 
-      last.receivedChunks = 0; 
     }
     else if (last.bufferNumber != chunk.bufferNumber) {
       // add last to list of out of order buffers 
