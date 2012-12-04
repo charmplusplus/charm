@@ -30,7 +30,7 @@ double get_clock()
        return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
 }
 
-#define     COMPRESS 1 
+//#define     COMPRESS 1 
 #define     DEBUG  1
 #define     CHAR_BIT 8
 #define     FLOAT_BIT CHAR_BIT*sizeof(float)
@@ -64,7 +64,7 @@ void compressChar(void *src, void *dst, int size, int *compressSize, void *bData
 
 #if !COMPRESS 
     memcpy(dest, source, size*sizeof(char)); 
-    *compressSize = s;
+    *compressSize = size;
 #else
     // Is this the first time we're sending stuff to this node?
     if (baseData == NULL) {
@@ -96,7 +96,7 @@ void compressChar(void *src, void *dst, int size, int *compressSize, void *bData
 #if DEBUG
     double t = get_clock()-t1;
     //printf("[%d] ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%f ms\n\n", CmiMyPe(), size*sizeof(char), *compressSize, (size*sizeof(char)-*compressSize), (1-(char)*compressSize/(size*sizeof(char)))*100, (CmiWallTimer()-startTimer)*1000);
-    printf(" ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(char)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000000));
+    printf(" ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(float)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000000));
 #endif
 }
 
