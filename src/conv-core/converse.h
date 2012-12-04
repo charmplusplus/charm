@@ -140,7 +140,7 @@ extern int _Cmi_mype_global;
 extern int _Cmi_numpes_global;
 extern int _Cmi_mynode_global;
 extern int _Cmi_numnodes_global;
-
+extern PartitionInfo partitionInfo;
 #define CmiMyPartition()         partitionInfo.myPartition
 #define CmiPartitionSize()       partitionInfo.partitionSize
 #define CmiNumPartition()        partitionInfo.numPartitions
