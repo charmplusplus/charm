@@ -26,7 +26,7 @@ double get_clock()
 {
        struct timeval tv; int ok;
        ok = gettimeofday(&tv, NULL);
-       if (ok<0) { printf("gettimeofday error");  }
+       if (ok<0) { CmiPrintf("gettimeofday error");  }
        return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
 }
 
@@ -38,11 +38,105 @@ double get_clock()
 
 #define  COMPRESS_EXP 1
 
-
 #if  COMPRESS_EXP
-
 #define     SETBIT(dest, i)  (dest[i>>3]) |= (1 << (i&7) )
 #define     TESTBIT(dest, i) ((dest[i>>3]) >>  (i&7)) & 1 
+#define     SETBIT11(dest, i)  (dest[(i)>>3]) |= (3 << ((i)&7) )
+#define     TESTBIT11(dest, i) ((dest[(i)>>3]) >>  ((i)&7)) & 0x3l 
+
+#else
+
+#define TESTBIT(data, b) (data>>(b)) & 1
+#define SETBIT(data, index, bit) (data |= ((bit)<<(index)))
+#endif
+
+
+/** compress char is the general algorithm   for any data*/
+void compressChar(void *src, void *dst, int size, int *compressSize, void *bData)
+{
+    register char *source = (char*)src;
+    register char *dest = (char*)dst;
+    register char *baseData = (char*)bData;
+    register int i;
+#if DEBUG
+    double t1 = get_clock();
+#endif
+
+#if !COMPRESS 
+    memcpy(dest, source, size*sizeof(char)); 
+    *compressSize = s;
+#else
+    // Is this the first time we're sending stuff to this node?
+    if (baseData == NULL) {
+        baseData = (char*)malloc(size*sizeof(char));
+        memcpy(baseData, source, size*sizeof(char));
+        memcpy(dest, source, size*sizeof(char)); 
+        *compressSize = size;
+    } else {
+        // Create message to receive the compressed buffer.
+        register int _dataIndex = (size+7)/8;
+        memset(dest, 0, (size+7)/8 );
+        for (i = 0; i < size; ++i) {
+            // Bitmask everything but the exponents, then check if they match.
+            char xor_d =  source[i] ^ baseData[i];
+            short different= xor_d  & 0xff;
+            if (different) {
+                // If not, mark this exponent as "different" and store it to send with the message.
+                dest[_dataIndex] = source[i];
+                _dataIndex += 1;
+            }else
+            {
+                SETBIT(dest, i);
+            }
+
+        }
+        *compressSize = _dataIndex;
+    }
+#endif
+#if DEBUG
+    double t = get_clock()-t1;
+    //printf("[%d] ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%f ms\n\n", CmiMyPe(), size*sizeof(char), *compressSize, (size*sizeof(char)-*compressSize), (1-(char)*compressSize/(size*sizeof(char)))*100, (CmiWallTimer()-startTimer)*1000);
+    printf(" ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(char)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000000));
+#endif
+}
+
+void decompressChar(void *cData, void *dData, int size, int compressSize, void *bData) {
+#if DEBUG
+    double t1 = get_clock();
+#endif
+#if !COMPRESS
+    memcpy(dData, cData, size*sizeof(char));
+#else
+    char *compressData = (char*)cData;
+    char *baseData = (char*)bData;
+    register char *decompressData =(char*)dData;
+    register int sdataIndex = (size+7)/8;
+    register char *src = (char*)compressData;
+    register int exponent;
+    register char mantissa;
+    register char *bptr = (char*)baseData;
+    register int i;
+    for(i=0; i<size; ++i)
+    {
+       if(TESTBIT(src, i)) // same 
+       {
+
+           decompressData[i] = baseData[i];
+       }else        //different exponet
+       {
+           decompressData[i] = compressData[sdataIndex];   
+           sdataIndex += 1;
+       }
+    }
+#endif
+#if DEBUG
+    double t = get_clock()-t1;
+    printf("done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000000)) ;
+#endif
+
+}
+
+#if  COMPRESS_EXP
 
 void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void *bData)
 {
@@ -96,8 +190,8 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    //printf("[%d] ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%f ms\n\n", CmiMyPe(), size*sizeof(float), *compressSize, (size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (CmiWallTimer()-startTimer)*1000);
-    printf(" ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(float)), *compressSize, (int)(size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
+    //CmiPrintf("[%d] ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%f ms\n\n", CmiMyPe(), size*sizeof(float), *compressSize, (size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (CmiWallTimer()-startTimer)*1000);
+    CmiPrintf(" ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(float)), *compressSize, (int)(size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
 #endif
 }
 
@@ -138,29 +232,12 @@ void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, 
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    printf("done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000000)) ;
+    CmiPrintf("done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000000)) ;
 #endif
 
 }
 
 #else
-
-
-#define TESTBIT(data, b) (data>>(b)) & 1
-#define SETBIT(data, index, bit) (data |= ((bit)<<(index)))
-
-void printbitssimple(int n) {
-    unsigned int i;
-    i = 1<<(sizeof(n) * 8 - 1);
-    
-    while (i > 0) {
-        if (n & i)
-            printf("1");
-        else
-            printf("0");
-        i >>= 1;
-    }
-}
 void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void *bData)
 {
     register unsigned int *dest = (unsigned int*)dst;
@@ -186,9 +263,6 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     for (i = 0; i < size; ++i) {
         xor_data = (uptr[i])^(bptr[i]);
         zers = 0;
-        //int value = xor_data;
-        //printbitssimple(value);
-        //printf("\n\n");
         b=FLOAT_BIT-1; 
         while(!TESTBIT(xor_data, b) && zers<15){
             zers++;
@@ -208,7 +282,7 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
         } 
     }
  /*   for (int k=0; k<f_index; k++) {
-        printf("%e ",dest[k]);
+        CmiPrintf("%e ",dest[k]);
     }
    */
     *compressSize = f_index/8;
@@ -216,7 +290,7 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     
 #if DEBUG
     double t = get_clock()-t1;
-    printf("===>done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(float)), *compressSize, (int)((size*sizeof(float)-*compressSize)), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
+    //CmiPrintf("===>done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(float)), *compressSize, (int)((size*sizeof(float)-*compressSize)), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
 #endif
 
 #endif
@@ -226,6 +300,8 @@ void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, 
     int size = s/sizeof(float);
 #if DEBUG
     double t1 = get_clock();
+    if(CmiMyPe() == 5)
+        CmiPrintf("[%d] starting decompressing \n", CmiMyPe());
 #endif
 #if !COMPRESS
     memcpy(dData, cData, size*sizeof(float));
@@ -264,9 +340,253 @@ void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, 
 
 #if DEBUG
     double t = get_clock()-t1;
-    printf("done decompressing.....  orig size:%d time:%d us \n", size, (int)(t*1000000000));
+    if(CmiMyPe() == 5)
+        CmiPrintf("[%d] done decompressing.....  orig size:%d time:%d us \n", CmiMyPe(), size, (int)(t*1000000));
 #endif
 
+#endif
+}
+
+#endif
+
+
+/***************************
+ *
+ * algorithms to compress doubles
+ * *****************/
+
+#define DOUBLE_BYTE sizeof(double)
+#define BITS_DOUBLE sizeof(double)*8
+
+#if COMPRESS_EXP
+
+void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
+{
+    int size = s/DOUBLE_BYTE;
+    double *source = (double*)src;
+    double *dest = (double*)dst;
+    double *baseData = (double*)bData;
+    register unsigned long *bptr = (unsigned long*) baseData;
+    register unsigned long *uptr = (unsigned long*) source;
+    register char *uchar;
+    register int i;
+#if DEBUG
+    double t1 = get_clock();
+#endif
+
+#if !COMPRESS 
+    memcpy(dest, source, s); 
+    *compressSize = s;
+#else
+    // Is this the first time we're sending stuff to this node?
+    if (baseData == NULL) {
+        baseData = (double*)malloc(size*sizeof(double));
+        memcpy(baseData, source, s);
+        memcpy(dest, source, s); 
+    } else {
+        *compressSize = s;
+        // Create message to receive the compressed buffer.
+        register unsigned char *cdst = (unsigned char*)dest; 
+        register int _dataIndex = (2*size+7)/8;
+        memset(cdst, 0, (2*size+7)/8 );
+        for (i = 0; i < size; ++i) {
+            // Bitmask everything but the exponents, then check if they match.
+            unsigned long xord = bptr[i] ^ uptr[i];
+            unsigned long eight = xord &  0xff00000000000000;
+            unsigned long sixteen = xord &  0xffff000000000000;
+            if(sixteen == 0l)    //00
+            {
+                unsigned long ui = uptr[i];
+                memcpy(cdst+_dataIndex, &ui, 6);
+                _dataIndex += 6;
+            }
+            else if(eight == 0l)//01
+            {
+                SETBIT(cdst, i<<1);
+                unsigned long ui = uptr[i];
+                memcpy(cdst+_dataIndex, &ui, 7);
+                _dataIndex += 7;
+            }else   //11
+            {
+                SETBIT11(cdst, i<<1);
+                unsigned long ui = uptr[i];
+                memcpy(cdst+_dataIndex, &ui, 8);
+                _dataIndex += 8;
+            }
+        }
+        *compressSize = _dataIndex;
+    }
+#endif
+#if DEBUG
+    double t = get_clock()-t1;
+    //printf("[%d] ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%f ms\n\n", CmiMyPe(), size*sizeof(double), *compressSize, (size*sizeof(double)-*compressSize), (1-(double)*compressSize/(size*sizeof(double)))*100, (CmiWallTimer()-startTimer)*1000);
+    printf(" ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(double)), *compressSize, (int)(size*sizeof(double)-*compressSize), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000000));
+#endif
+}
+
+void decompressDouble(void *cData, void *dData, int s, int compressSize, void *bData) {
+    int size = s/DOUBLE_BYTE;
+#if DEBUG
+    double t1 = get_clock();
+#endif
+#if !COMPRESS
+    memcpy(dData, cData, s);
+#else
+    double *compressData = (double*)cData;
+    double *baseData = (double*)bData;
+    register unsigned long *decompressData =(unsigned long*)dData;
+    register int _sdataIndex = (2*size+7)/8;
+    register char *src = (char*)compressData;
+    register unsigned long exponent;
+    register unsigned long mantissa;
+    register unsigned long *bptr = (unsigned long*)baseData;
+    register int i;
+    for(i=0; i<size; ++i)
+    {
+        int bitss = TESTBIT(src, i<<1);
+        if(bitss==3) // different
+        {
+
+            decompressData[i] = *((unsigned long*)(src+_sdataIndex));
+            _sdataIndex += 8;
+        }else if(bitss==1) 
+        {
+            exponent = bptr[i]  & 0xff00000000000000;
+            mantissa = *((unsigned long*)(src+_sdataIndex)) & 0x00ffffffffffffff;
+            mantissa |= exponent;
+            decompressData[i] = mantissa;   
+            _sdataIndex += 7;
+        }else
+        {
+            exponent = bptr[i]  & 0xffff000000000000;
+            mantissa = *((unsigned long*)(src+_sdataIndex)) & 0x0000ffffffffffff;
+            mantissa |= exponent;
+            decompressData[i] = mantissa;   
+            _sdataIndex += 6;
+        }
+    }
+#endif
+#if DEBUG
+    double t = get_clock()-t1;
+    printf("done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000000)) ;
+#endif
+
+}
+
+
+#else
+
+void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
+{
+    register unsigned long *dest = (unsigned long*)dst;
+    register unsigned long *bptr = (unsigned long*) bData;
+    register unsigned long  *uptr = (unsigned long*) src;
+    int size = s/sizeof(double);
+#if DEBUG
+    double t1 = get_clock();
+#endif
+    
+#if !COMPRESS
+    memcpy(dest, src, size*sizeof(double));
+    *compressSize = s;
+#else
+    register int f_index = 0;
+    register int i;
+    register int j;
+    register int b;
+    register int zers;
+    register unsigned long xor_data;
+    bzero(dest, s);
+    for (i = 0; i < size; ++i) {
+        xor_data = (uptr[i])^(bptr[i]);
+        zers = 0;
+        //int value = xor_data;
+        //printbitssimple(value);
+        //printf("\n\n");
+        b=BITS_DOUBLE-1;
+        while(!TESTBIT(xor_data, b) && zers<15){
+            zers++;
+            b--;
+        }
+        //cout<<"c: "<<zers<<endl;
+        //set the LZC 4 bits
+        for(j=0; j<4; j++)
+        {
+            SETBIT(dest[(int)(f_index>>6)], (f_index&0x3f), ((unsigned long)(TESTBIT(zers, j))));
+            f_index++;
+        }
+        while(b>=0)
+        {
+            SETBIT(dest[(f_index>>6)], f_index&0x3f, TESTBIT(xor_data, b));
+            f_index++;
+            b--;
+        }
+    }
+    /*for (int k=0; k<size; k++) {
+     printf(" %f ",dest[k]);
+     }*/
+    
+    *compressSize = f_index/8;
+    double compressRatio = (1-(double)(*compressSize)/s)*100;
+    
+#if DEBUG
+    double t = get_clock()-t1;
+    printf("===>done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(double)), *compressSize, (int)((size*sizeof(double)-*compressSize)), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000000));
+#endif
+    
+#endif
+}
+
+void decompressDouble(void *cData, void *dData, int s, int compressSize, void *bData) {
+    int size = s/sizeof(double);
+#if DEBUG
+    double t1 = get_clock();
+#endif
+#if !COMPRESS
+    memcpy(dData, cData, size*sizeof(double));
+#else
+    register unsigned long *compressData = (unsigned long*)cData;
+    register unsigned long *decompressData = (unsigned long*)dData;
+    register unsigned long *baseData = (unsigned long*)bData;
+    /*for (int k=0; k<size; k++) {
+        printf("d: %d ",compressData[k]);
+    }*/
+    
+    bzero(decompressData, s);
+    register int index;
+    register unsigned long xor_data;
+    register unsigned long data = 0;
+    register int d_index=0;
+    register int compp = 0;
+    register int i;
+    register int j;
+    register int f;
+    for (i=0; i<size; i++) {
+        index = BITS_DOUBLE-1;
+        data = 0; int zers=0;
+        //read 4 bits and puts index acccordingly
+        for (f=0; f<4; f++,compp++) {
+            if(TESTBIT(compressData[(int)(compp>>6)], (compp&0x3f))){
+                for (j=0; j < (1<<f); j++) {
+                    index--; zers++;
+                }
+            }
+        }
+        //cout<<"d: "<<zers<<endl;
+        //printbitssimple();
+        while(index>=0){
+            SETBIT(data, index, TESTBIT(compressData[(int)(compp>>6)], (compp&0x3f)));
+            index--; compp++;
+        }
+        xor_data = data^(baseData[i]);
+        decompressData[i] = xor_data;
+    }
+    
+#if DEBUG
+    double t = get_clock()-t1;
+    printf("done decompressing.....  orig size:%d time:%d us \n", size, (int)(t*1000000000));
+#endif
+    
 #endif
 }
 

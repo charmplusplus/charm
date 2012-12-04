@@ -250,7 +250,8 @@ static void persistentDecompressHandler(void *msg)
     free(decompressData);
     CldRestoreHandler(msg);
     (((CmiMsgHeaderExt*)msg)->xhdl) =  (((CmiMsgHeaderExt*)msg)->xxhdl);
-    //CmiPrintf("[%d] end uncompress message is decompressed history = %p h=%p index=%d", CmiMyPe(), history, slot, historyIndex);
+    if(CmiMyPe() == 5)
+        CmiPrintf("[%d] end uncompress message is decompressed history = %p h=%p index=%d", CmiMyPe(), history, slot, historyIndex);
     CmiHandleMessage(msg);
 #else
     CmiPrintf("[%d] msg is decompressed\n", CmiMyPe());
