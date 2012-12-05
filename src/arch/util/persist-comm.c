@@ -12,7 +12,8 @@
 #if CMK_PERSISTENT_COMM
 #include "compress.c"
 #include "machine-persistent.h"
-
+#define ENVELOP_SIZE 104
+//#define PRINT_DEBUG 1 
 CpvDeclare(PersistentSendsTable *, persistentSendsTableHead);
 CpvDeclare(PersistentSendsTable *, persistentSendsTableTail);
 CpvDeclare(int, persistentSendsTableCount);
@@ -196,6 +197,11 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
   msg->sourceHandler = h;
   msg->requestorPE = CmiMyPe();
 
+#if DELTA_COMPRESS
+  slot->previousMsg  = NULL; 
+  slot->compressStart = msg->compressStart = ENVELOP_SIZE;
+  slot->compressSize = msg->compressSize = 0;
+#endif
   CmiSetHandler(msg, persistentRequestHandlerIdx);
   CmiSyncSendAndFree(destPE,sizeof(PersistentRequestMsg),msg);
 
@@ -210,9 +216,6 @@ static void persistentNoDecompressHandler(void *msg)
     int size = ((CmiMsgHeaderExt*)msg)->size;
     slot->addrIndex = (slot->addrIndex + 1)%PERSIST_BUFFERS_NUM;
     // uncompress data from historyIndex data
-    //int historyIndex = (slot->addrIndex + 1)%PERSIST_BUFFERS_NUM;
-    //char *history = (char*)(slot->destBuf[historyIndex].destAddress);
-    //CmiPrintf("[%d] uncompress[NONO]  history = %p h=%p index=%d\n", CmiMyPe(), history, slot, historyIndex);
     CldRestoreHandler(msg);
     (((CmiMsgHeaderExt*)msg)->xhdl) =  (((CmiMsgHeaderExt*)msg)->xxhdl);
     CmiHandleMessage(msg);
@@ -220,104 +223,67 @@ static void persistentNoDecompressHandler(void *msg)
 
 static void persistentDecompressHandler(void *msg)
 {
-#if 1
-    //  decompress  delta
-    //  recovery message based on previousRecvMsg
+    //  recover message based on previousRecvMsg
     PersistentReceivesTable *slot = (PersistentReceivesTable *) (((CmiMsgHeaderExt*)msg)-> persistRecvHandler);
     int     historyIndex;
     int     i;
-    char    *msgdata = (char*)msg;
+    char    *cmsg = (char*)msg;
     int     size = ((CmiMsgHeaderExt*)msg)->size;
     int     compressSize = *(int*)(msg+slot->compressStart);
+
+    if(slot->compressSize == 0)
+    {
+        slot->compressSize = size-ENVELOP_SIZE;
+    }
     char    *decompressData =(char*) malloc(slot->compressSize);
     historyIndex = (slot->addrIndex + 1)%PERSIST_BUFFERS_NUM;
     slot->addrIndex = (slot->addrIndex + 1)%PERSIST_BUFFERS_NUM;
     // uncompress data from historyIndex data
     char *history = (char*)(slot->destBuf[historyIndex].destAddress);
 
-    //CmiPrintf("[%d] begin uncompress message is decompressed [%d:%d]history = %p h=%p index=%d", CmiMyPe(), size, compressSize, history, slot, historyIndex);
-    char *base_dst = msg+size-1;
-    char *base_src = msg+size-slot->compressSize+compressSize+sizeof(int)-1;
-    for(i=0; i<size - slot->compressStart - slot->compressSize-sizeof(int); i++)
+    //STH WRONG here
+    CmiPrintf("[%d] begin uncompress message is decompressed [%d:%d:%d start:%d]\n ", CmiMyPe(), size, compressSize, slot->compressSize, slot->compressStart);
+    char *base_dst = cmsg+size-1;
+    char *base_src = cmsg+size-1-slot->compressSize+compressSize+sizeof(int);
+    int left_size = size - slot->compressStart - slot->compressSize;
+    CmiPrintf("[%d] left size=%d\n", CmiMyPe(), left_size);
+    for(i=0; i<left_size; i++)
     {
        *base_dst = *base_src;
        base_dst--;
        base_src--;
     }
-
-    decompressFloatingPoint(msg+slot->compressStart+sizeof(int), decompressData, slot->compressSize, compressSize, history+slot->compressStart);
+    
+    decompressChar(msg+slot->compressStart+sizeof(int), decompressData, slot->compressSize, compressSize, history+slot->compressStart);
     memcpy(msg+slot->compressStart, decompressData, slot->compressSize);
     free(decompressData);
     CldRestoreHandler(msg);
     (((CmiMsgHeaderExt*)msg)->xhdl) =  (((CmiMsgHeaderExt*)msg)->xxhdl);
-    if(CmiMyPe() == 5)
-        CmiPrintf("[%d] end uncompress message is decompressed history = %p h=%p index=%d", CmiMyPe(), history, slot, historyIndex);
-    CmiHandleMessage(msg);
-#else
-    CmiPrintf("[%d] msg is decompressed\n", CmiMyPe());
-    CmiPrintf("\n[%d ] decompress switching   %d:%d\n", CmiMyPe(), CmiGetXHandler(msg), CmiGetHandler(msg));
-    CldRestoreHandler(msg);
-    (((CmiMsgHeaderExt*)msg)->xhdl) =  (((CmiMsgHeaderExt*)msg)->xxhdl);
-    CmiPrintf("\n[%d ] decompress after switching   %d:%d\n", CmiMyPe(), CmiGetXHandler(msg), CmiGetHandler(msg));
-    CmiHandleMessage(msg);
+#if PRINT_DEBUG
+    static int step=0;
+    char fname[50];
+    sprintf(fname, "output.%d", step);
+    FILE *fp = fopen(fname, "w");
+    fprintf(fp, "%d\n", size-slot->compressStart);
+    for(i=slot->compressStart; i<size; i++)
+        fprintf(fp, "%c ", ((char*)msg)[i]);
+    fclose(fp);
+    step++;
 #endif
+
+    CmiHandleMessage(msg);
+    CmiPrintf("[%d] done uncompress message is decompressed [%d:%d:%d start:%d]\n ", CmiMyPe(), size, compressSize, slot->compressSize, slot->compressStart);
 }
 
-int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
-{
-    PersistentSendsTable *slot = (PersistentSendsTable *)h;
-#if 0  
-    char *user_buffer = (char*) msg + sizeof(CmiMsgHeaderExt);
-    char *old_buffer = (char*)( h->sentPreviousMsg);
-    
-    char *delta_msg = (char*) malloc(size-sizeof(CmiMsgHeaderExt));
-    for(int i=0; i<size-sizeof(CmiMsgHeaderExt); i++)
-    {
-        delta_msg[i] = user_buffer - old_buffer;
-    }
-
-    memcpy(h->sentPreviousMsg, user_buffer, size-sizeof(CmiMsgHeaderExt));
-    void  (*compressFn) (void*, void*, int, int*); 
-    void *compress_msg = msg;
-    switch(compress_mode)
-    {
-    case CMODE_ZLIB:  compressFn = zlib_compress; break;
-    case CMODE_QUICKLZ: compressFn = quicklz_compress; break;
-    case CMODE_LZ4:  compressFn = lz4_wrapper_compress; break;
-    }
-    
-    ((CmiMsgHeaderExt*)compress_msg)->compress_flag = 1;
-    ((CmiMsgHeaderExt*)compress_msg)->original_size  = size;
-    compressFn(delta_msg, compress_msg+sizeof(CmiMsgHeaderExt), size-sizeof(CmiMsgHeaderExt), &compress_size);
-
-    CldSwitchHandler(compress_msg, persistentDecompressHandlerIdx);
-    /* ** change handler  */
-    return compress_size+ sizeof(CmiMsgHeaderExt);
-#else
 #if 0
-    ((CmiMsgHeaderExt*)msg)->size = size;
-    char *history = slot->previousMsg;
-    char tmp;
-    int i;
-    char *msgdata = (char*)msg;
-    for(i=sizeof(CmiMsgHeaderExt); i < size; i++)
-    {
-        //tmp = msgdata[i]; 
-        //msgdata[i] = msgdata[i]-history[i]; 
-        msgdata[i] = msgdata[i] & 255; 
-        //history[i] = tmp;
-    }
-    ((CmiMsgHeaderExt*)msg)-> persistRecvHandler = slot->destDataHandle;
-    CmiPrintf("\n[%d ] compressing... before   old:new %d ===>%d \n", CmiMyPe(), CmiGetXHandler(msg), CmiGetHandler(msg));
-    (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
-    CldSwitchHandler(msg, persistentDecompressHandlerIdx);
-    CmiPrintf("\n[%d ] after switching   %d:%d\n", CmiMyPe(), CmiGetXHandler(msg), CmiGetHandler(msg));
-    return size;
-#else
+int CompressPersistentMsg(PersistentHandle h, int size, void **m)
+{
+    void *msg = *m;
+    PersistentSendsTable *slot = (PersistentSendsTable *)h;
     int  newSize;
     void *history = slot->previousMsg;
-    void *dest;
-    int compressSize;
+    void *dest=NULL;
+    int compressSize=size;
     if(history == NULL)
     {
         newSize = size;
@@ -327,9 +293,95 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
         CldSwitchHandler(msg, persistentNoDecompressHandlerIdx);
     }else
     {
-        dest = malloc(size+(size+7)/8);
-        compressFloatingPoint(msg+slot->compressStart, dest, slot->compressSize, &compressSize, history+slot->compressStart);
-        if(compressSize>= slot->compressSize-10*sizeof(int)) //not compress
+        if(slot->compressSize == 0)
+        {
+            slot->compressSize = size-ENVELOP_SIZE;
+        }
+        if(slot->compressSize>100)
+        {
+            dest = CmiAlloc(size);
+            compressChar((char*)msg+slot->compressStart, (char*)dest+slot->compressStart+sizeof(int), slot->compressSize, &compressSize, (char*)history+slot->compressStart);
+        }
+    
+        CmiFree(history);
+        history = msg;
+        CmiReference(msg);
+        if(slot->compressSize-compressSize <= 100) //no compress
+        {
+            newSize = size;
+            (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
+            CldSwitchHandler(msg, persistentNoDecompressHandlerIdx);
+            if(dest != NULL)
+                CmiFree(dest);
+        }else
+        {
+            //header
+            memcpy(dest, msg, slot->compressStart);
+            //compressedSize
+            *(int*)(dest+slot->compressStart) = compressSize;
+            //tail
+            int leftSize = size - slot->compressStart - slot->compressSize;
+            if(leftSize > 0)
+                memcpy((char*)dest+slot->compressStart+sizeof(int)+compressSize, msg+slot->compressStart+slot->compressSize, leftSize);
+            newSize = size-slot->compressSize+compressSize+sizeof(int);
+            (((CmiMsgHeaderExt*)dest)->xxhdl) = (((CmiMsgHeaderExt*)dest)->xhdl);
+            CldSwitchHandler(dest, persistentDecompressHandlerIdx);
+            CmiPrintf(" handler =(%d : %d : %d) (%d:%d:%d)  %d\n", (((CmiMsgHeaderExt*)dest)->hdl), (((CmiMsgHeaderExt*)dest)->xhdl), (((CmiMsgHeaderExt*)dest)->xxhdl), (((CmiMsgHeaderExt*)msg)->hdl),  (((CmiMsgHeaderExt*)msg)->xhdl), (((CmiMsgHeaderExt*)msg)->xxhdl), persistentDecompressHandlerIdx);
+            *m=dest;
+        }
+        //update history
+    }
+    ((CmiMsgHeaderExt*)*m)-> persistRecvHandler = slot->destDataHandle;
+    ((CmiMsgHeaderExt*)*m)->size = size;
+    return newSize;
+}
+
+#else
+int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
+{
+    PersistentSendsTable *slot = (PersistentSendsTable *)h;
+    int  newSize;
+    void *history = slot->previousMsg;
+    void *dest=NULL;
+    int compressSize=size;
+    int i;
+
+#if PRINT_DEBUG
+    static int step=0;
+    char fname[50];
+    sprintf(fname, "input.%d", step);
+    FILE *fp = fopen(fname, "w");
+    fprintf(fp, "%d\n", size-slot->compressStart);
+    for(i=slot->compressStart; i<size; i++)
+        fprintf(fp, "%c ", ((char*)msg)[i]);
+    fclose(fp);
+    printf("#####\n\n");
+    printf("%d\n", size-slot->compressStart);
+    for(i=slot->compressStart; i<size; i++)
+        printf("%c ", ((char*)msg)[i]);
+
+    printf("#####\n\n");
+    step++;
+#endif
+
+    
+    if(history == NULL)
+    {
+        newSize = size;
+        slot->previousMsg = msg;
+        CmiReference(msg);
+        (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
+        CldSwitchHandler(msg, persistentNoDecompressHandlerIdx);
+    }else
+    {
+        if(slot->compressSize == 0)
+        {
+            slot->compressSize = size-ENVELOP_SIZE;
+        }
+
+        dest = malloc(size);
+        compressChar(msg+slot->compressStart, dest, slot->compressSize, &compressSize, history+slot->compressStart);
+        if(slot->compressSize - compressSize <= 100) //not compress
         {
             newSize = size;
             (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
@@ -339,11 +391,11 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
             CmiReference(msg);
         }else
         {
+            memcpy(history+slot->compressStart, msg+slot->compressStart, slot->compressSize);
             *(int*)(msg+slot->compressStart) = compressSize;
-            memcpy(history+slot->compressStart, msg+slot->compressStart, slot->compressSize); 
             memcpy(msg+slot->compressStart+sizeof(int), dest, compressSize);
             memcpy(msg+slot->compressStart+compressSize+sizeof(int), msg+slot->compressStart+slot->compressSize, size-slot->compressStart-slot->compressSize);
-            newSize = size-slot->compressSize+compressSize;
+            newSize = size-slot->compressSize+compressSize+sizeof(int);
             (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
             CldSwitchHandler(msg, persistentDecompressHandlerIdx);
             //CmiPrintf("\n[%d ] finish compressing \n", CmiMyPe() );
@@ -352,10 +404,11 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
     }
     ((CmiMsgHeaderExt*)msg)-> persistRecvHandler = slot->destDataHandle;
     ((CmiMsgHeaderExt*)msg)->size = size;
+ 
     return newSize;
-#endif
-#endif
 }
+
+#endif
 #else
 #endif
 

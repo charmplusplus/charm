@@ -10,7 +10,7 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  YOUR NAME (), 
+ *         Author:  Yanhua Sun 
  *   Organization:  
  *
  * =====================================================================================
@@ -30,7 +30,7 @@ double get_clock()
        return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
 }
 
-//#define     COMPRESS 1 
+#define     COMPRESS 1 
 #define     DEBUG  1
 #define     CHAR_BIT 8
 #define     FLOAT_BIT CHAR_BIT*sizeof(float)
@@ -76,7 +76,7 @@ void compressChar(void *src, void *dst, int size, int *compressSize, void *bData
         // Create message to receive the compressed buffer.
         register int _dataIndex = (size+7)/8;
         memset(dest, 0, (size+7)/8 );
-        for (i = 0; i < size; ++i) {
+        for (i = 0; i < size&&_dataIndex<size; ++i) {
             // Bitmask everything but the exponents, then check if they match.
             char xor_d =  source[i] ^ baseData[i];
             short different= xor_d  & 0xff;
@@ -96,7 +96,7 @@ void compressChar(void *src, void *dst, int size, int *compressSize, void *bData
 #if DEBUG
     double t = get_clock()-t1;
     //printf("[%d] ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%f ms\n\n", CmiMyPe(), size*sizeof(char), *compressSize, (size*sizeof(char)-*compressSize), (1-(char)*compressSize/(size*sizeof(char)))*100, (CmiWallTimer()-startTimer)*1000);
-    printf(" ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(float)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000000));
+    printf(" +++++done compressing(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(float)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000));
 #endif
 }
 
@@ -131,7 +131,7 @@ void decompressChar(void *cData, void *dData, int size, int compressSize, void *
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    printf("done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000000)) ;
+    printf("------done decompressing.....  orig size:%d time:%d us \n", (int)size, (int)(t*1000000)) ;
 #endif
 
 }
