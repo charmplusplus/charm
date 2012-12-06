@@ -16,6 +16,7 @@ public class Main
     public static boolean m_stdout;
     public static boolean m_translate_only;
     public static boolean m_count_tokens;
+    public static boolean m_executable;
 
     public static void main(String[] args) throws Exception
     {
@@ -38,6 +39,9 @@ public class Main
                 System.out.println(header + t.translate(filename));
             }
         }
+        if(m_executable)
+            t.createExecutable(files, m_charmc);
+
     }
 
     public static String[] processArgs(String[] args) throws Exception
@@ -109,6 +113,11 @@ public class Main
             .setLongFlag("help");
         _help.setHelp("Display this help message");
         processor.registerParameter(_help);
+        
+        Switch _exec = new Switch("exe")
+        .setLongFlag("exe");
+        _exec.setHelp("call charmc and creates the executable a.out");
+        processor.registerParameter(_exec);
 
         UnflaggedOption fileList = new UnflaggedOption("file")
             .setStringParser(JSAP.STRING_PARSER)
@@ -142,6 +151,7 @@ public class Main
         m_stdout = config.getBoolean("stdout", false);
         m_translate_only = config.getBoolean("translate-only", false);
         m_count_tokens = config.getBoolean("count-tokens", false);
+        m_executable = config.getBoolean("exe", false);
         
         String usrlib = config.getString("usrlib");
         if (usrlib != null) {

@@ -142,7 +142,7 @@ public class Translator {
         writeTempFile(filename, ccOutput, OutputMode.cc);
 
         if (!m_translate_only) compileTempFiles(filename, m_charmc);
-
+	
         // Build a string representing all emitted code. This will be printed
         // by the main driver if requested via command-line argument. 
         String ciHeader = "-----CI----------------------------\n";
@@ -356,13 +356,39 @@ public class Translator {
             error("Could not compile generated C++ file");
             return;
         }
-    }
 
+    }
+    /**
+    * Create the executable file from the generated .o files
+    */
+    public void createExecutable(String[] files, String charmc) throws
+	IOException, InterruptedException
+    {
+	// Create the executable
+	File currentDir = new File(".");        
+        String cmd = charmc + "-language charm++ -o a.out ";
+	for(String filename : files){
+	    int lastDot = filename.lastIndexOf(".");
+            int lastSlash = filename.lastIndexOf("/");
+            String baseDirectory = filename.substring(0, lastSlash + 1);
+            if (baseDirectory.equals("")) {
+                baseDirectory = "./";
+            }
+            String baseTempFilename = filename.substring(lastSlash + 1, lastDot);
+ 	    cmd += baseTempFilename + ".o ";
+	}
+        int retVal = exec(cmd, currentDir);
+        if (retVal != 0) {
+            error("Could not create the executable");
+            return;
+        }
+    }
+	
     /**
      * Utility function to execute a given command line.
      */
     private int exec(String cmd, File outputDir) throws
-        IOException, InterruptedException
+    	IOException, InterruptedException
     {
         if (m_verbose) System.out.println(" [charjc] exec: " + cmd);
         Process p = Runtime.getRuntime().exec(cmd, null, outputDir);

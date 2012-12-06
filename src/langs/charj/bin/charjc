@@ -63,6 +63,9 @@ processArgs() {
             CHARMC="$1"
             shift
             ;;
+        "--exe")
+            ARGS="$ARGS $arg"
+        ;;
         *.cj)
             CJFILES="$CJFILES $arg"
             ;;
