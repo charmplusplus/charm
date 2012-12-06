@@ -66,36 +66,26 @@ void compressChar(void *src, void *dst, int size, int *compressSize, void *bData
     memcpy(dest, source, size*sizeof(char)); 
     *compressSize = size;
 #else
-    // Is this the first time we're sending stuff to this node?
-    if (baseData == NULL) {
-        baseData = (char*)malloc(size*sizeof(char));
-        memcpy(baseData, source, size*sizeof(char));
-        memcpy(dest, source, size*sizeof(char)); 
-        *compressSize = size;
-    } else {
-        // Create message to receive the compressed buffer.
-        register int _dataIndex = (size+7)/8;
-        memset(dest, 0, (size+7)/8 );
-        for (i = 0; i < size&&_dataIndex<size; ++i) {
-            // Bitmask everything but the exponents, then check if they match.
-            char xor_d =  source[i] ^ baseData[i];
-            short different= xor_d  & 0xff;
-            if (different) {
-                // If not, mark this exponent as "different" and store it to send with the message.
-                dest[_dataIndex] = source[i];
-                _dataIndex += 1;
-            }else
-            {
-                SETBIT(dest, i);
-            }
+    register int _dataIndex = (size+7)/8;
+    memset(dest, 0, (size+7)/8 );
+    for (i = 0; i < size&&_dataIndex<size; ++i) {
+        // Bitmask everything but the exponents, then check if they match.
+         char xor_d =  source[i] ^ baseData[i];
+         short different= xor_d  & 0xff;
+         if (different) {
+             // If not, mark this exponent as "different" and store it to send with the message.
+             dest[_dataIndex] = source[i];
+             _dataIndex += 1;
+         }else
+         {
+             SETBIT(dest, i);
+         }
 
-        }
-        *compressSize = _dataIndex;
     }
+    *compressSize = _dataIndex;
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    //printf("[%d] ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%f ms\n\n", CmiMyPe(), size*sizeof(char), *compressSize, (size*sizeof(char)-*compressSize), (1-(char)*compressSize/(size*sizeof(char)))*100, (CmiWallTimer()-startTimer)*1000);
     printf(" +++++done compressing(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(float)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000));
 #endif
 }
@@ -112,15 +102,11 @@ void decompressChar(void *cData, void *dData, int size, int compressSize, void *
     register char *decompressData =(char*)dData;
     register int sdataIndex = (size+7)/8;
     register char *src = (char*)compressData;
-    register int exponent;
-    register char mantissa;
-    register char *bptr = (char*)baseData;
     register int i;
     for(i=0; i<size; ++i)
     {
        if(TESTBIT(src, i)) // same 
        {
-
            decompressData[i] = baseData[i];
        }else        //different exponet
        {
@@ -131,7 +117,7 @@ void decompressChar(void *cData, void *dData, int size, int compressSize, void *
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    printf("------done decompressing.....  orig size:%d time:%d us \n", (int)size, (int)(t*1000000)) ;
+    //printf("------done decompressing.....  orig size:%d time:%d us \n", (int)size, (int)(t*1000000)) ;
 #endif
 
 }

@@ -58,7 +58,7 @@ void CmiPersistentInit();
 
 PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int start, int size);
 PersistentHandle CmiCreatePersistent(int destPE, int maxBytes, int start);
-PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes);
+PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes, int start);
 PersistentReq CmiCreateReceiverPersistent(int maxBytes);
 PersistentHandle CmiRegisterReceivePersistent(PersistentReq req);
 void CmiUsePersistentHandle(PersistentHandle *p, int n);

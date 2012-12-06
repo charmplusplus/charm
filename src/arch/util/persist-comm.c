@@ -220,10 +220,10 @@ static void persistentNoDecompressHandler(void *msg)
     int size = ((CmiMsgHeaderExt*)msg)->size;
     slot->addrIndex = (slot->addrIndex + 1)%PERSIST_BUFFERS_NUM;
     // uncompress data from historyIndex data
-    CldRestoreHandler(msg);
 #if COPY_HISTORY 
     memcpy(slot->history, msg, size);
 #endif
+    CldRestoreHandler(msg);
     (((CmiMsgHeaderExt*)msg)->xhdl) =  (((CmiMsgHeaderExt*)msg)->xxhdl);
     CmiHandleMessage(msg);
 }
@@ -233,25 +233,22 @@ static void persistentDecompressHandler(void *msg)
     //  recover message based on previousRecvMsg
     PersistentReceivesTable *slot = (PersistentReceivesTable *) (((CmiMsgHeaderExt*)msg)-> persistRecvHandler);
     int     historyIndex;
-    int     i;
+    register int i;
     char    *cmsg = (char*)msg;
     int     size = ((CmiMsgHeaderExt*)msg)->size;
     int     compressSize = *(int*)(msg+slot->compressStart);
     int     originalSize = *(int*)(msg+slot->compressStart+sizeof(int));
     
-    char    real1 = cmsg[size - originalSize +sizeof(int)+compressSize];
-    char    real2 = cmsg[size - originalSize +sizeof(int)+compressSize+1];
     char    *decompressData =(char*) malloc(originalSize);
-    historyIndex = (slot->addrIndex + 1)%PERSIST_BUFFERS_NUM;
-    slot->addrIndex = (slot->addrIndex + 1)%PERSIST_BUFFERS_NUM;
-    // uncompress data from historyIndex data
 #if COPY_HISTORY
     char *history = slot->history;
 #else
+    historyIndex = (slot->addrIndex + 1)%PERSIST_BUFFERS_NUM;
+    slot->addrIndex = (slot->addrIndex + 1)%PERSIST_BUFFERS_NUM;
     char *history = (char*)(slot->destBuf[historyIndex].destAddress);
 #endif
     //CmiPrintf("[%d] begin uncompress message is decompressed [%d:%d:%d start:%d]\n ", CmiMyPe(), size, compressSize, originalSize, slot->compressStart);
-    int left_size = size - slot->compressStart - originalSize;
+    int  left_size = size - slot->compressStart - originalSize;
     char *base_dst = cmsg+size-1;
     char *base_src = cmsg+ size - originalSize +compressSize+sizeof(int) -1;
     for(i=0; i<left_size; i++)
@@ -269,6 +266,8 @@ static void persistentDecompressHandler(void *msg)
 
 #if VERIFY
    
+    char    real1 = cmsg[size - originalSize +sizeof(int)+compressSize];
+    char    real2 = cmsg[size - originalSize +sizeof(int)+compressSize+1];
     char checksum1 = cmsg[0];
     for(i=1; i< slot->compressStart; i++)
         checksum1 ^= cmsg[i];
@@ -285,7 +284,6 @@ static void persistentDecompressHandler(void *msg)
     memcpy(slot->history, msg, size);
 #endif
     CmiHandleMessage(msg);
-    //CmiPrintf("[%d] done uncompress message is decompressed [%d:%d:%d start:%d]\n ", CmiMyPe(), size, compressSize, originalSize, slot->compressStart);
 }
 
 #if 0
@@ -356,12 +354,10 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
     int  newSize;
     void *history = slot->previousMsg;
     void *dest=NULL;
-    int compressSize=size;
-    int i;
+    int  compressSize=size;
+    int  i;
     char *cmsg = (char*)msg;
 
-    char checksum1;
-    char checksum2;
    
     ((CmiMsgHeaderExt*)msg)-> persistRecvHandler = slot->destDataHandle;
     ((CmiMsgHeaderExt*)msg)->size = size;
@@ -388,11 +384,10 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
     }
     else {
         
-        if(slot->compressSize == 0)
-        {
-            slot->compressSize = size-slot->compressStart;
-        }
+        if(slot->compressSize == 0) {slot->compressSize = size-slot->compressStart; }
 #if VERIFY
+        char checksum1;
+        char checksum2;
         void *history_save = CmiAlloc(size);
         memcpy(history_save, history, size);
         checksum1 = cmsg[0];
@@ -402,7 +397,6 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
         for(i=slot->compressStart+1; i< size; i++)
             checksum2 ^= cmsg[i];
 #endif
- 
         dest = malloc(slot->compressSize);
         compressChar(msg+slot->compressStart, dest, slot->compressSize, &compressSize, history+slot->compressStart);
 #if VERIFY
@@ -426,6 +420,7 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
             *(int*)(msg+slot->compressStart+sizeof(int)) = slot->compressSize;
             memcpy(msg+slot->compressStart+2*sizeof(int), dest, compressSize);
             int leftSize = size-slot->compressStart-slot->compressSize;
+            //depending on memcpy implementation, this might not be safe
             if(leftSize > 0)
                 memcpy(msg+slot->compressStart+compressSize+2*sizeof(int), msg+slot->compressStart+slot->compressSize, leftSize);
             newSize = slot->compressStart + compressSize + 2*sizeof(int) +leftSize;
@@ -459,7 +454,6 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
                 CmiPrintf("sth wrong data \n");
             newSize += 2;
 #endif
-            //CmiPrintf("\n[%d ] finish compressing \n", CmiMyPe() );
         }
         free(dest);
     }
@@ -472,12 +466,12 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
 #endif
 
 /* for SMP */
-PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes)
+PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes, int start)
 {
     /* randomly pick one rank on the destination node is fine for setup.
        actual message will be handled by comm thread anyway */
   int pe = CmiNodeFirst(destNode) + rand()/RAND_MAX * CmiMyNodeSize();
-  return CmiCreatePersistent(pe, maxBytes, 0);
+  return CmiCreatePersistent(pe, maxBytes, start);
 }
 
 static void persistentRequestHandler(void *env)
