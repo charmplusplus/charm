@@ -22,85 +22,88 @@ CHARMC_ARGS=
 CJFILES=
 ARGS=
 processArgs() {
-    while [ ! $# -eq 0 ]
-    do
-        arg="$1"
-        shift
+while [ ! $# -eq 0 ]
+do
+arg="$1"
+shift
 
-        case "$arg" in
-        "-h"|"--help")
-            ARGS="$ARGS $arg"
-            ;;
-        "-v"|"-V"|"--verbose")
-            VERBOSE=true
-            ARGS="$ARGS $arg"
-            ;;
-        "--AST"|"--ast")
-            ARGS="$ARGS $arg"
-            ;;
-        "--debug")
-            ARGS="$ARGS $arg"
-            ;;
-        "--stdout")
-            ARGS="$ARGS $arg"
-            ;;
-        "--stdlib")
-            STDLIB="$1"
-            shift
-            ;;
-        "--lib")
-            ARGS="$ARGS $arg $1"
-            shift
-            ;;
-        "--translate-only")
-            NOCOMPILE=true
-            ARGS="$ARGS $arg"
-            ;;
-        "--count-tokens")
-            ARGS="$ARGS $arg"
-            ;;
-        "--charmc")
-            CHARMC="$1"
-            shift
-            ;;
-        *.cj)
-            CJFILES="$CJFILES $arg"
-            ;;
-        --*|-*)
-            # unrecognized options are passed through to charmc
-            CHARMC_ARGS="$CHARMC_ARGS $arg"
-            ;;
-        *)
-            echo "discarding unrecognized argument: $arg"
-            ;;
-        esac
-    done
-    CHARMC="$CHARMC $CHARMC_ARGS"
+case "$arg" in
+"-h"|"--help")
+ARGS="$ARGS $arg"
+;;
+"-v"|"-V"|"--verbose")
+VERBOSE=true
+ARGS="$ARGS $arg"
+;;
+"--AST"|"--ast")
+ARGS="$ARGS $arg"
+;;
+"--debug")
+ARGS="$ARGS $arg"
+;;
+"--stdout")
+ARGS="$ARGS $arg"
+;;
+"--stdlib")
+STDLIB="$1"
+shift
+;;
+"--lib")
+ARGS="$ARGS $arg $1"
+shift
+;;
+"--translate-only")
+NOCOMPILE=true
+ARGS="$ARGS $arg"
+;;
+"--count-tokens")
+ARGS="$ARGS $arg"
+;;
+"--charmc")
+CHARMC="$1"
+shift
+;;
+"--exe")
+ARGS="$ARGS $arg"
+;;
+*.cj)
+CJFILES="$CJFILES $arg"
+;;
+--*|-*)
+# unrecognized options are passed through to charmc
+CHARMC_ARGS="$CHARMC_ARGS $arg"
+;;
+*)
+echo "discarding unrecognized argument: $arg"
+;;
+esac
+done
+CHARMC="$CHARMC $CHARMC_ARGS"
 }
 
 processArgs "$@"
 for file in $CJFILES; do
-    tmpdir=`dirname $file`/`basename $file`.gen
-    mkdir -p $tmpdir
-    if $VERBOSE; then
-        #echo "cpp $ARGS $file $tmpdir/$file"
-        echo "cp $file $tmpdir/$file"
-        echo "cd $tmpdir"
-    fi
-    #cpp $CHARMC_ARGS $file $tmpdir/$file
-    cp $file $tmpdir/$file
-    cd $tmpdir
-    if $VERBOSE; then
-        echo "java $CHARJ_JFLAGS charj.Main --charmc \"$CHARMC\" \
-        --stdlib $STDLIB $ARGS $file"
-    fi
-    java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB \
-        $ARGS $file
-    if ! $NOCOMPILE; then
-        cp *.o *.decl.h ..
-    fi
+tmpdir=`dirname $file`/`basename $file`.gen
+mkdir -p $tmpdir
+if $VERBOSE; then
+#echo "cpp $ARGS $file $tmpdir/$file"
+echo "cp $file $tmpdir/$file"
+echo "cd $tmpdir"
+fi
+#cpp $CHARMC_ARGS $file $tmpdir/$file
+cp $file $tmpdir/$file
+cd $tmpdir
+if $VERBOSE; then
+echo "java $CHARJ_JFLAGS charj.Main --charmc \"$CHARMC\" \
+--stdlib $STDLIB $ARGS $file"
+fi
+java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB \
+$ARGS $file
+if ! $NOCOMPILE; then
+cp *.o *.decl.h ..
+fi
 done
 
 if [ -z "$CJFILES" ]; then
-    java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB $ARGS
+java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB $ARGS
 fi
