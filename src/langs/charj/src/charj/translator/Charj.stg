@@ -16,16 +16,18 @@ mainmodule <basename> {
 
 >>
 
+
 charjReadonly_ci(pds, ros) ::=
 <<
-//<if(first(pds))>namespace <first(pds)>
-//{
+<if(first(pds))>namespace <first(pds)>
+{
 <charjReadonly_ci(pds = rest(pds), ros = ros)>
-//} // namespace <first(pds)>
+} // namespace <first(pds)>
 <else>
 <ros; separator="\n">
 <endif>
 >>
+
 
 charjSource_h(basename, pd, imports, types, ros, debug) ::=
 <<

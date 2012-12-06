@@ -6,7 +6,7 @@ public class Foo {
 }
 
 public mainchare Main {
-    public entry Main() {
+    public entry Main(CkArgMsg[~]@ m) {
         SimpleChare@ c = new SimpleChare@();
         int x = 0;
         float y = 0.0;

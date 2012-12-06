@@ -1,5 +1,5 @@
 
-readonly Main@ main;
+readonly Main@ mainProxy;
 
 extern atoi;
 
@@ -9,7 +9,7 @@ public mainchare Main {
     public entry Main(CkArgMsg[~]@ m) {
         if (m.argc < 2) n = 16;
         else n = atoi(m.argv[1]);
-        main = thisProxy;
+        mainProxy = thisProxy;
         Fib@ fib = new Fib@(true, n, thishandle);
     }
 
@@ -53,7 +53,7 @@ public chare Fib {
     }
 
     public traced void passUp() {
-        if (root) main@done(partialResult);
+        if (root) mainProxy@done(partialResult);
         else parent@gather(partialResult);
         delete this;
     }
