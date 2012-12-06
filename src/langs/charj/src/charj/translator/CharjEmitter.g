@@ -152,6 +152,15 @@ typeDeclaration
             pupInits = currentClass.generateInits(currentClass.pupInitializers);
         }
         (csds+=classScopeDeclaration)*)
+        ->{emitCI()}? chareDeclaration_ci(
+                basename={basename()},
+                sym={currentClass},
+                chareType={"chare"},
+                arrayDim={null},
+                ident={$IDENT.text}, 
+                ext={$su.st}, 
+                csds={$csds},
+                entries={null})
         -> {emitCC()}? classDeclaration_cc(
                 sym={currentClass},
                 ident={$IDENT.text}, 
