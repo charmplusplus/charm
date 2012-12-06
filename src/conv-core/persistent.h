@@ -57,7 +57,7 @@ typedef struct {
 void CmiPersistentInit();
 
 PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int start, int size);
-PersistentHandle CmiCreatePersistent(int destPE, int maxBytes);
+PersistentHandle CmiCreatePersistent(int destPE, int maxBytes, int start);
 PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes);
 PersistentReq CmiCreateReceiverPersistent(int maxBytes);
 PersistentHandle CmiRegisterReceivePersistent(PersistentReq req);

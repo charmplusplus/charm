@@ -41,7 +41,7 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         // uGNI part
     
         slot->addrIndex = (destIndex+1)%PERSIST_BUFFERS_NUM;
-#if  DELTA_COMPRESS 
+#if  DELTA_COMPRESS
         size = CompressPersistentMsg(h, size, m);
 #endif
         MallocPostDesc(pd);

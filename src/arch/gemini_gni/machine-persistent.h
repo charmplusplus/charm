@@ -10,10 +10,14 @@
 
 #include "gni_pub.h"
 #define PERSIST_MIN_SIZE                SMSG_MAX_MSG
-
+//#define COPY_HISTORY                          1
 // one is for receive one is to store the previous msg
 #if DELTA_COMPRESS
+#if COPY_HISTORY 
+#define PERSIST_BUFFERS_NUM             1
+#else
 #define PERSIST_BUFFERS_NUM             2
+#endif
 #else
 #define PERSIST_BUFFERS_NUM             1
 #endif
@@ -39,6 +43,7 @@ typedef struct _PersistentSendsTable {
 #if DELTA_COMPRESS
   PersistentHandle destDataHandle;
   void  *previousMsg;
+  int   previousSize;
   int   compressStart;
   int   compressSize;
 #endif
@@ -53,7 +58,7 @@ typedef struct _PersistentReceivesTable {
   int           addrIndex;
 #if DELTA_COMPRESS
   int   compressStart;
-  int   compressSize;
+  void  *history;
 #endif
 } PersistentReceivesTable;
 
