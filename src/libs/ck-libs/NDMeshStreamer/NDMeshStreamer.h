@@ -1316,8 +1316,8 @@ struct ChunkOutOfOrderBuffer {
   int sourcePe;
   char *buffer;
 
-  ChunkOutOfOrderBuffer(int b, int s, char *buf)
-    : bufferNumber(b), receivedChunks(0), sourcePe(s), buffer(buf) {}
+  ChunkOutOfOrderBuffer(int b, int r, int s, char *buf)
+    : bufferNumber(b), receivedChunks(r), sourcePe(s), buffer(buf) {}
 
   bool operator==(const ChunkDataItem &chunk) {
     return ( (chunk.bufferNumber == bufferNumber) && 
@@ -1458,6 +1458,7 @@ public:
     else if (last.bufferNumber != chunk.bufferNumber) {
       // add last to list of out of order buffers 
       ChunkOutOfOrderBuffer lastOutOfOrderBuffer(last.bufferNumber, 
+                                                 last.receivedChunks,
                                                  chunk.sourcePe, last.buffer); 
       outOfOrderBuffers_.push_front(lastOutOfOrderBuffer);
  
