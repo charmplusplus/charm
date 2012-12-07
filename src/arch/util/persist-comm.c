@@ -403,7 +403,11 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
             checksum2 ^= cmsg[i];
 #endif
         //dest = malloc(slot->compressSize);
+#if EXTERNAL_COMPRESS
         int maxSize = (slot->compressSize+40)>LZ4_compressBound(slot->compressSize) ? slot->compressSize+40 : LZ4_compressBound(slot->compressSize);
+#else
+        int maxSize = slot->compressSize;
+#endif
         dest = malloc(maxSize);
         compressChar(msg+slot->compressStart, dest, slot->compressSize, &compressSize, history+slot->compressStart);
 #if VERIFY
