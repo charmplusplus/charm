@@ -10,7 +10,12 @@
 
 #include "converse.h"
 #if CMK_PERSISTENT_COMM
+//#define EXTERNAL_COMPRESS 1
+#if EXTERNAL_COMPRESS
+#include "compress-external.c"
+#else
 #include "compress.c"
+#endif
 #include "machine-persistent.h"
 #define ENVELOP_SIZE 104
 //#define VERIFY 1 
@@ -397,7 +402,9 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
         for(i=slot->compressStart+1; i< size; i++)
             checksum2 ^= cmsg[i];
 #endif
-        dest = malloc(slot->compressSize);
+        //dest = malloc(slot->compressSize);
+        int maxSize = (slot->compressSize+40)>LZ4_compressBound(slot->compressSize) ? slot->compressSize+40 : LZ4_compressBound(slot->compressSize);
+        dest = malloc(maxSize);
         compressChar(msg+slot->compressStart, dest, slot->compressSize, &compressSize, history+slot->compressStart);
 #if VERIFY
         void *recover = malloc(slot->compressSize);

@@ -31,7 +31,7 @@ double get_clock()
 }
 
 #define     COMPRESS 1 
-#define     DEBUG  1
+//#define     DEBUG  1
 #define     CHAR_BIT 8
 #define     FLOAT_BIT CHAR_BIT*sizeof(float)
 #define     FLOAT_BYTE sizeof(float)
@@ -117,7 +117,7 @@ void decompressChar(void *cData, void *dData, int size, int compressSize, void *
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    //printf("------done decompressing.....  orig size:%d time:%d us \n", (int)size, (int)(t*1000000)) ;
+    printf("------done decompressing.....  orig size:%d time:%d us \n", (int)size, (int)(t*1000000)) ;
 #endif
 
 }
@@ -577,3 +577,5 @@ void decompressDouble(void *cData, void *dData, int s, int compressSize, void *b
 }
 
 #endif
+
+
