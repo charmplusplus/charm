@@ -1,10 +1,10 @@
 #include "zlib-compress.c"
-#include "quicklz-compress.c"
+//#include "quicklz-compress.c"
 #include "lz4.h"
 static int compress_mode;
 #define     CMODE_NOCOMPRESS 0
 #define     CMODE_ZLIB  1
-#define     CMODE_QUICKLZ 2
+//#define     CMODE_QUICKLZ 2
 #define     CMODE_LZ4     3
 #define OUT_PLACE 1
 
@@ -27,7 +27,7 @@ void initCompress()
     switch(compress_mode)
     {
         case CMODE_ZLIB:    zlib_init();    break;
-        case CMODE_QUICKLZ: quicklz_init(); break;
+        //case CMODE_QUICKLZ: quicklz_init(); break;
         case CMODE_LZ4:     lz4_init();     break;
     }
 
@@ -50,7 +50,7 @@ void compressChar(void *src, void *dst, int size, int *compressSize, void *bData
     switch(compress_mode)
     {
      case CMODE_ZLIB:    compressFn = zlib_compress; break;
-     case CMODE_QUICKLZ: compressFn = quicklz_compress; break;
+     //case CMODE_QUICKLZ: compressFn = quicklz_compress; break;
      case CMODE_LZ4:     compressFn = lz4_wrapper_compress; break;
     }
     char *xor=malloc(size);
@@ -73,7 +73,7 @@ void decompressChar(void *cData, void *dData, int size, int compressSize, void *
     switch(compress_mode)
     {
     case CMODE_ZLIB: decompressFn = zlib_decompress; break;
-    case CMODE_QUICKLZ: decompressFn = quicklz_decompress; break;
+    //case CMODE_QUICKLZ: decompressFn = quicklz_decompress; break;
     case CMODE_LZ4: decompressFn = lz4_wrapper_decompress; break;
     }
     char *xor=(char*)malloc(size);
