@@ -1761,6 +1761,13 @@ extern int _immRunning;
         "stwcx. %1, 0, %2\n\t" \
         "bne- loop%=" \
         : "=m"(input), "=&r"(output) : "r"(&input), "m"(input) : "memory")
+#elif CMK_C_SYNC_PRIMITIVES
+/* #include <sys/syscall.h> */
+#define CmiMemoryReadFence()           __sync_synchronize()
+#define CmiMemoryWriteFence()          __sync_synchronize()
+#define CmiMemoryAtomicIncrement(someInt)  __sync_add_and_fetch(&someInt, 1)
+#define CmiMemoryAtomicDecrement(someInt)  __sync_sub_and_fetch(&someInt, 1)
+#define CmiMemoryAtomicFetchAndInc(input,output) output=__sync_fetch_and_add(&input, 1)
 #else
 #define CMK_NO_ASM_AVAILABLE    1
 extern CmiNodeLock cmiMemoryLock;
