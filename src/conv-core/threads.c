@@ -498,7 +498,7 @@ void CtgInstallTLS(void *cur, void *next)
   switchTLS(cur, newtls);
 }
 
-static tlsseg_t  _oldtlsseg[128];
+static tlsseg_t  _oldtlsseg[128] = {0};
 static int       tlsseg_ptr = -1;
 void CmiDisableTLS()
 {
@@ -515,6 +515,8 @@ void CmiEnableTLS()
 }
 #else
 void CtgInstallTLS(void *cur, void *next) {}
+void CmiDisableTLS() {}
+void CmiEnableTLS() {}
 #endif
 
 static void CthBaseInit(char **argv)

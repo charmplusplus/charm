@@ -17,7 +17,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "cklists.h"
 #include "memory-isomalloc.h"
 
-//#include "cmitls.h"
+#include "cmitls.h"
 
 class TCharmTraceLibList;
 
@@ -282,7 +282,7 @@ void TCHARM_Api_trace(const char *routineName, const char *libraryName);
 class TCharmAPIRoutine {
 	int state; //stores if the isomallocblockactivate and ctginstall need to be skipped during activation
 	CtgGlobals oldGlobals;	// this is actually a pointer
-//        tlsseg_t   oldtlsseg;   // for TLS globals
+        tlsseg_t   oldtlsseg;   // for TLS globals
 #ifdef CMK_BIGSIM_CHARM
 	void *callEvent; // The BigSim-level event that called into the library
         int pe;          // in case thread migrates
@@ -312,8 +312,8 @@ class TCharmAPIRoutine {
 			state |= 0x10;	// skip CtgInstall
 		}
                 if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-                        //CtgInstallTLS(&oldtlsseg, NULL); //switch to main thread
-                        CmiDisableTLS();
+                        CtgInstallTLS(&oldtlsseg, NULL); //switch to main thread
+                        //CmiDisableTLS();
                 }
 		//Disable migratable memory allocation while in Charm++:
 		TCharm::deactivateThread();
@@ -349,9 +349,9 @@ class TCharmAPIRoutine {
 			}
 		}
                 if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-                        //tlsseg_t cur;
-                        //CtgInstallTLS(&cur, &oldtlsseg);
-                        CmiEnableTLS();
+                        tlsseg_t cur;
+                        CtgInstallTLS(&cur, &oldtlsseg);
+                        //CmiEnableTLS();
                 }
 
 #ifdef CMK_BIGSIM_CHARM
