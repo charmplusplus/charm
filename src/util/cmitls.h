@@ -33,4 +33,8 @@ typedef struct {
 } tlsseg_t;
 
 
+#else
+
+typedef int  tlsseg_t;            /* fake */
+
 #endif

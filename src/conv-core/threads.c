@@ -423,7 +423,6 @@ static void CthThreadBaseInit(CthThreadBase *th)
 
   th->listener = NULL;
 
-
   th->magic = THD_MAGIC_NUM;
 }
 
@@ -489,6 +488,35 @@ static void CthThreadBaseFree(CthThreadBase *th)
 
 CpvDeclare(int, _numSwitches); /*Context switch count*/
 
+#if CMK_THREADS_BUILD_TLS
+static tlsseg_t _ctgTLS;
+
+void CtgInstallTLS(void *cur, void *next)
+{
+  tlsseg_t *newtls = (tlsseg_t *)next;
+  if (newtls == NULL)   newtls = &_ctgTLS;
+  switchTLS(cur, newtls);
+}
+
+static tlsseg_t  _oldtlsseg[128];
+static int       tlsseg_ptr = -1;
+void CmiDisableTLS()
+{
+  tlsseg_ptr++;
+  CmiAssert(tlsseg_ptr < 128);
+  switchTLS(&_oldtlsseg[tlsseg_ptr], &_ctgTLS);
+}
+
+void CmiEnableTLS()
+{
+  tlsseg_t  dummy;
+  switchTLS(&dummy, &_oldtlsseg[tlsseg_ptr]);
+  tlsseg_ptr --;
+}
+#else
+void CtgInstallTLS(void *cur, void *next) {}
+#endif
+
 static void CthBaseInit(char **argv)
 {
   CpvInitialize(int, _numSwitches);
@@ -511,6 +539,7 @@ static void CthBaseInit(char **argv)
 
 #if CMK_THREADS_BUILD_TLS
   CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
+  currentTLS(&_ctgTLS);
 #endif
 }
 
