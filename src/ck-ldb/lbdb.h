@@ -65,6 +65,10 @@ typedef struct {
 
 typedef struct _LDObjid {
   int id[OBJ_ID_SZ];
+#ifdef TEMP_LDB
+	int *getID(){return id;}
+#endif
+
 #if CMK_GLOBAL_LOCATION_UPDATE
   char dimension;
   char nInts;

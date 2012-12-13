@@ -19,6 +19,7 @@ module EveryLB {
   extern module TreeMatchLB;
   extern module RefineSwapLB;
   extern module CommAwareRefineLB;
+  extern module AdaptiveLB;
   extern module ComboCentLB;
   extern module GraphPartLB;
   extern module GraphBFTLB;
@@ -33,7 +34,7 @@ module EveryLB {
   extern module RefineTopoLB;
   extern module TopoCentLB;
   extern module TopoLB;
-  extern module AdaptiveLB;
+  extern module TempAwareRefineLB;
 
   initnode void initEveryLB(void);
 };

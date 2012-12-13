@@ -31,6 +31,10 @@ public:
    /*   int computeId; replaced by Id */
 //   LDObjHandle handle;
    LDObjid  id;
+#ifdef TEMP_LDB
+	 int omid;
+#endif
+
    int processor; // caller to ReBalancer MAY leave this field -1, 
    int oldProcessor; // stores the current assignment of the compute object.
    int migratable;

@@ -1,0 +1,8 @@
+module TempAwareRefineLB {
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] TempAwareRefineLB : CentralLB {
+  entry void TempAwareRefineLB(const CkLBOptions &);  
+};
+
+};

@@ -73,6 +73,13 @@ public:
 #endif
 } 
   CentralLB(CkMigrateMessage *m):BaseLB(m) {}
+#if defined(TEMP_LDB) 
+	float getTemp(int);
+	int physicalCoresPerNode;
+	int logicalCoresPerNode,numSockets;
+	int logicalCoresPerChip;
+#endif
+
   virtual ~CentralLB();
 
   void pup(PUP::er &p);
@@ -214,6 +221,7 @@ public:
   void preprocess(LDStats* stats);
   virtual LBMigrateMsg* Strategy(LDStats* stats);
   virtual void work(LDStats* stats);
+	virtual void changeFreq(int n);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
   virtual LBMigrateMsg * extractMigrateMsg(LBMigrateMsg *m, int p);
 
@@ -232,9 +240,9 @@ protected:
   void findSimResults(LDStats* stats, int count, 
                       LBMigrateMsg* msg, LBSimulation* simResults);
   void removeNonMigratable(LDStats* statsDataList, int count);
-
+	CProxy_CentralLB thisProxy;
 private:  
-  CProxy_CentralLB thisProxy;
+//CProxy_CentralLB thisProxy;
   int myspeed;
   int stats_msg_count;
   CLBStatsMsg **statsMsgsList;
@@ -273,6 +281,10 @@ public:
 //class CLBStatsMsg: public CMessage_CLBStatsMsg {
 class CLBStatsMsg {
 public:
+#if defined(TEMP_LDB)
+	float pe_temp;
+#endif
+
   int from_pe;
   int pe_speed;
   LBRealType total_walltime;
@@ -297,6 +309,10 @@ public:
   CLBStatsMsg(int osz, int csz);
   CLBStatsMsg(): from_pe(0), pe_speed(0), total_walltime(0.0), idletime(0.0),
 		 bg_walltime(0.0), n_objs(0), objData(NULL), n_comm(0),
+#if defined(TEMP_LDB)
+		pe_temp(1.0),
+#endif
+
 #if CMK_LB_CPUTIMER
 		 total_cputime(0.0), bg_cputime(0.0),
 #endif

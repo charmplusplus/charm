@@ -119,6 +119,12 @@ void CentralLB::initLB(const CkLBOptions &opt)
 
   load_balancer_created = 1;
 #endif
+#ifdef TEMP_LDB
+	logicalCoresPerNode=physicalCoresPerNode=4;
+	logicalCoresPerChip=4;
+	numSockets=1;
+#endif
+
 }
 
 CentralLB::~CentralLB()
@@ -218,6 +224,48 @@ void CentralLB::ProcessAtSync()
 #endif
 }
 
+#if defined(TEMP_LDB)
+static int cpufreq_sysfs_read (int proc)
+{
+        FILE *fd;
+        char path[100];
+        int i=proc;
+        sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",i);
+
+        fd = fopen (path, "r");
+
+        if (!fd) {
+                printf("33 FILE OPEN ERROR file=%s\n",path);
+                return 0;
+        }
+        char val[10];
+        fgets(val,10,fd);
+        int ff=atoi(val);
+        fclose (fd);
+
+        return ff;
+}
+
+float CentralLB::getTemp(int cpu)
+{
+        char val[10];
+        FILE *f;
+                char path[100];
+                sprintf(path,"/sys/devices/platform/coretemp.%d/temp1_input",cpu);
+                f=fopen(path,"r");
+                if (!f) {
+                        printf("777 FILE OPEN ERROR file=%s\n",path);
+                        exit(0);
+                }
+
+        if(f==NULL) {printf("ddddddddddddddddddddddddddd\n");exit(0);}
+        fgets(val,10,f);
+        fclose(f);
+        return atof(val)/1000;
+}
+#endif
+
+
 // called only on 0
 void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
 {
@@ -268,8 +316,15 @@ void CentralLB::BuildStatsMsg()
   theLbdb->GetTime(&msg->total_walltime,&msg->total_walltime,
 		   &msg->idletime, &msg->bg_walltime,&msg->bg_walltime);
 #endif
-
+#if defined(TEMP_LDB)
+	float mytemp=getTemp(CkMyPe()%physicalCoresPerNode);
+	int freq=cpufreq_sysfs_read (CkMyPe()%logicalCoresPerNode);
+	msg->pe_temp=mytemp;
+	msg->pe_speed=freq;
+#else
   msg->pe_speed = myspeed;
+#endif
+
   DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
 
   msg->n_objs = osz;
@@ -410,6 +465,11 @@ void CentralLB::depositData(CLBStatsMsg *m)
 
   const int pe = m->from_pe;
   struct ProcStats &procStat = statsData->procs[pe];
+#if defined(TEMP_LDB)
+	procStat.pe_temp=m->pe_temp;
+	procStat.pe_speed=m->pe_speed;
+#endif
+
   procStat.pe = pe;
   procStat.total_walltime = m->total_walltime;
   procStat.idletime = m->idletime;
@@ -419,6 +479,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.bg_cputime = m->bg_cputime;
 #endif
   procStat.pe_speed = m->pe_speed;
+
   //procStat.utilization = 1.0;
   procStat.available = CmiTrue;
   procStat.n_objs = m->n_objs;
@@ -504,6 +565,11 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
       statsData->n_objs += m->n_objs;
       statsData->n_comm += m->n_comm;
 #endif
+#if defined(TEMP_LDB)
+			procStat.pe_temp=m->pe_temp;
+			procStat.pe_speed=m->pe_speed;
+#endif
+
       stats_msg_count++;
     }
   }    // end of for
@@ -1108,6 +1174,11 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 #endif
 }
 
+void CentralLB::changeFreq(int r)
+{
+	CkAbort("ERROR: changeFreq in CentralLB should never be called!\n");
+}
+
 void CentralLB::work(LDStats* stats)
 {
   // does nothing but print the database
@@ -1427,6 +1498,10 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|pe_speed;
   p|total_walltime;
   p|idletime;
+#if defined(TEMP_LDB)
+	p|pe_temp;
+#endif
+
   p|bg_walltime;
 #if CMK_LB_CPUTIMER
   p|total_cputime;

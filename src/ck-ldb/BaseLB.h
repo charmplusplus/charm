@@ -34,6 +34,10 @@ public:
   struct ProcStats {		// per processor data
     int n_objs;			// number of objects on the processor
     double pe_speed;		// processor frequency
+#if defined(TEMP_LDB)
+	float pe_temp;
+#endif
+
     /// total time (total_walltime) = idletime + overhead (bg_walltime)
     ///                             + object load (obj_walltime)
     /// walltime and cputime may be different on shared compute nodes

@@ -18,6 +18,7 @@ ALL_LDBS=\
    $(L)/libmoduleTreeMatchLB.a \
    $(L)/libmoduleRefineSwapLB.a \
    $(L)/libmoduleCommAwareRefineLB.a \
+   $(L)/libmoduleAdaptiveLB.a \
    $(L)/libmoduleComboCentLB.a \
    $(L)/libmoduleGraphPartLB.a \
    $(L)/libmoduleGraphBFTLB.a \
@@ -32,7 +33,7 @@ ALL_LDBS=\
    $(L)/libmoduleRefineTopoLB.a \
    $(L)/libmoduleTopoCentLB.a \
    $(L)/libmoduleTopoLB.a \
-   $(L)/libmoduleAdaptiveLB.a \
+   $(L)/libmoduleTempAwareRefineLB.a \
    manager.o
 
 
@@ -144,6 +145,12 @@ $(L)/libmoduleCommAwareRefineLB.a: CommAwareRefineLB.o
 LBHEADERS += CommAwareRefineLB.h CommAwareRefineLB.decl.h
 
 
+$(L)/libmoduleAdaptiveLB.a: AdaptiveLB.o 
+	$(CHARMC) -o $(L)/libmoduleAdaptiveLB.a AdaptiveLB.o 
+	
+LBHEADERS += AdaptiveLB.h AdaptiveLB.decl.h
+
+
 $(L)/libmoduleComboCentLB.a: ComboCentLB.o 
 	$(CHARMC) -o $(L)/libmoduleComboCentLB.a ComboCentLB.o 
 	
@@ -228,10 +235,10 @@ $(L)/libmoduleTopoLB.a: TopoLB.o
 LBHEADERS += TopoLB.h TopoLB.decl.h
 
 
-$(L)/libmoduleAdaptiveLB.a: AdaptiveLB.o
-	$(CHARMC) -o $(L)/libmoduleAdaptiveLB.a AdaptiveLB.o
-
-LBHEADERS += AdaptiveLB.h AdaptiveLB.decl.h
+$(L)/libmoduleTempAwareRefineLB.a: TempAwareRefineLB.o 
+	$(CHARMC) -o $(L)/libmoduleTempAwareRefineLB.a TempAwareRefineLB.o 
+	
+LBHEADERS += TempAwareRefineLB.h TempAwareRefineLB.decl.h
 
 
 $(L)/libmoduleTempAwareGreedyLB.a: TempAwareGreedyLB.o 
@@ -284,6 +291,7 @@ ALL_LB_OBJS=EveryLB.o \
     TreeMatchLB.o \
     RefineSwapLB.o \
     CommAwareRefineLB.o \
+    AdaptiveLB.o \
     ComboCentLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
@@ -298,7 +306,7 @@ ALL_LB_OBJS=EveryLB.o \
     RefineTopoLB.o \
     TopoCentLB.o \
     TopoLB.o \
-    AdaptiveLB.o \
+    TempAwareRefineLB.o \
     TempAwareGreedyLB.o \
     MetisLB.o \
     ScotchLB.o \
@@ -329,6 +337,7 @@ EVERYLB_DEPS=EveryLB.o \
     TreeMatchLB.o \
     RefineSwapLB.o \
     CommAwareRefineLB.o \
+    AdaptiveLB.o \
     ComboCentLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
@@ -343,7 +352,7 @@ EVERYLB_DEPS=EveryLB.o \
     RefineTopoLB.o \
     TopoCentLB.o \
     TopoLB.o \
-    AdaptiveLB.o \
+    TempAwareRefineLB.o \
     manager.o \
     tm_tree.o  \
     tm_timings.o  \
@@ -369,6 +378,7 @@ COMMONLBS_DEPS=CommonLBs.o \
     TreeMatchLB.o \
     RefineSwapLB.o \
     CommAwareRefineLB.o \
+    AdaptiveLB.o \
     manager.o \
     tm_tree.o  \
     tm_timings.o  \
