@@ -449,7 +449,7 @@ rangeExpression
     ;
 
 rangeList returns [int len]
-    :   (r+=rangeExpression)*
+    :   (r+=rangeExpression)* { $len = $r.size(); }
         -> template(t={$r}) "<t; separator=\", \">"
     ;
 
