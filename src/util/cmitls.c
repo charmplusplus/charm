@@ -80,7 +80,7 @@ void currentTLS(tlsseg_t* cur) {
 
 void switchTLS(tlsseg_t* cur, tlsseg_t* next) {
 #if CMK_TLS_SWITCHING64
-#if 1
+#if 0
   asm volatile ("movq %%fs:0x0, %0\n\t"
                 : "=r"(cur->memseg));
   if (cur->memseg == next->memseg) return;      /* same */
@@ -95,10 +95,9 @@ void switchTLS(tlsseg_t* cur, tlsseg_t* next) {
 #endif
 #elif CMK_TLS_SWITCHING32
   asm volatile ("movl %%gs:0x0, %0\n\t"
-                : "=r"(cur->memseg));
-  if (cur->memseg == next->memseg) return;
-  asm volatile ("movl %1, %%gs:0x0\n\t"
-                : "=r"(next->memseg));
+                "movl %1, %%gs:0x0\n\t"
+                : "=r"(cur->memseg)
+                : "r"(next->memseg));
 #else
   fprintf(stderr, "TLS globals are not supported.");
   abort();
