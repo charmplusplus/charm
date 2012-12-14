@@ -34,6 +34,7 @@ ALL_LDBS=\
    $(L)/libmoduleTopoCentLB.a \
    $(L)/libmoduleTopoLB.a \
    $(L)/libmoduleTempAwareRefineLB.a \
+   $(L)/libmoduleTempAwareCommLB.a \
    manager.o
 
 
@@ -241,6 +242,12 @@ $(L)/libmoduleTempAwareRefineLB.a: TempAwareRefineLB.o
 LBHEADERS += TempAwareRefineLB.h TempAwareRefineLB.decl.h
 
 
+$(L)/libmoduleTempAwareCommLB.a: TempAwareCommLB.o 
+	$(CHARMC) -o $(L)/libmoduleTempAwareCommLB.a TempAwareCommLB.o 
+	
+LBHEADERS += TempAwareCommLB.h TempAwareCommLB.decl.h
+
+
 $(L)/libmoduleTempAwareGreedyLB.a: TempAwareGreedyLB.o 
 	$(CHARMC) -o $(L)/libmoduleTempAwareGreedyLB.a TempAwareGreedyLB.o 
 	
@@ -307,6 +314,7 @@ ALL_LB_OBJS=EveryLB.o \
     TopoCentLB.o \
     TopoLB.o \
     TempAwareRefineLB.o \
+    TempAwareCommLB.o \
     TempAwareGreedyLB.o \
     MetisLB.o \
     ScotchLB.o \
@@ -353,6 +361,7 @@ EVERYLB_DEPS=EveryLB.o \
     TopoCentLB.o \
     TopoLB.o \
     TempAwareRefineLB.o \
+    TempAwareCommLB.o \
     manager.o \
     tm_tree.o  \
     tm_timings.o  \

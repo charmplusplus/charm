@@ -75,6 +75,7 @@ public:
   CentralLB(CkMigrateMessage *m):BaseLB(m) {}
 #if defined(TEMP_LDB) 
 	float getTemp(int);
+	  FILE* logFD;
 	int physicalCoresPerNode;
 	int logicalCoresPerNode,numSockets;
 	int logicalCoresPerChip;

@@ -258,7 +258,7 @@ class ObjLoadGreater {
       return (v1.getVertexLoad() > v2.getVertexLoad());
     }
 };
-
+/*
 void TempAwareRefineLB::changeFreq(int nFreq)
 {
 #ifdef TEMP_LDB
@@ -275,6 +275,7 @@ void TempAwareRefineLB::changeFreq(int nFreq)
   }
 #endif
 }
+*/
 #ifdef TEMP_LDB
 int getTaskIdForMigration(ObjGraph *ogr,int pe,int start)
 {

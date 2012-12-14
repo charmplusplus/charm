@@ -225,6 +225,34 @@ void CentralLB::ProcessAtSync()
 }
 
 #if defined(TEMP_LDB)
+static int  cpufreq_sysfs_write (
+                     const char *setting,int proc
+                     )
+{
+char path[100];
+sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",proc);
+                FILE *fd = fopen (path, "w");
+
+                if (!fd) {
+                        printf("PROC#%d ooooooo666 FILE OPEN ERROR file=%s\n",CkMyPe(),path);
+                        return -1;
+                }
+//                else CkPrintf("PROC#%d opened freq file=%s\n",proc,path);
+
+        fseek ( fd , 0 , SEEK_SET );
+        int numw=fprintf (fd, setting);
+        if (numw <= 0) {
+
+                fclose (fd);
+                printf("FILE WRITING ERROR\n");
+                return 0;
+        }
+//        else CkPrintf("Freq for Proc#%d set to %s numw=%d\n",proc,setting,numw);
+        fclose(fd);
+        return 1;
+}
+
+
 static int cpufreq_sysfs_read (int proc)
 {
         FILE *fd;
@@ -1173,10 +1201,30 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   return NULL;
 #endif
 }
-
+/*
 void CentralLB::changeFreq(int r)
 {
 	CkAbort("ERROR: changeFreq in CentralLB should never be called!\n");
+}
+*/
+void CentralLB::changeFreq(int nFreq)
+{
+#ifdef TEMP_LDB
+        //CkPrintf("PROC#%d in changeFreq numProcs=%d\n",CkMyPe(),nFreq);
+//  for(int i=0;i<numProcs;i++)
+  {
+//        if(procFreq[i]!=procFreqNew[i])
+        {
+              char newfreq[10];
+              sprintf(newfreq,"%d",nFreq);
+              cpufreq_sysfs_write(newfreq,CkMyPe()%physicalCoresPerNode);//i%physicalCoresPerNode);
+//            CkPrintf("PROC#%d freq changing from %d to %d temp=%f\n",i,procFreq[i],procFreqNew[i],procTemp[i]);
+        }
+  }
+#else
+	CmiAbort("You should never call CentralLB::changeFreq without using the flag TEMP_LDB\n");
+#endif
+
 }
 
 void CentralLB::work(LDStats* stats)

@@ -61,6 +61,7 @@ ScotchLB.decl.h ScotchLB.def.h: ScotchLB.ci.stamp
 ScotchRefineLB.decl.h ScotchRefineLB.def.h: ScotchRefineLB.ci.stamp
 ScotchTopoLB.decl.h ScotchTopoLB.def.h: ScotchTopoLB.ci.stamp
 TeamLB.decl.h TeamLB.def.h: TeamLB.ci.stamp
+TempAwareCommLB.decl.h TempAwareCommLB.def.h: TempAwareCommLB.ci.stamp
 TempAwareGreedyLB.decl.h TempAwareGreedyLB.def.h: TempAwareGreedyLB.ci.stamp
 TempAwareRefineLB.decl.h TempAwareRefineLB.def.h: TempAwareRefineLB.ci.stamp
 tempo.decl.h tempo.def.h: tempo.ci.stamp

@@ -1,0 +1,9 @@
+module TempAwareCommLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] TempAwareCommLB : CentralLB {
+  entry void TempAwareCommLB(const CkLBOptions &);  
+};
+
+};
