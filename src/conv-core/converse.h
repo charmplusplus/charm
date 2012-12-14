@@ -1300,6 +1300,12 @@ CtgGlobals CtgCurrentGlobals(void);
 void CtgInstall_var(CtgGlobals g, void *ptr);
 void CtgUninstall_var(CtgGlobals g, void *ptr);
 
+/** for TLS globals */
+typedef struct tlsseg    *CtgTLSGlobals;
+void CtgInstallTLS(CtgTLSGlobals cur, CtgTLSGlobals next);
+void CmiEnableTLS();
+void CmiDisableTLS();
+
 /* The thread listener structure. The user must register one such listener
 	if he wants to find out when a thread is suspended or when it starts running
 	or gets destroyed. It can be used for tracing etc.

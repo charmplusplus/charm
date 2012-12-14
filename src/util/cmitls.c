@@ -58,23 +58,47 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
 }
 
 void switchTLS(tlsseg_t* , tlsseg_t* ) __attribute__((optimize(0)));
+void currentTLS(tlsseg_t*) __attribute__((optimize(0)));
 
 /* void allocNewTLSSegEmpty(tlsseg_t* t) {
  *   void* aux = CmiIsomallocAlign(t->align, t->size);
  *     t->memseg = (Addr) (aux + t->size);
  *     } */
 
+void currentTLS(tlsseg_t* cur) {
+#if CMK_TLS_SWITCHING64
+  asm volatile ("movq %%fs:0x0, %0\n\t"
+                : "=r"(cur->memseg));
+#elif CMK_TLS_SWITCHING32
+  asm volatile ("movl %%gs:0x0, %0\n\t"
+                : "=r"(cur->memseg));
+#else
+  fprintf(stderr, "TLS globals are not supported.");
+  abort();
+#endif
+}
+
 void switchTLS(tlsseg_t* cur, tlsseg_t* next) {
 #if CMK_TLS_SWITCHING64
+#if 1
+  asm volatile ("movq %%fs:0x0, %0\n\t"
+                : "=r"(cur->memseg));
+  if (cur->memseg == next->memseg) return;      /* same */
+  asm volatile ("movq %0, %%fs:0x0\n\t"
+                :
+                : "r"(next->memseg));
+#else
   asm volatile ("movq %%fs:0x0, %0\n\t"
                 "movq %1, %%fs:0x0\n\t"
                 : "=r"(cur->memseg)
                 : "r"(next->memseg));
+#endif
 #elif CMK_TLS_SWITCHING32
   asm volatile ("movl %%gs:0x0, %0\n\t"
-                "movl %1, %%gs:0x0\n\t"
-                : "=r"(cur->memseg)
-                : "r"(next->memseg));
+                : "=r"(cur->memseg));
+  if (cur->memseg == next->memseg) return;
+  asm volatile ("movl %1, %%gs:0x0\n\t"
+                : "=r"(next->memseg));
 #else
   fprintf(stderr, "TLS globals are not supported.");
   abort();
