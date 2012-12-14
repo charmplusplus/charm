@@ -52,8 +52,9 @@ To make use of Charj;
 \begin{enumerate}
 \item Go to: {\it charm/src/langs/charj} and {\it "make" } (Assuming Charm++ is already installed)
 \item Write your Charj code in a file with {\it .cj} extension. {\it (SampleProgram.cj)}
-\item Execute {\it charjc} script on the file {\it SampleProgram.cj}: \\ {\it charm/src/langs/charj/bin/charjc  SampleProgram.cj}
-\item After execution, a folder named {\it“SampleProgram.cj.gen”} will be created in the directory of {\it SampleProgram.cj}. This folder will contain the emitted Charm++ files; {\it SampleProgram.ci, SampleProgram.h SampleProgram.cc }.
+\item Execute {\it charjc} script on the file {\it SampleProgram.cj}: \\ {\it \$ charm/src/langs/charj/bin/charjc  SampleProgram.cj} \\ \\ For other compiler options, use help: \\ {\it \$ charm/src/langs/bin/charjc -h}
+
+\item After execution of {\it charjc} script, a folder named {\it“SampleProgram.cj.gen”} will be created in the directory of {\it SampleProgram.cj}. This folder will contain the emitted Charm++ files; {\it SampleProgram.ci, SampleProgram.h SampleProgram.cc }.
 
 * Example Charj programs can be found at {\it charm/src/langs/charj/tests}
 \end{enumerate}
