@@ -313,7 +313,6 @@ class TCharmAPIRoutine {
 		}
                 if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
                         CtgInstallTLS(&oldtlsseg, NULL); //switch to main thread
-                        //CmiDisableTLS();
                 }
 		//Disable migratable memory allocation while in Charm++:
 		TCharm::deactivateThread();
@@ -351,7 +350,6 @@ class TCharmAPIRoutine {
                 if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
                         tlsseg_t cur;
                         CtgInstallTLS(&cur, &oldtlsseg);
-                        //CmiEnableTLS();
                 }
 
 #ifdef CMK_BIGSIM_CHARM

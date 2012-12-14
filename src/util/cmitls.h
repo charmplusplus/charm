@@ -26,7 +26,7 @@ typedef Elf64_Ehdr Ehdr;
 typedef Elf64_Phdr Phdr;
 #endif
 
-typedef struct {
+typedef struct tlsseg {
   Addr memseg;
   size_t size;
   size_t align;
@@ -35,6 +35,6 @@ typedef struct {
 
 #else
 
-typedef int  tlsseg_t;            /* fake */
+typedef int  tlsseg_t;            /* place holder */
 
 #endif

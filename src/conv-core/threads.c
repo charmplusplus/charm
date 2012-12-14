@@ -491,11 +491,10 @@ CpvDeclare(int, _numSwitches); /*Context switch count*/
 #if CMK_THREADS_BUILD_TLS
 static tlsseg_t _ctgTLS;
 
-void CtgInstallTLS(void *cur, void *next)
+void CtgInstallTLS(CtgTLSGlobals cur, CtgTLSGlobals next)
 {
-  tlsseg_t *newtls = (tlsseg_t *)next;
-  if (newtls == NULL)   newtls = &_ctgTLS;
-  switchTLS(cur, newtls);
+  if (next == NULL)   next = &_ctgTLS;
+  switchTLS(cur, next);
 }
 
 static tlsseg_t  _oldtlsseg[128] = {0};
@@ -514,7 +513,7 @@ void CmiEnableTLS()
   tlsseg_ptr --;
 }
 #else
-void CtgInstallTLS(void *cur, void *next) {}
+void CtgInstallTLS(CtgTLSGlobals cur, CtgTLSGlobals next) {}
 void CmiDisableTLS() {}
 void CmiEnableTLS() {}
 #endif
