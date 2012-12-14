@@ -167,6 +167,16 @@ FDECL void FTN_NAME(CMIENABLEISOMALLOC, cmienableisomalloc) ()
   CmiEnableIsomalloc();
 }
 
+FDECL void FTN_NAME(CMIDISABLETLS, cmidisabletls) ()
+{
+  CmiDisableTLS();
+}
+
+FDECL void FTN_NAME(CMIENABLETLS, cmienabletls) ()
+{
+  CmiEnableTLS();
+}
+
 FDECL void FTN_NAME(CMIMEMORYCHECK, cmimemorycheck) ()
 {
   CmiMemoryCheck();

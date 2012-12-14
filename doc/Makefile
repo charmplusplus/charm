@@ -4,7 +4,7 @@ RMCMD	= rm -f ./pplmanual.sty
 WEBDIR	= /www/manuals
 DIRS	= converse convext charm++ libraries f90charm charisma pose \
 	fem ifem netfem ampi bigsim mblock projections tcharm debugger faq \
-	bignetsim
+	bignetsim charj
 
 all: pdf ps html
 
