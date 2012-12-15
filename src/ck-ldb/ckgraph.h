@@ -139,6 +139,11 @@ class Vertex {
     std::vector<Edge> recvFromList;
     std::vector<McastSrc> mcastToList;
     std::vector<McastDest> mcastFromList;
+		double getCompLoad() {return compLoad;}
+		void setCompLoad(double s) {compLoad = s;}
+    int getCurrPe() {return currPe;}
+    void setCurrPe(int s) {currPe = s;}
+
 
   private:
     int id;		// index in the LDStats array

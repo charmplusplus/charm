@@ -1,7 +1,7 @@
 /** \file ckgraph.h
- *  Author: Abhinav S Bhatele
- *  Date Created: October 29th, 2010
- *  E-mail: bhatele@illinois.edu
+ *  Author: Osman Sarood
+ *  Date Created: December 14th, 2012
+ *  E-mail: sarood1@illinois.edu
  *
  */
 

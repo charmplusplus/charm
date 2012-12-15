@@ -1,32 +1,19 @@
+/** \file TempAwareCommLB.C
+ *
+ *  Written by Osman Sarood
+ *  This load balancing strategy is meant for temperature control. It is mandotry to 
+ *  have access to frequency control to use it. It is a mixture of Refine and Comm LBs
+ *  in addition to normalization being done according to frequencies. 
+ *  This load balancer can also cater for sensitivity to frequency that an applicaiton 
+ *  has to frequency.  
+ */
+
+/*@{*/
 //#define NO_TEMP_LB
 //#define ORG_VERSION
 //#define MAX_MIN
 #define MAX_TEMP 49
 //#define tolerance 0.03
-
-/** \file TempAwareCommLB.C
- *
- *  Written by Harshitha Menon
- *  
- *  This Loadbalancer strategy is Refine but taking into consideration the
- *  Communication between the processors.
- *  The following are the steps in the loadbalancing strategy
- *
- *  1. Construct a max heap of processor load whose load is greater than avg
- *  2. Construct a sorted array of processor load whose load is less than avg
- *  3. Pick the heaviest processor from the heap, randomly select a chare in
- *  that processor and decide on which processor in the underloaded processor
- *  list to transfer it to based on the one with which it is 
- *  heavily communicating.
- *  4. If the load of the processors after the transfer is less than the avg
- *  load, then push it into the underloaded processor list, else push it into
- *  the max heap.
- */
-
-/**
- * \addtogroup CkLdb
-*/
-/*@{*/
 
 #include "TempAwareCommLB.h"
 #include "ckgraphTemp.h"

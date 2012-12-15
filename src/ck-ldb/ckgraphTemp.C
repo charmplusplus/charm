@@ -1,7 +1,7 @@
-/** \file ckgraph.C
- *  Author: Abhinav S Bhatele
- *  Date Created: October 29th, 2010
- *  E-mail: bhatele@illinois.edu
+/** \file ckgraphTemp.C
+ *  Author: Osman Sarood
+ *  Date Created: December 14th, 2012
+ *  E-mail: sarood1@illinois.edu
  *
  */
 
@@ -32,7 +32,7 @@ void ProcArrayTemp::convertToInsts(BaseLB::LDStats *stats)
 void ObjGraphTemp::convertToInsts(BaseLB::LDStats *stats)
 {
   for(int vert = 0; vert < stats->n_objs; vert++) {
-    vertices[vert].compLoad   = vertices[vert].compLoad * procFreq[vertices[vert].currPe];
+    vertices[vert].setCompLoad(vertices[vert].getCompLoad() * procFreq[vertices[vert].getCurrPe()]);
   } // end for
 
 }

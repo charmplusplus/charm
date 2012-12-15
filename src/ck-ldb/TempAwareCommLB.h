@@ -1,7 +1,3 @@
-/**
- * \addtogroup CkLdb
-*/
-/*@{*/
 
 #ifndef _COMMAWARELB_H_
 #define _COMMAWARELB_H_
