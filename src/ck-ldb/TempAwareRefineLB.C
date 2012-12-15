@@ -5,12 +5,8 @@
 //#define tolerance 0.03
 /** \file TempAwareRefineLB.C
  *
- *  Written by Gengbin Zheng
- *  Updated by Abhinav Bhatele, 2010-12-09 to use ckgraph
- *
- *  Status:
- *    -- Does not support pe_speed's currently
- *    -- Does not support nonmigratable attribute
+ *  Written by Osman Sarood
+ *  Temperature aware load balancer. Needs frequency control access to work.
  */
 
 /**
