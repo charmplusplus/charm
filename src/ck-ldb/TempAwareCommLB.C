@@ -2,7 +2,7 @@
 //#define ORG_VERSION
 //#define MAX_MIN
 #define MAX_TEMP 49
-#define tolerance 0.03
+//#define tolerance 0.03
 
 /** \file TempAwareCommLB.C
  *
@@ -29,7 +29,7 @@
 /*@{*/
 
 #include "TempAwareCommLB.h"
-#include "ckgraph.h"
+#include "ckgraphTemp.h"
 #include <algorithm>
 #include <map>
 
@@ -272,6 +272,29 @@ void PrintProcObj(ProcArray *parr, std::vector<int>* parr_objs) {
   CkPrintf("---------------------\n");
 }
 
+void TempAwareCommLB::populateEffectiveFreq(int numProcs)
+{
+#ifdef TEMP_LDB
+  for(int i=0;i<numProcs;i++)
+  {
+    for(int j=0;j<numAvailFreqs;j++)
+    {
+      if(freqs[j] == procFreqNew[i]) // same freq . copy effective freq
+      {
+        procFreqNewEffect[i] = freqsEffect[j];
+//        CkPrintf("** Proc%d j:%d NEWFreq:%d\n",i,j,procFreqNewEffect[i]);
+      }
+      if(freqs[j] == procFreq[i])
+      {
+        procFreqEffect[i] = freqsEffect[j];
+//        CkPrintf("-- Proc%d j:%d OLDFreq:%d procFreq:%d \n",i,j,procFreqEffect[i],procFreq[i]);
+      }
+    }
+  }
+#endif
+}
+
+
 void TempAwareCommLB::initStructs(LDStats* stats)
 {
 #ifdef TEMP_LDB
@@ -389,10 +412,13 @@ void TempAwareCommLB::work(LDStats* stats) {
 // initialize structures for TempLBs
 	initStructs(stats);
 	tempControl();
+	populateEffectiveFreq(stats->nprocs());
 //////////////////////////////////////////////////////
 	CkPrintf(" ================== in TempAwareCommLB::work() ===========\n");
-  ProcArray *parr = new ProcArray(stats);       // Processor Array
-  ObjGraph *ogr = new ObjGraph(stats);          // Object Graph
+  ProcArrayTemp *parr = new ProcArrayTemp(stats,procFreq,procFreqNew);       // Processor Array
+	parr->convertToInsts(stats);
+  ObjGraphTemp *ogr = new ObjGraphTemp(stats,procFreq,procFreqNew);          // Object Graph
+	ogr->convertToInsts(stats);
   double avgload = parr->getAverageLoad();      // Average load of processors
 
   // Sets to false if it is overloaded, else to true
@@ -483,6 +509,7 @@ void TempAwareCommLB::work(LDStats* stats) {
       int randd = rand();
       random = randd % parr_objs[p.getProcId()].size();
       randomly_obj_id = parr_objs[p.getProcId()][random];
+//need to update the load below .. account for freqs
       obj_load = ogr->vertices[randomly_obj_id].getVertexLoad();
 
       // CkPrintf("Heavy %d: Parr obj size : %d random : %d random obj id : %d\n", p_index,
@@ -687,7 +714,7 @@ inline void getPossiblePes(std::vector<int>& possible_pes, int vert,
   // Sort the pe communication vector for this chare
   std::sort(objpcomm.pcomm.begin(), objpcomm.pcomm.end(),
       ProcCommGreater());
-
+/*
   int pe_id;
   int node_id;
   int node_size;
@@ -706,6 +733,7 @@ inline void getPossiblePes(std::vector<int>& possible_pes, int vert,
       //CkPrintf("\t %d:%d (comm: %d)\n",node_id, node_first+j, objpcomm.pcomm[i].num_bytes); 
     }
   }
+*/
 }
 
 

@@ -21,6 +21,8 @@ public:
     int    id;
 
   };
+	void populateEffectiveFreq(int numProcs);
+	void convertToInsts();
   int procsPerNode,*freqsEffect,*procFreq,*procFreqEffect,*procFreqNewEffect,*procFreqNew,numProcs,coresPerChip,*freqs,numAvailFreqs;
   int numChips,*procFreqPtr;
 	void initStructs(LDStats *s);

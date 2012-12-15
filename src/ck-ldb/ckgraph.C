@@ -15,7 +15,6 @@
 
 ProcArray::ProcArray(BaseLB::LDStats *stats) {
   int numPes = stats->nprocs();
-
   // fill the processor array
   procs.resize(numPes);
 
@@ -28,6 +27,7 @@ ProcArray::ProcArray(BaseLB::LDStats *stats) {
     procs[pe].totalLoad() = stats->procs[pe].total_walltime - stats->procs[pe].idletime;
     procs[pe].available = stats->procs[pe].available;
     avgLoad += procs[pe].totalLoad();
+//		CkPrintf("PE%d overhead:%f totalLoad:%f \n",pe,procs[pe].overhead(),procs[pe].totalLoad());
   }
   avgLoad /= numPes;
 }

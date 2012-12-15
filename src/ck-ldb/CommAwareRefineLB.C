@@ -173,7 +173,7 @@ void CommAwareRefineLB::work(LDStats* stats) {
   if (_lb_args.debug()>1) 
     CkPrintf("[%d] In CommAwareRefineLB strategy\n",CkMyPe());
 
-  CkPrintf("Average load %E\n", avgload);
+  CkPrintf("-- Average load %E\n", avgload);
 
   int vert, i, j;
   int curr_pe;

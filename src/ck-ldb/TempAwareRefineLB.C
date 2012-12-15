@@ -2,7 +2,7 @@
 //#define ORG_VERSION
 //#define MAX_MIN
 #define MAX_TEMP 49
-#define tolerance 0.03
+//#define tolerance 0.03
 /** \file TempAwareRefineLB.C
  *
  *  Written by Gengbin Zheng

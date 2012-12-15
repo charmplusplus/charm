@@ -18,10 +18,23 @@
 #include "BaseLB.h"
 #include "ckgraph.h"
 
-class ProcArrayTemp : ProcArray {
+class ProcArrayTemp : public ProcArray {
   public:
-    ProcArrayTemp(BaseLB::LDStats *stats);
+		int *procFreq, *procFreqNew;
+		void convertToInsts(BaseLB::LDStats *);
+    ProcArrayTemp(BaseLB::LDStats *stats, int *p,int *pn) : ProcArray(stats){
+			procFreqNew = pn; procFreq = p;
+		}
     ~ProcArrayTemp() { }
+};
+
+class ObjGraphTemp : public ObjGraph {
+	public:
+		int *procFreq, *procFreqNew;
+		ObjGraphTemp(BaseLB::LDStats *stats,int *p, int *pn):ObjGraph(stats){
+			procFreqNew = pn; procFreq = p;
+		}
+		void convertToInsts(BaseLB::LDStats *);
 };
 
 #endif // _CKGRAPHTEMP_H_

@@ -34,7 +34,7 @@ class ProcInfo {
     inline double &pe_speed() { return _pe_speed; }
     inline bool isAvailable() { return available; }
 
-  private:
+  protected:
     int id;		// CkMyPe of the processor
     double _overhead;	// previously called background load (bg_walltime)
     double _totalLoad;	// includes object_load + overhead
@@ -52,7 +52,7 @@ class ProcArray {
     // vector containing the list of processors
     std::vector<ProcInfo> procs;
 
-  private:
+  protected:
     double avgLoad;
 };
 
