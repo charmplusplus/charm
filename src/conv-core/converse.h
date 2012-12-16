@@ -1301,7 +1301,8 @@ void CtgInstall_var(CtgGlobals g, void *ptr);
 void CtgUninstall_var(CtgGlobals g, void *ptr);
 
 /** for TLS globals */
-typedef struct tlsseg    *CtgTLSGlobals;
+#include "cmitls.h"
+typedef tlsseg_t    *CtgTLSGlobals;
 void CtgInstallTLS(CtgTLSGlobals cur, CtgTLSGlobals next);
 void CmiEnableTLS();
 void CmiDisableTLS();
