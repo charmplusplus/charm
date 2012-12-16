@@ -1,3 +1,5 @@
+#if !defined(CMITLS_H)
+#define CMITLS_H
 
 #include "conv-config.h"
 
@@ -36,5 +38,7 @@ typedef struct tlsseg {
 #else
 
 typedef int  tlsseg_t;            /* place holder */
+
+#endif
 
 #endif
