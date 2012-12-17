@@ -11,11 +11,11 @@
 #include "converse.h"
 #if CMK_PERSISTENT_COMM
 //#define EXTERNAL_COMPRESS 1
-#if EXTERNAL_COMPRESS
-#include "compress-external.c"
-#else
+//#if EXTERNAL_COMPRESS
+//#else
 #include "compress.c"
-#endif
+#include "compress-external.c"
+//#endif
 #include "machine-persistent.h"
 #define ENVELOP_SIZE 104
 //#define VERIFY 1 
@@ -34,6 +34,7 @@ typedef struct _PersistentRequestMsg {
   PersistentHandle sourceHandler;
 #if DELTA_COMPRESS
   int   compressStart;
+  int   dataType;
 #endif
 } PersistentRequestMsg;
 
@@ -157,7 +158,7 @@ PersistentHandle getFreeRecvSlot()
         message.
 ******************************************************************************/
 
-PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compressStart, int compressSize)
+PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compressStart, int compressSize, int type)
 {
   PersistentHandle h;
   PersistentSendsTable *slot;
@@ -178,6 +179,7 @@ PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compr
   slot->previousMsg  = NULL; 
   slot->compressStart =  msg->compressStart = compressStart;
   slot->compressSize = compressSize;
+  slot->dataType = msg->dataType = type;
 #endif
   CmiSetHandler(msg, persistentRequestHandlerIdx);
   CmiSyncSendAndFree(destPE,sizeof(PersistentRequestMsg),msg);
@@ -185,7 +187,7 @@ PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compr
   return h;
 }
 
-PersistentHandle CmiCreatePersistent(int destPE, int maxBytes, int start)
+PersistentHandle CmiCreatePersistent(int destPE, int maxBytes, int start, int type)
 {
   PersistentHandle h;
   PersistentSendsTable *slot;
@@ -210,6 +212,7 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes, int start)
   else
       slot->compressStart =  msg->compressStart = start;
   slot->compressSize =  0;
+  slot->dataType = msg->dataType = type;
 #endif
   CmiSetHandler(msg, persistentRequestHandlerIdx);
   CmiSyncSendAndFree(destPE,sizeof(PersistentRequestMsg),msg);
@@ -262,8 +265,15 @@ static void persistentDecompressHandler(void *msg)
        base_dst--;
        base_src--;
     }
-    
-    decompressChar(msg + slot->compressStart+2*sizeof(int), decompressData, originalSize, compressSize, history+slot->compressStart);
+
+    if(slot->dataType == CMI_FLOATING) 
+    	decompressFloatingPoint(msg + slot->compressStart+2*sizeof(int), decompressData, originalSize, compressSize, history+slot->compressStart);
+    else if(slot->dataType == CMI_CHAR) 
+	decompressChar(msg + slot->compressStart+2*sizeof(int), decompressData, originalSize, compressSize, history+slot->compressStart);
+    else if(slot->dataType == CMI_ZLIB) 
+	decompressZlib(msg + slot->compressStart+2*sizeof(int), decompressData, originalSize, compressSize, history+slot->compressStart);
+    else if(slot->dataType == CMI_LZ4) 
+	decompressLz4(msg + slot->compressStart+2*sizeof(int), decompressData, originalSize, compressSize, history+slot->compressStart);
     memcpy(msg+slot->compressStart, decompressData, originalSize);
     free(decompressData);
     CldRestoreHandler(msg);
@@ -409,7 +419,15 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
         int maxSize = slot->compressSize;
 #endif
         dest = malloc(maxSize);
+    if(slot->dataType == CMI_FLOATING) 
+        compressFloatingPoint(msg+slot->compressStart, dest, slot->compressSize, &compressSize, history+slot->compressStart);
+    else if(slot->dataType == CMI_CHAR)
         compressChar(msg+slot->compressStart, dest, slot->compressSize, &compressSize, history+slot->compressStart);
+    else if(slot->dataType == CMI_ZLIB)
+        compressZlib(msg+slot->compressStart, dest, slot->compressSize, &compressSize, history+slot->compressStart);
+    else if(slot->dataType == CMI_LZ4) 
+        compressLz4(msg+slot->compressStart, dest, slot->compressSize, &compressSize, history+slot->compressStart);
+
 #if VERIFY
         void *recover = malloc(slot->compressSize);
         decompressChar(dest, recover, slot->compressSize, compressSize, history_save+slot->compressStart);
@@ -477,12 +495,12 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
 #endif
 
 /* for SMP */
-PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes, int start)
+PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes, int start, int type)
 {
     /* randomly pick one rank on the destination node is fine for setup.
        actual message will be handled by comm thread anyway */
   int pe = CmiNodeFirst(destNode) + rand()/RAND_MAX * CmiMyNodeSize();
-  return CmiCreatePersistent(pe, maxBytes, start);
+  return CmiCreatePersistent(pe, maxBytes, start, type);
 }
 
 static void persistentRequestHandler(void *env)
@@ -501,6 +519,7 @@ static void persistentRequestHandler(void *env)
 
 #if DELTA_COMPRESS
   slot->compressStart = msg->compressStart;
+  slot->dataType = msg->dataType;
 #if COPY_HISTORY
   slot->history = malloc(msg->maxBytes);
 #endif

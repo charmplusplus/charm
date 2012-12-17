@@ -46,6 +46,7 @@ typedef struct _PersistentSendsTable {
   int   previousSize;
   int   compressStart;
   int   compressSize;
+  int 	dataType;
 #endif
   int addrIndex;
 } PersistentSendsTable;
@@ -58,6 +59,7 @@ typedef struct _PersistentReceivesTable {
   int           addrIndex;
 #if DELTA_COMPRESS
   int   compressStart;
+  int 	dataType;
   void  *history;
 #endif
 } PersistentReceivesTable;

@@ -86,7 +86,7 @@ void compressChar(void *src, void *dst, int size, int *compressSize, void *bData
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    printf(" +++++done compressing(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(float)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000));
+    printf(" +++++CHAR done compressing(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(float)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000));
 #endif
 }
 
@@ -117,7 +117,7 @@ void decompressChar(void *cData, void *dData, int size, int compressSize, void *
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    printf("------done decompressing.....  orig size:%d time:%d us \n", (int)size, (int)(t*1000000)) ;
+    printf("------CHAR done decompressing.....  orig size:%d time:%d us \n", (int)size, (int)(t*1000000)) ;
 #endif
 
 }
@@ -176,8 +176,7 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    //CmiPrintf("[%d] ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%f ms\n\n", CmiMyPe(), size*sizeof(float), *compressSize, (size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (CmiWallTimer()-startTimer)*1000);
-    CmiPrintf(" ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(float)), *compressSize, (int)(size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
+    CmiPrintf(" ===> FLOATING done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(float)), *compressSize, (int)(size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
 #endif
 }
 
@@ -218,7 +217,7 @@ void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, 
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    CmiPrintf("done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000000)) ;
+    //CmiPrintf("--- FLOATING done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000000)) ;
 #endif
 
 }
@@ -267,16 +266,12 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
             b--;
         } 
     }
- /*   for (int k=0; k<f_index; k++) {
-        CmiPrintf("%e ",dest[k]);
-    }
-   */
     *compressSize = f_index/8;
     float compressRatio = (1-(float)(*compressSize)/s)*100;
     
 #if DEBUG
     double t = get_clock()-t1;
-    //CmiPrintf("===>done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(float)), *compressSize, (int)((size*sizeof(float)-*compressSize)), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
+    CmiPrintf("===>[floating point lzc]done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(float)), *compressSize, (int)((size*sizeof(float)-*compressSize)), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
 #endif
 
 #endif
@@ -405,8 +400,7 @@ void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    //printf("[%d] ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%f ms\n\n", CmiMyPe(), size*sizeof(double), *compressSize, (size*sizeof(double)-*compressSize), (1-(double)*compressSize/(size*sizeof(double)))*100, (CmiWallTimer()-startTimer)*1000);
-    printf(" ===>done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(double)), *compressSize, (int)(size*sizeof(double)-*compressSize), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000000));
+    printf(" ===>[double lzc] done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(double)), *compressSize, (int)(size*sizeof(double)-*compressSize), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000000));
 #endif
 }
 
@@ -517,7 +511,7 @@ void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
     
 #if DEBUG
     double t = get_clock()-t1;
-    printf("===>done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(double)), *compressSize, (int)((size*sizeof(double)-*compressSize)), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000000));
+    printf("===>double lzc done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(double)), *compressSize, (int)((size*sizeof(double)-*compressSize)), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000000));
 #endif
     
 #endif

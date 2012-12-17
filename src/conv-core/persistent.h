@@ -56,9 +56,9 @@ typedef struct {
 
 void CmiPersistentInit();
 
-PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int start, int size);
-PersistentHandle CmiCreatePersistent(int destPE, int maxBytes, int start);
-PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes, int start);
+PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int start, int size, int type);
+PersistentHandle CmiCreatePersistent(int destPE, int maxBytes, int start, int type);
+PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes, int start, int type);
 PersistentReq CmiCreateReceiverPersistent(int maxBytes);
 PersistentHandle CmiRegisterReceivePersistent(PersistentReq req);
 void CmiUsePersistentHandle(PersistentHandle *p, int n);
@@ -71,7 +71,8 @@ void CmiPersistentOneSend();
 typedef int PersistentRecvHandle;
 
 #define CmiPersistentInit()
-#define CmiCreatePersistent(x,y)  0
+#define CmiCreatePersistent(x,y,z,t)  0
+#define CmiCreateCompressPersistent(x,y,z,t,m) 0
 #define CmiCreateReceiverPersistent(maxBytes)   0
 #define CmiRegisterReceivePersistent(req)  0
 #define CmiUsePersistentHandle(x,y)
