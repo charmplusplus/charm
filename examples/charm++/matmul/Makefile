@@ -16,4 +16,4 @@ test:
 	./charmrun +p4 ./matmul 50 5
 
 clean:
-	rm *.o *.decl.h *.def.h $(BINARY)
+	rm *.o *.decl.h *.def.h $(BINARY) charmrun
