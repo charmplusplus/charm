@@ -26,7 +26,7 @@ CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
 
 #define         HALF        CmiNumPes()/2
-#define USE_PERSISTENT     1
+#define USE_PERSISTENT     0
 
 #if USE_PERSISTENT
 PersistentHandle h;
