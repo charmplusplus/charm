@@ -88,6 +88,9 @@ public:
   void turnOn();
   void turnOff();
 
+  void SetPESpeed(int);
+  int GetPESpeed();
+
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid

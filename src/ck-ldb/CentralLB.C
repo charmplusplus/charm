@@ -79,7 +79,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   lbname = "CentralLB";
   thisProxy = CProxy_CentralLB(thisgroup);
   //  CkPrintf("Construct in %d\n",CkMyPe());
-
+  loadbalancer = thisgroup;
   // create and turn on by default
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
@@ -164,6 +164,16 @@ void CentralLB::turnOff()
   theLbdb->getLBDB()->
     TurnOffStartLBFn(startLbFnHdl);
 #endif
+}
+
+void CentralLB::SetPESpeed(int speed) 
+{
+  myspeed = speed;
+}
+
+int CentralLB::GetPESpeed() 
+{
+  return myspeed;
 }
 
 void CentralLB::AtSync()
