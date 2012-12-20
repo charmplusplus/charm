@@ -34,7 +34,7 @@ void initCompress()
     }
 
 }
-#define DEBUG  1 
+//#define DEBUG  1 
 
 void compressZlib(void *src, void *dst, int size, int *compressSize, void *bData)
 {

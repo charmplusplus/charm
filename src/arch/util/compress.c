@@ -152,21 +152,19 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
         // Create message to receive the compressed buffer.
         register unsigned char *cdst = (unsigned char*)dest; 
         register int _dataIndex = (size+7)/8;
-        memset(cdst, 0, (size+7)/8 );
+        register unsigned int diff;
+	memset(cdst, 0, (size+7)/8 );
         for (i = 0; i < size; ++i) {
             // Bitmask everything but the exponents, then check if they match.
-            unsigned int prevExp = bptr[i] & 0x7f800000;
-            unsigned int currExp = uptr[i] & 0x7f800000;
-            if (currExp != prevExp) {
+        diff = (bptr[i] ^ uptr[i]) & 0xff000000 ;    
+	if (diff) {
                 // If not, mark this exponent as "different" and store it to send with the message.
                 SETBIT(cdst, i);
                 memcpy(cdst+_dataIndex, &(uptr[i]), 4);
                 _dataIndex += 4;
             }else
             {
-                unsigned int ui = uptr[i];
-                ui = (ui << 1) | (ui >> 31);
-                memcpy(cdst+_dataIndex, &ui, 3);
+                memcpy(cdst+_dataIndex, &(uptr[i]), 3);
                 _dataIndex += 3;
             }
 
@@ -176,7 +174,7 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    CmiPrintf(" ===> FLOATING done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(float)), *compressSize, (int)(size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
+    CmiPrintf(" ===> FLOATING done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(float)), *compressSize, (int)(size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000));
 #endif
 }
 
@@ -206,18 +204,17 @@ void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, 
            _sdataIndex += 4;
        }else        //same exponet
        {
-           exponent = bptr[i]  & 0x7f800000;
+	   exponent = bptr[i]  & 0xff000000;
            mantissa = *((unsigned int*)(src+_sdataIndex)) & 0x00FFFFFF;
-           mantissa = (mantissa >> 1) | (mantissa << 31) ;
            mantissa |= exponent;
-           decompressData[i] = mantissa;   
+           decompressData[i] = mantissa;
            _sdataIndex += 3;
-       }
+	}
     }
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    //CmiPrintf("--- FLOATING done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000000)) ;
+    //CmiPrintf("--- FLOATING done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000)) ;
 #endif
 
 }
@@ -271,7 +268,7 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     
 #if DEBUG
     double t = get_clock()-t1;
-    CmiPrintf("===>[floating point lzc]done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(float)), *compressSize, (int)((size*sizeof(float)-*compressSize)), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000000));
+    CmiPrintf("===>[floating point lzc]done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(float)), *compressSize, (int)((size*sizeof(float)-*compressSize)), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000));
 #endif
 
 #endif
@@ -400,7 +397,7 @@ void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    printf(" ===>[double lzc] done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(double)), *compressSize, (int)(size*sizeof(double)-*compressSize), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000000));
+    printf(" ===>[double lzc] done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(double)), *compressSize, (int)(size*sizeof(double)-*compressSize), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000));
 #endif
 }
 
@@ -448,7 +445,7 @@ void decompressDouble(void *cData, void *dData, int s, int compressSize, void *b
 #endif
 #if DEBUG
     double t = get_clock()-t1;
-    printf("done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000000)) ;
+    printf("done decompressing.....  orig size:%d\n time:%d us", (int)size, (int)(t*1000000)) ;
 #endif
 
 }
@@ -511,7 +508,7 @@ void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
     
 #if DEBUG
     double t = get_clock()-t1;
-    printf("===>double lzc done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(double)), *compressSize, (int)((size*sizeof(double)-*compressSize)), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000000));
+    printf("===>double lzc done compressing compressed size:(%d===>%d) (reduction:%d) ration=%f Timer:%d us\n\n", (int)(size*sizeof(double)), *compressSize, (int)((size*sizeof(double)-*compressSize)), (1-(double)*compressSize/(size*sizeof(double)))*100, (int)(t*1000000));
 #endif
     
 #endif
@@ -564,7 +561,7 @@ void decompressDouble(void *cData, void *dData, int s, int compressSize, void *b
     
 #if DEBUG
     double t = get_clock()-t1;
-    printf("done decompressing.....  orig size:%d time:%d us \n", size, (int)(t*1000000000));
+    printf("done decompressing.....  orig size:%d time:%d us \n", size, (int)(t*1000000));
 #endif
     
 #endif
