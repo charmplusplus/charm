@@ -42,7 +42,8 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
     
         slot->addrIndex = (destIndex+1)%PERSIST_BUFFERS_NUM;
 #if  DELTA_COMPRESS
-        size = CompressPersistentMsg(h, size, m);
+        if(slot->compressFlag)
+            size = CompressPersistentMsg(h, size, m);
 #endif
         MallocPostDesc(pd);
         if(size <= LRTS_GNI_RDMA_THRESHOLD) {

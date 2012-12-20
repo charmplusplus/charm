@@ -47,6 +47,7 @@ typedef struct _PersistentSendsTable {
   int   compressStart;
   int   compressSize;
   int 	dataType;
+  int   compressFlag;
 #endif
   int addrIndex;
 } PersistentSendsTable;

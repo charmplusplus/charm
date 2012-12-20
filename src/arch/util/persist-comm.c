@@ -157,8 +157,37 @@ PersistentHandle getFreeRecvSlot()
         sender for the PersistentReqGrantedMsg. setup finish, send buffered
         message.
 ******************************************************************************/
+PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compressStart, int type)
+{
+  PersistentHandle h;
+  PersistentSendsTable *slot;
 
-PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compressStart, int compressSize, int type)
+  if (CmiMyNode() == CmiNodeOf(destPE)) return NULL;
+
+  h = getFreeSendSlot();
+  slot = (PersistentSendsTable *)h;
+
+  slot->destPE = destPE;
+  slot->sizeMax = maxBytes;
+  slot->addrIndex = 0;
+  PersistentRequestMsg *msg = (PersistentRequestMsg *)CmiAlloc(sizeof(PersistentRequestMsg));
+  msg->maxBytes = maxBytes;
+  msg->sourceHandler = h;
+  msg->requestorPE = CmiMyPe();
+#if DELTA_COMPRESS
+  slot->previousMsg  = NULL; 
+  slot->compressStart =  msg->compressStart = compressStart;
+  slot->dataType = msg->dataType = type;
+  slot->compressFlag = 1;
+#endif
+  CmiSetHandler(msg, persistentRequestHandlerIdx);
+  CmiSyncSendAndFree(destPE,sizeof(PersistentRequestMsg),msg);
+
+  return h;
+}
+
+
+PersistentHandle CmiCreateCompressPersistentSize(int destPE, int maxBytes, int compressStart, int compressSize, int type)
 {
   PersistentHandle h;
   PersistentSendsTable *slot;
@@ -180,6 +209,7 @@ PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compr
   slot->compressStart =  msg->compressStart = compressStart;
   slot->compressSize = compressSize;
   slot->dataType = msg->dataType = type;
+  slot->compressFlag = 1;
 #endif
   CmiSetHandler(msg, persistentRequestHandlerIdx);
   CmiSyncSendAndFree(destPE,sizeof(PersistentRequestMsg),msg);
@@ -187,7 +217,7 @@ PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compr
   return h;
 }
 
-PersistentHandle CmiCreatePersistent(int destPE, int maxBytes, int start, int type)
+PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
 {
   PersistentHandle h;
   PersistentSendsTable *slot;
@@ -206,13 +236,7 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes, int start, int ty
   msg->requestorPE = CmiMyPe();
 
 #if DELTA_COMPRESS
-  slot->previousMsg  = NULL;
-  if(start<=0)
-      slot->compressStart =  msg->compressStart = ENVELOP_SIZE;
-  else
-      slot->compressStart =  msg->compressStart = start;
-  slot->compressSize =  0;
-  slot->dataType = msg->dataType = type;
+  slot->compressFlag = 0;
 #endif
   CmiSetHandler(msg, persistentRequestHandlerIdx);
   CmiSyncSendAndFree(destPE,sizeof(PersistentRequestMsg),msg);
@@ -495,13 +519,29 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
 #endif
 
 /* for SMP */
-PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes, int start, int type)
+PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes)
 {
     /* randomly pick one rank on the destination node is fine for setup.
        actual message will be handled by comm thread anyway */
   int pe = CmiNodeFirst(destNode) + rand()/RAND_MAX * CmiMyNodeSize();
-  return CmiCreatePersistent(pe, maxBytes, start, type);
+  return CmiCreatePersistent(pe, maxBytes);
 }
+PersistentHandle CmiCreateCompressNodePersistent(int destNode, int maxBytes, int start, int type)
+{
+    /* randomly pick one rank on the destination node is fine for setup.
+       actual message will be handled by comm thread anyway */
+  int pe = CmiNodeFirst(destNode) + rand()/RAND_MAX * CmiMyNodeSize();
+  return CmiCreateCompressPersistent(pe, maxBytes, start, type);
+}
+
+PersistentHandle CmiCreateCompressNodePersistentSize(int destNode, int maxBytes, int start, int compressSize, int type)
+{
+    /* randomly pick one rank on the destination node is fine for setup.
+       actual message will be handled by comm thread anyway */
+  int pe = CmiNodeFirst(destNode) + rand()/RAND_MAX * CmiMyNodeSize();
+  return CmiCreateCompressPersistentSize(pe, maxBytes, start, compressSize, type);
+}
+
 
 static void persistentRequestHandler(void *env)
 {             
