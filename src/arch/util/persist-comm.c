@@ -178,6 +178,7 @@ PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compr
   slot->previousMsg  = NULL; 
   slot->compressStart =  msg->compressStart = compressStart;
   slot->dataType = msg->dataType = type;
+  slot->compressSize = 0;
   slot->compressFlag = 1;
 #endif
   CmiSetHandler(msg, persistentRequestHandlerIdx);
