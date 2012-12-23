@@ -81,7 +81,6 @@ static PyObject *CkPy_numpes(PyObject *self, PyObject *args) {
 static PyObject *CkPy_myindex(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, ":myindex")) return NULL;
   PyObject *dict = PyModule_GetDict(PyImport_AddModule("__main__"));
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(dict,"__charmNumber__"));
   PythonObject *object = (PythonObject*)PyLong_AsVoidPtr(PyDict_GetItemString(dict,"__charmObject__"));
   //CmiLock(CsvAccess(pyLock));
   ArrayElement1D *pyArray1 = dynamic_cast<ArrayElement1D*>(object);
@@ -105,7 +104,6 @@ static PyObject *CkPy_myindex(PyObject *self, PyObject *args) {
 static PyObject *CkPy_read(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, "O:read")) return NULL;
   PyObject *dict = PyModule_GetDict(PyImport_AddModule("__main__"));
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(dict,"__charmNumber__"));
   PythonObject *object = (PythonObject*)PyLong_AsVoidPtr(PyDict_GetItemString(dict,"__charmObject__"));
   //CmiLock(CsvAccess(pyLock));
   //CmiUnlock(CsvAccess(pyLock));
@@ -137,7 +135,6 @@ static PyObject *CkPy_write(PyObject *self, PyObject *args) {
     PyTuple_SET_ITEM(whatT, 0, what);
   }
   PyObject *dict = PyModule_GetDict(PyImport_AddModule("__main__"));
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(dict,"__charmNumber__"));
   PythonObject *object = (PythonObject*)PyLong_AsVoidPtr(PyDict_GetItemString(dict,"__charmObject__"));
   object->write(whereT, whatT);
   Py_DECREF(whereT);
