@@ -10,7 +10,7 @@
 #define beta 2.67e-9
 #define percent_overhead 10
 
-extern LBAllocFn getLBAllocFn(char *lbname);
+extern LBAllocFn getLBAllocFn(const char *lbname);
 
 CreateLBFunc_Def(AdaptiveLB, "Allow multiple strategies to work serially")
 
@@ -22,10 +22,10 @@ AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] AdaptiveLB created with %s\n",CkMyPe(), lbs);
 
   char *lbcopy = strdup(lbs);
-  char *greedyLBString = "GreedyLB";
-  char *refineLBString = "RefineLB";
-  char *metisLBString = "MetisLB";
-  char *commRefineLBString = "CommAwareRefineLB";
+  const char *greedyLBString = "GreedyLB";
+  const char *refineLBString = "RefineLB";
+  const char *metisLBString = "MetisLB";
+  const char *commRefineLBString = "CommAwareRefineLB";
 
   LBAllocFn fn = getLBAllocFn(greedyLBString);
   if (fn == NULL) {

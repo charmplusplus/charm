@@ -97,7 +97,7 @@ void LBRegisterBalancer(const char *name, LBCreateFn fn, LBAllocFn afn, const ch
   lbRegistry.addEntry(name, fn, afn, help, shown);
 }
 
-LBAllocFn getLBAllocFn(char *lbname) {
+LBAllocFn getLBAllocFn(const char *lbname) {
     return lbRegistry.getLBAllocFn(lbname);
 }
 

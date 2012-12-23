@@ -11,7 +11,7 @@ Status:
 
 #include "ComboCentLB.h"
 
-extern LBAllocFn getLBAllocFn(char *lbname);
+extern LBAllocFn getLBAllocFn(const char *lbname);
 
 CreateLBFunc_Def(ComboCentLB, "Allow multiple strategies to work serially")
 
