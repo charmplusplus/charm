@@ -137,6 +137,8 @@ void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t)
 	buf+=n;
 }
 
+extern "C" {
+
 // dealing with short write
 size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
 {
@@ -196,6 +198,8 @@ int CmiFclose(FILE *fp)
         }
         return status;
 }
+
+} // extern "C"
 
 /*Disk PUP::er's*/
 void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)

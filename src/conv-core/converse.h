@@ -1893,6 +1893,12 @@ CpvExtern(int,charmLibExitFlag);
  */
 extern int CmiGetHopsBetweenRanks(int pe1, int pe2);
 
+/******** I/O wrappers ***********/
+
+size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f);
+FILE *CmiFopen(const char *path, const char *mode);
+int CmiFclose(FILE *fp);
+
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
 #endif
@@ -1918,12 +1924,6 @@ extern int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int i
 extern int CmiGridQueueLookupMsg (char *msg);
 #endif
 #endif
-
-/******** I/O wrappers ***********/
-
-size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f);
-FILE *CmiFopen(const char *path, const char *mode);
-int CmiFclose(FILE *fp);
 
 #include "debug-conv.h"
 
