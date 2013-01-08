@@ -158,6 +158,24 @@ size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
         return nwritten;
 }
 
+size_t CmiFread(void *ptr, size_t size, size_t nmemb, FILE *f)
+{
+        size_t nread = 0;
+        char *buf = (char *)ptr;
+        while (nread < nmemb) {
+          size_t ncur = fread(buf + nread*size, size, nmemb-nread, f);
+          if (ncur <= 0) {
+            if  (errno == EINTR)
+              printf("Warning: CmiFwrite retrying ...\n");
+            else
+              break;
+          }
+          else
+            nread += ncur;
+        }
+        return nread;
+}
+
 FILE *CmiFopen(const char *path, const char *mode)
 {
         FILE *fp = NULL;
@@ -205,7 +223,7 @@ int CmiFclose(FILE *fp)
 void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 {/* CkPrintf("writing %d bytes\n",itemSize*n); */ CmiFwrite(p,itemSize,n,F);}
 void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
-{/* CkPrintf("reading %d bytes\n",itemSize*n); */ fread(p,itemSize,n,F);}
+{/* CkPrintf("reading %d bytes\n",itemSize*n); */ CmiFread(p,itemSize,n,F);}
 
 /****************** Seek support *******************
 For seeking:
