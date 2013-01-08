@@ -1665,9 +1665,8 @@ inline void LrtsPrepareEnvelope(char *msg, int size)
     CMI_SET_CHECKSUM(msg, size);
 }
 
-CmiCommHandle LrtsSendFunc(int destPE, int size, char *msg, int mode)
+CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mode)
 {
-    int destNode = CmiNodeOf(destPE);
     gni_return_t        status  =   GNI_RC_SUCCESS;
     uint8_t tag;
     CONTROL_MSG         *control_msg_tmp;

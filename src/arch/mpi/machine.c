@@ -479,10 +479,9 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     return (CmiCommHandle) &(smsg->req);
 }
 
-CmiCommHandle LrtsSendFunc(int destPE, int size, char *msg, int mode) {
+CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mode) {
     /* Ignoring the mode for MPI layer */
 
-    int destNode = CmiNodeOf(destPE);
     CmiState cs = CmiGetState();
     SMSG_LIST *msg_tmp;
     int  rank;

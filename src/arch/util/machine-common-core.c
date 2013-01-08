@@ -526,7 +526,7 @@ if (MSG_STATISTIC)
 #if CMK_USE_OOB
     if (CpvAccess(_urgentSend)) mode |= OUT_OF_BAND;
 #endif
-    return LrtsSendFunc(destPE, size, msg, mode);
+    return LrtsSendFunc(CmiNodeOf(destPE), destPE, size, msg, mode);
 }
 
 void CmiFreeSendFn(int destPE, int size, char *msg) {

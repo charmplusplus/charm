@@ -390,8 +390,7 @@ static void send_multi_done(void *data)
 }
 
 /* The machine specific send function */
-static CmiCommHandle MachineSpecificSendForDCMF(int destPE, int size, char *msg, int mode) {
-    int destNode = CmiNodeOf(destPE);
+static CmiCommHandle MachineSpecificSendForDCMF(int destNode, int destPE, int size, char *msg, int mode) {
     SMSG_LIST *msg_tmp = smsg_allocate(); //(SMSG_LIST *) malloc(sizeof(SMSG_LIST));
     //msg_tmp->destpe = destNode;
     //msg_tmp->size = size;
