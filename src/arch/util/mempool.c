@@ -24,9 +24,9 @@ Heavily modified by Nikhil Jain 11/28/2011
 #endif
 
 #if CMK_C_INLINE
-#define INLINE_KEYWORD inline
+#define INLINE_KEYWORD inline static
 #else
-#define INLINE_KEYWORD
+#define INLINE_KEYWORD static
 #endif
 
 #include "mempool.h"
