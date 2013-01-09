@@ -250,7 +250,7 @@ static void send_multi_done(void *data, DCMF_Error_t *err);
 static void send_done(void *data);
 static void send_multi_done(void *data);
 #endif
-static CmiCommHandle MachineSpecificSendForDCMF(int destNode, int size, char *msg, int mode);
+static CmiCommHandle MachineSpecificSendForDCMF(int destNode, int destPE, int size, char *msg, int mode);
 #define LrtsSendFunc MachineSpecificSendForDCMF
 
 /* The machine-specific recv-related function (on the receiver side) */
