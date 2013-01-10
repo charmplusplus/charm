@@ -295,6 +295,8 @@ void *valloc(size_t size) { return meta_valloc(size); }
 
 #endif
 
+static int skip_mallinfo = 0;
+
 void CmiMemoryInit(argv)
   char **argv;
 {
@@ -304,6 +306,7 @@ void CmiMemoryInit(argv)
   meta_init(argv);
 #endif
   CmiOutOfMemoryInit();
+  if (getenv("MEMORYUSAGE_NO_MALLINFO"))  skip_mallinfo = 1;
 }
 void *malloc_reentrant(size_t size) { return malloc(size); }
 void free_reentrant(void *mem) { free(mem); }
@@ -459,7 +462,7 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
     if(!memtotal) memtotal = MemusageWindows();
 #endif
     if(!memtotal) memtotal = MemusageMstats();
-    if(!memtotal) memtotal = MemusageMallinfo();
+    if(!memtotal && !skip_mallinfo) memtotal = MemusageMallinfo();
     if(!memtotal) memtotal = MemusageProcSelfStat();
     if(!memtotal) memtotal = MemusageSbrk();
     if(!memtotal) memtotal = MemusagePS();
