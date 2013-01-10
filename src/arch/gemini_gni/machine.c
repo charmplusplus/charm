@@ -648,7 +648,10 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
         int newsize = pool->size * 2;
         //printf("[%d] IndexPool_getslot %p expand to: %d\n", myrank, pool, newsize);
         if (newsize > (1<<(32-SHIFT-1))) {
-            printf("[%d] Warning: IndexPool_getslot %p overflow when expanding to: %d\n", myrank, pool, newsize);
+            static int warned = 0;
+            if (!warned)
+              printf("[%d] Warning: IndexPool_getslot %p overflow when expanding to: %d\n", myrank, pool, newsize);
+            warned = 1;
             return -1;
             CmiAbort("IndexPool for remote events overflows, try compile Charm++ with remote event disabled.");
         }
