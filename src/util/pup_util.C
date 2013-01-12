@@ -166,7 +166,7 @@ size_t CmiFread(void *ptr, size_t size, size_t nmemb, FILE *f)
           size_t ncur = fread(buf + nread*size, size, nmemb-nread, f);
           if (ncur <= 0) {
             if  (errno == EINTR)
-              printf("Warning: CmiFwrite retrying ...\n");
+              printf("Warning: CmiFread retrying ...\n");
             else
               break;
           }
