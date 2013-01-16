@@ -55,7 +55,7 @@ namespace Ck { namespace IO {
 	  size_t bufferOffset = stripeOffset;
 	  //write to file loop
 	  while (l > 0) {
-	    ssize_t ret = pwrite(files[token].fd, d, l, bufferOffset);
+	    CmiInt8 ret = pwrite(files[token].fd, d, l, bufferOffset);
 	    if (ret < 0) {
 	      if (errno == EINTR) {
 		continue;
