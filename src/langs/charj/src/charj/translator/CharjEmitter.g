@@ -803,7 +803,7 @@ sdagStatement
     :   ^(OVERLAP sdagBlock)
         -> template(b={$sdagBlock.st}) "overlap <b>"
     |   ^(WHEN (wa+=whenArgument)+ sdagBlock)
-        -> template(w={wa}, b={$sdagBlock.st}) "when <w> <b>"
+        -> template(w={$wa}, b={$sdagBlock.st}) "when <w; separator=\", \"> <b>"
     |   ^(SDAG_IF pe=parenthesizedExpression
             ifblock=sdagBlock elseblock=sdagBlock?)
         -> if(cond={$pe.st}, then={$ifblock.st}, else_={$elseblock.st})
