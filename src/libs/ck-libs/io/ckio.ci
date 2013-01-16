@@ -31,7 +31,7 @@ module CkIO {
 		if (-1 == opts.basePE)
 		  opts.basePE = 0;
 		if (-1 == opts.skipPEs)
-		  opts.skipPEs = CkNodeSize();
+		  opts.skipPEs = CkMyNodeSize();
 
 		CkAssert(lastActivePE(opts) < CkNumPes());
 		CkAssert(opts.writeStripe <= opts.peStripe);
