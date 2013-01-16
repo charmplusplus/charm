@@ -5,6 +5,16 @@
 #if defined(_WIN32)
 #include <io.h>
 #include <sys/stat.h>
+
+int pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
+{
+  long ret = _lseek(fd, offset, SEEK_SET);
+
+  if (ret == -1) {
+    return(-1);
+  }
+  return(_write(fd, buf, nbytes));
+}
 #endif
 
 namespace Ck { namespace IO {
