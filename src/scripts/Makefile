@@ -65,7 +65,7 @@ ARMCI: charm++ LIBS
 
 f90charm: charm++ $(L)/libf90charm.a
 
-DEFAULT_LIBS= completion NDMeshStreamer multicast pythonCCS
+DEFAULT_LIBS= completion NDMeshStreamer multicast pythonCCS io
 
 default_libs: $(DEFAULT_LIBS)
 
@@ -76,6 +76,7 @@ ChaNGa: charm++ cache liveViz
 
 cache: charm++
 liveViz: charm++
+io: charm++
 multicast: charmxi
 pythonCCS: charmxi
 completion: charmxi
