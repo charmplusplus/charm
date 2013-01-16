@@ -59,6 +59,7 @@ tokens {
     ACCELERATED             = 'accelerated'     ;
     THREADED                = 'threaded'        ;
     REDUCTIONTARGET         = 'reductiontarget' ;
+	CONTRIBUTE				= 'contribute'		;
 
     OVERLAP                 = 'overlap'         ;
     WHEN                    = 'when'            ;
