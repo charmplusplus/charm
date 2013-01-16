@@ -231,29 +231,6 @@ void         CmiDestroyLock(CmiNodeLock lock);
 #endif
 
 /* NOT VERY USEFUL */
-#if CMK_SHARED_VARS_PTHREADS /*Used only by origin-pthreads*/
-
-int CmiMyPe();
-int _Cmi_numpes;
-
-void CmiMemLock();
-void CmiMemUnlock();
-
-void         CmiLock(CmiNodeLock lock);
-void         CmiUnlock(CmiNodeLock lock);
-int          CmiTryLock(CmiNodeLock lock);
-
-/* optional, these functions are implemented in "machine-smp.c", so including
-   this file avoid the necessity to reimplement them.
- */
-void CmiNodeBarrier();
-void CmiNodeAllBarrier();
-CmiNodeLock  CmiCreateLock(void);
-void         CmiDestroyLock(CmiNodeLock lock);
-
-#endif
-
-/* NOT VERY USEFUL */
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win32 versions*/
 
 int _Cmi_numpes;
