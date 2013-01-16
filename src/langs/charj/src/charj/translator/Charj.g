@@ -173,8 +173,11 @@ tokens {
     CLASS_STATIC_INITIALIZER;
     CLASS_TOP_LEVEL_SCOPE;
     CONSTRUCTOR_DECL;
-    DOMAIN_EXPRESSION;
-    ENUM_TOP_LEVEL_SCOPE;
+    CONTRIBUTE_1;
+	CONTRIBUTE_2;
+	DOMAIN_EXPRESSION;
+    END;
+	ENUM_TOP_LEVEL_SCOPE;
     EXPR;
     EXTENDS_BOUND_LIST;
     EXTENDS_CLAUSE;
@@ -676,6 +679,10 @@ nonBlockStatement
         -> ^('delete' expression)
     |   'embed' STRING_LITERAL EMBED_BLOCK
         ->  ^('embed' STRING_LITERAL EMBED_BLOCK)
+	|	CONTRIBUTE '(' expression ')' ';'
+		-> ^(CONTRIBUTE_1 expression)
+	|	CONTRIBUTE '(' expression ',' expression ',' qualifiedIdentifier ',' expression ')' ';'
+		-> ^(CONTRIBUTE_2 expression expression qualifiedIdentifier expression)
     |   expression ';'!
     |   ';' // Preserve empty statements.
     ;           

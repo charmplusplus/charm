@@ -417,6 +417,8 @@ nonBlockStatement returns [boolean sdag]
     |   expression
     |   ^('delete' expression)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
+	|	^(CONTRIBUTE_1 expression)
+	|	^(CONTRIBUTE_2 expression expression qualifiedIdentifier expression)
     |   ';' // Empty statement.
     ;
         

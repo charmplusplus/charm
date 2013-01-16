@@ -853,6 +853,10 @@ nonBlockStatement
         -> template(t={$expression.st}) "delete <t>;"
     |   ^('embed' STRING_LITERAL EMBED_BLOCK)
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
+	|	^(CONTRIBUTE_1 e1=expression)
+		-> contribute(type={true}, size={null}, data={null}, func={null}, callback={$e1.st} )
+	|	^(CONTRIBUTE_2 e1=expression e2=expression q1=qualifiedIdentifier e3=expression)
+		-> contribute(type={false}, size={$e1.st}, data={$e2.st}, func={$q1.st}, callback={$e3.st})
     |   ';' // Empty statement.
         -> {%{$start.getText()}}
     ;
