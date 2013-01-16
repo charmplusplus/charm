@@ -2,6 +2,10 @@
 #include <errno.h>
 #include <algorithm>
 
+#if defined(_WIN32)
+#include <io.h>
+#include <sys/stat.h>
+#endif
 
 namespace Ck { namespace IO {
     Manager::Manager() : nextToken(0) {
@@ -95,6 +99,18 @@ namespace Ck { namespace IO {
     void Manager::read(Token token, void *data, size_t bytes, size_t offset,
 		       CkCallback complete) {
       CkAbort("not yet implemented");
+    }
+
+    int Manager::openFile(const std::string& name) {
+      int fd;
+#if defined(_WIN32)
+      fd = _open(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
+#else
+      fd = open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+#endif
+      if (-1 == fd)
+	CkAbort("Failed to open a file for parallel output");
+      return fd;
     }
   }
 }

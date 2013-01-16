@@ -55,10 +55,7 @@ module CkIO {
 	      if (((CkMyPe() - opts.basePE) % opts.skipPEs == 0 &&
 		   CkMyPe() < lastActivePE(opts)) ||
 		  true) {
-		int fd = open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-		if (-1 == fd)
-		  CkAbort("Failed to open a file for parallel output");
-		files[token].fd = fd;
+		files[token].fd = openFile(name);
 	      }
 
 	      contribute(CkCallback(CkIndex_Manager::prepareOutput_readied(0),
