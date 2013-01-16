@@ -322,7 +322,7 @@ public:
     p|_nBinSizeFloor;
     p|_nNumFirstSet;
   }
-}c;
+};
 
 
 /**
