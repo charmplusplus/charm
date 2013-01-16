@@ -56,13 +56,14 @@ namespace Ck { namespace IO {
 	  //write to file loop
 	  while (l > 0) {
 	    ssize_t ret = pwrite(files[token].fd, d, l, bufferOffset);
-	    if (ret < 0)
-	      if (errno == EINTR)
+	    if (ret < 0) {
+	      if (errno == EINTR) {
 		continue;
-	      else {
+	      } else {
 		CkPrintf("Output failed on PE %d: %s", CkMyPe(), strerror(errno));
 		CkAbort("Giving up");
 	      }
+            }
 	    l -= ret;
 	    d += ret;
 	    bufferOffset += ret;
