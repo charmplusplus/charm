@@ -65,27 +65,21 @@ ARMCI: charm++ LIBS
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: completion NDMeshStreamer multicast pythonCCS mpi-main
+DEFAULT_LIBS= completion NDMeshStreamer multicast pythonCCS
+
+default_libs: $(DEFAULT_LIBS)
+
+$(DEFAULT_LIBS) cache:
+	$(MAKE) -C libs/ck-libs/$@
 
 ChaNGa: charm++ cache liveViz
 
 cache: charm++
-	cd libs/ck-libs/cache && $(MAKE)
-
 liveViz: charm++
-	cd libs/ck-libs/liveViz && $(MAKE)
-
 multicast: charmxi
-	cd libs/ck-libs/multicast && $(MAKE)
-
 pythonCCS: charmxi
-	cd libs/ck-libs/pythonCCS && $(MAKE)
-
 completion: charmxi
-	cd libs/ck-libs/completion && $(MAKE)
-
 NDMeshStreamer: charm++ completion
-	cd libs/ck-libs/NDMeshStreamer && $(MAKE)
 
 mpi-main: mpi-mainmodule.o
 	cp mpi-mainmodule.o ../lib
@@ -727,7 +721,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
-charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs 
+charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs mpi-main
 
 CHARMLIBS: charm++ CONVLIBS 
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
