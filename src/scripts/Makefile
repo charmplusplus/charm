@@ -69,7 +69,7 @@ DEFAULT_LIBS= completion NDMeshStreamer multicast pythonCCS io
 
 default_libs: $(DEFAULT_LIBS)
 
-$(DEFAULT_LIBS) cache:
+$(DEFAULT_LIBS) cache pose fftlib:
 	$(MAKE) -C libs/ck-libs/$@
 
 ChaNGa: charm++ cache liveViz
@@ -77,6 +77,8 @@ ChaNGa: charm++ cache liveViz
 cache: charm++
 liveViz: charm++
 io: charm++
+pose: charm++
+fftlib: charm++
 multicast: charmxi
 pythonCCS: charmxi
 completion: charmxi
@@ -87,9 +89,6 @@ mpi-main: mpi-mainmodule.o
 
 translators: charmxi conv-cpm
 
-pose:  charm++
-	cd libs/ck-libs/pose && $(MAKE)
-
 msa: charm++
 	cd libs/ck-libs/multiphaseSharedArrays && $(MAKE)
 
@@ -97,8 +96,6 @@ jade: charm++ msa
 #	make the lib, include
 	cd langs/jade && $(MAKE)
 
-fftlib: charm++
-	cd libs/ck-libs/fftlib && $(MAKE)
 
 # This should be done offline, since the user does not need to compile
 # parser files, etc.  All they need is the libjade + include files,
