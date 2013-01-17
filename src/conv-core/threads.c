@@ -470,6 +470,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
     l->next=0;
     if (l->free) l->free(l);
   }
+  th->listener = NULL;
   free(th->data);
   if (th->isMigratable) {
 #if CMK_THREADS_ALIAS_STACK
@@ -521,13 +522,19 @@ void CmiEnableTLS() {}
 
 static void CthBaseInit(char **argv)
 {
+  char *str;
   CpvInitialize(int, _numSwitches);
   CpvAccess(_numSwitches) = 0;
 
   CthCpvInitialize(int,  _defaultStackSize);
   CthCpvAccess(_defaultStackSize)=CMK_STACKSIZE_DEFAULT;
+/*
   CmiGetArgIntDesc(argv,"+stacksize",&CthCpvAccess(_defaultStackSize),
       "Default user-level thread stack size");  
+*/
+  if (CmiGetArgStringDesc(argv,"+stacksize",&str,"Default user-level thread stack size"))  {
+      CthCpvAccess(_defaultStackSize) = CmiReadSize(str);
+  }
 
   CthCpvInitialize(CthThread,  CthCurrent);
   CthCpvInitialize(char *, CthData);
