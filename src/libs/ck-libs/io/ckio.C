@@ -1,7 +1,6 @@
 #include <ckio.h>
 #include <errno.h>
 #include <algorithm>
-#include <unistd.h>
 
 #if defined(_WIN32)
 #include <io.h>
@@ -16,6 +15,8 @@ int pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
   }
   return(_write(fd, buf, nbytes));
 }
+#else
+#include <unistd.h>
 #endif
 
 namespace Ck { namespace IO {
