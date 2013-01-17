@@ -74,15 +74,15 @@ $(DEFAULT_LIBS) cache pose fftlib:
 
 ChaNGa: charm++ cache liveViz
 
-cache: charm++
-liveViz: charm++
-io: charm++
-pose: charm++
-fftlib: charm++
+cache: charm-core
+liveViz: charm-core
+io: charm-core
+pose: charm-core
+fftlib: charm-core
 multicast: charmxi
 pythonCCS: charmxi
 completion: charmxi
-NDMeshStreamer: charm++ completion
+NDMeshStreamer: charm-core completion
 
 mpi-main: mpi-mainmodule.o
 	cp mpi-mainmodule.o ../lib
@@ -719,7 +719,8 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
-charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs mpi-main
+charm-core: converse $(L)/libck.a $(L)/libckf.a
+charm-target: loadbalancers default_libs comlib_objs mpi-main
 
 CHARMLIBS: charm++ CONVLIBS 
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
