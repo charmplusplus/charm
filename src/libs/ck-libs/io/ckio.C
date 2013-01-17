@@ -1,6 +1,7 @@
 #include <ckio.h>
 #include <errno.h>
 #include <algorithm>
+#include <unistd.h>
 
 #if defined(_WIN32)
 #include <io.h>
