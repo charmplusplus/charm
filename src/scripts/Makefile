@@ -65,35 +65,29 @@ ARMCI: charm++ LIBS
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: completion NDMeshStreamer multicast pythonCCS mpi-main
+DEFAULT_LIBS= completion NDMeshStreamer multicast pythonCCS io
+
+default_libs: $(DEFAULT_LIBS)
+
+$(DEFAULT_LIBS) cache pose fftlib liveViz:
+	$(MAKE) -C libs/ck-libs/$@
 
 ChaNGa: charm++ cache liveViz
 
-cache: charm++
-	cd libs/ck-libs/cache && $(MAKE)
-
-liveViz: charm++
-	cd libs/ck-libs/liveViz && $(MAKE)
-
+cache: charm-core
+liveViz: charm-core
+io: charm-core
+pose: charm-core
+fftlib: charm-core
 multicast: charmxi
-	cd libs/ck-libs/multicast && $(MAKE)
-
 pythonCCS: charmxi
-	cd libs/ck-libs/pythonCCS && $(MAKE)
-
 completion: charmxi
-	cd libs/ck-libs/completion && $(MAKE)
-
-NDMeshStreamer: charm++ completion
-	cd libs/ck-libs/NDMeshStreamer && $(MAKE)
+NDMeshStreamer: charm-core completion
 
 mpi-main: mpi-mainmodule.o
 	cp mpi-mainmodule.o ../lib
 
 translators: charmxi conv-cpm
-
-pose:  charm++
-	cd libs/ck-libs/pose && $(MAKE)
 
 msa: charm++
 	cd libs/ck-libs/multiphaseSharedArrays && $(MAKE)
@@ -102,8 +96,6 @@ jade: charm++ msa
 #	make the lib, include
 	cd langs/jade && $(MAKE)
 
-fftlib: charm++
-	cd libs/ck-libs/fftlib && $(MAKE)
 
 # This should be done offline, since the user does not need to compile
 # parser files, etc.  All they need is the libjade + include files,
@@ -727,7 +719,8 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
-charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs 
+charm-core: converse $(L)/libck.a $(L)/libckf.a
+charm-target: loadbalancers default_libs comlib_objs mpi-main
 
 CHARMLIBS: charm++ CONVLIBS 
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'

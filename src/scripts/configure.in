@@ -100,7 +100,7 @@ fi
 AC_ARG_ENABLE([tracing-commthread],
             [AS_HELP_STRING([--enable-tracing-commthread],
               [enable tracing communication thread])], ,
-            [enable_tracing_commthread=yes])
+            [enable_tracing_commthread=no])
 
 if test "$enable_tracing_commthread" = "yes"
 then

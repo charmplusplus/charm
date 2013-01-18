@@ -1,7 +1,23 @@
 #include <ckio.h>
 #include <errno.h>
 #include <algorithm>
+#include <sys/stat.h>
 
+#if defined(_WIN32)
+#include <io.h>
+
+int pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
+{
+  long ret = _lseek(fd, offset, SEEK_SET);
+
+  if (ret == -1) {
+    return(-1);
+  }
+  return(_write(fd, buf, nbytes));
+}
+#else
+#include <unistd.h>
+#endif
 
 namespace Ck { namespace IO {
     Manager::Manager() : nextToken(0) {
@@ -55,14 +71,15 @@ namespace Ck { namespace IO {
 	  size_t bufferOffset = stripeOffset;
 	  //write to file loop
 	  while (l > 0) {
-	    ssize_t ret = pwrite(files[token].fd, d, l, bufferOffset);
-	    if (ret < 0)
-	      if (errno == EINTR)
+	    CmiInt8 ret = pwrite(files[token].fd, d, l, bufferOffset);
+	    if (ret < 0) {
+	      if (errno == EINTR) {
 		continue;
-	      else {
+	      } else {
 		CkPrintf("Output failed on PE %d: %s", CkMyPe(), strerror(errno));
 		CkAbort("Giving up");
 	      }
+            }
 	    l -= ret;
 	    d += ret;
 	    bufferOffset += ret;
@@ -94,6 +111,18 @@ namespace Ck { namespace IO {
     void Manager::read(Token token, void *data, size_t bytes, size_t offset,
 		       CkCallback complete) {
       CkAbort("not yet implemented");
+    }
+
+    int Manager::openFile(const std::string& name) {
+      int fd;
+#if defined(_WIN32)
+      fd = _open(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
+#else
+      fd = open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+#endif
+      if (-1 == fd)
+	CkAbort("Failed to open a file for parallel output");
+      return fd;
     }
   }
 }

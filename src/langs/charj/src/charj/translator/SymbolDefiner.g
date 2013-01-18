@@ -237,7 +237,7 @@ varDeclaration
                 sym.definitionTokenStream = input.getTokenStream();
                 if (currentScope instanceof PackageScope) {
                     sym.isReadOnly = true;
-                    System.out.println("Marking " + $IDENT.text + " as readonly");
+                    //System.out.println("Marking " + $IDENT.text + " as readonly");
                 }
                 $IDENT.def = sym;
                 $IDENT.scope = currentScope;

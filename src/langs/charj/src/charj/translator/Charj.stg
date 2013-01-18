@@ -837,3 +837,13 @@ Domain\<<len>\>(<range>)<if(others)>, <others; separator=", "><endif>
 <else>
 <endif>
 >>
+
+contribute(type, size, data, func, callback) ::=
+<<
+	<if(type)>
+	contribute(<callback>);
+	<else>
+	contribute(<size>, &<data>, CkReduction::<func>, <callback>);
+	<endif>
+>>
+

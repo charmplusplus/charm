@@ -803,7 +803,7 @@ sdagStatement
     :   ^(OVERLAP sdagBlock)
         -> template(b={$sdagBlock.st}) "overlap <b>"
     |   ^(WHEN (wa+=whenArgument)+ sdagBlock)
-        -> template(w={wa}, b={$sdagBlock.st}) "when <w> <b>"
+        -> template(w={$wa}, b={$sdagBlock.st}) "when <w; separator=\", \"> <b>"
     |   ^(SDAG_IF pe=parenthesizedExpression
             ifblock=sdagBlock elseblock=sdagBlock?)
         -> if(cond={$pe.st}, then={$ifblock.st}, else_={$elseblock.st})
@@ -853,6 +853,10 @@ nonBlockStatement
         -> template(t={$expression.st}) "delete <t>;"
     |   ^('embed' STRING_LITERAL EMBED_BLOCK)
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
+	|	^(CONTRIBUTE_1 e1=expression)
+		-> contribute(type={true}, size={null}, data={null}, func={null}, callback={$e1.st} )
+	|	^(CONTRIBUTE_2 e1=expression e2=expression q1=qualifiedIdentifier e3=expression)
+		-> contribute(type={false}, size={$e1.st}, data={$e2.st}, func={$q1.st}, callback={$e3.st})
     |   ';' // Empty statement.
         -> {%{$start.getText()}}
     ;
@@ -986,7 +990,7 @@ expr
 primaryExpression
 @init { int dims = 1; boolean isValueType = true; }
     :   ^(DOT ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) IDENT)
-         -> template(pe={$pe.st}, ex={$ex.st}, id={$IDENT.text}) "(*((*(<pe>))[<ex>])).<id>"
+         -> template(pe={$pe.st}, ex={$ex.st}, id={$IDENT.text}) "((<pe>)[<ex>]).<id>"
     |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {
             if ($pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType) {
                 PointerType p = (PointerType)($pe.start.symbolType);

@@ -133,7 +133,7 @@ namespace Ck { namespace IO {
     int lastActivePE(const Options &opts) {
       return opts.basePE + (opts.activePEs-1)*opts.skipPEs;
     }
-
+    int openFile(const std::string& name);
   };
 
   }}

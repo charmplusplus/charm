@@ -78,7 +78,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   int count = 0;
   i = 0;
   if (isVoid == 1) {
-     defs << "    __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), (void*) _bgParentLog, 0);\n";
+     defs << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), (void*) _bgParentLog, 0);\n";
      defs << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
   }
   else {

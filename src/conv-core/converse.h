@@ -296,41 +296,6 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #endif
 
-#if CMK_SHARED_VARS_PTHREADS /*Used only by origin-pthreads*/
-
-#include <pthread.h>
-#include <sched.h>
-
-extern int CmiMyPe();
-extern int _Cmi_numpes;
-
-#define CmiNumPes()            _Cmi_numpes
-#define CmiMyRank()            CmiMyPe()
-#define CmiMyNodeSize()        _Cmi_numpes
-#define CmiMyNode()            0
-#define CmiNumNodes()          1
-#define CmiNodeFirst(node)     0
-#define CmiNodeSize(node)      _Cmi_numpes
-#define CmiNodeOf(pe)          0
-#define CmiRankOf(pe)          (pe)
-
-#define CMK_CPV_IS_SMP sched_yield();
-
-extern void CmiMemLock();
-extern void CmiMemUnlock();
-extern void CmiNodeBarrier();
-extern void CmiNodeAllBarrier();
-#define CmiSvAlloc CmiAlloc
-
-typedef pthread_mutex_t *CmiNodeLock;
-extern CmiNodeLock  CmiCreateLock(void);
-extern void         CmiLock(CmiNodeLock lock);
-extern void         CmiUnlock(CmiNodeLock lock);
-extern int          CmiTryLock(CmiNodeLock lock);
-extern void         CmiDestroyLock(CmiNodeLock lock);
-
-#endif
-
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win32 versions*/
 
 #include <windows.h>

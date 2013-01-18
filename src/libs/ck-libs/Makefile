@@ -2,7 +2,7 @@ CHARMC=../../bin/charmc $(OPTS)
 CHARMINC=.
 
 SIMPLE_DIRS = completion cache sparseContiguousReducer tcharm ampi idxl \
-              parmetis multiphaseSharedArrays fem ParFUM \
+              parmetis multiphaseSharedArrays fem ParFUM io \
               ifem armci collide mblock barrier irecv netfem liveViz \
               taskGraph search datatransfer MeshStreamer NDMeshStreamer pose \
               state_space_searchengine

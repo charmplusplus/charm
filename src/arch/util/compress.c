@@ -22,6 +22,12 @@
 struct timeval tv;
 #include <sys/time.h>
 
+//#define USE_SSE 1 
+
+#if USE_SSE
+#include <smmintrin.h>
+#endif
+
 double get_clock()
 {
        struct timeval tv; int ok;
@@ -49,7 +55,6 @@ double get_clock()
 #define TESTBIT(data, b) (data>>(b)) & 1
 #define SETBIT(data, index, bit) (data |= ((bit)<<(index)))
 #endif
-
 
 /** compress char is the general algorithm   for any data*/
 void compressChar(void *src, void *dst, int size, int *compressSize, void *bData)
@@ -124,6 +129,96 @@ void decompressChar(void *cData, void *dData, int size, int compressSize, void *
 
 #if  COMPRESS_EXP
 
+#if USE_SSE
+void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void *bData)
+{
+    int size = s/FLOAT_BYTE;
+    float *source = (float*)src;
+    float *dest = (float*)dst;
+    float *baseData = (float*)bData;
+    register unsigned int *bptr = (unsigned int*) baseData;
+    register unsigned int  *uptr = (unsigned int *) source;
+    register char *uchar;
+    register int i, j;
+#if DEBUG
+    double t1 = get_clock();
+#endif
+
+#if !COMPRESS 
+    memcpy(dest, source, size*sizeof(float)); 
+    *compressSize = s;
+#else
+    // Is this the first time we're sending stuff to this node?
+    if (baseData == NULL) {
+        baseData = (float*)malloc(size*sizeof(float));
+        memcpy(baseData, source, size*sizeof(float));
+        memcpy(dest, source, size*sizeof(float)); 
+        *compressSize = s;
+    } else {
+        // Create message to receive the compressed buffer.
+        register unsigned char *cdst = (unsigned char*)dest; 
+        register int _dataIndex = (size+7)/8;
+        register unsigned int diff;
+	memset(cdst, 0, (size+7)/8 );
+        
+        register const __m128i* b_ptr = (__m128i*)bptr;
+        register const __m128i* u_ptr = (__m128i*)uptr;
+        
+        register __m128i xmm_f = _mm_set1_epi32(0xFF000000);
+        for (i = 0; i < size; i+=4) {
+            // Bitmask everything but the exponents, then check if they match.
+            __m128i xmm_b = _mm_load_si128(b_ptr);
+            __m128i xmm_u = _mm_load_si128(u_ptr);
+            __m128i xmm_d = _mm_xor_si128(xmm_b, xmm_u);     //  XOR  4 32-bit words
+            xmm_d = _mm_and_si128(xmm_d, xmm_f);
+            
+            if (_mm_extract_epi32(xmm_d, 0)) {
+                SETBIT(cdst, i);
+                memcpy(cdst+_dataIndex, &(uptr[i]), 4);
+                _dataIndex += 4;
+            }
+            else{
+                memcpy(cdst+_dataIndex, &(uptr[i]), 3);
+                _dataIndex += 3;
+            }
+            if (_mm_extract_epi32(xmm_d, 1)) {
+                SETBIT(cdst, i+1);
+                memcpy(cdst+_dataIndex, &(uptr[i+1]), 4);
+                _dataIndex += 4;
+            }else{
+                memcpy(cdst+_dataIndex, &(uptr[i+1]), 3);
+                _dataIndex += 3;
+            }
+            if (_mm_extract_epi32(xmm_d, 2)) {
+                SETBIT(cdst, i+2);
+                memcpy(cdst+_dataIndex, &(uptr[i+2]), 4);
+                _dataIndex += 4;
+            }else{
+                memcpy(cdst+_dataIndex, &(uptr[i+2]), 3);
+                _dataIndex += 3;
+            }
+            if (_mm_extract_epi32(xmm_d, 3)) {
+                SETBIT(cdst, i+3);
+                memcpy(cdst+_dataIndex, &(uptr[i+3]), 4);
+                _dataIndex += 4;
+            }else{
+                memcpy(cdst+_dataIndex, &(uptr[i+3]), 3);
+                _dataIndex += 3;
+            }
+            ++b_ptr;
+            ++u_ptr;
+        }
+        *compressSize = _dataIndex;
+    }
+#endif
+#if DEBUG
+    double t = get_clock()-t1;
+    printf(" ===>floating compare done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us \n", (int)(size*sizeof(float)), *compressSize, (int)(size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000));
+#endif
+}
+
+#else
+
 void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void *bData)
 {
     int size = s/FLOAT_BYTE;
@@ -177,6 +272,8 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     CmiPrintf(" ===> FLOATING done compressingcompressed size:(%d===>%d) (reduction:%d) ration=%f time=%d us\n", (int)(size*sizeof(float)), *compressSize, (int)(size*sizeof(float)-*compressSize), (1-(float)*compressSize/(size*sizeof(float)))*100, (int)(t*1000000));
 #endif
 }
+
+#endif
 
 void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, void *bData) {
     int size = s/FLOAT_BYTE;

@@ -76,7 +76,7 @@ class TListCWhenTrigger
 
   public:
 
-    TListCWhenTrigger(void) : first(0), last(0) {;}
+    TListCWhenTrigger(void) : first(0), last(0), current(0) {;}
 
     void pup(PUP::er& p) {
       int nEntries=0;
@@ -170,7 +170,7 @@ class TListCMsgBuffer
 
   public:
 
-    TListCMsgBuffer(void) : first(0), last(0) {}
+    TListCMsgBuffer(void) : first(0), last(0), current(0) {}
 
     void pup(PUP::er& p) {
       int nEntries=0;
