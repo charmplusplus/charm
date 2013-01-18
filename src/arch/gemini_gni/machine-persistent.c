@@ -17,6 +17,24 @@
   * persist_machine_init  // machine specific initialization call
 */
 
+#if   PERSISTENT_GET_BASE
+void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *msg)
+{
+    PersistentSendsTable *slot = (PersistentSendsTable *)h;
+    int         destIndex; 
+    uint8_t tag = LMSG_PERSISTENT_INIT_TAG;
+    SMSG_QUEUE *queue = &smsg_queue;
+
+    LrtsPrepareEnvelope(msg, size);
+    if (size < BIG_MSG) {
+        CONTROL_MSG *control_msg_tmp =  construct_control_msg(size, msg, -1);
+        control_msg_tmp -> dest_addr = (uint64_t)slot->destBuf[destIndex].destAddress;
+        control_msg_tmp -> dest_mem_hndl = slot->destBuf[destIndex].mem_hndl;
+        registerMessage(msg, size, PERSIST_SEQ, &(control_msg_tmp -> source_mem_hndl));
+        buffer_small_msgs(queue, control_msg_tmp, CONTROL_MSG_SIZE, destNode, tag);
+    }
+}
+#else
 void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 {
     gni_post_descriptor_t *pd;
@@ -140,6 +158,8 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 #endif
   }
 }
+
+#endif
 
 #if 0
 void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
