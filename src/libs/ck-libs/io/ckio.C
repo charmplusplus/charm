@@ -1,10 +1,10 @@
 #include <ckio.h>
 #include <errno.h>
 #include <algorithm>
+#include <sys/stat.h>
 
 #if defined(_WIN32)
 #include <io.h>
-#include <sys/stat.h>
 
 int pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
 {
