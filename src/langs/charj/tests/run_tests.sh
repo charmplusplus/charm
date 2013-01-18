@@ -21,6 +21,10 @@ function test_file() {
     if [ "$?" -ne "0" ]; then
         RESULT="failure"
     fi
+	count=`cat run_tests.log.tmp | wc -l`
+	if [ $count -gt 2 ]; then
+		RESULT="failure"
+	fi
     cat run_tests.log.tmp >> $BASE_DIR/run_tests.log
     rm run_tests.log.tmp
 

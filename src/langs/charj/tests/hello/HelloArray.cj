@@ -4,8 +4,10 @@ package tests;
 readonly Main@ main;
 readonly int num_elements;
 
+extern atoi;
+
 public mainchare Main {
-    public entry Main(CkArgMsg m) {
+    public entry Main(CkArgMsg[~]@ m) {
         //Process command-line arguments
         num_elements = 5;
         if (m.argc > 1) num_elements = atoi(m.argv[1]);
@@ -16,7 +18,7 @@ public mainchare Main {
                  CkNumPes(), num_elements);
         main = thisProxy;
         Hello@ arr = new Hello@(num_elements);
-        arr[0]@SayHi(17);
+        arr[0+0]@SayHi(17);
     }
 
     public entry void done() {
