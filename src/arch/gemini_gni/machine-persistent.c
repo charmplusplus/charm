@@ -25,13 +25,41 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *msg
     uint8_t tag = LMSG_PERSISTENT_INIT_TAG;
     SMSG_QUEUE *queue = &smsg_queue;
 
-    LrtsPrepareEnvelope(msg, size);
-    if (size < BIG_MSG) {
+    destIndex = slot->addrIndex;
+    
+    CmiAssert(CmiNodeOf(slot->destPE) == destNode);
+    if (slot->destBuf[destIndex].destAddress) {
+#if  DELTA_COMPRESS
+        if(slot->compressFlag)
+            size = CompressPersistentMsg(h, size, msg);
+#endif
+        LrtsPrepareEnvelope(msg, size);
         CONTROL_MSG *control_msg_tmp =  construct_control_msg(size, msg, -1);
         control_msg_tmp -> dest_addr = (uint64_t)slot->destBuf[destIndex].destAddress;
         control_msg_tmp -> dest_mem_hndl = slot->destBuf[destIndex].mem_hndl;
-        registerMessage(msg, size, PERSIST_SEQ, &(control_msg_tmp -> source_mem_hndl));
+        registerMessage(msg, size, 0, &(control_msg_tmp -> source_mem_hndl));
         buffer_small_msgs(queue, control_msg_tmp, CONTROL_MSG_SIZE, destNode, tag);
+
+        MACHSTATE4(8, "[%d==%d]LrtsPersistent Sending %lld=>%lld\n", CmiMyNode(), destNode, msg, control_msg_tmp -> dest_addr);
+    }
+    else
+    {
+#if 1
+        if (slot->messageBuf != NULL) {
+            CmiPrintf("Unexpected message in buffer on %d\n", CmiMyPe());
+            CmiAbort("");
+        }
+        slot->messageBuf = msg;
+        slot->messageSize = size;
+#else
+        /* normal send */
+        PersistentHandle  *phs_tmp = phs;
+        int phsSize_tmp = phsSize;
+        phs = NULL; phsSize = 0;
+        CmiPrintf("[%d]Slot sending message directly\n", CmiMyPe());
+        CmiSyncSendAndFree(slot->destPE, size, msg);
+        phs = phs_tmp; phsSize = phsSize_tmp;
+#endif
     }
 }
 #else
@@ -248,6 +276,7 @@ int PumpPersistent()
 
 void *PerAlloc(int size)
 {
+#if CMK_PERSISTENT_COMM_PUT
 //  return CmiAlloc(size);
   gni_return_t status;
   void *res = NULL;
@@ -259,6 +288,9 @@ void *PerAlloc(int size)
   SIZEFIELD(ptr)=size;
   REFFIELD(ptr)= PERSIST_SEQ;
   return ptr;
+#else
+  char *ptr = CmiAlloc(size);
+#endif
 }
                                                                                 
 void PerFree(char *msg)
@@ -324,6 +356,7 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
   }
   slot->sizeMax = maxBytes;
   slot->addrIndex = 0;
+#if CMK_PERSISTENT_COMM_PUT
 #if REMOTE_EVENT
 #if !MULTI_THREAD_SEND
   CmiLock(persistPool.lock);    /* lock in function */
@@ -333,10 +366,12 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
   CmiUnlock(persistPool.lock);
 #endif
 #endif
+#endif
 }
 
 void clearRecvSlot(PersistentReceivesTable *slot)
 {
+#if CMK_PERSISTENT_COMM_PUT
 #if REMOTE_EVENT
 #if !MULTI_THREAD_SEND
   CmiLock(persistPool.lock);
@@ -344,6 +379,7 @@ void clearRecvSlot(PersistentReceivesTable *slot)
   IndexPool_freeslot(&persistPool, slot->index);
 #if !MULTI_THREAD_SEND
   CmiUnlock(persistPool.lock);
+#endif
 #endif
 #endif
 }
