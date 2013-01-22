@@ -15,7 +15,17 @@ int pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
   }
   return(_write(fd, buf, nbytes));
 }
-#else
+#define NO_UNISTD_NEEDED
+#endif
+
+#if defined(__PGIC__)
+// PGI compilers define funny feature flags that lead to standard
+// headers omitting this prototype
+ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+#define NO_UNISTD_NEEDED
+#endif
+
+#if !defined(NO_UNISTD_NEEDED)
 #include <unistd.h>
 #endif
 
