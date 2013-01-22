@@ -79,7 +79,6 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         printf("[%d] LrtsSendPersistentMsg: handle from node %d to node %d is NULL. \n", CmiMyPe(), myrank, destNode);
         CmiAbort("LrtsSendPersistentMsg: not a valid PersistentHandle");
     }
-    CmiAssert(CmiNodeOf(slot->destPE) == destNode);
     if (size > slot->sizeMax) {
         CmiPrintf("size: %d sizeMax: %d mype=%d destPe=%d\n", size, slot->sizeMax, CmiMyPe(), destNode);
         CmiAbort("Abort: Invalid size\n");

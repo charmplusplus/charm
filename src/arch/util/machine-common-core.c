@@ -537,10 +537,12 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
           return 0;
         }
 #endif
-#if CMK_PERSISTENT_COMM //not handled yet correctly
+#if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) {
           if (size > PERSIST_MIN_SIZE) {
             CmiAssert(CpvAccess(curphs) < CpvAccess(phsSize));
+            PersistentSendsTable *slot = (PersistentSendsTable *)CpvAccess(phs)[CpvAccess(curphs)];
+            CmiAssert(CmiNodeOf(slot->destPE) == destLocalNode);
             LrtsSendPersistentMsg(CpvAccess(phs)[CpvAccess(curphs)], destNode, size, msg);
             return 0;
           }
