@@ -68,9 +68,9 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
 #if CMK_BIGSIM_CHARM
   defs <<  "    CkElapse(0.01e-6);\n";
   SdagConstruct::generateTlineEndCall(defs);
+  defs << "    CMsgBuffer* cmsgbuf;\n";
 #endif
 
-  defs << "    CMsgBuffer* cmsgbuf;\n";
   defs << "    if (!__cDep.get()) _sdag_init();\n";
 
   int hasArrays = 0;
@@ -205,7 +205,11 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
 
 void CEntry::generateBufferMessage(XStr& defs, const char* messageName, const char* refnumArg)
 {
-  defs << "    cmsgbuf = __cDep->bufferMessage(" << entryNum
+  defs << "    "
+#if CMK_BIGSIM_CHARM
+       << "cmsgbuf = "
+#endif
+       << "__cDep->bufferMessage(" << entryNum
        << ", (void*)" << messageName << ", (void*) _bgParentLog, "
        << refnumArg << ");\n"
        << "    tr = __cDep->getTrigger(" << entryNum << ", " << refnumArg << ");\n";
