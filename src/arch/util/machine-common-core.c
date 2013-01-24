@@ -740,6 +740,8 @@ int pe_gToLTranslate(int pe) {
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
     int tmp;
+    //handle output to files for replica if requested
+    char *stdoutbase,*stdoutpath;
 #if CMK_WITH_STATS
     MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
 #endif
@@ -810,10 +812,7 @@ if (  MSG_STATISTIC)
     Cmi_startfn = fn;
     Cmi_usrsched = usched;
 
-    //handle output to files for replica if requested
-    char *stdoutbase;
     if ( CmiGetArgStringDesc(argv,"+stdout",&stdoutbase,"base filename to redirect replica stdout to") ) {
-      char *stdoutpath;
       stdoutpath = malloc(strlen(stdoutbase) + 30);
       sprintf(stdoutpath, stdoutbase, CmiMyPartition(), CmiMyPartition(), CmiMyPartition());
       if ( ! strcmp(stdoutpath, stdoutbase) ) {
