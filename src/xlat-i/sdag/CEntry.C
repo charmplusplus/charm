@@ -78,8 +78,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   int count = 0;
   i = 0;
   if (isVoid == 1) {
-     defs << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), (void*) _bgParentLog, 0);\n";
-     defs << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
+    generateBufferMessage(defs, "CkAllocSysMsg()", "0");
   }
   else {
      for(list<CStateVar*>::iterator it = myParameters.begin();
@@ -99,14 +98,11 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
         }
         if (paramMarshalling ==0) {
 	   defs << "    CmiReference(UsrToEnv(" << sv->name << "_msg));\n";
-           if(refNumNeeded) {
-              defs << "    int refnum = CkGetRefNum(" <<sv->name << "_msg);\n";
-              defs << "    cmsgbuf = __cDep->bufferMessage(" << entryNum << ",(void *) " << sv->name << "_msg , (void *) _bgParentLog, refnum);\n";
-              defs << "    tr = __cDep->getTrigger(" << entryNum<<", refnum);\n";
-           } else {
-              defs << "    cmsgbuf = __cDep->bufferMessage(" << entryNum << ", (void *) " << sv->name << "_msg,  (void *) _bgParentLog, 0);\n";
-              defs << "    tr = __cDep->getTrigger(" << entryNum<<", 0);\n";
-           } 
+           XStr messageName;
+           messageName << sv->name << "_msg";
+           if (refNumNeeded)
+             defs << "    int refnum = CkGetRefNum(" << sv->name << "_msg);\n";
+           generateBufferMessage(defs, messageName, refNumNeeded ? "refnum" : "0");
         }
         count++;
      }
@@ -173,12 +169,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
      // entry method are not messages) then the first parameter of the
      // entry method is an integer that specifies the reference number
      const char* refNumArg = refNumNeeded ? (*myParameters.begin())->name->charstar() : "0";
-
-     defs << "    cmsgbuf = __cDep->bufferMessage(" << entryNum
-        << ", (void *) impl_msg1, (void*) _bgParentLog, "
-        << refNumArg <<  ");\n";
-     defs << "    tr = __cDep->getTrigger(" << entryNum << ", "
-        << refNumArg << ");\n";
+     generateBufferMessage(defs, "impl_msg1", refNumArg);
    }
 
   defs << "    if (tr == 0)\n";
@@ -210,6 +201,14 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   // actual code ends
   defs << "}\n\n";
   templateGuardEnd(defs);
+}
+
+void CEntry::generateBufferMessage(XStr& defs, const char* messageName, const char* refnumArg)
+{
+  defs << "    cmsgbuf = __cDep->bufferMessage(" << entryNum
+       << ", (void*)" << messageName << ", (void*) _bgParentLog, "
+       << refnumArg << ");\n"
+       << "    tr = __cDep->getTrigger(" << entryNum << ", " << refnumArg << ");\n";
 }
 
 }
