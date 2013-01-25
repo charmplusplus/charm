@@ -136,7 +136,7 @@ CmiStartFn mymain()
     
 #if USE_PERSISTENT
     if (CmiMyPe() < CmiNumPes())
-    h = CmiCreatePersistent(otherPe, maxMsgSize+1024);
+        h = CmiCreateCompressPersistent(otherPe, maxMsgSize+1024, 200, CMI_FLOATING);
 #endif
     
     if (CmiMyPe() == 0)
