@@ -301,12 +301,24 @@ void (*signal_int)(int);
 static int _thread_provided = -1; /* Indicating MPI thread level */
 static int idleblock = 0;
 
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+typedef struct crashedrank{
+  int rank;
+  struct crashedrank *next;
+} crashedRankList;
+CpvDeclare(crashedRankList *, crashedRankHdr);
+CpvDeclare(crashedRankList *, crashedRankPtr);
+int isRankDie(int rank);
+#endif
 /* A simple list for msgs that have been sent by MPI_Isend */
 typedef struct msg_list {
     char *msg;
     struct msg_list *next;
     int size, destpe, mode;
     MPI_Request req;
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+    int dstrank; //used in fault tolerance protocol, if the destination is the died rank, delete the msg
+#endif
 } SMSG_LIST;
 
 CpvStaticDeclare(SMSG_LIST *, sent_msgs);
@@ -448,6 +460,7 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
 
 #if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
 	dstrank = petorank[node];
+        smsg->dstrank = dstrank;
 #else
 	dstrank=node;
 #endif
@@ -513,6 +526,13 @@ static size_t CmiAllAsyncMsgsSent(void) {
         done = 0;
         if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts))
             CmiAbort("CmiAllAsyncMsgsSent: MPI_Test failed!\n");
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+        if(isRankDie(msg_tmp->dstrank)){
+          //CmiPrintf("[%d][%d] msg to crashed rank\n",CmiMyPartition(),CmiMyPe());
+          //CmiAbort("unexpected send");
+          done = 1;
+        }
+#endif
         if (!done)
             return 0;
         msg_tmp = msg_tmp->next;
@@ -563,6 +583,11 @@ static void CmiReleaseSentMessages(void) {
 #endif
         if (MPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
             CmiAbort("CmiReleaseSentMessages: MPI_Test failed!\n");
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+        if (isRankDie(msg_tmp->dstrank)){
+          done = 1;
+        }
+#endif
         if (done) {
             MACHSTATE2(3,"CmiReleaseSentMessages release one %d to %d", CmiMyPe(), msg_tmp->destpe);
             CpvAccess(MsgQueueLen)--;
@@ -1367,6 +1392,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     nextrank = num_workpes;
 
     if (*myNodeID >= num_workpes) {    /* is spare processor */
+      if(CmiGetArgFlag(largv,"+isomalloc_sync")){
+          MPI_Barrier(charmComm);
+          MPI_Barrier(charmComm);
+          MPI_Barrier(charmComm);
+          MPI_Barrier(charmComm);
+      }
       MPI_Status sts;
       int vals[2];
       MPI_Recv(vals,2,MPI_INT,MPI_ANY_SOURCE,FAIL_TAG, charmComm,&sts);
@@ -1620,6 +1651,12 @@ void LrtsPreCommonInit(int everReturn) {
     waitIrecvListHead = waitIrecvListTail = irecvListEntryAllocate();
     waitIrecvListHead->next = NULL;
 #endif
+#endif
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+    CpvInitialize(crashedRankList *, crashedRankHdr);
+    CpvInitialize(crashedRankList *, crashedRankPtr);
+    CpvAccess(crashedRankHdr) = NULL;
+    CpvAccess(crashedRankPtr) = NULL;
 #endif
 }
 
@@ -1918,9 +1955,33 @@ int find_spare_mpirank(int pe)
     if (nextrank == total_pes) {
       CmiAbort("Charm++> No spare processor available.");
     }
+    crashedRankList * crashedRank= (crashedRankList *)(malloc(sizeof(crashedRankList)));
+    crashedRank->rank = petorank[pe];
+    crashedRank->next=NULL;
+    if(CpvAccess(crashedRankHdr)==NULL){
+      CpvAccess(crashedRankHdr) = crashedRank;
+      CpvAccess(crashedRankPtr) = CpvAccess(crashedRankHdr);
+    }else{
+      CpvAccess(crashedRankPtr)->next = crashedRank;
+      CpvAccess(crashedRankPtr) = crashedRank;
+    }
     petorank[pe] = nextrank;
     nextrank++;
     return nextrank-1;
+}
+
+int isRankDie(int rank){
+  crashedRankList * cur = CpvAccess(crashedRankHdr);
+  crashedRankList * head = CpvAccess(crashedRankHdr);
+  while(cur!=NULL){
+    if(rank == cur->rank){
+      CpvAccess(crashedRankHdr) = head;
+      return 1;
+    }
+    cur = cur->next;
+  }
+  CpvAccess(crashedRankHdr) = head;
+  return 0;
 }
 
 void CkDieNow()

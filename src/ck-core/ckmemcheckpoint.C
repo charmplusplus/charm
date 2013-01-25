@@ -61,6 +61,12 @@ void noopck(const char*, ...)
 // assume extra processors--0
 #if CMK_CONVERSE_MPI
 #define CK_NO_PROC_POOL				0
+static int pingHandlerIdx;
+static int pingCheckHandlerIdx;
+static int buddyDieHandlerIdx;
+static double lastPingTime = -1;
+void pingBuddy();
+void pingCheckHandler();
 #else
 #define CK_NO_PROC_POOL				0
 #endif
@@ -1124,6 +1130,12 @@ void CkMemCheckPT::finishUp()
        cpCallback.send();
        CkPrintf("[%d] Restart finished in %f seconds at %f.\n", CkMyPe(), CkWallTimer()-restartT, CkWallTimer());
   }
+#if CMK_CONVERSE_MPI	
+  if (CmiMyPe() == BuddyPE(thisFailedPe)) {
+    lastPingTime = CmiWallTimer();
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+  }
+#endif
 
 #if CK_NO_PROC_POOL
 #if NODE_CHECKPOINT
@@ -1503,16 +1515,16 @@ void notify_crash(int node)
 extern "C" void (*notify_crash_fn)(int node);
 
 #if CMK_CONVERSE_MPI
-static int pingHandlerIdx;
-static int pingCheckHandlerIdx;
-static int buddyDieHandlerIdx;
-static double lastPingTime = -1;
+//static int pingHandlerIdx;
+//static int pingCheckHandlerIdx;
+//static int buddyDieHandlerIdx;
+//static double lastPingTime = -1;
 
 extern "C" void mpi_restart_crashed(int pe, int rank);
 extern "C" int  find_spare_mpirank(int pe);
 
-void pingBuddy();
-void pingCheckHandler();
+//void pingBuddy();
+//void pingCheckHandler();
 
 void buddyDieHandler(char *msg)
 {
@@ -1526,7 +1538,7 @@ void buddyDieHandler(char *msg)
    int buddy = obj->BuddyPE(CmiMyPe());
    if (buddy == diepe)  {
      mpi_restart_crashed(diepe, newrank);
-     CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+     //CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
    }
 #endif
 }
