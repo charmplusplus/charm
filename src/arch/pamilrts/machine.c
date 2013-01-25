@@ -44,6 +44,12 @@ char *ALIGN_32(char *p) {
 #define SHORT_CUTOFF   128
 #define EAGER_CUTOFF   4096
 
+#if CMK_PERSISTENT_COMM
+void rzv_persist_pkt_dispatch (pami_context_t context, void *clientdata, const void *header_addr, size_t header_size, const void * pipe_addr,  size_t pipe_size,  pami_endpoint_t origin, pami_recv_t  * recv); 
+#define CMI_PAMI_RZV_PERSIST_DISPATCH            11 
+#include "machine-persistent.h"
+#endif
+
 #if !CMK_OPTIMIZE
 static int checksum_flag = 0;
 extern unsigned char computeCheckSum(unsigned char *data, int len);
@@ -304,7 +310,6 @@ static void short_pkt_dispatch (pami_context_t       context,
   //CmiPushPE(CMI_DEST_RANK(smsg), (void *)msg);
 }
 
-
 void rzv_pkt_dispatch (pami_context_t       context,   
     void               * clientdata,
     const void         * header_addr,
@@ -537,6 +542,15 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         pfn,
         NULL,
         options);      
+
+#if CMK_PERSISTENT_COMM
+      pfn.p2p = rzv_persist_pkt_dispatch;
+      PAMI_Dispatch_set (cmi_pami_contexts[i],
+          CMI_PAMI_RZV_PERSIST_DISPATCH,
+          pfn,
+          NULL,
+          options);     
+#endif      
 
     pfn.p2p = short_pkt_dispatch;
     PAMI_Dispatch_set (cmi_pami_contexts[i],
@@ -995,3 +1009,7 @@ void ack_pkt_dispatch (pami_context_t       context,
 }
 
 #include "cmimemcpy_qpx.h"
+
+#if CMK_PERSISTENT_COMM
+#include "machine-persistent.c"
+#endif

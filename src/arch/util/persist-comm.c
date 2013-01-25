@@ -753,8 +753,8 @@ void CmiDestoryAllPersistent()
     PersistentReceivesTable *next = slot->next;
     int i;
     for (i=0; i<PERSIST_BUFFERS_NUM; i++)  {
-      if (slot->destBuf[i].destSizeAddress)
-        CmiPrintf("Warning: CmiDestoryAllPersistent destoried buffered undelivered message.\n");
+      //if (slot->destBuf[i].destSizeAddress)
+      //  CmiPrintf("Warning: CmiDestoryAllPersistent destoried buffered undelivered message.\n");
       if (slot->destBuf[i].destAddress) PerFree((char*)slot->destBuf[i].destAddress);
     }
     free(slot);
