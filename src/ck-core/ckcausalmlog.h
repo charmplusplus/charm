@@ -645,6 +645,7 @@ extern CkVec<MigrationRecord> migratedNoticeList;
 extern CkVec<RetainedMigratedObject *> retainedObjectList;
 
 int getCheckPointPE();
+int getReverseCheckPointPE();
 inline int isSameDet(Determinant *first, Determinant *second);
 void forAllCharesDo(MlogFn fnPointer,void *data);
 envelope *copyEnvelope(envelope *env);
