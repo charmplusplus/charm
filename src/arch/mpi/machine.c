@@ -301,7 +301,7 @@ void (*signal_int)(int);
 static int _thread_provided = -1; /* Indicating MPI thread level */
 static int idleblock = 0;
 
-#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+#if __FAULT__ 
 typedef struct crashedrank{
   int rank;
   struct crashedrank *next;
@@ -316,7 +316,7 @@ typedef struct msg_list {
     struct msg_list *next;
     int size, destpe, mode;
     MPI_Request req;
-#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+#if __FAULT__ 
     int dstrank; //used in fault tolerance protocol, if the destination is the died rank, delete the msg
 #endif
 } SMSG_LIST;
@@ -526,7 +526,7 @@ static size_t CmiAllAsyncMsgsSent(void) {
         done = 0;
         if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts))
             CmiAbort("CmiAllAsyncMsgsSent: MPI_Test failed!\n");
-#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+#if __FAULT__ 
         if(isRankDie(msg_tmp->dstrank)){
           //CmiPrintf("[%d][%d] msg to crashed rank\n",CmiMyPartition(),CmiMyPe());
           //CmiAbort("unexpected send");
@@ -583,7 +583,7 @@ static void CmiReleaseSentMessages(void) {
 #endif
         if (MPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
             CmiAbort("CmiReleaseSentMessages: MPI_Test failed!\n");
-#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+#if __FAULT__ 
         if (isRankDie(msg_tmp->dstrank)){
           done = 1;
         }
@@ -1652,7 +1652,7 @@ void LrtsPreCommonInit(int everReturn) {
     waitIrecvListHead->next = NULL;
 #endif
 #endif
-#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+#if __FAULT__ 
     CpvInitialize(crashedRankList *, crashedRankHdr);
     CpvInitialize(crashedRankList *, crashedRankPtr);
     CpvAccess(crashedRankHdr) = NULL;
