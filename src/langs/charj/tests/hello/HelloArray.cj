@@ -18,7 +18,7 @@ public mainchare Main {
                  CkNumPes(), num_elements);
         main = thisProxy;
         Hello@ arr = new Hello@(num_elements);
-        arr[0+0]@SayHi(17);
+        arr[0]@SayHi(17);
     }
 
     public entry void done() {

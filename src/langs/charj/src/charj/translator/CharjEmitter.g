@@ -989,9 +989,7 @@ expr
 
 primaryExpression
 @init { int dims = 1; boolean isValueType = true; }
-    :   ^(DOT ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) IDENT)
-         -> template(pe={$pe.st}, ex={$ex.st}, id={$IDENT.text}) "((<pe>)[<ex>]).<id>"
-    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {
+    :  ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {
             if ($pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType) {
                 PointerType p = (PointerType)($pe.start.symbolType);
                 if (p.baseType instanceof ClassSymbol) {
