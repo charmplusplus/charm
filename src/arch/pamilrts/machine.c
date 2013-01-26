@@ -70,8 +70,6 @@ if (checksum_flag)      \
 #define CMI_CHECK_CHECKSUM(msg, len)
 #endif
 
-CpvDeclare(int, uselock);
-
 #if CMK_SMP && !CMK_MULTICORE
 //static volatile int commThdExit = 0;
 //static CmiNodeLock commThdExitLock = 0;
@@ -91,6 +89,10 @@ static void CmiNetworkBarrier(int async);
 
 #include "machine-lrts.h"
 #include "machine-common-core.c"
+
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+CpvDeclare(int, uselock);
+#endif
 
 #if CMK_ENABLE_ASYNC_PROGRESS  
 //Immediate messages not supported yet
@@ -169,6 +171,14 @@ static void send_done(pami_context_t ctxt, void *data, pami_result_t result)
   DECR_MSGQLEN();
 }
 
+#if CMK_SMP
+static void CmiSendPeer (int rank, int size, char *msg) {
+  //fprintf(stderr, "%d Send messages to peer\n", CmiMyPe());
+  CmiPushPE (rank, msg);
+}
+#endif
+
+
 static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t result) 
   /* recv done callback: push the recved msg to recv queue */
 {
@@ -206,7 +216,13 @@ static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t resul
 //      CmiPushNode(msg);
 //    else
 //#endif
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+  CpvAccess(uselock) = 0;
+#endif
   handleOneRecvedMsg(sndlen,msg);
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+  CpvAccess(uselock) = 1;
+#endif
 //  CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
 
   DECR_ORECVS();
@@ -278,8 +294,14 @@ static void short_pkt_dispatch (pami_context_t       context,
     /* received a non-charm msg */
     CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");     
   }
-
-  CmiPushPE(CMI_DEST_RANK(smsg), (void *)msg);
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+  CpvAccess(uselock) = 0;
+#endif
+  handleOneRecvedMsg(pipe_size,msg);
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+  CpvAccess(uselock) = 1;
+#endif
+  //CmiPushPE(CMI_DEST_RANK(smsg), (void *)msg);
 }
 
 
@@ -630,10 +652,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 void LrtsPreCommonInit(int everReturn)
 {
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
   CpvInitialize(int, uselock);
   CpvAccess(uselock) = 1;
+#endif
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
-  CMI_Progress_init(0, _n);
+  CMI_Progress_init(0, cmi_pami_numcontexts);
 #endif
 }
 
@@ -659,6 +683,7 @@ void LrtsDrainResources()
 void LrtsExit() 
 {
   int rank0 = 0;
+  CmiNetworkBarrier(1);
   if (CmiMyRank() == 0) {
     rank0 = 1;
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
@@ -667,20 +692,7 @@ void LrtsExit()
     PAMI_Context_destroyv(cmi_pami_contexts, cmi_pami_numcontexts);
     PAMI_Client_destroy(&cmi_pami_client);
   }
-
-  CmiNodeBarrier();
-  //  CmiNodeAllBarrier ();
-  //fprintf(stderr, "Before Exit\n");
-#if CMK_SMP
-  if (rank0) {
-    Delay(100000);
-    exit(0);
-  }
-  else
-    pthread_exit(0);
-#else
   exit(0);
-#endif
 }
 
 void LrtsAbort(const char *message) {
@@ -689,13 +701,6 @@ void LrtsAbort(const char *message) {
   CmiPrintStackTrace(0);
   assert(0);
 }
-
-#if CMK_SMP
-static void CmiSendPeer (int rank, int size, char *msg) {
-  //fprintf(stderr, "%d Send messages to peer\n", CmiMyPe());
-  CmiPushPE (rank, msg);
-}
-#endif
 
 pami_result_t machine_send_handoff (pami_context_t context, void *msg);
 void  machine_send       (pami_context_t      context, 
@@ -732,9 +737,7 @@ pami_result_t machine_send_handoff (pami_context_t context, void *msg) {
   int size = hdr->size;
 
   //As this is executed on the comm thread no locking is necessary
-  CpvAccess(uselock) = 0;
   machine_send(context, node, rank, size, msg, 0);
-  CpvAccess(uselock) = 1;
   return PAMI_SUCCESS;
 }
 #endif
@@ -749,9 +752,13 @@ void  machine_send       (pami_context_t      context,
   CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
   CMI_MSG_SIZE(msg) = size;
   CMI_SET_CHECKSUM(msg, size);
-  to_lock = CpvAccess(uselock);
 
   pami_endpoint_t target;
+
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+  to_lock = CpvAccess(uselock);
+#endif
+
 #if CMK_PAMI_MULTI_CONTEXT
   //size_t dst_context = (rank != DGRAM_NODEMESSAGE) ? (rank>>LTPS) : (rand_r(&r_seed) % cmi_pami_numcontexts);
   //Choose a context at random
