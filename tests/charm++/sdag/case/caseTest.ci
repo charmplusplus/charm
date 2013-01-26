@@ -1,0 +1,38 @@
+mainmodule caseTest {
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+
+    entry void run() {
+      while (true) {
+        serial {
+          CkPrintf("running\n");
+          thisProxy.test2();
+          thisProxy.test1(1); thisProxy.test3();
+          thisProxy.test5();
+        }
+
+        case {
+          when test2(), test4() serial { CkPrintf("case test2\n"); }
+          when test1(int a), test3() {
+            serial { CkPrintf("case test1, test3\n"); thisProxy.test4(); }
+            when test5() serial { CkPrintf("\t => test5\n"); }
+          }
+          when test4() serial { CkPrintf("case test4\n"); CkExit(); }
+        }
+
+        when test4() serial { CkPrintf("non-case test4\n"); }
+        when test2() serial { CkPrintf("non-case test2\n"); CkExit(); }
+      }
+      serial {
+        CkPrintf("finished successfully\n");
+        CkExit();
+      }
+    };
+
+    entry void test1(int a);
+    entry void test2();
+    entry void test3();
+    entry void test4();
+    entry void test5();
+  };
+};
