@@ -411,6 +411,32 @@ The range from MIN to MAX is inclusive. Its use is demonstrated through
 distributed parallel matrix-matrix multiply shown in
 \examplereffile{matmul/matmul.ci}
 
+\subsection{The \texttt{case} Statement}
+
+The \texttt{case} statement in SDAG expresses a disjunction over a set of
+\texttt{when} clauses. In other words, if it is known that one dependency out
+of a set will be satisfied, but which one is not known, this statement allows
+the set to be specified and will execute the corresponding block based on which
+dependency ends up being fulfilled.
+
+The following is a basic example of the \texttt{case} statement. Note that the
+trigger \texttt{b(), d()} will only be fulfilled if both \texttt{b()} and
+\texttt{d()} arrive. If only one arrives, then it will partially match, and the
+runtime will not ``commit'' to this branch until the second arrives. If another
+dependency fully matches, the partial match will be ignored and can be used to
+trigger another \texttt{when} later in the execution.
+
+\begin{verbatim}
+case {
+  when a() { }
+  when b(), d() { }
+  when c() { }
+}
+\end{verbatim}
+
+A full example of the \texttt{case} statement can be found
+\testreffile{sdag/case/caseTest.ci}.
+
 \section{Usage Notes}
 
 If you've added \sdag\ code to your class, you must link in the code by:
