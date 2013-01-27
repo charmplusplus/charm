@@ -859,7 +859,7 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 extern void ConverseCommonExit();
 
 static void CommunicationServer(int sleepTime) {
-#if CMK_SMP
+#if CMK_SMP 
     AdvanceCommunication(1);
 
     if (commThdExit == CmiMyNodeSize()) {
@@ -916,7 +916,7 @@ if (MSG_STATISTIC)
     if (CmiMyPe() == 0) CmiPrintf("End of program\n");
 #endif
 
-#if !CMK_SMP
+#if !CMK_SMP  || CMK_SMP_NO_COMMTHD
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif
@@ -967,7 +967,7 @@ void *CmiGetNonLocal(void) {
     /* ?????although it seems that lock is not needed, I found it crashes very often
        on mpi-smp without lock */
     msg = PCQueuePop(cs->recv);
-#if !CMK_SMP
+#if !CMK_SMP  || CMK_SMP_NO_COMMTHD
     if (!msg) {
        AdvanceCommunication(0);
        msg = PCQueuePop(cs->recv);
