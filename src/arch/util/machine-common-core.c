@@ -912,7 +912,6 @@ void ConverseExit(void) {
 	   || Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST)
 		LrtsDrainResources();
 #endif
-
     ConverseCommonExit();
 
 #if CMK_WITH_STATS
@@ -1032,7 +1031,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s) {
 #define SPINS_BEFORE_SLEEP 20
 static void CmiNotifyStillIdle(CmiIdleState *s) {
     MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
-#if !CMK_SMP
+#if !CMK_SMP || CMK_SMP_NO_COMMTHD
     AdvanceCommunication(1);
 #else
     LrtsPostNonLocal();

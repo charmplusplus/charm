@@ -1,13 +1,13 @@
-#if COMMON_PCQUEUE
-#define CMIQueue PCQueue
-#define CMIQueuePush    PCQueuePush
-#define CMIQueueCreate  PCQueueCreate
-#define CMIQueuePop     PCQueuePop
-#define CMIQueueEmpty   PCQueueEmpty
-#else
+#if NO_COMMON_PCQUEUE
 #define CMIQueue LRTSQueue 
 #define CMIQueuePush    LRTSQueuePush
 #define CMIQueueCreate  LRTSQueueCreate
 #define CMIQueuePop     LRTSQueuePop
 #define CMIQueueEmpty   LRTSQueueEmpty
+#else
+#define CMIQueue PCQueue
+#define CMIQueuePush    PCQueuePush
+#define CMIQueueCreate  PCQueueCreate
+#define CMIQueuePop     PCQueuePop
+#define CMIQueueEmpty   PCQueueEmpty
 #endif

@@ -193,35 +193,12 @@ static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t resul
   //int rank = *(int *) (msg + sndlen); //get rank from bottom of the message
   //CMI_DEST_RANK(msg) = rank;
 
-  //fprintf (stderr, "%d Recv message done \n", CmiMyPe());
-  /* then we do what PumpMsgs used to do:
-   * push msg to recv queue */
   CMI_CHECK_CHECKSUM(msg, sndlen);
   if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { 
     CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");
     return;
   }
-//#if CMK_BROADCAST_SPANNING_TREE 
-//  if (CMI_IS_BCAST_ON_CORES(msg) ) {
-//    //Forward along spanning tree
-//    CpvAccess(uselock) = 0;
-//    SendSpanningChildrenProc(sndlen, msg);
-//    CpvAccess(uselock) = 1;
-//  }
-//#endif
-//
-//#if CMK_NODE_QUEUE_AVAILABLE
-//#if CMK_BROADCAST_SPANNING_TREE
-//  if (CMI_IS_BCAST_ON_NODES(msg)) {
-//    CpvAccess(uselock) = 0;
-//    SendSpanningChildrenNode(sndlen, msg);
-//    CpvAccess(uselock) = 1;
-//  }
-//#endif
-//    if (CMI_DEST_RANK(msg) == DGRAM_NODEMESSAGE)
-//      CmiPushNode(msg);
-//    else
-//#endif
+
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
   CpvAccess(uselock) = 0;
 #endif
@@ -229,7 +206,6 @@ static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t resul
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
   CpvAccess(uselock) = 1;
 #endif
-//  CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
 
   DECR_ORECVS();
 }
@@ -260,8 +236,6 @@ static void pkt_dispatch (pami_context_t       context,
   INCR_ORECVS();    
   int alloc_size = pipe_size;
   char * buffer  = (char *)CmiAlloc(alloc_size);
-  //char * buffer  = (char *)CmiAlloc(alloc_size + sizeof(int));
-  //*(int *)(buffer+alloc_size) = *(int *)header_addr;
 
   if (recv) {
     recv->local_fn = recv_done;
@@ -288,8 +262,6 @@ static void short_pkt_dispatch (pami_context_t       context,
 {
   int alloc_size = pipe_size;
   char * buffer  = (char *)CmiAlloc(alloc_size);
-  //char * buffer  = (char *)CmiAlloc(alloc_size + sizeof(int));
-  //*(int *)(buffer+alloc_size) = *(int *)header_addr;
 
   memcpy (buffer, pipe_addr, pipe_size);
   char *smsg = (char *)pipe_addr;
@@ -307,7 +279,6 @@ static void short_pkt_dispatch (pami_context_t       context,
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
   CpvAccess(uselock) = 1;
 #endif
-  //CmiPushPE(CMI_DEST_RANK(smsg), (void *)msg);
 }
 
 void rzv_pkt_dispatch (pami_context_t       context,   
@@ -691,7 +662,6 @@ void LrtsDrainResources()
   while (MSGQLEN() > 0 || ORECVS() > 0) {
     LrtsAdvanceCommunication(0);
   }
-
   CmiNodeBarrier();
 }
 
@@ -736,7 +706,7 @@ void  machine_send       (pami_context_t      context,
     char              * msg, 
     int                 to_lock)__attribute__((always_inline));
 
-CmiCommHandle LrtsSendFunc(int node, int rank, int size, char *msg, int to_lock)
+CmiCommHandle LrtsSendFunc(int node, int destPE, int size, char *msg, int to_lock)
 {
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
   //int c = myrand(&r_seed) % cmi_pami_numcontexts;
@@ -750,7 +720,7 @@ CmiCommHandle LrtsSendFunc(int node, int rank, int size, char *msg, int to_lock)
       machine_send_handoff, msg);
 #else
   pami_context_t my_context = MY_CONTEXT();    
-  machine_send (my_context, node, rank, size, msg, to_lock);
+  machine_send (my_context, node, CMI_DEST_RANK(msg), size, msg, to_lock);
 #endif
   return 0;
 }
@@ -872,7 +842,6 @@ void LrtsAdvanceCommunication(int whenidle) {
   pami_context_t my_context = MY_CONTEXT();
 
 #if CMK_SMP
-  //CmiAssert (my_context != NULL);
   if (PAMIX_CONTEXT_TRYLOCK(my_context))
   {
     PAMI_Context_advance(my_context, 1);

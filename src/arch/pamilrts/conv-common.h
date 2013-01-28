@@ -6,6 +6,7 @@
 #define CMK_HANDLE_SIGUSR                                  1
 
 //#define CMK_ENABLE_ASYNC_PROGRESS                          1
+
 //#define  DELTA_COMPRESS                                     1
 
 #if DELTA_COMPRESS
