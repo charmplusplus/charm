@@ -4,6 +4,7 @@
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int nElements;
 /*readonly*/ int msgSize;
+/*readonly*/ int maxIter;
 
 /*mainchare*/
 class dataMsg : public CMessage_dataMsg {
@@ -15,14 +16,18 @@ class Main : public CBase_Main
 {
     double startTimer;
     int back;
+    int iter;
+    CProxy_Hello arr;
 public:
   Main(CkArgMsg* m)
   {
     //Process command-line arguments
     nElements=5;
     msgSize = 2048;
+    maxIter = 50;
     if(m->argc >1 ) nElements=atoi(m->argv[1]);
     if(m->argc >2 ) msgSize =atoi(m->argv[2]);
+    if(m->argc >3 ) maxIter=atoi(m->argv[3]);
     delete m;
 
     //Start the computation
@@ -30,8 +35,8 @@ public:
 	     CkNumPes(),nElements);
     mainProxy = thisProxy;
     back = 0;
-    
-    CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
+    iter = 0; 
+    arr = CProxy_Hello::ckNew(nElements);
     dataMsg *datamsg = new (msgSize) dataMsg();
     startTimer = CmiWallTimer();
     arr.SayHi(datamsg);
@@ -41,8 +46,19 @@ public:
   {
       back++;
       if(back == nElements)
-          CkPrintf("All done %d %d  cost  %lf \n", nElements, msgSize, CmiWallTimer()-startTimer);
-    CkExit();
+      {
+          iter++;
+          if(iter == maxIter)
+          {
+              CkPrintf("All done %d %d  cost  %lf \n", nElements, msgSize, (CmiWallTimer()-startTimer)/maxIter);
+              CkExit();
+          }else
+          {
+              back = 0;
+              dataMsg *datamsg = new (msgSize) dataMsg();
+              arr.SayHi(datamsg);
+          }
+      }
   };
 };
 
@@ -52,14 +68,14 @@ class Hello : public CBase_Hello
 public:
   Hello()
   {
-    CkPrintf("Hello %d created\n",thisIndex);
+    //CkPrintf("Hello %d created\n",thisIndex);
   }
 
   Hello(CkMigrateMessage *m) {}
   
   void SayHi(dataMsg *dm)
   {
-    CkPrintf("Hi[%d] from element \n",thisIndex);
+    //CkPrintf("Hi[%d] from element \n",thisIndex);
     delete dm;  
     mainProxy.done();
   }
