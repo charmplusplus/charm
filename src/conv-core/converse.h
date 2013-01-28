@@ -127,7 +127,7 @@ void setMemoryOwnedBy(void *p, int id);
 
 extern int CmiMyRank_();
 
-//variables and functions for replica
+//variables and functions for partition
 typedef struct {
   int numPartitions;
   int partitionSize;
@@ -169,7 +169,7 @@ int pe_gToLTranslate(int pe);
 #define CmiGetNodeGlobal(node,part)     node_lToGTranslate(node,part)
 #define CmiGetPeLocal(pe)               pe_gToLTranslate(pe)
 #define CmiGetNodeLocal(node)           node_gToLTranslate(node)
-//end of variables and functions for replica
+//end of variables and functions for partition
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 extern int _Cmi_mype;
@@ -1065,7 +1065,7 @@ void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
 void          CmiFreeMulticastFn(CmiGroup, int, char*);
 
-//inter replica send counterparts
+//inter partition send counterparts
 void          CmiInterSyncSendFn(int, int, int, char *);
 void          CmiInterFreeSendFn(int, int, int, char *);
 
@@ -1157,7 +1157,7 @@ void          CmiReleaseCommHandle(CmiCommHandle);
 #define CmiSyncMulticastAndFree(g,s,m)  (CmiFreeMulticastFn((g),(s),(char*)(m)))
 
 
-//adding functions for inter-replica communication - only the sync ones because
+//adding functions for inter-partition communication - only the sync ones because
 //we do not use the async ones
 #define CmiInterSyncSend(pe,p,s,m)              (CmiInterSyncSendFn((pe),(p),(s),(char *)(m)))
 #define CmiInterSyncSendAndFree(pe,p,s,m)       (CmiInterFreeSendFn((pe),(p),(s),(char *)(m)))
@@ -1176,7 +1176,7 @@ void          CmiSyncNodeBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int, char *);
 void          CmiFreeNodeBroadcastAllFn(int, char *);
 
-//if node queue is available, adding inter replica counterparts
+//if node queue is available, adding inter partition counterparts
 void          CmiInterSyncNodeSendFn(int, int, int, char *);
 void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #endif
@@ -1192,7 +1192,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
 
-//counterparts of inter replica
+//counterparts of inter partition
 #define CmiInterSyncNodeSend(pe,p,s,m)         (CmiInterSyncNodeSendFn((pe),(p),(s),(char *)(m)))
 #define CmiInterSyncNodeSendAndFree(pe,p,s,m)  (CmiInterFreeNodeSendFn((pe),(p),(s),(char *)(m)))
 
@@ -1231,7 +1231,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
 #define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
 #endif
-//and the inter replica counterparts
+//and the inter partition counterparts
 #define CmiInterSyncNodeSend(n,p,s,m)          CmiInterSyncSend(CmiNodeFirst(n),p,s,m)
 #define CmiInterSyncNodeSendAndFree(n,p,s,m)   CmiInterSyncSendAndFree(CmiNodeFirst(n),p,s,m)
 #endif

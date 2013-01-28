@@ -138,14 +138,14 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg);
 #define DGRAM_NODEMESSAGE   (0x1FFB)
 #endif
 
-// global state, equals local if running one replica
+// global state, equals local if running one partition
 PartitionInfo partitionInfo;
 int _Cmi_mype_global;
 int _Cmi_numpes_global;
 int _Cmi_mynode_global;
 int _Cmi_numnodes_global;
 
-// Node state structure, local information for the replica
+// Node state structure, local information for the partition
 int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_numnodes;  /* Total number of address spaces */
@@ -491,7 +491,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeSendFn(destPE, size, dupmsg);
 }
-//inter-replica send
+//inter-partition send
 void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiInterFreeSendFn(destPE, partition, size, dupmsg);
@@ -513,7 +513,7 @@ CpvExtern(int, _urgentSend);
 //declaration so that it can be used
 CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode);
 //I am changing this function to offload task to a generic function - the one
-//that handles sending to any replica
+//that handles sending to any partition
 INLINE_KEYWORD CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode) {
   return CmiInterSendNetworkFunc(destPE, CmiMyPartition(), size, msg, mode);
 }
@@ -564,7 +564,7 @@ if (MSG_STATISTIC)
 }
 
 //I am changing this function to offload task to a generic function - the one
-//that handles sending to any replica
+//that handles sending to any partition
 INLINE_KEYWORD void CmiFreeSendFn(int destPE, int size, char *msg) {
     CmiInterFreeSendFn(destPE, CmiMyPartition(), size, msg);
 }
@@ -602,7 +602,7 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
 #endif
 
 #if USE_COMMON_ASYNC_P2P
-//not implementing it for replica
+//not implementing it for partition
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg) {
     int destNode = CmiNodeOf(destPE);
     if (destNode == CmiMyNode()) {
@@ -642,7 +642,7 @@ INLINE_KEYWORD void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeNodeSendFn(destNode, size, dupmsg);
 }
-//inter-replica send
+//inter-partition send
 void CmiInterSyncNodeSendFn(int destNode, int partition, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiInterFreeNodeSendFn(destNode, partition, size, dupmsg);
@@ -652,7 +652,7 @@ void CmiInterSyncNodeSendFn(int destNode, int partition, int size, char *msg) {
 INLINE_KEYWORD void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
   CmiInterFreeNodeSendFn(destNode, CmiMyPartition(), size, msg);
 }
-//and the inter-replica function
+//and the inter-partition function
 void CmiInterFreeNodeSendFn(int destNode, int partition, int size, char *msg) {
     CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
     CQdCreate(CpvAccess(cQdState), 1);
@@ -677,7 +677,7 @@ if (  MSG_STATISTIC)
 #endif
 
 #if USE_COMMON_ASYNC_P2P
-//not implementing it for replica
+//not implementing it for partition
 CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg) {
     if (destNode == CmiMyNode()) {
         CmiSyncNodeSendFn(destNode, size, msg);
@@ -697,7 +697,7 @@ if (  MSG_STATISTIC)
 #endif
 #endif
 
-// functions related to replica
+// functions related to partition
 void CmiCreatePartitions(char **argv) {
   partitionInfo.numPartitions = 1; 
   if(!CmiGetArgInt(argv,"+partitions", &partitionInfo.numPartitions)) {
@@ -736,13 +736,13 @@ INLINE_KEYWORD int pe_lToGTranslate(int pe, int partition) {
 int pe_gToLTranslate(int pe) {
   return (pe % (CmiNumNodes()*CmiNodeSpan()));
 }
-//end of functions related to replica
+//end of functions related to partition
 
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
     int tmp;
-    //handle output to files for replica if requested
+    //handle output to files for partition if requested
     char *stdoutbase,*stdoutpath;
 #if CMK_WITH_STATS
     MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
@@ -814,7 +814,7 @@ if (  MSG_STATISTIC)
     Cmi_startfn = fn;
     Cmi_usrsched = usched;
 
-    if ( CmiGetArgStringDesc(argv,"+stdout",&stdoutbase,"base filename to redirect replica stdout to") ) {
+    if ( CmiGetArgStringDesc(argv,"+stdout",&stdoutbase,"base filename to redirect partition stdout to") ) {
       stdoutpath = malloc(strlen(stdoutbase) + 30);
       sprintf(stdoutpath, stdoutbase, CmiMyPartition(), CmiMyPartition(), CmiMyPartition());
       if ( ! strcmp(stdoutpath, stdoutbase) ) {
