@@ -119,13 +119,13 @@ void _alias_rank (int rank);
 volatile int msgQueueLen [MAX_NUM_CONTEXTS];
 volatile int outstanding_recvs [MAX_NUM_CONTEXTS];
 
-//#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
+#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
 #define THREADS_PER_CONTEXT 2
 #define LTPS                1 //Log Threads Per Context (TPS)
-//#else
-//#define THREADS_PER_CONTEXT 4
-//#define LTPS                2 //Log Threads Per Context (TPS)
-//#endif
+#else
+#define THREADS_PER_CONTEXT 2
+#define LTPS                1 //Log Threads Per Context (TPS)
+#endif
 
 #define  MY_CONTEXT_ID() (CmiMyRank() >> LTPS)
 #define  MY_CONTEXT()    (cmi_pami_contexts[CmiMyRank() >> LTPS])
@@ -756,9 +756,9 @@ void  machine_send       (pami_context_t      context,
 #endif
 
 #if CMK_PAMI_MULTI_CONTEXT
-  //size_t dst_context = (rank != DGRAM_NODEMESSAGE) ? (rank>>LTPS) : (rand_r(&r_seed) % cmi_pami_numcontexts);
+  size_t dst_context = (rank != DGRAM_NODEMESSAGE) ? (rank>>LTPS) : (rand_r(&r_seed) % cmi_pami_numcontexts);
   //Choose a context at random
-  size_t dst_context = myrand(&r_seed) % cmi_pami_numcontexts;
+  //size_t dst_context = myrand(&r_seed) % cmi_pami_numcontexts;
 #else
   size_t dst_context = 0;
 #endif
