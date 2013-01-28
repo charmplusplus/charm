@@ -76,9 +76,9 @@ typedef struct CmiStateStruct
 {
   int pe, rank;
 #if !CMK_SMP_MULTIQ
-  PCQueue recv; 
+  CMIQueue recv; 
 #else
-  PCQueue recv[MULTIQ_GRPSIZE];
+  CMIQueue recv[MULTIQ_GRPSIZE];
   int myGrpIdx;
   int curPolledIdx;
 #endif
@@ -92,13 +92,13 @@ typedef struct CmiNodeStateStruct
 {
   CmiNodeLock immSendLock; /* lock for pushing into immediate queues */
   CmiNodeLock immRecvLock; /* lock for processing immediate messages */
-  PCQueue     immQ; 	   /* immediate messages to handle ASAP: 
+  CMIQueue     immQ; 	   /* immediate messages to handle ASAP: 
                               Locks: push(SendLock), pop(RecvLock) */
-  PCQueue     delayedImmQ; /* delayed immediate messages:
+  CMIQueue     delayedImmQ; /* delayed immediate messages:
                               Locks: push(RecvLock), pop(RecvLock) */
 #if CMK_NODE_QUEUE_AVAILABLE
   CmiNodeLock CmiNodeRecvLock;
-  PCQueue     NodeRecv;
+  CMIQueue     NodeRecv;
 #endif
 }
 CmiNodeState;

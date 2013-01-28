@@ -643,9 +643,9 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->rank = rank;
   if (rank==CmiMyNodeSize()) return; /* Communications thread */
 #if !CMK_SMP_MULTIQ
-  state->recv = PCQueueCreate();
+  state->recv = CMIQueueCreate();
 #else
-  for(i=0; i<MULTIQ_GRPSIZE; i++) state->recv[i]=PCQueueCreate();
+  for(i=0; i<MULTIQ_GRPSIZE; i++) state->recv[i]=CMIQueueCreate();
   state->myGrpIdx = rank % MULTIQ_GRPSIZE;
   state->curPolledIdx = 0;
 #endif
@@ -659,12 +659,12 @@ void CmiNodeStateInit(CmiNodeState *nodeState)
 #if CMK_IMMEDIATE_MSG
   nodeState->immSendLock = CmiCreateLock();
   nodeState->immRecvLock = CmiCreateLock();
-  nodeState->immQ = PCQueueCreate();
-  nodeState->delayedImmQ = PCQueueCreate();
+  nodeState->immQ = CMIQueueCreate();
+  nodeState->delayedImmQ = CMIQueueCreate();
 #endif
 #if CMK_NODE_QUEUE_AVAILABLE
   nodeState->CmiNodeRecvLock = CmiCreateLock();
-  nodeState->NodeRecv = PCQueueCreate();
+  nodeState->NodeRecv = CMIQueueCreate();
 #endif
   MACHSTATE(4,"NodeStateInit done")
 }
