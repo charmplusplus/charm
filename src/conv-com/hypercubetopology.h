@@ -11,9 +11,12 @@
 #include "graphrouter.h"
 #include "string.h"
 
+#include <vector>
+
 class HypercubeTopology: public TopologyDescriptor {
     int NumPes, MyPe, Dim;
-    int *penum, **next;
+    std::vector<int> penum;
+    int **next;
 
     void CreateStageTable(int, int *);
     
