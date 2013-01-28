@@ -27,20 +27,23 @@
 #include <algorithm>
 #include <map>
 
+#include <vector>
+using std::vector;
+
 #include <time.h>
 
 #define THRESHOLD 0.02
 #define SWAP_MULTIPLIER 5 
 
-inline void eraseObjFromParrObjs(std::vector<int> & parr_objs, int remove_objid);
-inline void printMapping(std::vector<Vertex> &vertices);
-inline void removeFromArray(int pe_id, std::vector<int> &array);
-inline int popFromProcHeap(std::vector<int> & parr_above_avg, ProcArray *parr);
-inline void handleTransfer(int randomly_obj_id, ProcInfo& p, int possible_pe, std::vector<int> *parr_objs, ObjGraph *ogr, ProcArray* parr);
+inline void eraseObjFromParrObjs(vector<int> & parr_objs, int remove_objid);
+inline void printMapping(vector<Vertex> &vertices);
+inline void removeFromArray(int pe_id, vector<int> &array);
+inline int popFromProcHeap(vector<int> & parr_above_avg, ProcArray *parr);
+inline void handleTransfer(int randomly_obj_id, ProcInfo& p, int possible_pe, vector<int> *parr_objs, ObjGraph *ogr, ProcArray* parr);
 inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold, double lower_threshold,
-                           std::vector<int> &parr_above_avg, std::vector<int> &parr_below_avg,
-                           bool* proc_load_info, ProcArray *parr);
-inline void getPossiblePes(std::vector<int>& possible_pes, int randomly_obj_id,
+                           vector<int> &parr_above_avg, vector<int> &parr_below_avg,
+                           vector<bool> &proc_load_info, ProcArray *parr);
+inline void getPossiblePes(vector<int>& possible_pes, int randomly_obj_id,
     ObjGraph *ogr, ProcArray* parr);
 
 double upper_threshold;
@@ -101,7 +104,7 @@ class ObjPeCommInfo {
     }
 
     int obj_id;
-    std::vector<PeCommInfo> pcomm;
+    vector<PeCommInfo> pcomm;
 };
 
 class ProcCommGreater {
@@ -133,7 +136,7 @@ void PrintProcLoad(ProcArray *parr) {
   }
 }
 
-void PrintProcObj(ProcArray *parr, std::vector<int>* parr_objs) {
+void PrintProcObj(ProcArray *parr, vector<int>* parr_objs) {
   int i, j;
   CkPrintf("---------------------\n");
   for (i = 0; i < parr->procs.size(); i++) {
@@ -154,12 +157,11 @@ void CommAwareRefineLB::work(LDStats* stats) {
   double avgload = parr->getAverageLoad();      // Average load of processors
 
   // Sets to false if it is overloaded, else to true
-  bool* proc_load_info = new bool[parr->procs.size()];
-  memset(proc_load_info, false, parr->procs.size());
+  vector<bool> proc_load_info(parr->procs.size(), false);
 
   // Create an array of vectors for each processor mapping to the objects in
   // that processor
-  std::vector<int>* parr_objs = new std::vector<int>[parr->procs.size()];
+  vector<int>* parr_objs = new vector<int>[parr->procs.size()];
 
   upper_threshold = avgload + (avgload * THRESHOLD);
   //lower_threshold = avgload - (avgload * THRESHOLD * THRESHOLD);
@@ -185,8 +187,8 @@ void CommAwareRefineLB::work(LDStats* stats) {
     ogr->vertices[vert].setNewPe(curr_pe);
   }
 
-  std::vector<int> parr_above_avg;
-  std::vector<int> parr_below_avg;
+  vector<int> parr_above_avg;
+  vector<int> parr_below_avg;
 
   double pe_load;  
 
@@ -245,7 +247,7 @@ void CommAwareRefineLB::work(LDStats* stats) {
 
       // CkPrintf("Heavy %d: Parr obj size : %d random : %d random obj id : %d\n", p_index,
       //     parr_objs[p.getProcId()].size(), randd, randomly_obj_id);
-      std::vector<int> possible_pes;
+      vector<int> possible_pes;
       getPossiblePes(possible_pes, randomly_obj_id, ogr, parr);
       for (i = 0; i < possible_pes.size(); i++) {
 
@@ -302,11 +304,10 @@ void CommAwareRefineLB::work(LDStats* stats) {
   ogr->convertDecisions(stats);         // Send decisions back to LDStats
   delete parr;
   delete ogr;
-  delete proc_load_info;
   delete[] parr_objs;
 }
 
-inline void eraseObjFromParrObjs(std::vector<int> & parr_objs, int remove_objid) {
+inline void eraseObjFromParrObjs(vector<int> & parr_objs, int remove_objid) {
   for (int i = 0; i < parr_objs.size(); i++) {
     if (parr_objs[i] == remove_objid) {
       parr_objs.erase(parr_objs.begin() + i);
@@ -315,14 +316,14 @@ inline void eraseObjFromParrObjs(std::vector<int> & parr_objs, int remove_objid)
   }
 }
 
-inline void printMapping(std::vector<Vertex> &vertices) {
+inline void printMapping(vector<Vertex> &vertices) {
   for (int i = 0; i < vertices.size(); i++) {
     CkPrintf("%d: old map : %d new map : %d\n", i, vertices[i].getCurrentPe(),
         vertices[i].getNewPe());
   }
 }
 
-inline void removeFromArray(int pe_id, std::vector<int> &array) {
+inline void removeFromArray(int pe_id, vector<int> &array) {
   for (int i = 0; i < array.size(); i++) {
     if (array[i] == pe_id) {
       array.erase(array.begin() + i);
@@ -330,7 +331,7 @@ inline void removeFromArray(int pe_id, std::vector<int> &array) {
   }
 }
 
-inline int popFromProcHeap(std::vector<int> & parr_above_avg, ProcArray *parr) {
+inline int popFromProcHeap(vector<int> & parr_above_avg, ProcArray *parr) {
   int p_index = parr_above_avg.front();
   std::pop_heap(parr_above_avg.begin(), parr_above_avg.end(),
       ProcLoadGreater(parr));
@@ -339,7 +340,7 @@ inline int popFromProcHeap(std::vector<int> & parr_above_avg, ProcArray *parr) {
 }
 
     
-inline void handleTransfer(int randomly_obj_id, ProcInfo& p, int possible_pe, std::vector<int>* parr_objs, ObjGraph *ogr, ProcArray* parr) {
+inline void handleTransfer(int randomly_obj_id, ProcInfo& p, int possible_pe, vector<int>* parr_objs, ObjGraph *ogr, ProcArray* parr) {
   ogr->vertices[randomly_obj_id].setNewPe(possible_pe);
   parr_objs[possible_pe].push_back(randomly_obj_id);
   ProcInfo &possible_pe_procinfo = parr->procs[possible_pe];
@@ -352,8 +353,8 @@ inline void handleTransfer(int randomly_obj_id, ProcInfo& p, int possible_pe, st
 }
 
 inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold, double lower_threshold,
-                           std::vector<int>& parr_above_avg, std::vector<int>& parr_below_avg,
-                           bool* proc_load_info, ProcArray *parr) {
+                           vector<int>& parr_above_avg, vector<int>& parr_below_avg,
+                           vector<bool> &proc_load_info, ProcArray *parr) {
 
   ProcInfo& p = parr->procs[p_index];
   ProcInfo& possible_pe_procinfo = parr->procs[possible_pe];
@@ -390,7 +391,7 @@ inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold,
 
 }
 
-inline void getPossiblePes(std::vector<int>& possible_pes, int vert,
+inline void getPossiblePes(vector<int>& possible_pes, int vert,
     ObjGraph *ogr, ProcArray* parr) {
   std::map<int, int> tmp_map_pid_index;
   int counter = 0;

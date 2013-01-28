@@ -226,10 +226,8 @@ void RecursiveBiPart(ObjGraph *ogr, vector<Vertex *> &pvertices, int parent, int
   //child partitions
   vector<Vertex *> partition1;
   vector<Vertex *> partition2;
-  bool *taken=(bool *)malloc(vhelpers.size()*sizeof(bool));
+  vector<bool> taken(vhelpers.size(), false);
 
-  for(int i=0;i<vhelpers.size();i++)
-    taken[i]=false;
   int start = pvertices[0]->getVertexId();
   int count=0;
   double loadseen=0;
@@ -333,8 +331,6 @@ void RecursiveBiPart(ObjGraph *ogr, vector<Vertex *> &pvertices, int parent, int
     if(taken[v->getVertexId()]==false)
       partition2.push_back(v);
   }
-
-  delete[] taken;
 
   int initialedgecut;
 

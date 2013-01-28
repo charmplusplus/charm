@@ -92,7 +92,7 @@ inline int popFromProcHeap(std::vector<int> & parr_above_avg, ProcArray *parr);
 inline void handleTransfer(int randomly_obj_id, ProcInfo& p, int possible_pe, std::vector<int> *parr_objs, ObjGraph *ogr, ProcArray* parr);
 inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold, double lower_threshold,
                            std::vector<int> &parr_above_avg, std::vector<int> &parr_below_avg,
-                           bool* proc_load_info, ProcArray *parr);
+                           std::vector<bool> &proc_load_info, ProcArray *parr);
 inline void getPossiblePes(std::vector<int>& possible_pes, int randomly_obj_id,
     ObjGraph *ogr, ProcArray* parr);
 
@@ -409,8 +409,7 @@ void TempAwareCommLB::work(LDStats* stats) {
   double avgload = parr->getAverageLoad();      // Average load of processors
 
   // Sets to false if it is overloaded, else to true
-  bool* proc_load_info = new bool[parr->procs.size()];
-  memset(proc_load_info, false, parr->procs.size());
+  vector<bool> proc_load_info(parr->procs.size(), false);
 
   // Create an array of vectors for each processor mapping to the objects in
   // that processor
@@ -536,7 +535,7 @@ void TempAwareCommLB::work(LDStats* stats) {
             total_swaps--;
             handleTransfer(randomly_obj_id, p, random_pe, parr_objs, ogr, parr);
             updateLoadInfo(p_index, random_pe, upper_threshold, lower_threshold,
-                parr_above_avg, parr_below_avg, proc_load_info, parr);
+                           parr_above_avg, parr_below_avg, proc_load_info, parr);
             break;
           }
           num_tries++;
@@ -558,7 +557,6 @@ void TempAwareCommLB::work(LDStats* stats) {
   ogr->convertDecisions(stats);         // Send decisions back to LDStats
   delete parr;
   delete ogr;
-  delete proc_load_info;
   delete[] parr_objs;
 #else
 	CmiAbort("TempLBs are not supported without the TEMP_LDB flag\n"); 
@@ -612,7 +610,7 @@ inline void handleTransfer(int randomly_obj_id, ProcInfo& p, int possible_pe, st
 
 inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold, double lower_threshold,
                            std::vector<int>& parr_above_avg, std::vector<int>& parr_below_avg,
-                           bool* proc_load_info, ProcArray *parr) {
+                           std::vector<bool> &proc_load_info, ProcArray *parr) {
 
   ProcInfo& p = parr->procs[p_index];
   ProcInfo& possible_pe_procinfo = parr->procs[possible_pe];
