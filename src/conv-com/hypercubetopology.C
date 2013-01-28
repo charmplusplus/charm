@@ -31,12 +31,10 @@ inline int adjust(int dim, int pe)
     else return(pe);
 }
 
-HypercubeTopology::HypercubeTopology(int npes, int mype) {
-    
+HypercubeTopology::HypercubeTopology(int npes, int mype)
+  : NumPes(npes), MyPe(mype), Dim(maxdim(npes)), penum(NumPes, 0)
+{
     int i = 0;
-    NumPes = npes;
-    MyPe = mype;
-    Dim = maxdim(npes);
 
     next = new int *[Dim];
     for (i=0;i<Dim;i++) {
@@ -45,15 +43,12 @@ HypercubeTopology::HypercubeTopology(int npes, int mype) {
     }
     
     //Create and initialize the indexes to the above table
-    penum=new int[NumPes];
-    int *dp=new int[NumPes];
+    std::vector<int> dp(NumPes);
     for (i=0;i<NumPes;i++) {
-        penum[i]=0;
         dp[i]=i;
     }
     
-    CreateStageTable(NumPes, dp);
-    delete(dp);
+    CreateStageTable(NumPes, &dp[0]);
 }
 
 void HypercubeTopology::getNeighbors(int &np, int *pelist){
@@ -90,7 +85,7 @@ int HypercubeTopology::getNumMessagesExpected(int stage) {
 
 void HypercubeTopology::CreateStageTable(int numpes, int *destpes)
 {
-    int *dir=new int[numpes];
+    std::vector<int> dir(numpes);
     int nextdim, j, i;
     for (i=0;i<numpes;i++) {
         dir[i]=MyPe ^ adjust(Dim, destpes[i]);
@@ -112,7 +107,5 @@ void HypercubeTopology::CreateStageTable(int numpes, int *destpes)
             }
         }
     }
-    delete dir;
-    return;
 }
 /*@}*/
