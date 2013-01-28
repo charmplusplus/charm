@@ -700,7 +700,9 @@ if (  MSG_STATISTIC)
 // functions related to replica
 void CmiCreatePartitions(char **argv) {
   partitionInfo.numPartitions = 1; 
-  CmiGetArgInt(argv,"+partitions", &partitionInfo.numPartitions);
+  if(!CmiGetArgInt(argv,"+partitions", &partitionInfo.numPartitions)) {
+    CmiGetArgInt(argv,"+replicas", &partitionInfo.numPartitions);
+  }
 
   _Cmi_numnodes_global = _Cmi_numnodes;
   _Cmi_mynode_global = _Cmi_mynode;
