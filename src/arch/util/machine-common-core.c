@@ -903,7 +903,7 @@ static void CommunicationServerThread(int sleepTime) {
 
 void ConverseExit(void) {
     int i;
-#if !CMK_SMP
+#if !CMK_SMP || CMK_SMP_NO_COMMTHD
     LrtsDrainResources();
 #else
 	if(Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV

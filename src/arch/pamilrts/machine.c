@@ -477,8 +477,9 @@ int CMI_Progress_init(int start, int ncontexts) {
 
 int CMI_Progress_finalize(int start, int ncontexts) {
   int i = 0;
-  for (i = start; i < start+ncontexts; ++i) 
-    cmi_progress_disable  (cmi_pami_contexts[i], 0 /*progress all*/);    
+  for (i = start; i < start+ncontexts; ++i) {
+    cmi_progress_disable  (cmi_pami_contexts[i], 0 /*progress all*/);  
+  }
   PAMI_Extension_close (cmi_ext_progress);
 }
 #endif
@@ -697,7 +698,7 @@ void LrtsDrainResources()
 void LrtsExit() 
 {
   int rank0 = 0;
-  CmiNetworkBarrier(1);
+  CmiBarrier();
   if (CmiMyRank() == 0) {
     rank0 = 1;
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
@@ -706,7 +707,18 @@ void LrtsExit()
     PAMI_Context_destroyv(cmi_pami_contexts, cmi_pami_numcontexts);
     PAMI_Client_destroy(&cmi_pami_client);
   }
+
+  CmiNodeBarrier();
+#if CMK_SMP
+  if (rank0) {
+    Delay(100000);
+    exit(0);
+  }
+  else
+    pthread_exit(0);
+#else
   exit(0);
+#endif
 }
 
 void LrtsAbort(const char *message) {
