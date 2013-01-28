@@ -391,7 +391,7 @@ CkOutStream& operator<< (CkOutStream& ckos, CkBitVector const b ) {
     }
     buff[b.usedBits] = '\0';
     ckos << buff;
-    delete buff;
+    delete[] buff;
   }
 
   return ckos;
@@ -405,7 +405,7 @@ CkErrStream& operator<< (CkErrStream& ckes, CkBitVector const b ) {
     }
     buff[b.usedBits] = '\0';
     ckes << buff;
-    delete buff;
+    delete[] buff;
   }
 
   return ckes;
