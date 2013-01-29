@@ -1646,6 +1646,9 @@ void CmiDelayImmediate();
 #  define CmiBecomeImmediate(msg) do { \
 	CmiSetHandler(msg, (CmiGetHandler(msg))|0x8000); \
      } while (0)
+#  define CmiResetImmediate(msg) do { \
+	CmiSetHandler(msg, (CmiGetHandler(msg))&(~0x8000)); \
+     } while (0)
 #  define CmiIsImmediate(msg)      ((CmiGetHandler(msg)) & 0x8000) 
 #  define CmiImmediateHandler(msg) ((CmiGetHandler(msg)) ^ 0x8000)
 /*
@@ -1670,6 +1673,7 @@ extern int _immRunning;
 
 #else
 #  define CmiBecomeImmediate(msg) /* empty */
+#  define CmiResetImmediate(msg)  /* empty */
 #  define CmiIsImmediate(msg)   (0)
 #  define CmiImmIsRunning()       (0)
 #endif

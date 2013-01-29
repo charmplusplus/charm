@@ -1090,9 +1090,10 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
   obj = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
   if(!obj) { // groupmember not yet created
 #if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(env))     // buffer immediate message
-      CmiDelayImmediate();
-    else
+    if (CmiIsImmediate(env)) {
+      //CmiDelayImmediate();        /* buffer immediate message */
+      CmiResetImmediate(env);        // note: this may not be SIG IO safe !
+    }
 #endif
     CksvAccess(_nodeGroupTable)->find(groupID).enqMsg(env);
     CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
