@@ -499,7 +499,7 @@ typedef __uint128_t           CmiUInt16;
 #define CMK_HAS_INT16         1
 #elif CMK___int128_DEFINED
 typedef __int128              CmiInt16;
-typedef unsigned __int128     CmiUInt16;
+typedef __uint128     CmiUInt16;
 #define CMK_HAS_INT16         1
 #else
 #define CMK_HAS_INT16         0
@@ -1677,7 +1677,13 @@ extern int _immRunning;
 /******** Memory Fence ********/
 
 #if  CMK_SMP
-#if CMK_GCC_X86_ASM
+#if CMK_C_SYNC_PRIMITIVES
+#define CmiMemoryReadFence()                 __sync_synchronize()
+#define CmiMemoryWriteFence()                __sync_synchronize()
+#define CmiMemoryAtomicIncrement(someInt)    __sync_fetch_and_sub(&someInt, 1)
+#define CmiMemoryAtomicDecrement(someInt)    __sync_fetch_and_add(&someInt, 1)
+#define CmiMemoryAtomicFetchAndInc(input,output)   output =__sync_fetch_and_add(&input, 1)
+#elif CMK_GCC_X86_ASM
 #define CmiMemoryReadFence()               __asm__ __volatile__("lfence" ::: "memory")
 #define CmiMemoryWriteFence()              __asm__ __volatile__("sfence" ::: "memory")
 #if 1
@@ -1748,6 +1754,7 @@ extern CmiNodeLock cmiMemoryLock;
 #define CmiMemoryAtomicFetchAndInc(input,output) { CmiLock(cmiMemoryLock); output=input; input=output+1; CmiUnlock(cmiMemoryLock); }
 #endif
 #else
+/* for non-SMP, no need to define */
 #define CmiMemoryReadFence()
 #define CmiMemoryWriteFence()
 #define CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
