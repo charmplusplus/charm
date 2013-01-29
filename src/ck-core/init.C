@@ -1382,7 +1382,6 @@ void _initCharm(int unused_argc, char **argv)
 	DEBUGF(("[%d,%d%.6lf] inCommThread %d\n",CmiMyPe(),CmiMyRank(),CmiWallTimer(),inCommThread));
 	// when I am a communication thread, I don't participate initDone.
         if (inCommThread) {
-printf("[%d] init %d %d\n", CkMyNode(), _bocHandlerIdx, _charmHandlerIdx);
                 CkNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler,
                                         CkpvAccess(_coreState));
                 CkNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler
