@@ -74,7 +74,7 @@ void CkRemoveArrayElements();
 
 void CkStartCheckpoint(const char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname, CkArgMsg *args);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) || CMK_MEM_CHECKPOINT
+#if __FAULT__
 int  CkCountArrayElements();
 #endif
 

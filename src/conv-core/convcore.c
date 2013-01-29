@@ -937,7 +937,7 @@ void CmiTimerInit(char **argv)
 
   _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
 
-#if !CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
+#if !(__FAULT__)
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
@@ -955,7 +955,7 @@ void CmiTimerInit(char **argv)
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 #endif
 
-#if ! CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
+#if !(__FAULT__)
   CmiBarrier();
 /*  CmiBarrierZero(); */
 #endif
@@ -1248,7 +1248,7 @@ void CmiTimerInit(char **argv)
   /*fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);*/
 
   /* try to synchronize calling barrier */
-#if !CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
+#if !(__FAULT__)
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();

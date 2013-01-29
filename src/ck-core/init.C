@@ -1182,7 +1182,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	CmiNodeAllBarrier();
 
-#if ! CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
+#if !(__FAULT__)
 	CmiBarrier();
 	CmiBarrier();
 	CmiBarrier();
