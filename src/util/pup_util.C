@@ -726,7 +726,7 @@ void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
 #endif
     case Tbool: {
       char tmp[20];
-      if (1!=fscanf(f," %20s",tmp)) parseError("could not read boolean string");
+      if (1!=fscanf(f," %19s",tmp)) parseError("could not read boolean string");
       CmiBool val=CmiFalse;
       if (0==strcmp(tmp,"true")) val=CmiTrue;
       else if (0==strcmp(tmp,"false")) val=CmiFalse;
