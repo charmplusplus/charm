@@ -206,7 +206,10 @@ extern int killFlag;
 extern char *killFile;
 // function for reading the kill file
 void readKillFile();
-
+#if CMK_MESSAGE_LOGGING
+// flag for disk checkpoint
+extern int diskCkptFlag;
+#endif
 
 int _defaultObjectQ = 0;            // for obejct queue
 int _ringexit = 0;		    // for charm exit
@@ -264,6 +267,12 @@ static inline void _parseCommandLineOpts(char **argv)
 #endif
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
   }
+#if CMK_MESSAGE_LOGGING
+	// reading +ftc_disk flag
+	if (CmiGetArgFlagDesc(argv, "+ftc_disk", "Disk Checkpointing")) {
+		diskCkptFlag = 1;
+    }
+#endif
   // reading the killFile
   if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
     if(faultFunc == NULL){
