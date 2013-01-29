@@ -1686,7 +1686,7 @@ void readKillFile(){
 #if ! CMK_CONVERSE_MPI
 void CkDieNow()
 {
-#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
          // ignored for non-mpi version
         CmiPrintf("[%d] die now.\n", CmiMyPe());
         killTime = CmiWallTimer()+0.001;
