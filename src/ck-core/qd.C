@@ -26,7 +26,6 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   msg->setPhase(1);
   DEBUGP(("[%d] _bcastQD1: State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
 #if ! CMK_SHARED_VARS_UNIPROCESSOR && !CMK_MULTICORE
-/* immediate message does not count in QD now */
 /*
   QdState *comm_state;
   static int comm_create=0, comm_process=0;
@@ -191,8 +190,8 @@ void _qdHandler(envelope *env)
     CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
 }
 
-// when a message is sent from an immediate handler from comm thread or 
-// interrupt handler, the counter is sent to rank 0 of the same node
+// when a message is sent or received from an immediate handler from comm
+// thread or interrupt handler, the counter is sent to rank 0 of the same node
 void _qdCommHandler(envelope *env)
 {
   register QdCommMsg *msg = (QdCommMsg*) EnvToUsr(env);

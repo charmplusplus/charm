@@ -99,6 +99,9 @@ class QdState {
     void sendCount(int flag, int count);     // send msg to rank 0 for counting
     void process(int n=1) { 
          mProcessed += n; 
+#if CK_MSG_IMMEDIATE
+        sendCount(1, n);
+#endif
     }
     int getCreated(void) { return mCreated; }
     int getProcessed(void) { return mProcessed; }
