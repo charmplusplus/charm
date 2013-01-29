@@ -92,13 +92,16 @@ class QdState {
     void enq(QdCallback *c) { callbacks->enq((void *) c); }
     void create(int n=1) { 
         mCreated += n; 
-#if CK_MSG_IMMEDIATE
+#if CMK_IMMEDIATE_MSG
         sendCount(0, n);
 #endif
     }
     void sendCount(int flag, int count);     // send msg to rank 0 for counting
     void process(int n=1) { 
          mProcessed += n; 
+#if CMK_IMMEDIATE_MSG
+        sendCount(1, n);
+#endif
     }
     int getCreated(void) { return mCreated; }
     int getProcessed(void) { return mProcessed; }

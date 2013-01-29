@@ -1099,9 +1099,6 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
     return;
   }
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
-#if CMK_IMMEDIATE_MSG
-  if (!CmiIsImmediate(env))
-#endif
   ck->process();
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
@@ -1846,9 +1843,6 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
   _TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM) {
     _noCldNodeEnqueue(node, env);
-    if (opts & CK_MSG_IMMEDIATE) {    // immediate msg is invisible to QD
-      CkpvAccess(_coreState)->create(-numPes);
-    }
   }
   else
     _CldNodeEnqueue(node, env, _infoIdx);
@@ -1884,8 +1878,7 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
   _TRACE_CREATION_N(env, numPes);
   _noCldNodeEnqueue(node, env);
   _STATS_RECORD_SEND_BRANCH_1();
-  /* immeidate message is invisible to QD */
-//  CkpvAccess(_coreState)->create();
+  CkpvAccess(_coreState)->create();
   _TRACE_CREATION_DONE(1);
 #else
   // no support for immediate message, send inline
