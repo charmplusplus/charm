@@ -108,7 +108,7 @@ void pidtonid(int numpes) {
     rca_coords[i].mesh_x = rca_coords[i].mesh_y = rca_coords[i].mesh_z = -1;
   }
   for (i=0; i<numpes; i++) {
-    PMI_Get_nid(CmiNodeOf(i), &nid);
+    PMI_Get_nid(CmiGetNodeGlobal(CmiNodeOf(i),CmiMyPartition()), &nid);
     pid2nid[i] = nid;
     CmiAssert(nid < maxNID);
     ret = rca_get_meshcoord(nid, &rca_coords[nid]);
