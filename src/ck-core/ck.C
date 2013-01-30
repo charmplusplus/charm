@@ -347,7 +347,7 @@ void CProxy::pup(PUP::er &p) {
       delegatedMgr = ckDelegatedTo(); 
     }
 
-    int migCtor, cIdx; 
+    int migCtor = 0, cIdx; 
     if (!p.isUnpacking()) {
       if (isNodeGroup) {
         CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
