@@ -1190,7 +1190,8 @@ void LrtsExit() {
               CmiMyPe(), pumptime, releasetime, sendtime);
 #endif
 #endif
-
+    
+   CmiBarrier()
    if(!CharmLibInterOperate) {
 #if ! CMK_AUTOBUILD
       signal(SIGINT, signal_int);
