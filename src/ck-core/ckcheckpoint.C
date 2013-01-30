@@ -113,7 +113,11 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 
 #ifndef CMK_CHARE_USE_PTR
 	// save groups into Chares.dat
+#if CMK_CONVERSE_MPI
+	sprintf(fileName,"%s/%d-Chares_%d.dat",dirname,CmiMyPartition(),CkMyPe());
+#else
 	sprintf(fileName,"%s/Chares_%d.dat",dirname,CkMyPe());
+#endif        
 	FILE* fChares = CmiFopen(fileName,"wb");
 	if(!fChares) CkAbort("Failed to create checkpoint file for chares!");
 	PUP::toDisk pChares(fChares);
@@ -123,7 +127,11 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
+#if CMK_CONVERSE_MPI
+	sprintf(fileName,"%s/%d-Groups_%d.dat",dirname,CmiMyPartition(),CkMyPe());
+#else        
 	sprintf(fileName,"%s/Groups_%d.dat",dirname,CkMyPe());
+#endif
 	FILE* fGroups = CmiFopen(fileName,"wb");
 	if(!fGroups) CkAbort("Failed to create checkpoint file for group table!");
 	PUP::toDisk pGroups(fGroups);
@@ -137,7 +145,11 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	// save nodegroups into NodeGroups.dat
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
 	if (CkMyRank() == 0) {
+#if CMK_CONVERSE_MPI
+	  sprintf(fileName,"%s/%d-NodeGroups_%d.dat",dirname,CmiMyPartition(),CkMyNode());
+#else          
 	  sprintf(fileName,"%s/NodeGroups_%d.dat",dirname,CkMyNode());
+#endif
 	  FILE* fNodeGroups = CmiFopen(fileName,"wb");
 	  if(!fNodeGroups) 
 	    CkAbort("Failed to create checkpoint file for nodegroup table!");
@@ -151,7 +163,11 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
   	}
 
 	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
-	sprintf(fileName,"%s/arr_%d.dat",dirname, CkMyPe());
+#if CMK_CONVERSE_MPI
+	sprintf(fileName,"%s/%d-arr_%d.dat",dirname,CmiMyPartition(),CkMyPe());
+#else
+	sprintf(fileName,"%s/arr_%d.dat",dirname,CkMyPe());
+#endif
 	FILE *datFile=CmiFopen(fileName,"wb");
 	if (datFile==NULL) CkAbort("Could not create data file");
 	PUP::toDisk  p(datFile);
@@ -594,7 +610,11 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 	char filename[1024];
 	
 	// save readonlys, and callback BTW
+#if CMK_CONVERSE_MPI
+	sprintf(filename,"%s/%d-RO.dat",dirname,CmiMyPartition());
+#else
 	sprintf(filename,"%s/RO.dat",dirname);
+#endif
 	FILE* fRO = CmiFopen(filename,"wb");
 	if(!fRO) CkAbort("Failed to create checkpoint file for readonly data!");
 	PUP::toDisk pRO(fRO);
@@ -606,7 +626,11 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 
 	// save mainchares into MainChares.dat
 	{
+#if CMK_CONVERSE_MPI
+		sprintf(filename,"%s/%d-MainChares.dat",dirname,CmiMyPartition());
+#else
 		sprintf(filename,"%s/MainChares.dat",dirname);
+#endif
 		FILE* fMain = CmiFopen(filename,"wb");
 		if(!fMain) CkAbort("Failed to open checkpoint file for mainchare data!");
 		PUP::toDisk pMain(fMain);
@@ -670,7 +694,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	CkMemCheckPT::inRestarting = 1;
 
 	// restore readonlys
+#if CMK_CONVERSE_MPI
+	sprintf(filename,"%s/%d-RO.dat",dirname,CmiMyPartition());
+#else
 	sprintf(filename,"%s/RO.dat",dirname);
+#endif
 	FILE* fRO = CmiFopen(filename,"rb");
 	if(!fRO) CkAbort("Failed to open checkpoint file for readonly data!");
 	int _numPes = -1;
@@ -685,7 +713,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	CmiNodeBarrier();
 
 	// restore mainchares
+#if CMK_CONVERSE_MPI
+	sprintf(filename,"%s/%d-MainChares.dat",dirname,CmiMyPartition());
+#else
 	sprintf(filename,"%s/MainChares.dat",dirname);
+#endif
 	FILE* fMain = CmiFopen(filename,"rb");
 	if(fMain && CkMyPe()==0){ // only main chares have been checkpointed, we restart on PE0
 		PUP::fromDisk pMain(fMain);
@@ -698,7 +730,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 #ifndef CMK_CHARE_USE_PTR
 	// restore chares only when number of pes is the same 
 	if(CkNumPes() == _numPes) {
+#if CMK_CONVERSE_MPI
+		sprintf(filename,"%s/%d-Chares_%d.dat",dirname,CmiMyPartition(),CkMyPe());
+#else
 		sprintf(filename,"%s/Chares_%d.dat",dirname,CkMyPe());
+#endif
 		FILE* fChares = CmiFopen(filename,"rb");
 		if(!fChares) CkAbort("Failed to open checkpoint file for chares!");
 		PUP::fromDisk pChares(fChares);
@@ -712,9 +748,15 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	// restore from PE0's copy if shrink/expand
 	if(CkNumPes() != _numPes)
+#if CMK_CONVERSE_MPI
+		sprintf(filename,"%s/%d-Groups_0.dat",dirname,CmiMyPartition());
+	else
+		sprintf(filename,"%s/%d-Groups_%d.dat",dirname,CmiMyPartition(),CkMyPe());
+#else
 		sprintf(filename,"%s/Groups_0.dat",dirname);
 	else
 		sprintf(filename,"%s/Groups_%d.dat",dirname,CkMyPe());
+#endif
 	FILE* fGroups = CmiFopen(filename,"rb");
 	if(!fGroups) CkAbort("Failed to open checkpoint file for group table!");
 	PUP::fromDisk pGroups(fGroups);
@@ -728,10 +770,17 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// restore nodegroups
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
 	if(CkMyRank()==0){
+#if CMK_CONVERSE_MPI
+		if(CkNumPes() != _numPes)
+			sprintf(filename,"%s/%d-NodeGroups_0.dat",dirname,CmiMyPartition());
+		else
+			sprintf(filename,"%s/%d-NodeGroups_%d.dat",dirname,CmiMyPartition(),CkMyNode());
+#else
 		if(CkNumPes() != _numPes)
 			sprintf(filename,"%s/NodeGroups_0.dat",dirname);
 		else
 			sprintf(filename,"%s/NodeGroups_%d.dat",dirname,CkMyNode());
+#endif
 		FILE* fNodeGroups = CmiFopen(filename,"rb");
 		if(!fNodeGroups) CkAbort("Failed to open checkpoint file for nodegroup table!");
 		PUP::fromDisk pNodeGroups(fNodeGroups);
@@ -749,7 +798,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	if(CkMyPe() < _numPes) 	// in normal range: restore, otherwise, do nothing
           for (i=0; i<_numPes;i++) {
             if (i%CkNumPes() == CkMyPe()) {
-	      sprintf(filename,"%s/arr_%d.dat",dirname, i);
+#if CMK_CONVERSE_MPI
+	      sprintf(filename,"%s/%d-arr_%d.dat",dirname, CmiMyPartition(),i);
+#else
+	      sprintf(filename,"%s/arr_%d.dat",dirname,i);
+#endif
 	      FILE *datFile=CmiFopen(filename,"rb");
 	      if (datFile==NULL) CkAbort("Could not read data file");
 	      PUP::fromDisk  p(datFile);

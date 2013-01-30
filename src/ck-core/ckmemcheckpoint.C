@@ -258,7 +258,11 @@ public:
   {
 #if CMK_USE_MKSTEMP
     fname = new char[64];
+#if CMK_CONVERSE_MPI
+    sprintf(fname, "/tmp/ckpt%d-%d-%d-XXXXXX",CmiMyPartition(), CkMyPe(), myidx);
+#else
     sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), myidx);
+#endif
     mkstemp(fname);
 #else
     fname=tmpnam(NULL);
@@ -365,6 +369,7 @@ void CkMemCheckPT::pup(PUP::er& p)
   	recvCount = peCount = 0;
  	ackCount = 0;
   	expectCount = -1;
+        inCheckpointing = 0;
 #if CMK_CONVERSE_MPI
     void pingBuddy();
     void pingCheckHandler();
