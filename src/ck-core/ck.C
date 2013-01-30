@@ -2400,7 +2400,7 @@ private:
 	virtual CmiBool process(LBMigrateMsg **msg,CkCoreState *ck) {
 	  if (lbFile == NULL) lbFile = openReplayFile("ckreplay_",".lb","r");
 	  if (lbFile != NULL) {
-	    int num_moves;
+	    int num_moves = 0;
         PUP::fromDisk p(lbFile);
 	    p | num_moves;
 	    if (num_moves != (*msg)->n_moves) {
