@@ -1051,7 +1051,7 @@ void LrtsFreeListSendFn(int npes, int *pes, int size, char *msg) {
 
   //Fast path
   if (npes == 1) {
-    LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[0]),CmiMyPartition()), pes[0], size, msg, 1);
+    LrtsSendFunc(CmiNodeOf(pes[0]), pes[0], size, msg, 1);
     return;
   }
 
@@ -1109,12 +1109,12 @@ void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int si
       CmiAssert(copymsg != NULL);
       CmiMemcpy(copymsg,msg,size);
 #endif
-      LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[i]),CmiMyPartition()), pes[i], size, copymsg, 0);
+      LrtsSendFunc(CmiNodeOf(pes[i]), pes[i], size, copymsg, 0);
     }
   }
 
   if (npes  && CmiNodeOf(pes[npes-1]) != CmiMyNode())
-    LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[npes-1]),CmiMyPartition()), pes[npes-1], size, msg, 0);
+    LrtsSendFunc(CmiNodeOf(pes[npes-1]), pes[npes-1], size, msg, 0);
   else
     CmiFree(msg);    
 
