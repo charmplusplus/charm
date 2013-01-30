@@ -262,6 +262,7 @@ void heartBeatHandler(void *msg);
 void heartBeatCheckHandler();
 void partnerFailureHandler(char *msg);
 int getReverseCheckPointPE();
+int inCkptFlag = 0;
 #endif
 
 /** 
@@ -477,7 +478,7 @@ void heartBeatHandler(void *msg)
 void heartBeatCheckHandler()
 {
 	double now = CmiWallTimer();
-	if (lastPingTime > 0 && now - lastPingTime > 4) {
+	if (lastPingTime > 0 && now - lastPingTime > 4 && !inCkptFlag) {
 		int i, pe, buddy;
 		// tell everyone that PE is down
 		buddy = getReverseCheckPointPE();
@@ -1375,6 +1376,10 @@ void startMlogCheckpoint(void *_dummy, double curWallTime){
 	// increasing the checkpoint counter
 	checkpointCount++;
 	_recoveryFlag = 0;
+
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 1;
+#endif
 	
 #if DEBUG_CHECKPOINT
 	if(CmiMyPe() == 0){
@@ -1601,6 +1606,7 @@ void _storeCheckpointHandler(char *msg){
 	ackMsg.PE = CkMyPe();
 	ackMsg.dataSize = CpvAccess(_storedCheckpointData)->bufSize;
 	CmiSetHandler(&ackMsg,_checkpointAckHandlerIdx);
+	// CODING: should this be CmiSyncSendAndFree?
 	CmiSyncSend(sendingPE,sizeof(CheckPointAck),(char *)&ackMsg);
 	
 	traceUserBracketEvent(29,_startTime,CkWallTimer());
@@ -3454,6 +3460,7 @@ void finishedCheckpointLoadBalancing(){
 	msg.checkpointCount = checkpointCount;
 
 	CmiSetHandler(&msg,_checkpointBarrierHandlerIdx);
+	// CODING: Shouldn't this be CmiSyncSendAndFree?
 	CmiSyncSend(0,sizeof(CheckpointBarrierMsg),(char *)&msg);
 	
 };
@@ -3606,6 +3613,10 @@ void _checkpointBarrierAckHandler(CheckpointBarrierMsg *msg){
 #if !SYNCHRONIZED_CHECKPOINT
 	// sending a notice to all senders to remove message logs
 	sendRemoveLogRequests();
+#endif
+
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 0;
 #endif
 
 	// resuming LB function pointer
