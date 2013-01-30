@@ -689,7 +689,7 @@ void LrtsExit()
     PAMI_Client_destroy(&cmi_pami_client);
   }
 
-  CmiBarrier();
+  CmiNodeBarrier();
 #if CMK_SMP
   if (rank0) {
     Delay(100000);
