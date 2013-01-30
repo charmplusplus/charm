@@ -847,3 +847,17 @@ contribute(type, size, data, func, callback) ::=
 	<endif>
 >>
 
+whenArgument(ident, expr, params) ::=
+<<
+<if(expr)>
+	<ident> <whenExpression(expr)><params>
+<else>
+	<ident><params>
+<endif>
+>>
+
+whenExpression(expr) ::=
+<<
+[<expr>]
+>>
+

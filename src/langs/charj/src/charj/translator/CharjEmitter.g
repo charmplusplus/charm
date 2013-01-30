@@ -819,7 +819,7 @@ sdagStatement
 
 whenArgument
     :   IDENT expression? entryFormalParameterList
-        -> template(i={$IDENT.text}, e={$expression.st}, f={$entryFormalParameterList.st}) "<i> <if(e)>[<e>] <endif><f>"
+		-> whenArgument(ident={$IDENT.text}, expr={$expression.st}, params={$entryFormalParameterList.st})
     ;
 
 nonBlockStatement
