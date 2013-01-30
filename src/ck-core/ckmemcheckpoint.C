@@ -1088,7 +1088,7 @@ void CkMemCheckPT::gotReply(){
 void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gmap, CkVec<CkArrayIndex> * imap){
 #if CMK_CHKP_ALL
 	PUP::fromMem p(msg->packData);
-	int numElements;
+	int numElements = 0;
 	p|numElements;
 	if(p.isUnpacking()){
 		for(int i=0;i<numElements;i++){
