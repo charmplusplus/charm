@@ -1,4 +1,4 @@
-#if NO_COMMON_PCQUEUE
+#if SPECIFIC_PCQUEUE
 #define CMIQueue LRTSQueue 
 #define CMIQueuePush    LRTSQueuePush
 #define CMIQueueCreate  LRTSQueueCreate

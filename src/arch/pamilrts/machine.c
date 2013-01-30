@@ -92,7 +92,11 @@ __thread int32_t _cmi_bgq_incommthread = 0;
 //}
 
 static void CmiNetworkBarrier(int async);
-
+//#define SPECIFIC_PCQUEUE  1
+#if SPECIFIC_PCQUEUE
+#include "lrtsqueue.h"
+#include "memalloc.c"
+#endif
 #include "machine-lrts.h"
 #include "machine-common-core.c"
 
@@ -319,7 +323,7 @@ void mysleep (unsigned long cycles) {
 
 static void * test_buf;
 volatile int pami_barrier_flag = 0;
-typedef pami_result_t (*pamix_proc_memalign_fn) (void**, size_t, size_t, const char*);
+//typedef pami_result_t (*pamix_proc_memalign_fn) (void**, size_t, size_t, const char*);
 
 void pami_barrier_done (void *ctxt, void * clientdata, pami_result_t err)
 {
@@ -345,7 +349,7 @@ CmiPAMIMemRegion_t  cmi_pami_memregion[64];
 #endif
 
 #include "malloc.h"
-void *l2atomicbuf;
+//void *l2atomicbuf;
 
 void _alias_rank (int rank) {
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
@@ -631,6 +635,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     if (_Cmi_mynode == 0) CmiPrintf("Charm++: +checksum ignored in optimized version! \n");
 #endif
   }
+#if SPECIFIC_PCQUEUE 
+  LRTSQueuePreInit(); 
+   int actualNodeSize = 64/Kernel_ProcessCount(); 
+   CmiMemAllocInit_bgq ((char*)l2atomicbuf + 
+       2*actualNodeSize*sizeof(L2AtomicState)+sizeof(L2AtomicState),
+       2*actualNodeSize*sizeof(L2AtomicState)); 
+#endif
 
   //Initialize the manytomany api
   _cmidirect_m2m_initialize (cmi_pami_contexts, _n);
@@ -678,7 +689,7 @@ void LrtsExit()
     PAMI_Client_destroy(&cmi_pami_client);
   }
 
-  CmiNodeBarrier();
+  CmiBarrier();
 #if CMK_SMP
   if (rank0) {
     Delay(100000);

@@ -47,12 +47,10 @@ FILE *debugLog = NULL;
 #define CMK_OFFLOAD_BCAST_PROCESS 0
 #endif
 
-#include "cmiqueue.c"
-
 #if CMK_OFFLOAD_BCAST_PROCESS
-CsvDeclare(CmiQueue, procBcastQ);
+CsvDeclare(CMIQueue, procBcastQ);
 #if CMK_NODE_QUEUE_AVAILABLE
-CsvDeclare(CmiQueue, nodeBcastQ);
+CsvDeclare(CMIQueue, nodeBcastQ);
 #endif
 #endif
 
@@ -747,14 +745,14 @@ if (  MSG_STATISTIC)
 
 #if CMK_OFFLOAD_BCAST_PROCESS
     /* the actual queues should be created on comm thread considering NUMA in SMP */
-    CsvInitialize(CmiQueue, procBcastQ);
+    CsvInitialize(CMIQueue, procBcastQ);
 #if CMK_NODE_QUEUE_AVAILABLE
-    CsvInitialize(CmiQueue, nodeBcastQ);
+    CsvInitialize(CMIQueue, nodeBcastQ);
 #endif
 #endif
 
 #if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
-    CsvInitialize(CmiQueue, notifyCommThdMsgBuffer);
+    CsvInitialize(CMIQueue, notifyCommThdMsgBuffer);
 #endif
 
     CmiStartThreads(argv);
@@ -912,6 +910,7 @@ void ConverseExit(void) {
 	   || Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST)
 		LrtsDrainResources();
 #endif
+
     ConverseCommonExit();
 
 #if CMK_WITH_STATS
@@ -1031,7 +1030,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s) {
 #define SPINS_BEFORE_SLEEP 20
 static void CmiNotifyStillIdle(CmiIdleState *s) {
     MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
-#if !CMK_SMP || CMK_SMP_NO_COMMTHD
+#if !CMK_SMK || CMK_SMP_NO_COMMTHD
     AdvanceCommunication(1);
 #else
     LrtsPostNonLocal();
