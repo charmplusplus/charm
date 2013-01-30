@@ -437,7 +437,7 @@ public:
   }
 
   int procNum(int arrayHdl, const CkArrayIndex &i) {
-    int flati;
+    int flati = 0;
     if (amaps[arrayHdl]->_nelems.nInts == 0) {
       return RRMap::procNum(arrayHdl, i);
     }
