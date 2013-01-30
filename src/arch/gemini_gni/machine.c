@@ -4086,6 +4086,7 @@ void LrtsExit()
     //printf("FINAL [%d, %d]  register=%lld, send=%lld\n", myrank, CmiMyRank(), register_memory_size, buffered_send_msg); 
     mempool_destroy(CpvAccess(mempool));
 #endif
+    PMI_Barrier();
     PMI_Finalize();
     exit(0);
 }
