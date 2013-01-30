@@ -347,7 +347,7 @@ void CProxy::pup(PUP::er &p) {
       delegatedMgr = ckDelegatedTo(); 
     }
 
-    int migCtor, cIdx; 
+    int migCtor = 0, cIdx; 
     if (!p.isUnpacking()) {
       if (isNodeGroup) {
         CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
@@ -1090,9 +1090,10 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
   obj = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
   if(!obj) { // groupmember not yet created
 #if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(env))     // buffer immediate message
-      CmiDelayImmediate();
-    else
+    if (CmiIsImmediate(env)) {
+      //CmiDelayImmediate();        /* buffer immediate message */
+      CmiResetImmediate(env);        // note: this may not be SIG IO safe !
+    }
 #endif
     CksvAccess(_nodeGroupTable)->find(groupID).enqMsg(env);
     CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
@@ -2399,7 +2400,7 @@ private:
 	virtual CmiBool process(LBMigrateMsg **msg,CkCoreState *ck) {
 	  if (lbFile == NULL) lbFile = openReplayFile("ckreplay_",".lb","r");
 	  if (lbFile != NULL) {
-	    int num_moves;
+	    int num_moves = 0;
         PUP::fromDisk p(lbFile);
 	    p | num_moves;
 	    if (num_moves != (*msg)->n_moves) {

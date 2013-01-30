@@ -98,6 +98,7 @@ public:
   static CkCallback  cpCallback;
 
   static int inRestarting;
+  static int inCheckpointing;
   static int inLoadbalancing;
   static double startTime;
   static char*  stage;

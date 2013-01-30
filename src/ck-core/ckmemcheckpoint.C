@@ -80,6 +80,7 @@ CpvDeclare(int, _crashedNode);
 
 // static, so that it is accessible from Converse part
 int CkMemCheckPT::inRestarting = 0;
+int CkMemCheckPT::inCheckpointing = 0;
 int CkMemCheckPT::inLoadbalancing = 0;
 double CkMemCheckPT::startTime;
 char *CkMemCheckPT::stage;
@@ -481,6 +482,7 @@ void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
 {
   checkpointed = 1;
   cpCallback = cb;
+  inCheckpointing = 1;
   cpStarter = starter;
   if (CkMyPe() == cpStarter) {
     startTime = CmiWallTimer();
@@ -708,6 +710,7 @@ void CkMemCheckPT::cpFinish()
 // for debugging, report checkpoint info
 void CkMemCheckPT::report()
 {
+  inCheckpointing = 0;
 #if !CMK_CHKP_ALL
   int objsize = 0;
   int len = ckTable.length();
@@ -1085,7 +1088,7 @@ void CkMemCheckPT::gotReply(){
 void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gmap, CkVec<CkArrayIndex> * imap){
 #if CMK_CHKP_ALL
 	PUP::fromMem p(msg->packData);
-	int numElements;
+	int numElements = 0;
 	p|numElements;
 	if(p.isUnpacking()){
 		for(int i=0;i<numElements;i++){
@@ -1423,6 +1426,12 @@ int CkInRestarting()
 }
 
 extern "C"
+int CkInCheckpointing()
+{
+  return CkMemCheckPT::inCheckpointing;
+}
+
+extern "C"
 void CkSetInLdb(){
 #if CMK_MEM_CHECKPOINT
 	CkMemCheckPT::inLoadbalancing = 1;
@@ -1553,7 +1562,7 @@ void pingCheckHandler()
 {
 #if CMK_MEM_CHECKPOINT
   double now = CmiWallTimer();
-  if (lastPingTime > 0 && now - lastPingTime > 4 && !CkInLdb()) {
+  if (lastPingTime > 0 && now - lastPingTime > 4 && !CkInLdb() && !CkInRestarting() && !CkInCheckpointing()) {
     int i, pe, buddy;
     // tell everyone the buddy dies
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
@@ -1686,7 +1695,7 @@ void readKillFile(){
 #if ! CMK_CONVERSE_MPI
 void CkDieNow()
 {
-#ifdef CMK_MEM_CHECKPOINT || (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)
+#if __FAULT__
          // ignored for non-mpi version
         CmiPrintf("[%d] die now.\n", CmiMyPe());
         killTime = CmiWallTimer()+0.001;

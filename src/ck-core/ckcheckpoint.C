@@ -178,7 +178,7 @@ void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){
 
 void CkPupROData(PUP::er &p)
 {
-	int _numReadonlies;
+	int _numReadonlies = 0;
 	if (!p.isUnpacking()) _numReadonlies=_readonlyTable.size();
         p|_numReadonlies;
 	if (p.isUnpacking()) {
@@ -230,11 +230,11 @@ CkpvExtern(CkVec<VidBlock *>, vidblocks);
 // handle plain non-migratable chare
 void CkPupChareData(PUP::er &p)
 {
-  int i, n;
+  int i, n = 0;
   if (!p.isUnpacking()) n = CkpvAccess(chare_objs).size();
   p|n;
   for (i=0; i<n; i++) {
-        int chare_type;
+        int chare_type = 0;
 	if (!p.isUnpacking()) {
 		chare_type = CkpvAccess(chare_types)[i];
 	}
@@ -387,7 +387,7 @@ void CkPupNodeGroupData(PUP::er &p, CmiBool create)
 // handle GroupTable and data
 void CkPupGroupData(PUP::er &p)
 {
-	int numGroups, i;
+	int numGroups = 0, i;
 
 	if (!p.isUnpacking()) {
 	  numGroups = CkpvAccess(_groupIDTable)->size();
@@ -447,7 +447,7 @@ void CkPupGroupData(PUP::er &p)
 // handle NodeGroupTable and data
 void CkPupNodeGroupData(PUP::er &p)
 {
-	int numNodeGroups, i;
+	int numNodeGroups = 0, i;
 	if (!p.isUnpacking()) {
 	  numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
 	}
@@ -502,7 +502,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
         int numGroups = CkpvAccess(_groupIDTable)->size();
 
 	// number of array elements on this processor
-	int numElements;
+	int numElements = 0;
 	if (!p.isUnpacking()) {
 	  ElementCounter  counter;
 	  CKLOCMGR_LOOP(mgr->iterate(counter););
@@ -542,7 +542,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	}
 }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) ||CMK_MEM_CHECKPOINT
+#if __FAULT__
 int  CkCountArrayElements(){
     int numGroups = CkpvAccess(_groupIDTable)->size();
     int i;

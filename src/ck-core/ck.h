@@ -113,7 +113,7 @@ class VidBlock {
     }
     void pup(PUP::er &p) {
 #ifndef CMK_CHARE_USE_PTR
-      int s;
+      int s = 0;
       if (!p.isUnpacking()) s = state-FILLED;
       p|s;
       if (p.isUnpacking()) state = (VidState)(FILLED+s);
