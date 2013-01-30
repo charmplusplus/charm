@@ -91,8 +91,7 @@ void startEntryEvent(int id)
 	    TAU_PROFILER_START(eventStack.top());*/
 	  //exclude dummy event
 	  dprintf("------> excluding dummy function");
-	  events[id] = EXCLUDED;
-	  eventStack.push(events[id]);
+	  eventStack.push(EXCLUDED);
 	}
       else
 	{
