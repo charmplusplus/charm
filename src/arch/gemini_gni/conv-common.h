@@ -1,4 +1,6 @@
 
+#define CMK_USE_LRTS                                      1
+
 #define CMK_CONVERSE_GEMINI_UGNI                           1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
