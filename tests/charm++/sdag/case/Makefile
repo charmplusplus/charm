@@ -1,5 +1,10 @@
 CHARMC=../../../../bin/charmc $(OPTS)
 ALL=caseTest
+RUN=./charmrun
+
+ifndef $(PROCS)
+	PROCS=2
+endif
 
 .PHONY: all clean
 
@@ -17,3 +22,5 @@ caseTest.o: caseTest.cc caseTest.decl.h
 caseTest: caseTest.o
 	$(CHARMC) -language charm++ $(OPTS) $^ -o $@
 
+test: caseTest
+	$(RUN) +p$(PROCS) $< $(TESTOPTS)
