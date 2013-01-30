@@ -1000,6 +1000,137 @@ void ack_pkt_dispatch (pami_context_t       context,
   CmiFree (*buf);
 }
 
+
+/*==========================================================*/
+
+/* Optional routines which could use common code which is shared with
+   other machine layer implementations. */
+
+/* MULTICAST/VECTOR SENDING FUNCTIONS
+
+ * In relations to some flags, some other delivery functions may be needed.
+ */
+
+#if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
+
+void LrtsSyncListSendFn(int npes, int *pes, int size, char *msg) {
+  char *copymsg;
+  copymsg = (char *)CmiAlloc(size);
+  CmiMemcpy(copymsg,msg,size);
+  CmiFreeListSendFn(npes, pes, size, msg);
+}
+
+typedef struct ListMulticastVec_t {
+  int   *pes;
+  int    npes;
+  char  *msg;
+  int    size;
+} ListMulticastVec;
+
+void machineFreeListSendFn(pami_context_t    context, 
+    int               npes, 
+    int             * pes, 
+    int               size, 
+    char            * msg);
+
+pami_result_t machineFreeList_handoff(pami_context_t context, void *cookie)
+{
+  ListMulticastVec *lvec = (ListMulticastVec *) cookie;
+  machineFreeListSendFn(context, lvec->npes, lvec->pes, lvec->size, lvec->msg);
+  CmiFree(cookie);
+}
+
+void LrtsFreeListSendFn(int npes, int *pes, int size, char *msg) {
+  //printf("%d: In Free List Send Fn imm %d\n", CmiMyPe(), CmiIsImmediate(msg));
+
+  CMI_SET_BROADCAST_ROOT(msg,0);
+  CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
+  CmiMsgHeaderBasic *hdr = (CmiMsgHeaderBasic *)msg;
+  hdr->size = size;
+  CMI_SET_CHECKSUM(msg, size);
+
+  //Fast path
+  if (npes == 1) {
+    LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[0]),CmiMyPartition()), pes[0], size, msg, 1);
+    return;
+  }
+
+  pami_context_t my_context = MY_CONTEXT();
+#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
+  ListMulticastVec *lvec = (ListMulticastVec *) 
+    CmiAlloc(sizeof(ListMulticastVec) + sizeof(int)*npes);
+  lvec->pes = (int*)((char*)lvec + sizeof(ListMulticastVec));
+  int i = 0;
+  for (i=0; i<npes; i++) 
+    lvec->pes[i] = pes[i];
+  lvec->npes = npes;
+  lvec->msg  = msg;
+  lvec->size = size;
+  PAMI_Context_post(my_context, (pami_work_t*)hdr->work, 
+      machineFreeList_handoff, lvec);
+#else
+  machineFreeListSendFn(my_context, npes, pes, size, msg);
+#endif
+}
+
+void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int size, char *msg) {
+  int i;
+  char *copymsg;
+#if CMK_SMP
+  for (i=0; i<npes; i++) {
+    if (CmiNodeOf(pes[i]) == CmiMyNode()) {
+      copymsg = (char *)CmiAlloc(size);
+      CmiAssert(copymsg != NULL);
+      CmiMemcpy(copymsg,msg,size);	  
+      CmiSendPeer(CmiRankOf(pes[i]), size, copymsg);
+    }
+  }
+#else
+  for (i=0; i<npes; i++) {
+    if (CmiNodeOf(pes[i]) == CmiMyNode()) {
+      CmiSyncSend(pes[i], size, msg);
+    }
+  }
+#endif
+
+  PAMIX_CONTEXT_LOCK(my_context);
+#if CMK_SMP  && !CMK_ENABLE_ASYNC_PROGRESS
+  CpvAccess(uselock) = 0;
+#endif
+
+  for (i=0;i<npes;i++) {
+    if (CmiNodeOf(pes[i]) == CmiMyNode());
+    else if (i < npes - 1) {
+#if !CMK_SMP
+      CmiReference(msg);
+      copymsg = msg;
+#else
+      copymsg = (char *)CmiAlloc(size);
+      CmiAssert(copymsg != NULL);
+      CmiMemcpy(copymsg,msg,size);
+#endif
+      LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[i]),CmiMyPartition()), pes[i], size, copymsg, 0);
+    }
+  }
+
+  if (npes  && CmiNodeOf(pes[npes-1]) != CmiMyNode())
+    LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[npes-1]),CmiMyPartition()), pes[npes-1], size, msg, 0);
+  else
+    CmiFree(msg);    
+
+  PAMIX_CONTEXT_UNLOCK(my_context);
+#if CMK_SMP  && !CMK_ENABLE_ASYNC_PROGRESS
+  CpvAccess(uselock) = 1;
+#endif
+}
+
+CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int size, char *msg) {
+  CmiAbort("CmiAsyncListSendFn not implemented.");
+  return (CmiCommHandle) 0;
+}
+#endif
+
+
 #include "cmimemcpy_qpx.h"
 
 #if CMK_PERSISTENT_COMM
