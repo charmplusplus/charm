@@ -42,7 +42,6 @@ void LRTSQueueInit      (void           * l2mem,
 			     int              use_overflow,
 			     int              nelem) 
 {
-  static int    position = 0;
   pami_result_t rc;
   
   //Verify counter array is 64-byte aligned 
@@ -197,7 +196,6 @@ int LRTSQueue2QSpinWait (LRTSQueue    queue0,
 }
 
 static void *l2atomicbuf;
-static  int  position;
 typedef pami_result_t (*pamix_proc_memalign_fn) (void**, size_t, size_t, const char*);
 void   LRTSQueuePreInit()
 {
@@ -209,13 +207,13 @@ void   LRTSQueuePreInit()
     rc = PAMI_Extension_open(NULL, "EXT_bgq_l2atomic", &l2);
     CmiAssert (rc == 0);
     PAMIX_L2_proc_memalign = (pamix_proc_memalign_fn)PAMI_Extension_symbol(l2, "proc_memalign");
-    position = 0;
     rc = PAMIX_L2_proc_memalign(&l2atomicbuf, 64, size, NULL);
     CmiAssert (rc == 0);    
 }
 
 LRTSQueue  LRTSQueueCreate()
 {
+    static  int  position;
     LRTSQueue   Q;
     int actualNodeSize = 64/Kernel_ProcessCount(); 
     Q = (LRTSQueue)calloc(1, sizeof( struct _l2atomicq ));

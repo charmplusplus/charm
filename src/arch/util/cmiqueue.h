@@ -1,4 +1,4 @@
-#if SPECIFIC_PCQUEUE
+#if SPECIFIC_PCQUEUE && CMK_SMP
 #define CMIQueue LRTSQueue 
 #define CMIQueuePush    LRTSQueuePush
 #define CMIQueueCreate  LRTSQueueCreate

@@ -93,7 +93,7 @@ __thread int32_t _cmi_bgq_incommthread = 0;
 
 static void CmiNetworkBarrier(int async);
 //#define SPECIFIC_PCQUEUE  1
-#if SPECIFIC_PCQUEUE
+#if SPECIFIC_PCQUEUE && CMK_SMP
 #include "lrtsqueue.h"
 #include "memalloc.c"
 #endif
@@ -635,11 +635,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     if (_Cmi_mynode == 0) CmiPrintf("Charm++: +checksum ignored in optimized version! \n");
 #endif
   }
-#if SPECIFIC_PCQUEUE 
-  LRTSQueuePreInit(); 
+#if SPECIFIC_PCQUEUE  && CMK_SMP
+  LRTSQueuePreInit();
+  //reserve for pe queues and node queue first
    int actualNodeSize = 64/Kernel_ProcessCount(); 
    CmiMemAllocInit_bgq ((char*)l2atomicbuf + 
-       2*actualNodeSize*sizeof(L2AtomicState)+sizeof(L2AtomicState),
+       (2*actualNodeSize+1)*sizeof(L2AtomicState)+sizeof(L2AtomicState),
        2*actualNodeSize*sizeof(L2AtomicState)); 
 #endif
 
