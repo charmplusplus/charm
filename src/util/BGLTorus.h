@@ -35,6 +35,14 @@ class BGLTorusManager {
 
   public:
     BGLTorusManager() {
+      if(CmiNumPartitions() > 1) {
+        dimNX = dimX = CmiNumPes();
+        dimNY = dimNZ = dimNT = 1;
+        dimY = dimZ = 1;
+        procsPerNode = 1;
+        torus[0] = torus[1] = torus[2] = torus[3] = 0;
+        return;
+      }
       int size = sizeof(BGLPersonality);
       int i = rts_get_personality(&bgl_p, size);
 

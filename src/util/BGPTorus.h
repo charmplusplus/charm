@@ -37,6 +37,15 @@ class BGPTorusManager {
 
   public:
     BGPTorusManager() {
+      if(CmiNumPartitions() > 1) {
+        dimNX = dimX = CmiNumPes();
+        dimNY = dimNZ = dimNT = 1;
+        dimY = dimZ = 1;
+        procsPerNode = 1;
+        torus[0] = torus[1] = torus[2] = torus[3] = 0;
+        return;
+      }
+
       DCMF_Hardware(&bgp_hwt);
       hw_NX = bgp_hwt.xSize;
       hw_NY = bgp_hwt.ySize;
