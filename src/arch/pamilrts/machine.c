@@ -29,6 +29,10 @@ char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
 
+#if MACHINE_DEBUG_LOG
+FILE *debugLog = NULL;
+#endif
+
 #define CMI_MAGIC(msg)                   ((CmiMsgHeaderBasic *)msg)->magic
 /* FIXME: need a random number that everyone agrees ! */
 #define CHARM_MAGIC_NUMBER               126
@@ -92,8 +96,9 @@ __thread int32_t _cmi_bgq_incommthread = 0;
 //}
 
 static void CmiNetworkBarrier(int async);
-//#define SPECIFIC_PCQUEUE  1
+#define SPECIFIC_PCQUEUE  1
 #if SPECIFIC_PCQUEUE && CMK_SMP
+#define  QUEUE_NUMS     _Cmi_mynodesize + 3
 #include "lrtsqueue.h"
 #include "memalloc.c"
 #endif
@@ -491,6 +496,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   result = PAMI_Client_query(cmi_pami_client, &configuration, 1);
   *myNodeID = configuration.value.intval;
 
+#if MACHINE_DEBUG_LOG
+    char ln[200];
+    sprintf(ln,"debugLog.%d", *myNodeID);
+    debugLog=fopen(ln,"w");
+#endif
   configuration.name = PAMI_CLIENT_NUM_TASKS;
   result = PAMI_Client_query(cmi_pami_client, &configuration, 1);
   *numNodes = configuration.value.intval;
@@ -636,11 +646,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
   }
 #if SPECIFIC_PCQUEUE  && CMK_SMP
+  //if(CmiMyPe() == 0)
+  //  printf(" in L2Atomic Queue\n");
   LRTSQueuePreInit();
   //reserve for pe queues and node queue first
    int actualNodeSize = 64/Kernel_ProcessCount(); 
    CmiMemAllocInit_bgq ((char*)l2atomicbuf + 
-       (2*actualNodeSize+1)*sizeof(L2AtomicState)+sizeof(L2AtomicState),
+       (QUEUE_NUMS)*sizeof(L2AtomicState),
        2*actualNodeSize*sizeof(L2AtomicState)); 
 #endif
 

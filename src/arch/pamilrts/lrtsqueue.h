@@ -203,7 +203,9 @@ void   LRTSQueuePreInit()
     int actualNodeSize = 64/Kernel_ProcessCount(); 
     pami_extension_t l2;
     pamix_proc_memalign_fn PAMIX_L2_proc_memalign;
-    size_t size = (4*actualNodeSize+1) * sizeof(L2AtomicState);
+    size_t size = (QUEUE_NUMS + 2*actualNodeSize) * sizeof(L2AtomicState); 
+    // each rank, node, immediate 
+    //size_t size = (4*actualNodeSize+1) * sizeof(L2AtomicState);
     rc = PAMI_Extension_open(NULL, "EXT_bgq_l2atomic", &l2);
     CmiAssert (rc == 0);
     PAMIX_L2_proc_memalign = (pamix_proc_memalign_fn)PAMI_Extension_symbol(l2, "proc_memalign");
