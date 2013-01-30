@@ -9,6 +9,10 @@
 #define INLINE_KEYWORD
 #endif
 
+#if MACHINE_DEBUG_LOG
+FILE *debugLog = NULL;
+#endif
+
 /******* broadcast related  */
 #ifndef CMK_BROADCAST_SPANNING_TREE
 #define CMK_BROADCAST_SPANNING_TREE    1
@@ -677,7 +681,17 @@ if (  MSG_STATISTIC)
 #endif
 
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
-   
+#if MACHINE_DEBUG_LOG
+    char ln[200];
+    sprintf(ln,"debugLog.%d", _Cmi_mynode);
+    debugLog=fopen(ln,"w");
+    if (debugLog == NULL)
+    {
+        CmiAbort("debug file not open\n");
+    }
+#endif
+
+
 	if (_Cmi_mynode==0) {
 #if !CMK_SMP 
 		printf("Charm++> Running on non-SMP mode\n");

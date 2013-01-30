@@ -888,10 +888,6 @@ static void MachineInitForLAPI(int *argc, char ***argv, int *numNodes, int *myNo
 #endif
 }
 
-#if MACHINE_DEBUG_LOG
-CpvDeclare(FILE *, debugLog);
-#endif
-
 #if ENSURE_MSG_PAIRORDER
 static void initMsgOrderInfo(MsgOrderInfo *info) {
     int i;
@@ -921,15 +917,6 @@ static void MachinePreCommonInitForLAPI(int everReturn) {
 #if ENSURE_MSG_PAIRORDER
     CpvInitialize(MsgOrderInfo, p2pMsgSeqInfo);
     initMsgOrderInfo(&CpvAccess(p2pMsgSeqInfo));
-#endif
-
-#if MACHINE_DEBUG_LOG
-    {
-        char ln[200];
-        sprintf(ln,"debugLog.%d",CmiMyPe());
-        CpvInitialize(FILE *, debugLog);
-        CpvAccess(debugLog)=fopen(ln,"w");
-    }
 #endif
 
 }

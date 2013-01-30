@@ -1148,7 +1148,6 @@ static void PumpRemoteTransactions(gni_cq_handle_t);
 #endif
 
 #if MACHINE_DEBUG_LOG
-FILE *debugLog = NULL;
 static CmiInt8 buffered_recv_msg = 0;
 int         lrts_smsg_success = 0;
 int         lrts_received_msg = 0;
@@ -3980,12 +3979,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     sendRdmaBuf = PCQueueCreate();
     sendHighPriorBuf = PCQueueCreate();
-
-#if MACHINE_DEBUG_LOG
-    char ln[200];
-    sprintf(ln,"debugLog.%d",myrank);
-    debugLog=fopen(ln,"w");
-#endif
 
 //    NTK_Init();
 //    ntk_return_t sts = NTK_System_GetSmpdCount(&_smpd_count);

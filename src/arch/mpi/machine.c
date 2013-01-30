@@ -1252,10 +1252,6 @@ static void registerMPITraceEvents() {
 #endif
 }
 
-#if MACHINE_DEBUG_LOG
-FILE *debugLog = NULL;
-#endif
-
 static char *thread_level_tostring(int thread_level) {
 #if CMK_MPI_INIT_THREAD
     switch (thread_level) {
@@ -1294,9 +1290,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     int largc=*argc;
     char** largv=*argv;
 
-#if MACHINE_DEBUG
-    debugLog=NULL;
-#endif
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
     _main(largc,largv);
@@ -1690,13 +1683,6 @@ void LrtsPostCommonInit(int everReturn) {
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdleForMPI,NULL);
 #endif
 
-#if MACHINE_DEBUG_LOG
-    if (CmiMyRank() == 0) {
-        char ln[200];
-        sprintf(ln,"debugLog.%d",CmiMyNode());
-        debugLog=fopen(ln,"w");
-    }
-#endif
 }
 /* ######End of functions related with starting programs###### */
 
