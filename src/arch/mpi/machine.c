@@ -1191,7 +1191,7 @@ void LrtsExit() {
 #endif
 #endif
     
-   CmiBarrier()
+   CmiBarrier();
    if(!CharmLibInterOperate) {
 #if ! CMK_AUTOBUILD
       signal(SIGINT, signal_int);
