@@ -127,6 +127,8 @@ void setMemoryOwnedBy(void *p, int id);
 
 extern int CmiMyRank_();
 
+#if CMK_USE_LRTS
+
 //variables and functions for partition
 typedef struct {
   int numPartitions;
@@ -170,6 +172,24 @@ int pe_gToLTranslate(int pe);
 #define CmiGetPeLocal(pe)               pe_gToLTranslate(pe)
 #define CmiGetNodeLocal(node)           node_gToLTranslate(node)
 //end of variables and functions for partition
+
+#else
+
+#define CmiMyPartition()         0
+#define CmiPartitionSize()       CmiNumNodes()
+#define CmiNumPartitions()       1
+#define CmiNumNodesGlobal()      CmiNumNodes()
+#define CmiMyNodeGlobal()        CmiMyNode()
+#define CmiNumPesGlobal()        CmiNumPes()
+#define CmiMyPeGlobal()          CmiMyPe()
+#if !CMK_SMP
+extern int _Cmi_mynodesize;
+#endif
+#define CmiGetPeGlobal(pe,part)         (pe)
+#define CmiGetNodeGlobal(node,part)     (node)
+#define CmiGetPeLocal(pe)               (pe)
+#define CmiGetNodeLocal(node)           (node)
+#endif
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 extern int _Cmi_mype;
