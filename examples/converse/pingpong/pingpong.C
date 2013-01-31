@@ -20,7 +20,7 @@ CpvDeclare(int,node1Handler);
 CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
 
-#define USE_PERSISTENT     0
+#define USE_PERSISTENT     1
 
 #if USE_PERSISTENT
 PersistentHandle h;
