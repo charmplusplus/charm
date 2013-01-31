@@ -241,10 +241,15 @@ extern __thread int32_t _cmi_bgq_incommthread;
 #include "cmimemcpy.h"
 #elif CMK_BLUEGENEQ && CMK_BLUEGENEQ_OPTCOPY  
 void CmiMemcpy_qpx (void *dst, const void *src, size_t n);
-#define CmiMemcpy(dst,src,n)         				\
+#define CmiMemcpy(_dst, _src, _n)                                 \
+  do {                                                            \
+  void *dst = (_dst), *src = (_src);                              \
+  size_t n = (_n);                                                \
   if ( (n > 512+32) &&  ((((size_t)dst|(size_t)src) & 0x1F)==0) ) \
-    CmiMemcpy_qpx(dst, src, n);			\
-  else memcpy(dst,src,n);
+    CmiMemcpy_qpx(dst, src, n);                                   \
+  else                                                            \
+    memcpy(dst,src,n);                                            \
+  } while(0)
 #else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 #endif
