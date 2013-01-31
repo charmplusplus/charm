@@ -3,6 +3,9 @@
 */
 /*@{*/
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "charm.h"
 #include "middle.h"
 #include "cklists.h"
@@ -79,6 +82,10 @@ static void traceCommonInit(char **argv)
   char *temproot2;
   CkpvInitialize(char*, traceRoot);
   CkpvInitialize(int, traceRootBaseLength);
+
+  char subdir[20];
+  sprintf(subdir, "%d%s", CmiMyPartition(), PATHSEPSTR);
+
   if (CmiGetArgStringDesc(argv, "+traceroot", &temproot, "Directory to write trace files to")) {
     int i;
     // Trying to decide if the traceroot path is absolute or not. If it is not
@@ -96,18 +103,25 @@ static void traceCommonInit(char **argv)
     for (i=strlen(argv[0])-1; i>=0; i--) if (argv[0][i] == PATHSEP) break;
     i++;
     CkpvAccess(traceRootBaseLength) = strlen(root)+1;
-    CkpvAccess(traceRoot) = (char *)malloc(strlen(argv[0]+i) + strlen(root) + 2);    _MEMCHECK(CkpvAccess(traceRoot));
+    CkpvAccess(traceRoot) = (char *)malloc(strlen(argv[0]+i) + strlen(root) + 2 +strlen(subdir));    _MEMCHECK(CkpvAccess(traceRoot));
     strcpy(CkpvAccess(traceRoot), root);
     strcat(CkpvAccess(traceRoot), PATHSEPSTR);
+    strcat(CkpvAccess(traceRoot), subdir);
+    if(CmiMyPe() == 0)
+        CmiMkdir(CkpvAccess(traceRoot));
     strcat(CkpvAccess(traceRoot), argv[0]+i);
     if (CkMyPe() == 0) 
       CmiPrintf("Trace: traceroot: %s\n", CkpvAccess(traceRoot));
   }
   else {
-    CkpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1);
+    CkpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1 +strlen(subdir));
     _MEMCHECK(CkpvAccess(traceRoot));
-    strcpy(CkpvAccess(traceRoot), argv[0]);
+    strcpy(CkpvAccess(traceRoot), subdir);
+    if(CmiMyPe() == 0)
+        CmiMkdir(CkpvAccess(traceRoot));
+    strcat(CkpvAccess(traceRoot), argv[0]);
   }
+  CkpvAccess(traceRootBaseLength)  +=  strlen(subdir);
 	/* added for TAU trace module. */
 	char *cwd;
   CkpvInitialize(char*, selective);
