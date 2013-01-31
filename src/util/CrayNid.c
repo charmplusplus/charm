@@ -13,8 +13,6 @@
 #if CMK_CRAYXT || CMK_CRAYXE
 
 #if XT3_TOPOLOGY
-#include <catamount/cnos_mpi_os.h>
-
 #else	/* if it is a XT4/5 or XE */
 #include <pmi.h>
 #endif
@@ -28,17 +26,7 @@ CmiNodeLock  cray_lock, cray_lock2;
 int getXTNodeID(int mpirank, int nummpiranks) {
   int nid = -1;
 
-#if XT3_TOPOLOGY
-  cnos_nidpid_map_t *nidpid; 
-  int ierr;
-  
-  nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * nummpiranks);
-
-  ierr = cnos_get_nidpid_map(&nidpid);
-  nid = nidpid[mpirank].nid;
-  free(nidpid); 
-
-#elif CMK_HAS_PMI_GET_NID	/* if it is a XT4/5 or XE */
+#if CMK_HAS_PMI_GET_NID	/* if it is a XT4/5 or XE */
   PMI_Get_nid(mpirank, &nid);
 #else
 #error "Cannot get network topology information on a Cray build. Swap current module xt-mpt with xt-mpt/5.0.0 or higher and xt-asyncpe with xt-asyncpe/4.0 or higher and then rebuild"
@@ -49,44 +37,13 @@ int getXTNodeID(int mpirank, int nummpiranks) {
 
 #endif /* CMK_CRAYXT || CMK_CRAYXE */
 
-#if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 
 #if !CMK_HAS_RCALIB
 #error "The Cray rca library is not available. Try 'module load rca' and rebuild"
 #endif
 
 #include <rca_lib.h>
-
-/*
-	#if XT3_TOPOLOGY
-	#define MAXNID 2784
-	#define TDIM 2
-
-  #elif XT4_TOPOLOGY
-  #define MAXNID 14000
-  #define TDIM 4
-
-  #elif XT5_TOPOLOGY
-  #define MAXNID 22020
-  #define TDIM 12
-
-  #elif XE6_TOPOLOGY
-    // hopper 
-  #define MAXNID 6384
-  #define TDIM 24
-#if 0
-    // titan
-  #define MAXNID 9600
-#define TDIM 16
-    // ESS 
-  #define MAXNID 4608
-  #define TDIM 32
-    // JYC
-  #define MAXNID 97
-  #define TDIM 32
-#endif
-  #endif
-*/
 
 int *pid2nid = NULL;            /* rank to node ID */
 int maxX = -1;
@@ -143,47 +100,7 @@ void pidtonid(int numpes) {
   
   pid2nid = (int *)malloc(sizeof(int) * numpes);
 
-#if XT3_TOPOLOGY
-  cnos_nidpid_map_t *nidpid; 
-  int ierr, i, nid;
-	int *nid2pid;
-	
-  nid2pid = (int*)malloc(maxNID*2*sizeof(int));
-  nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
-
-  for(i=0; i<maxNID; i++) {
-    nid2pid[2*i+0] = -1;
-    nid2pid[2*i+1] = -1;
-  }
-      
-  ierr = cnos_get_nidpid_map(&nidpid);
-  for(i=0; i<numpes; i++) {
-    nid = nidpid[i].nid;
-    pid2nid[i] = nid;
-    
-    /* if the first position on the node is not filled */
-    /* put it there (0) else at (1) */
-    if (nid2pid[2*nid+0] == -1)
-      nid2pid[2*nid+0] = i;
-    else
-      nid2pid[2*nid+1] = i;
-  }
-
-  /* CORRECTION FOR MPICH_RANK_REORDER_METHOD */
-
-  int k = -1;
-  for(i=0; i<maxNID; i++) {
-    if(nid2pid[2*i+0] != -1) {
-      nid2pid[2*i+0] = k++;
-      pid2nid[k] = i;
-      nid2pid[2*i+1] = k++;
-      pid2nid[k] = i;
-    }
-  }
-	free(nidpid);
-	free(nid2pid);
-
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   int i, nid, ret;
   CmiAssert(rca_coords == NULL);
   rca_coords = (rca_mesh_coord_t *)malloc(sizeof(rca_mesh_coord_t)*(maxNID+1));
@@ -269,4 +186,4 @@ void craynid_init()
   }
 }
 
-#endif /* XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY */
+#endif /* XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY */

@@ -20,8 +20,6 @@
 #include "BGPTorus.h"
 #elif CMK_BLUEGENEQ
 #include "BGQTorus.h"
-#elif XT3_TOPOLOGY
-#include "XT3Torus.h"
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 #include "XTTorus.h"
 #endif
@@ -167,8 +165,6 @@ class TopoManager {
     BGPTorusManager bgptm;
 #elif CMK_BLUEGENEQ
     BGQTorusManager bgqtm;
-#elif XT3_TOPOLOGY
-    XT3TorusManager xt3tm;
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     XTTorusManager xttm;
 #endif

@@ -72,24 +72,6 @@ TopoManager::TopoManager() {
   torusD = torus[3];
   torusE = torus[4];
 
-#elif XT3_TOPOLOGY
-  dimX = xt3tm.getDimX();
-  dimY = xt3tm.getDimY();
-  dimZ = xt3tm.getDimZ();
-
-  dimNX = xt3tm.getDimNX();
-  dimNY = xt3tm.getDimNY();
-  dimNZ = xt3tm.getDimNZ();
-  dimNT = xt3tm.getDimNT();
-
-  procsPerNode = xt3tm.getProcsPerNode();
-  int *torus;
-  torus = xt3tm.isTorus();
-  torusX = torus[0];
-  torusY = torus[1];
-  torusZ = torus[2];
-  torusT = torus[3];
-
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   dimX = xttm.getDimX();
   dimY = xttm.getDimY();
@@ -173,7 +155,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
   bgltm.rankToCoordinates(pe, x, y, z);
 #elif CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z);
-#elif XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 	int t;
   xttm.rankToCoordinates(pe, x, y, z, t);
 #else
@@ -213,8 +195,6 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
   bgptm.rankToCoordinates(pe, x, y, z, t);
 #elif CMK_BLUEGENEQ
   bgqtm.rankToCoordinates(pe, x, y, z, t);
-#elif XT3_TOPOLOGY
-  xt3tm.rankToCoordinates(pe, x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   xttm.rankToCoordinates(pe, x, y, z, t);
 #else
@@ -266,7 +246,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
   return bgltm.coordinatesToRank(x, y, z);
 #elif CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z);
-#elif XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   return xttm.coordinatesToRank(x, y, z, 0);
 #else
   if(dimY > 1)
@@ -291,8 +271,6 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
   return bgptm.coordinatesToRank(x, y, z, t);
 #elif CMK_BLUEGENEQ
   return bgqtm.coordinatesToRank(x, y, z, t);
-#elif XT3_TOPOLOGY
-  return xt3tm.coordinatesToRank(x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   return xttm.coordinatesToRank(x, y, z, t);
 #else
@@ -341,7 +319,6 @@ void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
 int TopoManager::pickClosestRank(int mype, int *pes, int n) {
 #if CMK_BLUEGENEL
   return(bgltm->pickClosestRank(mype, pes, n));
-#elif XT3_TOPOLOGY
 #else 
   return(pickClosestRank(mype,pes,n));
 #endif
