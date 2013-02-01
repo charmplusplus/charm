@@ -1560,11 +1560,7 @@ void buddyDieHandler(char *msg)
    // send message to crash pe to let it restart
    CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
    int newrank;
-#if CMK_HAS_PARTITION
    newrank = find_spare_mpirank(diepe,CmiMyPartition());
-#else
-   newrank = find_spare_mpirank(diepe,0);
-#endif
    int buddy = obj->BuddyPE(CmiMyPe());
    if (buddy == diepe)  {
      mpi_restart_crashed(diepe, newrank);
