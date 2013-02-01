@@ -31,7 +31,6 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *msg
     }
 
     destIndex = slot->addrIndex;
-    CmiAssert(CmiNodeOf(slot->destPE) == destNode);
     if (slot->destBuf[destIndex].destAddress) {
         slot->addrIndex = (destIndex+1)%PERSIST_BUFFERS_NUM;
 #if  DELTA_COMPRESS
