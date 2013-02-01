@@ -18,7 +18,7 @@
  */
 
 /* This msg buffer pool is only created on comm thread, and it's multi-producer-single-consumer */
-CsvDeclare(PCQueue, notifyCommThdMsgBuffer);
+CsvDeclare(CMIQueue, notifyCommThdMsgBuffer);
 CpvDeclare(int, notifyCommThdHdlr);
 
 static void commThdHandleNotification(CmiNotifyCommThdMsg *msg){
@@ -33,14 +33,14 @@ void CmiInitNotifyCommThdScheme(){
     /* init the msg buffer */
     if(CmiMyRank() == CmiMyNodeSize()){
         int i;
-        CsvAccess(notifyCommThdMsgBuffer) = PCQueueCreate();
-        PCQueue q = CsvAccess(notifyCommThdMsgBuffer);
+        CsvAccess(notifyCommThdMsgBuffer) = CMIQueueCreate();
+        CMIQueue q = CsvAccess(notifyCommThdMsgBuffer);
         /* create init buffer of 16 msgs */
         for(i=0; i<16; i++) {
             CmiNotifyCommThdMsg *one = (CmiNotifyCommThdMsg *)malloc(sizeof(CmiNotifyCommThdMsg));
             CmiSetHandler(one, CpvAccess(notifyCommThdHdlr));
             CmiBecomeImmediate(one);
-            PCQueuePush(q, (char *)one);
+            CMIQueuePush(q, (char *)one);
         }
     }
     CmiNodeAllBarrier();
@@ -48,7 +48,7 @@ void CmiInitNotifyCommThdScheme(){
 
 /* ============ Beginning of implementation for user APIs ============= */
 CmiNotifyCommThdMsg *CmiCreateNotifyCommThdMsg(CmiCommThdFnPtr fn, int numParams, void *params, int toKeep){
-    CmiNotifyCommThdMsg *one = (CmiNotifyCommThdMsg *)PCQueuePop(CsvAccess(notifyCommThdMsgBuffer));
+    CmiNotifyCommThdMsg *one = (CmiNotifyCommThdMsg *)CMIQueuePop(CsvAccess(notifyCommThdMsgBuffer));
     if(one == NULL) {
         one = (CmiNotifyCommThdMsg *)malloc(sizeof(CmiNotifyCommThdMsg));
         CmiSetHandler(one, CpvAccess(notifyCommThdHdlr));
@@ -64,7 +64,7 @@ CmiNotifyCommThdMsg *CmiCreateNotifyCommThdMsg(CmiCommThdFnPtr fn, int numParams
 void CmiFreeNotifyCommThdMsg(CmiNotifyCommThdMsg *msg){
     free(msg->params);
     /* Recycle the msg */
-    PCQueuePush(CsvAccess(notifyCommThdMsgBuffer), (char *)msg);
+    CMIQueuePush(CsvAccess(notifyCommThdMsgBuffer), (char *)msg);
 }
 
 /* Note: the "msg" has to be created from function call "CmiCreateNotifyCommThdMsg" */

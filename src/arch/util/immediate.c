@@ -40,7 +40,7 @@ void CmiPushImmediateMsg(void *msg)
   */
   
   CmiLock(CsvAccess(NodeState).immSendLock);
-  PCQueuePush(CsvAccess(NodeState).immQ, (char *)msg);
+  CMIQueuePush(CsvAccess(NodeState).immQ, (char *)msg);
   CmiUnlock(CsvAccess(NodeState).immSendLock);
   MACHSTATE(4,"} pushing immediate message");
 }
@@ -58,7 +58,7 @@ void CmiDelayImmediate()
 
   CQdCreate(CpvAccess(cQdState),1);
   MACHSTATE(5,"Actually delaying an immediate message");
-  PCQueuePush(CsvAccess(NodeState).delayedImmQ, (char *)currentImmediateMsg);
+  CMIQueuePush(CsvAccess(NodeState).delayedImmQ, (char *)currentImmediateMsg);
 }
 
 
@@ -111,7 +111,7 @@ void CmiHandleImmediate()
    MACHSTATE(2,"Entered handleImmediate {")
 
    /* Handle all pending immediate messages */
-   while (NULL!=(msg=PCQueuePop(CsvAccess(NodeState).immQ)))
+   while (NULL!=(msg=CMIQueuePop(CsvAccess(NodeState).immQ)))
    {
      currentImmediateMsg = msg;
      MACHSTATE(4,"calling immediate message handler {");
@@ -120,7 +120,7 @@ void CmiHandleImmediate()
    }
    
    /* Take care of delayed immediate messages, which we have to handle next time */
-   while (NULL!=(msg=PCQueuePop(CsvAccess(NodeState).delayedImmQ)))
+   while (NULL!=(msg=CMIQueuePop(CsvAccess(NodeState).delayedImmQ)))
    	CmiPushImmediateMsg(msg);
    
    MACHSTATE(2,"} exiting handleImmediate")

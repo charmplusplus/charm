@@ -48,9 +48,9 @@ FILE *debugLog = NULL;
 #endif
 
 #if CMK_OFFLOAD_BCAST_PROCESS
-CsvDeclare(PCQueue, procBcastQ);
+CsvDeclare(CMIQueue, procBcastQ);
 #if CMK_NODE_QUEUE_AVAILABLE
-CsvDeclare(PCQueue, nodeBcastQ);
+CsvDeclare(CMIQueue, nodeBcastQ);
 #endif
 #endif
 
@@ -382,7 +382,7 @@ void CmiPushPE(int rank,void *msg) {
     }
 #endif
 
-    PCQueuePush(cs->recv,(char*)msg);
+    CMIQueuePush(cs->recv,(char*)msg);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
   if (_Cmi_noprocforcommthread)
@@ -403,7 +403,7 @@ void CmiPushNode(void *msg) {
     }
 #endif
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
-    PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
+    CMIQueuePush(CsvAccess(NodeState).NodeRecv,msg);
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
@@ -593,7 +593,7 @@ static void CmiSendNodeSelf(char *msg) {
     }
 #endif
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
-    PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
+    CMIQueuePush(CsvAccess(NodeState).NodeRecv, msg);
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
 }
 
@@ -745,14 +745,14 @@ if (  MSG_STATISTIC)
 
 #if CMK_OFFLOAD_BCAST_PROCESS
     /* the actual queues should be created on comm thread considering NUMA in SMP */
-    CsvInitialize(PCQueue, procBcastQ);
+    CsvInitialize(CMIQueue, procBcastQ);
 #if CMK_NODE_QUEUE_AVAILABLE
-    CsvInitialize(PCQueue, nodeBcastQ);
+    CsvInitialize(CMIQueue, nodeBcastQ);
 #endif
 #endif
 
 #if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
-    CsvInitialize(PCQueue, notifyCommThdMsgBuffer);
+    CsvInitialize(CMIQueue, notifyCommThdMsgBuffer);
 #endif
 
     CmiStartThreads(argv);
@@ -781,9 +781,9 @@ static void ConverseRunPE(int everReturn) {
 #endif
 
     if (createQueue) {
-        CsvAccess(procBcastQ) = PCQueueCreate();
+        CsvAccess(procBcastQ) = CMIQueueCreate();
 #if CMK_NODE_QUEUE_AVAILABLE
-        CsvAccess(nodeBcastQ) = PCQueueCreate();
+        CsvAccess(nodeBcastQ) = CMIQueueCreate();
 #endif
     }
 #endif
@@ -903,7 +903,7 @@ static void CommunicationServerThread(int sleepTime) {
 
 void ConverseExit(void) {
     int i;
-#if !CMK_SMP
+#if !CMK_SMP || CMK_SMP_NO_COMMTHD
     LrtsDrainResources();
 #else
 	if(Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV
@@ -930,7 +930,7 @@ if (MSG_STATISTIC)
     if (CmiMyPe() == 0) CmiPrintf("End of program\n");
 #endif
 
-#if !CMK_SMP  || CMK_SMP_NO_COMMTHD
+#if !CMK_SMP || CMK_SMP_NO_COMMTHD
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif
@@ -980,11 +980,11 @@ void *CmiGetNonLocal(void) {
     CmiIdleLock_checkMessage(&cs->idle);
     /* ?????although it seems that lock is not needed, I found it crashes very often
        on mpi-smp without lock */
-    msg = PCQueuePop(cs->recv);
-#if !CMK_SMP  || CMK_SMP_NO_COMMTHD
+    msg = CMIQueuePop(cs->recv);
+#if !CMK_SMP || CMK_SMP_NO_COMMTHD
     if (!msg) {
        AdvanceCommunication(0);
-       msg = PCQueuePop(cs->recv);
+       msg = CMIQueuePop(cs->recv);
     }
 #else
 //    LrtsPostNonLocal();
@@ -1000,10 +1000,10 @@ void *CmiGetNonLocalNodeQ(void) {
     CmiState cs = CmiGetState();
     char *result = 0;
     CmiIdleLock_checkMessage(&cs->idle);
-    if (!PCQueueEmpty(CsvAccess(NodeState).NodeRecv)) {
+    if (!CMIQueueEmpty(CsvAccess(NodeState).NodeRecv)) {
         MACHSTATE1(3,"CmiGetNonLocalNodeQ begin %d {", CmiMyPe());
         CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
-        result = (char *) PCQueuePop(CsvAccess(NodeState).NodeRecv);
+        result = (char *) CMIQueuePop(CsvAccess(NodeState).NodeRecv);
         CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
         MACHSTATE1(3,"} CmiGetNonLocalNodeQ end %d ", CmiMyPe());
     }
@@ -1030,7 +1030,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s) {
 #define SPINS_BEFORE_SLEEP 20
 static void CmiNotifyStillIdle(CmiIdleState *s) {
     MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
-#if !CMK_SMP
+#if !CMK_SMK || CMK_SMP_NO_COMMTHD
     AdvanceCommunication(1);
 #else
     LrtsPostNonLocal();

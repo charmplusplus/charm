@@ -1,0 +1,135 @@
+#!/bin/sh
+#
+# Conv-host for bluegenep:
+#  Translates +pN-style conv-host options into 
+# qsub options. 
+# The script qsub the job, wait until it finishes, and print the output.
+# good for job less than 30 minutes
+
+args=""
+pes=1
+machinefile=""
+pernode=32
+envs=""
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+	+ppn)
+		args=$args" +ppn "$2
+		shift
+		;;
+	+ppn*)
+		args=$args" "$1
+		;;
+	+p)
+		pes=$2
+		shift
+		;;
+	+p*)
+		pes=`echo $1 | awk '{print substr($1,3)}'`
+		;;
+        
+  -machinefile)
+		machinefile=$2
+		args=" "$1" "$2" "$args
+		shift
+		;;
+	--mode)
+		args=" "$1" "$2" "$args
+		shift
+		;;
+	--envs)
+		envs=$envs" --envs " $2
+		shift
+		;;
+  --pernode)
+    pernode=$2
+    shift
+    ;;
+	*) 
+		args=$args" "$1
+		;;
+	esac
+	shift
+done
+
+
+printf "\nRunning on $pes processors: $args\n"
+
+if test -n "$COBALT_JOBID"
+then
+  # charmrun called from script
+  echo "runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB --envs PAMI_RGETINJFIFOSIZE=2000000 $envs : $args"
+  runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB --envs PAMI_RGETINJFIFOSIZE=2000000 $envs : $args
+else
+
+queue_stat=qstat
+queue_kill=qdel
+queue_sub=qsub
+
+while [ true ]
+do
+
+echo "Submitting batch job for> $pes $args"
+echo " using the command> $queue_sub -t 30 -n $pes  $args"
+jobid=""
+while [ -z "$jobid" ]
+do
+  jobid=`$queue_sub -t 30 -n $pes  $args 2>err.$$ |tail -1`
+  if grep 'not found' err.$$ > /dev/null
+  then
+    cat err.$$
+    rm -f err.$$
+    exit 1
+  fi
+  sleep 10
+done
+echo "Job enqueued under job ID $jobid"
+
+output=$jobid.output
+err=$jobid.error
+
+End() {
+        echo "Charmrun> $queue_kill $jobid ..."
+        $queue_kill $jobid
+        rm -f $script
+        exit $1
+}
+
+# kill job if interrupted
+trap 'End 1' 2 3
+
+# Wait for the job to complete, by checking its status
+while [ true ]
+do
+        $queue_stat $jobid > tmp.$$
+	exitstatus=$?
+
+        if test $exitstatus -ne 0
+        then
+            # job not in the queue now
+            status=`tail -1 $err | sed 's/.*Exit status:[ ]*\([0-9\]*\).*/\1/'`
+            if test -n $status
+            then
+		  if test $status = 1
+                  then
+                    if grep 'Failed to boot the partition' $err > /dev/null 2>/dev/null
+                    then
+                      echo "Failed to boot the partition, retrying."
+                      break
+                    fi
+                  fi
+                  cat $output
+	          rm -f tmp.$$
+                  exit $status
+            fi
+        fi
+	sleep 20
+done
+
+done
+
+exit 1
+
+fi

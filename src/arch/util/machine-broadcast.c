@@ -8,10 +8,10 @@ static void handleOneBcastMsg(int size, char *msg) {
     CmiAssert(CMI_BROADCAST_ROOT(msg)!=0);
 #if CMK_OFFLOAD_BCAST_PROCESS
     if (CMI_BROADCAST_ROOT(msg)>0) {
-        PCQueuePush(CsvAccess(procBcastQ), msg);
+        CMIQueuePush(CsvAccess(procBcastQ), msg);
     } else {
 #if CMK_NODE_QUEUE_AVAILABLE
-        PCQueuePush(CsvAccess(nodeBcastQ), msg);
+        CMIQueuePush(CsvAccess(nodeBcastQ), msg);
 #endif
     }
 #else
@@ -29,7 +29,7 @@ static void processBcastQs() {
 #if CMK_OFFLOAD_BCAST_PROCESS
     char *msg;
     do {
-        msg = PCQueuePop(CsvAccess(procBcastQ));
+        msg = CMIQueuePop(CsvAccess(procBcastQ));
         if (!msg) break;
         MACHSTATE2(4, "[%d]: process a proc-level bcast msg %p begin{", CmiMyNode(), msg);
         processProcBcastMsg(CMI_MSG_SIZE(msg), msg);
@@ -37,7 +37,7 @@ static void processBcastQs() {
     } while (1);
 #if CMK_NODE_QUEUE_AVAILABLE
     do {
-        msg = PCQueuePop(CsvAccess(nodeBcastQ));
+        msg = CMIQueuePop(CsvAccess(nodeBcastQ));
         if (!msg) break;
         MACHSTATE2(4, "[%d]: process a node-level bcast msg %p begin{", CmiMyNode(), msg);
         processNodeBcastMsg(CMI_MSG_SIZE(msg), msg);
