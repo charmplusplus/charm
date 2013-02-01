@@ -291,6 +291,7 @@ void *PerAlloc(int size)
   return ptr;
 #else
   char *ptr = CmiAlloc(size);
+  return ptr;
 #endif
 }
                                                                                 
@@ -345,9 +346,11 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
 {
   int i;
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
-    char *buf = PerAlloc(maxBytes+sizeof(int)*2);
-    _MEMCHECK(buf);
-    memset(buf, 0, maxBytes+sizeof(int)*2);
+      CmiPrintf("[%d] request memory %d:%d\n", CmiMyPe(), maxBytes, i);
+      char *buf = PerAlloc(maxBytes+sizeof(int)*2);
+      _MEMCHECK(buf);
+      memset(buf, 0, maxBytes+sizeof(int)*2);
+      CmiPrintf("[%d] request memory %d:%d done done \n", CmiMyPe(), maxBytes, i);
       /* used large page and from mempool, memory always registered */
     slot->destBuf[i].mem_hndl = GetMemHndl(buf);
     slot->destBuf[i].destAddress = buf;
