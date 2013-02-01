@@ -683,7 +683,7 @@ void CmiCreatePartitions(char **argv) {
   partitionInfo.myPartition = _Cmi_mynode_global / partitionInfo.partitionSize;
 
   //reset local variables
-  _Cmi_mynode = node_gToLTranslate(_Cmi_mynode);
+  _Cmi_mynode = CmiGetNodeLocal(_Cmi_mynode);
   _Cmi_numnodes = CmiPartitionSize();
   //mype and numpes will be set following this
 }
