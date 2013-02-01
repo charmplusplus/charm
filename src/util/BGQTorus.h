@@ -55,8 +55,8 @@ class BGQTorusManager {
       if(CmiNumPartitions() > 1) {
         dimA = rn_NA = CmiNumPes();
         dimB = dimC = dimD = dimE = 1;
-        rn_NB = rn_NC = rn_ND = rn_DE = 1;
-        procsPerNode = thdsPerProc = 1;
+        rn_NB = rn_NC = rn_ND = rn_NE = 1;
+        procsPerNode = thdsPerProc = hw_NT = 1;
         torus[0] = torus[1] = torus[2] = torus[3] = torus[4] = 0;
         dims[0] = rn_NA;
         dims[1] = rn_NB;
