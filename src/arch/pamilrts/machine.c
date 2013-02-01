@@ -615,7 +615,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   CmiNetworkBarrier(0);
 
   /* checksum flag */
-  if (CmiGetArgFlag(argv,"+checksum")) {
+  if (CmiGetArgFlag(*argv,"+checksum")) {
 #if !CMK_OPTIMIZE
     checksum_flag = 1;
     if (_Cmi_mynode == 0) CmiPrintf("Charm++: CheckSum checking enabled! \n");
