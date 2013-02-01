@@ -8,6 +8,7 @@
 */
 /*@{*/
 
+#define ALIGN16(x)       (size_t)((~15)&((x)+15))
 #include "converse.h"
 #if CMK_PERSISTENT_COMM
 //#define EXTERNAL_COMPRESS 1
@@ -168,7 +169,7 @@ PersistentHandle CmiCreateCompressPersistent(int destPE, int maxBytes, int compr
   slot = (PersistentSendsTable *)h;
 
   slot->destPE = destPE;
-  slot->sizeMax = maxBytes;
+  slot->sizeMax = ALIGN16(maxBytes);
   slot->addrIndex = 0;
   PersistentRequestMsg *msg = (PersistentRequestMsg *)CmiAlloc(sizeof(PersistentRequestMsg));
   msg->maxBytes = maxBytes;
@@ -199,7 +200,7 @@ PersistentHandle CmiCreateCompressPersistentSize(int destPE, int maxBytes, int c
   slot = (PersistentSendsTable *)h;
 
   slot->destPE = destPE;
-  slot->sizeMax = maxBytes;
+  slot->sizeMax = ALIGN16(maxBytes);
   slot->addrIndex = 0;
   PersistentRequestMsg *msg = (PersistentRequestMsg *)CmiAlloc(sizeof(PersistentRequestMsg));
   msg->maxBytes = maxBytes;
@@ -229,7 +230,7 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
   slot = (PersistentSendsTable *)h;
 
   slot->destPE = destPE;
-  slot->sizeMax = maxBytes;
+  slot->sizeMax = ALIGN16(maxBytes);
   slot->addrIndex = 0;
   PersistentRequestMsg *msg = (PersistentRequestMsg *)CmiAlloc(sizeof(PersistentRequestMsg));
   msg->maxBytes = maxBytes;

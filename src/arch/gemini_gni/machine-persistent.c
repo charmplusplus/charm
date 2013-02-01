@@ -25,14 +25,18 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *msg
     uint8_t tag = LMSG_PERSISTENT_INIT_TAG;
     SMSG_QUEUE *queue = &smsg_queue;
 
+    if (size > slot->sizeMax) {
+        CmiPrintf("size: %d sizeMax: %d mype=%d destPe=%d\n", size, slot->sizeMax, CmiMyPe(), destNode);
+        CmiAbort("Abort: Invalid size\n");
+    }
+
     destIndex = slot->addrIndex;
-    
     CmiAssert(CmiNodeOf(slot->destPE) == destNode);
     if (slot->destBuf[destIndex].destAddress) {
         slot->addrIndex = (destIndex+1)%PERSIST_BUFFERS_NUM;
 #if  DELTA_COMPRESS
         if(slot->compressFlag)
-            size = CompressPersistentMsg(h, size, msg);
+            size = ALIGN64(CompressPersistentMsg(h, size, msg));
 #endif
         LrtsPrepareEnvelope(msg, size);
         CONTROL_MSG *control_msg_tmp =  construct_control_msg(size, msg, -1);
@@ -90,7 +94,7 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         slot->addrIndex = (destIndex+1)%PERSIST_BUFFERS_NUM;
 #if  DELTA_COMPRESS
         if(slot->compressFlag)
-            size = CompressPersistentMsg(h, size, m);
+            size = ALIGN64(CompressPersistentMsg(h, size, m));
 #endif
         MallocPostDesc(pd);
         if(size <= LRTS_GNI_RDMA_THRESHOLD) {
@@ -346,11 +350,9 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
 {
   int i;
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
-      CmiPrintf("[%d] request memory %d:%d\n", CmiMyPe(), maxBytes, i);
       char *buf = PerAlloc(maxBytes+sizeof(int)*2);
       _MEMCHECK(buf);
       memset(buf, 0, maxBytes+sizeof(int)*2);
-      CmiPrintf("[%d] request memory %d:%d done done \n", CmiMyPe(), maxBytes, i);
       /* used large page and from mempool, memory always registered */
     slot->destBuf[i].mem_hndl = GetMemHndl(buf);
     slot->destBuf[i].destAddress = buf;
