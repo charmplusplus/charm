@@ -127,6 +127,48 @@ void setMemoryOwnedBy(void *p, int id);
 
 extern int CmiMyRank_();
 
+//variables and functions for replica
+typedef struct {
+  int numPartitions;
+  int partitionSize;
+  int myPartition;
+} PartitionInfo;
+
+void CmiCreatePartitions(char **argv);
+
+extern int _Cmi_mype_global;
+extern int _Cmi_numpes_global;
+extern int _Cmi_mynode_global;
+extern int _Cmi_numnodes_global;
+
+#define CmiMyPartition()         partitionInfo.myPartition
+#define CmiPartitionSize()       partitionInfo.partitionSize
+#define CmiNumPartition()        partitionInfo.numPartitions
+#define CmiNumNodesGlobal()     _Cmi_numnodes_global
+#define CmiMyNodeGlobal()       _Cmi_mynode_global
+#define CmiNumPesGlobal()       _Cmi_numpes_global
+//we need different implementations of this based on SMP or non-smp
+#if !CMK_SMP
+#define CmiMyPeGlobal()         _Cmi_mype_global
+extern int _Cmi_mynodesize;
+#else
+extern int CmiMyPeGlobal();
+#endif
+
+//we need nodeSpan to find how many pes each node cover
+int CmiNodeSpan();
+
+int node_lToGTranslate(int node, int partition);
+int node_gToLTranslate(int node);
+int pe_lToGTranslate(int pe, int partition);
+int pe_gToLTranslate(int pe);
+
+#define CmiGetPeGlobal(pe,part)         pe_lToGTranslate(pe,part)
+#define CmiGetNodeGlobal(node,part)     node_lToGTranslate(node,part)
+#define CmiGetPeLocal(pe)               pe_gToLTranslate(pe)
+#define CmiGetNodeLocal(node)           node_gToLTranslate(node)
+//end of variables and functions for replica
+
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 extern int _Cmi_mype;
 extern int _Cmi_numpes;

@@ -497,9 +497,8 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
 
     CmiState cs = CmiGetState();
     SMSG_LIST *msg_tmp;
-    int  rank;
 
-    CmiAssert(destNode != CmiMyNode());
+    CmiAssert(destNode != CmiMyNodeGlobal());
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
       EnqueueMsg(msg, size, destNode, mode);

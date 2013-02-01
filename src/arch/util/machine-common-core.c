@@ -138,9 +138,16 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg);
 #define DGRAM_NODEMESSAGE   (0x1FFB)
 #endif
 
-/* Node state structure */
-int               _Cmi_mynode;    /* Which address space am I */
+// global state, equals local if running one replica
+PartitionInfo partitionInfo;
+int _Cmi_mype_global;
+int _Cmi_numpes_global;
+int _Cmi_mynode_global;
+int _Cmi_numnodes_global;
+
+// Node state structure, local information for the replica
 int               _Cmi_mynodesize;/* Number of processors in my address space */
+int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
 
@@ -332,11 +339,22 @@ static void CmiStartThreads(char **argv) {
     CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
     _Cmi_mype = Cmi_nodestart;
     _Cmi_myrank = 0;
+    _Cmi_mype_global = _Cmi_mynode_global;
+}
+
+INLINE_KEYWORD int CmiNodeSpan() {
+  return 1;
 }
 #else
 /************** SMP *******************/
 INLINE_KEYWORD int CmiMyPe() {
     return CmiGetState()->pe;
+}
+INLINE_KEYWORD int CmiNodeSpan() {
+  return (CmiMyNodeSize() + 1);
+}
+INLINE_KEYWORD int CmiMyPeGlobal() {
+    return CmiGetState()->pe + (CmiMyNodeGlobal()*CmiNodeSpan());
 }
 INLINE_KEYWORD int CmiMyRank() {
     return CmiGetState()->rank;
@@ -494,17 +512,18 @@ inline
 CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode)
 {
         int rank;
-        int destNode = CmiNodeOf(destPE); 
+        int destLocalNode = CmiNodeOf(destPE); 
+        int destNode = CmiGetNodeGlobal(CmiNodeOf(destPE),partitionInfo.myPartition); 
 #if CMK_USE_PXSHM
-        if (CmiValidPxshm(destNode, size)) {
-          CmiSendMessagePxshm(msg, size, destNode, &refcount);
+        if (CmiValidPxshm(destLocalNode, size)) {
+          CmiSendMessagePxshm(msg, size, destLocalNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
         }
 #endif
 #if CMK_USE_XPMEM
-        if (CmiValidXpmem(destNode, size)) {
-          CmiSendMessageXpmem(msg, size, destNode, &refcount);
+        if (CmiValidXpmem(destLocalNode, size)) {
+          CmiSendMessageXpmem(msg, size, destLocalNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
         }
@@ -530,7 +549,7 @@ if (MSG_STATISTIC)
 #if CMK_USE_OOB
     if (CpvAccess(_urgentSend)) mode |= OUT_OF_BAND;
 #endif
-    return LrtsSendFunc(CmiNodeOf(destPE), destPE, size, msg, mode);
+    return LrtsSendFunc(destNode, destPE, size, msg, mode);
 }
 
 void CmiFreeSendFn(int destPE, int size, char *msg) {
@@ -646,6 +665,45 @@ if (  MSG_STATISTIC)
 #endif
 #endif
 
+// functions related to replica
+void CmiCreatePartitions(char **argv) {
+  partitionInfo.numPartitions = 1; 
+  CmiGetArgInt(argv,"+partitions", &partitionInfo.numPartitions);
+
+  _Cmi_numnodes_global = _Cmi_numnodes;
+  _Cmi_mynode_global = _Cmi_mynode;
+  _Cmi_numpes_global = _Cmi_numnodes_global * _Cmi_mynodesize;
+  //still need to set _Cmi_mype_global
+
+  CmiAssert(partitionInfo.numPartitions <= _Cmi_numnodes_global);
+  CmiAssert((_Cmi_numnodes_global % partitionInfo.numPartitions) == 0);
+  
+  //simple partition, this will be made more complex in future
+  partitionInfo.partitionSize = _Cmi_numnodes_global / partitionInfo.numPartitions;
+  partitionInfo.myPartition = _Cmi_mynode_global / partitionInfo.partitionSize;
+
+  //reset local variables
+  _Cmi_mynode = node_gToLTranslate(_Cmi_mynode);
+  _Cmi_numnodes = CmiPartitionSize();
+  //mype and numpes will be set following this
+}
+
+INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
+  return (partition*partitionInfo.partitionSize)+node;
+}
+
+INLINE_KEYWORD int node_gToLTranslate(int node) {
+  return (node % partitionInfo.partitionSize);
+}
+
+INLINE_KEYWORD int pe_lToGTranslate(int pe, int partition) {
+  return (pe + partition*CmiNumNodes()*CmiNodeSpan());
+}
+int pe_gToLTranslate(int pe) {
+  return (pe % (CmiNumNodes()*CmiNodeSpan()));
+}
+//end of functions related to replica
+
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
@@ -710,6 +768,8 @@ if (  MSG_STATISTIC)
 		}
 #endif
 	}
+
+    CmiCreatePartitions(argv);
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
