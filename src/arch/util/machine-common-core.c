@@ -1041,7 +1041,8 @@ if (MSG_STATISTIC)
 #endif
 
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
-    if (CmiMyPe() == 0) CmiPrintf("End of program\n");
+    if (CmiMyPe() == 0) 
+      CmiPrintf("End of program\n");
 #endif
 
 #if !CMK_SMP || CMK_SMP_NO_COMMTHD
