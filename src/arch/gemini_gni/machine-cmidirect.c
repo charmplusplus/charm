@@ -160,7 +160,7 @@ void CmiDirect_put(CmiDirectUserHandle *userHandle) {
         pd->first_operand   = (uint64_t)(userHandle->remoteHandler);
         pd->amo_cmd         = 1;
         pd->cqwrite_value   = 1;        
-        bufferRdmaMsg(userHandle->remoteNode, pd); 
+        bufferRdmaMsg(CmiGetNodeGlobal(userHandle->remoteNode,CmiMyPartition()), pd); 
 #if CMI_DIRECT_DEBUG
         printHandle(userHandle, "After Direct_put");
         CmiPrintf("[%d] RDMA put %d,%d bytes addr %p to remoteNode %d:%p \n\n",CmiMyPe(), userHandle->transSize, pd->length, (void*)(pd->local_addr), userHandle->remoteNode, (void*) (pd->remote_addr));
@@ -204,7 +204,7 @@ void CmiDirect_get(CmiDirectUserHandle *userHandle) {
         pd->second_operand  = (uint64_t) (userHandle->callbackData);
         pd->amo_cmd         = 2;
         pd->cqwrite_value   = 1;
-        bufferRdmaMsg(userHandle->remoteNode, pd); 
+        bufferRdmaMsg(CmiGetNodeGlobal(userHandle->remoteNode,CmiMyPartition()), pd); 
 #if CMI_DIRECT_DEBUG
     CmiPrintf("[%d] RDMA get %d,%d bytes addr %p to remoteNode %d:%p \n\n",CmiMyPe(), userHandle->transSize, pd->length, (void*)(pd->local_addr), userHandle->remoteNode, (void*) (pd->remote_addr));
 #endif
