@@ -141,9 +141,10 @@ extern int _Cmi_numpes_global;
 extern int _Cmi_mynode_global;
 extern int _Cmi_numnodes_global;
 extern PartitionInfo partitionInfo;
+
 #define CmiMyPartition()         partitionInfo.myPartition
 #define CmiPartitionSize()       partitionInfo.partitionSize
-#define CmiNumPartition()        partitionInfo.numPartitions
+#define CmiNumPartitions()        partitionInfo.numPartitions
 #define CmiNumNodesGlobal()     _Cmi_numnodes_global
 #define CmiMyNodeGlobal()       _Cmi_mynode_global
 #define CmiNumPesGlobal()       _Cmi_numpes_global
@@ -158,6 +159,7 @@ extern int CmiMyPeGlobal();
 //we need nodeSpan to find how many pes each node cover
 int CmiNodeSpan();
 
+//functions to translate between local and global
 int node_lToGTranslate(int node, int partition);
 int node_gToLTranslate(int node);
 int pe_lToGTranslate(int pe, int partition);
@@ -1063,9 +1065,9 @@ void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
 void          CmiFreeMulticastFn(CmiGroup, int, char*);
 
-//remote replica send counterparts
-void          CmiRemoteSyncSendFn(int, int, int, char *);
-void          CmiRemoteFreeSendFn(int, int, int, char *);
+//inter replica send counterparts
+void          CmiInterSyncSendFn(int, int, int, char *);
+void          CmiInterFreeSendFn(int, int, int, char *);
 
 typedef void * (*CmiReduceMergeFn)(int*,void*,void**,int);
 typedef void (*CmiReducePupFn)(void*,void*);
@@ -1155,10 +1157,10 @@ void          CmiReleaseCommHandle(CmiCommHandle);
 #define CmiSyncMulticastAndFree(g,s,m)  (CmiFreeMulticastFn((g),(s),(char*)(m)))
 
 
-//adding functions for sending to remote replicas - only the sync ones because
+//adding functions for inter-replica communication - only the sync ones because
 //we do not use the async ones
-#define CmiRemoteSyncSend(pe,p,s,m)              (CmiRemoteSyncSendFn((pe),(p),(s),(char *)(m)))
-#define CmiRemoteSyncSendAndFree(pe,p,s,m)       (CmiRemoteFreeSendFn((pe),(p),(s),(char *)(m)))
+#define CmiInterSyncSend(pe,p,s,m)              (CmiInterSyncSendFn((pe),(p),(s),(char *)(m)))
+#define CmiInterSyncSendAndFree(pe,p,s,m)       (CmiInterFreeSendFn((pe),(p),(s),(char *)(m)))
 //support for rest may come later if required
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -1174,9 +1176,9 @@ void          CmiSyncNodeBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int, char *);
 void          CmiFreeNodeBroadcastAllFn(int, char *);
 
-//if node queue is available, adding remote replica counterparts
-void          CmiRemoteSyncNodeSendFn(int, int, int, char *);
-void          CmiRemoteFreeNodeSendFn(int, int, int, char *);
+//if node queue is available, adding inter replica counterparts
+void          CmiInterSyncNodeSendFn(int, int, int, char *);
+void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -1190,9 +1192,9 @@ void          CmiRemoteFreeNodeSendFn(int, int, int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
 
-//counterparts of remote replica
-#define CmiRemoteSyncNodeSend(pe,p,s,m)         (CmiRemoteSyncNodeSendFn((pe),(p),(s),(char *)(m)))
-#define CmiRemoteSyncNodeSendAndFree(pe,p,s,m)  (CmiRemoteFreeNodeSendFn((pe),(p),(s),(char *)(m)))
+//counterparts of inter replica
+#define CmiInterSyncNodeSend(pe,p,s,m)         (CmiInterSyncNodeSendFn((pe),(p),(s),(char *)(m)))
+#define CmiInterSyncNodeSendAndFree(pe,p,s,m)  (CmiInterFreeNodeSendFn((pe),(p),(s),(char *)(m)))
 
 #else
 
@@ -1229,9 +1231,9 @@ void          CmiRemoteFreeNodeSendFn(int, int, int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
 #define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
 #endif
-//and the remote replica counterparts
-#define CmiRemoteSyncNodeSend(n,p,s,m)          CmiRemoteSyncSend(CmiNodeFirst(n),p,s,m)
-#define CmiRemoteSyncNodeSendAndFree(n,p,s,m)   CmiRemoteSyncSendAndFree(CmiNodeFirst(n),p,s,m)
+//and the inter replica counterparts
+#define CmiInterSyncNodeSend(n,p,s,m)          CmiInterSyncSend(CmiNodeFirst(n),p,s,m)
+#define CmiInterSyncNodeSendAndFree(n,p,s,m)   CmiInterSyncSendAndFree(CmiNodeFirst(n),p,s,m)
 #endif
 
 /******** CMI MESSAGE RECEPTION ********/

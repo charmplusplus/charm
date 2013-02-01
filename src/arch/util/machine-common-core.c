@@ -354,7 +354,7 @@ INLINE_KEYWORD int CmiNodeSpan() {
   return (CmiMyNodeSize() + 1);
 }
 INLINE_KEYWORD int CmiMyPeGlobal() {
-    return CmiGetState()->pe + (CmiMyNodeGlobal()*CmiNodeSpan());
+    return CmiGetPeGlobal(CmiGetState()->pe,CmiMyPartition());
 }
 INLINE_KEYWORD int CmiMyRank() {
     return CmiGetState()->rank;
@@ -491,10 +491,10 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeSendFn(destPE, size, dupmsg);
 }
-//remote replica send
-void CmiRemoteSyncSendFn(int destPE, int partition, int size, char *msg) {
+//inter-replica send
+void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
-    CmiRemoteFreeSendFn(destPE, partition, size, dupmsg);
+    CmiInterFreeSendFn(destPE, partition, size, dupmsg);
 }
 
 #if CMK_USE_PXSHM
@@ -511,27 +511,27 @@ CpvExtern(int, _urgentSend);
 #endif
 
 //declaration so that it can be used
-CmiCommHandle CmiRemoteSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode);
+CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode);
 //I am changing this function to offload task to a generic function - the one
 //that handles sending to any replica
 INLINE_KEYWORD CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode) {
-  return CmiRemoteSendNetworkFunc(destPE, CmiMyPartition(), size, msg, mode);
+  return CmiInterSendNetworkFunc(destPE, CmiMyPartition(), size, msg, mode);
 }
 //the generic function that replaces the older one
-CmiCommHandle CmiRemoteSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode)
+CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode)
 {
         int rank;
         int destLocalNode = CmiNodeOf(destPE); 
         int destNode = CmiGetNodeGlobal(destLocalNode,partition); 
-#if CMK_USE_PXSHM       //not handled yet correctly
-        if (CmiValidPxshm(destLocalNode, size)) {
+#if CMK_USE_PXSHM      
+        if ((partition == CmiMyPartition()) && CmiValidPxshm(destLocalNode, size)) {
           CmiSendMessagePxshm(msg, size, destLocalNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
         }
 #endif
-#if CMK_USE_XPMEM       //not handled yet correctly
-        if (CmiValidXpmem(destLocalNode, size)) {
+#if CMK_USE_XPMEM     
+        if ((partition == CmiMyPartition()) && CmiValidXpmem(destLocalNode, size)) {
           CmiSendMessageXpmem(msg, size, destLocalNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
@@ -564,11 +564,11 @@ if (MSG_STATISTIC)
 //I am changing this function to offload task to a generic function - the one
 //that handles sending to any replica
 INLINE_KEYWORD void CmiFreeSendFn(int destPE, int size, char *msg) {
-    CmiRemoteFreeSendFn(destPE, CmiMyPartition(), size, msg);
+    CmiInterFreeSendFn(destPE, CmiMyPartition(), size, msg);
 }
 //and the generic implementation - I may be in danger of making the frequent
 //case slower - two extra comparisons may happen
-void CmiRemoteFreeSendFn(int destPE, int partition, int size, char *msg) {
+void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
     CQdCreate(CpvAccess(cQdState), 1);
     if (CmiMyPe()==destPE && partition == CmiMyPartition()) {
@@ -590,7 +590,7 @@ void CmiRemoteFreeSendFn(int destPE, int partition, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = destRank;
-        CmiRemoteSendNetworkFunc(destPE, partition, size, msg, P2P_SYNC);
+        CmiInterSendNetworkFunc(destPE, partition, size, msg, P2P_SYNC);
 
 #if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) CpvAccess(curphs)++;
@@ -640,18 +640,18 @@ INLINE_KEYWORD void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeNodeSendFn(destNode, size, dupmsg);
 }
-//send to remote replica
-void CmiRemoteSyncNodeSendFn(int destNode, int partition, int size, char *msg) {
+//inter-replica send
+void CmiInterSyncNodeSendFn(int destNode, int partition, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
-    CmiRemoteFreeNodeSendFn(destNode, partition, size, dupmsg);
+    CmiInterFreeNodeSendFn(destNode, partition, size, dupmsg);
 }
 
 //again, offloading the task to a generic function
 INLINE_KEYWORD void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
-  CmiRemoteFreeNodeSendFn(destNode, CmiMyPartition(), size, msg);
+  CmiInterFreeNodeSendFn(destNode, CmiMyPartition(), size, msg);
 }
-//and the remote replica function
-void CmiRemoteFreeNodeSendFn(int destNode, int partition, int size, char *msg) {
+//and the inter-replica function
+void CmiInterFreeNodeSendFn(int destNode, int partition, int size, char *msg) {
     CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
     CQdCreate(CpvAccess(cQdState), 1);
     CMI_SET_BROADCAST_ROOT(msg, 0);
@@ -666,7 +666,7 @@ if (  MSG_STATISTIC)
     msg_histogram[ret_log]++;
 }
 #endif
-        CmiRemoteSendNetworkFunc(CmiNodeFirst(destNode), partition, size, msg, P2P_SYNC);
+        CmiInterSendNetworkFunc(CmiNodeFirst(destNode), partition, size, msg, P2P_SYNC);
     }
 #if CMK_PERSISTENT_COMM
     if (CpvAccess(phs)) CpvAccess(curphs)++;
@@ -703,8 +703,8 @@ void CmiCreatePartitions(char **argv) {
   _Cmi_numnodes_global = _Cmi_numnodes;
   _Cmi_mynode_global = _Cmi_mynode;
   _Cmi_numpes_global = _Cmi_numnodes_global * _Cmi_mynodesize;
+  
   //still need to set _Cmi_mype_global
-
   CmiAssert(partitionInfo.numPartitions <= _Cmi_numnodes_global);
   CmiAssert((_Cmi_numnodes_global % partitionInfo.numPartitions) == 0);
   
@@ -741,6 +741,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #if CMK_WITH_STATS
     MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
 #endif
+
     /* processor per node */
     _Cmi_mynodesize = 1;
     if (!CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize))
@@ -779,25 +780,24 @@ if (  MSG_STATISTIC)
     }
 #endif
 
-
-	if (_Cmi_mynode==0) {
+    if (_Cmi_mynode==0) {
 #if !CMK_SMP 
-		printf("Charm++> Running on non-SMP mode\n");
+      printf("Charm++> Running on non-SMP mode\n");
 #else
-		printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
-		if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
-			printf("Charm++> The comm. thread both sends and receives messages\n");
-		} else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
-			printf("Charm++> The comm. thread only receives messages, while work threads send messages\n");
-		} else if (Cmi_smp_mode_setting == COMM_WORK_THREADS_SEND_RECV) {
-			printf("Charm++> Both  comm. thread and worker thread send and messages\n");
-		} else if (Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST) {
-			printf("Charm++> There's no comm. thread. Work threads both send and receive messages\n");
-		} else {
-			CmiAbort("Charm++> Invalid SMP mode setting\n");
-		}
+      printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
+      if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
+        printf("Charm++> The comm. thread both sends and receives messages\n");
+      } else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
+        printf("Charm++> The comm. thread only receives messages, while work threads send messages\n");
+      } else if (Cmi_smp_mode_setting == COMM_WORK_THREADS_SEND_RECV) {
+        printf("Charm++> Both  comm. thread and worker thread send and messages\n");
+      } else if (Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST) {
+        printf("Charm++> There's no comm. thread. Work threads both send and receive messages\n");
+      } else {
+        CmiAbort("Charm++> Invalid SMP mode setting\n");
+      }
 #endif
-	}
+    }
 
     CmiCreatePartitions(argv);
 
@@ -807,6 +807,27 @@ if (  MSG_STATISTIC)
     Cmi_argv = argv;
     Cmi_startfn = fn;
     Cmi_usrsched = usched;
+
+    //handle output to files for replica if requested
+    char *stdoutbase;
+    if ( CmiGetArgStringDesc(argv,"+stdout",&stdoutbase,"base filename to redirect replica stdout to") ) {
+      char *stdoutpath;
+      stdoutpath = malloc(strlen(stdoutbase) + 30);
+      sprintf(stdoutpath, stdoutbase, CmiMyPartition(), CmiMyPartition(), CmiMyPartition());
+      if ( ! strcmp(stdoutpath, stdoutbase) ) {
+        sprintf(stdoutpath, "%s.%d", stdoutbase, CmiMyPartition());
+      }
+      if ( CmiMyNodeGlobal() == 0 ) {
+        printf("Redirecting stdout to files %s through %d\n",stdoutpath,CmiNumPartitions()-1);
+      }
+      if ( ! freopen(stdoutpath, "a", stdout) ) {
+        fprintf(stderr,"Rank %d failed redirecting stdout to file %s: %s\n", CmiMyNodeGlobal(), stdoutpath,
+            strerror(errno));
+        CmiAbort("Error redirecting stdout to file.");
+      }
+      free(stdoutpath);
+    }
+
 
 #if CMK_USE_PXSHM
     CmiInitPxshm(argv);
