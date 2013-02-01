@@ -377,7 +377,7 @@ void   CmiDirect_manytomany_initialize_send ( void        * h,
 #else
   size_t dst_context = 0;
 #endif
-  PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)CmiNodeOf(pe), 
+  PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)CmiGetNodeGlobal(CmiNodeOf(pe),CmiMyPartition()), 
 			dst_context, &target);
   handle->m2m_node_eps   [idx]   = target;
 
@@ -519,8 +519,7 @@ void   CmiDirect_manytomany_start ( void       * h,
 		       &handle->swork[0]);
   }
   else {
-    int i;
-    for (i = 0; i < handle->n_work; ++i) {
+    for (int i = 0; i < handle->n_work; ++i) {
       PAMI_Context_post( handle->swork[i].context, 
 			&handle->swork[i].work, 
 			_cmidirect_m2m_send_post_handler,
