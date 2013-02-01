@@ -292,10 +292,14 @@ void LogPool::createFile(const char *fix)
   if (fileCreated) {
     return;
   }
+  
+  if(CmiNumPartitions() > 1) {
+    CmiMkdir(CkpvAccess(partitionRoot));
+  }
 
   char* filenameLastPart = strrchr(pgmname, PATHSEP) + 1; // Last occurrence of path separator
   char *pathPlusFilePrefix = new char[1024];
-
+ 
   if(nSubdirs > 0){
     int sd = CkMyPe() % nSubdirs;
     char *subdir = new char[1024];
@@ -370,6 +374,10 @@ void LogPool::createFile(const char *fix)
 void LogPool::createSts(const char *fix)
 {
   CkAssert(CkMyPe() == 0);
+  if(CmiNumPartitions() > 1) {
+    CmiMkdir(CkpvAccess(partitionRoot));
+  }
+
   // create the sts file
   char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(fix)+strlen(".sts")+2];
   sprintf(fname, "%s%s.sts", CkpvAccess(traceRoot), fix);

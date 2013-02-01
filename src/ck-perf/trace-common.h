@@ -73,6 +73,7 @@
 
 CkpvExtern(CmiInt8, CtrLogBufSize);
 CkpvExtern(char*, traceRoot);
+CkpvExtern(char*, partitionRoot);
 CkpvExtern(int, traceRootBaseLength);
 CkpvExtern(char*, selective);
 CkpvExtern(bool, verbose);
