@@ -127,7 +127,7 @@ void setMemoryOwnedBy(void *p, int id);
 
 extern int CmiMyRank_();
 
-#if CMK_USE_LRTS
+#if CMK_HAS_PARTITION
 
 //variables and functions for partition
 typedef struct {
