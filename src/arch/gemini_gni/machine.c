@@ -4081,7 +4081,9 @@ void LrtsExit()
 #endif
     PMI_Barrier();
     PMI_Finalize();
-    exit(0);
+    if(!CharmLibInterOperate) {
+      exit(0);
+    }
 }
 
 void LrtsDrainResources()

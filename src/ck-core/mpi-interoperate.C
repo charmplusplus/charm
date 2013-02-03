@@ -77,21 +77,23 @@ void _libExitHandler(envelope *env)
 	}
 }
 
-#if CMK_CONVERSE_MPI
+#if CMK_HAS_INTEROP
 extern "C"
+#if CMK_CONVERSE_MPI
 void CharmLibInit(MPI_Comm userComm, int argc, char **argv){
-	//note CmiNumNodes and CmiMyNode should just be macros
   charmComm = userComm;
   MPI_Comm_size(charmComm, &_Cmi_numnodes);
   MPI_Comm_rank(charmComm, &_Cmi_mynode);
-
-	CharmLibInterOperate = 1;
-	ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
+#else 
+void CharmLibInit(int userComm, int argc, char **argv){
+#endif
+  CharmLibInterOperate = 1;
+  ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
 }
 #else
 extern "C"
 void CharmLibInit(int userComm, int argc, char **argv){
-    CmiAbort("mpi-interoperate only supports MPI machine layer");
+    CmiAbort("mpi-interoperate not supported on this machine layer");
 }
 #endif
 
