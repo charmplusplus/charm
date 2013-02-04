@@ -1368,6 +1368,7 @@ void qd_callback(void *m)
 }
 
 static void changePhaseHandler(char *msg){
+#if CMK_MEM_CHECKPOINT
   CpvAccess(_curRestartPhase)--;
   if(CkMyNode()==CpvAccess(_crashedNode)){
     if(CmiMyRank()==0){
@@ -1376,6 +1377,7 @@ static void changePhaseHandler(char *msg){
       CkPrintf("crash_node:%d\n",CpvAccess( _crashedNode));
     }
   }
+#endif  
 }
 
 // on crashed node
