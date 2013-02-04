@@ -39,7 +39,7 @@ class BGPTorusManager {
     BGPTorusManager() {
       if(CmiNumPartitions() > 1) {
         rn_NX = dimX = CmiNumPes();
-        rn_NY = rn_NZ = rn_NT = 1;
+        rn_NY = rn_NZ = hw_NT = 1;
         dimY = dimZ = 1;
         procsPerNode = 1;
         torus[0] = torus[1] = torus[2] = torus[3] = 0;
