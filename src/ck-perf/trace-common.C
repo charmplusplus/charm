@@ -88,6 +88,8 @@ static void traceCommonInit(char **argv)
   char subdir[20];
   if(CmiNumPartitions() > 1) {
     sprintf(subdir, "prj.part%d%s", CmiMyPartition(), PATHSEPSTR);
+  } else {
+    subdir[0]='\0';
   }
 
   if (CmiGetArgStringDesc(argv, "+traceroot", &temproot, "Directory to write trace files to")) {
