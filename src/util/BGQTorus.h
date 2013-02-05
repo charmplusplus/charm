@@ -45,6 +45,27 @@ class BGQTorusManager {
 
   public:
     BGQTorusManager() {
+      order[0] = 5;
+      order[1] = 4;
+      order[2] = 3;
+      order[3] = 2;
+      order[4] = 1;
+      order[5] = 0;
+
+      if(CmiNumPartitions() > 1) {
+        dimA = rn_NA = CmiNumPes();
+        dimB = dimC = dimD = dimE = 1;
+        rn_NB = rn_NC = rn_ND = rn_NE = 1;
+        procsPerNode = thdsPerProc = hw_NT = 1;
+        torus[0] = torus[1] = torus[2] = torus[3] = torus[4] = 0;
+        dims[0] = rn_NA;
+        dims[1] = rn_NB;
+        dims[2] = rn_NC;
+        dims[3] = rn_ND;
+        dims[4] = rn_NE;
+        dims[5] = hw_NT; 
+        return;
+      }
 
       Kernel_GetPersonality(&pers, sizeof(pers)); 
 
@@ -57,13 +78,6 @@ class BGQTorusManager {
       procsPerNode = Kernel_ProcessCount();
       thdsPerProc = CmiMyNodeSize();
         
-      order[0] = 5;
-      order[1] = 4;
-      order[2] = 3;
-      order[3] = 2;
-      order[4] = 1;
-      order[5] = 0;
-
       mapping = getenv("RANK_ORDER");
       if(mapping != NULL) {
         sscanf(mapping,"%d %d %d %d %d %d",&order[5],&order[4],&order[3],&order[2],&order[1],&order[0]);

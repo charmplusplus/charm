@@ -127,6 +127,70 @@ void setMemoryOwnedBy(void *p, int id);
 
 extern int CmiMyRank_();
 
+#if CMK_HAS_PARTITION
+
+//variables and functions for partition
+typedef struct {
+  int numPartitions;
+  int partitionSize;
+  int myPartition;
+} PartitionInfo;
+
+void CmiCreatePartitions(char **argv);
+
+extern int _Cmi_mype_global;
+extern int _Cmi_numpes_global;
+extern int _Cmi_mynode_global;
+extern int _Cmi_numnodes_global;
+extern PartitionInfo partitionInfo;
+
+#define CmiMyPartition()         partitionInfo.myPartition
+#define CmiPartitionSize()       partitionInfo.partitionSize
+#define CmiNumPartitions()        partitionInfo.numPartitions
+#define CmiNumNodesGlobal()     _Cmi_numnodes_global
+#define CmiMyNodeGlobal()       _Cmi_mynode_global
+#define CmiNumPesGlobal()       _Cmi_numpes_global
+//we need different implementations of this based on SMP or non-smp
+#if !CMK_SMP
+#define CmiMyPeGlobal()         _Cmi_mype_global
+extern int _Cmi_mynodesize;
+#else
+extern int CmiMyPeGlobal();
+#endif
+
+//we need nodeSpan to find how many pes each node cover
+int CmiNodeSpan();
+
+//functions to translate between local and global
+int node_lToGTranslate(int node, int partition);
+int node_gToLTranslate(int node);
+int pe_lToGTranslate(int pe, int partition);
+int pe_gToLTranslate(int pe);
+
+#define CmiGetPeGlobal(pe,part)         pe_lToGTranslate(pe,part)
+#define CmiGetNodeGlobal(node,part)     node_lToGTranslate(node,part)
+#define CmiGetPeLocal(pe)               pe_gToLTranslate(pe)
+#define CmiGetNodeLocal(node)           node_gToLTranslate(node)
+//end of variables and functions for partition
+
+#else
+
+#define CmiMyPartition()         0
+#define CmiPartitionSize()       CmiNumNodes()
+#define CmiNumPartitions()       1
+#define CmiNumNodesGlobal()      CmiNumNodes()
+#define CmiMyNodeGlobal()        CmiMyNode()
+#define CmiNumPesGlobal()        CmiNumPes()
+#define CmiMyPeGlobal()          CmiMyPe()
+#if !CMK_SMP
+extern int _Cmi_mynodesize;
+#endif
+#define CmiGetPeGlobal(pe,part)         (pe)
+#define CmiGetNodeGlobal(node,part)     (node)
+#define CmiGetPeLocal(pe)               (pe)
+#define CmiGetNodeLocal(node)           (node)
+#endif
+
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 extern int _Cmi_mype;
 extern int _Cmi_numpes;
@@ -242,15 +306,16 @@ extern __thread int32_t _cmi_bgq_incommthread;
 #include "cmimemcpy.h"
 #elif CMK_BLUEGENEQ && CMK_BLUEGENEQ_OPTCOPY  
 void CmiMemcpy_qpx (void *dst, const void *src, size_t n);
-#define CmiMemcpy(_dst, _src, _n)                                   \
-  do {                                                              \
-    const void *src = (_src);                                       \
-    void *dst = (_dst);                                             \
-    size_t n = (_n);                                                \
-    if ( (n > 512+32) &&  ((((size_t)dst|(size_t)src) & 0x1F)==0) ) \
-      CmiMemcpy_qpx(dst, src, n);                                   \
-    else                                                            \
-      memcpy(dst,src,n);                                            \
+#define CmiMemcpy(_dst, _src, _n)                                        \
+  do {                                                                   \
+    const void *_cmimemcpy_src = (_src);                                 \
+    void *_cmimemcpy_dst = (_dst);                                       \
+    size_t _cmimemcpy_n = (_n);                                          \
+    if ( (_cmimemcpy_n > 512+32) &&                                      \
+         ((((size_t)_cmimemcpy_dst|(size_t)_cmimemcpy_src) & 0x1F)==0) ) \
+      CmiMemcpy_qpx(_cmimemcpy_dst, _cmimemcpy_src, _cmimemcpy_n);       \
+    else                                                                 \
+      memcpy(_cmimemcpy_dst, _cmimemcpy_src, _cmimemcpy_n);              \
   } while(0)
 #else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
@@ -1021,6 +1086,10 @@ void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
 void          CmiFreeMulticastFn(CmiGroup, int, char*);
 
+//inter partition send counterparts
+void          CmiInterSyncSendFn(int, int, int, char *);
+void          CmiInterFreeSendFn(int, int, int, char *);
+
 typedef void * (*CmiReduceMergeFn)(int*,void*,void**,int);
 typedef void (*CmiReducePupFn)(void*,void*);
 typedef void (*CmiReduceDeleteFn)(void*);
@@ -1108,6 +1177,13 @@ void          CmiReleaseCommHandle(CmiCommHandle);
 #define CmiAsyncMulticast(g,s,m)        (CmiAsyncMulticastFn((g),(s),(char*)(m)))
 #define CmiSyncMulticastAndFree(g,s,m)  (CmiFreeMulticastFn((g),(s),(char*)(m)))
 
+
+//adding functions for inter-partition communication - only the sync ones because
+//we do not use the async ones
+#define CmiInterSyncSend(pe,p,s,m)              (CmiInterSyncSendFn((pe),(p),(s),(char *)(m)))
+#define CmiInterSyncSendAndFree(pe,p,s,m)       (CmiInterFreeSendFn((pe),(p),(s),(char *)(m)))
+//support for rest may come later if required
+
 #if CMK_NODE_QUEUE_AVAILABLE
 void          CmiSyncNodeSendFn(int, int, char *);
 CmiCommHandle CmiAsyncNodeSendFn(int, int, char *);
@@ -1120,6 +1196,10 @@ void          CmiFreeNodeBroadcastFn(int, char *);
 void          CmiSyncNodeBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int, char *);
 void          CmiFreeNodeBroadcastAllFn(int, char *);
+
+//if node queue is available, adding inter partition counterparts
+void          CmiInterSyncNodeSendFn(int, int, int, char *);
+void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -1132,6 +1212,11 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 #define CmiSyncNodeBroadcastAll(s,m)        (CmiSyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
+
+//counterparts of inter partition
+#define CmiInterSyncNodeSend(pe,p,s,m)         (CmiInterSyncNodeSendFn((pe),(p),(s),(char *)(m)))
+#define CmiInterSyncNodeSendAndFree(pe,p,s,m)  (CmiInterFreeNodeSendFn((pe),(p),(s),(char *)(m)))
+
 #else
 
 #define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
@@ -1167,6 +1252,9 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
 #define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
 #endif
+//and the inter partition counterparts
+#define CmiInterSyncNodeSend(n,p,s,m)          CmiInterSyncSend(CmiNodeFirst(n),p,s,m)
+#define CmiInterSyncNodeSendAndFree(n,p,s,m)   CmiInterSyncSendAndFree(CmiNodeFirst(n),p,s,m)
 #endif
 
 /******** CMI MESSAGE RECEPTION ********/

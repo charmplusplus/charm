@@ -497,9 +497,8 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
 
     CmiState cs = CmiGetState();
     SMSG_LIST *msg_tmp;
-    int  rank;
 
-    CmiAssert(destNode != CmiMyNode());
+    CmiAssert(destNode != CmiMyNodeGlobal());
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
       EnqueueMsg(msg, size, destNode, mode);
@@ -1146,7 +1145,10 @@ void LrtsDrainResources() {
     }
 #endif
 #if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
-    if (CmiMyPe() == 0) mpi_end_spare();
+    if (CmiMyPe() == 0 && CmiMyPartition()==0)
+    { 
+      mpi_end_spare();
+    }
 #endif
     MACHSTATE(2, "Machine exit barrier begin {");
     START_EVENT();
@@ -1191,7 +1193,7 @@ void LrtsExit() {
               CmiMyPe(), pumptime, releasetime, sendtime);
 #endif
 #endif
-
+    
    if(!CharmLibInterOperate) {
 #if ! CMK_AUTOBUILD
       signal(SIGINT, signal_int);
@@ -1396,14 +1398,16 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
       MPI_Recv(vals,2,MPI_INT,MPI_ANY_SOURCE,FAIL_TAG, charmComm,&sts);
       int newpe = vals[0];
       CpvAccess(_curRestartPhase) = vals[1];
+      
+      CmiPrintf("Charm++> Spare MPI rank %d is activated for PE %d.\n", *myNodeID, newpe);
 
       if (newpe == -1) {
+          MPI_Barrier(charmComm);
           MPI_Barrier(charmComm);
           MPI_Finalize();
           exit(0);
       }
 
-      CmiPrintf("Charm++> Spare MPI rank %d is activated for PE %d.\n", *myNodeID, newpe);
         /* update petorank */
       MPI_Recv(petorank, num_workpes, MPI_INT,MPI_ANY_SOURCE,FAIL_TAG,charmComm, &sts);
       nextrank = *myNodeID + 1;
@@ -1920,7 +1924,7 @@ int CmiBarrierZero() {
 void mpi_restart_crashed(int pe, int rank)
 {
     int vals[2];
-    vals[0] = pe;
+    vals[0] = CmiGetPeGlobal(pe,CmiMyPartition());
     vals[1] = CpvAccess(_curRestartPhase)+1;
     MPI_Send((void *)vals,2,MPI_INT,rank,FAIL_TAG,charmComm);
     MPI_Send(petorank, num_workpes, MPI_INT,rank,FAIL_TAG,charmComm);
@@ -1936,11 +1940,12 @@ void mpi_end_spare()
     }
 }
 
-int find_spare_mpirank(int pe)
+int find_spare_mpirank(int _pe,int partition)
 {
     if (nextrank == total_pes) {
       CmiAbort("Charm++> No spare processor available.");
     }
+    int pe = CmiGetPeGlobal(_pe,partition);
     crashedRankList * crashedRank= (crashedRankList *)(malloc(sizeof(crashedRankList)));
     crashedRank->rank = petorank[pe];
     crashedRank->next=NULL;
@@ -1980,6 +1985,7 @@ void CkDieNow()
         PumpMsgs();
         CmiReleaseSentMessages();
     }
+    MPI_Barrier(charmComm);
     MPI_Barrier(charmComm);
     MPI_Finalize();
     exit(0);

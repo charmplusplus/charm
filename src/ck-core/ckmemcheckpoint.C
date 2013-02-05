@@ -57,6 +57,9 @@ void noopck(const char*, ...)
 // pick buddy processor from a different physical node
 #define NODE_CHECKPOINT                        0
 
+static int replicaDieHandlerIdx;
+static int replicaDieBcastHandlerIdx;
+static int changePhaseHandlerIdx;
 // assume NO extra processors--1
 // assume extra processors--0
 #if CMK_CONVERSE_MPI
@@ -258,7 +261,11 @@ public:
   {
 #if CMK_USE_MKSTEMP
     fname = new char[64];
+#if CMK_CONVERSE_MPI
+    sprintf(fname, "/tmp/ckpt%d-%d-%d-XXXXXX",CmiMyPartition(), CkMyPe(), myidx);
+#else
     sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), myidx);
+#endif
     mkstemp(fname);
 #else
     fname=tmpnam(NULL);
@@ -337,7 +344,7 @@ CkMemCheckPT::CkMemCheckPT(int w)
   void pingBuddy();
   void pingCheckHandler();
   CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-  CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+  CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
 	chkpTable[0] = NULL;
 	chkpTable[1] = NULL;
@@ -365,11 +372,12 @@ void CkMemCheckPT::pup(PUP::er& p)
   	recvCount = peCount = 0;
  	ackCount = 0;
   	expectCount = -1;
+        inCheckpointing = 0;
 #if CMK_CONVERSE_MPI
     void pingBuddy();
     void pingCheckHandler();
     CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
   }
 }
@@ -1136,7 +1144,7 @@ void CkMemCheckPT::finishUp()
 #if CMK_CONVERSE_MPI	
   if (CmiMyPe() == BuddyPE(thisFailedPe)) {
     lastPingTime = CmiWallTimer();
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
   }
 #endif
 
@@ -1260,21 +1268,10 @@ static void restartBcastHandler(char *msg)
   // advance phase counter
   CkMemCheckPT::inRestarting = 1;
   _diePE = *(int *)(msg+CmiMsgHeaderSizeBytes);
-  // gzheng
-  //if (CkMyPe() != _diePE) cur_restart_phase ++;
 
   if (CkMyPe()==_diePE)
     CkPrintf("[%d] restartBcastHandler cur_restart_phase=%d _diePE:%d at %f.\n", CkMyPe(), CpvAccess(_curRestartPhase), _diePE, CkWallTimer());
 
-  // reset QD counters
-/*  gzheng
-  if (CkMyPe() != _diePE) CpvAccess(_qd)->flushStates();
-*/
-
-/*  gzheng
-  if (CkMyPe()==_diePE)
-      CkRestartCheckPointCallback(NULL, NULL);
-*/
   CmiFree(msg);
 
   _resume_charm_message();
@@ -1305,13 +1302,6 @@ static void recoverProcDataHandler(char *msg)
    CkProcCheckPTMessage* procMsg = (CkProcCheckPTMessage *)(EnvToUsr(env));
    CpvAccess(_curRestartPhase) = procMsg->cur_restart_phase;
    CmiPrintf("[%d] ----- recoverProcDataHandler  cur_restart_phase:%d at time: %f\n", CkMyPe(), CpvAccess(_curRestartPhase), CkWallTimer());
-   //cur_restart_phase ++;
-     // gzheng ?
-   //CpvAccess(_qd)->flushStates();
-
-   // restore readonly, mainchare, group, nodegroup
-//   int temp = cur_restart_phase;
-//   cur_restart_phase = -1;
    PUP::fromMem p(procMsg->packData);
    _handleProcData(p);
 
@@ -1375,7 +1365,19 @@ void qd_callback(void *m)
    CmiSetHandler(msg, askProcDataHandlerIdx);
    int pe = ChkptOnPe(CpvAccess(_crashedNode));
    CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+}
 
+static void changePhaseHandler(char *msg){
+#if CMK_MEM_CHECKPOINT
+  CpvAccess(_curRestartPhase)--;
+  if(CkMyNode()==CpvAccess(_crashedNode)){
+    if(CmiMyRank()==0){
+      CkCallback cb(qd_callback);//safe to send now?
+      CkStartQD(cb);
+      CkPrintf("crash_node:%d\n",CpvAccess( _crashedNode));
+    }
+  }
+#endif  
 }
 
 // on crashed node
@@ -1393,17 +1395,17 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
     restartT = CmiWallTimer();
    CmiPrintf("[%d] I am restarting  cur_restart_phase:%d discard charm message at time: %f\n",CmiMyPe(), CpvAccess(_curRestartPhase), restartT);
   
-  /*if(CmiMyRank()==0){
-    CkCallback cb(qd_callback);
-    CkStartQD(cb);
-    CkPrintf("crash_node:%d\n",CpvAccess( _crashedNode));
-  }*/
-   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
+  //now safe to change the phase handler,braodcast every
+   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+   CmiSetHandler(msg, changePhaseHandlerIdx);
+   CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes, (char *)msg);
+
+/*   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
    *(int *)(msg+CmiMsgHeaderSizeBytes) = CpvAccess(_crashedNode);
    // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.c
    CmiSetHandler(msg, askProcDataHandlerIdx);
    int pe = ChkptOnPe(CpvAccess(_crashedNode));
-   CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+   CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);*/
 #else
    CmiAbort("Fault tolerance is not support, rebuild charm++ with 'syncft' option");
 #endif
@@ -1530,10 +1532,26 @@ extern "C" void (*notify_crash_fn)(int node);
 //static double lastPingTime = -1;
 
 extern "C" void mpi_restart_crashed(int pe, int rank);
-extern "C" int  find_spare_mpirank(int pe);
+extern "C" int  find_spare_mpirank(int pe,int partition);
 
 //void pingBuddy();
 //void pingCheckHandler();
+static void replicaDieHandler(char * msg){
+#if CMK_HAS_PARTITION
+  //broadcast to every one in my partition
+  CmiSetHandler(msg, replicaDieBcastHandlerIdx);
+  CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+#endif
+}
+
+static void replicaDieBcastHandler(char *msg){
+#if CMK_HAS_PARTITION
+  int diePe = *(int *)(msg+CmiMsgHeaderSizeBytes);
+  int partition = *(int *)(msg+CmiMsgHeaderSizeBytes+sizeof(int));
+  find_spare_mpirank(diePe,partition);
+  CmiFree(msg);
+#endif
+}
 
 void buddyDieHandler(char *msg)
 {
@@ -1543,7 +1561,8 @@ void buddyDieHandler(char *msg)
    notify_crash(diepe);
    // send message to crash pe to let it restart
    CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
-   int newrank = find_spare_mpirank(diepe);
+   int newrank;
+   newrank = find_spare_mpirank(diepe,CmiMyPartition());
    int buddy = obj->BuddyPE(CmiMyPe());
    if (buddy == diepe)  {
      mpi_restart_crashed(diepe, newrank);
@@ -1562,7 +1581,7 @@ void pingCheckHandler()
 {
 #if CMK_MEM_CHECKPOINT
   double now = CmiWallTimer();
-  if (lastPingTime > 0 && now - lastPingTime > 4 && !CkInLdb() && !CkInRestarting() && !CkInCheckpointing()) {
+  if (lastPingTime > 0 && now - lastPingTime > 2 && !CkInLdb() && !CkInRestarting() && !CkInCheckpointing()) {
     int i, pe, buddy;
     // tell everyone the buddy dies
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
@@ -1583,9 +1602,21 @@ void pingCheckHandler()
     *(int *)(msg+CmiMsgHeaderSizeBytes) = buddy;
     CmiSetHandler(msg, buddyDieHandlerIdx);
     CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+#if CMK_HAS_PARTITION
+    //notify processors in the other partition
+    for(int i=0;i<CmiNumPartitions();i++){
+      if(i!=CmiMyPartition()){
+        char * rMsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int)*2);
+        *(int *)(rMsg+CmiMsgHeaderSizeBytes) = buddy;
+        *(int *)(rMsg+CmiMsgHeaderSizeBytes+sizeof(int)) = CmiMyPartition();
+        CmiSetHandler(rMsg, replicaDieHandlerIdx);
+        CmiInterSyncSendAndFree(CkMyPe(),i,CmiMsgHeaderSizeBytes+sizeof(int),(char *)rMsg);
+      }
+    }
+#endif
   }
   else 
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
 }
 
@@ -1622,6 +1653,9 @@ void CkRegisterRestartHandler( )
   pingCheckHandlerIdx = CkRegisterHandler((CmiHandler)pingCheckHandler);
   buddyDieHandlerIdx = CkRegisterHandler((CmiHandler)buddyDieHandler);
 #endif
+  replicaDieHandlerIdx = CkRegisterHandler((CmiHandler)replicaDieHandler);
+  replicaDieBcastHandlerIdx = CkRegisterHandler((CmiHandler)replicaDieBcastHandler);
+  changePhaseHandlerIdx = CkRegisterHandler((CmiHandler)changePhaseHandler);
 
   CpvInitialize(CkProcCheckPTMessage *, procChkptBuf);
   CpvAccess(procChkptBuf) = NULL;

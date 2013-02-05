@@ -138,9 +138,16 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg);
 #define DGRAM_NODEMESSAGE   (0x1FFB)
 #endif
 
-/* Node state structure */
-int               _Cmi_mynode;    /* Which address space am I */
+// global state, equals local if running one partition
+PartitionInfo partitionInfo;
+int _Cmi_mype_global;
+int _Cmi_numpes_global;
+int _Cmi_mynode_global;
+int _Cmi_numnodes_global;
+
+// Node state structure, local information for the partition
 int               _Cmi_mynodesize;/* Number of processors in my address space */
+int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
 
@@ -332,11 +339,22 @@ static void CmiStartThreads(char **argv) {
     CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
     _Cmi_mype = Cmi_nodestart;
     _Cmi_myrank = 0;
+    _Cmi_mype_global = _Cmi_mynode_global;
+}
+
+INLINE_KEYWORD int CmiNodeSpan() {
+  return 1;
 }
 #else
 /************** SMP *******************/
 INLINE_KEYWORD int CmiMyPe() {
     return CmiGetState()->pe;
+}
+INLINE_KEYWORD int CmiNodeSpan() {
+  return (CmiMyNodeSize() + 1);
+}
+INLINE_KEYWORD int CmiMyPeGlobal() {
+    return CmiGetPeGlobal(CmiGetState()->pe,CmiMyPartition());
 }
 INLINE_KEYWORD int CmiMyRank() {
     return CmiGetState()->rank;
@@ -473,6 +491,11 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeSendFn(destPE, size, dupmsg);
 }
+//inter-partition send
+void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
+    char *dupmsg = CopyMsg(msg, size);
+    CmiInterFreeSendFn(destPE, partition, size, dupmsg);
+}
 
 #if CMK_USE_PXSHM
 #include "machine-pxshm.c"
@@ -487,24 +510,29 @@ static int refcount = 0;
 CpvExtern(int, _urgentSend);
 #endif
 
-/* a wrapper of LrtsSendFunc */
-#if CMK_C_INLINE
-inline 
-#endif
-CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode)
+//declaration so that it can be used
+CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode);
+//I am changing this function to offload task to a generic function - the one
+//that handles sending to any partition
+INLINE_KEYWORD CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode) {
+  return CmiInterSendNetworkFunc(destPE, CmiMyPartition(), size, msg, mode);
+}
+//the generic function that replaces the older one
+CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode)
 {
         int rank;
-        int destNode = CmiNodeOf(destPE); 
-#if CMK_USE_PXSHM
-        if (CmiValidPxshm(destNode, size)) {
-          CmiSendMessagePxshm(msg, size, destNode, &refcount);
+        int destLocalNode = CmiNodeOf(destPE); 
+        int destNode = CmiGetNodeGlobal(destLocalNode,partition); 
+#if CMK_USE_PXSHM      
+        if ((partition == CmiMyPartition()) && CmiValidPxshm(destLocalNode, size)) {
+          CmiSendMessagePxshm(msg, size, destLocalNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
         }
 #endif
-#if CMK_USE_XPMEM
-        if (CmiValidXpmem(destNode, size)) {
-          CmiSendMessageXpmem(msg, size, destNode, &refcount);
+#if CMK_USE_XPMEM     
+        if ((partition == CmiMyPartition()) && CmiValidXpmem(destLocalNode, size)) {
+          CmiSendMessageXpmem(msg, size, destLocalNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
         }
@@ -513,6 +541,8 @@ CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode)
         if (CpvAccess(phs)) {
           if (size > PERSIST_MIN_SIZE) {
             CmiAssert(CpvAccess(curphs) < CpvAccess(phsSize));
+            PersistentSendsTable *slot = (PersistentSendsTable *)CpvAccess(phs)[CpvAccess(curphs)];
+            CmiAssert(CmiNodeOf(slot->destPE) == destLocalNode);
             LrtsSendPersistentMsg(CpvAccess(phs)[CpvAccess(curphs)], destNode, size, msg);
             return 0;
           }
@@ -530,13 +560,20 @@ if (MSG_STATISTIC)
 #if CMK_USE_OOB
     if (CpvAccess(_urgentSend)) mode |= OUT_OF_BAND;
 #endif
-    return LrtsSendFunc(CmiNodeOf(destPE), destPE, size, msg, mode);
+    return LrtsSendFunc(destNode, destPE, size, msg, mode);
 }
 
-void CmiFreeSendFn(int destPE, int size, char *msg) {
+//I am changing this function to offload task to a generic function - the one
+//that handles sending to any partition
+INLINE_KEYWORD void CmiFreeSendFn(int destPE, int size, char *msg) {
+    CmiInterFreeSendFn(destPE, CmiMyPartition(), size, msg);
+}
+//and the generic implementation - I may be in danger of making the frequent
+//case slower - two extra comparisons may happen
+void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
     CQdCreate(CpvAccess(cQdState), 1);
-    if (CmiMyPe()==destPE) {
+    if (CmiMyPe()==destPE && partition == CmiMyPartition()) {
         CmiSendSelf(msg);
 #if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) CpvAccess(curphs)++;
@@ -546,7 +583,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         int destNode = CmiNodeOf(destPE);
         int destRank = CmiRankOf(destPE);
 #if CMK_SMP
-        if (CmiMyNode()==destNode) {
+        if (CmiMyNode()==destNode && partition == CmiMyPartition()) {
             CmiPushPE(destRank, msg);
 #if CMK_PERSISTENT_COMM
             if (CpvAccess(phs)) CpvAccess(curphs)++;
@@ -555,7 +592,8 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = destRank;
-        CmiSendNetworkFunc(destPE, size, msg, P2P_SYNC);
+        CmiInterSendNetworkFunc(destPE, partition, size, msg, P2P_SYNC);
+
 #if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) CpvAccess(curphs)++;
 #endif
@@ -564,6 +602,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
 #endif
 
 #if USE_COMMON_ASYNC_P2P
+//not implementing it for partition
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg) {
     int destNode = CmiNodeOf(destPE);
     if (destNode == CmiMyNode()) {
@@ -597,17 +636,28 @@ static void CmiSendNodeSelf(char *msg) {
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
 }
 
-#if USE_COMMON_ASYNC_P2P
-void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
+//I think this #if is incorrect - should be SYNC_P2P
+#if USE_COMMON_SYNC_P2P
+INLINE_KEYWORD void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeNodeSendFn(destNode, size, dupmsg);
 }
+//inter-partition send
+void CmiInterSyncNodeSendFn(int destNode, int partition, int size, char *msg) {
+    char *dupmsg = CopyMsg(msg, size);
+    CmiInterFreeNodeSendFn(destNode, partition, size, dupmsg);
+}
 
-void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
+//again, offloading the task to a generic function
+INLINE_KEYWORD void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
+  CmiInterFreeNodeSendFn(destNode, CmiMyPartition(), size, msg);
+}
+//and the inter-partition function
+void CmiInterFreeNodeSendFn(int destNode, int partition, int size, char *msg) {
     CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
     CQdCreate(CpvAccess(cQdState), 1);
     CMI_SET_BROADCAST_ROOT(msg, 0);
-    if (destNode == CmiMyNode()) {
+    if (destNode == CmiMyNode() && CmiMyPartition() == partition) {
         CmiSendNodeSelf(msg);
     } else {
 #if CMK_WITH_STATS
@@ -618,7 +668,7 @@ if (  MSG_STATISTIC)
     msg_histogram[ret_log]++;
 }
 #endif
-        CmiSendNetworkFunc(CmiNodeFirst(destNode), size, msg, P2P_SYNC);
+        CmiInterSendNetworkFunc(CmiNodeFirst(destNode), partition, size, msg, P2P_SYNC);
     }
 #if CMK_PERSISTENT_COMM
     if (CpvAccess(phs)) CpvAccess(curphs)++;
@@ -627,6 +677,7 @@ if (  MSG_STATISTIC)
 #endif
 
 #if USE_COMMON_ASYNC_P2P
+//not implementing it for partition
 CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg) {
     if (destNode == CmiMyNode()) {
         CmiSyncNodeSendFn(destNode, size, msg);
@@ -646,13 +697,57 @@ if (  MSG_STATISTIC)
 #endif
 #endif
 
+// functions related to partition
+void CmiCreatePartitions(char **argv) {
+  partitionInfo.numPartitions = 1; 
+  if(!CmiGetArgInt(argv,"+partitions", &partitionInfo.numPartitions)) {
+    CmiGetArgInt(argv,"+replicas", &partitionInfo.numPartitions);
+  }
+
+  _Cmi_numnodes_global = _Cmi_numnodes;
+  _Cmi_mynode_global = _Cmi_mynode;
+  _Cmi_numpes_global = _Cmi_numnodes_global * _Cmi_mynodesize;
+  
+  //still need to set _Cmi_mype_global
+  CmiAssert(partitionInfo.numPartitions <= _Cmi_numnodes_global);
+  CmiAssert((_Cmi_numnodes_global % partitionInfo.numPartitions) == 0);
+  
+  //simple partition, this will be made more complex in future
+  partitionInfo.partitionSize = _Cmi_numnodes_global / partitionInfo.numPartitions;
+  partitionInfo.myPartition = _Cmi_mynode_global / partitionInfo.partitionSize;
+
+  //reset local variables
+  _Cmi_mynode = CmiGetNodeLocal(_Cmi_mynode);
+  _Cmi_numnodes = CmiPartitionSize();
+  //mype and numpes will be set following this
+}
+
+INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
+  return (partition*partitionInfo.partitionSize)+node;
+}
+
+INLINE_KEYWORD int node_gToLTranslate(int node) {
+  return (node % partitionInfo.partitionSize);
+}
+
+INLINE_KEYWORD int pe_lToGTranslate(int pe, int partition) {
+  return (pe + partition*CmiNumNodes()*CmiNodeSpan());
+}
+int pe_gToLTranslate(int pe) {
+  return (pe % (CmiNumNodes()*CmiNodeSpan()));
+}
+//end of functions related to partition
+
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
     int tmp;
+    //handle output to files for partition if requested
+    char *stdoutbase,*stdoutpath;
 #if CMK_WITH_STATS
     MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
 #endif
+
     /* processor per node */
     _Cmi_mynodesize = 1;
     if (!CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize))
@@ -691,25 +786,26 @@ if (  MSG_STATISTIC)
     }
 #endif
 
-
-	if (_Cmi_mynode==0) {
+    if (_Cmi_mynode==0) {
 #if !CMK_SMP 
-		printf("Charm++> Running on non-SMP mode\n");
+      printf("Charm++> Running on non-SMP mode\n");
 #else
-		printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
-		if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
-			printf("Charm++> The comm. thread both sends and receives messages\n");
-		} else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
-			printf("Charm++> The comm. thread only receives messages, while work threads send messages\n");
-		} else if (Cmi_smp_mode_setting == COMM_WORK_THREADS_SEND_RECV) {
-			printf("Charm++> Both  comm. thread and worker thread send and messages\n");
-		} else if (Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST) {
-			printf("Charm++> There's no comm. thread. Work threads both send and receive messages\n");
-		} else {
-			CmiAbort("Charm++> Invalid SMP mode setting\n");
-		}
+      printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
+      if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
+        printf("Charm++> The comm. thread both sends and receives messages\n");
+      } else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
+        printf("Charm++> The comm. thread only receives messages, while work threads send messages\n");
+      } else if (Cmi_smp_mode_setting == COMM_WORK_THREADS_SEND_RECV) {
+        printf("Charm++> Both  comm. thread and worker thread send and messages\n");
+      } else if (Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST) {
+        printf("Charm++> There's no comm. thread. Work threads both send and receive messages\n");
+      } else {
+        CmiAbort("Charm++> Invalid SMP mode setting\n");
+      }
 #endif
-	}
+    }
+
+    CmiCreatePartitions(argv);
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
@@ -717,6 +813,24 @@ if (  MSG_STATISTIC)
     Cmi_argv = argv;
     Cmi_startfn = fn;
     Cmi_usrsched = usched;
+
+    if ( CmiGetArgStringDesc(argv,"+stdout",&stdoutbase,"base filename to redirect partition stdout to") ) {
+      stdoutpath = malloc(strlen(stdoutbase) + 30);
+      sprintf(stdoutpath, stdoutbase, CmiMyPartition(), CmiMyPartition(), CmiMyPartition());
+      if ( ! strcmp(stdoutpath, stdoutbase) ) {
+        sprintf(stdoutpath, "%s.%d", stdoutbase, CmiMyPartition());
+      }
+      if ( CmiMyNodeGlobal() == 0 ) {
+        printf("Redirecting stdout to files %s through %d\n",stdoutpath,CmiNumPartitions()-1);
+      }
+      if ( ! freopen(stdoutpath, "a", stdout) ) {
+        fprintf(stderr,"Rank %d failed redirecting stdout to file %s: %s\n", CmiMyNodeGlobal(), stdoutpath,
+            strerror(errno));
+        CmiAbort("Error redirecting stdout to file.");
+      }
+      free(stdoutpath);
+    }
+
 
 #if CMK_USE_PXSHM
     CmiInitPxshm(argv);
@@ -927,7 +1041,8 @@ if (MSG_STATISTIC)
 #endif
 
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
-    if (CmiMyPe() == 0) CmiPrintf("End of program\n");
+    if (CmiMyPe() == 0) 
+      CmiPrintf("End of program\n");
 #endif
 
 #if !CMK_SMP || CMK_SMP_NO_COMMTHD
@@ -1030,7 +1145,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s) {
 #define SPINS_BEFORE_SLEEP 20
 static void CmiNotifyStillIdle(CmiIdleState *s) {
     MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
-#if !CMK_SMK || CMK_SMP_NO_COMMTHD
+#if !CMK_SMP || CMK_SMP_NO_COMMTHD
     AdvanceCommunication(1);
 #else
     LrtsPostNonLocal();
@@ -1070,6 +1185,4 @@ static char *CopyMsg(char *msg, int len) {
     memcpy(copy, msg, len);
     return copy;
 }
-
-
 

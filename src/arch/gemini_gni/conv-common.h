@@ -1,4 +1,8 @@
 
+#define CMK_USE_LRTS                                      1
+
+#define CMK_HAS_PARTITION                                  1
+
 #define CMK_CONVERSE_GEMINI_UGNI                           1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
@@ -6,6 +10,8 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
 #define CMI_MPI_TRACE_USEREVENTS                           0
+
+#define  CMK_DIRECT                                             0
 
 //#define  DELTA_COMPRESS                                     1
 

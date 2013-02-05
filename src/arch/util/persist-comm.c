@@ -613,7 +613,7 @@ static void persistentReqGrantedHandler(void *env)
   //CmiPrintf("+++[%d] req grant %p\n", CmiMyPe(), slot->destDataHandle);
 #endif
   if (slot->messageBuf) {
-    LrtsSendPersistentMsg(h, CmiNodeOf(slot->destPE), slot->messageSize, slot->messageBuf);
+    LrtsSendPersistentMsg(h, CmiGetNodeGlobal(CmiNodeOf(slot->destPE),CmiMyPartition()), slot->messageSize, slot->messageBuf);
     slot->messageBuf = NULL;
   }
   CmiFree(msg);

@@ -10,12 +10,12 @@
 
 #define     CMI_DIRECT_DEBUG    0
 #include "cmidirect.h"
-
 CmiDirectMemoryHandler CmiDirect_registerMemory(void *buff, int size)
 {
     CmiDirectMemoryHandler mem_hndl; 
     gni_return_t        status;
-    MEMORY_REGISTER(onesided_hnd, nic_hndl, buff, size, &mem_hndl, &omdh, status);
+    status = registerMessage(buff, size, 0, &mem_hndl); 
+    //MEMORY_REGISTER(onesided_hnd, nic_hndl, buff, size, &mem_hndl, &omdh, status);
     GNI_RC_CHECK("cmidirect register memory fails\n", status);
     return mem_hndl;
 }
@@ -59,10 +59,10 @@ CmiDirectUserHandle CmiDirect_createHandle(int localNode,void *recvBuf, int recv
     userHandle.initialValue=initialValue;
     userHandle.callbackFnPtr=callbackFnPtr;
     userHandle.callbackData=callbackData;
-
     if(recvBufSize <= SMSG_MAX_MSG)
     {
-        MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle.remoteBuf, recvBufSize, &(userHandle.remoteMdh), &omdh, status);
+        status = registerMessage(userHandle.remoteBuf, recvBufSize, 0, &userHandle.remoteMdh); 
+        //MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle.remoteBuf, recvBufSize, &(userHandle.remoteMdh), &omdh, status);
     }
     else if(IsMemHndlZero((GetMemHndl(userHandle.remoteBuf)))){
         //status = registerMempool(userHandle.remoteBuf);
@@ -74,6 +74,9 @@ CmiDirectUserHandle CmiDirect_createHandle(int localNode,void *recvBuf, int recv
         userHandle.remoteMdh.qword2 = 0;
     }
 
+#if REMOTE_EVENT
+    userHandle.ack_index =  IndexPool_getslot(&ackPool, userHandle.remoteBuf, 1);
+#endif
 #if CMI_DIRECT_DEBUG
     //printHandle(&userHandle, "Create Handler");
 #endif
@@ -111,7 +114,8 @@ void CmiDirect_assocLocalBuffer(CmiDirectUserHandle *userHandle,void *sendBuf,in
 
     if(userHandle->transSize <= SMSG_MAX_MSG)
     {
-        MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle->localBuf, userHandle->transSize, &userHandle->localMdh, &omdh, status);
+        status = registerMessage(userHandle->localBuf, userHandle->transSize, 0, &(userHandle->localMdh)); 
+        //MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle->localBuf, userHandle->transSize, &userHandle->localMdh, &omdh, status);
     }
     else if(IsMemHndlZero((GetMemHndl(userHandle->localBuf)))){
         //status = registerMempool(userHandle->localBuf);
@@ -159,8 +163,12 @@ void CmiDirect_put(CmiDirectUserHandle *userHandle) {
         pd->rdma_mode       = 0;
         pd->first_operand   = (uint64_t)(userHandle->remoteHandler);
         pd->amo_cmd         = 1;
-        pd->cqwrite_value   = 1;        
-        bufferRdmaMsg(userHandle->remoteNode, pd); 
+        pd->cqwrite_value   = DIRECT_SEQ;
+#if REMOTE_EVENT
+        bufferRdmaMsg(sendRdmaBuf, CmiGetNodeGlobal(userHandle->remoteNode,CmiMyPartition()), pd, userHandle->ack_index); 
+#else
+        bufferRdmaMsg(sendRdmaBuf, CmiGetNodeGlobal(userHandle->remoteNode,CmiMyPartition()), pd, -1); 
+#endif
 #if CMI_DIRECT_DEBUG
         printHandle(userHandle, "After Direct_put");
         CmiPrintf("[%d] RDMA put %d,%d bytes addr %p to remoteNode %d:%p \n\n",CmiMyPe(), userHandle->transSize, pd->length, (void*)(pd->local_addr), userHandle->remoteNode, (void*) (pd->remote_addr));
@@ -203,8 +211,12 @@ void CmiDirect_get(CmiDirectUserHandle *userHandle) {
         pd->first_operand   = (uint64_t) (userHandle->callbackFnPtr);
         pd->second_operand  = (uint64_t) (userHandle->callbackData);
         pd->amo_cmd         = 2;
-        pd->cqwrite_value   = 1;
-        bufferRdmaMsg(userHandle->remoteNode, pd); 
+        pd->cqwrite_value   = DIRECT_SEQ;
+#if REMOTE_EVENT
+        bufferRdmaMsg(sendRdmaBuf, CmiGetNodeGlobal(userHandle->remoteNode,CmiMyPartition()), pd, userHandle->ack_index); 
+#else
+        bufferRdmaMsg(sendRdmaBuf, CmiGetNodeGlobal(userHandle->remoteNode,CmiMyPartition()), pd, -1);
+#endif
 #if CMI_DIRECT_DEBUG
     CmiPrintf("[%d] RDMA get %d,%d bytes addr %p to remoteNode %d:%p \n\n",CmiMyPe(), userHandle->transSize, pd->length, (void*)(pd->local_addr), userHandle->remoteNode, (void*) (pd->remote_addr));
 #endif

@@ -197,7 +197,7 @@ void   CmiDirect_manytomany_initialize_send ( void        * h,
   
   handle->m2m_sndlens    [tag][idx]   = bytes;
   handle->m2m_sdispls    [tag][idx]   = displ;
-  handle->m2m_ranks      [tag][idx]   = rank;
+  handle->m2m_ranks      [tag][idx]   = CmiGetNodeGlobal(CmiNodeOf(rank),CmiMyPartition());
   handle->m2m_permutation[tag][idx]   = (idx+1)%handle->m2m_nsndranks[tag];
 }
 

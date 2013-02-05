@@ -3,6 +3,9 @@
 */
 /*@{*/
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "charm.h"
 #include "middle.h"
 #include "cklists.h"
@@ -36,6 +39,7 @@ CkpvDeclare(double, traceInitCpuTime);
 CpvDeclare(int, traceOn);
 CkpvDeclare(int, traceOnPe);
 CkpvDeclare(char*, traceRoot);
+CkpvDeclare(char*, partitionRoot);
 CkpvDeclare(int, traceRootBaseLength);
 CkpvDeclare(char*, selective);
 CkpvDeclare(bool, verbose);
@@ -78,7 +82,16 @@ static void traceCommonInit(char **argv)
   char *temproot;
   char *temproot2;
   CkpvInitialize(char*, traceRoot);
+  CkpvInitialize(char*, partitionRoot);
   CkpvInitialize(int, traceRootBaseLength);
+
+  char subdir[20];
+  if(CmiNumPartitions() > 1) {
+    sprintf(subdir, "prj.part%d%s", CmiMyPartition(), PATHSEPSTR);
+  } else {
+    subdir[0]='\0';
+  }
+
   if (CmiGetArgStringDesc(argv, "+traceroot", &temproot, "Directory to write trace files to")) {
     int i;
     // Trying to decide if the traceroot path is absolute or not. If it is not
@@ -96,18 +109,28 @@ static void traceCommonInit(char **argv)
     for (i=strlen(argv[0])-1; i>=0; i--) if (argv[0][i] == PATHSEP) break;
     i++;
     CkpvAccess(traceRootBaseLength) = strlen(root)+1;
-    CkpvAccess(traceRoot) = (char *)malloc(strlen(argv[0]+i) + strlen(root) + 2);    _MEMCHECK(CkpvAccess(traceRoot));
+    CkpvAccess(traceRoot) = (char *)malloc(strlen(argv[0]+i) + strlen(root) + 2 +strlen(subdir));    _MEMCHECK(CkpvAccess(traceRoot));
+    CkpvAccess(partitionRoot) = (char *)malloc(strlen(argv[0]+i) + strlen(root) + 2 +strlen(subdir));    _MEMCHECK(CkpvAccess(partitionRoot));
     strcpy(CkpvAccess(traceRoot), root);
     strcat(CkpvAccess(traceRoot), PATHSEPSTR);
+    strcat(CkpvAccess(traceRoot), subdir);
+    strcpy(CkpvAccess(partitionRoot),CkpvAccess(traceRoot));
     strcat(CkpvAccess(traceRoot), argv[0]+i);
     if (CkMyPe() == 0) 
       CmiPrintf("Trace: traceroot: %s\n", CkpvAccess(traceRoot));
   }
   else {
-    CkpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1);
+    CkpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1 +strlen(subdir));
     _MEMCHECK(CkpvAccess(traceRoot));
-    strcpy(CkpvAccess(traceRoot), argv[0]);
+    CkpvAccess(partitionRoot) = (char *) malloc(strlen(argv[0])+1 +strlen(subdir));
+    _MEMCHECK(CkpvAccess(partitionRoot));
+    strcpy(CkpvAccess(traceRoot), subdir);
+    strcpy(CkpvAccess(partitionRoot),CkpvAccess(traceRoot));
+    strcat(CkpvAccess(traceRoot), argv[0]);
+    if (CkMyPe() == 0) 
+      CmiPrintf("Trace: traceroot: %s\n", CkpvAccess(traceRoot));
   }
+  CkpvAccess(traceRootBaseLength)  +=  strlen(subdir);
 	/* added for TAU trace module. */
 	char *cwd;
   CkpvInitialize(char*, selective);
