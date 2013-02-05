@@ -18,7 +18,7 @@
 
 #if !CMK_SMP
 #if CMK_ENABLE_ASYNC_PROGRESS
-#error "async progress non supported with non-smp
+#error "async progress non supported with non-smp"
 #endif
 #endif
 
@@ -65,7 +65,7 @@ extern unsigned char computeCheckSum(unsigned char *data, int len);
   }
 
 #define CMI_CHECK_CHECKSUM(msg, len)    \
-  int count; \				
+  int count; \
 if (checksum_flag)      \
      if (computeCheckSum((unsigned char*)msg, len) != 0)  { \
        printf("\n\n------------------------------\n\nReceiver %d size %d:", CmiMyPe(), len); \
