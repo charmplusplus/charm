@@ -6,7 +6,7 @@
 
 #if ! CMK_SMP            /* only test RDMA when non-SMP */
 
-#if defined(CMK_DIRECT) || defined(CMK_USE_IBVERBS)
+#if CMK_DIRECT || defined(CMK_USE_IBVERBS)
 #define USE_RDMA 1
 #endif
 
