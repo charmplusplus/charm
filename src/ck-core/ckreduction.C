@@ -820,18 +820,24 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
-      msgArr[nMsgs++]=m;
       msgs_nSources+=m->nSources();
-      r=m->reducer;
-      if (!m->callback.isInvalid())
-        msgs_callback=m->callback;
-      if (m->userFlag!=-1)
-        msgs_userFlag=m->userFlag;
-			
-	isMigratableContributor=m->isMigratableContributor();
 #if CMK_BIGSIM_CHARM
-	_TRACE_BG_ADD_BACKWARD_DEP(m->log);
+      _TRACE_BG_ADD_BACKWARD_DEP(m->log);
 #endif
+
+      // for "random" reducer type, only need to accept one message
+      if (nMsgs == 0 || m->reducer != CkReduction::random) {
+        msgArr[nMsgs++]=m;
+        r=m->reducer;
+        if (!m->callback.isInvalid())
+          msgs_callback=m->callback;
+        if (m->userFlag!=-1)
+          msgs_userFlag=m->userFlag;
+	isMigratableContributor=m->isMigratableContributor();
+      }
+      else {
+        delete m;
+      }
     }
     else
     { //This is just a placeholder message-- forget it
@@ -848,8 +854,16 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
     if(nMsgs == 1){
 	ret = msgArr[0];	
     }else{
-        CkReduction::reducerFn f=CkReduction::reducerTable[r];
-        ret=(*f)(nMsgs,msgArr);
+      if (msgArr[0]->reducer == CkReduction::random) {
+        // nMsgs > 1 indicates that reduction type is not random
+        // this means any data with reducer type random was submitted
+        // only so that counts would agree, and can be removed
+        delete msgArr[0];
+        msgArr[0] = msgArr[nMsgs - 1];
+        nMsgs--;
+      }
+      CkReduction::reducerFn f=CkReduction::reducerTable[r];
+      ret=(*f)(nMsgs,msgArr);
     }
     ret->reducer=r;
   }
@@ -986,25 +1000,34 @@ void CkReductionMgr :: endArrayReduction(){
 	int numMsgs = 0;
   	for (i=0;i<nMsgs;i++)
   	{
-    		CkReductionMsg *m=finalMsgs.deq();
-		if(m->redNo == completedRedNo +1){
-			msgs_gcount+=m->gcount;
-			if (m->sourceFlag!=0)
-    			{ //This is a real message from an element, not just a placeholder
-      				msgs_nSources+=m->nSources();
-      				r=m->reducer;
-      				if (!m->callback.isInvalid())
-        			msgs_callback=m->callback;
-				if(!m->secondaryCallback.isInvalid())
-					msgs_secondaryCallback = m->secondaryCallback;
-      				if (m->userFlag!=-1)
-        				msgs_userFlag=m->userFlag;
-				tempMsgs.push_back(m);
-    			}
-		}else{
-			finalMsgs.enq(m);
-		}
+          CkReductionMsg *m=finalMsgs.deq();
+          if(m->redNo == completedRedNo +1){
+            msgs_gcount+=m->gcount;
+            if (m->sourceFlag!=0)
+            { //This is a real message from an element, not just a placeholder
+              msgs_nSources+=m->nSources();
 
+              // for "random" reducer type, only need to accept one message
+              if (tempMsgs.length() == 0 || m->reducer != CkReduction::random) {
+                r=m->reducer;
+                if (!m->callback.isInvalid())
+                  msgs_callback=m->callback;
+                if(!m->secondaryCallback.isInvalid())
+                  msgs_secondaryCallback = m->secondaryCallback;
+                if (m->userFlag!=-1)
+                  msgs_userFlag=m->userFlag;
+                tempMsgs.push_back(m);
+              }
+              else {
+                delete m;
+              }
+            }
+            else {
+              delete m;
+            }
+          }else{
+            finalMsgs.enq(m);
+          }
 	}
 	numMsgs = tempMsgs.length();
 
@@ -1029,13 +1052,23 @@ void CkReductionMgr :: endArrayReduction(){
 		return;
 	}*/
 
-	if (nMsgs==0||r==CkReduction::invalid)
+	if (numMsgs==0||r==CkReduction::invalid)
   		//No valid reducer in the whole vector
     		ret=CkReductionMsg::buildNew(0,NULL);
   	else{//Use the reducer to reduce the messages
     		CkReduction::reducerFn f=CkReduction::reducerTable[r];
 		// has to be corrected elements from above need to be put into a temporary vector
     		CkReductionMsg **msgArr=&tempMsgs[0];//<-- HACK!
+
+                if (numMsgs > 1 && msgArr[0]->reducer == CkReduction::random) {
+                  // nMsgs > 1 indicates that reduction type is not "random"
+                  // this means any data with reducer type random was submitted
+                  // only so that counts would agree, and can be removed
+                  delete msgArr[0];
+                  msgArr[0] = msgArr[numMsgs - 1];
+                  numMsgs--;
+                }
+
     		ret=(*f)(numMsgs,msgArr);
     		ret->reducer=r;
 
@@ -2197,22 +2230,26 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
-      msgArr[nMsgs++]=m;
       msgs_nSources+=m->nSources();
-      r=m->reducer;
-      if (!m->callback.isInvalid())
-        msgs_callback=m->callback;
-      if(!m->secondaryCallback.isInvalid()){
-        msgs_secondaryCallback = m->secondaryCallback;
-      }
-      if (m->userFlag!=-1)
-        msgs_userFlag=m->userFlag;
-
-	isMigratableContributor= m->isMigratableContributor();
 #if CMK_BIGSIM_CHARM
       _TRACE_BG_ADD_BACKWARD_DEP(m->log);
 #endif
-				
+
+      if (nMsgs == 0 || m->reducer != CkReduction::random) {
+        msgArr[nMsgs++]=m;
+        r=m->reducer;
+        if (!m->callback.isInvalid())
+          msgs_callback=m->callback;
+        if(!m->secondaryCallback.isInvalid()){
+          msgs_secondaryCallback = m->secondaryCallback;
+        }
+        if (m->userFlag!=-1)
+          msgs_userFlag=m->userFlag;
+	isMigratableContributor= m->isMigratableContributor();
+      }
+      else {
+        delete m;
+      }
     }
     else
     { //This is just a placeholder message-- replace it
@@ -2226,10 +2263,18 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   else
   {//Use the reducer to reduce the messages
     if(nMsgs == 1){
-	ret = msgArr[0];
+      ret = msgArr[0];
     }else{
-        CkReduction::reducerFn f=CkReduction::reducerTable[r];
-        ret=(*f)(nMsgs,msgArr);
+      if (msgArr[0]->reducer == CkReduction::random) {
+        // nMsgs > 1 indicates that reduction type is not random
+        // this means any data with reducer type random was submitted
+        // only so that counts would agree, and can be removed
+        delete msgArr[0];
+        msgArr[0] = msgArr[nMsgs - 1];
+        nMsgs--;
+      }
+      CkReduction::reducerFn f=CkReduction::reducerTable[r];
+      ret=(*f)(nMsgs,msgArr);
     }
     ret->reducer=r;
   }
