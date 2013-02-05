@@ -1,8 +1,6 @@
 #ifndef _MPI_INTEROPERATE_
 #define _MPI_INTEROPERATE_
 
-#define CMK_HAS_INTEROP 1
-
 #include "converse.h"
 #include "ck.h"
 #include "trace.h"
