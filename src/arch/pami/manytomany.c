@@ -519,7 +519,8 @@ void   CmiDirect_manytomany_start ( void       * h,
 		       &handle->swork[0]);
   }
   else {
-    for (int i = 0; i < handle->n_work; ++i) {
+    int i;
+    for (i = 0; i < handle->n_work; ++i) {
       PAMI_Context_post( handle->swork[i].context, 
 			&handle->swork[i].work, 
 			_cmidirect_m2m_send_post_handler,
