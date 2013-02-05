@@ -44,6 +44,7 @@
 #include "converse.h"
 
 #if CMK_DIRECT
+#define DIRECT_SEQ 0xFFFFFFE 
 #include "cmidirect.h"
 #endif
 
@@ -593,6 +594,7 @@ static int  SHIFT   =           18;
 #define GET_INDEX(evt)          (((evt) >> SHIFT) & INDEX_MASK)
 
 #define PERSIST_EVENT(idx)      ( (1<<31) | (((idx) & INDEX_MASK)<<SHIFT) | myrank)
+#define DIRECT_EVENT(idx)      ( (1<<31) | (((idx) & INDEX_MASK)<<SHIFT) | myrank)
 
 #if CMK_SMP
 #define INIT_SIZE                4096
@@ -3011,6 +3013,14 @@ static void  SendRdmaMsg( BufferList sendqueue)
                 GNI_RC_CHECK("GNI_EpSetEventData", sts);
             }
 #endif
+#if CMK_DIRECT
+            else if (pd->cqwrite_value == DIRECT_SEQ) {
+                pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
+                int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, DIRECT_EVENT(ptr->ack_index));
+                GNI_RC_CHECK("GNI_EpSetEventData", sts);
+            }
+#endif
+
 #endif
 #if CMK_WITH_STATS
             RDMA_TRY_SEND(pd->type)

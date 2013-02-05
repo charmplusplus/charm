@@ -50,6 +50,7 @@ typedef struct infiDirectUserHandle{
     void *callbackData;
     gni_mem_handle_t    localMdh;
     gni_mem_handle_t    remoteMdh;
+    int ack_index;
 #else
     int senderNode;
     int recverNode;
