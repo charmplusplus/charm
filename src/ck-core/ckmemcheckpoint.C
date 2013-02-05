@@ -1396,16 +1396,18 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
    CmiPrintf("[%d] I am restarting  cur_restart_phase:%d discard charm message at time: %f\n",CmiMyPe(), CpvAccess(_curRestartPhase), restartT);
   
   //now safe to change the phase handler,braodcast every
-   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
-   CmiSetHandler(msg, changePhaseHandlerIdx);
-   CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes, (char *)msg);
-
-/*   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
+  if(CmiNumPartitions()>1){
+    char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler(msg, changePhaseHandlerIdx);
+    CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes, (char *)msg);
+  }else{  
+   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
    *(int *)(msg+CmiMsgHeaderSizeBytes) = CpvAccess(_crashedNode);
    // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.c
    CmiSetHandler(msg, askProcDataHandlerIdx);
    int pe = ChkptOnPe(CpvAccess(_crashedNode));
-   CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);*/
+   CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+  }
 #else
    CmiAbort("Fault tolerance is not support, rebuild charm++ with 'syncft' option");
 #endif
@@ -1652,9 +1654,9 @@ void CkRegisterRestartHandler( )
   pingHandlerIdx = CkRegisterHandler((CmiHandler)pingHandler);
   pingCheckHandlerIdx = CkRegisterHandler((CmiHandler)pingCheckHandler);
   buddyDieHandlerIdx = CkRegisterHandler((CmiHandler)buddyDieHandler);
-#endif
   replicaDieHandlerIdx = CkRegisterHandler((CmiHandler)replicaDieHandler);
   replicaDieBcastHandlerIdx = CkRegisterHandler((CmiHandler)replicaDieBcastHandler);
+#endif
   changePhaseHandlerIdx = CkRegisterHandler((CmiHandler)changePhaseHandler);
 
   CpvInitialize(CkProcCheckPTMessage *, procChkptBuf);
