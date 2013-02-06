@@ -1539,19 +1539,23 @@ extern "C" int  find_spare_mpirank(int pe,int partition);
 //void pingBuddy();
 //void pingCheckHandler();
 static void replicaDieHandler(char * msg){
+#if CMK_MEM_CHECKPOINT
 #if CMK_HAS_PARTITION
   //broadcast to every one in my partition
   CmiSetHandler(msg, replicaDieBcastHandlerIdx);
   CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
 #endif
+#endif
 }
 
 static void replicaDieBcastHandler(char *msg){
+#if CMK_MEM_CHECKPOINT
 #if CMK_HAS_PARTITION
   int diePe = *(int *)(msg+CmiMsgHeaderSizeBytes);
   int partition = *(int *)(msg+CmiMsgHeaderSizeBytes+sizeof(int));
   find_spare_mpirank(diePe,partition);
   CmiFree(msg);
+#endif
 #endif
 }
 
