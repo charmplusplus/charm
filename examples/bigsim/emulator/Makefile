@@ -1,42 +1,37 @@
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc -language bigsim $(OPTS)
+CXX=$(CHARMC)
 
-all: jacobi3D maxReduce prime ping octo line ring
+BINS=jacobi3D maxReduce prime ping octo line ring
+
+all: $(BINS)
 	cd littleMD; $(MAKE)
 
-jacobi3D: jacobi3D.C common.C
-	$(CHARMC) -language bigsim -o jacobi3D $^
+$(BINS): common.o
+	$(CHARMC) -o $@ $^
 
-maxReduce: maxReduce.C common.C
-	$(CHARMC) -language bigsim -o maxReduce $^
+jacobi3D: jacobi3D.C
+maxReduce: maxReduce.C
+prime: prime.C
+ping: ping.C
+octo: octo.C
+line: line.C
+ring: ring.C
 
-prime: prime.C common.C
-	$(CHARMC) -language bigsim -o prime $^
-
-ping: ping.C common.C
-	$(CHARMC) -language bigsim -o ping $^
-
-octo: octo.C common.C
-	$(CHARMC) -language bigsim -o octo $^
-
-line: line.C common.C
-	$(CHARMC) -language bigsim -o line $^
-
-ring: ring.C common.C
-	$(CHARMC) -language bigsim -o ring $^
+RUN=./charmrun +p4 $(TESTOPTS)
 
 test: all
-	./charmrun ./maxReduce +p4 +cth3 +wth10 +bgstacksize 102400 $(TESTOPTS)
-	./charmrun +p4 ./octo 3 3 3 4 5  +bgstacksize 102400 $(TESTOPTS)
-	./charmrun +p4 ./line 6 6 6 3 4 10 +bgstacksize 102400 $(TESTOPTS)
-	./charmrun +p4 ./jacobi3D 3 3 3 2 10 0.1 +bgstacksize 204800 $(TESTOPTS)
-	./charmrun +p4 ./prime 3 3 3 3 4 1000 +bgstacksize 102400 $(TESTOPTS)
-	./charmrun +p4 ./ring 2 2 2 1 1 $(TESTOPTS)
-	./charmrun +p4 littleMD/bgMD 6 6 6 3 4 +bgstacksize 102400 $(TESTOPTS)
+	$(RUN) ./maxReduce +cth3 +wth10 +bgstacksize 102400
+	$(RUN) ./octo 3 3 3 4 5  +bgstacksize 102400
+	$(RUN) ./line 6 6 6 3 4 10 +bgstacksize 102400
+	$(RUN) ./jacobi3D 3 3 3 2 10 0.1 +bgstacksize 204800
+	$(RUN) ./prime 3 3 3 3 4 1000 +bgstacksize 102400
+	$(RUN) ./ring 2 2 2 1 1
+	$(RUN) littleMD/bgMD 6 6 6 3 4 +bgstacksize 102400
 
 clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
-	rm -f jacobi3D maxReduce prime ping octo line ring
-	rm -f jacobi3D.exe maxReduce.exe prime.exe ping.exe octo.exe line.exe ring.exe
+	rm -f $(BINS)
+	rm -f $(patsubst %,%.exe,$(BINS))
 	rm -f conv-host charmrun
 	cd littleMD; $(MAKE) clean
