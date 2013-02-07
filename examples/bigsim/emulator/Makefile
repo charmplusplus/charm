@@ -2,6 +2,7 @@ CHARMC=../../../bin/charmc -language bigsim $(OPTS)
 CXX=$(CHARMC)
 
 BINS=jacobi3D maxReduce prime ping octo line ring
+BUT_ONE=maxReduce prime ping octo line ring
 
 all: $(BINS)
 	cd littleMD; $(MAKE)
@@ -9,6 +10,7 @@ all: $(BINS)
 $(BINS): common.o
 	$(CHARMC) -o $@ $^
 
+$(BUT_ONE): OPTS+=-no-charmrun
 jacobi3D: jacobi3D.C
 maxReduce: maxReduce.C
 prime: prime.C
