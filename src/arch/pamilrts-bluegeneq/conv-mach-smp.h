@@ -25,5 +25,4 @@
 
 #define CMK_FAKE_SCHED_YIELD                               1
 
-#define CMK_USE_L2ATOMICS                                  0
-
+#define SPECIFIC_PCQUEUE                                   1

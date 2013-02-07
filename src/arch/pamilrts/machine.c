@@ -96,7 +96,6 @@ __thread int32_t _cmi_bgq_incommthread = 0;
 //}
 
 static void CmiNetworkBarrier(int async);
-#define SPECIFIC_PCQUEUE  1
 #if SPECIFIC_PCQUEUE && CMK_SMP
 #define  QUEUE_NUMS     _Cmi_mynodesize + 3
 #include "lrtsqueue.h"
