@@ -1,3 +1,6 @@
+#ifndef _CMI_QUEUE_DECL_H
+#define _CMI_QUEUE_DECL_H
+
 #if SPECIFIC_PCQUEUE && CMK_SMP
 #define CMIQueue LRTSQueue 
 #define CMIQueuePush    LRTSQueuePush
@@ -11,3 +14,5 @@
 #define CMIQueuePop     PCQueuePop
 #define CMIQueueEmpty   PCQueueEmpty
 #endif
+
+#endif //_CMI_QUEUE_DECL_H
