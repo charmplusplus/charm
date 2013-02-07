@@ -71,6 +71,8 @@ void readKillFile();
 double killTime=0.0;
 double faultMean;
 int checkpointCount=0;
+int diskCkptFlag = 0;
+static char fName[100];
 
 /***** VARIABLES FOR MESSAGE LOGGING *****/
 // stores the id of current object sending a message
@@ -240,6 +242,16 @@ void _messageLoggingInit(){
 	//Cpv variables for checkpoint
 	CpvInitialize(StoredCheckpoint *,_storedCheckpointData);
 	CpvAccess(_storedCheckpointData) = new StoredCheckpoint;
+
+	// disk checkpoint
+	if(diskCkptFlag){
+#if CMK_USE_MKSTEMP
+		sprintf(fName, "/tmp/ckpt%d-XXXXXX", CkMyPe());
+		mkstemp(fName);
+#else
+		fName=tmpnam(NULL);
+#endif
+	}
 
 	// registering user events for projections	
 	traceRegisterUserEvent("Remove Logs", 20);
@@ -964,20 +976,22 @@ void pupArrayElementsSkip(PUP::er &p, CmiBool create, MigrationRecord *listToSki
 	}
 };
 
+/**
+ * Reads a checkpoint from disk. Assumes variable fName contains the name of the file.
+ */
+void readCheckpointFromDisk(int size, char *data){
+	FILE *f = fopen(fName,"rb");
+	fread(data,1,size,f);
+	fclose(f);
+}
 
-void writeCheckpointToDisk(int size,char *chkpt){
-      char fNameTemp[100];
-      sprintf(fNameTemp,"%s/mlogCheckpoint%d_tmp",checkpointDirectory,CkMyPe());
-      FILE *fd = fopen(fNameTemp,"w");
-      int ret = fwrite(chkpt,size,1,fd);
-      CkAssert(ret == size);
-      fclose(fd);
-  
-      char fName[100];
-      sprintf(fName,"%s/mlogCheckpoint%d",checkpointDirectory,CkMyPe());
-      unlink(fName);
-  
-      rename(fNameTemp,fName);
+/**
+ * Writes a checkpoint to disk. Assumes variable fName contains the name of the file.
+ */
+void writeCheckpointToDisk(int size, char *data){
+	FILE *f = fopen(fName,"wb");
+	fwrite(data, 1, size, f);
+	fclose(f);
 }
 
 //handler that receives the checkpoint from a processor
@@ -995,13 +1009,19 @@ void _storeCheckpointHandler(char *msg){
 		char *oldmsg = oldChkpt - sizeof(CheckPointDataMsg);
 		CmiFree(oldmsg);
 	}
-	//turning off storing checkpoints
 	
 	int sendingPE = chkMsg->PE;
 	
 	CpvAccess(_storedCheckpointData)->buf = chkpt;
 	CpvAccess(_storedCheckpointData)->bufSize = chkMsg->dataSize;
 	CpvAccess(_storedCheckpointData)->PE = sendingPE;
+
+	// storing checkpoint in disk
+	if(diskCkptFlag){
+		writeCheckpointToDisk(chkMsg->dataSize,chkpt);
+		CpvAccess(_storedCheckpointData)->buf = NULL;
+		CmiFree(msg);
+	}
 
 	int count=0;
 	for(int j=migratedNoticeList.size()-1;j>=0;j--){
@@ -1218,9 +1238,11 @@ void sendCheckpointData(){
 		buf = &buf[migratedNoticeList.size()*sizeof(MigrationRecord)];
 	}
 	
-
-
-	memcpy(buf,storedChkpt->buf,storedChkpt->bufSize);
+	if(diskCkptFlag){
+		readCheckpointFromDisk(storedChkpt->bufSize,buf);
+	} else {
+		memcpy(buf,storedChkpt->buf,storedChkpt->bufSize);
+	}
 	buf = &buf[storedChkpt->bufSize];
 
 	CmiSetHandler(msg,_recvCheckpointHandlerIdx);
