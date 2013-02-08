@@ -1181,9 +1181,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 void CmiNotifyIdle(void) {
     AdvanceCommunication(1);
     CmiYield();
-#if SPECIFIC_IDLE
     LrtsNotifyIdle();
-#endif
 }
 
 /* Utiltiy functions */

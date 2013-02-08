@@ -26,6 +26,3 @@
 #define CMK_FAKE_SCHED_YIELD                               1
 
 #define SPECIFIC_PCQUEUE                                   1
-#if SPECIFIC_PCQUEUE
-#define SPECIFIC_IDLE                                       1
-#endif
