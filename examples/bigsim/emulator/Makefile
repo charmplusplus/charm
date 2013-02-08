@@ -19,16 +19,16 @@ octo: octo.C
 line: line.C
 ring: ring.C
 
-RUN=./charmrun +p4 $(TESTOPTS)
+RUN=./charmrun +p4
 
 test: all
-	$(RUN) ./maxReduce +cth3 +wth10 +bgstacksize 102400
-	$(RUN) ./octo 3 3 3 4 5  +bgstacksize 102400
-	$(RUN) ./line 6 6 6 3 4 10 +bgstacksize 102400
-	$(RUN) ./jacobi3D 3 3 3 2 10 0.1 +bgstacksize 204800
-	$(RUN) ./prime 3 3 3 3 4 1000 +bgstacksize 102400
-	$(RUN) ./ring 2 2 2 1 1
-	$(RUN) littleMD/bgMD 6 6 6 3 4 +bgstacksize 102400
+	$(RUN) ./maxReduce +cth3 +wth10 +bgstacksize 102400 $(TESTOPTS)
+	$(RUN) ./octo 3 3 3 4 5  +bgstacksize 102400 $(TESTOPTS)
+	$(RUN) ./line 6 6 6 3 4 10 +bgstacksize 102400 $(TESTOPTS)
+	$(RUN) ./jacobi3D 3 3 3 2 10 0.1 +bgstacksize 204800 $(TESTOPTS)
+	$(RUN) ./prime 3 3 3 3 4 1000 +bgstacksize 102400 $(TESTOPTS)
+	$(RUN) ./ring 2 2 2 1 1 $(TESTOPTS)
+	$(RUN) littleMD/bgMD 6 6 6 3 4 +bgstacksize 102400 $(TESTOPTS)
 
 clean:
 	rm -f core *.cpm.h
