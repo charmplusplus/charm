@@ -31,4 +31,5 @@ void LrtsPostNonLocal();
 
 void* LrtsAlloc(int, int);
 void  LrtsFree(void*);
+void LrtsNotifyIdle();
 #endif

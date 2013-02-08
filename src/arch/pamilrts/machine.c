@@ -29,9 +29,6 @@ char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
 
-#if MACHINE_DEBUG_LOG
-FILE *debugLog = NULL;
-#endif
 
 #define CMI_MAGIC(msg)                   ((CmiMsgHeaderBasic *)msg)->magic
 /* FIXME: need a random number that everyone agrees ! */
@@ -495,11 +492,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   result = PAMI_Client_query(cmi_pami_client, &configuration, 1);
   *myNodeID = configuration.value.intval;
 
-#if MACHINE_DEBUG_LOG
-    char ln[200];
-    sprintf(ln,"debugLog.%d", *myNodeID);
-    debugLog=fopen(ln,"w");
-#endif
   configuration.name = PAMI_CLIENT_NUM_TASKS;
   result = PAMI_Client_query(cmi_pami_client, &configuration, 1);
   *numNodes = configuration.value.intval;
@@ -721,6 +713,28 @@ void LrtsAbort(const char *message) {
   assert(0);
 }
 
+void LrtsNotifyIdle()
+{
+#if CMK_SMP && CMK_PAMI_MULTI_CONTEXT
+#if !CMK_ENABLE_ASYNC_PROGRESS && SPECIFIC_QUEUE  &&  CMK_NODE_QUEUE_AVAILABLE
+  //Wait on the atomic queue to get a message with very low core
+  //overheads. One thread calls advance more frequently
+  ////spin wait for 2-4us when idle
+  ////process node queue messages every 10us
+  ////Idle cores will only use one LMQ slot and an int sum
+  CmiState cs = CmiGetStateN(rank);
+  if ((CmiMyRank()% THREADS_PER_CONTEXT) == 0)
+  {LRTSQueueSpinWait(CmiMyRecvQueue(), 
+			    10);}
+  else
+#endif
+#if SPECIFIC_QUEUE 
+  { LRTSQueueSpinWait(CmiMyRecvQueue(), 
+			    1000);
+  }
+#endif
+#endif
+}
 pami_result_t machine_send_handoff (pami_context_t context, void *msg);
 void  machine_send       (pami_context_t      context, 
     int                 node, 
@@ -778,7 +792,7 @@ void  machine_send       (pami_context_t      context,
   to_lock = CpvAccess(uselock);
 #endif
 
-#if CMK_PAMI_MULTI_CONTEXT
+#if CMK_PAMI_MULTI_CONTEXT &&  CMK_NODE_QUEUE_AVAILABLE
   size_t dst_context = (rank != DGRAM_NODEMESSAGE) ? (rank>>LTPS) : (rand_r(&r_seed) % cmi_pami_numcontexts);
   //Choose a context at random
   //size_t dst_context = myrand(&r_seed) % cmi_pami_numcontexts;

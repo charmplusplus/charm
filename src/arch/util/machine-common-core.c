@@ -318,6 +318,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s);
 void CmiNotifyIdle(void);
 /* ===== End of Idle-state Related Declarations =====  */
 
+CsvDeclare(CmiNodeState, NodeState);
 /* ===== Beginning of Processor/Node State-related Stuff =====*/
 #if !CMK_SMP
 /************ non SMP **************/
@@ -347,6 +348,15 @@ INLINE_KEYWORD int CmiNodeSpan() {
 }
 #else
 /************** SMP *******************/
+INLINE_KEYWORD CMIQueue CmiMyRecvQueue() {
+    return CmiGetState()->recv;
+}
+
+#if CMK_NODE_QUEUE_AVAILABLE
+INLINE_KEYWORD CMIQueue CmiMyNodeQueue() {
+    return CsvAccess(NodeState).NodeRecv;
+}
+#endif
 INLINE_KEYWORD int CmiMyPe() {
     return CmiGetState()->pe;
 }
@@ -372,7 +382,6 @@ INLINE_KEYWORD int CmiRankOf(int pe) {
     return pe%_Cmi_mynodesize;
 }
 #endif
-CsvDeclare(CmiNodeState, NodeState);
 /* ===== End of Processor/Node State-related Stuff =====*/
 
 #include "machine-broadcast.c"
@@ -1172,6 +1181,9 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 void CmiNotifyIdle(void) {
     AdvanceCommunication(1);
     CmiYield();
+#if SPECIFIC_IDLE
+    LrtsNotifyIdle();
+#endif
 }
 
 /* Utiltiy functions */

@@ -1671,7 +1671,7 @@ inline static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, 
     return status;
 #endif
 }
-
+inline void LrtsNotifyIdle() {}
 inline void LrtsPrepareEnvelope(char *msg, int size)
 {
     CmiSetMsgSize(msg, size);

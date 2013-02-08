@@ -19,6 +19,7 @@
 #define L2A_FAIL    -2
 
 typedef  void* LRTSQueueElement;
+static void *l2atomicbuf;
 
 typedef struct _l2atomicstate {
   volatile uint64_t Consumer;	// not used atomically
@@ -74,7 +75,6 @@ int LRTSQueuePush(LRTSQueue queue,
 		     void                   * element) 
 {
   //fprintf(stderr,"Insert message %p\n", element);
-
   register int qsize_1 = queue->_qsize - 1;
   uint64_t index = L2_AtomicLoadIncrementBounded(&queue->_l2state->Producer);
   L1P_FlushRequests();
@@ -195,7 +195,6 @@ int LRTSQueue2QSpinWait (LRTSQueue    queue0,
   return 0; 
 }
 
-static void *l2atomicbuf;
 typedef pami_result_t (*pamix_proc_memalign_fn) (void**, size_t, size_t, const char*);
 void   LRTSQueuePreInit()
 {
@@ -215,9 +214,8 @@ void   LRTSQueuePreInit()
 
 LRTSQueue  LRTSQueueCreate()
 {
-    static  int  position;
+    static  int  position=0;
     LRTSQueue   Q;
-    int actualNodeSize = 64/Kernel_ProcessCount(); 
     Q = (LRTSQueue)calloc(1, sizeof( struct _l2atomicq ));
     LRTSQueueInit ((char *) l2atomicbuf + sizeof(L2AtomicState)*position,
 			   sizeof(L2AtomicState),
@@ -225,5 +223,6 @@ LRTSQueue  LRTSQueueCreate()
 			   1, /*use overflow*/
 			   DEFAULT_SIZE /*1024 entries*/);
     position++; 
+    return Q;
 }
 #endif

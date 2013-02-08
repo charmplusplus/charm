@@ -1549,6 +1549,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
 }
 
+void LrtsNotifyIdle() {}
+
 void LrtsPreCommonInit(int everReturn) {
 
 #if USE_MPI_CTRLMSG_SCHEME
