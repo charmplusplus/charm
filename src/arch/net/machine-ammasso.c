@@ -109,7 +109,7 @@ void sendAck(OtherNode node);
 AmmassoToken *getQPSendToken(OtherNode node);
 int sendDataOnQP(char* data, int len, OtherNode node, char flags);
 void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned int broot, int copy);
-static void CommunicationServer(int withDelayMs, int where);
+static void CommunicationServerNet(int withDelayMs, int where);
 void CmiMachineExit();
 
 void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *eventRecord, void *cb);
@@ -1474,6 +1474,7 @@ static void CommunicationServer_nolock(int withDelayMs) {
 
   int i;
 
+  printf("CommunicationServer_nolock start \n");
   MACHSTATE(2, "CommunicationServer_nolock start {");
 
   // DMK : TODO : In spare time (here), check for messages and/or completions and/or errors
@@ -1487,6 +1488,7 @@ static void CommunicationServer_nolock(int withDelayMs) {
     CheckRecvBufForMessage(&(nodes[i]));
   }
 
+  printf("CommunicationServer_nolock end  \n");
   MACHSTATE(2, "}CommunicationServer_nolock end");
 }
 
@@ -1497,15 +1499,15 @@ static void CommunicationServer_nolock(int withDelayMs) {
  *   1: from interrupt
  *   2: from worker thread
  */
-static void CommunicationServer(int withDelayMs, int where) {
-
+static void CommunicationServerNet(int withDelayMs, int where) {
+  printf("Inside communication server net!.. \n");
   //// Check to see if we are running in standalone mode... if so, do nothing
   //if (Cmi_charmrun_pid == 0)
   //  return;
 
-  AMMASSO_STATS_START(CommunicationServer)
+  AMMASSO_STATS_START(CommunicationServerNet)
 
-  MACHSTATE2(2, "CommunicationServer(%d) from %d {",withDelayMs, where);
+  MACHSTATE2(2, "CommunicationServerNet(%d) from %d {",withDelayMs, where);
 
   // Check to see if this call is from an interrupt
   if (where == 1) {
@@ -1527,9 +1529,9 @@ static void CommunicationServer(int withDelayMs, int where) {
   CmiHandleImmediate();
 #endif
 
-  MACHSTATE(2,"} CommunicationServer");
+  MACHSTATE(2,"} CommunicationServerNet");
 
-  AMMASSO_STATS_END(CommunicationServer)
+  AMMASSO_STATS_END(CommunicationServerNet)
 }
 
 

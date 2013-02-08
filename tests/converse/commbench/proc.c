@@ -59,7 +59,9 @@ static void collectNumbers(ProcMsg *msg)
     CmiSetHandler(msg, CpvAccess(trial_handler));
     CmiSyncBroadcastAll(sizeof(ProcMsg), msg);
     CpvAccess(TimeN) = CmiWallTimer();
+	printf("if\n");
   } else {
+	printf("else\n");
     CpvAccess(nreported)++;
     CpvAccess(success) += msg->success;
     if(CpvAccess(nreported)==CmiNumPes()) {
@@ -74,6 +76,7 @@ static void collectNumbers(ProcMsg *msg)
       CmiPrintf("[proc] FYI, appox PI (par) = %lf\n",CpvAccess(parPI));
       CmiSetHandler(&emsg, CpvAccess(ack_handler));
       CmiSyncSend(0, sizeof(EmptyMsg), &emsg);
+		printf("else if\n");
     }
   }
 }
@@ -87,6 +90,7 @@ void proc_init(void)
   CmiSetHandler(&msg, CpvAccess(trial_handler));
   CmiSyncSend(0,sizeof(ProcMsg), &msg);
   CpvAccess(Time1) = CmiWallTimer();
+	printf("proc init\n");
 }
 
 void proc_moduleinit(void)
@@ -103,5 +107,6 @@ void proc_moduleinit(void)
 
   CpvAccess(collect_handler) = CmiRegisterHandler((CmiHandler)collectNumbers);
   CpvAccess(trial_handler) = CmiRegisterHandler((CmiHandler)doTrials);
+  printf("proc module init\n");
 }
 

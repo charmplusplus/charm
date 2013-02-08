@@ -69,7 +69,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s)
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
 #if CMK_SHARED_VARS_UNAVAILABLE
-  CommunicationServer(10, COMM_SERVER_FROM_SMP);
+  CommunicationServerNet(10, COMM_SERVER_FROM_SMP);
 #else
   int nSpins=20; /*Number of times to spin before sleeping*/
   s->nIdles++;
@@ -248,7 +248,7 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
  *
  ***********************************************************************/
 
-static void CommunicationServer(int sleepTime, int where)
+static void CommunicationServerNet(int sleepTime, int where)
 {
   unsigned int nTimes=0; /* Loop counter */
   CmiCommLockOrElse({
@@ -301,7 +301,7 @@ static void CommunicationServer(int sleepTime, int where)
 #endif
   }
 
-  MACHSTATE(2,"} CommunicationServer") 
+  MACHSTATE(2,"} CommunicationServerNet") 
 }
 
 

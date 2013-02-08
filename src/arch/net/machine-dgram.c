@@ -37,7 +37,7 @@
 
 #if CMK_NODE_QUEUE_AVAILABLE
 #define DGRAM_NODEBROADCAST (0xFA)
-#define DGRAM_NODEMESSAGE   (0xFB)
+//#define DGRAM_NODEMESSAGE   (0xFB)
 #endif
 #define DGRAM_DSTRANK_MAX   (0xFC)
 #define DGRAM_SIMPLEKILL    (0xFD)
@@ -778,7 +778,7 @@ static void CommunicationPeriodic(void)
 #if CMK_USE_PXSHM
 	CommunicationServerPxshm();
 #endif
-  CommunicationServer(0, COMM_SERVER_FROM_SMP);
+  CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
 }
 
 static void CommunicationPeriodicCaller(void *ignored)
@@ -792,7 +792,7 @@ static void CommunicationPeriodicCaller(void *ignored)
 /*void EnqueueOutgoingDgram(OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank, int broot);*/
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy);
 
-void SendSpanningChildren(OutgoingMsg ogm, int root, int size, char *msg, unsigned int startpe, int nodesend);
+//void SendSpanningChildren(OutgoingMsg ogm, int root, int size, char *msg, unsigned int startpe, int nodesend);
 void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int curcycle, int nodesend);
 
 #if CMK_USE_GM

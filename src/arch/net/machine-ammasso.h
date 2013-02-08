@@ -214,7 +214,7 @@ typedef struct __ammasso_stats {
 
   AMMASSO_STATS_VARS(sendAck)
 
-  AMMASSO_STATS_VARS(CommunicationServer)
+  AMMASSO_STATS_VARS(CommunicationServerNet)
 
 } AmmassoStats;
 
@@ -247,7 +247,7 @@ AmmassoStats __stats;
                                AMMASSO_STATS_INIT_AUX(ProcessMessage)               \
                                AMMASSO_STATS_INIT_AUX(processAmmassoControlMessage) \
                                AMMASSO_STATS_INIT_AUX(sendAck)                      \
-                               AMMASSO_STATS_INIT_AUX(CommunicationServer)          \
+                               AMMASSO_STATS_INIT_AUX(CommunicationServerNet)          \
 			     }
 
 #define TO_NS  ((double)1000000000.0)

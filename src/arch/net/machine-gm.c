@@ -324,7 +324,7 @@ static void CommunicationServer_nolock(int withDelayMs) {
    Note in netpoll mode, charmrun service is only performed in interrupt, 
  pingCharmrun is from sig alarm, so it is lock free 
 */
-static void CommunicationServer(int withDelayMs, int where)
+static void CommunicationServerNet(int withDelayMs, int where)
 {
   /* standalone mode */
   if (Cmi_charmrun_pid == 0 && gmport == NULL) return;

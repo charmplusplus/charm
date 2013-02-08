@@ -23,64 +23,52 @@
  *
  *****************************************************************************/
 
-typedef struct {
-  int sleepMs; /*Milliseconds to sleep while idle*/
-  int nIdles; /*Number of times we've been idle in a row*/
-  CmiState cs; /*Machine state*/
-} CmiIdleState;
+//XX: a few differences
+//static void CmiNotifyBeginIdle(CmiIdleState *s)
+//{
+//  s->sleepMs=0;
+//  s->nIdles=0;
+//
+//  MACHSTATE(3,"begin idle")
+//}
 
-static CmiIdleState *CmiNotifyGetState(void)
-{
-  CmiIdleState *s=(CmiIdleState *)malloc(sizeof(CmiIdleState));
-  s->sleepMs=0;
-  s->nIdles=0;
-  s->cs=CmiGetState();
-  return s;
-}
+//XX: a few differences
+//static void CmiNotifyStillIdle(CmiIdleState *s)
+//{
+//#if CMK_SHARED_VARS_UNAVAILABLE
+//  /*No comm. thread-- listen on sockets for incoming messages*/
+//  MACHSTATE(1,"idle commserver {")
+//  CommunicationServerNet(Cmi_idlepoll?0:10, COMM_SERVER_FROM_SMP);
+//  MACHSTATE(1,"} idle commserver")
+//#else
+//#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+//  if(_Cmi_noprocforcommthread ){
+//#endif
+//    int nSpins=20; /*Number of times to spin before sleeping*/
+//    s->nIdles++;
+//    if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
+//      s->sleepMs+=2;
+//      if (s->sleepMs>10) s->sleepMs=10;
+//    }
+//    /*Comm. thread will listen on sockets-- just sleep*/
+//    if (s->sleepMs>0) {
+//      MACHSTATE1(3,"idle lock(%d) {",CmiMyPe())
+//      CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
+//      CsdResetPeriodic();		/* check ccd callbacks when I am awakened */
+//      MACHSTATE1(3,"} idle lock(%d)",CmiMyPe())
+//    }
+//#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+//  }
+//#endif
+//#endif
+//}
 
-static void CmiNotifyBeginIdle(CmiIdleState *s)
-{
-  s->sleepMs=0;
-  s->nIdles=0;
-
-  MACHSTATE(3,"begin idle")
-}
-
-static void CmiNotifyStillIdle(CmiIdleState *s)
-{
-#if CMK_SHARED_VARS_UNAVAILABLE
-  /*No comm. thread-- listen on sockets for incoming messages*/
-  MACHSTATE(1,"idle commserver {")
-  CommunicationServer(Cmi_idlepoll?0:10, COMM_SERVER_FROM_SMP);
-  MACHSTATE(1,"} idle commserver")
-#else
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  if(_Cmi_noprocforcommthread ){
-#endif
-    int nSpins=20; /*Number of times to spin before sleeping*/
-    s->nIdles++;
-    if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
-      s->sleepMs+=2;
-      if (s->sleepMs>10) s->sleepMs=10;
-    }
-    /*Comm. thread will listen on sockets-- just sleep*/
-    if (s->sleepMs>0) {
-      MACHSTATE1(3,"idle lock(%d) {",CmiMyPe())
-      CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
-      CsdResetPeriodic();		/* check ccd callbacks when I am awakened */
-      MACHSTATE1(3,"} idle lock(%d)",CmiMyPe())
-    }
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  }
-#endif
-#endif
-}
-
-void CmiNotifyIdle(void) {
-  CmiIdleState s;
-  s.sleepMs=5; 
-  CmiNotifyStillIdle(&s);
-}
+//XX: a few differences
+//void CmiNotifyIdle(void) {
+//  CmiIdleState s;
+//  s.sleepMs=5; 
+//  CmiNotifyStillIdle(&s);
+//}
 
 /****************************************************************************
  *                                                                          
@@ -112,7 +100,7 @@ int CheckSocketsReady(int withDelayMs)
     if (Cmi_charmrun_fd!=-1) { CMK_PIPE_ADDREAD(Cmi_charmrun_fd); }
     else return 0; /* If there's no charmrun, none of this matters. */
     if (dataskt!=-1) {
-      CMK_PIPE_ADDREAD(dataskt); 
+      CMK_PIPE_ADDREAD(dataskt);
       CMK_PIPE_ADDWRITE(dataskt);
     }
   }
@@ -755,7 +743,7 @@ void ReceiveDatagram()
  ***********************************************************************/
 void CmiHandleImmediate();
 
-static void CommunicationServer(int sleepTime, int where)
+static void CommunicationServerNet(int sleepTime, int where)
 {
   unsigned int nTimes=0; /* Loop counter */
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
@@ -811,7 +799,7 @@ static void CommunicationServer(int sleepTime, int where)
 #endif
   }
 
-  MACHSTATE(1,"} CommunicationServer") 
+  MACHSTATE(1,"} CommunicationServerNet")
 }
 
 void CmiMachineInit(char **argv)

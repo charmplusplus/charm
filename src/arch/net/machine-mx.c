@@ -421,12 +421,12 @@ static void CommunicationServer_nolock(int withDelayMs) {
    Note in netpoll mode, charmrun service is only performed in interrupt, 
  pingCharmrun is from sig alarm, so it is lock free 
 */
-static void CommunicationServer(int withDelayMs, int where)
+static void CommunicationServerNet(int withDelayMs, int where)
 {
   /* standalone mode */
   if (Cmi_charmrun_pid == 0 && endpoint == NULL) return;
 
-  MACHSTATE2(2,"CommunicationServer(%d) from %d {",withDelayMs, where)
+  MACHSTATE2(2,"CommunicationServerNet(%d) from %d {",withDelayMs, where)
 
   if (where == COMM_SERVER_FROM_WORKER && machine_initiated_shutdown) {
       /* Converse exit, wait for pingCharm to quit */
@@ -453,7 +453,7 @@ static void CommunicationServer(int withDelayMs, int where)
     CmiHandleImmediate();
 #endif
 
-  MACHSTATE(2,"} CommunicationServer")
+  MACHSTATE(2,"} CommunicationServerNet")
 }
 
 void processFutureMessages(OtherNode node)
