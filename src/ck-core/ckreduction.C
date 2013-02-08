@@ -1440,7 +1440,7 @@ SIMPLE_REDUCTION(bitvec_or,int,"%d",ret[i]|=value[i];)
 
 //Select one random message to pass on
 static CkReductionMsg *random(int nMsg,CkReductionMsg **msg) {
-  return CkReductionMsg::buildNew(msg[0]->getLength(),(void *)msg[0]->getData(), CkReduction::invalid, msg[0]);
+  return CkReductionMsg::buildNew(msg[0]->getLength(),(void *)msg[0]->getData(), CkReduction::random, msg[0]);
 }
 
 /////////////// concat ////////////////
