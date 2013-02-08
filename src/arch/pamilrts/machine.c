@@ -46,8 +46,6 @@ char *ALIGN_32(char *p) {
 #define EAGER_CUTOFF   4096
 
 #if CMK_PERSISTENT_COMM
-void rzv_persist_pkt_dispatch (pami_context_t context, void *clientdata, const void *header_addr, size_t header_size, const void * pipe_addr,  size_t pipe_size,  pami_endpoint_t origin, pami_recv_t  * recv); 
-#define CMI_PAMI_RZV_PERSIST_DISPATCH            11 
 #include "machine-persistent.h"
 #endif
 
@@ -520,15 +518,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         NULL,
         options);      
 
-#if CMK_PERSISTENT_COMM
-      pfn.p2p = rzv_persist_pkt_dispatch;
-      PAMI_Dispatch_set (cmi_pami_contexts[i],
-          CMI_PAMI_RZV_PERSIST_DISPATCH,
-          pfn,
-          NULL,
-          options);     
-#endif      
-
     pfn.p2p = short_pkt_dispatch;
     PAMI_Dispatch_set (cmi_pami_contexts[i],
         CMI_PAMI_SHORT_DISPATCH,
@@ -648,6 +637,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
 
   //Initialize the manytomany api
+#if CMK_PERSISTENT_COMM
+  _initPersistent(cmi_pami_contexts, _n);
+#endif      
+
   _cmidirect_m2m_initialize (cmi_pami_contexts, _n);
 }
 

@@ -21,6 +21,25 @@ typedef struct _cmi_pami_rzv_persist {
 
 
 
+#define CMI_PAMI_RZV_PERSIST_DISPATCH            11 
+void rzv_persist_pkt_dispatch (pami_context_t context, void *clientdata, const void *header_addr, size_t header_size, const void * pipe_addr,  size_t pipe_size,  pami_endpoint_t origin, pami_recv_t  * recv);
+
+void _initPersistent( pami_context_t *contexts, int nc)
+{
+    pami_dispatch_hint_t options = (pami_dispatch_hint_t) {0};
+    pami_dispatch_callback_function pfn;
+    int i = 0;
+    for (i = 0; i < nc; ++i) {
+
+        pfn.p2p = rzv_persist_pkt_dispatch;
+        PAMI_Dispatch_set (cmi_pami_contexts[i],
+        CMI_PAMI_RZV_PERSIST_DISPATCH,
+        pfn,
+        NULL,
+        options);   
+    }
+}
+
 void rzv_persist_recv_done   (pami_context_t     ctxt, 
     void             * clientdata, 
     pami_result_t      result) 
