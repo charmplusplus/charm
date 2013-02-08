@@ -11,6 +11,7 @@ More documentation goes here...
 #include <stdlib.h>
 #include <string.h>
 #include <sstream>
+using std::ostringstream;
 #include <errno.h>
 #include "charm++.h"
 #include "ck.h"
@@ -101,13 +102,17 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 
 static void checkpointOne(const char* dirname, CkCallback& cb);
 
+static void addPartitionDirectory(ostringstream &path) {
+        if (CmiNumPartitions() > 1) {
+          path << "/part-" << CmiMyPartition() << '/';
+        }
+}
+
 static FILE* openCheckpointFile(const char *dirname, const char *basename,
                                 const char *mode, int id = -1) {
-        std::ostringstream out;
+        ostringstream out;
         out << dirname << '/';
-#if CMK_HAS_PARTITION
-        out << CmiMyPartition() << '-';
-#endif
+        addPartitionDirectory(out);
         out << basename;
         if (id != -1)
                 out << '_' << id;
@@ -115,7 +120,7 @@ static FILE* openCheckpointFile(const char *dirname, const char *basename,
 
         FILE *fp = CmiFopen(out.str().c_str(), mode);
         if (!fp) {
-                std::ostringstream error;
+                ostringstream error;
                 error << "PE " << CkMyPe() << " failed to open checkpoint file: " << out.str()
                       << ", mode: " << mode << " status: " << strerror(errno);
                 CkAbort(error.str().c_str());
@@ -128,6 +133,13 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	chkptStartTimer = CmiWallTimer();
 	// every body make dir in case it is local directory
 	CmiMkdir(dirname);
+
+        if (CmiNumPartitions() > 1) {
+          ostringstream partDir;
+          partDir << dirname;
+          addPartitionDirectory(partDir);
+          CmiMkdir(partDir.str().c_str());
+        }
 
 	if (CkMyPe() == 0) {
           checkpointOne(dirname, cb);
