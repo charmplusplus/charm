@@ -110,7 +110,7 @@ static void addPartitionDirectory(ostringstream &path) {
 
 static FILE* openCheckpointFile(const char *dirname, const char *basename,
                                 const char *mode, int id = -1) {
-        std::ostringstream out;
+        ostringstream out;
         out << dirname << '/';
         addPartitionDirectory(out);
         out << basename;
@@ -120,7 +120,7 @@ static FILE* openCheckpointFile(const char *dirname, const char *basename,
 
         FILE *fp = CmiFopen(out.str().c_str(), mode);
         if (!fp) {
-                std::ostringstream error;
+                ostringstream error;
                 error << "PE " << CkMyPe() << " failed to open checkpoint file: " << out.str()
                       << ", mode: " << mode << " status: " << strerror(errno);
                 CkAbort(error.str().c_str());
