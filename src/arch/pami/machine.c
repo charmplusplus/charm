@@ -16,6 +16,9 @@
 #include "pami.h"
 #include "pami_sys.h"
 
+#if MACHINE_DEBUG_LOG
+FILE *debugLog = NULL;
+#endif
 //#if CMK_SMP
 //#define CMK_USE_L2ATOMICS   1
 //#endif
@@ -670,6 +673,16 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     configuration.name = PAMI_CLIENT_NUM_TASKS;
     result = PAMI_Client_query(cmi_pami_client, &configuration, 1);
     _Cmi_numnodes = configuration.value.intval;
+#if MACHINE_DEBUG_LOG
+    char ln[200];
+    sprintf(ln,"debugLog.%d", _Cmi_mynode);
+    debugLog=fopen(ln,"w");
+    if (debugLog == NULL)
+    {
+        CmiAbort("debug file not open\n");
+    }
+#endif
+
 
     pami_dispatch_hint_t options = (pami_dispatch_hint_t) {0};
     pami_dispatch_callback_function pfn;
