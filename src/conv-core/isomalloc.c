@@ -2596,7 +2596,19 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   size_t size;
   int flags[2];
   int i, j;
+  int dopup = 1;
   int numBlocks = 0, numSlots = 0, flag = 1;
+
+  if(!pup_isUnpacking(p)) {
+    if(CtvAccessOther(tid,threadpool) == NULL) {
+      dopup = 0;
+    } else {
+      dopup = 1;
+    }
+  }
+  
+  pup_int(p,&dopup);
+  if(!dopup)  return;
 
 #if ISOMALLOC_DEBUG
   printf("[%d] My rank is %lld Pupping for %lld with isUnpack %d isDelete %d \n",CmiMyPe(),CthSelf(),tid,pup_isUnpacking(p),pup_isDeleting(p));

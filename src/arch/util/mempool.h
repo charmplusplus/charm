@@ -101,6 +101,10 @@ typedef struct mempool_type
 #endif
 } mempool_type;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_freeblock freefn, size_t limit);
 void  mempool_destroy(mempool_type *mptr);
 void*  mempool_malloc(mempool_type *mptr, int size, int expand);
@@ -109,16 +113,12 @@ void mempool_free(mempool_type *mptr, void *ptr_free);
 void mempool_free_thread(void *ptr_free);
 #endif
 
-#if CMK_CONVERSE_GEMINI_UGNI
-void* getNextRegisteredPool();
-#endif
-
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 #if defined(__cplusplus)
 }
+#endif
+
+#if CMK_CONVERSE_GEMINI_UGNI
+void* getNextRegisteredPool();
 #endif
 
 #endif /* MEMPOOL.H */
