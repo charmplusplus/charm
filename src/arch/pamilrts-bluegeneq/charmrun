@@ -62,6 +62,7 @@ then
   # charmrun called from script
   echo "runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB --envs PAMI_RGETINJFIFOSIZE=2000000 $envs : $args"
   runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB --envs PAMI_RGETINJFIFOSIZE=2000000 $envs : $args
+  exit $?
 else
 
 queue_stat=qstat
