@@ -298,7 +298,6 @@ static void CommunicationServerNet(int withDelayMs, int where);
 void CmiHandleImmediate();
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
-void ConverseCommonExit(void);
 
 static unsigned int dataport=0;
 static int Cmi_mach_id=0; /* Machine-specific identifier (GM-only) */
@@ -306,8 +305,6 @@ static SOCKET       dataskt;
 
 extern void TokenUpdatePeriodic();
 extern void getAvailSysMem();
-
-#define BROADCAST_SPANNING_FACTOR		4
 
 /****************************************************************************
  *
