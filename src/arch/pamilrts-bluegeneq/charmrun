@@ -1,10 +1,7 @@
 #!/bin/sh
 #
-# Conv-host for bluegenep:
-#  Translates +pN-style conv-host options into 
-# qsub options. 
-# The script qsub the job, wait until it finishes, and print the output.
 # good for job less than 30 minutes
+# have to pass bank using -A or set PROJECT environment variable
 
 args=""
 pes=1
@@ -29,13 +26,16 @@ do
 	+p*)
 		pes=`echo $1 | awk '{print substr($1,3)}'`
 		;;
-        
   -machinefile)
 		machinefile=$2
 		args=" "$1" "$2" "$args
 		shift
 		;;
 	--mode)
+		args=" "$1" "$2" "$args
+		shift
+		;;
+	-A)
 		args=" "$1" "$2" "$args
 		shift
 		;;
@@ -104,33 +104,25 @@ trap 'End 1' 2 3
 # Wait for the job to complete, by checking its status
 while [ true ]
 do
-        $queue_stat $jobid > tmp.$$
-	exitstatus=$?
+        $queue_stat $jobid >>tmp.$$
+        exitstatus=$?
 
         if test $exitstatus -ne 0
         then
+            rm -f tmp.$$
             # job not in the queue now
-            status=`tail -1 $err | sed 's/.*Exit status:[ ]*\([0-9\]*\).*/\1/'`
-            if test -n $status
+            status=`grep -c "exited with status 0" $err`
+            if test $status != 0 ;
             then
-		  if test $status = 1
-                  then
-                    if grep 'Failed to boot the partition' $err > /dev/null 2>/dev/null
-                    then
-                      echo "Failed to boot the partition, retrying."
-                      break
-                    fi
-                  fi
-                  cat $output
-	          rm -f tmp.$$
-                  exit $status
+              echo "job exited with status 0: output in $output"
+              exit 0
+            else
+              echo "job did not exit with status 0; error in $err, output in $output"
+              exit 1
             fi
         fi
-	sleep 20
+	      sleep 20
 done
-
 done
-
-exit 1
 
 fi
