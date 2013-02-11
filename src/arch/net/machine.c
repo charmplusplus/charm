@@ -210,6 +210,7 @@ int printf(const char *fmt, ...) {
 #include <setjmp.h>
 #include <signal.h>
 #include <string.h>
+#include <unistd.h>
 
 /* define machine debug */
 #include "machine.h"
@@ -2203,7 +2204,12 @@ void LrtsPostNonLocal()
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some implementations*/
     
-//void CmiMachineProgressImpl()
+#if CMK_MACHINE_PROGRESS_DEFINED
+void CmiMachineProgressImpl(){
+	LrtsAdvanceCommunication(0);
+}
+#endif
+
 void LrtsAdvanceCommunication(int whileidle)
 {
 #if CMK_USE_SYSVSHM

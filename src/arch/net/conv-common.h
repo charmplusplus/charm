@@ -35,7 +35,7 @@
 #define CMK_USE_SPECIAL_MESSAGE_QUEUE_CHECK                1
 
 #define CMK_BROADCAST_SPANNING_TREE    			   0
-#define CMK_BROADCAST_HYPERCUBE        			   1
+#define CMK_BROADCAST_HYPERCUBE        			   0
 
 #define CMK_BARRIER_USE_COMMON_CODE                        1
 
