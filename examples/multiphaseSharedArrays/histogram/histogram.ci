@@ -1,6 +1,8 @@
 // -*- mode: c++; tab-width: 4 -*-
 mainmodule histogram
 {
+  readonly unsigned int WORKERS;
+
     mainchare Driver
     {
         entry void Driver(CkArgMsg*);
