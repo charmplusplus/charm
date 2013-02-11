@@ -328,10 +328,6 @@ static int already_in_signal_handler=0;
 
 void CmiMachineExit();
 
-#if CMK_USE_SYSVSHM /* define teardown function before use */
-void tearDownSharedBuffers();
-#endif 
-
 static void machine_exit(int status)
 {
   MACHSTATE(3,"     machine_exit");
@@ -345,9 +341,6 @@ static void machine_exit(int status)
     gm_close(gmport); gmport = 0;
     gm_finalize();
   }
-#endif
-#if CMK_USE_SYSVSHM
-  tearDownSharedBuffers();
 #endif
   CmiMachineExit();
   exit(status);
@@ -1651,42 +1644,7 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 inline static
 #endif
 void DeliverViaNetworkOrPxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int broot,int copy){
-#if CMK_USE_SYSVSHM
-	{
-#if SYSVSHM_STATS
-	double _startValidTime = CmiWallTimer();
-#endif
-	int ret=CmiValidSysvshm(ogm,node);
-#if SYSVSHM_STATS
-	sysvshmContext->validCheckTime += CmiWallTimer() - _startValidTime;
-#endif			
-	MACHSTATE4(3,"Msg ogm %p size %d dst %d useSysvShm %d",ogm,ogm->size,ogm->dst,ret);
-	if(ret){
-		CmiSendMessageSysvshm(ogm,node,rank,broot);
-	}else{
-		DeliverViaNetwork(ogm, node, rank, broot,copy);
-	}
-	} 
-#elif CMK_USE_PXSHM
-     {
-#if PXSHM_STATS
-	double _startValidTime = CmiWallTimer();
-#endif
-      int ret=CmiValidPxshm(ogm,node);
-#if PXSHM_STATS
-	pxshmContext->validCheckTime += CmiWallTimer() - _startValidTime;
-#endif			
-      MACHSTATE4(3,"Msg ogm %p size %d dst %d usePxShm %d",ogm,ogm->size,ogm->dst,ret);
-      if(ret){
-         CmiSendMessagePxshm(ogm,node,rank,broot);
-       }else{
-         DeliverViaNetwork(ogm, node, rank, broot,copy);
-       }
-      } 
-#else
       DeliverViaNetwork(ogm, node, rank, broot, copy);
-#endif			
-	
 }
 
 
@@ -2212,10 +2170,6 @@ void CmiMachineProgressImpl(){
 
 void LrtsAdvanceCommunication(int whileidle)
 {
-#if CMK_USE_SYSVSHM
-	CommunicationServerSysvshm();
-printf("after CommunicationServerSysvshm \n");
-#endif
   CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
 //printf("after communicationi server net\n");
 }
@@ -2338,14 +2292,6 @@ void LrtsPostCommonInit(int everReturn)
       (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
-#if CMK_USE_SYSVSHM
- 	 CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdleSysvshm, NULL);
- 	 CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdleSysvshm, NULL);
-#elif CMK_USE_PXSHM
-		//TODO: add pxshm notify idle
- 	 CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdlePxshm, NULL);
- 	 CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdlePxshm, NULL);
-#endif
   }
 
 #if CMK_SHARED_VARS_UNAVAILABLE
@@ -2428,33 +2374,31 @@ void LrtsExit()
 {
   printf("inside lrts exit\n");
   MACHSTATE(2,"ConverseExit {");
-  machine_initiated_shutdown=1;
-  if (CmiMyRank()==0) {
-    if(Cmi_print_stats)
-      printNetStatistics();
-    log_done();
-  }
-#if CMK_USE_SYSVSHM
-	CmiExitSysvshm();
-#endif
-  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
-  if (CmiMyRank()==0) CmiStdoutFlush();
-  if (Cmi_charmrun_fd==-1) {
-    if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
-    else while (1) CmiYield();
-  }
-  else {
-  	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
-#if CMK_SHARED_VARS_UNAVAILABLE
- 	Cmi_check_delay = 1.0;		/* speed up checking of charmrun */
- 	while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
-#elif CMK_MULTICORE
-        if (!Cmi_commthread && CmiMyRank()==0) {
-          Cmi_check_delay = 1.0;	/* speed up checking of charmrun */
-          while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
-        }
-#endif
-  }
+  if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
+  //  machine_initiated_shutdown=1;
+//  if (CmiMyRank()==0) {
+//    if(Cmi_print_stats)
+//      printNetStatistics();
+//    log_done();
+//  }
+//  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+//  if (CmiMyRank()==0) CmiStdoutFlush();
+//  if (Cmi_charmrun_fd==-1) {
+//    if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
+//    else while (1) CmiYield();
+//  }
+//  else {
+//  	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
+//#if CMK_SHARED_VARS_UNAVAILABLE
+// 	Cmi_check_delay = 1.0;		/* speed up checking of charmrun */
+// 	while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
+//#elif CMK_MULTICORE
+//        if (!Cmi_commthread && CmiMyRank()==0) {
+//          Cmi_check_delay = 1.0;	/* speed up checking of charmrun */
+//          while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
+//        }
+//#endif
+//  }
   MACHSTATE(2,"} ConverseExit");
 }
 
@@ -2581,10 +2525,6 @@ printf("inside lrts init\n");
   MACHSTATE(5,"node_addresses_obtain done");
 
   CmiCommunicationInit(*argv);
-
-#if CMK_USE_SYSVSHM
-  CmiInitSysvshm(*argv);
-#endif
 
   skt_set_idle(CmiYield);
   Cmi_check_delay = 1.0+0.25*_Cmi_numnodes;
