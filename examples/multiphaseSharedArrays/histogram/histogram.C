@@ -125,6 +125,7 @@ public:
         for (unsigned int i=0; i<BINS; ++i) {
             CkPrintf("%d ", b.get(i)); 
         }
+        CkPrintf("\n");
     }
 };
 
