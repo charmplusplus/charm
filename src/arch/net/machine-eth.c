@@ -23,14 +23,6 @@
  *
  *****************************************************************************/
 
-//XX: a few differences
-//static void CmiNotifyBeginIdle(CmiIdleState *s)
-//{
-//  s->sleepMs=0;
-//  s->nIdles=0;
-//
-//  MACHSTATE(3,"begin idle")
-//}
 
 //XX: a few differences
 //static void CmiNotifyStillIdle(CmiIdleState *s)

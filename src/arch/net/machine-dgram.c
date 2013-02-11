@@ -16,6 +16,7 @@
  * @{
  */
 
+
 #if CMK_USE_AMMASSO
 #include "machine-ammasso.h"
 #endif

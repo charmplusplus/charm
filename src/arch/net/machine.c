@@ -1891,7 +1891,7 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 //CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freemode)
 {
-  //printf("inside lrts send\n");
+  printf("inside lrts send\n");
   int sendonnetwork;
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
   MACHSTATE(1,"CmiGeneralSend {");
@@ -2237,6 +2237,12 @@ void LrtsDrainResources()
 
 void LrtsPostNonLocal()
 {
+#if CMK_SHARED_VARS_UNAVAILABLE
+  /*No comm. thread-- listen on sockets for incoming messages*/
+  MACHSTATE(1,"idle commserver {")
+  CommunicationServerNet(Cmi_idlepoll?0:10, COMM_SERVER_FROM_SMP);
+  MACHSTATE(1,"} idle commserver")
+#endif
 	//printf("Inside lrts post non local\n");
 }
 
