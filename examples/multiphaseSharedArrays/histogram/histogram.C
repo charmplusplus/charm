@@ -18,6 +18,7 @@ unsigned int WORKERS = 10;
 
 class Driver : public CBase_Driver
 {
+  CProxy_Histogram workers;
 public:
     Driver(CkArgMsg* m)
     {
