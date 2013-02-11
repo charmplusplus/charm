@@ -897,38 +897,7 @@ static void CommunicationInterrupt(int ignored)
 
 extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
-static void CmiStartThreads(char **argv)
-{
-  MACHSTATE2(3,"_Cmi_numpes %d _Cmi_numnodes %d",_Cmi_numpes,_Cmi_numnodes);
-  MACHSTATE1(3,"_Cmi_mynodesize %d",_Cmi_mynodesize);
-  if ((_Cmi_numpes != _Cmi_numnodes) || (_Cmi_mynodesize != 1))
-    KillEveryone
-      ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
-  
-  CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
-  _Cmi_mype = Cmi_nodestart;
-
-  /* Prepare Cpv's for immediate messages: */
-  _Cmi_myrank=1;
-  CommunicationServerInit();
-  _Cmi_myrank=0;
-  
-#if !CMK_ASYNC_NOT_NEEDED
-  if (Cmi_asyncio)
-  {
-    CmiSignal(SIGIO, 0, 0, CommunicationInterrupt);
-    if (!Cmi_netpoll) {
-      if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
-      if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
-    }
-#if CMK_USE_GM || CMK_USE_MX
-      /* charmrun is serviced in interrupt for gm */
-    if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
-#endif
-  }
-#endif
-}
-
+//static void CmiStartThreads(char **argv) TODOTODO
 
 #endif
 
@@ -1433,17 +1402,6 @@ static void CmiStdoutFlush(void) {
 
 #include "machine-dgram.c"
 
-//XX: different implementation
-//#ifndef CmiNodeFirst
-//int CmiNodeFirst(int node) { return nodes[node].nodestart; }
-//int CmiNodeSize(int node)  { return nodes[node].nodesize; }
-//#endif
-//
-//#ifndef CmiNodeOf
-//int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
-//int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
-//#endif
-
 
 /*****************************************************************************
  *
@@ -1784,56 +1742,6 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
   return (CmiCommHandle)ogm;	
 }
 
-#if CMK_NODE_QUEUE_AVAILABLE
-
-/******************************************************************************
- *
- * CmiGeneralNodeSend
- *
- * Description: This is a generic message sending routine. All the
- * converse message send functions are implemented in terms of this
- * function. (By setting appropriate flags (eg freemode) that tell
- * CmiGeneralSend() how exactly to handle the particular case of
- * message send)
- *
- *****************************************************************************/
-
-CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
-{
-  CmiState cs = CmiGetState(); OutgoingMsg ogm;
-  MACHSTATE(1,"CmiGeneralNodeSend {");
-
-  if (freemode == 'S') {
-    char *copy = (char *)CmiAlloc(size);
-    if (!copy)
-      fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
-    memcpy(copy, data, size);
-    data = copy; freemode = 'F';
-  }
-
-#if CMK_IMMEDIATE_MSG
-    /* execute the immediate message right away */
-  if (node == CmiMyNode() && CmiIsImmediate(data)) {
-    CmiPushImmediateMsg(data);
-      /* only communication thread executes immediate messages in SMP */
-    if (!_immRunning) CmiHandleImmediate();
-    return;
-  }
-#endif
-
-  CmiMsgHeaderSetLength(data, size);
-  ogm=PrepareOutgoing(cs,node,size,freemode,data);
-  CmiCommLock();
-  DeliverOutgoingNodeMessage(ogm);
-  CmiCommUnlock();
-  /* Check if any packets have arrived recently (preserves kernel network buffers). */
-  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
-  MACHSTATE(1,"} CmiGeneralNodeSend");
-  return (CmiCommHandle)ogm;
-}
-
-#endif
-
 
 /******************************************************************************
  *
@@ -1886,117 +1794,6 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   return (CmiCommHandle)ogm;
 }
 
-
-//void CmiSyncSendFn(int p, int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), 1);
-//  CmiGeneralSend(p,s,'S',m); 
-//}
-//
-//CmiCommHandle CmiAsyncSendFn(int p, int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), 1);
-//  return CmiGeneralSend(p,s,'A',m); 
-//}
-//
-//void CmiFreeSendFn(int p, int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), 1);
-//  CmiGeneralSend(p,s,'F',m); 
-//}
-//
-//void CmiSyncBroadcastFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumPes()-1); 
-//  CmiGeneralSend(PE_BROADCAST_OTHERS,s,'S',m); 
-//}
-//
-//CmiCommHandle CmiAsyncBroadcastFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumPes()-1); 
-//  return CmiGeneralSend(PE_BROADCAST_OTHERS,s,'A',m); 
-//}
-//
-//void CmiFreeBroadcastFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
-//  CmiGeneralSend(PE_BROADCAST_OTHERS,s,'F',m); 
-//}
-//
-//void CmiSyncBroadcastAllFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumPes()); 
-//  CmiGeneralSend(PE_BROADCAST_ALL,s,'S',m); 
-//}
-//
-//CmiCommHandle CmiAsyncBroadcastAllFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumPes()); 
-//  return CmiGeneralSend(PE_BROADCAST_ALL,s,'A',m); 
-//}
-//
-//void CmiFreeBroadcastAllFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumPes()); 
-//  CmiGeneralSend(PE_BROADCAST_ALL,s,'F',m); 
-//}
-//
-//#if CMK_NODE_QUEUE_AVAILABLE
-//
-//void CmiSyncNodeSendFn(int p, int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), 1);
-//  CmiGeneralNodeSend(p,s,'S',m); 
-//}
-//
-//CmiCommHandle CmiAsyncNodeSendFn(int p, int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), 1);
-//  return CmiGeneralNodeSend(p,s,'A',m); 
-//}
-//
-//void CmiFreeNodeSendFn(int p, int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), 1);
-//  CmiGeneralNodeSend(p,s,'F',m); 
-//}
-//
-//void CmiSyncNodeBroadcastFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
-//  CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'S',m); 
-//}
-//
-//CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
-//  return CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m);
-//}
-//
-//void CmiFreeNodeBroadcastFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
-//  CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'F',m); 
-//}
-//
-//void CmiSyncNodeBroadcastAllFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumNodes());
-//  CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'S',m); 
-//}
-//
-//CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumNodes());
-//  return CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); 
-//}
-//
-//void CmiFreeNodeBroadcastAllFn(int s, char *m)
-//{ 
-//  CQdCreate(CpvAccess(cQdState), CmiNumNodes());
-//  CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'F',m); 
-//}
-//#endif
 
 /******************************************************************************
  *
@@ -2055,94 +1852,6 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
 #endif
 
 
-//#if CMK_BROADCAST_SPANNING_TREE
-/*
-  if root is 1, it is called from the broadcast root, only ogm is needed;
-  if root is 0, it is called in the tree, ogm must be NULL and msg, size and startpe are needed
-  note: function leaves msg buffer untouched
-*/
-/*
-void SendSpanningChildrenNet(OutgoingMsg ogm, int root, int size, char *msg, unsigned int startpe, int noderank)
-{
-  CmiState cs = CmiGetState();
-  int i;
-
-  if (root) startpe = _Cmi_mynode;
-  else ogm = NULL;
-
-  CmiAssert(startpe>=0 && startpe<_Cmi_numnodes);
-
-  for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-    int p = _Cmi_mynode-startpe;
-    if (p<0) p+=_Cmi_numnodes;
-    p = BROADCAST_SPANNING_FACTOR*p + i;
-    if (p > _Cmi_numnodes - 1) break;
-    p += startpe;
-    p = p%_Cmi_numnodes;
-    CmiAssert(p!=_Cmi_mynode);
-    // CmiPrintf("SendSpanningChildren: %d => %d\n", _Cmi_mynode, p); 
-    if (!root && !ogm) ogm=PrepareOutgoing(cs, PE_BROADCAST_OTHERS, size,'F',CopyMsg(msg, size));
-  //  DeliverViaNetwork(ogm, nodes + p, noderank, startpe, 1);
-    DeliverViaNetworkOrPxshm(ogm, nodes+p, noderank, startpe, 1);
-  }
-  if (!root && ogm) GarbageCollectMsg(ogm);
-}
-#endif
-*/
-#if CMK_BROADCAST_HYPERCUBE
-int log_of_2 (int i) {
-  int m;
-  for (m=0; i>(1<<m); ++m);
-  return m;
-}
-
-/* called from root - send msg along the hypercube in broadcast.
-  note: function leaves msg buffer untouched
-*/
-void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int srcpe, int noderank)
-{
-  CmiState cs = CmiGetState();
-  int i, k, npes, tmp;
-  int *dest_pes;
-
-  if (root) {
-    msg = ogm->data;
-    srcpe = CmiMyNode();
-  }
-  else ogm = NULL;
-
-  tmp = srcpe ^ CmiMyNode();
-  k = log_of_2(CmiNumNodes()) + 2;
-  if (tmp) {
-     do {--k;} while (!(tmp>>k));
-  }
-
-	MACHSTATE2(3,"Broadcast SendHypercube ogm %p size %d",ogm,size);
-
-  dest_pes = CmiTmpAlloc(sizeof(int)*(k+1));
-  k--;
-  npes = HypercubeGetBcastDestinations(CmiMyNode(), CmiNumNodes(), k, dest_pes);
-  
-  for (i = 0; i < npes; i++) {
-    int p = dest_pes[i];
-    /* CmiPrintf("SendHypercube: %d => %d (%d)\n", cs->pe, p, i); */
-    if (!root && ! ogm) 
-      ogm=PrepareOutgoing(cs ,PE_BROADCAST_OTHERS, size,'F',CopyMsg(msg, size));
-    DeliverViaNetworkOrPxshm(ogm, nodes + p, noderank, CmiMyNode(), 1);
-  }
-  if (!root && ogm) GarbageCollectMsg(ogm);
-  CmiTmpFree(dest_pes);
-}
-#endif
-
-/*
-#if CMK_IMMEDIATE_MSG
-void CmiProbeImmediateMsg()
-{
-  CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
-}
-#endif
-*/
 void LrtsDrainResources()
 {
 	printf("Inside lrts drain resources\n");
@@ -2374,31 +2083,8 @@ void LrtsExit()
 {
   printf("inside lrts exit\n");
   MACHSTATE(2,"ConverseExit {");
+  machine_initiated_shutdown=1;
   if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
-  //  machine_initiated_shutdown=1;
-//  if (CmiMyRank()==0) {
-//    if(Cmi_print_stats)
-//      printNetStatistics();
-//    log_done();
-//  }
-//  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
-//  if (CmiMyRank()==0) CmiStdoutFlush();
-//  if (Cmi_charmrun_fd==-1) {
-//    if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
-//    else while (1) CmiYield();
-//  }
-//  else {
-//  	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
-//#if CMK_SHARED_VARS_UNAVAILABLE
-// 	Cmi_check_delay = 1.0;		/* speed up checking of charmrun */
-// 	while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
-//#elif CMK_MULTICORE
-//        if (!Cmi_commthread && CmiMyRank()==0) {
-//          Cmi_check_delay = 1.0;	/* speed up checking of charmrun */
-//          while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
-//        }
-//#endif
-//  }
   MACHSTATE(2,"} ConverseExit");
 }
 
