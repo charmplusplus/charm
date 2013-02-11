@@ -52,6 +52,7 @@
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
 #define CMK_64BIT					   1
+#define CMK_AMD64					   1
 
 #define CMK_WEB_MODE                                       1
 #define CMK_DEBUG_MODE                                     0
