@@ -20,7 +20,13 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #endif
 
 CtvDeclare(TCharm *,_curTCharm);
+
+#if CMK_USE_MEMPOOL_ISOMALLOC
+extern "C"
+{
 CtvExtern(mempool_type *, threadpool);
+}
+#endif
 
 static int lastNumChunks=0;
 
