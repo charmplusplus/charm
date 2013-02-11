@@ -1891,7 +1891,6 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 //CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freemode)
 {
-  printf("inside lrts send\n");
   int sendonnetwork;
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
   MACHSTATE(1,"CmiGeneralSend {");
@@ -1911,39 +1910,6 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
     data = copy; freemode = 'F';
     }
   }
-  
-  if (pe == cs->pe) {
-#if ! CMK_SMP
-    if (!_immRunning) /* CdsFifo_Enqueue, below, isn't SIGIO or thread safe.  
-                      The SMP comm thread never gets here, because of the pe test. */
-#endif
-    {
-#if CMK_IMMEDIATE_MSG
-      /* execute the immediate message right away */
-      /* but to avoid infinite recursive call, don't do this if _immRunning */
-    if (CmiIsImmediate(data)) {
-      CmiPushImmediateMsg(data);
-      CmiHandleImmediate();
-      return 0;
-    }
-#endif
-    CdsFifo_Enqueue(cs->localqueue, data);
-    if (freemode == 'A') {
-      MallocOutgoingMsg(ogm);
-      ogm->freemode = 'X';
-      return ogm;
-    } else return 0;
-    }
-  }
-
-#if CMK_PERSISTENT_COMM
-  if (phs) {
-      CmiAssert(phsSize == 1);
-      CmiSendPersistentMsg(*phs, pe, size, data);
-      return NULL;
-  }
-#endif
-
   CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
 
@@ -1957,19 +1923,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   CmiCommUnlock();
 #endif  
   
-  /* Check if any packets have arrived recently (preserves kernel network buffers). */
-#if CMK_USE_SYSVSHM
-	CommunicationServerSysvshm();
-#elif CMK_USE_PXSHM
-	CommunicationServerPxshm();
-#endif
-#if !CMK_SHARED_VARS_UNAVAILABLE
-#if !CMK_SMP_NOT_SKIP_COMMSERVER
-  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
-#endif
-#endif
-  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
-  MACHSTATE(1,"}  CmiGeneralSend");
+  MACHSTATE(1,"}  LrtsSend");
   return (CmiCommHandle)ogm;
 }
 
