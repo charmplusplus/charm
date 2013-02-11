@@ -7,10 +7,11 @@ BUT_ONE=maxReduce prime ping octo line ring
 all: $(BINS)
 	cd littleMD; $(MAKE)
 
-$(BINS): common.o
+jacobi3D: common.o
 	$(CHARMC) -o $@ $^
+$(BUT_ONE): common.o
+	$(CHARMC) -no-charmrun -o $@ $^
 
-$(BUT_ONE): OPTS+=-no-charmrun
 jacobi3D: jacobi3D.C
 maxReduce: maxReduce.C
 prime: prime.C
