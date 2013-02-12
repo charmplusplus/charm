@@ -204,6 +204,7 @@ private:
     MCount SN;
 #if defined(_FAULT_CAUSAL_)
     MCount TN;
+    MCount mlogPadding;		//HACK: aligns envelope to double size (to make xlc work)
 #endif
     int incarnation;
 	int flags;
