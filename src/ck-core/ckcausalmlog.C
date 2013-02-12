@@ -269,6 +269,9 @@ int inCkptFlag = 0;
  * @brief Initialize message logging data structures and register handlers
  */
 void _messageLoggingInit(){
+	if(CkMyPe() == 0)
+		CkPrintf("[%d] Causal Message Logging Support",CkMyPe());
+
 	//current object
 	CpvInitialize(Chare *,_currentObj);
 	
