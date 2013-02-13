@@ -167,6 +167,9 @@ public:
         CkArrayIndexBase index; ///< Array element index
         int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
         CkGroupID arr;            ///< Array manager GID
+#if CMK_SMP_TRACE_COMMTHREAD
+        UInt srcpe; 
+#endif
         UChar hopCount;           ///< number of times message has been routed
         UChar ifNotThere;         ///< what to do if array element is missing
       } array;
@@ -207,7 +210,7 @@ private:
     MCount mlogPadding;		//HACK: aligns envelope to double size (to make xlc work)
 #endif
     int incarnation;
-	int flags;
+    int flags;
     UInt piggyBcastIdx;
 #endif
     void pup(PUP::er &p);
@@ -364,7 +367,11 @@ private:
     int getArrayMgrIdx(void) const {return type.array.arr.idx;}
     UShort &getsetArrayEp(void) {return epIdx;}
     UShort &getsetArrayBcastEp(void) {return type.group.arrayEp;}
+#if CMK_SMP_TRACE_COMMTHREAD
+    UInt &getsetArraySrcPe(void) {return type.array.srcpe;}
+#else
     UInt &getsetArraySrcPe(void) {return pe;}
+#endif
     UChar &getsetArrayHops(void) {return type.array.hopCount;}
     int getArrayIfNotThere(void) {return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) {type.array.ifNotThere=nt;}
