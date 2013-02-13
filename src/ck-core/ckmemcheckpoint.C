@@ -344,7 +344,7 @@ CkMemCheckPT::CkMemCheckPT(int w)
   void pingBuddy();
   void pingCheckHandler();
   CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-  CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
+  CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
 	chkpTable[0] = NULL;
 	chkpTable[1] = NULL;
@@ -377,7 +377,7 @@ void CkMemCheckPT::pup(PUP::er& p)
     void pingBuddy();
     void pingCheckHandler();
     CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-    CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
   }
 }
@@ -1144,7 +1144,7 @@ void CkMemCheckPT::finishUp()
 #if CMK_CONVERSE_MPI	
   if (CmiMyPe() == BuddyPE(thisFailedPe)) {
     lastPingTime = CmiWallTimer();
-    CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
   }
 #endif
 
@@ -1622,7 +1622,7 @@ void pingCheckHandler()
 #endif
   }
   else 
-    CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
 }
 
