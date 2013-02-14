@@ -1745,7 +1745,7 @@ test -r ./conv-config.sh && . ./conv-config.sh
 # Decimal representation of Charm++ release line and API revision
 # Increment the last 2 digits when making an API change
 # Increase the first three after branching for a release
-VERSION=60401
+VERSION=60500
 echo $VERSION > ../include/VERSION
 
 cat >>confdefs.h <<_ACEOF
