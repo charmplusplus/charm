@@ -1934,6 +1934,23 @@ then
 fi
 fi
 
+#### query Cray machine supports BANDWIDTH_INJECTION controls####
+cat > $tc <<EOT
+#include <stdint.h>
+#include <gni_pub.h>
+
+int main() {
+    gni_bi_desc_t gni_bi_desc;
+    uint32_t gni_device_id = 0;
+    gni_return_t gni_rc = GNI_GetBIConfig(gni_device_id, &gni_bi_desc);
+    if (gni_rc == GNI_RC_SUCCESS) {
+    }
+    return 0;
+}
+EOT
+test_linkc "whether GNI_GetBIConfig exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_BALANCED_INJECTION_API, $pass, [whether Cray gni_pub has GNI_GetBIConfig])
+
 fi  # end of Cray specific test
 
 #### test if it can build shared library ####

@@ -60,4 +60,4 @@
 
 #define CMK_LB_CPUTIMER					   0
 
-#define CMK_BALANCED_INJECTION_API                         1
+

@@ -485,7 +485,8 @@ ck.o: ck.C ck.h charm++.h charm.h converse.h conv-config.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h envelope.h qd.h register.h stats.h TopoManager.h \
-  crc32.h trace-common.h BaseLB.h ckliststring.h CkMarshall.def.h
+  crc32.h trace-common.h BaseLB.h ckliststring.h CkMarshall.def.h \
+  ckBIconfig.h
 	$(CHARMC) -c -I. ck.C
 
 main.o: main.C ck.h charm++.h charm.h converse.h conv-config.h \

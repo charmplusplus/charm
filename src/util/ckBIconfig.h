@@ -6,10 +6,9 @@
 
 #ifndef CK_BI_CONFIG
 #define CK_BI_CONFIG
-#ifdef CMK_CONVERSE_GEMINI_UGNI
+#ifdef CMK_BALANCED_INJECTION_API
+#include <stdint.h>
 #include <gni_pub.h>
-#undef CMK_BALANCED_INJECTION_API
-#define CMK_BALANCED_INJECTION_API 1
 
 uint16_t ck_get_GNI_BIConfig()
 {

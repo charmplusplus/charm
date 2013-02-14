@@ -42,6 +42,9 @@
 /* Cray MAXNID */
 #undef CMK_CRAY_MAXNID
 
+/* Cray Get_BIConfig */
+#undef CMK_BALANCED_INJECTION_API
+
 /* whether C inline works in C */
 #undef CMK_C_INLINE
 
