@@ -1,0 +1,149 @@
+
+\index{templates}
+
+% Intro
+
+Templates are a mechanism provided by the \CC language to parametrize code over
+various types and constants with compile-time code specialization for each
+instance. \charmpp allows developers to implement various entities using \CC
+templates to gain their advantages in abstraction, flexibility, and
+performance. Because the \charmpp runtime system requires some generated code
+for each entity type that is used in a program, template entities must each
+have a declaration in a .ci file, a definition in a \CC header, and
+declarations of their instantiations in one or more .ci files.
+
+% Mechanics
+%% Declaration
+
+The first step to implementing a templated \charmpp entity is declaring it as
+such in a .ci file. This declaration takes the same form as any \CC template:
+the {\tt template} keyword, a list of template parameters surrounded by angle
+brackets, and the normal declaration of the entity with possible reference to
+the template parameters. The \charmpp interface translator will generate
+corresponding templated code for the entity, similar to what it would generate
+for a non-templated entity of the same kind. Differences in how one uses this
+generated code are described below.
+
+A message template might be declared as follows:
+\begin{alltt}
+module A \{
+  template <class DType, int N=3>
+  message TMessage;
+\};
+\end{alltt}
+Note that default template parameters are supported.
+
+If one wished to include variable-length arrays in a message template, those
+can be accomodated as well:
+\begin{alltt}
+module B \{
+  template <class DType>
+  message TVarMessage \{
+    DType payload[];
+  \};
+\};
+\end{alltt}
+
+Similarly, chare class templates (for various kinds of chares) would be
+written:
+\begin{alltt}
+module C \{
+  template <typename T>
+  chare TChare \{
+    entry TChare();
+    entry void doStuff(T t);
+  \};
+
+  template <typename U>
+  group TGroup \{
+    entry TGroup();
+    entry void doSomethingElse(U u, int n);
+  \};
+
+  template <typename V, int s>
+  array [2D] TArray \{
+    entry TArray(V v);
+  \};
+
+  template <typename W>
+  nodegroup TNodeGroup \{
+    entry TNodeGroup();
+    entry void doAnotherThing(W w);
+  \};
+\};
+\end{alltt}
+
+Entry method templates are declared like so:
+\begin{alltt}
+module D \{
+    array [1D] libArray \{
+        entry libArray(int _dataSize);
+        template <typename T>
+        entry void doSomething(T t, CkCallback redCB);
+    \};
+\};
+\end{alltt}
+
+%% Definition
+
+The definition of templated \charmpp entities works almost identically to the
+definition of non-template entities, with the addition of the expected template
+signature:
+\begin{alltt}
+// A.h
+#include ``A.decl.h''
+
+template <class DType, int N=3>
+struct TMessage : public CMessage_TMessage<DType, N> \{
+  DType d[N];
+\};
+
+#define CK_TEMPLATES_ONLY
+#include ``A.def.h''
+#undef CK_TEMPLATES_ONLY
+\end{alltt}
+The distinguishing change is the additional requirement to include parts of the
+generated .def.h file that relate to the templates being defined. This exposes
+the generated code that provides registration and other supporting routines to
+client code that will need to instantiate it. As with \CC template code in
+general, the entire definition of the templated entity must be visible to the
+code that eventually references it to allow instantiation. In circumstances
+where {\tt module A} contains only template code, some source file including
+{\tt A.def.h} without the template macro will still have to be compiled and
+linked to incorporate module-level generated code.
+
+%% Instantiation
+
+Code that references particular templated entities needs to ask the interface
+translator to instantiate registration and delivery code for those
+entities. This is accomplished by a declaration in a {\tt .ci} file that names
+the entity and the actual template arguments for which an instantiation is
+desired.
+
+For the message and chare templates described above, a few instantiations might
+look like
+\begin{alltt}
+module D \{
+  extern module A;
+  message TMessage<float, 7>;
+  message TMessage<double>;
+  message TMessage<int, 1>;
+
+  extern module C;
+  array [2D] TArray<std::string, 4>;
+  group TGroup<char>;
+\};
+\end{alltt}
+
+Instantiations of entry method templates are slightly more complex, because
+they must specify the chare class containing them. The template arguments are
+also specified directly in the method's parameters, rather than as distinct
+template arguments.
+\begin{alltt}
+module E \{
+  extern module D;
+
+  // syntax: extern entry void chareClassName templateEntryMethodName(list, of, actual, arguments);
+  extern entry void libArray doSomething(int&, CkCallback redCB);
+\};
+\end{alltt}
