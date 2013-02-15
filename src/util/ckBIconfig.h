@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <gni_pub.h>
 
-uint16_t ck_get_GNI_BIConfig()
+static inline uint16_t ck_get_GNI_BIConfig()
 {
   gni_bi_desc_t gni_bi_desc;
   uint32_t gni_device_id = 0;
@@ -21,7 +21,7 @@ uint16_t ck_get_GNI_BIConfig()
   return(gni_bi_desc.current_bw);
 }
 
-void ck_set_GNI_BIConfig(uint16_t biValue)
+static inline void ck_set_GNI_BIConfig(uint16_t biValue)
 {
   uint16_t modes = GNI_BI_FLAG_APPLY_NOW;
   uint32_t gni_device_id = 0;
