@@ -295,6 +295,7 @@ int getDestHandler;
 
 
 static void CommunicationServerNet(int withDelayMs, int where);
+//static void CommunicationServer(int withDelayMs);
 
 void CmiHandleImmediate();
 extern int CmemInsideMem();
@@ -325,6 +326,8 @@ extern void getAvailSysMem();
 
 static int machine_initiated_shutdown=0;
 static int already_in_signal_handler=0;
+
+static void CmiDestoryLocks();
 
 void CmiMachineExit();
 
@@ -555,7 +558,6 @@ static int  Cmi_truecrash;
 static int already_aborting=0;
 void LrtsAbort(const char *message)
 {
-printf("inside lrts abort\n");
   if (already_aborting) machine_exit(1);
   already_aborting=1;
 	{
@@ -873,31 +875,89 @@ static double         Cmi_check_delay = 3.0;
 /************************ No kernel SMP threads ***************/
 #if CMK_SHARED_VARS_UNAVAILABLE
 
- _Cmi_myrank=0; /* Normally zero; only 1 during SIGIO handling */
+static volatile int memflag=0;
+//void CmiMemLock() { memflag++; }
+//void CmiMemUnlock() { memflag--; }
+
+static volatile int comm_flag=0;
+#define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
+#ifndef MACHLOCK_DEBUG
+#  define CmiCommLock() (comm_flag=1)
+#  define CmiCommUnlock() (comm_flag=0)
+#else /* Error-checking flag locks */
+void CmiCommLock(void) {
+  MACHLOCK_ASSERT(!comm_flag,"CmiCommLock");
+  comm_flag=1;
+}
+void CmiCommUnlock(void) {
+  MACHLOCK_ASSERT(comm_flag,"CmiCommUnlock");
+  comm_flag=0;
+}
+#endif
+
+//int _Cmi_myrank=0; /* Normally zero; only 1 during SIGIO handling */
 
 static void CommunicationInterrupt(int ignored)
 {
   MACHLOCK_ASSERT(!_Cmi_myrank,"CommunicationInterrupt");
-  if (CmiMemLock_lock || comm_mutex_isLocked || _immRunning || CmiCheckImmediateLock(0)) 
+  if (memflag || comm_flag || _immRunning || CmiCheckImmediateLock(0)) 
   { /* Already busy inside malloc, comm, or immediate messages */
     MACHSTATE(5,"--SKIPPING SIGIO--");
     return;
   }
-  MACHSTATE1(2,"--BEGIN SIGIO comm_mutex_isLocked: %d--", comm_mutex_isLocked)
+  MACHSTATE1(2,"--BEGIN SIGIO comm_mutex_isLocked: %d--", comm_flag)
   {
     /*Make sure any malloc's we do in here are NOT migratable:*/
     CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
 /*    _Cmi_myrank=1; */
     CommunicationServerNet(0, COMM_SERVER_FROM_INTERRUPT);  /* from interrupt */
+    //CommunicationServer(0);  /* from interrupt */
 /*    _Cmi_myrank=0; */
     CmiIsomallocBlockListActivate(oldList);
   }
   MACHSTATE(2,"--END SIGIO--")
 }
 
+static void CmiStartThreadsNet(char **argv)
+{
+  MACHSTATE2(3,"_Cmi_numpes %d _Cmi_numnodes %d",_Cmi_numpes,_Cmi_numnodes);
+  MACHSTATE1(3,"_Cmi_mynodesize %d",_Cmi_mynodesize);
+  if ((_Cmi_numpes != _Cmi_numnodes) || (_Cmi_mynodesize != 1))
+    KillEveryone
+      ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
+
+  CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
+  _Cmi_mype = Cmi_nodestart;
+
+  /* Prepare Cpv's for immediate messages: */
+  _Cmi_myrank=1;
+  CommunicationServerInit();
+  _Cmi_myrank=0;
+
+#if !CMK_ASYNC_NOT_NEEDED
+  if (Cmi_asyncio)
+  {
+    CmiSignal(SIGIO, 0, 0, CommunicationInterrupt);
+    if (!Cmi_netpoll) {
+      if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
+      if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
+    }
+#if CMK_USE_GM || CMK_USE_MX
+      /* charmrun is serviced in interrupt for gm */
+    if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
+#endif
+  }
+#endif
+}
+
+static void CmiDestoryLocks()
+{
+  comm_flag = 0;
+  memflag = 0;
+}
+
 extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
-//static void CmiStartThreads(char **argv) TODOTODO
 
 #endif
 
@@ -1854,18 +1914,18 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
 
 void LrtsDrainResources()
 {
-	printf("Inside lrts drain resources\n");
 }
 
 void LrtsPostNonLocal()
 {
+/*
 #if CMK_SHARED_VARS_UNAVAILABLE
-  /*No comm. thread-- listen on sockets for incoming messages*/
+  //No comm. thread-- listen on sockets for incoming messages
   MACHSTATE(1,"idle commserver {")
   CommunicationServerNet(Cmi_idlepoll?0:10, COMM_SERVER_FROM_SMP);
   MACHSTATE(1,"} idle commserver")
 #endif
-	//printf("Inside lrts post non local\n");
+*/
 }
 
 /* Network progress function is used to poll the network when for
@@ -1880,6 +1940,7 @@ void CmiMachineProgressImpl(){
 void LrtsAdvanceCommunication(int whileidle)
 {
   CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
+  //CommunicationServer(0);
 //printf("after communicationi server net\n");
 }
 
@@ -1963,7 +2024,6 @@ int CmiBarrierZero()
 
 void LrtsPreCommonInit(int everReturn)
 {
-  printf("inside lrts pre common init\n");
   CmiNodeAllBarrier();
 
 #if CMK_USE_GM
@@ -1974,7 +2034,6 @@ void LrtsPreCommonInit(int everReturn)
 
 void LrtsPostCommonInit(int everReturn)
 {
-  printf("inside lrts post common init\n");
   CmiIdleState *s=CmiNotifyGetState();
 
    /* better to show the status here */
@@ -2081,11 +2140,31 @@ void LrtsPostCommonInit(int everReturn)
 
 void LrtsExit()
 {
-  printf("inside lrts exit\n");
   MACHSTATE(2,"ConverseExit {");
+  #if CMK_USE_SYSVSHM
+    CmiExitSysvshm();
+  #endif
   machine_initiated_shutdown=1;
-  if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
-  MACHSTATE(2,"} ConverseExit");
+
+  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  if (CmiMyRank()==0) CmiStdoutFlush();
+  if (Cmi_charmrun_fd==-1) {
+    if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
+    else while (1) CmiYield();
+  }
+  else {
+    ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
+#if CMK_SHARED_VARS_UNAVAILABLE
+    Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
+    while (1) CommunicationServer(500, COMM_SERVER_FROM_WORKER);
+#elif CMK_MULTICORE
+        if (!Cmi_commthread && CmiMyRank()==0) {
+          Cmi_check_delay = 1.0;    /* speed up checking of charmrun */
+          while (1) CommunicationServer(500, COMM_SERVER_FROM_WORKER);
+        }
+#endif
+  }
+
 }
 
 static void set_signals(void)
@@ -2122,7 +2201,6 @@ static int net_default_skt_abort(int code,const char *msg)
 
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
-printf("inside lrts init\n");
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
   _main(argc,*argv);
