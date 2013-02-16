@@ -331,6 +331,10 @@ static void CmiDestoryLocks();
 
 void CmiMachineExit();
 
+#if CMK_USE_SYSVSHM /* define teardown function before use */
+void tearDownSharedBuffers();
+#endif
+
 static void machine_exit(int status)
 {
   MACHSTATE(3,"     machine_exit");
@@ -344,6 +348,9 @@ static void machine_exit(int status)
     gm_close(gmport); gmport = 0;
     gm_finalize();
   }
+#endif
+#if CMK_USE_SYSVSHM
+  tearDownSharedBuffers();
 #endif
   CmiMachineExit();
   exit(status);
@@ -876,8 +883,8 @@ static double         Cmi_check_delay = 3.0;
 #if CMK_SHARED_VARS_UNAVAILABLE
 
 static volatile int memflag=0;
-//void CmiMemLock() { memflag++; }
-//void CmiMemUnlock() { memflag--; }
+void CmiMemLock() { memflag++; }
+void CmiMemUnlock() { memflag--; }
 
 static volatile int comm_flag=0;
 #define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
@@ -896,6 +903,7 @@ void CmiCommUnlock(void) {
 #endif
 
 //int _Cmi_myrank=0; /* Normally zero; only 1 during SIGIO handling */
+_Cmi_myrank=0;
 
 static void CommunicationInterrupt(int ignored)
 {
@@ -917,6 +925,8 @@ static void CommunicationInterrupt(int ignored)
   }
   MACHSTATE(2,"--END SIGIO--")
 }
+
+extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
 static void CmiStartThreadsNet(char **argv)
 {
@@ -955,9 +965,6 @@ static void CmiDestoryLocks()
   comm_flag = 0;
   memflag = 0;
 }
-
-extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
-
 
 #endif
 
@@ -1840,7 +1847,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
 
-  #if CMK_SMP_NOT_RELAX_LOCK  
+#if CMK_SMP_NOT_RELAX_LOCK  
   CmiCommLock();
 #endif  
   
@@ -1939,7 +1946,10 @@ void CmiMachineProgressImpl(){
 
 void LrtsAdvanceCommunication(int whileidle)
 {
-  CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
+#if CMK_USE_SYSVSHM
+    CommunicationServerSysvshm();
+#endif
+  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
   //CommunicationServer(0);
 //printf("after communicationi server net\n");
 }
@@ -2060,6 +2070,14 @@ void LrtsPostCommonInit(int everReturn)
       (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
+#if CMK_USE_SYSVSHM
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdleSysvshm, NULL);
+   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdleSysvshm, NULL);
+#elif CMK_USE_PXSHM
+        //TODO: add pxshm notify idle
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdlePxshm, NULL);
+   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdlePxshm, NULL);
+#endif
   }
 
 #if CMK_SHARED_VARS_UNAVAILABLE
@@ -2141,10 +2159,10 @@ void LrtsPostCommonInit(int everReturn)
 void LrtsExit()
 {
   MACHSTATE(2,"ConverseExit {");
-  #if CMK_USE_SYSVSHM
-    CmiExitSysvshm();
-  #endif
   machine_initiated_shutdown=1;
+#if CMK_USE_SYSVSHM
+    CmiExitSysvshm();
+#endif
 
   CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
   if (CmiMyRank()==0) CmiStdoutFlush();
@@ -2156,14 +2174,15 @@ void LrtsExit()
     ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
 #if CMK_SHARED_VARS_UNAVAILABLE
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
-    while (1) CommunicationServer(500, COMM_SERVER_FROM_WORKER);
+    while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
 #elif CMK_MULTICORE
         if (!Cmi_commthread && CmiMyRank()==0) {
           Cmi_check_delay = 1.0;    /* speed up checking of charmrun */
-          while (1) CommunicationServer(500, COMM_SERVER_FROM_WORKER);
+          while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
         }
 #endif
   }
+  MACHSTATE(2,"} ConverseExit");
 
 }
 
@@ -2289,6 +2308,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   MACHSTATE(5,"node_addresses_obtain done");
 
   CmiCommunicationInit(*argv);
+
+#if CMK_USE_SYSVSHM
+    CmiInitSysvshm(argv);
+#endif
 
   skt_set_idle(CmiYield);
   Cmi_check_delay = 1.0+0.25*_Cmi_numnodes;

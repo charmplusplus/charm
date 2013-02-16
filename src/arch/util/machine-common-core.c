@@ -326,8 +326,8 @@ static struct CmiStateStruct Cmi_state;
 int _Cmi_mype;
 int _Cmi_myrank;
 
-void CmiMemLock() {}
-void CmiMemUnlock() {}
+//void CmiMemLock() {}
+//void CmiMemUnlock() {}
 
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
@@ -749,7 +749,10 @@ int pe_gToLTranslate(int pe) {
 
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
-    int _ii;
+    setbuf(stdout, NULL);
+    printf("converse init started\n");
+    fflush(stdout);
+	int _ii;
     int tmp;
     //handle output to files for partition if requested
     char *stdoutbase,*stdoutpath;
@@ -795,9 +798,11 @@ if (  MSG_STATISTIC)
     }
 #endif
 
+
     if (_Cmi_mynode==0) {
 #if !CMK_SMP 
       printf("Charm++> Running on non-SMP mode\n");
+  MACHSTATE1(4,"running nonsmp %d", _Cmi_mynode)
 #else
       printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
       if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
@@ -848,6 +853,7 @@ if (  MSG_STATISTIC)
     CmiInitXpmem(argv);
 #endif
 
+  MACHSTATE1(4,"2222running nonsmp %d", _Cmi_mynode)
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
     /* CmiNodesDim = ceil(log2(CmiNumNodes)) except when #nodes is 1*/
@@ -860,12 +866,14 @@ if (  MSG_STATISTIC)
     if (CmiNumNodes()==1) CmiNodesDim=1;
 #endif
 
+  MACHSTATE1(4,"333 nonsmp %d", _Cmi_mynode)
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
 #if CMK_SMP
     commThdExitLock = CmiCreateLock();
 #endif
 
+  MACHSTATE1(4,"333 nonsmp %d", _Cmi_mynode)
 #if CMK_OFFLOAD_BCAST_PROCESS
     /* the actual queues should be created on comm thread considering NUMA in SMP */
     CsvInitialize(CMIQueue, procBcastQ);
@@ -878,9 +886,12 @@ if (  MSG_STATISTIC)
     CsvInitialize(CMIQueue, notifyCommThdMsgBuffer);
 #endif
 
+    printf("converse init before threads\n");
     CmiStartThreads(argv);
 
+
     ConverseRunPE(initret);
+    printf("converse init ended\n");
 }
 
 extern void ConverseCommonInit(char **argv);
