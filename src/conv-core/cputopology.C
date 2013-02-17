@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_BLUEGENEQ
+#if CMK_BLUEGENEL || CMK_BLUEGENEP 
 #include "TopoManager.h"
 #endif
 
@@ -461,24 +461,6 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     for(int i=0; i<numPes; i++) {
       tmgr.rankToCoordinates(i, x, y, z, t);
       nid = tmgr.coordinatesToRank(x, y, z, 0);
-      cpuTopo.nodeIDs[i] = nid;
-    }
-    cpuTopo.sort();
-    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
-  }
-  CmiNodeAllBarrier();
-#elif CMK_BLUEGENEQ
-  if (CmiMyRank() == 0) {
-   TopoManager tmgr;
-
-    int numPes = cpuTopo.numPes = CmiNumPes();
-    cpuTopo.nodeIDs = new int[numPes];
-    CpuTopology::supported = 1;
-
-    int a, b, c, d, e, t, nid;
-    for(int i=0; i<numPes; i++) {
-      tmgr.rankToCoordinates(i, a, b, c, d, e, t);
-      nid = tmgr.coordinatesToRank(a, b, c, d, e, 0);
       cpuTopo.nodeIDs[i] = nid;
     }
     cpuTopo.sort();

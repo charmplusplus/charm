@@ -1740,10 +1740,11 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	if (!CqsEmpty(s->nodeQ)
 	 && !CqsPrioGT(CqsGetPriority(s->nodeQ),
 		       CqsGetPriority(s->schedQ))) {
-	  CmiLock(s->nodeLock);
-	  CqsDequeue(s->nodeQ,(void **)&msg);
-	  CmiUnlock(s->nodeLock);
-	  if (msg!=NULL) return msg;
+	  if(CmiTryLock(s->nodeLock) == 0) {
+	    CqsDequeue(s->nodeQ,(void **)&msg);
+	    CmiUnlock(s->nodeLock);
+	    if (msg!=NULL) return msg;
+	  }
 	}
 #endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
