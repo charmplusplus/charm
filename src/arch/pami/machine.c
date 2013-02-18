@@ -29,10 +29,8 @@ FILE *debugLog = NULL;
 #endif
 #endif
 
-
 #if CMK_SMP && CMK_USE_L2ATOMICS
 #include "L2AtomicQueue.h"
-#include "L2AtomicMutex.h"
 #include "memalloc.c"
 #endif
 
@@ -138,7 +136,6 @@ typedef struct ProcState {
 static ProcState  *procState;
 
 #if CMK_SMP && CMK_USE_L2ATOMICS
-static L2AtomicMutex *node_recv_mutex;
 static L2AtomicQueue node_recv_atomic_q;
 #endif
 
@@ -264,11 +261,11 @@ volatile int msgQueueLen [MAX_NUM_CONTEXTS];
 volatile int outstanding_recvs [MAX_NUM_CONTEXTS];
 
 //#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
-//#define THREADS_PER_CONTEXT 2
-//#define LTPS                1 //Log Threads Per Context (TPS)
+#define THREADS_PER_CONTEXT 2
+#define LTPS                1 //Log Threads Per Context (TPS)
 //#else
-#define THREADS_PER_CONTEXT 4
-#define LTPS                2 //Log Threads Per Context (TPS)
+//#define THREADS_PER_CONTEXT 4
+//#define LTPS                2 //Log Threads Per Context (TPS)
 //#endif
 
 #define  MY_CONTEXT_ID() (CmiMyRank() >> LTPS)
@@ -366,8 +363,8 @@ static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t resul
      * push msg to recv queue */
     CMI_CHECK_CHECKSUM(msg, sndlen);
     if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
-      CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");
-      return;
+        CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");
+        return;
     }
 
 #if CMK_BROADCAST_SPANNING_TREE 
@@ -395,15 +392,12 @@ typedef struct _cmi_pami_rzv {
   size_t           offset;
   int              bytes;
   int              dst_context;
-  pami_memregion_t mregion;
 }CmiPAMIRzv_t;  
 
 typedef struct _cmi_pami_rzv_recv {
   void           * msg;
   void           * src_buffer;
   int              src_ep;
-  int              size;
-  pami_memregion_t rmregion;
 } CmiPAMIRzvRecv_t;
 
 static void pkt_dispatch (pami_context_t       context,      
@@ -454,7 +448,7 @@ static void short_pkt_dispatch (pami_context_t       context,
   char *smsg = (char *)pipe_addr;
   char *msg  = (char *)buffer;
 
-  CMI_CHECK_CHECKSUM(smsg, alloc_size);  
+  CMI_CHECK_CHECKSUM(smsg, pipe_size);  
   if (CMI_MAGIC(smsg) != CHARM_MAGIC_NUMBER) {
     /* received a non-charm msg */
     CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");     
@@ -731,13 +725,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     assert(retval==0);  
     for (i = 0; i < _n; ++i) {
       cmi_pami_memregion[i].baseVA = k_mregion.BaseVa;
-      retval = PAMI_Memregion_create (cmi_pami_contexts[i],
-				      k_mregion.BaseVa,
-				      k_mregion.Bytes,
-				      &bytes_out,
-				      &cmi_pami_memregion[i].mregion);
-      assert(retval == PAMI_SUCCESS);
-      assert (bytes_out == k_mregion.Bytes);
+      PAMI_Memregion_create (cmi_pami_contexts[i],
+			     k_mregion.BaseVa,
+			     k_mregion.Bytes,
+			     &bytes_out,
+			     &cmi_pami_memregion[i].mregion);
     }
     free(buf);
 #endif
@@ -789,7 +781,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 					    num_algorithm[1]);
     
     int opt_alg = 0, nalg = 0;
-    for (nalg = 0; nalg < num_algorithm[0]; ++nalg) 
+    for (nalg = 0; nalg < num_algorithm[0]; ++nalg)
       if (strstr(always_works_md[nalg].name, "GI") != NULL) {
 	opt_alg = nalg;
 	break;
@@ -813,8 +805,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     CmiNetworkBarrier(0);
     CmiNetworkBarrier(0);
     CmiNetworkBarrier(0);
-
-    //fprintf(stderr, "After network barriers\n");
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
@@ -845,9 +835,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     //pami_result_t rc;
     pami_extension_t l2;
     pamix_proc_memalign_fn PAMIX_L2_proc_memalign;
-    size_t size = (_Cmi_mynodesize + 2*actualNodeSize + 1) 
-      * sizeof(L2AtomicState) + sizeof(L2AtomicMutex);
-
+    size_t size = (4*actualNodeSize+1) * sizeof(L2AtomicState);
     rc = PAMI_Extension_open(NULL, "EXT_bgq_l2atomic", &l2);
     CmiAssert (rc == 0);
     PAMIX_L2_proc_memalign = (pamix_proc_memalign_fn)PAMI_Extension_symbol(l2, "proc_memalign");
@@ -855,11 +843,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     CmiAssert (rc == 0);    
 #endif
 
-    char *l2_start = (char *) l2atomicbuf;
     procState = (ProcState *)malloc((_Cmi_mynodesize) * sizeof(ProcState));
     for (i=0; i<_Cmi_mynodesize; i++) {
+        /*    procState[i].sendMsgBuf = PCQueueCreate();   */
+        //procState[i].recvLock = CmiCreateLock();
 #if CMK_SMP && CMK_USE_L2ATOMICS
-	L2AtomicQueueInit (l2_start + sizeof(L2AtomicState)*i,
+	L2AtomicQueueInit ((char *) l2atomicbuf + sizeof(L2AtomicState)*i,
 			   sizeof(L2AtomicState),
 			   &procState[i].atomic_queue,
 			   1, /*use overflow*/
@@ -868,17 +857,15 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     }
 
 #if CMK_SMP && CMK_USE_L2ATOMICS    
-    l2_start += _Cmi_mynodesize * sizeof(L2AtomicState);
-    CmiMemAllocInit_bgq (l2_start, 2*actualNodeSize*sizeof(L2AtomicState)); 
-    l2_start += 2*actualNodeSize*sizeof(L2AtomicState); 
-
-    L2AtomicQueueInit (l2_start,
+    CmiMemAllocInit_bgq ((char*)l2atomicbuf + 
+			 2*actualNodeSize*sizeof(L2AtomicState),
+			 2*actualNodeSize*sizeof(L2AtomicState)); 
+    L2AtomicQueueInit ((char*)l2atomicbuf + 
+		       4*actualNodeSize*sizeof(L2AtomicState),
 		       sizeof(L2AtomicState),
 		       &node_recv_atomic_q,
 		       1, /*use overflow*/
-		       DEFAULT_SIZE /*1024 entries*/);	 
-    l2_start += sizeof(L2AtomicState);  
-    node_recv_mutex = L2AtomicMutexInit(l2_start, sizeof(L2AtomicMutex));   
+		       DEFAULT_SIZE /*1024 entries*/);		       
 #endif
     
     //Initialize the manytomany api
@@ -942,45 +929,6 @@ void ConverseRunPE(int everReturn) {
     }    
 }
 
-#define MAX_BARRIER_THREADS 64
-volatile unsigned char spin_bar_flag[2][MAX_BARRIER_THREADS];
-unsigned char spin_iter[MAX_BARRIER_THREADS];
-volatile unsigned char done_flag[2];
-
-//slow barrier for ckexit that calls advance while spinning
-void spin_wait_barrier () {
-  int i = 0;
-  int iter = spin_iter[CmiMyRank()];
-  int iter_1 = (iter + 1) % 2;
-
-  //start barrier 
-  //reset next barrier iteration before this one starts
-  done_flag[iter_1] = 0;
-  spin_iter[CmiMyRank()] = iter_1;
-  spin_bar_flag[iter_1][CmiMyRank()] = 0;
-  
-  //Notify arrival
-  spin_bar_flag[iter][CmiMyRank()] = 1;
-
-  if (CmiMyRank() == 0) {
-    while (!done_flag[iter]) {
-      for (i = 0; i < CmiMyNodeSize(); ++i)
-	if (spin_bar_flag[iter][i] == 0)
-	  break;
-      if (i >= CmiMyNodeSize()) 
-	done_flag[iter] = 1;
-      AdvanceCommunications();
-    }        
-  }
-  else {
-    while (!done_flag[iter])
-      AdvanceCommunications();
-  }
-
-  //barrier complete
-}
-
-
 void ConverseExit(void) {
 
     while (MSGQLEN() > 0 || ORECVS() > 0) {
@@ -994,10 +942,8 @@ void ConverseExit(void) {
         printf("End of program\n");
     }
 
-#if CMK_SMP
-    spin_wait_barrier();
-    //CmiNodeBarrier();
-#endif
+    CmiNodeBarrier();
+//  CmiNodeAllBarrier ();
 
     int rank0 = 0;
     if (CmiMyRank() == 0) {
@@ -1010,12 +956,14 @@ void ConverseExit(void) {
 	PAMI_Client_destroy(&cmi_pami_client);
     }
 
+    CmiNodeBarrier();
+    //  CmiNodeAllBarrier ();
+    //fprintf(stderr, "Before Exit\n");
 #if CMK_SMP
-    spin_wait_barrier();
-    //CmiNodeBarrier();
-    
-    if (rank0) 
-      exit(1);
+    if (rank0) {
+      Delay(100000);
+      exit(0);
+    }
     else
       pthread_exit(0);
 #else
@@ -1045,9 +993,9 @@ char *CmiGetNonLocalNodeQ(void) {
 
 #if CMK_SMP && CMK_USE_L2ATOMICS
     if (!L2AtomicQueueEmpty(&node_recv_atomic_q)) {
-      if (L2AtomicMutexTryAcquire(node_recv_mutex) == 0) {
+      if (CmiTryLock(CsvAccess(NodeState).CmiNodeRecvLock) == 0) {
 	result = (char*)L2AtomicDequeue(&node_recv_atomic_q);
-	L2AtomicMutexRelease(node_recv_mutex);
+	CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
       }
     }
 #else
@@ -1259,14 +1207,13 @@ void  machine_send       (pami_context_t      context,
       rzv.buffer      = msg;
       rzv.offset      = (size_t)msg - (size_t)cmi_pami_memregion[0].baseVA;
       rzv.dst_context = dst_context;
-      memcpy(&rzv.mregion, &cmi_pami_memregion[0].mregion, sizeof(pami_memregion_t));
 
       pami_send_immediate_t parameters;
       parameters.dispatch        = CMI_PAMI_RZV_DISPATCH;
       parameters.header.iov_base = &rzv;
       parameters.header.iov_len  = sizeof(rzv);
-      parameters.data.iov_base   = NULL;
-      parameters.data.iov_len    = 0;
+      parameters.data.iov_base   = &cmi_pami_memregion[0].mregion;      
+      parameters.data.iov_len    = sizeof(pami_memregion_t);
       parameters.dest = target;
       
       if(to_lock)
@@ -1446,7 +1393,6 @@ void AdvanceCommunications() {
 
 void CmiNotifyIdle() {
   AdvanceCommunications();
-
 #if CMK_SMP && CMK_PAMI_MULTI_CONTEXT
 #if !CMK_ENABLE_ASYNC_PROGRESS && CMK_USE_L2ATOMICS
   //Wait on the atomic queue to get a message with very low core
@@ -1585,7 +1531,7 @@ void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int si
       if (CmiNodeOf(pes[i]) == CmiMyNode()) {
 	//CmiSyncSend(pes[i], size, msg);
 	copymsg = (char *)CmiAlloc(size);
-	//CmiAssert(copymsg != NULL);
+	CmiAssert(copymsg != NULL);
 	CmiMemcpy(copymsg,msg,size);	  
 	CmiSendPeer(CmiRankOf(pes[i]), size, copymsg);
       }
@@ -1629,107 +1575,6 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg) {
     CmiAbort("CmiAsyncListSendFn not implemented.");
     return (CmiCommHandle) 0;
 }
-
-#if CMK_NODE_QUEUE_AVAILABLE
-
-typedef struct ListNodeMulticastVec_t {
-  int   *nodes;
-  int    n_nodes;
-  char  *msg;
-  int    size;
-} ListNodeMulticastVec;
-
-void machineFreeNodeListSendFn(pami_context_t    context, 
-			       int               n_nodes, 
-			       int             * nodes, 
-			       int               size, 
-			       char            * msg);
-
-pami_result_t machineFreeNodeList_handoff(pami_context_t context, void *cookie)
-{
-  ListNodeMulticastVec *lvec = (ListNodeMulticastVec *) cookie;
-  machineFreeNodeListSendFn(context, lvec->n_nodes, 
-			    lvec->nodes, lvec->size, lvec->msg);
-  CmiFree(cookie);
-}
-
-void CmiFreeNodeListSendFn(int n_nodes, int *nodes, int size, char *msg) {
-
-    //printf("%d In cmifreenodelistsendfn %d %d\n", CmiMyPe(), n_nodes, size);
-    CMI_SET_BROADCAST_ROOT(msg,0);
-    CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
-    CmiMsgHeaderBasic *hdr = (CmiMsgHeaderBasic *)msg;
-    hdr->size = size;
-    CMI_SET_CHECKSUM(msg, size);
-
-    //Fast path
-    if (n_nodes == 1) {
-      CmiGeneralFreeSendN(nodes[0], SMP_NODEMESSAGE, size, msg, 1);
-      return;
-    }
-
-    pami_context_t my_context = MY_CONTEXT();
-#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
-    ListNodeMulticastVec *lvec = (ListNodeMulticastVec *) 
-      CmiAlloc(sizeof(ListNodeMulticastVec));
-      
-    lvec->nodes   = nodes;
-    lvec->n_nodes = n_nodes;
-    lvec->msg     = msg;
-    lvec->size    = size;
-    PAMI_Context_post(my_context, (pami_work_t*)hdr->work, 
-		      machineFreeNodeList_handoff, lvec);
-#else
-    machineFreeNodeListSendFn(my_context, nodes, n_nodes, size, msg);
-#endif
-}
-
-void CmiSendNodeSelf(char *msg);
-void machineFreeNodeListSendFn(pami_context_t       my_context, 
-			       int                  n_nodes, 
-			       int                * nodes, 
-			       int                  size, 
-			       char               * msg) 
-{
-    int i;
-    char *copymsg;
-
-    for (i=0; i<n_nodes; i++) {
-      if (nodes[i] == CmiMyNode()) {
-	copymsg = (char *)CmiAlloc(size);
-	CmiAssert(copymsg != NULL);
-	CmiMemcpy(copymsg,msg,size);	  
-	CmiSendNodeSelf(copymsg);
-      }
-    }
-
-    PAMIX_CONTEXT_LOCK(my_context);
-    
-    for (i=0;i<n_nodes;i++) {
-        if (nodes[i] == CmiMyNode());
-        else if (i < n_nodes - 1) {
-#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
-	  CmiReference(msg);
-	  copymsg = msg;
-	  machine_send(my_context, nodes[i], SMP_NODEMESSAGE, size, copymsg, 0);
-#else
-	  copymsg = (char *)CmiAlloc(size);
-	  CmiAssert(copymsg != NULL);
-	  CmiMemcpy(copymsg,msg,size);
-	  CmiGeneralFreeSendN(nodes[i], SMP_NODEMESSAGE, size, copymsg, 0);
-#endif
-        }
-    }
-
-    if (n_nodes  && nodes[n_nodes-1] != CmiMyNode())
-      machine_send(my_context, nodes[n_nodes-1], SMP_NODEMESSAGE, size, msg, 0);
-    else
-      CmiFree(msg);    
-    
-    PAMIX_CONTEXT_UNLOCK(my_context);
-}
-#endif
-
 #endif
 
 /** NODE SENDING FUNCTIONS
@@ -1870,7 +1715,7 @@ static void CmiNetworkBarrier(int async) {
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
-void CmiSendNodeSelf(char *msg) {
+static void CmiSendNodeSelf(char *msg) {
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
       //CmiLock(CsvAccess(NodeState).immRecvLock);
@@ -2032,12 +1877,6 @@ void rzv_recv_done   (pami_context_t     ctxt,
 		      pami_result_t      result) 
 {
   CmiPAMIRzvRecv_t recv = *(CmiPAMIRzvRecv_t *)clientdata;
-
-  if (CMI_MAGIC(recv.msg) != CHARM_MAGIC_NUMBER) { 
-    fprintf(stderr,"Received bogus message from rank %d, size %d, sbuf %p dbuf %p\n", 
-	    recv.src_ep, recv.size, recv.src_buffer, recv.msg);
-  }
-
   recv_done(ctxt, recv.msg, PAMI_SUCCESS);
   sendAck(ctxt, &recv);
 }
@@ -2065,12 +1904,10 @@ void rzv_pkt_dispatch (pami_context_t       context,
   rzv_recv->msg        = buffer;
   rzv_recv->src_ep     = origin;
   rzv_recv->src_buffer = rzv_hdr->buffer;
-  rzv_recv->size       = rzv_hdr->bytes;
   
-  //CmiAssert (pipe_addr != NULL);
-  //CmiAssert (pipe_size == sizeof(pami_memregion_t));
-  //pami_memregion_t *mregion = (pami_memregion_t *) pipe_addr;
-  memcpy(&rzv_recv->rmregion, &rzv_hdr->mregion, sizeof(pami_memregion_t));
+  CmiAssert (pipe_addr != NULL);
+  pami_memregion_t *mregion = (pami_memregion_t *) pipe_addr;
+  CmiAssert (pipe_size == sizeof(pami_memregion_t));
 
   //Rzv inj fifos are on the 17th core shared by all contexts
   pami_rget_simple_t  rget;
@@ -2080,17 +1917,14 @@ void rzv_pkt_dispatch (pami_context_t       context,
   rget.rma.done_fn = rzv_recv_done;
   rget.rma.hints.buffer_registered = PAMI_HINT_ENABLE;
   rget.rma.hints.use_rdma = PAMI_HINT_ENABLE;
-  //rget.rma.hints.use_shmem = PAMI_HINT_DISABLE;
   rget.rdma.local.mr      = &cmi_pami_memregion[rzv_hdr->dst_context].mregion;  
   rget.rdma.local.offset  = (size_t)buffer - 
     (size_t)cmi_pami_memregion[rzv_hdr->dst_context].baseVA;
-  rget.rdma.remote.mr     = &rzv_recv->rmregion;
+  rget.rdma.remote.mr     = mregion; //from message payload
   rget.rdma.remote.offset = rzv_hdr->offset;
 
   //printf ("starting rget\n");
-  pami_result_t rc;
-  rc = PAMI_Rget (context, &rget);  
-  //CmiAssert(rc == PAMI_SUCCESS);
+  PAMI_Rget (context, &rget);  
 }
 
 void ack_pkt_dispatch (pami_context_t       context,   

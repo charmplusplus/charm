@@ -18,8 +18,6 @@
 #define L2A_EAGAIN  -1
 #define L2A_FAIL    -2
 
-#define __L2_ATOMIC_QUEUE_BLOCKING  1
-
 typedef  void* L2AtomicQueueElement;
 
 typedef struct _l2atomicstate {
@@ -107,13 +105,10 @@ void * L2AtomicDequeue (L2AtomicQueue    *queue)
   volatile void *e = NULL;
   if (head < tail) {    
     e = queue->_array[head & qsize_1];
-#if __L2_ATOMIC_QUEUE_BLOCKING
     while (e == NULL) 
       e = queue->_array[head & qsize_1];
-#else
-    if (e == NULL)
-      return NULL;
-#endif
+
+    //fprintf(stderr,"Found message %p\n", e);
 
     queue->_array[head & qsize_1] = NULL;
     ppc_msync();

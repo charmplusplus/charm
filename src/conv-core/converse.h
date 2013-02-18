@@ -1081,7 +1081,6 @@ void          CmiFreeBroadcastAllFn(int, char *);
 void          CmiSyncListSendFn(int, int *, int, char*);
 CmiCommHandle CmiAsyncListSendFn(int, int *, int, char*);
 void          CmiFreeListSendFn(int, int *, int, char*);
-void          CmiFreeNodeListSendFn(int, int *, int, char*);
 
 void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
