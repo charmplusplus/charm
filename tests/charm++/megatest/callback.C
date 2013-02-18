@@ -41,6 +41,36 @@ extern "C" void acceptCFnCall(void *param,void *msg)
 	coord.done(typeCfn,msg2val((callbackMsg *)msg));
 }
 
+
+class callbackChare : public CBase_callbackChare {
+	CProxy_callbackCoord coord;
+public:
+	callbackChare(CProxy_callbackCoord coord_) :coord(coord_) {}
+	void accept(callbackMsg *m) {
+		coord.done(typeChare,msg2val(m));
+	}
+};
+class callbackArray : public CBase_callbackArray {
+	CProxy_callbackCoord coord;
+public:
+	callbackArray(CProxy_callbackCoord coord_) :coord(coord_) {}
+	callbackArray(CkMigrateMessage *) {}
+	void accept(callbackMsg *m) {
+		coord.done(typeArray,msg2val(m));
+	}
+};
+class callbackGroup : public CBase_callbackGroup {
+	CProxy_callbackCoord coord;
+public:
+	callbackGroup(CProxy_callbackCoord coord_) :coord(coord_) {}
+	void accept(callbackMsg *m) {
+		coord.done(typeGroup,msg2val(m));
+	}
+	void reflect(CkCallback cb,int val) {
+		cb.send(new callbackMsg(val));
+	}
+};
+
 class callbackCoord : public CBase_callbackCoord {
 	CProxy_callbackChare cp;
 	int nArr;
@@ -65,7 +95,7 @@ class callbackCoord : public CBase_callbackCoord {
 		switch(state) {
 		case 0: //Send to chare
 			expectType=typeChare;
-			send(CkCallback(CkIndex_callbackChare::accept(NULL),
+			send(CkCallback(CkIndex_callbackChare::idx_accept(&callbackChare::accept),
 					cp));
 			break;
 		case 1: //Send to array element
@@ -142,36 +172,6 @@ public:
 		megatest_finish();
 	}
 };
-
-class callbackChare : public CBase_callbackChare {
-	CProxy_callbackCoord coord;
-public:
-	callbackChare(CProxy_callbackCoord coord_) :coord(coord_) {}
-	void accept(callbackMsg *m) {
-		coord.done(typeChare,msg2val(m));
-	}
-};
-class callbackArray : public CBase_callbackArray {
-	CProxy_callbackCoord coord;
-public:
-	callbackArray(CProxy_callbackCoord coord_) :coord(coord_) {}
-	callbackArray(CkMigrateMessage *) {}
-	void accept(callbackMsg *m) {
-		coord.done(typeArray,msg2val(m));
-	}
-};
-class callbackGroup : public CBase_callbackGroup {
-	CProxy_callbackCoord coord;
-public:
-	callbackGroup(CProxy_callbackCoord coord_) :coord(coord_) {}
-	void accept(callbackMsg *m) {
-		coord.done(typeGroup,msg2val(m));
-	}
-	void reflect(CkCallback cb,int val) {
-		cb.send(new callbackMsg(val));
-	}
-};
-
 
 MEGATEST_REGISTER_TEST(callback,"olawlor",1)
 #include "callback.def.h"
