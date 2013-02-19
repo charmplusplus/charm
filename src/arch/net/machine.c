@@ -1946,12 +1946,7 @@ void CmiMachineProgressImpl(){
 
 void LrtsAdvanceCommunication(int whileidle)
 {
-#if CMK_USE_SYSVSHM
-    CommunicationServerSysvshm();
-#endif
   CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
-  //CommunicationServer(0);
-//printf("after communicationi server net\n");
 }
 
 /******************************************************************************
@@ -2070,14 +2065,6 @@ void LrtsPostCommonInit(int everReturn)
       (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
-#if CMK_USE_SYSVSHM
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdleSysvshm, NULL);
-   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdleSysvshm, NULL);
-#elif CMK_USE_PXSHM
-        //TODO: add pxshm notify idle
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdlePxshm, NULL);
-   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdlePxshm, NULL);
-#endif
   }
 
 #if CMK_SHARED_VARS_UNAVAILABLE
@@ -2160,9 +2147,6 @@ void LrtsExit()
 {
   MACHSTATE(2,"ConverseExit {");
   machine_initiated_shutdown=1;
-#if CMK_USE_SYSVSHM
-    CmiExitSysvshm();
-#endif
 
   CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
   if (CmiMyRank()==0) CmiStdoutFlush();
@@ -2308,10 +2292,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   MACHSTATE(5,"node_addresses_obtain done");
 
   CmiCommunicationInit(*argv);
-
-#if CMK_USE_SYSVSHM
-    CmiInitSysvshm(argv);
-#endif
 
   skt_set_idle(CmiYield);
   Cmi_check_delay = 1.0+0.25*_Cmi_numnodes;
