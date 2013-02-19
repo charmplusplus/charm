@@ -327,7 +327,7 @@ extern void getAvailSysMem();
 static int machine_initiated_shutdown=0;
 static int already_in_signal_handler=0;
 
-static void CmiDestoryLocks();
+static void CmiDestroyLocks();
 
 void CmiMachineExit();
 
@@ -340,7 +340,7 @@ static void machine_exit(int status)
   MACHSTATE(3,"     machine_exit");
   machine_initiated_shutdown=1;
 
-  CmiDestoryLocks();		/* destory locks to prevent dead locking */
+  CmiDestroyLocks();		/* destory locks to prevent dead locking */
   EmergencyExit();
 
 #if CMK_USE_GM
@@ -398,7 +398,7 @@ static void KillOnAllSigs(int sigNo)
   }
 #endif
   
-  CmiDestoryLocks();		/* destory locks */
+  CmiDestroyLocks();		/* destory locks */
 
   if (sigNo==SIGSEGV) {
      sig="segmentation violation";
@@ -584,7 +584,7 @@ void LrtsAbort(const char *message)
   }
 #endif
   
-  /* CmiDestoryLocks();  */
+  /* CmiDestroyLocks();  */
 
   {
 /*    char str[22];
@@ -960,7 +960,7 @@ static void CmiStartThreadsNet(char **argv)
 #endif
 }
 
-static void CmiDestoryLocks()
+static void CmiDestroyLocks()
 {
   comm_flag = 0;
   memflag = 0;
