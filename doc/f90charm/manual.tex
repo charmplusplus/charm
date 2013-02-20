@@ -1,19 +1,5 @@
 \documentclass[11pt]{article}
 
-\newif\ifpdf
-\ifx\pdfoutput\undefined
-  \pdffalse
-\else
-  \pdfoutput=1
-  \pdftrue
-\fi
-
-\ifpdf
-  \pdfcompresslevel=9
-  \usepackage[pdftex,colorlinks=true,plainpages=false]{hyperref}
-\else
-\fi
-
 \pagestyle{headings}
 
 \title{Fortran90 Bindings for Charm++\footnote{last modified 4/1/2001 by Gengbin Zheng}}
