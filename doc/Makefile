@@ -32,11 +32,8 @@ web: doc
 	cp -r ps $(WEBDIR)/ps.new
 	cp -r pdf $(WEBDIR)/pdf.new
 	cp -r html $(WEBDIR)/html.new
-	cp manual.css $(WEBDIR)/
 	chgrp -R kale $(WEBDIR)/ps.new $(WEBDIR)/pdf.new $(WEBDIR)/html.new
-	-chgrp -R kale $(WEBDIR)/manual.css
 	chmod -R g+w $(WEBDIR)/ps.new $(WEBDIR)/pdf.new $(WEBDIR)/html.new
-	-chmod -R g+w $(WEBDIR)/manual.css
 	mv $(WEBDIR)/ps $(WEBDIR)/ps.old.nobackup
 	mv $(WEBDIR)/pdf $(WEBDIR)/pdf.old.nobackup
 	mv $(WEBDIR)/html $(WEBDIR)/html.old.nobackup
