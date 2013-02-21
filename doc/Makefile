@@ -28,12 +28,12 @@ doc:
 web: doc
 	-rm -rf $(WEBDIR)/backup
 	mkdir -p $(WEBDIR)/backup && \
-	mv $(WEBDIR)/ps $(WEBDIR)/pdf $(WEBDIR)/html $(WEBDIR)/backup
-	cp -r ps pdf html $(WEBDIR) && \
-	chgrp -R kale $(WEBDIR)/ps $(WEBDIR)/pdf $(WEBDIR)/html && \
-	chmod -R g+w $(WEBDIR)/ps $(WEBDIR)/pdf $(WEBDIR)/html || \
-	{ rm -rf $(WEBDIR)/ps $(WEBDIR)/pdf $(WEBDIR)/html && \
-	mv $(WEBDIR)/backup/ps $(WEBDIR)/backup/pdf $(WEBDIR)/backup/html $(WEBDIR); }
+	mv $(WEBDIR)/pdf $(WEBDIR)/html $(WEBDIR)/backup
+	cp -r pdf html $(WEBDIR) && \
+	chgrp -R kale $(WEBDIR)/pdf $(WEBDIR)/html && \
+	chmod -R g+w  $(WEBDIR)/pdf $(WEBDIR)/html || \
+	{ rm -rf $(WEBDIR)/pdf $(WEBDIR)/html && \
+	mv $(WEBDIR)/backup/pdf $(WEBDIR)/backup/html $(WEBDIR); }
 	-rm -rf $(WEBDIR)/backup
 
 clean:

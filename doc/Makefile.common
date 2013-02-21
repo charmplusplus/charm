@@ -29,7 +29,7 @@ DEPTEX=$(TEX) $(FILE).aux index.tex
 
 # Default target: build postscript, pdf, and html:
 
-all: pdf ps html
+all: pdf html
 
 # PostScript Target:
 ps: $(FILE).ps
@@ -96,11 +96,8 @@ clean:
 # Build local copy of documentation:
 doc: all
 	if [ ! -d $(DOCDIR) ] ; then mkdir $(DOCDIR) ; fi
-	if [ ! -d $(DOCDIR)/ps ] ; then mkdir $(DOCDIR)/ps ; fi
 	if [ ! -d $(DOCDIR)/pdf ] ; then mkdir $(DOCDIR)/pdf ; fi
 	if [ ! -d $(DOCDIR)/html ] ; then mkdir $(DOCDIR)/html ; fi
-	/bin/cp $(FILE).ps $(DOCDIR)/ps/$(DEST).ps
-	chmod 664 $(DOCDIR)/ps/$(DEST).ps
 	/bin/cp $(FILE).pdf $(DOCDIR)/pdf/$(DEST).pdf
 	chmod 664 $(DOCDIR)/pdf/$(DEST).pdf
 	/bin/rm -rf $(DOCDIR)/html/$(DEST)
@@ -110,8 +107,6 @@ doc: all
 
 # Build web copy of documentation (PPL-only):
 web: all
-	/bin/cp $(FILE).ps $(WEBDIR)/ps/$(DEST).ps
-	-chmod 664 $(WEBDIR)/ps/$(DEST).ps
 	/bin/cp $(FILE).pdf $(WEBDIR)/pdf/$(DEST).pdf
 	-chmod 664 $(WEBDIR)/pdf/$(DEST).pdf
 	/bin/rm -rf $(WEBDIR)/html/$(DEST)
