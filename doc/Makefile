@@ -26,20 +26,15 @@ doc:
 	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) doc) || exit 1; done
 
 web: doc
-	-rm -rf $(WEBDIR)/ps.new $(WEBDIR)/pdf.new $(WEBDIR)/html.new
-	-rm -rf $(WEBDIR)/ps.old $(WEBDIR)/pdf.old $(WEBDIR)/html.old
-	-rm -rf $(WEBDIR)/ps.old.nobackup $(WEBDIR)/pdf.old.nobackup $(WEBDIR)/html.old.nobackup
-	cp -r ps $(WEBDIR)/ps.new
-	cp -r pdf $(WEBDIR)/pdf.new
-	cp -r html $(WEBDIR)/html.new
-	chgrp -R kale $(WEBDIR)/ps.new $(WEBDIR)/pdf.new $(WEBDIR)/html.new
-	chmod -R g+w $(WEBDIR)/ps.new $(WEBDIR)/pdf.new $(WEBDIR)/html.new
-	mv $(WEBDIR)/ps $(WEBDIR)/ps.old.nobackup
-	mv $(WEBDIR)/pdf $(WEBDIR)/pdf.old.nobackup
-	mv $(WEBDIR)/html $(WEBDIR)/html.old.nobackup
-	mv $(WEBDIR)/ps.new $(WEBDIR)/ps
-	mv $(WEBDIR)/pdf.new $(WEBDIR)/pdf
-	mv $(WEBDIR)/html.new $(WEBDIR)/html
+	-rm -rf $(WEBDIR)/backup
+	mkdir -p $(WEBDIR)/backup && \
+	mv $(WEBDIR)/ps $(WEBDIR)/pdf $(WEBDIR)/html $(WEBDIR)/backup
+	cp -r ps pdf html $(WEBDIR) && \
+	chgrp -R kale $(WEBDIR)/ps $(WEBDIR)/pdf $(WEBDIR)/html && \
+	chmod -R g+w $(WEBDIR)/ps $(WEBDIR)/pdf $(WEBDIR)/html || \
+	{ rm -rf $(WEBDIR)/ps $(WEBDIR)/pdf $(WEBDIR)/html && \
+	mv $(WEBDIR)/backup/ps $(WEBDIR)/backup/pdf $(WEBDIR)/backup/html $(WEBDIR); }
+	-rm -rf $(WEBDIR)/backup
 
 clean:
 	for d in $(DIRS); do (cd $$d; $(RMCMD); $(MAKE) clean) || exit 1; done
