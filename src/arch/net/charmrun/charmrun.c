@@ -4398,7 +4398,7 @@ void start_one_node_rsh(int rank0no)
 int start_set_node_rsh(int client) {
 	/* a search function could be inserted here instead of sequential lookup for more complex node lists (e.g. interleaving) */
 	int clientgroup;
-#if CMK_SMP || defined(_WIN32)
+#if defined(_WIN32)
 	clientgroup=client+1; /* smp already handles this functionality */
 #else
 
@@ -4428,7 +4428,7 @@ int start_set_node_rsh(int client) {
 		clientgroup=client;
 		do {
 			clientgroup++; /* add one more client to group if not greater than nodes and shares the same name as client */
-        }while(clientgroup<nodetab_rank0_size&&(!strcmp(nodetab_name(clientgroup),nodetab_name(client))));
+        }while(clientgroup<nodetab_rank0_size&&(!strcmp(nodetab_getnodeinfo(clientgroup)->name,nodetab_getnodeinfo(client)->name)));
 	}
 #endif
 
