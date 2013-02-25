@@ -363,7 +363,7 @@ static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t resul
      * push msg to recv queue */
     CMI_CHECK_CHECKSUM(msg, sndlen);
     if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
-        CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");
+        CmiAbort("Charm++ Warning: Non Charm++ Message Received. If your application has a large number of messages, this may be because of overflow in the low-level FIFOs. Please set the environment variable MUSPI_INJFIFOSIZE if the application has large number of small messages (<=4K bytes), and/or PAMI_RGETINJFIFOSIZE if the application has a large number of large messages. The default value of these variable is 65536 which is sufficient for 1000 messages in flight; please try a larger value. Please note that the memory used for these FIFOs eats up the memory = 10*FIFO_SIZE per core. Please contact Charm++ developers for further information. \n");     
         return;
     }
 
@@ -451,7 +451,7 @@ static void short_pkt_dispatch (pami_context_t       context,
   CMI_CHECK_CHECKSUM(smsg, pipe_size);  
   if (CMI_MAGIC(smsg) != CHARM_MAGIC_NUMBER) {
     /* received a non-charm msg */
-    CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");     
+    CmiAbort("Charm++ Warning: Non Charm++ Message Received. If your application has a large number of messages, this may be because of overflow in the low-level FIFOs. Please set the environment variable MUSPI_INJFIFOSIZE if the application has large number of small messages (<=4K bytes), and/or PAMI_RGETINJFIFOSIZE if the application has a large number of large messages. The default value of these variable is 65536 which is sufficient for 1000 messages in flight; please try a larger value. Please note that the memory used for these FIFOs eats up the memory = 10*FIFO_SIZE per core. Please contact Charm++ developers for further information. \n");     
   }
  
   CmiPushPE(CMI_DEST_RANK(smsg), (void *)msg);
