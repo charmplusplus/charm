@@ -648,6 +648,10 @@ do
 		      OBJECT="a.out"
 		fi
 		;;
+        -print-prog-name=*)
+                echo $arg | cut -d'=' -f2
+                exit 0
+                ;;
 	"-c")
 		if [ "$EXPLICIT_OBJECT" = "no" ]
 		then
