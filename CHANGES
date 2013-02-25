@@ -132,6 +132,8 @@ What's new in Charm++ 6.5.0
   * A new scheme for optimization of double in-memory checkpoint/restart.
   * Message combining library for improved fine-grained communication
     performance
+  * Support for partitioning of allocated nodes into subsets that run
+    independent Charm++ instances but can interact with each other.
 
 Platform-Specific Changes
 -------------------------
@@ -151,6 +153,11 @@ Platform-Specific Changes
   interface and MPI, with and without SMP support. This supports many new
   systems, including ALCF's Mira and LLNL's Sequoia. The 'mpi-bluegeneq' and
   'pamilrts-bluegeneq' variants are probably the most stable.
+  Note: Applications that have large number of messages may crash in default setup 
+  due to overflow in the low-level FIFOs. Environment variables MUSPI_INJFIFOSIZE 
+  and PAMI_RGETINJFIFOSIZE can be set to avoid application failures due to large 
+  number of small and large messages respectively. The default value of these 
+  variable is 65536 which is sufficient for 1000 messages in flight.
 
 - Infiniband Verbs: Better support for more flavors of ibverbs libraries
 
