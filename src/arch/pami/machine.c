@@ -1146,9 +1146,9 @@ void  machine_send       (pami_context_t      context,
 
     pami_endpoint_t target;
 #if CMK_PAMI_MULTI_CONTEXT
-    //size_t dst_context = (rank != SMP_NODEMESSAGE) ? (rank>>LTPS) : (rand_r(&r_seed) % cmi_pami_numcontexts);
+    size_t dst_context = (rank != SMP_NODEMESSAGE) ? (rank>>LTPS) : (rand_r(&r_seed) % cmi_pami_numcontexts);
     //Choose a context at random
-    size_t dst_context = myrand(&r_seed) % cmi_pami_numcontexts;
+    //size_t dst_context = myrand(&r_seed) % cmi_pami_numcontexts;
 #else
     size_t dst_context = 0;
 #endif
