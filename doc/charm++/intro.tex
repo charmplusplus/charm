@@ -1,5 +1,5 @@
 
-\charmpp\ is a C++-based parallel programming system, founded on the
+\charm is a C++-based parallel programming system, founded on the
 migratable-objects programming model, and supported by a novel and
 powerful adaptive runtime system. It supports both irregular as well
 as regular applications, and can be used to specify task-parallelism
@@ -7,30 +7,30 @@ as well as data parallelism in a single application. It automates
 dynamic load balancing for task-parallel as well as data-parallel
 applications, via separate suites of load-balancing strategies. Via
 its message-driven execution model, it supports automatic latency
-tolerance, modularity and parallel composition. Charm++ also supports
+tolerance, modularity and parallel composition. \charm also supports
 automatic checkpoint/restart, as well as fault tolerance based on
 distributed checkpoints.
 % {\sc Converse} interoperable runtime system for parallel
 % programming.
 
-Charm++ is a production-quality parallel programming system used by
+\charm is a production-quality parallel programming system used by
 multiple applications in science and engineering on supercomputers as
 well as smaller clusters around the world.  Currently the parallel
-platforms supported by \charmpp\ are the BlueGene/L, BlueGene/P,
+platforms supported by \charm are the BlueGene/L, BlueGene/P,
 BlueGene/Q, Cray XT, XE and XK series (including XK6 and XE6),
 % XT3/4, Cray X1, Cray T3E,
 a single workstation or a network of workstations (including x86
 (running Linux, Windows, MacOS)), etc.  The communication protocols
 and infrastructures supported by
-\charmpp\ are UDP, TCP, Myrinet, Infiniband, MPI, uGNI, and PAMI. 
-\charmpp\ programs can run without changing the source
-on all these platforms. If built on MPI, \charmpp{} programs can 
+\charm are UDP, TCP, Myrinet, Infiniband, MPI, uGNI, and PAMI. 
+\charm programs can run without changing the source
+on all these platforms. If built on MPI, \charm programs can 
 also interoperate with pure MPI programs (\S\ref{sec:interop}).
-  Please see the \charmpp{}/\converse{}
+  Please see the \charm/\converse{}
 Installation and Usage
 \htmladdnormallink{Manual}{http://charm.cs.illinois.edu/manuals/html/install/manual.html}
 for details about installing, compiling and running
-\charmpp\ programs.
+\charm programs.
 
 
 \section{Programming Model}
@@ -41,25 +41,25 @@ computation in terms of creation of and interactions between these
 units, without any direct reference to the processor on which any unit
 resides. This empowers the runtime system to assign units to
 processors, and to change the assignment at runtime as
-necessary. Charm++ is the main (and early) exemplar of this
-programming model. AMPI is another example within the Charm++ family
+necessary. \charm is the main (and early) exemplar of this
+programming model. AMPI is another example within the \charm family
 of the same model.
 
 
 \section{Execution Model}
 
-% A \charmpp\ program consists of a number of \charmpp\ objects
+% A \charm program consists of a number of \charm objects
 % distributed across the available number of processors. Thus, 
 A basic
-unit of parallel computation in \charmpp\ programs is a {\em
+unit of parallel computation in \charm programs is a {\em
 chare}\index{chare}. 
-% a \charmpp\ object that can be created on any
+% a \charm object that can be created on any
 % available processor and can be accessed from remote processors.
 A \index{chare}chare is similar to a process, an actor, an ADA task,
 etc. At its most basic level, it is just a C++ object.
 %  with some of its methods
 % that can be invoked from remote objects. 
-A \charmpp computation consists of a large number of chares
+A \charm computation consists of a large number of chares
 distributed on available processors of the system, and interacting
 with each other via asynchronous method invocations.
 Asynchronously invoking a method on a remote object can also be
@@ -75,13 +75,13 @@ created dynamically.
 
 Conceptually, the system maintains a
 ``work-pool'' consisting of seeds for new \index{chare}chares, and
-\index{message}messages for existing chares. The Charm++ runtime system ({\em
+\index{message}messages for existing chares. The \charm runtime system ({\em
 Charm RTS}) may pick multiple items, non-deterministically, from this
 pool and execute them, with the proviso that two different methods
 cannot be simultaneously executing on the same chare object (say, on
 different processors). Although one can define a reasonable
-theoretical operational semantics of Charm++ in this fashion, a more
-practical description of execution is useful to understand Charm++: On
+theoretical operational semantics of \charm in this fashion, a more
+practical description of execution is useful to understand \charm: On
 each PE (``PE'' stands for a ``Processing Element''. PEs are akin to
 processor cores; see section \ref{sec:machine} for a precise
 description), there is a scheduler operating with its own private pool
@@ -108,10 +108,10 @@ of a chare needs to be an entry method.  Ordinary entry
 methods\footnote{``Threaded'' or ``synchronous'' methods are
 different. But even they do not lead to pre-emption; only to
 cooperative multi-threading} are completely non-preemptive--
-\charmpp\ will not interrupt an executing method to start any other work,
+\charm will not interrupt an executing method to start any other work,
 and all calls made are asynchronous.
 
-\charmpp\ provides dynamic seed-based load balancing. Thus location (processor
+\charm provides dynamic seed-based load balancing. Thus location (processor
 number) need not be specified while creating a
 remote \index{chare}chare. The Charm RTS will then place the remote
 chare on a suitable processor. Thus one can imagine chare creation
@@ -126,7 +126,7 @@ on some specific processor at a later time.
 % load-balancing framework for chare containers, such as arrays.)
 
 Chares can be grouped into collections. The types of collections of
-chares supported in Charm++ are: {\em chare-arrays}, \index{group}{\em
+chares supported in \charm are: {\em chare-arrays}, \index{group}{\em
 chare-groups}, and \index{nodegroup}{\em chare-nodegroups}, referred
 to as {\em arrays}, {\em groups}, and {\em nodegroups} throughout this
 manual for brevity. A Chare-array is a collection of an arbitrary number
@@ -135,16 +135,16 @@ processors according to a user-defined map group. A group (nodegroup)
 is a collection of chares, with exactly one member element on each PE
 (``node'').
 
-Charm++ does not allow global variables, except readonly variables
+\charm does not allow global variables, except readonly variables
 (see \ref{readonly}). A chare can normally only access its own data directly.
 However, each chare is accessible by a globally valid name. So, one
-can think of Charm++ as supporting a {\em global object space}.
+can think of \charm as supporting a {\em global object space}.
 
 
 
-Every \charmpp\ program must have at least one \kw{mainchare}.  Each
-\kw{mainchare} is created by the system on processor 0 when the \charmpp\
-program starts up.  Execution of a \charmpp\ program begins with the
+Every \charm program must have at least one \kw{mainchare}.  Each
+\kw{mainchare} is created by the system on processor 0 when the \charm
+program starts up.  Execution of a \charm program begins with the
 Charm Kernel constructing all the designated \kw{mainchare}s.  For
 a \kw{mainchare} named X, execution starts at constructor X() or
 X(CkArgMsg *) which are equivalent.  Typically, the
@@ -152,14 +152,14 @@ X(CkArgMsg *) which are equivalent.  Typically, the
 chares, and groups.  It can also be used to initialize shared \kw{readonly}
 objects.
 
-\charmpp\ program execution is terminated by the \kw{CkExit} call.  Like the
+\charm program execution is terminated by the \kw{CkExit} call.  Like the
 \kw{exit} system call, \kw{CkExit} never returns. The Charm RTS ensures
 that no more messages are processed and no entry methods are called after a
 \kw{CkExit}. \kw{CkExit} need not be called on all processors; it is enough
 to call it from just one processor at the end of the computation.
 
 \zap{
-The only method of communication between processors in \charmpp\ is
+The only method of communication between processors in \charm is
 asynchronous \index{entry method} entry method invocation on remote chares.
 For this purpose, Charm RTS needs to know the types of
 \index{chare}chares in the user program, the methods that can be invoked on
@@ -169,8 +169,8 @@ entities need to be registered with Charm RTS, which assigns a unique
 identifier to each of them. While invoking a method on a remote object,
 these identifiers need to be specified to Charm RTS. Registration of
 user-defined entities, and maintaining these identifiers can be cumbersome.
-Fortunately, it is done automatically by the \charmpp\ interface translator.
-The \charmpp\ interface translator generates definitions for {\em proxy}
+Fortunately, it is done automatically by the \charm interface translator.
+The \charm interface translator generates definitions for {\em proxy}
 objects. A proxy object acts as a {\em handle} to a remote chare. One
 invokes methods on a proxy object, which in turn carries out remote method
 invocation on the chare.}
@@ -183,7 +183,7 @@ structured manner, while allowing for some localized non-determinism
 (e.g. a pair of methods may execute in any order, but when they both
 finish, the execution continues in a pre-determined manner, say
 executing a 3rd entry method). To simplify expression of such control
-structures, Charm++ provides two methods: the structured dagger
+structures, \charm provides two methods: the structured dagger
 notation (Sec \ref{sec:sdag}), which is the main notation we recommend
 you use.  Alternatively, you may use threaded entry methods, in
 combination with {\em futures} and {\em sync} methods
@@ -206,7 +206,7 @@ RTS needs to be able to serialize (``marshall'') the parameters, and
 be able to generate global ``names'' for chares. For this purprpose,
 programmers have to declare the chare classes and the signature of
 their entry methods in a special ``\verb#.ci#'' file, called an
-interface file. Other than the interface file, the rest of a Charm++
+interface file. Other than the interface file, the rest of a \charm
 program consists of just normal C++ code. The system generates several
 classes based on the declarations in the interface file, including
 ``Proxy'' classes for each chare class.
@@ -227,7 +227,7 @@ Individual chares, chare array, groups, node-groups, as well as the
 individual elements of these collections have a such a
 proxy. Multiple methods for obtaining such proxies are described in
 the manual.
-Proxies for each type of entity in \charmpp\
+Proxies for each type of entity in \charm
 have some differences among the features they support, but the basic
 syntax and semantics remain the same -- that of invoking methods on
 the remote object by invoking methods on proxies.
@@ -236,7 +236,7 @@ the remote object by invoking methods on proxies.
 
 \zap{
 Historically, handles (which are basically globally unique
-identifiers) were used to uniquely identify \charmpp\ objects.  Unlike
+identifiers) were used to uniquely identify \charm objects.  Unlike
 pointers, they are valid on all processors and so could be sent as
 parameters in messages.  They are still available, but now proxies
 also have the same feature.
@@ -246,12 +246,12 @@ Handles (like CkChareID, CkArrayID, etc.) are still used internally, but should 
 Proxies (like
 CProxy\_foo) are just bytes and can be sent in messages, pup'd, and
 parameter marshalled.  This is now true of almost all objects in
-Charm++: the only exceptions being entire Chares (Array Elements,
+\charm: the only exceptions being entire Chares (Array Elements,
 etc.) and, paradoxically, messages themselves.
 }
 
 The following sections provide detailed information about various features of the
-\charmpp\ programming system. Part I, ``Basic Usage'', is sufficient
+\charm programming system. Part I, ``Basic Usage'', is sufficient
 for writing full-fledged applications. Note that only the last two
 chapters of this part involve the notion of physical processors
 (cores, nodes, ..), with the exception of simple query-type utilities
@@ -270,11 +270,11 @@ complex or sophisticated features.
 \footnote{For a description of the underlying design
 philosophy please refer to the following papers :\\
     L. V. Kale and Sanjeev Krishnan,
-    {\em ``\charmpp : Parallel Programming with Message-Driven Objects''},
+    {\em ``\charm : Parallel Programming with Message-Driven Objects''},
     in ``Parallel Programming Using \CC'',
     MIT Press, 1995. \\
     L. V. Kale and Sanjeev Krishnan,
-    {\em ``\charmpp : A Portable Concurrent Object Oriented System
+    {\em ``\charm : A Portable Concurrent Object Oriented System
     Based On \CC''},
     Proceedings of the Conference on Object Oriented Programming,
     Systems, Languages and Applications (OOPSLA), September 1993.
