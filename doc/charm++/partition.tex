@@ -1,0 +1,86 @@
+\charmpp has been augmented with support for partitioning. The key idea is to
+divide the allocated set of nodes into subsets that run independent \charmpp
+instances. These \charmpp instances (called partitions from now on) have a
+unique identifier, can be programmed to do different tasks, and can interact
+with each other. Addition of the partitioning scheme does not affect the
+existing code base or codes that do not want to use partitioning. Some of the use
+cases of partitioning are replicated NAMD, replica based fault tolerance,
+studying mapping performance etc. In some aspects, partitioning is similar to 
+disjoint communicator creation in MPI. 
+
+\section{Overview}
+\charmpp stack has three components - Charm++, Converse and machine layer. In
+general, machine layer handles the exchange of messages among nodes, and
+interacts with the next layer in the stack - Converse. Converse is responsible
+for scheduling of tasks (including user code) and is used by Charm++ to execute
+the user application. Charm++ is the top-most level in which the applications
+are written. During partitioning, Charm++ and machine layers are unaware of
+the partitioning. Charm++ assumes its partition to be the entire world, whereas
+machine layer considers the whole set of allocated nodes as one partition.
+During start up, converse divides the allocated set of nodes into partitions, in
+each of which Charm++ instances are run. It performs the necessary translations
+as interactions happen with Charm++ and the machine layer.  The partitions can 
+communicate with each other using the Converse API described later.
+
+\section{Ranking}
+\charmpp stack assigns a rank to every processing element (PE). In the non-partitioned
+version, a rank assigned to a PE is same at all three layers of \charmpp
+stack. This rank also (generally) coincides with the rank provided to processors/cores 
+by the underlying job scheduler. The importance of these ranks derive from the 
+fact that they are used for multiple purposes. Partitioning leads to segregation of the 
+notion of ranks at different levels of Charm++ stack. What used to be the PE is now a 
+local rank within a partition running a Charm++ instance. Existing methods such as CkMyPe,
+CkMyNode, CmiMyPe, CmiMyNode etc continue to provide these local ranks. Hence, existing 
+codes do not require any change as long as inter-partition interaction is not required. 
+
+On the other hand, machine layer is provided with the target ranks that
+are globally unique. These ranks can be obtained using functions with Global
+suffix such as CmiNumNodesGlobal, CmiMyNodeGlobal, CmiMyPeGlobal etc.
+
+Converse, which operates at a layer between Charm++ and machine layer,
+performs the required transitions. It maintains relevant information for any
+conversion. Information related to partitions can be obtained using Converse
+level functions such as CmiMyPartition, CmiPartitionSize, CmiNumPartitions
+etc. If required, one can also obtain the mapping of a local rank to a global
+rank using functions such as CmiGetPeGlobal, CmiGetNodeGlobal,  CmiGetPeLocal,
+CmiGetNodeLocal etc.       
+
+
+\section{Startup and Partitioning}
+
+Any user who wants to run multiple partitions in one single job can provide a
+run time parameter $+partitions <part\_numbers>$ or $+replicas <replica\_number>$.
+Converse startup will pick this up, and initialize the necessary data
+structure for such a division, and other conversions.  Currently, we have
+implemented a simple blocked-division scheme that divides the available
+resources among partitions. The entire partitioning step, in this sense, is
+transparent to the user. In future, we will provide hooks for each of these
+key functions – initial partitioning, rank conversion, and global coordination
+– that will enable the users to fully customize replica creation as per their
+requirements.
+
+\section{Inter-partition Communication}
+
+A new API was added to Converse to enable sending messages from one replica to
+another. Currently, following functions are available for the same
+\begin{itemize}
+\item CmiInterSyncSend(local\_rank, partition, size, message)        
+\item CmiInterSyncSendAndFree(local\_rank, partition, size, message)
+\item CmiInterSyncNodeSend(local\_node, partition, size, message)        
+\item CmiInterSyncNodeSendAndFree(local\_node, partition, size, message)
+\end{itemize}
+
+Users who have coded in Converse will find these functions to be very similar
+to basic Converse functions for send – CmiSyncSend and CmiSyncSendAndFree.
+Given the local rank of a PE and the partition it belongs to, these two
+functions will pass the message to the machine layer. CmiInterSyncSend does
+not return till “message” is ready for reuse. CmiInterSyncSendAndFree passes
+the ownership of “message” to Charm++ RTS, which will free the message when
+the send is complete. Each converse message contains a message header, which
+makes those messages active – they contain information about their handlers.
+These handlers can be registered using existing API in Charm++ -
+CmiRegisterHandler.  CmiInterNodeSend and CmiInterNodeSendAndFree are
+counterparts to these functions that allow sending of a message to a node (in
+    SMP mode).
+
+
