@@ -29,8 +29,10 @@ FILE *debugLog = NULL;
 #endif
 #endif
 
+
 #if CMK_SMP && CMK_USE_L2ATOMICS
 #include "L2AtomicQueue.h"
+#include "L2AtomicMutex.h"
 #include "memalloc.c"
 #endif
 
@@ -136,6 +138,7 @@ typedef struct ProcState {
 static ProcState  *procState;
 
 #if CMK_SMP && CMK_USE_L2ATOMICS
+static L2AtomicMutex *node_recv_mutex;
 static L2AtomicQueue node_recv_atomic_q;
 #endif
 
@@ -835,7 +838,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     //pami_result_t rc;
     pami_extension_t l2;
     pamix_proc_memalign_fn PAMIX_L2_proc_memalign;
-    size_t size = (4*actualNodeSize+1) * sizeof(L2AtomicState);
+    size_t size = (_Cmi_mynodesize + 2*actualNodeSize + 1) 
+      * sizeof(L2AtomicState) + sizeof(L2AtomicMutex);
+
     rc = PAMI_Extension_open(NULL, "EXT_bgq_l2atomic", &l2);
     CmiAssert (rc == 0);
     PAMIX_L2_proc_memalign = (pamix_proc_memalign_fn)PAMI_Extension_symbol(l2, "proc_memalign");
@@ -843,12 +848,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     CmiAssert (rc == 0);    
 #endif
 
+    char *l2_start = (char *) l2atomicbuf;
     procState = (ProcState *)malloc((_Cmi_mynodesize) * sizeof(ProcState));
     for (i=0; i<_Cmi_mynodesize; i++) {
-        /*    procState[i].sendMsgBuf = PCQueueCreate();   */
-        //procState[i].recvLock = CmiCreateLock();
 #if CMK_SMP && CMK_USE_L2ATOMICS
-	L2AtomicQueueInit ((char *) l2atomicbuf + sizeof(L2AtomicState)*i,
+	L2AtomicQueueInit (l2_start + sizeof(L2AtomicState)*i,
 			   sizeof(L2AtomicState),
 			   &procState[i].atomic_queue,
 			   1, /*use overflow*/
@@ -857,15 +861,17 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     }
 
 #if CMK_SMP && CMK_USE_L2ATOMICS    
-    CmiMemAllocInit_bgq ((char*)l2atomicbuf + 
-			 2*actualNodeSize*sizeof(L2AtomicState),
-			 2*actualNodeSize*sizeof(L2AtomicState)); 
-    L2AtomicQueueInit ((char*)l2atomicbuf + 
-		       4*actualNodeSize*sizeof(L2AtomicState),
+    l2_start += _Cmi_mynodesize * sizeof(L2AtomicState);
+    CmiMemAllocInit_bgq (l2_start, 2*actualNodeSize*sizeof(L2AtomicState)); 
+    l2_start += 2*actualNodeSize*sizeof(L2AtomicState); 
+
+    L2AtomicQueueInit (l2_start,
 		       sizeof(L2AtomicState),
 		       &node_recv_atomic_q,
 		       1, /*use overflow*/
-		       DEFAULT_SIZE /*1024 entries*/);		       
+		       DEFAULT_SIZE /*1024 entries*/);	 
+    l2_start += sizeof(L2AtomicState);  
+    node_recv_mutex = L2AtomicMutexInit(l2_start, sizeof(L2AtomicMutex));   
 #endif
     
     //Initialize the manytomany api
@@ -993,9 +999,9 @@ char *CmiGetNonLocalNodeQ(void) {
 
 #if CMK_SMP && CMK_USE_L2ATOMICS
     if (!L2AtomicQueueEmpty(&node_recv_atomic_q)) {
-      if (CmiTryLock(CsvAccess(NodeState).CmiNodeRecvLock) == 0) {
+      if (L2AtomicMutexTryAcquire(node_recv_mutex) == 0) {
 	result = (char*)L2AtomicDequeue(&node_recv_atomic_q);
-	CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+	L2AtomicMutexRelease(node_recv_mutex);
       }
     }
 #else
