@@ -548,12 +548,11 @@ public:
 	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkGroupID _metalb,CkArrayIndex& numInitial);
 	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndex& numInitial);
 	CkLocMgr(CkMigrateMessage *m);
+
 	inline CmiBool isLocMgr(void) { return CmiTrue; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
-	inline CProxy_CkLocMgr &getProxy(void)
-		{return thisProxy;}
-	inline CProxyElement_CkLocMgr &getLocalProxy(void)
-		{return thislocalproxy;}
+	inline CProxy_CkLocMgr &getProxy(void) {return thisProxy;}
+	inline CProxyElement_CkLocMgr &getLocalProxy(void) {return thislocalproxy;}
 
 //Interface used by array manager and proxies
 	/// Add a new local array manager to our list.  Array managers
@@ -563,13 +562,12 @@ public:
 
 	/// Populate this array with initial elements
 	void populateInitial(CkArrayIndex& numElements,void *initMsg,CkArrMgr *mgr)
-		{map->populateInitial(mapHandle,numElements,initMsg,mgr);}
+    { map->populateInitial(mapHandle,numElements,initMsg,mgr); }
 
 	/// Add a new local array element, calling element's constructor
 	///  Returns true if the element was successfully added;
 	///  false if the element migrated away or deleted itself.
-	CmiBool addElement(CkArrayID aid,const CkArrayIndex &idx,
-		CkMigratable *elt,int ctorIdx,void *ctorMsg);
+	CmiBool addElement(CkArrayID aid,const CkArrayIndex &idx, CkMigratable *elt,int ctorIdx,void *ctorMsg);
 
 	///Deliver message to this element:
 	inline void deliverViaQueue(CkMessage *m) {deliver(m,CkDeliver_queue);}
@@ -607,12 +605,12 @@ public:
 
 	//Migrate us to another processor
 	void emigrate(CkLocRec_local *rec,int toPe);
-  void informLBPeriod(CkLocRec_local *rec, int lb_ideal_period);
-  void metaLBCallLB(CkLocRec_local *rec);
+    void informLBPeriod(CkLocRec_local *rec, int lb_ideal_period);
+    void metaLBCallLB(CkLocRec_local *rec);
 
 #if CMK_LBDB_ON
 	LBDatabase *getLBDB(void) const { return the_lbdb; }
-  MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
+    MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
 	const LDOMHandle &getOMHandle(void) const { return myLBHandle; }
 #endif
 
@@ -625,12 +623,9 @@ public:
 
 //Interface used by external users:
 	/// Home mapping
-	inline int homePe(const CkArrayIndex &idx) const
-		{return map->homePe(mapHandle,idx);}
-	inline int procNum(const CkArrayIndex &idx) const
-		{return map->procNum(mapHandle,idx);}
-	inline CmiBool isHome(const CkArrayIndex &idx) const
-		{return (CmiBool)(homePe(idx)==CkMyPe());}
+	inline int     homePe (const CkArrayIndex &idx) const {return map->homePe(mapHandle,idx);}
+	inline int     procNum(const CkArrayIndex &idx) const {return map->procNum(mapHandle,idx);}
+	inline CmiBool isHome (const CkArrayIndex &idx) const {return (CmiBool)(homePe(idx)==CkMyPe());}
 
 	/// Look up the object with this array index, or return NULL
 	CkMigratable *lookup(const CkArrayIndex &idx,CkArrayID aid);
