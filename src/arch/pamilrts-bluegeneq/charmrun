@@ -60,8 +60,8 @@ printf "\nRunning on $pes processors: $args\n"
 if test -n "$COBALT_JOBID"
 then
   # charmrun called from script
-  echo "runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB --envs PAMI_RGETINJFIFOSIZE=2000000 $envs : $args"
-  runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB --envs PAMI_RGETINJFIFOSIZE=2000000 $envs : $args
+  echo "runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB $envs : $args"
+  runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB $envs : $args
   exit $?
 else
 
