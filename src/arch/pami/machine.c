@@ -935,6 +935,45 @@ void ConverseRunPE(int everReturn) {
     }    
 }
 
+#define MAX_BARRIER_THREADS 64
+volatile unsigned char spin_bar_flag[2][MAX_BARRIER_THREADS];
+unsigned char spin_iter[MAX_BARRIER_THREADS];
+volatile unsigned char done_flag[2];
+
+//slow barrier for ckexit that calls advance while spinning
+void spin_wait_barrier () {
+  int i = 0;
+  int iter = spin_iter[CmiMyRank()];
+  int iter_1 = (iter + 1) % 2;
+
+  //start barrier 
+  //reset next barrier iteration before this one starts
+  done_flag[iter_1] = 0;
+  spin_iter[CmiMyRank()] = iter_1;
+  spin_bar_flag[iter_1][CmiMyRank()] = 0;
+  
+  //Notify arrival
+  spin_bar_flag[iter][CmiMyRank()] = 1;
+
+  if (CmiMyRank() == 0) {
+    while (!done_flag[iter]) {
+      for (i = 0; i < CmiMyNodeSize(); ++i)
+	if (spin_bar_flag[iter][i] == 0)
+	  break;
+      if (i >= CmiMyNodeSize()) 
+	done_flag[iter] = 1;
+      AdvanceCommunications();
+    }        
+  }
+  else {
+    while (!done_flag[iter])
+      AdvanceCommunications();
+  }
+
+  //barrier complete
+}
+
+
 void ConverseExit(void) {
 
     while (MSGQLEN() > 0 || ORECVS() > 0) {
@@ -948,8 +987,10 @@ void ConverseExit(void) {
         printf("End of program\n");
     }
 
-    CmiNodeBarrier();
-//  CmiNodeAllBarrier ();
+#if CMK_SMP
+    spin_wait_barrier();
+    //CmiNodeBarrier();
+#endif
 
     int rank0 = 0;
     if (CmiMyRank() == 0) {
@@ -962,14 +1003,12 @@ void ConverseExit(void) {
 	PAMI_Client_destroy(&cmi_pami_client);
     }
 
-    CmiNodeBarrier();
-    //  CmiNodeAllBarrier ();
-    //fprintf(stderr, "Before Exit\n");
 #if CMK_SMP
-    if (rank0) {
-      Delay(100000);
-      exit(0);
-    }
+    spin_wait_barrier();
+    //CmiNodeBarrier();
+    
+    if (rank0) 
+      exit(1);
     else
       pthread_exit(0);
 #else
