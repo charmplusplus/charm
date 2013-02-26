@@ -90,14 +90,14 @@ inline void printMapping(std::vector<Vertex> &vertices);
 inline void removeFromArray(int pe_id, std::vector<int> &array);
 inline int popFromProcHeap(std::vector<int> & parr_above_avg, ProcArray *parr);
 inline void handleTransfer(int randomly_obj_id, ProcInfo& p, int possible_pe, std::vector<int> *parr_objs, ObjGraph *ogr, ProcArray* parr);
-inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold, double lower_threshold,
+inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold_temp, double lower_threshold_temp,
                            std::vector<int> &parr_above_avg, std::vector<int> &parr_below_avg,
                            std::vector<bool> &proc_load_info, ProcArray *parr);
 inline void getPossiblePes(std::vector<int>& possible_pes, int randomly_obj_id,
     ObjGraph *ogr, ProcArray* parr);
 
-double upper_threshold;
-double lower_threshold;
+double upper_threshold_temp;
+double lower_threshold_temp;
 
 CreateLBFunc_Def(TempAwareCommLB, "always assign the heaviest obj onto lightest loaded processor.")
 
@@ -225,16 +225,16 @@ class ProcCommGreater {
     }
 };
 
-void PrintProcLoad(ProcArray *parr) {
+void PrintProcLoadTemp(ProcArray *parr) {
   int vert;
   double pe_load;
   for (vert = 0; vert < parr->procs.size(); vert++) {
     pe_load = parr->procs[vert].getTotalLoad();
-    if (pe_load > upper_threshold) {
+    if (pe_load > upper_threshold_temp) {
       CkPrintf("Above load : %d load : %E overhead : %E\n",
         parr->procs[vert].getProcId(), parr->procs[vert].getTotalLoad(),
         parr->procs[vert].overhead());
-    } else if (pe_load < lower_threshold) {
+    } else if (pe_load < lower_threshold_temp) {
       CkPrintf("Below load : %d load : %E overhead : %E\n",
         parr->procs[vert].getProcId(), parr->procs[vert].getTotalLoad(),
         parr->procs[vert].overhead());
@@ -246,7 +246,7 @@ void PrintProcLoad(ProcArray *parr) {
   }
 }
 
-void PrintProcObj(ProcArray *parr, std::vector<int>* parr_objs) {
+void PrintProcObjTemp(ProcArray *parr, std::vector<int>* parr_objs) {
   int i, j;
   CkPrintf("---------------------\n");
   for (i = 0; i < parr->procs.size(); i++) {
@@ -415,9 +415,9 @@ void TempAwareCommLB::work(LDStats* stats) {
   // that processor
   std::vector<int>* parr_objs = new std::vector<int>[parr->procs.size()];
 
-  upper_threshold = avgload + (avgload * THRESHOLD);
+  upper_threshold_temp = avgload + (avgload * THRESHOLD);
   //lower_threshold = avgload - (avgload * THRESHOLD * THRESHOLD);
-  lower_threshold = avgload;
+  lower_threshold_temp = avgload;
 
   int less_loaded_counter = 0;
 
@@ -449,10 +449,10 @@ void TempAwareCommLB::work(LDStats* stats) {
   // Insert the processor id into parr_below_avg if the processor is underloaded 
   for (vert = 0; vert < parr->procs.size(); vert++) {
     pe_load = parr->procs[vert].getTotalLoad();
-    if (pe_load > upper_threshold) {
+    if (pe_load > upper_threshold_temp) {
       // Pushing ProcInfo into this list
       parr_above_avg.push_back(vert);
-    } else if (pe_load < lower_threshold) {
+    } else if (pe_load < lower_threshold_temp) {
       parr_below_avg.push_back(parr->procs[vert].getProcId());
       proc_load_info[parr->procs[vert].getProcId()] = true;
       less_loaded_counter++;
@@ -508,7 +508,7 @@ void TempAwareCommLB::work(LDStats* stats) {
         // assign it to that.
         possible_pe = possible_pes[i];
 
-        if ((parr->procs[possible_pe].getTotalLoad() + obj_load) < upper_threshold) {
+        if ((parr->procs[possible_pe].getTotalLoad() + obj_load) < upper_threshold_temp) {
          // CkPrintf("**  Transfered %d(Load %lf) from %d:%d(Load %lf) to %d:%d(Load %lf)\n",
          //     randomly_obj_id, obj_load, CkNodeOf(p.getProcId()), p.getProcId(), p.getTotalLoad(),
          //     CkNodeOf(possible_pe), possible_pe,
@@ -517,7 +517,7 @@ void TempAwareCommLB::work(LDStats* stats) {
           handleTransfer(randomly_obj_id, p, possible_pe, parr_objs, ogr, parr);
           obj_allocated = true;
           total_swaps--;
-          updateLoadInfo(p_index, possible_pe, upper_threshold, lower_threshold,
+          updateLoadInfo(p_index, possible_pe, upper_threshold_temp, lower_threshold_temp,
               parr_above_avg, parr_below_avg, proc_load_info, parr);
 
           break;
@@ -530,11 +530,11 @@ void TempAwareCommLB::work(LDStats* stats) {
         //CkPrintf(":( Could not transfer to the nearest communicating ones\n");
         for (int x = 0; x < parr_below_avg.size(); x++) {
           int random_pe = parr_below_avg[x];
-          if ((parr->procs[random_pe].getTotalLoad() + obj_load) < upper_threshold) {
+          if ((parr->procs[random_pe].getTotalLoad() + obj_load) < upper_threshold_temp) {
             obj_allocated = true;
             total_swaps--;
             handleTransfer(randomly_obj_id, p, random_pe, parr_objs, ogr, parr);
-            updateLoadInfo(p_index, random_pe, upper_threshold, lower_threshold,
+            updateLoadInfo(p_index, random_pe, upper_threshold_temp, lower_threshold_temp,
                            parr_above_avg, parr_below_avg, proc_load_info, parr);
             break;
           }
@@ -608,7 +608,7 @@ inline void handleTransfer(int randomly_obj_id, ProcInfo& p, int possible_pe, st
   //    possible_pe, possible_pe_procinfo.getTotalLoad());
 }
 
-inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold, double lower_threshold,
+inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold_temp, double lower_threshold_temp,
                            std::vector<int>& parr_above_avg, std::vector<int>& parr_below_avg,
                            std::vector<bool> &proc_load_info, ProcArray *parr) {
 
@@ -617,12 +617,12 @@ inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold,
 
   // If the updated load is still greater than the average by the
   // threshold value, then push it back to the max heap
-  if (p.getTotalLoad() > upper_threshold) {
+  if (p.getTotalLoad() > upper_threshold_temp) {
     parr_above_avg.push_back(p_index);
     std::push_heap(parr_above_avg.begin(), parr_above_avg.end(),
         ProcLoadGreater(parr));
     //CkPrintf("\t Pushing pe : %d to max heap\n", p.getProcId());
-  } else if (p.getTotalLoad() < lower_threshold) {
+  } else if (p.getTotalLoad() < lower_threshold_temp) {
     parr_below_avg.push_back(p_index);
     proc_load_info[p_index] = true;
     //CkPrintf("\t Adding pe : %d to less loaded\n", p.getProcId());
@@ -630,7 +630,7 @@ inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold,
 
   // If the newly assigned processor's load is greater than the average
   // by the threshold value, then push it into the max heap.
-  if (possible_pe_procinfo.getTotalLoad() > upper_threshold) {
+  if (possible_pe_procinfo.getTotalLoad() > upper_threshold_temp) {
     // TODO: It should be the index in procarray :(
     parr_above_avg.push_back(possible_pe);
     std::push_heap(parr_above_avg.begin(), parr_above_avg.end(),
@@ -638,7 +638,7 @@ inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold,
     removeFromArray(possible_pe, parr_below_avg);
     proc_load_info[possible_pe] = false;
     //CkPrintf("\t Pusing pe : %d to max heap\n", possible_pe);
-  } else if (possible_pe_procinfo.getTotalLoad() < lower_threshold) {
+  } else if (possible_pe_procinfo.getTotalLoad() < lower_threshold_temp) {
   } else {
     removeFromArray(possible_pe, parr_below_avg);
     proc_load_info[possible_pe] = false;
