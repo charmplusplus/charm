@@ -1581,6 +1581,107 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg) {
     CmiAbort("CmiAsyncListSendFn not implemented.");
     return (CmiCommHandle) 0;
 }
+
+#if CMK_NODE_QUEUE_AVAILABLE
+
+typedef struct ListNodeMulticastVec_t {
+  int   *nodes;
+  int    n_nodes;
+  char  *msg;
+  int    size;
+} ListNodeMulticastVec;
+
+void machineFreeNodeListSendFn(pami_context_t    context, 
+			       int               n_nodes, 
+			       int             * nodes, 
+			       int               size, 
+			       char            * msg);
+
+pami_result_t machineFreeNodeList_handoff(pami_context_t context, void *cookie)
+{
+  ListNodeMulticastVec *lvec = (ListNodeMulticastVec *) cookie;
+  machineFreeNodeListSendFn(context, lvec->n_nodes, 
+			    lvec->nodes, lvec->size, lvec->msg);
+  CmiFree(cookie);
+}
+
+void CmiFreeNodeListSendFn(int n_nodes, int *nodes, int size, char *msg) {
+
+    //printf("%d In cmifreenodelistsendfn %d %d\n", CmiMyPe(), n_nodes, size);
+    CMI_SET_BROADCAST_ROOT(msg,0);
+    CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
+    CmiMsgHeaderBasic *hdr = (CmiMsgHeaderBasic *)msg;
+    hdr->size = size;
+    CMI_SET_CHECKSUM(msg, size);
+
+    //Fast path
+    if (n_nodes == 1) {
+      CmiGeneralFreeSendN(nodes[0], SMP_NODEMESSAGE, size, msg, 1);
+      return;
+    }
+
+    pami_context_t my_context = MY_CONTEXT();
+#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
+    ListNodeMulticastVec *lvec = (ListNodeMulticastVec *) 
+      CmiAlloc(sizeof(ListNodeMulticastVec));
+      
+    lvec->nodes   = nodes;
+    lvec->n_nodes = n_nodes;
+    lvec->msg     = msg;
+    lvec->size    = size;
+    PAMI_Context_post(my_context, (pami_work_t*)hdr->work, 
+		      machineFreeNodeList_handoff, lvec);
+#else
+    machineFreeNodeListSendFn(my_context, nodes, n_nodes, size, msg);
+#endif
+}
+
+void CmiSendNodeSelf(char *msg);
+void machineFreeNodeListSendFn(pami_context_t       my_context, 
+			       int                  n_nodes, 
+			       int                * nodes, 
+			       int                  size, 
+			       char               * msg) 
+{
+    int i;
+    char *copymsg;
+
+    for (i=0; i<n_nodes; i++) {
+      if (nodes[i] == CmiMyNode()) {
+	copymsg = (char *)CmiAlloc(size);
+	CmiAssert(copymsg != NULL);
+	CmiMemcpy(copymsg,msg,size);	  
+	CmiSendNodeSelf(copymsg);
+      }
+    }
+
+    PAMIX_CONTEXT_LOCK(my_context);
+    
+    for (i=0;i<n_nodes;i++) {
+        if (nodes[i] == CmiMyNode());
+        else if (i < n_nodes - 1) {
+#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
+	  CmiReference(msg);
+	  copymsg = msg;
+	  machine_send(my_context, nodes[i], SMP_NODEMESSAGE, size, copymsg, 0);
+#else
+	  copymsg = (char *)CmiAlloc(size);
+	  CmiAssert(copymsg != NULL);
+	  CmiMemcpy(copymsg,msg,size);
+	  CmiGeneralFreeSendN(nodes[i], SMP_NODEMESSAGE, size, copymsg, 0);
+#endif
+        }
+    }
+
+    if (n_nodes  && nodes[n_nodes-1] != CmiMyNode())
+      machine_send(my_context, nodes[n_nodes-1], SMP_NODEMESSAGE, size, msg, 0);
+    else
+      CmiFree(msg);    
+    
+    PAMIX_CONTEXT_UNLOCK(my_context);
+}
+#endif
+
 #endif
 
 /** NODE SENDING FUNCTIONS
@@ -1721,7 +1822,7 @@ static void CmiNetworkBarrier(int async) {
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
-static void CmiSendNodeSelf(char *msg) {
+void CmiSendNodeSelf(char *msg) {
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
       //CmiLock(CsvAccess(NodeState).immRecvLock);
