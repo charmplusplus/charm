@@ -395,12 +395,15 @@ typedef struct _cmi_pami_rzv {
   size_t           offset;
   int              bytes;
   int              dst_context;
+  pami_memregion_t mregion;
 }CmiPAMIRzv_t;  
 
 typedef struct _cmi_pami_rzv_recv {
   void           * msg;
   void           * src_buffer;
   int              src_ep;
+  int              size;
+  pami_memregion_t rmregion;
 } CmiPAMIRzvRecv_t;
 
 static void pkt_dispatch (pami_context_t       context,      
@@ -728,11 +731,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     assert(retval==0);  
     for (i = 0; i < _n; ++i) {
       cmi_pami_memregion[i].baseVA = k_mregion.BaseVa;
-      PAMI_Memregion_create (cmi_pami_contexts[i],
-			     k_mregion.BaseVa,
-			     k_mregion.Bytes,
-			     &bytes_out,
-			     &cmi_pami_memregion[i].mregion);
+      retval = PAMI_Memregion_create (cmi_pami_contexts[i],
+				      k_mregion.BaseVa,
+				      k_mregion.Bytes,
+				      &bytes_out,
+				      &cmi_pami_memregion[i].mregion);
+      assert(retval == PAMI_SUCCESS);
+      assert (bytes_out == k_mregion.Bytes);
     }
     free(buf);
 #endif
@@ -1252,13 +1257,14 @@ void  machine_send       (pami_context_t      context,
       rzv.buffer      = msg;
       rzv.offset      = (size_t)msg - (size_t)cmi_pami_memregion[0].baseVA;
       rzv.dst_context = dst_context;
+      memcpy(&rzv.mregion, &cmi_pami_memregion[0].mregion, sizeof(pami_memregion_t));
 
       pami_send_immediate_t parameters;
       parameters.dispatch        = CMI_PAMI_RZV_DISPATCH;
       parameters.header.iov_base = &rzv;
       parameters.header.iov_len  = sizeof(rzv);
-      parameters.data.iov_base   = &cmi_pami_memregion[0].mregion;      
-      parameters.data.iov_len    = sizeof(pami_memregion_t);
+      parameters.data.iov_base   = NULL;
+      parameters.data.iov_len    = 0;
       parameters.dest = target;
       
       if(to_lock)
@@ -2050,10 +2056,12 @@ void rzv_pkt_dispatch (pami_context_t       context,
   rzv_recv->msg        = buffer;
   rzv_recv->src_ep     = origin;
   rzv_recv->src_buffer = rzv_hdr->buffer;
+  rzv_recv->size       = rzv_hdr->bytes;
   
-  CmiAssert (pipe_addr != NULL);
-  pami_memregion_t *mregion = (pami_memregion_t *) pipe_addr;
-  CmiAssert (pipe_size == sizeof(pami_memregion_t));
+  //CmiAssert (pipe_addr != NULL);
+  //CmiAssert (pipe_size == sizeof(pami_memregion_t));
+  //pami_memregion_t *mregion = (pami_memregion_t *) pipe_addr;
+  memcpy(&rzv_recv->rmregion, &rzv_hdr->mregion, sizeof(pami_memregion_t));
 
   //Rzv inj fifos are on the 17th core shared by all contexts
   pami_rget_simple_t  rget;
@@ -2063,14 +2071,17 @@ void rzv_pkt_dispatch (pami_context_t       context,
   rget.rma.done_fn = rzv_recv_done;
   rget.rma.hints.buffer_registered = PAMI_HINT_ENABLE;
   rget.rma.hints.use_rdma = PAMI_HINT_ENABLE;
+  //rget.rma.hints.use_shmem = PAMI_HINT_DISABLE;
   rget.rdma.local.mr      = &cmi_pami_memregion[rzv_hdr->dst_context].mregion;  
   rget.rdma.local.offset  = (size_t)buffer - 
     (size_t)cmi_pami_memregion[rzv_hdr->dst_context].baseVA;
-  rget.rdma.remote.mr     = mregion; //from message payload
+  rget.rdma.remote.mr     = &rzv_recv->rmregion;
   rget.rdma.remote.offset = rzv_hdr->offset;
 
   //printf ("starting rget\n");
-  PAMI_Rget (context, &rget);  
+  pami_result_t rc;
+  rc = PAMI_Rget (context, &rget);  
+  //CmiAssert(rc == PAMI_SUCCESS);
 }
 
 void ack_pkt_dispatch (pami_context_t       context,   
