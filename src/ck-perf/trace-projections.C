@@ -2013,6 +2013,7 @@ void TraceProjectionsBOC::flush_warning(int pe)
 void TraceProjectionsBOC::print_warning() 
 {
     CmiAssert(CkMyPe() == 0);
+    if (flush_count == 0) return;
     std::set<int>::iterator it;
     CkPrintf("*************************************************************\n");
     CkPrintf("Warning: Projections log flushed to disk %d times on %d cores: ", flush_count, list.size());
