@@ -1181,8 +1181,14 @@ void          CmiReleaseCommHandle(CmiCommHandle);
 
 //adding functions for inter-partition communication - only the sync ones because
 //we do not use the async ones
+#if CMK_HAS_PARTITION
 #define CmiInterSyncSend(pe,p,s,m)              (CmiInterSyncSendFn((pe),(p),(s),(char *)(m)))
 #define CmiInterSyncSendAndFree(pe,p,s,m)       (CmiInterFreeSendFn((pe),(p),(s),(char *)(m)))
+#else
+#define CmiInterSyncSend(pe,p,s,m)              (CmiSyncSendFn((pe),(s),(char *)(m)))
+#define CmiInterSyncSendAndFree(pe,p,s,m)       (CmiFreeSendFn((pe),(s),(char *)(m)))
+#endif
+
 //support for rest may come later if required
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -1215,8 +1221,13 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
 
 //counterparts of inter partition
+#if CMK_HAS_PARTITION
 #define CmiInterSyncNodeSend(pe,p,s,m)         (CmiInterSyncNodeSendFn((pe),(p),(s),(char *)(m)))
 #define CmiInterSyncNodeSendAndFree(pe,p,s,m)  (CmiInterFreeNodeSendFn((pe),(p),(s),(char *)(m)))
+#else 
+#define CmiInterSyncNodeSend(pe,p,s,m)         (CmiSyncNodeSendFn((pe),(s),(char *)(m)))
+#define CmiInterSyncNodeSendAndFree(pe,p,s,m)  (CmiFreeNodeSendFn((pe),(s),(char *)(m)))
+#endif
 
 #else
 
@@ -1254,8 +1265,13 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
 #endif
 //and the inter partition counterparts
+#if CMK_HAS_PARTITION
 #define CmiInterSyncNodeSend(n,p,s,m)          CmiInterSyncSend(CmiNodeFirst(n),p,s,m)
 #define CmiInterSyncNodeSendAndFree(n,p,s,m)   CmiInterSyncSendAndFree(CmiNodeFirst(n),p,s,m)
+#else
+#define CmiInterSyncNodeSend(n,p,s,m)          CmiSyncSend(CmiNodeFirst(n),s,m)
+#define CmiInterSyncNodeSendAndFree(n,p,s,m)   CmiSyncSendAndFree(CmiNodeFirst(n),s,m)
+#endif
 #endif
 
 /******** CMI MESSAGE RECEPTION ********/
