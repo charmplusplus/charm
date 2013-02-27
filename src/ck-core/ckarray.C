@@ -1038,6 +1038,9 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 	envelope *env=UsrToEnv((void *)msg);
 	env->getsetArrayMgr()=aid;
 	env->getsetArraySrcPe()=CkMyPe();
+#if CMK_SMP_TRACE_COMMTHREAD
+        env->setSrcPe(CkMyPe());
+#endif
 	env->setEpIdx(ep);
 	env->getsetArrayHops()=0;
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
@@ -1053,6 +1056,9 @@ void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
 	envelope *env=UsrToEnv((void *)msg);
 	env->getsetArrayMgr()=aid;
 	env->getsetArraySrcPe()=CkMyPe();
+#if CMK_SMP_TRACE_COMMTHREAD
+        env->setSrcPe(CkMyPe());
+#endif
 	env->setEpIdx(ep);
 	env->getsetArrayHops()=0;
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
