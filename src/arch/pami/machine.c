@@ -978,46 +978,44 @@ void spin_wait_barrier () {
   //barrier complete
 }
 
-
 void ConverseExit(void) {
 
-    while (MSGQLEN() > 0 || ORECVS() > 0) {
-      AdvanceCommunications();
-    }
-    
-    CmiNodeBarrier();
-    ConverseCommonExit();
-
-    if (CmiMyPe() == 0) {
-        printf("End of program\n");
-    }
+  while (MSGQLEN() > 0 || ORECVS() > 0) {
+    AdvanceCommunications();
+  }
 
 #if CMK_SMP
-    spin_wait_barrier();
-    //CmiNodeBarrier();
+  spin_wait_barrier(); //barrier with advance
+  CmiNodeBarrier();    //barrier w/o advance to wait for all advance 
+  //calls to complete 
+#else    
+  CmiNodeBarrier();
 #endif
 
-    int rank0 = 0;
-    if (CmiMyRank() == 0) {
-        rank0 = 1;
-        //free(procState);	
+  ConverseCommonExit();
+
+  if (CmiMyPe() == 0) {
+    printf("End of program\n");
+  }
+
+  int rank0 = 0;
+  if (CmiMyRank() == 0) {
+      rank0 = 1;
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
-	CMI_Progress_finalize(0, cmi_pami_numcontexts);
+      CMI_Progress_finalize(0, cmi_pami_numcontexts);
 #endif
-	PAMI_Context_destroyv(cmi_pami_contexts, cmi_pami_numcontexts);
-	PAMI_Client_destroy(&cmi_pami_client);
+      PAMI_Context_destroyv(cmi_pami_contexts, cmi_pami_numcontexts);
+      PAMI_Client_destroy(&cmi_pami_client);
     }
 
 #if CMK_SMP
-    spin_wait_barrier();
-    //CmiNodeBarrier();
-    
-    if (rank0) 
-      exit(1);
-    else
-      pthread_exit(0);
+  CmiNodeBarrier();
+  if (rank0)
+    exit(1); 
+  else
+    pthread_exit(0);
 #else
-    exit(0);
+  exit(0);
 #endif
 }
 
