@@ -217,7 +217,7 @@ void infi_freeMultipleSend(void *ptr);
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
-#if CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+#if CMK_SMP && CMK_BLUEGENEQ && (CMK_USE_L2ATOMICS || SPECIFIC_PCQUEUE)
 void * CmiAlloc_bgq (int     size);
 void   CmiFree_bgq  (void  * buf);
 #endif
@@ -2862,7 +2862,7 @@ void *CmiAlloc(int size)
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
   MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
-#elif CMK_SMP && CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+#elif CMK_SMP && CMK_BLUEGENEQ && (CMK_USE_L2ATOMICS || SPECIFIC_PCQUEUE)
   res = (char *) CmiAlloc_bgq(size+sizeof(CmiChunkHeader));
 #else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
@@ -2967,7 +2967,7 @@ void CmiFree(void *blk)
     CmiPoolFree(BLKSTART(parentBlk));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
     MPI_Free_mem(parentBlk);
-#elif CMK_SMP && CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+#elif CMK_SMP && CMK_BLUEGENEQ && (CMK_USE_L2ATOMICS || SPECIFIC_PCQUEUE)
     CmiFree_bgq(BLKSTART(parentBlk));
 #else
     free_nomigrate(BLKSTART(parentBlk));
