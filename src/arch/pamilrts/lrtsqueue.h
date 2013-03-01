@@ -227,10 +227,12 @@ LRTSQueue  LRTSQueueCreate()
 			   Q,
 			   1, /*use overflow*/
 			   DEFAULT_SIZE /*1024 entries*/);
-    if(CmiMyRank() == 0 && position == 0) {
-      position = CmiMyNodeSize();
-    } else {
-      position++; 
+    if(CmiMyRank() == 0) {
+      if(position == 0) {
+        position = CmiMyNodeSize();
+      } else {
+        position++; 
+      }
     }
     return Q;
 }
