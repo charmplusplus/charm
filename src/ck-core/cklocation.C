@@ -3203,7 +3203,7 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 #if ! CMK_ERROR_CHECKING
 //Assume the element will be found
-	return hash.getRef(*(CkArrayIndex *)&idx);
+	return hash.getRef(idx);
 #else
 //Include an out-of-bounds check if the element isn't found
 	CkLocRec *rec=elementNrec(idx);
@@ -3214,7 +3214,7 @@ CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 
 //Look up array element in hash table.  Return NULL if not there.
 CkLocRec *CkLocMgr::elementNrec(const CkArrayIndex &idx) {
-	return hash.get(*(CkArrayIndex *)&idx);
+	return hash.get(idx);
 }
 
 struct LocalElementCounter :  public CkLocIterator
