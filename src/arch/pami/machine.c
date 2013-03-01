@@ -1675,7 +1675,7 @@ void CmiFreeNodeListSendFn(int n_nodes, int *nodes, int size, char *msg) {
     PAMI_Context_post(my_context, (pami_work_t*)hdr->work, 
 		      machineFreeNodeList_handoff, lvec);
 #else
-    machineFreeNodeListSendFn(my_context, nodes, n_nodes, size, msg);
+    machineFreeNodeListSendFn(my_context, n_nodes, nodes, size, msg);
 #endif
 }
 
