@@ -215,14 +215,23 @@ void   LRTSQueuePreInit()
 LRTSQueue  LRTSQueueCreate()
 {
     static  int  position=0;
+    int place;
+    if(CmiMyRank() == 0) 
+      place = position;
+    else
+      place = CmiMyRank();
     LRTSQueue   Q;
     Q = (LRTSQueue)calloc(1, sizeof( struct _l2atomicq ));
-    LRTSQueueInit ((char *) l2atomicbuf + sizeof(L2AtomicState)*position,
+    LRTSQueueInit ((char *) l2atomicbuf + sizeof(L2AtomicState)*place,
 			   sizeof(L2AtomicState),
 			   Q,
 			   1, /*use overflow*/
 			   DEFAULT_SIZE /*1024 entries*/);
-    position++; 
+    if(CmiMyRank() == 0 && position == 0) {
+      position = CmiMyNodeSize();
+    } else {
+      position++; 
+    }
     return Q;
 }
 #endif

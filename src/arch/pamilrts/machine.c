@@ -709,7 +709,7 @@ void LrtsAbort(const char *message) {
 void LrtsNotifyIdle()
 {
 #if CMK_SMP && CMK_PAMI_MULTI_CONTEXT
-#if !CMK_ENABLE_ASYNC_PROGRESS && SPECIFIC_QUEUE  &&  CMK_NODE_QUEUE_AVAILABLE
+#if !CMK_ENABLE_ASYNC_PROGRESS && SPECIFIC_QUEUE  
   //Wait on the atomic queue to get a message with very low core
   //overheads. One thread calls advance more frequently
   ////spin wait for 2-4us when idle
@@ -721,7 +721,7 @@ void LrtsNotifyIdle()
 			    10);}
   else
 #endif
-#if SPECIFIC_QUEUE 
+#if 0 && SPECIFIC_QUEUE && CMK_NODE_QUEUE_AVAILABLE 
   { LRTSQueueSpinWait(CmiMyRecvQueue(), 
 			    1000);
   }
