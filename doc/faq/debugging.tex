@@ -13,7 +13,7 @@ printed.
 simulations. In the latter, each processor has a terminal window with a gdb
 connected.
 
-\item[charmdebug] This is the most sofisticated method to debug parallel
+\item[charmdebug] This is the most sophisticated method to debug parallel
 programs in Charm++. It is tailored to Charm++ and it can display and inspect
 chare objects as well as messages in the system. Single {\em gdb}s can be
 attached to specific processors on demand.
@@ -67,7 +67,7 @@ First, make sure the program at least starts to run properly without {\em ++debu
 (i.e. charmrun is working and there are no problems with the program startup
 phase). You need to make sure that gdb or dbx, and xterm are installed
 on all the machines you are using (not the one that is running {\tt charmrun}).
-If you are working on remote machines from Linux, you need to run ``xhost +''
+If you are working on remote machines from Linux, you may need to run ``xhost +''
 locally to give the remote machines permission to display an xterm on
 your desktop. If you are working from a Windows machine, you need an X-win
 application such as exceed. You need to set this up to give the right permissions
@@ -205,4 +205,4 @@ sometimes {\tt Bus Error}. What do these messages indicate?}
 
 {\tt Bus Error} and {\tt Hangup} both are indications that your
 program is terminating abnormally, i.e. with an uncaught signal (SEGV or
-SIGBUS). You should definitely run the program with gdb, or use {\em ++debug}.
+SIGBUS). You should definitely run the program with gdb, or use {\em ++debug}.  Bus Errors often mean there is an alignment problem, check if your compiler or environment offers support for detection of these.

@@ -79,13 +79,12 @@ so DON'T DO IT!
 \subsubsection{Is it possible to turn migratability on and off for an individual array
 element?}
 
-%<br>No.
-
+<br>Yes call {\em  setMigratable(false);} in the constructor.
 
 \subsubsection{Is it possible to insist that a particular array element gets migrated
 at the next {\em AtSync()}?}
 
-%<br>No.
+<br>No, but a manual migration can be triggered using {\em migrateMe}.
 
 
 \subsubsection{When not using {\tt AtSync} for LB, when does the LB start

@@ -53,8 +53,7 @@ message is deleted.
 \subsubsection{What are priorities?}
 
 Priorities are special values that can be associated with messages, so that the
-Charm++ scheduler will generally prefer higher priority messages when choosing a message
-to deliver. Priorities are often respected by Charm++ scheduler, but for correctness, a program must never rely upon any particular ordering of message deliveries. Messages with priorities are typically used to encourage high performance behavior of an application.
+Charm++ scheduler will generally prefer higher priority messages when choosing a buffered message from the queue to invoke as an entry method.  Priorities are often respected by Charm++ scheduler, but for correctness, a program must never rely upon any particular ordering of message deliveries. Messages with priorities are typically used to encourage high performance behavior of an application.
 
 
 For integer priorities, the smaller the priority value, the higher the priority
@@ -65,12 +64,15 @@ messages have a default priority of zero.
 
 \subsubsection{Can messages have multiple inheritance in Charm++?}
 
+Yes, but you probably shouldn't.  Perhaps you want to consider using \htmladdnormallink{generic or meta programming}{http://charm.cs.illinois.edu/manuals/html/charm++/15.html} techniques with templated chares, methods, and/or messages instead. 
+
 %<br>Messages can't be inherited at all-- they don't even have *single*
 %inheritance. This is a silly limitation; but the fact that messages need
 %to be transmitted as flat byte streams puts strong limits on what we can
 %do with them.
 
-\subsubsection{What is the difference between {\tt new} and {\tt alloc}?}
+%\subsubsection{What is the difference between {\tt new} and {\tt alloc}?}
+
 
 %My understanding is that </b><tt>new</tt><b>
 %calls </b><tt>alloc</tt><b>, but what else is

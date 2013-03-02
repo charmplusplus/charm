@@ -4,10 +4,10 @@
 
 See our \htmladdnormallink{download}{http://charm.cs.uiuc.edu/download/} page.
 
-\subsubsection{Should I use the CVS version of Charm++?}
+\subsubsection{Should I use the GIT version of Charm++?}
 
-The developers of Charm++ routinely use the latest CVS versions, and most of the
-time this is the best case. Occasionally something breaks, but the CVS version
+The developers of Charm++ routinely use the latest GIT versions, and most of the
+time this is the best case. Occasionally something breaks, but the GIT version
 will likely contain bug fixes not found in the releases.
 
 \subsubsection{How do I compile Charm++?}
@@ -32,6 +32,7 @@ Run the interactive build script {\tt ./build} and choose the option for buildin
 
 \subsubsection{Can I remove part of charm tree after compilation to free disk space?}
 
+Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examples, doc, contrib for normal usage once you have verified that your build is functional.
 
 \subsubsection{If the interactive script fails, how do I compile Charm++?}
 
@@ -228,7 +229,12 @@ Run the interactive build script {\tt ./build} and choose the option for buildin
 %foo.bar.edu
 %</pre>
 
+See Appendix V of the Charm manual for \htmladdnormallink{Installation and Usage}{http://charm.cs.illinois.edu/manuals/html/charm++/V.html}.
+
+
 \subsubsection{How do I specify the processors I want to use?}
+
+On machines where MPI has already been wired into the job system, use the --mpiexec flag and -np arguments.
 
 For the net versions, you need to write a nodelist file which lists
 all the machine hostnames available for parallel runs.
@@ -270,7 +276,10 @@ Yes.  Some of the known working serial libraries include:
 \item The Python interpreter (in Cosmo prototype)
 \item OpenGL graphics (in graphics demos)
 \item Metis mesh partitioning (included with charm)
+\item ATLAS, BLAS, LAPACK, ESSL, FFTW, MASSV, ACML, MKL, BOOST
 \end{itemize}
+
+In general, any serial library should work fine with Charm++.
 
 \subsubsection{How do I get the command-line switches available for a specific
 program?}

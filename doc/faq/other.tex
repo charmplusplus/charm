@@ -30,13 +30,14 @@ of a Charm++ message) while sending.
 \subsubsection{Is {\tt TempoArray::ckTempoSendElem()} the only way for non-AMPI
 code to communicate with running AMPI code?}
 
-%<br>A static method <tt>sendraw</tt> is added to the AMPI class, that allows
-%you to send a message to AMPI threads from outside AMPI. So, instead of
-%using the <tt>TempoArray</tt> method, you can use:
-%<tt>ampi::sendraw(tag1,tag2,msg,len,arrayid,index);</tt>
+<br>A static method <tt>sendraw</tt> is added to the AMPI class, that allows
+you to send a message to AMPI threads from outside AMPI. So, instead of
+using the <tt>TempoArray</tt> method, you can use:
+<tt>ampi::sendraw(tag1,tag2,msg,len,arrayid,index);</tt>
 
 \subsubsection{What is Charisma?}
 
+Charisma++ is a prototype language for describing global view of control in a parallel program. It is designed to solve the problem of obscured control flow in the object-based model with Charm++.
 
 \subsubsection{Does Projections use wall time or CPU time?}
 
