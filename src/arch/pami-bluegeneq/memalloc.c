@@ -4,8 +4,10 @@
 #define ALIGNMENT        64
 #define SMSG_SIZE        4096
 #define N_SMSG_ELEM      512
+#define MAX_SMSG_ELEM     1024
 #define LMSG_SIZE        16384
 #define N_LMSG_ELEM      128
+#define MAX_LMSG_ELEM     256
 
 L2AtomicQueue *sL2MemallocVec;
 L2AtomicQueue *bL2MemallocVec;
@@ -14,8 +16,17 @@ typedef struct CmiMemAllocHdr_bgq_t {
   int rank;
   int size;
   //Align the application buffer to 32 bytes
-  char dummy[ALIGNMENT - sizeof(CmiChunkHeader) - 2*sizeof(int)];
+  int tobuf;
+  char dummy[ALIGNMENT - sizeof(CmiChunkHeader) - 3*sizeof(int)];
 } CmiMemAllocHdr_bgq;
+
+typedef struct _AllocCount {
+    int allocated_smsg;
+    int allocated_lmsg;
+    char pad[ALIGNMENT -  2*sizeof(int)];
+} AllocCount;
+
+AllocCount allocs[64];
 
 static int _nodeStart;
 
@@ -24,29 +35,40 @@ void *CmiAlloc_bgq (int size) {
   char *buf;
   
   int myrank = Kernel_ProcessorID() - _nodeStart;
-
   if (size <= SMSG_SIZE) {
     hdr = L2AtomicDequeue (&sL2MemallocVec[myrank]);
-    if (hdr == NULL) 
-      hdr = (CmiMemAllocHdr_bgq *)
-	//malloc_nomigrate(SMSG_SIZE + sizeof(CmiMemAllocHdr_bgq));      
-	memalign(ALIGNMENT, SMSG_SIZE + sizeof(CmiMemAllocHdr_bgq));      
-
-    hdr->size = SMSG_SIZE;
+    if (hdr == NULL) {
+      if(allocs[myrank].allocated_smsg > MAX_SMSG_ELEM) {
+        hdr = (CmiMemAllocHdr_bgq *)memalign(ALIGNMENT, size + sizeof(CmiMemAllocHdr_bgq));      
+        hdr->tobuf = 0;
+      } else {
+        hdr = (CmiMemAllocHdr_bgq *) memalign(ALIGNMENT, SMSG_SIZE + sizeof(CmiMemAllocHdr_bgq));      
+        allocs[myrank].allocated_smsg++;
+        hdr->size = SMSG_SIZE;
+        hdr->tobuf = 1;
+      }
+    }
   }
   else if (size <= LMSG_SIZE) {
     hdr = L2AtomicDequeue (&bL2MemallocVec[myrank]);
-    if (hdr == NULL) 
-      hdr = (CmiMemAllocHdr_bgq *)
-	//malloc_nomigrate(LMSG_SIZE + sizeof(CmiMemAllocHdr_bgq));      
-	memalign(ALIGNMENT, LMSG_SIZE + sizeof(CmiMemAllocHdr_bgq));  
-    hdr->size = LMSG_SIZE;
+    if (hdr == NULL) {      
+      if(allocs[myrank].allocated_lmsg > MAX_LMSG_ELEM) {
+        hdr = (CmiMemAllocHdr_bgq *)memalign(ALIGNMENT, size + sizeof(CmiMemAllocHdr_bgq));      
+        hdr->tobuf = 0;
+      } else {
+        hdr = (CmiMemAllocHdr_bgq *) memalign(ALIGNMENT, LMSG_SIZE + sizeof(CmiMemAllocHdr_bgq));  
+        allocs[myrank].allocated_lmsg++;
+        hdr->size = LMSG_SIZE;
+        hdr->tobuf = 1;
+      }
+    }
   }
   else {
     hdr = (CmiMemAllocHdr_bgq *)
       //malloc_nomigrate(size + sizeof(CmiMemAllocHdr_bgq));      
       memalign(ALIGNMENT, size + sizeof(CmiMemAllocHdr_bgq));
     hdr->size = size;
+    hdr->tobuf  = 0;
   }
 
   hdr->rank = myrank;
@@ -59,16 +81,22 @@ void CmiFree_bgq (void *buf) {
   CmiMemAllocHdr_bgq *hdr = (CmiMemAllocHdr_bgq *)((char*)buf - sizeof(CmiMemAllocHdr_bgq));  
   int rc = L2A_EAGAIN;
   
-  if (hdr->size == SMSG_SIZE) 
+  if (hdr->tobuf && hdr->size == SMSG_SIZE) 
     rc = L2AtomicEnqueue (&sL2MemallocVec[hdr->rank], hdr);
-  else if (hdr->size == LMSG_SIZE)
+  else if (hdr->tobuf && hdr->size == LMSG_SIZE)
     rc = L2AtomicEnqueue (&bL2MemallocVec[hdr->rank], hdr);
 
-  if (rc == L2A_EAGAIN)
-    //queues are full or large buf
+  //queues are full or large buf
+  if (rc == L2A_EAGAIN) {
+    if(hdr->tobuf) {
+      if(hdr->size == SMSG_SIZE)
+        allocs[hdr->rank].allocated_smsg--;
+      else 
+        allocs[hdr->rank].allocated_lmsg--;
+    }
     free_nomigrate(hdr);
+  }
 }
-
 
 void CmiMemAllocInit_bgq (void   * l2mem,
 			  size_t   l2memsize) 
@@ -95,6 +123,7 @@ void CmiMemAllocInit_bgq (void   * l2mem,
 		       &bL2MemallocVec[i],
 		       0,
 		       N_LMSG_ELEM /*128 entries in long q*/);
+    allocs[i].allocated_smsg = 0;
+    allocs[i].allocated_lmsg = 0;
   }
 }
-
