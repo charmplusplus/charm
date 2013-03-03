@@ -122,13 +122,13 @@ void _alias_rank (int rank);
 volatile int msgQueueLen [MAX_NUM_CONTEXTS];
 volatile int outstanding_recvs [MAX_NUM_CONTEXTS];
 
-#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
-#define THREADS_PER_CONTEXT 2
-#define LTPS                1 //Log Threads Per Context (TPS)
-#else
-#define THREADS_PER_CONTEXT 2
-#define LTPS                1 //Log Threads Per Context (TPS)
-#endif
+//#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
+//#define THREADS_PER_CONTEXT 2
+//#define LTPS                1 //Log Threads Per Context (TPS)
+//#else
+#define THREADS_PER_CONTEXT 4
+#define LTPS                2 //Log Threads Per Context (TPS)
+//#endif
 
 #define  MY_CONTEXT_ID() (CmiMyRank() >> LTPS)
 #define  MY_CONTEXT()    (cmi_pami_contexts[CmiMyRank() >> LTPS])
