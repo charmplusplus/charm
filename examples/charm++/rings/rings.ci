@@ -26,7 +26,7 @@ mainmodule rings {
   message NotifyDone;
 
   mainchare main {
-    entry main();
+    entry main(CkArgMsg *m);
     entry void ringDone(NotifyDone *);
   };	
 

@@ -9,7 +9,7 @@ mainmodule Pgm {
   message DUMMYMSG;
   
   mainchare main {
-    entry main();
+    entry main(CkArgMsg *m);
     entry [threaded] void Quiescence1(DUMMYMSG *);
   };
   

@@ -2,7 +2,7 @@ mainmodule ring {
   message Msg;
 
   mainchare main {
-    entry main();
+    entry main(CkArgMsg *m);
     entry void quit_when_done(Msg *);
     readonly CkChareID mainhandle;
   };

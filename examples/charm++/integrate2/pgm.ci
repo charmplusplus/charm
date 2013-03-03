@@ -6,7 +6,7 @@ readonly CProxy_main mainProxy;
 
 mainchare main
 {
-  entry main();
+  entry main(CkArgMsg *m);
   entry void results(double partialIntegral);
 };
 

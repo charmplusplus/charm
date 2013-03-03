@@ -1,7 +1,7 @@
 mainmodule speed {
 
   mainchare main {
-    entry main();
+    entry main(CkArgMsg *m);
   };
   
   group test {
