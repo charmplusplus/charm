@@ -325,11 +325,7 @@ static int already_in_signal_handler=0;
 
 static void CmiDestroyLocks();
 
-void CmiMachineExit();
-
-#if CMK_USE_SYSVSHM /* define teardown function before use */
-void tearDownSharedBuffers();
-#endif
+void MachineExit();
 
 static void machine_exit(int status)
 {
@@ -345,10 +341,7 @@ static void machine_exit(int status)
     gm_finalize();
   }
 #endif
-#if CMK_USE_SYSVSHM
-  tearDownSharedBuffers();
-#endif
-  CmiMachineExit();
+  MachineExit();
   exit(status);
 }
 
@@ -1604,64 +1597,6 @@ static void node_addresses_obtain(char **argv)
   MACHSTATE(3,"} node_addresses_obtain ");
 }
 
-#if CMK_NODE_QUEUE_AVAILABLE
-
-/***********************************************************************
- * DeliverOutgoingNodeMessage()
- *
- * This function takes care of delivery of outgoing node messages from the
- * sender end. Broadcast messages are divided into sets of messages that 
- * are bound to the local node, and to remote nodes. For local
- * transmission, the messages are directly pushed into the recv
- * queues. For non-local transmission, the function DeliverViaNetwork()
- * is called
- ***********************************************************************/
-void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
-{
-  int i, rank, dst; OtherNode node;
-
-  dst = ogm->dst;
-  switch (dst) {
-  case NODE_BROADCAST_ALL:
-    CmiPushNode(CopyMsg(ogm->data,ogm->size));
-    /*case-fallthrough (no break)-- deliver to all other processors*/
-  case NODE_BROADCAST_OTHERS:
-#if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildrenNet(ogm, 1, 0, NULL, 0, DGRAM_NODEBROADCAST);
-#elif CMK_BROADCAST_HYPERCUBE
-    SendHypercube(ogm, 1, 0, NULL, 0, DGRAM_NODEBROADCAST);
-#else
-    for (i=0; i<_Cmi_numnodes; i++)
-      if (i!=_Cmi_mynode)
-	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE, DGRAM_ROOTPE_MASK, 1);
-#endif
-    GarbageCollectMsg(ogm);
-    break;
-  default:
-    node = nodes+dst;
-    rank=DGRAM_NODEMESSAGE;
-    if (dst != _Cmi_mynode) {
-      DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
-      GarbageCollectMsg(ogm);
-    } else {
-      if (ogm->freemode == 'A') {
-	CmiPushNode(CopyMsg(ogm->data,ogm->size));
-	ogm->freemode = 'X';
-      } else {
-	CmiPushNode(ogm->data);
-	FreeOutgoingMsg(ogm);
-      }
-    }
-  }
-}
-
-#else
-
-#define DeliverOutgoingNodeMessage(msg) DeliverOutgoingMessage(msg)
-
-#endif
-
-
 
 /***********************************************************************
  * DeliverOutgoingMessage()
@@ -1779,16 +1714,6 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
  *
  *****************************************************************************/
 
-int CmiAsyncMsgSent(CmiCommHandle handle)
-{
-  return (((OutgoingMsg)handle)->freemode == 'X');
-}
-
-void CmiReleaseCommHandle(CmiCommHandle handle)
-{
-  FreeOutgoingMsg(((OutgoingMsg)handle));
-}
-
 #if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
 
 /*****************************************************************************
@@ -1836,14 +1761,6 @@ void LrtsDrainResources()
 
 void LrtsPostNonLocal()
 {
-/*
-#if CMK_SHARED_VARS_UNAVAILABLE
-  //No comm. thread-- listen on sockets for incoming messages
-  MACHSTATE(1,"idle commserver {")
-  CommunicationServerNet(Cmi_idlepoll?0:10, COMM_SERVER_FROM_SMP);
-  MACHSTATE(1,"} idle commserver")
-#endif
-*/
 }
 
 /* Network progress function is used to poll the network when for

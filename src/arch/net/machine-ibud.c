@@ -1405,7 +1405,7 @@ void CmiCommunicationInit(char **argv) {
 	MACHSTATE(3,"} CmiCommunicationInit");
 }
 
-void CmiMachineExit()
+void MachineExit()
 {
 	ibv_destroy_qp(context->qp);
 	ibv_dealloc_pd(context->pd); 

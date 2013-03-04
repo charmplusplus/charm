@@ -8,7 +8,7 @@
  * - CmiNotifyIdle()
  * - DeliverViaNetwork()
  * - CommunicationServer()
- * - CmiMachineExit()
+ * - MachineExit()
 
   written by 
   Yan Shi, yanshi@uiuc.edu        2/1/2006
@@ -867,9 +867,9 @@ void CmiCommunicationInit(char **argv)
   CmiMXMakeConnection();
 }
 
-void CmiMachineExit()
+void MachineExit()
 {
-  MACHSTATE(3, "CmiMachineExit {");
+  MACHSTATE(3, "MachineExit {");
   mx_return_t  rc;
   if (endpoint) {
     rc = mx_close_endpoint(endpoint);
@@ -886,7 +886,7 @@ void CmiMachineExit()
       return;
     }
   }
-  MACHSTATE(3, "} CmiMachineExit");
+  MACHSTATE(3, "} MachineExit");
 }
 
 /* make sure other gm nodes are accessible in routing table */

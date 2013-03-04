@@ -602,7 +602,7 @@ void CmiMachineInit(char **argv)
 #endif
 }
 
-void CmiMachineExit()
+void MachineExit()
 {
 }
 

@@ -802,7 +802,7 @@ void CmiCommunicationInit(char **argv)
 {
 }
 
-void CmiMachineExit()
+void MachineExit()
 {
 }
 

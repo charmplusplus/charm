@@ -7,7 +7,7 @@
  * - CmiNotifyIdle()
  * - DeliverViaNetwork()
  * - CommunicationServer()
- * - CmiMachineExit()
+ * - MachineExit()
 
   written by 
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
@@ -972,7 +972,7 @@ void CmiCommunicationInit(char **argv)
 {
 }
 
-void CmiMachineExit()
+void MachineExit()
 {
 #if GM_STATS
   int i;
