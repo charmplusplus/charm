@@ -890,38 +890,6 @@ static void CommunicationInterrupt(int ignored)
 
 extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
-static void CmiStartThreadsNet(char **argv)
-{
-  MACHSTATE2(3,"_Cmi_numpes %d _Cmi_numnodes %d",_Cmi_numpes,_Cmi_numnodes);
-  MACHSTATE1(3,"_Cmi_mynodesize %d",_Cmi_mynodesize);
-  if ((_Cmi_numpes != _Cmi_numnodes) || (_Cmi_mynodesize != 1))
-    KillEveryone
-      ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
-
-  CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
-  _Cmi_mype = Cmi_nodestart;
-
-  /* Prepare Cpv's for immediate messages: */
-  _Cmi_myrank=1;
-  CommunicationServerInit();
-  _Cmi_myrank=0;
-
-#if !CMK_ASYNC_NOT_NEEDED
-  if (Cmi_asyncio)
-  {
-    CmiSignal(SIGIO, 0, 0, CommunicationInterrupt);
-    if (!Cmi_netpoll) {
-      if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
-      if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
-    }
-#if CMK_USE_GM || CMK_USE_MX
-      /* charmrun is serviced in interrupt for gm */
-    if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
-#endif
-  }
-#endif
-}
-
 static void CmiDestroyLocks()
 {
   comm_flag = 0;
@@ -1221,7 +1189,6 @@ static int InternalScanf(char *fmt, va_list l)
   CmiUnlock(Cmi_scanf_mutex);
   return i;
 }
-
 #if CMK_CMIPRINTF_IS_A_BUILTIN
 
 /*New stdarg.h declarations*/
@@ -1614,21 +1581,6 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
   return network;
 }
 
-
-/******************************************************************************
- *
- * CmiGetNonLocal
- *
- * The design of this system is that the communication thread does all the
- * work, to eliminate as many locking issues as possible.  This is the only
- * part of the code that happens in the receiver-thread.
- *
- * This operation is fairly cheap, it might be worthwhile to inline
- * the code into CmiDeliverMsgs to reduce function call overhead.
- *
- *****************************************************************************/
-
-
 /**
  * Set up an OutgoingMsg structure for this message.
  */
@@ -1758,7 +1710,7 @@ void LrtsAdvanceCommunication(int whileidle)
  *
  *****************************************************************************/
 
-#if CMK_BARRIER_USE_COMMON_CODE
+#if !CMK_BARRIER_USE_COMMON_CODE
 
 /* happen at node level */
 /* must be called on every PE including communication processors */
