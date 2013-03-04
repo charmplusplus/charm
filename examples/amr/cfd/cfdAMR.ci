@@ -6,6 +6,6 @@ mainmodule cfdAMR {
  initcall void AmrUserDataCfdProblemInit(void);
  mainchare main
  {
-   entry main();
+   entry main(CkArgMsg*);
  };
 };

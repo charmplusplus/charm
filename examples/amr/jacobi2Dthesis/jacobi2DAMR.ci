@@ -4,6 +4,6 @@ mainmodule jacobi2DAMR {
  initcall void AmrUserDataJacobiInit(void);
  mainchare main
  {
-   entry main();
+   entry main(CkArgMsg*);
  };
 };

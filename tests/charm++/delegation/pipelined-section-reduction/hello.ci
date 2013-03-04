@@ -15,7 +15,7 @@ mainmodule hello {
   };
 
   mainchare main {
-    entry main();
+    entry main(CkArgMsg*);
     entry void maindone(void);
   };
 

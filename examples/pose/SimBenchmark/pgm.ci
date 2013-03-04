@@ -3,6 +3,6 @@ mainmodule Pgm {
   readonly CkChareID mainhandle;
   
   mainchare main {
-    entry main();
+    entry main(CkArgMsg*);
   };
 };

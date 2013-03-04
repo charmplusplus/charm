@@ -2,6 +2,6 @@ mainmodule jacobi2DAMR {
  extern module amr;
  mainchare main
  {
-   entry main();
+   entry main(CkArgMsg*);
  };
 };

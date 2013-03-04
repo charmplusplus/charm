@@ -3,7 +3,7 @@ mainmodule broadcast {
   readonly int iterations;
   readonly int payload;
   mainchare main {
-    entry main();
+    entry main(CkArgMsg*);
     entry void maindone(void);
   };
   message PingMsg{char x[];};

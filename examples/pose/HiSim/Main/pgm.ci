@@ -8,6 +8,6 @@ mainmodule Pgm {
   readonly unsigned int netWidth;
   readonly Config config;
   mainchare main {
-    entry main();
+    entry main(CkArgMsg*);
   };
 };

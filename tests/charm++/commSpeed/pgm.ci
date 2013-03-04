@@ -3,7 +3,7 @@ mainmodule Pgm {
   readonly CProxy_main mp;
   
   mainchare main {
-    entry main();
+    entry main(CkArgMsg*);
     entry void finish(double avgLocal, double avgRemote);
   };
 };
