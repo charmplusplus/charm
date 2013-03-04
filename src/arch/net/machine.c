@@ -556,13 +556,6 @@ void LrtsAbort(const char *message)
 {
   if (already_aborting) machine_exit(1);
   already_aborting=1;
-	{
-/*	 char str[100];
-	 sprintf(str,"dead.%d",CmiMyNode());
-	 FILE *fp = fopen(str,"w");
-	 fprintf(fp,"%s",message);
-         fclose(fp);*/
-	}
   MACHSTATE1(5,"CmiAbort(%s)",message);
 
 #if CMK_CCS_AVAILABLE
@@ -573,16 +566,6 @@ void LrtsAbort(const char *message)
   }
 #endif
   
-  /* CmiDestroyLocks();  */
-
-  {
-/*    char str[22];
-    snprintf(str,18,"dead.%d",CmiMyPe());
-    FILE *fp = fopen(str,"w");
-    fprintf(fp,"Abort:%s\n",message);
-    fclose(fp);*/
-  }
-
   CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
   	"Reason: %s\n",CmiMyPe(),message);
   CmiPrintStackTrace(0);
@@ -746,16 +729,6 @@ static void extract_common_args(char **argv)
     Cmi_print_stats = 1;
 }
 
-/* for SMP */
-//#include "machine-smp.c"
-
-/* Immediate message support */
-#define CMI_DEST_RANK_NET(msg)	*(int *)(msg)
-//#include "immediate.c"
-
-#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
-//#include "machine-commthd-util.c"
-#endif
 
 /******************************************************************************
  *
@@ -869,7 +842,7 @@ static double         Cmi_check_delay = 3.0;
  *****************************************************************************/
 
 /************************ No kernel SMP threads ***************/
-#if CMK_SHARED_VARS_UNAVAILABLE
+#if !CMK_SMP 
 
 static volatile int memflag=0;
 void CmiMemLock() { memflag++; }
@@ -1341,7 +1314,8 @@ static void CmiStdoutInit(void) {
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
 #endif
-#if CMK_SHARED_VARS_UNAVAILABLE
+//NOTSURE #if CMK_SHARED_VARS_UNAVAILABLE
+#if !CMK_SMP 
                 if (Cmi_asyncio)
 		{
   /*No communication thread-- get a SIGIO on each write(), which keeps the buffer clean*/
@@ -1511,7 +1485,8 @@ static void node_addresses_obtain(char **argv)
 	ChMessage_new("nodeinfo",sizeof(ChSingleNodeinfo),&nodetabmsg);
 	fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);
   	CmiGetArgIntDesc(argv,"+p",&npes,"Set the number of processes to create");
-#if CMK_SHARED_VARS_UNAVAILABLE
+//#if CMK_SHARED_VARS_UNAVAILABLE
+#if !CMK_SMP 
 	if (npes!=1) {
 		fprintf(stderr,
 			"To use multiple processors, you must run this program as:\n"

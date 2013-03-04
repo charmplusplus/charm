@@ -405,7 +405,7 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #endif
 
-#if CMK_SHARED_VARS_UNAVAILABLE   /* non-SMP version */
+#if !CMK_SMP /* non-SMP version */
 
 typedef int CmiImmediateLockType;
 extern int _immediateLock;

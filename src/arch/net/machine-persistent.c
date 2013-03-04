@@ -17,6 +17,7 @@
  */
 #include "persist_impl.h"
 
+#define CMI_DEST_RANK_NET(msg)	*(int *)(msg)
 int persistentSendMsgHandlerIdx;
 
 static void sendPerMsgHandler(char *msg)

@@ -68,7 +68,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s)
 
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
-#if CMK_SHARED_VARS_UNAVAILABLE
+#if  !CMK_SMP 
   CommunicationServerNet(10, COMM_SERVER_FROM_SMP);
 #else
   int nSpins=20; /*Number of times to spin before sleeping*/
@@ -258,7 +258,7 @@ static void CommunicationServerNet(int sleepTime, int where)
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
   MACHSTATE2(sleepTime?3:2,"CommunicationsServer(%d,%d) {",
 	     sleepTime,writeableAcks||writeableDgrams)  
-#if !CMK_SHARED_VARS_UNAVAILABLE /*SMP mode: comm. lock is precious*/
+#if CMK_SMP
   if (sleepTime!=0) {/*Sleep *without* holding the comm. lock*/
     MACHSTATE(2,"CommServer going to sleep (NO LOCK)");
     if (CheckSocketsReady(sleepTime, 0)<=0) {
