@@ -11,7 +11,7 @@
 
 #include "hello.decl.h"
 
-class main : public CBase_Main {
+class main : public CBase_main {
 public:
   main(CkMigrateMessage *m) {}
   main(CkArgMsg *m);
