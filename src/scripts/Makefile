@@ -309,25 +309,25 @@ dirs+sources:
 	./gatherflat ../../src/ck-perf          .
 	./gatherflat ../../src/ck-ldb           .
 	./gatherflat ../../src/ck-com           .
-	./gatherflat ../../src/ck-cp           .
-	./gatherflat ../../src/conv-com           .
+	./gatherflat ../../src/ck-cp            .
+	./gatherflat ../../src/conv-com         .
 	./gatherflat ../../src/langs/simplemsg  .
 	./gatherflat ../../src/langs/pvmc       .
 	./gatherflat ../../src/langs/bluegene   .
 	./gatherflat ../../src/langs/f90charm   .
 	./gatherflat ../../src/xlat-i           .
 	./gatherflat ../../src/xlatcpm          .
-	./gathertree ../../src/QuickThreads QuickThreads
-	./gathertree ../../src/libs libs
-	./gathertree ../../src/arch/util      .
-	./gathertree ../../src/langs langs
-	./gathertree ../../src/langs/jade langs/jade
-	./gathertree ../../src/arch/common           .
-	./gathertree ../../src/arch/`cat .gdir`      .
+	./gathertree ../../src/QuickThreads     QuickThreads
+	./gathertree ../../src/libs             libs
+	./gathertree ../../src/arch/util        .
+	./gathertree ../../src/langs            langs
+	./gathertree ../../src/langs/jade       langs/jade
+	./gathertree ../../src/arch/common      .
+	./gathertree ../../src/arch/`cat .gdir` .
 	test -f ../../src/arch/`cat .gdir`/gdir_link && cat ../../src/arch/`cat .gdir`/gdir_link > .gdir.new && ./gathertree ../../src/arch/`cat .gdir.new`      . || true
-	./gatherflat ../../src/arch/`cat .vdir`      .
-	./gathertree ../../examples ../examples
-	./gathertree ../../tests ../tests
+	./gatherflat ../../src/arch/`cat .vdir` .
+	./gathertree ../../examples             ../examples
+	./gathertree ../../tests                ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
