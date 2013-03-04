@@ -236,24 +236,6 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]);
 void	infiPostInitialRecvs();
 #endif
 
-#if CMK_USE_AMMASSO
-
-/*
- * State Machine for Queue Pair Connection State (machine layer state for QP)
- *  PRE_CONNECT  --->  CONNECTED  ---> CONNECTION_LOST
- *                        |    /|\              |
- *                       \|/    \---------------/
- *           CONNECTION_CLOSED
- */
-
-typedef enum __qp_connection_state {
-  QP_CONN_STATE_PRE_CONNECT = 1,     /* Connection is being attempted and no successful connection has been made yet           */
-  QP_CONN_STATE_CONNECTED,           /* Connection has be established                                                          */
-  QP_CONN_STATE_CONNECTION_LOST,     /* Connection is being attempted and there has been an established connection in the past */
-  QP_CONN_STATE_CONNECTION_CLOSED    /* Connection closed                                                                      */
-} qp_connection_state_t;
-#endif
-  
 typedef struct FutureMessageStruct {
   char *msg;
   int len;
@@ -484,10 +466,6 @@ static void node_addresses_store(ChMessage *msg)
     nodes[i].sock = INVALID_SOCKET;
 #endif
     nodestart+=nodes[i].nodesize;
-
-#if CMK_USE_AMMASSO
-    CmiAmmassoNodeAddressesStoreHandler(nodes[i].nodestart, &(nodes[i].addr), nodes[i].dataport);
-#endif
 
   }
   _Cmi_numpes=nodestart;
