@@ -25,7 +25,7 @@ mainmodule barnes {
   };
 
   mainchare [migratable] Main {
-    entry Main();
+    entry Main(CkArgMsg *);
     entry [threaded] void startSimulation();
     entry void recvGlobalSizes(CkReductionMsg *msg);
   };
