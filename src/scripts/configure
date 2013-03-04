@@ -4210,7 +4210,15 @@ _ACEOF
 fi
 fi
 
+
+
+
 #### query Cray machine supports BANDWIDTH_INJECTION controls####
+
+if test "$CMK_BUILD_MPI" = "1"
+then
+echo "BANDWIDTH_INJECTION test disabled on MPI"
+else
 cat > $tc <<EOT
 #include <stdint.h>
 #include <gni_pub.h>
@@ -4229,6 +4237,8 @@ test_linkc "whether GNI_GetBIConfig exists" "yes" "no" ""
 cat >>confdefs.h <<_ACEOF
 #define CMK_BALANCED_INJECTION_API $pass
 _ACEOF
+
+fi # end of BIConfig test
 
 
 fi  # end of Cray specific test
