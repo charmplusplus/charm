@@ -19,8 +19,7 @@
 # -DMEMCHECK
 
 OPTS= -g -O3 #-DVERBOSE_PIECES -DVERBOSE_MAIN -DPRINT_TREE -DOUTPUT_ACC -DMEMCHECK  -DNO_LB #-DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
-CHARM_DIR=../../../multicore-linux64
-CHARMC=$(CHARM_DIR)/bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o grav.o util.o code_io.o 
 PROJ= #-tracemode projections #-tracemode summary
