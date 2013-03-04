@@ -1134,7 +1134,7 @@ void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int si
   }
 
   if (npes  && CmiNodeOf(pes[npes-1]) != CmiMyNode()) {
-    CMI_DEST_RANK(copymsg) = CmiRankOf(pes[npes-1]);
+    CMI_DEST_RANK(msg) = CmiRankOf(pes[npes-1]);
     LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[npes-1]),CmiMyPartition()), pes[npes-1], size, msg, 0);
   }
   else
