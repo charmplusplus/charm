@@ -1010,8 +1010,10 @@ void ConverseExit(void) {
 
 #if CMK_SMP
   CmiNodeBarrier();
-  if (rank0)
-    exit(1); 
+  if (rank0) {
+    Delat(100000);
+    exit(0); 
+  }
   else
     pthread_exit(0);
 #else
