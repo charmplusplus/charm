@@ -17,10 +17,6 @@
  */
 
 
-#if CMK_USE_AMMASSO
-#include "machine-ammasso.h"
-#endif
-
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
 #include <infiniband/verbs.h>
 #endif
@@ -296,76 +292,6 @@ typedef struct OtherNodeStruct
 
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
 	struct infiOtherNodeData *infiData;
-#endif
-
-#if CMK_USE_AMMASSO
-  /* DMK : TODO : If any of these can be shared, then they can be moved to mycb_t in "machine-ammasso.c"  */
-
-  cc_uint32_t            recv_cq_depth;
-  cc_cq_handle_t         recv_cq;
-  cc_uint32_t            send_cq_depth;
-  cc_cq_handle_t         send_cq;
-  cc_qp_id_t             qp_id;      /* Queue Pair ID      */
-  cc_qp_handle_t         qp;         /* Queue Pair Handle  */
-
-  int                    myNode;
-
-  // list of buffers currently allocated to this paricular node
-  LIST_DEFINE(AmmassoBuffer,recv_buf);
-  // This is used when deallocating buffers: it is set to the buffer previous to
-  // the last in the list of recv_buf, so that the list can be broken, and the
-  // buffers released without the usage of either a double linked list or a
-  // linear search
-  AmmassoBuffer          *secondLastRecvBuf;
-
-  // when allocating new buffers, they remain here until the other node conferm
-  // their allocation
-  LIST_DEFINE(AmmassoBuffer,pending);
-
-  // number of the next ACK to be sent to this node, it is piggybacked on every
-  // message
-  ammasso_ack_t          *remoteAck;
-
-  // how many messages have been received since the last ACK was sent
-  int                    messagesNotYetAcknowledged;
-
-  // the following is used to send the ACK without a message
-  cc_sq_wr_t             *ack_sq_wr;
-
-  // the following is a pointer to where the ACK will arrive (if directly sent)
-  ammasso_ack_t          *directAck;
-
-  LIST_DEFINE(AmmassoToken,sendTokens); // linked list of available tokens
-  LIST_DEFINE(AmmassoToken,usedTokens); // they are waiting for an ACK
-
-  // number of ACK received from this node, it is compared against the incoming
-  // ACK to release send buffers
-  ammasso_ack_t          localAck;
-
-  // NOTE: this locks are probably not needed, try to see if they can be deleted
-  CmiNodeLock            sendBufLock;
-  CmiNodeLock            send_next_lock;
-  CmiNodeLock            recv_expect_lock;
-
-  cc_ep_handle_t         ep;
-  cc_ep_handle_t         cr;
-
-  cc_qp_query_attrs_t      qp_attrs;
-  cc_stag_index_t          qp_attrs_stag_index;
-
-  int                    posted;
-
-  cc_inet_addr_t         address;  /* local if passive side of connection, remote if active side of connection */
-  cc_inet_port_t         port;     /* local if passive side of connection, remote if active side of connection */
-  qp_connection_state_t  connectionState;  /* State of the connection (connected, lost, etc) */
-
-  cc_stag_t              remote_recv_stag;
-  cc_uint64_t            remote_starting_to;
-  int                    recv_UseIndex;
-
-  /* Used by DYNAMIC ALLOCATOR */
-  int  max_used_tokens;
-
 #endif
 
   int                      asm_rank;
@@ -790,10 +716,6 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #elif CMK_USE_MX
 
 #include "machine-mx.c"
-
-#elif CMK_USE_AMMASSO
-
-#include "machine-ammasso.c"
 
 #elif CMK_USE_TCP
 

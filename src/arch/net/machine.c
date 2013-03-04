@@ -246,10 +246,6 @@ int MX_FILTER   =  123456;
 static uint64_t Cmi_nic_id=0; /* Machine-specific identifier (MX-only) */
 #endif
 
-#if CMK_USE_AMMASSO
-  #include "clustercore/ccil_api.h"
-#endif
-
 #if CMK_MULTICORE
 int Cmi_commthread = 0;
 #endif
@@ -1665,13 +1661,6 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 
 #endif
 
-#if CMK_C_INLINE
-inline static
-#endif
-void DeliverViaNetworkOrPxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int broot,int copy){
-      DeliverViaNetwork(ogm, node, rank, broot, copy);
-}
-
 
 
 /***********************************************************************
@@ -1693,59 +1682,6 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
   dst = ogm->dst;
 
   //printf("deliver outgoing message, dest: %d \n", dst);
-  switch (dst) {
-  case PE_BROADCAST_ALL:
-#if !CMK_SMP_NOT_RELAX_LOCK	  
-    CmiCommLock();
-#endif
-    for (rank = 0; rank<_Cmi_mynodesize; rank++) {
-      CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
-	}
-#if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildrenNet(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
-#elif CMK_BROADCAST_HYPERCUBE
-    SendHypercube(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
-#else
-    for (i=0; i<_Cmi_numnodes; i++)
-      if (i!=_Cmi_mynode){
-	/*FAULT_EVAC : is the target processor valid*/
-	if(CmiNodeAlive(i)){
-    	  DeliverViaNetworkOrPxshm(ogm, nodes+i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK, 1);
-	}
-      }	
-#endif
-    GarbageCollectMsg(ogm);
-#if !CMK_SMP_NOT_RELAX_LOCK	  	  
-    CmiCommUnlock();
-#endif	  
-    break;
-  case PE_BROADCAST_OTHERS:
-#if !CMK_SMP_NOT_RELAX_LOCK	  	  
-    CmiCommLock();
-#endif  
-    for (rank = 0; rank<_Cmi_mynodesize; rank++)
-      if (rank + Cmi_nodestart != ogm->src) {
-	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
-      }
-#if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildrenNet(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
-#elif CMK_BROADCAST_HYPERCUBE
-    SendHypercube(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
-#else
-    for (i = 0; i<_Cmi_numnodes; i++)
-      if (i!=_Cmi_mynode){
-	/*FAULT_EVAC : is the target processor valid*/
-	if(CmiNodeAlive(i)){
-    	  DeliverViaNetworkOrPxshm(ogm, nodes+i, DGRAM_BROADCAST, DGRAM_ROOTPE_MASK, 1);
-	}
-      }	
-#endif
-    GarbageCollectMsg(ogm);
-#if !CMK_SMP_NOT_RELAX_LOCK	  	  
-    CmiCommUnlock();
-#endif	  
-    break;
-  default:	
 #ifndef CMK_OPTIMIZE
     if (dst<0 || dst>=CmiNumPes())
       CmiAbort("Send to out-of-bounds processor!");
@@ -1756,21 +1692,11 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 #if !CMK_SMP_NOT_RELAX_LOCK	  		
         CmiCommLock();
 #endif		
-    	DeliverViaNetworkOrPxshm(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
-	GarbageCollectMsg(ogm);
+        DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
+        GarbageCollectMsg(ogm);
 #if !CMK_SMP_NOT_RELAX_LOCK	  		
         CmiCommUnlock();
 #endif		
-    } else {
-      network = 0;
-      if (ogm->freemode == 'A') {
-	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
-	ogm->freemode = 'X';
-      } else {
-	CmiPushPE(rank, ogm->data);
-	FreeOutgoingMsg(ogm);
-      }
-    }
   }
 #if CMK_MULTICORE
   network = 0;
@@ -1829,21 +1755,6 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
   MACHSTATE(1,"CmiGeneralSend {");
 
-  if (freemode == 'S') {
-#if CMK_USE_GM
-    if (pe != cs->pe) {
-      freemode = 'G';
-    }
-    else
-#endif
-    {
-    char *copy = (char *)CmiAlloc(size);
-    if (!copy)
-      fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
-    memcpy(copy, data, size);
-    data = copy; freemode = 'F';
-    }
-  }
   CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
 
@@ -2298,10 +2209,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
       Cmi_check_delay=1.0e30;
-
-#if CMK_USE_AMMASSO
-  CmiAmmassoOpenQueuePairs();
-#endif
 
 }
 
