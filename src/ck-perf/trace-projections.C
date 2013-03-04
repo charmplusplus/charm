@@ -367,7 +367,7 @@ void LogPool::createFile(const char *fix)
 #endif
   fileCreated = true;
   delete[] pathPlusFilePrefix;
-  openLog("w+");
+  openLog("w");
   CLOSE_LOG 
 }
 
