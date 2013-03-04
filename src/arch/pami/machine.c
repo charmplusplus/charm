@@ -1011,7 +1011,7 @@ void ConverseExit(void) {
 #if CMK_SMP
   CmiNodeBarrier();
   if (rank0) {
-    Delat(100000);
+    Delay(100000);
     exit(0); 
   }
   else
