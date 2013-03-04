@@ -1066,10 +1066,10 @@ void LrtsFreeListSendFn(int npes, int *pes, int size, char *msg) {
   CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
   CmiMsgHeaderBasic *hdr = (CmiMsgHeaderBasic *)msg;
   hdr->size = size;
-  CMI_SET_CHECKSUM(msg, size);
 
   //Fast path
   if (npes == 1) {
+    CMI_DEST_RANK(msg) = CmiRankOf(pes[0]);
     LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[0]),CmiMyPartition()), pes[0], size, msg, 1);
     return;
   }
@@ -1128,12 +1128,15 @@ void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int si
       CmiAssert(copymsg != NULL);
       CmiMemcpy(copymsg,msg,size);
 #endif
+      CMI_DEST_RANK(copymsg) = CmiRankOf(pes[i]);
       LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[i]),CmiMyPartition()), pes[i], size, copymsg, 0);
     }
   }
 
-  if (npes  && CmiNodeOf(pes[npes-1]) != CmiMyNode())
+  if (npes  && CmiNodeOf(pes[npes-1]) != CmiMyNode()) {
+    CMI_DEST_RANK(copymsg) = CmiRankOf(pes[npes-1]);
     LrtsSendFunc(CmiGetNodeGlobal(CmiNodeOf(pes[npes-1]),CmiMyPartition()), pes[npes-1], size, msg, 0);
+  }
   else
     CmiFree(msg);    
 
