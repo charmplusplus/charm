@@ -651,7 +651,9 @@ void LrtsPreCommonInit(int everReturn)
   CpvAccess(uselock) = 1;
 #endif
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
-  CMI_Progress_init(0, cmi_pami_numcontexts);
+  if(CmiMyRank() == 0) {
+    CMI_Progress_init(0, cmi_pami_numcontexts);
+  }
 #endif
 }
 
