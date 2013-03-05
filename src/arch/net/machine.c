@@ -715,12 +715,6 @@ static void parse_netstart(void)
   	Cmi_charmrun_pid=0;
         dataport = -1;
   }
-#if CMK_USE_IBVERBS | CMK_USE_IBUD
-	char *cmi_num_nodes = getenv("CmiNumNodes");
-	if(cmi_num_nodes != NULL){
-		sscanf(cmi_num_nodes,"%d",&_Cmi_numnodes);
-	}
-#endif	
 }
 
 static void extract_common_args(char **argv)
@@ -1426,19 +1420,6 @@ static void CmiStdoutFlush(void) {
  *
  *****************************************************************************/
 
-#if CMK_USE_IBVERBS
-void copyInfiAddr(ChInfiAddr *qpList);
-#endif
-
-#if CMK_IBVERBS_FAST_START
-static void send_partial_init()
-{
-  ChMessageInt_t nodeNo = ChMessageInt_new(_Cmi_mynode);
-	ctrl_sendone_nolock("partinit",(const char *)&(nodeNo),sizeof(nodeNo),NULL,0);
-}	
-#endif
-
-
 /*Note: node_addresses_obtain is called before starting
   threads, so no locks are needed (or valid!)*/
 static void node_addresses_obtain(char **argv)
@@ -1484,16 +1465,6 @@ static void node_addresses_obtain(char **argv)
 
   	me.nodeNo=ChMessageInt_new(_Cmi_mynode);
 
-#if CMK_USE_IBVERBS
-	{
-		int qpListSize = (_Cmi_numnodes-1)*sizeof(ChInfiAddr);
-		me.info.qpList = malloc(qpListSize);
-		copyInfiAddr(me.info.qpList);
-		MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
-		ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),(const char *)me.info.qpList,qpListSize);
-		free(me.info.qpList);
-	}
-#else
 	/*The nPE fields are set by charmrun--
 	  these values don't matter. 
           Set IP in case it is mpiexec mode where charmrun does not have IP yet
@@ -1505,12 +1476,6 @@ static void node_addresses_obtain(char **argv)
 #ifdef CMK_USE_MX
 	me.info.nic_id=ChMessageLong_new(Cmi_nic_id);
 #endif
-#if CMK_USE_IBUD
-	me.info.qp.lid=ChMessageInt_new(context->localAddr.lid);
-	me.info.qp.qpn=ChMessageInt_new(context->localAddr.qpn);
-	me.info.qp.psn=ChMessageInt_new(context->localAddr.psn);
-	MACHSTATE3(3,"IBUD Information lid=%i qpn=%i psn=%i\n",me.info.qp.lid,me.info.qp.qpn,me.info.qp.psn);
-#endif
   	me.info.dataport=ChMessageInt_new(dataport);
 
   	/*Send our node info. to charmrun.
@@ -1518,7 +1483,6 @@ static void node_addresses_obtain(char **argv)
   	use non-locking version*/
   	ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),NULL,0);
         MACHSTATE1(5,"send initnode - dataport:%d", dataport);
-#endif	//CMK_USE_IBVERBS
 
 	MACHSTATE(3,"initnode sent");
   
@@ -1856,7 +1820,7 @@ void LrtsPostCommonInit(int everReturn)
     setitimer(ITIMER_REAL, &i, NULL);
     }
 
-#if ! CMK_USE_GM && ! CMK_USE_MX && ! CMK_USE_TCP && ! CMK_USE_IBVERBS
+#if ! CMK_USE_GM && ! CMK_USE_MX && ! CMK_USE_TCP
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
     /*no need for GM case */
     CcdCallFnAfter((CcdVoidFn)CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);

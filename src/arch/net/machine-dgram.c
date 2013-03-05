@@ -16,11 +16,6 @@
  * @{
  */
 
-
-#if CMK_USE_IBVERBS | CMK_USE_IBUD
-#include <infiniband/verbs.h>
-#endif
-
 #define DGRAM_HEADER_SIZE 8
 
 #define CmiMsgHeaderSetLength(msg, len) (((int*)(msg))[2] = (len))
@@ -208,17 +203,6 @@ typedef struct ImplicitDgramStruct
 
 struct PendingMsgStruct;
 
-
-#if CMK_USE_IBUD
-struct infiOtherNodeData;
-struct infiOtherNodeData *initinfiData(int node,int lid,int qpn,int psn);
-#endif
-#if CMK_USE_IBVERBS
-struct infiOtherNodeData;
-struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]);
-void	infiPostInitialRecvs();
-#endif
-
 typedef struct FutureMessageStruct {
   char *msg;
   int len;
@@ -253,10 +237,6 @@ typedef struct OtherNodeStruct
   struct PendingMsgStruct *sendhead, *sendtail;  /* gm send queue */
   int 			   disable;
   int 			   gm_pending;
-#endif
-
-#if CMK_USE_IBVERBS | CMK_USE_IBUD
-	struct infiOtherNodeData *infiData;
 #endif
 
   int                      asm_rank;
@@ -392,21 +372,10 @@ static void node_addresses_store(ChMessage *msg)
   MACHSTATE(1,"node_addresses_store {");	
   _Cmi_numnodes=ChMessageInt(n32[0]);
 
-#if CMK_USE_IBVERBS
-  ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes]);
-  if (Cmi_charmrun_fd == -1) {
-    d = &((ChSingleNodeinfo*)n32)->info;
-  }
-  else if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes +sizeof(ChInfiAddr)*_Cmi_numnodes )
-         !=(unsigned int)msg->len)
-    {printf("Node table has inconsistent length!");machine_exit(1);}
-
-#else
-
   if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes)
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
-#endif /*CMK_USE_IBVERBS*/
+
   nodes = (OtherNode)malloc(_Cmi_numnodes * sizeof(struct OtherNodeStruct));
   nodestart=0;
   for (i=0; i<_Cmi_numnodes; i++) {
@@ -418,10 +387,6 @@ static void node_addresses_store(ChMessage *msg)
     nodes[i].nic_id = ChMessageLong(d[i].nic_id);
 #endif
 
-#if CMK_USE_IBUD
-    nodes[i].infiData=initinfiData(i,ChMessageInt(d[i].qp.lid),ChMessageInt(d[i].qp.qpn),ChMessageInt(d[i].qp.psn));
-#endif
-
 #if CMK_USE_GM
     CmiGmConvertMachineID(& nodes[i].mach_id);
 #endif
@@ -431,19 +396,8 @@ static void node_addresses_store(ChMessage *msg)
       _Cmi_mynodesize=nodes[i].nodesize;
       Cmi_self_IP=nodes[i].IP;
     }
-
-#if CMK_USE_IBVERBS 
-    if(i != _Cmi_mynode){
-	int addr[3];
-	addr[0] =ChMessageInt(remoteInfiAddr[i].lid);
-	addr[1] =ChMessageInt(remoteInfiAddr[i].qpn);
-	addr[2] =ChMessageInt(remoteInfiAddr[i].psn);
-	nodes[i].infiData = initInfiOtherNodeData(i,addr);
-    }
-#else
     nodes[i].dataport = ChMessageInt(d[i].dataport);
     nodes[i].addr = skt_build_addr(nodes[i].IP,nodes[i].dataport);
-#endif
 
 #if CMK_USE_TCP
     nodes[i].sock = INVALID_SOCKET;
@@ -470,9 +424,6 @@ static void node_addresses_store(ChMessage *msg)
     OtherNode node = nodes + i-_Cmi_numpes;
     nodes_by_pe[i] = node;
   }
-#endif
-#if CMK_USE_IBVERBS
-  infiPostInitialRecvs();
 #endif
   MACHSTATE(1,"} node_addresses_store");
 }
@@ -681,13 +632,6 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #elif CMK_USE_TCP
 
 #include "machine-tcp.c"
-
-#elif CMK_USE_IBVERBS
-
-#include "machine-ibverbs.c"
-
-#elif CMK_USE_IBUD
-#include "machine-ibud.c"
 
 #else
 
