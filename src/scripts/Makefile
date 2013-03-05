@@ -455,7 +455,6 @@ include Makefile.machine
 
 $(L)/libconv-cplus-n.a: machine.c $(CVHEADERS)
 	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
-	$(CHARMC) -o lz4.o  -DFOR_CPLUS=1 lz4.c
 	$(CHARMC) -o machine.o  -DFOR_CPLUS=1 machine.c
 	@-test -f ./bglmachine.C && $(CHARMC) -o machine.o  -DFOR_CPLUS=1 bglmachine.C || true
 	$(CHARMC) -o $(L)/libconv-cplus-y.a machine.o
@@ -539,6 +538,9 @@ conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 
 crc32.o: crc32.c crc32.h
 	$(CHARMC) -optimize -o crc32.o crc32.c
+
+lz4.o: lz4.c lz4.h
+	$(CHARMC) -o $@ $<
 
 ## Converse load balancers (seed balancers, -balance)
 $(L)/libldb-none.o: cldb.none.c $(CVHEADERS)
