@@ -2389,7 +2389,6 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 }
 void CkLocMgr::updateLocation(const CkArrayIndex &idx,int nowOnPe) {
   inform(idx,nowOnPe);
-	CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
 }
 
 /*************************** LocMgr: DELETION *****************************/
