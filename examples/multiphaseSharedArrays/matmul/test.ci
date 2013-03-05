@@ -5,7 +5,7 @@ mainmodule Test
 
     mainchare Test
     {
-        entry [threaded] Test();
+        entry [threaded] Test(CkArgMsg *);
         entry void done();
         entry void doneg();
     }

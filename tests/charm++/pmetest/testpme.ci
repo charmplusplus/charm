@@ -5,7 +5,7 @@ mainmodule testpme {
     readonly CProxy_Patch   patch_proxy;
     
     mainchare  main {
-	entry main ();
+	entry main (CkArgMsg *);
 	entry void finishedInitialization (CkReductionMsg *msg);
 	entry void finishedSetNumGrid (CkReductionMsg *msg);
 	entry void iterationsDone  (CkReductionMsg *msg);
