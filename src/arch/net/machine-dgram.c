@@ -397,10 +397,10 @@ typedef struct OtherNodeStruct
   unsigned int             stat_ack_pkts;   /* packets acked */
   unsigned int             stat_consec_resend; /*Packets retransmitted since last ack*/ 
 
-  int sent_msgs;
-  int recd_msgs;
-  int sent_bytes;
-  int recd_bytes;
+  unsigned int sent_msgs;
+  unsigned int recd_msgs;
+  unsigned int sent_bytes;
+  unsigned int recd_bytes;
 }
 *OtherNode;
 
