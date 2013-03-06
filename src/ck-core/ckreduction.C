@@ -230,14 +230,13 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
 
 }
 
-void CkReductionMgr::flushStates(int isgroup)
+void CkReductionMgr::flushStates()
 {
   // CmiPrintf("[%d] CkReductionMgr::flushState\n", CkMyPe());
   redNo=0;
   completedRedNo = -1;
   inProgress=CmiFalse;
   creating=CmiFalse;
-  if (!isgroup) gcount=lcount=0;    // array reduction group needs to reset to 0
   startRequested=CmiFalse;
   nContrib=nRemote=0;
   maxStartRequest=0;

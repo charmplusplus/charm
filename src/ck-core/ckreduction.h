@@ -541,7 +541,7 @@ public:
         void finishBarrier(void);
 
 	virtual CmiBool isReductionMgr(void){ return CmiTrue; }
-	virtual void flushStates(int isgroup);
+	virtual void flushStates();
 	/*FAULT_EVAC: used to get the gcount on a processor when 
 		it is evacuated.
 		TODO: It needs to be fixed as it should return the gcount
@@ -653,6 +653,7 @@ private:
 protected:
 	//whether to notify children that reduction starts
 	CmiBool disableNotifyChildrenStart;
+	void resetCountersWhenFlushingStates() { gcount = lcount = 0; }
 
 //Checkpointing utilities
 public:
@@ -744,7 +745,7 @@ class Group : public CkReductionMgr
 	virtual int isNodeGroup() { return 0; }
 	virtual void pup(PUP::er &p);
 	virtual void flushStates() {
-		CkReductionMgr::flushStates(1);
+		CkReductionMgr::flushStates();
 		reductionInfo.redNo = 0;
  	}
 	virtual void CkAddThreadListeners(CthThread tid, void *msg);
