@@ -379,7 +379,8 @@ TCharm::~TCharm()
   //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
   
 #if CMK_USE_MEMPOOL_ISOMALLOC
-  mempool_type *mptr = CtvAccess(threadpool);
+  mempool_type *mptr = NULL;
+  if(tid != NULL) mptr = CtvAccessOther(tid,threadpool);
 #else
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
 #endif
@@ -441,7 +442,8 @@ void TCharm::ckAboutToMigrate(void){
 void TCharm::clear()
 {
 #if CMK_USE_MEMPOOL_ISOMALLOC
-  mempool_type *mptr = CtvAccess(threadpool);
+  mempool_type *mptr = NULL;
+  if(tid != NULL) mptr = CtvAccessOther(tid,threadpool);
 #else 
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
 #endif
