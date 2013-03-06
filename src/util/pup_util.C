@@ -371,12 +371,12 @@ void PUP::able::pup(PUP::er &p) {}
 void PUP::able::PUP_ID::setName(const char *name)
 {
 	int i,o,n=strlen(name);
-	int t[len]={0};
+	unsigned int t[len]={0};
 	for (o=0;o<n;o++)
 		for (i=0;i<len;i++) {
 			unsigned char c=name[o];
-			int shift1=(((o+2)*(i+1)*5+4)%13);
-			int shift2=(((o+2)*(i+1)*3+2)%11)+13;
+			unsigned int shift1=(((o+2)*(i+1)*5+4)%13);
+			unsigned int shift2=(((o+2)*(i+1)*3+2)%11)+13;
 			t[i]+=(c<<shift1)+(c<<shift2);
 		}
 	for (i=0;i<len;i++) 
