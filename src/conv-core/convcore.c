@@ -2256,7 +2256,7 @@ enum {
 };
 
 CmiReduction* CmiGetReductionCreate(int id, short int numChildren) {
-  int index = id & ~((~0)<<CpvAccess(_reduce_info_size));
+  int index = id & ~((~0u)<<CpvAccess(_reduce_info_size));
   CmiReduction *red = CpvAccess(_reduce_info)[index];
   if (red != NULL && red->seqID != id) {
     /* The table needs to be expanded */
@@ -2288,7 +2288,7 @@ CmiReduction* CmiGetReduction(int id) {
 }
 
 void CmiClearReduction(int id) {
-  int index = id & ~((~0)<<CpvAccess(_reduce_info_size));
+  int index = id & ~((~0u)<<CpvAccess(_reduce_info_size));
   free(CpvAccess(_reduce_info)[index]);
   CpvAccess(_reduce_info)[index] = NULL;
 }
@@ -3292,11 +3292,11 @@ int HypercubeGetBcastDestinations(int mype, int total_pes, int k, int *dest_pes)
     dest_pes[num_pes] = mype ^ (1<<k);
     if (dest_pes[num_pes] >= total_pes) {
       /* find the first proc in the other part of the current dimention */
-      dest_pes[num_pes] &= (-1)<<k;
+      dest_pes[num_pes] &= (~0u)<<k;
       /* if the first proc there is over CmiNumPes() then there is no other
       	 dimension, otherwise if it is valid compute my correspondent in such
       	 a way to minimize the load for every processor */
-      if (total_pes>dest_pes[num_pes]) dest_pes[num_pes] += (mype - (mype & ((-1)<<k))) % (total_pes - dest_pes[num_pes]);
+      if (total_pes>dest_pes[num_pes]) dest_pes[num_pes] += (mype - (mype & ((~0u)<<k))) % (total_pes - dest_pes[num_pes]);
       }
     if (dest_pes[num_pes] < total_pes) {
       /* if the destination is in the acceptable range increment num_pes */
