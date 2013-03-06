@@ -97,6 +97,8 @@ inline CkHashCode circleShift(CkHashCode h,unsigned int by)
 {
     const unsigned int intBits=8*sizeof(CkHashCode);
     by%=intBits;
+    if (by == 0)
+      return h;
     return (h<<by)|(h>>(intBits-by));
 }
 
