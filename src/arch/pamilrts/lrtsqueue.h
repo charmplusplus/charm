@@ -35,7 +35,9 @@ typedef struct _l2atomicq {
   int                           _qsize;
   PCQueue                       _overflowQ;
   pthread_mutex_t               _overflowMutex;
-} *LRTSQueue;
+} L2AtomicQueue;
+
+typedef L2AtomicQueue* LRTSQueue;
 
 void LRTSQueueInit      (void           * l2mem, 
 			     size_t           l2memsize, 
