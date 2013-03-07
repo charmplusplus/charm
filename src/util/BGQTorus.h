@@ -51,12 +51,16 @@ class BGQTorusManager {
       order[3] = 2;
       order[4] = 1;
       order[5] = 0;
+      
+      int numPes = CmiNumPes();
+      procsPerNode = Kernel_ProcessCount();
+      thdsPerProc = CmiMyNodeSize();
+      hw_NT = procsPerNode*thdsPerProc;      
 
       if(CmiNumPartitions() > 1) {
-        dimA = rn_NA = CmiNumPes();
+        dimA = rn_NA = numPes/hw_NT;
         dimB = dimC = dimD = dimE = 1;
         rn_NB = rn_NC = rn_ND = rn_NE = 1;
-        procsPerNode = thdsPerProc = hw_NT = 1;
         torus[0] = torus[1] = torus[2] = torus[3] = torus[4] = 0;
         dims[0] = rn_NA;
         dims[1] = rn_NB;
@@ -75,16 +79,11 @@ class BGQTorusManager {
       hw_ND = pers.Network_Config.Dnodes;
       hw_NE = pers.Network_Config.Enodes;
 
-      procsPerNode = Kernel_ProcessCount();
-      thdsPerProc = CmiMyNodeSize();
-        
       mapping = getenv("RANK_ORDER");
       if(mapping != NULL) {
         sscanf(mapping,"%d %d %d %d %d %d",&order[5],&order[4],&order[3],&order[2],&order[1],&order[0]);
       }
       //printf("Mapping %d %d %d %d %d %d\n",order[0],order[1],order[2],order[3],order[4],order[5]);
-      hw_NT = procsPerNode*thdsPerProc;      
-      int numPes = CmiNumPes();
 
       rn_NA = hw_NA;
       rn_NB = hw_NB;

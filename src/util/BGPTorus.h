@@ -37,26 +37,23 @@ class BGPTorusManager {
 
   public:
     BGPTorusManager() {
+      int numPes = CmiNumPes();
+      DCMF_Hardware(&bgp_hwt);
+      procsPerNode = bgp_hwt.tSize;
+      thdsPerProc = CmiMyNodeSize();
+      hw_NT = procsPerNode*thdsPerProc;      
+
       if(CmiNumPartitions() > 1) {
-        rn_NX = dimX = CmiNumPes();
-        rn_NY = rn_NZ = hw_NT = 1;
+        rn_NX = dimX = numPes/hw_NT;
+        rn_NY = rn_NZ = 1;
         dimY = dimZ = 1;
-        procsPerNode = 1;
         torus[0] = torus[1] = torus[2] = torus[3] = 0;
         return;
       }
 
-      DCMF_Hardware(&bgp_hwt);
       hw_NX = bgp_hwt.xSize;
       hw_NY = bgp_hwt.ySize;
       hw_NZ = bgp_hwt.zSize;
-    
-      procsPerNode = bgp_hwt.tSize;
-      int numPes = CmiNumPes();
-      thdsPerProc = CmiMyNodeSize();
-      
-      hw_NT = procsPerNode*thdsPerProc;      
-
 
       //if(CmiMyPe()==0) printf("hw_NX/Y/Z/T=[%d, %d, %d, %d]\n", hw_NX, hw_NY, hw_NZ, hw_NT);
 
