@@ -566,6 +566,7 @@ void SdagConstruct::generateWhenCode(XStr& op)
   XStr whenParams = "";
   int i = 0;
   int iArgs = 0;
+  int generatedWhenParams = 0;
   bool lastWasVoid = false;
   bool paramMarshalling = false;
 
@@ -585,11 +586,13 @@ void SdagConstruct::generateWhenCode(XStr& op)
       op << "        PUP::fromMem implP" <<cn->nodeNum <<"(impl_buf" <<cn->nodeNum <<");\n";
     }
     if (sv->isMsg == 1) {
-      if((i!=0) && (lastWasVoid == 0))
+      if (generatedWhenParams != 0)
         whenParams.append(", ");
 #if CMK_BIGSIM_CHARM
       if(i==1) {
         whenParams.append(" NULL ");
+        generatedWhenParams++;
+
         lastWasVoid=0;
         // skip this arg which is supposed to be _bgParentLog
         iArgs++;
@@ -601,15 +604,19 @@ void SdagConstruct::generateWhenCode(XStr& op)
       whenParams.append(") tr->args[");
       whenParams<<iArgs;
       whenParams.append("]");
+      generatedWhenParams++;
       iArgs++;
     }
     else if (sv->isVoid == 1)
       // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
       op <<"        tr->args[" <<iArgs++ <<"] = 0;\n";
     else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
-      if(i > 1)
+      if (generatedWhenParams != 0)
         whenParams.append(", ");
+
       whenParams.append(*(sv->name));
+      generatedWhenParams++;
+
       if (sv->arrayLength != 0)
         op << "        int impl_off" << cn->nodeNum << "_" << sv->name << "; implP"
           <<cn->nodeNum << "|impl_off" <<cn->nodeNum  << "_" << sv->name << ";\n";
