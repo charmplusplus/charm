@@ -1,3 +1,13 @@
+
+whichxlc=`which bgxlc | grep dec2011`
+if [ -z $whichxlc ] 
+  then
+    echo "error: dec2011 compilers need to be loaded for Charm++ to be compiled with xlc"
+    echo "solution: execute \"soft add @ibm-compilers-dec2011\" to load the dec2011 compilers"
+    echo "alternatively: add  \"soft add @ibm-compilers-dec2011\" to your .bashrc"
+    exit 1
+fi
+
 XLC_PRE=/soft/apps/ibmcmp
 XLC_POST=bin/bg
 XLC_F=$XLC_PRE/xlf/bg/11.1
