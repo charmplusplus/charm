@@ -203,7 +203,7 @@ General Changes
 - New load balancers added:
   * TreeMatch
   * Zoltan
-  * Scotch graph paritioning based: ScotchLB and Refine and Topo variants
+  * Scotch graph partitioning based: ScotchLB and Refine and Topo variants
   * RefineSwap
 
 - Load balancing improvements:
