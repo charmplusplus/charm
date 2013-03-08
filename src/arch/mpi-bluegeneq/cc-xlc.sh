@@ -13,9 +13,6 @@ CMK_ENABLE_CPP11='-qlanglvl=extended0x'
 CMK_AR='ar cq'
 CMK_NM='nm '
 CMK_QT="aix"
-
-CMK_NATIVE_CC="xlc_r"
-CMK_NATIVE_CXX="xlc++_r"
 CMK_NATIVE_LD="$CMK_NATIVE_CC"
 CMK_NATIVE_LDXX="$CMK_NATIVE_CXX"
 CMK_RANLIB="ranlib"
