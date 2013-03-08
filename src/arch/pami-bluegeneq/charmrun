@@ -62,13 +62,7 @@ then
   # charmrun called from script
   echo "runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB $envs : $args"
   runjob -p $pernode -n $pes --block $COBALT_PARTNAME --envs BG_SHAREDMEMSIZE=32MB $envs : $args
-  rstatus=`echo $?`
-  if [ $rstatus -eq "0" -o $rstatus -eq "1" ] 
-  then
-    exit 0
-  else
-    exit 1
-  fi
+  exit $?
 else
 
 queue_stat=qstat
@@ -117,20 +111,13 @@ do
         then
             rm -f tmp.$$
             # job not in the queue now
-            status0=`grep -c "exited with status 0" $err`
-            status1=`grep -c "exited with status 1" $err`
-            if [ $status0 != "0" -o $status1 != "0" ] 
+            status=`grep -c "exited with status 0" $err`
+		        if test $status != 0 ;
             then
-              status=1;
-            else
-              status=0;
-            fi
-	    if test $status != 0 ;
-            then
-              echo "job exited cleanly: output in $output"
+              echo "job exited with status 0: output in $output"
               exit 0
             else
-              echo "job did not exit cleanly; error in $err, output in $output"
+              echo "job did not exit with status 0; error in $err, output in $output"
               exit 1
             fi
         fi
