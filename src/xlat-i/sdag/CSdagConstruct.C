@@ -607,7 +607,7 @@ void SdagConstruct::generateWhenCode(XStr& op)
       // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
       op <<"        tr->args[" <<iArgs++ <<"] = 0;\n";
     else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
-      if((i > 0) && (lastWasVoid == 0))
+      if(i > 1)
         whenParams.append(", ");
       whenParams.append(*(sv->name));
       if (sv->arrayLength != 0)
