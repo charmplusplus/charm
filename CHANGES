@@ -151,13 +151,27 @@ Platform-Specific Changes
 
 - IBM Blue Gene Q: Experimental machine-layer support for the native PAMI
   interface and MPI, with and without SMP support. This supports many new
-  systems, including ALCF's Mira and LLNL's Sequoia. The 'mpi-bluegeneq' and
-  'pamilrts-bluegeneq' variants are probably the most stable.
-  Note: Applications that have large number of messages may crash in default setup 
-  due to overflow in the low-level FIFOs. Environment variables MUSPI_INJFIFOSIZE 
-  and PAMI_RGETINJFIFOSIZE can be set to avoid application failures due to large 
-  number of small and large messages respectively. The default value of these 
-  variable is 65536 which is sufficient for 1000 messages in flight.
+  systems, including LLNL's Sequoia, ALCF's Mira, and FZ Juelich's Juqueen.
+
+  There are three network-layer implementations for these systems: 'mpi',
+  'pami', and 'pamilrts'. The 'mpi' layer is stable, but its performance and
+  scalability suffers from the additional overhead of using MPI rather than
+  driving the interconnect directly. The 'pami' layer is well tested for NAMD,
+  but has shown instability for other applications. It is likely to be replaced
+  by the 'pamilrts' layer, which is more generally stable and seems to provide
+  the same performance, in the next release.
+
+  In addition to the common 'smp' option to build the runtime system with
+  shared memory support, there is an 'async' option which sometimes provides
+  better performance on SMP builds. This option passes tests on 'pamilrts', but
+  is still experimental.
+
+  Note: Applications that have large number of messages may crash in default
+  setup due to overflow in the low-level FIFOs. Environment variables
+  MUSPI_INJFIFOSIZE and PAMI_RGETINJFIFOSIZE can be set to avoid application
+  failures due to large number of small and large messages respectively. The
+  default value of these variable is 65536 which is sufficient for 1000
+  messages in flight.
 
 - Infiniband Verbs: Better support for more flavors of ibverbs libraries
 
