@@ -17,8 +17,10 @@ struct CStateVar {
     bool byConst;
     XStr *arrayLength;
     int isMsg;
+    bool isCounter, isSpeculator;
 
-    CStateVar(int v, const char *t, int np, const char *n, XStr *r, const char *a, int m) : isVoid(v), numPtrs(np),  byRef(r), isMsg(m), declaredRef(NULL), byConst(false)
+    CStateVar(int v, const char *t, int np, const char *n, XStr *r, const char *a, int m) : isVoid(v), numPtrs(np),  byRef(r), isMsg(m), declaredRef(NULL), byConst(false), isCounter(false), isSpeculator(false)
+
  	{ 
 	  if (t != NULL) { type = new XStr(t); } 
 	  else {type = NULL;}
@@ -38,6 +40,8 @@ CStateVar(ParamList *pl)
       , byConst(pl->isConst())
       , arrayLength(pl->isArray() ? new XStr(pl->getArrayLen()) : NULL)
       , isMsg(pl->isMessage())
+      , isCounter(false)
+      , isSpeculator(false)
       { }
 };
 

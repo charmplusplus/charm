@@ -375,6 +375,7 @@ void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
         sprintf(txt, "_cf%d", nodeNum);
         counter = new XStr(txt);
         sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
+        sv->isCounter = true;
         stateVarsChildren->push_back(sv);
       }
       break;
@@ -391,6 +392,7 @@ void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
         sprintf(txt, "_cs%d", nodeNum);
         counter = new XStr(txt);
         sv = new CStateVar(0, "CSpeculator *", 0, txt, 0, NULL, 1);
+        sv->isSpeculator = true;
         stateVarsChildren->push_back(sv);
 
         for (std::list<SdagConstruct *>::iterator iter = constructs->begin();
@@ -408,6 +410,7 @@ void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
         sprintf(txt, "_co%d", nodeNum);
         counter = new XStr(txt);
         sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
+        sv->isCounter = true;
         stateVarsChildren->push_back(sv);
       }
       break;
@@ -581,7 +584,7 @@ void SdagConstruct::generateWhenCode(XStr& op)
     CStateVar *sv = *iter;
     if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
       paramMarshalling =1;
-      op << "        CkMarshallMsg *impl_msg" <<cn->nodeNum <<" = (CkMarshallMsg *) tr->args["<<iArgs++<<"];\n";
+      op << "        CkMarshallMsg *impl_msg" << cn->nodeNum << " = (CkMarshallMsg*)dynamic_cast<TransportableMsg*>(tr->args[" << iArgs++ << "])->msg;\n";
       op << "        char *impl_buf" <<cn->nodeNum <<"=((CkMarshallMsg *)impl_msg" <<cn->nodeNum <<")->msgBuf;\n";
       op << "        PUP::fromMem implP" <<cn->nodeNum <<"(impl_buf" <<cn->nodeNum <<");\n";
     }
@@ -599,18 +602,26 @@ void SdagConstruct::generateWhenCode(XStr& op)
         continue;
       }
 #endif
-      whenParams.append("(");
-      whenParams.append(sv->type->charstar());
-      whenParams.append(") tr->args[");
-      whenParams<<iArgs;
-      whenParams.append("]");
+
+      if (sv->isMsg && !sv->isCounter && !sv->isSpeculator)
+        whenParams << "(" << sv->type->charstar() << ")" << "dynamic_cast<TransportableMsg*>(";
+      else if (sv->isCounter)
+        whenParams << "dynamic_cast<CCounter*>(";
+      else if (sv->isSpeculator)
+        whenParams << "dynamic_cast<CSpeculator*>(";
+
+      whenParams << "tr->args[" << iArgs << "])";
+
+      if (sv->isMsg && !sv->isCounter && !sv->isSpeculator)
+        whenParams << "->msg";
+
       generatedWhenParams++;
       iArgs++;
     }
-    else if (sv->isVoid == 1)
-      // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
-      op <<"        tr->args[" <<iArgs++ <<"] = 0;\n";
-    else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
+    else if (sv->isVoid == 1) {
+      op << "        if (tr->args[" << iArgs << "]) delete tr->args[" << iArgs << "];\n";
+      op << "        tr->args[" <<iArgs++ <<"] = NULL;\n";
+    } else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
       if (generatedWhenParams != 0)
         whenParams.append(", ");
 
@@ -915,14 +926,17 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
        ++iter) {
     CStateVar *sv = *iter;
     if (sv->isVoid == 1) {
-       // defs <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
-       defs <<"       tr->args[" <<iArgs++ <<"] = (size_t)0xFF;\n";
+       defs << "       if (tr->args[" << iArgs << "]) delete tr->args[" << iArgs << "];\n";
+       defs << "       tr->args[" << iArgs++ << "] = NULL;\n";
     }
     else {
-      if (sv->isMsg == 1) {
-         defs << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name<<";\n";
-      }
-      else {
+      if (sv->isMsg == 1 && !sv->isCounter && !sv->isSpeculator) {
+         defs << "       if (tr->args[" << iArgs << "]) delete tr->args[" << iArgs << "];\n";
+         defs << "       tr->args[" << iArgs++ << "] = new TransportableMsg(" << sv->name << ");\n";
+      } else if (sv->isMsg == 1 && (sv->isCounter || sv->isSpeculator)) {
+         defs << "       if (tr->args[" << iArgs << "]) delete tr->args[" << iArgs << "];\n";
+         defs << "       tr->args[" << iArgs++ << "] = " << sv->name << ";\n";
+      } else {
          numParamsNeedingMarshalling++;
          if (numParamsNeedingMarshalling == 1) {
            defs << "       int impl_off=0;\n";
@@ -985,7 +999,8 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
               "," << sv->name << ",impl_cnt_" << sv->name << ");\n";
         }  
      }
-  defs << "       tr->args[" <<paramIndex <<"] = (size_t) impl_msg;\n";
+  defs << "       if (tr->args[" << iArgs << "]) delete tr->args[" << iArgs << "];\n";
+  defs << "       tr->args[" <<paramIndex <<"] = new TransportableMsg(impl_msg);\n";
   }
   int iRef=0, iAny=0;
 

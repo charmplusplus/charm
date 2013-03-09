@@ -26,6 +26,76 @@ class CMsgBuffer {
     }
 };
 
+struct TransportableEntity {
+  enum PType { TransportableEntityType, TransportableMsgType, TransportableCounterType, TransportableSpeculatorType };
+
+  PType type;
+
+  TransportableEntity() : type(TransportableEntityType) { };
+  TransportableEntity(PType type) : type(type) { };
+
+  void pupType(PUP::er& p) {
+    int t = (int)type;
+    p | t;
+    type = (PType)t;
+  }
+
+  virtual void pup(PUP::er& p) {
+    pupType(p);
+  }
+};
+
+struct TransportableMsg : public TransportableEntity {
+  void* msg;
+
+  TransportableMsg() : msg(0) { }
+
+  TransportableMsg(CkMessage* msg)
+    : msg(msg)
+    , TransportableEntity(TransportableMsgType) { }
+
+  void pup(PUP::er& p) {
+    TransportableEntity::pupType(p);
+    bool isNull = !msg;
+    p | isNull;
+    if (!isNull) CkPupMessage(p, &msg);
+  }
+};
+
+class CCounter : public TransportableEntity {
+private:
+  unsigned int count;
+public:
+  CCounter() : TransportableEntity(TransportableCounterType) { }
+  CCounter(int c) : TransportableEntity(TransportableCounterType), count(c) { }
+  CCounter(int first, int last, int stride)
+    : TransportableEntity(TransportableCounterType) {
+    count = ((last - first) / stride) + 1;
+  }
+  void decrement(void) { count--; }
+  int isDone(void) { return (count == 0); }
+
+  void pup(PUP::er& p) {
+    TransportableEntity::pupType(p);
+    p | count;
+  }
+};
+
+struct CSpeculator : public TransportableEntity {
+  int speculationIndex;
+
+  CSpeculator() : TransportableEntity(TransportableSpeculatorType) { }
+
+  CSpeculator(int speculationIndex_)
+    : TransportableEntity(TransportableSpeculatorType)
+    , speculationIndex(speculationIndex_) { }
+
+  void pup(PUP::er& p) {
+    TransportableEntity::pupType(p);
+    p | speculationIndex;
+  }
+};
+
 #define MAXARG 8
 #define MAXANY 8
 #define MAXREF 8
@@ -33,7 +103,7 @@ class CMsgBuffer {
 class CWhenTrigger {
   public:
     int whenID, nArgs;
-    size_t args[MAXARG];
+    TransportableEntity* args[MAXARG];
     int nAnyEntries;
     int anyEntries[MAXANY];
     int nEntries;
@@ -43,22 +113,43 @@ class CWhenTrigger {
 
     CWhenTrigger *next;
     CWhenTrigger(int id, int na, int ne, int nae) :
-    whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne), speculationIndex(-1), next(NULL) {}
-    CWhenTrigger(): next(NULL) {}
+      whenID(id), nArgs(na), nAnyEntries(nae), nEntries(ne), speculationIndex(-1), next(NULL) { init(); }
+    CWhenTrigger(): next(NULL) { init(); }
+    void init() {
+      for (int i = 0; i < MAXARG; i++) args[i] = NULL;
+    }
     void pup(PUP::er& p) {
       p|whenID;
       p|nArgs;
-      p(args, MAXARG);
       p|nAnyEntries;
       p(anyEntries, MAXANY);
       p|nEntries;
       p(entries, MAXREF);
       p(refnums, MAXREF);
-      // since CCounter is not pup'ed
-      // don't expect Overlap works with load balancer 
-      // as well as checkpointing
-      p(args, MAXARG);
-      //if (p.isUnpacking()) args[0]=0;            // HACK for load balancer
+
+      for (int i = 0; i < MAXARG; i++) {
+        bool isNull = !args[i];
+        p | isNull;
+
+        if (!isNull) {
+          int t = p.isUnpacking() ? -1 : args[i]->type;
+          p | t;
+
+          if (p.isUnpacking()) {
+            switch ((TransportableEntity::PType)t) {
+            case TransportableEntity::TransportableEntityType: args[i] = new TransportableEntity(); break;
+            case TransportableEntity::TransportableMsgType: args[i] = new TransportableMsg(); break;
+            case TransportableEntity::TransportableCounterType: args[i] = new CCounter(); break;
+            case TransportableEntity::TransportableSpeculatorType: args[i] = new CSpeculator(); break;
+            }
+          }
+
+          // use virtual dispatch
+          args[i]->pup(p);
+        } else {
+          args[i] = NULL;
+        }
+      }
       p|speculationIndex;
     }
 };
@@ -573,24 +664,6 @@ class COverDep {
 	  return elem;
         }
      }
-};
-
-class CCounter {
-  private:
-    unsigned int count;
-  public:
-    CCounter(int c) : count(c) { }
-    CCounter(int first, int last, int stride) {
-      count = ((last-first)/stride)+1;
-    }
-    void decrement(void) {count--;}
-    int isDone(void) {return (count==0);}
-};
-
-struct CSpeculator {
-  int speculationIndex;
-  CSpeculator(int speculationIndex_)
-    : speculationIndex(speculationIndex_) { }
 };
 
 #endif
