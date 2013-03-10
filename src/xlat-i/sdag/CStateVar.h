@@ -5,10 +5,9 @@
 #include "xi-symbol.h"
 
 namespace xi {
-
   class ParamList;
 
-struct CStateVar {
+  struct CStateVar {
     int isVoid;
     XStr *type;
     int numPtrs;
@@ -19,18 +18,24 @@ struct CStateVar {
     int isMsg;
     bool isCounter, isSpeculator;
 
-    CStateVar(int v, const char *t, int np, const char *n, XStr *r, const char *a, int m) : isVoid(v), numPtrs(np),  byRef(r), isMsg(m), declaredRef(NULL), byConst(false), isCounter(false), isSpeculator(false)
+    CStateVar(int v, const char *t, int np, const char *n, XStr *r, const char *a, int m)
+      : isVoid(v)
+      , numPtrs(np)
+      , byRef(r)
+      , isMsg(m)
+      , declaredRef(NULL)
+      , byConst(false)
+      , isCounter(false)
+      , isSpeculator(false) {
+      if (t != NULL) { type = new XStr(t); }
+      else {type = NULL;}
+      if (n != NULL) { name = new XStr(n); }
+      else { name = NULL; }
+      if (a != NULL) {arrayLength = new XStr(a); }
+      else { arrayLength = NULL; }
+    }
 
- 	{ 
-	  if (t != NULL) { type = new XStr(t); } 
-	  else {type = NULL;}
-	  if (n != NULL) { name = new XStr(n); }
-	  else { name = NULL; }
-	  if (a != NULL) {arrayLength = new XStr(a); }
-	  else { arrayLength = NULL; }
-	}
-
-CStateVar(ParamList *pl)
+    CStateVar(ParamList *pl)
       : isVoid(0)
       , type(new XStr(*(pl->param->getType())))
       , numPtrs(0)
@@ -42,8 +47,8 @@ CStateVar(ParamList *pl)
       , isMsg(pl->isMessage())
       , isCounter(false)
       , isSpeculator(false)
-      { }
-};
+    { }
+  };
 
 }
 
