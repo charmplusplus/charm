@@ -477,6 +477,16 @@ void CUDACallbackManager(void *fn) {
 #endif
 
 extern "C"
+void QdCreate(int n=1) {
+  CpvAccess(_qd)->create(n);
+}
+
+extern "C"
+void QdProcess(int n=1) {
+  CpvAccess(_qd)->process(n);
+}
+
+extern "C"
 void CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref)
 {
   UsrToEnv(msg)->setRef(ref);
