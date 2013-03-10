@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include "converse.h"
 
-#if CMK_CRAYXT || CMK_CRAYXE
+#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
 
 #if XT3_TOPOLOGY
 #else	/* if it is a XT4/5 or XE */
@@ -35,7 +35,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   return nid;
 }
 
-#endif /* CMK_CRAYXT || CMK_CRAYXE */
+#endif /* CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC */
 
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 

@@ -221,7 +221,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->block_tail = 0;
   mptr->limit = limit;
   mptr->size = pool_size;
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
   mptr->mempoolLock = CmiCreateLock();
 #endif
   mptr->block_head.mptr = pool;
@@ -230,7 +230,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->block_head.used = 0;
   mptr->block_head.block_prev = 0;
   mptr->block_head.block_next = 0;
-#if CMK_CONVERSE_GEMINI_UGNI
+#if CMK_CONVERSE_UGNI
   mptr->block_head.msgs_in_send= 0;
   mptr->block_head.msgs_in_recv= 0;
 #endif
@@ -266,7 +266,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     slot_header   *head_free,*head_next;
     mem_handle_t  mem_hndl;
 
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
     CmiLock(mptr->mempoolLock);
 #endif
 
@@ -323,7 +323,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
       current->used = 0;
       current->size = expand_size;
       current->block_next = 0;
-#if CMK_CONVERSE_GEMINI_UGNI
+#if CMK_CONVERSE_UGNI
       current->msgs_in_send= 0;
       current->msgs_in_recv = 0;
 #endif
@@ -347,7 +347,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 
       head_free->block_ptr = current;
       current->used += power;
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
       CmiUnlock(mptr->mempoolLock);
 #endif
       return (char*)head_free + sizeof(used_header);
@@ -357,7 +357,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     return NULL;
 }
 
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
 void mempool_free_thread( void *ptr_free)
 {
     slot_header *to_free;
@@ -478,7 +478,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
 #endif
 }
 
-#if CMK_CONVERSE_GEMINI_UGNI
+#if CMK_CONVERSE_UGNI
 inline void* getNextRegisteredPool(void *current)
 {
     
