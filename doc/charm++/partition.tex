@@ -49,7 +49,8 @@ CmiGetNodeLocal etc.
 \section{Startup and Partitioning}
 
 Any user who wants to run multiple partitions in one single job can provide a
-run time parameter $+partitions <part\_numbers>$ or $+replicas <replica\_number>$.
+run time parameter \emph{+partitions <part\_numbers>} or \emph{+replicas
+<replica\_number>}.
 Converse startup will pick this up, and initialize the necessary data
 structure for such a division, and other conversions.  Currently, we have
 implemented a simple blocked-division scheme that divides the available
@@ -58,6 +59,25 @@ transparent to the user. In future, we will provide hooks for each of these
 key functions – initial partitioning, rank conversion, and global coordination
 – that will enable the users to fully customize replica creation as per their
 requirements.
+
+\section{Redirecting output from individual partitions}
+Output to standard output (stdout) from various partitions can be directed 
+to separate files by passing the target path as a command line option. The run
+time parameter \emph{+stdout <path>} is to be used for this purpose. The
+\emph{<path>} may
+contain the C format specifier \emph{\%d}, which will be replaced by the
+partition number. In case, \emph{\%d} is specified multiple times, only the first
+three instances from the left will be replaced by the partition number (and rest
+will contain garbage values). In case, a format specifier is not specified, 
+the partition number will be appended as a suffix to the specified path. Example usage:
+
+\begin{itemize}
+\item \emph{+stdout out/\%d/log} will write to \emph{out/0/log, out/1/log,
+out/2/log,} $\cdots$.
+\item \emph{+stdout log} will write to \emph{log.0, log.1, log.2,} $\cdots$.
+\item \emph{+stdout out/\%d/log\%d} will write to \emph{out/0/log0, out/1/log1,
+out/2/log2,} $\cdots$.
+\end{itemize}
 
 \section{Inter-partition Communication}
 
