@@ -19,9 +19,12 @@ $(LIBDEST): $(LIBOBJ)
 CkCache.def.h CkCache.decl.h: INTERFACE
 
 BUILD_INT16=$(shell CHARMINC=../../../; if test -f ../../../conv-config.sh; then . ../../../conv-config.sh; echo $$CMK_HAS_INT16; fi )
+USING_CUDA=$(shell CHARMINC=../../../; if test -f ../../../conv-config.sh; then . ../../../conv-config.sh; echo $$BUILD_CUDA; fi )
 
 ifeq "$(BUILD_INT16)" "1"
+ifneq "$(USING_CUDA)" "1"
 CHARMXI_FLAGS += -DCMK_HAS_INT16=1
+endif
 endif
 
 INTERFACE: $(CIFILES)
