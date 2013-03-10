@@ -19,7 +19,7 @@ typedef struct {
 */
 #ifdef CMK_BLUEGENEP
 #include "dcmf.h"
-#elif  CMK_CONVERSE_GEMINI_UGNI
+#elif  CMK_CONVERSE_UGNI
 #include "gni_pub.h"
 #endif
 typedef struct infiDirectUserHandle{
@@ -38,7 +38,7 @@ typedef struct infiDirectUserHandle{
     DCMF_Memregion_t DCMF_recverMemregion;
     DCMF_Memregion_t DCMF_senderMemregion;
     DCMF_Callback_t DCMF_notify_cb;
-#elif  CMK_CONVERSE_GEMINI_UGNI
+#elif  CMK_CONVERSE_UGNI
     int localNode;
     int remoteRank;
     int remoteNode;
@@ -61,7 +61,7 @@ typedef struct infiDirectUserHandle{
 	double initialValue;
 }CmiDirectUserHandle;
 
-#ifdef  CMK_CONVERSE_GEMINI_UGNI
+#ifdef  CMK_CONVERSE_UGNI
 typedef gni_mem_handle_t    CmiDirectMemoryHandler;
 CmiDirectMemoryHandler CmiDirect_registerMemory(void *buff, int size);
 struct infiDirectUserHandle CmiDirect_createHandle_mem(CmiDirectMemoryHandler *mem_hndl, void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData);

@@ -119,7 +119,7 @@ CMK_LDXX="$CMK_LDXX $CMK_LIBDIR "
 #CMK_NATIVE_LD="$CMK_NATIVE_LD $CMK_LIBDIR "
 #CMK_NATIVE_LDXX="$CMK_NATIVE_LDXX $CMK_LIBDIR "
 
-if [ -n "$GEMINI_CRAYXE" -a -z "$CMK_SMP" ]
+if [ -n "$GNI_CRAYXE" -o -n "$GNI_CRAYXC" ] && [ -z "$CMK_SMP" ]
 then
   . $CHARMINC/conv-mach-pxshm.sh
 fi

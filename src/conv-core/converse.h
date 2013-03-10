@@ -1962,7 +1962,7 @@ extern int *memCriticalEntries;
 
 double CmiReadSize(const char *str);
 
-#if  CMK_CONVERSE_GEMINI_UGNI
+#if  CMK_CONVERSE_UGNI
 void CmiTurnOnStats();
 void CmiTurnOffStats();
 #else

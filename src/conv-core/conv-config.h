@@ -124,7 +124,7 @@
 #define CMK_BROADCAST_USE_CMIREFERENCE                      0
 #endif
 
-#if CMK_CRAYXE && CMK_CONVERSE_GEMINI_UGNI && ! CMK_SMP
+#if (CMK_CRAYXE || CMK_CRAYXC) && CMK_CONVERSE_UGNI && ! CMK_SMP
 #include "conv-mach-pxshm.h"
 #endif
 

@@ -1,4 +1,4 @@
-GNI_CRAYXE=1
+GNI_CRAYXC=1
 PMI_CFLAGS=`pkg-config --cflags cray-pmi`
 PMI_LIBS=`pkg-config --libs cray-pmi`
 UGNI_CFLAGS=`pkg-config --cflags cray-ugni`
@@ -28,8 +28,8 @@ CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="pgCC  --no_using_std "
 elif test -n "$ICPC"
 then
-CMK_SEQ_CC="icc -fPIC "
-CMK_SEQ_CXX="icpc -fPIC "
+CMK_SEQ_CC="cc -fPIC "
+CMK_SEQ_CXX="CC -fPIC "
 else
 CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="g++ "

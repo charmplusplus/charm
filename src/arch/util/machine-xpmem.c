@@ -227,7 +227,7 @@ void CmiInitXpmem(char **argv){
             CmiAbort("Opening /dev/xpmem");
         }
 
-#if CMK_CRAYXE
+#if CMK_CRAYXE || CMK_CRAYXC
         srand(getpid());
         int Cmi_charmrun_pid = rand();
         PMI_Bcast(&Cmi_charmrun_pid, sizeof(int));

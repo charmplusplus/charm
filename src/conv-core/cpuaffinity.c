@@ -539,7 +539,7 @@ static int search_pemap(char *pecoremap, int pe)
   return i;
 }
 
-#if CMK_CRAYXT || CMK_CRAYXE
+#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
 extern int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
@@ -639,7 +639,7 @@ void CmiInitCPUAffinity(char **argv)
     }
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
-#if !CMK_CRAYXT && !CMK_CRAYXE && !CMK_BLUEGENEQ
+#if !CMK_CRAYXT && !CMK_CRAYXE && !CMK_CRAYXC && !CMK_BLUEGENEQ
       if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
         while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
@@ -650,7 +650,7 @@ void CmiInitCPUAffinity(char **argv)
 #endif
       }
 #endif
-#if CMK_CRAYXT || CMK_CRAYXE
+#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
       /* if both pemap and commmap are NULL, will compute one */
       if (pemap != NULL)      
 #endif
@@ -676,7 +676,7 @@ void CmiInitCPUAffinity(char **argv)
     return;
   }
 
-#if CMK_CRAYXT || CMK_CRAYXE
+#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
   {
     int numPes = CmiNumPes();
     int numNodes = CmiNumNodes();
