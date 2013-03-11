@@ -615,8 +615,10 @@ void SdagConstruct::generateWhenCode(XStr& op)
 
       whenParams << "tr->args[" << iArgs << "])";
 
-      if (sv->isMsg && !sv->isCounter && !sv->isSpeculator)
+      if (sv->isMsg && !sv->isCounter && !sv->isSpeculator && !sv->isBgParentLog)
         whenParams << "->msg";
+      else if (sv->isMsg && sv->isBgParentLog)
+        whenParams << "->log";
 
       generatedWhenParams++;
       iArgs++;
