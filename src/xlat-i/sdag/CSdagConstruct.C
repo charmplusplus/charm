@@ -347,7 +347,8 @@ void SdagConstruct::propagateState(int uniqueVarNum)
 #if CMK_BIGSIM_CHARM
   // adding _bgParentLog as the last extra parameter for tracing
   stateVarsChildren = new list<CStateVar*>(*stateVars);
-  sv = new CStateVar(0, "void *", 0,"_bgParentLog", 0, NULL, 1);  
+  sv = new CStateVar(0, "void *", 0,"_bgParentLog", 0, NULL, 1);
+  sv->isBgParentLog = true;
   stateVarsChildren->push_back(sv);
 #else
   stateVarsChildren = stateVars; 
@@ -575,7 +576,7 @@ void SdagConstruct::generateWhenCode(XStr& op)
 
 #if CMK_BIGSIM_CHARM
   // bgLog2 stores the parent dependence of when, e.g. for, olist
-  op <<"  cmsgbuf->bgLog2 = (void*)tr->args[1];\n";
+  op << "        cmsgbuf->bgLog2 = (void*)dynamic_cast<TransportableBigSimLog*>(tr->args[1])->log;\n";
 #endif
 
   for (list<CStateVar*>::iterator iter = stateVars->begin();
@@ -603,12 +604,14 @@ void SdagConstruct::generateWhenCode(XStr& op)
       }
 #endif
 
-      if (sv->isMsg && !sv->isCounter && !sv->isSpeculator)
+      if (sv->isMsg && !sv->isCounter && !sv->isSpeculator && !sv->isBgParentLog)
         whenParams << "(" << sv->type->charstar() << ")" << "dynamic_cast<TransportableMsg*>(";
       else if (sv->isCounter)
         whenParams << "dynamic_cast<CCounter*>(";
       else if (sv->isSpeculator)
         whenParams << "dynamic_cast<CSpeculator*>(";
+      else if (sv->isBgParentLog)
+        whenParams << "dynamic_cast<TransportableBigSimLog*>(";
 
       whenParams << "tr->args[" << iArgs << "])";
 
@@ -930,9 +933,12 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
        defs << "       tr->args[" << iArgs++ << "] = NULL;\n";
     }
     else {
-      if (sv->isMsg == 1 && !sv->isCounter && !sv->isSpeculator) {
+      if (sv->isMsg == 1 && !sv->isCounter && !sv->isSpeculator && !sv->isBgParentLog) {
          defs << "       if (tr->args[" << iArgs << "]) delete tr->args[" << iArgs << "];\n";
          defs << "       tr->args[" << iArgs++ << "] = new TransportableMsg(" << sv->name << ");\n";
+      } else if (sv->isMsg == 1 && sv->isBgParentLog) {
+         defs << "       if (tr->args[" << iArgs << "]) delete tr->args[" << iArgs << "];\n";
+         defs << "       tr->args[" << iArgs++ << "] = new TransportableBigSimLog(" << sv->name << ");\n";
       } else if (sv->isMsg == 1 && (sv->isCounter || sv->isSpeculator)) {
          defs << "       if (tr->args[" << iArgs << "]) delete tr->args[" << iArgs << "];\n";
          defs << "       tr->args[" << iArgs++ << "] = " << sv->name << ";\n";

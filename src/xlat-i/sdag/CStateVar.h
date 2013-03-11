@@ -16,7 +16,7 @@ namespace xi {
     bool byConst;
     XStr *arrayLength;
     int isMsg;
-    bool isCounter, isSpeculator;
+    bool isCounter, isSpeculator, isBgParentLog;
 
     CStateVar(int v, const char *t, int np, const char *n, XStr *r, const char *a, int m)
       : isVoid(v)
@@ -26,7 +26,8 @@ namespace xi {
       , declaredRef(NULL)
       , byConst(false)
       , isCounter(false)
-      , isSpeculator(false) {
+      , isSpeculator(false)
+      , isBgParentLog(false) {
       if (t != NULL) { type = new XStr(t); }
       else {type = NULL;}
       if (n != NULL) { name = new XStr(n); }
@@ -47,6 +48,7 @@ namespace xi {
       , isMsg(pl->isMessage())
       , isCounter(false)
       , isSpeculator(false)
+      , isBgParentLog(false)
     { }
   };
 

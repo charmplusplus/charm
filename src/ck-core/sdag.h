@@ -27,7 +27,11 @@ class CMsgBuffer {
 };
 
 struct TransportableEntity {
-  enum PType { TransportableEntityType, TransportableMsgType, TransportableCounterType, TransportableSpeculatorType };
+  enum PType { TransportableEntityType,
+               TransportableMsgType,
+               TransportableCounterType,
+               TransportableSpeculatorType,
+               TransportableBigSimLogType };
 
   PType type;
 
@@ -42,6 +46,20 @@ struct TransportableEntity {
 
   virtual void pup(PUP::er& p) {
     pupType(p);
+  }
+};
+
+struct TransportableBigSimLog : public TransportableEntity {
+  void* log;
+  TransportableBigSimLog() : log(0) { }
+
+  TransportableBigSimLog(void* log)
+    : log(log)
+    , TransportableEntity(TransportableBigSimLogType) { }
+
+  void pup(PUP::er& p) {
+    TransportableEntity::pupType(p);
+    if (p.isUnpacking()) log = 0;
   }
 };
 
@@ -141,6 +159,7 @@ class CWhenTrigger {
             case TransportableEntity::TransportableMsgType: args[i] = new TransportableMsg(); break;
             case TransportableEntity::TransportableCounterType: args[i] = new CCounter(); break;
             case TransportableEntity::TransportableSpeculatorType: args[i] = new CSpeculator(); break;
+            case TransportableEntity::TransportableBigSimLogType: args[i] = new TransportableBigSimLog(); break;
             }
           }
 
