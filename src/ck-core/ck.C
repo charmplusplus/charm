@@ -476,13 +476,11 @@ void CUDACallbackManager(void *fn) {
 
 #endif
 
-extern "C"
-void QdCreate(int n=1) {
+void QdCreate(int n) {
   CpvAccess(_qd)->create(n);
 }
 
-extern "C"
-void QdProcess(int n=1) {
+void QdProcess(int n) {
   CpvAccess(_qd)->process(n);
 }
 
