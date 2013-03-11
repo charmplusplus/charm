@@ -247,7 +247,7 @@ mCastEntry::mCastEntry (mCastEntry *old):
   asm_fill = 0;
 }
 
-extern LDObjid idx2LDObjid(const CkArrayIndex &idx);    // cklocation.C
+extern LDObjid idx2LDObjid(const CkArrayIndex &idx, const CkGroupID& gid);    // cklocation.C
 
 
 
@@ -260,7 +260,10 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
     for (int i=0; i<n; i++) {
         entry->allElem.push_back(al[i]);
 #if CMK_LBDB_ON
-        const LDObjid key = idx2LDObjid(al[i]);
+        CkGroupID gid;
+        if (aid.ckLocalBranch()->getLocMgr())
+          gid = aid.ckLocalBranch()->getLocMgr()->getGroupID();
+        const LDObjid key = idx2LDObjid(al[i], gid);
         entry->allObjKeys.push_back(key);
 #endif
     }
@@ -294,7 +297,10 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem.push_back(al[i]);
 #if CMK_LBDB_ON
-    const LDObjid key = idx2LDObjid(al[i]);
+    CkGroupID gid;
+    if (aid.ckLocalBranch()->getLocMgr())
+      gid = aid.ckLocalBranch()->getLocMgr()->getGroupID();
+    const LDObjid key = idx2LDObjid(al[i], gid);
     entry->allObjKeys.push_back(key);
 #endif
   }
@@ -346,7 +352,10 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
   for (int i=0; i<count; i++) {
     entry->allElem.push_back(al[i]);
 #if CMK_LBDB_ON
-    const LDObjid key = idx2LDObjid(al[i]);
+    CkGroupID gid;
+    if (aid.ckLocalBranch()->getLocMgr())
+      gid = aid.ckLocalBranch()->getLocMgr()->getGroupID();
+    const LDObjid key = idx2LDObjid(al[i], gid);
     entry->allObjKeys.push_back(key);
 #endif
   }

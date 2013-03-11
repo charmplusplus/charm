@@ -3147,6 +3147,7 @@ void Entry::genArrayDefs(XStr& str)
       if(!isIget()) {
       if (container->isForElement() || container->isForSection()) {
         str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
+        str << "  contactElement(" << epIdx() << ");\n";
       }
       else
         str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";

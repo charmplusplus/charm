@@ -65,6 +65,7 @@ typedef struct {
 
 typedef struct _LDObjid {
   int id[OBJ_ID_SZ];
+  CkGroupID gid;
 #ifdef TEMP_LDB
 	int *getID(){return id;}
 #endif
@@ -380,6 +381,7 @@ PUPmarshall(LDOMid)
 
 inline void LDObjid::pup(PUP::er &p) {
   for (int i=0; i<OBJ_ID_SZ; i++) p|id[i];
+  p | gid;
 #if CMK_GLOBAL_LOCATION_UPDATE
   p|dimension;
   p|nInts;

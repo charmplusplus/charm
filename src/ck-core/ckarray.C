@@ -1067,6 +1067,43 @@ void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
 #endif
 }
 
+void CProxySection_ArrayBase::contactElement(int ep) {
+  // declare contact for all elements in section
+  for (int k=0; k<_nsid; ++k) {
+    for (int i=0; i< _sid[k]._nElems-1; i++) {
+      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[i]);
+      ap.contactElement(ep);
+    }
+    if (_sid[k]._nElems > 0) {
+      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[_sid[k]._nElems-1]);
+      ap.contactElement(ep);
+    }
+  }
+}
+
+void CProxyElement_ArrayBase::contactElement(int ep) {
+  if (CkpvAccess(_runningChare)) {
+    Chare* cur = CkpvAccess(_runningChare);
+    ArrayElementID id(ckGetArrayID(), _idx);
+    if (cur->contacts.get(id)) {
+      cur->contacts.getRef(id)++;
+    } else {
+      cur->contacts.put(id) = 0;
+    }
+
+    // CkPrintf("number of contacts (ep = %d, aid = %d) for %p: %d\n",
+    //          ep, CkGroupID(id.aid).idx, cur, cur->contacts.numObjects());
+
+    // CkHashtableIterator* iter = cur->contacts.iterator();
+    // while (iter->hasNext()) {
+    //   void* keyp;
+    //   int* num = (int *)iter->next(&keyp);
+    //   ArrayElementID& curid = *(ArrayElementID *)keyp;
+    //   CkPrintf("\telm: aid = %d, idx = %s, num = %d\n", CkGroupID(curid.aid).idx, idx2str(curid.idx), *num);
+    // }
+  }
+}
+
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) const
 {
 #if CMK_ERROR_CHECKING

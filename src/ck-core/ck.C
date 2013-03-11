@@ -145,6 +145,7 @@ void Chare::pup(PUP::er &p)
 	}
 	mlogData->pup(p);
 #endif
+  p | contacts;
 #if CMK_ERROR_CHECKING
   p(magic);
 #endif
