@@ -741,7 +741,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
 	if(CkMyRank()==0){
                 FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "rb",
-                                                       (CkNumPes() == _numPes) ? CkMyPe() : 0);
+                                                       (CkNumPes() == _numPes) ? CkMyNode() : 0);
                 PUP::fromDisk pNodeGroups(fNodeGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CkPupNodeGroupData(pNodeGroups,CmiTrue);
