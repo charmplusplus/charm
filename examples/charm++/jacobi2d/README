@@ -1,6 +1,6 @@
-Jacobi iteratoin with a 2D Array.
+Jacobi iteration with a 2D Array.
 
-Demonstrates 2d dense char array creation and use.  This code computes
+Demonstrates 2d dense chare array creation and use.  This code computes
 the steady state heat distribution of a 2d plate using the jacobi
 iteration:
 
@@ -12,7 +12,7 @@ end
 
 Every temp(x,y) is a chare in this sample application.  The main chare
 sends a notice to all the nodes in our simulation telling them to
-exchange information.  After each node is done updating it's
+exchange information.  After each node is done updating its
 temperature, it sends a message back the error as the difference
 between temp and new_temp.  Main quits driving the iterations when the
 error has been minimized below some threshold.
