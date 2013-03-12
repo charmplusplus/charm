@@ -9,6 +9,8 @@ module CkLocation {
 	entry CkLocMgr(CkArrayOptions opts);
 	entry void deliverInline(CkMessage *m);
 	entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
+        entry [expedited] void requestLocation(CkArrayIndex idx, int peToTell,
+                                               bool suppressIfHere);
 	entry [expedited] void updateLocation(CkArrayIndex idx,int nowOnPe);
 	entry void reclaimRemote(CkArrayIndex idx,int deletedOnPe);
 	

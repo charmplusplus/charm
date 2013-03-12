@@ -2386,8 +2386,25 @@ bool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	
 	return true;
 }
-void CkLocMgr::updateLocation(const CkArrayIndex &idx,int nowOnPe) {
-  inform(idx,nowOnPe);
+
+void CkLocMgr::requestLocation(const CkArrayIndex &idx, const int peToTell,
+                               bool suppressIfHere) {
+  int onPe = -1;
+
+  if (peToTell == CkMyPe())
+    return;
+
+  onPe = lastKnown(idx);
+  CkAssert(onPe != -1);
+
+  if (suppressIfHere && onPe == CkMyPe())
+    return;
+
+  thisProxy[peToTell].updateLocation(idx, onPe);
+}
+
+void CkLocMgr::updateLocation(const CkArrayIndex &idx, int nowOnPe) {
+  inform(idx, nowOnPe);
 }
 
 /*************************** LocMgr: DELETION *****************************/

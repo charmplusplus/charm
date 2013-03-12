@@ -655,6 +655,7 @@ public:
 
 //Communication:
 	void immigrate(CkArrayElementMigrateMessage *msg);
+        void requestLocation(const CkArrayIndex &idx, int peToTell, bool suppressIfHere);
 	void updateLocation(const CkArrayIndex &idx,int nowOnPe);
 	void reclaimRemote(const CkArrayIndex &idx,int deletedOnPe);
 	void dummyAtSync(void);
