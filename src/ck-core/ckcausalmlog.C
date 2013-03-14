@@ -41,6 +41,8 @@
 #define DEBUG_PE_NOW(x,y)  if(CkMyPe() == x) y
 #define DEBUG_RECOVERY(x) //x
 
+#define FAIL_DET_THRESHOLD 10
+
 extern const char *idx2str(const CkArrayIndex &ind);
 extern const char *idx2str(const ArrayElement *el);
 
@@ -481,7 +483,7 @@ void heartBeatHandler(void *msg)
 void heartBeatCheckHandler()
 {
 	double now = CmiWallTimer();
-	if (lastPingTime > 0 && now - lastPingTime > 4 && !inCkptFlag) {
+	if (lastPingTime > 0 && now - lastPingTime > FAIL_DET_THRESHOLD && !inCkptFlag) {
 		int i, pe, buddy;
 		// tell everyone that PE is down
 		buddy = getReverseCheckPointPE();
