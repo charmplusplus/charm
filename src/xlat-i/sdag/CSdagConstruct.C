@@ -1556,28 +1556,27 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
 
 void SdagConstruct::generateTrace()
 {
-  char text[1024];
-  switch(type) {
-  case SATOMIC:
-    if (traceName) {
-      sprintf(text, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
-      // remove blanks
-      for (unsigned int i=0; i<strlen(text); i++)
-        if (text[i]==' '||text[i]=='\t') text[i]='_';
-    }
-    else {
-      sprintf(text, "%s%s", CParsedFile::className->charstar(), label->charstar());
-    }
-    traceName = new XStr(text);
-    break;
-  default:
-    break;
-  }
-
   for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::generateTrace));
   if (con1) con1->generateTrace();
   if (con2) con2->generateTrace();
   if (con3) con3->generateTrace();
+}
+
+void AtomicConstruct::generateTrace()
+{
+  char traceText[1024];
+  if (traceName) {
+    sprintf(traceText, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
+    // remove blanks
+    for (unsigned int i=0; i<strlen(traceText); i++)
+      if (traceText[i]==' '||traceText[i]=='\t') traceText[i]='_';
+  }
+  else {
+    sprintf(traceText, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  }
+  traceName = new XStr(traceText);
+
+  if (con1) con1->generateTrace();
 }
 
 void SdagConstruct::generateTraceBeginCall(XStr& op)          // for trace

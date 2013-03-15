@@ -1354,7 +1354,7 @@ public:
   void setNext(SdagConstruct *, int);
 
   // for trace
-  void generateTrace();          
+  virtual void generateTrace();
   void generateRegisterEp(XStr& defs);
   void generateTraceEp(XStr& decls, XStr& defs, Chare* chare);
   static void generateTraceEndCall(XStr& defs);
@@ -1383,6 +1383,7 @@ class AtomicConstruct : public SdagConstruct {
 public:
   void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int );
   void generateCode(XStr&, XStr&, Entry *);
+  void generateTrace();
   AtomicConstruct(const char *code, SdagConstruct *pub_list, const char *trace_name)
     : SdagConstruct(SATOMIC, NULL, pub_list, 0,0,0,0,0)
   {
