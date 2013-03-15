@@ -1377,6 +1377,14 @@ public:
   void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
 };
 
+class AtomicConstruct : public SdagConstruct {
+public:
+  void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int );
+  AtomicConstruct(XStr *code, SdagConstruct *pub_list)
+    : SdagConstruct(SATOMIC, code, pub_list, 0,0,0,0,0)
+  { }
+};
+
 SdagConstruct *buildAtomic(const char* code,
 			   SdagConstruct *pub_list,
 			   const char *trace_name);

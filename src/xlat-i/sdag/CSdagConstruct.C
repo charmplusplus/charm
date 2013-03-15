@@ -68,7 +68,7 @@ SdagConstruct *buildAtomic(const char* code,
 {
   char *tmp = strdup(code);
   RemoveSdagComments(tmp);
-  SdagConstruct *ret = new SdagConstruct(SATOMIC, new XStr(tmp), pub_list, 0,0,0,0, 0 );
+  SdagConstruct *ret = new AtomicConstruct(new XStr(tmp), pub_list);
   free(tmp);
 
   if (trace_name)
@@ -424,19 +424,6 @@ void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
       break;
-    case SATOMIC:
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      stateVarsChildren = stateVars;
-      if (con1 != 0) {
-        publist.push_back(con1);
-        /*SdagConstruct *sc;
-        SdagConstruct *sc1;
-        for(sc =publist.begin(); !publist.end(); sc=publist.next()) {
-           for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
-           printf("Publist = %s\n", sc1->text->charstar());
-	}*/
-      }
-      break;
     case SFORWARD:
       stateVarsChildren = new list<CStateVar*>(wlist);
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
@@ -495,6 +482,22 @@ void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
   }
 
   propagateStateToChildren(*stateVarsChildren, whensEntryMethodStateVars, publist, uniqueVarNum);
+}
+
+
+void AtomicConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
+  stateVars = new list<CStateVar*>();
+  stateVars->insert(stateVars->end(), plist.begin(), plist.end());
+  stateVarsChildren = stateVars;
+  if (con1 != 0) {
+    publist.push_back(con1);
+    /*SdagConstruct *sc;
+    SdagConstruct *sc1;
+    for(sc =publist.begin(); !publist.end(); sc=publist.next()) {
+       for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
+       printf("Publist = %s\n", sc1->text->charstar());
+    }*/
+  }
 }
 
 void SdagConstruct::propagateStateToChildren(list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
