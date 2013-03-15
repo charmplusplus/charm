@@ -503,9 +503,6 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
     case SFORALL:
       generateForall(decls, defs, entry);
       break;
-    case SATOMIC:
-      generateAtomic(decls, defs, entry);
-      break;
     case SIF:
       generateIf(decls, defs, entry);
       if(con2 != 0)
@@ -1368,7 +1365,7 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
   endMethod(defs);
 }
 
-void SdagConstruct::generateAtomic(XStr& decls, XStr& defs, Entry* entry)
+void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
 
