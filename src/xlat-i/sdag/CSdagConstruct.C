@@ -62,26 +62,6 @@ SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr
   param = pl;
 }
 
-SdagConstruct *buildAtomic(const char* code,
-			   SdagConstruct *pub_list,
-			   const char *trace_name)
-{
-  char *tmp = strdup(code);
-  RemoveSdagComments(tmp);
-  SdagConstruct *ret = new AtomicConstruct(new XStr(tmp), pub_list);
-  free(tmp);
-
-  if (trace_name)
-  {
-    tmp = strdup(trace_name);
-    tmp[strlen(tmp)-1]=0;
-    ret->traceName = new XStr(tmp+1);
-    free(tmp);
-  }
-
-  return ret;
-}
-
 void SdagConstruct::numberNodes(void)
 {
   switch(type) {

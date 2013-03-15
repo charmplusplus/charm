@@ -1066,7 +1066,7 @@ NonWhenConstruct : ATOMIC
 
 SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPubList 
                  {
-		   $$ = buildAtomic($4, $6, $2);
+		   $$ = new AtomicConstruct($4, $6, $2);
 		 }
 		| CONNECT '(' IDENT EParameters ')' ParamBraceStart CCode '}'
 		{  
@@ -1111,7 +1111,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		| FORWARD ForwardList ';'
 		{ $$ = $2; }
 		| ParamBraceStart CCode ParamBraceEnd
-		{ $$ = buildAtomic($2, NULL, NULL); }
+		{ $$ = new AtomicConstruct($2, NULL, NULL); }
                 | error
                 { printf("Unknown SDAG construct or malformed entry method definition.\n"
                          "You may have forgotten to terminate an entry method definition with a"

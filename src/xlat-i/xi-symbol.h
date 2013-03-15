@@ -1377,19 +1377,28 @@ public:
   void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
 };
 
+extern void RemoveSdagComments(char *);
+
 class AtomicConstruct : public SdagConstruct {
 public:
   void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int );
-  AtomicConstruct(XStr *code, SdagConstruct *pub_list)
-    : SdagConstruct(SATOMIC, code, pub_list, 0,0,0,0,0)
-  { }
+  AtomicConstruct(const char *code, SdagConstruct *pub_list, const char *trace_name)
+    : SdagConstruct(SATOMIC, NULL, pub_list, 0,0,0,0,0)
+  {
+    char *tmp = strdup(code);
+    RemoveSdagComments(tmp);
+    text = new XStr(tmp);
+    free(tmp);
+
+    if (trace_name)
+    {
+      tmp = strdup(trace_name);
+      tmp[strlen(tmp)-1]=0;
+      traceName = new XStr(tmp+1);
+      free(tmp);
+    }
+  }
 };
-
-SdagConstruct *buildAtomic(const char* code,
-			   SdagConstruct *pub_list,
-			   const char *trace_name);
-
-extern void RemoveSdagComments(char *);
 
 }
 
