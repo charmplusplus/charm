@@ -38,6 +38,8 @@
 #define DEBUG_PE_NOW(x,y)  if(CkMyPe() == x) y
 #define DEBUG_RECOVERY(x) //x
 
+#define FAIL_DET_THRESHOLD 10
+
 extern const char *idx2str(const CkArrayIndex &ind);
 extern const char *idx2str(const ArrayElement *el);
 
@@ -172,6 +174,7 @@ void heartBeatHandler(void *msg);
 void heartBeatCheckHandler();
 void partnerFailureHandler(char *msg);
 int getReverseCheckPointPE();
+int inCkptFlag = 0;
 #endif
 
 /***** *****/
@@ -339,7 +342,7 @@ void heartBeatHandler(void *msg)
 void heartBeatCheckHandler()
 {
 	double now = CmiWallTimer();
-	if (lastPingTime > 0 && now - lastPingTime > 4) {
+	if (lastPingTime > 0 && now - lastPingTime > FAIL_DET_THRESHOLD && !inCkptFlag) {
 		int i, pe, buddy;
 		// tell everyone that PE is down
 		buddy = getReverseCheckPointPE();
@@ -837,6 +840,10 @@ void startMlogCheckpoint(void *_dummy, double curWallTime){
 	// increasing the checkpoint counter
 	checkpointCount++;
 	
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 1;
+#endif
+
 #if DEBUG_CHECKPOINT
 	if(CmiMyPe() == 0){
 		printf("[%d] starting checkpoint at %.6lf CmiTimer %.6lf \n",CkMyPe(),CmiWallTimer(),CmiTimer());
@@ -1944,6 +1951,10 @@ void _checkpointBarrierHandler(CheckpointBarrierMsg *msg){
 void _checkpointBarrierAckHandler(CheckpointBarrierMsg *msg){
 	DEBUG(CmiPrintf("[%d] _checkpointBarrierAckHandler \n",CmiMyPe()));
 	DEBUGLB(CkPrintf("[%d] Reaching this point\n",CkMyPe()));
+
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 0;
+#endif
 
 	// resuming LB function pointer
 	(*resumeLbFnPtr)(centralLb);
