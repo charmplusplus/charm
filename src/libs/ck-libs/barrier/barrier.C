@@ -5,7 +5,7 @@
 #include "barrier.h"
 #include "barrier.def.h"
 
-barrier::barrier(void)
+Barrier::Barrier(void)
 {
   myPe = CkMyPe();
   myLeft = (myPe*2)+1;
@@ -19,7 +19,7 @@ barrier::barrier(void)
     kidscount++;
 }
 
-void barrier::reset(void)
+void Barrier::reset(void)
 {
   kidscount = 0;
   if (myRight >= CkNumPes())
@@ -28,9 +28,9 @@ void barrier::reset(void)
     kidscount++;
 }
 
-void barrier::atBarrier(FP *m)
+void Barrier::atBarrier(FP *m)
 {
-  CProxy_barrier grp(myGroup);
+  CProxy_Barrier grp(myGroup);
 
   kidscount++;
   if (kidscount == 3) {
@@ -43,9 +43,9 @@ void barrier::atBarrier(FP *m)
   delete m;
 }
 
-void barrier::notify(void)
+void Barrier::notify(void)
 {
-  CProxy_barrier grp(myGroup);
+  CProxy_Barrier grp(myGroup);
 
   kidscount++;
   if (kidscount == 3) {
@@ -56,9 +56,9 @@ void barrier::notify(void)
   }
 }
 
-void barrier::callFP(void)
+void Barrier::callFP(void)
 {
-  CProxy_barrier grp(myGroup);
+  CProxy_Barrier grp(myGroup);
 
   if (myLeft < CkNumPes())
     grp[myLeft].callFP();
@@ -69,6 +69,6 @@ void barrier::callFP(void)
 
 CkGroupID barrierInit(void)
 {
-  return CProxy_barrier::ckNew();
+  return CProxy_Barrier::ckNew();
 }
 
