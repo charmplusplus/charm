@@ -1403,7 +1403,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
       if (newpe == -1) {
           MPI_Barrier(charmComm);
-          MPI_Barrier(charmComm);
+          //MPI_Barrier(charmComm);
           MPI_Finalize();
           exit(0);
       }
@@ -1988,7 +1988,7 @@ void CkDieNow()
         CmiReleaseSentMessages();
     }
     MPI_Barrier(charmComm);
-    MPI_Barrier(charmComm);
+ //   MPI_Barrier(charmComm);
     MPI_Finalize();
     exit(0);
 #endif
