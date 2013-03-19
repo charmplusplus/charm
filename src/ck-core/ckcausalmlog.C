@@ -1615,7 +1615,6 @@ void _storeCheckpointHandler(char *msg){
 	ackMsg.PE = CkMyPe();
 	ackMsg.dataSize = CpvAccess(_storedCheckpointData)->bufSize;
 	CmiSetHandler(&ackMsg,_checkpointAckHandlerIdx);
-	// CODING: should this be CmiSyncSendAndFree?
 	CmiSyncSend(sendingPE,sizeof(CheckPointAck),(char *)&ackMsg);
 	
 	traceUserBracketEvent(29,_startTime,CkWallTimer());
@@ -1653,7 +1652,7 @@ void sendRemoveLogRequests(){
 	
 	DEBUG_MEM(CmiMemoryCheck());
 	for(int i=0;i<CkNumPes();i++){
-		CmiSyncSend(i,totalSize,requestMsg);
+		CmiSyncSend(i,totalSize,requestMsg);  //make it broadcast
 	}
 	CmiFree(requestMsg);
 
@@ -2049,7 +2048,7 @@ void _recvRestartCheckpointHandler(char *_restartData){
 	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
 	for(int i=0;i<CkNumPes();i++){
 		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
+			CmiSyncSend(i,totalSize,resendMsg);	// make it a broadcast
 		}	
 	}
 	_resendMessagesHandler(resendMsg);
@@ -2294,12 +2293,7 @@ void _recvCheckpointHandler(char *_restartData){
 	memcpy(objList,objectVec.getVec(),numberObjects*sizeof(TProcessedLog));	
 
 	CmiSetHandler(resendMsg,_sendDetsHandlerIdx);
-	for(int i=0;i<CkNumPes();i++){
-		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
-		}
-	}
-	CmiFree(resendMsg);
+	CmiSyncBroadcastAndFree(totalSize,resendMsg);
 	
 }
 
@@ -2348,13 +2342,7 @@ void _updateHomeAckHandler(RestartRequest *updateHomeAck){
 //HERE	sleep(10);
 	
 	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
-	for(int i=0;i<CkNumPes();i++){
-		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
-		}
-	}
-	_resendMessagesHandler(resendMsg);
-	CmiFree(resendMsg);
+	CmiSyncBroadcastAllAndFree(totalSize, resendMsg);
 
 };
 
@@ -2568,6 +2556,9 @@ void _sendDetsHandler(char *msg){
 	ResendRequest *resendReq = (ResendRequest *)msg;
 
 	// CkPrintf("[%d] Sending determinants\n",CkMyPe());
+	
+	// cleaning global reduction sequence number
+	CmiResetGlobalReduceSeqID();
 
 	// building the reply message
 	char *listObjects = &msg[sizeof(ResendRequest)];
@@ -2688,9 +2679,9 @@ void _resendMessagesHandler(char *msg){
 
 	DEBUG_MEM(CmiMemoryCheck());
 
-	if(resendReq->PE != CkMyPe()){
+	//if(resendReq->PE != CkMyPe()){
 		CmiFree(msg);
-	}	
+	//}	
 //	CmiPrintf("[%d] End of resend Request \n",CmiMyPe());
 	lastRestart = CmiWallTimer();
 }
@@ -2813,15 +2804,9 @@ void _sendDetsReplyHandler(char *msg){
 
 //HERE	sleep(10);
 //	CkPrintf("[%d] RESUMING RECOVERY with %d \n",CkMyPe(),restartDecisionNumber);
-	
+
 	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
-	for(int i=0;i<CkNumPes();i++){
-		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
-		}
-	}
-	_resendMessagesHandler(resendMsg);
-	CmiFree(resendMsg);
+	CmiSyncBroadcastAllAndFree(totalSize, resendMsg);
 
 	/* test for parallel restart migrate away object**/
 	if(fastRecovery){
