@@ -177,6 +177,10 @@ int getReverseCheckPointPE();
 int inCkptFlag = 0;
 #endif
 
+static void *doNothingMsg(int * size, void * data, void ** remote, int count){
+	return data;
+}
+
 /***** *****/
 
 /** 
@@ -1314,8 +1318,6 @@ void _recvCheckpointHandler(char *_restartData){
 	_initDone();
 
 	getGlobalStep(globalLBID);
-
-	
 }
 
 
@@ -1430,6 +1432,9 @@ void _resendMessagesHandler(char *msg){
 	ResendData d;
 	ResendRequest *resendReq = (ResendRequest *)msg;
 
+	// cleaning global reduction sequence number
+	CmiResetGlobalReduceSeqID();
+
 	// building the reply message
 	char *listObjects = &msg[sizeof(ResendRequest)];
 	d.numberObjects = resendReq->numberObjects;
@@ -1443,9 +1448,7 @@ void _resendMessagesHandler(char *msg){
 
 	DEBUG_MEM(CmiMemoryCheck());
 
-	if(resendReq->PE != CkMyPe()){
-		CmiFree(msg);
-	}	
+	CmiFree(msg);
 }
 
 /*
@@ -1861,14 +1864,11 @@ void startLoadBalancingMlog(void (*_fnPtr)(void *),void *_centralLb){
 };
 
 void finishedCheckpointLoadBalancing(){
-	DEBUGLB(printf("[%d] finished checkpoint after lb \n",CmiMyPe());)
-	CheckpointBarrierMsg msg;
-	msg.fromPE = CmiMyPe();
-	msg.checkpointCount = checkpointCount;
-
-	CmiSetHandler(&msg,_checkpointBarrierHandlerIdx);
-	CmiSyncSend(0,sizeof(CheckpointBarrierMsg),(char *)&msg);
-	
+      DEBUGLB(printf("[%d] finished checkpoint after lb \n",CmiMyPe());)
+  
+      char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+      CmiSetHandler(msg,_checkpointBarrierHandlerIdx);
+      CmiReduce(msg,CmiMsgHeaderSizeBytes,doNothingMsg);
 };
 
 void _receiveMigrationNoticeHandler(MigrationNotice *msg){
@@ -1914,38 +1914,15 @@ void _receiveMlogLocationHandler(void *buf){
 	mgr->immigrate(msg);
 };
 
-/**
- * @brief Processor 0 sends a broadcast to every other processor after checkpoint barrier.
- */
-inline void checkAndSendCheckpointBarrierAcks(CheckpointBarrierMsg *msg){
-	if(checkpointBarrierCount == CmiNumPes()){
-		CmiSetHandler(msg,_checkpointBarrierAckHandlerIdx);
-		for(int i=0;i<CmiNumPes();i++){
-			CmiSyncSend(i,sizeof(CheckpointBarrierMsg),(char *)msg);
-		}
-	}
-}
-
-/**
- * @brief Processor 0 receives a contribution from every other processor after checkpoint.
- */ 
-void _checkpointBarrierHandler(CheckpointBarrierMsg *msg){
-	DEBUG(CmiPrintf("[%d] msg->checkpointCount %d pe %d checkpointCount %d checkpointBarrierCount %d \n",CmiMyPe(),msg->checkpointCount,msg->fromPE,checkpointCount,checkpointBarrierCount));
-	if(msg->checkpointCount == checkpointCount){
-		checkpointBarrierCount++;
-		checkAndSendCheckpointBarrierAcks(msg);
-	}else{
-		if(msg->checkpointCount-1 == checkpointCount){
-			checkpointBarrierCount++;
-			checkAndSendCheckpointBarrierAcks(msg);
-		}else{
-			printf("[%d] msg->checkpointCount %d checkpointCount %d\n",CmiMyPe(),msg->checkpointCount,checkpointCount);
-			CmiAbort("msg->checkpointCount and checkpointCount differ by more than 1");
-		}
-	}
+void _checkpointBarrierHandler(CheckpointBarrierMsg *barrierMsg){
 
 	// deleting the received message
-	CmiFree(msg);
+	CmiFree(barrierMsg);
+
+	// sending a broadcast to resume execution
+	CheckpointBarrierMsg *msg = (CheckpointBarrierMsg *)CmiAlloc(sizeof(CheckpointBarrierMsg));
+	CmiSetHandler(msg,_checkpointBarrierAckHandlerIdx);
+	CmiSyncBroadcastAllAndFree(sizeof(CheckpointBarrierMsg),(char *)msg);
 }
 
 void _checkpointBarrierAckHandler(CheckpointBarrierMsg *msg){
@@ -2091,13 +2068,7 @@ void _recvGlobalStepHandler(LBStepMsg *msg){
 	lb->ReceiveDummyMigration(restartDecisionNumber);
 
 	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
-	for(int i=0;i<CkNumPes();i++){
-		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
-		}
-	}
-	_resendMessagesHandler(resendMsg);
-	CmiFree(resendMsg);
+	CmiSyncBroadcastAllAndFree(totalSize, resendMsg);
 
 	/* test for parallel restart migrate away object**/
 	if(fastRecovery){
