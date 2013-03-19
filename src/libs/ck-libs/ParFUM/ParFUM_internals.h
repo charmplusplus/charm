@@ -38,13 +38,12 @@
 #include "idxl.h"
 #include "idxl_comm.h"
 
-#include "ParFUM.decl.h"
 #include "msa/msa.h"
 #include "cklists.h"
 #include "pup.h"
-
 #include "ParFUM.h"
-
+#include "ElemList.h"
+#include "MsaHashtable.h"
 
 #include <iosfwd>
 
@@ -2065,84 +2064,6 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 #define MESH_CHUNK_TAG 3000
 #define MAX_SHARED_PER_NODE 20
 
-template <class T, bool PUP_EVERY_ELEMENT=true >
-class DefaultListEntry {
-    public:
-    template<typename U>
-    static inline void accumulate(T& a, const U& b) { a += b; }
-    // identity for initializing at start of accumulate
-    static inline T getIdentity() { return T(); }
-    static inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
-  };
-
-extern double elemlistaccTime;
-
-template <class T>
-class ElemList{
- public:
-  CkVec<T> *vec;
-  ElemList(){
-    vec = new CkVec<T>();
-  }
-  ~ElemList(){
-    delete vec;
-  }
-  ElemList(const ElemList &rhs){
-    vec = new CkVec<T>();
-    *this=rhs;
-  }
-  inline ElemList& operator=(const ElemList& rhs){
-    //		 vec = new CkVec<T>();
-    *vec = *(rhs.vec);
-		return *this;
-  }
-  inline ElemList& operator+=(const ElemList& rhs){
-    /*
-      add the new unique elements to the List
-    */
-    double _start = CkWallTimer();
-    for(int i=0;i<rhs.vec->length();i++){
-      vec->push_back((*(rhs.vec))[i]);
-    }
-    //		uniquify();
-    elemlistaccTime += (CkWallTimer() - _start);
-    return *this;
-  }
-  ElemList(const T &val){
-    vec =new CkVec<T>();
-    vec->push_back(val);
-  };
-  inline virtual void pup(PUP::er &p){
-    if(p.isUnpacking()){
-      vec = new CkVec<T>();
-    }
-    pupCkVec(p,*vec);
-  }
-};
-template <class T>
-class UniqElemList: public ElemList<T>{
-public:
-  UniqElemList(const T &val):ElemList<T>(val){};
-  UniqElemList():ElemList<T>(){};
-  inline void uniquify(){
-    CkVec<T> *lvec = this->vec;
-    lvec->quickSort(8);
-    if(lvec->length() != 0){
-      int count=0;
-      for(int i=1;i<lvec->length();i++){
-	if((*lvec)[count] == (*lvec)[i]){
-	}else{
-	  count++;
-	  if(i != count){
-	    (*lvec)[count] = (*lvec)[i];
-	  }
-	}
-      }
-      lvec->resize(count+1);
-    }
-  }
-};
-
 class NodeElem {
  public:
   //global number of this node
@@ -2316,160 +2237,6 @@ class MeshElem{
 };
 
 
-class Hashnode{
-public:
-	class tupledata{
-		public:
-		enum {MAX_TUPLE = 8};
-			int nodes[MAX_TUPLE];
-			tupledata(int _nodes[MAX_TUPLE]){
-				memcpy(nodes,_nodes,sizeof(int)*MAX_TUPLE);
-			}
-			tupledata(tupledata &rhs){
-				memcpy(nodes,rhs.nodes,sizeof(int)*MAX_TUPLE);
-			}
-			tupledata(const tupledata &rhs){
-				memcpy(nodes,rhs.nodes,sizeof(int)*MAX_TUPLE);
-			}
-			tupledata(){};
-			//dont store the returned string
-			char *toString(int numnodes,char *str){
-				str[0]='\0';
-				for(int i=0;i<numnodes;i++){
-					sprintf(&str[strlen(str)],"%d ",nodes[i]);
-				}
-				return str;
-			}
-			inline int &operator[](int i){
-				return nodes[i];
-			}
-			inline const int &operator[](int i) const {
-				return nodes[i];
-			}
-			virtual void pup(PUP::er &p){
-				p(nodes,MAX_TUPLE);
-			}
-	};
-	int numnodes; //number of nodes in this tuple
-	//TODO: replace *nodes with the above tupledata class
-	tupledata nodes;	//the nodes in the tuple
-	int chunk;		//the chunk number to which this element belongs
-	int elementNo;		//local number of that element
-	Hashnode(){
-		numnodes=0;
-	};
-	Hashnode(int _num,int _chunk,int _elNo,int _nodes[tupledata::MAX_TUPLE]): nodes(_nodes){
-		numnodes = _num;
-		chunk = _chunk;
-		elementNo = _elNo;
-	}
-	Hashnode(const Hashnode &rhs){
-		*this = rhs;
-	}
-	inline Hashnode &operator=(const Hashnode &rhs){
-		numnodes = rhs.numnodes;
-		for(int i=0;i<numnodes;i++){
-			nodes[i] = rhs.nodes[i];
-		}
-		chunk = rhs.chunk;
-		elementNo = rhs.elementNo;
-                return *this;
-	}
-	inline bool operator==(const Hashnode &rhs){
-		if(numnodes != rhs.numnodes){
-			return false;
-		}
-		for(int i=0;i<numnodes;i++){
-			if(nodes[i] != rhs.nodes[i]){
-				return false;
-			}
-		}
-		if(chunk != rhs.chunk){
-			return false;
-		}
-		if(elementNo != rhs.elementNo){
-			return false;
-		}
-		return true;
-	}
-	inline bool operator>=(const Hashnode &rhs){
-		if(numnodes < rhs.numnodes){
-			return false;
-		};
-		if(numnodes > rhs.numnodes){
-			return true;
-		}
-
-    for(int i=0;i<numnodes;i++){
-      if(nodes[i] < rhs.nodes[i]){
-	return false;
-      }
-      if(nodes[i] > rhs.nodes[i]){
-	return true;
-      }
-    }
-    if(chunk < rhs.chunk){
-      return false;
-    }
-    if(chunk > rhs.chunk){
-      return true;
-    }
-    if(elementNo < rhs.elementNo){
-      return false;
-    }
-    if(elementNo > rhs.elementNo){
-      return true;
-    }
-    return true;
-  }
-
-  inline bool operator<=(const Hashnode &rhs){
-    if(numnodes < rhs.numnodes){
-      return true;
-    };
-    if(numnodes > rhs.numnodes){
-      return false;
-    }
-
-    for(int i=0;i<numnodes;i++){
-      if(nodes[i] < rhs.nodes[i]){
-	return true;
-      }
-      if(nodes[i] > rhs.nodes[i]){
-	return false;
-      }
-    }
-    if(chunk < rhs.chunk){
-      return true;
-    }
-    if(chunk > rhs.chunk){
-      return false;
-    }
-    if(elementNo < rhs.elementNo){
-      return true;
-    }
-    if(elementNo > rhs.elementNo){
-      return false;
-    }
-    return true;
-  }
-
-  inline bool equals(tupledata &tuple){
-    for(int i=0;i<numnodes;i++){
-      if(tuple.nodes[i] != nodes[i]){
-	return false;
-      }
-    }
-    return true;
-  }
-  virtual void pup(PUP::er &p){
-    p | numnodes;
-    p | nodes;
-    p | chunk;
-    p | elementNo;
-  }
-};
-
 typedef MSA::MSA2D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
 
 typedef MSA::MSA1D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINT;
@@ -2482,6 +2249,7 @@ typedef MSA::MSA1D<NodeList, DefaultListEntry<NodeList,true>,MSA_DEFAULT_ENTRIES
 
 typedef MSA::MSA1D<MeshElem,DefaultEntry<MeshElem,true>,1> MSA1DFEMMESH;
 
+#include "ParFUM.decl.h"
 
 
 struct conndata{
