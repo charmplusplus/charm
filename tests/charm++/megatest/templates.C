@@ -34,6 +34,7 @@ template <class dtype> void
 templates_Reduction<dtype>::Register(templates_ClientMsg *msg)
 {
   cid = msg->cid;
+  this->thisProxy;
   delete msg;
 }
 
