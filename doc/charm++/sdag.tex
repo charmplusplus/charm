@@ -463,8 +463,8 @@ public:
     Foo(CkMigrateMessage *m) \{ \}
     
     void pup(PUP::er &p) \{
-       CBase_Foo::pup(p);
        __sdag_pup(p);
+       ...
     \}
     . . .
 \};

@@ -274,6 +274,9 @@ as usual.
 Array objects can \index{migrate}migrate from one PE to another.  For
 example, the load balancer (see section~\ref{lbFramework}) might
 migrate array elements to better balance the load between processors.
+% The following are no longer strictly true - an unimplemented PUP is
+% a no-op, and chare PUPs no longer need to call their base class's
+% PUP
 For an array element to be migratable, it must implement a \uw{pup}
 method.  The standard PUP contract (see section \ref{sec:pupcontract})
 and constraints wrt to serializing data, and use of Structured Dagger
@@ -300,7 +303,6 @@ public:
 //In the .C file:
 void A2::pup(PUP::er \&p)
 \{
-    CBase\_A2::pup(p); //<- MUST call superclass's pup method
     p|nt;
     p|chr;
     p(flt,7);
