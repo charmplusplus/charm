@@ -549,7 +549,7 @@ Module::generate()
   if(isMain()) {
     declstr << "extern \"C\" void CkRegisterMainModule(void);\n";
   }
-  declstr << "#endif"<<endx;
+
   // Generate the publish class if there are structured dagger connect entries
   int connectPresent = 0;
   if (clist) clist->genPub(pubDeclStr, pubDefStr, pubDefConstr, connectPresent);
@@ -582,6 +582,8 @@ Module::generate()
   templateGuardEnd(defstr);
   // defstr << "#endif"<<endx;
 
+  if (clist) clist->genGlobalCode("", declstr, defstr);
+  declstr << "#endif" << endx;
 
   // DMK - Accel Support
   #if CMK_CELL != 0
@@ -771,6 +773,17 @@ void
 ConstructList::genReg(XStr& str)
 {
     perElemGen(constructs, str, &Construct::genReg, newLine);
+}
+
+void
+ConstructList::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
+{
+  for (list<Construct*>::iterator i = constructs.begin();
+       i != constructs.end(); ++i) {
+    if (*i) {
+      (*i)->genGlobalCode(scope, decls, defs);
+    }
+  }
 }
 
 void

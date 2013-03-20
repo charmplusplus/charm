@@ -106,6 +106,8 @@ class Construct : public Printable {
     virtual void genDecls(XStr& str) { (void)str; }
     virtual void genDefs(XStr& str) { (void)str; }
     virtual void genReg(XStr& str) { (void)str; }
+    virtual void genGlobalCode(XStr scope, XStr &decls, XStr &defs)
+    { (void)scope; (void)decls; (void)defs; }
     virtual void preprocess() { }
     virtual void check() { }
 
@@ -130,6 +132,7 @@ class ConstructList : public Construct {
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+    void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
     void preprocess();
 
     // DMK - Accel Support
@@ -499,6 +502,10 @@ class Scope : public Construct {
     virtual void genReg(XStr& str) {
         str << "using namespace " << name_ << ";\n";
         contents_->genReg(str);
+    }
+    void genGlobalCode(XStr scope, XStr &decls, XStr &defs) {
+      scope << name_ << "::";
+      contents_->genGlobalCode(scope, decls, defs);
     }
     virtual void preprocess() {
         contents_->preprocess();
