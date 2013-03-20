@@ -758,6 +758,8 @@ class Chare : public TEntity {
     	return str;
     }
     int  isTemplated(void) { return (templat!=0); }
+    bool isTemplateDeclaration() { return templat; }
+    bool isTemplateInstantiation() { return type->isTemplated(); }
     int  isMigratable(void) { return attrib&CMIGRATABLE; }
     int  isPython(void) { return attrib&CPYTHON; }
     int  isMainChare(void) {return attrib&CMAINCHARE;}
