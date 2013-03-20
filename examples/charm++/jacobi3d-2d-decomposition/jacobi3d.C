@@ -190,7 +190,6 @@ public:
 
     void pup(PUP::er &p)
     {
-      __sdag_pup(p);
       p|iterations;
       p|neighbors;
 

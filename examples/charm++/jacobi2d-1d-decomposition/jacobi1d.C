@@ -150,7 +150,6 @@ public:
 
     void pup(PUP::er &p)
     {
-      __sdag_pup(p);
       p|imsg;
       p|iterations;
       p|neighbors;

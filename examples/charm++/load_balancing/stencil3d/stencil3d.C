@@ -167,7 +167,6 @@ class Stencil: public CBase_Stencil {
 
     void pup(PUP::er &p)
     {
-      __sdag_pup(p);
       p|iterations;
       p|imsg;
 

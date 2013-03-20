@@ -279,8 +279,6 @@ class Jacobi: public CBase_Jacobi {
 	// Pupping function for migration and fault tolerance
 	// Condition: assuming the 3D Chare Arrays are NOT used
 	void pup(PUP::er &p){
-		__sdag_pup(p);
-	
 		// pupping properties of this class
 		p | iterations;
 		p | imsg;

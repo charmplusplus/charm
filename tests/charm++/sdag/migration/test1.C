@@ -43,8 +43,6 @@ public:
 
   void pup(PUP::er &p) {
     CkPrintf("called PUP for cell %s\n", p.isPacking() ? "packing" : "unpacking or sizing");
-    __sdag_pup(p);
-
     p | val;
   }
 
