@@ -1140,7 +1140,7 @@ void CkArrayPrefetch_writeToSwap(FILE *swapfile,void *objptr) {
 
   //Save the element's data to disk:
   PUP::toDisk p(swapfile);
-  elt->pup(p);
+  elt->virtual_pup(p);
 
   //Call the element's destructor in-place (so pointer doesn't change)
   CkpvAccess(CkSaveRestorePrefetch)=1;
@@ -1162,7 +1162,7 @@ void CkArrayPrefetch_readFromSwap(FILE *swapfile,void *objptr) {
   
   //Restore the element's data from disk:
   PUP::fromDisk p(swapfile);
-  elt->pup(p);
+  elt->virtual_pup(p);
 }
 
 static void _CkMigratable_prefetchInit(void) 
@@ -1422,7 +1422,7 @@ void CkMigratable::AtSync(int waitForMigration)
   if (usesAutoMeasure == false) UserSetLBLoad();
 
   PUP::sizer ps;
-  this->pup(ps);
+  this->virtual_pup(ps);
   setPupSize(ps.size());
 
   if (!_lb_args.metaLbOn()) {
@@ -2623,7 +2623,8 @@ bool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 
 #if CMK_OUT_OF_CORE
 	/* Register new element with out-of-core */
-	PUP::sizer p_getSize; elt->pup(p_getSize);
+	PUP::sizer p_getSize;
+	elt->virtual_pup(p_getSize);
 	elt->prefetchObjID=CooRegisterObject(&CkArrayElementPrefetcher,p_getSize.size(),elt);
 #endif
 	
@@ -3027,14 +3028,14 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
             CkMigratable *elt=m->element(localIdx);
             if (elt!=NULL)
                 {
-                       elt->pup(p);
+                       elt->virtual_pup(p);
                 }
         }
     }else{
             for(int i=0;i<dummyElts.size();i++){
                 CkMigratable *elt = dummyElts[i];
                 if (elt!=NULL){
-            elt->pup(p);
+            elt->virtual_pup(p);
         		}
                 delete elt;
             }
@@ -3077,7 +3078,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 		CkMigratable *elt=m->element(localIdx);
 		if (elt!=NULL)
                 {
-                        elt->pup(p);
+                        elt->virtual_pup(p);
 #if CMK_ERROR_CHECKING
                         if (p.isUnpacking()) elt->sanitycheck();
 #endif

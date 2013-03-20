@@ -264,7 +264,7 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 			}
 			else 
 			 	obj = (Chare *)_mainTable[i]->getObj();
-			obj->pup(p);
+			obj->virtual_pup(p);
 		}
 	}
 	// to update mainchare proxy
@@ -307,7 +307,7 @@ void CkPupChareData(PUP::er &p)
 		CkFreeSysMsg(m);
 	}
 	Chare *obj = (Chare*)CkpvAccess(chare_objs)[i];
-	obj->pup(p);
+	obj->virtual_pup(p);
   }
 
   if (!p.isUnpacking()) n = CkpvAccess(vidblocks).size();
@@ -406,7 +406,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
 #endif
 
     // if using migration constructor, you'd better have a pup
-    gobj->pup(p);
+    gobj->virtual_pup(p);
   }
 
   delete [] tmpInfo;

@@ -75,6 +75,7 @@ public:
   receiver();
   receiver(CkMigrateMessage *);
   ~receiver();
+  void pup(PUP::er &p);
 
   // interface
   void isend(void *buf, int count, int datatype, int dest, int tag, int refno);
@@ -97,7 +98,6 @@ private:
   void pupCmmTable(CmmTable &t, PUP::er &p);
 
 protected:
-  void pup(PUP::er &p);
   virtual void resumeFromWait();
 };
 

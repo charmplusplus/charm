@@ -333,10 +333,10 @@ public:
 };
 
 //This is used as a list of base classes
-class TypeList : public Printable {
+struct TypeList : public Printable {
     Type *type;
     TypeList *next;
-  public:
+
     TypeList(Type *t, TypeList *n=0) : type(t), next(n) {}
     ~TypeList() { delete type; delete next; }
     int length(void) const;
@@ -802,6 +802,7 @@ class Chare : public TEntity {
     	if (withTemplates) str<<tvars();
     	return str;
     }
+    XStr cbaseTType();
     int  isTemplated(void) { return (templat!=0); }
     bool isTemplateDeclaration() { return templat; }
     bool isTemplateInstantiation() { return type->isTemplated(); }
@@ -822,6 +823,7 @@ class Chare : public TEntity {
     void genDefs(XStr& str);
     void genReg(XStr& str);
     void genDecls(XStr &str);
+    void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
     void preprocess();
 
     // DMK - Accel Support
@@ -858,6 +860,9 @@ class Chare : public TEntity {
     virtual char *proxyPrefix(void);
     virtual void genSubRegisterMethodDef(XStr& str) { (void)str; }
     void lookforCEntry(CEntry *centry);
+
+private:
+    XStr virtualPupDef(const XStr &name);
 };
 
 class MainChare : public Chare {

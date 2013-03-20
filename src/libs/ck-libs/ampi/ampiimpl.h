@@ -1320,7 +1320,7 @@ friend class SReq;
     void ckJustRestored(void);
     ~ampi();
 
-    virtual void pup(PUP::er &p);
+    void pup(PUP::er &p);
 
     void allInitDone(CkReductionMsg *m);
     void setInitDoneFlag();

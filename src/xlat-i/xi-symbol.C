@@ -1043,48 +1043,13 @@ Chare::genDecls(XStr& str)
 
   // Create CBase_Whatever convenience type so that chare implementations can
   // avoid inheriting from a complex CBaseT templated type.
-  TypeList *b=bases_CBase;
-  if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
-  if (templat) {
+  XStr CBaseName;
+  CBaseName << "CBase_" << type;
+  if (isTemplateDeclaration()) {
     templat->genSpec(str);
-    str << "\nclass CBase_" << type << " : public ";
+    str << "\nstruct " << CBaseName << ";\n";
   } else {
-    str << "typedef ";
-  }
-  str << "CBaseT" << b->length() << "<";
-  if (isPython()) {
-    str << Prefix::Python << type;
-  } else {
-    str << b;
-  }
-  str << ", CProxy_" << type;
-  if (templat) {
-    templat->genVars(str);
-    str <<
-      " > {\n"
-      "public:\n";
-
-    XStr CBaseT_type;
-    CBaseT_type << "CBaseT" << b->length() << "<" << b << ", CProxy_" << type;
-    templat->genVars(CBaseT_type);
-    CBaseT_type << ">";
-
-    str << "\tCBase_" << type << "() : "                    << CBaseT_type << "() {}\n"
-        << "\tCBase_" << type << "(CkMigrateMessage* m) : " << CBaseT_type << "(m) {}\n";
-
-    if (b->length() == 1) {
-      str <<
-        "\ttemplate <typename... Args>\n"
-        "\tCBase_" << type << "(Args... args)\n"
-        "\t: " << CBaseT_type << "(args...)\n"
-        "\t{ }\n"
-        ;
-    }
-
-    str << "\tvoid pup(PUP::er& p) {\n";
-    str << "\t\t" << CBaseT_type << "::pup(p);\n\t}\n};\n";
-  } else {
-    str << "> CBase_" << type << ";\n";
+    str << "typedef " << cbaseTType() << CBaseName << ";\n";
   }
 }
 
@@ -1112,6 +1077,76 @@ disambig_proxy(XStr &str, const XStr &super)
       << "\n    CkGroupID ckDelegatedIdx(void) const"
       << "\n    { return " << super << "::ckDelegatedIdx(); }"
       << "\n";
+}
+
+// This is a separate function becase template chare classes have
+// their definition of virtual_pup() generated inline in the
+// CBase_foo<T> definition in the matching namespace, while
+// non-templates are overridding the definition of CBaseTn<Proxy,
+// etc>::virtual_pup() in the global namespace
+XStr Chare::virtualPupDef(const XStr &name)
+{
+  XStr str;
+  str << "virtual_pup(PUP::er &p) {"
+      << "\n    recursive_pup<" << name << " >(dynamic_cast<"
+      << name << "* >(this), p);"
+      << "\n}";
+  return str;
+}
+
+void
+Chare::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
+{
+  XStr templatedType;
+  templatedType << type;
+  if (templat)
+    templat->genVars(templatedType);
+
+  XStr templateSpec;
+  if (templat)
+    templat->genSpec(templateSpec);
+  else
+    templateSpec << "template <>";
+  templateSpec << "\n";
+
+  XStr scopedName;
+  scopedName << scope << templatedType;
+
+  // XXX: This may cause problems if someone tries to partially
+  // specialize a chare template.
+  if (!isTemplateDeclaration()) {
+    templateGuardBegin(false, defs);
+
+    XStr rec_pup_impl_name, rec_pup_impl_sig, rec_pup_impl_body;
+    rec_pup_impl_name << "recursive_pup_impl<" << scopedName << ", 1>";
+    rec_pup_impl_sig << "operator()(" << scopedName << " *obj, PUP::er &p)";
+
+    rec_pup_impl_body << rec_pup_impl_sig << " {"
+                      << "\n    obj->parent_pup(p);";
+    rec_pup_impl_body << "\n    obj->" << scopedName << "::pup(p);"
+                      << "\n}\n";
+
+    decls << "\ntemplate <>"
+          << "\nvoid " << rec_pup_impl_name << "::" << rec_pup_impl_sig << ";\n";
+
+    defs << templateSpec
+         << "void " << rec_pup_impl_name
+         << "::" << rec_pup_impl_body;
+
+    templateGuardEnd(defs);
+  }
+
+  if (!isTemplateInstantiation() && !isTemplateDeclaration()) {
+    // Leave out ArrayElement because of its funny inheritance
+    // structure. It doesn't inherit from CBase_ArrayElement anyway.
+    if (0 != strcmp(type->getBaseName(),"ArrayElement")) {
+      templateGuardBegin(false, defs);
+      defs << templateSpec
+           << "void " << scope
+           << "CBase_"<< baseName(true) << "::" << virtualPupDef(scopedName) << "\n";
+      templateGuardEnd(defs);
+    }
+  }
 }
 
 void
@@ -1976,6 +2011,97 @@ Chare::genDefs(XStr& str)
     str << "\n";
     str << sdagDefs;
   }
+
+  XStr templateSpec;
+  if (templat)
+    templat->genSpec(templateSpec);
+  else
+    templateSpec << "template <>";
+  templateSpec << "\n";
+
+  if (isTemplateDeclaration()) {
+    templateGuardBegin(true, str);
+
+    TypeList *b=bases_CBase;
+    if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
+
+    XStr baseClass;
+    if (isPython()) {
+      baseClass << Prefix::Python << type;
+    } else {
+      baseClass << b;
+    }
+
+    XStr CBaseName;
+    CBaseName << "CBase_" << type;
+
+    str << templateSpec << "struct " << CBaseName << " : public "
+        << baseClass << ", virtual CBase";
+    str << "\n";
+    str << " {"
+        << "\n  CProxy_" << type << tvars() << " thisProxy;";
+
+    /***** Constructors *****/
+    // Default constructor
+    str << "\n  " << CBaseName << "() : thisProxy(this)";
+    for (TypeList* t = b; t; t = t->next) {
+      str << "\n    , " << t->type << "()";
+    }
+    str << "\n  { }";
+
+    // Migration constructor
+    str << "\n  " << CBaseName << "(CkMigrateMessage* m) : thisProxy(this)";
+    for (TypeList* t = b; t; t = t->next) {
+      str << "\n    , " << t->type << "(m)";
+    }
+    str << "  { }";
+
+    // Constructor(s) with user-defined arguments to pass to parent class
+    if (b->length() == 1) {
+      str << "\n  template <typename... Args>"
+          << "\n  " << CBaseName << "(Args... args) : thisProxy(this)";
+      for (TypeList* t = b; t; t = t->next) {
+        str << "\n    , " << t->type << "(args...)";
+      }
+      str << "  { }";
+    }
+
+    // PUP-related methods
+    str << "\n  void pup(PUP::er &p) { }"
+        << "\n  void " << virtualPupDef(baseName(true))
+        << "\n  void parent_pup(PUP::er &p) {";
+    for (TypeList* t = b; t; t = t->next) {
+      str << "\n    recursive_pup< " << t->type << " >(this, p);";
+    }
+    str << "\n    p|thisProxy;"
+        << "\n  }"
+        << "\n};\n";
+
+    templateGuardEnd(str);
+  }
+}
+
+XStr
+Chare::cbaseTType()
+{
+  TypeList *b=bases_CBase;
+  if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
+
+  XStr baseClass;
+  if (isPython()) {
+    baseClass << Prefix::Python << type;
+  } else {
+    baseClass << b;
+  }
+
+  XStr templatedType;
+  templatedType << type;
+  if (isTemplateDeclaration())
+    templat->genVars(templatedType);
+
+  XStr CBaseT_type;
+  CBaseT_type << "CBaseT" << b->length() << "<" << baseClass << ", CProxy_" << templatedType << ">";
+  return CBaseT_type;
 }
 
 void

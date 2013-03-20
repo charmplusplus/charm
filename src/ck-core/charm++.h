@@ -216,7 +216,19 @@ class Chare {
     Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
-    virtual void pup(PUP::er &p);//<- pack/unpack routine
+
+    /// Pack/UnPack - tell the runtime how to serialize this class's
+    /// data for migration, checkpoint, etc.
+    virtual void pup(PUP::er &p);
+    /// Routine that runtime the runtime actually calls, to enable
+    /// more intelligence in generated code that overrides this. The
+    /// actual pup() method must remain virtual, so that this
+    /// continues to work for older code.
+    virtual void virtual_pup(PUP::er &p) { pup(p); }
+    void parent_pup(PUP::er &p) {
+      CkAbort("Should never get here - only called in generated CBase code");
+    }
+
     inline const CkChareID &ckGetChareID(void) const {return thishandle;}
     inline void CkGetChareID(CkChareID *dest) const {*dest=thishandle;}
     // object message queue
@@ -277,55 +289,102 @@ class IrrGroup : public Chare {
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
 };
 
-#define CBASE_PROXY_MEMBERS(CProxy_Derived) \
-	typedef typename CProxy_Derived::local_t local_t; \
-	typedef typename CProxy_Derived::index_t index_t; \
-	typedef typename CProxy_Derived::proxy_t proxy_t; \
-	typedef typename CProxy_Derived::element_t element_t; \
-	CProxy_Derived thisProxy; 
+// As described in http://www.gotw.ca/publications/mxc++-item-4.htm
+template<typename D, typename B>
+class IsDerivedFrom
+{
+  class No { };
+  class Yes { No no[3]; };
 
+  static Yes Test( B* ); // not defined
+  static No Test( ... ); // not defined
+
+  static void Constraints(D* p) { B* pb = p; pb = p; }
+
+public:
+  enum { Is = sizeof(Test(static_cast<D*>(0))) == sizeof(Yes) };
+
+  IsDerivedFrom() { void(*p)(D*) = Constraints; }
+};
+
+/// Base case for the infrastructure to recursively handle inheritance
+/// through CBase_foo from anything that implements X::pup(). Chare
+/// classes have generated specializations that call PUPs for their
+/// parents, SDAG, etc. The default case is an explicit specialization
+/// so that corner cases I haven't handled are more likely to produce
+/// linker errors, rather than potentially running incorrectly.
+///
+/// The specialized templates are structs for reasons explained by
+/// http://www.gotw.ca/publications/mill17.htm
+struct CBase { };
+template <typename T, int automatic>
+struct recursive_pup_impl {
+  void operator()(T *obj, PUP::er &p);
+};
+template <typename T>
+struct recursive_pup_impl<T, 0> {
+  void operator()(T *obj, PUP::er &p) {
+    obj->T::pup(p);
+  }
+};
+template <typename T>
+void recursive_pup(T *obj, PUP::er &p) {
+  recursive_pup_impl<T, IsDerivedFrom<T, CBase>::Is>()(obj, p);
+}
+
+// CBaseX::pup must be an empty override, so that the recursive PUPing
+// doesn't call an implementation multiple times up the inheritance
+// hierarchy, and old-style calls to CBase_foo::pup actually produce
+// no-ops. We give the prototype for virtual_pup to avoid repetition.
+#define CBASE_MEMBERS                                         \
+  typedef typename CProxy_Derived::local_t local_t;           \
+  typedef typename CProxy_Derived::index_t index_t;           \
+  typedef typename CProxy_Derived::proxy_t proxy_t;           \
+  typedef typename CProxy_Derived::element_t element_t;       \
+  CProxy_Derived thisProxy;                                   \
+  void pup(PUP::er &p) { }                                    \
+  void virtual_pup(PUP::er &p)
 
 /*Templated implementation of CBase_* classes.*/
 template <class Parent,class CProxy_Derived>
-class CBaseT1 : public Parent {
-public:
-	CBASE_PROXY_MEMBERS(CProxy_Derived)
+struct CBaseT1 : Parent, virtual CBase {
+  CBASE_MEMBERS;
 
 #if CMK_HAS_RVALUE_REFERENCES
-          template <typename... Args>
-          CBaseT1(Args&&... args) : Parent(std::forward<Args>(args)...) { thisProxy = this; }
+  template <typename... Args>
+  CBaseT1(Args&&... args) : Parent(std::forward<Args>(args)...) { thisProxy = this; }
 #else
-          template <typename... Args>
-          CBaseT1(Args... args) : Parent(args...) { thisProxy = this; }
+  template <typename... Args>
+  CBaseT1(Args... args) : Parent(args...) { thisProxy = this; }
 #endif
 
-	void pup(PUP::er &p) {
-		Parent::pup(p);
-		p|thisProxy;
-	}
+  void parent_pup(PUP::er &p) {
+    recursive_pup<Parent>(this, p);
+    p|thisProxy;
+  }
 };
 
 /*Templated version of above for multiple (at least duplicate) inheritance:*/
 template <class Parent1,class Parent2,class CProxy_Derived>
-class CBaseT2 : public Parent1, public Parent2 {
-public:
-	CBASE_PROXY_MEMBERS(CProxy_Derived)
+struct CBaseT2 : public Parent1, public Parent2, virtual CBase {
+  CBASE_MEMBERS;
 
-	CBaseT2(void) :Parent1(), Parent2()
-		{ thisProxy = (Parent1 *)this; }
-	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m)
-		{ thisProxy = (Parent1 *)this; } 
-	void pup(PUP::er &p) {
-		Parent1::pup(p);
-		Parent2::pup(p);
-		p|thisProxy;
-	}
+  CBaseT2(void) :Parent1(), Parent2()
+    { thisProxy = (Parent1 *)this; }
+  CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m)
+    { thisProxy = (Parent1 *)this; }
 
-//These overloads are needed to prevent ambiguity for multiple inheritance:
-	inline const CkChareID &ckGetChareID(void) const
-		{return ((Parent1 *)this)->ckGetChareID();}
-	static int isIrreducible(){ return (Parent1::isIrreducible() && Parent2::isIrreducible());}
-	CHARM_INPLACE_NEW
+  void parent_pup(PUP::er &p) {
+    recursive_pup<Parent1>(this, p);
+    recursive_pup<Parent2>(this, p);
+    p|thisProxy;
+  }
+
+  //These overloads are needed to prevent ambiguity for multiple inheritance:
+  inline const CkChareID &ckGetChareID(void) const
+    {return ((Parent1 *)this)->ckGetChareID();}
+  static int isIrreducible(){ return (Parent1::isIrreducible() && Parent2::isIrreducible());}
+  CHARM_INPLACE_NEW
 };
 
 #define BASEN(n) CMK_CONCAT(CBaseT, n)
@@ -335,9 +394,9 @@ public:
   BASEN(n)() : base(), PARENTN(n)() {}				      \
   BASEN(n)(CkMigrateMessage *m)                                       \
 	  : base(m), PARENTN(n)(m) {}				      \
-  void pup(PUP::er &p) {                                              \
-    base::pup(p);                                                     \
-    PARENTN(n)::pup(p);                                               \
+  void parent_pup(PUP::er &p) {                                       \
+    recursive_pup<base>(this, p);                                     \
+    recursive_pup<PARENTN(n)>(this, p);                               \
   }                                                                   \
   static int isIrreducible() {                                        \
     return (base::isIrreducible() && PARENTN(n)::isIrreducible());    \
