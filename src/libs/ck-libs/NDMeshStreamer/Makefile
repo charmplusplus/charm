@@ -1,7 +1,8 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=NDMeshStreamer.h DataItemTypes.h NDMeshStreamer.decl.h NDMeshStreamer.def.h
+GENHEADERS=NDMeshStreamer.decl.h NDMeshStreamer.def.h
+HEADERS=NDMeshStreamer.h DataItemTypes.h $(GENHEADERS)
 OBJS=NDMeshStreamer.o
 LIB=libmoduleNDMeshStreamer
 
@@ -10,7 +11,7 @@ DEST=$(LIBDIR)/$(LIB).a
 
 .SUFFIXES:
 .SUFFIXES: .C .o
-                                                                                
+
 .C.o:
 	$(CHARMC) -c $<
 
@@ -21,14 +22,17 @@ $(DEST): $(OBJS) headers
 	#cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
 headers: $(HEADERS)
-	cp $(HEADERS) $(CDIR)/include/
-	touch headers
+	cp $^ $(CDIR)/include/
+	touch $@
 
-NDMeshStreamer.o: NDMeshStreamer.C NDMeshStreamer.decl.h $(HEADERS)
-	$(CHARMC) -c NDMeshStreamer.C
+NDMeshStreamer.o: NDMeshStreamer.C $(HEADERS)
+	$(CHARMC) -c $<
 
-NDMeshStreamer.decl.h NDMeshStreamer.def.h: NDMeshStreamer.ci
-	$(CHARMC) NDMeshStreamer.ci
+$(GENHEADERS): NDMeshStreamer.stamp
+
+NDMeshStreamer.stamp: NDMeshStreamer.ci
+	$(CHARMC) $<
+	touch $@
 
 clean: 
-	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) conv-host charmrun headers
+	-rm -fr *.o *~ *.decl.h *.def.h *.stamp gmon.out $(DEST) conv-host charmrun headers
