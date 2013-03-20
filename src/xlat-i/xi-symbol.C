@@ -1123,6 +1123,8 @@ Chare::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
 
     rec_pup_impl_body << rec_pup_impl_sig << " {"
                       << "\n    obj->parent_pup(p);";
+    if (hasSdagEntry)
+      rec_pup_impl_body << "\n    obj->_sdag_pup(p);";
     rec_pup_impl_body << "\n    obj->" << scopedName << "::pup(p);"
                       << "\n}\n";
 

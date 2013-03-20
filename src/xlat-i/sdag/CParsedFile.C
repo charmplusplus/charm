@@ -148,8 +148,10 @@ void CParsedFile::generateDependencyMergePoints(XStr& decls)
 void CParsedFile::generatePupFunction(XStr& decls, XStr& defs)
 {
   decls << "public:\n";
-  XStr signature = "__sdag_pup(PUP::er &p)";
+  XStr signature = "_sdag_pup(PUP::er &p)";
   decls << "  void " << signature << ";\n";
+  // Backward compatibility version
+  decls << "  void _" << signature << " { }\n";
 
   templateGuardBegin(false, defs);
   defs << container->tspec()
