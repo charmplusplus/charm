@@ -442,15 +442,12 @@ A full example of the \texttt{case} statement can be found
 
 \section{Usage Notes}
 
-If you've added \sdag\ code to your class, you must link in the code by:
-\begin{itemize}
-  \item Adding ``{\it className}\_SDAG\_CODE'' inside the class declaration
-     in the .h file.  This macro defines the entry points and support
-     code used by \sdag{}.  Forgetting this results in a compile error
-     (undefined sdag entry methods referenced from the .def.h file).
-  \item Adding a call to the pup routine ``\_\_sdag\_pup(p);'' from your pup routine.
-     Forgetting this results in failure after migration.
-\end{itemize}
+If you've added \sdag\ code to your class, you must link in the code
+by adding ``{\it className}\_SDAG\_CODE'' inside the class declaration
+in the .h file. This macro defines the entry points and support code
+used by \sdag{}. Forgetting this results in a compile error (undefined
+SDAG entry methods referenced from the .def.h file).
+
 For example, an array named ``Foo'' that uses sdag code might contain:
 \begin{center}
 \begin{alltt}
@@ -463,7 +460,6 @@ public:
     Foo(CkMigrateMessage *m) \{ \}
     
     void pup(PUP::er &p) \{
-       __sdag_pup(p);
        ...
     \}
     . . .

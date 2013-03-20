@@ -172,28 +172,6 @@ with the ``PUPbytes'' declaration, \kw{PUParray} uses an even faster block
 transfer, with one virtual function call per array.
 
 
-\subsection{PUP structured dagger}
-
-\label{sec:pupsdag}
-
-Please note that if your object contains Structured Dagger code (see section~\ref{sec:sdag}) you must call the generated method \kw{\_\_sdag\_pup}, after any superclass pup methods, to correctly pup the Structured Dagger state:
-
-\begin{alltt}
-class bar : public barParent \{
- public:
-    bar_SDAG_CODE 
-    ...other methods...
-
-    virtual void pup(PUP::er& p) \{
-      barParent::pup(p);
-      __sdag_pup(p);
-      ...pup other data here...
-    \}
-\};
-\end{alltt}
-
-
-
 \subsection{PUP modes}
 
 \label{sec:pupmodes}
@@ -279,8 +257,7 @@ migrate array elements to better balance the load between processors.
 % PUP
 For an array element to be migratable, it must implement a \uw{pup}
 method.  The standard PUP contract (see section \ref{sec:pupcontract})
-and constraints wrt to serializing data, and use of Structured Dagger
-apply. 
+and constraints wrt to serializing data apply.
 
 
 A simple example for an array follows:
