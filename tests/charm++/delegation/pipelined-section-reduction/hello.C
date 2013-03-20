@@ -182,7 +182,6 @@ public:
   }
 
   void pup(PUP::er &p) {
-    CBase_Hello::pup(p);//Call superclass
     p|sid;
     p(init);
     p|cnt;

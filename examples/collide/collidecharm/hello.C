@@ -70,7 +70,6 @@ public:
 
   Hello(CkMigrateMessage *m) : CBase_Hello(m) {}
   void pup(PUP::er &p) {
-     CBase_Hello::pup(p);
      p|collide;
      if (p.isUnpacking())
 	CollideRegister(collide,thisIndex);

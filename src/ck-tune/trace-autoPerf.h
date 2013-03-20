@@ -221,10 +221,7 @@ public:
 
     TraceAutoPerfBOC(CkMigrateMessage *m) : CBase_TraceAutoPerfBOC(m) {};
 
-    void pup(PUP::er &p)
-    {
-        CBase_TraceAutoPerfBOC::pup(p);
-    }
+    void pup(PUP::er &p) { }
 
     void setAutoPerfDoneCallback(CkCallback cb, bool frameworkShouldAdvancePhase); 
     void timeStep(int);

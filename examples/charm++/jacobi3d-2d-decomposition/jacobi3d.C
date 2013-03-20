@@ -190,7 +190,6 @@ public:
 
     void pup(PUP::er &p)
     {
-      CBase_Jacobi::pup(p);
       __sdag_pup(p);
       p|iterations;
       p|neighbors;

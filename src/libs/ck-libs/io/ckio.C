@@ -75,7 +75,6 @@ namespace Ck { namespace IO {
         Director(CkMigrateMessage *m) : CBase_Director(m) { }
 
         void pup(PUP::er &p) {
-          CBase_Director::pup(p);
           __sdag_pup(p);
 
           // FIXME: All files must be closed across checkpoint/restart
@@ -166,7 +165,6 @@ namespace Ck { namespace IO {
         }
 
         void pup(PUP::er &p) {
-          CBase_Manager::pup(p);
           __sdag_pup(p);
 
           p | opnum;

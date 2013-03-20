@@ -99,8 +99,6 @@ class redistributor2D: public CBase_redistributor2D {
  public:
 
   void pup(PUP::er &p) {
-    CBase_redistributor2D::pup(p);
-
     p | data_arrays_sizes;
     p | data_arrays_incoming_sizes;
     p | incoming_count;

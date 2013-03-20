@@ -50,7 +50,6 @@ struct Test : public CBase_Test {
   Test(CkMigrateMessage*) { }
 
   void pup(PUP::er& p) {
-    CBase_Test::pup(p);
     __sdag_pup(p);
     p | data;
   }

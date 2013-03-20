@@ -383,9 +383,6 @@ Jacobi::Jacobi() {
        // CkPrintf("neighbor = %d \n", neighbors);
     }
 void Jacobi::pup(PUP::er &p){
-		
-		// calling parent's pup
-		CBase_Jacobi::pup(p);
 		__sdag_pup(p);
 		// pupping properties of this class
 		p | iterations;

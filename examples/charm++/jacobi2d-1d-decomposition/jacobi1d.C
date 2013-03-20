@@ -150,7 +150,6 @@ public:
 
     void pup(PUP::er &p)
     {
-      CBase_Jacobi::pup(p);
       __sdag_pup(p);
       p|imsg;
       p|iterations;

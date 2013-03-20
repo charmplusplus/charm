@@ -183,7 +183,6 @@ public:
     void pup(PUP::er &p)
     {
       int i,j;
-      CBase_Jacobi::pup(p);
       __sdag_pup(p);
       p|imsg;
       p|iterations;

@@ -268,7 +268,6 @@ controlPointManager::controlPointManager() {
 
   void controlPointManager::pup(PUP::er &p)
   {
-    CBase_controlPointManager::pup(p);
       // FIXME: does not work when control point is actually used,
       // just minimal pup so that it allows exit function to work (exitIfReady).
     p|generatedPlanForStep;

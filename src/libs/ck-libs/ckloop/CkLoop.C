@@ -347,7 +347,6 @@ void FuncCkLoop::registerHelper(HelperNotifyMsg* msg) {
 }
 
 void FuncCkLoop::pup(PUP::er &p) {
-  CBase_FuncCkLoop::pup(p);
   p|mode;
   p|numHelpers;
   if (p.isUnpacking()) {

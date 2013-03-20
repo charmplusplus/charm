@@ -31,7 +31,6 @@ void ParticleChunk::ResumeFromSync(){
 }
 
 void ParticleChunk::pup(PUP::er &p){
-  CBase_ParticleChunk::pup(p);
   if(p.isUnpacking()){
     particlesToTps.resize(numTreePieces);
     for(int i = 0; i < numTreePieces; i++){

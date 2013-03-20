@@ -34,7 +34,6 @@ public:
 
   void pup(PUP::er &p)
   {
-    CBase_TraceControlPointsBOC::pup(p);
   }
 
  TraceControlPointsBOC(CkMigrateMessage *m) : CBase_TraceControlPointsBOC(m) {};

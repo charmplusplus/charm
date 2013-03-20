@@ -72,7 +72,6 @@ public:
   }
 
   void pup(PUP::er &p){
-    CBase_Main::pup(p);
     p|step;
     p|a; p(b,2);
     CkPrintf("Main's PUPer. a=%d(%p), b[0]=%d(%p), b[1]=%d\n",a,&a,b[0],b,b[1]);
@@ -97,7 +96,6 @@ public:
   }
   
   void pup(PUP::er &p){
-    CBase_Hello::pup(p);
     p|step;
   }
 };
@@ -115,7 +113,6 @@ public:
   }
 
   void pup(PUP::er &p){
-    CBase_CHello::pup(p);
     p|step;
     printf("CHello's PUPer. step=%d.\n", step);
   }

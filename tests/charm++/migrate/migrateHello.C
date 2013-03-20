@@ -63,7 +63,6 @@ public:
 
   void pup(PUP::er &p)
   {
-      CBase_MigrateHello::pup(p);
       if(p.isUnpacking()) data = (char*)malloc(dataSize);
       p(data, dataSize);
   }

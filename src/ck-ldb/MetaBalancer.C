@@ -147,7 +147,6 @@ void MetaBalancer::init(void) {
 }
 
 void MetaBalancer::pup(PUP::er& p) {
-	CBase_MetaBalancer::pup(p);
   if (p.isUnpacking()) {
     lbdatabase = (LBDatabase *)CkLocalBranch(_lbdb);
     metaRdnGroup = (MetaBalancerRedn*)CkLocalBranch(_metalbred);
@@ -910,7 +909,6 @@ void MetaBalancerRedn::init() {
 }
 
 void MetaBalancerRedn::pup(PUP::er& p) {
-	CBase_MetaBalancerRedn::pup(p);
 }
 
 void MetaBalancerRedn::ReceiveIterNo(int max_iter) {

@@ -817,7 +817,7 @@ class ampiWorlds : public CBase_ampiWorlds {
       add(nextWorld);
     }
     ampiWorlds(CkMigrateMessage *m): CBase_ampiWorlds(m) {}
-    void pup(PUP::er &p)  { CBase_ampiWorlds::pup(p); }
+    void pup(PUP::er &p)  { }
     void add(const ampiCommStruct &nextWorld) {
       int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD); // Isaac guessed there shouldn't be a +1 after the MPI_COMM_WORLD
       mpi_worlds[new_idx].comm=nextWorld;

@@ -37,7 +37,6 @@ void Compute::interact(ParticleDataMsg *msg){
 
 //pack important information if I am moving
 void Compute::pup(PUP::er &p) {
-  CBase_Compute::pup(p);
   __sdag_pup(p);
   p | stepCount;
 }

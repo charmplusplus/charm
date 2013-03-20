@@ -142,7 +142,7 @@ public:
 	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
 	void Checkpoint(const char *dirname,CkCallback& cb);
 	void SendRestartCB(CkReductionMsg *m);
-	void pup(PUP::er& p){ CBase_CkCheckpointMgr::pup(p); p|restartCB; }
+	void pup(PUP::er& p){ p|restartCB; }
 };
 
 // broadcast

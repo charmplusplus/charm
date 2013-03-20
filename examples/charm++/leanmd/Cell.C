@@ -255,7 +255,6 @@ Particle& Cell::wrapAround(Particle &p) {
 
 //pack important data when I move
 void Cell::pup(PUP::er &p) {
-  CBase_Cell::pup(p);
   __sdag_pup(p);
   p | particles;
   p | stepCount;

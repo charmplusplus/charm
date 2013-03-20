@@ -379,7 +379,6 @@ CkMemCheckPT::~CkMemCheckPT()
 
 void CkMemCheckPT::pup(PUP::er& p) 
 { 
-  CBase_CkMemCheckPT::pup(p); 
   p|cpStarter;
   p|thisFailedPe;
   p|failedPes;
