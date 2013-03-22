@@ -349,6 +349,7 @@ void CkPupGroupData(PUP::er &p, CmiBool create)
 	    }
 	    void *m = CkAllocSysMsg();
 	    envelope* env = UsrToEnv((CkMessage *)m);
+		env->setMsgtype(BocInitMsg);
 		if(create)
 		    CkCreateLocalGroup(gID, eIdx, env);
 	  }   // end of unPacking
