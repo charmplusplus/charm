@@ -1848,41 +1848,16 @@ double CmiCpuTimer(void) {
 
 #endif     /* CMK_TIMER_USE_SPECIAL */
 
-/************Barrier Related Functions****************/
-/* must be called on all ranks including comm thread in SMP */
-int CmiBarrier() {
-#if CMK_SMP
-    /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
-    CmiNodeAllBarrier();
-    if (CmiMyRank() == CmiMyNodeSize())
-#else
-    if (CmiMyRank() == 0)
-#endif
-    {
-        /**
-         *  The call of CmiBarrier is usually before the initialization
-         *  of trace module of Charm++, therefore, the START_EVENT
-         *  and END_EVENT are disabled here. -Chao Mei
-         */
-        /*START_EVENT();*/
-
-        if (MPI_SUCCESS != MPI_Barrier(charmComm))
-            CmiAbort("Timernit: MPI_Barrier failed!\n");
-
-        /*END_EVENT(10);*/
-    }
-    CmiNodeAllBarrier();
-    return 0;
+void LrtsBarrier()
+{
+    if (MPI_SUCCESS != MPI_Barrier(charmComm))
+        CmiAbort("Timernit: MPI_Barrier failed!\n");
 }
 
 /* CmiBarrierZero make sure node 0 is the last one exiting the barrier */
 int CmiBarrierZero() {
     int i;
-#if CMK_SMP
-    if (CmiMyRank() == CmiMyNodeSize())
-#else
     if (CmiMyRank() == 0)
-#endif
     {
         char msg[1];
         MPI_Status sts;

@@ -4202,31 +4202,12 @@ double CmiCpuTimer(void) {
 #endif
 /************Barrier Related Functions****************/
 
-int CmiBarrier()
+void LrtsBarrier()
 {
     gni_return_t status;
 
-#if CMK_SMP
-    /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
-    CmiNodeAllBarrier();
-    if (CmiMyRank() == CmiMyNodeSize())
-#else
-    if (CmiMyRank() == 0)
-#endif
-    {
-        /**
-         *  The call of CmiBarrier is usually before the initialization
-         *  of trace module of Charm++, therefore, the START_EVENT
-         *  and END_EVENT are disabled here. -Chao Mei
-         */
-        /*START_EVENT();*/
-        status = PMI_Barrier();
-        GNI_RC_CHECK("PMI_Barrier", status);
-        /*END_EVENT(10);*/
-    }
-    CmiNodeAllBarrier();
-    return 0;
-
+    status = PMI_Barrier();
+    GNI_RC_CHECK("PMI_Barrier", status);
 }
 #if CMK_DIRECT
 #include "machine-cmidirect.c"

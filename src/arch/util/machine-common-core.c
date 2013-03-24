@@ -1207,3 +1207,21 @@ static char *CopyMsg(char *msg, int len) {
     return copy;
 }
 
+/************Barrier Related Functions****************/
+/* must be called on all ranks including comm thread in SMP */
+int CmiBarrier() {
+#if CMK_SMP
+    /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
+    CmiNodeAllBarrier();
+    if (CmiMyRank() == CmiMyNodeSize())
+#else
+    if (CmiMyRank() == 0)
+#endif
+    {
+        LrtsBarrier();
+    }
+    CmiNodeAllBarrier();
+    return 0;
+}
+
+

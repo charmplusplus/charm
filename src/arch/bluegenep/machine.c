@@ -1005,8 +1005,7 @@ CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
 /* Barrier needs to be implemented!!! -Chao Mei */
 /* These two barriers are only needed by CmiTimerInit to synchronize all the
    threads. They do not need to provide a general barrier. */
-int CmiBarrier() {
-    return 0;
+void LrtsBarrier() {
 }
 int CmiBarrierZero() {
     return 0;
