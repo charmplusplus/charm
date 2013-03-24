@@ -360,8 +360,8 @@ void mpi_end_spare();
 #if CMK_BLUEGENEL
 extern void MPID_Progress_test();
 #endif
-static size_t CmiAllAsyncMsgsSent(void);
-static void CmiReleaseSentMessages(void);
+static size_t CheckAllAsyncMsgsSent(void);
+static void ReleaseSentMessages(void);
 static int PumpMsgs(void);
 static void PumpMsgsBlocking(void);
 
@@ -483,7 +483,7 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     if (mode == P2P_SYNC || mode == P2P_ASYNC)
     {
     while (CpvAccess(MsgQueueLen) > request_max) {
-        CmiReleaseSentMessages();
+        ReleaseSentMessages();
         PumpMsgs();
     }
     }
@@ -516,7 +516,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
     return MPISendOneMsg(msg_tmp);
 }
 
-static size_t CmiAllAsyncMsgsSent(void) {
+static size_t CheckAllAsyncMsgsSent(void) {
     SMSG_LIST *msg_tmp = CpvAccess(sent_msgs);
     MPI_Status sts;
     int done;
@@ -524,7 +524,7 @@ static size_t CmiAllAsyncMsgsSent(void) {
     while (msg_tmp!=0) {
         done = 0;
         if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts))
-            CmiAbort("CmiAllAsyncMsgsSent: MPI_Test failed!\n");
+            CmiAbort("CheckAllAsyncMsgsSent: MPI_Test failed!\n");
 #if __FAULT__ 
         if(isRankDie(msg_tmp->dstrank)){
           //CmiPrintf("[%d][%d] msg to crashed rank\n",CmiMyPartition(),CmiMyPe());
@@ -540,7 +540,7 @@ static size_t CmiAllAsyncMsgsSent(void) {
     return 1;
 }
 
-int CmiAsyncMsgSent(CmiCommHandle c) {
+int CheckAsyncMsgSent(CmiCommHandle c) {
 
     SMSG_LIST *msg_tmp = CpvAccess(sent_msgs);
     int done;
@@ -551,19 +551,16 @@ int CmiAsyncMsgSent(CmiCommHandle c) {
     if (msg_tmp) {
         done = 0;
         if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts))
-            CmiAbort("CmiAsyncMsgSent: MPI_Test failed!\n");
+            CmiAbort("CheckAsyncMsgSent: MPI_Test failed!\n");
         return ((done)?1:0);
     } else {
         return 1;
     }
 }
 
-void CmiReleaseCommHandle(CmiCommHandle c) {
-    return;
-}
 
 /* ######Beginning of functions related with communication progress ###### */
-static void CmiReleaseSentMessages(void) {
+static void ReleaseSentMessages(void) {
     SMSG_LIST *msg_tmp=CpvAccess(sent_msgs);
     SMSG_LIST *prev=0;
     SMSG_LIST *temp;
@@ -574,21 +571,21 @@ static void CmiReleaseSentMessages(void) {
     MPID_Progress_test();
 #endif
 
-    MACHSTATE1(2,"CmiReleaseSentMessages begin on %d {", CmiMyPe());
+    MACHSTATE1(2,"ReleaseSentMessages begin on %d {", CmiMyPe());
     while (msg_tmp!=0) {
         done =0;
 #if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
         double startT = CmiWallTimer();
 #endif
         if (MPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
-            CmiAbort("CmiReleaseSentMessages: MPI_Test failed!\n");
+            CmiAbort("ReleaseSentMessages: MPI_Test failed!\n");
 #if __FAULT__ 
         if (isRankDie(msg_tmp->dstrank)){
           done = 1;
         }
 #endif
         if (done) {
-            MACHSTATE2(3,"CmiReleaseSentMessages release one %d to %d", CmiMyPe(), msg_tmp->destpe);
+            MACHSTATE2(3,"ReleaseSentMessages release one %d to %d", CmiMyPe(), msg_tmp->destpe);
             CpvAccess(MsgQueueLen)--;
             /* Release the message */
             temp = msg_tmp->next;
@@ -613,7 +610,7 @@ static void CmiReleaseSentMessages(void) {
 #endif
     }
     CpvAccess(end_sent) = prev;
-    MACHSTATE(2,"} CmiReleaseSentMessages end");
+    MACHSTATE(2,"} ReleaseSentMessages end");
 }
 
 static int PumpMsgs(void) {
@@ -1037,7 +1034,7 @@ void LrtsAdvanceCommunication(int whenidle) {
     t2 = CmiWallTimer();
 #endif
 
-    CmiReleaseSentMessages();
+    ReleaseSentMessages();
 #if REPORT_COMM_METRICS
     t3 = CmiWallTimer();
 #endif
@@ -1052,7 +1049,7 @@ void LrtsAdvanceCommunication(int whenidle) {
 #endif
 
 #else /* non-SMP case */
-    CmiReleaseSentMessages();
+    ReleaseSentMessages();
 
 #if REPORT_COMM_METRICS
     t2 = CmiWallTimer();
@@ -1082,7 +1079,7 @@ void LrtsPostNonLocal() {
      */
 #if 0
     if (!msg) {
-        CmiReleaseSentMessages();
+        ReleaseSentMessages();
         if (PumpMsgs())
             return  PCQueuePop(cs->recv);
         else
@@ -1091,7 +1088,7 @@ void LrtsPostNonLocal() {
 #endif
 #else
   if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
-        CmiReleaseSentMessages();       
+        ReleaseSentMessages();       
         /* ??? SendMsgBuf is a not a thread-safe function. If it is put
          * here and this function will be called in CmiNotifyStillIdle,
          * then a data-race problem occurs */
@@ -1102,7 +1099,7 @@ void LrtsPostNonLocal() {
 
 /* Idle-state related functions: called in non-smp mode */
 void CmiNotifyIdleForMPI(void) {
-    CmiReleaseSentMessages();
+    ReleaseSentMessages();
     if (!PumpMsgs() && idleblock) PumpMsgsBlocking();
 }
 
@@ -1127,20 +1124,20 @@ void CmiMachineProgressImpl() {
 /* ######Beginning of functions related with exiting programs###### */
 void LrtsDrainResources() {
 #if !CMK_SMP
-    while (!CmiAllAsyncMsgsSent()) {
+    while (!CheckAllAsyncMsgsSent()) {
         PumpMsgs();
-        CmiReleaseSentMessages();
+        ReleaseSentMessages();
     }
 #else
     if(Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV){
-        while (!MsgQueueEmpty() || !CmiAllAsyncMsgsSent()) {
-	    CmiReleaseSentMessages();
+        while (!MsgQueueEmpty() || !CheckAllAsyncMsgsSent()) {
+	    ReleaseSentMessages();
             SendMsgBuf();
             PumpMsgs();
         }
     }else if(Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
-        while(!CmiAllAsyncMsgsSent()) {
-            CmiReleaseSentMessages();
+        while(!CheckAllAsyncMsgsSent()) {
+            ReleaseSentMessages();
         }
     }
 #endif
@@ -1983,9 +1980,9 @@ void CkDieNow()
     CmiPrintf("[%d] die now.\n", CmiMyPe());
 
       /* release old messages */
-    while (!CmiAllAsyncMsgsSent()) {
+    while (!CheckAllAsyncMsgsSent()) {
         PumpMsgs();
-        CmiReleaseSentMessages();
+        ReleaseSentMessages();
     }
     MPI_Barrier(charmComm);
  //   MPI_Barrier(charmComm);
