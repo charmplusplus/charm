@@ -1914,12 +1914,7 @@ void LrtsPostCommonInit(int everReturn)
     }
 #endif
 
-#if CMK_SMP
-    CmiIdleState *s=CmiNotifyGetState();
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
-#else
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,NULL);
+#if !CMK_SMP
     if (useDynamicSMSG)
     CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) PumpDatagramConnection, NULL);
 #endif

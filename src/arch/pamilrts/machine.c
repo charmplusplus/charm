@@ -659,8 +659,6 @@ void LrtsPreCommonInit(int everReturn)
 
 void LrtsPostCommonInit(int everReturn)
 {
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
-
   //printf ("before calling CmiBarrier() \n");
   CmiBarrier();
 }

@@ -1658,7 +1658,6 @@ void LrtsPreCommonInit(int everReturn) {
 
 void LrtsPostCommonInit(int everReturn) {
 
-    CmiIdleState *s=CmiNotifyGetState();
 
     CpvInitialize(SMSG_LIST *, sent_msgs);
     CpvInitialize(SMSG_LIST *, end_sent);
@@ -1675,15 +1674,6 @@ void LrtsPostCommonInit(int everReturn) {
     if (CmiMyPe() == 0) {
         registerMachineUserEventsFunction(&registerMPITraceEvents);
     }
-#endif
-
-#if CMK_SMP
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
-    if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV)
-      CcdCallOnConditionKeep(CcdPERIODIC,(CcdVoidFn)LrtsPostNonLocal,NULL);
-#else
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdleForMPI,NULL);
 #endif
 
 }

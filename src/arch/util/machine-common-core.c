@@ -931,6 +931,17 @@ static void ConverseRunPE(int everReturn) {
     CpvAccess(networkProgressCount) = 0;
 
     ConverseCommonInit(CmiMyArgv);
+    
+    // register idle events
+
+#if CMK_SMP
+    CmiIdleState *sidle=CmiNotifyGetState();
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)sidle);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)sidle);
+#else
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle, NULL);
+#endif
+
 
     LrtsPostCommonInit(everReturn);
 

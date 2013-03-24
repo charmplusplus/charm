@@ -861,10 +861,6 @@ static void MachinePreCommonInitForDCMF(int everReturn) {
 }
 
 static void MachinePostCommonInitForDCMF(int everReturn) {
-#if !CMK_SMP || CMK_SMP_NO_COMMTHD
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
-#endif
-
     CmiBarrier();
 }
 /* ######End of functions related with starting programs###### */
