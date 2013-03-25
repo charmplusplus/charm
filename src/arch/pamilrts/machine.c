@@ -90,7 +90,7 @@ __thread int32_t _cmi_bgq_incommthread = 0;
 //  return _cmi_bgq_incommthread;
 //}
 
-static void LrtsBarrier(int async);
+static void CmiNetworkBarrier(int async);
 #if SPECIFIC_PCQUEUE && CMK_SMP
 #define  QUEUE_NUMS     _Cmi_mynodesize + 3
 #include "lrtsqueue.h"
@@ -612,9 +612,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     return;
   }
 
-  LrtsBarrier(0);
-  LrtsBarrier(0);
-  LrtsBarrier(0);
+  CmiNetworkBarrier(0);
+  CmiNetworkBarrier(0);
+  CmiNetworkBarrier(0);
 
   /* checksum flag */
   if (CmiGetArgFlag(*argv,"+checksum")) {
@@ -904,7 +904,11 @@ pami_result_t network_barrier_handoff(pami_context_t context, void *msg)
   return machine_network_barrier(context, 0);
 }
 
-void LrtsBarrier(int async) {
+void LrtsBarrier()
+{
+    CmiNetworkBarrier(1);
+}
+static void CmiNetworkBarrier(int async) {
   pami_context_t my_context = cmi_pami_contexts[0];
   pami_barrier_flag = 1;
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
