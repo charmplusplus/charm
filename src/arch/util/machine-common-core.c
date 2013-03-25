@@ -1158,8 +1158,10 @@ static CmiIdleState *CmiNotifyGetState(void) {
 }
 
 static void CmiNotifyBeginIdle(CmiIdleState *s) {
-    s->sleepMs=0;
-    s->nIdles=0;
+    if(s!= NULL){
+        s->sleepMs=0;
+        s->nIdles=0;
+    }
     LrtsBeginIdle();
 }
 
@@ -1186,7 +1188,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
     }
     }
 #endif
-    LrtsStillIlde();
+    LrtsStillIdle();
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
 }
 
