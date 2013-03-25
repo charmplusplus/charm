@@ -104,7 +104,7 @@ CkpvExtern(int, envelopeEventID);
 @{
 The class envelope defines a Charm++ message's header. The first
 'CmiReservedHeaderSize' bytes of memory is exclusively reserved for Converse
-header, which is defined in convere.h and platform specific config files.
+header, which is defined in converse.h and platform specific config files.
 
 After Charm++ envelope comes the payload, i.e. a variable-length amount of user
 data. Following the user data, optionally, a variable number of bits of
