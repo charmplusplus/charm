@@ -120,9 +120,7 @@ class XTTorusManager {
       _MEMCHECK(pid2coords);
 
       // fill the nid2pid and pid2nid data structures
-/*
       pidtonid(numPes);
-*/
       getDimension(&maxNID,&xDIM,&yDIM,&zDIM);
       minX=xDIM, minY=yDIM, minZ=zDIM;
       numCores = CmiNumCores()*CPU_FACTOR;
