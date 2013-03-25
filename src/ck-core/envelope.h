@@ -23,8 +23,6 @@
 #define CkMsgAlignLength(x) (((x)+CkMsgAlignmentMask)&(~(CkMsgAlignmentMask)))
 #define CkMsgAlignOffset(x)     (CkMsgAlignLength(x)-(x))
 #define CkPriobitsToInts(nBits)    ((nBits+CkIntbits-1)/CkIntbits)
-// silly ancient name: for backward compatability only.
-#define PW(x) CkPriobitsToInts(x) 
 
 #if CMK_MESSAGE_LOGGING
 #define CK_FREE_MSG_MLOG 	0x1

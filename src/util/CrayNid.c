@@ -181,8 +181,6 @@ void craynid_init()
   if (CmiMyRank()==0) {
     cray_lock = CmiCreateLock();
     cray_lock2 = CmiCreateLock();
-
-    pidtonid(CmiNumPes());
   }
 }
 
