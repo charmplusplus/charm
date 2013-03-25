@@ -1546,7 +1546,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
 }
 
-void LrtsNotifyIdle() {}
+INLINE_KEYWORD void LrtsNotifyIdle() {}
+
+INLINE_KEYWORD void LrtsBeginIdle() {}
+
+INLINE_KEYWORD void LrtsStillIdle() {}
 
 void LrtsPreCommonInit(int everReturn) {
 

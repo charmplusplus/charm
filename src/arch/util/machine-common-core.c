@@ -939,6 +939,7 @@ static void ConverseRunPE(int everReturn) {
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)sidle);
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)sidle);
 #else
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle, NULL);
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle, NULL);
 #endif
 
@@ -1159,6 +1160,7 @@ static CmiIdleState *CmiNotifyGetState(void) {
 static void CmiNotifyBeginIdle(CmiIdleState *s) {
     s->sleepMs=0;
     s->nIdles=0;
+    LrtsBeginIdle();
 }
 
 /*Number of times to spin before sleeping*/
@@ -1184,7 +1186,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
     }
     }
 #endif
-
+    LrtsStillIlde();
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
 }
 

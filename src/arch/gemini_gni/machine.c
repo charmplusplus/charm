@@ -648,7 +648,7 @@ static void IndexPool_init(IndexPool *pool)
 }
 
 static
-inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
+INLINE_KEYWORD int IndexPool_getslot(IndexPool *pool, void *addr, int type)
 {
     int s, i;
 #if MULTI_THREAD_SEND  
@@ -692,7 +692,7 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
 }
 
 static
-inline  void IndexPool_freeslot(IndexPool *pool, int s)
+INLINE_KEYWORD void IndexPool_freeslot(IndexPool *pool, int s)
 {
     CmiAssert(s>=0 && s<pool->size);
 #if MULTI_THREAD_SEND
@@ -1168,8 +1168,8 @@ static void sweep_mempool(mempool_type *mptr)
     printf("[n %d] sweep_mempool slot END.\n", myrank);
 }
 
-inline
-static  gni_return_t deregisterMemory(mempool_type *mptr, block_header **from)
+
+static INLINE_KEYWORD  gni_return_t deregisterMemory(mempool_type *mptr, block_header **from)
 {
     block_header *current = *from;
 
@@ -1186,7 +1186,7 @@ static  gni_return_t deregisterMemory(mempool_type *mptr, block_header **from)
     return GNI_RC_SUCCESS;
 }
 
-inline 
+INLINE_KEYWORD 
 static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, size_t size, gni_mem_handle_t  *memhndl, gni_cq_handle_t cqh )
 {
     gni_return_t status = GNI_RC_SUCCESS;
@@ -1223,7 +1223,7 @@ static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, siz
     return status;
 }
 
-inline 
+INLINE_KEYWORD
 static gni_return_t registerMemory(void *msg, size_t size, gni_mem_handle_t *t, gni_cq_handle_t cqh )
 {
     static int rank = -1;
@@ -1247,7 +1247,7 @@ static gni_return_t registerMemory(void *msg, size_t size, gni_mem_handle_t *t, 
     return  GNI_RC_ERROR_RESOURCE;
 }
 
-inline
+INLINE_KEYWORD
 static void buffer_small_msgs(SMSG_QUEUE *queue, void *msg, int size, int destNode, uint8_t tag)
 {
     MSG_LIST        *msg_tmp;
@@ -1281,12 +1281,12 @@ static void buffer_small_msgs(SMSG_QUEUE *queue, void *msg, int size, int destNo
 #endif
 }
 
-inline static void print_smsg_attr(gni_smsg_attr_t     *a)
+INLINE_KEYWORD static void print_smsg_attr(gni_smsg_attr_t     *a)
 {
     printf("type=%d\n, credit=%d\n, size=%d\n, buf=%p, offset=%d\n", a->msg_type, a->mbox_maxcredit, a->buff_size, a->msg_buffer, a->mbox_offset);
 }
 
-inline
+INLINE_KEYWORD
 static void setup_smsg_connection(int destNode)
 {
     mdh_addr_list_t  *new_entry = 0;
@@ -1349,7 +1349,7 @@ static void setup_smsg_connection(int destNode)
 }
 
 /* useDynamicSMSG */
-inline 
+INLINE_KEYWORD
 static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
 {
     gni_return_t status = GNI_RC_NOT_DONE;
@@ -1384,7 +1384,7 @@ static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
 }
 
 /* useDynamicSMSG */
-inline 
+INLINE_KEYWORD
 static int connect_to(int destNode)
 {
     gni_return_t status = GNI_RC_NOT_DONE;
@@ -1417,7 +1417,7 @@ static int connect_to(int destNode)
     return 1;
 }
 
-inline 
+INLINE_KEYWORD
 static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg, int size, uint8_t tag, int inbuff, MSG_LIST *ptr )
 {
     unsigned int          remote_address;
@@ -1510,7 +1510,7 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
     return status;
 }
 
-inline 
+INLINE_KEYWORD
 static CONTROL_MSG* construct_control_msg(int size, char *msg, int seqno)
 {
     /* construct a control message and send */
@@ -1543,7 +1543,7 @@ static CONTROL_MSG* construct_control_msg(int size, char *msg, int seqno)
 
 // Large message, send control to receiver, receiver register memory and do a GET, 
 // return 1 - send no success
-inline static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL_MSG  *control_msg_tmp, int inbuff, MSG_LIST *smsg_ptr, uint8_t lmsg_tag)
+INLINE_KEYWORD static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL_MSG  *control_msg_tmp, int inbuff, MSG_LIST *smsg_ptr, uint8_t lmsg_tag)
 {
     gni_return_t        status  =  GNI_RC_ERROR_NOMEM;
     uint32_t            vmdh_index  = -1;
@@ -1671,8 +1671,14 @@ inline static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, 
     return status;
 #endif
 }
-inline void LrtsNotifyIdle() {}
-inline void LrtsPrepareEnvelope(char *msg, int size)
+
+INLINE_KEYWORD void LrtsBeginIdle() {}
+
+INLINE_KEYWORD void LrtsStillIdle() {}
+
+INLINE_KEYWORD void LrtsNotifyIdle() {}
+
+INLINE_KEYWORD void LrtsPrepareEnvelope(char *msg, int size)
 {
     CmiSetMsgSize(msg, size);
     CMI_SET_CHECKSUM(msg, size);
@@ -2083,7 +2089,7 @@ static void PumpNetworkRdmaMsgs()
 
 }
 
-inline 
+INLINE_KEYWORD
 static void bufferRdmaMsg(PCQueue bufferqueue, int inst_id, gni_post_descriptor_t *pd, int ack_index)
 {
     RDMA_REQUEST        *rdma_request_msg;
@@ -3078,7 +3084,7 @@ static void  SendRdmaMsg( BufferList sendqueue)
 }
 
 static 
-inline gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *ptr)
+INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *ptr)
 {
     CONTROL_MSG         *control_msg_tmp;
     gni_return_t        status = GNI_RC_ERROR_RESOURCE;
@@ -3551,7 +3557,7 @@ static void _init_static_smsg()
     GNI_RC_CHECK("SmsgSetMaxRetrans Init", status);
 } 
 
-inline
+INLINE_KEYWORD
 static void _init_send_queue(SMSG_QUEUE *queue)
 {
      int i;
@@ -3575,7 +3581,7 @@ static void _init_send_queue(SMSG_QUEUE *queue)
 #endif
 }
 
-inline
+INLINE_KEYWORD
 static void _init_smsg()
 {
     if(mysize > 1) {
@@ -3615,7 +3621,7 @@ static CmiUInt8 total_mempool_calls = 0;
 
 #if USE_LRTS_MEMPOOL
 
-inline
+INLINE_KEYWORD
 static void *_alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag, gni_cq_handle_t cqh)
 {
     void *pool;
@@ -3667,14 +3673,14 @@ sweep_mempool(CpvAccess(mempool));
     return pool;
 }
 
-inline
+INLINE_KEYWORD
 static void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
 {
     return _alloc_mempool_block(size, mem_hndl, expand_flag, rdma_rx_cqh);
 }
 
 #if CMK_PERSISTENT_COMM_PUT
-inline
+INLINE_KEYWORD
 static void *alloc_persistent_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
 {
     return _alloc_mempool_block(size, mem_hndl, expand_flag, highpriority_rx_cqh);
@@ -4135,11 +4141,11 @@ static int _absoluteTime = 0;
 static int _is_global = 0;
 static struct timespec start_ts;
 
-inline int CmiTimerIsSynchronized() {
+INLINE_KEYWORD int CmiTimerIsSynchronized() {
     return 0;
 }
 
-inline int CmiTimerAbsolute() {
+INLINE_KEYWORD int CmiTimerAbsolute() {
     return _absoluteTime;
 }
 

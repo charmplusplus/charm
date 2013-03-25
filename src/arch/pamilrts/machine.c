@@ -169,7 +169,7 @@ volatile int outstanding_recvs;
 #define A_PRIME 13
 #define B_PRIME 19
 
-static inline unsigned myrand (unsigned *seed) {
+static INLINE_KEYWORD unsigned myrand (unsigned *seed) {
   *seed = A_PRIME * (*seed) + B_PRIME;
   return *seed;
 }
@@ -705,6 +705,10 @@ void LrtsAbort(const char *message) {
   CmiPrintStackTrace(0);
   assert(0);
 }
+
+INLINE_KEYWORD void LrtsBeginIdle() {}
+
+INLINE_KEYWORD void LrtsStillIdle() {}
 
 void LrtsNotifyIdle()
 {
