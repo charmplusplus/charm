@@ -647,8 +647,7 @@ static void IndexPool_init(IndexPool *pool)
 #endif
 }
 
-static
-INLINE_KEYWORD int IndexPool_getslot(IndexPool *pool, void *addr, int type)
+static int IndexPool_getslot(IndexPool *pool, void *addr, int type)
 {
     int s, i;
 #if MULTI_THREAD_SEND  
@@ -691,8 +690,7 @@ INLINE_KEYWORD int IndexPool_getslot(IndexPool *pool, void *addr, int type)
     return s;
 }
 
-static
-INLINE_KEYWORD void IndexPool_freeslot(IndexPool *pool, int s)
+static void IndexPool_freeslot(IndexPool *pool, int s)
 {
     CmiAssert(s>=0 && s<pool->size);
 #if MULTI_THREAD_SEND
@@ -1186,7 +1184,6 @@ static INLINE_KEYWORD  gni_return_t deregisterMemory(mempool_type *mptr, block_h
     return GNI_RC_SUCCESS;
 }
 
-INLINE_KEYWORD 
 static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, size_t size, gni_mem_handle_t  *memhndl, gni_cq_handle_t cqh )
 {
     gni_return_t status = GNI_RC_SUCCESS;
