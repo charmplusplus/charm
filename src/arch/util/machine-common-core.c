@@ -1218,7 +1218,7 @@ int CmiBarrier() {
     /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
     CmiNodeAllBarrier();
 #endif
-#if ( CMK_SMP && !NO_COMM_THREAD )
+#if ( CMK_SMP && !CMK_SMP_NO_COMMTHD)
     if (CmiMyRank() == CmiMyNodeSize())
     {
 #else
