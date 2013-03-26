@@ -1195,10 +1195,14 @@ Chare::genSubDecls(XStr& str)
         << "\n    { return ("<<type<<tvars()<<" *)CkLocalChare(&ckGetChareID()); }"
         << "\n";
 
-  if(list)
-    list->genDecls(str);
+  genMemberDecls(str);
   str << CIClassEnd;
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
+}
+
+void Chare::genMemberDecls(XStr& str) {
+  if(list)
+    list->genDecls(str);
 }
 
 void Chare::genPythonDecls(XStr& str) {
@@ -1430,8 +1434,7 @@ Group::genSubDecls(XStr& str)
   else
     str << "CkLocalBranch(gID);\n";
   str << "    }\n";
-  if(list)
-    list->genDecls(str);
+  genMemberDecls(str);
   str << CIClassEnd;
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
 
@@ -1792,9 +1795,7 @@ Array::genSubDecls(XStr& str)
     "    } \n";
   }
 
-  if(list){
-    list->genDecls(str);
-  }
+  genMemberDecls(str);
   str << CIClassEnd;
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
 }

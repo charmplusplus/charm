@@ -688,6 +688,7 @@ class MemberList : public Printable {
 
 /* Chare or group is a templated entity */
 class Chare : public TEntity {
+    MemberList *list;
   public:
     enum { //Set these attribute bits in "attrib"
     	CMIGRATABLE=1<<2,
@@ -706,7 +707,6 @@ class Chare : public TEntity {
     int hasSection; //1-- applies only to array section
 
     NamedType *type;
-    MemberList *list;
     TypeList *bases; //Base classes used by proxy
     TypeList *bases_CBase; //Base classes used by CBase (or NULL)
     
@@ -717,6 +717,7 @@ class Chare : public TEntity {
     void genTypedefs(XStr& str);
     void genRegisterMethodDef(XStr& str);
     void sharedDisambiguation(XStr &str,const XStr &superclass);
+    void genMemberDecls(XStr &str);
   public:
     Chare(int ln, attrib_t Nattr,
     	NamedType *t, TypeList *b=0, MemberList *l=0);
