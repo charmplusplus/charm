@@ -146,6 +146,7 @@ int main(int argc, char *argv[])
   internalMode = 0;
   bool dependsMode = false;
   bool countTokens = false;
+  bool chareNames = false;
 
   for (int i=1; i<argc; i++) {
     if (*argv[i]=='-') {
@@ -155,6 +156,7 @@ int main(int argc, char *argv[])
       else if (strncmp(argv[i],"-D", 2)==0)  macros.push_back(new MacroDefinition(argv[i]+2));
       else if (strncmp(argv[i], "-M", 2)==0) dependsMode = true;
       else if (strcmp(argv[i], "-count-tokens")==0) countTokens = true;
+      else if (strcmp(argv[i], "-chare-names")==0) chareNames = true;
       else abortxi(argv[0]);
     }
     else
@@ -171,6 +173,12 @@ int main(int argc, char *argv[])
   if (!m) return 0;
   m->preprocess();
   m->check();
+
+  if (chareNames) {
+    m->printChareNames();
+    return 0;
+  }
+
   if (dependsMode)
   {
       std::string ciFileBaseName = fname;

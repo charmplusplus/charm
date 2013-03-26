@@ -110,6 +110,7 @@ class Construct : public Printable {
     { (void)scope; (void)decls; (void)defs; }
     virtual void preprocess() { }
     virtual void check() { }
+    virtual void printChareNames() { }
 
     // DMK - Accel Support
     virtual int genAccels_spe_c_funcBodies(XStr& str) { (void)str; return 0; }
@@ -127,6 +128,7 @@ class ConstructList : public Construct {
     void setExtern(int e);
     void setModule(Module *m);
     void print(XStr& str);
+    void printChareNames();
     void check();
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
@@ -485,6 +487,7 @@ class Scope : public Construct {
     const char* name_;
     ConstructList* contents_;
   public:
+    void printChareNames();
     Scope(const char* name, ConstructList* contents) : name_(name), contents_(contents) {}
     virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {
         contents_->genPub(declstr, defstr, defconstr, connectPresent);
@@ -747,6 +750,7 @@ class Chare : public TEntity {
                         const char *suffix, const char *sep);
     void genIndexNames(XStr& str, const char *prefix, const char *middle, 
                         const char *suffix, const char *sep);
+    void printChareNames();
     XStr proxyName(int withTemplates=1); 
     XStr indexName(int withTemplates=1); 
     XStr indexList();
@@ -1151,6 +1155,7 @@ class Module : public Construct {
 	    if (clist!=NULL) clist->setModule(this);
     }
     void print(XStr& str);
+    void printChareNames() { if (clist) clist->printChareNames(); }
     void check();
     void generate();
     void setModule();
@@ -1189,6 +1194,7 @@ class ModuleList : public Printable {
     void generate();
     void preprocess();
     void genDepends(std::string ciFileBaseName);
+    void printChareNames();
 };
 
 class Readonly : public Member {

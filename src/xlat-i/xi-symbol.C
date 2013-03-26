@@ -704,6 +704,12 @@ ModuleList::generate()
 }
 
 void
+ModuleList::printChareNames()
+{
+  perElem(modules, &Module::printChareNames);
+}
+
+void
 ModuleList::check()
 {
   perElem(modules, &Module::check);
@@ -790,6 +796,24 @@ void
 ConstructList::preprocess()
 {
   perElem(constructs, &Construct::preprocess);
+}
+
+void
+ConstructList::printChareNames()
+{
+  perElem(constructs, &Construct::printChareNames);
+}
+
+void
+Scope::printChareNames()
+{
+  contents_->printChareNames();
+}
+
+void
+Chare::printChareNames()
+{
+  cout << baseName(0) << endl;
 }
 
 XStr Chare::proxyName(int withTemplates)
