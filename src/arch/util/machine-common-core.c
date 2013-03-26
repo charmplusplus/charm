@@ -326,8 +326,8 @@ static struct CmiStateStruct Cmi_state;
 int _Cmi_mype;
 int _Cmi_myrank;
 
-//void CmiMemLock() {}
-//void CmiMemUnlock() {}
+void CmiMemLock() {}
+void CmiMemUnlock() {}
 
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)

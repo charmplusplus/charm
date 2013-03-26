@@ -836,11 +836,12 @@ static double         Cmi_check_delay = 3.0;
  *****************************************************************************/
 
 /************************ No kernel SMP threads ***************/
-#if !CMK_SMP 
+//XX
+#if CMK_SHARED_VARS_UNAVAILABLE
 
 static volatile int memflag=0;
-void CmiMemLock() { memflag++; }
-void CmiMemUnlock() { memflag--; }
+void CmiMemLockNet() { memflag++; }
+void CmiMemUnlockNet() { memflag--; }
 
 static volatile int comm_flag=0;
 #define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
@@ -1276,7 +1277,7 @@ static void CmiStdoutInit(void) {
 		CmiEnableNonblockingIO(srcFd);
 #endif
 //NOTSURE #if CMK_SHARED_VARS_UNAVAILABLE
-#if !CMK_SMP 
+#if CMK_SHARED_VARS_UNAVAILABLE 
                 if (Cmi_asyncio)
 		{
   /*No communication thread-- get a SIGIO on each write(), which keeps the buffer clean*/
@@ -1433,8 +1434,8 @@ static void node_addresses_obtain(char **argv)
 	ChMessage_new("nodeinfo",sizeof(ChSingleNodeinfo),&nodetabmsg);
 	fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);
   	CmiGetArgIntDesc(argv,"+p",&npes,"Set the number of processes to create");
-//#if CMK_SHARED_VARS_UNAVAILABLE
-#if !CMK_SMP 
+#if CMK_SHARED_VARS_UNAVAILABLE
+//#if !CMK_SMP 
 	if (npes!=1) {
 		fprintf(stderr,
 			"To use multiple processors, you must run this program as:\n"

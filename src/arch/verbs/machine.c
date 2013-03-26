@@ -823,8 +823,8 @@ static double         Cmi_check_delay = 3.0;
 #if !CMK_SMP 
 
 static volatile int memflag=0;
-void CmiMemLock() { memflag++; }
-void CmiMemUnlock() { memflag--; }
+void CmiMemLockNet() { memflag++; }
+void CmiMemUnlockNet() { memflag--; }
 
 static volatile int comm_flag=0;
 #define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
