@@ -482,62 +482,36 @@ class TParamVal : public TParam {
     void genSpec(XStr& str) { str << val; }
 };
 
-class Scope : public Construct {
+class Scope : public ConstructList {
   protected:
     const char* name_;
-    ConstructList* contents_;
   public:
-    void printChareNames();
-    Scope(const char* name, ConstructList* contents) : name_(name), contents_(contents) {}
-    virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {
-        contents_->genPub(declstr, defstr, defconstr, connectPresent);
-    }
-    virtual void genDecls(XStr& str) {
+    Scope(const char* name, ConstructList* contents)
+      : name_(name)
+      , ConstructList(contents->line, NULL, contents)
+    { }
+    void genDecls(XStr& str) {
         str << "namespace " << name_ << " {\n";
-        contents_->genDecls(str);
+        ConstructList::genDecls(str);
         str << "} // namespace " << name_ << "\n";
     }
-    virtual void genDefs(XStr& str) {
+    void genDefs(XStr& str) {
         str << "namespace " << name_ << " {\n";
-        contents_->genDefs(str);
+        ConstructList::genDefs(str);
         str << "} // namespace " << name_ << "\n";
     }
-    virtual void genReg(XStr& str) {
+    void genReg(XStr& str) {
         str << "using namespace " << name_ << ";\n";
-        contents_->genReg(str);
+        ConstructList::genReg(str);
     }
     void genGlobalCode(XStr scope, XStr &decls, XStr &defs) {
       scope << name_ << "::";
-      contents_->genGlobalCode(scope, decls, defs);
+      ConstructList::genGlobalCode(scope, decls, defs);
     }
-    virtual void preprocess() {
-        contents_->preprocess();
-    }
-    virtual void print(XStr& str) {
+    void print(XStr& str) {
         str << "namespace " << name_ << "{\n";
-        contents_->print(str);
+        ConstructList::print(str);
         str << "} // namespace " << name_ << "\n";
-    }
-    void check();
-
-    // DMK - Accel Support
-    virtual int genAccels_spe_c_funcBodies(XStr& str) {
-      return contents_->genAccels_spe_c_funcBodies(str);
-    }
-    virtual void genAccels_spe_c_regFuncs(XStr& str) {
-      contents_->genAccels_spe_c_regFuncs(str);
-    }
-    virtual void genAccels_spe_c_callInits(XStr& str) {
-      contents_->genAccels_spe_c_callInits(str);
-    }
-    virtual void genAccels_spe_h_includes(XStr& str) {
-      contents_->genAccels_spe_h_includes(str);
-    }
-    virtual void genAccels_spe_h_fiCountDefs(XStr& str) {
-      contents_->genAccels_spe_h_fiCountDefs(str);
-    }
-    virtual void genAccels_ppe_c_regFuncs(XStr& str) {
-      contents_->genAccels_ppe_c_regFuncs(str);
     }
 };
 

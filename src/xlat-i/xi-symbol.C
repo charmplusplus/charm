@@ -502,11 +502,6 @@ void ConstructList::check() {
   perElem(constructs, &Construct::check);
 }
 
-void Scope::check() {
-  if (contents_)
-    contents_->check();
-}
-
 void Entry::check() {
   if (!external) {
     if(isConstructor() && retType && !retType->isVoid())
@@ -802,12 +797,6 @@ void
 ConstructList::printChareNames()
 {
   perElem(constructs, &Construct::printChareNames);
-}
-
-void
-Scope::printChareNames()
-{
-  contents_->printChareNames();
 }
 
 void
