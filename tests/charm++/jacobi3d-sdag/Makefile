@@ -31,12 +31,20 @@ fttest: jacobi3d
 	./charmrun ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_02.txt $(TESTOPTS)
 	./charmrun ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_03.txt $(TESTOPTS)
 
-mpisyncfttest mlogfttest: mpifttest
-mpifttest: jacobi3d
-	./charmrun ./jacobi3d 256 128 +p10 +wp8 +balancer DummyLB $(TESTOPTS)
-	./charmrun ./jacobi3d 256 128 +p10 +wp8 +balancer DummyLB +killFile kill_01.txt $(TESTOPTS)
-	./charmrun ./jacobi3d 256 256 256 64 64 32 +p10 +wp8 +balancer DummyLB +killFile kill_02.txt $(TESTOPTS)
-	./charmrun ./jacobi3d 256 256 256 64 64 32 +p10 +wp8 +balancer DummyLB +killFile kill_03.txt $(TESTOPTS)
+mpisyncfttest: jacobi3d
+	./charmrun ./jacobi3d 256 128 150 50 +p10 +wp8 +balancer DummyLB $(TESTOPTS)
+	./charmrun ./jacobi3d 256 128 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_04.txt $(TESTOPTS)
+	./charmrun ./jacobi3d 256 256 256 64 64 32 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_05.txt $(TESTOPTS)
+	./charmrun ./jacobi3d 256 256 256 64 64 32 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_06.txt $(TESTOPTS)
+
+mlogfttest: jacobi3d
+	./charmrun ./jacobi3d 256 128 150 50 +p10 +wp8 +balancer DummyLB $(TESTOPTS)
+	./charmrun ./jacobi3d 256 128 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_04.txt $(TESTOPTS)
+	./charmrun ./jacobi3d 256 256 256 64 64 32 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_05.txt $(TESTOPTS)
+	./charmrun ./jacobi3d 256 256 256 64 64 32 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_05.txt +fastRecovery 1 $(TESTOPTS)
+	./charmrun ./jacobi3d 256 256 256 64 64 32 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_05.txt +fastRecovery 2 $(TESTOPTS)
+	./charmrun ./jacobi3d 256 256 256 64 64 32 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_05.txt +fastRecovery 4 $(TESTOPTS)
+	./charmrun ./jacobi3d 256 256 256 64 64 32 150 50 +p10 +wp8 +balancer DummyLB +killFile kill_06.txt $(TESTOPTS)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o jacobi3d jacobi3d.prj charmrun *~
