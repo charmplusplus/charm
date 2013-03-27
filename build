@@ -230,7 +230,7 @@ if test -f $src/$BASEVERSION/vdir_link
 then
   BASEVERSION=`cat $src/$BASEVERSION/vdir_link`
 fi
-ARCH=`echo $1 | sed -e 's@-.*@@'`
+ARCH=`echo $BASEVERSION | sed -e 's@-.*@@'`
 shift
 
 #echo $src
@@ -615,7 +615,7 @@ fi
 
 
 echo $BASEVERSION > $DESTINATION/tmp/.vdir
-echo $VERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
+echo $BASEVERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
 
 if test $BUILD_EMULATOR = 1
 then
