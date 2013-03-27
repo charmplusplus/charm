@@ -16,7 +16,7 @@ bgtest:
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
-syncfttest causalfttest:
+syncfttest causalfttest mpisyncfttest mlogfttest:
 	for d in jacobi3d jacobi3d-sdag; do \
 		(cd $$d; $(MAKE) $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
