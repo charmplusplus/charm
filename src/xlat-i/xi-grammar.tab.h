@@ -197,7 +197,7 @@ typedef union YYSTYPE
 /* Line 1676 of yacc.c  */
 #line 23 "xi-grammar.y"
 
-  ModuleList *modlist;
+  AstChildren<Module> *modlist;
   Module *module;
   ConstructList *conslist;
   Construct *construct;
@@ -216,7 +216,7 @@ typedef union YYSTYPE
   ParamList *plist;
   Template *templat;
   TypeList *typelist;
-  MemberList *mbrlist;
+  AstChildren<Member> *mbrlist;
   Member *member;
   TVar *tvar;
   TVarList *tvarlist;

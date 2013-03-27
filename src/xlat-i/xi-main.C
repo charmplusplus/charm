@@ -14,7 +14,7 @@ extern int yyparse (void);
 extern int yyerror(char *);
 extern int yylex(void);
 
-extern xi::ModuleList *modlist;
+extern xi::AstChildren<xi::Module> *modlist;
 
 namespace xi {
 
@@ -111,7 +111,7 @@ ModuleList *Parse(char *interfacefile)
 }
 */
 
-ModuleList *Parse(FILE *fp)
+AstChildren<Module> *Parse(FILE *fp)
 {
   modlist = NULL;
   yyin = fp ;
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
       return 0;
   }
 
-  ModuleList *m = Parse(openFile(fname)) ;
+  AstChildren<Module> *m = Parse(openFile(fname)) ;
   if (!m) return 0;
   m->preprocess();
   m->check();
@@ -185,9 +185,9 @@ int main(int argc, char *argv[])
       size_t loc = ciFileBaseName.rfind('/');
       if(loc != std::string::npos)
           ciFileBaseName = ciFileBaseName.substr(loc+1);
-      m->genDepends(ciFileBaseName);
+      m->recurse(ciFileBaseName.c_str(), &Module::genDepend);
   }
   else
-      m->generate();
+    m->recursev(&Module::generate);
   return 0 ;
 }

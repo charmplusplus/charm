@@ -82,7 +82,7 @@ void yyerror(const char *);
 extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
 extern std::list<Entry *> connectEntries;
-ModuleList *modlist;
+AstChildren<Module> *modlist;
 namespace xi {
 extern int macroDefined(const char *str, int istrue);
 extern const char *python_doc;
@@ -276,7 +276,7 @@ typedef union YYSTYPE
 /* Line 214 of yacc.c  */
 #line 23 "xi-grammar.y"
 
-  ModuleList *modlist;
+  AstChildren<Module> *modlist;
   Module *module;
   ConstructList *conslist;
   Construct *construct;
@@ -295,7 +295,7 @@ typedef union YYSTYPE
   ParamList *plist;
   Template *templat;
   TypeList *typelist;
-  MemberList *mbrlist;
+  AstChildren<Member> *mbrlist;
   Member *member;
   TVar *tvar;
   TVarList *tvarlist;
@@ -2200,7 +2200,7 @@ yyreduce:
 
 /* Line 1455 of yacc.c  */
 #line 166 "xi-grammar.y"
-    { (yyval.modlist) = new ModuleList(lineno, (yyvsp[(1) - (2)].module), (yyvsp[(2) - (2)].modlist)); }
+    { (yyval.modlist) = new AstChildren<Module>(lineno, (yyvsp[(1) - (2)].module), (yyvsp[(2) - (2)].modlist)); }
     break;
 
   case 5:
@@ -2350,7 +2350,7 @@ yyreduce:
 
 /* Line 1455 of yacc.c  */
 #line 239 "xi-grammar.y"
-    { if((yyvsp[(3) - (5)].conslist)) (yyvsp[(3) - (5)].conslist)->setExtern((yyvsp[(1) - (5)].intval)); (yyval.construct) = (yyvsp[(3) - (5)].conslist); }
+    { if((yyvsp[(3) - (5)].conslist)) (yyvsp[(3) - (5)].conslist)->recurse<int&>((yyvsp[(1) - (5)].intval), &Construct::setExtern); (yyval.construct) = (yyvsp[(3) - (5)].conslist); }
     break;
 
   case 24:
@@ -3262,7 +3262,7 @@ yyreduce:
 #line 612 "xi-grammar.y"
     { 
                   if (!connectEntries.empty()) {
-                    (yyval.mbrlist) = new MemberList(connectEntries);
+                    (yyval.mbrlist) = new AstChildren<Member>(connectEntries);
 		  } else {
 		    (yyval.mbrlist) = 0; 
                   }
@@ -3273,7 +3273,7 @@ yyreduce:
 
 /* Line 1455 of yacc.c  */
 #line 620 "xi-grammar.y"
-    { (yyval.mbrlist) = new MemberList((yyvsp[(1) - (2)].member), (yyvsp[(2) - (2)].mbrlist)); }
+    { (yyval.mbrlist) = new AstChildren<Member>(-1, (yyvsp[(1) - (2)].member), (yyvsp[(2) - (2)].mbrlist)); }
     break;
 
   case 153:

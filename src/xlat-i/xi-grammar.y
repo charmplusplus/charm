@@ -12,7 +12,7 @@ void yyerror(const char *);
 extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
 extern std::list<Entry *> connectEntries;
-ModuleList *modlist;
+AstChildren<Module> *modlist;
 namespace xi {
 extern int macroDefined(const char *str, int istrue);
 extern const char *python_doc;
@@ -21,7 +21,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %}
 
 %union {
-  ModuleList *modlist;
+  AstChildren<Module> *modlist;
   Module *module;
   ConstructList *conslist;
   Construct *construct;
@@ -40,7 +40,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
   ParamList *plist;
   Template *templat;
   TypeList *typelist;
-  MemberList *mbrlist;
+  AstChildren<Member> *mbrlist;
   Member *member;
   TVar *tvar;
   TVarList *tvarlist;
@@ -163,7 +163,7 @@ ModuleEList	: /* Empty */
 		  $$ = 0; 
 		}
 		| Module ModuleEList
-		{ $$ = new ModuleList(lineno, $1, $2); }
+		{ $$ = new AstChildren<Module>(lineno, $1, $2); }
 		;
 
 OptExtern	: /* Empty */
@@ -236,7 +236,7 @@ ConstructSemi   : USING NAMESPACE QualName
                 ;
 
 Construct	: OptExtern '{' ConstructList '}' OptSemiColon
-        { if($3) $3->setExtern($1); $$ = $3; }
+        { if($3) $3->recurse<int&>($1, &Construct::setExtern); $$ = $3; }
         | NAMESPACE Name '{' ConstructList '}'
         { $$ = new Scope($2, $4); }
         | ConstructSemi ';'
@@ -611,13 +611,13 @@ MemberEList	: ';'
 MemberList	: /* Empty */
 		{ 
                   if (!connectEntries.empty()) {
-                    $$ = new MemberList(connectEntries);
+                    $$ = new AstChildren<Member>(connectEntries);
 		  } else {
 		    $$ = 0; 
                   }
 		}
 		| Member MemberList
-		{ $$ = new MemberList($1, $2); }
+		{ $$ = new AstChildren<Member>(-1, $1, $2); }
 		;
 
 NonEntryMember  : Readonly
