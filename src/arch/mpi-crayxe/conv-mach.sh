@@ -33,6 +33,9 @@ elif test -n "$ICPC"
 then
 CMK_SEQ_CC="icc -fPIC "
 CMK_SEQ_CXX="icpc -fPIC "
+CMK_C_OPTIMIZE="-fast -no-ipo"
+CMK_CXX_OPTIMIZE="-fast -no-ipo"
+CMK_F90_OPTIMIZE="-fast -no-ipo"
 else
 CMK_SEQ_CC="gcc -fPIC"
 CMK_SEQ_CXX="g++ -fPIC "

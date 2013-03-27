@@ -32,3 +32,5 @@ fi
 CMK_F77LIBS="$CMK_F90LIBS"
 
 CMK_F90_USE_MODDIR=""
+
+CMK_F90_OPTIMIZE="-fast -no-ipo"

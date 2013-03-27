@@ -34,6 +34,9 @@ CMK_SEQ_CXX="$CMK_NATIVE_CXX"
 CMK_SEQ_LD="$CMK_NATIVE_LD"
 CMK_SEQ_LDXX="$CMK_NATIVE_LDXX"
 
+CMK_C_OPTIMIZE="-fast -no-ipo"
+CMK_CXX_OPTIMIZE="-fast -no-ipo"
+
 #CMK_CF90='ifc -auto '
 #CMK_CF90_FIXED="$CMK_CF90 -132 -FI "
 #CMK_F90LIBS='-L/usr/local/intel/compiler70/ia32/lib -L/opt/intel/compiler70/ia32/lib -lintrins -lIEPCF90 -lF90 -lintrins -limf  '
