@@ -88,7 +88,7 @@ extern "C" {
 extern void CpdSetInitializeMemory(int v);
 extern void CpdSystemEnter();
 extern void CpdSystemExit();
-#if CMK_ERROR_CHECKING
+#if CMK_CHARMDEBUG
 extern int memory_status_info;
 extern int memory_chare_id;
 #define setMemoryStatus(p) { \

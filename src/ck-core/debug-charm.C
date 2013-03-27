@@ -60,7 +60,7 @@ extern "C" int CpdInUserCode() {return cpdInSystem==0 && _debugData.length()>0 &
 
 // Function called right before an entry method
 void CpdBeforeEp(int ep, void *obj, void *msg) {
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
   if (CpvAccess(cmiArgDebugFlag)) {
     DebugRecursiveEntry entry;
     entry.previousChareID = setMemoryChareIDFromPtr(obj);
@@ -90,7 +90,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
 
 // Function called right after an entry method
 void CpdAfterEp(int ep) {
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
   if (CpvAccess(cmiArgDebugFlag)) {
     DebugRecursiveEntry entry = _debugData.peek();
     CkVec<DebugPersistentCheck> &postExecutes = CkpvAccess(_debugEntryTable)[ep].postProcess;
