@@ -124,7 +124,7 @@ bgtest: bigsim AMPI
 	cd ../tests ; $(MAKE) bgtest OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) bgtest OPTS='$(OPTS)'
 
-syncfttest causalfttest: charm++ AMPI
+syncfttest causalfttest mpisyncfttest mlogfttest: charm++ AMPI
 	cd ../tests ; $(MAKE) $@ OPTS='$(OPTS)'
 
 test: bigsim AMPI
