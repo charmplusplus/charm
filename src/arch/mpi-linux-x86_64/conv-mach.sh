@@ -19,9 +19,11 @@ then
   chmod +x $CHARMINC/MPIOPTS
 fi
 
+CMK_GCC64="-m64 -fPIC"
+
 CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 case "$CMK_REAL_COMPILER" in
-g++) CMK_AMD64="-m64 -fPIC" ;;
+g++) CMK_AMD64="$CMK_GCC64" ;;
 pgCC)  CMK_AMD64="-fPIC -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std " ;;
 charmc)  echo "Error> charmc can not call AMPI's mpicxx/mpiCC wrapper! Please fix your PATH."; exit 1 ;;
 esac
@@ -36,10 +38,10 @@ CMK_CXXPP="$MPICXX -E $CMK_AMD64 "
 CMK_LIBS="-lckqt $CMK_SYSLIBS "
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
-CMK_NATIVE_CC="gcc $CMK_AMD64 "
-CMK_NATIVE_LD="gcc $CMK_AMD64 "
-CMK_NATIVE_CXX="g++ $CMK_AMD64 "
-CMK_NATIVE_LDXX="g++ $CMK_AMD64 "
+CMK_NATIVE_CC="gcc $CMK_GCC64 "
+CMK_NATIVE_LD="gcc $CMK_GCC64 "
+CMK_NATIVE_CXX="g++ $CMK_GCC64 "
+CMK_NATIVE_LDXX="g++ $CMK_GCC64 "
 CMK_NATIVE_LIBS=""
 
 # fortran compiler 
