@@ -1,5 +1,5 @@
 # Point this to your charm installation
-CHARMHOME = $(HOME)/charm
+CHARMHOME = ../../..
 
 # Charm directory structure
 CHARMBIN := $(CHARMHOME)/bin
@@ -18,8 +18,8 @@ ARGS      = 10 8 128 10 1
 
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc
-OPT       = -O2
-CXXFLAGS += -language charm++ $(OPT)
+OPTS     ?= -O2
+CXXFLAGS += -language charm++ $(OPTS)
 CPPFLAGS +=
 LDFLAGS  += -module CkMulticast -module comlib
 EXEC      = ./charmrun
