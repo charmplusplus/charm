@@ -8,7 +8,7 @@ class TestController: public CBase_TestController
 {
     public:
         TestController(CkArgMsg *m);
-        /// @entry Split the setup into two phases to accommodate libraries like comlib
+        /// @entry Split the setup into two phases (originally, to accommodate libraries like comlib)
         void finishInit();
         /// @entry Starts the timing tests
         void startTest();

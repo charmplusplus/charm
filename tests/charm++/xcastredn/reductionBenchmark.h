@@ -17,7 +17,6 @@
 enum CommMechanism
 {
     bcastCkMulticast,
-    bcastComlib,
     bcastCharm,
     bcastConverse,
     rednCkMulticast,

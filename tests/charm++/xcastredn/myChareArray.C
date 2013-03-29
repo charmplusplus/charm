@@ -69,10 +69,6 @@ void MyChareArray::crunchData(DataMsg *msg)
             break;
         }
 
-        case bcastComlib:
-            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
-            break;
-
         default:
             CkAbort("Attempting to use unknown mechanism to handle the reduction");
             break;

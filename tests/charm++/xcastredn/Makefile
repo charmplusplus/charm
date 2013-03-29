@@ -21,7 +21,7 @@ CXX       = $(CHARMBIN)/charmc
 OPTS     ?= -O2
 CXXFLAGS += -language charm++ $(OPTS)
 CPPFLAGS +=
-LDFLAGS  += -module CkMulticast -module comlib
+LDFLAGS  += -module CkMulticast
 EXEC      = ./charmrun
 EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)

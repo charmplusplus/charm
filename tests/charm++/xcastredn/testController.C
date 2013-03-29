@@ -1,5 +1,4 @@
 #include "testController.h"
-#include "comlib.h"
 #include <iomanip>
 
 //----------------- externed globals -----------------
@@ -13,7 +12,6 @@ config cfg;
 /// The names of the communication mechanisms being tested in this benchmark
 char commName[][commNameLen] = {
                                  "CkMulticast-Bcast",
-                                 "Comlib-Bcast",
                                  "Charm-Bcast",
                                  "Converse-Bcast",
                                  "CkMulticast-Redn",
@@ -99,13 +97,6 @@ TestController::TestController(CkArgMsg *m)
     /// Delegate the section collectives to the communication libraries
     //                            CkMulticast
     arraySections[0].ckSectionDelegate(mgr);
-    //                            Comlib
-    /* Charm startup makes no guarantees that comlib will be
-     * set up before the user mainchare starts. Hence all
-     * delegation will have to wait until after this mainchare
-     * is done.
-     * uggghhh!
-     */
 
     /// Setup the client at the root of the reductions
     CkCallback *cb = new CkCallback(CkIndex_TestController::receiveReduction(0),thisProxy);
@@ -131,7 +122,7 @@ TestController::TestController(CkArgMsg *m)
         out<<std::setw(cfg.fieldWidth-3)<<(float)i/1024<<std::setw(3)<<" KB";
     out<<"\n"<<std::setw(commNameLen)<<commName[curCommType];
 
-    /// Allow comlib (and other library mainchares?) to complete their initialization
+    /// Allow any required library mainchares (originally: comlib) to complete their initialization
     thisProxy.finishInit();
 }
 
@@ -158,13 +149,6 @@ CProxySection_MyChareArray TestController::createSection(const bool isSectionCon
 
 void TestController::finishInit()
 {
-    /* The comlib mainchare can be instantiated after the user mainchare
-     * Hence, strategy association should happen outside of user mainchare
-     */
-    Strategy *comStrat = new MultiRingMulticastStrategy();
-    ComlibDoneCreating();
-    ComlibAssociateProxy(comStrat, arraySections[1]);
-
     /// Wait for quiescence and then start the timing tests
     CkCallback *trigger = new CkCallback(CkIndex_TestController::startTest(), thisProxy);
     CkCallback filler(qFiller, (void*)trigger);
@@ -213,11 +197,6 @@ void TestController::sendMulticast(const CommMechanism commType, const int msgSi
         case bcastCkMulticast:
             timeStart = CmiWallTimer();
             arraySections[0].crunchData(msg);
-            break;
-
-        case bcastComlib:
-            timeStart = CmiWallTimer();
-            arraySections[1].crunchData(msg);
             break;
 
         case bcastCharm:
