@@ -5,6 +5,8 @@ CXXFLAGS=$(OPTS)
 
 BINARY=matmul
 
+all: $(BINARY)
+
 $(BINARY): matmul.o
 	$(CHARMC) -o $@ $< $(OPTS) -lblas
 
