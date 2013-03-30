@@ -55,4 +55,4 @@ $(TNM)/TNM.o: $(TNM)/TNM.C
 #	$(CXX_COMPILE) $(CTNMFLAGS) -o $(TNM)/inputbis.o -c $(TNM)/inputbis.C
 
 clean:
-	@rm -f $(EXES) *.def.h *.decl.h *.o $(MINISAT)/*.o $(TNM)/*.o charmrun
+	@rm -f $(EXES) *.def.h *.decl.h *.stamp *.o $(MINISAT)/*.o $(TNM)/*.o charmrun
