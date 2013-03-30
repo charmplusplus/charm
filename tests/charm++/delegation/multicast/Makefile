@@ -8,8 +8,11 @@ hello:   hello.o
 hello.o : hello.C hello.def.h hello.decl.h 
 	$(CHARMC) -c hello.C
 
-hello.decl.h hello.def.h : hello.ci
-	$(CHARMC) hello.ci
+hello.decl.h hello.def.h : hello.ci.stamp
+
+hello.ci.stamp: hello.ci
+	$(CHARMC) $<
+	touch $@
 
 test: all
 	./charmrun +p3 ./hello 10 $(TESTOPTS)
