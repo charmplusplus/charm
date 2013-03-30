@@ -14,7 +14,7 @@ PMEMimic.decl.h: PMEMimic.ci
 	$(CHARMC)  PMEMimic.ci
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o PMEMimic charmrun
+	rm -f *.decl.h *.def.h conv-host *.o pgm charmrun
 
 PMEMimic.o: PMEMimic.C PMEMimic.decl.h
 	$(CHARMC) -c PMEMimic.C

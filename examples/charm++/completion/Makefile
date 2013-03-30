@@ -13,7 +13,7 @@ all: $(EXEC_NAME)
 .PHONY: clean
 
 clean:
-	-rm $(OBJ) $(EXEC_NAME) $(DECLS) $(DEFS) charmrun
+	rm -f $(OBJ) $(EXEC_NAME) $(DECLS) $(DEFS) charmrun
 
 $(SRC): $(DECLS)
 

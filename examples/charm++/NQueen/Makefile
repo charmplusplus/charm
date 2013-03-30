@@ -43,7 +43,7 @@ counter.o: counter.C
 
 main.decl.h main.def.h : main.ci
 	$(CHARMC) main.ci
-	
+
 counter.decl.h counter.def.h : counter.ci
 	$(CHARMC) counter.ci
 
@@ -54,6 +54,6 @@ clean:
 	rm -f main.decl.h main.def.h main.o
 	rm -f counter.decl.h counter.def.h nqueen.o
 	rm -f nqueen nqueen_refine nqueen_greedy nqueen_prj nqueen_rand nqueen_spray nqueen_neighbor charmrun nqueen_*
-	rm *.o *.def.h *.decl.h
-	rm *.log *.sts *.projrc
+	rm -f *.o *.def.h *.decl.h
+	rm -f *.log *.sts *.projrc
 
