@@ -71,7 +71,7 @@ public:
     float max_error;
 
     void report_error(int row, int col, float error) {
-	CkPrintf("[main] (%d, %d) error=%g\n", row, col, error);
+      //CkPrintf("[main] (%d, %d) error=%g\n", row, col, error);
 
 	if ((receive_count == num_chares)
 	    ||
