@@ -1,5 +1,30 @@
-DIRS	= hello integrate integrate2 integrateArray piArray queens RedExample \
-	  ring rings speeds load_balancing completion
+DIRS	= \
+AllReduce \
+allToAll \
+cksequence \
+completion \
+fib \
+hello \
+integrate \
+integrate2 \
+integrateArray \
+jacobi2d \
+leanmd \
+load_balancing \
+manyToMany \
+matmul \
+namespace \
+NQueen \
+piArray \
+PUP \
+queens \
+RedExample \
+ring \
+rings \
+speeds \
+sync_square \
+threaded_ring \
+typed_reduction
 
 all: 
 	for d in $(DIRS); do \
