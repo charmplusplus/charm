@@ -2,9 +2,12 @@ MINISAT		  = minisat
 TNM			  = TNM
 #CHARMDIR = /Users/yanhuasun/PPL/charm/charm-6.1.2/multicore-darwin-x86_64
 OPTS = -g
-CXX = charmc   
+CXX = ../../../bin/charmc
+
+EXES=parsat_minisat parsat_tnm
+
 default: all
-all: parsat_minisat parsat_tnm
+all: $(EXES)
 
 CFLAGS    = $(OPTS)  -ffloat-store
 CMINISATFLAGS = $(CFLAGS) -I$(MINISAT) -DMINISAT
@@ -26,8 +29,11 @@ main.o : main.C main.decl.h main.def.h
 par_Solver_minisat.o : par_Solver.C par_SolverTypes.h par_Solver.h $(MINISAT)/SolverTypes.h  main.decl.h main.def.h 
 	$(CXX_COMPILE) $(CMINISATFLAGS) -o par_Solver_minisat.o -c par_Solver.C
 
-main.def.h main.decl.h : main.ci
-	$(CXX) main.ci
+main.def.h main.decl.h : main.ci.stamp
+
+main.ci.stamp: main.ci
+	$(CXX) $<
+	touch $@
 
 $(MINISAT)/Solver.o: $(MINISAT)/Solver.C $(MINISAT)/Solver.h  $(MINISAT)/SolverTypes.h 
 	$(CXX_COMPILE) $(CMINISATFLAGS) -o $(MINISAT)/Solver.o -c $(MINISAT)/Solver.C 
@@ -49,4 +55,4 @@ $(TNM)/TNM.o: $(TNM)/TNM.C
 #	$(CXX_COMPILE) $(CTNMFLAGS) -o $(TNM)/inputbis.o -c $(TNM)/inputbis.C
 
 clean:
-	@rm -f parsat_minisat *.def.h *.decl.h *.o $(MINISAT)/*.o $(TNM)/*.o charmrun
+	@rm -f $(EXES) *.def.h *.decl.h *.o $(MINISAT)/*.o $(TNM)/*.o charmrun
