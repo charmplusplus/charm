@@ -12,7 +12,7 @@ matmul.o: matmul.C matmul.decl.h
 matmul.decl.h: matmul.ci
 	$(CHARMC) $<
 
-test:
+test: $(BINARY)
 	./charmrun +p4 ./matmul 50 5
 
 clean:
