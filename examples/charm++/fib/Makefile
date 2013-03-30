@@ -21,7 +21,7 @@ $(BINARY): $(patsubst %.cc,%.o,$(wildcard *.cc))
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)
-	./charmrun ./$(BINARY) $(TESTFLAGS)
+	./charmrun ./$(BINARY) 5 $(TESTFLAGS)
 
 clean:
 	rm -f *.o *.decl.h *.def.h charmrun $(BINARY)
