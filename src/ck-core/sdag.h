@@ -54,8 +54,8 @@ struct TransportableBigSimLog : public TransportableEntity {
   TransportableBigSimLog() : log(0) { }
 
   TransportableBigSimLog(void* log)
-    : log(log)
-    , TransportableEntity(TransportableBigSimLogType) { }
+    : TransportableEntity(TransportableBigSimLogType)
+    , log(log) { }
 
   void pup(PUP::er& p) {
     TransportableEntity::pupType(p);
@@ -69,8 +69,8 @@ struct TransportableMsg : public TransportableEntity {
   TransportableMsg() : msg(0) { }
 
   TransportableMsg(CkMessage* msg)
-    : msg(msg)
-    , TransportableEntity(TransportableMsgType) { }
+    : TransportableEntity(TransportableMsgType)
+    , msg(msg) { }
 
   void pup(PUP::er& p) {
     TransportableEntity::pupType(p);
