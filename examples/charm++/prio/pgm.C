@@ -1,4 +1,4 @@
-#include "prio.decl.h"
+#include "pgm.decl.h"
 
 /*readonly*/ CProxy_Main mainProxy;
 
@@ -52,4 +52,4 @@ struct Chare1 : CBase_Chare1 {
   }
 };
 
-#include "prio.def.h"
+#include "pgm.def.h"
