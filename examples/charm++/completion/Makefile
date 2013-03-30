@@ -25,3 +25,7 @@ $(EXEC_NAME): $(OBJ)
 
 comp.o: comp.cc $(DECLS)
 	$(CXX) $(CXXFLAGS) -c $*.cc -o $*.o
+
+test: all
+	./charmrun +p1 ./$(EXEC_NAME) $(TESTOPTS)
+	./charmrun +p4 ./$(EXEC_NAME) $(TESTOPTS)
