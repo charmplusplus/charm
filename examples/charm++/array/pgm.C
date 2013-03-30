@@ -1,4 +1,4 @@
-#include "arr.decl.h"
+#include "pgm.decl.h"
 
 /*readonly*/ CProxy_Main mainProxy;
 
@@ -72,4 +72,4 @@ struct ArrayF : CBase_ArrayF {
 };
 
 
-#include "arr.def.h"
+#include "pgm.def.h"
