@@ -1,7 +1,20 @@
-#include <cblas.h>
 #include "matmul.decl.h"
 
 CProxy_Main mainProxy;
+
+void example_dgemm(int M, int N, int K, double alpha,
+                   double *A, double *B,
+                   double beta, double *C) {
+  for (int i = 0; i < M; ++i) {
+    for (int j = 0; j < N; ++j) {
+      double sum = 0.0;
+      for (int k = 0; k < K; ++k) {
+        sum += A[i*K + k] * B[k*N + j];
+      }
+      C[N*i + j] = beta*C[N*i + j] + alpha*sum;
+    }
+  }
+}
 
 class Main : public CBase_Main {
   double startTime;

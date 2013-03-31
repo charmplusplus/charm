@@ -24,11 +24,13 @@ mainmodule matmul {
           atomic {
           CkAssert(KA == KB);
 
-          cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                      M, N, KA,
-                      alpha,
-                      blockA, KA, blockB, N,
-                      beta, data, N);
+          // This DGEMM makes no attempt at optimization. For
+          // benchmarking, it should be replaced with a library
+          // call. The local version is kept for easy portability.
+          example_dgemm(M, N, KA,
+                        alpha,
+                        blockA, blockB,
+                        beta, data);
 
           if (blockIdA != numBlocks) {
             int destX = (thisIndex.x + 1) % numBlocks;
