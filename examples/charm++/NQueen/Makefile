@@ -48,7 +48,7 @@ counter.o: counter.C  Counter.decl.h Counter.def.h
 main.decl.h main.def.h : main.ci.stamp
 Counter.decl.h Counter.def.h : counter.ci.stamp
 
-test:
+test: all
 	 ./charmrun +p 4 ./nqueen 17 5 +CPGatherAll +CPSaveData +CPDefaultValues grainsize=5 +CPDivideConquer +CPSamplePeriod 0.25
 
 clean:
