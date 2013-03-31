@@ -1,5 +1,5 @@
 CXX = ../../../bin/charmc
-CXXFLAGS = -g -O3 -Wall
+CXXFLAGS = $(OPTS)
 
 SRC = $(wildcard *.cc)
 SRCCI = $(wildcard *.ci)
