@@ -14,7 +14,6 @@ load_balancing \
 manyToMany \
 matmul \
 namespace \
-NQueen \
 piArray \
 PUP \
 queens \
