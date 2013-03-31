@@ -8,7 +8,7 @@ BINARY=matmul
 all: $(BINARY)
 
 $(BINARY): matmul.o
-	$(CHARMC) -o $@ $< $(OPTS) -lblas
+	$(CHARMC) -o $@ $< $(OPTS)
 
 matmul.o: matmul.C matmul.decl.h
 matmul.decl.h: matmul.ci
