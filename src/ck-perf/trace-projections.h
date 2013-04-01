@@ -258,6 +258,7 @@ class LogPool {
   friend class controlPointManager;
   private:
     bool writeData;
+    int writeSummaryFiles;
     unsigned int poolSize;
     unsigned int numEntries;
     LogEntry *pool;
@@ -266,6 +267,7 @@ class LogPool {
     FILE *stsfp;
     FILE *rcfp;
     FILE *topofp;
+    FILE *statisfp;
     char *fname;
     char *dfname;
     char *pgmname;
@@ -292,11 +294,22 @@ class LogPool {
     int headerWritten;
     bool fileCreated;
     void writeHeader();
+
+    // for statistics 
+    double beginComputationTime;
+    double endComputationTime;
+    double statisLastTimer;
+    double statisTotalExecutionTime;
+    double statisTotalIdleTime;
+    double statisTotalPackTime;
+    double statisTotalUnpackTime;
+
   public:
     LogPool(char *pgm);
     ~LogPool();
     void setBinary(int b) { binary = b; }
     void setNumSubdirs(int n) { nSubdirs = n; }
+    void setWriteSummaryFiles(int n) { writeSummaryFiles = n;}
 #if CMK_PROJECTIONS_USE_ZLIB
     void setCompressed(int c) { compressed = c; }
 #endif
@@ -312,7 +325,7 @@ class LogPool {
     void writeSts(TraceProjections *traceProj);
     void writeRC(void);
     void writeTopo();
-
+    void writeStatis();
     void initializePhases() {
       keepPhase = new bool[numPhases];
       for (int i=0; i<numPhases; i++) {
@@ -461,8 +474,7 @@ class TraceProjections : public Trace {
     int papiEventSet;
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
-
-  public:
+public:
     int converseExit; // used for exits that bypass CkExit.
     double endTime;
 

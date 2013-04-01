@@ -268,6 +268,7 @@ void LogPool::closeLog(void)
 LogPool::LogPool(char *pgm) {
   pool = new LogEntry[CkpvAccess(CtrLogBufSize)];
   // defaults to writing data (no outlier changes)
+  writeSummaryFiles = 0;
   writeData = true;
   numEntries = 0;
   // **CW** for simple delta encoding
@@ -285,6 +286,13 @@ LogPool::LogPool(char *pgm) {
   poolSize = CkpvAccess(CtrLogBufSize);
   pgmname = new char[strlen(pgm)+1];
   strcpy(pgmname, pgm);
+
+  //statistic init
+  statisLastTimer = 0;
+  statisTotalExecutionTime  = 0;
+  statisTotalIdleTime = 0;
+  statisTotalPackTime = 0;
+  statisTotalUnpackTime = 0;
 }
 
 void LogPool::createFile(const char *fix)
@@ -427,6 +435,8 @@ void LogPool::createRC()
 LogPool::~LogPool() 
 {
   if (writeData) {
+      if(writeSummaryFiles)
+          writeStatis();
     writeLog();
 #if !CMK_TRACE_LOGFILE_NUM_CONTROL
     closeLog();
@@ -631,6 +641,32 @@ void LogPool::writeTopo(void)
   fclose(topofp);
 }
 
+void LogPool::writeStatis(void)
+{
+    
+   // create the statis file
+  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".statis")+10];
+  sprintf(fname, "%s.%d.statis", CkpvAccess(traceRoot), CkMyPe());
+  do
+  {
+      statisfp = fopen(fname, "w");
+  } while (!statisfp && (errno == EINTR || errno == EMFILE));
+  if(statisfp==0){
+      CmiPrintf("Cannot open projections statistic file for writing due to %s\n", strerror(errno));
+      CmiAbort("Error!!\n");
+  }
+  delete[] fname;
+  double totaltime = endComputationTime - beginComputationTime;
+  fprintf(statisfp, "time(sec) percentage\n");
+  fprintf(statisfp, "Time:    \t%f\n", totaltime);
+  fprintf(statisfp, "Overhead:\t%f\t %.1f\n", statisTotalIdleTime, statisTotalIdleTime/totaltime * 100); 
+  fprintf(statisfp, "Idle:    \t%f\t %.1f\n", totaltime - statisTotalIdleTime - statisTotalExecutionTime , (totaltime - statisTotalIdleTime - statisTotalExecutionTime)/totaltime * 100); 
+  fprintf(statisfp, "Exeuction:\t%f\t %.1f\n", statisTotalExecutionTime, statisTotalExecutionTime/totaltime*100); 
+  fprintf(statisfp, "Pack:     \t%f\t %.2f\n", statisTotalPackTime, statisTotalPackTime/totaltime*100); 
+  fprintf(statisfp, "Unpack:   \t%f\t %.2f\n", statisTotalUnpackTime, statisTotalUnpackTime/totaltime*100); 
+  fclose(statisfp);
+}
+
 #if CMK_BIGSIM_CHARM
 static void updateProjLog(void *data, double t, double recvT, void *ptr)
 {
@@ -666,6 +702,35 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
 		  double time, int event, int pe, int ml, CmiObjId *id, 
 		  double recvT, double cpuT, int numPe)
 {
+    switch(type)
+    {
+        case BEGIN_COMPUTATION:
+            beginComputationTime = time;
+            break;
+        case END_COMPUTATION:
+            endComputationTime = time;
+            break;
+        case BEGIN_PROCESSING:
+        case BEGIN_UNPACK:
+        case BEGIN_PACK:
+        case BEGIN_IDLE:
+            statisLastTimer = time;
+            break;
+        case END_PROCESSING:
+            statisTotalExecutionTime += (time - statisLastTimer);
+            break;
+        case END_UNPACK:
+            statisTotalUnpackTime += (time - statisLastTimer);
+            break;
+        case END_PACK:
+            statisTotalPackTime += (time - statisLastTimer);
+            break;
+        case END_IDLE:
+            statisTotalIdleTime += (time - statisLastTimer);
+            break;
+        default:
+            break;
+    }
   new (&pool[numEntries++])
     LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPe);
   if ((type == END_PHASE) || (type == END_COMPUTATION)) {
@@ -1044,6 +1109,8 @@ TraceProjections::TraceProjections(char **argv):
   if(CkMyPe() == 0) CkPrintf("Warning> gz-trace is not supported on this machine!\n");
 #endif
 
+  int writeSummaryFiles = CmiGetArgFlagDesc(argv,"+write-analysis-file","Enable writing summary files "); 
+  
   // **CW** default to non delta log encoding. The user may choose to do
   // create both logs (for debugging) or just the old log timestamping
   // (for compatibility).
@@ -1059,6 +1126,7 @@ TraceProjections::TraceProjections(char **argv):
   _logPool = new LogPool(CkpvAccess(traceRoot));
   _logPool->setNumSubdirs(nSubdirs);
   _logPool->setBinary(binary);
+  _logPool->setWriteSummaryFiles(writeSummaryFiles);
 #if CMK_PROJECTIONS_USE_ZLIB
   _logPool->setCompressed(compressed);
 #endif
@@ -1466,7 +1534,7 @@ void TraceProjections::beginExecute(CmiObjId *tid)
   if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
   execEvent = CtvAccess(curThreadEvent);
   execEp = (-1);
-  _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
+  _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP, TraceTimer(),
 		execEvent,CkMyPe(), 0, tid);
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(papiValues);
@@ -1485,7 +1553,7 @@ void TraceProjections::beginExecute(envelope *e)
     if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
-    _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
+    _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP, TraceTimer(),
 		  execEvent,CkMyPe(), 0, NULL, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
     _logPool->addPapi(papiValues);
@@ -1536,7 +1604,7 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
-  _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),event,
+  _logPool->add(BEGIN_PROCESSING,msgType,ep, TraceTimer(),event,
 		srcPe, mlen, idx, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(papiValues);
@@ -1576,11 +1644,12 @@ void TraceProjections::endExecuteLocal(void)
 #endif
   if (checknested && !inEntry) CmiAbort("Nested EndExecute!\n");
   double cputime = TraceCpuTimer();
+  double now = TraceTimer();
   if(execEp == (-1)) {
-    _logPool->add(END_PROCESSING, 0, _threadEP, TraceTimer(),
+    _logPool->add(END_PROCESSING, 0, _threadEP, now,
 		  execEvent, CkMyPe(), 0, NULL, 0.0, cputime);
   } else {
-    _logPool->add(END_PROCESSING, 0, execEp, TraceTimer(),
+    _logPool->add(END_PROCESSING, 0, execEp, now,
 		  execEvent, execPe, 0, NULL, 0.0, cputime);
   }
 #if CMK_HAS_COUNTER_PAPI
@@ -1611,32 +1680,32 @@ void TraceProjections::messageRecv(char *env, int pe)
 
 void TraceProjections::beginIdle(double curWallTime)
 {
-  _logPool->add(BEGIN_IDLE, 0, 0, TraceTimer(curWallTime), 0, CkMyPe());
+    _logPool->add(BEGIN_IDLE, 0, 0, TraceTimer(curWallTime), 0, CkMyPe());
 }
 
 void TraceProjections::endIdle(double curWallTime)
 {
-  _logPool->add(END_IDLE, 0, 0, TraceTimer(curWallTime), 0, CkMyPe());
+    _logPool->add(END_IDLE, 0, 0, TraceTimer(curWallTime), 0, CkMyPe());
 }
 
 void TraceProjections::beginPack(void)
 {
-  _logPool->add(BEGIN_PACK, 0, 0, TraceTimer(), 0, CkMyPe());
+    _logPool->add(BEGIN_PACK, 0, 0, TraceTimer(), 0, CkMyPe());
 }
 
 void TraceProjections::endPack(void)
 {
-  _logPool->add(END_PACK, 0, 0, TraceTimer(), 0, CkMyPe());
+    _logPool->add(END_PACK, 0, 0, TraceTimer(), 0, CkMyPe());
 }
 
 void TraceProjections::beginUnpack(void)
 {
-  _logPool->add(BEGIN_UNPACK, 0, 0, TraceTimer(), 0, CkMyPe());
+    _logPool->add(BEGIN_UNPACK, 0, 0, TraceTimer(), 0, CkMyPe());
 }
 
 void TraceProjections::endUnpack(void)
 {
-  _logPool->add(END_UNPACK, 0, 0, TraceTimer(), 0, CkMyPe());
+    _logPool->add(END_UNPACK, 0, 0, TraceTimer(), 0, CkMyPe());
 }
 
 void TraceProjections::enqueue(envelope *) {}
@@ -1646,7 +1715,6 @@ void TraceProjections::dequeue(envelope *) {}
 void TraceProjections::beginComputation(void)
 {
   computationStarted = 1;
-
   // Executes the callback function provided by the machine
   // layer. This is the proper method to register user events in a
   // machine layer because projections is a charm++ module.

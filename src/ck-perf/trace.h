@@ -48,7 +48,8 @@ typedef CMK_TYPEDEF_INT8 LONG_LONG_PAPI;
 // Base class of all tracing strategies.
 // 
 class Trace {
-  protected:
+
+protected:
     int _traceOn;
   
   public:
