@@ -120,6 +120,7 @@ The following are a few terms that are used often:
                              [       Charm envelope        ] 
  User message pointer     -> [ User data/payload ... ]
  Priority pointer         -> [ Priority ints ... ]
+ Extra data pointer       -> [ data specific to this message type ]
 </pre>
 
 The "message pointers" passed to and from users bypass the envelope and point
@@ -139,10 +140,7 @@ user message pointers.
 */
 
  /**
-   This union stores the type-specific message information.
-   Keeping this in a union allows the different kinds of messages 
-   to have different fields/types, in an alignment-safe way, 
-   without wasting any storage.
+   These structures store the type-specific message information.
  */
 struct s_chare {  // NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidMsg
         void *ptr;      ///< object pointer
@@ -297,6 +295,18 @@ private:
     void   setTotalsize(const UInt s) { totalsize = s; }
     UInt   getUsersize(void) const { 
       return totalsize - getPrioBytes() - sizeof(envelope) - extrasize; 
+    }
+    void   setUsersize(const UInt s) {
+      CkAssert(s >= 0 && s < getUsersize());
+      UInt newPrioOffset = sizeof(envelope) + CkMsgAlignLength(s);
+      UInt newExtraDataOffset = newPrioOffset + getPrioBytes();
+      UInt newTotalsize = newPrioOffset + getExtrasize();
+      void *newPrioPtr = (void *) ((char *) this + newPrioOffset); 
+      void *newExtraPtr = (void *) ((char *) this + newExtraDataOffset);
+      // use memmove instead of memcpy in case memory areas overlap
+      memmove(newPrioPtr, getPrioPtr(), getPrioBytes()); 
+      memmove(newExtraPtr, (void *) extraData(), getExtrasize());
+      setTotalsize(newTotalsize); 
     }
     UShort getExtrasize(void) const { return extrasize; }
     void   setExtrasize(const UShort s) { extrasize = s; }
