@@ -25,6 +25,22 @@ sync_square \
 threaded_ring \
 typed_reduction
 
+BGDIRS=\
+AllReduce \
+hello \
+integrate \
+integrate2 \
+integrateArray \
+jacobi2d \
+load_balancing \
+piArray \
+PUP \
+queens \
+RedExample \
+ring \
+rings \
+speeds
+
 all: 
 	for d in $(DIRS); do \
 		(cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
@@ -36,7 +52,7 @@ test:
 	done
 
 bgtest:
-	for d in $(DIRS); do \
+	for d in $(BGDIRS); do \
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
