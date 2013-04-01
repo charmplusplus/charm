@@ -16,11 +16,15 @@ bgtest:
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
-syncfttest causalfttest mpisyncfttest mlogfttest:
+syncfttest causalfttest mpisyncfttest:
 	for d in jacobi3d jacobi3d-sdag; do \
 		(cd $$d; $(MAKE) $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
+mlogfttest:
+	for d in jacobi3d-sdag; do \
+		(cd $$d; $(MAKE) $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
+	done
 
 clean:
 	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done

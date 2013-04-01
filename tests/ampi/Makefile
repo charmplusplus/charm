@@ -21,6 +21,8 @@ syncfttest causalfttest:
         (cd $$d && $(MAKE) $@ OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
     done
 
+mpisyncfttest mlogfttest:
+
 clean:
 	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done
 	rm -f TAGS #*#
