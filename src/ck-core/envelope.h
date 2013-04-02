@@ -300,7 +300,7 @@ private:
       CkAssert(s >= 0 && s < getUsersize());
       UInt newPrioOffset = sizeof(envelope) + CkMsgAlignLength(s);
       UInt newExtraDataOffset = newPrioOffset + getPrioBytes();
-      UInt newTotalsize = newPrioOffset + getExtrasize();
+      UInt newTotalsize = newExtraDataOffset + getExtrasize();
       void *newPrioPtr = (void *) ((char *) this + newPrioOffset); 
       void *newExtraPtr = (void *) ((char *) this + newExtraDataOffset);
       // use memmove instead of memcpy in case memory areas overlap
@@ -308,6 +308,13 @@ private:
       memmove(newExtraPtr, (void *) extraData(), getExtrasize());
       setTotalsize(newTotalsize); 
     }
+
+    // s specifies number of bytes to remove from user portion of message
+    void shrinkUsersize(const UInt s) {
+      CkAssert(s >= 0 && s < getUsersize());
+      setUsersize(getUsersize() - s);
+    }
+
     UShort getExtrasize(void) const { return extrasize; }
     void   setExtrasize(const UShort s) { extrasize = s; }
     UChar  isPacked(void) const { return attribs.isPacked; }
