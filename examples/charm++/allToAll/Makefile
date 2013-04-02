@@ -17,5 +17,5 @@ allToAll.o: allToAll.C allToAll.decl.h
 	$(CHARMC) -c allToAll.C
 
 test: all
-	./charmrun allToAll +p4 1024 
+	./charmrun ./allToAll +p4 1024
 

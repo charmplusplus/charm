@@ -17,8 +17,8 @@ seek_block.o: seek_block.cc seek_block.h seek_block.decl.h
 	$(CHARMC) -c seek_block.cc
 
 test: all
-	./charmrun seek_block +p4  $(TESTOPTS)
-	./charmrun seek_block +p4  $(TESTOPTS)
+	./charmrun ./seek_block +p4  $(TESTOPTS)
+	./charmrun ./seek_block +p4  $(TESTOPTS)
 
 bgtest: all
-	./charmrun seek_block +p4 +x2 +y2 +z1
+	./charmrun ./seek_block +p4 +x2 +y2 +z1

@@ -17,7 +17,7 @@ pgm.o: pgm.C pgm.decl.h
 	$(CHARMC) -c pgm.C
 
 test: all
-	./charmrun pgm +p4 $(TESTOPTS)
+	./charmrun ./pgm +p4 $(TESTOPTS)
 
 bgtest: all
-	./charmrun pgm +p4 +x2 +y2 +z1 $(TESTOPTS)
+	./charmrun ./pgm +p4 +x2 +y2 +z1 $(TESTOPTS)
