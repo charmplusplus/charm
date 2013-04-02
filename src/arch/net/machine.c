@@ -1749,8 +1749,6 @@ int CmiBarrierZero()
 
 void LrtsPreCommonInit(int everReturn)
 {
-  CmiNodeAllBarrier();
-
 #if CMK_USE_GM
   CmiCheckGmStatus();
 #endif
