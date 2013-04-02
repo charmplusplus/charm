@@ -19,4 +19,4 @@ lvServer.o: lvServer.C lvServer.decl.h
 	$(CHARMC) -c lvServer.C
 
 test: all
-	charmrun ./lvServer +p5 ++server ++server-port 1234
+	./charmrun ./lvServer +p5 ++server ++server-port 1234
