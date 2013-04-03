@@ -31,11 +31,11 @@ inline CommMechanism operator++(CommMechanism &m)
 void qFiller(void *param, void *msg)
 {
     #ifdef VERBOSE_OPERATION
-        CkPrintf("\n[%d] Filling scheduler Q with %d entry methods of duration %d us", CkMyPe(), cfg.qLength, cfg.uSecs);
+        CkPrintf("\n[%d] Filling scheduler Q with %d entry methods that have %d Mflop", CkMyPe(), cfg.qLength, cfg.flopM);
     #endif
     /// Build up a scheduler queue of the required length
     for (int i=0; i < cfg.qLength; i++)
-        hogger[CkMyPe()].doSomething(cfg.uSecs);
+        hogger[CkMyPe()].doSomething(cfg.flopM);
     /// Trigger the test via the callback
     CkCallback *triggerCB =  (CkCallback*)param;
     if (!triggerCB)    CkAbort("Test trigger callback not supplied!");
@@ -70,14 +70,14 @@ TestController::TestController(CkArgMsg *m)
         if (m->argc >= 5)
             cfg.qLength          = atoi(m->argv[4]);
         if (m->argc >= 6)
-            cfg.uSecs            = atoi(m->argv[5]);
+            cfg.flopM            = atoi(m->argv[5]);
     }
     else
         CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin(bytes) msgSizeMax(KB) qFillLength fillMethodDuration(us)",m->argv[0]);
 
     delete m;
-    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nTest parameters are: \n\tArray size = Section size = Num PEs = %d \n\tMsg sizes: %d bytes to %d KB \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
-             CkNumPes(), cfg.arraySize, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats, cfg.qLength, cfg.uSecs);
+    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nTest parameters are: \n\tArray size = Section size = Num PEs = %d \n\tMsg sizes: %d bytes to %d KB \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Total Flops: %d Mflop",
+             CkNumPes(), cfg.arraySize, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats, cfg.qLength, cfg.flopM);
 
     // Initialize the mainchare pointer used by the converse redn handler
     mainChare = this;

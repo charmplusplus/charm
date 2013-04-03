@@ -36,7 +36,7 @@ The args must be specified in the following order:
 - msgSizeMin          [int]  : The minimum message size in bytes
 - msgSizeMax          [int]  : The maximum message size in KB
 - qLength             [int]  : The length of the scheduler queue (num of pending entry methods)
-- fillMethodDuration  [int]  : The time taken for each fill entry method to execute in us (microseconds)
+- fillMethodMflop     [int]  : The number of floating point operations in each filler entry method (Mflop)
 
 
 -------------------------------------------------------------------------------

@@ -21,7 +21,7 @@ mainmodule reductionBenchmark {
     group QHogger
     {
         entry QHogger();
-        entry void doSomething(int uSecs);
+        entry void doSomething(int flopM);
     };
 
 

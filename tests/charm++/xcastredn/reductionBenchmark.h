@@ -41,7 +41,7 @@ class config
         {
             p|arraySize;  p|sectionSize;
             p|msgSizeMin; p|msgSizeMax;
-            p|qLength;    p|uSecs;
+            p|qLength;    p|flopM;
             p|numRepeats;
             p|useContiguousSection;
         }
@@ -53,7 +53,7 @@ class config
             msgSizeMin  = 8;
             msgSizeMax  = 64;
             qLength     = 0;
-            uSecs       = 0;
+            flopM       = 0;
             numRepeats  = 3;
             useContiguousSection = true;
         }
@@ -71,7 +71,7 @@ class config
         /// How long the scheduler q should be (num enqueued entry methods)
         int qLength;
         /// How long each entry method should be (micro seconds)
-        int uSecs;
+        int flopM;
         /// Some output beauty
         const int fieldWidth;
 };
@@ -107,13 +107,15 @@ class QHogger: public CBase_QHogger
     public:
         QHogger(): numCalled(0) {}
         /// @entry An entry method that recursively hogs the scheduler Q
-        void doSomething(int uSecs = 0)
+        void doSomething(int flopM = 0)
         {
             numCalled++;
             /// Do something to hog some time
-            usleep(uSecs);
+            double a = 1;
+            for (int i=0; i < 1000000 * flopM; i++)
+                a = 0.5*a + 0.5;
             /// Renqueue myself to keep the scheduler busy
-            thisProxy[CkMyPe()].doSomething(uSecs);
+            thisProxy[CkMyPe()].doSomething(flopM);
         }
     private:
         long int numCalled;
