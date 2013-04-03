@@ -14,11 +14,11 @@ INTF      = reductionBenchmark.ci
 # Specify the exe name and the arguments to run it with
 NP        = 4
 TARGET    = testReduction
-ARGS      = 10 8 128 10 1
+ARGS      = 10 8 128
 
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc
-OPTS     ?= -O2
+OPTS     ?= -optimize -production
 CXXFLAGS += -language charm++ $(OPTS)
 CPPFLAGS +=
 LDFLAGS  += -module CkMulticast
@@ -39,7 +39,7 @@ $(TARGET): $(OBJ)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
-	$(RM) $(wildcard *.decl.h *.def.h *.d *.di *.o) $(TARGET) charmrun 
+	$(RM) $(wildcard *.decl.h *.def.h *.d *.di *.o *.ci.stamp) $(TARGET) charmrun
 
 again: 
 	$(MAKE) clean; $(MAKE)
@@ -61,7 +61,10 @@ test: all
 # Rule to generate dependency info for charm++ interface (ci) definition files
 %.di: %.ci
 	$(info Generating dependencies for $<)
-	@grep "module" $< | sed -e "s|.*module[ ]\+\([^ ]\+\).\+|\1\.decl\.h \1\.def\.h $@: $<\n\t$(CXX) -c $<\n|g" > $@
+	@$(CXX) -M $< > $@
+
+%.ci.stamp: %.ci
+	$(CXX) $< && touch $@
 
 # Include the generated files containing dependency info
 -include $(SRC:.C=.d)
