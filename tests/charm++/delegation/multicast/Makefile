@@ -22,7 +22,7 @@ bgtest: all
 
 clean:
 	rm -f conv-host *.o charmrun charmrun.exe
-	rm -f *.def.h *.decl.h
+	rm -f *.def.h *.decl.h *.ci.stamp
 	rm -f hello hello.*.log hello.sts hello.exe hello.pdb hello.ilk
 	rm -f gmon.out #*#
 	rm -f core *~
