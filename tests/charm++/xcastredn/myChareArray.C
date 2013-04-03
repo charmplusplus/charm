@@ -3,7 +3,7 @@
 #include <algorithm>
 
 //----------------- externed globals -----------------
-extern std::vector<MyChareArray*> localElems;
+CpvExtern(std::vector<MyChareArray*>, localElems);
 
 
 
@@ -13,7 +13,7 @@ MyChareArray::MyChareArray(CkGroupID grpID): msgNum(0), mcastGrpID(grpID)
         CkPrintf("\nArrayElem[%d] Just born...",thisIndex);
     #endif
     mcastMgr = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
-    localElems.push_back(this);
+    CpvAccess(localElems).push_back(this);
     /// Prepare some data to be returned (max sized contribution)
     int numUnits = cfg.msgSizeMax * 1024 /sizeof(double);
     returnData   = new double[numUnits];

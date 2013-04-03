@@ -6,7 +6,7 @@
 /// Converse broadcast and reduction handler function IDs. Global vars.
 int bcastHandlerID, rednHandlerID, bcastConverterID;
 /// Array elements local to each pe. Used by the conv to array bcast converter
-std::vector<MyChareArray*> localElems;
+CpvDeclare(std::vector<MyChareArray*>, localElems);
 /// Pointer to the mainchare on pe 0 used by the converse redn handler
 TestController *mainChare;
 
@@ -57,11 +57,11 @@ void convBcastHandler(void *env)
     /// Get an unpacked charm msg from the envelope
     DataMsg *msg = DataMsg::unpack( EnvToUsr((envelope*)env) );
     /// Deliver to each local element
-    int numElems = localElems.size();
-    for (int i=0; i < localElems.size(); i++)
+    int numElems = CpvAccess(localElems).size();
+    for (int i=0; i < numElems; i++)
     {
         DataMsg *aMsgPtr = (numElems - i > 1) ? (DataMsg*)CkCopyMsg((void**)&msg) : msg;
-        localElems[i]->crunchData(aMsgPtr);
+        CpvAccess(localElems)[i]->crunchData(aMsgPtr);
     }
     /// If there are no local elements, delete the incoming msg
     if (numElems == 0)
@@ -75,6 +75,7 @@ void registerHandlers()
 {
     bcastHandlerID   = CmiRegisterHandler(convBcastHandler);
     rednHandlerID    = CmiRegisterHandler(convRednHandler);
+    CpvInitialize(std::vector<MyChareArray*>, localElems);
 }
 
 #include "reductionBenchmark.def.h"
