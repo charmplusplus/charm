@@ -1288,7 +1288,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     /// If you've received a msg from a previous redn, something has gone horribly wrong somewhere!
     if (msg->redNo < redInfo.redNo) {
         CmiPrintf("[%d] msg redNo:%d, msg:%p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, msg, entry, redInfo.redNo);
-        CmiAbort("Could never happen! \n");
+        CmiAbort("CkMulticast received a reduction msg with redNo less than the current redn number. Should never happen! \n");
     }
 
     //-------------------------------------------------------------------------
