@@ -293,6 +293,17 @@ LogPool::LogPool(char *pgm) {
   statisTotalIdleTime = 0;
   statisTotalPackTime = 0;
   statisTotalUnpackTime = 0;
+  statisTotalCreationMsgs = 0;
+  statisTotalCreationBytes = 0;
+  statisTotalMCastMsgs = 0;
+  statisTotalMCastBytes = 0;
+  statisTotalEnqueueMsgs = 0;
+  statisTotalDequeueMsgs = 0;
+  statisTotalRecvMsgs = 0;
+  statisTotalRecvBytes = 0;
+  statisTotalMemAlloc = 0;
+  statisTotalMemFree = 0;
+
 }
 
 void LogPool::createFile(const char *fix)
@@ -664,6 +675,9 @@ void LogPool::writeStatis(void)
   fprintf(statisfp, "Exeuction:\t%f\t %.1f\n", statisTotalExecutionTime, statisTotalExecutionTime/totaltime*100); 
   fprintf(statisfp, "Pack:     \t%f\t %.2f\n", statisTotalPackTime, statisTotalPackTime/totaltime*100); 
   fprintf(statisfp, "Unpack:   \t%f\t %.2f\n", statisTotalUnpackTime, statisTotalUnpackTime/totaltime*100); 
+  fprintf(statisfp, "Creation Msgs Numbers, Bytes, Avg:   \t%lld\t %lld\t %lld \n", statisTotalCreationMsgs, statisTotalCreationBytes, (statisTotalCreationMsgs>0)?statisTotalCreationBytes/statisTotalCreationMsgs:statisTotalCreationMsgs); 
+  fprintf(statisfp, "Multicast Msgs Numbers, Bytes, Avg:   \t%lld\t %lld\t %lld \n", statisTotalMCastMsgs, statisTotalMCastBytes, (statisTotalMCastMsgs>0)?statisTotalMCastBytes/statisTotalMCastMsgs:statisTotalMCastMsgs); 
+  fprintf(statisfp, "Received Msgs Numbers, Bytes, Avg:   \t%lld\t %lld\t %lld \n", statisTotalRecvMsgs, statisTotalRecvBytes, (statisTotalRecvMsgs>0)?statisTotalRecvBytes/statisTotalRecvMsgs:statisTotalRecvMsgs); 
   fclose(statisfp);
 }
 
@@ -709,6 +723,30 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
             break;
         case END_COMPUTATION:
             endComputationTime = time;
+            break;
+        case CREATION:
+            statisTotalCreationMsgs++;
+            statisTotalCreationBytes += ml;
+            break;
+        case CREATION_MULTICAST:
+            statisTotalMCastMsgs++;
+            statisTotalMCastBytes += ml;
+            break;
+        case ENQUEUE:
+            statisTotalEnqueueMsgs++;
+            break;
+        case DEQUEUE:
+            statisTotalDequeueMsgs++;
+            break;
+        case MESSAGE_RECV:
+            statisTotalRecvMsgs++;
+            statisTotalRecvBytes += ml;
+            break;
+        case MEMORY_MALLOC:
+            statisTotalMemAlloc++;
+            break;
+        case MEMORY_FREE:
+            statisTotalMemFree++;
             break;
         case BEGIN_PROCESSING:
         case BEGIN_UNPACK:

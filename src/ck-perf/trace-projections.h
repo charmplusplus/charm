@@ -303,6 +303,17 @@ class LogPool {
     double statisTotalIdleTime;
     double statisTotalPackTime;
     double statisTotalUnpackTime;
+    long long statisTotalCreationMsgs;
+    long long statisTotalCreationBytes;
+    long long statisTotalMCastMsgs;
+    long long statisTotalMCastBytes;
+    long long statisTotalEnqueueMsgs;
+    long long statisTotalDequeueMsgs;
+    long long statisTotalRecvMsgs;
+    long long statisTotalRecvBytes;
+    long long statisTotalMemAlloc;
+    long long statisTotalMemFree;
+
 
   public:
     LogPool(char *pgm);
