@@ -72,8 +72,8 @@ inline void calcPairForces(ParticleDataMsg* first, ParticleDataMsg* second, int 
   cellArray(first->x, first->y, first->z).receiveForces(stepCount,firstmsg,firstLen);
   cellArray(second->x, second->y, second->z).receiveForces(stepCount,secondmsg,secondLen);
 
-  delete firstmsg;
-  delete secondmsg;
+  delete [] firstmsg;
+  delete [] secondmsg;
   delete first;
   delete second;
 }
@@ -110,7 +110,7 @@ inline void calcInternalForces(ParticleDataMsg* first, int stepCount) {
     }
   }
   cellArray(first->x, first->y, first->z).receiveForces(stepCount,firstmsg,firstLen);
-  delete firstmsg;
+  delete [] firstmsg;
   delete first;
 }
 #endif
