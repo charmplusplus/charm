@@ -136,7 +136,7 @@ CProxySection_MyChareArray TestController::createSection(const bool isSectionCon
     /// Determine a step size based on whether a contiguous section is needed
     int dX = 1;
     if (!isSectionContiguous)
-        dX = floor( cfg.arraySize / cfg.sectionSize );
+        dX = cfg.arraySize / cfg.sectionSize;
     /// Determine the upper index bounds for the section
     int Xu = (cfg.sectionSize - 1) * dX;
     CkAssert(cfg.arraySize >= Xu);
