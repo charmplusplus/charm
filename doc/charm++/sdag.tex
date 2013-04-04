@@ -244,9 +244,12 @@ that executes asynchronously (without any sort of barrier or other synchronizati
 between steps) or a particular piece of the problem being solved.
 Matching is requested by placing an expression denoting the desired reference
 number in square brackets between the entry method name and its parameter list.
-That expression will be compared for equality with the entry method's first
-argument, or with the reference number field of an explicit message
-(\S~\ref{messages}). Matching is used in the loop example below, and in
+For parameter marshalled entry methods, the reference number expression will be
+compared for equality with the entry method's first argument. For entry methods
+that accept an explicit message (\S~\ref{messages}), the reference number on
+the message can be set by calling the function
+\verb|CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref)|.
+Matching is used in the loop example below, and in
 \examplereffile{jacobi2d-sdag/jacobi2d.ci}. Multiple {\tt when} triggers for
 an entry method with different matching reference numbers will not conflict - each
 will receive only corresponding messages.
