@@ -51,15 +51,15 @@ typedef struct _PersistentReqGrantedMsg {
   PersistentHandle destDataHandler;
 } PersistentReqGrantedMsg;
 
-typedef struct _PersistentDestoryMsg {
+typedef struct _PersistentDestroyMsg {
   char core[CmiMsgHeaderSizeBytes];
   PersistentHandle destHandlerIndex;
-} PersistentDestoryMsg;
+} PersistentDestroyMsg;
 
 /* Converse handler */
 int persistentRequestHandlerIdx;
 int persistentReqGrantedHandlerIdx;
-int persistentDestoryHandlerIdx;
+int persistentDestroyHandlerIdx;
 int persistentDecompressHandlerIdx;
 int persistentNoDecompressHandlerIdx;
 
@@ -672,14 +672,14 @@ PersistentHandle CmiRegisterReceivePersistent(PersistentReq recvHand)
 }
 
 /******************************************************************************
-     destory Persistent Comm handler
+     destroy Persistent Comm handler
 ******************************************************************************/
 
 /* Converse Handler */
-void persistentDestoryHandler(void *env)
+void persistentDestroyHandler(void *env)
 {             
   int i;
-  PersistentDestoryMsg *msg = (PersistentDestoryMsg *)env;
+  PersistentDestroyMsg *msg = (PersistentDestroyMsg *)env;
   PersistentHandle h = getPersistentHandle(msg->destHandlerIndex, 0);
   CmiAssert(h!=NULL);
   CmiFree(msg);
@@ -707,19 +707,19 @@ void persistentDestoryHandler(void *env)
 }
 
 /* FIXME: need to buffer until ReqGranted message come back? */
-void CmiDestoryPersistent(PersistentHandle h)
+void CmiDestroyPersistent(PersistentHandle h)
 {
   if (h == NULL) return;
 
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
   /* CmiAssert(slot->destHandle != 0); */
 
-  PersistentDestoryMsg *msg = (PersistentDestoryMsg *)
-                              CmiAlloc(sizeof(PersistentDestoryMsg));
+  PersistentDestroyMsg *msg = (PersistentDestroyMsg *)
+                              CmiAlloc(sizeof(PersistentDestroyMsg));
   msg->destHandlerIndex = slot->destHandle;
 
-  CmiSetHandler(msg, persistentDestoryHandlerIdx);
-  CmiSyncSendAndFree(slot->destPE,sizeof(PersistentDestoryMsg),msg);
+  CmiSetHandler(msg, persistentDestroyHandlerIdx);
+  CmiSyncSendAndFree(slot->destPE,sizeof(PersistentDestroyMsg),msg);
 
   /* free this slot */
   if (slot->prev) {
@@ -738,7 +738,7 @@ void CmiDestoryPersistent(PersistentHandle h)
 }
 
 
-void CmiDestoryAllPersistent()
+void CmiDestroyAllPersistent()
 {
   PersistentSendsTable *sendslot = CpvAccess(persistentSendsTableHead);
   while (sendslot) {
@@ -755,7 +755,7 @@ void CmiDestoryAllPersistent()
     int i;
     for (i=0; i<PERSIST_BUFFERS_NUM; i++)  {
       //if (slot->destBuf[i].destSizeAddress)
-      //  CmiPrintf("Warning: CmiDestoryAllPersistent destoried buffered undelivered message.\n");
+      //  CmiPrintf("Warning: CmiDestroyAllPersistent destoried buffered undelivered message.\n");
       if (slot->destBuf[i].destAddress) PerFree((char*)slot->destBuf[i].destAddress);
     }
     free(slot);
@@ -774,8 +774,8 @@ void CmiPersistentInit()
        CmiRegisterHandler((CmiHandler)persistentRequestHandler);
   persistentReqGrantedHandlerIdx = 
        CmiRegisterHandler((CmiHandler)persistentReqGrantedHandler);
-  persistentDestoryHandlerIdx = 
-       CmiRegisterHandler((CmiHandler)persistentDestoryHandler);
+  persistentDestroyHandlerIdx = 
+       CmiRegisterHandler((CmiHandler)persistentDestroyHandler);
 
 #if DELTA_COMPRESS
   persistentDecompressHandlerIdx = 

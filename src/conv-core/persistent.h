@@ -27,10 +27,10 @@
 	p = NULL will cancel the persistent communication. n = 1 is for 
 	sending message to one Chare, n > 1 is for message in multicast - 
 	one PersistentHandle for each PE.
-* void CmiDestoryPersistent(PersistentHandle h);
-	Destory a persistent communication specified by PersistentHandle h.
-* void CmiDestoryAllPersistent();
-	Destory all persistent communication on the local processor.
+* void CmiDestroyPersistent(PersistentHandle h);
+	Destroy a persistent communication specified by PersistentHandle h.
+* void CmiDestroyAllPersistent();
+	Destroy all persistent communication on the local processor.
 
 *****************************************************************************/
 
@@ -65,8 +65,8 @@ PersistentHandle CmiCreateCompressNodePersistentSize(int destNode, int maxBytes,
 PersistentReq CmiCreateReceiverPersistent(int maxBytes);
 PersistentHandle CmiRegisterReceivePersistent(PersistentReq req);
 void CmiUsePersistentHandle(PersistentHandle *p, int n);
-void CmiDestoryPersistent(PersistentHandle h);
-void CmiDestoryAllPersistent();
+void CmiDestroyPersistent(PersistentHandle h);
+void CmiDestroyAllPersistent();
 
 void CmiPersistentOneSend();
 #else
@@ -83,7 +83,7 @@ typedef int PersistentRecvHandle;
 #define CmiCreateReceiverPersistent(maxBytes)   
 #define CmiRegisterReceivePersistent(req)  
 #define CmiUsePersistentHandle(x,y)
-#define CmiDestoryAllPersistent()
+#define CmiDestroyAllPersistent()
 
 #endif
 
