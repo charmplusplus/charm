@@ -15,7 +15,7 @@ matmul.decl.h: matmul.ci
 	$(CHARMC) $<
 
 test: $(BINARY)
-	./charmrun +p4 ./matmul 50 5
+	./charmrun +p4 ./matmul 50 5 $(TESTOPTS)
 
 clean:
 	rm -f *.o *.decl.h *.def.h $(BINARY) charmrun

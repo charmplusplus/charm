@@ -17,7 +17,7 @@ jacobi2d.o: jacobi2d.C jacobi2d.decl.h
 	$(CHARMC) -c jacobi2d.C
 
 test: all
-	./charmrun ./jacobi2d +p4 10
+	./charmrun ./jacobi2d +p4 10 $(TESTOPTS)
 
 bgtest: all
 	./charmrun ./jacobi2d +p4 10 +x2 +y2 +z2

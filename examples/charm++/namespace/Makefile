@@ -3,7 +3,7 @@ BINARY = inherit
 
 CHARMCFLAGS =
 CHARMCLINKFLAGS = -language charm++
-TESTFLAGS = 
+TESTFLAGS = $(TESTOPTS)
 
 %.o: %.C
 
