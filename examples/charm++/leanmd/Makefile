@@ -21,7 +21,7 @@ Compute.o: Compute.C Compute.h leanmd.decl.h defs.h physics.h
 	$(CHARMC) $(OPTS) -o $@ $<
 
 test: leanmd
-	./charmrun +p4 ./leanmd 4 4 4 101 
+	./charmrun +p4 ./leanmd 3 3 3 20
 
 clean:
 	rm -f *.decl.h *.def.h *.o leanmd leanmd.prj charmrun
