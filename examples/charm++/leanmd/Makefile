@@ -8,17 +8,17 @@ leanmd: Main.o Cell.o Compute.o leanmd.decl.h
 	$(CHARMC) $(OPTS) -module DummyLB \
 	-language charm++ -o leanmd Main.o Cell.o Compute.o
 
-Main.o: Main.cc Main.h leanmd.decl.h defs.h
-	$(CHARMC) $(OPTS) -o Main.o Main.cc
+Main.o: Main.C Main.h leanmd.decl.h defs.h
+	$(CHARMC) $(OPTS) -o $@ $<
 
-Cell.o: Cell.cc Cell.h leanmd.decl.h defs.h
-	$(CHARMC) $(OPTS) -o Cell.o Cell.cc
+Cell.o: Cell.C Cell.h leanmd.decl.h defs.h
+	$(CHARMC) $(OPTS) -o $@ $<
 
 leanmd.decl.h:	leanmd.ci
 	$(CHARMC) leanmd.ci
 
-Compute.o: Compute.cc Compute.h leanmd.decl.h defs.h physics.h
-	$(CHARMC) $(OPTS) -o Compute.o Compute.cc
+Compute.o: Compute.C Compute.h leanmd.decl.h defs.h physics.h
+	$(CHARMC) $(OPTS) -o $@ $<
 
 test: leanmd
 	./charmrun +p4 ./leanmd 4 4 4 101 

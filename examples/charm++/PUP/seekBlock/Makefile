@@ -13,8 +13,8 @@ seek_block.decl.h: seek_block.ci
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o seek_block charmrun
 
-seek_block.o: seek_block.cc seek_block.h seek_block.decl.h
-	$(CHARMC) -c seek_block.cc
+seek_block.o: seek_block.C seek_block.h seek_block.decl.h
+	$(CHARMC) -c $<
 
 test: all
 	./charmrun ./seek_block +p4  $(TESTOPTS)

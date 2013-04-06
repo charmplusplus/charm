@@ -1,9 +1,9 @@
 CXX = ../../../bin/charmc
 CXXFLAGS = $(OPTS)
 
-SRC = $(wildcard *.cc)
+SRC = $(wildcard *.C)
 SRCCI = $(wildcard *.ci)
-OBJ = $(SRC:.cc=.o)
+OBJ = $(SRC:.C=.o)
 EXEC_NAME = comp.x
 DECLS := $(SRCCI:.ci=.decl.h)
 DEFS := $(SRCCI:.ci=.def.h)
@@ -23,8 +23,8 @@ $(EXEC_NAME): $(OBJ)
 %.decl.h: %.ci
 	$(CXX) -c $*.ci
 
-comp.o: comp.cc $(DECLS)
-	$(CXX) $(CXXFLAGS) -c $*.cc -o $*.o
+comp.o: comp.C $(DECLS)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 test: all
 	./charmrun +p1 ./$(EXEC_NAME) $(TESTOPTS)
