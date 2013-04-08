@@ -225,7 +225,30 @@ QUIET=""
 [ $# -lt 2 ] && ./smart-build.pl && exit 1
 PROGRAM=$1
 shift
-VERSION=$1; BASEVERSION=$1; 
+
+# find longest prefix of version argument that exists as a directory in $src
+VERSION=$1
+VERSOPTS=""
+testversion=""
+oldifs=$IFS
+IFS=-
+for w in $1; do
+  IFS=$oldifs
+  if [ -z "$testversion" ]; then
+    testversion=$w
+  else
+    testversion="$testversion-$w"
+  fi
+  if [ -d $src/$testversion ]; then
+    VERSION=$testversion
+    VERSOPTS=""
+  else
+    VERSOPTS="$VERSOPTS $w"
+  fi
+done
+if [ $VERSION = $1 ]; then VERSOPTS=""; fi
+
+BASEVERSION=$VERSION; 
 if test -f $src/$BASEVERSION/vdir_link
 then
   BASEVERSION=`cat $src/$BASEVERSION/vdir_link`
@@ -238,6 +261,28 @@ shift
 #echo $ARCH
 
 OPT_DIRS="$src/$BASEVERSION $src/$ARCH $src/common"
+
+# process remainder of version argument as options, copied from below
+for w in $VERSOPTS; do
+  # This has to be a build-time option (like "smp", "gcc3", or "kcc")
+        TestIfCompiler $w
+        if [ $? -eq 1 ] 
+        then
+  # It specifies a compiler:
+          if [ ! -z "$COMPILER" ] 
+          then
+              echo "Error> Tried to specify two compilers: $COMPILER and $w"
+              printOption
+          fi
+          COMPILER=$w
+        else
+  # It specifies some other option:
+          TestIfOption $w
+          BOPTS="$BOPTS $w"
+          [ $w =  "bigemulator" ] && BUILD_EMULATOR=1
+          [ $w =  "bigsim" ] && BUILD_EMULATOR=1
+        fi
+done
 
 while [ ! $# -eq 0 ]
 do
