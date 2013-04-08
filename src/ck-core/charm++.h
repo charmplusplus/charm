@@ -203,7 +203,6 @@ public:
 
 
 
-#include "ckhashtable.h"
 #include "ckarrayindex.h"
 
 class CkArrayID {

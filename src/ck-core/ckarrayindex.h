@@ -1,4 +1,5 @@
 #include "pup.h"
+#include "ckhashtable.h"
 
 #ifndef CKARRAYINDEX_H
 #define CKARRAYINDEX_H
@@ -7,6 +8,10 @@
 /// Max number of integers in an array index
 #ifndef CK_ARRAYINDEX_MAXLEN
     #define CK_ARRAYINDEX_MAXLEN 3
+#endif
+
+#ifndef CK_ARRAYLISTENER_MAXLEN
+# define CK_ARRAYLISTENER_MAXLEN 3
 #endif
 
 /** @warning: fwd declaration of child class to support crazy ptr cast

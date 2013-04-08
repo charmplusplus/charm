@@ -5,6 +5,11 @@
 #ifndef _ENVELOPE_H
 #define _ENVELOPE_H
 
+#include <pup.h>
+#include <middle.h>
+#include <ckarrayindex.h>
+#include <cklists.h>
+
 #ifndef CkIntbits
 #define CkIntbits (sizeof(int)*8)
 #endif

@@ -28,6 +28,7 @@ Orion Sky Lawlor, olawlor@acm.org
 
 #include "cklocation.h"
 #include "ckmemcheckpoint.h" // for CkArrayCheckPTReqMessage
+#include "ckarrayindex.h"
 
 /***********************************************************
 	Utility defines, includes, etc.
@@ -538,9 +539,6 @@ protected:
 
 private:
 //Array implementation methods:
-#ifndef CK_ARRAYLISTENER_MAXLEN
-# define CK_ARRAYLISTENER_MAXLEN 3
-#endif
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
 
 #if CMK_MEM_CHECKPOINT
