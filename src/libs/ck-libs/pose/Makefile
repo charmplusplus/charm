@@ -33,19 +33,21 @@ pose: $(LIBDEST)
 
 seqpose:  $(LIBSEQDEST) 
 
-$(LIBDEST):	$(OBJECTS)
+$(LIBDEST):	$(OBJECTS) $(POSEINCDIR) headerinst
 	$(CHARMC) -o $(LIBDEST) $(OBJECTS)
-	test ! -d $(POSEINCDIR) && mkdir $(POSEINCDIR) || true
-	/bin/cp -f  *.h $(POSEINCDIR)
 	/bin/cp libmodulepose.dep $(CHARMLIB)/.
-	/bin/cp -f  etrans.pl $(CHARMBIN)
 
-$(LIBSEQDEST):	$(SEQOBJECTS)
+$(LIBSEQDEST):	$(SEQOBJECTS) $(POSEINCDIR) headerinst
 	$(CHARMC) -o $(LIBSEQDEST) $(SEQOBJECTS)
-	test ! -d $(POSEINCDIR) && mkdir $(POSEINCDIR) || true
-	/bin/cp -f  *.h $(POSEINCDIR)
 	/bin/cp libmodulepose.dep $(CHARMLIB)/libmoduleseqpose.dep
-	/bin/cp -f  etrans.pl $(CHARMBIN)
+
+$(POSEINCDIR):
+	test ! -d $@ && mkdir $@ || true
+headerinst: $(patsubst %,$(POSEINCDIR)/%,$(wildcard *.h)) $(CHARMBIN)/etrans.pl
+$(POSEINCDIR)/%.h: %.h $(POSEINCDIR)
+	/bin/cp -f $< $@
+$(CHARMBIN)/etrans.pl: etrans.pl
+	/bin/cp -f $< $@
 
 # *******************************
 
