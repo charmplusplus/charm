@@ -1,9 +1,9 @@
-#include "pup.h"
-#include "ckhashtable.h"
-
 #ifndef CKARRAYINDEX_H
 #define CKARRAYINDEX_H
 
+#include "pup.h"
+#include "ckhashtable.h"
+#include "charm.h"
 
 /// Max number of integers in an array index
 #ifndef CK_ARRAYINDEX_MAXLEN
@@ -192,6 +192,27 @@ class CkArrayIndex: public CkArrayIndexBase
  * CkArrayIndexMax should no longer be supported.
  */
 typedef CkArrayIndex CkArrayIndexMax;
+
+class CkArray;
+
+class CkArrayID {
+	CkGroupID _gid;
+public:
+	CkArrayID() : _gid() { }
+	CkArrayID(CkGroupID g) :_gid(g) {}
+	inline void setZero(void) {_gid.setZero();}
+	inline int isZero(void) const {return _gid.isZero();}
+	operator CkGroupID() const {return _gid;}
+	CkArray *ckLocalBranch(void) const
+		{ return (CkArray *)CkLocalBranch(_gid); }
+	static CkArray *CkLocalBranch(CkArrayID id)
+		{ return (CkArray *)::CkLocalBranch(id); }
+	void pup(PUP::er &p) {p | _gid; }
+	int operator == (const CkArrayID& other) const {
+		return (_gid == other._gid);
+	}
+};
+PUPmarshall(CkArrayID)
 
 #endif // CKARRAYINDEX_H
 

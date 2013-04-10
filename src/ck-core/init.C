@@ -63,8 +63,10 @@ never be excluded...
 */
 /*@{*/
 
+#include "ckcheckpoint.h"
 #include "ck.h"
 #include "trace.h"
+#include "CkCheckpoint.decl.h"
 
 void CkRestartMain(const char* dirname);
 

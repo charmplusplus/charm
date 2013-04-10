@@ -16,6 +16,7 @@ using std::ostringstream;
 #include "charm++.h"
 #include "ck.h"
 #include "ckcheckpoint.h"
+#include "CkCheckpoint.decl.h"
 
 void noopit(const char*, ...)
 {}
@@ -127,6 +128,21 @@ static FILE* openCheckpointFile(const char *dirname, const char *basename,
         }
         return fp;
 }
+
+/**
+ * There is only one Checkpoint Manager in the whole system
+**/
+class CkCheckpointMgr : public CBase_CkCheckpointMgr {
+private:
+	CkCallback restartCB;
+	double chkptStartTimer;
+public:
+	CkCheckpointMgr() { }
+	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
+	void Checkpoint(const char *dirname,CkCallback& cb);
+	void SendRestartCB(CkReductionMsg *m);
+	void pup(PUP::er& p){ CBase_CkCheckpointMgr::pup(p); p|restartCB; }
+};
 
 // broadcast
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){

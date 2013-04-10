@@ -12,7 +12,11 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #ifndef _CKCALLBACK_H_
 #define _CKCALLBACK_H_
 
+#include "cksection.h"
 #include "conv-ccs.h" /*for CcsDelayedReply struct*/
+#include "charm.h"
+#include "ckarrayindex.h"
+
 typedef void (*CkCallbackFn)(void *param,void *message);
 typedef void (*Ck1CallbackFn)(void *message);
 

@@ -15,6 +15,9 @@
 #ifndef _CKMULTICAST_H
 #define _CKMULTICAST_H
 
+#include "charm.h"
+#include "ckarrayindex.h"
+
 #define  MulticastMsg          1
 #define  COMLIB_MULTICAST_MESSAGE    2
 
