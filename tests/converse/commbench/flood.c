@@ -6,31 +6,31 @@
 #define pvd CpvStaticDeclare
 #define pvi CpvInitialize
 
-#define MSGNUMS  10 
+#define MSGNUMS  4 
 
 static struct testdata {
   int size;
   int numiter;
 } sizes[] = {
  {16,      4000},
- {32,      4000},
- {64,      4000},
- {128,      4000},
- {256,     1000},
- {512,     1000},
- {1024,    1000},
- {2048,    1000},
- {4096,    1000},
- {8192,    1000},
- {16384,   1000},
- {32768,   1000},
- {65536,   100},
- {131072,   40},
- {524288,   40},
- {1048576, 10},
- {4194304,  10},
- {8388608,  10},
- {16777216,  4},
+{32,      4000},
+{64,      4000},
+{128,      4000},
+{256,     1000},
+{512,     1000},
+{1024,    1000},
+{2048,    1000},
+{4096,    1000},
+{8192,    1000},
+{16384,   1000},
+{32768,   1000},
+{65536,   100},
+{131072,   40},
+{524288,   40},
+{1048576, 10},
+//{4194304,  10},
+//{8388608,  10},
+//{16777216,  4},
 /*
  {33554432,  4},
 */
@@ -126,10 +126,10 @@ static void recvTime(TimeMessage *msg)
   if(pva(numRecv)==CmiNumPes()){
     for(j=0;j<pva(numSizes);j++)
       pva(gavg)[j] /= (CmiNumPes()*(CmiNumPes()-1));
-    CmiPrintf("[flood] CmiSyncSend\n");
+    CmiPrintf("[flood] CmiSyncSend %d \n", MSGNUMS);
     for(j=0;j<pva(numSizes);j++) {
-        CmiPrintf("%d\t %.2f \n",
-            sizes[j].size, 1000000*pva(gavg)[j]);
+        CmiPrintf("flood %d       \t%.4f GBytes/sec\n",
+            sizes[j].size, sizes[j].size*MSGNUMS/pva(gavg)[j]/1e9);
   //    CmiPrintf("[flood] size=%d\taverageTime=%le seconds\n",
   //                          sizes[j].size, pva(gavg)[j]);
   //    CmiPrintf("[flood] size=%d\tmaxTime=%le seconds\t[%d->%d]\n",
@@ -188,7 +188,7 @@ static void startNextSize(EmptyMsg *msg)
 {
   EmptyMsg m;
   Message *mm;
-
+  int num;
   pva(nextSize)++;
   if(pva(nextSize) == pva(numSizes)) {
     pva(nextSize) = -1;
@@ -196,13 +196,15 @@ static void startNextSize(EmptyMsg *msg)
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
   } else {
     int size = sizeof(Message)+sizes[pva(nextSize)].size;
-    mm = (Message *) CmiAlloc(size);
-    mm->srcpe = CmiMyPe();
-    mm->idx = pva(nextSize);
-    mm->iter = 0; 
-    CmiSetHandler(mm, pva(iterHandler));
-    fillMessage(mm);
-    CmiSyncSendAndFree(CmiMyPe(), size, mm);
+    for(num=0; num < MSGNUMS; num++){
+        mm = (Message *) CmiAlloc(size);
+        mm->srcpe = CmiMyPe();
+        mm->idx = pva(nextSize);
+        mm->iter = 0; 
+        CmiSetHandler(mm, pva(iterHandler));
+        fillMessage(mm);
+        CmiSyncSendAndFree(CmiMyPe(), size, mm);
+    }
     pva(starttime) = CmiWallTimer();
   }
   CmiFree(msg);
