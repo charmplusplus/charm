@@ -26,6 +26,7 @@ extern void timer_init(void);
 extern void proc_init(void);
 extern void smputil_init(void);
 extern void pingpong_init(void);
+extern void flood_init(void);
 extern void broadcast_init(void);
 extern void reduction_init(void);
 extern void ctxt_init(void);
@@ -36,6 +37,7 @@ extern void timer_moduleinit(void);
 extern void proc_moduleinit(void);
 extern void smputil_moduleinit(void);
 extern void pingpong_moduleinit(void);
+extern void flood_moduleinit(void);
 extern void broadcast_moduleinit(void);
 extern void reduction_moduleinit(void);
 extern void ctxt_moduleinit(void);
@@ -52,6 +54,7 @@ struct testinfo
   { "proc",      proc_init,      proc_moduleinit },
   { "smputil",   smputil_init,   smputil_moduleinit },
   { "pingpong",  pingpong_init,  pingpong_moduleinit },
+  { "flood",    flood_init,     flood_moduleinit},
   { "broadcast", broadcast_init, broadcast_moduleinit },
   { "reduction", reduction_init, reduction_moduleinit },
   { "ctxt",      ctxt_init,      ctxt_moduleinit },
