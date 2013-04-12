@@ -165,7 +165,7 @@ struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
         UShort arrayEp;        ///< Used only for array broadcasts
 };
 
-struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
+struct s_array{             ///< ForArrayEltMsg
         CkArrayIndexBase index; ///< Array element index
         CkGroupID arr;            ///< Array manager GID
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -175,7 +175,7 @@ struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMs
         UChar ifNotThere;         ///< what to do if array element is missing
 };
 
-struct s_arrayinit{         ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
+struct s_arrayinit{         ///< ArrayEltInitMsg
         CkArrayIndexBase index; ///< Array element index
         CkGroupID arr;            ///< Array manager GID
 #if CMK_SMP_TRACE_COMMTHREAD
