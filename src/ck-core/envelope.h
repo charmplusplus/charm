@@ -333,7 +333,7 @@ private:
     }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
-      CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
+      CkAssert(type >= NewChareMsg && type < LAST_CK_ENVELOPE_TYPE);
 
 #if CMK_USE_STL_MSGQ
       // Ideally, this should be a static compile-time assert. However we need API changes for that
