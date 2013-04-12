@@ -56,7 +56,7 @@ void ChunkMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 
 
   //THIS IS A TEMPORARY HACK, WILL WORK ONLY FOR RING
-  const CkArrayID destArrayID(env->getsetArrayMgr());
+  const CkArrayID destArrayID(env->getArrayMgr());
   int nRemotePes=-1, nRemoteIndices=-1;
   ComlibMulticastIndexCount *indicesCount;
   int *belongingList;

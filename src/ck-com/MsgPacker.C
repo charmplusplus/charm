@@ -23,7 +23,7 @@
 //         CkPackMessage(&env);
 
 //         if(count == 0) {
-//             aid = env->getsetArrayMgr();
+//             aid = env->getArrayMgr();
 //             if(aid.isZero()) 
 //                 CkAbort("Array packing set and ArrayID is zero");
 //         }        
@@ -53,7 +53,7 @@
 //         CkPackMessage(&env);
 
 //         if(count == 0) {
-//             aid = env->getsetArrayMgr();
+//             aid = env->getArrayMgr();
 //             if(aid.isZero()) 
 //                 CkAbort("Array packing set and ArrayID is zero");
 //         }        

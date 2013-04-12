@@ -460,7 +460,8 @@ private:
     void setGroupDep(const CkGroupID &r){ /* CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); */ ((struct s_groupinit*)extraData())->dep = r; }
 
 // Array-specific fields
-    CkGroupID &getsetArrayMgr(void) {return ((struct s_array*)extraData())->arr;}
+    CkGroupID getArrayMgr(void) const { return ((struct s_array*)extraData())->arr; }
+    void setArrayMgr(const CkGroupID gid) { ((struct s_array*)extraData())->arr = gid; }
     int getArrayMgrIdx(void) const {return ((struct s_array*)extraData())->arr.idx;}
     UShort &getsetArrayEp(void) {return epIdx;}
     UShort &getsetArrayBcastEp(void) {return ((struct s_group*)extraData())->arrayEp;}

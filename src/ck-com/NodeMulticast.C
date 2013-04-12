@@ -104,7 +104,7 @@
 //     env->setUsed(0);
 //     ComlibPrintf("In receive Handler\n");
 //     if(mode == ARRAY_MODE) {
-//         env->getsetArrayMgr()=mAid;
+//         env->setArrayMgr(mAid);
 // 	env->getsetArrayEp()=entryPoint;
 // 	env->getsetArrayHops()=0;	
 // 	CkUnpackMessage(&env);
