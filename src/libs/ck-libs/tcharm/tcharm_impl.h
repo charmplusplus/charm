@@ -198,7 +198,7 @@ class TCharm: public CBase_TCharm
 	
 	inline static TCharm *get(void) {
 		TCharm *c=getNULL();
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (!c) ::CkAbort("TCharm has not been initialized!\n");
 #endif
 		return c;
@@ -317,9 +317,9 @@ class TCharmAPIRoutine {
 		//Disable migratable memory allocation while in Charm++:
 		TCharm::deactivateThread();
 
-		#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 		TCHARM_Api_trace(routineName,libraryName);
-		#endif
+#endif
 	}
 
 	// Returning to user code from Charm++

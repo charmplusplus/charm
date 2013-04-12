@@ -252,8 +252,8 @@ void TCharm::pup(PUP::er &p) {
   	CkAbort("TCharm::pup> Cannot migrate with unconsumed semaphores!\n");
   }
 
-#ifndef CMK_OPTIMIZE
   DBG("Packing thread");
+#if CMK_ERROR_CHECKING
   if (!isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
     if(_BgOutOfCoreFlag==0) //not doing out-of-core scheduling
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
@@ -483,7 +483,7 @@ void TCharm::run(void)
 //Block the thread until start()ed again.
 void TCharm::stop(void)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (tid != CthSelf())
     CkAbort("Called TCharm::stop from outside TCharm thread!\n");
   if (tcharm_nothreads)

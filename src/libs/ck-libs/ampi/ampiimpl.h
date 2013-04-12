@@ -292,14 +292,14 @@ public:
 
 	//Get the array index for rank r in this communicator
 	int getIndexForRank(int r) const {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (r>=size) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
 #endif
 		if (isWorld) return r;
 		else return indices[r];
 	}
 	int getIndexForRemoteRank(int r) const {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (r>=remoteIndices.size()) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
 #endif
 		if (isWorld) return r;
