@@ -299,6 +299,10 @@ class LogPool {
     double beginComputationTime;
     double endComputationTime;
     double statisLastTimer;
+    double statisLastProcessTimer;
+    double statisLastIdleTimer;
+    double statisLastPackTimer;
+    double statisLastUnpackTimer;
     double statisTotalExecutionTime;
     double statisTotalIdleTime;
     double statisTotalPackTime;

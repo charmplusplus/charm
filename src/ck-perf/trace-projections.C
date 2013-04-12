@@ -288,7 +288,10 @@ LogPool::LogPool(char *pgm) {
   strcpy(pgmname, pgm);
 
   //statistic init
-  statisLastTimer = 0;
+  statisLastProcessTimer = 0;
+  statisLastIdleTimer = 0;
+  statisLastPackTimer = 0;
+  statisLastUnpackTimer = 0;
   statisTotalExecutionTime  = 0;
   statisTotalIdleTime = 0;
   statisTotalPackTime = 0;
@@ -670,8 +673,8 @@ void LogPool::writeStatis(void)
   double totaltime = endComputationTime - beginComputationTime;
   fprintf(statisfp, "time(sec) percentage\n");
   fprintf(statisfp, "Time:    \t%f\n", totaltime);
-  fprintf(statisfp, "Overhead:\t%f\t %.1f\n", statisTotalIdleTime, statisTotalIdleTime/totaltime * 100); 
-  fprintf(statisfp, "Idle:    \t%f\t %.1f\n", totaltime - statisTotalIdleTime - statisTotalExecutionTime , (totaltime - statisTotalIdleTime - statisTotalExecutionTime)/totaltime * 100); 
+  fprintf(statisfp, "Idle :\t%f\t %.1f\n", statisTotalIdleTime, statisTotalIdleTime/totaltime * 100); 
+  fprintf(statisfp, "Overhead:    \t%f\t %.1f\n", totaltime - statisTotalIdleTime - statisTotalExecutionTime , (totaltime - statisTotalIdleTime - statisTotalExecutionTime)/totaltime * 100); 
   fprintf(statisfp, "Exeuction:\t%f\t %.1f\n", statisTotalExecutionTime, statisTotalExecutionTime/totaltime*100); 
   fprintf(statisfp, "Pack:     \t%f\t %.2f\n", statisTotalPackTime, statisTotalPackTime/totaltime*100); 
   fprintf(statisfp, "Unpack:   \t%f\t %.2f\n", statisTotalUnpackTime, statisTotalUnpackTime/totaltime*100); 
@@ -749,22 +752,28 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
             statisTotalMemFree++;
             break;
         case BEGIN_PROCESSING:
+            statisLastProcessTimer = time;
+            break;
         case BEGIN_UNPACK:
+            statisLastUnpackTimer = time;
+            break;
         case BEGIN_PACK:
+            statisLastPackTimer = time;
+            break;
         case BEGIN_IDLE:
-            statisLastTimer = time;
+            statisLastIdleTimer = time;
             break;
         case END_PROCESSING:
-            statisTotalExecutionTime += (time - statisLastTimer);
+            statisTotalExecutionTime += (time - statisLastProcessTimer);
             break;
         case END_UNPACK:
-            statisTotalUnpackTime += (time - statisLastTimer);
+            statisTotalUnpackTime += (time - statisLastUnpackTimer);
             break;
         case END_PACK:
-            statisTotalPackTime += (time - statisLastTimer);
+            statisTotalPackTime += (time - statisLastPackTimer);
             break;
         case END_IDLE:
-            statisTotalIdleTime += (time - statisLastTimer);
+            statisTotalIdleTime += (time - statisLastIdleTimer);
             break;
         default:
             break;
