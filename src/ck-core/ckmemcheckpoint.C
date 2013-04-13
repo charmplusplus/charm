@@ -170,7 +170,7 @@ void ArrayElement::init_checkpt() {
 	  CkPrintf("[%d] Warning: init_checkpt called during restart, possible bug in migration constructor!\n");
 	}
 	// only master init checkpoint
-        if (thisArray->getLocMgr()->firstManager->mgr!=thisArray) return;
+        if (thisArray->getLocMgr()->managers.begin()->second != thisArray) return;
 
         budPEs[0] = CkMyPe();
         budPEs[1] = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->BuddyPE(CkMyPe());

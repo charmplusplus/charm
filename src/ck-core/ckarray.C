@@ -926,13 +926,14 @@ CkArray::CkArray(CkArrayOptions &opts,
     locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
     locMgrID(opts.getLocationManager()),
     thisProxy(thisgroup),
-    // Register with our location manager
-    elements((ArrayElementList *)locMgr->addManager(thisgroup,this)),
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
     numInitial(opts.getNumInitial()), isInserting(true)
 {
-  setupSpringCleaning();
+  // Register with our location manager
+  locMgr->addManager(thisgroup,this);
 
+  setupSpringCleaning();
+  
   //set the field in one my parent class (CkReductionMgr)
   if(opts.disableNotifyChildInRed)
 	  disableNotifyChildrenStart = true; 
@@ -1029,7 +1030,7 @@ void CkArray::pup(PUP::er &p){
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;
 		locMgr = CProxy_CkLocMgr::ckLocalBranch(locMgrID);
-		elements = (ArrayElementList *)locMgr->addManager(thisgroup,this);
+		locMgr->addManager(thisgroup,this);
 		/// Restore our default listeners:
 		broadcaster=(CkArrayBroadcaster *)(CkArrayListener *)(listeners[0]);
 		reducer=(CkArrayReducer *)(CkArrayListener *)(listeners[1]);
@@ -1616,14 +1617,6 @@ void CkArray::recvBroadcast(CkMessage *m)
         _tempBroadcastCount=0;
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
-	//Run through the list of local elements
-	int idx=0, len=0, count=0;
-        if (stableLocations) {            /* remove all NULLs in the array */
-          len = 0;
-          while (elements->next(idx)!=NULL) len++;
-          idx = 0;
-        }
-	ArrayElement *el;
 #if CMK_BIGSIM_CHARM
         void *root;
         _TRACE_BG_TLINE_END(&root);
@@ -1632,7 +1625,8 @@ void CkArray::recvBroadcast(CkMessage *m)
 	extern void stopVTimer();
 	extern void startVTimer();
 #endif
-	while (NULL!=(el=elements->next(idx))) {
+    int len = localElems.size(), count = 0;
+    for (std::map<int,CkMigratable*>::iterator itr = localElems.begin(); itr != localElems.end(); ++itr) {
 #if CMK_BIGSIM_CHARM
                 //BgEntrySplit("split-broadcast");
   		stopVTimer();
@@ -1642,7 +1636,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 #endif
 		bool doFree = false;
 		if (stableLocations && ++count == len) doFree = true;
-		broadcaster->deliver(msg, el, doFree);
+		broadcaster->deliver(msg, (ArrayElement*)itr->second, doFree);
 	}
 #endif
 
@@ -1686,11 +1680,8 @@ void CkArray::ckDestroy() {
   // to send messages to remote PEs with reclaimRemote messages.
   locMgr->setDuringDestruction(true);
 
-  int i = 0;
-  ArrayElement *a = NULL;
-  while ((a = elements->next(i))) {
-    a->ckDestroy();
-  }
+  for (std::map<int, CkMigratable*>::iterator i = localElems.begin(); i != localElems.end(); ++i)
+    i->second->ckDestroy();
 
   locMgr->deleteManager(CkGroupID(thisProxy), this);
   delete this;

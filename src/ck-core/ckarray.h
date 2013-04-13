@@ -693,8 +693,8 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
   CkLocMgr *locMgr;
   CkGroupID locMgrID;
   CProxy_CkArray thisProxy;
-  typedef CkMigratableListT<ArrayElement> ArrayElementList;
-  ArrayElementList *elements;
+  // Stores a list of array elements.  These lists are kept by the array managers. 
+  std::map<int, CkMigratable*> localElems;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     int *children;
     int numChildren;
@@ -726,6 +726,15 @@ public:
   /// Fetch a local element via its index (return NULL if not local)
   inline ArrayElement *lookup(const CkArrayIndex &index)
 	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}
+
+  virtual CkMigratable* getEltFromArrMgr(int localIdx) {
+    std::map<int, CkMigratable*>::iterator itr = localElems.find(localIdx);
+    return ( itr == localElems.end() ? NULL : itr->second );
+  }
+  virtual void putEltInArrMgr(int localIdx, CkMigratable* elt)
+  { localElems[localIdx] = elt; }
+  virtual CkMigratable* eraseEltFromArrMgr(int localIdx)
+  { localElems.erase(localIdx); }
 
 //Creation:
   /// Create-after-migrate:

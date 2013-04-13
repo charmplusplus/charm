@@ -1834,23 +1834,6 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 #endif
 
 
-/*CkMigratableList*/
-CkMigratableList::CkMigratableList() {}
-CkMigratableList::~CkMigratableList() {}
-
-void CkMigratableList::setSize(int s) {
-	el.resize(s);
-}
-
-void CkMigratableList::put(CkMigratable *v,int atIdx) {
-#if CMK_ERROR_CHECKING
-	if (atIdx>=length())
-		CkAbort("Internal array manager error (CkMigrableList::put index out of bounds)");
-#endif
-	el[atIdx]=v;
-}
-
-
 /************************** Location Records: *********************************/
 
 //---------------- Base type:
@@ -2535,9 +2518,6 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 // moved to _CkMigratable_initInfoInit()
 //	CkpvInitialize(CkMigratable_initInfo,mig_initInfo);
 
-	managers.init();
-	nManagers=0;
-  	firstManager=NULL;
 	firstFree=localLen=0;
 	duringMigration=false;
 	nSprings=0;
@@ -2564,9 +2544,6 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	:IrrGroup(m),thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),hash(17,0.3)
 {
-	managers.init();
-	nManagers=0;
-	firstManager=NULL;
 	firstFree=localLen=0;
 	duringMigration=false;
 	nSprings=0;
@@ -2700,42 +2677,18 @@ void _CkLocMgrInit(void) {
 }
 
 /// Add a new local array manager to our list.
-/// Returns a new CkMigratableList for the manager to store his
-/// elements in.
-CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
+void CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 {
 	CK_MAGICNUMBER_CHECK
 	DEBC((AA "Adding new array manager\n" AB));
-	//Link new manager into list
-	ManagerRec *n=new ManagerRec;
-	managers.find(id)=n;
-	n->next=firstManager;
-	n->mgr=mgr;
-	n->elts.setSize(localLen);
-	nManagers++;
-	firstManager=n;
-	return &n->elts;
+	managers[id] = mgr;
 }
 
 void CkLocMgr::deleteManager(CkArrayID id, CkArrMgr *mgr) {
-  ManagerRec *&rec = managers.find(id);
+  CkAssert(managers[id] == mgr);
+  managers.erase(id);
 
-  ManagerRec **prev = &firstManager;
-  ManagerRec *cur = firstManager;
-  while (cur->mgr != mgr) {
-    prev = &cur->next;
-    cur = cur->next;
-  }
-
-  CkAssert(cur);
-  CkAssert(cur == rec);
-
-  *prev = cur->next;
-  nManagers--;
-  delete cur;
-  rec = NULL; // Would like to remove the entry entirely, but it's in a direct-mapped array
-
-  if (nManagers == 0)
+  if (managers.size() == 0)
     delete this;
 }
 
@@ -2746,8 +2699,6 @@ int CkLocMgr::nextFree(void) {
 		int oldLen=localLen;
 		localLen=localLen*2+8;
 		DEBC((AA "Growing the local list from %d to %d...\n" AB,oldLen,localLen));
-		for (ManagerRec *m=firstManager;m!=NULL;m=m->next)
-			m->elts.setSize(localLen);
 		//Update the free list
 		freeList.resize(localLen);
 		for (int i=oldLen;i<localLen;i++)
@@ -2852,18 +2803,18 @@ bool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 		rec=((CkLocRec_local *)oldRec);
 		rec->addedElement();
 	}
-	if (!addElementToRec(rec,managers.find(id),elt,ctorIdx,ctorMsg)) return false;
+	if (!addElementToRec(rec,managers[id],elt,ctorIdx,ctorMsg)) return false;
 	elt->ckFinishConstruction();
 	return true;
 }
 
 //As above, but shared with the migration code
-bool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
+bool CkLocMgr::addElementToRec(CkLocRec_local *rec,CkArrMgr *mgr,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg)
 {//Insert the new element into its manager's local list
 	int localIdx=rec->getLocalIndex();
-	if (m->elts.get(localIdx)!=NULL) CkAbort("Cannot insert array element twice!");
-	m->elts.put(elt,localIdx); //Local element table
+	if (mgr->getEltFromArrMgr(localIdx)) CkAbort("Cannot insert array element twice!");
+	mgr->putEltInArrMgr(localIdx, elt); //Local element table
 
 //Call the element's constructor
 	DEBC((AA "Constructing element %s of array\n" AB,idx2str(rec->getIndex())));
@@ -2918,9 +2869,12 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	CK_MAGICNUMBER_CHECK
 	DEBC((AA "Destroying element %s (local %d)\n" AB,idx2str(idx),localIdx));
 	//Delete, and mark as empty, each array element
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		delete m->elts.get(localIdx);
-		m->elts.empty(localIdx);
+    for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin();
+            itr != managers.end(); ++itr) {
+        if (itr->second->getEltFromArrMgr(localIdx)) {
+            delete itr->second->getEltFromArrMgr(localIdx);
+            itr->second->eraseEltFromArrMgr(localIdx);
+        }
 	}
 	
 	removeFromTable(idx);
@@ -3132,9 +3086,9 @@ bool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts)
 	}
 	else
 	{ // We *are* the home processor:
-	//Check if the element's array manager has been registered yet:
-	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getArrayMgr())->mgr;
-	  if (!mgr) { //No manager yet-- postpone the message (stupidly)
+	  //Check if the element's array manager has been registered yet:
+      //No manager yet-- postpone the message (stupidly)
+	  if (managers.find(UsrToEnv((void*)msg)->getArrayMgr()) == managers.end()) {
 	    if (CkInRestarting()) {
 	      // during restarting, this message should be ignored
 	      delete msg;
@@ -3176,9 +3130,8 @@ bool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type
 	
 	//Find the manager and build the element
 	DEBC((AA "Demand-creating element %s on pe %d\n" AB,idx2str(idx),onPe));
-	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getArrayMgr())->mgr;
-	if (!mgr) CkAbort("Tried to demand-create for nonexistent arrMgr");
-	return mgr->demandCreateElement(idx,onPe,ctor,type);
+	return managers[UsrToEnv((void *)msg)->getArrayMgr()]
+        ->demandCreateElement(idx,onPe,ctor,type);
 }
 
 //This message took several hops to reach us-- fix it
@@ -3257,25 +3210,24 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
         CkElementCreation_t type, bool create, int dummy)
 {
     p.comment("-------- Array Location --------");
-    register ManagerRec *m;
     int localIdx=rec->getLocalIndex();
     CkVec<CkMigratable *> dummyElts;
 
-    for (m=firstManager;m!=NULL;m=m->next) {
+    for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
         int elCType;
         if (!p.isUnpacking())
         { //Need to find the element's existing type
-            CkMigratable *elt=m->element(localIdx);
+            CkMigratable *elt = itr->second->getEltFromArrMgr(localIdx);
             if (elt) elCType=elt->ckGetChareType();
             else elCType=-1; //Element hasn't been created
         }
         p(elCType);
         if (p.isUnpacking() && elCType!=-1) {
-            CkMigratable *elt=m->mgr->allocateMigrated(elCType,rec->getIndex(),type);
+            CkMigratable *elt = itr->second->allocateMigrated(elCType,rec->getIndex(),type);
             int migCtorIdx=_chareTable[elCType]->getMigCtor();
                 if(!dummy){
 			if(create)
-                    		if (!addElementToRec(rec,m,elt,migCtorIdx,NULL)) return;
+                    		if (!addElementToRec(rec, itr->second, elt, migCtorIdx, NULL)) return;
  				}else{
                     CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
                     i.locRec=rec;
@@ -3286,8 +3238,8 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
         }
     }
     if(!dummy){
-        for (m=firstManager;m!=NULL;m=m->next) {
-            CkMigratable *elt=m->element(localIdx);
+        for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+            CkMigratable *elt = itr->second->getEltFromArrMgr(localIdx);
             if (elt!=NULL)
                 {
                        elt->virtual_pup(p);
@@ -3301,8 +3253,8 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
         		}
                 delete elt;
             }
-			for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-                m->elts.empty(localIdx);
+            for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+                itr->second->eraseEltFromArrMgr(localIdx);
             }
         freeList[localIdx]=firstFree;
         firstFree=localIdx;
@@ -3313,31 +3265,30 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 		CkElementCreation_t type,bool rebuild)
 {
 	p.comment("-------- Array Location --------");
-	register ManagerRec *m;
 	int localIdx=rec->getLocalIndex();
 
 	//First pup the element types
 	// (A separate loop so ckLocal works even in element pup routines)
-	for (m=firstManager;m!=NULL;m=m->next) {
+    for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
 		int elCType;
 		if (!p.isUnpacking())
 		{ //Need to find the element's existing type
-			CkMigratable *elt=m->element(localIdx);
+			CkMigratable *elt = itr->second->getEltFromArrMgr(localIdx);
 			if (elt) elCType=elt->ckGetChareType();
 			else elCType=-1; //Element hasn't been created
 		}
 		p(elCType);
 		if (p.isUnpacking() && elCType!=-1) {
 			//Create the element
-			CkMigratable *elt=m->mgr->allocateMigrated(elCType,rec->getIndex(),type);
+			CkMigratable *elt = itr->second->allocateMigrated(elCType,rec->getIndex(),type);
 			int migCtorIdx=_chareTable[elCType]->getMigCtor();
 			//Insert into our tables and call migration constructor
-			if (!addElementToRec(rec,m,elt,migCtorIdx,NULL)) return;
+			if (!addElementToRec(rec,itr->second,elt,migCtorIdx,NULL)) return;
 		}
 	}
 	//Next pup the element data
-	for (m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *elt=m->element(localIdx);
+    for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+		CkMigratable *elt = itr->second->getEltFromArrMgr(localIdx);
 		if (elt!=NULL)
                 {
                         elt->virtual_pup(p);
@@ -3371,8 +3322,8 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn)
 {
 	int localIdx=rec->getLocalIndex();
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *el=m->element(localIdx);
+    for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+		CkMigratable *el = itr->second->getEltFromArrMgr(localIdx);
 		if (el) (el->* fn)();
 	}
 }
@@ -3381,8 +3332,8 @@ void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn)
 void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_arg_t fn,     void * data)
 {
 	int localIdx=rec->getLocalIndex();
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *el=m->element(localIdx);
+    for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+		CkMigratable *el = itr->second->getEltFromArrMgr(localIdx);
 		if (el) (el->* fn)(data);
 	}
 }
@@ -3390,11 +3341,10 @@ void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_arg_t fn,     
 /// return a list of migratables in this local record
 void CkLocMgr::migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list)
 {
-        register ManagerRec *m;
         int localIdx=rec->getLocalIndex();
 
-        for (m=firstManager;m!=NULL;m=m->next) {
-                CkMigratable *elt=m->element(localIdx);
+        for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+                CkMigratable *elt = itr->second->getEltFromArrMgr(localIdx);
                 if (elt) list.push_back(elt);
         }
 }
@@ -3417,8 +3367,8 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 #if CMK_OUT_OF_CORE
 	int localIdx=rec->getLocalIndex();
 	/* Load in any elements that are out-of-core */
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *el=m->element(localIdx);
+    for (std::map<CkArrayID, CkArrMgr*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+		CkMigratable *el = itr->second->getEltFromArrMgr(localIdx);
 		if (el) if (!el->isInCore) CooBringIn(el->prefetchObjID);
 	}
 #endif
@@ -3440,7 +3390,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		new (bufSize, 0) CkArrayElementMigrateMessage;
 	msg->idx=idx;
 	msg->length=bufSize;
-        msg->nManagers = nManagers;
+        msg->nManagers = managers.size();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     msg->gid = ckGetGroupID();
 #endif
@@ -3513,9 +3463,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		
 	PUP::fromMem p(msg->packData); 
 	
-	if (msg->nManagers < nManagers)
+	if (msg->nManagers < managers.size())
 		CkAbort("Array element arrived from location with fewer managers!\n");
-	if (msg->nManagers > nManagers) {
+	if (msg->nManagers > managers.size()) {
 		//Some array managers haven't registered yet-- throw it back
 		DEBM((AA "Busy-waiting for array registration on migrating %s\n" AB,idx2str(idx)));
 		thisProxy[CkMyPe()].immigrate(msg);
@@ -3537,7 +3487,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 			"packing PUP::er, but %d bytes in the unpacking PUP::er!\n",
 			msg->length,p.size());
 		CkError("(I have %d managers; he claims %d managers)\n",
-			nManagers, msg->nManagers);
+			managers.size(), msg->nManagers);
 		
 		CkAbort("Array element's pup routine has a direction mismatch.\n");
 	}

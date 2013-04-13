@@ -9,6 +9,8 @@ array proxies, or the details of element creation (see ckarray.h).
 #ifndef __CKLOCATION_H
 #define __CKLOCATION_H
 
+#include <map>
+
 /*********************** Array Messages ************************/
 class CkArrayMessage : public CkMessage {
 public:
@@ -129,53 +131,6 @@ CkpvExtern(int,CkSaveRestorePrefetch);
 
 #include "ckmigratable.h"
 
-/** 
- * Stores a list of array elements.  These lists are 
- * kept by the array managers. 
- */
-class CkMigratableList {
-	CkVec< CkZeroPtr<CkMigratable> > el;
- public:
-	CkMigratableList();
-	~CkMigratableList();
-	
-	void setSize(int s);
-	inline int length(void) const {return el.length();}
-
-	/// Add an element at the given location
-	void put(CkMigratable *v,int atIdx);
-
-	/// Return the element at the given location
-	inline CkMigratable *get(int localIdx) {return el[localIdx];}
-
-	/**
-	 * Return the next non-empty element starting from the given index,
-	 * or NULL if there is none.  Updates from to point past the returned index.
-	*/
-	CkMigratable *next(int &from) {
-		while (from<length()) {
-			CkMigratable *ret=el[from];
-			from++;
-			if (ret!=NULL) return ret;
-		}
-		return NULL;
-	}
-
-	/// Remove the element at the given location
-	inline void empty(int localIdx) {el[localIdx]=NULL;}
-};
-
-/**
- *A typed version of the above.
- */
-template <class T>
-class CkMigratableListT : public CkMigratableList {
-	typedef CkMigratableList super;
-public:
-	inline void put(T *v,int atIdx) {super::put((CkMigratable *)v,atIdx);}
-	inline T *get(int localIdx) {return (T *)super::get(localIdx);}
-	inline T *next(int &from) {return (T *)super::next(from);}
-};
 
 
 /********************** CkLocMgr ********************/
@@ -267,6 +222,10 @@ public:
 	///  false if the element migrated away or deleted itself.
 	virtual bool demandCreateElement(const CkArrayIndex &idx,
 		int onPe,int ctor,CkDeliver_t type) =0;
+
+    virtual CkMigratable* getEltFromArrMgr(int localIdx) = 0;
+    virtual void putEltInArrMgr(int localIdx, CkMigratable* elt) = 0;
+    virtual CkMigratable* eraseEltFromArrMgr(int localIdx) = 0;
 };
 
 
@@ -295,8 +254,7 @@ public:
 //Interface used by array manager and proxies
 	/// Add a new local array manager to our list.  Array managers
 	///  must be registered in the same order on all processors.
-	/// Returns a list which will contain that array's local elements
-	CkMigratableList *addManager(CkArrayID aid,CkArrMgr *mgr);
+	void addManager(CkArrayID aid,CkArrMgr *mgr);
         void deleteManager(CkArrayID aid, CkArrMgr *mgr);
 
 	/// Populate this array with initial elements
@@ -335,11 +293,7 @@ public:
 //Interface used by CkLocRec_local
 	//Look up the object with this local index
 	inline CkMigratable *lookupLocal(int localIdx,CkArrayID arrayID) {
-#if CMK_ERROR_CHECKING
-		if (managers.find(arrayID)->mgr==NULL)
-			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
-#endif
-		return managers.find(arrayID)->elts.get(localIdx);
+		return managers.at(arrayID)->getEltFromArrMgr(localIdx);
 	}
 
 	//Migrate us to another processor
@@ -461,25 +415,9 @@ public:
 
 //Data Members:
 	//Map array ID to manager and elements
-	class ManagerRec {
-	public:
-		ManagerRec *next; //next non-null array manager
-		CkArrMgr *mgr;
-		CkMigratableList elts;
-		ManagerRec() {
-			next=NULL;
-			mgr=NULL;
-		}
-		void init(void) { next=NULL; mgr=NULL; }
-		CkMigratable *element(int localIdx) {
-			return elts.get(localIdx);
-		}
-	};
-	GroupIdxArray<ManagerRec *> managers;
-	int nManagers;
-	ManagerRec *firstManager; //First non-null array manager
+    std::map<CkArrayID, CkArrMgr*> managers;
 
-	bool addElementToRec(CkLocRec_local *rec,ManagerRec *m,
+	bool addElementToRec(CkLocRec_local *rec,CkArrMgr *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 
 	//For keeping track of free local indices
