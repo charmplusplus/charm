@@ -263,6 +263,8 @@ void flood_moduleinit(void)
   pva(numRecv) = 0;
   pvi(int, nextIter);
   pva(nextIter) = -1;
+  pvi(int, doneNum);
+  pva(doneNum) = 0;
   pvi(int, nextSize);
   pva(nextSize) = -1;
   pvi(int, nextNbr);
