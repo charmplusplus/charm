@@ -18,4 +18,4 @@ test.ci.stamp: test.ci
 	touch $@
 
 clean:
-	rm -f $(TARGETS) *.o *.decl.h *.def.h charmrun pgm.exe pgm.pdb pgm.ilk
+	rm -f $(TARGETS) *.o *.decl.h *.def.h test.ci.stamp charmrun pgm.exe pgm.pdb pgm.ilk
