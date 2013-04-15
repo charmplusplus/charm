@@ -211,6 +211,9 @@ public:
 	int operator == (const CkArrayID& other) const {
 		return (_gid == other._gid);
 	}
+    friend bool operator< (const CkArrayID &lhs, const CkArrayID &rhs) {
+        return (lhs._gid < rhs._gid);
+    }
 };
 PUPmarshall(CkArrayID)
 
