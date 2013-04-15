@@ -684,7 +684,7 @@ class CkArrayReducer;
 
 void _ckArrayInit(void);
 
-class CkArray : public CkReductionMgr, public CkArrMgr {
+class CkArray : public CkReductionMgr {
   friend class ArrayElement;
   friend class CProxy_ArrayBase;
   friend class CProxyElement_ArrayBase;
@@ -694,7 +694,7 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
   CkGroupID locMgrID;
   CProxy_CkArray thisProxy;
   // Stores a list of array elements.  These lists are kept by the array managers. 
-  std::map<int, CkMigratable*> localElems;
+  std::map<CkArrayIndex, CkMigratable*> localElems;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     int *children;
     int numChildren;
@@ -722,22 +722,23 @@ public:
   /// Deliver message to this element (directly if local)
   /// doFree if is local
   inline int deliver(CkMessage *m,CkDeliver_t type,int opts=0)
-	  {return locMgr->deliver(m,type,opts);}
+	  {return locMgr->deliverMsg(m,type,opts);}
   /// Fetch a local element via its index (return NULL if not local)
-  inline ArrayElement *lookup(const CkArrayIndex &index)
-	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}
+  inline ArrayElement *lookup(const CkArrayIndex &index) { return (ArrayElement*) getEltFromArrMgr(index); }
 
-  virtual CkMigratable* getEltFromArrMgr(int localIdx) {
-    std::map<int, CkMigratable*>::iterator itr = localElems.find(localIdx);
+  virtual CkMigratable* getEltFromArrMgr(const CkArrayIndex &idx) {
+    std::map<CkArrayIndex, CkMigratable*>::iterator itr = localElems.find(idx);
     return ( itr == localElems.end() ? NULL : itr->second );
   }
-  virtual void putEltInArrMgr(int localIdx, CkMigratable* elt)
-  { localElems[localIdx] = elt; }
-  virtual CkMigratable* eraseEltFromArrMgr(int localIdx)
-  { localElems.erase(localIdx); }
+  virtual void putEltInArrMgr(const CkArrayIndex &idx, CkMigratable* elt)
+  { localElems[idx] = elt; }
+  virtual CkMigratable* eraseEltFromArrMgr(const CkArrayIndex &idx)
+  { localElems.erase(idx); }
 
 //Creation:
   /// Create-after-migrate:
+  /// Create an uninitialized element after migration
+  ///  The element's constructor will be called immediately after.
   virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx,
 		  	CkElementCreation_t type);
 
@@ -755,6 +756,9 @@ public:
   virtual bool insertElement(CkMessage *);
 
 /// Demand-creation:
+  /// Demand-create an element at this index on this processor
+  ///  Returns true if the element was successfully added;
+  ///  false if the element migrated away or deleted itself.
   bool demandCreateElement(const CkArrayIndex &idx,
   	int onPe,int ctor,CkDeliver_t type);
 
@@ -817,7 +821,9 @@ public:
         static int isIrreducible() { return 1; }
 };
 
-
+// Maintain old name of former parent class for backwards API compatibility
+// with usage in maps' populateInitial()
+typedef CkArray CkArrMgr;
 
 /*@}*/
 

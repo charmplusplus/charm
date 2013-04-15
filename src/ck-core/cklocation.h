@@ -77,7 +77,7 @@ public:
 extern CkGroupID _defaultArrayMapID;
 extern CkGroupID _fastArrayMapID;
 class CkLocMgr;
-class CkArrMgr;
+class CkArray;
 
 /**
 \addtogroup CkArray
@@ -95,7 +95,7 @@ public:
   virtual ~CkArrayMap();
   virtual int registerArray(const CkArrayIndex& numElements, CkArrayID aid);
   virtual void unregisterArray(int idx);
-  virtual void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArrMgr *mgr);
+  virtual void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArray *mgr);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
   virtual int homePe(int arrayHdl,const CkArrayIndex &element)
              { return procNum(arrayHdl, element); }
@@ -202,31 +202,6 @@ enum CkElementCreation_t {
   CkElementCreation_resume=3,  // Create object after checkpoint
   CkElementCreation_restore=4  // Create object after checkpoint, skip listeners
 };
-/// Abstract superclass of all array manager objects 
-class CkArrMgr {
-public:
-	virtual ~CkArrMgr() {}
-	/// Insert this initial element on this processor
-	virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local=1)=0;
-	
-	/// Done with initial insertions
-	virtual void doneInserting(void)=0;
-	
-	/// Create an uninitialized element after migration
-	///  The element's constructor will be called immediately after.
-	virtual CkMigratable *allocateMigrated(int elChareType,
-		const CkArrayIndex &idx,CkElementCreation_t type) =0;
-
-	/// Demand-create an element at this index on this processor
-	///  Returns true if the element was successfully added;
-	///  false if the element migrated away or deleted itself.
-	virtual bool demandCreateElement(const CkArrayIndex &idx,
-		int onPe,int ctor,CkDeliver_t type) =0;
-
-    virtual CkMigratable* getEltFromArrMgr(int localIdx) = 0;
-    virtual void putEltInArrMgr(int localIdx, CkMigratable* elt) = 0;
-    virtual CkMigratable* eraseEltFromArrMgr(int localIdx) = 0;
-};
 
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -251,80 +226,19 @@ public:
 	inline CProxy_CkLocMgr &getProxy(void) {return thisProxy;}
 	inline CProxyElement_CkLocMgr &getLocalProxy(void) {return thislocalproxy;}
 
-//Interface used by array manager and proxies
-	/// Add a new local array manager to our list.  Array managers
-	///  must be registered in the same order on all processors.
-	void addManager(CkArrayID aid,CkArrMgr *mgr);
-        void deleteManager(CkArrayID aid, CkArrMgr *mgr);
-
-	/// Populate this array with initial elements
-	void populateInitial(CkArrayOptions& options,void *initMsg,CkArrMgr *mgr)
-    { map->populateInitial(mapHandle,options,initMsg,mgr); }
-
-	/// Add a new local array element, calling element's constructor
-	///  Returns true if the element was successfully added;
-	///  false if the element migrated away or deleted itself.
-	bool addElement(CkArrayID aid,const CkArrayIndex &idx, CkMigratable *elt,int ctorIdx,void *ctorMsg);
-
-	///Deliver message to this element:
-	inline void deliverViaQueue(CkMessage *m) {deliver(m,CkDeliver_queue);}
-	inline void deliverInline(CkMessage *m) {deliver(m,CkDeliver_inline);}
-	int deliver(CkMessage *m, CkDeliver_t type, int opts=0);
-
-	///Done inserting elements for now
-	void doneInserting(void);
-	void startInserting(void);
-
-	// How many elements of each associated array are local to this PE?
-	// If this returns n, and there are k associated arrays, that
-	// means k*n elements are living here
-	unsigned int numLocalElements();
-
-//Advisories:
-	///This index now lives on the given processor-- update local records
-	void inform(const CkArrayIndex &idx,int nowOnPe);
-
-	///This index now lives on the given processor-- tell the home processor
-	void informHome(const CkArrayIndex &idx,int nowOnPe);
-
-	///This message took several hops to reach us-- fix it
-	void multiHop(CkArrayMessage *m);
-
-//Interface used by CkLocRec_local
-	//Look up the object with this local index
-	inline CkMigratable *lookupLocal(int localIdx,CkArrayID arrayID) {
-		return managers.at(arrayID)->getEltFromArrMgr(localIdx);
-	}
-
-	//Migrate us to another processor
-	void emigrate(CkLocRec_local *rec,int toPe);
-    void informLBPeriod(CkLocRec_local *rec, int lb_ideal_period);
-    void metaLBCallLB(CkLocRec_local *rec);
-
-#if CMK_LBDB_ON
-	LBDatabase *getLBDB(void) const { return the_lbdb; }
-    MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
-	const LDOMHandle &getOMHandle(void) const { return myLBHandle; }
-#endif
-
-	//This index will no longer be used-- delete the associated elements
-	void reclaim(const CkArrayIndex &idx,int localIdx);
-
-	int getSpringCount(void) const { return nSprings; }
-
-	bool demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type);
-
 //Interface used by external users:
 	/// Home mapping
 	inline int     homePe (const CkArrayIndex &idx) const {return map->homePe(mapHandle,idx);}
 	inline int     procNum(const CkArrayIndex &idx) const {return map->procNum(mapHandle,idx);}
 	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
 
-	/// Look up the object with this array index, or return NULL
-	CkMigratable *lookup(const CkArrayIndex &idx,CkArrayID aid);
-
 	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx);
+
+	//Look up array element in hash table.  Index out-of-bounds if not found.
+	CkLocRec *elementRec(const CkArrayIndex &idx);
+	//Look up array element in hash table.  Return NULL if not there.
+	CkLocRec *elementNrec(const CkArrayIndex &idx);
 
 	/// Return true if this array element lives on another processor
 	bool isRemote(const CkArrayIndex &idx,int *onPe) const;
@@ -348,6 +262,61 @@ public:
 	void resume(const CkArrayIndex &idx, PUP::er &p, bool notify=true,bool=false);
 #endif
 
+//Interface used by array manager and proxies
+	/// Add a new local array manager to our list.
+	void addManager(CkArrayID aid,CkArray *mgr);
+        void deleteManager(CkArrayID aid, CkArray *mgr);
+
+	/// Populate this array with initial elements
+	void populateInitial(CkArrayOptions& options,void *initMsg,CkArray *mgr)
+    { map->populateInitial(mapHandle,options,initMsg,mgr); }
+
+	/// Add a new local array element, calling element's constructor
+	///  Returns true if the element was successfully added; false if the element migrated away or deleted itself.
+	bool addElement(CkArrayID aid,const CkArrayIndex &idx, CkMigratable *elt,int ctorIdx,void *ctorMsg);
+
+	///Done inserting elements for now
+	void doneInserting(void);
+	void startInserting(void);
+
+	// How many elements of each associated array are local to this PE?
+	// If this returns n, and there are k associated arrays, that
+	// means k*n elements are living here
+	unsigned int numLocalElements();
+
+	///Deliver message to this element:
+	int deliverMsg(CkMessage *m, CkDeliver_t type, int opts=0);
+
+//Advisories:
+	///This index now lives on the given processor-- update local records
+	void inform(const CkArrayIndex &idx,int nowOnPe);
+
+	///This index now lives on the given processor-- tell the home processor
+	void informHome(const CkArrayIndex &idx,int nowOnPe);
+
+	///This message took several hops to reach us-- fix it
+	void multiHop(CkArrayMessage *m);
+
+//Interface used by CkLocRec_local
+
+	//Migrate us to another processor
+	void emigrate(CkLocRec_local *rec,int toPe);
+    void informLBPeriod(CkLocRec_local *rec, int lb_ideal_period);
+    void metaLBCallLB(CkLocRec_local *rec);
+
+#if CMK_LBDB_ON
+	LBDatabase *getLBDB(void) const { return the_lbdb; }
+    MetaBalancer *getMetaBalancer(void) const { return the_metalb;}
+	const LDOMHandle &getOMHandle(void) const { return myLBHandle; }
+#endif
+
+	//This index will no longer be used-- delete the associated elements
+	void reclaim(const CkArrayIndex &idx);
+
+	int getSpringCount(void) const { return nSprings; }
+
+	bool demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type);
+
 //Communication:
 	void immigrate(CkArrayElementMigrateMessage *msg);
         void requestLocation(const CkArrayIndex &idx, int peToTell, bool suppressIfHere);
@@ -362,11 +331,6 @@ public:
 	void flushLocalRecs(void);
 	void pup(PUP::er &p);
 	
-	//Look up array element in hash table.  Index out-of-bounds if not found.
-	CkLocRec *elementRec(const CkArrayIndex &idx);
-	//Look up array element in hash table.  Return NULL if not there.
-	CkLocRec *elementNrec(const CkArrayIndex &idx);
-
 
 private:
 //Internal interface:
@@ -415,16 +379,10 @@ public:
 
 //Data Members:
 	//Map array ID to manager and elements
-    std::map<CkArrayID, CkArrMgr*> managers;
+    std::map<CkArrayID, CkArray*> managers;
 
-	bool addElementToRec(CkLocRec_local *rec,CkArrMgr *m,
+	bool addElementToRec(CkLocRec_local *rec,CkArray *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
-
-	//For keeping track of free local indices
-	CkVec<int> freeList;//Linked list of free local indices
-	int firstFree;//First free local index
-	int localLen;//Last allocated local index plus one
-	int nextFree(void);
 
 	CProxy_CkLocMgr thisProxy;
 	CProxyElement_CkLocMgr thislocalproxy;

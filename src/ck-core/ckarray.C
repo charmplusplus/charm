@@ -1580,7 +1580,7 @@ void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index
         env->getsetArrayIndex() = *index;
         env->setSrcPe(CkMyPe());
         env->getsetArrayHops() = 0;
-        rec->deliver(copy,CkDeliver_queue);
+        deliver(copy,CkDeliver_queue);
         _tempBroadcastCount++;
     }else{
         if(locMgr->homeElementCount != -1){
@@ -1626,7 +1626,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 	extern void startVTimer();
 #endif
     int len = localElems.size(), count = 0;
-    for (std::map<int,CkMigratable*>::iterator itr = localElems.begin(); itr != localElems.end(); ++itr) {
+    for (std::map<CkArrayIndex,CkMigratable*>::iterator itr = localElems.begin(); itr != localElems.end(); ++itr) {
 #if CMK_BIGSIM_CHARM
                 //BgEntrySplit("split-broadcast");
   		stopVTimer();
@@ -1680,7 +1680,7 @@ void CkArray::ckDestroy() {
   // to send messages to remote PEs with reclaimRemote messages.
   locMgr->setDuringDestruction(true);
 
-  for (std::map<int, CkMigratable*>::iterator i = localElems.begin(); i != localElems.end(); ++i)
+  for (std::map<CkArrayIndex, CkMigratable*>::iterator i = localElems.begin(); i != localElems.end(); ++i)
     i->second->ckDestroy();
 
   locMgr->deleteManager(CkGroupID(thisProxy), this);

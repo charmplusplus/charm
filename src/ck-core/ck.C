@@ -1181,7 +1181,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
-    mgr->getLocMgr()->deliverInline((CkMessage *)EnvToUsr(env));
+    mgr->deliver((CkMessage *)EnvToUsr(env), CkDeliver_inline);
   }
 }
 

@@ -417,7 +417,9 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
 #endif
 
   // find a list of array elements bound together
-  ArrayElement *elt = (ArrayElement *)mgr->lookup(m->index, m->aid);
+  CkArray *arrmgr = m->aid.ckLocalBranch();
+  CmiAssert(arrmgr);
+  ArrayElement *elt = arrmgr->lookup(m->index);
   CmiAssert(elt);
   CkLocRec_local *rec = elt->myRec;
   CkVec<CkMigratable *> list;

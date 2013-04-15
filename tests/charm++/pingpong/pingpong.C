@@ -27,6 +27,11 @@ class Fancy
       strncpy(_str, str, 12);
     }
     int equals(const char *str) const { return !strcmp(str, _str); }
+    friend bool operator< (const Fancy &lhs, const Fancy &rhs) {
+        for (int i=0; (i < 12) && (lhs._str[i] != '\0') && (rhs._str[i] != '\0'); ++i)
+            if ( !(lhs._str[i] < rhs._str[i]) ) return false;
+        return true;
+    }
 };
 
 class CkArrayIndexFancy : public CkArrayIndex {
@@ -38,6 +43,7 @@ class CkArrayIndexFancy : public CkArrayIndex {
         f = new (index) Fancy(str);
         nInts=3; 
     }
+    friend bool operator< (const CkArrayIndexFancy &lhs, const CkArrayIndexFancy &rhs) { return (lhs.f < rhs.f); }
 };
 
 #include "pingpong.decl.h"

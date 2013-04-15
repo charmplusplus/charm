@@ -31,18 +31,8 @@ public:
   } RecType;
   virtual RecType type(void)=0;
   
-  /// Accept a message for this element
-  virtual bool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0)=0;
-  
-  /// This is called when this ArrayRec is about to be replaced.
-  /// It is only used to deliver buffered element messages.
-  virtual void beenReplaced(void);
-  
   /// Return if this rec is now obsolete
   virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)=0;
-
-  /// Return the represented array element; or NULL if there is none
-  virtual CkMigratable *lookupElement(CkArrayID aid);
 
   /// Return the last known processor; or -1 if none
   virtual int lookupProcessor(void);
@@ -53,14 +43,12 @@ public:
  */
 class CkLocRec_local : public CkLocRec {
   CkArrayIndex idx;/// Element's array index
-  int localIdx; /// Local index (into array manager's element lists)
   bool running; /// True when inside a startTiming/stopTiming pair
   bool *deletedMarker; /// Set this if we're deleted during processing
-  CkQ<CkArrayMessage *> halfCreated; /// Stores messages for nonexistent siblings of existing elements
 public:
+  CkQ<CkArrayMessage *> halfCreated; /// Stores messages for nonexistent siblings of existing elements
   //Creation and Destruction:
-  CkLocRec_local(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival,
-  	const CkArrayIndex &idx_,int localIdx_);
+  CkLocRec_local(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival, const CkArrayIndex &idx_);
   void migrateMe(int toPe); //Leave this processor
   void informIdealLBPeriod(int lb_ideal_period);
   void metaLBCallLB();
@@ -69,12 +57,6 @@ public:
 
   /// A new element has been added to this index
   void addedElement(void);
-
-  /**
-   *  Accept a message for this element.
-   *  Returns false if the element died during the receive.
-   */
-  virtual bool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0);
 
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
@@ -97,9 +79,7 @@ public:
   inline void startTiming(int ignore_running=0) {  }
   inline void stopTiming(int ignore_running=0) { }
 #endif
-  inline int getLocalIndex(void) const {return localIdx;}
   inline const CkArrayIndex &getIndex(void) const {return idx;}
-  virtual CkMigratable *lookupElement(CkArrayID aid);
   virtual int lookupProcessor(void);
 
 #if CMK_LBDB_ON

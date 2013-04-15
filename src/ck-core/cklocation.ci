@@ -7,7 +7,6 @@ module CkLocation {
 
   group [migratable] CkLocMgr {
 	entry CkLocMgr(CkArrayOptions opts);
-	entry void deliverInline(CkMessage *m);
 	entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
         entry [expedited] void requestLocation(CkArrayIndex idx, int peToTell,
                                                bool suppressIfHere);
@@ -17,7 +16,6 @@ module CkLocation {
 	//Load balancing:
 	entry void dummyAtSync(void);
   };
-  initnode void _CkLocMgrInit(void);
   
   // Array Map object support:
   group [migratable] CkArrayMap {

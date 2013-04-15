@@ -225,7 +225,7 @@ own map object and overriding this virtual function of \kw{CkArrayMap}:
 
 \begin{alltt}
   virtual void populateInitial(int arrayHdl,int numInitial,
-	void *msg,CkArrMgr *mgr)
+	void *msg,CkArray *mgr)
 \end{alltt}
 
 In this call, \kw{arrayHdl} is the value returned by \kw{registerArray},
@@ -234,13 +234,13 @@ In this call, \kw{arrayHdl} is the value returned by \kw{registerArray},
 array to create.
 
 \kw{populateInitial} creates new array elements using the method
-\kw{void CkArrMgr::insertInitial(CkArrayIndex idx,void *ctorMsg)}.
+\kw{void CkArray::insertInitial(CkArrayIndex idx,void *ctorMsg)}.
 For example, to create one row of 2D array elements on each processor,
 you would write:
 
 \begin{alltt}
 void xyElementMap::populateInitial(int arrayHdl,int numInitial,
-	void *msg,CkArrMgr *mgr)
+	void *msg,CkArray *mgr)
 \{
   if (numInitial==0) return; //No initial elements requested
 	

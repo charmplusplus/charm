@@ -2115,13 +2115,12 @@ void _verifyAckRequestHandler(VerifyAckMsg *verifyRequest){
 			CkLocRec_local *localRec = (CkLocRec_local *) rec;
 			CmiPrintf("[%d] Found element gid %d idx %s that needs to be removed\n",CmiMyPe(),verifyRequest->migRecord.gID.idx,idx2str(verifyRequest->migRecord.idx));
 			
-			int localIdx = localRec->getLocalIndex();
 			LBDatabase *lbdb = localRec->getLBDB();
 			LDObjHandle ldHandle = localRec->getLdHandle();
 				
 			locMgr->setDuringMigration(true);
 			
-			locMgr->reclaim(verifyRequest->migRecord.idx,localIdx);
+			locMgr->reclaim(verifyRequest->migRecord.idx);
 			lbdb->UnregisterObj(ldHandle);
 			
 			locMgr->setDuringMigration(false);
