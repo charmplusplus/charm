@@ -177,6 +177,18 @@ class CkArrayIndex: public CkArrayIndexBase
             for (int i=6; i < 2 * CK_ARRAYINDEX_MAXLEN; i++)
                 indexShorts[i] = 0;
         }
+
+
+        /// A very crude comparison operator to enable using in comparison-based containers
+        friend bool operator< (const CkArrayIndex &lhs, const CkArrayIndex &rhs)
+        {
+            if (lhs.nInts != rhs.nInts)
+                CkAbort("cannot compare two indices of different cardinality");
+            for (int i = 0; i < lhs.nInts; i++)
+                if (lhs.data()[i] >= rhs.data()[i])
+                    return false;
+            return true;
+        }
 };
 
 
