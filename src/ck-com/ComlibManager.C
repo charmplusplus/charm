@@ -52,7 +52,7 @@ void recv_array_msg(void *msg){
 
 	RECORD_RECV_STATS(sid, env->getTotalsize(), srcPe);
 
-	CkArray *a=(CkArray *)_localBranch(env->getsetArrayMgr());
+	CkArray *a=(CkArray *)_localBranch(env->getArrayMgr());
 	
 	a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue);
 

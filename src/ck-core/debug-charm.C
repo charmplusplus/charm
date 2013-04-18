@@ -391,7 +391,7 @@ void CpdPupMessage(PUP::er &p, void *msg)
 
   // Pup the information specific to this envelope type
   if (envType == ForArrayEltMsg || envType == ArrayEltInitMsg) {
-    int arrID = env->getsetArrayMgr().idx;
+    int arrID = env->getArrayMgr().idx;
     PUPn(arrID);
     CkArrayIndex &idx = env->getsetArrayIndex();
     int nInts = idx.nInts;

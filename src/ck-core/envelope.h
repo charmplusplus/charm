@@ -165,7 +165,7 @@ struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
         UShort arrayEp;        ///< Used only for array broadcasts
 };
 
-struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
+struct s_array{             ///< ForArrayEltMsg
         CkArrayIndexBase index; ///< Array element index
         CkGroupID arr;            ///< Array manager GID
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -175,7 +175,7 @@ struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMs
         UChar ifNotThere;         ///< what to do if array element is missing
 };
 
-struct s_arrayinit{         ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
+struct s_arrayinit{         ///< ArrayEltInitMsg
         CkArrayIndexBase index; ///< Array element index
         CkGroupID arr;            ///< Array manager GID
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -333,7 +333,7 @@ private:
     }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
-      CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
+      CkAssert(type >= NewChareMsg && type < LAST_CK_ENVELOPE_TYPE);
 
 #if CMK_USE_STL_MSGQ
       // Ideally, this should be a static compile-time assert. However we need API changes for that
@@ -460,7 +460,8 @@ private:
     void setGroupDep(const CkGroupID &r){ /* CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); */ ((struct s_groupinit*)extraData())->dep = r; }
 
 // Array-specific fields
-    CkGroupID &getsetArrayMgr(void) {return ((struct s_array*)extraData())->arr;}
+    CkGroupID getArrayMgr(void) const { return ((struct s_array*)extraData())->arr; }
+    void setArrayMgr(const CkGroupID gid) { ((struct s_array*)extraData())->arr = gid; }
     int getArrayMgrIdx(void) const {return ((struct s_array*)extraData())->arr.idx;}
     UShort &getsetArrayEp(void) {return epIdx;}
     UShort &getsetArrayBcastEp(void) {return ((struct s_group*)extraData())->arrayEp;}

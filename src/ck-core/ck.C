@@ -1139,14 +1139,14 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 /************** Receive: Arrays *************/
 
 static void _processArrayEltInitMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getsetArrayMgr());
+  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
     mgr->insertElement((CkMessage *)EnvToUsr(env));
   }
 }
 static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getsetArrayMgr());
+  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
     mgr->getLocMgr()->deliverInline((CkMessage *)EnvToUsr(env));
@@ -2018,7 +2018,7 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
 extern "C"
 void CkArrayManagerInsert(int pe,void *msg,CkGroupID aID) {
   register envelope *env = UsrToEnv(msg);
-  env->getsetArrayMgr()=aID;
+  env->setArrayMgr(aID);
   _prepareOutgoingArrayMsg(env,ArrayEltInitMsg);
   _CldEnqueue(pe, env, _infoIdx);
 }

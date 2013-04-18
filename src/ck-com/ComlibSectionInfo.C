@@ -43,7 +43,7 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
 
     CkPackMessage(&env);
 
-    const CkArrayID destArrayID(env->getsetArrayMgr());
+    const CkArrayID destArrayID(env->getArrayMgr());
     int nRemotePes=-1, nRemoteIndices=-1;
     ComlibMulticastIndexCount *indicesCount;
     int *belongingList;
@@ -114,7 +114,7 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
     delete [] indicesCount;
     delete [] belongingList;
 
-    newenv->getsetArrayMgr() = env->getsetArrayMgr();
+    newenv->getArrayMgr() = env->getArrayMgr();
     newenv->getsetArraySrcPe() = env->getsetArraySrcPe();
     newenv->getsetArrayEp() = env->getsetArrayEp();
     newenv->getsetArrayHops() = env->getsetArrayHops();

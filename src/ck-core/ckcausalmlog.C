@@ -693,7 +693,7 @@ void sendNodeGroupMsg(envelope *env, int destNode, int _infoIdx){
 void sendArrayMsg(envelope *env,int destPE,int _infoIdx){
 	CkObjID recver;
 	recver.type = TypeArray;
-	recver.data.array.id = env->getsetArrayMgr();
+	recver.data.array.id = env->getArrayMgr();
 	recver.data.array.idx.asChild() = *(&env->getsetArrayIndex());
 
 	if(CpvAccess(_currentObj)!=NULL &&  CpvAccess(_currentObj)->mlogData->objID.type != TypeArray){
