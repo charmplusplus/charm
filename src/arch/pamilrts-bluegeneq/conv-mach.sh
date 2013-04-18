@@ -12,7 +12,7 @@ then
   BGQ_INSTALL=$BGQ_TYPICAL_FLOOR
 fi
 
-BGQ_ZLIB=/soft/libraries/3rdparty/zlib-1.2.6
+BGQ_ZLIB=/soft/libraries/alcf/current/gcc/ZLIB/
 
 BGQ_BIN=$BGQ_FLOOR/gnu-linux/bin
 BGQ_INC="-I$BGQ_INSTALL/comm/sys/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk -I$BGQ_ZLIB/include"
