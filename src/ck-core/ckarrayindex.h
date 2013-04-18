@@ -185,9 +185,11 @@ class CkArrayIndex: public CkArrayIndexBase
             if (lhs.nInts != rhs.nInts)
                 CkAbort("cannot compare two indices of different cardinality");
             for (int i = 0; i < lhs.nInts; i++)
-                if (lhs.data()[i] >= rhs.data()[i])
+                if (lhs.data()[i] < rhs.data()[i])
+                    return true;
+                else if (rhs.data()[i] < lhs.data()[i])
                     return false;
-            return true;
+            return false;
         }
 };
 
