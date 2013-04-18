@@ -90,7 +90,7 @@ class CkArrayIndex: public CkArrayIndexBase
         }
 
         /// Used for debug prints elsewhere
-        void print() { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
+        void print() const { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
 
         /// Equality comparison
         CmiBool operator==(const CkArrayIndex& idx) const
