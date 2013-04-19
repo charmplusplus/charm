@@ -32,18 +32,6 @@ extern void CkGetSectionInfo(CkSectionInfo &id, void *msg);
 class CkMulticastMgr: public CkDelegateMgr 
 {
     private:
-        /// Internal class for the (array index, location) pair.
-        class IndexPos {
-            public:
-                CkArrayIndex idx;
-                int  pe;
-            public:
-                IndexPos() {}
-                IndexPos(int i): idx(), pe(i) {}
-                IndexPos(CkArrayIndex i, int p): idx(i), pe(p) {};
-                void pup(PUP::er &p){ p|idx; p|pe; }
-        };
-        typedef CkVec<IndexPos>  arrayIndexPosList;
         int factor;           // spanning tree factor, can be negative
         unsigned int split_size;
         unsigned int split_threshold;
