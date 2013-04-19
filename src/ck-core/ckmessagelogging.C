@@ -1091,7 +1091,6 @@ void _getCheckpointHandler(RestartRequest *restartMsg){
 	dataMsg->PE = CkMyPe();
 	dataMsg->restartWallTime = CmiTimer();
 	dataMsg->checkPointSize = storedChkpt->bufSize;
-	dataMsg->migratedElementSize = 0;
 	dataMsg->lbGroupID = globalLBID;
 	
 	//store checkpoint data
