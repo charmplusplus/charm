@@ -851,6 +851,9 @@ void _startCheckpointHandler(CheckpointBarrierMsg *startMsg){
 
 	// increasing the checkpoint counter
 	checkpointCount++;
+
+	// setting globalLBID to NULL
+	globalLBID.idx = 0;
 	
 #if CMK_CONVERSE_MPI
 	inCkptFlag = 1;
