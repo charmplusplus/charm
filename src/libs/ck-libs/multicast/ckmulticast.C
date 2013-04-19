@@ -541,15 +541,12 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         int *peListPtr = mySubTreePEs.getVec();
         topo::SpanningTreeVertex *nextGenInfo;
         nextGenInfo = topo::buildSpanningTreeGeneration(peListPtr,peListPtr + mySubTreePEs.size(),numchild);
-        //CkAssert(nextGenInfo->childIndex.size() == numchild);
-	numchild = nextGenInfo->childIndex.size();
-	entry->numChild = numchild;
+        numchild = nextGenInfo->childIndex.size();
+        entry->numChild = numchild;
 
-        // Distribute the section members across the number of direct children (branches)
-        // Direct children are simply the first section member in each of the branch lists
-        arrayIndexPosList *slots = new arrayIndexPosList[numchild];
+        CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-        // For each direct child, collate indices of all section members on the PEs in that branch
+        // Ask each direct child to setup its subtree
         for (i=0; i < numchild; i++)
         {
             // Determine the indices of the first and last PEs in this branch of my sub-tree
@@ -558,44 +555,40 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
                 childEndIndex = nextGenInfo->childIndex[i+1];
             else
                 childEndIndex = mySubTreePEs.size();
-            // For each PE in this branch, add the section members on that PE to a list
-            for (j = childStartIndex; j < childEndIndex; j++)
-            {
-                int pe = mySubTreePEs[j];
-                for (int k=0; k < elemBins[pe].size(); k++)
-                    slots[i].push_back( IndexPos(elemBins[pe][k], pe) );
-            }
-        }
 
-        // Ask each of your direct children to setup their branches
-        CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-        for (i=0; i<numchild; i++) 
-        {
-            // Give each child info about the number, indices and location of its children
-            int n = slots[i].length();
-            multicastSetupMsg *m = new (n, n, 0) multicastSetupMsg;
+            // Find the total number of section member elements on this subtree
+            int numSubTreeElems = 0;
+            for (j = childStartIndex; j < childEndIndex; j++)
+                numSubTreeElems += elemBins[ mySubTreePEs[j] ].size();
+
+            // Prepare the setup msg intended for the child
+            multicastSetupMsg *m = new (numSubTreeElems, numSubTreeElems, 0) multicastSetupMsg;
             m->parent = CkSectionInfo(aid, entry);
-            m->nIdx = slots[i].length();
+            m->nIdx = numSubTreeElems;
             m->rootSid = msg->rootSid;
             m->redNo = msg->redNo;
-            for (j=0; j<slots[i].length(); j++) 
+
+            // Give each child the number, indices and location of its children
+            for (int j = childStartIndex, cnt = 0; j < childEndIndex; j++)
             {
-                m->arrIdx[j] = slots[i][j].idx;
-                m->lastKnown[j] = slots[i][j].pe;
+                int childPE = mySubTreePEs[j];
+                for (int k = 0; k < elemBins[childPE].size(); k++, cnt++)
+                {
+                    m->arrIdx[cnt]  = elemBins[childPE][k];
+                    m->lastKnown[cnt] = childPE;
+                }
             }
-            int childroot = slots[i][0].pe;
-            DEBUGF(("[%d] call set up %d numelem:%d\n", CkMyPe(), childroot, n));
+
+            int childroot = mySubTreePEs[childStartIndex];
+            DEBUGF(("[%d] call set up %d numelem:%d\n", CkMyPe(), childroot, numSubTreeElems));
             // Send the message to the child
             mCastGrp[childroot].setup(m);
         }
-        delete [] slots;
         delete nextGenInfo;
     }
     // else, tell yourself that your children are ready
     else 
-    {
         childrenReady(entry);
-    }
     delete msg;
 }
 
