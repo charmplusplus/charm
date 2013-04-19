@@ -1957,7 +1957,7 @@ void _getGlobalStepHandler(LBStepMsg *msg){
 		msg->step = -1;
 	}
 	CmiAssert(msg->fromPE != CmiMyPe());
-	CmiPrintf("[%d] getGlobalStep called from %d step %d gid %d \n",CmiMyPe(),msg->fromPE,lb->step(),msg->lbID.idx);
+	CmiPrintf("[%d] getGlobalStep called from %d step %d gid %d \n",CmiMyPe(),msg->fromPE,msg->step,msg->lbID.idx);
 	CmiSetHandler(msg,_recvGlobalStepHandlerIdx);
 	CmiSyncSend(msg->fromPE,sizeof(LBStepMsg),(char *)msg);
 };
