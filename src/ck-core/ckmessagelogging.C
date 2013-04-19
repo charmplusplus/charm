@@ -46,7 +46,6 @@ extern const char *idx2str(const ArrayElement *el);
 void getGlobalStep(CkGroupID gID);
 
 bool fault_aware(CkObjID &recver);
-void sendCheckpointData();
 void createObjIDList(void *data,ChareMlogData *mlogData);
 inline bool isLocal(int destPE);
 inline bool isTeamLocal(int destPE);
@@ -110,8 +109,6 @@ int _storeCheckpointHandlerIdx;
 int _checkpointAckHandlerIdx;
 int _getCheckpointHandlerIdx;
 int _recvCheckpointHandlerIdx;
-int _verifyAckRequestHandlerIdx;
-int _verifyAckHandlerIdx;
 int _dummyMigrationHandlerIdx;
 int	_getGlobalStepHandlerIdx;
 int	_recvGlobalStepHandlerIdx;
@@ -124,10 +121,6 @@ int _sendBackLocationHandlerIdx;
 
 void setTeamRecovery(void *data, ChareMlogData *mlogData);
 void unsetTeamRecovery(void *data, ChareMlogData *mlogData);
-int verifyAckTotal;
-int verifyAckCount;
-int verifyAckedRequests=0;
-RestartRequest *storedRequest;
 int _falseRestart =0; /**
 													For testing on clusters we might carry out restarts on 
 													a porcessor without actually starting it
@@ -140,12 +133,8 @@ int onGoingLoadBalancing=0;
 void *centralLb;
 void (*resumeLbFnPtr)(void *);
 int _receiveMlogLocationHandlerIdx;
-int _receiveMigrationNoticeHandlerIdx;
-int _receiveMigrationNoticeAckHandlerIdx;
 int _checkpointBarrierHandlerIdx;
 int _checkpointBarrierAckHandlerIdx;
-CkVec<MigrationRecord> migratedNoticeList;
-CkVec<RetainedMigratedObject *> retainedObjectList;
 int donotCountMigration=0;
 int countLBMigratedAway=0;
 int countLBToMigrate=0;
@@ -207,14 +196,10 @@ void _messageLoggingInit(){
 	_resendMessagesHandlerIdx = CkRegisterHandler((CmiHandler)_resendMessagesHandler);
 	_distributedLocationHandlerIdx=CkRegisterHandler((CmiHandler)_distributedLocationHandler);
 	_sendBackLocationHandlerIdx=CkRegisterHandler((CmiHandler)_sendBackLocationHandler);
-	_verifyAckRequestHandlerIdx = CkRegisterHandler((CmiHandler)_verifyAckRequestHandler);
-	_verifyAckHandlerIdx = CkRegisterHandler((CmiHandler)_verifyAckHandler);
 	_dummyMigrationHandlerIdx = CkRegisterHandler((CmiHandler)_dummyMigrationHandler);
 
 	//handlers for load balancing
 	_receiveMlogLocationHandlerIdx=CkRegisterHandler((CmiHandler)_receiveMlogLocationHandler);
-	_receiveMigrationNoticeHandlerIdx=CkRegisterHandler((CmiHandler)_receiveMigrationNoticeHandler);
-	_receiveMigrationNoticeAckHandlerIdx=CkRegisterHandler((CmiHandler)_receiveMigrationNoticeAckHandler);
 	_getGlobalStepHandlerIdx=CkRegisterHandler((CmiHandler)_getGlobalStepHandler);
 	_recvGlobalStepHandlerIdx=CkRegisterHandler((CmiHandler)_recvGlobalStepHandler);
 	_checkpointBarrierHandlerIdx=CkRegisterHandler((CmiHandler)_checkpointBarrierHandler);
@@ -1034,21 +1019,6 @@ void _storeCheckpointHandler(char *msg){
 		CmiFree(msg);
 	}
 
-	int count=0;
-	for(int j=migratedNoticeList.size()-1;j>=0;j--){
-		if(migratedNoticeList[j].fromPE == sendingPE){
-			migratedNoticeList[j].ackFrom = 1;
-		}else{
-			CmiAssert("migratedNoticeList entry for processor other than buddy");
-		}
-		if(migratedNoticeList[j].ackFrom == 1 && migratedNoticeList[j].ackTo == 1){
-			migratedNoticeList.remove(j);
-			count++;
-		}
-		
-	}
-	DEBUG(printf("[%d] For proc %d from number of migratedNoticeList cleared %d checkpointAckHandler %d\n",CmiMyPe(),sendingPE,count,_checkpointAckHandlerIdx));
-	
 	CheckPointAck ackMsg;
 	ackMsg.PE = CkMyPe();
 	ackMsg.dataSize = CpvAccess(_storedCheckpointData)->bufSize;
@@ -1070,35 +1040,6 @@ void _checkpointAckHandler(CheckPointAck *ackMsg){
 	}
 	CmiFree(ackMsg);
 };
-
-void clearUpMigratedRetainedLists(int PE){
-	int count=0;
-	CmiMemoryCheck();
-	
-	for(int j=migratedNoticeList.size()-1;j>=0;j--){
-		if(migratedNoticeList[j].toPE == PE){
-			migratedNoticeList[j].ackTo = 1;
-		}
-		if(migratedNoticeList[j].ackFrom == 1 && migratedNoticeList[j].ackTo == 1){
-			migratedNoticeList.remove(j);
-			count++;
-		}
-	}
-	DEBUG(printf("[%d] For proc %d to number of migratedNoticeList cleared %d \n",CmiMyPe(),PE,count));
-	
-	for(int j=retainedObjectList.size()-1;j>=0;j--){
-		if(retainedObjectList[j]->migRecord.toPE == PE){
-			RetainedMigratedObject *obj = retainedObjectList[j];
-			DEBUG(printf("[%d] Clearing retainedObjectList %d to PE %d obj %p msg %p\n",CmiMyPe(),j,PE,obj,obj->msg));
-			retainedObjectList.remove(j);
-			if(obj->msg != NULL){
-				CmiMemoryCheck();
-				CmiFree(obj->msg);
-			}
-			delete obj;
-		}
-	}
-}
 
 /***************************************************************
 	Restart Methods and handlers
@@ -1139,90 +1080,10 @@ void _getCheckpointHandler(RestartRequest *restartMsg){
 	// making sure it is its buddy who is requesting the checkpoint
 	CkAssert(restartMsg->PE == storedChkpt->PE);
 
-	storedRequest = restartMsg;
-	verifyAckTotal = 0;
-
-	for(int i=0;i<migratedNoticeList.size();i++){
-		if(migratedNoticeList[i].fromPE == restartMsg->PE){
-//			if(migratedNoticeList[i].ackFrom == 0 && migratedNoticeList[i].ackTo == 0){
-			if(migratedNoticeList[i].ackFrom == 0){
-				//need to verify if the object actually exists .. it might not
-				//have been acked but it might exist on it
-				VerifyAckMsg msg;
-				msg.migRecord = migratedNoticeList[i];
-				msg.index = i;
-				msg.fromPE = CmiMyPe();
-				CmiPrintf("[%d] Verify  gid %d idx %s from proc %d\n",CmiMyPe(),migratedNoticeList[i].gID.idx,idx2str(migratedNoticeList[i].idx),migratedNoticeList[i].toPE);
-				CmiSetHandler(&msg,_verifyAckRequestHandlerIdx);
-				CmiSyncSend(migratedNoticeList[i].toPE,sizeof(VerifyAckMsg),(char *)&msg);
-				verifyAckTotal++;
-			}
-		}
-	}
-
-	// sending the checkpoint back to its buddy	
-	if(verifyAckTotal == 0){
-		sendCheckpointData();
-	}
-	verifyAckCount = 0;
-}
-
-
-void _verifyAckRequestHandler(VerifyAckMsg *verifyRequest){
-	CkLocMgr *locMgr =  (CkLocMgr*)CkpvAccess(_groupTable)->find(verifyRequest->migRecord.gID).getObj();
-	CkLocRec *rec = locMgr->elementNrec(verifyRequest->migRecord.idx);
-	if(rec != NULL && rec->type() == CkLocRec::local){
-			//this location exists on this processor
-			//and needs to be removed	
-			CkLocRec_local *localRec = (CkLocRec_local *) rec;
-			CmiPrintf("[%d] Found element gid %d idx %s that needs to be removed\n",CmiMyPe(),verifyRequest->migRecord.gID.idx,idx2str(verifyRequest->migRecord.idx));
-			
-			int localIdx = localRec->getLocalIndex();
-			LBDatabase *lbdb = localRec->getLBDB();
-			LDObjHandle ldHandle = localRec->getLdHandle();
-				
-			locMgr->setDuringMigration(true);
-			
-			locMgr->reclaim(verifyRequest->migRecord.idx,localIdx);
-			lbdb->UnregisterObj(ldHandle);
-			
-			locMgr->setDuringMigration(false);
-			
-			verifyAckedRequests++;
-
-	}
-	CmiSetHandler(verifyRequest, _verifyAckHandlerIdx);
-	CmiSyncSendAndFree(verifyRequest->fromPE,sizeof(VerifyAckMsg),(char *)verifyRequest);
-};
-
-
-void _verifyAckHandler(VerifyAckMsg *verifyReply){
-	int index = 	verifyReply->index;
-	migratedNoticeList[index] = verifyReply->migRecord;
-	verifyAckCount++;
-	CmiPrintf("[%d] VerifyReply received %d for  gid %d idx %s from proc %d\n",CmiMyPe(),migratedNoticeList[index].ackTo, migratedNoticeList[index].gID,idx2str(migratedNoticeList[index].idx),migratedNoticeList[index].toPE);
-	if(verifyAckCount == verifyAckTotal){
-		sendCheckpointData();
-	}
-}
-
-/**
- * Sends the checkpoint to its buddy. 
- */
-void sendCheckpointData(){	
-	RestartRequest *restartMsg = storedRequest;
-	StoredCheckpoint *storedChkpt = CpvAccess(_storedCheckpointData);
-	int numMigratedAwayElements = migratedNoticeList.size();
-	if(migratedNoticeList.size() != 0){
-			printf("[%d] size of migratedNoticeList %d\n",CmiMyPe(),migratedNoticeList.size());
-//			CkAssert(migratedNoticeList.size() == 0);
-	}
-	int totalSize = sizeof(RestartProcessorData)+storedChkpt->bufSize;
+	int totalSize = sizeof(RestartProcessorData) + storedChkpt->bufSize;
 	
 	DEBUG_RESTART(CkPrintf("[%d] Sending out checkpoint for processor %d size %d \n",CkMyPe(),restartMsg->PE,totalSize);)
 	CkPrintf("[%d] Sending out checkpoint for processor %d size %d \n",CkMyPe(),restartMsg->PE,totalSize);
-	
-	totalSize += numMigratedAwayElements*sizeof(MigrationRecord);
 	
 	char *msg = (char *)CmiAlloc(totalSize);
 	
@@ -1230,38 +1091,22 @@ void sendCheckpointData(){
 	dataMsg->PE = CkMyPe();
 	dataMsg->restartWallTime = CmiTimer();
 	dataMsg->checkPointSize = storedChkpt->bufSize;
-	
-	dataMsg->numMigratedAwayElements = numMigratedAwayElements;
-//	dataMsg->numMigratedAwayElements = 0;
-	
-	dataMsg->numMigratedInElements = 0;
 	dataMsg->migratedElementSize = 0;
 	dataMsg->lbGroupID = globalLBID;
-	/*msg layout 
-		|RestartProcessorData|List of Migrated Away ObjIDs|CheckpointData|CheckPointData for objects migrated in|
-		Local MessageLog|
-	*/
+	
 	//store checkpoint data
 	char *buf = &msg[sizeof(RestartProcessorData)];
 
-	if(dataMsg->numMigratedAwayElements != 0){
-		memcpy(buf,migratedNoticeList.getVec(),migratedNoticeList.size()*sizeof(MigrationRecord));
-		buf = &buf[migratedNoticeList.size()*sizeof(MigrationRecord)];
-	}
-	
 	if(diskCkptFlag){
 		readCheckpointFromDisk(storedChkpt->bufSize,buf);
 	} else {
 		memcpy(buf,storedChkpt->buf,storedChkpt->bufSize);
 	}
-	buf = &buf[storedChkpt->bufSize];
 
 	CmiSetHandler(msg,_recvCheckpointHandlerIdx);
 	CmiSyncSendAndFree(restartMsg->PE,totalSize,msg);
 	CmiFree(restartMsg);
-
-};
-
+}
 
 // this list is used to create a vector of the object ids of all
 //the chares on this processor currently and the highest TN processed by them 
@@ -1287,13 +1132,6 @@ void _recvCheckpointHandler(char *_restartData){
 	
 	printf("[%d] Restart Checkpointdata received from PE %d at %.6lf with checkpointSize %d\n",CkMyPe(),restartData->PE,CmiWallTimer(),restartData->checkPointSize);
 	char *buf = &_restartData[sizeof(RestartProcessorData)];
-	
-	if(restartData->numMigratedAwayElements != 0){
-		migratedAwayElements = new MigrationRecord[restartData->numMigratedAwayElements];
-		memcpy(migratedAwayElements,buf,restartData->numMigratedAwayElements*sizeof(MigrationRecord));
-		printf("[%d] Number of migratedaway elements %d\n",CmiMyPe(),restartData->numMigratedAwayElements);
-		buf = &buf[restartData->numMigratedAwayElements*sizeof(MigrationRecord)];
-	}
 	
 	PUP::fromMem pBuf(buf);
 
@@ -1668,13 +1506,11 @@ void _dummyMigrationHandler(DummyMigrationMsg *msg){
 	}
 	if(msg->flag == MLOG_COUNT){
 		DEBUG_RESTART(CmiPrintf("[%d] dummyMigration count %d received from restarted processor\n",CmiMyPe(),msg->count));
-		msg->count -= verifyAckedRequests;
 		for(int i=0;i<msg->count;i++){
 			LDObjHandle h;
 			lb->Migrated(h,1);
 		}
 	}
-	verifyAckedRequests=0;
 	CmiFree(msg);
 };
 
@@ -1869,36 +1705,6 @@ void finishedCheckpointLoadBalancing(){
       char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
       CmiSetHandler(msg,_checkpointBarrierHandlerIdx);
       CmiReduce(msg,CmiMsgHeaderSizeBytes,doNothingMsg);
-};
-
-void _receiveMigrationNoticeHandler(MigrationNotice *msg){
-	msg->migRecord.ackFrom = msg->migRecord.ackTo = 0;
-	migratedNoticeList.push_back(msg->migRecord);
-
-	MigrationNoticeAck buf;
-	buf.record = msg->record;
-	CmiSetHandler((void *)&buf,_receiveMigrationNoticeAckHandlerIdx);
-	CmiSyncSend(getCheckPointPE(),sizeof(MigrationNoticeAck),(char *)&buf);
-}
-
-void _receiveMigrationNoticeAckHandler(MigrationNoticeAck *msg){
-	
-	RetainedMigratedObject *retainedObject = (RetainedMigratedObject *)(msg->record);
-	retainedObject->acked = 1;
-
-	CmiSetHandler(retainedObject->msg,_receiveMlogLocationHandlerIdx);
-	CmiSyncSend(retainedObject->migRecord.toPE,retainedObject->size,(char *)retainedObject->msg);
-
-	//inform home about the new location of this object
-	CkGroupID gID = retainedObject->migRecord.gID ;
-	CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
-	informLocationHome(gID,retainedObject->migRecord.idx, mgr->homePe(retainedObject->migRecord.idx),retainedObject->migRecord.toPE);
-	
-	countLBMigratedAway++;
-	if(countLBMigratedAway == countLBToMigrate && migrationDoneCalled == 1){
-		DEBUGLB(printf("[%d] calling startMlogCheckpoint in _receiveMigrationNoticeAckHandler countLBToMigrate %d countLBMigratedAway %d \n",CmiMyPe(),countLBToMigrate,countLBMigratedAway));
-		startMlogCheckpoint(NULL,CmiWallTimer());
-	}
 };
 
 void _receiveMlogLocationHandler(void *buf){
