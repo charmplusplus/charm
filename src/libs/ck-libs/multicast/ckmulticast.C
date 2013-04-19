@@ -18,6 +18,9 @@
 #include "spanningTreeStrategy.h"
 #include "XArraySectionReducer.h"
 
+#include <map>
+#include <vector>
+
 #define DEBUGF(x)  // CkPrintf x;
 
 // turn on or off fragmentation in multicast
@@ -503,7 +506,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 
     // Create a numPE sized array of vectors to hold the array elements in each PE
     int numpes = CkNumPes();
-    arrayIndexPosList *lists = new arrayIndexPosList[numpes];
+    std::map<int, std::vector<CkArrayIndex> > elemBins;
     // Sort each array index in the setup message based on last known location
     for (i=0; i<msg->nIdx; i++) 
     {
@@ -513,7 +516,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
           entry->localElem.insertAtEnd(msg->arrIdx[i]);
       // else, add it to the list corresponding to its PE
       else
-          lists[lastKnown].push_back(IndexPos(msg->arrIdx[i], lastKnown));
+          elemBins[lastKnown].push_back(msg->arrIdx[i]);
     }
 
     CkVec<int> mySubTreePEs;
@@ -521,12 +524,9 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     // The first PE in my subtree should be me, the tree root (as required by the spanning tree builder)
     mySubTreePEs.push_back(CkMyPe());
     // Identify the child PEs in the tree, ie the PEs with section members on them
-    for (i=0; i<numpes; i++) 
-    {
-      if (i==CkMyPe()) continue;
-      if (lists[i].size()) 
-          mySubTreePEs.push_back(i);
-    }
+    for (std::map<int, std::vector<CkArrayIndex> >::iterator itr = elemBins.begin();
+         itr != elemBins.end(); ++itr)
+        mySubTreePEs.push_back(itr->first);
     // The number of multicast children can be limited by the spanning tree factor 
     int num = mySubTreePEs.size() - 1, numchild = 0;
     if (factor <= 0) numchild = num;
@@ -562,8 +562,8 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
             for (j = childStartIndex; j < childEndIndex; j++)
             {
                 int pe = mySubTreePEs[j];
-                for (int k=0; k<lists[pe].size(); k++)
-                    slots[i].push_back(lists[pe][k]);
+                for (int k=0; k < elemBins[pe].size(); k++)
+                    slots[i].push_back( IndexPos(elemBins[pe][k], pe) );
             }
         }
 
@@ -596,7 +596,6 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     {
         childrenReady(entry);
     }
-    delete [] lists;
     delete msg;
 }
 
