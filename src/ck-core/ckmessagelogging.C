@@ -135,6 +135,8 @@ void (*resumeLbFnPtr)(void *);
 int _receiveMlogLocationHandlerIdx;
 int _checkpointBarrierHandlerIdx;
 int _checkpointBarrierAckHandlerIdx;
+int _startCheckpointIdx;
+int _endCheckpointIdx;
 int donotCountMigration=0;
 int countLBMigratedAway=0;
 int countLBToMigrate=0;
@@ -145,6 +147,7 @@ CkGroupID globalLBID;
 int restartDecisionNumber=-1;
 double lastCompletedAlarm=0;
 double lastRestart=0;
+CkCallback ckptCallback;
 
 //update location globals
 int _receiveLocationHandlerIdx;
@@ -204,6 +207,8 @@ void _messageLoggingInit(){
 	_recvGlobalStepHandlerIdx=CkRegisterHandler((CmiHandler)_recvGlobalStepHandler);
 	_checkpointBarrierHandlerIdx=CkRegisterHandler((CmiHandler)_checkpointBarrierHandler);
 	_checkpointBarrierAckHandlerIdx=CkRegisterHandler((CmiHandler)_checkpointBarrierAckHandler);
+	_startCheckpointIdx = CkRegisterHandler((CmiHandler)_startCheckpointHandler);
+	_endCheckpointIdx = CkRegisterHandler((CmiHandler)_endCheckpointHandler);
 	
 	//handlers for updating locations
 	_receiveLocationHandlerIdx=CkRegisterHandler((CmiHandler)_receiveLocationHandler);
@@ -821,6 +826,107 @@ void _checkpointRequestHandler(CheckpointRequest *request){
 }
 
 /**
+ * @brief Starts checkpoint phase at PE 0
+ */
+void CkStartMlogCheckpoint(CkCallback &cb){
+
+	// storing callback
+	ckptCallback = cb;
+
+	// sending a broadcast to start checkpoint
+	CheckpointBarrierMsg *msg = (CheckpointBarrierMsg *)CmiAlloc(sizeof(CheckpointBarrierMsg));
+	CmiSetHandler(msg,_startCheckpointIdx);
+	CmiSyncBroadcastAllAndFree(sizeof(CheckpointBarrierMsg),(char *)msg);
+}
+
+/**
+ * @brief Starts checkpoint: send its checkpoint to its partner. This checkpointing strategy is NOT connected to the load balancer, 
+ * hence onGoingLoadBalancer==0.
+ */
+void _startCheckpointHandler(CheckpointBarrierMsg *startMsg){
+	CmiFree(startMsg);
+
+	// removing messages from the log and cleaning up other data structures
+	garbageCollectMlog();
+
+	// increasing the checkpoint counter
+	checkpointCount++;
+	
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 1;
+#endif
+
+#if DEBUG_CHECKPOINT
+	if(CmiMyPe() == 0){
+		printf("[%d] starting checkpoint handler at %.6lf CmiTimer %.6lf \n",CkMyPe(),CmiWallTimer(),CmiTimer());
+	}
+#endif
+
+	DEBUG_MEM(CmiMemoryCheck());
+
+	PUP::sizer psizer;
+	psizer | checkpointCount;
+	for(int i=0; i<CmiNumPes(); i++){
+		psizer | CpvAccess(_incarnation)[i];
+	}
+	CkPupROData(psizer);
+	DEBUG_MEM(CmiMemoryCheck());
+	CkPupGroupData(psizer,CmiTrue);
+	DEBUG_MEM(CmiMemoryCheck());
+	CkPupNodeGroupData(psizer,CmiTrue);
+	DEBUG_MEM(CmiMemoryCheck());
+	pupArrayElementsSkip(psizer,CmiTrue,NULL);
+	DEBUG_MEM(CmiMemoryCheck());
+
+	int dataSize = psizer.size();
+	int totalSize = sizeof(CheckPointDataMsg)+dataSize;
+	char *msg = (char *)CmiAlloc(totalSize);
+	CheckPointDataMsg *chkMsg = (CheckPointDataMsg *)msg;
+	chkMsg->PE = CkMyPe();
+	chkMsg->dataSize = dataSize;
+	
+	char *buf = &msg[sizeof(CheckPointDataMsg)];
+	PUP::toMem pBuf(buf);
+
+	pBuf | checkpointCount;
+	for(int i=0; i<CmiNumPes(); i++){
+		pBuf | CpvAccess(_incarnation)[i];
+	}
+	CkPupROData(pBuf);
+	CkPupGroupData(pBuf,CmiTrue);
+	CkPupNodeGroupData(pBuf,CmiTrue);
+	pupArrayElementsSkip(pBuf,CmiTrue,NULL);
+
+	unAckedCheckpoint=1;
+	CmiSetHandler(msg,_storeCheckpointHandlerIdx);
+	CmiSyncSendAndFree(getCheckPointPE(),totalSize,msg);
+
+#if DEBUG_CHECKPOINT
+	if(CmiMyPe() == 0){
+		printf("[%d] finishing checkpoint at %.6lf CmiTimer %.6lf with dataSize %d\n",CkMyPe(),CmiWallTimer(),CmiTimer(),dataSize);
+	}
+#endif
+
+#if COLLECT_STATS_MEMORY
+	CkPrintf("[%d] CKP=%d BUF_DET=%d STO_DET=%d MSG_LOG=%d\n",CkMyPe(),totalSize,bufferedDetsSize*sizeof(Determinant),storedDetsSize*sizeof(Determinant),msgLogSize);
+	msgLogSize = 0;
+	bufferedDetsSize = 0;
+	storedDetsSize = 0;
+#endif
+
+};
+
+/**
+ * @brief Finishes checkpoint process by making the callback
+ */
+void _endCheckpointHandler(char *msg){
+	CmiFree(msg);
+
+	// making the callback to resume execution after checkpoint
+	ckptCallback.send();
+}
+
+/**
  * @brief Starts the checkpoint phase after migration.
  */
 void startMlogCheckpoint(void *_dummy, double curWallTime){
@@ -1034,9 +1140,16 @@ void _checkpointAckHandler(CheckPointAck *ackMsg){
 	unAckedCheckpoint=0;
 	DEBUGLB(printf("[%d] CheckPoint Acked from PE %d with size %d onGoingLoadBalancing %d \n",CkMyPe(),ackMsg->PE,ackMsg->dataSize,onGoingLoadBalancing));
 	DEBUGLB(CkPrintf("[%d] ACK HANDLER with %d\n",CkMyPe(),onGoingLoadBalancing));	
-	if(onGoingLoadBalancing){
+	if(onGoingLoadBalancing) {
 		onGoingLoadBalancing = 0;
 		finishedCheckpointLoadBalancing();
+	} else {
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 0;
+#endif
+		char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+		CmiSetHandler(msg, _endCheckpointIdx);
+		CmiReduce(msg,CmiMsgHeaderSizeBytes,doNothingMsg);
 	}
 	CmiFree(ackMsg);
 };
@@ -1125,7 +1238,6 @@ void createObjIDList(void *data, ChareMlogData *mlogData){
  */
 void _recvCheckpointHandler(char *_restartData){
 	RestartProcessorData *restartData = (RestartProcessorData *)_restartData;
-	MigrationRecord *migratedAwayElements;
 
 	globalLBID = restartData->lbGroupID;
 	
@@ -1834,8 +1946,13 @@ void getGlobalStep(CkGroupID gID){
 };
 
 void _getGlobalStepHandler(LBStepMsg *msg){
-	CentralLB *lb = (CentralLB *)CkpvAccess(_groupTable)->find(msg->lbID).getObj();
-	msg->step = lb->step();
+	CentralLB *lb;
+	if(msg->lbID.idx != 0){
+		lb = (CentralLB *)CkpvAccess(_groupTable)->find(msg->lbID).getObj();
+		msg->step = lb->step();
+	} else {
+		msg->step = -1;
+	}
 	CmiAssert(msg->fromPE != CmiMyPe());
 	CmiPrintf("[%d] getGlobalStep called from %d step %d gid %d \n",CmiMyPe(),msg->fromPE,lb->step(),msg->lbID.idx);
 	CmiSetHandler(msg,_recvGlobalStepHandlerIdx);
@@ -1868,9 +1985,11 @@ void _recvGlobalStepHandler(LBStepMsg *msg){
 	char *objList = &resendMsg[sizeof(ResendRequest)];
 	memcpy(objList,objectVec.getVec(),numberObjects * sizeof(CkObjID));	
 
-	CentralLB *lb = (CentralLB *)CkpvAccess(_groupTable)->find(globalLBID).getObj();
-	CpvAccess(_currentObj) = lb;
-	lb->ReceiveDummyMigration(restartDecisionNumber);
+	if(restartDecisionNumber != -1){
+		CentralLB *lb = (CentralLB *)CkpvAccess(_groupTable)->find(globalLBID).getObj();
+		CpvAccess(_currentObj) = lb;
+		lb->ReceiveDummyMigration(restartDecisionNumber);
+	}
 
 	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
 	CmiSyncBroadcastAllAndFree(totalSize, resendMsg);
