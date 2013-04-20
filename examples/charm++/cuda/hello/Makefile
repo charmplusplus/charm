@@ -26,7 +26,7 @@ helloCUDA.o: helloCUDA.cu
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) $(CHARMINC) helloCUDA.cu
 
 test: all
-	./charmrun hello +p4 10
+	./charmrun ./hello +p4 10
 
 bgtest: all
-	./charmrun hello +p4 10 +x2 +y2 +z1
+	./charmrun ./hello +p4 10 +x2 +y2 +z1

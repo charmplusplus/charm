@@ -13,9 +13,10 @@ then
 fi
 
 BGQ_BIN=$BGQ_FLOOR/gnu-linux/bin
-BGQ_INC="-I$BGQ_INSTALL/comm/xl/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk/"
+BGQ_ZLIB=/soft/libraries/alcf/current/gcc/ZLIB/
 
-BGQ_LIB="-L$BGQ_INSTALL/comm/xl.legacy.ndebug/lib -lmpich -lopa -lmpl -ldl -L$BGQ_INSTALL/comm/sys-fast/lib -lpami -L$BGQ_INSTALL/spi/lib -lSPI -lSPI_cnk -lpthread -lrt"
+BGQ_INC="-I$BGQ_INSTALL/comm/sys/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk -I$BGQ_ZLIB/include"
+BGQ_LIB="-L$BGQ_INSTALL/comm/sys-fast/lib -lpami -L$BGQ_INSTALL/spi/lib -L$BGQ_ZLIB/lib -lSPI -lSPI_cnk -lpthread -lrt" 
 
 # test if compiler binary present
 if test ! -x $BGQ_BIN/powerpc64-bgq-linux-g++

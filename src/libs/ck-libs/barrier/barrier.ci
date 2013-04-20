@@ -3,8 +3,8 @@ module barrier
 {
   message FP;
 
-  group barrier {
-    entry barrier(void);
+  group Barrier {
+    entry Barrier(void);
     entry void notify(void);
     entry void callFP(void);
     entry void reset(void);

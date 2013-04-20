@@ -1,12 +1,17 @@
-#include "pup.h"
-
 #ifndef CKARRAYINDEX_H
 #define CKARRAYINDEX_H
 
+#include "pup.h"
+#include "ckhashtable.h"
+#include "charm.h"
 
 /// Max number of integers in an array index
 #ifndef CK_ARRAYINDEX_MAXLEN
     #define CK_ARRAYINDEX_MAXLEN 3
+#endif
+
+#ifndef CK_ARRAYLISTENER_MAXLEN
+# define CK_ARRAYLISTENER_MAXLEN 3
 #endif
 
 /** @warning: fwd declaration of child class to support crazy ptr cast
@@ -85,7 +90,7 @@ class CkArrayIndex: public CkArrayIndexBase
         }
 
         /// Used for debug prints elsewhere
-        void print() { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
+        void print() const { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
 
         /// Equality comparison
         CmiBool operator==(const CkArrayIndex& idx) const
@@ -172,6 +177,20 @@ class CkArrayIndex: public CkArrayIndexBase
             for (int i=6; i < 2 * CK_ARRAYINDEX_MAXLEN; i++)
                 indexShorts[i] = 0;
         }
+
+
+        /// A very crude comparison operator to enable using in comparison-based containers
+        friend bool operator< (const CkArrayIndex &lhs, const CkArrayIndex &rhs)
+        {
+            if (lhs.nInts != rhs.nInts)
+                CkAbort("cannot compare two indices of different cardinality");
+            for (int i = 0; i < lhs.nInts; i++)
+                if (lhs.data()[i] < rhs.data()[i])
+                    return true;
+                else if (rhs.data()[i] < lhs.data()[i])
+                    return false;
+            return false;
+        }
 };
 
 
@@ -187,6 +206,30 @@ class CkArrayIndex: public CkArrayIndexBase
  * CkArrayIndexMax should no longer be supported.
  */
 typedef CkArrayIndex CkArrayIndexMax;
+
+class CkArray;
+
+class CkArrayID {
+	CkGroupID _gid;
+public:
+	CkArrayID() : _gid() { }
+	CkArrayID(CkGroupID g) :_gid(g) {}
+	inline void setZero(void) {_gid.setZero();}
+	inline int isZero(void) const {return _gid.isZero();}
+	operator CkGroupID() const {return _gid;}
+	CkArray *ckLocalBranch(void) const
+		{ return (CkArray *)CkLocalBranch(_gid); }
+	static CkArray *CkLocalBranch(CkArrayID id)
+		{ return (CkArray *)::CkLocalBranch(id); }
+	void pup(PUP::er &p) {p | _gid; }
+	int operator == (const CkArrayID& other) const {
+		return (_gid == other._gid);
+	}
+    friend bool operator< (const CkArrayID &lhs, const CkArrayID &rhs) {
+        return (lhs._gid < rhs._gid);
+    }
+};
+PUPmarshall(CkArrayID)
 
 #endif // CKARRAYINDEX_H
 

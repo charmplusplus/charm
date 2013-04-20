@@ -13,6 +13,8 @@ mainmodule jacobi3d {
   readonly int num_chare_z;
 
   readonly int globalBarrier;
+  readonly int maxIter;
+  readonly int ckptFreq;
 
   message ghostMsg {
     double gh[];

@@ -410,6 +410,7 @@ void postProcessReceivedMessage(Chare *obj,CkObjID &sender,MCount SN,MlogEntry *
 CpvExtern(StoredCheckpoint *,_storedCheckpointData);
 
 //methods for checkpointing
+void CkStartMlogCheckpoint(CkCallback &cb);
 void checkpointAlarm(void *_dummy,double curWallTime);
 void startMlogCheckpoint(void *_dummy,double curWallTime);
 void pupArrayElementsSkip(PUP::er &p, CmiBool create, MigrationRecord *listToSkip,int listSize=0);
@@ -420,6 +421,8 @@ void _storeCheckpointHandler(char *msg);
 void _checkpointAckHandler(CheckPointAck *ackMsg);
 void _removeProcessedLogHandler(char *requestMsg);
 void garbageCollectMlog();
+void _startCheckpointHandler(CheckpointBarrierMsg *msg);
+void _endCheckpointHandler(char *msg);
 
 //handler idxs for checkpoint
 extern int _checkpointRequestHandlerIdx;

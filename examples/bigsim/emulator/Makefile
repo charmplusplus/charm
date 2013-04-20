@@ -29,7 +29,7 @@ test: all
 	$(RUN) ./jacobi3D 3 3 3 2 10 0.1 +bgstacksize 204800 $(TESTOPTS)
 	$(RUN) ./prime 3 3 3 3 4 1000 +bgstacksize 102400 $(TESTOPTS)
 	$(RUN) ./ring 2 2 2 1 1 $(TESTOPTS)
-	$(RUN) littleMD/bgMD 6 6 6 3 4 +bgstacksize 102400 $(TESTOPTS)
+	$(RUN) ./littleMD/bgMD 6 6 6 3 4 +bgstacksize 102400 $(TESTOPTS)
 
 clean:
 	rm -f core *.cpm.h

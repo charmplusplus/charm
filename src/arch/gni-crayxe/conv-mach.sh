@@ -1,4 +1,4 @@
-GEMINI_CRAYXE=1
+GNI_CRAYXE=1
 PMI_CFLAGS=`pkg-config --cflags cray-pmi`
 PMI_LIBS=`pkg-config --libs cray-pmi`
 UGNI_CFLAGS=`pkg-config --cflags cray-ugni`

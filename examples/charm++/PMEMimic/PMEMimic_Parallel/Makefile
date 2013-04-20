@@ -23,7 +23,7 @@ PMEMimic.o: PMEMimic.C PMEMimic.decl.h
 	$(CHARMC) -c PMEMimic.C
 
 test: all
-	./charmrun +p12 pgm 3 2 2 $(TESTOPTS)
+	./charmrun +p12 ./pgm 3 2 2 $(TESTOPTS)
 
 bgtest: all
-	./charmrun pgm +p4 10 +x2 +y2 +z1 $(TESTOPTS)
+	./charmrun ./pgm +p4 10 +x2 +y2 +z1 $(TESTOPTS)

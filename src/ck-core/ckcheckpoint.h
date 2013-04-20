@@ -26,7 +26,10 @@ restarting of Charm++ programs. ...
 #ifndef _CKCHECKPOINT_H
 #define _CKCHECKPOINT_H
 
-#include "CkCheckpoint.decl.h"
+#include <pup.h>
+#include <ckcallback.h>
+#include <ckmessage.h>
+
 // loop over all CkLocMgr and do "code"
 #define  CKLOCMGR_LOOP(code)	\
   for(i=0;i<numGroups;i++) {	\
@@ -36,25 +39,6 @@ restarting of Charm++ programs. ...
       code	\
     }	\
   }
-/***
-  * Location iterator that save each location
- ***/
-void printIndex(const CkArrayIndex &idx,char *dest);
-
-/**
- * There is only one Checkpoint Manager in the whole system
-**/
-class CkCheckpointMgr : public CBase_CkCheckpointMgr {
-private:
-	CkCallback restartCB;
-	double chkptStartTimer;
-public:
-	CkCheckpointMgr() { }
-	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
-	void Checkpoint(const char *dirname,CkCallback& cb);
-	void SendRestartCB(CkReductionMsg *m);
-	void pup(PUP::er& p){ CBase_CkCheckpointMgr::pup(p); p|restartCB; }
-};
 
 // utility functions to pup system global tables
 void CkPupROData(PUP::er &p);

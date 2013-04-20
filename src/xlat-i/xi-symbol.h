@@ -90,15 +90,11 @@ class ValueList : public Printable {
 
 class Module;
 
-class Construct : public Printable {
-  protected:
-    int external;
-  public:
-    int line;
-    Module *containerModule;
-    Construct() {external=0;line=-1;}
-    void setExtern(int &e) { external = e; }
-    void setModule(Module *m) { containerModule = m; }
+class AstNode : public Printable {
+protected:
+  int line;
+public:
+  AstNode(int line_ = -1) : line(line_) { }
     virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
     {
       (void)declstr; (void)defstr; (void)defconstr; (void)connectPresent;
@@ -106,8 +102,11 @@ class Construct : public Printable {
     virtual void genDecls(XStr& str) { (void)str; }
     virtual void genDefs(XStr& str) { (void)str; }
     virtual void genReg(XStr& str) { (void)str; }
+    virtual void genGlobalCode(XStr scope, XStr &decls, XStr &defs)
+    { (void)scope; (void)decls; (void)defs; }
     virtual void preprocess() { }
     virtual void check() { }
+    virtual void printChareNames() { }
 
     // DMK - Accel Support
     virtual int genAccels_spe_c_funcBodies(XStr& str) { (void)str; return 0; }
@@ -118,27 +117,68 @@ class Construct : public Printable {
     virtual void genAccels_ppe_c_regFuncs(XStr& str) { (void)str; }
 };
 
-class ConstructList : public Construct {
-    std::list<Construct*> constructs;
+class Construct : virtual public AstNode {
+  protected:
+    int external;
   public:
-    ConstructList(int l, Construct *c, ConstructList *n=0);
-    void setExtern(int e);
-    void setModule(Module *m);
-    void print(XStr& str);
-    void check();
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
-    void genDecls(XStr& str);
-    void genDefs(XStr& str);
-    void genReg(XStr& str);
-    void preprocess();
+    Module *containerModule;
+    Construct() {external=0;}
+    void setExtern(int& e) { external = e; }
+    void setModule(Module *m) { containerModule = m; }
+};
 
-    // DMK - Accel Support
-    int genAccels_spe_c_funcBodies(XStr& str);
-    void genAccels_spe_c_regFuncs(XStr& str);
-    void genAccels_spe_c_callInits(XStr& str);
-    void genAccels_spe_h_includes(XStr& str);
-    void genAccels_spe_h_fiCountDefs(XStr& str);
-    void genAccels_ppe_c_regFuncs(XStr& str);
+template <typename Child>
+class AstChildren : public virtual AstNode
+{
+protected:
+  std::list<Child*> children;
+
+public:
+  AstChildren(int line_, Child *c, AstChildren *cs)
+    : AstNode(line_)
+    {
+      children.push_back(c);
+      if (cs)
+	children.insert(children.end(), cs->children.begin(), cs->children.end());
+    }
+
+  template <typename T>
+  AstChildren(std::list<T*>&l)
+    {
+      children.insert(children.begin(), l.begin(), l.end());
+      l.clear();
+    }
+  void push_back(Child *c);
+
+  void preprocess();
+  void check();
+  void print(XStr& str);
+
+  void printChareNames();
+
+  void genDecls(XStr& str);
+  void genDefs(XStr& str);
+  void genReg(XStr& str);
+  void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
+  void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
+
+  // Accelerated Entry Method support
+  int genAccels_spe_c_funcBodies(XStr& str);
+  void genAccels_spe_c_regFuncs(XStr& str);
+  void genAccels_spe_c_callInits(XStr& str);
+  void genAccels_spe_h_includes(XStr& str);
+  void genAccels_spe_h_fiCountDefs(XStr& str);
+  void genAccels_ppe_c_regFuncs(XStr& str);
+
+  template <typename T>
+  void recurse(T arg, void (Child::*fn)(T));
+  void recursev(void (Child::*fn)());
+};
+
+class ConstructList : public AstChildren<Construct>, public Construct {
+public:
+  ConstructList(int l, Construct *c, ConstructList *n=0)
+    : AstChildren<Construct>(l, c, n) { }
 };
 
 /*********************** Type System **********************/
@@ -477,57 +517,36 @@ class TParamVal : public TParam {
     void genSpec(XStr& str) { str << val; }
 };
 
-class Scope : public Construct {
+class Scope : public ConstructList {
   protected:
     const char* name_;
-    ConstructList* contents_;
   public:
-    Scope(const char* name, ConstructList* contents) : name_(name), contents_(contents) {}
-    virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {
-        contents_->genPub(declstr, defstr, defconstr, connectPresent);
-    }
-    virtual void genDecls(XStr& str) {
+    Scope(const char* name, ConstructList* contents)
+      : name_(name)
+      , ConstructList(-1, NULL, contents)
+    { }
+    void genDecls(XStr& str) {
         str << "namespace " << name_ << " {\n";
-        contents_->genDecls(str);
+        AstChildren<Construct>::genDecls(str);
         str << "} // namespace " << name_ << "\n";
     }
-    virtual void genDefs(XStr& str) {
+    void genDefs(XStr& str) {
         str << "namespace " << name_ << " {\n";
-        contents_->genDefs(str);
+        AstChildren<Construct>::genDefs(str);
         str << "} // namespace " << name_ << "\n";
     }
-    virtual void genReg(XStr& str) {
+    void genReg(XStr& str) {
         str << "using namespace " << name_ << ";\n";
-        contents_->genReg(str);
+        AstChildren<Construct>::genReg(str);
     }
-    virtual void preprocess() {
-        contents_->preprocess();
+    void genGlobalCode(XStr scope, XStr &decls, XStr &defs) {
+      scope << name_ << "::";
+      AstChildren<Construct>::genGlobalCode(scope, decls, defs);
     }
-    virtual void print(XStr& str) {
+    void print(XStr& str) {
         str << "namespace " << name_ << "{\n";
-        contents_->print(str);
+        AstChildren<Construct>::print(str);
         str << "} // namespace " << name_ << "\n";
-    }
-    void check();
-
-    // DMK - Accel Support
-    virtual int genAccels_spe_c_funcBodies(XStr& str) {
-      return contents_->genAccels_spe_c_funcBodies(str);
-    }
-    virtual void genAccels_spe_c_regFuncs(XStr& str) {
-      contents_->genAccels_spe_c_regFuncs(str);
-    }
-    virtual void genAccels_spe_c_callInits(XStr& str) {
-      contents_->genAccels_spe_c_callInits(str);
-    }
-    virtual void genAccels_spe_h_includes(XStr& str) {
-      contents_->genAccels_spe_h_includes(str);
-    }
-    virtual void genAccels_spe_h_fiCountDefs(XStr& str) {
-      contents_->genAccels_spe_h_fiCountDefs(str);
-    }
-    virtual void genAccels_ppe_c_regFuncs(XStr& str) {
-      contents_->genAccels_ppe_c_regFuncs(str);
     }
 };
 
@@ -647,6 +666,14 @@ class TVarList : public Printable {
 
 /******************* Chares, Arrays, Groups ***********/
 
+struct SdagCollection
+{
+  CParsedFile *pf;
+  bool sdagPresent;
+  SdagCollection(CParsedFile *p) : pf(p), sdagPresent(false) {}
+  void addNode(Entry *e);
+};
+
 /* Member of a chare or group, i.e. entry, RO or ROM */
 class Member : public Construct {
    //friend class CParsedFile;
@@ -658,7 +685,7 @@ class Member : public Construct {
     inline Chare *getContainer() const { return container; }
     virtual void setChare(Chare *c) { container = c; }
     virtual int isSdag(void) { return 0; }
-    virtual void collectSdagCode(CParsedFile *, int&) { return; }
+    virtual void collectSdagCode(SdagCollection *) { return; }
     XStr makeDecl(const XStr &returnType,int forProxy=0, bool isStatic = false);
     virtual void genPythonDecls(XStr& ) {}
     virtual void genIndexDecls(XStr& ) {}
@@ -668,42 +695,9 @@ class Member : public Construct {
     virtual void lookforCEntry(CEntry *)  {}
 };
 
-/* List of members of a chare or group */
-class MemberList : public Printable {
-    std::list<Member*> members;
-  public:
-    MemberList(Member *m, MemberList *n=0);
-    MemberList(std::list<Entry*>&);
-
-    void appendMember(Member *m);
-    void print(XStr& str);
-    void setChare(Chare *c);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
-    void genDecls(XStr& str);
-    void genIndexDecls(XStr& str);
-    void genPythonDecls(XStr& str);
-    void genDefs(XStr& str);
-    void genReg(XStr& str);
-    void preprocess();
-    void check();
-
-    // DMK - Accel Support
-    int genAccels_spe_c_funcBodies(XStr& str);
-    void genAccels_spe_c_regFuncs(XStr& str);
-    void genAccels_spe_c_callInits(XStr& str);
-    void genAccels_spe_h_includes(XStr& str);
-    void genAccels_spe_h_fiCountDefs(XStr& str);
-    void genAccels_ppe_c_regFuncs(XStr& str);
-
-    void genPythonDefs(XStr& str);
-    void genPythonStaticDefs(XStr& str);
-    void genPythonStaticDocs(XStr& str);
-    void collectSdagCode(CParsedFile *pf, int& sdagPresent);
-    virtual void lookforCEntry(CEntry *centry);
-};
-
 /* Chare or group is a templated entity */
 class Chare : public TEntity {
+  AstChildren<Member> *list;
   public:
     enum { //Set these attribute bits in "attrib"
     	CMIGRATABLE=1<<2,
@@ -722,7 +716,6 @@ class Chare : public TEntity {
     int hasSection; //1-- applies only to array section
 
     NamedType *type;
-    MemberList *list;
     TypeList *bases; //Base classes used by proxy
     TypeList *bases_CBase; //Base classes used by CBase (or NULL)
     
@@ -733,13 +726,14 @@ class Chare : public TEntity {
     void genTypedefs(XStr& str);
     void genRegisterMethodDef(XStr& str);
     void sharedDisambiguation(XStr &str,const XStr &superclass);
+    void genMemberDecls(XStr &str);
   public:
-    Chare(int ln, attrib_t Nattr,
-    	NamedType *t, TypeList *b=0, MemberList *l=0);
+    Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b=0, AstChildren<Member> *l=0);
     void genProxyNames(XStr& str, const char *prefix, const char *middle, 
                         const char *suffix, const char *sep);
     void genIndexNames(XStr& str, const char *prefix, const char *middle, 
                         const char *suffix, const char *sep);
+    void printChareNames();
     XStr proxyName(int withTemplates=1); 
     XStr indexName(int withTemplates=1); 
     XStr indexList();
@@ -751,6 +745,8 @@ class Chare : public TEntity {
     	return str;
     }
     int  isTemplated(void) { return (templat!=0); }
+    bool isTemplateDeclaration() { return templat; }
+    bool isTemplateInstantiation() { return type->isTemplated(); }
     int  isMigratable(void) { return attrib&CMIGRATABLE; }
     int  isPython(void) { return attrib&CPYTHON; }
     int  isMainChare(void) {return attrib&CMAINCHARE;}
@@ -805,8 +801,8 @@ class Chare : public TEntity {
 
 class MainChare : public Chare {
   public:
-    MainChare(int ln, attrib_t Nattr, 
-    	NamedType *t, TypeList *b=0, MemberList *l=0):
+    MainChare(int ln, attrib_t Nattr,
+              NamedType *t, TypeList *b=0, AstChildren<Member> *l=0):
 	    Chare(ln, Nattr|CMAINCHARE, t,b,l) {}
     virtual char *chareTypeName(void) {return (char *) "mainchare";}
 };
@@ -817,7 +813,7 @@ class Array : public Chare {
     XStr indexType;//"CkArrayIndex"+indexSuffix;
   public:
     Array(int ln, attrib_t Nattr, NamedType *index,
-    	NamedType *t, TypeList *b=0, MemberList *l=0);
+          NamedType *t, TypeList *b=0, AstChildren<Member> *l=0);
     virtual int is1D(void) {return indexSuffix==(const char*)"1D";}
     virtual const char* dim(void) {return indexSuffix.get_string_const();}
     virtual void genSubDecls(XStr& str);
@@ -827,7 +823,7 @@ class Array : public Chare {
 class Group : public Chare {
   public:
     Group(int ln, attrib_t Nattr,
-    	NamedType *t, TypeList *b=0, MemberList *l=0);
+          NamedType *t, TypeList *b=0, AstChildren<Member> *l=0);
     virtual void genSubDecls(XStr& str);
     virtual char *chareTypeName(void) {return (char *) "group";}
     virtual void genSubRegisterMethodDef(XStr& str);
@@ -836,7 +832,7 @@ class Group : public Chare {
 class NodeGroup : public Group {
   public:
     NodeGroup(int ln, attrib_t Nattr,
-    	NamedType *t, TypeList *b=0, MemberList *l=0):
+              NamedType *t, TypeList *b=0, AstChildren<Member> *l=0):
 	    Group(ln,Nattr|CNODEGROUP,t,b,l) {}
     virtual char *chareTypeName(void) {return (char *) "nodegroup";}
 };
@@ -1075,7 +1071,7 @@ class Entry : public Member {
     void preprocess();
     char *getEntryName() { return name; }
     void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
-    void collectSdagCode(CParsedFile *pf, int& sdagPresent);
+    void collectSdagCode(SdagCollection *sc);
     void propagateState(int);
     void lookforCEntry(CEntry *centry);
     int getLine() { return line; }
@@ -1133,15 +1129,12 @@ class AccelBlock : public Construct {
 class Module : public Construct {
     int _isMain;
     const char *name;
-    
-  public:
     ConstructList *clist;
-    Module(int l, const char *n, ConstructList *c) : name(n), clist(c) {
-	    line = l;
-	    _isMain=0;
-	    if (clist!=NULL) clist->setModule(this);
-    }
+
+  public:
+    Module(int l, const char *n, ConstructList *c);
     void print(XStr& str);
+    void printChareNames() { if (clist) clist->printChareNames(); }
     void check();
     void generate();
     void setModule();
@@ -1162,24 +1155,6 @@ class Module : public Construct {
     void genAccels_spe_h_includes(XStr& str);
     void genAccels_spe_h_fiCountDefs(XStr& str);
     void genAccels_ppe_c_regFuncs(XStr& str);
-};
-
-class ModuleList : public Printable {
-    std::list<Module*> modules;
-  public:
-    int line;
-    ModuleList(int l, Module *m, ModuleList *n=0) : line(l)
-	{
-	    modules.push_back(m);
-	    if (n)
-		modules.insert(modules.end(),
-			       n->modules.begin(), n->modules.end());
-	}
-    void print(XStr& str);
-    void check();
-    void generate();
-    void preprocess();
-    void genDepends(std::string ciFileBaseName);
 };
 
 class Readonly : public Member {
@@ -1354,7 +1329,7 @@ public:
   void setNext(SdagConstruct *, int);
 
   // for trace
-  void generateTrace();          
+  virtual void generateTrace();
   void generateRegisterEp(XStr& defs);
   void generateTraceEp(XStr& decls, XStr& defs, Chare* chare);
   static void generateTraceEndCall(XStr& defs);
@@ -1377,11 +1352,30 @@ public:
   void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
 };
 
-SdagConstruct *buildAtomic(const char* code,
-			   SdagConstruct *pub_list,
-			   const char *trace_name);
-
 extern void RemoveSdagComments(char *);
+
+class AtomicConstruct : public SdagConstruct {
+public:
+  void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int );
+  void generateCode(XStr&, XStr&, Entry *);
+  void generateTrace();
+  AtomicConstruct(const char *code, SdagConstruct *pub_list, const char *trace_name)
+    : SdagConstruct(SATOMIC, NULL, pub_list, 0,0,0,0,0)
+  {
+    char *tmp = strdup(code);
+    RemoveSdagComments(tmp);
+    text = new XStr(tmp);
+    free(tmp);
+
+    if (trace_name)
+    {
+      tmp = strdup(trace_name);
+      tmp[strlen(tmp)-1]=0;
+      traceName = new XStr(tmp+1);
+      free(tmp);
+    }
+  }
+};
 
 }
 

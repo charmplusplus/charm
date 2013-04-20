@@ -477,13 +477,11 @@ void CUDACallbackManager(void *fn) {
 
 #endif
 
-extern "C"
-void QdCreate(int n=1) {
+void QdCreate(int n) {
   CpvAccess(_qd)->create(n);
 }
 
-extern "C"
-void QdProcess(int n=1) {
+void QdProcess(int n) {
   CpvAccess(_qd)->process(n);
 }
 
@@ -1142,14 +1140,14 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 /************** Receive: Arrays *************/
 
 static void _processArrayEltInitMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getsetArrayMgr());
+  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
     mgr->insertElement((CkMessage *)EnvToUsr(env));
   }
 }
 static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getsetArrayMgr());
+  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
     mgr->getLocMgr()->deliverInline((CkMessage *)EnvToUsr(env));
@@ -1660,9 +1658,11 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   register envelope *env = UsrToEnv(msg);
+/*
 #if CMK_ERROR_CHECKING
   CkNodeGroupID nodeRedMgr;
 #endif
+*/
   _CHECK_USED(env);
   _SET_USED(env, 1);
 #if CMK_REPLAYSYSTEM
@@ -1672,10 +1672,12 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
+/*
 #if CMK_ERROR_CHECKING
   nodeRedMgr.setZero();
   env->setRednMgr(nodeRedMgr);
 #endif
+*/
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   criticalPath_send(env);
   automaticallySetMessagePriority(env);
@@ -2017,7 +2019,7 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
 extern "C"
 void CkArrayManagerInsert(int pe,void *msg,CkGroupID aID) {
   register envelope *env = UsrToEnv(msg);
-  env->getsetArrayMgr()=aID;
+  env->setArrayMgr(aID);
   _prepareOutgoingArrayMsg(env,ArrayEltInitMsg);
   _CldEnqueue(pe, env, _infoIdx);
 }

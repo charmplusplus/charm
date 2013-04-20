@@ -33,7 +33,7 @@
     
 void Main::inputdata ()
 {
-   ifstream instr;
+   std::ifstream instr;
    char headbuf[128];
    int ndim,counter=0;
    bodyptr p;

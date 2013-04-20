@@ -54,6 +54,7 @@ class XStr {
     char *charstar(void) const { return get_string(); }
     //This operator allows us to use XStr's interchangably with char *'s:
     operator char *() {return get_string();}
+    size_t length() const { return len; }
     //Comparison operators
     int operator==(XStr &s2) const {return 0==strcmp(s,s2.s);}
     int operator!=(XStr &s2) const {return 0!=strcmp(s,s2.s);}

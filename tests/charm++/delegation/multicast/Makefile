@@ -8,8 +8,11 @@ hello:   hello.o
 hello.o : hello.C hello.def.h hello.decl.h 
 	$(CHARMC) -c hello.C
 
-hello.decl.h hello.def.h : hello.ci
-	$(CHARMC) hello.ci
+hello.decl.h hello.def.h : hello.ci.stamp
+
+hello.ci.stamp: hello.ci
+	$(CHARMC) $<
+	touch $@
 
 test: all
 	./charmrun +p3 ./hello 10 $(TESTOPTS)
@@ -19,7 +22,7 @@ bgtest: all
 
 clean:
 	rm -f conv-host *.o charmrun charmrun.exe
-	rm -f *.def.h *.decl.h
+	rm -f *.def.h *.decl.h *.ci.stamp
 	rm -f hello hello.*.log hello.sts hello.exe hello.pdb hello.ilk
 	rm -f gmon.out #*#
 	rm -f core *~

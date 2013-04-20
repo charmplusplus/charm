@@ -151,6 +151,8 @@ void (*notify_crash_fn)(int) = NULL;
 
 CpvDeclare(char *, _validProcessors);
 
+CmiUInt4 envMaxExtraSize = 60;      /*  must be more than the size of type-specific in envelope */
+
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -227,7 +229,7 @@ CpvDeclare(void *, CkGridObject);
 CpvDeclare(void *, CsdGridQueue);
 #endif
 
-#if CMK_CRAYXE
+#if CMK_CRAYXE || CMK_CRAYXC
 void* LrtsAlloc(int, int);
 void  LrtsFree(void*);
 #endif
@@ -2383,6 +2385,12 @@ void *CmiReduceMergeFn_random(int *size, void *data, void** remote, int n) {
   return data;
 }
 
+#if CMK_MESSAGE_LOGGING
+void CmiResetGlobalReduceSeqID(){
+	CpvAccess(_reduce_seqID_global) = 0;
+}
+#endif
+
 static void CmiGlobalReduce(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReduction *red) {
   CmiAssert(red->localContributed == 0);
   red->localContributed = 1;
@@ -2848,6 +2856,8 @@ void *CmiAlloc(int size)
 
   char *res;
 
+  size += envMaxExtraSize;
+
 #if CONVERSE_VERSION_ELAN
   res = (char *) elan_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_VERSION_VMI
@@ -2856,7 +2866,7 @@ void *CmiAlloc(int size)
   res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));
 #elif CMK_USE_IBVERBS | CMK_USE_IBUD
   res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
-#elif CMK_CONVERSE_GEMINI_UGNI
+#elif CMK_CONVERSE_UGNI
   res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
@@ -2961,7 +2971,7 @@ void CmiFree(void *blk)
       }
 #endif
     infi_CmiFree(BLKSTART(parentBlk));
-#elif CMK_CONVERSE_GEMINI_UGNI
+#elif CMK_CONVERSE_UGNI
     LrtsFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));

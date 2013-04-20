@@ -153,7 +153,7 @@ inline void MsgPacker::deliver(CombinedMessage *cmb_msg){
             //Unpack the message
             data = (char *)_msgTable[msgIdx]->unpack(data); 
             
-            env->getsetArrayMgr() = aid;
+            env->setArrayMgr(aid);
             env->getsetArrayIndex() = senv.idx;
             env->getsetArrayEp() = ep;
             env->setPacked(0); 

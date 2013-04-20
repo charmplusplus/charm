@@ -941,7 +941,7 @@ public:
 CkMigratable * CkArrayMessageObjectPtr(envelope *env) {
   if (env->getMsgtype()!=ForArrayEltMsg) return NULL;   // not an array msg
 
-  CkArrayID aid = env->getsetArrayMgr();
+  CkArrayID aid = env->getArrayMgr();
   CkArray *mgr=(CkArray *)_localBranch(aid);
   if (mgr) {
     CkLocMgr *locMgr = mgr->getLocMgr();
@@ -1548,7 +1548,7 @@ LDObjHandle CkMigratable::timingBeforeCall(int* objstopped){
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
 		if (_entryTable[epIdx]->traceEnabled)
 			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
-		    		 ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID(((CkGroupID)env->getsetArrayMgr())).idx);
+		    		 ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID(((CkGroupID)env->getArrayMgr())).idx);
 	}
 #endif*/
 
@@ -1597,7 +1597,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
 		if (_entryTable[epIdx]->traceEnabled)
 			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
-		    		 ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID((((CkGroupID)env->getsetArrayMgr())).idx));
+		    		 ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID((((CkGroupID)env->getArrayMgr())).idx));
 	}
 #endif
 
@@ -1635,7 +1635,7 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 	else
 	{
 		CkMigratable *obj=myLocMgr->lookupLocal(localIdx,
-			UsrToEnv(msg)->getsetArrayMgr());
+			UsrToEnv(msg)->getArrayMgr());
 		if (obj==NULL) {//That sibling of this object isn't created yet!
 			if (opts & CK_MSG_KEEP)
 				msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
@@ -2612,7 +2612,7 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts)
 	else
 	{ // We *are* the home processor:
 	//Check if the element's array manager has been registered yet:
-	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getsetArrayMgr())->mgr;
+	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getArrayMgr())->mgr;
 	  if (!mgr) { //No manager yet-- postpone the message (stupidly)
 	    if (CkInRestarting()) {
 	      // during restarting, this message should be ignored
@@ -2655,7 +2655,7 @@ CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t t
 	
 	//Find the manager and build the element
 	DEBC((AA"Demand-creating element %s on pe %d\n"AB,idx2str(idx),onPe));
-	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getsetArrayMgr())->mgr;
+	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getArrayMgr())->mgr;
 	if (!mgr) CkAbort("Tried to demand-create for nonexistent arrMgr");
 	return mgr->demandCreateElement(idx,onPe,ctor,type);
 }

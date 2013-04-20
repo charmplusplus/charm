@@ -11,6 +11,7 @@ struct Main : public CBase_Main {
     detector = CProxy_CompletionDetector::ckNew();
     detector.start_detection(num,
                              CkCallback(CkIndex_Main::startTest(), thisProxy),
+                             CkCallback(),
                              CkCallback(CkIndex_Main::finishTest(), thisProxy), 0);
   }
 

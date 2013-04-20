@@ -16,6 +16,7 @@ using std::ostringstream;
 #include "charm++.h"
 #include "ck.h"
 #include "ckcheckpoint.h"
+#include "CkCheckpoint.decl.h"
 
 void noopit(const char*, ...)
 {}
@@ -127,6 +128,21 @@ static FILE* openCheckpointFile(const char *dirname, const char *basename,
         }
         return fp;
 }
+
+/**
+ * There is only one Checkpoint Manager in the whole system
+**/
+class CkCheckpointMgr : public CBase_CkCheckpointMgr {
+private:
+	CkCallback restartCB;
+	double chkptStartTimer;
+public:
+	CkCheckpointMgr() { }
+	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
+	void Checkpoint(const char *dirname,CkCallback& cb);
+	void SendRestartCB(CkReductionMsg *m);
+	void pup(PUP::er& p){ CBase_CkCheckpointMgr::pup(p); p|restartCB; }
+};
 
 // broadcast
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
@@ -349,6 +365,7 @@ void CkPupGroupData(PUP::er &p, CmiBool create)
 	    }
 	    void *m = CkAllocSysMsg();
 	    envelope* env = UsrToEnv((CkMessage *)m);
+		env->setMsgtype(BocInitMsg);
 		if(create)
 		    CkCreateLocalGroup(gID, eIdx, env);
 	  }   // end of unPacking
@@ -458,6 +475,7 @@ void CkPupGroupData(PUP::er &p)
 	    }
 	    void *m = CkAllocSysMsg();
 	    envelope* env = UsrToEnv((CkMessage *)m);
+            env->setMsgtype(BocInitMsg);
 	    CkCreateLocalGroup(gID, eIdx, env);
 	  }   // end of unPacking
 	  IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
@@ -741,7 +759,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
 	if(CkMyRank()==0){
                 FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "rb",
-                                                       (CkNumPes() == _numPes) ? CkMyPe() : 0);
+                                                       (CkNumPes() == _numPes) ? CkMyNode() : 0);
                 PUP::fromDisk pNodeGroups(fNodeGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CkPupNodeGroupData(pNodeGroups,CmiTrue);

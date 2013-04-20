@@ -18,6 +18,9 @@
 #include "spanningTreeStrategy.h"
 #include "XArraySectionReducer.h"
 
+#include <map>
+#include <vector>
+
 #define DEBUGF(x)  // CkPrintf x;
 
 // turn on or off fragmentation in multicast
@@ -512,7 +515,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 
     // Create a numPE sized array of vectors to hold the array elements in each PE
     int numpes = CkNumPes();
-    arrayIndexPosList *lists = new arrayIndexPosList[numpes];
+    std::map<int, std::vector<CkArrayIndex> > elemBins;
     // Sort each array index in the setup message based on last known location
     for (i=0; i<msg->nIdx; i++) 
     {
@@ -522,7 +525,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
           entry->localElem.insertAtEnd(msg->arrIdx[i]);
       // else, add it to the list corresponding to its PE
       else
-          lists[lastKnown].push_back(IndexPos(msg->arrIdx[i], lastKnown));
+          elemBins[lastKnown].push_back(msg->arrIdx[i]);
     }
 
     CkVec<int> mySubTreePEs;
@@ -530,12 +533,9 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     // The first PE in my subtree should be me, the tree root (as required by the spanning tree builder)
     mySubTreePEs.push_back(CkMyPe());
     // Identify the child PEs in the tree, ie the PEs with section members on them
-    for (i=0; i<numpes; i++) 
-    {
-      if (i==CkMyPe()) continue;
-      if (lists[i].size()) 
-          mySubTreePEs.push_back(i);
-    }
+    for (std::map<int, std::vector<CkArrayIndex> >::iterator itr = elemBins.begin();
+         itr != elemBins.end(); ++itr)
+        mySubTreePEs.push_back(itr->first);
     // The number of multicast children can be limited by the spanning tree factor 
     int num = mySubTreePEs.size() - 1, numchild = 0;
     if (factor <= 0) numchild = num;
@@ -550,15 +550,12 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         int *peListPtr = mySubTreePEs.getVec();
         topo::SpanningTreeVertex *nextGenInfo;
         nextGenInfo = topo::buildSpanningTreeGeneration(peListPtr,peListPtr + mySubTreePEs.size(),numchild);
-        //CkAssert(nextGenInfo->childIndex.size() == numchild);
-	numchild = nextGenInfo->childIndex.size();
-	entry->numChild = numchild;
+        numchild = nextGenInfo->childIndex.size();
+        entry->numChild = numchild;
 
-        // Distribute the section members across the number of direct children (branches)
-        // Direct children are simply the first section member in each of the branch lists
-        arrayIndexPosList *slots = new arrayIndexPosList[numchild];
+        CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-        // For each direct child, collate indices of all section members on the PEs in that branch
+        // Ask each direct child to setup its subtree
         for (i=0; i < numchild; i++)
         {
             // Determine the indices of the first and last PEs in this branch of my sub-tree
@@ -567,45 +564,40 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
                 childEndIndex = nextGenInfo->childIndex[i+1];
             else
                 childEndIndex = mySubTreePEs.size();
-            // For each PE in this branch, add the section members on that PE to a list
-            for (j = childStartIndex; j < childEndIndex; j++)
-            {
-                int pe = mySubTreePEs[j];
-                for (int k=0; k<lists[pe].size(); k++)
-                    slots[i].push_back(lists[pe][k]);
-            }
-        }
 
-        // Ask each of your direct children to setup their branches
-        CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-        for (i=0; i<numchild; i++) 
-        {
-            // Give each child info about the number, indices and location of its children
-            int n = slots[i].length();
-            multicastSetupMsg *m = new (n, n, 0) multicastSetupMsg;
+            // Find the total number of section member elements on this subtree
+            int numSubTreeElems = 0;
+            for (j = childStartIndex; j < childEndIndex; j++)
+                numSubTreeElems += elemBins[ mySubTreePEs[j] ].size();
+
+            // Prepare the setup msg intended for the child
+            multicastSetupMsg *m = new (numSubTreeElems, numSubTreeElems, 0) multicastSetupMsg;
             m->parent = CkSectionInfo(aid, entry);
-            m->nIdx = slots[i].length();
+            m->nIdx = numSubTreeElems;
             m->rootSid = msg->rootSid;
             m->redNo = msg->redNo;
-            for (j=0; j<slots[i].length(); j++) 
+
+            // Give each child the number, indices and location of its children
+            for (int j = childStartIndex, cnt = 0; j < childEndIndex; j++)
             {
-                m->arrIdx[j] = slots[i][j].idx;
-                m->lastKnown[j] = slots[i][j].pe;
+                int childPE = mySubTreePEs[j];
+                for (int k = 0; k < elemBins[childPE].size(); k++, cnt++)
+                {
+                    m->arrIdx[cnt]  = elemBins[childPE][k];
+                    m->lastKnown[cnt] = childPE;
+                }
             }
-            int childroot = slots[i][0].pe;
-            DEBUGF(("[%d] call set up %d numelem:%d\n", CkMyPe(), childroot, n));
+
+            int childroot = mySubTreePEs[childStartIndex];
+            DEBUGF(("[%d] call set up %d numelem:%d\n", CkMyPe(), childroot, numSubTreeElems));
             // Send the message to the child
             mCastGrp[childroot].setup(m);
         }
-        delete [] slots;
         delete nextGenInfo;
     }
     // else, tell yourself that your children are ready
     else 
-    {
         childrenReady(entry);
-    }
-    delete [] lists;
     delete msg;
 }
 
@@ -1297,7 +1289,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     /// If you've received a msg from a previous redn, something has gone horribly wrong somewhere!
     if (msg->redNo < redInfo.redNo) {
         CmiPrintf("[%d] msg redNo:%d, msg:%p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, msg, entry, redInfo.redNo);
-        CmiAbort("Could never happen! \n");
+        CmiAbort("CkMulticast received a reduction msg with redNo less than the current redn number. Should never happen! \n");
     }
 
     //-------------------------------------------------------------------------

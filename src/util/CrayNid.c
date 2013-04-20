@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include "converse.h"
 
-#if CMK_CRAYXT || CMK_CRAYXE
+#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
 
 #if XT3_TOPOLOGY
 #else	/* if it is a XT4/5 or XE */
@@ -35,7 +35,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   return nid;
 }
 
-#endif /* CMK_CRAYXT || CMK_CRAYXE */
+#endif /* CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC */
 
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 
@@ -121,7 +121,7 @@ void pidtonid(int numpes) {
 /* get size and dimension for XE machine */
 void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 {
-  int i = 0, ret;
+  int i = 0, nid, ret;
   rca_mesh_coord_t dimsize;
 
   CmiLock(cray_lock2);
@@ -141,7 +141,13 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   maxX = *xdim = dimsize.mesh_x+1;
   maxY = *ydim = dimsize.mesh_y+1;
   maxZ = *zdim = dimsize.mesh_z+1;
-  maxNID = *maxnid = *xdim * *ydim * *zdim * 2;
+  maxNID = 0;
+
+  for(i = 0; i < CmiNumNodes(); i++) {
+    PMI_Get_nid(i, &nid);
+    if(nid >= maxNID) maxNID = nid + 1;
+  }
+  *maxnid = maxNID;
 
 #else
 
@@ -181,8 +187,6 @@ void craynid_init()
   if (CmiMyRank()==0) {
     cray_lock = CmiCreateLock();
     cray_lock2 = CmiCreateLock();
-
-    pidtonid(CmiNumPes());
   }
 }
 

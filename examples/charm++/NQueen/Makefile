@@ -32,28 +32,29 @@ nqueen_centralized.prj : main.o nqueen.o counter.o
 nqueen_centralized : main.o nqueen.o counter.o
 	$(CHARMC) -language charm++  -balance centralized -o nqueen_centralized main.o nqueen.o counter.o
 
-main.o : main.C main.h counter.decl.h counter.def.h  main.decl.h main.def.h
+main.o : main.C main.h Counter.decl.h main.decl.h main.def.h
 	$(CHARMC) -o main.o main.C
 
-nqueen.o : nqueen.C nqueen.h counter.decl.h counter.def.h main.decl.h
+nqueen.o : nqueen.C nqueen.h Counter.decl.h main.decl.h
 	$(CHARMC) -o nqueen.o nqueen.C
 
-counter.o: counter.C
+counter.o: counter.C  Counter.decl.h Counter.def.h
 	$(CHARMC) -o counter.o counter.C
 
-main.decl.h main.def.h : main.ci
-	$(CHARMC) main.ci
-	
-counter.decl.h counter.def.h : counter.ci
-	$(CHARMC) counter.ci
+%.stamp: %
+	$(CHARMC) $<
+	touch $@
 
-test:
-	 ./charmrun +p128 ./nqueen 17 5 +CPGatherAll +CPSaveData +CPDefaultValues grainsize=5 +CPDivideConquer +CPSamplePeriod 
+main.decl.h main.def.h : main.ci.stamp
+Counter.decl.h Counter.def.h : counter.ci.stamp
+
+test: all
+	 ./charmrun +p 4 ./nqueen 17 5 +CPGatherAll +CPSaveData +CPDefaultValues grainsize=5 +CPDivideConquer +CPSamplePeriod 0.25
 
 clean:
 	rm -f main.decl.h main.def.h main.o
-	rm -f counter.decl.h counter.def.h nqueen.o
+	rm -f Counter.decl.h Counter.def.h nqueen.o
 	rm -f nqueen nqueen_refine nqueen_greedy nqueen_prj nqueen_rand nqueen_spray nqueen_neighbor charmrun nqueen_*
-	rm *.o *.def.h *.decl.h
-	rm *.log *.sts *.projrc
+	rm -f *.o *.def.h *.decl.h *.stamp
+	rm -f *.log *.sts *.projrc
 

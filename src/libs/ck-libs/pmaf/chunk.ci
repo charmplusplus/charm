@@ -32,7 +32,7 @@ module PMAF {
 
   // ------------------------ Global Read-only Data -------------------------
   readonly CProxy_chunk mesh;
-  initcall void refineChunkInit(void);
+  initnode void refineChunkInit(void);
 
   // ---------------------------- Chare Arrays ------------------------------
   array [1D] chunk {

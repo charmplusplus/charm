@@ -5,7 +5,7 @@
 #include "conv-config.h"
 #include "converse.h"
 
-#if CMK_CONVERSE_GEMINI_UGNI
+#if CMK_CONVERSE_UGNI
 #include "gni_pub.h"
 #include "pmi.h"
 typedef gni_mem_handle_t    mem_handle_t;
@@ -78,7 +78,7 @@ typedef struct block_header
   size_t              block_prev,block_next;   // offset to next memblock
   size_t              freelists[cutOffNum];
   struct mempool_type  *mptr;               // mempool_type
-#if CMK_CONVERSE_GEMINI_UGNI
+#if CMK_CONVERSE_UGNI
   int                 msgs_in_send;
   int                 msgs_in_recv;
 #endif
@@ -96,7 +96,7 @@ typedef struct mempool_type
   size_t                 block_tail;
   size_t                 limit;
   size_t                 size;
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
   CmiNodeLock		 mempoolLock;
 #endif
 } mempool_type;
@@ -109,7 +109,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_f
 void  mempool_destroy(mempool_type *mptr);
 void*  mempool_malloc(mempool_type *mptr, int size, int expand);
 void mempool_free(mempool_type *mptr, void *ptr_free);
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
 void mempool_free_thread(void *ptr_free);
 #endif
 
@@ -117,7 +117,7 @@ void mempool_free_thread(void *ptr_free);
 }
 #endif
 
-#if CMK_CONVERSE_GEMINI_UGNI
+#if CMK_CONVERSE_UGNI
 void* getNextRegisteredPool();
 #endif
 

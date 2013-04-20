@@ -14,7 +14,7 @@ extern int yyparse (void);
 extern int yyerror(char *);
 extern int yylex(void);
 
-extern xi::ModuleList *modlist;
+extern xi::AstChildren<xi::Module> *modlist;
 
 namespace xi {
 
@@ -111,7 +111,7 @@ ModuleList *Parse(char *interfacefile)
 }
 */
 
-ModuleList *Parse(FILE *fp)
+AstChildren<Module> *Parse(FILE *fp)
 {
   modlist = NULL;
   yyin = fp ;
@@ -146,6 +146,7 @@ int main(int argc, char *argv[])
   internalMode = 0;
   bool dependsMode = false;
   bool countTokens = false;
+  bool chareNames = false;
 
   for (int i=1; i<argc; i++) {
     if (*argv[i]=='-') {
@@ -155,6 +156,7 @@ int main(int argc, char *argv[])
       else if (strncmp(argv[i],"-D", 2)==0)  macros.push_back(new MacroDefinition(argv[i]+2));
       else if (strncmp(argv[i], "-M", 2)==0) dependsMode = true;
       else if (strcmp(argv[i], "-count-tokens")==0) countTokens = true;
+      else if (strcmp(argv[i], "-chare-names")==0) chareNames = true;
       else abortxi(argv[0]);
     }
     else
@@ -167,19 +169,25 @@ int main(int argc, char *argv[])
       return 0;
   }
 
-  ModuleList *m = Parse(openFile(fname)) ;
+  AstChildren<Module> *m = Parse(openFile(fname)) ;
   if (!m) return 0;
   m->preprocess();
   m->check();
+
+  if (chareNames) {
+    m->printChareNames();
+    return 0;
+  }
+
   if (dependsMode)
   {
       std::string ciFileBaseName = fname;
       size_t loc = ciFileBaseName.rfind('/');
       if(loc != std::string::npos)
           ciFileBaseName = ciFileBaseName.substr(loc+1);
-      m->genDepends(ciFileBaseName);
+      m->recurse(ciFileBaseName.c_str(), &Module::genDepend);
   }
   else
-      m->generate();
+    m->recursev(&Module::generate);
   return 0 ;
 }

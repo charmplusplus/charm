@@ -5,7 +5,7 @@ module liveViz {
 
 	extern module liveVizPoll;
 
-	initcall void liveVizNodeInit(void);
+	initnode void liveVizNodeInit(void);
 
 	readonly CProxy_liveVizGroup lvG;
 	group [migratable] liveVizGroup {

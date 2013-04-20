@@ -326,7 +326,7 @@ static void MachinePostNonLocalForDCMF();
 /*######Beginning of functions related with Communication-Op functions ######*/
 
 /* Utility functions */
-static inline SMSG_LIST * smsg_allocate() {
+static INLINE_KEYWORD SMSG_LIST * smsg_allocate() {
     SMSG_LIST *smsg = (SMSG_LIST *)PCQueuePop(CpvAccess(smsg_list_q));
     if (smsg != NULL)
         return smsg;
@@ -338,7 +338,7 @@ static inline SMSG_LIST * smsg_allocate() {
     return (SMSG_LIST *) buf;
 }
 
-static inline void smsg_free (SMSG_LIST *smsg) {
+static INLINE_KEYWORD void smsg_free (SMSG_LIST *smsg) {
     int size = PCQueueLength (CpvAccess(smsg_list_q));
     if (size < MAX_NUM_SMSGS)
         PCQueuePush (CpvAccess(smsg_list_q), (char *) smsg);
@@ -861,10 +861,6 @@ static void MachinePreCommonInitForDCMF(int everReturn) {
 }
 
 static void MachinePostCommonInitForDCMF(int everReturn) {
-#if !CMK_SMP || CMK_SMP_NO_COMMTHD
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
-#endif
-
     CmiBarrier();
 }
 /* ######End of functions related with starting programs###### */
@@ -874,7 +870,13 @@ static void MachinePostCommonInitForDCMF(int everReturn) {
  * Abort function:
  *
  ************************************************************************/
-void LrtsNotifyIdle() {}
+
+INLINE_KEYWORD void LrtsBeginIdle() {}
+
+INLINE_KEYWORD void LrtsStillIdle() {}
+
+INLINE_KEYWORD void LrtsNotifyIdle() {}
+
 void LrtsAbort(const char *message) {
     CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
              "{snd:%d,rcv:%d} Reason: %s\n",CmiMyPe(),
@@ -1009,8 +1011,7 @@ CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
 /* Barrier needs to be implemented!!! -Chao Mei */
 /* These two barriers are only needed by CmiTimerInit to synchronize all the
    threads. They do not need to provide a general barrier. */
-int CmiBarrier() {
-    return 0;
+void LrtsBarrier() {
 }
 int CmiBarrierZero() {
     return 0;

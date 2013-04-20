@@ -1,0 +1,46 @@
+This benchmark measures the performance of the communication mechanisms in the
+charm software stack. The comm operations being measured are Xcasts and Reductions.
+
+
+The mechanisms that are tested are:
+1) Converse broadcast
+2) Charm Array broadcast
+3) CkMulticast Array section multicast
+6) Charm Array reduction
+7) CkMulticast Array section reduction
+
+
+The test defaults to placing a single chare array member on each PE and then measuring
+the average time taken for multiple xcast/redn loops using different mechanisms. Tests
+are conducted for a range of message sizes. Output reported includes the average time,
+max, min and std. deviation to put the results in a correct perspective.
+
+These tests can be conducted as a pure benchmark or (to mimic real-world scenarios)
+with the presence of other entry methods in the scheduler queue. Such entry methods
+do not add any memory or network pressure. They are zombie methods that keep calling
+themselves so that the scheduler queue remains filled to the desired length. The time
+taken by each such 'fill' method to execute can also be controlled.
+
+-------------------------------------------------------------------------------
+make and make test should do the trick.
+
+
+-------------------------------------------------------------------------------
+Usage:
+- The program can be run with no args (uses a set of defaults)
+- All the args are optional. If the section / array size are not specified, they default to the number of PEs.
+
+The args must be specified in the following order:
+
+- numRepeats          [int]  : The number of times to repeat the collective (xcast/redn) loop
+- msgSizeMin          [int]  : The minimum message size in bytes
+- msgSizeMax          [int]  : The maximum message size in KB
+- qLength             [int]  : The length of the scheduler queue (num of pending entry methods)
+- fillMethodMflop     [int]  : The number of floating point operations in each filler entry method (Mflop)
+
+
+-------------------------------------------------------------------------------
+Note:
+
+1) The minimum msg size is in *bytes* while the max message size is in *Kilobytes*.
+

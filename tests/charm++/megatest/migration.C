@@ -2,7 +2,7 @@
 
 void migration_init(void)
 {
-  const int numElements = 10;
+  const int numElements = 10 + (CkNumPes() * 2);
   if(CkNumPes() < 2) {
     CkError("migration: requires at least 2 processors.\n");
     megatest_finish();

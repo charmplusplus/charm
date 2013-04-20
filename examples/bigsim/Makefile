@@ -1,4 +1,6 @@
-DIRS= emulator tools
+DIRS= emulator
+# Disabled due to host/target incompatibility described in bug #89
+#DIRS += tools
 
 BUILD_TRACING=$(shell CHARMINC=../../tmp; if test -f $$CHARMINC/conv-config.sh; then . $$CHARMINC/conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
 

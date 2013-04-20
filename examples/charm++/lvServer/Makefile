@@ -1,4 +1,4 @@
-LIBS = -lpython2.5 -lpthread -lutil -ldl -lm
+LIBS = -lpython2.7 -lpthread -lutil -ldl -lm
 
 CHARMC=../../../bin/charmc -module liveViz -module PythonCCS $(OPTS)
 
@@ -19,4 +19,4 @@ lvServer.o: lvServer.C lvServer.decl.h
 	$(CHARMC) -c lvServer.C
 
 test: all
-	charmrun ./lvServer +p5 ++server ++server-port 1234
+	./charmrun ./lvServer +p5 ++server ++server-port 1234

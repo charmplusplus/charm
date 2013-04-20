@@ -931,6 +931,18 @@ static void ConverseRunPE(int everReturn) {
     CpvAccess(networkProgressCount) = 0;
 
     ConverseCommonInit(CmiMyArgv);
+    
+    // register idle events
+
+#if CMK_SMP
+    CmiIdleState *sidle=CmiNotifyGetState();
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)sidle);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)sidle);
+#else
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle, NULL);
+#endif
+
 
     LrtsPostCommonInit(everReturn);
 
@@ -1146,8 +1158,11 @@ static CmiIdleState *CmiNotifyGetState(void) {
 }
 
 static void CmiNotifyBeginIdle(CmiIdleState *s) {
-    s->sleepMs=0;
-    s->nIdles=0;
+    if(s!= NULL){
+        s->sleepMs=0;
+        s->nIdles=0;
+    }
+    LrtsBeginIdle();
 }
 
 /*Number of times to spin before sleeping*/
@@ -1173,7 +1188,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
     }
     }
 #endif
-
+    LrtsStillIdle();
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
 }
 
@@ -1195,4 +1210,27 @@ static char *CopyMsg(char *msg, int len) {
     memcpy(copy, msg, len);
     return copy;
 }
+
+/************Barrier Related Functions****************/
+/* must be called on all ranks including comm thread in SMP */
+int CmiBarrier() {
+#if CMK_SMP
+    /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
+    CmiNodeAllBarrier();
+#endif
+#if ( CMK_SMP && !CMK_SMP_NO_COMMTHD)
+    if (CmiMyRank() == CmiMyNodeSize())
+    {
+#else
+    if (CmiMyRank() == 0)
+    {
+#endif
+        LrtsBarrier();
+    }
+#if CMK_SMP
+    CmiNodeAllBarrier();
+#endif
+    return 0;
+}
+
 

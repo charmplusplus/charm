@@ -62,26 +62,6 @@ SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr
   param = pl;
 }
 
-SdagConstruct *buildAtomic(const char* code,
-			   SdagConstruct *pub_list,
-			   const char *trace_name)
-{
-  char *tmp = strdup(code);
-  RemoveSdagComments(tmp);
-  SdagConstruct *ret = new SdagConstruct(SATOMIC, new XStr(tmp), pub_list, 0,0,0,0, 0 );
-  free(tmp);
-
-  if (trace_name)
-  {
-    tmp = strdup(trace_name);
-    tmp[strlen(tmp)-1]=0;
-    ret->traceName = new XStr(tmp+1);
-    free(tmp);
-  }
-
-  return ret;
-}
-
 void SdagConstruct::numberNodes(void)
 {
   switch(type) {
@@ -424,19 +404,6 @@ void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
       break;
-    case SATOMIC:
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      stateVarsChildren = stateVars;
-      if (con1 != 0) {
-        publist.push_back(con1);
-        /*SdagConstruct *sc;
-        SdagConstruct *sc1;
-        for(sc =publist.begin(); !publist.end(); sc=publist.next()) {
-           for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
-           printf("Publist = %s\n", sc1->text->charstar());
-	}*/
-      }
-      break;
     case SFORWARD:
       stateVarsChildren = new list<CStateVar*>(wlist);
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
@@ -497,6 +464,22 @@ void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
   propagateStateToChildren(*stateVarsChildren, whensEntryMethodStateVars, publist, uniqueVarNum);
 }
 
+
+void AtomicConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
+  stateVars = new list<CStateVar*>();
+  stateVars->insert(stateVars->end(), plist.begin(), plist.end());
+  stateVarsChildren = stateVars;
+  if (con1 != 0) {
+    publist.push_back(con1);
+    /*SdagConstruct *sc;
+    SdagConstruct *sc1;
+    for(sc =publist.begin(); !publist.end(); sc=publist.next()) {
+       for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
+       printf("Publist = %s\n", sc1->text->charstar());
+    }*/
+  }
+}
+
 void SdagConstruct::propagateStateToChildren(list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
   if (constructs != 0) {
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
@@ -519,9 +502,6 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
       break;
     case SFORALL:
       generateForall(decls, defs, entry);
-      break;
-    case SATOMIC:
-      generateAtomic(decls, defs, entry);
       break;
     case SIF:
       generateIf(decls, defs, entry);
@@ -1385,7 +1365,7 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
   endMethod(defs);
 }
 
-void SdagConstruct::generateAtomic(XStr& decls, XStr& defs, Entry* entry)
+void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
 
@@ -1576,28 +1556,27 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
 
 void SdagConstruct::generateTrace()
 {
-  char text[1024];
-  switch(type) {
-  case SATOMIC:
-    if (traceName) {
-      sprintf(text, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
-      // remove blanks
-      for (unsigned int i=0; i<strlen(text); i++)
-        if (text[i]==' '||text[i]=='\t') text[i]='_';
-    }
-    else {
-      sprintf(text, "%s%s", CParsedFile::className->charstar(), label->charstar());
-    }
-    traceName = new XStr(text);
-    break;
-  default:
-    break;
-  }
-
   for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::generateTrace));
   if (con1) con1->generateTrace();
   if (con2) con2->generateTrace();
   if (con3) con3->generateTrace();
+}
+
+void AtomicConstruct::generateTrace()
+{
+  char traceText[1024];
+  if (traceName) {
+    sprintf(traceText, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
+    // remove blanks
+    for (unsigned int i=0; i<strlen(traceText); i++)
+      if (traceText[i]==' '||traceText[i]=='\t') traceText[i]='_';
+  }
+  else {
+    sprintf(traceText, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  }
+  traceName = new XStr(traceText);
+
+  if (con1) con1->generateTrace();
 }
 
 void SdagConstruct::generateTraceBeginCall(XStr& op)          // for trace

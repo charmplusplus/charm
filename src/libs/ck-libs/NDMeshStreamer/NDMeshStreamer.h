@@ -801,12 +801,9 @@ void MeshStreamer<dtype>::sendLargestBuffer() {
 
       // not sending the full buffer, shrink the message size
       envelope *env = UsrToEnv(destinationBuffer);
-      env->setTotalsize(env->getTotalsize() - sizeof(dtype) *
-                        (bufferSize_ - destinationBuffer->numDataItems));
-      *((int *) env->getPrioPtr()) = prio_;
-
+      env->shrinkUsersize((bufferSize_ - destinationBuffer->numDataItems)
+                        * sizeof(dtype));
       numDataItemsBuffered_ -= destinationBuffer->numDataItems;
-
       sendMeshStreamerMessage(destinationBuffer, flushDimension, 
                               destinationIndex); 
 
@@ -865,9 +862,8 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
     if (destinationBuffer->numDataItems != 0) {
       // not sending the full buffer, shrink the message size
       envelope *env = UsrToEnv(destinationBuffer);
-      env->setTotalsize(env->getTotalsize() - sizeof(dtype) *
-                        (bufferSize_ - destinationBuffer->numDataItems));
-      *((int *) env->getPrioPtr()) = prio_;
+      env->shrinkUsersize((bufferSize_ - destinationBuffer->numDataItems)
+                          * sizeof(dtype));
     }
     numDataItemsBuffered_ -= destinationBuffer->numDataItems;
 

@@ -27,7 +27,7 @@ When it is time to start completion detection, invoke the following method of th
 library on {\em all} branches of the completion detection group:
 
 \begin{alltt}
-void start_detection(int num_producers, CkCallback start, CkCallback finish, int prio_);
+void start_detection(int num_producers, CkCallback start, CkCallback allProduced, CkCallback finish, int prio_);
 \end{alltt}
 
 The \verb|num_producers| parameter is the number of objects (chares)
@@ -37,6 +37,9 @@ event, then it would be the size of the array.
 The \verb|start| callback notifies your program that it is safe to
 begin producing and consuming (this state is reached when the module
 has finished its internal initialization).
+
+The \verb|allProduced| callback notifies your program when the client has
+called \verb|done| with arguments summing to \verb|num_producers|.
 
 The \verb|finish| callback is invoked when completion has been
 detected (all objects participating have produced and consumed an

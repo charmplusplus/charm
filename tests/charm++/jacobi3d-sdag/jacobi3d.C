@@ -52,6 +52,8 @@
 /*readonly*/ int num_chare_z;
 
 /*readonly*/ int globalBarrier;
+/*readonly*/ int maxIter;
+/*readonly*/ int ckptFreq;
 
 static unsigned long next = 1;
 
@@ -68,7 +70,7 @@ int myrand(int numpes) {
 
 #define index(a, b, c)	( (a)*(blockDimY+2)*(blockDimZ+2) + (b)*(blockDimZ+2) + (c) )
 
-#define PRINT_FREQ      100
+#define PRINT_FREQ      10
 #define CKP_FREQ		100
 #define MAX_ITER	 400	
 #define WARM_ITER		5
@@ -106,7 +108,7 @@ class Main : public CBase_Main {
     int iterations;
 
     Main(CkArgMsg* m) {
-      if ( (m->argc != 3) && (m->argc != 7) ) {
+	if ( (m->argc != 3) && (m->argc != 7) && (m->argc != 5) && (m->argc != 9) ) {
         CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
         CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z]\n", m->argv[0]);
         CkAbort("Abort");
@@ -117,19 +119,34 @@ class Main : public CBase_Main {
 
       // store the main proxy
       mainProxy = thisProxy;
+		maxIter = MAX_ITER;
+		ckptFreq = CKP_FREQ;
 	
-      if(m->argc == 3) {
-	arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
-        blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]); 
-      }
-      else if (m->argc == 7) {
+    if(m->argc == 3) {
+        arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
+        blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]);
+    } else if (m->argc == 5) {
+        arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
+        blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]);
+        maxIter = atoi(m->argv[3]);
+        ckptFreq = atoi(m->argv[4]);
+    } else if (m->argc == 7) {
         arrayDimX = atoi(m->argv[1]);
-	arrayDimY = atoi(m->argv[2]);
-	arrayDimZ = atoi(m->argv[3]);
-        blockDimX = atoi(m->argv[4]); 
-	blockDimY = atoi(m->argv[5]); 
-	blockDimZ = atoi(m->argv[6]);
-      }
+        arrayDimY = atoi(m->argv[2]);
+        arrayDimZ = atoi(m->argv[3]);
+        blockDimX = atoi(m->argv[4]);
+        blockDimY = atoi(m->argv[5]);
+        blockDimZ = atoi(m->argv[6]);
+    } else if (m->argc == 9) {
+        arrayDimX = atoi(m->argv[1]);
+        arrayDimY = atoi(m->argv[2]);
+        arrayDimZ = atoi(m->argv[3]);
+        blockDimX = atoi(m->argv[4]);
+        blockDimY = atoi(m->argv[5]);
+        blockDimZ = atoi(m->argv[6]);
+        maxIter = atoi(m->argv[7]);
+        ckptFreq = atoi(m->argv[8]);
+    }
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
         CkAbort("array_size_X % block_size_X != 0!");
@@ -199,8 +216,8 @@ class Main : public CBase_Main {
 
     // Each worker reports back to here when it completes an iteration
 	void report() {
-		iterations += CKP_FREQ;
-		if (iterations < MAX_ITER) {
+		iterations += ckptFreq;
+		if (iterations < maxIter) {
 #ifdef CMK_MEM_CHECKPOINT
 			CkCallback cb (CkIndex_Jacobi::doStep(), array);
 			CkStartMemCheckpoint(cb);
@@ -208,9 +225,9 @@ class Main : public CBase_Main {
 			array.doStep();
 #endif
 		} else {
-			CkPrintf("Completed %d iterations\n", MAX_ITER-1);
+			CkPrintf("Completed %d iterations\n", maxIter-1);
 			endTime = CmiWallTimer();
-			CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-1-WARM_ITER));
+			CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(maxIter-1-WARM_ITER));
 			CkExit();
 		}
 	}
@@ -415,11 +432,11 @@ class Jacobi: public CBase_Jacobi {
 
 		constrainBC();
 
-		if (iterations % CKP_FREQ == 0 || iterations > MAX_ITER){
+		if (iterations % ckptFreq == 0 || iterations > maxIter){
 #ifdef CMK_MEM_CHECKPOINT
 			contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
 #elif CMK_MESSAGE_LOGGING
-			if(iterations > MAX_ITER)
+			if(iterations > maxIter)
 				contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
 			else
 				AtSync();

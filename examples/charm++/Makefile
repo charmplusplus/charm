@@ -1,5 +1,45 @@
-DIRS	= hello integrate integrate2 integrateArray piArray queens RedExample \
-	  ring rings speeds load_balancing
+DIRS	= \
+AllReduce \
+allToAll \
+cksequence \
+completion \
+fib \
+hello \
+integrate \
+integrate2 \
+integrateArray \
+jacobi2d \
+leanmd \
+load_balancing \
+manyToMany \
+matmul \
+namespace \
+piArray \
+PUP \
+queens \
+RedExample \
+ring \
+rings \
+speeds \
+sync_square \
+threaded_ring \
+typed_reduction
+
+BGDIRS=\
+AllReduce \
+hello \
+integrate \
+integrate2 \
+integrateArray \
+jacobi2d \
+load_balancing \
+piArray \
+PUP \
+queens \
+RedExample \
+ring \
+rings \
+speeds
 
 all: 
 	for d in $(DIRS); do \
@@ -12,7 +52,7 @@ test:
 	done
 
 bgtest:
-	for d in $(DIRS); do \
+	for d in $(BGDIRS); do \
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 

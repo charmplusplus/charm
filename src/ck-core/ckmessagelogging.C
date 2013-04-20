@@ -38,13 +38,14 @@
 #define DEBUG_PE_NOW(x,y)  if(CkMyPe() == x) y
 #define DEBUG_RECOVERY(x) //x
 
+#define FAIL_DET_THRESHOLD 10
+
 extern const char *idx2str(const CkArrayIndex &ind);
 extern const char *idx2str(const ArrayElement *el);
 
 void getGlobalStep(CkGroupID gID);
 
 bool fault_aware(CkObjID &recver);
-void sendCheckpointData();
 void createObjIDList(void *data,ChareMlogData *mlogData);
 inline bool isLocal(int destPE);
 inline bool isTeamLocal(int destPE);
@@ -108,8 +109,6 @@ int _storeCheckpointHandlerIdx;
 int _checkpointAckHandlerIdx;
 int _getCheckpointHandlerIdx;
 int _recvCheckpointHandlerIdx;
-int _verifyAckRequestHandlerIdx;
-int _verifyAckHandlerIdx;
 int _dummyMigrationHandlerIdx;
 int	_getGlobalStepHandlerIdx;
 int	_recvGlobalStepHandlerIdx;
@@ -122,10 +121,6 @@ int _sendBackLocationHandlerIdx;
 
 void setTeamRecovery(void *data, ChareMlogData *mlogData);
 void unsetTeamRecovery(void *data, ChareMlogData *mlogData);
-int verifyAckTotal;
-int verifyAckCount;
-int verifyAckedRequests=0;
-RestartRequest *storedRequest;
 int _falseRestart =0; /**
 													For testing on clusters we might carry out restarts on 
 													a porcessor without actually starting it
@@ -138,12 +133,10 @@ int onGoingLoadBalancing=0;
 void *centralLb;
 void (*resumeLbFnPtr)(void *);
 int _receiveMlogLocationHandlerIdx;
-int _receiveMigrationNoticeHandlerIdx;
-int _receiveMigrationNoticeAckHandlerIdx;
 int _checkpointBarrierHandlerIdx;
 int _checkpointBarrierAckHandlerIdx;
-CkVec<MigrationRecord> migratedNoticeList;
-CkVec<RetainedMigratedObject *> retainedObjectList;
+int _startCheckpointIdx;
+int _endCheckpointIdx;
 int donotCountMigration=0;
 int countLBMigratedAway=0;
 int countLBToMigrate=0;
@@ -154,6 +147,7 @@ CkGroupID globalLBID;
 int restartDecisionNumber=-1;
 double lastCompletedAlarm=0;
 double lastRestart=0;
+CkCallback ckptCallback;
 
 //update location globals
 int _receiveLocationHandlerIdx;
@@ -172,7 +166,12 @@ void heartBeatHandler(void *msg);
 void heartBeatCheckHandler();
 void partnerFailureHandler(char *msg);
 int getReverseCheckPointPE();
+int inCkptFlag = 0;
 #endif
+
+static void *doNothingMsg(int * size, void * data, void ** remote, int count){
+	return data;
+}
 
 /***** *****/
 
@@ -200,18 +199,16 @@ void _messageLoggingInit(){
 	_resendMessagesHandlerIdx = CkRegisterHandler((CmiHandler)_resendMessagesHandler);
 	_distributedLocationHandlerIdx=CkRegisterHandler((CmiHandler)_distributedLocationHandler);
 	_sendBackLocationHandlerIdx=CkRegisterHandler((CmiHandler)_sendBackLocationHandler);
-	_verifyAckRequestHandlerIdx = CkRegisterHandler((CmiHandler)_verifyAckRequestHandler);
-	_verifyAckHandlerIdx = CkRegisterHandler((CmiHandler)_verifyAckHandler);
 	_dummyMigrationHandlerIdx = CkRegisterHandler((CmiHandler)_dummyMigrationHandler);
 
 	//handlers for load balancing
 	_receiveMlogLocationHandlerIdx=CkRegisterHandler((CmiHandler)_receiveMlogLocationHandler);
-	_receiveMigrationNoticeHandlerIdx=CkRegisterHandler((CmiHandler)_receiveMigrationNoticeHandler);
-	_receiveMigrationNoticeAckHandlerIdx=CkRegisterHandler((CmiHandler)_receiveMigrationNoticeAckHandler);
 	_getGlobalStepHandlerIdx=CkRegisterHandler((CmiHandler)_getGlobalStepHandler);
 	_recvGlobalStepHandlerIdx=CkRegisterHandler((CmiHandler)_recvGlobalStepHandler);
 	_checkpointBarrierHandlerIdx=CkRegisterHandler((CmiHandler)_checkpointBarrierHandler);
 	_checkpointBarrierAckHandlerIdx=CkRegisterHandler((CmiHandler)_checkpointBarrierAckHandler);
+	_startCheckpointIdx = CkRegisterHandler((CmiHandler)_startCheckpointHandler);
+	_endCheckpointIdx = CkRegisterHandler((CmiHandler)_endCheckpointHandler);
 	
 	//handlers for updating locations
 	_receiveLocationHandlerIdx=CkRegisterHandler((CmiHandler)_receiveLocationHandler);
@@ -339,7 +336,7 @@ void heartBeatHandler(void *msg)
 void heartBeatCheckHandler()
 {
 	double now = CmiWallTimer();
-	if (lastPingTime > 0 && now - lastPingTime > 4) {
+	if (lastPingTime > 0 && now - lastPingTime > FAIL_DET_THRESHOLD && !inCkptFlag) {
 		int i, pe, buddy;
 		// tell everyone that PE is down
 		buddy = getReverseCheckPointPE();
@@ -506,7 +503,7 @@ void sendNodeGroupMsg(envelope *env, int destNode, int _infoIdx){
 void sendArrayMsg(envelope *env,int destPE,int _infoIdx){
 	CkObjID recver;
 	recver.type = TypeArray;
-	recver.data.array.id = env->getsetArrayMgr();
+	recver.data.array.id = env->getArrayMgr();
 	recver.data.array.idx.asChild() = *(&env->getsetArrayIndex());
 
 	if(CpvAccess(_currentObj)!=NULL &&  CpvAccess(_currentObj)->mlogData->objID.type != TypeArray){
@@ -829,6 +826,110 @@ void _checkpointRequestHandler(CheckpointRequest *request){
 }
 
 /**
+ * @brief Starts checkpoint phase at PE 0
+ */
+void CkStartMlogCheckpoint(CkCallback &cb){
+
+	// storing callback
+	ckptCallback = cb;
+
+	// sending a broadcast to start checkpoint
+	CheckpointBarrierMsg *msg = (CheckpointBarrierMsg *)CmiAlloc(sizeof(CheckpointBarrierMsg));
+	CmiSetHandler(msg,_startCheckpointIdx);
+	CmiSyncBroadcastAllAndFree(sizeof(CheckpointBarrierMsg),(char *)msg);
+}
+
+/**
+ * @brief Starts checkpoint: send its checkpoint to its partner. This checkpointing strategy is NOT connected to the load balancer, 
+ * hence onGoingLoadBalancer==0.
+ */
+void _startCheckpointHandler(CheckpointBarrierMsg *startMsg){
+	CmiFree(startMsg);
+
+	// removing messages from the log and cleaning up other data structures
+	garbageCollectMlog();
+
+	// increasing the checkpoint counter
+	checkpointCount++;
+
+	// setting globalLBID to NULL
+	globalLBID.idx = 0;
+	
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 1;
+#endif
+
+#if DEBUG_CHECKPOINT
+	if(CmiMyPe() == 0){
+		printf("[%d] starting checkpoint handler at %.6lf CmiTimer %.6lf \n",CkMyPe(),CmiWallTimer(),CmiTimer());
+	}
+#endif
+
+	DEBUG_MEM(CmiMemoryCheck());
+
+	PUP::sizer psizer;
+	psizer | checkpointCount;
+	for(int i=0; i<CmiNumPes(); i++){
+		psizer | CpvAccess(_incarnation)[i];
+	}
+	CkPupROData(psizer);
+	DEBUG_MEM(CmiMemoryCheck());
+	CkPupGroupData(psizer,CmiTrue);
+	DEBUG_MEM(CmiMemoryCheck());
+	CkPupNodeGroupData(psizer,CmiTrue);
+	DEBUG_MEM(CmiMemoryCheck());
+	pupArrayElementsSkip(psizer,CmiTrue,NULL);
+	DEBUG_MEM(CmiMemoryCheck());
+
+	int dataSize = psizer.size();
+	int totalSize = sizeof(CheckPointDataMsg)+dataSize;
+	char *msg = (char *)CmiAlloc(totalSize);
+	CheckPointDataMsg *chkMsg = (CheckPointDataMsg *)msg;
+	chkMsg->PE = CkMyPe();
+	chkMsg->dataSize = dataSize;
+	
+	char *buf = &msg[sizeof(CheckPointDataMsg)];
+	PUP::toMem pBuf(buf);
+
+	pBuf | checkpointCount;
+	for(int i=0; i<CmiNumPes(); i++){
+		pBuf | CpvAccess(_incarnation)[i];
+	}
+	CkPupROData(pBuf);
+	CkPupGroupData(pBuf,CmiTrue);
+	CkPupNodeGroupData(pBuf,CmiTrue);
+	pupArrayElementsSkip(pBuf,CmiTrue,NULL);
+
+	unAckedCheckpoint=1;
+	CmiSetHandler(msg,_storeCheckpointHandlerIdx);
+	CmiSyncSendAndFree(getCheckPointPE(),totalSize,msg);
+
+#if DEBUG_CHECKPOINT
+	if(CmiMyPe() == 0){
+		printf("[%d] finishing checkpoint at %.6lf CmiTimer %.6lf with dataSize %d\n",CkMyPe(),CmiWallTimer(),CmiTimer(),dataSize);
+	}
+#endif
+
+#if COLLECT_STATS_MEMORY
+	CkPrintf("[%d] CKP=%d BUF_DET=%d STO_DET=%d MSG_LOG=%d\n",CkMyPe(),totalSize,bufferedDetsSize*sizeof(Determinant),storedDetsSize*sizeof(Determinant),msgLogSize);
+	msgLogSize = 0;
+	bufferedDetsSize = 0;
+	storedDetsSize = 0;
+#endif
+
+};
+
+/**
+ * @brief Finishes checkpoint process by making the callback
+ */
+void _endCheckpointHandler(char *msg){
+	CmiFree(msg);
+
+	// making the callback to resume execution after checkpoint
+	ckptCallback.send();
+}
+
+/**
  * @brief Starts the checkpoint phase after migration.
  */
 void startMlogCheckpoint(void *_dummy, double curWallTime){
@@ -837,6 +938,10 @@ void startMlogCheckpoint(void *_dummy, double curWallTime){
 	// increasing the checkpoint counter
 	checkpointCount++;
 	
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 1;
+#endif
+
 #if DEBUG_CHECKPOINT
 	if(CmiMyPe() == 0){
 		printf("[%d] starting checkpoint at %.6lf CmiTimer %.6lf \n",CkMyPe(),CmiWallTimer(),CmiTimer());
@@ -1023,21 +1128,6 @@ void _storeCheckpointHandler(char *msg){
 		CmiFree(msg);
 	}
 
-	int count=0;
-	for(int j=migratedNoticeList.size()-1;j>=0;j--){
-		if(migratedNoticeList[j].fromPE == sendingPE){
-			migratedNoticeList[j].ackFrom = 1;
-		}else{
-			CmiAssert("migratedNoticeList entry for processor other than buddy");
-		}
-		if(migratedNoticeList[j].ackFrom == 1 && migratedNoticeList[j].ackTo == 1){
-			migratedNoticeList.remove(j);
-			count++;
-		}
-		
-	}
-	DEBUG(printf("[%d] For proc %d from number of migratedNoticeList cleared %d checkpointAckHandler %d\n",CmiMyPe(),sendingPE,count,_checkpointAckHandlerIdx));
-	
 	CheckPointAck ackMsg;
 	ackMsg.PE = CkMyPe();
 	ackMsg.dataSize = CpvAccess(_storedCheckpointData)->bufSize;
@@ -1053,41 +1143,19 @@ void _checkpointAckHandler(CheckPointAck *ackMsg){
 	unAckedCheckpoint=0;
 	DEBUGLB(printf("[%d] CheckPoint Acked from PE %d with size %d onGoingLoadBalancing %d \n",CkMyPe(),ackMsg->PE,ackMsg->dataSize,onGoingLoadBalancing));
 	DEBUGLB(CkPrintf("[%d] ACK HANDLER with %d\n",CkMyPe(),onGoingLoadBalancing));	
-	if(onGoingLoadBalancing){
+	if(onGoingLoadBalancing) {
 		onGoingLoadBalancing = 0;
 		finishedCheckpointLoadBalancing();
+	} else {
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 0;
+#endif
+		char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+		CmiSetHandler(msg, _endCheckpointIdx);
+		CmiReduce(msg,CmiMsgHeaderSizeBytes,doNothingMsg);
 	}
 	CmiFree(ackMsg);
 };
-
-void clearUpMigratedRetainedLists(int PE){
-	int count=0;
-	CmiMemoryCheck();
-	
-	for(int j=migratedNoticeList.size()-1;j>=0;j--){
-		if(migratedNoticeList[j].toPE == PE){
-			migratedNoticeList[j].ackTo = 1;
-		}
-		if(migratedNoticeList[j].ackFrom == 1 && migratedNoticeList[j].ackTo == 1){
-			migratedNoticeList.remove(j);
-			count++;
-		}
-	}
-	DEBUG(printf("[%d] For proc %d to number of migratedNoticeList cleared %d \n",CmiMyPe(),PE,count));
-	
-	for(int j=retainedObjectList.size()-1;j>=0;j--){
-		if(retainedObjectList[j]->migRecord.toPE == PE){
-			RetainedMigratedObject *obj = retainedObjectList[j];
-			DEBUG(printf("[%d] Clearing retainedObjectList %d to PE %d obj %p msg %p\n",CmiMyPe(),j,PE,obj,obj->msg));
-			retainedObjectList.remove(j);
-			if(obj->msg != NULL){
-				CmiMemoryCheck();
-				CmiFree(obj->msg);
-			}
-			delete obj;
-		}
-	}
-}
 
 /***************************************************************
 	Restart Methods and handlers
@@ -1128,90 +1196,10 @@ void _getCheckpointHandler(RestartRequest *restartMsg){
 	// making sure it is its buddy who is requesting the checkpoint
 	CkAssert(restartMsg->PE == storedChkpt->PE);
 
-	storedRequest = restartMsg;
-	verifyAckTotal = 0;
-
-	for(int i=0;i<migratedNoticeList.size();i++){
-		if(migratedNoticeList[i].fromPE == restartMsg->PE){
-//			if(migratedNoticeList[i].ackFrom == 0 && migratedNoticeList[i].ackTo == 0){
-			if(migratedNoticeList[i].ackFrom == 0){
-				//need to verify if the object actually exists .. it might not
-				//have been acked but it might exist on it
-				VerifyAckMsg msg;
-				msg.migRecord = migratedNoticeList[i];
-				msg.index = i;
-				msg.fromPE = CmiMyPe();
-				CmiPrintf("[%d] Verify  gid %d idx %s from proc %d\n",CmiMyPe(),migratedNoticeList[i].gID.idx,idx2str(migratedNoticeList[i].idx),migratedNoticeList[i].toPE);
-				CmiSetHandler(&msg,_verifyAckRequestHandlerIdx);
-				CmiSyncSend(migratedNoticeList[i].toPE,sizeof(VerifyAckMsg),(char *)&msg);
-				verifyAckTotal++;
-			}
-		}
-	}
-
-	// sending the checkpoint back to its buddy	
-	if(verifyAckTotal == 0){
-		sendCheckpointData();
-	}
-	verifyAckCount = 0;
-}
-
-
-void _verifyAckRequestHandler(VerifyAckMsg *verifyRequest){
-	CkLocMgr *locMgr =  (CkLocMgr*)CkpvAccess(_groupTable)->find(verifyRequest->migRecord.gID).getObj();
-	CkLocRec *rec = locMgr->elementNrec(verifyRequest->migRecord.idx);
-	if(rec != NULL && rec->type() == CkLocRec::local){
-			//this location exists on this processor
-			//and needs to be removed	
-			CkLocRec_local *localRec = (CkLocRec_local *) rec;
-			CmiPrintf("[%d] Found element gid %d idx %s that needs to be removed\n",CmiMyPe(),verifyRequest->migRecord.gID.idx,idx2str(verifyRequest->migRecord.idx));
-			
-			int localIdx = localRec->getLocalIndex();
-			LBDatabase *lbdb = localRec->getLBDB();
-			LDObjHandle ldHandle = localRec->getLdHandle();
-				
-			locMgr->setDuringMigration(true);
-			
-			locMgr->reclaim(verifyRequest->migRecord.idx,localIdx);
-			lbdb->UnregisterObj(ldHandle);
-			
-			locMgr->setDuringMigration(false);
-			
-			verifyAckedRequests++;
-
-	}
-	CmiSetHandler(verifyRequest, _verifyAckHandlerIdx);
-	CmiSyncSendAndFree(verifyRequest->fromPE,sizeof(VerifyAckMsg),(char *)verifyRequest);
-};
-
-
-void _verifyAckHandler(VerifyAckMsg *verifyReply){
-	int index = 	verifyReply->index;
-	migratedNoticeList[index] = verifyReply->migRecord;
-	verifyAckCount++;
-	CmiPrintf("[%d] VerifyReply received %d for  gid %d idx %s from proc %d\n",CmiMyPe(),migratedNoticeList[index].ackTo, migratedNoticeList[index].gID,idx2str(migratedNoticeList[index].idx),migratedNoticeList[index].toPE);
-	if(verifyAckCount == verifyAckTotal){
-		sendCheckpointData();
-	}
-}
-
-/**
- * Sends the checkpoint to its buddy. 
- */
-void sendCheckpointData(){	
-	RestartRequest *restartMsg = storedRequest;
-	StoredCheckpoint *storedChkpt = CpvAccess(_storedCheckpointData);
-	int numMigratedAwayElements = migratedNoticeList.size();
-	if(migratedNoticeList.size() != 0){
-			printf("[%d] size of migratedNoticeList %d\n",CmiMyPe(),migratedNoticeList.size());
-//			CkAssert(migratedNoticeList.size() == 0);
-	}
-	int totalSize = sizeof(RestartProcessorData)+storedChkpt->bufSize;
+	int totalSize = sizeof(RestartProcessorData) + storedChkpt->bufSize;
 	
 	DEBUG_RESTART(CkPrintf("[%d] Sending out checkpoint for processor %d size %d \n",CkMyPe(),restartMsg->PE,totalSize);)
 	CkPrintf("[%d] Sending out checkpoint for processor %d size %d \n",CkMyPe(),restartMsg->PE,totalSize);
-	
-	totalSize += numMigratedAwayElements*sizeof(MigrationRecord);
 	
 	char *msg = (char *)CmiAlloc(totalSize);
 	
@@ -1219,38 +1207,21 @@ void sendCheckpointData(){
 	dataMsg->PE = CkMyPe();
 	dataMsg->restartWallTime = CmiTimer();
 	dataMsg->checkPointSize = storedChkpt->bufSize;
-	
-	dataMsg->numMigratedAwayElements = numMigratedAwayElements;
-//	dataMsg->numMigratedAwayElements = 0;
-	
-	dataMsg->numMigratedInElements = 0;
-	dataMsg->migratedElementSize = 0;
 	dataMsg->lbGroupID = globalLBID;
-	/*msg layout 
-		|RestartProcessorData|List of Migrated Away ObjIDs|CheckpointData|CheckPointData for objects migrated in|
-		Local MessageLog|
-	*/
+	
 	//store checkpoint data
 	char *buf = &msg[sizeof(RestartProcessorData)];
 
-	if(dataMsg->numMigratedAwayElements != 0){
-		memcpy(buf,migratedNoticeList.getVec(),migratedNoticeList.size()*sizeof(MigrationRecord));
-		buf = &buf[migratedNoticeList.size()*sizeof(MigrationRecord)];
-	}
-	
 	if(diskCkptFlag){
 		readCheckpointFromDisk(storedChkpt->bufSize,buf);
 	} else {
 		memcpy(buf,storedChkpt->buf,storedChkpt->bufSize);
 	}
-	buf = &buf[storedChkpt->bufSize];
 
 	CmiSetHandler(msg,_recvCheckpointHandlerIdx);
 	CmiSyncSendAndFree(restartMsg->PE,totalSize,msg);
 	CmiFree(restartMsg);
-
-};
-
+}
 
 // this list is used to create a vector of the object ids of all
 //the chares on this processor currently and the highest TN processed by them 
@@ -1270,19 +1241,11 @@ void createObjIDList(void *data, ChareMlogData *mlogData){
  */
 void _recvCheckpointHandler(char *_restartData){
 	RestartProcessorData *restartData = (RestartProcessorData *)_restartData;
-	MigrationRecord *migratedAwayElements;
 
 	globalLBID = restartData->lbGroupID;
 	
 	printf("[%d] Restart Checkpointdata received from PE %d at %.6lf with checkpointSize %d\n",CkMyPe(),restartData->PE,CmiWallTimer(),restartData->checkPointSize);
 	char *buf = &_restartData[sizeof(RestartProcessorData)];
-	
-	if(restartData->numMigratedAwayElements != 0){
-		migratedAwayElements = new MigrationRecord[restartData->numMigratedAwayElements];
-		memcpy(migratedAwayElements,buf,restartData->numMigratedAwayElements*sizeof(MigrationRecord));
-		printf("[%d] Number of migratedaway elements %d\n",CmiMyPe(),restartData->numMigratedAwayElements);
-		buf = &buf[restartData->numMigratedAwayElements*sizeof(MigrationRecord)];
-	}
 	
 	PUP::fromMem pBuf(buf);
 
@@ -1307,8 +1270,6 @@ void _recvCheckpointHandler(char *_restartData){
 	_initDone();
 
 	getGlobalStep(globalLBID);
-
-	
 }
 
 
@@ -1423,6 +1384,9 @@ void _resendMessagesHandler(char *msg){
 	ResendData d;
 	ResendRequest *resendReq = (ResendRequest *)msg;
 
+	// cleaning global reduction sequence number
+	CmiResetGlobalReduceSeqID();
+
 	// building the reply message
 	char *listObjects = &msg[sizeof(ResendRequest)];
 	d.numberObjects = resendReq->numberObjects;
@@ -1436,9 +1400,7 @@ void _resendMessagesHandler(char *msg){
 
 	DEBUG_MEM(CmiMemoryCheck());
 
-	if(resendReq->PE != CkMyPe()){
-		CmiFree(msg);
-	}	
+	CmiFree(msg);
 }
 
 /*
@@ -1658,13 +1620,11 @@ void _dummyMigrationHandler(DummyMigrationMsg *msg){
 	}
 	if(msg->flag == MLOG_COUNT){
 		DEBUG_RESTART(CmiPrintf("[%d] dummyMigration count %d received from restarted processor\n",CmiMyPe(),msg->count));
-		msg->count -= verifyAckedRequests;
 		for(int i=0;i<msg->count;i++){
 			LDObjHandle h;
 			lb->Migrated(h,1);
 		}
 	}
-	verifyAckedRequests=0;
 	CmiFree(msg);
 };
 
@@ -1854,44 +1814,11 @@ void startLoadBalancingMlog(void (*_fnPtr)(void *),void *_centralLb){
 };
 
 void finishedCheckpointLoadBalancing(){
-	DEBUGLB(printf("[%d] finished checkpoint after lb \n",CmiMyPe());)
-	CheckpointBarrierMsg msg;
-	msg.fromPE = CmiMyPe();
-	msg.checkpointCount = checkpointCount;
-
-	CmiSetHandler(&msg,_checkpointBarrierHandlerIdx);
-	CmiSyncSend(0,sizeof(CheckpointBarrierMsg),(char *)&msg);
-	
-};
-
-void _receiveMigrationNoticeHandler(MigrationNotice *msg){
-	msg->migRecord.ackFrom = msg->migRecord.ackTo = 0;
-	migratedNoticeList.push_back(msg->migRecord);
-
-	MigrationNoticeAck buf;
-	buf.record = msg->record;
-	CmiSetHandler((void *)&buf,_receiveMigrationNoticeAckHandlerIdx);
-	CmiSyncSend(getCheckPointPE(),sizeof(MigrationNoticeAck),(char *)&buf);
-}
-
-void _receiveMigrationNoticeAckHandler(MigrationNoticeAck *msg){
-	
-	RetainedMigratedObject *retainedObject = (RetainedMigratedObject *)(msg->record);
-	retainedObject->acked = 1;
-
-	CmiSetHandler(retainedObject->msg,_receiveMlogLocationHandlerIdx);
-	CmiSyncSend(retainedObject->migRecord.toPE,retainedObject->size,(char *)retainedObject->msg);
-
-	//inform home about the new location of this object
-	CkGroupID gID = retainedObject->migRecord.gID ;
-	CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
-	informLocationHome(gID,retainedObject->migRecord.idx, mgr->homePe(retainedObject->migRecord.idx),retainedObject->migRecord.toPE);
-	
-	countLBMigratedAway++;
-	if(countLBMigratedAway == countLBToMigrate && migrationDoneCalled == 1){
-		DEBUGLB(printf("[%d] calling startMlogCheckpoint in _receiveMigrationNoticeAckHandler countLBToMigrate %d countLBMigratedAway %d \n",CmiMyPe(),countLBToMigrate,countLBMigratedAway));
-		startMlogCheckpoint(NULL,CmiWallTimer());
-	}
+      DEBUGLB(printf("[%d] finished checkpoint after lb \n",CmiMyPe());)
+  
+      char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+      CmiSetHandler(msg,_checkpointBarrierHandlerIdx);
+      CmiReduce(msg,CmiMsgHeaderSizeBytes,doNothingMsg);
 };
 
 void _receiveMlogLocationHandler(void *buf){
@@ -1907,43 +1834,24 @@ void _receiveMlogLocationHandler(void *buf){
 	mgr->immigrate(msg);
 };
 
-/**
- * @brief Processor 0 sends a broadcast to every other processor after checkpoint barrier.
- */
-inline void checkAndSendCheckpointBarrierAcks(CheckpointBarrierMsg *msg){
-	if(checkpointBarrierCount == CmiNumPes()){
-		CmiSetHandler(msg,_checkpointBarrierAckHandlerIdx);
-		for(int i=0;i<CmiNumPes();i++){
-			CmiSyncSend(i,sizeof(CheckpointBarrierMsg),(char *)msg);
-		}
-	}
-}
-
-/**
- * @brief Processor 0 receives a contribution from every other processor after checkpoint.
- */ 
-void _checkpointBarrierHandler(CheckpointBarrierMsg *msg){
-	DEBUG(CmiPrintf("[%d] msg->checkpointCount %d pe %d checkpointCount %d checkpointBarrierCount %d \n",CmiMyPe(),msg->checkpointCount,msg->fromPE,checkpointCount,checkpointBarrierCount));
-	if(msg->checkpointCount == checkpointCount){
-		checkpointBarrierCount++;
-		checkAndSendCheckpointBarrierAcks(msg);
-	}else{
-		if(msg->checkpointCount-1 == checkpointCount){
-			checkpointBarrierCount++;
-			checkAndSendCheckpointBarrierAcks(msg);
-		}else{
-			printf("[%d] msg->checkpointCount %d checkpointCount %d\n",CmiMyPe(),msg->checkpointCount,checkpointCount);
-			CmiAbort("msg->checkpointCount and checkpointCount differ by more than 1");
-		}
-	}
+void _checkpointBarrierHandler(CheckpointBarrierMsg *barrierMsg){
 
 	// deleting the received message
-	CmiFree(msg);
+	CmiFree(barrierMsg);
+
+	// sending a broadcast to resume execution
+	CheckpointBarrierMsg *msg = (CheckpointBarrierMsg *)CmiAlloc(sizeof(CheckpointBarrierMsg));
+	CmiSetHandler(msg,_checkpointBarrierAckHandlerIdx);
+	CmiSyncBroadcastAllAndFree(sizeof(CheckpointBarrierMsg),(char *)msg);
 }
 
 void _checkpointBarrierAckHandler(CheckpointBarrierMsg *msg){
 	DEBUG(CmiPrintf("[%d] _checkpointBarrierAckHandler \n",CmiMyPe()));
 	DEBUGLB(CkPrintf("[%d] Reaching this point\n",CkMyPe()));
+
+#if CMK_CONVERSE_MPI
+	inCkptFlag = 0;
+#endif
 
 	// resuming LB function pointer
 	(*resumeLbFnPtr)(centralLb);
@@ -2041,10 +1949,15 @@ void getGlobalStep(CkGroupID gID){
 };
 
 void _getGlobalStepHandler(LBStepMsg *msg){
-	CentralLB *lb = (CentralLB *)CkpvAccess(_groupTable)->find(msg->lbID).getObj();
-	msg->step = lb->step();
+	CentralLB *lb;
+	if(msg->lbID.idx != 0){
+		lb = (CentralLB *)CkpvAccess(_groupTable)->find(msg->lbID).getObj();
+		msg->step = lb->step();
+	} else {
+		msg->step = -1;
+	}
 	CmiAssert(msg->fromPE != CmiMyPe());
-	CmiPrintf("[%d] getGlobalStep called from %d step %d gid %d \n",CmiMyPe(),msg->fromPE,lb->step(),msg->lbID.idx);
+	CmiPrintf("[%d] getGlobalStep called from %d step %d gid %d \n",CmiMyPe(),msg->fromPE,msg->step,msg->lbID.idx);
 	CmiSetHandler(msg,_recvGlobalStepHandlerIdx);
 	CmiSyncSend(msg->fromPE,sizeof(LBStepMsg),(char *)msg);
 };
@@ -2075,18 +1988,14 @@ void _recvGlobalStepHandler(LBStepMsg *msg){
 	char *objList = &resendMsg[sizeof(ResendRequest)];
 	memcpy(objList,objectVec.getVec(),numberObjects * sizeof(CkObjID));	
 
-	CentralLB *lb = (CentralLB *)CkpvAccess(_groupTable)->find(globalLBID).getObj();
-	CpvAccess(_currentObj) = lb;
-	lb->ReceiveDummyMigration(restartDecisionNumber);
+	if(restartDecisionNumber != -1){
+		CentralLB *lb = (CentralLB *)CkpvAccess(_groupTable)->find(globalLBID).getObj();
+		CpvAccess(_currentObj) = lb;
+		lb->ReceiveDummyMigration(restartDecisionNumber);
+	}
 
 	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
-	for(int i=0;i<CkNumPes();i++){
-		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
-		}
-	}
-	_resendMessagesHandler(resendMsg);
-	CmiFree(resendMsg);
+	CmiSyncBroadcastAllAndFree(totalSize, resendMsg);
 
 	/* test for parallel restart migrate away object**/
 	if(fastRecovery){

@@ -25,7 +25,7 @@
 */
 void CkPupMessage(PUP::er &p,void **atMsg,int pack_mode) {
 	UChar type;
-	int size,prioBits,envSize;
+	int size,prioBits,envSize,extraSize;
 
 	/* pup this simple flag so that we can handle the NULL msg */
 	int isNull = (*atMsg == NULL);   // be overwritten when unpacking
@@ -41,12 +41,14 @@ void CkPupMessage(PUP::er &p,void **atMsg,int pack_mode) {
 		  CkPackMessage(&env); //Pack it
 		type=env->getMsgtype();
 		size=env->getTotalsize();
+                extraSize=env->getExtrasize();
 		prioBits=env->getPriobits();
 		envSize=sizeof(envelope);
 	}
 	p(type);
 	p(wasPacked);
 	p(size);
+	p(extraSize);
 	p(prioBits);
 	p(envSize);
 	int userSize=size-envSize-sizeof(int)*CkPriobitsToInts(prioBits);
@@ -73,7 +75,7 @@ void CkPupMessage(PUP::er &p,void **atMsg,int pack_mode) {
 	    _entryTable[ep]->pupFn(p,*atMsg);
 	  else
 #endif
-	    ((CkMessage *)*atMsg)->pup(p);
+	  ((CkMessage *)*atMsg)->pup(p);
 	  p.comment("} End Charm++ Message");
 	}
 	if (0==wasPacked) //Restore the packed-ness to previous state-- unpacked
@@ -109,28 +111,35 @@ void envelope::pup(PUP::er &p) {
 	switch(getMsgtype()) {
 	case NewChareMsg: case NewVChareMsg: 
 	case ForChareMsg: case ForVidMsg: case FillVidMsg:
-		p((char *)&(type.chare.ptr),sizeof(void *));
-		p(type.chare.forAnyPe);
+		p((char *)&(((struct s_chare*)extraData())->ptr),sizeof(void *));
+		p(((struct s_chare*)extraData())->forAnyPe);
 		break;
 	case NodeBocInitMsg: case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
-		p|type.group.g;
-		p|type.group.rednMgr;
-		p|type.group.epoch;
-		p|type.group.arrayEp;
+		p|((struct s_group*)extraData())->g;
+		p|((struct s_groupinit*)extraData())->rednMgr;
+		p|((struct s_groupinit*)extraData())->epoch;
+		p|((struct s_group*)extraData())->arrayEp;
 		break;
-	case ArrayEltInitMsg: case ForArrayEltMsg:
-		p|type.array.arr;
-		p(type.array.index.nInts);
-		p(type.array.index.index,CK_ARRAYINDEX_MAXLEN);
-		p(type.array.listenerData,CK_ARRAYLISTENER_MAXLEN);
-		p(type.array.hopCount);
-		p(type.array.ifNotThere);
+	case ForArrayEltMsg:
+		p|((struct s_array*)extraData())->arr;
+		p(((struct s_array*)extraData())->index.nInts);
+		p(((struct s_array*)extraData())->index.index,CK_ARRAYINDEX_MAXLEN);
+		p(((struct s_array*)extraData())->hopCount);
+		p(((struct s_array*)extraData())->ifNotThere);
 		break;
+	case ArrayEltInitMsg:
+		p|((struct s_arrayinit*)extraData())->arr;
+		p(((struct s_arrayinit*)extraData())->index.nInts);
+		p(((struct s_arrayinit*)extraData())->index.index,CK_ARRAYINDEX_MAXLEN);
+		p(((struct s_arrayinit*)extraData())->hopCount);
+		p(((struct s_arrayinit*)extraData())->ifNotThere);
+		p(((struct s_arrayinit*)extraData())->listenerData,CK_ARRAYLISTENER_MAXLEN);
+                break;
 	case RODataMsg:
-		p(type.roData.count);
+		p(((struct s_roData*)extraData())->count);
 		break;
 	case ROMsgMsg:
-		p(type.roMsg.roIdx);
+		p(((struct s_roMsg*)extraData())->roIdx);
 		break;
 	default: /*No type-dependent fields to pack*/
 		break;

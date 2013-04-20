@@ -23,5 +23,5 @@ clean:
 jacobi2d.o: jacobi2d.C jacobi2d.decl.h
 	$(CHARMC) -c jacobi2d.C
 
-run: jacobi2d
-	./charmrun +p2 ./jacobi2d 20 10 +balancer Refine 
+test: jacobi2d
+	./charmrun +p2 ./jacobi2d 20 10 +balancer Refine $(TESTOPTS)

@@ -525,7 +525,7 @@ void map_topology_simple(tm_topology_t *topology,tree_t *comm_tree, int *sigma,i
   map_topology(topology,comm_tree,topology->nb_nodes[topology->nb_levels-1],topology->nb_levels-1,sigma,k);
 }
 
-int int_cmp(const void* x1,const void* x2){ 
+static int int_cmp(const void* x1,const void* x2){
 
   int *e1,*e2;
 

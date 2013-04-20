@@ -38,7 +38,7 @@ int CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayInd
   int ep = env->getsetArrayEp();
   CkUnpackMessage(&env);
 
-  CkArrayID destination_aid = env->getsetArrayMgr();
+  CkArrayID destination_aid = env->getArrayMgr();
   CkArray *a=(CkArray *)_localBranch(destination_aid);
 
   env->setPacked(0);
@@ -431,7 +431,7 @@ int ComlibArrayInfo::localMulticast(CkVec<CkArrayIndex>*vec,
     int ep = env->getsetArrayEp();
     CkUnpackMessage(&env);
 
-    CkArrayID destination_aid = env->getsetArrayMgr();
+    CkArrayID destination_aid = env->getArrayMgr();
     env->setPacked(0);
     env->getsetArrayHops()=1;
     env->setUsed(0);
@@ -481,7 +481,7 @@ void ComlibArrayInfo::deliver(envelope *env){
     env->getsetArrayHops()=1;
     CkUnpackMessage(&env);
     
-    CkArray *a=(CkArray *)_localBranch(env->getsetArrayMgr());
+    CkArray *a=(CkArray *)_localBranch(env->getArrayMgr());
     a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue);
 }
 

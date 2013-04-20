@@ -1,7 +1,7 @@
 mainmodule jacobi2DAMR {
  extern module amr;
 // extern module GreedyLB;
- initcall void AmrUserDataJacobiInit(void);
+ initnode void AmrUserDataJacobiInit(void);
  mainchare main
  {
    entry main(CkArgMsg*);

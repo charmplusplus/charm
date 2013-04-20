@@ -25,4 +25,4 @@ overlapTestCU.o: overlapTest.cu
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) $(CHARMINC) -o overlapTestCU.o overlapTest.cu
 
 test: all
-	./charmrun overlapTest +p2 2 8
+	./charmrun ./overlapTest +p2 2 8

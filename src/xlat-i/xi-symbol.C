@@ -201,58 +201,6 @@ void newLine(XStr &str)
     str << endx;
 }
 
-ConstructList::ConstructList(int l, Construct *c, ConstructList *n)
-{
-    constructs.push_back(c);
-    if (n)
-	constructs.insert(constructs.end(),
-			  n->constructs.begin(), n->constructs.end());
-    line = l;
-}
-
-void
-ConstructList::setExtern(int e)
-{
-  Construct::setExtern(e);
-  perElemGen(constructs, e, &Construct::setExtern);
-}
-
-void
-ConstructList::setModule(Module *m)
-{
-  Construct::setModule(m);
-  perElemGen(constructs, m, &Construct::setModule);
-}
-
-void
-ConstructList::print(XStr& str)
-{
-    perElemGen(constructs, str, &Construct::print);
-}
-
-int ConstructList::genAccels_spe_c_funcBodies(XStr& str) {
-    int rtn = 0;
-    for (list<Construct *>::iterator i = constructs.begin();
-	 i != constructs.end(); ++i)
-	if (*i) rtn += (*i)->genAccels_spe_c_funcBodies(str);
-    return rtn;
-}
-void ConstructList::genAccels_spe_c_regFuncs(XStr& str) {
-    perElemGen(constructs, str, &Construct::genAccels_spe_c_regFuncs);
-}
-void ConstructList::genAccels_spe_c_callInits(XStr& str) {
-    perElemGen(constructs, str, &Construct::genAccels_spe_c_callInits);
-}
-void ConstructList::genAccels_spe_h_includes(XStr& str) {
-    perElemGen(constructs, str, &Construct::genAccels_spe_h_includes);
-}
-void ConstructList::genAccels_spe_h_fiCountDefs(XStr& str) {
-    perElemGen(constructs, str, &Construct::genAccels_spe_h_fiCountDefs);
-}
-void ConstructList::genAccels_ppe_c_regFuncs(XStr& str) {
-    perElemGen(constructs, str, &Construct::genAccels_ppe_c_regFuncs);
-}
-
 
 void
 TParamList::print(XStr& str)
@@ -337,54 +285,146 @@ int TypeList::length(void) const
   else return 1;
 }
 
-MemberList::MemberList(Member *m, MemberList *n)
-{
-    members.push_back(m);
-    if (n)
-	members.insert(members.end(), n->members.begin(), n->members.end());
-}
-
-MemberList::MemberList(list<Entry*>&l)
-{
-  members.insert(members.begin(), l.begin(), l.end());
-  l.clear();
-}
-
+template <typename Child>
 void
-MemberList::print(XStr& str)
+AstChildren<Child>::print(XStr& str)
 {
-    perElemGen(members, str, &Member::print);
+    perElemGen(children, str, &Child::print);
 }
 
+template <typename Child>
 void
-MemberList::appendMember(Member *m)
+AstChildren<Child>::preprocess()
 {
-    members.push_back(m);
+  perElem(children, &Child::preprocess);
 }
 
-int MemberList::genAccels_spe_c_funcBodies(XStr& str) {
+template <typename Child>
+void
+AstChildren<Child>::check() {
+  perElem(children, &Child::check);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::genDecls(XStr& str)
+{
+    perElemGen(children, str, &Child::genDecls, newLine);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::genDefs(XStr& str)
+{
+    perElemGen(children, str, &Child::genDefs, newLine);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::genReg(XStr& str)
+{
+    perElemGen(children, str, &Child::genReg, newLine);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
+{
+    for (typename list<Child*>::iterator i = children.begin(); i != children.end(); ++i)
+	if (*i) {
+	    (*i)->genPub(declstr, defstr, defconstr, connectPresent);
+	    declstr << endx;
+	}
+}
+
+template <typename Child>
+template <typename T>
+void
+AstChildren<Child>::recurse(T t, void (Child::*fn)(T))
+{
+  perElemGen(children, t, fn);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::recursev(void (Child::*fn)())
+{
+  perElem(children, fn);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
+{
+  for (typename list<Child*>::iterator i = children.begin();
+       i != children.end(); ++i) {
+    if (*i) {
+      (*i)->genGlobalCode(scope, decls, defs);
+    }
+  }
+}
+
+template <typename Child>
+void
+AstChildren<Child>::printChareNames()
+{
+  perElem(children, &Child::printChareNames);
+}
+
+
+template <typename Child>
+int
+AstChildren<Child>::genAccels_spe_c_funcBodies(XStr& str) {
     int rtn = 0;
-    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
+    for (typename list<Child*>::iterator i = children.begin(); i != children.end(); ++i)
 	if (*i)
 	    rtn += (*i)->genAccels_spe_c_funcBodies(str);
     return rtn;
 }
-void MemberList::genAccels_spe_c_regFuncs(XStr& str) {
-    perElemGen(members, str, &Member::genAccels_spe_c_regFuncs);
+template <typename Child>
+void
+AstChildren<Child>::genAccels_spe_c_regFuncs(XStr& str) {
+    perElemGen(children, str, &Child::genAccels_spe_c_regFuncs);
 }
-void MemberList::genAccels_spe_c_callInits(XStr& str) {
-    perElemGen(members, str, &Member::genAccels_spe_c_callInits);
+template <typename Child>
+void
+AstChildren<Child>::genAccels_spe_c_callInits(XStr& str) {
+    perElemGen(children, str, &Child::genAccels_spe_c_callInits);
 }
-void MemberList::genAccels_spe_h_includes(XStr& str) {
-    perElemGen(members, str, &Member::genAccels_spe_h_includes);
+template <typename Child>
+void
+AstChildren<Child>::genAccels_spe_h_includes(XStr& str) {
+    perElemGen(children, str, &Child::genAccels_spe_h_includes);
 }
-void MemberList::genAccels_spe_h_fiCountDefs(XStr& str) {
-    perElemGen(members, str, &Member::genAccels_spe_h_fiCountDefs);
+template <typename Child>
+void
+AstChildren<Child>::genAccels_spe_h_fiCountDefs(XStr& str) {
+    perElemGen(children, str, &Child::genAccels_spe_h_fiCountDefs);
 }
-void MemberList::genAccels_ppe_c_regFuncs(XStr& str) {
-    perElemGen(members, str, &Member::genAccels_ppe_c_regFuncs);
+template <typename Child>
+void
+AstChildren<Child>::genAccels_ppe_c_regFuncs(XStr& str) {
+    perElemGen(children, str, &Child::genAccels_ppe_c_regFuncs);
 }
 
+
+// Explicit instantiation because of the cross-references from the driver and the grammar
+template class AstChildren<Module>;
+template class AstChildren<Member>;
+template void AstChildren<Module>::recurse<const char *>(const char*, void (Module::*)(const char*));
+template void AstChildren<Construct>::recurse<int&>(int&, void (Construct::*)(int&));
+
+template <typename Child>
+void
+AstChildren<Child>::push_back(Child *m)
+{
+    children.push_back(m);
+}
+
+void SdagCollection::addNode(Entry *e) {
+  sdagPresent = true;
+  pf->addNode(e);
+}
 
 void
 Chare::print(XStr& str)
@@ -478,6 +518,16 @@ Entry::print(XStr& str)
   str << ";\n";
 }
 
+Module::Module(int l, const char *n, ConstructList *c)
+  : name(n)
+  , clist(c)
+{
+  line = l;
+  _isMain=0;
+  if (clist)
+    clist->recurse(this, &Construct::setModule);
+}
+
 void
 Module::print(XStr& str)
 {
@@ -498,15 +548,6 @@ void Module::check() {
     clist->check();
 }
 
-void ConstructList::check() {
-  perElem(constructs, &Construct::check);
-}
-
-void Scope::check() {
-  if (contents_)
-    contents_->check();
-}
-
 void Entry::check() {
   if (!external) {
     if(isConstructor() && retType && !retType->isVoid())
@@ -520,10 +561,6 @@ void Entry::check() {
 void Chare::check() {
   if (list)
     list->check();
-}
-
-void MemberList::check() {
-  perElem(members, &Member::check);
 }
 
 void
@@ -549,7 +586,7 @@ Module::generate()
   if(isMain()) {
     declstr << "extern \"C\" void CkRegisterMainModule(void);\n";
   }
-  declstr << "#endif"<<endx;
+
   // Generate the publish class if there are structured dagger connect entries
   int connectPresent = 0;
   if (clist) clist->genPub(pubDeclStr, pubDefStr, pubDefConstr, connectPresent);
@@ -582,6 +619,8 @@ Module::generate()
   templateGuardEnd(defstr);
   // defstr << "#endif"<<endx;
 
+  if (clist) clist->genGlobalCode("", declstr, defstr);
+  declstr << "#endif" << endx;
 
   // DMK - Accel Support
   #if CMK_CELL != 0
@@ -690,36 +729,6 @@ Module::genDepend(const char *cifile)
 }
 
 void
-ModuleList::print(XStr& str)
-{
-    perElemGen(modules, str, &Module::print);
-}
-
-void
-ModuleList::generate()
-{
-  perElem(modules, &Module::generate);
-}
-
-void
-ModuleList::check()
-{
-  perElem(modules, &Module::check);
-}
-
-void
-ModuleList::preprocess()
-{
-  perElem(modules, &Module::preprocess);
-}
-
-void
-ModuleList::genDepends(std::string ciFileBaseName)
-{
-    perElemGen(modules, ciFileBaseName.c_str(), &Module::genDepend);
-}
-
-void
 Readonly::print(XStr& str)
 {
   if(external)
@@ -739,44 +748,9 @@ Readonly::print(XStr& str)
 }
 
 void
-MemberList::setChare(Chare *c)
+Chare::printChareNames()
 {
-    perElemGen(members, c, &Member::setChare);
-}
-
-void
-ConstructList::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-    for (list<Construct*>::iterator i = constructs.begin(); 
-	 i != constructs.end(); ++i)
-	if (*i) {
-	    (*i)->genPub(declstr, defstr, defconstr, connectPresent);
-	    declstr << endx;
-	}
-}
-
-void
-ConstructList::genDecls(XStr& str)
-{
-    perElemGen(constructs, str, &Construct::genDecls, newLine);
-}
-
-void
-ConstructList::genDefs(XStr& str)
-{
-    perElemGen(constructs, str, &Construct::genDefs, newLine);
-}
-
-void
-ConstructList::genReg(XStr& str)
-{
-    perElemGen(constructs, str, &Construct::genReg, newLine);
-}
-
-void
-ConstructList::preprocess()
-{
-  perElem(constructs, &Construct::preprocess);
+  cout << baseName(0) << endl;
 }
 
 XStr Chare::proxyName(int withTemplates)
@@ -905,7 +879,7 @@ static const char *CIClassEnd =
 "};\n"
 ;
 
-Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
+Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, AstChildren<Member> *l)
 	 : attrib(Nattr), type(t), list(l), bases(b)
 {
 	line = ln;
@@ -918,7 +892,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 	hasSdagEntry=0;
 	if (list)
 	{
-		list->setChare(this);
+          list->recurse(this, &Member::setChare);
       		//Add migration constructor to MemberList
 		if(isMigratable()) {
 			Entry *e=new Entry(ln,SMIGRATE,NULL,
@@ -926,7 +900,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 			  new ParamList(new Parameter(line,
 				new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
 			e->setChare(this);
-			list=new MemberList(e,list);
+			list->push_back(e);
 		}
 	}
 	if (bases==NULL) //Always add Chare as a base class
@@ -988,7 +962,7 @@ Chare::genDecls(XStr& str)
     str << "#include \"PythonCCS.h\"\n";
     if (list) {
       Entry *etemp = new Entry(0,0,new BuiltinType("void"),"pyRequest",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
-      list->appendMember(etemp);
+      list->push_back(etemp);
       etemp->setChare(this);
       //etemp = new Entry(0,0,new BuiltinType("void"),"getPrint",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
       //list->appendMember(etemp);
@@ -1023,7 +997,7 @@ Chare::genDecls(XStr& str)
     str << "    static int __idx;\n";
     str << "    static void __register(const char *s, size_t size);\n";
     if(list)
-      list->genIndexDecls(str);
+      list->recurse<XStr&>(str, &Member::genIndexDecls);
     str << CIClassEnd;
   }
   str << "/* --------------- element proxy ------------------ */\n";
@@ -1046,8 +1020,9 @@ Chare::genDecls(XStr& str)
     int sdagPresent = 0;
     XStr sdagStr;
     CParsedFile myParsedFile(this);
-    list->collectSdagCode(&myParsedFile, sdagPresent);
-    if(sdagPresent) {
+    SdagCollection sc(&myParsedFile);
+    list->recurse(&sc, &Member::collectSdagCode);
+    if(sc.sdagPresent) {
       XStr classname;
       XStr sdagDecls;
       classname << baseName(0);
@@ -1169,10 +1144,14 @@ Chare::genSubDecls(XStr& str)
         << "\n    { return ("<<type<<tvars()<<" *)CkLocalChare(&ckGetChareID()); }"
         << "\n";
 
-  if(list)
-    list->genDecls(str);
+  genMemberDecls(str);
   str << CIClassEnd;
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
+}
+
+void Chare::genMemberDecls(XStr& str) {
+  if(list)
+    list->genDecls(str);
 }
 
 void Chare::genPythonDecls(XStr& str) {
@@ -1214,7 +1193,7 @@ void Chare::genPythonDecls(XStr& str) {
 
   // declare all static python methods and CkPy_MethodsCustom
   if (list)
-    list->genPythonDecls(str);
+    list->recurse<XStr&>(str, &Member::genPythonDecls);
   str << "\n";
 
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
@@ -1228,21 +1207,20 @@ void Chare::genPythonDefs(XStr& str) {
   // generate the python methods array
   str << "PyMethodDef "<<ptype<<"::CkPy_MethodsCustom[] = {\n";
   if (list)
-    list->genPythonStaticDefs(str);
+    list->recurse<XStr&>(str, &Member::genPythonStaticDefs);
   str << "  {NULL, NULL}\n};\n\n";
   // generate documentaion for the methods
   str << "const char * "<<ptype<<"::CkPy_MethodsCustomDoc = \"charm.__doc__ = \\\"Available methods for object "<<type<<":\\\\n\"";
   if (list)
-    list->genPythonStaticDocs(str);
+    list->recurse<XStr&>(str, &Member::genPythonStaticDocs);
   str << "\n  \"\\\"\";\n\n";
 
   if (list)
-    list->genPythonDefs(str);
+    list->recurse<XStr&>(str, &Member::genPythonDefs);
 
 }
 
-Group::Group(int ln, attrib_t Nattr,
-    	NamedType *t, TypeList *b, MemberList *l)
+Group::Group(int ln, attrib_t Nattr, NamedType *t, TypeList *b, AstChildren<Member> *l)
     	:Chare(ln,Nattr|CGROUP,t,b,l)
 {
         hasElement=1;
@@ -1404,8 +1382,7 @@ Group::genSubDecls(XStr& str)
   else
     str << "CkLocalBranch(gID);\n";
   str << "    }\n";
-  if(list)
-    list->genDecls(str);
+  genMemberDecls(str);
   str << CIClassEnd;
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
 
@@ -1424,7 +1401,7 @@ XStr indexSuffix2object(const XStr &indexSuffix) {
 
 //Array Constructor
 Array::Array(int ln, attrib_t Nattr, NamedType *index,
-	NamedType *t, TypeList *b, MemberList *l)
+             NamedType *t, TypeList *b, AstChildren<Member> *l)
     : Chare(ln,Nattr|CARRAY|CMIGRATABLE,t,b,l)
 {
         hasElement=1;
@@ -1766,9 +1743,7 @@ Array::genSubDecls(XStr& str)
     "    } \n";
   }
 
-  if(list){
-    list->genDecls(str);
-  }
+  genMemberDecls(str);
   str << CIClassEnd;
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
 }
@@ -2708,68 +2683,6 @@ void TParamList::genSpec(XStr& str)
   }
 }
 
-void MemberList::genIndexDecls(XStr& str)
-{
-    perElemGen(members, str, &Member::genIndexDecls, newLine);
-}
-
-void MemberList::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
-	if (*i) {
-	    (*i)->genPub(declstr, defstr, defconstr, connectPresent);
-	    declstr << endx;
-	}
-}
-
-void MemberList::genDecls(XStr& str)
-{
-    perElemGen(members, str, &Member::genDecls, newLine);
-}
-
-void MemberList::collectSdagCode(CParsedFile *pf, int& sdagPresent)
-{
-    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
-	if (*i)
-	    (*i)->collectSdagCode(pf, sdagPresent);
-}
-
-void MemberList::genDefs(XStr& str)
-{
-    perElemGen(members, str, &Member::genDefs, newLine);
-}
-
-void MemberList::genReg(XStr& str)
-{
-    perElemGen(members, str, &Member::genReg, newLine);
-}
-
-void MemberList::preprocess()
-{
-  perElem(members, &Member::preprocess);
-}
-
-void MemberList::lookforCEntry(CEntry *centry)
-{
-    perElemGen(members, centry, &Member::lookforCEntry);
-}
-
-void MemberList::genPythonDecls(XStr& str) {
-    perElemGen(members, str, &Member::genPythonDecls, newLine);
-}
-
-void MemberList::genPythonDefs(XStr& str) {
-    perElemGen(members, str, &Member::genPythonDefs, newLine);
-}
-
-void MemberList::genPythonStaticDefs(XStr& str) {
-    perElemGen(members, str, &Member::genPythonStaticDefs);
-}
-
-void MemberList::genPythonStaticDocs(XStr& str) {
-    perElemGen(members, str, &Member::genPythonStaticDocs);
-}
-
 void Entry::lookforCEntry(CEntry *centry)
 {
    // compare name
@@ -2786,7 +2699,7 @@ void Entry::lookforCEntry(CEntry *centry)
 void Chare::lookforCEntry(CEntry *centry)
 {
   if(list)
-    list->lookforCEntry(centry);
+    list->recurse(centry, &Member::lookforCEntry);
   if (centry->decl_entry == NULL)  {
     cerr<<"Function \""<<centry->entry->get_string_const()
         <<"\" appears in Sdag When construct, but not defined as an entry function. "
@@ -2876,11 +2789,10 @@ XStr Entry::eo(int withDefaultVals,int priorComma) {
   return str;
 }
 
-void Entry::collectSdagCode(CParsedFile *pf, int& sdagPresent)
+void Entry::collectSdagCode(SdagCollection *sc)
 {
   if (isSdag()) {
-    sdagPresent = 1;
-    pf->addNode(this);
+    sc->addNode(this);
   }
 }
 
@@ -4190,6 +4102,7 @@ void Entry::genIndexDecls(XStr& str)
     str << templateSpecLine
         << "\n    static void _marshallmessagepup_"<<epStr()<<"(PUP::er &p,void *msg);";
   }
+  str << "\n";
 }
 
 void Entry::genDecls(XStr& str)

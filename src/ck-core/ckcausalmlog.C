@@ -41,6 +41,8 @@
 #define DEBUG_PE_NOW(x,y)  if(CkMyPe() == x) y
 #define DEBUG_RECOVERY(x) //x
 
+#define FAIL_DET_THRESHOLD 10
+
 extern const char *idx2str(const CkArrayIndex &ind);
 extern const char *idx2str(const ArrayElement *el);
 
@@ -265,6 +267,10 @@ int getReverseCheckPointPE();
 int inCkptFlag = 0;
 #endif
 
+static void *doNothingMsg(int * size, void * data, void ** remote, int count){
+    return data;
+}
+
 /** 
  * @brief Initialize message logging data structures and register handlers
  */
@@ -481,7 +487,7 @@ void heartBeatHandler(void *msg)
 void heartBeatCheckHandler()
 {
 	double now = CmiWallTimer();
-	if (lastPingTime > 0 && now - lastPingTime > 4 && !inCkptFlag) {
+	if (lastPingTime > 0 && now - lastPingTime > FAIL_DET_THRESHOLD && !inCkptFlag) {
 		int i, pe, buddy;
 		// tell everyone that PE is down
 		buddy = getReverseCheckPointPE();
@@ -687,7 +693,7 @@ void sendNodeGroupMsg(envelope *env, int destNode, int _infoIdx){
 void sendArrayMsg(envelope *env,int destPE,int _infoIdx){
 	CkObjID recver;
 	recver.type = TypeArray;
-	recver.data.array.id = env->getsetArrayMgr();
+	recver.data.array.id = env->getArrayMgr();
 	recver.data.array.idx.asChild() = *(&env->getsetArrayIndex());
 
 	if(CpvAccess(_currentObj)!=NULL &&  CpvAccess(_currentObj)->mlogData->objID.type != TypeArray){
@@ -1609,7 +1615,6 @@ void _storeCheckpointHandler(char *msg){
 	ackMsg.PE = CkMyPe();
 	ackMsg.dataSize = CpvAccess(_storedCheckpointData)->bufSize;
 	CmiSetHandler(&ackMsg,_checkpointAckHandlerIdx);
-	// CODING: should this be CmiSyncSendAndFree?
 	CmiSyncSend(sendingPE,sizeof(CheckPointAck),(char *)&ackMsg);
 	
 	traceUserBracketEvent(29,_startTime,CkWallTimer());
@@ -1647,7 +1652,7 @@ void sendRemoveLogRequests(){
 	
 	DEBUG_MEM(CmiMemoryCheck());
 	for(int i=0;i<CkNumPes();i++){
-		CmiSyncSend(i,totalSize,requestMsg);
+		CmiSyncSend(i,totalSize,requestMsg);  //make it broadcast
 	}
 	CmiFree(requestMsg);
 
@@ -2043,7 +2048,7 @@ void _recvRestartCheckpointHandler(char *_restartData){
 	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
 	for(int i=0;i<CkNumPes();i++){
 		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
+			CmiSyncSend(i,totalSize,resendMsg);	// make it a broadcast
 		}	
 	}
 	_resendMessagesHandler(resendMsg);
@@ -2288,12 +2293,7 @@ void _recvCheckpointHandler(char *_restartData){
 	memcpy(objList,objectVec.getVec(),numberObjects*sizeof(TProcessedLog));	
 
 	CmiSetHandler(resendMsg,_sendDetsHandlerIdx);
-	for(int i=0;i<CkNumPes();i++){
-		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
-		}
-	}
-	CmiFree(resendMsg);
+	CmiSyncBroadcastAndFree(totalSize,resendMsg);
 	
 }
 
@@ -2342,13 +2342,7 @@ void _updateHomeAckHandler(RestartRequest *updateHomeAck){
 //HERE	sleep(10);
 	
 	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
-	for(int i=0;i<CkNumPes();i++){
-		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
-		}
-	}
-	_resendMessagesHandler(resendMsg);
-	CmiFree(resendMsg);
+	CmiSyncBroadcastAllAndFree(totalSize, resendMsg);
 
 };
 
@@ -2562,6 +2556,9 @@ void _sendDetsHandler(char *msg){
 	ResendRequest *resendReq = (ResendRequest *)msg;
 
 	// CkPrintf("[%d] Sending determinants\n",CkMyPe());
+	
+	// cleaning global reduction sequence number
+	CmiResetGlobalReduceSeqID();
 
 	// building the reply message
 	char *listObjects = &msg[sizeof(ResendRequest)];
@@ -2682,9 +2679,9 @@ void _resendMessagesHandler(char *msg){
 
 	DEBUG_MEM(CmiMemoryCheck());
 
-	if(resendReq->PE != CkMyPe()){
+	//if(resendReq->PE != CkMyPe()){
 		CmiFree(msg);
-	}	
+	//}	
 //	CmiPrintf("[%d] End of resend Request \n",CmiMyPe());
 	lastRestart = CmiWallTimer();
 }
@@ -2807,15 +2804,9 @@ void _sendDetsReplyHandler(char *msg){
 
 //HERE	sleep(10);
 //	CkPrintf("[%d] RESUMING RECOVERY with %d \n",CkMyPe(),restartDecisionNumber);
-	
+
 	CmiSetHandler(resendMsg,_resendMessagesHandlerIdx);
-	for(int i=0;i<CkNumPes();i++){
-		if(i != CkMyPe()){
-			CmiSyncSend(i,totalSize,resendMsg);
-		}
-	}
-	_resendMessagesHandler(resendMsg);
-	CmiFree(resendMsg);
+	CmiSyncBroadcastAllAndFree(totalSize, resendMsg);
 
 	/* test for parallel restart migrate away object**/
 	if(fastRecovery){
@@ -3458,14 +3449,10 @@ void startLoadBalancingMlog(void (*_fnPtr)(void *),void *_centralLb){
 
 void finishedCheckpointLoadBalancing(){
 	DEBUGLB(printf("[%d] finished checkpoint after lb \n",CmiMyPe());)
-	CheckpointBarrierMsg msg;
-	msg.fromPE = CmiMyPe();
-	msg.checkpointCount = checkpointCount;
 
-	CmiSetHandler(&msg,_checkpointBarrierHandlerIdx);
-	// CODING: Shouldn't this be CmiSyncSendAndFree?
-	CmiSyncSend(0,sizeof(CheckpointBarrierMsg),(char *)&msg);
-	
+	char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+	CmiSetHandler(msg,_checkpointBarrierHandlerIdx);
+	CmiReduce(msg,CmiMsgHeaderSizeBytes,doNothingMsg);
 };
 
 
@@ -3576,37 +3563,17 @@ void resumeFromSyncRestart(void *data,ChareMlogData *mlogData){
 }
 
 /**
- * @brief Processor 0 sends a broadcast to every other processor after checkpoint barrier.
- */
-inline void checkAndSendCheckpointBarrierAcks(CheckpointBarrierMsg *msg){
-	if(checkpointBarrierCount == CmiNumPes()){
-		CmiSetHandler(msg,_checkpointBarrierAckHandlerIdx);
-		for(int i=0;i<CmiNumPes();i++){
-			CmiSyncSend(i,sizeof(CheckpointBarrierMsg),(char *)msg);
-		}
-	}
-}
-
-/**
  * @brief Processor 0 receives a contribution from every other processor after checkpoint.
  */ 
-void _checkpointBarrierHandler(CheckpointBarrierMsg *msg){
-	DEBUG(CmiPrintf("[%d] msg->checkpointCount %d pe %d checkpointCount %d checkpointBarrierCount %d \n",CmiMyPe(),msg->checkpointCount,msg->fromPE,checkpointCount,checkpointBarrierCount));
-	if(msg->checkpointCount == checkpointCount){
-		checkpointBarrierCount++;
-		checkAndSendCheckpointBarrierAcks(msg);
-	}else{
-		if(msg->checkpointCount-1 == checkpointCount){
-			checkpointBarrierCount++;
-			checkAndSendCheckpointBarrierAcks(msg);
-		}else{
-			printf("[%d] msg->checkpointCount %d checkpointCount %d\n",CmiMyPe(),msg->checkpointCount,checkpointCount);
-			CmiAbort("msg->checkpointCount and checkpointCount differ by more than 1");
-		}
-	}
+void _checkpointBarrierHandler(CheckpointBarrierMsg *barrierMsg){
 
 	// deleting the received message
-	CmiFree(msg);
+	CmiFree(barrierMsg);
+
+	// sending a broadcast to resume execution
+	CheckpointBarrierMsg *msg = (CheckpointBarrierMsg *)CmiAlloc(sizeof(CheckpointBarrierMsg));
+	CmiSetHandler(msg,_checkpointBarrierAckHandlerIdx);
+	CmiSyncBroadcastAllAndFree(sizeof(CheckpointBarrierMsg),(char *)msg); 
 }
 
 void _checkpointBarrierAckHandler(CheckpointBarrierMsg *msg){

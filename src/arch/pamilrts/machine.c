@@ -169,7 +169,7 @@ volatile int outstanding_recvs;
 #define A_PRIME 13
 #define B_PRIME 19
 
-static inline unsigned myrand (unsigned *seed) {
+static INLINE_KEYWORD unsigned myrand (unsigned *seed) {
   *seed = A_PRIME * (*seed) + B_PRIME;
   return *seed;
 }
@@ -659,8 +659,6 @@ void LrtsPreCommonInit(int everReturn)
 
 void LrtsPostCommonInit(int everReturn)
 {
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
-
   //printf ("before calling CmiBarrier() \n");
   CmiBarrier();
 }
@@ -707,6 +705,10 @@ void LrtsAbort(const char *message) {
   CmiPrintStackTrace(0);
   assert(0);
 }
+
+INLINE_KEYWORD void LrtsBeginIdle() {}
+
+INLINE_KEYWORD void LrtsStillIdle() {}
 
 void LrtsNotifyIdle()
 {
@@ -885,16 +887,6 @@ void LrtsAdvanceCommunication(int whenidle) {
 }
 #endif
 
-
-/* Dummy implementation */
-extern int CmiBarrier() {
-  CmiNodeBarrier();
-  if (CmiMyRank() == 0)
-    CmiNetworkBarrier(1);
-  CmiNodeBarrier();
-  return 0;
-}
-
 static pami_result_t machine_network_barrier(pami_context_t   my_context, 
     int              to_lock) 
 {
@@ -916,6 +908,10 @@ pami_result_t network_barrier_handoff(pami_context_t context, void *msg)
   return machine_network_barrier(context, 0);
 }
 
+void LrtsBarrier()
+{
+    CmiNetworkBarrier(1);
+}
 static void CmiNetworkBarrier(int async) {
   pami_context_t my_context = cmi_pami_contexts[0];
   pami_barrier_flag = 1;

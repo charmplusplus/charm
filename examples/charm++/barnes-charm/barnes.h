@@ -8,8 +8,6 @@
 #include "defs.h"
 #include "stdinc.h"
 
-using namespace std;
-
 #include "barnes.decl.h"
 
 #define MAX_PARTS_PER_TP 1000
@@ -55,7 +53,7 @@ class ParticleMsg : public CMessage_ParticleMsg {
 };
 
 
-static string headline = "Hack code: Plummer model";
+static std::string headline = "Hack code: Plummer model";
 
 class Main : public CBase_Main {
 
@@ -63,8 +61,8 @@ class Main : public CBase_Main {
   int maxleaf;
   int maxcell;
 
-  string infile;
-  string outfile;
+  std::string infile;
+  std::string outfile;
 
   real tnow;
   real tout;
@@ -79,17 +77,17 @@ class Main : public CBase_Main {
   bodyptr bodytab;
 
 
-  CkVec<string> defaults; 
+  CkVec<std::string> defaults; 
 
-  //void initparam (string *argv, const char **defv);
+  //void initparam (std::string *argv, const char **defv);
   void initoutput();
 
-  string extrvalue(string &arg);
-  double getdparam(string name);
-  bool getbparam(string name);
-  long getlparam(string name);
-  int getiparam(string name);
-  string getparam(string name);
+  std::string extrvalue(std::string &arg);
+  double getdparam(std::string name);
+  bool getbparam(std::string name);
+  long getlparam(std::string name);
+  int getiparam(std::string name);
+  std::string getparam(std::string name);
 
   void init_root(unsigned int ProcessId);
   int createTopLevelTree(cellptr node, int depth);

@@ -5,6 +5,8 @@
 
 // Readonly proxy that is used by the HistogramMerger group
 CProxy_Main mainProxy;
+// Proxy to the Histogram chare array
+CProxy_Histogram histogramProxy;
 // The proxy to the merger group is used by the Histogram chare array to submit results
 CProxy_HistogramMerger histogramMergerProxy;
 

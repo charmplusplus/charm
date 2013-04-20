@@ -1,4 +1,4 @@
-mainmodule arr {
+mainmodule pgm {
   readonly CProxy_Main mainProxy;
 
   mainchare Main {

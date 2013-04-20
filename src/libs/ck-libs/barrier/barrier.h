@@ -9,7 +9,7 @@ public:
   voidfn fp;
 };
 
-class barrier : public Group 
+class Barrier : public CBase_Barrier
 {
   int myPe, myLeft, myRight, myParent;
   CkGroupID myGroup;
@@ -18,7 +18,7 @@ class barrier : public Group
 
 public:
   /* entry methods */
-  barrier(void);
+  Barrier(void);
   void notify(void);
   void callFP(void);
   void reset(void);

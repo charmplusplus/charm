@@ -17,5 +17,5 @@ manyToMany.o: manyToMany.C manyToMany.decl.h
 	$(CHARMC) -c manyToMany.C
 
 test: all
-	./charmrun manyToMany +p4 1024 
+	./charmrun ./manyToMany +p4 1024 $(TESTOPTS)
 

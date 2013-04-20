@@ -3,7 +3,7 @@ mainmodule cfdAMR {
  //extern module CommLB;	
  //extern module HeapCentLB;
  extern module RefineLB;
- initcall void AmrUserDataCfdProblemInit(void);
+ initnode void AmrUserDataCfdProblemInit(void);
  mainchare main
  {
    entry main(CkArgMsg*);

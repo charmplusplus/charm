@@ -1,6 +1,8 @@
 #include "barnes.h"
 #include "defs.h"
 
+using std::string;
+
 CProxy_Main mainChare;
 CProxy_TreePiece pieces;
 CProxy_ParticleChunk chunks;

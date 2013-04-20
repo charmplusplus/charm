@@ -1036,7 +1036,8 @@ void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local)
 inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 {
 	envelope *env=UsrToEnv((void *)msg);
-	env->getsetArrayMgr()=aid;
+        env->setMsgtype(ForArrayEltMsg);
+	env->setArrayMgr(aid);
 	env->getsetArraySrcPe()=CkMyPe();
 #if CMK_SMP_TRACE_COMMTHREAD
         env->setSrcPe(CkMyPe());
@@ -1054,7 +1055,7 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
 {
 	envelope *env=UsrToEnv((void *)msg);
-	env->getsetArrayMgr()=aid;
+	env->setArrayMgr(aid);
 	env->getsetArraySrcPe()=CkMyPe();
 #if CMK_SMP_TRACE_COMMTHREAD
         env->setSrcPe(CkMyPe());
@@ -1275,7 +1276,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
     }
     envelope *env = UsrToEnv(bcast);
     env->getsetArrayEp() = epIdx;
-    env->getsetArrayMgr() = el->ckGetArrayID();
+    env->setArrayMgr( el->ckGetArrayID() );
     env->getsetArrayIndex() = el->ckGetArrayIndex();
     CkArrayManagerDeliver(CkMyPe(), bcast, 0);
     return true;
@@ -1435,7 +1436,7 @@ void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index
 		env->SN = 0;
         env->piggyBcastIdx = epIdx;
         env->setEpIdx(CkIndex_ArrayElement::recvBroadcast(0));
-        env->getsetArrayMgr() = thisgroup;
+        env->setArrayMgr(thisgroup);
         env->getsetArrayIndex() = *index;
     env->getsetArrayEp() = CkIndex_ArrayElement::recvBroadcast(0);
         env->setSrcPe(CkMyPe());
