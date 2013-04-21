@@ -465,7 +465,7 @@ void partnerFailureHandler(char *msg)
 
    // send message to crash pe to let it restart
    int newrank = find_spare_mpirank(diepe);
-   int buddy = getCheckPointPE();
+   int buddy = getReverseCheckPointPE();
    if (buddy == diepe)  {
      mpi_restart_crashed(diepe, newrank);
      CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)heartBeatCheckHandler,NULL);
