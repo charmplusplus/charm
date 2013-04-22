@@ -18,7 +18,7 @@ struct Main : public CBase_Main {
 	Main(CkArgMsg* m) {
 
         max_iter = 400;
-        numChares = sqrt(CkNumPes());
+        numChares = sqrt((double)CkNumPes());
         msgSize = 1024;
 		// 3D manyToMany on a NxNxN array
         if(m->argc >= 2)
