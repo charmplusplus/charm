@@ -2610,9 +2610,9 @@ int getCharmEnvelopeSize() {
   return sizeof(envelope);
 }
 
+/// Best-effort guess at whether @arg msg points at a charm envelope
 extern "C"
 int isCharmEnvelope(void *msg) {
-      // best efford guessing if this is a charm envelope
     envelope *e = (envelope *)msg;
     if (SIZEFIELD(msg) < sizeof(envelope)) return 0;
     if (SIZEFIELD(msg) < e->getTotalsize()) return 0;
