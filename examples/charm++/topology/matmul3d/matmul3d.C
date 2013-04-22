@@ -10,6 +10,7 @@
 #if CMK_BLUEGENEP || CMK_VERSION_BLUEGENE
 #include "essl.h"
 #endif
+#include "rand48_replacement.h"
 
 Main::Main(CkArgMsg* m) {
   if ( (m->argc != 3) && (m->argc != 7) && (m->argc != 10) ) {

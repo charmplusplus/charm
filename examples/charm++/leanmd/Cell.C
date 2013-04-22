@@ -2,6 +2,7 @@
 #include "defs.h"
 #include "leanmd.decl.h"
 #include "Cell.h"
+#include "rand48_replacement.h"
 
 extern /* readonly */ CProxy_Main mainProxy;
 extern /* readonly */ CProxy_Cell cellArray;

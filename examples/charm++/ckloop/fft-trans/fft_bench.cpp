@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <limits>
 #include <cmath>
+#include "rand48_replacement.h"
 
 using namespace std;
 
