@@ -313,6 +313,7 @@ void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
   int *counts = (int *)msg->getData();
   int n_objs = counts[0];
   int n_comm = counts[1];
+  delete msg;
 
     // resize database
   statsData->objData.resize(n_objs);
