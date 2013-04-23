@@ -174,7 +174,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", CkMyPe());
 	PUP::toDisk pGroups(fGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CkPupGroupData(pGroups,CmiTrue);
+    CkPupGroupData(pGroups,true);
 #else
     CkPupGroupData(pGroups);
 #endif
@@ -186,7 +186,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	  FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", CkMyNode());
 	  PUP::toDisk pNodeGroups(fNodeGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      CkPupNodeGroupData(pNodeGroups,CmiTrue);
+      CkPupNodeGroupData(pNodeGroups,true);
 #else
       CkPupNodeGroupData(pNodeGroups);
 #endif
@@ -318,7 +318,7 @@ void CkPupChareData(PUP::er &p)
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 // handle GroupTable and data
-void CkPupGroupData(PUP::er &p, CmiBool create)
+void CkPupGroupData(PUP::er &p, bool create)
 {
 	int numGroups, i;
 
@@ -380,7 +380,7 @@ void CkPupGroupData(PUP::er &p, CmiBool create)
 }
 
 // handle NodeGroupTable and data
-void CkPupNodeGroupData(PUP::er &p, CmiBool create)
+void CkPupNodeGroupData(PUP::er &p, bool create)
 {
 	int numNodeGroups, i;
 	if (!p.isUnpacking()) {
@@ -570,7 +570,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
                 p|idx;
 		CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
 		if (notifyListeners){
-  		  mgr->resume(idx,p,CmiTrue);
+  		  mgr->resume(idx,p,true);
 		}
                 else{
   		  mgr->restore(idx,p);
@@ -613,7 +613,7 @@ void CkPupProcessorData(PUP::er &p)
 
     // save groups 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CkPupGroupData(p,CmiTrue);
+    CkPupGroupData(p,true);
 #else
     CkPupGroupData(p);
 #endif
@@ -621,7 +621,7 @@ void CkPupProcessorData(PUP::er &p)
     // save nodegroups
     if(CkMyRank()==0) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CkPupNodeGroupData(p,CmiTrue);	
+        CkPupNodeGroupData(p,true);	
 #else
         CkPupNodeGroupData(p);
 #endif
@@ -749,7 +749,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
                                            (CkNumPes() == _numPes) ? CkMyPe() : 0);
 	PUP::fromDisk pGroups(fGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CkPupGroupData(pGroups,CmiTrue);
+    CkPupGroupData(pGroups,true);
 #else
     CkPupGroupData(pGroups);
 #endif
@@ -762,7 +762,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
                                                        (CkNumPes() == _numPes) ? CkMyNode() : 0);
                 PUP::fromDisk pNodeGroups(fNodeGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CkPupNodeGroupData(pNodeGroups,CmiTrue);
+        CkPupNodeGroupData(pNodeGroups,true);
 #else
         CkPupNodeGroupData(pNodeGroups);
 #endif

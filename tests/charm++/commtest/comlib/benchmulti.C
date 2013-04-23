@@ -217,7 +217,7 @@ public:
         for(int count = 0; count < nElements; count ++) 
             elem_array[count] = CkArrayIndex1D(count);
         
-        usesAtSync = CmiTrue;
+        usesAtSync = true;
         setMigratable(true);
         myinst = cinst;
     }

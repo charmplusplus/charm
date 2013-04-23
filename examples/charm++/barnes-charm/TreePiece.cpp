@@ -4,7 +4,7 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_,  real rx, real ry, real
   nodeptr p;
   isTopLevel = false;
 
-  usesAtSync = CmiFalse;
+  usesAtSync = false;
   setMigratable(false);
   
   rmin[0] = rx;
@@ -62,7 +62,7 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_, CkArrayIndex1D parentId
   // acceptroots
   whichChildAmI = thisIndex%NSUB;
 
-  usesAtSync = CmiFalse;
+  usesAtSync = false;
   setMigratable(false);
 
   mycelltab.reserve(maxmycell);

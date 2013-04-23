@@ -118,7 +118,7 @@ void CkEmmigrateElement(void *arg){
 	int targetPE=getNextPE(idx);
 	//set this flag so that load balancer is not informed when
 	//this element migrates
-	rec->AsyncMigrate(CmiTrue);
+	rec->AsyncMigrate(true);
 	mgr->emigrate(rec,targetPE);
 	CkEvacuatedElement();
 	
@@ -237,7 +237,7 @@ void CkElementEvacuate::addLocation(CkLocation &loc){
 	if(rec->isAsyncEvacuate()){
 		numEvacuated++;
 		printf("[%d]<%.6lf> START to emigrate array element \n",CkMyPe(),CmiWallTimer());
-		rec->AsyncMigrate(CmiTrue);
+		rec->AsyncMigrate(true);
 		locMgr->emigrate(rec,targetPE);
 		printf("[%d]<%.6lf> emigrated array element \n",CkMyPe(),CmiWallTimer());
 	}else{
@@ -252,7 +252,7 @@ void CkElementEvacuate::addLocation(CkLocation &loc){
 			if(list[i]->isAsyncEvacuate()){
 				DEBUGC(printf("[%d] possible TCharm element decides to migrate \n",CkMyPe()));
 //				list[i]->ckMigrate(targetPE);
-				rec->AsyncMigrate(CmiTrue);
+				rec->AsyncMigrate(true);
 				locMgr->emigrate(rec,targetPE);
 				numEvacuated++;
 			}

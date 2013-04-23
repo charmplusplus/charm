@@ -105,17 +105,17 @@ public:
 
   ///Element was just created on this processor
   /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementCreated(ArrayElement *elt)
+  virtual bool ckElementCreated(ArrayElement *elt)
     { return bringUpToDate(elt); }
 
   ///Element just arrived on this processor (so just called pup)
   /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementArriving(ArrayElement *elt)
+  virtual bool ckElementArriving(ArrayElement *elt)
     { return bringUpToDate(elt); }
 
   void incoming(CkArrayMessage *msg);
 
-  CmiBool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
+  bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
 
   void springCleaning(void);
 
@@ -129,7 +129,7 @@ private:
   bool stableLocations;
   bool broadcastViaScheduler;
 
-  CmiBool bringUpToDate(ArrayElement *el);
+  bool bringUpToDate(ArrayElement *el);
 };
 
 ///This arrayListener is in charge of performing reductions on the array.
@@ -159,8 +159,8 @@ public:
 
   void ckElementLeaving(ArrayElement *elt)
     {mgr->contributorLeaving(getData(elt));}
-  CmiBool ckElementArriving(ArrayElement *elt)
-    {mgr->contributorArriving(getData(elt)); return CmiTrue; }
+  bool ckElementArriving(ArrayElement *elt)
+    {mgr->contributorArriving(getData(elt)); return true; }
 };
 
 /*
@@ -206,10 +206,10 @@ void CkVerboseListener::ckElementCreating(ArrayElement *elt)
 {
   VL_PRINT<<"LIFE  About to create element "<<idx2str(elt)<<endl;
 }
-CmiBool CkVerboseListener::ckElementCreated(ArrayElement *elt)
+bool CkVerboseListener::ckElementCreated(ArrayElement *elt)
 {
   VL_PRINT<<"LIFE  Created element "<<idx2str(elt)<<endl;
-  return CmiTrue;
+  return true;
 }
 void CkVerboseListener::ckElementDied(ArrayElement *elt)
 {
@@ -220,10 +220,10 @@ void CkVerboseListener::ckElementLeaving(ArrayElement *elt)
 {
   VL_PRINT<<"MIG  Leaving: element "<<idx2str(elt)<<endl;
 }
-CmiBool CkVerboseListener::ckElementArriving(ArrayElement *elt)
+bool CkVerboseListener::ckElementArriving(ArrayElement *elt)
 {
   VL_PRINT<<"MIG  Arriving: element "<<idx2str(elt)<<endl;
-  return CmiTrue;
+  return true;
 }
 
 
@@ -234,7 +234,7 @@ public:
   CkArrayID thisArrayID;
   CkArrayIndex numInitial;
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
-  CmiBool fromMigration;
+  bool fromMigration;
 };
 
 CkpvStaticDeclare(ArrayElement_initInfo,initInfo);
@@ -486,7 +486,7 @@ void ArrayElement::recvBroadcast(CkMessage *m){
 	CkArrayMessage *bcast = (CkArrayMessage *)m;
     envelope *env = UsrToEnv(m);
 	int epIdx= env->piggyBcastIdx;
-    ckInvokeEntry(epIdx,bcast,CmiTrue);
+    ckInvokeEntry(epIdx,bcast,true);
 #endif
 }
 
@@ -753,7 +753,7 @@ CkArray::CkArray(CkArrayOptions &opts,
     // Register with our location manager
     elements((ArrayElementList *)locMgr->addManager(thisgroup,this)),
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
-    numInitial(opts.getNumInitial()), isInserting(CmiTrue)
+    numInitial(opts.getNumInitial()), isInserting(true)
 {
   if (!stableLocations)
       CcdCallOnConditionKeep(CcdPERIODIC_1minute,
@@ -761,7 +761,7 @@ CkArray::CkArray(CkArrayOptions &opts,
   
   //set the field in one my parent class (CkReductionMgr)
   if(opts.disableNotifyChildInRed)
-	  disableNotifyChildrenStart = CmiTrue; 
+	  disableNotifyChildrenStart = true; 
   
   //Find, register, and initialize the arrayListeners
   listenerDataOffset=0;
@@ -832,7 +832,7 @@ CkArray::CkArray(CkMigrateMessage *m)
 	:CkReductionMgr(m), thisProxy(thisgroup)
 {
   locMgr=NULL;
-  isInserting=CmiTrue;
+  isInserting=true;
 }
 
 #if CMK_ERROR_CHECKING
@@ -892,7 +892,7 @@ void CkArray::prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx)
 CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx,
 			CkElementCreation_t type)
 {
-	ArrayElement *ret=allocate(elChareType,idx,NULL,CmiTrue);
+	ArrayElement *ret=allocate(elChareType,idx,NULL,true);
 	if (type==CkElementCreation_resume) 
 	{ // HACK: Re-stamp elements on checkpoint resume--
 	  //  this restores, e.g., reduction manager's gcount
@@ -903,7 +903,7 @@ CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx,
 }
 
 ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
-		     CkMessage *msg,CmiBool fromMigration) 
+		     CkMessage *msg,bool fromMigration) 
 {
 	//Stash the element's initialization information in the global "initInfo"
 	ArrayElement_initInfo &init=CkpvAccess(initInfo);
@@ -925,7 +925,7 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 }
 
 /// This method is called by ck.C or the user to add an element.
-CmiBool CkArray::insertElement(CkMessage *me)
+bool CkArray::insertElement(CkMessage *me)
 {
   CK_MAGICNUMBER_CHECK
   CkArrayMessage *m=(CkArrayMessage *)me;
@@ -934,18 +934,18 @@ CmiBool CkArray::insertElement(CkMessage *me)
   if (locMgr->isRemote(idx,&onPe)) 
   { /* element's sibling lives somewhere else, so insert there */
   	CkArrayManagerInsert(onPe,me,thisgroup);
-	return CmiFalse;
+	return false;
   }
   int ctorIdx=m->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
-  ArrayElement *elt=allocate(chareType,idx,me,CmiFalse);
+  ArrayElement *elt=allocate(chareType,idx,me,false);
 #ifndef CMK_CHARE_USE_PTR
   ((Chare *)elt)->chareIdx = -1;
 #endif
-  if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return CmiFalse;
+  if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return false;
   CK_ARRAYLISTENER_LOOP(listeners,
-      if (!l->ckElementCreated(elt)) return CmiFalse;);
-  return CmiTrue;
+      if (!l->ckElementCreated(elt)) return false;);
+  return true;
 }
 
 void CProxy_ArrayBase::doneInserting(void)
@@ -976,7 +976,7 @@ void CkArray::remoteDoneInserting(void)
 {
   CK_MAGICNUMBER_CHECK
   if (isInserting) {
-    isInserting=CmiFalse;
+    isInserting=false;
     DEBC((AA"Done inserting objects\n"AB));
     for (int l=0;l<listeners.size();l++) listeners[l]->ckEndInserting();
     locMgr->doneInserting();
@@ -988,14 +988,14 @@ void CkArray::remoteBeginInserting(void)
   CK_MAGICNUMBER_CHECK;
 
   if (!isInserting) {
-    isInserting = CmiTrue;
+    isInserting = true;
     DEBC((AA"Begin inserting objects\n"AB));
     for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
     locMgr->startInserting();
   }
 }
 
-CmiBool CkArray::demandCreateElement(const CkArrayIndex &idx,
+bool CkArray::demandCreateElement(const CkArrayIndex &idx,
 	int onPe,int ctor,CkDeliver_t type)
 {
 	CkArrayMessage *m=(CkArrayMessage *)CkAllocSysMsg();
@@ -1010,7 +1010,7 @@ CmiBool CkArray::demandCreateElement(const CkArrayIndex &idx,
 		DEBC((AA"Demand-creating %s\n"AB,idx2str(idx)));
 		return insertElement(m);
 	}
-	return CmiTrue;
+	return true;
 }
 
 void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local)
@@ -1216,19 +1216,19 @@ void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 }
 
 /// Deliver a copy of the given broadcast to the given local element
-CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
-				    CmiBool doFree)
+bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
+				    bool doFree)
 {
   int &elBcastNo=getData(el);
   // if this array element already received this message, skip it
-  if (elBcastNo >= bcastNo) return CmiFalse;
+  if (elBcastNo >= bcastNo) return false;
   elBcastNo++;
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
   int epIdx=bcast->array_ep_bcast();
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
   DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
-  return CmiTrue;
+  return true;
 #else
   if (!broadcastViaScheduler)
     return el->ckInvokeEntry(epIdx, bcast, doFree);
@@ -1248,9 +1248,9 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
 }
 
 /// Deliver all needed broadcasts to the given local element
-CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
+bool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 {
-  if (stableLocations) return CmiTrue;
+  if (stableLocations) return true;
   int &elBcastNo=getData(el);
   if (elBcastNo<bcastNo)
   {//This element needs some broadcasts-- it must have
@@ -1269,12 +1269,12 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 		if(msg == NULL)
         	continue;
       oldBcasts.enq(msg);
-      if (!deliver(msg, el, CmiFalse))
-	return CmiFalse; //Element migrated away
+      if (!deliver(msg, el, false))
+	return false; //Element migrated away
     }
   }
   //Otherwise, the element survived
-  return CmiTrue;
+  return true;
 }
 
 
@@ -1456,8 +1456,8 @@ void CkArray::recvBroadcast(CkMessage *m)
                 logs.push_back(curlog);
   		startVTimer();
 #endif
-		CmiBool doFree = CmiFalse;
-		if (stableLocations && ++count == len) doFree = CmiTrue;
+		bool doFree = false;
+		if (stableLocations && ++count == len) doFree = true;
 		broadcaster->deliver(msg, el, doFree);
 	}
 #endif

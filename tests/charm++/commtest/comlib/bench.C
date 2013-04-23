@@ -206,7 +206,7 @@ public:
 
         myInst.setSourcePe();
 
-        usesAtSync = CmiTrue;
+        usesAtSync = true;
         setMigratable(true);
 
         arrd = arr;

@@ -2156,7 +2156,7 @@ private:
     fprintf(f, "%s", buffer);
     curpos=0;
   }
-  virtual CmiBool process(envelope **envptr,CkCoreState *ck) {
+  virtual bool process(envelope **envptr,CkCoreState *ck) {
     if ((*envptr)->getEvent()) {
       bool wasPacked = (*envptr)->isPacked();
       if (!wasPacked) CkPackMessage(envptr);
@@ -2174,15 +2174,15 @@ private:
       if (curpos > _recplay_logsize-128) flushLog();
       if (!wasPacked) CkUnpackMessage(envptr);
     }
-    return CmiTrue;
+    return true;
   }
-  virtual CmiBool process(CthThreadToken *token,CkCoreState *ck) {
+  virtual bool process(CthThreadToken *token,CkCoreState *ck) {
     curpos+=sprintf(&buffer[curpos], "%d %d %d\n",CkMyPe(), -2, token->serialNo);
     if (curpos > _recplay_logsize-128) flushLog();
-    return CmiTrue;
+    return true;
   }
   
-  virtual CmiBool process(LBMigrateMsg **msg,CkCoreState *ck) {
+  virtual bool process(LBMigrateMsg **msg,CkCoreState *ck) {
     FILE *f;
     if (firstOpen) f = openReplayFile("ckreplay_",".lb","w");
     else f = openReplayFile("ckreplay_",".lb","a");
@@ -2193,7 +2193,7 @@ private:
       (*msg)->pup(p);
       fclose(f);
     }
-    return CmiTrue;
+    return true;
   }
 };
 
@@ -2209,7 +2209,7 @@ public:
   }
   ~CkMessageDetailRecorder() {fclose(f);}
 private:
-  virtual CmiBool process(envelope **envptr, CkCoreState *ck) {
+  virtual bool process(envelope **envptr, CkCoreState *ck) {
     bool wasPacked = (*envptr)->isPacked();
     if (!wasPacked) CkPackMessage(envptr);
     envelope *env = *envptr;
@@ -2217,7 +2217,7 @@ private:
     fwrite(&size, 4, 1, f);
     fwrite(env, env->getTotalsize(), 1, f);
     if (!wasPacked) CkUnpackMessage(envptr);
-    return CmiTrue;
+    return true;
   }
 };
 
@@ -2260,22 +2260,22 @@ class CkMessageReplay : public CkMessageWatcher {
 		*/
 		counter++;
 	}
-	/// If this is the next message we need, advance and return CmiTrue.
-	CmiBool isNext(envelope *env) {
-		if (nextPE!=env->getSrcPe()) return CmiFalse;
-		if (nextEvent!=env->getEvent()) return CmiFalse;
-		if (nextSize<0) return CmiFalse; // not waiting for a regular message
+	/// If this is the next message we need, advance and return true.
+	bool isNext(envelope *env) {
+		if (nextPE!=env->getSrcPe()) return false;
+		if (nextEvent!=env->getEvent()) return false;
+		if (nextSize<0) return false; // not waiting for a regular message
 #if 1
 		if (nextEP != env->getEpIdx()) {
 			CkPrintf("[%d] CkMessageReplay> Message EP changed during replay org: [%d %d %d %d] got: [%d %d %d %d]\n", CkMyPe(), nextPE, nextSize, nextEvent, nextEP, env->getSrcPe(), env->getTotalsize(), env->getEvent(), env->getEpIdx());
-			return CmiFalse;
+			return false;
 		}
 #endif
 #if ! CMK_BIGSIM_CHARM
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("[%d] CkMessageReplay> Message size changed during replay org: [%d %d %d %d] got: [%d %d %d %d]\n", CkMyPe(), nextPE, nextSize, nextEvent, nextEP, env->getSrcPe(), env->getTotalsize(), env->getEvent(), env->getEpIdx());
-                        return CmiFalse;
+                        return false;
                 }
 		if (_recplay_crc || _recplay_checksum) {
 		  bool wasPacked = env->isPacked();
@@ -2303,11 +2303,11 @@ class CkMessageReplay : public CkMessageWatcher {
 		  if (!wasPacked) CkUnpackMessage(&env);
 		}
 #endif
-		return CmiTrue;
+		return true;
 	}
-	CmiBool isNext(CthThreadToken *token) {
-	  if (nextPE==CkMyPe() && nextSize==-2 && nextEvent==token->serialNo) return CmiTrue;
-	  return CmiFalse;
+	bool isNext(CthThreadToken *token) {
+	  if (nextPE==CkMyPe() && nextSize==-2 && nextEvent==token->serialNo) return true;
+	  return false;
 	}
 
 	/// This is a (short) list of messages we aren't yet ready for:
@@ -2364,19 +2364,19 @@ public:
 	~CkMessageReplay() {fclose(f);}
 
 private:
-	virtual CmiBool process(envelope **envptr,CkCoreState *ck) {
+	virtual bool process(envelope **envptr,CkCoreState *ck) {
           bool wasPacked = (*envptr)->isPacked();
           if (!wasPacked) CkPackMessage(envptr);
           envelope *env = *envptr;
 	  //CkAssert(*(int*)env == 0x34567890);
 	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx() << " ep:" << env->getEpIdx());
-                if (env->getEvent() == 0) return CmiTrue;
+                if (env->getEvent() == 0) return true;
 		if (isNext(env)) { /* This is the message we were expecting */
 			REPLAYDEBUG("Executing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
 			getNext(); /* Advance over this message */
 			flush(); /* try to process queued-up stuff */
     			if (!wasPacked) CkUnpackMessage(envptr);
-			return CmiTrue;
+			return true;
 		}
 #if CMK_SMP
                 else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg) {
@@ -2386,7 +2386,7 @@ private:
                         if (nextpe == CkNodeFirst(CkMyNode())+CkMyNodeSize())
                         nextpe = CkNodeFirst(CkMyNode());
                         CmiSyncSendAndFree(nextpe,env->getTotalsize(),(char *)env);
-                        return CmiFalse;
+                        return false;
                 }
 #endif
 		else /*!isNext(env) */ {
@@ -2394,25 +2394,25 @@ private:
 				<<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent << " " << nextEP)
 			delayedMessages.enq(env);
                         flush();
-			return CmiFalse;
+			return false;
 		}
 	}
-	virtual CmiBool process(CthThreadToken *token, CkCoreState *ck) {
+	virtual bool process(CthThreadToken *token, CkCoreState *ck) {
       REPLAYDEBUG("ProcessToken token: "<<token->serialNo);
 	  if (isNext(token)) {
         REPLAYDEBUG("Executing token: "<<token->serialNo)
 	    getNext();
 	    flush();
-	    return CmiTrue;
+	    return true;
 	  } else {
         REPLAYDEBUG("Queueing token: "<<token->serialNo
             <<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
 	    delayedTokens.enq(token);
-	    return CmiFalse;
+	    return false;
 	  }
 	}
 
-	virtual CmiBool process(LBMigrateMsg **msg,CkCoreState *ck) {
+	virtual bool process(LBMigrateMsg **msg,CkCoreState *ck) {
 	  if (lbFile == NULL) lbFile = openReplayFile("ckreplay_",".lb","r");
 	  if (lbFile != NULL) {
 	    int num_moves = 0;
@@ -2424,7 +2424,7 @@ private:
 	    }
 	    (*msg)->pup(p);
 	  }
-	  return CmiTrue;
+	  return true;
 	}
 };
 
@@ -2461,10 +2461,10 @@ public:
 
     CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)CkMessageDetailReplayDone, (void*)this);
   }
-  virtual CmiBool process(envelope **env,CkCoreState *ck) {
+  virtual bool process(envelope **env,CkCoreState *ck) {
     void *msg = getNext();
     if (msg != NULL) CsdEnqueue(msg);
-    return CmiTrue;
+    return true;
   }
 };
 
@@ -2482,12 +2482,12 @@ extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
   ConverseExit();
 }
 
-static CmiBool CpdExecuteThreadResume(CthThreadToken *token) {
+static bool CpdExecuteThreadResume(CthThreadToken *token) {
   CkCoreState *ck = CkpvAccess(_coreState);
   if (ck->watcher!=NULL) {
     return ck->watcher->processThread(token,ck);
   }
-  return CmiTrue;
+  return true;
 }
 
 CpvCExtern(int, CthResumeNormalThreadIdx);
@@ -2528,7 +2528,7 @@ CpvExtern(int      , CthResumeBigSimThreadIdx);
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     CmiArgGroup("Charm++","Record/Replay");
-    CmiBool forceReplay = CmiFalse;
+    bool forceReplay = false;
     char *procs = NULL;
     _replaySystem = 0;
     if (CmiGetArgFlagDesc(argv,"+recplay-crc","Enable CRC32 checksum for message record-replay")) {
@@ -2560,7 +2560,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
       ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
     }
 	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Replay the specified processors from recorded message content")) {
-	    forceReplay = CmiTrue;
+	    forceReplay = true;
 	    CpdSetInitializeMemory(1);
 	    // Set the parameters of the processor
 #if CMK_SHARED_VARS_UNAVAILABLE

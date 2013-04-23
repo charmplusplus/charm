@@ -118,7 +118,7 @@ public:
 
   // Constructor, initialize values
   Jacobi() {
-    usesAtSync = CmiTrue;
+    usesAtSync = true;
     converged = false;
 
     // allocate a three dimensional array

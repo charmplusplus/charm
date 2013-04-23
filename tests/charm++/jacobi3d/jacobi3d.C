@@ -252,7 +252,7 @@ class Jacobi: public CBase_Jacobi {
       	imsg = 0;
       	constrainBC();
 
-		usesAtSync = CmiTrue;
+		usesAtSync = true;
     }
 
     Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) {}

@@ -874,11 +874,11 @@ void _startCheckpointHandler(CheckpointBarrierMsg *startMsg){
 	}
 	CkPupROData(psizer);
 	DEBUG_MEM(CmiMemoryCheck());
-	CkPupGroupData(psizer,CmiTrue);
+	CkPupGroupData(psizer,true);
 	DEBUG_MEM(CmiMemoryCheck());
-	CkPupNodeGroupData(psizer,CmiTrue);
+	CkPupNodeGroupData(psizer,true);
 	DEBUG_MEM(CmiMemoryCheck());
-	pupArrayElementsSkip(psizer,CmiTrue,NULL);
+	pupArrayElementsSkip(psizer,true,NULL);
 	DEBUG_MEM(CmiMemoryCheck());
 
 	int dataSize = psizer.size();
@@ -896,9 +896,9 @@ void _startCheckpointHandler(CheckpointBarrierMsg *startMsg){
 		pBuf | CpvAccess(_incarnation)[i];
 	}
 	CkPupROData(pBuf);
-	CkPupGroupData(pBuf,CmiTrue);
-	CkPupNodeGroupData(pBuf,CmiTrue);
-	pupArrayElementsSkip(pBuf,CmiTrue,NULL);
+	CkPupGroupData(pBuf,true);
+	CkPupNodeGroupData(pBuf,true);
+	pupArrayElementsSkip(pBuf,true,NULL);
 
 	unAckedCheckpoint=1;
 	CmiSetHandler(msg,_storeCheckpointHandlerIdx);
@@ -957,11 +957,11 @@ void startMlogCheckpoint(void *_dummy, double curWallTime){
 	}
 	CkPupROData(psizer);
 	DEBUG_MEM(CmiMemoryCheck());
-	CkPupGroupData(psizer,CmiTrue);
+	CkPupGroupData(psizer,true);
 	DEBUG_MEM(CmiMemoryCheck());
-	CkPupNodeGroupData(psizer,CmiTrue);
+	CkPupNodeGroupData(psizer,true);
 	DEBUG_MEM(CmiMemoryCheck());
-	pupArrayElementsSkip(psizer,CmiTrue,NULL);
+	pupArrayElementsSkip(psizer,true,NULL);
 	DEBUG_MEM(CmiMemoryCheck());
 
 	int dataSize = psizer.size();
@@ -979,9 +979,9 @@ void startMlogCheckpoint(void *_dummy, double curWallTime){
 		pBuf | CpvAccess(_incarnation)[i];
 	}
 	CkPupROData(pBuf);
-	CkPupGroupData(pBuf,CmiTrue);
-	CkPupNodeGroupData(pBuf,CmiTrue);
-	pupArrayElementsSkip(pBuf,CmiTrue,NULL);
+	CkPupGroupData(pBuf,true);
+	CkPupNodeGroupData(pBuf,true);
+	pupArrayElementsSkip(pBuf,true,NULL);
 
 	unAckedCheckpoint=1;
 	CmiSetHandler(msg,_storeCheckpointHandlerIdx);
@@ -1026,7 +1026,7 @@ public:
 /**
  * Pups all the array elements in this processor.
  */
-void pupArrayElementsSkip(PUP::er &p, CmiBool create, MigrationRecord *listToSkip,int listsize){
+void pupArrayElementsSkip(PUP::er &p, bool create, MigrationRecord *listToSkip,int listsize){
 	int numElements,i;
 	int numGroups = CkpvAccess(_groupIDTable)->size();	
 	if(!p.isUnpacking()){
@@ -1254,9 +1254,9 @@ void _recvCheckpointHandler(char *_restartData){
 		pBuf | CpvAccess(_incarnation)[i];
 	}
 	CkPupROData(pBuf);
-	CkPupGroupData(pBuf,CmiTrue);
-	CkPupNodeGroupData(pBuf,CmiTrue);
-	pupArrayElementsSkip(pBuf,CmiTrue,NULL);
+	CkPupGroupData(pBuf,true);
+	CkPupNodeGroupData(pBuf,true);
+	pupArrayElementsSkip(pBuf,true,NULL);
 	CkAssert(pBuf.size() == restartData->checkPointSize);
 	printf("[%d] Restart Objects created from CheckPointData at %.6lf \n",CkMyPe(),CmiWallTimer());
 
@@ -1463,9 +1463,9 @@ public:
 		pmem.becomeDeleting();
 		pupLocation(loc,pmem);
 			
-		locMgr->setDuringMigration(CmiTrue);
+		locMgr->setDuringMigration(true);
 		delete rec;
-		locMgr->setDuringMigration(CmiFalse);
+		locMgr->setDuringMigration(false);
 		locMgr->inform(idx,*targetPE);
 
 		CmiSetHandler(msg,_distributedLocationHandlerIdx);
@@ -1507,7 +1507,7 @@ void _sendBackLocationHandler(char *receivedMsg){
 	pmem |idx;
 	CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
 	donotCountMigration=1;
-	mgr->resume(idx,pmem,CmiTrue);
+	mgr->resume(idx,pmem,true);
 	donotCountMigration=0;
 	informLocationHome(gID,idx,mgr->homePe(idx),CkMyPe());
 	printf("Array element inserted at processor %d after parallel recovery\n",CkMyPe());
@@ -1544,7 +1544,7 @@ void _distributedLocationHandler(char *receivedMsg){
 	pmem |idx;
 	CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
 	donotCountMigration=1;
-	mgr->resume(idx,pmem,CmiTrue);
+	mgr->resume(idx,pmem,true);
 	donotCountMigration=0;
 	informLocationHome(gID,idx,mgr->homePe(idx),CkMyPe());
 	printf("Array element inserted at processor %d after distribution at restart ",CkMyPe());
@@ -1757,9 +1757,9 @@ void sendBackImmigrantRecObjs(){
 		pmem.becomeDeleting();
 		pupLocation(loc,locMgr,pmem);
 		
-		locMgr->setDuringMigration(CmiTrue);
+		locMgr->setDuringMigration(true);
 		delete rec;
-		locMgr->setDuringMigration(CmiFalse);
+		locMgr->setDuringMigration(false);
 		locMgr->inform(idx,targetPE);
 
 		// sending the object

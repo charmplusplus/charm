@@ -142,7 +142,7 @@ Jacobi::Jacobi() {
       imsg = 0;
       constrainBC();
 
-      usesAtSync = CmiTrue;
+      usesAtSync = true;
       neighbors = 6;
       if(thisIndex.x == 0) 
           neighbors--;

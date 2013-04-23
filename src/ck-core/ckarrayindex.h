@@ -93,12 +93,12 @@ class CkArrayIndex: public CkArrayIndexBase
         void print() const { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
 
         /// Equality comparison
-        CmiBool operator==(const CkArrayIndex& idx) const
+        bool operator==(const CkArrayIndex& idx) const
         {
-            if (nInts != idx.nInts) return CmiFalse;
+            if (nInts != idx.nInts) return false;
             for (int i=0; i<nInts; i++)
-                if (index[i] != idx.index[i]) return CmiFalse;
-            return CmiTrue;
+                if (index[i] != idx.index[i]) return false;
+            return true;
         }
 
         /// These routines allow CkArrayIndex to be used in a CkHashtableT

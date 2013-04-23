@@ -272,9 +272,9 @@ class IrrGroup : public Chare {
 
     // Silly run-time type information
     virtual int isNodeGroup() { return 0; };
-    virtual CmiBool isLocMgr(void){ return CmiFalse; }
-    virtual CmiBool isArrMgr(void){ return CmiFalse; }
-    virtual CmiBool isReductionMgr(void){ return CmiFalse; }
+    virtual bool isLocMgr(void){ return false; }
+    virtual bool isArrMgr(void){ return false; }
+    virtual bool isReductionMgr(void){ return false; }
     static int isIrreducible(){ return 1;}
     virtual void flushStates() {}
 		/*

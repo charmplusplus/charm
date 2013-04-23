@@ -3,7 +3,7 @@
 #include "barnes.decl.h"
 ParticleChunk::ParticleChunk(int mleaf, int mcell){
 
-  usesAtSync = CmiTrue;
+  usesAtSync = true;
 
   nstep = 0;
   numMsgsToEachTp = new int[numTreePieces];

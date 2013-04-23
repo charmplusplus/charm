@@ -170,8 +170,8 @@ class CkArrayListener : public PUP::able {
   virtual void ckElementCreating(ArrayElement *elt) {}
   ///Element was just created on this processor
   /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementCreated(ArrayElement *elt)
-    { return CmiTrue; }
+  virtual bool ckElementCreated(ArrayElement *elt)
+    { return true; }
 
   ///Element is about to be destroyed
   virtual void ckElementDied(ArrayElement *elt) {}
@@ -182,8 +182,8 @@ class CkArrayListener : public PUP::able {
 
   ///Element just arrived on this processor (so just called pup)
   /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementArriving(ArrayElement *elt)
-    { return CmiTrue; }
+  virtual bool ckElementArriving(ArrayElement *elt)
+    { return true; }
 
   /// used by checkpointing to reset the states
   virtual void flushState()  {}
@@ -204,11 +204,11 @@ class CkVerboseListener : public CkArrayListener {
 
   virtual void ckElementStamp(int *eltInfo);
   virtual void ckElementCreating(ArrayElement *elt);
-  virtual CmiBool ckElementCreated(ArrayElement *elt);
+  virtual bool ckElementCreated(ArrayElement *elt);
   virtual void ckElementDied(ArrayElement *elt);
 
   virtual void ckElementLeaving(ArrayElement *elt);
-  virtual CmiBool ckElementArriving(ArrayElement *elt);
+  virtual bool ckElementArriving(ArrayElement *elt);
 };
 
 /**
@@ -694,10 +694,10 @@ public:
   void remoteBeginInserting(void);
 
   /// Create manually:
-  virtual CmiBool insertElement(CkMessage *);
+  virtual bool insertElement(CkMessage *);
 
 /// Demand-creation:
-  CmiBool demandCreateElement(const CkArrayIndex &idx,
+  bool demandCreateElement(const CkArrayIndex &idx,
   	int onPe,int ctor,CkDeliver_t type);
 
 /// Broadcast communication:
@@ -715,15 +715,15 @@ public:
   //ComlibArrayListener * calistener;
   //ComlibArrayListener * getComlibArrayListener() {return calistener;}
 
-  virtual CmiBool isArrMgr(void) {return CmiTrue;}
+  virtual bool isArrMgr(void) {return true;}
 
 private:
   CkArrayIndex numInitial;/// Number of initial array elements
-  CmiBool isInserting;/// Are we currently inserting elements?
+  bool isInserting;/// Are we currently inserting elements?
 
 /// Allocate space for a new array element
   ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
-	CkMessage *msg,CmiBool fromMigration);
+	CkMessage *msg,bool fromMigration);
 
 //Spring cleaning
   void springCleaning(void);

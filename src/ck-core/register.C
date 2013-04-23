@@ -47,16 +47,16 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
 	int ck_ep_flags)
 {
   EntryInfo *e = new EntryInfo(name, call?call:ckInvalidCallFn, msgIdx, chareIdx);
-  if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=CmiTrue;
-  if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=CmiTrue;
-  if (ck_ep_flags & CK_EP_TRACEDISABLE) e->traceEnabled=CmiFalse;
+  if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=true;
+  if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=true;
+  if (ck_ep_flags & CK_EP_TRACEDISABLE) e->traceEnabled=false;
 #if ADAPT_SCHED_MEM
   if (ck_ep_flags & CK_EP_MEMCRITICAL){
-     e->isMemCritical=CmiTrue;
+     e->isMemCritical=true;
      if (CkMyRank()==0)
         numMemCriticalEntries++;
   }else{
-    e->isMemCritical=CmiFalse;
+    e->isMemCritical=false;
   }
 #endif
   return _entryTable.add(e);
@@ -70,7 +70,7 @@ int CkRegisterChare(const char *name, size_t dataSz, ChareType chareType)
 
 extern "C"
 void CkRegisterChareInCharm(int chareIndex){
-  _chareTable[chareIndex]->inCharm = CmiTrue;
+  _chareTable[chareIndex]->inCharm = true;
 }
 
 extern "C"
@@ -137,13 +137,13 @@ void CkRegisterMessagePupFn(int epIndex,CkMessagePupFn m)
 extern "C"
 int CkDisableTracing(int epIdx) {
 	int oldStatus = _entryTable[epIdx]->traceEnabled;
-	_entryTable[epIdx]->traceEnabled=CmiFalse;
+	_entryTable[epIdx]->traceEnabled=false;
 	return oldStatus;
 }
 
 extern "C"
 void CkEnableTracing(int epIdx) {
-	_entryTable[epIdx]->traceEnabled=CmiTrue;
+	_entryTable[epIdx]->traceEnabled=true;
 }
 
 #if CMK_CHARMDEBUG
