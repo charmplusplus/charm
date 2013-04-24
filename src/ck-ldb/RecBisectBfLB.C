@@ -48,10 +48,10 @@ RecBisectBfLB::RecBisectBfLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] RecBisectBfLB created\n",CkMyPe());
 }
 
-CmiBool RecBisectBfLB::QueryBalanceNow(int _step)
+bool RecBisectBfLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
+  return true;
 }
 
 void RecBisectBfLB::work(LDStats* stats)

@@ -141,7 +141,7 @@ void HybridBaseLB::FindNeighbors()
         data->statsData = new LDStats(data->nChildren+1, 0);  // incomplete
         //  a fake processor
         ProcStats &procStat = data->statsData->procs[data->nChildren];
-        procStat.available = CmiFalse;
+        procStat.available = false;
       }
       levelData.push_back(data);
       DEBUGF(("[%d] level: %d nchildren:%d - %d %d\n", CkMyPe(), level, data->nChildren, data->nChildren>0?data->children[0]:-1, data->nChildren>1?data->children[1]:-1));
@@ -300,7 +300,7 @@ void HybridBaseLB::depositLBStatsMessage(CLBStatsMsg *m, int atlevel)
   procStat.bg_cputime = m->bg_cputime;
 #endif
   procStat.pe_speed = m->pe_speed;		// important
-  procStat.available = CmiTrue;
+  procStat.available = true;
   procStat.n_objs = m->n_objs;
 
   statsData->n_objs += m->n_objs;

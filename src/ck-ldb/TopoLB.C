@@ -38,9 +38,9 @@ TopoLB::TopoLB(const CkLBOptions &opt) : CentralLB (opt)
   }
 }
 
-CmiBool TopoLB::QueryBalanceNow (int _step)
+bool TopoLB::QueryBalanceNow (int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 void TopoLB::freeDataStructures(int count)

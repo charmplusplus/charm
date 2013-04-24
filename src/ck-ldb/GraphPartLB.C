@@ -22,8 +22,8 @@ GraphPartLB::GraphPartLB(const CkLBOptions &opt) : CentralLB(opt) {
     CkPrintf("GraphPartLB created\n");
 }
 
-CmiBool GraphPartLB::QueryBalanceNow(int _step) {
-  return CmiTrue;
+bool GraphPartLB::QueryBalanceNow(int _step) {
+  return true;
 }
 
 void GraphPartLB::work(LDStats *stats) {

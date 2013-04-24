@@ -82,7 +82,7 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int n_nbrs)
       }
 
       // Get the biggest object
-      CmiBool objfound = CmiFalse;
+      bool objfound = false;
       do {
 	obj = objs.deleteMax();
 	if (obj == 0) break;
@@ -91,7 +91,7 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int n_nbrs)
 	double my_new_load = myload - obj->load;
 	if (new_p_load < my_new_load) {
 //	if (new_p_load < avgload) {
-	  objfound = CmiTrue;
+	  objfound = true;
 	} else {
 	  // This object is too big, so throw it away
 //	  CkPrintf("[%d] Can't move object w/ load %f to proc %d load %f %f\n",

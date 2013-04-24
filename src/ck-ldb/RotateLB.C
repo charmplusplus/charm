@@ -31,9 +31,9 @@ RotateLB::RotateLB (const CkLBOptions &opt) : CentralLB (opt)
 /**************************************************************************
 **
 */
-CmiBool RotateLB::QueryBalanceNow (int _step)
+bool RotateLB::QueryBalanceNow (int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 

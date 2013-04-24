@@ -21,7 +21,7 @@ public:
   AdaptiveLB(CkMigrateMessage *m):CentralLB(m) {}
 
 protected:
-  virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
+  virtual bool QueryBalanceNow(int) { return true; };  
   virtual void work(LDStats* stats);
 //  void computeNonlocalComm(long long &nmsgs, long long &nbytes);
 

@@ -54,8 +54,8 @@ public:
     LBRealType obj_cputime;
 #endif
     int pe_speed;
-    CmiBool available;
-    CmiBool move;
+    bool available;
+    bool move;
 
     int n_objs;
     LDObjData* objData;
@@ -71,8 +71,8 @@ public:
   };
 
 protected:
-  virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
-  virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
+  virtual bool QueryBalanceNow(int) { return true; };  
+  virtual bool QueryMigrateStep(int) { return true; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats, int n_nbrs);
 
   int NeighborIndex(int pe);   // return the neighbor array index

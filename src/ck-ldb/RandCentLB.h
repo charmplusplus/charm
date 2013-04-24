@@ -19,7 +19,7 @@ public:
 
   void work(LDStats* stats);
 private:
-  CmiBool QueryBalanceNow(int step);
+  bool QueryBalanceNow(int step);
 };
 
 #endif /* _RANDCENTLB_H_ */

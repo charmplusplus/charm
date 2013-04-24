@@ -22,7 +22,7 @@ public:
   RefineCommLB(const CkLBOptions &);
   RefineCommLB(CkMigrateMessage *m):RefineLB(m) {}
 private:
-  CmiBool QueryBalanceNow(int step);
+  bool QueryBalanceNow(int step);
   void work(LDStats* stats);
 
 protected:

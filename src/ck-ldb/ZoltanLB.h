@@ -24,7 +24,7 @@ public:
   ZoltanLB(const CkLBOptions &);
   ZoltanLB(CkMigrateMessage *m):CentralLB(m) { lbname = "ZoltanLB"; }
 private:
-  CmiBool QueryBalanceNow(int step) { return CmiTrue; }
+  bool QueryBalanceNow(int step) { return true; }
   void work(LDStats* stats);
 };
 

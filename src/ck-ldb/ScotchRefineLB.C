@@ -20,8 +20,8 @@ ScotchRefineLB::ScotchRefineLB(const CkLBOptions &opt) : CentralLB(opt) {
     CkPrintf("ScotchRefineLB created\n");
 }
 
-CmiBool ScotchRefineLB::QueryBalanceNow(int _step) {
-  return CmiTrue;
+bool ScotchRefineLB::QueryBalanceNow(int _step) {
+  return true;
 }
 
 void ScotchRefineLB::work(LDStats *stats) {

@@ -43,14 +43,14 @@ typedef int LDHandle;
 
 typedef struct _LDOMid {
   CkGroupID id;
-  CmiBool operator==(const struct _LDOMid& omId) const {
-    return id == omId.id?CmiTrue:CmiFalse;
+  bool operator==(const struct _LDOMid& omId) const {
+    return id == omId.id?true:false;
   }
-  CmiBool operator<(const struct _LDOMid& omId) const {
-    return id < omId.id?CmiTrue:CmiFalse;
+  bool operator<(const struct _LDOMid& omId) const {
+    return id < omId.id?true:false;
   }
-  CmiBool operator!=(const struct _LDOMid& omId) const {
-    return id == omId.id?CmiFalse:CmiTrue;
+  bool operator!=(const struct _LDOMid& omId) const {
+    return id == omId.id?false:true;
   }
   inline void pup(PUP::er &p);
 } LDOMid;
@@ -75,16 +75,16 @@ typedef struct _LDObjid {
   char isArrayElement;
   char locMgrGid; 
 #endif
-  CmiBool operator==(const struct _LDObjid& objid) const {
-    for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return CmiFalse;
-    return CmiTrue;
+  bool operator==(const struct _LDObjid& objid) const {
+    for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return false;
+    return true;
   }
-  CmiBool operator<(const struct _LDObjid& objid) const {
+  bool operator<(const struct _LDObjid& objid) const {
     for (int i=0; i<OBJ_ID_SZ; i++) {
-      if (id[i] < objid.id[i]) return CmiTrue;
-      else if (id[i] > objid.id[i]) return CmiFalse;
+      if (id[i] < objid.id[i]) return true;
+      else if (id[i] > objid.id[i]) return false;
     }
-    return CmiFalse;
+    return false;
   }
   inline void pup(PUP::er &p);
 } LDObjid;
@@ -95,13 +95,13 @@ typedef struct _LDObjKey {
   LDOMid omId;
   LDObjid objId;
 public:
-  CmiBool operator==(const _LDObjKey& obj) const {
-    return (CmiBool)(omId == obj.omId && objId == obj.objId);
+  bool operator==(const _LDObjKey& obj) const {
+    return (bool)(omId == obj.omId && objId == obj.objId);
   }
-  CmiBool operator<(const _LDObjKey& obj) const {
-    if (omId < obj.omId) return CmiTrue;
+  bool operator<(const _LDObjKey& obj) const {
+    if (omId < obj.omId) return true;
     else if (omId == obj.omId) return objId < obj.objId;
-    else return CmiFalse;
+    else return false;
   }
   inline LDOMid &omID() { return omId; }
   inline LDObjid &objID() { return objId; }
@@ -131,8 +131,8 @@ typedef struct {
 #if ! COMPRESS_LDB
   LBRealType minWall, maxWall;
 #endif
-  CmiBool migratable;
-  CmiBool asyncArrival;
+  bool migratable;
+  bool asyncArrival;
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const LDObjid &objID() const { return handle.id; }
@@ -196,7 +196,7 @@ typedef struct _LDCommDesc {
   	  dest.destObjs.objs[i].objID() =objid[i];
 	}
   }
-  inline CmiBool operator==(const _LDCommDesc &obj) const;
+  inline bool operator==(const _LDCommDesc &obj) const;
   inline _LDCommDesc &operator=(const _LDCommDesc &c);
   inline void pup(PUP::er &p);
 } LDCommDesc;
@@ -276,7 +276,7 @@ void LDMessage(LDObjHandle from,
 void LDEstObjLoad(LDObjHandle h, double load);
 void LDNonMigratable(const LDObjHandle &h);
 void LDMigratable(const LDObjHandle &h);
-void LDAsyncMigrate(const LDObjHandle &h, CmiBool);
+void LDAsyncMigrate(const LDObjHandle &h, bool);
 void LDDumpDatabase(LDHandle _lbdb);
 
 /*
@@ -352,8 +352,8 @@ void LDLocalBarrierOn(LDHandle _db);
 void LDLocalBarrierOff(LDHandle _db);
 void LDResumeClients(LDHandle _lbdb);
 int LDProcessorSpeed();
-CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2);
-CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2);
+bool LDOMidEqual(const LDOMid &i1, const LDOMid &i2);
+bool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2);
 
 /*
  *  LBDB Configuration calls
@@ -441,18 +441,18 @@ inline void LDObjData::pup(PUP::er &p) {
 }
 PUPmarshall(LDObjData)
 
-inline CmiBool LDCommDesc::operator==(const LDCommDesc &obj) const {
-    if (type != obj.type) return CmiFalse;
+inline bool LDCommDesc::operator==(const LDCommDesc &obj) const {
+    if (type != obj.type) return false;
     switch (type) {
-    case LD_PROC_MSG: return (CmiBool)(dest.destProc == obj.dest.destProc);
-    case LD_OBJ_MSG:  return (CmiBool)(dest.destObj.destObj == obj.dest.destObj.destObj);
+    case LD_PROC_MSG: return dest.destProc == obj.dest.destProc;
+    case LD_OBJ_MSG:  return dest.destObj.destObj == obj.dest.destObj.destObj;
     case LD_OBJLIST_MSG: { if (dest.destObjs.len != obj.dest.destObjs.len) 
-                               return CmiFalse;
+                               return false;
                            for (int i=0; i<dest.destObjs.len; i++)
-                             if (!(dest.destObjs.objs[i] == obj.dest.destObjs.objs[i])) return CmiFalse;
-                           return CmiTrue; }
+                             if (!(dest.destObjs.objs[i] == obj.dest.destObjs.objs[i])) return false;
+                           return true; }
     }
-    return CmiFalse;
+    return false;
 }
 inline LDCommDesc & LDCommDesc::operator=(const LDCommDesc &c) {
     type = c.type;

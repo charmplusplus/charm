@@ -30,7 +30,7 @@ public:
   CommLB(const CkLBOptions &);
   CommLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
-  CmiBool QueryBalanceNow(int step);
+  bool QueryBalanceNow(int step);
   void work(LDStats* stats);
   void alloc(int pe, int id, double load, int nmsg, int nbyte);
   double compute_cost(int id, int pe, int n_alloc, int &out_msg, int &out_byte); 

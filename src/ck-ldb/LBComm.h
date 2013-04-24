@@ -75,7 +75,7 @@ public:
   };
 
   inline int key() const { return mykey; };
-  CmiBool equal(const LBCommData &_d2) const;
+  bool equal(const LBCommData &_d2) const;
 
   inline int from_proc() const { return (src_proc != -1); }
 private:

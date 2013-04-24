@@ -23,8 +23,8 @@ GraphBFTLB::GraphBFTLB(const CkLBOptions &opt) : CentralLB(opt) {
     CkPrintf("GraphBFTLB created\n");
 }
 
-CmiBool GraphBFTLB::QueryBalanceNow(int _step) {
-  return CmiTrue;
+bool GraphBFTLB::QueryBalanceNow(int _step) {
+  return true;
 }
 
 void GraphBFTLB::work(LDStats *stats) {

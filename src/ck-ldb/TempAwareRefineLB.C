@@ -228,10 +228,10 @@ void TempAwareRefineLB::populateEffectiveFreq(int numProcs)
 #endif
 }
 
-CmiBool TempAwareRefineLB::QueryBalanceNow(int _step)
+bool TempAwareRefineLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
+  return true;
 }
 
 class ProcLoadGreater {

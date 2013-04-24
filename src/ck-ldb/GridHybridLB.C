@@ -89,13 +89,13 @@ GridHybridLB::GridHybridLB (CkMigrateMessage *msg) : CentralLB (msg)
 ** The Charm++ load balancing framework invokes this method to determine
 ** whether load balancing can be performed at a specified time.
 */
-CmiBool GridHybridLB::QueryBalanceNow (int step)
+bool GridHybridLB::QueryBalanceNow (int step)
 {
   if (_lb_args.debug() > 2) {
     CkPrintf ("[%d] GridHybridLB is balancing on step %d.\n", CkMyPe(), step);
   }
 
-  return (CmiTrue);
+  return (true);
 }
 
 

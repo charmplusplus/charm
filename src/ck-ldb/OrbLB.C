@@ -24,9 +24,9 @@ OrbLB::OrbLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] OrbLB created\n",CkMyPe());
 }
 
-CmiBool OrbLB::QueryBalanceNow(int _step)
+bool OrbLB::QueryBalanceNow(int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 void OrbLB::rec_divide(int n, Partition &p)
@@ -357,7 +357,7 @@ void OrbLB::work(LDStats* stats)
 
   npartition = 0;
   for (i=0; i<P; i++)
-    if (stats->procs[i].available == CmiTrue) npartition++;
+    if (stats->procs[i].available == true) npartition++;
   partitions = new Partition[npartition];
 
   double totalLoad = 0.0;

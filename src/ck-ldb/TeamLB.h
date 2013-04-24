@@ -24,7 +24,7 @@ class TeamLB : public CentralLB {
     int teamSize;
     int numberTeams;
 
-    CmiBool QueryBalanceNow(int step) { return CmiTrue; }
+    bool QueryBalanceNow(int step) { return true; }
 };
 
 #endif /* _TEAMLB_H_ */

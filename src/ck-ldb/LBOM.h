@@ -29,7 +29,7 @@ private:
     myid = _id;
     userData = _userData;
     callbacks = _callbacks;
-    registering_objs = CmiFalse;
+    registering_objs = false;
   };
   ~LBOM() { }
 
@@ -43,15 +43,15 @@ private:
     callbacks.metaLBCallLBOnChares(_h);
   }
 #endif
-  CmiBool RegisteringObjs() { return registering_objs; };
-  void SetRegisteringObjs(CmiBool _set) { registering_objs = _set; };
+  bool RegisteringObjs() { return registering_objs; };
+  void SetRegisteringObjs(bool _set) { registering_objs = _set; };
 
   LBDB *parent;
   LDOMid myid;
   LDOMHandle myhandle;
   void *userData;
   LDCallbacks callbacks;
-  CmiBool registering_objs;
+  bool registering_objs;
 
 };
 

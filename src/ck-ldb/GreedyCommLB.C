@@ -40,10 +40,10 @@ GreedyCommLB::GreedyCommLB(CkMigrateMessage *m):CentralLB(m) {
     init();
 }
 
-CmiBool GreedyCommLB::QueryBalanceNow(int _step)
+bool GreedyCommLB::QueryBalanceNow(int _step)
 {
     //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-    return CmiTrue;
+    return true;
 }
 
 // assign id to processor pe, load including both computation and communication

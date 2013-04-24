@@ -30,10 +30,10 @@ RefineSwapLB::RefineSwapLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] RefineSwapLB created\n",CkMyPe());
 }
 
-CmiBool RefineSwapLB::QueryBalanceNow(int _step)
+bool RefineSwapLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
+  return true;
 }
 
 class ProcLoadGreater {

@@ -78,7 +78,7 @@ WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt)
   myStats.comm_data_sz = 0;
   receive_stats_ready = 0;
 
-  vacate = CmiFalse;
+  vacate = false;
   usage = 1.0;
   usage_int_err = 0.;
 
@@ -385,7 +385,7 @@ void WSLB::ResumeClients()
 #endif
 }
 
-CmiBool WSLB::QueryBalanceNow(int step)
+bool WSLB::QueryBalanceNow(int step)
 {
 #if CMK_LBDB_ON
   double now = CkWallTimer();
@@ -394,16 +394,16 @@ CmiBool WSLB::QueryBalanceNow(int step)
     first_step_time = now;
   else if (CkMyPe() == VACATE_PROC && now > VACATE_AFTER
 	   && now < (VACATE_AFTER+UNVACATE_AFTER)) {
-    if (vacate == CmiFalse) 
+    if (vacate == false) 
       CkPrintf("PE %d vacating at %f\n",CkMyPe(),now);
-    vacate = CmiTrue;
+    vacate = true;
   } else {
-    if (vacate == CmiTrue)
+    if (vacate == true)
       CkPrintf("PE %d unvacating at %f\n",CkMyPe(),now);
-    vacate = CmiFalse;
+    vacate = false;
   }
 #endif
-  return CmiTrue;
+  return true;
 }
 
 LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
@@ -497,7 +497,7 @@ LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
       }
 
       // Get the biggest object
-      CmiBool objfound = CmiFalse;
+      bool objfound = false;
       do {
 	obj = objs.deleteMax();
 	if (obj == 0) break;
@@ -510,7 +510,7 @@ LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 	// If we're vacating, the biggest object is always good.
 	// Otherwise, only take it if it doesn't produce overload
 	if (vacate || new_p_load < my_new_load) {
-	  objfound = CmiTrue;
+	  objfound = true;
 	} else {
 	  // This object is too big, so throw it away
 //	  CkPrintf("[%d] Can't move object w/ load %f to proc %d load %f %f\n",

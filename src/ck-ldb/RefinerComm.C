@@ -45,7 +45,7 @@ void RefinerComm::computeAverage()
   for (i=0; i<numComputes; i++) total += computes[i].load;
 
   for (i=0; i<P; i++) {
-    if (processors[i].available == CmiTrue) {
+    if (processors[i].available == true) {
 	total += processors[i].backgroundLoad;
         total += commTable->overheadOnPe(i);
     }

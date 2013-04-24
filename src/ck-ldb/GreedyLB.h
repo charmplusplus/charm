@@ -29,10 +29,10 @@ private:
     	void           Heapify(HeapData*, int, int, HeapCmp);
 	void           HeapSort(HeapData*, int, HeapCmp);
 	void           BuildHeap(HeapData*, int, HeapCmp);
-	CmiBool        Compare(double, double, HeapCmp);
+	bool        Compare(double, double, HeapCmp);
 	HeapData*      BuildCpuArray(BaseLB::LDStats*, int, int *);  
 	HeapData*      BuildObjectArray(BaseLB::LDStats*, int, int *);      
-	CmiBool        QueryBalanceNow(int step);
+	bool        QueryBalanceNow(int step);
 };
 
 #endif /* _HEAPCENTLB_H_ */

@@ -72,7 +72,7 @@ public:
   OrbLB(CkMigrateMessage *m):CentralLB(m) { lbname = "OrbLB"; }
 
   void work(LDStats* stats);
-  CmiBool QueryBalanceNow(int step);
+  bool QueryBalanceNow(int step);
 };
 
 

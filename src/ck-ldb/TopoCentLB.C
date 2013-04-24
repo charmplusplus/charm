@@ -40,9 +40,9 @@ TopoCentLB::TopoCentLB(const CkLBOptions &opt) : CentralLB (opt)
 }
 
 
-CmiBool TopoCentLB::QueryBalanceNow (int _step)
+bool TopoCentLB::QueryBalanceNow (int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 TopoCentLB::~TopoCentLB(){

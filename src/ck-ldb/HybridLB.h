@@ -25,8 +25,8 @@ protected:
   CentralLB *greedy;
   CentralLB *refine;
 
-  virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
-  virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
+  virtual bool QueryBalanceNow(int) { return true; };  
+  virtual bool QueryMigrateStep(int) { return true; };  
   virtual void work(LDStats* stats);
 
 };

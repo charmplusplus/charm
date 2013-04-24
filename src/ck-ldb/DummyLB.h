@@ -16,7 +16,7 @@ public:
   DummyLB(const CkLBOptions &);
   DummyLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
-  CmiBool QueryBalanceNow(int step);
+  bool QueryBalanceNow(int step);
   void work(LDStats* stats) {}
 };
 

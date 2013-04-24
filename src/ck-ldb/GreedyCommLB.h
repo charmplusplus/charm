@@ -33,7 +33,7 @@ public:
   GreedyCommLB(const CkLBOptions &);
   GreedyCommLB(CkMigrateMessage *m);
   void pup(PUP::er &p){ CentralLB::pup(p); }
-  CmiBool QueryBalanceNow(int step);
+  bool QueryBalanceNow(int step);
   void work(LDStats* stats);
 
 private:

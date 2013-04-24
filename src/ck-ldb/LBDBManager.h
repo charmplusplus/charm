@@ -19,7 +19,7 @@ class LocalBarrier {
 friend class LBDB;
 public:
   LocalBarrier() { cur_refcount = 1; client_count = 0; max_client = 0;
-                   max_receiver= 0; at_count = 0; on = CmiFalse; 
+                   max_receiver= 0; at_count = 0; on = false; 
 	#if CMK_BIGSIM_CHARM
 	first_free_client_slot = 0;
 	#endif
@@ -33,8 +33,8 @@ public:
   void TurnOnReceiver(LDBarrierReceiver h);
   void TurnOffReceiver(LDBarrierReceiver h);
   void AtBarrier(LDBarrierClient h);
-  void TurnOn() { on = CmiTrue; CheckBarrier(); };
-  void TurnOff() { on = CmiFalse; };
+  void TurnOn() { on = true; CheckBarrier(); };
+  void TurnOff() { on = false; };
 
 private:
   void CallReceivers(void);
@@ -60,7 +60,7 @@ private:
   int client_count;
   int max_receiver;
   int at_count;
-  CmiBool on;
+  bool on;
 
   #if CMK_BIGSIM_CHARM
   int first_free_client_slot;
@@ -79,7 +79,7 @@ public:
 
   LDOMHandle AddOM(LDOMid _userID, void* _userData, LDCallbacks _callbacks);
   LDObjHandle AddObj(LDOMHandle _h, LDObjid _id, void *_userData,
-		     CmiBool _migratable);
+		     bool _migratable);
   void UnregisterObj(LDObjHandle _h);
 
   void RegisteringObjects(LDOMHandle _h);
@@ -99,10 +99,10 @@ public:
   void DumpDatabase(void);
 
   inline void TurnStatsOn(void) 
-       {statsAreOn = CmiTrue; machineUtil.StatsOn();}
+       {statsAreOn = true; machineUtil.StatsOn();}
   inline void TurnStatsOff(void) 
-       {statsAreOn = CmiFalse;machineUtil.StatsOff();}
-  inline CmiBool StatsOn(void) const 
+       {statsAreOn = false;machineUtil.StatsOff();}
+  inline bool StatsOn(void) const 
        { return statsAreOn; };
 
   void SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off, LDPredictModelFn change, void* data);
@@ -148,9 +148,9 @@ public:
   void RemoveNotifyMigrated(int handle);
 
   inline void TurnManualLBOn() 
-       { useBarrier = CmiFalse; }
+       { useBarrier = false; }
   inline void TurnManualLBOff() 
-       { useBarrier = CmiTrue; }
+       { useBarrier = true; }
 
   int AddStartLBFn(LDStartLBFn fn, void* data);
   void TurnOnStartLBFn(int handle)
@@ -180,12 +180,12 @@ public:
     objs array. Copying LDObjHandle is expensive.
   */
   inline void SetRunningObj(const LDObjHandle &_h) 
-       { runningObj = _h.handle; obj_running = CmiTrue; };
+       { runningObj = _h.handle; obj_running = true; };
   inline const LDObjHandle &RunningObj() const 
        { return objs[runningObj]->GetLDObjHandle(); };
   inline void NoRunningObj() 
-       { obj_running = CmiFalse; };
-  inline CmiBool ObjIsRunning() const 
+       { obj_running = false; };
+  inline bool ObjIsRunning() const 
        { return obj_running; };
   
   inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) 
@@ -268,20 +268,20 @@ private:
   ObjList objs;
   int objCount;
 
-  CmiBool statsAreOn;
+  bool statsAreOn;
   MigrateCBList migrateCBList;
 
   MigrationDoneCBList migrationDoneCBList;
 
   PredictCB* predictCBFn;
 
-  CmiBool obj_running;
+  bool obj_running;
   int runningObj;		// index of the runningObj in ObjList
 
   batsyncer batsync;
 
   LocalBarrier localBarrier;    // local barrier to trigger LB automatically
-  CmiBool useBarrier;           // use barrier or not
+  bool useBarrier;           // use barrier or not
 
   LBMachineUtil machineUtil;
   double obj_walltime;

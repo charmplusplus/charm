@@ -138,7 +138,7 @@ class TopoCentLB : public CentralLB
     //static int compare(const void *p,const void *q);
   private:
     
-    CmiBool QueryBalanceNow (int step);
+    bool QueryBalanceNow (int step);
 };
 
 #endif /* _TOPOCENTLB_H_ */

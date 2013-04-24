@@ -21,9 +21,9 @@ BlockLB::BlockLB (const CkLBOptions &opt) : CentralLB (opt)
 /**************************************************************************
 **
 */
-CmiBool BlockLB::QueryBalanceNow (int _step)
+bool BlockLB::QueryBalanceNow (int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 

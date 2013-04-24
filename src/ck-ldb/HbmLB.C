@@ -92,7 +92,7 @@ void HbmLB::FindNeighbors()
         data->statsData = new LDStats(data->nChildren+1);
         //  a fake processor
         ProcStats &procStat = data->statsData->procs[data->nChildren];
-        procStat.available = CmiFalse;
+        procStat.available = false;
       }
       levelData.push_back(data);
       DEBUGF(("[%d] level: %d nchildren:%d - %d %d\n", CkMyPe(), level, data->nChildren, data->nChildren>0?data->children[0]:-1, data->nChildren>1?data->children[1]:-1));

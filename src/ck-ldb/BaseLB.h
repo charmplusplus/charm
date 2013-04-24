@@ -54,12 +54,12 @@ public:
 #endif
     // double utilization;
     int pe;			// processor id
-    CmiBool available;
+    bool available;
     ProcStats(): n_objs(0), pe_speed(1), total_walltime(0.0), idletime(0.0),
 #if CMK_LB_CPUTIMER
 		 total_cputime(0.0), bg_cputime(0.0),
 #endif
-	   	 bg_walltime(0.0), pe(-1), available(CmiTrue) {}
+	   	 bg_walltime(0.0), pe(-1), available(true) {}
     inline void clearBgLoad() {
       idletime = bg_walltime = 
 #if CMK_LB_CPUTIMER

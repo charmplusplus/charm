@@ -32,9 +32,9 @@ RefineTopoLB::RefineTopoLB(const CkLBOptions &opt) : TopoLB (opt)
   }
 }
 
-CmiBool RefineTopoLB::QueryBalanceNow (int _step)
+bool RefineTopoLB::QueryBalanceNow (int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 void RefineTopoLB :: work(LDStats *stats)

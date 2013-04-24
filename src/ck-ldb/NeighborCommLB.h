@@ -18,7 +18,7 @@ public:
   NeighborCommLB(const CkLBOptions &);
   NeighborCommLB(CkMigrateMessage *m):NborBaseLB(m) {}
 private:
-  CmiBool QueryBalanceNow(int step) { return CmiTrue; };
+  bool QueryBalanceNow(int step) { return true; };
   virtual int max_neighbors() {
     return (CkNumPes() > 5) ? 4 : (CkNumPes()-1);
   };

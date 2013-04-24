@@ -58,10 +58,10 @@ CommAwareRefineLB::CommAwareRefineLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] CommAwareRefineLB created\n",CkMyPe());
 }
 
-CmiBool CommAwareRefineLB::QueryBalanceNow(int _step)
+bool CommAwareRefineLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
+  return true;
 }
 
 class ProcLoadGreater {

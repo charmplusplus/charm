@@ -37,7 +37,7 @@ void RefinerTemp::create(int count, BaseLB::LDStats* stats, int* procs)
     processors[i].pe_speed = stats->procs[i].pe_speed;
 //    processors[i].utilization = stats->procs[i].utilization;
     processors[i].available = stats->procs[i].available;
-    if (processors[i].available == CmiTrue) numAvail++;
+    if (processors[i].available == true) numAvail++;
   }
 
   for (i=0; i<stats->n_objs; i++)
@@ -100,7 +100,7 @@ void RefinerTemp::computeAverage()
   for (i=0; i<numComputes; i++) total += computes[i].load*procFreq[computes[i].oldProcessor];
 
   for (i=0; i<P; i++)
-    if (processors[i].available == CmiTrue)
+    if (processors[i].available == true)
         total += processors[i].backgroundLoad*procFreq[processors[i].Id];
 
   averageLoad = total/numAvail;
@@ -112,7 +112,7 @@ double RefinerTemp::computeMax()
   int i;
   double max = -1.0;
   for (i=0; i<P; i++) {
-    if (processors[i].available == CmiTrue && processors[i].load > max)
+    if (processors[i].available == true && processors[i].load > max)
 //      max = processors[i].load;
 	max=processors[i].load/procFreqNew[processors[i].Id];
   }
@@ -125,7 +125,7 @@ double RefinerTemp::computeMax(int *maxPe)
   double max = -1.0,maxratio=-1.0;
   for (i=0; i<P; i++) {
 //CkPrintf(" ********** pe%d load=%f freq=%d ratio=%f\n",processors[i].Id,processors[i].load,procFreqNew[processors[i].Id],processors[i].load/procFreqNew[processors[i].Id]);
-    if (processors[i].available == CmiTrue && processors[i].load/procFreqNew[processors[i].Id] > maxratio)
+    if (processors[i].available == true && processors[i].load/procFreqNew[processors[i].Id] > maxratio)
     {
 //      max = processors[i].load;
 //CkPrintf(" ********** pe%d load=%f freq=%d \n",processors[i].Id,processors[i].load,procFreqNew[processors[i].Id]);
@@ -139,7 +139,7 @@ double RefinerTemp::computeMax(int *maxPe)
 
 int RefinerTemp::isHeavy(processorInfo *p)
 {
-  if (p->available == CmiTrue) 
+  if (p->available == true) 
 //     return p->load > overLoad*averageLoad;
 	return p->load > overLoad*(totalInst*procFreqNew[p->Id]/sumFreqs);
   else {
@@ -149,7 +149,7 @@ int RefinerTemp::isHeavy(processorInfo *p)
 
 int RefinerTemp::isLight(processorInfo *p)
 {
-  if (p->available == CmiTrue) 
+  if (p->available == true) 
 //     return p->load < averageLoad;
 	return p->load < totalInst*procFreqNew[p->Id]/sumFreqs;
   else 
@@ -165,9 +165,9 @@ void RefinerTemp::removeComputes()
   if (numAvail < P) {
     if (numAvail == 0) CmiAbort("No processor available!");
     for (first=0; first<P; first++)
-      if (processors[first].available == CmiTrue) break;
+      if (processors[first].available == true) break;
     for (int i=0; i<P; i++) {
-      if (processors[i].available == CmiFalse) {
+      if (processors[i].available == false) {
           computeInfo *c = (computeInfo *)
 	           processors[i].computeSet->iterator((Iterator *)&nextCompute);
 	  while (c) {

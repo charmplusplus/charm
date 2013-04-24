@@ -54,11 +54,11 @@ void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
  * LBDB Code
  *************************************************************/
 
-LBDB::LBDB(): useBarrier(CmiTrue)
+LBDB::LBDB(): useBarrier(true)
 {
-    statsAreOn = CmiFalse;
+    statsAreOn = false;
     omCount = objCount = oms_registering = 0;
-    obj_running = CmiFalse;
+    obj_running = false;
     commTable = new LBCommTable;
     obj_walltime = 0;
 #if CMK_LB_CPUTIMER
@@ -93,7 +93,7 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
 #endif
 
 LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
-			 void *_userData, CmiBool _migratable)
+			 void *_userData, bool _migratable)
 {
   LDObjHandle newhandle;
 
@@ -147,7 +147,7 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
 
 void LBDB::UnregisterObj(LDObjHandle _h)
 {
-//  (objs[_h.handle])->registered=CmiFalse;
+//  (objs[_h.handle])->registered=false;
 // free the memory, it is a memory leak.
 // CmiPrintf("[%d] UnregisterObj: %d\n", CkMyPe(), _h.handle);
   delete objs[_h.handle];
@@ -179,7 +179,7 @@ void LBDB::RegisteringObjects(LDOMHandle _h)
     if (oms_registering == 0)
       localBarrier.TurnOff();
     oms_registering++;
-    om->SetRegisteringObjs(CmiTrue);
+    om->SetRegisteringObjs(true);
   }
   }
 }
@@ -198,7 +198,7 @@ void LBDB::DoneRegisteringObjects(LDOMHandle _h)
     oms_registering--;
     if (oms_registering == 0)
       localBarrier.TurnOn();
-    om->SetRegisteringObjs(CmiFalse);
+    om->SetRegisteringObjs(false);
   }
   }
 }
@@ -632,12 +632,12 @@ void LocalBarrier::CheckBarrier()
     CallReceivers();
   }
   if (at_count >= client_count) {
-    CmiBool at_barrier = CmiFalse;
+    bool at_barrier = false;
 
 //    for(int i=0; i < max_client; i++)
     for(int i=0; i < clients.size(); i++)
       if (clients[i] != 0 && ((client*)clients[i])->refcount >= cur_refcount)
-	at_barrier = CmiTrue;
+	at_barrier = true;
 		
     if (at_barrier) {
       at_count -= client_count;
@@ -649,7 +649,7 @@ void LocalBarrier::CheckBarrier()
 
 void LocalBarrier::CallReceivers(void)
 {
-  CmiBool called_receiver=CmiFalse;
+  bool called_receiver=false;
 
 //  for(int i=0; i < max_receiver; i++)
 //   for (int i=max_receiver-1; i>=0; i--) {
@@ -657,7 +657,7 @@ void LocalBarrier::CallReceivers(void)
       receiver *recv = receivers[i];
       if (recv != 0 && recv->on) {
         recv->fn(recv->data);
-        called_receiver = CmiTrue;
+        called_receiver = true;
       }
   }
 

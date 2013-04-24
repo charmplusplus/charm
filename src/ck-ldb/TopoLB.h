@@ -76,7 +76,7 @@ class TopoLB : public CentralLB
     virtual double getHopBytesNew(int *assign_map, int count);
     void performMapping(int *newmap, int count);
     
-    CmiBool QueryBalanceNow (int step);
+    bool QueryBalanceNow (int step);
 }; 
 
 
