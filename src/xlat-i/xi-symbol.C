@@ -1797,7 +1797,7 @@ Chare::genDefs(XStr& str)
       str << "    " << fortranify(baseName(), "_allocate") << "((char **)&user_data, &aid, &thisIndex.x, &thisIndex.y);\n";
     else if (dim==(const char*)"3D")
       str << "    " << fortranify(baseName(), "_allocate") << "((char **)&user_data, &aid, &thisIndex.x, &thisIndex.y, &thisIndex.z);\n";
-    str << "      usesAtSync = CmiTrue;\n";
+    str << "      usesAtSync = true;\n";
     str << "  }\n";
     str << "\n";
     str << "  " << baseName() << "(CkMigrateMessage *m)\n";
