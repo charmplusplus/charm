@@ -18,7 +18,7 @@ pup, which will perform all needed packing/unpacking.
 A simple example is:
 class foo {
  private:
-  CmiBool isBar;
+  bool isBar;
   int x;
   char y;
   unsigned long z;
@@ -64,7 +64,7 @@ class bar {
 #define CmiAbort(x) { printf(x); abort(); }
 #else
 #ifndef CHARM_H
-#  include "converse.h" // <- for CmiBool, CMK_* defines
+#  include "converse.h" // <- for CMK_* defines
 #endif
 extern "C" void CmiAbort(const char *msg);
 #endif
@@ -113,7 +113,7 @@ class seekBlock {
 	int nSec;//Number of sections; current section #
 	int secTabOff;//Start of the section table, relative to the seek block
 	er &p;
-	CmiBool hasEnded;
+	bool hasEnded;
 public:
 	//Constructor
 	seekBlock(er &Np,int nSections);
@@ -162,25 +162,25 @@ class er {
   virtual ~er();//<- does nothing, but might be needed by some child
 
   //State queries (exactly one of these will be true)
-  CmiBool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0?CmiTrue:CmiFalse;}
-  CmiBool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0?CmiTrue:CmiFalse;}
-  CmiBool isUnpacking(void) const {return (PUP_er_state&IS_UNPACKING)!=0?CmiTrue:CmiFalse;}
+  bool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0?true:false;}
+  bool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0?true:false;}
+  bool isUnpacking(void) const {return (PUP_er_state&IS_UNPACKING)!=0?true:false;}
   const char *  typeString() const;
   unsigned int getStateFlags(void) const {return PUP_er_state;}
 
   //This indicates that the pup routine should free memory during packing.
   void becomeDeleting(void) {PUP_er_state|=IS_DELETING;}
-  CmiBool isDeleting(void) const {return (PUP_er_state&IS_DELETING)!=0?CmiTrue:CmiFalse;}
+  bool isDeleting(void) const {return (PUP_er_state&IS_DELETING)!=0?true:false;}
 
   //This indicates that the pup routine should not call system objects' pups.
   void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
-  CmiBool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?CmiTrue:CmiFalse;}
+  bool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?true:false;}
   
   //This indicates that the pup routine should not call system objects' pups.
   void becomeRestarting(void) {PUP_er_state|=IS_RESTARTING;}
-  CmiBool isRestarting(void) const {return (PUP_er_state&IS_RESTARTING)!=0?CmiTrue:CmiFalse;}
+  bool isRestarting(void) const {return (PUP_er_state&IS_RESTARTING)!=0?true:false;}
   
-  CmiBool hasComments(void) const {return (PUP_er_state&IS_COMMENTS)!=0?CmiTrue:CmiFalse;}
+  bool hasComments(void) const {return (PUP_er_state&IS_COMMENTS)!=0?true:false;}
 
 //For single elements, pretend it's an array containing one element
   void operator()(signed char &v)     {(*this)(&v,1);}
@@ -199,7 +199,7 @@ class er {
 #if CMK_LONG_DOUBLE_DEFINED
   void operator()(long double &v)     {(*this)(&v,1);}
 #endif
-  void operator()(CmiBool &v)         {(*this)(&v,1);}
+  void operator()(bool &v)         {(*this)(&v,1);}
 #ifdef CMK_PUP_LONG_LONG
   void operator()(CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
   void operator()(unsigned CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
@@ -247,8 +247,8 @@ class er {
 #endif
 
   //For bools:
-  void operator()(CmiBool *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(CmiBool),Tbool);}
+  void operator()(bool *a,int nItems)
+    {bytes((void *)a,nItems,sizeof(bool),Tbool);}
 
 #ifdef CMK_PUP_LONG_LONG
   void operator()(CMK_PUP_LONG_LONG *a,int nItems)
@@ -567,9 +567,9 @@ class machineInfo {
 //  myByte padding[1];//Padding to 16 bytes
 
   //Return true if our magic number is valid.
-  CmiBool valid(void) const;
+  bool valid(void) const;
   //Return true if we differ from the current (running) machine.
-  CmiBool needsConversion(void) const;
+  bool needsConversion(void) const;
   
   //Get a machineInfo for the current machine
   static const machineInfo &current(void);
@@ -637,11 +637,11 @@ public:
 		PUP_ID(int val) {for (int i=0;i<len;i++) hash[i]=val;}
 		PUP_ID(const char *name) {setName(name);}
 		void setName(const char *name);//Write name into hash
-		CmiBool operator==(const PUP_ID &other) const {
+		bool operator==(const PUP_ID &other) const {
 			for (int i=0;i<len;i++)
 				if (hash[i]!=other.hash[i])
-					return CmiFalse;
-			return CmiTrue;
+					return false;
+			return true;
 		}
 		void pup(er &p) {
 			 p((char *)hash,sizeof(unsigned char)*len);
@@ -962,7 +962,7 @@ PUP_BUILTIN_SUPPORT(unsigned int)
 PUP_BUILTIN_SUPPORT(unsigned long)
 PUP_BUILTIN_SUPPORT(float)
 PUP_BUILTIN_SUPPORT(double)
-PUP_BUILTIN_SUPPORT(CmiBool)
+PUP_BUILTIN_SUPPORT(bool)
 #if CMK_LONG_DOUBLE_DEFINED
 PUP_BUILTIN_SUPPORT(long double)
 #endif

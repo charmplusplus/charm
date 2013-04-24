@@ -52,7 +52,7 @@ void PUP_toNetwork4_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	casePUP_toNetwork4_type(Tint,int,int);
        	case PUP::Tulong: 
        	casePUP_toNetwork4_type(Tlong,long,int);
-       	casePUP_toNetwork4_type(Tbool,CmiBool,int);
+       	casePUP_toNetwork4_type(Tbool,bool,int);
        	case PUP::Tsync:
        		break; //Ignore
        	default: 
@@ -85,7 +85,7 @@ void PUP_toNetwork4_unpack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	casePUP_toNetwork4_type(Tint,int,int);
        	case PUP::Tulong: 
        	casePUP_toNetwork4_type(Tlong,long,int);
-       	casePUP_toNetwork4_type(Tbool,CmiBool,int);
+       	casePUP_toNetwork4_type(Tbool,bool,int);
        	case PUP::Tsync:
        		break; //Ignore
        	default: 
