@@ -1904,15 +1904,15 @@ int id[OBJ_ID_SZ];
       id[i] = -1;
     }
   }
-  int isNull() {
+  bool isNull() {
     for (int i=0; i<OBJ_ID_SZ; i++) {
-      if (id[i] != -1) return CmiFalse;
+      if (id[i] != -1) return false;
     }
-    return CmiTrue;
+    return true;
   }
-  CmiBool operator==(const struct _CmiObjId& objid) const {
-    for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return CmiFalse;
-    return CmiTrue;
+  bool operator==(const struct _CmiObjId& objid) const {
+    for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return false;
+    return true;
   }
 #endif
 } CmiObjId;
