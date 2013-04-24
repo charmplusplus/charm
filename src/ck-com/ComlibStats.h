@@ -28,7 +28,7 @@ class ComlibComRec {
                             // in the communication operation
     int degree;             // Number of processors messages are sent 
                             // to or received from
-    CmiBool recorded;
+    bool recorded;
 
     friend class ComlibLocalStats;
  public:
@@ -40,7 +40,7 @@ class ComlibComRec {
         nmessages_sent = 0;
         nmessages_received = 0;
         degree = 0;
-        recorded = CmiFalse;
+        recorded = false;
     }
 
     ComlibComRec(int _npes) {
@@ -51,7 +51,7 @@ class ComlibComRec {
         nmessages_sent = 0;
         nmessages_received = 0;
         degree = 0;
-        recorded = CmiFalse;
+        recorded = false;
     }
 
     ~ComlibComRec() {
@@ -62,7 +62,7 @@ class ComlibComRec {
     }
 
     void setNpes(int _npes) {npes = _npes;}
-    CmiBool isRecorded() { return recorded;}
+    bool isRecorded() { return recorded;}
 
     int getTotalBytes() { return  totalbytes_sent + totalbytes_received; }
     int getTotalMessages() { return nmessages_sent + nmessages_received;}
@@ -70,7 +70,7 @@ class ComlibComRec {
 
     inline void recordSend(int size, int dest) {
         if(!recorded) {
-            recorded = CmiTrue;
+            recorded = true;
             int mapsize = (npes / (sizeof(char)*8) + 1) * sizeof(char); 
             procMap = (unsigned char*) CmiAlloc(mapsize);
             memset(procMap, 0, mapsize);
@@ -90,7 +90,7 @@ class ComlibComRec {
     inline void recordSendM(int size, int *dest_m, int ndest) {
         
         if(!recorded) {
-            recorded = CmiTrue;
+            recorded = true;
             int mapsize = (npes / (sizeof(char)*8) + 1) * sizeof(char); 
             procMap = (unsigned char*) CmiAlloc(mapsize);
             memset(procMap, 0, mapsize);
@@ -113,7 +113,7 @@ class ComlibComRec {
 
     inline void recordRecv(int size, int src) {
         if(!recorded) {
-            recorded = CmiTrue;
+            recorded = true;
             int mapsize = (npes / (sizeof(char)*8) + 1) * sizeof(char); 
             procMap = (unsigned char*) CmiAlloc(mapsize);
             memset(procMap, 0, mapsize);
@@ -132,7 +132,7 @@ class ComlibComRec {
     
     inline void recordRecvM(int size, int *src_m, int nsrc) {
         if(!recorded) {
-            recorded = CmiTrue;
+            recorded = true;
             int mapsize = (npes / (sizeof(char)*8) + 1) * sizeof(char); 
             procMap = (unsigned char*) CmiAlloc(mapsize);
             memset(procMap, 0, mapsize);
@@ -162,7 +162,7 @@ class ComlibComRec {
         nmessages_sent = 0;
         nmessages_received = 0;
         degree = 0;
-        recorded = CmiFalse;
+        recorded = false;
     }
 
     void pup(PUP::er &p) {

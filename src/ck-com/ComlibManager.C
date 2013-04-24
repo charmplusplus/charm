@@ -1165,7 +1165,7 @@ CkDelegateData* ComlibManager::ckCopyDelegateData(CkDelegateData *data) {
 CkDelegateData* ComlibManager::DelegatePointerPup(PUP::er &p,
 		CkDelegateData *pd) {
 	if (!p.isUnpacking() && pd == NULL) CkAbort("Tryed to pup a null ComlibDelegateData!\n");
-	//CmiBool isNotNull = pd!=NULL ? CmiTrue : CmiFalse;
+	//bool isNotNull = pd!=NULL ? true : false;
 	ComlibDelegateData *inst = static_cast<ComlibDelegateData *>(pd);
 
 	// call a migration constructor

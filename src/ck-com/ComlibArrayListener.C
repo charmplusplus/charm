@@ -58,25 +58,25 @@
 //  for (int i=0; i<users.size(); ++i) {
 //    users[i]->newElement(thisArrayID, elt->ckGetArrayIndex());
 //  }
-//  //addElement(elt, CmiFalse);
+//  //addElement(elt, false);
 //    //CkPrintf("[%d] Element Created\n", CkMyPe());
 //}
 ///*
 //void ComlibArrayListener::ckElementDied(ArrayElement *elt){
-//    deleteElement(elt, CmiFalse);
+//    deleteElement(elt, false);
 //}
 //
 //void ComlibArrayListener::ckElementLeaving(ArrayElement *elt){
-//    deleteElement(elt, CmiTrue);
+//    deleteElement(elt, true);
 //}
 //
-//CmiBool ComlibArrayListener::ckElementArriving(ArrayElement *elt){
-//    addElement(elt, CmiTrue);
-//    return CmiTrue;
+//bool ComlibArrayListener::ckElementArriving(ArrayElement *elt){
+//    addElement(elt, true);
+//    return true;
 //}
 //
 //void ComlibArrayListener::addElement(ArrayElement *elt, 
-//                                     CmiBool migration_flag){
+//                                     bool migration_flag){
 //    if(nElements == 0)
 //        thisArrayID = elt->ckGetArrayID();
 //
@@ -96,7 +96,7 @@
 //}
 //
 //void ComlibArrayListener::deleteElement(ArrayElement *elt, 
-//                                        CmiBool migration_flag){
+//                                        bool migration_flag){
 //    ht->remove(elt->thisIndexMax);
 //    nElements --;
 //    
