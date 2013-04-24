@@ -1050,7 +1050,7 @@ void TraceSummaryBOC::initCCS() {
       CkPrintf("[%d] Setting up periodic startCollectData callback\n", CkMyPe());
       CcdCallOnConditionKeep(CcdPERIODIC_1second, startCollectData,
 			     (void *)this);
-      summaryCcsStreaming = CmiTrue;
+      summaryCcsStreaming = true;
     }
     firstTime = false;
   }
