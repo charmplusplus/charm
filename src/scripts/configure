@@ -2591,18 +2591,6 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
-#### Check bool ####
-cat > $t <<EOT
-#include <stdlib.h>
-bool foo(void) { return true; }
-EOT
-test_cxx "whether C++ bool works" "ok" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_BOOL_DEFINED $pass
-_ACEOF
-
-
 #### Check long long ####
 cat > $t <<EOT
 #include <stdlib.h>

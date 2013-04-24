@@ -62,17 +62,10 @@
 /* not the C++ compiler.  If this is C++, ignore them.       */
 #ifdef __cplusplus
 
-/* Only C++ needs this backup bool defined.  We'll assume that C doesn't
-   use it */
-
-#if ! CMK_BOOL_DEFINED
-enum CmiBool {CmiFalse=0, CmiTrue=1};
-typedef enum {false = 0, true = 1} bool;
-#else
+/// @todo: Cmi{Bool,False,True} are a relic from gory old days. Remove completely in charm v6.6
 typedef bool CmiBool;
 #define CmiFalse false
 #define CmiTrue true
-#endif
 
 #if ! CMK_HAS_OFFSETOF
 #undef offsetof

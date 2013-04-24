@@ -655,14 +655,6 @@ EOT
 test_cxx "whether has regex.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_REGEX_H, $pass, [whether has regex.h])
 
-#### Check bool ####
-cat > $t <<EOT
-#include <stdlib.h>
-bool foo(void) { return true; }
-EOT
-test_cxx "whether C++ bool works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_BOOL_DEFINED, $pass, [whether C++ bool works])
-
 #### Check long long ####
 cat > $t <<EOT
 #include <stdlib.h>

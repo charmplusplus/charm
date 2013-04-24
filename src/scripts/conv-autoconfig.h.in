@@ -3,9 +3,6 @@
 /* Charm++ Release/API version number */
 #undef CHARM_VERSION
 
-/* whether C++ bool works */
-#undef CMK_BOOL_DEFINED
-
 /* bproc version */
 #undef CMK_BPROC_VERSION
 

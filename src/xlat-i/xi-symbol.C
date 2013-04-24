@@ -11,10 +11,6 @@ using std::cerr;
 using std::cout;
 using std::endl;
 
-#if ! CMK_BOOL_DEFINED
-typedef enum {false = 0, true = 1} bool;
-#endif
-
 #include <fstream>
 
 namespace xi {
