@@ -39,11 +39,11 @@ public:
 	CkRect getShift(int dx,int dy) {
 		return CkRect(l+dx,t+dy,r+dx,b+dy);
 	}
-	CmiBool isEmpty(void) const {return (CmiBool)((l>=r) || (t>=b));}
-	CmiBool inbounds(int x,int y) const {
-		if (x<l || x>=r) return CmiFalse;
-		if (y<t || y>=b) return CmiFalse;
-		return CmiTrue;
+	bool isEmpty(void) const {return (bool)((l>=r) || (t>=b));}
+	bool inbounds(int x,int y) const {
+		if (x<l || x>=r) return false;
+		if (y<t || y>=b) return false;
+		return true;
 	}
 	void makeEmpty(void) {l=t=1000000000; b=r=-1000000000;}
 	void empty(void) {makeEmpty();}
