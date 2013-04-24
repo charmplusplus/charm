@@ -39,7 +39,7 @@ public:
 	CkRect getShift(int dx,int dy) {
 		return CkRect(l+dx,t+dy,r+dx,b+dy);
 	}
-	bool isEmpty(void) const {return (bool)((l>=r) || (t>=b));}
+	bool isEmpty(void) const {return ((l>=r) || (t>=b));}
 	bool inbounds(int x,int y) const {
 		if (x<l || x>=r) return false;
 		if (y<t || y>=b) return false;

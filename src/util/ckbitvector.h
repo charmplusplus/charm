@@ -83,11 +83,11 @@ class CkBitVector {
 
   // Comparison operators
   bool operator==(const CkBitVector &b) const { return false; } // HERE
-  bool operator!=(const CkBitVector &b) const { return (bool)!(*this==b); }
+  bool operator!=(const CkBitVector &b) const { return !(*this==b); }
   bool operator<(const CkBitVector &b) const { return false; } // HERE
-  bool operator<=(const CkBitVector &b) const { return (bool)(*this==b||*this>b); }
+  bool operator<=(const CkBitVector &b) const { return (*this==b||*this>b); }
   bool operator>(const CkBitVector &b) const { return false; } // HERE
-  bool operator>=(const CkBitVector &b) const { return (bool)(*this==b||*this<b); }
+  bool operator>=(const CkBitVector &b) const { return (*this==b||*this<b); }
 
   // Print the bit vector to either output stream type
   friend CkOutStream & operator<< (CkOutStream &ckos, CkBitVector const b);

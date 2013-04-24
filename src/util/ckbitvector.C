@@ -190,7 +190,7 @@ bool CkBitVector::Test(prio_t bit) const {
 //ckerr << bit << ": at offset " << index << " mask " << bitMask << endl;
 
   // Access that bit, check it versus the mask and return the result
-  return (bool)((data[index]&bitMask) != 0);
+  return ((data[index]&bitMask) != 0);
 }
 
 
