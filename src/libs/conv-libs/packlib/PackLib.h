@@ -13,7 +13,7 @@ public:
   enum ItemType { t_voidp, t_char, t_uchar, t_int, t_uint, 
 		  t_long, t_ulong, t_float, t_double };
 
-  Packer(CmiBool _debug = CmiFalse) { 
+  Packer(bool _debug = false) { 
     head = tail = 0; bytes = 0;  debug = _debug;
   };
 
@@ -335,12 +335,12 @@ private:
   item* head;
   item* tail;
   int bytes;
-  CmiBool debug;
+  bool debug;
 };
 
 class Unpacker {
 public:
-  Unpacker(const void *const _buffer, CmiBool _debug = CmiFalse) {
+  Unpacker(const void *const _buffer, bool _debug = false) {
     buffer = _buffer;
 #if CMK_CPP_CAST_LEGAL
     bufsz = *(static_cast<const int*>(buffer)) - sizeof(int);
@@ -499,7 +499,7 @@ public:
   const char* buf_ptr;
   int bufsz;
   int unpacked;
-  CmiBool debug;
+  bool debug;
 };
 
 #endif /* PACKLIB_H */

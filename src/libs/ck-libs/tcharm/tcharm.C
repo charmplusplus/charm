@@ -190,7 +190,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   isStopped=true;
   resumeAfterMigration=false;
 	/* FAULT_EVAC*/
-	AsyncEvacuate(CmiTrue);
+	AsyncEvacuate(true);
   skipResume=false;
   exitWhenDone=initMsg->opts.exitWhenDone;
   isSelfDone = false;
@@ -202,7 +202,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   } else
   	heapBlocks=0;
   nUd=0;
-  usesAtSync=CmiTrue;
+  usesAtSync=true;
   run();
 }
 
@@ -213,7 +213,7 @@ TCharm::TCharm(CkMigrateMessage *msg)
   tid=NULL;
   threadGlobals=NULL;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
-	AsyncEvacuate(CmiTrue);
+	AsyncEvacuate(true);
   heapBlocks=0;
 }
 

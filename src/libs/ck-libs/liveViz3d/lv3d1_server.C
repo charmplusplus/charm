@@ -142,7 +142,7 @@ public:
 /* The array itself just forwards everything to the impl_LV3D_Array */
 void LV3D_Array::init(void) {
 	impl=new impl_LV3D_Array(this);
-	usesAtSync=CmiTrue;
+	usesAtSync=true;
 }
 
 void LV3D_Array::addViewable(CkViewable *v) {
