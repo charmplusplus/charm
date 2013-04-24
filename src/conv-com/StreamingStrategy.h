@@ -53,8 +53,8 @@ class StreamingStrategy : public Strategy {
     int msgSizeMax;
     int bufSizeMax;
     double PERIOD;
-    //CmiBool shortMsgPackingFlag;
-    CmiBool idleFlush;
+    //bool shortMsgPackingFlag;
+    bool idleFlush;
 
     //int streaming_handler_id; //Getting rid of multiple send
 
@@ -94,10 +94,10 @@ class StreamingStrategy : public Strategy {
 
     virtual void pup(PUP::er &p);
     //virtual void enableShortArrayMessagePacking()
-    //    {shortMsgPackingFlag=CmiTrue;} //Should be used only for array
+    //    {shortMsgPackingFlag = true;} //Should be used only for array
                                        //messages
 
-    virtual void disableIdleFlush() { idleFlush = CmiFalse;}
+    virtual void disableIdleFlush() { idleFlush = false;}
 
     /// Register self to be flushed again after a delay.
     void registerFlush(void);

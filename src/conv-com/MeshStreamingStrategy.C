@@ -201,7 +201,7 @@ MeshStreamingStrategy::MeshStreamingStrategy (int period, int bucket_size)
     column_bytes = new int[num_columns];
     row_bucket = new CkQ<char *>[num_rows];
 
-    //shortMsgPackingFlag = CmiFalse;
+    //shortMsgPackingFlag = false;
 }
 
 

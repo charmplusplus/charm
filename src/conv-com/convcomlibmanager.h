@@ -41,7 +41,7 @@ class ConvComlibManager {
   /// a table containing all the strategies in the system
   StrategyTable strategyTable;
   /// it is true after the system has been initialized at the program startup
-  CmiBool init_flag;
+  bool init_flag;
   /// the number of strategies currently present in the system
   int nstrats;
 
@@ -52,14 +52,14 @@ class ConvComlibManager {
   /// count how many acks have been received for the current synchronization
   int acksReceived;
   /// used when a doneCreating is called before the previous one is finished
-  CmiBool doneCreatingScheduled;
+  bool doneCreatingScheduled;
   /// true when the manager is busy synchronizing the strategies
-  CmiBool busy;
+  bool busy;
 
   ConvComlibManager();
 
-  void setInitialized() {init_flag = CmiTrue;}
-  CmiBool getInitialized() {return init_flag;}
+  void setInitialized() {init_flag = true;}
+  bool getInitialized() {return init_flag;}
 
   // used only by ComlibManager.C to broadcast the strategies: DEPRECATED!
   // the broadcast has to be done by converse

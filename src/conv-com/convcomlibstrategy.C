@@ -64,7 +64,7 @@ StrategyWrapper::StrategyWrapper(int count) {
   nstrats = count;
   strategy = new Strategy* [nstrats];
   position = new int[nstrats];
-  replace = new CmiBool[nstrats];
+  replace = new bool[nstrats];
 }
 
 StrategyWrapper::~StrategyWrapper() {
@@ -80,7 +80,7 @@ void StrategyWrapper::pup (PUP::er &p) {
   if(p.isUnpacking()) {
     strategy = new Strategy* [nstrats];
     position = new int[nstrats];
-    replace = new CmiBool[nstrats];
+    replace = new bool[nstrats];
   }
   
   for(int count = 0; count < nstrats; ++count) {

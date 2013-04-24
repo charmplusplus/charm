@@ -93,7 +93,7 @@ void *comlibReadyHandler(void *msg) {
   if (--CkpvAccess(conv_com_object).acksReceived == 0) {
     // ok, we are done. Do we have to broadcast a new table?
     ComlibPrintf("Strategy table propagation finished\n");
-    CkpvAccess(conv_com_object).busy = CmiFalse;
+    CkpvAccess(conv_com_object).busy = false;
     if (CkpvAccess(conv_com_object).doneCreatingScheduled) {
       CkpvAccess(conv_com_object).doneCreating();
     }
@@ -176,10 +176,10 @@ void *comlibReceiveTableHandler(void *msg) {
 
 ConvComlibManager::ConvComlibManager(): strategyTable(MAX_NUM_STRATS+1){
   nstrats = 0;
-  init_flag = CmiFalse;
+  init_flag = false;
   acksReceived = 0;
-  doneCreatingScheduled = CmiFalse;
-  busy = CmiFalse;
+  doneCreatingScheduled = false;
+  busy = false;
 }
 
 /** Insert a strategy into the system table, and return a handle to be used to
@@ -214,11 +214,11 @@ void ConvComlibManager::doneCreating() {
   ComlibPrintf("Called doneCreating\n");
   if (busy) {
     // we have to delay the table broadcast because we are in the middle of another one
-    doneCreatingScheduled = CmiTrue;
+    doneCreatingScheduled = true;
     return;
   }
   // if we reach here it means we are not busy and we can proceed
-  busy = CmiTrue;
+  busy = true;
   acksReceived = CmiNumPes() - 1;
   int count = 0;
   for (int i=1; i<=nstrats; ++i) {
@@ -234,7 +234,7 @@ void ConvComlibManager::doneCreating() {
     for (int i=1; i<=nstrats; ++i) {
       if (strategyTable[i].isNew) {
     	  sw.position[count] = i;
-    	  sw.replace[count] = CmiFalse;
+    	  sw.replace[count] = false;
     	  sw.strategy[count] = strategyTable[i].strategy;
     	  count++;
     	  CkpvAccess(conv_com_object).inSync(i);
@@ -263,7 +263,7 @@ void ConvComlibManager::doneCreating() {
     }
     */
   } else {
-    busy = CmiFalse;
+    busy = false;
   }
 }
 

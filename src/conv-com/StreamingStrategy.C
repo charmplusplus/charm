@@ -39,8 +39,8 @@ StreamingStrategy::StreamingStrategy(int periodMs, int bufferMax_,
     streamingMsgBuf = NULL;
     streamingMsgCount = NULL;
     bufSize = NULL;
-    //shortMsgPackingFlag = CmiFalse;
-    idleFlush = CmiTrue;
+    //shortMsgPackingFlag = false;
+    idleFlush = true;
     //streaming_handler_id = 0;
     setType(CONVERSE_STRATEGY);
 }
@@ -52,8 +52,8 @@ StreamingStrategy::StreamingStrategy(double periodMs, int bufferMax_,
     streamingMsgBuf = NULL;
     streamingMsgCount = NULL;
     bufSize = NULL;
-    //shortMsgPackingFlag = CmiFalse;
-    idleFlush = CmiTrue;
+    //shortMsgPackingFlag = false;
+    idleFlush = true;
     //streaming_handler_id = 0;
     setType(CONVERSE_STRATEGY);
 }
