@@ -1,0 +1,579 @@
+%\documentclass[11pt]{article}
+
+%\begin{document}
+
+%\chapter{Mesh Streamer Overview and Manual}
+%\author{Lukasz Wesolowski\\
+%University of Illinois at Urbana-Champaign\\
+%Department of Computer Science
+%}
+
+%\maketitle
+
+\section{Overview}
+
+Mesh Streamer is a library for optimization of many-to-many and
+all-to-all collective communication patterns in Charm++
+applications. The library performs topological routing and aggregation
+of network communication in the context of a virtual mesh topology
+comprising the Charm++ Processing Elements (PEs) in the parallel
+run. The number of dimensions and their sizes within this topology are
+specified by the user when initializing an instance of the library.
+
+Mesh Streamer is implemented as a Charm++ group, so an \emph{instance}
+of Mesh Streamer has one object on every PE used in the run. We use
+the term \emph{local instance} to denote a member of the Mesh Streamer
+group on a particular PE. 
+
+Most collective communication patterns involve sending linear arrays
+of a single data type. In order to more efficiently aggregate and
+process network data, Mesh Streamer restricts the data sent using the
+library to a single data type specified by the user through a template
+parameter when initializing an instance of the library. We use the
+term \emph{data item} to denote a single object of this datatype
+submitted to the library for sending. While the library is active
+(i.e. after initialization and before termination), an arbitrary
+number of data items can be submitted to the library at each PE.
+
+Due to the underlying assumption of a mesh topology, the
+benefits of Mesh Streamer are most pronounced on systems with a mesh
+or torus network topology, where the virtual mesh of PEs is made to
+match the physical topology of the network. The latter can easily be
+accomplished using the Charm++ Topology Manager.
+
+%\textbf{proposed
+%  addition: provide a way to automatically determine virtual topology
+%  dimensions based on physical topology, so that the user need not
+%  worry about Topology Manager.}
+
+The next two sections explain the routing and aggregation techniques
+used in the library.
+
+\subsection{Routing}
+
+Let the variables $j$ and $k$ denote PEs within an N-dimensional
+virtual topology of PEs and $x$ denote a dimension of the mesh. We
+represent the coordinates of $j$ and $k$ within the mesh as $\left
+(j_0, j_1, \ldots, j_{N-1} \right) $ and $ \left (k_0, k_1, \ldots,
+k_{N-1} \right) $.  Also, let
+\[
+f(x, j, k) = 
+\begin{cases} 
+0, & \text{if } j_x = k_x \\
+1, & \text{if } j_x \ne k_x
+\end{cases}
+\]
+
+$j$ and $k$ are \emph{peers} if 
+\begin{equation}
+\sum_{d=0}^{N-1} f(d, j, k) = 1 .
+\label{eq:peer}
+\end{equation}
+When using Mesh Streamer, PEs communicate directly only with their
+peers. Sending to a PE which is not a peer is handled inside the
+library by routing the data through one or more \emph{intermediate
+  destinations} along the route to the \emph{final destination}.
+
+Suppose a data item destined for PE $k$ is submitted to the library at
+PE $j$. If $k$ is a peer of $j$, the data item will be sent directly
+to $k$, possibly along with other data items for which $k$ is the
+final or intermediate destination.  If $k$ is not a peer of $j$, the
+data item will be sent to an intermediate destination $m$ along the
+route to $k$ whose index is $\left (j_0, j_1, \ldots, j_{i-1}, k_i,
+j_{i+1}, \ldots, j_{N-1} \right)$, where $i$ is the greatest value of
+$x$ for which $f(x, j, k) = 1$.
+
+Note that in obtaining the coordinates of $m$ from $j$, exactly one of
+the coordinates of $j$ which differs from the coordinates of $k$ is
+made to agree with $k$. It follows that m is a peer of $j$, and that
+using this routing process at $m$ and every subsequent intermediate
+destination along the route eventually leads to the data item being
+received at $k$. Consequently, the number of messages $F(j, k)$ that
+will carry the data item to the destination is
+\begin{equation}
+F(j,k) = \sum_{d=0}^{N-1}f(d, j, k) .
+\label{eq:nummsgs}
+\end{equation}
+
+\subsection{Aggregation}
+
+Communicating over the network of a parallel machine involves per
+message bandwidth and processing overhead. Mesh Streamer amortizes
+this overhead by aggregating data items at the source and every
+intermediate destination along the route to the final destination.
+
+Every local instance of the Mesh Streamer group buffers the data items
+that have been submitted locally or received from another PE for
+forwarding. Because only peers communicate directly in the virtual
+mesh, it suffices to have a single buffer per PE for every
+peer. Given a dimension d within the virtual topology, let $s_d$
+denote its \emph{size}, or the number of distinct values a coordinate
+for dimension d can take. Consequently, each local instance allocates
+up to $s_d - 1 $ buffers per dimension, for a total of
+$\sum_{d=0}^{N-1} (s_d - 1) $ buffers. Buffers are of a constant
+size. This size can either be specified directly by the user when
+creating the Mesh Streamer instance or, when using an alternative
+constructor, specified indirectly through a parameter denoting the
+maximum number of data items to be buffered at any point in time per
+local instance of the library.  This amount is multiplied by a
+constant \emph{overallocation factor} inside the library and divided
+by the number of peers when determining the size of each
+buffer. To prevent data allocation for peers which rarely or never
+communicate, Mesh Streamer allocates buffers on demand as soon as a
+data item needs to be sent out to a particular peer.
+
+Sending with Mesh Streamer is done by submitting a data item and a
+destination identifier, either PE or array index, using a function
+call to the local instance.  If the index belongs to a peer, the
+library places the data item in the buffer for the peer's
+PE. Otherwise, the library calculates the index of the intermediate
+destination using the previously described algorithm, and places the
+data item in the buffer for the resulting PE, which by design is
+always a peer of the local PE. Buffers are sent out immediately
+when they become full. When a message is received at an intermediate
+destination, the data items comprising it are distributed into the
+appropriate buffers for subsequent sending. In the process, if a data
+item is determined to have reached its final destination, it is
+immediately returned to the user through a virtual function reserved
+for that purpose.
+
+The total buffering capacity specified by the user may be reached even
+when no single buffer is completely filled up. In that case the buffer
+with the greatest number of buffered data items is sent.
+
+%In the context of this document, a data item is a piece
+%of data sent in application code using Mesh Streamer. We do not use
+%the term message in this context to indicate that a data item does not
+%contain an envelope. Data items are aggregated into messages inside
+%the library. Aggregation is done on a per-dimension basis, as
+%described below.
+
+%Each PE can be represented using its coordinates in the N-dimensional
+%topology as $ \left (i_0, i_1, \ldots, i_{N-1} \right) $. A PE
+%communicates directly with PEs whose coordinates match its own in all
+%but one of the dimensions. 
+
+%Let $s_d$, for $ d \in 0 \ldots N - 1$
+%denote the number of PEs along dimension d in the topology. Buffers
+%are allocated on demand when needed - initially no buffers are
+%allocated. Consequently, each PE will allocate up to $s_d - 1 $
+%buffers per dimension, for a total of $ \sum_{d=0}^{N-1} (s_d - 1) $
+%buffers.
+
+%Items are typically delivered to intermediate PEs along the route to
+%the destination. At each intermediate destination, received items are
+%sorted into correct messages for subsequent sending. Consider an item
+%$a$ submitted at PE $ \left (j_0, j_1, \ldots, j_{N-1} \right) $ for
+%destination PE $ \left (k_0, k_1, \ldots, k_{N-1} \right) $. Let
+%\[
+%f(x) = 
+%\begin{cases} 
+%0, & \text{if } j_x = k_x \\
+%1, & \text{if } j_x \ne k_x
+%\end{cases}
+%\]
+
+%The number of messages along which $a$ will travel is
+%$\sum_{d=0}^{N-1}f(d)$. Sending an item involves comparing the index
+%of the destination PE (where the item is to be delivered) to the index
+%of the current PE, starting from the right. The first coordinate in
+%the destination PE index thus encountered which is not equal to the
+%corresponding coordinate in the source PE is substituted into the
+%source PE index to obtain the next PE along the route of the item. The
+%item is then placed in the appropriate buffer for the resulting index
+%(if the buffer does not exist, it is created).
+
+%As an example, a PE in a 3D mesh is a member of some row, column, and
+%plane, representing the mesh dimensions. Each PE contains a single
+%buffer for every index
+
+\section{Application User Interface}
+
+A typical usage scenario for Mesh Streamer involves a start-up phase
+followed by one or more \emph{streaming steps}. We next describe the
+interface and details relevant to usage of the library, which normally
+follows these steps:
+ 
+\begin{enumerate}
+\item{\textbf{Start-up}} Creation of a Mesh Streamer group of an
+  appropriate type and set up of client arrays and groups
+\item{\textbf{Initialization}} Calling an appropriate initialization
+  function, which returns through a callback
+\item{\textbf{Sending}} An arbitrary number of sends using the
+  insertData function call
+\item{\textbf{Receiving}} Processing received data items through the
+  virtual \emph{process} function which serves as the delivery
+  interface for the library and must be defined by the user
+\item{\textbf{Termination}} Termination of a streaming step
+\item{\textbf{Reinitialization}} Chare migration, potentially followed
+  by reinitialization of Mesh Streamer (step 2) for a new streaming step
+\end{enumerate}
+
+\subsection{Start-Up}
+
+Start-up is typically performed once in a program, often inside the
+Main function of the mainchare, and involves creating the Mesh
+Streamer group.
+
+An instance of Mesh Streamer is restricted to sending data items of a
+single user-specified type, which we denote by \emph{dtype}, to a
+single user-specified chare array or group. The target group or array
+should inherit from MeshStreamerGroupClient\textless{}dtype\textgreater{} and
+MeshStreamerArrayClient\textless{}dtype, itype\textgreater{}, respectively.
+
+%\textbf{proposed change:
+%  remove client inheritance to simplify the interface. This will have
+%  the effect of removing support for anytime migration.} 
+
+
+\subsubsection{Sending to a Group}
+To use Mesh Streamer for sending to a group, a GroupMeshStreamer group
+should be created. Either of the following two GroupMeshStreamer
+constructors can be used for that purpose:
+
+\begin{alltt}
+template <class dtype>
+GroupMeshStreamer<dtype>::GroupMeshStreamer(
+                  int maxNumDataItemsBuffered, 
+                  int numDimensions, 
+                  int *dimensionSizes, 
+                  const CProxy_MeshStreamerGroupClient<dtype>& clientProxy, 
+                  bool yieldFlag = 0, 
+                  double progressPeriodInMs = -1.0); \\
+template <class dtype>
+GroupMeshStreamer<dtype>::GroupMeshStreamer(
+                  int numDimensions, 
+                  int *dimensionSizes, 
+                  const CProxy_MeshStreamerGroupClient<dtype>& clientProxy, 
+                  int bufferSize, 
+                  bool yieldFlag = 0, 
+                  double progressPeriodInMs = -1.0);
+
+\end{alltt}
+
+\subsubsection{Sending to a Chare Array}
+For sending to a chare array, an ArrayMeshStreamer group should be
+created, which has a similar constructor interface to GroupMeshStreamer:
+
+\begin{alltt}
+template <class dtype, class itype>
+ArrayMeshStreamer<dtype, itype>::ArrayMeshStreamer(
+                  int maxNumDataItemsBuffered, 
+                  int numDimensions,
+                  int *dimensionSizes, 
+                  const CProxy_MeshStreamerArrayClient<dtype>& clientProxy,
+                  bool yieldFlag = 0, 
+                  double progressPeriodInMs = -1.0); \\
+template <class dtype, class itype>
+ArrayMeshStreamer<dtype, itype>::ArrayMeshStreamer(
+                  int numDimensions, 
+                  int *dimensionSizes, 
+                  const CProxy_MeshStreamerArrayClient<dtype>& clientProxy,
+                  int bufferSize, 
+                  bool yieldFlag = 0, 
+                  double progressPeriodInMs = -1.0);
+
+\end{alltt}
+
+Description of parameters:
+\begin{itemize}
+\item maxNumDataItemsBuffered: maximum number of items that the
+  library is allowed to buffer per PE 
+\item numDimensions: number of dimensions in mesh of PEs
+\item dimensionSizes: array of size numDimensions containing the size
+  of each dimension in the mesh
+\item clientProxy: the proxy for the destination array or group
+\item bufferSize: size of the buffer for each peer,
+  in terms of number of data items
+\item yieldFlag: when true, calls CthYield() after every 1024 item
+  insertions - setting it true requires all data items to be submitted
+  from threaded entry methods - ensures that pending messages are sent
+  out by the runtime system - useful when a large number of data items
+  are submitted from a single entry method,
+\item progressPeriodInMs: number of milliseconds in between periodic
+  flushes of all internal buffers, relevant only when periodic
+  flushing is enabled (see section on termination)
+\end{itemize}
+
+template parameters:
+\begin{itemize}
+\item dtype: data item type
+\item itype: index type of client chare array (use int for
+  CkArrayIndex1D and CkArrayIndex for all other index types)
+\end{itemize}
+
+The group or array which receives data sent using Mesh Streamer needs
+to inherit from MeshStreamerGroupClient<dtype> or
+MeshStreamerArrayClient<dtype>.
+
+\subsection{Initialization}
+
+Before any sending can be done, the library needs to be
+initialized. There are currently two main modes of operation,
+depending on the type of termination used: staged completion and
+completion detection. The modes of termination are described
+later. Here, we present the interface for intializing a streaming step
+in each case.
+
+When using completion detection, each local instance of Mesh Streamer
+must be initialized using the following init function:
+
+\begin{alltt}
+void MeshStreamer<dtype>::init(
+                  int numContributors,
+                  CkCallback startCb, 
+                  CkCallback endCb, 
+                  CProxy_CompletionDetector detector, 
+                  int prio, bool usePeriodicFlushing);
+\end{alltt}
+
+Description of parameters:
+
+\begin{itemize}
+\item numContributors: number of \emph{done} calls expected globally
+  before termination of this streaming step
+\item startCb: callback to be invoked by the libray after
+  initialization is complete
+\item endCb: callback to be invoked by the library after termination
+  of this streaming step
+\item detector: an inactive CompletionDetector object
+\item prio: Charm++ prority to be used for messages sent using Mesh
+  Streamer in this streaming step
+\item usePeriodicFlushing: specifies whether periodic flushing should
+  be used for this streaming step
+\end{itemize}
+
+When using staged completion, a completion detector object is not
+required as input, as the library performs its own specialized form of
+termination. In this case, each local instance of Mesh Streamer must
+be initialized using a different interface for the overloaded init function: 
+
+\begin{alltt}
+void MeshStreamer<dtype>::init(
+                  int numLocalContributors, 
+                  CkCallback startCb, 
+                  CkCallback endCb, 
+                  int prio, bool usePeriodicFlushing);
+\end{alltt}
+
+Note that numLocalContributors denotes the local number of done calls
+expected, rather than the global as in the first interface of init. In
+practice, this often precludes calling this version of init through a
+broadcast, as the desired number of done calls may be different on
+each PE.
+
+A common case is to have a single chare array perform all the sends in
+a streaming step, with each element of the array as a contributor. For
+this case there is a special version of init that takes as input the
+CkArrayID object for the chare array that will perform the sends: 
+
+\begin{alltt}
+void MeshStreamer<dtype>::init(
+                  CkArrayID senderArrayID,
+                  CkCallback startCb, 
+                  CkCallback endCb, 
+                  int prio, bool usePeriodicFlushing);
+\end{alltt}
+
+After initialization is finished, the system invokes startCb,
+signalling to the user that the library is ready to accept data items
+for sending. 
+\\
+
+%\textbf{proposed addition: add a non-streaming all-to-all interface,
+%  which should not require an init call}
+
+\subsection{Sending}
+
+Sending with Mesh Streamer is done through calls to insertData and broadcast. 
+
+\begin{alltt}
+void GroupMeshStreamer<dtype>::insertData(
+                       const dtype &dataItem, 
+                       int destinationPe);
+\end{alltt}
+
+\begin{alltt}
+void ArrayMeshStreamer<dtype, itype>::insertData(
+                       const dtype &dataItem,
+                       itype arrayIndex);
+void MeshStreamer<dtype>::broadcast(const dtype& dataItem);
+\end{alltt}
+
+\begin{itemize}
+\item dataItem: reference to a data item to be sent
+\item destinationPe: index of destination PE
+\item arrayIndex: index of destination array element
+\end{itemize}
+
+Broadcasting has the effect of delivering the data item:
+\begin{itemize}
+\item {once on every PE involved in the computation for GroupMeshStreamer}
+\item {once for every array element involved in the computation for
+       ArrayMeshStreamer}
+\end{itemize}
+
+%\textbf{proposed addition: add an interface for sending an array of
+%  data items}
+
+\subsection{Receiving}
+
+To receive data items sent using Mesh Streamer, the user must define
+the process function for each client group and array:
+
+\begin{alltt}
+void MeshStreamerGroupClient<dtype>::process(const dtype &dataItem);
+void MeshStreamerArrayClient<dtype>::process(const dtype &dataItem);
+\end{alltt}
+
+process is called by the library on the destination processor once for
+every delivered item.
+
+\subsection{Termination}
+
+A termination mechanism is required due to the buffering of data items
+in Mesh Streamer local instances at the source and intermediate
+destinations. Without a flushing or termination mechanism, data items
+may remain buffered indefinitely without ever getting delivered to
+their final destinations. A termination scheme ensures that these
+items are delivered, preventing deadlock. 
+
+Currently, two means of termination are supported, staged completion
+and completion detection. Periodic flushing is a secondary mechanism
+which can be enabled or disabled when initiating one of the primary
+mechanisms. 
+
+In general, termination requires the user to issue a number of calls
+to the \emph{done} function:
+\begin{alltt}
+ void MeshStreamer<dtype>::done(int numContributorsFinished = 1);
+\end{alltt}
+When using completion detection, the number of done calls that are
+expected globally by the Mesh Streamer instance is specified using the
+numContributors parameter to init. Safe termination requires that no
+calls to insertData or broadcast are made after the last call to
+\emph{done} is performed globally. Because order of execution is
+uncertain in parallel applications, some care is required to ensure
+the above condition is met. A simple way to terminate safely is to set
+numContributors equal to the number of senders, and call done once for
+each sender that is done sending.
+
+In contrast to using completion detection, using staged completion
+involves setting the local number of expected done calls on each local
+instance using the numLocalContributors parameter in the init
+function. To ensure safe termination, no insertData or broadcast calls
+should be made on any PE that has received all its expected done
+calls. 
+
+The final overloaded version of init, which takes a CkArrayID object as an
+argument, provides a simplified interface in the common case when a
+single chare array performs all the sends within a streaming step,
+with each of its elements as a contributor. This version of init
+determines the appropriate number of local contributors automatically
+and can be called through a broadcast. It also correctly handles
+the case of PEs without any contributors by immediately marking those
+PEs as having finished the streaming step. As such, this version of init
+should be preferred by the user when applicable. 
+
+The choice of which termination mechanism to use is left to the
+user. There are cases where it may be easier to use the completion
+detection scheme. If either mode can be used with ease, staged
+completion should be preferred, as it achieves termination faster and
+does not involve the persistent overhead of completion detection due
+to reductions for determining when the global number of expected done
+calls is reached. Staged completion, unlike completion detection, does
+incur a small bandwidth overhead (4 bytes) for every Mesh Streamer
+message, but in practice this is more than offset by the persistent
+traffic incurred by completion detection. 
+
+Periodic flushing is an auxiliary mechanism which checks at a regular
+interval whether any sends have taken place since the last time the
+check was performed. If not, the mechanism sends out all the data
+items buffered per local instance of the library. The period is
+specified by the user in the Mesh Streamer constructor. A typical use case
+for periodic flushing is when the submission of a data item A to
+Mesh Streamer happens as a result of the delivery of another data item B
+sent using the same Mesh Streamer instance. If B is buffered inside the library
+and insufficient data items are submitted to cause the buffer holding
+B to be sent out, a deadlock could arise. With the periodic flushing
+mechanism, the buffer holding B is guaranteed to be sent out
+eventually, and deadlock is prevented.
+
+%Staged completion is a termination mechanism with one stage per
+%dimension of the topology. The end result of each stage is a flush,
+%which sends the messages for PEs that lie along the particular
+%dimension. In the context of the following discussion, a dimension d
+%is outer compared to dimension d' if the coordinate for dimension d is
+%to the right of the coordinate for dimension d' within an
+%index. Likewise, dimension d' in this case would be inner compared to d.
+%Flushes proceed from the ``outermost'' dimension to the
+%``innermost'' dimension. The flush for the ``outermost'' dimension is
+%carried out as soon as a \emph{done} call is received from all
+%producers local to that PE. 
+%A flush is carried out when it has been determined that all
+%the messages along 
+
+
+%aggregated along the dimension.  A staged
+%completion over an N-dimensional mesh produces N flushes at each
+%PE. 
+
+%A flush is the sending of all
+%buffered data 
+
+% of termination, with a
+%stage for flushing along each dimension. 
+
+
+%orderly manner of termination where
+%at each PE data is flushed in order from ``outermost'' to
+%``innermost'' dimensions.
+
+\subsection{Reinitialization}
+
+A Mesh Streamer instance that has terminated cannot be used for
+sending more data items until it has been
+reinitialized. Reinitialization is achieved by calling init, which
+prepares the instance of the library for a new streaming
+step. Reinitialization is useful for time stepped applications. A new
+streaming step is normally done for each step of the application.
+
+Many applications perform load balancing between time steps. Mesh
+Streamer supports using load balancing in this fashion as long as
+migrations are not performed during a streaming step.
+
+A potential performance issue when using ArrayMeshStreamer with load
+balancing is that it bypasses the automatic array location updates
+performed by the runtime system. As such, when an array element is
+migrated, most data items submitted for sending to that destination
+will be routed to the wrong PE, and only then sent using the default
+Charm++ mechanism to the correct PE. To make matters worse, this does
+not not lead to the original sender finding out the correct updated
+location, leading to serious performance degradation. 
+
+
+
+%Updates of chare location data are normally performed in lazy fashion
+%by the Charm++ runtime system. When a message is delivered to a PE
+%where the destination chare no longer resides, a forwarding mechanism
+%finds the correct destination PE and sends it the message, but also
+%sends a control message back to the sender with the updated location
+%data.  When using Mesh Streamer, destination PEs are determined at the
+%PE where a data item is submitted to the library. A data item that
+%reaches its destination PE may
+
+To fix this problem, Charm++ should be compiled with
+-DCMK\underline{\hspace{.2cm}}GLOBAL
+\underline{\hspace{.2cm}}LOCATION\underline{\hspace{.2cm}}UPDATE for
+applications which use Mesh Streamer and load balancing. The option
+has the effect of performing a global broadcast of location data for
+every chare array that is migrated. Unfortunately, this operation is
+expensive when migrating large numbers of elements. A better workaround
+is in development. 
+
+%\subsection{Optimizations}
+
+\thispagestyle{empty}
+\pagestyle{empty}
+
+%\end{document}

@@ -1,6 +1,12 @@
 \documentclass[10pt]{report}
 \usepackage{xspace}
 \usepackage{../pplmanual}
+\usepackage[hmargin=0.85in,vmargin=0.85in]{geometry}
+\usepackage{alltt}
+\usepackage{color}
+\usepackage{amsmath}
+\usepackage[T1]{fontenc}
+
 \input{../pplmanual}
 
 \title{\converse{} and \charmpp{}\\ Libraries Manual}
@@ -11,7 +17,7 @@ developed by Terry Wilmarth. \tempo{} library was originally developed
 by Zehra Sura, and later rewritten by Milind Bhandarkar.  Multiphase
 shared arrays library was written by Rahul Joshi and enhanced by
 Jayant DeSouza. The matrix multiplication library was developed by
-Esteban Pauli.
+Esteban Pauli. The Mesh Streamer library was developed by Lukasz Wesolowski.
 }
 \begin{document}
 \maketitle
@@ -24,6 +30,8 @@ Esteban Pauli.
 \input{msa}
 \chapter{3D FFT Library}
 \input{fftlib}
+\chapter{Mesh Streamer Library}
+\input{meshstreamer}
 
 \include{index}
 
