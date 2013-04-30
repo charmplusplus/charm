@@ -1271,7 +1271,7 @@ static void CmiStdoutInit(void) {
 			{perror("building stdio redirection socketpair"); exit(1);}
 #endif
 		readStdout[i]=pair[0]; /*We get the read end of pipe*/
-		if (-1==dup2(srcFd,pair[1])) {perror("dup2 redirection pipe"); exit(1);}
+		if (-1==dup2(pair[1],srcFd)) {perror("dup2 redirection pipe"); exit(1);}
 		
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
