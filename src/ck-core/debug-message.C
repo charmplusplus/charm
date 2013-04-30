@@ -120,9 +120,10 @@ void envelope::pup(PUP::er &p) {
 		p|((struct s_groupinit*)extraData())->dep;
 		p|((struct s_groupinit*)extraData())->epoch;
 		break;
-        case ForNodeBocMsg: case ForBocMsg:
+    case ForNodeBocMsg: case ForBocMsg:
 		p|((struct s_group*)extraData())->g;
 		p|((struct s_group*)extraData())->arrayEp;
+        break;
 	case ForArrayEltMsg:
 		p|((struct s_array*)extraData())->arr;
 		p(((struct s_array*)extraData())->index.nInts);
