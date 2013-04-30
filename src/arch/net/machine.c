@@ -1271,7 +1271,8 @@ static void CmiStdoutInit(void) {
 			{perror("building stdio redirection socketpair"); exit(1);}
 #endif
 		readStdout[i]=pair[0]; /*We get the read end of pipe*/
-		if (-1==dup2(pair[1],srcFd)) {perror("dup2 redirection pipe"); exit(1);}
+		//if (-1==dup2(pair[1],srcFd)) {perror("dup2 redirection pipe"); exit(1);}
+		if (-1==dup2(srcFd,pair[1])) {perror("dup2 redirection pipe"); exit(1);}
 		
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
@@ -1597,8 +1598,8 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   
 #if CMK_SMP
   if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
+    CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
 #endif
-  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
   MACHSTATE(1,"}  LrtsSend");
   return (CmiCommHandle)ogm;
 }
@@ -1664,11 +1665,7 @@ void LrtsPostNonLocal()
     
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl(){
-#if CMK_SMP
-  CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
-#else
-  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
-#endif
+  LrtsAdvanceCommunication(5);
 }
 #endif
 
@@ -1677,8 +1674,9 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP
   CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
 #else
-  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
+  CommunicationServerNet(5, COMM_SERVER_FROM_WORKER);
 #endif
+
 }
 
 /******************************************************************************
