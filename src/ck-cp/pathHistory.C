@@ -226,6 +226,7 @@ void automaticallySetMessagePriority(envelope *env){
     
     switch(env->getMsgtype()) {
     case ForArrayEltMsg:
+    case ForIDedObjMsg:
     case ForChareMsg:
       {        
 	const int ep = env->getsetArrayEp();

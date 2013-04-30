@@ -1177,8 +1177,9 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
         CkObjID sender;
         MCount SN;
         MlogEntry *entry=NULL;
-        if(env->getMsgtype() == ForBocMsg || env->getMsgtype() == ForNodeBocMsg ||
-        env->getMsgtype() == ForArrayEltMsg || env->getMsgtype() == ForChareMsg){
+        if(env->getMsgtype() == ForBocMsg || env->getMsgtype() == ForNodeBocMsg
+           || env->getMsgtype() == ForArrayEltMsg || env->getMsgtype() == ForIDedObjMsg
+           || env->getMsgtype() == ForChareMsg) {
                 sender = env->sender;
                 SN = env->SN;
                 int result = preProcessReceivedMessage(env,&obj,&entry);
@@ -1229,6 +1230,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processArrayEltInitMsg(ck,env);
       break;
+    case ForIDedObjMsg:
     case ForArrayEltMsg:
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForArrayEltMsg\n", CkMyPe());)
       if(env->isPacked()) CkUnpackMessage(&env);

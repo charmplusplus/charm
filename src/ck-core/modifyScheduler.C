@@ -73,6 +73,7 @@ void CqsIncreasePriorityForMemCriticalEntries(Queue q){
 
 static bool checkAndRemoveMatching(void *&msgPtr, const int *entryMethod, const int numEntryMethods, envelope *env, void** &p) {
 	if(env != NULL && (env->getMsgtype() == ForArrayEltMsg ||
+                       env->getMsgtype() == ForIDedObjMsg ||
                        env->getMsgtype() == ForChareMsg)
       ){
 	    const int ep = env->getsetArrayEp();

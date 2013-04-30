@@ -940,8 +940,10 @@ public:
 
 // given an envelope of a Charm msg, find the recipient object pointer
 CkMigratable * CkArrayMessageObjectPtr(envelope *env) {
-  if (env->getMsgtype()!=ForArrayEltMsg) return NULL;   // not an array msg
+  if (env->getMsgtype() != ForArrayEltMsg && env->getMsgtype() != ForIDedObjMsg)
+      return NULL;   // not an array msg
 
+  ///@todo: Delegate this to the array manager which can then deal with ForArrayEltMsg or ForIDedObjMsg
   CkArrayID aid = env->getArrayMgr();
   CkArray *mgr=(CkArray *)_localBranch(aid);
   if (mgr) {

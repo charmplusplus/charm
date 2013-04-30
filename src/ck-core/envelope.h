@@ -9,6 +9,7 @@
 #include <middle.h>
 #include <ckarrayindex.h>
 #include <cklists.h>
+#include <objid.h>
 
 #ifndef CkIntbits
 #define CkIntbits (sizeof(int)*8)
@@ -175,6 +176,15 @@ struct s_array{             ///< ForArrayEltMsg
         UChar ifNotThere;         ///< what to do if array element is missing
 };
 
+struct s_objid {
+        ck::ObjID id;
+#if CMK_SMP_TRACE_COMMTHREAD
+        UInt srcpe;
+#endif
+        UChar hopCount;           ///< number of times message has been routed
+        UChar ifNotThere;         ///< what to do if array element is missing
+};
+
 struct s_arrayinit{         ///< ArrayEltInitMsg
         CkArrayIndexBase index; ///< Array element index
         CkGroupID arr;            ///< Array manager GID
@@ -219,6 +229,9 @@ inline UShort extraSize(CkEnvelopeType type)
     break;
   case ForArrayEltMsg:
     ret = sizeof(struct s_array);
+    break;
+  case ForIDedObjMsg:
+    ret = sizeof(struct s_objid);
     break;
   case RODataMsg:
     ret = sizeof(struct s_roData);
@@ -460,7 +473,15 @@ private:
     void setGroupDep(const CkGroupID &r){ /* CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); */ ((struct s_groupinit*)extraData())->dep = r; }
 
 // Array-specific fields
-    CkGroupID getArrayMgr(void) const { return ((struct s_array*)extraData())->arr; }
+    CkGroupID getArrayMgr(void) const {
+        if (getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg)
+            return ((struct s_array*)extraData())->arr;
+        else if (getMsgtype() == ForIDedObjMsg)
+            return ((struct s_objid*)extraData())->id.getCollectionID();
+        else
+            CkAbort("Cannot return ArrayID from msg for non-array entity");
+    }
+
     void setArrayMgr(const CkGroupID gid) { ((struct s_array*)extraData())->arr = gid; }
     int getArrayMgrIdx(void) const {return ((struct s_array*)extraData())->arr.idx;}
     UShort &getsetArrayEp(void) {return epIdx;}

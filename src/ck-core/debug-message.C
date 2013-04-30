@@ -124,6 +124,11 @@ void envelope::pup(PUP::er &p) {
 		p|((struct s_group*)extraData())->g;
 		p|((struct s_group*)extraData())->arrayEp;
         break;
+    case ForIDedObjMsg:
+        p|((struct s_objid*)extraData())->id;
+        p|((struct s_objid*)extraData())->hopCount;
+        p|((struct s_objid*)extraData())->ifNotThere;
+        break;
 	case ForArrayEltMsg:
 		p|((struct s_array*)extraData())->arr;
 		p(((struct s_array*)extraData())->index.nInts);

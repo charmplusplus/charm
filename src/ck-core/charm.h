@@ -260,7 +260,8 @@ typedef enum {
   ForNodeBocMsg  =16,
   ArrayEltInitMsg =17,
   ForArrayEltMsg  =18,
-  LAST_CK_ENVELOPE_TYPE =19
+  ForIDedObjMsg   =19,
+  LAST_CK_ENVELOPE_TYPE =20
 } CkEnvelopeType;
 
 
