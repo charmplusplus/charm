@@ -1595,6 +1595,10 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   CmiCommUnlock();
 #endif  
   
+#if CMK_SMP
+  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
+#endif
+  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
   MACHSTATE(1,"}  LrtsSend");
   return (CmiCommHandle)ogm;
 }
@@ -1660,13 +1664,21 @@ void LrtsPostNonLocal()
     
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl(){
-	LrtsAdvanceCommunication(0);
+#if CMK_SMP
+  CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
+#else
+  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
+#endif
 }
 #endif
 
 void LrtsAdvanceCommunication(int whileidle)
 {
+#if CMK_SMP
+  CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
+#else
   CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
+#endif
 }
 
 /******************************************************************************

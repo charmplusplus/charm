@@ -750,9 +750,7 @@ int pe_gToLTranslate(int pe) {
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     setbuf(stdout, NULL);
-    printf("converse init started\n");
-    fflush(stdout);
-	int _ii;
+    int _ii;
     int tmp;
     //handle output to files for partition if requested
     char *stdoutbase,*stdoutpath;
