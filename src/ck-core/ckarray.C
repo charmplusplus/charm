@@ -615,7 +615,7 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   { //Create a new location manager
     CkEntryOptions  e_opts;
     e_opts.setGroupDepID(opts.getMap());       // group creation dependence
-    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(), opts.getNumInitial(), &e_opts);
+    locMgr = CProxy_CkLocMgr::ckNew(opts, &e_opts);
     opts.setLocationManager(locMgr);
   }
   //Create the array manager

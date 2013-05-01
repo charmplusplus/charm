@@ -6,7 +6,7 @@ module CkLocation {
   };
 
   group [migratable] CkLocMgr {
-	entry CkLocMgr(CkGroupID map, CkArrayIndex numInitial);
+	entry CkLocMgr(CkArrayOptions opts);
 	entry void deliverInline(CkMessage *m);
 	entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
 	entry [expedited] void updateLocation(CkArrayIndex idx,int nowOnPe);

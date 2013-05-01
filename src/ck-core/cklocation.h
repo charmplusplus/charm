@@ -49,6 +49,7 @@ typedef enum {
 	CkDeliver_inline=1  //Deliver via a regular call
 } CkDeliver_t;
 
+class CkArrayOptions;
 #include "CkLocation.decl.h"
 
 /************************** Array Messages ****************************/
@@ -545,7 +546,7 @@ typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
-	CkLocMgr(CkGroupID map, CkArrayIndex& numInitial);
+	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
 
 	inline bool isLocMgr(void) { return true; }

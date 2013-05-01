@@ -2064,7 +2064,7 @@ void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 #endif
 
 /*************************** LocMgr: CREATION *****************************/
-CkLocMgr::CkLocMgr(CkGroupID mapID_, CkArrayIndex& numInitial)
+CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
 {
@@ -2083,10 +2083,10 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_, CkArrayIndex& numInitial)
 #endif
 
 //Register with the map object
-	mapID=mapID_;
+	mapID = opts.getMap();
 	map=(CkArrayMap *)CkLocalBranch(mapID);
 	if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
-	mapHandle=map->registerArray(numInitial,thisgroup);
+	mapHandle=map->registerArray(opts.getNumInitial(), thisgroup);
 
 //Find and register with the load balancer
 #if CMK_LBDB_ON
