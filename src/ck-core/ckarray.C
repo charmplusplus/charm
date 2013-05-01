@@ -54,10 +54,6 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ck.h"
 #include "pathHistory.h"
 
-#if CMK_LBDB_ON
-#include "LBDatabase.h"
-#endif // CMK_LBDB_ON
-
 CpvDeclare(int ,serializer);
 
 bool _isAnytimeMigration;
@@ -617,13 +613,9 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   CkGroupID locMgr = opts.getLocationManager();
   if (locMgr.isZero())
   { //Create a new location manager
-#if !CMK_LBDB_ON
-    CkGroupID _lbdb;
-    CkGroupID _metalb;
-#endif
     CkEntryOptions  e_opts;
     e_opts.setGroupDepID(opts.getMap());       // group creation dependence
-    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(),_lbdb,_metalb,opts.getNumInitial(),&e_opts);
+    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(), opts.getNumInitial(), &e_opts);
     opts.setLocationManager(locMgr);
   }
   //Create the array manager

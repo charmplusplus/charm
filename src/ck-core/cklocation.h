@@ -545,7 +545,7 @@ typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
-	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkGroupID _metalb,CkArrayIndex& numInitial);
+	CkLocMgr(CkGroupID map, CkArrayIndex& numInitial);
 	CkLocMgr(CkMigrateMessage *m);
 
 	inline bool isLocMgr(void) { return true; }

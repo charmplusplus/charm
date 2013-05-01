@@ -2064,7 +2064,7 @@ void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 #endif
 
 /*************************** LocMgr: CREATION *****************************/
-CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkGroupID metalbID_,CkArrayIndex& numInitial)
+CkLocMgr::CkLocMgr(CkGroupID mapID_, CkArrayIndex& numInitial)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
 {
@@ -2089,9 +2089,11 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkGroupID metalbID_,CkArra
 	mapHandle=map->registerArray(numInitial,thisgroup);
 
 //Find and register with the load balancer
-	lbdbID = lbdbID_;
-  metalbID = metalbID_;
-	initLB(lbdbID_, metalbID_);
+#if CMK_LBDB_ON
+        lbdbID = _lbdb;
+        metalbID = _metalb;
+#endif
+        initLB(lbdbID, metalbID);
 	hashImmLock = CmiCreateImmediateLock();
 }
 
