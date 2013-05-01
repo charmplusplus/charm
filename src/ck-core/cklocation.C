@@ -162,7 +162,7 @@ be forwarded by default.
 
 CkArrayMap::CkArrayMap(void) { }
 CkArrayMap::~CkArrayMap() { }
-int CkArrayMap::registerArray(CkArrayIndex& numElements,CkArrayID aid)
+int CkArrayMap::registerArray(const CkArrayIndex& numElements, CkArrayID aid)
 {return 0;}
 
 #define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
@@ -281,7 +281,7 @@ public:
 
   arrayMapInfo(void) { }
 
-  arrayMapInfo(CkArrayIndex& n) : _nelems(n), _numChares(0) {
+  arrayMapInfo(const CkArrayIndex& n) : _nelems(n), _numChares(0) {
     compute_binsize();
   }
 
@@ -343,7 +343,7 @@ public:
 
   DefaultArrayMap(CkMigrateMessage *m) : RRMap(m){}
 
-  int registerArray(CkArrayIndex& numElements, CkArrayID aid)
+  int registerArray(const CkArrayIndex& numElements, CkArrayID aid)
   {
     int idx = amaps.size();
     amaps.resize(idx+1);
@@ -428,7 +428,7 @@ public:
 
   FastArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
 
-  int registerArray(CkArrayIndex& numElements, CkArrayID aid)
+  int registerArray(const CkArrayIndex& numElements, CkArrayID aid)
   {
     int idx;
     idx = DefaultArrayMap::registerArray(numElements, aid);
@@ -482,7 +482,7 @@ public:
 
   ReadFileMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
 
-  int registerArray(CkArrayIndex& numElements, CkArrayID aid)
+  int registerArray(const CkArrayIndex& numElements, CkArrayID aid)
   {
     int idx;
     idx = DefaultArrayMap::registerArray(numElements, aid);
@@ -768,7 +768,7 @@ class arrInfo {
    void distrib(int *speeds);
  public:
    arrInfo(void):_map(NULL){}
-   arrInfo(CkArrayIndex& n, int *speeds)
+   arrInfo(const CkArrayIndex& n, int *speeds)
    {
      _nelems = n;
      _map = new int[_nelems.getCombinedCount()];
@@ -910,7 +910,7 @@ public:
     DEBC((AA"Creating PropMap\n"AB));
   }
   PropMap(CkMigrateMessage *m) {}
-  int registerArray(CkArrayIndex& numElements,CkArrayID aid)
+  int registerArray(const CkArrayIndex& numElements, CkArrayID aid)
   {
     int idx = arrs.size();
     arrs.resize(idx+1);

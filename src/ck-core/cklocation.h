@@ -89,7 +89,7 @@ public:
   CkArrayMap(void);
   CkArrayMap(CkMigrateMessage *m): IrrGroup(m) {}
   virtual ~CkArrayMap();
-  virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
+  virtual int registerArray(const CkArrayIndex& numElements, CkArrayID aid);
   virtual void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
   virtual int homePe(int arrayHdl,const CkArrayIndex &element)
