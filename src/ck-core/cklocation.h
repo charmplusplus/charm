@@ -760,6 +760,7 @@ public:
 	void springCleaning(void);
 	int nSprings;
 
+private:
 	//Map object
 	CkGroupID mapID;
 	int mapHandle;
@@ -767,6 +768,13 @@ public:
 
 	CkGroupID lbdbID;
 	CkGroupID metalbID;
+
+	ck::ArrayIndexCompressor *compressor;
+#if CMK_ERROR_CHECKING
+	const CkArrayIndex bounds;
+#endif
+	void checkInBounds(const CkArrayIndex &idx);
+
 #if CMK_LBDB_ON
 	LBDatabase *the_lbdb;
   MetaBalancer *the_metalb;
@@ -777,6 +785,7 @@ public:
 	void recvAtSync(void);
 	LDOMHandle myLBHandle;
 #endif
+private:
 	void initLB(CkGroupID lbdbID, CkGroupID metalbID);
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))

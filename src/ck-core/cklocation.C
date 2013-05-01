@@ -2067,6 +2067,9 @@ void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
+#if CMK_ERROR_CHECKING
+        , bounds(opts.getBounds())
+#endif
 {
 	DEBC((AA"Creating new location manager %d\n"AB,thisgroup));
 // moved to _CkMigratable_initInfoInit()
@@ -2087,6 +2090,9 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	map=(CkArrayMap *)CkLocalBranch(mapID);
 	if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
 	mapHandle=map->registerArray(opts.getNumInitial(), thisgroup);
+
+        // Figure out the mapping from indices to object IDs if one is possible
+        compressor = ck::FixedArrayIndexCompressor::make(opts.getBounds());
 
 //Find and register with the load balancer
 #if CMK_LBDB_ON
@@ -2667,6 +2673,22 @@ void CkLocMgr::multiHop(CkArrayMessage *msg)
 	}
 }
 
+void CkLocMgr::checkInBounds(const CkArrayIndex &idx)
+{
+#if CMK_ERROR_CHECKING
+  if (bounds.nInts > 0) {
+    CkAssert(idx.dimension == bounds.dimension);
+    bool shorts = idx.dimension > 3;
+
+    for (int i = 0; i < idx.dimension; ++i) {
+      unsigned int thisDim = shorts ? idx.indexShorts[i] : idx.index[i];
+      unsigned int thatDim = shorts ? bounds.indexShorts[i] : bounds.index[i];
+      CkAssert(thisDim < thatDim);
+    }
+  }
+#endif
+}
+
 /************************** LocMgr: ITERATOR *************************/
 CkLocation::CkLocation(CkLocMgr *mgr_, CkLocRec_local *rec_)
 	:mgr(mgr_), rec(rec_) {}
@@ -3179,6 +3201,7 @@ void CkLocMgr::insertRec(CkLocRec *rec,const CkArrayIndex &idx) {
 //Add given record, when there is guarenteed to be no prior record
 void CkLocMgr::insertRecN(CkLocRec *rec,const CkArrayIndex &idx) {
 	DEBC((AA"  adding new rec(%s) for %s\n"AB,rec2str[rec->type()],idx2str(idx)));
+        checkInBounds(idx);
         CmiImmediateLock(hashImmLock);
 	hash.put(*(CkArrayIndex *)&idx)=rec;
         CmiImmediateUnlock(hashImmLock);

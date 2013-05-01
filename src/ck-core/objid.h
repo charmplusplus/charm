@@ -26,6 +26,14 @@ class ObjID {
     /// @note: may have to befriend the ArrayMgr
     public:
         ObjID(): id(0) {}
+        ///
+        ObjID(const CkGroupID gid, const CmiUInt8 eid)
+            : id( ((CmiUInt8)gid.idx << ELEMENT_BITS) | eid)
+        {
+            CmiAssert( (CmiUInt8)gid.idx <= (COLLECTION_MASK >> ELEMENT_BITS) );
+            CmiAssert( eid <= ELEMENT_MASK );
+        }
+
         // should tag system be query-able
         // get collection id
         inline CkGroupID getCollectionID() const {
@@ -34,14 +42,6 @@ class ObjID {
             return gid;
         }
     private:
-        ///
-        ObjID(const CkGroupID gid, const CmiUInt8 eid)
-            : id( ((CmiUInt8)gid.idx << ELEMENT_BITS) | eid)
-        {
-            CmiAssert( gid.idx <= (COLLECTION_MASK >> ELEMENT_BITS) );
-            CmiAssert( eid <= ELEMENT_MASK );
-        }
-
 
         /// get element id
         inline CmiUInt8 getElementID() const { return id & ELEMENT_MASK; }

@@ -4,6 +4,9 @@
 #include "pup.h"
 #include "ckhashtable.h"
 #include "charm.h"
+#include "objid.h"
+#include <vector>
+#include <math.h>
 
 /// Max number of integers in an array index
 #ifndef CK_ARRAYINDEX_MAXLEN
@@ -230,6 +233,68 @@ public:
     }
 };
 PUPmarshall(CkArrayID)
+
+namespace ck {
+  class ArrayIndexCompressor {
+  public:
+    virtual ObjID compress(const CkGroupID gid, const CkArrayIndex &idx) = 0;
+  };
+
+  class FixedArrayIndexCompressor : public ArrayIndexCompressor {
+  public:
+    /// Factory that checks whether a bit-packing compression is possible given
+    /// @arg bounds
+    static FixedArrayIndexCompressor* make(const CkArrayIndex &bounds) {
+      if (bounds.nInts == 0)
+        return NULL;
+
+      std::vector<unsigned int> bits;
+      unsigned int sum = 0;
+      if (bounds.nInts <= 3) {
+        for (int i = 0; i < bounds.dimension; ++i) {
+          unsigned int bitCount = ceil(log2(bounds.index[i]));
+          bits.push_back(bitCount);
+          sum += bitCount;
+        }
+      } else {
+        for (int i = 0; i < bounds.dimension; ++i) {
+          unsigned int bitCount = ceil(log2(bounds.indexShorts[i]));
+          bits.push_back(bitCount);
+          sum += bitCount;
+        }
+      }
+
+      if (sum > 48)
+        return NULL;
+
+      return new FixedArrayIndexCompressor(bits);
+    }
+
+    /// Pack the bits of @arg idx into an ObjID
+    ObjID compress(const CkGroupID gid, const CkArrayIndex &idx) {
+      CkAssert(idx.dimension == bitsPerDim.size());
+
+      CmiUInt8 eid = 0;
+
+      bool shorts = idx.dimension > 3;
+
+      for (int i = 0; i < idx.dimension; ++i) {
+        unsigned int numBits = bitsPerDim[i];
+        unsigned int thisDim = shorts ? idx.indexShorts[i] : idx.index[i];
+        CkAssert(thisDim < (1UL << numBits));
+        eid = (eid << numBits) | thisDim;
+      }
+
+      return ObjID(gid, eid);
+    }
+
+  private:
+    FixedArrayIndexCompressor(std::vector<unsigned int> bits)
+      : bitsPerDim(bits)
+      { }
+    std::vector<unsigned int> bitsPerDim;
+  };
+}
 
 #endif // CKARRAYINDEX_H
 
