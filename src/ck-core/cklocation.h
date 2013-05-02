@@ -231,7 +231,7 @@ public:
 	inline int     homePe (const CkArrayIndex &idx) const {return map->homePe(mapHandle,idx);}
 	inline int     procNum(const CkArrayIndex &idx) const {return map->procNum(mapHandle,idx);}
 	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
-
+    int whichPE(const CkArrayIndex &idx);
 	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx);
 
@@ -313,8 +313,6 @@ public:
 	//This index will no longer be used-- delete the associated elements
 	void reclaim(const CkArrayIndex &idx);
 
-	int getSpringCount(void) const { return nSprings; }
-
 	bool demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type);
 
 //Communication:
@@ -394,13 +392,6 @@ public:
 	bool duringMigration;
 	/// This flag is set while we are deleting location manager
 	bool duringDestruction;
-
-	//Occasionally clear out stale remote pointers
-	static void staticSpringCleaning(void *mgr,double curWallTime);
-	void springCleaning(void);
-	void setupSpringCleaning();
-	int nSprings;
-	int springCleaningCcd;
 
 private:
 	//Map object

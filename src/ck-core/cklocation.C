@@ -1830,11 +1830,7 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 /************************** Location Records: *********************************/
 
 //---------------- Base type:
-void CkLocRec::weAreObsolete(const CkArrayIndex &idx) {}
 CkLocRec::~CkLocRec() { }
-//Return the last known processor; or -1 if none
-int CkLocRec::lookupProcessor(void) {return -1;}
-
 
 /*----------------- Local:
 Matches up the array index with the local index, an
@@ -1934,11 +1930,6 @@ void CkLocRec_local::destroy(void) //User called destructor
 	delete this;
 }
 
-//Return the last known processor; or -1 if none
-int CkLocRec_local::lookupProcessor(void) {
-	return CkMyPe();
-}
-
 CkLocRec::RecType CkLocRec_local::type(void)
 {
 	return local;
@@ -1950,21 +1941,6 @@ void CkLocRec_local::addedElement(void)
 	// anything not ready yet will be put back in.
 	while (!halfCreated.isEmpty()) 
 		CkArrayManagerDeliver(CkMyPe(),halfCreated.deq());
-}
-
-bool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
-{ 
-	int len=halfCreated.length();
-	if (len!=0) {
-		/* This is suspicious-- the halfCreated queue should be extremely
-		 transient.  It's possible we just looked at the wrong time, though;
-		 so this is only a warning. 
-		*/
-		CkPrintf("CkLoc WARNING> %d messages still around for uncreated element %s!\n",
-			 len,idx2str(idx));
-	}
-	//A local element never expires
-	return false;
 }
 
 /**********Added for cosmology (inline function handling without parameter marshalling)***********/
@@ -2128,56 +2104,13 @@ void CkLocRec_local::Migrated(){
 #endif
 
 /**
- * Represents a deleted array element (and prevents re-use).
- * These are a debugging aid, usable only by uncommenting a line in
- * the element destruction code.
- */
-class CkLocRec_dead:public CkLocRec {
-public:
-	CkLocRec_dead(CkLocMgr *Narr):CkLocRec(Narr) {}
-  
-	virtual RecType type(void) {return dead;}
-  
-	//Return if this element is now obsolete (it isn't)
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx) {return false;}	
-};
-
-/**
- * This is the abstract superclass of arrayRecs that keep track of their age,
- * and eventually expire. Its kids are remote and buffering.
- */
-class CkLocRec_aging:public CkLocRec {
-private:
-	int lastAccess;//Age when last accessed
-public:
-	//Update our access time
-	inline void access(void) {
-		lastAccess=myLocMgr->getSpringCount();
-	}
-	//Return if we are "stale"-- we were last accessed a while ago
-	bool isStale(void) {
-		if (myLocMgr->getSpringCount()-lastAccess>3) return true;
-		else return false;
-	}
-public:
-	CkLocRec_aging(CkLocMgr *Narr):CkLocRec(Narr) {
-		lastAccess=myLocMgr->getSpringCount();
-	}
-	//Return if this element is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)=0;
-	//virtual void pup(PUP::er &p) { CkLocRec::pup(p); p(lastAccess); }
-};
-
-
-/**
  * Represents a remote array element.  This is just a PE number.
  */
-class CkLocRec_remote:public CkLocRec_aging {
-private:
-	int onPe;//The last known Pe for this element
+class CkLocRec_remote:public CkLocRec {
 public:
+	int onPe;//The last known Pe for this element
 	CkLocRec_remote(CkLocMgr *Narr,int NonPe)
-		:CkLocRec_aging(Narr)
+		:CkLocRec(Narr)
 		{
 			onPe=NonPe;
 #if CMK_ERROR_CHECKING
@@ -2185,23 +2118,8 @@ public:
 				CkAbort("ERROR!  'remote' array element on this Pe!\n");
 #endif
 		}
-	//Return the last known processor for this element
-	int lookupProcessor(void) {
-		return onPe;
-	}  
 	virtual RecType type(void) {return remote;}
-  
-	//Return if this element is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx) {
-		if (myLocMgr->isHome(idx)) 
-			//Home elements never become obsolete
-			return false;
-		else if (isStale())
-			return true;//We haven't been used in a long time
-		else
-			return false;//We're fairly recent
-	}
-	//virtual void pup(PUP::er &p) { CkLocRec_aging::pup(p); p(onPe); }
+	//virtual void pup(PUP::er &p) { CkLocRec::pup(p); p(onPe); }
 };
 
 
@@ -2216,11 +2134,11 @@ public:
  * so this kind of record causes an abort "Stale array manager message!"
  * if it's left undelivered too long.
  */
-class CkLocRec_buffering:public CkLocRec_aging {
+class CkLocRec_buffering:public CkLocRec {
 public:
 	CkQ<CkArrayMessage *> buffer;//Buffered messages.
 public:
-	CkLocRec_buffering(CkLocMgr *Narr):CkLocRec_aging(Narr) {}
+	CkLocRec_buffering(CkLocMgr *Narr):CkLocRec(Narr) {}
 	virtual ~CkLocRec_buffering() {
 		if (0!=buffer.length()) {
 			CkPrintf("[%d] Warning: Messages abandoned in array manager buffer!\n", CkMyPe());
@@ -2233,73 +2151,12 @@ public:
   
 	virtual RecType type(void) {return buffering;}
   
-	//Return if this element is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx) {
-		if (isStale() && buffer.length()>0) {
-			/*This indicates something is seriously wrong--
-			  buffers should be short-lived.*/
-			CkPrintf("[%d] WARNING: %d stale array message(s) found!\n",CkMyPe(),buffer.length());
-			CkArrayMessage *msg=buffer[0];
-			CkPrintf("Addressed to: ");
-			CkPrintEntryMethod(msg->array_ep());
-			CkPrintf(" index %s\n",idx2str(idx));
-			if (myLocMgr->isHome(idx)) 
-				CkPrintf("is this an out-of-bounds array index, or was it never created?\n");
-			else //Idx is a remote-home index
-				CkPrintf("why weren't they forwarded?\n");
-			
-			// CkAbort("Stale array manager message(s)!\n");
-		}
-		return false;
-	}
-  
 /*  virtual void pup(PUP::er &p) {
-    CkLocRec_aging::pup(p);
+    CkLocRec::pup(p);
     CkArray::pupArrayMsgQ(buffer, p);
     }*/
 };
 
-/*********************** Spring Cleaning *****************/
-/**
- * Used to periodically flush out unused remote element pointers.
- *
- * Cleaning often will free up memory quickly, but slow things
- * down because the cleaning takes time and some not-recently-referenced
- * remote element pointers might be valid and used some time in 
- * the future.
- *
- * Also used to determine if buffered messages have become stale.
- */
-inline void CkLocMgr::springCleaning(void)
-{
-  nSprings++;
-
-  //Poke through the hash table for old ArrayRecs.
-  void *objp;
-  void *keyp;
-  
-  CkHashtableIterator *it=hash.iterator();
-  CmiImmediateLock(hashImmLock);
-  while (NULL!=(objp=it->next(&keyp))) {
-    CkLocRec *rec=*(CkLocRec **)objp;
-    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-    if (rec->isObsolete(nSprings,idx)) {
-      //This record is obsolete-- remove it from the table
-      DEBK((AA "Cleaning out old record %s\n" AB,idx2str(idx)));
-      hash.remove(*(CkArrayIndex *)&idx);
-      delete rec;
-      it->seek(-1);//retry this hash slot
-    }
-  }
-  CmiImmediateUnlock(hashImmLock);
-  delete it;
-
-  setupSpringCleaning();
-}
-void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
-	DEBK((AA "Starting spring cleaning at %.2f\n" AB,CkWallTimer()));
-	((CkLocMgr *)forWhom)->springCleaning();
-}
 //doesn't delete if there is extra pe
 void CkLocMgr::flushLocalRecs(void)
 {
@@ -2380,8 +2237,6 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 //	CkpvInitialize(CkMigratable_initInfo,mig_initInfo);
 
 	duringMigration = false;
-	nSprings=0;
-        setupSpringCleaning();
 
 //Register with the map object
 	mapID = opts.getMap();
@@ -2405,15 +2260,7 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	:IrrGroup(m),thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),hash(17,0.3)
 {
 	duringMigration = false;
-	nSprings=0;
-        setupSpringCleaning();
 	hashImmLock = CmiCreateImmediateLock();
-}
-
-void CkLocMgr::setupSpringCleaning() {
-#if !CMK_GLOBAL_LOCATION_UPDATE
-	springCleaningCcd = CcdCallOnConditionOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
-#endif
 }
 
 CkLocMgr::~CkLocMgr() {
@@ -2423,7 +2270,6 @@ CkLocMgr::~CkLocMgr() {
   the_lbdb->RemoveLocalBarrierReceiver(lbBarrierReceiver);
   the_lbdb->UnregisterOM(myLBHandle);
 #endif
-  CcdCancelCallOnCondition(CcdPERIODIC_1minute, springCleaningCcd);
   map->unregisterArray(mapHandle);
   CmiDestroyLock(hashImmLock);
 }
@@ -2488,7 +2334,7 @@ void CkLocMgr::pup(PUP::er &p){
                 if(homePe(idx) == CmiMyPe()){
                   int pe;
                   CkArrayIndex max = idx;
-                  pe = rec->lookupProcessor();
+                  pe = whichPE(idx);
                   idx_list.push_back(max);
                   pe_list.push_back(pe);
                     count++;
@@ -2505,26 +2351,6 @@ void CkLocMgr::pup(PUP::er &p){
         max.pup(p);
         p|pe_list[i];
       }
-    /*    it = hash.iterator();
-      while (NULL!=(objp=it->next(&keyp))) {
-      CkLocRec *rec=*(CkLocRec **)objp;
-        CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-            CkArrayIndex max = idx;
-            if(rec->type() != CkLocRec::local){
-                if(homePe(idx) == CmiMyPe()){
-                    int pe;
-                    max.pup(p);
-                    pe = rec->lookupProcessor();
-                    p | pe;
-                    count1++;
-                }
-            }
-        }
-      //  CmiAssert(count == count1);
-
-		// releasing iterator memory
-		delete it;*/
-
 #endif
 
 	}
@@ -2729,8 +2555,6 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx) {
 #endif
 	        if (!duringDestruction)
 	            thisProxy[home].reclaimRemote(idx,CkMyPe());
-	        /*  //Install a zombie to keep the living from re-using this index.
-	            insertRecN(new CkLocRec_dead(this),idx); */
 	}
 }
 
@@ -2779,7 +2603,7 @@ int CkLocMgr::deliverMsg(CkMessage *m,CkDeliver_t type,int opts) {
 		the_lbdb->Send(myLBHandle
                       , ldid
                       , UsrToEnv(msg)->getTotalsize()
-                      , (rec == NULL ? homePe(msg->array_index()) : rec->lookupProcessor())
+                      , lastKnown(msg->array_index())
                       , 1);
 #endif
 
@@ -2835,13 +2659,12 @@ int CkLocMgr::deliverMsg(CkMessage *m,CkDeliver_t type,int opts) {
 
         case CkLocRec::remote:
         {
-            int destPE = rec->lookupProcessor();
+            int destPE = lastKnown(idx);
             if((!CmiNodeAlive(destPE) && destPE != allowMessagesOnly)){
                 // Send it to its home processor instead
                 const CkArrayIndex &idx=msg->array_index();
                 destPE = getNextPE(idx);
             }
-            ((CkLocRec_remote*)rec)->access();//Update our modification date
             msg->array_hops()++;
             if (opts & CK_MSG_KEEP)
                 msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
@@ -2860,11 +2683,6 @@ int CkLocMgr::deliverMsg(CkMessage *m,CkDeliver_t type,int opts) {
 #endif
             return true;
         }
-
-        case CkLocRec::dead:
-            CkPrintf("Dead array element is %s.\n",idx2str(msg->array_index()));
-            CkAbort("Send to dead array element!\n");
-            return false;
 
         default:
             CkAbort("unknown location record type");
@@ -3304,14 +3122,12 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	if(CkpvAccess(startedEvac)){
 		int newhomePE = getNextPE(idx);
 		DEBM((AA "Migrated into failed processor index size %s resent to %d \n" AB,idx2str(idx),newhomePE));	
-		CkLocMgr *mgr = rec->getLocMgr();
 		int targetPE=getNextPE(idx);
 		//set this flag so that load balancer is not informed when
 		//this element migrates
 		rec->AsyncMigrate(true);
 		rec->Bounced(true);
-		mgr->emigrate(rec,targetPE);
-		
+		emigrate(rec,targetPE);
 	}
 
 	delete msg;
@@ -3386,12 +3202,27 @@ void CkMagicNumber_impl::badMagicNumber(
 }
 CkMagicNumber_impl::CkMagicNumber_impl(int m) :magic(m) { }
 
+int CkLocMgr::whichPE(const CkArrayIndex &idx)
+{
+    CkLocRec *rec = elementNrec(idx);
+    if (rec == NULL) return -1;
+    switch(rec->type())
+    {
+        case CkLocRec::local:
+            return CkMyPe();
+        case CkLocRec::remote:
+            return ((CkLocRec_remote*)rec)->onPe;
+        default:
+            return -1;
+    };
+}
+
 //"Last-known" location (returns a processor number)
 int CkLocMgr::lastKnown(const CkArrayIndex &idx) {
 	CkLocMgr *vthis=(CkLocMgr *)this;//Cast away "const"
 	CkLocRec *rec=vthis->elementNrec(idx);
 	int pe=-1;
-	if (rec!=NULL) pe=rec->lookupProcessor();
+	if (rec!=NULL) pe = whichPE(idx);
 	if (pe==-1) return homePe(idx);
 	else{
 		/*
@@ -3414,7 +3245,7 @@ bool CkLocMgr::isRemote(const CkArrayIndex &idx,int *onPe) const
 		return false; /* not definitely a remote element */
 	else /* element is indeed remote */
 	{
-		*onPe=rec->lookupProcessor();
+		*onPe = vthis->whichPE(idx);
 		return true;
 	}
 }
@@ -3424,7 +3255,6 @@ static const char *rec2str[]={
     "local",//Array element that lives on this Pe
     "remote",//Array element that lives on some other Pe
     "buffering",//Array element that was just created
-    "dead"//Deleted element (for debugging)
 };
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))

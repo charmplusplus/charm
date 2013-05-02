@@ -113,13 +113,12 @@ void CkStopScheduler(){
 
 void CkEmmigrateElement(void *arg){
 	CkLocRec_local *rec = (CkLocRec_local *)arg;
-	CkLocMgr *mgr = rec->getLocMgr();
 	const CkArrayIndex &idx = rec->getIndex();
 	int targetPE=getNextPE(idx);
 	//set this flag so that load balancer is not informed when
 	//this element migrates
 	rec->AsyncMigrate(true);
-	mgr->emigrate(rec,targetPE);
+	rec->migrateMe(targetPE);
 	CkEvacuatedElement();
 	
 }

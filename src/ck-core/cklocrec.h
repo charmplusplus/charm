@@ -13,13 +13,9 @@ class CkMigratable;//Migratable object
 class CkLocRec {
 protected:
   CkLocMgr *myLocMgr;
-  //int lastAccess;//Age when last accessed. Removed since unused and colliding with a inheriting class, Filippo
-  //Called when we discover we are obsolete before we delete ourselves
-  virtual void weAreObsolete(const CkArrayIndex &idx);
 public:
   CkLocRec(CkLocMgr *mgr) :myLocMgr(mgr) { }
   virtual ~CkLocRec();
-  inline CkLocMgr *getLocMgr(void) const {return myLocMgr;}
 
   /// Return the type of this ArrayRec:
   typedef enum {
@@ -27,15 +23,8 @@ public:
     local,//Array element that lives on this Pe
     remote,//Array element that lives on some other Pe
     buffering,//Array element that was just created
-    dead//Deleted element (for debugging)
   } RecType;
   virtual RecType type(void)=0;
-  
-  /// Return if this rec is now obsolete
-  virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)=0;
-
-  /// Return the last known processor; or -1 if none
-  virtual int lookupProcessor(void);
 };
 
 /**
@@ -66,7 +55,6 @@ public:
   bool invokeEntry(CkMigratable *obj,void *msg,int idx,bool doFree);
 
   virtual RecType type(void);
-  virtual bool isObsolete(int nSprings,const CkArrayIndex &idx);
 
 #if CMK_LBDB_ON  //For load balancing:
   /// Control the load balancer:
@@ -80,7 +68,6 @@ public:
   inline void stopTiming(int ignore_running=0) { }
 #endif
   inline const CkArrayIndex &getIndex(void) const {return idx;}
-  virtual int lookupProcessor(void);
 
 #if CMK_LBDB_ON
 public:
