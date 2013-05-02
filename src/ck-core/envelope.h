@@ -154,14 +154,14 @@ struct s_chare {  // NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidM
         int  bype;      ///< created by this pe
 };
 
-struct s_groupinit {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
+struct s_groupinit {         // NodeBocInitMsg, BocInitMsg
         CkGroupID g;           ///< GroupID
         CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
         CkGroupID dep;         ///< create after dep is created (constructor only!)
         int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
 };
 
-struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
+struct s_group {         // ForNodeBocMsg, ForBocMsg
         CkGroupID g;           ///< GroupID
         UShort arrayEp;        ///< Used only for array broadcasts
 };
@@ -456,21 +456,28 @@ private:
 
 // Group-specific fields
     CkGroupID   getGroupNum(void) const {
-      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+      CkAssert(getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
       return ((struct s_group*)extraData())->g;
     }
     void   setGroupNum(const CkGroupID g) {
-      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+      CkAssert(getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
       ((struct s_group*)extraData())->g = g;
+    }
+
+    CkGroupID getInitGroupNum(void) const {
+      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);
+      return ((struct s_groupinit*)extraData())->g;
+    }
+    void   setInitGroupNum(const CkGroupID g) {
+      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);
+      ((struct s_groupinit*)extraData())->g = g;
     }
     void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); ((struct s_groupinit*)extraData())->epoch=epoch; }
     int getGroupEpoch(void) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return ((struct s_groupinit*)extraData())->epoch; }
     void setRednMgr(CkNodeGroupID r){CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);  ((struct s_groupinit*)extraData())->rednMgr = r; }
     CkNodeGroupID getRednMgr(){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return ((struct s_groupinit*)extraData())->rednMgr; }
     CkGroupID getGroupDep(){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return ((struct s_groupinit*)extraData())->dep; }
-    void setGroupDep(const CkGroupID &r){ /* CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); */ ((struct s_groupinit*)extraData())->dep = r; }
+    void setGroupDep(const CkGroupID &r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); ((struct s_groupinit*)extraData())->dep = r; }
 
 // Array-specific fields
     CkGroupID getArrayMgr(void) const {

@@ -113,7 +113,6 @@ CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opt
 		CmiMemcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes());
 	//Set the message's queueing type
 	env->setQueueing((unsigned char)opts->getQueueing());
-	env->setGroupDep(opts->getGroupDepID());
 	return m;
 }
 

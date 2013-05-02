@@ -3305,12 +3305,22 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   char *node = (char *)(container->isNodeGroup()?"Node":"");
   str << makeDecl("CkGroupID",1)<<"::ckNew("<<paramType(0,1)<<")\n";
   str << "{\n"<<marshallMsg();
+  str << "  UsrToEnv(impl_msg)->setMsgtype(" << node << "BocInitMsg);\n";
+  if (param->isMarshalled()) {
+    str << "  if (impl_e_opts)\n";
+    str << "    UsrToEnv(impl_msg)->setGroupDep(impl_e_opts->getGroupDepID());\n";
+  }
   str << "  return CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg);\n";
   str << "}\n";
 
   if (!param->isVoid()) {
     str << makeDecl(" ",1)<<"::"<<container->proxyName(0)<<"("<<paramType(0,1)<<")\n";
     str << "{\n"<<marshallMsg();
+    str << "  UsrToEnv(impl_msg)->setMsgtype(" << node << "BocInitMsg);\n";
+    if (param->isMarshalled()) {
+      str << "  if (impl_e_opts)\n";
+      str << "    UsrToEnv(impl_msg)->setGroupDep(impl_e_opts->getGroupDepID());\n";
+    }
     str << "  ckSetGroupID(CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg));\n";
     str << "}\n";
   }

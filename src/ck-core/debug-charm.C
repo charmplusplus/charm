@@ -404,9 +404,11 @@ void CpdPupMessage(PUP::er &p, void *msg)
     } else {
       p(idx.index, nInts);
     }
-  } else if (envType == BocInitMsg || envType == NodeBocInitMsg ||
-             envType == ForNodeBocMsg || envType == ForBocMsg) {
+  } else if (envType == ForNodeBocMsg || envType == ForBocMsg) {
     int groupID = env->getGroupNum().idx;
+    PUPn(groupID);
+  } else if (envType == BocInitMsg || envType == NodeBocInitMsg) {
+    int groupID = env->getInitGroupNum().idx;
     PUPn(groupID);
   } else if (envType == NewVChareMsg || envType == ForVidMsg || envType == FillVidMsg) {
     p.comment("ptr");

@@ -769,7 +769,7 @@ void _createGroup(CkGroupID groupID, envelope *env)
   }else{
 	rednMgr.setZero();
   }
-  env->setGroupNum(groupID);
+  env->setInitGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setRednMgr(rednMgr);
   env->setGroupEpoch(CkpvAccess(_charmEpoch));
@@ -791,7 +791,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
   _CHECK_USED(env);
   _SET_USED(env, 1);
   register int epIdx = env->getEpIdx();
-  env->setGroupNum(groupID);
+  env->setInitGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setGroupEpoch(CkpvAccess(_charmEpoch));
   if(CkNumNodes()>1) {
@@ -1117,7 +1117,7 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 
 void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
-  register CkGroupID groupID = env->getGroupNum();
+  register CkGroupID groupID = env->getInitGroupNum();
   register int epIdx = env->getEpIdx();
   if (!env->getGroupDep().isZero()) {      // dependence
     CkGroupID dep = env->getGroupDep();
@@ -1131,7 +1131,7 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
 
 void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 {
-  register CkGroupID groupID = env->getGroupNum();
+  register CkGroupID groupID = env->getInitGroupNum();
   register int epIdx = env->getEpIdx();
   CkCreateLocalNodeGroup(groupID, epIdx, env);
 }
