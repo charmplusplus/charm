@@ -112,7 +112,7 @@ void CkStopScheduler(){
 }
 
 void CkEmmigrateElement(void *arg){
-	CkLocRec_local *rec = (CkLocRec_local *)arg;
+	CkLocRec *rec = (CkLocRec *)arg;
 	const CkArrayIndex &idx = rec->getIndex();
 	int targetPE=getNextPE(idx);
 	//set this flag so that load balancer is not informed when
@@ -230,7 +230,7 @@ void CkClearAllArrayElementsCPP(){
 
 void CkElementEvacuate::addLocation(CkLocation &loc){
 	CkLocMgr *locMgr = loc.getManager();
-	CkLocRec_local *rec = loc.getLocalRecord();
+	CkLocRec *rec = loc.getLocalRecord();
 	const CkArrayIndex &i = loc.getIndex();
 	int targetPE=getNextPE(i);
 	if(rec->isAsyncEvacuate()){

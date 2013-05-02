@@ -3,7 +3,7 @@
 
 class CkMigratable : public Chare {
 protected:
-  CkLocRec_local *myRec;
+  CkLocRec *myRec;
 private:
   int thisChareType;//My chare type
   void commonInit(void);

@@ -732,7 +732,7 @@ public:
   }
   virtual void putEltInArrMgr(const CkArrayIndex &idx, CkMigratable* elt)
   { localElems[idx] = elt; }
-  virtual CkMigratable* eraseEltFromArrMgr(const CkArrayIndex &idx)
+  virtual void eraseEltFromArrMgr(const CkArrayIndex &idx)
   { localElems.erase(idx); }
 
 //Creation:

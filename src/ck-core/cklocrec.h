@@ -11,41 +11,18 @@ class CkMigratable;//Migratable object
  * CkLocRec *'s.
  */
 class CkLocRec {
-protected:
+private:
   CkLocMgr *myLocMgr;
-public:
-  CkLocRec(CkLocMgr *mgr) :myLocMgr(mgr) { }
-  virtual ~CkLocRec();
-
-  /// Return the type of this ArrayRec:
-  typedef enum {
-    base=0,//Base class (invalid type)
-    local,//Array element that lives on this Pe
-    remote,//Array element that lives on some other Pe
-    buffering,//Array element that was just created
-  } RecType;
-  virtual RecType type(void)=0;
-};
-
-/**
- * Represents a local array element.
- */
-class CkLocRec_local : public CkLocRec {
   CkArrayIndex idx;/// Element's array index
   bool running; /// True when inside a startTiming/stopTiming pair
   bool *deletedMarker; /// Set this if we're deleted during processing
 public:
-  CkQ<CkArrayMessage *> halfCreated; /// Stores messages for nonexistent siblings of existing elements
-  //Creation and Destruction:
-  CkLocRec_local(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival, const CkArrayIndex &idx_);
-  void migrateMe(int toPe); //Leave this processor
-  void informIdealLBPeriod(int lb_ideal_period);
-  void metaLBCallLB();
-  void destroy(void); //User called destructor
-  virtual ~CkLocRec_local();
 
-  /// A new element has been added to this index
-  void addedElement(void);
+  //Creation and Destruction:
+  CkLocRec(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival, const CkArrayIndex &idx_);
+  void migrateMe(int toPe); //Leave this processor
+  void destroy(void); //User called destructor
+  ~CkLocRec();
 
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
@@ -53,8 +30,6 @@ public:
    *    if false, the message can be reused.
    */
   bool invokeEntry(CkMigratable *obj,void *msg,int idx,bool doFree);
-
-  virtual RecType type(void);
 
 #if CMK_LBDB_ON  //For load balancing:
   /// Control the load balancer:
@@ -77,8 +52,6 @@ public:
   static void staticMigrate(LDObjHandle h, int dest);
   static void staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period);
   static void staticMetaLBCallLBOnChares(LDObjHandle h);
-  void metaLBResumeWaitingChares(int lb_ideal_period);
-  void metaLBCallLBOnChares();
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
   void setPupSize(size_t obj_pup_size);
@@ -116,7 +89,6 @@ public:
 	bool isBounced(){return bounced;}
 	void Bounced(bool set){bounced = set;}
 };
-class CkLocRec_remote;
 
 #endif // CK_LOC_REC_H
 

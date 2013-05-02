@@ -421,7 +421,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   CmiAssert(arrmgr);
   ArrayElement *elt = arrmgr->lookup(m->index);
   CmiAssert(elt);
-  CkLocRec_local *rec = elt->myRec;
+  CkLocRec *rec = elt->myRec;
   CkVec<CkMigratable *> list;
   mgr->migratableList(rec, list);
   CmiAssert(list.length() > 0);

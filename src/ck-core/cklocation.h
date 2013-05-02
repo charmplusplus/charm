@@ -166,15 +166,15 @@ class CkMagicNumber : public CkMagicNumber_impl {
         
 class CkLocation {
 	CkLocMgr *mgr;
-	CkLocRec_local *rec;
+	CkLocRec *rec;
 public:
-	CkLocation(CkLocMgr *mgr_, CkLocRec_local *rec_);
+	CkLocation(CkLocMgr *mgr_, CkLocRec *rec_);
 	
 	/// Find our location manager
 	inline CkLocMgr *getManager(void) const {return mgr;}
 	
 	/// Find the local record that refers to this element
-	inline CkLocRec_local *getLocalRecord(void) const {return rec;}
+	inline CkLocRec *getLocalRecord(void) const {return rec;}
 	
 	/// Look up and return the array index of this location.
 	const CkArrayIndex &getIndex(void) const;
@@ -231,7 +231,7 @@ public:
 	inline int     homePe (const CkArrayIndex &idx) const {return map->homePe(mapHandle,idx);}
 	inline int     procNum(const CkArrayIndex &idx) const {return map->procNum(mapHandle,idx);}
 	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
-    int whichPE(const CkArrayIndex &idx);
+	int whichPE(const CkArrayIndex &idx) const;
 	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx);
 
@@ -289,7 +289,10 @@ public:
 
 //Advisories:
 	///This index now lives on the given processor-- update local records
-	void inform(const CkArrayIndex &idx,int nowOnPe);
+	void inform(const CkArrayIndex &idx,int nowOnPe) {
+          idx2pe[idx] = nowOnPe;
+          deliverAnyBufferedMsgs(idx, bufferedMsgs);
+        }
 
 	///This index now lives on the given processor-- tell the home processor
 	void informHome(const CkArrayIndex &idx,int nowOnPe);
@@ -297,12 +300,12 @@ public:
 	///This message took several hops to reach us-- fix it
 	void multiHop(CkArrayMessage *m);
 
-//Interface used by CkLocRec_local
+//Interface used by CkLocRec
 
 	//Migrate us to another processor
-	void emigrate(CkLocRec_local *rec,int toPe);
-    void informLBPeriod(CkLocRec_local *rec, int lb_ideal_period);
-    void metaLBCallLB(CkLocRec_local *rec);
+	void emigrate(CkLocRec *rec,int toPe);
+    void informLBPeriod(CkLocRec *rec, int lb_ideal_period);
+    void metaLBCallLB(CkLocRec *rec);
 
 #if CMK_LBDB_ON
 	LBDatabase *getLBDB(void) const { return the_lbdb; }
@@ -323,7 +326,7 @@ public:
 	void dummyAtSync(void);
 
 	/// return a list of migratables in this local record
-	void migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list);
+	void migratableList(CkLocRec *rec, CkVec<CkMigratable *> &list);
 
 	void flushAllRecs(void);
 	void flushLocalRecs(void);
@@ -334,10 +337,6 @@ private:
 //Internal interface:
 	//Add given element array record at idx, replacing the existing record
 	void insertRec(CkLocRec *rec,const CkArrayIndex &idx);
-	//Add given record, when there is guarenteed to be no prior record
-	void insertRecN(CkLocRec *rec,const CkArrayIndex &idx);
-	//Insert a remote record at the given index
-	CkLocRec_remote *insertRemote(const CkArrayIndex &idx,int nowOnPe);
 
 	//Remove this entry from the table (does not delete record)
 	void removeFromTable(const CkArrayIndex &idx);
@@ -346,10 +345,10 @@ private:
 	friend class ArrayElement;
 	friend class MemElementPacker;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
+	void pupElementsFor(PUP::er &p,CkLocRec *rec,
         CkElementCreation_t type, bool create=true, int dummy=0);
 #else
-	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
+	void pupElementsFor(PUP::er &p,CkLocRec *rec,
 		CkElementCreation_t type,bool rebuild = false);
 #endif
 
@@ -357,29 +356,41 @@ private:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
 
 	typedef void (CkMigratable::* CkMigratable_voidfn_arg_t)(void*);
-	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_arg_t fn, void*);
+	void callMethod(CkLocRec *rec,CkMigratable_voidfn_arg_t fn, void*);
 
-	bool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts);
+	void deliverUnknown(CkArrayMessage *msg, CkDeliver_t type, int opts);
+	typedef std::map<CkArrayIndex, std::vector<CkArrayMessage*> > MsgBuffer;
+	/// Deliver any buffered msgs to a newly created array element
+	void deliverAnyBufferedMsgs(const CkArrayIndex &idx, MsgBuffer &buffer);
 
 	/// Create a new local record at this array index.
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-CkLocRec_local *createLocal(const CkArrayIndex &idx,
+CkLocRec *createLocal(const CkArrayIndex &idx,
         bool forMigration, bool ignoreArrival,
         bool notifyHome,int dummy=0);
 #else
-	CkLocRec_local *createLocal(const CkArrayIndex &idx, 
+	CkLocRec *createLocal(const CkArrayIndex &idx, 
 		bool forMigration, bool ignoreArrival,
 		bool notifyHome);
 #endif
 
 public:
-	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn);
+	void callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn);
 
 //Data Members:
 	//Map array ID to manager and elements
     std::map<CkArrayID, CkArray*> managers;
+    // Map idx to location
+    std::map<CkArrayIndex, int> idx2pe;
+    /// Map idx to undelivered msgs
+    /// @todo: We should not buffer msgs for uncreated array elements forever.
+    /// After some timeout or other policy, we should throw errors or warnings
+    /// or at least report and discard any msgs addressed to uncreated array elements
+    MsgBuffer bufferedMsgs;
+    MsgBuffer bufferedRemoteMsgs;
+    MsgBuffer bufferedShadowElemMsgs;
 
-	bool addElementToRec(CkLocRec_local *rec,CkArray *m,
+	bool addElementToRec(CkLocRec *rec,CkArray *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 
 	CProxy_CkLocMgr thisProxy;

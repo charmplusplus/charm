@@ -1054,8 +1054,18 @@ void CkArray::prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx)
   env->getsetArrayIndex()=idx;
   int *listenerData=env->getsetArrayListenerData();
   CK_ARRAYLISTENER_STAMP_LOOP(listenerData);
+
+  int hostPe = locMgr->whichPE(idx);
+  if (onPe == -1) {
+    onPe = hostPe; // This new element is bound to an existing element
+  } else if (hostPe == onPe) {
+    // Yay, something higher up the stack got onPe right
+  } else if (hostPe != -1) {
+    CkAbort("hostPe for a bound element disagrees with an explicit onPe");
+  }
+
   if (onPe==-1) onPe=procNum(idx);   // onPe may still be -1
-  if (onPe!=CkMyPe()&&onPe!=-1) //Let the local manager know where this el't is
+  if (onPe!=-1) //Let the local manager know where this el't is
   	getLocMgr()->inform(idx,onPe);
 }
 
