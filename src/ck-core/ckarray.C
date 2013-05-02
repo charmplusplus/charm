@@ -1125,8 +1125,8 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts)
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts)
 {
   CkArrayMessage *m=(CkArrayMessage *)msg;
-  m->array_index()=idx;
   msg_prepareSend(m,entryIndex,aID);
+  m->array_index()=idx;
   CkArray *a=(CkArray *)_localBranch(aID);
   if (a == NULL)
     CkArrayManagerDeliver(CkMyPe(), msg, 0);
@@ -1137,8 +1137,8 @@ void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex
 void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts)
 {
   CkArrayMessage *m=(CkArrayMessage *)msg;
-  m->array_index()=idx;
   msg_prepareSend(m,entryIndex,aID);
+  m->array_index()=idx;
   CkArray *a=(CkArray *)_localBranch(aID);
   int oldStatus = CkDisableTracing(entryIndex);     // avoid nested tracing
   a->deliver(m,CkDeliver_inline,opts);
@@ -1418,6 +1418,14 @@ void CkArray::recvBroadcast(CkMessage *m)
 {
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
+
+        // Turn the message into a real single-element message
+        unsigned short ep = msg->array_ep_bcast();
+        CkAssert(UsrToEnv(msg)->getGroupNum() == thisgroup);
+        UsrToEnv(msg)->setMsgtype(ForArrayEltMsg);
+        UsrToEnv(msg)->setArrayMgr(thisgroup);
+        UsrToEnv(msg)->getsetArrayEp() = ep;
+
 	broadcaster->incoming(msg);
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))

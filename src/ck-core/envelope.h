@@ -489,21 +489,24 @@ private:
             CkAbort("Cannot return ArrayID from msg for non-array entity");
     }
 
-    void setArrayMgr(const CkGroupID gid) { ((struct s_array*)extraData())->arr = gid; }
-    int getArrayMgrIdx(void) const {return ((struct s_array*)extraData())->arr.idx;}
+    void setArrayMgr(const CkGroupID gid) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); ((struct s_array*)extraData())->arr = gid; }
+    int getArrayMgrIdx(void) const { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->arr.idx;}
     UShort &getsetArrayEp(void) {return epIdx;}
     UShort &getsetArrayBcastEp(void) {return ((struct s_group*)extraData())->arrayEp;}
-    UChar &getsetArrayHops(void) {return ((struct s_array*)extraData())->hopCount;}
-    int getArrayIfNotThere(void) {return ((struct s_array*)extraData())->ifNotThere;}
-    void setArrayIfNotThere(int nt) {((struct s_array*)extraData())->ifNotThere=nt;}
-    int *getsetArrayListenerData(void) {return ((struct s_arrayinit*)extraData())->listenerData;}
+    UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->hopCount;}
+    int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->ifNotThere;}
+    void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); ((struct s_array*)extraData())->ifNotThere=nt;}
+    int *getsetArrayListenerData(void) { CkAssert(getMsgtype() == ArrayEltInitMsg); return ((struct s_arrayinit*)extraData())->listenerData;}
 #if CMK_SMP_TRACE_COMMTHREAD
     UInt &getsetArraySrcPe(void) {return ((struct s_array*)extraData())->srcpe;}
 #else
     UInt &getsetArraySrcPe(void) {return pe;}
 #endif
     CkArrayIndex &getsetArrayIndex(void) 
-    	{return *(CkArrayIndex *)&((struct s_array*)extraData())->index;}
+    {
+      CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
+      return *(CkArrayIndex *)&((struct s_array*)extraData())->index;
+    }
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  public:

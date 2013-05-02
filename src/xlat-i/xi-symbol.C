@@ -3014,6 +3014,7 @@ void Entry::genArrayDefs(XStr& str)
     str << "{\n  ckCheck();\n";
     if (!isLocal()) {
       str << marshallMsg();
+      str << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
       str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
       str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
     } else {
@@ -3101,44 +3102,62 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
       str<<
       makeDecl("void",1)<<"::insert("<<paramComma(0,0)<<"int onPE"<<eo(0)<<")\n"
       "{ \n"<<marshallMsg()<<
+      "   UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
       "   ckInsert((CkArrayMessage *)impl_msg,"<<epIdx()<<",onPE);\n}\n";
-  else if (container->getForWhom()==forAll){
-      str<<
-      makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const CkArrayOptions &opts"<<eo(0)<<")\n"
-       "{ \n"<<marshallMsg()<<
-	 "   return ckCreateArray((CkArrayMessage *)impl_msg,"<<epIdx()<<",opts);\n"
-       "}\n";
-      if (container->isArray()) {
-        XStr dim = ((Array*)container)->dim();
-        if (dim==(const char*)"1D") {
-          str<<
-            makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const int s1"<<eo(0)<<")\n"
-            "{ \n"<<marshallMsg()<<
-            "   return ckCreateArray((CkArrayMessage *)impl_msg,"<<epIdx()<<",CkArrayOptions(s1));\n"
-            "}\n";
-        } else if (dim==(const char*)"2D") {
-          str<<
-            makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const int s1, const int s2"<<eo(0)<<")\n"
-            "{ \n"<<marshallMsg()<<
-            "   return ckCreateArray((CkArrayMessage *)impl_msg,"<<epIdx()<<",CkArrayOptions(s1, s2));\n"
-            "}\n";
-        } else if (dim==(const char*)"3D") {
-          str<<
-            makeDecl("CkArrayID",1)<<"::ckNew("<<paramComma(0)<<"const int s1, const int s2, const int s3"<<eo(0)<<")\n"
-            "{ \n"<<marshallMsg()<<
-            "   return ckCreateArray((CkArrayMessage *)impl_msg,"<<epIdx()<<",CkArrayOptions(s1, s2, s3));\n"
-            "}\n";
-        /*} else if (dim==(const char*)"4D") {
-          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4"<<eo(1)<<");\n";
-        } else if (dim==(const char*)"5D") {
-          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5"<<eo(1)<<");\n";
-        } else if (dim==(const char*)"6D") {
-          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5, const short s6"<<eo(1)<<");\n";
-        */
-        }
-      }
-  }
+  else if (container->getForWhom()==forAll) {
+    XStr decl, head, tail;
+    decl << makeDecl("CkArrayID", 1) << "::ckNew";
 
+    head << "{\n"
+         << marshallMsg();
+
+    tail << "  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
+         << "  return ckCreateArray((CkArrayMessage *)impl_msg, "
+         << epIdx() << ", opts);\n"
+       "}\n";
+
+    str << decl << "(" << paramComma(0) << "const CkArrayOptions &opts" << eo(0) << ")\n"
+        << head << tail;
+
+    if (container->isArray()) {
+      XStr dim = ((Array*)container)->dim();
+      XStr sizeParams, sizeArgs;
+      bool emit = true;
+
+      if (dim==(const char*)"1D") {
+        sizeParams << "const int s1";
+        sizeArgs << "s1";
+      } else if (dim==(const char*)"2D") {
+        sizeParams << "const int s1, const int s2";
+        sizeArgs << "s1, s2";
+      } else if (dim==(const char*)"3D") {
+        sizeParams << "const int s1, const int s2, const int s3";
+        sizeArgs << "s1, s2, s3";
+      }
+#if 0
+      else if (dim==(const char*)"4D") {
+        sizeParams << "const short s1, const short s2, const short s3, const short s4";
+        sizeArgs << "s1, s2, s3, s4";
+      } else if (dim==(const char*)"5D") {
+        sizeParams << "const short s1, const short s2, const short s3, const short s4, "
+                   << "const short s5";
+        sizeArgs << "s1, s2, s3, s4, s5";
+      } else if (dim==(const char*)"6D") {
+        sizeParams << "const short s1, const short s2, const short s3, const short s4, "
+                   << "const short s5, const short s6";
+        sizeArgs << "s1, s2, s3, s4, s5, s6";
+      }
+#endif
+      else {
+        emit = false;
+      }
+
+      if (emit) {
+        str << decl << "(" << paramComma(0) << sizeParams << eo(0) << ")\n"
+            << head << "  CkArrayOptions opts(" << sizeArgs << ");\n" << tail;
+      }
+    }
+  }
 }
 
 
