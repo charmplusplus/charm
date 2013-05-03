@@ -910,9 +910,7 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 	//Build the element
 	int elSize=_chareTable[elChareType]->size;
 	ArrayElement *elem = (ArrayElement *)malloc(elSize);
-#ifndef CMK_OPTIMIZE
 	if (elem!=NULL) setMemoryTypeChare(elem);
-#endif
 	return elem;
 }
 
