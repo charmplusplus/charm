@@ -1271,8 +1271,9 @@ void _initCharm(int unused_argc, char **argv)
             int *pelist;
             int num;
             CmiGetPesOnPhysicalNode(0, &pelist, &num);
-            if (CkMyPe()==0 && !_Cmi_noprocforcommthread && num+num/CmiMyNodeSize() > CmiNumCores()) {
-                CkPrintf("\nCharm++> Warning: the number of SMP threads is greater than the number of physical cores, use +CmiNoProcForComThread runtime option.\n\n");
+            if (!_Cmi_noprocforcommthread && num+num/CmiMyNodeSize() > CmiNumCores()) {
+                //CkPrintf("\nCharm++> Warning: the number of SMP threads is greater than the number of physical cores, use +CmiNoProcForComThread runtime option.\n\n");
+                _Cmi_noprocforcommthread = 1;
             }
         }
 #endif
