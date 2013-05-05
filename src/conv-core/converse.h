@@ -126,7 +126,7 @@ extern int CmiMyRank_();
 
 #if CMK_HAS_PARTITION
 
-enum Partition_Type {
+typedef enum Partition_Type {
       PARTITION_DEFAULT,
       PARTITION_MASTER,
       PARTITION_PREFIX,
@@ -137,7 +137,7 @@ typedef struct {
   Partition_Type type;
   int isTopoaware;
   int numPartitions;
-  int *partitionSizes;
+  int *partitionSize;
   int *partitionPrefix;
   int *nodeMap;
   int myPartition;
@@ -149,17 +149,18 @@ extern int _Cmi_mype_global;
 extern int _Cmi_numpes_global;
 extern int _Cmi_mynode_global;
 extern int _Cmi_numnodes_global;
-extern PartitionInfo partitionInfo;
+extern PartitionInfo _partitionInfo;
 
-#define CmiMyPartition()         partitionInfo.myPartition
-#define CmiPartitionSize()       partitionInfo.partitionSize
-#define CmiNumPartitions()        partitionInfo.numPartitions
-#define CmiNumNodesGlobal()     _Cmi_numnodes_global
-#define CmiMyNodeGlobal()       _Cmi_mynode_global
-#define CmiNumPesGlobal()       _Cmi_numpes_global
+#define CmiNumPartitions()              _partitionInfo.numPartitions
+#define CmiMyPartition()                _partitionInfo.myPartition
+#define CmiPartitionSize(part)          _partitionInfo.partitionSize[part]
+#define CmiMyPartitionSize()            CmiPartitionSize(CmiMyPartition())
+#define CmiNumNodesGlobal()             _Cmi_numnodes_global
+#define CmiMyNodeGlobal()               _Cmi_mynode_global
+#define CmiNumPesGlobal()               _Cmi_numpes_global
 //we need different implementations of this based on SMP or non-smp
 #if !CMK_SMP
-#define CmiMyPeGlobal()         _Cmi_mype_global
+#define CmiMyPeGlobal()                 _Cmi_mype_global
 extern int _Cmi_mynodesize;
 #else
 extern int CmiMyPeGlobal();

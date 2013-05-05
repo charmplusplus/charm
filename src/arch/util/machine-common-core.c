@@ -139,7 +139,7 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg);
 #endif
 
 // global state, equals local if running one partition
-PartitionInfo partitionInfo;
+PartitionInfo _partitionInfo;
 int _Cmi_mype_global;
 int _Cmi_numpes_global;
 int _Cmi_mynode_global;
@@ -715,144 +715,163 @@ if (  MSG_STATISTIC)
 static int create_partition_map( char **argv)
 {
   char* partsizes = NULL, *token, *tptr;
+  int i;
 
-  partitionInfo.numPartitions = 1; 
-  partitionInfo.type = PARTITION_DEFAULT;
+  _partitionInfo.numPartitions = 1; 
+  _partitionInfo.type = PARTITION_DEFAULT;
 
-  if(!CmiGetArgIntDesc(argv,"+partitions", &partitionInfo.numPartitions,"number of partitions")) {
-    CmiGetArgIntDesc(argv,"+replicas", &partitionInfo.numPartitions,"number of partitions");
+  if(!CmiGetArgIntDesc(argv,"+partitions", &_partitionInfo.numPartitions,"number of partitions")) {
+    CmiGetArgIntDesc(argv,"+replicas", &_partitionInfo.numPartitions,"number of partitions");
   }
 
-  partitionInfo.partitionSizes = (int*)calloc(partitionInfo.numPartitions,sizeof(int));
-  partitionInfo.partitionPrefix = (int*)calloc(partitionInfo.numPartitions,sizeof(int));
+  _partitionInfo.partitionSize = (int*)calloc(_partitionInfo.numPartitions,sizeof(int));
+  _partitionInfo.partitionPrefix = (int*)calloc(_partitionInfo.numPartitions,sizeof(int));
   
   if (CmiGetArgFlagDesc(argv,"+assign_master","assign a process as master partition")) {
-    partitionInfo.type = PARTITION_MASTER;
+    _partitionInfo.type = PARTITION_MASTER;
   }
  
   if (CmiGetArgStringDesc(argv, "+partsize", &partsizes, "size of partitions")) {
-    if(partitionInfo.type != PARTITION_DEFAULT) {
+    if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
       CmiAbort("+partsize used with incompatible option, possibly +use_master\n");
     }
-    partitionInfo.type = PARTITION_PREFIX;
+    _partitionInfo.type = PARTITION_PREFIX;
   }
 
   if (CmiGetArgFlagDesc(argv,"+use_topology","topology aware partitions")) {
-    partitionInfo.isTopoaware = 1;
+    _partitionInfo.isTopoaware = 1;
   } else {
-    partitionInfo.isTopoaware = 0;
+    _partitionInfo.isTopoaware = 0;
   }
 
-  if(partitionInfo.type == PARTITION_DEFAULT) {
-    CmiAssert((_Cmi_numnodes_global % partitionInfo.numPartitions) == 0);
-    partitionInfo.partitionPrefix[0] = 0;
-    partitionInfo.partitionSize[0] = _Cmi_numnodes_global / partitionInfo.numPartitions;
-    for(i = 1; i < partitionSizes.numPartitions; i++) {
-      partitionInfo.partitionSize[i] = partitionSize.partitionSize[i-1];
-      partitionInfo.partitionPrefix[i] = partitionPrefix[i-1] + partitionSizes[i-1];
-    } 
-    partitionInfo.myPartition = _Cmi_mynode_global / partitionInfo.partitionSize;
-  } else if(partitionInfo.type == PARTITION_MASTER) {
-    CmiAssert(((_Cmi_numnodes_global-1) % (partitionInfo.numPartitions-1)) == 0);
-    partitionInfo.partitionSize[0] = 1;
-    partitionInfo.partitionPrefix[0] = 0;
-    partitionInfo.partitionSize[1] = (_Cmi_numnodes_global-1) / (partitionInfo.numPartitions-1);
-    partitionInfo.partitionPrefix[1] = 1;
-    for(i = 2; i < partitionSizes.numPartitions; i++) {
-      partitionInfo.partitionSize[i] = partitionSize.partitionSize[i-1];
-      partitionInfo.partitionPrefix[i] = partitionPrefix[i-1] + partitionSizes[i-1];
-    } 
-    partitionInfo.myPartition = 1 + (_Cmi_mynode_global-1) / partitionInfo.partitionSize;
-    if(!_Cmi_mynode_global) 
-      partitionInfo.myPartition = 0;
-  }
-
-  if(partitionInfo.type == PARTITION_PREFIX) {
-    token = strtok_r(partsizes, ",", &tptr);
-    while (token)
-    {
-      int i,j;
-      int hasdash=0, hascolon=0, hasdot=0;
-      int start, end, stride = 1, block = 1, size;
-      for (i = 0; i < strlen(token); i++) {
-        if (token[i] == '-') hasdash=1;
-        else if (token[i] == ':') hascolon=1;
-        else if (token[i] == '.') hasdot=1;
-      }
-      if (hasdash) {
-        if (hascolon) {
-          if (hasdot) {
-            if (sscanf(token, "%d-%d:%d.%d#%d", &start, &end, &stride, &block, &size) != 5)
-              printf("Warning: Check the format of \"%s\".\n", token);
+  if(_partitionInfo.isTopoaware) {
+  } else {
+    if(_partitionInfo.type == PARTITION_DEFAULT) {
+      CmiAssert((_Cmi_numnodes_global % _partitionInfo.numPartitions) == 0);
+      _partitionInfo.partitionPrefix[0] = 0;
+      _partitionInfo.partitionSize[0] = _Cmi_numnodes_global / _partitionInfo.numPartitions;
+      for(i = 1; i < _partitionInfo.numPartitions; i++) {
+        _partitionInfo.partitionSize[i] = _partitionInfo.partitionSize[i-1];
+        _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
+      } 
+      _partitionInfo.myPartition = _Cmi_mynode_global / _partitionInfo.partitionSize[0];
+    } else if(_partitionInfo.type == PARTITION_MASTER) {
+      CmiAssert(((_Cmi_numnodes_global-1) % (_partitionInfo.numPartitions-1)) == 0);
+      _partitionInfo.partitionSize[0] = 1;
+      _partitionInfo.partitionPrefix[0] = 0;
+      _partitionInfo.partitionSize[1] = (_Cmi_numnodes_global-1) / (_partitionInfo.numPartitions-1);
+      _partitionInfo.partitionPrefix[1] = 1;
+      for(i = 2; i < _partitionInfo.numPartitions; i++) {
+        _partitionInfo.partitionSize[i] = _partitionInfo.partitionSize[i-1];
+        _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
+      } 
+      _partitionInfo.myPartition = 1 + (_Cmi_mynode_global-1) / _partitionInfo.partitionSize[1];
+      if(!_Cmi_mynode_global) 
+        _partitionInfo.myPartition = 0;
+    } else if(_partitionInfo.type == PARTITION_PREFIX) {
+      token = strtok_r(partsizes, ",", &tptr);
+      while (token)
+      {
+        int i,j;
+        int hasdash=0, hascolon=0, hasdot=0;
+        int start, end, stride = 1, block = 1, size;
+        for (i = 0; i < strlen(token); i++) {
+          if (token[i] == '-') hasdash=1;
+          else if (token[i] == ':') hascolon=1;
+          else if (token[i] == '.') hasdot=1;
+        }
+        if (hasdash) {
+          if (hascolon) {
+            if (hasdot) {
+              if (sscanf(token, "%d-%d:%d.%d#%d", &start, &end, &stride, &block, &size) != 5)
+                printf("Warning: Check the format of \"%s\".\n", token);
+            }
+            else {
+              if (sscanf(token, "%d-%d:%d#%d", &start, &end, &stride, &size) != 4)
+                printf("Warning: Check the format of \"%s\".\n", token);
+            }
           }
           else {
-            if (sscanf(token, "%d-%d:%d#%d", &start, &end, &stride, &size) != 4)
+            if (sscanf(token, "%d-%d#%d", &start, &end, &size) != 3)
               printf("Warning: Check the format of \"%s\".\n", token);
           }
         }
         else {
-          if (sscanf(token, "%d-%d#%d", &start, &end, &size) != 3)
+          if (sscanf(token, "%d#%d", &start, &size) != 2) {
             printf("Warning: Check the format of \"%s\".\n", token);
-        }
-      }
-      else {
-        if (sscanf(token, "%d#%d", &start, &size) != 2) {
-          printf("Warning: Check the format of \"%s\".\n", token);
+          }
           end = start;
         }
-      }
-      if (block > stride) {
-        printf("Warning: invalid block size in \"%s\" ignored.\n", token);
-        block = 1;
-      }
-      for (i = start; i <= end; i += stride) {
-        for (j = 0; j < block; j++) {
-          if (i + j > end) break;
-          partitionInfo.partitionSizes[i+j] = size;
+        if (block > stride) {
+          printf("Warning: invalid block size in \"%s\" ignored.\n", token);
+          block = 1;
         }
+        for (i = start; i <= end; i += stride) {
+          for (j = 0; j < block; j++) {
+            if (i + j > end) break;
+            _partitionInfo.partitionSize[i+j] = size;
+          }
+        }
+        token = strtok_r(NULL, ",", &tptr);
       }
-      str = strtok_r(NULL, ",", &tptr);
+      _partitionInfo.partitionPrefix[0] = 0;
+      _partitionInfo.myPartition = 0;
+      for(i = 1; i < _partitionInfo.numPartitions; i++) {
+        CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
+        _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
+        if((_Cmi_mynode_global >= _partitionInfo.partitionPrefix[i]) && (_Cmi_mynode_global < (_partitionInfo.partitionPrefix[i] + _partitionInfo.partitionSize[i]))) {
+          _partitionInfo.myPartition = i;
+        }
+      } 
+      CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
     }
-    partitionInfo.partitionPrefix[0] = 0;
-    for(i = 1; i < partitionSizes.numPartitions; i++) {
-      CmiAssert(partitionInfo.partitionSizes[i-1] > 0);
-      partitionInfo.partitionPrefix[i] = partitionPrefix[i-1] + partitionSizes[i-1];
-    } 
+    _Cmi_mynode = _Cmi_mynode - _partitionInfo.partitionPrefix[_partitionInfo.myPartition];
   }
 }
 
 void CmiCreatePartitions(char **argv) {
-
-  create_partition_map(argv)
-
   _Cmi_numnodes_global = _Cmi_numnodes;
   _Cmi_mynode_global = _Cmi_mynode;
   _Cmi_numpes_global = _Cmi_numnodes_global * _Cmi_mynodesize;
-  
-  //still need to set _Cmi_mype_global
-  CmiAssert(partitionInfo.numPartitions <= _Cmi_numnodes_global);
 
+  //creates partitions, reset _Cmi_mynode to be the new local rank
+  CmiAssert(_partitionInfo.numPartitions <= _Cmi_numnodes_global);
+  create_partition_map(argv);
   
-
-  //reset local variables
-  _Cmi_mynode = CmiGetNodeLocal(_Cmi_mynode);
-  _Cmi_numnodes = CmiPartitionSize();
+  //reset other local variables
+  _Cmi_numnodes = CmiMyPartitionSize();
   //mype and numpes will be set following this
 }
 
 INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
-  return (partition*partitionInfo.partitionSize)+node;
-}
-
-INLINE_KEYWORD int node_gToLTranslate(int node) {
-  return (node % partitionInfo.partitionSize);
+  if(_partitionInfo.isTopoaware) {
+  } else {
+    if(_partitionInfo.type == PARTITION_DEFAULT) { 
+      return (partition * _partitionInfo.partitionSize[0]) + node;
+    } else if(_partitionInfo.type == PARTITION_MASTER) {
+      if(partition == 0) {
+        CmiAssert(node == 0);
+        return 0;
+      }
+      return 1 + ((partition - 1) * _partitionInfo.partitionSize[1]) + node;
+    } else if(_partitionInfo.type == PARTITION_PREFIX) {
+      return _partitionInfo.partitionPrefix[partition] + node;
+    } else {
+      CmiAbort("Partition type did not match any of the supported types\n");
+    }
+  }
 }
 
 INLINE_KEYWORD int pe_lToGTranslate(int pe, int partition) {
-  return (pe + partition*CmiNumNodes()*CmiNodeSpan());
+  return node_lToGTranslate(CmiNodeOf(pe),partition)*CmiMyNodeSize() + CmiRankOf(pe);
 }
-int pe_gToLTranslate(int pe) {
-  return (pe % (CmiNumNodes()*CmiNodeSpan()));
+
+INLINE_KEYWORD int node_gToLTranslate(int node) {
+  CmiAbort("Conversion from global rank to local rank is not supported. Please contact Charm++ developers with the use case.\n");
+}
+
+INLINE_KEYWORD int pe_gToLTranslate(int pe) {
+  CmiAbort("Conversion from global rank to local rank is not supported. Please contact Charm++ developers with the use case.\n");
 }
 //end of functions related to partition
 
@@ -907,10 +926,10 @@ if (  MSG_STATISTIC)
 
     if (_Cmi_mynode==0) {
 #if !CMK_SMP 
-      printf("Charm++> Running on non-SMP mode\n");
-  MACHSTATE1(4,"running nonsmp %d", _Cmi_mynode)
+      printf("Charm++> Running in non-SMP mode: numPes %d\n",_Cmi_numnodes);
+      MACHSTATE1(4,"running nonsmp %d", _Cmi_mynode)
 #else
-      printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
+      printf("Charm++> Running in SMP mode: numNodes %d,  %d worker threads per process\n", CmiNumNodes(),_Cmi_mynodesize);
       if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
         printf("Charm++> The comm. thread both sends and receives messages\n");
       } else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
@@ -1174,7 +1193,7 @@ if (MSG_STATISTIC)
 
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     if (CmiMyPe() == 0) 
-      CmiPrintf("End of program\n");
+      CmiPrintf("[Partition %d][Node %d] End of program\n",CmiMyPartition(),CmiMyNode());
 #endif
 
 #if !CMK_SMP || CMK_SMP_NO_COMMTHD
