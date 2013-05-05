@@ -707,11 +707,123 @@ if (  MSG_STATISTIC)
 #endif
 
 // functions related to partition
-void CmiCreatePartitions(char **argv) {
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+  /* strtok is thread safe in VC++ */
+#define strtok_r(x,y,z) strtok(x,y)
+#endif
+
+static int create_partition_map( char **argv)
+{
+  char* partsizes = NULL, *token, *tptr;
+
   partitionInfo.numPartitions = 1; 
-  if(!CmiGetArgInt(argv,"+partitions", &partitionInfo.numPartitions)) {
-    CmiGetArgInt(argv,"+replicas", &partitionInfo.numPartitions);
+  partitionInfo.type = PARTITION_DEFAULT;
+
+  if(!CmiGetArgIntDesc(argv,"+partitions", &partitionInfo.numPartitions,"number of partitions")) {
+    CmiGetArgIntDesc(argv,"+replicas", &partitionInfo.numPartitions,"number of partitions");
   }
+
+  partitionInfo.partitionSizes = (int*)calloc(partitionInfo.numPartitions,sizeof(int));
+  partitionInfo.partitionPrefix = (int*)calloc(partitionInfo.numPartitions,sizeof(int));
+  
+  if (CmiGetArgFlagDesc(argv,"+assign_master","assign a process as master partition")) {
+    partitionInfo.type = PARTITION_MASTER;
+  }
+ 
+  if (CmiGetArgStringDesc(argv, "+partsize", &partsizes, "size of partitions")) {
+    if(partitionInfo.type != PARTITION_DEFAULT) {
+      CmiAbort("+partsize used with incompatible option, possibly +use_master\n");
+    }
+    partitionInfo.type = PARTITION_PREFIX;
+  }
+
+  if (CmiGetArgFlagDesc(argv,"+use_topology","topology aware partitions")) {
+    partitionInfo.isTopoaware = 1;
+  } else {
+    partitionInfo.isTopoaware = 0;
+  }
+
+  if(partitionInfo.type == PARTITION_DEFAULT) {
+    CmiAssert((_Cmi_numnodes_global % partitionInfo.numPartitions) == 0);
+    partitionInfo.partitionPrefix[0] = 0;
+    partitionInfo.partitionSize[0] = _Cmi_numnodes_global / partitionInfo.numPartitions;
+    for(i = 1; i < partitionSizes.numPartitions; i++) {
+      partitionInfo.partitionSize[i] = partitionSize.partitionSize[i-1];
+      partitionInfo.partitionPrefix[i] = partitionPrefix[i-1] + partitionSizes[i-1];
+    } 
+    partitionInfo.myPartition = _Cmi_mynode_global / partitionInfo.partitionSize;
+  } else if(partitionInfo.type == PARTITION_MASTER) {
+    CmiAssert(((_Cmi_numnodes_global-1) % (partitionInfo.numPartitions-1)) == 0);
+    partitionInfo.partitionSize[0] = 1;
+    partitionInfo.partitionPrefix[0] = 0;
+    partitionInfo.partitionSize[1] = (_Cmi_numnodes_global-1) / (partitionInfo.numPartitions-1);
+    partitionInfo.partitionPrefix[1] = 1;
+    for(i = 2; i < partitionSizes.numPartitions; i++) {
+      partitionInfo.partitionSize[i] = partitionSize.partitionSize[i-1];
+      partitionInfo.partitionPrefix[i] = partitionPrefix[i-1] + partitionSizes[i-1];
+    } 
+    partitionInfo.myPartition = 1 + (_Cmi_mynode_global-1) / partitionInfo.partitionSize;
+    if(!_Cmi_mynode_global) 
+      partitionInfo.myPartition = 0;
+  }
+
+  if(partitionInfo.type == PARTITION_PREFIX) {
+    token = strtok_r(partsizes, ",", &tptr);
+    while (token)
+    {
+      int i,j;
+      int hasdash=0, hascolon=0, hasdot=0;
+      int start, end, stride = 1, block = 1, size;
+      for (i = 0; i < strlen(token); i++) {
+        if (token[i] == '-') hasdash=1;
+        else if (token[i] == ':') hascolon=1;
+        else if (token[i] == '.') hasdot=1;
+      }
+      if (hasdash) {
+        if (hascolon) {
+          if (hasdot) {
+            if (sscanf(token, "%d-%d:%d.%d#%d", &start, &end, &stride, &block, &size) != 5)
+              printf("Warning: Check the format of \"%s\".\n", token);
+          }
+          else {
+            if (sscanf(token, "%d-%d:%d#%d", &start, &end, &stride, &size) != 4)
+              printf("Warning: Check the format of \"%s\".\n", token);
+          }
+        }
+        else {
+          if (sscanf(token, "%d-%d#%d", &start, &end, &size) != 3)
+            printf("Warning: Check the format of \"%s\".\n", token);
+        }
+      }
+      else {
+        if (sscanf(token, "%d#%d", &start, &size) != 2) {
+          printf("Warning: Check the format of \"%s\".\n", token);
+          end = start;
+        }
+      }
+      if (block > stride) {
+        printf("Warning: invalid block size in \"%s\" ignored.\n", token);
+        block = 1;
+      }
+      for (i = start; i <= end; i += stride) {
+        for (j = 0; j < block; j++) {
+          if (i + j > end) break;
+          partitionInfo.partitionSizes[i+j] = size;
+        }
+      }
+      str = strtok_r(NULL, ",", &tptr);
+    }
+    partitionInfo.partitionPrefix[0] = 0;
+    for(i = 1; i < partitionSizes.numPartitions; i++) {
+      CmiAssert(partitionInfo.partitionSizes[i-1] > 0);
+      partitionInfo.partitionPrefix[i] = partitionPrefix[i-1] + partitionSizes[i-1];
+    } 
+  }
+}
+
+void CmiCreatePartitions(char **argv) {
+
+  create_partition_map(argv)
 
   _Cmi_numnodes_global = _Cmi_numnodes;
   _Cmi_mynode_global = _Cmi_mynode;
@@ -719,11 +831,8 @@ void CmiCreatePartitions(char **argv) {
   
   //still need to set _Cmi_mype_global
   CmiAssert(partitionInfo.numPartitions <= _Cmi_numnodes_global);
-  CmiAssert((_Cmi_numnodes_global % partitionInfo.numPartitions) == 0);
+
   
-  //simple partition, this will be made more complex in future
-  partitionInfo.partitionSize = _Cmi_numnodes_global / partitionInfo.numPartitions;
-  partitionInfo.myPartition = _Cmi_mynode_global / partitionInfo.partitionSize;
 
   //reset local variables
   _Cmi_mynode = CmiGetNodeLocal(_Cmi_mynode);

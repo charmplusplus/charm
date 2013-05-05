@@ -126,10 +126,20 @@ extern int CmiMyRank_();
 
 #if CMK_HAS_PARTITION
 
+enum Partition_Type {
+      PARTITION_DEFAULT,
+      PARTITION_MASTER,
+      PARTITION_PREFIX,
+} Partition_Type;
+
 //variables and functions for partition
 typedef struct {
+  Partition_Type type;
+  int isTopoaware;
   int numPartitions;
-  int partitionSize;
+  int *partitionSizes;
+  int *partitionPrefix;
+  int *nodeMap;
   int myPartition;
 } PartitionInfo;
 
