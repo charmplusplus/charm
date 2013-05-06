@@ -127,6 +127,7 @@ extern int CmiMyRank_();
 #if CMK_HAS_PARTITION
 
 typedef enum Partition_Type {
+      PARTITION_SINGELTON,
       PARTITION_DEFAULT,
       PARTITION_MASTER,
       PARTITION_PREFIX,

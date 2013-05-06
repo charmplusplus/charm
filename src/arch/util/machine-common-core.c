@@ -712,6 +712,14 @@ if (  MSG_STATISTIC)
 #define strtok_r(x,y,z) strtok(x,y)
 #endif
 
+void create_topoaware_partitions() {
+  _partitionInfo.nodeMap = (int*)malloc(CmiNumNodesGloabl());
+  _MEMCHECK(_partitionInfo.nodeMap);
+  TopoManager tmgr;
+
+  tmgr.createPartitions(_partitionInfo.numPartitions, _partitionInfo.partitionSize, _partitionInfo.nodeMap);
+}
+
 static int create_partition_map( char **argv)
 {
   char* partsizes = NULL, *token, *tptr;
@@ -744,88 +752,89 @@ static int create_partition_map( char **argv)
     _partitionInfo.isTopoaware = 0;
   }
 
-  if(_partitionInfo.isTopoaware) {
-  } else {
-    if(_partitionInfo.type == PARTITION_DEFAULT) {
-      CmiAssert((_Cmi_numnodes_global % _partitionInfo.numPartitions) == 0);
-      _partitionInfo.partitionPrefix[0] = 0;
-      _partitionInfo.partitionSize[0] = _Cmi_numnodes_global / _partitionInfo.numPartitions;
-      for(i = 1; i < _partitionInfo.numPartitions; i++) {
-        _partitionInfo.partitionSize[i] = _partitionInfo.partitionSize[i-1];
-        _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
-      } 
-      _partitionInfo.myPartition = _Cmi_mynode_global / _partitionInfo.partitionSize[0];
-    } else if(_partitionInfo.type == PARTITION_MASTER) {
-      CmiAssert(((_Cmi_numnodes_global-1) % (_partitionInfo.numPartitions-1)) == 0);
-      _partitionInfo.partitionSize[0] = 1;
-      _partitionInfo.partitionPrefix[0] = 0;
-      _partitionInfo.partitionSize[1] = (_Cmi_numnodes_global-1) / (_partitionInfo.numPartitions-1);
-      _partitionInfo.partitionPrefix[1] = 1;
-      for(i = 2; i < _partitionInfo.numPartitions; i++) {
-        _partitionInfo.partitionSize[i] = _partitionInfo.partitionSize[i-1];
-        _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
-      } 
-      _partitionInfo.myPartition = 1 + (_Cmi_mynode_global-1) / _partitionInfo.partitionSize[1];
-      if(!_Cmi_mynode_global) 
-        _partitionInfo.myPartition = 0;
-    } else if(_partitionInfo.type == PARTITION_PREFIX) {
-      token = strtok_r(partsizes, ",", &tptr);
-      while (token)
-      {
-        int i,j;
-        int hasdash=0, hascolon=0, hasdot=0;
-        int start, end, stride = 1, block = 1, size;
-        for (i = 0; i < strlen(token); i++) {
-          if (token[i] == '-') hasdash=1;
-          else if (token[i] == ':') hascolon=1;
-          else if (token[i] == '.') hasdot=1;
-        }
-        if (hasdash) {
-          if (hascolon) {
-            if (hasdot) {
-              if (sscanf(token, "%d-%d:%d.%d#%d", &start, &end, &stride, &block, &size) != 5)
-                printf("Warning: Check the format of \"%s\".\n", token);
-            }
-            else {
-              if (sscanf(token, "%d-%d:%d#%d", &start, &end, &stride, &size) != 4)
-                printf("Warning: Check the format of \"%s\".\n", token);
-            }
+  if(_partitionInfo.type == PARTITION_DEFAULT) {
+    CmiAssert((_Cmi_numnodes_global % _partitionInfo.numPartitions) == 0);
+    _partitionInfo.partitionPrefix[0] = 0;
+    _partitionInfo.partitionSize[0] = _Cmi_numnodes_global / _partitionInfo.numPartitions;
+    for(i = 1; i < _partitionInfo.numPartitions; i++) {
+      _partitionInfo.partitionSize[i] = _partitionInfo.partitionSize[i-1];
+      _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
+    } 
+    _partitionInfo.myPartition = _Cmi_mynode_global / _partitionInfo.partitionSize[0];
+  } else if(_partitionInfo.type == PARTITION_MASTER) {
+    CmiAssert(((_Cmi_numnodes_global-1) % (_partitionInfo.numPartitions-1)) == 0);
+    _partitionInfo.partitionSize[0] = 1;
+    _partitionInfo.partitionPrefix[0] = 0;
+    _partitionInfo.partitionSize[1] = (_Cmi_numnodes_global-1) / (_partitionInfo.numPartitions-1);
+    _partitionInfo.partitionPrefix[1] = 1;
+    for(i = 2; i < _partitionInfo.numPartitions; i++) {
+      _partitionInfo.partitionSize[i] = _partitionInfo.partitionSize[i-1];
+      _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
+    } 
+    _partitionInfo.myPartition = 1 + (_Cmi_mynode_global-1) / _partitionInfo.partitionSize[1];
+    if(!_Cmi_mynode_global) 
+      _partitionInfo.myPartition = 0;
+  } else if(_partitionInfo.type == PARTITION_PREFIX) {
+    token = strtok_r(partsizes, ",", &tptr);
+    while (token)
+    {
+      int i,j;
+      int hasdash=0, hascolon=0, hasdot=0;
+      int start, end, stride = 1, block = 1, size;
+      for (i = 0; i < strlen(token); i++) {
+        if (token[i] == '-') hasdash=1;
+        else if (token[i] == ':') hascolon=1;
+        else if (token[i] == '.') hasdot=1;
+      }
+      if (hasdash) {
+        if (hascolon) {
+          if (hasdot) {
+            if (sscanf(token, "%d-%d:%d.%d#%d", &start, &end, &stride, &block, &size) != 5)
+              printf("Warning: Check the format of \"%s\".\n", token);
           }
           else {
-            if (sscanf(token, "%d-%d#%d", &start, &end, &size) != 3)
+            if (sscanf(token, "%d-%d:%d#%d", &start, &end, &stride, &size) != 4)
               printf("Warning: Check the format of \"%s\".\n", token);
           }
         }
         else {
-          if (sscanf(token, "%d#%d", &start, &size) != 2) {
+          if (sscanf(token, "%d-%d#%d", &start, &end, &size) != 3)
             printf("Warning: Check the format of \"%s\".\n", token);
-          }
-          end = start;
         }
-        if (block > stride) {
-          printf("Warning: invalid block size in \"%s\" ignored.\n", token);
-          block = 1;
-        }
-        for (i = start; i <= end; i += stride) {
-          for (j = 0; j < block; j++) {
-            if (i + j > end) break;
-            _partitionInfo.partitionSize[i+j] = size;
-          }
-        }
-        token = strtok_r(NULL, ",", &tptr);
       }
-      _partitionInfo.partitionPrefix[0] = 0;
-      _partitionInfo.myPartition = 0;
-      for(i = 1; i < _partitionInfo.numPartitions; i++) {
-        CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
-        _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
-        if((_Cmi_mynode_global >= _partitionInfo.partitionPrefix[i]) && (_Cmi_mynode_global < (_partitionInfo.partitionPrefix[i] + _partitionInfo.partitionSize[i]))) {
-          _partitionInfo.myPartition = i;
+      else {
+        if (sscanf(token, "%d#%d", &start, &size) != 2) {
+          printf("Warning: Check the format of \"%s\".\n", token);
         }
-      } 
-      CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
+        end = start;
+      }
+      if (block > stride) {
+        printf("Warning: invalid block size in \"%s\" ignored.\n", token);
+        block = 1;
+      }
+      for (i = start; i <= end; i += stride) {
+        for (j = 0; j < block; j++) {
+          if (i + j > end) break;
+          _partitionInfo.partitionSize[i+j] = size;
+        }
+      }
+      token = strtok_r(NULL, ",", &tptr);
     }
-    _Cmi_mynode = _Cmi_mynode - _partitionInfo.partitionPrefix[_partitionInfo.myPartition];
+    _partitionInfo.partitionPrefix[0] = 0;
+    _partitionInfo.myPartition = 0;
+    for(i = 1; i < _partitionInfo.numPartitions; i++) {
+      CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
+      _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
+      if((_Cmi_mynode_global >= _partitionInfo.partitionPrefix[i]) && (_Cmi_mynode_global < (_partitionInfo.partitionPrefix[i] + _partitionInfo.partitionSize[i]))) {
+        _partitionInfo.myPartition = i;
+      }
+    } 
+    CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
+  }
+  _Cmi_mynode = _Cmi_mynode - _partitionInfo.partitionPrefix[_partitionInfo.myPartition];
+
+  if(_partitionInfo.isTopoaware) {
+    create_topoaware_partitions();
   }
 }
 
@@ -844,21 +853,26 @@ void CmiCreatePartitions(char **argv) {
 }
 
 INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
-  if(_partitionInfo.isTopoaware) {
-  } else {
-    if(_partitionInfo.type == PARTITION_DEFAULT) { 
-      return (partition * _partitionInfo.partitionSize[0]) + node;
-    } else if(_partitionInfo.type == PARTITION_MASTER) {
-      if(partition == 0) {
-        CmiAssert(node == 0);
-        return 0;
-      }
-      return 1 + ((partition - 1) * _partitionInfo.partitionSize[1]) + node;
-    } else if(_partitionInfo.type == PARTITION_PREFIX) {
-      return _partitionInfo.partitionPrefix[partition] + node;
-    } else {
-      CmiAbort("Partition type did not match any of the supported types\n");
+  int rank;
+  if(_partitionInfo.type == PARTITION_SINGELTON) { 
+    return node;
+  } else if(_partitionInfo.type == PARTITION_DEFAULT) { 
+    rank =  (partition * _partitionInfo.partitionSize[0]) + node;
+  } else if(_partitionInfo.type == PARTITION_MASTER) {
+    if(partition == 0) {
+      CmiAssert(node == 0);
+      rank =  0;
     }
+    rank = 1 + ((partition - 1) * _partitionInfo.partitionSize[1]) + node;
+  } else if(_partitionInfo.type == PARTITION_PREFIX) {
+    rank = _partitionInfo.partitionPrefix[partition] + node;
+  } else {
+    CmiAbort("Partition type did not match any of the supported types\n");
+  }
+  if(_partitionInfo.isTopoaware) {
+    return _partitionInfo.nodeMap[rank];
+  } else {
+    return rank;
   }
 }
 
