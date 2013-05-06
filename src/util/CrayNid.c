@@ -79,7 +79,7 @@ int getMeshCoord(int nid, int *x, int *y, int *z) {
   return *x==-1?-1:0;
   }
 #else
-  CmiAbort("rca_get_meshcoord not exist");
+  CmiAbort("rca_get_meshcoord does not exist");
   return -1;
 #endif
 }
@@ -184,9 +184,11 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 
 void craynid_init()
 {
-  if (CmiMyRank()==0) {
+  static init_done = 0;
+  if (CmiMyRank()==0 && !init_done) {
     cray_lock = CmiCreateLock();
     cray_lock2 = CmiCreateLock();
+    init_done = 1;
   }
 }
 

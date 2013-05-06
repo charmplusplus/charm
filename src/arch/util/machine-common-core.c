@@ -712,12 +712,31 @@ if (  MSG_STATISTIC)
 #define strtok_r(x,y,z) strtok(x,y)
 #endif
 
-void create_topoaware_partitions() {
-  _partitionInfo.nodeMap = (int*)malloc(CmiNumNodesGloabl());
-  _MEMCHECK(_partitionInfo.nodeMap);
-  TopoManager tmgr;
+extern void TopoManager_init();
+extern void TopoManager_createPartitions(int numPartitions, int *partitionSize, int *nodeMap, int *mynode, int *mypart);
 
-  tmgr.createPartitions(_partitionInfo.numPartitions, _partitionInfo.partitionSize, _partitionInfo.nodeMap);
+void create_topoaware_partitions() {
+  _partitionInfo.nodeMap = (int*)malloc(CmiNumNodesGlobal());
+  _MEMCHECK(_partitionInfo.nodeMap);
+
+  Partition_Type type_bak = _partitionInfo.type;
+  _partitionInfo.type = PARTITION_SINGELTON;
+
+  int numparts_bak = _partitionInfo.numPartitions;
+  _partitionInfo.numPartitions = 1;
+
+  //int mypart_bak = _partitionInfo.myPartition;
+  _partitionInfo.myPartition = 0;
+
+  _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
+  
+  TopoManager_init();
+  TopoManager_createPartitions(_partitionInfo.numPartitions, _partitionInfo.partitionSize, _partitionInfo.nodeMap, &_Cmi_mynode, &_partitionInfo.myPartition);
+  
+  _partitionInfo.type = type_bak;
+  _partitionInfo.numPartitions = numparts_bak;
+  //_partitionInfo.myPartition = mypart_bak;
+  //_partitionInfo.isTopoaware = 0;
 }
 
 static int create_partition_map( char **argv)

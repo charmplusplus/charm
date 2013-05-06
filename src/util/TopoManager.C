@@ -429,11 +429,17 @@ void TopoManager::printAllocation(FILE *fp)
 extern "C" void craynid_init();
 #endif
 
-void TopoManager_init()
+extern "C" void TopoManager_init()
 {
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     craynid_init();
 #endif
+}
+
+extern "C" void TopoManager_createPartitions(int numPartitions, int *partitionSize, int *nodeMap, int *mynode, int *mypart) {
+  TopoManager tmgr;
+  if(!CmiMyNodeGlobal())
+  tmgr.printAllocation(stdout);
 }
 
 extern "C" int CmiGetHopsBetweenRanks(int pe1, int pe2)

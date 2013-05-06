@@ -901,7 +901,7 @@ extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
 extern "C" void CmiInitPxshm(char **argv);
 
-extern void TopoManager_init();
+extern "C" void TopoManager_init();
 
 //extern "C" void CldCallback();
 
