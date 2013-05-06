@@ -78,13 +78,10 @@ for some application **/
 
 #include "TopoManager.h"
 
-TopoManager *tmgr = NULL;
 double hops = 0;
 
 extern "C" void calculateTotalHops(int pe1, int pe2, int size) {
-  if(tmgr == NULL)
-    tmgr = new TopoManager();
-  hops += (tmgr->getHopsBetweenRanks(pe1, pe2) * size);
+  hops += (TopoManger_getHopsBetweenPeRanks(pe1, pe2) * size);
 }
 
 extern "C" void printTotalHops() {
@@ -901,8 +898,6 @@ extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
 extern "C" void CmiInitPxshm(char **argv);
 
-extern "C" void TopoManager_init();
-
 //extern "C" void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
@@ -1296,14 +1291,13 @@ void _initCharm(int unused_argc, char **argv)
         char *topoFilename;
         if(CmiGetArgStringDesc(argv,"+printTopo",&topoFilename,"topo file name")) 
         {
-	    TopoManager tmgr;
             FILE *fp;
             fp = fopen(topoFilename, "w");
             if (fp == NULL) {
               CkPrintf("Error opening topology.Info.txt file, writing to stdout\n");
               fp = stdout;
             }
-	    tmgr.printAllocation(fp);
+	    TopoManager_printAllocation(fp);
             fclose(fp);
         }
     }

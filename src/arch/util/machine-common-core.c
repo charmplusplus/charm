@@ -712,8 +712,7 @@ if (  MSG_STATISTIC)
 #define strtok_r(x,y,z) strtok(x,y)
 #endif
 
-extern void TopoManager_init();
-extern void TopoManager_createPartitions(int numPartitions, int *partitionSize, int *nodeMap, int *mynode, int *mypart);
+#include "TopoManager.h"
 
 void create_topoaware_partitions() {
   _partitionInfo.nodeMap = (int*)malloc(CmiNumNodesGlobal());

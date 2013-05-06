@@ -429,23 +429,111 @@ void TopoManager::printAllocation(FILE *fp)
 extern "C" void craynid_init();
 #endif
 
+CmiNodeLock _topoLock;
+TopoManager *_tmgr = NULL;
+
 extern "C" void TopoManager_init()
 {
+    _topoLock = CmiCreateLock();
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     craynid_init();
 #endif
 }
 
-extern "C" void TopoManager_createPartitions(int numPartitions, int *partitionSize, int *nodeMap, int *mynode, int *mypart) {
-  TopoManager tmgr;
-  if(!CmiMyNodeGlobal())
-  tmgr.printAllocation(stdout);
+extern "C" void TopoManager_reset() {
+  CmiLock(_topoLock);
+  if(_topoLock) delete tmgr;
+  tmgr = new TopoManager;
+  CmiUnlock(_topoLock);
 }
 
-extern "C" int CmiGetHopsBetweenRanks(int pe1, int pe2)
-{
-    TopoManager topomgr;
-    return topomgr.getHopsBetweenRanks(pe1, pe2);
+extern "C" void TopoManager_free() {
+  CmiLock(_topoLock);
+  if(_topoLock) delete tmgr;
+  tmgr = NULL;
+  CmiUnlock(_topoLock);
+}
+
+extern "C" void TopoManager_printAllocation(File *fp) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+  _tmgr->printAllocation(fp);
+}
+
+extern "C" void TopoManager_getDimCount(int *ndims) {
+#if CMK_BLUEGENEQ
+  *ndims = 5;
+#else
+  *ndims = 3;
+#endif
+}
+
+extern "C" void TopoManager_getDims(int *dims) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+#if CMK_BLUEGENEQ
+  dims[0] = _tmgr->getDimNA():
+  dims[1] = _tmgr->getDimNB():
+  dims[2] = _tmgr->getDimNC():
+  dims[3] = _tmgr->getDimND():
+  dims[4] = _tmgr->getDimNE():
+  dims[5] = _tmgr->getProcsPerNode();
+#else 
+  dims[0] = _tmgr->getDimNX():
+  dims[1] = _tmgr->getDimNY():
+  dims[2] = _tmgr->getDimNZ():
+  dims[3] = _tmgr->getProcsPerNode();
+#endif
+}
+
+extern "C" void TopoManager_getCoordinates(int rank, int *coords) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+  int t;
+#if CMK_BLUEGENEQ
+  _tmgr->rankToCoordinates(CmiNodeFirst(rank),coords[0],coords[1],coords[2],coords[3],coords[4],t);
+#else
+  _tmgr->rankToCoordinates(CmiNodeFirst(rank),coords[0],coords[1],coords[2],t);
+#endif
+}
+
+extern "C" void TopoManager_getPeCoordinates(int rank, int *coords);
+  if(_tmgr == NULL) { TopoManager_reset(); }
+#if CMK_BLUEGENEQ
+  _tmgr->rankToCoordinates(rank,coords[0],coords[1],coords[2],coords[3],coords[4],coords[5]);
+#else
+  _tmgr->rankToCoordinates(rank,coords[0],coords[1],coords[2],coords[3]);
+#endif
+}
+
+void TopoManager_getRanks(int **ranks, int *coords) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+  int rank, numRanks = _tmgr->getDimNT()/CmiMyNodeSize(), rank_cnt = 0;
+  *ranks = (int *)malloc(numRanks*sizeof(int));
+  for(int t = 0; t < _tmgr->getDimNT(); t += CmiMyNodeSize()) {
+#if CMK_BLUEGENEQ
+    rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3],coords[4],t);
+#else
+    rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3],t);
+#endif
+    (*ranks)[rank_cnt++] = CmiNodeOf(rank);
+  }
+}
+
+extern "C" void TopoManager_getPeRank(int *rank, int *coords) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+#if CMK_BLUEGENEQ
+  *rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3],coords[4],coords[5]);
+#else
+  *rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3]);
+#endif
+}
+
+extern "C" void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+  return _tmgr->getHopsBetweenRanks(pe1, pe2);
+}
+
+extern "C" void TopoManager_createPartitions(int numPartitions, int *partitionSize, int *nodeMap, int *mynode, int *mypart, int scheme) {
+  if(!CmiMyNodeGlobal())
+  tmgr.printAllocation(stdout);
 }
 
 

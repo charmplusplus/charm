@@ -1996,11 +1996,6 @@ void CmiTurnOffStats();
 extern int CharmLibInterOperate;
 CpvExtern(int,charmLibExitFlag);
 
-/*
- *         Topology C wrapper
- */
-extern int CmiGetHopsBetweenRanks(int pe1, int pe2);
-
 /******** I/O wrappers ***********/
 
 size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f);
