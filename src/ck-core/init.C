@@ -81,7 +81,9 @@ for some application **/
 double hops = 0;
 
 extern "C" void calculateTotalHops(int pe1, int pe2, int size) {
-  hops += (TopoManger_getHopsBetweenPeRanks(pe1, pe2) * size);
+  int delta;
+  TopoManger_getHopsBetweenPeRanks(pe1, pe2, &delta);
+  hops += (delta * size);
 }
 
 extern "C" void printTotalHops() {

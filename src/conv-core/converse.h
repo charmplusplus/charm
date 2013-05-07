@@ -136,7 +136,7 @@ typedef enum Partition_Type {
 //variables and functions for partition
 typedef struct {
   Partition_Type type;
-  int isTopoaware;
+  int isTopoaware, scheme;
   int numPartitions;
   int *partitionSize;
   int *partitionPrefix;

@@ -730,7 +730,7 @@ void create_topoaware_partitions() {
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
   
   TopoManager_init();
-  TopoManager_createPartitions(_partitionInfo.numPartitions, _partitionInfo.partitionSize, _partitionInfo.nodeMap, &_Cmi_mynode, &_partitionInfo.myPartition);
+  TopoManager_createPartitions(_partitionInfo.numPartitions, _partitionInfo.partitionSize, _partitionInfo.nodeMap, &_Cmi_mynode, &_partitionInfo.myPartition,_partitionInfo.scheme);
   
   _partitionInfo.type = type_bak;
   _partitionInfo.numPartitions = numparts_bak;
@@ -762,6 +762,13 @@ static int create_partition_map( char **argv)
       CmiAbort("+partsize used with incompatible option, possibly +use_master\n");
     }
     _partitionInfo.type = PARTITION_PREFIX;
+  }
+
+  _partitionInfo.scheme = 0;
+  if (CmiGetArgIntDesc(argv,"+use_topology_scheme", &_partitionInfo.scheme, "topology aware partitioning scheme")) {
+    _partitionInfo.isTopoaware = 1;
+  } else {
+    _partitionInfo.isTopoaware = 0;
   }
 
   if (CmiGetArgFlagDesc(argv,"+use_topology","topology aware partitions")) {

@@ -1,7 +1,13 @@
 /** \file patitioning_strategies.h + hilbert.h
- *  Author: Nikhil Jain
- *  Contact: nikhil@illinois.edu
+ *  Author: Nikhil Jain, Harshitha Menon
+ *  Contact: nikhil@illinois.edu, gplkrsh2@illinois.edu
  */
+#ifndef _PARTITIONING_STRATEGIES_H
+#define _PARTITIONING_STRATEGIES_H
+
+#include "TopoManager.h"
+
+#ifdef __cplusplus
 #include <queue>
 #include <vector>
 #include <iostream>
@@ -9,236 +15,6 @@
 #include <math.h>
 
 using namespace std;
-
-/** \brief A function to traverse the given processors, and get a hilbert list
- */
-int* getHilbertList()
-{
-  vector<int> hcoords;
-  int *procList = (int*)malloc(profile_data.numpes*sizeof(int));
-  int pe,peh,end;
-
-  int dims[4], pdims[4];
-  getDims(dims);
-
-  //hilbert only works for power of 2
-  int maxDim = dims[0];
-  if(maxDim < dims[1]) maxDim = dims[1];
-  if(maxDim < dims[2]) maxDim = dims[2];
-
-  int pow2 = 1;
-  while(maxDim>pow2)
-    pow2 *= 2;
-  int cubeDim = pow2*pow2*pow2;
-
-  int currPos = 0;
-  for(int i=0; i<cubeDim; i++) {
-    hcoords = int_to_Hilbert(i,3);
-
-    if((hcoords[0] >= dims[0]) || (hcoords[1] >= dims[1]) || (hcoords[2] >= dims[2])) continue;
-
-    //check if gemini is allocatd to us
-    pdims[0]=hcoords[0]; pdims[1]=hcoords[1]; pdims[2]=hcoords[2]; pdims[3]=0;
-    coordinatesToRank(&pe,pdims);
-    if(pe == -1) continue; 
-
-    //check if both chips on the gemini were allocated to us
-    end = dims[3]/2;
-    pdims[3] = dims[3]/2;
-    coordinatesToRank(&peh,pdims);
-    if(pe != peh) end = dims[3];
-    
-    for(int j=0; j<end; j++) {
-      procList[currPos++] = pe+j;
-    }
-  }
-  return procList;
-}
-
-/** \brief A function to traverse the given processors, and get a planar list
- */
-int* getPlanarList()
-{
-  int *procList = (int*)malloc(profile_data.numpes*sizeof(int));
-  int pe,peh,end;
-
-  int dims[4], pdims[4];
-  getDims(dims);
-
-  int currPos = 0;
-  for(int i=0; i<dims[0]; i++) {
-    for(int j=0; j<dims[1]; j++) {
-      for(int k=0; k<dims[2]; k++) {
-        //check if gemini is allocatd to us
-        pdims[0]=i; pdims[1]=j; pdims[2]=k; pdims[3]=0;
-        coordinatesToRank(&pe,pdims);
-        if(pe == -1) continue; 
-
-        //check if both chips on the gemini were allocated to us
-        end = dims[3]/2;
-        pdims[3] = dims[3]/2;
-        coordinatesToRank(&peh,pdims);
-        if(pe != peh) end = dims[3];
-
-        for(int l=0; l<end; l++) {
-          procList[currPos++] = pe+l;
-        }
-      }
-    }
-  }
-  return procList;
-}
-
-
-/** \brief A function to traverse the collected graph, do a BFS, and get a list
- */
-int* getBFSList(Profile_Graph *allData) 
-{
-  int *rankList = (int*)malloc(profile_data.numpes*sizeof(int));
-  int *doneList = (int*)calloc(profile_data.numpes,sizeof(int));
-  int currRank, currPos=0, nbr, insertrank=0;
-  myInt offset, start;
-  std::queue<int> rankq;
-
-  while(currPos != profile_data.numpes) {
-    while(doneList[insertrank] != 0) {
-      insertrank++;
-    }
-    rankq.push(insertrank);
-    doneList[insertrank] = 1;
-    rankList[currPos++] = insertrank;
-
-    while(!rankq.empty()) {
-      currRank = rankq.front();
-      rankq.pop();
-
-      offset = allData->offsets[currRank];
-      start = offset+1;
-      for(int i = 0; i < allData->values[offset]; i++) {
-        nbr = allData->values[start+3*i];
-        if(doneList[nbr] == 0) {
-          rankq.push(nbr);
-          doneList[nbr] = 1;
-          rankList[currPos++] = nbr;
-        }
-      } 
-    }
-  }
-  free(doneList);
-  return rankList;
-}
-
-/** \brief A function traverse the collected graph, do a single edge BFS+DFS
- * combo, and get a list
- */
-int * getBFS_DFS_List(Profile_Graph *allData) 
-{
-  int *rankList = (int*)malloc(profile_data.numpes*sizeof(int));
-  int *doneList = (int*)calloc(profile_data.numpes,sizeof(int));
-  int currRank, currPos=0, nbr, insertrank=0, heavy, weight;
-  myInt offset, start;
-  std::queue<int> rankq;
-
-  while(currPos != profile_data.numpes) {
-    while(doneList[insertrank] != 0) {
-      insertrank++;
-    }
-    rankq.push(insertrank);
-    doneList[insertrank] = 1;
-    rankList[currPos++] = insertrank;
-
-    while(!rankq.empty()) {
-      currRank = rankq.front();
-      rankq.pop();
-
-      offset = allData->offsets[currRank];
-      start = offset+1;
-      heavy=-1; weight=0;
-      for(int i = 0; i < allData->values[offset]; i++) {
-        nbr = allData->values[start+3*i];
-        if(doneList[nbr] == 0) {
-          if(weight < allData->values[start+3*i+2])
-            heavy = nbr;
-          doneList[nbr] = 1;
-          rankList[currPos++] = nbr;
-        }
-      } 
-      if(heavy != -1)
-        rankq.push(heavy);
-    }
-  } 
-  free(doneList);
-  return rankList;
-}
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/** \brief A dummy map function */
-void dummyMap(Profile_Graph *allData, int ** ranks)
-{
-  int i;
-    printf("TOPO_PROFILER> Using a dummy map\n");
-  *ranks = (int*)malloc(profile_data.numpes*sizeof(int));
-  for(i=0; i <profile_data.numpes; i++) {
-    (*ranks)[i] = i;
-  }
-}
-
-/** \brief A mapping function that traverses the ranks in BFS, procs using
- * Hilbert
- */
-void BFS_Hilbert_Map(Profile_Graph *allData, MPI_Comm ** ranks)
-{
-  printf("TOPO_PROFILER> Creating a new communicator using BFS traversal for application graph, and Hilbert curve for processor grid\n");
-  int *rankList = getBFSList(allData);
-  int *procList = getHilbertList();
-  TopoProfiler_createRanks(rankList, procList, ranks);
-  free(rankList);
-  free(procList);
-}
-
-/** \brief A mapping function that traverses the ranks in BFS, procs in planes
- */
-void BFS_Planar_Map(Profile_Graph *allData, int ** ranks)
-{
-  printf("TOPO_PROFILER> Creating a new communicator using BFS traversal for application graph, and planar curve for processor grid\n");
-  int *rankList = getBFSList(allData);
-  int *procList = getPlanarList();
-  TopoProfiler_createRanks(rankList, procList, ranks);
-  free(rankList);
-  free(procList);
-}
-
-/** \brief A mapping function that traverses the ranks in BFS+DFS combo, procs
- * using hilbert
- */
-void BFS_DFS_Hilbert_Map(Profile_Graph *allData, int ** ranks)
-{
-  printf("TOPO_PROFILER> Creating a new communicator using BFS+DFS combo traversal for application graph, and Hilbert curve for processor grid\n");
-  int *rankList = getBFS_DFS_List(allData);
-  int *procList = getHilbertList();
-  TopoProfiler_createRanks(rankList, procList, ranks);
-  free(rankList);
-  free(procList);
-}
-
-/** \brief A mapping function that traverses the ranks in BFS+DFS combo, procs
- * in planes
- */
-void BFS_DFS_Planar_Map(Profile_Graph *allData, int ** ranks)
-{
-  printf("TOPO_PROFILER> Creating a new communicator using BFS+DFS combo traversal for application graph, and planar curve for processor grid\n");
-  int *rankList = getBFS_DFS_List(allData);
-  int *procList = getPlanarList();
-  TopoProfiler_createRanks(rankList, procList, ranks);
-  free(rankList);
-  free(procList);
-}
-#ifdef __cplusplus
-}
-#endif
 
 /** \file hilbert.h
  *  Author: Harshitha Menon 
@@ -372,3 +148,178 @@ vector<int> int_to_Hilbert(int i, int dim) {
 }
 #endif
 
+/** \brief A function to traverse the given processors, and get a hilbert list
+ */
+int* getHilbertList()
+{
+  vector<int> hcoords;
+
+  int numDims;
+  int *dims, *pdims;
+  int *ranks, numranks;
+  int *procList = new int[CmiNumNodes()];
+
+  TopoManager_getDimCount(&numDims);
+
+  dims = new int[numDims+1];
+  pdims = new int[numDims+1];
+
+  TopoManager_getDims(dims);
+  ranks = new int[dims[numDims]];
+
+  //our hilbert only works for power of 2
+  int maxDim = dims[0];
+  for(int i = 1; i < numDims; i++) {
+    if(maxDim < dims[i]) maxDim = dims[i];
+  }
+
+  int pow2 = 1;
+  while(maxDim>pow2)
+    pow2 *= 2;
+
+  int cubeDim = pow2;
+
+  for(int i = 1; i < numDims; i++) {
+    cubeDim *= pow2;
+  }
+
+  int currPos = 0;
+  for(int i = 0; i < cubeDim; i++) {
+    hcoords = int_to_Hilbert(i,numDims);
+
+    for(int i = 0; i < numDims; i++) {
+      if(hcoords[i] >= dims[i]) continue;
+
+    //check if physical node is allocatd to us
+    for(int i = 0; i < numDims; i++) {
+      pdims[i] = hcoords[i]; 
+    }
+    TopoManager_getRanks(&numranks, ranks, pdims);
+    if(numranks == 0) continue; 
+
+    //check if both chips on the gemini were allocated to us
+    for(int j = 0; j < numranks; j++) {
+      procList[currPos++] = ranks[j];
+    }
+  }
+
+  CmiAssert(currPos == CmiNumNodes());
+
+  delete [] dims;
+  delete [] pdims;
+  delete [] ranks;
+  return procList;
+}
+
+/** \brief A function to traverse the given processors, and get a planar list
+ */
+int* getPlanarList()
+{
+  int *procList = new int[CmiNumNodes()];
+
+  int numDims;
+  int *dims, *pdims;
+  int *ranks, numranks;
+  int *procList = new int[CmiNumNodes()];
+
+  TopoManager_getDimCount(&numDims);
+
+  dims = new int[numDims+1];
+  pdims = new int[numDims+1];
+
+  TopoManager_getDims(dims);
+  ranks = new int[dims[numDims]];
+
+  int currPos = 0;
+  for(pdims[0] = 0; pdims[0] < dims[0]; pdims[0]++) {
+
+        TopoManager_getRanks(&numranks, ranks, pdims);
+        if(numranks == 0) continue; 
+
+        for(int j = 0; j < numranks; j++) {
+          procList[currPos++] = ranks[j];
+        }
+      }
+    }
+  }
+
+  CmiAssert(currPos == CmiNumNodes());
+
+  delete [] dims;
+  delete [] pdims;
+  delete [] ranks;
+  return procList;
+}
+
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** \brief A dummy map function */
+void dummyMap(Profile_Graph *allData, int ** ranks)
+{
+  int i;
+    printf("TOPO_PROFILER> Using a dummy map\n");
+  *ranks = (int*)malloc(profile_data.numpes*sizeof(int));
+  for(i=0; i <profile_data.numpes; i++) {
+    (*ranks)[i] = i;
+  }
+}
+
+/** \brief A mapping function that traverses the ranks in BFS, procs using
+ * Hilbert
+ */
+void BFS_Hilbert_Map(Profile_Graph *allData, MPI_Comm ** ranks)
+{
+  printf("TOPO_PROFILER> Creating a new communicator using BFS traversal for application graph, and Hilbert curve for processor grid\n");
+  int *rankList = getBFSList(allData);
+  int *procList = getHilbertList();
+  TopoProfiler_createRanks(rankList, procList, ranks);
+  free(rankList);
+  free(procList);
+}
+
+/** \brief A mapping function that traverses the ranks in BFS, procs in planes
+ */
+void BFS_Planar_Map(Profile_Graph *allData, int ** ranks)
+{
+  printf("TOPO_PROFILER> Creating a new communicator using BFS traversal for application graph, and planar curve for processor grid\n");
+  int *rankList = getBFSList(allData);
+  int *procList = getPlanarList();
+  TopoProfiler_createRanks(rankList, procList, ranks);
+  free(rankList);
+  free(procList);
+}
+
+/** \brief A mapping function that traverses the ranks in BFS+DFS combo, procs
+ * using hilbert
+ */
+void BFS_DFS_Hilbert_Map(Profile_Graph *allData, int ** ranks)
+{
+  printf("TOPO_PROFILER> Creating a new communicator using BFS+DFS combo traversal for application graph, and Hilbert curve for processor grid\n");
+  int *rankList = getBFS_DFS_List(allData);
+  int *procList = getHilbertList();
+  TopoProfiler_createRanks(rankList, procList, ranks);
+  free(rankList);
+  free(procList);
+}
+
+/** \brief A mapping function that traverses the ranks in BFS+DFS combo, procs
+ * in planes
+ */
+void BFS_DFS_Planar_Map(Profile_Graph *allData, int ** ranks)
+{
+  printf("TOPO_PROFILER> Creating a new communicator using BFS+DFS combo traversal for application graph, and planar curve for processor grid\n");
+  int *rankList = getBFS_DFS_List(allData);
+  int *procList = getPlanarList();
+  TopoProfiler_createRanks(rankList, procList, ranks);
+  free(rankList);
+  free(procList);
+}
+
+#ifdef __cplusplus
+}
+#endif
+#endif

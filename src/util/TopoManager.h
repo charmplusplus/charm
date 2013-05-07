@@ -35,11 +35,11 @@ void TopoManager_getCoordinates(int rank, int *coords);
 /** get coordinate of a PE, includes an additional dim */
 void TopoManager_getPeCoordinates(int rank, int *coords);
 /** get ranks of logical nodes at a coordinate */
-void TopoManager_getRanks(int **ranks, int *coords);
+void TopoManager_getRanks(int *rank_cnt, int *ranks, int *coords);
 /** get rank of PE at a coordinate */
 void TopoManager_getPeRank(int *rank, int *coords);
 /** get hops betweens Pes */
-void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2);
+void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops);
 /** topoaware partition using scheme s */
 void TopoManager_createPartitions(int numPartitions, int *partitionSize, int *nodeMap, int *mynode, int *mypart, int scheme);
 
