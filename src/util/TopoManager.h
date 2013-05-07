@@ -41,7 +41,7 @@ void TopoManager_getPeRank(int *rank, int *coords);
 /** get hops betweens Pes */
 void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops);
 /** topoaware partition using scheme s */
-void TopoManager_createPartitions(int numPartitions, int *partitionSize, int *nodeMap, int *mynode, int *mypart, int scheme);
+void TopoManager_createPartitions(int *nodeMap, int scheme);
 
 #if defined(__cplusplus)
 }

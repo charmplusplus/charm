@@ -6,6 +6,7 @@
 #define _PARTITIONING_STRATEGIES_H
 
 #include "TopoManager.h"
+#include "converse.h"
 
 #ifdef __cplusplus
 #include <queue>
@@ -146,18 +147,18 @@ vector<int> int_to_Hilbert(int i, int dim) {
   //cout << "coords size " << coord_chunks.size() << endl;
   return pack_coords(coord_chunks, dim);
 }
+
 #endif
 
 /** \brief A function to traverse the given processors, and get a hilbert list
  */
-int* getHilbertList()
+void getHilbertList(int * procList)
 {
   vector<int> hcoords;
 
   int numDims;
   int *dims, *pdims;
   int *ranks, numranks;
-  int *procList = new int[CmiNumNodes()];
 
   TopoManager_getDimCount(&numDims);
 
@@ -189,6 +190,7 @@ int* getHilbertList()
 
     for(int i = 0; i < numDims; i++) {
       if(hcoords[i] >= dims[i]) continue;
+    }
 
     //check if physical node is allocatd to us
     for(int i = 0; i < numDims; i++) {
@@ -208,19 +210,16 @@ int* getHilbertList()
   delete [] dims;
   delete [] pdims;
   delete [] ranks;
-  return procList;
 }
 
 /** \brief A function to traverse the given processors, and get a planar list
  */
-int* getPlanarList()
+void * getPlanarList(int *procList) 
 {
-  int *procList = new int[CmiNumNodes()];
-
   int numDims;
   int *dims, *pdims;
   int *ranks, numranks;
-  int *procList = new int[CmiNumNodes()];
+  int phynodes;
 
   TopoManager_getDimCount(&numDims);
 
@@ -230,16 +229,24 @@ int* getPlanarList()
   TopoManager_getDims(dims);
   ranks = new int[dims[numDims]];
 
+  phynodes = 1;
+  for(int i = 0; i < numDims; i++) {
+    phynodes *= dims[i];
+    pdims[i] = 0;
+  }
+
   int currPos = 0;
-  for(pdims[0] = 0; pdims[0] < dims[0]; pdims[0]++) {
+  for(int i = 0; i < phynodes; i++) {
 
-        TopoManager_getRanks(&numranks, ranks, pdims);
-        if(numranks == 0) continue; 
+    TopoManager_getRanks(&numranks, ranks, pdims);
+    for(int j = numDims - 1; j > -1; j--) {
+      pdims[j] = (pdims[j]+1) % dims[j];
+      if(pdims[j] != 0) break;
+    }
+    if(numranks == 0) continue; 
 
-        for(int j = 0; j < numranks; j++) {
-          procList[currPos++] = ranks[j];
-        }
-      }
+    for(int j = 0; j < numranks; j++) {
+      procList[currPos++] = ranks[j];
     }
   }
 
@@ -248,78 +255,7 @@ int* getPlanarList()
   delete [] dims;
   delete [] pdims;
   delete [] ranks;
-  return procList;
 }
 
-#endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/** \brief A dummy map function */
-void dummyMap(Profile_Graph *allData, int ** ranks)
-{
-  int i;
-    printf("TOPO_PROFILER> Using a dummy map\n");
-  *ranks = (int*)malloc(profile_data.numpes*sizeof(int));
-  for(i=0; i <profile_data.numpes; i++) {
-    (*ranks)[i] = i;
-  }
-}
-
-/** \brief A mapping function that traverses the ranks in BFS, procs using
- * Hilbert
- */
-void BFS_Hilbert_Map(Profile_Graph *allData, MPI_Comm ** ranks)
-{
-  printf("TOPO_PROFILER> Creating a new communicator using BFS traversal for application graph, and Hilbert curve for processor grid\n");
-  int *rankList = getBFSList(allData);
-  int *procList = getHilbertList();
-  TopoProfiler_createRanks(rankList, procList, ranks);
-  free(rankList);
-  free(procList);
-}
-
-/** \brief A mapping function that traverses the ranks in BFS, procs in planes
- */
-void BFS_Planar_Map(Profile_Graph *allData, int ** ranks)
-{
-  printf("TOPO_PROFILER> Creating a new communicator using BFS traversal for application graph, and planar curve for processor grid\n");
-  int *rankList = getBFSList(allData);
-  int *procList = getPlanarList();
-  TopoProfiler_createRanks(rankList, procList, ranks);
-  free(rankList);
-  free(procList);
-}
-
-/** \brief A mapping function that traverses the ranks in BFS+DFS combo, procs
- * using hilbert
- */
-void BFS_DFS_Hilbert_Map(Profile_Graph *allData, int ** ranks)
-{
-  printf("TOPO_PROFILER> Creating a new communicator using BFS+DFS combo traversal for application graph, and Hilbert curve for processor grid\n");
-  int *rankList = getBFS_DFS_List(allData);
-  int *procList = getHilbertList();
-  TopoProfiler_createRanks(rankList, procList, ranks);
-  free(rankList);
-  free(procList);
-}
-
-/** \brief A mapping function that traverses the ranks in BFS+DFS combo, procs
- * in planes
- */
-void BFS_DFS_Planar_Map(Profile_Graph *allData, int ** ranks)
-{
-  printf("TOPO_PROFILER> Creating a new communicator using BFS+DFS combo traversal for application graph, and planar curve for processor grid\n");
-  int *rankList = getBFS_DFS_List(allData);
-  int *procList = getPlanarList();
-  TopoProfiler_createRanks(rankList, procList, ranks);
-  free(rankList);
-  free(procList);
-}
-
-#ifdef __cplusplus
-}
 #endif
 #endif

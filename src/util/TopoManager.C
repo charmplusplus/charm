@@ -235,7 +235,8 @@ void TopoManager::rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int 
 #endif
 
 int TopoManager::coordinatesToRank(int x, int y, int z) {
-  CmiAssert( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ );
+  if(!( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ ))
+    return -1;
 #if CMK_BIGSIM_CHARM
   if(dimY > 1)
     return x + y*dimX + z*dimX*dimY;
@@ -258,7 +259,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
-  CmiAssert( x>=0 && x<dimNX && y>=0 && y<dimNY && z>=0 && z<dimNZ && t>=0 && t<dimNT );
+  if(!( x>=0 && x<dimNX && y>=0 && y<dimNY && z>=0 && z<dimNZ && t>=0 && t<dimNT ))
+    return -1;
 #if CMK_BIGSIM_CHARM
   if(dimNY > 1)
     return t + (x + (y + z*dimNY) * dimNX) * dimNT;
@@ -284,7 +286,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 
 #if CMK_BLUEGENEQ
 int TopoManager::coordinatesToRank(int a, int b, int c, int d, int e, int t) {
-  CmiAssert( a>=0 && a<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT );
+  if(!( a>=0 && a<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT ))
+    return -1;
   return bgqtm.coordinatesToRank(a, b, c, d, e, t);
 }
 #endif
@@ -430,12 +433,12 @@ void TopoManager::printAllocation(FILE *fp)
 extern "C" void craynid_init();
 #endif
 
-CmiNodeLock _topoLock = NULL;
+CmiNodeLock _topoLock = 0;
 TopoManager *_tmgr = NULL;
 
 extern "C" void TopoManager_init()
 {
-  if(_topoLock == NULL) {
+  if(_topoLock == 0) {
     _topoLock = CmiCreateLock();
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     craynid_init();
@@ -509,15 +512,17 @@ extern "C" void TopoManager_getPeCoordinates(int rank, int *coords) {
 void TopoManager_getRanks(int *rank_cnt, int *ranks, int *coords) {
   if(_tmgr == NULL) { TopoManager_reset(); }
   int rank, numRanks = _tmgr->getDimNT()/CmiMyNodeSize();
-  rank_cnt = 0;
+  *rank_cnt = 0;
   for(int t = 0; t < _tmgr->getDimNT(); t += CmiMyNodeSize()) {
 #if CMK_BLUEGENEQ
     rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3],coords[4],t);
 #else
     rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],t);
 #endif
-    if(rank != -1)
-      ranks[rank_cnt++] = CmiNodeOf(rank);
+    if(rank != -1) {
+      ranks[*rank_cnt] = CmiNodeOf(rank);
+      *rank_cnt = *rank_cnt + 1;
+    }
   }
 }
 
@@ -535,9 +540,16 @@ extern "C" void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops) {
   *hops = _tmgr->getHopsBetweenRanks(pe1, pe2);
 }
 
-extern "C" void TopoManager_createPartitions(int numPartitions, int *partitionSize, int *nodeMap, int *mynode, int *mypart, int scheme) {
-  if(!CmiMyNodeGlobal())
-  _tmgr->printAllocation(stdout);
+extern "C" void TopoManager_createPartitions(int *nodeMap, int scheme) {
+
+  if(scheme == 0) {
+    int i;
+    for(i = 0; i < CmiNumNodes(); i++) {
+      nodeMap[i] = i;
+    }
+  } else if(scheme == 1) {
+    getPlanarList(nodeMap);
+  } else if(scheme == 2) {
+    getHilbertList(nodeMap);
+  }
 }
-
-

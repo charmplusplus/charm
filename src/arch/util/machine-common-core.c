@@ -715,6 +715,8 @@ if (  MSG_STATISTIC)
 #include "TopoManager.h"
 
 void create_topoaware_partitions() {
+  int i,j;
+
   _partitionInfo.nodeMap = (int*)malloc(CmiNumNodesGlobal());
   _MEMCHECK(_partitionInfo.nodeMap);
 
@@ -724,18 +726,26 @@ void create_topoaware_partitions() {
   int numparts_bak = _partitionInfo.numPartitions;
   _partitionInfo.numPartitions = 1;
 
-  //int mypart_bak = _partitionInfo.myPartition;
   _partitionInfo.myPartition = 0;
 
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
   
   TopoManager_init();
-  TopoManager_createPartitions(_partitionInfo.numPartitions, _partitionInfo.partitionSize, _partitionInfo.nodeMap, &_Cmi_mynode, &_partitionInfo.myPartition,_partitionInfo.scheme);
+  TopoManager_createPartitions(_partitionInfo.nodeMap, _partitionInfo.scheme);
   
   _partitionInfo.type = type_bak;
   _partitionInfo.numPartitions = numparts_bak;
-  //_partitionInfo.myPartition = mypart_bak;
-  //_partitionInfo.isTopoaware = 0;
+
+  for(i = 0; i < _partitionInfo.numPartitions; i++) {
+    int endnode = _partitionInfo.partitionPrefix[i] + _partitionInfo.partitionSize[i];
+    for(j = _partitionInfo.partitionPrefix[i]; j < endnode; j++) {
+      if(_partitionInfo.nodeMap[j] == CmiMyNodeGlobal()) {
+        _Cmi_mynode = j - _partitionInfo.partitionPrefix[i];
+        _partitionInfo.myPartition = i;
+      }
+    }
+  }
+  TopoManager_reset();
 }
 
 static int create_partition_map( char **argv)
@@ -764,17 +774,15 @@ static int create_partition_map( char **argv)
     _partitionInfo.type = PARTITION_PREFIX;
   }
 
-  _partitionInfo.scheme = 0;
-  if (CmiGetArgIntDesc(argv,"+use_topology_scheme", &_partitionInfo.scheme, "topology aware partitioning scheme")) {
-    _partitionInfo.isTopoaware = 1;
-  } else {
-    _partitionInfo.isTopoaware = 0;
-  }
-
   if (CmiGetArgFlagDesc(argv,"+use_topology","topology aware partitions")) {
     _partitionInfo.isTopoaware = 1;
   } else {
     _partitionInfo.isTopoaware = 0;
+  }
+  
+  _partitionInfo.scheme = 0;
+  if (CmiGetArgIntDesc(argv,"+use_topology_scheme", &_partitionInfo.scheme, "topology aware partitioning scheme")) {
+    _partitionInfo.isTopoaware = 1;
   }
 
   if(_partitionInfo.type == PARTITION_DEFAULT) {
