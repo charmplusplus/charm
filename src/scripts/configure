@@ -2290,6 +2290,20 @@ void foo(void) {
 	printf("Hello, world!\n");
 }
 EOT
+
+if test "$CMK_BUILD_CRAY" = "1"
+then
+#echo "Test for known incompatible compiler versions"
+
+ if test "$CRAY_CC_VERSION" = "8.1.4"
+ then
+	echo "CCE 8.1.4 produces incorrect Charm++ code"
+	echo "Please use a newer version of the CCE compiler"
+	echo "e.g. module load cce/8.1.7"
+	test_finish 1
+ fi
+fi
+
 #echo "set C++ compiler as: $CMK_CXX $OPTS_CXX $OPTS"
 { $as_echo "$as_me:$LINENO: checking \"C++ compiler as\"" >&5
 $as_echo_n "checking \"C++ compiler as\"... " >&6; }
@@ -2351,6 +2365,7 @@ then
 	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "linux compiler"
   fi
 fi
+
 
 # Figure out if the user has asked to enable the latest language standards
 USER_ASKED_FOR_NEW_STD=`echo "$BUILDOPTS" | grep "-use-new-std" | wc -l`
@@ -4116,7 +4131,16 @@ fi
 ## Cray specific test
 if test "$CMK_BUILD_CRAY" = "1"
 then
+#echo "Test for known incompatible compiler versions"
 
+ if test "$CRAY_CC_VERSION" = "8.1.4"
+ then
+	echo "CCE 8.1.4 produces incorrect Charm++ code"
+	echo "Please use a newer version of the CCE compiler"
+	echo "e.g. module load cce/8.1.7"
+	test_finish 1
+ fi
+EOT
 #### test if Cray node topology will work ####
 cat > $tc <<EOT
 #include <pmi.h>
