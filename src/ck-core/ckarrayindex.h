@@ -250,18 +250,12 @@ namespace ck {
 
       std::vector<unsigned int> bits;
       unsigned int sum = 0;
-      if (bounds.nInts <= 3) {
-        for (int i = 0; i < bounds.dimension; ++i) {
-          unsigned int bitCount = ceil(log2(bounds.index[i]));
-          bits.push_back(bitCount);
-          sum += bitCount;
-        }
-      } else {
-        for (int i = 0; i < bounds.dimension; ++i) {
-          unsigned int bitCount = ceil(log2(bounds.indexShorts[i]));
-          bits.push_back(bitCount);
-          sum += bitCount;
-        }
+
+      for (int i = 0; i < bounds.dimension; ++i) {
+        int bound = (bounds.nInts <= 3) ? bounds.index[i] : bounds.indexShorts[i];
+        unsigned int b = bitCount(bound);
+        bits.push_back(b);
+        sum += b;
       }
 
       if (sum > 48)
@@ -293,6 +287,29 @@ namespace ck {
       : bitsPerDim(bits)
       { }
     std::vector<unsigned int> bitsPerDim;
+
+    /// Compute the number of bits to represent integer indices in the range
+    /// [0..bound). Essentially, ceil(log2(bound)).
+    static unsigned int bitCount(int bound) {
+      CkAssert(bound > 0);
+
+      // Round up to the nearest power of 2 (effectively, ceiling)
+      bound--;
+      bound |= bound >> 1;
+      bound |= bound >> 2;
+      bound |= bound >> 4;
+      bound |= bound >> 8;
+      bound |= bound >> 16;
+      bound++;
+
+      // log2(bound)
+      unsigned int result = 0;
+      while (bound >>= 1) {
+        ++result;
+      }
+
+      return result;
+    }
   };
 }
 
