@@ -691,6 +691,10 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
   for (int i=0; i< sid._nElems-1; i++) {
      CProxyElement_ArrayBase ap(a, sid._elems[i]);
      void *newMsg=CkCopyMsg((void **)&m);
+#if CMK_MESSAGE_LOGGING
+	envelope *env = UsrToEnv(newMsg);
+	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
+#endif
      ap.ckSend((CkArrayMessage *)newMsg,ep,opts|CK_MSG_LB_NOTRACE);
   }
   if (sid._nElems > 0) {
@@ -879,6 +883,10 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   for (i=0; i<entry->children.length(); i++) {
     multicastGrpMsg *newmsg = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
+#if CMK_MESSAGE_LOGGING
+	envelope *env = UsrToEnv(newmsg);
+	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
+#endif
     newmsg->_cookie = entry->children[i];
     mCastGrp[entry->children[i].get_pe()].recvMsg(newmsg);
   }
@@ -998,6 +1006,10 @@ inline CkReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *dat
   msg->rebuilt = (id.get_pe() == CkMyPe())?0:1;
   msg->callback = cb;
   msg->userFlag=userFlag;
+#if CMK_MESSAGE_LOGGING
+  envelope *env = UsrToEnv(msg);
+  env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
+#endif
   return msg;
 }
 
@@ -1091,6 +1103,10 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
   }
 
   CkReductionMsg *msg = CkReductionMsg::buildNew(dataSize, NULL);
+#if CMK_MESSAGE_LOGGING
+  envelope *env = UsrToEnv(msg);
+  env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
+#endif
 
   // initialize msg header
   msg->redNo      = redInfo.msgs[0][0]->redNo;
@@ -1148,6 +1164,10 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
 
     // Perform the actual reduction
     CkReductionMsg *newmsg = (*f)(rmsgs.length(), rmsgs.getVec());
+#if CMK_MESSAGE_LOGGING
+	envelope *env = UsrToEnv(newmsg);
+	env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
+#endif
     newmsg->redNo  = redInfo.redNo;
     newmsg->nFrags = nFrags;
     newmsg->fragNo = fragNo;
