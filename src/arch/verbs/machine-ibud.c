@@ -122,12 +122,6 @@ struct infiOtherNodeData{
 
 enum { INFI_HEADER_DATA=21,INFI_DATA};
 
-typedef struct {
-  int sleepMs; /*Milliseconds to sleep while idle*/
-  int nIdles;  /*Number of times we've been idle in a row*/
-  CmiState cs; /*Machine state*/
-} CmiIdleState;
-
 #define BUFFER_RECV 1
 struct infiBuffer{
 	int type;
@@ -492,12 +486,12 @@ void infiPostInitialRecvs(){
 
 
 
-static CmiIdleState *CmiNotifyGetState(void) { 
+static CmiIdleState *CmiNotifyGetStateNet(void) { 
 	return NULL; 
 }
 
-static void CmiNotifyStillIdle(CmiIdleState *s); 
-static void CmiNotifyBeginIdle(CmiIdleState *s) {
+static void CmiNotifyStillIdleNet(CmiIdleState *s); 
+static void CmiNotifyBeginIdleNet(CmiIdleState *s) {
   CmiNotifyStillIdle(s);
 }
 
@@ -505,7 +499,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s) {
 static inline  void CommunicationServer_lock(int toBuffer);
 static inline  void CommunicationServer_nolock(int toBuffer);
 
-static void CmiNotifyStillIdle(CmiIdleState *s) { 
+static void CmiNotifyStillIdleNet(CmiIdleState *s) { 
 #if CMK_SMP
         CommunicationServer_lock(0);
 #else
@@ -519,8 +513,8 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
  *
  *****************************************************************************/
 
-void CmiNotifyIdle(void) {
-  CmiNotifyStillIdle(NULL);
+void CmiNotifyIdleNet(void) {
+  CmiNotifyStillIdleNet(NULL);
 }
 
 /****************************************************************************
@@ -1047,7 +1041,7 @@ struct infiOtherNodeData *initinfiData(int node,int lid,int qpn,int psn) {
  *
  ***********************************************************************/
 void CmiHandleImmediate();
-static void CommunicationServer(int sleepTime, int where) {
+static void CommunicationServerNet(int sleepTime, int where) {
 /*  0: from smp thread
     1: from interrupt
     2: from worker thread
@@ -1186,7 +1180,7 @@ MACHSTATE(3,"recvBarrierMessage 0"); // FIXME: REMOVE this debug
 
 // FIXME: haven't looked at yet
 /* happen at node level */
-int CmiBarrier() {
+int CmiBarrierNet() {
 	int len, size, i;
 	int status;
 	int count = 0;
@@ -1231,7 +1225,7 @@ MACHSTATE(3,"Barrier e");
 
 // FIXME: haven't looked at yet
 /* everyone sends a message to pe 0 and go on */
-int CmiBarrierZero() {
+int CmiBarrierZeroNet() {
 	int i;
 
 	if (CmiMyRank() == 0) {
