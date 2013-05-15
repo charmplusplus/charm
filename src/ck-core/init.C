@@ -67,6 +67,7 @@ never be excluded...
 #include "ck.h"
 #include "trace.h"
 #include "CkCheckpoint.decl.h"
+#include <sstream>
 
 void CkRestartMain(const char* dirname);
 
@@ -1293,10 +1294,13 @@ void _initCharm(int unused_argc, char **argv)
         char *topoFilename;
         if(CmiGetArgStringDesc(argv,"+printTopo",&topoFilename,"topo file name")) 
         {
+            std::stringstream sstm;
+            sstm << topoFilename << "." << CmiMyPartition();
+            std::string result = sstm.str();
             FILE *fp;
-            fp = fopen(topoFilename, "w");
+            fp = fopen(result.c_str(), "w");
             if (fp == NULL) {
-              CkPrintf("Error opening topology.Info.txt file, writing to stdout\n");
+              CkPrintf("Error opening %s file, writing to stdout\n", topoFilename);
               fp = stdout;
             }
 	    TopoManager_printAllocation(fp);
