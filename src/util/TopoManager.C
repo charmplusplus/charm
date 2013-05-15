@@ -411,7 +411,7 @@ void TopoManager::printAllocation(FILE *fp)
 	fprintf(fp, "Rank - a b c d e t\n");
 	for(i=0; i<numPes; i++) {
 		rankToCoordinates(i,a,b,c,d,e,t);
-		fprintf(fp, "%d - %d %d %d %d %d %d\n",i,a,b,c,d,e,t);
+		fprintf(fp, "%d/%d - %d/%d - %d %d %d %d %d %d\n",CmiGetPeGlobal(i,CmiMyPartition()),CmiGetNodeGlobal(CmiNodeOf(i),CmiMyPartition()),i,CmiNodeOf(i),a,b,c,d,e,t);
 	}
 }
 #else
@@ -421,10 +421,10 @@ void TopoManager::printAllocation(FILE *fp)
 	fprintf(fp, "Topology Info-\n");
 	fprintf(fp, "NumPes -  %d\n", numPes);
 	fprintf(fp, "Dims - %d %d %d\n",dimNX,dimNY,dimNZ);
-	fprintf(fp, "Rank - x y z t\n");
+	fprintf(fp, "GlobalPe/GlobalNode - LocalPe/LocalNode - x y z t\n");
 	for(i=0; i<numPes; i++) {
 		rankToCoordinates(i,x,y,z,t);
-		fprintf(fp, "%d - %d %d %d %d\n",i,x,y,z,t);
+		fprintf(fp, "%d/%d - %d/%d - %d %d %d %d\n",CmiGetPeGlobal(i,CmiMyPartition()),CmiGetNodeGlobal(CmiNodeOf(i),CmiMyPartition()),i,CmiNodeOf(i),x,y,z,t);
 	}
 }
 #endif
