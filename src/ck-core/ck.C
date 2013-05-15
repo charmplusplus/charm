@@ -1705,7 +1705,14 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
                   int pe=CLD_BROADCAST_ALL, int opts = 0)
 {
   int numPes;
-  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  register envelope *env;
+    if (opts & CK_MSG_IMMEDIATE) {
+        env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
+    }else
+    {
+        env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+    }
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	sendGroupMsg(env,pe,_infoIdx);
 #else
