@@ -717,7 +717,7 @@ if (  MSG_STATISTIC)
 void create_topoaware_partitions() {
   int i,j;
 
-  _partitionInfo.nodeMap = (int*)malloc(CmiNumNodesGlobal());
+  _partitionInfo.nodeMap = (int*)malloc(CmiNumNodesGlobal()*sizeof(int));
   _MEMCHECK(_partitionInfo.nodeMap);
 
   Partition_Type type_bak = _partitionInfo.type;
@@ -732,6 +732,7 @@ void create_topoaware_partitions() {
   
   TopoManager_init();
   TopoManager_createPartitions(_partitionInfo.nodeMap, _partitionInfo.scheme);
+  TopoManager_free();
   
   _partitionInfo.type = type_bak;
   _partitionInfo.numPartitions = numparts_bak;
@@ -745,7 +746,6 @@ void create_topoaware_partitions() {
       }
     }
   }
-  TopoManager_reset();
 }
 
 static int create_partition_map( char **argv)
