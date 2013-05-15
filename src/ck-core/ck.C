@@ -1852,10 +1852,16 @@ void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
                 int node=CLD_BROADCAST_ALL, int opts=0)
 {
-  int numPes;
-  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+    int numPes;
+    register envelope *env;
+    if (opts & CK_MSG_IMMEDIATE) {
+        env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+    }else
+    {
+        env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+    }
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	sendNodeGroupMsg(env,node,_infoIdx);
+    sendNodeGroupMsg(env,node,_infoIdx);
 #else
   numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1);
   _TRACE_CREATION_N(env, numPes);
