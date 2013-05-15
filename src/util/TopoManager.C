@@ -431,6 +431,8 @@ void TopoManager::printAllocation(FILE *fp)
 
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 extern "C" void craynid_init();
+extern "C" void craynid_reset();
+extern "C" void craynid_free();
 #endif
 
 CmiNodeLock _topoLock = 0;
@@ -448,6 +450,9 @@ extern "C" void TopoManager_init()
 
 extern "C" void TopoManager_reset() {
   CmiLock(_topoLock);
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+  craynid_reset();
+#endif
   if(_topoLock) delete _tmgr;
   _tmgr = new TopoManager;
   CmiUnlock(_topoLock);
@@ -457,6 +462,9 @@ extern "C" void TopoManager_free() {
   CmiLock(_topoLock);
   if(_topoLock) delete _tmgr;
   _tmgr = NULL;
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+  craynid_free();
+#endif
   CmiUnlock(_topoLock);
 }
 
@@ -541,7 +549,6 @@ extern "C" void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops) {
 }
 
 extern "C" void TopoManager_createPartitions(int *nodeMap, int scheme) {
-
   if(scheme == 0) {
     int i;
     for(i = 0; i < CmiNumNodes(); i++) {

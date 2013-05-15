@@ -182,6 +182,29 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   /* printf("%d %d %d %d\n", *maxnid, *xdim, *ydim, *zdim); */
 }
 
+void craynid_free()
+{
+  CmiLock(cray_lock);
+  free(pid2nid);
+  pid2nid = NULL;
+#if CMK_HAS_RCALIB
+  free(rca_coords);
+  rca_coords = NULL;
+#endif
+  CmiUnlock(cray_lock);
+}
+
+void craynid_reset()
+{
+  craynid_free();
+  CmiLock(cray_lock);
+  maxX = -1;
+  maxY = -1;
+  maxZ = -1;
+  maxNID = -1;
+  CmiUnlock(cray_lock);
+}
+
 void craynid_init()
 {
   static init_done = 0;
