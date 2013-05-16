@@ -90,6 +90,9 @@ mpi-main: mpi-mainmodule.o
 main: main.o
 	cp main.o ../lib
 
+custom_partitioner: custom_partitioner.o
+	cp custom_partitioner.o ../lib
+
 translators: charmxi conv-cpm
 
 msa: charm++
@@ -256,7 +259,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  pathHistory.h envelope-path.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
-		mpi-interoperate.h \
+	  mpi-interoperate.h \
 	  $(CVHEADERS) $(CONVCOMHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -407,7 +410,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o commitid.o
+	cmitls.o memoryaffinity.o commitid.o custom_partitioner.o
 
 #############################################
 #Comlib Core objects that go into libck.a
@@ -666,7 +669,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a
-charm-target: loadbalancers default_libs comlib_objs mpi-main main
+charm-target: loadbalancers default_libs comlib_objs mpi-main main custom_partitioner
 
 CHARMLIBS: charm++ CONVLIBS 
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'

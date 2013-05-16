@@ -99,6 +99,7 @@ SPU_EXTRA_LIBS=""
 
 MPI_INTEROPERATE=""
 NO_MAIN=""
+CUSTOM_PARTITION=""
 
 ####################################################################
 #
@@ -126,7 +127,7 @@ printUsage() {
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
     echo "        -fmoddir <f90mod path>"
     echo "        -pg <opt> -build-shared -charm-shared -no-trace-mpi"
-    echo "        -mpi -nomain"
+    echo "        -mpi -nomain -custom-part"
     echo
     echo "  Cell specific flags:"
     echo "        -spu-cpp -spu-lib <libname>"
@@ -791,6 +792,9 @@ do
 		;;
 	-nomain)
 		NO_MAIN="yes"
+		;;
+	-custom-part)
+		CUSTOM_PARTITION="yes"
 		;;
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
@@ -1568,6 +1572,11 @@ fi
 if [ "$MPI_INTEROPERATE" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/mpi-mainmodule.o $OBJECTFILES"
+fi
+
+if [ "$CUSTOM_PARTITION" = "" ]
+then
+	OBJECTFILES="$CHARMLIB/custom_partitioner.o $OBJECTFILES"
 fi
 
 # check if we're linking a sequential object

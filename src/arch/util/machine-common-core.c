@@ -713,6 +713,7 @@ if (  MSG_STATISTIC)
 #endif
 
 #include "TopoManager.h"
+extern void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
 
 void create_topoaware_partitions() {
   int i,j;
@@ -731,7 +732,11 @@ void create_topoaware_partitions() {
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
   
   TopoManager_init();
-  TopoManager_createPartitions(_partitionInfo.nodeMap, _partitionInfo.scheme);
+  if(_partitionInfo.scheme == 100) {
+    createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);       
+  } else {
+    TopoManager_createPartitions(_partitionInfo.nodeMap, _partitionInfo.scheme);
+  }
   TopoManager_free();
   
   _partitionInfo.type = type_bak;
@@ -782,6 +787,11 @@ static int create_partition_map( char **argv)
   
   _partitionInfo.scheme = 0;
   if (CmiGetArgIntDesc(argv,"+use_topology_scheme", &_partitionInfo.scheme, "topology aware partitioning scheme")) {
+    _partitionInfo.isTopoaware = 1;
+  }
+
+  if (CmiGetArgIntDesc(argv,"+use_custom_part", &_partitionInfo.scheme, "custom partitioning scheme")) {
+    _partitionInfo.scheme = 100;
     _partitionInfo.isTopoaware = 1;
   }
 
