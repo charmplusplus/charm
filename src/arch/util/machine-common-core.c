@@ -790,7 +790,7 @@ static int create_partition_map( char **argv)
     _partitionInfo.isTopoaware = 1;
   }
 
-  if (CmiGetArgIntDesc(argv,"+use_custom_part", &_partitionInfo.scheme, "custom partitioning scheme")) {
+  if (CmiGetArgFlagDesc(argv,"+use_custom_part", "custom partitioning scheme")) {
     _partitionInfo.scheme = 100;
     _partitionInfo.isTopoaware = 1;
   }
