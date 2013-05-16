@@ -1574,11 +1574,6 @@ then
 	OBJECTFILES="$CHARMLIB/mpi-mainmodule.o $OBJECTFILES"
 fi
 
-if [ "$CUSTOM_PARTITION" = "" ]
-then
-	OBJECTFILES="$CHARMLIB/custom_partitioner.o $OBJECTFILES"
-fi
-
 # check if we're linking a sequential object
 case "$LANGUAGE" in
 "c"|"C"|"f90"|"f77")
@@ -1800,6 +1795,12 @@ MAKE_LDXX="0"
 MAKE_LD="0"
 
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ "
+
+if [ "$CUSTOM_PARTITION" = "" ]
+then
+	CORE_LIBS="$CORE_LIBS $CHARMLIB/custom_partitioner.o"
+fi
+
 
 # get TAU stub makefile variables
 if test "$CMK_WITH_TAU" = "true"
