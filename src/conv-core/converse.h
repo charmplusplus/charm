@@ -185,7 +185,8 @@ int pe_gToLTranslate(int pe);
 #else
 
 #define CmiMyPartition()         0
-#define CmiPartitionSize()       CmiNumNodes()
+#define CmiPartitionSize(part)       CmiNumNodes()
+#define CmiMyPartitionSize()         CmiNumNodes()
 #define CmiNumPartitions()       1
 #define CmiNumNodesGlobal()      CmiNumNodes()
 #define CmiMyNodeGlobal()        CmiMyNode()
