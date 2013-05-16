@@ -410,7 +410,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o commitid.o custom_partitioner.o
+	cmitls.o memoryaffinity.o commitid.o 
 
 #############################################
 #Comlib Core objects that go into libck.a
@@ -960,7 +960,7 @@ $(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C futil.f90
 ##############################################################################
 # adding this entry for files which do not belong to any of other locations
 
-OTHER_OBJS= mpi-mainmodule.o main.o
+OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o 
 
 ##############################################################################
 
