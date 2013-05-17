@@ -3075,7 +3075,7 @@ _ACEOF
 
 
 
-#### test if we can use PPC assembly like this ####
+#### test if we can use asm eieio assembly like this ####
 cat > $t <<EOT
 double foo(void)
 {
@@ -3084,7 +3084,7 @@ double foo(void)
         return x;
 }
 EOT
-test_cxx "whether PPC assembly works" "yes" "no" ""
+test_cxx "whether asm eieio assembly works" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_PPC_ASM $strictpass
@@ -3123,8 +3123,45 @@ EOT
 test_linkc "whether synchronization primitives (__sync_add_and_fetch) works in C" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
-#define CMK_C_SYNC_PRIMITIVES $pass
+#define CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE $pass
 _ACEOF
+
+
+#### check __sync_synchronize ####
+cat > $tc <<EOT
+#include <stdio.h>
+int main()
+{
+  __sync_synchronize();
+}
+EOT
+
+test_linkc "whether synchronization primitives (__sync_synchronize) works in C" "yes" "no" ""
+
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE $pass
+_ACEOF
+
+
+
+#### check __BUILTIN_IA32_XFENCE ####
+cat > $tc <<EOT
+#include <stdio.h>
+#include <intrinsics.h>
+int main()
+{
+  __builtin_ia32_lfence();  __builtin_ia32_sfence();   __builtin_ia32_mfence();
+}
+EOT
+
+test_linkc "whether fence intrinsic primitives (__builtin_Xfence_ia32) works in C" "yes" "no" ""
+
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_C_BUILTIN_IA32_XFENCE $pass
+_ACEOF
+
 
 
 ### test if switching TLS register ###
@@ -4140,7 +4177,7 @@ then
 	echo "e.g. module load cce/8.1.7"
 	test_finish 1
  fi
-EOT
+
 #### test if Cray node topology will work ####
 cat > $tc <<EOT
 #include <pmi.h>

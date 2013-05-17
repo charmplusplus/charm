@@ -487,6 +487,8 @@ private:
             return ((struct s_objid*)extraData())->id.getCollectionID();
         else
             CkAbort("Cannot return ArrayID from msg for non-array entity");
+	/* compiler appeasement, even though this will never be executed */
+	return ((struct s_array*)extraData())->arr;
     }
 
     void setArrayMgr(const CkGroupID gid) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); ((struct s_array*)extraData())->arr = gid; }
