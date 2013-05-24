@@ -81,7 +81,7 @@ FDECL int FTN_NAME(FPUP_ISUSERLEVEL,fpup_isuserlevel)(const pup_er p)
   { return (mp.isUserlevel())?1:0;}
 
 /*Read the size of the pupper */
-CDECL int pup_size(const pup_er p)
+CDECL size_t pup_size(const pup_er p)
   { return mp.size(); }
 
 /*Insert a synchronization into the data stream */
@@ -99,13 +99,13 @@ CDECL void pup_comment(const pup_er p, char *message)
 The macros expand like:
 void pup_int(pup_er p,int *i) <- single integer pack/unpack
   {(PUP::er & cast p)(*i);}
-void pup_ints(pup_er p,int *iarr,int nItems) <- array pack/unpack
+void pup_ints(pup_er p,int *iarr,size_t nItems) <- array pack/unpack
   {(PUP::er * cast p)(iarr,nItems);}
 */
 #define PUP_BASIC_DATATYPE(typeName,type) \
  CDECL void pup_##typeName(pup_er p,type *v) \
    {mp(*v);} \
- CDECL void pup_##typeName##s(pup_er p,type *arr,int nItems) \
+ CDECL void pup_##typeName##s(pup_er p,type *arr,size_t nItems) \
    {mp(arr,nItems);}
 
 PUP_BASIC_DATATYPE(char,char)
@@ -119,17 +119,18 @@ PUP_BASIC_DATATYPE(ulong,unsigned long)
 PUP_BASIC_DATATYPE(float,float)
 PUP_BASIC_DATATYPE(double,double)
 PUP_BASIC_DATATYPE(int8,CMK_TYPEDEF_INT8)
+PUP_BASIC_DATATYPE(size_t,size_t)
 
 // Pointers have a different signature, so they need special treatment
 CDECL void pup_pointer(pup_er p,void **v) {mp(*v,(void*)NULL);}
-CDECL void pup_pointers(pup_er p,void **arr,int nItems) {mp(arr,nItems,(void*)NULL);}
+CDECL void pup_pointers(pup_er p,void **arr,size_t nItems) {mp(arr,nItems,(void*)NULL);}
 
 #define PUP_BASIC_DATATYPEF(typeUP,typelo,type) \
  FDECL void FTN_NAME(FPUP_##typeUP,fpup_##typelo)(pup_er p,type *v) \
    {mp(*v);} \
- FDECL void FTN_NAME(FPUP_##typeUP##SG,fpup_##typelo##sg)(pup_er p,type *arr,int *nItems) \
+ FDECL void FTN_NAME(FPUP_##typeUP##SG,fpup_##typelo##sg)(pup_er p,type *arr,size_t *nItems) \
    {mp(arr,*nItems);} \
- FDECL void FTN_NAME(FPUP_##typeUP##S,fpup_##typelo##s)(pup_er p,type *arr,int *nItems) \
+ FDECL void FTN_NAME(FPUP_##typeUP##S,fpup_##typelo##s)(pup_er p,type *arr,size_t *nItems) \
    {mp(arr,*nItems);}
 
 PUP_BASIC_DATATYPEF(CHAR,char,char)
@@ -141,12 +142,12 @@ PUP_BASIC_DATATYPEF(DOUBLE,double,double)
 PUP_BASIC_DATATYPEF(LOGICAL,logical,int)
 
 /*Pack/unpack untyped byte array:*/
-CDECL void pup_bytes(pup_er p,void *ptr,int nBytes)
+CDECL void pup_bytes(pup_er p,void *ptr,size_t nBytes)
 {
   mp((char *)ptr,nBytes);
 }
 
-FDECL void FTN_NAME(FPUP_BYTES,fpup_bytes)(pup_er p,void *ptr,int *nBytes)
+FDECL void FTN_NAME(FPUP_BYTES,fpup_bytes)(pup_er p,void *ptr,size_t *nBytes)
 {
   mp((char *)ptr,*nBytes);
 }

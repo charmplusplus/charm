@@ -57,7 +57,7 @@ inline void operator|(PUP::er &p,std::complex<T> &v)
 template <class charType> 
 inline void operator|(PUP::er &p,typename std::basic_string<charType> &v)
 {
-  int nChar=v.length();
+  size_t nChar=v.length();
   p|nChar;
   if (p.isUnpacking()) { //Unpack to temporary buffer
     charType *buf=new charType[nChar];
@@ -73,7 +73,7 @@ inline void operator|(PUP::er &p,typename std::basic_string<charType> &v)
 inline void operator|(PUP::er &p,std::string &v)
 {
   p.syncComment(PUP::sync_begin_object,"std::string");
-  int nChar=v.length();
+  size_t nChar=v.length();
   p|nChar;
   if (p.isUnpacking()) { //Unpack to temporary buffer
     char *buf=new char[nChar];
@@ -92,8 +92,8 @@ inline void operator|(PUP::er &p,std::string &v)
 
 //Impl. util: pup the length of a container
 template <class container>
-inline int PUP_stl_container_size(PUP::er &p,container &c) {
-  int nElem=c.size();
+inline size_t PUP_stl_container_size(PUP::er &p,container &c) {
+  size_t nElem=c.size();
   p|nElem;
   return nElem; 
 }
@@ -113,11 +113,11 @@ inline void PUP_stl_container_items(PUP::er &p,container &c) {
 template <class container,class dtype>
 inline void PUP_stl_container(PUP::er &p,container &c) {
   p.syncComment(PUP::sync_begin_array);
-  int nElem=PUP_stl_container_size(p,c);
+  size_t nElem=PUP_stl_container_size(p,c);
   if (p.isUnpacking()) 
   { //Unpacking: Extract each element and push_back:
     c.resize(0);
-    for (int i=0;i<nElem;i++) {
+    for (size_t i=0;i<nElem;i++) {
       p.syncComment(PUP::sync_item);
       dtype n;
       p|n;
@@ -132,10 +132,10 @@ inline void PUP_stl_container(PUP::er &p,container &c) {
 template <class container,class dtype>
 inline void PUP_stl_map(PUP::er &p,container &c) {
   p.syncComment(PUP::sync_begin_list);
-  int nElem=PUP_stl_container_size(p,c);
+  size_t nElem=PUP_stl_container_size(p,c);
   if (p.isUnpacking()) 
   { //Unpacking: Extract each element and insert:
-    for (int i=0;i<nElem;i++) {
+    for (size_t i=0;i<nElem;i++) {
       dtype n;
       p|n;
       c.insert(n);

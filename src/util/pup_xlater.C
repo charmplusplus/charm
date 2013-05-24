@@ -115,12 +115,12 @@ const PUP::machineInfo &PUP::machineInfo::current(void)
 typedef unsigned char myByte;
 
 //Do nothing to the given bytes (the "null conversion")
-static void cvt_null(int N,const myByte *in,myByte *out,int nElem) {}
+static void cvt_null(int N,const myByte *in,myByte *out,size_t nElem) {}
 
 //Swap the order of each N-byte chunk in the given array (in can equal out)
-static void cvt_swap(int N,const myByte *in,myByte *out,int nElem)
+static void cvt_swap(int N,const myByte *in,myByte *out,size_t nElem)
 {
-	int i;
+	size_t i;
 	for (i=0;i<nElem;i++)
 	{
 		const myByte *s=&in[N*i];
@@ -132,13 +132,15 @@ static void cvt_swap(int N,const myByte *in,myByte *out,int nElem)
 /*******************************************************
 Convert N-byte boolean to machine boolean.
 */
-static void cvt_bool(int N,const myByte *in,myByte *out,int nElem)
+static void cvt_bool(int N,const myByte *in,myByte *out,size_t nElem)
 {
-	int i;for (i=nElem-1;i>=0;i--)
+	size_t i;
+        for (i=nElem-1;i>=0;i--)
 	{
 		const myByte *s=&in[N*i];
 		bool ret=false;
-		int j;for (j=0;j<N;j++)
+		int j;
+                for (j=0;j<N;j++)
 			if (s[j]!=0) //Some bit is set
 				ret=true;
 		((bool *)(out))[i]=ret;
@@ -157,9 +159,9 @@ Values too large to be represented will be garbage
 
 /// These defines actually provide the conversion function bodies
 #define def_cvtFunc(bigName,bigIdx,nameT,rT,uT) \
-static void cvt##bigName##_to##nameT(int N,const myByte *in,myByte *out,int nElem) \
+static void cvt##bigName##_to##nameT(int N,const myByte *in,myByte *out,size_t nElem) \
 { \
-	int i;for (i=0;i<nElem;i++)\
+	size_t i;for (i=0;i<nElem;i++)\
 	{\
 		const myByte *s=&in[N*i];\
 		rT ret=0;\
@@ -193,7 +195,7 @@ def_cvtTypes(def_cvtBig_touT) //the big unsigned conversion functions
 #define arr_cvtTypes(cvtNT) \
   {cvtNT(char), cvtNT(short), cvtNT(int), cvtNT(long)}
 
-typedef void (*dataConverterFn)(int N,const myByte *in,myByte *out,int nElem);
+typedef void (*dataConverterFn)(int N,const myByte *in,myByte *out,size_t nElem);
 
 const static dataConverterFn cvt_intTable
 	[2]//Indexed by source endian-ness (big--0, little-- 1)
@@ -296,7 +298,7 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 }
 
 //Generic bottleneck: unpack n items of size itemSize from p.
-void PUP::xlater::bytes(void *ptr,int n,size_t itemSize,dataType t)
+void PUP::xlater::bytes(void *ptr,size_t n,size_t itemSize,dataType t)
 {
 	if (convertSize[t]==itemSize)
 	{//Do conversion in-place

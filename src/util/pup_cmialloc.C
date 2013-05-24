@@ -1,10 +1,10 @@
 #include "pup_cmialloc.h"
 
-void PUP_cmiAllocSizer::bytes(void *,int n,size_t itemSize,PUP::dataType) {
+void PUP_cmiAllocSizer::bytes(void *,size_t n,size_t itemSize,PUP::dataType) {
     nBytes += n * itemSize;
 }
 
-void PUP_toCmiAllocMem::bytes(void *p, int n, size_t itemSize, 
+void PUP_toCmiAllocMem::bytes(void *p, size_t n, size_t itemSize, 
                               PUP::dataType t) {
 
     n *= itemSize;
@@ -12,7 +12,7 @@ void PUP_toCmiAllocMem::bytes(void *p, int n, size_t itemSize,
     buf += n;
 }
 
-void PUP_fromCmiAllocMem::bytes(void *p, int n, size_t itemSize, 
+void PUP_fromCmiAllocMem::bytes(void *p, size_t n, size_t itemSize, 
                                 PUP::dataType t)
 {
     n*=itemSize;
@@ -26,7 +26,7 @@ void PUP_cmiAllocSizer::pupCmiAllocBuf(void **msg) {
     pupCmiAllocBuf(msg, chnk_hdr.size);
 }
 
-void PUP_cmiAllocSizer::pupCmiAllocBuf(void **msg, int msg_size) {
+void PUP_cmiAllocSizer::pupCmiAllocBuf(void **msg, size_t msg_size) {
 
     //The cmialloced buf can only start at an aligned memory location
     //So nbytes has to be aligned
@@ -43,7 +43,7 @@ void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg) {
     pupCmiAllocBuf(msg, SIZEFIELD(msg));
 }
 
-void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, int msg_size) {
+void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, size_t msg_size) {
 
     CmiChunkHeader chnk_hdr;
 

@@ -39,7 +39,7 @@ class PUP_pagedDisk : public PUP::er {
 
 class PUP_toPagedDisk : public PUP_pagedDisk{
   protected:
-  virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
 	pup_pageentry *entry;
 	long current_block;
 	long bytes_left;
@@ -60,7 +60,7 @@ class PUP_toPagedDisk : public PUP_pagedDisk{
 
 class PUP_fromPagedDisk : public PUP_pagedDisk{
 	protected:
-	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType );
+	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType );
 	pup_pageentry *entry;
 	long current_block;
 	long bytes_unread;

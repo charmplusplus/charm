@@ -30,11 +30,11 @@ typedef CMK_NETWORK_INT4 CMK_POINTER_SIZED_INT;
 #endif
 
 class PUP_toNetwork_sizer : public PUP::er {
-	int nBytes;
-	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
+	size_t nBytes;
+	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
  public:
 	PUP_toNetwork_sizer(void) :PUP::er(IS_SIZING), nBytes(0) {}
-	int size(void) const {return nBytes;}
+	size_t size(void) const {return nBytes;}
 };
 
 class PUP_toNetwork_pack : public PUP::er {
@@ -66,13 +66,13 @@ class PUP_toNetwork_pack : public PUP::er {
 	  //w(*(CMK_DOUBLE_SIZED_INT *)&f);
 	}
 
-	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
+	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
  public:
 	PUP_toNetwork_pack(void *dest) :PUP::er(IS_PACKING) {
 		start=buf=(unsigned char *)dest;
 		CmiAssert(sizeof(void *) == sizeof(CMK_POINTER_SIZED_INT));
 	}
-	inline int size(void) const {return buf-start;}
+	inline size_t size(void) const {return buf-start;}
 };
 
 class PUP_toNetwork_unpack : public PUP::er {
@@ -111,12 +111,12 @@ class PUP_toNetwork_unpack : public PUP::er {
 	    return *(void **)&i;
 	}
 
-	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
+	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
  public:
 	PUP_toNetwork_unpack(const void *src) :PUP::er(IS_UNPACKING) {
 		start=buf=(const unsigned char *)src;
 	}
-	inline int size(void) const {return buf-start;}
+	inline size_t size(void) const {return buf-start;}
 };
 
 #endif

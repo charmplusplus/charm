@@ -13,7 +13,7 @@ Orion Sky Lawlor, olawlor@acm.org, 2004/3/18
 /****************** toNetwork ********************
 */
 
-void PUP_toNetwork_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+void PUP_toNetwork_sizer::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
@@ -53,9 +53,9 @@ void PUP_toNetwork_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	case PUP::Tsync: break; /* ignore syncs */ \
 	casePUP_toNetwork_type(Tpointer,void*,CMK_POINTER_SIZED_INT);
 
-void PUP_toNetwork_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+void PUP_toNetwork_pack::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
-	int i;
+	size_t i;
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
 	case PUP::Tuchar:
@@ -79,9 +79,9 @@ void PUP_toNetwork_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
        	}
 }
 
-void PUP_toNetwork_unpack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
+void PUP_toNetwork_unpack::bytes(void *p,size_t n,size_t itemSize,PUP::dataType t)
 {
-	int i;
+	size_t i;
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
 	case PUP::Tuchar:

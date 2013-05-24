@@ -85,7 +85,7 @@
 class PUP_cmiAllocSizer : public PUP::sizer {
  protected:
     //Generic bottleneck: n items of size itemSize
-    virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
+    virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
  public:
     //Write data to the given buffer
     PUP_cmiAllocSizer(void): PUP::sizer() {}
@@ -95,7 +95,7 @@ class PUP_cmiAllocSizer : public PUP::sizer {
         
     //In case source is not CmiAlloced the size can be passed and any
     //user buf can be converted into a cmialloc'ed buf
-    void pupCmiAllocBuf(void **msg, int msg_size);
+    void pupCmiAllocBuf(void **msg, size_t msg_size);
 };
  
 
@@ -105,11 +105,11 @@ class PUP_cmiAllocSizer : public PUP::sizer {
 class PUP_toCmiAllocMem : public PUP::toMem {
  protected:
     //Generic bottleneck: pack n items of size itemSize from p.
-    virtual void bytes(void *p,int n,size_t itemSize, PUP::dataType t);
+    virtual void bytes(void *p,size_t n,size_t itemSize, PUP::dataType t);
     
  public:
     //Write data to the given buffer
-    PUP_toCmiAllocMem(int size): PUP::toMem(CmiAlloc(size)) {}
+    PUP_toCmiAllocMem(size_t size): PUP::toMem(CmiAlloc(size)) {}
     PUP_toCmiAllocMem(void *buf): PUP::toMem(buf) {}
     
     //Copy the size of the buffer and the reference count while packing
@@ -119,7 +119,7 @@ class PUP_toCmiAllocMem : public PUP::toMem {
     
     //Non cmialloc'ed buffers can also be passed and pupped as a
     //cmialloc'ed buffers
-    void pupCmiAllocBuf(void **msg, int size);
+    void pupCmiAllocBuf(void **msg, size_t size);
 };
  
  
@@ -127,7 +127,7 @@ class PUP_toCmiAllocMem : public PUP::toMem {
 class PUP_fromCmiAllocMem : public PUP::fromMem {
  protected:
     //Generic bottleneck: unpack n items of size itemSize from p.
-    virtual void bytes(void *p,int n,size_t itemSize, PUP::dataType t);
+    virtual void bytes(void *p,size_t n,size_t itemSize, PUP::dataType t);
  public:
     //Read data from the given buffer
     //The buffer SHOULD have been CMIALLOC'ed
@@ -139,7 +139,7 @@ class PUP_fromCmiAllocMem : public PUP::fromMem {
     void pupCmiAllocBuf(void **msg);
     
     //size is irrelevant and for consistency with toCmiAllocMem
-    void pupCmiAllocBuf(void **msg, int size) {
+    void pupCmiAllocBuf(void **msg, size_t size) {
         pupCmiAllocBuf(msg);
     }
 };

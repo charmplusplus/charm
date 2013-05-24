@@ -100,7 +100,7 @@ void pup_syncComment(const pup_er p, unsigned int sync, char *message);
 void pup_comment(const pup_er p, char *message);
 
 /*Read the size of a pupper */
-int pup_size(const pup_er p);
+size_t pup_size(const pup_er p);
 
 /*Pack/unpack data items, declared with macros for brevity.
 The macros expand like:
@@ -109,7 +109,7 @@ void pup_ints(pup_er p,int *iarr,int nItems); <- array pack/unpack
 */
 #define PUP_BASIC_DATATYPE(typeName,type) \
   void pup_##typeName(pup_er p,type *v); \
-  void pup_##typeName##s(pup_er p,type *arr,int nItems);
+  void pup_##typeName##s(pup_er p,type *arr,size_t nItems);
 
 PUP_BASIC_DATATYPE(char,char)
 PUP_BASIC_DATATYPE(short,short)
@@ -123,9 +123,10 @@ PUP_BASIC_DATATYPE(float,float)
 PUP_BASIC_DATATYPE(double,double)
 PUP_BASIC_DATATYPE(pointer,void*)
 PUP_BASIC_DATATYPE(int8, CMK_TYPEDEF_INT8)
+PUP_BASIC_DATATYPE(size_t, size_t)
 
 /*Pack/unpack untyped byte array:*/
-void pup_bytes(pup_er p,void *ptr,int nBytes);
+void pup_bytes(pup_er p,void *ptr,size_t nBytes);
 
 /* These MUST match the sync declarations in pup.h */
 enum {
