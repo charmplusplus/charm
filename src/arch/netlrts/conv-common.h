@@ -1,3 +1,6 @@
+#define CMK_SUPPORT_LRTS	                           1
+
+#define	CMK_HAS_PARTITION		                   1
 
 #define CMK_NET_VERSION					   1
 
@@ -46,5 +49,3 @@
 /* call cpu timer for LB */
 #define CMK_LB_CPUTIMER					   0
 
-#define	CMK_HAS_PARTITION		1
-#define CMK_SUPPORT_LRTS		1

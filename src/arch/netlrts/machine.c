@@ -1,6 +1,6 @@
 
 /** @file
- * Basic NET implementation of Converse machine layer
+ * Basic NET-LRTS implementation of Converse machine layer
  * @ingroup NET
  */
 
