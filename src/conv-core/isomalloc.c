@@ -62,7 +62,7 @@ added by Ryan Mokos in July 2008.
 
 #if CMK_USE_MEMPOOL_ISOMALLOC
 #include "mempool.h"
-extern int cutOffPoints[cutOffNum];
+extern size_t cutOffPoints[cutOffNum];
 #endif 
 
 static int _sync_iso = 0;
@@ -136,11 +136,11 @@ static CmiInt8 pe2slot(int pe) {
 }
 /* Return the number of slots in a block with n user data bytes */
 #if CMK_USE_MEMPOOL_ISOMALLOC
-static int length2slots(int nBytes) {
+static size_t length2slots(size_t nBytes) {
   return (nBytes+slotsize-1)/slotsize;
 }
 #else
-static int length2slots(int nBytes) {
+static size_t length2slots(size_t nBytes) {
   return (sizeof(CmiIsomallocBlock)+nBytes+slotsize-1)/slotsize;
 }
 #endif
@@ -2338,7 +2338,7 @@ static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
 
 /************** External interface ***************/
 #if CMK_USE_MEMPOOL_ISOMALLOC
-void *CmiIsomalloc(int size, CthThread tid)
+void *CmiIsomalloc(size_t size, CthThread tid)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
@@ -2365,7 +2365,7 @@ void *CmiIsomalloc(int size, CthThread tid)
   return block2pointer(blk);
 }
 #else
-void *CmiIsomalloc(int size, CthThread tid)
+void *CmiIsomalloc(size_t size, CthThread tid)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
@@ -2590,6 +2590,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
 {
   mempool_type *mptr;
   block_header *current, *block_head;
+  large_block_header* lcurr;
   slot_header *currSlot;
   void *newblock;
   CmiInt8 slot;
@@ -2616,6 +2617,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   flags[0] = 0; flags[1] = 1;
   if(!pup_isUnpacking(p)) {
     mptr = CtvAccessOther(tid,threadpool);
+    //pup regular blocks
     current = MEMPOOL_GetBlockHead(mptr);
     while(current != NULL) {
       numBlocks++;
@@ -2627,8 +2629,8 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
     pup_int(p,&numBlocks);
     current = MEMPOOL_GetBlockHead(mptr);
     while(current != NULL) {
-      pup_bytes(p,&(MEMPOOL_GetBlockSize(current)),sizeof(MEMPOOL_GetBlockSize(current)));
-      pup_bytes(p,&(MEMPOOL_GetBlockMemHndl(current)),sizeof(CmiInt8));
+      pup_size_t(p,&(MEMPOOL_GetBlockSize(current)));
+      pup_int8(p,(CmiInt8*)&(MEMPOOL_GetBlockMemHndl(current)));
       numSlots = 0;
       if(flag) {
         pup_bytes(p,current,sizeof(mempool_type));
@@ -2649,7 +2651,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
         currSlot = (slot_header*)((char*)current+sizeof(block_header));
       }
       while(currSlot != NULL) {
-        pup_int(p,&cutOffPoints[currSlot->size]);
+        pup_size_t(p,&cutOffPoints[currSlot->size]);
         if(MEMPOOL_GetSlotStatus(currSlot)) {
           pup_int(p,&flags[0]);
           pup_bytes(p,(void*)currSlot,sizeof(slot_header));
@@ -2661,16 +2663,32 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
       }
       current = (MEMPOOL_GetBlockNext(current))?(block_header *)((char*)mptr+MEMPOOL_GetBlockNext(current)):NULL;
     }
+    //pup large blocks
+    numBlocks = 0;
+    lcurr = (mptr->large_blocks)?(large_block_header*)((char*)mptr + mptr->large_blocks):NULL;
+    while(lcurr != NULL) {
+      numBlocks++;
+      lcurr = MEMPOOL_GetBlockNext(lcurr)?(large_block_header *)((char*)mptr+MEMPOOL_GetBlockNext(lcurr)):NULL;
+    }
+    pup_int(p,&numBlocks);
+    lcurr = (mptr->large_blocks)?(large_block_header*)((char*)mptr + mptr->large_blocks):NULL;
+    while(lcurr != NULL) {
+      pup_size_t(p,&(MEMPOOL_GetBlockSize(lcurr)));
+      pup_int8(p,(CmiInt8*)&(MEMPOOL_GetBlockMemHndl(lcurr)));
+      pup_bytes(p,lcurr,MEMPOOL_GetBlockSize(lcurr));
+      lcurr = MEMPOOL_GetBlockNext(lcurr)?(large_block_header *)((char*)mptr+MEMPOOL_GetBlockNext(lcurr)):NULL;
+    }
   }
 
   if(pup_isUnpacking(p)) {
+    //unpack regular blocks
     pup_int(p,&numBlocks);
 #if ISOMALLOC_DEBUG
     printf("Number of blocks to be unpacked %d\n",numBlocks);
 #endif
     for(i = 0; i < numBlocks; i++) { 
-      pup_bytes(p,&size,sizeof(size));
-      pup_bytes(p,&slot,sizeof(slot));
+      pup_size_t(p,&size);
+      pup_int8(p,&slot);
       newblock = map_slots(slot,size/slotsize);
       if(flag) {
         mptr = (mempool_type*)newblock;
@@ -2683,21 +2701,29 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
       }
       pup_int(p,&numSlots);
       for(j=0; j < numSlots; j++) {
-        pup_int(p,&flags[0]);
+        pup_size_t(p,&size);
         pup_int(p,&flags[1]);
         if(flags[1] == 0) {
           pup_bytes(p,newblock,sizeof(slot_header));
         } else {
-          pup_bytes(p,newblock,flags[0]);
+          pup_bytes(p,newblock,size);
         }
         newblock = (char*)newblock + flags[0];
       }
+    }
+    //unpack large blocks
+    pup_int(p,&numBlocks);
+    for(i = 0; i < numBlocks; i++) { 
+      pup_size_t(p,&size);
+      pup_int8(p,&slot);
+      newblock = map_slots(slot,size/slotsize);
+      pup_bytes(p,newblock,size);
     }
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
     mptr->mempoolLock = CmiCreateLock();
 #endif  
   }
-  pup_bytes(p,lp,sizeof(int*));
+  pup_pointer(p,(void**)lp);
   if(pup_isDeleting(p)) {
     *lp=NULL;
   }
