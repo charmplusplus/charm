@@ -1,0 +1,12 @@
+BUILD_GPU_MANAGER=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$BUILD_CUDA; fi )
+
+ifeq "$(BUILD_GPU_MANAGER)" "1"
+hybridAPI: 
+	   cd hybridAPI && make install
+
+charm++: hybridAPI
+
+.PHONY: hybridAPI
+endif
+
+$(L)/libconv-cplus-n.a: machine.c machine-dgram.c machine-tcp.c machine-eth.c machine-mx.c machine-gm.c machine.h machine-smp.c machine-ammasso.h machine-ammasso.c machine-ibverbs.c machine-pxshm.c machine-sysvshm.c conv-onesided.c immediate.c machine-recover.c machine-commthd-util.c $(CVHEADERS)
