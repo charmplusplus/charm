@@ -57,7 +57,7 @@ void PUP_toPagedDisk::nextblock(){
 
 
 
-void PUP_toPagedDisk::bytes(void *p,int n,size_t itemSize,PUP::dataType) {
+void PUP_toPagedDisk::bytes(void *p,size_t n,size_t itemSize,PUP::dataType) {
 	long size = itemSize*n;
 	char *c = (char *)p;
 	while(size > bytes_left){
@@ -116,7 +116,7 @@ void PUP_fromPagedDisk::nextblock(){
 	bytes_unread = PUP_BLOCK;
 }
 
-void PUP_fromPagedDisk::bytes(void *p,int n,size_t itemSize,PUP::dataType ){
+void PUP_fromPagedDisk::bytes(void *p,size_t n,size_t itemSize,PUP::dataType ){
 	long size = n*itemSize;
 	char *c = (char *)p;
 	while(size > bytes_unread){

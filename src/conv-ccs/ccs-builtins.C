@@ -666,7 +666,7 @@ extern "C" void CcsBuiltinsInit(char **argv)
 
 #endif /*CMK_CCS_AVAILABLE*/
 
-void PUP_fmt::fieldHeader(typeCode_t typeCode,int nItems) {
+void PUP_fmt::fieldHeader(typeCode_t typeCode,size_t nItems) {
     // Compute and write intro byte:
     lengthLen_t ll;
     if (nItems==1) ll=lengthLen_single;
@@ -689,7 +689,7 @@ void PUP_fmt::fieldHeader(typeCode_t typeCode,int nItems) {
 }
 
 void PUP_fmt::comment(const char *message) {
-	int nItems=strlen(message);
+	size_t nItems=strlen(message);
 	fieldHeader(typeCode_comment,nItems);
 	p((char *)message,nItems);
 }
@@ -697,7 +697,7 @@ void PUP_fmt::synchronize(unsigned int m) {
 	fieldHeader(typeCode_sync,1);
 	p(m);
 }
-void PUP_fmt::bytes(void *ptr,int n,size_t itemSize,PUP::dataType t) {
+void PUP_fmt::bytes(void *ptr,size_t n,size_t itemSize,PUP::dataType t) {
 	switch(t) {
 	case PUP::Tchar:
 	case PUP::Tuchar:

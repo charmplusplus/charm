@@ -128,7 +128,7 @@ public:
 	//An evil hack to avoid inheritance and virtual functions among seekers--
 	// stores the PUP::er specific block start information.
 	union {
-		int off;
+		size_t off;
 		long loff;
 		const myByte *cptr;
 		myByte *ptr;
@@ -210,67 +210,68 @@ class er {
   
 //For arrays:
   //Integral types:
-  void operator()(signed char *a,int nItems)
+  void operator()(signed char *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(signed char),Tchar);}
 #if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char *a,int nItems)
+  void operator()(char *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(char),Tchar);}
 #endif
-  void operator()(short *a,int nItems)
+  void operator()(short *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(short),Tshort);}
-  void operator()(int *a,int nItems)
+  void operator()(int *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(int),Tint);}
-  void operator()(long *a,int nItems)
+  void operator()(long *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(long),Tlong);}
 
   //Unsigned integral types:
-  void operator()(unsigned char *a,int nItems)
+  void operator()(unsigned char *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(unsigned char),Tuchar);}
-  void operator()(unsigned short *a,int nItems)
+  void operator()(unsigned short *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(unsigned short),Tushort);}
-  void operator()(unsigned int *a,int nItems)
+  void operator()(unsigned int *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(unsigned int),Tuint);}
-  void operator()(unsigned long *a,int nItems)
+  void operator()(unsigned long *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(unsigned long),Tulong);}
 
   //Floating-point types:
-  void operator()(float *a,int nItems)
+  void operator()(float *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(float),Tfloat);}
-  void operator()(double *a,int nItems)
+  void operator()(double *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(double),Tdouble);}
 
 #if CMK_LONG_DOUBLE_DEFINED
-  void operator()(long double *a,int nItems)
+  void operator()(long double *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(long double),Tlongdouble);}
 #endif
 
   //For bools:
-  void operator()(bool *a,int nItems)
+  void operator()(bool *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(bool),Tbool);}
 
 #ifdef CMK_PUP_LONG_LONG
-  void operator()(CMK_PUP_LONG_LONG *a,int nItems)
+  void operator()(CMK_PUP_LONG_LONG *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(CMK_PUP_LONG_LONG),Tlonglong);}
-  void operator()(unsigned CMK_PUP_LONG_LONG *a,int nItems)
+  void operator()(unsigned CMK_PUP_LONG_LONG *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
 #endif
 #if CMK_HAS_INT16
-  void operator()(CmiInt16 *a,int nItems)
+  void operator()(CmiInt16 *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(CmiInt16),Tint128);}
-  void operator()(CmiUInt16 *a,int nItems)
+  void operator()(CmiUInt16 *a,size_t nItems)
     {bytes((void *)a,nItems,sizeof(CmiUInt16),Tuint128);}
 #endif
 
   //For pointers: the last parameter is to make it more difficult to call
   //(should not be used in normal code as pointers may loose meaning across processor)
-  void operator()(void **a,int nItems,void *pointerSignature) {
+  void operator()(void **a,size_t nItems,void *pointerSignature) {
     (void)pointerSignature;
-    bytes((void *)a,nItems,sizeof(void *),Tpointer); }
+    bytes((void *)a,nItems,sizeof(void *),Tpointer);
+  }
 
   //For raw memory (n gives number of bytes)
 /*
   // pup void * is error-prune, let's avoid it - Gengbin
-  void operator()(void *a,int nBytes)
+  void operator()(void *a,size_t nBytes)
     {bytes((void *)a,nBytes,1,Tbyte);}
 */
 
@@ -302,15 +303,15 @@ class er {
 
   //Generic bottleneck: pack/unpack n items of size itemSize
   // and data type t from p.  Desc describes the data item
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t) =0;
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t) =0;
   virtual void object(able** a);
 
   virtual size_t size(void) const { return 0; }
   
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
-  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
-  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+  virtual size_t impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,size_t off); /*Seek to the given offset*/
   virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 
   //See more documentation before PUP_cmiAllocSizer in pup_cmialloc.h
@@ -322,7 +323,7 @@ class er {
 
   //In case source is not CmiAlloced the size can be passed and any
   //user buf can be converted into a cmialloc'ed buf
-  virtual void pupCmiAllocBuf(void **msg, int size) {
+  virtual void pupCmiAllocBuf(void **msg, size_t size) {
     (void)msg;
     (void)size;
     CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");
@@ -368,7 +369,7 @@ class sizer : public er {
  protected:
   size_t nBytes;
   //Generic bottleneck: n items of size itemSize
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
  public:
   //Write data to the given buffer
   sizer(void):er(IS_SIZING),nBytes(0) {}
@@ -393,8 +394,8 @@ class mem : public er { //Memory-buffer packers and unpackers
 
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
-  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
-  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+  virtual size_t impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,size_t off); /*Seek to the given offset*/
  public:
   //Return the current number of buffer bytes used
   size_t size(void) const {return buf-origBuf;}
@@ -404,7 +405,7 @@ class mem : public er { //Memory-buffer packers and unpackers
 class toMem : public mem {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
  public:
   //Write data to the given buffer
   toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
@@ -421,13 +422,13 @@ inline void toMemBuf(T &t,void *buf, size_t len) {
 class fromMem : public mem {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
  public:
   //Read data from the given buffer
   fromMem(const void *Nbuf):mem(IS_UNPACKING,(myByte *)Nbuf) {}
 };
 template <class T>
-inline void fromMemBuf(T &t,void *buf,int len) {
+inline void fromMemBuf(T &t,void *buf,size_t len) {
 	PUP::fromMem p(buf);
 	p|t;
 	if (p.size()!=len) CmiAbort("Size mismatch during PUP::fromMemBuf!\n"
@@ -444,15 +445,15 @@ class disk : public er {
 
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
-  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
-  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+  virtual size_t impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,size_t off); /*Seek to the given offset*/
 };
 
 //For packing to a disk file
 class toDisk : public disk {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   bool error;
  public:
   // Write data to the given file pointer
@@ -466,7 +467,7 @@ class toDisk : public disk {
 class fromDisk : public disk {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
  public:
   // Read data from the given file pointer 
   // (must be opened for binary read)
@@ -492,14 +493,14 @@ class toTextUtil : public er {
   virtual void comment(const char *message);
   virtual void synchronize(unsigned int m);
  protected:
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void object(able** a);
 };
 /* Return the number of characters, including terminating NULL */
 class sizerText : public toTextUtil {
  private:
   char line[1000];
-  int charCount; /*Total characters seen so far (not including NULL) */
+  size_t charCount; /*Total characters seen so far (not including NULL) */
  protected:
   virtual char *advance(char *cur);
  public:
@@ -511,7 +512,7 @@ class sizerText : public toTextUtil {
 class toText : public toTextUtil {
  private:
   char *buf;
-  int charCount; /*Total characters written so far (not including NULL) */
+  size_t charCount; /*Total characters written so far (not including NULL) */
  protected:
   virtual char *advance(char *cur);
  public:
@@ -524,7 +525,7 @@ class toText : public toTextUtil {
 class toTextFile : public er {
  protected:
   FILE *f;
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
  public:
   //Begin writing to this file, which should be opened for ascii write.
   // You must close the file yourself when done.
@@ -541,7 +542,7 @@ class fromTextFile : public er {
   CMK_TYPEDEF_INT8 readLongInt(const char *fmt="%lld");
   double readDouble(void);
   
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void parseError(const char *what);
  public:
   //Begin writing to this file, which should be opened for ascii read.
@@ -603,8 +604,8 @@ public:
 	virtual size_t size(void) const { return p.size(); }
 	
 	virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
-	virtual int impl_tell(seekBlock &s); /*Give the current offset*/
-	virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+	virtual size_t impl_tell(seekBlock &s); /*Give the current offset*/
+	virtual void impl_seek(seekBlock &s,size_t off); /*Seek to the given offset*/
 	virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 };
 
@@ -613,7 +614,7 @@ public:
 // translate during unpack-- "reader makes right".)
 class xlater : public wrap_er {
  protected:
-  typedef void (*dataConverterFn)(int N,const myByte *in,myByte *out,int nElem);
+  typedef void (*dataConverterFn)(int N,const myByte *in,myByte *out,size_t nElem);
   
   //This table is indexed by dataType, and contains an appropriate
   // conversion function to unpack a n-item array of the corresponding 
@@ -625,7 +626,7 @@ class xlater : public wrap_er {
     int isUnsigned,int intType,dataType dest);
   
   //Generic bottleneck: unpack n items of size itemSize from p.
-  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
  public:
   xlater(const machineInfo &fromMachine, er &fromData);
 };
@@ -892,13 +893,13 @@ namespace PUP {
 template <class T>
 inline void operator|(PUP::er &p,T &t) {p((void *)&t,sizeof(T));}
 template <class T>
-inline void PUParray(PUP::er &p,T *ta,int n) { p((void *)ta,n*sizeof(T)); }
+inline void PUParray(PUP::er &p,T *ta,size_t n) { p((void *)ta,n*sizeof(T)); }
 
 /* enable normal pup mode from CK_DEFAULT_BITWISE_PUP */
 #  define PUPmarshall(type) \
 template<class T> inline void operator|(PUP::er &p,T &t) { t.pup(p); } \
-template<class T> inline void PUParray(PUP::er &p,T *t,int n) { \
-	for (int i=0;i<n;i++) p|t[i]; \
+template<class T> inline void PUParray(PUP::er &p,T *t,size_t n) { \
+	for (size_t i=0;i<n;i++) p|t[i]; \
 }
 
 #else /* !CK_DEFAULT_BITWISE_PUP */
@@ -917,9 +918,9 @@ inline void operator|(PUP::er &p,T &t) {
   Default PUParray: pup each element.
 */
 template<class T>
-inline void PUParray(PUP::er &p,T *t,int n) {
+inline void PUParray(PUP::er &p,T *t,size_t n) {
 	p.syncComment(PUP::sync_begin_array);
-	for (int i=0;i<n;i++) {
+	for (size_t i=0;i<n;i++) {
 		p.syncComment(PUP::sync_item);
 		p|t[i];
 	}
@@ -934,8 +935,8 @@ inline void PUParray(PUP::er &p,T *t,int n) {
 
 /// Copy this type as raw memory (like memcpy).
 #define PUPbytes(type) \
-  namespace PUP { inline void operator|(PUP::er &p,type &t) {p((char *)&t,sizeof(type));} }  \
-  namespace PUP { inline void PUParray(PUP::er &p,type *ta,int n) { p((char *)ta,n*sizeof(type)); } }  \
+  namespace PUP { inline void operator|(PUP::er &p,type &t) {p((char *)&t,sizeof(type));} } \
+  namespace PUP { inline void PUParray(PUP::er &p,type *ta,size_t n) { p((char *)ta,n*sizeof(type)); } } \
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; }
@@ -956,8 +957,8 @@ inline void PUParray(PUP::er &p,T *t,int n) {
   operator| and PUParray use p(t) and p(ta,n).
 */
 #define PUP_BUILTIN_SUPPORT(type) \
-  namespace PUP { inline void operator|(er &p,type &t) {p(t);} }	\
-  namespace PUP { inline void PUParray(er &p,type *ta,int n) { p(ta,n); } } \
+  namespace PUP { inline void operator|(er &p,type &t) {p(t);} } \
+  namespace PUP { inline void PUParray(er &p,type *ta,size_t n) { p(ta,n); } } \
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; }

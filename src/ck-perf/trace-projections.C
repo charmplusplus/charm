@@ -1781,7 +1781,7 @@ void TraceProjections::endFunc(int num){
 }
 
 // specialized PUP:ers for handling trace projections logs
-void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
+void toProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
     switch(t) {
@@ -1804,7 +1804,7 @@ void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
     };
 }
 
-void fromProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
+void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
     switch(t) {
@@ -1835,7 +1835,7 @@ void fromProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
 }
 
 #if CMK_PROJECTIONS_USE_ZLIB
-void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
+void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
     switch(t) {
