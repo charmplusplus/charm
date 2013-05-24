@@ -749,7 +749,6 @@ int pe_gToLTranslate(int pe) {
 
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
-    setbuf(stdout, NULL);
     int _ii;
     int tmp;
     //handle output to files for partition if requested
@@ -851,7 +850,6 @@ if (  MSG_STATISTIC)
     CmiInitXpmem(argv);
 #endif
 
-  MACHSTATE1(4,"2222running nonsmp %d", _Cmi_mynode)
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
     /* CmiNodesDim = ceil(log2(CmiNumNodes)) except when #nodes is 1*/
@@ -864,14 +862,12 @@ if (  MSG_STATISTIC)
     if (CmiNumNodes()==1) CmiNodesDim=1;
 #endif
 
-  MACHSTATE1(4,"333 nonsmp %d", _Cmi_mynode)
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
 #if CMK_SMP
     commThdExitLock = CmiCreateLock();
 #endif
 
-  MACHSTATE1(4,"333 nonsmp %d", _Cmi_mynode)
 #if CMK_OFFLOAD_BCAST_PROCESS
     /* the actual queues should be created on comm thread considering NUMA in SMP */
     CsvInitialize(CMIQueue, procBcastQ);
@@ -884,12 +880,9 @@ if (  MSG_STATISTIC)
     CsvInitialize(CMIQueue, notifyCommThdMsgBuffer);
 #endif
 
-    printf("converse init before threads\n");
     CmiStartThreads(argv);
 
-
     ConverseRunPE(initret);
-    printf("converse init ended\n");
 }
 
 extern void ConverseCommonInit(char **argv);
