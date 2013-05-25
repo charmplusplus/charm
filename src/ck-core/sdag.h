@@ -3,6 +3,7 @@
 
 #include "charm++.h"
 #include <vector>
+#include <set>
 
 class CMsgBuffer {
   public:
@@ -519,13 +520,13 @@ class CDep {
    // given the entry number and reference number,
    // get the buffered message, without removing it from
    // the list, NULL if no such message exists
-   CMsgBuffer *getMessage(int entry, int refnum)
+   CMsgBuffer *getMessage(int entry, int refnum, std::set<CMsgBuffer*> ignore)
    {
      TListCMsgBuffer *list = buffers[entry];
      for(CMsgBuffer *elem=list->begin(); !list->end(); elem=list->next()) {
-       if(elem==0)
+       if(elem == 0)
          return 0;
-       if(elem->refnum == refnum)
+       if(elem->refnum == refnum && ignore.find(elem) == ignore.end())
          return elem;
      }
      return 0;
@@ -535,8 +536,30 @@ class CDep {
    // get the buffered message, without removing it from
    // the list, NULL if no such message exists
    // note that this is the ANY case
-   CMsgBuffer *getMessage(int entry)
+   CMsgBuffer *getMessage(int entry, std::set<CMsgBuffer*> ignore)
    {
+     TListCMsgBuffer *list = buffers[entry];
+     for(CMsgBuffer *elem=list->begin(); !list->end(); elem=list->next()) {
+       if(elem == 0)
+         return 0;
+       if(ignore.find(elem) == ignore.end())
+         return elem;
+     }
+     return 0;
+   }
+
+   CMsgBuffer *getMessageSingle(int entry, int refnum) {
+     TListCMsgBuffer *list = buffers[entry];
+     for(CMsgBuffer *elem=list->begin(); !list->end(); elem=list->next()) {
+       if(elem == 0)
+         return 0;
+       if(elem->refnum == refnum)
+         return elem;
+     }
+     return 0;
+   }
+
+   CMsgBuffer *getMessageSingle(int entry) {
      return buffers[entry]->front();
    }
 
@@ -553,11 +576,11 @@ class CDep {
    {
      int i;
      for(i=0;i<trigger->nEntries;i++) {
-       if(!getMessage(trigger->entries[i], trigger->refnums[i]))
+       if(!getMessageSingle(trigger->entries[i], trigger->refnums[i]))
          return 0;
      }
      for(i=0;i<trigger->nAnyEntries;i++) {
-       if(!getMessage(trigger->anyEntries[i]))
+       if(!getMessageSingle(trigger->anyEntries[i]))
          return 0;
      }
      return 1;

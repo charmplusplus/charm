@@ -682,6 +682,17 @@ void SdagConstruct::generateForward(XStr& decls, XStr& defs, Entry* entry) {
   endMethod(defs);
 }
 
+void WhenConstruct::generateEntryName(XStr& defs, Entry* e, int curEntry) {
+  if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1))
+    defs << e->getEntryName() << "_" << curEntry;
+  else {
+    for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end(); ++it) {
+      CStateVar* sv = *it;
+      defs << sv->name;
+    }
+  }
+  defs << "_buf";
+}
 
 void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 {
@@ -695,16 +706,15 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 
   Entry *e;
   EntryList *el;
+  int curEntry = 0;
   el = elist;
   while (el != NULL){
     e = el->entry;
     if (e->param->isVoid() == 1)
-        defs << "    CMsgBuffer *"<<e->getEntryName()<<"_buf;\n";
+      defs << "    CMsgBuffer *" << e->getEntryName() << "_" << curEntry << "_buf;\n";
     else if (e->paramIsMarshalled() == 1) {
-
-        defs << "    CMsgBuffer *"<<e->getEntryName()<<"_buf;\n";
-        defs << "    CkMarshallMsg *" <<
-                        e->getEntryName() << "_msg;\n";
+      defs << "    CMsgBuffer *" << e->getEntryName() << "_" << curEntry << "_buf;\n";
+      defs << "    CkMarshallMsg *" << e->getEntryName() << "_" << curEntry << "_msg;\n";
     }
     else {
       for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end();
@@ -714,40 +724,57 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
              << "    " << sv->type << " " << sv->name << ";\n";
       }
     }
+    curEntry++;
     el = el->next;
   }
 
+  bool singleEntry = curEntry == 1;
+
   defs << "\n";
+  if (!singleEntry) defs << "    std::set<CMsgBuffer*> found;\n";
   el = elist;
+  curEntry = 0;
+
   while (el != NULL) {
      e = el->entry;
 
      defs << "    ";
-     if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1))
-       defs << e->getEntryName();
+     generateEntryName(defs, e, curEntry);
+     if (!singleEntry)
+       defs << " = __cDep->getMessage(" << e->entryPtr->entryNum;
      else
-       defs << sv->name;
-     defs << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum;
+       defs << " = __cDep->getMessageSingle(" << e->entryPtr->entryNum;
+
      if (e->intExpr)
        defs << ", " << e->intExpr;
-     defs << ");\n";
+     defs << ((!singleEntry) ? ", found" : "") << ");\n";
+
+     if (!singleEntry) {
+       defs << "    found.insert(";
+       generateEntryName(defs, e, curEntry);
+       defs << ");\n\n";
+     }
 
     el = el->next;
+    curEntry++;
   }
 
   defs << "\n";
   defs << "    if (";
   el = elist;
+  curEntry = 0;
+
   while (el != NULL)  {
      e = el->entry;
      if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() ==1)) {
-        defs << "(" << e->getEntryName() << "_buf != 0)";
+       defs << "(" << e->getEntryName() << "_" << curEntry << "_buf != 0)";
      }
      else {
        sv = *(e->stateVars.begin());
        defs << "(" << sv->name << "_buf != 0)";
      }
      el = el->next;
+     curEntry++;
      if (el != NULL)
         defs << "&&";
   }
@@ -756,24 +783,27 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 #if CMK_BIGSIM_CHARM
   // for tracing
   //TODO: instead of this, add a length field to EntryList
-  int elen=0;
+  int elen = 0;
   for(el=elist; el!=NULL; el=elist->next) elen++;
  
   defs << "         void * logs1["<< elen << "]; \n";
   defs << "         void * logs2["<< elen + 1<< "]; \n";
   int localnum = 0;
+
+  curEntry = 0;
   for(el=elist; el!=NULL; el=elist->next) {
     e = el->entry;
        if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() ==1)) {
-	defs << "       logs1[" << localnum << "] = " << /*el->con4->text sv->type*/e->getEntryName() << "_buf->bgLog1; \n";
-	defs << "       logs2[" << localnum << "] = " << /*el->con4->text sv->type*/e->getEntryName() << "_buf->bgLog2; \n";
+         defs << "       logs1[" << localnum << "] = " << e->getEntryName() << "_" << curEntry << "_buf->bgLog1; \n";
+         defs << "       logs2[" << localnum << "] = " << e->getEntryName() << "_" << curEntry << "_buf->bgLog2; \n";
 	localnum++;
       }
       else{
-	defs << "       logs1[" << localnum << "] = " << /*el->con4->text*/ sv->name<< "_buf->bgLog1; \n";
-	defs << "       logs2[" << localnum << "] = " << /*el->con4->text*/ sv->name << "_buf->bgLog2; \n";
+	defs << "       logs1[" << localnum << "] = " << sv->name<< "_buf->bgLog1; \n";
+	defs << "       logs2[" << localnum << "] = " << sv->name << "_buf->bgLog2; \n";
 	localnum++;
       }
+    curEntry++;
   }
       
   defs << "       logs2[" << localnum << "] = " << "_bgParentLog; \n";
@@ -782,47 +812,48 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 #endif
 
   el = elist;
+  curEntry = 0;
+
   while (el != NULL) {
      e = el->entry;
      if (e->param->isVoid() == 1) {
-        defs <<"       CkFreeSysMsg((void *) "<<e->getEntryName() <<"_buf->msg);\n";
-        defs << "       __cDep->removeMessage(" << e->getEntryName() <<
+       defs <<"       CkFreeSysMsg((void *) "<< e->getEntryName() << "_" << curEntry <<"_buf->msg);\n";
+       defs << "       __cDep->removeMessage(" << e->getEntryName() << "_" << curEntry <<
               "_buf);\n";
-        defs << "      delete " << e->getEntryName() << "_buf;\n";
+       defs << "      delete " << e->getEntryName() << "_" << curEntry << "_buf;\n";
      }
      else if (e->paramIsMarshalled() == 1) {
-        defs << "       " << e->getEntryName() << "_msg = (CkMarshallMsg *)"
-               << e->getEntryName() << "_buf->msg;\n";
-        defs << "       char *"<<e->getEntryName() <<"_impl_buf=((CkMarshallMsg *)"
-	   <<e->getEntryName() <<"_msg)->msgBuf;\n";
-        defs <<"       PUP::fromMem " <<e->getEntryName() <<"_implP("
-	   <<e->getEntryName() <<"_impl_buf);\n";
+       defs << "       " << e->getEntryName() << "_" << curEntry << "_msg = (CkMarshallMsg *)"
+            << e->getEntryName() << "_" << curEntry << "_buf->msg;\n";
+       defs << "       char *"<<e->getEntryName() << "_" << curEntry <<"_impl_buf=((CkMarshallMsg *)"
+            << e->getEntryName() << "_" << curEntry << "_msg)->msgBuf;\n";
+       defs <<"       PUP::fromMem " << e->getEntryName() << "_" << curEntry <<"_implP("
+            << e->getEntryName() << "_" << curEntry <<"_impl_buf);\n";
 
         for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end();
              ++it) {
         CStateVar *sv = *it;
            if (sv->arrayLength != NULL)
-              defs <<"       int impl_off_"<<sv->name
-	         <<"; "<<e->getEntryName() <<"_implP|impl_off_"
-		 <<sv->name<<";\n";
+             defs << "       int impl_off_"<<sv->name
+                  << "; "<<e->getEntryName() << "_" << curEntry <<"_implP|impl_off_"
+                  << sv->name<<";\n";
            else
-               defs <<"       "<<sv->type<<" "<<sv->name
-	       <<"; " <<e->getEntryName() <<"_implP|"
-	       <<sv->name<<";\n";
+             defs << "       "<<sv->type<<" "<<sv->name
+                  << "; " <<e->getEntryName() << "_" << curEntry <<"_implP|"
+                  << sv->name<<";\n";
 	}
-        defs << "       " <<e->getEntryName() <<"_impl_buf+=CK_ALIGN("
-	   <<e->getEntryName() <<"_implP.size(),16);\n";
+        defs << "       " <<e->getEntryName() << "_" << curEntry << "_impl_buf+=CK_ALIGN("
+             << e->getEntryName() << "_" << curEntry << "_implP.size(),16);\n";
         for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end();
              ++it) {
           CStateVar *sv = *it;
            if (sv->arrayLength != NULL)
               defs << "       "<<sv->type<< " *" <<sv->name <<"=(" <<sv->type
-		 <<" *)(" <<e->getEntryName() <<"_impl_buf+" <<"impl_off_"
-		 <<sv->name<<");\n";
+                   <<" *)(" << e->getEntryName() << "_" << curEntry << "_impl_buf+" <<"impl_off_"
+                   << sv->name <<");\n";
         }
-        defs << "       __cDep->removeMessage(" << e->getEntryName() <<
-              "_buf);\n";
-        defs << "       delete " << e->getEntryName() << "_buf;\n";
+        defs << "       __cDep->removeMessage(" << e->getEntryName() << "_" << curEntry << "_buf);\n";
+        defs << "       delete " << e->getEntryName() << "_" << curEntry << "_buf;\n";
      }
      else {  // There was a message as the only parameter
         sv = *e->stateVars.begin();
@@ -834,6 +865,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
         defs << "       delete " << sv->name << "_buf;\n";
      }
      el = el->next;
+     curEntry++;
   }
 
   // max(current,merge) --> current, then reset the mergepath
@@ -856,12 +888,14 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
   }
 
   el = elist;
+  curEntry = 0;
   while (el != NULL){
     e = el->entry;
     if (e->paramIsMarshalled() == 1) {
-        defs << "       delete " << e->getEntryName() << "_msg;\n";
+      defs << "       delete " << e->getEntryName() << "_" << curEntry << "_msg;\n";
     }
     el = el->next;
+    curEntry++;
   }
   defs << "       return 0;\n";
   defs << "    } else {\n";
