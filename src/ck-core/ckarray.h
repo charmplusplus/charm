@@ -396,7 +396,6 @@ public:
 
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) const;
-        void contactElement(int ep);
 //      static void ckSendWrapper(void *me, void *m, int ep, int opts = 0);
       static void ckSendWrapper(CkArrayID _aid, CkArrayIndex _idx, void *m, int ep, int opts);
 	void *ckSendSync(CkArrayMessage *m, int ep) const;
@@ -476,7 +475,6 @@ public:
 		{ ckDelegate(d); d->initDelegateMgr(this); }
 //	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
-        void contactElement(int ep);
 
 //	ArrayElement *ckLocal(void) const;
     inline int ckGetNumSubSections() const { return _nsid; }

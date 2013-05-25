@@ -201,50 +201,12 @@ class ChareMlogData;
 
 #define CHARE_MAGIC    0x201201
 
-struct ArrayElementID {
-  CkArrayID aid;
-  CkArrayIndex idx;
-
-  ArrayElementID() { }
-
-  ArrayElementID(CkArrayID aid, CkArrayIndex idx)
-    : aid(aid)
-    , idx(idx) { }
-
-  bool operator==(const ArrayElementID& elm) const {
-    return elm.aid == aid && elm.idx == idx;
-  }
-
-  inline int compare(const ArrayElementID &elm) const {
-    return elm == *this;
-  }
-
-  inline CkHashCode hash() const {
-    return CkGroupID(aid).idx + idx.hash();
-  }
-
-  static CkHashCode staticHash(const void* k, size_t keyLen) {
-    return ((const ArrayElementID *)k)->hash();
-  }
-
-  static int staticCompare(const void *a,const void *b, size_t) {
-    return *(const ArrayElementID *)a == *(const ArrayElementID *)b;
-  }
-
-  void pup(PUP::er &p) {
-    p | aid;
-    p | idx;
-  }
-};
-
 /**
   The base class of all parallel objects in Charm++,
   including Array Elements, Groups, and NodeGroups.
 */
 class Chare {
-public:
-  CkHashtableT<ArrayElementID, int> contacts;
-protected:
+  protected:
     CkChareID thishandle;
 #if CMK_OBJECT_QUEUE_AVAILABLE
     CkObjectMsgQ objQ;                // object message queue
@@ -288,8 +250,6 @@ protected:
     }
 #endif
 };
-
-CkpvExtern(Chare*, _runningChare);
 
 //Superclass of all Groups that cannot participate in reductions.
 //  Undocumented: should only be used inside Charm++.

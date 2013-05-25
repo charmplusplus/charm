@@ -69,13 +69,16 @@ bool useNodeBlkMapping;
 /*LBDB object handles are fixed-sized, and not necc.
 the same size as ArrayIndices.
 */
-LDObjid idx2LDObjid(const CkArrayIndex &idx, const CkGroupID& gid)
+LDObjid idx2LDObjid(const CkArrayIndex &idx)
 {
   LDObjid r;
   int i;
   const int *data=idx.data();
-  if (OBJ_ID_SZ * sizeof(int) >= sizeof(CkArrayIndexBase)) {
-    memcpy(r.id, &idx, sizeof(CkArrayIndexBase));
+  if (OBJ_ID_SZ>=idx.nInts) {
+    for (i=0;i<idx.nInts;i++)
+      r.id[i]=data[i];
+    for (i=idx.nInts;i<OBJ_ID_SZ;i++)
+      r.id[i]=0;
   } else {
     //Must hash array index into LBObjid
     int j;
@@ -86,8 +89,6 @@ LDObjid idx2LDObjid(const CkArrayIndex &idx, const CkGroupID& gid)
         r.id[j]+=circleShift(data[i],22+11*i*(j+1))+
           circleShift(data[i],21-9*i*(j+1));
   }
-
-  r.gid = gid;
 
 #if CMK_GLOBAL_LOCATION_UPDATE
   r.dimension = idx.dimension;
@@ -1418,7 +1419,7 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,bool fromMigration,
 	bounced  = false;
 	the_lbdb=mgr->getLBDB();
 	the_metalb=mgr->getMetaBalancer();
-	LDObjid ldid = idx2LDObjid(idx, mgr->getGroupID());
+	LDObjid ldid = idx2LDObjid(idx);
 #if CMK_GLOBAL_LOCATION_UPDATE
         ldid.locMgrGid = mgr->getGroupID().idx;
 #endif        
@@ -1539,7 +1540,6 @@ LDObjHandle CkMigratable::timingBeforeCall(int* objstopped){
 	}
 	myRec->startTiming(1);
 #endif
-        CkpvAccess(_runningChare) = static_cast<Chare*>(this);
 
   //DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
 	//bool isDeleted=false; //Enables us to detect deletion during processing
@@ -1591,7 +1591,7 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	bool isDeleted=false; //Enables us to detect deletion during processing
 	deletedMarker=&isDeleted;
 	startTiming();
-        CkpvAccess(_runningChare) = static_cast<Chare*>(obj);
+
 
 #if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
@@ -1620,7 +1620,6 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 #endif
 	if (isDeleted) return false;//We were deleted
 	deletedMarker=NULL;
-        CkpvAccess(_runningChare) = 0;
 	stopTiming();
 	return true;
 }
@@ -2496,7 +2495,7 @@ int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 //#if !defined(_FAULT_MLOG_)
 #if CMK_LBDB_ON
 
-        LDObjid ldid = idx2LDObjid(idx, getGroupID());
+        LDObjid ldid = idx2LDObjid(idx);
 #if CMK_GLOBAL_LOCATION_UPDATE
         ldid.locMgrGid = thisgroup.idx;
 #endif        

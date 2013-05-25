@@ -137,7 +137,6 @@ CkpvDeclare(int,         _currentChareType);
 CkpvDeclare(CkGroupID,   _currentGroup);
 CkpvDeclare(void*,       _currentNodeGroupObj);
 CkpvDeclare(CkGroupID,   _currentGroupRednMgr);
-CkpvDeclare(Chare*, _runningChare);
 CkpvDeclare(GroupTable*, _groupTable);
 CkpvDeclare(GroupIDTable*, _groupIDTable);
 CkpvDeclare(CmiImmediateLockType, _groupTableImmLock);
@@ -973,8 +972,6 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CkGroupID, _currentGroup);
 	CkpvInitialize(void *, _currentNodeGroupObj);
 	CkpvInitialize(CkGroupID, _currentGroupRednMgr);
-        CkpvInitialize(Chare*, _runningChare);
-        CkpvAccess(_runningChare) = 0;
 	CkpvInitialize(GroupTable*, _groupTable);
 	CkpvInitialize(GroupIDTable*, _groupIDTable);
 	CkpvInitialize(CmiImmediateLockType, _groupTableImmLock);
