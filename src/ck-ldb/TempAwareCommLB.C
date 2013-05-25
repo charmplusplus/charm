@@ -168,10 +168,10 @@ TempAwareCommLB::TempAwareCommLB(const CkLBOptions &opt): CentralLB(opt)
 #endif
 }
 
-CmiBool TempAwareCommLB::QueryBalanceNow(int _step)
+bool TempAwareCommLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
+  return true;
 }
 
 class ProcLoadGreater {

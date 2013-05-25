@@ -26,10 +26,10 @@ TempAwareGreedyLB::TempAwareGreedyLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] TempAwareGreedyLB created\n",CkMyPe());
 }
 
-CmiBool TempAwareGreedyLB::QueryBalanceNow(int _step)
+bool TempAwareGreedyLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
+  return true;
 }
 
 class ProcLoadGreater {

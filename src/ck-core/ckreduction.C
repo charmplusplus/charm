@@ -188,9 +188,9 @@ CkReductionMgr::CkReductionMgr()//Constructor
 #endif
   redNo=0;
   completedRedNo = -1;
-  inProgress=CmiFalse;
-  creating=CmiFalse;
-  startRequested=CmiFalse;
+  inProgress=false;
+  creating=false;
+  startRequested=false;
   gcount=lcount=0;
   nContrib=nRemote=0;
   maxStartRequest=0;
@@ -198,7 +198,7 @@ CkReductionMgr::CkReductionMgr()//Constructor
 	numImmigrantRecObjs = 0;
 	numEmigrantRecObjs = 0;
 #endif
-  disableNotifyChildrenStart = CmiFalse;
+  disableNotifyChildrenStart = false;
 
   barrier_gCount=0;
   barrier_nSource=0;
@@ -211,9 +211,9 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
 {
   redNo=0;
   completedRedNo = -1;
-  inProgress=CmiFalse;
-  creating=CmiFalse;
-  startRequested=CmiFalse;
+  inProgress=false;
+  creating=false;
+  startRequested=false;
   gcount=lcount=0;
   nContrib=nRemote=0;
   maxStartRequest=0;
@@ -235,9 +235,9 @@ void CkReductionMgr::flushStates()
   // CmiPrintf("[%d] CkReductionMgr::flushState\n", CkMyPe());
   redNo=0;
   completedRedNo = -1;
-  inProgress=CmiFalse;
-  creating=CmiFalse;
-  startRequested=CmiFalse;
+  inProgress=false;
+  creating=false;
+  startRequested=false;
   nContrib=nRemote=0;
   maxStartRequest=0;
 
@@ -286,12 +286,12 @@ void contributorInfo::pup(PUP::er &p)
 void CkReductionMgr::creatingContributors(void)
 {
   DEBR((AA"Creating contributors...\n"AB));
-  creating=CmiTrue;
+  creating=true;
 }
 void CkReductionMgr::doneCreatingContributors(void)
 {
   DEBR((AA"Done creating contributors...\n"AB));
-  creating=CmiFalse;
+  creating=false;
   if (startRequested) startReduction(redNo,CkMyPe());
   finishReduction();
 }
@@ -516,13 +516,13 @@ void CkReductionMgr::startReduction(int number,int srcPE)
   if (creating) //Don't start yet-- we're creating elements
   {
     DEBR((AA"Postponing start request #%d until we're done creating\n"AB,redNo));
-    startRequested=CmiTrue;
+    startRequested=true;
     return;
   }
 
 //If none of these cases, we need to start the reduction--
   DEBR((AA"Starting reduction #%d  %d %d \n"AB,redNo,completedRedNo,number));
-  inProgress=CmiTrue;
+  inProgress=true;
  
 
 	/*
@@ -724,8 +724,8 @@ void CkReductionMgr::finishReduction(void)
 	adjVec.length()--;  
   }
 
-  inProgress=CmiFalse;
-  startRequested=CmiFalse;
+  inProgress=false;
+  startRequested=false;
   nRemote=nContrib=0;
 
   //Look through the future queue for messages we can now handle
@@ -1193,9 +1193,9 @@ int CkReductionMgr::treeRoot(void)
 {
   return 0;
 }
-CmiBool CkReductionMgr::hasParent(void) //Root Node
+bool CkReductionMgr::hasParent(void) //Root Node
 {
-  return (CmiBool)(CkMyPe()!=treeRoot());
+  return (bool)(CkMyPe()!=treeRoot());
 }
 int CkReductionMgr::treeParent(void) //My parent Node
 {
@@ -1681,16 +1681,16 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 #endif
   storedCallback=NULL;
   redNo=0;
-  inProgress=CmiFalse;
+  inProgress=false;
   
-  startRequested=CmiFalse;
+  startRequested=false;
   gcount=CkNumNodes();
   lcount=1;
   nContrib=nRemote=0;
   lockEverything = CmiCreateLock();
 
 
-  creating=CmiFalse;
+  creating=false;
   interrupt = 0;
   DEBR((AA"In NodereductionMgr constructor at %d \n"AB,this));
 	/*
@@ -1707,14 +1707,14 @@ void CkNodeReductionMgr::flushStates()
  if(CkMyRank() == 0){
   // CmiPrintf("[%d] CkNodeReductionMgr::flushState\n", CkMyPe());
   redNo=0;
-  inProgress=CmiFalse;
+  inProgress=false;
 
-  startRequested=CmiFalse;
+  startRequested=false;
   gcount=CkNumNodes();
   lcount=1;
   nContrib=nRemote=0;
 
-  creating=CmiFalse;
+  creating=false;
   interrupt = 0;
   while (!msgs.isEmpty()) { delete msgs.deq(); }
   while (!futureMsgs.isEmpty()) delete futureMsgs.deq();
@@ -1882,13 +1882,13 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	if (creating) //Don't start yet-- we're creating elements
 	{
 		DEBR((AA" Node Postponing start request #%d until we're done creating\n"AB,redNo));
-		startRequested=CmiTrue;
+		startRequested=true;
 		return;
 	}
 	
 	//If none of these cases, we need to start the reduction--
 	DEBR((AA"Starting Node reduction #%d on %p srcNode %d\n"AB,redNo,this,srcNode));
-	inProgress=CmiTrue;
+	inProgress=true;
 
 	if(!_isNotifyChildInRed) return;
 
@@ -2067,8 +2067,8 @@ void CkNodeReductionMgr::finishReduction(void)
   redNo++;
 	updateTree();
   int i;
-  inProgress=CmiFalse;
-  startRequested=CmiFalse;
+  inProgress=false;
+  startRequested=false;
   nRemote=nContrib=0;
 
   //Look through the future queue for messages we can now handle
@@ -2173,9 +2173,9 @@ int CkNodeReductionMgr::treeRoot(void)
 {
   return 0;
 }
-CmiBool CkNodeReductionMgr::hasParent(void) //Root Node
+bool CkNodeReductionMgr::hasParent(void) //Root Node
 {
-  return (CmiBool)(CkMyNode()!=treeRoot());
+  return (bool)(CkMyNode()!=treeRoot());
 }
 int CkNodeReductionMgr::treeParent(void) //My parent Node
 {

@@ -49,7 +49,7 @@ void CreateGridHybridSeedLB ();
 class PE_Data_T
 {
   public:
-    CmiBool available;
+    bool available;
     int cluster;
     int num_objs;
     int num_lan_objs;
@@ -63,7 +63,7 @@ class PE_Data_T
 class Object_Data_T
 {
   public:
-    CmiBool migratable;
+    bool migratable;
     int cluster;
     int from_pe;
     int to_pe;
@@ -87,7 +87,7 @@ class GridHybridSeedLB : public CentralLB
     GridHybridSeedLB (const CkLBOptions &opt);
     GridHybridSeedLB (CkMigrateMessage *msg);
 
-    CmiBool QueryBalanceNow (int step);
+    bool QueryBalanceNow (int step);
     void work (LDStats *stats);
     void pup (PUP::er &p) { CentralLB::pup (p); }
 

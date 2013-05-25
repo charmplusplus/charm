@@ -77,13 +77,13 @@ GridMetisLB::GridMetisLB (CkMigrateMessage *msg) : CentralLB (msg)
 ** The Charm++ load balancing framework invokes this method to determine
 ** whether load balancing can be performed at a specified time.
 */
-CmiBool GridMetisLB::QueryBalanceNow (int step)
+bool GridMetisLB::QueryBalanceNow (int step)
 {
   if (_lb_args.debug() > 2) {
     CkPrintf ("[%d] GridMetisLB is balancing on step %d.\n", CkMyPe(), step);
   }
 
-  return (CmiTrue);
+  return (true);
 }
 
 

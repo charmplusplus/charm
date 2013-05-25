@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "pgm.h"
+#include "rand48_replacement.h"
 
 /* Proxies to allow charm structures to talk to each other */
 CProxy_Main mainProxy;

@@ -31,10 +31,10 @@ GreedyLB::GreedyLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] GreedyLB created\n",CkMyPe());
 }
 
-CmiBool GreedyLB::QueryBalanceNow(int _step)
+bool GreedyLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
+  return true;
 }
 
 class ProcLoadGreater {

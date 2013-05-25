@@ -49,6 +49,7 @@ typedef enum {
 	CkDeliver_inline=1  //Deliver via a regular call
 } CkDeliver_t;
 
+class CkArrayOptions;
 #include "CkLocation.decl.h"
 
 /************************** Array Messages ****************************/
@@ -64,7 +65,7 @@ public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CkGroupID gid; //gid of location manager
 #endif
-	CmiBool bounced;
+	bool bounced;
 	double* packData;
 };
 
@@ -89,7 +90,7 @@ public:
   CkArrayMap(void);
   CkArrayMap(CkMigrateMessage *m): IrrGroup(m) {}
   virtual ~CkArrayMap();
-  virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
+  virtual int registerArray(const CkArrayIndex& numElements, CkArrayID aid);
   virtual void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
   virtual int homePe(int arrayHdl,const CkArrayIndex &element)
@@ -144,14 +145,14 @@ public:
   virtual RecType type(void)=0;
   
   /// Accept a message for this element
-  virtual CmiBool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0)=0;
+  virtual bool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0)=0;
   
   /// This is called when this ArrayRec is about to be replaced.
   /// It is only used to deliver buffered element messages.
   virtual void beenReplaced(void);
   
   /// Return if this rec is now obsolete
-  virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx)=0; 
+  virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)=0; 
 
   /// Return the represented array element; or NULL if there is none
   virtual CkMigratable *lookupElement(CkArrayID aid);
@@ -166,12 +167,12 @@ public:
 class CkLocRec_local : public CkLocRec {
   CkArrayIndex idx;/// Element's array index
   int localIdx; /// Local index (into array manager's element lists)
-  CmiBool running; /// True when inside a startTiming/stopTiming pair
-  CmiBool *deletedMarker; /// Set this if we're deleted during processing
+  bool running; /// True when inside a startTiming/stopTiming pair
+  bool *deletedMarker; /// Set this if we're deleted during processing
   CkQ<CkArrayMessage *> halfCreated; /// Stores messages for nonexistent siblings of existing elements
 public:
   //Creation and Destruction:
-  CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,CmiBool ignoreArrival,
+  CkLocRec_local(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival,
   	const CkArrayIndex &idx_,int localIdx_);
   void migrateMe(int toPe); //Leave this processor
   void informIdealLBPeriod(int lb_ideal_period);
@@ -186,17 +187,17 @@ public:
    *  Accept a message for this element.
    *  Returns false if the element died during the receive.
    */
-  virtual CmiBool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0);
+  virtual bool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0);
 
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
    *   If doFree is true, the message is freed after send;
    *    if false, the message can be reused.
    */
-  CmiBool invokeEntry(CkMigratable *obj,void *msg,int idx,CmiBool doFree);
+  bool invokeEntry(CkMigratable *obj,void *msg,int idx,bool doFree);
 
   virtual RecType type(void);
-  virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx);
+  virtual bool isObsolete(int nSprings,const CkArrayIndex &idx);
 
 #if CMK_LBDB_ON  //For load balancing:
   /// Control the load balancer:
@@ -225,39 +226,39 @@ public:
   void metaLBCallLBOnChares();
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
-  void AsyncMigrate(CmiBool use);
-  CmiBool isAsyncMigrate()   { return asyncMigrate; }
-  void ReadyMigrate(CmiBool ready) { readyMigrate = ready; } ///called from user
+  void AsyncMigrate(bool use);
+  bool isAsyncMigrate()   { return asyncMigrate; }
+  void ReadyMigrate(bool ready) { readyMigrate = ready; } ///called from user
   int  isReadyMigrate()	{ return readyMigrate; }
-  CmiBool checkBufferedMigration();	// check and execute pending migration
+  bool checkBufferedMigration();	// check and execute pending migration
   int   MigrateToPe();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         void Migrated();
 #endif
-  inline void setMeasure(CmiBool status) { enable_measure = status; }
+  inline void setMeasure(bool status) { enable_measure = status; }
 private:
   LBDatabase *the_lbdb;
   MetaBalancer *the_metalb;
   LDObjHandle ldHandle;
-  CmiBool  asyncMigrate;  /// if readyMove is inited
-  CmiBool  readyMigrate;    /// status whether it is ready to migrate
-  CmiBool  enable_measure;
+  bool  asyncMigrate;  /// if readyMove is inited
+  bool  readyMigrate;    /// status whether it is ready to migrate
+  bool  enable_measure;
   int  nextPe;              /// next migration dest processor
 #else
-  void AsyncMigrate(CmiBool use){};
+  void AsyncMigrate(bool use){};
 #endif
 /**FAULT_EVAC*/
 private:
-	CmiBool asyncEvacuate; //can the element be evacuated anytime, false for tcharm 
-	CmiBool bounced; //did this element try to immigrate into a processor which was evacuating
+	bool asyncEvacuate; //can the element be evacuated anytime, false for tcharm 
+	bool bounced; //did this element try to immigrate into a processor which was evacuating
 											// and was bounced away to some other processor. This is assumed to happen
 											//only if this object was migrated by a load balancer, but the processor
 											// started crashing soon after
 public:	
-	CmiBool isAsyncEvacuate(){return asyncEvacuate;}
-	void AsyncEvacuate(CmiBool set){asyncEvacuate = set;}
-	CmiBool isBounced(){return bounced;}
-	void Bounced(CmiBool set){bounced = set;}
+	bool isAsyncEvacuate(){return asyncEvacuate;}
+	void AsyncEvacuate(bool set){asyncEvacuate = set;}
+	bool isBounced(){return bounced;}
+	void Bounced(bool set){bounced = set;}
 };
 class CkLocRec_remote;
 
@@ -279,7 +280,7 @@ protected:
 private:
   int thisChareType;//My chare type
   void commonInit(void);
-  CmiBool asyncEvacuate;
+  bool asyncEvacuate;
   int atsync_iteration;
 
   enum state {
@@ -339,16 +340,16 @@ public:
 
   /// Execute the given entry method.  Returns false if the element 
   /// deleted itself or migrated away during execution.
-  inline CmiBool ckInvokeEntry(int epIdx,void *msg,CmiBool doFree) 
+  inline bool ckInvokeEntry(int epIdx,void *msg,bool doFree) 
 	  {return myRec->invokeEntry(this,msg,epIdx,doFree);}
 
 protected:
   /// A more verbose form of abort
   virtual void CkAbort(const char *str) const;
 
-  CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
-  CmiBool usesAutoMeasure; //You must set this to use auto lb instrumentation.
-  CmiBool barrierRegistered;//True iff barrier handle below is set
+  bool usesAtSync;//You must set this in the constructor to use AtSync().
+  bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
+  bool barrierRegistered;//True iff barrier handle below is set
 
 public:
   virtual void ResumeFromSync(void);
@@ -365,7 +366,7 @@ private: //Load balancer state:
   LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)  
   static void staticResumeFromSync(void* data);
 public:
-  void ReadyMigrate(CmiBool ready);
+  void ReadyMigrate(bool ready);
   void ckFinishConstruction(void);
   void setMigratable(int migratable);
 #else
@@ -382,13 +383,13 @@ private:
   friend void CkArrayPrefetch_writeToSwap(FILE *swapfile,void *objptr);
   friend void CkArrayPrefetch_readFromSwap(FILE *swapfile,void *objptr);
   int prefetchObjID; //From CooRegisterObject
-  CmiBool isInCore; //If true, the object is present in memory
+  bool isInCore; //If true, the object is present in memory
 #endif
 
   // FAULT_EVAC
-  void AsyncEvacuate(CmiBool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
+  void AsyncEvacuate(bool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
 public:
-  CmiBool isAsyncEvacuate(){return asyncEvacuate;};
+  bool isAsyncEvacuate(){return asyncEvacuate;};
 };
 
 /** 
@@ -527,7 +528,7 @@ public:
 	/// Demand-create an element at this index on this processor
 	///  Returns true if the element was successfully added;
 	///  false if the element migrated away or deleted itself.
-	virtual CmiBool demandCreateElement(const CkArrayIndex &idx,
+	virtual bool demandCreateElement(const CkArrayIndex &idx,
 		int onPe,int ctor,CkDeliver_t type) =0;
 };
 
@@ -545,11 +546,10 @@ typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
-	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkGroupID _metalb,CkArrayIndex& numInitial);
-	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndex& numInitial);
+	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
 
-	inline CmiBool isLocMgr(void) { return CmiTrue; }
+	inline bool isLocMgr(void) { return true; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
 	inline CProxy_CkLocMgr &getProxy(void) {return thisProxy;}
 	inline CProxyElement_CkLocMgr &getLocalProxy(void) {return thislocalproxy;}
@@ -567,7 +567,7 @@ public:
 	/// Add a new local array element, calling element's constructor
 	///  Returns true if the element was successfully added;
 	///  false if the element migrated away or deleted itself.
-	CmiBool addElement(CkArrayID aid,const CkArrayIndex &idx, CkMigratable *elt,int ctorIdx,void *ctorMsg);
+	bool addElement(CkArrayID aid,const CkArrayIndex &idx, CkMigratable *elt,int ctorIdx,void *ctorMsg);
 
 	///Deliver message to this element:
 	inline void deliverViaQueue(CkMessage *m) {deliver(m,CkDeliver_queue);}
@@ -619,13 +619,13 @@ public:
 
 	int getSpringCount(void) const { return nSprings; }
 
-	CmiBool demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type);
+	bool demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type);
 
 //Interface used by external users:
 	/// Home mapping
 	inline int     homePe (const CkArrayIndex &idx) const {return map->homePe(mapHandle,idx);}
 	inline int     procNum(const CkArrayIndex &idx) const {return map->procNum(mapHandle,idx);}
-	inline CmiBool isHome (const CkArrayIndex &idx) const {return (CmiBool)(homePe(idx)==CkMyPe());}
+	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
 
 	/// Look up the object with this array index, or return NULL
 	CkMigratable *lookup(const CkArrayIndex &idx,CkArrayID aid);
@@ -638,7 +638,7 @@ public:
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	//mark the duringMigration variable .. used for parallel restart
-	void setDuringMigration(CmiBool _duringMigration);
+	void setDuringMigration(bool _duringMigration);
 #endif
 
 	/// Pass each of our locations (each separate array index) to this destination.
@@ -648,13 +648,14 @@ public:
 	void restore(const CkArrayIndex &idx, PUP::er &p);
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool create, int dummy=0);
+	void resume(const CkArrayIndex &idx, PUP::er &p, bool create, int dummy=0);
 #else
-	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify=CmiTrue,CmiBool=CmiFalse);
+	void resume(const CkArrayIndex &idx, PUP::er &p, bool notify=true,bool=false);
 #endif
 
 //Communication:
 	void immigrate(CkArrayElementMigrateMessage *msg);
+        void requestLocation(const CkArrayIndex &idx, int peToTell, bool suppressIfHere);
 	void updateLocation(const CkArrayIndex &idx,int nowOnPe);
 	void reclaimRemote(const CkArrayIndex &idx,int deletedOnPe);
 	void dummyAtSync(void);
@@ -689,10 +690,10 @@ private:
 	friend class MemElementPacker;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-        CkElementCreation_t type, CmiBool create=CmiTrue, int dummy=0);
+        CkElementCreation_t type, bool create=true, int dummy=0);
 #else
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-		CkElementCreation_t type,CmiBool rebuild = CmiFalse);
+		CkElementCreation_t type,bool rebuild = false);
 #endif
 
 	/// Call this member function on each element of this location:
@@ -701,17 +702,17 @@ private:
 	typedef void (CkMigratable::* CkMigratable_voidfn_arg_t)(void*);
 	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_arg_t fn, void*);
 
-	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts);
+	bool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts);
 
 	/// Create a new local record at this array index.
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 CkLocRec_local *createLocal(const CkArrayIndex &idx,
-        CmiBool forMigration, CmiBool ignoreArrival,
-        CmiBool notifyHome,int dummy=0);
+        bool forMigration, bool ignoreArrival,
+        bool notifyHome,int dummy=0);
 #else
 	CkLocRec_local *createLocal(const CkArrayIndex &idx, 
-		CmiBool forMigration, CmiBool ignoreArrival,
-		CmiBool notifyHome);
+		bool forMigration, bool ignoreArrival,
+		bool notifyHome);
 #endif
 
 public:
@@ -737,7 +738,7 @@ public:
 	int nManagers;
 	ManagerRec *firstManager; //First non-null array manager
 
-	CmiBool addElementToRec(CkLocRec_local *rec,ManagerRec *m,
+	bool addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 
 	//For keeping track of free local indices
@@ -753,13 +754,14 @@ public:
 	CmiImmediateLockType hashImmLock;
 
 	/// This flag is set while we delete an old copy of a migrator
-	CmiBool duringMigration;
+	bool duringMigration;
 
 	//Occasionally clear out stale remote pointers
 	static void staticSpringCleaning(void *mgr,double curWallTime);
 	void springCleaning(void);
 	int nSprings;
 
+private:
 	//Map object
 	CkGroupID mapID;
 	int mapHandle;
@@ -767,6 +769,13 @@ public:
 
 	CkGroupID lbdbID;
 	CkGroupID metalbID;
+
+	ck::ArrayIndexCompressor *compressor;
+#if CMK_ERROR_CHECKING
+	const CkArrayIndex bounds;
+#endif
+	void checkInBounds(const CkArrayIndex &idx);
+
 #if CMK_LBDB_ON
 	LBDatabase *the_lbdb;
   MetaBalancer *the_metalb;
@@ -777,6 +786,7 @@ public:
 	void recvAtSync(void);
 	LDOMHandle myLBHandle;
 #endif
+private:
 	void initLB(CkGroupID lbdbID, CkGroupID metalbID);
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))

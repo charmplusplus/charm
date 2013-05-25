@@ -190,7 +190,7 @@ public:
       _lb_predict_window = window_size;
       if (pred) predicted_model = new FutureModel(window_size, pred);
       else predicted_model = new FutureModel(window_size);
-      _lb_predict = CmiTrue;
+      _lb_predict = true;
     }
     PredictorPrintf("Predictor turned on, window size %d\n",window_size);
   }
@@ -199,7 +199,7 @@ public:
   void predictorOff() {
     if (predicted_model) delete predicted_model;
     predicted_model = 0;
-    _lb_predict = CmiFalse;
+    _lb_predict = false;
     PredictorPrintf("Predictor turned off\n");
   }
 
@@ -235,8 +235,8 @@ public:
   }
 
 protected:
-  virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
-  virtual CmiBool QueryDumpData() { return CmiFalse; };  
+  virtual bool QueryBalanceNow(int) { return true; };  
+  virtual bool QueryDumpData() { return false; };  
   virtual void LoadbalanceDone(int balancing) {}
 
   void simulationRead();

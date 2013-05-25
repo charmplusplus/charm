@@ -53,15 +53,15 @@ class EntryInfo {
     /// Our chare's index into the _chareTable
     int chareIdx;
     /// Charm++ Tracing enabled for this ep (can change dynamically)
-    CmiBool traceEnabled; 
+    bool traceEnabled; 
     /// Method doesn't keep (and delete) message passed in to it.
-    CmiBool noKeep; 
+    bool noKeep; 
     /// true if this EP is charm internal functions
-    CmiBool inCharm;
+    bool inCharm;
     
 #ifdef ADAPT_SCHED_MEM
    /// true if this EP is used to be rescheduled when adjusting memory usage
-   CmiBool isMemCritical;
+   bool isMemCritical;
 #endif
     /** 
       A "marshall unpack" function:
@@ -88,7 +88,7 @@ class EntryInfo {
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
       name(n), call(c), msgIdx(m), chareIdx(ci), 
       marshallUnpack(0), messagePup(0)
-    { traceEnabled=CmiTrue; noKeep=CmiFalse; inCharm=CmiFalse;}
+    { traceEnabled=true; noKeep=false; inCharm=false;}
 };
 
 /**
@@ -160,7 +160,7 @@ class ChareInfo {
     ChareType  chareType;
 
     /// true if this EP is charm internal functions
-    CmiBool inCharm;
+    bool inCharm;
 
     int mainChareIdx;      
 
@@ -168,7 +168,7 @@ class ChareInfo {
       defCtor=migCtor=-1;
       isIrr = numbases = 0;
       chareType = t;
-      inCharm = CmiFalse;
+      inCharm = false;
       mainChareIdx = -1;
     }
     void setDefaultCtor(int idx) { defCtor = idx; }
@@ -176,8 +176,8 @@ class ChareInfo {
     void setMigCtor(int idx) { migCtor = idx; }
     int getMigCtor(void) { return migCtor; }
     void addBase(int idx) { bases[numbases++] = idx; }
-    void setInCharm() { inCharm = CmiTrue; }
-    CmiBool isInCharm() { return inCharm; }
+    void setInCharm() { inCharm = true; }
+    bool isInCharm() { return inCharm; }
     void setMainChareType(int idx) { mainChareIdx = idx; }
     int mainChareType() { return mainChareIdx; }
 };

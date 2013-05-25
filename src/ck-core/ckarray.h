@@ -170,8 +170,8 @@ class CkArrayListener : public PUP::able {
   virtual void ckElementCreating(ArrayElement *elt) {}
   ///Element was just created on this processor
   /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementCreated(ArrayElement *elt)
-    { return CmiTrue; }
+  virtual bool ckElementCreated(ArrayElement *elt)
+    { return true; }
 
   ///Element is about to be destroyed
   virtual void ckElementDied(ArrayElement *elt) {}
@@ -182,8 +182,8 @@ class CkArrayListener : public PUP::able {
 
   ///Element just arrived on this processor (so just called pup)
   /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementArriving(ArrayElement *elt)
-    { return CmiTrue; }
+  virtual bool ckElementArriving(ArrayElement *elt)
+    { return true; }
 
   /// used by checkpointing to reset the states
   virtual void flushState()  {}
@@ -204,11 +204,11 @@ class CkVerboseListener : public CkArrayListener {
 
   virtual void ckElementStamp(int *eltInfo);
   virtual void ckElementCreating(ArrayElement *elt);
-  virtual CmiBool ckElementCreated(ArrayElement *elt);
+  virtual bool ckElementCreated(ArrayElement *elt);
   virtual void ckElementDied(ArrayElement *elt);
 
   virtual void ckElementLeaving(ArrayElement *elt);
-  virtual CmiBool ckElementArriving(ArrayElement *elt);
+  virtual bool ckElementArriving(ArrayElement *elt);
 };
 
 /**
@@ -221,6 +221,9 @@ class CkArrayOptions {
 	friend class CkArray;
 
 	CkArrayIndex numInitial;///< Number of elements to create
+        /// Limits of element counts in each dimension of this and all bound
+        /// arrays
+        CkArrayIndex bounds;
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
@@ -269,6 +272,25 @@ class CkArrayOptions {
 		{numInitial=CkArrayIndex6D(ni1, ni2, ni3, ni4, ni5, ni6); return *this;}
         */
 
+	/// Allow up to this many elements in 1D
+	CkArrayOptions &setBounds(int ni)
+		{bounds=CkArrayIndex1D(ni); return *this;}
+	/// Allow up to this many elements in 2D
+	CkArrayOptions &setBounds(int ni1, int ni2)
+		{bounds=CkArrayIndex2D(ni1, ni2); return *this;}
+	/// Allow up to this many elements in 3D
+	CkArrayOptions &setBounds(int ni1, int ni2, int ni3)
+		{bounds=CkArrayIndex3D(ni1 ,ni2, ni3); return *this;}
+	/// Allow up to this many elements in 4D
+	CkArrayOptions &setBounds(short ni1, short ni2, short ni3, short ni4)
+		{bounds=CkArrayIndex4D(ni1, ni2, ni3, ni4); return *this;}
+	/// Allow up to this many elements in 5D
+	CkArrayOptions &setBounds(short ni1, short ni2, short ni3, short ni4, short ni5)
+		{bounds=CkArrayIndex5D(ni1, ni2, ni3, ni4, ni5); return *this;}
+	/// Allow up to this many elements in 6D
+	CkArrayOptions &setBounds(short ni1, short ni2, short ni3, short ni4, short ni5, short ni6)
+		{bounds=CkArrayIndex6D(ni1, ni2, ni3, ni4, ni5, ni6); return *this;}
+
 	/// Use this location map
 	CkArrayOptions &setMap(const CkGroupID &m)
 		{map=m; return *this;}
@@ -291,6 +313,7 @@ class CkArrayOptions {
 
   //Used by the array manager:
 	const CkArrayIndex &getNumInitial(void) const {return numInitial;}
+	const CkArrayIndex &getBounds(void) const {return bounds;}
 	const CkGroupID &getMap(void) const {return map;}
 	const CkGroupID &getLocationManager(void) const {return locMgr;}
 	int getListeners(void) const {return arrayListeners.size();}
@@ -696,10 +719,10 @@ public:
   void remoteBeginInserting(void);
 
   /// Create manually:
-  virtual CmiBool insertElement(CkMessage *);
+  virtual bool insertElement(CkMessage *);
 
 /// Demand-creation:
-  CmiBool demandCreateElement(const CkArrayIndex &idx,
+  bool demandCreateElement(const CkArrayIndex &idx,
   	int onPe,int ctor,CkDeliver_t type);
 
 /// Broadcast communication:
@@ -717,15 +740,15 @@ public:
   //ComlibArrayListener * calistener;
   //ComlibArrayListener * getComlibArrayListener() {return calistener;}
 
-  virtual CmiBool isArrMgr(void) {return CmiTrue;}
+  virtual bool isArrMgr(void) {return true;}
 
 private:
   CkArrayIndex numInitial;/// Number of initial array elements
-  CmiBool isInserting;/// Are we currently inserting elements?
+  bool isInserting;/// Are we currently inserting elements?
 
 /// Allocate space for a new array element
   ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
-	CkMessage *msg,CmiBool fromMigration);
+	CkMessage *msg,bool fromMigration);
 
 //Spring cleaning
   void springCleaning(void);

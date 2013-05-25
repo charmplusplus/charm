@@ -20,9 +20,9 @@ RandCentLB::RandCentLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] RandCentLB created\n",CkMyPe());
 }
 
-CmiBool RandCentLB::QueryBalanceNow(int _step)
+bool RandCentLB::QueryBalanceNow(int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 inline int chooseProc(int count)

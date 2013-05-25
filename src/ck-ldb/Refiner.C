@@ -36,7 +36,7 @@ void Refiner::create(int count, BaseLB::LDStats* stats, int* procs)
     processors[i].pe_speed = stats->procs[i].pe_speed;
 //    processors[i].utilization = stats->procs[i].utilization;
     processors[i].available = stats->procs[i].available;
-    if (processors[i].available == CmiTrue) numAvail++;
+    if (processors[i].available == true) numAvail++;
   }
 
   for (i=0; i<stats->n_objs; i++)
@@ -95,7 +95,7 @@ void Refiner::computeAverage()
   for (i=0; i<numComputes; i++) total += computes[i].load;
 
   for (i=0; i<P; i++)
-    if (processors[i].available == CmiTrue) 
+    if (processors[i].available == true) 
 	total += processors[i].backgroundLoad;
 
   averageLoad = total/numAvail;
@@ -106,7 +106,7 @@ double Refiner::computeMax()
   int i;
   double max = -1.0;
   for (i=0; i<P; i++) {
-    if (processors[i].available == CmiTrue && processors[i].load > max)
+    if (processors[i].available == true && processors[i].load > max)
       max = processors[i].load;
   }
   return max;
@@ -114,7 +114,7 @@ double Refiner::computeMax()
 
 int Refiner::isHeavy(processorInfo *p)
 {
-  if (p->available == CmiTrue) 
+  if (p->available == true) 
      return p->load > overLoad*averageLoad;
   else {
      return p->computeSet->numElements() != 0;
@@ -123,7 +123,7 @@ int Refiner::isHeavy(processorInfo *p)
 
 int Refiner::isLight(processorInfo *p)
 {
-  if (p->available == CmiTrue) 
+  if (p->available == true) 
      return p->load < averageLoad;
   else 
      return 0;
@@ -138,9 +138,9 @@ void Refiner::removeComputes()
   if (numAvail < P) {
     if (numAvail == 0) CmiAbort("No processor available!");
     for (first=0; first<P; first++)
-      if (processors[first].available == CmiTrue) break;
+      if (processors[first].available == true) break;
     for (int i=0; i<P; i++) {
-      if (processors[i].available == CmiFalse) {
+      if (processors[i].available == false) {
           computeInfo *c = (computeInfo *)
 	           processors[i].computeSet->iterator((Iterator *)&nextCompute);
 	  while (c) {

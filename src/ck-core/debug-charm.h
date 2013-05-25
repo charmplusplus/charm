@@ -42,11 +42,11 @@ typedef struct DebugPersistentCheck {
 class DebugEntryInfo {
 public:
   // true if this entry method has a breakpoint set
-  CmiBool isBreakpoint;
+  bool isBreakpoint;
   CkVec<DebugPersistentCheck> preProcess;
   CkVec<DebugPersistentCheck> postProcess;
 
-  DebugEntryInfo() : isBreakpoint(CmiFalse) { }
+  DebugEntryInfo() : isBreakpoint(false) { }
 };
 
 typedef CkVec<DebugEntryInfo> DebugEntryTable;

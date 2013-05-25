@@ -32,10 +32,10 @@ CommLB::CommLB(const CkLBOptions &opt): CentralLB(opt)
   lbname = "CommLB";
 }
 
-CmiBool CommLB::QueryBalanceNow(int _step)
+bool CommLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
+  return true;
 }
 
 void CommLB::alloc(int pe , int id, double load, int nmsg, int nbyte){

@@ -61,7 +61,7 @@ extern "C" LDObjHandle LDRegisterObj(LDOMHandle _h, LDObjid _id,
 				       void *_userData, int _migratable)
 {
   LBDB *const db = (LBDB*)(_h.ldb.handle);
-  return db->AddObj(_h, _id, _userData, (CmiBool)(_migratable));
+  return db->AddObj(_h, _id, _userData, (bool)(_migratable));
 }
 
 extern "C" void LDUnregisterObj(LDObjHandle _h)
@@ -305,7 +305,7 @@ extern "C" void LDNonMigratable(const LDObjHandle &h)
   LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(h);
 
-  obj->SetMigratable(CmiFalse);
+  obj->SetMigratable(false);
 }
 
 extern "C" void LDMigratable(const LDObjHandle &h)
@@ -313,10 +313,10 @@ extern "C" void LDMigratable(const LDObjHandle &h)
   LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(h);
 
-  obj->SetMigratable(CmiTrue);
+  obj->SetMigratable(true);
 }
 
-extern "C" void LDAsyncMigrate(const LDObjHandle &h, CmiBool async)
+extern "C" void LDAsyncMigrate(const LDObjHandle &h, bool async)
 {
   LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(h);
@@ -530,14 +530,14 @@ extern "C" int LDMemusage(LDHandle _db)
 extern "C" int LDProcessorSpeed() { return 1; }
 #endif // CMK_LBDB_ON
 
-CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2)
+bool LDOMidEqual(const LDOMid &i1, const LDOMid &i2)
 {
- return i1.id == i2.id?CmiTrue:CmiFalse;
+ return i1.id == i2.id?true:false;
 }
 
-CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2)
+bool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2)
 {
-  return (CmiBool)(i1.id[0] == i2.id[0] 
+  return (i1.id[0] == i2.id[0] 
 	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
 	 && i1.id[3] == i2.id[3]);
 }

@@ -31,9 +31,9 @@ PhasebyArrayLB::PhasebyArrayLB(const CkLBOptions &opt): CentralLB(opt)
   lb = (CentralLB *)fn();
 }
 
-CmiBool PhasebyArrayLB::QueryBalanceNow(int _step)
+bool PhasebyArrayLB::QueryBalanceNow(int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 void PhasebyArrayLB::copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats){
@@ -95,9 +95,9 @@ void PhasebyArrayLB::work(LDStats *stats){
 	odata = &(tempStats->objData[0]);
 	omids.push_back(odata->omID());
 	if(odata->migratable)
-		migratableOMs.push_back(CmiTrue);
+		migratableOMs.push_back(true);
 	else
-		migratableOMs.push_back(CmiFalse);
+		migratableOMs.push_back(false);
 
 	for(i=0;i<tempStats->n_objs; i++){
 		odata = &(tempStats->objData[i]);
@@ -113,9 +113,9 @@ void PhasebyArrayLB::work(LDStats *stats){
 		else{
 			omids.push_back(odata->omID());
 			if(odata->migratable)
-				migratableOMs.push_back(CmiTrue);
+				migratableOMs.push_back(true);
 			else
-				migratableOMs.push_back(CmiFalse);
+				migratableOMs.push_back(false);
 		}
 	}
 	
@@ -127,7 +127,7 @@ void PhasebyArrayLB::work(LDStats *stats){
 			for (obj = 0; obj < tempStats->n_objs; obj++) {
 		  	odata = &(tempStats->objData[obj]);
 		  	if (odata->omID() != omid)
-					odata->migratable=CmiFalse;
+					odata->migratable=false;
  			}
 			//Call a strategy here
 			lb->work(tempStats);

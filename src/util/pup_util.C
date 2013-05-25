@@ -106,7 +106,7 @@ void PUP::sizer::bytes(void * /*p*/,int n,size_t itemSize,dataType /*t*/)
 #ifdef CK_CHECK_PUP
 	nBytes+=sizeof(pupCheckRec);
 #endif
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if (n<0) CmiAbort("PUP::sizer> Tried to pup a negative number of items!");
 	const unsigned int maxPupBytes=1024*1024*1024; //Pup 1 GB at a time
 	if (((unsigned int)(n*itemSize))>maxPupBytes) 
@@ -253,7 +253,7 @@ PUP::seekBlock::seekBlock(PUP::er &Np,int nSections)
 		for (int i=0;i<=nSec;i++) secTab[i]=-1;
 	}
 	p(secTab,nSec+1);
-	hasEnded=CmiFalse;
+	hasEnded=false;
 }
 PUP::seekBlock::~seekBlock() 
 {
@@ -283,7 +283,7 @@ void PUP::seekBlock::endBlock(void)
 	//Seek to the end of the seek block
 	p.impl_seek(*this,secTab[nSec]);
 	p.impl_endSeek(*this);
-	hasEnded=CmiTrue;
+	hasEnded=true;
 }
 
 /** PUP::er seek implementation routines **/
@@ -566,7 +566,7 @@ void PUP::toTextUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
       case Tulong: sprintf(o,"ulong=%lu;\n",((unsigned long *)p)[i]); break;
       case Tfloat: sprintf(o,"float=%.7g;\n",((float *)p)[i]); break;
       case Tdouble: sprintf(o,"double=%.15g;\n",((double *)p)[i]); break;
-      case Tbool: sprintf(o,"bool=%s;\n",((CmiBool *)p)[i]?"true":"false"); break;
+      case Tbool: sprintf(o,"bool=%s;\n",((bool *)p)[i]?"true":"false"); break;
 #if CMK_LONG_DOUBLE_DEFINED
       case Tlongdouble: sprintf(o,"longdouble=%Lg;\n",((long double *)p)[i]);break;
 #endif
@@ -623,7 +623,7 @@ void PUP::toTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tulong: fprintf(f," %lu",((unsigned long *)p)[i]); break;
     case Tfloat: fprintf(f," %.7g",((float *)p)[i]); break;
     case Tdouble: fprintf(f," %.15g",((double *)p)[i]); break;
-    case Tbool: fprintf(f," %s",((CmiBool *)p)[i]?"true":"false"); break;
+    case Tbool: fprintf(f," %s",((bool *)p)[i]?"true":"false"); break;
 #if CMK_LONG_DOUBLE_DEFINED
     case Tlongdouble: fprintf(f," %Lg",((long double *)p)[i]);break;
 #endif
@@ -727,11 +727,11 @@ void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tbool: {
       char tmp[20];
       if (1!=fscanf(f," %19s",tmp)) parseError("could not read boolean string");
-      CmiBool val=CmiFalse;
-      if (0==strcmp(tmp,"true")) val=CmiTrue;
-      else if (0==strcmp(tmp,"false")) val=CmiFalse;
+      bool val=false;
+      if (0==strcmp(tmp,"true")) val=true;
+      else if (0==strcmp(tmp,"false")) val=false;
       else parseError("could not recognize boolean string");
-      ((CmiBool *)p)[i]=val; 
+      ((bool *)p)[i]=val; 
     }
       break;
     case Tpointer: {

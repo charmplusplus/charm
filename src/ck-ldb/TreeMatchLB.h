@@ -17,7 +17,7 @@ public:
   TreeMatchLB(CkMigrateMessage *m):CentralLB(m) {}
   void work(BaseLB::LDStats* stats);
 private:
-  CmiBool QueryBalanceNow(int step);
+  bool QueryBalanceNow(int step);
 };
 
 #endif /* _TREEMATCHLB_H_ */

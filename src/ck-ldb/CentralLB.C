@@ -313,6 +313,7 @@ void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
   int *counts = (int *)msg->getData();
   int n_objs = counts[0];
   int n_comm = counts[1];
+  delete msg;
 
     // resize database
   statsData->objData.resize(n_objs);
@@ -519,7 +520,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.pe_speed = m->pe_speed;
 
   //procStat.utilization = 1.0;
-  procStat.available = CmiTrue;
+  procStat.available = true;
   procStat.n_objs = m->n_objs;
 
   int &nobj = statsData->n_objs;
@@ -597,7 +598,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 #endif
       procStat.pe_speed = m->pe_speed;
       //procStat.utilization = 1.0;
-      procStat.available = CmiTrue;
+      procStat.available = true;
       procStat.n_objs = m->n_objs;
 
       statsData->n_objs += m->n_objs;
@@ -671,7 +672,7 @@ void CentralLB::LoadBalance()
 
   char *availVector = LBDatabaseObj()->availVector();
   for(proc = 0; proc < clients; proc++)
-      statsData->procs[proc].available = (CmiBool)availVector[proc];
+      statsData->procs[proc].available = (bool)availVector[proc];
 
   preprocess(statsData);
 

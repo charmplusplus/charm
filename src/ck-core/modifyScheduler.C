@@ -71,6 +71,29 @@ void CqsIncreasePriorityForMemCriticalEntries(Queue q){
 }
 #endif
 
+static bool checkAndRemoveMatching(void *&msgPtr, const int *entryMethod, const int numEntryMethods, envelope *env, void** &p) {
+	if(env != NULL && (env->getMsgtype() == ForArrayEltMsg ||
+                       env->getMsgtype() == ForIDedObjMsg ||
+                       env->getMsgtype() == ForChareMsg)
+      ){
+	    const int ep = env->getsetArrayEp();
+	    bool foundMatch = false;
+	    // Search for ep by linearly searching through entryMethod
+	    for(int i=0;i<numEntryMethods;++i){
+		if(ep==entryMethod[i]){
+		    foundMatch=true;
+		    break;
+		}
+	    }
+	    if(foundMatch){
+		// Remove the entry from the queue
+		*p = NULL;
+		msgPtr = env;
+		return true;
+	    }
+	}
+}
+
 /** Find and remove the first 1 occurences of messages that matches a specified entry method index.
     The size of the deq will not change, it will just contain an entry for a NULL pointer.
 
@@ -87,23 +110,9 @@ int CqsFindRemoveSpecificDeq(_deq q, void *&msgPtr, const int *entryMethod, cons
     while(iter != q->tail){
 	// *iter is contains a pointer to a message
 	envelope *env = (envelope*)*iter;
-	if(env != NULL && (env->getMsgtype() == ForArrayEltMsg || env->getMsgtype() == ForChareMsg)){
-	    const int ep = env->getsetArrayEp();
-	    bool foundMatch = false;
-	    // Search for ep by linearly searching through entryMethod
-	    for(int i=0;i<numEntryMethods;++i){
-		if(ep==entryMethod[i]){
-		    foundMatch=true;
-		    break;
-		}
-	    }
-	    if(foundMatch){
-		// Remove the entry from the queue
-		*iter = NULL;
-		msgPtr = env;
-		return 1;
-	    }
-	}
+	if (checkAndRemoveMatching(msgPtr, entryMethod, numEntryMethods, env, iter))
+	  return 1;
+
 	// Advance head to the next item in the circular queue
 	iter++;
 	if(iter == q->end)
@@ -137,23 +146,9 @@ int CqsFindRemoveSpecificPrioq(_prioq q, void *&msgPtr, const int *entryMethod, 
         while(head != tail){
 	    // *head contains a pointer to a message
 	    envelope *env = (envelope*)*head;
-	    if(env != NULL && (env->getMsgtype() == ForArrayEltMsg || env->getMsgtype() == ForChareMsg)){
-		const int ep = env->getsetArrayEp();
-		bool foundMatch = false;
-		// Search for ep by linearly searching through entryMethod
-		for(int i=0;i<numEntryMethods;++i){
-		    if(ep==entryMethod[i]){
-			foundMatch=true;
-//			break;
-		    }
-		}
-		if(foundMatch){
-		    // Remove the entry from the queue
-		    *head = NULL;
-		    msgPtr = env;
-		    return 1;
-		}
-	    }
+	    if (checkAndRemoveMatching(msgPtr, entryMethod, numEntryMethods, env, head))
+	      return 1;
+
 	    // Advance head to the next item in the circular queue
 	    head++;
             if(head == (pe->data).end)

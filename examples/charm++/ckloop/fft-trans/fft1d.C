@@ -3,6 +3,7 @@
 #include <limits>
 #include "fileio.h"
 #include "CkLoopAPI.h"
+#include "rand48_replacement.h"
 
 #define TWOPI 6.283185307179586
 

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 #include "fileio.h"
+#include "rand48_replacement.h"
 
 using namespace std;
 

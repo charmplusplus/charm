@@ -65,7 +65,7 @@ class CkQ \{
   CkQ(int initial_size); // constructor with initial buffer size
   ~CkQ(); // destructor
   int length(void); // returns length of the q
-  CmiBool isEmpty(void); // returns CmiTrue if q is empty, CmiFalse otherwise
+  bool isEmpty(void); // returns true if q is empty, false otherwise
   T deq(void); // removes and returns the front element
   void enq(const T\&); // appends at the end of the list
   void push(const T\&); // inserts in the beginning of the list

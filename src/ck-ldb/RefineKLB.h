@@ -34,7 +34,7 @@ public:
   RefineKLB(CkMigrateMessage *m):CentralLB(m) { lbname = (char *)"RefineKLB"; }
   void work(LDStats* stats);
 private:
-  CmiBool QueryBalanceNow(int step) { return CmiTrue; }
+  bool QueryBalanceNow(int step) { return true; }
 
 protected:
 /*

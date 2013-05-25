@@ -9,6 +9,7 @@
 #include <middle.h>
 #include <ckarrayindex.h>
 #include <cklists.h>
+#include <objid.h>
 
 #ifndef CkIntbits
 #define CkIntbits (sizeof(int)*8)
@@ -153,14 +154,14 @@ struct s_chare {  // NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidM
         int  bype;      ///< created by this pe
 };
 
-struct s_groupinit {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
+struct s_groupinit {         // NodeBocInitMsg, BocInitMsg
         CkGroupID g;           ///< GroupID
         CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
         CkGroupID dep;         ///< create after dep is created (constructor only!)
         int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
 };
 
-struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
+struct s_group {         // ForNodeBocMsg, ForBocMsg
         CkGroupID g;           ///< GroupID
         UShort arrayEp;        ///< Used only for array broadcasts
 };
@@ -170,6 +171,15 @@ struct s_array{             ///< ForArrayEltMsg
         CkGroupID arr;            ///< Array manager GID
 #if CMK_SMP_TRACE_COMMTHREAD
         UInt srcpe; 
+#endif
+        UChar hopCount;           ///< number of times message has been routed
+        UChar ifNotThere;         ///< what to do if array element is missing
+};
+
+struct s_objid {
+        ck::ObjID id;
+#if CMK_SMP_TRACE_COMMTHREAD
+        UInt srcpe;
 #endif
         UChar hopCount;           ///< number of times message has been routed
         UChar ifNotThere;         ///< what to do if array element is missing
@@ -219,6 +229,9 @@ inline UShort extraSize(CkEnvelopeType type)
     break;
   case ForArrayEltMsg:
     ret = sizeof(struct s_array);
+    break;
+  case ForIDedObjMsg:
+    ret = sizeof(struct s_objid);
     break;
   case RODataMsg:
     ret = sizeof(struct s_roData);
@@ -443,39 +456,59 @@ private:
 
 // Group-specific fields
     CkGroupID   getGroupNum(void) const {
-      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+      CkAssert(getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
       return ((struct s_group*)extraData())->g;
     }
     void   setGroupNum(const CkGroupID g) {
-      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+      CkAssert(getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
       ((struct s_group*)extraData())->g = g;
+    }
+
+    CkGroupID getInitGroupNum(void) const {
+      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);
+      return ((struct s_groupinit*)extraData())->g;
+    }
+    void   setInitGroupNum(const CkGroupID g) {
+      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);
+      ((struct s_groupinit*)extraData())->g = g;
     }
     void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); ((struct s_groupinit*)extraData())->epoch=epoch; }
     int getGroupEpoch(void) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return ((struct s_groupinit*)extraData())->epoch; }
     void setRednMgr(CkNodeGroupID r){CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);  ((struct s_groupinit*)extraData())->rednMgr = r; }
     CkNodeGroupID getRednMgr(){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return ((struct s_groupinit*)extraData())->rednMgr; }
     CkGroupID getGroupDep(){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return ((struct s_groupinit*)extraData())->dep; }
-    void setGroupDep(const CkGroupID &r){ /* CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); */ ((struct s_groupinit*)extraData())->dep = r; }
+    void setGroupDep(const CkGroupID &r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); ((struct s_groupinit*)extraData())->dep = r; }
 
 // Array-specific fields
-    CkGroupID getArrayMgr(void) const { return ((struct s_array*)extraData())->arr; }
-    void setArrayMgr(const CkGroupID gid) { ((struct s_array*)extraData())->arr = gid; }
-    int getArrayMgrIdx(void) const {return ((struct s_array*)extraData())->arr.idx;}
+    CkGroupID getArrayMgr(void) const {
+        if (getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg)
+            return ((struct s_array*)extraData())->arr;
+        else if (getMsgtype() == ForIDedObjMsg)
+            return ((struct s_objid*)extraData())->id.getCollectionID();
+        else
+            CkAbort("Cannot return ArrayID from msg for non-array entity");
+	/* compiler appeasement, even though this will never be executed */
+	return ((struct s_array*)extraData())->arr;
+    }
+
+    void setArrayMgr(const CkGroupID gid) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); ((struct s_array*)extraData())->arr = gid; }
+    int getArrayMgrIdx(void) const { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->arr.idx;}
     UShort &getsetArrayEp(void) {return epIdx;}
     UShort &getsetArrayBcastEp(void) {return ((struct s_group*)extraData())->arrayEp;}
-    UChar &getsetArrayHops(void) {return ((struct s_array*)extraData())->hopCount;}
-    int getArrayIfNotThere(void) {return ((struct s_array*)extraData())->ifNotThere;}
-    void setArrayIfNotThere(int nt) {((struct s_array*)extraData())->ifNotThere=nt;}
-    int *getsetArrayListenerData(void) {return ((struct s_arrayinit*)extraData())->listenerData;}
+    UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->hopCount;}
+    int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->ifNotThere;}
+    void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); ((struct s_array*)extraData())->ifNotThere=nt;}
+    int *getsetArrayListenerData(void) { CkAssert(getMsgtype() == ArrayEltInitMsg); return ((struct s_arrayinit*)extraData())->listenerData;}
 #if CMK_SMP_TRACE_COMMTHREAD
     UInt &getsetArraySrcPe(void) {return ((struct s_array*)extraData())->srcpe;}
 #else
     UInt &getsetArraySrcPe(void) {return pe;}
 #endif
     CkArrayIndex &getsetArrayIndex(void) 
-    	{return *(CkArrayIndex *)&((struct s_array*)extraData())->index;}
+    {
+      CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
+      return *(CkArrayIndex *)&((struct s_array*)extraData())->index;
+    }
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  public:

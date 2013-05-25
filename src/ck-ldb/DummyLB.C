@@ -16,9 +16,9 @@ DummyLB::DummyLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] DummyLB created\n",CkMyPe());
 }
 
-CmiBool DummyLB::QueryBalanceNow(int _step)
+bool DummyLB::QueryBalanceNow(int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 

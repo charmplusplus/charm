@@ -193,12 +193,12 @@ second. It is desirable for the application to set a larger interval using
 +LBPeriod runtime option. For example ``+LBPeriod 5.0'' can be used to start load
 balancing roughly every 5 seconds. By default, array elements may be asked to
 migrate at any time, provided that they are not in the middle of executing an
-entry method. The array element's variable \kw{usesAtSync} being CmiFalse
+entry method. The array element's variable \kw{usesAtSync} being false
 attributes to this default behavior.
 %
 \item {\bf At sync mode}: Using this method, elements can be migrated only at
 certain points in the execution when the application invokes \kw{AtSync()}. In order to use the at
-sync mode, one should set \kw{usesAtSync} to CmiTrue in the array element
+sync mode, one should set \kw{usesAtSync} to true in the array element
 constructor.  When an element is ready to migrate, call
 \kw{AtSync()}~\footnote{AtSync() is a member function of class ArrayElement}.
 When all local elements call \kw{AtSync}, the load balancer is triggered.  Once
@@ -299,7 +299,7 @@ configure the load balancer, etc. These functions are:
       on or off on the calling processor. No implicit broadcast or 
       synchronization exists in these functions.
       Fortran interface: {\bf FLBTURNINSTRUMENTON()} and {\bf FLBTURNINSTRUMENTOFF()}.
-\item {\bf setMigratable(CmiBool migratable)}: is a member function of array
+\item {\bf setMigratable(bool migratable)}: is a member function of array
       element. This function can be called 
       in an array element constructor to tell the load balancer whether this object
       is migratable or not\footnote{Currently not all load balancers 
@@ -626,8 +626,8 @@ public:
   \{
     workcnt=0;
     /* May initialize some variables to be used in doWork */
-    //Must be set to CmiTrue to make AtSync work
-    usesAtSync=CmiTrue;
+    //Must be set to true to make AtSync work
+    usesAtSync = true;
   \}
 
   LBExample(CkMigrateMessage *m) \{ /* Migration constructor -- invoked when chare migrates */ \}

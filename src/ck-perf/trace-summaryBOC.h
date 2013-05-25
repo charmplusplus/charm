@@ -15,7 +15,7 @@ class TraceSummaryInit : public Chare {
     CProxy_TraceSummaryBOC(traceSummaryGID).ckSetReductionClient(cb);
 
     // No CCS Streaming support until user-code requires it.
-    summaryCcsStreaming = CmiFalse;
+    summaryCcsStreaming = false;
   }
   TraceSummaryInit(CkMigrateMessage *m):Chare(m) {}
 };

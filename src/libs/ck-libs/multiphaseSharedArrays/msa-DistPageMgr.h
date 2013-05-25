@@ -666,7 +666,7 @@ protected:
 //             ckout << "p" << CkMyPe() << ": Calling pageFault" << endl;
 				pageFault(page, access);
 			}
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 			if (stateN(page)->state!=access) {
 				CkPrintf("page=%d mode=%d pagestate=%d", page, access, stateN(page)->state);
 				CkAbort("MSA Runtime error: Attempting to access a page that is still in another mode.");

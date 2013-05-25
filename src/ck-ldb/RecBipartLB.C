@@ -158,8 +158,8 @@ RecBipartLB::RecBipartLB(const CkLBOptions &opt) : CentralLB(opt) {
     CkPrintf("RecBipartLB created\n");
 }
 
-CmiBool RecBipartLB::QueryBalanceNow(int _step) {
-  return CmiTrue;
+bool RecBipartLB::QueryBalanceNow(int _step) {
+  return true;
 }
 
 void RecBipartLB::work(LDStats *stats) {

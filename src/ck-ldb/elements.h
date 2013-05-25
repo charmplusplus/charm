@@ -51,7 +51,7 @@ public:
                           // by adding these two.		     
    int pe_speed;
    double utilization;
-   CmiBool available;
+   bool available;
    Set *computeSet; // caller to ReBalancer should leave this field NULL.
 };
 

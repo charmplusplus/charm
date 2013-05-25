@@ -273,7 +273,7 @@ class StrategyWrapper {
  public:
   Strategy **strategy;
   int *position;
-  CmiBool *replace;
+  bool *replace;
   int nstrats;
   //int total_nstrats;
 

@@ -352,9 +352,9 @@ private:
 	CkCallback *storedCallback;
 
 	int redNo;//Number of current reduction (incremented at end)
-	CmiBool inProgress;//Is a reduction started, but not complete?
-	CmiBool creating;//Are elements still being created?
-	CmiBool startRequested;//Should we start the next reduction when creation finished?
+	bool inProgress;//Is a reduction started, but not complete?
+	bool creating;//Are elements still being created?
+	bool startRequested;//Should we start the next reduction when creation finished?
 	int gcount;
 	int lcount;//Number of local contributors
 
@@ -399,7 +399,7 @@ private:
 	void init_BinaryTree();
 	enum {TREE_WID=2};
 	int treeRoot(void);//Root PE
-	CmiBool hasParent(void);
+	bool hasParent(void);
 	int treeParent(void);//My parent PE
 	int firstKid(void);//My first child PE
 	int treeKids(void);//Number of children in tree
@@ -408,9 +408,9 @@ private:
 	CkReductionMsg *reduceMessages(void);
 
 	//Map reduction number to a time
-	CmiBool isPast(int num) const {return (CmiBool)(num<redNo);}
-	CmiBool isPresent(int num) const {return (CmiBool)(num==redNo);}
-	CmiBool isFuture(int num) const {return (CmiBool)(num>redNo);}
+	bool isPast(int num) const {return (bool)(num<redNo);}
+	bool isPresent(int num) const {return (bool)(num==redNo);}
+	bool isFuture(int num) const {return (bool)(num>redNo);}
 
 	/*FAULT_EVAC*/
 	bool oldleaf;
@@ -540,7 +540,7 @@ public:
         void addBarrier(CkReductionMsg *m);
         void finishBarrier(void);
 
-	virtual CmiBool isReductionMgr(void){ return CmiTrue; }
+	virtual bool isReductionMgr(void){ return true; }
 	virtual void flushStates();
 	/*FAULT_EVAC: used to get the gcount on a processor when 
 		it is evacuated.
@@ -584,9 +584,9 @@ private:
 
 	int redNo;//Number of current reduction (incremented at end) to be deposited with NodeGroups
 	int completedRedNo;//Number of reduction Completed ie recieved callback from NodeGroups
-	CmiBool inProgress;//Is a reduction started, but not complete?
-	CmiBool creating;//Are elements still being created?
-	CmiBool startRequested;//Should we start the next reduction when creation finished?
+	bool inProgress;//Is a reduction started, but not complete?
+	bool creating;//Are elements still being created?
+	bool startRequested;//Should we start the next reduction when creation finished?
 	int gcount;//=el't created here - el't deleted here
 	int lcount;//Number of local contributors
 	int maxStartRequest; // the highest future ReductionStarting message received
@@ -628,7 +628,7 @@ private:
 	void init_BinaryTree();
 	enum {TREE_WID=2};
 	int treeRoot(void);//Root PE
-	CmiBool hasParent(void);
+	bool hasParent(void);
 	int treeParent(void);//My parent PE
 	int firstKid(void);//My first child PE
 	int treeKids(void);//Number of children in tree
@@ -637,9 +637,9 @@ private:
 	CkReductionMsg *reduceMessages(void);
 
 	//Map reduction number to a time
-	CmiBool isPast(int num) const {return (CmiBool)(num<redNo);}
-	CmiBool isPresent(int num) const {return (CmiBool)(num==redNo);}
-	CmiBool isFuture(int num) const {return (CmiBool)(num>redNo);}
+	bool isPast(int num) const {return (bool)(num<redNo);}
+	bool isPresent(int num) const {return (bool)(num==redNo);}
+	bool isFuture(int num) const {return (bool)(num>redNo);}
 
 
 	//This vector of adjustments is indexed by redNo,
@@ -652,7 +652,7 @@ private:
 
 protected:
 	//whether to notify children that reduction starts
-	CmiBool disableNotifyChildrenStart;
+	bool disableNotifyChildrenStart;
 	void resetCountersWhenFlushingStates() { gcount = lcount = 0; }
 
 //Checkpointing utilities

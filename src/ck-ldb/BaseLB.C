@@ -373,7 +373,7 @@ double BaseLB::LDStats::computeAverageLoad()
   for (i=0; i<n_objs; i++) total += objData[i].wallTime;
                                                                                 
   for (i=0; i<nprocs(); i++)
-    if (procs[i].available == CmiTrue) {
+    if (procs[i].available == true) {
         total += procs[i].bg_walltime;
 	numAvail++;
     }

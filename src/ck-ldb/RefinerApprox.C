@@ -22,7 +22,7 @@ void RefinerApprox::create(int count, CentralLB::LDStats* stats, int* procs)
     processors[i].pe_speed = stats->procs[i].pe_speed;
 //    processors[i].utilization = stats->procs[i].utilization;
     processors[i].available = stats->procs[i].available;
-    if (processors[i].available == CmiTrue) numAvail++;
+    if (processors[i].available == true) numAvail++;
   }
 
   int index=0;
@@ -30,7 +30,7 @@ void RefinerApprox::create(int count, CentralLB::LDStats* stats, int* procs)
   {
   
       LDObjData &odata = stats->objData[i];
-      if (odata.migratable == CmiTrue)
+      if (odata.migratable == true)
       {
         computes[index].id = odata.objID();
         computes[index].Id = i;

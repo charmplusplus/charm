@@ -103,13 +103,13 @@ GridCommRefineLB::GridCommRefineLB (CkMigrateMessage *msg) : CentralLB (msg)
 ** The Charm++ load balancing framework invokes this method to determine
 ** whether load balancing can be performed at a specified time.
 */
-CmiBool GridCommRefineLB::QueryBalanceNow (int step)
+bool GridCommRefineLB::QueryBalanceNow (int step)
 {
   if (_lb_args.debug() > 2) {
     CkPrintf ("[%d] GridCommRefineLB is balancing on step %d.\n", CkMyPe(), step);
   }
 
-  return (CmiTrue);
+  return (true);
 }
 
 
@@ -582,8 +582,8 @@ void GridCommRefineLB::work (LDStats *stats)
 {
   int i;
   // int j;
-  // CmiBool available;
-  // CmiBool all_pes_mapped;
+  // bool available;
+  // bool all_pes_mapped;
   // int max_cluster;
   // int min_speed;
   // int send_object;

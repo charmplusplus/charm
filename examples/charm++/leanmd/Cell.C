@@ -2,6 +2,7 @@
 #include "defs.h"
 #include "leanmd.decl.h"
 #include "Cell.h"
+#include "rand48_replacement.h"
 
 extern /* readonly */ CProxy_Main mainProxy;
 extern /* readonly */ CProxy_Cell cellArray;
@@ -18,7 +19,7 @@ Cell::Cell() {
   int i;
   inbrs = NUM_NEIGHBORS;
   //load balancing to be called when AtSync is called
-  usesAtSync = CmiTrue;
+  usesAtSync = true;
 
   int myid = thisIndex.x + thisIndex.y*cellArrayDimX + thisIndex.z*cellArrayDimX*cellArrayDimY;
   myNumParts = PARTICLES_PER_CELL_START + (myid*(PARTICLES_PER_CELL_END-PARTICLES_PER_CELL_START))/(cellArrayDimX*cellArrayDimY*cellArrayDimZ);
@@ -50,7 +51,7 @@ Cell::Cell() {
 
 //constructor for chare object migration
 Cell::Cell(CkMigrateMessage *msg): CBase_Cell(msg) {
-  usesAtSync = CmiTrue;
+  usesAtSync = true;
   delete msg;
 }  
 

@@ -20,8 +20,8 @@ private:
   BaseLB::LDStats *tempStats;
 	CentralLB *lb;
 	CkVec<LDOMid> omids;
-	CkVec<CmiBool> migratableOMs;
-	CmiBool QueryBalanceNow(int step);
+	CkVec<bool> migratableOMs;
+	bool QueryBalanceNow(int step);
 	void copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats);
 	void updateStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats);
 	void work(LDStats* stats);

@@ -213,7 +213,7 @@ public:
         ComlibResetSectionProxy(&sproxy);
         ComlibDelegateProxy(&sproxy);
 
-        usesAtSync = CmiTrue;
+        usesAtSync = true;
         setMigratable(true);
         myinst = cinst;
     }

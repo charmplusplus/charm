@@ -49,7 +49,7 @@ void PUP_toNetwork_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	casePUP_toNetwork_type(Tlong,long,CMK_NETWORK_INT8); \
 	case PUP::Tulonglong:  \
 	casePUP_toNetwork_type(Tlonglong,CMK_NETWORK_INT8,CMK_NETWORK_INT8); \
-	casePUP_toNetwork_type(Tbool,CmiBool,int); \
+	casePUP_toNetwork_type(Tbool,bool,int); \
 	case PUP::Tsync: break; /* ignore syncs */ \
 	casePUP_toNetwork_type(Tpointer,void*,CMK_POINTER_SIZED_INT);
 

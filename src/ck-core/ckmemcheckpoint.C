@@ -394,9 +394,9 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   CkLocMgr *mgr = CProxy_CkLocMgr(m->locMgr).ckLocalBranch();
   CmiAssert(mgr);
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
-  mgr->resume(m->index, p, CmiTrue);     // optimize notifyHome
+  mgr->resume(m->index, p, true);     // optimize notifyHome
 #else
-  mgr->resume(m->index, p, CmiFalse);     // optimize notifyHome
+  mgr->resume(m->index, p, false);     // optimize notifyHome
 #endif
 
   // find a list of array elements bound together
@@ -1109,9 +1109,9 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 			CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
     			int homePe = mgr->homePe(idx);
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
-			mgr->resume(idx,p,CmiTrue,CmiTrue);
+			mgr->resume(idx,p,true,true);
 #else
-			mgr->resume(idx,p,CmiFalse,CmiTrue);
+			mgr->resume(idx,p,false,true);
 #endif
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
 			homePe = mgr->homePe(idx);

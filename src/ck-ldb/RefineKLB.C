@@ -128,7 +128,7 @@ void RefineKLB::performGreedyMoves(int count, BaseLB::LDStats* stats,int *from_p
   }
   for(i=0;i<stats->n_objs;i++)
   {
-    if((stats->objData[i]).migratable == CmiFalse)
+    if((stats->objData[i]).migratable == false)
       continue;
     InfoRecord *rec=new InfoRecord();
     rec->load=(stats->objData[i]).wallTime;

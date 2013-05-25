@@ -22,16 +22,16 @@ big and little-endian IEEE 32- and 64-bit floats.
 static const unsigned char machInfo_magic[4]={0x10,0xea,0xbd,0xf9};
 
 //Return true if our magic number is valid.
-CmiBool PUP::machineInfo::valid(void) const
+bool PUP::machineInfo::valid(void) const
 {
 	for (int i=0;i<4;i++)
 		if (magic[i]!=machInfo_magic[i])
-			return CmiFalse;
-	return CmiTrue;
+			return false;
+	return true;
 }
 
 //Return true if we differ from the current (running) machine.
-CmiBool PUP::machineInfo::needsConversion(void) const
+bool PUP::machineInfo::needsConversion(void) const
 {
 	const machineInfo &m=current();
 	if (intFormat==m.intFormat && floatFormat==m.floatFormat &&
@@ -40,9 +40,9 @@ CmiBool PUP::machineInfo::needsConversion(void) const
 	    floatBytes==m.floatBytes && doubleBytes==m.doubleBytes && 
 	    boolBytes==m.boolBytes && pointerBytes==m.pointerBytes
 	   )
-		return CmiFalse;//No conversion needed
+		return false;//No conversion needed
 	else 
-		return CmiTrue;//Some differences-- convert
+		return true;//Some differences-- convert
 }
 
 ////////// For getting info. about the current machine /////////
@@ -104,7 +104,7 @@ const PUP::machineInfo &PUP::machineInfo::current(void)
 		m->floatBytes=sizeof(float);
 		m->doubleBytes=sizeof(double);
 		m->floatFormat=getFloatFormat();
-		m->boolBytes=sizeof(CmiBool);
+		m->boolBytes=sizeof(bool);
 		m->pointerBytes=sizeof(void*);
 		//m->padding[0]=0;    // version 1 does not have padding field
 	}
@@ -137,11 +137,11 @@ static void cvt_bool(int N,const myByte *in,myByte *out,int nElem)
 	int i;for (i=nElem-1;i>=0;i--)
 	{
 		const myByte *s=&in[N*i];
-		CmiBool ret=CmiFalse;
+		bool ret=false;
 		int j;for (j=0;j<N;j++)
 			if (s[j]!=0) //Some bit is set
-				ret=CmiTrue;
-		((CmiBool *)(out))[i]=ret;
+				ret=true;
+		((bool *)(out))[i]=ret;
 	}
 }
 

@@ -214,7 +214,7 @@ public:
       arr = new float[1000];
     for (int i = 0; i < 1000; i++)
         arr[i] = rand ();
-      usesAtSync = CmiTrue;
+      usesAtSync = true;
       iterations = 0;
     // allocate two dimensional array
   }
@@ -353,7 +353,7 @@ public:
       arr = new float[1000];
     for (int i = 0; i < 1000; i++)
         arr[i] = rand ();
-      usesAtSync = CmiTrue;
+      usesAtSync = true;
       iterations = 0;
     // allocate two dimensional array
   }

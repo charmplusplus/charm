@@ -3,7 +3,7 @@ module CkArray {
   extern module CkLocation;
   extern module CkArrayReductionMgr;
 
-  readonly CmiBool _isAnytimeMigration;
+  readonly bool _isAnytimeMigration;
   
   group [migratable] CkArray : CkReductionMgr {
 	entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg, CkNodeGroupID nodereductionProxy);

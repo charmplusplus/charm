@@ -1,4 +1,5 @@
 #include "matmul.decl.h"
+#include "rand48_replacement.h"
 
 CProxy_Main mainProxy;
 

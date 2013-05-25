@@ -135,7 +135,7 @@ class Jacobi: public CBase_Jacobi {
   bool leftBound, rightBound, topBound, bottomBound;
   // Constructor, initialize values
   Jacobi() {
-    usesAtSync=CmiTrue;
+    usesAtSync=true;
 
     int i, j;
     // allocate a two dimensional array

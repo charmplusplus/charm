@@ -14,7 +14,7 @@ Orion Sky Lawlor, olawlor@acm.org, 6/13/2001
 class extrudeMethod {
  public:
   int toWidth;//Number of cells to extrude
-  CmiBool withCorners;//If true, include diagonal cells
+  bool withCorners;//If true, include diagonal cells
   extrudeMethod(int ghostWidth) {
 	if (ghostWidth>=0) {
 	   toWidth=ghostWidth; withCorners=false;
@@ -37,7 +37,7 @@ class patch {
 	blockSpan span;
 
 	int flatAxis; //Axis along which we're flat-- the normal axis
-	CmiBool isLow; //True if we're at zero along our flat axis
+	bool isLow; //True if we're at zero along our flat axis
 public:
 	enum {ext=0,internal=1} type; 
 

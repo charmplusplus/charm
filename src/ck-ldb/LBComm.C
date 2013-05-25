@@ -15,9 +15,9 @@
 
 // Moved comparison function to LDObjIDEqual
 
-// static inline CmiBool ObjIDEqual(const LDObjid i1, const LDObjid i2)
+// static inline bool ObjIDEqual(const LDObjid i1, const LDObjid i2)
 // {
-//   return (CmiBool)(i1.id[0] == i2.id[0] 
+//   return (bool)(i1.id[0] == i2.id[0] 
 // 	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
 // 	 && i1.id[3] == i2.id[3]);
 // };
@@ -83,17 +83,17 @@ void LBCommTable::Resize()
   delete [] old_state;
 }	
 
-CmiBool LBCommData::equal(const LBCommData &d2) const
+bool LBCommData::equal(const LBCommData &d2) const
 {
   if (from_proc()) {
     if (src_proc != d2.src_proc)
-      return CmiFalse;
+      return false;
   } else {
     if (!LDOMidEqual(srcObj.omID(), d2.srcObj.omID())
 	|| !LDObjIDEqual(srcObj.objID(),d2.srcObj.objID()) )
-      return CmiFalse;
+      return false;
   }
-  return (CmiBool)(destObj == d2.destObj);
+  return (bool)(destObj == d2.destObj);
 }
 
 int LBCommData::compute_key()

@@ -184,7 +184,7 @@ public:
     for(i=0; i < future_bufsz; i++)
       future_receives[i]=0;
 	
-    usesAtSync=CmiTrue;
+    usesAtSync = true;
 
     contribute(sizeof(i), &i, CkReduction::sum_int);
   }

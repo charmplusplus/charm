@@ -148,7 +148,7 @@ class Stencil: public CBase_Stencil {
 
     // Constructor, initialize values
     Stencil() {
-      usesAtSync = CmiTrue;
+      usesAtSync = true;
 
       int i, j, k;
       // allocate a three dimensional array

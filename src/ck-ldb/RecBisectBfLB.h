@@ -37,7 +37,7 @@ public:
   RecBisectBfLB(const CkLBOptions &);
   RecBisectBfLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
-  CmiBool QueryBalanceNow(int step);
+  bool QueryBalanceNow(int step);
   void work(LDStats* stats);
 
   Graph * convertGraph(ObjGraph *og);

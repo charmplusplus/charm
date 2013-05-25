@@ -169,7 +169,7 @@ To do so, in the array element's constructor, the user first needs to turn off
 automatic CPU load measurement completely by setting
 
 \begin{alltt}
-   usesAutoMeasure = CmiFalse;
+   usesAutoMeasure = false;
 \end{alltt}
 
 The user must also implement the following function to the chare array
@@ -286,7 +286,7 @@ The database data structure named {\kw LDStats} is defined in {\em CentralLB.h}:
     LBRealType bg_cputime;
     int pe_speed;
     double utilization;
-    CmiBool available;
+    bool available;
     int   n_objs;
   }
 

@@ -45,8 +45,8 @@ void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
 void CkPupChareData(PUP::er &p);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CkPupGroupData(PUP::er &p,CmiBool create=CmiTrue);
-void CkPupNodeGroupData(PUP::er &p,CmiBool create=CmiTrue);
+void CkPupGroupData(PUP::er &p,bool create=true);
+void CkPupNodeGroupData(PUP::er &p,bool create=true);
 #else
 void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);

@@ -24,8 +24,8 @@ ScotchTopoLB::ScotchTopoLB(const CkLBOptions &opt) : CentralLB(opt) {
     CkPrintf("ScotchTopoLB created\n");
 }
 
-CmiBool ScotchTopoLB::QueryBalanceNow(int _step) {
-  return CmiTrue;
+bool ScotchTopoLB::QueryBalanceNow(int _step) {
+  return true;
 }
 
 void ScotchTopoLB::work(LDStats *stats) {

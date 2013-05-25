@@ -404,9 +404,11 @@ void CpdPupMessage(PUP::er &p, void *msg)
     } else {
       p(idx.index, nInts);
     }
-  } else if (envType == BocInitMsg || envType == NodeBocInitMsg ||
-             envType == ForNodeBocMsg || envType == ForBocMsg) {
+  } else if (envType == ForNodeBocMsg || envType == ForBocMsg) {
     int groupID = env->getGroupNum().idx;
+    PUPn(groupID);
+  } else if (envType == BocInitMsg || envType == NodeBocInitMsg) {
+    int groupID = env->getInitGroupNum().idx;
     PUPn(groupID);
   } else if (envType == NewVChareMsg || envType == ForVidMsg || envType == FillVidMsg) {
     p.comment("ptr");
@@ -774,7 +776,7 @@ static void _call_freeze_on_break_point(void * msg, void * object)
 
   // If the counter "skipBreakpoint" is not zero we actually do not freeze and deliver the regular message
   EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CkMessageToEpIdx(msg));
-  if (CkpvAccess(skipBreakpoint) > 0 || CkpvAccess(_debugEntryTable)[CkMessageToEpIdx(msg)].isBreakpoint==CmiFalse) {
+  if (CkpvAccess(skipBreakpoint) > 0 || CkpvAccess(_debugEntryTable)[CkMessageToEpIdx(msg)].isBreakpoint==false) {
     CkAssert(breakPointEntryInfo != NULL);
     breakPointEntryInfo->call(msg, object);
     if (CkpvAccess(skipBreakpoint) > 0) CkpvAccess(skipBreakpoint) --;
@@ -889,7 +891,7 @@ void CpdSetBreakPoint (char *msg)
              //CkAssert(breakPointEntryInfo->msgIdx == _entryTable[tableIdx]->msgIdx);
              //CkAssert(breakPointEntryInfo->chareIdx == _entryTable[tableIdx]->chareIdx);
            }
-           CkpvAccess(_debugEntryTable)[tableIdx].isBreakpoint = CmiTrue;
+           CkpvAccess(_debugEntryTable)[tableIdx].isBreakpoint = true;
            reply = ~0;
       }
     }
@@ -922,7 +924,7 @@ void CpdRemoveBreakPoint (char *msg)
             _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
           }
           reply = ~0 ;
-          CkpvAccess(_debugEntryTable)[idx].isBreakpoint = CmiFalse;
+          CkpvAccess(_debugEntryTable)[idx].isBreakpoint = false;
           //CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
           //CkpvAccess(breakPointEntryTable)->remove(idx);
         }
@@ -948,7 +950,7 @@ void CpdRemoveAllBreakPoints ()
       _entryTable[idx]->name =  breakPointEntryInfo->name;
       _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
     }
-    CkpvAccess(_debugEntryTable)[idx].isBreakpoint = CmiFalse;
+    CkpvAccess(_debugEntryTable)[idx].isBreakpoint = false;
   }
   CcsSendReply(sizeof(int), (void*)&reply);
 }

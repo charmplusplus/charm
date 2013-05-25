@@ -878,7 +878,7 @@ class ampiWorlds : public CBase_ampiWorlds {
   init();
 
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
-  AsyncEvacuate(CmiFalse);
+  AsyncEvacuate(false);
 }
 
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
@@ -888,7 +888,7 @@ ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
 
   init();
 
-  AsyncEvacuate(CmiFalse);
+  AsyncEvacuate(false);
 }
 
 void ampiParent::pup(PUP::er &p) {
@@ -1218,7 +1218,7 @@ void ampi::init(void) {
   msgs=NULL;
   posted_ireqs=NULL;
   resumeOnRecv=false;
-  AsyncEvacuate(CmiFalse);
+  AsyncEvacuate(false);
 }
 
 ampi::ampi()
@@ -3761,7 +3761,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
   return 0;
 }
 
-  CmiBool PersReq::test(MPI_Status *sts){
+  bool PersReq::test(MPI_Status *sts){
     if(sndrcv == 2) 	// recv request
       return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
     else			// send request
@@ -3773,7 +3773,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
       CkAbort("AMPI> Error in persistent request complete");
   }
 
-CmiBool IReq::test(MPI_Status *sts){
+bool IReq::test(MPI_Status *sts){
   if (statusIreq == true) {           
     if(sts)
       sts->MPI_LENGTH = length;           
@@ -3788,7 +3788,7 @@ CmiBool IReq::test(MPI_Status *sts){
    */
 }
 
-CmiBool SReq::test(MPI_Status *sts){
+bool SReq::test(MPI_Status *sts){
   if (statusIreq == true) {
     return true;
   }
@@ -3829,7 +3829,7 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
   //print();
 }
 
-CmiBool ATAReq::test(MPI_Status *sts){
+bool ATAReq::test(MPI_Status *sts){
   int i, flag=1;
   for(i=0;i<count;i++){
     flag *= getAmpiInstance(myreqs[i].comm)->iprobe(myreqs[i].tag, myreqs[i].src,

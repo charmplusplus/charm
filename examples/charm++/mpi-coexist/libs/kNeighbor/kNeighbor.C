@@ -167,7 +167,7 @@ class Block: public CBase_Block {
   public:
     Block() {
       //srand(thisIndex.x+thisIndex.y);
-      usesAtSync = CmiTrue;
+      usesAtSync = true;
 
       numNeighbors = 2*STRIDEK;
       neighbors = new int[numNeighbors];

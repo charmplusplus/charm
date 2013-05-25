@@ -359,7 +359,7 @@ class CharmStrategy {
  protected:
   //int forwardOnMigration;
     ComlibLearner *learner;
-    CmiBool mflag;    //Does this strategy handle point-to-point or 
+    bool mflag;    //Does this strategy handle point-to-point or 
     CkCallback onFinish;
 
 
@@ -386,7 +386,7 @@ class CharmStrategy {
       //forwardOnMigration = 0;
       //iterationNumber = 0;
       learner = NULL;
-      mflag = CmiFalse;
+      mflag = false;
     }
 
     CharmStrategy(CkMigrateMessage *m) { //: Strategy(m){
@@ -395,11 +395,11 @@ class CharmStrategy {
 
     //Set flag to optimize strategy for 
     inline void setMulticast(){
-        mflag = CmiTrue;
+        mflag = true;
     }
 
     //get the multicast flag
-    CmiBool getMulticast () {
+    bool getMulticast () {
         return mflag;
     }
 

@@ -24,7 +24,7 @@ public:
   MetisLB(const CkLBOptions &);
   MetisLB(CkMigrateMessage *m):CentralLB(m) { lbname = "MetisLB"; }
 private:
-  CmiBool QueryBalanceNow(int step) { return CmiTrue; }
+  bool QueryBalanceNow(int step) { return true; }
   void work(LDStats* stats);
 };
 

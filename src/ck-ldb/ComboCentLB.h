@@ -21,7 +21,7 @@ public:
   ComboCentLB(CkMigrateMessage *m):CentralLB(m) {}
 
 protected:
-  virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
+  virtual bool QueryBalanceNow(int) { return true; };  
   virtual void work(LDStats* stats);
 
 private:  

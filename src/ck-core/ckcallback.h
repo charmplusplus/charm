@@ -140,7 +140,7 @@ public:
 	}
 
     // Call a chare entry method
-	CkCallback(int ep,const CkChareID &id,CmiBool doInline=CmiFalse) {
+	CkCallback(int ep,const CkChareID &id,bool doInline=false) {
 #if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
@@ -161,10 +161,10 @@ public:
 	}
 
     // Send to nodegroup element
-	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline=CmiFalse);
+	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline=false);
 
     // Send to group/nodegroup element
-	CkCallback(int ep,int onPE,const CkGroupID &id,CmiBool doInline=CmiFalse, int isNodeGroup=0) {
+	CkCallback(int ep,int onPE,const CkGroupID &id,bool doInline=false, int isNodeGroup=0) {
 #if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
@@ -173,7 +173,7 @@ public:
 	}
 
     // Send to specified group element
-	CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline=CmiFalse);
+	CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline=false);
 	
     // Bcast to array
 	CkCallback(int ep,const CkArrayID &id) {
@@ -185,7 +185,7 @@ public:
 	}
 
     // Send to array element
-	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,CmiBool doInline=CmiFalse) {
+	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool doInline=false) {
 #if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
@@ -194,23 +194,23 @@ public:
 	}
 
     // Bcast to array
-	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline=CmiFalse);
+	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline=false);
 	
 	//Bcast to section
-	CkCallback(int ep,CProxySection_ArrayBase &sectElt,CmiBool doInline=CmiFalse);
+	CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline=false);
 	CkCallback(int ep, CkSectionID &sid);
 	
 	// Send to chare
-	CkCallback(Chare *p, int ep, CmiBool doInline=CmiFalse);
+	CkCallback(Chare *p, int ep, bool doInline=false);
 
     // Send to group element on current PE
-	CkCallback(Group *p, int ep, CmiBool doInline=CmiFalse);
+	CkCallback(Group *p, int ep, bool doInline=false);
 
     // Send to nodegroup element on current node
-	CkCallback(NodeGroup *p, int ep, CmiBool doInline=CmiFalse);
+	CkCallback(NodeGroup *p, int ep, bool doInline=false);
 
     // Send to specified array element 
- 	CkCallback(ArrayElement *p, int ep,CmiBool doInline=CmiFalse);
+ 	CkCallback(ArrayElement *p, int ep,bool doInline=false);
 
 	CkCallback(const CcsDelayedReply &reply) {
 #if CMK_REPLAYSYSTEM

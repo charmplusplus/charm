@@ -16,7 +16,7 @@ class BlockLB : public CentralLB
     void pup (PUP::er &p) { CentralLB::pup(p); }
 
   private:
-    CmiBool QueryBalanceNow (int step);
+    bool QueryBalanceNow (int step);
 };
 
 #endif /* _BLOCKLB_H_ */

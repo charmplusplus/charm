@@ -23,9 +23,9 @@ TreeMatchLB::TreeMatchLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] TreeMatchLB created\n",CkMyPe());
 }
 
-CmiBool TreeMatchLB::QueryBalanceNow(int _step)
+bool TreeMatchLB::QueryBalanceNow(int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 

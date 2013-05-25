@@ -11,6 +11,7 @@
 #include "Patch.decl.h"
 #include "Patch.h"
 #include "Compute.h"
+#include "rand48_replacement.h"
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_Patch patchArray;

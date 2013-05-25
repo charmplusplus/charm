@@ -23,8 +23,8 @@ ScotchLB::ScotchLB(const CkLBOptions &opt) : CentralLB(opt) {
     CkPrintf("ScotchLB created\n");
 }
 
-CmiBool ScotchLB::QueryBalanceNow(int _step) {
-  return CmiTrue;
+bool ScotchLB::QueryBalanceNow(int _step) {
+  return true;
 }
 
 void ScotchLB::work(LDStats *stats) {

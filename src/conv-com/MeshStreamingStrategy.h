@@ -73,7 +73,7 @@ PUPbytes(MeshStreamingHeader)
  */
 class MeshStreamingStrategy : public Strategy
 {
-  //CmiBool shortMsgPackingFlag;
+  //bool shortMsgPackingFlag;
  public:
     MeshStreamingStrategy (int period=DEFAULT_FLUSH_PERIOD,
 			   int bucket_size=DEFAULT_MAX_BUCKET_SIZE);
@@ -97,7 +97,7 @@ class MeshStreamingStrategy : public Strategy
 
     //Should be used only for array messages
     //virtual void enableShortArrayMessagePacking()
-    //{shortMsgPackingFlag=CmiTrue;} 
+    //{shortMsgPackingFlag=true;} 
 
   private:
 

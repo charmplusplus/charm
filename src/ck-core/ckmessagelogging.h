@@ -413,7 +413,7 @@ CpvExtern(StoredCheckpoint *,_storedCheckpointData);
 void CkStartMlogCheckpoint(CkCallback &cb);
 void checkpointAlarm(void *_dummy,double curWallTime);
 void startMlogCheckpoint(void *_dummy,double curWallTime);
-void pupArrayElementsSkip(PUP::er &p, CmiBool create, MigrationRecord *listToSkip,int listSize=0);
+void pupArrayElementsSkip(PUP::er &p, bool create, MigrationRecord *listToSkip,int listSize=0);
 
 //handler functions for checkpoint
 void _checkpointRequestHandler(CheckpointRequest *request);

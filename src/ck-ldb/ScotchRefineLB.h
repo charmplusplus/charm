@@ -26,7 +26,7 @@ class ScotchRefineLB : public CentralLB {
     void pup(PUP::er &p) { CentralLB::pup(p); }
 
   private:
-    CmiBool QueryBalanceNow(int _step);
+    bool QueryBalanceNow(int _step);
 };
 
 #endif /* _SCOTCHREFINELB_H_ */

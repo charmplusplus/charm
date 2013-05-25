@@ -292,14 +292,14 @@ public:
 
 	//Get the array index for rank r in this communicator
 	int getIndexForRank(int r) const {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (r>=size) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
 #endif
 		if (isWorld) return r;
 		else return indices[r];
 	}
 	int getIndexForRemoteRank(int r) const {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (r>=remoteIndices.size()) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
 #endif
 		if (isWorld) return r;
@@ -557,7 +557,7 @@ public:
 	virtual int start(void){ return -1; }
 
 	/// Return true if this request is finished (progress).
-	virtual CmiBool test(MPI_Status *sts) =0;
+	virtual bool test(MPI_Status *sts) =0;
 
 	/// Completes the operation hanging on the request
 	virtual void complete(MPI_Status *sts) =0;
@@ -608,7 +608,7 @@ public:
 	PersReq(){};
 	~PersReq(){ }
 	int start();
-	CmiBool test(MPI_Status *sts);
+	bool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
@@ -632,7 +632,7 @@ public:
 	}
 	IReq(): statusIreq(false){};
 	~IReq(){ }
-	CmiBool test(MPI_Status *sts);
+	bool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	inline int getType(void){ return 2; }
@@ -684,7 +684,7 @@ public:
 		myreqs[idx].tag=tag_;	myreqs[idx].comm=comm_;
 		return (++idx);
 	}
-	CmiBool test(MPI_Status *sts);
+	bool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
@@ -717,7 +717,7 @@ public:
 	}
 	SReq(): statusIreq(false) {}
 	~SReq(){ }
-	CmiBool test(MPI_Status *sts);
+	bool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
@@ -736,7 +736,7 @@ class GPUReq : public AmpiRequest {
 public:
     GPUReq();
     int getType() { return 5; }
-    CmiBool test(MPI_Status *sts);
+    bool test(MPI_Status *sts);
     void complete(MPI_Status *sts);
     int wait(MPI_Status *sts);
     void receive(ampi *ptr, AmpiMsg *msg);
@@ -1124,10 +1124,10 @@ public:
     void pup(PUP::er &p);
 
     inline void start_measure() {
-      usesAutoMeasure = CmiFalse;
+      usesAutoMeasure = false;
     }
     inline void stop_measure() {
-      usesAutoMeasure = CmiTrue;
+      usesAutoMeasure = true;
     }
     virtual void UserSetLBLoad(void) {
       // empty
@@ -1427,8 +1427,8 @@ friend class SReq;
     CthThread getThread() { return thread->getThread(); }
 #if CMK_LBDB_ON
     void setMigratable(int mig) { 
-      if(mig) thread->setMigratable(CmiTrue); 
-      else thread->setMigratable(CmiFalse);
+      if(mig) thread->setMigratable(true); 
+      else thread->setMigratable(false);
     }
 #endif
   public:

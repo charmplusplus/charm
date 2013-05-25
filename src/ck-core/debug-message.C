@@ -114,12 +114,21 @@ void envelope::pup(PUP::er &p) {
 		p((char *)&(((struct s_chare*)extraData())->ptr),sizeof(void *));
 		p(((struct s_chare*)extraData())->forAnyPe);
 		break;
-	case NodeBocInitMsg: case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
-		p|((struct s_group*)extraData())->g;
+	case NodeBocInitMsg: case BocInitMsg:
+		p|((struct s_groupinit*)extraData())->g;
 		p|((struct s_groupinit*)extraData())->rednMgr;
+		p|((struct s_groupinit*)extraData())->dep;
 		p|((struct s_groupinit*)extraData())->epoch;
-		p|((struct s_group*)extraData())->arrayEp;
 		break;
+    case ForNodeBocMsg: case ForBocMsg:
+		p|((struct s_group*)extraData())->g;
+		p|((struct s_group*)extraData())->arrayEp;
+        break;
+    case ForIDedObjMsg:
+        p|((struct s_objid*)extraData())->id;
+        p|((struct s_objid*)extraData())->hopCount;
+        p|((struct s_objid*)extraData())->ifNotThere;
+        break;
 	case ForArrayEltMsg:
 		p|((struct s_array*)extraData())->arr;
 		p(((struct s_array*)extraData())->index.nInts);

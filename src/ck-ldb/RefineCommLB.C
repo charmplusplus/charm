@@ -16,9 +16,9 @@ RefineCommLB::RefineCommLB(const CkLBOptions &opt): RefineLB(opt)
     CkPrintf("[%d] RefineCommLB created\n",CkMyPe());
 }
 
-CmiBool RefineCommLB::QueryBalanceNow(int _step)
+bool RefineCommLB::QueryBalanceNow(int _step)
 {
-  return CmiTrue;
+  return true;
 }
 
 void RefineCommLB::work(LDStats* stats)

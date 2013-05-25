@@ -32,18 +32,18 @@ GreedyAgentLB::GreedyAgentLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] GreedyAgentLB created\n",CkMyPe());
 }
 
-CmiBool GreedyAgentLB::QueryBalanceNow(int _step)
+bool GreedyAgentLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
-  return CmiTrue;
+  return true;
 }
 
-CmiBool  GreedyAgentLB::Compare(double x, double y, HeapCmp cmp)
+bool  GreedyAgentLB::Compare(double x, double y, HeapCmp cmp)
 {
   const int test =  ((cmp == GT) ? (x > y) : (x < y));
 
-  if (test) return CmiTrue; 
-  else return CmiFalse;
+  if (test) return true; 
+  else return false;
 }
 
 
@@ -107,7 +107,7 @@ GreedyAgentLB::BuildObjectArray(CentralLB::LDStats* stats,
   int obj;
 
 //for (obj = 0; obj < stats[pe].n_objs; obj++)
-//if (stats[pe].objData[obj].migratable == CmiTrue) (*objCount)++; 
+//if (stats[pe].objData[obj].migratable == true) (*objCount)++; 
 
   objData  = new HeapData[stats->n_objs];
   *objCount = 0; 

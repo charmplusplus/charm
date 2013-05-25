@@ -24,8 +24,8 @@
 //  CkHashtableT<CkArrayIndex, CkArrayIndex*> *ht;
 //    
 //  int isRegistered(ArrayElement *elt, CharmStrategy *astrat);
-//  void addElement(ArrayElement *elt, CmiBool mogration_flag);
-//  void deleteElement(ArrayElement *elt, CmiBool migration_flag);
+//  void addElement(ArrayElement *elt, bool mogration_flag);
+//  void deleteElement(ArrayElement *elt, bool migration_flag);
 //  */
 //  CkVec<ComlibArrayInfo*> users;
 //  CkVec<int> userIDs;
@@ -53,7 +53,7 @@
 //  //void ckElementDied(ArrayElement *elt);
 //    
 //  //void ckElementLeaving(ArrayElement *elt);
-//  //CmiBool ckElementArriving(ArrayElement *elt);
+//  //bool ckElementArriving(ArrayElement *elt);
 //    
 //  //Add strategy to listening list, strategy will get an the number
 //  //of array elements lying on that processor

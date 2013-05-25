@@ -15,7 +15,7 @@ class LBObj
 friend class LBDB;
 
 public:
-  LBObj(LBDB *_parentDB, const LDObjHandle &_h, void *usr_ptr = NULL, CmiBool _migratable=CmiTrue, CmiBool _asyncArrival = CmiFalse) {
+  LBObj(LBDB *_parentDB, const LDObjHandle &_h, void *usr_ptr = NULL, bool _migratable=true, bool _asyncArrival = false) {
     data.handle = _h;
     data.migratable = _migratable;
     data.asyncArrival = _asyncArrival;
@@ -27,7 +27,7 @@ public:
     userData = usr_ptr;
     parentDB = _parentDB;
 //    migratable = _migratable;
-//    registered = CmiTrue;
+//    registered = true;
     startWTime = -1.0;
     lastWallTime = .0;
 #if CMK_LB_CPUTIMER
@@ -40,13 +40,13 @@ public:
 
 #if 0
   LBObj(LBDB *_parentDB, LDOMHandle _omhandle, LDObjid _id,
-	void *_userData = 0, CmiBool _migratable=CmiTrue) {
+	void *_userData = 0, bool _migratable=true) {
     parentDB = _parentDB;
 //    parentOM = _omhandle;
 //    myhandle.id = _id;
 //    userData = _userData;
     migratable = _migratable;
-    registered = CmiFalse;
+    registered = false;
   };
 
   void DepositHandle(const LDObjHandle &_h) {
@@ -57,7 +57,7 @@ public:
     data.migratable = migratable;
     data.cpuTime = 0.;
     data.wallTime = 0.;
-    registered = CmiTrue;
+    registered = true;
   };
 #endif
 
@@ -105,8 +105,8 @@ public:
 
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
-  inline void SetMigratable(CmiBool mig) { data.migratable = mig; }
-  inline void UseAsyncMigrate(CmiBool async) { data.asyncArrival = async; }
+  inline void SetMigratable(bool mig) { data.migratable = mig; }
+  inline void UseAsyncMigrate(bool async) { data.asyncArrival = async; }
   inline LDObjData &ObjData() { return data; };
   inline void lastKnownLoad(LBRealType *w, LBRealType *c) {
     *w = lastWallTime;
@@ -124,14 +124,14 @@ private:
 //  LDOMHandle parentOM;
 //  LDObjHandle myhandle;
   LDObjData data;
-//  CmiBool registered;
+//  bool registered;
   double startWTime;             // needs double precision
   LBRealType lastWallTime;
 #if CMK_LB_CPUTIMER
   double startCTime;
   LBRealType lastCpuTime;
 #endif
-//  CmiBool migratable;   // temp
+//  bool migratable;   // temp
 };
 
 #endif

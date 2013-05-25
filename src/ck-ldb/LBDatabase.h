@@ -252,7 +252,7 @@ public:
   void EstObjLoad(const LDObjHandle &h, double cpuload);
   inline void NonMigratable(LDObjHandle h) { LDNonMigratable(h); };
   inline void Migratable(LDObjHandle h) { LDMigratable(h); };
-  inline void UseAsyncMigrate(LDObjHandle h, CmiBool flag) { LDAsyncMigrate(h, flag); };
+  inline void UseAsyncMigrate(LDObjHandle h, bool flag) { LDAsyncMigrate(h, flag); };
   inline void DumpDatabase(void) { LDDumpDatabase(myLDHandle); };
 
   /*

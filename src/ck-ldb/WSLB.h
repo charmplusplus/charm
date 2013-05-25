@@ -52,11 +52,11 @@ public:
     double obj_cputime;
     double usage;
     int proc_speed;
-    CmiBool vacate_me;
+    bool vacate_me;
   };
 
 protected:
-  virtual CmiBool QueryBalanceNow(int);
+  virtual bool QueryBalanceNow(int);
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
 #if 0
   virtual int num_neighbors() {
@@ -116,7 +116,7 @@ private:
   double first_step_time;
   double usage;
   double usage_int_err;
-  CmiBool vacate;
+  bool vacate;
 };
 
 class WSLBStatsMsg : public CMessage_WSLBStatsMsg {
@@ -132,7 +132,7 @@ public:
   double obj_walltime;
   double obj_cputime;
   double usage;
-  CmiBool vacate_me;
+  bool vacate_me;
 }; 
 
 

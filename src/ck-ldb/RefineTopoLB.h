@@ -26,7 +26,7 @@ class RefineTopoLB : public TopoLB
     double getCpartHopBytes(int cpart, int proc, int count);
     double findSwapGain(int cpart1, int cpart2, int n_pes);
     //double getInterMedHopBytes(CentralLB::LDStats *stats,int count, int *newmap);
-    CmiBool QueryBalanceNow (int step);
+    bool QueryBalanceNow (int step);
     void updateCommUA(int count);
 }; 
 

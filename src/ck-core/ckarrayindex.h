@@ -4,6 +4,9 @@
 #include "pup.h"
 #include "ckhashtable.h"
 #include "charm.h"
+#include "objid.h"
+#include <vector>
+#include <math.h>
 
 /// Max number of integers in an array index
 #ifndef CK_ARRAYINDEX_MAXLEN
@@ -93,12 +96,12 @@ class CkArrayIndex: public CkArrayIndexBase
         void print() const { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
 
         /// Equality comparison
-        CmiBool operator==(const CkArrayIndex& idx) const
+        bool operator==(const CkArrayIndex& idx) const
         {
-            if (nInts != idx.nInts) return CmiFalse;
+            if (nInts != idx.nInts) return false;
             for (int i=0; i<nInts; i++)
-                if (index[i] != idx.index[i]) return CmiFalse;
-            return CmiTrue;
+                if (index[i] != idx.index[i]) return false;
+            return true;
         }
 
         /// These routines allow CkArrayIndex to be used in a CkHashtableT
@@ -230,6 +233,85 @@ public:
     }
 };
 PUPmarshall(CkArrayID)
+
+namespace ck {
+  class ArrayIndexCompressor {
+  public:
+    virtual ObjID compress(const CkGroupID gid, const CkArrayIndex &idx) = 0;
+  };
+
+  class FixedArrayIndexCompressor : public ArrayIndexCompressor {
+  public:
+    /// Factory that checks whether a bit-packing compression is possible given
+    /// @arg bounds
+    static FixedArrayIndexCompressor* make(const CkArrayIndex &bounds) {
+      if (bounds.nInts == 0)
+        return NULL;
+
+      std::vector<unsigned int> bits;
+      unsigned int sum = 0;
+
+      for (int i = 0; i < bounds.dimension; ++i) {
+        int bound = (bounds.nInts <= 3) ? bounds.index[i] : bounds.indexShorts[i];
+        unsigned int b = bitCount(bound);
+        bits.push_back(b);
+        sum += b;
+      }
+
+      if (sum > 48)
+        return NULL;
+
+      return new FixedArrayIndexCompressor(bits);
+    }
+
+    /// Pack the bits of @arg idx into an ObjID
+    ObjID compress(const CkGroupID gid, const CkArrayIndex &idx) {
+      CkAssert(idx.dimension == bitsPerDim.size());
+
+      CmiUInt8 eid = 0;
+
+      bool shorts = idx.dimension > 3;
+
+      for (int i = 0; i < idx.dimension; ++i) {
+        unsigned int numBits = bitsPerDim[i];
+        unsigned int thisDim = shorts ? idx.indexShorts[i] : idx.index[i];
+        CkAssert(thisDim < (1UL << numBits));
+        eid = (eid << numBits) | thisDim;
+      }
+
+      return ObjID(gid, eid);
+    }
+
+  private:
+    FixedArrayIndexCompressor(std::vector<unsigned int> bits)
+      : bitsPerDim(bits)
+      { }
+    std::vector<unsigned int> bitsPerDim;
+
+    /// Compute the number of bits to represent integer indices in the range
+    /// [0..bound). Essentially, ceil(log2(bound)).
+    static unsigned int bitCount(int bound) {
+      CkAssert(bound > 0);
+
+      // Round up to the nearest power of 2 (effectively, ceiling)
+      bound--;
+      bound |= bound >> 1;
+      bound |= bound >> 2;
+      bound |= bound >> 4;
+      bound |= bound >> 8;
+      bound |= bound >> 16;
+      bound++;
+
+      // log2(bound)
+      unsigned int result = 0;
+      while (bound >>= 1) {
+        ++result;
+      }
+
+      return result;
+    }
+  };
+}
 
 #endif // CKARRAYINDEX_H
 

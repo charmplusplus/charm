@@ -25,7 +25,7 @@
 #define CMK_BROADCAST_SPANNING_TREE 0
 
 #undef CMK_BROADCAST_HYPERCUBE
-#define CMK_BROADCAST_HYPERCUBE  1
+#define CMK_BROADCAST_HYPERCUBE  0
 
 #undef CMK_DIRECT                 
 #define CMK_DIRECT                                        1

@@ -17,11 +17,11 @@ extern /* readonly */ int finalStepCount;
 //compute - Default constructor
 Compute::Compute() {
   stepCount = 1;
-  usesAtSync = CmiTrue;
+  usesAtSync = true;
 }
 
 Compute::Compute(CkMigrateMessage *msg): CBase_Compute(msg)  { 
-  usesAtSync = CmiTrue;
+  usesAtSync = true;
   delete msg;
 }
 

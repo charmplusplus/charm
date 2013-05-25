@@ -11,7 +11,7 @@ public:
          * This message is about to be processed by Charm.
          * If this function returns false, the message will not be processed.
          */
-        virtual CmiBool record(char *msg) { return CmiFalse; }
+        virtual bool record(char *msg) { return false; }
         virtual int replay() { return 0; }
 	virtual void rewind() {}
 };
@@ -23,7 +23,7 @@ public:
         BgMessageRecorder(FILE * f_, int node);
         ~BgMessageRecorder() { fclose(f); }
 
-        virtual CmiBool record(char *msg) {
+        virtual bool record(char *msg) {
 //                if (BgGetGlobalWorkerThreadID()==0) printf("srcpe: %d size: %d handle: %d\n",CmiBgMsgSrcPe(msg),CmiBgMsgLength(msg),CmiBgMsgHandle(msg));
                 int d = CmiBgMsgSrcPe(msg);
 		pos = ftell(f);
@@ -32,7 +32,7 @@ public:
                 if ( (nodelevel == 0 && d == BgGetGlobalWorkerThreadID()) ||
                      (nodelevel == 1 && d/BgGetNumWorkThread() == BgGetGlobalWorkerThreadID()/BgGetNumWorkThread()) ) {
                     //CmiPrintf("[%d] local message.\n", BgGetGlobalWorkerThreadID());
-                    return CmiTrue; // don't record local msg
+                    return true; // don't record local msg
                 }
                 d = CmiBgMsgLength(msg);
                 fwrite(&d, sizeof(int), 1, f);
@@ -44,7 +44,7 @@ printf("replay: %d %d\n", m[0], m[1]);
 */
                 fwrite(msg, sizeof(char), d, f);
                 //CmiPrintf("[%d] BgMessageRecord>  PE: %d size: %d msg: %p\n", BgGetGlobalWorkerThreadID(), CmiBgMsgSrcPe(msg),CmiBgMsgLength(msg), msg);
-                return CmiTrue;
+                return true;
         }
         virtual int replay() { return 0; }
 	virtual void rewind() {
@@ -70,7 +70,7 @@ public:
 		done();
  		fclose(f);
 	}
-        CmiBool record(char *msg) { return CmiFalse; }
+        bool record(char *msg) { return false; }
         int replay(void) {
                 int nextPE;
                 int ret =  fread(&nextPE, sizeof(int), 1, f);

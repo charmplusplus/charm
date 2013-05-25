@@ -11,6 +11,7 @@
 #include "cell.h"
 #include "main.decl.h"
 #include "time.h"
+#include "rand48_replacement.h"
 
 extern /* readonly */ CProxy_Main mainProxy;
 extern /* readonly */ CProxy_Cell cellArray;
