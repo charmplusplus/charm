@@ -1651,14 +1651,8 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
 
 #endif
 
-
-void LrtsDrainResources()
-{
-}
-
-void LrtsPostNonLocal()
-{
-}
+void LrtsDrainResources(){}
+void LrtsPostNonLocal() {}
 
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some implementations*/
@@ -1689,17 +1683,17 @@ void LrtsAdvanceCommunication(int whileidle)
 
 /* happen at node level */
 /* must be called on every PE including communication processors */
-int CmiBarrier()
+void LrtsBarrier()
 {
   int len, size, i;
   int status;
   int numnodes = CmiNumNodes();
   static int barrier_phase = 0;
 
-  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (Cmi_charmrun_fd == -1) return;                // standalone
   if (numnodes == 1) {
     CmiNodeAllBarrier();
-    return 0;
+    return;
   }
 
   if (CmiMyRank() == 0) {
@@ -1715,7 +1709,7 @@ int CmiBarrier()
 
   CmiNodeAllBarrier();
   /* printf("[%d] OUT of barrier %d \n", CmiMyPe(), barrier_phase); */
-  return 0;
+  return;
 }
 
 

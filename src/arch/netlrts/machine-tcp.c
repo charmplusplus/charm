@@ -60,38 +60,10 @@ static CmiIdleState *CmiNotifyGetState(void)
   return s;
 }
 
-static void CmiNotifyBeginIdle(CmiIdleState *s)
-{
-  s->sleepMs=0;
-  s->nIdles=0;
-}
 
-static void CmiNotifyStillIdle(CmiIdleState *s)
-{
-#if  !CMK_SMP 
-  CommunicationServerNet(10, COMM_SERVER_FROM_SMP);
-#else
-  int nSpins=20; /*Number of times to spin before sleeping*/
-  s->nIdles++;
-  if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
-    s->sleepMs+=2;
-    if (s->sleepMs>10) s->sleepMs=10;
-  }
-  /*Comm. thread will listen on sockets-- just sleep*/
-  if (s->sleepMs>0) {
-    MACHSTATE1(3,"idle lock(%d) {",CmiMyPe())
-    CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
-    CsdResetPeriodic();		/* check ccd callbacks when I am awakened */
-    MACHSTATE1(3,"} idle lock(%d)",CmiMyPe())
-  }
-#endif
-}
-
-void CmiNotifyIdle(void) {
-  CmiIdleState s;
-  s.sleepMs=5; 
-  CmiNotifyStillIdle(&s);
-}
+void  LrtsNotifyIdle() { }
+void  LrtsBeginIdle() { }
+void  LrtsStillIdle() { }
 
 /****************************************************************************
  *                                                                          

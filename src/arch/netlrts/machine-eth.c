@@ -23,42 +23,11 @@
  *
  *****************************************************************************/
 
+void LrtsStillIdle() {}
 
-static void CmiNotifyStillIdleNet(CmiIdleState *s)
-{
-#if CMK_SHARED_VARS_UNAVAILABLE
-  /*No comm. thread-- listen on sockets for incoming messages*/
-  MACHSTATE(1,"idle commserver {")
-  CommunicationServerNet(Cmi_idlepoll?0:10, COMM_SERVER_FROM_SMP);
-  MACHSTATE(1,"} idle commserver")
-#else
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  if(_Cmi_noprocforcommthread ){
-#endif
-    int nSpins=20; /*Number of times to spin before sleeping*/
-    s->nIdles++;
-    if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
-      s->sleepMs+=2;
-      if (s->sleepMs>10) s->sleepMs=10;
-    }
-    /*Comm. thread will listen on sockets-- just sleep*/
-    if (s->sleepMs>0) {
-      MACHSTATE1(3,"idle lock(%d) {",CmiMyPe())
-      CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
-      CsdResetPeriodic();		/* check ccd callbacks when I am awakened */
-      MACHSTATE1(3,"} idle lock(%d)",CmiMyPe())
-    }
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  }
-#endif
-#endif
-}
+void LrtsNotifyIdle() {}
 
-void CmiNotifyIdleNet(void) {
-  CmiIdleState s;
-  s.sleepMs=5; 
-  CmiNotifyStillIdle(&s);
-}
+void LrtsBeginIdle() {}
 
 /****************************************************************************
  *                                                                          

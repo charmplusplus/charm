@@ -3170,6 +3170,9 @@ static void pollCmiDirectQ(){
 	}
 }
 
+void  LrtsNotifyIdle() {}
+void  LrtsBeginIdle() {}
+void  LrtsStillIdle() {}
 
 /*void processDirectRequest(struct infiDirectRequestPacket *directRequestPacket){
 	int senderProc = directRequestPacket->senderProc;
