@@ -39,7 +39,7 @@ module CkIO {
 
 		thisProxy.prepareOutput_distrib(nextToken, name, bytes, opts);
 
-		files[nextToken] = FileInfo(name, bytes, opts);
+		files[nextToken] = impl::FileInfo(name, bytes, opts);
 		files[nextToken].complete = complete;
 	      }
 
@@ -47,7 +47,7 @@ module CkIO {
 						    Options opts) atomic {
 	      if (CkMyPe() != 0) {
 		CkAssert(files.end() == files.find(token));
-		files[token] = FileInfo(name, bytes, opts);
+		files[token] = impl::FileInfo(name, bytes, opts);
 	      }
 
 	      // Open file if we're one of the active PEs

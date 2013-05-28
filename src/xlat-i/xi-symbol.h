@@ -1350,6 +1350,7 @@ public:
   { }
   void generateEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
   void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  void generateEntryName(XStr& defs, Entry* e, int curEntry);
 };
 
 extern void RemoveSdagComments(char *);

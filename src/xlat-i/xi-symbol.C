@@ -575,7 +575,8 @@ Module::generate()
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
   "#include \"charm++.h\"\n"
-  "#include <memory>\n";
+  "#include <memory>\n"
+  "#include <set>\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
   declstr << "extern void _register"<<name<<"(void);\n";

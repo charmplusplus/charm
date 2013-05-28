@@ -50,44 +50,45 @@ namespace Ck { namespace IO {
     Token token;
     FileReadyMsg(const Token &tok) : token(tok) {}
   };
-  
-  struct buffer
-  {
-    std::vector<char> array;
-    int bytes_filled_so_far;
+
+  namespace impl {  
+    struct buffer
+    {
+      std::vector<char> array;
+      int bytes_filled_so_far;
     
-    buffer()
-    {
-      bytes_filled_so_far = 0;
-    }
+      buffer()
+      {
+	bytes_filled_so_far = 0;
+      }
 
-    void expect(size_t bytes)
-    {
-      array.resize(bytes);
-    }
+      void expect(size_t bytes)
+      {
+	array.resize(bytes);
+      }
     
-    void insertData(const char *data, size_t length, size_t offset)
-    {
-      char *dest = &array[offset];
-      memcpy(dest, data, length);
+      void insertData(const char *data, size_t length, size_t offset)
+      {
+	char *dest = &array[offset];
+	memcpy(dest, data, length);
 
-      bytes_filled_so_far += length;
-    }
+	bytes_filled_so_far += length;
+      }
 
-    bool isFull()
-    {
-      return bytes_filled_so_far == array.size();
-    }
-  };
+      bool isFull()
+      {
+	return bytes_filled_so_far == array.size();
+      }
+    };
     
 
-  struct FileInfo {
-    std::string name;
-    Options opts;
-    size_t bytes, total_written;
-    int fd;
-    CkCallback complete;
-    std::map<size_t, struct buffer> bufferMap;
+    struct FileInfo {
+      std::string name;
+      Options opts;
+      size_t bytes, total_written;
+      int fd;
+      CkCallback complete;
+      std::map<size_t, struct buffer> bufferMap;
 
     FileInfo(std::string name_, size_t bytes_, Options opts_)
     : name(name_), opts(opts_), bytes(bytes_), total_written(0), fd(-1)
@@ -95,7 +96,8 @@ namespace Ck { namespace IO {
     FileInfo()
     : bytes(-1), total_written(-1), fd(-1)
       { }
-  };
+    };
+  }
 
   /// Class to mediate IO operations between Charm++ application code
   /// and underlying filesystems.
@@ -127,7 +129,7 @@ namespace Ck { namespace IO {
   private:
     int filesOpened;
     Token nextToken;
-    std::map<Token, FileInfo> files;
+    std::map<Token, impl::FileInfo> files;
     CkCallback nextReady;
 
     int lastActivePE(const Options &opts) {

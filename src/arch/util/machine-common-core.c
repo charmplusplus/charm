@@ -795,9 +795,11 @@ if (  MSG_STATISTIC)
     }
 #endif
 
+
     if (_Cmi_mynode==0) {
 #if !CMK_SMP 
       printf("Charm++> Running on non-SMP mode\n");
+  MACHSTATE1(4,"running nonsmp %d", _Cmi_mynode)
 #else
       printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
       if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {

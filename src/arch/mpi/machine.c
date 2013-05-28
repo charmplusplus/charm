@@ -1332,7 +1332,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 			MPI_Comm_rank(charmComm, myNodeID);
     }
 
-    MPI_Bcast(&_Cmi_mynodesize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&_Cmi_mynodesize, 1, MPI_INT, 0, charmComm);
 
     myNID = *myNodeID;
 

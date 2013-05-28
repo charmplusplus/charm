@@ -246,7 +246,7 @@ static void CmiStartThreads(char **argv)
     PerrorExit("TlsSetValue");
 }
 
-static void CmiDestoryLocks()
+static void CmiDestroyLocks()
 {
   CloseHandle(comm_mutex);
   CloseHandle(CmiMemLock_lock);
@@ -489,7 +489,7 @@ static void CmiStartThreads(char **argv)
   MACHSTATE(4,"CmiStartThreads done")
 }
 
-static void CmiDestoryLocks()
+static void CmiDestroyLocks()
 {
   CmiDestroyLock(comm_mutex);
   CmiDestroyLock(CmiMemLock_lock);
