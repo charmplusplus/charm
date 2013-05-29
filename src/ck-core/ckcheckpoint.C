@@ -199,8 +199,12 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	CkPupArrayElementsData(p);
 	CmiFclose(datFile);
 
-#if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
+#if ! CMK_DISABLE_SYNC
+#if CMK_HAS_SYNC_FUNC
+        sync();
+#elif CMK_HAS_SYNC
 	system("sync");
+#endif
 #endif
 
 	restartCB = cb;
