@@ -3,6 +3,9 @@
 /* Charm++ Release/API version number */
 #undef CHARM_VERSION
 
+/* whether Cray gni_pub has GNI_GetBIConfig */
+#undef CMK_BALANCED_INJECTION_API
+
 /* bproc version */
 #undef CMK_BPROC_VERSION
 
@@ -39,20 +42,17 @@
 /* Cray MAXNID */
 #undef CMK_CRAY_MAXNID
 
-/* Cray Get_BIConfig */
-#undef CMK_BALANCED_INJECTION_API
+/* whether Xfence intrinsics works in C */
+#undef CMK_C_BUILTIN_IA32_XFENCE
 
 /* whether C inline works in C */
 #undef CMK_C_INLINE
 
-/* whether synchronization primitives works in C */
-#undef CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE
-
-/* whether add and fetch primitives works in C */
+/* whether sync_add_and_fetch primitive works in C */
 #undef CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE
 
-/* whether builtin_ia32_xfence builtin works in C */
-#undef CMK_C_BUILTIN_IA32_XFENCE
+/* whether sync_synchronize primitives works in C */
+#undef CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE
 
 /* whether C++ allows declaration of variable sized array */
 #undef CMK_DECLARE_VARSIZE_ARRAY
@@ -235,6 +235,9 @@
 #undef CMK_HAS_SYNC
 
 /* whether has system */
+#undef CMK_HAS_SYNC_FUNC
+
+/* whether has system */
 #undef CMK_HAS_SYSTEM
 
 /* Allows __thread. */
@@ -285,7 +288,7 @@
 /* whether is power7 */
 #undef CMK_POWER7
 
-/* Allows PPC assembly. */
+/* Allows asm eieio assembly. */
 #undef CMK_PPC_ASM
 
 /* whether has zlib */
