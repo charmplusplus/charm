@@ -1293,6 +1293,17 @@ EOT
 test_link "whether has system" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SYSTEM, $pass, [whether has system])
 
+#### test for sync() ###
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  sync();
+  return 0;
+}
+EOT
+test_link "whether has sync()" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SYNC_FUNC, $pass, [whether has system])
+
 #### test for sbrk ###
 cat > $t <<EOT
 #include <unistd.h>
