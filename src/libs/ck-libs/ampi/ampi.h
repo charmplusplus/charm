@@ -214,6 +214,7 @@ typedef struct {
 
 #define stsempty(sts) (sts).MPI_TAG=(sts).MPI_SOURCE=(sts).MPI_COMM=(sts).MPI_LENGTH=0
 #define MPI_STATUS_IGNORE (MPI_Status *)0
+#define MPI_STATUSES_IGNORE (MPI_Status *)0
 
 typedef int MPI_Errhandler;
 #define MPI_ERRHANDLER_NULL     0

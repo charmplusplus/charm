@@ -3643,7 +3643,8 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
     for(j=0;j<((*reqvec)[i]).size();j++){
       //CkPrintf("[%d] in loop [%d, %d]\n", pptr->thisIndex,i, j);
       if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL){
-        stsempty(sts[((*reqvec)[i])[j]]);
+        if(sts)
+          stsempty(sts[((*reqvec)[i])[j]]);
         continue;
       }
       oldPe = CkMyPe();
@@ -3651,7 +3652,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       int waitResult = -1;
       do{	
         AmpiRequest *waitReq = ((*reqs)[request[((*reqvec)[i])[j]]]);
-        waitResult = waitReq->wait(&sts[((*reqvec)[i])[j]]);
+        waitResult = waitReq->wait(sts ? &sts[((*reqvec)[i])[j]] : (MPI_Status *)0);
         if(_BgInOutOfCoreMode){
           reqs = getReqs();
           reqvec = vecIndex(count, request);
