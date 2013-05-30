@@ -318,7 +318,7 @@ static void machine_exit(int status)
   MACHSTATE(3,"     machine_exit");
   machine_initiated_shutdown=1;
 
-  CmiDestroyLocks();		/* destory locks to prevent dead locking */
+  CmiDestroyLocks();		/* destroy locks to prevent dead locking */
   EmergencyExit();
 
   MachineExit();
@@ -367,7 +367,7 @@ static void KillOnAllSigs(int sigNo)
   }
 #endif
   
-  CmiDestroyLocks();		/* destory locks */
+  CmiDestroyLocks();
 
   if (sigNo==SIGSEGV) {
      sig="segmentation violation";
