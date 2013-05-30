@@ -5215,8 +5215,11 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
 int AMPI_Comm_dup(int comm, int *newcomm)
 {
   AMPIAPI("AMPI_Comm_dup");
-  *newcomm = comm;
-  return 0;
+
+  int rank;
+  AMPI_Comm_rank(comm, &rank);
+
+  return AMPI_Comm_split(comm, 0, rank, newcomm);
 }
 
   CDECL
