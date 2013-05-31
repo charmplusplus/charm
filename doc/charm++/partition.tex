@@ -107,8 +107,7 @@ to separate files by passing the target path as a command line option. The run
 time parameter {\tt +stdout $<$path$>$} is to be used for this purpose. The
 {\tt $<$path$>$} may contain the C format specifier \emph{\%d}, which will be replaced by the
 partition number. In case, \emph{\%d} is specified multiple times, only the first
-three instances from the left will be replaced by the partition number (and rest
-will contain garbage values). In case, a format specifier is not specified, 
+three instances from the left will be replaced by the partition number (other or additional format specifiers will result in undefined behavior). If a format specifier is not specified, 
 the partition number will be appended as a suffix to the specified path. Example usage:
 
 \begin{itemize}
