@@ -92,7 +92,7 @@ extern ``C'' void createCustomPartitions(int numparts, int *partitionSize, int *
 {\tt nodeMap} (output, preallocated) - a preallocated array of length {\tt CmiNumNodesGlobal()}.
 Entry $i$ in this array specifies the new global node rank of a node with default node rank $i$. 
 The entries in this array are block wise divided to create partitions, i.e entries 0 to 
-partitionSize[0]-1 belong to partition 1, partitonSize[0] to
+partitionSize[0]-1 belong to partition 1, partitionSize[0] to
 partitionSize[0]+partitionSize[1]-1 to partition 2 and so on.\\
 
 When this function is invoked to create partitions, TopoManager is configured to 
