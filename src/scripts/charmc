@@ -1389,6 +1389,9 @@ fi
 
 Debug "About to link..."
 
+# if interoperate dont create the library now, wait to collect all info
+if [ "$MPI_INTEROPERATE" = "" ]
+then
 case "$OBJECT" in
 *.o)
 	Debugf "Converting $FILES to $OBJECTFILES"
@@ -1444,6 +1447,7 @@ case "$OBJECT" in
 	Copyobj
 	;;
 esac
+fi
 # If the above case returns, we're not creating a .o or .a file,
 # so linking is needed.
 
@@ -1560,6 +1564,7 @@ then
         fi
 fi
 
+# dummy main module
 if [ "$MPI_INTEROPERATE" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/mpi-mainmodule.o $OBJECTFILES"
@@ -1865,7 +1870,13 @@ then
     LANG_LIBS="-L$CHARMLIBSO $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
   fi
 else
-  LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+# if interoperate, need a lib with moduleinit
+  if [ "$MPI_INTEROPERATE" != "" ]
+  then
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $PRE_LIBRARIES"
+  else
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+  fi
 fi
 if [ "$TRACE_WITH_TAU" = 1 ]
 then
@@ -1875,6 +1886,23 @@ else
 	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS"
 fi
 Debugf "All libraries are: $ALL_LIBS"
+
+#currently only support creation of .a
+if [ "$MPI_INTEROPERATE" != "" ]
+then
+case "$OBJECT" in
+*.a)
+	# in case building charm so, build .so under lib_so as well # Gengbin
+	DoNoErrCheck $RM $OBJECT
+        echo "$CMK_AR $OBJECT $OBJECTFILES $modInitObj"
+	Do $CMK_AR $OBJECT $OBJECTFILES $modInitObj
+	Do $CMK_RANLIB $OBJECT
+        echo "export CHARM_ALL_LIBS=\"$ALL_LIBS\"" > ./charm_all_libs.sh
+        echo "CHARM_ALL_LIBS=\"$ALL_LIBS\""
+	Copyobj
+	;;
+esac
+fi
 
 if [ "$BUILD_SHARE" = "1" -a "$CHARM_SHARED" = "1" ]
 then
