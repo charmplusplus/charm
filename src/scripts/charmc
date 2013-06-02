@@ -1903,6 +1903,11 @@ case "$OBJECT" in
 	;;
 esac
 fi
+  
+if [ "$MPI_INTEROPERATE" != "" ]
+then
+  ALL_LIBS="$OBJECTFILES $modInitObj $ALL_LIBS"
+fi
 
 if [ "$BUILD_SHARE" = "1" -a "$CHARM_SHARED" = "1" ]
 then
