@@ -87,6 +87,9 @@ NDMeshStreamer: charm-core completion
 mpi-main: mpi-mainmodule.o
 	cp mpi-mainmodule.o ../lib
 
+main: main.o
+	cp main.o ../lib
+
 translators: charmxi conv-cpm
 
 msa: charm++
@@ -708,7 +711,7 @@ $(L)/loadsym.o: loadsym.c  $(CVHEADERS)
 
 CK_LIBS_CORE=$(L)/libck.a
 
-LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
+LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
            tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
@@ -723,7 +726,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a
-charm-target: loadbalancers default_libs comlib_objs mpi-main
+charm-target: loadbalancers default_libs comlib_objs mpi-main main
 
 CHARMLIBS: charm++ CONVLIBS 
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
@@ -1014,7 +1017,7 @@ $(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C futil.f90
 ##############################################################################
 # adding this entry for files which do not belong to any of other locations
 
-OTHER_OBJS= mpi-mainmodule.o
+OTHER_OBJS= mpi-mainmodule.o main.o
 
 ##############################################################################
 

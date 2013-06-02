@@ -98,6 +98,7 @@ SPU_USE_CPP=0
 SPU_EXTRA_LIBS=""
 
 MPI_INTEROPERATE=""
+NO_MAIN=""
 
 ####################################################################
 #
@@ -125,6 +126,7 @@ printUsage() {
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
     echo "        -fmoddir <f90mod path>"
     echo "        -pg <opt> -build-shared -charm-shared -no-trace-mpi"
+    echo "        -mpi -nomain"
     echo
     echo "  Cell specific flags:"
     echo "        -spu-cpp -spu-lib <libname>"
@@ -785,6 +787,10 @@ do
 		;;
 	-mpi)
 		MPI_INTEROPERATE="yes"
+		NO_MAIN="yes"
+		;;
+	-nomain)
+		NO_MAIN="yes"
 		;;
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
@@ -1801,6 +1807,10 @@ case "$LANGUAGE" in
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
+        if [ "$NO_MAIN" = "" ]
+        then
+	  MIDDLE_LIBS="$CHARMLIB/main.o $MIDDLE_LIBS"
+        fi
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
 		TAU_LIBS="$TAU_MPI_FLIBS $TAU_LIBS"
@@ -1811,6 +1821,10 @@ case "$LANGUAGE" in
 "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
+        if [ "$NO_MAIN" = "" ]
+        then
+	  MIDDLE_LIBS="$CHARMLIB/main.o $MIDDLE_LIBS"
+        fi
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
