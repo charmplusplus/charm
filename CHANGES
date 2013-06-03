@@ -2,6 +2,14 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.5.1
+================================================================================
+
+- Deprecations
+  * The CmiBool type definitions will be deleted in release 6.6.0, since the
+    standard C++ bool has long been universally implemented.
+
+================================================================================
 What's new in Charm++ 6.5.0
 ================================================================================
 
