@@ -55,7 +55,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   MACHSTATE(1,"} idle commserver")
 #else
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  if(_Cmi_noprocforcommthread ){
+  if(_Cmi_sleepOnIdle ){
 #endif
     int nSpins=20; /*Number of times to spin before sleeping*/
     s->nIdles++;

@@ -3580,7 +3580,7 @@ void ConverseCommonInit(char **argv)
   
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
   if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for net-smp-*) ?")){
-    if(CmiMyRank() == 0) _Cmi_noprocforcommthread=1;
+    if(CmiMyRank() == 0) _Cmi_sleepOnIdle=1;
    }
 #endif
 	
