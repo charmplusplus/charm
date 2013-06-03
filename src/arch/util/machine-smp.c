@@ -264,7 +264,7 @@ CmiNodeLock CmiMemLock_lock;
 #ifdef CMK_NO_ASM_AVAILABLE
 CmiNodeLock cmiMemoryLock;
 #endif
-int _Cmi_noprocforcommthread=0;/*this variable marks if there is an extra processor for comm thread
+int _Cmi_sleepOnIdle=0;/*this variable marks if there is an extra processor for comm thread
 in smp*/
 
 #if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD

@@ -412,7 +412,7 @@ void CmiPushPE(int rank,void *msg) {
     CMIQueuePush(cs->recv,(char*)msg);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  if (_Cmi_noprocforcommthread)
+  if (_Cmi_sleepOnIdle)
 #endif
     CmiIdleLock_addMessage(&cs->idle);
     MACHSTATE1(3,"} Pushing message into rank %d's queue done",rank);
@@ -434,7 +434,7 @@ void CmiPushNode(void *msg) {
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-    if (_Cmi_noprocforcommthread)
+    if (_Cmi_sleepOnIdle)
 #endif
     {
         CmiState cs=CmiGetStateN(0);
@@ -1159,7 +1159,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 #else
     LrtsPostNonLocal();
 
-    if (_Cmi_noprocforcommthread) {
+    if (_Cmi_sleepOnIdle) {
     s->nIdles++;
     if (s->nIdles>SPINS_BEFORE_SLEEP) { /*Start giving some time back to the OS*/
         s->sleepMs+=2;
