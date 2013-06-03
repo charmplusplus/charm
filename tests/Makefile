@@ -2,7 +2,7 @@
 -include ../tmp/buildopts.mk
 OPTS += $(OPTSATBUILDTIME)
 
-DIRS=util charm++ converse ampi fem
+DIRS=util charm++ converse ampi
 
 all:
 	for d in $(DIRS); do \
