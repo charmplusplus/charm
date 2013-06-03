@@ -2,6 +2,16 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.6.0
+================================================================================
+
+
+
+- Deprecations
+  * The long-unsupported FEM library has been deprecated in favor of ParFUM
+  * The CmiBool typedefs have been deleted, as C++ bool has long been universal
+
+================================================================================
 What's new in Charm++ 6.5.0
 ================================================================================
 
