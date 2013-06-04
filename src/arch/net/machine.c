@@ -1048,7 +1048,7 @@ void CmiPushPE(int pe,void *msg)
 #endif
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  if (_Cmi_sleepOnIdle) 
+  if (_Cmi_sleepOnIdle)
 #endif
   CmiIdleLock_addMessage(&cs->idle);
 }
@@ -1087,7 +1087,7 @@ static void CmiPushNode(void *msg)
   /*Silly: always try to wake up processor 0, so at least *somebody*
     will be awake to handle the message*/
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  if (_Cmi_sleepOnIdle) 
+  if (_Cmi_sleepOnIdle)
 #endif
   CmiIdleLock_addMessage(&cs->idle);
 }

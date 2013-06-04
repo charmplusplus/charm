@@ -250,6 +250,7 @@ extern int _Cmi_mynodesize;
 extern int _Cmi_mynode;
 extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
+extern int _Cmi_forceSpinOnIdle;
 
 extern int CmiMyPe();
 extern int CmiMyRank();
@@ -374,6 +375,7 @@ extern int _Cmi_mynodesize;
 extern int _Cmi_mynode;
 extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
+extern int _Cmi_forceSpinOnIdle;
 
 extern int CmiMyPe();
 extern int CmiMyRank();

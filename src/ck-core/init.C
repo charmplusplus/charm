@@ -1277,9 +1277,16 @@ void _initCharm(int unused_argc, char **argv)
             int *pelist;
             int num;
             CmiGetPesOnPhysicalNode(0, &pelist, &num);
-            if (!_Cmi_sleepOnIdle && num+num/CmiMyNodeSize() > CmiNumCores()) {
-                //CkPrintf("\nCharm++> Warning: the number of SMP threads is greater than the number of physical cores, use +CmiNoProcForComThread runtime option.\n\n");
-                _Cmi_sleepOnIdle = 1;
+#if !CMK_MULTICORE && !CMK_SMP_NO_COMMTHD
+            // Count communication threads, if present
+            // XXX: Assuming uniformity of node size here
+            num += num/CmiMyNodeSize();
+#endif
+            if (!_Cmi_sleepOnIdle && !_Cmi_forceSpinOnIdle && num > CmiNumCores())
+            {
+              if (CmiMyPe() == 0)
+                CmiPrintf("\nCharm++> Warning: the number of SMP threads (%d) is greater than the number of physical cores (%d), so threads will sleep while idling. Use +CmiSpinOnIdle or +CmiSleepOnIdle to control this directly.\n\n", num, CmiNumCores());
+              _Cmi_sleepOnIdle = 1;
             }
         }
 #endif
