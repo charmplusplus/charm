@@ -50,10 +50,6 @@ CpvDeclare(void *, myProcStatFP);
 #include <Carbon/Carbon.h> /* Carbon APIs for Multiprocessing */
 #endif
 
-#if defined(ARCH_HPUX11) ||  defined(ARCH_HPUX10)
-#include <sys/mpctl.h>
-#endif
-
 
 #define MAX_EXCLUDE      64
 static int excludecore[MAX_EXCLUDE] = {-1};
