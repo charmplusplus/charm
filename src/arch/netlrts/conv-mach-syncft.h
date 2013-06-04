@@ -15,10 +15,3 @@
 #define __FAULT__					   1
 
 #define CMK_MEM_CHECKPOINT				   1
-
-/*
-#if CMK_NET_VERSION
-#undef CMK_NETPOLL
-#define CMK_NETPOLL                                        0
-#endif
-*/
