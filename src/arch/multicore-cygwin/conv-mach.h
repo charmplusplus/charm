@@ -68,7 +68,5 @@
 
 #define CMK_LBDB_ON					   1
 
-#define CMK_NETPOLL                                        1
-
 #endif
 
