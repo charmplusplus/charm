@@ -1,9 +1,6 @@
 #undef CMK_USE_PXSHM
 #define CMK_USE_PXSHM 			1
 
-#undef CMK_NETPOLL
-#define CMK_NETPOLL         0
-
 #undef CMK_IMMEDIATE_MSG
 #define CMK_IMMEDIATE_MSG       1
 
