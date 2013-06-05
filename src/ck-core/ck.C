@@ -2578,7 +2578,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    forceReplay = true;
 	    CpdSetInitializeMemory(1);
 	    // Set the parameters of the processor
-#if !CMK_SHARED_VARS_UNAVAILABLE
+#if CMK_SHARED_VARS_UNAVAILABLE
 	    _Cmi_mype = atoi(procs);
 	    while (procs[0]!='/') procs++;
 	    procs++;

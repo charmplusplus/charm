@@ -1663,6 +1663,7 @@ void CmiMachineProgressImpl(){
 
 void LrtsAdvanceCommunication(int whileidle)
 {
+#if CMK_SMP
   CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
 #else
   CommunicationServerNet(5, COMM_SERVER_FROM_WORKER);
