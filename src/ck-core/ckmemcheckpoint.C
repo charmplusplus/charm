@@ -1181,6 +1181,8 @@ void CkMemCheckPT::quiescence(CkCallback &cb)
 void CkStartMemCheckpoint(CkCallback &cb)
 {
 #if CMK_MEM_CHECKPOINT
+  if(cb.isInvalid()) 
+    CkAbort("callback after checkpoint is not set properly");
   if (_memChkptOn == 0) {
     CkPrintf("Warning: In-Memory checkpoint has been disabled! \n");
     cb.send();

@@ -1,6 +1,0 @@
-hybridAPI:
-	cd hybridAPI && make install
-
-charm++: hybridAPI
-
-.PHONY: hybridAPI
