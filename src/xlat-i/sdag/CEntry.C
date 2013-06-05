@@ -13,6 +13,13 @@ void CEntry::generateDeps(XStr& op)
   }
 }
 
+void CEntry::generateDepsNew(XStr& op) {
+  for(list<WhenConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn) {
+    op << "    __dep->addDepends(" << (*cn)->nodeNum << "," << entryNum << ");\n";
+  }
+}
+
+
 void CEntry::generateCode(XStr& decls, XStr& defs)
 {
   CStateVar *sv;
@@ -20,10 +27,6 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   int isVoid = 1;
   int lastWasVoid;
   i = 0;
-  decls << "  void ";
-
-  templateGuardBegin(false, defs);
-  defs << "void " << decl_entry->getContainer()->baseName() << "::";
 
   XStr signature;
   signature <<  *entry << "(";
@@ -58,10 +61,38 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
     else
       signature <<"void";
   }
+  if (i > 0 && needsParamMarshalling && !isVoid) {
+    decls << "  void " << *entry << "(" << decl_entry->proxyName() << "::" << decl_entry->name << "_"
+         << decl_entry->entryCount << "_struct* genStruct);\n";
+  }
   signature << ")";
 
-  decls << signature << ";\n";
 
+  if (i > 0 && needsParamMarshalling && !isVoid) {
+    templateGuardBegin(false, defs);
+    defs << "void " << decl_entry->getContainer()->baseName() << "::";
+    defs << *entry << "(" << decl_entry->proxyName() << "::" << decl_entry->name << "_"
+         << decl_entry->entryCount << "_struct* genStruct) {\n";
+    // new SDAG code goes here on recv message
+    defs << "  // new SDAG code\n";
+    defs << "  if (!__dep.get()) _sdag_init();\n";
+    defs << "  __dep->pushBuffer(" << entryNum << ", genStruct, genStruct->__refnum);\n";
+    defs << "  SDAG::Trigger* t = __dep->tryFindTrigger(" << entryNum << ");\n";
+
+    defs << "  if (!t) {\n"; // if a trigger was not found
+    defs << "    return;\n";
+    defs << "  } else {\n"; // if a trigger was found
+
+    defs << "  }\n";
+
+    defs << "}\n\n";
+    templateGuardEnd(defs);
+  }
+
+  decls << "  void " << signature << ";\n";
+
+  templateGuardBegin(false, defs);
+  defs << "void " << decl_entry->getContainer()->baseName() << "::";
   defs << signature << "{\n";
   defs << "    CWhenTrigger *tr;\n";
   defs << "    void* _bgParentLog = NULL;\n";

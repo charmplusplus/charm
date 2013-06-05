@@ -5,26 +5,9 @@
 #include <vector>
 #include <set>
 
-class CMsgBuffer {
-  public:
-    int entry;
-    void *msg;
-    void *bgLog1; 
-    void *bgLog2; 
-    int refnum;
-    CMsgBuffer *next;
-
-    CMsgBuffer(int e, void *m, void* l1, int r) : entry(e), msg(m), bgLog1(l1), bgLog2(NULL),refnum(r), next(NULL) {}
-    CMsgBuffer(int e, void *m, int r) : entry(e), msg(m), bgLog1(NULL), bgLog2(NULL),refnum(r), next(NULL) {}
-    CMsgBuffer(): bgLog1(NULL), bgLog2(NULL), next(NULL) {}
-    void pup(PUP::er& p) {
-      p|entry;
-      CkPupMessage(p, &msg);
-      p|refnum;
-      if (p.isUnpacking()) {
-        bgLog1 = bgLog2 = NULL;
-      }
-    }
+struct PackableParams {
+  virtual void pup(PUP::er& p) = 0;
+  virtual int getType() = 0;
 };
 
 struct TransportableEntity {
@@ -114,6 +97,181 @@ struct CSpeculator : public TransportableEntity {
     p | speculationIndex;
   }
 };
+
+namespace SDAG {
+  struct Trigger {
+    int whenID;
+    std::vector<TransportableEntity*> args;
+    std::vector<int> entries, refnums;
+    std::vector<int> anyEntries;
+    int speculationIndex;
+
+    void pup(PUP::er& p) {
+      p | whenID;
+      //p | args;
+      p | entries;
+      p | refnums;
+      p | anyEntries;
+      p | speculationIndex;
+    }
+  };
+
+  struct Buffer {
+    int entry, refnum;
+    PackableParams* packable;
+
+    Buffer(int entry, PackableParams* packable, int refnum)
+      : entry(entry)
+      , packable(packable)
+      , refnum(refnum) { }
+  };
+
+  struct Dependency {
+    std::vector<std::list<int> > entryToWhen;
+    std::map<int, std::list<Trigger*> > whenToTrigger;
+
+    // entry -> lst of buffers
+    std::vector<std::list<Buffer*> > buffer;
+
+    int curSpeculationIndex;
+
+    void pup(PUP::er& p) {
+      p | curSpeculationIndex;
+    }
+
+    Dependency(int numEntries, int numWhens)
+      : curSpeculationIndex(0)
+      , buffer(numEntries)
+      , entryToWhen(numEntries) { }
+
+    void addDepends(int whenID, int entry) {
+      entryToWhen[entry].push_back(whenID);
+    }
+
+    void reg(Trigger *trigger) {
+      whenToTrigger[trigger->whenID].push_back(trigger);
+    }
+
+    void dereg(Trigger *trigger) {
+      if (whenToTrigger.find(trigger->whenID) != whenToTrigger.end()) {
+        std::list<Trigger*>& lst = whenToTrigger[trigger->whenID];
+        lst.remove(trigger);
+      } else {
+        CkAbort("trying to deregister: trigger not found");
+      }
+    }
+
+    Buffer* pushBuffer(int entry, PackableParams *packable, int refnum) {
+      Buffer* buf = new Buffer(entry, packable, refnum);
+      buffer[entry].push_back(buf);
+      return buf;
+    }
+
+    Trigger *tryFindTrigger(int entry) {
+      for (std::list<int>::iterator iter = entryToWhen[entry].begin();
+           iter != entryToWhen[entry].end();
+           ++iter) {
+        int whenID = *iter;
+
+        for (std::list<Trigger*>::iterator iter2 = whenToTrigger[whenID].begin();
+             iter2 != whenToTrigger[whenID].end();
+             iter2++) {
+          Trigger* t = *iter2;
+          if (searchBufferedMatching(t)) {
+            dereg(t);
+            return t;
+          }
+        }
+      }
+      return 0;
+    }
+
+    bool searchBufferedMatching(Trigger* t) {
+      CkAssert(t->entries.size() == t->refnums.size());
+      for (int i = 0; i < t->entries.size(); i++) {
+        if (!tryFindMessage(t->entries[i], true, t->refnums[i], false)) {
+          return false;
+        }
+      }
+      for (int i = 0; i < t->anyEntries.size(); i++) {
+        if (!tryFindMessage(t->entries[i], false, 0, false)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    Buffer* tryFindMessage(int entry, bool hasRef, int refnum, bool hasIgnore,
+                           std::set<Buffer*> ignore = std::set<Buffer*>()) {
+      if (buffer[entry].size() == 0) return 0;
+      else {
+        for (std::list<Buffer*>::iterator iter = buffer[entry].begin();
+             iter != buffer[entry].end();
+             ++iter) {
+          if ((!hasRef || (*iter)->refnum == refnum) &&
+              (!hasIgnore || ignore.find(*iter) == ignore.end()))
+            return *iter;
+        }
+        return 0;
+      }
+    }
+
+    Buffer* tryFindMessage(int entry) {
+      if (buffer[entry].size() == 0) return 0;
+      else return buffer[entry].front();
+    }
+
+    void removeMessage(Buffer *buf) {
+      std::list<Buffer*>& lst = buffer[buf->entry];
+      lst.remove(buf);
+    }
+
+    int getAndIncrementSpeculationIndex() {
+      return curSpeculationIndex++;
+    }
+
+    void removeAllSpeculationIndex(int speculationIndex) {
+      for (std::map<int, std::list<Trigger*> >::iterator iter = whenToTrigger.begin();
+           iter != whenToTrigger.end();
+           ++iter) {
+        std::list<Trigger*>& lst = iter->second;
+
+        for (std::list<Trigger*>::iterator iter2 = lst.begin();
+             iter2 != lst.end();
+             ++iter2) {
+          if ((*iter2)->speculationIndex == speculationIndex) {
+            Trigger *cancelled = *iter2;
+            iter2 = lst.erase(iter2);
+            delete cancelled;
+          }
+        }
+      }
+    }
+  };
+}
+
+class CMsgBuffer {
+public:
+  int entry;
+  void *msg;
+  void *bgLog1;
+  void *bgLog2;
+  int refnum;
+  CMsgBuffer *next;
+
+  CMsgBuffer(int e, void *m, void* l1, int r) : entry(e), msg(m), bgLog1(l1), bgLog2(NULL),refnum(r), next(NULL) {}
+  CMsgBuffer(int e, void *m, int r) : entry(e), msg(m), bgLog1(NULL), bgLog2(NULL),refnum(r), next(NULL) {}
+  CMsgBuffer(): bgLog1(NULL), bgLog2(NULL), next(NULL) {}
+  void pup(PUP::er& p) {
+    p|entry;
+    CkPupMessage(p, &msg);
+    p|refnum;
+    if (p.isUnpacking()) {
+      bgLog1 = bgLog2 = NULL;
+    }
+  }
+};
+
 
 #define MAXARG 8
 #define MAXANY 8

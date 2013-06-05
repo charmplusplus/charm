@@ -196,6 +196,7 @@ class Type : public Printable {
     virtual int isCkMigMsgPtr(void) const {return 0;}
     virtual int isCkMigMsg(void) const {return 0;}
     virtual int isReference(void) const {return 0;}
+    virtual int isInt(void) const { return 0; }
     virtual bool isConst(void) const {return false;}
     virtual Type *deref(void) {return this;}
     virtual const char *getBaseName(void) const = 0;
@@ -315,6 +316,7 @@ class TypeList : public Printable {
 
 /**************** Parameter types & lists (for marshalling) ************/
 class Parameter {
+public:
     Type *type;
     const char *name; /*The name of the variable, if any*/
     const char *given_name; /*The name of the msg in ci file, if any*/
@@ -330,6 +332,7 @@ class Parameter {
     // DMK - Added field for accelerator options
     int accelBufferType;
     XStr* accelInstName;
+    bool podType;
 
     friend class ParamList;
     void pup(XStr &str);
@@ -337,9 +340,13 @@ class Parameter {
     void marshallArraySizes(XStr &str);
     void marshallArrayData(XStr &str);
     void beginUnmarshall(XStr &str);
+    void beginUnmarshallSDAGCall(XStr &str);
     void unmarshallArrayData(XStr &str);
+    void unmarshallArrayDataSDAG(XStr &str);
+    void unmarshallArrayDataSDAGCall(XStr &str);
     void pupAllValues(XStr &str);
   public:
+    Entry *entry;
     Parameter(int Nline,Type *Ntype,const char *Nname=0,
     	const char *NarrLen=0,Value *Nvalue=0);
     void setConditional(int c) { conditional = c; if (c) byReference = false; };
@@ -390,6 +397,7 @@ class ParamList {
     void callEach(fn_t f,XStr &str);
     bool manyPointers;
   public:
+    Entry *entry;
     Parameter *param;
     ParamList *next;
     ParamList(ParamList *pl) : manyPointers(false), param(pl->param), next(pl->next) {}
@@ -449,8 +457,11 @@ class ParamList {
     int hasConditional();
     void marshall(XStr &str, XStr &entry);
     void beginUnmarshall(XStr &str);
+    void beginUnmarshallSDAG(XStr &str);
+    void beginUnmarshallSDAGCall(XStr &str);
     void beginRednWrapperUnmarshall(XStr &str);
     void unmarshall(XStr &str, int isFirst=1);
+    void unmarshallSDAGCall(XStr &str, int isFirst=1);
     void unmarshallAddress(XStr &str, int isFirst=1);
     void pupAllValues(XStr &str);
     void endUnmarshall(XStr &str);
@@ -933,19 +944,23 @@ class Message : public TEntity {
 
 /* An entry construct */
 class Entry : public Member {
-  private:
+public:
     int line,entryCount;
+  private:    
     int attribs;    
     Type *retType;
     Value *stacksize;
     const char *pythonDoc;
     
+
+public:
     XStr proxyName(void) {return container->proxyName();}
     XStr indexName(void) {return container->indexName();}
 
+private:
 //    friend class CParsedFile;
     int hasCallMarshall;
-    void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false);
+    void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false, bool isSDAGGen = false);
 
     XStr epStr(bool isForRedn = false, bool templateCall = false);
     XStr epIdx(int fromProxy=1, bool isForRedn = false);
@@ -953,6 +968,8 @@ class Entry : public Member {
     XStr chareIdx(int fromProxy=1);
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
+
+    void genStruct(XStr& str);
     
     void genChareDecl(XStr& str);
     void genChareStaticConstructorDecl(XStr& str);

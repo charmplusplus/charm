@@ -41,6 +41,7 @@ public:
 
     void generateCode(XStr& decls, XStr& defs);
     void generateDeps(XStr& op);
+    void generateDepsNew(XStr& op);
     void generateBufferMessage(XStr& defs, const char* messageName, const char* refnumArg);
 };
 

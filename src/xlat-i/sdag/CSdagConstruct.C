@@ -319,6 +319,7 @@ void SdagConstruct::propagateState(int uniqueVarNum)
   }
   else {
     while (pl != NULL) {
+      printf("creating statevar 1\n");
       stateVars->push_back(new CStateVar(pl));
       pl = pl->next;
     }
@@ -450,6 +451,7 @@ void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
     }
     else {
       while(pl != NULL) {
+        printf("creating statevar 2 %s %d\n", pl->param->getGivenName(), pl->param->isArray());
         sv = new CStateVar(pl);
         stateVarsChildren->push_back(sv);
         whensEntryMethodStateVars.push_back(sv);
