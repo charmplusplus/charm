@@ -1277,7 +1277,6 @@ static void CmiStdoutInit(void) {
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
 #endif
-//NOTSURE #if CMK_SHARED_VARS_UNAVAILABLE
 #if CMK_SHARED_VARS_UNAVAILABLE 
                 if (Cmi_asyncio)
 		{
@@ -1436,7 +1435,6 @@ static void node_addresses_obtain(char **argv)
 	fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);
   	CmiGetArgIntDesc(argv,"+p",&npes,"Set the number of processes to create");
 #if CMK_SHARED_VARS_UNAVAILABLE
-//#if !CMK_SMP 
 	if (npes!=1) {
 		fprintf(stderr,
 			"To use multiple processors, you must run this program as:\n"
@@ -1665,7 +1663,6 @@ void CmiMachineProgressImpl(){
 
 void LrtsAdvanceCommunication(int whileidle)
 {
-#if CMK_SMP
   CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
 #else
   CommunicationServerNet(5, COMM_SERVER_FROM_WORKER);
