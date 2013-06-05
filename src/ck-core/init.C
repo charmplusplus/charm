@@ -707,14 +707,20 @@ static void _triggerHandler(envelope *env)
 
 static inline void _processROMsgMsg(envelope *env)
 {
-  *((char **)(_readonlyMsgs[env->getRoIdx()]->pMsg))=(char *)EnvToUsr(env);
+  if(!CmiMyRank()) {
+    *((char **)(_readonlyMsgs[env->getRoIdx()]->pMsg))=(char *)EnvToUsr(env);
+  }
 }
 
 static inline void _processRODataMsg(envelope *env)
 {
   //Unpack each readonly:
-  PUP::fromMem pu((char *)EnvToUsr(env));
-  for(size_t i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pu);
+  if(!CmiMyRank()) {
+    PUP::fromMem pu((char *)EnvToUsr(env));
+    for(size_t i=0;i<_readonlyTable.size();i++) {
+      _readonlyTable[i]->pupData(pu);
+    }
+  }
   CmiFree(env);
 }
 
@@ -1063,7 +1069,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
-  _metabalancerInit();
+        _metabalancerInit();
 	
 #if CMK_MEM_CHECKPOINT
         init_memcheckpt(argv);
