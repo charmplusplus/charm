@@ -143,7 +143,7 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   maxZ = *zdim = dimsize.mesh_z+1;
   maxNID = 0;
 
-  for(i = 0; i < CmiNumNodes(); i++) {
+  for(i = 0; i < CmiNumNodesGlobal(); i++) {
     PMI_Get_nid(i, &nid);
     if(nid >= maxNID) maxNID = nid + 1;
   }
