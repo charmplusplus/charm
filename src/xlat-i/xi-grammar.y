@@ -723,19 +723,23 @@ UnexpectedToken : ENTRY
 
 Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
+                  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, 0, 0); 
 		  if ($7 != 0) { 
 		    $7->con1 = new SdagConstruct(SIDENT, $4);
+                    $7->entry = $$;
+                    $7->con1->entry = $$;
                     $7->param = new ParamList($5);
                   }
-		  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, 0, 0); 
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
 		{ 
-		  if ($5 != 0) {
+                  Entry *e = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0);
+                  if ($5 != 0) {
 		    $5->con1 = new SdagConstruct(SIDENT, $3);
+                    $5->entry = e;
+                    $5->con1->entry = e;
                     $5->param = new ParamList($4);
                   }
-		  Entry *e = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0);
 		  if (e->param && e->param->isCkMigMsgPtr()) {
 		    yyerror("Charm++ takes a CkMigrateMsg chare constructor for granted, but continuing anyway");
 		    $$ = NULL;
