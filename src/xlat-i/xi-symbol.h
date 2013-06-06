@@ -17,6 +17,7 @@ namespace xi {
 
 class Chare;
 class CParsedFile;
+class EncapState;
 
 extern void generateSignature(XStr& decls, XStr& defs,
                               const Entry* entry, bool declareStatic,
@@ -26,6 +27,14 @@ extern void generateSignature(XStr& decls, XStr& defs,
                               const Chare* chare, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
                               std::list<CStateVar*>* params);
+extern void generateSignatureNew(XStr& decls, XStr& defs,
+                                 const Chare* chare, bool declareStatic,
+                                 const char* returnType, const XStr* name, bool isEnd,
+                                 std::list<EncapState*> params);
+extern void generateSignatureNew(XStr& decls, XStr& defs,
+                                 const Entry* entry, bool declareStatic,
+                                 const char* returnType, const XStr* name, bool isEnd,
+                                 std::list<EncapState*> params);
 extern void endMethod(XStr& op);
 
 class CStateVar;
@@ -402,7 +411,7 @@ class ParamList {
     ParamList *next;
     ParamList(ParamList *pl) : manyPointers(false), param(pl->param), next(pl->next) {}
     ParamList(Parameter *Nparam,ParamList *Nnext=NULL)
-    	:param(Nparam), next(Nnext) { 
+      :param(Nparam), next(Nnext) { 
           manyPointers = false;
           if(next != NULL && (param->isMessage() || next->isMessage())){
             manyPointers = true;
@@ -945,6 +954,8 @@ class Message : public TEntity {
 /* An entry construct */
 class Entry : public Member {
 public:
+    XStr* genStructTypeName;
+    XStr* genStructTypeNameProxy;
     int line,entryCount;
   private:    
     int attribs;    
@@ -1279,7 +1290,6 @@ private:
   void generateOlist(XStr& decls, XStr& defs, Entry* entry);
   void generateSdagEntry(XStr& decls, XStr& defs, Entry *entry);
   void generateSlist(XStr& decls, XStr& defs, Entry* entry);
-  void generateAtomic(XStr& decls, XStr& defs, Entry* entry);
   void generateForward(XStr& decls, XStr& defs, Entry* entry);
   void generateConnect(XStr& decls, XStr& defs, Entry* entry);
   void generateCaseList(XStr& decls, XStr& defs, Entry* entry);
@@ -1287,17 +1297,20 @@ private:
 protected:
   void generateCall(XStr& defs, std::list<CStateVar*>& args,
                     const XStr* name, const char* nameSuffix = 0);
-
+  void generateCallNew(XStr& op, std::list<EncapState*>& cur,
+                       std::list<EncapState*>& next, const XStr* name,
+                       const char* nameSuffix = 0);
   void generateTraceBeginCall(XStr& defs);          // for trace
   void generateBeginTime(XStr& defs);               //for Event Bracket
   void generateEventBracket(XStr& defs, int eventType);     //for Event Bracket
   void generateListEventBracket(XStr& defs, int eventType);
   void generateChildrenCode(XStr& decls, XStr& defs, Entry* entry);
   void generateChildrenEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
-  void propagateStateToChildren(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  void propagateStateToChildren(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
   std::list<SdagConstruct *> *constructs;
   std::list<SdagConstruct *> *publishesList;
   std::list<CStateVar *> *stateVars;
+  std::list<EncapState*> encapState, encapStateChild;
   std::list<CStateVar *> *stateVarsChildren;
 
 public:
@@ -1313,6 +1326,7 @@ public:
   XStr *connectEntry;
   int nextBeginOrEnd;
   EntryList *elist;
+  Entry* entry;
   SdagConstruct *con1, *con2, *con3, *con4;
   SdagConstruct(EToken t, SdagConstruct *construct1);
 
@@ -1340,10 +1354,12 @@ public:
   void generateConnectEntries(XStr&);
   virtual void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
   void propagateState(int);
-  virtual void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  virtual void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
   virtual void generateCode(XStr& decls, XStr& defs, Entry *entry);
   void generateWhenCode(XStr& op);
+  void generateWhenCodeNew(XStr& op);
   void setNext(SdagConstruct *, int);
+  void buildTypes(std::list<EncapState*>& state);
 
   // for trace
   virtual void generateTrace();
@@ -1361,12 +1377,13 @@ class WhenConstruct : public SdagConstruct {
 public:
   CStateVar* speculativeState;
   void generateCode(XStr& decls, XStr& defs, Entry *entry);
+  void generateCodeNew(XStr& decls, XStr& defs, Entry *entry);
   WhenConstruct(EntryList *el, SdagConstruct *body)
     : SdagConstruct(SWHEN, 0, 0, 0,0,0, body, el)
     , speculativeState(0)
   { }
   void generateEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
-  void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
   void generateEntryName(XStr& defs, Entry* e, int curEntry);
 };
 
@@ -1374,8 +1391,9 @@ extern void RemoveSdagComments(char *);
 
 class AtomicConstruct : public SdagConstruct {
 public:
-  void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int );
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int );
   void generateCode(XStr&, XStr&, Entry *);
+  void generateCodeNew(XStr&, XStr&, Entry *);
   void generateTrace();
   AtomicConstruct(const char *code, SdagConstruct *pub_list, const char *trace_name)
     : SdagConstruct(SATOMIC, NULL, pub_list, 0,0,0,0,0)

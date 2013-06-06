@@ -2716,7 +2716,7 @@ void ParamList::checkParamList(){
 }
 
 Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int connect, ParamList *connectPList) :
-      attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), connectParam(connectPList), isConnect(connect)
+  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), connectParam(connectPList), isConnect(connect), genStructTypeName(0)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -4225,7 +4225,13 @@ void Entry::genStruct(XStr& decls) {
     toPup << "      }\n";
   }
 
-  decls << "    struct " << name << "_" << entryCount << "_struct : public PackableParams" << " {\n";
+  genStructTypeName = new XStr();
+  genStructTypeNameProxy = new XStr();
+  *genStructTypeNameProxy << proxyName() << "::";
+  *genStructTypeNameProxy << name << "_" << entryCount << "_struct";
+  *genStructTypeName << name << "_" << entryCount << "_struct";
+
+  decls << "    struct " <<  *genStructTypeName <<" : public PackableParams" << " {\n";
   decls << structure << "\n";
   decls << "      void alloc() {\n";
   decls << alloc;
@@ -5213,8 +5219,9 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str) {
 
   if (isMarshalled()) {
     str << "  PUP::fromMem implP(impl_buf);\n";
-    str << "  " << entry->proxyName() << "::" << entry->name << "_" << entry->entryCount << "_struct*" <<
-      " genStruct = new " << entry->proxyName() << "::" << entry->name << "_" << entry->entryCount << "_struct()" << ";\n";
+    printf("setting for entry %p\n", entry);
+    str << "  " << *entry->genStructTypeNameProxy << "*" <<
+      " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
     str << "  genStruct->alloc();\n";
     if (param->type->isInt()) {
       str << "  genStruct->__refnum = genStruct->" << param->name << ";\n";

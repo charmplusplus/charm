@@ -10,7 +10,7 @@ struct PackableParams {
   virtual int getType() = 0;
 };
 
-struct TransportableEntity {
+struct TransportableEntity : public PackableParams {
   enum PType { TransportableEntityType,
                TransportableMsgType,
                TransportableCounterType,
@@ -27,6 +27,8 @@ struct TransportableEntity {
     p | t;
     type = (PType)t;
   }
+
+  virtual int getType() { return 0; }
 
   virtual void pup(PUP::er& p) {
     pupType(p);
@@ -101,7 +103,7 @@ struct CSpeculator : public TransportableEntity {
 namespace SDAG {
   struct Trigger {
     int whenID;
-    std::vector<TransportableEntity*> args;
+    std::vector<PackableParams*> args;
     std::vector<int> entries, refnums;
     std::vector<int> anyEntries;
     int speculationIndex;
