@@ -109,10 +109,10 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   // @todo write the code to fetch the message with the ref num
 
   // search for a continuation to restart execution
-  defs << "  SDAG::Trigger* t = __dep->tryFindTrigger(" << entryNum << ");\n";
+  defs << "  SDAG::Continuation* c = __dep->tryFindContinuation(" << entryNum << ");\n";
 
   // found a continuation
-  defs << "  if (t) {\n";
+  defs << "  if (c) {\n";
   if (whenList.size() == 1) {
     //defs << "    {\n";
     (*whenList.begin())->generateWhenCodeNew(defs);
@@ -120,7 +120,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   } else {
     // switch on the possible entry points for the continuation
     // each continuation entry knows how to generate its own code
-    defs << "    switch(t->whenID) {\n";
+    defs << "    switch(c->whenID) {\n";
     for(list<WhenConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn) {
       defs << "    case " << (*cn)->nodeNum << ":\n";
       (*cn)->generateWhenCodeNew(defs);
@@ -130,7 +130,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   }
 
   // delete the continuation now that we are finished with it
-  defs << "    delete t;\n";
+  defs << "    delete c;\n";
   defs << "  }\n";
 
   defs << "}\n\n";

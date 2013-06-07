@@ -604,7 +604,7 @@ void SdagConstruct::generateWhenCodeNew(XStr& op) {
   for (list<EncapState*>::iterator iter = encapState.begin();
        iter != encapState.end(); ++iter, ++cur) {
     EncapState& state = **iter;
-    op << "\n          reinterpret_cast<" << *state.type << "*>(t->args[" << cur << "])";
+    op << "\n          reinterpret_cast<" << *state.type << "*>(c->args[" << cur << "])";
     if (cur != encapState.size() - 1) op << ", ";
   }  
   op << "\n        );\n";
@@ -765,7 +765,7 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
   buildTypes(encapStateChild);
 
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  generateSignatureNew(decls, defs, entry, false, "SDAG::Trigger*", label, false, encapState);
+  generateSignatureNew(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState);
 
   int entryLen = 0;
 
@@ -800,10 +800,10 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
       // build the continutation specification for starting
       // has a refnum, needs to be saved in the trigger
       if (e->intExpr) {
-        continutationSpec << "    t->entries.push_back(" << e->entryPtr->entryNum << ");\n";
-        continutationSpec << "    t->refnums.push_back(" << e->intExpr << ");\n";
+        continutationSpec << "    c->entries.push_back(" << e->entryPtr->entryNum << ");\n";
+        continutationSpec << "    c->refnums.push_back(" << e->intExpr << ");\n";
       } else {
-        continutationSpec << "    t->anyEntries.push_back(" << e->entryPtr->entryNum << ");\n";
+        continutationSpec << "    c->anyEntries.push_back(" << e->entryPtr->entryNum << ");\n";
       }
 
       if (entryLen > cur + 1) {
@@ -838,14 +838,14 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
   defs << "  } else {\n";
   // did not find matching buffers, create a continuation
 
-  defs << "    SDAG::Trigger* t = new SDAG::Trigger(" << nodeNum << ");\n";
+  defs << "    SDAG::Continuation* c = new SDAG::Continuation(" << nodeNum << ");\n";
 
   // iterative through current state and save in a trigger
   {
     int cur = 0;
     for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
       EncapState& state = **iter;
-      defs << "    t->args.push_back(";
+      defs << "    c->args.push_back(";
       state.name ? (defs << *state.name) : (defs << "gen" << cur);
       defs << ");\n";
     }
@@ -855,8 +855,8 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
   defs << continutationSpec;
 
   // register the newly formed continutation with the runtime
-  defs << "    __dep->reg(t);\n";
-  defs << "    return t;\n";
+  defs << "    __dep->reg(c);\n";
+  defs << "    return c;\n";
   defs << "  }\n";
 
   endMethod(defs);

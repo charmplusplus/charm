@@ -103,16 +103,16 @@ struct CSpeculator : public TransportableEntity {
 };
 
 namespace SDAG {
-  struct Trigger {
+  struct Continuation {
     int whenID;
     std::vector<PackableParams*> args;
     std::vector<int> entries, refnums;
     std::vector<int> anyEntries;
     int speculationIndex;
 
-    Trigger() { }
+    Continuation() { }
 
-    Trigger(int whenID)
+    Continuation(int whenID)
       : whenID(whenID) { }
 
     void pup(PUP::er& p) {
@@ -137,7 +137,7 @@ namespace SDAG {
 
   struct Dependency {
     std::vector<std::list<int> > entryToWhen;
-    std::map<int, std::list<Trigger*> > whenToTrigger;
+    std::map<int, std::list<Continuation*> > whenToContinuation;
 
     // entry -> lst of buffers
     std::vector<std::list<Buffer*> > buffer;
@@ -157,17 +157,17 @@ namespace SDAG {
       entryToWhen[entry].push_back(whenID);
     }
 
-    void reg(Trigger *trigger) {
-      //printf("registering new trigger %p, whenID = %d\n", trigger, trigger->whenID);
-      whenToTrigger[trigger->whenID].push_back(trigger);
+    void reg(Continuation *c) {
+      //printf("registering new continuation %p, whenID = %d\n", c, c->whenID);
+      whenToContinuation[c->whenID].push_back(c);
     }
 
-    void dereg(Trigger *trigger) {
-      if (whenToTrigger.find(trigger->whenID) != whenToTrigger.end()) {
-        std::list<Trigger*>& lst = whenToTrigger[trigger->whenID];
-        lst.remove(trigger);
+    void dereg(Continuation *c) {
+      if (whenToContinuation.find(c->whenID) != whenToContinuation.end()) {
+        std::list<Continuation*>& lst = whenToContinuation[c->whenID];
+        lst.remove(c);
       } else {
-        CkAbort("trying to deregister: trigger not found");
+        CkAbort("trying to deregister: continuation not found");
       }
     }
 
@@ -177,28 +177,28 @@ namespace SDAG {
       return buf;
     }
 
-    Trigger *tryFindTrigger(int entry) {
+    Continuation *tryFindContinuation(int entry) {
       for (std::list<int>::iterator iter = entryToWhen[entry].begin();
            iter != entryToWhen[entry].end();
            ++iter) {
         int whenID = *iter;
 
-        for (std::list<Trigger*>::iterator iter2 = whenToTrigger[whenID].begin();
-             iter2 != whenToTrigger[whenID].end();
+        for (std::list<Continuation*>::iterator iter2 = whenToContinuation[whenID].begin();
+             iter2 != whenToContinuation[whenID].end();
              iter2++) {
-          Trigger* t = *iter2;
-          if (searchBufferedMatching(t)) {
-            //printf("found matching trigger %p\n", t);
-            dereg(t);
-            return t;
+          Continuation* c = *iter2;
+          if (searchBufferedMatching(c)) {
+            //printf("found matching continuation %p\n", t);
+            dereg(c);
+            return c;
           }
         }
       }
-      //printf("no trigger found\n");
+      //printf("no continuation found\n");
       return 0;
     }
 
-    bool searchBufferedMatching(Trigger* t) {
+    bool searchBufferedMatching(Continuation* t) {
       CkAssert(t->entries.size() == t->refnums.size());
       for (int i = 0; i < t->entries.size(); i++) {
         if (!tryFindMessage(t->entries[i], true, t->refnums[i], false)) {
@@ -246,16 +246,16 @@ namespace SDAG {
     }
 
     void removeAllSpeculationIndex(int speculationIndex) {
-      for (std::map<int, std::list<Trigger*> >::iterator iter = whenToTrigger.begin();
-           iter != whenToTrigger.end();
+      for (std::map<int, std::list<Continuation*> >::iterator iter = whenToContinuation.begin();
+           iter != whenToContinuation.end();
            ++iter) {
-        std::list<Trigger*>& lst = iter->second;
+        std::list<Continuation*>& lst = iter->second;
 
-        for (std::list<Trigger*>::iterator iter2 = lst.begin();
+        for (std::list<Continuation*>::iterator iter2 = lst.begin();
              iter2 != lst.end();
              ++iter2) {
           if ((*iter2)->speculationIndex == speculationIndex) {
-            Trigger *cancelled = *iter2;
+            Continuation *cancelled = *iter2;
             iter2 = lst.erase(iter2);
             delete cancelled;
           }
