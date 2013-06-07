@@ -3,6 +3,8 @@
 
 #include "charm++.h"
 #include <vector>
+#include <list>
+#include <map>
 #include <set>
 
 struct PackableParams {
@@ -114,12 +116,12 @@ namespace SDAG {
       : whenID(whenID) { }
 
     void pup(PUP::er& p) {
-      p | whenID;
+      //p | whenID;
       //p | args;
-      p | entries;
-      p | refnums;
-      p | anyEntries;
-      p | speculationIndex;
+      //p | entries;
+      //p | refnums;
+      //p | anyEntries;
+      //p | speculationIndex;
     }
   };
 
