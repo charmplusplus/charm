@@ -469,7 +469,7 @@ class ParamList {
     void beginUnmarshall(XStr &str);
     void beginUnmarshallSDAG(XStr &str);
     void beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf);
-    void beginRednWrapperUnmarshall(XStr &str);
+    void beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen);
     void unmarshall(XStr &str, int isFirst=1);
     void unmarshallSDAGCall(XStr &str, int isFirst=1);
     void unmarshallAddress(XStr &str, int isFirst=1);
@@ -1316,6 +1316,8 @@ protected:
   std::list<CStateVar *> *stateVarsChildren;
 
 public:
+  void unravelClosures(XStr& defs);
+
   int nodeNum;
   XStr *label;
   XStr *counter;

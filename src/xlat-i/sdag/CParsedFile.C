@@ -115,16 +115,13 @@ void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
 {
   decls << "public:\n";
-  decls << "  std::auto_ptr<CDep> __cDep;\n";
   decls << "  std::auto_ptr<SDAG::Dependency> __dep;\n";
 
   XStr name = "_sdag_init";
   generateSignature(decls, defs, container, false, "void", &name, false, NULL);
-  defs << "    __cDep.reset(new CDep(" << numEntries << "," << numWhens << "));\n";
   defs << "    __dep.reset(new SDAG::Dependency(" << numEntries << "," << numWhens << "));\n";
   CEntry *en;
   for(list<CEntry*>::iterator en=entryList.begin(); en != entryList.end(); ++en) {
-    (*en)->generateDeps(defs);
     (*en)->generateDepsNew(defs);
   }
   endMethod(defs);
@@ -168,10 +165,10 @@ void CParsedFile::generatePupFunction(XStr& decls, XStr& defs)
   templateGuardBegin(false, defs);
   defs << container->tspec()
        << "void " << container->baseName() << "::" << signature << " {\n"
-       << "    bool hasSDAG = __cDep.get();\n"
+       << "    bool hasSDAG = __dep.get();\n"
        << "    p|hasSDAG;\n"
        << "    if (p.isUnpacking() && hasSDAG) _sdag_init();\n"
-       << "    if (hasSDAG) { __cDep->pup(p); }\n"
+       << "    if (hasSDAG) { __dep->pup(p); }\n"
        << "}\n";
   templateGuardEnd(defs);
 }

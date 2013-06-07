@@ -67,8 +67,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   XStr newSig;
 
   if (needsParamMarshalling || isVoid) {
-    newSig << *entry << "(" << decl_entry->proxyName() << "::" << decl_entry->name << "_"
-           << decl_entry->entryCount << "_struct* genStruct)";
+    newSig << *entry << "(" << *decl_entry->genStructTypeNameProxy << "* genStruct)";
   } else { // a message
     newSig << signature << "";
   }
@@ -90,9 +89,9 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   // found a continuation
   defs << "  if (t) {\n";
   if (whenList.size() == 1) {
-    defs << "    {\n";
+    //defs << "    {\n";
     (*whenList.begin())->generateWhenCodeNew(defs);
-    defs << "    }\n";
+    //defs << "    }\n";
   } else {
     // switch on the possible entry points for the continuation
     // each continuation entry knows how to generate its own code

@@ -608,30 +608,6 @@ void SdagConstruct::generateWhenCodeNew(XStr& op) {
     if (cur != encapState.size() - 1) op << ", ";
   }  
   op << "\n        );\n";
-
-  // op << "        // encap len = " << (int)encapState.size() << "\n";
-
-  // for (list<EncapState*>::iterator iter = encapState.begin();
-  //      iter != encapState.end();
-  //      ++iter) {
-  //   EncapState& encap = **iter;
-
-  //   op << "       // start encap\n";
-
-  //   if (encap.type) {
-  //     op << "         // name = " << *encap.type << "\n";
-  //   }
-
-  //   for (list<CStateVar*>::iterator iter2 = encap.vars.begin();
-  //        iter2 != encap.vars.end();
-  //        ++iter2) {
-  //     CStateVar *sv = *iter2;
-  //     if (sv && sv->name)
-  //       op << "           // state param " << sv->name << "\n";
-  //   }
-
-  //   op << "       // end encap\n";
-  // }
 }
 
 void SdagConstruct::generateWhenCode(XStr& op)
@@ -1312,10 +1288,13 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
 {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
 
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
 #endif
+
+  unravelClosures(defs);
+
   defs << "    " << con1->text << ";\n";
   //Record only the beginning for FOR
 #if CMK_BIGSIM_CHARM
@@ -1323,10 +1302,10 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
 #endif
   defs << "    if (" << con2->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label);
+  generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 
@@ -1334,78 +1313,103 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
 
-  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
 #endif
+  unravelClosures(defs);
+
   defs << "   " << con3->text << ";\n";
   defs << "    if (" << con2->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label);
+  generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
   defs << "    } else {\n";
 #if CMK_BIGSIM_CHARM
   generateEventBracket(defs, SFOR_END);
 #endif
   defs << "      ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
+}
+
+void SdagConstruct::unravelClosures(XStr& defs) {
+  int cur = 0;
+  // traverse all the state variables bring them into scope
+  for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
+    EncapState& state = **iter;
+
+    defs << "  // begin encap: ";
+    state.name ? (defs << *state.name) : (defs << "gen" << cur);
+    defs << "\n";
+    int i = 0;
+    for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end(); ++iter2, ++i) {
+      CStateVar& var = **iter2;
+      defs << "  " << var.type << (var.arrayLength ? "*" : "") << "& " << var.name << " = ";
+      state.name ? (defs << *state.name) : (defs << "gen" << cur);
+      defs << "->" << "getP" << i << "();\n";
+    }
+  }
 }
 
 void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry)
 {
   strcpy(nameStr,label->charstar());
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
   generateEventBracket(defs, SIF);
 #endif
+
+  unravelClosures(defs);
+
   defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label);
+  generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
   if (con2 != 0) {
-    generateCall(defs, *stateVarsChildren, con2->label);
+    generateCallNew(defs, encapStateChild, encapStateChild, con2->label);
   } else {
-    generateCall(defs, *stateVarsChildren, label, "_end");
+    generateCallNew(defs, encapStateChild, encapStateChild, label, "_end");
   }
   defs << "    }\n";
   endMethod(defs);
 
   strcpy(nameStr,label->charstar());
   strcat(nameStr,"_end");
-  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
   generateEventBracket(defs,SIF_END);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
 void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
 {
   strcpy(nameStr,label->charstar());
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
   // trace
   generateBeginTime(defs);
   generateEventBracket(defs, SELSE);
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label);
+  generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
   endMethod(defs);
 
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
-  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
   generateEventBracket(defs,SELSE_END);
 #endif
   defs << "      ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
@@ -1517,7 +1521,7 @@ void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry)
 
 void SdagConstruct::generateCaseList(XStr& decls, XStr& defs, Entry* entry) {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  defs << "    CSpeculator* " << counter << " = new CSpeculator(__cDep->getAndIncrementSpeculationIndex());\n";
+  defs << "    CSpeculator* " << counter << " = new CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
   defs << "    CWhenTrigger* tr = 0;\n";
   for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
        ++it) {
@@ -1602,22 +1606,7 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry) {
 void AtomicConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
   generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
 
-  int cur = 0;
-  // traverse all the state variables bring them into scope
-  for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
-    EncapState& state = **iter;
-
-    defs << "  // begin encap: ";
-    state.name ? (defs << *state.name) : (defs << "gen" << cur);
-    defs << "\n";
-    int i = 0;
-    for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end(); ++iter2, ++i) {
-      CStateVar& var = **iter2;
-      defs << "  " << var.type << (var.arrayLength ? "*" : "") << "& " << var.name << " = ";
-      state.name ? (defs << *state.name) : (defs << "gen" << cur);
-      defs << "->" << "getP" << i << "();\n";
-    }
-  }
+  unravelClosures(defs);
 
   defs << "  // begin serial block\n";
   defs << "  " << text << "\n";

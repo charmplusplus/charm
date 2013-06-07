@@ -4162,7 +4162,7 @@ void Entry::genDecls(XStr& str)
     genChareDecl(str);
   }
 
-  genStruct(str);
+  if (container->getForWhom() == forAll) genStruct(str);
 }
 
 void Entry::genStruct(XStr& decls) {
@@ -4433,7 +4433,7 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool isSD
 	else isArgcArgv = true;
   } else {
     //Normal case: Unmarshall variables
-    if (redn_wrapper) param->beginRednWrapperUnmarshall(str);
+    if (redn_wrapper) param->beginRednWrapperUnmarshall(str, isSDAGGen);
     else if (!isSDAGGen) param->beginUnmarshall(str);
     else param->beginUnmarshallSDAGCall(str, usesImplBuf);
   }
@@ -4557,7 +4557,7 @@ void Entry::genDefs(XStr& str)
               << container->baseName() << "*> (impl_obj_void);\n"
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
           XStr precall;
-          genCall(str, precall, true);
+          genCall(str, precall, true, (sdagCon || isWhenEntry), false);
           str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
       }
   }
@@ -5143,11 +5143,15 @@ void Parameter::copyPtr(XStr &str)
   }
 }
 
-void ParamList::beginRednWrapperUnmarshall(XStr &str)
+void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen)
 {
     if (isMarshalled())
     {
         str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
+        if (isSDAGGen) {
+              str << "  " << *entry->genStructTypeNameProxy << "*" <<
+                " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
+        }
         str<<"  PUP::fromMem implP(impl_buf);\n";
         if (next != NULL && next->next == NULL) {
             if (isArray()) {
@@ -5169,14 +5173,23 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
                 str << "  " << dt << "* " << next->param->name << "; "
                     << next->param->name << " = (" << dt << "*)impl_buf;\n";
             } else {
+              if (!isSDAGGen)
                 callEach(&Parameter::beginUnmarshall,str);
+              else
+                callEach(&Parameter::beginUnmarshallSDAGCall,str);
             }
         } else {
             str << "  /* non two-param case */\n";
-            callEach(&Parameter::beginUnmarshall,str);
+            if (!isSDAGGen)
+              callEach(&Parameter::beginUnmarshall,str);
+            else
+              callEach(&Parameter::beginUnmarshallSDAGCall,str);
             str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
             str<<"  /*Unmarshall arrays:*/\n";
-            callEach(&Parameter::unmarshallArrayData,str);
+            if (!isSDAGGen)
+              callEach(&Parameter::unmarshallArrayData,str);
+            else
+              callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
         }
     }
 }
