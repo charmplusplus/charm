@@ -108,6 +108,11 @@ namespace SDAG {
     std::vector<int> anyEntries;
     int speculationIndex;
 
+    Trigger() { }
+
+    Trigger(int whenID)
+      : whenID(whenID) { }
+
     void pup(PUP::er& p) {
       p | whenID;
       //p | args;
@@ -151,6 +156,7 @@ namespace SDAG {
     }
 
     void reg(Trigger *trigger) {
+      //printf("registering new trigger %p, whenID = %d\n", trigger, trigger->whenID);
       whenToTrigger[trigger->whenID].push_back(trigger);
     }
 
@@ -180,11 +186,13 @@ namespace SDAG {
              iter2++) {
           Trigger* t = *iter2;
           if (searchBufferedMatching(t)) {
+            //printf("found matching trigger %p\n", t);
             dereg(t);
             return t;
           }
         }
       }
+      //printf("no trigger found\n");
       return 0;
     }
 
@@ -196,7 +204,7 @@ namespace SDAG {
         }
       }
       for (int i = 0; i < t->anyEntries.size(); i++) {
-        if (!tryFindMessage(t->entries[i], false, 0, false)) {
+        if (!tryFindMessage(t->anyEntries[i], false, 0, false)) {
           return false;
         }
       }
@@ -220,12 +228,15 @@ namespace SDAG {
 
     Buffer* tryFindMessage(int entry) {
       if (buffer[entry].size() == 0) return 0;
-      else return buffer[entry].front();
+      else {
+        Buffer* buf = buffer[entry].front();
+        //printf("found buffered message %p\n", buf);
+        return buffer[entry].front();
+      }
     }
 
     void removeMessage(Buffer *buf) {
-      std::list<Buffer*>& lst = buffer[buf->entry];
-      lst.remove(buf);
+      buffer[buf->entry].remove(buf);
     }
 
     int getAndIncrementSpeculationIndex() {

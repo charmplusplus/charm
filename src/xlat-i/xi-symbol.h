@@ -435,6 +435,7 @@ class ParamList {
     }
     int isPointer(void) const {return param->type->isPointer();}
     const char *getGivenName(void) const {return param->getGivenName();}
+    const char *getName(void) const {return param->getName();}
     int isMarshalled(void) const {
     	return !isVoid() && !isMessage();
     }
@@ -467,14 +468,14 @@ class ParamList {
     void marshall(XStr &str, XStr &entry);
     void beginUnmarshall(XStr &str);
     void beginUnmarshallSDAG(XStr &str);
-    void beginUnmarshallSDAGCall(XStr &str);
+    void beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf);
     void beginRednWrapperUnmarshall(XStr &str);
     void unmarshall(XStr &str, int isFirst=1);
     void unmarshallSDAGCall(XStr &str, int isFirst=1);
     void unmarshallAddress(XStr &str, int isFirst=1);
     void pupAllValues(XStr &str);
     void endUnmarshall(XStr &str);
-    int operator==(const ParamList &plist) const {
+    int operator==(ParamList &plist) {
       if (!(*param == *(plist.param))) return 0;
       if (!next && !plist.next) return 1;
       if (!next || !plist.next) return 0;
@@ -971,7 +972,8 @@ public:
 private:
 //    friend class CParsedFile;
     int hasCallMarshall;
-    void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false, bool isSDAGGen = false);
+    void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false,
+                 bool isSDAGGen = false, bool usesImplBuf = false);
 
     XStr epStr(bool isForRedn = false, bool templateCall = false);
     XStr epIdx(int fromProxy=1, bool isForRedn = false);

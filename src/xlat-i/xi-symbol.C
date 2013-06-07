@@ -4166,35 +4166,40 @@ void Entry::genDecls(XStr& str)
 }
 
 void Entry::genStruct(XStr& decls) {
-  bool hasArray = false;
-
-  XStr structure, toPup, alloc;
-  for(ParamList* pl = param; pl != NULL; pl = pl->next) {
+  bool hasArray = false, isMessage = false;
+  XStr messageType;
+  int i = 0;
+  XStr structure, toPup, alloc, getter;
+  for(ParamList* pl = param; pl != NULL; pl = pl->next, i++) {
     Parameter* sv = pl->param;
 
     if (XStr(sv->type->getBaseName()) == "CkArrayOptions") continue;
 
     structure << "      ";
+    getter << "      ";
 
     if ((sv->isMessage() != 1) && (sv->isVoid() != 1)) {
        structure << sv->type << " ";
+       getter << sv->type << " ";
        if (sv->isArray() != 0) {
          structure << "*";
+         getter << "*";
        }
 
        if (sv->isArray() != 0) {
          hasArray = hasArray || true;
        } else {
-         if (sv->type->getNumStars() == 0 &&
+         if (1 || (sv->type->getNumStars() == 0 &&
              (XStr(sv->type->getBaseName()) == "int" ||
               XStr(sv->type->getBaseName()) == "bool" ||
               XStr(sv->type->getBaseName()) == "char" ||
-              XStr(sv->type->getBaseName()) == "long")) {
+              XStr(sv->type->getBaseName()) == "long"))) {
            // @todo add more POD types here
            toPup << "        " << "p | " << sv->name << ";\n";
            sv->podType = true;
          } else {
            structure << "*";
+           getter << "*";
            toPup << "        " << "if (p.isUnpacking()) " << "alloc();\n";
            alloc << "        " << sv->name << " = new " << sv->type << "()" << ";\n";
            toPup << "        " << "p | *" << sv->name << ";\n";
@@ -4203,44 +4208,67 @@ void Entry::genStruct(XStr& decls) {
 
        if (sv->name != 0) {
          structure << sv->name << ";\n";
+         getter << "& " << "getP" << i << "() { return " << sv->name << ";}\n";
        }
 
     }
     else if (sv->isVoid() != 1){
       if (sv->isMessage()) {
+        isMessage = true;
         structure << sv->type << " " << sv->name << ";\n";
         toPup << "        " << "CkPupMessage(p, (void**)&" << sv->name << ");\n";
+        messageType << sv->type;
       }
     }
   }
 
   structure << "\n      " << "int __refnum;\n";
 
+  XStr initCode;
+
   if (hasArray) {
-    structure << "      " << "CkMarshallMsg *_impl_marshall;\n";
-    toPup << "      " << "CkPupMessage(p, (void**)&" << "_impl_marshall" << ");\n";
-    toPup << "      if (p.isUnpacking()) {\n";
-    toPup << "        char *impl_buf = _impl_marshall->msgBuf;\n";
+    structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
+    structure << "      " << "char* _impl_buf_in;\n";
+    structure << "      " << "int _impl_buf_size;\n";
+
+    initCode << "        _impl_marshall = 0;\n";
+    initCode << "        _impl_buf_in = 0;\n";
+    initCode << "        _impl_buf_size = -1;\n";
+
+    toPup << "        p | _impl_buf_size;\n";
+    toPup << "        bool hasMsg = (_impl_marshall != 0); if (p.isUnpacking()) p | hasMsg;\n";
+    toPup << "        " << "if (hasMsg) CkPupMessage(p, (void**)&" << "_impl_marshall" << ");\n";
+    toPup << "        " << "else PUParray(p, _impl_buf_in, _impl_buf_size);\n";
+    toPup << "        if (p.isUnpacking()) {\n";
+    toPup << "          char *impl_buf = _impl_marshall ? _impl_marshall->msgBuf : _impl_buf_in;\n";
     param->beginUnmarshallSDAG(toPup);
-    toPup << "      }\n";
+    toPup << "        }\n";
   }
 
-  genStructTypeName = new XStr();
-  genStructTypeNameProxy = new XStr();
-  *genStructTypeNameProxy << proxyName() << "::";
-  *genStructTypeNameProxy << name << "_" << entryCount << "_struct";
-  *genStructTypeName << name << "_" << entryCount << "_struct";
+  if (!isMessage) {
+    genStructTypeName = new XStr();
+    genStructTypeNameProxy = new XStr();
+    *genStructTypeNameProxy << proxyName() << "::";
+    *genStructTypeNameProxy << name << "_" << entryCount << "_struct";
+    *genStructTypeName << name << "_" << entryCount << "_struct";
 
-  decls << "    struct " <<  *genStructTypeName <<" : public PackableParams" << " {\n";
-  decls << structure << "\n";
-  decls << "      void alloc() {\n";
-  decls << alloc;
-  decls << "      }\n";
-  decls << "      void pup(PUP::er& p) {\n";
-  decls << toPup;
-  decls << "      }\n";
-  decls << "      int getType() { return " << entryCount << "; }\n";
-  decls << "    };\n";
+    decls << "    struct " <<  *genStructTypeName <<" : public PackableParams" << " {\n";
+    decls << structure << "\n";
+    decls << "      " << *genStructTypeName << "() {\n";
+    decls << initCode;
+    decls << "      }\n";
+    decls << getter;
+    decls << "      void pup(PUP::er& p) {\n";
+    decls << toPup;
+    decls << "      }\n";
+    decls << "      int getType() { return " << entryCount << "; }\n";
+    decls << "    };\n";
+  } else {
+    genStructTypeName = new XStr();
+    genStructTypeNameProxy = new XStr();
+    *genStructTypeNameProxy << messageType;
+    *genStructTypeName << messageType;
+  }
 }
 
 void Entry::genPub(XStr &declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
@@ -4391,7 +4419,7 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   Generate the code to actually unmarshall the parameters and call
   the entry method.
 */
-void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool isSDAGGen)
+void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool isSDAGGen, bool usesImplBuf)
 {
   bool isArgcArgv=false;
   bool isMigMain=false;
@@ -4407,7 +4435,7 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool isSD
     //Normal case: Unmarshall variables
     if (redn_wrapper) param->beginRednWrapperUnmarshall(str);
     else if (!isSDAGGen) param->beginUnmarshall(str);
-    else param->beginUnmarshallSDAGCall(str);
+    else param->beginUnmarshallSDAGCall(str, usesImplBuf);
   }
 
   str << preCall;
@@ -4484,9 +4512,13 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool isSD
     else {//Normal case: unmarshall parameters (or just pass message)
       if (isSDAGGen) {
         str << "(";
-        //param->unmarshallSDAGCall(str);
-        //if (!param->isVoid()) str << ", ";
-        str << "genStruct";
+        if (param->isMessage()) {
+          param->unmarshall(str);
+          //} else if (param->isVoid()) {
+          // no parameter
+        } else {
+          str << "genStruct";
+        }
         str << ");\n";
       } else {
         str<<"("; param->unmarshall(str); str<<");\n";
@@ -4663,7 +4695,7 @@ void Entry::genDefs(XStr& str)
       else str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
       str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
     }
-    genCall(str,preCall);
+    genCall(str, preCall, false, (sdagCon || isWhenEntry), false);
     param->endUnmarshall(str);
     str << postCall;
     if(isThreaded() && param->isMarshalled()) str << "  delete impl_msg_typed;\n";
@@ -4672,35 +4704,13 @@ void Entry::genDefs(XStr& str)
   }
   str << "}\n";
 
-  // Generate alternative SDAG version of call-method body
-  if (!isConstructor() && param->isMarshalled()) {
-    str << makeDecl("void") << "::_call_sdag_" << epStr() << "(void* impl_msg, void* impl_obj_void)\n";
-    str << "{\n"
-        << "  " << container->baseName() << "* impl_obj = static_cast<"
-        << container->baseName() << " *>(impl_obj_void);\n";
-    if (!isLocal()) {
-      str << preMarshall;
-      if (param->isMarshalled()) {
-        str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
-        str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
-      }
-      genCall(str, preCall, false, true);
-      param->endUnmarshall(str);
-      str << postCall;
-      if(isThreaded() && param->isMarshalled()) str << "  delete impl_msg_typed;\n";
-    } else {
-      str << "  CkAbort(\"This method should never be called as it refers to a LOCAL entry method!\");\n";
-    }
-    str << "}\n";
-  }
-
   if (hasCallMarshall) {
     str << makeDecl("int") << "::_callmarshall_" << epStr()
         <<"(char* impl_buf, void* impl_obj_void) {\n";
     str << "  " << containerType << "* impl_obj = static_cast< " << containerType << " *>(impl_obj_void);\n";
     if (!isLocal()) {
       if (!param->hasConditional()) {
-        genCall(str,preCall);
+        genCall(str, preCall, false, (sdagCon || isWhenEntry), true);
         /*FIXME: implP.size() is wrong if the parameter list contains arrays--
         need to add in the size of the arrays.
          */
@@ -5211,7 +5221,7 @@ void Parameter::beginUnmarshallSDAGCall(XStr &str) {
 
 
 /** unmarshalling: unpack fields from flat buffer **/
-void ParamList::beginUnmarshallSDAGCall(XStr &str) {
+void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
   bool hasArray = false;
   for (ParamList* pl = this; pl != NULL; pl = pl->next) {
     hasArray = hasArray || pl->param->isArray();
@@ -5219,21 +5229,27 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str) {
 
   if (isMarshalled()) {
     str << "  PUP::fromMem implP(impl_buf);\n";
-    printf("setting for entry %p\n", entry);
     str << "  " << *entry->genStructTypeNameProxy << "*" <<
       " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
-    str << "  genStruct->alloc();\n";
+    callEach(&Parameter::beginUnmarshallSDAGCall, str);
+    str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+    callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
+    if (hasArray) {
+      if (!usesImplBuf)
+        str << "  genStruct->_impl_marshall = impl_msg_typed;\n";
+      else {
+        str << "  genStruct->_impl_buf_in = impl_buf;\n";
+        str << "  genStruct->_impl_buf_size = implP.size();\n";
+      }
+    }
     if (param->type->isInt()) {
       str << "  genStruct->__refnum = genStruct->" << param->name << ";\n";
     } else {
       str << "  genStruct->__refnum = 0;\n";
     }
-    callEach(&Parameter::beginUnmarshallSDAGCall,str);
-    str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
-    callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
-    if (hasArray) {
-      str << "  genStruct->_impl_marshall = impl_msg_typed;\n";
-    }
+  } else if (isVoid()) {
+    str << "  " << *entry->genStructTypeNameProxy << "*" <<
+      " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
   }
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {

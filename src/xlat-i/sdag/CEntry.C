@@ -61,49 +61,55 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
     else
       signature <<"void";
   }
-  if (i > 0 && needsParamMarshalling && !isVoid) {
-    decls << "  void " << *entry << "(" << decl_entry->proxyName() << "::" << decl_entry->name << "_"
-         << decl_entry->entryCount << "_struct* genStruct);\n";
-  }
+
   signature << ")";
 
+  XStr newSig;
+
+  if (needsParamMarshalling || isVoid) {
+    newSig << *entry << "(" << decl_entry->proxyName() << "::" << decl_entry->name << "_"
+           << decl_entry->entryCount << "_struct* genStruct)";
+  } else { // a message
+    newSig << signature << "";
+  }
+
+  decls << "  void " <<  newSig << ";\n";
+
+  templateGuardBegin(false, defs);
+  defs << "void " << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
+  defs << "  if (!__dep.get()) _sdag_init();\n";
 
   if (i > 0 && needsParamMarshalling && !isVoid) {
-    templateGuardBegin(false, defs);
-    defs << "void " << decl_entry->getContainer()->baseName() << "::";
-    defs << *entry << "(" << decl_entry->proxyName() << "::" << decl_entry->name << "_"
-         << decl_entry->entryCount << "_struct* genStruct) {\n";
-    defs << "  if (!__dep.get()) _sdag_init();\n";
-
     // add the incoming message to a buffer
     defs << "  __dep->pushBuffer(" << entryNum << ", genStruct, genStruct->__refnum);\n";
-
-    // search for a continuation to restart execution
-    defs << "  SDAG::Trigger* t = __dep->tryFindTrigger(" << entryNum << ");\n";
-
-    // found a continuation
-    defs << "  if (t) {\n";
-    if (whenList.size() == 1) {
-      defs << "    {\n";
-      (*whenList.begin())->generateWhenCodeNew(defs);
-      defs << "    }\n";
-    } else {
-      // switch on the possible entry points for the continuation
-      // each continuation entry knows how to generate its own code
-      defs << "    switch(t->whenID) {\n";
-      for(list<WhenConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn) {
-        defs << "    case " << (*cn)->nodeNum << ":\n";
-        (*cn)->generateWhenCodeNew(defs);
-      }
-      defs << "    }\n";
-    }
-
-    defs << "    delete t;\n";
-    defs << "  }\n";
-
-    defs << "}\n\n";
-    templateGuardEnd(defs);
   }
+
+  // search for a continuation to restart execution
+  defs << "  SDAG::Trigger* t = __dep->tryFindTrigger(" << entryNum << ");\n";
+
+  // found a continuation
+  defs << "  if (t) {\n";
+  if (whenList.size() == 1) {
+    defs << "    {\n";
+    (*whenList.begin())->generateWhenCodeNew(defs);
+    defs << "    }\n";
+  } else {
+    // switch on the possible entry points for the continuation
+    // each continuation entry knows how to generate its own code
+    defs << "    switch(t->whenID) {\n";
+    for(list<WhenConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn) {
+      defs << "    case " << (*cn)->nodeNum << ":\n";
+      (*cn)->generateWhenCodeNew(defs);
+      defs << "    break;\n";
+    }
+    defs << "    }\n";
+  }
+
+  defs << "    delete t;\n";
+  defs << "  }\n";
+
+  defs << "}\n\n";
+  templateGuardEnd(defs);
 
   return;
   // starting old code here

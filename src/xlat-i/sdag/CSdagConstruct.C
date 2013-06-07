@@ -314,19 +314,17 @@ void SdagConstruct::propagateState(int uniqueVarNum)
   if (pl->isVoid() == 1) {
      sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
      stateVars->push_back(sv);
+     std::list<CStateVar*> lst;
+     encap.push_back(new EncapState(this->entry, lst));
   }
   else {
     while (pl != NULL) {
-      printf("creating statevar 1\n");
       stateVars->push_back(new CStateVar(pl));
       pl = pl->next;
     }
     
     encap.push_back(new EncapState(this->entry, *stateVars));
   }
-
-  printf("starting propagation at (%d): len = %d, hasEntry = %s\n",
-         nodeNum, encap.size(), this->entry ? "true" : "false");
 
   encapState = encap;
 
@@ -352,13 +350,6 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
 {
   CStateVar *sv;
   list<CStateVar*> *whensEntryMethodStateVars = NULL;
-
-  printf("propagating at (%d): len = %d\n", nodeNum, encap.size());
-
-  // @todo why explicit copy ??
-  // for (list<EncapState*>::iterator iter = encap.begin(); iter != encap.end(); ++iter) {
-  // encapState.push_back(*iter);
-  // }
 
   encapState = encap;
 
@@ -461,6 +452,7 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
 void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
   CStateVar *sv;
   list<CStateVar*> whensEntryMethodStateVars;
+  list<CStateVar*> whenCurEntry;
   stateVars = new list<CStateVar*>();
   stateVarsChildren = new list<CStateVar*>();
 
@@ -470,14 +462,7 @@ void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
     stateVarsChildren->push_back(sv);
   }
 
-  printf("starting propagating to WHEN at (%d): len = %d\n", nodeNum, encap.size());
-
   encapState = encap;
-
-  // @todo why explicit copy???
-  // for (list<EncapState*>::iterator iter = encap.begin(); iter != encap.end(); ++iter) {
-  // encapState.push_back(*iter);
-  // }
 
   EntryList *el;
   el = elist;
@@ -489,20 +474,22 @@ void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
       //stateVars->push_back(sv);
       stateVarsChildren->push_back(sv);
       whensEntryMethodStateVars.push_back(sv);
+      whenCurEntry.push_back(sv);
       el->entry->addEStateVar(sv);
     }
     else {
       while(pl != NULL) {
-        printf("creating statevar 2 %s %d\n", pl->param->getGivenName(), pl->param->isArray());
         sv = new CStateVar(pl);
         stateVarsChildren->push_back(sv);
         whensEntryMethodStateVars.push_back(sv);
+        whenCurEntry.push_back(sv);
         el->entry->addEStateVar(sv);
 
         pl = pl->next;
       }
     }
-    encap.push_back(new EncapState(el->entry, whensEntryMethodStateVars));
+    encap.push_back(new EncapState(el->entry, whenCurEntry));
+    whenCurEntry.clear();
     el = el->next;
   }
 
@@ -858,6 +845,7 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
 
   // make call to next method
   defs << "    ";
+
   if (constructs && !constructs->empty())
     generateCallNew(defs, encapState, encapStateChild, constructs->front()->label);
   else
@@ -870,10 +858,11 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
   if (speculativeState)
     defs << "    __dep->removeAllSpeculationIndex(" << speculativeState->name << "->speculationIndex);\n";
   
+  defs << "    return 0;\n";
   defs << "  } else {\n";
   // did not find matching buffers, create a continuation
 
-  defs << "    SDAG::Trigger* t = new SDAG::Trigger();\n";
+  defs << "    SDAG::Trigger* t = new SDAG::Trigger(" << nodeNum << ");\n";
 
   // iterative through current state and save in a trigger
   {
@@ -891,6 +880,7 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
 
   // register the newly formed continutation with the runtime
   defs << "    __dep->reg(t);\n";
+  defs << "    return t;\n";
   defs << "  }\n";
 
   endMethod(defs);
@@ -1564,8 +1554,10 @@ void SdagConstruct::generateSlist(XStr& decls, XStr& defs, Entry* entry) {
   endMethod(defs);
 }
 
-void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
-{
+void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry) {
+  buildTypes(encapState);
+  buildTypes(encapStateChild);
+
   if (entry->isConstructor()) {
     std::cerr << cur_file << ":" << entry->getLine()
               << ": Chare constructor cannot be defined with SDAG code" << std::endl;
@@ -1573,16 +1565,8 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
   }
 
   decls << "public:\n";
-  generateSignature(decls, defs, entry, false, "void", con1->text, false, stateVars);
-  for (list<SdagConstruct*>::iterator pubIter = publishesList->begin();
-       pubIter != publishesList->end();
-       ++pubIter) {
-    SdagConstruct *sc = *pubIter;
-    for (list<SdagConstruct*>::iterator it = sc->constructs->begin();
-         it != sc->constructs->end();
-         ++it)
-       defs << "    _connect_" << (*it)->text <<"();\n";
-  }
+
+  generateSignatureNew(decls, defs, entry, false, "void", con1->text, false, encapState);
 
 #if CMK_BIGSIM_CHARM
   generateEndSeq(defs);
@@ -1590,10 +1574,10 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
   if (!entry->getContainer()->isGroup() || !entry->isConstructor())
     generateTraceEndCall(defs);
 
-  defs << "    if (!__cDep.get())\n"
+  defs << "    if (!__dep.get())\n"
        << "        _sdag_init();\n";
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label);
+  generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
 
 #if CMK_BIGSIM_CHARM
   generateTlineEndCall(defs);
@@ -1605,11 +1589,11 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
   endMethod(defs);
 
   decls << "private:\n";
-  generateSignature(decls, defs, entry, false, "void", con1->text, true,
+  generateSignatureNew(decls, defs, entry, false, "void", con1->text, true,
 #if CMK_BIGSIM_CHARM
-  stateVarsChildren
+  encapStateChild
 #else
-  stateVars
+  encapState
 #endif
 );
   endMethod(defs);
@@ -1623,11 +1607,15 @@ void AtomicConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
   for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
     EncapState& state = **iter;
 
-    for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end(); ++iter2) {
+    defs << "  // begin encap: ";
+    state.name ? (defs << *state.name) : (defs << "gen" << cur);
+    defs << "\n";
+    int i = 0;
+    for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end(); ++iter2, ++i) {
       CStateVar& var = **iter2;
-      defs << "  " << var.type << "& " << var.name << " = ";
+      defs << "  " << var.type << (var.arrayLength ? "*" : "") << "& " << var.name << " = ";
       state.name ? (defs << *state.name) : (defs << "gen" << cur);
-      defs << "->" << var.name << ";\n";
+      defs << "->" << "getP" << i << "();\n";
     }
   }
 
