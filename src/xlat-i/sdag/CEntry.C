@@ -68,11 +68,35 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
 
   if (needsParamMarshalling || isVoid) {
     newSig << *entry << "(" << *decl_entry->genStructTypeNameProxy << "* genStruct)";
+    decls << "  void " <<  newSig << ";\n";
+    decls << "  void " <<  signature << ";\n";
   } else { // a message
     newSig << signature << "";
+    decls << "  void " <<  newSig << ";\n";
   }
 
-  decls << "  void " <<  newSig << ";\n";
+  // generate wrapper for local calls to the function
+  if (needsParamMarshalling || isVoid) {
+    templateGuardBegin(false, defs);
+    defs << "void " << decl_entry->getContainer()->baseName() << "::" << signature << "{\n";
+    defs << "  " << *decl_entry->genStructTypeNameProxy << "*" <<
+      " genStruct = new " << *decl_entry->genStructTypeNameProxy << "()" << ";\n";
+    {
+      int i = 0;
+      for (list<CStateVar*>::iterator it = myParameters.begin(); it != myParameters.end(); ++it, ++i) {
+        CStateVar& var = **it;
+        if (i == 0 && *var.type == "int")
+          defs << "  genStruct->__refnum" << " = " << var.name << ";\n";
+        else if (i == 0)
+          defs << "  genStruct->__refnum" << " = 0;\n";
+        defs << "  genStruct->" << var.name << " = " << var.name << ";\n";
+      }
+    }
+
+    defs << "  " << *entry << "(genStruct);\n";
+    defs << "}\n\n";
+    templateGuardEnd(defs);
+  }
 
   templateGuardBegin(false, defs);
   defs << "void " << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
