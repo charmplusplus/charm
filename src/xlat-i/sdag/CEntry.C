@@ -54,7 +54,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
     }
     else if (sv->isVoid != 1){
       if (i < 1) 
-         signature << sv->type << " " << sv->name << "_msg";
+         signature << sv->type << "* " << sv->name << "_msg";
       else
          printf("ERROR: A message must be the only parameter in an entry function\n");
     }

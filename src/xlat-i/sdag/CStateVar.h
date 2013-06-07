@@ -40,7 +40,7 @@ namespace xi {
 
     CStateVar(ParamList *pl)
       : isVoid(0)
-      , type(new XStr(*(pl->param->getType())))
+      , type(new XStr(pl->param->type->isMessage() ? *(pl->param->type->deref()) : *(pl->param->getType())))
       , numPtrs(0)
       , name(new XStr(pl->getGivenName()))
       , byRef(pl->isReference() ? new XStr("&") : NULL)

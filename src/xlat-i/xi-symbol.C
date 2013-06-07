@@ -4217,7 +4217,7 @@ void Entry::genStruct(XStr& decls) {
         isMessage = true;
         structure << sv->type << " " << sv->name << ";\n";
         toPup << "        " << "CkPupMessage(p, (void**)&" << sv->name << ");\n";
-        messageType << sv->type;
+        messageType << sv->type->deref();
       }
     }
   }
