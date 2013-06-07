@@ -105,7 +105,7 @@ struct CSpeculator : public TransportableEntity {
 namespace SDAG {
   struct Continuation {
     int whenID;
-    std::vector<PackableParams*> args;
+    std::vector<PackableParams*> closure;
     std::vector<int> entries, refnums;
     std::vector<int> anyEntries;
     int speculationIndex;

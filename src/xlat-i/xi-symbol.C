@@ -4249,8 +4249,8 @@ void Entry::genStruct(XStr& decls) {
     genStructTypeName = new XStr();
     genStructTypeNameProxy = new XStr();
     *genStructTypeNameProxy << proxyName() << "::";
-    *genStructTypeNameProxy << name << "_" << entryCount << "_struct";
-    *genStructTypeName << name << "_" << entryCount << "_struct";
+    *genStructTypeNameProxy << name << "_" << entryCount << "_closure";
+    *genStructTypeName << name << "_" << entryCount << "_closure";
 
     decls << "    struct " <<  *genStructTypeName <<" : public PackableParams" << " {\n";
     decls << structure << "\n";

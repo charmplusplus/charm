@@ -604,7 +604,7 @@ void SdagConstruct::generateWhenCodeNew(XStr& op) {
   for (list<EncapState*>::iterator iter = encapState.begin();
        iter != encapState.end(); ++iter, ++cur) {
     EncapState& state = **iter;
-    op << "\n          reinterpret_cast<" << *state.type << "*>(c->args[" << cur << "])";
+    op << "\n          reinterpret_cast<" << *state.type << "*>(c->closure[" << cur << "])";
     if (cur != encapState.size() - 1) op << ", ";
   }  
   op << "\n        );\n";
@@ -840,12 +840,12 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
 
   defs << "    SDAG::Continuation* c = new SDAG::Continuation(" << nodeNum << ");\n";
 
-  // iterative through current state and save in a trigger
+  // iterate through current closures and save in a continuation
   {
     int cur = 0;
     for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
       EncapState& state = **iter;
-      defs << "    c->args.push_back(";
+      defs << "    c->closure.push_back(";
       state.name ? (defs << *state.name) : (defs << "gen" << cur);
       defs << ");\n";
     }
