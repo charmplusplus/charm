@@ -1287,23 +1287,23 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 
 void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry)
 {
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
   defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label);
+  generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 
-  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
   defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label);
+  generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
