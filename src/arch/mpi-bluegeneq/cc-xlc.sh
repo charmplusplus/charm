@@ -4,8 +4,8 @@ BGQ_INC="-I$BGQ_INSTALL/comm/sys/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTA
 BGQ_LIB="-L$BGQ_INSTALL/comm/sys-fast/lib -lpami -L$BGQ_INSTALL/spi/lib -L$BGQ_ZLIB/lib -lSPI -lSPI_cnk -lpthread -lrt" 
 CMK_SYSLIBS="$BGQ_LIB"
 
-CMK_CC="bgxlc_r -qcpluscmt -qhalt=e $BGQ_INC -qnokeyword=__int128"
-CMK_CXX="bgxlC_r -qhalt=e $BGQ_INC -qnokeyword=__int128"
+CMK_CC="bgxlc_r -qcpluscmt -qhalt=e $BGQ_INC -qnokeyword=__int128 -qsmp=noostls"
+CMK_CXX="bgxlC_r -qhalt=e $BGQ_INC -qnokeyword=__int128 -qsmp=noostls"
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
 CMK_CF77="bgxlf_r "
