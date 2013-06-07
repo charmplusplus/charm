@@ -33,12 +33,12 @@ Heavily modified by Nikhil Jain 11/28/2011
 int cutOffPoints[] = {64,128,256,512,1024,2048,4096, 8192,16384,32768,
                       65536,131072,262144,524288,1048576,2097152,4194304,
                       8388608,16777216,33554432,67108864,134217728,268435456,
-                      536870912,1073741824};
+                      536870912,1073741824,2147483647};
 
 INLINE_KEYWORD int which_pow2(size_t size)
 {
   int i;
-  for(i=0; i<cutOffNum; i++) {
+  for(i=0; i<=cutOffNum; i++) {
     if(size <= cutOffPoints[i]) {
       return i;
     }
@@ -67,11 +67,12 @@ INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,int po
     loc = (char*)pool+sizeof(mempool_type)-(char*)mptr;
   }
   power = which_pow2(left);
-  if(left < cutOffPoints[power]) {
-    power--;
+  if(power <= cutOffNum) {
+    if(left < cutOffPoints[power]) {
+      power--;
+    }
   }
-    
-  if(power == cutOffNum) {
+  if(power >= cutOffNum) {
     CmiAbort("Mempool-requested slot is more than what mempool can provide as\
     one chunk, increase cutOffNum and cutoffPoints in mempool\n");
   }
@@ -272,7 +273,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 
     bestfit_size = size + sizeof(used_header);
     power = which_pow2(bestfit_size);
-    if(power == cutOffNum) {
+    if(power >= cutOffNum) {
       CmiAbort("Mempool-requested slot is more than what mempool can provide as\
       one chunk, increase cutOffNum and cutoffPoints in mempool\n");
     }
@@ -305,8 +306,18 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
       }
 
       tail = (block_header*)((char*)mptr+mptr->block_tail);
-      expand_size = 2*bestfit_size + sizeof(block_header); 
+      if(bestfit_size <= cutOffPoints[18]) {
+        expand_size = 2*bestfit_size + sizeof(block_header); 
+      } else {
+        expand_size = bestfit_size + sizeof(block_header); 
+      }
+#if MEMPOOL_DEBUG
+      CmiPrintf(" Calling alloc request for %zd\n",expand_size);
+#endif
       pool = mptr->newblockfn(&expand_size, &mem_hndl, 1);
+#if MEMPOOL_DEBUG
+      CmiPrintf("Returned from alloc\n");
+#endif
       if(pool==NULL) {
         CmiPrintf("Mempool-Did not get memory while expanding\n");
         return NULL;
