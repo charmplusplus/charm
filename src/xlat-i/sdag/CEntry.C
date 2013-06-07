@@ -106,6 +106,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
     // add the incoming message to a buffer
     defs << "  __dep->pushBuffer(" << entryNum << ", genStruct, genStruct->__refnum);\n";
   }
+  // @todo write the code to fetch the message with the ref num
 
   // search for a continuation to restart execution
   defs << "  SDAG::Trigger* t = __dep->tryFindTrigger(" << entryNum << ");\n";
@@ -128,6 +129,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
     defs << "    }\n";
   }
 
+  // delete the continuation now that we are finished with it
   defs << "    delete t;\n";
   defs << "  }\n";
 
