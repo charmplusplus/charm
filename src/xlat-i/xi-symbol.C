@@ -27,7 +27,6 @@ const char *Prefix::Message="CMessage_";
 const char *Prefix::Index="CkIndex_";
 const char *Prefix::Python="CkPython_";
 
-
 //Fatal error function
 void die(const char *why,int line)
 {
@@ -306,6 +305,13 @@ void
 AstChildren<Child>::genDecls(XStr& str)
 {
     perElemGen(children, str, &Child::genDecls, newLine);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::genClosure(XStr& str)
+{
+    perElemGen(children, str, &Child::genClosure, newLine);
 }
 
 template <typename Child>
@@ -1013,6 +1019,9 @@ Chare::genDecls(XStr& str)
     genPythonDecls(str);
   }
 
+  str << "/* ---------------- method closures -------------- */\n";
+  genClosureDecls(str);
+
   if(list) {
     //handle the case that some of the entries may be sdag Entries
     int sdagPresent = 0;
@@ -1090,6 +1099,16 @@ disambig_proxy(XStr &str, const XStr &super)
       << "\n    CkGroupID ckDelegatedIdx(void) const"
       << "\n    { return " << super << "::ckDelegatedIdx(); }"
       << "\n";
+}
+
+void
+Chare::genClosureDecls(XStr& str) {
+  XStr ptype;
+  ptype << "Closure_" << type;
+  str << tspec()<< "class " << ptype << " ";
+  str << CIClassStart;
+  if (list) list->genClosure(str);
+  str << CIClassEnd;
 }
 
 void
@@ -4161,11 +4180,9 @@ void Entry::genDecls(XStr& str)
   } else { // chare or mainchare
     genChareDecl(str);
   }
-
-  if (container->getForWhom() == forAll) genStruct(str);
 }
 
-void Entry::genStruct(XStr& decls) {
+void Entry::genClosure(XStr& decls) {
   bool hasArray = false, isMessage = false;
   XStr messageType;
   int i = 0;
@@ -4248,7 +4265,7 @@ void Entry::genStruct(XStr& decls) {
   if (!isMessage) {
     genStructTypeName = new XStr();
     genStructTypeNameProxy = new XStr();
-    *genStructTypeNameProxy << proxyName() << "::";
+    *genStructTypeNameProxy << "Closure_" << container->baseName() << "::";
     *genStructTypeNameProxy << name << "_" << entryCount << "_closure";
     *genStructTypeName << name << "_" << entryCount << "_closure";
 

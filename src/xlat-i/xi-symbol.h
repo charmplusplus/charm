@@ -110,6 +110,7 @@ public:
     }
     virtual void genDecls(XStr& str) { (void)str; }
     virtual void genDefs(XStr& str) { (void)str; }
+    virtual void genClosure(XStr& str) { }
     virtual void genReg(XStr& str) { (void)str; }
     virtual void genGlobalCode(XStr scope, XStr &decls, XStr &defs)
     { (void)scope; (void)decls; (void)defs; }
@@ -165,6 +166,7 @@ public:
 
   void printChareNames();
 
+  void genClosure(XStr& str);
   void genDecls(XStr& str);
   void genDefs(XStr& str);
   void genReg(XStr& str);
@@ -714,6 +716,7 @@ class Member : public Construct {
     virtual void genPythonStaticDefs(XStr&) {}
     virtual void genPythonStaticDocs(XStr&) {}
     virtual void lookforCEntry(CEntry *)  {}
+    virtual void genClosure(XStr& str) { }
 };
 
 /* Chare or group is a templated entity */
@@ -812,6 +815,7 @@ class Chare : public TEntity {
 
     int nextEntry(void) {return entryCount++;}
     virtual void genSubDecls(XStr& str);
+    virtual void genClosureDecls(XStr& str);
     void genPythonDecls(XStr& str);
     void genPythonDefs(XStr& str);
     virtual char *chareTypeName(void) {return (char *)"chare";}
@@ -982,7 +986,7 @@ private:
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
 
-    void genStruct(XStr& str);
+    void genClosure(XStr& str);
     
     void genChareDecl(XStr& str);
     void genChareStaticConstructorDecl(XStr& str);
