@@ -16,6 +16,8 @@ namespace SDAG {
 #include <map>
 #include <set>
 
+#include <pup_stl.h>
+
 namespace SDAG {
   struct TransportableBigSimLog : public Closure {
     void* log;
@@ -82,7 +84,7 @@ namespace SDAG {
     PUPable_decl(CSpeculator);
   };
 
-  struct Continuation {
+  struct Continuation : public PUP::able {
     int whenID;
     std::vector<Closure*> closure;
     std::vector<int> entries, refnums;
@@ -90,28 +92,39 @@ namespace SDAG {
     int speculationIndex;
 
     Continuation() { }
+    Continuation(CkMigrateMessage*) { }
 
     Continuation(int whenID)
       : whenID(whenID) { }
 
     void pup(PUP::er& p) {
-      //p | whenID;
-      //p | args;
-      //p | entries;
-      //p | refnums;
-      //p | anyEntries;
-      //p | speculationIndex;
+      p | whenID;
+      p | closure;
+      p | entries;
+      p | refnums;
+      p | anyEntries;
+      p | speculationIndex;
     }
+    PUPable_decl(Continuation);
   };
 
-  struct Buffer {
+  struct Buffer : public PUP::able {
     int entry, refnum;
     Closure* cl;
+
+    Buffer(CkMigrateMessage*) { }
 
     Buffer(int entry, Closure* cl, int refnum)
       : entry(entry)
       , cl(cl)
       , refnum(refnum) { }
+
+    void pup(PUP::er& p) {
+      p | entry;
+      p | refnum;
+      p | cl;
+    }
+    PUPable_decl(Buffer);
   };
 
   struct Dependency {
@@ -125,6 +138,9 @@ namespace SDAG {
 
     void pup(PUP::er& p) {
       p | curSpeculationIndex;
+      p | entryToWhen;
+      p | buffer;
+      p | whenToContinuation;
     }
 
     Dependency(int numEntries, int numWhens)
@@ -242,6 +258,8 @@ namespace SDAG {
       }
     }
   };
+
+  void registerPUPables();
 }
 
 #endif

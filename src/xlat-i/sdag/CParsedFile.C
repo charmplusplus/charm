@@ -178,6 +178,8 @@ void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
   XStr name = "__sdag_register";
   generateSignature(decls, defs, container, true, "void", &name, false, NULL);
 
+  defs << "  SDAG::registerPUPables();\n";
+
   for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
     if ((*cn)->sdagCon != 0) {
       (*cn)->sdagCon->generateRegisterEp(defs);
