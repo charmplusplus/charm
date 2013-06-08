@@ -1,6 +1,15 @@
 #ifndef _sdag_H_
 #define _sdag_H_
 
+#include "pup.h"
+
+namespace SDAG {
+  struct Closure : public PUP::able {
+    virtual void pup(PUP::er& p) = 0;
+    PUPable_abstract(Closure);
+  };
+}
+
 #include "charm++.h"
 #include <vector>
 #include <list>
@@ -8,11 +17,6 @@
 #include <set>
 
 namespace SDAG {
-  struct Closure : public PUP::able {
-    virtual void pup(PUP::er& p) = 0;
-    PUPable_abstract(Closure);
-  };
-
   struct TransportableBigSimLog : public Closure {
     void* log;
     TransportableBigSimLog() : log(0) { }
