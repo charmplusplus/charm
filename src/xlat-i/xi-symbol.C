@@ -4768,8 +4768,10 @@ void Entry::genDefs(XStr& str)
 
   // to match the registry, generate register call even if there is no SDAG code
   //if ((param->isMarshalled() || param->isVoid()) /* && (sdagCon || isWhenEntry) */)
-  if ((param->isMarshalled() || param->isVoid()) && genStructTypeNameProxy)
-    str << "PUPable_def(" << *genStructTypeNameProxy << ");\n";
+  if ((param->isMarshalled() || param->isVoid()) && genStructTypeNameProxy) {
+    if (!container->isTemplated())
+      str << "PUPable_def(" << *genStructTypeNameProxy << ");\n";
+  }
 
   templateGuardEnd(str);
 }
