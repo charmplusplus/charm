@@ -412,14 +412,14 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
         char txt[128];
         sprintf(txt, "_co%d", nodeNum);
         counter = new XStr(txt);
-        sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
+        sv = new CStateVar(0, "SDAG::CCounter *", 0, txt, 0, NULL, 1);
         sv->isCounter = true;
         stateVarsChildren->push_back(sv);
 
         list<CStateVar*> lst;
         lst.push_back(sv);
         EncapState *state = new EncapState(NULL, lst);
-        state->type = new XStr("CCounter");
+        state->type = new XStr("SDAG::CCounter");
         state->name = new XStr(txt);
         encap.push_back(state);
       }
@@ -1464,13 +1464,13 @@ void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry)
 void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
 {
   SdagConstruct *cn;
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  defs << "    CCounter *" << counter << "= new CCounter(" <<
+  generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+  defs << "    SDAG::CCounter *" << counter << "= new SDAG::CCounter(" <<
     (int)constructs->size() << ");\n";
   for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
        ++it) {
     defs << "    ";
-    generateCall(defs, *stateVarsChildren, (*it)->label);
+    generateCallNew(defs, encapStateChild, encapStateChild, (*it)->label);
   }
   endMethod(defs);
 
@@ -1480,7 +1480,7 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
   defs << "  CkVec<void*> " <<label << "_bgLogList;\n";
 #endif
 
-  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
   defs << "    " <<label << "_bgLogList.insertAtEnd(_bgParentLog);\n";
@@ -1507,7 +1507,7 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
 #endif
 
   defs << "      ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
