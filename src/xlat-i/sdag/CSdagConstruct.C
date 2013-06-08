@@ -1360,12 +1360,14 @@ void SdagConstruct::unravelClosures(XStr& defs) {
     int i = 0;
     for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end(); ++iter2, ++i) {
       CStateVar& var = **iter2;
-      defs << "  " << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
-      state.name ? (defs << *state.name) : (defs << "gen" << cur);
-      if (!var.isMsg)
-        defs << "->" << "getP" << i << "();\n";
-      else
-        defs << ";\n";
+      if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
+        defs << "  " << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
+        state.name ? (defs << *state.name) : (defs << "gen" << cur);
+        if (!var.isMsg)
+          defs << "->" << "getP" << i << "();\n";
+        else
+          defs << ";\n";
+      }
     }
   }
 }
