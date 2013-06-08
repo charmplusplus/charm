@@ -1350,16 +1350,16 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
 
 void SdagConstruct::unravelClosures(XStr& defs) {
   int cur = 0;
+
   // traverse all the state variables bring them into scope
   for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
     EncapState& state = **iter;
 
-    defs << "  // begin encap: ";
-    state.name ? (defs << *state.name) : (defs << "gen" << cur);
-    defs << "\n";
     int i = 0;
     for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end(); ++iter2, ++i) {
       CStateVar& var = **iter2;
+      // if the var is one of the following it a system state var that should
+      // not be brought into scope
       if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
         defs << "  " << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
         state.name ? (defs << *state.name) : (defs << "gen" << cur);
