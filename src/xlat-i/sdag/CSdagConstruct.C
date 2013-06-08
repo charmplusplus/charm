@@ -2037,7 +2037,20 @@ void SdagConstruct::generateListEventBracket(XStr& op, int eventType)
 void SdagConstruct::generateRegisterEp(XStr& defs)
 {
   if (traceName) {
-    defs << "    (void)_sdag_idx_" << traceName << "();\n";
+    defs << "  (void)_sdag_idx_" << traceName << "();\n";
+  }
+
+  for (EntryList *el = elist; el != NULL; el = el->next) {
+    Entry* entry = el->entry;
+    XStr type = "";
+    if (entry && entry->paramIsMarshalled()) {
+      if (entry && entry->entryPtr && entry->entryPtr->decl_entry)
+        type << entry->entryPtr->decl_entry->genStructTypeNameProxy;
+      else
+        type << entry->genStructTypeNameProxy;
+
+      defs << "  PUPable_reg(" << type << ");\n";
+    }
   }
 
   for (list<SdagConstruct*>::iterator iter = constructs->begin(); iter != constructs->end(); ++iter)
