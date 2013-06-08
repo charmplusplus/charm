@@ -166,6 +166,8 @@ namespace SDAG {
     std::map<int, std::list<Continuation*> > whenToContinuation;
 
     // entry -> lst of buffers
+    // @todo this will have sequential lookup time for specific reference
+    // numbers
     std::vector<std::list<Buffer*> > buffer;
 
     int curSpeculationIndex;
@@ -247,6 +249,7 @@ namespace SDAG {
                            std::set<Buffer*> ignore = std::set<Buffer*>()) {
       if (buffer[entry].size() == 0) return 0;
       else {
+        // @todo sequential lookup for buffer with reference number or ignore set
         for (std::list<Buffer*>::iterator iter = buffer[entry].begin();
              iter != buffer[entry].end();
              ++iter) {
