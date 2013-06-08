@@ -105,6 +105,14 @@ namespace SDAG {
       p | anyEntries;
       p | speculationIndex;
     }
+
+    virtual ~Continuation() {
+      for (int i = 0; i < closure.size(); i++) {
+        delete closure[i];
+      }
+      closure.clear();
+    }
+
     PUPable_decl(Continuation);
   };
 
@@ -127,6 +135,12 @@ namespace SDAG {
       if (hasCl)
         p | cl;
     }
+
+    virtual ~Buffer() {
+      delete cl;
+      cl = 0;
+    }
+
     PUPable_decl(Buffer);
   };
 
