@@ -16,6 +16,7 @@ namespace SDAG {
   struct TransportableBigSimLog : public Closure {
     void* log;
     TransportableBigSimLog() : log(0) { }
+    TransportableBigSimLog(CkMigrateMessage*) : log(0) { }
 
     TransportableBigSimLog(void* log)
       : log(log) { }
@@ -30,6 +31,7 @@ namespace SDAG {
     void* msg;
 
     MsgClosure() : msg(0) { }
+    MsgClosure(CkMigrateMessage*) : msg(0) { }
 
     MsgClosure(CkMessage* msg)
       : msg(msg) { }
@@ -47,6 +49,7 @@ namespace SDAG {
     unsigned int count;
   public:
     CCounter() { }
+    CCounter(CkMigrateMessage*) { }
     CCounter(int c) : count(c) { }
     CCounter(int first, int last, int stride) {
       count = ((last - first) / stride) + 1;
@@ -64,6 +67,7 @@ namespace SDAG {
     int speculationIndex;
 
     CSpeculator() { }
+    CSpeculator(CkMigrateMessage*) { }
 
     CSpeculator(int speculationIndex_)
       : speculationIndex(speculationIndex_) { }

@@ -170,6 +170,10 @@ void CParsedFile::generatePupFunction(XStr& decls, XStr& defs)
        << "    if (p.isUnpacking() && hasSDAG) _sdag_init();\n"
        << "    if (hasSDAG) { __dep->pup(p); }\n"
        << "}\n";
+  defs << "PUPable_def(SDAG::MsgClosure);\n";
+  defs << "PUPable_def(SDAG::TransportableBigSimLog);\n";
+  defs << "PUPable_def(SDAG::CCounter);\n";
+  defs << "PUPable_def(SDAG::CSpeculator);\n";
   templateGuardEnd(defs);
 }
 

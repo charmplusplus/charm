@@ -4257,6 +4257,9 @@ void Entry::genStruct(XStr& decls) {
     decls << "      " << *genStructTypeName << "() {\n";
     decls << initCode;
     decls << "      }\n";
+    decls << "      " << *genStructTypeName << "(CkMigrateMessage*) {\n";
+    decls << initCode;
+    decls << "      }\n";
     decls << getter;
     decls << "      void pup(PUP::er& p) {\n";
     decls << toPup;
@@ -4741,6 +4744,10 @@ void Entry::genDefs(XStr& str)
      }
      str << "}\n";
   }
+
+  if ((param->isMarshalled() || param->isVoid()) && (sdagCon || isWhenEntry))
+    str << "PUPable_def(" << *genStructTypeNameProxy << ");\n";
+
   templateGuardEnd(str);
 }
 
