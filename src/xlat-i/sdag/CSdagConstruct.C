@@ -1593,6 +1593,52 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry) {
 
   decls << "public:\n";
 
+  XStr signature;
+
+  signature << con1->text;
+  signature << "(";
+  if (stateVars) {
+    int count = 0;
+    for (list<CStateVar*>::iterator iter = stateVars->begin(); iter != stateVars->end(); ++iter) {
+      CStateVar& var = **iter;
+      if (var.isVoid != 1) {
+        if (count != 0) signature << ", ";
+        if (var.type != 0) signature << var.type << " ";
+        if (var.arrayLength != NULL) signature << "* ";
+        if (var.name != 0) signature << var.name;
+        count++;
+      }
+    }
+  }
+  signature << ")";
+
+  decls << "  void " <<  signature << ";\n";
+
+  // generate wrapper for local calls to the function
+  if (entry->paramIsMarshalled() || entry->param->isVoid()) {
+    templateGuardBegin(false, defs);
+    defs << "void " << entry->getContainer()->baseName() << "::" << signature << "{\n";
+    defs << "  " << *entry->genStructTypeNameProxy << "*" <<
+      " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
+    if (stateVars) {
+      int i = 0;
+      for (list<CStateVar*>::iterator it = stateVars->begin(); it != stateVars->end(); ++it, ++i) {
+        CStateVar& var = **it;
+        if (var.name) {
+          if (i == 0 && *var.type == "int")
+            defs << "  genStruct->__refnum" << " = " << var.name << ";\n";
+          else if (i == 0)
+            defs << "  genStruct->__refnum" << " = 0;\n";
+          defs << "  genStruct->" << var.name << " = " << var.name << ";\n";
+        }
+      }
+    }
+
+    defs << "  " << con1->text << "(genStruct);\n";
+    defs << "}\n\n";
+    templateGuardEnd(defs);
+  }
+
   generateSignatureNew(decls, defs, entry, false, "void", con1->text, false, encapState);
 
 #if CMK_BIGSIM_CHARM

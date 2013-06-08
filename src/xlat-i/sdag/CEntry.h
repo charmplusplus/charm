@@ -39,6 +39,7 @@ public:
 //      printf("entry %s (%s *)", entry->charstar(), msgType->charstar());
     } 
 
+    void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature);
     void generateCode(XStr& decls, XStr& defs);
     void generateDeps(XStr& op);
     void generateDepsNew(XStr& op);
