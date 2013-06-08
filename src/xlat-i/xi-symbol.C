@@ -5287,6 +5287,7 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
   } else if (isVoid()) {
     str << "  " << *entry->genStructTypeNameProxy << "*" <<
       " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
+    str << "  genStruct->__refnum = 0;\n";
   }
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {
