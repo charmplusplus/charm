@@ -581,6 +581,7 @@ Module::generate()
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
   "#include \"charm++.h\"\n"
+  "#include \"envelope.h\"\n"
   "#include <memory>\n"
   "#include <set>\n"
   "#include \"sdag.h\"\n";
