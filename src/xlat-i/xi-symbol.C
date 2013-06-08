@@ -4253,7 +4253,7 @@ void Entry::genClosure(XStr& decls) {
 
     initCode << "        _impl_marshall = 0;\n";
     initCode << "        _impl_buf_in = 0;\n";
-    initCode << "        _impl_buf_size = -1;\n";
+    initCode << "        _impl_buf_size = 0;\n";
 
     toPup << "        p | _impl_buf_size;\n";
     toPup << "        bool hasMsg = (_impl_marshall != 0); p | hasMsg;\n";
