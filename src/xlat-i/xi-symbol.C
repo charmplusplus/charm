@@ -5280,9 +5280,10 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
     str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
     callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
     if (hasArray) {
-      if (!usesImplBuf)
+      if (!usesImplBuf) {
         str << "  genStruct->_impl_marshall = impl_msg_typed;\n";
-      else {
+        str << "  CmiReference(UsrToEnv(genStruct->_impl_marshall));\n";
+      } else {
         str << "  genStruct->_impl_buf_in = impl_buf;\n";
         str << "  genStruct->_impl_buf_size = implP.size();\n";
       }
