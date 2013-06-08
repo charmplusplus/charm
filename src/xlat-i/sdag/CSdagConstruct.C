@@ -853,7 +853,7 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
     int cur = 0;
     for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
       EncapState& state = **iter;
-      defs << "    c->closure.push_back(";
+      defs << "    c->addClosure(";
 
       // if the current state param is a message, create a thin wrapper for it
       // (MsgClosure) for migration purposes

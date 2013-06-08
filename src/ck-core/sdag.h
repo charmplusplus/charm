@@ -7,6 +7,11 @@ namespace SDAG {
   struct Closure : public PUP::able {
     virtual void pup(PUP::er& p) = 0;
     PUPable_abstract(Closure);
+    int continuations;
+    // reference count and self-destruct when no continuations have a reference
+    void ref() { continuations++; }
+    void deref() { if (--continuations <= 0) delete this; }
+    Closure() : continuations(0) { };
   };
 }
 
@@ -106,11 +111,14 @@ namespace SDAG {
       p | speculationIndex;
     }
 
+    void addClosure(Closure* cl) {
+      cl->ref();
+      closure.push_back(cl);
+    }
+
     virtual ~Continuation() {
-      for (int i = 0; i < closure.size(); i++) {
-        delete closure[i];
-      }
-      closure.clear();
+      for (int i = 0; i < closure.size(); i++)
+        closure[i]->deref();
     }
 
     PUPable_decl(Continuation);
@@ -125,7 +133,9 @@ namespace SDAG {
     Buffer(int entry, Closure* cl, int refnum)
       : entry(entry)
       , cl(cl)
-      , refnum(refnum) { }
+      , refnum(refnum) {
+      cl->ref();
+    }
 
     void pup(PUP::er& p) {
       p | entry;
@@ -137,8 +147,7 @@ namespace SDAG {
     }
 
     virtual ~Buffer() {
-      delete cl;
-      cl = 0;
+      cl->deref();
     }
 
     PUPable_decl(Buffer);
