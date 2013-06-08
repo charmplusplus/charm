@@ -960,8 +960,8 @@ class Message : public TEntity {
 /* An entry construct */
 class Entry : public Member {
 public:
-    XStr* genStructTypeName;
-    XStr* genStructTypeNameProxy;
+    XStr* genClosureTypeName;
+    XStr* genClosureTypeNameProxy;
     int line,entryCount;
   private:    
     int attribs;    

@@ -589,9 +589,9 @@ void SdagConstruct::buildTypes(list<EncapState*>& state) {
     EncapState& encap = **iter;
     if (!encap.type) {
       if (encap.entry->entryPtr && encap.entry->entryPtr->decl_entry)
-        encap.type = encap.entry->entryPtr->decl_entry->genStructTypeNameProxy;
+        encap.type = encap.entry->entryPtr->decl_entry->genClosureTypeNameProxy;
       else
-        encap.type = encap.entry->genStructTypeNameProxy;
+        encap.type = encap.entry->genClosureTypeNameProxy;
     }
   }
 }
@@ -1615,23 +1615,23 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry) {
   if (entry->paramIsMarshalled() || entry->param->isVoid()) {
     templateGuardBegin(false, defs);
     defs << "void " << entry->getContainer()->baseName() << "::" << signature << "{\n";
-    defs << "  " << *entry->genStructTypeNameProxy << "*" <<
-      " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
+    defs << "  " << *entry->genClosureTypeNameProxy << "*" <<
+      " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
     if (stateVars) {
       int i = 0;
       for (list<CStateVar*>::iterator it = stateVars->begin(); it != stateVars->end(); ++it, ++i) {
         CStateVar& var = **it;
         if (var.name) {
           if (i == 0 && *var.type == "int")
-            defs << "  genStruct->__refnum" << " = " << var.name << ";\n";
+            defs << "  genClosure->__refnum" << " = " << var.name << ";\n";
           else if (i == 0)
-            defs << "  genStruct->__refnum" << " = 0;\n";
-          defs << "  genStruct->" << var.name << " = " << var.name << ";\n";
+            defs << "  genClosure->__refnum" << " = 0;\n";
+          defs << "  genClosure->" << var.name << " = " << var.name << ";\n";
         }
       }
     }
 
-    defs << "  " << con1->text << "(genStruct);\n";
+    defs << "  " << con1->text << "(genClosure);\n";
     defs << "}\n\n";
     templateGuardEnd(defs);
   }

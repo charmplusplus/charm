@@ -2735,7 +2735,7 @@ void ParamList::checkParamList(){
 }
 
 Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int connect, ParamList *connectPList) :
-  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), connectParam(connectPList), isConnect(connect), genStructTypeName(0), entryPtr(0)
+  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), connectParam(connectPList), isConnect(connect), genClosureTypeName(0), entryPtr(0)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -4265,33 +4265,33 @@ void Entry::genClosure(XStr& decls) {
   }
 
   if (!isMessage) {
-    genStructTypeName = new XStr();
-    genStructTypeNameProxy = new XStr();
-    *genStructTypeNameProxy << "Closure_" << container->baseName() << "::";
-    *genStructTypeNameProxy << name << "_" << entryCount << "_closure";
-    *genStructTypeName << name << "_" << entryCount << "_closure";
+    genClosureTypeName = new XStr();
+    genClosureTypeNameProxy = new XStr();
+    *genClosureTypeNameProxy << "Closure_" << container->baseName() << "::";
+    *genClosureTypeNameProxy << name << "_" << entryCount << "_closure";
+    *genClosureTypeName << name << "_" << entryCount << "_closure";
 
-    container->sdagPUPReg << "  PUPable_reg(" << *genStructTypeNameProxy << ");\n";
+    container->sdagPUPReg << "  PUPable_reg(" << *genClosureTypeNameProxy << ");\n";
 
-    decls << "    struct " <<  *genStructTypeName <<" : public SDAG::Closure" << " {\n";
+    decls << "    struct " <<  *genClosureTypeName <<" : public SDAG::Closure" << " {\n";
     decls << structure << "\n";
-    decls << "      " << *genStructTypeName << "() {\n";
+    decls << "      " << *genClosureTypeName << "() {\n";
     decls << initCode;
     decls << "      }\n";
-    decls << "      " << *genStructTypeName << "(CkMigrateMessage*) {\n";
+    decls << "      " << *genClosureTypeName << "(CkMigrateMessage*) {\n";
     decls << initCode;
     decls << "      }\n";
     decls << getter;
     decls << "      void pup(PUP::er& p) {\n";
     decls << toPup;
     decls << "      }\n";
-    decls << "      PUPable_decl(" << *genStructTypeName << ");\n";
+    decls << "      PUPable_decl(" << *genClosureTypeName << ");\n";
     decls << "    };\n";
   } else {
-    genStructTypeName = new XStr();
-    genStructTypeNameProxy = new XStr();
-    *genStructTypeNameProxy << messageType;
-    *genStructTypeName << messageType;
+    genClosureTypeName = new XStr();
+    genClosureTypeNameProxy = new XStr();
+    *genClosureTypeNameProxy << messageType;
+    *genClosureTypeName << messageType;
   }
 }
 
@@ -4541,7 +4541,7 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool isSD
           //} else if (param->isVoid()) {
           // no parameter
         } else {
-          str << "genStruct";
+          str << "genClosure";
         }
         str << ");\n";
       } else {
@@ -4768,9 +4768,9 @@ void Entry::genDefs(XStr& str)
 
   // to match the registry, generate register call even if there is no SDAG code
   //if ((param->isMarshalled() || param->isVoid()) /* && (sdagCon || isWhenEntry) */)
-  if ((param->isMarshalled() || param->isVoid()) && genStructTypeNameProxy) {
+  if ((param->isMarshalled() || param->isVoid()) && genClosureTypeNameProxy) {
     if (!container->isTemplated())
-      str << "PUPable_def(" << *genStructTypeNameProxy << ");\n";
+      str << "PUPable_def(" << *genClosureTypeNameProxy << ");\n";
   }
 
   templateGuardEnd(str);
@@ -5181,8 +5181,8 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen)
     {
         str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
         if (isSDAGGen) {
-              str << "  " << *entry->genStructTypeNameProxy << "*" <<
-                " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
+              str << "  " << *entry->genClosureTypeNameProxy << "*" <<
+                " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
         }
         str<<"  PUP::fromMem implP(impl_buf);\n";
         if (next != NULL && next->next == NULL) {
@@ -5261,7 +5261,7 @@ void Parameter::beginUnmarshallSDAGCall(XStr &str) {
     str << "  implP|impl_off_" << name << ";\n";
     str << "  implP|impl_cnt_" << name << ";\n";
   } else
-    str << "  implP|" << (podType ? "" : "*") << "genStruct->" << name << ";\n";
+    str << "  implP|" << (podType ? "" : "*") << "genClosure->" << name << ";\n";
 }
 
 
@@ -5274,29 +5274,29 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
 
   if (isMarshalled()) {
     str << "  PUP::fromMem implP(impl_buf);\n";
-    str << "  " << *entry->genStructTypeNameProxy << "*" <<
-      " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
+    str << "  " << *entry->genClosureTypeNameProxy << "*" <<
+      " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
     callEach(&Parameter::beginUnmarshallSDAGCall, str);
     str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
     callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
     if (hasArray) {
       if (!usesImplBuf) {
-        str << "  genStruct->_impl_marshall = impl_msg_typed;\n";
-        str << "  CmiReference(UsrToEnv(genStruct->_impl_marshall));\n";
+        str << "  genClosure->_impl_marshall = impl_msg_typed;\n";
+        str << "  CmiReference(UsrToEnv(genClosure->_impl_marshall));\n";
       } else {
-        str << "  genStruct->_impl_buf_in = impl_buf;\n";
-        str << "  genStruct->_impl_buf_size = implP.size();\n";
+        str << "  genClosure->_impl_buf_in = impl_buf;\n";
+        str << "  genClosure->_impl_buf_size = implP.size();\n";
       }
     }
     if (param->type->isInt()) {
-      str << "  genStruct->__refnum = genStruct->" << param->name << ";\n";
+      str << "  genClosure->__refnum = genClosure->" << param->name << ";\n";
     } else {
-      str << "  genStruct->__refnum = 0;\n";
+      str << "  genClosure->__refnum = 0;\n";
     }
   } else if (isVoid()) {
-    str << "  " << *entry->genStructTypeNameProxy << "*" <<
-      " genStruct = new " << *entry->genStructTypeNameProxy << "()" << ";\n";
-    str << "  genStruct->__refnum = 0;\n";
+    str << "  " << *entry->genClosureTypeNameProxy << "*" <<
+      " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
+    str << "  genClosure->__refnum = 0;\n";
   }
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {
@@ -5316,14 +5316,14 @@ void Parameter::unmarshallArrayDataSDAG(XStr &str) {
 void Parameter::unmarshallArrayDataSDAGCall(XStr &str) {
   if (isArray()) {
     Type *dt=type->deref();//Type, without &
-    str << "  genStruct->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name << ");\n";
+    str << "  genClosure->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name << ");\n";
   }
 }
 
 void ParamList::unmarshallSDAGCall(XStr &str, int isFirst) {
   if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
   else if (!isVoid()) {
-    str << "genStruct->";
+    str << "genClosure->";
     str << param->getName();
     if (next) {
       str<<", ";

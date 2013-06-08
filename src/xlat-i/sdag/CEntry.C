@@ -24,21 +24,21 @@ void CEntry::generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& sig
   if (needsParamMarshalling || isVoid) {
     templateGuardBegin(false, defs);
     defs << "void " << decl_entry->getContainer()->baseName() << "::" << signature << "{\n";
-    defs << "  " << *decl_entry->genStructTypeNameProxy << "*" <<
-      " genStruct = new " << *decl_entry->genStructTypeNameProxy << "()" << ";\n";
+    defs << "  " << *decl_entry->genClosureTypeNameProxy << "*" <<
+      " genClosure = new " << *decl_entry->genClosureTypeNameProxy << "()" << ";\n";
     {
       int i = 0;
       for (list<CStateVar*>::iterator it = myParameters.begin(); it != myParameters.end(); ++it, ++i) {
         CStateVar& var = **it;
         if (i == 0 && *var.type == "int")
-          defs << "  genStruct->__refnum" << " = " << var.name << ";\n";
+          defs << "  genClosure->__refnum" << " = " << var.name << ";\n";
         else if (i == 0)
-          defs << "  genStruct->__refnum" << " = 0;\n";
-        defs << "  genStruct->getP" << i << "() = " << var.name << ";\n";
+          defs << "  genClosure->__refnum" << " = 0;\n";
+        defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
       }
     }
 
-    defs << "  " << *entry << "(genStruct);\n";
+    defs << "  " << *entry << "(genClosure);\n";
     defs << "}\n\n";
     templateGuardEnd(defs);
   }
@@ -89,7 +89,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
   XStr newSig;
 
   if (needsParamMarshalling || isVoid) {
-    newSig << *entry << "(" << *decl_entry->genStructTypeNameProxy << "* genStruct)";
+    newSig << *entry << "(" << *decl_entry->genClosureTypeNameProxy << "* genClosure)";
     decls << "  void " <<  newSig << ";\n";
     // generate local wrapper decls
     decls << "  void " <<  signature << ";\n";
@@ -109,7 +109,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
 
     // note that there will always be a closure even when the method has no
     // parameters for consistency
-    defs << "  __dep->pushBuffer(" << entryNum << ", genStruct, genStruct->__refnum);\n";
+    defs << "  __dep->pushBuffer(" << entryNum << ", genClosure, genClosure->__refnum);\n";
   } else {
     defs << "  int refnum = ";
     if (refNumNeeded)
