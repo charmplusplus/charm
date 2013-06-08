@@ -779,6 +779,7 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
 
   int entryLen = 0;
 
+  // count the number of entries this when contains (for logical ands)
   {
     int cur = 0;
     for (EntryList *el = elist; el != NULL; el = el->next, cur++) entryLen++;
@@ -816,6 +817,8 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
         continutationSpec << "    c->anyEntries.push_back(" << e->entryPtr->entryNum << ");\n";
       }
 
+      // buffers attached that we should ignore when trying to match a logical
+      // AND condition
       if (entryLen > cur + 1) {
         haveAllBuffersCond << " && ";
         defs << "  ignore.insert(" << bufName << ");\n";
@@ -856,6 +859,9 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
     for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
       EncapState& state = **iter;
       defs << "    c->closure.push_back(";
+
+      // if the current state param is a message, create a thin wrapper for it
+      // (MsgClosure) for migration purposes
       if (state.isMessage) defs << "new MsgClosure(";
         state.name ? (defs << *state.name) : (defs << "gen" << cur);
       if (state.isMessage) defs << ")";
@@ -868,6 +874,8 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
 
   // register the newly formed continutation with the runtime
   defs << "    __dep->reg(c);\n";
+
+  // return the continuation that was just created
   defs << "    return c;\n";
   defs << "  }\n";
 
