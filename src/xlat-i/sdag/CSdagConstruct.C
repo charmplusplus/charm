@@ -17,6 +17,7 @@ namespace xi {
 SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
 {
   con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
+  elist = 0;
   type = t;
   traceName=NULL;
   publishesList = new list<SdagConstruct*>();
@@ -28,6 +29,7 @@ SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct 
 {
   con1=0; con2=0; con3=0; con4=0;
   type = t;
+  elist = 0;
   traceName=NULL;
   publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
@@ -60,6 +62,7 @@ SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr
   publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
   param = pl;
+  elist = 0;
 }
 
 void SdagConstruct::numberNodes(void)
@@ -367,7 +370,7 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
         char txt[128];
         sprintf(txt, "_cf%d", nodeNum);
         counter = new XStr(txt);
-        sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
+        sv = new CStateVar(0, "SDAG::CCounter *", 0, txt, 0, NULL, 1);
         sv->isCounter = true;
         stateVarsChildren->push_back(sv);
       }
@@ -384,7 +387,7 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
         char txt[128];
         sprintf(txt, "_cs%d", nodeNum);
         counter = new XStr(txt);
-        sv = new CStateVar(0, "CSpeculator *", 0, txt, 0, NULL, 1);
+        sv = new CStateVar(0, "SDAG::CSpeculator *", 0, txt, 0, NULL, 1);
         sv->isSpeculator = true;
         stateVarsChildren->push_back(sv);
 
@@ -397,7 +400,7 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
         lst.push_back(sv);
         EncapState *state = new EncapState(NULL, lst);
         state->name = new XStr(txt);
-        state->type = new XStr("CSpeculator");
+        state->type = new XStr("SDAG::CSpeculator");
         encap.push_back(state);
       }
       
@@ -1512,49 +1515,49 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
 void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry)
 {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
   generateEventBracket(defs, SOVERLAP);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label);
+  generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
   endMethod(defs);
 
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
-  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
   generateEventBracket(defs, SOVERLAP_END);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
 void SdagConstruct::generateCaseList(XStr& decls, XStr& defs, Entry* entry) {
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  defs << "    CSpeculator* " << counter << " = new CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
-  defs << "    CWhenTrigger* tr = 0;\n";
+  generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+  defs << "    SDAG::CSpeculator* " << counter << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
+  defs << "    SDAG::Continuation* c = 0;\n";
   for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
        ++it) {
-    defs << "    tr = ";
-    generateCall(defs, *stateVarsChildren, (*it)->label);
-    defs << "    if (!tr) return;\n";
-    defs << "    else tr->speculationIndex = " << counter << "->speculationIndex;\n";
+    defs << "    c = ";
+    generateCallNew(defs, encapStateChild, encapStateChild, (*it)->label);
+    defs << "    if (!c) return;\n";
+    defs << "    else c->speculationIndex = " << counter << "->speculationIndex;\n";
   }
   endMethod(defs);
 
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
 
-  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
 
   defs << "    delete " << counter << ";\n";
   defs << "    ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 

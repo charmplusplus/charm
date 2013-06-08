@@ -1339,16 +1339,16 @@ public:
   SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
               SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el);
 
- SdagConstruct(EToken t, const char *str) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0)
+  SdagConstruct(EToken t, const char *str) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0), elist(0)
   { text = new XStr(str); constructs = new std::list<SdagConstruct*>();
     publishesList = new std::list<SdagConstruct*>(); }
                                              
  
-  SdagConstruct(EToken t) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0) 
+  SdagConstruct(EToken t) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0), elist(0)
   { publishesList = new std::list<SdagConstruct*>();
 		  constructs = new std::list<SdagConstruct*>(); }
 
-  SdagConstruct(EToken t, XStr *txt) : type(t), traceName(NULL), text(txt), con1(0), con2(0), con3(0), con4(0) 
+  SdagConstruct(EToken t, XStr *txt) : type(t), traceName(NULL), text(txt), con1(0), con2(0), con3(0), con4(0), elist(0)
   { publishesList = new std::list<SdagConstruct*>();
 		  constructs = new std::list<SdagConstruct*>();  }
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
