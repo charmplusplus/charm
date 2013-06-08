@@ -185,6 +185,9 @@ void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
       (*cn)->sdagCon->generateRegisterEp(defs);
     }
   }
+
+  defs << container->sdagPUPReg;
+
   endMethod(defs);
 }
 

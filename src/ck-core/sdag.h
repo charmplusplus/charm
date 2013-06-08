@@ -178,14 +178,15 @@ namespace SDAG {
            ++iter) {
         int whenID = *iter;
 
-        for (std::list<Continuation*>::iterator iter2 = whenToContinuation[whenID].begin();
-             iter2 != whenToContinuation[whenID].end();
-             iter2++) {
-          Continuation* c = *iter2;
-          if (searchBufferedMatching(c)) {
-            //printf("found matching continuation %p\n", t);
-            dereg(c);
-            return c;
+        if (whenToContinuation.find(whenID) != whenToContinuation.end()) {
+          for (std::list<Continuation*>::iterator iter2 = whenToContinuation[whenID].begin();
+               iter2 != whenToContinuation[whenID].end();
+               iter2++) {
+            Continuation* c = *iter2;
+            if (searchBufferedMatching(c)) {
+              dereg(c);
+              return c;
+            }
           }
         }
       }

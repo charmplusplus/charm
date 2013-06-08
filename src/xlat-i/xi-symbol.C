@@ -4183,6 +4183,8 @@ void Entry::genDecls(XStr& str)
 }
 
 void Entry::genClosure(XStr& decls) {
+  if (isConstructor()) return;
+
   bool hasArray = false, isMessage = false;
   XStr messageType;
   int i = 0;
@@ -4268,6 +4270,8 @@ void Entry::genClosure(XStr& decls) {
     *genStructTypeNameProxy << "Closure_" << container->baseName() << "::";
     *genStructTypeNameProxy << name << "_" << entryCount << "_closure";
     *genStructTypeName << name << "_" << entryCount << "_closure";
+
+    container->sdagPUPReg << "  PUPable_reg(" << *genStructTypeNameProxy << ");\n";
 
     decls << "    struct " <<  *genStructTypeName <<" : public SDAG::Closure" << " {\n";
     decls << structure << "\n";
@@ -4762,7 +4766,9 @@ void Entry::genDefs(XStr& str)
      str << "}\n";
   }
 
-  if ((param->isMarshalled() || param->isVoid()) && (sdagCon || isWhenEntry))
+  // to match the registry, generate register call even if there is no SDAG code
+  //if ((param->isMarshalled() || param->isVoid()) /* && (sdagCon || isWhenEntry) */)
+  if ((param->isMarshalled() || param->isVoid()) && genStructTypeNameProxy)
     str << "PUPable_def(" << *genStructTypeNameProxy << ");\n";
 
   templateGuardEnd(str);

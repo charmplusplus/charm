@@ -733,6 +733,7 @@ class Chare : public TEntity {
     	CNODEGROUP=1<<13
     };
     typedef unsigned int attrib_t;
+    XStr sdagPUPReg;
   protected:
     attrib_t attrib;
     int hasElement;//0-- no element type; 1-- has element type
