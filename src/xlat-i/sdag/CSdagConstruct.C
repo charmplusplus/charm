@@ -327,7 +327,7 @@ void SdagConstruct::propagateState(int uniqueVarNum)
     }
     
     EncapState* state = new EncapState(this->entry, *stateVars);
-    if (!this->entry->paramIsMarshalled())
+    if (!this->entry->paramIsMarshalled() && !this->entry->param->isVoid())
       state->isMessage = true;
     encap.push_back(state);
   }
@@ -488,7 +488,7 @@ void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
     }
 
     EncapState* state = new EncapState(el->entry, whenCurEntry);
-    if (!el->entry->paramIsMarshalled())
+    if (!el->entry->paramIsMarshalled() && !el->entry->param->isVoid())
       state->isMessage = true;
     encap.push_back(state);
     whenCurEntry.clear();
