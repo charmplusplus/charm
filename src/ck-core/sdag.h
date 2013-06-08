@@ -11,7 +11,10 @@ namespace SDAG {
     // reference count and self-destruct when no continuations have a reference
     void ref() { continuations++; }
     void deref() { if (--continuations <= 0) delete this; }
-    Closure() : continuations(0) { };
+    // done this way to keep Closure abstract for PUP reasons
+    // these must be called by descendents of Closure
+    void packClosure(PUP::er& p) { p | continuations; }
+    void init() { continuations = 0; }
   };
 }
 
@@ -26,14 +29,15 @@ namespace SDAG {
 namespace SDAG {
   struct TransportableBigSimLog : public Closure {
     void* log;
-    TransportableBigSimLog() : log(0) { }
-    TransportableBigSimLog(CkMigrateMessage*) : log(0) { }
+    TransportableBigSimLog() : log(0) { init(); }
+    TransportableBigSimLog(CkMigrateMessage*) : log(0) { init(); }
 
     TransportableBigSimLog(void* log)
-      : log(log) { }
+      : log(log) { init(); }
 
     void pup(PUP::er& p) {
       if (p.isUnpacking()) log = 0;
+      packClosure(p);
     }
     PUPable_decl(TransportableBigSimLog);
   };
@@ -41,16 +45,17 @@ namespace SDAG {
   struct MsgClosure : public Closure {
     void* msg;
 
-    MsgClosure() : msg(0) { }
-    MsgClosure(CkMigrateMessage*) : msg(0) { }
+    MsgClosure() : msg(0) { init(); }
+    MsgClosure(CkMigrateMessage*) : msg(0) { init(); }
 
     MsgClosure(CkMessage* msg)
-      : msg(msg) { }
+      : msg(msg) { init(); }
 
     void pup(PUP::er& p) {
       bool isNull = !msg;
       p | isNull;
       if (!isNull) CkPupMessage(p, &msg);
+      packClosure(p);
     }
     PUPable_decl(MsgClosure);
   };
@@ -59,10 +64,11 @@ namespace SDAG {
   private:
     unsigned int count;
   public:
-    CCounter() { }
-    CCounter(CkMigrateMessage*) { }
-    CCounter(int c) : count(c) { }
+    CCounter() { init(); }
+    CCounter(CkMigrateMessage*) { init(); }
+    CCounter(int c) : count(c) { init(); }
     CCounter(int first, int last, int stride) {
+      init();
       count = ((last - first) / stride) + 1;
     }
     void decrement(void) { count--; }
@@ -70,6 +76,7 @@ namespace SDAG {
 
     void pup(PUP::er& p) {
       p | count;
+      packClosure(p);
     }
     PUPable_decl(CCounter);
   };
@@ -77,14 +84,15 @@ namespace SDAG {
   struct CSpeculator : public Closure {
     int speculationIndex;
 
-    CSpeculator() { }
-    CSpeculator(CkMigrateMessage*) { }
+    CSpeculator() { init(); }
+    CSpeculator(CkMigrateMessage*) { init(); }
 
     CSpeculator(int speculationIndex_)
-      : speculationIndex(speculationIndex_) { }
+      : speculationIndex(speculationIndex_) { init(); }
 
     void pup(PUP::er& p) {
       p | speculationIndex;
+      packClosure(p);
     }
     PUPable_decl(CSpeculator);
   };

@@ -4244,7 +4244,10 @@ void Entry::genClosure(XStr& decls) {
 
   structure << "\n      " << "int __refnum;\n";
 
+  toPup << "        packClosure(p);\n";
+
   XStr initCode;
+  initCode << "        init();\n";
 
   if (hasArray) {
     structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
