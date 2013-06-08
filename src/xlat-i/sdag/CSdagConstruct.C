@@ -323,7 +323,10 @@ void SdagConstruct::propagateState(int uniqueVarNum)
       pl = pl->next;
     }
     
-    encap.push_back(new EncapState(this->entry, *stateVars));
+    EncapState* state = new EncapState(this->entry, *stateVars);
+    if (!this->entry->paramIsMarshalled())
+      state->isMessage = true;
+    encap.push_back(state);
   }
 
   encapState = encap;
@@ -488,7 +491,11 @@ void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
         pl = pl->next;
       }
     }
-    encap.push_back(new EncapState(el->entry, whenCurEntry));
+
+    EncapState* state = new EncapState(el->entry, whenCurEntry);
+    if (!el->entry->paramIsMarshalled())
+      state->isMessage = true;
+    encap.push_back(state);
     whenCurEntry.clear();
     el = el->next;
   }
@@ -604,7 +611,10 @@ void SdagConstruct::generateWhenCodeNew(XStr& op) {
   for (list<EncapState*>::iterator iter = encapState.begin();
        iter != encapState.end(); ++iter, ++cur) {
     EncapState& state = **iter;
-    op << "\n          reinterpret_cast<" << *state.type << "*>(c->closure[" << cur << "])";
+    if (!state.isMessage)
+      op << "\n          reinterpret_cast<" << *state.type << "*>(c->closure[" << cur << "])";
+    else
+      op << "\n          reinterpret_cast<" << *state.type << "*>(reinterpret_cast<MsgClosure*>(c->closure[" << cur << "])->msg)";
     if (cur != encapState.size() - 1) op << ", ";
   }  
   op << "\n        );\n";
@@ -846,7 +856,9 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
     for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
       EncapState& state = **iter;
       defs << "    c->closure.push_back(";
-      state.name ? (defs << *state.name) : (defs << "gen" << cur);
+      if (state.isMessage) defs << "new MsgClosure(";
+        state.name ? (defs << *state.name) : (defs << "gen" << cur);
+      if (state.isMessage) defs << ")";
       defs << ");\n";
     }
   }

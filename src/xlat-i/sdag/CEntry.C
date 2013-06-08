@@ -102,9 +102,20 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   defs << "void " << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
   defs << "  if (!__dep.get()) _sdag_init();\n";
 
-  if (i > 0 && needsParamMarshalling && !isVoid) {
+  if (needsParamMarshalling || isVoid) {
     // add the incoming message to a buffer
+
+    // note that there will always be a closure even when the method has no
+    // parameters for consistency
     defs << "  __dep->pushBuffer(" << entryNum << ", genStruct, genStruct->__refnum);\n";
+  } else {
+    defs << "  int refnum = ";
+    if (refNumNeeded)
+        defs << "CkGetRefNum(" << sv->name << "_msg);\n";
+    else
+      defs << "0;\n";
+
+    defs << "  __dep->pushBuffer(" << entryNum << ", new MsgClosure(" << sv->name << "_msg" << "), refnum);\n";
   }
   // @todo write the code to fetch the message with the ref num
 

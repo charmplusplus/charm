@@ -51,12 +51,12 @@ struct TransportableBigSimLog : public TransportableEntity {
   }
 };
 
-struct TransportableMsg : public TransportableEntity {
+struct MsgClosure : public TransportableEntity {
   void* msg;
 
-  TransportableMsg() : msg(0) { }
+  MsgClosure() : msg(0) { }
 
-  TransportableMsg(CkMessage* msg)
+  MsgClosure(CkMessage* msg)
     : TransportableEntity(TransportableMsgType)
     , msg(msg) { }
 
@@ -330,7 +330,7 @@ class CWhenTrigger {
           if (p.isUnpacking()) {
             switch ((TransportableEntity::PType)t) {
             case TransportableEntity::TransportableEntityType: args[i] = new TransportableEntity(); break;
-            case TransportableEntity::TransportableMsgType: args[i] = new TransportableMsg(); break;
+            case TransportableEntity::TransportableMsgType: args[i] = new MsgClosure(); break;
             case TransportableEntity::TransportableCounterType: args[i] = new CCounter(); break;
             case TransportableEntity::TransportableSpeculatorType: args[i] = new CSpeculator(); break;
             case TransportableEntity::TransportableBigSimLogType: args[i] = new TransportableBigSimLog(); break;
