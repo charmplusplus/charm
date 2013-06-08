@@ -4188,7 +4188,7 @@ void Entry::genClosure(XStr& decls) {
   bool hasArray = false, isMessage = false;
   XStr messageType;
   int i = 0;
-  XStr structure, toPup, alloc, getter;
+  XStr structure, toPup, alloc, getter, dealloc;
   for(ParamList* pl = param; pl != NULL; pl = pl->next, i++) {
     Parameter* sv = pl->param;
 
@@ -4249,6 +4249,7 @@ void Entry::genClosure(XStr& decls) {
     structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
     structure << "      " << "char* _impl_buf_in;\n";
     structure << "      " << "int _impl_buf_size;\n";
+    dealloc << "        if (_impl_marshall) CmiFree(UsrToEnv(_impl_marshall));\n";
 
     initCode << "        _impl_marshall = 0;\n";
     initCode << "        _impl_buf_in = 0;\n";
@@ -4284,6 +4285,9 @@ void Entry::genClosure(XStr& decls) {
     decls << getter;
     decls << "      void pup(PUP::er& p) {\n";
     decls << toPup;
+    decls << "      }\n";
+    decls << "      virtual ~" << *genClosureTypeName << "() {\n";
+    decls << dealloc;
     decls << "      }\n";
     decls << "      PUPable_decl(" << *genClosureTypeName << ");\n";
     decls << "    };\n";
