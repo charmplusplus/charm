@@ -472,15 +472,7 @@ void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
   ParamList *pl;
   while (el != NULL) {
     pl = el->entry->param;
-    if (pl->isVoid()) {
-      sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
-      //stateVars->push_back(sv);
-      stateVarsChildren->push_back(sv);
-      whensEntryMethodStateVars.push_back(sv);
-      whenCurEntry.push_back(sv);
-      el->entry->addEStateVar(sv);
-    }
-    else {
+    if (!pl->isVoid()) {
       while(pl != NULL) {
         sv = new CStateVar(pl);
         stateVarsChildren->push_back(sv);

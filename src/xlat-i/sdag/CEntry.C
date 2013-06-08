@@ -34,7 +34,7 @@ void CEntry::generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& sig
           defs << "  genStruct->__refnum" << " = " << var.name << ";\n";
         else if (i == 0)
           defs << "  genStruct->__refnum" << " = 0;\n";
-        defs << "  genStruct->" << var.name << " = " << var.name << ";\n";
+        defs << "  genStruct->getP" << i << "() = " << var.name << ";\n";
       }
     }
 
