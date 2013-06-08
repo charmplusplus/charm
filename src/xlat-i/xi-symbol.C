@@ -4255,7 +4255,7 @@ void Entry::genClosure(XStr& decls) {
     initCode << "        _impl_buf_size = -1;\n";
 
     toPup << "        p | _impl_buf_size;\n";
-    toPup << "        bool hasMsg = (_impl_marshall != 0); if (p.isUnpacking()) p | hasMsg;\n";
+    toPup << "        bool hasMsg = (_impl_marshall != 0); p | hasMsg;\n";
     toPup << "        " << "if (hasMsg) CkPupMessage(p, (void**)&" << "_impl_marshall" << ");\n";
     toPup << "        " << "else PUParray(p, _impl_buf_in, _impl_buf_size);\n";
     toPup << "        if (p.isUnpacking()) {\n";

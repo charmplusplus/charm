@@ -122,7 +122,10 @@ namespace SDAG {
     void pup(PUP::er& p) {
       p | entry;
       p | refnum;
-      p | cl;
+      bool hasCl = cl;
+      p | hasCl;
+      if (hasCl)
+        p | cl;
     }
     PUPable_decl(Buffer);
   };
