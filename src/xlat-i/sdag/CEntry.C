@@ -117,7 +117,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
     else
       defs << "0;\n";
 
-    defs << "  __dep->pushBuffer(" << entryNum << ", new MsgClosure(" << sv->name << "_msg" << "), refnum);\n";
+    defs << "  __dep->pushBuffer(" << entryNum << ", new SDAG::MsgClosure(" << sv->name << "_msg" << "), refnum);\n";
   }
   // @todo write the code to fetch the message with the ref num
 

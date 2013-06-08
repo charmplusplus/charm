@@ -614,7 +614,7 @@ void SdagConstruct::generateWhenCodeNew(XStr& op) {
     if (!state.isMessage)
       op << "\n          reinterpret_cast<" << *state.type << "*>(c->closure[" << cur << "])";
     else
-      op << "\n          reinterpret_cast<" << *state.type << "*>(reinterpret_cast<MsgClosure*>(c->closure[" << cur << "])->msg)";
+      op << "\n          reinterpret_cast<" << *state.type << "*>(reinterpret_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
     if (cur != encapState.size() - 1) op << ", ";
   }  
   op << "\n        );\n";
@@ -862,7 +862,7 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
 
       // if the current state param is a message, create a thin wrapper for it
       // (MsgClosure) for migration purposes
-      if (state.isMessage) defs << "new MsgClosure(";
+      if (state.isMessage) defs << "new SDAG::MsgClosure(";
         state.name ? (defs << *state.name) : (defs << "gen" << cur);
       if (state.isMessage) defs << ")";
       defs << ");\n";
@@ -1836,7 +1836,7 @@ void SdagConstruct::generateCallNew(XStr& op, list<EncapState*>& scope,
     if (state->type) {
       if (cur > scope.size() - 1) {
         int offset = cur - scope.size();
-        op << "reinterpret_cast<" << *state->type << "*>(buf" << offset << "->packable)";
+        op << "reinterpret_cast<" << *state->type << "*>(buf" << offset << "->cl)";
       } else {
         if (state->name) op << *state->name; else op << "gen" << cur;
       }

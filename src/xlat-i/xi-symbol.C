@@ -4252,7 +4252,7 @@ void Entry::genStruct(XStr& decls) {
     *genStructTypeNameProxy << name << "_" << entryCount << "_closure";
     *genStructTypeName << name << "_" << entryCount << "_closure";
 
-    decls << "    struct " <<  *genStructTypeName <<" : public PackableParams" << " {\n";
+    decls << "    struct " <<  *genStructTypeName <<" : public SDAG::Closure" << " {\n";
     decls << structure << "\n";
     decls << "      " << *genStructTypeName << "() {\n";
     decls << initCode;
@@ -4261,7 +4261,7 @@ void Entry::genStruct(XStr& decls) {
     decls << "      void pup(PUP::er& p) {\n";
     decls << toPup;
     decls << "      }\n";
-    decls << "      int getType() { return " << entryCount << "; }\n";
+    decls << "      PUPable_decl(" << *genStructTypeName << ");\n";
     decls << "    };\n";
   } else {
     genStructTypeName = new XStr();
