@@ -316,6 +316,13 @@ AstChildren<Child>::genClosure(XStr& str)
 
 template <typename Child>
 void
+AstChildren<Child>::outputClosures(XStr& str)
+{
+    perElemGen(children, str, &Child::outputClosures, newLine);
+}
+
+template <typename Child>
+void
 AstChildren<Child>::genDefs(XStr& str)
 {
     perElemGen(children, str, &Child::genDefs, newLine);
@@ -587,6 +594,7 @@ Module::generate()
   "#include \"sdag.h\"\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
+  if (clist) clist->outputClosures(declstr);
   declstr << "extern void _register"<<name<<"(void);\n";
   if(isMain()) {
     declstr << "extern \"C\" void CkRegisterMainModule(void);\n";
@@ -954,6 +962,11 @@ Chare::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
 }
 
 void
+Chare::outputClosures(XStr& str) {
+  str << closures;
+}
+
+void
 Chare::genDecls(XStr& str)
 {
   if(type->isTemplated())
@@ -1020,8 +1033,8 @@ Chare::genDecls(XStr& str)
     genPythonDecls(str);
   }
 
-  str << "/* ---------------- method closures -------------- */\n";
-  genClosureDecls(str);
+  closures << "/* ---------------- method closures -------------- */\n";
+  genClosureDecls(closures);
 
   if(list) {
     //handle the case that some of the entries may be sdag Entries
