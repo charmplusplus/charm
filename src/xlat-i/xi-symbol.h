@@ -574,6 +574,11 @@ class Scope : public ConstructList {
         AstChildren<Construct>::print(str);
         str << "} // namespace " << name_ << "\n";
     }
+    void outputClosures(XStr& str) {
+      str << "namespace " << name_ << " {\n";
+      AstChildren<Construct>::outputClosures(str);
+      str << "} // namespace " << name_ << "\n";
+    }
 };
 
 class UsingScope : public Construct {
