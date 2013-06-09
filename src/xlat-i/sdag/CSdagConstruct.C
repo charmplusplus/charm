@@ -1833,7 +1833,10 @@ void SdagConstruct::generateCallNew(XStr& op, list<EncapState*>& scope,
     if (state->type) {
       if (cur > scope.size() - 1) {
         int offset = cur - scope.size();
-        op << "reinterpret_cast<" << *state->type << "*>(buf" << offset << "->cl)";
+        if (!state->isMessage)
+          op << "reinterpret_cast<" << *state->type << "*>(buf" << offset << "->cl)";
+        else
+          op << "reinterpret_cast<" << *state->type << "*>(reinterpret_cast<SDAG::MsgClosure*>(buf" << offset << "->cl)->msg)";
       } else {
         if (state->name) op << *state->name; else op << "gen" << cur;
       }
