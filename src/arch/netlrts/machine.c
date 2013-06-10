@@ -274,6 +274,15 @@ int getDestHandler;
 #endif
 #endif
 
+#if CMK_SHRINK_EXPAND
+extern void resumeAfterRealloc();
+extern char willContinue;
+extern int mynewpe;
+extern int numProcessAfterRestart;
+CcsDelayedReply shrinkExpandreplyToken;
+extern char *_shrinkexpand_basedir;
+#endif
+
 static void CommunicationServerNet(int withDelayMs, int where);
 //static void CommunicationServer(int withDelayMs);
 
@@ -613,6 +622,14 @@ static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
 
+#if CMK_SHRINK_EXPAND
+int    Cmi_isOldProcess = 0; // means this process was already there
+static int    Cmi_mynewpe = 0;
+static int    Cmi_oldpe = 0;
+static int    Cmi_newnumnodes = 0;
+int    Cmi_myoldpe = 0;
+#endif
+
 #if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
 static void parse_forks(void) {
@@ -667,6 +684,12 @@ static void parse_netstart(void)
                 fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
                 exit(1);
         }
+#if CMK_SHRINK_EXPAND
+    if (Cmi_isOldProcess) {
+      Cmi_myoldpe = Lrts_myNode;
+    }
+#endif
+
   } else 
   {/*No charmrun-- set flag values for standalone operation*/
   	Lrts_myNode=0;
@@ -684,6 +707,12 @@ static void extract_common_args(char **argv)
 {
   if (CmiGetArgFlagDesc(argv,"+stats","Print network statistics at shutdown"))
     Cmi_print_stats = 1;
+#if CMK_SHRINK_EXPAND
+  //Realloc specific args
+  CmiGetArgIntDesc(argv,"+mynewpe",&Cmi_mynewpe,"New PE after realloc");
+  CmiGetArgIntDesc(argv,"+myoldpe",&Cmi_oldpe,"New PE after realloc");
+  CmiGetArgIntDesc(argv,"+newnumpes",&Cmi_newnumnodes,"New num PEs after realloc");
+#endif
 }
 
 
@@ -1010,6 +1039,13 @@ CmiPrintStackTrace(0);
   	ctrl_sendone_nolock("abort",msgBuf,strlen(msgBuf),s,strlen(s)+1);
   }
 }
+
+#if CMK_SHRINK_EXPAND
+void charmrun_realloc(const char *s)
+{
+  ctrl_sendone_nolock("realloc",s,strlen(s)+1,NULL,0);
+}
+#endif
 
 /* ctrl_getone */
 
@@ -1841,6 +1877,7 @@ void LrtsPostCommonInit(int everReturn)
 
 void LrtsExit()
 {
+  CmiPrintf("[%d] LrtsExit\n", CmiMyRank());
   int i;
   machine_initiated_shutdown=1;
 
@@ -1861,6 +1898,143 @@ void LrtsExit()
     }
   }
 }
+
+#if CMK_SHRINK_EXPAND
+void ConverseCleanup(void)
+{
+  MACHSTATE(2,"ConverseCleanup {");
+  if (CmiMyRank()==0) {
+    if(Cmi_print_stats)
+      printNetStatistics();
+    log_done();
+  }
+
+  CmiBarrier();
+
+  if (CmiMyPe() == 0) {
+    if (willContinue) {
+      CcsSendDelayedReply(shrinkExpandreplyToken, 0, 0); //reply to CCS client
+      // wait for this message to receive, hack
+      // TODO: figure out why this is important
+      usleep(500);
+      // this causes charmrun to go away
+      ctrl_sendone_locking("realloc",&numProcessAfterRestart, sizeof(int),NULL,0);
+    } else {
+      ctrl_sendone_locking("ending",NULL,0,NULL,0);
+    }
+  }
+
+  // TODO: ensure this won't gobble up some other important message
+  ChMessage replymsg;
+  memset(replymsg.header.type, 0, sizeof(replymsg.header.type));
+  while (strncmp(replymsg.header.type, "realloc_ack", CH_TYPELEN) != 0)
+    ChMessage_recv(Cmi_charmrun_fd, &replymsg);
+
+#if CMK_USE_SYSVSHM
+	CmiExitSysvshm();
+#elif CMK_USE_PXSHM
+	CmiExitPxshm();
+#endif
+  ConverseCommonExit();               /* should be called by every rank */
+  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  if (CmiMyRank()==0) CmiStdoutFlush();
+  if (Cmi_charmrun_fd==-1) {
+    if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
+    else while (1) CmiYield();
+  } else {
+    if (willContinue) {
+      int argc=CmiGetArgc(Cmi_argvcopy);
+
+      int i;
+      int restart_idx = -1;
+      for (i = 0; i < argc; ++i) {
+        if (strcmp(Cmi_argvcopy[i], "+restart") == 0) {
+          restart_idx = i;
+          break;
+        }
+      }
+
+      char **ret;
+      if (restart_idx == -1) {
+        ret=(char **)malloc(sizeof(char *)*(argc+10));
+      } else {
+        ret=(char **)malloc(sizeof(char *)*(argc+8));
+      }
+
+      for (i=0;i<argc;i++) {
+        MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
+        ret[i]=Cmi_argvcopy[i];
+      }
+
+      ret[argc+0]="+shrinkexpand";
+      ret[argc+1]="+newnumpes";
+
+      char temp[50];
+      sprintf(temp,"%d", numProcessAfterRestart);
+      ret[argc+2]=temp;
+
+      ret[argc+3]="+mynewpe";
+      char temp2[50];
+      sprintf(temp2,"%d", mynewpe);
+      ret[argc+4]=temp2;
+
+      ret[argc+5]="+myoldpe";
+      char temp3[50];
+      sprintf(temp3,"%d", _Cmi_mype);
+      ret[argc+6]=temp3;
+
+      if (restart_idx == -1) {
+        ret[argc+7]="+restart";
+        ret[argc+8]=_shrinkexpand_basedir;
+        ret[argc+9]=Cmi_argvcopy[argc];
+      } else {
+        ret[restart_idx + 1] = _shrinkexpand_basedir;
+        ret[argc+7]=Cmi_argvcopy[argc];
+      }
+
+      free(Cmi_argvcopy);
+      MACHSTATE1(3,"ConverseCleanup mynewpe %s", temp2);
+      MACHSTATE(2,"} ConverseCleanup");
+
+      skt_close(Cmi_charmrun_fd);
+      // Avoid crash by SIGALRM
+      signal(SIGALRM, SIG_IGN);
+
+#if CMK_USE_IBVERBS
+      CmiMachineCleanup();
+#endif
+      //put references to the controlling tty back on normal fd so that
+      //CmiStdoutInit  refers to the tty not the old pipe
+      dup2(writeStdout[0], 1);
+      dup2(writeStdout[1], 2);
+
+#if CMK_SHRINK_EXPAND
+      // Close any old file descriptors.
+      // FDs carry over execv, so these have to be closed at some point.
+      // Since some of them are async pipes, however, doing so flushes the buffer,
+      // raising a SIGIO before a handler is assigned in LrtsPreCommonInit, which
+      // kills the program.
+      // An easy way to deal with this is to simply close the FDs here.
+      int b;
+      for (b = 3; b < 20; b++) {
+        close(b);
+      }
+#endif
+
+      // TODO: check variant of execv that takes file descriptor
+      execv(ret[0], ret); // Need to check if the process name is always first arg
+      /* should not be here */
+      MACHSTATE1(3,"execv error: %s", strerror(errno));
+      CmiPrintf("[%d] should not be here\n", CmiMyPe());
+      exit(1);
+    } else {
+      skt_close(Cmi_charmrun_fd);
+      exit(0);
+    }
+  }
+}
+
+#endif
 
 static void set_signals(void)
 {
@@ -1918,6 +2092,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   if (CmiGetArgFlagDesc(*argv,"+idlesleep","Make sleep calls when idle")) Cmi_idlepoll = 0;
   Cmi_syncprint = CmiGetArgFlagDesc(*argv,"+syncprint", "Flush each CmiPrintf to the terminal");
 
+#if CMK_SHRINK_EXPAND
+  if (CmiGetArgFlagDesc(*argv,"+shrinkexpand","Restarting of already running prcoess")) Cmi_isOldProcess = 1;
+#endif
+
   Cmi_asyncio = 1;
 #if CMK_ASYNC_NOT_NEEDED
   Cmi_asyncio = 0;
@@ -1943,6 +2121,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   parse_magic();
 #if ! defined(_WIN32)
   /* only get forks in non-smp mode */
+#if CMK_SHRINK_EXPAND
+  if(Cmi_isOldProcess!=1)
+#endif
   parse_forks();
 #endif
   extract_args(*argv);
@@ -1950,8 +2131,18 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   Cmi_comm_var_mutex = CmiCreateLock();
   Cmi_freelist_mutex = CmiCreateLock();
   Cmi_scanf_mutex = CmiCreateLock();
+#if CMK_SHRINK_EXPAND
+  if (Cmi_isOldProcess == 1) {
+    Lrts_myNode = Cmi_mynewpe;
+    Cmi_myoldpe = Cmi_oldpe;
+    Lrts_numNodes = Cmi_newnumnodes;
+  }
+#endif
 
     /* NOTE: can not acutally call timer before timerInit ! GZ */
+#if CMK_SHRINK_EXPAND
+  MACHSTATE3(2,"After reorg  %d %d %d \n", Cmi_oldpe, Lrts_myNode, Lrts_numNodes);
+#endif
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 
   skt_set_idle(obtain_idleFn);

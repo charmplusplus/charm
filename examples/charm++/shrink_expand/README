@@ -1,0 +1,20 @@
+To be able to shrink and expand an application
+    1 - Needs to run with a load balancer
+    2 - Ccs server option needs to be added buring runtime
+
+Example running command:
+./charmrun +p4 jacobi2d 200 20 +balancer GreedyLB +LBDebug 3 ++nodelist ./mynodelistfile ++server ++server-port 1234
+
+Use the client to send the shrink or expand command to the running application:
+./client <hostname> <port> <oldprocs> <newprocs>
+
+For example this command will expand the application from 4 to 8 PEs:
+./client valor 1234 4 8
+
+NOTE 1: Charm needs to built with --enable-shrinkexpand option.
+
+NOTE 2: Let's say you want to shrink your application from 2 nodes to 1 node where
+each node has 8 cores, you should have repetitive 8 entries in the nodelist file
+for the number of cores in each node. Otherwise, you'll end up shrinking your
+application in a way that it'll use 4 cores from each node whereas what you really
+want is(usually) to only use 8 cores in one of the nodes after shrink.

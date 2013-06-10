@@ -69,7 +69,7 @@ never be excluded...
 #include "CkCheckpoint.decl.h"
 #include <sstream>
 
-void CkRestartMain(const char* dirname);
+void CkRestartMain(const char* dirname, CkArgMsg* args);
 
 #define  DEBUGF(x)     //CmiPrintf x;
 
@@ -154,6 +154,11 @@ extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
 CpvCExtern(int,interopExitFlag);
 
+#if CMK_SHRINK_EXPAND
+//for shrink expand cleanup
+int _ROGroupRestartHandlerIdx;
+char* _shrinkexpand_basedir;
+#endif
 /*
 	FAULT_EVAC
 */
@@ -261,6 +266,13 @@ static inline void _parseCommandLineOpts(char **argv)
       CmiAbort("Charm++> Object queue not enabled, recompile Charm++ with CMK_OBJECT_QUEUE_AVAILABLE defined to 1.");
 #endif
   }
+
+#if CMK_SHRINK_EXPAND
+  if (!CmiGetArgStringDesc(argv, "+shrinkexpand_basedir", &_shrinkexpand_basedir,
+                           "Checkpoint directory used for shrink-expand (defaults to /dev/shm)"))
+      _shrinkexpand_basedir = "/dev/shm";
+#endif
+
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;
 #if __FAULT__
@@ -587,6 +599,9 @@ static void _exitHandler(envelope *env)
       }
       else
         CmiFree(env);
+#if CMK_SHRINK_EXPAND
+      ConverseCleanup();
+#endif
       //everyone exits here - there may be issues with leftover messages in the queue
 #if !CMK_WITH_STATS
       DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n",CkMyPe()));
@@ -629,6 +644,12 @@ static void _exitHandler(envelope *env)
   }
 }
 
+#if CMK_SHRINK_EXPAND
+void _ROGroupRestartHandler(void * msg){
+  CkResumeRestartMain((char *)msg);
+}
+#endif
+
 /**
  * Create all groups in this processor (not called on processor zero).
  * Notice that only groups created in mainchares are processed here;
@@ -643,7 +664,18 @@ static inline void _processBufferedBocInits(void)
   register int len = inits.size();
   for(i=1; i<len; i++) {
     envelope *env = inits[i];
-    if(env==0) CkAbort("_processBufferedBocInits: empty message");
+    if(env==0) {
+#if CMK_SHRINK_EXPAND
+      if(_inrestart){
+        CkPrintf("_processBufferedBocInits: empty message in restart, ignoring\n");
+        break;
+      }
+      else
+        CkAbort("_processBufferedBocInits: empty message");
+#else
+      CkAbort("_processBufferedBocInits: empty message");
+#endif
+    }
     if(env->isPacked())
       CkUnpackMessage(&env);
     _processBocInitMsg(ck,env);
@@ -904,6 +936,18 @@ void _CkExit(void)
 }
 #endif
 
+#if CMK_SHRINK_EXPAND
+extern "C"
+void CkCleanup()
+{
+	// always send to PE 0
+	envelope *env = _allocEnv(StartExitMsg);
+	env->setSrcPe(CkMyPe());
+	CmiSetHandler(env, _exitHandlerIdx);
+	CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
+}
+#endif
+
 CkQ<CkExitFn> _CkExitFnVec;
 
 // triger exit on PE 0,
@@ -1126,6 +1170,10 @@ void _initCharm(int unused_argc, char **argv)
 	//added for interoperabilitY
 	_libExitHandlerIdx = CkRegisterHandler(_libExitHandler);
 	_bocHandlerIdx = CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState));
+#if CMK_SHRINK_EXPAND
+	// for shrink expand cleanup
+	_ROGroupRestartHandlerIdx = CkRegisterHandler(_ROGroupRestartHandler);
+#endif
 
 #ifdef __BIGSIM__
 	if(BgNodeRank()==0) 
@@ -1559,7 +1607,11 @@ extern "C" void fmain_(int *argc,char _argv[][80],int length[])
 // see trace-summary for an example.
 void registerExitFn(CkExitFn fn)
 {
+#if CMK_SHRINK_EXPAND
+  CkAbort("registerExitFn is called when shrink-expand is enabled!");
+#else
   _CkExitFnVec.enq(fn);
+#endif
 }
 
 /*@}*/

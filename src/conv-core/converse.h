@@ -1632,6 +1632,9 @@ int 	   CmmGetLastTag(CmmTable t, int ntags, int *tags);
 void ConverseInit(int, char**, CmiStartFn, int, int);
 void ConverseExit(void);
 
+#if CMK_SHRINK_EXPAND
+void ConverseCleanup(void);
+#endif
 void CmiAbort(const char *);
 void CmiOutOfMemory(int nBytes);
 

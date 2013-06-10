@@ -636,6 +636,7 @@ enable_replay
 enable_ccs
 enable_controlpoint
 enable_lbuserdata
+enable_shrinkexpand
 with_numa
 with_lbtime_type
 with_qlogic
@@ -1264,6 +1265,7 @@ Optional Features:
   --enable-ccs            enable CCS
   --enable-controlpoint   enable control point
   --enable-lbuserdata     enable LB user data
+  --enable-shrinkexpand   enable malleable jobs / shrink expand
   --enable-randomized-msgq
                           enable a randomized msg queue (for debugging etc)
 
@@ -1995,6 +1997,36 @@ else
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_LB_USER_DATA 0
+_ACEOF
+
+fi
+
+# Check whether --enable-shrinkexpand was given.
+if test "${enable_shrinkexpand+set}" = set; then :
+  enableval=$enable_shrinkexpand; enable_shrinkexpand=$enableval
+else
+  enable_shrinkexpand=no
+fi
+
+
+if test "$enable_shrinkexpand" = "yes"
+then
+  Echo "Charm shrink expand is enabled - Controlpoint is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_CONTROLPOINT 0
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_SHRINK_EXPAND 1
+_ACEOF
+
+else
+  Echo "Charm shrink expand is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_SHRINK_EXPAND 0
 _ACEOF
 
 fi

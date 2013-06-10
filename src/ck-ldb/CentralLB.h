@@ -9,6 +9,9 @@
 #include "BaseLB.h"
 #include "CentralLB.decl.h"
 
+#include <vector>
+#include "pup_stl.h"
+#include "manager.h"
 extern CkGroupID loadbalancer;
 
 void CreateCentralLB();
@@ -71,8 +74,15 @@ public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         lbDecisionCount= resumeCount=0;
 #endif
-} 
-  CentralLB(CkMigrateMessage *m) : CBase_CentralLB(m) {}
+#if CMK_SHRINK_EXPAND
+		manager_init();
+#endif
+  }
+  CentralLB(CkMigrateMessage *m) : CBase_CentralLB(m) {
+#if CMK_SHRINK_EXPAND
+		manager_init();
+#endif
+  }
 #if defined(TEMP_LDB) 
 	float getTemp(int);
 	  FILE* logFD;
@@ -116,6 +126,13 @@ public:
 	void ReceiveDummyMigration(int _step);
 #endif
   void MissMigrate(int waitForBarrier);
+
+  //Shrink-Expand related functions
+  void CheckForRealloc ();
+  void ResumeFromReallocCheckpoint();
+  void MigrationDoneImpl (int );
+  void WillIbekilled(std::vector<char> avail, int);
+  void StartCleanup();
 
   // manual predictor start/stop
   static void staticPredictorOn(void* data, void* model);

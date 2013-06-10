@@ -52,6 +52,9 @@ extern "C" {
 #define CkAssert                CmiAssert
 
 extern void  CkExit(void);
+#if CMK_SHRINK_EXPAND
+extern void  CkCleanup(void);
+#endif
 extern char **CkGetArgv(void);
 extern int  CkGetArgc(void);
 

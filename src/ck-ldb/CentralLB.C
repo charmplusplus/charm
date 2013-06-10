@@ -39,6 +39,16 @@ CpvExtern(void *, CkGridObject);
 extern void UpdateLocation(MigrateInfo& migData); 
 #endif
 
+#if CMK_SHRINK_EXPAND
+extern "C" void charmrun_realloc(char *s);
+extern char willContinue;
+extern realloc_state pending_realloc_state;
+extern char * se_avail_vector;
+extern "C" int mynewpe;
+extern char *_shrinkexpand_basedir;
+int numProcessAfterRestart;
+int mynewpe=0;
+#endif
 CkGroupID loadbalancer;
 int * lb_ptr;
 int load_balancer_created;
@@ -1188,8 +1198,75 @@ void CentralLB::ReceiveDummyMigration(int globalDecisionCount){
 }
 #endif
 
+// We assume that bit vector would have been aptly set async by either scheduler or charmrun.
+void CentralLB::CheckForRealloc(){
+#if CMK_SHRINK_EXPAND
+   if(pending_realloc_state == REALLOC_MSG_RECEIVED) {
+        pending_realloc_state = REALLOC_IN_PROGRESS; //in progress
+        CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
+        double end_lb_time = CkWallTimer();
+        CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
+            lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
+        // do checkpoint
+        CkCallback cb(CkIndex_CentralLB::ResumeFromReallocCheckpoint(), thisProxy[0]);
+        CkStartCheckpoint(_shrinkexpand_basedir, cb);
+    }
+    else{
+        thisProxy.MigrationDoneImpl(1);
+    }
+#endif
+}
+
+void CentralLB::ResumeFromReallocCheckpoint(){
+#if CMK_SHRINK_EXPAND
+    std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
+    free(se_avail_vector);
+    thisProxy.WillIbekilled(avail, numProcessAfterRestart);
+#endif
+}
+
+
+
+#if CMK_SHRINK_EXPAND
+int GetNewPeNumber(std::vector<char> avail){
+  int mype = CkMyPe();
+  int count =0;
+  for (int i =0; i <mype; i++){
+    if(avail[i] ==0) count++;
+  }
+  return (mype - count);
+}
+#endif
+
+void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRestart){
+#if CMK_SHRINK_EXPAND
+ numProcessAfterRestart = newnumProcessAfterRestart;
+ mynewpe =  GetNewPeNumber(avail);
+ willContinue = avail[CkMyPe()];
+ CkCallback cb(CkIndex_CentralLB::StartCleanup(), thisProxy[0]);
+ contribute(cb);
+#endif
+}
+
+void CentralLB::StartCleanup(){
+#if CMK_SHRINK_EXPAND
+		CkCleanup();
+#endif
+}
 void CentralLB::MigrationDone(int balancing)
 {
+#if CMK_SHRINK_EXPAND
+   // barrier to check for reallocation
+    CkCallback cb(CkIndex_CentralLB::CheckForRealloc(), thisProxy[0]);
+    contribute(cb);
+	return;
+#else
+    MigrationDoneImpl(balancing);
+#endif
+}
+void CentralLB::MigrationDoneImpl (int balancing)
+{
+
 #if CMK_LBDB_ON
   migrates_completed = 0;
   migrates_expected = -1;
@@ -1223,9 +1300,9 @@ void CentralLB::MigrationDone(int balancing)
 #if CMK_GRID_QUEUE_AVAILABLE
   CmiGridQueueDeregisterAll ();
   CpvAccess(CkGridObject) = NULL;
-#endif
-#endif 
-#endif
+#endif  // if CMK_GRID_QUEUE_AVAILABLE
+#endif  // if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
+#endif  // if CMK_LBDB_ON
 }
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))

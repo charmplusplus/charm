@@ -3165,6 +3165,17 @@ static void pollCmiDirectQ(){
 	}
 }
 
+void CmiMachineCleanup(){
+        MACHSTATE(3, "CmiMachineCleanup")
+        int num_devices;
+        struct ibv_device **devList;
+        ibv_dealloc_pd(context->pd);
+        ibv_close_device(context->context);
+        devList = ibv_get_device_list(&num_devices);
+        ibv_free_device_list(devList);
+        MACHSTATE(3, "CmiMachineCleanup END")
+}
+
 void  LrtsNotifyIdle() {}
 void  LrtsBeginIdle() {}
 void  LrtsStillIdle() {}

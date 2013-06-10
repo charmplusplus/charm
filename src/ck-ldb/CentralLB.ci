@@ -29,6 +29,11 @@ group [migratable] CentralLB : BaseLB {
   entry void ProcessReceiveMigration(CkReductionMsg  *);
   entry void ProcessMigrationDecision(CkReductionMsg *);
   entry void MissMigrate(int);
+  entry void CheckForRealloc();
+  entry void ResumeFromReallocCheckpoint();
+  entry void MigrationDoneImpl(int);
+  entry void WillIbekilled(std::vector <char> avail, int);
+  entry void StartCleanup();
 };
 
 };

@@ -7,6 +7,12 @@ More documentation goes here...
     see ckcheckpoint.h for change log
 */
 
+#include <unistd.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+
+#include <errno.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +48,13 @@ int _inrestart = 0;
 int _restarted = 0;
 int _oldNumPes = 0;
 int _chareRestored = 0;
+double chkptStartTimer = 0;
+#if CMK_SHRINK_EXPAND
+int originalnumGroups = -1;
+extern int Cmi_isOldProcess;
+extern int Cmi_myoldpe;
+extern char *_shrinkexpand_basedir;
+#endif
 
 void CkCreateLocalChare(int epIdx, envelope *env);
 
@@ -91,6 +104,37 @@ static void bdcastRO(void){
 	CmiSetHandler(env, _roRestartHandlerIdx);
 	CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
 }
+
+#if CMK_SHRINK_EXPAND
+static void bdcastROGroupData(void){
+	int i;
+	//Determine the size of the RODataMessage
+	PUP::sizer ps, ps1;
+	CkPupROData(ps);
+	int ROSize = ps.size();
+
+	CkPupGroupData(ps1);
+	int GroupSize = ps1.size();
+
+	char *msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes + 2*sizeof(int) + ps.size() + ps1.size());
+	char *payloadOffset = msg + CmiMsgHeaderSizeBytes;
+
+	// how much data to send
+	*(int*)payloadOffset = ps.size();
+	payloadOffset += sizeof(int);
+	*(int*)payloadOffset = ps1.size();
+	payloadOffset += sizeof(int);
+
+	//Allocate and fill out the RODataMessage
+	PUP::toMem pp((char *)payloadOffset);
+	CkPupROData(pp);
+
+	CkPupGroupData(pp);
+
+	CmiSetHandler(msg, _ROGroupRestartHandlerIdx);
+	CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes + 2*sizeof(int) + pp.size(), msg);
+}
+#endif
 
 // Print out an array index to this string as decimal fields
 // separated by underscores.
@@ -162,8 +206,18 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb, bool _requ
         }
 
 	if (CkMyPe() == 0) {
-          success = success && checkpointOne(dirname, cb, requestStatus);
- 	}
+#if CMK_SHRINK_EXPAND
+    if (pending_realloc_state == REALLOC_IN_PROGRESS) {
+      // After restarting from this AtSync checkpoint, resume execution along the
+      // normal path (i.e. whatever the user defined as ResumeFromSync.)
+      CkCallback resumeFromSyncCB(CkIndex_LBDatabase::ResumeClients(), _lbdb);
+      success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
+    } else
+#endif
+    {
+      success &= checkpointOne(dirname, cb, requestStatus);
+    }
+  }
 
 #ifndef CMK_CHARE_USE_PTR
 	// save plain singleton chares into Chares.dat
@@ -248,7 +302,9 @@ void CkPupROData(PUP::er &p)
 	int _numReadonlies = 0;
 	int _numReadonlyMsgs = 0;
 	if (!p.isUnpacking()) _numReadonlies=_readonlyTable.size();
-        p|_numReadonlies;
+
+	p|_numReadonlies;
+
 	if (p.isUnpacking()) {
 	  if (_numReadonlies != _readonlyTable.size())
 	    CkAbort("You cannot add readonlies and restore from checkpoint...");
@@ -291,8 +347,11 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 	// in general, if chare proxy is contained in some data structure,
 	// such as CkCallback, it is user's responsibility to
 	// update them after restarting
+#if !CMK_SHRINK_EXPAND
 	if (p.isUnpacking() && CkMyPe()==0)
 		bdcastRO();
+#endif
+
 }
 
 #ifndef CMK_CHARE_USE_PTR
@@ -587,21 +646,22 @@ static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatu
 	char filename[1024];
 	
 	// save readonlys, and callback BTW
-	FILE* fRO = openCheckpointFile(dirname, "RO", "wb");
+	FILE* fRO = openCheckpointFile(dirname, "RO", "wb", -1);
 	PUP::toDisk pRO(fRO);
 	int _numPes = CkNumPes();
 	pRO|_numPes;
 	int _numNodes = CkNumNodes();
+
 	pRO|_numNodes;
 	pRO|cb;
 	CkPupROData(pRO);
 	pRO|requestStatus;
-	
+
 	if(pRO.checkError())
 	{
 	  return false;
 	}
-	
+
 	if(CmiFclose(fRO)!=0)
 	{
 	  return false;
@@ -609,7 +669,7 @@ static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatu
 
 	// save mainchares into MainChares.dat
 	{
-		FILE* fMain = openCheckpointFile(dirname, "MainChares", "wb");
+		FILE* fMain = openCheckpointFile(dirname, "MainChares", "wb", -1);
 		PUP::toDisk pMain(fMain);
 		CkPupMainChareData(pMain, NULL);
 		if(pMain.checkError())
@@ -675,10 +735,10 @@ void CkStartCheckpoint(const char* dirname,const CkCallback& cb, bool requestSta
   *          broadcast message.
   **/
 
+CkCallback cb;
 void CkRestartMain(const char* dirname, CkArgMsg *args){
 	int i;
 	char filename[1024];
-	CkCallback cb;
 	
         if (CmiMyRank() == 0) {
           _inrestart = 1;
@@ -687,7 +747,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
         }
 
 	// restore readonlys
-	FILE* fRO = openCheckpointFile(dirname, "RO", "rb");
+	FILE* fRO = openCheckpointFile(dirname, "RO", "rb", -1);
 	int _numPes = -1;
 	PUP::fromDisk pRO(fRO);
 	pRO|_numPes;
@@ -728,7 +788,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	// restore from PE0's copy if shrink/expand
 	FILE* fGroups = openCheckpointFile(dirname, "Groups", "rb",
-                                           (CkNumPes() == _numPes) ? CkMyPe() : 0);
+                                     (CkNumPes() == _numPes) ? CkMyPe() : 0);
 	PUP::fromDisk pGroups(fGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CkPupGroupData(pGroups,true);
@@ -782,6 +842,54 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		}
 	}
 }
+
+#if CMK_SHRINK_EXPAND
+// after resume and getting message
+void CkResumeRestartMain(char * msg) {
+  int i;
+  char filename[1024];
+  const char * dirname = "";
+  _inrestart = 1;
+  _restarted = 1;
+  CkMemCheckPT::inRestarting = 1;
+  CmiPrintf("[%d]CkResumeRestartMain: Inside Resume Restart\n",CkMyPe());
+  CmiPrintf("[%d]CkResumeRestartMain: Group restored %d\n",CkMyPe(), CkpvAccess(_numGroups)-1);
+
+  int _numPes = -1;
+  if(CkMyPe()!=0) {
+    PUP::fromMem pRO((char *)(msg+CmiMsgHeaderSizeBytes+2*sizeof(int)));
+
+    CkPupROData(pRO);
+    CmiPrintf("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    CkPupGroupData(pRO,true);
+#else
+    CkPupGroupData(pRO);
+#endif
+    CmiPrintf("[%d]CkResumeRestartMain: Group restored %d\n",CkMyPe(), CkpvAccess(_numGroups)-1);
+  }
+
+  CmiFree(msg);
+  CmiNodeBarrier();
+  if(Cmi_isOldProcess) {
+    /* CmiPrintf("[%d] For shrinkexpand newpe=%d, oldpe=%d \n",Cmi_myoldpe, CkMyPe(), Cmi_myoldpe); */
+    // non-shrink files would be empty since LB would take care
+    FILE *datFile = openCheckpointFile(dirname, "arr", "rb", Cmi_myoldpe);
+    PUP::fromDisk  p(datFile);
+    CkPupArrayElementsData(p);
+    CmiFclose(datFile);
+  }
+  _initDone();
+  _inrestart = 0;
+  CkMemCheckPT::inRestarting = 0;
+  if(CkMyPe()==0) {
+    CmiPrintf("[%d]CkResumeRestartMain done. sending out callback.\n",CkMyPe());
+    CkPrintf("Restart from shared memory  finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
+    cb.send();
+  }
+}
+#endif
 
 // Main chare: initialize system checkpoint manager
 class CkCheckpointInit : public Chare {

@@ -1087,7 +1087,17 @@ void CmiMachineExit()
 #if CMK_IBVERBS_STATS	
 	printf("[%d] numReg %d numUnReg %d numCurReg %d msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",_Cmi_mynode,numReg, numUnReg, numCurReg, msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
 #endif
+}
 
+void CmiMachineCleanup(){
+	MACHSTATE(3, "CmiMachineCleanup")
+	int num_devices;
+	struct ibv_device **devList;
+	ibv_dealloc_pd(context->pd);
+	ibv_close_device(context->context);
+	devList = ibv_get_device_list(&num_devices);
+	ibv_free_device_list(devList);
+	MACHSTATE(3, "CmiMachineCleanup END")
 }
 static void ServiceCharmrun_nolock();
 

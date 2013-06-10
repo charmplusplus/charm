@@ -196,6 +196,28 @@ else
   AC_DEFINE_UNQUOTED(CMK_LB_USER_DATA, 0, [disable lb user data])
 fi
 
+AC_ARG_ENABLE([shrinkexpand],
+            [AS_HELP_STRING([--enable-shrinkexpand],
+              [enable malleable jobs / shrink expand])],
+            [enable_shrinkexpand=$enableval],
+            [enable_shrinkexpand=no])
+
+if test "$enable_shrinkexpand" = "yes"
+then
+  if test "$enable_ccs" = "no"
+  then
+    Echo "CCS cannot be disabled when enabling shrink-expand"
+    test_finish 1
+  else
+    Echo "Charm shrink expand is enabled - Controlpoint is disabled."
+    AC_DEFINE_UNQUOTED(CMK_SHRINK_EXPAND, 1, [enable shrinkexpand])
+    AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 0, [disable controlpoint])
+  fi
+else
+  Echo "Charm shrink expand is disabled"
+  AC_DEFINE_UNQUOTED(CMK_SHRINK_EXPAND, 0, [disable shrinkexpand])
+fi
+
 AC_ARG_WITH([numa],
             [AS_HELP_STRING([--with-numa],
               [support memory affinity with NUMA])],

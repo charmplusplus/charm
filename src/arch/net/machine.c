@@ -289,6 +289,13 @@ int getDestHandler;
 #endif
 #endif
 
+#if CMK_SHRINK_EXPAND
+extern char willContinue;
+extern int mynewpe;
+extern int numProcessAfterRestart;
+CcsDelayedReply shrinkExpandreplyToken;
+extern char *_shrinkexpand_basedir;
+#endif
 
 static void CommunicationServer(int withDelayMs, int where);
 
@@ -705,6 +712,14 @@ static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
 
+#if CMK_SHRINK_EXPAND
+int    Cmi_isOldProcess = 0; // means this process was already there
+static int    Cmi_mynewpe = 0;
+static int    Cmi_oldpe = 0;
+static int    Cmi_newnumnodes = 0;
+ int    Cmi_myoldpe = 0;
+#endif
+
 #if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
 static void parse_forks(void) {
@@ -746,41 +761,51 @@ static void parse_netstart(void)
   int nread;
   int port;
   ns = getenv("NETSTART");
-  if (ns!=0) 
-  {/*Read values set by Charmrun*/
-        char Cmi_charmrun_name[1024];
-        nread = sscanf(ns, "%d%s%d%d%d",
-                 &_Cmi_mynode,
-                 Cmi_charmrun_name, &Cmi_charmrun_port,
-                 &Cmi_charmrun_pid, &port);
-	Cmi_charmrun_IP=skt_lookup_ip(Cmi_charmrun_name);
+  if (ns!=0) {/*Read values set by Charmrun*/
+    char Cmi_charmrun_name[1024];
+    nread = sscanf(ns, "%d%s%d%d%d",
+                   &_Cmi_mynode,
+                   Cmi_charmrun_name, &Cmi_charmrun_port,
+                   &Cmi_charmrun_pid, &port);
+    Cmi_charmrun_IP=skt_lookup_ip(Cmi_charmrun_name);
 
-        if (nread!=5) {
-                fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
-                exit(1);
-        }
-  } else 
-  {/*No charmrun-- set flag values for standalone operation*/
-  	_Cmi_mynode=0;
-  	Cmi_charmrun_IP=_skt_invalid_ip;
-  	Cmi_charmrun_port=0;
-  	Cmi_charmrun_pid=0;
-        dataport = -1;
+    if (nread!=5) {
+      fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
+      exit(1);
+    }
+#if CMK_SHRINK_EXPAND
+    if (Cmi_isOldProcess) {
+      Cmi_myoldpe = _Cmi_mype;
+    }
+#endif
+  } else {/*No charmrun-- set flag values for standalone operation*/
+    _Cmi_mynode=0;
+    Cmi_charmrun_IP=_skt_invalid_ip;
+    Cmi_charmrun_port=0;
+    Cmi_charmrun_pid=0;
+    dataport = -1;
   }
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
-    {
-	char *cmi_num_nodes = getenv("CmiNumNodes");
-	if(cmi_num_nodes != NULL){
-		sscanf(cmi_num_nodes,"%d",&_Cmi_numnodes);
-	}
-    }
-#endif	
+  {
+    char *cmi_num_nodes = getenv("CmiNumNodes");
+    if (cmi_num_nodes != NULL)
+      sscanf(cmi_num_nodes,"%d",&_Cmi_numnodes);
+  }
+#endif
 }
 
 static void extract_common_args(char **argv)
 {
   if (CmiGetArgFlagDesc(argv,"+stats","Print network statistics at shutdown"))
     Cmi_print_stats = 1;
+#if CMK_SHRINK_EXPAND
+  //Realloc specific args
+ if(Cmi_isOldProcess==1){
+   CmiGetArgIntDesc(argv,"+mynewpe",&Cmi_mynewpe,"New PE after realloc");
+   CmiGetArgIntDesc(argv,"+myoldpe",&Cmi_oldpe,"Old PE after realloc");
+   CmiGetArgIntDesc(argv,"+newnumpes",&Cmi_newnumnodes,"New num PEs after realloc");
+ }
+#endif
 }
 
 /* for SMP */
@@ -1239,6 +1264,14 @@ CmiPrintStackTrace(0);
   }
 }
 
+#if CMK_SHRINK_EXPAND
+void charmrun_realloc(const char *s)
+{
+  ctrl_sendone_nolock("realloc",s,strlen(s)+1,NULL,0);
+}
+#endif
+
+
 /* ctrl_getone */
 
 #ifdef __FAULT__
@@ -1668,104 +1701,102 @@ static void send_partial_init()
 
 
 /*Note: node_addresses_obtain is called before starting
-  threads, so no locks are needed (or valid!)*/
+threads, so no locks are needed (or valid!)*/
 static void node_addresses_obtain(char **argv)
 {
   ChMessage nodetabmsg; /* info about all nodes*/
   MACHSTATE(3,"node_addresses_obtain { ");
   if (Cmi_charmrun_fd==-1) 
   {/*Standalone-- fake a single-node nodetab message*/
-  	int npes=1;
-  	ChSingleNodeinfo *fakeTab;
-	ChMessage_new("nodeinfo",sizeof(ChSingleNodeinfo),&nodetabmsg);
-	fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);
-  	CmiGetArgIntDesc(argv,"+p",&npes,"Set the number of processes to create");
+    int npes=1;
+    ChSingleNodeinfo *fakeTab;
+    ChMessage_new("nodeinfo",sizeof(ChSingleNodeinfo),&nodetabmsg);
+    fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);
+    CmiGetArgIntDesc(argv,"+p",&npes,"Set the number of processes to create");
 #if CMK_SHARED_VARS_UNAVAILABLE
-	if (npes!=1) {
-		fprintf(stderr,
-			"To use multiple processors, you must run this program as:\n"
-			" > charmrun +p%d %s <args>\n"
-			"or build the %s-smp version of Charm++.\n",
-			npes,argv[0],CMK_MACHINE_NAME);
-		exit(1);
-	}
+    if (npes!=1) {
+      fprintf(stderr,
+      "To use multiple processors, you must run this program as:\n"
+      " > charmrun +p%d %s <args>\n"
+      "or build the %s-smp version of Charm++.\n",
+      npes,argv[0],CMK_MACHINE_NAME);
+      exit(1);
+    }
 #else
-        /* standalone smp version reads ppn */
-        if (CmiGetArgInt(argv, "+ppn", &_Cmi_mynodesize) || 
-               CmiGetArgInt(argv, "++ppn", &_Cmi_mynodesize) )
-          npes = _Cmi_mynodesize;
+    /* standalone smp version reads ppn */
+    if (CmiGetArgInt(argv, "+ppn", &_Cmi_mynodesize) ||
+    CmiGetArgInt(argv, "++ppn", &_Cmi_mynodesize) )
+      npes = _Cmi_mynodesize;
 #endif
-	/*This is a stupid hack: we expect the *number* of nodes
-	followed by ChNodeinfo structs; so we use a ChSingleNodeinfo
-	(which happens to have exactly that layout!) and stuff
-	a 1 into the "node number" slot
-	*/
-	fakeTab->nodeNo=ChMessageInt_new(1); /* <- hack */
-	fakeTab->info.nPE=ChMessageInt_new(npes);
-	fakeTab->info.dataport=ChMessageInt_new(0);
-	fakeTab->info.IP=_skt_invalid_ip;
+    /*This is a stupid hack: we expect the *number* of nodes
+    followed by ChNodeinfo structs; so we use a ChSingleNodeinfo
+    (which happens to have exactly that layout!) and stuff
+    a 1 into the "node number" slot
+    */
+    fakeTab->nodeNo=ChMessageInt_new(1); /* <- hack */
+    fakeTab->info.nPE=ChMessageInt_new(npes);
+    fakeTab->info.dataport=ChMessageInt_new(0);
+    fakeTab->info.IP=_skt_invalid_ip;
   }
   else 
   { /*Contact charmrun for machine info.*/
-	ChSingleNodeinfo me;
+    ChSingleNodeinfo me;
 
-  	me.nodeNo=ChMessageInt_new(_Cmi_mynode);
+    me.nodeNo=ChMessageInt_new(_Cmi_mynode);
 
 #if CMK_USE_IBVERBS
-	{
-		int qpListSize = (_Cmi_numnodes-1)*sizeof(ChInfiAddr);
-		me.info.qpList = malloc(qpListSize);
-		copyInfiAddr(me.info.qpList);
-		MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
-		ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),(const char *)me.info.qpList,qpListSize);
-		free(me.info.qpList);
-	}
+    {
+      int qpListSize = (_Cmi_numnodes-1)*sizeof(ChInfiAddr);
+      me.info.qpList = malloc(qpListSize);
+      copyInfiAddr(me.info.qpList);
+      MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
+      ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),(const char *)me.info.qpList,qpListSize);
+      free(me.info.qpList);
+    }
 #else
-	/*The nPE fields are set by charmrun--
-	  these values don't matter. 
-          Set IP in case it is mpiexec mode where charmrun does not have IP yet
-        */
-	me.info.nPE=ChMessageInt_new(0);
-	/* me.info.IP=_skt_invalid_ip; */
-        me.info.IP=skt_innode_my_ip();
-	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
+    /*The nPE fields are set by charmrun--
+    these values don't matter.
+    Set IP in case it is mpiexec mode where charmrun does not have IP yet
+    */
+    me.info.nPE=ChMessageInt_new(0);
+    /* me.info.IP=_skt_invalid_ip; */
+    me.info.IP=skt_innode_my_ip();
+    me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
 #ifdef CMK_USE_MX
-	me.info.nic_id=ChMessageLong_new(Cmi_nic_id);
+    me.info.nic_id=ChMessageLong_new(Cmi_nic_id);
 #endif
 #if CMK_USE_IBUD
-	me.info.qp.lid=ChMessageInt_new(context->localAddr.lid);
-	me.info.qp.qpn=ChMessageInt_new(context->localAddr.qpn);
-	me.info.qp.psn=ChMessageInt_new(context->localAddr.psn);
-	MACHSTATE3(3,"IBUD Information lid=%i qpn=%i psn=%i\n",me.info.qp.lid,me.info.qp.qpn,me.info.qp.psn);
+    me.info.qp.lid=ChMessageInt_new(context->localAddr.lid);
+    me.info.qp.qpn=ChMessageInt_new(context->localAddr.qpn);
+    me.info.qp.psn=ChMessageInt_new(context->localAddr.psn);
+    MACHSTATE3(3,"IBUD Information lid=%i qpn=%i psn=%i\n",me.info.qp.lid,me.info.qp.qpn,me.info.qp.psn);
 #endif
-  	me.info.dataport=ChMessageInt_new(dataport);
-
-  	/*Send our node info. to charmrun.
-  	CommLock hasn't been initialized yet-- 
-  	use non-locking version*/
-  	ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),NULL,0);
-        MACHSTATE1(5,"send initnode - dataport:%d", dataport);
+    me.info.dataport=ChMessageInt_new(dataport);
+    /*Send our node info. to charmrun.
+    CommLock hasn't been initialized yet--
+    use non-locking version*/
+    ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),NULL,0);
+    MACHSTATE1(5,"send initnode - dataport:%d", dataport);
 #endif	//CMK_USE_IBVERBS
+    MACHSTATE(3,"initnode sent");
 
-	MACHSTATE(3,"initnode sent");
-  
-  	/*We get the other node addresses from a message sent
-  	  back via the charmrun control port.*/
-  	if (!skt_select1(Cmi_charmrun_fd,1200*1000)){
-		CmiAbort("Timeout waiting for nodetab!\n");
-	}
-        MACHSTATE(2,"recv initnode {");
-  	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
-        MACHSTATE(2,"} recv initnode");
+    /*We get the other node addresses from a message sent
+    back via the charmrun control port.*/
+    if (!skt_select1(Cmi_charmrun_fd,1200*1000)){
+      CmiAbort("Timeout waiting for nodetab!\n");
+    }
+    MACHSTATE(2,"recv initnode {");
+    ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
+    MACHSTATE(2,"} recv initnode");
   }
   ChMessageInt_t *n32 = (ChMessageInt_t *) nodetabmsg.data;
   ChNodeinfo *d = (ChNodeinfo *) (n32+1);
   _Cmi_myphysnode_numprocesses = ChMessageInt(d[_Cmi_mynode].nProcessesInPhysNode);
-//#if CMK_USE_IBVERBS	
+//#if CMK_USE_IBVERBS
 //#else
   node_addresses_store(&nodetabmsg);
   ChMessage_free(&nodetabmsg);
-//#endif	
+//#endif
   MACHSTATE(3,"} node_addresses_obtain ");
 }
 
@@ -2746,6 +2777,127 @@ void ConverseExit(void)
   while (1) CmiYield();
 }
 
+#if CMK_SHRINK_EXPAND
+void ConverseCleanup(void)
+{
+  MACHSTATE(2,"ConverseCleanup {");
+  if (CmiMyRank()==0) {
+    if(Cmi_print_stats)
+      printNetStatistics();
+    log_done();
+  }
+
+  CmiBarrier();
+
+  if (CmiMyPe() == 0) {
+    if (willContinue) {
+      CcsSendDelayedReply(shrinkExpandreplyToken, 0, 0); //reply to CCS client
+      // wait for this message to receive, hack
+      // TODO: figure out why this is important
+      usleep(500);
+      // this causes charmrun to go away
+      ctrl_sendone_locking("realloc",&numProcessAfterRestart, sizeof(int),NULL,0);
+    } else {
+      ctrl_sendone_locking("ending",NULL,0,NULL,0);
+    }
+  }
+
+  // TODO: ensure this won't gobble up some other important message
+  ChMessage replymsg;
+  memset(replymsg.header.type, 0, sizeof(replymsg.header.type));
+  while (strncmp(replymsg.header.type, "realloc_ack", CH_TYPELEN) != 0)
+    ChMessage_recv(Cmi_charmrun_fd, &replymsg);
+
+#if CMK_USE_SYSVSHM
+  CmiExitSysvshm();
+#elif CMK_USE_PXSHM
+  CmiExitPxshm();
+#endif
+  ConverseCommonExit();               /* should be called by every rank */
+  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  if (CmiMyRank()==0) CmiStdoutFlush();
+  if (Cmi_charmrun_fd==-1) {
+    if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
+    else while (1) CmiYield();
+  } else {
+    if (willContinue) {
+      int argc=CmiGetArgc(Cmi_argvcopy);
+
+      int i;
+      int restart_idx = -1;
+      for (i = 0; i < argc; ++i) {
+        if (strcmp(Cmi_argvcopy[i], "+restart") == 0) {
+          restart_idx = i;
+          break;
+        }
+      }
+
+      char **ret;
+      if (restart_idx == -1) {
+        ret=(char **)malloc(sizeof(char *)*(argc+10));
+      } else {
+        ret=(char **)malloc(sizeof(char *)*(argc+8));
+      }
+
+      for (i=0;i<argc;i++) {
+        MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
+        ret[i]=Cmi_argvcopy[i];
+      }
+
+      ret[argc+0]="+shrinkexpand";
+      ret[argc+1]="+newnumpes";
+
+      char temp[50];
+      sprintf(temp,"%d", numProcessAfterRestart);
+      ret[argc+2]=temp;
+
+      ret[argc+3]="+mynewpe";
+      char temp2[50];
+      sprintf(temp2,"%d", mynewpe);
+      ret[argc+4]=temp2;
+
+      ret[argc+5]="+myoldpe";
+      char temp3[50];
+      sprintf(temp3,"%d", _Cmi_mype);
+      ret[argc+6]=temp3;
+
+      if (restart_idx == -1) {
+        ret[argc+7]="+restart";
+        ret[argc+8]=_shrinkexpand_basedir;
+        ret[argc+9]=Cmi_argvcopy[argc];
+      } else {
+        ret[restart_idx + 1] = _shrinkexpand_basedir;
+        ret[argc+7]=Cmi_argvcopy[argc];
+      }
+
+      free(Cmi_argvcopy);
+      MACHSTATE1(3,"ConverseCleanup mynewpe %s", temp2);
+      MACHSTATE(2,"} ConverseCleanup");
+
+      skt_close(Cmi_charmrun_fd);
+      // Avoid crash by SIGALRM
+      signal(SIGALRM, SIG_IGN);
+
+#if CMK_USE_IBVERBS
+      CmiMachineCleanup();
+#endif
+      //put references to the controlling tty back on normal fd so that
+      //CmiStdoutInit  refers to the tty not the old pipe
+      dup2(writeStdout[0], 1);
+      dup2(writeStdout[1], 2);
+      // TODO: check variant of execv that takes file descriptor
+      execv(ret[0], ret); // Need to check if the process name is always first arg
+      /* should not be here */
+      CmiPrintf("[%d] should not be here\n", CmiMyPe());
+      /* exit(1); */
+    } else {
+      skt_close(Cmi_charmrun_fd);
+      exit(0);
+    }
+  }
+}
+
+#endif
 static void set_signals(void)
 {
   if(!Cmi_truecrash) {
@@ -2787,6 +2939,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   if (CmiGetArgFlagDesc(argv,"++quiet","Omit non-error runtime messages")) {
     quietModeRequested = quietMode = 1;
   }
+#if CMK_SHRINK_EXPAND
+  // close any old file descriptors
+  int b;
+  int maxfd=sysconf(_SC_OPEN_MAX);
+  for (b=3; b<maxfd; b++)
+   close(b);
+#endif
 #if MACHINE_DEBUG
   debugLog=NULL;
 #endif
@@ -2816,6 +2975,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   if (CmiGetArgFlagDesc(argv,"+idlesleep","Make sleep calls when idle")) Cmi_idlepoll = 0;
   Cmi_syncprint = CmiGetArgFlagDesc(argv,"+syncprint", "Flush each CmiPrintf to the terminal");
 
+#if CMK_SHRINK_EXPAND
+  if (CmiGetArgFlagDesc(argv,"+shrinkexpand","Restarting of already running prcoess")) Cmi_isOldProcess = 1;
+#endif
   Cmi_asyncio = 1;
 #if CMK_ASYNC_NOT_NEEDED
   Cmi_asyncio = 0;
@@ -2841,11 +3003,22 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   parse_magic();
 #if ! defined(_WIN32)
   /* only get forks in non-smp mode */
+#if CMK_SHRINK_EXPAND
+if(Cmi_isOldProcess!=1)
+#endif
   parse_forks();
+
 #endif
   extract_args(argv);
   log_init();
   Cmi_scanf_mutex = CmiCreateLock();
+#if CMK_SHRINK_EXPAND
+  if(Cmi_isOldProcess ==1){
+    _Cmi_mynode = Cmi_mynewpe;
+    Cmi_myoldpe = Cmi_oldpe;
+    _Cmi_numnodes = Cmi_newnumnodes;
+  }
+#endif
 
 #if MACHINE_DEBUG_LOG
   {
@@ -2856,6 +3029,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
 
     /* NOTE: can not acutally call timer before timerInit ! GZ */
+#if CMK_SHRINK_EXPAND
+  MACHSTATE3(2,"After reorg  %d %d %d \n", Cmi_oldpe, _Cmi_mynode, _Cmi_numnodes);
+#endif
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 
   skt_set_idle(obtain_idleFn);

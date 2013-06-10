@@ -391,6 +391,13 @@ char *getenv_display_no_tamper()
 
 #endif
 
+static unsigned int server_port;
+static char server_addr[1024]; /* IP address or hostname of charmrun*/
+static SOCKET server_fd;
+#if CMK_SHRINK_EXPAND
+char *create_netstart(int node);
+char *create_oldnodenames();
+#endif
 /*****************************************************************************
  *                                                                           *
  * PPARAM - obtaining "program parameters" from the user.                    *
@@ -751,6 +758,15 @@ int arg_help; /* print help message */
 int arg_ppn;  /* pes per node */
 int arg_usehostname;
 
+#if CMK_SHRINK_EXPAND
+char **saved_argv;
+int saved_argc;
+int arg_realloc_pes;
+int arg_old_pes;
+int arg_shrinkexpand;
+int arg_charmrun_port;
+const char *arg_shrinkexpand_basedir;
+#endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int arg_read_pes = 0;
 #endif
@@ -825,6 +841,12 @@ void arg_init(int argc, const char **argv)
               "hierarchical start");
   pparam_flag(&arg_child_charmrun, 0, "child-charmrun", "child charmrun");
 #endif
+#if CMK_SHRINK_EXPAND
+  pparam_int(&arg_realloc_pes, 1, "newp", "new number of processes to create");
+  pparam_int(&arg_old_pes, 1, "oldp", "old number of processes to create");
+  pparam_flag(&arg_shrinkexpand, 0, "shrinkexpand", "shrink expand");
+  pparam_int(&arg_charmrun_port, 0, "charmrun_port", "make charmrun listen on this port");
+#endif
   pparam_flag(&arg_usehostname, 0, "usehostname",
               "Send nodes our symbolic hostname instead of IP address");
   pparam_str(&arg_charmrunip, 0, "useip",
@@ -884,6 +906,16 @@ void arg_init(int argc, const char **argv)
   arg_argv = dupargv(argv);
 #endif
 
+#if CMK_SHRINK_EXPAND
+  /* move it to a function */
+  saved_argc = argc;
+  saved_argv = (char **) malloc(sizeof(char *) * (saved_argc));
+  for (i = 0; i < saved_argc; i++) {
+    //  MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
+    saved_argv[i] = (char *) argv[i];
+  }
+#endif
+
   if (pparam_parsecmd('+', argv) < 0) {
     fprintf(stderr, "ERROR> syntax: %s\n", pparam_error);
     pparam_printdocs();
@@ -902,6 +934,13 @@ void arg_init(int argc, const char **argv)
   }
 
   if ( arg_mpiexec_no_n ) arg_mpiexec = arg_mpiexec_no_n;
+
+#if CMK_SHRINK_EXPAND
+  if (arg_shrinkexpand) {
+    arg_requested_pes = arg_realloc_pes;
+    printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
+  }
+#endif
 
 #ifdef HSTART
   if (!arg_hierarchical_start || arg_child_charmrun)
@@ -1338,6 +1377,30 @@ void nodetab_init_hierarchical_start(void)
 }
 #endif
 
+#if CMK_SHRINK_EXPAND
+int isPresent(const char *names, char **listofnames)
+{
+  int k;
+  for (k = 0; k < arg_old_pes; k++) {
+    if (strcmp(names, listofnames[k]) == 0)
+      return 1;
+  }
+  return 0;
+}
+void parse_oldnodenames(char **oldnodelist)
+{
+  char *ns;
+  ns = getenv("OLDNODENAMES");
+  int i;
+  char buffer[1024 * 1000];
+  for (i = 0; i < arg_old_pes; i++) {
+    oldnodelist[i] = (char *) malloc(100 * sizeof(char));
+    int nread = sscanf(ns, "%s %[^\n]", oldnodelist[i], buffer);
+    ns = buffer;
+  }
+}
+#endif
+
 void nodetab_init()
 {
   FILE *f;
@@ -1496,6 +1559,29 @@ fin:
 #endif
 
   free(prevHostName);
+
+#if CMK_SHRINK_EXPAND
+  if (arg_shrinkexpand &&
+      (arg_requested_pes > arg_old_pes)) // modify nodetable ordering
+  {
+    nodetab_host **reordered_nodetab_table =
+        (nodetab_host **) malloc(arg_requested_pes * sizeof(nodetab_host *));
+    char **oldnodenames = (char **) malloc(arg_old_pes * sizeof(char *));
+
+    parse_oldnodenames(oldnodenames);
+    int newpes = arg_old_pes;
+    int oldpes = 0;
+    int k;
+    for (k = 0; k < nodetab_size; k++) {
+      if (isPresent(nodetab_table[k]->name, oldnodenames))
+        reordered_nodetab_table[oldpes++] = nodetab_table[k];
+      else
+        reordered_nodetab_table[newpes++] = nodetab_table[k];
+    }
+    free(nodetab_table);
+    nodetab_table = reordered_nodetab_table;
+  }
+#endif
 }
 
 /* Given a processor number, look up the nodetab info: */
@@ -2134,12 +2220,22 @@ int req_handle_ending(ChMessage *msg, SOCKET fd)
   int i;
   req_ending++;
 
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
+#if CMK_SHRINK_EXPAND
+  // When using shrink-expand, only PE 0 will send an "ending" request.
+#elif (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   if (req_ending == nodetab_size)
 #else
   if (req_ending == arg_requested_pes)
 #endif
   {
+#if CMK_SHRINK_EXPAND
+    ChMessage ackmsg;
+    ChMessage_new("realloc_ack", 0, &ackmsg);
+    for (i = 0; i < req_nClients; i++) {
+      ChMessage_send(req_clients[i], &ackmsg);
+    }
+#endif
+
     for (i = 0; i < req_nClients; i++)
       skt_close(req_clients[i]);
     if (arg_verbose)
@@ -2225,6 +2321,91 @@ int req_handle_scanf(ChMessage *msg, SOCKET fd)
   free(res);
   return REQ_OK;
 }
+
+#if CMK_SHRINK_EXPAND
+int req_handle_realloc(ChMessage *msg, SOCKET fd)
+{
+  printf("Charmrun> Realloc request received %s \n", msg->data);
+
+  /* Exec to clear and restart everything, just preserve contents of
+   * netstart*/
+  int restart_idx = -1;
+  for (int i = 0; i < saved_argc; ++i) {
+    if (strcmp(saved_argv[i], "+restart") == 0) {
+      restart_idx = i;
+      break;
+    }
+  }
+
+  char *dir = "/dev/shm";
+  for (int i = 0; i < saved_argc; ++i) {
+    if (strcmp(saved_argv[i], "+shrinkexpand_basedir") == 0) {
+      dir = saved_argv[i+1];
+      break;
+    }
+  }
+
+  char **ret;
+  if (restart_idx == -1) {
+    ret = (char **) malloc(sizeof(char *) * (saved_argc + 10));
+  } else {
+    ret = (char **) malloc(sizeof(char *) * (saved_argc + 8));
+  }
+
+  int newP = *(int *) (msg->data);
+  int oldP = arg_requested_pes;
+  printf("Charmrun> newp =  %d oldP = %d \n \n \n", newP, oldP);
+
+  int i;
+  for (i = 0; i < saved_argc; i++) {
+    ret[i] = saved_argv[i];
+  }
+
+  ret[saved_argc + 0] = "++newp";
+
+  char sp_buffer[50];
+  sprintf(sp_buffer, "%d", newP);
+  ret[saved_argc + 1] = sp_buffer;
+  ret[saved_argc + 2] = "++shrinkexpand";
+  ret[saved_argc + 3] = "++oldp";
+
+  char sp_buffer1[50];
+  sprintf(sp_buffer1, "%d", arg_requested_pes);
+  ret[saved_argc + 4] = sp_buffer1;
+
+  char sp_buffer2[6];
+  sprintf(sp_buffer2, "%d", server_port);
+  ret[saved_argc + 5] = "++charmrun_port";
+  ret[saved_argc + 6] = sp_buffer2;
+
+  if (restart_idx == -1) {
+    ret[saved_argc + 7] = "+restart";
+    ret[saved_argc + 8] = dir;
+    ret[saved_argc + 9] = NULL;
+  } else {
+    ret[restart_idx + 1] = dir;
+    ret[saved_argc + 7] = NULL;
+  }
+
+  setenv("NETSTART", create_netstart(1), 1);
+  setenv("OLDNODENAMES", create_oldnodenames(), 1);
+
+  ChMessage ackmsg;
+  ChMessage_new("realloc_ack", 0, &ackmsg);
+  for (i = 0; i < req_nClients; i++) {
+    ChMessage_send(req_clients[i], &ackmsg);
+  }
+
+  skt_client_table.clear();
+  skt_close(server_fd);
+  skt_close(CcsServer_fd());
+  execv(ret[0], ret);
+  printf("Should not be here %s \n");
+  exit(1);
+
+  return REQ_OK;
+}
+#endif
 
 #ifdef __FAULT__
 void restart_node(int crashed_node);
@@ -2465,6 +2646,10 @@ int req_handler_dispatch(ChMessage *msg, SOCKET replyFd)
   else if (strcmp(cmd, "initnode") == 0)
     return req_handle_crash(msg, replyFd);
 #endif
+#endif
+#if CMK_SHRINK_EXPAND
+  else if (strcmp(cmd, "realloc") == 0)
+    return req_handle_realloc(msg, replyFd);
 #endif
   else {
 #ifndef __FAULT__
@@ -2959,10 +3144,6 @@ void req_poll_hierarchical()
   }
 }
 #endif
-
-static unsigned int server_port;
-static char server_addr[1024]; /* IP address or hostname of charmrun*/
-static SOCKET server_fd;
 
 #ifdef HSTART
 static skt_ip_t parent_charmrun_IP;
@@ -3513,6 +3694,25 @@ void req_client_start_and_connect(void)
 void req_start_server(void)
 {
   skt_ip_t ip = skt_innode_my_ip();
+  server_port = 0;
+#if CMK_SHRINK_EXPAND
+  if (arg_shrinkexpand) { // Need port information
+    char *ns;
+    int nread;
+    int port;
+    ns = getenv("NETSTART");
+    if (ns != 0) { /*Read values set by Charmrun*/
+      int node_num, old_charmrun_pid;
+      char old_charmrun_name[1024 * 1000];
+      nread = sscanf(ns, "%d%s%d%d%d", &node_num, old_charmrun_name,
+                     &server_port, &old_charmrun_pid, &port);
+      if (nread != 5) {
+        fprintf(stderr, "Error parsing NETSTART '%s'\n", ns);
+        exit(1);
+      }
+    }
+  }
+#endif
   if (arg_local)
     /* local execution, use localhost always */
     strcpy(server_addr, "127.0.0.1");
@@ -3532,7 +3732,11 @@ void req_start_server(void)
   else
     skt_print_ip(server_addr, ip);
 
+#if CMK_SHRINK_EXPAND
+  server_port = arg_charmrun_port;
+#else
   server_port = 0;
+#endif
   server_fd = skt_server(&server_port);
 
   if (arg_verbose) {
@@ -3559,7 +3763,7 @@ void parse_netstart(void)
   int port;
   ns = getenv("NETSTART");
   if (ns != 0) { /*Read values set by Charmrun*/
-    char parent_charmrun_name[1024];
+    char parent_charmrun_name[1024 * 1000];
     nread = sscanf(ns, "%d%s%d%d%d", &unique_node_start, parent_charmrun_name,
                    &parent_charmrun_port, &parent_charmrun_pid, &port);
     parent_charmrun_IP = skt_lookup_ip(parent_charmrun_name);
@@ -3742,10 +3946,17 @@ int main(int argc, const char **argv, char **envp)
   {
     if (!arg_local) {
       if (!arg_batch_spawn) {
-        if (arg_mpiexec)
-          start_nodes_mpiexec();
-        else
-          start_nodes_ssh();
+#if CMK_SHRINK_EXPAND
+        //  modified rsh in shrink expand, need to launch only new ones,
+        //  preserve some info between new and old
+        if (!arg_shrinkexpand || (arg_requested_pes > arg_old_pes))
+#endif
+        {
+          if (arg_mpiexec)
+            start_nodes_mpiexec();
+          else
+            start_nodes_ssh();
+        }
       } else
         req_client_start_and_connect();
     } else
@@ -3835,6 +4046,19 @@ char *create_netstart(int node)
   return dest;
 }
 
+#if CMK_SHRINK_EXPAND
+/*This little snippet creates a OLDNODENAMES
+environment variable entry*/
+char *create_oldnodenames()
+{
+  static char dest1[1024 * 1000];
+  int i;
+  for (i = 0; i < nodetab_size; i++)
+    sprintf(dest1, "%s %s", dest1, (*nodetab_table[i]).name);
+  printf("Charmrun> Created oldnames %s \n", dest1);
+  return dest1;
+}
+#endif
 /* The remainder of charmrun is only concerned with starting all
 the node-programs, also known as charmrun clients.  We have to
 start nodetab_rank0_size processes on the remote machines.
@@ -4830,6 +5054,23 @@ void start_nodes_ssh()
   if (arg_verbose)
     printf("start_nodes_ssh\n");
   client = 0;
+#if CMK_SHRINK_EXPAND
+  if (arg_verbose)
+    printf("start_nodes_rsh %d %d\n", arg_requested_pes, arg_old_pes);
+  if (arg_shrinkexpand) {
+    if (arg_requested_pes >= arg_old_pes) { // expand case
+      if (arg_verbose)
+        printf("Expand %d %d\n", arg_requested_pes, arg_old_pes);
+      for (client = 0; client < arg_old_pes; client++)
+        rsh_pids[client] = 0;
+    } else { // shrink case
+      if (arg_verbose)
+        printf("Shrink  %d %d\n", arg_requested_pes, arg_old_pes);
+      for (client = 0; client < arg_requested_pes; client++)
+        rsh_pids[client] = 0;
+    }
+  }
+#endif
   while (client < nodetab_rank0_size) {
     /* start a group of processes per node */
     clientgroup = start_set_node_ssh(client);

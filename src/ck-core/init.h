@@ -121,6 +121,9 @@ extern unsigned int    _printSS;
 extern int     _infoIdx;
 extern int     _charmHandlerIdx;
 extern int     _roRestartHandlerIdx;     /* for checkpoint/restart */
+#if CMK_SHRINK_EXPAND
+extern int     _ROGroupRestartHandlerIdx;     /* for checkpoint/restart */
+#endif
 extern int     _bocHandlerIdx;
 extern int     _qdHandlerIdx;
 extern unsigned int   _numInitMsgs;

@@ -611,7 +611,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o DistBaseLB.o \
            ckgraphTemp.o ckgraph.o LButil.o RefinerTemp.o Refiner.o RefinerApprox.o  \
-           RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
+           manager.o RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \

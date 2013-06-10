@@ -377,3 +377,6 @@
 
 /* enable qlogic */
 #undef QLOGIC
+
+/* disable shrink expand */
+#undef CMK_SHRINK_EXPAND

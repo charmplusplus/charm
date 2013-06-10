@@ -1,0 +1,25 @@
+mainmodule jacobi2d {
+
+  readonly CProxy_Main mainProxy;
+  readonly int array_height;
+  readonly int array_width;
+  readonly int block_height;
+  readonly int block_width;
+  readonly int num_chare_rows;
+  readonly int num_chare_cols;
+
+  mainchare [migratable]  Main {
+    entry Main(CkArgMsg *m);
+	entry void report(CkReductionMsg *m);
+  };
+
+  array [2D] Jacobi {
+    // Normal Charm++ entry methods
+    entry Jacobi(void);
+    entry void begin_iteration(void);
+    entry void ghostsFromLeft(int width, double s[width]);
+    entry void ghostsFromRight(int width, double s[width]);
+    entry void ghostsFromTop(int width, double s[width]);
+    entry void ghostsFromBottom(int width, double s[width]);
+  };
+};

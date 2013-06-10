@@ -59,8 +59,17 @@ void CkRemoveArrayElements();
 
 void CkStartCheckpoint(const char* dirname,const CkCallback& cb, bool requestStatus = false);
 void CkRestartMain(const char* dirname, CkArgMsg *args);
+#if CMK_SHRINK_EXPAND
+void CkResumeRestartMain(char *msg);
+#endif
 #if __FAULT__
 int  CkCountArrayElements();
+#endif
+
+#if CMK_SHRINK_EXPAND
+enum realloc_state { NO_REALLOC=0, REALLOC_MSG_RECEIVED=1, REALLOC_IN_PROGRESS=2; };
+extern realloc_state pending_realloc_state;
+extern CkGroupID _lbdb;
 #endif
 
 // some useful flags (for disk checkpointing)
