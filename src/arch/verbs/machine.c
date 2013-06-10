@@ -1854,7 +1854,7 @@ void LrtsExit()
   MACHSTATE(2,"ConverseExit {");
   machine_initiated_shutdown=1;
 
-  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  //CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
   if (CmiMyRank()==0) CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
     if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
