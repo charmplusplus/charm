@@ -1700,30 +1700,6 @@ void LrtsAdvanceCommunication(int whileidle)
 /* must be called on every PE including communication processors */
 void LrtsBarrier()
 {
-  int len, size, i;
-  int status;
-  int numnodes = CmiNumNodes();
-  static int barrier_phase = 0;
-
-  if (Cmi_charmrun_fd == -1) return;                // standalone
-  if (numnodes == 1) {
-    CmiNodeAllBarrier();
-    return;
-  }
-
-  if (CmiMyRank() == 0) {
-    ctrl_sendone_locking("barrier",NULL,0,NULL,0);
-    while (barrierReceived != 1) {
-      CmiCommLock();
-      ctrl_getone();
-      CmiCommUnlock();
-    }
-    barrierReceived = 0;
-    barrier_phase ++;
-  }
-
-  CmiNodeAllBarrier();
-  /* printf("[%d] OUT of barrier %d \n", CmiMyPe(), barrier_phase); */
 }
 
 
