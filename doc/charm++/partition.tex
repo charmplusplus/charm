@@ -84,7 +84,7 @@ plane by plane during partitioning. A hilbert curve based traversal is used with
 
 \item Compilation parameter: {\tt -custom-part}, runtime parameter: {\tt +use\_custom\_part} -
 enables use of user defined partitioning. In order to implement a new partitioning scheme, 
-a user is required to implement a C function with following prototype: \\ 
+a user must link an object exporting a C function with following prototype: \\ 
 
 extern ``C'' void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);\\
 {\tt numparts} (input) - number of partitions to be created. \\
@@ -97,7 +97,7 @@ partitionSize[0]+partitionSize[1]-1 to partition 2 and so on.\\
 
 When this function is invoked to create partitions, TopoManager is configured to 
 view all the allocated node as one partition. Partition based API is yet to be 
-initialized, and should not be used. A compile time parameter {\tt -custom-part} 
+initialized, and should not be used. A link time parameter {\tt -custom-part} 
 is required to be passed to {\tt charmc} for successful compilation.
 \end{itemize}
 
