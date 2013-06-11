@@ -548,7 +548,7 @@ extern "C" void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops) {
   *hops = _tmgr->getHopsBetweenRanks(pe1, pe2);
 }
 
-extern "C" void TopoManager_createPartitions(int *nodeMap, int scheme) {
+extern "C" void TopoManager_createPartitions(int scheme, int *nodeMap) {
   if(scheme == 0) {
     int i;
     for(i = 0; i < CmiNumNodes(); i++) {

@@ -735,7 +735,7 @@ void create_topoaware_partitions() {
   if(_partitionInfo.scheme == 100) {
     createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);       
   } else {
-    TopoManager_createPartitions(_partitionInfo.nodeMap, _partitionInfo.scheme);
+    TopoManager_createPartitions(_partitionInfo.scheme, _partitionInfo.nodeMap);
   }
   TopoManager_free();
   
