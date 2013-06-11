@@ -59,7 +59,8 @@ to run multiple partitions in one single job.
 \begin{itemize}
 \item Runtime parameter: {\tt +partitions $<$part\_number$>$} or {\tt +replicas
 $<$replica\_number$>$} - number of partitions to be created. If no further options are
-provided, allocated cores/nodes are divided equally among partitions.
+provided, allocated cores/nodes are divided equally among partitions. Only this option 
+is supported from the 6.5.0 release; remaining options are supported starting 6.6.0.
 
 \item Runtime parameter: {\tt +assign\_master} - assign one core/node as the master 
 partition (partition 0), and divide the remaining cores/nodes equally among remaining
@@ -76,6 +77,9 @@ partitions identified so far. For example, the sequence {\tt 0-4:2\#10,1\#5,3\#1
 partitions 0, 2, 4 should be of size 10, partition 1 of size 5 and partition 3 of size 15. 
 In SMP mode, these sizes are in terms of nodes. All workers threads associated with a node are
 assigned to the partition of the node. This option conflicts with {\tt +assign\_master}.
+
+\item Runtime parameter: {\tt +use\_topology} - use a default topology aware scheme
+to partition the allocated nodes. 
 
 \item Runtime parameter: {\tt +use\_topology\_scheme $<$scheme$>$} - use the given scheme
 to partition the allocated nodes. Currently, two generalized schemes are supported that 

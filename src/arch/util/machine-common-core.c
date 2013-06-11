@@ -779,13 +779,14 @@ static int create_partition_map( char **argv)
     _partitionInfo.type = PARTITION_PREFIX;
   }
 
+  _partitionInfo.scheme = 0;
   if (CmiGetArgFlagDesc(argv,"+use_topology","topology aware partitions")) {
     _partitionInfo.isTopoaware = 1;
+    _partitionInfo.scheme = 1;
   } else {
     _partitionInfo.isTopoaware = 0;
   }
   
-  _partitionInfo.scheme = 0;
   if (CmiGetArgIntDesc(argv,"+use_topology_scheme", &_partitionInfo.scheme, "topology aware partitioning scheme")) {
     _partitionInfo.isTopoaware = 1;
   }
