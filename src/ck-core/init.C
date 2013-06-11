@@ -73,24 +73,7 @@ void CkRestartMain(const char* dirname);
 
 #define  DEBUGF(x)     //CmiPrintf x;
 
-#ifdef CALCULATE_HOPS
-/** Turn on manually if you want to calculate hops from within Charm++
-for some application **/
-
 #include "TopoManager.h"
-
-double hops = 0;
-
-extern "C" void calculateTotalHops(int pe1, int pe2, int size) {
-  int delta;
-  TopoManger_getHopsBetweenPeRanks(pe1, pe2, &delta);
-  hops += (delta * size);
-}
-
-extern "C" void printTotalHops() {
-  CmiPrintf("TOTAL HOPS %lf\n", hops/(1024*1024) );
-}
-#endif
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
