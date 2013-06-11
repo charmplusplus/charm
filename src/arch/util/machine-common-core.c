@@ -917,8 +917,9 @@ INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
     if(partition == 0) {
       CmiAssert(node == 0);
       rank =  0;
+    } else {
+      rank = 1 + ((partition - 1) * _partitionInfo.partitionSize[1]) + node;
     }
-    rank = 1 + ((partition - 1) * _partitionInfo.partitionSize[1]) + node;
   } else if(_partitionInfo.type == PARTITION_PREFIX) {
     rank = _partitionInfo.partitionPrefix[partition] + node;
   } else {
