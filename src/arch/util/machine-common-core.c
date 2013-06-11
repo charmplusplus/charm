@@ -743,10 +743,14 @@ void create_topoaware_partitions() {
   _partitionInfo.numPartitions = numparts_bak;
 
 #if CMK_ERROR_CHECKING
+  int *testMap = (int*)calloc(CmiNumNodesGlobal(), sizeof(int));
   for(i = 0; i < CmiNumNodesGlobal(); i++) {
     CmiAssert(nodeMap[i] >= 0);
     CmiAssert(nodeMap[i] < CmiNumNodesGlobal());
+    CmiAssert(testMap[nodeMap[i]] == 0);
+    testMap[nodeMap[i]] = 1;
   }
+  free(testMap);
 #endif
 
   for(i = 0; i < _partitionInfo.numPartitions; i++) {
@@ -755,10 +759,6 @@ void create_topoaware_partitions() {
       if(_partitionInfo.nodeMap[j] == CmiMyNodeGlobal()) {
         _Cmi_mynode = j - _partitionInfo.partitionPrefix[i];
         _partitionInfo.myPartition = i;
-#if CMK_ERROR_CHECKING
-        CmiAssert(_partitionInfo.myPartition >= 0);
-        CmiAssert(_partitionInfo.myPartition < _partitionInfo.numPartitions);
-#endif
       }
     }
   }
