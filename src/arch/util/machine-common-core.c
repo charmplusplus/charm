@@ -722,7 +722,7 @@ void create_topoaware_partitions() {
   _MEMCHECK(_partitionInfo.nodeMap);
 
   Partition_Type type_bak = _partitionInfo.type;
-  _partitionInfo.type = PARTITION_SINGELTON;
+  _partitionInfo.type = PARTITION_SINGLETON;
 
   int numparts_bak = _partitionInfo.numPartitions;
   _partitionInfo.numPartitions = 1;
@@ -898,7 +898,7 @@ void CmiCreatePartitions(char **argv) {
 
 INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
   int rank;
-  if(_partitionInfo.type == PARTITION_SINGELTON) { 
+  if(_partitionInfo.type == PARTITION_SINGLETON) { 
     return node;
   } else if(_partitionInfo.type == PARTITION_DEFAULT) { 
     rank =  (partition * _partitionInfo.partitionSize[0]) + node;
