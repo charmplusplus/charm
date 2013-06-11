@@ -742,12 +742,23 @@ void create_topoaware_partitions() {
   _partitionInfo.type = type_bak;
   _partitionInfo.numPartitions = numparts_bak;
 
+#if CMK_ERROR_CHECKING
+  for(i = 0; i < CmiNumNodesGlobal(); i++) {
+    CmiAssert(nodeMap[i] >= 0);
+    CmiAssert(nodeMap[i] < CmiNumNodesGlobal());
+  }
+#endif
+
   for(i = 0; i < _partitionInfo.numPartitions; i++) {
     int endnode = _partitionInfo.partitionPrefix[i] + _partitionInfo.partitionSize[i];
     for(j = _partitionInfo.partitionPrefix[i]; j < endnode; j++) {
       if(_partitionInfo.nodeMap[j] == CmiMyNodeGlobal()) {
         _Cmi_mynode = j - _partitionInfo.partitionPrefix[i];
         _partitionInfo.myPartition = i;
+#if CMK_ERROR_CHECKING
+        CmiAssert(_partitionInfo.myPartition >= 0);
+        CmiAssert(_partitionInfo.myPartition < _partitionInfo.numPartitions);
+#endif
       }
     }
   }
