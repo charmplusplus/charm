@@ -745,10 +745,10 @@ void create_topoaware_partitions() {
 #if CMK_ERROR_CHECKING
   int *testMap = (int*)calloc(CmiNumNodesGlobal(), sizeof(int));
   for(i = 0; i < CmiNumNodesGlobal(); i++) {
-    CmiAssert(nodeMap[i] >= 0);
-    CmiAssert(nodeMap[i] < CmiNumNodesGlobal());
-    CmiAssert(testMap[nodeMap[i]] == 0);
-    testMap[nodeMap[i]] = 1;
+    CmiAssert(_partitionInfo.nodeMap[i] >= 0);
+    CmiAssert(_partitionInfo.nodeMap[i] < CmiNumNodesGlobal());
+    CmiAssert(testMap[_partitionInfo.nodeMap[i]] == 0);
+    testMap[_partitionInfo.nodeMap[i]] = 1;
   }
   free(testMap);
 #endif
