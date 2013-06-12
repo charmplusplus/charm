@@ -84,6 +84,10 @@ struct _SYSTEM_INFO sysinfo;
 #elif defined(_SC_NPROC_ONLN)
   a = sysconf(_SC_NPROC_ONLN); /* number of active/running CPUs */
 #endif
+#if CMK_BLUEGENEQ
+  a *= Kernel_ProcessCount();
+#endif
+
   if (a == -1) a = 1;
 
   return a;
