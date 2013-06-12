@@ -1453,7 +1453,7 @@ void CthUserAddListeners(CthThread th);
 
 /****** Isomalloc: Migratable Memory Allocation ********/
 /*Simple block-by-block interface:*/
-void *CmiIsomalloc(size_t sizeInBytes, CthThread tid);
+void *CmiIsomalloc(int sizeInBytes, CthThread tid);
 void *CmiIsomallocAlign(size_t align, size_t size, CthThread t);
 void  CmiIsomallocPup(pup_er p,void **block);
 void  CmiIsomallocFree(void *block);

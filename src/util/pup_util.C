@@ -56,18 +56,14 @@ static void showBanner(void) {
 class pupCheckRec {
 	unsigned char magic[4];//Cannot use "int" because of alignment
 	unsigned char type;
-	unsigned char length[8];
+	unsigned char length[3];
 	enum {pupMagic=0xf36c5a21,typeMask=0x75};
 	int getMagic(void) const {return (magic[3]<<24)+(magic[2]<<16)+(magic[1]<<8)+magic[0];}
 	void setMagic(int v) {for (int i=0;i<4;i++) magic[i]=(v>>(8*i));}
 	PUP::dataType getType(void) const {return (PUP::dataType)(type^typeMask);}
 	void setType(PUP::dataType v) {type=v^typeMask;}
-	size_t getLength(void) const {
-          size_t v = 0;
-          for (int i=0;i<8;i++) v += (length[i]<<(8*i));
-          return v;
-        }
-	void setLength(size_t v) {for (int i=0;i<8;i++) length[i]=(v>>(8*i));}
+	int getLength(void) const {return (length[2]<<16)+(length[1]<<8)+length[0];}
+	void setLength(int v) {for (int i=0;i<3;i++) length[i]=(v>>(8*i));}
 	
 	/*Compare the packed value (from us) and the unpacked value
 	  (from the user).
@@ -84,13 +80,13 @@ class pupCheckRec {
 		abort();
 	}
 public:
-	void write(PUP::dataType t,size_t n) {
+	void write(PUP::dataType t,int n) {
 		if (!bannerDisplayed) showBanner();
 		setMagic(pupMagic);
 		type=t^typeMask;
 		setLength(n);
 	}
-	void check(PUP::dataType t,size_t n) const {
+	void check(PUP::dataType t,int n) const {
 		compare("magic number",
 			"you unpacked more than you packed, or the values were corrupted during transport",
 			getMagic(),pupMagic);
@@ -105,19 +101,22 @@ public:
 #endif
 
 
-void PUP::sizer::bytes(void * /*p*/,size_t n,size_t itemSize,dataType /*t*/)
+void PUP::sizer::bytes(void * /*p*/,int n,size_t itemSize,dataType /*t*/)
 {
 #ifdef CK_CHECK_PUP
 	nBytes+=sizeof(pupCheckRec);
 #endif
 #if CMK_ERROR_CHECKING
 	if (n<0) CmiAbort("PUP::sizer> Tried to pup a negative number of items!");
+	const unsigned int maxPupBytes=1024*1024*1024; //Pup 1 GB at a time
+	if (((unsigned int)(n*itemSize))>maxPupBytes) 
+		CmiAbort("PUP::sizer> Tried to pup absurdly large number of bytes!");
 #endif
 	nBytes+=n*itemSize;
 }
 
 /*Memory PUP::er's*/
-void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
+void PUP::toMem::bytes(void *p,int n,size_t itemSize,dataType t)
 {
 #ifdef CK_CHECK_PUP
 	((pupCheckRec *)buf)->write(t,n);
@@ -127,7 +126,7 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 	memcpy((void *)buf,p,n); 
 	buf+=n;
 }
-void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
+void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t)
 {
 #ifdef CK_CHECK_PUP
 	((pupCheckRec *)buf)->check(t,n);
@@ -221,9 +220,9 @@ int CmiFclose(FILE *fp)
 } // extern "C"
 
 /*Disk PUP::er's*/
-void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType /*t*/)
+void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 {/* CkPrintf("writing %d bytes\n",itemSize*n); */ CmiFwrite(p,itemSize,n,F);}
-void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType /*t*/)
+void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 {/* CkPrintf("reading %d bytes\n",itemSize*n); */ CmiFread(p,itemSize,n,F);}
 
 /****************** Seek support *******************
@@ -293,9 +292,9 @@ appropriate behavior for, e.g., sizers.
 */
 void PUP::er::impl_startSeek(PUP::seekBlock &s) /*Begin a seeking block*/
 {}
-size_t PUP::er::impl_tell(seekBlock &s) /*Give the current offset*/
+int PUP::er::impl_tell(seekBlock &s) /*Give the current offset*/
 {return 0;}
-void PUP::er::impl_seek(seekBlock &s,size_t off) /*Seek to the given offset*/
+void PUP::er::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
 {}
 void PUP::er::impl_endSeek(seekBlock &s)/*End a seeking block*/
 {}
@@ -304,25 +303,25 @@ void PUP::er::impl_endSeek(seekBlock &s)/*End a seeking block*/
 /*Memory buffer seeking is trivial*/
 void PUP::mem::impl_startSeek(seekBlock &s) /*Begin a seeking block*/
   {s.data.ptr=buf;}
-size_t PUP::mem::impl_tell(seekBlock &s) /*Give the current offset*/
+int PUP::mem::impl_tell(seekBlock &s) /*Give the current offset*/
   {return buf-s.data.ptr;}
-void PUP::mem::impl_seek(seekBlock &s,size_t off) /*Seek to the given offset*/
+void PUP::mem::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
   {buf=s.data.ptr+off;}
 
 /*Disk buffer seeking is also simple*/
 void PUP::disk::impl_startSeek(seekBlock &s) /*Begin a seeking block*/
   {s.data.loff=ftell(F);}
-size_t PUP::disk::impl_tell(seekBlock &s) /*Give the current offset*/
+int PUP::disk::impl_tell(seekBlock &s) /*Give the current offset*/
   {return (int)(ftell(F)-s.data.loff);}
-void PUP::disk::impl_seek(seekBlock &s,size_t off) /*Seek to the given offset*/
+void PUP::disk::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
   {fseek(F,s.data.loff+off,0);}
 
 /*PUP::wrap_er just forwards seek calls to its wrapped PUP::er.*/
 void PUP::wrap_er::impl_startSeek(seekBlock &s) /*Begin a seeking block*/
   {p.impl_startSeek(s);}
-size_t PUP::wrap_er::impl_tell(seekBlock &s) /*Give the current offset*/
+int PUP::wrap_er::impl_tell(seekBlock &s) /*Give the current offset*/
   {return p.impl_tell(s);}
-void PUP::wrap_er::impl_seek(seekBlock &s,size_t off) /*Seek to the given offset*/
+void PUP::wrap_er::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
   {p.impl_seek(s,off);}
 void PUP::wrap_er::impl_endSeek(seekBlock &s) /*Finish a seeking block*/
   {p.impl_endSeek(s);}
@@ -351,7 +350,7 @@ PUP::able *PUP::able::clone(void) const {
 
 	// Save our own state into a buffer
 	PUP::able *mthis=(PUP::able *)this; /* cast away constness */
-	size_t size;
+	int size;
 	{ PUP::sizer ps; mthis->pup(ps); size=ps.size(); }
 	void *buf=malloc(size);
 	{ PUP::toMem pt(buf); mthis->pup(pt); }
@@ -515,7 +514,7 @@ void PUP::toTextUtil::synchronize(unsigned int m)
 #endif
 }
 
-void PUP::toTextUtil::bytes(void *p,size_t n,size_t itemSize,dataType t) {
+void PUP::toTextUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
   if (t==Tchar) 
   { /*Character data is written out directly (rather than numerically)*/
     char *o=beginLine();
@@ -523,7 +522,7 @@ void PUP::toTextUtil::bytes(void *p,size_t n,size_t itemSize,dataType t) {
     *o++='\"'; /*Leading quote*/
     /*Copy each character, possibly escaped*/
     const char *c=(const char *)p;
-    for (size_t i=0;i<n;i++) {
+    for (int i=0;i<n;i++) {
       if (c[i]=='\n') {
 	sprintf(o,"\\n");o+=strlen(o);
       } else if (iscntrl(c[i])) {
@@ -541,7 +540,7 @@ void PUP::toTextUtil::bytes(void *p,size_t n,size_t itemSize,dataType t) {
     beginEnv("byte %d",n);
     const unsigned char *c=(const unsigned char *)p;
     char *o=beginLine();
-    for (size_t i=0;i<n;i++) {
+    for (int i=0;i<n;i++) {
       sprintf(o,"%02X ",c[i]);o+=strlen(o);
       if (i%25==24 && (i+1!=n)) 
       { /* This line is too long-- wrap it */
@@ -556,7 +555,7 @@ void PUP::toTextUtil::bytes(void *p,size_t n,size_t itemSize,dataType t) {
   else
   { /*Ordinary number-- write out in decimal */
     if (n!=1) beginEnv("array %d",n);
-    for (size_t i=0;i<n;i++) {
+    for (int i=0;i<n;i++) {
       char *o=beginLine();
       switch(t) {
       case Tshort: sprintf(o,"short=%d;\n",((short *)p)[i]); break;
@@ -609,9 +608,9 @@ PUP::toText::toText(char *outBuf)
   :toTextUtil(IS_PACKING+IS_COMMENTS,outBuf),buf(outBuf),charCount(0) { }
 
 /************** To/from text FILE ****************/
-void PUP::toTextFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
+void PUP::toTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
 {
-  for (size_t i=0;i<n;i++) 
+  for (int i=0;i<n;i++) 
     switch(t) {
     case Tchar: fprintf(f," '%c'",((char *)p)[i]); break;
     case Tuchar:
@@ -688,9 +687,9 @@ double PUP::fromTextFile::readDouble(void) {
   }
   return ret;
 }
-void PUP::fromTextFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
+void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
 {
-  for (size_t i=0;i<n;i++) 
+  for (int i=0;i<n;i++) 
     switch(t) {
     case Tchar: 
       if (1!=fscanf(f," '%c'",&((char *)p)[i]))

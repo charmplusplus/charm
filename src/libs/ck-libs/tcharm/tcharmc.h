@@ -5,7 +5,6 @@ Orion Sky Lawlor, olawlor@acm.org, 11/20/2001
 #ifndef __TCHARM_H
 #define __TCHARM_H
 
-#include "stdio.h"
 #include "pup_c.h"
 
 #ifdef __cplusplus
