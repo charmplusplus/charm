@@ -716,15 +716,17 @@ if (  MSG_STATISTIC)
 extern void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
 
 void create_topoaware_partitions() {
-  int i,j;
+  int i, j, numparts_bak;
+  Partition_Type type_bak;
+  int *testMap;
 
   _partitionInfo.nodeMap = (int*)malloc(CmiNumNodesGlobal()*sizeof(int));
   _MEMCHECK(_partitionInfo.nodeMap);
 
-  Partition_Type type_bak = _partitionInfo.type;
+  type_bak = _partitionInfo.type;
   _partitionInfo.type = PARTITION_SINGLETON;
 
-  int numparts_bak = _partitionInfo.numPartitions;
+  numparts_bak = _partitionInfo.numPartitions;
   _partitionInfo.numPartitions = 1;
 
   _partitionInfo.myPartition = 0;
@@ -743,7 +745,7 @@ void create_topoaware_partitions() {
   _partitionInfo.numPartitions = numparts_bak;
 
 #if CMK_ERROR_CHECKING
-  int *testMap = (int*)calloc(CmiNumNodesGlobal(), sizeof(int));
+  testMap = (int*)calloc(CmiNumNodesGlobal(), sizeof(int));
   for(i = 0; i < CmiNumNodesGlobal(); i++) {
     CmiAssert(_partitionInfo.nodeMap[i] >= 0);
     CmiAssert(_partitionInfo.nodeMap[i] < CmiNumNodesGlobal());
