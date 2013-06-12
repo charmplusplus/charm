@@ -1396,7 +1396,6 @@ class WhenConstruct : public SdagConstruct {
 public:
   CStateVar* speculativeState;
   void generateCode(XStr& decls, XStr& defs, Entry *entry);
-  void generateCodeNew(XStr& decls, XStr& defs, Entry *entry);
   WhenConstruct(EntryList *el, SdagConstruct *body)
     : SdagConstruct(SWHEN, 0, 0, 0,0,0, body, el)
     , speculativeState(0)

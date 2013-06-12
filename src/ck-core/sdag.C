@@ -2,6 +2,7 @@
 
 namespace SDAG {
   PUPable_def(MsgClosure);
+  PUPable_def(ForallClosure);
   PUPable_def(TransportableBigSimLog);
   PUPable_def(CCounter);
   PUPable_def(CSpeculator);
@@ -10,6 +11,7 @@ namespace SDAG {
 
   void registerPUPables() {
     PUPable_reg(MsgClosure);
+    PUPable_reg(ForallClosure);
     PUPable_reg(TransportableBigSimLog);
     PUPable_reg(CCounter);
     PUPable_reg(CSpeculator);

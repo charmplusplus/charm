@@ -59,13 +59,15 @@ namespace xi {
     XStr* type;
     XStr* name;
     bool isMessage;
+    bool isForall;
     std::list<CStateVar*> vars;
 
     EncapState(Entry* entry, std::list<CStateVar*>& vars)
       : entry(entry)
-      , isMessage(false)
       , type(0)
       , name(0)
+      , isMessage(false)
+      , isForall(false)
       , vars(vars) { }
   };
 

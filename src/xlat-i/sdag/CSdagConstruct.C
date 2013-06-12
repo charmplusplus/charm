@@ -366,6 +366,19 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
       stateVarsChildren = new list<CStateVar*>(plist);
       sv = new CStateVar(0,"int", 0, con1->text->charstar(), 0,NULL, 0);
       stateVarsChildren->push_back(sv);
+
+      {
+        list<CStateVar*> lst;
+        lst.push_back(sv);
+        EncapState *state = new EncapState(NULL, lst);
+        state->isForall = true;
+        state->type = new XStr("SDAG::ForallClosure");
+        XStr* name = new XStr();
+        *name << con1->text << "_cl";
+        state->name = name;
+        encap.push_back(state);
+      }
+
       {
         char txt[128];
         sprintf(txt, "_cf%d", nodeNum);
@@ -373,6 +386,13 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
         sv = new CStateVar(0, "SDAG::CCounter *", 0, txt, 0, NULL, 1);
         sv->isCounter = true;
         stateVarsChildren->push_back(sv);
+
+        list<CStateVar*> lst;
+        lst.push_back(sv);
+        EncapState *state = new EncapState(NULL, lst);
+        state->type = new XStr("SDAG::CCounter");
+        state->name = new XStr(txt);
+        encap.push_back(state);
       }
       break;
     case SIF:
@@ -637,12 +657,28 @@ void WhenConstruct::generateEntryName(XStr& defs, Entry* e, int curEntry) {
   defs << "_buf";
 }
 
-void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
+void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   buildTypes(encapState);
   buildTypes(encapStateChild);
 
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   generateSignatureNew(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState);
+
+  // if we have a forall in the closures, we need to unravel the state
+  // @todo do a partial unraveling for performance reasons (however, the
+  // compiler should be able to optimize most of this out)
+  // @todo BUG this may cause name collisions!
+  {
+    bool foundForAll = false;
+    for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter) {
+      EncapState& state = **iter;
+      if (state.isForall) {
+        foundForAll = true;
+        break;
+      }
+    }
+    if (foundForAll) unravelClosures(defs);
+  }
 
   int entryLen = 0;
 
@@ -755,15 +791,10 @@ void WhenConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
   generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 
-}
-
-void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
-  generateCodeNew(decls, defs, entry);
   generateChildrenCode(decls, defs, entry);
 }
 
-void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry)
-{
+void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry) {
   generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
   defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
@@ -785,8 +816,7 @@ void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry)
   endMethod(defs);
 }
 
-void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
-{
+void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry) {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
 
   generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
@@ -858,8 +888,7 @@ void SdagConstruct::unravelClosures(XStr& defs) {
   }
 }
 
-void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry)
-{
+void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry) {
   strcpy(nameStr,label->charstar());
   generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
 
@@ -895,8 +924,7 @@ void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry)
   endMethod(defs);
 }
 
-void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
-{
+void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry) {
   strcpy(nameStr,label->charstar());
   generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
   // trace
@@ -919,21 +947,19 @@ void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
   endMethod(defs);
 }
 
-void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry)
-{
+void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry) {
   generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
-  defs << "    int __first = (" << con2->text <<
-        "), __last = (" << con3->text << 
-        "), __stride = (" << con4->text << ");\n";
+  defs << "    int __first = (" << con2->text << "), __last = (" << con3->text
+       << "), __stride = (" << con4->text << ");\n";
   defs << "    if (__first > __last) {\n";
   defs << "      int __tmp=__first; __first=__last; __last=__tmp;\n";
   defs << "      __stride = -__stride;\n";
   defs << "    }\n";
-  defs << "    SDAG::CCounter *" << counter <<
-        " = new SDAG::CCounter(__first,__last,__stride);\n"; 
-  defs << "    for(int " << con1->text <<
-        "=__first;" << con1->text <<
-        "<=__last;" << con1->text << "+=__stride) {\n";
+  defs << "    SDAG::CCounter *" << counter << " = new SDAG::CCounter(__first,__last,__stride);\n";
+  defs << "    " << counter << "->ref();\n";
+  defs << "    for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
+       << con1->text << "+=__stride) {\n";
+  defs << "      SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
   defs << "      ";
   generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
   defs << "    }\n";

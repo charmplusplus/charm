@@ -42,6 +42,20 @@ namespace SDAG {
     PUPable_decl(TransportableBigSimLog);
   };
 
+  struct ForallClosure : public Closure {
+    int val;
+    ForallClosure() : val(0) { init(); }
+    ForallClosure(CkMigrateMessage*) : val(0) { init(); }
+    ForallClosure(int val) : val(val) { init(); }
+
+    void pup(PUP::er& p) {
+      p | val;
+      packClosure(p);
+    }
+    PUPable_decl(ForallClosure);
+    int& getP0() { return val; }
+  };
+
   struct MsgClosure : public Closure {
     CkMessage* msg;
 
