@@ -67,30 +67,13 @@ never be excluded...
 #include "ck.h"
 #include "trace.h"
 #include "CkCheckpoint.decl.h"
+#include <sstream>
 
 void CkRestartMain(const char* dirname);
 
 #define  DEBUGF(x)     //CmiPrintf x;
 
-#ifdef CALCULATE_HOPS
-/** Turn on manually if you want to calculate hops from within Charm++
-for some application **/
-
 #include "TopoManager.h"
-
-TopoManager *tmgr = NULL;
-double hops = 0;
-
-extern "C" void calculateTotalHops(int pe1, int pe2, int size) {
-  if(tmgr == NULL)
-    tmgr = new TopoManager();
-  hops += (tmgr->getHopsBetweenRanks(pe1, pe2) * size);
-}
-
-extern "C" void printTotalHops() {
-  CmiPrintf("TOTAL HOPS %lf\n", hops/(1024*1024) );
-}
-#endif
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
@@ -709,14 +692,20 @@ static void _triggerHandler(envelope *env)
 
 static inline void _processROMsgMsg(envelope *env)
 {
-  *((char **)(_readonlyMsgs[env->getRoIdx()]->pMsg))=(char *)EnvToUsr(env);
+  if(!CmiMyRank_()) {
+    *((char **)(_readonlyMsgs[env->getRoIdx()]->pMsg))=(char *)EnvToUsr(env);
+  }
 }
 
 static inline void _processRODataMsg(envelope *env)
 {
   //Unpack each readonly:
-  PUP::fromMem pu((char *)EnvToUsr(env));
-  for(size_t i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pu);
+  if(!CmiMyRank_()) {
+    PUP::fromMem pu((char *)EnvToUsr(env));
+    for(size_t i=0;i<_readonlyTable.size();i++) {
+      _readonlyTable[i]->pupData(pu);
+    }
+  }
   CmiFree(env);
 }
 
@@ -895,8 +884,6 @@ extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
 extern "C" void CmiInitPxshm(char **argv);
 
-extern void TopoManager_init();
-
 //extern "C" void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
@@ -1065,7 +1052,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
-  _metabalancerInit();
+        _metabalancerInit();
 	
 #if CMK_MEM_CHECKPOINT
         init_memcheckpt(argv);
@@ -1271,9 +1258,16 @@ void _initCharm(int unused_argc, char **argv)
             int *pelist;
             int num;
             CmiGetPesOnPhysicalNode(0, &pelist, &num);
-            if (!_Cmi_noprocforcommthread && num+num/CmiMyNodeSize() > CmiNumCores()) {
-                //CkPrintf("\nCharm++> Warning: the number of SMP threads is greater than the number of physical cores, use +CmiNoProcForComThread runtime option.\n\n");
-                _Cmi_noprocforcommthread = 1;
+#if !CMK_MULTICORE && !CMK_SMP_NO_COMMTHD
+            // Count communication threads, if present
+            // XXX: Assuming uniformity of node size here
+            num += num/CmiMyNodeSize();
+#endif
+            if (!_Cmi_sleepOnIdle && !_Cmi_forceSpinOnIdle && num > CmiNumCores())
+            {
+              if (CmiMyPe() == 0)
+                CmiPrintf("\nCharm++> Warning: the number of SMP threads (%d) is greater than the number of physical cores (%d), so threads will sleep while idling. Use +CmiSpinOnIdle or +CmiSleepOnIdle to control this directly.\n\n", num, CmiNumCores());
+              _Cmi_sleepOnIdle = 1;
             }
         }
 #endif
@@ -1283,14 +1277,16 @@ void _initCharm(int unused_argc, char **argv)
         char *topoFilename;
         if(CmiGetArgStringDesc(argv,"+printTopo",&topoFilename,"topo file name")) 
         {
-	    TopoManager tmgr;
+            std::stringstream sstm;
+            sstm << topoFilename << "." << CmiMyPartition();
+            std::string result = sstm.str();
             FILE *fp;
-            fp = fopen(topoFilename, "w");
+            fp = fopen(result.c_str(), "w");
             if (fp == NULL) {
-              CkPrintf("Error opening topology.Info.txt file, writing to stdout\n");
+              CkPrintf("Error opening %s file, writing to stdout\n", topoFilename);
               fp = stdout;
             }
-	    tmgr.printAllocation(fp);
+	    TopoManager_printAllocation(fp);
             fclose(fp);
         }
     }

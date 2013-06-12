@@ -126,10 +126,21 @@ extern int CmiMyRank_();
 
 #if CMK_HAS_PARTITION
 
+typedef enum Partition_Type {
+      PARTITION_SINGLETON,
+      PARTITION_DEFAULT,
+      PARTITION_MASTER,
+      PARTITION_PREFIX,
+} Partition_Type;
+
 //variables and functions for partition
 typedef struct {
+  Partition_Type type;
+  int isTopoaware, scheme;
   int numPartitions;
-  int partitionSize;
+  int *partitionSize;
+  int *partitionPrefix;
+  int *nodeMap;
   int myPartition;
 } PartitionInfo;
 
@@ -139,17 +150,18 @@ extern int _Cmi_mype_global;
 extern int _Cmi_numpes_global;
 extern int _Cmi_mynode_global;
 extern int _Cmi_numnodes_global;
-extern PartitionInfo partitionInfo;
+extern PartitionInfo _partitionInfo;
 
-#define CmiMyPartition()         partitionInfo.myPartition
-#define CmiPartitionSize()       partitionInfo.partitionSize
-#define CmiNumPartitions()        partitionInfo.numPartitions
-#define CmiNumNodesGlobal()     _Cmi_numnodes_global
-#define CmiMyNodeGlobal()       _Cmi_mynode_global
-#define CmiNumPesGlobal()       _Cmi_numpes_global
+#define CmiNumPartitions()              _partitionInfo.numPartitions
+#define CmiMyPartition()                _partitionInfo.myPartition
+#define CmiPartitionSize(part)          _partitionInfo.partitionSize[part]
+#define CmiMyPartitionSize()            CmiPartitionSize(CmiMyPartition())
+#define CmiNumNodesGlobal()             _Cmi_numnodes_global
+#define CmiMyNodeGlobal()               _Cmi_mynode_global
+#define CmiNumPesGlobal()               _Cmi_numpes_global
 //we need different implementations of this based on SMP or non-smp
 #if !CMK_SMP
-#define CmiMyPeGlobal()         _Cmi_mype_global
+#define CmiMyPeGlobal()                 _Cmi_mype_global
 extern int _Cmi_mynodesize;
 #else
 extern int CmiMyPeGlobal();
@@ -173,7 +185,8 @@ int pe_gToLTranslate(int pe);
 #else
 
 #define CmiMyPartition()         0
-#define CmiPartitionSize()       CmiNumNodes()
+#define CmiPartitionSize(part)       CmiNumNodes()
+#define CmiMyPartitionSize()         CmiNumNodes()
 #define CmiNumPartitions()       1
 #define CmiNumNodesGlobal()      CmiNumNodes()
 #define CmiMyNodeGlobal()        CmiMyNode()
@@ -249,7 +262,8 @@ extern int _Cmi_numpes;
 extern int _Cmi_mynodesize;
 extern int _Cmi_mynode;
 extern int _Cmi_numnodes;
-extern int _Cmi_noprocforcommthread;
+extern int _Cmi_sleepOnIdle;
+extern int _Cmi_forceSpinOnIdle;
 
 extern int CmiMyPe();
 extern int CmiMyRank();
@@ -373,7 +387,8 @@ extern int _Cmi_numpes;
 extern int _Cmi_mynodesize;
 extern int _Cmi_mynode;
 extern int _Cmi_numnodes;
-extern int _Cmi_noprocforcommthread;
+extern int _Cmi_sleepOnIdle;
+extern int _Cmi_forceSpinOnIdle;
 
 extern int CmiMyPe();
 extern int CmiMyRank();
@@ -405,7 +420,7 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #endif
 
-#if !CMK_SMP /* non-SMP version */
+#if CMK_SHARED_VARS_UNAVAILABLE /* non-SMP version */
 
 typedef int CmiImmediateLockType;
 extern int _immediateLock;
@@ -1981,11 +1996,6 @@ void CmiTurnOffStats();
  */
 extern int CharmLibInterOperate;
 CpvExtern(int,charmLibExitFlag);
-
-/*
- *         Topology C wrapper
- */
-extern int CmiGetHopsBetweenRanks(int pe1, int pe2);
 
 /******** I/O wrappers ***********/
 

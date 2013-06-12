@@ -87,6 +87,12 @@ NDMeshStreamer: charm-core completion
 mpi-main: mpi-mainmodule.o
 	cp mpi-mainmodule.o ../lib
 
+main: main.o
+	cp main.o ../lib
+
+custom_partitioner: custom_partitioner.o
+	cp custom_partitioner.o ../lib
+
 translators: charmxi conv-cpm
 
 msa: charm++
@@ -253,7 +259,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  pathHistory.h envelope-path.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
-		mpi-interoperate.h \
+	  mpi-interoperate.h \
 	  $(CVHEADERS) $(CONVCOMHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -404,7 +410,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o commitid.o
+	cmitls.o memoryaffinity.o commitid.o 
 
 #############################################
 #Comlib Core objects that go into libck.a
@@ -415,7 +421,7 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
 	conv-lists.o RTH.o persist-comm.o mempool.o graph.o \
-	TopoManager.o CrayNid.o crc32.o  lz4.o
+	TopoManager.o CrayNid.o crc32.o  lz4.o partitioning_strategies.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -474,74 +480,14 @@ $(L)/libccs-client.a: ccs-client.o
 ccs-client.o: ccs-client.c $(CVHEADERS)
 	$(CHARMC) ccs-client.c
 
-sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -DCMK_USE_CONVERSE=1 sockRoutines.c
-
 sockRoutines-seq.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(SEQCHARMC) -o sockRoutines-seq.o sockRoutines.c
-
-pup_util.o: pup_util.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -o pup_util.o pup_util.C
-
-pup_toNetwork.o: pup_toNetwork.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -I. -o pup_toNetwork.o pup_toNetwork.C
-
-pup_toNetwork4.o: pup_toNetwork4.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -I. -o pup_toNetwork4.o pup_toNetwork4.C
-
-pup_xlater.o: pup_xlater.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -I. -o pup_xlater.o pup_xlater.C
-
-pup_c.o: pup_c.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -o pup_c.o pup_c.C
-
-pup_paged.o: pup_paged.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -o pup_paged.o pup_paged.C
 
 pup_f.f90: pup_f.f90.sh
 	./pup_f.f90.sh
 
 pup_f.o: pup_f.f90 $(CVHEADERS)
 	-$(CHARMC) -c pup_f.f90 && $(CHARMC) -cpmod ../include pupmod.M || touch pup_f.o
-
-pup_cmialloc.o: pup_cmialloc.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -o pup_cmialloc.o pup_cmialloc.C
-
-ckhashtable.o: ckhashtable.C ckhashtable.h $(CVHEADERS)
-	$(CHARMC) -o ckhashtable.o ckhashtable.C
-
-TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h BGPTorus.h BGQTorus.h XTTorus.h CrayNid.c $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -o TopoManager.o TopoManager.C
-
-CrayNid.o: CrayNid.c $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -c -o CrayNid.o CrayNid.c
-
-ckdll.o: ckdll.C ckdll.h $(CVHEADERS)
-	$(CHARMC) -o ckdll.o ckdll.C
-
-ckimage.o: ckimage.C ckimage.h $(CVHEADERS)
-	$(CHARMC) -o ckimage.o ckimage.C
-
-graph.o: graph.c $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -c -o graph.o graph.c
-
-RTH.o: RTH.C RTH.h $(CVHEADERS)
-	$(CHARMC) -o RTH.o RTH.C
-
-persist-comm.o: persist-comm.c $(CVHEADERS)
-	$(CHARMC) -o persist-comm.o persist-comm.c
-
-mempool.o: mempool.c $(CVHEADERS)
-	$(CHARMC) -o mempool.o mempool.c
-
-conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
-	$(CHARMC) -o conv-lists.o conv-lists.C
-
-crc32.o: crc32.c crc32.h
-	$(CHARMC) -optimize -o crc32.o crc32.c
-
-lz4.o: lz4.c lz4.h
-	$(CHARMC) -o $@ $<
 
 ## Converse load balancers (seed balancers, -balance)
 $(L)/libldb-none.o: cldb.none.c $(CVHEADERS)
@@ -708,7 +654,7 @@ $(L)/loadsym.o: loadsym.c  $(CVHEADERS)
 
 CK_LIBS_CORE=$(L)/libck.a
 
-LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
+LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
            tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
@@ -723,7 +669,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a
-charm-target: loadbalancers default_libs comlib_objs mpi-main
+charm-target: loadbalancers default_libs comlib_objs mpi-main main custom_partitioner
 
 CHARMLIBS: charm++ CONVLIBS 
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
@@ -1014,7 +960,7 @@ $(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C futil.f90
 ##############################################################################
 # adding this entry for files which do not belong to any of other locations
 
-OTHER_OBJS= mpi-mainmodule.o
+OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o 
 
 ##############################################################################
 
@@ -1091,7 +1037,7 @@ depends: cidepends commitid.c
 	echo '#generated by make depends' > $(DEPENDFILE); \
         touch metis.h scotch.h;   \
 	processFiles=''; 	\
-        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(OTHER_OBJS) ; do \
+        for i in $(LIBCONV_CORE) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(OTHER_OBJS) ; do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\
@@ -1118,7 +1064,7 @@ dependsCaseSensitive: cidepends
 	echo '#generated by make depends' > $(DEPENDFILE); \
         touch metis.h scotch.h;   \
 	processFiles=''; 	\
-        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(OTHER_OBJS); do \
+        for i in $(LIBCONV_CORE) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(OTHER_OBJS); do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\

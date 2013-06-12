@@ -31,6 +31,34 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 /*************** Simple classes ***************/
 // Non-const version is required for puping std::pair
 template <class A,class B>
+inline void operator|(PUP::er &p,typename std::pair<A,B> &v);
+template <class A,class B>
+inline void operator|(PUP::er &p,typename std::pair<const A,B> &v);
+template <class T>
+inline void operator|(PUP::er &p,std::complex<T> &v);
+template <class charType>
+inline void operator|(PUP::er &p,typename std::basic_string<charType> &v);
+inline void operator|(PUP::er &p,std::string &v);
+template <class container>
+inline int PUP_stl_container_size(PUP::er &p,container &c);
+template <class container, class dtype>
+inline void PUP_stl_container_items(PUP::er &p,container &c);
+template <class container,class dtype>
+inline void PUP_stl_container(PUP::er &p,container &c);
+template <class container,class dtype>
+inline void PUP_stl_map(PUP::er &p,container &c);
+template <class T>
+inline void operator|(PUP::er &p,typename std::vector<T> &v);
+template <class T>
+inline void operator|(PUP::er &p,typename std::list<T> &v);
+template <class V,class T,class Cmp>
+inline void operator|(PUP::er &p,typename std::map<V,T,Cmp> &m);
+template <class V,class T,class Cmp>
+inline void operator|(PUP::er &p,typename std::multimap<V,T,Cmp> &m);
+template <class T>
+inline void operator|(PUP::er &p,typename std::set<T> &m);
+
+template <class A,class B>
 inline void operator|(PUP::er &p,typename std::pair<A,B> &v)
 {
   p.syncComment(PUP::sync_index);

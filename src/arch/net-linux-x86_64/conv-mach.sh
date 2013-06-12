@@ -1,19 +1,22 @@
 #CMK_DEFS="$CMK_DEFS -DHAVE_USR_INCLUDE_MALLOC_H=1 "
 CMK_AMD64="-m64"
 
+CMK_PIC="-fPIC"
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="gcc -E $CMK_AMD64 "
-CMK_CC="gcc -fPIC $CMK_AMD64 "
-CMK_CXX="g++ -fPIC $CMK_AMD64 "
+CMK_CC="gcc $CMK_AMD64 "
+CMK_CXX="g++ $CMK_AMD64 "
 CMK_CXXPP="$CMK_CXX -x c++ -E $CMK_AMD64 "
 CMK_XIOPTS=""
 CMK_LD="$CMK_CC $CMK_AMD64 "
 CMK_LDXX="$CMK_CXX $CMK_AMD64 "
 CMK_LD_SHARED="-shared"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
-CMK_LIBDIR="-L$CUDA_DIR/lib64"
-CMK_LIBS="-lckqt -lcuda -lcudart -lGL -lcudahybridapi"
+CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
+CMK_CC64=true
+CMK_WARNINGS_ARE_ERRORS="-Werror"
+CMK_CXX_OPTIMIZE="-O3"
 
 # native compiler for compiling charmxi, etc
 CMK_NATIVE_CC="$CMK_CC $CMK_AMD64 -fPIC $CMK_DEFS "
@@ -30,7 +33,6 @@ CMK_SEQ_LDXX="$CMK_NATIVE_LDXX"
 CMK_QT='generic64'
 
 CMK_CF90=`which f95 2>/dev/null`
-
 if test -n "$CMK_CF90"
 then
 #    CMK_FPP="/lib/cpp -P -CC"

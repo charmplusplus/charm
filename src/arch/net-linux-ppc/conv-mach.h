@@ -1,6 +1,7 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_NETPOLL         1
 
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
@@ -10,8 +11,8 @@
 
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          1
-#define CMK_MALLOC_USE_OS_BUILTIN                          0
+#define CMK_MALLOC_USE_GNU_MALLOC                          0
+#define CMK_MALLOC_USE_OS_BUILTIN                          1
 
 #define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0

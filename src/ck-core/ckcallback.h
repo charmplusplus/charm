@@ -229,7 +229,8 @@ public:
 	}
 	
 	int isInvalid(void) const {return type==invalid;}
-
+        
+        int isTargetToChare(void) const {return type==sendChare||type==isendChare;}
 /**
  * Interface used by threaded callbacks:
  * Libraries should call these from their "start" entry points.

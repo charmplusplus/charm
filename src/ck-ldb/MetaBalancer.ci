@@ -6,7 +6,7 @@ module MetaBalancer {
     entry MetaLBInit(CkArgMsg *m);
   };
 
-  initproc void registerLBDataCollection(void);
+  initnode void registerLBDataCollection(void);
   group [migratable] MetaBalancer {
     entry void MetaBalancer(void);  
     initnode void initnodeFn();

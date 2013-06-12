@@ -9,6 +9,7 @@
  */
 
 #include "TopoManager.h"
+#include "partitioning_strategies.h"
 
 TopoManager::TopoManager() {
 #if CMK_BLUEGENEL
@@ -234,7 +235,8 @@ void TopoManager::rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int 
 #endif
 
 int TopoManager::coordinatesToRank(int x, int y, int z) {
-  CmiAssert( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ );
+  if(!( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ ))
+    return -1;
 #if CMK_BIGSIM_CHARM
   if(dimY > 1)
     return x + y*dimX + z*dimX*dimY;
@@ -257,7 +259,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
-  CmiAssert( x>=0 && x<dimNX && y>=0 && y<dimNY && z>=0 && z<dimNZ && t>=0 && t<dimNT );
+  if(!( x>=0 && x<dimNX && y>=0 && y<dimNY && z>=0 && z<dimNZ && t>=0 && t<dimNT ))
+    return -1;
 #if CMK_BIGSIM_CHARM
   if(dimNY > 1)
     return t + (x + (y + z*dimNY) * dimNX) * dimNT;
@@ -283,7 +286,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 
 #if CMK_BLUEGENEQ
 int TopoManager::coordinatesToRank(int a, int b, int c, int d, int e, int t) {
-  CmiAssert( a>=0 && a<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT );
+  if(!( a>=0 && a<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT ))
+    return -1;
   return bgqtm.coordinatesToRank(a, b, c, d, e, t);
 }
 #endif
@@ -407,7 +411,7 @@ void TopoManager::printAllocation(FILE *fp)
 	fprintf(fp, "Rank - a b c d e t\n");
 	for(i=0; i<numPes; i++) {
 		rankToCoordinates(i,a,b,c,d,e,t);
-		fprintf(fp, "%d - %d %d %d %d %d %d\n",i,a,b,c,d,e,t);
+		fprintf(fp, "%d/%d - %d/%d - %d %d %d %d %d %d\n",CmiGetPeGlobal(i,CmiMyPartition()),CmiGetNodeGlobal(CmiNodeOf(i),CmiMyPartition()),i,CmiNodeOf(i),a,b,c,d,e,t);
 	}
 }
 #else
@@ -417,29 +421,142 @@ void TopoManager::printAllocation(FILE *fp)
 	fprintf(fp, "Topology Info-\n");
 	fprintf(fp, "NumPes -  %d\n", numPes);
 	fprintf(fp, "Dims - %d %d %d\n",dimNX,dimNY,dimNZ);
-	fprintf(fp, "Rank - x y z t\n");
+	fprintf(fp, "GlobalPe/GlobalNode - LocalPe/LocalNode - x y z t\n");
 	for(i=0; i<numPes; i++) {
 		rankToCoordinates(i,x,y,z,t);
-		fprintf(fp, "%d - %d %d %d %d\n",i,x,y,z,t);
+		fprintf(fp, "%d/%d - %d/%d - %d %d %d %d\n",CmiGetPeGlobal(i,CmiMyPartition()),CmiGetNodeGlobal(CmiNodeOf(i),CmiMyPartition()),i,CmiNodeOf(i),x,y,z,t);
 	}
 }
 #endif
 
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 extern "C" void craynid_init();
+extern "C" void craynid_reset();
+extern "C" void craynid_free();
 #endif
 
-void TopoManager_init()
+CmiNodeLock _topoLock = 0;
+TopoManager *_tmgr = NULL;
+
+extern "C" void TopoManager_init()
 {
+  if(_topoLock == 0) {
+    _topoLock = CmiCreateLock();
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     craynid_init();
 #endif
+  }
 }
 
-extern "C" int CmiGetHopsBetweenRanks(int pe1, int pe2)
-{
-    TopoManager topomgr;
-    return topomgr.getHopsBetweenRanks(pe1, pe2);
+extern "C" void TopoManager_reset() {
+  CmiLock(_topoLock);
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+  craynid_reset();
+#endif
+  if(_topoLock) delete _tmgr;
+  _tmgr = new TopoManager;
+  CmiUnlock(_topoLock);
 }
 
+extern "C" void TopoManager_free() {
+  CmiLock(_topoLock);
+  if(_topoLock) delete _tmgr;
+  _tmgr = NULL;
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+  craynid_free();
+#endif
+  CmiUnlock(_topoLock);
+}
 
+extern "C" void TopoManager_printAllocation(FILE *fp) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+  _tmgr->printAllocation(fp);
+}
+
+extern "C" void TopoManager_getDimCount(int *ndims) {
+#if CMK_BLUEGENEQ
+  *ndims = 5;
+#else
+  *ndims = 3;
+#endif
+}
+
+extern "C" void TopoManager_getDims(int *dims) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+#if CMK_BLUEGENEQ
+  dims[0] = _tmgr->getDimNA();
+  dims[1] = _tmgr->getDimNB();
+  dims[2] = _tmgr->getDimNC();
+  dims[3] = _tmgr->getDimND();
+  dims[4] = _tmgr->getDimNE();
+  dims[5] = _tmgr->getDimNT()/CmiMyNodeSize();
+#else 
+  dims[0] = _tmgr->getDimNX();
+  dims[1] = _tmgr->getDimNY();
+  dims[2] = _tmgr->getDimNZ();
+  dims[3] = _tmgr->getDimNT()/CmiMyNodeSize();
+#endif
+}
+
+extern "C" void TopoManager_getCoordinates(int rank, int *coords) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+  int t;
+#if CMK_BLUEGENEQ
+  _tmgr->rankToCoordinates(CmiNodeFirst(rank),coords[0],coords[1],coords[2],coords[3],coords[4],t);
+#else
+  _tmgr->rankToCoordinates(CmiNodeFirst(rank),coords[0],coords[1],coords[2],t);
+#endif
+}
+
+extern "C" void TopoManager_getPeCoordinates(int rank, int *coords) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+#if CMK_BLUEGENEQ
+  _tmgr->rankToCoordinates(rank,coords[0],coords[1],coords[2],coords[3],coords[4],coords[5]);
+#else
+  _tmgr->rankToCoordinates(rank,coords[0],coords[1],coords[2],coords[3]);
+#endif
+}
+
+void TopoManager_getRanks(int *rank_cnt, int *ranks, int *coords) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+  int rank, numRanks = _tmgr->getDimNT()/CmiMyNodeSize();
+  *rank_cnt = 0;
+  for(int t = 0; t < _tmgr->getDimNT(); t += CmiMyNodeSize()) {
+#if CMK_BLUEGENEQ
+    rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3],coords[4],t);
+#else
+    rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],t);
+#endif
+    if(rank != -1) {
+      ranks[*rank_cnt] = CmiNodeOf(rank);
+      *rank_cnt = *rank_cnt + 1;
+    }
+  }
+}
+
+extern "C" void TopoManager_getPeRank(int *rank, int *coords) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+#if CMK_BLUEGENEQ
+  *rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3],coords[4],coords[5]);
+#else
+  *rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3]);
+#endif
+}
+
+extern "C" void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops) {
+  if(_tmgr == NULL) { TopoManager_reset(); }
+  *hops = _tmgr->getHopsBetweenRanks(pe1, pe2);
+}
+
+extern "C" void TopoManager_createPartitions(int scheme, int *nodeMap) {
+  if(scheme == 0) {
+    int i;
+    for(i = 0; i < CmiNumNodes(); i++) {
+      nodeMap[i] = i;
+    }
+  } else if(scheme == 1) {
+    getPlanarList(nodeMap);
+  } else if(scheme == 2) {
+    getHilbertList(nodeMap);
+  }
+}

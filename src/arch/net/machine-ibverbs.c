@@ -455,16 +455,22 @@ static void CmiMachineInit(char **argv){
 	infiPacket *pktPtrs;
 	struct infiRdmaPacket **rdmaPktPtrs;
         int num_devices, idev;
+#define MAX_DEVICE_NAME 120
+        char *usr_ibv_device_name=NULL;
+        int ibv_device_name_set=0;
 
 	MACHSTATE(3,"CmiMachineInit {");
 	MACHSTATE2(3,"_Cmi_numnodes %d CmiNumNodes() %d",_Cmi_numnodes,CmiNumNodes());
 	MACHSTATE1(3,"CmiMyNodeSize() %d",CmiMyNodeSize());
 	
-	//TODO: make the device and ibport configureable by commandline parameter
-	//Check example for how to do that
 	devList =  ibv_get_device_list(&num_devices);
         CmiAssert(num_devices > 0);
 	CmiAssert(devList != NULL);
+	if (CmiGetArgStringDesc(argv,"+IBVDeviceName",&usr_ibv_device_name,"User set IBV device name"))
+          {
+	    MACHSTATE1(3,"IBVDeviceName set %s",usr_ibv_device_name);
+	    ibv_device_name_set=1;
+          }
 
 	context = (struct infiContext *)malloc(sizeof(struct infiContext));
 	MACHSTATE1(3,"context allocated %p",context);
@@ -474,14 +480,12 @@ static void CmiMachineInit(char **argv){
 	MACHSTATE1(3,"context->localAddr allocated %p",context->localAddr);
 
         idev = 0;
-
         // try all devices, can't assume device 0 is IB, it may be ethernet
 loop:
 	dev = devList[idev];
 	CmiAssert(dev != NULL);
 
-	MACHSTATE1(3,"device name %s",ibv_get_device_name(dev));
-
+	MACHSTATE2(3,"device name %s for %d",ibv_get_device_name(dev), idev);
 	//the context for this infiniband device 
 	context->context = ibv_open_device(dev);
 	CmiAssert(context->context != NULL);
@@ -504,6 +508,18 @@ loop:
           else
             goto loop;
         }
+	if(ibv_device_name_set)
+	  {
+	    if(strcmp(usr_ibv_device_name,ibv_get_device_name(dev))==0)
+	      {
+		MACHSTATE2(3, "device %d selected for user requested IBVDeviceName %s\n",idev, ibv_get_device_name(dev));
+	      }
+	    else
+	      { // force increment to next device
+		if(ibPort != MAXPORT) ++idev;
+		goto loop;
+	      }
+	  }
 	context->ibPort = ibPort;
 	MACHSTATE1(3,"use port %d", ibPort);
 	

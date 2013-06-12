@@ -86,10 +86,6 @@ struct _SYSTEM_INFO sysinfo;
 #endif
   if (a == -1) a = 1;
 
-#if defined(ARCH_HPUX11) || defined(ARCH_HPUX10)
-  a = mpctl(MPC_GETNUMSPUS, 0, 0); /* total number of CPUs */
-#endif /* HPUX */
-
   return a;
 }
 

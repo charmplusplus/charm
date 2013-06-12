@@ -24,57 +24,6 @@
 
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 
-// XDIM, YDIM, ZDIM and MAXNID depend on a specific Cray installation.
-// Please do NOT expect things to work if you use this code on a new
-// Cray machine.
-
-/*
-#if XT4_TOPOLOGY
-#define MAXNID 14000
-#define XDIM 21
-#define YDIM 16
-#define ZDIM 24
-#define TDIM 4
-#define CPU_FACTOR 1
-
-#elif XT5_TOPOLOGY
-#define MAXNID 22020
-#define XDIM 25
-#define YDIM 32
-#define ZDIM 24
-#define TDIM 12
-#define CPU_FACTOR 1
-
-#elif XE6_TOPOLOGY
-#define CPU_FACTOR 2
-// hopper 
-#define MAXNID 6384
-#define XDIM 17
-#define YDIM 8
-#define ZDIM 24
-#define TDIM 24
-#if 0
-// titan 
-#define MAXNID 9600
-#define XDIM 25
-#define YDIM 16
-#define ZDIM 24
-#define TDIM 16
-// ESS 
-#define MAXNID 4608
-#define XDIM 12
-#define YDIM 8
-#define ZDIM 24
-#define TDIM 32
-// JYC 
-#define MAXNID 97
-#define XDIM 1
-#define YDIM 6
-#define ZDIM 8
-#define TDIM 32
-#endif
-#endif
-*/
 extern "C" int *pid2nid;
 extern "C" int pidtonid(int numpes);
 extern "C" int getMeshCoord(int nid, int *x, int *y, int *z);
@@ -241,11 +190,7 @@ class XTTorusManager {
     }
 
     inline int coordinatesToRank(int x, int y, int z, int t) {
-      if(coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t] == -1 && ((t+origin.t)>=(dimNT/2))) {
-				return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t-dimNT/2]; 
-			} else {
-				return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t];
-			}
+      return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t];
     }
 };
 
