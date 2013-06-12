@@ -4261,6 +4261,7 @@ void Entry::genClosure(XStr& decls) {
 
   XStr initCode;
   initCode << "        init();\n";
+  initCode << "        __refnum = 0;\n";
 
   if (hasArray) {
     structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
@@ -4603,7 +4604,10 @@ void Entry::genDefs(XStr& str)
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
           XStr precall;
           genCall(str, precall, true, (sdagCon || isWhenEntry), false);
-          str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
+          if (!(sdagCon || isWhenEntry))
+            str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
+          else
+            str << "  \n}\n\n";
       }
   }
 
@@ -5196,18 +5200,19 @@ void Parameter::copyPtr(XStr &str)
   }
 }
 
-void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen)
-{
+void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
+  if (isSDAGGen) {
+    str << "  " << *entry->genClosureTypeNameProxy << "*"
+        << " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
+  }
+
     if (isMarshalled())
     {
         str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
-        if (isSDAGGen) {
-              str << "  " << *entry->genClosureTypeNameProxy << "*" <<
-                " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
-        }
         str<<"  PUP::fromMem implP(impl_buf);\n";
         if (next != NULL && next->next == NULL) {
             if (isArray()) {
+              if (!isSDAGGen) {
                 Type* dt = next->param->type->deref();
                 str << "  " << dt << " " << next->param->name << "; "
                     << next->param->name << " = "
@@ -5216,7 +5221,16 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen)
                 dt = param->type->deref();
                 str << "  " << dt << "* " << param->name << "; "
                     << param->name << " = (" << dt << "*)impl_buf;\n";
+              } else {
+                Type* dt = param->type->deref();
+                str << "  genClosure->" << next->param->name << " = "
+                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+                    << param->type->deref() << ");\n";
+                dt = param->type->deref();
+                str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
+              }
             } else if (next->isArray()) {
+              if (!isSDAGGen) {
                 Type* dt = param->type->deref();
                 str << "  " << dt << " " << param->name << "; "
                     << param->name << " = "
@@ -5225,6 +5239,14 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen)
                 dt = next->param->type->deref();
                 str << "  " << dt << "* " << next->param->name << "; "
                     << next->param->name << " = (" << dt << "*)impl_buf;\n";
+              } else {
+                Type* dt = param->type->deref();
+                str << "  genClosure->" << param->name << " = "
+                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+                    << next->param->type->deref() << ");\n";
+                dt = next->param->type->deref();
+                str << "  genClosure->" << next->param->name << " = (" << dt << "*)impl_buf;\n";
+              }
             } else {
               if (!isSDAGGen)
                 callEach(&Parameter::beginUnmarshall,str);

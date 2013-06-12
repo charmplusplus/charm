@@ -43,20 +43,28 @@ namespace SDAG {
   };
 
   struct MsgClosure : public Closure {
-    void* msg;
+    CkMessage* msg;
 
     MsgClosure() : msg(0) { init(); }
     MsgClosure(CkMigrateMessage*) : msg(0) { init(); }
 
     MsgClosure(CkMessage* msg)
-      : msg(msg) { init(); }
+      : msg(msg) {
+      init();
+      CmiReference(UsrToEnv(msg));
+    }
 
     void pup(PUP::er& p) {
       bool isNull = !msg;
       p | isNull;
-      if (!isNull) CkPupMessage(p, &msg);
+      if (!isNull) CkPupMessage(p, (void**)&msg);
       packClosure(p);
     }
+
+    virtual ~MsgClosure() {
+      if (msg) CmiFree(UsrToEnv(msg));
+    }
+
     PUPable_decl(MsgClosure);
   };
 
@@ -104,11 +112,12 @@ namespace SDAG {
     std::vector<int> anyEntries;
     int speculationIndex;
 
-    Continuation() { }
-    Continuation(CkMigrateMessage*) { }
+    Continuation() : speculationIndex(-1) { }
+    Continuation(CkMigrateMessage*) : speculationIndex(-1) { }
 
     Continuation(int whenID)
-      : whenID(whenID) { }
+      : whenID(whenID)
+      , speculationIndex(-1) { }
 
     void pup(PUP::er& p) {
       p | whenID;

@@ -1469,6 +1469,9 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
   generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
   defs << "    SDAG::CCounter *" << counter << "= new SDAG::CCounter(" <<
     (int)constructs->size() << ");\n";
+
+  defs << "    " << counter << "->ref();\n";
+
   for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
        ++it) {
     defs << "    ";
@@ -1501,7 +1504,7 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
   defs << "      olist_" << counter << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
-  defs << "      delete " << counter << ";\n";
+  defs << "    " << counter << "->deref();\n";
 
 #if CMK_BIGSIM_CHARM
   generateListEventBracket(defs, SOLIST_END);
@@ -1542,6 +1545,8 @@ void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry)
 void SdagConstruct::generateCaseList(XStr& decls, XStr& defs, Entry* entry) {
   generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
   defs << "    SDAG::CSpeculator* " << counter << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
+  
+  defs << "    " << counter << "->ref();\n";
   defs << "    SDAG::Continuation* c = 0;\n";
   for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
        ++it) {
@@ -1557,7 +1562,7 @@ void SdagConstruct::generateCaseList(XStr& decls, XStr& defs, Entry* entry) {
 
   generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
 
-  defs << "    delete " << counter << ";\n";
+  defs << "    " << counter << "->deref();\n";
   defs << "    ";
   generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
