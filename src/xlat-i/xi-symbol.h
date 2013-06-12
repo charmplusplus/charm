@@ -104,10 +104,6 @@ protected:
   int line;
 public:
   AstNode(int line_ = -1) : line(line_) { }
-    virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-    {
-      (void)declstr; (void)defstr; (void)defconstr; (void)connectPresent;
-    }
     virtual void outputClosures(XStr& str) { (void)str; }
     virtual void genDecls(XStr& str) { (void)str; }
     virtual void genDefs(XStr& str) { (void)str; }
@@ -174,7 +170,6 @@ public:
   void genDefs(XStr& str);
   void genReg(XStr& str);
   void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
-  void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
 
   // Accelerated Entry Method support
   int genAccels_spe_c_funcBodies(XStr& str);
@@ -611,7 +606,6 @@ class Template : public Construct {
     Template(TVarList *t, TEntity *e) : tspec(t), entity(e) {}
     virtual void setExtern(int e);
     void print(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genSpec(XStr& str);
@@ -797,7 +791,6 @@ class Chare : public TEntity {
     void check();
     void genDefs(XStr& str);
     void genReg(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr &str);
     void preprocess();
 
@@ -1051,8 +1044,6 @@ private:
     CEntry *entryPtr;
     const char *intExpr;
     ParamList *param;
-    ParamList *connectParam;
-    int isConnect;
     int isWhenEntry;
 
     void addEStateVar(CStateVar *sv) {
@@ -1076,9 +1067,8 @@ private:
     int accel_dmaList_numWriteOnly;
     int accel_dmaList_scalarNeedsWrite;
 
-    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0, int connect=0, ParamList *connectPList =0);
+    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0);
     void setChare(Chare *c);
-    int isConnectEntry(void) { return isConnect; }
     int paramIsMarshalled(void) { return param->isMarshalled(); }
     int getStackSize(void) { return (stacksize ? stacksize->getIntVal() : 0); }
     int isThreaded(void) { return (attribs & STHREADED); }
@@ -1108,7 +1098,6 @@ private:
     void print(XStr& str);
     void check();
     void genIndexDecls(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
@@ -1186,7 +1175,6 @@ class Module : public Construct {
     void prependConstruct(Construct *c) { clist = new ConstructList(-1, c, clist); }
     void preprocess();
     void genDepend(const char *cifile);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
@@ -1307,8 +1295,6 @@ private:
   void generateOlist(XStr& decls, XStr& defs, Entry* entry);
   void generateSdagEntry(XStr& decls, XStr& defs, Entry *entry);
   void generateSlist(XStr& decls, XStr& defs, Entry* entry);
-  void generateForward(XStr& decls, XStr& defs, Entry* entry);
-  void generateConnect(XStr& decls, XStr& defs, Entry* entry);
   void generateCaseList(XStr& decls, XStr& defs, Entry* entry);
 
 protected:
@@ -1323,9 +1309,8 @@ protected:
   void generateListEventBracket(XStr& defs, int eventType);
   void generateChildrenCode(XStr& decls, XStr& defs, Entry* entry);
   void generateChildrenEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
-  void propagateStateToChildren(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  void propagateStateToChildren(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   std::list<SdagConstruct *> *constructs;
-  std::list<SdagConstruct *> *publishesList;
   std::list<CStateVar *> *stateVars;
   std::list<EncapState*> encapState, encapStateChild;
   std::list<CStateVar *> *stateVarsChildren;
@@ -1342,7 +1327,6 @@ public:
   SdagConstruct *next;
   ParamList *param;
   XStr *text;
-  XStr *connectEntry;
   int nextBeginOrEnd;
   EntryList *elist;
   Entry* entry;
@@ -1355,26 +1339,21 @@ public:
               SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el);
 
   SdagConstruct(EToken t, const char *str) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0), elist(0)
-  { text = new XStr(str); constructs = new std::list<SdagConstruct*>();
-    publishesList = new std::list<SdagConstruct*>(); }
+  { text = new XStr(str); constructs = new std::list<SdagConstruct*>(); }
                                              
  
   SdagConstruct(EToken t) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0), elist(0)
-  { publishesList = new std::list<SdagConstruct*>();
-		  constructs = new std::list<SdagConstruct*>(); }
+  { constructs = new std::list<SdagConstruct*>(); }
 
   SdagConstruct(EToken t, XStr *txt) : type(t), traceName(NULL), text(txt), con1(0), con2(0), con3(0), con4(0), elist(0)
-  { publishesList = new std::list<SdagConstruct*>();
-		  constructs = new std::list<SdagConstruct*>();  }
+  { constructs = new std::list<SdagConstruct*>();  }
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
   void numberNodes(void);
   void labelNodes();
   XStr* createLabel(const char* str, int nodeNum);
-  void generateConnectEntryList(std::list<SdagConstruct*>&);
-  void generateConnectEntries(XStr&);
   virtual void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
   void propagateState(int);
-  virtual void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  virtual void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   virtual void generateCode(XStr& decls, XStr& defs, Entry *entry);
   void generateWhenCode(XStr& op);
   void generateWhenCodeNew(XStr& op);
@@ -1402,7 +1381,7 @@ public:
     , speculativeState(0)
   { }
   void generateEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
-  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateEntryName(XStr& defs, Entry* e, int curEntry);
 };
 
@@ -1410,11 +1389,11 @@ extern void RemoveSdagComments(char *);
 
 class AtomicConstruct : public SdagConstruct {
 public:
-  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int );
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateCode(XStr&, XStr&, Entry *);
   void generateTrace();
-  AtomicConstruct(const char *code, SdagConstruct *pub_list, const char *trace_name)
-    : SdagConstruct(SATOMIC, NULL, pub_list, 0,0,0,0,0)
+  AtomicConstruct(const char *code, const char *trace_name)
+    : SdagConstruct(SATOMIC, NULL, 0, 0, 0, 0, 0, 0)
   {
     char *tmp = strdup(code);
     RemoveSdagComments(tmp);

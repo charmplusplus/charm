@@ -336,17 +336,6 @@ AstChildren<Child>::genReg(XStr& str)
 }
 
 template <typename Child>
-void
-AstChildren<Child>::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-    for (typename list<Child*>::iterator i = children.begin(); i != children.end(); ++i)
-	if (*i) {
-	    (*i)->genPub(declstr, defstr, defconstr, connectPresent);
-	    declstr << endx;
-	}
-}
-
-template <typename Child>
 template <typename T>
 void
 AstChildren<Child>::recurse(T t, void (Child::*fn)(T))
@@ -600,14 +589,6 @@ Module::generate()
     declstr << "extern \"C\" void CkRegisterMainModule(void);\n";
   }
 
-  // Generate the publish class if there are structured dagger connect entries
-  int connectPresent = 0;
-  if (clist) clist->genPub(pubDeclStr, pubDefStr, pubDefConstr, connectPresent);
-  if (connectPresent == 1) {
-     pubDeclStr << "};\n\n";
-     pubDefConstr <<"}\n\n";
-  }
-
   // defstr << "#ifndef _DEFS_"<<name<<"_H_"<<endx;
   // defstr << "#define _DEFS_"<<name<<"_H_"<<endx;
   genDefs(defstr);
@@ -668,11 +649,6 @@ Module::generate()
   }
   decl<<declstr.get_string();
   def<<defstr.get_string();
-  if (connectPresent == 1) {
-    decl << pubDeclStr;
-    def << pubDefConstr;
-    def << pubDefStr;
-  }
 
   // DMK - Accel Support
   #if CMK_CELL != 0
@@ -950,18 +926,6 @@ Chare::genRegisterMethodDef(XStr& str)
 }
 
 void
-Chare::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-  if(type->isTemplated())
-    return;
-  else
-  {
-    if(list)
-      list->genPub(declstr, defstr, defconstr, connectPresent);
-  }
-}
-
-void
 Chare::outputClosures(XStr& str) {
   str << closures;
 }
@@ -979,7 +943,7 @@ Chare::genDecls(XStr& str)
   if (isPython()) {
     str << "#include \"PythonCCS.h\"\n";
     if (list) {
-      Entry *etemp = new Entry(0,0,new BuiltinType("void"),"pyRequest",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
+      Entry *etemp = new Entry(0,0,new BuiltinType("void"),"pyRequest",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0);
       list->push_back(etemp);
       etemp->setChare(this);
       //etemp = new Entry(0,0,new BuiltinType("void"),"getPrint",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
@@ -2323,14 +2287,6 @@ Template::genSpec(XStr& str)
 }
 
 void
-Template::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-  if(!external && entity) {
-    entity->genPub(declstr, defstr, defconstr, connectPresent);
-  }
-}
-
-void
 Template::genDecls(XStr& str)
 {
   if(!external && entity) {
@@ -2424,15 +2380,6 @@ void TName::genShort(XStr& str)
 {
   str << name;
 }
-
-void
-Module::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-  if(!external) {
-    if (clist) clist->genPub(declstr, defstr, defconstr, connectPresent);
-  }
-}
-
 
 void
 Module::genDecls(XStr& str)
@@ -2748,8 +2695,8 @@ void ParamList::checkParamList(){
   }
 }
 
-Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int connect, ParamList *connectPList) :
-  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), connectParam(connectPList), isConnect(connect), genClosureTypeName(0), entryPtr(0)
+Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e) :
+  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), genClosureTypeName(0), entryPtr(0)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -4316,120 +4263,6 @@ void Entry::genClosure(XStr& decls) {
     *genClosureTypeName << messageType;
   }
 }
-
-void Entry::genPub(XStr &declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-/*  if (isConnect == 1)
-     printf("Entry is Connected %s\n", name);
-  else
-     printf("Entry is not Connected %s\n", name);
-*/
-  if ((isConnect == 1) && (connectPresent == 0)) {
-     connectPresent = 1;
-     declstr << "class publish\n";
-     declstr << "{\n";
-     declstr << "   public:\n";
-     declstr << "      publish();\n";
-     defconstr << "publish::publish()\n"  << "{\n";
-  }
-  if (isConnect == 1) {
-     defconstr << "   publishflag_" <<getEntryName() << " = 0;\n";
-     defconstr << "   getflag_" <<getEntryName() << " = 0;\n";
-     declstr << "      void " <<getEntryName() <<"(";
-     defstr << "void publish::" << getEntryName() <<"(";
-     ParamList *pl = connectParam;
-     XStr *parameters = new XStr("");
-     int count = 0;
-     int i, numStars;
-     if (pl->isVoid() == 1) {
-	declstr << "void);\n";
-	defstr << "void);\n";
-     }
-     else if (pl->isMessage() == 1){
-	declstr << pl->getBaseName() <<"* " << pl->getGivenName() <<");\n";
-	defstr << pl->getBaseName() <<"* " << pl->getGivenName() <<");\n";
-	defconstr << "   " << pl->getGivenName() <<" = new " << pl->getBaseName() <<"();\n";
-	parameters->append("      ");
-	parameters->append(pl->getBaseName());
-	parameters->append("* ");
-	parameters->append(pl->getGivenName());
-	parameters->append("_msg;\n ");
-     }
-     else {
-	defconstr << "   " << getEntryName() <<"_msg = new CkMarshallMsg();\n";
-	parameters->append("      CkMarshallMsg *");
-	parameters->append(getEntryName());
-	parameters->append("_msg;\n");
-        while(pl != NULL) {
-	  if (count > 0) {
-	    declstr << ", ";
-	    defstr << ", ";
-	  }
-	  if (pl->isPointer() == 1) {
-	  // FIX THE FOLLOWING - I think there could be problems if the original passed in value is deleted
-	    declstr << pl->getBaseName();
-	    defstr << pl->getBaseName();
-	    numStars = pl->getNumStars();
-	    for(i=0; i< numStars; i++) {
-	      declstr << "*";
-	      defstr << "*";
-	    }
-	    declstr << " " <<  pl->getGivenName();
-	    defstr << " " <<  pl->getGivenName();
-	  }
-	  else if (pl->isReference() == 1) {
-	    declstr << pl->getBaseName() <<"& " <<pl->getGivenName();
-	    defstr << pl->getBaseName() <<"& " <<pl->getGivenName();
-	  }
-	  else if (pl->isArray() == 1){
-	    declstr << pl->getBaseName() <<"* " <<pl->getGivenName();
-	    defstr << pl->getBaseName() <<"* " <<pl->getGivenName();
-	  }
-	  else if ((pl->isBuiltin() == 1) || (pl->isNamed() == 1)) {
-	    declstr << pl->getBaseName() <<" " <<pl->getGivenName();
-	    defstr << pl->getBaseName() <<" " <<pl->getGivenName();
-	  }
-	  pl = pl->next;
-	  count++;
-	}
-	declstr << "); \n";
-	defstr << ") { \n";
-     }
-     declstr << "      void get_" << getEntryName() << "(CkCallback cb);\n";
-     declstr << "      int publishflag_" << getEntryName() << ";\n";
-     declstr << "      int getflag_" << getEntryName() << ";\n";
-     declstr << "      CkCallback " << getEntryName() << "_cb;\n";
-     declstr << parameters;
-
-     // Following generates the def publish::connectFunction code
-
-     // Traverse thru parameter list and set the local messages accordingly
-     defstr <<"    const CkEntryOptions *impl_e_opts = NULL;\n";
-     XStr epName = epStr();
-     connectParam->marshall(defstr, epName);
-     defstr << "   " << getEntryName() << "_msg = impl_msg;\n";
-     defstr << "   " << "if (getflag_" << getEntryName() <<" == 1) {\n";
-     // FIX THE FOLLOWING IN CASE MSG IS VOID
-     defstr << "     " << getEntryName() << "_cb.send(" << getEntryName() <<"_msg);\n";
-     defstr << "   }\n";
-     defstr << "   else\n";
-     defstr << "     publishflag_" << getEntryName() << " = 1;\n";
-     defstr << "}\n\n";
-
-     // Following generates the def publish::get_connectFunction code
-
-     defstr << "void publish::get_" << getEntryName() << "(CkCallback cb) {\n";
-     defstr << "   " << getEntryName() << "_cb = cb;\n";
-     defstr << "   if (publishflag_" << getEntryName() << " == 1) {\n";
-     defstr << "     cb.send(" << getEntryName() << "_msg);\n";
-     defstr << "     publishflag_" << getEntryName() << " = 0 ;\n";
-     defstr << "   }\n";
-     defstr << "   else\n";
-     defstr << "     getflag_" << getEntryName() << " = 1;\n";
-     defstr << "}\n";
-  }
-}
-
 
 //This routine is only used in Entry::genDefs.
 // It ends the current procedure with a call to awaken another thread,

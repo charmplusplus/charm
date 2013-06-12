@@ -14,37 +14,31 @@ using std::mem_fun;
 
 namespace xi {
 
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
-{
+SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1) {
   con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
   elist = 0;
   type = t;
   traceName=NULL;
-  publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
   constructs->push_back(construct1);
 }
 
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList)
-{
+SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList) {
   con1=0; con2=0; con3=0; con4=0;
   type = t;
   elist = 0;
   traceName=NULL;
-  publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
   constructs->push_back(construct1);
   constructs->insert(constructs->end(), aList->constructs->begin(), aList->constructs->end());
 }
 
 SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
-			     SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el)
-{
+			     SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el) {
   text = txt;
   type = t;
   traceName=NULL;
   con1 = c1; con2 = c2; con3 = c3; con4 = c4;
-  publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
   if (constructAppend != 0) {
     constructs->push_back(constructAppend);
@@ -52,46 +46,39 @@ SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstru
   elist = el;
 }
 
-SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl)
-{
+SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl) {
   type = t;
   traceName=NULL;
   text = new XStr(codeStr);
-  connectEntry = new XStr(entryStr);
   con1 = 0; con2 = 0; con3 = 0; con4 =0;
-  publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
   param = pl;
   elist = 0;
 }
 
-void SdagConstruct::numberNodes(void)
-{
+void SdagConstruct::numberNodes(void) {
   switch(type) {
-    case SSDAGENTRY: nodeNum = numSdagEntries++; break;
-    case SOVERLAP: nodeNum = numOverlaps++; break;
-    case SWHEN: nodeNum = numWhens++; break;
-    case SFOR: nodeNum = numFors++; break;
-    case SWHILE: nodeNum = numWhiles++; break;
-    case SIF: nodeNum = numIfs++; if(con2!=0) con2->numberNodes(); break;
-    case SELSE: nodeNum = numElses++; break;
-    case SFORALL: nodeNum = numForalls++; break;
-    case SSLIST: nodeNum = numSlists++; break;
-    case SOLIST: nodeNum = numOlists++; break;
-    case SATOMIC: nodeNum = numAtomics++; break;
-    case SFORWARD: nodeNum = numForwards++; break;
-    case SCONNECT: nodeNum = numConnects++; break;
-    case SCASE: nodeNum = numCases++; break;
-    case SCASELIST: nodeNum = numCaseLists++; break;
-    case SINT_EXPR:
-    case SIDENT: 
-    default:
-      break;
+  case SSDAGENTRY: nodeNum = numSdagEntries++; break;
+  case SOVERLAP: nodeNum = numOverlaps++; break;
+  case SWHEN: nodeNum = numWhens++; break;
+  case SFOR: nodeNum = numFors++; break;
+  case SWHILE: nodeNum = numWhiles++; break;
+  case SIF: nodeNum = numIfs++; if(con2!=0) con2->numberNodes(); break;
+  case SELSE: nodeNum = numElses++; break;
+  case SFORALL: nodeNum = numForalls++; break;
+  case SSLIST: nodeNum = numSlists++; break;
+  case SOLIST: nodeNum = numOlists++; break;
+  case SATOMIC: nodeNum = numAtomics++; break;
+  case SCASE: nodeNum = numCases++; break;
+  case SCASELIST: nodeNum = numCaseLists++; break;
+  case SINT_EXPR:
+  case SIDENT: 
+  default:
+    break;
   }
   SdagConstruct *cn;
-  if (constructs != 0) {
+  if (constructs != 0)
     for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::numberNodes));
-  }
 }
 
 XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
@@ -126,8 +113,6 @@ void SdagConstruct::labelNodes() {
   case SSLIST: label = createLabel("_slist_", nodeNum); break;
   case SOLIST: label = createLabel("_olist_", nodeNum); break;
   case SATOMIC: label = createLabel("_atomic_", nodeNum); break;
-  case SFORWARD: label = createLabel("_forward_", nodeNum); break;
-  case SCONNECT: label = createLabel("_connect_", nodeNum); break;
   case SCASE: label = createLabel("_case_", nodeNum); break;
   case SCASELIST: label = createLabel("_caselist_", nodeNum); break;
   case SINT_EXPR: case SIDENT: default: break;
@@ -137,19 +122,15 @@ void SdagConstruct::labelNodes() {
     for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::labelNodes));
 }
 
-void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
-{
-   EntryList *el;
-   el = this;
-   while (el != NULL)
-   {
+void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
+   EntryList *el = this;
+   while (el != NULL) {
      el->entry->generateEntryList(CEntrylist, thisWhen);
      el = el->next;
    }
 }
 
-void Entry::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
-{
+void Entry::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
    // case SENTRY:
    bool found = false;
    
@@ -211,65 +192,24 @@ void Entry::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen
       //break;
 }
 
-void SdagConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
-{
+void SdagConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
   if (SIF == type && con2 != 0)
     con2->generateEntryList(CEntrylist, thisWhen);
   generateChildrenEntryList(CEntrylist, thisWhen);
 }
 
-void WhenConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
-{
+void WhenConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
   elist->generateEntryList(CEntrylist, this);  /* con1 is the WHEN's ELIST */
   generateChildrenEntryList(CEntrylist, thisWhen);
 }
 
-void SdagConstruct::generateChildrenEntryList(list<CEntry*>& CEntrylist,
-                                              WhenConstruct *thisWhen) {
-  if (constructs != 0) {
-    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
-         ++it)
+void SdagConstruct::generateChildrenEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
+  if (constructs != 0)
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end(); ++it)
       (*it)->generateEntryList(CEntrylist, thisWhen);
-  }
 }
 
-void SdagConstruct::generateConnectEntries(XStr& decls) {
-   decls << "  void " <<connectEntry << "(";
-   ParamList *pl = param;
-   XStr msgParams;
-   if (pl->isVoid() == 1) {
-     decls << "void";
-   }
-   else if (pl->isMessage() == 1){
-     decls << pl->getBaseName() <<" *" <<pl->getGivenName();
-   }
-   else {
-    decls << "CkMarshallMsg *" /*<< connectEntry*/ <<"_msg";
-   }
-   decls << ") {\n";
-
-   if (!pl->isVoid() && !pl->isMessage()) {
-    msgParams <<"   char *impl_buf= _msg->msgBuf;\n";
-    param->beginUnmarshall(msgParams);
-   }
-
-   decls << msgParams <<"\n";
-   decls << "  " <<text <<"\n";
-
-   decls << "  }\n";
-}
-
-void SdagConstruct::generateConnectEntryList(list<SdagConstruct*>& ConnectEList) {
-  if (type == SCONNECT)
-     ConnectEList.push_back(this);
-  if (constructs != 0) {
-    for (list<SdagConstruct*>::iterator iter = constructs->begin(); iter != constructs->end(); ++iter)
-      (*iter)->generateConnectEntryList(ConnectEList);
-  }
-}
-
-void SdagConstruct::propagateState(int uniqueVarNum)
-{ 
+void SdagConstruct::propagateState(int uniqueVarNum) {
   CStateVar *sv; 
   list<EncapState*> encap;
 
@@ -310,11 +250,10 @@ void SdagConstruct::propagateState(int uniqueVarNum)
   list<CStateVar*> whensEntryMethodStateVars;
   for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
        ++it)
-    (*it)->propagateState(encap, *stateVarsChildren, whensEntryMethodStateVars, *publishesList, uniqueVarNum);
+    (*it)->propagateState(encap, *stateVarsChildren, whensEntryMethodStateVars, uniqueVarNum);
 }
 
-void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum)
-{
+void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist, int uniqueVarNum) {
   CStateVar *sv;
   list<CStateVar*> *whensEntryMethodStateVars = NULL;
 
@@ -359,7 +298,7 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
     case SIF:
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
-      if(con2 != 0) con2->propagateState(encap, plist, wlist, publist, uniqueVarNum);
+      if(con2 != 0) con2->propagateState(encap, plist, wlist, uniqueVarNum);
       break;
     case SCASELIST:
       stateVarsChildren = new list<CStateVar*>(plist);
@@ -414,11 +353,6 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
       break;
-    case SFORWARD:
-      stateVarsChildren = new list<CStateVar*>(wlist);
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      break;
-    case SCONNECT: 
     case SINT_EXPR:
     case SIDENT:
     case SENTRY:
@@ -432,11 +366,11 @@ void SdagConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
 
   encapStateChild = encap;
 
-  propagateStateToChildren(encap, *stateVarsChildren, wlist, publist, uniqueVarNum);
+  propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
   delete whensEntryMethodStateVars;
 }
 
-void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
+void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
   CStateVar *sv;
   list<CStateVar*> whensEntryMethodStateVars;
   list<CStateVar*> whenCurEntry;
@@ -478,35 +412,23 @@ void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
 
   encapStateChild = encap;
 
-  propagateStateToChildren(encap, *stateVarsChildren, whensEntryMethodStateVars, publist, uniqueVarNum);
+  propagateStateToChildren(encap, *stateVarsChildren, whensEntryMethodStateVars, uniqueVarNum);
 }
 
 
-void AtomicConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
+void AtomicConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist, int uniqueVarNum) {
   stateVars = new list<CStateVar*>();
   stateVars->insert(stateVars->end(), plist.begin(), plist.end());
   stateVarsChildren = stateVars;
 
   encapState = encap;
   encapStateChild = encap;
-
-  if (con1 != 0) {
-    publist.push_back(con1);
-    /*SdagConstruct *sc;
-    SdagConstruct *sc1;
-    for(sc =publist.begin(); !publist.end(); sc=publist.next()) {
-       for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
-       printf("Publist = %s\n", sc1->text->charstar());
-    }*/
-  }
 }
 
-void SdagConstruct::propagateStateToChildren(list<EncapState*> encap, list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
-  if (constructs != 0) {
-    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
-         ++it)
-      (*it)->propagateState(encap, stateVarsChildren, wlist, publist, uniqueVarNum);
-  }
+void SdagConstruct::propagateStateToChildren(list<EncapState*> encap, list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, int uniqueVarNum) {
+  if (constructs != 0)
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end(); ++it)
+      (*it)->propagateState(encap, stateVarsChildren, wlist, uniqueVarNum);
 }
 
 void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
@@ -523,19 +445,15 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
   case SFOR: generateFor(decls, defs, entry); break;
   case SCASE: case SOVERLAP: generateOverlap(decls, defs, entry); break;
   case SCASELIST: generateCaseList(decls, defs, entry); break;
-  case SFORWARD: generateForward(decls, defs, entry); break;
-  case SCONNECT: generateConnect(decls, defs, entry); break;
   default: break;
   }
   generateChildrenCode(decls, defs, entry);
 }
 
 void SdagConstruct::generateChildrenCode(XStr& decls, XStr& defs, Entry* entry) {
-  if (constructs != 0) {
-    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
-         ++it)
+  if (constructs != 0)
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end(); ++it)
       (*it)->generateCode(decls, defs, entry);
-  }
 }
 
 void SdagConstruct::buildTypes(list<EncapState*>& state) {
@@ -570,40 +488,6 @@ void SdagConstruct::generateWhenCodeNew(XStr& op) {
 }
 
 void SdagConstruct::generateWhenCode(XStr& op) {
-}
-
-void SdagConstruct::generateConnect(XStr& decls, XStr& defs, Entry* entry) {
-  generateSignature(decls, defs, entry, false, "void", label, false, NULL);
-  defs << "    int index;\n";
-  if ((param->isVoid() == 0) && (param->isMessage() == 0)) {
-     defs << "    CkMarshallMsg *x;\n";
-     defs << "    index = CkIndex_Ar1::" <<connectEntry <<"(x);\n";  //replace
-     defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
-  }
-  else if (param->isVoid() == 1) {
-     defs << "    index = CkIndex_Ar1::" <<connectEntry <<"(void);\n";  //replace
-     defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
-  }
-  else {
-     defs << "    " << param->getBaseName() <<" *x;\n";  // replace
-     defs << "    index = CkIndex_Ar1::" <<connectEntry <<"(x);\n";  //replace
-     defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
-  }
-  defs << "    myPublish->get_" <<connectEntry <<"(cb);\n";  //replace - myPublish
-
-  endMethod(defs);
-}
-
-void SdagConstruct::generateForward(XStr& decls, XStr& defs, Entry* entry) {
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
-       ++it) {
-    defs << "    { ";
-    generateCall(defs, *stateVarsChildren, (*it)->text);
-    defs<<" }\n";
-  }
-  generateCall(defs, *stateVarsChildren, next->label, nextBeginOrEnd ? 0 : "_end");
-  endMethod(defs);
 }
 
 void WhenConstruct::generateEntryName(XStr& defs, Entry* e, int curEntry) {
@@ -1344,9 +1228,6 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
         ++it;
 
         for(; it != constructs->end(); ++it) {
-	  if ((*it)->type == SCONNECT)
-	    continue;
-
           cn->setNext(*it, 1);
           cn = *it;
         }
@@ -1373,7 +1254,6 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
     case SFOR:
     case SWHILE:
     case SATOMIC:
-    case SFORWARD:
     case SELSE:
       next = n;
       nextBeginOrEnd = boe;

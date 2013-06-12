@@ -53,7 +53,6 @@ void CParsedFile::doProcess(XStr& classname, XStr& decls, XStr& defs) {
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::numberNodes));
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::labelNodes));
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<int>(&SdagConstruct::propagateState, 0));
-  generateConnectEntryList();
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::generateTrace));
   generateEntryList();
   mapCEntry();
@@ -87,13 +86,6 @@ void CParsedFile::generateEntryList(void)
   }
 }
 
-void CParsedFile::generateConnectEntryList(void)
-{
-  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
-    (*cn)->sdagCon->generateConnectEntryList(connectEntryList);
-  }
-}
-
 void CParsedFile::generateCode(XStr& decls, XStr& defs)
 {
   for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
@@ -105,8 +97,6 @@ void CParsedFile::generateCode(XStr& decls, XStr& defs)
 void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 {
   decls << "public:\n";
-  for(list<SdagConstruct *>::iterator sc=connectEntryList.begin(); sc != connectEntryList.end(); ++sc)
-    (*sc)->generateConnectEntries(decls);
   for(list<CEntry*>::iterator en = entryList.begin(); en != entryList.end(); ++en) {
     (*en)->generateCode(decls, defs);
   }
