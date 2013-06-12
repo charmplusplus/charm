@@ -84,7 +84,7 @@ void SdagConstruct::numberNodes(void) {
 XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
   char text[128];
   if (nodeNum != -1)
-    sprintf(text, "%s_%d", str, nodeNum);
+    sprintf(text, "%s%d", str, nodeNum);
   else
     sprintf(text, "%s", str);
 
