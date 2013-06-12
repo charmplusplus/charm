@@ -94,86 +94,47 @@ void SdagConstruct::numberNodes(void)
   }
 }
 
-void SdagConstruct::labelNodes(void)
-{
+XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
   char text[128];
+  if (nodeNum != -1)
+    sprintf(text, "%s_%d", str, nodeNum);
+  else
+    sprintf(text, "%s", str);
+
+  return new XStr(text);
+}
+
+void SdagConstruct::labelNodes() {
   switch(type) {
-    case SSDAGENTRY:
-      sprintf(text, "%s", con1->text->charstar());
-      label = new XStr(text);
-      break;
-    case SOVERLAP: 
-      sprintf(text, "_overlap_%d", nodeNum); 
-      label = new XStr(text);
-      break;
-    case SWHEN: 
-      sprintf(text, "_when_%d", nodeNum); 
-      label = new XStr(text);
-      EntryList *el;
-      el = elist;
-      while (el !=NULL) {
-        el->entry->label = new XStr(el->entry->name);
-        el=el->next; 
-      }
-      break;
-    case SFOR: 
-      sprintf(text, "_for_%d", nodeNum); 
-      label = new XStr(text);
-      break;
-    case SWHILE: 
-      sprintf(text, "_while_%d", nodeNum); 
-      label = new XStr(text);
-      break;
-    case SIF: 
-      sprintf(text, "_if_%d", nodeNum); 
-      label = new XStr(text);
-      if(con2!=0) con2->labelNodes();
-      break;
-    case SELSE: 
-      sprintf(text, "_else_%d", nodeNum); 
-      label = new XStr(text);
-      break;
-    case SFORALL: 
-      sprintf(text, "_forall_%d", nodeNum); 
-      label = new XStr(text);
-      break;
-    case SSLIST: 
-      sprintf(text, "_slist_%d", nodeNum); 
-      label = new XStr(text);
-      break;
-    case SOLIST: 
-      sprintf(text, "_olist_%d", nodeNum); 
-      label = new XStr(text);
-      break;
-    case SATOMIC: 
-      sprintf(text, "_atomic_%d", nodeNum); 
-      label = new XStr(text);
-      break;
-    case SFORWARD: 
-      sprintf(text, "_forward_%d", nodeNum); 
-      label = new XStr(text);
-      break;
-    case SCONNECT:
-      sprintf(text, "_connect_%s",connectEntry->charstar()); 
-      label = new XStr(text);
-      break;
-    case SCASE:
-      sprintf(text, "_case_%d", nodeNum);
-      label = new XStr(text);
-      break;
-    case SCASELIST:
-      sprintf(text, "_caselist_%d", nodeNum);
-      label = new XStr(text);
-      break;
-    case SINT_EXPR:
-    case SIDENT:
-    default:
-      break;
+  case SSDAGENTRY: label = createLabel(con1->text->charstar(), -1); break;
+  case SOVERLAP: label = createLabel("_overlap_", nodeNum); break;
+  case SWHEN: label = createLabel("_when_", nodeNum);
+    EntryList *el;
+    el = elist;
+    while (el !=NULL) {
+      el->entry->label = new XStr(el->entry->name);
+      el = el->next;
+    }
+    break;
+  case SFOR: label = createLabel("_for_", nodeNum); break;
+  case SWHILE: label = createLabel("_while_", nodeNum); break;
+  case SIF: label = createLabel("_if_", nodeNum);
+    if (con2 != 0) con2->labelNodes();
+    break;
+  case SELSE: label = createLabel("_else_", nodeNum); break;
+  case SFORALL: label = createLabel("_forall_", nodeNum); break;
+  case SSLIST: label = createLabel("_slist_", nodeNum); break;
+  case SOLIST: label = createLabel("_olist_", nodeNum); break;
+  case SATOMIC: label = createLabel("_atomic_", nodeNum); break;
+  case SFORWARD: label = createLabel("_forward_", nodeNum); break;
+  case SCONNECT: label = createLabel("_connect_", nodeNum); break;
+  case SCASE: label = createLabel("_case_", nodeNum); break;
+  case SCASELIST: label = createLabel("_caselist_", nodeNum); break;
+  case SINT_EXPR: case SIDENT: default: break;
   }
   SdagConstruct *cn;
-  if (constructs != 0) {
+  if (constructs != 0)
     for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::labelNodes));
-  }
 }
 
 void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)

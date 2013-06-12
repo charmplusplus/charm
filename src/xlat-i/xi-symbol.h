@@ -1368,7 +1368,8 @@ public:
 		  constructs = new std::list<SdagConstruct*>();  }
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
   void numberNodes(void);
-  void labelNodes(void);
+  void labelNodes();
+  XStr* createLabel(const char* str, int nodeNum);
   void generateConnectEntryList(std::list<SdagConstruct*>&);
   void generateConnectEntries(XStr&);
   virtual void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
