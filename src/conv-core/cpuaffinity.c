@@ -764,11 +764,11 @@ void CmiInitCPUAffinity(char **argv)
 
 /* called in ConverseCommonInit to initialize basic variables */
 void CmiInitCPUAffinityUtil(){
+    char fname[64];
     CpvInitialize(int, myCPUAffToCore);
     CpvAccess(myCPUAffToCore) = -1;
 #if CMK_OS_IS_LINUX
     CpvInitialize(void *, myProcStatFP);
-    char fname[64];
     CmiLock(_smp_mutex);
 #if CMK_SMP
     sprintf(fname, "/proc/%d/task/%d/stat", getpid(), syscall(SYS_gettid));

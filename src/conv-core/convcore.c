@@ -606,10 +606,11 @@ int CmiIsFortranLibraryCall() {
   if (nLevels>0) {
     int i;
     char **names=CmiBacktraceLookup(stackPtrs,nLevels);
+    const char *trimmed;
     if (names==NULL) return 0;
     for (i=0;i<nLevels;i++) {
       if (names[i] == NULL) continue;
-      const char *trimmed=_implTrimParenthesis(names[i], 1);
+      trimmed=_implTrimParenthesis(names[i], 1);
       if (strncmp(trimmed, "for__", 5) == 0                /* ifort */
           || strncmp(trimmed, "_xlf", 4) == 0               /* xlf90 */
           || strncmp(trimmed, "_xlfBeginIO", 11) == 0 
