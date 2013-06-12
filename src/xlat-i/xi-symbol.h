@@ -1412,7 +1412,6 @@ class AtomicConstruct : public SdagConstruct {
 public:
   void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int );
   void generateCode(XStr&, XStr&, Entry *);
-  void generateCodeNew(XStr&, XStr&, Entry *);
   void generateTrace();
   AtomicConstruct(const char *code, SdagConstruct *pub_list, const char *trace_name)
     : SdagConstruct(SATOMIC, NULL, pub_list, 0,0,0,0,0)

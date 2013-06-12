@@ -528,50 +528,23 @@ void SdagConstruct::propagateStateToChildren(list<EncapState*> encap, list<CStat
   }
 }
 
-void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
-{
+void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
   switch(type) {
-    case SSDAGENTRY:
-      generateSdagEntry(decls, defs, entry);
-      break;
-    case SSLIST:
-      generateSlist(decls, defs, entry);
-      break;
-    case SOLIST:
-      generateOlist(decls, defs, entry);
-      break;
-    case SFORALL:
-      generateForall(decls, defs, entry);
-      break;
-    case SIF:
-      generateIf(decls, defs, entry);
-      if(con2 != 0)
-        con2->generateCode(decls, defs, entry);
-      break;
-    case SELSE:
-      generateElse(decls, defs, entry);
-      break;
-    case SWHILE:
-      generateWhile(decls, defs, entry);
-      break;
-    case SFOR:
-      generateFor(decls, defs, entry);
-      break;
-    case SCASE:
-    case SOVERLAP:
-      generateOverlap(decls, defs, entry);
-      break;
-    case SFORWARD:
-      generateForward(decls, defs, entry);
-      break;
-    case SCONNECT:
-      generateConnect(decls, defs, entry);
-      break;
-    case SCASELIST:
-      generateCaseList(decls, defs, entry);
-      break;
-    default:
-      break;
+  case SSDAGENTRY: generateSdagEntry(decls, defs, entry); break;
+  case SSLIST: generateSlist(decls, defs, entry); break;
+  case SOLIST: generateOlist(decls, defs, entry); break;
+  case SFORALL: generateForall(decls, defs, entry); break;
+  case SIF: generateIf(decls, defs, entry);
+    if(con2 != 0) con2->generateCode(decls, defs, entry);
+    break;
+  case SELSE: generateElse(decls, defs, entry); break;
+  case SWHILE: generateWhile(decls, defs, entry); break;
+  case SFOR: generateFor(decls, defs, entry); break;
+  case SCASE: case SOVERLAP: generateOverlap(decls, defs, entry); break;
+  case SCASELIST: generateCaseList(decls, defs, entry); break;
+  case SFORWARD: generateForward(decls, defs, entry); break;
+  case SCONNECT: generateConnect(decls, defs, entry); break;
+  default: break;
   }
   generateChildrenCode(decls, defs, entry);
 }
@@ -948,7 +921,7 @@ void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
 
 void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry)
 {
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
   defs << "    int __first = (" << con2->text <<
         "), __last = (" << con3->text << 
         "), __stride = (" << con4->text << ");\n";
@@ -956,22 +929,22 @@ void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry)
   defs << "      int __tmp=__first; __first=__last; __last=__tmp;\n";
   defs << "      __stride = -__stride;\n";
   defs << "    }\n";
-  defs << "    CCounter *" << counter <<
-        " = new CCounter(__first,__last,__stride);\n"; 
+  defs << "    SDAG::CCounter *" << counter <<
+        " = new SDAG::CCounter(__first,__last,__stride);\n"; 
   defs << "    for(int " << con1->text <<
         "=__first;" << con1->text <<
         "<=__last;" << con1->text << "+=__stride) {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label);
+  generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
   defs << "    }\n";
   endMethod(defs);
 
-  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
   defs << "    " << counter << "->decrement(); /* DECREMENT 1 */ \n";
   defs << "    if (" << counter << "->isDone()) {\n";
-  defs << "      delete " << counter << ";\n";
+  defs << "      " << counter << "->deref();\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
+  generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
@@ -1187,7 +1160,7 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry) {
   endMethod(defs);
 }
 
-void AtomicConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
+void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
 
   unravelClosures(defs);
@@ -1197,30 +1170,6 @@ void AtomicConstruct::generateCodeNew(XStr& decls, XStr& defs, Entry* entry) {
   defs << "  // end serial block\n";
   defs << "  ";
   generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-  endMethod(defs);
-}
-
-void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
-  generateCodeNew(decls, defs, entry);
-  return;
-
-  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-
-#if CMK_BIGSIM_CHARM
-  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  generateBeginExec(defs, nameStr);
-#endif
-  generateTraceBeginCall(defs);
-
-  defs << "    " << text << "\n";
-
-  generateTraceEndCall(defs);
-#if CMK_BIGSIM_CHARM
-  generateEndExec(defs);
-#endif
-
-  defs << "    ";
-  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
