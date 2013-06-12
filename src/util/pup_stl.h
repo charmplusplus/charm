@@ -40,7 +40,7 @@ template <class charType>
 inline void operator|(PUP::er &p,typename std::basic_string<charType> &v);
 inline void operator|(PUP::er &p,std::string &v);
 template <class container>
-inline int PUP_stl_container_size(PUP::er &p,container &c);
+inline size_t PUP_stl_container_size(PUP::er &p,container &c);
 template <class container, class dtype>
 inline void PUP_stl_container_items(PUP::er &p,container &c);
 template <class container,class dtype>
