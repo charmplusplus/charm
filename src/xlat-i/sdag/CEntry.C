@@ -107,7 +107,6 @@ namespace xi {
         defs << "CkGetRefNum(" << sv->name << "_msg);\n";
       else
         defs << "0;\n";
-      defs << "  CmiReference(UsrToEnv(" << sv->name << "_msg" "));\n";
       defs << "  __dep->pushBuffer(" << entryNum << ", new SDAG::MsgClosure(" << sv->name << "_msg" << "), refnum);\n";
     }
     // @todo write the code to fetch the message with the ref num
