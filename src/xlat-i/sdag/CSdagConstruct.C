@@ -96,12 +96,8 @@ void SdagConstruct::labelNodes() {
   case SSDAGENTRY: label = createLabel(con1->text->charstar(), -1); break;
   case SOVERLAP: label = createLabel("_overlap_", nodeNum); break;
   case SWHEN: label = createLabel("_when_", nodeNum);
-    EntryList *el;
-    el = elist;
-    while (el !=NULL) {
+    for (EntryList *el = elist; el != NULL; el = el->next)
       el->entry->label = new XStr(el->entry->name);
-      el = el->next;
-    }
     break;
   case SFOR: label = createLabel("_for_", nodeNum); break;
   case SWHILE: label = createLabel("_while_", nodeNum); break;
