@@ -4205,6 +4205,7 @@ void Entry::genClosure(XStr& decls) {
   structure << "\n      " << "int __refnum;\n";
 
   toPup << "        packClosure(p);\n";
+  toPup << "        p | __refnum;\n";
 
   XStr initCode;
   initCode << "        init();\n";
