@@ -509,22 +509,6 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   generateSignatureNew(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState);
 
-  // if we have a forall in the closures, we need to unravel the state
-  // @todo do a partial unraveling for performance reasons (however, the
-  // compiler should be able to optimize most of this out)
-  // @todo BUG this may cause name collisions!
-  {
-    bool foundForAll = false;
-    for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter) {
-      EncapState& state = **iter;
-      if (state.isForall) {
-        foundForAll = true;
-        break;
-      }
-    }
-    if (foundForAll) unravelClosures(defs);
-  }
-
   int entryLen = 0;
 
   // count the number of entries this when contains (for logical ands)
@@ -532,6 +516,24 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     int cur = 0;
     for (EntryList *el = elist; el != NULL; el = el->next, cur++) entryLen++;
   }
+
+  // if we have a reference number in the closures, we need to unravel the state
+  int cur = 0;
+  bool hasRef = false;;
+  for (EntryList *el = elist; el != NULL; el = el->next, cur++)
+    if (el->entry->intExpr) {
+      defs << "  int refnum_" << cur << ";\n";
+      hasRef = true;
+    }
+  // create a new scope for unraveling the closures
+  if (hasRef) defs << "  {\n";
+  if (hasRef) unravelClosures(defs);
+  cur = 0;
+  // generate each refnum variable we need that can access the internal closure state
+  for (EntryList *el = elist; el != NULL; el = el->next, cur++)
+    if (el->entry->intExpr)
+      defs << "    refnum_" << cur << " = " << (el->entry->intExpr ? el->entry->intExpr : "0") << ";\n";
+  if (hasRef) defs << "  }\n";
 
   if (entryLen > 1) defs << "  std::set<SDAG::Buffer*> ignore;\n";
 
@@ -545,10 +547,12 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
       Entry* e = el->entry;
       XStr bufName("buf");
       bufName << cur;
+      XStr refName;
+      refName << "refnum_" << cur;
       defs << "  SDAG::Buffer* " << bufName << " = __dep->tryFindMessage("
            << e->entryPtr->entryNum // entry number
            << ", " << (e->intExpr ? "true" : "false") // has a ref number?
-           << ", " << (e->intExpr ? e->intExpr : "0") // the ref number
+           << ", " << (e->intExpr ? refName : "0")  // the ref number
            << ", " << (cur != 0 ? "true" : "false")   // has a ignore set?
            << (entryLen > 1 ? ", ignore" : "") // the ignore set
            << ");\n";
@@ -560,7 +564,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
       // has a refnum, needs to be saved in the trigger
       if (e->intExpr) {
         continutationSpec << "    c->entries.push_back(" << e->entryPtr->entryNum << ");\n";
-        continutationSpec << "    c->refnums.push_back(" << e->intExpr << ");\n";
+        continutationSpec << "    c->refnums.push_back(refnum_" << cur << ");\n";
       } else {
         continutationSpec << "    c->anyEntries.push_back(" << e->entryPtr->entryNum << ");\n";
       }
