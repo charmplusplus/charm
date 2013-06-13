@@ -288,15 +288,15 @@ CpvDeclare(int, _bgCcsAck);
  * worker thread. The function of this function is to receive the CCS message in
  * the bottom converse layer and forward it to the emulated layer. */
 static void bg_req_fw_handler(char *msg) {
+  /* Get out of the message who is the destination pe */
+  int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
+  CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
+  int destPE = (int)ChMessageInt(hdr->pe);
   if (CpvAccess(_bgCcsAck) < BgNodeSize()) {
     CcsBufferMessage(msg);
     return;
   }
   //CmiPrintf("CCS scheduling message\n");
-  /* Get out of the message who is the destination pe */
-  int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
-  CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
-  int destPE = (int)ChMessageInt(hdr->pe);
   if (destPE == -1) destPE = 0;
   if (destPE < -1) {
     ChMessageInt_t *pes_nbo = (ChMessageInt_t *)(msg+CmiReservedHeaderSize+sizeof(CcsImplHeader));

@@ -73,6 +73,10 @@
 
 extern const char * const CmiCommitID;
 
+#if CMK_BIGSIM_CHARM
+extern void initQd(char **argv);
+#endif
+
 #if CMK_OUT_OF_CORE
 #include "conv-ooc.h"
 #endif
@@ -3639,7 +3643,6 @@ void ConverseCommonInit(char **argv)
 
 #if CMK_BIGSIM_CHARM
    /* have to initialize QD here instead of _initCharm */
-  extern void initQd(char **argv);
   initQd(argv);
 #endif
 }
