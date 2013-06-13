@@ -1,7 +1,8 @@
 #!/bin/sh
 
 # Silly shorthand, used for source reorganization
-src="src/arch"
+srcbase="$(cd $(dirname $0)/src/; pwd)"
+src="$srcbase/arch/"
 
 more=0
 
@@ -81,8 +82,8 @@ syntax() {
   echo "  --build-shared     build Charm++ dynamic libraries (.so) "
   echo ''
   echo 'Enable/disable features:'
-  src/scripts/configure --help | grep enable-
-  src/scripts/configure --help | grep with-
+  $srcbase/scripts/configure --help | grep enable-
+  $srcbase/scripts/configure --help | grep with-
   echo "  --with-production       build Charm++ with all optimizations for maximum performance, and disabling all above features"
   echo ''
   echo 'Miscellaneous options:'
@@ -562,16 +563,16 @@ EOF
   $DESTINATION/tmp/system_ln $DESTINATION/include/VERSION VERSION
 fi
 
-$DESTINATION/tmp/system_ln "../../src/scripts/Make.depends" $DESTINATION/tmp/Make.depends
-$DESTINATION/tmp/system_ln "../../src/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
+$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.depends" $DESTINATION/tmp/Make.depends
+$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
 if test -f src/ck-ldb/Make.lb
 then
-$DESTINATION/tmp/system_ln "../../src/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
+$DESTINATION/tmp/system_ln "$srcbase/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 else
 touch $DESTINATION/tmp/Make.lb
 fi
-$DESTINATION/tmp/system_ln "../../src/scripts/Makefile" $DESTINATION/tmp/Makefile
-$DESTINATION/tmp/system_ln "../../src/scripts/Make.tau" $DESTINATION/tmp/Make.tau
+$DESTINATION/tmp/system_ln "$srcbase/scripts/Makefile" $DESTINATION/tmp/Makefile
+$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.tau" $DESTINATION/tmp/Make.tau
 touch $DESTINATION/tmp/Makefile.machine
 touch $DESTINATION/tmp/Make.extlib
 
@@ -657,8 +658,8 @@ fi
 [ -z "$TAU_MAKEFILE" ] && TAU_MAKEFILE="Make.tau"
 SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
 
-sed -e $SED_CHARMC src/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ src/scripts/Makefile && rm -f  .Makefile.$$
-sed -e $SED_CHARMC src/scripts/charmc > .charmc.$$ && cp .charmc.$$ src/scripts/charmc && rm -f .charmc.$$
+sed -e $SED_CHARMC $srcbase/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ $srcbase/scripts/Makefile && rm -f  .Makefile.$$
+sed -e $SED_CHARMC $srcbase/scripts/charmc > .charmc.$$ && cp .charmc.$$ $srcbase/scripts/charmc && rm -f .charmc.$$
 
 if test $WITH_TAU -eq 1
 then
@@ -695,6 +696,7 @@ printError()
 }
 
 echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
+echo "SRCBASE=$srcbase" > $DESTINATION/tmp/charmpath.mk
 
 Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 

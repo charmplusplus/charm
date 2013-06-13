@@ -25,6 +25,8 @@ SHELL=/bin/sh
 L=../lib
 INC=../include
 
+include charmpath.mk
+
 CC=$(CHARMC)
 CXX=$(CHARMC)
 CFLAGS=-I.
@@ -296,7 +298,7 @@ conv-autoconfig.h: configure config_opts.sh
 .PHONY: clean veryclean VERSION.new
 
 VERSION: VERSION.new
-	./commitid.sh
+	SRCBASE=$(SRCBASE) ./commitid.sh
 
 commitid.c: VERSION
 	echo "const char * const CmiCommitID = \"`cat VERSION`\";" > $@
@@ -316,43 +318,43 @@ dirs+sources:
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
 	if case `cat .vdir` in *win32*) true;; *win64*) true;; *) false;; esac; then \
-		cp -f ../../src/arch/`cat .vdir | awk -F- '{print $$2}'`/unix2nt* ../bin; \
-		cp -f ../../src/arch/win32/createlink.exe ../bin; \
+		cp -f $(SRCBASE)/arch/`cat .vdir | awk -F- '{print $$2}'`/unix2nt* ../bin; \
+		cp -f $(SRCBASE)/arch/win32/createlink.exe ../bin; \
 	fi
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../lib_so ; mkdir ../lib_so; touch ../lib_so/.charmso
 	rm -rf ../examples
 	rm -rf ../tests
 	rm -rf ../doc ; ln -s ../doc ../doc
-	../../src/scripts/gatherflat ../../src/scripts .
-	./gatherflat ../../src/conv-core        .
-	./gatherflat ../../src/conv-ldb         .
-	./gatherflat ../../src/conv-ccs         .
-	./gatherflat ../../src/conv-perf	.
-	./gatherflat ../../src/ck-core          .
-	./gatherflat ../../src/ck-perf          .
-	./gatherflat ../../src/ck-tune          .
-	./gatherflat ../../src/ck-ldb           .
-	./gatherflat ../../src/ck-com           .
-	./gatherflat ../../src/ck-cp            .
-	./gatherflat ../../src/conv-com         .
-	./gatherflat ../../src/langs/simplemsg  .
-	./gatherflat ../../src/langs/pvmc       .
-	./gatherflat ../../src/langs/bluegene   .
-	./gatherflat ../../src/langs/f90charm   .
-	./gatherflat ../../src/xlatcpm          .
-	./gathertree ../../src/QuickThreads     QuickThreads
-	./gathertree ../../src/libs             libs
-	./gathertree ../../src/arch/util        .
-	./gathertree ../../src/util             .
-	./gathertree ../../src/langs            langs
-	./gathertree ../../src/langs/jade       langs/jade
-	./gathertree ../../src/arch/common      .
-	./gathertree ../../src/arch/`cat .gdir` .
-	test -f ../../src/arch/`cat .gdir`/gdir_link && cat ../../src/arch/`cat .gdir`/gdir_link > .gdir.new && ./gathertree ../../src/arch/`cat .gdir.new`      . || true
-	./gatherflat ../../src/arch/`cat .vdir` .
-	./gathertree ../../examples             ../examples
-	./gathertree ../../tests                ../tests
+	$(SRCBASE)/scripts/gatherflat $(SRCBASE)/scripts .
+	./gatherflat $(SRCBASE)/conv-core        .
+	./gatherflat $(SRCBASE)/conv-ldb         .
+	./gatherflat $(SRCBASE)/conv-ccs         .
+	./gatherflat $(SRCBASE)/conv-perf	.
+	./gatherflat $(SRCBASE)/ck-core          .
+	./gatherflat $(SRCBASE)/ck-perf          .
+	./gatherflat $(SRCBASE)/ck-tune          .
+	./gatherflat $(SRCBASE)/ck-ldb           .
+	./gatherflat $(SRCBASE)/ck-com           .
+	./gatherflat $(SRCBASE)/ck-cp            .
+	./gatherflat $(SRCBASE)/conv-com         .
+	./gatherflat $(SRCBASE)/langs/simplemsg  .
+	./gatherflat $(SRCBASE)/langs/pvmc       .
+	./gatherflat $(SRCBASE)/langs/bluegene   .
+	./gatherflat $(SRCBASE)/langs/f90charm   .
+	./gatherflat $(SRCBASE)/xlatcpm          .
+	./gathertree $(SRCBASE)/QuickThreads     QuickThreads
+	./gathertree $(SRCBASE)/libs             libs
+	./gathertree $(SRCBASE)/arch/util        .
+	./gathertree $(SRCBASE)/util             .
+	./gathertree $(SRCBASE)/langs            langs
+	./gathertree $(SRCBASE)/langs/jade       langs/jade
+	./gathertree $(SRCBASE)/arch/common      .
+	./gathertree $(SRCBASE)/arch/`cat .gdir` .
+	test -f $(SRCBASE)/arch/`cat .gdir`/gdir_link && cat $(SRCBASE)/arch/`cat .gdir`/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
+	./gatherflat $(SRCBASE)/arch/`cat .vdir` .
+	./gathertree $(SRCBASE)/../examples             ../examples
+	./gathertree $(SRCBASE)/../tests                ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
@@ -478,10 +480,10 @@ include Makefile.machine
 
 $(L)/libconv-cplus-n.a: machine.c $(CVHEADERS)
 	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
-	$(CHARMC) -o machine.o  -DFOR_CPLUS=1 machine.c
+	$(CHARMC) -I. -o machine.o  -DFOR_CPLUS=1 machine.c
 	@-test -f ./bglmachine.C && $(CHARMC) -o machine.o  -DFOR_CPLUS=1 bglmachine.C || true
 	$(CHARMC) -o $(L)/libconv-cplus-y.a machine.o
-	$(CHARMC) -o $(L)/libconv-cplus-n.a -DFOR_CPLUS=0 machine.c
+	$(CHARMC) -I. -o $(L)/libconv-cplus-n.a -DFOR_CPLUS=0 machine.c
 	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
 
 $(L)/libconv-util.a: $(LIBCONV_UTIL)
@@ -892,12 +894,11 @@ CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
 SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o CParsedFile.o
 SDAGHEADERS= CToken.h EToken.h CParsedFile.h sdag-globals.h CEntry.h
 
-SRCDIR = ../../src
 $(CHARMXIOBJ) $(SDAGOBJ): $(XIHEADERS) $(SDAGHEADERS)
 $(CHARMXIOBJ) $(SDAGOBJ): CXX=$(NATIVECHARMC)
-$(CHARMXIOBJ) $(SDAGOBJ): CXXFLAGS=-I$(SRCDIR)/xlat-i/ -I$(SRCDIR)/xlat-i/sdag/ -I.
+$(CHARMXIOBJ) $(SDAGOBJ): CXXFLAGS=-I$(SRCBASE)/xlat-i/ -I$(SRCBASE)/xlat-i/sdag/ -I.
 xi-scan.o: CXXFLAGS+=-DYY_NEVER_INTERACTIVE
-VPATH=$(SRCDIR)/xlat-i:$(SRCDIR)/xlat-i/sdag
+VPATH=$(SRCBASE)/xlat-i:$(SRCBASE)/xlat-i/sdag
 
 charmxi: ../bin/charmxi
 
