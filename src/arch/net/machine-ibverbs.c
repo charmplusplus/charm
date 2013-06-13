@@ -47,7 +47,10 @@ static int maxRecvBuffers;
 static int maxTokens;
 //static int tokensPerProcessor; /*number of outstanding sends and receives between any two nodes*/
 static int sendPacketPoolSize; /*total number of send buffers created*/
-
+#define NON_SRQ
+#ifdef NON_SRQ
+static int minPerProcessorRecvs;
+#endif
 static double _startTime=0;
 static int regCount;
 
@@ -251,8 +254,9 @@ struct infiContext {
 	struct ibv_pd		*pd;
 	struct ibv_cq		*sendCq;
 	struct ibv_cq   *recvCq;
+#ifndef NON_SRQ
 	struct ibv_srq  *srq;
-	
+#endif	
 	struct ibv_qp		**qp; //Array of qps (numNodes long) to temporarily store the queue pairs
 												//It is used between CmiMachineInit and the call to node_addresses_store
 												//when the qps are stored in the corresponding OtherNodes
@@ -265,7 +269,9 @@ struct infiContext {
 
 	struct infiPacketHeader header;
 
+#ifndef NON_SRQ
 	int srqSize;
+#endif	
 	int sendCqSize,recvCqSize;
 	int tokensLeft;
 
@@ -702,6 +708,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 
 	context->qp = (struct ibv_qp **)malloc(sizeof(struct ibv_qp *)*numNodes);
 
+#ifndef NON_SRQ
 	if(numNodes > 1)
 	{
 		context->srqSize = (maxRecvBuffers+2);
@@ -713,17 +720,23 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 		};
 		context->srq = ibv_create_srq(context->pd,&srqAttr);
 		CmiAssert(context->srq != NULL);
-	
+#endif	
 		struct ibv_qp_init_attr initAttr = {
 			.qp_type = IBV_QPT_RC,
 			.send_cq = context->sendCq,
 			.recv_cq = context->recvCq,
+#ifndef NON_SRQ
 			.srq		 = context->srq,
+#endif	
 			.sq_sig_all = 0,
 			.qp_context = NULL,
 			.cap     = {
 				.max_send_wr  = maxTokens,
 				.max_send_sge = 2,
+#ifdef NON_SRQ
+				.max_recv_wr  = maxRecvBuffers, // or maxRecvBuffers
+				.max_recv_sge = 2,
+#endif	
 			},
 		};
 		struct ibv_qp_attr attr;
@@ -737,9 +750,9 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 		struct ibv_qp *qp = ibv_create_qp(context->pd,&initAttr);
 		MACHSTATE1(3,"TEST QP %p",qp);*/
 
-		for( i=1;i<numNodes;i++){
-                        int n = (myNode + i)%numNodes;
-			if(n == myNode){
+		for( i=1;i<numnodes;i++){
+                        int n = (mynode + i)%numnodes;
+			if(n == mynode){
 			}else{
 				localAddr[n].lid = myLid;
 				context->qp[n] = ibv_create_qp(context->pd,&initAttr);
@@ -870,6 +883,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 void 	infiPostInitialRecvs(){
 	//create the pool and post the receives
 	int numPosts;
+
 /*	if(tokensPerProcessor*(_Cmi_numnodes-1) <= maxRecvBuffers){
 		numPosts = tokensPerProcessor*(_Cmi_numnodes-1);
 	}else{
@@ -881,6 +895,14 @@ void 	infiPostInitialRecvs(){
 	}else{
 		numPosts = 0;
 	}
+#ifdef NON_SRQ
+// This is resulting in the total recv buffers to grow as the number of nodes. What could be the alternative? May be adaptively increase number of buffers for the most communicating nodes. Need a mechanism for such flow control, existing does not claim to work.
+	minPerProcessorRecvs = 10;
+	if(minPerProcessorRecvs*(_Cmi_numnodes-1) <= maxRecvBuffers){
+		numPosts = minPerProcessorRecvs*(_Cmi_numnodes-1);
+	}
+#endif
+
 	if(numPosts > 0){
 		context->recvBufferPool = allocateInfiBufferPool(numPosts,packetSize);
 		postInitialRecvs(context->recvBufferPool,numPosts,packetSize);
@@ -967,11 +989,27 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 		}
 		
 	}
+#ifndef NON_SRQ
 	workRequests[numRecvs-1].next = NULL;
 	MACHSTATE(3,"About to call ibv_post_srq_recv");
 	if(ibv_post_srq_recv(context->srq,workRequests,&bad_wr)){
 		CmiAssert(0);
 	}
+#else 
+// create a pool per processor and post initial receives to processor queue similar to send, split the buffer pool Equi-partitioning recv pool
+  	int perNodeRecvs = numRecvs/(numnodes-1);
+	int k =0;
+	for( i=1;i<numnodes;i++){
+                int n = (mynode + i)%numnodes;
+		if(n  != mynode){ 
+				if (k==numnodes-2) 
+					workRequests[numRecvs-1].next = NULL;
+				else
+					workRequests[(k+1)*perNodeRecvs-1].next = NULL;
+				if(ibv_post_recv(context->qp[n],&workRequests[k*perNodeRecvs],&bad_wr)){CmiAssert(0)}
+				k++;
+				}
+#endif
 
 	free(workRequests);
 	free(sgElements);
@@ -1756,8 +1794,13 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 			.next = NULL
 		};
 		struct ibv_recv_wr *bad_wr;
-	
-		if(ibv_post_srq_recv(context->srq,&wr,&bad_wr)){
+#ifndef NON_SRQ	
+		if(ibv_post_srq_recv(context->srq,&wr,&bad_wr))
+#else
+		OtherNode node1 = &nodes[nodeNo];
+		if(ibv_post_recv(node1->InfiData->qp,&wr,&bad_wr))
+#endif 
+		{
 			CmiAssert(0);
 		}
 	}
@@ -2155,7 +2198,7 @@ static inline void increaseTokens(OtherNode node){
 	}
 	context->sendCqSize+= increase;
 };
-
+// Should not be used with NON-SRQ (at this time I am not sure INCTOKEN  works, at the top it says never turn it on), so I am not modifying these to make them work with Non-SRQ version
 static void increasePostedRecvs(int nodeNo){
 	OtherNode node = &nodes[nodeNo];
 	int tokenIncrease = node->infiData->postedRecvs*INCTOKENS_INCREASE;	
