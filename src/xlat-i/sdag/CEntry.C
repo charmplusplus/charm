@@ -14,9 +14,9 @@ namespace xi {
     // generate wrapper for local calls to the function
     if (needsParamMarshalling || isVoid) {
       templateGuardBegin(false, defs);
-      defs << "void " << decl_entry->getContainer()->baseName() << "::" << signature << "{\n";
-      defs << "  " << *decl_entry->genClosureTypeNameProxy << "*" <<
-        " genClosure = new " << *decl_entry->genClosureTypeNameProxy << "()" << ";\n";
+      defs << decl_entry->getContainer()->tspec() << " void " << decl_entry->getContainer()->baseName() << "::" << signature << "{\n";
+      defs << "  " << *decl_entry->genClosureTypeNameProxyTemp << "*" <<
+        " genClosure = new " << *decl_entry->genClosureTypeNameProxyTemp << "()" << ";\n";
       {
         int i = 0;
         for (list<CStateVar*>::iterator it = myParameters.begin(); it != myParameters.end(); ++it, ++i) {
@@ -80,7 +80,7 @@ namespace xi {
     XStr newSig;
 
     if (needsParamMarshalling || isVoid) {
-      newSig << *entry << "(" << *decl_entry->genClosureTypeNameProxy << "* genClosure)";
+      newSig << *entry << "(" << *decl_entry->genClosureTypeNameProxyTemp << "* genClosure)";
       decls << "  void " <<  newSig << ";\n";
       // generate local wrapper decls
       decls << "  void " <<  signature << ";\n";
@@ -92,7 +92,7 @@ namespace xi {
     generateLocalWrapper(decls, defs, isVoid, signature);
 
     templateGuardBegin(false, defs);
-    defs << "void " << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
+    defs << decl_entry->getContainer()->tspec() << " void " << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
     defs << "  if (!__dep.get()) _sdag_init();\n";
 
     if (needsParamMarshalling || isVoid) {

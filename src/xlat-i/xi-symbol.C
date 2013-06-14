@@ -2252,6 +2252,12 @@ Message::genReg(XStr& str)
 }
 
 void
+Template::outputClosures(XStr& str) {
+  Chare* c = dynamic_cast<Chare*>(entity);
+  if (c) str << c->closures;
+}
+
+void
 Template::setExtern(int e)
 {
   Construct::setExtern(e);
@@ -4234,7 +4240,7 @@ void Entry::genClosure(XStr& decls) {
   if (!isMessage) {
     genClosureTypeName = new XStr();
     genClosureTypeNameProxy = new XStr();
-    *genClosureTypeNameProxy << "Closure_" << container->baseName() << "::";
+    *genClosureTypeNameProxy << " Closure_" << container->baseName() << "::";
     *genClosureTypeNameProxy << name << "_" << entryCount << "_closure";
     *genClosureTypeName << name << "_" << entryCount << "_closure";
 
@@ -4255,7 +4261,8 @@ void Entry::genClosure(XStr& decls) {
     decls << "      virtual ~" << *genClosureTypeName << "() {\n";
     decls << dealloc;
     decls << "      }\n";
-    decls << "      PUPable_decl(" << *genClosureTypeName << ");\n";
+    decls << "      " << (container->isTemplated() ? "PUPable_decl_template" : "PUPable_decl")
+          << "(" << *genClosureTypeName << ");\n";
     decls << "    };\n";
   } else {
     genClosureTypeName = new XStr();
@@ -4263,6 +4270,9 @@ void Entry::genClosure(XStr& decls) {
     *genClosureTypeNameProxy << messageType;
     *genClosureTypeName << messageType;
   }
+
+  genClosureTypeNameProxyTemp = new XStr();
+  *genClosureTypeNameProxyTemp << (container->isTemplated() ? "typename " : "") << genClosureTypeNameProxy;
 }
 
 //This routine is only used in Entry::genDefs.
@@ -4628,8 +4638,9 @@ void Entry::genDefs(XStr& str)
   // to match the registry, generate register call even if there is no SDAG code
   //if ((param->isMarshalled() || param->isVoid()) /* && (sdagCon || isWhenEntry) */)
   if ((param->isMarshalled() || param->isVoid()) && genClosureTypeNameProxy) {
-    if (!container->isTemplated())
-      str << "PUPable_def(" << *genClosureTypeNameProxy << ");\n";
+    if (container->isTemplated())
+      str << container->tspec();
+    str << (container->isTemplated() ? "PUPable_def_template_nonInst" : "PUPable_def") << "(" << *genClosureTypeNameProxy << ");\n";
   }
 
   templateGuardEnd(str);
@@ -5036,8 +5047,8 @@ void Parameter::copyPtr(XStr &str)
 
 void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
   if (isSDAGGen) {
-    str << "  " << *entry->genClosureTypeNameProxy << "*"
-        << " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
+    str << *entry->genClosureTypeNameProxyTemp << "*"
+        << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
   }
 
     if (isMarshalled())
@@ -5151,8 +5162,8 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
 
   if (isMarshalled()) {
     str << "  PUP::fromMem implP(impl_buf);\n";
-    str << "  " << *entry->genClosureTypeNameProxy << "*" <<
-      " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
+    str << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
+      " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
     callEach(&Parameter::beginUnmarshallSDAGCall, str);
     str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
     callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
@@ -5171,8 +5182,8 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
       str << "  genClosure->__refnum = 0;\n";
     }
   } else if (isVoid()) {
-    str << "  " << *entry->genClosureTypeNameProxy << "*" <<
-      " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
+    str << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
+      " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
     str << "  genClosure->__refnum = 0;\n";
   }
 }

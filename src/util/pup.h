@@ -753,6 +753,10 @@ public:\
 #define PUPable_def_template(className) \
 	template<> PUP::able::PUP_ID className::my_PUP_ID = 0;
 
+//Definitions to include exactly once at file scope
+#define PUPable_def_template_nonInst(className) \
+	PUP::able::PUP_ID className::my_PUP_ID = 0;
+
 //Code to execute exactly once at program start time
 #define PUPable_reg(className)	\
     className::register_PUP_ID(#className);

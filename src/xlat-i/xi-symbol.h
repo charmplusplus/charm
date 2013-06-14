@@ -610,6 +610,7 @@ class Template : public Construct {
     void genDefs(XStr& str);
     void genSpec(XStr& str);
     void genVars(XStr& str);
+    void outputClosures(XStr& str);
 
     // DMK - Accel Support
     int genAccels_spe_c_funcBodies(XStr& str);
@@ -737,6 +738,7 @@ class Chare : public TEntity {
     };
     typedef unsigned int attrib_t;
     XStr sdagPUPReg;
+    XStr sdagDefs, closures;
   protected:
     attrib_t attrib;
     int hasElement;//0-- no element type; 1-- has element type
@@ -749,7 +751,6 @@ class Chare : public TEntity {
     
     int entryCount;
     int hasSdagEntry;
-    XStr sdagDefs, closures;
 
     void genTypedefs(XStr& str);
     void genRegisterMethodDef(XStr& str);
@@ -965,6 +966,7 @@ class Entry : public Member {
 public:
     XStr* genClosureTypeName;
     XStr* genClosureTypeNameProxy;
+    XStr* genClosureTypeNameProxyTemp;
     int line,entryCount;
   private:    
     int attribs;    

@@ -457,9 +457,9 @@ void SdagConstruct::buildTypes(list<EncapState*>& state) {
     EncapState& encap = **iter;
     if (!encap.type) {
       if (encap.entry->entryPtr && encap.entry->entryPtr->decl_entry)
-        encap.type = encap.entry->entryPtr->decl_entry->genClosureTypeNameProxy;
+        encap.type = encap.entry->entryPtr->decl_entry->genClosureTypeNameProxyTemp;
       else
-        encap.type = encap.entry->genClosureTypeNameProxy;
+        encap.type = encap.entry->genClosureTypeNameProxyTemp;
     }
   }
 }
@@ -976,9 +976,9 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry) {
   // generate wrapper for local calls to the function
   if (entry->paramIsMarshalled() || entry->param->isVoid()) {
     templateGuardBegin(false, defs);
-    defs << "void " << entry->getContainer()->baseName() << "::" << signature << "{\n";
-    defs << "  " << *entry->genClosureTypeNameProxy << "*" <<
-      " genClosure = new " << *entry->genClosureTypeNameProxy << "()" << ";\n";
+    defs << entry->getContainer()->tspec() << " void " << entry->getContainer()->baseName() << "::" << signature << "{\n";
+    defs << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
+      " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
     if (stateVars) {
       int i = 0;
       for (list<CStateVar*>::iterator it = stateVars->begin(); it != stateVars->end(); ++it, ++i) {
