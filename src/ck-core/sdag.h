@@ -312,7 +312,7 @@ namespace SDAG {
              ++iter2) {
           if ((*iter2)->speculationIndex == speculationIndex) {
             Continuation *cancelled = *iter2;
-            iter2 = lst.erase(iter2);
+            lst.erase(iter2++);
             delete cancelled;
           }
         }
