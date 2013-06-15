@@ -62,11 +62,11 @@ to run multiple partitions in one single job.
 provided, allocated cores/nodes are divided equally among partitions. Only this option 
 is supported from the 6.5.0 release; remaining options are supported starting 6.6.0.
 
-\item Runtime parameter: {\tt +master_partition} - assign one core/node as the master 
+\item Runtime parameter: {\tt +master\_partition} - assign one core/node as the master 
 partition (partition 0), and divide the remaining cores/nodes equally among remaining
 partitions.
 
-\item Runtime parameter: {\tt +partition_sizes L[-U[:S[.R]]]\#W[,...]} - defines the size of 
+\item Runtime parameter: {\tt +partition\_sizes L[-U[:S[.R]]]\#W[,...]} - defines the size of 
 partitions.  A single number identifies a particular partition. Two numbers separated by
 a dash identify an inclusive range (\emph{lower bound} and \emph{upper bound}). If they 
 are followed by a colon and another number (a \emph{stride}), that range will be stepped 
