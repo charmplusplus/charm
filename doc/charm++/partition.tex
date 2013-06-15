@@ -62,11 +62,11 @@ to run multiple partitions in one single job.
 provided, allocated cores/nodes are divided equally among partitions. Only this option 
 is supported from the 6.5.0 release; remaining options are supported starting 6.6.0.
 
-\item Runtime parameter: {\tt +assign\_master} - assign one core/node as the master 
+\item Runtime parameter: {\tt +master_partition} - assign one core/node as the master 
 partition (partition 0), and divide the remaining cores/nodes equally among remaining
 partitions.
 
-\item Runtime parameter: {\tt +partsize L[-U[:S[.R]]]\#W[,...]} - defines the size of 
+\item Runtime parameter: {\tt +partition_sizes L[-U[:S[.R]]]\#W[,...]} - defines the size of 
 partitions.  A single number identifies a particular partition. Two numbers separated by
 a dash identify an inclusive range (\emph{lower bound} and \emph{upper bound}). If they 
 are followed by a colon and another number (a \emph{stride}), that range will be stepped 
@@ -78,15 +78,15 @@ partitions 0, 2, 4 should be of size 10, partition 1 of size 5 and partition 3 o
 In SMP mode, these sizes are in terms of nodes. All workers threads associated with a node are
 assigned to the partition of the node. This option conflicts with {\tt +assign\_master}.
 
-\item Runtime parameter: {\tt +use\_topology} - use a default topology aware scheme
+\item Runtime parameter: {\tt +partition\_topology} - use a default topology aware scheme
 to partition the allocated nodes. 
 
-\item Runtime parameter: {\tt +use\_topology\_scheme <scheme>} - use the given scheme
+\item Runtime parameter: {\tt +partition\_topology\_scheme <scheme>} - use the given scheme
 to partition the allocated nodes. Currently, two generalized schemes are supported that 
 should be useful on torus networks. If scheme is set to 1, allocated nodes are traversed 
 plane by plane during partitioning. A hilbert curve based traversal is used with scheme 2.
 
-\item Compilation parameter: {\tt -custom-part}, runtime parameter: {\tt +use\_custom\_part} -
+\item Compilation parameter: {\tt -custom-part}, runtime parameter: {\tt +use\_custom\_partition} -
 enables use of user defined partitioning. In order to implement a new partitioning scheme, 
 a user must link an object exporting a C function with following prototype: \\ 
 
