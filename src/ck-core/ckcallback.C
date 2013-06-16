@@ -347,6 +347,43 @@ void CkCallback::pup(PUP::er &p) {
   }
 }
 
+bool CkCallback::containsPointer() const {
+  switch(type) {
+  case invalid:
+  case ignore:
+  case ckExit:
+  case sendGroup:
+  case sendNodeGroup:
+  case sendArray:
+  case isendGroup:
+  case isendNodeGroup:
+  case isendArray:
+  case bcastGroup:
+  case bcastNodeGroup:
+  case bcastArray:
+    return false;
+
+  case resumeThread:
+  case callCFn:
+  case call1Fn:
+  case replyCCS:
+  case bcastSection:
+    return true;
+
+  case sendChare:
+  case isendChare:
+#if CMK_CHARE_USE_PTR
+    return true;
+#else
+    return false;
+#endif
+
+  default:
+    CkAbort("Asked about an unknown CkCallback type");
+    return true;
+  }
+}
+
 void CkCallback::thread_destroy() const {
   if (type==resumeThread && CpvAccess(threadCBs).get(d.thread.cb)==this) {
     CpvAccess(threadCBs).remove(d.thread.cb);
