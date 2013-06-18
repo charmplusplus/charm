@@ -1,4 +1,6 @@
-DIRS=megatest pingpong simplearrayhello load_balancing chkpt delegation queue sdag ckAllocSysMsgTest method_templates
+DIRS=megatest pingpong simplearrayhello load_balancing chkpt queue sdag ckAllocSysMsgTest method_templates
+# Disabled due to #77
+#DIRS+=delegation
 
 all:
 	for d in $(DIRS); do \
