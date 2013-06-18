@@ -1,6 +1,4 @@
-DIRS=charm++ converse ampi ParFUM armci
-# Disabled due to #233
-#DIRS+=bigsim
+DIRS=charm++ converse ampi ParFUM armci bigsim
 
 
 all:
