@@ -692,7 +692,7 @@ static void _triggerHandler(envelope *env)
 
 static inline void _processROMsgMsg(envelope *env)
 {
-  if(!CmiMyRank_()) {
+  if(!CmiMyRank()) {
     *((char **)(_readonlyMsgs[env->getRoIdx()]->pMsg))=(char *)EnvToUsr(env);
   }
 }
@@ -700,7 +700,7 @@ static inline void _processROMsgMsg(envelope *env)
 static inline void _processRODataMsg(envelope *env)
 {
   //Unpack each readonly:
-  if(!CmiMyRank_()) {
+  if(!CmiMyRank()) {
     PUP::fromMem pu((char *)EnvToUsr(env));
     for(size_t i=0;i<_readonlyTable.size();i++) {
       _readonlyTable[i]->pupData(pu);
