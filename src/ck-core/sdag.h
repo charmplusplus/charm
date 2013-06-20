@@ -13,7 +13,7 @@ namespace SDAG {
     void deref() { if (--continuations <= 0) delete this; }
     // done this way to keep Closure abstract for PUP reasons
     // these must be called by descendents of Closure
-    void packClosure(PUP::er& p) { p | continuations; }
+    void packClosure(PUP::er& p) { p(continuations); }
     void init() { continuations = 0; }
   };
 }
@@ -49,7 +49,7 @@ namespace SDAG {
     ForallClosure(int val) : val(val) { init(); }
 
     void pup(PUP::er& p) {
-      p | val;
+      p(val);
       packClosure(p);
     }
     PUPable_decl(ForallClosure);
@@ -70,7 +70,7 @@ namespace SDAG {
 
     void pup(PUP::er& p) {
       bool isNull = !msg;
-      p | isNull;
+      p(isNull);
       if (!isNull) CkPupMessage(p, (void**)&msg);
       packClosure(p);
     }
@@ -97,7 +97,7 @@ namespace SDAG {
     int isDone(void) { return (count == 0); }
 
     void pup(PUP::er& p) {
-      p | count;
+      p(count);
       packClosure(p);
     }
     PUPable_decl(CCounter);
@@ -113,7 +113,7 @@ namespace SDAG {
       : speculationIndex(speculationIndex_) { init(); }
 
     void pup(PUP::er& p) {
-      p | speculationIndex;
+      p(speculationIndex);
       packClosure(p);
     }
     PUPable_decl(CSpeculator);
@@ -134,12 +134,12 @@ namespace SDAG {
       , speculationIndex(-1) { }
 
     void pup(PUP::er& p) {
-      p | whenID;
-      p | closure;
-      p | entries;
-      p | refnums;
-      p | anyEntries;
-      p | speculationIndex;
+      p(whenID);
+      p(closure);
+      p(entries);
+      p(refnums);
+      p(anyEntries);
+      p(speculationIndex);
     }
 
     void addClosure(Closure* cl) {
@@ -169,12 +169,12 @@ namespace SDAG {
     }
 
     void pup(PUP::er& p) {
-      p | entry;
-      p | refnum;
+      p(entry);
+      p(refnum);
       bool hasCl = cl;
-      p | hasCl;
+      p(hasCl);
       if (hasCl)
-        p | cl;
+        p(cl);
     }
 
     virtual ~Buffer() {
@@ -196,10 +196,10 @@ namespace SDAG {
     int curSpeculationIndex;
 
     void pup(PUP::er& p) {
-      p | curSpeculationIndex;
-      p | entryToWhen;
-      p | buffer;
-      p | whenToContinuation;
+      p(curSpeculationIndex);
+      p(entryToWhen);
+      p(buffer);
+      p(whenToContinuation);
     }
 
     Dependency(int numEntries, int numWhens)
