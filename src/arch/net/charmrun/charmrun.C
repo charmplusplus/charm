@@ -111,8 +111,7 @@ double GetClock(void)
 }
 
 
-int probefile(path)
-    char *path;
+int probefile(const char *path)
 {
 	FILE *f=fopen(path,"r");
 	if (f==NULL) return 0;
@@ -120,7 +119,7 @@ int probefile(path)
 	return 1;
 }
 
-char *mylogin(void)
+const char *mylogin(void)
 {
 #if defined(_WIN32) && !defined(__CYGWIN__)
 	static char name[100]={'d','u','n','n','o',0};
@@ -188,15 +187,15 @@ void ping_developers()
  *
  *************************************************************************/
 
-typedef struct pathfixlist {
+typedef struct s_pathfixlist {
   char *s1;
   char *s2;
-  struct pathfixlist *next;
+  struct s_pathfixlist *next;
 } *pathfixlist;
 
 pathfixlist pathfix_append(char *s1, char *s2, pathfixlist l)
 {
-  pathfixlist pf = (pathfixlist)malloc(sizeof(struct pathfixlist));
+  pathfixlist pf = (pathfixlist)malloc(sizeof(s_pathfixlist));
   pf->s1 = s1;
   pf->s2 = s2;
   pf->next = l;
@@ -259,7 +258,7 @@ void zap_newline(char *s)
 }
 
 /* get substring from lo to hi, remove quote chars */
-char *substr(char *lo, char *hi)
+char *substr(const char *lo, const char *hi)
 {
   int len;
   char *res;
@@ -272,7 +271,7 @@ char *substr(char *lo, char *hi)
   return res;
 }
 
-int subeqs(char *lo, char *hi, char *str)
+int subeqs(const char *lo, const char *hi, const char *str)
 {
   int len = strlen(str);
   if (hi-lo != len) return 0;
@@ -281,14 +280,14 @@ int subeqs(char *lo, char *hi, char *str)
 }
 
 /* advance pointer over blank characters */
-char *skipblanks(char *p)
+const char *skipblanks(const char *p)
 {
   while ((*p==' ')||(*p=='\t')) p++;
   return p;
 }
 
 /* advance pointer over nonblank characters and a quoted string */
-char *skipstuff(char *p)
+const char *skipstuff(const char *p)
 {
   char quote = 0;
   if (*p && (*p=='\'' || *p=='"')) { quote=*p; p++; }
@@ -306,7 +305,7 @@ char *skipstuff(char *p)
 }
 
 #if CMK_USE_RSH
-char *getenv_rsh()
+const char *getenv_rsh()
 {
   char *e;
 
@@ -352,18 +351,18 @@ char *getenv_display_no_tamper()
  *                                                                           *
  *****************************************************************************/
 
-typedef struct ppdef
+typedef struct s_ppdef
 {
   union {
       int *i;
       double *r;
-      char **s;
+      const char **s;
       int *f;
     } where;/*Where to store result*/
   const char *lname; /*Argument name on command line*/
   const char *doc;
   char  type; /*One of i, r, s, f.*/
-  struct ppdef *next;
+  struct s_ppdef *next;
 }
 *ppdef;
 
@@ -374,8 +373,7 @@ static char  **pparam_argv;
 static char    pparam_optc='-';
 char           pparam_error[100];
 
-static ppdef pparam_find(lname)
-    const char *lname;
+static ppdef pparam_find(const char *lname)
 {
   ppdef def;
   for (def=ppdefs; def; def=def->next)
@@ -384,12 +382,11 @@ static ppdef pparam_find(lname)
   return 0;
 }
 
-static ppdef pparam_cell(lname)
-    const char *lname;
+static ppdef pparam_cell(const char *lname)
 {
   ppdef def = pparam_find(lname);
   if (def) return def;
-  def = (ppdef)malloc(sizeof(struct ppdef));
+  def = (ppdef)malloc(sizeof(s_ppdef));
   def->lname = lname;
   def->type  = 's';
   def->doc   = "(undocumented)";
@@ -429,18 +426,18 @@ void pparam_real(double *where,double defValue,
   def->lname=arg;
   def->doc=doc;
 }
-void pparam_str(char **where,char *defValue,
+void pparam_str(const char **where,const char *defValue,
 				   const char *arg,const char *doc)
 {
   ppdef def = pparam_cell(arg);
   def->type  = 's';
-  def->where.s = where; *where=defValue;
+  def->where.s = where;
+  *where=defValue;
   def->lname=arg;
   def->doc=doc;
 }
 
-static int pparam_setdef(def, value)
-    ppdef def; char *value;
+static int pparam_setdef(ppdef def, char *value)
 {
   char *p;
   switch(def->type)
@@ -464,15 +461,13 @@ static int pparam_setdef(def, value)
   return -1;
 }
 
-int pparam_set(lname, value)
-    char *lname; char *value;
+int pparam_set(char *lname, char *value)
 {
   ppdef def = pparam_cell(lname);
   return pparam_setdef(def, value);
 }
 
-char *pparam_getdef(def)
-    ppdef def;
+const char *pparam_getdef(ppdef def)
 {
   static char result[100];
   switch(def->type)
@@ -507,16 +502,14 @@ void pparam_printdocs()
   fprintf(stderr,"\n");
 }
 
-void pparam_delarg(i)
-    int i;
+void pparam_delarg(int i)
 {
   int j;
   for (j=i; pparam_argv[j]; j++)
     pparam_argv[j]=pparam_argv[j+1];
 }
 
-int pparam_countargs(argv)
-    char **argv;
+int pparam_countargs(char **argv)
 {
   int argc;
   for (argc=0; argv[argc]; argc++);
@@ -598,8 +591,7 @@ int pparam_parseopt()
   return 0;
 }
 
-int pparam_parsecmd(optchr, argv)
-    char optchr; char **argv;
+int pparam_parsecmd(char optchr, char **argv)
 {
   pparam_error[0]=0;
   pparam_argv = argv;
@@ -617,8 +609,7 @@ int pparam_parsecmd(optchr, argv)
 
 #ifdef HSTART
 char **
-dupargv (argv)
-     char **argv;
+dupargv (char **argv)
 {
   int argc;
   char **copy;
@@ -665,10 +656,10 @@ int    arg_argc;
 int   arg_requested_pes;
 int   arg_timeout;
 int   arg_verbose;
-char *arg_nodelist;
-char *arg_nodegroup;
-char *arg_runscript; /* script to run the node-program with */
-char *arg_charmrunip;
+const char *arg_nodelist;
+const char *arg_nodegroup;
+const char *arg_runscript; /* script to run the node-program with */
+const char *arg_charmrunip;
 #if CONVERSE_VERSION_VMI
 char *arg_vmispecfile;
 #endif
@@ -677,7 +668,7 @@ int   arg_debug;
 int   arg_debug_no_pause;
 int   arg_debug_no_xrdb;
 int   arg_charmdebug;
-char *arg_debug_commands; /* commands that are provided by a ++debug-commands flag. These are passed into gdb. */
+const char *arg_debug_commands; /* commands that are provided by a ++debug-commands flag. These are passed into gdb. */
 
 int   arg_local;	/* start node programs directly by exec on localhost */
 int   arg_batch_spawn;  /* control starting node programs, several at a time */
@@ -697,13 +688,13 @@ int     arg_read_pes=0;
 
 #if CMK_USE_RSH
 int   arg_maxrsh;
-char *arg_shell;
+const char *arg_shell;
 int   arg_in_xterm;
-char *arg_debugger;
-char *arg_xterm;
-char *arg_display;
+const char *arg_debugger;
+const char *arg_xterm;
+const char *arg_display;
 int arg_ssh_display;
-char *arg_mylogin;
+const char *arg_mylogin;
 #endif
 int   arg_mpiexec;
 int   arg_no_va_rand;
@@ -715,7 +706,7 @@ char *arg_currdir_r;
 
 int   arg_server;
 int   arg_server_port=0;
-char *arg_server_auth=NULL;
+const char *arg_server_auth=NULL;
 int   replay_single=0;
 
 #if CMK_BPROC
@@ -987,7 +978,7 @@ char *nodetab_file_find()
 
   /* Find a nodes-file as specified by ++nodelist */
   if (arg_nodelist) {
-    char *path = arg_nodelist;
+    const char *path = arg_nodelist;
     if (probefile(path)) return strdup(path);
     fprintf(stderr,"ERROR> No such nodelist file %s\n",path);
     exit(1);
@@ -1037,12 +1028,12 @@ typedef struct nodetab_host {
   int     dataport;/*UDP port number*/
   SOCKET  ctrlfd;/*Connection to control port*/
 #if CMK_USE_RSH
-  char    *shell;  /*Rsh to use*/
-  char    *debugger ; /*Debugger to use*/
-  char    *xterm ;  /*Xterm to use*/
-  char    *login;  /*User login name to use*/
-  char    *passwd;  /*User login password*/
-  char    *setup;  /*Commands to execute on login*/
+  const char    *shell;  /*Rsh to use*/
+  const char    *debugger ; /*Debugger to use*/
+  const char    *xterm ;  /*Xterm to use*/
+  const char    *login;  /*User login name to use*/
+  const char    *passwd;  /*User login password*/
+  const char    *setup;  /*Commands to execute on login*/
 #endif
 
 #if CMK_USE_IBVERBS
@@ -1121,12 +1112,12 @@ void nodetab_makehost(char *name,nodetab_host *h)
   nodetab_add(h);
 }
 
-char *nodetab_args(char *args,nodetab_host *h)
+const char *nodetab_args(const char *args,nodetab_host *h)
 {
   if (arg_ppn>0) h->cpus = arg_ppn;
   while(*args != 0) {
-    char *b1 = skipblanks(args), *e1 = skipstuff(b1);
-    char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
+    const char *b1 = skipblanks(args), *e1 = skipstuff(b1);
+    const char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
     while (*b1=='+') b1++;/*Skip over "++" on parameters*/
 #if CMK_USE_RSH
     if (subeqs(b1,e1,"login")) h->login = substr(b2,e2);
@@ -1142,7 +1133,7 @@ char *nodetab_args(char *args,nodetab_host *h)
       if (arg_ppn==0) h->cpus = atol(b2);	/* ignore if there is ++ppn */
     }
     else if (subeqs(b1,e1,"pathfix")) {
-      char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
+      const char * b3 = skipblanks(e2), *e3 = skipstuff(b3);
       args = skipblanks(e3);
       h->pathfixes=pathfix_append(substr(b2,e2),substr(b3,e3),h->pathfixes);
       e2 = e3;       /* for the skipblanks at the end */
@@ -1228,7 +1219,7 @@ void nodetab_init_hierarchical_start(void)
 
 void nodetab_init()
 {
-  FILE *f,*fopen();
+  FILE *f;
   char *nodesfile; 
   nodetab_host global,group,host;
   char input_line[MAX_LINE_LENGTH];
@@ -1281,9 +1272,9 @@ void nodetab_init()
 		nodetab_args(input_line,&group);
 	}
 	else {/*Not an option line*/
-		char *b1 = skipblanks(input_line), *e1 = skipstuff(b1);
-		char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
-		char *b3 = skipblanks(e2);
+		const char *b1 = skipblanks(input_line), *e1 = skipstuff(b1);
+		const char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
+		const char *b3 = skipblanks(e2);
 		if (subeqs(b1,e1,"host")) {
 			if (rightgroup) {
 				host=group;
@@ -1360,12 +1351,12 @@ int          nodetab_dataport(int i) { return nodetab_getinfo(i)->dataport; }
 int          nodetab_nice(int i)     { return nodetab_getinfo(i)->nice; }
 SOCKET      nodetab_ctrlfd(int i)    { return nodetab_getinfo(i)->ctrlfd;}
 #if CMK_USE_RSH
-char        *nodetab_setup(int i)    { return nodetab_getinfo(i)->setup; }
-char        *nodetab_shell(int i)    { return nodetab_getinfo(i)->shell; }
-char        *nodetab_debugger(int i) { return nodetab_getinfo(i)->debugger; }
-char        *nodetab_xterm(int i)    { return nodetab_getinfo(i)->xterm; }
-char        *nodetab_login(int i)    { return nodetab_getinfo(i)->login; }
-char        *nodetab_passwd(int i)   { return nodetab_getinfo(i)->passwd; }
+const char  *nodetab_setup(int i)    { return nodetab_getinfo(i)->setup; }
+const char  *nodetab_shell(int i)    { return nodetab_getinfo(i)->shell; }
+const char  *nodetab_debugger(int i) { return nodetab_getinfo(i)->debugger; }
+const char  *nodetab_xterm(int i)    { return nodetab_getinfo(i)->xterm; }
+const char  *nodetab_login(int i)    { return nodetab_getinfo(i)->login; }
+const char  *nodetab_passwd(int i)   { return nodetab_getinfo(i)->passwd; }
 #endif
 
 /****************************************************************************
@@ -1454,7 +1445,7 @@ void input_extend()
     fprintf(stderr,"end-of-file on stdin");
     exit(1);
   }
-  input_buffer = realloc(input_buffer, len + strlen(line) + 1);
+  input_buffer = (char*)realloc(input_buffer, len + strlen(line) + 1);
   strcpy(input_buffer+len, line);
 }
 
@@ -1463,8 +1454,7 @@ void input_init()
   input_buffer = strdup("");
 }
 
-char *input_extract(nchars)
-    int nchars;
+char *input_extract(int nchars)
 {
   char *res = substr(input_buffer, input_buffer+nchars);
   char *tmp = substr(input_buffer+nchars, input_buffer+strlen(input_buffer));
@@ -1488,8 +1478,7 @@ char *input_gets()
 }
 
 /*FIXME: I am terrified by this routine. OSL 9/8/00*/
-char *input_scanf_chars(fmt)
-    char *fmt;
+char *input_scanf_chars(char *fmt)
 {
   char buf[8192]; int len, pos;
   static int fd; static FILE *file;
@@ -2807,7 +2796,7 @@ void req_set_client_connect(int start,int end) {
 	
 	curclient=curclientend=curclientstart=start;
 
-	finished=malloc((end-start)*sizeof(int));
+	finished=(int*)malloc((end-start)*sizeof(int));
 	for(i=0;i<(end-start);i++)
 		finished[i]=0;
 
@@ -3108,7 +3097,7 @@ void req_charmrun_connect(void)
 void start_one_node_rsh(int rank0no);
 void finish_one_node(int rank0no);
 void finish_set_nodes(int start, int stop);
-
+int start_set_node_rsh(int client);
 
 
 void req_client_start_and_connect(void)
@@ -3867,10 +3856,10 @@ void removeEnv(const char *doomedEnv)
 
 int rsh_fork(int nodeno,const char *startScript)
 {
-  char **rshargv;
+  const char **rshargv;
   int pid;
   int num=0;
-  char *s, *e;
+  const char *s, *e;
 
   /* figure out size and dynamic allocate */
   s=nodetab_shell(nodeno); e=skipstuff(s);
@@ -3878,7 +3867,7 @@ int rsh_fork(int nodeno,const char *startScript)
 	num++;
 	s = skipblanks(e); e = skipstuff(s);
   }
-  rshargv = (char **)malloc(sizeof(char *)*(num+6));
+  rshargv = (const char **)malloc(sizeof(char *)*(num+6));
 
   num = 0;
   s=nodetab_shell(nodeno); e=skipstuff(s);
@@ -3905,7 +3894,7 @@ int rsh_fork(int nodeno,const char *startScript)
 	  dup2(fdScript,0);/*Open script as standard input*/
 	  //removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
 	  for(i=3; i<1024; i++) close(i);
-	  execvp(rshargv[0], rshargv);
+	  execvp(rshargv[0], const_cast<char**>(rshargv));
 	  fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
 	  exit(1);
   }
@@ -3932,8 +3921,8 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 {
   char *netstart;
   char *arg_nodeprog_r,*arg_currdir_r;
-  char *dbg=nodetab_debugger(nodeno);
-  char *host=nodetab_name(nodeno);
+  const char *dbg=nodetab_debugger(nodeno);
+  const char *host=nodetab_name(nodeno);
 
   if (arg_mpiexec)
         fprintf(f, "#!/bin/sh\n");
@@ -4246,19 +4235,21 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 /* use the command "size" to get information about the position of the ".data"
    and ".bss" segments inside the program memory */
 void read_global_segments_size() {
-  char **rshargv;
+  const char **rshargv;
+  char *tmp;
   int childPid;
 
   /* find the node-program */
   arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
 
-  rshargv = (char **)malloc(sizeof(char *)*6);
+  rshargv = (const char **)malloc(sizeof(char *)*6);
   rshargv[0]=nodetab_shell(0);
   rshargv[1]=nodetab_name(0);
   rshargv[2]="-l";
   rshargv[3]=nodetab_login(0);
-  rshargv[4] = (char *)malloc(sizeof(char)*9+strlen(arg_nodeprog_r));
-  sprintf(rshargv[4],"size -A %s",arg_nodeprog_r);
+  tmp = (char *)malloc(sizeof(char)*9+strlen(arg_nodeprog_r));
+  sprintf(tmp,"size -A %s",arg_nodeprog_r);
+  rshargv[4] = tmp;
   rshargv[5]=0;
 
   childPid = fork();
@@ -4268,12 +4259,12 @@ void read_global_segments_size() {
     /* child process */
     dup2(2, 1);
     /*printf("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n",rshargv[0],rshargv[1],rshargv[2],rshargv[3],rshargv[4]);*/
-    execvp(rshargv[0], rshargv);
+    execvp(rshargv[0], const_cast<char**>(rshargv));
     fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
     exit(1);
   } else {
     /* else we are in the parent */
-    free(rshargv[4]);
+    free(tmp);
     free(rshargv);
     waitpid(childPid, NULL, 0);
   }
@@ -4281,7 +4272,8 @@ void read_global_segments_size() {
 
 /* open a rsh connection with processor 0 and open a gdb session for info */
 void open_gdb_info() {
-  char **rshargv;
+  const char **rshargv;
+  char *tmp;
   int fdin[2];
   int fdout[2];
   int fderr[2];
@@ -4290,13 +4282,14 @@ void open_gdb_info() {
   /* find the node-program */
   arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
 
-  rshargv = (char **)malloc(sizeof(char *)*6);
+  rshargv = (const char **)malloc(sizeof(char *)*6);
   rshargv[0]=nodetab_shell(0);
   rshargv[1]=nodetab_name(0);
   rshargv[2]="-l";
   rshargv[3]=nodetab_login(0);
-  rshargv[4] = (char *)malloc(sizeof(char)*8+strlen(arg_nodeprog_r));
-  sprintf(rshargv[4],"gdb -q %s",arg_nodeprog_r);
+  tmp = (char *)malloc(sizeof(char)*8+strlen(arg_nodeprog_r));
+  sprintf(tmp,"gdb -q %s",arg_nodeprog_r);
+  rshargv[4] = tmp;
   rshargv[5]=0;
 
 		  pipe(fdin);
@@ -4316,12 +4309,12 @@ void open_gdb_info() {
 			dup2(fdout[1],1);
 			dup2(fderr[1],2);
 			for(i=3; i<1024; i++) close(i);
-			execvp(rshargv[0], rshargv);
+			execvp(rshargv[0], const_cast<char**>(rshargv));
 			fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
 			exit(1);
 		  }
 		  /* else we are in the parent */
-		  free(rshargv[4]);
+		  free(tmp);
 		  free(rshargv);
 		  gdb_info_std[0] = fdin[1];
 		  gdb_info_std[1] = fdout[0];
@@ -4460,7 +4453,7 @@ int rsh_fork_one(const char *startScript)
   int pid;
   int num=0;
   char npes[128];
-  char *s, *e;
+  const char *s, *e;
 
   /* figure out size and dynamic allocate */
   s=nodetab_shell(0); e=skipstuff(s);

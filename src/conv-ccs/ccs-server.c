@@ -48,7 +48,7 @@ static int CCS_AUTH_numClients(CCS_AUTH_clients *cl) {
 static int CCS_AUTH_addClient(CCS_AUTH_clients *cl) {
   int clientNo=cl->nClients++;
   if ((clientNo%64)==0)
-    cl->clients=realloc(cl->clients,sizeof(int)*(cl->nClients+63));
+    cl->clients=(int*)realloc(cl->clients,sizeof(int)*(cl->nClients+63));
   cl->clients[clientNo]=CCS_RAND_next(&cl->rand);
   return clientNo;
 }
@@ -492,7 +492,7 @@ void write_stdio_duplicate(char* data) {
       if (size+stdio_size >= stdio_alloc) {
         char *newbuf;
         stdio_alloc += (size>4096 ? size : 4096);
-        newbuf = malloc(stdio_alloc);
+        newbuf = (char*)malloc(stdio_alloc);
         memcpy(newbuf, stdio_buffer, stdio_size);
         free(stdio_buffer);
         stdio_buffer = newbuf;
@@ -508,7 +508,7 @@ int check_stdio_header(CcsImplHeader *hdr) {
     /*This is a request to make a duplicate to stdio*/
     if (stdio_alloc == 0) {
       stdio_alloc = 4096;
-      stdio_buffer = malloc(stdio_alloc);
+      stdio_buffer = (char*)malloc(stdio_alloc);
     }
     CcsServer_sendReply(hdr,0,0);
   }
