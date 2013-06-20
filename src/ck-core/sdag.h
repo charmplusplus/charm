@@ -225,10 +225,8 @@ namespace SDAG {
       }
     }
 
-    Buffer* pushBuffer(int entry, Closure *cl, int refnum) {
-      Buffer* buf = new Buffer(entry, cl, refnum);
-      buffer[entry].push_back(buf);
-      return buf;
+    void pushBuffer(int entry, Closure *cl, int refnum) {
+      buffer[entry].push_back(new Buffer(entry, cl, refnum));
     }
 
     Continuation *tryFindContinuation(int entry) {
