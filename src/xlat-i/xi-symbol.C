@@ -4181,14 +4181,14 @@ void Entry::genClosure(XStr& decls) {
               XStr(sv->type->getBaseName()) == "char" ||
               XStr(sv->type->getBaseName()) == "long"))) {
            // @todo add more POD types here
-           toPup << "        " << "p(" << sv->name << ");\n";
+           toPup << "        " << "p | " << sv->name << ";\n";
            sv->podType = true;
          } else {
            structure << "*";
            getter << "*";
            toPup << "        " << "if (p.isUnpacking()) " << "alloc();\n";
            alloc << "        " << sv->name << " = new " << sv->type << "()" << ";\n";
-           toPup << "        " << "p(*" << sv->name << ");\n";
+           toPup << "        " << "p | *" << sv->name << ";\n";
          }
        }
 
@@ -4211,7 +4211,7 @@ void Entry::genClosure(XStr& decls) {
   structure << "\n      " << "int __refnum;\n";
 
   toPup << "        packClosure(p);\n";
-  toPup << "        p(__refnum);\n";
+  toPup << "        p | __refnum;\n";
 
   XStr initCode;
   initCode << "        init();\n";
@@ -4227,8 +4227,8 @@ void Entry::genClosure(XStr& decls) {
     initCode << "        _impl_buf_in = 0;\n";
     initCode << "        _impl_buf_size = 0;\n";
 
-    toPup << "        p(_impl_buf_size);\n";
-    toPup << "        bool hasMsg = (_impl_marshall != 0); p(hasMsg);\n";
+    toPup << "        p | _impl_buf_size;\n";
+    toPup << "        bool hasMsg = (_impl_marshall != 0); p | hasMsg;\n";
     toPup << "        " << "if (hasMsg) CkPupMessage(p, (void**)&" << "_impl_marshall" << ");\n";
     toPup << "        " << "else PUParray(p, _impl_buf_in, _impl_buf_size);\n";
     toPup << "        if (p.isUnpacking()) {\n";
