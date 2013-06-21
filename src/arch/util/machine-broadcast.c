@@ -223,7 +223,7 @@ void CmiSyncBroadcastFn1(int size, char *msg) {
     mype = CmiMyPe();
     #if CMK_SMP
     /* In SMP, this function may be called from comm thread with a larger pe */
-    if(mype > _Cmi_numpes){
+    if(mype >= _Cmi_numpes){
 	for(i=0; i<_Cmi_numpes; i++)
 		CmiSyncSendFn(i, size, msg);
 	return;
