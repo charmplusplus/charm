@@ -1200,6 +1200,7 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
  {
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
 		struct ibv_mr *key;
+		struct ibv_mr *packetKey;
 
 		
 		packet->size = sizeof(struct infiRdmaPacket);
@@ -1223,7 +1224,7 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
 		rdmaPacket->remoteSize = ogm->size;
 		
 		
-		struct ibv_mr *packetKey = METADATAFIELD((void *)rdmaPacket)->key;
+		packetKey = METADATAFIELD((void *)rdmaPacket)->key;
 		
 		MACHSTATE3(3,"rdmaRequest being sent to node %d buf %p size %d",node->infiData->nodeNo,ogm->data,ogm->size);
 		EnqueuePacket(node,packet,sizeof(struct infiRdmaPacket),packetKey);
