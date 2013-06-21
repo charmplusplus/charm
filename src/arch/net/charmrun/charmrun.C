@@ -1709,7 +1709,7 @@ int req_handle_initnode(ChMessage *msg,SOCKET fd)
     fprintf(stderr,"Charmrun: Bad initnode data length. Aborting\n");
 	exit(1);
   }
-  nodeInfo->info.qpList = malloc(sizeof(ChInfiAddr)*(nodetab_rank0_size-1));
+  nodeInfo->info.qpList = (ChInfiAddr*)malloc(sizeof(ChInfiAddr)*(nodetab_rank0_size-1));
   memcpy((char *)nodeInfo->info.qpList,&msg->data[sizeof(ChSingleNodeinfo)],sizeof(ChInfiAddr)*(nodetab_rank0_size-1));
 /*	for(i=0;i<nodetab_rank0_size-1;i++){
 		printf("i %d  0x%0x 0x%0x 0x%0x\n",i,ChMessageInt(nodeInfo->info.qpList[i].lid),ChMessageInt(nodeInfo->info.qpList[i].qpn),ChMessageInt(nodeInfo->info.qpList[i].psn));
@@ -2943,7 +2943,7 @@ void exchange_qpdata_clients(){
 	int proc,i;
 	for( i=0;i<nodetab_rank0_size;i++){
 		int nt=nodetab_rank0_table[i];/*Nodetable index for this node*/	
-		nodetab_table[nt]->qpData = malloc(sizeof(ChInfiAddr)*nodetab_rank0_size);
+		nodetab_table[nt]->qpData = (ChInfiAddr*)malloc(sizeof(ChInfiAddr)*nodetab_rank0_size);
 	}
 	for(proc =0;proc< nodetab_rank0_size;proc++){
 		int count=0;
