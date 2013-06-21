@@ -451,6 +451,7 @@ static void CmiMachineInit(char **argv){
 	struct ibv_device *dev;
 	int ibPort;
 	int i;
+        int MAXPORT = 8;
 	int calcMaxSize;
 	infiPacket *pktPtrs;
 	struct infiRdmaPacket **rdmaPktPtrs;
@@ -491,7 +492,6 @@ loop:
 	CmiAssert(context->context != NULL);
 
         // test ibPort
-        int MAXPORT = 8;
         for (ibPort = 1; ibPort < MAXPORT; ibPort++) {
           struct ibv_port_attr attr;
           if (ibv_query_port(context->context, ibPort, &attr) != 0) continue;
@@ -704,7 +704,9 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 
 	if(numNodes > 1)
 	{
+		struct ibv_qp_attr attr;
 		context->srqSize = (maxRecvBuffers+2);
+              {
 		struct ibv_srq_init_attr srqAttr = {
 			.attr = {
 			.max_wr  = context->srqSize,
@@ -713,7 +715,9 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 		};
 		context->srq = ibv_create_srq(context->pd,&srqAttr);
 		CmiAssert(context->srq != NULL);
-	
+              }
+              
+              {
 		struct ibv_qp_init_attr initAttr = {
 			.qp_type = IBV_QPT_RC,
 			.send_cq = context->sendCq,
@@ -726,7 +730,6 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 				.max_send_sge = 2,
 			},
 		};
-		struct ibv_qp_attr attr;
 
 		attr.qp_state        = IBV_QPS_INIT;
 		attr.pkey_index      = 0;
@@ -758,6 +761,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 				MACHSTATE4(3,"i %d lid Ox%x qpn 0x%x psn 0x%x",n,localAddr[n].lid,localAddr[n].qpn,localAddr[n].psn);
 			}
 		}
+              }
 	}
 	MACHSTATE(3,"qps created");
 };
@@ -798,17 +802,6 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	struct infiOtherNodeData * ret = malloc(sizeof(struct infiOtherNodeData));
 	int err;
-	ret->state = INFI_HEADER_DATA;
-	ret->qp = context->qp[node];
-//	ret->totalTokens = tokensPerProcessor;
-//	ret->tokensLeft = tokensPerProcessor;
-	ret->nodeNo = node;
-//	ret->postedRecvs = tokensPerProcessor;
-#if	CMK_IBVERBS_DEBUG	
-	ret->psn = 0;
-	ret->recvPsn = 0;
-#endif
-	
 	struct ibv_qp_attr attr = {
 		.qp_state		= IBV_QPS_RTR,
 		.path_mtu		= mtu,
@@ -824,6 +817,17 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 			.port_num	= context->ibPort
 		}
 	};
+	
+	ret->state = INFI_HEADER_DATA;
+	ret->qp = context->qp[node];
+//	ret->totalTokens = tokensPerProcessor;
+//	ret->tokensLeft = tokensPerProcessor;
+	ret->nodeNo = node;
+//	ret->postedRecvs = tokensPerProcessor;
+#if	CMK_IBVERBS_DEBUG	
+	ret->psn = 0;
+	ret->recvPsn = 0;
+#endif
 	
 	MACHSTATE2(3,"initInfiOtherNodeData %d{ qp %p",node,ret->qp);
 	MACHSTATE3(3,"dlid 0x%x qp 0x%x psn 0x%x",attr.ah_attr.dlid,attr.dest_qp_num,attr.rq_psn);
@@ -1037,6 +1041,7 @@ static inline void getFreeTokens(struct infiOtherNodeData *infiData){
 static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struct ibv_mr *dataKey){
 	int incTokens=0;
 	int retval;
+	struct ibv_send_wr *bad_wr=NULL;
 #if	CMK_IBVERBS_DEBUG
 	packet->header.psn = (++node->infiData->psn);
 #endif	
@@ -1068,7 +1073,6 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 		CmiAssert(0);
 	}*/
 
-	struct ibv_send_wr *bad_wr=NULL;
 	if(retval = ibv_post_send(node->infiData->qp,&(packet->wr),&bad_wr)){
 		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",_Cmi_mynode,node->infiData->nodeNo,retval);
 		CmiAssert(0);
@@ -1104,6 +1108,7 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 
 
 static void inline EnqueueDummyPacket(OtherNode node,int size){
+	struct ibv_mr *key;
 	infiPacket packet;
 	MallocInfiPacket(packet);
 	packet->size = size;
@@ -1111,7 +1116,7 @@ static void inline EnqueueDummyPacket(OtherNode node,int size){
 	
 	packet->header.code = INFIDUMMYPACKET;
 
-	struct ibv_mr *key = METADATAFIELD(packet->buf)->key;
+	key = METADATAFIELD(packet->buf)->key;
 	
 	MACHSTATE2(3,"Dummy packet to %d size %d",node->infiData->nodeNo,size);
 	EnqueuePacket(node,packet,size,key);
@@ -1123,6 +1128,7 @@ static void inline EnqueueDummyPacket(OtherNode node,int size){
 
 
 static void inline EnqueueDataPacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,int size,int broot,int copy){
+	struct ibv_mr *key;
 	infiPacket packet;
 	MallocInfiPacket(packet);
 	packet->size = size;
@@ -1134,7 +1140,7 @@ static void inline EnqueueDataPacket(OutgoingMsg ogm, OtherNode node, int rank,c
 	ogm->refcount++;
 	packet->ogm = ogm;
 	
-	struct ibv_mr *key = METADATAFIELD(ogm->data)->key;
+	key = METADATAFIELD(ogm->data)->key;
 	CmiAssert(key != NULL);
 	
 	EnqueuePacket(node,packet,size,key);
@@ -1193,12 +1199,13 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
  
  {
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
+		struct ibv_mr *key;
 
 		
 		packet->size = sizeof(struct infiRdmaPacket);
 		packet->buf = (char *)rdmaPacket;
 		
-		struct ibv_mr *key = METADATAFIELD(ogm->data)->key;
+		key = METADATAFIELD(ogm->data)->key;
 
 		CmiAssert(key!=NULL);
 
@@ -1536,10 +1543,9 @@ void static inline handoverMessage(char *newmsg,int total_size,int rank,int broo
 
 static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffer){
 	char *newmsg;
-	
+	OtherNode node = &nodes[nodeNo];
 	MACHSTATE2(3,"Processing packet from node %d len %d",nodeNo,len);
 	
-	OtherNode node = &nodes[nodeNo];
 	newmsg = node->asm_msg;		
 	
 	/// This simple state machine determines if this packet marks the beginning of a new message
@@ -1797,6 +1803,7 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 	int nodeNo = fromNodeNo;
 	OtherNode node = &nodes[nodeNo];
 	struct infiRdmaPacket *rdmaPacket;
+	struct infiBuffer *buffer = malloc(sizeof(struct infiBuffer));
 
 	getFreeTokens(node->infiData);
 #if CMK_IBVERBS_TOKENS_FLOW
@@ -1809,7 +1816,6 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 #endif
 #endif
 	
-	struct infiBuffer *buffer = malloc(sizeof(struct infiBuffer));
 //	CmiAssert(buffer != NULL);
 	
 	
@@ -1902,7 +1908,7 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 	
 	free(buffer);
 	
-	OtherNode node=&nodes[rdmaPacket->fromNodeNo];
+	//OtherNode node=&nodes[rdmaPacket->fromNodeNo];
 	//we are sending this ack as a response to a successful
 	// rdma_Read.. the token for that rdma_Read needs to be freed
 #if CMK_IBVERBS_TOKENS_FLOW	
@@ -1912,8 +1918,8 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 
 	//send ack to sender if toBuffer is off otherwise buffer it
 	if(toBuffer){
-		MACHSTATE1(3,"Buffering Rdma Ack %p",rdmaPacket);
 		struct infiRdmaPacket *tmp = context->bufferedRdmaAcks;
+		MACHSTATE1(3,"Buffering Rdma Ack %p",rdmaPacket);
 		context->bufferedRdmaAcks = rdmaPacket;
 		rdmaPacket->next = tmp;
 		rdmaPacket->prev = NULL;
@@ -1934,13 +1940,14 @@ static inline void EnqueueRdmaAck(struct infiRdmaPacket *rdmaPacket){
 	MallocInfiPacket(packet);
 	{
 		struct infiRdmaPacket *ackPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
+		struct ibv_mr *packetKey;
 		*ackPacket = *rdmaPacket;
 		packet->size = sizeof(struct infiRdmaPacket);
 		packet->buf = (char *)ackPacket;
 		packet->header.code = INFIRDMA_ACK;
 		packet->ogm=NULL;
 		
-		struct ibv_mr *packetKey = METADATAFIELD((void *)ackPacket)->key;
+		packetKey = METADATAFIELD((void *)ackPacket)->key;
 	
 
 		EnqueuePacket(node,packet,sizeof(struct infiRdmaPacket),packetKey);
@@ -2141,6 +2148,7 @@ static inline void processAllBufferedMsgs(){
 static inline void increaseTokens(OtherNode node){
 	int err;
 	int increase = node->infiData->totalTokens*INCTOKENS_INCREASE;
+        int currentCqSize;
 	if(node->infiData->totalTokens + increase > maxTokens){
 		increase = maxTokens-node->infiData->totalTokens;
 	}
@@ -2148,7 +2156,7 @@ static inline void increaseTokens(OtherNode node){
 	node->infiData->tokensLeft += increase;
 	MACHSTATE3(3,"Increasing tokens for node %d to %d by %d",node->infiData->nodeNo,node->infiData->totalTokens,increase);
 	//increase the size of the sendCq
-	int currentCqSize = context->sendCqSize;
+	currentCqSize = context->sendCqSize;
 	if(ibv_resize_cq(context->sendCq,currentCqSize+increase)){
 		fprintf(stderr,"[%d] failed to increase cq by %d from %d totalTokens %d \n",_Cmi_mynode,increase,currentCqSize, node->infiData->totalTokens);
 		CmiAssert(0);
@@ -2160,6 +2168,7 @@ static void increasePostedRecvs(int nodeNo){
 	OtherNode node = &nodes[nodeNo];
 	int tokenIncrease = node->infiData->postedRecvs*INCTOKENS_INCREASE;	
 	int recvIncrease = tokenIncrease;
+	int currentCqSize;
 	if(tokenIncrease+node->infiData->postedRecvs > maxTokens){
 		tokenIncrease = maxTokens - node->infiData->postedRecvs;
 	}
@@ -2170,7 +2179,7 @@ static void increasePostedRecvs(int nodeNo){
 	context->srqSize += recvIncrease;
 	MACHSTATE3(3,"Increase tokens by %d to %d for node %d ",tokenIncrease,node->infiData->postedRecvs,nodeNo);
 	//increase the size of the recvCq
-	int currentCqSize = context->recvCqSize;
+	currentCqSize = context->recvCqSize;
 	if(ibv_resize_cq(context->recvCq,currentCqSize+tokenIncrease)){
 		CmiAssert(0);
 	}
@@ -2685,6 +2694,8 @@ void infi_CmiFree(void *ptr){
 void infi_CmiFree(void *ptr){
 	int size;
 	void *freePtr = ptr;
+	int poolIdx;
+	infiCmiChunkMetaData *metaData;
 #if CMK_IBVERBS_STATS
 	numFree++;
 #endif
@@ -2696,8 +2707,6 @@ void infi_CmiFree(void *ptr){
 	ptr += sizeof(CmiChunkHeader);
 	size = SIZEFIELD (ptr);
 /*	if(size > firstBinSize){*/
-		infiCmiChunkMetaData *metaData;
-		int poolIdx;
 		//there is a infiniband specific header
 		freePtr = (char*)ptr - sizeof(infiCmiChunkHeader);
 		metaData = METADATAFIELD(ptr);
@@ -2743,8 +2752,8 @@ void infi_CmiFree(void *ptr){
 			}else{
 				if(metaData->owner->metaData->count == 0){
 					//need to free the owner's buffer and metadata
-					freePtr = metaData->owner;
 					int unregstat=ibv_dereg_mr(metaData->key);
+					freePtr = metaData->owner;
 #if CMK_IBVERBS_STATS
                                         numUnReg++;
                                         numCurReg--;
