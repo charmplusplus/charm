@@ -794,7 +794,8 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 
         _inrestart = 0;
 
-   	_initDone();
+   	if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
+   	//_initDone();
 	CkMemCheckPT::inRestarting = 0;
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
