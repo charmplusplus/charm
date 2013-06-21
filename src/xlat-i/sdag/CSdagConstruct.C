@@ -548,7 +548,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
       defs << "  SDAG::Buffer* " << bufName << " = __dep->tryFindMessage("
            << e->entryPtr->entryNum // entry number
            << ", " << (e->intExpr ? "true" : "false") // has a ref number?
-           << ", " << (e->intExpr ? refName : "0")  // the ref number
+           << ", " << (e->intExpr ? refName.get_string_const() : "0")  // the ref number
            << ", " << (cur != 0 ? "true" : "false")   // has a ignore set?
            << (entryLen > 1 ? ", ignore" : "") // the ignore set
            << ");\n";
