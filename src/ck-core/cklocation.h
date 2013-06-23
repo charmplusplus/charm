@@ -62,6 +62,7 @@ public:
 	CkArrayIndex idx; // Array index that is migrating
 	int ignoreArrival;   // if to inform LB of arrival
 	int length;//Size in bytes of the packed data
+	int nManagers; // Number of associated array managers
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CkGroupID gid; //gid of location manager
 #endif
