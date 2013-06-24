@@ -75,9 +75,10 @@ void CmiHandleImmediateMessage(void *msg) {
         CmiAssert(0);
 #endif
   int handlerNo=CmiImmediateHandler(msg);
+  CmiHandlerInfo *h;
   MACHSTATE2(4,"immediate message handler %d %d", CmiGetHandler(msg), handlerNo)
 /*  CmiHandlerInfo *h=&CpvAccessOther(CmiHandlerTable,0)[handlerNo]; */
-  CmiHandlerInfo *h = &CpvAccess(CmiHandlerTable)[handlerNo];
+  h = &CpvAccess(CmiHandlerTable)[handlerNo];
   CmiAssert(h && h->hdlr);
 
   MACHLOCK_ASSERT(_immRunning,"CmiHandleImmediateMessage");
