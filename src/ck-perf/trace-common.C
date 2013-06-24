@@ -116,8 +116,6 @@ static void traceCommonInit(char **argv)
     strcat(CkpvAccess(traceRoot), subdir);
     strcpy(CkpvAccess(partitionRoot),CkpvAccess(traceRoot));
     strcat(CkpvAccess(traceRoot), argv[0]+i);
-    if (CkMyPe() == 0) 
-      CmiPrintf("Trace: traceroot: %s\n", CkpvAccess(traceRoot));
   }
   else {
     CkpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1 +strlen(subdir));
@@ -127,12 +125,10 @@ static void traceCommonInit(char **argv)
     strcpy(CkpvAccess(traceRoot), subdir);
     strcpy(CkpvAccess(partitionRoot),CkpvAccess(traceRoot));
     strcat(CkpvAccess(traceRoot), argv[0]);
-    if (CkMyPe() == 0) 
-      CmiPrintf("Trace: traceroot: %s\n", CkpvAccess(traceRoot));
   }
   CkpvAccess(traceRootBaseLength)  +=  strlen(subdir);
 	/* added for TAU trace module. */
-	char *cwd;
+  char *cwd;
   CkpvInitialize(char*, selective);
   if (CmiGetArgStringDesc(argv, "+selective", &temproot, "TAU's selective instrumentation file")) {
     // Trying to decide if the traceroot path is absolute or not. If it is not
@@ -399,8 +395,12 @@ static inline void _traceInit(char **argv)
    CmiBarrier();
 #endif
 
-  if (CkpvAccess(_traces)->length() && !CmiGetArgFlagDesc(argv,"+traceoff","Disable tracing"))
-    traceBegin();
+  if (CkpvAccess(_traces)->length()) {
+    if (CkMyPe() == 0) 
+      CmiPrintf("Trace: traceroot: %s\n", CkpvAccess(traceRoot));
+    if (!CmiGetArgFlagDesc(argv,"+traceoff","Disable tracing"))
+      traceBegin();
+  }
 }
 
 /// Converse version
