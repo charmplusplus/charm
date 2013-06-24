@@ -73,6 +73,10 @@
 
 extern const char * const CmiCommitID;
 
+#if CMK_BIGSIM_CHARM
+extern void initQd(char **argv);
+#endif
+
 #if CMK_OUT_OF_CORE
 #include "conv-ooc.h"
 #endif
@@ -3580,22 +3584,20 @@ void ConverseCommonInit(char **argv)
   CIdleTimeoutInit(argv);
   
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp and multicore versions*/
-  if(CmiMyRank() == 0) {
-    if(CmiGetArgFlagDesc(argv, "+CmiSpinOnIdle", "Force the runtime system to spin on message reception when idle, rather than sleeping")) {
-      _Cmi_forceSpinOnIdle = 1;
+  if(CmiGetArgFlagDesc(argv, "+CmiSpinOnIdle", "Force the runtime system to spin on message reception when idle, rather than sleeping")) {
+    if(CmiMyRank() == 0) _Cmi_forceSpinOnIdle = 1;
+  }
+  if(CmiGetArgFlagDesc(argv, "+CmiSleepOnIdle", "Force the runtime system to sleep when idle, rather than spinning on message reception")) {
+    if(CmiMyRank() == 0) _Cmi_sleepOnIdle = 1;
+  }
+  if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for net-smp-*) ?")){
+    if (CmiMyPe() == 0) {
+      CmiPrintf("Charm++> Note: The option +CmiNoProcForComThread has been superseded by +CmiSleepOnIdle\n");
     }
-    if(CmiGetArgFlagDesc(argv, "+CmiSleepOnIdle", "Force the runtime system to sleep when idle, rather than spinning on message reception")) {
-      _Cmi_sleepOnIdle = 1;
-    }
-    if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for net-smp-*) ?")){
-      if (CmiMyPe() == 0) {
-        CmiPrintf("Charm++> Note: The option +CmiNoProcForComThread has been superseded by +CmiSleepOnIdle\n");
-      }
-      _Cmi_sleepOnIdle=1;
-    }
-    if (_Cmi_sleepOnIdle && _Cmi_forceSpinOnIdle) {
-      CmiAbort("The option +CmiSpinOnIdle is mutually exclusive with the options +CmiSleepOnIdle and +CmiNoProcForComThread");
-    }
+    if(CmiMyRank() == 0) _Cmi_sleepOnIdle=1;
+  }
+  if (_Cmi_sleepOnIdle && _Cmi_forceSpinOnIdle) {
+    if(CmiMyRank() == 0) CmiAbort("The option +CmiSpinOnIdle is mutually exclusive with the options +CmiSleepOnIdle and +CmiNoProcForComThread");
   }
 #endif
 	
@@ -3639,7 +3641,6 @@ void ConverseCommonInit(char **argv)
 
 #if CMK_BIGSIM_CHARM
    /* have to initialize QD here instead of _initCharm */
-  extern void initQd(char **argv);
   initQd(argv);
 #endif
 }

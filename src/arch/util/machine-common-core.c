@@ -781,30 +781,30 @@ static int create_partition_map( char **argv)
   _partitionInfo.partitionSize = (int*)calloc(_partitionInfo.numPartitions,sizeof(int));
   _partitionInfo.partitionPrefix = (int*)calloc(_partitionInfo.numPartitions,sizeof(int));
   
-  if (CmiGetArgFlagDesc(argv,"+assign_master","assign a process as master partition")) {
+  if (CmiGetArgFlagDesc(argv,"+master_partition","assign a process as master partition")) {
     _partitionInfo.type = PARTITION_MASTER;
   }
  
-  if (CmiGetArgStringDesc(argv, "+partsize", &partsizes, "size of partitions")) {
+  if (CmiGetArgStringDesc(argv, "+partition_sizes", &partsizes, "size of partitions")) {
     if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
-      CmiAbort("+partsize used with incompatible option, possibly +use_master\n");
+      CmiAbort("+partition_sizes used with incompatible option, possibly +use_master\n");
     }
     _partitionInfo.type = PARTITION_PREFIX;
   }
 
   _partitionInfo.scheme = 0;
-  if (CmiGetArgFlagDesc(argv,"+use_topology","topology aware partitions")) {
+  if (CmiGetArgFlagDesc(argv,"+partition_topology","topology aware partitions")) {
     _partitionInfo.isTopoaware = 1;
     _partitionInfo.scheme = 1;
   } else {
     _partitionInfo.isTopoaware = 0;
   }
   
-  if (CmiGetArgIntDesc(argv,"+use_topology_scheme", &_partitionInfo.scheme, "topology aware partitioning scheme")) {
+  if (CmiGetArgIntDesc(argv,"+partition_topology_scheme", &_partitionInfo.scheme, "topology aware partitioning scheme")) {
     _partitionInfo.isTopoaware = 1;
   }
 
-  if (CmiGetArgFlagDesc(argv,"+use_custom_part", "custom partitioning scheme")) {
+  if (CmiGetArgFlagDesc(argv,"+use_custom_partition", "custom partitioning scheme")) {
     _partitionInfo.scheme = 100;
     _partitionInfo.isTopoaware = 1;
   }

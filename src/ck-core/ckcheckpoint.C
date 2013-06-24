@@ -691,10 +691,10 @@ void CkStartCheckpoint(const char* dirname,const CkCallback& cb)
 {
   if(cb.isInvalid()) 
     CkAbort("callback after checkpoint is not set properly");
-#ifdef CMK_CHARE_USE_PTR
-  if(cb.isTargetToChare()) 
-    CkAbort("callback cannot set to a plain chare");
-#endif
+
+  if(cb.containsPointer())
+    CkAbort("Cannot restart from a callback based on a pointer");
+
 
 	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	

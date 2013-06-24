@@ -763,10 +763,12 @@ static void parse_netstart(void)
         dataport = -1;
   }
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
+    {
 	char *cmi_num_nodes = getenv("CmiNumNodes");
 	if(cmi_num_nodes != NULL){
 		sscanf(cmi_num_nodes,"%d",&_Cmi_numnodes);
 	}
+    }
 #endif	
 }
 
