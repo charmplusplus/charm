@@ -3,6 +3,12 @@ BGQ_BIN=$BGQ_FLOOR/gnu-linux/bin
 BGQ_INC="-I$BGQ_ZLIB/include"
 BGQ_LIB="-L$BGQ_ZLIB/lib -lpthread -lrt" 
 CMK_SYSLIBS="$BGQ_LIB"
+  
+if [[ -z `command -v mpixlcxx` ]]
+then
+  echo "mpixlcxx not in default path; please load xl wrappers for MPI" >&2
+  exit 1
+fi
 
 compiler=`mpixlcxx_r -show | awk '{print $1}'`;
 
