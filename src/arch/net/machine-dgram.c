@@ -505,7 +505,7 @@ static void node_addresses_store(ChMessage *msg)
   int nodestart;
   int i,j,n;
 #if CMK_USE_IBVERBS
-  ChInfiAddr *remoteInfiAddr
+  ChInfiAddr *remoteInfiAddr;
 #endif
   MACHSTATE(1,"node_addresses_store {");	
   _Cmi_numnodes=ChMessageInt(n32[0]);
