@@ -35,6 +35,10 @@
 #include "TopoManager.h"
 #endif
 
+#if CMK_BLUEGENEQ
+#include "spi/include/kernel/process.h"
+#endif
+
 #if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
