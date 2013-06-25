@@ -31,7 +31,7 @@
 
 #include <infiniband/verbs.h>
 
-#define QLOGIC
+//#define QLOGIC
 #ifndef QLOGIC
 enum ibv_mtu mtu = IBV_MTU_2048;
 #else
