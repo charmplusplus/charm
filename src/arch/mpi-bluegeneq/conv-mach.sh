@@ -18,16 +18,15 @@ BGQ_ZLIB=/soft/libraries/alcf/current/gcc/ZLIB/
 BGQ_INC="-I$BGQ_ZLIB/include"
 BGQ_LIB="-L$BGQ_ZLIB/lib -lpthread -lrt" 
 
-# test if compiler binary present
-if test ! -x $BGQ_BIN/powerpc64-bgq-linux-g++
-then
- echo "ERROR: Invalid BGQ_INSTALL or BGQ_FLOOR, C/C++ compiler missing"
- exit 1
-fi
-
 usesGCC=`cat conv-mach-opt.h  | grep "cc-xlc"`;
 if [[ -z $usesGCC ]]
 then
+  if [[ -z `command -v mpicxx` ]]
+  then
+    echo "mpicxx not in default path; please load gcc wrappers for MPI" >&2
+    exit 1
+  fi
+
   compiler=`mpicxx -show | awk '{print $1}'`;
   if [[ $compiler == "powerpc64-bgq-linux-g++" ]] ; then
     true
