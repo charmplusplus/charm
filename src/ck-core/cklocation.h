@@ -67,7 +67,7 @@ public:
         CkGroupID gid; //gid of location manager
 #endif
 	bool bounced;
-	double* packData;
+	char* packData;
 };
 
 /******************* Map object ******************/

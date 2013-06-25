@@ -2922,7 +2922,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	/*EVAC*/
 
 //First pass: find size of migration message
-	int bufSize;
+	size_t bufSize;
 	{
 		PUP::sizer p;
 		pupElementsFor(p,rec,CkElementCreation_migrate);
@@ -2930,9 +2930,8 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	}
 
 //Allocate and pack into message
-	int doubleSize=bufSize/sizeof(double)+1;
 	CkArrayElementMigrateMessage *msg = 
-		new (doubleSize, 0) CkArrayElementMigrateMessage;
+		new (bufSize, 0) CkArrayElementMigrateMessage;
 	msg->idx=idx;
 	msg->length=bufSize;
         msg->nManagers = nManagers;
