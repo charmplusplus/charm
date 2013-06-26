@@ -475,9 +475,9 @@ void SdagConstruct::generateWhenCodeNew(XStr& op) {
        iter != encapState.end(); ++iter, ++cur) {
     EncapState& state = **iter;
     if (!state.isMessage)
-      op << "\n          reinterpret_cast<" << *state.type << "*>(c->closure[" << cur << "])";
+      op << "\n          static_cast<" << *state.type << "*>(c->closure[" << cur << "])";
     else
-      op << "\n          reinterpret_cast<" << *state.type << "*>(reinterpret_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
+      op << "\n          static_cast<" << *state.type << "*>(static_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
     if (cur != encapState.size() - 1) op << ", ";
   }  
   op << "\n        );\n";
@@ -1172,9 +1172,9 @@ void SdagConstruct::generateCallNew(XStr& op, list<EncapState*>& scope,
       if (cur > scope.size() - 1) {
         int offset = cur - scope.size();
         if (!state->isMessage)
-          op << "reinterpret_cast<" << *state->type << "*>(buf" << offset << "->cl)";
+          op << "static_cast<" << *state->type << "*>(buf" << offset << "->cl)";
         else
-          op << "reinterpret_cast<" << *state->type << "*>(reinterpret_cast<SDAG::MsgClosure*>(buf" << offset << "->cl)->msg)";
+          op << "static_cast<" << *state->type << "*>(static_cast<SDAG::MsgClosure*>(buf" << offset << "->cl)->msg)";
       } else {
         if (state->name) op << *state->name; else op << "gen" << cur;
       }
