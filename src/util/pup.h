@@ -763,11 +763,10 @@ public:\
 #define PUPable_reg2(classIdentifier,className)	\
     classIdentifier::register_PUP_ID(className);
 
-
+  inline void operator|(er &p,able &a) {a.pup(p);}
+  inline void operator|(er &p,able* &a) {p(&a);}
 } //<- End namespace PUP
 
-inline void operator|(PUP::er &p,PUP::able &a) {a.pup(p);}
-inline void operator|(PUP::er &p,PUP::able* &a) {p(&a);}
 
 //Holds a pointer to a (possibly dynamically allocated) PUP::able.
 //  Extracting the pointer hands the deletion responsibility over.
@@ -878,7 +877,7 @@ namespace PUP {
 		public: enum {value=0};
 #endif
 	};
-}
+
 
 #ifdef CK_DEFAULT_BITWISE_PUP   /* OLD compatability mode*/
 /// Default operator| and PUParray: copy as bytes.
@@ -942,14 +941,15 @@ inline void PUParray(PUP::er &p,T *t,int n) {
 #define PUPenum(enumType) \
   inline void operator|(PUP::er &p,enumType &e) { int v=e;  p|v; e=v; }
 
+}
 
 /**
   For all builtin types, like "int",
   operator| and PUParray use p(t) and p(ta,n).
 */
 #define PUP_BUILTIN_SUPPORT(type) \
-  inline void operator|(PUP::er &p,type &t) {p(t);} \
-  inline void PUParray(PUP::er &p,type *ta,int n) { p(ta,n); } \
+  namespace PUP { inline void operator|(er &p,type &t) {p(t);} }	\
+  namespace PUP { inline void PUParray(er &p,type *ta,int n) { p(ta,n); } } \
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; }
