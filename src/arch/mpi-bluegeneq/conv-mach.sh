@@ -18,7 +18,7 @@ BGQ_ZLIB=/soft/libraries/alcf/current/gcc/ZLIB/
 BGQ_INC="-I$BGQ_ZLIB/include"
 BGQ_LIB="-L$BGQ_ZLIB/lib -lpthread -lrt" 
 
-usesGCC=`cat conv-mach-opt.h  | grep "cc-xlc"`;
+usesGCC=`cat $CHARMINC/conv-mach-opt.h  | grep "cc-xlc"`;
 if [[ -z $usesGCC ]]
 then
   if [[ -z `command -v mpicxx` ]]
