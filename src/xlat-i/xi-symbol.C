@@ -309,16 +309,30 @@ AstChildren<Child>::genDecls(XStr& str)
 
 template <typename Child>
 void
-AstChildren<Child>::genClosure(XStr& str)
+AstChildren<Child>::genClosureEntryDecls(XStr& str)
 {
-    perElemGen(children, str, &Child::genClosure, newLine);
+    perElemGen(children, str, &Child::genClosureEntryDecls, newLine);
 }
 
 template <typename Child>
 void
-AstChildren<Child>::outputClosures(XStr& str)
+AstChildren<Child>::genClosureEntryDefs(XStr& str)
 {
-    perElemGen(children, str, &Child::outputClosures, newLine);
+    perElemGen(children, str, &Child::genClosureEntryDefs, newLine);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::outputClosuresDecl(XStr& str)
+{
+    perElemGen(children, str, &Child::outputClosuresDecl, newLine);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::outputClosuresDef(XStr& str)
+{
+    perElemGen(children, str, &Child::outputClosuresDef, newLine);
 }
 
 template <typename Child>
@@ -583,7 +597,8 @@ Module::generate()
   "#include \"sdag.h\"\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
-  if (clist) clist->outputClosures(declstr);
+  if (clist) clist->outputClosuresDecl(declstr);
+  if (clist) clist->outputClosuresDef(defstr);
   declstr << "extern void _register"<<name<<"(void);\n";
   if(isMain()) {
     declstr << "extern \"C\" void CkRegisterMainModule(void);\n";
@@ -926,8 +941,13 @@ Chare::genRegisterMethodDef(XStr& str)
 }
 
 void
-Chare::outputClosures(XStr& str) {
-  str << closures;
+Chare::outputClosuresDecl(XStr& str) {
+  str << closuresDecl;
+}
+
+void
+Chare::outputClosuresDef(XStr& str) {
+  str << closuresDef;
 }
 
 void
@@ -997,8 +1017,10 @@ Chare::genDecls(XStr& str)
     genPythonDecls(str);
   }
 
-  closures << "/* ---------------- method closures -------------- */\n";
-  genClosureDecls(closures);
+  closuresDecl << "/* ---------------- method closures -------------- */\n";
+  closuresDef << closuresDecl;
+  genClosureEntryDecls(closuresDecl);
+  genClosureEntryDefs(closuresDef);
 
   if(list) {
     //handle the case that some of the entries may be sdag Entries
@@ -1080,13 +1102,18 @@ disambig_proxy(XStr &str, const XStr &super)
 }
 
 void
-Chare::genClosureDecls(XStr& str) {
+Chare::genClosureEntryDecls(XStr& str) {
   XStr ptype;
   ptype << "Closure_" << type;
-  str << tspec()<< "class " << ptype << " ";
+  str << tspec() << "class " << ptype << " ";
   str << CIClassStart;
-  if (list) list->genClosure(str);
+  if (list) list->genClosureEntryDecls(str);
   str << CIClassEnd;
+}
+
+void
+Chare::genClosureEntryDefs(XStr& str) {
+  if (list) list->genClosureEntryDefs(str);
 }
 
 void
@@ -2252,9 +2279,15 @@ Message::genReg(XStr& str)
 }
 
 void
-Template::outputClosures(XStr& str) {
+Template::outputClosuresDecl(XStr& str) {
   Chare* c = dynamic_cast<Chare*>(entity);
-  if (c) str << c->closures;
+  if (c) str << c->closuresDecl;
+}
+
+void
+Template::outputClosuresDef(XStr& str) {
+  Chare* c = dynamic_cast<Chare*>(entity);
+  if (c) str << c->closuresDef;
 }
 
 void
@@ -4149,7 +4182,17 @@ void Entry::genDecls(XStr& str)
   }
 }
 
-void Entry::genClosure(XStr& decls) {
+void Entry::genClosureEntryDecls(XStr& str) {
+  genClosure(str, false);
+}
+
+void Entry::genClosureEntryDefs(XStr& str) {
+  templateGuardBegin(tspec || container->isTemplated(), str);
+  genClosure(str, true);
+  templateGuardEnd(str);
+}
+
+void Entry::genClosure(XStr& decls, bool isDef) {
   if (isConstructor()) return;
 
   bool hasArray = false, isMessage = false;
@@ -4246,24 +4289,31 @@ void Entry::genClosure(XStr& decls) {
 
     container->sdagPUPReg << "  PUPable_reg(" << *genClosureTypeNameProxy << ");\n";
 
-    decls << "    struct " <<  *genClosureTypeName <<" : public SDAG::Closure" << " {\n";
-    decls << structure << "\n";
-    decls << "      " << *genClosureTypeName << "() {\n";
-    decls << initCode;
-    decls << "      }\n";
-    decls << "      " << *genClosureTypeName << "(CkMigrateMessage*) {\n";
-    decls << initCode;
-    decls << "      }\n";
-    decls << getter;
-    decls << "      void pup(PUP::er& p) {\n";
-    decls << toPup;
-    decls << "      }\n";
-    decls << "      virtual ~" << *genClosureTypeName << "() {\n";
-    decls << dealloc;
-    decls << "      }\n";
-    decls << "      " << (container->isTemplated() ? "PUPable_decl_template" : "PUPable_decl")
-          << "(" << *genClosureTypeName << ");\n";
-    decls << "    };\n";
+    if (isDef) {
+      if (container->isTemplated()) {
+        decls << container->tspec() << "\n";
+      }
+      decls << "    struct " << *genClosureTypeNameProxy <<" : public SDAG::Closure" << " {\n";
+      decls << structure << "\n";
+      decls << "      " << *genClosureTypeName << "() {\n";
+      decls << initCode;
+      decls << "      }\n";
+      decls << "      " << *genClosureTypeName << "(CkMigrateMessage*) {\n";
+      decls << initCode;
+      decls << "      }\n";
+      decls << getter;
+      decls << "      void pup(PUP::er& p) {\n";
+      decls << toPup;
+      decls << "      }\n";
+      decls << "      virtual ~" << *genClosureTypeName << "() {\n";
+      decls << dealloc;
+      decls << "      }\n";
+      decls << "      " << (container->isTemplated() ? "PUPable_decl_template" : "PUPable_decl")
+            << "(" << *genClosureTypeNameProxy << ");\n";
+      decls << "    };\n";
+    } else {
+      decls << "    struct " <<  *genClosureTypeName << ";\n";
+    }
   } else {
     genClosureTypeName = new XStr();
     genClosureTypeNameProxy = new XStr();

@@ -104,10 +104,12 @@ protected:
   int line;
 public:
   AstNode(int line_ = -1) : line(line_) { }
-    virtual void outputClosures(XStr& str) { (void)str; }
+    virtual void outputClosuresDecl(XStr& str) { (void)str; }
+    virtual void outputClosuresDef(XStr& str) { (void)str; }
     virtual void genDecls(XStr& str) { (void)str; }
     virtual void genDefs(XStr& str) { (void)str; }
-    virtual void genClosure(XStr& str) { }
+    virtual void genClosureEntryDecls(XStr& str) { }
+    virtual void genClosureEntryDefs(XStr& str) { }
     virtual void genReg(XStr& str) { (void)str; }
     virtual void genGlobalCode(XStr scope, XStr &decls, XStr &defs)
     { (void)scope; (void)decls; (void)defs; }
@@ -163,9 +165,11 @@ public:
 
   void printChareNames();
 
-  void outputClosures(XStr& str);
+  void outputClosuresDecl(XStr& str);
+  void outputClosuresDef(XStr& str);
 
-  void genClosure(XStr& str);
+  void genClosureEntryDecls(XStr& str);
+  void genClosureEntryDefs(XStr& str);
   void genDecls(XStr& str);
   void genDefs(XStr& str);
   void genReg(XStr& str);
@@ -569,9 +573,14 @@ class Scope : public ConstructList {
         AstChildren<Construct>::print(str);
         str << "} // namespace " << name_ << "\n";
     }
-    void outputClosures(XStr& str) {
+    void outputClosuresDecl(XStr& str) {
       str << "namespace " << name_ << " {\n";
-      AstChildren<Construct>::outputClosures(str);
+      AstChildren<Construct>::outputClosuresDecl(str);
+      str << "} // namespace " << name_ << "\n";
+    }
+    void outputClosuresDef(XStr& str) {
+      str << "namespace " << name_ << " {\n";
+      AstChildren<Construct>::outputClosuresDef(str);
       str << "} // namespace " << name_ << "\n";
     }
 };
@@ -610,7 +619,8 @@ class Template : public Construct {
     void genDefs(XStr& str);
     void genSpec(XStr& str);
     void genVars(XStr& str);
-    void outputClosures(XStr& str);
+    void outputClosuresDecl(XStr& str);
+    void outputClosuresDef(XStr& str);
 
     // DMK - Accel Support
     int genAccels_spe_c_funcBodies(XStr& str);
@@ -719,8 +729,10 @@ class Member : public Construct {
     virtual void genPythonStaticDefs(XStr&) {}
     virtual void genPythonStaticDocs(XStr&) {}
     virtual void lookforCEntry(CEntry *)  {}
-    virtual void genClosure(XStr& str) { }
-    virtual void outputClosures(XStr& str) { }
+    virtual void genClosureEntryDecls(XStr& str) { }
+    virtual void genClosureEntryDefs(XStr& str) { }
+    virtual void outputClosuresDecl(XStr& str) { }
+    virtual void outputClosuresDef(XStr& str) { }
 };
 
 /* Chare or group is a templated entity */
@@ -738,17 +750,17 @@ class Chare : public TEntity {
     };
     typedef unsigned int attrib_t;
     XStr sdagPUPReg;
-    XStr sdagDefs, closures;
+    XStr sdagDefs, closuresDecl, closuresDef;
+    NamedType *type;
   protected:
     attrib_t attrib;
     int hasElement;//0-- no element type; 1-- has element type
     forWhom forElement;
     int hasSection; //1-- applies only to array section
 
-    NamedType *type;
     TypeList *bases; //Base classes used by proxy
     TypeList *bases_CBase; //Base classes used by CBase (or NULL)
-    
+
     int entryCount;
     int hasSdagEntry;
 
@@ -819,8 +831,10 @@ class Chare : public TEntity {
 
     int nextEntry(void) {return entryCount++;}
     virtual void genSubDecls(XStr& str);
-    virtual void outputClosures(XStr& str);
-    virtual void genClosureDecls(XStr& str);
+    virtual void outputClosuresDecl(XStr& str);
+    virtual void outputClosuresDef(XStr& str);
+    virtual void genClosureEntryDecls(XStr& str);
+    virtual void genClosureEntryDefs(XStr& str);
     void genPythonDecls(XStr& str);
     void genPythonDefs(XStr& str);
     virtual char *chareTypeName(void) {return (char *)"chare";}
@@ -992,7 +1006,9 @@ private:
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
 
-    void genClosure(XStr& str);
+    void genClosure(XStr& str, bool isDef);
+    void genClosureEntryDefs(XStr& str);
+    void genClosureEntryDecls(XStr& str);
     
     void genChareDecl(XStr& str);
     void genChareStaticConstructorDecl(XStr& str);
