@@ -482,9 +482,6 @@ namespace xi {
     op << "\n        );\n";
   }
 
-  void SdagConstruct::generateWhenCode(XStr& op) {
-  }
-
   void WhenConstruct::generateEntryName(XStr& defs, Entry* e, int curEntry) {
     if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1))
       defs << e->getEntryName() << "_" << curEntry;
