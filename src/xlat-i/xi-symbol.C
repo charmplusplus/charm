@@ -4218,7 +4218,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
        if (sv->isArray() != 0) {
          hasArray = hasArray || true;
        } else {
-         toPup << "        " << "p | " << sv->name << ";\n";
+         toPup << "        " << "__p | " << sv->name << ";\n";
          sv->podType = true;
        }
 
@@ -4232,7 +4232,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
       if (sv->isMessage()) {
         isMessage = true;
         structure << sv->type << " " << sv->name << ";\n";
-        toPup << "        " << "CkPupMessage(p, (void**)&" << sv->name << ");\n";
+        toPup << "        " << "CkPupMessage(__p, (void**)&" << sv->name << ");\n";
         messageType << sv->type->deref();
       }
     }
@@ -4240,8 +4240,8 @@ void Entry::genClosure(XStr& decls, bool isDef) {
 
   structure << "\n      " << "int __refnum;\n";
 
-  toPup << "        packClosure(p);\n";
-  toPup << "        p | __refnum;\n";
+  toPup << "        packClosure(__p);\n";
+  toPup << "        __p | __refnum;\n";
 
   XStr initCode;
   initCode << "        init();\n";
@@ -4257,11 +4257,11 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     initCode << "        _impl_buf_in = 0;\n";
     initCode << "        _impl_buf_size = 0;\n";
 
-    toPup << "        p | _impl_buf_size;\n";
-    toPup << "        bool hasMsg = (_impl_marshall != 0); p | hasMsg;\n";
-    toPup << "        " << "if (hasMsg) CkPupMessage(p, (void**)&" << "_impl_marshall" << ");\n";
-    toPup << "        " << "else PUParray(p, _impl_buf_in, _impl_buf_size);\n";
-    toPup << "        if (p.isUnpacking()) {\n";
+    toPup << "        __p | _impl_buf_size;\n";
+    toPup << "        bool hasMsg = (_impl_marshall != 0); __p | hasMsg;\n";
+    toPup << "        " << "if (hasMsg) CkPupMessage(__p, (void**)&" << "_impl_marshall" << ");\n";
+    toPup << "        " << "else PUParray(__p, _impl_buf_in, _impl_buf_size);\n";
+    toPup << "        if (__p.isUnpacking()) {\n";
     toPup << "          char *impl_buf = _impl_marshall ? _impl_marshall->msgBuf : _impl_buf_in;\n";
     param->beginUnmarshallSDAG(toPup);
     toPup << "        }\n";
@@ -4289,7 +4289,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
       decls << initCode;
       decls << "      }\n";
       decls << getter;
-      decls << "      void pup(PUP::er& p) {\n";
+      decls << "      void pup(PUP::er& __p) {\n";
       decls << toPup;
       decls << "      }\n";
       decls << "      virtual ~" << *genClosureTypeName << "() {\n";
