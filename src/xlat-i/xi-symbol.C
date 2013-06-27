@@ -4280,6 +4280,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
       if (container->isTemplated()) {
         decls << container->tspec() << "\n";
       }
+      decls << generateTemplateSpec(tspec) << "\n";
       decls << "    struct " << *genClosureTypeNameProxy <<" : public SDAG::Closure" << " {\n";
       decls << structure << "\n";
       decls << "      " << *genClosureTypeName << "() {\n";
@@ -4295,10 +4296,17 @@ void Entry::genClosure(XStr& decls, bool isDef) {
       decls << "      virtual ~" << *genClosureTypeName << "() {\n";
       decls << dealloc;
       decls << "      }\n";
-      decls << "      " << (container->isTemplated() ? "PUPable_decl_template" : "PUPable_decl")
-            << "(" << *genClosureTypeNameProxy << ");\n";
+      decls << "      " << ((container->isTemplated() || tspec) ? "PUPable_decl_template" : "PUPable_decl")
+            << "(" << *genClosureTypeNameProxy;
+      if (tspec) {
+        decls << "<";
+        tspec->genShort(decls);
+        decls << ">";
+      }
+      decls << ");\n";
       decls << "    };\n";
     } else {
+      decls << generateTemplateSpec(tspec) << "\n";
       decls << "    struct " <<  *genClosureTypeName << ";\n";
     }
   } else {
@@ -4677,7 +4685,19 @@ void Entry::genDefs(XStr& str)
   if ((param->isMarshalled() || param->isVoid()) && genClosureTypeNameProxy) {
     if (container->isTemplated())
       str << container->tspec();
-    str << (container->isTemplated() ? "PUPable_def_template_nonInst" : "PUPable_def") << "(" << *genClosureTypeNameProxy << ");\n";
+    if (tspec) {
+      str << "template <";
+      tspec->genLong(str);
+      str << "> ";
+    }
+
+    str << ((container->isTemplated() || tspec) ? "PUPable_def_template_nonInst" : "PUPable_def") << "(" << *genClosureTypeNameProxy;
+    if (tspec) {
+      str << "<";
+      tspec->genShort(str);
+      str << ">";
+    }
+      str << ");\n";
   }
 
   templateGuardEnd(str);
