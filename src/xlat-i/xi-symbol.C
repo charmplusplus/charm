@@ -4218,21 +4218,8 @@ void Entry::genClosure(XStr& decls, bool isDef) {
        if (sv->isArray() != 0) {
          hasArray = hasArray || true;
        } else {
-         if (1 || (sv->type->getNumStars() == 0 &&
-             (XStr(sv->type->getBaseName()) == "int" ||
-              XStr(sv->type->getBaseName()) == "bool" ||
-              XStr(sv->type->getBaseName()) == "char" ||
-              XStr(sv->type->getBaseName()) == "long"))) {
-           // @todo add more POD types here
-           toPup << "        " << "p | " << sv->name << ";\n";
-           sv->podType = true;
-         } else {
-           structure << "*";
-           getter << "*";
-           toPup << "        " << "if (p.isUnpacking()) " << "alloc();\n";
-           alloc << "        " << sv->name << " = new " << sv->type << "()" << ";\n";
-           toPup << "        " << "p | *" << sv->name << ";\n";
-         }
+         toPup << "        " << "p | " << sv->name << ";\n";
+         sv->podType = true;
        }
 
        if (sv->name != 0) {
