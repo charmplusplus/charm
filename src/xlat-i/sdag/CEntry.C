@@ -107,6 +107,15 @@ namespace xi {
         defs << "CkGetRefNum(" << sv->name << "_msg);\n";
       else
         defs << "0;\n";
+
+      // possible memory pressure problem: this message will be kept as long as
+      // it is a state parameter! there are ways to remediate this, but it
+      // involves either live variable analysis (which is not feasible) or
+      // keeping a meta-structure for every message passed in
+
+      //increase reference count by one for the state parameter
+      defs << "  CmiReference(UsrToEnv(" << sv->name << "_msg));\n";
+
       defs << "  __dep->pushBuffer(" << entryNum << ", new SDAG::MsgClosure(" << sv->name << "_msg" << "), refnum);\n";
     }
     // @todo write the code to fetch the message with the ref num

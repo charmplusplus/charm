@@ -1332,7 +1332,7 @@ protected:
   std::list<CStateVar *> *stateVarsChildren;
 
 public:
-  void unravelClosures(XStr& defs);
+  void unravelClosures(XStr& defs, bool child = false);
 
   int nodeNum;
   XStr *label;

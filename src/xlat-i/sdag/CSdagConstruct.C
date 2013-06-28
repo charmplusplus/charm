@@ -625,11 +625,35 @@ namespace xi {
 
     endMethod(defs);
 
-    // generate the _end variant of this method
+    /**
+     *   Generate the ending of this 'when' clause, which calls the next in the
+     *   sequence and handling deallocation of messages
+     */
 
+    // generate the _end variant of this method
     generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "    ";
+
+    // decrease the reference count of any message state parameters
+    // that are going out of scope
+
+    // first unravel the closures so the message names are correspond to the
+    // state variable names
+    unravelClosures(defs, true);
+
+    // call CmiFree on each state variable going out of scope that is a message
+    // (i.e. the ones that are currently brought in scope by the current
+    // EntryList
+    for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
+      if (el->entry->param->isMessage() == 1) {
+        CStateVar*& sv = *el->entry->stateVars.begin();
+        defs << "  CmiFree(UsrToEnv(" << sv->name << "));\n";
+      }
+    }
+
+    // generate call to the next in the sequence
+    defs << "  ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+
     endMethod(defs);
 
     generateChildrenCode(decls, defs, entry);
@@ -705,11 +729,13 @@ namespace xi {
     endMethod(defs);
   }
 
-  void SdagConstruct::unravelClosures(XStr& defs) {
+  void SdagConstruct::unravelClosures(XStr& defs, bool child) {
     int cur = 0;
 
+    list<EncapState*>& encaps = child ? encapStateChild : encapState;
+
     // traverse all the state variables bring them into scope
-    for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
+    for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end(); ++iter, ++cur) {
       EncapState& state = **iter;
 
       int i = 0;
