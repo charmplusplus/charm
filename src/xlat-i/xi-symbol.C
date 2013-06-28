@@ -4274,7 +4274,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     *genClosureTypeNameProxy << name << "_" << entryCount << "_closure";
     *genClosureTypeName << name << "_" << entryCount << "_closure";
 
-    container->sdagPUPReg << "  PUPable_reg(" << *genClosureTypeNameProxy << ");\n";
+    container->sdagPUPReg << "  PUPable_reg(SINGLE_ARG(" << *genClosureTypeNameProxy << "));\n";
 
     if (isDef) {
       if (container->isTemplated()) {
@@ -4296,8 +4296,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
       decls << "      virtual ~" << *genClosureTypeName << "() {\n";
       decls << dealloc;
       decls << "      }\n";
-      decls << "      " << ((container->isTemplated() || tspec) ? "PUPable_decl_template" : "PUPable_decl")
-            << "(" << *genClosureTypeNameProxy;
+      decls << "      " << ((container->isTemplated() || tspec) ? "PUPable_decl_template" : "PUPable_decl") << "(" << *genClosureTypeName;
       if (tspec) {
         decls << "<";
         tspec->genShort(decls);
@@ -4691,13 +4690,13 @@ void Entry::genDefs(XStr& str)
       str << "> ";
     }
 
-    str << ((container->isTemplated() || tspec) ? "PUPable_def_template_nonInst" : "PUPable_def") << "(" << *genClosureTypeNameProxy;
+    str << ((container->isTemplated() || tspec) ? "PUPable_def_template_nonInst" : "PUPable_def") << "(SINGLE_ARG(" << *genClosureTypeNameProxy;
     if (tspec) {
       str << "<";
       tspec->genShort(str);
       str << ">";
     }
-      str << ");\n";
+      str << "));\n";
   }
 
   templateGuardEnd(str);

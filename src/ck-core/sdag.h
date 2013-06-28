@@ -3,6 +3,8 @@
 
 #include "pup.h"
 
+#define SINGLE_ARG(...) __VA_ARGS__
+
 namespace SDAG {
   struct Closure : public PUP::able {
     virtual void pup(PUP::er& p) = 0;
