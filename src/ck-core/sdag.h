@@ -108,8 +108,8 @@ namespace SDAG {
   struct CSpeculator : public Closure {
     int speculationIndex;
 
-    CSpeculator() { init(); }
-    CSpeculator(CkMigrateMessage*) { init(); }
+    CSpeculator() : speculationIndex(0) { init(); }
+    CSpeculator(CkMigrateMessage*) : speculationIndex(0) { init(); }
 
     CSpeculator(int speculationIndex_)
       : speculationIndex(speculationIndex_) { init(); }
@@ -165,8 +165,8 @@ namespace SDAG {
 
     Buffer(int entry, Closure* cl, int refnum)
       : entry(entry)
-      , cl(cl)
-      , refnum(refnum) {
+      , refnum(refnum)
+      , cl(cl) {
       cl->ref();
     }
 
@@ -205,9 +205,9 @@ namespace SDAG {
     }
 
     Dependency(int numEntries, int numWhens)
-      : curSpeculationIndex(0)
+      : entryToWhen(numEntries)
       , buffer(numEntries)
-      , entryToWhen(numEntries) { }
+      , curSpeculationIndex(0) { }
 
     void addDepends(int whenID, int entry) {
       entryToWhen[entry].push_back(whenID);
