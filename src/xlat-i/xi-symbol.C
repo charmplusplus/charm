@@ -4193,7 +4193,7 @@ void Entry::genClosureEntryDefs(XStr& str) {
 }
 
 void Entry::genClosure(XStr& decls, bool isDef) {
-  if (isConstructor()) return;
+  if (isConstructor() || isLocal()) return;
 
   bool hasArray = false, isMessage = false;
   XStr messageType;
