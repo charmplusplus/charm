@@ -519,13 +519,14 @@ namespace xi {
       }
     // create a new scope for unraveling the closures
     if (hasRef) defs << "  {\n";
-    if (hasRef) unravelClosures(defs);
+    if (hasRef) unravelClosuresBegin(defs);
     cur = 0;
     // generate each refnum variable we need that can access the internal closure state
     for (EntryList *el = elist; el != NULL; el = el->next, cur++)
       if (el->entry->intExpr)
         defs << "    refnum_" << cur << " = " << (el->entry->intExpr ? el->entry->intExpr : "0") << ";\n";
     if (hasRef) defs << "  }\n";
+    if (hasRef) unravelClosuresEnd(defs);
 
     if (entryLen > 1) defs << "  std::set<SDAG::Buffer*> ignore;\n";
 
@@ -638,7 +639,7 @@ namespace xi {
 
     // first unravel the closures so the message names are correspond to the
     // state variable names
-    unravelClosures(defs, true);
+    unravelClosuresBegin(defs, true);
 
     // call CmiFree on each state variable going out of scope that is a message
     // (i.e. the ones that are currently brought in scope by the current
@@ -649,6 +650,8 @@ namespace xi {
         defs << "  CmiFree(UsrToEnv(" << sv->name << "));\n";
       }
     }
+
+    unravelClosuresEnd(defs, true);
 
     // generate call to the next in the sequence
     defs << "  ";
@@ -689,7 +692,7 @@ namespace xi {
     generateBeginTime(defs);
 #endif
 
-    unravelClosures(defs);
+    unravelClosuresBegin(defs);
 
     defs << "    " << con1->text << ";\n";
     //Record only the beginning for FOR
@@ -703,6 +706,9 @@ namespace xi {
     defs << "      ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     defs << "    }\n";
+
+    unravelClosuresEnd(defs);
+
     endMethod(defs);
 
     // trace
@@ -713,7 +719,7 @@ namespace xi {
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
 #endif
-    unravelClosures(defs);
+    unravelClosuresBegin(defs);
 
     defs << "   " << con3->text << ";\n";
     defs << "    if (" << con2->text << ") {\n";
@@ -726,10 +732,13 @@ namespace xi {
     defs << "      ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     defs << "    }\n";
+
+    unravelClosuresEnd(defs);
+
     endMethod(defs);
   }
 
-  void SdagConstruct::unravelClosures(XStr& defs, bool child) {
+  void SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
     int cur = 0;
 
     list<EncapState*>& encaps = child ? encapStateChild : encapState;
@@ -737,6 +746,8 @@ namespace xi {
     // traverse all the state variables bring them into scope
     for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end(); ++iter, ++cur) {
       EncapState& state = **iter;
+
+      defs << "  {\n";
 
       int i = 0;
       for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end(); ++iter2, ++i) {
@@ -752,6 +763,18 @@ namespace xi {
             defs << ";\n";
         }
       }
+
+    }
+  }
+
+  void SdagConstruct::unravelClosuresEnd(XStr& defs, bool child) {
+    list<EncapState*>& encaps = child ? encapStateChild : encapState;
+
+    // traverse all the state variables bring them into scope
+    for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end(); ++iter) {
+      EncapState& state = **iter;
+
+      defs << "  }\n";
     }
   }
 
@@ -764,7 +787,7 @@ namespace xi {
     generateEventBracket(defs, SIF);
 #endif
 
-    unravelClosures(defs);
+    unravelClosuresBegin(defs);
 
     defs << "    if (" << con1->text << ") {\n";
     defs << "      ";
@@ -777,6 +800,9 @@ namespace xi {
       generateCallNew(defs, encapStateChild, encapStateChild, label, "_end");
     }
     defs << "    }\n";
+
+    unravelClosuresEnd(defs);
+
     endMethod(defs);
 
     strcpy(nameStr,label->charstar());
@@ -1054,12 +1080,15 @@ namespace xi {
   void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
 
-    unravelClosures(defs);
+    unravelClosuresBegin(defs);
 
-    defs << "  // begin serial block\n";
+    defs << "  { // begin serial block\n";
     defs << "  " << text << "\n";
-    defs << "  // end serial block\n";
+    defs << "  } // end serial block\n";
     defs << "  ";
+
+    unravelClosuresEnd(defs);
+
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
