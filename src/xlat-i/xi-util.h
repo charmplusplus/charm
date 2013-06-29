@@ -88,6 +88,10 @@ class Printable {
 void templateGuardBegin(bool templateOnly, XStr &str);
 void templateGuardEnd(XStr &str);
 
+ inline void indentBy(XStr& s, int num) {
+   for (int i = 0; i < num; i++) s << "  ";
+ }
+
 }
 
 #endif

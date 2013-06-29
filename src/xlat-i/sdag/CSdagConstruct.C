@@ -517,16 +517,28 @@ namespace xi {
         defs << "  int refnum_" << cur << ";\n";
         hasRef = true;
       }
-    // create a new scope for unraveling the closures
-    if (hasRef) defs << "  {\n";
-    if (hasRef) unravelClosuresBegin(defs);
+    int indent = 2;
+
+    // unravel the closures so the potential refnum expressions can be resolved
+    if (hasRef) {
+      indent = unravelClosuresBegin(defs);
+      indentBy(defs, indent);
+      // create a new scope for unraveling the closures
+      defs << "{\n";
+    }
     cur = 0;
     // generate each refnum variable we need that can access the internal closure state
     for (EntryList *el = elist; el != NULL; el = el->next, cur++)
-      if (el->entry->intExpr)
-        defs << "    refnum_" << cur << " = " << (el->entry->intExpr ? el->entry->intExpr : "0") << ";\n";
-    if (hasRef) defs << "  }\n";
-    if (hasRef) unravelClosuresEnd(defs);
+      if (el->entry->intExpr) {
+        indentBy(defs, indent + 1);
+        defs << "refnum_" << cur << " = " << (el->entry->intExpr ? el->entry->intExpr : "0") << ";\n";
+      }
+
+    if (hasRef) {
+      indentBy(defs, indent);
+      defs << "}\n";
+      unravelClosuresEnd(defs);
+    }
 
     if (entryLen > 1) defs << "  std::set<SDAG::Buffer*> ignore;\n";
 
@@ -639,15 +651,18 @@ namespace xi {
 
     // first unravel the closures so the message names are correspond to the
     // state variable names
-    unravelClosuresBegin(defs, true);
+    {
+      int indent = unravelClosuresBegin(defs, true);
 
-    // call CmiFree on each state variable going out of scope that is a message
-    // (i.e. the ones that are currently brought in scope by the current
-    // EntryList
-    for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
-      if (el->entry->param->isMessage() == 1) {
-        CStateVar*& sv = *el->entry->stateVars.begin();
-        defs << "  CmiFree(UsrToEnv(" << sv->name << "));\n";
+      // call CmiFree on each state variable going out of scope that is a message
+      // (i.e. the ones that are currently brought in scope by the current
+      // EntryList
+      for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
+        if (el->entry->param->isMessage() == 1) {
+          CStateVar*& sv = *el->entry->stateVars.begin();
+          indentBy(defs, indent);
+          defs << "CmiFree(UsrToEnv(" << sv->name << "));\n";
+        }
       }
     }
 
@@ -738,7 +753,7 @@ namespace xi {
     endMethod(defs);
   }
 
-  void SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
+  int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
     int cur = 0;
 
     list<EncapState*>& encaps = child ? encapStateChild : encapState;
@@ -747,15 +762,20 @@ namespace xi {
     for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end(); ++iter, ++cur) {
       EncapState& state = **iter;
 
-      defs << "  {\n";
+      indentBy(defs, cur + 1);
+
+      defs << "{\n";
 
       int i = 0;
       for (list<CStateVar*>::iterator iter2 = state.vars.begin(); iter2 != state.vars.end(); ++iter2, ++i) {
         CStateVar& var = **iter2;
+
         // if the var is one of the following it a system state var that should
         // not be brought into scope
         if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
-          defs << "  " << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
+          indentBy(defs, cur + 2);
+
+          defs << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
           state.name ? (defs << *state.name) : (defs << "gen" << cur);
           if (!var.isMsg)
             defs << "->" << "getP" << i << "();\n";
@@ -763,18 +783,23 @@ namespace xi {
             defs << ";\n";
         }
       }
-
     }
+
+    return cur + 1;
   }
 
   void SdagConstruct::unravelClosuresEnd(XStr& defs, bool child) {
     list<EncapState*>& encaps = child ? encapStateChild : encapState;
 
+    int cur = encaps.size();
+
     // traverse all the state variables bring them into scope
-    for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end(); ++iter) {
+    for (list<EncapState*>::iterator iter = encaps.begin(); iter != encaps.end(); ++iter, --cur) {
       EncapState& state = **iter;
 
-      defs << "  }\n";
+      indentBy(defs, cur);
+
+      defs << "}\n";
     }
   }
 
@@ -1080,15 +1105,17 @@ namespace xi {
   void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
 
-    unravelClosuresBegin(defs);
+    int indent = unravelClosuresBegin(defs);
 
-    defs << "  { // begin serial block\n";
-    defs << "  " << text << "\n";
-    defs << "  } // end serial block\n";
-    defs << "  ";
+    indentBy(defs, indent);
+    defs << "{ // begin serial block\n";
+    defs << text << "\n";
+    indentBy(defs, indent);
+    defs << "} // end serial block\n";
 
     unravelClosuresEnd(defs);
 
+    indentBy(defs, 1);
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
