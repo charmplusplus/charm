@@ -874,11 +874,9 @@ namespace xi {
     defs << "      __stride = -__stride;\n";
     defs << "    }\n";
     defs << "    SDAG::CCounter *" << counter << " = new SDAG::CCounter(__first,__last,__stride);\n";
-    defs << "    " << counter << "->ref();\n";
     defs << "    for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
          << con1->text << "+=__stride) {\n";
     defs << "      SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
-    defs << "      " << con1->text << "_cl->ref();\n";
     defs << "      ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
     defs << "    }\n";
@@ -900,8 +898,6 @@ namespace xi {
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
     defs << "    SDAG::CCounter *" << counter << "= new SDAG::CCounter(" <<
       (int)constructs->size() << ");\n";
-
-    defs << "    " << counter << "->ref();\n";
 
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
          ++it) {
@@ -976,7 +972,6 @@ namespace xi {
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
     defs << "    SDAG::CSpeculator* " << counter << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
   
-    defs << "    " << counter << "->ref();\n";
     defs << "    SDAG::Continuation* c = 0;\n";
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
          ++it) {
@@ -1067,6 +1062,7 @@ namespace xi {
       }
 
       defs << "  " << con1->text << "(genClosure);\n";
+      defs << "  genClosure->deref();\n";
       defs << "}\n\n";
       templateGuardEnd(defs);
     }

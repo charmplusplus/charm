@@ -30,6 +30,7 @@ namespace xi {
       }
 
       defs << "  " << *entry << "(genClosure);\n";
+      defs << "  genClosure->deref();\n";
       defs << "}\n\n";
       templateGuardEnd(defs);
     }

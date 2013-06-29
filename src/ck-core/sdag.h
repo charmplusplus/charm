@@ -16,7 +16,7 @@ namespace SDAG {
     // done this way to keep Closure abstract for PUP reasons
     // these must be called by descendents of Closure
     void packClosure(PUP::er& p) { p | continuations; }
-    void init() { continuations = 0; }
+    void init() { continuations = 1; }
     virtual ~Closure() { }
   };
 }
@@ -62,12 +62,13 @@ namespace SDAG {
   struct MsgClosure : public Closure {
     CkMessage* msg;
 
-    MsgClosure() : msg(0) { init(); }
-    MsgClosure(CkMigrateMessage*) : msg(0) { init(); }
+    MsgClosure() : msg(0) { init(); continuations = 0; }
+    MsgClosure(CkMigrateMessage*) : msg(0) { init(); continuations = 0; }
 
     MsgClosure(CkMessage* msg)
       : msg(msg) {
       init();
+      continuations = 0;
       CmiReference(UsrToEnv(msg));
     }
 

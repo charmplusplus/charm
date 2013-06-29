@@ -4454,6 +4454,8 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool isSD
           str << "genClosure";
         }
         str << ");\n";
+	if (!param->isMessage())
+	  str << "  genClosure->deref();\n";
       } else {
         str<<"("; param->unmarshall(str); str<<");\n";
       }
