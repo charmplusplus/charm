@@ -878,6 +878,7 @@ namespace xi {
     defs << "    for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
          << con1->text << "+=__stride) {\n";
     defs << "      SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
+    defs << "      " << con1->text << "_cl->ref();\n";
     defs << "      ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
     defs << "    }\n";
@@ -885,6 +886,7 @@ namespace xi {
 
     generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
     defs << "    " << counter << "->decrement(); /* DECREMENT 1 */ \n";
+    defs << "    " << con1->text << "_cl->deref();\n";
     defs << "    if (" << counter << "->isDone()) {\n";
     defs << "      " << counter << "->deref();\n";
     defs << "      ";
