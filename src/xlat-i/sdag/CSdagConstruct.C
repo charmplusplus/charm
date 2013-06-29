@@ -1079,6 +1079,14 @@ namespace xi {
 
     defs << "  if (!__dep.get())\n"
          << "      _sdag_init();\n";
+
+    // is a message sdag entry, in this case since this is a SDAG entry, there
+    // will only be one parameter which is the message (called 'gen0')
+    if (!entry->paramIsMarshalled() && !entry->param->isVoid()) {
+      // increase reference count by one for the state parameter
+      defs << "  CmiReference(UsrToEnv(gen0));\n";
+    }
+
     defs << "  ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
 
@@ -1099,6 +1107,12 @@ namespace xi {
                          encapState
 #endif
                          );
+
+    if (!entry->paramIsMarshalled() && !entry->param->isVoid()) {
+      // decrease reference count by one for the message
+      defs << "  CmiFree(UsrToEnv(gen0));\n";
+    }
+
     endMethod(defs);
   }
 
