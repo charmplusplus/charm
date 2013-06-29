@@ -17,6 +17,7 @@ namespace SDAG {
     // these must be called by descendents of Closure
     void packClosure(PUP::er& p) { p | continuations; }
     void init() { continuations = 0; }
+    virtual ~Closure() { }
   };
 }
 
