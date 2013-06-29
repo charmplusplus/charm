@@ -223,6 +223,8 @@ namespace SDAG {
       if (whenToContinuation.find(c->whenID) != whenToContinuation.end()) {
         std::list<Continuation*>& lst = whenToContinuation[c->whenID];
         lst.remove(c);
+	if (lst.size() == 0)
+	  whenToContinuation.erase(c->whenID);
       } else {
         CkAbort("trying to deregister: continuation not found");
       }
