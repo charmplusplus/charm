@@ -913,9 +913,11 @@ namespace xi {
   void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry) {
     strcpy(nameStr,label->charstar());
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+#if CMK_BIGSIM_CHARM
     // trace
     generateBeginTime(defs);
     generateEventBracket(defs, SELSE);
+#endif
     defs << "  ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
     endMethod(defs);
