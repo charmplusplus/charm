@@ -141,10 +141,14 @@ namespace xi {
 
     // found a continuation
     defs << "  if (c) {\n";
+
+    SdagConstruct::generateTraceEndCall(defs, 2);
+#if CMK_BIGSIM_CHARM
+    SdagConstruct::generateEndExec(defs);
+#endif
+
     if (whenList.size() == 1) {
-      //defs << "    {\n";
       (*whenList.begin())->generateWhenCodeNew(defs, 2);
-      //defs << "    }\n";
     } else {
       // switch on the possible entry points for the continuation
       // each continuation entry knows how to generate its own code
@@ -161,13 +165,6 @@ namespace xi {
 
     // delete the continuation now that we are finished with it
     defs << "    delete c;\n";
-    defs << "  } else {\n";
-
-    SdagConstruct::generateTraceEndCall(defs, 2);
-#if CMK_BIGSIM_CHARM
-    SdagConstruct::generateEndExec(defs);
-#endif
-
     defs << "  }\n";
 
     defs << "}\n\n";
