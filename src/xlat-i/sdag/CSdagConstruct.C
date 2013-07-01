@@ -650,9 +650,15 @@ namespace xi {
     // decrease the reference count of any message state parameters
     // that are going out of scope
 
+    // first check if we have any messages going out of scope
+    bool messageOutOfScope = false;
+    for (EntryList *el = elist; el != NULL; el = el->next, cur++)
+      if (el->entry->param->isMessage() == 1)
+        messageOutOfScope = true;
+
     // first unravel the closures so the message names are correspond to the
     // state variable names
-    {
+    if (messageOutOfScope) {
       int indent = unravelClosuresBegin(defs, true);
 
       // call CmiFree on each state variable going out of scope that is a message
@@ -665,9 +671,9 @@ namespace xi {
           defs << "CmiFree(UsrToEnv(" << sv->name << "));\n";
         }
       }
-    }
 
-    unravelClosuresEnd(defs, true);
+      unravelClosuresEnd(defs, true);
+    }
 
     // generate call to the next in the sequence
     defs << "  ";
@@ -1119,15 +1125,28 @@ namespace xi {
 
     generateTraceBeginCall(defs, 1);
 
-    int indent = unravelClosuresBegin(defs);
+    char* str = text->get_string();
+    bool hasCode = false;
 
-    indentBy(defs, indent);
-    defs << "{ // begin serial block\n";
-    defs << text << "\n";
-    indentBy(defs, indent);
-    defs << "} // end serial block\n";
+    while (*str != '\0') {
+      if (*str != '\n' && *str != ' ' && *str != '\t') {
+        hasCode = true;
+        break;
+      }
+      str++;
+    }
 
-    unravelClosuresEnd(defs);
+    if (hasCode) {
+      int indent = unravelClosuresBegin(defs);
+
+      indentBy(defs, indent);
+      defs << "{ // begin serial block\n";
+      defs << text << "\n";
+      indentBy(defs, indent);
+      defs << "} // end serial block\n";
+
+      unravelClosuresEnd(defs);
+    }
 
     generateTraceEndCall(defs, 1);
 
