@@ -468,18 +468,18 @@ namespace xi {
     buildTypes(encapStateChild);
 
     // generate call this when
-    op << "        " << this->label << "(";
+    op << "      " << this->label << "(";
     int cur = 0;
     for (list<EncapState*>::iterator iter = encapState.begin();
          iter != encapState.end(); ++iter, ++cur) {
       EncapState& state = **iter;
       if (!state.isMessage)
-        op << "\n          static_cast<" << *state.type << "*>(c->closure[" << cur << "])";
+        op << "\n        static_cast<" << *state.type << "*>(c->closure[" << cur << "])";
       else
-        op << "\n          static_cast<" << *state.type << "*>(static_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
+        op << "\n        static_cast<" << *state.type << "*>(static_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
       if (cur != encapState.size() - 1) op << ", ";
     }  
-    op << "\n        );\n";
+    op << "\n      );\n";
   }
 
   void WhenConstruct::generateEntryName(XStr& defs, Entry* e, int curEntry) {
