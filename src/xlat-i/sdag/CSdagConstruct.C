@@ -1445,7 +1445,7 @@ namespace xi {
 
   void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent) {
     indentBy(op, indent);
-    op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _dummyEP, CkMyPe(), 0, NULL); \n";
+    op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, NULL); \n";
   }
 
   void SdagConstruct::generateTraceEndCall(XStr& op, int indent) {
