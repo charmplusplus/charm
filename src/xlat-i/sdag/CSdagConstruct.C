@@ -1059,30 +1059,8 @@ namespace xi {
     decls << "  void " <<  signature << ";\n";
 
     // generate wrapper for local calls to the function
-    if (entry->paramIsMarshalled() || entry->param->isVoid()) {
-      templateGuardBegin(false, defs);
-      defs << entry->getContainer()->tspec() << "void " << entry->getContainer()->baseName() << "::" << signature << "{\n";
-      defs << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
-        " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
-      if (stateVars) {
-        int i = 0;
-        for (list<CStateVar*>::iterator it = stateVars->begin(); it != stateVars->end(); ++it, ++i) {
-          CStateVar& var = **it;
-          if (var.name) {
-            if (i == 0 && *var.type == "int")
-              defs << "  genClosure->__refnum" << " = " << var.name << ";\n";
-            else if (i == 0)
-              defs << "  genClosure->__refnum" << " = 0;\n";
-            defs << "  genClosure->" << var.name << " = " << var.name << ";\n";
-          }
-        }
-      }
-
-      defs << "  " << con1->text << "(genClosure);\n";
-      defs << "  genClosure->deref();\n";
-      defs << "}\n\n";
-      templateGuardEnd(defs);
-    }
+    if (entry->paramIsMarshalled() || entry->param->isVoid())
+      generateLocalWrapper(decls, defs, entry->param->isVoid(), signature, entry, stateVars, con1->text);
 
     generateSignatureNew(decls, defs, entry, false, "void", con1->text, false, encapState);
 

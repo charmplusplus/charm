@@ -10,17 +10,18 @@ namespace xi {
       op << "  __dep->addDepends(" << (*cn)->nodeNum << "," << entryNum << ");\n";
   }
 
-  void CEntry::generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature) {
+  void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature, Entry* entry,
+                            std::list<CStateVar*>* params, XStr* next) {
     // generate wrapper for local calls to the function
-    if (needsParamMarshalling || isVoid) {
-      templateGuardBegin(false, defs);
-      defs << decl_entry->getContainer()->tspec() << "void " << decl_entry->getContainer()->baseName() << "::" << signature << "{\n";
-      defs << "  " << *decl_entry->genClosureTypeNameProxyTemp << "*" <<
-        " genClosure = new " << *decl_entry->genClosureTypeNameProxyTemp << "()" << ";\n";
-      {
-        int i = 0;
-        for (list<CStateVar*>::iterator it = myParameters.begin(); it != myParameters.end(); ++it, ++i) {
-          CStateVar& var = **it;
+    templateGuardBegin(false, defs);
+    defs << entry->getContainer()->tspec() << "void " << entry->getContainer()->baseName() << "::" << signature << "{\n";
+    defs << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
+      " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
+    if (params) {
+      int i = 0;
+      for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end(); ++it, ++i) {
+        CStateVar& var = **it;
+        if (var.name) {
           if (i == 0 && *var.type == "int")
             defs << "  genClosure->__refnum" << " = " << var.name << ";\n";
           else if (i == 0)
@@ -28,12 +29,12 @@ namespace xi {
           defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
         }
       }
-
-      defs << "  " << *entry << "(genClosure);\n";
-      defs << "  genClosure->deref();\n";
-      defs << "}\n\n";
-      templateGuardEnd(defs);
     }
+
+    defs << "  " << *next << "(genClosure);\n";
+    defs << "  genClosure->deref();\n";
+    defs << "}\n\n";
+    templateGuardEnd(defs);
   }
 
   void CEntry::generateCode(XStr& decls, XStr& defs) {
@@ -85,12 +86,11 @@ namespace xi {
       decls << "  void " <<  newSig << ";\n";
       // generate local wrapper decls
       decls << "  void " <<  signature << ";\n";
+      generateLocalWrapper(decls, defs, isVoid, signature, decl_entry, &myParameters, entry);
     } else { // a message
       newSig << signature << "";
       decls << "  void " <<  newSig << ";\n";
     }
-
-    generateLocalWrapper(decls, defs, isVoid, signature);
 
     templateGuardBegin(false, defs);
     defs << decl_entry->getContainer()->tspec() << "void " << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";

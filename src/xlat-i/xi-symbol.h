@@ -1405,6 +1405,9 @@ public:
 
 extern void RemoveSdagComments(char *);
 
+void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature, Entry* entry,
+                          std::list<CStateVar*>* params, XStr* next);
+
 class AtomicConstruct : public SdagConstruct {
 public:
   void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
