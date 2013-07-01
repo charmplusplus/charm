@@ -14,45 +14,37 @@ using std::mem_fun;
 
 namespace xi {
   SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1) {
-    con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
-    elist = 0;
-    type = t;
-    traceName=NULL;
-    constructs = new list<SdagConstruct*>();
+    init(t);
     constructs->push_back(construct1);
   }
 
   SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList) {
-    con1=0; con2=0; con3=0; con4=0;
-    type = t;
-    elist = 0;
-    traceName=NULL;
-    constructs = new list<SdagConstruct*>();
+    init(t);
     constructs->push_back(construct1);
     constructs->insert(constructs->end(), aList->constructs->begin(), aList->constructs->end());
   }
 
   SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
                                SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el) {
+    init(t);
     text = txt;
-    type = t;
-    traceName=NULL;
     con1 = c1; con2 = c2; con3 = c3; con4 = c4;
-    constructs = new list<SdagConstruct*>();
-    if (constructAppend != 0) {
-      constructs->push_back(constructAppend);
-    }
+    if (constructAppend != 0) constructs->push_back(constructAppend);
     elist = el;
   }
 
   SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl) {
-    type = t;
-    traceName=NULL;
+    init(t);
     text = new XStr(codeStr);
-    con1 = 0; con2 = 0; con3 = 0; con4 =0;
-    constructs = new list<SdagConstruct*>();
     param = pl;
+  }
+
+  void SdagConstruct::init(EToken& t) {
+    con1 = 0; con2 = 0; con3 = 0; con4 = 0;
+    traceName = 0;
     elist = 0;
+    constructs = new list<SdagConstruct*>();
+    type = t;
   }
 
   void SdagConstruct::numberNodes(void) {

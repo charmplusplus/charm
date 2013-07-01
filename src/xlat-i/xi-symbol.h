@@ -1364,6 +1364,8 @@ public:
 
   SdagConstruct(EToken t, XStr *txt) : type(t), traceName(NULL), text(txt), con1(0), con2(0), con3(0), con4(0), elist(0)
   { constructs = new std::list<SdagConstruct*>();  }
+
+  void init(EToken& t);
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
   void numberNodes(void);
   void labelNodes();
