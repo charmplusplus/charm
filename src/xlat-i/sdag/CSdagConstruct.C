@@ -686,23 +686,23 @@ namespace xi {
 
   void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry) {
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "    if (" << con1->text << ") {\n";
-    defs << "      ";
+    defs << "  if (" << con1->text << ") {\n";
+    defs << "    ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "    } else {\n";
+    defs << "  } else {\n";
     defs << "      ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "    }\n";
+    defs << "  }\n";
     endMethod(defs);
 
     generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "    if (" << con1->text << ") {\n";
-    defs << "      ";
+    defs << "  if (" << con1->text << ") {\n";
+    defs << "    ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "    } else {\n";
+    defs << "  } else {\n";
     defs << "      ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "    }\n";
+    defs << "  }\n";
     endMethod(defs);
   }
 
@@ -714,20 +714,24 @@ namespace xi {
     generateBeginTime(defs);
 #endif
 
-    unravelClosuresBegin(defs);
+    int indent = unravelClosuresBegin(defs);
 
-    defs << "    " << con1->text << ";\n";
+    indentBy(defs, indent);
+    defs << con1->text << ";\n";
     //Record only the beginning for FOR
 #if CMK_BIGSIM_CHARM
     generateEventBracket(defs, SFOR);
 #endif
-    defs << "    if (" << con2->text << ") {\n";
-    defs << "      ";
+    indentBy(defs, indent);
+    defs << "if (" << con2->text << ") {\n";
+    indentBy(defs, indent + 1);
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "    } else {\n";
-    defs << "      ";
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "    }\n";
+    indentBy(defs, indent);
+    defs << "}\n";
 
     unravelClosuresEnd(defs);
 
@@ -741,19 +745,23 @@ namespace xi {
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
 #endif
-    unravelClosuresBegin(defs);
+    indent = unravelClosuresBegin(defs);
 
-    defs << "   " << con3->text << ";\n";
-    defs << "    if (" << con2->text << ") {\n";
-    defs << "      ";
+    indentBy(defs, indent);
+    defs << con3->text << ";\n";
+    indentBy(defs, indent);
+    defs << "if (" << con2->text << ") {\n";
+    indentBy(defs, indent + 1);
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "    } else {\n";
+    indentBy(defs, indent);
+    defs << "} else {\n";
 #if CMK_BIGSIM_CHARM
     generateEventBracket(defs, SFOR_END);
 #endif
-    defs << "      ";
+    indentBy(defs, indent + 1);
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "    }\n";
+    indentBy(defs, indent);
+    defs << "}\n";
 
     unravelClosuresEnd(defs);
 
@@ -819,19 +827,21 @@ namespace xi {
     generateEventBracket(defs, SIF);
 #endif
 
-    unravelClosuresBegin(defs);
+    int indent = unravelClosuresBegin(defs);
 
-    defs << "    if (" << con1->text << ") {\n";
-    defs << "      ";
+    indentBy(defs, indent);
+    defs << "if (" << con1->text << ") {\n";
+    indentBy(defs, indent + 1);
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "    } else {\n";
-    defs << "      ";
-    if (con2 != 0) {
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
+    if (con2 != 0)
       generateCallNew(defs, encapStateChild, encapStateChild, con2->label);
-    } else {
+    else
       generateCallNew(defs, encapStateChild, encapStateChild, label, "_end");
-    }
-    defs << "    }\n";
+    indentBy(defs, indent);
+    defs << "}\n";
 
     unravelClosuresEnd(defs);
 
@@ -844,7 +854,7 @@ namespace xi {
     generateBeginTime(defs);
     generateEventBracket(defs,SIF_END);
 #endif
-    defs << "    ";
+    indentBy(defs, 1);
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
@@ -855,7 +865,7 @@ namespace xi {
     // trace
     generateBeginTime(defs);
     generateEventBracket(defs, SELSE);
-    defs << "    ";
+    defs << "  ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
     endMethod(defs);
 
@@ -867,7 +877,7 @@ namespace xi {
     generateBeginTime(defs);
     generateEventBracket(defs,SELSE_END);
 #endif
-    defs << "      ";
+    defs << "  ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
