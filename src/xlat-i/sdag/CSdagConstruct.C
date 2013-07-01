@@ -867,41 +867,41 @@ namespace xi {
 
   void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry) {
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "    int __first = (" << con2->text << "), __last = (" << con3->text
+    defs << "  int __first = (" << con2->text << "), __last = (" << con3->text
          << "), __stride = (" << con4->text << ");\n";
-    defs << "    if (__first > __last) {\n";
-    defs << "      int __tmp=__first; __first=__last; __last=__tmp;\n";
-    defs << "      __stride = -__stride;\n";
-    defs << "    }\n";
-    defs << "    SDAG::CCounter *" << counter << " = new SDAG::CCounter(__first,__last,__stride);\n";
-    defs << "    for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
+    defs << "  if (__first > __last) {\n";
+    defs << "    int __tmp=__first; __first=__last; __last=__tmp;\n";
+    defs << "    __stride = -__stride;\n";
+    defs << "  }\n";
+    defs << "  SDAG::CCounter *" << counter << " = new SDAG::CCounter(__first,__last,__stride);\n";
+    defs << "  for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
          << con1->text << "+=__stride) {\n";
-    defs << "      SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
-    defs << "      ";
+    defs << "    SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
+    defs << "    ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "    }\n";
+    defs << "  }\n";
     endMethod(defs);
 
     generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "    " << counter << "->decrement(); /* DECREMENT 1 */ \n";
-    defs << "    " << con1->text << "_cl->deref();\n";
-    defs << "    if (" << counter << "->isDone()) {\n";
-    defs << "      " << counter << "->deref();\n";
-    defs << "      ";
+    defs << "  " << counter << "->decrement(); /* DECREMENT 1 */ \n";
+    defs << "  " << con1->text << "_cl->deref();\n";
+    defs << "  if (" << counter << "->isDone()) {\n";
+    defs << "    " << counter << "->deref();\n";
+    defs << "    ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "    }\n";
+    defs << "  }\n";
     endMethod(defs);
   }
 
   void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry) {
     SdagConstruct *cn;
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "    SDAG::CCounter *" << counter << "= new SDAG::CCounter(" <<
+    defs << "  SDAG::CCounter *" << counter << "= new SDAG::CCounter(" <<
       (int)constructs->size() << ");\n";
 
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
          ++it) {
-      defs << "    ";
+      defs << "  ";
       generateCallNew(defs, encapStateChild, encapStateChild, (*it)->label);
     }
     endMethod(defs);
@@ -915,32 +915,32 @@ namespace xi {
     generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
-    defs << "    " <<label << "_bgLogList.insertAtEnd(_bgParentLog);\n";
+    defs << "  " <<label << "_bgLogList.insertAtEnd(_bgParentLog);\n";
 #endif
     //Accumulate all the bgParent pointers that the calling when_end functions give
-    defs << "    " << counter << "->decrement();\n";
+    defs << "  " << counter << "->decrement();\n";
  
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-    defs << "    olist_" << counter << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
+    defs << "  olist_" << counter << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
 #endif
 
-    defs << "    if (" << counter << "->isDone()) {\n";
+    defs << "  if (" << counter << "->isDone()) {\n";
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-    defs << "      currentlyExecutingPath = olist_" << counter << "_PathMergePoint; /* Critical Path Detection */ \n";
-    defs << "      olist_" << counter << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+    defs << "    currentlyExecutingPath = olist_" << counter << "_PathMergePoint; /* Critical Path Detection */ \n";
+    defs << "    olist_" << counter << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
-    defs << "    " << counter << "->deref();\n";
+    defs << "  " << counter << "->deref();\n";
 
 #if CMK_BIGSIM_CHARM
     generateListEventBracket(defs, SOLIST_END);
-    defs << "       "<< label <<"_bgLogList.length()=0;\n";
+    defs << "    " << label <<"_bgLogList.length()=0;\n";
 #endif
 
-    defs << "      ";
+    defs << "    ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "    }\n";
+    defs << "  }\n";
     endMethod(defs);
   }
 
@@ -951,7 +951,7 @@ namespace xi {
     generateBeginTime(defs);
     generateEventBracket(defs, SOVERLAP);
 #endif
-    defs << "    ";
+    defs << "  ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
     endMethod(defs);
 
@@ -963,22 +963,22 @@ namespace xi {
     generateBeginTime(defs);
     generateEventBracket(defs, SOVERLAP_END);
 #endif
-    defs << "    ";
+    defs << "  ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 
   void SdagConstruct::generateCaseList(XStr& decls, XStr& defs, Entry* entry) {
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "    SDAG::CSpeculator* " << counter << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
+    defs << "  SDAG::CSpeculator* " << counter << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
   
-    defs << "    SDAG::Continuation* c = 0;\n";
+    defs << "  SDAG::Continuation* c = 0;\n";
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
          ++it) {
-      defs << "    c = ";
+      defs << "  c = ";
       generateCallNew(defs, encapStateChild, encapStateChild, (*it)->label);
-      defs << "    if (!c) return;\n";
-      defs << "    else c->speculationIndex = " << counter << "->speculationIndex;\n";
+      defs << "  if (!c) return;\n";
+      defs << "  else c->speculationIndex = " << counter << "->speculationIndex;\n";
     }
     endMethod(defs);
 
@@ -987,8 +987,8 @@ namespace xi {
 
     generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
 
-    defs << "    " << counter << "->deref();\n";
-    defs << "    ";
+    defs << "  " << counter << "->deref();\n";
+    defs << "  ";
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
@@ -998,12 +998,12 @@ namespace xi {
     buildTypes(encapStateChild);
 
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "    ";
+    defs << "  ";
     generateCallNew(defs, encapState, encapState, constructs->front()->label);
     endMethod(defs);
 
     generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "    ";
+    defs << "  ";
     generateCallNew(defs, encapState, encapStateChild, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
@@ -1044,7 +1044,7 @@ namespace xi {
     // generate wrapper for local calls to the function
     if (entry->paramIsMarshalled() || entry->param->isVoid()) {
       templateGuardBegin(false, defs);
-      defs << entry->getContainer()->tspec() << " void " << entry->getContainer()->baseName() << "::" << signature << "{\n";
+      defs << entry->getContainer()->tspec() << "void " << entry->getContainer()->baseName() << "::" << signature << "{\n";
       defs << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
         " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
       if (stateVars) {
@@ -1075,8 +1075,7 @@ namespace xi {
     if (!entry->getContainer()->isGroup() || !entry->isConstructor())
       generateTraceEndCall(defs);
 
-    defs << "  if (!__dep.get())\n"
-         << "      _sdag_init();\n";
+    defs << "  if (!__dep.get()) _sdag_init();\n";
 
     // is a message sdag entry, in this case since this is a SDAG entry, there
     // will only be one parameter which is the message (called 'gen0')

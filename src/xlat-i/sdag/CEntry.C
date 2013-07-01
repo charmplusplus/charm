@@ -7,14 +7,14 @@ using std::list;
 namespace xi {
   void CEntry::generateDeps(XStr& op) {
     for (list<WhenConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn)
-      op << "    __dep->addDepends(" << (*cn)->nodeNum << "," << entryNum << ");\n";
+      op << "  __dep->addDepends(" << (*cn)->nodeNum << "," << entryNum << ");\n";
   }
 
   void CEntry::generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature) {
     // generate wrapper for local calls to the function
     if (needsParamMarshalling || isVoid) {
       templateGuardBegin(false, defs);
-      defs << decl_entry->getContainer()->tspec() << " void " << decl_entry->getContainer()->baseName() << "::" << signature << "{\n";
+      defs << decl_entry->getContainer()->tspec() << "void " << decl_entry->getContainer()->baseName() << "::" << signature << "{\n";
       defs << "  " << *decl_entry->genClosureTypeNameProxyTemp << "*" <<
         " genClosure = new " << *decl_entry->genClosureTypeNameProxyTemp << "()" << ";\n";
       {
@@ -93,7 +93,7 @@ namespace xi {
     generateLocalWrapper(decls, defs, isVoid, signature);
 
     templateGuardBegin(false, defs);
-    defs << decl_entry->getContainer()->tspec() << " void " << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
+    defs << decl_entry->getContainer()->tspec() << "void " << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
     defs << "  if (!__dep.get()) _sdag_init();\n";
 
     if (needsParamMarshalling || isVoid) {

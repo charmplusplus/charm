@@ -109,7 +109,7 @@ void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
 
   XStr name = "_sdag_init";
   generateSignature(decls, defs, container, false, "void", &name, false, NULL);
-  defs << "    __dep.reset(new SDAG::Dependency(" << numEntries << "," << numWhens << "));\n";
+  defs << "  __dep.reset(new SDAG::Dependency(" << numEntries << "," << numWhens << "));\n";
 
   for(list<CEntry*>::iterator en=entryList.begin(); en != entryList.end(); ++en)
     (*en)->generateDeps(defs);
