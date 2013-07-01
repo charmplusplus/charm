@@ -96,8 +96,19 @@ namespace xi {
     defs << decl_entry->getContainer()->tspec() << "void " << decl_entry->getContainer()->baseName() << "::" << newSig << "{\n";
     defs << "  if (!__dep.get()) _sdag_init();\n";
 
+
+#if CMK_BIGSIM_CHARM
+      defs << "  void* _bgParentLog = NULL;\n";
+      defs << "  CkElapse(0.01e-6);\n";
+      SdagConstruct::generateTlineEndCall(defs);
+#endif
+
     if (needsParamMarshalling || isVoid) {
       // add the incoming message to a buffer
+
+#if CMK_BIGSIM_CHARM
+      defs << "  SDAG::Buffer* cmsgbuf = ";
+#endif
 
       // note that there will always be a closure even when the method has no
       // parameters for consistency
@@ -116,6 +127,10 @@ namespace xi {
 
       //increase reference count by one for the state parameter
       defs << "  CmiReference(UsrToEnv(" << sv->name << "_msg));\n";
+
+#if CMK_BIGSIM_CHARM
+      defs << "  SDAG::Buffer* cmsgbuf = ";
+#endif
 
       defs << "  __dep->pushBuffer(" << entryNum << ", new SDAG::MsgClosure(" << sv->name << "_msg" << "), refnum);\n";
     }

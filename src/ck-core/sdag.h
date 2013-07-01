@@ -163,12 +163,21 @@ namespace SDAG {
     int entry, refnum;
     Closure* cl;
 
+#if CMK_BIGSIM_CHARM
+    void *bgLog1, *bgLog2;
+#endif
+
     Buffer(CkMigrateMessage*) { }
 
     Buffer(int entry, Closure* cl, int refnum)
       : entry(entry)
       , refnum(refnum)
-      , cl(cl) {
+      , cl(cl)
+#if CMK_BIGSIM_CHARM
+      , bgLog1(0)
+      , bgLog2(0)
+#endif
+    {
       cl->ref();
     }
 
@@ -179,6 +188,12 @@ namespace SDAG {
       p | hasCl;
       if (hasCl)
         p | cl;
+#if CMK_BIGSIM_CHARM
+      if (p.isUnpacking())
+        bgLog1 = bgLog2 = 0;
+      else if (bgLog1 != 0 && bgLog2 != 0)
+        CkAbort("BigSim logs stored by SDAG are not migratable\n");
+#endif
     }
 
     virtual ~Buffer() {
@@ -231,8 +246,10 @@ namespace SDAG {
       }
     }
 
-    void pushBuffer(int entry, Closure *cl, int refnum) {
-      buffer[entry].push_back(new Buffer(entry, cl, refnum));
+    Buffer* pushBuffer(int entry, Closure *cl, int refnum) {
+      Buffer* buf = new Buffer(entry, cl, refnum);
+      buffer[entry].push_back(buf);
+      return buf;
     }
 
     Continuation *tryFindContinuation(int entry) {

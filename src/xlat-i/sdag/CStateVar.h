@@ -60,6 +60,7 @@ namespace xi {
     XStr* name;
     bool isMessage;
     bool isForall;
+    bool isBgParentLog;
     std::list<CStateVar*> vars;
 
     EncapState(Entry* entry, std::list<CStateVar*>& vars)
@@ -68,6 +69,7 @@ namespace xi {
       , name(0)
       , isMessage(false)
       , isForall(false)
+      , isBgParentLog(false)
       , vars(vars) { }
   };
 

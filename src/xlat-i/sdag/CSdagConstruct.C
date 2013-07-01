@@ -228,6 +228,17 @@ namespace xi {
     sv = new CStateVar(0, "void *", 0,"_bgParentLog", 0, NULL, 1);
     sv->isBgParentLog = true;
     stateVarsChildren->push_back(sv);
+
+    {
+      list<CStateVar*> lst;
+      lst.push_back(sv);
+      EncapState *state = new EncapState(NULL, lst);
+      state->type = new XStr("void");
+      state->name = new XStr("_bgParentLog");
+      state->isBgParentLog = true;
+      encapStateChild.push_back(state);
+      encap.push_back(state);
+    }
 #else
     stateVarsChildren = stateVars; 
 #endif
@@ -459,10 +470,16 @@ namespace xi {
     buildTypes(encapState);
     buildTypes(encapStateChild);
 
-    // generate the call this when
+    // generate the call for this when
+
+#if CMK_BIGSIM_CHARM
+    // bgLog2 stores the parent dependence of when, e.g. for, olist
     indentBy(op, indent);
+    op << "cmsgbuf->bgLog2 = (void*)static_cast<SDAG::TransportableBigSimLog*>(c->closure[1])->log;\n";
+#endif
 
     // output the when function's name
+    indentBy(op, indent);
     op << this->label << "(";
 
     // output all the arguments to the function that are stored in a continuation
@@ -474,13 +491,19 @@ namespace xi {
       indentBy(op, indent + 1);
       if (state.isMessage)
         op << "static_cast<" << *state.type << "*>(static_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
+      else if (state.isBgParentLog)
+        op << "NULL";
       else
         op << "static_cast<" << *state.type << "*>(c->closure[" << cur << "])";
       if (cur != encapState.size() - 1) op << ", ";
-    }  
+    }
     op << "\n";
     indentBy(op, indent);
     op << ");\n";
+#if CMK_BIGSIM_CHARM
+    generateTlineEndCall(op);
+    generateBeginExec(op, "sdagholder");
+#endif
   }
 
   void WhenConstruct::generateEntryName(XStr& defs, Entry* e, int curEntry) {
@@ -501,6 +524,10 @@ namespace xi {
 
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
     generateSignatureNew(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState);
+
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+#endif
 
     int entryLen = 0;
 
@@ -587,6 +614,24 @@ namespace xi {
     // decide based on whether buffers are found for each entry on the when
     defs << "  if (" << haveAllBuffersCond << ") {\n";
 
+#if CMK_BIGSIM_CHARM
+    // TODO: instead of this, add a length field to EntryList
+    defs << "    void* logs1["<< entryLen << "]; \n";
+    defs << "    void* logs2["<< entryLen + 1 << "]; \n";
+    int localnum = 0;
+    cur = 0;
+    for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
+      XStr bufName("buf");
+      bufName << cur;
+      defs << "    logs1[" << localnum << "] = " << bufName << "->bgLog1; \n";
+      defs << "    logs2[" << localnum << "] = " << bufName << "->bgLog2; \n";
+      localnum++;
+    }
+    defs << "    logs2[" << localnum << "] = " << "_bgParentLog; \n";
+    generateEventBracket(defs, SWHEN);
+    defs << "    _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
+#endif
+
     // remove all messages fetched from SDAG buffers
     defs << removeMessagesIfFound;
 
@@ -621,8 +666,9 @@ namespace xi {
         // if the current state param is a message, create a thin wrapper for it
         // (MsgClosure) for migration purposes
         if (state.isMessage) defs << "new SDAG::MsgClosure(";
+        if (state.isBgParentLog) defs << "new SDAG::TransportableBigSimLog(";
         state.name ? (defs << *state.name) : (defs << "gen" << cur);
-        if (state.isMessage) defs << ")";
+        if (state.isMessage || state.isBgParentLog) defs << ")";
         defs << ");\n";
       }
     }
@@ -646,6 +692,11 @@ namespace xi {
 
     // generate the _end variant of this method
     generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+    generateEventBracket(defs, SWHEN_END);
+#endif
 
     // decrease the reference count of any message state parameters
     // that are going out of scope
@@ -1111,6 +1162,11 @@ namespace xi {
   void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
 
+#if CMK_BIGSIM_CHARM
+    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+    generateBeginExec(defs, nameStr);
+#endif
+
     generateTraceBeginCall(defs, 1);
 
     char* str = text->get_string();
@@ -1137,6 +1193,10 @@ namespace xi {
     }
 
     generateTraceEndCall(defs, 1);
+
+#if CMK_BIGSIM_CHARM
+    generateEndExec(defs);
+#endif
 
     indentBy(defs, 1);
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
@@ -1401,7 +1461,7 @@ namespace xi {
 
   void SdagConstruct::generateBeginTime(XStr& op) {
     //Record begin time for tracing
-    op << "    double __begintime = CkVTimer(); \n";
+    op << "  double __begintime = CkVTimer(); \n";
   }
 
   void SdagConstruct::generateTlineEndCall(XStr& op) {
