@@ -1319,7 +1319,7 @@ protected:
   void generateCallNew(XStr& op, std::list<EncapState*>& cur,
                        std::list<EncapState*>& next, const XStr* name,
                        const char* nameSuffix = 0);
-  void generateTraceBeginCall(XStr& defs);          // for trace
+  void generateTraceBeginCall(XStr& defs, int indent);          // for trace
   void generateBeginTime(XStr& defs);               //for Event Bracket
   void generateEventBracket(XStr& defs, int eventType);     //for Event Bracket
   void generateListEventBracket(XStr& defs, int eventType);
@@ -1372,7 +1372,7 @@ public:
   void propagateState(int);
   virtual void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   virtual void generateCode(XStr& decls, XStr& defs, Entry *entry);
-  void generateWhenCodeNew(XStr& op);
+  void generateWhenCodeNew(XStr& op, int indent);
   void setNext(SdagConstruct *, int);
   void buildTypes(std::list<EncapState*>& state);
 
@@ -1380,12 +1380,12 @@ public:
   virtual void generateTrace();
   void generateRegisterEp(XStr& defs);
   void generateTraceEp(XStr& decls, XStr& defs, Chare* chare);
-  static void generateTraceEndCall(XStr& defs);
+  static void generateTraceEndCall(XStr& defs, int indent);
   static void generateTlineEndCall(XStr& defs);
   static void generateBeginExec(XStr& defs, const char *name);
   static void generateEndExec(XStr& defs);
   static void generateEndSeq(XStr& defs);
-  static void generateDummyBeginExecute(XStr& defs);
+  static void generateDummyBeginExecute(XStr& defs, int indent);
 };
 
 class WhenConstruct : public SdagConstruct {

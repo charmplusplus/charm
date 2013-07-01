@@ -463,23 +463,32 @@ namespace xi {
     }
   }
 
-  void SdagConstruct::generateWhenCodeNew(XStr& op) {
+  void SdagConstruct::generateWhenCodeNew(XStr& op, int indent) {
     buildTypes(encapState);
     buildTypes(encapStateChild);
 
-    // generate call this when
-    op << "      " << this->label << "(";
+    // generate the call this when
+    indentBy(op, indent);
+
+    // output the when function's name
+    op << this->label << "(";
+
+    // output all the arguments to the function that are stored in a continuation
     int cur = 0;
     for (list<EncapState*>::iterator iter = encapState.begin();
          iter != encapState.end(); ++iter, ++cur) {
       EncapState& state = **iter;
-      if (!state.isMessage)
-        op << "\n        static_cast<" << *state.type << "*>(c->closure[" << cur << "])";
+      op << "\n";
+      indentBy(op, indent + 1);
+      if (state.isMessage)
+        op << "static_cast<" << *state.type << "*>(static_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
       else
-        op << "\n        static_cast<" << *state.type << "*>(static_cast<SDAG::MsgClosure*>(c->closure[" << cur << "])->msg)";
+        op << "static_cast<" << *state.type << "*>(c->closure[" << cur << "])";
       if (cur != encapState.size() - 1) op << ", ";
     }  
-    op << "\n      );\n";
+    op << "\n";
+    indentBy(op, indent);
+    op << ");\n";
   }
 
   void WhenConstruct::generateEntryName(XStr& defs, Entry* e, int curEntry) {
@@ -1073,7 +1082,7 @@ namespace xi {
     generateEndSeq(defs);
 #endif
     if (!entry->getContainer()->isGroup() || !entry->isConstructor())
-      generateTraceEndCall(defs);
+      generateTraceEndCall(defs, 1);
 
     defs << "  if (!__dep.get()) _sdag_init();\n";
 
@@ -1092,7 +1101,7 @@ namespace xi {
     generateBeginExec(defs, "spaceholder");
 #endif
     if (!entry->getContainer()->isGroup() || !entry->isConstructor())
-      generateDummyBeginExecute(defs);
+      generateDummyBeginExecute(defs, 1);
 
     endMethod(defs);
 
@@ -1116,6 +1125,8 @@ namespace xi {
   void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
 
+    generateTraceBeginCall(defs, 1);
+
     int indent = unravelClosuresBegin(defs);
 
     indentBy(defs, indent);
@@ -1125,6 +1136,8 @@ namespace xi {
     defs << "} // end serial block\n";
 
     unravelClosuresEnd(defs);
+
+    generateTraceEndCall(defs, 1);
 
     indentBy(defs, 1);
     generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
@@ -1362,17 +1375,21 @@ namespace xi {
     if (con1) con1->generateTrace();
   }
 
-  void SdagConstruct::generateTraceBeginCall(XStr& op) {
-    if(traceName)
-      op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, NULL); \n";
+  void SdagConstruct::generateTraceBeginCall(XStr& op, int indent) {
+    if (traceName) {
+      indentBy(op, indent);
+      op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, NULL); \n";
+    }
   }
 
-  void SdagConstruct::generateDummyBeginExecute(XStr& op) {
-    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _dummyEP, CkMyPe(), 0, NULL); \n";
+  void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent) {
+    indentBy(op, indent);
+    op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _dummyEP, CkMyPe(), 0, NULL); \n";
   }
 
-  void SdagConstruct::generateTraceEndCall(XStr& op) {
-    op << "    " << "_TRACE_END_EXECUTE(); \n";
+  void SdagConstruct::generateTraceEndCall(XStr& op, int indent) {
+    indentBy(op, indent);
+    op << "_TRACE_END_EXECUTE(); \n";
   }
 
   void SdagConstruct::generateBeginExec(XStr& op, const char *name) {
@@ -1398,7 +1415,7 @@ namespace xi {
     op <<  "    CkElapse(0.01e-6);\n";
     //op<<  "    BgElapse(1e-6);\n";
     generateTlineEndCall(op);
-    generateTraceEndCall(op);
+    generateTraceEndCall(op, 1);
     generateEndExec(op);
   }
 

@@ -128,7 +128,7 @@ namespace xi {
     defs << "  if (c) {\n";
     if (whenList.size() == 1) {
       //defs << "    {\n";
-      (*whenList.begin())->generateWhenCodeNew(defs);
+      (*whenList.begin())->generateWhenCodeNew(defs, 2);
       //defs << "    }\n";
     } else {
       // switch on the possible entry points for the continuation
@@ -136,17 +136,22 @@ namespace xi {
       defs << "    switch(c->whenID) {\n";
       for(list<WhenConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn) {
         defs << "    case " << (*cn)->nodeNum << ":\n";
-        (*cn)->generateWhenCodeNew(defs);
+        (*cn)->generateWhenCodeNew(defs, 3);
         defs << "    break;\n";
       }
       defs << "    }\n";
     }
 
+    SdagConstruct::generateDummyBeginExecute(defs, 2);
+
     // delete the continuation now that we are finished with it
     defs << "    delete c;\n";
     defs << "  } else {\n";
 
-    SdagConstruct::generateTraceEndCall(defs);
+    SdagConstruct::generateTraceEndCall(defs, 2);
+#if CMK_BIGSIM_CHARM
+    SdagConstruct::generateEndExec(defs);
+#endif
 
     defs << "  }\n";
 
