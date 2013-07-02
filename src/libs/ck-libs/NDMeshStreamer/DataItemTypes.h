@@ -3,6 +3,12 @@
 
 #define CHUNK_SIZE 256
 
+template<class dtype>
+struct AddressedItem {
+  int destinationPe;
+  dtype item;
+};
+
 template<class dtype, class itype>
 class ArrayDataItem {
 

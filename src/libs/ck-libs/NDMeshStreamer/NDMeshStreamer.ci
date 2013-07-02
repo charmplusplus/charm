@@ -5,8 +5,7 @@ module NDMeshStreamer {
 
   template<class dtype> 
   message MeshStreamerMessage {
-    int destinationPes[];
-    dtype dataItems[]; 
+    AddressedItem<dtype> addressedItems[];
   };
 
   template<class dtype> group MeshStreamerGroupClient {};
