@@ -5,9 +5,21 @@ This file describes the most significant changes. For more detail, use
 What's new in Charm++ 6.5.1
 ================================================================================
 
+For the complete list of changes, please see the related issuess in Redmine:
+https://charm.cs.illinois.edu/redmine/versions/3
+
+- Cray XC (Cascade) systems are now fully supported with gni-crayxc builds
+
+- Fixes for broadly-applicable bugs
+  * #187: Centralized load balancers had a slow memory leak
+  * #242: SMP builds of Charm++ would unpack readonly variables on all PEs in a
+    racy fashion
+
 - Deprecations
-  * The CmiBool type definitions will be deleted in release 6.6.0, since the
+  * The CmiBool type definitions will be deleted in release 6.6, since the
     standard C++ bool has long been universally implemented.
+  * The FEM library has long been supplanted by ParFUM, and will be deleted in
+    release 6.7.
 
 ================================================================================
 What's new in Charm++ 6.5.0
