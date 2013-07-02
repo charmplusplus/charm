@@ -10,7 +10,8 @@
 
 namespace Ck { namespace IO {
   /// Identifier for a file to be accessed
-  typedef int Token;
+  typedef int FileToken;
+  typedef int SessionToken;
 
   struct Options {
     Options()
@@ -47,8 +48,8 @@ namespace Ck { namespace IO {
 
 namespace Ck { namespace IO {
   struct FileReadyMsg : public CMessage_FileReadyMsg {
-    Token token;
-    FileReadyMsg(const Token &tok) : token(tok) {}
+    FileToken token;
+    FileReadyMsg(const FileToken &tok) : token(tok) {}
   };
 
   namespace impl {  
@@ -81,21 +82,31 @@ namespace Ck { namespace IO {
       }
     };
     
+    struct SessionInfo {
+      FileToken file;
+      size_t bytes, offset, total_written;
+      int pesReady;
+      CkCallback complete;
+      std::map<size_t, struct buffer> bufferMap;
+
+      SessionInfo(FileToken file_, size_t bytes_, size_t offset_, CkCallback complete_)
+        : file(file_), bytes(bytes_), offset(offset_), complete(complete_)
+        { }
+      SessionInfo()
+        : file(-1)
+    };
 
     struct FileInfo {
       std::string name;
       Options opts;
-      size_t bytes, total_written;
       int fd;
-      CkCallback complete;
-      std::map<size_t, struct buffer> bufferMap;
 
-    FileInfo(std::string name_, size_t bytes_, Options opts_)
-    : name(name_), opts(opts_), bytes(bytes_), total_written(0), fd(-1)
-      { }
-    FileInfo()
-    : bytes(-1), total_written(-1), fd(-1)
-      { }
+      FileInfo(std::string name_, Options opts_)
+        : name(name_), opts(opts_), fd(-1)
+        { }
+      FileInfo()
+        : fd(-1)
+        { }
     };
   }
 
@@ -111,25 +122,28 @@ namespace Ck { namespace IO {
     Manager_SDAG_CODE;
 
     /// Application-facing methods, invoked locally on the calling PE
-    void prepareOutput(const char *name, size_t bytes,
-		       CkCallback ready, CkCallback complete,
-		       Options opts = Options());
-    void write(Token token, const char *data, size_t bytes, size_t offset);
+    void openWrite(std::string name, CkCallback opened, Options opts = Options());
+    void prepareWrite(size_t bytes, size_t offset, CkCallback ready, CkCallback complete);
+    void write(FileToken file, SessionToken session,
+               const char *data, size_t bytes, size_t offset);
 
+#if 0
     void prepareInput(const char *name, CkCallback ready,
 		      Options opts = Options());
     void read(Token token, void *data, size_t bytes, size_t offset,
 	      CkCallback complete);
-
+#endif
 
     /// Internal methods, used for interaction among IO managers across the system
-    void write_forwardData(Token token, const char *data, size_t bytes, size_t offset);
-    void write_dataWritten(Token token, size_t bytes);
+    void write_forwardData(SessionToken token, const char *data, size_t bytes, size_t offset);
+    void write_dataWritten(SessionToken token, size_t bytes);
 
   private:
-    int filesOpened;
-    Token nextToken;
-    std::map<Token, impl::FileInfo> files;
+    int filesOpened, sessionsOpened;
+    FileToken nextToken;
+    std::map<FileToken, impl::FileInfo> files;
+    std::map<SessionToken, impl::SessionInfo> sessions;
+
     CkCallback nextReady;
 
     int lastActivePE(const Options &opts) {

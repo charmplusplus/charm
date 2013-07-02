@@ -5,20 +5,18 @@ module CkIO {
       group Manager {
 	entry Manager();
 
-	entry void prepareOutput_central(std::string name, size_t bytes,
-					 CkCallback ready, CkCallback complete,
+	entry void prepareOutput_central(std::string name, CkCallback opened,
 					 Options opts);
-	entry void prepareOutput_distrib(Token token, std::string name, size_t bytes,
+	entry void prepareOutput_distrib(FileToken token, std::string name,
 					 Options opts);
-	entry void prepareOutput_readied(CkReductionMsg *m);
+	entry void prepareOutput_opened(CkReductionMsg *m);
 
 	/// Serialize setting up each file, so that all PEs have the same sequence
 	entry void run() {
 	  for (filesOpened = 0; true; filesOpened++) {
 	    if (CkMyPe() == 0)
-	      when prepareOutput_central(std::string name, size_t bytes,
-					 CkCallback ready, CkCallback complete,
-					 Options opts) atomic {
+	      when prepareOutput_central(std::string name, CkCallback opened,
+                                         Options opts) atomic {
 		if (-1 == opts.peStripe)
 		  opts.peStripe = 16 * 1024 * 1024;
 		if (-1 == opts.writeStripe)
@@ -35,19 +33,18 @@ module CkIO {
 
 		CkAssert(lastActivePE(opts) < CkNumPes());
 		CkAssert(opts.writeStripe <= opts.peStripe);
-		nextReady = ready;
+		nextReady = opened;
 
-		thisProxy.prepareOutput_distrib(nextToken, name, bytes, opts);
+		thisProxy.prepareOutput_distrib(nextToken, name, opts);
 
-		files[nextToken] = impl::FileInfo(name, bytes, opts);
-		files[nextToken].complete = complete;
+		files[nextToken] = impl::FileInfo(name, opts);
 	      }
 
-	    when prepareOutput_distrib[filesOpened](Token token, std::string name, size_t bytes,
+	    when prepareOutput_distrib[filesOpened](FileToken token, std::string name,
 						    Options opts) atomic {
 	      if (CkMyPe() != 0) {
 		CkAssert(files.end() == files.find(token));
-		files[token] = impl::FileInfo(name, bytes, opts);
+		files[token] = impl::FileInfo(name, opts);
 	      }
 
 	      // Open file if we're one of the active PEs
@@ -58,13 +55,13 @@ module CkIO {
 		files[token].fd = openFile(name);
 	      }
 
-	      contribute(CkCallback(CkIndex_Manager::prepareOutput_readied(0),
+	      contribute(CkCallback(CkIndex_Manager::prepareOutput_opened(0),
 				    thisProxy[0]),
 			 filesOpened);
 	    }
 
 	    if (CkMyPe() == 0)
-	      when prepareOutput_readied[filesOpened](CkReductionMsg *m) atomic {
+	      when prepareOutput_opened[filesOpened](CkReductionMsg *m) atomic {
 		delete m;
 		FileReadyMsg *f = new FileReadyMsg(nextToken++);
 		nextReady.send(f);
@@ -73,9 +70,22 @@ module CkIO {
 
 	};
 
-	entry void write_forwardData(Token token, const char data[bytes],
+        entry void write_prepareSession(FileToken file, size_t bytes, size_t offset,
+                                        CkCallback ready, CkCallback complete) {
+          atomic {
+            CkAssert(CkMyPe() == 0);
+            thisProxy.write_announceSession(file, sessionsOpened++, bytes, offset);
+          }
+          // 
+          when sessionReady[sessionsOpened - 1](CkReductionMsg *m) { delete m; }
+          atomic { ready.send(new SessionReadyMsg(/*session ID */)); }
+        };
+
+        entry void write_announceSession(FileToken file, SessionToken session,
+                                         size_t bytes, size_t offset);
+	entry void write_forwardData(SessionToken token, const char data[bytes],
 				     size_t bytes, size_t offset);
-	entry void write_dataWritten(Token token, size_t bytes);
+	entry void write_dataWritten(SessionToken token, size_t bytes);
       };
     }
 

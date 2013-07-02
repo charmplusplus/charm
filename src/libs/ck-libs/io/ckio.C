@@ -30,17 +30,20 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 #endif
 
 namespace Ck { namespace IO {
-    Manager::Manager() : nextToken(0) {
+    Manager::Manager() : nextToken(0), sessionsOpened(0) {
       run();
     }
 
-    void Manager::prepareOutput(const char *name, size_t bytes,
-				CkCallback ready, CkCallback complete,
-				Options opts) {
-      thisProxy[0].prepareOutput_central(name, bytes, ready, complete, opts);
+    void Manager::openWrite(std::string name, CkCallback opened, Options opts = Options()) {
+      thisProxy[0].prepareOutput_central(name, opened, opts);
     }
 
-    void Manager::write(Token token, const char *data, size_t bytes, size_t offset) {
+    void Manager::prepareWrite(FileToken file, size_t bytes, size_t offset
+                               CkCallback ready, CkCallback complete) {
+      thisProxy[0].write_prepareSession(file, bytes, offset, ready, complete);
+    }
+
+    void Manager::write(SessionToken token, const char *data, size_t bytes, size_t offset) {
       Options &opts = files[token].opts;
       while (bytes > 0) {
         size_t stripeIndex = offset / opts.peStripe;
@@ -54,7 +57,7 @@ namespace Ck { namespace IO {
       }
     }
 
-    void Manager::write_forwardData(Token token, const char *data, size_t bytes,
+    void Manager::write_forwardData(SessionToken token, const char *data, size_t bytes,
 				    size_t offset) {
       //files[token].bufferMap[(offset/stripeSize)*stripeSize] is the buffer to which this char should write to.
       CkAssert(offset + bytes <= files[token].bytes);
