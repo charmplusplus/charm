@@ -30,8 +30,12 @@ serialtree.o: serialtree.C $(HEADDEP)
 idastar.o: idastar.C $(HEADDEP)
 	$(CHARMC) -c idastar.C
 
-search.decl.h search.def.h: search.ci
-	$(CHARMC) search.ci
+search.decl.h search.def.h: search.ci.stamp
+	touch $@
+
+search.ci.stamp: search.ci
+	$(CHARMC) $<
+	touch $@
 
 clean:
-	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers
+	rm -rf *.a *.def.h *.decl.h *.o *.stamp SunWS_cache $(DEST) headers
