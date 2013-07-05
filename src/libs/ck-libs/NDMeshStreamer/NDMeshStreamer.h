@@ -34,23 +34,24 @@ public:
   int finalMsgCount; 
   int dimension; 
   int numDataItems;
-  AddressedItem<dtype> *addressedItems;
+  int *destinationPes;
+  dtype *dataItems;
 
   MeshStreamerMessage(int dim): numDataItems(0), dimension(dim) {
     finalMsgCount = -1; 
   }
 
   inline int addDataItem(const dtype& dataItem) {
-    addressedItems[numDataItems].item = dataItem;
+    dataItems[numDataItems] = dataItem;
     return ++numDataItems; 
   }
 
   inline void markDestination(const int index, const int destinationPe) {
-    addressedItems[index].destinationPe = destinationPe;
+    destinationPes[index] = destinationPe;
   }
 
   inline const dtype& getDataItem(const int index) {
-    return addressedItems[index].item;
+    return dataItems[index];
   }
 
 };
@@ -491,12 +492,12 @@ void MeshStreamer<dtype>::storeMessage(
     if (dimension == 0) {
       // personalized messages do not require destination indices
       messageBuffers[bufferIndex] = 
-        new (bufferSize_, 8 * sizeof(int)) 
+        new (0, bufferSize_, 8 * sizeof(int)) 
          MeshStreamerMessage<dtype>(dimension);
     }
     else {
       messageBuffers[bufferIndex] = 
-        new (bufferSize_, 8 * sizeof(int)) 
+        new (bufferSize_, bufferSize_, 8 * sizeof(int)) 
          MeshStreamerMessage<dtype>(dimension);
     }
     *(int *) CkPriorityPtr(messageBuffers[bufferIndex]) = prio_;
@@ -740,7 +741,7 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
 
   lastDestinationPe = -1;
   for (int i = 0; i < msg->numDataItems; i++) {
-    destinationPe = msg->addressedItems[i].destinationPe;
+    destinationPe = msg->destinationPes[i];
     const dtype& dataItem = msg->getDataItem(i);
     if (destinationPe == CkMyPe()) {
       localDeliver(dataItem);
@@ -801,7 +802,7 @@ void MeshStreamer<dtype>::sendLargestBuffer() {
       // not sending the full buffer, shrink the message size
       envelope *env = UsrToEnv(destinationBuffer);
       env->shrinkUsersize((bufferSize_ - destinationBuffer->numDataItems)
-                          * sizeof(AddressedItem<dtype>));
+                        * sizeof(dtype));
       numDataItemsBuffered_ -= destinationBuffer->numDataItems;
       sendMeshStreamerMessage(destinationBuffer, flushDimension, 
                               destinationIndex); 
@@ -844,7 +845,7 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
     if(messageBuffers[j] == NULL) {      
       if (sendMsgCounts && j != myLocationIndex_[dimension]) {
         messageBuffers[j] = 
-          new (0, 8 * sizeof(int)) MeshStreamerMessage<dtype>(dimension);
+          new (0, 0, 8 * sizeof(int)) MeshStreamerMessage<dtype>(dimension);
         *(int *) CkPriorityPtr(messageBuffers[j]) = prio_;
         CkSetQueueing(messageBuffers[j], CK_QUEUEING_IFIFO);
       }
@@ -862,7 +863,7 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
       // not sending the full buffer, shrink the message size
       envelope *env = UsrToEnv(destinationBuffer);
       env->shrinkUsersize((bufferSize_ - destinationBuffer->numDataItems)
-                          * sizeof(AddressedItem<dtype>));
+                          * sizeof(dtype));
     }
     numDataItemsBuffered_ -= destinationBuffer->numDataItems;
 
@@ -1283,9 +1284,9 @@ public:
       int numDataItems = destinationBuffer->numDataItems;
       const DataItemHandle *tempHandle = 
         (const DataItemHandle *) dataItemHandle;
-      (destinationBuffer->addressedItems)[numDataItems].item.dataItem =
-        *(tempHandle->dataItem);
-      (destinationBuffer->addressedItems)[numDataItems].item.arrayIndex =
+      (destinationBuffer->dataItems)[numDataItems].dataItem = 
+	*(tempHandle->dataItem);
+      (destinationBuffer->dataItems)[numDataItems].arrayIndex = 
 	tempHandle->arrayIndex;
       return ++destinationBuffer->numDataItems;
     }
