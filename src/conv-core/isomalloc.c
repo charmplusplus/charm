@@ -2536,7 +2536,6 @@ void CmiIsomallocInit(char **argv)
   if (CmiGetArgFlagDesc(argv,"+isomalloc_sync","synchronize isomalloc region globaly"))
     _sync_iso = 1;
 #if __FAULT__
-  int resPhase;
   if (CmiGetArgFlagDesc(argv,"+restartisomalloc","restarting isomalloc on this processor after a crash"))
     _restart = 1;
 #endif
