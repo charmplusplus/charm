@@ -2656,6 +2656,9 @@ void infi_CmiFreeDirect(void *ptr){
         int size;
         int parentPe;
         void *freePtr = ptr;
+        infiCmiChunkMetaData *metaData;
+        int poolIdx;
+        infiCmiChunkPool *pool;
 #if CMK_IBVERBS_STATS
 	numFree++;
 #endif
@@ -2663,13 +2666,11 @@ void infi_CmiFreeDirect(void *ptr){
         //ptr += sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
-        infiCmiChunkMetaData *metaData;
-        int poolIdx;
         //there is a infiniband specific header
         freePtr = ptr - sizeof(infiCmiChunkHeader);
         metaData = METADATAFIELD(ptr);
         poolIdx = metaData->poolIdx;
-	infiCmiChunkPool *pool = infiCmiChunkPools[CmiMyRank()] + poolIdx;
+	pool = infiCmiChunkPools[CmiMyRank()] + poolIdx;
         MACHSTATE2(1,"CmiFree buf %p goes back to pool %d",ptr,poolIdx);
 //      CmiAssert(poolIdx >= 0);
 	if(poolIdx < INFINUMPOOLS && pool->count < INFIMAXPERPOOL &&
@@ -2699,9 +2700,10 @@ void infi_CmiFreeDirect(void *ptr){
 	    // freed dont free my metaData. will need later
 	  }else{
 	    if(metaData->owner->metaData->count == 0){
+              int unregstat;
 	      //need to free the owner's buffer and metadata
 	      freePtr = metaData->owner;
-	      int unregstat=ibv_dereg_mr(metaData->key);
+	      unregstat=ibv_dereg_mr(metaData->key);
 #if CMK_IBVERBS_STATS
 	      numUnReg++;
 	      numCurReg--;
@@ -2725,6 +2727,8 @@ void infi_CmiFree(void *ptr){
 	int nodeSize;
 	void *pointer;
         void *freePtr = ptr;
+	infiCmiChunkMetaData *metaData;
+        int poolIdx;
 	nodeSize = CmiMyNodeSize() + 1;
 
 	MACHSTATE(3,"Freeing");
@@ -2733,8 +2737,6 @@ void infi_CmiFree(void *ptr){
         ptr += sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
-	infiCmiChunkMetaData *metaData;
-        int poolIdx;
         //there is a infiniband specific header
         freePtr = ptr - sizeof(infiCmiChunkHeader);
         metaData = METADATAFIELD(ptr);

@@ -282,7 +282,7 @@ inline int flushSendQ(int dstRank);
  * ****************************/
 
 void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int broot){
-
+	sharedBufData *dstBuf;
 	
 #if PXSHM_STATS
 	double _startSendTime = CmiWallTimer();
@@ -299,7 +299,7 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 
 	CmiAssert(dstRank >=0 && dstRank != pxshmContext->noderank);
 	
-	sharedBufData *dstBuf = &(pxshmContext->sendBufs[dstRank]);
+	dstBuf = &(pxshmContext->sendBufs[dstRank]);
 
 
 #if PXSHM_OSSPINLOCK
@@ -333,10 +333,11 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 				int ret = sendMessage(ogm,dstBuf,pxshmContext->sendQs[dstRank]);
 				MACHSTATE(3,"Pxshm Send succeeded immediately");
 		 }else{
+				int sent;
 				ogm->refcount+=2;/*this message should not get deleted when the queue is flushed*/
 			 	pushSendQ(pxshmContext->sendQs[dstRank],ogm);
 				MACHSTATE3(3,"Pxshm ogm %p pushed to sendQ length %d refcount %d",ogm,pxshmContext->sendQs[dstRank]->numEntries,ogm->refcount);
-				int sent = flushSendQ(dstRank);
+				sent = flushSendQ(dstRank);
 				ogm->refcount--; /*if it has been sent, can be deleted by caller, if not will be deleted when queue is flushed*/
 				MACHSTATE1(3,"Pxshm flushSendQ sent %d messages",sent);
 		 }
@@ -614,10 +615,11 @@ inline int flushSendQ(int dstRank){
 	int count=dstSendQ->numEntries;
 	int sent=0;
 	while(count > 0){
+		int ret;
 		OutgoingMsg ogm = popSendQ(dstSendQ);
 		ogm->refcount--;
 		MACHSTATE4(3,"Pxshm trysending ogm %p size %d to dstRank %d refcount %d",ogm,ogm->size,dstRank,ogm->refcount);
-		int ret = sendMessage(ogm,dstBuf,dstSendQ);
+		ret = sendMessage(ogm,dstBuf,dstSendQ);
 		if(ret==1){
 			sent++;
       GarbageCollectMsg(ogm);
