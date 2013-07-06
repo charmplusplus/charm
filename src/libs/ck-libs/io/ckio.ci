@@ -2,92 +2,79 @@ module CkIO {
   namespace Ck { namespace IO {
       message FileReadyMsg;
 
-      group Manager {
-	entry Manager();
+      readonly CProxy_Director director;
 
-	entry void prepareOutput_central(std::string name, CkCallback opened,
-					 Options opts);
-	entry void prepareOutput_distrib(FileToken token, std::string name,
-					 Options opts);
-	entry void prepareOutput_opened(CkReductionMsg *m);
+      mainchare Director
+      {
+        entry Director();
 
-	/// Serialize setting up each file, so that all PEs have the same sequence
-	entry void run() {
-	  for (filesOpened = 0; true; filesOpened++) {
-	    if (CkMyPe() == 0)
-	      when prepareOutput_central(std::string name, CkCallback opened,
-                                         Options opts) atomic {
-		if (-1 == opts.peStripe)
-		  opts.peStripe = 16 * 1024 * 1024;
-		if (-1 == opts.writeStripe)
-		  opts.writeStripe = 4 * 1024 * 1024;
-
-		if (-1 == opts.activePEs) {
-		  size_t numStripes = (bytes + opts.peStripe - 1) / opts.peStripe;
-		  opts.activePEs = std::min((size_t)CkNumNodes(), numStripes);
-		}
-		if (-1 == opts.basePE)
-		  opts.basePE = 0;
-		if (-1 == opts.skipPEs)
-		  opts.skipPEs = CkMyNodeSize();
-
-		CkAssert(lastActivePE(opts) < CkNumPes());
-		CkAssert(opts.writeStripe <= opts.peStripe);
-		nextReady = opened;
-
-		thisProxy.prepareOutput_distrib(nextToken, name, opts);
-
-		files[nextToken] = impl::FileInfo(name, opts);
-	      }
-
-	    when prepareOutput_distrib[filesOpened](FileToken token, std::string name,
-						    Options opts) atomic {
-	      if (CkMyPe() != 0) {
-		CkAssert(files.end() == files.find(token));
-		files[token] = impl::FileInfo(name, opts);
-	      }
-
-	      // Open file if we're one of the active PEs
-	      // XXX: Or maybe wait until the first write-out, to smooth the metadata load?
-	      if (((CkMyPe() - opts.basePE) % opts.skipPEs == 0 &&
-		   CkMyPe() < lastActivePE(opts)) ||
-		  true) {
-		files[token].fd = openFile(name);
-	      }
-
-	      contribute(CkCallback(CkIndex_Manager::prepareOutput_opened(0),
-				    thisProxy[0]),
-			 filesOpened);
-	    }
-
-	    if (CkMyPe() == 0)
-	      when prepareOutput_opened[filesOpened](CkReductionMsg *m) atomic {
-		delete m;
-		FileReadyMsg *f = new FileReadyMsg(nextToken++);
-		nextReady.send(f);
-	      }
-	  }
-
-	};
-
-        entry void write_prepareSession(FileToken file, size_t bytes, size_t offset,
-                                        CkCallback ready, CkCallback complete) {
+	/// Serialize setting up each file through this chare, so that all PEs
+	/// have the same sequence
+	entry void openFile(std::string name, CkCallback opened, Options opts) {
           atomic {
-            CkAssert(CkMyPe() == 0);
-            thisProxy.write_announceSession(file, sessionsOpened++, bytes, offset);
+            if (-1 == opts.peStripe)
+              opts.peStripe = 16 * 1024 * 1024;
+            if (-1 == opts.writeStripe)
+              opts.writeStripe = 4 * 1024 * 1024;
+
+            if (-1 == opts.activePEs) {
+              size_t numStripes = (bytes + opts.peStripe - 1) / opts.peStripe;
+              opts.activePEs = std::min((size_t)CkNumNodes(), numStripes);
+            }
+            if (-1 == opts.basePE)
+              opts.basePE = 0;
+            if (-1 == opts.skipPEs)
+              opts.skipPEs = CkMyNodeSize();
+
+            CkAssert(lastActivePE(opts) < CkNumPes());
+            CkAssert(opts.writeStripe <= opts.peStripe);
+
+            files[filesOpened] = impl::FileInfo(name, opts);
+            managers.openFile(filesOpened++, name, opened, opts);
           }
-          // 
-          when sessionReady[sessionsOpened - 1](CkReductionMsg *m) { delete m; }
-          atomic { ready.send(new SessionReadyMsg(/*session ID */)); }
         };
 
-        entry void write_announceSession(FileToken file, SessionToken session,
-                                         size_t bytes, size_t offset);
-	entry void write_forwardData(SessionToken token, const char data[bytes],
-				     size_t bytes, size_t offset);
-	entry void write_dataWritten(SessionToken token, size_t bytes);
+        entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
+                                       CkCallback ready, CkCallback complete) {
+          atomic {
+            int numElements = files[file].activePEs;
+            CkArrayOpts opts(numElements);
+            opts.setMap();
+            CProxy_WriteSession::ckNew(file, bytes, offset, ready, complete, opts);
+          }
+        };
+      }
+
+      group Manager
+      {
+	entry Manager();
+
+        entry void openFile(FileToken token, std::string name,
+                            CkCallback opened, Options opts) {
+          atomic {
+            CkAssert(files.end() == files.find(token));
+            files[token] = impl::FileInfo(name, opts);
+
+            // Open file if we're one of the active PEs
+            // XXX: Or maybe wait until the first write-out, to smooth the metadata load?
+            if (((CkMyPe() - opts.basePE) % opts.skipPEs == 0 &&
+                 CkMyPe() < lastActivePE(opts)) ||
+                true) {
+              files[token].fd = doOpenFile(name);
+            }
+
+            contribute(sizeof(FileToken), token, CkReduction::max_int, opened);
+          }
+        };
+      };
+
+      array [1D] WriteSession
+      {
+        entry WriteSession(FileToken file, size_t offset, size_t bytes,
+                           CkCallback ready, CkCallback complete);
+	entry void forwardData(size_t offset, size_t bytes,
+                               const char data[bytes]);
       };
     }
-
   }
 }
