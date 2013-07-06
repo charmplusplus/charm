@@ -1,6 +1,8 @@
 module CkIO {
   namespace Ck { namespace IO {
       message FileReadyMsg;
+      message SessionReadyMsg;
+      message SessionCommitMsg;
 
       readonly CProxy_Director director;
 
@@ -40,7 +42,9 @@ module CkIO {
             int numElements = files[file].activePEs;
             CkArrayOpts opts(numElements);
             opts.setMap();
-            CProxy_WriteSession::ckNew(file, bytes, offset, ready, complete, opts);
+            CProxy_WriteSession session =
+              CProxy_WriteSession::ckNew(file, bytes, offset, complete, opts);
+            ready.send(new SessionReadyMessage(session));
           }
         };
       }
@@ -71,7 +75,7 @@ module CkIO {
       array [1D] WriteSession
       {
         entry WriteSession(FileToken file, size_t offset, size_t bytes,
-                           CkCallback ready, CkCallback complete);
+                           CkCallback complete);
 	entry void forwardData(size_t offset, size_t bytes,
                                const char data[bytes]);
       };
