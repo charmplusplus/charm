@@ -71,11 +71,11 @@ SMP: This routine must be called holding immRecvLock
  */
 void CmiHandleImmediateMessage(void *msg) {
 /*  int handlerNo=CmiGetXHandler(msg); */
+  int handlerNo=CmiImmediateHandler(msg);
+  CmiHandlerInfo *h;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CmiAssert(0);
 #endif
-  int handlerNo=CmiImmediateHandler(msg);
-  CmiHandlerInfo *h;
   MACHSTATE2(4,"immediate message handler %d %d", CmiGetHandler(msg), handlerNo)
 /*  CmiHandlerInfo *h=&CpvAccessOther(CmiHandlerTable,0)[handlerNo]; */
   h = &CpvAccess(CmiHandlerTable)[handlerNo];
