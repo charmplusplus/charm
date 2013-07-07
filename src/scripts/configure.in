@@ -815,15 +815,6 @@ EOT
 test_cxx "whether C++ signed char and char differ" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIGNEDCHAR_DIFF_CHAR, $pass, [whether C++ signed char and char differ])
 
-#### check if C++ casts work ####
-cat > $t <<EOT
-int foo(float *t) {return *reinterpret_cast<int *>(t);}
-EOT
-test_cxx "whether C++ *_casts<> work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_CPP_CAST_LEGAL, $pass, [C++ *_casts<> work])
-AC_DEFINE_UNQUOTED(CMK_CPP_CAST_ILLEGAL, $fail, [C++ *_casts<> does not work])
-
-
 ### check if varsize array on stack ####
 cat > $t <<EOT
 #include <stdio.h>
