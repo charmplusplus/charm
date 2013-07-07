@@ -817,16 +817,6 @@ EOT
 test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_DECLARE_VARSIZE_ARRAY, $pass, [whether C++ allows declaration of variable sized array])
 
-#### check if namespaces can be defined #####
-cat > $t <<EOT
-namespace foo {
-	int x;
-}
-EOT
-test_cxx "whether namespaces work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail, [whether namespaces work])
-
-
 #### check if typeinfo exists and works #####
 cat > $t <<EOT
 #include <typeinfo>

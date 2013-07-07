@@ -270,9 +270,6 @@
 /* whether operator delete can be overloaded in same class */
 #undef CMK_MULTIPLE_DELETE
 
-/* whether namespaces work */
-#undef CMK_NAMESPACES_BROKEN
-
 /* OS is Linux */
 #undef CMK_OS_IS_LINUX
 

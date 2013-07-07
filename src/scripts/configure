@@ -2765,20 +2765,6 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
-#### check if namespaces can be defined #####
-cat > $t <<EOT
-namespace foo {
-	int x;
-}
-EOT
-test_cxx "whether namespaces work" "ok" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_NAMESPACES_BROKEN $fail
-_ACEOF
-
-
-
 #### check if typeinfo exists and works #####
 cat > $t <<EOT
 #include <typeinfo>
