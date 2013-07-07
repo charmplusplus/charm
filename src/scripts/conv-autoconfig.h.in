@@ -60,9 +60,6 @@
 /* enable error checking */
 #undef CMK_ERROR_CHECKING
 
-/* whether C++ class explicit keyword works */
-#undef CMK_EXPLICIT
-
 /* ALLCAPS */
 #undef CMK_FORTRAN_USES_ALLCAPS
 

@@ -792,17 +792,6 @@ EOT
 test_cc "whether inline works in C" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_C_INLINE, $strictpass, [whether C inline works in C])
 
-#### check explicit ####
-cat > $t <<EOT
-#include <stdlib.h>
-class er {
- protected:
-   explicit er(unsigned int inType) {};
-};
-EOT
-test_cxx "whether C++ class explicit keyword works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_EXPLICIT, $pass, [whether C++ class explicit keyword works])
-
 #### check if signed char is same as char ####
 cat > $t <<EOT
 #include <stdlib.h>

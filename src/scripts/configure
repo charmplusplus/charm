@@ -2732,21 +2732,6 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
-#### check explicit ####
-cat > $t <<EOT
-#include <stdlib.h>
-class er {
- protected:
-   explicit er(unsigned int inType) {};
-};
-EOT
-test_cxx "whether C++ class explicit keyword works" "ok" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_EXPLICIT $pass
-_ACEOF
-
-
 #### check if signed char is same as char ####
 cat > $t <<EOT
 #include <stdlib.h>
