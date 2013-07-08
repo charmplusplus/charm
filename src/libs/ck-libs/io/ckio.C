@@ -136,17 +136,41 @@ namespace Ck { namespace IO {
 
       class WriteSession : public CBase_WriteSession {
         FileToken file;
-        size_t sessionOffset;
+        size_t sessionOffset, myOffset;
         size_t sessionBytes, myBytes, myBytesWritten;
         CkCallback complete;
+
+        struct buffer {
+          std::vector<char> array;
+          int bytes_filled_so_far;
+
+          buffer() {
+            bytes_filled_so_far = 0;
+          }
+
+          void expect(size_t bytes) {
+            array.resize(bytes);
+          }
+
+          void insertData(const char *data, size_t length, size_t offset) {
+            char *dest = &array[offset];
+            memcpy(dest, data, length);
+
+            bytes_filled_so_far += length;
+          }
+
+          bool isFull() {
+            return bytes_filled_so_far == array.size();
+          }
+        };
+        std::map<size_t, struct buffer> bufferMap;
 
       public:
         WriteSession(FileToken file_, size_t offset_, size_t bytes_, CkCallback complete_)
           : file(file_), offset(offset_), bytes(bytes_), complete(complete_)
         { }
 
-        void forwardData(SessionToken token, const char *data, size_t bytes,
-                         size_t offset) {
+        void forwardData(const char *data, size_t bytes, size_t offset) {
           //files[token].bufferMap[(offset/stripeSize)*stripeSize] is the buffer to which this char should write to.
           CkAssert(offset + bytes <= files[token].bytes);
           // XXX: CkAssert(this is the right processor to receive this data)
@@ -155,7 +179,7 @@ namespace Ck { namespace IO {
           while(bytes > 0) {
             size_t stripeOffset = (offset/stripeSize)*stripeSize;
             size_t expectedBufferSize = std::min(files[token].bytes - stripeOffset, stripeSize);
-            struct impl::buffer & currentBuffer = files[token].bufferMap[stripeOffset];
+            buffer& currentBuffer = files[token].bufferMap[stripeOffset];
             size_t bytesInCurrentStripe = std::min(expectedBufferSize - offset%stripeSize, bytes);
 
             //check if buffer this element already exists in map. If not, insert and resize buffer to stripe size

@@ -57,41 +57,12 @@ namespace Ck { namespace IO {
   };
 
   namespace impl {  
-    struct buffer
-    {
-      std::vector<char> array;
-      int bytes_filled_so_far;
-    
-      buffer()
-      {
-	bytes_filled_so_far = 0;
-      }
-
-      void expect(size_t bytes)
-      {
-	array.resize(bytes);
-      }
-    
-      void insertData(const char *data, size_t length, size_t offset)
-      {
-	char *dest = &array[offset];
-	memcpy(dest, data, length);
-
-	bytes_filled_so_far += length;
-      }
-
-      bool isFull()
-      {
-	return bytes_filled_so_far == array.size();
-      }
-    };
     
     struct SessionInfo {
       FileToken file;
       size_t bytes, offset, total_written;
       int pesReady;
       CkCallback complete;
-      std::map<size_t, struct buffer> bufferMap;
 
       SessionInfo(FileToken file_, size_t bytes_, size_t offset_, CkCallback complete_)
         : file(file_), bytes(bytes_), offset(offset_), complete(complete_)
