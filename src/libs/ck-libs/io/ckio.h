@@ -38,7 +38,11 @@ namespace Ck { namespace IO {
     }
   };
 
-    struct FileReadyMsg;
+  struct FileReadyMsg;
+
+  void open(std::string name, CkCallback opened, Options opts);
+  void startSession(FileToken token, size_t offset, size_t bytes, CkCallback complete);
+  void write(SessionToken token, const char *data, size_t bytes, size_t offset);
   }
 }
 
@@ -119,8 +123,6 @@ namespace Ck { namespace IO {
   public:
     Manager();
 
-    Manager_SDAG_CODE;
-
     /// Application-facing methods, invoked locally on the calling PE
     void openWrite(std::string name, CkCallback opened, Options opts = Options());
     void prepareWrite(size_t bytes, size_t offset, CkCallback ready, CkCallback complete);
@@ -141,15 +143,11 @@ namespace Ck { namespace IO {
   private:
     int filesOpened, sessionsOpened;
     FileToken nextToken;
-    std::map<FileToken, impl::FileInfo> files;
     std::map<SessionToken, impl::SessionInfo> sessions;
-
-    CkCallback nextReady;
 
     int lastActivePE(const Options &opts) {
       return opts.basePE + (opts.activePEs-1)*opts.skipPEs;
     }
-    int openFile(const std::string& name);
   };
 
   }}
