@@ -1,4 +1,5 @@
 #include <string>
+typedef int FileToken;
 #include "CkIO.decl.h"
 #include <ckio.h>
 #include <errno.h>
@@ -33,7 +34,6 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 #endif
 
 namespace Ck { namespace IO {
-
     namespace impl {
       CProxy_Director director;
       Manager *manager;
@@ -49,6 +49,12 @@ namespace Ck { namespace IO {
                       CkArrayID sessionID)
         : file(file_), bytes(bytes_), offset(offset_), proxy(sessionID)
       { }
+    };
+
+    class FileReadyMsg : public CMessage_FileReadyMsg {
+    public:
+      FileToken token;
+      FileReadyMsg(const FileToken &tok) : token(tok) {}
     };
 
     namespace impl {
@@ -313,9 +319,9 @@ namespace Ck { namespace IO {
       impl::director.openFile(name, opened, opts);
     }
 
-    void startSession(FileToken token, size_t bytes, size_t offset,
+    void startSession(FileReadyMsg *file, size_t bytes, size_t offset,
                       CkCallback ready, CkCallback complete) {
-      impl::director.prepareWriteSession(token, bytes, offset, ready, complete);
+      impl::director.prepareWriteSession(file->token, bytes, offset, ready, complete);
     }
 
     void write(SessionReadyMsg *session,
@@ -323,8 +329,8 @@ namespace Ck { namespace IO {
       impl::manager->write(session, data, bytes, offset);
     }
 
-    void close(FileToken token, CkCallback closed) {
-      impl::director.close(token, closed);
+    void close(FileReadyMsg *file, CkCallback closed) {
+      impl::director.close(file->token, closed);
     }
 
     class SessionCommitMsg : public CMessage_SessionCommitMsg {

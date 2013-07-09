@@ -5,8 +5,7 @@
 #include <pup_stl.h>
 
 namespace Ck { namespace IO {
-  /// Identifier for a file to be accessed
-  typedef int FileToken;
+  class FileReadyMsg;
   class SessionReadyMsg;
 
   struct Options {
@@ -34,8 +33,6 @@ namespace Ck { namespace IO {
     }
   };
 
-  struct FileReadyMsg;
-
   /// Open the named file on the selected subset of PEs, and send a
   /// FileReadyMsg to the opened callback when the system is ready to accept
   /// session requests on that file.
@@ -46,7 +43,7 @@ namespace Ck { namespace IO {
   /// SessionReadyMsg will be sent to the ready callback. When all of the data
   /// has been written and synced, a message will be sent to the complete
   /// callback.
-  void startSession(FileToken token, size_t bytes, size_t offset,
+  void startSession(FileReadyMsg *file, size_t bytes, size_t offset,
                     CkCallback ready, CkCallback complete);
 
   /// Write the given data into the file to which session is attached. The
@@ -55,11 +52,6 @@ namespace Ck { namespace IO {
 
   /// Close a previously-opened file. All sessions on that file must have
   /// already signalled that they are complete.
-  void close(FileToken token, CkCallback closed);
-
-  struct FileReadyMsg : public CMessage_FileReadyMsg {
-    FileToken token;
-    FileReadyMsg(const FileToken &tok) : token(tok) {}
-  };
+  void close(FileReadyMsg *file, CkCallback closed);
 }}
 #endif
