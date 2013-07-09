@@ -1,11 +1,14 @@
 #include <string>
+#include <map>
+#include <algorithm>
+
 typedef int FileToken;
 #include "CkIO.decl.h"
-#include <ckio.h>
-#include <errno.h>
-#include <algorithm>
+
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <pup_stl.h>
 
 #if defined(_WIN32)
 #include <io.h>

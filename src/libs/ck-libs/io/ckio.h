@@ -2,7 +2,8 @@
 #define CK_IO_H
 
 #include <string>
-#include <pup_stl.h>
+#include <pup.h>
+#include <ckcallback.h>
 
 namespace Ck { namespace IO {
   class FileReadyMsg;
