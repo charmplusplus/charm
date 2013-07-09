@@ -54,10 +54,11 @@ namespace Ck { namespace IO {
     namespace impl {
       using std::min;
       using std::max;
+      using std::map;
 
       class Director : public CBase_Director {
         int filesOpened;
-        std::map<FileToken, impl::FileInfo> files;
+        map<FileToken, impl::FileInfo> files;
         CProxy_Manager managers;
 
       public:
@@ -159,7 +160,7 @@ namespace Ck { namespace IO {
         }
 
       private:
-        std::map<FileToken, impl::FileInfo> files;
+        map<FileToken, impl::FileInfo> files;
         friend class WriteSession;
 
         int doOpenFile(const std::string& name) {
@@ -208,7 +209,7 @@ namespace Ck { namespace IO {
             return bytes_filled_so_far == array.size();
           }
         };
-        std::map<size_t, struct buffer> bufferMap;
+        map<size_t, struct buffer> bufferMap;
 
       public:
         WriteSession(FileToken file_, size_t offset_, size_t bytes_, CkCallback complete_)
