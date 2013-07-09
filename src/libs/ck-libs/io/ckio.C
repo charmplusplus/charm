@@ -52,6 +52,8 @@ namespace Ck { namespace IO {
     };
 
     namespace impl {
+      using std::min;
+      using std::max;
 
       class Director : public CBase_Director {
         int filesOpened;
@@ -73,7 +75,7 @@ namespace Ck { namespace IO {
           if (-1 == opts.writeStripe)
             opts.writeStripe = 4 * 1024 * 1024;
           if (-1 == opts.activePEs)
-            opts.activePEs = std::min(CkNumPes(), 32);
+            opts.activePEs = min(CkNumPes(), 32);
           if (-1 == opts.basePE)
             opts.basePE = 0;
           if (-1 == opts.skipPEs)
@@ -137,7 +139,7 @@ namespace Ck { namespace IO {
 
           while (bytes > 0) {
             size_t stripeIndex = (offset - sessionStripeBase) / stripe;
-            size_t bytesToSend = std::min(bytes, stripe - offset % stripe);
+            size_t bytesToSend = min(bytes, stripe - offset % stripe);
 
             session->proxy[stripeIndex].forwardData(data, bytesToSend, offset);
 
@@ -231,10 +233,10 @@ namespace Ck { namespace IO {
 
           while (bytes > 0) {
             size_t stripeBase = (offset/stripeSize)*stripeSize;
-            size_t stripeOffset = std::max(stripeBase, myOffset);
+            size_t stripeOffset = max(stripeBase, myOffset);
             size_t nextStripe = stripeBase + stripeSize;
-            size_t expectedBufferSize = std::min(nextStripe, myOffset + myBytes) - stripeOffset;
-            size_t bytesInCurrentStripe = std::min(nextStripe - offset, bytes);
+            size_t expectedBufferSize = min(nextStripe, myOffset + myBytes) - stripeOffset;
+            size_t bytesInCurrentStripe = min(nextStripe - offset, bytes);
 
             buffer& currentBuffer = bufferMap[stripeOffset];
             currentBuffer.expect(expectedBufferSize);
