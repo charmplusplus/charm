@@ -37,6 +37,7 @@ module CkIO {
           entry WriteSession(FileToken file, size_t offset, size_t bytes,
                              CkCallback complete);
           entry void forwardData(const char data[bytes], size_t bytes, size_t offset);
+          entry void syncData();
         };
       }
     }

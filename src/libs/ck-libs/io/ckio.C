@@ -250,6 +250,14 @@ namespace Ck { namespace IO {
             data += bytesInCurrentStripe;
             offset += bytesInCurrentStripe;
           }
+
+          if (myBytesWritten == myBytes)
+            contribute(CkCallback(CkIndex_WriteSession::syncData(), thisProxy));
+        }
+
+        void syncData() {
+          fdatasync(file->fd);
+          contribute(complete);
         }
 
         void flushBuffer(buffer& buf, size_t bufferOffset) {
