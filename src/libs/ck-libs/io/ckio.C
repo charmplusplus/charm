@@ -125,7 +125,7 @@ namespace Ck { namespace IO {
             files[token].fd = doOpenFile(name);
           }
 
-          contribute(sizeof(FileToken), token, CkReduction::max_int, opened);
+          contribute(sizeof(FileToken), &token, CkReduction::max_int, opened);
         }
 
         void write(SessionReadyMsg *session,
