@@ -215,9 +215,9 @@ namespace Ck { namespace IO {
         WriteSession(FileToken file_, size_t offset_, size_t bytes_, CkCallback complete_)
           : file(&manager->files[file_])
           , sessionOffset(offset_)
-          , myOffset()
+          , myOffset((sessionOffset / file->opts.peStripe + thisIndex) * file->opts.peStripe)
           , sessionBytes(bytes_)
-          , myBytes()
+          , myBytes(min(file->opts.peStripe, sessionOffset + sessionBytes - myOffset))
           , myBytesWritten(0)
           , complete(complete_)
         { }
