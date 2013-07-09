@@ -36,10 +36,25 @@ namespace Ck { namespace IO {
 
   struct FileReadyMsg;
 
+  /// Open the named file on the selected subset of PEs, and send a
+  /// FileReadyMsg to the opened callback when the system is ready to accept
+  /// session requests on that file.
   void open(std::string name, CkCallback opened, Options opts);
+
+  /// Prepare to write data into the file described by token, in the window
+  /// defined by the offset and byte length. When the session is set up, a
+  /// SessionReadyMsg will be sent to the ready callback. When all of the data
+  /// has been written and synced, a message will be sent to the complete
+  /// callback.
   void startSession(FileToken token, size_t bytes, size_t offset,
                     CkCallback ready, CkCallback complete);
+
+  /// Write the given data into the file to which session is attached. The
+  /// offset is relative to the file as a whole, not to the session's offset.
   void write(SessionReadyMsg *session, const char *data, size_t bytes, size_t offset);
+
+  /// Close a previously-opened file. All sessions on that file must have
+  /// already signalled that they are complete.
   void close(FileToken token, CkCallback closed);
 
   struct FileReadyMsg : public CMessage_FileReadyMsg {
