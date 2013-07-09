@@ -25,7 +25,7 @@ module CkIO {
                                          CkCallback ready, CkCallback complete);
         }
 
-        group Manager : CkArrayMap
+        group Manager // : CkArrayMap
         {
           entry Manager();
           entry void openFile(FileToken token, std::string name,
