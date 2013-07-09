@@ -1,17 +1,13 @@
 #ifndef CK_IO_H
 #define CK_IO_H
 
-#include <cstring>
 #include <string>
-//#include <algorithm>
-#include <utility>
-#include <fcntl.h>
 #include <pup_stl.h>
 
 namespace Ck { namespace IO {
   /// Identifier for a file to be accessed
   typedef int FileToken;
-  typedef int SessionToken;
+  class SessionReadyMessage;
 
   struct Options {
     Options()
@@ -43,7 +39,7 @@ namespace Ck { namespace IO {
   void open(std::string name, CkCallback opened, Options opts);
   void startSession(FileToken token, size_t bytes, size_t offset,
                     CkCallback ready, CkCallback complete);
-  void write(SessionToken token, const char *data, size_t bytes, size_t offset);
+  void write(SessionReadyMessage *session, const char *data, size_t bytes, size_t offset);
   }
 }
 
@@ -114,13 +110,7 @@ namespace Ck { namespace IO {
     void write_dataWritten(SessionToken token, size_t bytes);
 
   private:
-    int filesOpened, sessionsOpened;
-    FileToken nextToken;
     std::map<SessionToken, impl::SessionInfo> sessions;
-
-    int lastActivePE(const Options &opts) {
-      return opts.basePE + (opts.activePEs-1)*opts.skipPEs;
-    }
   };
 #endif
 

@@ -25,7 +25,7 @@ module CkIO {
                                          CkCallback ready, CkCallback complete);
         }
 
-        group Manager
+        group Manager : CkArrayMap
         {
           entry Manager();
           entry void openFile(FileToken token, std::string name,
@@ -36,8 +36,7 @@ module CkIO {
         {
           entry WriteSession(FileToken file, size_t offset, size_t bytes,
                              CkCallback complete);
-          entry void forwardData(size_t offset, size_t bytes,
-                                 const char data[bytes]);
+          entry void forwardData(const char data[bytes], size_t bytes, size_t offset);
         };
       }
     }
