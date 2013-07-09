@@ -239,8 +239,6 @@ namespace Ck { namespace IO {
         WriteSession(CkMigrateMessage *m) { }
 
         void forwardData(const char *data, size_t bytes, size_t offset) {
-          //files[token].bufferMap[(offset/stripeSize)*stripeSize] is the buffer to which this char should write to.
-
           CkAssert(offset >= myOffset);
           CkAssert(offset + bytes < myOffset + myBytes);
 
