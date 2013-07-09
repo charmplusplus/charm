@@ -116,6 +116,11 @@ namespace Ck { namespace IO {
             CProxy_WriteSession::ckNew(file, bytes, offset, complete, sessionOpts);
           ready.send(new SessionReadyMsg(file, bytes, offset, session));
         }
+
+        void close(FileToken token, CkCallback closed) {
+          managers.close(token, closed);
+          files.erase(token);
+        }
       };
 
       class Manager : public CBase_Manager {
@@ -161,6 +166,12 @@ namespace Ck { namespace IO {
             offset += bytesToSend;
             bytes -= bytesToSend;
           }
+        }
+
+        void close(FileToken token, CkCallback closed) {
+          ::close(files[token].fd);
+          files.erase(token);
+          contribute(closed);
         }
 
         int procNum(int arrayHdl,const CkArrayIndex &element)
@@ -310,6 +321,10 @@ namespace Ck { namespace IO {
     void write(SessionReadyMsg *session,
                const char *data, size_t bytes, size_t offset) {
       impl::manager->write(session, data, bytes, offset);
+    }
+
+    void close(FileToken token, CkCallback closed) {
+      impl::director.close(token, closed);
     }
 
     class SessionCommitMsg : public CMessage_SessionCommitMsg {

@@ -40,6 +40,7 @@ namespace Ck { namespace IO {
   void startSession(FileToken token, size_t bytes, size_t offset,
                     CkCallback ready, CkCallback complete);
   void write(SessionReadyMessage *session, const char *data, size_t bytes, size_t offset);
+  void close(FileToken token, CkCallback closed);
 
   struct FileReadyMsg : public CMessage_FileReadyMsg {
     FileToken token;
