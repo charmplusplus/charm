@@ -56,6 +56,19 @@ namespace Ck { namespace IO {
       using std::max;
       using std::map;
 
+      struct FileInfo {
+        std::string name;
+        Options opts;
+        int fd;
+
+        FileInfo(std::string name_, Options opts_)
+          : name(name_), opts(opts_), fd(-1)
+        { }
+        FileInfo()
+          : fd(-1)
+        { }
+      };
+
       class Director : public CBase_Director {
         int filesOpened;
         map<FileToken, impl::FileInfo> files;

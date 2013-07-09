@@ -45,36 +45,5 @@ namespace Ck { namespace IO {
     FileToken token;
     FileReadyMsg(const FileToken &tok) : token(tok) {}
   };
-
-  namespace impl {  
-    
-    struct SessionInfo {
-      FileToken file;
-      size_t bytes, offset, total_written;
-      int pesReady;
-      CkCallback complete;
-
-      SessionInfo(FileToken file_, size_t bytes_, size_t offset_, CkCallback complete_)
-        : file(file_), bytes(bytes_), offset(offset_), complete(complete_)
-        { }
-      SessionInfo()
-        : file(-1)
-        { }
-    };
-
-    struct FileInfo {
-      std::string name;
-      Options opts;
-      int fd;
-
-      FileInfo(std::string name_, Options opts_)
-        : name(name_), opts(opts_), fd(-1)
-        { }
-      FileInfo()
-        : fd(-1)
-        { }
-    };
-  }
-
-  }}
+}}
 #endif
