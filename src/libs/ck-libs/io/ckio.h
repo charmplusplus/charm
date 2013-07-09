@@ -7,7 +7,7 @@
 namespace Ck { namespace IO {
   /// Identifier for a file to be accessed
   typedef int FileToken;
-  class SessionReadyMessage;
+  class SessionReadyMsg;
 
   struct Options {
     Options()
@@ -39,7 +39,7 @@ namespace Ck { namespace IO {
   void open(std::string name, CkCallback opened, Options opts);
   void startSession(FileToken token, size_t bytes, size_t offset,
                     CkCallback ready, CkCallback complete);
-  void write(SessionReadyMessage *session, const char *data, size_t bytes, size_t offset);
+  void write(SessionReadyMsg *session, const char *data, size_t bytes, size_t offset);
   void close(FileToken token, CkCallback closed);
 
   struct FileReadyMsg : public CMessage_FileReadyMsg {
