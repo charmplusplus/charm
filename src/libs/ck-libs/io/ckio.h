@@ -40,13 +40,7 @@ namespace Ck { namespace IO {
   void startSession(FileToken token, size_t bytes, size_t offset,
                     CkCallback ready, CkCallback complete);
   void write(SessionReadyMessage *session, const char *data, size_t bytes, size_t offset);
-  }
-}
 
-#include <map>
-#include <vector>
-
-namespace Ck { namespace IO {
   struct FileReadyMsg : public CMessage_FileReadyMsg {
     FileToken token;
     FileReadyMsg(const FileToken &tok) : token(tok) {}
@@ -81,38 +75,6 @@ namespace Ck { namespace IO {
         { }
     };
   }
-
-#if 0
-  /// Class to mediate IO operations between Charm++ application code
-  /// and underlying filesystems.
-  ///
-  /// Tokens are passed to @arg ready callbacks, which the application
-  /// then passes to the local methods when initiating operations.
-  class Manager : public CBase_Manager {
-  public:
-    Manager();
-
-    /// Application-facing methods, invoked locally on the calling PE
-    void openWrite(std::string name, CkCallback opened, Options opts = Options());
-    void prepareWrite(size_t bytes, size_t offset, CkCallback ready, CkCallback complete);
-    void write(FileToken file, SessionToken session,
-               const char *data, size_t bytes, size_t offset);
-
-#if 0
-    void prepareInput(const char *name, CkCallback ready,
-		      Options opts = Options());
-    void read(Token token, void *data, size_t bytes, size_t offset,
-	      CkCallback complete);
-#endif
-
-    /// Internal methods, used for interaction among IO managers across the system
-    void write_forwardData(SessionToken token, const char *data, size_t bytes, size_t offset);
-    void write_dataWritten(SessionToken token, size_t bytes);
-
-  private:
-    std::map<SessionToken, impl::SessionInfo> sessions;
-  };
-#endif
 
   }}
 #endif
