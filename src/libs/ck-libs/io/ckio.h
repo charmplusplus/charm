@@ -3,7 +3,7 @@
 
 #include <cstring>
 #include <string>
-#include <algorithm>
+//#include <algorithm>
 #include <utility>
 #include <fcntl.h>
 #include <pup_stl.h>
@@ -41,12 +41,12 @@ namespace Ck { namespace IO {
   struct FileReadyMsg;
 
   void open(std::string name, CkCallback opened, Options opts);
-  void startSession(FileToken token, size_t offset, size_t bytes, CkCallback complete);
+  void startSession(FileToken token, size_t bytes, size_t offset,
+                    CkCallback ready, CkCallback complete);
   void write(SessionToken token, const char *data, size_t bytes, size_t offset);
   }
 }
 
-#include "CkIO.decl.h"
 #include <map>
 #include <vector>
 
@@ -69,6 +69,7 @@ namespace Ck { namespace IO {
         { }
       SessionInfo()
         : file(-1)
+        { }
     };
 
     struct FileInfo {
@@ -85,6 +86,7 @@ namespace Ck { namespace IO {
     };
   }
 
+#if 0
   /// Class to mediate IO operations between Charm++ application code
   /// and underlying filesystems.
   ///
@@ -120,6 +122,7 @@ namespace Ck { namespace IO {
       return opts.basePE + (opts.activePEs-1)*opts.skipPEs;
     }
   };
+#endif
 
   }}
 #endif

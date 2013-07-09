@@ -1,3 +1,5 @@
+#include <string>
+#include "CkIO.decl.h"
 #include <ckio.h>
 #include <errno.h>
 #include <algorithm>
@@ -30,7 +32,20 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 #endif
 
 namespace Ck { namespace IO {
-    
+
+    namespace impl {
+      CProxy_Director director;
+    }
+
+    void open(std::string name, CkCallback opened, Options opts) {
+      impl::director.openFile(name, opened, opts);
+    }
+
+    void startSession(FileToken token, size_t bytes, size_t offset,
+                      CkCallback ready, CkCallback complete) {
+      impl::director.prepareWriteSession(token, bytes, offset, ready, complete);
+    }
+
     void write(SessionToken token, const char *data, size_t bytes, size_t offset) {
       Options &opts = files[token].opts;
       while (bytes > 0) {
@@ -46,17 +61,18 @@ namespace Ck { namespace IO {
     }
 
     namespace impl {
-      CProxy_Director director;
 
       class Director : public CBase_Director {
         int filesOpened;
         std::map<FileToken, impl::FileInfo> files;
+        CProxy_Manager managers;
 
       public:
         Director()
           : filesOpened(0)
         {
           director = thisProxy;
+          managers = CProxy_Manager::ckNew();
         }
 
         void openFile(std::string name, CkCallback opened, Options opts) {
@@ -77,7 +93,7 @@ namespace Ck { namespace IO {
           CkAssert(lastActivePE(opts) < CkNumPes());
           CkAssert(opts.writeStripe <= opts.peStripe);
 
-          files[filesOpened] = impl::FileInfo(name, opts);
+          files[filesOpened] = FileInfo(name, opts);
           managers.openFile(filesOpened++, name, opened, opts);
         }
 

@@ -1,15 +1,21 @@
 module CkIO {
+
   namespace Ck { namespace IO {
       message FileReadyMsg;
       message SessionReadyMsg;
       message SessionCommitMsg;
+    }
+  }
 
+  include "ckio.h";
+
+  namespace Ck { namespace IO {
       namespace impl {
         readonly CProxy_Director director;
 
         mainchare Director
         {
-          entry Director();
+          entry Director(CkArgMsg *);
 
           /// Serialize setting up each file through this chare, so that all PEs
           /// have the same sequence
