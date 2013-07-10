@@ -37,6 +37,11 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 #include <unistd.h>
 #endif
 
+using std::min;
+using std::max;
+using std::map;
+using std::string;
+
 namespace Ck { namespace IO {
     namespace impl {
       CProxy_Director director;
@@ -62,16 +67,12 @@ namespace Ck { namespace IO {
     };
 
     namespace impl {
-      using std::min;
-      using std::max;
-      using std::map;
-
       struct FileInfo {
-        std::string name;
+        string name;
         Options opts;
         int fd;
 
-        FileInfo(std::string name_, Options opts_)
+        FileInfo(string name_, Options opts_)
           : name(name_), opts(opts_), fd(-1)
         { }
         FileInfo()
@@ -79,7 +80,7 @@ namespace Ck { namespace IO {
         { }
       };
 
-      void fatalError(std::string desc, std::string file) {
+      void fatalError(string desc, string file) {
         std::stringstream out;
         out << "FATAL ERROR on PE " << CkMyPe()
             << " working on file '" << file << "': "
@@ -101,7 +102,7 @@ namespace Ck { namespace IO {
           managers = CProxy_Manager::ckNew();
         }
 
-        void openFile(std::string name, CkCallback opened, Options opts) {
+        void openFile(string name, CkCallback opened, Options opts) {
           if (-1 == opts.peStripe)
             opts.peStripe = 16 * 1024 * 1024;
           if (-1 == opts.writeStripe)
@@ -149,7 +150,7 @@ namespace Ck { namespace IO {
           manager = this;
         }
 
-        void openFile(FileToken token, std::string name,
+        void openFile(FileToken token, string name,
                       CkCallback opened, Options opts) {
           CkAssert(files.end() == files.find(token));
           CkAssert(lastActivePE(opts) < CkNumPes());
@@ -210,7 +211,7 @@ namespace Ck { namespace IO {
         map<FileToken, impl::FileInfo> files;
         friend class WriteSession;
 
-        int doOpenFile(const std::string& name) {
+        int doOpenFile(const string& name) {
           int fd;
 #if defined(_WIN32)
           fd = _open(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
@@ -332,7 +333,7 @@ namespace Ck { namespace IO {
       };
     }
 
-    void open(std::string name, CkCallback opened, Options opts) {
+    void open(string name, CkCallback opened, Options opts) {
       impl::director.openFile(name, opened, opts);
     }
 
