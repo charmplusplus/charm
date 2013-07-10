@@ -306,6 +306,7 @@ namespace Ck { namespace IO {
         }
 
         void syncData() {
+          CkAssert(bufferMap.size() == 0);
           if (fdatasync(file->fd) < 0)
             fatalError("fdatasync failed", file->name);
           contribute(complete);
