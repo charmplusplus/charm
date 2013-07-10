@@ -1,6 +1,7 @@
 #include <string>
 #include <map>
 #include <algorithm>
+#include <sstream>
 
 typedef int FileToken;
 #include "CkIO.decl.h"
@@ -77,6 +78,14 @@ namespace Ck { namespace IO {
           : fd(-1)
         { }
       };
+
+      void fatalError(std::string desc, std::string file) {
+        std::stringstream out;
+        out << "FATAL ERROR on PE " << CkMyPe()
+            << " working on file '" << file << "': "
+            << desc << "; system reported " << strerror(errno) << std::endl;
+        CkAbort(out.str().c_str());
+      }
 
       class Director : public CBase_Director {
         int filesOpened;
@@ -178,7 +187,12 @@ namespace Ck { namespace IO {
         }
 
         void close(FileToken token, CkCallback closed) {
-          ::close(files[token].fd);
+          int ret;
+          do {
+            ret = ::close(files[token].fd);
+          } while (ret < 0 && errno == EINTR);
+          if (ret < 0)
+            fatalError("close failed", files[token].name);
           files.erase(token);
           contribute(closed);
         }
@@ -204,7 +218,7 @@ namespace Ck { namespace IO {
           fd = ::open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 #endif
           if (-1 == fd)
-            CkAbort("Failed to open a file for parallel output");
+            fatalError("Failed to open a file for parallel output", name);
           return fd;
         }
 
@@ -291,7 +305,8 @@ namespace Ck { namespace IO {
         }
 
         void syncData() {
-          fdatasync(file->fd);
+          if (fdatasync(file->fd) < 0)
+            fatalError("fdatasync failed", file->name);
           contribute(complete);
         }
 
@@ -305,8 +320,7 @@ namespace Ck { namespace IO {
               if (errno == EINTR) {
                 continue;
               } else {
-                CkPrintf("Output failed on PE %d: %s", CkMyPe(), strerror(errno));
-                CkAbort("Giving up");
+                fatalError("Call to pwrite failed", file->name);
               }
             }
             l -= ret;
