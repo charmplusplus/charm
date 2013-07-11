@@ -586,8 +586,7 @@ namespace xi {
              << e->entryPtr->entryNum // entry number
              << ", " << (e->intExpr ? "true" : "false") // has a ref number?
              << ", " << (e->intExpr ? refName.get_string_const() : "0")  // the ref number
-             << ", " << (cur != 0 ? "true" : "false")   // has a ignore set?
-             << (entryLen > 1 ? ", ignore" : "") // the ignore set
+             << ", " << (entryLen > 1 ? "&ignore" : "0") // the ignore set
              << ");\n";
         haveAllBuffersCond << bufName;
         removeMessagesIfFound << "    __dep->removeMessage(" << bufName << ");\n";
@@ -606,7 +605,7 @@ namespace xi {
         // AND condition
         if (entryLen > cur + 1) {
           haveAllBuffersCond << " && ";
-          defs << "  ignore.insert(" << bufName << ");\n";
+          defs << "  if (" << bufName << ") ignore.insert(" << bufName << ");\n";
         }
       }
     }

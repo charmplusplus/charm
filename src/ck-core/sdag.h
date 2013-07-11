@@ -277,41 +277,35 @@ namespace SDAG {
     bool searchBufferedMatching(Continuation* t) {
       CkAssert(t->entries.size() == t->refnums.size());
       for (int i = 0; i < t->entries.size(); i++) {
-        if (!tryFindMessage(t->entries[i], true, t->refnums[i], false)) {
+        if (!tryFindMessage(t->entries[i], true, t->refnums[i], 0)) {
           return false;
         }
       }
       for (int i = 0; i < t->anyEntries.size(); i++) {
-        if (!tryFindMessage(t->anyEntries[i], false, 0, false)) {
+        if (!tryFindMessage(t->anyEntries[i], false, 0, 0)) {
           return false;
         }
       }
       return true;
     }
 
-    Buffer* tryFindMessage(int entry, bool hasRef, int refnum, bool hasIgnore,
-                           std::set<Buffer*> ignore = std::set<Buffer*>()) {
-      if (buffer[entry].size() == 0) return 0;
-      else {
-        // @todo sequential lookup for buffer with reference number or ignore set
-        for (std::list<Buffer*>::iterator iter = buffer[entry].begin();
-             iter != buffer[entry].end();
-             ++iter) {
-          if ((!hasRef || (*iter)->refnum == refnum) &&
-              (!hasIgnore || ignore.find(*iter) == ignore.end()))
-            return *iter;
-        }
-        return 0;
+    Buffer* tryFindMessage(int entry, bool hasRef, int refnum, std::set<Buffer*>* ignore) {
+      // @todo sequential lookup for buffer with reference number or ignore set
+      for (std::list<Buffer*>::iterator iter = buffer[entry].begin();
+           iter != buffer[entry].end();
+           ++iter) {
+        if ((!hasRef || (*iter)->refnum == refnum) &&
+            (!ignore || ignore->find(*iter) == ignore->end()))
+          return *iter;
       }
+      return 0;
     }
 
     Buffer* tryFindMessage(int entry) {
-      if (buffer[entry].size() == 0) return 0;
-      else {
-        Buffer* buf = buffer[entry].front();
-        //printf("found buffered message %p\n", buf);
+      if (buffer[entry].size() == 0)
+        return 0;
+      else
         return buffer[entry].front();
-      }
     }
 
     void removeMessage(Buffer *buf) {
