@@ -310,6 +310,7 @@ namespace Ck { namespace IO {
           if (fdatasync(file->fd) < 0)
             fatalError("fdatasync failed", file->name);
           contribute(complete);
+          contribute(CkCallback(CkIndex_WriteSession::ckDestroy(), thisProxy));
         }
 
         void flushBuffer(buffer& buf, size_t bufferOffset) {
