@@ -332,6 +332,16 @@ namespace Ck { namespace IO {
           myBytesWritten += buf.bytes_filled_so_far;
         }
       };
+
+      class Map : public CBase_Map {
+      public:
+        Map()
+          { }
+
+        int procNum(int arrayHdl, const CkArrayIndex &element) {
+          return 0;
+        }
+      };
     }
 
     void open(string name, CkCallback opened, Options opts) {
