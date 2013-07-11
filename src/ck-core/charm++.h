@@ -291,8 +291,14 @@ class CBaseT1 : public Parent {
 public:
 	CBASE_PROXY_MEMBERS(CProxy_Derived)
 
-	CBaseT1(void) :Parent()  { thisProxy=this; }
-	CBaseT1(CkMigrateMessage *m) :Parent(m) { thisProxy=this; }
+#if CMK_HAS_RVALUE_REFERENCES
+          template <typename... Args>
+          CBaseT1(Args&&... args) : Parent(std::forward<Args>(args)...) { thisProxy = this; }
+#else
+          template <typename... Args>
+          CBaseT1(Args... args) : Parent(args...) { thisProxy = this; }
+#endif
+
 	void pup(PUP::er &p) {
 		Parent::pup(p);
 		p|thisProxy;
