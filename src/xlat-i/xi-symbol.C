@@ -593,7 +593,6 @@ Module::generate()
   "#include \"charm++.h\"\n"
   "#include \"envelope.h\"\n"
   "#include <memory>\n"
-  "#include <set>\n"
   "#include \"sdag.h\"\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
