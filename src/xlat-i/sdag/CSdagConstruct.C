@@ -638,9 +638,9 @@ namespace xi {
     defs << "    ";
 
     if (constructs && !constructs->empty())
-      generateCallNew(defs, encapState, encapStateChild, constructs->front()->label);
+      generateCall(defs, encapState, encapStateChild, constructs->front()->label);
     else
-      generateCallNew(defs, encapState, encapStateChild, label, "_end");
+      generateCall(defs, encapState, encapStateChild, label, "_end");
 
     // delete all buffered messages now that they are not needed
     defs << deleteMessagesIfFound;
@@ -727,7 +727,7 @@ namespace xi {
 
     // generate call to the next in the sequence
     defs << "  ";
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
 
     endMethod(defs);
 
@@ -738,20 +738,20 @@ namespace xi {
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
     defs << "  if (" << con1->text << ") {\n";
     defs << "    ";
-    generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
     defs << "  } else {\n";
     defs << "      ";
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     defs << "  }\n";
     endMethod(defs);
 
     generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
     defs << "  if (" << con1->text << ") {\n";
     defs << "    ";
-    generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
     defs << "  } else {\n";
     defs << "      ";
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     defs << "  }\n";
     endMethod(defs);
   }
@@ -775,11 +775,11 @@ namespace xi {
     indentBy(defs, indent);
     defs << "if (" << con2->text << ") {\n";
     indentBy(defs, indent + 1);
-    generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
     indentBy(defs, indent);
     defs << "} else {\n";
     indentBy(defs, indent + 1);
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     indentBy(defs, indent);
     defs << "}\n";
 
@@ -802,14 +802,14 @@ namespace xi {
     indentBy(defs, indent);
     defs << "if (" << con2->text << ") {\n";
     indentBy(defs, indent + 1);
-    generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
     indentBy(defs, indent);
     defs << "} else {\n";
 #if CMK_BIGSIM_CHARM
     generateEventBracket(defs, SFOR_END);
 #endif
     indentBy(defs, indent + 1);
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     indentBy(defs, indent);
     defs << "}\n";
 
@@ -882,14 +882,14 @@ namespace xi {
     indentBy(defs, indent);
     defs << "if (" << con1->text << ") {\n";
     indentBy(defs, indent + 1);
-    generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
     indentBy(defs, indent);
     defs << "} else {\n";
     indentBy(defs, indent + 1);
     if (con2 != 0)
-      generateCallNew(defs, encapStateChild, encapStateChild, con2->label);
+      generateCall(defs, encapStateChild, encapStateChild, con2->label);
     else
-      generateCallNew(defs, encapStateChild, encapStateChild, label, "_end");
+      generateCall(defs, encapStateChild, encapStateChild, label, "_end");
     indentBy(defs, indent);
     defs << "}\n";
 
@@ -905,7 +905,7 @@ namespace xi {
     generateEventBracket(defs,SIF_END);
 #endif
     indentBy(defs, 1);
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 
@@ -918,7 +918,7 @@ namespace xi {
     generateEventBracket(defs, SELSE);
 #endif
     defs << "  ";
-    generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
     endMethod(defs);
 
     // trace
@@ -930,7 +930,7 @@ namespace xi {
     generateEventBracket(defs,SELSE_END);
 #endif
     defs << "  ";
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 
@@ -947,7 +947,7 @@ namespace xi {
          << con1->text << "+=__stride) {\n";
     defs << "    SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
     defs << "    ";
-    generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
     defs << "  }\n";
     endMethod(defs);
 
@@ -957,7 +957,7 @@ namespace xi {
     defs << "  if (" << counter << "->isDone()) {\n";
     defs << "    " << counter << "->deref();\n";
     defs << "    ";
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     defs << "  }\n";
     endMethod(defs);
   }
@@ -971,7 +971,7 @@ namespace xi {
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
          ++it) {
       defs << "  ";
-      generateCallNew(defs, encapStateChild, encapStateChild, (*it)->label);
+      generateCall(defs, encapStateChild, encapStateChild, (*it)->label);
     }
     endMethod(defs);
 
@@ -1008,7 +1008,7 @@ namespace xi {
 #endif
 
     defs << "    ";
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     defs << "  }\n";
     endMethod(defs);
   }
@@ -1021,7 +1021,7 @@ namespace xi {
     generateEventBracket(defs, SOVERLAP);
 #endif
     defs << "  ";
-    generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
     endMethod(defs);
 
     // trace
@@ -1033,7 +1033,7 @@ namespace xi {
     generateEventBracket(defs, SOVERLAP_END);
 #endif
     defs << "  ";
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 
@@ -1045,7 +1045,7 @@ namespace xi {
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
          ++it) {
       defs << "  c = ";
-      generateCallNew(defs, encapStateChild, encapStateChild, (*it)->label);
+      generateCall(defs, encapStateChild, encapStateChild, (*it)->label);
       defs << "  if (!c) return;\n";
       defs << "  else c->speculationIndex = " << counter << "->speculationIndex;\n";
     }
@@ -1058,7 +1058,7 @@ namespace xi {
 
     defs << "  " << counter << "->deref();\n";
     defs << "  ";
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 
@@ -1068,12 +1068,12 @@ namespace xi {
 
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
     defs << "  ";
-    generateCallNew(defs, encapState, encapState, constructs->front()->label);
+    generateCall(defs, encapState, encapState, constructs->front()->label);
     endMethod(defs);
 
     generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
     defs << "  ";
-    generateCallNew(defs, encapState, encapStateChild, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapStateChild, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 
@@ -1132,7 +1132,7 @@ namespace xi {
     }
 
     defs << "  ";
-    generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
 
 #if CMK_BIGSIM_CHARM
     generateTlineEndCall(defs);
@@ -1200,7 +1200,7 @@ namespace xi {
 #endif
 
     indentBy(defs, 1);
-    generateCallNew(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 
@@ -1315,7 +1315,7 @@ namespace xi {
     defs << op << " {\n";
   }
 
-  void SdagConstruct::generateCallNew(XStr& op, list<EncapState*>& scope,
+  void SdagConstruct::generateCall(XStr& op, list<EncapState*>& scope,
                                       list<EncapState*>& next, const XStr* name,
                                       const char* nameSuffix) {
     op << name << (nameSuffix ? nameSuffix : "") << "(";

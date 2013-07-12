@@ -1316,9 +1316,9 @@ private:
   void generateCaseList(XStr& decls, XStr& defs, Entry* entry);
 
 protected:
-  void generateCallNew(XStr& op, std::list<EncapState*>& cur,
-                       std::list<EncapState*>& next, const XStr* name,
-                       const char* nameSuffix = 0);
+  void generateCall(XStr& op, std::list<EncapState*>& cur,
+                    std::list<EncapState*>& next, const XStr* name,
+                    const char* nameSuffix = 0);
   void generateTraceBeginCall(XStr& defs, int indent);          // for trace
   void generateBeginTime(XStr& defs);               //for Event Bracket
   void generateEventBracket(XStr& defs, int eventType);     //for Event Bracket
