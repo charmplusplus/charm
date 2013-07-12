@@ -1374,7 +1374,7 @@ public:
   void propagateState(int);
   virtual void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   virtual void generateCode(XStr& decls, XStr& defs, Entry *entry);
-  void generateWhenCodeNew(XStr& op, int indent);
+  void generateWhenCode(XStr& op, int indent);
   void setNext(SdagConstruct *, int);
   void buildTypes(std::list<EncapState*>& state);
 

@@ -466,7 +466,7 @@ namespace xi {
     }
   }
 
-  void SdagConstruct::generateWhenCodeNew(XStr& op, int indent) {
+  void SdagConstruct::generateWhenCode(XStr& op, int indent) {
     buildTypes(encapState);
     buildTypes(encapStateChild);
 

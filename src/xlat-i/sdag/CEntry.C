@@ -148,14 +148,14 @@ namespace xi {
 #endif
 
     if (whenList.size() == 1) {
-      (*whenList.begin())->generateWhenCodeNew(defs, 2);
+      (*whenList.begin())->generateWhenCode(defs, 2);
     } else {
       // switch on the possible entry points for the continuation
       // each continuation entry knows how to generate its own code
       defs << "    switch(c->whenID) {\n";
       for(list<WhenConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn) {
         defs << "    case " << (*cn)->nodeNum << ":\n";
-        (*cn)->generateWhenCodeNew(defs, 3);
+        (*cn)->generateWhenCode(defs, 3);
         defs << "    break;\n";
       }
       defs << "    }\n";
