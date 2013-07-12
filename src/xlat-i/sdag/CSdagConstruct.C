@@ -75,7 +75,7 @@ namespace xi {
   XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
     char text[128];
     if (nodeNum != -1)
-      sprintf(text, "%s%d", str, nodeNum);
+      sprintf(text, "_%s_%d", str, nodeNum);
     else
       sprintf(text, "%s", str);
 
@@ -85,23 +85,23 @@ namespace xi {
   void SdagConstruct::labelNodes() {
     switch(type) {
     case SSDAGENTRY: label = createLabel(con1->text->charstar(), -1); break;
-    case SOVERLAP: label = createLabel("_overlap_", nodeNum); break;
-    case SWHEN: label = createLabel("_when_", nodeNum);
+    case SOVERLAP: label = createLabel("overlap", nodeNum); break;
+    case SWHEN: label = createLabel("when", nodeNum);
       for (EntryList *el = elist; el != NULL; el = el->next)
         el->entry->label = new XStr(el->entry->name);
       break;
-    case SFOR: label = createLabel("_for_", nodeNum); break;
-    case SWHILE: label = createLabel("_while_", nodeNum); break;
-    case SIF: label = createLabel("_if_", nodeNum);
+    case SFOR: label = createLabel("for", nodeNum); break;
+    case SWHILE: label = createLabel("while", nodeNum); break;
+    case SIF: label = createLabel("if", nodeNum);
       if (con2 != 0) con2->labelNodes();
       break;
-    case SELSE: label = createLabel("_else_", nodeNum); break;
-    case SFORALL: label = createLabel("_forall_", nodeNum); break;
-    case SSLIST: label = createLabel("_slist_", nodeNum); break;
-    case SOLIST: label = createLabel("_olist_", nodeNum); break;
-    case SATOMIC: label = createLabel("_atomic_", nodeNum); break;
-    case SCASE: label = createLabel("_case_", nodeNum); break;
-    case SCASELIST: label = createLabel("_caselist_", nodeNum); break;
+    case SELSE: label = createLabel("else", nodeNum); break;
+    case SFORALL: label = createLabel("forall", nodeNum); break;
+    case SSLIST: label = createLabel("slist", nodeNum); break;
+    case SOLIST: label = createLabel("olist", nodeNum); break;
+    case SATOMIC: label = createLabel("atomic", nodeNum); break;
+    case SCASE: label = createLabel("case", nodeNum); break;
+    case SCASELIST: label = createLabel("caselist", nodeNum); break;
     case SINT_EXPR: case SIDENT: default: break;
     }
     SdagConstruct *cn;
