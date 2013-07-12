@@ -1193,28 +1193,6 @@ void SdagConstruct::generateCallNew(XStr& op, list<EncapState*>& scope,
   op << ");\n";
 }
 
-void SdagConstruct::generateCall(XStr& op, list<CStateVar*>& alist,
-                                 const XStr* name, const char* nameSuffix) {
-  op << name << (nameSuffix ? nameSuffix : "") << "(";
-
-  CStateVar *sv;
-  int isVoid;
-  int count;
-  count = 0;
-  for (list<CStateVar*>::iterator iter = alist.begin(); iter != alist.end(); ++iter) {
-    CStateVar *sv = *iter;
-    isVoid = sv->isVoid;
-    if ((count != 0) && (isVoid != 1))
-      op << ", ";
-    if (sv->name != 0) 
-      op << sv->name;
-    if (sv->isVoid != 1)
-      count++;
-  }
-
-  op << ");\n";
-}
-
 // boe = 1, if the next call is to begin construct
 // boe = 0, if the next call is to end a contruct
 void SdagConstruct::setNext(SdagConstruct *n, int boe)

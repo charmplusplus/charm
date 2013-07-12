@@ -1298,8 +1298,6 @@ private:
   void generateCaseList(XStr& decls, XStr& defs, Entry* entry);
 
 protected:
-  void generateCall(XStr& defs, std::list<CStateVar*>& args,
-                    const XStr* name, const char* nameSuffix = 0);
   void generateCallNew(XStr& op, std::list<EncapState*>& cur,
                        std::list<EncapState*>& next, const XStr* name,
                        const char* nameSuffix = 0);
