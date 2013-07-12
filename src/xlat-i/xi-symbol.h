@@ -997,7 +997,7 @@ private:
 //    friend class CParsedFile;
     int hasCallMarshall;
     void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false,
-                 bool isSDAGGen = false, bool usesImplBuf = false);
+                 bool usesImplBuf = false);
 
     XStr epStr(bool isForRedn = false, bool templateCall = false);
     XStr epIdx(int fromProxy=1, bool isForRedn = false);

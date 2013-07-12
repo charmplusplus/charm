@@ -4352,10 +4352,11 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   Generate the code to actually unmarshall the parameters and call
   the entry method.
 */
-void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool isSDAGGen, bool usesImplBuf)
+void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool usesImplBuf)
 {
   bool isArgcArgv=false;
   bool isMigMain=false;
+  bool isSDAGGen = sdagCon || isWhenEntry;
 
   if (param->isCkArgMsgPtr() && (!isConstructor() || !container->isMainChare()))
     die("CkArgMsg can only be used in mainchare's constructor.\n");
@@ -4492,7 +4493,7 @@ void Entry::genDefs(XStr& str)
               << container->baseName() << "*> (impl_obj_void);\n"
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
           XStr precall;
-          genCall(str, precall, true, (sdagCon || isWhenEntry), false);
+          genCall(str, precall, true, false);
           if (!(sdagCon || isWhenEntry))
             str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
           else
@@ -4633,7 +4634,7 @@ void Entry::genDefs(XStr& str)
       else str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
       str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
     }
-    genCall(str, preCall, false, (sdagCon || isWhenEntry), false);
+    genCall(str, preCall, false, false);
     param->endUnmarshall(str);
     str << postCall;
     if(isThreaded() && param->isMarshalled()) str << "  delete impl_msg_typed;\n";
@@ -4648,7 +4649,7 @@ void Entry::genDefs(XStr& str)
     str << "  " << containerType << "* impl_obj = static_cast< " << containerType << " *>(impl_obj_void);\n";
     if (!isLocal()) {
       if (!param->hasConditional()) {
-        genCall(str, preCall, false, (sdagCon || isWhenEntry), true);
+        genCall(str, preCall, false, true);
         /*FIXME: implP.size() is wrong if the parameter list contains arrays--
         need to add in the size of the arrays.
          */
