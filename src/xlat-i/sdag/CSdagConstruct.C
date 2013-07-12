@@ -523,7 +523,7 @@ namespace xi {
     buildTypes(encapStateChild);
 
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    generateSignatureNew(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState);
 
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
@@ -690,7 +690,7 @@ namespace xi {
      */
 
     // generate the _end variant of this method
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
 
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
@@ -735,7 +735,7 @@ namespace xi {
   }
 
   void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry) {
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
     defs << "  if (" << con1->text << ") {\n";
     defs << "    ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
@@ -745,7 +745,7 @@ namespace xi {
     defs << "  }\n";
     endMethod(defs);
 
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
     defs << "  if (" << con1->text << ") {\n";
     defs << "    ";
     generateCallNew(defs, encapStateChild, encapStateChild, constructs->front()->label);
@@ -759,7 +759,7 @@ namespace xi {
   void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry) {
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
 
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
 #endif
@@ -791,7 +791,7 @@ namespace xi {
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
     strcat(nameStr,"_end");
 
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
 #endif
@@ -870,7 +870,7 @@ namespace xi {
 
   void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry) {
     strcpy(nameStr,label->charstar());
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
@@ -899,7 +899,7 @@ namespace xi {
 
     strcpy(nameStr,label->charstar());
     strcat(nameStr,"_end");
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
     generateEventBracket(defs,SIF_END);
@@ -911,7 +911,7 @@ namespace xi {
 
   void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry) {
     strcpy(nameStr,label->charstar());
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 #if CMK_BIGSIM_CHARM
     // trace
     generateBeginTime(defs);
@@ -924,7 +924,7 @@ namespace xi {
     // trace
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
     strcat(nameStr,"_end");
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
     generateEventBracket(defs,SELSE_END);
@@ -935,7 +935,7 @@ namespace xi {
   }
 
   void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry) {
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
     defs << "  int __first = (" << con2->text << "), __last = (" << con3->text
          << "), __stride = (" << con4->text << ");\n";
     defs << "  if (__first > __last) {\n";
@@ -951,7 +951,7 @@ namespace xi {
     defs << "  }\n";
     endMethod(defs);
 
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
     defs << "  " << counter << "->decrement(); /* DECREMENT 1 */ \n";
     defs << "  " << con1->text << "_cl->deref();\n";
     defs << "  if (" << counter << "->isDone()) {\n";
@@ -964,7 +964,7 @@ namespace xi {
 
   void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry) {
     SdagConstruct *cn;
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
     defs << "  SDAG::CCounter *" << counter << "= new SDAG::CCounter(" <<
       (int)constructs->size() << ");\n";
 
@@ -981,7 +981,7 @@ namespace xi {
     defs << "  CkVec<void*> " <<label << "_bgLogList;\n";
 #endif
 
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
     defs << "  " <<label << "_bgLogList.insertAtEnd(_bgParentLog);\n";
@@ -1015,7 +1015,7 @@ namespace xi {
 
   void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry) {
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
     generateEventBracket(defs, SOVERLAP);
@@ -1027,7 +1027,7 @@ namespace xi {
     // trace
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
     strcat(nameStr,"_end");
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
 #if CMK_BIGSIM_CHARM
     generateBeginTime(defs);
     generateEventBracket(defs, SOVERLAP_END);
@@ -1038,7 +1038,7 @@ namespace xi {
   }
 
   void SdagConstruct::generateCaseList(XStr& decls, XStr& defs, Entry* entry) {
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
     defs << "  SDAG::CSpeculator* " << counter << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
   
     defs << "  SDAG::Continuation* c = 0;\n";
@@ -1054,7 +1054,7 @@ namespace xi {
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
     strcat(nameStr,"_end");
 
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
 
     defs << "  " << counter << "->deref();\n";
     defs << "  ";
@@ -1066,12 +1066,12 @@ namespace xi {
     buildTypes(encapState);
     buildTypes(encapStateChild);
 
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
     defs << "  ";
     generateCallNew(defs, encapState, encapState, constructs->front()->label);
     endMethod(defs);
 
-    generateSignatureNew(decls, defs, entry, false, "void", label, true, encapStateChild);
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
     defs << "  ";
     generateCallNew(defs, encapState, encapStateChild, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
@@ -1114,7 +1114,7 @@ namespace xi {
     if (entry->paramIsMarshalled() || entry->param->isVoid())
       generateLocalWrapper(decls, defs, entry->param->isVoid(), signature, entry, stateVars, con1->text);
 
-    generateSignatureNew(decls, defs, entry, false, "void", con1->text, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", con1->text, false, encapState);
 
 #if CMK_BIGSIM_CHARM
     generateEndSeq(defs);
@@ -1144,7 +1144,7 @@ namespace xi {
     endMethod(defs);
 
     decls << "private:\n";
-    generateSignatureNew(decls, defs, entry, false, "void", con1->text, true,
+    generateClosureSignature(decls, defs, entry, false, "void", con1->text, true,
 #if CMK_BIGSIM_CHARM
                          encapStateChild
 #else
@@ -1161,7 +1161,7 @@ namespace xi {
   }
 
   void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
-    generateSignatureNew(decls, defs, entry, false, "void", label, false, encapState);
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 
 #if CMK_BIGSIM_CHARM
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
@@ -1204,19 +1204,19 @@ namespace xi {
     endMethod(defs);
   }
 
-  void generateSignature(XStr& str,
+  void generateVarSignature(XStr& str,
                          const XStr* name, const char* suffix,
                          list<CStateVar*>* params) {
     
   }
-  void generateSignature(XStr& decls, XStr& defs,
+  void generateVarSignature(XStr& decls, XStr& defs,
                          const Entry* entry, bool declareStatic, const char* returnType,
                          const XStr* name, bool isEnd,
                          list<CStateVar*>* params) {
-    generateSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
+    generateVarSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
                       name, isEnd, params);
   }
-  void generateSignature(XStr& decls, XStr& defs,
+  void generateVarSignature(XStr& decls, XStr& defs,
                          const Chare* chare, bool declareStatic, const char* returnType,
                          const XStr* name, bool isEnd,
                          list<CStateVar*>* params) {
@@ -1271,14 +1271,14 @@ namespace xi {
     op << "\n\n";
   }
 
-  void generateSignatureNew(XStr& decls, XStr& defs,
+  void generateClosureSignature(XStr& decls, XStr& defs,
                             const Entry* entry, bool declareStatic, const char* returnType,
                             const XStr* name, bool isEnd,
                             list<EncapState*> encap) {
-    generateSignatureNew(decls, defs, entry->getContainer(), declareStatic, returnType,
+    generateClosureSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
                          name, isEnd, encap);
   }
-  void generateSignatureNew(XStr& decls, XStr& defs, const Chare* chare,
+  void generateClosureSignature(XStr& decls, XStr& defs, const Chare* chare,
                             bool declareStatic, const char* returnType,
                             const XStr* name, bool isEnd, list<EncapState*> encap) {
     decls << "  " << (declareStatic ? "static " : "") << returnType << " ";
@@ -1510,12 +1510,12 @@ namespace xi {
 
       idxName << "_sdag_idx_" << traceName;
       regName << "_sdag_reg_" << traceName;
-      generateSignature(decls, defs, chare, true, "int", &idxName, false, NULL);
+      generateVarSignature(decls, defs, chare, true, "int", &idxName, false, NULL);
       defs << "  static int epidx = " << regName << "();\n"
            << "  return epidx;\n";
       endMethod(defs);
 
-      generateSignature(decls, defs, chare, true, "int", &regName, false, NULL);
+      generateVarSignature(decls, defs, chare, true, "int", &regName, false, NULL);
       defs << "  return CkRegisterEp(\""
            << traceName << "\", NULL, 0, " << chare->indexName() << "::__idx, 0"
            << ");\n";

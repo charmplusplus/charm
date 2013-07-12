@@ -108,7 +108,7 @@ void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
   decls << "  std::auto_ptr<SDAG::Dependency> __dep;\n";
 
   XStr name = "_sdag_init";
-  generateSignature(decls, defs, container, false, "void", &name, false, NULL);
+  generateVarSignature(decls, defs, container, false, "void", &name, false, NULL);
   defs << "  __dep.reset(new SDAG::Dependency(" << numEntries << "," << numWhens << "));\n";
 
   for(list<CEntry*>::iterator en=entryList.begin(); en != entryList.end(); ++en)
@@ -117,7 +117,7 @@ void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
 
   // Backwards compatibility
   XStr oldname = "__sdag_init";
-  generateSignature(decls, defs, container, false, "void", &oldname, false, NULL);
+  generateVarSignature(decls, defs, container, false, "void", &oldname, false, NULL);
   endMethod(defs);
 }
 
@@ -165,7 +165,7 @@ void CParsedFile::generatePupFunction(XStr& decls, XStr& defs)
 void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
 {
   XStr name = "__sdag_register";
-  generateSignature(decls, defs, container, true, "void", &name, false, NULL);
+  generateVarSignature(decls, defs, container, true, "void", &name, false, NULL);
 
   defs << "  SDAG::registerPUPables();\n";
 

@@ -19,19 +19,19 @@ class Chare;
 class CParsedFile;
 class EncapState;
 
-extern void generateSignature(XStr& decls, XStr& defs,
+extern void generateVarSignature(XStr& decls, XStr& defs,
                               const Entry* entry, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
                               std::list<CStateVar*>* params);
-extern void generateSignature(XStr& decls, XStr& defs,
+extern void generateVarSignature(XStr& decls, XStr& defs,
                               const Chare* chare, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
                               std::list<CStateVar*>* params);
-extern void generateSignatureNew(XStr& decls, XStr& defs,
+extern void generateClosureSignature(XStr& decls, XStr& defs,
                                  const Chare* chare, bool declareStatic,
                                  const char* returnType, const XStr* name, bool isEnd,
                                  std::list<EncapState*> params);
-extern void generateSignatureNew(XStr& decls, XStr& defs,
+extern void generateClosureSignature(XStr& decls, XStr& defs,
                                  const Entry* entry, bool declareStatic,
                                  const char* returnType, const XStr* name, bool isEnd,
                                  std::list<EncapState*> params);
