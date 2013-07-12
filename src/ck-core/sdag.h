@@ -73,9 +73,9 @@ namespace SDAG {
     }
 
     void pup(PUP::er& p) {
-      bool isNull = !msg;
-      p | isNull;
-      if (!isNull) CkPupMessage(p, (void**)&msg);
+      bool hasMsg = msg;
+      p | hasMsg;
+      if (hasMsg) CkPupMessage(p, (void**)&msg);
       packClosure(p);
     }
 
