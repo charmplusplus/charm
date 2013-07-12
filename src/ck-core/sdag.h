@@ -40,6 +40,8 @@ namespace SDAG {
 
     void pup(PUP::er& p) {
       if (p.isUnpacking()) log = 0;
+      else if (log != 0)
+        CkAbort("BigSim logs stored by SDAG are not migratable\n");
       packClosure(p);
     }
     PUPable_decl(TransportableBigSimLog);
