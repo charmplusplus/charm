@@ -50,10 +50,6 @@ CpvDeclare(void *, myProcStatFP);
 #include <Carbon/Carbon.h> /* Carbon APIs for Multiprocessing */
 #endif
 
-#if defined(ARCH_HPUX11) ||  defined(ARCH_HPUX10)
-#include <sys/mpctl.h>
-#endif
-
 
 #define MAX_EXCLUDE      64
 static int excludecore[MAX_EXCLUDE] = {-1};
@@ -768,11 +764,11 @@ void CmiInitCPUAffinity(char **argv)
 
 /* called in ConverseCommonInit to initialize basic variables */
 void CmiInitCPUAffinityUtil(){
+    char fname[64];
     CpvInitialize(int, myCPUAffToCore);
     CpvAccess(myCPUAffToCore) = -1;
 #if CMK_OS_IS_LINUX
     CpvInitialize(void *, myProcStatFP);
-    char fname[64];
     CmiLock(_smp_mutex);
 #if CMK_SMP
     sprintf(fname, "/proc/%d/task/%d/stat", getpid(), syscall(SYS_gettid));

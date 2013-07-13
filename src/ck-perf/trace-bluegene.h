@@ -37,7 +37,7 @@ class TraceBluegene : public Trace {
     void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr);
     void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
     void bgPrint(const char* str);
-    void bgMark(char* str);
+    void bgMark(const char* str);
     void creatFiles();
     void writePrint(char *, double t);
     void traceClose();
@@ -138,7 +138,7 @@ extern "C" void BgSetStartEvent();
 #endif   /* CMK_TRACE_IN_CHARM */
 
 extern "C" void BgPrintf(const char *str);
-extern "C" void BgMark(char *str);
+extern "C" void BgMark(const char *str);
 
 #endif
 

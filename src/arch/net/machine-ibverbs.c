@@ -31,7 +31,12 @@
 
 #include <infiniband/verbs.h>
 
+//#define QLOGIC
+#ifndef QLOGIC
 enum ibv_mtu mtu = IBV_MTU_2048;
+#else
+enum ibv_mtu mtu = IBV_MTU_4096;
+#endif
 static int page_size;
 static int mtu_size;
 static int packetSize;
@@ -47,7 +52,10 @@ static int maxRecvBuffers;
 static int maxTokens;
 //static int tokensPerProcessor; /*number of outstanding sends and receives between any two nodes*/
 static int sendPacketPoolSize; /*total number of send buffers created*/
-
+//#define NON_SRQ
+#ifdef NON_SRQ
+static int minPerProcessorRecvs;
+#endif
 static double _startTime=0;
 static int regCount;
 
@@ -251,8 +259,9 @@ struct infiContext {
 	struct ibv_pd		*pd;
 	struct ibv_cq		*sendCq;
 	struct ibv_cq   *recvCq;
+#ifndef NON_SRQ
 	struct ibv_srq  *srq;
-	
+#endif	
 	struct ibv_qp		**qp; //Array of qps (numNodes long) to temporarily store the queue pairs
 												//It is used between CmiMachineInit and the call to node_addresses_store
 												//when the qps are stored in the corresponding OtherNodes
@@ -265,7 +274,9 @@ struct infiContext {
 
 	struct infiPacketHeader header;
 
+#ifndef NON_SRQ
 	int srqSize;
+#endif	
 	int sendCqSize,recvCqSize;
 	int tokensLeft;
 
@@ -451,20 +462,27 @@ static void CmiMachineInit(char **argv){
 	struct ibv_device *dev;
 	int ibPort;
 	int i;
+        int MAXPORT = 8;
 	int calcMaxSize;
 	infiPacket *pktPtrs;
 	struct infiRdmaPacket **rdmaPktPtrs;
         int num_devices, idev;
+#define MAX_DEVICE_NAME 120
+        char *usr_ibv_device_name=NULL;
+        int ibv_device_name_set=0;
 
 	MACHSTATE(3,"CmiMachineInit {");
 	MACHSTATE2(3,"_Cmi_numnodes %d CmiNumNodes() %d",_Cmi_numnodes,CmiNumNodes());
 	MACHSTATE1(3,"CmiMyNodeSize() %d",CmiMyNodeSize());
 	
-	//TODO: make the device and ibport configureable by commandline parameter
-	//Check example for how to do that
 	devList =  ibv_get_device_list(&num_devices);
         CmiAssert(num_devices > 0);
 	CmiAssert(devList != NULL);
+	if (CmiGetArgStringDesc(argv,"+IBVDeviceName",&usr_ibv_device_name,"User set IBV device name"))
+          {
+	    MACHSTATE1(3,"IBVDeviceName set %s",usr_ibv_device_name);
+	    ibv_device_name_set=1;
+          }
 
 	context = (struct infiContext *)malloc(sizeof(struct infiContext));
 	MACHSTATE1(3,"context allocated %p",context);
@@ -474,20 +492,17 @@ static void CmiMachineInit(char **argv){
 	MACHSTATE1(3,"context->localAddr allocated %p",context->localAddr);
 
         idev = 0;
-
         // try all devices, can't assume device 0 is IB, it may be ethernet
 loop:
 	dev = devList[idev];
 	CmiAssert(dev != NULL);
 
-	MACHSTATE1(3,"device name %s",ibv_get_device_name(dev));
-
+	MACHSTATE2(3,"device name %s for %d",ibv_get_device_name(dev), idev);
 	//the context for this infiniband device 
 	context->context = ibv_open_device(dev);
 	CmiAssert(context->context != NULL);
 
         // test ibPort
-        int MAXPORT = 8;
         for (ibPort = 1; ibPort < MAXPORT; ibPort++) {
           struct ibv_port_attr attr;
           if (ibv_query_port(context->context, ibPort, &attr) != 0) continue;
@@ -504,6 +519,18 @@ loop:
           else
             goto loop;
         }
+	if(ibv_device_name_set)
+	  {
+	    if(strcmp(usr_ibv_device_name,ibv_get_device_name(dev))==0)
+	      {
+		MACHSTATE2(3, "device %d selected for user requested IBVDeviceName %s\n",idev, ibv_get_device_name(dev));
+	      }
+	    else
+	      { // force increment to next device
+		if(ibPort != MAXPORT) ++idev;
+		goto loop;
+	      }
+	  }
 	context->ibPort = ibPort;
 	MACHSTATE1(3,"use port %d", ibPort);
 	
@@ -662,7 +689,7 @@ void CmiCommunicationInit(char **argv)
 void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,struct infiAddr *localAddr){
 	int myLid;
 	int i;
-	
+	int err;
 	
 	//find my lid
 	myLid = getLocalLid(context->context,ibPort);
@@ -676,7 +703,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 	MACHSTATE1(3,"sendCq created %p",context->sendCq);
 	
 	
-	context->recvCqSize = maxRecvBuffers;
+	context->recvCqSize = maxRecvBuffers+2;
 	context->recvCq = ibv_create_cq(context->context,context->recvCqSize,NULL,NULL,0);
 	
 	MACHSTATE2(3,"recvCq created %p %d",context->recvCq,context->recvCqSize);
@@ -688,7 +715,10 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 
 	if(numNodes > 1)
 	{
+		struct ibv_qp_attr attr;
+#ifndef NON_SRQ
 		context->srqSize = (maxRecvBuffers+2);
+              {
 		struct ibv_srq_init_attr srqAttr = {
 			.attr = {
 			.max_wr  = context->srqSize,
@@ -697,25 +727,33 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 		};
 		context->srq = ibv_create_srq(context->pd,&srqAttr);
 		CmiAssert(context->srq != NULL);
-	
+              }
+#endif	
+              
+              {
 		struct ibv_qp_init_attr initAttr = {
 			.qp_type = IBV_QPT_RC,
 			.send_cq = context->sendCq,
 			.recv_cq = context->recvCq,
+#ifndef NON_SRQ
 			.srq		 = context->srq,
+#endif	
 			.sq_sig_all = 0,
 			.qp_context = NULL,
 			.cap     = {
 				.max_send_wr  = maxTokens,
 				.max_send_sge = 2,
+#ifdef NON_SRQ
+				.max_recv_wr  = maxRecvBuffers, // or maxRecvBuffers
+				.max_recv_sge = 1,
+#endif	
 			},
 		};
-		struct ibv_qp_attr attr;
 
 		attr.qp_state        = IBV_QPS_INIT;
 		attr.pkey_index      = 0;
 		attr.port_num        = ibPort;
-		attr.qp_access_flags = IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+         	attr.qp_access_flags = IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
 
 /*		MACHSTATE1(3,"context->pd %p",context->pd);
 		struct ibv_qp *qp = ibv_create_qp(context->pd,&initAttr);
@@ -731,17 +769,20 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 				MACHSTATE2(3,"qp[%d] created %p",n,context->qp[n]);
 				CmiAssert(context->qp[n] != NULL);
 			
-				ibv_modify_qp(context->qp[n], &attr,
+				if(err= ibv_modify_qp(context->qp[n], &attr,
 					  IBV_QP_STATE              |
 					  IBV_QP_PKEY_INDEX         |
 				  	IBV_QP_PORT               |
-				  	IBV_QP_ACCESS_FLAGS);		
-
+				  	IBV_QP_ACCESS_FLAGS)) {
+					     		  	MACHSTATE1(3,"ERROR modifying  to INIT %d",err);
+                                                      	        CmiAbort("failed to change qp state to INIT ");
+                                                                }
 				localAddr[n].qpn = context->qp[n]->qp_num;
 				localAddr[n].psn = lrand48() & 0xffffff;
 				MACHSTATE4(3,"i %d lid Ox%x qpn 0x%x psn 0x%x",n,localAddr[n].lid,localAddr[n].qpn,localAddr[n].psn);
 			}
 		}
+              }
 	}
 	MACHSTATE(3,"qps created");
 };
@@ -782,17 +823,6 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	struct infiOtherNodeData * ret = malloc(sizeof(struct infiOtherNodeData));
 	int err;
-	ret->state = INFI_HEADER_DATA;
-	ret->qp = context->qp[node];
-//	ret->totalTokens = tokensPerProcessor;
-//	ret->tokensLeft = tokensPerProcessor;
-	ret->nodeNo = node;
-//	ret->postedRecvs = tokensPerProcessor;
-#if	CMK_IBVERBS_DEBUG	
-	ret->psn = 0;
-	ret->recvPsn = 0;
-#endif
-	
 	struct ibv_qp_attr attr = {
 		.qp_state		= IBV_QPS_RTR,
 		.path_mtu		= mtu,
@@ -808,6 +838,17 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 			.port_num	= context->ibPort
 		}
 	};
+	
+	ret->state = INFI_HEADER_DATA;
+	ret->qp = context->qp[node];
+//	ret->totalTokens = tokensPerProcessor;
+//	ret->tokensLeft = tokensPerProcessor;
+	ret->nodeNo = node;
+//	ret->postedRecvs = tokensPerProcessor;
+#if	CMK_IBVERBS_DEBUG	
+	ret->psn = 0;
+	ret->recvPsn = 0;
+#endif
 	
 	MACHSTATE2(3,"initInfiOtherNodeData %d{ qp %p",node,ret->qp);
 	MACHSTATE3(3,"dlid 0x%x qp 0x%x psn 0x%x",attr.ah_attr.dlid,attr.dest_qp_num,attr.rq_psn);
@@ -827,23 +868,33 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	MACHSTATE(3,"qp state changed to RTR");
 	
 	attr.qp_state 	    = IBV_QPS_RTS;
+// Here NON_SRQ is for QLOGIC
+#ifndef QLOGIC
 	attr.timeout 	    = 26;
 	attr.retry_cnt 	    = 20;
+#else
+	attr.timeout 	    = 14;
+	attr.retry_cnt 	    = 7;
+#endif
 	attr.rnr_retry 	    = 7;
 	attr.sq_psn 	    = context->localAddr[node].psn;
 	attr.max_rd_atomic  = 1;
 
+	MACHSTATE3(3,"dlid 0x%x qp 0x%x psn 0x%x",attr.ah_attr.dlid,attr.dest_qp_num,attr.sq_psn);
 	
-	if (ibv_modify_qp(ret->qp, &attr,
+
+	if (err=ibv_modify_qp(ret->qp, &attr,
 	  IBV_QP_STATE              |
 	  IBV_QP_TIMEOUT            |
 	  IBV_QP_RETRY_CNT          |
 	  IBV_QP_RNR_RETRY          |
 	  IBV_QP_SQ_PSN             |
 	  IBV_QP_MAX_QP_RD_ATOMIC)) {
-			fprintf(stderr, "Failed to modify QP to RTS\n");
-			exit(1);
+			MACHSTATE1(3,"ERROR changing qp state to RTS %d",err);
+			CmiAbort("failed1 to change qp state to RTS");
 	}
+
+
 	MACHSTATE(3,"qp state changed to RTS");
 
 	MACHSTATE(3,"} initInfiOtherNodeData");
@@ -854,6 +905,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 void 	infiPostInitialRecvs(){
 	//create the pool and post the receives
 	int numPosts;
+
 /*	if(tokensPerProcessor*(_Cmi_numnodes-1) <= maxRecvBuffers){
 		numPosts = tokensPerProcessor*(_Cmi_numnodes-1);
 	}else{
@@ -865,6 +917,14 @@ void 	infiPostInitialRecvs(){
 	}else{
 		numPosts = 0;
 	}
+#ifdef NON_SRQ
+// This is resulting in the total recv buffers to grow as the number of nodes. What could be the alternative? May be adaptively increase number of buffers for the most communicating nodes. Need a mechanism for such flow control, existing does not claim to work.
+	minPerProcessorRecvs = 10;
+	if(minPerProcessorRecvs*(_Cmi_numnodes-1) <= maxRecvBuffers){
+		numPosts = minPerProcessorRecvs*(_Cmi_numnodes-1);
+	}
+#endif
+//        numPosts=1000; 
 	if(numPosts > 0){
 		context->recvBufferPool = allocateInfiBufferPool(numPosts,packetSize);
 		postInitialRecvs(context->recvBufferPool,numPosts,packetSize);
@@ -951,11 +1011,36 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 		}
 		
 	}
+#ifndef NON_SRQ
 	workRequests[numRecvs-1].next = NULL;
 	MACHSTATE(3,"About to call ibv_post_srq_recv");
 	if(ibv_post_srq_recv(context->srq,workRequests,&bad_wr)){
 		CmiAssert(0);
 	}
+#else 
+// create a pool per processor and post initial receives to processor queue similar to send, split the buffer pool Equi-partitioning recv pool
+       { 
+        int myNode;
+	int numNodes;
+        int perNodeRecvs,k,i,n;
+	numNodes = _Cmi_numnodes;
+	myNode = _Cmi_mynode;
+  	perNodeRecvs = numRecvs/(numNodes-1);
+	k =0;
+	for( i=1;i<numNodes;i++){
+                n = (myNode + i)%numNodes;
+		if(n  != myNode){ 
+				if (k==numNodes-2) 
+
+					workRequests[numRecvs-1].next = NULL;
+				else
+					workRequests[(k+1)*perNodeRecvs-1].next = NULL;
+				if(ibv_post_recv(context->qp[n],&workRequests[k*perNodeRecvs],&bad_wr)){CmiAssert(0);}
+				k++;
+				}
+          }
+        }
+#endif
 
 	free(workRequests);
 	free(sgElements);
@@ -1021,6 +1106,7 @@ static inline void getFreeTokens(struct infiOtherNodeData *infiData){
 static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struct ibv_mr *dataKey){
 	int incTokens=0;
 	int retval;
+	struct ibv_send_wr *bad_wr=NULL;
 #if	CMK_IBVERBS_DEBUG
 	packet->header.psn = (++node->infiData->psn);
 #endif	
@@ -1052,7 +1138,6 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 		CmiAssert(0);
 	}*/
 
-	struct ibv_send_wr *bad_wr=NULL;
 	if(retval = ibv_post_send(node->infiData->qp,&(packet->wr),&bad_wr)){
 		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",_Cmi_mynode,node->infiData->nodeNo,retval);
 		CmiAssert(0);
@@ -1088,6 +1173,7 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 
 
 static void inline EnqueueDummyPacket(OtherNode node,int size){
+	struct ibv_mr *key;
 	infiPacket packet;
 	MallocInfiPacket(packet);
 	packet->size = size;
@@ -1095,7 +1181,7 @@ static void inline EnqueueDummyPacket(OtherNode node,int size){
 	
 	packet->header.code = INFIDUMMYPACKET;
 
-	struct ibv_mr *key = METADATAFIELD(packet->buf)->key;
+	key = METADATAFIELD(packet->buf)->key;
 	
 	MACHSTATE2(3,"Dummy packet to %d size %d",node->infiData->nodeNo,size);
 	EnqueuePacket(node,packet,size,key);
@@ -1107,6 +1193,7 @@ static void inline EnqueueDummyPacket(OtherNode node,int size){
 
 
 static void inline EnqueueDataPacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,int size,int broot,int copy){
+	struct ibv_mr *key;
 	infiPacket packet;
 	MallocInfiPacket(packet);
 	packet->size = size;
@@ -1118,7 +1205,7 @@ static void inline EnqueueDataPacket(OutgoingMsg ogm, OtherNode node, int rank,c
 	ogm->refcount++;
 	packet->ogm = ogm;
 	
-	struct ibv_mr *key = METADATAFIELD(ogm->data)->key;
+	key = METADATAFIELD(ogm->data)->key;
 	CmiAssert(key != NULL);
 	
 	EnqueuePacket(node,packet,size,key);
@@ -1177,12 +1264,14 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
  
  {
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
+		struct ibv_mr *key;
+		struct ibv_mr *packetKey;
 
 		
 		packet->size = sizeof(struct infiRdmaPacket);
 		packet->buf = (char *)rdmaPacket;
 		
-		struct ibv_mr *key = METADATAFIELD(ogm->data)->key;
+		key = METADATAFIELD(ogm->data)->key;
 
 		CmiAssert(key!=NULL);
 
@@ -1200,7 +1289,7 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
 		rdmaPacket->remoteSize = ogm->size;
 		
 		
-		struct ibv_mr *packetKey = METADATAFIELD((void *)rdmaPacket)->key;
+		packetKey = METADATAFIELD((void *)rdmaPacket)->key;
 		
 		MACHSTATE3(3,"rdmaRequest being sent to node %d buf %p size %d",node->infiData->nodeNo,ogm->data,ogm->size);
 		EnqueuePacket(node,packet,sizeof(struct infiRdmaPacket),packetKey);
@@ -1520,10 +1609,9 @@ void static inline handoverMessage(char *newmsg,int total_size,int rank,int broo
 
 static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffer){
 	char *newmsg;
-	
+	OtherNode node = &nodes[nodeNo];
 	MACHSTATE2(3,"Processing packet from node %d len %d",nodeNo,len);
 	
-	OtherNode node = &nodes[nodeNo];
 	newmsg = node->asm_msg;		
 	
 	/// This simple state machine determines if this packet marks the beginning of a new message
@@ -1740,8 +1828,13 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 			.next = NULL
 		};
 		struct ibv_recv_wr *bad_wr;
-	
-		if(ibv_post_srq_recv(context->srq,&wr,&bad_wr)){
+#ifndef NON_SRQ	
+		if(ibv_post_srq_recv(context->srq,&wr,&bad_wr))
+#else
+		OtherNode node1 = &nodes[nodeNo];
+		if(ibv_post_recv(node1->infiData->qp,&wr,&bad_wr))
+#endif 
+		{
 			CmiAssert(0);
 		}
 	}
@@ -1781,6 +1874,7 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 	int nodeNo = fromNodeNo;
 	OtherNode node = &nodes[nodeNo];
 	struct infiRdmaPacket *rdmaPacket;
+	struct infiBuffer *buffer = malloc(sizeof(struct infiBuffer));
 
 	getFreeTokens(node->infiData);
 #if CMK_IBVERBS_TOKENS_FLOW
@@ -1793,7 +1887,6 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 #endif
 #endif
 	
-	struct infiBuffer *buffer = malloc(sizeof(struct infiBuffer));
 //	CmiAssert(buffer != NULL);
 	
 	
@@ -1886,7 +1979,7 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 	
 	free(buffer);
 	
-	OtherNode node=&nodes[rdmaPacket->fromNodeNo];
+	//OtherNode node=&nodes[rdmaPacket->fromNodeNo];
 	//we are sending this ack as a response to a successful
 	// rdma_Read.. the token for that rdma_Read needs to be freed
 #if CMK_IBVERBS_TOKENS_FLOW	
@@ -1896,8 +1989,8 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 
 	//send ack to sender if toBuffer is off otherwise buffer it
 	if(toBuffer){
-		MACHSTATE1(3,"Buffering Rdma Ack %p",rdmaPacket);
 		struct infiRdmaPacket *tmp = context->bufferedRdmaAcks;
+		MACHSTATE1(3,"Buffering Rdma Ack %p",rdmaPacket);
 		context->bufferedRdmaAcks = rdmaPacket;
 		rdmaPacket->next = tmp;
 		rdmaPacket->prev = NULL;
@@ -1918,13 +2011,14 @@ static inline void EnqueueRdmaAck(struct infiRdmaPacket *rdmaPacket){
 	MallocInfiPacket(packet);
 	{
 		struct infiRdmaPacket *ackPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
+		struct ibv_mr *packetKey;
 		*ackPacket = *rdmaPacket;
 		packet->size = sizeof(struct infiRdmaPacket);
 		packet->buf = (char *)ackPacket;
 		packet->header.code = INFIRDMA_ACK;
 		packet->ogm=NULL;
 		
-		struct ibv_mr *packetKey = METADATAFIELD((void *)ackPacket)->key;
+		packetKey = METADATAFIELD((void *)ackPacket)->key;
 	
 
 		EnqueuePacket(node,packet,sizeof(struct infiRdmaPacket),packetKey);
@@ -2125,6 +2219,7 @@ static inline void processAllBufferedMsgs(){
 static inline void increaseTokens(OtherNode node){
 	int err;
 	int increase = node->infiData->totalTokens*INCTOKENS_INCREASE;
+        int currentCqSize;
 	if(node->infiData->totalTokens + increase > maxTokens){
 		increase = maxTokens-node->infiData->totalTokens;
 	}
@@ -2132,29 +2227,32 @@ static inline void increaseTokens(OtherNode node){
 	node->infiData->tokensLeft += increase;
 	MACHSTATE3(3,"Increasing tokens for node %d to %d by %d",node->infiData->nodeNo,node->infiData->totalTokens,increase);
 	//increase the size of the sendCq
-	int currentCqSize = context->sendCqSize;
+	currentCqSize = context->sendCqSize;
 	if(ibv_resize_cq(context->sendCq,currentCqSize+increase)){
 		fprintf(stderr,"[%d] failed to increase cq by %d from %d totalTokens %d \n",_Cmi_mynode,increase,currentCqSize, node->infiData->totalTokens);
 		CmiAssert(0);
 	}
 	context->sendCqSize+= increase;
 };
-
+// Should not be used with NON-SRQ (at this time I am not sure INCTOKEN  works, at the top it says never turn it on), so I am not modifying these to make them work with Non-SRQ version
 static void increasePostedRecvs(int nodeNo){
 	OtherNode node = &nodes[nodeNo];
 	int tokenIncrease = node->infiData->postedRecvs*INCTOKENS_INCREASE;	
 	int recvIncrease = tokenIncrease;
+	int currentCqSize;
 	if(tokenIncrease+node->infiData->postedRecvs > maxTokens){
 		tokenIncrease = maxTokens - node->infiData->postedRecvs;
 	}
+#ifndef NON_SRQ
 	if(tokenIncrease+context->srqSize > maxRecvBuffers){
 		recvIncrease = maxRecvBuffers-context->srqSize;
 	}
 	node->infiData->postedRecvs+= recvIncrease;
 	context->srqSize += recvIncrease;
+#endif
 	MACHSTATE3(3,"Increase tokens by %d to %d for node %d ",tokenIncrease,node->infiData->postedRecvs,nodeNo);
 	//increase the size of the recvCq
-	int currentCqSize = context->recvCqSize;
+	currentCqSize = context->recvCqSize;
 	if(ibv_resize_cq(context->recvCq,currentCqSize+tokenIncrease)){
 		CmiAssert(0);
 	}
@@ -2558,6 +2656,9 @@ void infi_CmiFreeDirect(void *ptr){
         int size;
         int parentPe;
         void *freePtr = ptr;
+        infiCmiChunkMetaData *metaData;
+        int poolIdx;
+        infiCmiChunkPool *pool;
 #if CMK_IBVERBS_STATS
 	numFree++;
 #endif
@@ -2565,13 +2666,11 @@ void infi_CmiFreeDirect(void *ptr){
         //ptr += sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
-        infiCmiChunkMetaData *metaData;
-        int poolIdx;
         //there is a infiniband specific header
         freePtr = ptr - sizeof(infiCmiChunkHeader);
         metaData = METADATAFIELD(ptr);
         poolIdx = metaData->poolIdx;
-	infiCmiChunkPool *pool = infiCmiChunkPools[CmiMyRank()] + poolIdx;
+	pool = infiCmiChunkPools[CmiMyRank()] + poolIdx;
         MACHSTATE2(1,"CmiFree buf %p goes back to pool %d",ptr,poolIdx);
 //      CmiAssert(poolIdx >= 0);
 	if(poolIdx < INFINUMPOOLS && pool->count < INFIMAXPERPOOL &&
@@ -2601,9 +2700,10 @@ void infi_CmiFreeDirect(void *ptr){
 	    // freed dont free my metaData. will need later
 	  }else{
 	    if(metaData->owner->metaData->count == 0){
+              int unregstat;
 	      //need to free the owner's buffer and metadata
 	      freePtr = metaData->owner;
-	      int unregstat=ibv_dereg_mr(metaData->key);
+	      unregstat=ibv_dereg_mr(metaData->key);
 #if CMK_IBVERBS_STATS
 	      numUnReg++;
 	      numCurReg--;
@@ -2627,6 +2727,8 @@ void infi_CmiFree(void *ptr){
 	int nodeSize;
 	void *pointer;
         void *freePtr = ptr;
+	infiCmiChunkMetaData *metaData;
+        int poolIdx;
 	nodeSize = CmiMyNodeSize() + 1;
 
 	MACHSTATE(3,"Freeing");
@@ -2635,8 +2737,6 @@ void infi_CmiFree(void *ptr){
         ptr += sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
-	infiCmiChunkMetaData *metaData;
-        int poolIdx;
         //there is a infiniband specific header
         freePtr = ptr - sizeof(infiCmiChunkHeader);
         metaData = METADATAFIELD(ptr);
@@ -2669,6 +2769,8 @@ void infi_CmiFree(void *ptr){
 void infi_CmiFree(void *ptr){
 	int size;
 	void *freePtr = ptr;
+	int poolIdx;
+	infiCmiChunkMetaData *metaData;
 #if CMK_IBVERBS_STATS
 	numFree++;
 #endif
@@ -2680,8 +2782,6 @@ void infi_CmiFree(void *ptr){
 	ptr += sizeof(CmiChunkHeader);
 	size = SIZEFIELD (ptr);
 /*	if(size > firstBinSize){*/
-		infiCmiChunkMetaData *metaData;
-		int poolIdx;
 		//there is a infiniband specific header
 		freePtr = (char*)ptr - sizeof(infiCmiChunkHeader);
 		metaData = METADATAFIELD(ptr);
@@ -2727,8 +2827,8 @@ void infi_CmiFree(void *ptr){
 			}else{
 				if(metaData->owner->metaData->count == 0){
 					//need to free the owner's buffer and metadata
-					freePtr = metaData->owner;
 					int unregstat=ibv_dereg_mr(metaData->key);
+					freePtr = metaData->owner;
 #if CMK_IBVERBS_STATS
                                         numUnReg++;
                                         numCurReg--;

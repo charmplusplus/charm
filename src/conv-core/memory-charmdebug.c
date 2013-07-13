@@ -188,11 +188,13 @@ size_t cpd_memory_length(void *lenParam) {
  * about the slot (like size and location), but not the allocated data itself. */
 #ifdef CMK_SEPARATE_SLOT
 void cpd_memory_single_pup(CkHashtable_c h, pup_er p) {
-  memory_charmdebug_internal = 1;
-  CkHashtableIterator_c hashiter = CkHashtableGetIterator(h);
+  CkHashtableIterator_c hashiter;
   void *key;
   Slot *cur;
   //int counter=0;
+
+  memory_charmdebug_internal = 1;
+  hashiter = CkHashtableGetIterator(h);
   while ((cur = (Slot *)CkHashtableIteratorNext(hashiter, &key)) != NULL) {
     if (pup_isPacking(p) && cur->userData == lastMemoryAllocated) continue;
     //counter++;
@@ -204,6 +206,7 @@ void cpd_memory_single_pup(Slot* list, pup_er p) {
   if (pup_isPacking(p)) cur = cur->next;
   for ( ; cur != list; cur = cur->next) {
 #endif
+    {
     int i;
     int flags;
     void *loc = SlotToUser(cur);
@@ -229,6 +232,7 @@ void cpd_memory_single_pup(Slot* list, pup_er p) {
       void *myNULL = NULL;
       printf("Block %p has no stack!\n",cur);
       pup_pointer(p, &myNULL);
+    }
     }
   }
   /*CmiPrintf("counter=%d\n",counter);*/
@@ -311,12 +315,11 @@ int charmEnvelopeSize = 0;
  * from either the stack or the global variables. */
 // FIXME: this function assumes that all memory is allocated in slot_unknown!
 void check_memory_leaks(LeakSearchInfo *info) {
-  memory_charmdebug_internal = 1;
   //FILE* fd=fopen("check_memory_leaks", "w");
   // Step 1)
   // index all memory into a CkHashtable, with a scan of 4 bytes.
   CkHashtable_c table;
-  PCQueue inProgress = PCQueueCreate();
+  PCQueue inProgress;
   Slot *sl, **fnd, *found;
   char *scanner;
   char *begin_stack, *end_stack;
@@ -327,6 +330,10 @@ void check_memory_leaks(LeakSearchInfo *info) {
   // copy all the memory from "slot_first" to "leaking"
 
   Slot *slold1=0, *slold2=0, *slold3=0;
+
+  memory_charmdebug_internal = 1;
+  
+  inProgress = PCQueueCreate();
   table = CkCreateHashtable_pointer(sizeof(char *), 10000);
   SLOT_ITERATE_START(sl)
     // index the i-th memory slot
@@ -334,10 +341,11 @@ void check_memory_leaks(LeakSearchInfo *info) {
     char *ptr;
     sl->magic |= LEAK_FLAG;
     if (info->quick > 0) {
+      char **object;
       //CmiPrintf("checking memory fast\n");
       // means index only specific offsets of the memory region
       ptr = SlotToUser(sl);
-      char **object = (char**)CkHashtablePut(table, &ptr);
+      object = (char**)CkHashtablePut(table, &ptr);
       *object = (char*)sl;
       ptr += 4;
       object = (char**)CkHashtablePut(table, &ptr);
@@ -544,6 +552,7 @@ struct _AllocationPoint {
 
 // pup a single AllocationPoint. The data structure must be already allocated
 void pupAllocationPointSingle(pup_er p, AllocationPoint *node, int *numChildren) {
+  AllocationPoint *child;
   pup_pointer(p, &node->key);
   pup_int(p, &node->size);
   pup_int(p, &node->count);
@@ -555,7 +564,6 @@ void pupAllocationPointSingle(pup_er p, AllocationPoint *node, int *numChildren)
     node->next = NULL;
   }
   *numChildren = 0;
-  AllocationPoint *child;
   for (child = node->firstChild; child != NULL; child = child->sibling) (*numChildren) ++;
   pup_int(p, numChildren);
 
@@ -565,8 +573,8 @@ void pupAllocationPointSingle(pup_er p, AllocationPoint *node, int *numChildren)
 void pupAllocationPoint(pup_er p, void *data) {
   AllocationPoint *node = (AllocationPoint*)data;
   int numChildren;
-  pupAllocationPointSingle(p, node, &numChildren);
   AllocationPoint *child;
+  pupAllocationPointSingle(p, node, &numChildren);
   for (child = node->firstChild; child != NULL; child = child->sibling) {
     pupAllocationPoint(p, child);
   }
@@ -583,9 +591,10 @@ void deleteAllocationPoint(void *ptr) {
 
 void printAllocationTree(AllocationPoint *node, FILE *fd, int depth) {
   int i;
-  if (node==NULL) return;
   int numChildren = 0;
   AllocationPoint *child;
+
+  if (node==NULL) return;
   for (child = node->firstChild; child != NULL; child = child->sibling) numChildren ++;
   for (i=0; i<depth; ++i) fprintf(fd, " ");
   fprintf(fd, "node %p: bytes=%d, count=%d, child=%d\n",node->key,node->size,node->count,numChildren);
@@ -600,6 +609,10 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   AllocationPoint *parent, **start, *cur;
   AllocationPoint *root = NULL;
   int numNodes = 0;
+  char filename[100];
+  FILE *fd;
+  CkHashtableIterator_c it;
+  AllocationPoint **startscan, *scan;
 
   table = CkCreateHashtable_pointer(sizeof(char *), 10000);
 
@@ -666,12 +679,10 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
     }
   SLOT_ITERATE_END
 
-  char filename[100];
   sprintf(filename, "allocationTree_%d", CmiMyPe());
-  FILE *fd = fopen(filename, "w");
+  fd = fopen(filename, "w");
   fprintf(fd, "digraph %s {\n", filename);
-  CkHashtableIterator_c it = CkHashtableGetIterator(table);
-  AllocationPoint **startscan, *scan;
+  it = CkHashtableGetIterator(table);
   while ((startscan=(AllocationPoint**)CkHashtableIteratorNext(it,NULL))!=NULL) {
     fprintf(fd, "\t\"n%p\" [label=\"%p\\nsize=%d\\ncount=%d\"];\n",*startscan,(*startscan)->key,
           (*startscan)->size,(*startscan)->count);
@@ -806,9 +817,9 @@ void * mergeMemStat(int *size, void *data, void **remoteData, int numRemote) {
   int i,j,k;
   if (memStatReturnOnlyOne) {
     MemStatSingle *l = &((MemStat*) data)->array[0];
-    l->pe = -1;
     MemStat r;
     MemStatSingle *m = &r.array[0];
+    l->pe = -1;
     for (i=0; i<numRemote; ++i) {
       pup_er p = pup_new_fromMem(remoteData[i]);
       pupMemStat(p, &r);
@@ -822,17 +833,17 @@ void * mergeMemStat(int *size, void *data, void **remoteData, int numRemote) {
     }
     return data;
   } else {
-    MemStat *l = (MemStat*)data;
+    MemStat *l = (MemStat*)data, *res;
+    MemStat r;
     int count = l->count;
     for (i=0; i<numRemote; ++i) count += ((MemStat*)remoteData[i])->count;
     BEFORE_MALLOC_CALL;
-    MemStat *res = (MemStat*)mm_malloc(sizeof(MemStat) + (count-1)*sizeof(MemStatSingle));
+    res = (MemStat*)mm_malloc(sizeof(MemStat) + (count-1)*sizeof(MemStatSingle));
     AFTER_MALLOC_CALL;
     memset(res, 0, sizeof(MemStat)+(count-1)*sizeof(MemStatSingle));
     res->count = count;
     memcpy(res->array, l->array, l->count*sizeof(MemStatSingle));
     count = l->count;
-    MemStat r;
     for (i=0; i<numRemote; ++i) {
       pup_er p = pup_new_fromMem(remoteData[i]);
       pupMemStat(p, &r);
@@ -847,11 +858,13 @@ void * mergeMemStat(int *size, void *data, void **remoteData, int numRemote) {
 
 MemStat * CreateMemStat() {
   Slot *cur;
+  MemStat *st;
+  MemStatSingle *stat;
   BEFORE_MALLOC_CALL;
-  MemStat *st = (MemStat*)mm_calloc(1, sizeof(MemStat));
+  st = (MemStat*)mm_calloc(1, sizeof(MemStat));
   AFTER_MALLOC_CALL;
   st->count = 1;
-  MemStatSingle *stat = &st->array[0];
+  stat = &st->array[0];
   SLOT_ITERATE_START(cur)
     stat->sizes[0][(cur->magic&0x7)] += cur->userSize;
     stat->counts[0][(cur->magic&0x7)] ++;
@@ -944,10 +957,11 @@ static int CpdMemBackup = 0;
 
 static void backupMemory() {
   Slot *cur;
+  char * ptr;
+  int totalMemory = SLOTSPACE;
   if (*memoryBackup != NULL)
     CmiAbort("memoryBackup != NULL\n");
 
-  int totalMemory = SLOTSPACE;
   {
     SLOT_ITERATE_START(cur)
       totalMemory += sizeof(Slot) + cur->userSize + cur->stackLen*sizeof(void*);
@@ -958,7 +972,7 @@ static void backupMemory() {
   *memoryBackup = mm_malloc(totalMemory);
   AFTER_MALLOC_CALL;
 
-  char * ptr = *memoryBackup;
+  ptr = *memoryBackup;
 #ifndef CMK_SEPARATE_SLOT
   memcpy(*memoryBackup, slot_first, sizeof(Slot));
   ptr += sizeof(Slot);
@@ -995,6 +1009,7 @@ static void checkBackup() {
   }
 
   while (cur != slot_first) {
+    char *last;
     // ptr is the old copy of cur
     if (memory_chare_id != cur->chareID) {
       int res = memcmp(ptr+sizeof(Slot), ((char*)cur)+sizeof(Slot), cur->userSize + cur->stackLen*sizeof(void*));
@@ -1006,7 +1021,6 @@ static void checkBackup() {
 
     // advance to next, skipping deleted memory blocks
     cur = cur->next;
-    char *last;
     do {
       last = ptr;
       ptr += sizeof(Slot) + ((Slot*)ptr)->userSize + ((Slot*)ptr)->stackLen*sizeof(void*);
@@ -1038,17 +1052,19 @@ static int unProtectedPagesMaxSize = 0;
 
 static void* lastAddressSegv;
 static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
+  void *pageToUnprotect;
   if (lastAddressSegv == si->si_addr) {
     CmiPrintf("Second SIGSEGV at address 0x%lx\n", (long) si->si_addr);
     CpdFreeze();
   }
   lastAddressSegv = si->si_addr;
-  void *pageToUnprotect = (void*)((CmiUInt8)si->si_addr & ~(meta_getpagesize()-1));
+  pageToUnprotect = (void*)((CmiUInt8)si->si_addr & ~(meta_getpagesize()-1));
   mprotect(pageToUnprotect, 4, PROT_READ|PROT_WRITE);
   if (unProtectedPagesSize >= unProtectedPagesMaxSize) {
+    void **newUnProtectedPages;
     unProtectedPagesMaxSize += 10;
     BEFORE_MALLOC_CALL;
-    void **newUnProtectedPages = (void**)mm_malloc((unProtectedPagesMaxSize)*sizeof(void*));
+    newUnProtectedPages = (void**)mm_malloc((unProtectedPagesMaxSize)*sizeof(void*));
     memcpy(newUnProtectedPages, unProtectedPages, unProtectedPagesSize*sizeof(void*));
     mm_free(unProtectedPages);
     AFTER_MALLOC_CALL;
@@ -1109,10 +1125,10 @@ void CpdResetMemory() {
  * message has corrupted the memory of some other chare, or some system memory.
  */
 void CpdCheckMemory() {
+  Slot *cur;
   if (CpdMprotect) unProtectMemory();
   if (CpdCRC32) CheckAllCRC();
   if (CpdMemBackup) checkBackup();
-  Slot *cur;
   SLOT_ITERATE_START(cur)
     if (cur->magic == SLOTMAGIC_FREED) CmiAbort("SLOT deallocate in list");
     if (cur->from == NULL) printf("SLOT %p has no stack\n",cur);
@@ -1253,6 +1269,9 @@ static void dumpStackFrames() {
 /* Write a valid slot to this field */
 static void *setSlot(Slot **sl,int userSize) {
 #ifdef CMK_SEPARATE_SLOT
+  Slot *s;
+  char *user;
+
   static int mallocFirstTime = 1;
   if (mallocFirstTime) {
     mallocFirstTime = 0;
@@ -1261,9 +1280,9 @@ static void *setSlot(Slot **sl,int userSize) {
     memory_charmdebug_internal = 0;
   }
   
-  char *user = (char *)*sl;
+  user = (char *)*sl;
   memory_charmdebug_internal = 1;
-  Slot *s = (Slot *)CkHashtablePut(block_slots, sl);
+  s = (Slot *)CkHashtablePut(block_slots, sl);
   memory_charmdebug_internal = 0;
   *sl = s;
 
@@ -1314,9 +1333,10 @@ static void *setSlot(Slot **sl,int userSize) {
   }
   if (saveAllocationHistory) {
     if (allocatedSinceSize >= allocatedSinceMaxSize) {
+      Slot **newAllocatedSince;
       allocatedSinceMaxSize += 10;
       BEFORE_MALLOC_CALL;
-      Slot **newAllocatedSince = (Slot**)mm_malloc((allocatedSinceMaxSize)*sizeof(Slot*));
+      newAllocatedSince = (Slot**)mm_malloc((allocatedSinceMaxSize)*sizeof(Slot*));
       memcpy(newAllocatedSince, allocatedSince, allocatedSinceSize*sizeof(Slot*));
       mm_free(allocatedSince);
       AFTER_MALLOC_CALL;
@@ -1390,8 +1410,8 @@ int cpdInitializeMemory;
 void CpdSetInitializeMemory(int v) { cpdInitializeMemory = v; }
 
 static void meta_init(char **argv) {
-  status("Converse -memory mode: charmdebug\n");
   char buf[100];
+  status("Converse -memory mode: charmdebug\n");
   sprintf(buf, "slot size %d\n", (int)sizeof(Slot));
   status(buf);
   CmiMemoryIs_flag|=CMI_MEMORY_IS_CHARMDEBUG;
@@ -1423,8 +1443,8 @@ static void meta_init(char **argv) {
   }
 #ifdef CPD_USE_MMAP
   if (CmiGetArgFlagDesc(argv,"+memory_mprotect", "Use mprotect to protect memory of other chares")) {
-    CpdMprotect = 1;
     struct sigaction sa;
+    CpdMprotect = 1;
     sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESTART;
     sigemptyset(&sa.sa_mask);
     sa.sa_sigaction = CpdMMAPhandler;
@@ -1442,12 +1462,13 @@ static void meta_init(char **argv) {
 static void *meta_malloc(size_t size) {
   void *user;
   if (memory_charmdebug_internal==0) {
+    Slot *s;
     dumpStackFrames();
     BEFORE_MALLOC_CALL;
 #if CPD_USE_MMAP
-    Slot *s=(Slot *)mmap(NULL, SLOTSPACE+size+numStackFrames*sizeof(void*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    s=(Slot *)mmap(NULL, SLOTSPACE+size+numStackFrames*sizeof(void*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #else
-    Slot *s=(Slot *)mm_malloc(SLOTSPACE+size+numStackFrames*sizeof(void*));
+    s=(Slot *)mm_malloc(SLOTSPACE+size+numStackFrames*sizeof(void*));
 #endif
     AFTER_MALLOC_CALL;
     if (s!=NULL) {
@@ -1475,6 +1496,7 @@ static void *meta_malloc(size_t size) {
 
 static void meta_free(void *mem) {
   if (memory_charmdebug_internal==0) {
+    int memSize;
     Slot *s;
     if (mem==NULL) return; /*Legal, but misleading*/
     s=UserToSlot(mem);
@@ -1503,7 +1525,7 @@ static void meta_free(void *mem) {
     CmiAssert(s->userData == mem);
 #endif
     
-    int memSize = 0;
+    memSize = 0;
     if (mem!=NULL) memSize = s->userSize;
     memory_allocated_user_total -= memSize;
 #if ! CMK_BIGSIM_CHARM
@@ -1533,11 +1555,12 @@ static void meta_free(void *mem) {
     else if ((s->magic&~FLAGS_MASK)==SLOTMAGIC)
     { /*Ordinary allocated block */
       int freeSize=SLOTSPACE+s->userSize+s->stackLen*sizeof(void*);
+      void *ptr;
       freeSlot(s);
 #ifdef CMK_SEPARATE_SLOT
-      void *ptr = mem;
+      ptr = mem;
 #else
-      void *ptr = s;
+      ptr = s;
 #endif
       BEFORE_MALLOC_CALL;
 #if CPD_USE_MMAP
@@ -1585,15 +1608,19 @@ static void *meta_realloc(void *oldBuffer, size_t newSize) {
 
 static void *meta_memalign(size_t align, size_t size) {
   int overhead = align;
+  char *alloc;
+  Slot *s;
+  void *user;
+
   while (overhead < SLOTSPACE+sizeof(SlotStack)) overhead += align;
   /* Allocate the required size + the overhead needed to keep the user alignment */
   dumpStackFrames();
 
   BEFORE_MALLOC_CALL;
-  char *alloc=(char *)mm_memalign(align,overhead+size+numStackFrames*sizeof(void*));
+  alloc=(char *)mm_memalign(align,overhead+size+numStackFrames*sizeof(void*));
   AFTER_MALLOC_CALL;
-  Slot *s=(Slot*)(alloc+overhead-SLOTSPACE);
-  void *user=setSlot(&s,size);
+  s=(Slot*)(alloc+overhead-SLOTSPACE);
+  user=setSlot(&s,size);
   s->magic = SLOTMAGIC_VALLOC + (s->magic&0xF);
   s->extraStack = (SlotStack *)alloc; /* use the extra space as stack */
   s->extraStack->protectedMemory = NULL;
@@ -1629,8 +1656,9 @@ void setMemoryTypeChare(void *ptr) {
   sl->magic = (sl->magic & ~FLAGS_MASK) | CHARE_TYPE;
   sl->chareID = nextChareID;
   if (nextChareID >= chareObjectMemorySize) {
+    void **newChare;
     BEFORE_MALLOC_CALL;
-    void **newChare = (void**)mm_malloc((nextChareID+100) * sizeof(void*));
+    newChare = (void**)mm_malloc((nextChareID+100) * sizeof(void*));
     AFTER_MALLOC_CALL;
     memcpy(newChare, chareObjectMemory, chareObjectMemorySize*sizeof(void*));
     chareObjectMemorySize = nextChareID+100;

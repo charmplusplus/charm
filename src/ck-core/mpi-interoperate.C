@@ -6,7 +6,7 @@ static int   _libExitStarted = 0;
 int    _libExitHandlerIdx;
 
 #if CMK_CONVERSE_MPI
-extern "C" { MPI_Comm charmComm; }
+extern  "C" { extern MPI_Comm charmComm ;}
 #endif
 
 extern int _ringexit;		    // for charm exit

@@ -339,7 +339,7 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
     for (int i=0; i<n; ++i) locMgr[i] = gid[i];
     numLocMgrWB = nWB;
     locMgrWB = new CkGroupID[nWB];
-    for (int i=0; i<n; ++i) locMgrWB[i] = gidWB[i];
+    for (int i=0; i<nWB; ++i) locMgrWB[i] = gidWB[i];
     maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
@@ -564,6 +564,7 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
         chunkAck[i] = localChares.count;
         chunkAckWB[i] = localCharesWB.count;
         chunkWeight[i] = 0;
+        //CkPrintf("[%d] CkCache::cacheSync group %d ack %d ackWb %d\n", CkMyPe(), this->thisgroup.idx, chunkAck[i], chunkAckWB[i]);
       }
       
 #if COSMO_STATS > 0
@@ -577,6 +578,7 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
 
   template<class CkCacheKey>
   void CkCacheManager<CkCacheKey>::writebackChunk(int chunk) {
+    //CkPrintf("[%d] CkCache::writebackChunk group %d ackWb %d\n", CkMyPe(), this->thisgroup.idx, chunkAckWB[chunk]);
     CkAssert(chunkAckWB[chunk] > 0);
     if (--chunkAckWB[chunk] == 0) {
       // we can safely write back the chunk to the senders
@@ -593,6 +595,7 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
 
   template<class CkCacheKey>
   void CkCacheManager<CkCacheKey>::finishedChunk(int chunk, CmiUInt8 weight) {
+    //CkPrintf("[%d] CkCache::finishedChunk group %d ack %d\n", CkMyPe(), this->thisgroup.idx, chunkAck[chunk]);
     CkAssert(chunkAck[chunk] > 0);
     chunkWeight[chunk] += weight;
     //CkPrintf("Cache %d: finishedChunk %d\n",thisgroup.idx,chunkAck[chunk]);

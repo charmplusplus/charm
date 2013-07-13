@@ -1,4 +1,5 @@
-\charmpp has been augmented with support for partitioning. The key idea is to
+With the latest 6.5.0 release, \charmpp has been augmented with support for 
+partitioning. The key idea is to
 divide the allocated set of nodes into subsets that run independent \charmpp
 instances. These \charmpp instances (called partitions from now on) have a
 unique identifier, can be programmed to do different tasks, and can interact
@@ -29,53 +30,95 @@ stack. This rank also (generally) coincides with the rank provided to processors
 by the underlying job scheduler. The importance of these ranks derive from the 
 fact that they are used for multiple purposes. Partitioning leads to segregation of the 
 notion of ranks at different levels of Charm++ stack. What used to be the PE is now a 
-local rank within a partition running a Charm++ instance. Existing methods such as CkMyPe,
-CkMyNode, CmiMyPe, CmiMyNode etc continue to provide these local ranks. Hence, existing 
+local rank within a partition running a Charm++ instance. Existing methods such as {\tt CkMyPe()},
+{\tt CkMyNode()}, { \tt CmiMyPe()}, etc continue to provide these local ranks. Hence, existing 
 codes do not require any change as long as inter-partition interaction is not required. 
 
 On the other hand, machine layer is provided with the target ranks that
-are globally unique. These ranks can be obtained using functions with Global
-suffix such as CmiNumNodesGlobal, CmiMyNodeGlobal, CmiMyPeGlobal etc.
+are globally unique. These ranks can be obtained using functions with \emph{Global}
+suffix such as {\tt CmiNumNodesGlobal()}, {\tt CmiMyNodeGlobal()}, {\tt CmiMyPeGlobal()} etc.
 
 Converse, which operates at a layer between Charm++ and machine layer,
 performs the required transitions. It maintains relevant information for any
 conversion. Information related to partitions can be obtained using Converse
-level functions such as CmiMyPartition, CmiPartitionSize, CmiNumPartitions
+level functions such as {\tt CmiMyPartition()}, {\tt CmiNumPartitions()}, 
 etc. If required, one can also obtain the mapping of a local rank to a global
-rank using functions such as CmiGetPeGlobal, CmiGetNodeGlobal,  CmiGetPeLocal,
-CmiGetNodeLocal etc.       
+rank using functions such as {\tt CmiGetPeGlobal(int perank, int partition)} and 
+{\tt CmiGetNodeGlobal(int noderank, int partition)}. These functions
+take two arguments - the local rank and the partition number. For example, 
+CmiGetNodeGlobal(5, 2) will return the global rank of the node that belongs to 
+partition 2 and has a local rank of 5 in partition 2. The inverse 
+translation, from global rank to local rank, is not supported.
 
 
 \section{Startup and Partitioning}
 
-Any user who wants to run multiple partitions in one single job can provide a
-run time parameter \emph{+partitions <part\_numbers>} or \emph{+replicas
-<replica\_number>}.
-Converse startup will pick this up, and initialize the necessary data
-structure for such a division, and other conversions.  Currently, we have
-implemented a simple blocked-division scheme that divides the available
-resources among partitions. The entire partitioning step, in this sense, is
-transparent to the user. In future, we will provide hooks for each of these
-key functions – initial partitioning, rank conversion, and global coordination
-– that will enable the users to fully customize replica creation as per their
-requirements.
+A number of compile time and runtime parameters are available for users who want 
+to run multiple partitions in one single job.
+
+\begin{itemize}
+\item Runtime parameter: {\tt +partitions <part\_number>} or {\tt +replicas
+<replica\_number>} - number of partitions to be created. If no further options are
+provided, allocated cores/nodes are divided equally among partitions. Only this option 
+is supported from the 6.5.0 release; remaining options are supported starting 6.6.0.
+
+\item Runtime parameter: {\tt +master\_partition} - assign one core/node as the master 
+partition (partition 0), and divide the remaining cores/nodes equally among remaining
+partitions.
+
+\item Runtime parameter: {\tt +partition\_sizes L[-U[:S[.R]]]\#W[,...]} - defines the size of 
+partitions.  A single number identifies a particular partition. Two numbers separated by
+a dash identify an inclusive range (\emph{lower bound} and \emph{upper bound}). If they 
+are followed by a colon and another number (a \emph{stride}), that range will be stepped 
+through in increments of the additional number. Within each stride, a dot followed by a
+\emph{run} will indicate how many partitions to use from that starting point.  Finally, 
+a compulsory number sign (\#) followed by a \emph{width} defines the size of each of the
+partitions identified so far. For example, the sequence {\tt 0-4:2\#10,1\#5,3\#15} states that 
+partitions 0, 2, 4 should be of size 10, partition 1 of size 5 and partition 3 of size 15. 
+In SMP mode, these sizes are in terms of nodes. All workers threads associated with a node are
+assigned to the partition of the node. This option conflicts with {\tt +assign\_master}.
+
+\item Runtime parameter: {\tt +partition\_topology} - use a default topology aware scheme
+to partition the allocated nodes. 
+
+\item Runtime parameter: {\tt +partition\_topology\_scheme <scheme>} - use the given scheme
+to partition the allocated nodes. Currently, two generalized schemes are supported that 
+should be useful on torus networks. If scheme is set to 1, allocated nodes are traversed 
+plane by plane during partitioning. A hilbert curve based traversal is used with scheme 2.
+
+\item Compilation parameter: {\tt -custom-part}, runtime parameter: {\tt +use\_custom\_partition} -
+enables use of user defined partitioning. In order to implement a new partitioning scheme, 
+a user must link an object exporting a C function with following prototype: \\ 
+
+extern ``C'' void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);\\
+{\tt numparts} (input) - number of partitions to be created. \\
+{\tt partitionSize} (input) - an array that contains size of each partition. \\
+{\tt nodeMap} (output, preallocated) - a preallocated array of length {\tt CmiNumNodesGlobal()}.
+Entry \emph{i} in this array specifies the new global node rank of a node with default node rank \emph{i}. 
+The entries in this array are block wise divided to create partitions, i.e entries 0 to 
+partitionSize[0]-1 belong to partition 1, partitionSize[0] to
+partitionSize[0]+partitionSize[1]-1 to partition 2 and so on.\\
+
+When this function is invoked to create partitions, TopoManager is configured to 
+view all the allocated node as one partition. Partition based API is yet to be 
+initialized, and should not be used. A link time parameter {\tt -custom-part} 
+is required to be passed to {\tt charmc} for successful compilation.
+\end{itemize}
 
 \section{Redirecting output from individual partitions}
 Output to standard output (stdout) from various partitions can be directed 
 to separate files by passing the target path as a command line option. The run
-time parameter \emph{+stdout <path>} is to be used for this purpose. The
-\emph{<path>} may
-contain the C format specifier \emph{\%d}, which will be replaced by the
+time parameter {\tt +stdout <path>} is to be used for this purpose. The
+{\tt <path>} may contain the C format specifier \emph{\%d}, which will be replaced by the
 partition number. In case, \emph{\%d} is specified multiple times, only the first
-three instances from the left will be replaced by the partition number (and rest
-will contain garbage values). In case, a format specifier is not specified, 
+three instances from the left will be replaced by the partition number (other or additional format specifiers will result in undefined behavior). If a format specifier is not specified, 
 the partition number will be appended as a suffix to the specified path. Example usage:
 
 \begin{itemize}
-\item \emph{+stdout out/\%d/log} will write to \emph{out/0/log, out/1/log,
+\item {\tt +stdout out/\%d/log} will write to \emph{out/0/log, out/1/log,
 out/2/log,} $\cdots$.
-\item \emph{+stdout log} will write to \emph{log.0, log.1, log.2,} $\cdots$.
-\item \emph{+stdout out/\%d/log\%d} will write to \emph{out/0/log0, out/1/log1,
+\item {\tt +stdout log} will write to \emph{log.0, log.1, log.2,} $\cdots$.
+\item {\tt +stdout out/\%d/log\%d} will write to \emph{out/0/log0, out/1/log1,
 out/2/log2,} $\cdots$.
 \end{itemize}
 

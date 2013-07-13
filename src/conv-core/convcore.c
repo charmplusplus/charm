@@ -73,6 +73,10 @@
 
 extern const char * const CmiCommitID;
 
+#if CMK_BIGSIM_CHARM
+extern void initQd(char **argv);
+#endif
+
 #if CMK_OUT_OF_CORE
 #include "conv-ooc.h"
 #endif
@@ -606,10 +610,11 @@ int CmiIsFortranLibraryCall() {
   if (nLevels>0) {
     int i;
     char **names=CmiBacktraceLookup(stackPtrs,nLevels);
+    const char *trimmed;
     if (names==NULL) return 0;
     for (i=0;i<nLevels;i++) {
       if (names[i] == NULL) continue;
-      const char *trimmed=_implTrimParenthesis(names[i], 1);
+      trimmed=_implTrimParenthesis(names[i], 1);
       if (strncmp(trimmed, "for__", 5) == 0                /* ifort */
           || strncmp(trimmed, "_xlf", 4) == 0               /* xlf90 */
           || strncmp(trimmed, "_xlfBeginIO", 11) == 0 
@@ -3578,10 +3583,22 @@ void ConverseCommonInit(char **argv)
   CmiReductionsInit();
   CIdleTimeoutInit(argv);
   
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp and multicore versions*/
+  if(CmiGetArgFlagDesc(argv, "+CmiSpinOnIdle", "Force the runtime system to spin on message reception when idle, rather than sleeping")) {
+    if(CmiMyRank() == 0) _Cmi_forceSpinOnIdle = 1;
+  }
+  if(CmiGetArgFlagDesc(argv, "+CmiSleepOnIdle", "Force the runtime system to sleep when idle, rather than spinning on message reception")) {
+    if(CmiMyRank() == 0) _Cmi_sleepOnIdle = 1;
+  }
   if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for net-smp-*) ?")){
-    if(CmiMyRank() == 0) _Cmi_noprocforcommthread=1;
-   }
+    if (CmiMyPe() == 0) {
+      CmiPrintf("Charm++> Note: The option +CmiNoProcForComThread has been superseded by +CmiSleepOnIdle\n");
+    }
+    if(CmiMyRank() == 0) _Cmi_sleepOnIdle=1;
+  }
+  if (_Cmi_sleepOnIdle && _Cmi_forceSpinOnIdle) {
+    if(CmiMyRank() == 0) CmiAbort("The option +CmiSpinOnIdle is mutually exclusive with the options +CmiSleepOnIdle and +CmiNoProcForComThread");
+  }
 #endif
 	
 #if CMK_TRACE_ENABLED
@@ -3624,7 +3641,6 @@ void ConverseCommonInit(char **argv)
 
 #if CMK_BIGSIM_CHARM
    /* have to initialize QD here instead of _initCharm */
-  extern void initQd(char **argv);
   initQd(argv);
 #endif
 }

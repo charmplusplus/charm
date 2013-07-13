@@ -93,6 +93,10 @@ do
      shift
      nPE=$1
      ;;
+  -n)
+     shift
+     nPE=$1
+     ;;
   -np*)
      nPE=`echo $1 | sed -e 's/^-np//'`
      ;;

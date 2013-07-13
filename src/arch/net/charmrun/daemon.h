@@ -34,7 +34,7 @@ character (returned to conv-host) and an error message
 const static struct {
 				int errorCode;
 				char statusCode;/*'G'->sucess; all others failure*/
-				char *reason;
+				const char *reason;
 } daemon_errtab[]= {
 				{ERROR_FILE_NOT_FOUND,'F',"executable not found."},
 				{-1,'D',"directory not found."},

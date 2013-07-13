@@ -655,16 +655,18 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
   pup_int(p, &t->magic);
 
 #if CMK_THREADS_BUILD_TLS
-  void* aux;
-  pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
-  aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
-  /* fixme: tls global variables handling needs isomalloc */
+  {
+    void* aux;
+    pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
+    aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
+    /* fixme: tls global variables handling needs isomalloc */
 #if CMK_USE_MEMPOOL_ISOMALLOC
-  pup_bytes(p,&aux,sizeof(char*));
+    pup_bytes(p,&aux,sizeof(char*));
 #else
-  CmiIsomallocPup(p, &aux);
+    CmiIsomallocPup(p, &aux);
 #endif
-  /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
+    /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
+  }
 #endif
 }
 
@@ -935,8 +937,9 @@ static void CthThreadFree(CthThread t)
 void CthFree(t)
   CthThread t;
 {
+  CthProcInfo proc;
   if (t==NULL) return;
-  CthProcInfo proc = CthCpvAccess(CthProc);	
+  proc = CthCpvAccess(CthProc);
 
   if (t != CthSelf()) {
     CthThreadFree(t);
@@ -998,17 +1001,18 @@ size_t CthStackOffset(CthThread t, char *p)
 
 char * CthPointer(CthThread t, size_t pos)
 {
-  char *stackbase;
+  char *stackbase, *p;
+  CthProcInfo proc;
   CmiAssert(t);
-  CthProcInfo proc = CthCpvAccess(CthProc);
+  proc = CthCpvAccess(CthProc);
   if (CthCpvAccess(CthCurrent) == t)    /* current thread uses current stack */
     stackbase = (char *)proc->stackbase;
   else                                  /* sleep thread uses its saved stack */
     stackbase = (char *)t->savedstack;
 #ifdef QT_GROW_DOWN
-  char *p = stackbase + t->savedsize + pos;
+  p = stackbase + t->savedsize + pos;
 #else
-  char *p = stackbase + pos;
+  p = stackbase + pos;
 #endif
   return p;
 }

@@ -98,6 +98,8 @@ SPU_USE_CPP=0
 SPU_EXTRA_LIBS=""
 
 MPI_INTEROPERATE=""
+NO_MAIN=""
+CUSTOM_PARTITION=""
 
 ####################################################################
 #
@@ -125,6 +127,7 @@ printUsage() {
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
     echo "        -fmoddir <f90mod path>"
     echo "        -pg <opt> -build-shared -charm-shared -no-trace-mpi"
+    echo "        -mpi -nomain -custom-part"
     echo
     echo "  Cell specific flags:"
     echo "        -spu-cpp -spu-lib <libname>"
@@ -785,6 +788,13 @@ do
 		;;
 	-mpi)
 		MPI_INTEROPERATE="yes"
+		NO_MAIN="yes"
+		;;
+	-nomain)
+		NO_MAIN="yes"
+		;;
+	-custom-part)
+		CUSTOM_PARTITION="yes"
 		;;
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
@@ -1383,6 +1393,9 @@ fi
 
 Debug "About to link..."
 
+# if interoperate dont create the library now, wait to collect all info
+if [ "$MPI_INTEROPERATE" = "" ]
+then
 case "$OBJECT" in
 *.o)
 	Debugf "Converting $FILES to $OBJECTFILES"
@@ -1438,6 +1451,7 @@ case "$OBJECT" in
 	Copyobj
 	;;
 esac
+fi
 # If the above case returns, we're not creating a .o or .a file,
 # so linking is needed.
 
@@ -1554,6 +1568,7 @@ then
         fi
 fi
 
+# dummy main module
 if [ "$MPI_INTEROPERATE" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/mpi-mainmodule.o $OBJECTFILES"
@@ -1781,6 +1796,12 @@ MAKE_LD="0"
 
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ "
 
+if [ "$CUSTOM_PARTITION" = "" ]
+then
+	CORE_LIBS="$CORE_LIBS $CHARMLIB/custom_partitioner.o"
+fi
+
+
 # get TAU stub makefile variables
 if test "$CMK_WITH_TAU" = "true"
 then
@@ -1801,6 +1822,10 @@ case "$LANGUAGE" in
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
+        if [ "$NO_MAIN" = "" ]
+        then
+	  MIDDLE_LIBS="$CHARMLIB/main.o $MIDDLE_LIBS"
+        fi
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
 		TAU_LIBS="$TAU_MPI_FLIBS $TAU_LIBS"
@@ -1811,6 +1836,10 @@ case "$LANGUAGE" in
 "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
+        if [ "$NO_MAIN" = "" ]
+        then
+	  MIDDLE_LIBS="$CHARMLIB/main.o $MIDDLE_LIBS"
+        fi
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
@@ -1851,7 +1880,13 @@ then
     LANG_LIBS="-L$CHARMLIBSO $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
   fi
 else
-  LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+# if interoperate, need a lib with moduleinit
+  if [ "$MPI_INTEROPERATE" != "" ]
+  then
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $PRE_LIBRARIES"
+  else
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+  fi
 fi
 if [ "$TRACE_WITH_TAU" = 1 ]
 then
@@ -1861,6 +1896,28 @@ else
 	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS"
 fi
 Debugf "All libraries are: $ALL_LIBS"
+
+#currently only support creation of .a
+if [ "$MPI_INTEROPERATE" != "" ]
+then
+case "$OBJECT" in
+*.a)
+	# in case building charm so, build .so under lib_so as well # Gengbin
+	DoNoErrCheck $RM $OBJECT
+        echo "$CMK_AR $OBJECT $OBJECTFILES $modInitObj"
+	Do $CMK_AR $OBJECT $OBJECTFILES $modInitObj
+	Do $CMK_RANLIB $OBJECT
+        echo "export CHARM_ALL_LIBS=\"$ALL_LIBS\"" > ./charm_all_libs.sh
+        echo "CHARM_ALL_LIBS=\"$ALL_LIBS\""
+	Copyobj
+	;;
+esac
+fi
+  
+if [ "$MPI_INTEROPERATE" != "" ]
+then
+  ALL_LIBS="$OBJECTFILES $modInitObj $ALL_LIBS"
+fi
 
 if [ "$BUILD_SHARE" = "1" -a "$CHARM_SHARED" = "1" ]
 then

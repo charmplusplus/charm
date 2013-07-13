@@ -35,6 +35,10 @@
 #include "TopoManager.h"
 #endif
 
+#if CMK_BLUEGENEQ
+#include "spi/include/kernel/process.h"
+#endif
+
 #if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
@@ -84,11 +88,11 @@ struct _SYSTEM_INFO sysinfo;
 #elif defined(_SC_NPROC_ONLN)
   a = sysconf(_SC_NPROC_ONLN); /* number of active/running CPUs */
 #endif
-  if (a == -1) a = 1;
+#if CMK_BLUEGENEQ
+  a *= Kernel_ProcessCount();
+#endif
 
-#if defined(ARCH_HPUX11) || defined(ARCH_HPUX10)
-  a = mpctl(MPC_GETNUMSPUS, 0, 0); /* total number of CPUs */
-#endif /* HPUX */
+  if (a == -1) a = 1;
 
   return a;
 }

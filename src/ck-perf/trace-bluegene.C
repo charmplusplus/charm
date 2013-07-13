@@ -254,13 +254,13 @@ extern "C" void BgPrintf(const char *str)
   BgPrint(str);
 }
 
-void TraceBluegene::bgMark(char* str){
+void TraceBluegene::bgMark(const char* str){
   double curT = BgGetTime();
   if (genTimeLog)
     bgAddProjEvent(strdup(str), -1, curT, writeData, this, BG_EVENT_MARK);
 }
 
-extern "C" void BgMark(char *str)
+extern "C" void BgMark(const char *str)
 {
   BgMark_(str);
 }

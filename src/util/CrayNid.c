@@ -79,7 +79,7 @@ int getMeshCoord(int nid, int *x, int *y, int *z) {
   return *x==-1?-1:0;
   }
 #else
-  CmiAbort("rca_get_meshcoord not exist");
+  CmiAbort("rca_get_meshcoord does not exist");
   return -1;
 #endif
 }
@@ -143,7 +143,7 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   maxZ = *zdim = dimsize.mesh_z+1;
   maxNID = 0;
 
-  for(i = 0; i < CmiNumNodes(); i++) {
+  for(i = 0; i < CmiNumNodesGlobal(); i++) {
     PMI_Get_nid(i, &nid);
     if(nid >= maxNID) maxNID = nid + 1;
   }
@@ -182,11 +182,36 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   /* printf("%d %d %d %d\n", *maxnid, *xdim, *ydim, *zdim); */
 }
 
+void craynid_free()
+{
+  CmiLock(cray_lock);
+  free(pid2nid);
+  pid2nid = NULL;
+#if CMK_HAS_RCALIB
+  free(rca_coords);
+  rca_coords = NULL;
+#endif
+  CmiUnlock(cray_lock);
+}
+
+void craynid_reset()
+{
+  craynid_free();
+  CmiLock(cray_lock);
+  maxX = -1;
+  maxY = -1;
+  maxZ = -1;
+  maxNID = -1;
+  CmiUnlock(cray_lock);
+}
+
 void craynid_init()
 {
-  if (CmiMyRank()==0) {
+  static init_done = 0;
+  if (CmiMyRank()==0 && !init_done) {
     cray_lock = CmiCreateLock();
     cray_lock2 = CmiCreateLock();
+    init_done = 1;
   }
 }
 

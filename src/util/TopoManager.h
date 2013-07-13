@@ -14,6 +14,38 @@
 
 #include "converse.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+/** basic initialization */
+void TopoManager_init();
+/** redo the initialization */
+void TopoManager_reset();
+/** free the current occupant */
+void TopoManager_free();
+/** print allocation */
+void TopoManager_printAllocation(FILE *fp);
+/** get the number physical dimensions */
+void TopoManager_getDimCount(int *ndims);
+/** get the length of dimensions, last one is core/process/thread count */
+void TopoManager_getDims(int *dims);
+/** get coordinates of a logical node */
+void TopoManager_getCoordinates(int rank, int *coords);
+/** get coordinate of a PE, includes an additional dim */
+void TopoManager_getPeCoordinates(int rank, int *coords);
+/** get ranks of logical nodes at a coordinate */
+void TopoManager_getRanks(int *rank_cnt, int *ranks, int *coords);
+/** get rank of PE at a coordinate */
+void TopoManager_getPeRank(int *rank, int *coords);
+/** get hops betweens Pes */
+void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops);
+/** topoaware partition using scheme s */
+void TopoManager_createPartitions(int scheme, int *nodeMap);
+
+#if defined(__cplusplus)
+}
+
 #if CMK_BLUEGENEL
 #include "BGLTorus.h"
 #elif CMK_BLUEGENEP
@@ -172,5 +204,5 @@ class TopoManager {
     void quicksort(int pe, int *pes, int *arr, int left, int right);
     int partition(int pe, int *pes, int *idx, int left, int right);
 };
-
+#endif
 #endif //_TOPO_MANAGER_H_

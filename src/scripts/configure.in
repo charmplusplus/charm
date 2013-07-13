@@ -792,17 +792,6 @@ EOT
 test_cc "whether inline works in C" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_C_INLINE, $strictpass, [whether C inline works in C])
 
-#### check explicit ####
-cat > $t <<EOT
-#include <stdlib.h>
-class er {
- protected:
-   explicit er(unsigned int inType) {};
-};
-EOT
-test_cxx "whether C++ class explicit keyword works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_EXPLICIT, $pass, [whether C++ class explicit keyword works])
-
 #### check if signed char is same as char ####
 cat > $t <<EOT
 #include <stdlib.h>
@@ -814,15 +803,6 @@ class er {
 EOT
 test_cxx "whether C++ signed char and char differ" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIGNEDCHAR_DIFF_CHAR, $pass, [whether C++ signed char and char differ])
-
-#### check if C++ casts work ####
-cat > $t <<EOT
-int foo(float *t) {return *reinterpret_cast<int *>(t);}
-EOT
-test_cxx "whether C++ *_casts<> work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_CPP_CAST_LEGAL, $pass, [C++ *_casts<> work])
-AC_DEFINE_UNQUOTED(CMK_CPP_CAST_ILLEGAL, $fail, [C++ *_casts<> does not work])
-
 
 ### check if varsize array on stack ####
 cat > $t <<EOT
@@ -836,16 +816,6 @@ void foo()
 EOT
 test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_DECLARE_VARSIZE_ARRAY, $pass, [whether C++ allows declaration of variable sized array])
-
-#### check if namespaces can be defined #####
-cat > $t <<EOT
-namespace foo {
-	int x;
-}
-EOT
-test_cxx "whether namespaces work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail, [whether namespaces work])
-
 
 #### check if typeinfo exists and works #####
 cat > $t <<EOT
@@ -1292,6 +1262,17 @@ int main() {
 EOT
 test_link "whether has system" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SYSTEM, $pass, [whether has system])
+
+#### test for sync() ###
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  sync();
+  return 0;
+}
+EOT
+test_link "whether has sync()" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SYNC_FUNC, $pass, [whether has system])
 
 #### test for sbrk ###
 cat > $t <<EOT

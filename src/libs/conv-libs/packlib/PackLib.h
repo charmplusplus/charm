@@ -60,15 +60,9 @@ public:
   int buffer_size() const { return bytes + sizeof(int); };
 
   PackErr fill_buffer(void *const buffer, int buf_bytes) {
-#if CMK_CPP_CAST_LEGAL
     char* buf_ptr = static_cast<char*>(buffer);
     if (buf_bytes >= sizeof(int))
       *(static_cast<int*>(buffer)) = buf_bytes;
-#else
-    char* buf_ptr = (char*)buffer;
-    if (buf_bytes >= sizeof(int))
-      *((int*)buffer) = buf_bytes;
-#endif
 
     buf_ptr += sizeof(int);
     buf_bytes -= sizeof(int);
@@ -77,7 +71,6 @@ public:
     while (cur_item = dequeue()) {
       const void* item_ptr;
 
-#if CMK_CPP_CAST_LEGAL
       if (cur_item->type == t_char) {
 	item_ptr = static_cast<const void*>(&cur_item->cdat);
       } else if (cur_item->type == t_uchar) {
@@ -97,45 +90,16 @@ public:
       } else if (cur_item->type == t_voidp) {
 	item_ptr = static_cast<const void*>(cur_item->arr);
       } else return EType;
-#else
-      if (cur_item->type == t_char) {
-	item_ptr = (const void*)(&cur_item->cdat);
-      } else if (cur_item->type == t_uchar) {
-	item_ptr = (const void*)(&cur_item->ucdat);
-      } else if (cur_item->type == t_int) {
-	item_ptr = (const void*)(&cur_item->idat);
-      } else if (cur_item->type == t_uint) {
-	item_ptr = (const void*)(&cur_item->uidat);
-      } else if (cur_item->type == t_long) {
-	item_ptr = (const void*)(&cur_item->ldat);
-      } else if (cur_item->type == t_ulong) {
-	item_ptr = (const void*)(&cur_item->uldat);
-      } else if (cur_item->type == t_float) {
-	item_ptr = (const void*)(&cur_item->fdat);
-      } else if (cur_item->type == t_double) {
-	item_ptr = (const void*)(&cur_item->ddat);
-      } else if (cur_item->type == t_voidp) {
-	item_ptr = (const void*)(cur_item->arr);
-      } else return EType;
-#endif
 
       const int ibytes = cur_item->size;
       if (debug && buf_bytes >= sizeof(int)) {
-#if CMK_CPP_CAST_LEGAL
 	const char* cptr = reinterpret_cast<const char*>(&ibytes);
-#else
-	const char* cptr = (const char*)(&ibytes);
-#endif
 	for(int i=0; i < sizeof(int); i++)
 	  *buf_ptr++ = *cptr++;
 	buf_bytes -= sizeof(int);
       }
       
-#if CMK_CPP_CAST_LEGAL
       const char* cptr = static_cast<const char*>(item_ptr);
-#else
-      const char* cptr = (const char*)(item_ptr);
-#endif
       if (buf_bytes >= ibytes) {
 	for(int i=0; i < ibytes; i++) {
 	  *buf_ptr++ = *cptr++;
@@ -210,88 +174,56 @@ private:
     item(const char *i, const int _size) { 
       size = _size * sizeof(char);
       type = t_voidp;
-#if CMK_CPP_CAST_LEGAL
       arr = static_cast<const void*>(i); 
-#else
-      arr = (const void*)(i); 
-#endif
       nxt = 0; 
     };
 
     item(const unsigned char *i, const int _size) { 
       size = _size * sizeof(unsigned char);
       type = t_voidp;
-#if CMK_CPP_CAST_LEGAL
       arr = static_cast<const void*>(i); 
-#else
-      arr = (const void*)(i); 
-#endif
       nxt = 0; 
     };
 
     item(const int *i, const int _size) { 
       size = _size * sizeof(int);
       type = t_voidp;
-#if CMK_CPP_CAST_LEGAL
       arr = static_cast<const void*>(i); 
-#else
-      arr = (const void*)(i); 
-#endif
       nxt = 0; 
     };
 
     item(const unsigned int *i, const int _size) { 
       size = _size * sizeof(unsigned int);
       type = t_voidp;
-#if CMK_CPP_CAST_LEGAL
       arr = static_cast<const void*>(i); 
-#else
-      arr = (const void*)(i); 
-#endif
       nxt = 0; 
     };
 
     item(const long *i, const int _size) { 
       size = _size * sizeof(long);
       type = t_voidp;
-#if CMK_CPP_CAST_LEGAL
       arr = static_cast<const void*>(i); 
-#else
-      arr = (const void*)(i); 
-#endif
       nxt = 0; 
     };
 
     item(const unsigned long *i, const int _size) { 
       size = _size * sizeof(unsigned long);
       type = t_voidp;
-#if CMK_CPP_CAST_LEGAL
       arr = static_cast<const void*>(i); 
-#else
-      arr = (const void*)(i); 
-#endif
       nxt = 0; 
     };
 
     item(const float *i, const int _size) { 
       size = _size * sizeof(float);
       type = t_voidp;
-#if CMK_CPP_CAST_LEGAL
       arr = static_cast<const void*>(i); 
-#else
-      arr = (const void*)(i); 
-#endif
       nxt = 0; 
     };
 
     item(const double *i, const int _size) { 
       size = _size * sizeof(double);
       type = t_voidp;
-#if CMK_CPP_CAST_LEGAL
       arr = static_cast<const void*>(i); 
-#else
-      arr = (const void*)(i); 
-#endif
       nxt = 0; 
     };
 
@@ -342,18 +274,12 @@ class Unpacker {
 public:
   Unpacker(const void *const _buffer, bool _debug = false) {
     buffer = _buffer;
-#if CMK_CPP_CAST_LEGAL
     bufsz = *(static_cast<const int*>(buffer)) - sizeof(int);
     buf_ptr = static_cast<const char*>(buffer) + sizeof(int);
-#else
-    bufsz = *((const int*)(buffer)) - sizeof(int);
-    buf_ptr = (const char*)(buffer) + sizeof(int);
-#endif
     unpacked = sizeof(int);
     debug = _debug;
   };
 
-#if CMK_CPP_CAST_LEGAL
   PackErr unpack(char *i) { 
     return unpack_item(static_cast<void*>(i), sizeof(char));
   };
@@ -405,70 +331,13 @@ public:
   PackErr unpack(double *i,const int items) {
     return unpack_item(static_cast<void*>(i), sizeof(double)*items);
   };
-#else
-  PackErr unpack(char *i) { 
-    return unpack_item((void*)(i), sizeof(char));
-  };
-  PackErr unpack(unsigned char *i) { 
-    return unpack_item((void*)(i), sizeof(unsigned char));
-  };
-  PackErr unpack(int *i) { 
-    return unpack_item((void*)(i), sizeof(int));
-  };
-  PackErr unpack(unsigned int *i) {
-    return unpack_item((void*)(i), sizeof(unsigned int));
-  };
-  PackErr unpack(long *i) { 
-    return unpack_item((void*)(i), sizeof(long));
-  };
-  PackErr unpack(unsigned long *i) {
-    return unpack_item((void*)(i), sizeof(unsigned long));
-  };
-  PackErr unpack(float *i) {
-    return unpack_item((void*)(i), sizeof(float));
-  };
-  PackErr unpack(double *i) {
-    return unpack_item((void*)(i), sizeof(double));
-  };
-  PackErr unpack(char *i,const int items) { 
-    return unpack_item((void*)(i), sizeof(char)*items);
-  };
-  PackErr unpack(unsigned char *i,const int items) { 
-    return unpack_item((void*)(i), 
-		       sizeof(unsigned char)*items);
-  };
-  PackErr unpack(int *i,const int items) { 
-    return unpack_item((void*)(i), sizeof(int)*items);
-  };
-  PackErr unpack(unsigned int *i,const int items) {
-    return unpack_item((void*)(i), 
-		       sizeof(unsigned int)*items);
-  };
-  PackErr unpack(long *i,const int items) { 
-    return unpack_item((void*)(i), sizeof(long)*items);
-  };
-  PackErr unpack(unsigned long *i,const int items) {
-    return unpack_item((void*)(i),
-		       sizeof(unsigned long)*items);
-  };
-  PackErr unpack(float *i,const int items) {
-    return unpack_item((void*)(i), sizeof(float)*items);
-  };
-  PackErr unpack(double *i,const int items) {
-    return unpack_item((void*)(i), sizeof(double)*items);
-  };
-#endif
   int bytes_unpacked() { return unpacked; };
 
  private:
   PackErr unpack_item(void *item, int bytes) {
     if (debug) {
       int item_sz;
-#if CMK_CPP_CAST_LEGAL
       char* item_ptr = reinterpret_cast<char*>(&item_sz);
-#else
-      char* item_ptr = (char*)(&item_sz);
-#endif
       if (bufsz >= sizeof(int)) {
 	for(int i=0; i<sizeof(int); i++)
 	  *item_ptr++ = *buf_ptr++;
@@ -481,11 +350,7 @@ public:
       }
     }
 
-#if CMK_CPP_CAST_LEGAL    
     char* item_ptr = static_cast<char*>(item);
-#else
-    char* item_ptr = (char*)(item);
-#endif
     if (bufsz >= bytes) {
       for(int i=0; i<bytes; i++)
 	*item_ptr++ = *buf_ptr++;

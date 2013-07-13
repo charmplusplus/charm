@@ -2922,20 +2922,19 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	/*EVAC*/
 
 //First pass: find size of migration message
-	int bufSize;
+	size_t bufSize;
 	{
 		PUP::sizer p;
-		p(nManagers);
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		bufSize=p.size(); 
 	}
 
 //Allocate and pack into message
-	int doubleSize=bufSize/sizeof(double)+1;
 	CkArrayElementMigrateMessage *msg = 
-		new (doubleSize, 0) CkArrayElementMigrateMessage;
+		new (bufSize, 0) CkArrayElementMigrateMessage;
 	msg->idx=idx;
 	msg->length=bufSize;
+        msg->nManagers = nManagers;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     msg->gid = ckGetGroupID();
 #endif
@@ -2949,7 +2948,6 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	{
 		PUP::toMem p(msg->packData); 
 		p.becomeDeleting(); 
-		p(nManagers);
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		if (p.size()!=bufSize) {
 			CkError("ERROR! Array element claimed it was %d bytes to a "
@@ -3009,11 +3007,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		
 	PUP::fromMem p(msg->packData); 
 	
-	int nMsgMan;
-	p(nMsgMan);
-	if (nMsgMan<nManagers)
+	if (msg->nManagers < nManagers)
 		CkAbort("Array element arrived from location with fewer managers!\n");
-	if (nMsgMan>nManagers) {
+	if (msg->nManagers > nManagers) {
 		//Some array managers haven't registered yet-- throw it back
 		DEBM((AA"Busy-waiting for array registration on migrating %s\n"AB,idx2str(idx)));
 		thisProxy[CkMyPe()].immigrate(msg);
@@ -3035,7 +3031,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 			"packing PUP::er, but %d bytes in the unpacking PUP::er!\n",
 			msg->length,p.size());
 		CkError("(I have %d managers; he claims %d managers)\n",
-			nManagers,nMsgMan);
+			nManagers, msg->nManagers);
 		
 		CkAbort("Array element's pup routine has a direction mismatch.\n");
 	}

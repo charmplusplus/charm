@@ -325,6 +325,16 @@ void mpi_barrier(int *comm, int *ierr)
   *ierr = AMPI_Barrier(*comm);
 }
 
+void mpi_yield(int *comm, int *ierr)
+{
+  *ierr = AMPI_Yield(*comm);
+}
+
+void mpi_resume(int *dest, int *comm, int *ierr)
+{
+  *ierr = AMPI_Resume(*dest, *comm);
+}
+
 void mpi_bcast(void *buf, int *count, int *type, int *root, int *comm, 
    int *ierr)
 {

@@ -318,7 +318,7 @@ static void machine_exit(int status)
   MACHSTATE(3,"     machine_exit");
   machine_initiated_shutdown=1;
 
-  CmiDestroyLocks();		/* destory locks to prevent dead locking */
+  CmiDestroyLocks();		/* destroy locks to prevent dead locking */
   EmergencyExit();
 
   MachineExit();
@@ -367,7 +367,7 @@ static void KillOnAllSigs(int sigNo)
   }
 #endif
   
-  CmiDestroyLocks();		/* destory locks */
+  CmiDestroyLocks();
 
   if (sigNo==SIGSEGV) {
      sig="segmentation violation";
@@ -1700,30 +1700,6 @@ void LrtsAdvanceCommunication(int whileidle)
 /* must be called on every PE including communication processors */
 void LrtsBarrier()
 {
-  int len, size, i;
-  int status;
-  int numnodes = CmiNumNodes();
-  static int barrier_phase = 0;
-
-  if (Cmi_charmrun_fd == -1) return;                // standalone
-  if (numnodes == 1) {
-    CmiNodeAllBarrier();
-    return;
-  }
-
-  if (CmiMyRank() == 0) {
-    ctrl_sendone_locking("barrier",NULL,0,NULL,0);
-    while (barrierReceived != 1) {
-      CmiCommLock();
-      ctrl_getone();
-      CmiCommUnlock();
-    }
-    barrierReceived = 0;
-    barrier_phase ++;
-  }
-
-  CmiNodeAllBarrier();
-  /* printf("[%d] OUT of barrier %d \n", CmiMyPe(), barrier_phase); */
 }
 
 
@@ -1878,7 +1854,7 @@ void LrtsExit()
   MACHSTATE(2,"ConverseExit {");
   machine_initiated_shutdown=1;
 
-  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  //CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
   if (CmiMyRank()==0) CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
     if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/

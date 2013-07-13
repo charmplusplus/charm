@@ -50,9 +50,7 @@ extern "C" int ConverseDeliver(int pe);
 #define ConverseDeliver(pe)   1
 #endif
 
-#if ! CMK_NAMESPACES_BROKEN
 namespace Converse {
-#endif
 
 static inline int CkMyPe() { return CmiMyPe(); }
 static inline int CkNumPes() { return CmiNumPes(); }
@@ -114,9 +112,7 @@ public:
 };
 #endif
 
-#if ! CMK_NAMESPACES_BROKEN
 }
-#endif
 
 
 /*

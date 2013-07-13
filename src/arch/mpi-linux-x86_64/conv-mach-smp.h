@@ -12,16 +12,3 @@
 #undef CMK_TIMER_USE_SPECIAL
 #define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
-
-/*
-#undef CMK_MALLOC_USE_GNU_MALLOC
-#undef CMK_MALLOC_USE_OS_BUILTIN
-#define CMK_MALLOC_USE_GNU_MALLOC                          1
-#define CMK_MALLOC_USE_OS_BUILTIN                          0
-*/
-
-/*#define  CMK_USE_MFENCE                                    1 */
-/*#define  CMK_PCQUEUE_LOCK                                  1 */
-/*Replaced by CMK_NOT_USE_TLS_THREAD as the default case*/
-/*#define CMK_USE_TLS_THREAD                                 1*/
-

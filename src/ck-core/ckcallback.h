@@ -230,6 +230,10 @@ public:
 	
 	int isInvalid(void) const {return type==invalid;}
 
+        /// Does this callback point at something that may not be at the same
+        /// address after a checkpoint/restart cycle?
+        bool containsPointer() const;
+
 /**
  * Interface used by threaded callbacks:
  * Libraries should call these from their "start" entry points.

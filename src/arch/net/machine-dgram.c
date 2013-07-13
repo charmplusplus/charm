@@ -504,11 +504,14 @@ static void node_addresses_store(ChMessage *msg)
   ChNodeinfo *d=(ChNodeinfo *)(n32+1);
   int nodestart;
   int i,j,n;
+#if CMK_USE_IBVERBS
+  ChInfiAddr *remoteInfiAddr;
+#endif
   MACHSTATE(1,"node_addresses_store {");	
   _Cmi_numnodes=ChMessageInt(n32[0]);
 
 #if CMK_USE_IBVERBS
-  ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes]);
+  remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes]);
   if (Cmi_charmrun_fd == -1) {
     d = &((ChSingleNodeinfo*)n32)->info;
   }

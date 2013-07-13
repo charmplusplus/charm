@@ -1,0 +1,13 @@
+mainmodule migrateHello {
+  readonly CProxy_Main mainProxy;
+  readonly int nElements;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+  };
+
+ array [1D] MigrateHello {
+    entry MigrateHello(void);
+    entry void SayHi(int n);
+  };        	
+};

@@ -154,10 +154,8 @@ class er {
         TYPE_MASK   =0xFF00
   };
   unsigned int PUP_er_state;
-#if CMK_EXPLICIT
   explicit /* Makes constructor below behave better */
-#endif
-           er(unsigned int inType): PUP_er_state(inType) {} //You don't want to create raw PUP::er's.
+    er(unsigned int inType): PUP_er_state(inType) {} //You don't want to create raw PUP::er's.
  public:
   virtual ~er();//<- does nothing, but might be needed by some child
 

@@ -340,7 +340,7 @@ static void machine_exit(int status)
   MACHSTATE(3,"     machine_exit");
   machine_initiated_shutdown=1;
 
-  CmiDestroyLocks();		/* destory locks to prevent dead locking */
+  CmiDestroyLocks();		/* destroy locks to prevent dead locking */
   EmergencyExit();
 
 #if CMK_USE_GM
@@ -398,7 +398,7 @@ static void KillOnAllSigs(int sigNo)
   }
 #endif
   
-  CmiDestroyLocks();		/* destory locks */
+  CmiDestroyLocks();
 
   if (sigNo==SIGSEGV) {
      sig="segmentation violation";
@@ -763,10 +763,12 @@ static void parse_netstart(void)
         dataport = -1;
   }
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
+    {
 	char *cmi_num_nodes = getenv("CmiNumNodes");
 	if(cmi_num_nodes != NULL){
 		sscanf(cmi_num_nodes,"%d",&_Cmi_numnodes);
 	}
+    }
 #endif	
 }
 
@@ -1048,7 +1050,7 @@ void CmiPushPE(int pe,void *msg)
 #endif
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  if (_Cmi_noprocforcommthread) 
+  if (_Cmi_sleepOnIdle)
 #endif
   CmiIdleLock_addMessage(&cs->idle);
 }
@@ -1087,7 +1089,7 @@ static void CmiPushNode(void *msg)
   /*Silly: always try to wake up processor 0, so at least *somebody*
     will be awake to handle the message*/
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-  if (_Cmi_noprocforcommthread) 
+  if (_Cmi_sleepOnIdle)
 #endif
   CmiIdleLock_addMessage(&cs->idle);
 }
@@ -2786,7 +2788,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   if (CmiGetArgFlagDesc(argv,"+commthread","Use communication thread")) {
     Cmi_commthread = 1;
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-    _Cmi_noprocforcommthread = 1;   /* worker thread go sleep */
+    _Cmi_sleepOnIdle = 1;   /* worker thread go sleep */
 #endif
     if (CmiMyPe() == 0) CmiPrintf("Charm++> communication thread is launched in multicore version. \n");
   }

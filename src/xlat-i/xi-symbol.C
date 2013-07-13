@@ -986,7 +986,7 @@ Chare::genDecls(XStr& str)
   str << "/* --------------- index object ------------------ */\n";
   str << tspec()<< "class "<<Prefix::Index<<type;
   str << ":";
-  genProxyNames(str, "public ",NULL, "", ", ");
+  genIndexNames(str, "public ",NULL, "", ", ");
   if(external || type->isTemplated())
   { //Just a template instantiation/forward declaration
     str << ";";

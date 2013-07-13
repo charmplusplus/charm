@@ -2762,7 +2762,8 @@ static void PumpRemoteTransactions(gni_cq_handle_t rx_cqh)
     }
     if(status == GNI_RC_ERROR_RESOURCE)
     {
-        GNI_RC_CHECK("rdma_rx_cq full too many ack", status);
+        printf("charm> Please use +useRecvQueue %d in your command line, if the error comes again, increase this number\n", REMOTE_QUEUE_ENTRIES*2);
+        GNI_RC_CHECK("PumpRemoteTransactions: rx_cqh full", status);
     }
 }
 #endif

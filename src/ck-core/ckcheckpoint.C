@@ -199,8 +199,12 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	CkPupArrayElementsData(p);
 	CmiFclose(datFile);
 
-#if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
+#if ! CMK_DISABLE_SYNC
+#if CMK_HAS_SYNC_FUNC
+        sync();
+#elif CMK_HAS_SYNC
 	system("sync");
+#endif
 #endif
 
 	restartCB = cb;
@@ -685,6 +689,12 @@ void CkTestArrayElements()
 
 void CkStartCheckpoint(const char* dirname,const CkCallback& cb)
 {
+  if(cb.isInvalid()) 
+    CkAbort("callback after checkpoint is not set properly");
+
+  if(cb.containsPointer())
+    CkAbort("Cannot restart from a callback based on a pointer");
+
 
 	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	
@@ -784,7 +794,8 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 
         _inrestart = 0;
 
-   	_initDone();
+   	if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
+   	//_initDone();
 	CkMemCheckPT::inRestarting = 0;
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());

@@ -2,7 +2,7 @@ module CkLocation {
   extern module CkMarshall;
 
   message CkArrayElementMigrateMessage {
-	double packData[];
+	char packData[];
   };
 
   group [migratable] CkLocMgr {

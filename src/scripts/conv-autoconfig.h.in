@@ -3,6 +3,9 @@
 /* Charm++ Release/API version number */
 #undef CHARM_VERSION
 
+/* whether Cray gni_pub has GNI_GetBIConfig */
+#undef CMK_BALANCED_INJECTION_API
+
 /* bproc version */
 #undef CMK_BPROC_VERSION
 
@@ -30,29 +33,20 @@
 /* whether ucontext has pointer (v_regs) of vector type */
 #undef CMK_CONTEXT_V_REGS
 
-/* C++ *_casts<> does not work */
-#undef CMK_CPP_CAST_ILLEGAL
-
-/* C++ *_casts<> work */
-#undef CMK_CPP_CAST_LEGAL
-
 /* Cray MAXNID */
 #undef CMK_CRAY_MAXNID
 
-/* Cray Get_BIConfig */
-#undef CMK_BALANCED_INJECTION_API
+/* whether Xfence intrinsics works in C */
+#undef CMK_C_BUILTIN_IA32_XFENCE
 
 /* whether C inline works in C */
 #undef CMK_C_INLINE
 
-/* whether synchronization primitives works in C */
-#undef CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE
-
-/* whether add and fetch primitives works in C */
+/* whether sync_add_and_fetch primitive works in C */
 #undef CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE
 
-/* whether builtin_ia32_xfence builtin works in C */
-#undef CMK_C_BUILTIN_IA32_XFENCE
+/* whether sync_synchronize primitives works in C */
+#undef CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE
 
 /* whether C++ allows declaration of variable sized array */
 #undef CMK_DECLARE_VARSIZE_ARRAY
@@ -65,9 +59,6 @@
 
 /* enable error checking */
 #undef CMK_ERROR_CHECKING
-
-/* whether C++ class explicit keyword works */
-#undef CMK_EXPLICIT
 
 /* ALLCAPS */
 #undef CMK_FORTRAN_USES_ALLCAPS
@@ -235,6 +226,9 @@
 #undef CMK_HAS_SYNC
 
 /* whether has system */
+#undef CMK_HAS_SYNC_FUNC
+
+/* whether has system */
 #undef CMK_HAS_SYSTEM
 
 /* Allows __thread. */
@@ -276,16 +270,13 @@
 /* whether operator delete can be overloaded in same class */
 #undef CMK_MULTIPLE_DELETE
 
-/* whether namespaces work */
-#undef CMK_NAMESPACES_BROKEN
-
 /* OS is Linux */
 #undef CMK_OS_IS_LINUX
 
 /* whether is power7 */
 #undef CMK_POWER7
 
-/* Allows PPC assembly. */
+/* Allows asm eieio assembly. */
 #undef CMK_PPC_ASM
 
 /* whether has zlib */
