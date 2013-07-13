@@ -729,10 +729,6 @@ class Member : public Construct {
     virtual void genPythonStaticDefs(XStr&) {}
     virtual void genPythonStaticDocs(XStr&) {}
     virtual void lookforCEntry(CEntry *)  {}
-    virtual void genClosureEntryDecls(XStr& str) { }
-    virtual void genClosureEntryDefs(XStr& str) { }
-    virtual void outputClosuresDecl(XStr& str) { }
-    virtual void outputClosuresDef(XStr& str) { }
 };
 
 /* Chare or group is a templated entity */
