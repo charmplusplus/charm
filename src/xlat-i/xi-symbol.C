@@ -4237,14 +4237,12 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     }
   }
 
-  structure << "\n      " << "int __refnum;\n";
+  structure << "\n";
 
   toPup << "        packClosure(__p);\n";
-  toPup << "        __p | __refnum;\n";
 
   XStr initCode;
   initCode << "        init();\n";
-  initCode << "        __refnum = 0;\n";
 
   if (hasArray) {
     structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
@@ -5234,15 +5232,9 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
         str << "  genClosure->_impl_buf_size = implP.size();\n";
       }
     }
-    if (param->type->isInt()) {
-      str << "  genClosure->__refnum = genClosure->" << param->name << ";\n";
-    } else {
-      str << "  genClosure->__refnum = 0;\n";
-    }
   } else if (isVoid()) {
     str << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
       " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
-    str << "  genClosure->__refnum = 0;\n";
   }
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {

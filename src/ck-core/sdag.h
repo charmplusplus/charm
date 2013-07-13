@@ -128,7 +128,7 @@ namespace SDAG {
   struct Continuation : public PUP::able {
     int whenID;
     std::vector<Closure*> closure;
-    std::vector<int> entries, refnums;
+    std::vector<CMK_REFNUM_TYPE> entries, refnums;
     std::vector<int> anyEntries;
     int speculationIndex;
 
@@ -162,7 +162,8 @@ namespace SDAG {
   };
 
   struct Buffer : public PUP::able {
-    int entry, refnum;
+    int entry;
+    CMK_REFNUM_TYPE refnum;
     Closure* cl;
 
 #if CMK_BIGSIM_CHARM
@@ -171,7 +172,7 @@ namespace SDAG {
 
     Buffer(CkMigrateMessage*) { }
 
-    Buffer(int entry, Closure* cl, int refnum)
+    Buffer(int entry, Closure* cl, CMK_REFNUM_TYPE refnum)
       : entry(entry)
       , refnum(refnum)
       , cl(cl)
@@ -248,7 +249,7 @@ namespace SDAG {
       }
     }
 
-    Buffer* pushBuffer(int entry, Closure *cl, int refnum) {
+    Buffer* pushBuffer(int entry, Closure *cl, CMK_REFNUM_TYPE refnum) {
       Buffer* buf = new Buffer(entry, cl, refnum);
       buffer[entry].push_back(buf);
       return buf;
@@ -291,7 +292,7 @@ namespace SDAG {
       return true;
     }
 
-    Buffer* tryFindMessage(int entry, bool hasRef, int refnum, std::set<Buffer*>* ignore) {
+    Buffer* tryFindMessage(int entry, bool hasRef, CMK_REFNUM_TYPE refnum, std::set<Buffer*>* ignore) {
       // @todo sequential lookup for buffer with reference number or ignore set
       for (std::list<Buffer*>::iterator iter = buffer[entry].begin();
            iter != buffer[entry].end();

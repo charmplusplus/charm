@@ -21,13 +21,8 @@ namespace xi {
       int i = 0;
       for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end(); ++it, ++i) {
         CStateVar& var = **it;
-        if (var.name) {
-          if (i == 0 && *var.type == "int")
-            defs << "  genClosure->__refnum" << " = " << var.name << ";\n";
-          else if (i == 0)
-            defs << "  genClosure->__refnum" << " = 0;\n";
+        if (var.name)
           defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
-        }
       }
     }
 
@@ -112,9 +107,10 @@ namespace xi {
 
       // note that there will always be a closure even when the method has no
       // parameters for consistency
-      defs << "  __dep->pushBuffer(" << entryNum << ", genClosure, genClosure->__refnum);\n";
+      defs << "  __dep->pushBuffer(" << entryNum << ", genClosure, " <<
+        (refNumNeeded ? "genClosure->getP0()" : "0") <<");\n";
     } else {
-      defs << "  int refnum = ";
+      defs << "  CMK_REFNUM_TYPE refnum = ";
       if (refNumNeeded)
         defs << "CkGetRefNum(" << sv->name << "_msg);\n";
       else

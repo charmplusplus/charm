@@ -542,7 +542,7 @@ namespace xi {
     bool hasRef = false;;
     for (EntryList *el = elist; el != NULL; el = el->next, cur++)
       if (el->entry->intExpr) {
-        defs << "  int refnum_" << cur << ";\n";
+        defs << "  CMK_REFNUM_TYPE refnum_" << cur << ";\n";
         hasRef = true;
       }
     int indent = 2;
