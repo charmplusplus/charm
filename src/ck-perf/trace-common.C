@@ -51,7 +51,7 @@ CpvStaticDeclare(mTFP, machineTraceFuncPtr);    // machine user event
 int _threadMsg, _threadChare, _threadEP;
 int _packMsg, _packChare, _packEP;
 int _unpackMsg, _unpackChare, _unpackEP;
-int _dummyMsg, _dummyChare, _dummyEP;
+int _sdagMsg, _sdagChare, _sdagEP;
 
 /// decide parameters from command line
 static void traceCommonInit(char **argv)
@@ -175,10 +175,10 @@ static void traceCommonInit(char **argv)
     CkRegisterChareInCharm(_unpackChare);
     _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare, 0+CK_EP_INTRINSIC);
 
-    _dummyMsg = CkRegisterMsg("dummy_msg", 0, 0, 0, 0);
-    _dummyChare = CkRegisterChare("dummy_chare", 0, TypeInvalid);
-    CkRegisterChareInCharm(_dummyChare);
-    _dummyEP = CkRegisterEp("dummy_ep", 0, _dummyMsg,_dummyChare, 0+CK_EP_INTRINSIC);
+    _sdagMsg = CkRegisterMsg("sdag_msg", 0, 0, 0, 0);
+    _sdagChare = CkRegisterChare("SDAG", 0, TypeInvalid);
+    CkRegisterChareInCharm(_sdagChare);
+    _sdagEP = CkRegisterEp("SDAG_RTS", 0, _sdagMsg, _sdagChare, 0+CK_EP_INTRINSIC);
   }
 }
 

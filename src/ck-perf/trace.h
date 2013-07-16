@@ -26,7 +26,7 @@ extern "C" void traceEnableCCS();
 
 extern double CmiTraceTimer();
 
-extern int _dummyMsg, _dummyChare, _dummyEP;
+extern int _sdagMsg, _sdagChare, _sdagEP;
 
 /* CW Support for Thread Listener interface */
 extern "C" void traceAddThreadListeners(CthThread tid, envelope *e);

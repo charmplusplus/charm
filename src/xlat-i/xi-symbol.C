@@ -27,7 +27,6 @@ const char *Prefix::Message="CMessage_";
 const char *Prefix::Index="CkIndex_";
 const char *Prefix::Python="CkPython_";
 
-
 //Fatal error function
 void die(const char *why,int line)
 {
@@ -310,6 +309,34 @@ AstChildren<Child>::genDecls(XStr& str)
 
 template <typename Child>
 void
+AstChildren<Child>::genClosureEntryDecls(XStr& str)
+{
+    perElemGen(children, str, &Child::genClosureEntryDecls, newLine);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::genClosureEntryDefs(XStr& str)
+{
+    perElemGen(children, str, &Child::genClosureEntryDefs, newLine);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::outputClosuresDecl(XStr& str)
+{
+    perElemGen(children, str, &Child::outputClosuresDecl, newLine);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::outputClosuresDef(XStr& str)
+{
+    perElemGen(children, str, &Child::outputClosuresDef, newLine);
+}
+
+template <typename Child>
+void
 AstChildren<Child>::genDefs(XStr& str)
 {
     perElemGen(children, str, &Child::genDefs, newLine);
@@ -320,17 +347,6 @@ void
 AstChildren<Child>::genReg(XStr& str)
 {
     perElemGen(children, str, &Child::genReg, newLine);
-}
-
-template <typename Child>
-void
-AstChildren<Child>::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-    for (typename list<Child*>::iterator i = children.begin(); i != children.end(); ++i)
-	if (*i) {
-	    (*i)->genPub(declstr, defstr, defconstr, connectPresent);
-	    declstr << endx;
-	}
 }
 
 template <typename Child>
@@ -575,21 +591,16 @@ Module::generate()
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
   "#include \"charm++.h\"\n"
+  "#include \"envelope.h\"\n"
   "#include <memory>\n"
-  "#include <set>\n";
+  "#include \"sdag.h\"\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
+  if (clist) clist->outputClosuresDecl(declstr);
+  if (clist) clist->outputClosuresDef(defstr);
   declstr << "extern void _register"<<name<<"(void);\n";
   if(isMain()) {
     declstr << "extern \"C\" void CkRegisterMainModule(void);\n";
-  }
-
-  // Generate the publish class if there are structured dagger connect entries
-  int connectPresent = 0;
-  if (clist) clist->genPub(pubDeclStr, pubDefStr, pubDefConstr, connectPresent);
-  if (connectPresent == 1) {
-     pubDeclStr << "};\n\n";
-     pubDefConstr <<"}\n\n";
   }
 
   // defstr << "#ifndef _DEFS_"<<name<<"_H_"<<endx;
@@ -652,11 +663,6 @@ Module::generate()
   }
   decl<<declstr.get_string();
   def<<defstr.get_string();
-  if (connectPresent == 1) {
-    decl << pubDeclStr;
-    def << pubDefConstr;
-    def << pubDefStr;
-  }
 
   // DMK - Accel Support
   #if CMK_CELL != 0
@@ -934,15 +940,13 @@ Chare::genRegisterMethodDef(XStr& str)
 }
 
 void
-Chare::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-  if(type->isTemplated())
-    return;
-  else
-  {
-    if(list)
-      list->genPub(declstr, defstr, defconstr, connectPresent);
-  }
+Chare::outputClosuresDecl(XStr& str) {
+  str << closuresDecl;
+}
+
+void
+Chare::outputClosuresDef(XStr& str) {
+  str << closuresDef;
 }
 
 void
@@ -958,7 +962,7 @@ Chare::genDecls(XStr& str)
   if (isPython()) {
     str << "#include \"PythonCCS.h\"\n";
     if (list) {
-      Entry *etemp = new Entry(0,0,new BuiltinType("void"),"pyRequest",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
+      Entry *etemp = new Entry(0,0,new BuiltinType("void"),"pyRequest",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0);
       list->push_back(etemp);
       etemp->setChare(this);
       //etemp = new Entry(0,0,new BuiltinType("void"),"getPrint",new ParamList(new Parameter(0,new PtrType(new NamedType("CkCcsRequestMsg",0)),"msg")),0,0,0,0);
@@ -982,7 +986,7 @@ Chare::genDecls(XStr& str)
   str << "/* --------------- index object ------------------ */\n";
   str << tspec()<< "class "<<Prefix::Index<<type;
   str << ":";
-  genProxyNames(str, "public ",NULL, "", ", ");
+  genIndexNames(str, "public ",NULL, "", ", ");
   if(external || type->isTemplated())
   { //Just a template instantiation/forward declaration
     str << ";";
@@ -1011,6 +1015,11 @@ Chare::genDecls(XStr& str)
     str << "/* ---------------- python wrapper -------------- */\n";
     genPythonDecls(str);
   }
+
+  closuresDecl << "/* ---------------- method closures -------------- */\n";
+  closuresDef << closuresDecl;
+  genClosureEntryDecls(closuresDecl);
+  genClosureEntryDefs(closuresDef);
 
   if(list) {
     //handle the case that some of the entries may be sdag Entries
@@ -1089,6 +1098,21 @@ disambig_proxy(XStr &str, const XStr &super)
       << "\n    CkGroupID ckDelegatedIdx(void) const"
       << "\n    { return " << super << "::ckDelegatedIdx(); }"
       << "\n";
+}
+
+void
+Chare::genClosureEntryDecls(XStr& str) {
+  XStr ptype;
+  ptype << "Closure_" << type;
+  str << tspec() << "class " << ptype << " ";
+  str << CIClassStart;
+  if (list) list->genClosureEntryDecls(str);
+  str << CIClassEnd;
+}
+
+void
+Chare::genClosureEntryDefs(XStr& str) {
+  if (list) list->genClosureEntryDefs(str);
 }
 
 void
@@ -2254,6 +2278,18 @@ Message::genReg(XStr& str)
 }
 
 void
+Template::outputClosuresDecl(XStr& str) {
+  Chare* c = dynamic_cast<Chare*>(entity);
+  if (c) str << c->closuresDecl;
+}
+
+void
+Template::outputClosuresDef(XStr& str) {
+  Chare* c = dynamic_cast<Chare*>(entity);
+  if (c) str << c->closuresDef;
+}
+
+void
 Template::setExtern(int e)
 {
   Construct::setExtern(e);
@@ -2286,14 +2322,6 @@ void
 Template::genSpec(XStr& str)
 {
   str << generateTemplateSpec(tspec);
-}
-
-void
-Template::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-  if(!external && entity) {
-    entity->genPub(declstr, defstr, defconstr, connectPresent);
-  }
 }
 
 void
@@ -2390,15 +2418,6 @@ void TName::genShort(XStr& str)
 {
   str << name;
 }
-
-void
-Module::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-  if(!external) {
-    if (clist) clist->genPub(declstr, defstr, defconstr, connectPresent);
-  }
-}
-
 
 void
 Module::genDecls(XStr& str)
@@ -2714,8 +2733,8 @@ void ParamList::checkParamList(){
   }
 }
 
-Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int connect, ParamList *connectPList) :
-      attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), connectParam(connectPList), isConnect(connect)
+Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e) :
+  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), genClosureTypeName(0), entryPtr(0)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -2728,6 +2747,12 @@ Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, Sdag
   if (isPython()) pythonDoc = python_doc;
   if(!isLocal() && p){
     p->checkParamList();
+  }
+  ParamList *plist = p;
+  while (plist != NULL) {
+    plist->entry = this;
+    if (plist->param) plist->param->entry = this;
+    plist = plist->next;
   }
 }
 
@@ -4114,6 +4139,8 @@ void Entry::genIndexDecls(XStr& str)
   // call function declaration
   str << templateSpecLine
       << "\n    static void _call_" << epStr() << "(void* impl_msg, void* impl_obj);";
+  str << templateSpecLine
+      << "\n    static void _call_sdag_" << epStr() << "(void* impl_msg, void* impl_obj);";
   if(isThreaded()) {
     str  << templateSpecLine
          << "\n    static void _callthr_"<<epStr()<<"(CkThrCallArg *);";
@@ -4154,120 +4181,140 @@ void Entry::genDecls(XStr& str)
   }
 }
 
-
-void Entry::genPub(XStr &declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-{
-/*  if (isConnect == 1)
-     printf("Entry is Connected %s\n", name);
-  else
-     printf("Entry is not Connected %s\n", name);
-*/
-  if ((isConnect == 1) && (connectPresent == 0)) {
-     connectPresent = 1;
-     declstr << "class publish\n";
-     declstr << "{\n";
-     declstr << "   public:\n";
-     declstr << "      publish();\n";
-     defconstr << "publish::publish()\n"  << "{\n";
-  }
-  if (isConnect == 1) {
-     defconstr << "   publishflag_" <<getEntryName() << " = 0;\n";
-     defconstr << "   getflag_" <<getEntryName() << " = 0;\n";
-     declstr << "      void " <<getEntryName() <<"(";
-     defstr << "void publish::" << getEntryName() <<"(";
-     ParamList *pl = connectParam;
-     XStr *parameters = new XStr("");
-     int count = 0;
-     int i, numStars;
-     if (pl->isVoid() == 1) {
-	declstr << "void);\n";
-	defstr << "void);\n";
-     }
-     else if (pl->isMessage() == 1){
-	declstr << pl->getBaseName() <<"* " << pl->getGivenName() <<");\n";
-	defstr << pl->getBaseName() <<"* " << pl->getGivenName() <<");\n";
-	defconstr << "   " << pl->getGivenName() <<" = new " << pl->getBaseName() <<"();\n";
-	parameters->append("      ");
-	parameters->append(pl->getBaseName());
-	parameters->append("* ");
-	parameters->append(pl->getGivenName());
-	parameters->append("_msg;\n ");
-     }
-     else {
-	defconstr << "   " << getEntryName() <<"_msg = new CkMarshallMsg();\n";
-	parameters->append("      CkMarshallMsg *");
-	parameters->append(getEntryName());
-	parameters->append("_msg;\n");
-        while(pl != NULL) {
-	  if (count > 0) {
-	    declstr << ", ";
-	    defstr << ", ";
-	  }
-	  if (pl->isPointer() == 1) {
-	  // FIX THE FOLLOWING - I think there could be problems if the original passed in value is deleted
-	    declstr << pl->getBaseName();
-	    defstr << pl->getBaseName();
-	    numStars = pl->getNumStars();
-	    for(i=0; i< numStars; i++) {
-	      declstr << "*";
-	      defstr << "*";
-	    }
-	    declstr << " " <<  pl->getGivenName();
-	    defstr << " " <<  pl->getGivenName();
-	  }
-	  else if (pl->isReference() == 1) {
-	    declstr << pl->getBaseName() <<"& " <<pl->getGivenName();
-	    defstr << pl->getBaseName() <<"& " <<pl->getGivenName();
-	  }
-	  else if (pl->isArray() == 1){
-	    declstr << pl->getBaseName() <<"* " <<pl->getGivenName();
-	    defstr << pl->getBaseName() <<"* " <<pl->getGivenName();
-	  }
-	  else if ((pl->isBuiltin() == 1) || (pl->isNamed() == 1)) {
-	    declstr << pl->getBaseName() <<" " <<pl->getGivenName();
-	    defstr << pl->getBaseName() <<" " <<pl->getGivenName();
-	  }
-	  pl = pl->next;
-	  count++;
-	}
-	declstr << "); \n";
-	defstr << ") { \n";
-     }
-     declstr << "      void get_" << getEntryName() << "(CkCallback cb);\n";
-     declstr << "      int publishflag_" << getEntryName() << ";\n";
-     declstr << "      int getflag_" << getEntryName() << ";\n";
-     declstr << "      CkCallback " << getEntryName() << "_cb;\n";
-     declstr << parameters;
-
-     // Following generates the def publish::connectFunction code
-
-     // Traverse thru parameter list and set the local messages accordingly
-     defstr <<"    const CkEntryOptions *impl_e_opts = NULL;\n";
-     XStr epName = epStr();
-     connectParam->marshall(defstr, epName);
-     defstr << "   " << getEntryName() << "_msg = impl_msg;\n";
-     defstr << "   " << "if (getflag_" << getEntryName() <<" == 1) {\n";
-     // FIX THE FOLLOWING IN CASE MSG IS VOID
-     defstr << "     " << getEntryName() << "_cb.send(" << getEntryName() <<"_msg);\n";
-     defstr << "   }\n";
-     defstr << "   else\n";
-     defstr << "     publishflag_" << getEntryName() << " = 1;\n";
-     defstr << "}\n\n";
-
-     // Following generates the def publish::get_connectFunction code
-
-     defstr << "void publish::get_" << getEntryName() << "(CkCallback cb) {\n";
-     defstr << "   " << getEntryName() << "_cb = cb;\n";
-     defstr << "   if (publishflag_" << getEntryName() << " == 1) {\n";
-     defstr << "     cb.send(" << getEntryName() << "_msg);\n";
-     defstr << "     publishflag_" << getEntryName() << " = 0 ;\n";
-     defstr << "   }\n";
-     defstr << "   else\n";
-     defstr << "     getflag_" << getEntryName() << " = 1;\n";
-     defstr << "}\n";
-  }
+void Entry::genClosureEntryDecls(XStr& str) {
+  genClosure(str, false);
 }
 
+void Entry::genClosureEntryDefs(XStr& str) {
+  templateGuardBegin(tspec || container->isTemplated(), str);
+  genClosure(str, true);
+  templateGuardEnd(str);
+}
+
+void Entry::genClosure(XStr& decls, bool isDef) {
+  if (isConstructor() || (isLocal() && !sdagCon)) return;
+
+  bool hasArray = false, isMessage = false;
+  XStr messageType;
+  int i = 0;
+  XStr structure, toPup, alloc, getter, dealloc;
+  for(ParamList* pl = param; pl != NULL; pl = pl->next, i++) {
+    Parameter* sv = pl->param;
+
+    if (XStr(sv->type->getBaseName()) == "CkArrayOptions") continue;
+
+    structure << "      ";
+    getter << "      ";
+
+    if ((sv->isMessage() != 1) && (sv->isVoid() != 1)) {
+       structure << sv->type << " ";
+       getter << sv->type << " ";
+       if (sv->isArray() != 0) {
+         structure << "*";
+         getter << "*";
+       }
+
+       if (sv->isArray() != 0) {
+         hasArray = hasArray || true;
+       } else {
+         toPup << "        " << "__p | " << sv->name << ";\n";
+         sv->podType = true;
+       }
+
+       if (sv->name != 0) {
+         structure << sv->name << ";\n";
+         getter << "& " << "getP" << i << "() { return " << sv->name << ";}\n";
+       }
+
+    }
+    else if (sv->isVoid() != 1){
+      if (sv->isMessage()) {
+        isMessage = true;
+        structure << sv->type << " " << sv->name << ";\n";
+        toPup << "        " << "CkPupMessage(__p, (void**)&" << sv->name << ");\n";
+        messageType << sv->type->deref();
+      }
+    }
+  }
+
+  structure << "\n";
+
+  toPup << "        packClosure(__p);\n";
+
+  XStr initCode;
+  initCode << "        init();\n";
+
+  if (hasArray) {
+    structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
+    structure << "      " << "char* _impl_buf_in;\n";
+    structure << "      " << "int _impl_buf_size;\n";
+    dealloc << "        if (_impl_marshall) CmiFree(UsrToEnv(_impl_marshall));\n";
+
+    initCode << "        _impl_marshall = 0;\n";
+    initCode << "        _impl_buf_in = 0;\n";
+    initCode << "        _impl_buf_size = 0;\n";
+
+    toPup << "        __p | _impl_buf_size;\n";
+    toPup << "        bool hasMsg = (_impl_marshall != 0); __p | hasMsg;\n";
+    toPup << "        " << "if (hasMsg) CkPupMessage(__p, (void**)&" << "_impl_marshall" << ");\n";
+    toPup << "        " << "else PUParray(__p, _impl_buf_in, _impl_buf_size);\n";
+    toPup << "        if (__p.isUnpacking()) {\n";
+    toPup << "          char *impl_buf = _impl_marshall ? _impl_marshall->msgBuf : _impl_buf_in;\n";
+    param->beginUnmarshallSDAG(toPup);
+    toPup << "        }\n";
+  }
+
+  if (!isMessage) {
+    genClosureTypeName = new XStr();
+    genClosureTypeNameProxy = new XStr();
+    *genClosureTypeNameProxy << " Closure_" << container->baseName() << "::";
+    *genClosureTypeNameProxy << name << "_" << entryCount << "_closure";
+    *genClosureTypeName << name << "_" << entryCount << "_closure";
+
+    container->sdagPUPReg << "  PUPable_reg(SINGLE_ARG(" << *genClosureTypeNameProxy << "));\n";
+
+    if (isDef) {
+      if (container->isTemplated()) {
+        decls << container->tspec() << "\n";
+      }
+      decls << generateTemplateSpec(tspec) << "\n";
+      decls << "    struct " << *genClosureTypeNameProxy <<" : public SDAG::Closure" << " {\n";
+      decls << structure << "\n";
+      decls << "      " << *genClosureTypeName << "() {\n";
+      decls << initCode;
+      decls << "      }\n";
+      decls << "      " << *genClosureTypeName << "(CkMigrateMessage*) {\n";
+      decls << initCode;
+      decls << "      }\n";
+      decls << getter;
+      decls << "      void pup(PUP::er& __p) {\n";
+      decls << toPup;
+      decls << "      }\n";
+      decls << "      virtual ~" << *genClosureTypeName << "() {\n";
+      decls << dealloc;
+      decls << "      }\n";
+      decls << "      " << ((container->isTemplated() || tspec) ? "PUPable_decl_template" : "PUPable_decl") << "(" << *genClosureTypeName;
+      if (tspec) {
+        decls << "<";
+        tspec->genShort(decls);
+        decls << ">";
+      }
+      decls << ");\n";
+      decls << "    };\n";
+    } else {
+      decls << generateTemplateSpec(tspec) << "\n";
+      decls << "    struct " <<  *genClosureTypeName << ";\n";
+    }
+  } else {
+    genClosureTypeName = new XStr();
+    genClosureTypeNameProxy = new XStr();
+    *genClosureTypeNameProxy << messageType;
+    *genClosureTypeName << messageType;
+  }
+
+  genClosureTypeNameProxyTemp = new XStr();
+  *genClosureTypeNameProxyTemp << (container->isTemplated() ? "typename " : "") << genClosureTypeNameProxy;
+}
 
 //This routine is only used in Entry::genDefs.
 // It ends the current procedure with a call to awaken another thread,
@@ -4303,10 +4350,11 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   Generate the code to actually unmarshall the parameters and call
   the entry method.
 */
-void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
+void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool usesImplBuf)
 {
   bool isArgcArgv=false;
   bool isMigMain=false;
+  bool isSDAGGen = sdagCon || isWhenEntry;
 
   if (param->isCkArgMsgPtr() && (!isConstructor() || !container->isMainChare()))
     die("CkArgMsg can only be used in mainchare's constructor.\n");
@@ -4317,8 +4365,9 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
 	else isArgcArgv = true;
   } else {
     //Normal case: Unmarshall variables
-    if (redn_wrapper) param->beginRednWrapperUnmarshall(str);
-    else param->beginUnmarshall(str);
+    if (redn_wrapper) param->beginRednWrapperUnmarshall(str, isSDAGGen);
+    else if (!isSDAGGen) param->beginUnmarshall(str);
+    else param->beginUnmarshallSDAGCall(str, usesImplBuf);
   }
 
   str << preCall;
@@ -4393,7 +4442,21 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
         str<<"((CkMigrateMessage*)impl_msg);\n";
     }
     else {//Normal case: unmarshall parameters (or just pass message)
+      if (isSDAGGen) {
+        str << "(";
+        if (param->isMessage()) {
+          param->unmarshall(str);
+          //} else if (param->isVoid()) {
+          // no parameter
+        } else {
+          str << "genClosure";
+        }
+        str << ");\n";
+	if (!param->isMessage())
+	  str << "  genClosure->deref();\n";
+      } else {
         str<<"("; param->unmarshall(str); str<<");\n";
+      }
     }
   }
 }
@@ -4428,8 +4491,11 @@ void Entry::genDefs(XStr& str)
               << container->baseName() << "*> (impl_obj_void);\n"
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
           XStr precall;
-          genCall(str, precall, true);
-          str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
+          genCall(str, precall, true, false);
+          if (!(sdagCon || isWhenEntry))
+            str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
+          else
+            str << "  \n}\n\n";
       }
   }
 
@@ -4566,7 +4632,7 @@ void Entry::genDefs(XStr& str)
       else str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
       str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
     }
-    genCall(str,preCall);
+    genCall(str, preCall, false, false);
     param->endUnmarshall(str);
     str << postCall;
     if(isThreaded() && param->isMarshalled()) str << "  delete impl_msg_typed;\n";
@@ -4581,7 +4647,7 @@ void Entry::genDefs(XStr& str)
     str << "  " << containerType << "* impl_obj = static_cast< " << containerType << " *>(impl_obj_void);\n";
     if (!isLocal()) {
       if (!param->hasConditional()) {
-        genCall(str,preCall);
+        genCall(str, preCall, false, true);
         /*FIXME: implP.size() is wrong if the parameter list contains arrays--
         need to add in the size of the arrays.
          */
@@ -4612,6 +4678,27 @@ void Entry::genDefs(XStr& str)
      }
      str << "}\n";
   }
+
+  // to match the registry, generate register call even if there is no SDAG code
+  //if ((param->isMarshalled() || param->isVoid()) /* && (sdagCon || isWhenEntry) */)
+  if ((param->isMarshalled() || param->isVoid()) && genClosureTypeNameProxy) {
+    if (container->isTemplated())
+      str << container->tspec();
+    if (tspec) {
+      str << "template <";
+      tspec->genLong(str);
+      str << "> ";
+    }
+
+    str << ((container->isTemplated() || tspec) ? "PUPable_def_template_nonInst" : "PUPable_def") << "(SINGLE_ARG(" << *genClosureTypeNameProxy;
+    if (tspec) {
+      str << "<";
+      tspec->genShort(str);
+      str << ">";
+    }
+      str << "));\n";
+  }
+
   templateGuardEnd(str);
 }
 
@@ -4806,6 +4893,7 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
   , byConst(false)
   , conditional(0)
   , given_name(Nname)
+  , podType(false)
 {
 	if (isMessage()) {
 		name="impl_msg";
@@ -5013,14 +5101,19 @@ void Parameter::copyPtr(XStr &str)
   }
 }
 
-void ParamList::beginRednWrapperUnmarshall(XStr &str)
-{
+void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
+  if (isSDAGGen) {
+    str << *entry->genClosureTypeNameProxyTemp << "*"
+        << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
+  }
+
     if (isMarshalled())
     {
         str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
         str<<"  PUP::fromMem implP(impl_buf);\n";
         if (next != NULL && next->next == NULL) {
             if (isArray()) {
+              if (!isSDAGGen) {
                 Type* dt = next->param->type->deref();
                 str << "  " << dt << " " << next->param->name << "; "
                     << next->param->name << " = "
@@ -5029,7 +5122,16 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
                 dt = param->type->deref();
                 str << "  " << dt << "* " << param->name << "; "
                     << param->name << " = (" << dt << "*)impl_buf;\n";
+              } else {
+                Type* dt = param->type->deref();
+                str << "  genClosure->" << next->param->name << " = "
+                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+                    << param->type->deref() << ");\n";
+                dt = param->type->deref();
+                str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
+              }
             } else if (next->isArray()) {
+              if (!isSDAGGen) {
                 Type* dt = param->type->deref();
                 str << "  " << dt << " " << param->name << "; "
                     << param->name << " = "
@@ -5038,15 +5140,32 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
                 dt = next->param->type->deref();
                 str << "  " << dt << "* " << next->param->name << "; "
                     << next->param->name << " = (" << dt << "*)impl_buf;\n";
+              } else {
+                Type* dt = param->type->deref();
+                str << "  genClosure->" << param->name << " = "
+                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+                    << next->param->type->deref() << ");\n";
+                dt = next->param->type->deref();
+                str << "  genClosure->" << next->param->name << " = (" << dt << "*)impl_buf;\n";
+              }
             } else {
+              if (!isSDAGGen)
                 callEach(&Parameter::beginUnmarshall,str);
+              else
+                callEach(&Parameter::beginUnmarshallSDAGCall,str);
             }
         } else {
             str << "  /* non two-param case */\n";
-            callEach(&Parameter::beginUnmarshall,str);
+            if (!isSDAGGen)
+              callEach(&Parameter::beginUnmarshall,str);
+            else
+              callEach(&Parameter::beginUnmarshallSDAGCall,str);
             str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
             str<<"  /*Unmarshall arrays:*/\n";
-            callEach(&Parameter::unmarshallArrayData,str);
+            if (!isSDAGGen)
+              callEach(&Parameter::unmarshallArrayData,str);
+            else
+              callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
         }
     }
 }
@@ -5078,6 +5197,80 @@ void Parameter::beginUnmarshall(XStr &str)
 	else
 		str<<"  "<<dt<<" "<<name<<"; implP|"<<name<<";\n";
 }
+
+void Parameter::beginUnmarshallSDAGCall(XStr &str) {
+  Type *dt=type->deref();
+  if (isArray()) {
+    str << "  int impl_off_" << name << ", impl_cnt_" << name << "; \n";
+    str << "  implP|impl_off_" << name << ";\n";
+    str << "  implP|impl_cnt_" << name << ";\n";
+  } else
+    str << "  implP|" << (podType ? "" : "*") << "genClosure->" << name << ";\n";
+}
+
+
+/** unmarshalling: unpack fields from flat buffer **/
+void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
+  bool hasArray = false;
+  for (ParamList* pl = this; pl != NULL; pl = pl->next) {
+    hasArray = hasArray || pl->param->isArray();
+  }
+
+  if (isMarshalled()) {
+    str << "  PUP::fromMem implP(impl_buf);\n";
+    str << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
+      " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
+    callEach(&Parameter::beginUnmarshallSDAGCall, str);
+    str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+    callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
+    if (hasArray) {
+      if (!usesImplBuf) {
+        str << "  genClosure->_impl_marshall = impl_msg_typed;\n";
+        str << "  CmiReference(UsrToEnv(genClosure->_impl_marshall));\n";
+      } else {
+        str << "  genClosure->_impl_buf_in = impl_buf;\n";
+        str << "  genClosure->_impl_buf_size = implP.size();\n";
+      }
+    }
+  } else if (isVoid()) {
+    str << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
+      " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
+  }
+}
+void ParamList::beginUnmarshallSDAG(XStr &str) {
+  if (isMarshalled()) {
+    str << "        PUP::fromMem implP(impl_buf);\n";
+    callEach(&Parameter::beginUnmarshall,str);
+    str << "        impl_buf+=CK_ALIGN(implP.size(),16);\n";
+    callEach(&Parameter::unmarshallArrayDataSDAG,str);
+  }
+}
+void Parameter::unmarshallArrayDataSDAG(XStr &str) {
+  if (isArray()) {
+    Type *dt=type->deref();//Type, without &
+    str << "        " << name << " = ("<<dt<<" *)(impl_buf+impl_off_" << name << ");\n";
+  }
+}
+void Parameter::unmarshallArrayDataSDAGCall(XStr &str) {
+  if (isArray()) {
+    Type *dt=type->deref();//Type, without &
+    str << "  genClosure->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name << ");\n";
+  }
+}
+
+void ParamList::unmarshallSDAGCall(XStr &str, int isFirst) {
+  if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
+  else if (!isVoid()) {
+    str << "genClosure->";
+    str << param->getName();
+    if (next) {
+      str<<", ";
+      next->unmarshallSDAGCall(str, 0);
+    }
+  }
+}
+
+
 void Parameter::unmarshallArrayData(XStr &str)
 { //Second pass: unpack pointed-to arrays
 	if (isArray()) {

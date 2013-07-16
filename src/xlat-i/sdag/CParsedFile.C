@@ -53,7 +53,6 @@ void CParsedFile::doProcess(XStr& classname, XStr& decls, XStr& defs) {
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::numberNodes));
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::labelNodes));
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<int>(&SdagConstruct::propagateState, 0));
-  generateConnectEntryList();
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::generateTrace));
   generateEntryList();
   mapCEntry();
@@ -87,13 +86,6 @@ void CParsedFile::generateEntryList(void)
   }
 }
 
-void CParsedFile::generateConnectEntryList(void)
-{
-  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
-    (*cn)->sdagCon->generateConnectEntryList(connectEntryList);
-  }
-}
-
 void CParsedFile::generateCode(XStr& decls, XStr& defs)
 {
   for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
@@ -105,8 +97,6 @@ void CParsedFile::generateCode(XStr& decls, XStr& defs)
 void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 {
   decls << "public:\n";
-  for(list<SdagConstruct *>::iterator sc=connectEntryList.begin(); sc != connectEntryList.end(); ++sc)
-    (*sc)->generateConnectEntries(decls);
   for(list<CEntry*>::iterator en = entryList.begin(); en != entryList.end(); ++en) {
     (*en)->generateCode(decls, defs);
   }
@@ -115,20 +105,19 @@ void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
 {
   decls << "public:\n";
-  decls << "  std::auto_ptr<CDep> __cDep;\n";
+  decls << "  std::auto_ptr<SDAG::Dependency> __dep;\n";
 
   XStr name = "_sdag_init";
-  generateSignature(decls, defs, container, false, "void", &name, false, NULL);
-  defs << "    __cDep.reset(new CDep(" << numEntries << "," << numWhens << "));\n";
-  CEntry *en;
-  for(list<CEntry*>::iterator en=entryList.begin(); en != entryList.end(); ++en) {
+  generateVarSignature(decls, defs, container, false, "void", &name, false, NULL);
+  defs << "  __dep.reset(new SDAG::Dependency(" << numEntries << "," << numWhens << "));\n";
+
+  for(list<CEntry*>::iterator en=entryList.begin(); en != entryList.end(); ++en)
     (*en)->generateDeps(defs);
-  }
   endMethod(defs);
 
   // Backwards compatibility
   XStr oldname = "__sdag_init";
-  generateSignature(decls, defs, container, false, "void", &oldname, false, NULL);
+  generateVarSignature(decls, defs, container, false, "void", &oldname, false, NULL);
   endMethod(defs);
 }
 
@@ -165,10 +154,10 @@ void CParsedFile::generatePupFunction(XStr& decls, XStr& defs)
   templateGuardBegin(false, defs);
   defs << container->tspec()
        << "void " << container->baseName() << "::" << signature << " {\n"
-       << "    bool hasSDAG = __cDep.get();\n"
+       << "    bool hasSDAG = __dep.get();\n"
        << "    p|hasSDAG;\n"
        << "    if (p.isUnpacking() && hasSDAG) _sdag_init();\n"
-       << "    if (hasSDAG) { __cDep->pup(p); }\n"
+       << "    if (hasSDAG) { __dep->pup(p); }\n"
        << "}\n";
   templateGuardEnd(defs);
 }
@@ -176,13 +165,18 @@ void CParsedFile::generatePupFunction(XStr& decls, XStr& defs)
 void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
 {
   XStr name = "__sdag_register";
-  generateSignature(decls, defs, container, true, "void", &name, false, NULL);
+  generateVarSignature(decls, defs, container, true, "void", &name, false, NULL);
+
+  defs << "  SDAG::registerPUPables();\n";
 
   for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
     if ((*cn)->sdagCon != 0) {
       (*cn)->sdagCon->generateRegisterEp(defs);
     }
   }
+
+  defs << container->sdagPUPReg;
+
   endMethod(defs);
 }
 

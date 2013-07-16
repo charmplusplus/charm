@@ -4,6 +4,8 @@
 #include "xi-util.h"
 #include "xi-symbol.h"
 
+#include <list>
+
 namespace xi {
   class ParamList;
 
@@ -38,7 +40,7 @@ namespace xi {
 
     CStateVar(ParamList *pl)
       : isVoid(0)
-      , type(new XStr(*(pl->param->getType())))
+      , type(new XStr(pl->param->type->isMessage() ? *(pl->param->type->deref()) : *(pl->param->getType())))
       , numPtrs(0)
       , name(new XStr(pl->getGivenName()))
       , byRef(pl->isReference() ? new XStr("&") : NULL)
@@ -50,6 +52,25 @@ namespace xi {
       , isSpeculator(false)
       , isBgParentLog(false)
     { }
+  };
+
+  struct EncapState {
+    Entry* entry;
+    XStr* type;
+    XStr* name;
+    bool isMessage;
+    bool isForall;
+    bool isBgParentLog;
+    std::list<CStateVar*> vars;
+
+    EncapState(Entry* entry, std::list<CStateVar*>& vars)
+      : entry(entry)
+      , type(0)
+      , name(0)
+      , isMessage(false)
+      , isForall(false)
+      , isBgParentLog(false)
+      , vars(vars) { }
   };
 
 }

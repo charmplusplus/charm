@@ -17,15 +17,24 @@ namespace xi {
 
 class Chare;
 class CParsedFile;
+class EncapState;
 
-extern void generateSignature(XStr& decls, XStr& defs,
+extern void generateVarSignature(XStr& decls, XStr& defs,
                               const Entry* entry, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
                               std::list<CStateVar*>* params);
-extern void generateSignature(XStr& decls, XStr& defs,
+extern void generateVarSignature(XStr& decls, XStr& defs,
                               const Chare* chare, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
                               std::list<CStateVar*>* params);
+extern void generateClosureSignature(XStr& decls, XStr& defs,
+                                 const Chare* chare, bool declareStatic,
+                                 const char* returnType, const XStr* name, bool isEnd,
+                                 std::list<EncapState*> params);
+extern void generateClosureSignature(XStr& decls, XStr& defs,
+                                 const Entry* entry, bool declareStatic,
+                                 const char* returnType, const XStr* name, bool isEnd,
+                                 std::list<EncapState*> params);
 extern void endMethod(XStr& op);
 
 class CStateVar;
@@ -95,12 +104,12 @@ protected:
   int line;
 public:
   AstNode(int line_ = -1) : line(line_) { }
-    virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
-    {
-      (void)declstr; (void)defstr; (void)defconstr; (void)connectPresent;
-    }
+    virtual void outputClosuresDecl(XStr& str) { (void)str; }
+    virtual void outputClosuresDef(XStr& str) { (void)str; }
     virtual void genDecls(XStr& str) { (void)str; }
     virtual void genDefs(XStr& str) { (void)str; }
+    virtual void genClosureEntryDecls(XStr& str) { }
+    virtual void genClosureEntryDefs(XStr& str) { }
     virtual void genReg(XStr& str) { (void)str; }
     virtual void genGlobalCode(XStr scope, XStr &decls, XStr &defs)
     { (void)scope; (void)decls; (void)defs; }
@@ -156,11 +165,15 @@ public:
 
   void printChareNames();
 
+  void outputClosuresDecl(XStr& str);
+  void outputClosuresDef(XStr& str);
+
+  void genClosureEntryDecls(XStr& str);
+  void genClosureEntryDefs(XStr& str);
   void genDecls(XStr& str);
   void genDefs(XStr& str);
   void genReg(XStr& str);
   void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
-  void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
 
   // Accelerated Entry Method support
   int genAccels_spe_c_funcBodies(XStr& str);
@@ -196,6 +209,7 @@ class Type : public Printable {
     virtual int isCkMigMsgPtr(void) const {return 0;}
     virtual int isCkMigMsg(void) const {return 0;}
     virtual int isReference(void) const {return 0;}
+    virtual int isInt(void) const { return 0; }
     virtual bool isConst(void) const {return false;}
     virtual Type *deref(void) {return this;}
     virtual const char *getBaseName(void) const = 0;
@@ -315,6 +329,7 @@ class TypeList : public Printable {
 
 /**************** Parameter types & lists (for marshalling) ************/
 class Parameter {
+public:
     Type *type;
     const char *name; /*The name of the variable, if any*/
     const char *given_name; /*The name of the msg in ci file, if any*/
@@ -330,6 +345,7 @@ class Parameter {
     // DMK - Added field for accelerator options
     int accelBufferType;
     XStr* accelInstName;
+    bool podType;
 
     friend class ParamList;
     void pup(XStr &str);
@@ -337,9 +353,13 @@ class Parameter {
     void marshallArraySizes(XStr &str);
     void marshallArrayData(XStr &str);
     void beginUnmarshall(XStr &str);
+    void beginUnmarshallSDAGCall(XStr &str);
     void unmarshallArrayData(XStr &str);
+    void unmarshallArrayDataSDAG(XStr &str);
+    void unmarshallArrayDataSDAGCall(XStr &str);
     void pupAllValues(XStr &str);
   public:
+    Entry *entry;
     Parameter(int Nline,Type *Ntype,const char *Nname=0,
     	const char *NarrLen=0,Value *Nvalue=0);
     void setConditional(int c) { conditional = c; if (c) byReference = false; };
@@ -390,11 +410,12 @@ class ParamList {
     void callEach(fn_t f,XStr &str);
     bool manyPointers;
   public:
+    Entry *entry;
     Parameter *param;
     ParamList *next;
     ParamList(ParamList *pl) : manyPointers(false), param(pl->param), next(pl->next) {}
     ParamList(Parameter *Nparam,ParamList *Nnext=NULL)
-    	:param(Nparam), next(Nnext) { 
+      :param(Nparam), next(Nnext) { 
           manyPointers = false;
           if(next != NULL && (param->isMessage() || next->isMessage())){
             manyPointers = true;
@@ -418,6 +439,7 @@ class ParamList {
     }
     int isPointer(void) const {return param->type->isPointer();}
     const char *getGivenName(void) const {return param->getGivenName();}
+    const char *getName(void) const {return param->getName();}
     int isMarshalled(void) const {
     	return !isVoid() && !isMessage();
     }
@@ -449,12 +471,15 @@ class ParamList {
     int hasConditional();
     void marshall(XStr &str, XStr &entry);
     void beginUnmarshall(XStr &str);
-    void beginRednWrapperUnmarshall(XStr &str);
+    void beginUnmarshallSDAG(XStr &str);
+    void beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf);
+    void beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen);
     void unmarshall(XStr &str, int isFirst=1);
+    void unmarshallSDAGCall(XStr &str, int isFirst=1);
     void unmarshallAddress(XStr &str, int isFirst=1);
     void pupAllValues(XStr &str);
     void endUnmarshall(XStr &str);
-    int operator==(const ParamList &plist) const {
+    int operator==(ParamList &plist) {
       if (!(*param == *(plist.param))) return 0;
       if (!next && !plist.next) return 1;
       if (!next || !plist.next) return 0;
@@ -548,6 +573,16 @@ class Scope : public ConstructList {
         AstChildren<Construct>::print(str);
         str << "} // namespace " << name_ << "\n";
     }
+    void outputClosuresDecl(XStr& str) {
+      str << "namespace " << name_ << " {\n";
+      AstChildren<Construct>::outputClosuresDecl(str);
+      str << "} // namespace " << name_ << "\n";
+    }
+    void outputClosuresDef(XStr& str) {
+      str << "namespace " << name_ << " {\n";
+      AstChildren<Construct>::outputClosuresDef(str);
+      str << "} // namespace " << name_ << "\n";
+    }
 };
 
 class UsingScope : public Construct {
@@ -580,11 +615,12 @@ class Template : public Construct {
     Template(TVarList *t, TEntity *e) : tspec(t), entity(e) {}
     virtual void setExtern(int e);
     void print(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genSpec(XStr& str);
     void genVars(XStr& str);
+    void outputClosuresDecl(XStr& str);
+    void outputClosuresDef(XStr& str);
 
     // DMK - Accel Support
     int genAccels_spe_c_funcBodies(XStr& str);
@@ -709,19 +745,20 @@ class Chare : public TEntity {
     	CNODEGROUP=1<<13
     };
     typedef unsigned int attrib_t;
+    XStr sdagPUPReg;
+    XStr sdagDefs, closuresDecl, closuresDef;
+    NamedType *type;
   protected:
     attrib_t attrib;
     int hasElement;//0-- no element type; 1-- has element type
     forWhom forElement;
     int hasSection; //1-- applies only to array section
 
-    NamedType *type;
     TypeList *bases; //Base classes used by proxy
     TypeList *bases_CBase; //Base classes used by CBase (or NULL)
-    
+
     int entryCount;
     int hasSdagEntry;
-    XStr sdagDefs;
 
     void genTypedefs(XStr& str);
     void genRegisterMethodDef(XStr& str);
@@ -763,7 +800,6 @@ class Chare : public TEntity {
     void check();
     void genDefs(XStr& str);
     void genReg(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr &str);
     void preprocess();
 
@@ -791,6 +827,10 @@ class Chare : public TEntity {
 
     int nextEntry(void) {return entryCount++;}
     virtual void genSubDecls(XStr& str);
+    virtual void outputClosuresDecl(XStr& str);
+    virtual void outputClosuresDef(XStr& str);
+    virtual void genClosureEntryDecls(XStr& str);
+    virtual void genClosureEntryDefs(XStr& str);
     void genPythonDecls(XStr& str);
     void genPythonDefs(XStr& str);
     virtual char *chareTypeName(void) {return (char *)"chare";}
@@ -933,19 +973,27 @@ class Message : public TEntity {
 
 /* An entry construct */
 class Entry : public Member {
-  private:
+public:
+    XStr* genClosureTypeName;
+    XStr* genClosureTypeNameProxy;
+    XStr* genClosureTypeNameProxyTemp;
     int line,entryCount;
+  private:    
     int attribs;    
     Type *retType;
     Value *stacksize;
     const char *pythonDoc;
     
+
+public:
     XStr proxyName(void) {return container->proxyName();}
     XStr indexName(void) {return container->indexName();}
 
+private:
 //    friend class CParsedFile;
     int hasCallMarshall;
-    void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false);
+    void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false,
+                 bool usesImplBuf = false);
 
     XStr epStr(bool isForRedn = false, bool templateCall = false);
     XStr epIdx(int fromProxy=1, bool isForRedn = false);
@@ -953,6 +1001,10 @@ class Entry : public Member {
     XStr chareIdx(int fromProxy=1);
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
+
+    void genClosure(XStr& str, bool isDef);
+    void genClosureEntryDefs(XStr& str);
+    void genClosureEntryDecls(XStr& str);
     
     void genChareDecl(XStr& str);
     void genChareStaticConstructorDecl(XStr& str);
@@ -1006,8 +1058,6 @@ class Entry : public Member {
     CEntry *entryPtr;
     const char *intExpr;
     ParamList *param;
-    ParamList *connectParam;
-    int isConnect;
     int isWhenEntry;
 
     void addEStateVar(CStateVar *sv) {
@@ -1031,9 +1081,8 @@ class Entry : public Member {
     int accel_dmaList_numWriteOnly;
     int accel_dmaList_scalarNeedsWrite;
 
-    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0, int connect=0, ParamList *connectPList =0);
+    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0);
     void setChare(Chare *c);
-    int isConnectEntry(void) { return isConnect; }
     int paramIsMarshalled(void) { return param->isMarshalled(); }
     int getStackSize(void) { return (stacksize ? stacksize->getIntVal() : 0); }
     int isThreaded(void) { return (attribs & STHREADED); }
@@ -1063,7 +1112,6 @@ class Entry : public Member {
     void print(XStr& str);
     void check();
     void genIndexDecls(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
@@ -1141,7 +1189,6 @@ class Module : public Construct {
     void prependConstruct(Construct *c) { clist = new ConstructList(-1, c, clist); }
     void preprocess();
     void genDepend(const char *cifile);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
@@ -1262,28 +1309,28 @@ private:
   void generateOlist(XStr& decls, XStr& defs, Entry* entry);
   void generateSdagEntry(XStr& decls, XStr& defs, Entry *entry);
   void generateSlist(XStr& decls, XStr& defs, Entry* entry);
-  void generateAtomic(XStr& decls, XStr& defs, Entry* entry);
-  void generateForward(XStr& decls, XStr& defs, Entry* entry);
-  void generateConnect(XStr& decls, XStr& defs, Entry* entry);
   void generateCaseList(XStr& decls, XStr& defs, Entry* entry);
 
 protected:
-  void generateCall(XStr& defs, std::list<CStateVar*>& args,
-                    const XStr* name, const char* nameSuffix = 0);
-
-  void generateTraceBeginCall(XStr& defs);          // for trace
+  void generateCall(XStr& op, std::list<EncapState*>& cur,
+                    std::list<EncapState*>& next, const XStr* name,
+                    const char* nameSuffix = 0);
+  void generateTraceBeginCall(XStr& defs, int indent);          // for trace
   void generateBeginTime(XStr& defs);               //for Event Bracket
   void generateEventBracket(XStr& defs, int eventType);     //for Event Bracket
   void generateListEventBracket(XStr& defs, int eventType);
   void generateChildrenCode(XStr& decls, XStr& defs, Entry* entry);
   void generateChildrenEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
-  void propagateStateToChildren(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  void propagateStateToChildren(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   std::list<SdagConstruct *> *constructs;
-  std::list<SdagConstruct *> *publishesList;
   std::list<CStateVar *> *stateVars;
+  std::list<EncapState*> encapState, encapStateChild;
   std::list<CStateVar *> *stateVarsChildren;
 
 public:
+  int unravelClosuresBegin(XStr& defs, bool child = false);
+  void unravelClosuresEnd(XStr& defs, bool child = false);
+
   int nodeNum;
   XStr *label;
   XStr *counter;
@@ -1293,9 +1340,9 @@ public:
   SdagConstruct *next;
   ParamList *param;
   XStr *text;
-  XStr *connectEntry;
   int nextBeginOrEnd;
   EntryList *elist;
+  Entry* entry;
   SdagConstruct *con1, *con2, *con3, *con4;
   SdagConstruct(EToken t, SdagConstruct *construct1);
 
@@ -1304,40 +1351,39 @@ public:
   SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
               SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el);
 
- SdagConstruct(EToken t, const char *str) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0)
-  { text = new XStr(str); constructs = new std::list<SdagConstruct*>();
-    publishesList = new std::list<SdagConstruct*>(); }
+  SdagConstruct(EToken t, const char *str) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0), elist(0)
+  { text = new XStr(str); constructs = new std::list<SdagConstruct*>(); }
                                              
  
-  SdagConstruct(EToken t) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0) 
-  { publishesList = new std::list<SdagConstruct*>();
-		  constructs = new std::list<SdagConstruct*>(); }
+  SdagConstruct(EToken t) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0), elist(0)
+  { constructs = new std::list<SdagConstruct*>(); }
 
-  SdagConstruct(EToken t, XStr *txt) : type(t), traceName(NULL), text(txt), con1(0), con2(0), con3(0), con4(0) 
-  { publishesList = new std::list<SdagConstruct*>();
-		  constructs = new std::list<SdagConstruct*>();  }
+  SdagConstruct(EToken t, XStr *txt) : type(t), traceName(NULL), text(txt), con1(0), con2(0), con3(0), con4(0), elist(0)
+  { constructs = new std::list<SdagConstruct*>();  }
+
+  void init(EToken& t);
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
   void numberNodes(void);
-  void labelNodes(void);
-  void generateConnectEntryList(std::list<SdagConstruct*>&);
-  void generateConnectEntries(XStr&);
+  void labelNodes();
+  XStr* createLabel(const char* str, int nodeNum);
   virtual void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
   void propagateState(int);
-  virtual void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  virtual void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   virtual void generateCode(XStr& decls, XStr& defs, Entry *entry);
-  void generateWhenCode(XStr& op);
+  void generateWhenCode(XStr& op, int indent);
   void setNext(SdagConstruct *, int);
+  void buildTypes(std::list<EncapState*>& state);
 
   // for trace
   virtual void generateTrace();
   void generateRegisterEp(XStr& defs);
   void generateTraceEp(XStr& decls, XStr& defs, Chare* chare);
-  static void generateTraceEndCall(XStr& defs);
+  static void generateTraceEndCall(XStr& defs, int indent);
   static void generateTlineEndCall(XStr& defs);
   static void generateBeginExec(XStr& defs, const char *name);
   static void generateEndExec(XStr& defs);
   static void generateEndSeq(XStr& defs);
-  static void generateDummyBeginExecute(XStr& defs);
+  static void generateDummyBeginExecute(XStr& defs, int indent);
 };
 
 class WhenConstruct : public SdagConstruct {
@@ -1349,19 +1395,22 @@ public:
     , speculativeState(0)
   { }
   void generateEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
-  void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateEntryName(XStr& defs, Entry* e, int curEntry);
 };
 
 extern void RemoveSdagComments(char *);
 
+void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature, Entry* entry,
+                          std::list<CStateVar*>* params, XStr* next);
+
 class AtomicConstruct : public SdagConstruct {
 public:
-  void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, std::list<SdagConstruct*>&, int );
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateCode(XStr&, XStr&, Entry *);
   void generateTrace();
-  AtomicConstruct(const char *code, SdagConstruct *pub_list, const char *trace_name)
-    : SdagConstruct(SATOMIC, NULL, pub_list, 0,0,0,0,0)
+  AtomicConstruct(const char *code, const char *trace_name)
+    : SdagConstruct(SATOMIC, NULL, 0, 0, 0, 0, 0, 0)
   {
     char *tmp = strdup(code);
     RemoveSdagComments(tmp);

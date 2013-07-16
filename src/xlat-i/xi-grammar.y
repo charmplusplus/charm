@@ -88,11 +88,8 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %token WHEN
 %token OVERLAP
 %token ATOMIC
-%token FORWARD
 %token IF
 %token ELSE
-%token CONNECT
-%token PUBLISHES 
 %token PYTHON LOCAL
 %token NAMESPACE
 %token USING 
@@ -148,7 +145,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %type <mv>		Var
 %type <mvlist>		VarList
 %type <intval>		ParamBraceStart ParamBraceEnd SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
-%type <sc>		Slist SingleConstruct Olist OptSdagCode HasElse ForwardList PublishesList OptPubList CaseList
+%type <sc>		Slist SingleConstruct Olist OptSdagCode HasElse CaseList
 %type <when>            WhenConstruct NonWhenConstruct
 %type <intval>		PythonOptions
 
@@ -225,7 +222,7 @@ ConstructSemi   : USING NAMESPACE QualName
                 { $2->setExtern($1); $$ = $2; }
                 | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters
                 {
-                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, 0, 0);
+                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0);
                   int isExtern = 1;
                   e->setExtern(isExtern);
                   e->targs = $6;
@@ -723,19 +720,23 @@ UnexpectedToken : ENTRY
 
 Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
+                  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7); 
 		  if ($7 != 0) { 
 		    $7->con1 = new SdagConstruct(SIDENT, $4);
+                    $7->entry = $$;
+                    $7->con1->entry = $$;
                     $7->param = new ParamList($5);
                   }
-		  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, 0, 0); 
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
 		{ 
-		  if ($5 != 0) {
+                  Entry *e = new Entry(lineno, $2, 0, $3, $4,  0, $5);
+                  if ($5 != 0) {
 		    $5->con1 = new SdagConstruct(SIDENT, $3);
+                    $5->entry = e;
+                    $5->con1->entry = e;
                     $5->param = new ParamList($4);
                   }
-		  Entry *e = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0);
 		  if (e->param && e->param->isCkMigMsgPtr()) {
 		    yyerror("Charm++ takes a CkMigrateMsg chare constructor for granted, but continuing anyway");
 		    $$ = NULL;
@@ -751,9 +752,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		  XStr* codeBody = new XStr($10);
                   const char* callbackName = $12;
 
-                  $$ = new Entry(lineno, attribs, new BuiltinType("void"), name, paramList,
-                                 0, 0, 0, 0, 0
-                                );
+                  $$ = new Entry(lineno, attribs, new BuiltinType("void"), name, paramList, 0, 0, 0 );
                   $$->setAccelParam(accelParamList);
                   $$->setAccelCodeBody(codeBody);
                   $$->setAccelCallbackName(new XStr(callbackName));
@@ -1020,18 +1019,6 @@ CaseList        : WhenConstruct
                 { yyerror("Case blocks in SDAG can only contain when clauses."); YYABORT; }
 		;
 
-OptPubList	: /* Empty */
-		{ $$ = 0; }
-		| PUBLISHES '(' PublishesList ')'
-		{ $$ = $3; }
-		;
-
-PublishesList	: IDENT	
-		{ $$ = new SdagConstruct(SPUBLISHES, new SdagConstruct(SIDENT, $1)); }
-		| IDENT ',' PublishesList 
-		{ $$ = new SdagConstruct(SPUBLISHES, new SdagConstruct(SIDENT, $1), $3);  }
-		;
-
 OptTraceName	: LITERAL
 		 { $$ = $1; }
 		|
@@ -1048,8 +1035,6 @@ WhenConstruct   : WHEN SEntryList '{' '}'
 
 NonWhenConstruct : ATOMIC
                  { $$ = 0; }
-                 | CONNECT
-                 { $$ = 0; }
                  | OVERLAP
                  { $$ = 0; }
                  | FOR
@@ -1060,28 +1045,10 @@ NonWhenConstruct : ATOMIC
                  { $$ = 0; }
                  | WHILE
                  { $$ = 0; }
-                 | FORWARD
-                 { $$ = 0; }
                  ;
 
-SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPubList 
-                 {
-		   $$ = new AtomicConstruct($4, $6, $2);
-		 }
-		| CONNECT '(' IDENT EParameters ')' ParamBraceStart CCode '}'
-		{  
-		   in_braces = 0;
-		   if (($4->isVoid() == 0) && ($4->isMessage() == 0))
-                   {
-		      connectEntries.push_back(new Entry(0, 0, new BuiltinType("void"), $3,
-	 	 			new ParamList(new Parameter(lineno, new PtrType( 
-                                        new NamedType("CkMarshallMsg")), "_msg")), 0, 0, 0, 1, $4));
-		   }
-		   else  {
-		      connectEntries.push_back(new Entry(0, 0, new BuiltinType("void"), $3, $4, 0, 0, 0, 1, $4));
-                   }
-                   $$ = new SdagConstruct(SCONNECT, $3, $7, $4);
-		}
+SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
+                { $$ = new AtomicConstruct($4, $2); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new SdagConstruct(SOVERLAP,0, 0,0,0,0,$3, 0); }	
                 | WhenConstruct
@@ -1108,10 +1075,8 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		{ $$ = new SdagConstruct(SWHILE, 0, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$5,0); }
 		| WHILE StartIntExpr CCode EndIntExpr '{' Slist '}' 
 		{ $$ = new SdagConstruct(SWHILE, 0, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$6,0); }
-		| FORWARD ForwardList ';'
-		{ $$ = $2; }
 		| ParamBraceStart CCode ParamBraceEnd
-		{ $$ = new AtomicConstruct($2, NULL, NULL); }
+		{ $$ = new AtomicConstruct($2, NULL); }
                 | error
                 { printf("Unknown SDAG construct or malformed entry method definition.\n"
                          "You may have forgotten to terminate an entry method definition with a"
@@ -1125,11 +1090,6 @@ HasElse		: /* Empty */
 		| ELSE '{' Slist '}'
 		{ $$ = new SdagConstruct(SELSE, 0,0,0,0,0, $3,0); }
 		;
-ForwardList	: IDENT 
-		{ $$ = new SdagConstruct(SFORWARD, new SdagConstruct(SIDENT, $1)); }
-		| IDENT ',' ForwardList 
-		{ $$ = new SdagConstruct(SFORWARD, new SdagConstruct(SIDENT, $1), $3);  }
-		;
 
 EndIntExpr	: ')'
 		{ in_int_expr = 0; $$ = 0; }
@@ -1140,9 +1100,9 @@ StartIntExpr	: '('
 		;
 
 SEntry		: IDENT EParameters
-		{ $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, 0); }
+		{ $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0); }
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
-		{ $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, 0); }
+		{ $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3); }
 		;
 
 SEntryList	: SEntry 
