@@ -1,6 +1,6 @@
 mainmodule migrateHello {
   readonly CProxy_Main mainProxy;
-  readonly int nElements;
+  readonly int numIterations;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
