@@ -8,9 +8,11 @@ class ArrayDataItem {
 
 public:
   itype arrayIndex;
+  int sourcePe;
   dtype dataItem;
 
-  ArrayDataItem(itype i, const dtype d) : arrayIndex(i), dataItem(d) {}
+  ArrayDataItem(itype i, int srcPe, const dtype d)
+    : arrayIndex(i), sourcePe(srcPe), dataItem(d) {}
 };
 
 class ChunkDataItem {

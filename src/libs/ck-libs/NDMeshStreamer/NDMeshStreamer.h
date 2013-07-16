@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <list>
+#include <map>
 #include "NDMeshStreamer.decl.h"
 #include "DataItemTypes.h"
 #include "completion.h"
@@ -151,9 +152,6 @@ private:
   int numLocalDone_; 
   int numLocalContributors_;
 
-  void storeMessage(int destinationPe, 
-                    const MeshLocation& destinationCoordinates, 
-                    const void *dataItem, bool copyIndirectly = false);
   virtual void localDeliver(const dtype& dataItem) = 0; 
   virtual void localBroadcast(const dtype& dataItem) = 0; 
   virtual int numElementsInClient() = 0;
@@ -164,8 +162,6 @@ private:
   void sendLargestBuffer();
   void flushToIntermediateDestinations();
   void flushDimension(int dimension, bool sendMsgCounts = false); 
-  MeshLocation determineLocation(int destinationPe, 
-                                 int dimensionReceivedAlong);
 
 protected:
 
@@ -178,9 +174,19 @@ protected:
   void insertData(const void *dataItemHandle, int destinationPe);
   void broadcast(const void *dataItemHandle, int dimension, 
                  bool copyIndirectly);
+  MeshLocation determineLocation(int destinationPe,
+                                 int dimensionReceivedAlong);
+  void storeMessage(int destinationPe,
+                    const MeshLocation& destinationCoordinates,
+                    const void *dataItem, bool copyIndirectly = false);
+
+  void ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
+                  int *dimensionSizes, int bufferSize,
+                  bool yieldFlag, double progressPeriodInMs);
 
 public:
 
+  MeshStreamer() {}
   MeshStreamer(int maxNumDataItemsBuffered, int numDimensions, 
                int *dimensionSizes, int bufferSize,
                bool yieldFlag = 0, double progressPeriodInMs = -1.0);
@@ -293,13 +299,22 @@ MeshStreamer<dtype>::MeshStreamer(
 		     int *dimensionSizes, 
                      int bufferSize,
 		     bool yieldFlag, 
-                     double progressPeriodInMs)
- :numDimensions_(numDimensions), 
-  maxNumDataItemsBuffered_(maxNumDataItemsBuffered), 
-  yieldFlag_(yieldFlag), 
-  progressPeriodInMs_(progressPeriodInMs), 
-  bufferSize_(bufferSize)
-{
+                     double progressPeriodInMs) {
+  ctorHelper(maxNumDataItemsBuffered, numDimensions, dimensionSizes,
+             bufferSize, yieldFlag, progressPeriodInMs);
+}
+
+template <class dtype>
+void MeshStreamer<dtype>::
+ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
+           int *dimensionSizes, int bufferSize,
+           bool yieldFlag, double progressPeriodInMs) {
+
+  numDimensions_ = numDimensions;
+  maxNumDataItemsBuffered_ = maxNumDataItemsBuffered;
+  yieldFlag_ = yieldFlag;
+  progressPeriodInMs_ = progressPeriodInMs;
+  bufferSize_ = bufferSize;
 
   int sumAlongAllDimensions = 0;   
   individualDimensionSizes_ = new int[numDimensions_];
@@ -688,7 +703,10 @@ void MeshStreamer<dtype>::init(int numContributors,
   yieldCount_ = 0; 
   prio_ = prio;
   userCallback_ = endCb; 
-  CkCallback flushCb(CkIndex_MeshStreamer<dtype>::flushIfIdle(), 
+
+  // to facilitate completion, enable flushing after all contributors
+  //  have finished submitting items
+  CkCallback flushCb(CkIndex_MeshStreamer<dtype>::enablePeriodicFlushing(),
                      this->thisProxy);
   CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), 
 		    this->thisProxy);
@@ -881,7 +899,6 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
   
 }
 
-
 template <class dtype>
 void MeshStreamer<dtype>::flushIfIdle(){
   // flush if (1) this is not a periodic call or 
@@ -920,7 +937,7 @@ void MeshStreamer<dtype>::registerPeriodicProgressFunction() {
 
 
 template <class dtype>
-class GroupMeshStreamer : public MeshStreamer<dtype> {
+class GroupMeshStreamer : public CBase_GroupMeshStreamer<dtype> {
 private:
 
   CProxy_MeshStreamerGroupClient<dtype> clientProxy_;
@@ -977,10 +994,9 @@ public:
   GroupMeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
 		    int *dimensionSizes, 
 		    const CProxy_MeshStreamerGroupClient<dtype>& clientProxy,
-		    bool yieldFlag = 0, double progressPeriodInMs = -1.0)
-   :MeshStreamer<dtype>(maxNumDataItemsBuffered, numDimensions, dimensionSizes,
-                        0, yieldFlag, progressPeriodInMs) 
-  {
+		    bool yieldFlag = 0, double progressPeriodInMs = -1.0) {
+    this->ctorHelper(maxNumDataItemsBuffered, numDimensions, dimensionSizes,
+               0, yieldFlag, progressPeriodInMs);
     clientProxy_ = clientProxy; 
     clientObj_ = clientProxy_.ckLocalBranch();
   }
@@ -988,10 +1004,9 @@ public:
   GroupMeshStreamer(int numDimensions, int *dimensionSizes, 
 		    const CProxy_MeshStreamerGroupClient<dtype>& clientProxy,
 		    int bufferSize, bool yieldFlag = 0, 
-                    double progressPeriodInMs = -1.0)
-   :MeshStreamer<dtype>(0, numDimensions, dimensionSizes, bufferSize, 
-                        yieldFlag, progressPeriodInMs) 
-  {
+                    double progressPeriodInMs = -1.0) {
+    this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize,
+               yieldFlag, progressPeriodInMs);
     clientProxy_ = clientProxy; 
     clientObj_ = clientProxy_.ckLocalBranch();
   }
@@ -1043,7 +1058,7 @@ public:
 };
 
 template <class dtype, class itype>
-class ArrayMeshStreamer : public MeshStreamer<ArrayDataItem<dtype, itype> > {
+class ArrayMeshStreamer : public CBase_ArrayMeshStreamer<dtype, itype> {
   
 private:
   
@@ -1051,6 +1066,7 @@ private:
   CkArray *clientArrayMgr_;
   int numArrayElements_;
   int numLocalArrayElements_;
+  std::map<itype, std::vector<ArrayDataItem<dtype, itype> > > misdeliveredItems;
 #ifdef CACHE_ARRAY_METADATA
   MeshStreamerArrayClient<dtype> **clientObjs_;
   int *destinationPes_;
@@ -1080,8 +1096,22 @@ private:
       }
     }
     else { 
-      // array element is no longer present locally - redeliver using proxy
-      clientProxy_[arrayId].receiveRedeliveredItem(packedDataItem.dataItem);
+      // array element arrayId is no longer present locally:
+      //  buffer the data item and request updated PE index
+      //  to be sent to the source and this PE
+      if (MeshStreamer<ArrayDataItem<dtype, itype> >
+          ::useStagedCompletion_ == false) {
+        CkAbort("Using staged completion when array locations"
+                " are not guaranteed to be correct is currently"
+                " not supported.");
+      }
+      misdeliveredItems[arrayId].push_back(packedDataItem);
+      if (misdeliveredItems[arrayId].size() == 1) {
+        CkLocMgr *clientLocMgr = clientProxy_.ckLocMgr();
+        int homePe = clientLocMgr->homePe(arrayId);
+        this->thisProxy[homePe].processLocationRequest(arrayId, CkMyPe(),
+                                                 packedDataItem.sourcePe);
+      }
     }
   }
 
@@ -1158,11 +1188,9 @@ public:
   ArrayMeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
 		    int *dimensionSizes, 
                     const CProxy_MeshStreamerArrayClient<dtype>& clientProxy,
-		    bool yieldFlag = 0, double progressPeriodInMs = -1.0)
-    :MeshStreamer<ArrayDataItem<dtype, itype> >(
-                  maxNumDataItemsBuffered, numDimensions, dimensionSizes, 
-                  0, yieldFlag, progressPeriodInMs) 
-  {
+		    bool yieldFlag = 0, double progressPeriodInMs = -1.0) {
+    this->ctorHelper(maxNumDataItemsBuffered, numDimensions, dimensionSizes, 0,
+                     yieldFlag, progressPeriodInMs);
     clientProxy_ = clientProxy; 
     clientArrayMgr_ = clientProxy_.ckLocalBranch();
     commonInit();
@@ -1171,11 +1199,9 @@ public:
   ArrayMeshStreamer(int numDimensions, int *dimensionSizes, 
 		    const CProxy_MeshStreamerArrayClient<dtype>& clientProxy,
 		    int bufferSize, bool yieldFlag = 0, 
-                    double progressPeriodInMs = -1.0)
-    :MeshStreamer<ArrayDataItem<dtype,itype> >(
-                  0, numDimensions, dimensionSizes, 
-                  bufferSize, yieldFlag, progressPeriodInMs) 
-  {
+                    double progressPeriodInMs = -1.0) {
+    this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
+                     progressPeriodInMs);
     clientProxy_ = clientProxy; 
     clientArrayMgr_ = clientProxy_.ckLocalBranch();
     commonInit();
@@ -1219,7 +1245,8 @@ public:
     }
 
     // deliver locally
-    ArrayDataItem<dtype, itype>& packedDataItem(TRAM_BROADCAST, dataItem);
+    ArrayDataItem<dtype, itype>& packedDataItem(TRAM_BROADCAST, CkMyPe(),
+                                                dataItem);
     localBroadcast(packedDataItem);
 
     DataItemHandle tempHandle; 
@@ -1260,7 +1287,7 @@ public:
 #endif
 
     if (destinationPe == CkMyPe()) {
-      ArrayDataItem<dtype, itype> packedDataItem(arrayIndex, dataItem);
+      ArrayDataItem<dtype, itype> packedDataItem(arrayIndex, CkMyPe(), dataItem);
       localDeliver(packedDataItem);
       return;
     }
@@ -1284,10 +1311,11 @@ public:
       int numDataItems = destinationBuffer->numDataItems;
       const DataItemHandle *tempHandle = 
         (const DataItemHandle *) dataItemHandle;
-      (destinationBuffer->dataItems)[numDataItems].dataItem = 
-	*(tempHandle->dataItem);
       (destinationBuffer->dataItems)[numDataItems].arrayIndex = 
 	tempHandle->arrayIndex;
+      (destinationBuffer->dataItems)[numDataItems].sourcePe = CkMyPe();
+      (destinationBuffer->dataItems)[numDataItems].dataItem =
+	*(tempHandle->dataItem);
       return ++destinationBuffer->numDataItems;
     }
     else {
@@ -1295,6 +1323,54 @@ public:
       // we can copy it from the received message
       return MeshStreamer<ArrayDataItem<dtype, itype> >::
 	      copyDataItemIntoMessage(destinationBuffer, dataItemHandle);
+    }
+  }
+
+  // always called on homePE for array element arrayId
+  void processLocationRequest(itype arrayId, int deliveredToPe, int sourcePe) {
+    int ownerPe =
+      clientArrayMgr_->lastKnown(clientProxy_[arrayId].ckGetIndex());
+    this->thisProxy[deliveredToPe].resendMisdeliveredItems(arrayId, ownerPe);
+    this->thisProxy[sourcePe].updateLocationAtSource(arrayId, sourcePe);
+  }
+
+  void resendMisdeliveredItems(itype arrayId, int destinationPe) {
+    CkLocMgr *clientLocMgr = clientProxy_.ckLocMgr();
+    clientLocMgr->updateLocation(arrayId, destinationPe);
+
+    std::vector<ArrayDataItem<dtype, itype> > &bufferedItems
+      = misdeliveredItems[arrayId];
+
+    MeshLocation destinationLocation =
+      determineLocation(destinationPe, MeshStreamer
+                        <ArrayDataItem<dtype, itype> >::numDimensions_);
+    for (int i = 0; i < bufferedItems.size(); i++) {
+      storeMessage(destinationPe, destinationLocation, &bufferedItems[i]);
+    }
+
+    bufferedItems.clear();
+  }
+
+  void updateLocationAtSource(itype arrayId, int destinationPe) {
+
+    int prevOwner = clientArrayMgr_->lastKnown(clientProxy_[arrayId].ckGetIndex());
+
+    if (prevOwner != destinationPe) {
+      CkLocMgr *clientLocMgr = clientProxy_.ckLocMgr();
+      clientLocMgr->updateLocation(arrayId, destinationPe);
+
+//    // could also try to correct destinations of items buffered for arrayId,
+//    // but it would take significant additional computation, so leaving it out;
+//    // the items will get forwarded after being delivered to the previous owner
+//    MeshLocation oldLocation = determineLocation(prevOwner, numDimensions_);
+
+//    MeshStreamerMessage<dtype> *messageBuffer = dataBuffers_
+//     [oldLocation.dimension][oldLocation.bufferIndex];
+
+//    if (messageBuffer != NULL) {
+//      // TODO: find items for arrayId, move them to buffer for destinationPe
+//      // do not leave holes in messageBuffer
+//    }
     }
   }
 
@@ -1344,11 +1420,9 @@ public:
        int *dimensionSizes, 
        const CProxy_MeshStreamerGroupClient<dtype>& clientProxy,
        bool yieldFlag = 0, double progressPeriodInMs = -1.0, 
-       bool userHandlesFreeing = false)
-    :MeshStreamer<ChunkDataItem>(maxNumDataItemsBuffered, 
-                                 numDimensions, dimensionSizes,
-                                 0, yieldFlag, progressPeriodInMs) {
-
+       bool userHandlesFreeing = false) {
+    ctorHelper(maxNumDataItemsBuffered, numDimensions, dimensionSizes,
+               0, yieldFlag, progressPeriodInMs);
     clientProxy_ = clientProxy; 
     clientObj_ = clientProxy_.ckLocalBranch();    
     userHandlesFreeing_ = userHandlesFreeing; 

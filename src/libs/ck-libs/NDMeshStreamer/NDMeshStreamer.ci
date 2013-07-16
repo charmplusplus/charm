@@ -18,7 +18,7 @@ module NDMeshStreamer {
   template<class dtype> 
   group MeshStreamer {
     entry void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
-    entry void flushIfIdle();
+    entry void enablePeriodicFlushing();
     entry void finish();
     entry void init(int numLocalContributors, CkCallback startCb, 
 		    CkCallback endCb, int prio, 
@@ -61,6 +61,12 @@ module NDMeshStreamer {
 	  const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
 	  int bufferSize, bool yieldFlag = 0, 
 	  double progressPeriodInMs = -1.0);
+
+    entry void processLocationRequest(itype arrayId, int deliveredToPe,
+				      int sourcePe);
+    entry void resendMisdeliveredItems(itype arrayId, int destinationPe);
+    entry void updateLocationAtSource(itype arrayId, int destinationPe);
+
   };
 
   template<class dtype>
