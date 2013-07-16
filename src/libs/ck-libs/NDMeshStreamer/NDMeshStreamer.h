@@ -59,12 +59,9 @@ public:
 
 template <class dtype>
 class MeshStreamerArrayClient : public CBase_MeshStreamerArrayClient<dtype>{
-private:
-  CompletionDetector *detectorLocalObj_;
+
 public:
-  MeshStreamerArrayClient(){
-    detectorLocalObj_ = NULL; 
-  }
+
   MeshStreamerArrayClient(CkMigrateMessage *msg) {}
   // would like to make it pure virtual but charm will try to
   // instantiate the abstract class, leading to errors
@@ -72,19 +69,6 @@ public:
     CkAbort("Error. MeshStreamerArrayClient::process() is being called. "
             "This virtual function should have been defined by the user.\n");
   }     
-  inline void setDetector(CompletionDetector *detectorLocalObj) {
-    detectorLocalObj_ = detectorLocalObj;
-  }
-  void receiveRedeliveredItem(dtype data) {
-#ifdef STREAMER_VERBOSE_OUTPUT
-    CkPrintf("[%d] redelivered to index %d\n", 
-             CkMyPe(), this->thisIndex.data[0]);
-#endif
-    if (detectorLocalObj_ != NULL) {
-      detectorLocalObj_->consume();
-    }
-    process(data);
-  }
 
   void pup(PUP::er& p) {
     CBase_MeshStreamerArrayClient<dtype>::pup(p);
@@ -1014,29 +998,6 @@ public:
 };
 
 template <class dtype>
-class ClientInitializer : public CkLocIterator {
-
-public:
-  
-  CompletionDetector *detectorLocalObj_;
-  CkArray *clientArrMgr_;
-  ClientInitializer(CompletionDetector *detectorObj, 
-			     CkArray *clientArrMgr) 
-    : detectorLocalObj_(detectorObj), clientArrMgr_(clientArrMgr) {}
-
-  // CkLocMgr::iterate will call addLocation on all elements local to this PE
-  inline void addLocation(CkLocation& loc) {
-
-    MeshStreamerArrayClient<dtype> *clientObj = 
-      (MeshStreamerArrayClient<dtype> *) clientArrMgr_->lookup(loc.getIndex());
-
-    CkAssert(clientObj != NULL); 
-    clientObj->setDetector(detectorLocalObj_); 
-  }
-
-};
-
-template <class dtype>
 class LocalBroadcaster : public CkLocIterator {
 
 public:
@@ -1148,18 +1109,7 @@ private:
 
       for (int i = 0; i < numArrayElements_; i++) {
         clientObjs_[i] = clientProxy_[i].ckLocal();
-        if (clientObjs_[i] != NULL) {
-          clientObjs_[i]->setDetector(
-           MeshStreamer<ArrayDataItem<dtype, itype> >::detectorLocalObj_);
-        }
       }
-#else
-      // set completion detector in local elements of the client
-      CkLocMgr *clientLocMgr = clientProxy_.ckLocMgr(); 
-      ClientInitializer<dtype> clientIterator(
-          MeshStreamer<ArrayDataItem<dtype, itype> >::detectorLocalObj_, 
-          clientProxy_.ckLocalBranch());
-      clientLocMgr->iterate(clientIterator);
 #endif    
     }
     else {
