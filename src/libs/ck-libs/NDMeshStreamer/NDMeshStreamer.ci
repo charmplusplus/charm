@@ -11,9 +11,7 @@ module NDMeshStreamer {
 
   template<class dtype> group MeshStreamerGroupClient {};
 
-  template<class dtype> array [Max] MeshStreamerArrayClient {
-    entry void receiveRedeliveredItem(dtype data);
-  };
+  template<class dtype> array [Max] MeshStreamerArrayClient {};
 
   template<class dtype> 
   group MeshStreamer {

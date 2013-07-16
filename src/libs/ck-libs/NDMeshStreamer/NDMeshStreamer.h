@@ -62,6 +62,7 @@ class MeshStreamerArrayClient : public CBase_MeshStreamerArrayClient<dtype>{
 
 public:
 
+  MeshStreamerArrayClient() {}
   MeshStreamerArrayClient(CkMigrateMessage *msg) {}
   // would like to make it pure virtual but charm will try to
   // instantiate the abstract class, leading to errors
