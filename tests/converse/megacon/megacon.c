@@ -77,7 +77,9 @@ tests[] = {
   { "nodenum",   nodenum_init,   nodenum_moduleinit,    0,  1 },
   { "specmsg",   specmsg_init,   specmsg_moduleinit,    0,  0 },
   { "vars",      vars_init,      vars_moduleinit,       0,  1 },
+#if ! CMK_RANDOMIZED_MSGQ
   { "priotest",  priotest_init,  priotest_moduleinit,   1,  0 },
+#endif
   { "ringsimple",ringsimple_init,ringsimple_moduleinit, 0, 10 },
   { "ring",      ring_init,      ring_moduleinit,       1,  1 },
   { "fibobj",    fibobj_init,    fibobj_moduleinit,     1,  1 },
