@@ -28,6 +28,8 @@ module NDMeshStreamer {
     entry void init(CkArrayID senderArrayID, CkCallback startCb, 
 		    CkCallback endCb, int prio, 
 		    bool usePeriodicFlushing); 
+    entry void init(CkCallback endCb, int prio);
+
 
     entry void receiveAtDestination(MeshStreamerMessage<dtype> *msg);
   };

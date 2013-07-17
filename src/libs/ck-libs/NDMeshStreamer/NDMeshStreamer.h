@@ -142,8 +142,6 @@ private:
 
   virtual void localDeliver(const dtype& dataItem) = 0; 
   virtual void localBroadcast(const dtype& dataItem) = 0; 
-  virtual int numElementsInClient() = 0;
-  virtual int numLocalElementsInClient() = 0; 
 
   virtual void initLocalClients() = 0;
 
@@ -155,6 +153,7 @@ protected:
 
   int numDimensions_;
   bool useStagedCompletion_;
+  bool useCompletionDetection_;
   CompletionDetector *detectorLocalObj_;
   virtual int copyDataItemIntoMessage(
               MeshStreamerMessage<dtype> *destinationBuffer, 
@@ -188,6 +187,7 @@ public:
             int prio, bool usePeriodicFlushing);
   void init(CkArrayID senderArrayID, CkCallback startCb, CkCallback endCb, 
             int prio, bool usePeriodicFlushing);
+  void init(CkCallback endCb, int prio);
 
   void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
   virtual void receiveAtDestination(MeshStreamerMessage<dtype> *msg) = 0;
@@ -219,7 +219,7 @@ public:
         startStagedCompletion();
       }
     }
-    else {
+    else if (useCompletionDetection_){
       detectorLocalObj_->done(numContributorsFinished);
     }
   }
@@ -553,7 +553,7 @@ void MeshStreamer<dtype>::broadcast(const dtype& dataItem) {
   CkAssert(stagedCompletionStarted() == false);
 
   // produce and consume once per PE
-  if (!useStagedCompletion_) {
+  if (useCompletionDetection_) {
     detectorLocalObj_->produce(CkNumPes());
   }
   QdCreate(CkNumPes());
@@ -624,7 +624,7 @@ void MeshStreamer<dtype>::insertData(const dtype& dataItem, int destinationPe) {
   // and staged completion has begun
   CkAssert(stagedCompletionStarted() == false);
 
-  if (!useStagedCompletion_) {
+  if (useCompletionDetection_) {
     detectorLocalObj_->produce();
   }
   QdCreate(1);
@@ -637,10 +637,28 @@ void MeshStreamer<dtype>::insertData(const dtype& dataItem, int destinationPe) {
 }
 
 template <class dtype>
+void MeshStreamer<dtype>::init(CkCallback endCb, int prio) {
+  useStagedCompletion_ = false;
+  useCompletionDetection_ = false;
+
+  yieldCount_ = 0;
+  userCallback_ = endCb;
+  prio_ = prio;
+
+  initLocalClients();
+
+  hasSentRecently_ = false;
+  enablePeriodicFlushing();
+
+}
+
+
+template <class dtype>
 void MeshStreamer<dtype>::init(int numLocalContributors, CkCallback startCb, 
                                CkCallback endCb, int prio, 
                                bool usePeriodicFlushing) {
   useStagedCompletion_ = true; 
+  useCompletionDetection_ = false;
   // allocate memory on first use
   if (cntMsgSent_ == NULL) {
     cntMsgSent_ = new int*[numDimensions_]; 
@@ -690,6 +708,7 @@ void MeshStreamer<dtype>::init(int numContributors,
                                int prio, bool usePeriodicFlushing) {
 
   useStagedCompletion_ = false; 
+  useCompletionDetection_ = true;
   yieldCount_ = 0; 
   prio_ = prio;
   userCallback_ = endCb; 
@@ -948,7 +967,7 @@ private:
 #endif
       this->markMessageReceived(msg->dimension, msg->finalMsgCount); 
     }
-    else {
+    else if (MeshStreamer<dtype>::useCompletionDetection_){
       this->detectorLocalObj_->consume(msg->numDataItems);    
     }
     QdProcess(msg->numDataItems);
@@ -957,7 +976,7 @@ private:
 
   inline void localDeliver(const dtype& dataItem) {
     clientObj_->process(dataItem);
-    if (MeshStreamer<dtype>::useStagedCompletion_ == false) {
+    if (MeshStreamer<dtype>::useCompletionDetection_) {
       MeshStreamer<dtype>::detectorLocalObj_->consume();
     }
     QdProcess(1);
@@ -965,15 +984,6 @@ private:
 
   inline void localBroadcast(const dtype& dataItem) {
     localDeliver(dataItem); 
-  }
-
-  inline int numElementsInClient() {
-    // client is a group - there is one element per PE
-    return CkNumPes();
-  }
-
-  inline int numLocalElementsInClient() {
-    return 1; 
   }
 
   inline void initLocalClients() {
@@ -1058,7 +1068,7 @@ private:
     if (clientObj != NULL) {
       clientObj->process(packedDataItem.dataItem);
       if (MeshStreamer<ArrayDataItem<dtype, itype> >
-           ::useStagedCompletion_ == false) {
+           ::useCompletionDetection_) {
         MeshStreamer<ArrayDataItem<dtype, itype> >
          ::detectorLocalObj_->consume();
       }
@@ -1069,7 +1079,7 @@ private:
       //  buffer the data item and request updated PE index
       //  to be sent to the source and this PE
       if (MeshStreamer<ArrayDataItem<dtype, itype> >
-          ::useStagedCompletion_ == false) {
+          ::useStagedCompletion_) {
         CkAbort("Using staged completion when array locations"
                 " are not guaranteed to be correct is currently"
                 " not supported.");
@@ -1093,24 +1103,16 @@ private:
     clientLocMgr->iterate(clientIterator);
 
     if (MeshStreamer<ArrayDataItem<dtype, itype> >
-         ::useStagedCompletion_ == false) {
+         ::useCompletionDetection_) {
         MeshStreamer<ArrayDataItem<dtype, itype> >
          ::detectorLocalObj_->consume();      
     }
     QdProcess(1);
   }
 
-  inline int numElementsInClient() {
-    return numArrayElements_;
-  }
-
-  inline int numLocalElementsInClient() {
-    return numLocalArrayElements_;
-  }
-
   inline void initLocalClients() {
     if (MeshStreamer<ArrayDataItem<dtype, itype> >
-         ::useStagedCompletion_ == false) {
+         ::useCompletionDetection_) {
 #ifdef CACHE_ARRAY_METADATA
       std::fill(isCachedArrayMetadata_, 
                 isCachedArrayMetadata_ + numArrayElements_, false);
@@ -1119,9 +1121,6 @@ private:
         clientObjs_[i] = clientProxy_[i].ckLocal();
       }
 #endif    
-    }
-    else {
-      numLocalArrayElements_ = clientProxy_.ckLocMgr()->numLocalElements();
     }
   }
 
@@ -1197,7 +1196,7 @@ public:
                ::stagedCompletionStarted()) == false);
 
     if (MeshStreamer<ArrayDataItem<dtype, itype> >
-         ::useStagedCompletion_ == false) {
+         ::useCompletionDetection_) {
       MeshStreamer<ArrayDataItem<dtype, itype> >
         ::detectorLocalObj_->produce(CkNumPes());
     }
@@ -1226,7 +1225,7 @@ public:
                ::stagedCompletionStarted()) == false);
 
     if (MeshStreamer<ArrayDataItem<dtype, itype> >
-         ::useStagedCompletion_ == false) {
+         ::useCompletionDetection_) {
       MeshStreamer<ArrayDataItem<dtype, itype> >::detectorLocalObj_->produce();
     }
     QdCreate(1);
@@ -1529,7 +1528,7 @@ public:
 
   inline void localDeliver(const ChunkDataItem& chunk) {
     processChunk(chunk);
-    if (MeshStreamer<ChunkDataItem>::useStagedCompletion_ == false) {
+    if (MeshStreamer<ChunkDataItem>::useCompletionDetection_) {
       MeshStreamer<ChunkDataItem>::detectorLocalObj_->consume();
     }
     QdProcess(1);
@@ -1552,7 +1551,7 @@ public:
 #endif
       this->markMessageReceived(msg->dimension, msg->finalMsgCount); 
     }
-    else {
+    else if (MeshStreamer<ChunkDataItem>::useCompletionDetection_){
       this->detectorLocalObj_->consume(msg->numDataItems);    
     }
     QdProcess(msg->numDataItems);
@@ -1562,15 +1561,6 @@ public:
 
   inline void localBroadcast(const ChunkDataItem& dataItem) {
     localDeliver(dataItem); 
-  }
-
-  inline int numElementsInClient() {
-    // client is a group - there is one element per PE
-    return CkNumPes();
-  }
-
-  inline int numLocalElementsInClient() {
-    return 1; 
   }
 
   inline void initLocalClients() {
