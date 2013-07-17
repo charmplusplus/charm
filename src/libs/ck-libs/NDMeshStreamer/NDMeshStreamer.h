@@ -22,6 +22,9 @@
 
 #define TRAM_BROADCAST (-100)
 
+extern void QdCreate(int n);
+extern void QdProcess(int n);
+
 struct MeshLocation {
   int dimension; 
   int bufferIndex; 
@@ -553,6 +556,7 @@ void MeshStreamer<dtype>::broadcast(const dtype& dataItem) {
   if (!useStagedCompletion_) {
     detectorLocalObj_->produce(CkNumPes());
   }
+  QdCreate(CkNumPes());
 
   // deliver locally
   localBroadcast(dataItem);
@@ -623,6 +627,7 @@ void MeshStreamer<dtype>::insertData(const dtype& dataItem, int destinationPe) {
   if (!useStagedCompletion_) {
     detectorLocalObj_->produce();
   }
+  QdCreate(1);
   if (destinationPe == CkMyPe()) {
     localDeliver(dataItem);
     return;
@@ -946,7 +951,7 @@ private:
     else {
       this->detectorLocalObj_->consume(msg->numDataItems);    
     }
-
+    QdProcess(msg->numDataItems);
     delete msg;
   }
 
@@ -955,6 +960,7 @@ private:
     if (MeshStreamer<dtype>::useStagedCompletion_ == false) {
       MeshStreamer<dtype>::detectorLocalObj_->consume();
     }
+    QdProcess(1);
   }
 
   inline void localBroadcast(const dtype& dataItem) {
@@ -1056,6 +1062,7 @@ private:
         MeshStreamer<ArrayDataItem<dtype, itype> >
          ::detectorLocalObj_->consume();
       }
+      QdProcess(1);
     }
     else { 
       // array element arrayId is no longer present locally:
@@ -1090,7 +1097,7 @@ private:
         MeshStreamer<ArrayDataItem<dtype, itype> >
          ::detectorLocalObj_->consume();      
     }
-
+    QdProcess(1);
   }
 
   inline int numElementsInClient() {
@@ -1194,6 +1201,7 @@ public:
       MeshStreamer<ArrayDataItem<dtype, itype> >
         ::detectorLocalObj_->produce(CkNumPes());
     }
+    QdCreate(CkNumPes());
 
     // deliver locally
     ArrayDataItem<dtype, itype>& packedDataItem(TRAM_BROADCAST, CkMyPe(),
@@ -1221,6 +1229,7 @@ public:
          ::useStagedCompletion_ == false) {
       MeshStreamer<ArrayDataItem<dtype, itype> >::detectorLocalObj_->produce();
     }
+    QdCreate(1);
     int destinationPe; 
 #ifdef CACHE_ARRAY_METADATA
   if (isCachedArrayMetadata_[arrayIndex]) {    
@@ -1523,6 +1532,7 @@ public:
     if (MeshStreamer<ChunkDataItem>::useStagedCompletion_ == false) {
       MeshStreamer<ChunkDataItem>::detectorLocalObj_->consume();
     }
+    QdProcess(1);
   }
 
   void receiveAtDestination(
@@ -1545,7 +1555,7 @@ public:
     else {
       this->detectorLocalObj_->consume(msg->numDataItems);    
     }
-
+    QdProcess(msg->numDataItems);
     delete msg;
     
   }
