@@ -989,6 +989,7 @@ bool CkArray::demandCreateElement(const CkArrayIndex &idx,
 	int onPe,int ctor,CkDeliver_t type)
 {
 	CkArrayMessage *m=(CkArrayMessage *)CkAllocSysMsg();
+        UsrToEnv(m)->setMsgtype(ArrayEltInitMsg);
 	prepareCtorMsg(m,onPe,idx);
 	m->array_ep()=ctor;
 	
