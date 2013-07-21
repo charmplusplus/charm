@@ -1472,8 +1472,8 @@ public:
 
   inline void localDeliver(const ChunkDataItem& chunk) {
     processChunk(chunk);
-    if (MeshStreamer<ChunkDataItem>::useCompletionDetection_) {
-      MeshStreamer<ChunkDataItem>::detectorLocalObj_->consume();
+    if (this->useCompletionDetection_) {
+      this->detectorLocalObj_->consume();
     }
     QdProcess(1);
   }
@@ -1486,7 +1486,7 @@ public:
       processChunk(chunk);
     }
 
-    if (MeshStreamer<ChunkDataItem>::useStagedCompletion_) {
+    if (this->useStagedCompletion_) {
 #ifdef STREAMER_VERBOSE_OUTPUT
       envelope *env = UsrToEnv(msg);
       CkPrintf("[%d] received at dest from %d %d items finalMsgCount: %d\n",
@@ -1495,7 +1495,7 @@ public:
 #endif
       this->markMessageReceived(msg->dimension, msg->finalMsgCount);
     }
-    else if (MeshStreamer<ChunkDataItem>::useCompletionDetection_){
+    else if (this->useCompletionDetection_){
       this->detectorLocalObj_->consume(msg->numDataItems);
     }
     QdProcess(msg->numDataItems);
