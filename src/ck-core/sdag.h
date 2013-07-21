@@ -231,6 +231,27 @@ namespace SDAG {
       , buffer(numEntries)
       , curSpeculationIndex(0) { }
 
+    // after a migration free the structures
+    ~Dependency() {
+      for (std::vector<std::list<Buffer*> >::iterator iter = buffer.begin();
+           iter != buffer.end(); ++iter) {
+        std::list<Buffer*> lst = *iter;
+        for (std::list<Buffer*>::iterator iter2 = lst.begin();
+             iter2 != lst.end(); ++iter2) {
+          delete *iter2;
+        }
+      }
+
+      for (std::map<int, std::list<Continuation*> >::iterator iter = whenToContinuation.begin();
+           iter != whenToContinuation.end(); ++iter) {
+        std::list<Continuation*> lst = iter->second;
+        for (std::list<Continuation*>::iterator iter2 = lst.begin();
+             iter2 != lst.end(); ++iter2) {
+          delete *iter2;
+        }
+      }
+    }
+
     void addDepends(int whenID, int entry) {
       entryToWhen[entry].push_back(whenID);
     }
