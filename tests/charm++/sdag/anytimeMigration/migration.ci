@@ -1,0 +1,68 @@
+mainmodule migration {
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+    entry void finished();
+  }
+
+  message Msg {
+    char arr[];
+  };
+
+  array [1D] Test {
+    entry Test();
+    entry void run() {
+      serial {
+        srand(CkMyPe() * 2972727 * thisIndex);
+        int migrateToPe = rand() % CkNumPes();
+        //CkPrintf("%d: starting run for %d, migrate to %d\n", CkMyPe(), thisIndex, migrateToPe);
+
+        // this works!
+        thisProxy.doMigrate(migrateToPe);
+
+        // this fails!!
+        // migrateMe(migrateToPe);
+      }
+      overlap {
+        when methodA() { }
+        when methodB() { }
+      }
+      when wrapper(int val1, int val2) {
+        when method1() {
+          serial {
+            //CkPrintf("%d: executing method1, val1 = %d, val2 = %d\n", CkMyPe(), val1, val2);
+          }
+          when method2(int test3, int test4) {
+            serial {
+              //CkPrintf("%d: index = %d: test3 = %d, test4 = %d, data = %d\n",
+                       //CkMyPe(), thisIndex, test3, test4, data);
+            }
+            when method3(Msg* m) {
+              serial {
+                char str[100];
+                sprintf(str, "test %d", thisIndex);
+                if (!(strcmp(m->arr, str) == 0)) {
+                  CkPrintf("%d: index = %d: msg->data = %d, msg->arr = \"%s\", str = \"%s\", data = %d\n",
+                           CkMyPe(), thisIndex, m->data, m->arr, str, data);
+                }
+                CkAssert(strcmp(m->arr, str) == 0);
+              }
+            }
+          }
+        }
+      }
+
+      forall [iter] (0:10, 1) {
+        when wrapper(int val1, int val2) {
+          when method1() { }
+        }
+      }
+    };
+    entry void wrapper(int val1, int val2);
+    entry void methodA();
+    entry void methodB();
+    entry void method1();
+    entry void method2(int test3, int test4);
+    entry void method3(Msg* m);
+    entry void doMigrate(int pe);
+  }
+}

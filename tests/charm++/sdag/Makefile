@@ -1,4 +1,4 @@
-DIRS=migration template
+DIRS=migration template case anytimeMigration
 
 all:
 	for d in $(DIRS); do \
