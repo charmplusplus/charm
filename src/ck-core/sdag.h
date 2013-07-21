@@ -78,6 +78,8 @@ namespace SDAG {
       bool hasMsg = msg;
       p | hasMsg;
       if (hasMsg) CkPupMessage(p, (void**)&msg);
+      if (hasMsg && p.isUnpacking())
+        CmiReference(UsrToEnv(msg));
       packClosure(p);
     }
 
