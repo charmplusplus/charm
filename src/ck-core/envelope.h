@@ -164,6 +164,7 @@ struct s_groupinit {         // NodeBocInitMsg, BocInitMsg
 struct s_group {         // ForNodeBocMsg, ForBocMsg
         CkGroupID g;           ///< GroupID
         UShort arrayEp;        ///< Used only for array broadcasts
+        UInt bcastID;
 };
 
 struct s_array{             ///< ForArrayEltMsg
@@ -496,6 +497,8 @@ private:
     UShort &getsetArrayEp(void) {return epIdx;}
     UShort &getsetArrayBcastEp(void) {return ((struct s_group*)extraData())->arrayEp;}
     UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->hopCount;}
+    UInt getBcastID() { CkAssert(getMsgtype() == ForBocMsg); return ((struct s_group*)extraData())->bcastID;}
+    void setBcastID(UInt bcastID_) { CkAssert(getMsgtype() == ForBocMsg); ((struct s_group*)extraData())->bcastID = bcastID_;}
     int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->ifNotThere;}
     void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); ((struct s_array*)extraData())->ifNotThere=nt;}
     int *getsetArrayListenerData(void) { CkAssert(getMsgtype() == ArrayEltInitMsg); return ((struct s_arrayinit*)extraData())->listenerData;}
