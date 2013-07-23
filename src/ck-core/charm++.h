@@ -43,8 +43,6 @@ CkpvExtern(size_t *, _offsets);
 
 class CkArray;
 
-void CkPupMessage(PUP::er &p,void **atMsg,int pack_detail=1);
-
 //This is for passing a single Charm++ message via parameter marshalling
 class CkMarshalledMessage {
 	void *msg;

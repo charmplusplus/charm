@@ -21,13 +21,16 @@ namespace SDAG {
   };
 }
 
-#include "charm++.h"
 #include <vector>
 #include <list>
 #include <map>
 #include <set>
 
 #include <pup_stl.h>
+#include <envelope.h>
+#include <debug-charm.h>
+
+class CkMessage;
 
 namespace SDAG {
   struct TransportableBigSimLog : public Closure {

@@ -14,6 +14,8 @@
 #include "pup.h"
 #include "cklists.h"
 
+void CkPupMessage(PUP::er &p,void **atMsg,int pack_detail=1);
+
 void *CpdGetCurrentObject();
 void *CpdGetCurrentMsg();
 
