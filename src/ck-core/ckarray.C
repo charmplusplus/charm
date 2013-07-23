@@ -111,7 +111,12 @@ public:
   virtual bool ckElementArriving(ArrayElement *elt)
     { return bringUpToDate(elt); }
 
-  void incoming(CkArrayMessage *msg);
+  /// Return msg if it's the next broadcast in sequence, or else
+  /// buffer it for later and return NULL
+  CkArrayMessage* incoming(CkMessage *msg);
+
+  /// Check whether the next broadcast in sequence has already arrived
+  CkArrayMessage* getNextMsg();
 
   bool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
 
@@ -119,9 +124,9 @@ public:
 
   void flushState();
 
+private:
   int bcastNo;//Number of broadcasts received (also serial number)
   std::map<int, CkMessage*> outOfOrderBcasts;
-private:
   int oldBcastNo;//Above value last spring cleaning
   //This queue stores old broadcasts (in case a migrant arrives
   // and needs to be brought up to date)
@@ -1210,14 +1215,25 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
   while (NULL!=(msg=oldBcasts.deq())) delete msg;
 }
 
-void CkArrayBroadcaster::incoming(CkArrayMessage *msg) {
+CkArrayMessage* CkArrayBroadcaster::incoming(CkMessage *m) {
+  CkArrayMessage* msg = (CkArrayMessage*)m;
+
+  int thisBcast = UsrToEnv(msg)->getBcastID();
+
+  if (bcastNo != thisBcast) {
+    outOfOrderBcasts[thisBcast] = m;
+    return NULL;
+  }
+
   bcastNo++;
   DEBB((AA"Received broadcast %d\n"AB,bcastNo));
 
-  if (stableLocations) return;
+  if (!stableLocations){
+    CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
+    oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
+  }
 
-  CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
-  oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
+  return msg;
 }
 
 /// Deliver a copy of the given broadcast to the given local element
@@ -1250,6 +1266,16 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
     return true;
   }
 #endif
+}
+
+CkArrayMessage* CkArrayBroadcaster::getNextMsg() {
+  CkArrayMessage* m = NULL;
+  std::map<int, CkMessage*>::iterator i = outOfOrderBcasts.find(bcastNo);
+  if (i != outOfOrderBcasts.end()) {
+    m = (CkArrayMessage *)i->second;
+    outOfOrderBcasts.erase(i);
+  }
+  return m;
 }
 
 /// Deliver all needed broadcasts to the given local element
@@ -1435,78 +1461,72 @@ void CkArray::recvBroadcastViaTree(CkMessage *msg){
 /// Increment broadcast count; deliver to all local elements
 void CkArray::recvBroadcast(CkMessage *m) {
   CK_MAGICNUMBER_CHECK
-  CkArrayMessage* msg = (CkArrayMessage*)m;
 
-  int thisBcast = UsrToEnv(msg)->getBcastID();
+  CkArrayMessage *msg = broadcaster->incoming(m);
+  if (!msg)
+    return;
 
-  if (broadcaster->bcastNo == thisBcast) {
-    // Turn the message into a real single-element message
-    unsigned short ep = msg->array_ep_bcast();
-    CkAssert(UsrToEnv(msg)->getGroupNum() == thisgroup);
-    UsrToEnv(msg)->setMsgtype(ForArrayEltMsg);
-    UsrToEnv(msg)->setArrayMgr(thisgroup);
-    UsrToEnv(msg)->getsetArrayEp() = ep;
-
-    broadcaster->incoming(msg);
+  // Turn the message into a real single-element message
+  unsigned short ep = msg->array_ep_bcast();
+  CkAssert(UsrToEnv(msg)->getGroupNum() == thisgroup);
+  UsrToEnv(msg)->setMsgtype(ForArrayEltMsg);
+  UsrToEnv(msg)->setArrayMgr(thisgroup);
+  UsrToEnv(msg)->getsetArrayEp() = ep;
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    _tempBroadcastCount=0;
-    locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
+  _tempBroadcastCount=0;
+  locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
-    //Run through the list of local elements
-    int idx=0, len=0, count=0;
-    if (stableLocations) {            /* remove all NULLs in the array */
-      len = 0;
-      while (elements->next(idx)!=NULL) len++;
-      idx = 0;
-    }
-    ArrayElement *el;
+  //Run through the list of local elements
+  int idx=0, len=0, count=0;
+  if (stableLocations) {            /* remove all NULLs in the array */
+    len = 0;
+    while (elements->next(idx)!=NULL) len++;
+    idx = 0;
+  }
+  ArrayElement *el;
 #if CMK_BIGSIM_CHARM
-    void *root;
-    _TRACE_BG_TLINE_END(&root);
-    BgSetEntryName("start-broadcast", &root);
-    CkVec<void *> logs;    // store all logs for each delivery
-    extern void stopVTimer();
-    extern void startVTimer();
+  void *root;
+  _TRACE_BG_TLINE_END(&root);
+  BgSetEntryName("start-broadcast", &root);
+  CkVec<void *> logs;    // store all logs for each delivery
+  extern void stopVTimer();
+  extern void startVTimer();
 #endif
-    while (NULL!=(el=elements->next(idx))) {
+  while (NULL!=(el=elements->next(idx))) {
 #if CMK_BIGSIM_CHARM
-      //BgEntrySplit("split-broadcast");
-      stopVTimer();
-      void *curlog = BgSplitEntry("split-broadcast", &root, 1);
-      logs.push_back(curlog);
-      startVTimer();
-#endif
-      bool doFree = false;
-      if (stableLocations && ++count == len) doFree = true;
-      broadcaster->deliver(msg, el, doFree);
-    }
-#endif
-
-#if CMK_BIGSIM_CHARM
-    //BgEntrySplit("end-broadcast");
+    //BgEntrySplit("split-broadcast");
     stopVTimer();
-    BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
+    void *curlog = BgSplitEntry("split-broadcast", &root, 1);
+    logs.push_back(curlog);
     startVTimer();
 #endif
-
-    // CkArrayBroadcaster doesn't have msg buffered, and there was
-    // no last delivery to transfer ownership
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    if (stableLocations)
-      delete msg;
-#else
-    if (stableLocations && len == 0)
-      delete msg;
+    bool doFree = false;
+    if (stableLocations && ++count == len) doFree = true;
+    broadcaster->deliver(msg, el, doFree);
+  }
 #endif
 
-    if (broadcaster->outOfOrderBcasts.find(broadcaster->bcastNo) != broadcaster->outOfOrderBcasts.end()) {
-      recvBroadcast(broadcaster->outOfOrderBcasts[broadcaster->bcastNo]);
-      broadcaster->outOfOrderBcasts.erase(broadcaster->outOfOrderBcasts.find(broadcaster->bcastNo));
-    }
-  } else {
-    broadcaster->outOfOrderBcasts[thisBcast] = m;
-  }
+#if CMK_BIGSIM_CHARM
+  //BgEntrySplit("end-broadcast");
+  stopVTimer();
+  BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
+  startVTimer();
+#endif
+
+  // CkArrayBroadcaster doesn't have msg buffered, and there was
+  // no last delivery to transfer ownership
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  if (stableLocations)
+    delete msg;
+#else
+  if (stableLocations && len == 0)
+    delete msg;
+#endif
+
+  msg = broadcaster->getNextMsg();
+  if (msg)
+    recvBroadcast(msg);
 }
 
 void CkArray::flushStates() {
