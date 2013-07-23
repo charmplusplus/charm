@@ -53,11 +53,15 @@ namespace Ck { namespace IO {
     namespace impl {
       struct FileInfo {
         string name;
+        CkCallback opened;
         Options opts;
         int fd;
 
+        FileInfo(string name_, CkCallback opened_, Options opts_)
+          : name(name_), opened(opened_), opts(opts_), fd(-1)
+        { }
         FileInfo(string name_, Options opts_)
-          : name(name_), opts(opts_), fd(-1)
+          : name(name_), opened(), opts(opts_), fd(-1)
         { }
         FileInfo()
           : fd(-1)
@@ -98,8 +102,12 @@ namespace Ck { namespace IO {
           if (-1 == opts.skipPEs)
             opts.skipPEs = CkMyNodeSize();
 
-          files[filesOpened] = FileInfo(name, opts);
-          managers.openFile(filesOpened++, name, opened, opts);
+          files[filesOpened] = FileInfo(name, opened, opts);
+          managers.openFile(filesOpened++, name, opts);
+        }
+
+        void fileOpened(FileToken file) {
+          files[file].opened.send(new FileReadyMsg(file));
         }
 
         void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
@@ -134,8 +142,7 @@ namespace Ck { namespace IO {
           manager = this;
         }
 
-        void openFile(FileToken token, string name,
-                      CkCallback opened, Options opts) {
+        void openFile(FileToken token, string name, Options opts) {
           CkAssert(files.end() == files.find(token));
           CkAssert(lastActivePE(opts) < CkNumPes());
           CkAssert(opts.writeStripe <= opts.peStripe);
@@ -146,10 +153,12 @@ namespace Ck { namespace IO {
           if (((CkMyPe() - opts.basePE) % opts.skipPEs == 0 &&
                CkMyPe() < lastActivePE(opts)) ||
               true) {
-            files[token].fd = doOpenFile(name);
+            int fd = doOpenFile(name);
+            files[token].fd = fd;
           }
 
-          contribute(sizeof(FileToken), &token, CkReduction::max_int, opened);
+          contribute(sizeof(FileToken), &token, CkReduction::max_int,
+                     CkCallback(CkReductionTarget(Director, fileOpened), director));
         }
 
         void write(Session session, const char *data, size_t bytes, size_t offset) {
@@ -253,7 +262,9 @@ namespace Ck { namespace IO {
           , myBytes(min(file->opts.peStripe, sessionOffset + sessionBytes - myOffset))
           , myBytesWritten(0)
           , complete(complete_)
-        { }
+        {
+          CkAssert(file->fd != -1);
+        }
 
         WriteSession(CkMigrateMessage *m) { }
 

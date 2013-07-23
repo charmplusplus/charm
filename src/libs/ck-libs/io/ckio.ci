@@ -24,6 +24,7 @@ module CkIO_impl {
           /// Serialize setting up each file through this chare, so that all PEs
           /// have the same sequence
           entry void openFile(std::string name, CkCallback opened, Options opts);
+          entry [reductiontarget] void fileOpened(FileToken file);
 
           entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
                                          CkCallback ready, CkCallback complete);
@@ -33,8 +34,7 @@ module CkIO_impl {
         group Manager
         {
           entry Manager();
-          entry void openFile(FileToken token, std::string name,
-                              CkCallback opened, Options opts);
+          entry void openFile(FileToken token, std::string name, Options opts);
           entry void close(FileToken token, CkCallback closed);
         };
 
