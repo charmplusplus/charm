@@ -5,29 +5,35 @@
 class Main : public CBase_Main {
   CProxy_test testers;
   int n;
+  Ck::IO::File f;
 public:
   Main(CkArgMsg *m) {
     n = atoi(m->argv[1]);
-    mgr = Ck::IO::CProxy_Manager::ckNew();
-    CkPrintf("Main created group\n");
-    Ck::IO::Manager *iomgr = (Ck::IO::Manager *)CkLocalBranch(mgr);
     Ck::IO::Options opts;
     opts.peStripe = 200;
     opts.writeStripe = 1;
-    iomgr->prepareOutput("test", 10*n,
-			 CkCallback(CkIndex_Main::ready(NULL), thisProxy),
-			 CkCallback(CkIndex_Main::test_written(), thisProxy),
-			 opts);
+
+    Ck::IO::open("test", CkCallback(CkIndex_Main::ready(NULL), thisProxy), opts);
+
     CkPrintf("Main ran\n");
   }
 
   void ready(Ck::IO::FileReadyMsg *m) {
-    testers = CProxy_test::ckNew(m->token, n);
+    f = m->file;
+    Ck::IO::startSession(f, 10*n, 0,
+                         CkCallback(CkIndex_Main::start_write(0), thisProxy),
+			 CkCallback(CkIndex_Main::test_written(), thisProxy));
+    delete m;
     CkPrintf("Main saw file ready\n");
   }
 
+  void start_write(Ck::IO::SessionReadyMsg *m) {
+    testers = CProxy_test::ckNew(m->session, n);
+    CkPrintf("Main saw session ready\n");
+  }
+
   void test_written() {
-    CkPrintf("Main see write done\n");
+    CkPrintf("Main saw write done\n");
     // Read file and validate contents
 
     CkExit();
@@ -35,10 +41,10 @@ public:
 };
 
 struct test : public CBase_test {
-  test(Ck::IO::Token token) {
+  test(Ck::IO::Session token) {
     char out[11];
     sprintf(out, "%9d\n", thisIndex);
-    ((Ck::IO::Manager *)CkLocalBranch(mgr))->write(token, out, 10, 10*thisIndex);
+    Ck::IO::write(token, out, 10, 10*thisIndex);
   }
   test(CkMigrateMessage *m) {}
 };

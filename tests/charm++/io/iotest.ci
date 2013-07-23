@@ -5,10 +5,11 @@ mainmodule iotest {
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void ready(Ck::IO::FileReadyMsg *m);
+    entry void start_write(Ck::IO::SessionReadyMsg *m);
     entry void test_written();
   };
 
   array [1D] test {
-    entry test(Ck::IO::Token token);
+    entry test(Ck::IO::Session token);
   }
 }
