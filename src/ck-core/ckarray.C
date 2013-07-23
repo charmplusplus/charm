@@ -54,6 +54,8 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ck.h"
 #include "pathHistory.h"
 
+#include <map>
+
 CpvDeclare(int ,serializer);
 
 bool _isAnytimeMigration;
@@ -118,6 +120,7 @@ public:
   void flushState();
 
   int bcastNo;//Number of broadcasts received (also serial number)
+  std::map<int, CkMessage*> outOfOrderBcasts;
 private:
   int oldBcastNo;//Above value last spring cleaning
   //This queue stores old broadcasts (in case a migrant arrives
@@ -1191,6 +1194,8 @@ void CkArrayBroadcaster::pup(PUP::er &p) {
   CkArrayListener::pup(p);
   /* Assumption: no migrants during checkpoint, so no need to
      save old broadcasts. */
+  /* @todo? Assumption: no out of order broadcasts are present during
+     checkpoint */
   p|bcastNo;
   p|stableLocations;
   p|broadcastViaScheduler;
@@ -1495,8 +1500,12 @@ void CkArray::recvBroadcast(CkMessage *m) {
       delete msg;
 #endif
 
+    if (broadcaster->outOfOrderBcasts.find(broadcaster->bcastNo) != broadcaster->outOfOrderBcasts.end()) {
+      recvBroadcast(broadcaster->outOfOrderBcasts[broadcaster->bcastNo]);
+      broadcaster->outOfOrderBcasts.erase(broadcaster->outOfOrderBcasts.find(broadcaster->bcastNo));
+    }
   } else {
-    thisProxy[CkMyPe()].recvBroadcast(m);
+    broadcaster->outOfOrderBcasts[thisBcast] = m;
   }
 }
 
