@@ -755,16 +755,6 @@ private:
   static void staticSpringCleaning(void *forWhom,double curWallTime);
 
 //ArrayListeners:
-//Iterate over the CkArrayListeners in this vector, calling "inside" each time.
-#define CK_ARRAYLISTENER_LOOP(listVec,inside) \
-  do { \
-	int lIdx,lMax=listVec.size();\
-	for (lIdx=0;lIdx<lMax;lIdx++) { \
-		CkArrayListener *l=listVec[lIdx];\
-		inside;\
-	}\
-  } while(0)
-
   CkPupAblePtrVec<CkArrayListener> listeners;
   int listenerDataOffset;
  public:
@@ -782,20 +772,8 @@ private:
   CkArrayReducer *reducer; //Read-only copy of default reducer
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
-  void flushStates() {
-      CkReductionMgr::flushStates();
-      // For chare arrays, and for chare arrays alone, the global and local
-      // element counters in the reduction manager need to be reset to 0.
-      // This is because all array elements are recreated during recovery
-      // and will reregister, pushing the counts back to the correct levels.
-      // For groups, the counters are set to 1 in the Group constructor.
-      // However, since groups are not recreated during recovery, setting them
-      // to zero in Group::flushStates() would not be followed by an increment
-      // to 1 because the constructor will not be invoked.
-      // Hence, these counters are reset only for chare arrays.
-      resetCountersWhenFlushingStates();
-      CK_ARRAYLISTENER_LOOP(listeners, l->flushState());
-  }
+  void flushStates();
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
 	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
