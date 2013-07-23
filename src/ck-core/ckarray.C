@@ -126,7 +126,7 @@ public:
 
 private:
   int bcastNo;//Number of broadcasts received (also serial number)
-  std::map<int, CkMessage*> outOfOrderBcasts;
+  std::map<int, CkArrayMessage*> outOfOrderBcasts;
   int oldBcastNo;//Above value last spring cleaning
   //This queue stores old broadcasts (in case a migrant arrives
   // and needs to be brought up to date)
@@ -1217,11 +1217,12 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
 
 CkArrayMessage* CkArrayBroadcaster::incoming(CkMessage *m) {
   CkArrayMessage* msg = (CkArrayMessage*)m;
+  envelope *env = UsrToEnv(msg);
 
-  int thisBcast = UsrToEnv(msg)->getBcastID();
+  int thisBcast = env->getBcastID();
 
   if (bcastNo != thisBcast) {
-    outOfOrderBcasts[thisBcast] = m;
+    outOfOrderBcasts[thisBcast] = msg;
     return NULL;
   }
 
@@ -1229,8 +1230,8 @@ CkArrayMessage* CkArrayBroadcaster::incoming(CkMessage *m) {
   DEBB((AA"Received broadcast %d\n"AB,bcastNo));
 
   if (!stableLocations){
-    CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
-    oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
+    CmiMemoryMarkBlock(((char *)env)-sizeof(CmiChunkHeader));
+    oldBcasts.enq(msg);//Stash the message for later use
   }
 
   return msg;
@@ -1270,9 +1271,9 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
 
 CkArrayMessage* CkArrayBroadcaster::getNextMsg() {
   CkArrayMessage* m = NULL;
-  std::map<int, CkMessage*>::iterator i = outOfOrderBcasts.find(bcastNo);
+  std::map<int, CkArrayMessage*>::iterator i = outOfOrderBcasts.find(bcastNo);
   if (i != outOfOrderBcasts.end()) {
-    m = (CkArrayMessage *)i->second;
+    m = i->second;
     outOfOrderBcasts.erase(i);
   }
   return m;
