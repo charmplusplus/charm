@@ -259,7 +259,7 @@ namespace Ck { namespace IO {
 
         void forwardData(const char *data, size_t bytes, size_t offset) {
           CkAssert(offset >= myOffset);
-          CkAssert(offset + bytes < myOffset + myBytes);
+          CkAssert(offset + bytes <= myOffset + myBytes);
 
           size_t stripeSize = file->opts.writeStripe;
 
