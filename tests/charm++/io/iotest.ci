@@ -5,8 +5,32 @@ mainmodule iotest {
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void ready(Ck::IO::FileReadyMsg *m);
+
+    entry void run() {
+      when ready[5](Ck::IO::FileReadyMsg *m) serial {
+        f = m->file;
+        CkCallback sessionStart(CkIndex_Main::start_write(0), thisProxy);
+        sessionStart.setRefnum(13);
+        CkCallback sessionEnd(CkIndex_Main::test_written(0), thisProxy);
+        sessionEnd.setRefnum(13);
+        Ck::IO::startSession(f, 10*n, 0, sessionStart, sessionEnd);
+        delete m;
+        CkPrintf("Main saw file ready\n");
+      }
+      when start_write[13](Ck::IO::SessionReadyMsg *m) serial {
+        testers = CProxy_test::ckNew(m->session, n);
+        CkPrintf("Main saw session ready\n");
+      }
+      when test_written[13](CkReductionMsg *m) serial {
+        CkPrintf("Main saw write done\n");
+        // Read file and validate contents
+
+        CkExit();
+      }
+    };
+
     entry void start_write(Ck::IO::SessionReadyMsg *m);
-    entry void test_written();
+    entry void test_written(CkReductionMsg *m);
   };
 
   array [1D] test {

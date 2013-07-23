@@ -5,4 +5,4 @@ pgm: iotest.ci iotest.C
 	$(CHARMC) -g iotest.C -o $@ -module CkIO
 
 clean:
-	rm -f *.o *.decl.h *.def.h pgm
+	rm -f *.o *.decl.h *.def.h pgm test

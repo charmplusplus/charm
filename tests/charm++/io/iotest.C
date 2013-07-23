@@ -3,6 +3,8 @@
 /* readonly */ CkGroupID mgr;
 
 class Main : public CBase_Main {
+  Main_SDAG_CODE
+
   CProxy_test testers;
   int n;
   Ck::IO::File f;
@@ -12,32 +14,14 @@ public:
     Ck::IO::Options opts;
     opts.peStripe = 200;
     opts.writeStripe = 1;
-
-    Ck::IO::open("test", CkCallback(CkIndex_Main::ready(NULL), thisProxy), opts);
+    CkCallback opened(CkIndex_Main::ready(NULL), thisProxy);
+    opened.setRefnum(5);
+    Ck::IO::open("test", opened, opts);
 
     CkPrintf("Main ran\n");
+    thisProxy.run();
   }
 
-  void ready(Ck::IO::FileReadyMsg *m) {
-    f = m->file;
-    Ck::IO::startSession(f, 10*n, 0,
-                         CkCallback(CkIndex_Main::start_write(0), thisProxy),
-			 CkCallback(CkIndex_Main::test_written(), thisProxy));
-    delete m;
-    CkPrintf("Main saw file ready\n");
-  }
-
-  void start_write(Ck::IO::SessionReadyMsg *m) {
-    testers = CProxy_test::ckNew(m->session, n);
-    CkPrintf("Main saw session ready\n");
-  }
-
-  void test_written() {
-    CkPrintf("Main saw write done\n");
-    // Read file and validate contents
-
-    CkExit();
-  }
 };
 
 struct test : public CBase_test {
