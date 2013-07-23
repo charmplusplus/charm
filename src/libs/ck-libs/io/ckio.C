@@ -5,6 +5,7 @@
 
 typedef int FileToken;
 #include "CkIO.decl.h"
+#include "CkIO_impl.decl.h"
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -48,23 +49,6 @@ namespace Ck { namespace IO {
       Manager *manager;
     }
 
-    class SessionReadyMsg : public CMessage_SessionReadyMsg {
-      FileToken file;
-      size_t bytes, offset;
-      impl::CProxy_WriteSession proxy;
-      friend class impl::Manager;
-    public:
-      SessionReadyMsg(FileToken file_, size_t bytes_, size_t offset_,
-                      CkArrayID sessionID)
-        : file(file_), bytes(bytes_), offset(offset_), proxy(sessionID)
-      { }
-    };
-
-    class FileReadyMsg : public CMessage_FileReadyMsg {
-    public:
-      FileToken token;
-      FileReadyMsg(const FileToken &tok) : token(tok) {}
-    };
 
     namespace impl {
       struct FileInfo {
@@ -133,7 +117,7 @@ namespace Ck { namespace IO {
           sessionOpts.setMap(managers);
           CProxy_WriteSession session =
             CProxy_WriteSession::ckNew(file, bytes, offset, complete, sessionOpts);
-          ready.send(new SessionReadyMsg(file, bytes, offset, session));
+          ready.send(new SessionReadyMsg(Session(file, bytes, offset, session)));
         }
 
         void close(FileToken token, CkCallback closed) {
@@ -168,18 +152,18 @@ namespace Ck { namespace IO {
           contribute(sizeof(FileToken), &token, CkReduction::max_int, opened);
         }
 
-        void write(SessionReadyMsg *session,
-                   const char *data, size_t bytes, size_t offset) {
-          Options &opts = files[session->file].opts;
+        void write(Session session, const char *data, size_t bytes, size_t offset) {
+          Options &opts = files[session.file].opts;
           size_t stripe = opts.peStripe;
 
-          size_t sessionStripeBase = (session->offset / stripe) * stripe;
+          size_t sessionStripeBase = (session.offset / stripe) * stripe;
 
           while (bytes > 0) {
             size_t stripeIndex = (offset - sessionStripeBase) / stripe;
             size_t bytesToSend = min(bytes, stripe - offset % stripe);
 
-            session->proxy[stripeIndex].forwardData(data, bytesToSend, offset);
+            CProxy_WriteSession(session.sessionID)[stripeIndex]
+              .forwardData(data, bytesToSend, offset);
 
             data += bytesToSend;
             offset += bytesToSend;
@@ -349,18 +333,17 @@ namespace Ck { namespace IO {
       impl::director.openFile(name, opened, opts);
     }
 
-    void startSession(FileReadyMsg *file, size_t bytes, size_t offset,
+    void startSession(File file, size_t bytes, size_t offset,
                       CkCallback ready, CkCallback complete) {
-      impl::director.prepareWriteSession(file->token, bytes, offset, ready, complete);
+      impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete);
     }
 
-    void write(SessionReadyMsg *session,
-               const char *data, size_t bytes, size_t offset) {
+    void write(Session session, const char *data, size_t bytes, size_t offset) {
       impl::manager->write(session, data, bytes, offset);
     }
 
-    void close(FileReadyMsg *file, CkCallback closed) {
-      impl::director.close(file->token, closed);
+    void close(File file, CkCallback closed) {
+      impl::director.close(file.token, closed);
     }
 
     class SessionCommitMsg : public CMessage_SessionCommitMsg {
@@ -370,3 +353,4 @@ namespace Ck { namespace IO {
 }
 
 #include "CkIO.def.h"
+#include "CkIO_impl.def.h"

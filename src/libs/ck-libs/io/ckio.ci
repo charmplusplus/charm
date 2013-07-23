@@ -7,6 +7,10 @@ module CkIO {
     }
   }
 
+  initnode _registerCkIO_impl();
+};
+
+module CkIO_impl {
   include "ckio.h";
 
   namespace Ck { namespace IO {

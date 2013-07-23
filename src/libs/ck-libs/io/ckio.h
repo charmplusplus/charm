@@ -5,10 +5,9 @@
 #include <pup.h>
 #include <ckcallback.h>
 
-namespace Ck { namespace IO {
-  class FileReadyMsg;
-  class SessionReadyMsg;
+#include <CkIO.decl.h>
 
+namespace Ck { namespace IO {
   struct Options {
     Options()
       : peStripe(-1), writeStripe(-1), activePEs(-1), basePE(-1), skipPEs(-1)
@@ -34,6 +33,9 @@ namespace Ck { namespace IO {
     }
   };
 
+  class File;
+  class Session;
+
   /// Open the named file on the selected subset of PEs, and send a
   /// FileReadyMsg to the opened callback when the system is ready to accept
   /// session requests on that file.
@@ -44,15 +46,62 @@ namespace Ck { namespace IO {
   /// SessionReadyMsg will be sent to the ready callback. When all of the data
   /// has been written and synced, a message will be sent to the complete
   /// callback.
-  void startSession(FileReadyMsg *file, size_t bytes, size_t offset,
+  void startSession(File file, size_t bytes, size_t offset,
                     CkCallback ready, CkCallback complete);
 
   /// Write the given data into the file to which session is attached. The
   /// offset is relative to the file as a whole, not to the session's offset.
-  void write(SessionReadyMsg *session, const char *data, size_t bytes, size_t offset);
+  void write(Session session, const char *data, size_t bytes, size_t offset);
 
   /// Close a previously-opened file. All sessions on that file must have
   /// already signalled that they are complete.
-  void close(FileReadyMsg *file, CkCallback closed);
+  void close(File file, CkCallback closed);
+
+  class File {
+    int token;
+    friend void startSession(File file, size_t bytes, size_t offset,
+                             CkCallback ready, CkCallback complete);
+    friend void close(File file, CkCallback closed);
+    friend class FileReadyMsg;
+
+  public:
+    File(int token_) : token(token_) { }
+    File() : token(-1) { }
+    void pup(PUP::er &p) { p|token; }
+  };
+
+  class FileReadyMsg : public CMessage_FileReadyMsg {
+  public:
+    File file;
+    FileReadyMsg(const File &tok) : file(tok) {}
+  };
+
+  namespace impl { class Manager; }
+
+  class Session {
+    int file;
+    size_t bytes, offset;
+    CkArrayID sessionID;
+    friend class Ck::IO::impl::Manager;
+  public:
+    Session(int file_, size_t bytes_, size_t offset_,
+            CkArrayID sessionID_)
+      : file(file_), bytes(bytes_), offset(offset_), sessionID(sessionID_)
+      { }
+    Session() { }
+    void pup(PUP::er &p) {
+      p|file;
+      p|bytes;
+      p|offset;
+      p|sessionID;
+    }
+  };
+
+  class SessionReadyMsg : public CMessage_SessionReadyMsg {
+  public:
+    Session session;
+    SessionReadyMsg(Session session_) : session(session_) { }
+  };
+
 }}
 #endif
