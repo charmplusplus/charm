@@ -24,13 +24,19 @@ mainmodule iotest {
       when test_written[13](CkReductionMsg *m) serial {
         CkPrintf("Main saw write done\n");
         // Read file and validate contents
-
+        CkCallback cb(CkIndex_Main::closed(0), thisProxy);
+        cb.setRefnum(17);
+        Ck::IO::close(f, cb);
+      }
+      when closed[17](CkReductionMsg *m) serial {
+        CkPrintf("Main saw close done\n");
         CkExit();
       }
     };
 
     entry void start_write(Ck::IO::SessionReadyMsg *m);
     entry void test_written(CkReductionMsg *m);
+    entry void closed(CkReductionMsg *m);
   };
 
   array [1D] test {
