@@ -225,50 +225,62 @@ void CkCallback::send(void *msg) const
 		break;
 	case sendChare: //Send message to a chare
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.chare.hasRefnum) CkSetRefNum(msg, d.chare.refnum);
 		CkSendMsg(d.chare.ep,msg,&d.chare.id);
 		break;
 	case isendChare: //inline send-to-chare
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.chare.hasRefnum) CkSetRefNum(msg, d.chare.refnum);
 		CkSendMsgInline(d.chare.ep,msg,&d.chare.id);
 		break;
 	case sendGroup: //Send message to a group element
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
 		CkSendMsgBranch(d.group.ep,msg,d.group.onPE,d.group.id);
 		break;
 	case sendNodeGroup: //Send message to a group element
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
 		CkSendMsgNodeBranch(d.group.ep,msg,d.group.onPE,d.group.id);
 		break;
 	case isendGroup: //inline send-to-group element
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
 		CkSendMsgBranchInline(d.group.ep,msg,d.group.onPE,d.group.id);
 		break;
 	case isendNodeGroup: //inline send-to-group element
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
 		CkSendMsgNodeBranchInline(d.group.ep,msg,d.group.onPE,d.group.id);
 		break;
 	case sendArray: //Send message to an array element
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
 		CkSendMsgArray(d.array.ep,msg,d.array.id,d.array.idx.asChild());
 		break;
 	case isendArray: //inline send-to-array element
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
 		CkSendMsgArrayInline(d.array.ep,msg,d.array.id,d.array.idx.asChild());
 		break;
 	case bcastGroup:
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
 		CkBroadcastMsgBranch(d.group.ep,msg,d.group.id);
 		break;
 	case bcastNodeGroup:
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
 		CkBroadcastMsgNodeBranch(d.group.ep,msg,d.group.id);
 		break;
 	case bcastArray:
 		if (!msg) msg=CkAllocSysMsg();
+                if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
 		CkBroadcastMsgArray(d.array.ep,msg,d.array.id);
 		break;
 	case bcastSection: {
 		if(!msg)msg=CkAllocSysMsg();
+                if (d.section.hasRefnum) CkSetRefNum(msg, d.section.refnum);
                 CkSectionInfo sinfo(d.section.sinfo);
                 CkSectionID secID(sinfo, d.section._elems, d.section._nElems, d.section.pelist, d.section.npes);
 		CkBroadcastMsgSection(d.section.ep,msg,secID);
@@ -311,23 +323,33 @@ void CkCallback::pup(PUP::er &p) {
   case sendChare:
     p|d.chare.ep;
     p|d.chare.id;
+    p|d.chare.hasRefnum;
+    p|d.chare.refnum;
     break;
   case isendGroup:
   case sendGroup:
   case isendNodeGroup:
   case sendNodeGroup:
     p|d.group.onPE;
+    p|d.group.hasRefnum;
+    p|d.group.refnum;
   case bcastNodeGroup:
   case bcastGroup:
     p|d.group.ep;
     p|d.group.id;
+    p|d.group.hasRefnum;
+    p|d.group.refnum;
     break;
   case isendArray:
   case sendArray:
     p|d.array.idx;
+    p|d.array.hasRefnum;
+    p|d.array.refnum;
   case bcastArray:
     p|d.array.ep;
     p|d.array.id;
+    p|d.array.hasRefnum;
+    p|d.array.refnum;
     break;
   case replyCCS:
     p((char*)&d.ccsReply.reply, sizeof(d.ccsReply.reply));

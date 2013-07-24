@@ -72,16 +72,22 @@ private:
 	struct s_chare { //sendChare
 		int ep; //Entry point to call
 		CkChareID id; //Chare to call it on
+		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
+		bool hasRefnum;
 	} chare;
 	struct s_group { //(sendGroup, bcastGroup)
 		int ep; //Entry point to call
 		CkGroupID id; //Group to call it on
 		int onPE; //Processor to send to (if any)
+		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
+		bool hasRefnum;
 	} group;
 	struct s_array { //(sendArray, bcastArray)
 		int ep; //Entry point to call
 		CkGroupID id; //Array ID to call it on
 		CkArrayIndexBase idx; //Index to send to (if any)
+		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
+		bool hasRefnum;
 	} array;
 	struct s_section{
 		CkSectionInfoStruct sinfo;
@@ -90,6 +96,8 @@ private:
                 int *pelist;
                 int npes;
 		int ep;
+		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
+		bool hasRefnum;
 	} section;
 
 	struct s_ccsReply {
@@ -263,6 +271,41 @@ public:
 	void send(int length,const void *data) const;
 	
 	void pup(PUP::er &p);
+
+        void setRefnum(CMK_REFNUM_TYPE refnum) {
+		switch(type) {
+                case sendChare:
+                case isendChare:
+                  d.chare.hasRefnum = true;
+                  d.chare.refnum = refnum;
+                  break;
+
+                case sendGroup:
+                case sendNodeGroup:
+                case isendGroup:
+                case isendNodeGroup:
+                case bcastGroup:
+                case bcastNodeGroup:
+                  d.group.hasRefnum = true;
+                  d.group.refnum = refnum;
+                  break;
+
+                case sendArray:
+                case isendArray:
+                case bcastArray:
+                  d.array.hasRefnum = true;
+                  d.array.refnum = refnum;
+                  break;
+
+                case bcastSection:
+                  d.section.hasRefnum = true;
+                  d.section.refnum = refnum;
+                  break;
+
+                default:
+                  CkAbort("Tried to set a refnum on a callback not directed at an entry method");
+                }
+        }
 };
 //PUPbytes(CkCallback) //FIXME: write a real pup routine
 
