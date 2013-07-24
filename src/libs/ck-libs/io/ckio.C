@@ -153,7 +153,14 @@ namespace Ck { namespace IO {
           if (((CkMyPe() - opts.basePE) % opts.skipPEs == 0 &&
                CkMyPe() < lastActivePE(opts)) ||
               true) {
-            int fd = doOpenFile(name);
+#if defined(_WIN32)
+            int fd = _open(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
+#else
+            int fd = ::open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+#endif
+            if (-1 == fd)
+              fatalError("Failed to open a file for parallel output", name);
+
             files[token].fd = fd;
           }
 
@@ -203,18 +210,6 @@ namespace Ck { namespace IO {
       private:
         map<FileToken, impl::FileInfo> files;
         friend class WriteSession;
-
-        int doOpenFile(const string& name) {
-          int fd;
-#if defined(_WIN32)
-          fd = _open(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
-#else
-          fd = ::open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-#endif
-          if (-1 == fd)
-            fatalError("Failed to open a file for parallel output", name);
-          return fd;
-        }
 
         int lastActivePE(const Options &opts) {
           return opts.basePE + (opts.activePEs-1)*opts.skipPEs;
