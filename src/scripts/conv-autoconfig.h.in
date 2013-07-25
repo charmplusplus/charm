@@ -225,7 +225,7 @@
 /* sync program */
 #undef CMK_HAS_SYNC
 
-/* whether has system */
+/* whether has sync */
 #undef CMK_HAS_SYNC_FUNC
 
 /* whether has system */
