@@ -23,4 +23,4 @@ caseTest: caseTest.o
 	$(CHARMC) -language charm++ $(OPTS) $^ -o $@
 
 test: caseTest
-	$(RUN) +p$(PROCS) $< $(TESTOPTS)
+	$(RUN) +p$(PROCS) ./$< $(TESTOPTS)
