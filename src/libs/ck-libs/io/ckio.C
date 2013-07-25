@@ -302,8 +302,19 @@ namespace Ck { namespace IO {
 
         void syncData() {
           CkAssert(bufferMap.size() == 0);
+#if CMK_HAS_FDATASYNC_FUNC
           if (fdatasync(file->fd) < 0)
             fatalError("fdatasync failed", file->name);
+#elif CMK_HAS_FSYNC_FUNC
+          if (fsync(file->fd) < 0)
+            fatalError("fsync failed", file->name);
+#elif CMK_HAS_SYNC_FUNC
+#warning "Will call sync() for every completed write"
+          sync(); // No error reporting from sync()
+#else
+#warning "No file synchronization function available!"
+#endif
+
           contribute(complete);
           contribute(CkCallback(CkIndex_WriteSession::ckDestroy(), thisProxy));
         }
