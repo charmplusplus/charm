@@ -105,6 +105,12 @@
 /* whether has fabsf */
 #undef CMK_HAS_FABSF
 
+/* whether has fdatasync */
+#undef CMK_HAS_FDATASYNC_FUNC
+
+/* whether has fsync */
+#undef CMK_HAS_FSYNC_FUNC
+
 /* whether gethostname() exists */
 #undef CMK_HAS_GETHOSTNAME
 

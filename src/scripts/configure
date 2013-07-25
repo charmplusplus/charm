@@ -3306,6 +3306,36 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test for fsync() ###
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  fsync(0);
+  return 0;
+}
+EOT
+test_link "whether has fsync()" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_FSYNC_FUNC $pass
+_ACEOF
+
+
+#### test for fdatasync() ###
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  fdatasync(0);
+  return 0;
+}
+EOT
+test_link "whether has fdatasync()" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_FDATASYNC_FUNC $pass
+_ACEOF
+
+
 #### test for sbrk ###
 cat > $t <<EOT
 #include <unistd.h>
