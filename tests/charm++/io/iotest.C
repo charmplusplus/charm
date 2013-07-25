@@ -1,27 +1,29 @@
 #include "iotest.decl.h"
-
-/* readonly */ CkGroupID mgr;
+#include <vector>
 
 class Main : public CBase_Main {
   Main_SDAG_CODE
 
   CProxy_test testers;
-  int n;
-  Ck::IO::File f;
+  int n, numdone;
+  std::vector<Ck::IO::File> f;
 public:
   Main(CkArgMsg *m) {
+    numdone = 0;
     n = atoi(m->argv[1]);
-    Ck::IO::Options opts;
-    opts.peStripe = 200;
-    opts.writeStripe = 1;
-    CkCallback opened(CkIndex_Main::ready(NULL), thisProxy);
-    opened.setRefnum(5);
-    Ck::IO::open("test", opened, opts);
+
+    f.resize(6);
+    for (int i = 0; i < f.size(); ++i)
+      thisProxy.run(4*i);
 
     CkPrintf("Main ran\n");
-    thisProxy.run();
   }
 
+  void iterDone() {
+    numdone++;
+    if (numdone == f.size())
+      CkExit();
+  }
 };
 
 struct test : public CBase_test {

@@ -80,10 +80,11 @@ namespace Ck { namespace IO {
         int filesOpened;
         map<FileToken, impl::FileInfo> files;
         CProxy_Manager managers;
+        int opnum;
 
       public:
         Director(CkArgMsg *m)
-          : filesOpened(0)
+          : filesOpened(0), opnum(0)
         {
           delete m;
           director = thisProxy;
@@ -103,7 +104,7 @@ namespace Ck { namespace IO {
             opts.skipPEs = CkMyNodeSize();
 
           files[filesOpened] = FileInfo(name, opened, opts);
-          managers.openFile(filesOpened++, name, opts);
+          managers.openFile(opnum++, filesOpened++, name, opts);
         }
 
         void fileOpened(FileToken file) {
@@ -129,20 +130,24 @@ namespace Ck { namespace IO {
         }
 
         void close(FileToken token, CkCallback closed) {
-          managers.close(token, closed);
+          managers.close(opnum++, token, closed);
           files.erase(token);
         }
       };
 
       class Manager : public CBase_Manager {
+        Manager_SDAG_CODE
+        int opnum;
 
       public:
         Manager()
+          : opnum(0)
         {
           manager = this;
+          thisProxy[CkMyPe()].run();
         }
 
-        void openFile(FileToken token, string name, Options opts) {
+        void doOpenFile(FileToken token, string name, Options opts) {
           CkAssert(files.end() == files.find(token));
           CkAssert(lastActivePE(opts) < CkNumPes());
           CkAssert(opts.writeStripe <= opts.peStripe);
@@ -187,7 +192,7 @@ namespace Ck { namespace IO {
           }
         }
 
-        void close(FileToken token, CkCallback closed) {
+        void doClose(FileToken token, CkCallback closed) {
           int ret;
           do {
             ret = ::close(files[token].fd);

@@ -34,8 +34,21 @@ module CkIO_impl {
         group Manager
         {
           entry Manager();
-          entry void openFile(FileToken token, std::string name, Options opts);
-          entry void close(FileToken token, CkCallback closed);
+          entry void run() {
+            while (true) {
+              case {
+                when openFile[opnum](unsigned int opnum_,
+                                     FileToken token, std::string name, Options opts)
+                  serial { doOpenFile(token, name, opts); }
+                when close[opnum](unsigned int opnum_, FileToken token, CkCallback closed)
+                  serial { doClose(token, closed); }
+              }
+              serial { opnum++; }
+            }
+          };
+          entry void openFile(unsigned int opnum,
+                              FileToken token, std::string name, Options opts);
+          entry void close(unsigned int opnum, FileToken token, CkCallback closed);
         };
 
         array [1D] WriteSession
