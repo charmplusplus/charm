@@ -181,6 +181,7 @@ multisectiontest_master::multisectiontest_master(int groups):numgroups(groups)
   iteration=0;
   msgCount=0;
   startCount=0;
+  groupIDs=NULL;
 }
 
 void multisectiontest_master::recvID( multisectionGID_msg *m)
@@ -196,14 +197,12 @@ void multisectiontest_master::recvID( multisectionGID_msg *m)
     CkAbort("master message incorrectly found off 0\n");
   //  CkPrintf("[%d] master received IDs\n",CkMyPe());
   delete m;  
+  finishSetup();
 }
 
-/** the test_grps reduce to the master and the master starts iterations*/
-void multisectiontest_master::doneSetup(CkReductionMsg *rmsg)
+void multisectiontest_master::finishSetup()
 {
-  ++startCount;
-  //  CkPrintf("master setup count %d of %d\n",startCount,NUMARRAYS+NUMGROUPS);
-  if(startCount==NUMARRAYS+NUMGROUPS)
+ if(startCount==NUMARRAYS+NUMGROUPS && groupIDs!=NULL)
     {
       // everyone is ready, start the show
       multisectiontest_msg *gmsg= new multisectiontest_msg;
@@ -216,6 +215,15 @@ void multisectiontest_master::doneSetup(CkReductionMsg *rmsg)
 	  foo.nextIteration(gmsg);
 	}
     }
+}
+
+/** the test_grps reduce to the master and the master starts iterations*/
+void multisectiontest_master::doneSetup(CkReductionMsg *rmsg)
+{
+  ++startCount;
+  delete rmsg;
+  finishSetup();
+  //  CkPrintf("master setup count %d of %d\n",startCount,NUMARRAYS+NUMGROUPS);
 }
 
 /** the test_grps reduce to the master and the master controls iterations*/

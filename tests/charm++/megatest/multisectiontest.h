@@ -75,6 +75,7 @@ class multisectiontest_master : public CBase_multisectiontest_master
     void recvID(multisectionGID_msg *msg);
     void doneIteration(CkReductionMsg *);
     void doneSetup(CkReductionMsg *);
+    void finishSetup();
 };
 
 class multisectiontest_grp : public CBase_multisectiontest_grp
