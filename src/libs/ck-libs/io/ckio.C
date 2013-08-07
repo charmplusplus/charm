@@ -125,7 +125,7 @@ namespace Ck { namespace IO {
           CkArrayOptions sessionOpts(numStripes);
           //sessionOpts.setMap(managers);
           CProxy_WriteSession session =
-            CProxy_WriteSession::ckNew(file, bytes, offset, complete, sessionOpts);
+            CProxy_WriteSession::ckNew(file, offset, bytes, complete, sessionOpts);
           ready.send(new SessionReadyMsg(Session(file, bytes, offset, session)));
         }
 
