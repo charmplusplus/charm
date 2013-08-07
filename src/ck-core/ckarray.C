@@ -757,8 +757,8 @@ CkArray::CkArray(CkArrayOptions &opts,
     numInitial(opts.getNumInitial()), isInserting(true)
 {
   if (!stableLocations)
-      CcdCallOnConditionKeep(CcdPERIODIC_1minute,
-			     staticSpringCleaning, (void *)this);
+      springCleaningCcd = CcdCallOnConditionKeep(CcdPERIODIC_1minute,
+                                                 staticSpringCleaning, (void *)this);
   
   //set the field in one my parent class (CkReductionMgr)
   if(opts.disableNotifyChildInRed)
@@ -828,6 +828,12 @@ CkArray::CkArray(CkMigrateMessage *m)
   isInserting=true;
 }
 
+CkArray::~CkArray()
+{
+  if (!stableLocations)
+    CcdCancelCallOnConditionKeep(CcdPERIODIC_1minute, springCleaningCcd);
+}
+
 #if CMK_ERROR_CHECKING
 inline void testPup(PUP::er &p,int shouldBe) {
   int a=shouldBe;
@@ -856,8 +862,9 @@ void CkArray::pup(PUP::er &p){
 		reducer=(CkArrayReducer *)(CkArrayListener *)(listeners[1]);
                 /// set up broadcast cleaner
                 if (!stableLocations)
-                    CcdCallOnConditionKeep(CcdPERIODIC_1minute,
-			                   staticSpringCleaning, (void *)this);
+                    springCleaningCcd =
+                      CcdCallOnConditionKeep(CcdPERIODIC_1minute,
+                                             staticSpringCleaning, (void *)this);
 	}
 }
 
@@ -1493,6 +1500,16 @@ void CkArray::flushStates() {
   // Hence, these counters are reset only for chare arrays.
   resetCountersWhenFlushingStates();
   CK_ARRAYLISTENER_LOOP(listeners, l->flushState());
+}
+
+void CkArray::ckDestroy() {
+  int i = 0;
+  ArrayElement *a = NULL;
+  while ((a = elements->next(i))) {
+    a->ckDestroy();
+  }
+
+  delete this;
 }
 
 #include "CkArray.def.h"

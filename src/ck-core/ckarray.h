@@ -681,6 +681,7 @@ public:
 //Array Creation:
   CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionProxy);
   CkArray(CkMigrateMessage *m);
+  ~CkArray();
   CkGroupID &getGroupID(void) {return thisgroup;}
 
 //Access & information routines
@@ -730,6 +731,9 @@ public:
   void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
   void recvBroadcastViaTree(CkMessage *msg);
 
+  /// Whole array destruction, including all elements and the group itself
+  void ckDestroy();
+
   void pup(PUP::er &p);
   void ckJustMigrated(void){ doneInserting(); }
 
@@ -751,6 +755,7 @@ private:
 //Spring cleaning
   void springCleaning(void);
   static void staticSpringCleaning(void *forWhom,double curWallTime);
+  int springCleaningCcd;
 
 //ArrayListeners:
   CkPupAblePtrVec<CkArrayListener> listeners;
