@@ -4293,13 +4293,13 @@ void Entry::genClosure(XStr& decls, bool isDef) {
       decls << "      virtual ~" << *genClosureTypeName << "() {\n";
       decls << dealloc;
       decls << "      }\n";
-      decls << "      " << ((container->isTemplated() || tspec) ? "PUPable_decl_template" : "PUPable_decl") << "(" << *genClosureTypeName;
+      decls << "      " << ((container->isTemplated() || tspec) ? "PUPable_decl_template" : "PUPable_decl") << "(SINGLE_ARG(" << *genClosureTypeName;
       if (tspec) {
         decls << "<";
         tspec->genShort(decls);
         decls << ">";
       }
-      decls << ");\n";
+      decls << "));\n";
       decls << "    };\n";
     } else {
       decls << generateTemplateSpec(tspec) << "\n";
