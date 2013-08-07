@@ -323,7 +323,7 @@ namespace Ck { namespace IO {
 #endif
 
           contribute(complete);
-          contribute(CkCallback(CkIndex_WriteSession::ckDestroy(), thisProxy));
+          contribute(CkCallback(CkIndex_CkArray::ckDestroy(), CkGroupID(thisArrayID)));
         }
 
         void flushBuffer(buffer& buf, size_t bufferOffset) {
