@@ -23,10 +23,23 @@ attached to specific processors on demand.
 \subsubsection{How do I use charmdebug?}
 
 Currently charmdebug is tested to work only under net- versions. With other versions,
-testing is pending. The executable is present in {\tt java/bin/charmdebug} of
-the Charm++ distribution. To start, simply substitute ``charmdebug'' to
+testing is pending. To get the Charm Debug tool, check out the source code from the repository.
+This will create a directory named ccs\_tools. Move to this directory and
+build Charm Debug.
+
+\begin{verbatim}
+ git clone git://charm.cs.uiuc.edu/ccs_tools.git 
+ cd ccs_tools
+ ant
+\end{verbatim}
+
+This will create the executable {\tt bin/charmdebug}. To start, simply substitute ``charmdebug'' to
 ``charmrun'':
+
 \begin{alltt}shell> <path>/charmdebug ./myprogram\end{alltt}
+
+You can find more detailed information in the debugger manual in 
+\href{http://charm.cs.illinois.edu/manuals/html/debugger/manual-1p.html}{here}.
 
 \subsubsection{Can I use TotalView?}
 

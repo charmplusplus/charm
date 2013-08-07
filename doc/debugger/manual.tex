@@ -23,20 +23,22 @@ By Filippo Gioachin, Rashmi Jyothi, Orion Lawlor, Eric Bohm
 
 \section{Building the \charmpp{} Debug Tool}
 
-Every version of \charmpp{} is already provided with a compiled version
-of the debugger, and is located under charm/java/bin/charmdebug. This
-compiled version is built with java 1.4.2.
-
-In case of necessity, to rebuild the debugger, checkout a fresh copy of charm
-and then
+To get the Charm Debug tool, check out the source code from the repository.
+This will create a directory named ccs\_tools. Move to this directory and 
+build Charm Debug.
 
 \begin{verbatim}
-  cd charm/java;
-  ant clean;
-  ant;
+ git clone git://charm.cs.uiuc.edu/ccs_tools.git 
+ cd ccs_tools
+ ant
 \end{verbatim}
 
-This will recreate charm/bin/charmdebug for your java version.
+This will create the executable {\tt bin/charmdebug}, which should work.
+
+You can also download the binaries from the \charmpp{} downloads website and use it
+directly without building.
+(NOTE: Binaries may not be properly working in some platforms, so building from the
+source code is recommended.)
 
 
 \section{Preparing the \charmpp Application for Debugging}
