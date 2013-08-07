@@ -39,7 +39,7 @@ module CkIO_impl {
               case {
                 when openFile[opnum](unsigned int opnum_,
                                      FileToken token, std::string name, Options opts)
-                  serial { doOpenFile(token, name, opts); }
+                  serial { prepareFile(token, name, opts); }
                 when close[opnum](unsigned int opnum_, FileToken token, CkCallback closed)
                   serial { doClose(token, closed); }
               }

@@ -147,17 +147,23 @@ namespace Ck { namespace IO {
           thisProxy[CkMyPe()].run();
         }
 
-        void doOpenFile(FileToken token, string name, Options opts) {
+        void prepareFile(FileToken token, string name, Options opts) {
           CkAssert(files.end() == files.find(token));
           CkAssert(lastActivePE(opts) < CkNumPes());
           CkAssert(opts.writeStripe <= opts.peStripe);
           files[token] = impl::FileInfo(name, opts);
 
+          contribute(sizeof(FileToken), &token, CkReduction::max_int,
+                     CkCallback(CkReductionTarget(Director, fileOpened), director));
+        }
+
+        impl::FileInfo* get(FileToken token) {
+          CkAssert(files.find(token) != files.end());
+
           // Open file if we're one of the active PEs
           // XXX: Or maybe wait until the first write-out, to smooth the metadata load?
-          if (((CkMyPe() - opts.basePE) % opts.skipPEs == 0 &&
-               CkMyPe() < lastActivePE(opts)) ||
-              true) {
+          if (files[token].fd == -1) {
+            string& name = files[token].name;
 #if defined(_WIN32)
             int fd = _open(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
 #else
@@ -169,8 +175,7 @@ namespace Ck { namespace IO {
             files[token].fd = fd;
           }
 
-          contribute(sizeof(FileToken), &token, CkReduction::max_int,
-                     CkCallback(CkReductionTarget(Director, fileOpened), director));
+          return &(files[token]);
         }
 
         void write(Session session, const char *data, size_t bytes, size_t offset) {
@@ -193,12 +198,15 @@ namespace Ck { namespace IO {
         }
 
         void doClose(FileToken token, CkCallback closed) {
-          int ret;
-          do {
-            ret = ::close(files[token].fd);
-          } while (ret < 0 && errno == EINTR);
-          if (ret < 0)
-            fatalError("close failed", files[token].name);
+          int fd = files[token].fd;
+          if (fd != -1) {
+            int ret;
+            do {
+              ret = ::close(fd);
+            } while (ret < 0 && errno == EINTR);
+            if (ret < 0)
+              fatalError("close failed", files[token].name);
+          }
           files.erase(token);
           contribute(closed);
         }
@@ -214,7 +222,6 @@ namespace Ck { namespace IO {
 
       private:
         map<FileToken, impl::FileInfo> files;
-        friend class WriteSession;
 
         int lastActivePE(const Options &opts) {
           return opts.basePE + (opts.activePEs-1)*opts.skipPEs;
@@ -254,7 +261,7 @@ namespace Ck { namespace IO {
 
       public:
         WriteSession(FileToken file_, size_t offset_, size_t bytes_, CkCallback complete_)
-          : file(&manager->files[file_])
+          : file(manager->get(file_))
           , sessionOffset(offset_)
           , myOffset((sessionOffset / file->opts.peStripe + thisIndex)
                      * file->opts.peStripe)
