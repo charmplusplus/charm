@@ -296,6 +296,7 @@ public:
 	///  must be registered in the same order on all processors.
 	/// Returns a list which will contain that array's local elements
 	CkMigratableList *addManager(CkArrayID aid,CkArrMgr *mgr);
+        void deleteManager(CkArrayID aid, CkArrMgr *mgr);
 
 	/// Populate this array with initial elements
 	void populateInitial(CkArrayIndex& numElements,void *initMsg,CkArrMgr *mgr)

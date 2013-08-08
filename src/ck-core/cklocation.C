@@ -2245,6 +2245,25 @@ CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 	return &n->elts;
 }
 
+void CkLocMgr::deleteManager(CkArrayID id, CkArrMgr *mgr) {
+  ManagerRec *&rec = managers.find(id);
+
+  ManagerRec **prev = &firstManager;
+  ManagerRec *cur = firstManager;
+  while (cur->mgr != mgr) {
+    prev = &cur->next;
+    ++cur;
+  }
+
+  CkAssert(cur);
+  CkAssert(cur == rec);
+
+  *prev = cur->next;
+  nManagers--;
+  delete cur;
+  rec = NULL; // Would like to remove the entry entirely, but it's in a direct-mapped array
+}
+
 /// Return the next unused local element index.
 int CkLocMgr::nextFree(void) {
 	if (firstFree>=localLen)

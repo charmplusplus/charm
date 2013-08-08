@@ -1509,6 +1509,7 @@ void CkArray::ckDestroy() {
     a->ckDestroy();
   }
 
+  locMgr->deleteManager(CkGroupID(thisProxy), this);
   delete this;
 }
 
