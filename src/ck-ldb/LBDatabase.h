@@ -190,6 +190,10 @@ public:
     return LDRegisterOM(myLDHandle,userID, userptr, cb);
   };
 
+  inline void UnregisterOM(LDOMHandle omHandle) {
+    return LDUnregisterOM(myLDHandle, omHandle);
+  };
+
   inline void RegisteringObjects(LDOMHandle _om) {
     LDRegisteringObjects(_om);
   };

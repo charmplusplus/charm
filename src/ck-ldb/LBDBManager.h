@@ -69,6 +69,8 @@ public:
   void insert(LBOM *om);
 
   LDOMHandle AddOM(LDOMid _userID, void* _userData, LDCallbacks _callbacks);
+  void RemoveOM(LDOMHandle om);
+
   LDObjHandle AddObj(LDOMHandle _h, LDObjid _id, void *_userData,
 		     bool _migratable);
   void UnregisterObj(LDObjHandle _h);
