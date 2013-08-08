@@ -182,6 +182,9 @@ namespace Ck { namespace IO {
           Options &opts = files[session.file].opts;
           size_t stripe = opts.peStripe;
 
+          CkAssert(offset >= session.offset);
+          CkAssert(offset + bytes <= session.offset + session.bytes);
+
           size_t sessionStripeBase = (session.offset / stripe) * stripe;
 
           while (bytes > 0) {
@@ -271,6 +274,8 @@ namespace Ck { namespace IO {
           , complete(complete_)
         {
           CkAssert(file->fd != -1);
+          CkAssert(myOffset >= sessionOffset);
+          CkAssert(myOffset + myBytes <= sessionOffset + sessionBytes);
         }
 
         WriteSession(CkMigrateMessage *m) { }
