@@ -36,7 +36,8 @@ int varsizetest2_Msg::check(void)
       return 1;
     }
   for(i=0; i<10; i++)
-    if(farray[i] != i*i*seqnum) {
+    if((fabs(farray[i]) - fabs(2.0*i*i*seqnum))>10.0) {
+      CkPrintf("farray[%d] should be %0.8f, is instead %0.8f\n",i,farray[i],2.0*i*i*seqnum);
       return 1;
     }
   return 1;

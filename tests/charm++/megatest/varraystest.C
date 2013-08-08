@@ -46,10 +46,13 @@ int varraystest_Msg::check(void)
   int i;
   for(i=0; i<isize; i++)
     if(iarray[i] != i*i*seqnum) {
+      CkPrintf("iarray[%d] should be %d, is instead %d\n",i,iarray[i],i*i*seqnum);
       return 0;
     }
   for(i=0; i<fsize; i++)
-    if(farray[i] != 2.0*i*i*seqnum) {
+    //    if((fabs(fabs(farray[i]) - fabs(2.0*i*i*seqnum)))/1000000.0>0.00001) {
+    if((fabs(farray[i]) - fabs(2.0*i*i*seqnum))>10.0) {
+      CkPrintf("farray[%d] should be %0.8f, is instead %0.8f\n",i,farray[i],2.0*i*i*seqnum);
       return 0;
     }
   return 1;
