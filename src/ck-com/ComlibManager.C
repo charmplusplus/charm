@@ -1277,6 +1277,7 @@ public:
 		if(CkMyPe() == 0 && msg !=  NULL)
 			CmiGetArgInt(msg->argv, "+spanning_factor", &sfactor);
 
+                delete msg;
 		CProxy_ComlibManager::ckNew();
 	}
 };

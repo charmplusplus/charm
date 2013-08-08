@@ -1169,6 +1169,8 @@ public:
 
 
     controlPointManagerProxy = CProxy_controlPointManager::ckNew();
+
+    delete args;
   }
   ~controlPointMain(){}
 };

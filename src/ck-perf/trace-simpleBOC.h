@@ -15,7 +15,8 @@ extern CkGroupID traceSimpleGID;
 
 class TraceSimpleInit : public Chare {
   public:
-  TraceSimpleInit(CkArgMsg*) {
+  TraceSimpleInit(CkArgMsg *m) {
+    delete m;
     traceSimpleGID = CProxy_TraceSimpleBOC::ckNew();
     CProxy_TraceSimpleBOC simpleProxy(traceSimpleGID);
   }

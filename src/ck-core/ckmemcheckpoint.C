@@ -1484,6 +1484,7 @@ void init_memcheckpt(char **argv)
 class CkMemCheckPTInit: public Chare {
 public:
   CkMemCheckPTInit(CkArgMsg *m) {
+    delete m;
 #if CMK_MEM_CHECKPOINT
     if (arg_where == CkCheckPoint_inDISK) {
       CkPrintf("Charm++> Double-disk Checkpointing. \n");

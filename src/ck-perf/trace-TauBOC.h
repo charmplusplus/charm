@@ -15,7 +15,8 @@ extern CkGroupID traceTauGID;
 
 class TraceTauInit : public Chare {
   public:
-  TraceTauInit(CkArgMsg*) {
+  TraceTauInit(CkArgMsg *m) {
+    delete m;
     traceTauGID = CProxy_TraceTauBOC::ckNew();
     CProxy_TraceTauBOC tauProxy(traceTauGID);
   }

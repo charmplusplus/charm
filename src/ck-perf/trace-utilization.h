@@ -52,6 +52,7 @@ void collectUtilizationData(void *data, double currT);
 class TraceUtilizationInit : public Chare {
  public:
   TraceUtilizationInit(CkArgMsg *m) {
+    delete m;
     CkPrintf("[%d] TraceUtilizationInit creating traceUtilizationGroupProxy");
     fflush(stdout);
    

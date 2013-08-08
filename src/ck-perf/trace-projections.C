@@ -2080,6 +2080,8 @@ TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
 					entryThreshold,
 					outlierUsePhases);
   }
+
+  delete msg;
 }
 
 // Called on every processor.

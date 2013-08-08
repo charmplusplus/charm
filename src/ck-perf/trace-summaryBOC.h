@@ -8,6 +8,7 @@ extern bool summaryCcsStreaming;
 class TraceSummaryInit : public Chare {
  public:
   TraceSummaryInit(CkArgMsg *m) {
+    delete m;
     traceSummaryGID = CProxy_TraceSummaryBOC::ckNew();
     CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
 

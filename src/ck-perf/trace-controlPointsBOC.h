@@ -16,7 +16,8 @@ extern CkGroupID traceControlPointsGID;
 
 class TraceControlPointsInit : public Chare {
   public:
-  TraceControlPointsInit(CkArgMsg*) {
+  TraceControlPointsInit(CkArgMsg *m) {
+    delete m;
     traceControlPointsGID = CProxy_TraceControlPointsBOC::ckNew();
     CProxy_TraceControlPointsBOC controlPointsProxy(traceControlPointsGID);
     //CkPrintf("Initializing counters on pe %d\n", CkMyPe());
