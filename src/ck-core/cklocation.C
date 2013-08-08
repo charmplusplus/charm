@@ -2285,6 +2285,9 @@ void CkLocMgr::deleteManager(CkArrayID id, CkArrMgr *mgr) {
   nManagers--;
   delete cur;
   rec = NULL; // Would like to remove the entry entirely, but it's in a direct-mapped array
+
+  if (nManagers == 0)
+    delete this;
 }
 
 /// Return the next unused local element index.
