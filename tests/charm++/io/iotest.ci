@@ -29,9 +29,11 @@ mainmodule iotest {
       when start_write[iter + 1](Ck::IO::SessionReadyMsg *m) serial {
         testers = CProxy_test::ckNew(m->session, n);
         CkPrintf("Main saw session ready\n");
+        delete m;
       }
       when test_written[iter + 2](CkReductionMsg *m) serial {
         CkPrintf("Main saw write done\n");
+        delete m;
         // Read file and validate contents
         CkCallback cb(CkIndex_Main::closed(0), thisProxy);
         cb.setRefnum(iter + 3);
@@ -39,6 +41,7 @@ mainmodule iotest {
       }
       when closed[iter + 3](CkReductionMsg *m) serial {
         CkPrintf("Main saw close done\n");
+        delete m;
         thisProxy.iterDone();
       }
     };

@@ -17,6 +17,7 @@ public:
       thisProxy.run(4*i);
 
     CkPrintf("Main ran\n");
+    delete m;
   }
 
   void iterDone() {
