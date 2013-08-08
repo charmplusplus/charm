@@ -286,6 +286,7 @@ class CkLocMgr : public IrrGroup {
 public:
 	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
+        ~CkLocMgr();
 
 	inline bool isLocMgr(void) { return true; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
@@ -499,6 +500,7 @@ public:
 	static void staticSpringCleaning(void *mgr,double curWallTime);
 	void springCleaning(void);
 	int nSprings;
+	int springCleaningCcd;
 
 private:
 	//Map object
@@ -524,6 +526,7 @@ private:
 	static void staticRecvAtSync(void* data);
 	void recvAtSync(void);
 	LDOMHandle myLBHandle;
+        LDBarrierReceiver lbBarrierReceiver;
 #endif
 private:
 	void initLB(CkGroupID lbdbID, CkGroupID metalbID);

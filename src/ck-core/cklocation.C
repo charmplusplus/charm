@@ -2094,7 +2094,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	duringMigration=false;
 	nSprings=0;
 #if !CMK_GLOBAL_LOCATION_UPDATE
-	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+	springCleaningCcd = CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
 #endif
 
 //Register with the map object
@@ -2125,9 +2125,20 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	duringMigration=false;
 	nSprings=0;
 #if !CMK_GLOBAL_LOCATION_UPDATE
-	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+	springCleaningCcd = CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
 #endif
 	hashImmLock = CmiCreateImmediateLock();
+}
+
+CkLocMgr::~CkLocMgr() {
+#if CMK_LBDB_ON
+  the_lbdb->RemoveLocalBarrierClient(dummyBarrierHandle);
+  the_lbdb->RemoveLocalBarrierReceiver(lbBarrierReceiver);
+  the_lbdb->UnregisterOM(myLBHandle);
+#endif
+  CcdCancelCallOnConditionKeep(CcdPERIODIC_1minute, springCleaningCcd);
+  map->unregisterArray(mapHandle);
+  CmiDestroyLock(hashImmLock);
 }
 
 void CkLocMgr::pup(PUP::er &p){
@@ -3334,7 +3345,7 @@ void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 	  us to call Registering/DoneRegistering during each AtSync,
 	  and this is the only way to do so.
 	*/
-	the_lbdb->AddLocalBarrierReceiver(
+	lbBarrierReceiver = the_lbdb->AddLocalBarrierReceiver(
 		(LDBarrierFn)staticRecvAtSync,(void*)(this));
 	dummyBarrierHandle = the_lbdb->AddLocalBarrierClient(
 		(LDResumeFn)staticDummyResumeFromSync,(void*)(this));
