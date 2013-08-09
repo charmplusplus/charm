@@ -133,6 +133,7 @@ typedef struct {
 #endif
   bool migratable;
   bool asyncArrival;
+  size_t pupSize;
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const LDObjid &objID() const { return handle.id; }
@@ -276,6 +277,7 @@ void LDMessage(LDObjHandle from,
 void LDEstObjLoad(LDObjHandle h, double load);
 void LDNonMigratable(const LDObjHandle &h);
 void LDMigratable(const LDObjHandle &h);
+void LDSetPupSize(const LDObjHandle &h, size_t);
 void LDAsyncMigrate(const LDObjHandle &h, bool);
 void LDDumpDatabase(LDHandle _lbdb);
 
@@ -438,6 +440,7 @@ inline void LDObjData::pup(PUP::er &p) {
 #endif
   p|migratable;
   if (_lb_version > -1) p|asyncArrival;
+  p|pupSize;
 }
 PUPmarshall(LDObjData)
 

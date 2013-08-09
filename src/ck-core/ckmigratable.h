@@ -96,9 +96,11 @@ public:
   void ReadyMigrate(bool ready);
   void ckFinishConstruction(void);
   void setMigratable(int migratable);
+  void setPupSize(size_t obj_pup_size);
 #else
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
   void setMigratable(int migratable)  { }
+  void setPupSize(size_t obj_pup_size) { }
 public:
   void ckFinishConstruction(void) { }
 #endif

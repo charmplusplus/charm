@@ -1235,6 +1235,10 @@ void CkMigratable::AtSync(int waitForMigration)
   // model-based load balancing, ask user to provide cpu load
   if (usesAutoMeasure == false) UserSetLBLoad();
 
+  PUP::sizer ps;
+  this->pup(ps);
+  setPupSize(ps.size());
+
   if (!_lb_args.metaLbOn()) {
     myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
     return;
@@ -1315,6 +1319,11 @@ void CkMigratable::staticResumeFromSync(void* data)
 void CkMigratable::setMigratable(int migratable) 
 {
 	myRec->setMigratable(migratable);
+}
+
+void CkMigratable::setPupSize(size_t obj_pup_size)
+{
+	myRec->setPupSize(obj_pup_size);
 }
 
 struct CkArrayThreadListener {
@@ -1753,6 +1762,11 @@ void CkLocRec_local::setMigratable(int migratable)
 	else
   	  the_lbdb->NonMigratable(ldHandle);
 }
+
+void CkLocRec_local::setPupSize(size_t obj_pup_size) {
+  the_lbdb->setPupSize(ldHandle, obj_pup_size);
+}
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocRec_local::Migrated(){
     the_lbdb->Migrated(ldHandle, true);

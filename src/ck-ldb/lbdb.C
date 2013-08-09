@@ -316,6 +316,14 @@ extern "C" void LDMigratable(const LDObjHandle &h)
   obj->SetMigratable(true);
 }
 
+extern "C" void LDSetPupSize(const LDObjHandle &h, size_t obj_pup_size)
+{
+  LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
+  LBObj *const obj = db->LbObj(h);
+
+  obj->setPupSize(obj_pup_size);
+}
+
 extern "C" void LDAsyncMigrate(const LDObjHandle &h, bool async)
 {
   LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);

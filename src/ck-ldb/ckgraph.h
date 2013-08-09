@@ -126,7 +126,9 @@ class Vertex {
 
   public:
     Vertex() {}
-    Vertex(int i, double cl, bool mig, int curpe, int newpe=-1): id(i), compLoad(cl), migratable(mig), currPe(curpe), newPe(newpe)  {}
+    Vertex(int i, double cl, bool mig, int curpe, int newpe=-1, size_t pupsize=0):
+        id(i), compLoad(cl), migratable(mig), currPe(curpe), newPe(newpe),
+        pupSize(pupsize)  {}
     inline int getVertexId() { return id; }
     inline double getVertexLoad() { return compLoad; }
     inline int getCurrentPe() { return currPe; }
@@ -151,6 +153,7 @@ class Vertex {
     bool migratable;	// migratable or non-migratable
     int currPe;		// current processor assignment
     int newPe;		// new processor assignment after load balancing
+    size_t pupSize;
 };
 
 
