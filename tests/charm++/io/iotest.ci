@@ -22,7 +22,10 @@ mainmodule iotest {
         sessionStart.setRefnum(iter + 1);
         CkCallback sessionEnd(CkIndex_Main::test_written(0), thisProxy);
         sessionEnd.setRefnum(iter + 2);
-        Ck::IO::startSession(f.at(iter/4), 10*n, 0, sessionStart, sessionEnd);
+        std::string h = "hello\n";
+        Ck::IO::startSession(f.at(iter/4), 10*n, 0, sessionStart,
+                             h.c_str(), h.size(), 10*n,
+                             sessionEnd);
         delete m;
         CkPrintf("Main saw file ready\n");
       }
