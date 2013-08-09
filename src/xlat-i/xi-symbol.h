@@ -1370,7 +1370,6 @@ public:
   void propagateState(int);
   virtual void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   virtual void generateCode(XStr& decls, XStr& defs, Entry *entry);
-  void generateWhenCode(XStr& op, int indent);
   void setNext(SdagConstruct *, int);
   void buildTypes(std::list<EncapState*>& state);
 
@@ -1397,6 +1396,7 @@ public:
   void generateEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
   void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateEntryName(XStr& defs, Entry* e, int curEntry);
+  void generateWhenCode(XStr& op, int indent);
 };
 
 extern void RemoveSdagComments(char *);
