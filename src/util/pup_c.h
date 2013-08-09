@@ -102,6 +102,10 @@ void pup_comment(const pup_er p, char *message);
 /*Read the size of a pupper */
 int pup_size(const pup_er p);
 
+/* Utilities to approximately encode large sizes, within 1% */
+CMK_TYPEDEF_UINT2 pup_encodeSize(size_t s);
+size_t pup_decodeSize(CMK_TYPEDEF_UINT2 a);
+
 /*Pack/unpack data items, declared with macros for brevity.
 The macros expand like:
 void pup_int(pup_er p,int *i); <- single integer pack/unpack

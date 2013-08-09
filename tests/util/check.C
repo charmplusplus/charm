@@ -2,6 +2,31 @@
 #include "envelope.h"
 #include <stdio.h>
 
+void check_size_approx(size_t s) {
+  double diff = s - pup_decodeSize(pup_encodeSize(s));
+  if (diff / s > 0.01) {
+    CmiPrintf("Failed to accurately encode size %lu: difference was %f\n",
+              (unsigned long)s, diff);
+    exit(2);
+  }
+}
+
+size_t check_size_values[] =
+{
+  0,
+  1,
+  256,
+  1UL << 12,
+  (1UL << 12) + 1,
+  (1UL << 13) - 1,
+  1UL << 13,
+  (1UL << 13) + 1,
+  1UL << 31,
+  1UL << 32,
+  1UL << 33,
+  1UL << 34
+};
+
 void check_test(int argc, char** argv) {
   CmiInt2 int2;
   CmiInt4 int4;
@@ -81,6 +106,10 @@ void check_test(int argc, char** argv) {
     CmiPrintf("Error: size of envelope can not divide 8. \n");
     exit(1);
   }
+
+  for (int i = 0; i < sizeof(check_size_values)/sizeof(check_size_values[0]); ++i)
+    check_size_approx(check_size_values[i]);
+
   CmiPrintf("All tests passed\n");
 }
 

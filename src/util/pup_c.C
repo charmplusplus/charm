@@ -84,6 +84,34 @@ FDECL int FTN_NAME(FPUP_ISUSERLEVEL,fpup_isuserlevel)(const pup_er p)
 CDECL int pup_size(const pup_er p)
   { return mp.size(); }
 
+#define SIZE_APPROX_BITS 13
+
+/* Utilities to approximately encode large sizes, within 1% */
+CDECL CMK_TYPEDEF_UINT2 pup_encodeSize(size_t s)
+{
+  // Use the top two bits to indicate a scaling factor as a power of 256. At
+  // each step up in size, we'll thus lose the bottom 8 bits out of 14:
+  // 256/32k < 1%
+  CmiUInt2 power = 0;
+
+  while (s > (1UL << SIZE_APPROX_BITS) - 1) {
+    power++;
+    s >>= 8;
+  }
+
+  return (power << SIZE_APPROX_BITS) | s;
+}
+
+CDECL size_t pup_decodeSize(CMK_TYPEDEF_UINT2 a)
+{
+  CmiUInt2 power = a >> SIZE_APPROX_BITS;
+  size_t factor = 1UL << (8 * power);
+
+  size_t base = a & ((1UL << SIZE_APPROX_BITS) - 1);
+
+  return base * factor;
+}
+
 /*Insert a synchronization into the data stream */
 CDECL void pup_syncComment(const pup_er p, unsigned int sync, char *message)
   { mp.syncComment(sync, message); }
