@@ -41,7 +41,7 @@ inline void MPI_Recv_pup(T &t, int from,int tag,MPI_Comm comm) {
 /// MPI_Send, but using an object T with a pup routine.
 template <class T>
 inline void MPI_Send_pup(T &t, int to,int tag,MPI_Comm comm) {
-	int len=PUP::size(t); char *buf=new char[len];
+	size_t len=PUP::size(t); char *buf=new char[len];
 	PUP::toMemBuf(t,buf,len);
 	pup_checkMPI(MPI_Send(buf,len,MPI_BYTE, to,tag,comm));
 	delete[] buf;
@@ -53,7 +53,7 @@ inline void MPI_Bcast_pup(T &t, int root,MPI_Comm comm) {
 	int myRank;
 	MPI_Comm_rank(comm,&myRank);
 	/* Can't do broadcast until everybody knows the size */
-	int len=0;
+	size_t len=0;
 	if(myRank == root) len=PUP::size(t); 
 	pup_checkMPI(MPI_Bcast(&len,1,MPI_INT,root,comm));
 	/* Now pack object and send off */

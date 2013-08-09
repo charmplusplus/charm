@@ -9,11 +9,11 @@ Orion Sky Lawlor, olawlor@acm.org, 11/1/2001
 #include "pup.h"
 
 class PUP_toNetwork4_sizer : public PUP::er {
-	int nBytes;
+	size_t nBytes;
 	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
  public:
 	PUP_toNetwork4_sizer(void) :PUP::er(IS_SIZING) {nBytes=0;}
-	int size(void) const {return nBytes;}
+	size_t size(void) const {return nBytes;}
 
 };
 
@@ -43,7 +43,7 @@ class PUP_toNetwork4_pack : public PUP::er {
 	}
   	PUP_toNetwork4_pack(const PUP_toNetwork4_pack &p); //don't copy
   	void operator=(const PUP_toNetwork4_pack &p);	      // don't copy
-	inline int size(void) const {return buf-start;}
+	inline size_t size(void) const {return buf-start;}
 };
 
 class PUP_toNetwork4_unpack : public PUP::er {
@@ -71,7 +71,7 @@ class PUP_toNetwork4_unpack : public PUP::er {
 	}
   	PUP_toNetwork4_unpack(const PUP_toNetwork4_unpack &p); //don't copy
   	void operator=(const PUP_toNetwork4_unpack &p);	      // don't copy
-	inline int size(void) const {return buf-start;}
+	inline size_t size(void) const {return buf-start;}
 };
 
 #endif

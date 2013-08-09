@@ -304,7 +304,7 @@ class er {
   virtual void bytes(void *p,int n,size_t itemSize,dataType t) =0;
   virtual void object(able** a);
 
-  virtual int size(void) const { return 0; }
+  virtual size_t size(void) const { return 0; }
   
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
@@ -360,7 +360,7 @@ enum {
 //For finding the number of bytes to pack (e.g., to preallocate a memory buffer)
 class sizer : public er {
  protected:
-  int nBytes;
+  size_t nBytes;
   //Generic bottleneck: n items of size itemSize
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
@@ -368,11 +368,11 @@ class sizer : public er {
   sizer(void):er(IS_SIZING),nBytes(0) {}
   
   //Return the current number of bytes to be packed
-  int size(void) const {return nBytes;}
+  size_t size(void) const {return nBytes;}
 };
 
 template <class T>
-inline int size(T &t) {
+inline size_t size(T &t) {
 	PUP::sizer p; p|t; return p.size();
 }
 
@@ -391,7 +391,7 @@ class mem : public er { //Memory-buffer packers and unpackers
   virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
  public:
   //Return the current number of buffer bytes used
-  int size(void) const {return buf-origBuf;}
+  size_t size(void) const {return buf-origBuf;}
 };
 
 //For packing into a preallocated, presized memory buffer
@@ -404,7 +404,7 @@ class toMem : public mem {
   toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
 };
 template <class T>
-inline void toMemBuf(T &t,void *buf,int len) {
+inline void toMemBuf(T &t,void *buf, size_t len) {
 	PUP::toMem p(buf);
 	p|t;
 	if (p.size()!=len) CmiAbort("Size mismatch during PUP::toMemBuf!\n"
@@ -496,7 +496,7 @@ class sizerText : public toTextUtil {
   virtual char *advance(char *cur);
  public:
   sizerText(void);
-  int size(void) const {return charCount+1; /*add NULL*/ }
+  size_t size(void) const {return charCount+1; /*add NULL*/ }
 };
 
 /* Copy data to this C string, including terminating NULL. */
@@ -510,7 +510,7 @@ class toText : public toTextUtil {
   toText(char *outStr);
   toText(const toText &p);			//You don't want to copy
   void operator=(const toText &p);		// You don't want to copy
-  int size(void) const {return charCount+1; /*add NULL*/ }
+  size_t size(void) const {return charCount+1; /*add NULL*/ }
 };
 
 class toTextFile : public er {
@@ -592,7 +592,7 @@ protected:
 	er &p;
 public:
 	wrap_er(er &p_,unsigned int newFlags=0) :er(p_.getStateFlags()|newFlags), p(p_) {}
-	virtual int size(void) const { return p.size(); }
+	virtual size_t size(void) const { return p.size(); }
 	
 	virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
 	virtual int impl_tell(seekBlock &s); /*Give the current offset*/

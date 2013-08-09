@@ -350,7 +350,7 @@ PUP::able *PUP::able::clone(void) const {
 
 	// Save our own state into a buffer
 	PUP::able *mthis=(PUP::able *)this; /* cast away constness */
-	int size;
+	size_t size;
 	{ PUP::sizer ps; mthis->pup(ps); size=ps.size(); }
 	void *buf=malloc(size);
 	{ PUP::toMem pt(buf); mthis->pup(pt); }
