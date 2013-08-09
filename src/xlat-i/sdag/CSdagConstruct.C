@@ -497,6 +497,15 @@ namespace xi {
         op << "static_cast<" << *state.type << "*>(c->closure[" << cur << "])";
       if (cur != encapState.size() - 1) op << ", ";
     }
+
+    cur = 0;
+    for (EntryList *el = elist; el != NULL; el = el->next, cur++)
+      if (el->entry->intExpr) {
+        op << ",\n";
+        indentBy(op, indent + 1);
+        op << "c->refnums[" << cur << "]";
+      }
+
     op << "\n";
     indentBy(op, indent);
     op << ");\n";
@@ -522,51 +531,70 @@ namespace xi {
     buildTypes(encapState);
     buildTypes(encapStateChild);
 
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    generateClosureSignature(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState);
+    int entryLen = 0, numRefs = 0;
 
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-#endif
-
-    int entryLen = 0;
-
-    // count the number of entries this when contains (for logical ands)
+    // count the number of entries this when contains (for logical ands) and
+    // the number of reference numbers
     {
       int cur = 0;
-      for (EntryList *el = elist; el != NULL; el = el->next, cur++) entryLen++;
+      for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
+        entryLen++;
+        if (el->entry->intExpr) numRefs++;
+      }
     }
 
-    // if we have a reference number in the closures, we need to unravel the state
-    int cur = 0;
-    bool hasRef = false;;
-    for (EntryList *el = elist; el != NULL; el = el->next, cur++)
-      if (el->entry->intExpr) {
-        defs << "  CMK_REFNUM_TYPE refnum_" << cur << ";\n";
-        hasRef = true;
-      }
-    int indent = 2;
+    // if reference numbers exist for this when, generate a wrapper that calls
+    // the when method with the reference numbers determined based on the
+    // current state
+    if (numRefs > 0) {
+      sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+      generateClosureSignature(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState);
 
-    // unravel the closures so the potential refnum expressions can be resolved
-    if (hasRef) {
+      // if we have a reference number in the closures, we need to unravel the state
+      int cur = 0;
+      for (EntryList *el = elist; el != NULL; el = el->next, cur++)
+        if (el->entry->intExpr) defs << "  CMK_REFNUM_TYPE refnum_" << cur << ";\n";
+      int indent = 2;
+
+      // unravel the closures so the potential refnum expressions can be resolved
       indent = unravelClosuresBegin(defs);
       indentBy(defs, indent);
       // create a new scope for unraveling the closures
       defs << "{\n";
-    }
-    cur = 0;
-    // generate each refnum variable we need that can access the internal closure state
-    for (EntryList *el = elist; el != NULL; el = el->next, cur++)
-      if (el->entry->intExpr) {
-        indentBy(defs, indent + 1);
-        defs << "refnum_" << cur << " = " << (el->entry->intExpr ? el->entry->intExpr : "0") << ";\n";
-      }
 
-    if (hasRef) {
+      cur = 0;
+      // generate each refnum variable we need that can access the internal closure state
+      for (EntryList *el = elist; el != NULL; el = el->next, cur++)
+        if (el->entry->intExpr) {
+          indentBy(defs, indent + 1);
+          defs << "refnum_" << cur << " = " << (el->entry->intExpr ? el->entry->intExpr : "0") << ";\n";
+        }
+
+      // end the unraveling of closures
       indentBy(defs, indent);
       defs << "}\n";
       unravelClosuresEnd(defs);
+
+      // generate the call to the actual when that takes the reference numbers as arguments
+      defs << "  return " << label << "(";
+      cur = 0;
+      for (list<EncapState*>::iterator iter = encapState.begin(); iter != encapState.end(); ++iter, ++cur) {
+        EncapState *state = *iter;
+        if (state->name) defs << *state->name; else defs << "gen" << cur;
+        if (cur != encapState.size() - 1) defs << ", ";
+      }
+      for (int i = 0; i < numRefs; i++) defs << ", refnum_" << i;
+      defs << ");\n";
+
+      endMethod(defs);
     }
+
+    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+    generateClosureSignature(decls, defs, entry, false, "SDAG::Continuation*", label, false, encapState, numRefs);
+
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+#endif
 
     if (entryLen > 1) defs << "  std::set<SDAG::Buffer*> ignore;\n";
 
@@ -702,6 +730,7 @@ namespace xi {
 
     // first check if we have any messages going out of scope
     bool messageOutOfScope = false;
+    int cur = 0;
     for (EntryList *el = elist; el != NULL; el = el->next, cur++)
       if (el->entry->param->isMessage() == 1)
         messageOutOfScope = true;
@@ -1272,15 +1301,15 @@ namespace xi {
   }
 
   void generateClosureSignature(XStr& decls, XStr& defs,
-                            const Entry* entry, bool declareStatic, const char* returnType,
-                            const XStr* name, bool isEnd,
-                            list<EncapState*> encap) {
+                                const Entry* entry, bool declareStatic, const char* returnType,
+                                const XStr* name, bool isEnd,
+                                list<EncapState*> encap, int numRefs) {
     generateClosureSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
-                         name, isEnd, encap);
+                             name, isEnd, encap, numRefs);
   }
   void generateClosureSignature(XStr& decls, XStr& defs, const Chare* chare,
-                            bool declareStatic, const char* returnType,
-                            const XStr* name, bool isEnd, list<EncapState*> encap) {
+                                bool declareStatic, const char* returnType,
+                                const XStr* name, bool isEnd, list<EncapState*> encap, int numRefs) {
     decls << "  " << (declareStatic ? "static " : "") << returnType << " ";
 
     templateGuardBegin(false, defs);
@@ -1308,6 +1337,8 @@ namespace xi {
 
       if (cur != encap.size() - 1) op << ", ";
     }
+
+    for (int i = 0; i < numRefs; i++) op << ", int refnum_" << i;
 
     op << ")";
 
