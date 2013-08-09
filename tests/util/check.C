@@ -3,10 +3,11 @@
 #include <stdio.h>
 
 void check_size_approx(size_t s) {
-  double diff = s - pup_decodeSize(pup_encodeSize(s));
-  if (diff / s > 0.01) {
-    CmiPrintf("Failed to accurately encode size %lu: difference was %f\n",
-              (unsigned long)s, diff);
+  size_t enc = pup_decodeSize(pup_encodeSize(s));
+  double diff = s > enc ? s - enc : enc - s;
+  if (diff / s > 0.005) {
+    CmiPrintf("Failed to accurately encode size %lu as %lu: difference was %f\n",
+              (unsigned long)s, enc, diff);
     exit(2);
   }
 }
@@ -21,6 +22,7 @@ size_t check_size_values[] =
   (1UL << 13) - 1,
   1UL << 13,
   (1UL << 13) + 1,
+  (1UL << 14) - 1,
   1UL << 31,
   1UL << 32,
   1UL << 33,

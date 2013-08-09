@@ -102,7 +102,7 @@ void pup_comment(const pup_er p, char *message);
 /*Read the size of a pupper */
 int pup_size(const pup_er p);
 
-/* Utilities to approximately encode large sizes, within 1% */
+/* Utilities to approximately encode large sizes, within 0.5% */
 CMK_TYPEDEF_UINT2 pup_encodeSize(size_t s);
 size_t pup_decodeSize(CMK_TYPEDEF_UINT2 a);
 

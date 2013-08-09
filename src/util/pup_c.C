@@ -86,7 +86,7 @@ CDECL int pup_size(const pup_er p)
 
 #define SIZE_APPROX_BITS 13
 
-/* Utilities to approximately encode large sizes, within 1% */
+/* Utilities to approximately encode large sizes, within 0.5% */
 CDECL CMK_TYPEDEF_UINT2 pup_encodeSize(size_t s)
 {
   // Use the top two bits to indicate a scaling factor as a power of 256. At
@@ -96,6 +96,8 @@ CDECL CMK_TYPEDEF_UINT2 pup_encodeSize(size_t s)
 
   while (s > (1UL << SIZE_APPROX_BITS) - 1) {
     power++;
+    if (s & (1UL << 6)) // Round up as needed to cut relative error in half
+      s += (1UL << 7);
     s >>= 8;
   }
 
