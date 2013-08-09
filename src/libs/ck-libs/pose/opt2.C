@@ -28,7 +28,7 @@ void opt2::Step()
       eq->ShiftEvent(); // shift to next event
       ev = eq->currentPtr; // reset ev
     }
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_TRACE_DISABLED
     if(pose_config.stats)
       if (iter > 0) localStats->Loop();
 #endif  

@@ -82,7 +82,7 @@ void POSE_init(int IDflag, int ET) // can specify both
 #else
   _POSE_SEQUENTIAL = 0;
 #endif
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_TRACE_DISABLED
   traceRegisterUserEvent("Forward Execution", 10);
   traceRegisterUserEvent("Cancellation", 20);
   traceRegisterUserEvent("Cancel Spawn", 30);
@@ -111,7 +111,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   TempMemID = CProxy_TimePool::ckNew();
 #endif
   // Initialize statistics collection if desired
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_TRACE_DISABLED
   theLocalStats = CProxy_localStat::ckNew();
   CProxy_globalStat::ckNew(&theGlobalStats);
 #endif
@@ -292,7 +292,7 @@ void pose::stop(void)
 //! dump stats if enabled and exit
 void pose::prepExit(void) 
 {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_TRACE_DISABLED
   if(pose_config.stats)
     {
       CProxy_localStat stats(theLocalStats);

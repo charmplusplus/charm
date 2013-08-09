@@ -92,7 +92,7 @@ public:
   }
   /// Send cancellation messages to all of event e's spawned events
   void CancelSpawn(Event *e) {  
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_TRACE_DISABLED
     double critStart;
     if(pose_config.trace)
       critStart= CmiWallTimer();
@@ -113,7 +113,7 @@ public:
       delete ev; // delete the spawn
       ev = e->spawnedList; // move on to next in list
     }
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_TRACE_DISABLED
     if(pose_config.trace)
       traceUserBracketEvent(30, critStart, CmiWallTimer());
 #endif
