@@ -107,7 +107,7 @@ public:
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(bool mig) { data.migratable = mig; }
   inline void setPupSize(size_t obj_pup_size) {
-    data.pupSize = obj_pup_size;
+    data.pupSize = pup_encodeSize(obj_pup_size);
   }
   inline void UseAsyncMigrate(bool async) { data.asyncArrival = async; }
   inline LDObjData &ObjData() { return data; };

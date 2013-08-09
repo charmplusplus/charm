@@ -133,7 +133,9 @@ typedef struct {
 #endif
   bool migratable;
   bool asyncArrival;
-  size_t pupSize;
+  // An encoded approximation of the amount of data the object would pack;
+  // call pup_decodeSize(pupSize) to get the actual approximate value
+  CmiUInt2 pupSize;
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const LDObjid &objID() const { return handle.id; }

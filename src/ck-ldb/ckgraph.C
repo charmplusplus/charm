@@ -47,7 +47,7 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
     vertices[vert].migratable = stats->objData[vert].migratable;
     vertices[vert].currPe     = stats->from_proc[vert];
     vertices[vert].newPe      = -1;
-    vertices[vert].pupSize    = stats->objData[vert].pupSize;
+    vertices[vert].pupSize    = pup_decodeSize(stats->objData[vert].pupSize);
   } // end for
 
   // fill the edge list for each vertex
