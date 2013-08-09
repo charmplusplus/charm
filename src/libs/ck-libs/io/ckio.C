@@ -54,11 +54,12 @@ namespace Ck { namespace IO {
         int filesOpened;
         map<FileToken, impl::FileInfo> files;
         CProxy_Manager managers;
-        int opnum;
+        int opnum, sessionID;
+        Director_SDAG_CODE
 
       public:
         Director(CkArgMsg *m)
-          : filesOpened(0), opnum(0)
+          : filesOpened(0), opnum(0), sessionID(0)
         {
           delete m;
           director = thisProxy;
@@ -336,6 +337,13 @@ namespace Ck { namespace IO {
     void startSession(File file, size_t bytes, size_t offset,
                       CkCallback ready, CkCallback complete) {
       impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete);
+    }
+    void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
+                      const char *commitData, size_t commitBytes, size_t commitOffset,
+                      CkCallback complete) {
+      impl::director.prepareWriteSession(file.token, bytes, offset, ready,
+                                         commitData, commitBytes, commitOffset,
+                                         complete);
     }
 
     void write(Session session, const char *data, size_t bytes, size_t offset) {

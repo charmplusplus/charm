@@ -49,6 +49,16 @@ namespace Ck { namespace IO {
   void startSession(File file, size_t bytes, size_t offset,
                     CkCallback ready, CkCallback complete);
 
+  /// Prepare to write data into @arg file, in the window defined by the @arg
+  /// offset and length in @arg bytes. When the session is set up, a
+  /// SessionReadyMsg will be sent to the @arg ready callback. When all of the
+  /// data has been written and synced, an additional write will be made to the
+  /// file to `commit' the session's work. When that write has completed, a
+  /// message will be sent to the @arg complete callback.
+  void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
+                    const char *commitData, size_t commitBytes, size_t commitOffset,
+                    CkCallback complete);
+
   /// Write the given data into the file to which session is attached. The
   /// offset is relative to the file as a whole, not to the session's offset.
   void write(Session session, const char *data, size_t bytes, size_t offset);
@@ -61,6 +71,9 @@ namespace Ck { namespace IO {
     int token;
     friend void startSession(File file, size_t bytes, size_t offset,
                              CkCallback ready, CkCallback complete);
+    friend void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
+                             const char *commitData, size_t commitBytes, size_t commitOffset,
+                             CkCallback complete);
     friend void close(File file, CkCallback closed);
     friend class FileReadyMsg;
 

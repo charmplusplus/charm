@@ -28,6 +28,25 @@ module CkIO_impl {
 
           entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
                                          CkCallback ready, CkCallback complete);
+          entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
+                                         CkCallback ready, const char commitData[commitBytes],
+                                         size_t commitBytes, size_t commitOffset,
+                                         CkCallback complete) {
+            serial {
+              CkCallback committed(CkIndex_Director::sessionDone(NULL), thisProxy);
+              committed.setRefnum(++sessionID);
+              prepareWriteSession(file, bytes, offset, ready, committed);
+            }
+            when sessionDone[sessionID](CkReductionMsg *m) serial {
+              delete m;
+              impl::FileInfo* info = manager->get(file);
+              CmiInt8 ret = CmiPwrite(info->fd, commitData, commitBytes, commitOffset);
+              if (ret != commitBytes)
+                fatalError("Commit write failed", info->name);
+              complete.send(CkReductionMsg::buildNew(0, NULL));
+            }
+          };
+          entry void sessionDone(CkReductionMsg *);
           entry void close(FileToken token, CkCallback closed);
         }
 
