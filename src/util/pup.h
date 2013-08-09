@@ -667,6 +667,8 @@ public:
 	virtual const PUP_ID &get_PUP_ID(void) const=0;
 };
 
+#define SINGLE_ARG(...) __VA_ARGS__
+
 //Declarations which create routines implemeting the | operator.
 //  Macros to be used inside a class body.
 #define PUPable_operator_inside(className)\
@@ -689,8 +691,8 @@ public:
     PUPable_operator_inside(className)
 
 #define PUPable_decl_template(className) \
-    PUPable_decl_inside_template(className) \
-    PUPable_operator_inside(className)
+    PUPable_decl_inside_template(SINGLE_ARG(className))   \
+    PUPable_operator_inside(SINGLE_ARG(className))
 
 //PUPable_decl for classes inside a namespace: inside body
 #define PUPable_decl_inside(className) \
