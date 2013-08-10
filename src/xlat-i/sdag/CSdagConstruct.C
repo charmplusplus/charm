@@ -642,21 +642,23 @@ namespace xi {
     defs << "  if (" << haveAllBuffersCond << ") {\n";
 
 #if CMK_BIGSIM_CHARM
-    // TODO: instead of this, add a length field to EntryList
-    defs << "    void* logs1["<< entryLen << "]; \n";
-    defs << "    void* logs2["<< entryLen + 1 << "]; \n";
-    int localnum = 0;
-    cur = 0;
-    for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
-      XStr bufName("buf");
-      bufName << cur;
-      defs << "    logs1[" << localnum << "] = " << bufName << "->bgLog1; \n";
-      defs << "    logs2[" << localnum << "] = " << bufName << "->bgLog2; \n";
-      localnum++;
+    {
+      // TODO: instead of this, add a length field to EntryList
+      defs << "    void* logs1["<< entryLen << "]; \n";
+      defs << "    void* logs2["<< entryLen + 1 << "]; \n";
+      int localnum = 0;
+      int cur = 0;
+      for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
+        XStr bufName("buf");
+        bufName << cur;
+        defs << "    logs1[" << localnum << "] = " << bufName << "->bgLog1; \n";
+        defs << "    logs2[" << localnum << "] = " << bufName << "->bgLog2; \n";
+        localnum++;
+      }
+      defs << "    logs2[" << localnum << "] = " << "_bgParentLog; \n";
+      generateEventBracket(defs, SWHEN);
+      defs << "    _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
     }
-    defs << "    logs2[" << localnum << "] = " << "_bgParentLog; \n";
-    generateEventBracket(defs, SWHEN);
-    defs << "    _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
 #endif
 
     // remove all messages fetched from SDAG buffers
