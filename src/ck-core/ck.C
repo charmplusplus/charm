@@ -1022,7 +1022,7 @@ static inline void _processDeleteVidMsg(CkCoreState *ck,envelope *env)
  Return a pointer to the local BOC of "groupID".
  The message "env" passed in has some known dependency on this groupID
  (either it is to be delivered to this BOC, or it depends on this BOC being there).
- Therefore, if the return value is NULL, this function buffers the massage so that
+ Therefore, if the return value is NULL, this function buffers the message so that
  it will be re-sent (by CkCreateLocalBranch) when this groupID is eventually constructed.
  The message passed in must have its handlers correctly set so that it can be
  scheduled again.
