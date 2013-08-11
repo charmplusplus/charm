@@ -683,8 +683,6 @@ public:
   CkArray(CkMigrateMessage *m);
   CkGroupID &getGroupID(void) {return thisgroup;}
 
-  int bcastSerializer;
-
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
   inline const CkArrayIndex &getNumInitial(void) const {return numInitial;}
