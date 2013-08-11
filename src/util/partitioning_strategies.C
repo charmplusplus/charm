@@ -40,11 +40,11 @@ static void initial_start_end(int nChunks, int dim, int& start, int& end) {
   if (mod_val < 0) {
     mod_val += dim;
   }
-  end = pow(2, mod_val);
+  end = pow((double)2, (double)mod_val);
 }
 
 static int pack_index(vector<int> chunks, int dim) {
-  int p = pow(2, dim);
+  int p = pow((double)2, (double)dim);
   int chunk_size = chunks.size();
   int val = 0;
   for (int i = 0;i < chunk_size; i++) {
@@ -76,8 +76,8 @@ static vector<int> pack_coords(vector<int> coord_chunks, int dim) {
 }
 
 static void unpack_index(int i, int dim, vector<int>& chunks) {
-  int p = pow(2, dim);
-  int nChunks = max(1, int(ceil(double(log(i+1))/log(p))));
+  int p = pow((double)2, (double)dim);
+  int nChunks = max(1, int(ceil(double(log((double)i+1))/log((double)p))));
   //cout << "num chunks " << nChunks << endl;
   chunks.resize(nChunks); 
   for (int j = nChunks-1; j > -1; j--) {
@@ -120,7 +120,7 @@ static vector<int> int_to_Hilbert(int i, int dim) {
   unpack_index(i, dim, index_chunks);
   nChunks = index_chunks.size();
   //cout << "int to hilbert of " << i << " in dim " << dim << " size " << nChunks << endl;
-  mask = pow(2, dim) - 1;
+  mask = pow((double)2, (double)dim) - 1;
   //cout << "mask " << mask << endl;
   initial_start_end(nChunks, dim, start, end);
   //cout << "start " << start << " end " << end << endl;
@@ -203,7 +203,7 @@ void getHilbertList(int * procList)
 
 /** \brief A function to traverse the given processors, and get a planar list
  */
-void * getPlanarList(int *procList) 
+void getPlanarList(int *procList) 
 {
   int numDims;
   int *dims, *pdims;

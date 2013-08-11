@@ -7,6 +7,6 @@ extern void getHilbertList(int * procList);
 
 /** \brief A function to traverse the given processors, and get a planar list
  */
-extern void * getPlanarList(int *procList);
+extern void getPlanarList(int *procList);
 
 #endif

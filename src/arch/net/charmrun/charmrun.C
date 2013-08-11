@@ -123,8 +123,8 @@ const char *mylogin(void)
 {
 #if defined(_WIN32) && !defined(__CYGWIN__)
 	static char name[100]={'d','u','n','n','o',0};
-	int len=100;
-	GetUserName(name,&len);
+	unsigned int len=100;
+	GetUserName(name,(LPDWORD)&len);
 	return name;
 #else /*UNIX*/
   struct passwd *self;
