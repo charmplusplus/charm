@@ -15,9 +15,9 @@ namespace ck {
 #error "Object ID is broken"
 #endif
 
-#define ELEMENT_MASK    ((1UL << ELEMENT_BITS) - 1)
-#define COLLECTION_MASK (((1UL << COLLECTION_BITS) - 1) << ELEMENT_BITS)
-#define TYPE_TAG_MASK   (((1UL << TYPE_TAG_BITS) - 1) << (ELEMENT_BITS + COLLECTION_BITS))
+#define ELEMENT_MASK    ((1ULL << ELEMENT_BITS) - 1)
+#define COLLECTION_MASK (((1ULL << COLLECTION_BITS) - 1) << ELEMENT_BITS)
+#define TYPE_TAG_MASK   (((1ULL << TYPE_TAG_BITS) - 1) << (ELEMENT_BITS + COLLECTION_BITS))
 
 /**
  * The basic element identifier
