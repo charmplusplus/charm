@@ -2734,7 +2734,7 @@ void ParamList::checkParamList(){
 }
 
 Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e) :
-  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), genClosureTypeName(0), entryPtr(0)
+  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), genClosureTypeName(0), genClosureTypeNameProxy(0), genClosureTypeNameProxyTemp(0), entryPtr(0)
 {
   line=l; container=NULL;
   entryCount=-1;
