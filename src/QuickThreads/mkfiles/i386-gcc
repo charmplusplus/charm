@@ -8,16 +8,16 @@ qt: md/i386.h qt.c md/i386.s
 	rm -f qtmd.h
 	ln -s md/i386.h qtmd.h
 	$(CHARMC) -o qt.o qt.c
-	as -o qtmds.o md/i386.s
+	as --32 -o qtmds.o md/i386.s
 	CHARMINC=..; . ../conv-config.sh;	\
 	$(CHARMC) -shared -o libqt.$$CMK_SHARED_SUF qt.o qtmds.o
 	ar q libqt.a qt.o qtmds.o
 
 stp:
-	$(CC) -c stp.c
+	$(CHARMC) -c stp.c
 	ar q libstp.a stp.o
 
 testpgm:
-	$(CC) -c meas.c
-	as -o qtmdb.o md/i386_b.s
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CHARMC) -c meas.c
+	as --32  -o qtmdb.o md/i386_b.s
+	$(CHARMC) -o run meas.o qtmdb.o libstp.a libqt.a
