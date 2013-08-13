@@ -322,7 +322,6 @@ dirs+sources:
 	./gatherflat ../../src/langs/pvmc       .
 	./gatherflat ../../src/langs/bluegene   .
 	./gatherflat ../../src/langs/f90charm   .
-	./gatherflat ../../src/xlat-i           .
 	./gatherflat ../../src/xlatcpm          .
 	./gathertree ../../src/QuickThreads     QuickThreads
 	./gathertree ../../src/libs             libs
@@ -875,37 +874,17 @@ CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
 SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o CParsedFile.o
 SDAGHEADERS= CToken.h EToken.h CParsedFile.h sdag-globals.h CEntry.h
 
+SRCDIR = ../../src
+$(CHARMXIOBJ) $(SDAGOBJ): $(XIHEADERS) $(SDAGHEADERS)
+$(CHARMXIOBJ) $(SDAGOBJ): CXX=$(NATIVECHARMC)
+$(CHARMXIOBJ) $(SDAGOBJ): CXXFLAGS=-I$(SRCDIR)/xlat-i/ -I$(SRCDIR)/xlat-i/sdag/ -I.
+xi-scan.o: CXXFLAGS+=-DYY_NEVER_INTERACTIVE
+VPATH=$(SRCDIR)/xlat-i:$(SRCDIR)/xlat-i/sdag
+
 charmxi: ../bin/charmxi
 
 ../bin/charmxi: $(CHARMXIOBJ) $(SDAGOBJ)
-	$(NATIVECHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXIOBJ) $(SDAGOBJ)
-
-xi-main.o: xi-main.C $(XIHEADERS) $(SDAGHEADERS)
-	$(NATIVECHARMC) xi-main.C
-
-xi-symbol.o: xi-symbol.C $(XIHEADERS) $(SDAGHEADERS)
-	$(NATIVECHARMC) xi-symbol.C
-
-xi-util.o: xi-util.C $(XIHEADERS) $(SDAGHEADERS)
-	$(NATIVECHARMC) xi-util.C
-
-xi-grammar.tab.o: xi-grammar.tab.C $(XIHEADERS) $(SDAGHEADERS)
-	$(NATIVECHARMC) xi-grammar.tab.C
-
-xi-scan.o: xi-scan.C $(XIHEADERS) $(SDAGHEADERS)
-	$(NATIVECHARMC) -I. -DYY_NEVER_INTERACTIVE xi-scan.C
-
-sdag-globals.o: sdag-globals.C $(XIHEADERS) $(SDAGHEADERS)
-	$(NATIVECHARMC) -c sdag-globals.C
-
-CSdagConstruct.o: CSdagConstruct.C $(XIHEADERS) $(SDAGHEADERS)
-	$(NATIVECHARMC) -c CSdagConstruct.C
-
-CEntry.o: CEntry.C $(XIHEADERS) $(SDAGHEADERS)
-	$(NATIVECHARMC) -c CEntry.C
-
-CParsedFile.o: CParsedFile.C $(XIHEADERS) $(SDAGHEADERS)
-	$(NATIVECHARMC) -c $<
+	$(NATIVECHARMC) -language c++ -cp ../bin/ -o charmxi $^
 
 xi-clean:
 	rm $(CHARMXIOBJ) $(SDAGOBJ)
