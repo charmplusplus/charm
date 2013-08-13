@@ -265,6 +265,8 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  mpi-interoperate.h \
 	  $(CVHEADERS) $(CONVCOMHEADERS)
 
+BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
+
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
 	graph.h bitvecset.h ckset.h LBSimulation.h  \
@@ -834,7 +836,6 @@ $(L)/libbluegene.a: BlueGene.o
 	$(CHARMC) -o $@ $^
 
 # (Converse) Blue Gene emulator
-BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
 BLUE_OBJS = blue.o bigsim_node.o bigsim_proc.o bigsim_init.o bigsim_timing.o bigsim_record.o bigsim_ooc.o shared_alloc.o
 BIGSIM_IO_OBJS = bigsim_read.o bigsim_logs.o bigsim_api.o
 
