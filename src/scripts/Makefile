@@ -295,7 +295,7 @@ commitid.o: CC=$(CHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
-	-for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
+	-for hdr in $(filter-out dirs+sources Makefile,$(sort $^)) ; do test ! -f "../include/`basename $$hdr`" && ./system_ln "../tmp/$$hdr" ../include ; done
 	touch headerlinks
 
 dirs+sources:
