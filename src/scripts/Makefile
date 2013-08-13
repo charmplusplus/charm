@@ -828,9 +828,8 @@ bigemulator: bigsim
 
 bigsim-target: charm++ $(L)/libconv-bigsim.a $(L)/libconv-bigsim-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a METIS
 
-$(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
-	$(CHARMC) -c BlueGene.C
-	$(CHARMC) -o $@ BlueGene.o
+$(L)/libbluegene.a: BlueGene.o
+	$(CHARMC) -o $@ $^
 
 # (Converse) Blue Gene emulator
 BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
@@ -840,16 +839,16 @@ BIGSIM_IO_OBJS = bigsim_read.o bigsim_logs.o bigsim_api.o
 LIBBLUE_OBJS = $(BLUE_OBJS) $(BIGSIM_IO_OBJS) blue_stub.o blue_standalone.o
 
 $(L)/libconv-bigsim.a: $(BLUE_OBJS)
-	$(CHARMC) -o $@  $(BLUE_OBJS)
+	$(CHARMC) -o $@ $^
 
 $(L)/libconv-bigsim-logs.a: $(BIGSIM_IO_OBJS)
-	$(CHARMC) -o $@  $(BIGSIM_IO_OBJS)
+	$(CHARMC) -o $@ $^
 
 $(L)/libconv-bluegene-stub.a:  blue_stub.o
-	$(CHARMC) -o $@  blue_stub.o
+	$(CHARMC) -o $@ $^
 
 $(L)/libblue-standalone.a: blue_standalone.o
-	$(CHARMC) -o $@  blue_standalone.o
+	$(CHARMC) -o $@ $^
 
 ###############################################################################
 #
@@ -939,7 +938,7 @@ $(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C futil.f90
 ##############################################################################
 # adding this entry for files which do not belong to any of other locations
 
-OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o 
+OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o BlueGene.o
 
 ##############################################################################
 
