@@ -186,6 +186,9 @@ include Make.lb
 # Build changes for external libraries
 include Make.extlib
 
+SRCDIR = ../../src
+VPATH=$(SRCDIR)/xlat-i:$(SRCDIR)/xlat-i/sdag:$(SRCDIR)/langs/bluegene
+
 ###############################################################################
 #
 # The basics (bin, lib, include, headers, charmc, conv-mach.sh)
@@ -320,7 +323,6 @@ dirs+sources:
 	./gatherflat ../../src/conv-com         .
 	./gatherflat ../../src/langs/simplemsg  .
 	./gatherflat ../../src/langs/pvmc       .
-	./gatherflat ../../src/langs/bluegene   .
 	./gatherflat ../../src/langs/f90charm   .
 	./gatherflat ../../src/xlatcpm          .
 	./gathertree ../../src/QuickThreads     QuickThreads
@@ -873,12 +875,10 @@ CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
 SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o CParsedFile.o
 SDAGHEADERS= CToken.h EToken.h CParsedFile.h sdag-globals.h CEntry.h
 
-SRCDIR = ../../src
 $(CHARMXIOBJ) $(SDAGOBJ): $(XIHEADERS) $(SDAGHEADERS)
 $(CHARMXIOBJ) $(SDAGOBJ): CXX=$(NATIVECHARMC)
 $(CHARMXIOBJ) $(SDAGOBJ): CXXFLAGS=-I$(SRCDIR)/xlat-i/ -I$(SRCDIR)/xlat-i/sdag/ -I.
 xi-scan.o: CXXFLAGS+=-DYY_NEVER_INTERACTIVE
-VPATH=$(SRCDIR)/xlat-i:$(SRCDIR)/xlat-i/sdag
 
 charmxi: ../bin/charmxi
 
