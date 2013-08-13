@@ -1049,7 +1049,7 @@ depends: cidepends commitid.c
 	      SRCFILE=`basename $$i .o`.C ; \
 	      [ ! -f $$SRCFILE ] && SRCFILE=`basename $$i .o`.c ;	\
               echo "checking dependencies for $$SRCFILE" ; \
-              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
+              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. $$<' >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
         done;  \
         rm -f metis.h  scotch.h
@@ -1078,7 +1078,7 @@ dependsCaseSensitive: cidepends
 	      found=`/usr/bin/find $$SRCDIR -depth 1 -name $$SRCFILE`; \
               [ ! $$found ] && SRCFILE=`basename $$i .o`.c ; \
               echo "checking dependencies for $$SRCFILE" ; \
-              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
+              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. $$<' >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
         done;  \
         rm -f metis.h  scotch.h
