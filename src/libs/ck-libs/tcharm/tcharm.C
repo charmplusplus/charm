@@ -254,7 +254,7 @@ void TCharm::pup(PUP::er &p) {
 
   DBG("Packing thread");
 #if CMK_ERROR_CHECKING
-  if (!isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
+  if (!p.isSizing() && !isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
     if(_BgOutOfCoreFlag==0) //not doing out-of-core scheduling
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
@@ -278,8 +278,10 @@ void TCharm::pup(PUP::er &p) {
   
 //Pack all user data
   // Set up TCHARM context for use during user's pup routines:
-  CtvAccess(_curTCharm)=this;
-  activateThread();
+  if(isStopped) {
+    CtvAccess(_curTCharm)=this;
+    activateThread();
+  }
 
   s.seek(0);
   checkPupMismatch(p,5135,"before TCHARM user data");
@@ -290,16 +292,20 @@ void TCharm::pup(PUP::er &p) {
   }
   checkPupMismatch(p,5137,"after TCHARM_Register user data");
 
-  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-    deactivateThread();
+  if(isStopped) {
+    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+      deactivateThread();
+  }
   p|sud;           //  sud vector block can not be in isomalloc
   checkPupMismatch(p,5138,"after TCHARM_Global user data");
   
   // Tear down TCHARM context after calling user pup routines
-  if (!CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-    deactivateThread();
-  CtvAccess(_curTCharm)=NULL;
-  
+  if(isStopped) {
+    if (!CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+      deactivateThread();
+    CtvAccess(_curTCharm)=NULL;
+  }
+
   if (!p.isUnpacking())
   {//In this case, pack the thread & heap after the user data
     s.seek(1);

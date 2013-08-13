@@ -562,7 +562,7 @@ CthThread CthSelf()
 void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 {
 #if CMK_ERROR_CHECKING
-  if ((CthThread)t==CthCpvAccess(CthCurrent))
+  if (!pup_isSizing(p) && (CthThread)t==CthCpvAccess(CthCurrent))
     CmiAbort("CthPupBase: Cannot pack running thread!");
 #endif
   /*
