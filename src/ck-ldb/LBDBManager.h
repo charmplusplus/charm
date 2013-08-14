@@ -18,7 +18,7 @@
 class LocalBarrier {
 friend class LBDB;
 public:
-  LocalBarrier() { cur_refcount = 1; client_count = 0; max_client = 0;
+  LocalBarrier() { cur_refcount = 1; client_count = 0;
                    max_receiver= 0; at_count = 0; on = false; 
 	#if CMK_BIGSIM_CHARM
 	first_free_client_slot = 0;
@@ -56,7 +56,6 @@ private:
   CkVec<receiver*> receivers;
 
   int cur_refcount;
-  int max_client;
   int client_count;
   int max_receiver;
   int at_count;

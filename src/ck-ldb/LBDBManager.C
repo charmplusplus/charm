@@ -534,10 +534,8 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
   }
 
 #else  
-  //ret_val.serial = max_client;
   ret_val.serial = clients.size();
   clients.insertAtEnd(new_client);
-  //max_client++;
   client_count++;
 #endif
 
@@ -561,7 +559,6 @@ void LocalBarrier::RemoveClient(LDBarrierClient c)
     }
   }
 #else
-  //if (cnum < max_client && clients[cnum] != 0) {
   if (cnum < clients.size() && clients[cnum] != 0) {
     delete (clients[cnum]);
     clients[cnum] = 0;
@@ -578,10 +575,8 @@ LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
   new_receiver->on = 1;
 
   LDBarrierReceiver ret_val;
-//  ret_val.serial = max_receiver;
   ret_val.serial = receivers.size();
   receivers.insertAtEnd(new_receiver);
-//  max_receiver++;
 
   return ret_val;
 }
@@ -589,7 +584,6 @@ LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
 void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
 {
   const int cnum = c.serial;
-  //if (cnum < max_receiver && receivers[cnum] != 0) {
   if (cnum < receivers.size() && receivers[cnum] != 0) {
     delete (receivers[cnum]);
     receivers[cnum] = 0;
@@ -599,7 +593,6 @@ void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
 void LocalBarrier::TurnOnReceiver(LDBarrierReceiver c)
 {
   const int cnum = c.serial;
-  //if (cnum < max_receiver && receivers[cnum] != 0) {
   if (cnum < receivers.size() && receivers[cnum] != 0) {
     receivers[cnum]->on = 1;
   }
@@ -608,7 +601,6 @@ void LocalBarrier::TurnOnReceiver(LDBarrierReceiver c)
 void LocalBarrier::TurnOffReceiver(LDBarrierReceiver c)
 {
   const int cnum = c.serial;
-  //if (cnum < max_receiver && receivers[cnum] != 0) {
   if (cnum < receivers.size() && receivers[cnum] != 0) {
     receivers[cnum]->on = 0;
   }
@@ -634,7 +626,6 @@ void LocalBarrier::CheckBarrier()
   if (at_count >= client_count) {
     bool at_barrier = false;
 
-//    for(int i=0; i < max_client; i++)
     for(int i=0; i < clients.size(); i++)
       if (clients[i] != 0 && ((client*)clients[i])->refcount >= cur_refcount)
 	at_barrier = true;
@@ -651,8 +642,6 @@ void LocalBarrier::CallReceivers(void)
 {
   bool called_receiver=false;
 
-//  for(int i=0; i < max_receiver; i++)
-//   for (int i=max_receiver-1; i>=0; i--) {
    for (int i=receivers.size()-1; i>=0; i--) {
       receiver *recv = receivers[i];
       if (recv != 0 && recv->on) {
@@ -668,7 +657,6 @@ void LocalBarrier::CallReceivers(void)
 
 void LocalBarrier::ResumeClients(void)
 {
-//  for(int i=0; i < max_client; i++)
   for(int i=0; i < clients.size(); i++)
     if (clients[i] != 0) {
       ((client*)clients[i])->fn(((client*)clients[i])->data);
