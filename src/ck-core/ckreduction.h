@@ -485,7 +485,9 @@ public:
         CProxy_CkReductionMgr thisProxy;
 
 public:
+#if !GROUP_LEVEL_REDUCTION
 	CProxy_CkArrayReductionMgr nodeProxy; //holds the local branch of the nodegroup tree
+#endif
 	CkReductionMgr(void);
 	CkReductionMgr(CkMigrateMessage *m);
 

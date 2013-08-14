@@ -93,8 +93,8 @@ Group::Group()
 	contributorStamped(&reductionInfo);
 	contributorCreated(&reductionInfo);
 	doneCreatingContributors();
-	DEBR(("[%d,%d]Creating nodeProxy with gid %d\n",CkMyNode(),CkMyPe(),CkpvAccess(_currentGroupRednMgr)));
 #if !GROUP_LEVEL_REDUCTION
+	DEBR(("[%d,%d]Creating nodeProxy with gid %d\n",CkMyNode(),CkMyPe(),CkpvAccess(_currentGroupRednMgr)));
 	CProxy_CkArrayReductionMgr nodetemp(CkpvAccess(_currentGroupRednMgr));
 	nodeProxy = nodetemp;
 #endif
@@ -258,7 +258,7 @@ void CkReductionMgr::flushStates()
 //Add the given client function.  Overwrites any previous client.
 void CkReductionMgr::ckSetReductionClient(CkCallback *cb)
 {
-  DEBR((AA"Setting reductionClient in ReductionMgr groupid %d in nodeProxy %p\n"AB,thisgroup.idx,&nodeProxy));
+  DEBR((AA"Setting reductionClient in ReductionMgr groupid %d\n"AB,thisgroup.idx));
 
   if (CkMyPe()!=0)
 	  CkError("WARNING: ckSetReductionClient should only be called from processor zero!\n");  
@@ -931,7 +931,9 @@ void CkReductionMgr::pup(PUP::er &p)
   p|futureRemoteMsgs;
   p|finalMsgs;
   p|adjVec;
+#if !GROUP_LEVEL_REDUCTION
   p|nodeProxy;
+#endif
   p|storedCallback;
     // handle CkReductionClientBundle
   if (storedCallback.type == CkCallback::callCFn && storedCallback.d.cfn.fn == CkReductionClientBundle::callbackCfn) 
