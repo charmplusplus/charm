@@ -507,10 +507,18 @@ inline void CkArray::springCleaning(void)
 {
   DEBK((AA"Starting spring cleaning\n"AB));
   broadcaster->springCleaning();
+  setupSpringCleaning();
 }
 
 void CkArray::staticSpringCleaning(void *forArray,double curWallTime) {
 	((CkArray *)forArray)->springCleaning();
+}
+
+void CkArray::setupSpringCleaning() {
+ // set up broadcast cleaner
+ if (!stableLocations)
+      springCleaningCcd = CcdCallOnCondition(CcdPERIODIC_1minute,
+                                             staticSpringCleaning, (void *)this);
 }
 
 /********************* Little CkArray Utilities ******************/
@@ -756,10 +764,8 @@ CkArray::CkArray(CkArrayOptions &opts,
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
     numInitial(opts.getNumInitial()), isInserting(true)
 {
-  if (!stableLocations)
-      springCleaningCcd = CcdCallOnConditionKeep(CcdPERIODIC_1minute,
-                                                 staticSpringCleaning, (void *)this);
-  
+  setupSpringCleaning();
+
   //set the field in one my parent class (CkReductionMgr)
   if(opts.disableNotifyChildInRed)
 	  disableNotifyChildrenStart = true; 
@@ -831,7 +837,7 @@ CkArray::CkArray(CkMigrateMessage *m)
 CkArray::~CkArray()
 {
   if (!stableLocations)
-    CcdCancelCallOnConditionKeep(CcdPERIODIC_1minute, springCleaningCcd);
+    CcdCancelCallOnCondition(CcdPERIODIC_1minute, springCleaningCcd);
 }
 
 #if CMK_ERROR_CHECKING
@@ -860,11 +866,7 @@ void CkArray::pup(PUP::er &p){
 		/// Restore our default listeners:
 		broadcaster=(CkArrayBroadcaster *)(CkArrayListener *)(listeners[0]);
 		reducer=(CkArrayReducer *)(CkArrayListener *)(listeners[1]);
-                /// set up broadcast cleaner
-                if (!stableLocations)
-                    springCleaningCcd =
-                      CcdCallOnConditionKeep(CcdPERIODIC_1minute,
-                                             staticSpringCleaning, (void *)this);
+                setupSpringCleaning();
 	}
 }
 

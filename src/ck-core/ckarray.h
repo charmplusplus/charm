@@ -755,6 +755,7 @@ private:
 //Spring cleaning
   void springCleaning(void);
   static void staticSpringCleaning(void *forWhom,double curWallTime);
+  void setupSpringCleaning();
   int springCleaningCcd;
 
 //ArrayListeners:

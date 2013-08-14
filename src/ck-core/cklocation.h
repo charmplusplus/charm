@@ -499,6 +499,7 @@ public:
 	//Occasionally clear out stale remote pointers
 	static void staticSpringCleaning(void *mgr,double curWallTime);
 	void springCleaning(void);
+	void setupSpringCleaning();
 	int nSprings;
 	int springCleaningCcd;
 

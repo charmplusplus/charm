@@ -2003,6 +2003,8 @@ inline void CkLocMgr::springCleaning(void)
   }
   CmiImmediateUnlock(hashImmLock);
   delete it;
+
+  setupSpringCleaning();
 }
 void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
 	DEBK((AA"Starting spring cleaning at %.2f\n"AB,CkWallTimer()));
@@ -2093,9 +2095,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	firstFree=localLen=0;
 	duringMigration=false;
 	nSprings=0;
-#if !CMK_GLOBAL_LOCATION_UPDATE
-	springCleaningCcd = CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
-#endif
+        setupSpringCleaning();
 
 //Register with the map object
 	mapID = opts.getMap();
@@ -2124,10 +2124,14 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	firstFree=localLen=0;
 	duringMigration=false;
 	nSprings=0;
-#if !CMK_GLOBAL_LOCATION_UPDATE
-	springCleaningCcd = CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
-#endif
+        setupSpringCleaning();
 	hashImmLock = CmiCreateImmediateLock();
+}
+
+void CkLocMgr::setupSpringCleaning() {
+#if !CMK_GLOBAL_LOCATION_UPDATE
+	springCleaningCcd = CcdCallOnConditionOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+#endif
 }
 
 CkLocMgr::~CkLocMgr() {
@@ -2136,7 +2140,7 @@ CkLocMgr::~CkLocMgr() {
   the_lbdb->RemoveLocalBarrierReceiver(lbBarrierReceiver);
   the_lbdb->UnregisterOM(myLBHandle);
 #endif
-  CcdCancelCallOnConditionKeep(CcdPERIODIC_1minute, springCleaningCcd);
+  CcdCancelCallOnCondition(CcdPERIODIC_1minute, springCleaningCcd);
   map->unregisterArray(mapHandle);
   CmiDestroyLock(hashImmLock);
 }
