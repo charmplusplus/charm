@@ -15,6 +15,9 @@
 #include "LBComm.h"
 #include "LBMachineUtil.h"
 
+class client;
+class receiver;
+
 class LocalBarrier {
 friend class LBDB;
 public:
@@ -40,17 +43,6 @@ private:
   void CallReceivers(void);
   void CheckBarrier();
   void ResumeClients(void);
-
-  struct client {
-    void* data;
-    LDResumeFn fn;
-    int refcount;
-  };
-  struct receiver {
-    void* data;
-    LDBarrierFn fn;
-    int on;
-  };
 
   CkVec<client*> clients;
   CkVec<receiver*> receivers;

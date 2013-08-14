@@ -497,6 +497,19 @@ int LBDB::useMem() {
   return size;
 }
 
+class client {
+  friend class LocalBarrier;
+  void* data;
+  LDResumeFn fn;
+  int refcount;
+};
+class receiver {
+  friend class LocalBarrier;
+  void* data;
+  LDBarrierFn fn;
+  int on;
+};
+
 LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 {
   client* new_client = new client;
