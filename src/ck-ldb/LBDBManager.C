@@ -534,26 +534,21 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 void LocalBarrier::RemoveClient(LDBarrierClient c)
 {
   const int cnum = c.serial;
-#if CMK_BIGSIM_CHARM
   if (cnum < clients.size() && clients[cnum] != 0) {
     delete (clients[cnum]);
     clients[cnum] = 0;
 
+#if CMK_BIGSIM_CHARM
     if(cnum<=first_free_client_slot) first_free_client_slot = cnum;
 
-    if(_BgOutOfCoreFlag!=1){
-	//during out-of-core emulation for BigSim, if taking procs from mem to disk,
-	//client_count should not be increased
+    //during out-of-core emulation for BigSim, if taking procs from mem to disk,
+    //client_count should not be increased
+    if(_BgOutOfCoreFlag!=1)
+#endif
+    {
 	client_count--;
     }
   }
-#else
-  if (cnum < clients.size() && clients[cnum] != 0) {
-    delete (clients[cnum]);
-    clients[cnum] = 0;
-    client_count--;
-  }
-#endif
 }
 
 LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
