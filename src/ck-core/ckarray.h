@@ -779,6 +779,7 @@ public:
 	static void staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index);
 #endif
 
+        static int isIrreducible() { return 1; }
 };
 
 
