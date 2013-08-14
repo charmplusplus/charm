@@ -233,6 +233,15 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
 
 }
 
+CkReductionMgr::~CkReductionMgr()
+{
+#if !GROUP_LEVEL_REDUCTION
+  if (CkMyRank() == 0) {
+    delete nodeProxy.ckLocalBranch();
+  }
+#endif
+}
+
 void CkReductionMgr::flushStates()
 {
   // CmiPrintf("[%d] CkReductionMgr::flushState\n", CkMyPe());

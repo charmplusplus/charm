@@ -487,6 +487,7 @@ public:
 public:
 	CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr);
 	CkReductionMgr(CkMigrateMessage *m);
+        ~CkReductionMgr();
 
 	typedef CkReductionClientFn clientFn;
 
