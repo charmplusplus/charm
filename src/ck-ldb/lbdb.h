@@ -10,6 +10,8 @@
 #include "charm.h"
 #include "middle.h"
 
+#include <list>
+
 class LBDatabase;//Forward declaration
 
 //typedef float floatType;
@@ -333,13 +335,21 @@ void LDMigrated(LDObjHandle h, int waitBarrier);
 typedef void (*LDBarrierFn)(void *user_ptr);
 typedef void (*LDResumeFn)(void *user_ptr);
 
-typedef struct {
-  int serial;
-} LDBarrierClient;
+class client;
+struct LDBarrierClient {
+  std::list<client *>::iterator i;
+  LDBarrierClient() { }
+  LDBarrierClient(std::list<client *>::iterator in)
+  : i(in) { }
+};
 
-typedef struct {
-  int serial;
-} LDBarrierReceiver;
+class receiver;
+struct LDBarrierReceiver {
+  std::list<receiver *>::iterator i;
+  LDBarrierReceiver() { }
+  LDBarrierReceiver(std::list<receiver *>::iterator in)
+  : i(in) { }
+};
 
 LDBarrierClient LDAddLocalBarrierClient(LDHandle _lbdb,LDResumeFn fn,
 					void* data);

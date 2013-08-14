@@ -517,51 +517,34 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
   new_client->data = data;
   new_client->refcount = cur_refcount;
 
-  LDBarrierClient ret_val;
 #if CMK_BIGSIM_CHARM
-  ret_val.serial = first_free_client_slot;
-  clients.insert(ret_val.serial, new_client);
-
-  //looking for the next first free client slot
-  int nextfree=-1;
-  for(int i=first_free_client_slot+1; i<clients.size(); i++)
-    if(clients[i]==NULL) { nextfree = i; break; }
-  if(nextfree==-1) nextfree = clients.size();
-  first_free_client_slot = nextfree;
-
   if(_BgOutOfCoreFlag!=2){
     //during out-of-core emualtion for BigSim, if taking procs from disk to mem,
     //client_count should not be increased
     client_count++;
   }
-
 #else  
-  ret_val.serial = clients.size();
-  clients.insertAtEnd(new_client);
   client_count++;
 #endif
 
-  return ret_val;
+  return LDBarrierClient(clients.insert(clients.end(), new_client));
 }
 
 void LocalBarrier::RemoveClient(LDBarrierClient c)
 {
-  const int cnum = c.serial;
-  if (cnum < clients.size() && clients[cnum] != 0) {
-    delete (clients[cnum]);
-    clients[cnum] = 0;
+  delete *(c.i);
+  clients.erase(c.i);
 
 #if CMK_BIGSIM_CHARM
-    if(cnum<=first_free_client_slot) first_free_client_slot = cnum;
-
-    //during out-of-core emulation for BigSim, if taking procs from mem to disk,
-    //client_count should not be increased
-    if(_BgOutOfCoreFlag!=1)
-#endif
-    {
-	client_count--;
-    }
+  //during out-of-core emulation for BigSim, if taking procs from mem to disk,
+  //client_count should not be increased
+  if(_BgOutOfCoreFlag!=1)
+  {
+    client_count--;
   }
+#else
+  client_count--;
+#endif
 }
 
 LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
@@ -571,41 +554,28 @@ LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
   new_receiver->data = data;
   new_receiver->on = 1;
 
-  LDBarrierReceiver ret_val;
-  ret_val.serial = receivers.size();
-  receivers.insertAtEnd(new_receiver);
-
-  return ret_val;
+  return LDBarrierReceiver(receivers.insert(receivers.end(), new_receiver));
 }
 
 void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
 {
-  const int cnum = c.serial;
-  if (cnum < receivers.size() && receivers[cnum] != 0) {
-    delete (receivers[cnum]);
-    receivers[cnum] = 0;
-  }
+  delete *(c.i);
+  receivers.erase(c.i);
 }
 
 void LocalBarrier::TurnOnReceiver(LDBarrierReceiver c)
 {
-  const int cnum = c.serial;
-  if (cnum < receivers.size() && receivers[cnum] != 0) {
-    receivers[cnum]->on = 1;
-  }
+  (*c.i)->on = 1;
 }
 
 void LocalBarrier::TurnOffReceiver(LDBarrierReceiver c)
 {
-  const int cnum = c.serial;
-  if (cnum < receivers.size() && receivers[cnum] != 0) {
-    receivers[cnum]->on = 0;
-  }
+  (*c.i)->on = 0;
 }
 
 void LocalBarrier::AtBarrier(LDBarrierClient h)
 {
-  (clients[h.serial])->refcount++;
+  (*h.i)->refcount++;
   at_count++;
   CheckBarrier();
 }
@@ -623,8 +593,8 @@ void LocalBarrier::CheckBarrier()
   if (at_count >= client_count) {
     bool at_barrier = false;
 
-    for(int i=0; i < clients.size(); i++)
-      if (clients[i] != 0 && ((client*)clients[i])->refcount >= cur_refcount)
+    for(std::list<client*>::iterator i = clients.begin(); i != clients.end(); ++i)
+      if ((*i)->refcount >= cur_refcount)
 	at_barrier = true;
 		
     if (at_barrier) {
@@ -639,25 +609,23 @@ void LocalBarrier::CallReceivers(void)
 {
   bool called_receiver=false;
 
-   for (int i=receivers.size()-1; i>=0; i--) {
-      receiver *recv = receivers[i];
-      if (recv != 0 && recv->on) {
-        recv->fn(recv->data);
-        called_receiver = true;
-      }
+  for (std::list<receiver *>::iterator i = receivers.begin();
+       i != receivers.end(); ++i) {
+    receiver *recv = *i;
+    if (recv->on) {
+      recv->fn(recv->data);
+      called_receiver = true;
+    }
   }
 
   if (!called_receiver)
     ResumeClients();
-  
 }
 
 void LocalBarrier::ResumeClients(void)
 {
-  for(int i=0; i < clients.size(); i++)
-    if (clients[i] != 0) {
-      ((client*)clients[i])->fn(((client*)clients[i])->data);
-    }	
+  for (std::list<client *>::iterator i = clients.begin(); i != clients.end(); ++i)
+    (*i)->fn((*i)->data);
 }
 
 #endif

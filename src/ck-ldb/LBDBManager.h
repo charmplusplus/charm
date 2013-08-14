@@ -44,8 +44,8 @@ private:
   void CheckBarrier();
   void ResumeClients(void);
 
-  CkVec<client*> clients;
-  CkVec<receiver*> receivers;
+  std::list<client*> clients;
+  std::list<receiver*> receivers;
 
   int cur_refcount;
   int client_count;
