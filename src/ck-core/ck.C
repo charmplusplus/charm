@@ -192,9 +192,16 @@ IrrGroup::IrrGroup(void) {
 
 IrrGroup::~IrrGroup() {
   // remove the object pointer
-  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
-  CkpvAccess(_groupTable)->find(thisgroup).setObj(NULL);
-  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+  if (CkpvAccess(_destroyingNodeGroup)) {
+    CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
+    CksvAccess(_nodeGroupTable)->find(thisgroup).setObj(NULL);
+    CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+    CkpvAccess(_destroyingNodeGroup) = false;
+  } else {
+    CmiImmediateLock(CkpvAccess(_groupTableImmLock));
+    CkpvAccess(_groupTable)->find(thisgroup).setObj(NULL);
+    CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+  }
 }
 
 void IrrGroup::pup(PUP::er &p)

@@ -144,6 +144,8 @@ CkpvExtern(GroupIDTable*, _groupIDTable);
 CkpvExtern(CmiImmediateLockType, _groupTableImmLock);
 CkpvExtern(unsigned int, _numGroups);
 
+CkpvExtern(bool, _destroyingNodeGroup);
+
 CkpvExtern(char **,Ck_argv);
 
 static inline IrrGroup *_localBranch(CkGroupID gID)

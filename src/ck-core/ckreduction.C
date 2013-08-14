@@ -1643,6 +1643,7 @@ NodeGroup::NodeGroup(void) {
 }
 NodeGroup::~NodeGroup() {
   CmiDestroyLock(__nodelock);
+  CkpvAccess(_destroyingNodeGroup) = true;
 }
 void NodeGroup::pup(PUP::er &p)
 {

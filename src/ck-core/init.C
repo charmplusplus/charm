@@ -135,6 +135,9 @@ CksvDeclare(CmiNodeLock, _nodeLock);
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
 
+CkpvDeclare(bool, _destroyingNodeGroup);
+
+
 CkpvDeclare(Stats*, _myStats);
 CkpvDeclare(MsgPool*, _msgPool);
 
@@ -962,6 +965,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(GroupTable*, _groupTable);
 	CkpvInitialize(GroupIDTable*, _groupIDTable);
 	CkpvInitialize(CmiImmediateLockType, _groupTableImmLock);
+        CkpvInitialize(bool, _destroyingNodeGroup);
+        CkpvAccess(_destroyingNodeGroup) = false;
 	CkpvInitialize(UInt, _numGroups);
 	CkpvInitialize(int, _numInitsRecd);
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
