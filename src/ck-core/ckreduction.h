@@ -485,10 +485,7 @@ public:
         CProxy_CkReductionMgr thisProxy;
 
 public:
-#if !GROUP_LEVEL_REDUCTION
-	CProxy_CkArrayReductionMgr nodeProxy; //holds the local branch of the nodegroup tree
-#endif
-	CkReductionMgr(void);
+	CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr);
 	CkReductionMgr(CkMigrateMessage *m);
 
 	typedef CkReductionClientFn clientFn;
@@ -576,6 +573,10 @@ private:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	int numImmigrantRecObjs;
 	int numEmigrantRecObjs;
+#endif
+
+#if !GROUP_LEVEL_REDUCTION
+	CProxy_CkArrayReductionMgr nodeProxy; //holds the local branch of the nodegroup tree
 #endif
 
 //Data members

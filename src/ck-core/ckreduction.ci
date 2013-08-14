@@ -15,7 +15,7 @@ module CkReduction {
   message CkReductionNumberMsg;
   
   group [migratable] CkReductionMgr : CkGroupInitCallback {
-  	entry CkReductionMgr(void);
+	entry CkReductionMgr(CProxy_CkArrayReductionMgr);
 
 	entry [expedited] void RecvMsg(CkReductionMsg *);
 	//Sent down the reduction tree (used by barren PEs)

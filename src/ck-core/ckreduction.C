@@ -86,6 +86,7 @@ waits for the migrant contributions to straggle in.
 extern int _inrestart;
 
 Group::Group()
+  : CkReductionMgr(CkpvAccess(_currentGroupRednMgr))
 {
 	if (_inrestart) CmiAbort("A Group object did not call the migratable constructor of its base class!");
 
@@ -95,8 +96,6 @@ Group::Group()
 	doneCreatingContributors();
 #if !GROUP_LEVEL_REDUCTION
 	DEBR(("[%d,%d]Creating nodeProxy with gid %d\n",CkMyNode(),CkMyPe(),CkpvAccess(_currentGroupRednMgr)));
-	CProxy_CkArrayReductionMgr nodetemp(CkpvAccess(_currentGroupRednMgr));
-	nodeProxy = nodetemp;
 #endif
 }
 
@@ -178,8 +177,12 @@ the reduced message up the reduction tree to node zero, where
 they're passed to the user's client function.
 */
 
-CkReductionMgr::CkReductionMgr()//Constructor
-  : thisProxy(thisgroup)
+CkReductionMgr::CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr)
+  :
+#if !GROUP_LEVEL_REDUCTION
+  nodeProxy(groupRednMgr),
+#endif
+  thisProxy(thisgroup)
 { 
 #ifdef BINOMIAL_TREE
   init_BinomialTree();

@@ -747,7 +747,7 @@ void _ckArrayInit(void)
 CkArray::CkArray(CkArrayOptions &opts,
 		 CkMarshalledMessage &initMsg,
 		 CkNodeGroupID nodereductionID)
-  : CkReductionMgr(),
+  : CkReductionMgr(nodereductionID),
     locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
     locMgrID(opts.getLocationManager()),
     thisProxy(thisgroup),
@@ -782,14 +782,6 @@ CkArray::CkArray(CkArrayOptions &opts,
 
   ///Set up initial elements (if any)
   locMgr->populateInitial(numInitial,initMsg.getMessage(),this);
-
-  ///adding code for Reduction using nodegroups
-
-#if !GROUP_LEVEL_REDUCTION
-  CProxy_CkArrayReductionMgr  nodetemp(nodereductionID);  
-  nodeProxy = nodetemp;
-  //nodeProxy = new CProxy_CkArrayReductionMgr (nodereductionID);
-#endif
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// creating the spanning tree to be used for broadcast
