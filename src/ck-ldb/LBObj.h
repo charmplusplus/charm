@@ -38,29 +38,6 @@ public:
 
   ~LBObj() { };
 
-#if 0
-  LBObj(LBDB *_parentDB, LDOMHandle _omhandle, LDObjid _id,
-	void *_userData = 0, bool _migratable=true) {
-    parentDB = _parentDB;
-//    parentOM = _omhandle;
-//    myhandle.id = _id;
-//    userData = _userData;
-    migratable = _migratable;
-    registered = false;
-  };
-
-  void DepositHandle(const LDObjHandle &_h) {
-//    CkAssert(_h.id == myhandle.id);
-//    myhandle = _h;
-    data.handle = _h;
-//    data.omHandle = _h.omhandle;
-    data.migratable = migratable;
-    data.cpuTime = 0.;
-    data.wallTime = 0.;
-    registered = true;
-  };
-#endif
-
   void Clear(void);
 
   void IncrementTime(LBRealType walltime, LBRealType cputime);

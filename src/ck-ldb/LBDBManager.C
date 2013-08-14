@@ -101,7 +101,6 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
 //  newhandle.user_ptr = _userData;
   newhandle.id = _id;
   
-#if 1
 #if CMK_BIGSIM_CHARM
   if(_BgOutOfCoreFlag==2){ //taking object into memory
     //first find the first (LBOBJ_OOC_IDX) in objs and insert the object at that position
@@ -132,16 +131,6 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
   //BIGSIM_OOC DEBUGGING
   //CkPrintf("LBDBManager.C: New handle: %d, LBObj=%p\n", newhandle.handle, objs[newhandle.handle]);
 
-#else
-  LBObj *obj = new LBObj(this,_omh,_id,_userData,_migratable);
-  if (obj != NULL) {
-    newhandle.handle = objs.length();
-    objs.insertAtEnd(obj);
-  } else {
-    newhandle.handle = -1;
-  }
-  obj->DepositHandle(newhandle);
-#endif
   return newhandle;
 }
 
