@@ -687,16 +687,18 @@ void LrtsExit()
   }
 
   CmiNodeBarrier();
+  if(!CharmLibInterOperate) {
 #if CMK_SMP
-  if (rank0) {
-    Delay(100000);
-    exit(0);
-  }
-  else
-    pthread_exit(0);
+    if (rank0) {
+      Delay(100000);
+      exit(0);
+    }
+    else
+      pthread_exit(0);
 #else
-  exit(0);
+    exit(0);
 #endif
+  }
 }
 
 void LrtsAbort(const char *message) {

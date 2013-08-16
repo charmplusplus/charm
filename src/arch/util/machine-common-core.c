@@ -1157,22 +1157,14 @@ static void ConverseRunPE(int everReturn) {
        node barrier previously should take care of the node synchronization */
     _immediateReady = 1;
 
-    if(CharmLibInterOperate) {
-	/* !!! Not considering SMP mode now */
-	/* TODO: make interoperability working in SMP!!! */
-	Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-	CsdScheduler(-1);
-    } else {
-      /* communication thread */
-      if (CmiMyRank() == CmiMyNodeSize()) {
+    /* communication thread */
+    if (CmiMyRank() == CmiMyNodeSize()) {
+      Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+      while (1) CommunicationServerThread(5);
+    } else { /* worker thread */
+      if (!everReturn) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-        while (1) CommunicationServerThread(5);
-      } else { /* worker thread */
-        if (!everReturn) {
-          Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-          if (Cmi_usrsched==0) CsdScheduler(-1);
-          ConverseExit();
-        }
+        if (Cmi_usrsched==0) CsdScheduler(-1);
       }
     }
 }
@@ -1284,7 +1276,10 @@ if (MSG_STATISTIC)
     CmiLock(commThdExitLock);
     commThdExit++;
     CmiUnlock(commThdExitLock);
-    while (1) CmiYield();
+    if(CharmLibInterOperate)
+      CmiYield();
+    else 
+      while (1) CmiYield();
 #endif
 }
 /* ##### End of Functions Related with Machine Running ##### */

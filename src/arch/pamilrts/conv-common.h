@@ -3,6 +3,7 @@
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
 #define CMK_HAS_PARTITION                                  1
+#define CMK_HAS_INTEROP                                    1
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 

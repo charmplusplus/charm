@@ -3730,9 +3730,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*local_event_handler)(gni_cq_entry_t *, void *)       = &LocalEventHandle;
     //void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
-   
-    status = PMI_Init(&first_spawned);
-    GNI_RC_CHECK("PMI_Init", status);
+  
+    if(!CharmLibInterOperate) {
+      status = PMI_Init(&first_spawned);
+      GNI_RC_CHECK("PMI_Init", status);
+    }
 
     status = PMI_Get_size(&mysize);
     GNI_RC_CHECK("PMI_Getsize", status);
@@ -3799,7 +3801,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     local_addr = gniGetNicAddress();
 #else
     ptag = get_ptag();
-    cookie = get_cookie();
+    cookie = get_cookie() - 1;
 #if 0
     modes = GNI_CDM_MODE_CQ_NIC_LOCAL_PLACEMENT;
 #endif
@@ -4088,9 +4090,11 @@ void LrtsExit()
     //printf("FINAL [%d, %d]  register=%lld, send=%lld\n", myrank, CmiMyRank(), register_memory_size, buffered_send_msg); 
     mempool_destroy(CpvAccess(mempool));
 #endif
-    PMI_Barrier();
-    PMI_Finalize();
-    exit(0);
+    if(!CharmLibInterOperate) {
+      PMI_Barrier();
+      PMI_Finalize();
+      exit(0);
+    }
 }
 
 void LrtsDrainResources()

@@ -64,6 +64,10 @@ int main(int argc, char **argv){
 
   HiStart(16);
   MPI_Barrier(newComm);
+
+  if(!peid)
+    printf("Invoke charmlib exit\n");
+
   CharmLibExit();
 
   //final synchronization
