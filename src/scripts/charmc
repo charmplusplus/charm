@@ -100,6 +100,7 @@ SPU_USE_CPP=0
 SPU_EXTRA_LIBS=""
 
 MPI_INTEROPERATE=""
+NO_MAIN_MODULE=""
 NO_MAIN=""
 CUSTOM_PARTITION=""
 
@@ -129,7 +130,7 @@ printUsage() {
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
     echo "        -fmoddir <f90mod path>"
     echo "        -pg <opt> -build-shared -charm-shared -no-trace-mpi"
-    echo "        -mpi -nomain -custom-part"
+    echo "        -mpi -nomain-module -nomain -custom-part"
     echo
     echo "  Cell specific flags:"
     echo "        -spu-cpp -spu-lib <libname>"
@@ -790,6 +791,9 @@ do
 	-mpi)
 		MPI_INTEROPERATE="yes"
 		NO_MAIN="yes"
+		;;
+	-nomain-module)
+		NO_MAIN_MODULE="yes"
 		;;
 	-nomain)
 		NO_MAIN="yes"
@@ -1631,7 +1635,7 @@ then
 fi
 
 # dummy main module
-if [ "$MPI_INTEROPERATE" != "" ]
+if [ "$MPI_INTEROPERATE" != "" -a "$NO_MAIN_MODULE" = "" ]
 then
 	OBJECTFILES="$CHARMLIB/mpi-mainmodule.o $OBJECTFILES"
 fi
