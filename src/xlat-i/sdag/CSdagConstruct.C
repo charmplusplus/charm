@@ -767,23 +767,34 @@ namespace xi {
 
   void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry) {
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "  if (" << con1->text << ") {\n";
-    defs << "    ";
+
+    int indent = unravelClosuresBegin(defs);
+    indentBy(defs, indent);
+    defs << "if (" << con1->text << ") {\n";
+    indentBy(defs, indent + 1);
     generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "  } else {\n";
-    defs << "      ";
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
     generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "  }\n";
+    indentBy(defs, indent);
+    defs << "}\n";
+    unravelClosuresEnd(defs);
     endMethod(defs);
 
     generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "  if (" << con1->text << ") {\n";
-    defs << "    ";
+    indent = unravelClosuresBegin(defs);
+    indentBy(defs, indent);
+    defs << "if (" << con1->text << ") {\n";
+    indentBy(defs, indent + 1);
     generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "  } else {\n";
-    defs << "      ";
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
     generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "  }\n";
+    indentBy(defs, indent);
+    defs << "}\n";
+    unravelClosuresEnd(defs);
     endMethod(defs);
   }
 
