@@ -1,4 +1,16 @@
-OPTS = -O3
+OPTS = -O3 
 CHARMDIR=../../..
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
-CXX=mpicxx $(OPTS)
+
+MPI_LIBS=""
+ifeq ($(TARGET),gni)
+       CXX=CC $(OPTS)
+else
+ifeq ($(TARGET),bgq)
+       CXX=mpicxx $(OPTS)
+       BGQ_INSTALL=/bgsys/drivers/ppcfloor
+       MPI_LIBS=-L$(BGQ_INSTALL)/comm/gcc/lib -lmpich -lopa -lmpl -ldl -L$(BGQ_INSTALL)/comm/sys-fast/lib -lpami -L$(BGQ_INSTALL)/spi/lib -lSPI -lSPI_cnk -lpthread -lrt
+else
+       CXX=mpicxx $(OPTS)
+endif
+endif

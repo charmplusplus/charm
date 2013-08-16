@@ -73,7 +73,6 @@ int main(int argc, char **argv){
   //final synchronization
   MPI_Barrier(MPI_COMM_WORLD);
   
-  printf("[%d] Calling finalize\n",peid);
   MPI_Finalize();
   return 0;  
 }

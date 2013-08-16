@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 //header files for libraries in Charm I wish to use with MPI
-#include "libs/hi/hi.h"
 #include "libs/hello/hello.h"
 #include "libs/kNeighbor/kNeighbor.h"
 //header file from Charm needed for Interoperation
@@ -60,7 +59,7 @@ int main(int argc, char **argv){
     CharmLibExit();
   }
     
-  //on the first set, do more MPI work, invoke Hi and clean up Charm
+  //on the first set, do more MPI work, invoke Hello and clean up Charm
   if(peid%2) {
     for(int i=0; i<5; i++) {
       if(peid % 4 == 1) {    
@@ -71,7 +70,7 @@ int main(int argc, char **argv){
         MPI_Recv(&recvid, 1, MPI_INT, peid-2, 808, MPI_COMM_WORLD, &sts);
       }
     }
-    HiStart(16);
+    HelloStart(16);
     MPI_Barrier(newComm);
     CharmLibExit();
   }
