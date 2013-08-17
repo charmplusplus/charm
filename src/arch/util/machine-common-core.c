@@ -176,8 +176,10 @@ static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
 
 
 #if CMK_SMP
-static volatile int commThdExit = 0;
-static CmiNodeLock  commThdExitLock = 0;
+volatile int commThdExit = 0;
+CmiNodeLock  commThdExitLock = 0;
+extern CmiNodeLock  libcommThdExitLock;
+extern int CharmLibInterOperate;
 
 /**
  *  The macro defines whether to have a comm thd to offload some
@@ -277,7 +279,7 @@ static void ConverseRunPE(int everReturn);
 /* Functions regarding machine running on every proc */
 static void AdvanceCommunication(int whenidle);
 static void CommunicationServer(int sleepTime);
-static void CommunicationServerThread(int sleepTime);
+void CommunicationServerThread(int sleepTime);
 void ConverseExit(void);
 
 /* Functions providing incoming network messages */
@@ -1066,6 +1068,7 @@ if (  MSG_STATISTIC)
     CmiNodeStateInit(&CsvAccess(NodeState));
 #if CMK_SMP
     commThdExitLock = CmiCreateLock();
+    libcommThdExitLock = CmiCreateLock();
 #endif
 
 #if CMK_OFFLOAD_BCAST_PROCESS
@@ -1160,7 +1163,9 @@ static void ConverseRunPE(int everReturn) {
     /* communication thread */
     if (CmiMyRank() == CmiMyNodeSize()) {
       Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-      while (1) CommunicationServerThread(5);
+      if(!CharmLibInterOperate) {
+        while (1) CommunicationServerThread(5);
+      }
     } else { /* worker thread */
       if (!everReturn) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -1225,7 +1230,7 @@ static void CommunicationServer(int sleepTime) {
 #endif
 }
 
-static void CommunicationServerThread(int sleepTime) {
+void CommunicationServerThread(int sleepTime) {
     CommunicationServer(sleepTime);
 #if CMK_IMMEDIATE_MSG
     CmiHandleImmediate();

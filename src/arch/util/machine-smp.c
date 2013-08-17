@@ -266,6 +266,8 @@ CmiNodeLock cmiMemoryLock;
 #endif
 int _Cmi_sleepOnIdle=0;
 int _Cmi_forceSpinOnIdle=0;
+extern int _cleanUp;
+extern void CharmScheduler();
 
 #if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
 static __thread struct CmiStateStruct     Cmi_mystate;
@@ -409,6 +411,23 @@ static void *call_startfn(void *vindex)
 #endif
 
   ConverseRunPE(0);
+
+  if(CharmLibInterOperate) {
+    while(1) {
+      if(!_cleanUp) {
+        CharmScheduler();
+        CmiNodeAllBarrier();
+      } else {
+        if (CmiMyRank() == CmiMyNodeSize()) {
+          while (1) { CommunicationServerThread(5); }
+        } else { 
+          CsdScheduler(-1);
+        }
+        break;
+      }
+    }
+  }
+
 #if 0
   if (index<_Cmi_mynodesize) 
 	  ConverseRunPE(0); /*Regular worker thread*/

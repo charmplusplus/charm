@@ -8,8 +8,18 @@ extern "C" void CkExit(void);
 #define DEBUG(a) 
 #endif
 
+#if PERFORM_DEBUG
+#define DEBUG(a) a
+#else
+#define DEBUG(a) 
+#endif
+
 static int   _libExitStarted = 0;
 int    _libExitHandlerIdx;
+int _cleanUp = 0;
+
+static volatile int libcommThdExit = 0;
+CmiNodeLock  libcommThdExitLock = 0;
 
 #if CMK_CONVERSE_MPI
 extern  "C" { extern MPI_Comm charmComm ;}
@@ -28,6 +38,19 @@ void CharmScheduler() {
     while (libcommThdExit != CmiMyNodeSize()) {
       CommunicationServerThread(5);
     }
+    libcommThdExit = 0;
+  } else { 
+    CsdScheduler(-1);
+  }
+}
+
+extern "C" 
+void CharmScheduler() {
+  DEBUG(printf("[%d]Starting scheduler [%d]/[%d]\n",CmiMyPe(),CmiMyRank(),CmiMyNodeSize());)
+  if (CmiMyRank() == CmiMyNodeSize()) {
+    while (libcommThdExit != CmiMyNodeSize()) {
+      CommunicationServerThread(5);
+    }
     DEBUG(printf("[%d] Commthread Exit Scheduler\n",CmiMyPe());)
     libcommThdExit = 0;
   } else { 
@@ -37,13 +60,17 @@ void CharmScheduler() {
 
 extern "C"
 void StartCharmScheduler() {
-  CsdScheduler(-1);
+  CmiNodeAllBarrier();
+  CharmScheduler();
 }
 
 extern "C"
 void StopCharmScheduler() {
   DEBUG(printf("[%d] Exit Scheduler\n",CmiMyPe());)
   CpvAccess(charmLibExitFlag) = 1;
+  CmiLock(libcommThdExitLock);
+  libcommThdExit++;
+  CmiUnlock(libcommThdExitLock);
 }
 
 // triger LibExit on PE 0,
@@ -59,6 +86,7 @@ void LibCkExit(void)
 
 void _libExitHandler(envelope *env)
 {
+  DEBUG(printf("[%d] Exit started for %d PE %d nodes\n",CmiMyPe(),CmiNumPes(),CmiNumNodes());)
   switch(env->getMsgtype()) {
     case StartExitMsg:
       DEBUG(printf("[%d] Exit started for %d PE %d nodes\n",CmiMyPe(),CmiNumPes(),CmiNumNodes());)
@@ -76,7 +104,8 @@ void _libExitHandler(envelope *env)
       // if exit in ring, instead of broadcasting, send in ring
       if (_ringexit){
         const int stride = CkNumPes()/_ringtoken;
-        int pe = 0; while (pe<CkNumPes()) {
+        int pe = 0;
+        while (pe<CkNumPes()) {
           CmiSyncSend(pe, env->getTotalsize(), (char *)env);
           pe += stride;
         }
@@ -99,8 +128,9 @@ void _libExitHandler(envelope *env)
       else
         CmiFree(env);
       //everyone exits here - there may be issues with leftover messages in the queue
+      DEBUG(printf("[%d] Am done here\n",CmiMyPe());)
       _libExitStarted = 0;
-      CpvAccess(charmLibExitFlag) = 1;
+      StopCharmScheduler();
       break;
     default:
       CmiAbort("Internal Error(_libExitHandler): Unknown-msg-type. Contact Developers.\n");
@@ -118,12 +148,14 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv){
 
   CharmLibInterOperate = 1;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
+  CharmScheduler();
 }
 #else 
 extern "C"
 void CharmLibInit(int userComm, int argc, char **argv){
   CharmLibInterOperate = 1;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
+  CharmScheduler();
 }
 #endif
 #else
@@ -142,6 +174,10 @@ void CharmLibExit() {
   if(CkMyPe() == 0) {
     CkExit();
   }
-  CsdScheduler(-1);
+  if (CmiMyRank() == CmiMyNodeSize()) {
+    while (1) { CommunicationServerThread(5); }
+  } else { 
+    CsdScheduler(-1);
+  }
 }
 

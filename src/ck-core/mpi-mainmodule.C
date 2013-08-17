@@ -6,7 +6,7 @@ class mpi_main : public CBase_mpi_main
 {
 public:
   mpi_main(CkArgMsg* m) 
-  { 
+  {
     delete m;
     CkExit();
   };
