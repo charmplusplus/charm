@@ -2446,7 +2446,7 @@ private:
 	    p | num_moves;
 	    if (num_moves != (*msg)->n_moves) {
 	      delete *msg;
-	      *msg = new (num_moves,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+	      *msg = new (num_moves,CkNumPes(),0) LBMigrateMsg;
 	    }
 	    (*msg)->pup(p);
 	  }

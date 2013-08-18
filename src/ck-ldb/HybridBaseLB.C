@@ -1231,8 +1231,8 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
   int migrate_count=migrateInfo.length();
   DEBUGF(("[%d] level: %d has %d migrations. \n", CkMyPe(), currentLevel, migrate_count));
   // ignore avail_vector, etc for now
-  //LBMigrateMsg * msg = new(migrate_count,count,count,0) LBMigrateMsg;
-  LBMigrateMsg * msg = new(migrate_count,0,0,0) LBMigrateMsg;
+  //LBMigrateMsg * msg = new(migrate_count,count,0) LBMigrateMsg;
+  LBMigrateMsg * msg = new(migrate_count,0,0) LBMigrateMsg;
   msg->level = currentLevel;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
@@ -1287,8 +1287,8 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo,
 
   int migrate_count=migrateInfo.length();
   // ignore avail_vector, etc for now
-  //LBMigrateMsg * msg = new(migrate_count,count,count,0) LBMigrateMsg;
-  LBMigrateMsg* msg = new(migrate_count,0,0,0) LBMigrateMsg;
+  //LBMigrateMsg * msg = new(migrate_count,count,0) LBMigrateMsg;
+  LBMigrateMsg* msg = new(migrate_count,0,0) LBMigrateMsg;
   msg->level = currentLevel;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {

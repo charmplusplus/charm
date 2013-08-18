@@ -731,8 +731,6 @@ void CentralLB::LoadBalance()
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);
       CkPrintf("[%d] Load Summary (after LB): max (with bg load): %f max (obj only): %f average: %f at step %d nonlocal: %d msgs %.2fKB useMem: %.2fKB.\n", CkMyPe(), mLoad, mCpuLoad, totalLoad/clients, step(), nmsgs, 1.0*nbytes/1024, (1.0*useMem())/1024);
-      for (int i=0; i<clients; i++)
-        migrateMsg->expectedLoad[i] = info.peLoads[i];
   }
 
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));
@@ -909,7 +907,6 @@ void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
   if (_lb_args.debug() > 1) 
     if (CkMyPe()%1024==0) CmiPrintf("[%d] Starting ReceiveMigration step %d at %f\n",CkMyPe(),step(), CmiWallTimer());
 
-  for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
 /*FAULT_EVAC*/
   if(!CmiNodeAlive(CkMyPe())){
@@ -1266,7 +1263,7 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats)
   }
 
   int migrate_count=migrateInfo.length();
-  LBMigrateMsg* msg = new(migrate_count,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+  LBMigrateMsg* msg = new(migrate_count,CkNumPes(),0) LBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
@@ -1290,8 +1287,8 @@ LBMigrateMsg * CentralLB::extractMigrateMsg(LBMigrateMsg *m, int p)
     if (!m->avail_vector[i]) nunavail++;
   }
   LBMigrateMsg* msg;
-  if (nunavail) msg = new(nmoves,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
-  else msg = new(nmoves,0,0,0) LBMigrateMsg;
+  if (nunavail) msg = new(nmoves,CkNumPes(),0) LBMigrateMsg;
+  else msg = new(nmoves,0,0) LBMigrateMsg;
   msg->n_moves = nmoves;
   msg->level = m->level;
   msg->next_lb = m->next_lb;
@@ -1306,7 +1303,6 @@ LBMigrateMsg * CentralLB::extractMigrateMsg(LBMigrateMsg *m, int p)
   if (nunavail)
   for (i=0; i<CkNumPes();i++) {
     msg->avail_vector[i] = m->avail_vector[i];
-    msg->expectedLoad[i] = m->expectedLoad[i];
   }
   return msg;
 }
@@ -1337,7 +1333,7 @@ void CentralLB::simulationWrite() {
 
 void CentralLB::simulationRead() {
   LBSimulation *simResults = NULL, *realResults;
-  LBMigrateMsg *voidMessage = new (0,0,0,0) LBMigrateMsg();
+  LBMigrateMsg *voidMessage = new (0,0,0) LBMigrateMsg();
   voidMessage->n_moves=0;
   for ( ;LBSimulation::simStepSize > 0; --LBSimulation::simStepSize, ++LBSimulation::simStep) {
     // here we are supposed to read the data from the dump database

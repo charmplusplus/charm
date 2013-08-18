@@ -564,7 +564,7 @@ LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   //    CkPrintf("PE %d: Sent away %d of %d objects\n",
   //	     CkMyPe(),migrate_count,myStats.obj_data_sz);
   //  }
-  LBMigrateMsg* msg = new(migrate_count,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+  LBMigrateMsg* msg = new(migrate_count,CkNumPes(),0) LBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*) migrateInfo[i];

@@ -5,7 +5,6 @@ extern module LBDatabase;
 message LBMigrateMsg {
   MigrateInfo moves[];
   char avail_vector[];
-  double expectedLoad[];
 };
 
 message LBVectorMigrateMsg {

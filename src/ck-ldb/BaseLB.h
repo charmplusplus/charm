@@ -166,7 +166,6 @@ public:
 
 /// migration decision for an obj.
 struct MigrateInfo {  
-    int index;   // object index in objData array
     LDObjHandle obj;
     int from_pe;
     int to_pe;
@@ -178,7 +177,6 @@ struct MigrateInfo {
     }
 
     void pup(PUP::er &p) {
-      p | index;
       p | obj;
       p | from_pe;
       p | to_pe;
@@ -199,8 +197,6 @@ public:
   char * avail_vector;		// processor bit vector
   int next_lb;			// next load balancer
 
-  double * expectedLoad;	// expected load for future
-
 public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	int step;
@@ -219,7 +215,6 @@ public:
     CkAssert(numPes == CkNumPes());
     for (i=0; i<n_moves; ++i) p | moves[i];
     p(avail_vector, numPes);
-    for (i=0; i<numPes; ++i) p | expectedLoad[i];
   }
 };
 

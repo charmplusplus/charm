@@ -395,13 +395,6 @@ public:
   void set_avail_vector(char * bitmap, int new_ld=-1);
   int & new_lbbalancer() { return new_ld_balancer; }
 
-  struct LastLBInfo {
-    LBRealType *expectedLoad;
-    LastLBInfo();
-  };
-  LastLBInfo lastLBInfo;
-  inline LBRealType myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
-  inline LBRealType* expectedLoad() { return lastLBInfo.expectedLoad; }
   inline int useMem() { return LDMemusage(myLDHandle); }
 
   int getLoadbalancerTicket();
