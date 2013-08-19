@@ -211,6 +211,7 @@ public:
     double period;//Time (seconds) between builtin-atsyncs  
     double nextT;
     LDBarrierClient BH;//Handle for the builtin-atsync barrier 
+    bool gotoSyncCalled;
     static void gotoSync(void *bs);
     static void resumeFromSync(void *bs);
   public:

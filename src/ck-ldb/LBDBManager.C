@@ -21,6 +21,7 @@ struct MigrateCB;
 void LBDB::batsyncer::gotoSync(void *bs)
 {
   LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
+  s->gotoSyncCalled = true;
   s->db->AtLocalBarrier(s->BH);
 }
 //Called at end of each load balancing cycle
@@ -35,7 +36,10 @@ void LBDB::batsyncer::resumeFromSync(void *bs)
   s->nextT = curT + s->period;
 #endif
 
-  CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, 1000*s->period, CkMyPe());
+  if (s->gotoSyncCalled) {
+    CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, 1000*s->period, CkMyPe());
+    s->gotoSyncCalled = false;
+  }
 }
 
 // initPeriod in seconds
@@ -45,6 +49,7 @@ void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
   period=initPeriod;
   nextT = CmiWallTimer() + period;
   BH = db->AddLocalBarrierClient((LDResumeFn)resumeFromSync,(void*)(this));
+  gotoSyncCalled = true;
   //This just does a CcdCallFnAfter
   resumeFromSync((void *)this);
 }
