@@ -21,9 +21,12 @@ group [migratable] CentralLB : BaseLB {
   entry void LoadBalance(void);
   entry void ResumeClients(int);
   entry void ResumeClients(CkReductionMsg *);
-	entry void changeFreq(int);
-  entry void ReceiveMigration(LBMigrateMsg*);	
+  entry void changeFreq(int);
+  entry void ScatterMigrationResults(LBScatterMsg *);
+  entry void ReceiveMigration(LBMigrateMsg*);
+  entry void ReceiveMigration(LBScatterMsg*);
   entry void ProcessReceiveMigration(CkReductionMsg  *);
+  entry void ProcessMigrationDecision(CkReductionMsg *);
   entry void MissMigrate(int);
 };
 

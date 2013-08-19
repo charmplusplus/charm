@@ -45,6 +45,8 @@ int load_balancer_created;
 
 CreateLBFunc_Def(CentralLB, "CentralLB base class")
 
+static int broadcastThreshold = 32;
+
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
 
@@ -740,6 +742,9 @@ void CentralLB::LoadBalance()
 #endif
 
   envelope *env = UsrToEnv(migrateMsg);
+#if CMK_SCATTER_LB_RESULTS
+  InitiateScatter(migrateMsg);
+#else
   if (1) {
       // broadcast
     thisProxy.ReceiveMigration(migrateMsg);
@@ -752,12 +757,127 @@ void CentralLB::LoadBalance()
     }
     delete migrateMsg;
   }
-
+#endif
   // Zero out data structures for next cycle
   // CkPrintf("zeroing out data\n");
   statsData->clear();
   stats_msg_count=0;
 #endif
+}
+
+void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
+
+  if (CkNumPes() <= broadcastThreshold) {
+    thisProxy.ReceiveMigration(msg);
+    return;
+  }
+
+  int middlePe = CkNumPes() / 2;
+
+  // allocate maximum possible size to avoid later copies
+  // the messages will be resized before sending
+  LBScatterMsg *leftMsg = new (middlePe, msg->n_moves)
+    LBScatterMsg(0, middlePe - 1);
+  LBScatterMsg *rightMsg = new (CkNumPes() - middlePe, msg->n_moves)
+    LBScatterMsg(middlePe, CkNumPes() - 1);
+
+  int migrateTally[CkNumPes()];
+  memset(migrateTally, 0, CkNumPes() * sizeof(int));
+
+  for (int i = 0; i < msg->n_moves; i++) {
+    MigrateInfo* item = (MigrateInfo*) &msg->moves[i];
+    migrateTally[item->to_pe]++;
+    if (item->from_pe < middlePe) {
+      leftMsg->moves[leftMsg->numMigrates++] = *item;
+    }
+    else {
+      rightMsg->moves[rightMsg->numMigrates++] = *item;
+    }
+  }
+
+  memcpy(leftMsg->numMigratesPerPe, migrateTally, middlePe * sizeof(int));
+  memcpy(rightMsg->numMigratesPerPe, &migrateTally[middlePe], (CkNumPes() - middlePe) * sizeof(int));
+
+  // shrink the size of the messages
+  envelope *env = UsrToEnv(rightMsg);
+  env->shrinkUsersize((msg->n_moves - rightMsg->numMigrates) * sizeof(MigrateDecision));
+
+  // left message is not getting sent yet, but better resize it now
+  // before we lose track of its original size
+  env = UsrToEnv(leftMsg);
+  env->shrinkUsersize((msg->n_moves - leftMsg->numMigrates) * sizeof(MigrateDecision));
+
+  // send out results for right half of PEs first
+  // to overlap communication with computation
+  thisProxy[middlePe].ScatterMigrationResults(rightMsg);
+
+  delete msg;
+  ScatterMigrationResults(leftMsg);
+}
+
+void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
+
+  int finished = false;
+  do {
+    CkAssert(msg->firstPeInSpan == CkMyPe());
+    int numPesInSpan = msg->lastPeInSpan - msg->firstPeInSpan + 1 ;
+
+    if (numPesInSpan <= broadcastThreshold) {
+      for (int i = msg->firstPeInSpan; i < msg->lastPeInSpan; i++) {
+        // TODO: multicast without allocating new message each time
+        LBScatterMsg *msgCopy = new (numPesInSpan, msg->numMigrates)
+          LBScatterMsg(msg->firstPeInSpan, msg->lastPeInSpan);
+        msgCopy->numMigrates = msg->numMigrates;
+        memcpy(msgCopy->numMigratesPerPe, msg->numMigratesPerPe,
+               numPesInSpan * sizeof(int));
+        memcpy(msgCopy->moves, msg->moves,
+               msg->numMigrates * sizeof(MigrateDecision));
+        thisProxy[i].ReceiveMigration(msgCopy);
+      }
+      // use original message for last send
+      thisProxy[msg->lastPeInSpan].ReceiveMigration(msg);
+      finished = true;
+    }
+    else {
+      int middlePe = (msg->firstPeInSpan + msg->lastPeInSpan + 1) / 2;
+      // reuse received message, taking care not to overwrite needed data
+      LBScatterMsg *leftMsg = msg;
+      int numMigrates = leftMsg->numMigrates;
+      int numPesInRightSpan = leftMsg->lastPeInSpan - middlePe + 1;
+      LBScatterMsg *rightMsg =
+        new (numPesInRightSpan, leftMsg->numMigrates)
+        LBScatterMsg(middlePe, leftMsg->lastPeInSpan);
+      leftMsg->numMigrates = 0;
+      leftMsg->lastPeInSpan = middlePe - 1;
+      for (int i = 0; i < numMigrates; i++) {
+        if (leftMsg->moves[i].fromPe < middlePe) {
+          leftMsg->moves[leftMsg->numMigrates++] = leftMsg->moves[i];
+        }
+        else {
+          rightMsg->moves[rightMsg->numMigrates++] = leftMsg->moves[i];
+        }
+      }
+
+      memcpy(rightMsg->numMigratesPerPe,
+             &leftMsg->numMigratesPerPe[middlePe - leftMsg->firstPeInSpan],
+             (numPesInRightSpan) * sizeof(int));
+
+      // shrink the size of the messages
+      envelope *env = UsrToEnv(rightMsg);
+      env->shrinkUsersize((numMigrates - rightMsg->numMigrates)
+                          * sizeof(MigrateDecision));
+
+      // left message is not getting sent yet, but better resize it now
+      // before we lose track of its original size
+      env = UsrToEnv(leftMsg);
+      env->shrinkUsersize((numMigrates - leftMsg->numMigrates)
+                          * sizeof(MigrateDecision));
+
+      thisProxy[middlePe].ScatterMigrationResults(rightMsg);
+    }
+
+  } while (!finished);
+
 }
 
 // test if sender and receiver in a commData is nonmigratable.
@@ -868,6 +988,22 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
 extern int restarted;
 #endif
 
+void CentralLB::ReceiveMigration(LBScatterMsg *m) {
+  storedMigrateMsg = NULL;
+  storedScatterMsg = m;
+#if CMK_MEM_CHECKPOINT
+  CkResetInLdb();
+#endif
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	restoreParallelRecovery(&resumeAfterRestoreParallelRecovery,(void *)this);
+#else
+  CkCallback cb(CkIndex_CentralLB::ProcessMigrationDecision((CkReductionMsg*)NULL),
+                  thisProxy);
+  contribute(0, NULL, CkReduction::max_int, cb);
+#endif
+
+}
+
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
   storedMigrateMsg = m;
@@ -881,6 +1017,36 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
                   thisProxy);
   contribute(0, NULL, CkReduction::max_int, cb);
 #endif
+}
+
+void CentralLB::ProcessMigrationDecision(CkReductionMsg *msg) {
+  LBScatterMsg *m = storedScatterMsg;
+  CkAssert(m != NULL);
+  delete msg;
+
+  migrates_expected = m->numMigratesPerPe[CkMyPe() - m->firstPeInSpan];
+  future_migrates_expected = 0;
+
+  for(int i = 0; i < m->numMigrates; i++) {
+    MigrateDecision& move = m->moves[i];
+    const int me = CkMyPe();
+    if (move.fromPe == me) {
+      DEBUGF(("[%d] migrating object to %d\n", move.fromPe, move.toPe));
+      // migrate object, in case it is already gone, inform toPe
+      LDObjHandle objInfo = theLbdb->GetObjHandle(move.dbIndex);
+
+      if (theLbdb->Migrate(objInfo,move.toPe) == 0) {
+        CkAbort("Error: Async arrival not supported in scattering mode\n");
+      }
+    }
+  }
+
+  if (migrates_expected == 0 || migrates_completed == migrates_expected) {
+    MigrationDone(1);
+  }
+
+  delete m;
+
 }
 
 void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)

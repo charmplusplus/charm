@@ -7,6 +7,11 @@ message LBMigrateMsg {
   char avail_vector[];
 };
 
+message LBScatterMsg {
+  int numMigratesPerPe[];
+  MigrateDecision moves[];
+};
+
 message LBVectorMigrateMsg {
   VectorMigrateInfo moves[];
 };

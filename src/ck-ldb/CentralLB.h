@@ -105,7 +105,11 @@ public:
   void ResumeClients(int);                      // Resuming clients needs
 
   void ResumeClients(CkReductionMsg *); // to be resumed via message
+  void InitiateScatter(LBMigrateMsg *msg);
+  void ScatterMigrationResults(LBScatterMsg *);
+  void ReceiveMigration(LBScatterMsg *);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
+  void ProcessMigrationDecision(CkReductionMsg *);
   void ProcessReceiveMigration(CkReductionMsg  *);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void ReceiveDummyMigration(int _step);
@@ -258,6 +262,7 @@ private:
   int lbdone;
   double start_lb_time;
   LBMigrateMsg   *storedMigrateMsg;
+  LBScatterMsg   *storedScatterMsg;
   int  reduction_started;
 
 
