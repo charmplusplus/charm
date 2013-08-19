@@ -781,7 +781,7 @@ void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
   LBScatterMsg *rightMsg = new (CkNumPes() - middlePe, msg->n_moves)
     LBScatterMsg(middlePe, CkNumPes() - 1);
 
-  int migrateTally[CkNumPes()];
+  int *migrateTally = new int[CkNumPes()];
   memset(migrateTally, 0, CkNumPes() * sizeof(int));
 
   for (int i = 0; i < msg->n_moves; i++) {
@@ -797,6 +797,8 @@ void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
 
   memcpy(leftMsg->numMigratesPerPe, migrateTally, middlePe * sizeof(int));
   memcpy(rightMsg->numMigratesPerPe, &migrateTally[middlePe], (CkNumPes() - middlePe) * sizeof(int));
+
+  delete [] migrateTally;
 
   // shrink the size of the messages
   envelope *env = UsrToEnv(rightMsg);
@@ -1020,6 +1022,7 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 }
 
 void CentralLB::ProcessMigrationDecision(CkReductionMsg *msg) {
+#if CMK_LBDB_ON
   LBScatterMsg *m = storedScatterMsg;
   CkAssert(m != NULL);
   delete msg;
@@ -1046,7 +1049,7 @@ void CentralLB::ProcessMigrationDecision(CkReductionMsg *msg) {
   }
 
   delete m;
-
+#endif
 }
 
 void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
