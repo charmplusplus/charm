@@ -1824,7 +1824,7 @@ case "$LANGUAGE" in
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
         if [ "$NO_MAIN" = "" ]
         then
-	  MIDDLE_LIBS="$CHARMLIB/main.o $MIDDLE_LIBS"
+	  MIDDLE_LIBS="-lmain $MIDDLE_LIBS"
         fi
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
@@ -1838,7 +1838,7 @@ case "$LANGUAGE" in
 	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
         if [ "$NO_MAIN" = "" ]
         then
-	  MIDDLE_LIBS="$CHARMLIB/main.o $MIDDLE_LIBS"
+	  MIDDLE_LIBS="-lmain $MIDDLE_LIBS"
         fi
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	if [ "$TAU_TRACE_MPI" = "1" ]
