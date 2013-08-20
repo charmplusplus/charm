@@ -93,6 +93,14 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
   return newhandle;
 }
 
+void LBDB::RemoveOM(LDOMHandle om)
+{
+  delete oms[om.handle];
+  oms[om.handle] = NULL;
+  omCount--;
+}
+
+
 #if CMK_BIGSIM_CHARM
 #define LBOBJ_OOC_IDX 0x1
 #endif

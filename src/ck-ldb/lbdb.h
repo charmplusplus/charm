@@ -253,6 +253,7 @@ LDHandle LDCreate(void);
 
 LDOMHandle LDRegisterOM(LDHandle _lbdb, LDOMid userID, 
 			void *userptr, LDCallbacks cb);
+void LDUnregisterOM(LDHandle _db, LDOMHandle handle);
 
 void LDOMMetaLBResumeWaitingChares(LDHandle _h, int lb_ideal_period);
 void LDOMMetaLBCallLBOnChares(LDHandle _h);

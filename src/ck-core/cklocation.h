@@ -92,6 +92,7 @@ public:
   CkArrayMap(CkMigrateMessage *m): IrrGroup(m) {}
   virtual ~CkArrayMap();
   virtual int registerArray(const CkArrayIndex& numElements, CkArrayID aid);
+  virtual void unregisterArray(int idx);
   virtual void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
   virtual int homePe(int arrayHdl,const CkArrayIndex &element)
@@ -285,6 +286,7 @@ class CkLocMgr : public IrrGroup {
 public:
 	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
+        ~CkLocMgr();
 
 	inline bool isLocMgr(void) { return true; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
@@ -296,6 +298,7 @@ public:
 	///  must be registered in the same order on all processors.
 	/// Returns a list which will contain that array's local elements
 	CkMigratableList *addManager(CkArrayID aid,CkArrMgr *mgr);
+        void deleteManager(CkArrayID aid, CkArrMgr *mgr);
 
 	/// Populate this array with initial elements
 	void populateInitial(CkArrayIndex& numElements,void *initMsg,CkArrMgr *mgr)
@@ -496,7 +499,9 @@ public:
 	//Occasionally clear out stale remote pointers
 	static void staticSpringCleaning(void *mgr,double curWallTime);
 	void springCleaning(void);
+	void setupSpringCleaning();
 	int nSprings;
+	int springCleaningCcd;
 
 private:
 	//Map object
@@ -522,6 +527,7 @@ private:
 	static void staticRecvAtSync(void* data);
 	void recvAtSync(void);
 	LDOMHandle myLBHandle;
+        LDBarrierReceiver lbBarrierReceiver;
 #endif
 private:
 	void initLB(CkGroupID lbdbID, CkGroupID metalbID);

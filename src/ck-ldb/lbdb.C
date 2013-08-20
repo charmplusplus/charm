@@ -29,6 +29,12 @@ extern "C" LDOMHandle LDRegisterOM(LDHandle _db, LDOMid _userID,
   return db->AddOM(_userID, _userptr, _callbacks);
 }
 
+extern "C" void LDUnregisterOM(LDHandle _db, LDOMHandle om)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->RemoveOM(om);
+}
+
 extern "C" void LDOMMetaLBResumeWaitingChares(LDHandle _db, int lb_ideal_period) {
   LBDB *const db = (LBDB*)(_db.handle);
   db->MetaLBResumeWaitingChares(lb_ideal_period);

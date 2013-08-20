@@ -164,6 +164,8 @@ CkArrayMap::CkArrayMap(void) { }
 CkArrayMap::~CkArrayMap() { }
 int CkArrayMap::registerArray(const CkArrayIndex& numElements, CkArrayID aid)
 {return 0;}
+void CkArrayMap::unregisterArray(int idx)
+{ }
 
 #define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
         int i; \
@@ -349,6 +351,12 @@ public:
     amaps.resize(idx+1);
     amaps[idx] = new arrayMapInfo(numElements);
     return idx;
+  }
+
+  void unregisterArray(int idx)
+  {
+    delete amaps[idx];
+    amaps[idx] = NULL;
   }
  
   int procNum(int arrayHdl, const CkArrayIndex &i) {
@@ -916,6 +924,10 @@ public:
     arrs.resize(idx+1);
     arrs[idx] = new arrInfo(numElements, speeds);
     return idx;
+  }
+  void unregisterArray(int idx)
+  {
+    arrs[idx].destroy();
   }
   int procNum(int arrayHdl, const CkArrayIndex &i)
   {
@@ -1991,6 +2003,8 @@ inline void CkLocMgr::springCleaning(void)
   }
   CmiImmediateUnlock(hashImmLock);
   delete it;
+
+  setupSpringCleaning();
 }
 void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
 	DEBK((AA"Starting spring cleaning at %.2f\n"AB,CkWallTimer()));
@@ -2081,9 +2095,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	firstFree=localLen=0;
 	duringMigration=false;
 	nSprings=0;
-#if !CMK_GLOBAL_LOCATION_UPDATE
-	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
-#endif
+        setupSpringCleaning();
 
 //Register with the map object
 	mapID = opts.getMap();
@@ -2112,10 +2124,25 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	firstFree=localLen=0;
 	duringMigration=false;
 	nSprings=0;
-#if !CMK_GLOBAL_LOCATION_UPDATE
-	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
-#endif
+        setupSpringCleaning();
 	hashImmLock = CmiCreateImmediateLock();
+}
+
+void CkLocMgr::setupSpringCleaning() {
+#if !CMK_GLOBAL_LOCATION_UPDATE
+	springCleaningCcd = CcdCallOnConditionOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+#endif
+}
+
+CkLocMgr::~CkLocMgr() {
+#if CMK_LBDB_ON
+  the_lbdb->RemoveLocalBarrierClient(dummyBarrierHandle);
+  the_lbdb->RemoveLocalBarrierReceiver(lbBarrierReceiver);
+  the_lbdb->UnregisterOM(myLBHandle);
+#endif
+  CcdCancelCallOnCondition(CcdPERIODIC_1minute, springCleaningCcd);
+  map->unregisterArray(mapHandle);
+  CmiDestroyLock(hashImmLock);
 }
 
 void CkLocMgr::pup(PUP::er &p){
@@ -2243,6 +2270,28 @@ CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 	nManagers++;
 	firstManager=n;
 	return &n->elts;
+}
+
+void CkLocMgr::deleteManager(CkArrayID id, CkArrMgr *mgr) {
+  ManagerRec *&rec = managers.find(id);
+
+  ManagerRec **prev = &firstManager;
+  ManagerRec *cur = firstManager;
+  while (cur->mgr != mgr) {
+    prev = &cur->next;
+    ++cur;
+  }
+
+  CkAssert(cur);
+  CkAssert(cur == rec);
+
+  *prev = cur->next;
+  nManagers--;
+  delete cur;
+  rec = NULL; // Would like to remove the entry entirely, but it's in a direct-mapped array
+
+  if (nManagers == 0)
+    delete this;
 }
 
 /// Return the next unused local element index.
@@ -3303,7 +3352,7 @@ void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 	  us to call Registering/DoneRegistering during each AtSync,
 	  and this is the only way to do so.
 	*/
-	the_lbdb->AddLocalBarrierReceiver(
+	lbBarrierReceiver = the_lbdb->AddLocalBarrierReceiver(
 		(LDBarrierFn)staticRecvAtSync,(void*)(this));
 	dummyBarrierHandle = the_lbdb->AddLocalBarrierClient(
 		(LDResumeFn)staticDummyResumeFromSync,(void*)(this));

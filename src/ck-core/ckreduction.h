@@ -316,6 +316,7 @@ public:
 	CkNodeReductionMgr(CkMigrateMessage *m) : IrrGroup(m) {
           storedCallback = NULL;
         }
+        ~CkNodeReductionMgr();
 
 	typedef CkReductionClientFn clientFn;
 
@@ -487,6 +488,7 @@ public:
 public:
 	CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr);
 	CkReductionMgr(CkMigrateMessage *m);
+        ~CkReductionMgr();
 
 	typedef CkReductionClientFn clientFn;
 

@@ -507,10 +507,18 @@ inline void CkArray::springCleaning(void)
 {
   DEBK((AA"Starting spring cleaning\n"AB));
   broadcaster->springCleaning();
+  setupSpringCleaning();
 }
 
 void CkArray::staticSpringCleaning(void *forArray,double curWallTime) {
 	((CkArray *)forArray)->springCleaning();
+}
+
+void CkArray::setupSpringCleaning() {
+ // set up broadcast cleaner
+ if (!stableLocations)
+      springCleaningCcd = CcdCallOnCondition(CcdPERIODIC_1minute,
+                                             staticSpringCleaning, (void *)this);
 }
 
 /********************* Little CkArray Utilities ******************/
@@ -756,10 +764,8 @@ CkArray::CkArray(CkArrayOptions &opts,
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
     numInitial(opts.getNumInitial()), isInserting(true)
 {
-  if (!stableLocations)
-      CcdCallOnConditionKeep(CcdPERIODIC_1minute,
-			     staticSpringCleaning, (void *)this);
-  
+  setupSpringCleaning();
+
   //set the field in one my parent class (CkReductionMgr)
   if(opts.disableNotifyChildInRed)
 	  disableNotifyChildrenStart = true; 
@@ -828,6 +834,12 @@ CkArray::CkArray(CkMigrateMessage *m)
   isInserting=true;
 }
 
+CkArray::~CkArray()
+{
+  if (!stableLocations)
+    CcdCancelCallOnCondition(CcdPERIODIC_1minute, springCleaningCcd);
+}
+
 #if CMK_ERROR_CHECKING
 inline void testPup(PUP::er &p,int shouldBe) {
   int a=shouldBe;
@@ -854,10 +866,7 @@ void CkArray::pup(PUP::er &p){
 		/// Restore our default listeners:
 		broadcaster=(CkArrayBroadcaster *)(CkArrayListener *)(listeners[0]);
 		reducer=(CkArrayReducer *)(CkArrayListener *)(listeners[1]);
-                /// set up broadcast cleaner
-                if (!stableLocations)
-                    CcdCallOnConditionKeep(CcdPERIODIC_1minute,
-			                   staticSpringCleaning, (void *)this);
+                setupSpringCleaning();
 	}
 }
 
@@ -1493,6 +1502,17 @@ void CkArray::flushStates() {
   // Hence, these counters are reset only for chare arrays.
   resetCountersWhenFlushingStates();
   CK_ARRAYLISTENER_LOOP(listeners, l->flushState());
+}
+
+void CkArray::ckDestroy() {
+  int i = 0;
+  ArrayElement *a = NULL;
+  while ((a = elements->next(i))) {
+    a->ckDestroy();
+  }
+
+  locMgr->deleteManager(CkGroupID(thisProxy), this);
+  delete this;
 }
 
 #include "CkArray.def.h"
