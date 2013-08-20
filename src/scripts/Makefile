@@ -88,7 +88,7 @@ mpi-main: mpi-mainmodule.o
 	cp mpi-mainmodule.o ../lib
 
 main: main.o
-	cp main.o ../lib
+	$(CHARMC) -o $(L)/libmain.a main.o
 
 custom_partitioner: custom_partitioner.o
 	cp custom_partitioner.o ../lib
