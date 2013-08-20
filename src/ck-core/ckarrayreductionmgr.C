@@ -233,5 +233,8 @@ int CkArrayReductionMgr::getTotalGCount(){
 	return totalGCount;
 }
 
+CkArrayReductionMgr::~CkArrayReductionMgr() {
+  CmiDestroyLock(lockCount);
+}
 
 #include "CkArrayReductionMgr.def.h"

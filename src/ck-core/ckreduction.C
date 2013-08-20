@@ -1717,6 +1717,11 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 	additionalGCount = newAdditionalGCount = 0;
 }
 
+CkNodeReductionMgr::~CkNodeReductionMgr()
+{
+  CmiDestroyLock(lockEverything);
+}
+
 void CkNodeReductionMgr::flushStates()
 {
  if(CkMyRank() == 0){
