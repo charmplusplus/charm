@@ -87,8 +87,8 @@ NDMeshStreamer: charm-core completion
 mpi-main: mpi-mainmodule.o
 	cp mpi-mainmodule.o ../lib
 
-main: main.o
-	$(CHARMC) -o $(L)/libmain.a main.o
+$(L)/libckmain.a: main.o
+	$(CHARMC) -o $@ main.o
 
 custom_partitioner: custom_partitioner.o
 	cp custom_partitioner.o ../lib
@@ -669,8 +669,8 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
-charm-core: converse $(L)/libck.a $(L)/libckf.a
-charm-target: loadbalancers default_libs comlib_objs mpi-main main custom_partitioner
+charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
+charm-target: loadbalancers default_libs comlib_objs mpi-main custom_partitioner
 
 CHARMLIBS: charm++ CONVLIBS 
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
