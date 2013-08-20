@@ -164,6 +164,8 @@ CkArrayMap::CkArrayMap(void) { }
 CkArrayMap::~CkArrayMap() { }
 int CkArrayMap::registerArray(const CkArrayIndex& numElements, CkArrayID aid)
 {return 0;}
+void CkArrayMap::unregisterArray(int idx)
+{ }
 
 #define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
         int i; \
@@ -349,6 +351,12 @@ public:
     amaps.resize(idx+1);
     amaps[idx] = new arrayMapInfo(numElements);
     return idx;
+  }
+
+  void unregisterArray(int idx)
+  {
+    delete amaps[idx];
+    amaps[idx] = NULL;
   }
  
   int procNum(int arrayHdl, const CkArrayIndex &i) {
@@ -916,6 +924,10 @@ public:
     arrs.resize(idx+1);
     arrs[idx] = new arrInfo(numElements, speeds);
     return idx;
+  }
+  void unregisterArray(int idx)
+  {
+    arrs[idx].destroy();
   }
   int procNum(int arrayHdl, const CkArrayIndex &i)
   {
