@@ -416,7 +416,7 @@ LBMigrateMsg* NborBaseLB::Strategy(LDStats* stats, int n_nbrs)
   }
 
   int sizes=0;
-  LBMigrateMsg* msg = new(sizes,CkNumPes(),0) LBMigrateMsg;
+  LBMigrateMsg* msg = new(sizes,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
   msg->n_moves = 0;
 
   return msg;
