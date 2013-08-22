@@ -570,6 +570,7 @@ void CmiInitCPUAffinity(char **argv)
         strcat(pemap, buf);
       }
     }
+    fclose(fp);
     if (CmiMyPe()==0) CmiPrintf("Charm++> read from pemap file '%s': %s\n", pemapfile, pemap);
   }
 
