@@ -4333,10 +4333,8 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
 #if CMK_BIGSIM_CHARM
   str << "  BgAttach(tid);\n";
 #endif
-  str << "  CthAwaken(tid);\n";
+  str << "  CthResume(tid);\n";
   str << "}\n";
-//  str << "  CthAwaken(CthCreate((CthVoidFn)"<<procFull
-//   <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<"));\n}\n";
 
   str << makeDecl("void")<<"::"<<procFull<<"(CkThrCallArg *impl_arg)\n";
   str << "{\n";\
