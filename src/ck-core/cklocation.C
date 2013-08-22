@@ -1100,7 +1100,7 @@ void CkMigratable::pup(PUP::er &p) {
   p(can_reset);
 	p(usesAutoMeasure);
 #if CMK_LBDB_ON 
-	int readyMigrate;
+	int readyMigrate = 0;
 	if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
 	p|readyMigrate;
 	if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
@@ -2164,7 +2164,7 @@ void CkLocMgr::pup(PUP::er &p){
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID, metalbID);
 #if __FAULT__
-        int count;
+        int count = 0;
         p | count;
         DEBUG(CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))    
@@ -2172,7 +2172,7 @@ void CkLocMgr::pup(PUP::er &p){
 #endif
         for(int i=0;i<count;i++){
             CkArrayIndex idx;
-            int pe;
+            int pe = 0;
             idx.pup(p);
             p | pe;
   //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
