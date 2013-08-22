@@ -5,7 +5,8 @@ MODULE=CkIO
 LIB = $(CDIR)/lib/libmodule$(MODULE).a
 LIBOBJ = ckio.o
 
-HEADERS = ckio.h $(MODULE).decl.h $(MODULE).def.h $(MODULE)_impl.decl.h $(MODULE)_impl.def.h
+GENHEADERS = $(MODULE).decl.h $(MODULE).def.h $(MODULE)_impl.decl.h $(MODULE)_impl.def.h
+HEADERS = ckio.h $(GENHEADERS)
 
 all: $(LIBDEST)$(LIB)
 
@@ -19,10 +20,10 @@ headers: $(HEADERS)
 ckio.o: ckio.C headers
 	$(CHARMC) -c $<
 
-$(MODULE).def.h: $(MODULE).decl.h
-
-$(MODULE).decl.h: ckio.ci
+$(GENHEADERS): ckio.ci.stamp
+%.ci.stamp: %.ci
 	$(CHARMC) -c $<
+	touch $@
 
 clean:
-	rm -f *.o *.decl.h *.def.h $(LIB) headers
+	rm -f *.o *.decl.h *.def.h $(LIB) headers *.stamp
