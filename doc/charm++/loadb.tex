@@ -609,7 +609,7 @@ public:
   void done(void)
   \{
     count++;
-    if(count==nElements){
+    if(count==nElements)\{
       CkPrintf("All done");
       CkExit();
     \}
@@ -637,7 +637,7 @@ public:
     CBase_LBExample::pup(p);
     p|workcnt;
     /* There may be some more variables used in doWork */
-  }
+  \}
 	
   void doWork()
   \{
