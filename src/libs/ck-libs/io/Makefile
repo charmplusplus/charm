@@ -5,7 +5,7 @@ MODULE=CkIO
 LIB = $(CDIR)/lib/libmodule$(MODULE).a
 LIBOBJ = ckio.o
 
-HEADERS = ckio.h $(MODULE).decl.h $(MODULE).def.h
+HEADERS = ckio.h $(MODULE).decl.h $(MODULE).def.h $(MODULE)_impl.decl.h $(MODULE)_impl.def.h
 
 all: $(LIBDEST)$(LIB)
 

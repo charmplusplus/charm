@@ -1,17 +1,13 @@
 #ifndef CK_IO_H
 #define CK_IO_H
 
-#include <cstring>
 #include <string>
-#include <algorithm>
-#include <utility>
-#include <fcntl.h>
-#include <pup_stl.h>
+#include <pup.h>
+#include <ckcallback.h>
+
+#include <CkIO.decl.h>
 
 namespace Ck { namespace IO {
-  /// Identifier for a file to be accessed
-  typedef int Token;
-
   struct Options {
     Options()
       : peStripe(-1), writeStripe(-1), activePEs(-1), basePE(-1), skipPEs(-1)
@@ -37,106 +33,88 @@ namespace Ck { namespace IO {
     }
   };
 
-    struct FileReadyMsg;
-  }
-}
+  class File;
+  class Session;
 
-#include "CkIO.decl.h"
-#include <map>
-#include <vector>
+  /// Open the named file on the selected subset of PEs, and send a
+  /// FileReadyMsg to the opened callback when the system is ready to accept
+  /// session requests on that file.
+  void open(std::string name, CkCallback opened, Options opts);
 
-namespace Ck { namespace IO {
-  struct FileReadyMsg : public CMessage_FileReadyMsg {
-    Token token;
-    FileReadyMsg(const Token &tok) : token(tok) {}
-  };
+  /// Prepare to write data into the file described by token, in the window
+  /// defined by the offset and byte length. When the session is set up, a
+  /// SessionReadyMsg will be sent to the ready callback. When all of the data
+  /// has been written and synced, a message will be sent to the complete
+  /// callback.
+  void startSession(File file, size_t bytes, size_t offset,
+                    CkCallback ready, CkCallback complete);
 
-  namespace impl {  
-    struct buffer
-    {
-      std::vector<char> array;
-      int bytes_filled_so_far;
-    
-      buffer()
-      {
-	bytes_filled_so_far = 0;
-      }
+  /// Prepare to write data into @arg file, in the window defined by the @arg
+  /// offset and length in @arg bytes. When the session is set up, a
+  /// SessionReadyMsg will be sent to the @arg ready callback. When all of the
+  /// data has been written and synced, an additional write will be made to the
+  /// file to `commit' the session's work. When that write has completed, a
+  /// message will be sent to the @arg complete callback.
+  void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
+                    const char *commitData, size_t commitBytes, size_t commitOffset,
+                    CkCallback complete);
 
-      void expect(size_t bytes)
-      {
-	array.resize(bytes);
-      }
-    
-      void insertData(const char *data, size_t length, size_t offset)
-      {
-	char *dest = &array[offset];
-	memcpy(dest, data, length);
+  /// Write the given data into the file to which session is attached. The
+  /// offset is relative to the file as a whole, not to the session's offset.
+  void write(Session session, const char *data, size_t bytes, size_t offset);
 
-	bytes_filled_so_far += length;
-      }
+  /// Close a previously-opened file. All sessions on that file must have
+  /// already signalled that they are complete.
+  void close(File file, CkCallback closed);
 
-      bool isFull()
-      {
-	return bytes_filled_so_far == array.size();
-      }
-    };
-    
+  class File {
+    int token;
+    friend void startSession(File file, size_t bytes, size_t offset,
+                             CkCallback ready, CkCallback complete);
+    friend void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
+                             const char *commitData, size_t commitBytes, size_t commitOffset,
+                             CkCallback complete);
+    friend void close(File file, CkCallback closed);
+    friend class FileReadyMsg;
 
-    struct FileInfo {
-      std::string name;
-      Options opts;
-      size_t bytes, total_written;
-      int fd;
-      CkCallback complete;
-      std::map<size_t, struct buffer> bufferMap;
-
-    FileInfo(std::string name_, size_t bytes_, Options opts_)
-    : name(name_), opts(opts_), bytes(bytes_), total_written(0), fd(-1)
-      { }
-    FileInfo()
-    : bytes(-1), total_written(-1), fd(-1)
-      { }
-    };
-  }
-
-  /// Class to mediate IO operations between Charm++ application code
-  /// and underlying filesystems.
-  ///
-  /// Tokens are passed to @arg ready callbacks, which the application
-  /// then passes to the local methods when initiating operations.
-  class Manager : public CBase_Manager {
   public:
-    Manager();
-
-    Manager_SDAG_CODE;
-
-    /// Application-facing methods, invoked locally on the calling PE
-    void prepareOutput(const char *name, size_t bytes,
-		       CkCallback ready, CkCallback complete,
-		       Options opts = Options());
-    void write(Token token, const char *data, size_t bytes, size_t offset);
-
-    void prepareInput(const char *name, CkCallback ready,
-		      Options opts = Options());
-    void read(Token token, void *data, size_t bytes, size_t offset,
-	      CkCallback complete);
-
-
-    /// Internal methods, used for interaction among IO managers across the system
-    void write_forwardData(Token token, const char *data, size_t bytes, size_t offset);
-    void write_dataWritten(Token token, size_t bytes);
-
-  private:
-    int filesOpened;
-    Token nextToken;
-    std::map<Token, impl::FileInfo> files;
-    CkCallback nextReady;
-
-    int lastActivePE(const Options &opts) {
-      return opts.basePE + (opts.activePEs-1)*opts.skipPEs;
-    }
-    int openFile(const std::string& name);
+    File(int token_) : token(token_) { }
+    File() : token(-1) { }
+    void pup(PUP::er &p) { p|token; }
   };
 
-  }}
+  class FileReadyMsg : public CMessage_FileReadyMsg {
+  public:
+    File file;
+    FileReadyMsg(const File &tok) : file(tok) {}
+  };
+
+  namespace impl { class Manager; }
+
+  class Session {
+    int file;
+    size_t bytes, offset;
+    CkArrayID sessionID;
+    friend class Ck::IO::impl::Manager;
+  public:
+    Session(int file_, size_t bytes_, size_t offset_,
+            CkArrayID sessionID_)
+      : file(file_), bytes(bytes_), offset(offset_), sessionID(sessionID_)
+      { }
+    Session() { }
+    void pup(PUP::er &p) {
+      p|file;
+      p|bytes;
+      p|offset;
+      p|sessionID;
+    }
+  };
+
+  class SessionReadyMsg : public CMessage_SessionReadyMsg {
+  public:
+    Session session;
+    SessionReadyMsg(Session session_) : session(session_) { }
+  };
+
+}}
 #endif

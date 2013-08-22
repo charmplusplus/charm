@@ -2000,6 +2000,7 @@ CpvExtern(int,charmLibExitFlag);
 /******** I/O wrappers ***********/
 
 size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f);
+CmiInt8 CmiPwrite(int fd, char *buf, size_t bytes, size_t offset);
 FILE *CmiFopen(const char *path, const char *mode);
 int CmiFclose(FILE *fp);
 

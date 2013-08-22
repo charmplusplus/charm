@@ -22,6 +22,32 @@ virtual functions are defined here.
 #include "pup.h"
 #include "ckhashtable.h"
 
+#if defined(_WIN32)
+#include <io.h>
+
+int pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
+{
+  long ret = _lseek(fd, offset, SEEK_SET);
+
+  if (ret == -1) {
+    return(-1);
+  }
+  return(_write(fd, buf, nbytes));
+}
+#define NO_UNISTD_NEEDED
+#endif
+
+#if defined(__PGIC__)
+// PGI compilers define funny feature flags that lead to standard
+// headers omitting this prototype
+ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+#define NO_UNISTD_NEEDED
+#endif
+
+#if !defined(NO_UNISTD_NEEDED)
+#include <unistd.h>
+#endif
+
 PUP::er::~er() {}
 
 void PUP::er::operator()(able& a)
@@ -156,6 +182,25 @@ size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
             nwritten += ncur;
         }
         return nwritten;
+}
+
+CmiInt8 CmiPwrite(int fd, char *buf, size_t bytes, size_t offset)
+{
+  size_t origBytes = bytes;
+  while (bytes > 0) {
+    CmiInt8 ret = pwrite(fd, buf, bytes, offset);
+    if (ret < 0) {
+      if (errno == EINTR) {
+        continue;
+      } else {
+        return ret;
+      }
+    }
+    bytes -= ret;
+    buf += ret;
+    offset += ret;
+  }
+  return origBytes;
 }
 
 size_t CmiFread(void *ptr, size_t size, size_t nmemb, FILE *f)
