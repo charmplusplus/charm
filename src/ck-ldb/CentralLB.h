@@ -102,6 +102,7 @@ public:
   
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
+  void t_LoadBalance(void); 
   void ResumeClients(int);                      // Resuming clients needs
 
   void ResumeClients(CkReductionMsg *); // to be resumed via message
@@ -249,6 +250,7 @@ protected:
                       LBMigrateMsg* msg, LBSimulation* simResults);
   void removeNonMigratable(LDStats* statsDataList, int count);
 	CProxy_CentralLB thisProxy;
+  void loadbalance_with_thread() { use_thread = 1; }
 private:  
 //CProxy_CentralLB thisProxy;
   int myspeed;
@@ -264,7 +266,7 @@ private:
   LBMigrateMsg   *storedMigrateMsg;
   LBScatterMsg   *storedScatterMsg;
   int  reduction_started;
-
+  int  use_thread;
 
   FutureModel *predicted_model;
 

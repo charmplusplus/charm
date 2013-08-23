@@ -116,6 +116,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   lbdone = 0;
   count_msgs=0;
   statsMsg = NULL;
+  use_thread = 0;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
@@ -621,7 +622,10 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
   if (stats_msg_count == clients) {
 	DEBUGF(("[%d] All stats messages received \n",CmiMyPe()));
     statsData->nprocs() = stats_msg_count;
-    thisProxy[CkMyPe()].LoadBalance();
+    if (use_thread)
+        thisProxy[CkMyPe()].t_LoadBalance();
+    else
+        thisProxy[CkMyPe()].LoadBalance();
   }
 #endif
 }
@@ -765,6 +769,11 @@ void CentralLB::LoadBalance()
   statsData->clear();
   stats_msg_count=0;
 #endif
+}
+
+void CentralLB::t_LoadBalance()
+{
+    LoadBalance();
 }
 
 void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
@@ -1691,7 +1700,7 @@ void CentralLB::pup(PUP::er &p) {
   p | lbDecisionCount;
   p | resumeCount;
 #endif
-	
+  p | use_thread;
 }
 
 int CentralLB::useMem() { 
