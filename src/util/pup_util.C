@@ -40,7 +40,11 @@ int pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
 #if defined(__PGIC__)
 // PGI compilers define funny feature flags that lead to standard
 // headers omitting this prototype
-ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+
+extern "C" {
+
+extern ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+}
 #define NO_UNISTD_NEEDED
 #endif
 
