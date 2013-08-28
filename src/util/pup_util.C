@@ -25,9 +25,9 @@ virtual functions are defined here.
 #if defined(_WIN32)
 #include <io.h>
 
-int pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
+int pwrite(int fd, const void *buf, size_t nbytes, __int64 offset)
 {
-  long ret = _lseek(fd, offset, SEEK_SET);
+  __int64 ret = _lseek(fd, offset, SEEK_SET);
 
   if (ret == -1) {
     return(-1);
