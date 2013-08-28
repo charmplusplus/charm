@@ -305,7 +305,7 @@ namespace Ck { namespace IO {
             fatalError("fsync failed", file->name);
 #elif defined(_WIN32)
           intptr_t hFile = _get_osfhandle(file->fd);
-          if (FlushFileBuffers(hFile) == 0)
+          if (FlushFileBuffers((HANDLE)hFile) == 0)
             fatalError("FlushFileBuffers failed", file->name);
 #elif CMK_HAS_SYNC_FUNC
 #warning "Will call sync() for every completed write"
