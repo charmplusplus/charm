@@ -12,6 +12,10 @@ typedef int FileToken;
 #include <errno.h>
 #include <pup_stl.h>
 
+#if defined(_WIN32)
+#include <io.h>
+#endif
+
 using std::min;
 using std::max;
 using std::map;
@@ -180,7 +184,11 @@ namespace Ck { namespace IO {
           if (fd != -1) {
             int ret;
             do {
+#if defined(_WIN32)
+              ret = _close(fd);
+#else
               ret = ::close(fd);
+#endif
             } while (ret < 0 && errno == EINTR);
             if (ret < 0)
               fatalError("close failed", files[token].name);
@@ -295,6 +303,10 @@ namespace Ck { namespace IO {
 #elif CMK_HAS_FSYNC_FUNC
           if (fsync(file->fd) < 0)
             fatalError("fsync failed", file->name);
+#elif defined(_WIN32)
+          intptr_t hFile = _get_osfhandle(file->fd);
+          if (FlushFileBuffers(hFile) == 0)
+            fatalError("FlushFileBuffers failed", file->name);
 #elif CMK_HAS_SYNC_FUNC
 #warning "Will call sync() for every completed write"
           sync(); // No error reporting from sync()
