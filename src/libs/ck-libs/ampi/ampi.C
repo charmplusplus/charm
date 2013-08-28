@@ -5324,6 +5324,7 @@ int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
   rroot = ptr->getIndexForRemoteRank(0);
   lhigh = high;
   lrank = ptr->getRank(intercomm);
+  first = 0;
 
   if(lrank==0){
     MPI_Status sts;
