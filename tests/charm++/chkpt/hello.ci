@@ -1,7 +1,11 @@
 mainmodule hello {
   readonly CProxy_Main mainProxy;
   readonly CProxy_Hello helloProxy;
+  readonly CProxy_CHello chelloProxy;
+  readonly CProxy_HelloGroup helloGroupProxy;
+  readonly CProxy_HelloNodeGroup helloNodeGroupProxy;
   readonly int nElements;
+  readonly int chkpPENum;
 
   mainchare [migratable] Main {
     entry Main(CkArgMsg *m);
@@ -17,4 +21,13 @@ mainmodule hello {
     entry CHello(void);
     entry void SayHi(int);
   };
+
+  group [migratable] HelloGroup{
+    entry HelloGroup(void);
+  };
+
+  nodegroup [migratable] HelloNodeGroup{
+    entry HelloNodeGroup(void);
+  };
+
 };
