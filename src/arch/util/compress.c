@@ -21,6 +21,7 @@
 #include <math.h>
 struct timeval tv;
 #include <sys/time.h>
+#include <assert.h>
 
 //#define USE_SSE 1 
 
