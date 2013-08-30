@@ -3,6 +3,9 @@ AC_INIT(./Makefile)
 
 AC_CONFIG_HEADER(conv-autoconfig.h)
 
+AC_CONFIG_COMMANDS([config-cleanup],
+                   [sed -i -e 's:^#define\s\+PACKAGE://&:' conv-autoconfig.h])
+
 CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
