@@ -257,7 +257,7 @@ static int partnerFailureHandlerIdx;
 static double lastPingTime = -1;
 
 extern "C" void mpi_restart_crashed(int pe, int rank);
-extern "C" int  find_spare_mpirank(int pe);
+extern "C" int  find_spare_mpirank(int pe, int partition);
 
 void heartBeatPartner();
 void heartBeatHandler(void *msg);
@@ -464,7 +464,7 @@ void partnerFailureHandler(char *msg)
    int diepe = *(int *)(msg+CmiMsgHeaderSizeBytes);
 
    // send message to crash pe to let it restart
-   int newrank = find_spare_mpirank(diepe);
+   int newrank = find_spare_mpirank(diepe, CmiMyPartition());
    int buddy = getReverseCheckPointPE();
    if (buddy == diepe)  {
      mpi_restart_crashed(diepe, newrank);
