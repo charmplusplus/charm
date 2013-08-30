@@ -411,7 +411,7 @@ void ArrayClass::methodName (CkCallback &cb)
 \end{alltt}
 
 Inside the reduction's target method, the contributions can be accessed by using
-the \kw{CkReduction::setElement->next()} iterator.
+the \texttt{CkReduction::setElement->next()} iterator.
 
 \begin{alltt}
 void SomeClass::reductionTargetMethod (CkReductionMsg *msg)
@@ -436,7 +436,7 @@ data type, you will likely have to supply code for
 %reduction element data is complex.  
 serializing/deserializing them.
 Consider using the \kw{PUP}
-interface see ~\ref{sec:pup} to simplify your object serialization
+interface (\S~\ref{sec:pup}) to simplify your object serialization
 needs.
 
 If the outcome of your reduction is dependent on the order in which 
