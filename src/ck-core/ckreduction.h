@@ -165,8 +165,8 @@ public:
 	// and contains the data from one contribution.
 	class setElement {
 	public:
-	        int dataSize;//The length of the data array below
-	        char data[1];//The (dataSize-long) array of data
+	        int dataSize;//The allocated length of the `data' array, in bytes
+	        char data[1];//The beginning of the array of data
 		//Utility routine: get the next setElement,
 		// or return NULL if there are none.
 		setElement *next(void);

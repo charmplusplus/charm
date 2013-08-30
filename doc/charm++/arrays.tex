@@ -382,7 +382,6 @@ are not delimiter-separated.
 
 \end{enumerate}
 
-
 \kw{CkReduction::set} returns a collection of \kw{CkReduction::setElement}
 objects, one per contribution.  This class has the definition:
 
@@ -390,25 +389,43 @@ objects, one per contribution.  This class has the definition:
 class CkReduction::setElement 
 \{
 public:
-  int dataSize;//The length of the data array below
-  char data[];//The (dataSize-long) array of data
+  int dataSize; //The length of the `data' array in bytes.
+  char data[1]; //A place holder that marks the start of the data array.
   CkReduction::setElement *next(void);
 \};
 \end{alltt}
 
-To extract the contribution of each array element from a reduction set, use the
-\uw{next} routine repeatedly:
+Example: Suppose you would like to contribute 3 integers from each array
+element. In the reduction method you would do the following:
 
 \begin{alltt}
-  //Inside a reduction handler-- 
-  //  data is our reduced data from CkReduction_set
-  CkReduction::setElement *cur=(CkReduction::setElement *)data;
-  while (cur!=NULL)
+void ArrayClass::methodName (CkCallback &cb)
+\{
+  int result[3];
+  result[0] = 1;            // Copy the desired values into the result.
+  result[1] = 2;
+  result[3] = 3;
+  // Contribute the result to the reductiontarget cb.
+  contribute(3*sizeof(int), result, CkReduction::set, cb);
+\}
+\end{alltt}
+
+Inside the reduction's target method, the contributions can be accessed by using
+the \kw{CkReduction::setElement->next()} iterator.
+
+\begin{alltt}
+void SomeClass::reductionTargetMethod (CkReductionMsg *msg)
+\{
+  // Get the initial element in the set.
+  CkReduction::setElement *current = (CkReduction::setElement*) msg->getData();
+  while(current != NULL) // Loop over elements in set.
   \{
-    ... //Use cur->dataSize and cur->data
-    //Now advance to the next element's contribution
-    cur=cur->next();
+    // Get the pointer to the packed int's.
+    int *result = (int*) &current->data;
+    // Do something with result.
+    current = current->next(); // Iterate.
   \}
+\}
 \end{alltt}
 
 The reduction set order is undefined.  You should add a source field to the
