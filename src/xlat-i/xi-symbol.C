@@ -4267,7 +4267,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
   if (!isMessage) {
     genClosureTypeName = new XStr();
     genClosureTypeNameProxy = new XStr();
-    *genClosureTypeNameProxy << " Closure_" << container->baseName() << "::";
+    *genClosureTypeNameProxy << "Closure_" << container->baseName() << "::";
     *genClosureTypeNameProxy << name << "_" << entryCount << "_closure";
     *genClosureTypeName << name << "_" << entryCount << "_closure";
 
@@ -5237,9 +5237,9 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {
   if (isMarshalled()) {
-    str << "        PUP::fromMem implP(impl_buf);\n";
+    str << "          PUP::fromMem implP(impl_buf);\n";
     callEach(&Parameter::beginUnmarshall,str);
-    str << "        impl_buf+=CK_ALIGN(implP.size(),16);\n";
+    str << "          impl_buf+=CK_ALIGN(implP.size(),16);\n";
     callEach(&Parameter::unmarshallArrayDataSDAG,str);
   }
 }
