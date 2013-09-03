@@ -390,7 +390,7 @@ public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void resume(const CkArrayIndex &idx, PUP::er &p, bool create, int dummy=0);
 #else
-	void resume(const CkArrayIndex &idx, PUP::er &p, bool notify=true,bool=false);
+	void resume(const CkArrayIndex &idx, PUP::er &p, bool notify=true,bool rebuild=false, bool create = true);
 #endif
 
 //Communication:
@@ -433,7 +433,7 @@ private:
         CkElementCreation_t type, bool create=true, int dummy=0);
 #else
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-		CkElementCreation_t type,bool rebuild = false);
+		CkElementCreation_t type,bool rebuild = false, bool create = true);
 #endif
 
 	/// Call this member function on each element of this location:

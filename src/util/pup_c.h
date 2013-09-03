@@ -90,6 +90,12 @@ void pup_destroy(pup_er p);
 return 1 for true, 0 for false.*/
 int pup_isPacking(const pup_er p);
 int pup_isUnpacking(const pup_er p);
+int pup_isChecking(const pup_er p);
+int pup_isCalChecking(const pup_er p);
+void pup_resumeChecking(const pup_er p);
+void pup_skipChecking(const pup_er p);
+void pup_setAccuracy(const pup_er p,double accuracy);
+void pup_setAccuracyBit(const pup_er p,int accuracy);
 int pup_isSizing(const pup_er p);
 int pup_isDeleting(const pup_er p);
 int pup_isUserlevel(const pup_er p);

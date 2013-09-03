@@ -58,6 +58,18 @@ CDECL int pup_isPacking(const pup_er p)
   { return (mp.isPacking())?1:0;}
 CDECL int pup_isUnpacking(const pup_er p)
   { return (mp.isUnpacking())?1:0;}
+CDECL int pup_isChecking(const pup_er p)
+  { return (mp.isChecking())?1:0;}
+CDECL int pup_isCalChecking(const pup_er p)
+  { return (mp.isCalChecking())?1:0;}
+CDECL void pup_resumeChecking(const pup_er p)
+  { mp.resume();}
+CDECL void pup_skipChecking(const pup_er p)
+  { mp.skip();}
+CDECL void pup_setAccuracy(const pup_er p,double accuracy)
+  { mp.setAccuracy(accuracy);}
+CDECL void pup_setAccuracyBit(const pup_er p,int accuracy)
+  { mp.setAccuracyBit(accuracy);}
 CDECL int pup_isSizing(const pup_er p)
   { return (mp.isSizing())?1:0;}
 CDECL int pup_isDeleting(const pup_er p)

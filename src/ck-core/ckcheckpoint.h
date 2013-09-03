@@ -44,13 +44,8 @@ restarting of Charm++ programs. ...
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
 void CkPupChareData(PUP::er &p);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkPupGroupData(PUP::er &p,bool create=true);
 void CkPupNodeGroupData(PUP::er &p,bool create=true);
-#else
-void CkPupGroupData(PUP::er &p);
-void CkPupNodeGroupData(PUP::er &p);
-#endif
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
 void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();

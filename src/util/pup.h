@@ -151,6 +151,8 @@ class er {
   enum {IS_SIZING   =0x0100,
   	IS_PACKING  =0x0200,
         IS_UNPACKING=0x0400,
+        IS_CHECKING=0x0800,  // If set, it is checking the match of 2 checkpoints
+        IS_CALCHECKING=0x1000,  // If set, it is calculating the checksum
         TYPE_MASK   =0xFF00
   };
   unsigned int PUP_er_state;
@@ -163,6 +165,9 @@ class er {
   bool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0?true:false;}
   bool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0?true:false;}
   bool isUnpacking(void) const {return (PUP_er_state&IS_UNPACKING)!=0?true:false;}
+  bool isChecking(void) const {return (PUP_er_state&IS_CHECKING||PUP_er_state&IS_CALCHECKING)!=0?true:false;}
+  bool isCalChecking(void) const {return (PUP_er_state&IS_CALCHECKING)!=0?true:false;}
+
   const char *  typeString() const;
   unsigned int getStateFlags(void) const {return PUP_er_state;}
 
@@ -306,6 +311,12 @@ class er {
 
   virtual size_t size(void) const { return 0; }
   
+  virtual void setAccuracy(double _accuracy){}
+  virtual void setAccuracyBit(int _accuracy){}
+  virtual void skipNext(){}
+  virtual void skip(){}
+  virtual void resume(){}
+  
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
   virtual int impl_tell(seekBlock &s); /*Give the current offset*/
@@ -392,6 +403,86 @@ class mem : public er { //Memory-buffer packers and unpackers
  public:
   //Return the current number of buffer bytes used
   size_t size(void) const {return buf-origBuf;}
+};
+
+class checker : public er {
+  protected:
+    virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+    myByte * origBuf;
+    myByte * buf;
+    double accuracy;
+    int accuracyBit;
+    int sum1;
+    int sum2;
+    bool _skip;
+    bool result;
+    bool reset;
+    bool calCheck;
+    long long offset;
+    int fault_bytes;
+  public:
+    checker(void * Abuf, void * Bbuf):er(IS_CHECKING),origBuf((myByte *)Abuf),buf((myByte *)Bbuf),_skip(true),accuracy(0.0),result(true),reset(false),calCheck(false), fault_bytes(0) {}
+    checker(void * Abuf):er(IS_CALCHECKING),origBuf((myByte *)Abuf),buf((myByte *)Abuf),_skip(true),accuracy(0.0),result(true),reset(false),calCheck(true),sum1(0),sum2(0),fault_bytes(0) {}
+    virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
+    virtual int impl_tell(seekBlock &s); /*Give the current offset*/
+    virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+    virtual void setAccuracy(double _accuracy) 
+    {
+      accuracy = _accuracy;
+    }
+    virtual void setAccuracyBit(int _accuracy) 
+    {
+      accuracyBit = _accuracy;
+      offset = 0XFFFFFFFFFFFFFFFFLL;
+      offset = offset<<accuracyBit;
+    }
+    virtual void skipNext() 
+    {
+      _skip = true;
+      reset = true;
+    }
+    virtual void skip() 
+    {
+      _skip = true;
+      reset = false;
+    }
+    virtual void resume() 
+    {
+      _skip = false;
+    }
+
+    void add(int value)
+    {
+      union{int value;char byte[4];} data;
+      data.value = value;
+      for(int i=0;i<4;i++){
+        add(data.byte[i]);
+      }
+    }
+
+    void add(double value)
+    {
+      union{long long int value;char byte[8];} data;
+      long long int intA = *(long long int *)&value;
+      if(intA<0)
+        intA = 0X8000000000000000LL -intA;
+      intA = intA&offset;
+      data.value = intA;
+      for(int i=0;i<8;i++)
+      {
+        add(data.byte[i]);
+      }
+    }
+
+    void add(char value)
+    {
+      sum1 = (sum1+value)%255;
+      sum2 = (sum1+sum2)%255;
+    }
+
+    bool getResult() {return result;}	
+    int getChecksum() {return (sum2<<8)|sum1;}
+    int getFaultNum(){return fault_bytes;}
 };
 
 //For packing into a preallocated, presized memory buffer

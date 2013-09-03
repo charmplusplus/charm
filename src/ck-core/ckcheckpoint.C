@@ -320,7 +320,6 @@ void CkPupChareData(PUP::er &p)
 }
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 // handle GroupTable and data
 void CkPupGroupData(PUP::er &p, bool create)
 {
@@ -375,8 +374,10 @@ void CkPupGroupData(PUP::er &p, bool create)
 	  }   // end of unPacking
 	  IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
 	  // if using migration constructor, you'd better have a pup
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	  	if(!create)
 			gobj->mlogData->teamRecoveryFlag = 1;
+#endif
           gobj->pup(p);
          // CkPrintf("Group PUP'ed: gid = %d, name = %s\n",gobj->ckGetGroupID().idx, tmpInfo[i].name);
 	}
@@ -429,117 +430,6 @@ void CkPupNodeGroupData(PUP::er &p, bool create)
 	}
 	delete [] tmpInfo;
 }
-#else
-// handle GroupTable and data
-void CkPupGroupData(PUP::er &p)
-{
-	int numGroups = 0, i;
-
-	if (!p.isUnpacking()) {
-	  numGroups = CkpvAccess(_groupIDTable)->size();
-	}
-	p|numGroups;
-	if (p.isUnpacking()) {
-	  if(CkMyPe()==0)  
-            CkpvAccess(_numGroups) = numGroups+1; 
-          else 
-	    CkpvAccess(_numGroups) = 1;
-	}
-	DEBCHK("[%d] CkPupGroupData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
-
-	GroupInfo *tmpInfo = new GroupInfo [numGroups];
-	if (!p.isUnpacking()) {
-	  for(i=0;i<numGroups;i++) {
-		tmpInfo[i].gID = (*CkpvAccess(_groupIDTable))[i];
-		TableEntry ent = CkpvAccess(_groupTable)->find(tmpInfo[i].gID);
-		tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
-		tmpInfo[i].DefCtor = _chareTable[ent.getcIdx()]->defCtor;
-		strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
-		DEBCHK("[%d] CkPupGroupData: %s group %s \n",
-			CkMyPe(), p.typeString(), tmpInfo[i].name);
-
-		if(tmpInfo[i].MigCtor==-1) {
-			char buf[512];
-			sprintf(buf,"Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name);
-			CkAbort(buf);
-		}
-	  }
-  	}
-	for (i=0; i<numGroups; i++) p|tmpInfo[i];
-
-	for(i=0;i<numGroups;i++) 
-	{
-	  CkGroupID gID = tmpInfo[i].gID;
-	  if (p.isUnpacking()) {
-	    //CkpvAccess(_groupIDTable)->push_back(gID);
-	    int eIdx = tmpInfo[i].MigCtor;
-	    // error checking
-	    if (eIdx == -1) {
-	      CkPrintf("[%d] ERROR> Group %s's migration constructor is not defined!\n", CkMyPe(), tmpInfo[i].name); CkAbort("Abort");
-	    }
-	    void *m = CkAllocSysMsg();
-	    envelope* env = UsrToEnv((CkMessage *)m);
-            env->setMsgtype(BocInitMsg);
-	    CkCreateLocalGroup(gID, eIdx, env);
-	  }   // end of unPacking
-	  IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
-	  // if using migration constructor, you'd better have a pup
-          gobj->pup(p);
-          DEBCHK("Group PUP'ed: gid = %d, name = %s\n",
-			gobj->ckGetGroupID().idx, tmpInfo[i].name);
-	}
-	delete [] tmpInfo;
-}
-
-// handle NodeGroupTable and data
-void CkPupNodeGroupData(PUP::er &p)
-{
-	int numNodeGroups = 0, i;
-	if (!p.isUnpacking()) {
-	  numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
-	}
-	p|numNodeGroups;
-	if (p.isUnpacking()) {
-	  if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
-	  else { CksvAccess(_numNodeGroups) = 1; }
-	}
-	DEBCHK("[%d] CkPupNodeGroupData %s: numNodeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
-
-	GroupInfo *tmpInfo = new GroupInfo [numNodeGroups];
-	if (!p.isUnpacking()) {
-	  for(i=0;i<numNodeGroups;i++) {
-		tmpInfo[i].gID = CksvAccess(_nodeGroupIDTable)[i];
-		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(tmpInfo[i].gID);
-		tmpInfo[i].MigCtor = _chareTable[ent2.getcIdx()]->migCtor;
-		if(tmpInfo[i].MigCtor==-1) {
-			char buf[512];
-			sprintf(buf,"NodeGroup %s either need a migration constructor and\n\
-				     declared as [migratable] in .ci to be able to checkpoint.",\
-				     _chareTable[ent2.getcIdx()]->name);
-			CkAbort(buf);
-		}
-	  }
-	}
-	for (i=0; i<numNodeGroups; i++) p|tmpInfo[i];
-	for (i=0;i<numNodeGroups;i++) {
-		CkGroupID gID = tmpInfo[i].gID;
-		if (p.isUnpacking()) {
-			//CksvAccess(_nodeGroupIDTable).push_back(gID);
-			int eIdx = tmpInfo[i].MigCtor;
-			void *m = CkAllocSysMsg();
-			envelope* env = UsrToEnv((CkMessage *)m);
-			CkCreateLocalNodeGroup(gID, eIdx, env);
-		}
-		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(gID);
-		IrrGroup *obj = ent2.getObj();
-		obj->pup(p);
-		DEBCHK("Nodegroup PUP'ed: gid = %d, name = %s\n",
-			obj->ckGetGroupID().idx,
-			_chareTable[ent2.getcIdx()]->name);
-	}
-	delete [] tmpInfo;
-}
-#endif
 
 // handle chare array elements for this processor
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners)

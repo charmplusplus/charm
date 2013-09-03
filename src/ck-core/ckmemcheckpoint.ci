@@ -6,7 +6,11 @@ module CkMemCheckpoint {
 
   message CkArrayCheckPTMessage {
         double packData[];
-  };    
+  };
+  message CkCheckPTMessage {
+        char packData[];
+  };
+
   message CkProcCheckPTMessage {
         char packData[];
   };    
@@ -36,6 +40,13 @@ module CkMemCheckpoint {
 	entry void quiescence(CkCallback&);
         entry void inmem_restore(CkArrayCheckPTMessage *m);
 	entry void updateLocations(int n, CkGroupID g[n], CkArrayIndex idx[n],int nowOnPe);
+  
+        //replica ft
+        entry void doneComparison(bool);
+        entry [reductiontarget] void doneRComparison(int);
+        entry [reductiontarget] void recoverFromSoftFailure();
+        entry void doneBothComparison();
+        entry void RollBack();
   };
 
   initproc void CkRegisterRestartHandler();

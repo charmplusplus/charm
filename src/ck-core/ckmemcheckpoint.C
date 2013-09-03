@@ -1,43 +1,43 @@
 
 /*
-Charm++ support for fault tolerance of
-In memory synchronous checkpointing and restart
+   Charm++ support for fault tolerance of
+   In memory synchronous checkpointing and restart
 
-written by Gengbin Zheng, gzheng@uiuc.edu
+   written by Gengbin Zheng, gzheng@uiuc.edu
            Lixia Shi,     lixiashi@uiuc.edu
 
-added 12/18/03:
+   added 12/18/03:
 
-To support fault tolerance while allowing migration, it uses double
-checkpointing scheme for each array element (not a infallible scheme).
-In this version, checkpointing is done based on array elements. 
-Each array element individully sends its checkpoint data to two buddies.
+   To support fault tolerance while allowing migration, it uses double
+   checkpointing scheme for each array element (not a infallible scheme).
+   In this version, checkpointing is done based on array elements. 
+   Each array element individully sends its checkpoint data to two buddies.
 
-In this implementation, assume only one failure happens at a time,
-or two failures on two processors which are not buddy to each other;
-also assume there is no failure during a checkpointing or restarting phase.
+   In this implementation, assume only one failure happens at a time,
+   or two failures on two processors which are not buddy to each other;
+   also assume there is no failure during a checkpointing or restarting phase.
 
-Restart phase contains two steps:
-1. Converse level restart: the newly created process for the failed
+   Restart phase contains two steps:
+   1. Converse level restart: the newly created process for the failed
    processor recover its system data (no array elements) from 
    its backup processor.
-2. Charm++ level restart: CkMemCheckPT gets control and recover array 
+   2. Charm++ level restart: CkMemCheckPT gets control and recover array 
    elements and reset all states of system groups to be consistent.
 
-added 3/14/04:
-1. also support for double in-disk checkpoint/restart
+   added 3/14/04:
+   1. also support for double in-disk checkpoint/restart
    set "where" to CkCheckPoint_inDISK/CkCheckPoint_inMEM in init()
 
-added 4/16/04:
-1. also support the case when there is a pool of extra processors.
+   added 4/16/04:
+   1. also support the case when there is a pool of extra processors.
    set CK_NO_PROC_POOL to 0.
 
 TODO:
 1. checkpoint scheme can be reimplemented based on per processor scheme;
- restart phase should restore/reset group table, etc on all processors, thus flushStates() can be eliminated.
+restart phase should restore/reset group table, etc on all processors, thus flushStates() can be eliminated.
 2. crash at checkpointing phase currently is catastrophic, can be fixed by storing another transient checkpoints.
 
-*/
+ */
 
 #include "unistd.h"
 
@@ -60,6 +60,7 @@ void noopck(const char*, ...)
 static int replicaDieHandlerIdx;
 static int replicaDieBcastHandlerIdx;
 static int changePhaseHandlerIdx;
+static inline void _handleProcData(PUP::er &p, bool create = true);
 // assume NO extra processors--1
 // assume extra processors--0
 #if CMK_CONVERSE_MPI
@@ -70,6 +71,7 @@ static int buddyDieHandlerIdx;
 static double lastPingTime = -1;
 void pingBuddy();
 void pingCheckHandler();
+
 #else
 #define CK_NO_PROC_POOL				0
 #endif
@@ -77,7 +79,7 @@ void pingCheckHandler();
 #define CMK_CHKP_ALL		1
 #define CMK_USE_BARRIER		0
 
-#define FAIL_DET_THRESHOLD 10
+#define FAIL_DET_THRESHOLD 2
 
 //stream remote records happned only if CK_NO_PROC_POOL =1 which means the chares to pe map will change
 #define STREAMING_INFORMHOME                    1
@@ -90,8 +92,48 @@ int CkMemCheckPT::inLoadbalancing = 0;
 double CkMemCheckPT::startTime;
 char *CkMemCheckPT::stage;
 CkCallback CkMemCheckPT::cpCallback;
+int CkMemCheckPT::replicaAlive = 1;
 
+static int arg_where = CkCheckPoint_inMEM;
 int _memChkptOn = 1;			// checkpoint is on or off
+
+/*ACR related functions and variables*/ 
+#if CMK_MEM_CHECKPOINT
+bool compare(char * buf1, char * buf2);
+#endif
+
+CpvDeclare(int, use_checksum);
+CpvDeclare(int, resilience);
+CpvDeclare(int, _remoteCrashedNode);
+CpvDeclare(CkCheckPTMessage**, chkpBuf);
+CpvDeclare(CkCheckPTMessage**, localProcChkpBuf);
+//store the checkpoint of the buddy to compare
+//do not need the whole msg, can be the checksum
+CpvDeclare(CkCheckPTMessage*, buddyBuf);
+CpvDeclare(CkCheckPTMessage*, recoverProcBuf);
+CpvDeclare(CkCheckPTMessage*, recoverArrayBuf);
+CpvDeclare(int, localChecksum);
+CpvDeclare(int, remoteChecksum);
+CpvDeclare(int, curPointer);
+CpvDeclare(int, recvdRemote);
+CpvDeclare(int, recvdLocal);
+CpvDeclare(int, remoteStarted);
+CpvDeclare(int, localStarted);
+CpvDeclare(int, remoteReady);
+CpvDeclare(int, localReady);
+CpvDeclare(int, recvdArrayChkp);
+CpvDeclare(int, recvdProcChkp);
+CpvDeclare(int, remoteRecovered);
+CpvDeclare(int, waitForRecover);
+
+static int replicaChkpStartHandlerIdx;
+static int recvRemoteChkpHandlerIdx;
+static int replicaChkpDoneHandlerIdx;
+static int recvPhaseHandlerIdx;
+static int askRecoverDataHandlerIdx;
+static int recoverRemoteProcDataHandlerIdx;
+static int recoverRemoteArrayDataHandlerIdx;
+static int replicaRecoverHandlerIdx;
 
 CkGroupID ckCheckPTGroupID;		// readonly
 
@@ -122,7 +164,7 @@ double killTime=0.0;
       code	\
     }	\
   }	\
- }
+}
 
 /// checkpoint buffer for processor system data, remove static to make icpc 10.1 pass with -O
 CpvDeclare(CkProcCheckPTMessage*, procChkptBuf);
@@ -182,9 +224,9 @@ void ArrayElement::init_checkpt() {
 // entry function invoked by checkpoint mgr asking for checkpoint data
 void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
 #if CMK_MEM_CHECKPOINT
-//  DEBUGF("[p%d] HERE checkpoint to PE %d %d \n", CkMyPe(), budPEs[0], budPEs[1]);
-//char index[128];   thisIndexMax.sprint(index);
-//printf("[%d] checkpointing %s\n", CkMyPe(), index);
+  //  DEBUGF("[p%d] HERE checkpoint to PE %d %d \n", CkMyPe(), budPEs[0], budPEs[1]);
+  //char index[128];   thisIndexMax.sprint(index);
+  //printf("[%d] checkpointing %s\n", CkMyPe(), index);
   CkLocMgr *locMgr = thisArray->getLocMgr();
   CmiAssert(myRec!=NULL);
   int size;
@@ -216,7 +258,7 @@ void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
 class CkMemCheckPTInfo: public CkCheckPTInfo
 {
   CkArrayCheckPTMessage *ckBuffer;
-public:
+  public:
   CkMemCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndex idx, int pno): 
 	            CkCheckPTInfo(a, loc, idx, pno)
   {
@@ -258,7 +300,7 @@ class CkDiskCheckPTInfo: public CkCheckPTInfo
   char *fname;
   int bud1, bud2;
   int len; 			// checkpoint size
-public:
+  public:
   CkDiskCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndex idx, int pno, int myidx): CkCheckPTInfo(a, loc, idx, pno)
   {
 #if CMK_USE_MKSTEMP
@@ -293,7 +335,7 @@ public:
     PUP::toDisk p(f);
     CkPupMessage(p, (void **)&data);
     // delay sync to the end because otherwise the messages are blocked
-//    fsync(fileno(f));
+    //    fsync(fileno(f));
     fclose(f);
     bud1 = data->bud1;
     bud2 = data->bud2;
@@ -349,7 +391,7 @@ CkMemCheckPT::CkMemCheckPT(int w)
   void pingBuddy();
   void pingCheckHandler();
   CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-  CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+  CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
 #if CMK_CHKP_ALL
   initEntry();
@@ -391,7 +433,7 @@ void CkMemCheckPT::pup(PUP::er& p)
     void pingBuddy();
     void pingCheckHandler();
     CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
   }
 }
@@ -502,13 +544,15 @@ void CkMemCheckPT::recoverEntry(CkArrayCheckPTMessage *msg)
 void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
 {
   checkpointed = 1;
-  cpCallback = cb;
   inCheckpointing = 1;
+  cpCallback = cb;
   cpStarter = starter;
   if (CkMyPe() == cpStarter) {
     startTime = CmiWallTimer();
     CkPrintf("[%d] Start checkpointing  starter: %d... \n", CkMyPe(), cpStarter);
   }
+  if(where != CkCheckPoint_replica)
+  {
 #if !CMK_CHKP_ALL
   int len = ckTable.length();
   for (int i=0; i<len; i++) {
@@ -529,6 +573,10 @@ void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
 #endif
   // pack and send proc level data
   sendProcData();
+  }else
+  {
+    startReplicaCheckpoint();
+  }
 }
 
 class MemElementPacker : public CkLocIterator{
@@ -588,6 +636,346 @@ void CkMemCheckPT::startArrayCheckpoint(){
         recvCount++;
 #endif
 }
+void CkMemCheckPT::startReplicaProcCheckPoint()
+{
+#if CMK_CONVERSE_MPI
+  int size;
+  {
+    PUP::sizer p;
+    _handleProcData(p,false);
+    size = p.size();
+  }
+  CkCheckPTMessage * procMsg = new (size,0) CkCheckPTMessage;
+  procMsg->len = size;
+  procMsg->cp_flag = 1;
+  {
+    PUP::toMem p(procMsg->packData);
+    _handleProcData(p,false);
+  }
+
+  int pointer = CpvAccess(curPointer);
+  if(CpvAccess(localProcChkpBuf)[pointer]) delete CpvAccess(localProcChkpBuf)[pointer];
+  CpvAccess(localProcChkpBuf)[pointer] = procMsg;
+#endif
+}
+
+void CkMemCheckPT::startReplicaArrayCheckpoint()
+{
+#if CMK_CONVERSE_MPI
+  int size;
+  {
+    PUP::sizer psizer;
+    pupAllElements(psizer);
+    size = psizer.size();
+  }
+  CkCheckPTMessage * msg = new (size,0) CkCheckPTMessage;
+  msg->len = size;
+  msg->cp_flag = 1;
+  int checksum;
+  {
+    if(CpvAccess(use_checksum)&&CkReplicaAlive()==1){
+      PUP::checker p(msg->packData);
+      pupAllElements(p);
+      checksum = p.getChecksum();
+      CpvAccess(localChecksum) = checksum;
+      //    CmiPrintf("[%d][%d] checksum %d\n",CmiMyPartition(),CkMyPe(),checksum);
+    }else{  
+      PUP::toMem p(msg->packData);
+      pupAllElements(p);
+    }
+  }
+
+  int pointer = CpvAccess(curPointer);
+  if(CpvAccess(chkpBuf)[pointer]) delete CpvAccess(chkpBuf)[pointer];
+  CpvAccess(chkpBuf)[pointer] = msg;
+#endif
+}
+
+void CkMemCheckPT::sendReplicaCheckpoint()
+{
+  if(CpvAccess(use_checksum)){
+    //only send the checksum
+    char *chkpMsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
+    *(int *)(chkpMsg+CmiMsgHeaderSizeBytes) = CpvAccess(localChecksum);
+    CmiSetHandler(chkpMsg,recvRemoteChkpHandlerIdx);
+    CmiInterSyncSendAndFree(CkMyPe(),CmiMyPartition()^1,CmiMsgHeaderSizeBytes+sizeof(int),chkpMsg);
+  }else
+  {
+    //send the whole checkpoint message
+    envelope * env = (envelope *)(UsrToEnv((CkCheckPTMessage *)CkCopyMsg((void **)&(CpvAccess(chkpBuf)[CpvAccess(curPointer)]))));
+    CkPackMessage(&env);
+    CmiSetHandler(env,recvRemoteChkpHandlerIdx);
+    CmiInterSyncSendAndFree(CkMyPe(),CmiMyPartition()^1,env->getTotalsize(),(char *)env);
+  }
+}
+
+void CkMemCheckPT::recvReplicaCheckpoint()
+{
+#if CMK_MEM_CHECKPOINT
+  int pointer = CpvAccess(curPointer);
+
+  //compare the checkpoint 
+  int size = CpvAccess(chkpBuf)[pointer]->len;
+  if(CpvAccess(use_checksum)){
+    if(CpvAccess(localChecksum) == CpvAccess(remoteChecksum)){
+      thisProxy[CkMyPe()].doneComparison(true);
+    }
+    else
+    {
+      thisProxy[CkMyPe()].doneComparison(false);
+    }
+  }else
+  {
+    if(CpvAccess(buddyBuf)->len == size && compare((char *)(CpvAccess(chkpBuf)[pointer]->packData),(char *)(CpvAccess(buddyBuf)->packData)))
+    {
+      thisProxy[CkMyPe()].doneComparison(true);
+    }
+    else{
+      thisProxy[CkMyPe()].doneComparison(false);
+    }
+    
+    if(CpvAccess(buddyBuf)) delete CpvAccess(buddyBuf);
+  }
+  
+  if(CkMyPe()==0)
+  {
+    CmiPrintf("[%d][%d] comparison done at %lf\n",CmiMyPartition(),CkMyPe(),CmiWallTimer());
+  }
+#endif
+}
+
+void CkMemCheckPT::recoverReplica()
+{
+  //TODO only continue work after the replica has recovered
+  //control when the message can be sent: after the crashed replica change the phase number, otherwise buffer it
+  int pointer = CpvAccess(curPointer);
+  
+  if(CpvAccess(remoteReady)==1)
+  {
+    if(CkMyPe() == CpvAccess(_remoteCrashedNode))
+    {	
+      //send the proc data
+      CkCheckPTMessage * procMsg = (CkCheckPTMessage *)CkCopyMsg((void **)&CpvAccess(localProcChkpBuf)[pointer]);
+      procMsg->pointer = pointer;
+      envelope * env = (envelope *)(UsrToEnv(procMsg));
+      CkPackMessage(&env);
+      CmiSetHandler(env,recoverRemoteProcDataHandlerIdx);
+      CmiInterSyncSendAndFree(CkMyPe(),CmiMyPartition()^1,env->getTotalsize(),(char *)env);
+      
+      if(CkMyPe() == CpvAccess(_remoteCrashedNode))
+      {
+        CkPrintf("[%d] sendProcdata at %lf\n",CkMyPe(),CmiWallTimer());
+      }
+    }
+    //send the array checkpoint data
+    CkCheckPTMessage * msg = (CkCheckPTMessage *)CkCopyMsg((void **)&CpvAccess(chkpBuf)[pointer]);
+    msg->pointer = pointer;
+    envelope * env = (envelope *)(UsrToEnv(msg));
+    CkPackMessage(&env);
+    CmiSetHandler(env,recoverRemoteArrayDataHandlerIdx);
+    CmiInterSyncSendAndFree(CkMyPe(),CmiMyPartition()^1,env->getTotalsize(),(char *)env);
+    
+    if(CkMyPe() == CpvAccess(_remoteCrashedNode))
+    {
+      CkPrintf("[%d] sendArraydata at %lf\n",CkMyPe(),CmiWallTimer());
+    }
+  }
+  else
+  {
+    if(CkMyPe() == CpvAccess(_remoteCrashedNode))
+    {
+      CpvAccess(recoverProcBuf) = (CkCheckPTMessage *)CkCopyMsg((void **)&CpvAccess(localProcChkpBuf)[pointer]);
+      (CpvAccess(recoverProcBuf))->pointer = pointer;
+    }
+    CpvAccess(recoverArrayBuf) = (CkCheckPTMessage *)CkCopyMsg((void **)&CpvAccess(chkpBuf)[pointer]);
+    (CpvAccess(recoverArrayBuf))->pointer = CpvAccess(curPointer);
+    //checkpoint message already stored
+    CpvAccess(localReady) = 1;
+  }
+  
+  int _ret = 1;
+  notifyReplica = 1;
+  CkCallback cb(CkReductionTarget(CkMemCheckPT,doneRComparison),thisProxy[0]);
+  contribute(sizeof(int),&_ret,CkReduction::sum_int,cb);
+}
+
+void CkMemCheckPT::startReplicaCheckpoint(){
+#if CMK_CONVERSE_MPI
+  //proc checkpoint
+  startReplicaProcCheckPoint();
+
+  //array checkpoint
+  startReplicaArrayCheckpoint();
+
+  if(CkMyPe()==0)
+  {
+    CmiPrintf("[%d][%d] local checkpoint done at %lf\n",CmiMyPartition(),CkMyPe(),CmiWallTimer());
+  }
+
+  if(CkReplicaAlive()==1)
+  {
+    CpvAccess(recvdLocal) = 1;
+    
+    if(CmiMyPartition()==0)
+    {
+      //only one reaplica will send the checkpoint message
+      sendReplicaCheckpoint();
+      notifyReplica = 1;
+    }
+    else
+    {
+      //the other partition once receive the checkpoint, compare the concents
+      if(CpvAccess(recvdRemote)==1)
+      {
+        recvReplicaCheckpoint();
+      }
+    }
+  }
+  else
+  {
+    //one replica has died, starts recover using the most current checkpoint
+    //this can only happen in medium and weak resilience
+    recoverReplica();
+  }
+#endif
+}
+
+void CkMemCheckPT::doneComparison(bool ret)
+{
+  int _ret = 1;
+  if(!ret)
+  {
+    _ret = 0;
+  }
+  else
+  {
+    _ret = 1;
+  }
+  CkCallback cb(CkReductionTarget(CkMemCheckPT,doneRComparison),thisProxy[0]);
+  contribute(sizeof(int),&_ret,CkReduction::sum_int,cb);
+}
+
+void CkMemCheckPT::doneRComparison(int ret)
+{
+  CkPrintf("[%d][%d] doneRComparison\n", CmiMyPartition(), CkMyPe());
+  
+  if(ret==CkNumPes())
+  {
+    if(CkReplicaAlive() == 1 || CpvAccess(remoteRecovered) == 1)
+    {
+      thisProxy.doneBothComparison();
+    }else
+    {
+      CpvAccess(waitForRecover) = 1;
+    }
+  }
+  else
+  {
+    ret = 0;
+    CkPrintf("[%d][%d] going to RollBack %d at %lf checkpoint in %lf\n", CmiMyPartition(),CkMyPe(),ret,CmiWallTimer(), CmiWallTimer()-startTime);
+    startTime = CmiWallTimer();
+    thisProxy.RollBack();
+  }
+
+  if(notifyReplica == 0)
+  {
+    //notify the replica am done
+    char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
+    *(int *)(msg+CmiMsgHeaderSizeBytes) = ret;
+    CmiSetHandler(msg,replicaChkpDoneHandlerIdx);
+    CmiInterSyncSendAndFree(0,CmiMyPartition()^1,CmiMsgHeaderSizeBytes+sizeof(int),(char *)msg);
+    notifyReplica = 1;
+  }
+}
+
+void CkMemCheckPT::RollBack()
+{
+#if CMK_MEM_CHECKPOINT
+  //restore group data
+  checkpointed = 0;
+  inRestarting = 1;
+  int pointer = CpvAccess(curPointer)^1;//use the previous one
+  CkCheckPTMessage* chkpMsg = CpvAccess(chkpBuf)[pointer];
+  PUP::fromMem p(chkpMsg->packData);	
+
+  //destroy array elements
+  CKLOCMGR_LOOP(mgr->flushLocalRecs(););
+  int numGroups = CkpvAccess(_groupIDTable)->size();
+  for(int i=0;i<numGroups;i++)
+  {
+    CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
+    IrrGroup *obj = CkpvAccess(_groupTable)->find(gID).getObj();
+    obj->flushStates();
+    obj->ckJustMigrated();
+  }
+  
+  //restore array elements
+  int numElements;
+  p|numElements;
+
+  if(p.isUnpacking())
+  {
+    for(int i=0;i<numElements;i++)
+    {
+      CkGroupID gID;
+      CkArrayIndex idx;
+      p|gID;
+      p|idx;
+      CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
+      CmiAssert(mgr);
+      mgr->resume(idx,p,CmiFalse,CmiTrue,CmiTrue);
+    }
+  }
+  
+  CkCallback cb(CkReductionTarget(CkMemCheckPT,recoverFromSoftFailure),thisProxy);
+  contribute(cb);
+#endif
+}
+
+void CkMemCheckPT::recoverFromSoftFailure()
+{
+  inRestarting = 0;
+  CpvAccess(recvdRemote) = 0;
+  CpvAccess(recvdLocal) = 0;
+  CpvAccess(remoteReady) = 0;
+  CpvAccess(localReady) = 0;
+  CpvAccess(remoteStarted) = 0;
+  CpvAccess(localStarted) = 0;
+  CpvAccess(_remoteCrashedNode) = -1;
+  CkMemCheckPT::replicaAlive = 1;
+  inCheckpointing = 0;
+  notifyReplica = 0;
+  if(CkMyPe() == 0)
+  {
+    CmiPrintf("[%d][%d] Recover From soft failures in %lf, sending callback ... \n", CmiMyPartition(),CkMyPe(),CmiWallTimer()-startTime);
+    //resume from checkpointing
+    cpCallback.send();
+  }
+}
+
+void CkMemCheckPT::doneBothComparison()
+{
+  CpvAccess(recvdRemote) = 0;
+  CpvAccess(remoteReady) = 0;
+  CpvAccess(localReady) = 0;
+  CpvAccess(recvdLocal) = 0;
+  CpvAccess(remoteStarted) = 0;
+  CpvAccess(localStarted) = 0;
+  CpvAccess(_remoteCrashedNode) = -1;
+  CpvAccess(remoteRecovered) = 0;
+  CpvAccess(waitForRecover) = 0;
+  CkMemCheckPT::replicaAlive = 1;
+  int size = CpvAccess(chkpBuf)[CpvAccess(curPointer)]->len;
+  CpvAccess(curPointer)^=1;
+  inCheckpointing = 0;
+  notifyReplica = 0;
+  
+  if(CkMyPe() == 0)
+  {
+    CmiPrintf("[%d][%d] Checkpoint finished in %f seconds at %lf, checkpoint size %d, memory usage %lf sending callback ... \n", CmiMyPartition(),CkMyPe(), CmiWallTimer()-startTime,CmiWallTimer(),size, CmiMemoryUsage()/1048576.0);
+    cpCallback.send();
+  }
+}
 
 void CkMemCheckPT::recvArrayCheckpoint(CkArrayCheckPTMessage *msg)
 {
@@ -618,7 +1006,7 @@ void CkMemCheckPT::recvArrayCheckpoint(CkArrayCheckPTMessage *msg)
 }
 
 // don't handle array elements
-static inline void _handleProcData(PUP::er &p)
+static inline void _handleProcData(PUP::er &p, bool create)
 {
     // save readonlys, and callback BTW
     CkPupROData(p);
@@ -632,10 +1020,10 @@ static inline void _handleProcData(PUP::er &p)
 #endif
 
     // save groups into Groups.dat
-    CkPupGroupData(p);
+  CkPupGroupData(p, create);
 
     // save nodegroups into NodeGroups.dat
-    if(CkMyRank()==0) CkPupNodeGroupData(p);
+  if(CkMyRank()==0) CkPupNodeGroupData(p, create);
 }
 
 void CkMemCheckPT::sendProcData()
@@ -720,7 +1108,7 @@ void CkMemCheckPT::cpFinish()
   peCount++;
     // now that all processors have finished, activate callback
   if (peCount == 2) 
-{
+  {
     CmiPrintf("[%d] Checkpoint finished in %f seconds, sending callback ... \n", CkMyPe(), CmiWallTimer()-startTime);
     cpCallback.send();
     peCount = 0;
@@ -750,14 +1138,14 @@ void CkMemCheckPT::report()
 
 /*****************************************************************************
 			RESTART Procedure
-*****************************************************************************/
+ *****************************************************************************/
 
 // master processor of two buddies
 inline int CkMemCheckPT::isMaster(int buddype)
 {
 #if 0
   int mype = CkMyPe();
-//CkPrintf("ismaster: %d %d\n", pe, mype);
+  //CkPrintf("ismaster: %d %d\n", pe, mype);
   if (CkNumPes() - totalFailed() == 2) {
     return mype > buddype;
   }
@@ -771,7 +1159,7 @@ inline int CkMemCheckPT::isMaster(int buddype)
 #else
     // smaller one
   int mype = CkMyPe();
-//CkPrintf("ismaster: %d %d\n", pe, mype);
+  //CkPrintf("ismaster: %d %d\n", pe, mype);
   if (CkNumPes() - totalFailed() == 2) {
     return mype < buddype;
   }
@@ -788,28 +1176,28 @@ inline int CkMemCheckPT::isMaster(int buddype)
   }
   return 0;
 #endif
-}
+  }
 
 
 
 #if 0
-// helper class to pup all elements that belong to same ckLocMgr
-class ElementDestoryer : public CkLocIterator {
-private:
+  // helper class to pup all elements that belong to same ckLocMgr
+  class ElementDestoryer : public CkLocIterator {
+    private:
         CkLocMgr *locMgr;
-public:
+    public:
         ElementDestoryer(CkLocMgr* mgr_):locMgr(mgr_){};
         void addLocation(CkLocation &loc) {
 		CkArrayIndex idx=loc.getIndex();
 		CkPrintf("[%d] destroy: ", CkMyPe()); idx.print();
 		loc.destroy();
         }
-};
+  };
 #endif
 
-// restore the bitmap vector for LB
-void CkMemCheckPT::resetLB(int diepe)
-{
+  // restore the bitmap vector for LB
+  void CkMemCheckPT::resetLB(int diepe)
+  {
 #if CMK_LBDB_ON
   int i;
   char *bitmap = new char[CkNumPes()];
@@ -831,15 +1219,15 @@ void CkMemCheckPT::resetLB(int diepe)
 
   delete [] bitmap;
 #endif
-}
+  }
 
-// in case when failedPe dies, everybody go through its checkpoint table:
-// destory all array elements
-// recover lost buddies
-// reconstruct all array elements from check point data
-// called on all processors
-void CkMemCheckPT::restart(int diePe)
-{
+  // in case when failedPe dies, everybody go through its checkpoint table:
+  // destory all array elements
+  // recover lost buddies
+  // reconstruct all array elements from check point data
+  // called on all processors
+  void CkMemCheckPT::restart(int diePe)
+  {
 #if CMK_MEM_CHECKPOINT
   double curTime = CmiWallTimer();
   if (CkMyPe() == diePe)
@@ -862,19 +1250,21 @@ void CkMemCheckPT::restart(int diePe)
   if (CkMyPe() != diePe) resetLB(diePe);
 
   CKLOCMGR_LOOP(mgr->startInserting(););
-
-  //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::removeArrayElements(), thisProxy));
+    if(arg_where != CkCheckPoint_replica)
+    {
   barrier(CkCallback(CkIndex_CkMemCheckPT::removeArrayElements(), thisProxy));
-/*
-  if (CkMyPe() == 0)
-    CkStartQD(CkCallback(CkIndex_CkMemCheckPT::removeArrayElements(), thisProxy));
-*/
+    }
+    else
+    {
+      CKLOCMGR_LOOP(mgr->flushLocalRecs(););
+      barrier(CkCallback(CkIndex_CkMemCheckPT::resetReductionMgr(), thisProxy));
+    }
 #endif
-}
+  }
 
-// loally remove all array elements
-void CkMemCheckPT::removeArrayElements()
-{
+  // loally remove all array elements
+  void CkMemCheckPT::removeArrayElements()
+  {
 #if CMK_MEM_CHECKPOINT
   int len = ckTable.length();
   double curTime = CmiWallTimer();
@@ -893,16 +1283,16 @@ void CkMemCheckPT::removeArrayElements()
 #else
 	CKLOCMGR_LOOP(mgr->flushLocalRecs(););
 #endif
-//  CKLOCMGR_LOOP(ElementDestoryer chk(mgr); mgr->iterate(chk););
+    //  CKLOCMGR_LOOP(ElementDestoryer chk(mgr); mgr->iterate(chk););
 
   //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::resetReductionMgr(), thisProxy));
   barrier(CkCallback(CkIndex_CkMemCheckPT::resetReductionMgr(), thisProxy));
 #endif
-}
+  }
 
-// flush state in reduction manager
-void CkMemCheckPT::resetReductionMgr()
-{
+  // flush state in reduction manager
+  void CkMemCheckPT::resetReductionMgr()
+  {
   //CkPrintf("[%d] CkMemCheckPT ----- resetReductionMgr\n",CkMyPe());
   int numGroups = CkpvAccess(_groupIDTable)->size();
   for(int i=0;i<numGroups;i++) {
@@ -913,19 +1303,21 @@ void CkMemCheckPT::resetReductionMgr()
   }
   // reset again
   //CpvAccess(_qd)->flushStates();
-
-#if 1
-  //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverBuddies(), thisProxy));
+    if(arg_where != CkCheckPoint_replica)
+    {
   barrier(CkCallback(CkIndex_CkMemCheckPT::recoverBuddies(), thisProxy));
-#else
-  if (CkMyPe() == 0)
-    CkStartQD(CkCallback(CkIndex_CkMemCheckPT::recoverBuddies(), thisProxy));
-#endif
-}
+    }
+    else
+    {
+      if (CkMyPe() == thisFailedPe) 
+        CkPrintf("[%d] CkMemCheckPT ----- resetReductionMgr ends at %lf\n",CkMyPe(),CmiWallTimer());
+      barrier(CkCallback(CkReductionTarget(CkMemCheckPT, recoverArrayElements), thisProxy));
+    }
+  }
 
-// recover the lost buddies
-void CkMemCheckPT::recoverBuddies()
-{
+  // recover the lost buddies
+  void CkMemCheckPT::recoverBuddies()
+  {
   int idx;
   int len = ckTable.length();
   // ready to flush reduction manager
@@ -977,47 +1369,40 @@ void CkMemCheckPT::recoverBuddies()
   }
 #endif
 
-#if 1
   if (expectCount == 0) {
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, recoverArrayElements), thisProxy));
-    //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
   }
-#else
-  if (CkMyPe() == 0) {
-    CkStartQD(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
-  }
-#endif
 
   //CkPrintf("[%d] CkMemCheckPT ----- recoverBuddies done  in %f seconds\n",CkMyPe(), curTime-startTime);
-}
+  }
 
-void CkMemCheckPT::gotData()
-{
+  void CkMemCheckPT::gotData()
+  {
   ackCount ++;
   if (ackCount == expectCount) {
     ackCount = 0;
     expectCount = -1;
-    //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, recoverArrayElements), thisProxy));
   }
-}
+  }
 
-void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe)
-{
+  void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe)
+  {
 
   for (int i=0; i<n; i++) {
     CkLocMgr *mgr = CProxy_CkLocMgr(g[i]).ckLocalBranch();
     mgr->updateLocation(idx[i], nowOnPe);
   }
 	thisProxy[nowOnPe].gotReply();
-}
+  }
 
-// restore array elements
-void CkMemCheckPT::recoverArrayElements()
-{
+  // restore array elements
+  void CkMemCheckPT::recoverArrayElements()
+  {
   double curTime = CmiWallTimer();
   int len = ckTable.length();
-  //CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
+    if (CkMyPe() == thisFailedPe)
+      CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
   stage = (char *)"recoverArrayElements";
   if (CkMyPe() == thisFailedPe)
   CkPrintf("[%d] CkMemCheckPT ----- %s starts at %f \n",CkMyPe(), stage, curTime);
@@ -1037,14 +1422,14 @@ void CkMemCheckPT::recoverArrayElements()
     CkCheckPTInfo *entry = ckTable[idx];
 #if CK_NO_PROC_POOL
     // the bigger one will do 
-//    if (CkMyPe() < entry->pNo) continue;
+      //    if (CkMyPe() < entry->pNo) continue;
     if (!isMaster(entry->pNo)) continue;
 #else
     // smaller one do it, which has the original object
     if (CkMyPe() == entry->pNo+1 || 
         CkMyPe()+CkNumPes() == entry->pNo+1) continue;
 #endif
-//CkPrintf("[%d] restore idx:%d aid:%d loc:%d ", CkMyPe(), idx, (CkGroupID)(entry->aid), entry->locMgr); entry->index.print();
+      //CkPrintf("[%d] restore idx:%d aid:%d loc:%d ", CkMyPe(), idx, (CkGroupID)(entry->aid), entry->locMgr); entry->index.print();
 
     entry->updateBuddy(CkMyPe(), entry->pNo);
     CkArrayCheckPTMessage *msg = entry->getCopy();
@@ -1063,11 +1448,24 @@ void CkMemCheckPT::recoverArrayElements()
     count ++;
   }
 #else
-	CkArrayCheckPTMessage * msg = chkpTable[0].getCopy();
+    char * packData;
+    void * msg;
+    if(arg_where != CkCheckPoint_replica)
+    {
+      msg = chkpTable[0].getCopy();
+      packData = (char *)((CkArrayCheckPTMessage *)msg)->packData;
+    }
+    else
+    {
+      int pointer = CpvAccess(curPointer);
+      msg = (CkCheckPTMessage *)CkCopyMsg((void **)&CpvAccess(chkpBuf)[pointer]);
+      packData = ((CkCheckPTMessage *)msg)->packData;
+    }
+
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
-	recoverAll(msg,gmap,imap);
+    recoverAll(packData,gmap,imap);
 #else
-	recoverAll(msg);
+    recoverAll(packData);
 #endif
     CkFreeMsg(msg);
 #endif
@@ -1095,20 +1493,21 @@ void CkMemCheckPT::recoverArrayElements()
   if (CkMyPe() == 0)
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
 #else
-if(flag == 0)
-{
+    if(flag == 0)
+    {
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, finishUp), thisProxy));
-}
+    }
 #endif
-}
+  }
 
-void CkMemCheckPT::gotReply(){
+  void CkMemCheckPT::gotReply(){
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, finishUp), thisProxy));
-}
+  }
 
-void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gmap, CkVec<CkArrayIndex> * imap){
+  void CkMemCheckPT::recoverAll(char * packData, CkVec<CkGroupID> * gmap, CkVec<CkArrayIndex> * imap){
+#if CMK_MEM_CHECKPOINT
 #if CMK_CHKP_ALL
-	PUP::fromMem p(msg->packData);
+    PUP::fromMem p(packData);
 	int numElements = 0;
 	p|numElements;
 	if(p.isUnpacking()){
@@ -1118,7 +1517,6 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 			p|gID;
 			p|idx;
 			CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
-    			int homePe = mgr->homePe(idx);
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
 			mgr->resume(idx,p,true,true);
 #else
@@ -1136,14 +1534,15 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 	if(CkMyPe()==thisFailedPe)
 	CkPrintf("recover all ends\n");	
 #endif
-}
+#endif
+  }
 
-static double restartT;
+  static double restartT;
 
-// on every processor
-// turn load balancer back on
-void CkMemCheckPT::finishUp()
-{
+  // on every processor
+  // turn load balancer back on
+  void CkMemCheckPT::finishUp()
+  {
   //CkPrintf("[%d] CkMemCheckPT::finishUp\n", CkMyPe());
   //CKLOCMGR_LOOP(mgr->doneInserting(););
   
@@ -1154,10 +1553,30 @@ void CkMemCheckPT::finishUp()
        cpCallback.send();
        CkPrintf("[%d] Restart finished in %f seconds at %f.\n", CkMyPe(), CkWallTimer()-restartT, CkWallTimer());
   }
+
 #if CMK_CONVERSE_MPI	
-  if (CmiMyPe() == BuddyPE(thisFailedPe)) {
+    if(arg_where == CkCheckPoint_replica)
+    {
+      CpvAccess(recvdProcChkp) = 0;
+      CpvAccess(recvdArrayChkp) = 0;
+      CpvAccess(curPointer)^=1;
+      CpvAccess(remoteRecovered) = 0;
+      CpvAccess(waitForRecover) = 0;
+      
+      //notify my replica, restart is done
+      if (CkMyPe() == 0&&CpvAccess(resilience)!=1)
+      {
+        CpvAccess(remoteStarted) =0;
+        char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+        CmiSetHandler(msg,replicaRecoverHandlerIdx);
+        CmiInterSyncSendAndFree(CkMyPe(),CmiMyPartition()^1,CmiMsgHeaderSizeBytes,(char *)msg);
+      }
+    }
+
+    if (CmiMyPe() == BuddyPE(thisFailedPe))
+    {
     lastPingTime = CmiWallTimer();
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+      CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
   }
 #endif
 
@@ -1172,11 +1591,11 @@ void CkMemCheckPT::finishUp()
     _memChkptOn = 0;
   }
 #endif
-}
+  }
 
-// called only on 0
-void CkMemCheckPT::quiescence(CkCallback &cb)
-{
+  // called only on 0
+  void CkMemCheckPT::quiescence(CkCallback &cb)
+  {
   static int pe_count = 0;
   pe_count ++;
   CmiAssert(CkMyPe() == 0);
@@ -1185,12 +1604,12 @@ void CkMemCheckPT::quiescence(CkCallback &cb)
     pe_count = 0;
     cb.send();
   }
-}
+  }
 
-// User callable function - to start a checkpoint
-// callback cb is used to pass control back
-void CkStartMemCheckpoint(CkCallback &cb)
-{
+  // User callable function - to start a checkpoint
+  // callback cb is used to pass control back
+  void CkStartMemCheckpoint(CkCallback &cb)
+  {
 #if CMK_MEM_CHECKPOINT
   if(cb.isInvalid()) 
     CkAbort("callback after checkpoint is not set properly");
@@ -1204,17 +1623,40 @@ void CkStartMemCheckpoint(CkCallback &cb)
     cb.send();
     return;
   }
+    
     // store user callback and user data
   CkMemCheckPT::cpCallback = cb;
 
     // broadcast to start check pointing
   CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
+    
+    if(arg_where == CkCheckPoint_replica)
+    {
+      //send to my replica that checkpoint begins 
+      if(CkReplicaAlive()==1){
+        char * msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+        CmiSetHandler(msg, replicaChkpStartHandlerIdx);
+        CkPrintf("[%d][%d] send checkpoint start msg to my replica\n", CmiMyPartition(), CkMyPe());
+        CmiInterSyncSendAndFree(0,CmiMyPartition()^1,CmiMsgHeaderSizeBytes,msg);
+      }
+      CpvAccess(localStarted) = 1;
+    }
+    
+    if(arg_where != CkCheckPoint_replica || CpvAccess(remoteStarted)==1 || CkReplicaAlive()==0)
+    {
+      //TODO cb has been stored separately
   checkptMgr.doItNow(CkMyPe(), cb);
+    }
 #else
   // when mem checkpoint is disabled, invike cb immediately
   CkPrintf("Warning: In-Memory checkpoint has been disabled! Please use -syncft when build Charm++\n");
   cb.send();
 #endif
+}
+
+void CkResetCheckpointCb(CkCallback &cb)
+{
+  CkMemCheckPT::cpCallback = cb; 
 }
 
 void CkRestartCheckPoint(int diePe)
@@ -1235,8 +1677,6 @@ CkPrintf("[%d] CkRestartCheckPointCallback activated for diePe: %d at %f\n", CkM
 }
 
 // Converse function handles
-static int askPhaseHandlerIdx;
-static int recvPhaseHandlerIdx;
 static int askProcDataHandlerIdx;
 static int restartBcastHandlerIdx;
 static int recoverProcDataHandlerIdx;
@@ -1262,9 +1702,22 @@ static void restartBeginHandler(char *msg)
   static int count = 0;
   CmiAssert(CkMyPe() == _diePE);
   count ++;
+  if(arg_where != CkCheckPoint_replica)
+  {
   if (count == CkNumPes()) {
+      printf("restart begin on %d at %lf\n",CkMyPe(),CmiWallTimer());
     CkRestartCheckPointCallback(NULL, NULL);
     count = 0;
+  }
+  }
+  else
+  {
+    if (count == CkNumPes() || (CpvAccess(resilience) ==1 && count == 1)) 
+    {
+      printf("restart begin on %d at %lf\n",CkMyPe(),CmiWallTimer());
+      CkRestartCheckPointCallback(NULL, NULL);
+      count = 0;
+    }
   }
 #endif
 #endif
@@ -1364,6 +1817,8 @@ void qd_callback(void *m)
 {
    CmiPrintf("[%d] callback after QD for crashed node: %d. at %lf\n", CkMyPe(), CpvAccess(_crashedNode),CmiWallTimer());
    CkFreeMsg(m);
+   if(CmiNumPartitions() == 1 || arg_where != CkCheckPoint_replica)
+   {
 #ifdef CMK_SMP
    for(int i=0;i<CmiMyNodeSize();i++){
    char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
@@ -1380,6 +1835,182 @@ void qd_callback(void *m)
    CmiSetHandler(msg, askProcDataHandlerIdx);
    int pe = ChkptOnPe(CpvAccess(_crashedNode));
    CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+  }
+  else
+  {
+    char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler(msg, recvPhaseHandlerIdx);
+    CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes, (char *)msg);
+  }
+}
+
+static void recvPhaseHandler(char * msg)
+{
+#if CMK_MEM_CHECKPOINT
+  //decrease the phase number so that the crashed replica can communicate with the healthy one
+  CpvAccess(_curRestartPhase)--;
+  
+  CkMemCheckPT::inRestarting = 1;
+  CmiFree(msg);
+  //notify the buddy in the replica now i can receive the checkpoint msg
+  if(CpvAccess(resilience)!=1||CpvAccess(_crashedNode)==CmiMyPe())
+  {
+    char *rmsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler(rmsg, askRecoverDataHandlerIdx);
+    CmiInterSyncSendAndFree(CmiMyPe(),CmiMyPartition()^1,CmiMsgHeaderSizeBytes,(char *)rmsg);
+    //timer start
+    if(CpvAccess(_crashedNode)==CkMyPe())
+    {
+      CkMemCheckPT::startTime = restartT = CmiWallTimer();
+      CmiPrintf("[%d][%d] ask for checkpoint data in replica at %lf phase %d\n",CmiMyPartition(),CmiMyPe(),CmiWallTimer(), CpvAccess(_curRestartPhase));
+    }
+  }else{
+    CpvAccess(curPointer)^=1;
+    CkMemCheckPT::inRestarting = 1;
+    _resume_charm_message();
+    _diePE = CpvAccess(_crashedNode);
+  }
+#endif
+}
+
+extern "C" int  find_spare_mpirank(int pe,int partition);
+
+static void askRecoverDataHandler(char * msg){
+  CmiFree(msg);
+  if(CmiMyPe() == CpvAccess(_remoteCrashedNode))
+    CmiPrintf("[%d][%d] receive replica phase change at %lf\n",CmiMyPartition(),CmiMyPe(),CmiWallTimer());
+  if(CpvAccess(resilience)!=1)
+  {
+    CpvAccess(remoteReady)=1;
+    if(CpvAccess(localReady)==1)
+    {
+      if(CmiMyPe() == CpvAccess(_remoteCrashedNode))
+      {	
+        envelope * env = (envelope *)(UsrToEnv(CpvAccess(recoverProcBuf)));
+        CkPackMessage(&env);
+        CmiSetHandler(env,recoverRemoteProcDataHandlerIdx);
+        CmiInterSyncSendAndFree(CmiMyPe(),CmiMyPartition()^1,env->getTotalsize(),(char *)env);
+        CmiPrintf("[%d] sendProcdata after request at %lf\n",CmiMyPe(),CmiWallTimer());
+      }
+      //send the array checkpoint data
+      envelope * env = (envelope *)(UsrToEnv(CpvAccess(recoverArrayBuf)));
+      CkPackMessage(&env);
+      CmiSetHandler(env,recoverRemoteArrayDataHandlerIdx);
+      CmiInterSyncSendAndFree(CmiMyPe(),CmiMyPartition()^1,env->getTotalsize(),(char *)env);
+      if(CmiMyPe() == CpvAccess(_remoteCrashedNode))
+        CmiPrintf("[%d] sendArraydata after request\n",CmiMyPe());
+    }
+  }
+  else
+  {
+#if CMK_CONVERSE_MPI
+    find_spare_mpirank(CkMyPe(),CmiMyPartition()^1);
+    int pointer = CpvAccess(curPointer)^1;
+    CkCheckPTMessage * procMsg = (CkCheckPTMessage *)CkCopyMsg((void **)&CpvAccess(localProcChkpBuf)[pointer]);
+    procMsg->pointer = pointer;
+    envelope * env = (envelope *)(UsrToEnv(procMsg));
+    CkPackMessage(&env);
+    CmiSetHandler(env,recoverRemoteProcDataHandlerIdx);
+    CmiInterSyncSendAndFree(CmiMyPe(),CmiMyPartition()^1,env->getTotalsize(),(char *)env);
+    CmiPrintf("[%d] sendProcdata after request at %lf\n",CmiMyPe(),CmiWallTimer());
+    
+    CkCheckPTMessage * arrayMsg = (CkCheckPTMessage *)CkCopyMsg((void **)&CpvAccess(chkpBuf)[pointer]);
+    arrayMsg->pointer = pointer;
+    envelope * env1 = (envelope *)(UsrToEnv(arrayMsg));
+    CkPackMessage(&env1);
+    CmiSetHandler(env1,recoverRemoteArrayDataHandlerIdx);
+    CmiInterSyncSendAndFree(CmiMyPe(),CmiMyPartition()^1,env1->getTotalsize(),(char *)env1);
+    CmiPrintf("[%d] sendArraydata after request\n",CmiMyPe());
+#endif  
+  }
+}
+
+static void recoverRemoteProcDataHandler(char *msg)
+{
+#if CMK_MEM_CHECKPOINT
+  envelope *env = (envelope *)msg;
+  CkUnpackMessage(&env);
+  CkCheckPTMessage* procMsg = (CkCheckPTMessage *)(EnvToUsr(env));
+
+  //store the checkpoint
+  int pointer = procMsg->pointer;
+
+  if(CkMyPe()==CpvAccess(_crashedNode))
+  {
+    if(CpvAccess(localProcChkpBuf)[pointer]) delete CpvAccess(localProcChkpBuf)[pointer];
+    CpvAccess(localProcChkpBuf)[pointer] = procMsg; 
+    PUP::fromMem p(procMsg->packData);
+    _handleProcData(p,true);
+    _initDone();
+    CkPrintf("[%d] receive recover proc data at %lf\n", CkMyPe(), CmiWallTimer());
+  }
+  else
+  {
+    //shud never happen
+    CmiAbort("non crashed pe received proc data");
+  }
+  CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->resetLB(CkMyPe());
+  CKLOCMGR_LOOP(mgr->startInserting(););
+
+  CpvAccess(recvdProcChkp) =1;
+  if(CpvAccess(recvdArrayChkp)==1)
+  {
+    _resume_charm_message();
+    _diePE = CpvAccess(_crashedNode);
+    char *restartmsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler(restartmsg, restartBeginHandlerIdx);
+#if CMK_USE_BARRIER
+    if(CpvAccess(resilience)==1)
+    {
+      CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
+    }else
+    {
+      CmiReduce(restartmsg,CmiMsgHeaderSizeBytes,doNothingMsg);
+    }
+#else
+    CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
+#endif 
+  }
+#endif
+}
+
+static void recoverRemoteArrayDataHandler(char *msg)
+{
+#if CMK_MEM_CHECKPOINT
+  envelope *env = (envelope *)msg;
+  CkUnpackMessage(&env);
+  CkCheckPTMessage* chkpMsg = (CkCheckPTMessage *)(EnvToUsr(env));
+
+  //store the checkpoint
+  int pointer = chkpMsg->pointer;
+  CpvAccess(curPointer) = pointer;
+  if(CpvAccess(chkpBuf)[pointer]) delete CpvAccess(chkpBuf)[pointer];
+  CpvAccess(chkpBuf)[pointer] = chkpMsg;
+  CpvAccess(recvdArrayChkp) =1;
+  CkMemCheckPT::inRestarting = 1;
+
+  if(CkMyPe()==CpvAccess(_crashedNode))
+    CkPrintf("[%d] receive recover array data at %lf\n", CkMyPe(), CmiWallTimer());
+  
+  if(CpvAccess(recvdProcChkp) == 1||CkMyPe()!= CpvAccess(_crashedNode))
+  {
+    _resume_charm_message();
+    _diePE = CpvAccess(_crashedNode);
+    //CmiPrintf("[%d] send to die pe %d\n",CkMyPe(),_diePE);
+    char *restartmsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler(restartmsg, restartBeginHandlerIdx);
+    //CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
+#if CMK_USE_BARRIER
+    if(CpvAccess(resilience)==1)
+    {
+      CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
+    }else
+      CmiReduce(restartmsg,CmiMsgHeaderSizeBytes,doNothingMsg);
+#else
+    CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
+#endif 
+  }
+#endif
 }
 
 static void changePhaseHandler(char *msg){
@@ -1412,9 +2043,17 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
   
   //now safe to change the phase handler,braodcast every
   if(CmiNumPartitions()>1){
+    if(arg_where != CkCheckPoint_replica)
+    {
     char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
     CmiSetHandler(msg, changePhaseHandlerIdx);
     CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes, (char *)msg);
+    }
+    else
+    {
+      CkCallback cb(qd_callback);
+      CkStartQD(cb);
+    }
   }else{  
    char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
    *(int *)(msg+CmiMsgHeaderSizeBytes) = CpvAccess(_crashedNode);
@@ -1442,6 +2081,12 @@ int CkInRestarting()
 #else
   return 0;
 #endif
+}
+
+extern "C"
+int CkReplicaAlive()
+{
+  return CkMemCheckPT::replicaAlive;
 }
 
 extern "C"
@@ -1476,13 +2121,90 @@ void CkResetInLdb(){
                 module initialization
 *****************************************************************************/
 
-static int arg_where = CkCheckPoint_inMEM;
 
 #if CMK_MEM_CHECKPOINT
 void init_memcheckpt(char **argv)
 {
     if (CmiGetArgFlagDesc(argv, "+ftc_disk", "Double-disk Checkpointing")) {
       arg_where = CkCheckPoint_inDISK;
+    }
+
+    if(CmiGetArgFlagDesc(argv, "+ACR", "Automatic checkpoint/restart"))
+    {
+      if(CmiNumPartitions() == 1)
+      {
+        CkPrintf("Warning: cannot use ACR when there is only one partition, use the default double in-memory checkpoint/restart instead\n");
+      }else
+      {
+        arg_where = CkCheckPoint_replica;
+      
+        CpvInitialize(int, use_checksum);
+        CpvInitialize(int, resilience);
+        CpvInitialize(int, _remoteCrashedNode);
+        CpvAccess(use_checksum)=0;
+        CpvAccess(resilience)=1;//TODO should set a default resilience level
+        CpvAccess(_remoteCrashedNode) = -1;
+        if(CmiGetArgFlagDesc(argv, "+use_checksum", "use checksum strategy"))
+        {
+          CpvAccess(use_checksum)=1;
+        }
+        if(CmiGetArgFlagDesc(argv, "+strong_resilience", "use strong resilience"))
+        {
+          CpvAccess(resilience)=1;
+        }
+        if(CmiGetArgFlagDesc(argv, "+weak_resilience", "use strong resilience"))
+        {
+          CpvAccess(resilience)=2;
+        }
+        if(CmiGetArgFlagDesc(argv, "+medium_resilience", "use strong resilience"))
+        {
+          CpvAccess(resilience)=3;
+        }
+
+        //other process level variable
+        CpvInitialize(CkCheckPTMessage **, chkpBuf);
+        CpvInitialize(CkCheckPTMessage **, localProcChkpBuf);
+        CpvInitialize(CkCheckPTMessage *, buddyBuf);
+        CpvInitialize(CkCheckPTMessage *, recoverProcBuf);
+        CpvInitialize(CkCheckPTMessage *, recoverArrayBuf);
+        CpvInitialize(int,curPointer);
+        CpvInitialize(int,recvdLocal);
+        CpvInitialize(int,recvdRemote);
+        CpvInitialize(int,remoteStarted);
+        CpvInitialize(int,localStarted);
+        CpvInitialize(int,localReady);
+        CpvInitialize(int,remoteReady);
+        CpvInitialize(int,localChecksum);
+        CpvInitialize(int,remoteChecksum);
+        CpvInitialize(int,recvdArrayChkp);
+        CpvInitialize(int,recvdProcChkp);
+        CpvInitialize(int,remoteRecovered);
+        CpvInitialize(int,waitForRecover);
+
+        CpvAccess(buddyBuf) = NULL;
+        CpvAccess(recoverProcBuf) = NULL;
+        CpvAccess(recoverArrayBuf) = NULL;
+        CpvAccess(chkpBuf) = new CkCheckPTMessage *[2];
+        CpvAccess(localProcChkpBuf) = new CkCheckPTMessage *[2];
+        CpvAccess(chkpBuf)[0] = NULL;
+        CpvAccess(chkpBuf)[1] = NULL;
+        CpvAccess(localProcChkpBuf)[0] = NULL;
+        CpvAccess(localProcChkpBuf)[1] = NULL;
+
+        CpvAccess(curPointer) = 0;
+        CpvAccess(recvdLocal) = 0;
+        CpvAccess(recvdRemote) = 0;
+        CpvAccess(remoteStarted) = 0;
+        CpvAccess(localStarted) = 0;
+        CpvAccess(localReady) = 0;
+        CpvAccess(remoteReady) = 0;
+        CpvAccess(localChecksum) = 0;
+        CpvAccess(remoteChecksum) = 0;
+        CpvAccess(recvdProcChkp) = 0;
+        CpvAccess(recvdArrayChkp) = 0;
+        CpvAccess(remoteRecovered) = 0;
+        CpvAccess(waitForRecover) = 0;
+      }
     }
 
 	// initiliazing _crashedNode variable
@@ -1543,6 +2265,131 @@ void notify_crash(int node)
 
 extern "C" void (*notify_crash_fn)(int node);
 
+/*************Replica FT related converse functions*************/
+
+#if CMK_MEM_CHECKPOINT
+bool compare(char * buf1, char *buf2)
+{
+  if(CkMyPe()==0)
+  {
+    CmiPrintf("[%d][%d] comparison begin at %lf\n",CmiMyPartition(),CkMyPe(),CmiWallTimer());
+  }
+
+  PUP::checker pchecker(buf1,buf2);
+  pchecker.skip();
+  int numElements;
+  pchecker|numElements;
+  for(int i=0;i<numElements;i++)
+  {
+    CkGroupID gID;
+    CkArrayIndex idx;
+
+    pchecker|gID;
+    pchecker|idx;
+
+    CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
+    mgr->resume(idx,pchecker,CmiFalse,CmiFalse,CmiFalse);
+  }
+  if(CkMyPe()==0)
+  {
+    CmiPrintf("[%d][%d]local comparison done at %lf\n",CmiMyPartition(),CkMyPe(),CmiWallTimer());
+  }
+  bool result = pchecker.getResult();
+  return result;
+}
+#endif
+
+static void replicaChkpStartHandler(char * msg){
+  if(CkMyPe()==0)
+  {
+    CkPrintf("[%d][%d] my replica will begin to checkpoint at %lf\n", CmiMyPartition(), CkMyPe(), CmiWallTimer());
+  }
+  CpvAccess(remoteStarted) =1;
+  if(CpvAccess(localStarted)==1)
+  {
+    CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
+    checkptMgr.doItNow(CkMyPe(), CkMemCheckPT::cpCallback);
+  }
+}
+
+static void recvRemoteChkpHandler(char *msg)
+{
+#if CMK_MEM_CHECKPOINT
+  CpvAccess(recvdRemote) = 1;
+  if(CpvAccess(use_checksum))
+  {
+    if(CkMyPe()==0)
+    {
+      CmiPrintf("[%d][%d] receive checksum at %lf\n",CmiMyPartition(),CkMyPe(),CmiWallTimer());
+    }
+    CpvAccess(remoteChecksum) = *(int *)(msg+CmiMsgHeaderSizeBytes);
+    if(CpvAccess(recvdLocal)==1)
+    {
+      if(CpvAccess(remoteChecksum) == CpvAccess(localChecksum))
+      {
+        CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->doneComparison(true);
+      }
+      else
+      {
+        //CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->doneComparison(true);
+        CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->doneComparison(false);
+      }
+    }
+    CmiFree(msg);
+  }else{
+    envelope *env = (envelope *)msg;
+    CkUnpackMessage(&env);
+    CkCheckPTMessage* chkpMsg = (CkCheckPTMessage *)(EnvToUsr(env));
+    if(CpvAccess(recvdLocal)==1)
+    {
+      int pointer = CpvAccess(curPointer);
+      int size = CpvAccess(chkpBuf)[pointer]->len;
+      if(chkpMsg->len == size && compare((char *)(CpvAccess(chkpBuf)[pointer]->packData),(char *)(chkpMsg->packData)))
+      {
+        CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->doneComparison(true);
+      }
+      else
+      {
+        //CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->doneComparison(true);
+        CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->doneComparison(false);
+      }
+      CmiFree(msg);
+      if(CkMyPe()==0)
+      {
+        CmiPrintf("[%d][%d] comparison done at %lf\n",CmiMyPartition(),CkMyPe(),CmiWallTimer());
+      }
+    }
+    else
+    {
+      if(CpvAccess(buddyBuf)) delete CpvAccess(buddyBuf);
+      CpvAccess(buddyBuf) = chkpMsg;
+    }
+  }
+#endif
+}
+
+static void replicaChkpDoneHandler(char *msg)
+{
+  CmiPrintf("[%d][%d]receive replica checkpoint done\n",CmiMyPartition(),CmiMyPe());
+  int ret = *(int *)(msg+CmiMsgHeaderSizeBytes);
+  CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->doneRComparison(ret);
+  CmiFree(msg);
+}
+
+static void replicaRecoverHandler(char *msg){
+  //fflush(stdout);
+  CmiPrintf("[%d][%d]receive replica recover\n",CmiMyPartition(),CmiMyPe());
+  CpvAccess(remoteRecovered) = 1;
+  if(CpvAccess(waitForRecover) == 1)
+    CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->doneRComparison(CkNumPes());
+  else
+  {  
+    CmiPrintf("[%d]localChkpDone hasn't been finished\n",CmiMyPe());
+    //CmiAbort("impossible state");
+  }
+  CmiFree(msg);
+}
+
 #if CMK_CONVERSE_MPI
 //static int pingHandlerIdx;
 //static int pingCheckHandlerIdx;
@@ -1550,16 +2397,13 @@ extern "C" void (*notify_crash_fn)(int node);
 //static double lastPingTime = -1;
 
 extern "C" void mpi_restart_crashed(int pe, int rank);
-extern "C" int  find_spare_mpirank(int pe,int partition);
 
-//void pingBuddy();
-//void pingCheckHandler();
 static void replicaDieHandler(char * msg){
 #if CMK_MEM_CHECKPOINT
 #if CMK_HAS_PARTITION
   //broadcast to every one in my partition
   CmiSetHandler(msg, replicaDieBcastHandlerIdx);
-  CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+  CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizeof(int)*2, (char *)msg);
 #endif
 #endif
 }
@@ -1569,7 +2413,32 @@ static void replicaDieBcastHandler(char *msg){
 #if CMK_HAS_PARTITION
   int diePe = *(int *)(msg+CmiMsgHeaderSizeBytes);
   int partition = *(int *)(msg+CmiMsgHeaderSizeBytes+sizeof(int));
+  
+  if(arg_where == CkCheckPoint_replica)
+  {
+    CpvAccess(_remoteCrashedNode) = diePe;
+    if(CpvAccess(resilience)!=1||CkMyPe()!=diePe){
   find_spare_mpirank(diePe,partition);
+    }
+  }
+  else
+  {
+    find_spare_mpirank(diePe,partition);
+  }
+  
+  //weak resilience, wait until the next checkpoint to send the latest checkpoint message
+  if(CpvAccess(resilience) != 1)
+  {
+    CkMemCheckPT::replicaAlive = 0;
+    if(CpvAccess(localStarted)==1){    
+      if(CkMyPe()==0){
+        CkPrintf("[%d][%d] start checkpoint after replica die\n", CmiMyPartition(),CkMyPe());
+        CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
+        checkptMgr.doItNow(0, CkMemCheckPT::cpCallback);
+      }
+    }
+  }
+
   CmiFree(msg);
 #endif
 #endif
@@ -1612,14 +2481,7 @@ void pingCheckHandler()
        if (obj->BuddyPE(pe) == CmiMyPe()) break;
     }
     buddy = pe;
-    CmiPrintf("[%d] detected buddy processor %d died %f %f. \n", CmiMyPe(), buddy, now, lastPingTime);
-    /*for (int pe = 0; pe < CmiNumPes(); pe++) {
-      if (obj->isFailed(pe) || pe == buddy) continue;
-      char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
-      *(int *)(msg+CmiMsgHeaderSizeBytes) = buddy;
-      CmiSetHandler(msg, buddyDieHandlerIdx);
-      CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
-    }*/
+    CmiPrintf("[%d][%d] detected buddy processor %d died %f %f. \n", CmiMyPartition(), CmiMyPe(), buddy, now, lastPingTime);
     char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
     *(int *)(msg+CmiMsgHeaderSizeBytes) = buddy;
     CmiSetHandler(msg, buddyDieHandlerIdx);
@@ -1632,13 +2494,13 @@ void pingCheckHandler()
         *(int *)(rMsg+CmiMsgHeaderSizeBytes) = buddy;
         *(int *)(rMsg+CmiMsgHeaderSizeBytes+sizeof(int)) = CmiMyPartition();
         CmiSetHandler(rMsg, replicaDieHandlerIdx);
-        CmiInterSyncSendAndFree(CkMyPe(),i,CmiMsgHeaderSizeBytes+sizeof(int),(char *)rMsg);
+        CmiInterSyncSendAndFree(CkMyPe(),i,CmiMsgHeaderSizeBytes+sizeof(int)*2,(char *)rMsg);
       }
     }
 #endif
   }
   else 
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_1s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
 }
 
@@ -1684,10 +2546,19 @@ void CkRegisterRestartHandler( )
 
   notify_crash_fn = notify_crash;
 
+  //replica FT handler
+  recvRemoteChkpHandlerIdx = CkRegisterHandler((CmiHandler)recvRemoteChkpHandler);
+  replicaChkpStartHandlerIdx = CkRegisterHandler((CmiHandler)replicaChkpStartHandler);
+  replicaChkpDoneHandlerIdx = CkRegisterHandler((CmiHandler)replicaChkpDoneHandler);
+  recvPhaseHandlerIdx = CkRegisterHandler((CmiHandler)recvPhaseHandler);
+  askRecoverDataHandlerIdx = CkRegisterHandler((CmiHandler)askRecoverDataHandler);
+  recoverRemoteProcDataHandlerIdx = CkRegisterHandler((CmiHandler)recoverRemoteProcDataHandler);
+  recoverRemoteArrayDataHandlerIdx = CkRegisterHandler((CmiHandler)recoverRemoteArrayDataHandler);
+  replicaRecoverHandlerIdx = CkRegisterHandler((CmiHandler)replicaRecoverHandler);
 #if ! CMK_CONVERSE_MPI
   // print pid to kill
-//  CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
-//  sleep(4);
+  CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
+  sleep(4);
 #endif
 #endif
 }

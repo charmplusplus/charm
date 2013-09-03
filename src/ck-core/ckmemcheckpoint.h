@@ -20,6 +20,14 @@ public:
 	int cp_flag;          // 1: from checkpoint 0: from recover
 };
 
+class CkCheckPTMessage: public CMessage_CkCheckPTMessage {
+public:
+        char *packData;
+        int bud1, bud2;
+        int len;
+        int pointer;
+        int cp_flag;          // 1: from checkpoint 0: from recover
+};
 
 class CkProcCheckPTMessage: public CMessage_CkProcCheckPTMessage {
 public:
@@ -50,9 +58,10 @@ public:
    virtual int getSize() = 0;
 };
 
-/// memory or disk checkpointing
+/// memory or disk or replica checkpointing
 #define CkCheckPoint_inMEM   1
 #define CkCheckPoint_inDISK  2
+#define CkCheckPoint_replica 3
 
 class CkCheckPTEntry{
   CkArrayCheckPTMessage *data;
@@ -166,7 +175,21 @@ public:
   void pupAllElements(PUP::er &p);
   void startArrayCheckpoint();
   void recvArrayCheckpoint(CkArrayCheckPTMessage *m);
-  void recoverAll(CkArrayCheckPTMessage * msg, CkVec<CkGroupID> * gmap=NULL, CkVec<CkArrayIndex> * imap=NULL);
+  void recoverAll(char * msg, CkVec<CkGroupID> * gmap=NULL, CkVec<CkArrayIndex> * imap=NULL);
+  
+  //replica FT related function
+  void startReplicaCheckpoint();
+  void startReplicaProcCheckPoint();
+  void startReplicaArrayCheckpoint();
+  void sendReplicaCheckpoint();
+  void recvReplicaCheckpoint();
+  void recoverReplica();
+  void doneComparison(bool ret);
+  void doneRComparison(int ret);
+  void doneBothComparison();
+  void RollBack();
+  void recoverFromSoftFailure();
+
 public:
   static CkCallback  cpCallback;
 
@@ -175,6 +198,7 @@ public:
   static int inLoadbalancing;
   static double startTime;
   static char*  stage;
+  static int replicaAlive;
 private:
   CkVec<CkCheckPTInfo *> ckTable;
   CkCheckPTEntry chkpTable[2];
@@ -186,6 +210,7 @@ private:
   CkVec<int> failedPes;
   int thisFailedPe;
 
+  int notifyReplica;
     /// to use memory or disk checkpointing
   int    where;
 private:
@@ -204,13 +229,14 @@ void CkMemRestart(const char *, CkArgMsg *);
 // called by user applications
 // to start a checkpointing
 void CkStartMemCheckpoint(CkCallback &cb);
+void CkResetCheckpointCb(CkCallback &cb);
 
 // true if inside a restarting phase
 extern "C" int CkInRestarting(); 
 extern "C" int CkInLdb(); 
 extern "C" void CkSetInLdb(); 
 extern "C" void CkResetInLdb();
-
+extern "C" int CkReplicaAlive();
 extern "C" int CkHasCheckpoints();
 
 extern "C" void CkDieNow();

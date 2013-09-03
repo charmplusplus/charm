@@ -17,6 +17,7 @@ virtual functions are defined here.
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <math.h>
 
 #include "converse.h"
 #include "pup.h"
@@ -167,6 +168,119 @@ void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t)
 	buf+=n;
 }
 
+void PUP::checker::bytes(void * p,int n,size_t itemSize,dataType t)
+{
+  if(!calCheck)
+  {
+    n*=itemSize;
+    memcpy(p,(const void *)origBuf,n); 
+    if(!_skip)
+    {
+      //get the data work for certain type
+      switch(t)
+      {
+        case Tdouble:
+        {
+          double * p1;
+          double * p2;
+          p1 = (double*)p;
+          p2 = new double[n/itemSize];
+          memcpy((char *)p2,(const void *)buf,n); 
+          for(int i=0;i<n/itemSize;i++)
+          {
+            if(fabs(p1[i]-p2[i])>accuracy)
+            {
+              result = result && false;
+            }
+          }
+          delete [] p2;
+          break;
+        }
+        case Tint:
+        {
+          int * p1;
+          int * p2;
+          p1 = (int *)p;
+          p2 = new int[n/itemSize];
+          memcpy((char *)p2,(const void *)buf,n); 
+          for(int i=0;i<n/itemSize;i++)
+          {
+            if(abs(p1[i]-p2[i])>accuracy)
+            {
+              result = result && false;
+            }
+          }
+          delete [] p2;
+          break;
+        }
+        case Tchar:
+        {
+          char * p1;
+          char * p2;
+          p1 = (char *)p;
+          p2 = new char[n/itemSize];
+          memcpy((char *)p2,(const void *)buf,n); 
+          for(int i=0;i<n/itemSize;i++)
+          {
+            if(abs(p1[i]-p2[i])>accuracy)
+            {
+              result = result && false;
+            }
+          }
+          delete [] p2;
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    if(reset){
+      _skip = false;
+      reset = false;
+    }
+    origBuf+=n;
+    buf+=n;
+  } 
+  else
+  {
+    n*=itemSize;
+    memcpy((void *)buf,p,n); 
+    if(!_skip)
+    {
+      switch(t)
+      {
+        case Tint:
+        {
+          int * p1 = (int *)p;
+          for(int i=0;i<n/itemSize;i++){
+            add(p1[i]);
+          }
+          break;
+        }
+        case Tdouble:
+        {
+          double * p1 = (double *)p;
+          for(int i=0;i<n/itemSize;i++){
+            add(p1[i]);
+          }
+          break;
+        }
+        case Tchar:
+        {
+          char * p1 = (char *)p;
+          for(int i=0;i<n/itemSize;i++){
+            add(p1[i]);
+          }
+          break;
+        }
+        default:
+          break;
+       }
+     }
+    buf+=n;
+  }
+}
+
 extern "C" {
 
 // dealing with short write
@@ -296,7 +410,7 @@ PUP::seekBlock::seekBlock(PUP::er &Np,int nSections)
 	if (nSections<0 || nSections>maxSections)
 		CmiAbort("Invalid # of sections passed to PUP::seekBlock!");
 	p.impl_startSeek(*this);
-	if (p.isPacking()) 
+	if (p.isPacking() || p.isCalChecking()) 
 	{ //Must fabricate the section table
 		secTabOff=p.impl_tell(*this);
 		for (int i=0;i<=nSec;i++) secTab[i]=-1;
@@ -314,7 +428,7 @@ void PUP::seekBlock::seek(int toSection)
 {
 	if (toSection<0 || toSection>=nSec)
 		CmiAbort("Invalid section # passed to PUP::seekBlock::seek!");
-	if (p.isPacking()) //Build the section table
+	if (p.isPacking() || p.isCalChecking()) //Build the section table
 		secTab[toSection]=p.impl_tell(*this);
 	else if (p.isUnpacking()) //Extract the section table
 		p.impl_seek(*this,secTab[toSection]);
@@ -323,7 +437,7 @@ void PUP::seekBlock::seek(int toSection)
 
 void PUP::seekBlock::endBlock(void) 
 {
-	if (p.isPacking()) {
+	if (p.isPacking() || p.isCalChecking()) {
 		//Finish off and write out the section table
 		secTab[nSec]=p.impl_tell(*this);
 		p.impl_seek(*this,secTabOff);
@@ -356,6 +470,24 @@ int PUP::mem::impl_tell(seekBlock &s) /*Give the current offset*/
   {return buf-s.data.ptr;}
 void PUP::mem::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
   {buf=s.data.ptr+off;}
+
+void PUP::checker::impl_startSeek(seekBlock &s) /*Begin a seeking block*/
+{
+  if(calCheck)
+    s.data.ptr=buf;
+}
+int PUP::checker::impl_tell(seekBlock &s) /*Give the current offset*/
+{
+  if(calCheck)
+    return buf-s.data.ptr;
+  else
+    return 0;
+}
+void PUP::checker::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
+{
+  if(calCheck)
+    buf=s.data.ptr+off;
+}
 
 /*Disk buffer seeking is also simple*/
 void PUP::disk::impl_startSeek(seekBlock &s) /*Begin a seeking block*/

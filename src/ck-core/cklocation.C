@@ -1242,7 +1242,7 @@ void CkMigratable::pup(PUP::er &p) {
 	p(usesAutoMeasure);
 #if CMK_LBDB_ON 
 	int readyMigrate = 0;
-	if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
+	if (p.isPacking() || p.isCalChecking()) readyMigrate = myRec->isReadyMigrate();
 	p|readyMigrate;
 	if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
 #endif
@@ -2989,7 +2989,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 }
 #else
 void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-		CkElementCreation_t type,bool rebuild)
+		CkElementCreation_t type,bool rebuild, bool create)
 {
 	p.comment("-------- Array Location --------");
 	register ManagerRec *m;
@@ -3011,8 +3011,11 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 			CkMigratable *elt=m->mgr->allocateMigrated(elCType,rec->getIndex(),type);
 			int migCtorIdx=_chareTable[elCType]->getMigCtor();
 			//Insert into our tables and call migration constructor
+                        if(create)
+                        {
 			if (!addElementToRec(rec,m,elt,migCtorIdx,NULL)) return;
 		}
+	}
 	}
 	//Next pup the element data
 	for (m=firstManager;m!=NULL;m=m->next) {
@@ -3301,14 +3304,31 @@ void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, bool create, int dumm
     }
 }
 #else
-void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, bool notify,bool rebuild)
+void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, bool notify,bool rebuild, bool create)
 {
-	CkLocRec_local *rec=createLocal(idx,false,false,notify /* home doesn't know yet */ );
+	CkLocRec_local *rec;
+	CkLocRec *recGlobal;	
 
+        if(create)
+        {
 	//Create the new elements as we unpack the message
-	pupElementsFor(p,rec,CkElementCreation_resume,rebuild);
+          rec=createLocal(idx,false,false,notify /* home doesn't know yet */ );
+        }
+        else
+        {
+          recGlobal = elementNrec(idx);
+          if(recGlobal == NULL) 
+                  CmiAbort("Local object not found");
+          if(recGlobal->type() != CkLocRec::local)
+                  CmiAbort("Local object not local, :P");
+          rec = (CkLocRec_local *)recGlobal;
+        }
+	pupElementsFor(p,rec,CkElementCreation_resume,rebuild, create);
 
+        if(!p.isChecking())
+        {
 	callMethod(rec,&CkMigratable::ckJustMigrated);
+        }
 }
 #endif
 
