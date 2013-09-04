@@ -17,6 +17,10 @@
 
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* m) {
+#if defined(_WIN32)
+  CkExit();
+#endif
+
   CkPrintf("\nLENNARD JONES MOLECULAR DYNAMICS START UP ...\n");
 
   //set variable values to a default set
