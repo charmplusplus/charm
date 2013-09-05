@@ -1007,7 +1007,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   else
   {//Use the reducer to reduce the messages
 		//if there is only one msg to be reduced just return that message
-    if(nMsgs == 1){
+    if(nMsgs == 1 && msgArr[0]->reducer != CkReduction::set) {
 	ret = msgArr[0];	
     }else{
       if (msgArr[0]->reducer == CkReduction::random) {
