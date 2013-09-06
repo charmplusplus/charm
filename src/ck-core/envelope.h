@@ -315,6 +315,9 @@ private:
       return totalsize - getPrioBytes() - sizeof(envelope) - extrasize; 
     }
     void   setUsersize(const UInt s) {
+      if (s == getUsersize()) {
+        return;
+      }
       CkAssert(s < getUsersize());
       UInt newPrioOffset = sizeof(envelope) + CkMsgAlignLength(s);
       UInt newExtraDataOffset = newPrioOffset + getPrioBytes();
@@ -329,7 +332,7 @@ private:
 
     // s specifies number of bytes to remove from user portion of message
     void shrinkUsersize(const UInt s) {
-      CkAssert(s < getUsersize());
+      CkAssert(s <= getUsersize());
       setUsersize(getUsersize() - s);
     }
 
