@@ -453,14 +453,14 @@ extern "C" void TopoManager_reset() {
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   craynid_reset();
 #endif
-  if(_topoLock) delete _tmgr;
+  if(_tmgr) delete _tmgr;
   _tmgr = new TopoManager;
   CmiUnlock(_topoLock);
 }
 
 extern "C" void TopoManager_free() {
   CmiLock(_topoLock);
-  if(_topoLock) delete _tmgr;
+  if(_tmgr) delete _tmgr;
   _tmgr = NULL;
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   craynid_free();

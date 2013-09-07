@@ -1245,8 +1245,10 @@ void _initCharm(int unused_argc, char **argv)
 			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
 		}*/
 	}	
-
-    TopoManager_init();
+    
+    if (CkMyRank() == 0) {
+      TopoManager_init();
+    }
     CmiNodeAllBarrier();
 
     if (!_replaySystem) {
