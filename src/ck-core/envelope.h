@@ -545,11 +545,15 @@ private:
 
 };
 
-inline int getEnvelopesize()
+inline int CkEnvelopeMaxsize()
 {
   return sizeof(envelope)+ getMaxExtrasize();
 }
 
+inline int CkEnvelopeBasicsize()
+{
+    return sizeof(envelope);
+}
 
 inline envelope *UsrToEnv(const void *const msg) {
   return (((envelope *) msg)-1);
