@@ -204,6 +204,28 @@ struct s_roMsg {     ///< ROMsgMsg for readonlys defined in ci files
         UInt roIdx;
 };
 
+
+inline int getMaxExtrasize()
+{
+
+    int ret=0;
+    ret = sizeof(struct s_chare);
+    if(ret <  sizeof(struct s_groupinit))
+        ret = sizeof(struct s_groupinit);
+    if(ret < sizeof(struct s_group))
+        ret = sizeof(struct s_group);
+    if(ret < sizeof(struct s_arrayinit))
+        ret = sizeof(struct s_arrayinit);
+    if(ret < sizeof(struct s_array))
+        ret = sizeof(struct s_array);
+    if ( ret < sizeof(struct s_roData))
+        ret = sizeof(struct s_roData);
+    if(ret < sizeof(struct s_roMsg))
+        ret = sizeof(struct s_roMsg);
+    return ret;
+
+}
+
 inline UShort extraSize(CkEnvelopeType type)
 {
   int ret = 0;
@@ -522,6 +544,11 @@ private:
 #endif
 
 };
+
+inline int getEnvelopesize()
+{
+  return sizeof(envelope)+ getMaxExtrasize();
+}
 
 
 inline envelope *UsrToEnv(const void *const msg) {
