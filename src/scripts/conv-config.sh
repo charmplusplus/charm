@@ -102,6 +102,10 @@ fi
 
 [ -z "$CMK_CELL" ] && CMK_CELL=0
 
+[ -z "$CMK_C_OPENMP" ] && CMK_C_OPENMP="-fopenmp"
+[ -z "$CMK_F_OPENMP" ] && CMK_F_OPENMP="$CMK_C_OPENMP"
+[ -z "$CMK_LD_OPENMP" ] && CMK_LD_OPENMP="$CMK_C_OPENMP"
+
 # apply incdir and libdir
 CMK_CC="$CMK_CC $CMK_INCDIR "
 CMK_CXX="$CMK_CXX $CMK_INCDIR "

@@ -80,6 +80,7 @@ USE_FASTEST_CC=""
 PROG_EXT=""
 GENDEPENDS="no"
 COUNTTOKENS="no"
+USE_OPENMP="no"
 
 COPY_CHARMRUN=true
 USE_BUILD_OPTIONS=0
@@ -796,6 +797,12 @@ do
 	-custom-part)
 		CUSTOM_PARTITION="yes"
 		;;
+
+	-fopenmp|-openmp)
+	        echo Saw OpenMP flag
+		USE_OPENMP="yes"
+		;;
+
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
@@ -875,6 +882,19 @@ then
     then
         OPTS_CXX="$OPTS $CMK_ENABLE_CPP11"
     fi
+fi
+
+echo "USE_OPENMP set to '$USE_OPENMP'"
+if [ "$USE_OPENMP" = "yes" ]
+then
+    echo OpenMP support enabled
+    OPTS_CC="$OPTS_CC $CMK_C_OPENMP"
+    OPTS_CXX="$OPTS_CXX $CMK_C_OPENMP"
+    OPTS_F90="$OPTS_F90 $CMK_F_OPENMP"
+    OPTS_LD="$OPTS_LD $CMK_LD_OPENMP"
+    OPTS_LDXX="$OPTS_LDXX $CMK_LD_OPENMP"
+else
+    echo OpenMP support not enabled
 fi
 
 # Look up and add the dependencies for module $1
