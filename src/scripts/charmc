@@ -883,7 +883,6 @@ then
     fi
 fi
 
-echo "USE_OPENMP set to '$USE_OPENMP'"
 if [ "$USE_OPENMP" = "yes" ]
 then
     [ -n "$VERBOSE" ] && echo OpenMP support enabled
