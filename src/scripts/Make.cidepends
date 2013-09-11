@@ -67,6 +67,7 @@ TempAwareRefineLB.decl.h TempAwareRefineLB.def.h: TempAwareRefineLB.ci.stamp
 tempo.decl.h tempo.def.h: tempo.ci.stamp
 TopoCentLB.decl.h TopoCentLB.def.h: TopoCentLB.ci.stamp
 TopoLB.decl.h TopoLB.def.h: TopoLB.ci.stamp
+TraceAutoPerf.decl.h TraceAutoPerf.def.h: trace-autoPerf.ci.stamp
 TraceControlPoints.decl.h TraceControlPoints.def.h: trace-controlPoints.ci.stamp
 TraceProjections.decl.h TraceProjections.def.h: trace-projections.ci.stamp
 TraceSimple.decl.h TraceSimple.def.h: trace-simple.ci.stamp
