@@ -73,7 +73,10 @@ public:
 #else
       sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), idx);
 #endif
-      mkstemp(fname);
+      if(mkstemp(fname)<0)
+	{
+	  CmiAbort("mkstemp fail in checkpoint");
+	}
 #else
       fname=tmpnam(NULL);
 #endif
