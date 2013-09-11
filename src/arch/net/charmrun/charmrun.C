@@ -451,8 +451,26 @@ static int pparam_setdef(ppdef def, char *value)
       if (*p) return -1;
       return 0;
     case 's' :
-      *def->where.s = strdup(value);
-      return 0;
+      {
+        /* Parse input string and convert a literal "\n" into '\n'. */
+        *def->where.s = (char*) calloc(strlen(value)+1, sizeof(char));
+        char* parsed_value = (char*) *def->where.s;
+        for(int i = 0, j = 0; i < strlen(value); i++)
+        {
+          fprintf(stderr, "i = %d, j = %d, value[i] = \n", i, j);
+          if(i+1 < strlen(value))
+          {
+            if(value[i] == '\\' && value[i+1] == 'n')
+            {
+              parsed_value[j++] = '\n';
+              i++;
+              continue;
+            }
+          }
+          parsed_value[j++] = value[i];
+        }
+        return 0;
+      }
     case 'f' :
       *def->where.f = strtol(value, &p, 10);
       if (*p) return -1;
