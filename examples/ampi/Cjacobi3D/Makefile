@@ -25,6 +25,10 @@ jacobi.tls: jacobi.C
 	-$(CHARMC) -c -tlsglobal jacobi.C -o jacobi.tls.o 
 	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobal -module CommonLBs #-memory isomalloc
 
+jacobi.rose: jacobi.C
+	$(CHARMC) -roseomptlsglobals -o jacobi.rose.o -c $<
+	$(CHARMC) -roseomptlsglobals -o $@ jacobi.rose.o -module CommonLBs
+
 jacobi-get: jacobi-get.C
 	$(CHARMC) -c jacobi-get.C
 	$(CHARMC) -o jacobi-get jacobi-get.o -module CommonLBs -lm

@@ -90,6 +90,7 @@ CHARM_SHARED="0"
 BUILD_SHARE="0"
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
+ROSE_OMP_TLS_GLOBALS="no"
 
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
@@ -503,6 +504,10 @@ do
 		TLSGLOBALS="1"
 		;;
 
+	"-roseomptlsglobals")
+		ROSE_OMP_TLS_GLOBALS="yes"
+		;;
+
 	"-verbose")
 		echo "Verbose mode set"
 		VERBOSE=true
@@ -875,6 +880,17 @@ then
     if [ "$CMK_COMPILER_KNOWS_CPP11" = "1" ]
     then
         OPTS_CXX="$OPTS $CMK_ENABLE_CPP11"
+    fi
+fi
+
+if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
+then
+    USE_OPENMP="yes"
+    TLSGLOBALS="1"
+
+    if [ ! -x "$CMK_ROSE_OMP_TOOL" ]
+    then
+	Abort "The environment variable CMK_ROSE_OMP_TOOL must contain the path to a built binary of the ROSE OpenMP variable privatization tool"
     fi
 fi
 
@@ -1300,6 +1316,30 @@ do
 		DESTO=""
 	fi
 	NU_OBJ=""
+
+	if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
+	then
+	    case "$FILE" in
+		*.c)
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE
+		    FILE="rose_$FILE"
+		    ;;
+		*.C|*.cc|*.cxx|*.cpp|*.c++)
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE
+		    FILE="rose_$FILE"
+		    ;;
+		*.f|*.F)
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP $OPTS_F90 -c $FILE
+		    FILE="rose_$FILE"
+		    ;;
+		*.f90|*.F90)
+		    test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP $OPTS_F90 $FILE
+		    FILE="rose_$FILE"
+		    ;;
+	    esac
+	fi
+
 	case "$FILE" in
 	*.ci)
                 XIOPTS=$CMK_XIOPTS
