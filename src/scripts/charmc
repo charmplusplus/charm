@@ -501,11 +501,6 @@ do
 
 	"-tlsglobal"|"-tlsglobals")
 		TLSGLOBALS="1"
-		OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
-		OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
-		OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
-		OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
-		OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
 		;;
 
 	"-verbose")
@@ -893,6 +888,15 @@ then
     OPTS_LDXX="$OPTS_LDXX $CMK_LD_OPENMP"
 else
     [ -n "$VERBOSE" ] && echo OpenMP support not enabled
+fi
+
+if [ "$TLSGLOBALS" = "1" ]
+then
+    OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
+    OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
+    OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
+    OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
+    OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
 fi
 
 # Look up and add the dependencies for module $1
