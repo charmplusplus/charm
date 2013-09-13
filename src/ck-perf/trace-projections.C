@@ -1259,7 +1259,8 @@ TraceProjections::TraceProjections(char **argv):
       CmiAbort("PAPI events conflict! Please re-assign event types!\n");
     } else {
       char error_str[PAPI_MAX_STR_LEN];
-      PAPI_perror(papiRetValue,error_str,PAPI_MAX_STR_LEN);
+      PAPI_perror(error_str);
+      //PAPI_perror(papiRetValue,error_str,PAPI_MAX_STR_LEN);
       CmiPrintf("PAPI failed with error %s val %d\n",error_str,papiRetValue);
       CmiAbort("PAPI failed to add designated events!\n");
     }
