@@ -1,0 +1,48 @@
+mainmodule jacobi3d {
+  readonly CProxy_Main mainProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int arrayDimZ;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int blockDimZ;
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int num_chare_z;
+  readonly int max_iter;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void doneConverge(int);
+    entry [reductiontarget] void doneIter(double);
+  };
+
+  array [3D] Jacobi {
+    entry Jacobi(void);
+    entry void updateGhosts(int ref, int dir, int w, int h, double gh[w*h]);
+    entry [reductiontarget] void checkConverged(double e);
+    entry void run() {
+      while (iterations < max_iter && !converged) {
+        atomic { begin_iteration(); }
+        for (remoteCount = 0; remoteCount < neighbors; remoteCount++) {
+          when updateGhosts[iterations](int ref, int dir, int w, int h, double buf[w*h]) atomic {
+            updateBoundary(dir, w, h, buf);
+          }
+        }
+        atomic {
+          error = computeKernel();
+          //CkPrintf(" error   %d %d %d  is %f\n", thisIndex.x, thisIndex.y, thisIndex.z, error);
+          iterations++;
+          contribute(sizeof(double), &error, CkReduction::max_double, CkCallback(CkReductionTarget(Jacobi, checkConverged), thisProxy));
+        }
+        when checkConverged(double maxerror)
+        {
+            if (maxerror<DELTA) atomic{ converged = true; contribute(sizeof(int), &iterations, CkReduction::nop, CkCallback((CkReductionTarget(Main, doneConverge)), mainProxy)); }
+        }
+      }
+      if(iterations >= max_iter)
+          atomic { contribute(sizeof(double), &error, CkReduction::max_double, CkCallback((CkReductionTarget(Main, doneIter)), mainProxy));}
+
+    };
+  };
+};
