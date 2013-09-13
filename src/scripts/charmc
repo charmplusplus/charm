@@ -90,6 +90,7 @@ CHARM_SHARED="0"
 BUILD_SHARE="0"
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
+ROSE_OMP_TLS_GLOBALS="no"
 
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
@@ -501,11 +502,10 @@ do
 
 	"-tlsglobal"|"-tlsglobals")
 		TLSGLOBALS="1"
-		OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
-		OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
-		OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
-		OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
-		OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
+		;;
+
+	"-roseomptlsglobals")
+		ROSE_OMP_TLS_GLOBALS="yes"
 		;;
 
 	"-verbose")
@@ -883,6 +883,17 @@ then
     fi
 fi
 
+if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
+then
+    USE_OPENMP="yes"
+    TLSGLOBALS="1"
+
+    if [ ! -x "$CMK_ROSE_OMP_TOOL" ]
+    then
+	Abort "The environment variable CMK_ROSE_OMP_TOOL must contain the path to a built binary of the ROSE OpenMP variable privatization tool"
+    fi
+fi
+
 if [ "$USE_OPENMP" = "yes" ]
 then
     [ -n "$VERBOSE" ] && echo OpenMP support enabled
@@ -893,6 +904,15 @@ then
     OPTS_LDXX="$OPTS_LDXX $CMK_LD_OPENMP"
 else
     [ -n "$VERBOSE" ] && echo OpenMP support not enabled
+fi
+
+if [ "$TLSGLOBALS" = "1" ]
+then
+    OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
+    OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
+    OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
+    OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
+    OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
 fi
 
 # Look up and add the dependencies for module $1
@@ -1296,6 +1316,30 @@ do
 		DESTO=""
 	fi
 	NU_OBJ=""
+
+	if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
+	then
+	    case "$FILE" in
+		*.c)
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE
+		    FILE="rose_$FILE"
+		    ;;
+		*.C|*.cc|*.cxx|*.cpp|*.c++)
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE
+		    FILE="rose_$FILE"
+		    ;;
+		*.f|*.F)
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP $OPTS_F90 -c $FILE
+		    FILE="rose_$FILE"
+		    ;;
+		*.f90|*.F90)
+		    test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP $OPTS_F90 $FILE
+		    FILE="rose_$FILE"
+		    ;;
+	    esac
+	fi
+
 	case "$FILE" in
 	*.ci)
                 XIOPTS=$CMK_XIOPTS
