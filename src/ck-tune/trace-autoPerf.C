@@ -66,6 +66,12 @@ CkReductionMsg *perfDataReduction(int nMsg,CkReductionMsg **msgs){
         //Total invocations
         ret->numInvocations += m->numInvocations;
         ret->objLoadMax = max(ret->objLoadMax, m->objLoadMax);
+#if CMK_HAS_COUNTER_PAPI
+        for(int i=0; i<NUMPAPIEVENTS; i++)
+        {
+            ret->papiValues[i] += m->papiValues[i]; 
+        }
+#endif
     }  
     CkReductionMsg *msg= CkReductionMsg::buildNew(sizeof(perfData),ret); 
     return msg;
@@ -169,6 +175,11 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
     CkPrintf("Overhead(%):     \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f \n", data->overheadMin*100, data->overheadMax*100, overheadPercentage*100, data->overheadTotalTime);
     CkPrintf("Grainsize(ms):\t(avg:max)\t: (%.3f:    %.3f) \n", data->utilTotalTime/data->numInvocations*1000, data->grainsizeMax*1000);
     CkPrintf("Invocations:  \t%lld\n", data->numInvocations);
+    char eventName[PAPI_MAX_STR_LEN];
+    for (int i=0;i<NUMPAPIEVENTS;i++) {
+        PAPI_event_code_to_name(papiEvents[i], eventName);
+        CkPrintf(" EVENT  %s   counter   %lld \n", eventName, data->papiValues[i]);
+    }
     //)
    
     // --- time step measurement 
