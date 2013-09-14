@@ -33,6 +33,7 @@ liveViz:
 taskGraph:
 search:
 datatransfer: ampi fem
+NDMeshStreamer: completion
 
 pythonCCS:
 	-(CHARMINC=../../../include;. $$CHARMINC/conv-config.sh; \
