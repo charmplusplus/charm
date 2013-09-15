@@ -175,11 +175,13 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
     CkPrintf("Overhead(%):     \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f \n", data->overheadMin*100, data->overheadMax*100, overheadPercentage*100, data->overheadTotalTime);
     CkPrintf("Grainsize(ms):\t(avg:max)\t: (%.3f:    %.3f) \n", data->utilTotalTime/data->numInvocations*1000, data->grainsizeMax*1000);
     CkPrintf("Invocations:  \t%lld\n", data->numInvocations);
+#if CMK_HAS_COUNTER_PAPI
     char eventName[PAPI_MAX_STR_LEN];
     for (int i=0;i<NUMPAPIEVENTS;i++) {
         PAPI_event_code_to_name(papiEvents[i], eventName);
         CkPrintf(" EVENT  %s   counter   %lld \n", eventName, data->papiValues[i]);
     }
+#endif
     //)
    
     // --- time step measurement 
