@@ -411,7 +411,34 @@ CkErrStream& operator<< (CkErrStream& ckes, CkBitVector const b ) {
   return ckes;
 }
 
-
+int CkBitVector::Compare(const CkBitVector &b) const
+{
+#if 0
+    int result = 0;
+    int length, i;
+    if(usedBits > b.usedBits)
+        result = 1;
+    else if (usedBits < b.usedBits)
+        result = -1;
+    else {
+        length = chunks(usedBits);
+        for(i=length-1; i>=0; i--)
+        {
+            if(data[i] > b.data[i])
+            {
+                result = 1;
+                break;
+            }else if (data[i] < b.data[i])
+            {
+                result = -1;
+                break;
+            }
+        }
+    }
+    return result;
+#endif
+    return 1;
+}
 
 // Pack and unpack this bugger!
 void CkBitVector::pup(PUP::er &p) {

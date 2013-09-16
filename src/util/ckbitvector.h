@@ -82,11 +82,12 @@ class CkBitVector {
   CkBitVector & Concat(CkBitVector const &b);
 
   // Comparison operators
-  bool operator==(const CkBitVector &b) const { return *this==b; } // HERE
+  int  Compare(const CkBitVector &b) const;
+  bool operator==(const CkBitVector &b) const {   if(Compare(b) == 0) return true; else return false; } // HERE
   bool operator!=(const CkBitVector &b) const { return !(*this==b); }
-  bool operator<(const CkBitVector &b) const { return *this>b; } // HERE
+  bool operator<(const CkBitVector &b) const { if(Compare(b) == -1) return true; else return false; } // HERE
   bool operator<=(const CkBitVector &b) const { return (*this==b||*this>b); }
-  bool operator>(const CkBitVector &b) const { return *this<b; } // HERE
+  bool operator>(const CkBitVector &b) const { if(Compare(b) == 1) return true; else return false;} // HERE
   bool operator>=(const CkBitVector &b) const { return (*this==b||*this<b); }
 
   // Print the bit vector to either output stream type
