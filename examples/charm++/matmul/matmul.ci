@@ -6,17 +6,17 @@ mainmodule matmul {
   };
 
   array [2D] Block {
-    entry Block(unsigned int blockSize, unsigned int numBlocks);
+    entry Block(bool randomInit, unsigned int blockSize, unsigned int numBlocks);
     entry void pdgemmSendInput(CProxy_Block output, bool aOrB) {
       atomic {
         if (aOrB)
-          output[thisIndex].inputA(0, data, blockSize, blockSize);
+          output((thisIndex.x-thisIndex.y+numBlocks)%numBlocks, thisIndex.y).inputA(0, data, blockSize, blockSize);
         else
-          output[thisIndex].inputB(0, data, blockSize, blockSize);
+          output(thisIndex.x, (thisIndex.y-thisIndex.x+numBlocks)%numBlocks).inputB(0, data, blockSize, blockSize);
       }
     };
 
-    entry void pdgemmRun(double alpha, double beta, CkCallback done) {
+    entry void pdgemmRun(double alpha, CkCallback done) {
       forall [block] (0:numBlocks-1,1) {
         when
           inputA[block](int blockIdA, double blockA[M*KA], unsigned int M, unsigned int KA),
@@ -29,8 +29,7 @@ mainmodule matmul {
           // call. The local version is kept for easy portability.
           example_dgemm(M, N, KA,
                         alpha,
-                        blockA, blockB,
-                        beta, data);
+                        blockA, blockB, data);
 
           if (blockIdA != numBlocks) {
             int destX = (thisIndex.x + 1) % numBlocks;
