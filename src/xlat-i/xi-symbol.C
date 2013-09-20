@@ -3053,6 +3053,8 @@ void Entry::genArrayDefs(XStr& str)
       if (!isNoTrace())
 	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
 	      << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
+      if(isAppWork())
+      str << " _TRACE_BEGIN_APPWORK();\n";    
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
@@ -3063,6 +3065,8 @@ void Entry::genArrayDefs(XStr& str)
       "  CpdAfterEp("<<epIdx()<<");\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
+      if(isAppWork())
+      str << " _TRACE_END_APPWORK();\n";    
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     }
@@ -3257,6 +3261,8 @@ void Entry::genGroupDefs(XStr& str)
       str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
       str << "  CkAssert(obj);\n";
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL);\n";
+      if(isAppWork())
+      str << " _TRACE_BEGIN_APPWORK();\n";    
       str << "#if CMK_LBDB_ON\n"
 "  // if there is a running obj being measured, stop it temporarily\n"
 "  LDObjHandle objHandle;\n"
@@ -3278,6 +3284,8 @@ void Entry::genGroupDefs(XStr& str)
       str << "#if CMK_LBDB_ON\n"
 "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
 "#endif\n";
+      if(isAppWork())
+      str << " _TRACE_BEGIN_APPWORK();\n";    
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     } else if(isSync()) {
@@ -4733,6 +4741,7 @@ XStr Entry::genRegEp(bool isForRedn)
   if ( !isForRedn && (attribs & SNOKEEP) ) str << "+CK_EP_NOKEEP";
   if (attribs & SNOTRACE) str << "+CK_EP_TRACEDISABLE";
   if (attribs & SIMMEDIATE) str << "+CK_EP_TRACEDISABLE";
+  if (attribs & SAPPWORK) str << "+CK_EP_APPWORK";
 
   /*MEICHAO*/
   if (attribs & SMEM) str << "+CK_EP_MEMCRITICAL";

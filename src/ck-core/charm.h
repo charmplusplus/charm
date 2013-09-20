@@ -105,6 +105,7 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 #define CK_EP_TRACEDISABLE  (1<<4) 
 
 #define CK_EP_MEMCRITICAL (1<<5)
+#define CK_EP_APPWORK     (1<<6)
 
 /** type of a chare */
 #if CMK_MESSAGE_LOGGING

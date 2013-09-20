@@ -58,7 +58,7 @@ class EntryInfo {
     bool noKeep; 
     /// true if this EP is charm internal functions
     bool inCharm;
-    
+    bool appWork; 
 #ifdef ADAPT_SCHED_MEM
    /// true if this EP is used to be rescheduled when adjusting memory usage
    bool isMemCritical;
@@ -88,7 +88,7 @@ class EntryInfo {
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
       name(n), call(c), msgIdx(m), chareIdx(ci), 
       marshallUnpack(0), messagePup(0)
-    { traceEnabled=true; noKeep=false; inCharm=false;}
+    { traceEnabled=true; noKeep=false; inCharm=false; appWork=false;}
 };
 
 /**

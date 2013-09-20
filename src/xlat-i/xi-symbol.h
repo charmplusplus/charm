@@ -970,6 +970,7 @@ class Message : public TEntity {
 #define SACCEL        0x10000
 #define SMEM          0x20000
 #define SREDUCE       0x40000 // <- reduction target
+#define SAPPWORK      0x80000 // <- reduction target
 
 /* An entry construct */
 class Entry : public Member {
@@ -1100,6 +1101,7 @@ private:
     int isCreateHere(void) { return (attribs & SCREATEHERE); }
     int isPython(void) { return (attribs & SPYTHON); }
     int isNoTrace(void) { return (attribs & SNOTRACE); }
+    int isAppWork(void) { return (attribs & SAPPWORK); }
     int isNoKeep(void) { return (attribs & SNOKEEP); }
     int isSdag(void) { return (sdagCon!=0); }
 

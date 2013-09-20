@@ -76,7 +76,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %token THREADED
 %token TEMPLATE
 %token SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE 
-%token CREATEHERE CREATEHOME NOKEEP NOTRACE
+%token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK
 %token VOID
 %token CONST
 %token PACKED
@@ -801,6 +801,8 @@ EAttrib		: THREADED
 		{ $$ = SNOKEEP; }
 		| NOTRACE
 		{ $$ = SNOTRACE; }
+		| APPWORK 
+		{ $$ = SAPPWORK; }
 		| IMMEDIATE
                 { $$ = SIMMEDIATE; }
 		| SKIPSCHED

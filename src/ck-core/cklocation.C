@@ -1610,8 +1610,12 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 		envelope *env=UsrToEnv(msg);
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
 		if (_entryTable[epIdx]->traceEnabled)
-			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
+        {
+            _TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
                                                       ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID(env->getArrayMgrIdx()));
+            if(_entryTable[epIdx]->appWork)
+                _TRACE_BEGIN_APPWORK();
+        }
 	}
 #endif
 
@@ -1624,7 +1628,11 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 #if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		if (_entryTable[epIdx]->traceEnabled)
+        {
+            if(_entryTable[epIdx]->appWork)
+                _TRACE_END_APPWORK();
 			_TRACE_END_EXECUTE();
+        }
 	}
 #endif
 #if CMK_LBDB_ON
