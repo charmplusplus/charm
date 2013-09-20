@@ -109,6 +109,11 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
 
 extern "C" void (*registerMachineUserEvents())();
 
+#if CMK_HAS_COUNTER_PAPI
+extern int papiEvents[NUMPAPIEVENTS];
+extern "C" void initPAPI(); 
+#endif
+
 #endif
 
 /*@}*/
