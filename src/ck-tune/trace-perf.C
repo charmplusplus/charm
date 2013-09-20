@@ -1,4 +1,3 @@
-
 CkpvStaticDeclare(TraceAutoPerf*, _trace);
 //-------- group information ---------------------------
 
@@ -73,9 +72,16 @@ void TraceAutoPerf::traceEnd(void){
 void TraceAutoPerf::userEvent(int eventID) { }
 void TraceAutoPerf::userBracketEvent(int eventID, double bt, double et) { }
 
-void TraceAutoPerf::appWork(int eventID, double bt, double et) { 
-    totalAppTime += (et-bt);
+void TraceAutoPerf::beginAppWork() 
+{
+    appWorkStartTimer = TraceTimer();
 }
+
+void TraceAutoPerf::endAppWork() 
+{
+    totalAppTime += (TraceTimer() - appWorkStartTimer);
+}
+
 void TraceAutoPerf::creation(envelope *, int epIdx, int num) { } 
 void TraceAutoPerf::creationMulticast(envelope *, int epIdx, int num, int *pelist) { }
 void TraceAutoPerf::creationDone(int num) { }

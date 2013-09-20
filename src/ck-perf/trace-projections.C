@@ -1332,10 +1332,6 @@ void TraceProjections::userBracketEvent(int e, double bt, double et)
   _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(et), curevent++, CkMyPe());
 }
 
-void TraceProjections::appWork(int e, double bt, double et)
-{
-}
-
 void TraceProjections::userSuppliedData(int d)
 {
   if (!computationStarted) return;

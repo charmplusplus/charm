@@ -43,7 +43,6 @@ CkpvDeclare(char*, partitionRoot);
 CkpvDeclare(int, traceRootBaseLength);
 CkpvDeclare(char*, selective);
 CkpvDeclare(bool, verbose);
-CkpvDeclare(double, startUsefulWorkTimer);
 
 typedef void (*mTFP)();                   // function pointer for
 CpvStaticDeclare(mTFP, machineTraceFuncPtr);    // machine user event
@@ -63,8 +62,6 @@ static void traceCommonInit(char **argv)
   CkpvAccess(traceInitTime) = CmiStartTimer();
   CkpvInitialize(double, traceInitCpuTime);
   CkpvAccess(traceInitCpuTime) = TRACE_CPUTIMER();
-  CkpvInitialize(double, startUsefulWorkTimer);
-  CkpvAccess(startUsefulWorkTimer) = TRACE_CPUTIMER();
   CpvInitialize(int, traceOn);
   CpvAccess(traceOn) = 0;
   CpvInitialize(int, _traceCoreOn); //projector
@@ -478,20 +475,23 @@ void traceUserEvent(int e)
 }
 
 extern "C" 
-void traceStartUsefulWork()
-{
-#if CMK_TRACE_ENABLED
-    CkpvAccess(startUsefulWorkTimer) = TraceTimer();
-#endif
-}
-
-extern "C" 
-void traceStopUsefulWork()
+void beginAppWork()
 {
 #if CMK_TRACE_ENABLED
     if (CpvAccess(traceOn) && CkpvAccess(_traces))
     {
-        CkpvAccess(_traces)->appWork(1, CkpvAccess(startUsefulWorkTimer), TraceTimer());
+        CkpvAccess(_traces)->beginAppWork();
+    }
+#endif
+}
+
+extern "C" 
+void endAppWork()
+{
+#if CMK_TRACE_ENABLED
+    if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    {
+        CkpvAccess(_traces)->endAppWork();
     }
 #endif
 }

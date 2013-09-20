@@ -272,6 +272,7 @@ public:
     /** The amount of time spent executing entry methods since we last reset the counters */
     double totalEntryMethodTime;
 
+    double appWorkStartTimer;
     /** the amount of application useful work, need app knowledge */
     double totalAppTime;
 
@@ -315,7 +316,8 @@ public:
   void userEvent(int eventID);
   // a pair of begin/end user event has just occured
   void userBracketEvent(int eventID, double bt, double et);
-  void appWork(int eventID, double bt, double et);
+  void beginAppWork();
+  void endAppWork();
   
   // "creation" of message(s) - message Sends
   void creation(envelope *, int epIdx, int num=1);

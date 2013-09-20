@@ -238,7 +238,6 @@ void TraceAutoPerfBOC::generatePerfModel()
 }
 
 extern "C" void traceAutoPerfExitFunction() {
-    CkPrintf("calling before exiting............................\n");
     autoPerfProxy.timeStep(CkMyPe());
     //CkExit();
 }
