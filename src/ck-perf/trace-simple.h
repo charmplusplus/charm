@@ -27,6 +27,7 @@ class TraceSimple : public Trace {
   // a pair of begin/end user event has just occured
   void userBracketEvent(int eventID, double bt, double et);
   
+  void appWork(int e, double bt, double et);
   // "creation" of message(s) - message Sends
   void creation(envelope *, int epIdx, int num=1);
   void creation(char *msg) {}

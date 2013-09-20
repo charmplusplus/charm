@@ -483,6 +483,7 @@ public:
     TraceProjections(char **argv);
     void userEvent(int e);
     void userBracketEvent(int e, double bt, double et);
+    void appWork(int e, double bt, double et);
     void userSuppliedBracketedNote(char*, int, double, double);
 
     void userSuppliedData(int e);

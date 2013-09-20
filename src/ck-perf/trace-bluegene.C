@@ -227,7 +227,6 @@ void TraceBluegene::userBracketEvent(const char* name, double bt, double et, voi
   tTIMELINEREC.logEntryInsert(newLog);
 }
 
-
 void TraceBluegene::userBracketEvent(const char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList){
    
   if (!genTimeLog) return;

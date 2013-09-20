@@ -24,6 +24,7 @@ TraceAutoPerf::TraceAutoPerf(char **argv)
 void TraceAutoPerf::resetTimings(){
     totalIdleTime = 0.0;
     totalEntryMethodTime = 0.0;
+    totalAppTime = 0.0;
     totalEntryMethodInvocations = 0;
     lastBeginIdle = lastBeginExecuteTime = lastResetTime = TraceTimer();
     totalUntracedTime = 0;
@@ -41,6 +42,7 @@ void TraceAutoPerf::resetTimings(){
 void TraceAutoPerf::resetAll(){
     totalIdleTime = 0.0;
     totalEntryMethodTime = 0.0;
+    totalAppTime = 0.0;
     memUsage = 0;
     totalEntryMethodInvocations = 0;
     lastBeginIdle = lastBeginExecuteTime = lastResetTime = TraceTimer();
@@ -70,6 +72,10 @@ void TraceAutoPerf::traceEnd(void){
 
 void TraceAutoPerf::userEvent(int eventID) { }
 void TraceAutoPerf::userBracketEvent(int eventID, double bt, double et) { }
+
+void TraceAutoPerf::appWork(int eventID, double bt, double et) { 
+    totalAppTime += (et-bt);
+}
 void TraceAutoPerf::creation(envelope *, int epIdx, int num) { } 
 void TraceAutoPerf::creationMulticast(envelope *, int epIdx, int num, int *pelist) { }
 void TraceAutoPerf::creationDone(int num) { }

@@ -158,6 +158,10 @@ public:
     double utilTotalTime;
     double utilMax;
    
+    double appMin;
+    double appTotalTime;
+    double appMax;
+
     double overheadMin;
     double overheadTotalTime;
     double overheadMax;
@@ -268,6 +272,9 @@ public:
     /** The amount of time spent executing entry methods since we last reset the counters */
     double totalEntryMethodTime;
 
+    /** the amount of application useful work, need app knowledge */
+    double totalAppTime;
+
     /** The amount of time spent idle since we last reset the counters */
     double totalIdleTime;
 
@@ -308,6 +315,7 @@ public:
   void userEvent(int eventID);
   // a pair of begin/end user event has just occured
   void userBracketEvent(int eventID, double bt, double et);
+  void appWork(int eventID, double bt, double et);
   
   // "creation" of message(s) - message Sends
   void creation(envelope *, int epIdx, int num=1);
@@ -421,6 +429,14 @@ public:
           totalEntryMethodTime += (TraceTimer() - lastBeginExecuteTime);
       return totalEntryMethodTime; 
   }
+
+  inline double appRatio() {
+      return totalAppTime/ totalTraceTime(); 
+  }
+
+  inline double appTime() {
+      return totalAppTime; 
+  }
   /** Highest memory usage (in MB) value we've seen since resetting the counters */
   inline double memoryUsageMB(){
     return ((double)memUsage) / 1024.0 / 1024.0;
@@ -458,6 +474,8 @@ public:
       currentSummary->idleTotalTime = idleTime();
       currentSummary->utilMin = currentSummary->utilMax = utilRatio(); 
       currentSummary->utilTotalTime= utilTime();
+      currentSummary->appMin = currentSummary->appMax = appRatio(); 
+      currentSummary->appTotalTime= appTime();
       currentSummary->overheadMin = currentSummary->overheadMax = overheadRatio();
       currentSummary->overheadTotalTime = overheadTime();
       currentSummary->grainsizeAvg = grainSize();

@@ -34,6 +34,7 @@ class TraceBluegene : public Trace {
     virtual void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx);
     void addBackwardDep(void *log);
     void userBracketEvent(int eventID, double bt, double et) {}	// from trace.h
+    void appWork(int e, double bt, double et){}
     void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr);
     void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
     void bgPrint(const char* str);

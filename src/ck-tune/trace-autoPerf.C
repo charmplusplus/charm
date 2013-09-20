@@ -54,6 +54,9 @@ CkReductionMsg *perfDataReduction(int nMsg,CkReductionMsg **msgs){
         ret->utilMin = min(ret->utilMin, m->utilMin);
         ret->utilTotalTime += m->utilTotalTime; 
         ret->utilMax = max(ret->utilMax, m->utilMax);
+        ret->appMin = min(ret->appMin, m->appMin);
+        ret->appTotalTime += m->appTotalTime; 
+        ret->appMax = max(ret->appMax, m->appMax);
         // mem usage (max)
         ret->mem =max(ret->mem,m->mem);
         // bytes per invocation for two types of entry methods
@@ -169,8 +172,10 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
     double idlePercentage = data->idleTotalTime/totalTime;
     double overheadPercentage = data->overheadTotalTime/totalTime;
     double utilPercentage = data->utilTotalTime/totalTime;
+    double appPercentage = data->appTotalTime/totalTime;
     //DEBUG_PRINT ( 
     CkPrintf("Utilization(%):  \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f\n", data->utilMin*100, data->utilMax*100, utilPercentage*100, data->utilTotalTime);
+    CkPrintf("Application time (%):  \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f\n", data->appMin*100, data->appMax*100, appPercentage*100, data->appTotalTime);
     CkPrintf("Idle(%):         \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f \n", data->idleMin*100,  data->idleMax*100, idlePercentage*100, data->idleTotalTime);
     CkPrintf("Overhead(%):     \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f \n", data->overheadMin*100, data->overheadMax*100, overheadPercentage*100, data->overheadTotalTime);
     CkPrintf("Grainsize(ms):\t(avg:max)\t: (%.3f:    %.3f) \n", data->utilTotalTime/data->numInvocations*1000, data->grainsizeMax*1000);
