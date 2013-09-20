@@ -53,7 +53,7 @@ void TraceAutoPerf::resetAll(){
     currentSummary->commTime = 0;
     currentSummary->objLoadMax = 0;
 #if CMK_HAS_COUNTER_PAPI
-    memcpy(previous_papiValues, papiValues, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+    memcpy(previous_papiValues, CkpvAccess(papiValues), sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
 #endif
 }
 
@@ -157,8 +157,12 @@ void TraceAutoPerf::endIdle(double curWallTime) {
 void TraceAutoPerf::beginComputation(void) {
 #if CMK_HAS_COUNTER_PAPI
   // we start the counters here
-  if (PAPI_start(papiEventSet) != PAPI_OK) {
-    CmiAbort("PAPI failed to start designated counters!\n");
+  if(CkpvAccess(papiStarted) == 0)
+  {
+      if (PAPI_start(CkpvAccess(papiEventSet)) != PAPI_OK) {
+          CmiAbort("PAPI failed to start designated counters!\n");
+      }
+      CkpvAccess(papiStarted) = 1;
   }
 #endif
 
@@ -168,8 +172,11 @@ void TraceAutoPerf::endComputation(void) {
 #if CMK_HAS_COUNTER_PAPI
   // we stop the counters here. A silent failure is alright since we
   // are already at the end of the program.
-  if (PAPI_stop(papiEventSet, papiValues) != PAPI_OK) {
-    CkPrintf("Warning: PAPI failed to stop correctly!\n");
+  if(CkpvAccess(papiStopped) == 0) {
+      if (PAPI_stop(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
+          CkPrintf("Warning: PAPI failed to stop correctly!\n");
+      }
+      CkpvAccess(papiStopped) = 1;
   }
   //else 
   //{

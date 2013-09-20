@@ -110,8 +110,18 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
 extern "C" void (*registerMachineUserEvents())();
 
 #if CMK_HAS_COUNTER_PAPI
+#include <papi.h>
+#ifdef USE_SPP_PAPI
+#define NUMPAPIEVENTS 6
+#else
+#define NUMPAPIEVENTS 2
+#endif
+CkpvExtern(int, papiEventSet);
+CkpvExtern(LONG_LONG_PAPI*, papiValues);
+CkpvExtern(int, papiStarted);
+CkpvExtern(int, papiStopped);
 extern int papiEvents[NUMPAPIEVENTS];
-extern "C" void initPAPI(); 
+void initPAPI(); 
 #endif
 
 #endif

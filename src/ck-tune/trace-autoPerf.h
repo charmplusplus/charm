@@ -15,18 +15,6 @@
 #include <map>
 #include <list>
 
-
-#if CMK_HAS_COUNTER_PAPI
-#include <papi.h>
-#ifdef USE_SPP_PAPI
-#define NUMPAPIEVENTS 8
-#else
-#define NUMPAPIEVENTS 9
-#endif
-#endif
-
-
-
 using namespace std;
 
 extern CkGroupID traceAutoPerfGID;
@@ -190,7 +178,6 @@ public:
 #if CMK_HAS_COUNTER_PAPI
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
-
     // functions
     perfData(){}
 };
@@ -264,8 +251,6 @@ class TraceAutoPerf : public Trace {
 public:
 
 #if CMK_HAS_COUNTER_PAPI
-    int papiEventSet;
-    LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
     LONG_LONG_PAPI previous_papiValues[NUMPAPIEVENTS];
 #endif
     double  lastBeginExecuteTime;
@@ -461,7 +446,7 @@ public:
 #if CMK_HAS_COUNTER_PAPI
   inline void readPAPI()
   {
-      if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
+      if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
           CmiAbort("PAPI failed to read at begin execute!\n");
       }
   }
@@ -482,7 +467,7 @@ public:
       readPAPI();
       for(int i=0; i<NUMPAPIEVENTS; i++)
       {
-          currentSummary->papiValues[i] = (papiValues[i] - previous_papiValues[i]);
+          currentSummary->papiValues[i] = (CkpvAccess(papiValues)[i] - previous_papiValues[i]);
       }
 #endif
       return currentSummary;

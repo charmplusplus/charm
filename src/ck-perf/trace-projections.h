@@ -14,15 +14,6 @@
 #include "trace-common.h"
 #include "ckhashtable.h"
 
-#if CMK_HAS_COUNTER_PAPI
-#include <papi.h>
-#ifdef USE_SPP_PAPI
-#define NUMPAPIEVENTS 6
-#else
-#define NUMPAPIEVENTS 2
-#endif
-#endif
-
 #if CMK_PROJECTIONS_USE_ZLIB
 #include <zlib.h>
 #endif
@@ -485,10 +476,6 @@ class TraceProjections : public Trace {
     //so that we need a data structure to track idx. --added by Chao Mei
     CkVec<int> idxVec;
     int idxRegistered(int idx);    
-#if CMK_HAS_COUNTER_PAPI
-    int papiEventSet;
-    LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
-#endif
 public:
     int converseExit; // used for exits that bypass CkExit.
     double endTime;

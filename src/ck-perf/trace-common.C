@@ -770,6 +770,10 @@ void traceChangeLastTimestamp(double ts){
 }
 
 #if CMK_HAS_COUNTER_PAPI
+CkpvDeclare(int, papiEventSet);
+CkpvDeclare(LONG_LONG_PAPI*, papiValues);
+CkpvDeclare(int, papiStarted);
+CkpvDeclare(int, papiStopped);
 #ifdef USE_SPP_PAPI
 int papiEvents[NUMPAPIEVENTS];
 #else
@@ -778,16 +782,18 @@ int papiEvents[NUMPAPIEVENTS] = { PAPI_L2_DCM, PAPI_FP_OPS };
 #endif // CMK_HAS_COUNTER_PAPI
 
 #if CMK_HAS_COUNTER_PAPI
-extern "C"
 void initPAPI() {
 #if CMK_HAS_COUNTER_PAPI
   // We initialize and create the event sets for use with PAPI here.
-  static int called = 0;
-  if(called == 1)
-      return;
-  called = 1;
   int papiRetValue;
   if(CkMyRank()==0){
+      papiRetValue = PAPI_is_initialized();
+      if(papiRetValue != PAPI_NOT_INITED)
+          return;
+      CkpvInitialize(int, papiStarted);
+      CkpvAccess(papiStarted) = 0;
+      CkpvInitialize(int, papiStopped);
+      CkpvAccess(papiStopped) = 0;
     papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
     if (papiRetValue != PAPI_VER_CURRENT) {
       CmiAbort("PAPI Library initialization failure!\n");
@@ -808,8 +814,9 @@ void initPAPI() {
   #endif
 #endif
   // PAPI 3 mandates the initialization of the set to PAPI_NULL
-  papiEventSet = PAPI_NULL; 
-  if (PAPI_create_eventset(&papiEventSet) != PAPI_OK) {
+  CkpvInitialize(int, papiEventSet); 
+  CkpvAccess(papiEventSet) = PAPI_NULL; 
+  if (PAPI_create_eventset(&CkpvAccess(papiEventSet)) != PAPI_OK) {
     CmiAbort("PAPI failed to create event set!\n");
   }
 #ifdef USE_SPP_PAPI
@@ -853,7 +860,7 @@ void initPAPI() {
 #else
   // just uses { PAPI_L2_DCM, PAPI_FP_OPS } the 2 initialized PAPI_EVENTS
 #endif
-  papiRetValue = PAPI_add_events(papiEventSet, papiEvents, NUMPAPIEVENTS);
+  papiRetValue = PAPI_add_events(CkpvAccess(papiEventSet), papiEvents, NUMPAPIEVENTS);
   if (papiRetValue < 0) {
     if (papiRetValue == PAPI_ECNFLCT) {
       CmiAbort("PAPI events conflict! Please re-assign event types!\n");
@@ -876,7 +883,9 @@ void initPAPI() {
 	}
       CmiPrintf("\n");
     }
-  memset(papiValues, 0, NUMPAPIEVENTS*sizeof(LONG_LONG_PAPI));
+  CkpvInitialize(LONG_LONG_PAPI*, papiValues);
+  CkpvAccess(papiValues) = (LONG_LONG_PAPI*)malloc(NUMPAPIEVENTS*sizeof(LONG_LONG_PAPI));
+  memset(CkpvAccess(papiValues), 0, NUMPAPIEVENTS*sizeof(LONG_LONG_PAPI));
 #endif
 }
 #endif

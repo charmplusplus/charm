@@ -971,7 +971,7 @@ void LogEntry::pup(PUP::er &p)
       for (i=0; i<NUMPAPIEVENTS; i++) {
 	// not yet!!!
 	//	p|papiIDs[i]; 
-	p|papiValues[i];
+	p|CkpvAccess(papiValues)[i];
 	
       }
 #else
@@ -990,7 +990,7 @@ void LogEntry::pup(PUP::er &p)
       for (i=0; i<NUMPAPIEVENTS; i++) {
 	// not yet!!!
 	//	p|papiIDs[i];
-	p|papiValues[i];
+	p|CkpvAccess(papiValues)[i];
       }
 #else
       //p|numPapiEvents;  // non papi version has value 0
@@ -1476,7 +1476,7 @@ void TraceProjections::creationDone(int num)
 void TraceProjections::beginExecute(CmiObjId *tid)
 {
 #if CMK_HAS_COUNTER_PAPI
-  if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
+  if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
     CmiAbort("PAPI failed to read at begin execute!\n");
   }
 #endif
@@ -1486,7 +1486,7 @@ void TraceProjections::beginExecute(CmiObjId *tid)
   _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP, TraceTimer(),
 		execEvent,CkMyPe(), 0, tid);
 #if CMK_HAS_COUNTER_PAPI
-  _logPool->addPapi(papiValues);
+  _logPool->addPapi(CkpvAccess(papiValues));
 #endif
   inEntry = 1;
 }
@@ -1495,7 +1495,7 @@ void TraceProjections::beginExecute(envelope *e)
 {
   if(e==0) {
 #if CMK_HAS_COUNTER_PAPI
-    if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
+    if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
       CmiAbort("PAPI failed to read at begin execute!\n");
     }
 #endif
@@ -1505,7 +1505,7 @@ void TraceProjections::beginExecute(envelope *e)
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP, TraceTimer(),
 		  execEvent,CkMyPe(), 0, NULL, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
-    _logPool->addPapi(papiValues);
+    _logPool->addPapi(CkpvAccess(papiValues));
 #endif
     inEntry = 1;
   } else {
@@ -1545,7 +1545,7 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
 				    int mlen, CmiObjId *idx)
 {
 #if CMK_HAS_COUNTER_PAPI
-  if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
+  if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
     CmiAbort("PAPI failed to read at begin execute!\n");
   }
 #endif
@@ -1556,7 +1556,7 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
   _logPool->add(BEGIN_PROCESSING,msgType,ep, TraceTimer(),event,
 		srcPe, mlen, idx, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
-  _logPool->addPapi(papiValues);
+  _logPool->addPapi(CkpvAccess(papiValues));
 #endif
   inEntry = 1;
 }
@@ -1587,7 +1587,7 @@ void TraceProjections::endExecute(char *msg)
 void TraceProjections::endExecuteLocal(void)
 {
 #if CMK_HAS_COUNTER_PAPI
-  if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
+  if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
     CmiAbort("PAPI failed to read at end execute!\n");
   }
 #endif
@@ -1602,7 +1602,7 @@ void TraceProjections::endExecuteLocal(void)
 		  execEvent, execPe, 0, NULL, 0.0, cputime);
   }
 #if CMK_HAS_COUNTER_PAPI
-  _logPool->addPapi(papiValues);
+  _logPool->addPapi(CkpvAccess(papiValues));
 #endif
   inEntry = 0;
 }
@@ -1678,8 +1678,12 @@ void TraceProjections::beginComputation(void)
   _logPool->add(BEGIN_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 #if CMK_HAS_COUNTER_PAPI
   // we start the counters here
-  if (PAPI_start(papiEventSet) != PAPI_OK) {
-    CmiAbort("PAPI failed to start designated counters!\n");
+  if(CkpvAccess(papiStarted) == 0)
+  {
+      if (PAPI_start(CkpvAccess(papiEventSet)) != PAPI_OK) {
+          CmiAbort("PAPI failed to start designated counters!\n");
+      }
+      CkpvAccess(papiStarted) = 1;
   }
 #endif
 }
@@ -1689,8 +1693,11 @@ void TraceProjections::endComputation(void)
 #if CMK_HAS_COUNTER_PAPI
   // we stop the counters here. A silent failure is alright since we
   // are already at the end of the program.
-  if (PAPI_stop(papiEventSet, papiValues) != PAPI_OK) {
-    CkPrintf("Warning: PAPI failed to stop correctly!\n");
+  if(CkpvAccess(papiStopped) == 0) {
+      if (PAPI_stop(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
+          CkPrintf("Warning: PAPI failed to stop correctly!\n");
+      }
+      CkpvAccess(papiStopped) = 1;
   }
   // NOTE: We should not do a complete close of PAPI until after the
   // sts writer is done.
