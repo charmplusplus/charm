@@ -481,10 +481,10 @@ $(L)/libccs-client.a: ccs-client.o
 	$(CHARMC) -o $@ ccs-client.o
 
 ccs-client.o: ccs-client.c $(CVHEADERS)
-	$(CHARMC) ccs-client.c
+	$(CHARMC) -DCMK_NOT_USE_CONVERSE=1 ccs-client.c
 
 sockRoutines-seq.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
-	$(SEQCHARMC) -o sockRoutines-seq.o sockRoutines.c
+	$(SEQCHARMC) -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o sockRoutines.c
 
 pup_f.f90: pup_f.f90.sh
 	./pup_f.f90.sh

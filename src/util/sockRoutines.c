@@ -17,9 +17,9 @@
 #include <sys/bproc.h>
 #endif
 
-#if CMK_USE_CONVERSE
+#ifndef CMK_NOT_USE_CONVERSE
 #  include "converse.h" /* use real CmiTmpAlloc/Free */
-#else /* fake CmiTmpAlloc/Free via malloc */
+#elif CMK_NOT_USE_CONVERSE /* fake CmiTmpAlloc/Free via malloc */
 #  define CMI_TMP_SKIP
 #  define CmiTmpAlloc(size) malloc(size)
 #  define CmiTmpFree(ptr) free(ptr)
