@@ -145,20 +145,20 @@ void TraceAutoPerf::endExecute(void)
         totalEntryMethodInvocations ++;
         if(executionTime > maxEntryMethodTime)
             maxEntryMethodTime = executionTime;
-        double m = (double)CmiMemoryUsage();
-        if(memUsage < m){
-            memUsage = m;
-        }    
+        //double m = (double)CmiMemoryUsage();
+        //if(memUsage < m){
+        //    memUsage = m;
+        //}    
     }
 }
 
 void TraceAutoPerf::beginIdle(double curWallTime) {
     lastBeginIdle =  curWallTime; 
     lastEvent =  BEGIN_IDLE;
-    double m = (double)CmiMemoryUsage();
-    if(memUsage < m){
-        memUsage = m;
-    }
+    //double m = (double)CmiMemoryUsage();
+    //if(memUsage < m){
+    //    memUsage = m;
+    //}
 }
 
 void TraceAutoPerf::endIdle(double curWallTime) {
@@ -206,10 +206,10 @@ void TraceAutoPerf::endComputation(void) {
 
 void TraceAutoPerf::malloc(void *where, int size, void **stack, int stackSize)
 {
-    double m = (double)CmiMemoryUsage();
-    if(memUsage < m){
-        memUsage = m;
-    }
+    //double m = (double)CmiMemoryUsage();
+    //if(memUsage < m){
+    //    memUsage = m;
+    //}
 }
 
 void TraceAutoPerf::free(void *where, int size) { }
