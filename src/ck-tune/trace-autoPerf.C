@@ -176,8 +176,9 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
     //DEBUG_PRINT ( 
     CkPrintf("Utilization(%):  \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f\n", data->utilMin*100, data->utilMax*100, utilPercentage*100, data->utilTotalTime);
     CkPrintf("Application time (%):  \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f\n", data->appMin*100, data->appMax*100, appPercentage*100, data->appTotalTime);
+    CkPrintf("Parallel overhead(%):\t (%f)\t time:%f\n", 100*(utilPercentage-appPercentage), data->utilTotalTime - data->appTotalTime);
     CkPrintf("Idle(%):         \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f \n", data->idleMin*100,  data->idleMax*100, idlePercentage*100, data->idleTotalTime);
-    CkPrintf("Overhead(%):     \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f \n", data->overheadMin*100, data->overheadMax*100, overheadPercentage*100, data->overheadTotalTime);
+    CkPrintf("Runtime Overhead(%):     \t(min:max:avg):(%.1f:\t  %.1f:\t  %.1f) time:%f \n", data->overheadMin*100, data->overheadMax*100, overheadPercentage*100, data->overheadTotalTime);
     CkPrintf("Grainsize(ms):\t(avg:max)\t: (%.3f:    %.3f) \n", data->utilTotalTime/data->numInvocations*1000, data->grainsizeMax*1000);
     CkPrintf("Invocations:  \t%lld\n", data->numInvocations);
 #if CMK_HAS_COUNTER_PAPI

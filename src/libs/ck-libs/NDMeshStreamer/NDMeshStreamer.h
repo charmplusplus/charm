@@ -71,8 +71,6 @@ private:
   int *individualDimensionSizes_;
   int *combinedDimensionSizes_;
 
-  int *startingIndexAtDimension_;
-
   int myIndex_;
   int *myLocationIndex_;
 
@@ -269,19 +267,18 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
 
   int sumAlongAllDimensions = 0;
   individualDimensionSizes_ = new int[numDimensions_];
-  combinedDimensionSizes_ = new int[numDimensions_ + 1];
+  combinedDimensionSizes_ = new int[numDimensions_];
   myLocationIndex_ = new int[numDimensions_];
-  startingIndexAtDimension_ = new int[numDimensions_ + 1];
   memcpy(individualDimensionSizes_, dimensionSizes,
-	 numDimensions * sizeof(int));
-  combinedDimensionSizes_[0] = 1;
-  for (int i = 0; i < numDimensions; i++) {
+	 numDimensions_ * sizeof(int));
+  combinedDimensionSizes_[numDimensions - 1] = 1;
+  sumAlongAllDimensions += individualDimensionSizes_[numDimensions_ - 1];
+  for (int i = numDimensions_ - 2; i >= 0; i--) {
     sumAlongAllDimensions += individualDimensionSizes_[i];
-    combinedDimensionSizes_[i + 1] =
-      combinedDimensionSizes_[i] * individualDimensionSizes_[i];
+    combinedDimensionSizes_[i] =
+      combinedDimensionSizes_[i + 1] * individualDimensionSizes_[i + 1];
   }
-
-  CkAssert(combinedDimensionSizes_[numDimensions] == CkNumPes());
+  CkAssert(combinedDimensionSizes_[0] * individualDimensionSizes_[0]== CkNumPes());
 
   // a bufferSize input of 0 indicates it should be calculated by the library
   if (bufferSize_ == 0) {
@@ -317,13 +314,9 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
 
   myIndex_ = CkMyPe();
   int remainder = myIndex_;
-  startingIndexAtDimension_[numDimensions_] = 0;
-  for (int i = numDimensions_ - 1; i >= 0; i--) {
+  for (int i = 0; i < numDimensions_; i++) {
     myLocationIndex_[i] = remainder / combinedDimensionSizes_[i];
-    int dimensionOffset = combinedDimensionSizes_[i] * myLocationIndex_[i];
-    remainder -= dimensionOffset;
-    startingIndexAtDimension_[i] =
-      startingIndexAtDimension_[i+1] + dimensionOffset;
+    remainder -= combinedDimensionSizes_[i] * myLocationIndex_[i];
   }
 
   isPeriodicFlushEnabled_ = false;
@@ -354,7 +347,6 @@ MeshStreamer<dtype>::~MeshStreamer() {
   delete[] individualDimensionSizes_;
   delete[] combinedDimensionSizes_;
   delete[] myLocationIndex_;
-  delete[] startingIndexAtDimension_;
 
 #ifdef CACHE_LOCATIONS
   delete[] cachedLocations_;
@@ -383,11 +375,12 @@ determineLocation(int destinationPe, int dimensionReceivedAlong) {
 #endif
 
   MeshLocation destinationLocation;
-  int remainder =
-    destinationPe - startingIndexAtDimension_[dimensionReceivedAlong];
-  int dimensionIndex;
   for (int i = dimensionReceivedAlong - 1; i >= 0; i--) {
-    dimensionIndex = remainder / combinedDimensionSizes_[i];
+    int blockIndex = destinationPe / combinedDimensionSizes_[i];
+
+    int dimensionIndex =
+      blockIndex - blockIndex / individualDimensionSizes_[i]
+      * individualDimensionSizes_[i];
 
     if (dimensionIndex != myLocationIndex_[i]) {
       destinationLocation.dimension = i;
@@ -398,8 +391,6 @@ determineLocation(int destinationPe, int dimensionReceivedAlong) {
 #endif
       return destinationLocation;
     }
-
-    remainder -= combinedDimensionSizes_[i] * dimensionIndex;
   }
 
   CkAbort("Error. MeshStreamer::determineLocation called with destinationPe "
