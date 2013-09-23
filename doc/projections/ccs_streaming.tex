@@ -1,0 +1,8 @@
+Projections provides a continuous performance monitoring tool - CCS streaming. 
+Different from other tools discussed above, which are used to visualize post-mortem data, 
+ccs streaming visualizes the running programs. In order to use it, the Charm++
+program needs to be linked with \textbf{-tracemode utilization}.
+The command line needs to include "++server ++server-port 2345". "2345" is 
+the socket port number on server side.
+In projections ccs streaming tool, the port number should be same with that on server side.
+
