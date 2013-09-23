@@ -10,11 +10,11 @@ INCLUDED=../conv-mach.h ../conv-mach-opt.h \
 all: charmrun-notify charmrun-silent charmd charmd_faceless
 
 charmrun-silent: charmrun.C $(INCLUDED)
-	$(CHARMC) -c -seq -DSILENT charmrun.C -o charmrun-silent.o
+	$(CHARMC) -c -seq -DCMK_NOT_USE_CONVERSE=1 -DSILENT charmrun.C -o charmrun-silent.o
 	$(CHARMC) -cp $(BIN) -seq -language c++ -o charmrun-silent charmrun-silent.o
 
 charmrun-notify: charmrun.C $(INCLUDED)
-	$(CHARMC) -c -seq -DNOTIFY charmrun.C
+	$(CHARMC) -c -seq -DCMK_NOT_USE_CONVERSE=1 -DNOTIFY charmrun.C
 	$(CHARMC) -cp $(BIN) -seq -language c++ -o charmrun-notify charmrun.o
 	(cd ..; CHARMINC=.; . ./conv-config.sh; cp ../bin/charmrun-notify$$CMK_POST_EXE ../bin/charmrun$$CMK_POST_EXE)
 
