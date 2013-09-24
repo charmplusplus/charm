@@ -1,7 +1,7 @@
 BGQ_ZLIB=/soft/libraries/alcf/current/xl/ZLIB/
 BGQ_BIN=$BGQ_FLOOR/gnu-linux/bin
-BGQ_INC="-I$BGQ_INSTALL/comm/sys/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk -I$BGQ_ZLIB/include"
-BGQ_LIB="-L$BGQ_INSTALL/comm/sys-fast/lib -lpami -L$BGQ_INSTALL/spi/lib -L$BGQ_ZLIB/lib -lSPI -lSPI_cnk -lpthread -lrt" 
+BGQ_INC="-I$BGQ_INSTALL/comm/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk -I$BGQ_ZLIB/include"
+BGQ_LIB="-L$BGQ_INSTALL/comm/lib -lpami-gcc -L$BGQ_INSTALL/spi/lib -L$BGQ_ZLIB/lib -lSPI -lSPI_cnk -lpthread -lrt"
 CMK_SYSLIBS="$BGQ_LIB"
 CMK_CC="bgxlc_r -qcpluscmt -qhalt=e $BGQ_INC -qnokeyword=__int128 -qsmp=noostls"
 CMK_CXX="bgxlC_r -qhalt=e $BGQ_INC -qnokeyword=__int128 -qsmp=noostls"
