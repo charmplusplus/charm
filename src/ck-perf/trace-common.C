@@ -44,6 +44,13 @@ CkpvDeclare(int, traceRootBaseLength);
 CkpvDeclare(char*, selective);
 CkpvDeclare(bool, verbose);
 
+bool outlierAutomatic;
+bool findOutliers;
+int numKSeeds;
+int peNumKeep;
+bool outlierUsePhases;
+double entryThreshold;
+
 typedef void (*mTFP)();                   // function pointer for
 CpvStaticDeclare(mTFP, machineTraceFuncPtr);    // machine user event
                                           // registration
@@ -153,6 +160,34 @@ static void traceCommonInit(char **argv)
     _MEMCHECK(CkpvAccess(selective));
     strcpy(CkpvAccess(selective), "");
   }
+
+  outlierAutomatic = true;
+  findOutliers = false;
+  numKSeeds = 10;
+  peNumKeep = CkNumPes();
+  outlierUsePhases = false;
+  entryThreshold = 0.0;
+  //For KMeans
+  if (outlierAutomatic) {
+    CmiGetArgIntDesc(argv, "+outlierNumSeeds", &numKSeeds,
+		     "Number of cluster seeds to apply at outlier analysis.");
+    CmiGetArgIntDesc(argv, "+outlierPeNumKeep", 
+		     &peNumKeep, "Number of Processors to retain data");
+    CmiGetArgDoubleDesc(argv, "+outlierEpThresh", &entryThreshold,
+			"Minimum significance of entry points to be considered for clustering (%).");
+    findOutliers =
+      CmiGetArgFlagDesc(argv,"+outlier", "Find Outliers.");
+    outlierUsePhases = 
+      CmiGetArgFlagDesc(argv,"+outlierUsePhases",
+			"Apply automatic outlier analysis to any available phases.");
+    if (outlierUsePhases) {
+      // if the user wants to use an outlier feature, it is assumed outlier
+      //    analysis is desired.
+      findOutliers = true;
+    }
+  }
+
+  
   
 #ifdef __BIGSIM__
   if(BgNodeRank()==0) {

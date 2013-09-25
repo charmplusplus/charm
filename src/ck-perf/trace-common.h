@@ -98,6 +98,13 @@ inline double TraceCpuTimer(double t) { return t - CkpvAccess(traceInitCpuTime);
 
 #define TRACE_WARN(msg) if (CkpvAccess(verbose)) CmiPrintf(msg)
 
+extern bool outlierAutomatic;
+extern bool findOutliers;
+extern int numKSeeds;
+extern int peNumKeep;
+extern bool outlierUsePhases;
+extern double entryThreshold;
+
 /** Tracing-specific registered Charm entities: */
 extern int _threadMsg, _threadChare, _threadEP;
 extern int _packMsg, _packChare, _packEP;

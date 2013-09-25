@@ -18,7 +18,7 @@
 #define DEBUGN(...)  // easy way to selectively disable DEBUGs
 
 #define DefaultLogBufSize      1000000
-
+#define  DEBUG_KMEANS 0
 // **CW** Simple delta encoding implementation
 // delta encoding is on by default. It may be turned off later in
 // the runtime.
@@ -1917,7 +1917,9 @@ void registerOutlierReduction() {
 extern "C" void TraceProjectionsExitHandler()
 {
 #if CMK_TRACE_ENABLED
-  // CkPrintf("[%d] TraceProjectionsExitHandler called!\n", CkMyPe());
+#if DEBUG_KMEANS
+  CkPrintf("[%d] TraceProjectionsExitHandler called!\n", CkMyPe());
+#endif
   CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
   bocProxy.traceProjectionsParallelShutdown(CkMyPe());
 #else
@@ -1955,31 +1957,6 @@ void initTraceProjectionsBOC()
 TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
   /** Options for Outlier Analysis */
   // defaults. Things will change with support for interactive analysis.
-  bool findOutliers = false;
-  bool outlierAutomatic = true;
-  int numKSeeds = 10; 
-
-  int peNumKeep = CkNumPes();  // used as a default
-  double entryThreshold = 0.0;
-  bool outlierUsePhases = false;
-  if (outlierAutomatic) {
-    CmiGetArgIntDesc(msg->argv, "+outlierNumSeeds", &numKSeeds,
-		     "Number of cluster seeds to apply at outlier analysis.");
-    CmiGetArgIntDesc(msg->argv, "+outlierPeNumKeep", 
-		     &peNumKeep, "Number of Processors to retain data");
-    CmiGetArgDoubleDesc(msg->argv, "+outlierEpThresh", &entryThreshold,
-			"Minimum significance of entry points to be considered for clustering (%).");
-    findOutliers =
-      CmiGetArgFlagDesc(msg->argv,"+outlier", "Find Outliers.");
-    outlierUsePhases = 
-      CmiGetArgFlagDesc(msg->argv,"+outlierUsePhases",
-			"Apply automatic outlier analysis to any available phases.");
-    if (outlierUsePhases) {
-      // if the user wants to use an outlier feature, it is assumed outlier
-      //    analysis is desired.
-      findOutliers = true;
-    }
-  }
   bool findStartTime = (CmiTimerAbsolute()==1);
   traceProjectionsGID = CProxy_TraceProjectionsBOC::ckNew(findOutliers, findStartTime);
   if (findOutliers) {
@@ -1995,7 +1972,9 @@ TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
 
 // Called on every processor.
 void TraceProjectionsBOC::traceProjectionsParallelShutdown(int pe) {
-  //CmiPrintf("[%d] traceProjectionsParallelShutdown called from . \n", CkMyPe(), pe);
+#if DEBUG_KMEANS
+  CmiPrintf("[%d] traceProjectionsParallelShutdown called from . \n", CkMyPe(), pe);
+#endif
   endPe = pe;                // the pe that starts CkExit()
   if (CkMyPe() == 0) {
     analysisStartTime = CmiWallTimer();
