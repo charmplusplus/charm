@@ -1450,6 +1450,7 @@ SIMPLE_REDUCTION(logical_or,int,"%d",
 
 SIMPLE_REDUCTION(bitvec_and,int,"%d",ret[i]&=value[i];)
 SIMPLE_REDUCTION(bitvec_or,int,"%d",ret[i]|=value[i];)
+SIMPLE_REDUCTION(bitvec_xor,int,"%d",ret[i]^=value[i];)
 
 //Select one random message to pass on
 static CkReductionMsg *random(int nMsg,CkReductionMsg **msg) {
@@ -1610,6 +1611,9 @@ CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
 
     // Compute the logical bitvector OR of the integers passed by each element.
     ::bitvec_or,
+    
+    // Compute the logical bitvector XOR of the integers passed by each element.
+    ::bitvec_xor,
 
     // Select one of the messages at random to pass on
     ::random,

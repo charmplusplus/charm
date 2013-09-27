@@ -146,6 +146,9 @@ public:
 
                 // Compute the logical bitvector OR of the integers passed by each element.
                 bitvec_or,
+                
+                // Compute the logical bitvector XOR of the integers passed by each element.
+                bitvec_xor,
 
 	// Select one message at random to pass on
 		random,
