@@ -346,37 +346,39 @@ pass the correct number of bytes to \kw{contribute}.
 
 \begin{enumerate}
 
-\item \kw{CkReduction::nop}-- no operation performed.
+\item \kw{CkReduction::nop} : no operation performed.
 
-\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double}-- the
+\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double} : the
 result will be the sum of the given numbers.
 
 \item \kw{CkReduction::product\_int}, \kw{product\_float},
-\kw{product\_double}-- the result will be the product of the given numbers.
+\kw{product\_double} : the result will be the product of the given numbers.
 
-\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double}-- the
+\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double} : the
 result will be the largest of the given numbers.
 
-\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double}-- the
+\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double} : the
 result will be the smallest of the given numbers.
 
-\item \kw{CkReduction::logical\_and}-- the result will be the logical AND of the given
+\item \kw{CkReduction::logical\_and} : the result will be the logical AND of the given
 integers.  0 is false, nonzero is true.
 
-\item \kw{CkReduction::logical\_or}-- the result will be the logical OR of the given
+\item \kw{CkReduction::logical\_or} : the result will be the logical OR of the given
 integers.
 
-\item \kw{CkReduction::bitvec\_and}-- the result will be the bitvector AND of the given numbers (represented as integers).
+\item \kw{CkReduction::bitvec\_and} : the result will be the bitvector AND of the given numbers (represented as integers).
 
-\item \kw{CkReduction::bitvec\_or}-- the result will be the bitvector OR of the given numbers (represented as integers).
+\item \kw{CkReduction::bitvec\_or} : the result will be the bitvector OR of the given numbers (represented as integers).
 
-\item \kw{CkReduction::set}-- the result will be a verbatim concatenation of
+\item \kw{CkReduction::bitvec\_xor} : the result will be the bitvector XOR of the given numbers (represented as integers).
+
+\item \kw{CkReduction::set} : the result will be a verbatim concatenation of
 all the contributed data, separated into \kw{CkReduction::setElement} records.
 The data contributed can be of any length, and can vary across array elements
 or reductions.  To extract the data from each element, see the description
 below.
 
-\item \kw{CkReduction::concat}-- the result will be a byte-by-byte
+\item \kw{CkReduction::concat} : the result will be a byte-by-byte
 concatentation of all the contributed data.  The contributed elements
 are not delimiter-separated. 
 
