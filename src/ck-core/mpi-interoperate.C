@@ -38,19 +38,6 @@ void CharmScheduler() {
     while (libcommThdExit != CmiMyNodeSize()) {
       CommunicationServerThread(5);
     }
-    libcommThdExit = 0;
-  } else { 
-    CsdScheduler(-1);
-  }
-}
-
-extern "C" 
-void CharmScheduler() {
-  DEBUG(printf("[%d]Starting scheduler [%d]/[%d]\n",CmiMyPe(),CmiMyRank(),CmiMyNodeSize());)
-  if (CmiMyRank() == CmiMyNodeSize()) {
-    while (libcommThdExit != CmiMyNodeSize()) {
-      CommunicationServerThread(5);
-    }
     DEBUG(printf("[%d] Commthread Exit Scheduler\n",CmiMyPe());)
     libcommThdExit = 0;
   } else { 
