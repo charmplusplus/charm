@@ -1170,6 +1170,9 @@ static void ConverseRunPE(int everReturn) {
       if (!everReturn) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
         if (Cmi_usrsched==0) CsdScheduler(-1);
+        if(!CharmLibInterOperate) {
+          ConverseExit();
+        } 
       }
     }
 }
