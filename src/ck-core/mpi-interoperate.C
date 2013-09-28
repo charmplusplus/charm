@@ -142,7 +142,7 @@ void _libExitHandler(envelope *env)
 extern "C"
 void CharmLibInit(MPI_Comm userComm, int argc, char **argv){
   //note CmiNumNodes and CmiMyNode should just be macros
-  charmComm = userComm;
+  MPI_Comm_dup(userComm, &charmComm);
   MPI_Comm_size(charmComm, &_Cmi_numnodes);
   MPI_Comm_rank(charmComm, &_Cmi_mynode);
 
