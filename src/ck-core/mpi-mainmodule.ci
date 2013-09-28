@@ -1,6 +1,7 @@
 mainmodule mpi_main {
   mainchare mpi_main {
     entry mpi_main(CkArgMsg *m);
+    entry void exit();
   };
 }
 
