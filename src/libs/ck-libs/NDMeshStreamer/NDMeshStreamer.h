@@ -668,9 +668,11 @@ init(int numContributors, CkCallback startCb, CkCallback endCb,
                                      finish , 0);
 
   if (progressPeriodInMs_ <= 0) {
-    CkPrintf("Using completion detection in NDMeshStreamer requires"
-	     " setting a valid periodic flush period. Defaulting"
-	     " to 10 ms\n");
+    if (CkMyPe() == 0) {
+      CkPrintf("Using completion detection in NDMeshStreamer requires"
+               " setting a valid periodic flush period. Defaulting"
+               " to 10 ms.\n");
+    }
     progressPeriodInMs_ = 10;
   }
 
@@ -1240,10 +1242,10 @@ public:
       = misdeliveredItems[arrayId];
 
     MeshLocation destinationLocation =
-      determineLocation(destinationPe, MeshStreamer
-                        <ArrayDataItem<dtype, itype> >::numDimensions_);
+      this->determineLocation(destinationPe, MeshStreamer
+                              <ArrayDataItem<dtype, itype> >::numDimensions_);
     for (int i = 0; i < bufferedItems.size(); i++) {
-      storeMessage(destinationPe, destinationLocation, &bufferedItems[i]);
+      this->storeMessage(destinationPe, destinationLocation, &bufferedItems[i]);
     }
 
     bufferedItems.clear();
