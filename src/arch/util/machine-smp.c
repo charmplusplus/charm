@@ -415,7 +415,7 @@ static void *call_startfn(void *vindex)
   if(CharmLibInterOperate) {
     while(1) {
       if(!_cleanUp) {
-        CharmScheduler();
+        StartInteropScheduler();
         CmiNodeAllBarrier();
       } else {
         if (CmiMyRank() == CmiMyNodeSize()) {

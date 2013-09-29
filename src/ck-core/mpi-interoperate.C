@@ -16,10 +16,7 @@ extern "C" void CkExit(void);
 
 static int   _libExitStarted = 0;
 int    _libExitHandlerIdx;
-int _cleanUp = 0;
-
-static volatile int libcommThdExit = 0;
-CmiNodeLock  libcommThdExitLock = 0;
+extern "C" int _cleanUp;
 
 #if CMK_CONVERSE_MPI
 extern  "C" { extern MPI_Comm charmComm ;}
@@ -31,33 +28,18 @@ extern void _initCharm(int unused_argc, char **argv);
 extern "C" void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
 
-extern "C" 
-void CharmScheduler() {
-  DEBUG(printf("[%d]Starting scheduler [%d]/[%d]\n",CmiMyPe(),CmiMyRank(),CmiMyNodeSize());)
-  if (CmiMyRank() == CmiMyNodeSize()) {
-    while (libcommThdExit != CmiMyNodeSize()) {
-      CommunicationServerThread(5);
-    }
-    DEBUG(printf("[%d] Commthread Exit Scheduler\n",CmiMyPe());)
-    libcommThdExit = 0;
-  } else { 
-    CsdScheduler(-1);
-  }
-}
+extern "C" void StartInteropScheduler();
+extern "C" void StopInteropScheduler();
 
 extern "C"
 void StartCharmScheduler() {
   CmiNodeAllBarrier();
-  CharmScheduler();
+  StartInteropScheduler();
 }
 
 extern "C"
 void StopCharmScheduler() {
-  DEBUG(printf("[%d] Exit Scheduler\n",CmiMyPe());)
-  CpvAccess(charmLibExitFlag) = 1;
-  CmiLock(libcommThdExitLock);
-  libcommThdExit++;
-  CmiUnlock(libcommThdExitLock);
+  StopInteropScheduler();
 }
 
 // triger LibExit on PE 0,
@@ -135,14 +117,14 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv){
 
   CharmLibInterOperate = 1;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-  CharmScheduler();
+  StartInteropScheduler();
 }
 #else 
 extern "C"
 void CharmLibInit(int userComm, int argc, char **argv){
   CharmLibInterOperate = 1;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-  CharmScheduler();
+  StartInteropScheduler();
 }
 #endif
 #else

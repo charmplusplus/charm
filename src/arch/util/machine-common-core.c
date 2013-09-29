@@ -178,7 +178,7 @@ static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
 #if CMK_SMP
 volatile int commThdExit = 0;
 CmiNodeLock  commThdExitLock = 0;
-extern CmiNodeLock  libcommThdExitLock;
+extern CmiNodeLock  interopCommThdExitLock;
 extern int CharmLibInterOperate;
 
 /**
@@ -1068,7 +1068,7 @@ if (  MSG_STATISTIC)
     CmiNodeStateInit(&CsvAccess(NodeState));
 #if CMK_SMP
     commThdExitLock = CmiCreateLock();
-    libcommThdExitLock = CmiCreateLock();
+    interopCommThdExitLock = CmiCreateLock();
 #endif
 
 #if CMK_OFFLOAD_BCAST_PROCESS

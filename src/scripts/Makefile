@@ -413,7 +413,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o commitid.o sdag.o
+	cmitls.o memoryaffinity.o commitid.o sdag.o conv-interoperate.o
 
 #############################################
 #Comlib Core objects that go into libck.a

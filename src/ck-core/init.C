@@ -151,6 +151,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 //for interoperability
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
+CpvExtern(int,interopExitFlag);
 
 /*
 	FAULT_EVAC
@@ -531,8 +532,8 @@ static void _exitHandler(envelope *env)
       if(CkMyPe()){
         DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
-				if(CharmLibInterOperate)
-					CpvAccess(charmLibExitFlag) = 1;
+        if(CharmLibInterOperate)
+          CpvAccess(interopExitFlag) = 1;
       }
       break;
     case StatMsg:
@@ -547,8 +548,8 @@ static void _exitHandler(envelope *env)
         _printStats();
         DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
-				if(CharmLibInterOperate)
-					CpvAccess(charmLibExitFlag) = 1;
+        if(CharmLibInterOperate)
+          CpvAccess(interopExitFlag) = 1;
       }
       break;
     default:

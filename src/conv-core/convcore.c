@@ -145,7 +145,7 @@ CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
 int CharmLibInterOperate = 0;
-CpvDeclare(int,charmLibExitFlag);
+CpvDeclare(int,interopExitFlag);
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
 
@@ -1843,8 +1843,8 @@ void CsdScheduleForever(void)
   while (1) {
     /* The interoperation will cost this little overhead in scheduling */
     if(CharmLibInterOperate) {
-      if(CpvAccess(charmLibExitFlag)) {
-        CpvAccess(charmLibExitFlag) = 0;
+      if(CpvAccess(interopExitFlag)) {
+        CpvAccess(interopExitFlag) = 0;
         break;
       }
     }
@@ -3554,8 +3554,8 @@ void ConverseCommonInit(char **argv)
   CpvInitialize(int, cmiArgDebugFlag);
   CpvAccess(cmiArgDebugFlag) = 0;
 #endif
-  CpvInitialize(int,charmLibExitFlag);
-  CpvAccess(charmLibExitFlag) = 0;
+  CpvInitialize(int,interopExitFlag);
+  CpvAccess(interopExitFlag) = 0;
 
   CpvInitialize(int,_curRestartPhase);
   CpvAccess(_curRestartPhase)=1;
