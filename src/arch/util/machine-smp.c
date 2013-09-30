@@ -447,6 +447,7 @@ static void CmiStartThreads(char **argv)
   size_t i;
   int ok, tocreate;
   pthread_attr_t attr;
+  int start, end;
 
   MACHSTATE(4,"CmiStartThreads")
   CmiMemLock_lock=CmiCreateLock();
@@ -471,13 +472,16 @@ static void CmiStartThreads(char **argv)
   Cmi_state_vector = (CmiState *)calloc(_Cmi_mynodesize+1, sizeof(CmiState));
 #if CMK_CONVERSE_MPI
       /* main thread is communication thread */
-  CmiStateInit(_Cmi_mynode+CmiNumPes(), _Cmi_mynodesize, &Cmi_mystate);
-  Cmi_state_vector[_Cmi_mynodesize] = &Cmi_mystate;
-#else
-      /* main thread is of rank 0 */
-  CmiStateInit(Cmi_nodestart, 0, &Cmi_mystate);
-  Cmi_state_vector[0] = &Cmi_mystate;
+  if(!CharmLibInterOperate) {
+    CmiStateInit(_Cmi_mynode+CmiNumPes(), _Cmi_mynodesize, &Cmi_mystate);
+    Cmi_state_vector[_Cmi_mynodesize] = &Cmi_mystate;
+  } else 
 #endif
+  {
+    /* main thread is of rank 0 */
+    CmiStateInit(Cmi_nodestart, 0, &Cmi_mystate);
+    Cmi_state_vector[0] = &Cmi_mystate;
+  }
 #endif
 
 #if CMK_MULTICORE || CMK_SMP_NO_COMMTHD
@@ -487,10 +491,16 @@ static void CmiStartThreads(char **argv)
 #endif
   tocreate = _Cmi_mynodesize;
 #if CMK_CONVERSE_MPI
-  for (i=0; i<=tocreate-1; i++) {          /* skip comm thread */
-#else
-  for (i=1; i<=tocreate; i++) {            /* skip rank 0 main thread */
+  if(!CharmLibInterOperate) {
+    start = 0;
+    end = tocreate - 1;                    /* skip comm thread */
+  } else 
 #endif
+  {
+    start = 1;
+    end = tocreate;                       /* skip rank 0 main thread */
+  }
+  for (i=start; i<=end; i++) {        
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
@@ -499,10 +509,11 @@ static void CmiStartThreads(char **argv)
   }
 #if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
 #if CMK_CONVERSE_MPI
-  pthread_setspecific(Cmi_state_key, Cmi_state_vector+_Cmi_mynodesize);
-#else
-  pthread_setspecific(Cmi_state_key, Cmi_state_vector);
+  if(!CharmLibInterOperate)
+    pthread_setspecific(Cmi_state_key, Cmi_state_vector+_Cmi_mynodesize);
+  else 
 #endif
+    pthread_setspecific(Cmi_state_key, Cmi_state_vector);
 #endif
 
   MACHSTATE(4,"CmiStartThreads done")

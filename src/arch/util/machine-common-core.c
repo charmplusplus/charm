@@ -1228,6 +1228,7 @@ static void CommunicationServer(int sleepTime) {
 #if CMK_USE_XPMEM
         CmiExitXpmem();
 #endif
+        CmiNodeAllBarrier();
         LrtsExit();
     }
 #endif
@@ -1284,6 +1285,7 @@ if (MSG_STATISTIC)
     CmiLock(commThdExitLock);
     commThdExit++;
     CmiUnlock(commThdExitLock);
+    CmiNodeAllBarrier();
     if(CharmLibInterOperate)
       CmiYield();
     else 

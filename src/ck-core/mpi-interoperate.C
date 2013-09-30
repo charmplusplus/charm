@@ -8,12 +8,6 @@ extern "C" void CkExit(void);
 #define DEBUG(a) 
 #endif
 
-#if PERFORM_DEBUG
-#define DEBUG(a) a
-#else
-#define DEBUG(a) 
-#endif
-
 static int   _libExitStarted = 0;
 int    _libExitHandlerIdx;
 extern "C" int _cleanUp;

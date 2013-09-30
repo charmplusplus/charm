@@ -1327,9 +1327,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     largc = *argc;
     largv = *argv;
     if(!CharmLibInterOperate) {
-			MPI_Comm_dup(MPI_COMM_WORLD,&charmComm);
+      MPI_Comm_dup(MPI_COMM_WORLD,&charmComm);
       MPI_Comm_size(charmComm, numNodes);
-			MPI_Comm_rank(charmComm, myNodeID);
+      MPI_Comm_rank(charmComm, myNodeID);
     }
 
     MPI_Bcast(&_Cmi_mynodesize, 1, MPI_INT, 0, charmComm);

@@ -1,12 +1,6 @@
 #include "converse.h"
 
-#define PERFORM_DEBUG 1
-#if PERFORM_DEBUG
-#define DEBUG(a) a
-#else
-#define DEBUG(a) 
-#endif
-
+//#define PERFORM_DEBUG 1
 #if PERFORM_DEBUG
 #define DEBUG(a) a
 #else
