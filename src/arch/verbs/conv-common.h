@@ -1,3 +1,6 @@
+#define CMK_USE_LRTS                                       1
+
+#define	CMK_HAS_PARTITION		                   1
 
 #define CMK_NET_VERSION					   1
 

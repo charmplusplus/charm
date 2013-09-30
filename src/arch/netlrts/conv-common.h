@@ -1,4 +1,4 @@
-#define CMK_SUPPORT_LRTS	                           1
+#define CMK_USE_LRTS	                                   1
 
 #define	CMK_HAS_PARTITION		                   1
 
