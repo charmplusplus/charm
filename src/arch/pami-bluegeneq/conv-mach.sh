@@ -15,9 +15,14 @@ fi
 BGQ_ZLIB=/soft/libraries/alcf/current/gcc/ZLIB/
 
 BGQ_BIN=$BGQ_FLOOR/gnu-linux/bin
-BGQ_INC="-I$BGQ_INSTALL/comm/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk -I$BGQ_ZLIB/include"
-
-BGQ_LIB="-L$BGQ_INSTALL/comm/lib -lpami-gcc -L$BGQ_INSTALL/spi/lib -L$BGQ_ZLIB/lib -lSPI -lSPI_cnk -lpthread -lrt"
+if test -d "$BGQ_INSTALL/comm/lib"
+then
+  BGQ_INC="-I$BGQ_INSTALL/comm/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk -I$BGQ_ZLIB/include"
+  BGQ_LIB="-L$BGQ_INSTALL/comm/lib -lpami-gcc -L$BGQ_INSTALL/spi/lib -L$BGQ_ZLIB/lib -lSPI -lSPI_cnk -lpthread -lrt"
+else
+  BGQ_INC="-I$BGQ_INSTALL/comm/sys-fast/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk -I$BGQ_ZLIB/include"
+  BGQ_LIB="-L$BGQ_INSTALL/comm/sys-fast/lib -lpami -L$BGQ_INSTALL/spi/lib -L$BGQ_ZLIB/lib -lSPI -lSPI_cnk -lpthread -lrt"
+fi
 
 # test if compiler binary present
 if test ! -x $BGQ_BIN/powerpc64-bgq-linux-g++
