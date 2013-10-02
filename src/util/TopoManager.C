@@ -548,16 +548,32 @@ extern "C" void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops) {
   *hops = _tmgr->getHopsBetweenRanks(pe1, pe2);
 }
 
-extern "C" void TopoManager_createPartitions(int scheme, int *nodeMap) {
+extern "C" void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap) {
   if(scheme == 0) {
+    if(!CmiMyNodeGlobal()) {
+      CmiPrintf("Charm++> Using rank ordered division (scheme 0) for topology aware partitions\n");
+    }
     int i;
     for(i = 0; i < CmiNumNodes(); i++) {
       nodeMap[i] = i;
     }
   } else if(scheme == 1) {
+    if(!CmiMyNodeGlobal()) {
+      CmiPrintf("Charm++> Using planar division (scheme 1) for topology aware partitions\n");
+    }
     getPlanarList(nodeMap);
   } else if(scheme == 2) {
+    if(!CmiMyNodeGlobal()) {
+      CmiPrintf("Charm++> Using hilber curve (scheme 2) for topology aware partitions\n");
+    }
     getHilbertList(nodeMap);
+  } else if(scheme == 3) {
+    if(!CmiMyNodeGlobal()) {
+      CmiPrintf("Charm++> Using recursive bisection (scheme 3) for topology aware partitions\n");
+    }
+    getRecursiveBisectionList(numparts,nodeMap);
+  } else {
+    CmiAbort("Specified value for topology scheme is not supported\n");
   }
 }
 

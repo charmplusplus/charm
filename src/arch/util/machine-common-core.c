@@ -739,7 +739,7 @@ void create_topoaware_partitions() {
   if(_partitionInfo.scheme == 100) {
     createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);       
   } else {
-    TopoManager_createPartitions(_partitionInfo.scheme, _partitionInfo.nodeMap);
+    TopoManager_createPartitions(_partitionInfo.scheme, numparts_bak, _partitionInfo.nodeMap);
   }
   TopoManager_free();
   
@@ -789,7 +789,7 @@ static int create_partition_map( char **argv)
  
   if (CmiGetArgStringDesc(argv, "+partition_sizes", &partsizes, "size of partitions")) {
     if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
-      CmiAbort("+partition_sizes used with incompatible option, possibly +use_master\n");
+      CmiAbort("+partition_sizes used with incompatible option, possibly +master_partition\n");
     }
     _partitionInfo.type = PARTITION_PREFIX;
   }
