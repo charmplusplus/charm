@@ -716,6 +716,7 @@ if (  MSG_STATISTIC)
 
 #include "TopoManager.h"
 extern void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
+extern void setDefaultPartitionParams();
 
 void create_topoaware_partitions() {
   int i, j, numparts_bak;
@@ -768,13 +769,52 @@ void create_topoaware_partitions() {
   }
 }
 
+void CmiSetNumPartitions(int nump) {
+  _partitionInfo.numPartitions = nump;
+}
+
+void CmiSetMasterPartition() {
+  if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
+    CmiAbort("setMasterPartition used with incompatible option\n");
+  }
+  _partitionInfo.type = PARTITION_MASTER;
+} 
+
+void CmiSetPartitionSizes(char *sizes) {
+  int length = strlen(sizes);
+  _partitionInfo.partsizes = (char*)malloc((length+1)*sizeof(char));
+
+  if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
+    CmiAbort("setPartitionSizes used with incompatible option\n");
+  }
+
+  memcpy(_partitionInfo.partsizes, sizes, length*sizeof(char));
+  _partitionInfo.partsizes[length] = '\0';
+  _partitionInfo.type = PARTITION_PREFIX;
+}
+
+void CmiSetPartitionScheme(int scheme) {
+  _partitionInfo.scheme = scheme;
+  _partitionInfo.isTopoaware = 1;
+}
+
+void CmiSetCustomPartitioning() {
+  _partitionInfo.scheme = 100;
+  _partitionInfo.isTopoaware = 1;
+}
+
 static int create_partition_map( char **argv)
 {
-  char* partsizes = NULL, *token, *tptr;
-  int i;
-
+  char* token, *tptr;
+  int i, flag;
+  
   _partitionInfo.numPartitions = 1; 
   _partitionInfo.type = PARTITION_DEFAULT;
+  _partitionInfo.partsizes = NULL;
+  _partitionInfo.scheme = 0;
+  _partitionInfo.isTopoaware = 0;
+
+  setDefaultPartitionParams();
 
   if(!CmiGetArgIntDesc(argv,"+partitions", &_partitionInfo.numPartitions,"number of partitions")) {
     CmiGetArgIntDesc(argv,"+replicas", &_partitionInfo.numPartitions,"number of partitions");
@@ -787,21 +827,18 @@ static int create_partition_map( char **argv)
     _partitionInfo.type = PARTITION_MASTER;
   }
  
-  if (CmiGetArgStringDesc(argv, "+partition_sizes", &partsizes, "size of partitions")) {
+  if (CmiGetArgStringDesc(argv, "+partition_sizes", &_partitionInfo.partsizes, "size of partitions")) {
     if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
       CmiAbort("+partition_sizes used with incompatible option, possibly +master_partition\n");
     }
     _partitionInfo.type = PARTITION_PREFIX;
   }
 
-  _partitionInfo.scheme = 0;
   if (CmiGetArgFlagDesc(argv,"+partition_topology","topology aware partitions")) {
     _partitionInfo.isTopoaware = 1;
     _partitionInfo.scheme = 1;
-  } else {
-    _partitionInfo.isTopoaware = 0;
-  }
-  
+  }  
+
   if (CmiGetArgIntDesc(argv,"+partition_topology_scheme", &_partitionInfo.scheme, "topology aware partitioning scheme")) {
     _partitionInfo.isTopoaware = 1;
   }
@@ -834,7 +871,7 @@ static int create_partition_map( char **argv)
     if(!_Cmi_mynode_global) 
       _partitionInfo.myPartition = 0;
   } else if(_partitionInfo.type == PARTITION_PREFIX) {
-    token = strtok_r(partsizes, ",", &tptr);
+    token = strtok_r(_partitionInfo.partsizes, ",", &tptr);
     while (token)
     {
       int i,j;

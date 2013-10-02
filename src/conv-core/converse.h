@@ -142,9 +142,21 @@ typedef struct {
   int *partitionPrefix;
   int *nodeMap;
   int myPartition;
+  char *partsizes;
 } PartitionInfo;
 
 void CmiCreatePartitions(char **argv);
+#if defined(__cplusplus)
+extern "C" {
+#endif
+void CmiSetNumPartitions(int nump);
+void CmiSetMasterPartition();
+void CmiSetPartitionSizes(char *size);
+void CmiSetPartitionScheme(int scheme);
+void CmiSetCustomPartitioning();
+#if defined(__cplusplus)
+}
+#endif 
 
 extern int _Cmi_mype_global;
 extern int _Cmi_numpes_global;

@@ -3413,6 +3413,9 @@ sdag.o: sdag.C sdag.h pup.h converse.h conv-config.h conv-autoconfig.h \
  debug-conv++.h cklists.h
 	$(CHARMC) -c -I. $<
 
+set_partition_params.o: set_partition_params.c
+	$(CHARMC) -c -I. $<
+
 shared_alloc.o: shared_alloc.C shared-alloc.h
 	$(CHARMC) -c -I. $<
 

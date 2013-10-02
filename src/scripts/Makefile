@@ -88,10 +88,7 @@ mpi-main: mpi-mainmodule.o
 	cp mpi-mainmodule.o ../lib
 
 $(L)/libckmain.a: main.o
-	$(CHARMC) -o $@ main.o
-
-custom_partitioner: custom_partitioner.o
-	cp custom_partitioner.o ../lib
+	$(CHARMC) -o $@ $^
 
 translators: charmxi conv-cpm
 
@@ -216,7 +213,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
 	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h BGQTorus.h \
 	TopoManager.h XTTorus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
-	crc32.h ckBIconfig.h rand48_replacement.h
+	crc32.h ckBIconfig.h rand48_replacement.h 
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
@@ -404,7 +401,7 @@ CVLIBS=$(L)/libconv-core.a \
 	$(L)/libconv-cplus-y.a $(L)/libconv-cplus-n.a \
 	$(L)/libconv-util.a $(L)/libconv-utilf.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
-	$(L)/libccs-client.a
+	$(L)/libccs-client.a $(L)/libconv-partition.a
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
@@ -460,6 +457,9 @@ $(L)/libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) $(TAU_LIBS) -o $@ $(LIBCONV_CORE) 
 
 $(L)/libconv-cplus-y.a: $(L)/libconv-cplus-n.a
+
+$(L)/libconv-partition.a: custom_partitioner.o set_partition_params.o
+	$(CHARMC) -o $@ $^
 
 include Makefile.machine
 
@@ -672,7 +672,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
-charm-target: loadbalancers default_libs comlib_objs mpi-main custom_partitioner
+charm-target: loadbalancers default_libs comlib_objs mpi-main 
 
 CHARMLIBS: charm++ CONVLIBS 
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
@@ -945,7 +945,7 @@ $(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C futil.f90
 ##############################################################################
 # adding this entry for files which do not belong to any of other locations
 
-OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o BlueGene.o
+OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o BlueGene.o set_partition_params.o
 
 ##############################################################################
 
