@@ -79,6 +79,7 @@ static int read_randomflag(void)
   if (fp != NULL) {
     fscanf(fp, "%d", &random_flag);
     fclose(fp);
+    if(random_flag) random_flag = 1;
 #if CMK_HAS_ADDR_NO_RANDOMIZE
     if(random_flag)
     {
