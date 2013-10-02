@@ -151,7 +151,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 //for interoperability
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
-CpvExtern(int,interopExitFlag);
+CpvCExtern(int,interopExitFlag);
 
 /*
 	FAULT_EVAC
