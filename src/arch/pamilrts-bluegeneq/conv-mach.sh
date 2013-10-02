@@ -32,7 +32,7 @@ then
 fi
 
 OPTS_CPP="$OPTS_CPP"
-GCC_OPTS="-Wno-deprecated $BGQ_INC"
+GCC_OPTS="-Wno-deprecated "
 OPTS_LD="$OPTS_LD"
 
 CMK_CPP_CHARM="$BGQ_BIN/powerpc64-bgq-linux-cpp -P"
@@ -45,6 +45,7 @@ CMK_CF77="$BGQ_BIN/powerpc64-bgq-linux-gfortran "
 CMK_CF90='f90'
 CMK_RANLIB="$BGQ_BIN/powerpc64-bgq-linux-ranlib "
 CMK_AR="$BGQ_BIN/powerpc64-bgq-linux-ar q "
+CMK_SYSINC="$BGQ_INC" 
 CMK_SYSLIBS="$BGQ_LIB"
 CMK_LIBS='-lckqt'
 CMK_LD="$CMK_CC"

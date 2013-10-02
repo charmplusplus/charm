@@ -1071,7 +1071,7 @@ fi
 
 if [ -n "$CMK_F90_USE_MODDIR" ]
 then
-    CMK_CF90="$CMK_CF90 $CMK_CF90_MODINC$CHARMINC "
+    CMK_CF90="$CMK_CF90 $CMK_CF90_MODINC $CHARMINC $CMK_SYSINC"
 fi
 
 if [ -n "$SEQUENTIAL" ]
@@ -1268,7 +1268,7 @@ do
 	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
 	Do touch $BASE.cpm.h
 	Do $LN -f -s $FILE $TMP.c
-	Do $CMK_CPP_C -I$CHARMINC $OPTS_CC $OPTS_CPP $TMP.c > $TMP.i
+	Do $CMK_CPP_C -I$CHARMINC $CMK_SYSINC $OPTS_CC $OPTS_CPP $TMP.c > $TMP.i
 	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
 done
 
@@ -1325,20 +1325,20 @@ do
 	then
 	    case "$FILE" in
 		*.c)
-		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE
 		    FILE="rose_$FILE"
 		    ;;
 		*.C|*.cc|*.cxx|*.cpp|*.c++)
-		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE
 		    FILE="rose_$FILE"
 		    ;;
 		*.f|*.F)
-		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP $OPTS_F90 -c $FILE
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 -c $FILE
 		    FILE="rose_$FILE"
 		    ;;
 		*.f90|*.F90)
 		    test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
-		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $OPTS_CPP $OPTS_F90 $FILE
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 $FILE
 		    FILE="rose_$FILE"
 		    ;;
 	    esac
@@ -1356,26 +1356,26 @@ do
                 fi
 		;;
 	*.c|*.s)
-		Do $CMK_CC -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
+		Do $CMK_CC -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	bglmachine.C)
-		Do $CMK_GCXX -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
+		Do $CMK_GCXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu)
-		Do $CMK_CXX -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
+		Do $CMK_CXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.f|*.F)
 		test -z "$CMK_CF90_FIXED" && Abort "No F90 compiler (CMK_CF90_FIXED) defined"
-		Do $CMK_CF90_FIXED -I$CHARMINC $OPTS_CPP $OPTS_F90 -c $FILE $DESTO
+		Do $CMK_CF90_FIXED -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.f90|*.F90)
 		test -z "$CMK_CF90" && Abort "No F90 compiler (CMK_CF90) defined"
 		test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
-		Do $CMK_CF90 -I$CHARMINC $OPTS_CPP $OPTS_F90 $FILE $DESTO
+		Do $CMK_CF90 -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.fc|*.FC)
@@ -1570,7 +1570,7 @@ then
     fi
 
     # Make the spe object file to be included
-    Do $SPU_COMPILER -c -I$CHARMINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
+    Do $SPU_COMPILER -c -I$CHARMINC $CMK_SYSINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
     Do $SPU_LINKER -L$CHARMLIB -o main__funcLookup__.genSPECode main__funcLookup__.genSPECode.o $CMK_SPERT_LIBS $SPU_EXTRA_LIBS
     Do $CMK_PPU_EMBEDSPU spert_main main__funcLookup__.genSPECode main__funcLookup__.genSPECode.ppe.o
 
@@ -1955,9 +1955,9 @@ else
 # if interoperate, need a lib with moduleinit
   if [ "$MPI_INTEROPERATE" != "" ]
   then
-    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $PRE_LIBRARIES"
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $BAL_OBJ $PRE_LIBRARIES"
   else
-    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
   fi
 fi
 if [ "$TRACE_WITH_TAU" = 1 ]
