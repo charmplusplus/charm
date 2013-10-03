@@ -457,7 +457,7 @@ static int pparam_setdef(ppdef def, char *value)
         char* parsed_value = (char*) *def->where.s;
         for(int i = 0, j = 0; i < strlen(value); i++)
         {
-          fprintf(stderr, "i = %d, j = %d, value[i] = \n", i, j);
+          //fprintf(stderr, "i = %d, j = %d, value[i] = \n", i, j);
           if(i+1 < strlen(value))
           {
             if(value[i] == '\\' && value[i+1] == 'n')
