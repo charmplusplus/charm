@@ -3801,7 +3801,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     local_addr = gniGetNicAddress();
 #else
     ptag = get_ptag();
-    cookie = get_cookie() - 1;
+    cookie = get_cookie();
 #if 0
     modes = GNI_CDM_MODE_CQ_NIC_LOCAL_PLACEMENT;
 #endif
