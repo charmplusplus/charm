@@ -145,6 +145,7 @@ CkpvDeclare(_CkOutStream*, _ckout);
 CkpvDeclare(_CkErrStream*, _ckerr);
 
 CkpvStaticDeclare(int,  _numInitsRecd);
+CkpvStaticDeclare(int,  _initdone);
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
@@ -661,6 +662,8 @@ static void _sendTriggers(void)
  */
 void _initDone(void)
 {
+  if (CkpvAccess(_initdone)) return;
+  CkpvAccess(_initdone) ++;
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
   if (!CksvAccess(_triggersSent)) _sendTriggers();
   CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler);
@@ -691,7 +694,7 @@ static void _triggerHandler(envelope *env)
     DEBUGF(("Calling Init Done from _triggerHandler\n"));
     _initDone();
   }
-  CmiFree(env);
+  if (env!=NULL) CmiFree(env);
 }
 
 static inline void _processROMsgMsg(envelope *env)
@@ -726,6 +729,13 @@ static void _roRestartHandler(void *msg)
   CkpvAccess(_numInitsRecd)++;
   _numExpectInitMsgs = env->getCount();
   _processRODataMsg(env);
+  // in SMP, potentially there us a race condition between rank0 calling
+  // initDone, which sendTriggers, and PE 0 calls bdcastRO which broadcast
+  // readonlys
+  // if this readonly message arrives later, we need to call trigger again
+  // to trigger initDone() on all ranks
+  // we therefore needs to make sure initDone() is exactly 
+  _triggerHandler(NULL);
 }
 
 /**
@@ -781,7 +791,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
-	DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
+  DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
   if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)==_numExpectInitMsgs)) {
     _initDone();
   }
@@ -970,6 +980,7 @@ void _initCharm(int unused_argc, char **argv)
         CkpvAccess(_destroyingNodeGroup) = false;
 	CkpvInitialize(UInt, _numGroups);
 	CkpvInitialize(int, _numInitsRecd);
+	CkpvInitialize(int, _initdone);
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
@@ -1032,6 +1043,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_coreState)=new CkCoreState();
 
 	CkpvAccess(_numInitsRecd) = 0;
+	CkpvAccess(_initdone) = 0;
 
 	CkpvAccess(_ckout) = new _CkOutStream();
 	CkpvAccess(_ckerr) = new _CkErrStream();
