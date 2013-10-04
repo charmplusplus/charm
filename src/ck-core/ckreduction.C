@@ -304,6 +304,7 @@ void CkReductionMgr::doneCreatingContributors(void)
 {
   DEBR((AA"Done creating contributors...\n"AB));
   creating=false;
+  checkIsActive();
   if (startRequested) startReduction(redNo,CkMyPe());
   finishReduction();
 }
@@ -331,6 +332,7 @@ void CkReductionMgr::contributorCreated(contributorInfo *ci)
   //He may not need to contribute to some of our reductions:
   for (int r=redNo;r<ci->redNo;r++)
     adj(r).lcount--;//He won't be contributing to r here
+  checkIsActive();
 }
 
 /*Don't expect any more contributions from this one.
@@ -370,6 +372,11 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   for (r=redNo;r<ci->redNo;r++)
     adj(r).lcount++;//He'll be contributing to r here
 
+  // Check whether the death of this contributor made this pe go barren at this
+  // redNo
+  if (ci->redNo <= redNo) {
+    checkIsActive();
+  }
   finishReduction();
 }
 
@@ -382,6 +389,10 @@ void CkReductionMgr::contributorLeaving(contributorInfo *ci)
   for (int r=redNo;r<ci->redNo;r++)
     adj(r).lcount++;//He'll be contributing to r here
 
+  // Check whether this made this pe go barren at redNo
+  if (ci->redNo <= redNo) {
+    checkIsActive();
+  }
   finishReduction();
 }
 
@@ -399,6 +410,10 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
   for (int r=redNo;r<ci->redNo;r++)
     adj(r).lcount--;//He won't be contributing to r here
 
+  // Check if the arrival of a new contributor makes this PE become active again
+  if (ci->redNo == redNo) {
+    checkIsActive();
+  }
 }
 
 //Contribute-- the given msg can contain any data.  The reducerType
@@ -453,6 +468,91 @@ void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){
 #else
 void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){}
 #endif
+
+void CkReductionMgr::checkIsActive() {
+  // Check the number of kids in the inactivelist before or at this redNo
+  std::map<int, int>::iterator it;
+  int c_inactive = 0;
+  for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
+    if (it->second <= redNo) {
+      c_inactive++;
+    }
+  }
+
+  if(numKids == c_inactive && lcount == 0) {
+    if(!is_inactive) {
+      informParentInactive();
+    }
+    is_inactive = true;
+  } else if(is_inactive) {
+    is_inactive = false;
+  }
+}
+
+/*
+* Add to the child to the inactiveList
+*/
+void CkReductionMgr::checkAndAddToInactiveList(int id, int red_no) {
+  // If there is already a reduction in progress corresponding to red_no, then
+  // the time to call ReductionStarting is past so explicitly invoke
+  // ReductionStarting on the kid
+  if (inProgress && redNo == red_no) {
+    thisProxy[id].ReductionStarting(new CkReductionNumberMsg(red_no));
+  }
+
+  std::map<int, int>::iterator it;
+  it = inactiveList.find(id);
+  if (it == inactiveList.end()) {
+    inactiveList.insert(std::pair<int, int>(id, red_no));
+  } else {
+    it->second = red_no;
+  }
+  // If the red_no is redNo, then check whether this makes this PE inactive
+  if (redNo == red_no) {
+    checkIsActive();
+  }
+}
+
+/*
+* This is invoked when a real contribution is received from the kid for a
+* particular red_no
+*/
+void CkReductionMgr::checkAndRemoveFromInactiveList(int id, int red_no) {
+  std::map<int, int>::iterator it;
+  it = inactiveList.find(id);
+  if (it == inactiveList.end()) {
+    return;
+  }
+  if (it->second <= red_no) {
+    inactiveList.erase(it);
+    DEBR((AA"[%d] Parent removing kid %d from inactivelist red_no %d\n"AB,
+      CkMyPe(), id, red_no));
+  }
+}
+
+// Inform parent that I am inactive
+void CkReductionMgr::informParentInactive() {
+  if (hasParent()) {
+    thisProxy[treeParent()].AddToInactiveList(
+      new CkReductionInactiveMsg(CkMyPe(), redNo));
+  }
+}
+
+/*
+*  Send ReductionStarting message to all the inactive kids which are inactive
+*  for the specified red_no
+*/
+void CkReductionMgr::sendReductionStartingToKids(int red_no) {
+  std::map<int, int>::iterator it;
+  for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
+    if (it->second <= red_no) {
+      DEBR((AA"[%d] Parent sending reductionstarting to inactive kid %d\n"AB,
+        CkMyPe(), it->first));
+      thisProxy[it->first].ReductionStarting(new CkReductionNumberMsg(red_no));
+    }
+  }
+}
+
 
 //////////// Reduction Manager Remote Entry Points /////////////
 //Sent down the reduction tree (used by barren PEs)
@@ -548,11 +648,12 @@ void CkReductionMgr::startReduction(int number,int srcPE)
  
   //Sent start requests to our kids (in case they don't already know)
 #if GROUP_LEVEL_REDUCTION
-  for (int k=0;k<treeKids();k++)
-  {
-    DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
-    thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
-  }
+  sendReductionStartingToKids(redNo);
+  //for (int k=0;k<treeKids();k++)
+  //{
+  //  DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
+  //  thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
+  //}
 #else
   nodeProxy[CkMyNode()].ckLocalBranch()->startNodeGroupReduction(number,thisgroup);
 #endif
@@ -722,6 +823,9 @@ void CkReductionMgr::finishReduction(void)
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
+  // Check after every reduction contribution whether this makes the PE inactive
+  // starting this redNo
+  checkIsActive();
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
 #if !GROUP_LEVEL_REDUCTION
@@ -776,6 +880,11 @@ void CkReductionMgr::finishReduction(void)
 #endif
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
     DEBR((AA"Recv'd remote contribution %d for #%d\n"AB,nRemote,m->redNo));
+    // If the remote contribution is real, then check whether we can remove the
+    // child from the inactiveList if it is in the list
+    if (m->nSources() > 0) {
+      checkAndRemoveFromInactiveList(m->fromPE, m->redNo);
+    }
     startReduction(m->redNo, CkMyPe());
     msgs.enq(m);
     nRemote++;
@@ -787,6 +896,21 @@ void CkReductionMgr::finishReduction(void)
   } 
   else CkAbort("Recv'd late remote contribution!\n");
 #endif
+}
+
+void CkReductionMgr::AddToInactiveList(CkReductionInactiveMsg *m) {
+  int id = m->id;
+  int last_redno = m->redno;
+  delete m;
+
+  DEBR((AA"[%d] parent add kid %d to inactive list from redno %d\n"AB, CkMyPe(),
+    id, last_redno));
+  checkAndAddToInactiveList(id, last_redno);
+
+  finishReduction();
+  if (last_redno <= redNo) {
+    checkIsActive();
+  }
 }
 
 //////////// Reduction Manager Utilities /////////////
@@ -918,6 +1042,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   ret->callback=msgs_callback;
   ret->sourceFlag=msgs_nSources;
 	ret->setMigratableContributor(isMigratableContributor);
+  ret->fromPE = CkMyPe();
   DEBR((AA"Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
 
   return ret;
@@ -1814,6 +1939,7 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
 //Sent down the reduction tree (used by barren PEs)
 void CkNodeReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 {
+  DEBR((AA"[%d] Received reductionStarting redNo %d\n"AB, CkMyPe(), m->num));
   CmiLock(lockEverything);
 	/*
 		FAULT_EVAC

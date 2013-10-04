@@ -13,6 +13,7 @@ module CkReduction {
   
   message CkReductionMsg;
   message CkReductionNumberMsg;
+  message CkReductionInactiveMsg;
   
   group [migratable] CkReductionMgr : CkGroupInitCallback {
 	entry CkReductionMgr(CProxy_CkArrayReductionMgr);
@@ -30,6 +31,7 @@ module CkReduction {
 	//call back for using NodeGroup Reductions added by sayantan
 	entry void ArrayReductionHandler(CkReductionMsg *m);
 	entry void contributeViaMessage(CkReductionMsg *m);
+  entry void AddToInactiveList(CkReductionInactiveMsg *m);
 
         initnode void sanitycheck();
   };

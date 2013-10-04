@@ -79,6 +79,13 @@ public:
 };
 
 
+class CkReductionInactiveMsg:public CMessage_CkReductionInactiveMsg {
+  public:
+    int id, redno;
+    CkReductionInactiveMsg(int i, int r) {id=i; redno = r;}
+};
+
+
 /**some data classes used by both ckreductionmgr and cknodereductionmgr**/
 class contributorInfo {
 public:
@@ -274,8 +281,8 @@ private:
   	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
 #if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_ )
     int sourceProcessorCount;
-    int fromPE;
 #endif
+    int fromPE;
 private:
 #if CMK_BIGSIM_CHARM
         void *log;
@@ -533,6 +540,7 @@ public:
 	void MigrantDied(CkReductionNumberMsg *m);
 
 	void RecvMsg(CkReductionMsg *m);
+  void AddToInactiveList(CkReductionInactiveMsg *m);
 
 	//Call back for using Node added by Sayantan
 	void ArrayReductionHandler(CkReductionMsg *m);
@@ -617,11 +625,18 @@ private:
 	CkMsgQ<CkReductionMsg> futureRemoteMsgs;
 
 	CkMsgQ<CkReductionMsg> finalMsgs;
+  std::map<int, int> inactiveList;
+  bool is_inactive;
 
 //State:
 	void startReduction(int number,int srcPE);
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
+  void checkIsActive();
+  void informParentInactive();
+  void checkAndAddToInactiveList(int id, int red_no);
+  void checkAndRemoveFromInactiveList(int id, int red_no);
+  void sendReductionStartingToKids(int red_no);
 
 //Reduction tree utilities
 	unsigned upperSize;
