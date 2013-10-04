@@ -141,6 +141,13 @@ public:
   ~MeshStreamer();
 
   // entry
+
+  void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
+  void enablePeriodicFlushing(){
+    isPeriodicFlushEnabled_ = true;
+    registerPeriodicProgressFunction();
+  }
+  void finish();
   void init(int numLocalContributors, CkCallback startCb, CkCallback endCb,
             int prio, bool usePeriodicFlushing);
   void init(int numContributors, CkCallback startCb, CkCallback endCb,
@@ -148,14 +155,12 @@ public:
             int prio, bool usePeriodicFlushing);
   void init(CkArrayID senderArrayID, CkCallback startCb, CkCallback endCb,
             int prio, bool usePeriodicFlushing);
-  void init(CkCallback endCb, int prio);
+  void init(CkCallback startCb, int prio);
 
-  void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
   virtual void receiveAtDestination(MeshStreamerMessage<dtype> *msg) = 0;
-  void flushIfIdle();
-  void finish();
 
   // non entry
+  void flushIfIdle();
   inline bool isPeriodicFlushEnabled() {
     return isPeriodicFlushEnabled_;
   }
@@ -166,11 +171,6 @@ public:
                                int dimension, int destinationIndex);
 
   void registerPeriodicProgressFunction();
-  // flushing begins only after enablePeriodicFlushing has been invoked
-  inline void enablePeriodicFlushing(){
-    isPeriodicFlushEnabled_ = true;
-    registerPeriodicProgressFunction();
-  }
 
   inline void done(int numContributorsFinished = 1) {
 
@@ -578,19 +578,21 @@ insertData(const dtype& dataItem, int destinationPe) {
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::init(CkCallback endCb, int prio) {
+void MeshStreamer<dtype>::init(CkCallback startCb, int prio) {
 
   useStagedCompletion_ = false;
   useCompletionDetection_ = false;
 
   yieldCount_ = 0;
-  userCallback_ = endCb;
+  userCallback_ = CkCallback();
   prio_ = prio;
 
   initLocalClients();
 
   hasSentRecently_ = false;
   enablePeriodicFlushing();
+
+  this->contribute(startCb);
 }
 
 template <class dtype>
