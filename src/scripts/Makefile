@@ -312,7 +312,7 @@ dirs+sources:
 	./gatherflat ../../src/conv-ccs         .
 	./gatherflat ../../src/conv-perf	.
 	./gatherflat ../../src/ck-core          .
-	./gatherflat ../../src/util             .
+	./gathertree ../../src/util             .
 	./gatherflat ../../src/ck-perf          .
 	./gatherflat ../../src/ck-tune          .
 	./gatherflat ../../src/ck-ldb           .
@@ -427,8 +427,7 @@ LIBCONV_UTILF=pup_f.o
 
 converse: fmain-ok charmrun-target swapglobal-target conv-cpm
 
-charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS)
-	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS) -Wno-error' -j1 ) ; fi
+charmrun-target: charmrun 
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
 fmain-ok: fmain.f90
@@ -978,7 +977,7 @@ clean:
 	rm -f core #*#
 	rm -f core *~
 	rm -f *.stamp
-	if [ -d charmrun ] ; then ( cd charmrun; make clean ) ; fi
+	if [ -d charmrun-src ] ; then ( cd charmrun-src; make clean ) ; fi
 	-( cd doc && $(MAKE) clean )
 	( cd libs; $(MAKE) clean )
 	( cd ../examples && $(MAKE) clean )
