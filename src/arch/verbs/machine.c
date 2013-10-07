@@ -1,6 +1,6 @@
 
 /** @file
- * Basic NET implementation of Converse machine layer
+ * Basic NET-LRTS implementation of Converse machine layer
  * @ingroup NET
  */
 
@@ -1662,13 +1662,9 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
 #endif
 
 
-void LrtsDrainResources()
-{
-}
+void LrtsDrainResources() { }
 
-void LrtsPostNonLocal()
-{
-}
+void LrtsPostNonLocal() { }
 
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some implementations*/
@@ -1851,29 +1847,19 @@ void LrtsPostCommonInit(int everReturn)
 
 void LrtsExit()
 {
-  MACHSTATE(2,"ConverseExit {");
+  int i;
   machine_initiated_shutdown=1;
 
-  //CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
-  if (CmiMyRank()==0) CmiStdoutFlush();
+  CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
-    if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
-    else while (1) CmiYield();
-  }
-  else {
-    ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
-#if CMK_SHARED_VARS_UNAVAILABLE
+    exit(0); /*Standalone version-- just leave*/
+  } else {
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
-    while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
-#elif CMK_MULTICORE
-        if (!Cmi_commthread && CmiMyRank()==0) {
-          Cmi_check_delay = 1.0;    /* speed up checking of charmrun */
-          while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
-        }
-#endif
+    for(i = 0; i < CmiMyNodeSize(); i++) {
+      ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
+    }
+    while(1) CommunicationServerNet(5, COMM_SERVER_FROM_WORKER);
   }
-  MACHSTATE(2,"} ConverseExit");
-
 }
 
 static void set_signals(void)
