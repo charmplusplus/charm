@@ -196,6 +196,7 @@ CkReductionMgr::CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr)
   startRequested=false;
   gcount=lcount=0;
   nContrib=nRemote=0;
+  is_inactive = false;
   maxStartRequest=0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	numImmigrantRecObjs = 0;
@@ -219,6 +220,7 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   startRequested=false;
   gcount=lcount=0;
   nContrib=nRemote=0;
+  is_inactive = false;
   maxStartRequest=0;
   DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
 
@@ -475,9 +477,12 @@ void CkReductionMgr::checkIsActive() {
   int c_inactive = 0;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= redNo) {
+      DEBR((AA"Kid %d is inactive from redNo %d\n"AB, it->first, it->second));
       c_inactive++;
     }
   }
+  DEBR((AA"CheckIsActive redNo %d, kids %d(inactive %d), lcount %d\n"AB, redNo,
+    numKids, c_inactive, lcount));
 
   if(numKids == c_inactive && lcount == 0) {
     if(!is_inactive) {
@@ -525,14 +530,15 @@ void CkReductionMgr::checkAndRemoveFromInactiveList(int id, int red_no) {
   }
   if (it->second <= red_no) {
     inactiveList.erase(it);
-    DEBR((AA"[%d] Parent removing kid %d from inactivelist red_no %d\n"AB,
-      CkMyPe(), id, red_no));
+    DEBR((AA"Parent removing kid %d from inactivelist red_no %d\n"AB,
+      id, red_no));
   }
 }
 
 // Inform parent that I am inactive
 void CkReductionMgr::informParentInactive() {
   if (hasParent()) {
+    DEBR((AA"Inform parent to add to inactivelist red_no %d\n"AB, redNo));
     thisProxy[treeParent()].AddToInactiveList(
       new CkReductionInactiveMsg(CkMyPe(), redNo));
   }
@@ -546,8 +552,8 @@ void CkReductionMgr::sendReductionStartingToKids(int red_no) {
   std::map<int, int>::iterator it;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= red_no) {
-      DEBR((AA"[%d] Parent sending reductionstarting to inactive kid %d\n"AB,
-        CkMyPe(), it->first));
+      DEBR((AA"Parent sending reductionstarting to inactive kid %d\n"AB,
+        it->first));
       thisProxy[it->first].ReductionStarting(new CkReductionNumberMsg(red_no));
     }
   }
@@ -759,7 +765,10 @@ void CkReductionMgr::finishReduction(void)
 #endif
 
 #if GROUP_LEVEL_REDUCTION
-  if (nRemote<treeKids())  return;//Need more remote messages
+  if (nRemote<treeKids()) {
+    DEBR((AA"Need more remote messages %d %d\n"AB,nRemote,treeKids()));
+    return;//Need more remote messages
+  }
 	
 #endif
  
@@ -903,7 +912,7 @@ void CkReductionMgr::AddToInactiveList(CkReductionInactiveMsg *m) {
   int last_redno = m->redno;
   delete m;
 
-  DEBR((AA"[%d] parent add kid %d to inactive list from redno %d\n"AB, CkMyPe(),
+  DEBR((AA"Parent add kid %d to inactive list from redno %d\n"AB,
     id, last_redno));
   checkAndAddToInactiveList(id, last_redno);
 
@@ -1103,6 +1112,8 @@ void CkReductionMgr::pup(PUP::er &p)
 #else
     init_BinaryTree();
 #endif
+    is_inactive = false;
+    checkIsActive();
   }
 
   DEBR(("[%d,%d] pupping _____________  gcount = %d \n",CkMyNode(),CkMyPe(),gcount));

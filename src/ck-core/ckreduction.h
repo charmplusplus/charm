@@ -609,6 +609,8 @@ private:
 
 	//Current local and remote contributions
 	int nContrib,nRemote;
+  // Is it inactive
+  bool is_inactive;
 
         // simple barrier
         CkCallback barrier_storedCallback;
@@ -626,7 +628,6 @@ private:
 
 	CkMsgQ<CkReductionMsg> finalMsgs;
   std::map<int, int> inactiveList;
-  bool is_inactive;
 
 //State:
 	void startReduction(int number,int srcPE);
