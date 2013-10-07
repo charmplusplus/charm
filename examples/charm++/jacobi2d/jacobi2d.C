@@ -42,6 +42,7 @@ public:
     int receive_count;
     CProxy_Jacobi array;
     int num_chares;
+    int count;
 
     Main(CkArgMsg* m) {
 	mainProxy = thisProxy;
@@ -54,6 +55,7 @@ public:
 	delete m;
 	
 	num_rows = num_cols;
+        count = 0;
 
 	CkPrintf("Running Jacobi on %d processors with (%d,%d) elements\n",
 		 CkNumPes(), num_rows, num_cols);
@@ -82,7 +84,8 @@ public:
 
 	receive_count--;
 	if (0 == receive_count) {
-	    if (max_error < epsilon) {
+            count++;
+	    if (max_error < epsilon || count == 100) {
 		CkPrintf("All done\n");
 		CkExit();
 	    } else {
