@@ -144,6 +144,15 @@ public:
 
   void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
   void enablePeriodicFlushing(){
+    if (progressPeriodInMs_ <= 0) {
+      if (CkMyPe() == 0) {
+        CkPrintf("Using periodic flushing for NDMeshStreamer requires"
+                 " setting a valid periodic flush period. Defaulting"
+                 " to 10 ms.\n");
+      }
+      progressPeriodInMs_ = 10;
+    }
+
     isPeriodicFlushEnabled_ = true;
     registerPeriodicProgressFunction();
   }
@@ -668,15 +677,6 @@ init(int numContributors, CkCallback startCb, CkCallback endCb,
 
   detectorLocalObj_->start_detection(numContributors, startCb, flushCb,
                                      finish , 0);
-
-  if (progressPeriodInMs_ <= 0) {
-    if (CkMyPe() == 0) {
-      CkPrintf("Using completion detection in NDMeshStreamer requires"
-               " setting a valid periodic flush period. Defaulting"
-               " to 10 ms.\n");
-    }
-    progressPeriodInMs_ = 10;
-  }
 
   hasSentRecently_ = false;
   if (usePeriodicFlushing) {
