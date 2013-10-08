@@ -40,7 +40,7 @@
 #define CMK_BROADCAST_SPANNING_TREE    			   0
 #define CMK_BROADCAST_HYPERCUBE        			   0
 
-#define CMK_BARRIER_USE_COMMON_CODE                        0
+#define CMK_BARRIER_USE_COMMON_CODE                        1
 
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
 
@@ -49,5 +49,3 @@
 /* call cpu timer for LB */
 #define CMK_LB_CPUTIMER					   0
 
-#define	CMK_HAS_PARTITION		1
-#define CMK_SUPPORT_LRTS		1

@@ -1677,12 +1677,28 @@ void LrtsAdvanceCommunication(int whileidle)
  *
  *****************************************************************************/
 
-#if !CMK_BARRIER_USE_COMMON_CODE
+#if CMK_BARRIER_USE_COMMON_CODE
 
 /* happen at node level */
 /* must be called on every PE including communication processors */
 void LrtsBarrier()
 {
+  int numnodes = CmiNumNodes();
+  static int barrier_phase = 0;
+
+  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (numnodes == 1) {
+    return 0;
+  }
+
+  ctrl_sendone_locking("barrier",NULL,0,NULL,0);
+  while (barrierReceived != 1) {
+    CmiCommLock();
+    ctrl_getone();
+    CmiCommUnlock();
+  }
+  barrierReceived = 0;
+  barrier_phase ++;
 }
 
 int CmiBarrierZero()
