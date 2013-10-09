@@ -44,22 +44,6 @@ int TransmitDatagram(int pe);
  * CmiNotifyIdle()-- wait until a packet comes in
  *
  *****************************************************************************/
-typedef struct {
-  int sleepMs; /*Milliseconds to sleep while idle*/
-  int nIdles; /*Number of times we've been idle in a row*/
-  CmiState cs; /*Machine state*/
-} CmiIdleState;
-
-
-static CmiIdleState *CmiNotifyGetState(void) 
-{
-  CmiIdleState *s=(CmiIdleState *)malloc(sizeof(CmiIdleState));
-  s->sleepMs=0;
-  s->nIdles=0;
-  s->cs=CmiGetState();
-  return s;
-}
-
 
 void  LrtsNotifyIdle() { }
 void  LrtsBeginIdle() { }
@@ -358,35 +342,8 @@ static void IntegrateMessageDatagram(char **msg, int len)
       if (node->asm_fill > node->asm_total)
          CmiAbort("\n\n\t\tLength mismatch!!\n\n");
       if (node->asm_fill == node->asm_total) {
-        /* do it at integration - the following function may re-entrant */
-#if CMK_BROADCAST_SPANNING_TREE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-           )
-          SendSpanningChildren(NULL, 0, node->asm_total, newmsg, broot, rank);
-#elif CMK_BROADCAST_HYPERCUBE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-           )
-          SendHypercube(NULL, 0, node->asm_total, newmsg, broot, rank);
-#endif
-        if (rank == DGRAM_BROADCAST) {
-          for (i=1; i<_Cmi_mynodesize; i++)
-            CmiPushPE(i, CopyMsg(newmsg, node->asm_total));
-          CmiPushPE(0, newmsg);
-        } else {
-#if CMK_NODE_QUEUE_AVAILABLE
-           if (rank==DGRAM_NODEMESSAGE || rank==DGRAM_NODEBROADCAST) {
-             CmiPushNode(newmsg);
-           }
-           else
-#endif
-             CmiPushPE(rank, newmsg);
-        }
+	    //common core code  will handle where to send the messages
+		handleOneRecvedMsg(rank, newmsg);
         node->asm_msg = 0;
       }
     } 

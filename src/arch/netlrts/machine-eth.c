@@ -24,9 +24,7 @@
  *****************************************************************************/
 
 void LrtsStillIdle() {}
-
 void LrtsNotifyIdle() {}
-
 void LrtsBeginIdle() {}
 
 /****************************************************************************
@@ -398,38 +396,8 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
       KillEveryoneCode(4559313);
   }
   if (node->asm_fill == node->asm_total) {
-    /* spanning tree broadcast - send first to avoid invalid msg ptr */
-#if CMK_BROADCAST_SPANNING_TREE
-    if (node->asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE 
-          || node->asm_rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendSpanningChildren(NULL, 0, node->asm_total, msg, dg->broot, dg->rank);
-#elif CMK_BROADCAST_HYPERCUBE
-    if (node->asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || node->asm_rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendHypercube(NULL, 0, node->asm_total, msg, dg->broot, dg->rank);
-#endif
-    if (node->asm_rank == DGRAM_BROADCAST) {
-      int len = node->asm_total;
-      for (i=1; i<_Cmi_mynodesize; i++)
-         CmiPushPE(i, CopyMsg(msg, len));
-      CmiPushPE(0, msg);
-    } else {
-#if CMK_NODE_QUEUE_AVAILABLE
-         if (node->asm_rank==DGRAM_NODEMESSAGE ||
-	     node->asm_rank==DGRAM_NODEBROADCAST) 
-	 {
-	   CmiPushNode(msg);
-         }
-	 else
-#endif
-	   CmiPushPE(node->asm_rank, msg);
-    }
+	//common core code  will handle where to send the messages
+ 	handleOneRecvedMsg(node->asm_rank, msg);
     node->asm_msg = 0;
     myNode->recd_msgs++;
     myNode->recd_bytes += node->asm_total;
