@@ -4050,10 +4050,6 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 #ifdef CMK_GFORTRAN
   fprintf(f,"GFORTRAN_UNBUFFERED_ALL=YES; export GFORTRAN_UNBUFFERED_ALL\n");
 #endif
-#if CMK_USE_MX
-  fprintf(f,"MX_MONOTHREAD=1; export MX_MONOTHREAD\n");
-  /*fprintf(f,"MX_RCACHE=1; export MX_RCACHE\n");*/
-#endif
 #if CMK_AIX && CMK_SMP
   fprintf(f,"MALLOCMULTIHEAP=1; export MALLOCMULTIHEAP\n");
 #endif

@@ -397,7 +397,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   }
   if (node->asm_fill == node->asm_total) {
 	//common core code  will handle where to send the messages
- 	handleOneRecvedMsg(node->asm_rank, msg);
+    handleOneRecvedMsg(node->asm_rank, msg);
     node->asm_msg = 0;
     myNode->recd_msgs++;
     myNode->recd_bytes += node->asm_total;

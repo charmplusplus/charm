@@ -199,7 +199,7 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
  * 
  * This function does the scheduling of the tasks related to the
  * message sends and receives. 
- * It first check the charmrun port for message, and poll the gm event
+ * It first check the charmrun port for message, and poll
  * for send complete and outcoming messages.
  *
  ***********************************************************************/
@@ -415,7 +415,7 @@ void ReceiveDatagram(int node)
  *
  * This function is responsible for all non-local transmission. It
  * first allocate a send token, if fails, put the send message to
- * penging message queue, otherwise invoke the GM send.
+ * penging message queue.
  ***********************************************************************/
 
 int TransmitImplicitDgram(ImplicitDgram dg)
@@ -518,7 +518,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 /***********************************************************************
  * CmiMachineInit()
  *
- * This function intialize the GM board. Set receive buffer
+ * Set receive buffer
  *
  ***********************************************************************/
 

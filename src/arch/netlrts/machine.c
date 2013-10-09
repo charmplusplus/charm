@@ -232,20 +232,6 @@ int _kq = -1;
 #include <poll.h>
 #endif
 
-#if CMK_USE_GM
-#include "gm.h"
-struct gm_port *gmport = NULL;
-int  portFinish = 0;
-#endif
-
-#if CMK_USE_MX
-#include "myriexpress.h"
-mx_endpoint_t      endpoint;
-mx_endpoint_addr_t endpoint_addr;
-int MX_FILTER   =  123456;
-static uint64_t Cmi_nic_id=0; /* Machine-specific identifier (MX-only) */
-#endif
-
 #if CMK_MULTICORE
 int Cmi_commthread = 0;
 #endif
@@ -298,7 +284,6 @@ extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 
 static unsigned int dataport=0;
-static int Cmi_mach_id=0; /* Machine-specific identifier (GM-only) */
 static SOCKET       dataskt;
 
 extern void TokenUpdatePeriodic();
@@ -335,12 +320,6 @@ static void machine_exit(int status)
   CmiDestroyLocks();		/* destroy locks to prevent dead locking */
   EmergencyExit();
 
-#if CMK_USE_GM
-  if (gmport) { 
-    gm_close(gmport); gmport = 0;
-    gm_finalize();
-  }
-#endif
   MachineExit();
   exit(status);
 }
@@ -981,25 +960,17 @@ static void pingCharmrun(void *ignored)
   if (clock > Cmi_check_last + Cmi_check_delay) {
     MACHSTATE1(3,"CommunicationsClock pinging charmrun Cmi_charmrun_fd_sendflag=%d", Cmi_charmrun_fd_sendflag);
     Cmi_check_last = clock; 
-#if CMK_USE_GM || CMK_USE_MX
-    if (!Cmi_netpoll)  /* GM netpoll, charmrun service is done in interrupt */
-#endif
     CmiCommLockOrElse(return;); /*Already busy doing communication*/
     if (Cmi_charmrun_fd_sendflag) return; /*Busy talking to charmrun*/
     CmiCommLock();
     ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
     CmiCommUnlock();
   }
-#if 1
-#if CMK_USE_GM || CMK_USE_MX
-  if (!Cmi_netpoll)
-#endif
   CmiStdoutFlush(); /*Make sure stdout buffer hasn't filled up*/
-#endif
   }
 }
 
-/* periodic charm ping, for gm and netpoll */
+/* periodic charm ping, for netpoll */
 static void pingCharmrunPeriodic(void *ignored)
 {
   pingCharmrun(ignored);
@@ -1472,10 +1443,6 @@ static void node_addresses_obtain(char **argv)
 	me.info.nPE=ChMessageInt_new(0);
 	/* me.info.IP=_skt_invalid_ip; */
         me.info.IP=skt_innode_my_ip();
-	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
-#ifdef CMK_USE_MX
-	me.info.nic_id=ChMessageLong_new(Cmi_nic_id);
-#endif
   	me.info.dataport=ChMessageInt_new(dataport);
 
   	/*Send our node info. to charmrun.
@@ -1741,10 +1708,6 @@ int CmiBarrierZero()
 
 void LrtsPreCommonInit(int everReturn)
 {
-#if CMK_USE_GM
-  CmiCheckGmStatus();
-#endif
-    
 }
 
 void LrtsPostCommonInit(int everReturn)
@@ -1767,9 +1730,6 @@ void LrtsPostCommonInit(int everReturn)
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
 #endif
-#if CMK_USE_GM || CMK_USE_MX
-  if (Cmi_charmrun_fd != -1)
-#endif
   {
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
@@ -1790,7 +1750,6 @@ void LrtsPostCommonInit(int everReturn)
     CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) CmiStdoutFlush, NULL);
 #if CMK_SHARED_VARS_UNAVAILABLE
     if (!Cmi_asyncio) {
-    /* gm cannot live with setitimer */
     CcdCallFnAfter((CcdVoidFn)pingCharmrunPeriodic,NULL,1000);
     }
     else {
@@ -1811,9 +1770,8 @@ void LrtsPostCommonInit(int everReturn)
     setitimer(ITIMER_REAL, &i, NULL);
     }
 
-#if ! CMK_USE_GM && ! CMK_USE_MX && ! CMK_USE_TCP
+#if ! CMK_USE_TCP
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
-    /*no need for GM case */
     CcdCallFnAfter((CcdVoidFn)CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);
 #endif
 #endif
@@ -1842,10 +1800,6 @@ void LrtsPostCommonInit(int everReturn)
 #ifdef __ONESIDED_NO_HARDWARE
   putSrcHandler = CmiRegisterHandler((CmiHandler)handlePutSrc);
   putDestHandler = CmiRegisterHandler((CmiHandler)handlePutDest);
-  getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
-  getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
-#endif
-#ifdef __ONESIDED_GM_HARDWARE
   getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
   getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
 #endif
@@ -1969,10 +1923,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   	set_signals();
 #if CMK_USE_TCP
   	dataskt=skt_server(&dataport);
-#elif !CMK_USE_GM && !CMK_USE_MX
-  	dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
 #else
-          /* GM and MX do not need to create any socket for communication */
         dataskt=-1;
 #endif
 	MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
