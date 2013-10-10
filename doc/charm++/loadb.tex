@@ -238,29 +238,13 @@ called in the constructor of a static array and definitely before the {\em
 doneInserting} call for a dynamic array.  It can be called multiple times on
 one processor, but only the last one takes effect.
 
-The function call {\em StartLB()} starts load balancing immediately. This call
-should be made at only one place on only one processor. This function is also
+The function call {\em CkStartLB()} starts load balancing immediately. This call
+should be made at only one place on only one processor. This function is
 not blocking, the object will continue to process messages and the load
-balancing when triggered happens in the background. Note that the {\em
-StartLB()} method can not be called directly, instead it is called on the {\em
-LBDatabase} object. The following code snippet illustrates this use:
-
-\begin{alltt}
-/* The method that initiates load balancing. */
-\{
-  LBDatabase *db = LBDatabaseObj();
-  /* Do something and pick an opportune moment to sneak in a wake-up
-   * call to the LB. */
-  db->StartLB();
-  /* To make sure that the LB is done balancing things, insert the
-  following also. */
-  CkWaitQD();
-  /* Do something else. */
-\}
-\end{alltt}
+balancing, when triggered, happens in the background.
 
 {\em TurnManualLBOff()} turns off manual load balancing and switches back to
-the automatic Load balancing mode.
+the automatic load balancing mode.
 %
 \end{enumerate}
 

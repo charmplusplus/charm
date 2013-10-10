@@ -435,6 +435,8 @@ void LBClearLoads();
 
 inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }
 
+inline void CkStartLB() { LBDatabase::Object()->StartLB(); }
+
 inline void get_avail_vector(char * bitmap) {
   LBDatabaseObj()->get_avail_vector(bitmap);
 }
