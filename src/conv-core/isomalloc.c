@@ -2512,8 +2512,8 @@ CmiInt8  CmiIsomallocLength(void *block)
 int CmiIsomallocInRange(void *addr)
 {
   if (isomallocStart==NULL) return 0; /* There is no range we manage! */
-  return pointer_ge((char *)addr,isomallocStart) && 
-    pointer_lt((char*)addr,isomallocEnd);
+  return (addr == NULL) || (pointer_ge((char *)addr,isomallocStart) && 
+    pointer_lt((char*)addr,isomallocEnd));
 }
 
 void CmiIsomallocInit(char **argv)
