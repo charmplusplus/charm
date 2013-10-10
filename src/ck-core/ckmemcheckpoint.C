@@ -268,7 +268,10 @@ public:
 #else
     sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), myidx);
 #endif
-    mkstemp(fname);
+    if(mkstemp(fname) < 0)
+    {
+      CmiAbort("mkstemp fail in checkpoint");
+    }
 #else
     fname=tmpnam(NULL);
 #endif
@@ -701,7 +704,10 @@ void CkMemCheckPT::syncFiles(CkReductionMsg *m)
 {
   delete m;
 #if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
-  system("sync");
+  if(system("sync")< 0)
+  {
+    CmiAbort("sync file failed");
+  }
 #endif
   contribute(CkCallback(CkReductionTarget(CkMemCheckPT, cpFinish), thisProxy[cpStarter]));
 }
