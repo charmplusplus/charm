@@ -416,22 +416,31 @@ int CkBitVector::Compare(const CkBitVector &b) const
     int result = 0;
     int length, i;
     if(usedBits > b.usedBits)
+    {
         result = 1;
+        length = chunks(b.usedBits);
+    }
     else if (usedBits < b.usedBits)
+    {
         result = -1;
-    else {
         length = chunks(usedBits);
-        for(i=0; i<length; i++)
+    }
+    else
+    {
+        result = 0;
+        length = chunks(usedBits);
+    }
+
+    for(i=length; i>=0; i--)
+    {
+        if(data[i] > b.data[i])
         {
-            if(data[i] > b.data[i])
-            {
-                result = 1;
-                break;
-            }else if (data[i] < b.data[i])
-            {
-                result = -1;
-                break;
-            }
+            result = 1;
+            break;
+        }else if (data[i] < b.data[i])
+        {
+            result = -1;
+            break;
         }
     }
     return result;
