@@ -1924,7 +1924,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_USE_TCP
   	dataskt=skt_server(&dataport);
 #else
-        dataskt=-1;
+    dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
+    dataskt=-1;
 #endif
 	MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
   	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
