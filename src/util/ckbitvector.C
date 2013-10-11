@@ -431,7 +431,7 @@ int CkBitVector::Compare(const CkBitVector &b) const
         length = chunks(usedBits);
     }
 
-    for(i=length; i>=0; i--)
+    for(i=0; i<length; i++)
     {
         if(data[i] > b.data[i])
         {
