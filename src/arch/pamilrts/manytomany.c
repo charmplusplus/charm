@@ -396,8 +396,8 @@ void   CmiDirect_manytomany_initialize_send ( void        * h,
 #else
   size_t dst_context = 0;
 #endif
-  PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)CmiNodeOf(pe), 
-			dst_context, &target);
+  PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)CmiGetNodeGlobal(CmiNodeOf(pe),CmiMyPartition()),
+                        dst_context, &target);
   handle->m2m_node_eps   [idx]   = target;
 
   //uint64_t p_rand = ((uint64_t)idx+1)*PRIME_A + PRIME_B*(CmiMyPe()+1);
