@@ -187,6 +187,9 @@ static void m2m_pkt_dispatch (pami_context_t       context,
 
 
 void * CmiDirect_manytomany_allocate_handle () {  
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+    CmiAbort("!!!!!!!!!Please build Charm++ with async in order to use many-to-many interface\n");
+#else 
   if (!CpvInitialized(_handle))
     CpvInitialize(PAMICmiDirectM2mHandle*, _handle);
   if (!CpvInitialized(_completion_handler))
@@ -201,6 +204,7 @@ void * CmiDirect_manytomany_allocate_handle () {
   
   //printf ("allocate_handle on rank %d %p\n", CmiMyPe(), CpvAccess(_handle));
   return CpvAccess(_handle);
+#endif
 }
 
 
@@ -212,6 +216,9 @@ void   CmiDirect_manytomany_initialize_recvbase(void                 * h,
 						unsigned               nranks,
 						unsigned               myIdx )
 {
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+    CmiAbort("!!!!!!!!!Please build Charm++ with async in order to use many-to-many interface\n");
+#else 
   PAMICmiDirectM2mHandle *handle = &(((PAMICmiDirectM2mHandle *) h)[tag]);
   //PAMICmiDirectM2mHandle *handle = &(CpvAccess(_handle)[tag]);
 
@@ -249,6 +256,7 @@ void   CmiDirect_manytomany_initialize_recvbase(void                 * h,
   //CmiDirect_manytomany_initialize_recv (h, tag,  myIdx, 0, 0, CmiMyPe());
   //}
   handle->m2m_rrankIndex = myIdx;
+#endif
 }
 
 void   CmiDirect_manytomany_initialize_recv ( void          * h,
@@ -258,6 +266,9 @@ void   CmiDirect_manytomany_initialize_recv ( void          * h,
 					      unsigned        bytes,
 					      unsigned        rank )
 {
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+    CmiAbort("!!!!!!!!!Please build Charm++ with async in order to use many-to-many interface\n");
+#else 
   PAMICmiDirectM2mHandle *handle = &(((PAMICmiDirectM2mHandle *) h)[tag]);
   assert ( tag < MAX_CONN  );
   
@@ -266,6 +277,7 @@ void   CmiDirect_manytomany_initialize_recv ( void          * h,
 
   handle->m2m_rcvlens  [idx]   = bytes;
   handle->m2m_rdispls  [idx]   = displ;
+#endif
 }
 
 
@@ -277,6 +289,9 @@ void   CmiDirect_manytomany_initialize_sendbase( void                 * h,
 						 unsigned               nranks,
 						 unsigned               myIdx )
 {
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+    CmiAbort("!!!!!!!!!Please build Charm++ with async in order to use many-to-many interface\n");
+#else 
   PAMICmiDirectM2mHandle *handle = &(((PAMICmiDirectM2mHandle *) h)[tag]);
   assert ( tag < MAX_CONN  );
   handle->m2m_sndbuf       = sndbuf;
@@ -350,6 +365,7 @@ void   CmiDirect_manytomany_initialize_sendbase( void                 * h,
   handle->swork[0].context = MY_CONTEXT();
   PAMIX_CONTEXT_UNLOCK(MY_CONTEXT());
 #endif
+#endif
 }
 
 #define PRIME_A  3010349UL
@@ -362,6 +378,9 @@ void   CmiDirect_manytomany_initialize_send ( void        * h,
 					      unsigned      bytes,
 					      unsigned      pe )
 {
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+    CmiAbort("!!!!!!!!!Please build Charm++ with async in order to use many-to-many interface\n");
+#else 
   PAMICmiDirectM2mHandle *handle = &(((PAMICmiDirectM2mHandle *) h)[tag]);
   assert ( tag < MAX_CONN  );  
   handle->m2m_sndlens    [idx]   = bytes;
@@ -377,7 +396,7 @@ void   CmiDirect_manytomany_initialize_send ( void        * h,
 #else
   size_t dst_context = 0;
 #endif
-  PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)CmiGetNodeGlobal(CmiNodeOf(pe),CmiMyPartition()), 
+  PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)CmiNodeOf(pe), 
 			dst_context, &target);
   handle->m2m_node_eps   [idx]   = target;
 
@@ -391,6 +410,7 @@ void   CmiDirect_manytomany_initialize_send ( void        * h,
   handle->m2m_hdrs[idx].connid   = tag;  
   handle->m2m_hdrs[idx].dstrank  = lrank; 
   handle->m2m_hdrs[idx].srcindex = handle->m2m_srankIndex;
+#endif
 }
 
 static void  _internal_machine_send   ( pami_context_t      context, 
@@ -504,6 +524,9 @@ void _cmidirect_m2m_initialize (pami_context_t *contexts, int nc) {
 
 void   CmiDirect_manytomany_start ( void       * h,
 				    unsigned     tag ) {
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+    CmiAbort("!!!!!!!!!Please build Charm++ with async in order to use many-to-many interface\n");
+#else 
   PAMICmiDirectM2mHandle *handle = &(((PAMICmiDirectM2mHandle *) h)[tag]);
   assert (tag < MAX_CONN);
 
@@ -531,5 +554,6 @@ void   CmiDirect_manytomany_start ( void       * h,
   PAMIX_CONTEXT_LOCK(MY_CONTEXT());
   _cmidirect_m2m_send_post_handler (MY_CONTEXT(), &handle->swork[0]);
   PAMIX_CONTEXT_UNLOCK(MY_CONTEXT());
+#endif
 #endif
 }
