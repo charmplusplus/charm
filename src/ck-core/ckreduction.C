@@ -472,6 +472,10 @@ void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){}
 #endif
 
 void CkReductionMgr::checkIsActive() {
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  return;
+#endif
+
   // Check the number of kids in the inactivelist before or at this redNo
   std::map<int, int>::iterator it;
   int c_inactive = 0;
@@ -549,6 +553,13 @@ void CkReductionMgr::informParentInactive() {
 *  for the specified red_no
 */
 void CkReductionMgr::sendReductionStartingToKids(int red_no) {
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  for (int k=0;k<treeKids();k++)
+  {
+    DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
+    thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
+  }
+#else
   std::map<int, int>::iterator it;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= red_no) {
@@ -557,6 +568,7 @@ void CkReductionMgr::sendReductionStartingToKids(int red_no) {
       thisProxy[it->first].ReductionStarting(new CkReductionNumberMsg(red_no));
     }
   }
+#endif
 }
 
 
