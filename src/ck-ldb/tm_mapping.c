@@ -153,7 +153,7 @@ void init_comm(char *filename,int N,double **comm){
     }
     printf("\n");
     } */
-
+  fclose(pf);
 }    
 
 int  build_comm(char *filename,double ***pcomm){
@@ -388,10 +388,26 @@ void map_MPIPP(tm_topology_t *topology,int nb_seed,int N,int *Value,double **com
 
     }while(max>0);
     
+    if (sol != NULL) {
+      free(sol);
+      sol = NULL;
+    }
     sol=generate_random_sol(topology,N,topology->nb_levels-1,seed++);
 
   }
+  if (sol != NULL) {
+    free(sol);
+    sol = NULL;
+  }
+  free(state);
+  free(temp);
 
+  for(i=0;i<N;i++){
+    free(history[i]);
+    free(gain[i]);
+  }
+  free(history);
+  free(gain);
 }
   
 
