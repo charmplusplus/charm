@@ -48,8 +48,10 @@ class GroupIdxArray {
   // common case to be inlined.
   dtype& nonInlineFind(CkGroupID n) {
 #if CMK_ERROR_CHECKING
-      if (n.idx==0) {CkAbort("Group ID is zero-- invalid!\n"); dtype *nul=NULL; return *nul;}
-      else 
+      if (n.idx==0) {
+        CkAbort("Group ID is zero-- invalid!\n");
+        return *(new dtype);
+      } else
 #endif
       if (n.idx>=max) { /* Extend processor 0's group table */
         dtype *oldtab=tab;

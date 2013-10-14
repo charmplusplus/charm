@@ -276,10 +276,17 @@ static void CmiAddCLA(const char *arg,const char *param,const char *desc) {
 	else { /* Printf doesn't work yet-- just add to the list.
 		This assumes the const char *'s are static references,
 		which is probably reasonable. */
+                CLA *temp;
 		i=CLAlistLen++;
 		if (CLAlistLen>CLAlistMax) { /*Grow the CLA list */
 			CLAlistMax=16+2*CLAlistLen;
-			CLAlist=realloc(CLAlist,sizeof(CLA)*CLAlistMax);\
+			temp=realloc(CLAlist,sizeof(CLA)*CLAlistMax);
+                        if(temp != NULL) {
+			  CLAlist=temp;
+                        } else {
+                          free(CLAlist);
+                          CmiAbort("Reallocation failed for CLAlist\n");
+                        }
 		}
 		CLAlist[i].arg=arg;
 		CLAlist[i].param=param;

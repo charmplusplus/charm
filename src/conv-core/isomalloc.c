@@ -1692,7 +1692,7 @@ typedef struct {
 /*Estimate the top of the current stack*/
 static void *__cur_stack_frame(void)
 {
-  char __dummy;
+  char __dummy = 'A';
   void *top_of_stack=(void *)&__dummy;
   return top_of_stack;
 }
