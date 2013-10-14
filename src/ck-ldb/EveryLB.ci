@@ -36,6 +36,7 @@ module EveryLB {
   extern module TopoLB;
   extern module TempAwareRefineLB;
   extern module TempAwareCommLB;
+  extern module DistributedLB;
 
   initnode void initEveryLB(void);
 };

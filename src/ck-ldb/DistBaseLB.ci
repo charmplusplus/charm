@@ -1,0 +1,16 @@
+module DistBaseLB {
+
+extern module LBDatabase;
+extern module BaseLB;
+
+
+group [migratable] DistBaseLB: BaseLB {
+  entry void DistBaseLB(const CkLBOptions &);  
+  entry void LoadBalance();
+  entry [reductiontarget] void barrierDone();
+	entry void AtSync();
+  entry void ResumeClients(CkReductionMsg *msg);
+  entry void ResumeClients(int balancing);
+};
+
+};

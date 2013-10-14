@@ -230,7 +230,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefinerTemp.h Refiner.h RefinerApprox.h RefinerComm.h ckgraphTemp.h ckgraph.h ckheap.h \
           elements.h CommLBHeap.h topology.h manager.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h \
-	  NborBaseLB.h HybridBaseLB.h HybridLBMsg.h \
+	  NborBaseLB.h DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
 	  NeighborLBMsg.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
@@ -239,7 +239,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkMemCheckpoint.decl.h \
           LBDatabase.decl.h MetaBalancer.decl.h CentralLB.decl.h NullLB.decl.h \
           BaseLB.decl.h \
-	  NborBaseLB.decl.h \
+	  NborBaseLB.decl.h DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
           charisma.decl.h TraceSummary.decl.h TraceProjections.decl.h TraceAutoPerf.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
@@ -663,7 +663,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o ckobjid.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
-	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o \
+	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o DistBaseLB.o \
            ckgraphTemp.o ckgraph.o LButil.o RefinerTemp.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) modifyScheduler.o \

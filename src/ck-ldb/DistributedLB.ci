@@ -1,0 +1,16 @@
+module DistributedLB {
+
+extern module DistBaseLB;
+initnode void lbinit(void);
+
+group [migratable] DistributedLB : DistBaseLB {
+  entry void DistributedLB(const CkLBOptions &);  
+  entry void GossipLoadInfo(int req_hop, int pe, int n, int pe_no[n], double load[n]);
+  entry [reductiontarget] void AvgLoadReduction(double x);
+  entry void DoneGossip();
+  entry [expedited] void InformMigration(int obj_id, int from_pe, double obj_load, bool force);
+  entry [expedited] void RecvAck(int obj_id, int assigned_pe, bool can_accept);
+  entry void SendAfterBarrier(CkReductionMsg *msg);
+};
+
+};

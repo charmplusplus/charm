@@ -21,6 +21,8 @@ CommLB.decl.h CommLB.def.h: CommLB.ci.stamp
 CommonLBs.decl.h CommonLBs.def.h: CommonLBs.ci.stamp
 ControlPoints.decl.h ControlPoints.def.h: controlPoints.ci.stamp
 ControlPointsNoTrace.decl.h ControlPointsNoTrace.def.h: controlPointsNoTrace.ci.stamp
+DistBaseLB.decl.h DistBaseLB.def.h: DistBaseLB.ci.stamp
+DistributedLB.decl.h DistributedLB.def.h: DistributedLB.ci.stamp
 DummyLB.decl.h DummyLB.def.h: DummyLB.ci.stamp
 EveryLB.decl.h EveryLB.def.h: EveryLB.ci.stamp
 f90main.decl.h f90main.def.h: f90main.ci.stamp
