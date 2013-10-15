@@ -71,7 +71,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
 }
 
 /*global*/ CkReduction::reducerType lbDataCollectionType;
-/*initcall*/ void registerLBDataCollection(void) {
+/*initnode*/ void registerLBDataCollection(void) {
   lbDataCollectionType = CkReduction::addReducer(lbDataCollection);
 }
 

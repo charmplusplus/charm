@@ -154,9 +154,9 @@ static int reflector=0;
 void marshall_init(void)
 {
   if (marshallInitVal!=0x1234567)
-	CkAbort("initcall marshallInit never got called!\n");
+	CkAbort("initnode marshallInit never got called!\n");
   if (eltInitVal!=0x54321)
-	CkAbort("initcall marshallElt::eltInit never got called!\n");
+	CkAbort("initnode marshallElt::eltInit never got called!\n");
   reflector++;
   for (int i=0;i<numElements;i++)
   	arrayProxy[(i+reflector)%numElements].reflectMarshall(i);

@@ -51,7 +51,7 @@ static void ArmciDefaultSetup(void) {
 
 CtvDeclare(ArmciVirtualProcessor *, _armci_ptr);
 
-// Node initialization (made by initcall of the module armci)
+// Node initialization (made by initproc of the module armci)
 void armciProcInit(void) {
   CtvInitialize(ArmciVirtualProcessor, _armci_ptr);
   CtvAccess(_armci_ptr) = NULL;
