@@ -5,6 +5,9 @@
 
 #include "DistributedLB.h"
 
+#include <math.h>
+#include <time.h>
+
 #include "elements.h"
 
 CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
