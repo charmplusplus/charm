@@ -56,6 +56,7 @@ private:
   double kTransferThreshold;
   int kPartialInfoCount;
   int kMaxTrials;
+  int kMaxGossipMsgCount;
 
   int gossip_msg_count;
   bool lb_started;

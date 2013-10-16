@@ -5,9 +5,6 @@
 
 #include "DistributedLB.h"
 
-#include <math.h>
-#include <time.h>
-
 #include "elements.h"
 
 CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
@@ -39,6 +36,8 @@ void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
   // Maximum number of times we will try to find a PE to transfer an object
   // successfully
   kMaxTrials = CkNumPes();
+  // Max gossip messages sent from each PE
+  kMaxGossipMsgCount = 2 * CmiLog2(CkNumPes());
  
   my_stats = stats;
 
@@ -57,7 +56,7 @@ void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
   gossip_msg_count = 0;
   negack_count = 0;
 
-  srand(time(NULL) + CkMyPe());
+  srand((unsigned)(CmiWallTimer()*1.0e06) + CkMyPe());
   // Use reduction to obtain the average load in the system
   CkCallback cb(CkReductionTarget(DistributedLB, AvgLoadReduction), thisProxy);
   contribute(sizeof(double), &my_load, CkReduction::sum_double, cb);
@@ -152,7 +151,7 @@ void DistributedLB::SendLoadInfo() {
   // TODO: Keep it 0.8*log
   // This PE has already sent the maximum set threshold for gossip messages.
   // Hence don't send out any more messages. This is to prevent flooding.
-  if (gossip_msg_count > 2*log2(CkNumPes())) {
+  if (gossip_msg_count > kMaxGossipMsgCount) {
     return;
   }
 
