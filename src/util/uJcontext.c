@@ -32,7 +32,7 @@
 
 /* Return an approximation of the top of the stack */
 static void *getStack(void) {
-	int x = 'A';
+	int x = 0;
         void *p=&x;
 	return p;
 }
@@ -122,7 +122,7 @@ int setJcontext (const uJcontext_t *u)
 #elif 0 /* Blue Gene/Light gcc PPC assembly version: */
 			asm __volatile__ ("mr 1,%0" :: "r"(new_sp));
 #else /* Portable alloca version */
-			char *old_sp;
+			char *old_sp = NULL;
 			register CmiInt8 allocLen;
 			old_sp =  (char *)&old_sp;
 			allocLen=old_sp-new_sp;
