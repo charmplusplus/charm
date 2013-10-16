@@ -102,7 +102,12 @@
 #define PVT_DEBUG_BUFFER_LINE_LENGTH 1
 
 #if USE_LONG_TIMESTAMPS 
+#include "conv-autoconfig.h"
+#if CMK_LONG_LONG_DEFINED
+typedef long long int POSE_TimeType;
+#else
 typedef CmiInt8 POSE_TimeType;
+#endif
 //we'd like to set UnsetTS to a very large negative value with some
 //wiggle room for underflow.  But there are many maddeningly hard to
 //find things which quietly break if its not -1.
