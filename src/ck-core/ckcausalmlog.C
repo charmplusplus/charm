@@ -3964,7 +3964,7 @@ MCount ChareMlogData::searchRestoredLocalQ(CkObjID &sender,CkObjID &recver,MCoun
  * Then, we only support one failure at a time. Read Sayantan's thesis, sections 4.2 and 4.3 for more details.
  */
 void ChareMlogData::pup(PUP::er &p){
-	int tCountAux;
+	int tCountAux = 0;
 	int startSize=0;
 	char nameStr[100];
 	if(p.isSizing()){
