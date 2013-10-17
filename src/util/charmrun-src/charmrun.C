@@ -1700,7 +1700,7 @@ FILE *gdb_stream=NULL;
 #define REQ_FAILED -1
 
 #ifdef HSTART
-int req_reply_child(SOCKET fd, char *type, 
+int req_reply_child(SOCKET fd, const char *type, 
 	      const char *data, int dataLen)
 {
 
@@ -1715,7 +1715,7 @@ int req_reply_child(SOCKET fd, char *type,
 /**
  * @brief This is the only place where charmrun talks back to anyone. 
  */
-int req_reply(SOCKET fd, char *type, 
+int req_reply(SOCKET fd, const char *type, 
 	      const char *data, int dataLen)
 {
 	ChMessageHeader msg;
