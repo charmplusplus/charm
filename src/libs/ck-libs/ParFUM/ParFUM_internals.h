@@ -1736,9 +1736,9 @@ class FEM_chunk
   int thisIndex;
 
 #if CMK_ERROR_CHECKING /* Skip the check, for speed. */
-  inline void check(const char *where) { }
-#else /* Do an extensive self-check */
   void check(const char *where);
+#else /* Do an extensive self-check */
+  inline void check(const char *where) { }
 #endif
 
  private:
