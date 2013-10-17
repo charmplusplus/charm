@@ -1034,7 +1034,7 @@ char *nodetab_file_find()
 }
 
 typedef struct nodetab_host {
-  char    *name;  /*Host DNS name*/
+  const char    *name;  /*Host DNS name*/
   skt_ip_t ip; /*IP address of host*/
   pathfixlist pathfixes;
   char    *ext;  /*FIXME: What the heck is this?  OSL 9/8/00*/
@@ -1361,7 +1361,7 @@ nodetab_host *nodetab_getnodeinfo(int i)
 }
 
 /*These routines all take *PE* numbers (NOT node numbers!)*/
-char        *nodetab_name(int i)     { return nodetab_getinfo(i)->name; }
+const char  *nodetab_name(int i)     { return nodetab_getinfo(i)->name; }
 pathfixlist  nodetab_pathfixes(int i){ return nodetab_getinfo(i)->pathfixes; }
 char        *nodetab_ext(int i)      { return nodetab_getinfo(i)->ext; }
 skt_ip_t     nodetab_ip(int i)       { return nodetab_getinfo(i)->ip; }
@@ -4558,7 +4558,7 @@ void start_nodes_mpiexec()
 
 void finish_set_nodes(int start, int stop) {
 	int status,done,i;
-	char *host;
+	const char *host;
 
 	if (!rsh_pids) return; /*nothing to do*/
 
