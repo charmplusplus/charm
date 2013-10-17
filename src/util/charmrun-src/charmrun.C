@@ -233,6 +233,7 @@ char *pathextfix(char *path, pathfixlist fixes, char *ext)
   ret = (char *)malloc(strlen(newpath)+strlen(ext)+2);
   strcpy(ret, newpath);
   strcat(ret, ext);
+  free(newpath);
   return ret;
 }
 
@@ -1257,6 +1258,7 @@ void nodetab_init()
     fprintf(stderr,"ERROR> Cannot read %s: %s\n",nodesfile,strerror(errno));
     exit(1);
   }
+  free(nodesfile);
  
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if(arg_read_pes == 0){
@@ -1457,13 +1459,26 @@ char *input_buffer;
 void input_extend()
 {
   char line[1024];
+  char* new_input_buffer;
   int len = input_buffer?strlen(input_buffer):0;
   fflush(stdout);
   if (fgets(line, 1023, stdin)==0) { 
     fprintf(stderr,"end-of-file on stdin");
     exit(1);
   }
-  input_buffer = (char*)realloc(input_buffer, len + strlen(line) + 1);
+  new_input_buffer = (char*)realloc(input_buffer, len + strlen(line) + 1);
+  if(new_input_buffer == NULL)
+  {
+    // could not realloc
+    free(input_buffer);
+    fprintf(stderr,"Charmrun: Realloc failed");
+    exit(1);
+  }
+  else
+  {
+	  input_buffer = new_input_buffer;
+  }
+
   strcpy(input_buffer+len, line);
 }
 
@@ -3555,13 +3570,13 @@ void start_nodes_daemon(void)
     
     arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeNumber));
 	strcpy(task.cwd,arg_currdir_r);
-
+	free(arg_currdir_r);
     arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(nodeNumber), nodetab_ext(nodeNumber));
     strcpy(task.pgm,arg_nodeprog_r);
 
 if (arg_verbose)
   printf("Charmrun> Starting node program %d on '%s' as %s.\n",nodeNumber,nodetab_name(pe0), arg_nodeprog_r);
-
+	free(arg_nodeprog_r);
 sprintf(task.env,"NETSTART=%s",create_netstart(nodeNumber));
 
 if (nodetab_nice(nodeNumber) != -100) {
@@ -4247,6 +4262,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
      "  Exit 1\n"
      "fi\n");
   fprintf(f,"Exit 0\n");
+  free(arg_currdir_r);
 }
 
 
