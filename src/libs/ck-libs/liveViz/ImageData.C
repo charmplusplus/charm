@@ -602,8 +602,8 @@ int ImageData::CombineImageDataSize (int nMsg, CkReductionMsg **msgs)
         else
         {
             prevHead = (LineHeader*)(buff + headPos);
-            memcpy (prevHead,
-                    minHead,
+            memcpy ((void*) prevHead,
+                    (void*) minHead,
                     sizeof (LineHeader));
             headPos += sizeof (LineHeader);
             numDataLines ++;
@@ -644,7 +644,7 @@ int ImageData::CombineImageDataSize (int nMsg, CkReductionMsg **msgs)
                 else
                 {
                     prevHead = (LineHeader*)(buff + headPos);
-                    memcpy (prevHead, minHead, sizeof (LineHeader));
+                    memcpy ((void*)prevHead, (void*)minHead, sizeof (LineHeader));
                     numPixels += ((LineHeader*)(buff+headPos))->m_size;
                     headPos += sizeof (LineHeader);
                     minHead ++; //+= sizeof (LineHeader);

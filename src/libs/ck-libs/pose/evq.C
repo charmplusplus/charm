@@ -496,7 +496,7 @@ char *eventQueue::dumpString() {
   }
   char *eqs=eqh->dumpString();
   strncat(str, eqs, PVT_DEBUG_BUFFER_LINE_LENGTH);
-  delete eqs;
+  delete [] eqs;
   strncat(str, "end EVQ]", PVT_DEBUG_BUFFER_LINE_LENGTH);
   return str;
 }

@@ -273,8 +273,7 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
         //in this mode, it's always synced
         sync = 1;
     }
-
-    curLoop->stealWork();
+    if(curLoop) curLoop->stealWork();
     TRACE_BRACKET(CKLOOP_TOTAL_WORK_EVENTID);
 
     //printf("[%d]: parallelize func %p with [%d ~ %d] divided into %d chunks using loop=%p\n", CkMyPe(), func, lowerRange, upperRange, numChunks, curLoop);

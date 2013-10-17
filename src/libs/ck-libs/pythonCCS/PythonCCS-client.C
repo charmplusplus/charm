@@ -92,7 +92,7 @@ int PythonExecute::size() {
 
 char *PythonExecute::pack() {
   void *memory = malloc(size());
-  memcpy (memory, this, sizeof(PythonExecute));
+  memcpy (memory, (void*) this, sizeof(PythonExecute));
   char *ptr = (char*)memory+sizeof(PythonExecute);
   if (codeLength) {
     memcpy (ptr, code.code, codeLength+1);

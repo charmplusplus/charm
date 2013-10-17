@@ -544,10 +544,11 @@ char *SRtable::dumpString() {
   while (tmp) {
     char *stemp=tmp->dumpString();
     strcat(str, stemp);
-    delete stemp;
+    delete [] stemp;
     tmp = tmp->next;
   }
   strncat(str, "]", PVT_DEBUG_BUFFER_LINE_LENGTH);
+  delete [] tempStr;
   return str;
 }
 

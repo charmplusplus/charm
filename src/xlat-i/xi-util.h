@@ -81,6 +81,7 @@ class Printable {
     //This lets us cast printables to XStr
     operator XStr () {XStr ret;print(ret);return ret;}
     //These let us stream Printables to XStr.
+    virtual ~Printable(){}
     friend XStr & operator << (XStr &str,Printable &p) {p.print(str);return str;}
     friend XStr & operator << (XStr &str,Printable *p) {p->print(str);return str;}
 };
@@ -91,7 +92,6 @@ void templateGuardEnd(XStr &str);
  inline void indentBy(XStr& s, int num) {
    for (int i = 0; i < num; i++) s << "  ";
  }
-
 }
 
 #endif

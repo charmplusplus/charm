@@ -125,7 +125,7 @@ void setTableReferences(TopModel* model, bool recomputeHash=false)
  */
 TopModel* topModel_Create_Init(){
   TopModel* model = new TopModel;
-  memset(model, 0, sizeof(TopModel));
+  memset((void*) model, 0, sizeof(TopModel));
   
   model->nodeIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
   model->elemIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
@@ -213,7 +213,7 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
     CkAssert(node_attr_sz > 0);
     int which_mesh=FEM_Mesh_default_read();
     TopModel *model = new TopModel;
-    memset(model, 0, sizeof(TopModel));
+    memset((void*) model, 0, sizeof(TopModel));
 
     model->target_device = target_device;
     model->elem_attr_size = elem_attr_sz;

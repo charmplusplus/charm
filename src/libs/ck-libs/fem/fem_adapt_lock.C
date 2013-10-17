@@ -1277,6 +1277,9 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	  if(nnsize!=0) free(nnNodes);
 	  if(nncount!=0) delete [] lockw;
 	  if(nncount!=0) delete [] gotlocks;
+	  free(conn);
+	  free(adjnodes);
+	  free(adjelems);
 	  return ERVAL;
 	}
 	CthYield();
@@ -1289,6 +1292,9 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
     if(nncount!=0) delete [] lockw;
     if(nncount!=0) delete [] gotlocks;
     if(numtries>=3 && !done) return ERVAL;
+    free(conn);
+    free(adjnodes);
+    free(adjelems);
   }
 
 

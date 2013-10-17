@@ -212,14 +212,14 @@ char *HeapNode::dumpString() {
   if (left) {
     char *lstring=left->dumpString();
     strncat(str, lstring, PVT_DEBUG_BUFFER_LINE_LENGTH);
-    delete lstring;
+    delete [] lstring;
   } else {
     strncat(str, "[NULL] ",  PVT_DEBUG_BUFFER_LINE_LENGTH);
   }
   if (right) {
     char *rstring=right->dumpString();
     strncat(str, rstring, PVT_DEBUG_BUFFER_LINE_LENGTH);
-    delete rstring;
+    delete [] rstring;
   } else {
     strncat(str, "[NULL]", PVT_DEBUG_BUFFER_LINE_LENGTH);
   }

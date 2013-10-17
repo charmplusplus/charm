@@ -701,7 +701,7 @@ void BgTimeLineRec::pup(PUP::er &p)
 
 void BgTimeLineRec::winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, int& tLineLength) {
 
-  int l;
+  int l=0;
 
   if (!p.isUnpacking()) {
 

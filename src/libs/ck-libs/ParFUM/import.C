@@ -336,6 +336,7 @@ void ParFUM_createComm(int meshid, int dim, MPI_Comm comm)
   if (rank==0) CkPrintf("Making ghosts...\n");
   makeGhosts(mesh,comm,0,gdata->numLayers,gdata->layers);
   //MPI_Barrier(MPI_COMM_WORLD);
+  delete gdata;
 }
 
 void ParFUM_import_nodes(int meshid, int numNodes, double *nodeCoords, int dim)
