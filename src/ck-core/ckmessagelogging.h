@@ -60,7 +60,11 @@ public:
 
         ~RSSN()
         {
-          delete data;
+          if(data != NULL)
+          {
+            delete []data;
+            data = NULL;
+          }
         }
 
 	// Checks if a particular SSN is already in the data; if not, stores it		
