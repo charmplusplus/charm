@@ -306,7 +306,7 @@ Agent::Elem* MulticastAgent::my_preferred_procs(int *existing_map,int object,int
   double * comcosts = new double [npes];
   memset(comcosts, 0, sizeof(double)*npes);
   double alpha = _lb_args.alpha();
-  double beeta = _lb_args.beeta();
+  double beta = _lb_args.beta();
 
     // all multicast this object belongs to
   CkVec<int> &mlist = objmap[object];
@@ -317,7 +317,7 @@ Agent::Elem* MulticastAgent::my_preferred_procs(int *existing_map,int object,int
      for (int obj=0; obj<minfo.objs.size(); obj++) {
        int pe = existing_map[obj];
        if (pe == -1) continue;		// not assigned yet
-       comcosts[pe] += minfo.messages * alpha + minfo.nbytes * beeta;
+       comcosts[pe] += minfo.messages * alpha + minfo.nbytes * beta;
      }
   }
   // find number of processors with non-0 cost

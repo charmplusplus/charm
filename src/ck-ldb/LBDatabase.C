@@ -278,12 +278,12 @@ void _loadbalancerInit()
 	_lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB",
 		"Turn on MetaBalancer");
 
-  // set alpha and beeta
+  // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
-  _lb_args.beeta() = PER_BYTE_SEND_OVERHEAD_DEFAULT;
+  _lb_args.beta() = PER_BYTE_SEND_OVERHEAD_DEFAULT;
   CmiGetArgDoubleDesc(argv,"+LBAlpha", &_lb_args.alpha(),
                            "per message send overhead");
-  CmiGetArgDoubleDesc(argv,"+LBBeta", &_lb_args.beeta(),
+  CmiGetArgDoubleDesc(argv,"+LBBeta", &_lb_args.beta(),
                            "per byte send overhead");
 
   if (CkMyPe() == 0) {
@@ -291,7 +291,7 @@ void _loadbalancerInit()
       CmiPrintf("CharmLB> Verbose level %d, load balancing period: %g seconds\n", _lb_args.debug(), _lb_args.lbperiod());
     }
     if (_lb_args.debug() > 1) {
-      CmiPrintf("CharmLB> Topology %s alpha: %es beta: %es.\n", _lbtopo, _lb_args.alpha(), _lb_args.beeta());
+      CmiPrintf("CharmLB> Topology %s alpha: %es beta: %es.\n", _lbtopo, _lb_args.alpha(), _lb_args.beta());
     }
     if (_lb_args.printSummary())
       CmiPrintf("CharmLB> Load balancer print summary of load balancing result.\n");

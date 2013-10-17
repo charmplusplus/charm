@@ -17,7 +17,7 @@
 #include "CommLB.h"
 
 #define alpha 35e-6
-#define beeta 8.5e-9
+#define beta 8.5e-9
 
 #define LOWER_FACTOR 0.33
 #define UPPER_FACTOR 0.67
@@ -77,7 +77,7 @@ double CommLB::compute_cost(int id, int pe, int n_alloc, int &com_msg, int &com_
     com_data += ptr->data;
     com_msg += ptr->nmsg;
   }
-  com_cost = weight * (alpha*(com_msg + alloc_array[pe][nobj].nmsg) + beeta*(com_data + alloc_array[pe][nobj].nbyte));
+  com_cost = weight * (alpha*(com_msg + alloc_array[pe][nobj].nmsg) + beta*(com_data + alloc_array[pe][nobj].nbyte));
 //  CkPrintf("%d, %d \n",com_data,com_msg);
   total_cost = alloc_array[pe][nobj].load + com_cost;
   return total_cost;

@@ -21,7 +21,7 @@ class CkLBArgs
 private:
   double _autoLbPeriod;		// in seconds
   double _lb_alpha;		// per message send overhead
-  double _lb_beeta;		// per byte send overhead
+  double _lb_beta;		// per byte send overhead
   int _lb_debug;		// 1 or greater
   int _lb_printsumamry;		// print summary
   int _lb_loop;                 // use multiple load balancers in loop
@@ -69,7 +69,7 @@ public:
   inline int & traceComm() { return _lb_traceComm; }
   inline int & central_pe() { return _lb_central_pe; }
   inline double & alpha() { return _lb_alpha; }
-  inline double & beeta() { return _lb_beeta; }
+  inline double & beta() { return _lb_beta; }
   inline int & percentMovesAllowed() { return _lb_percentMovesAllowed;}
   inline int & metaLbOn() {return _lb_metaLbOn;}
 };

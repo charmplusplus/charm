@@ -25,7 +25,7 @@ void GreedyCommLB::init()
 {
     lbname = (char*)"GreedyCommLB";
     alpha = _lb_args.alpha();
-    beeta = _lb_args.beeta();
+    beta = _lb_args.beta();
     manager_init();
 }
 
@@ -71,7 +71,7 @@ double GreedyCommLB::compute_com(LDStats* stats, int id, int pe){
 	com_msg += ptr->nmsg;
     }
     
-    total_time = alpha*com_msg + beeta*com_data;
+    total_time = alpha*com_msg + beta*com_data;
     return total_time;
 }
 
@@ -88,7 +88,7 @@ void GreedyCommLB::update(LDStats* stats, int id, int pe){
 	    continue;
 	int com_data = ptr->data;
 	int com_msg = ptr->nmsg;
-        double com_time = alpha*com_msg + beeta*com_data;
+        double com_time = alpha*com_msg + beta*com_data;
         processors[destPe].load += com_time;
     }
 }
@@ -267,7 +267,7 @@ void GreedyCommLB::work(LDStats* stats)
 	  int destPe = stats->to_proc[destObj];
 	  if(stats->procs[destPe].available == 0) continue;
 	  
-	  double cload = alpha*ptr->nmsg + beeta*ptr->data;
+	  double cload = alpha*ptr->nmsg + beta*ptr->data;
 	  pe_comm[destPe] += cload;
 	  commload += cload;
 

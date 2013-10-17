@@ -65,7 +65,7 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 	clear();
 
 	double alpha = _lb_args.alpha();
-	double beeta = _lb_args.beeta();
+	double beta = _lb_args.beta();
 
         minObjLoad = 1.0e20;  // I suppose no object load is beyond this
 	maxObjLoad = 0.0;
@@ -173,7 +173,7 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 		double comload = msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
 			      msgSentCount[i]  * alpha +
 			      byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
-			      byteSentCount[i] * beeta;
+			      byteSentCount[i] * beta;
 		peLoads[i] += comload;
 		if (comLoads) comLoads[i] += comload;
 		msgCount += msgRecvCount[i] + msgSentCount[i];

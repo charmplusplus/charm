@@ -43,7 +43,7 @@ private:
   void add_graph(int x, int y, int data, int nmsg);
   void update(LDStats* stats, int id, int pe);
 
-  double alpha, beeta;
+  double alpha, beta;
 };
 
 #endif
