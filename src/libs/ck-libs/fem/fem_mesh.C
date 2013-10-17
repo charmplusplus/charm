@@ -1831,7 +1831,7 @@ int FEM_Mesh::nElems(int t_max) const //Return total number of elements before t
 int FEM_Mesh::getGlobalElem(int elType,int elNo) const
 {
 	int base=nElems(elType); //Global number of first element of this type
-#ifndef CMK_ERROR_CHECKING
+#if CMK_ERROR_CHECKING
 	if (elNo<0 || elNo>=elem[elType].size()) {
 		CkPrintf("FEM> Element number %d is invalid-- element type %d has only %d elements\n",
 			elNo,elType,elem[elType].size());
