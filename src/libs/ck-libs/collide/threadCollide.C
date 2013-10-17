@@ -40,7 +40,7 @@ class threadCollideMgr : public CBase_threadCollideMgr
 	CkVec<threadCollide *> contrib;
 	inline threadCollide *lookup(int chunkNo) {
 		threadCollide *ret=contrib[chunkNo];
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (ret==NULL) CkAbort("threadCollideMgr can't find contributor");
 #endif
 		return ret;
@@ -250,7 +250,7 @@ void threadCollideMgr::sift(int nColl,const Collision *colls)
 {
 	for (int i=0;i<nColl;i++) {
 		const Collision &c=colls[i];
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (c.A.pe!=myPe) CkAbort("Should only have local collisions now");
 #endif
 		lookup(c.A.chunk)->colls.push_back(c);
@@ -311,7 +311,7 @@ threadCollide *COLLIDE_Lookup(collide_t c) {
 	CkGroupID g; g.idx=c;
 	CProxy_threadCollide coll(g);
 	threadCollide *ret=coll[TCharm::get()->getElement()].ckLocal();
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if (ret==NULL) CkAbort("COLLIDE can't find its collision array element.");
 #endif	
 	return ret;

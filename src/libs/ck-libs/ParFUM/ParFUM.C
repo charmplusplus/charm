@@ -436,7 +436,7 @@ int *CkCopyArray(const int *src,int len,int indexBase)
 
 
 /***** Mesh getting and setting state ****/
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 void FEM_chunk::check(const char *where) {
 	// CkPrintf("[%d] FEM> %s\n",thisIndex,where);
 }

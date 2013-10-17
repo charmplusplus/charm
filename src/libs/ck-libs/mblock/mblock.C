@@ -309,7 +309,7 @@ MBlockChunk::send(int fid,const extrudeMethod &meth,const void *grid)
         for(int i=0;i<dsize[0];i++)	
 	{
 	  blockLoc from=so+i*iDir+j*jDir+k*kDir;
-#ifndef CMK_OPTIMIZE  /*Perform bounds check*/
+#if CMK_ERROR_CHECKING  /*Perform bounds check*/
 	  if (!src.contains(from))
 	    CkAbort("Read location out of bounds in mblock::MBlockChunk::send!\n");
 #endif
@@ -344,7 +344,7 @@ MBlockChunk::update_field(MBlockDataMsg *msg)
       for(int i=dest.start[0]; i<dest.end[0]; i++) 
       {
         char *dest = fStart+dim.c_index(i,j,k)*dt.distance;
-#ifndef CMK_OPTIMIZE /*Perform bounds check*/
+#if CMK_ERROR_CHECKING /*Perform bounds check*/
 	if (dest<aStart || dest>=aEnd)
 	  CkAbort("MBlockChunk::update_field would write out of bounds!\n");
 #endif

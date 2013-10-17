@@ -1735,7 +1735,7 @@ class FEM_chunk
   /// Global index (rank) in default communicator
   int thisIndex;
 
-#ifdef CMK_OPTIMIZE /* Skip the check, for speed. */
+#if CMK_ERROR_CHECKING /* Skip the check, for speed. */
   inline void check(const char *where) { }
 #else /* Do an extensive self-check */
   void check(const char *where);

@@ -20,7 +20,7 @@ void IDXL_Rec::pup(PUP::er &p)
 void IDXL_Rec::add(int chk,int idx) 
 {
 	int n=shares.size();
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if (chk<0 || chk>1000000)
 		CkAbort("FEM IDXL_Rec::add> Tried to add absurd chunk number!\n");
 #endif
