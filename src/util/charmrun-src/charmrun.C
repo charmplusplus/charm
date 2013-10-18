@@ -528,7 +528,7 @@ void pparam_delarg(int i)
     pparam_argv[j]=pparam_argv[j+1];
 }
 
-int pparam_countargs(char **argv)
+int pparam_countargs(const char **argv)
 {
   int argc;
   for (argc=0; argv[argc]; argc++);
@@ -669,7 +669,7 @@ dupargv (char **argv)
 #define MAX_NODES 1000
 #define MAX_LINE_LENGTH 1000
 
-char **arg_argv;
+const char **arg_argv;
 int    arg_argc;
 
 int   arg_requested_pes;
@@ -835,7 +835,7 @@ void arg_init(int argc, char **argv)
 #ifdef HSTART
   if (!arg_hierarchical_start || arg_child_charmrun)
 #endif
-  arg_argv = argv+1; /*Skip over charmrun (0) here and program name (1) later*/
+  arg_argv = const_cast<const char**>(argv)+1; /*Skip over charmrun (0) here and program name (1) later*/
   arg_argc = pparam_countargs(arg_argv);
   if (arg_argc<1) {
     fprintf(stderr,"ERROR> You must specify a node-program.\n");
@@ -1113,7 +1113,7 @@ void nodetab_add(nodetab_host *h)
   *nodetab_table[nodetab_size++] = *h;
 }
 
-void nodetab_makehost(char *name,nodetab_host *h)
+void nodetab_makehost(const char *name,nodetab_host *h)
 {
   h->name=strdup(name);
   h->ip = skt_innode_lookup_ip(name);
@@ -1199,7 +1199,7 @@ void nodetab_init_for_local()
   group.cpus = arg_ppn;
   i = 0;
   while (!done) {
-    char *hostname = "127.0.0.1";
+    const char *hostname = "127.0.0.1";
     for (group.rank = 0; group.rank<arg_ppn; group.rank++) {
       nodetab_makehost(hostname, &group);
       if (++i == arg_requested_pes) { done = 1; break; }
@@ -3938,7 +3938,7 @@ int rsh_fork(int nodeno,const char *startScript)
   return pid;
 }
 
-void fprint_arg(FILE *f,char **argv)
+void fprint_arg(FILE *f, const char **argv)
 {
   while (*argv) { 
   	fprintf(f," %s",*argv); 
@@ -3950,7 +3950,7 @@ void rsh_Find(FILE *f,const char *program,const char *dest)
     fprintf(f,"Find %s\n",program);
     fprintf(f,"%s=$loc\n",dest);
 }
-void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
+void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv, int restart)
 {
   char *netstart;
   char *arg_nodeprog_r,*arg_currdir_r;
@@ -4483,7 +4483,7 @@ void start_nodes_rsh()
 /* for mpiexec, for once calling mpiexec to start on all nodes  */
 int rsh_fork_one(const char *startScript)
 {
-  char **rshargv;
+  const char **rshargv;
   int pid;
   int num=0;
   char npes[128];
@@ -4495,7 +4495,7 @@ int rsh_fork_one(const char *startScript)
     num++;
     s = skipblanks(e); e = skipstuff(s);
   }
-  rshargv = (char **)malloc(sizeof(char *)*(num+8));
+  rshargv = (const char **)malloc(sizeof(char *)*(num+8));
 
   num = 0;
   s=nodetab_shell(0); e=skipstuff(s);
@@ -4520,7 +4520,7 @@ int rsh_fork_one(const char *startScript)
   /*  unlink(startScript); */
       //removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
       for(i=3; i<1024; i++) close(i);
-      execvp(rshargv[0], rshargv);
+      execvp(rshargv[0], const_cast<char * const *>(rshargv));
       fprintf(stderr,"Charmrun> Couldn't find mpiexec program '%s'!\n",rshargv[0]);
       exit(1);
   }
