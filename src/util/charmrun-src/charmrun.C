@@ -202,7 +202,7 @@ pathfixlist pathfix_append(char *s1, char *s2, pathfixlist l)
   return pf;
 }
 
-char *pathfix(char *path, pathfixlist fixes)
+char *pathfix(const char *path, pathfixlist fixes)
 {
   char buffer[MAXPATHLEN]; pathfixlist l; 
   char buf2[MAXPATHLEN]; 
@@ -225,7 +225,7 @@ char *pathfix(char *path, pathfixlist fixes)
   return strdup(buffer);
 }
 
-char *pathextfix(char *path, pathfixlist fixes, char *ext)
+char *pathextfix(const char *path, pathfixlist fixes, char *ext)
 {
   char *newpath = pathfix(path, fixes);
   char *ret;
@@ -370,7 +370,7 @@ typedef struct s_ppdef
 static ppdef ppdefs;
 
 static int     pparam_pos;
-static char  **pparam_argv;
+static const char  **pparam_argv;
 static char    pparam_optc='-';
 char           pparam_error[100];
 
@@ -438,7 +438,7 @@ void pparam_str(const char **where,const char *defValue,
   def->doc=doc;
 }
 
-static int pparam_setdef(ppdef def, char *value)
+static int pparam_setdef(ppdef def, const char *value)
 {
   char *p;
   switch(def->type)
@@ -538,7 +538,7 @@ int pparam_countargs(const char **argv)
 int pparam_parseopt()
 {
   int ok; ppdef def=NULL;
-  char *opt = pparam_argv[pparam_pos];
+  const char *opt = pparam_argv[pparam_pos];
   /* handle ++ by skipping to end */
   if ((opt[1]=='+')&&(opt[2]==0))
     {
@@ -610,7 +610,7 @@ int pparam_parseopt()
   return 0;
 }
 
-int pparam_parsecmd(char optchr, char **argv)
+int pparam_parsecmd(char optchr, const char **argv)
 {
   pparam_error[0]=0;
   pparam_argv = argv;
@@ -618,7 +618,7 @@ int pparam_parsecmd(char optchr, char **argv)
   pparam_pos  = 0;
   while(1)
     {
-      char *opt = pparam_argv[pparam_pos];
+      const char *opt = pparam_argv[pparam_pos];
       if (opt==0) break;
       if (opt[0]!=optchr) pparam_pos++;
       else if (pparam_parseopt()<0) return -1;
@@ -718,8 +718,8 @@ const char *arg_mylogin;
 int   arg_mpiexec;
 int   arg_no_va_rand;
 
-char *arg_nodeprog_a;
-char *arg_nodeprog_r;
+const char *arg_nodeprog_a;
+const char *arg_nodeprog_r;
 char *arg_currdir_a;
 char *arg_currdir_r;
 
@@ -735,7 +735,7 @@ int   arg_singlemaster;
 int   arg_skipmaster;
 #endif
 
-void arg_init(int argc, char **argv)
+void arg_init(int argc, const char **argv)
 {
   static char buf[1024];
   
@@ -835,7 +835,7 @@ void arg_init(int argc, char **argv)
 #ifdef HSTART
   if (!arg_hierarchical_start || arg_child_charmrun)
 #endif
-  arg_argv = const_cast<const char**>(argv)+1; /*Skip over charmrun (0) here and program name (1) later*/
+  arg_argv = (argv)+1; /*Skip over charmrun (0) here and program name (1) later*/
   arg_argc = pparam_countargs(arg_argv);
   if (arg_argc<1) {
     fprintf(stderr,"ERROR> You must specify a node-program.\n");
@@ -3371,7 +3371,7 @@ void read_global_segments_size(void);
 static void fast_idleFn(void) {sleep(0);}
 void finish_nodes(void);
 
-int main(int argc, char **argv, char **envp)
+int main(int argc, const char **argv, char **envp)
 {
   srand(time(0)); 
   skt_init();
@@ -4656,7 +4656,7 @@ void start_nodes_local(char ** env)
 	  if (-1!=(fd = open("/dev/null", O_RDWR))) {
 		dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
 	  }
-	  status = execve(pparam_argv[1], pparam_argv+1, envp);
+	  status = execve(pparam_argv[1], const_cast<char* const*>(pparam_argv)+1, envp);
 	  dup2(fd1, 1);
 	  printf("execve failed to start process \"%s\" with status: %d\n", pparam_argv[1], status);
 	  kill(getppid(), 9);
