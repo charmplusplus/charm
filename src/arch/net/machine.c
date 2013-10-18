@@ -1910,7 +1910,7 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 #endif	  
     break;
   default:
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (dst<0 || dst>=CmiNumPes())
       CmiAbort("Send to out-of-bounds processor!");
 #endif
