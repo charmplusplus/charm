@@ -32,7 +32,7 @@ PVT::PVT()
 #ifdef POSE_COMM_ON
   //com_debug = 1;
 #endif
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   localStats = (localStat *)CkLocalBranch(theLocalStats);
   if (pose_config.stats) {
     localStats->TimerStart(GVT_TIMER);
@@ -83,7 +83,7 @@ PVT::PVT()
   parLBInProgress = 0;
   parLastLBGVT = 0;
   //  debugBufferLoc = debugBufferWrapped = debugBufferDumped = 0;
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -104,7 +104,7 @@ void PVT::pup(PUP::er &p) {
 
   if (p.isUnpacking()) {
     parStartTime = parLastCheckpointTime;
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
     localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
 #ifdef MEM_TEMPORAL
@@ -148,7 +148,7 @@ void PVT::startPhase(prioBcMsg *m)
   register int i;
 
   if (startPhaseActive) return;
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
@@ -239,7 +239,7 @@ void PVT::startPhase(prioBcMsg *m)
   */
   objs.SetIdle(); // Set objects to idle
   iterMin = POSE_UnsetTS;
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -248,7 +248,7 @@ void PVT::startPhase(prioBcMsg *m)
 /// ENTRY: receive GVT estimate; wake up objects
 void PVT::setGVT(GVTMsg *m)
 {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
@@ -311,7 +311,7 @@ void PVT::setGVT(GVTMsg *m)
     eventMsg *dummyMsg = new eventMsg();
     p[CkMyPe()].resumeAfterCheckpoint(dummyMsg);
   }
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -319,7 +319,7 @@ void PVT::setGVT(GVTMsg *m)
 
 /// ENTRY: begin checkpoint now that quiescence has been reached
 void PVT::beginCheckpoint(eventMsg *m) {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
@@ -331,14 +331,14 @@ void PVT::beginCheckpoint(eventMsg *m) {
     CkCallback cb(CkIndex_PVT::resumeAfterCheckpoint(dummyMsg), CkMyPe(), ThePVT);
     CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
   }
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
 }
 
 void PVT::beginLoadbalancing(eventMsg *m) {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
@@ -347,19 +347,19 @@ void PVT::beginLoadbalancing(eventMsg *m) {
     CProxy_PVT p(ThePVT);
     p.callAtSync();
   }
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
 }
 
 void PVT::callAtSync() {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
   objs.callAtSync();
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -373,7 +373,7 @@ void PVT::doneLB() {
 
 /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
 void PVT::resumeAfterCheckpoint(eventMsg *m) {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
@@ -390,7 +390,7 @@ void PVT::resumeAfterCheckpoint(eventMsg *m) {
   *((int *)CkPriorityPtr(startMsg)) = 0;
   CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
   p[CkMyPe()].startPhase(startMsg);
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -405,7 +405,7 @@ void PVT::resumeAfterLB(eventMsg *m) {
     return;
   }
   count = 0;
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
@@ -422,7 +422,7 @@ void PVT::resumeAfterLB(eventMsg *m) {
   *((int *)CkPriorityPtr(startMsg)) = 0;
   CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
   p[CkMyPe()].startPhase(startMsg);
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -445,7 +445,7 @@ void PVT::objRemove(int pvtIdx)
 /// Update send/recv table at timestamp
 void PVT::objUpdate(POSE_TimeType timestamp, int sr)
 {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   int tstat = localStats->TimerRunning();
   if(pose_config.stats){
     if (tstat)
@@ -467,7 +467,7 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
     SendsAndRecvs->Restructure(estGVT, timestamp, sr);
   }
   else SendsAndRecvs->Insert(timestamp, sr);
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats){
     if (tstat)
       localStats->SwitchTimer(tstat);
@@ -504,7 +504,7 @@ void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt)
 /// Reduction point for PVT reports
 void PVT::reportReduce(UpdateMsg *m)
 {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
@@ -590,7 +590,7 @@ void PVT::reportReduce(UpdateMsg *m)
     }
     rdone = 0;
   }
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -609,7 +609,7 @@ GVT::GVT()
   startOffset = 0;
   gvtIterationCount = 0;
 
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
 #ifndef SEQUENTIAL_POSE
@@ -640,7 +640,7 @@ void GVT::pup(PUP::er &p) {
   p|gvtIterationCount;
 
   if (p.isUnpacking()) {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
     localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
   }
@@ -676,7 +676,7 @@ void GVT::pup(PUP::er &p) {
 /// ENTRY: Run the GVT
 void GVT::runGVT(UpdateMsg *m) 
 {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
@@ -687,7 +687,7 @@ void GVT::runGVT(UpdateMsg *m)
   CProxy_GVT g(TheGVT);
   m->runGVTflag = 1;
   g[CkMyPe()].computeGVT(m);  // start the next PVT phase of the GVT algorithm
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -696,7 +696,7 @@ void GVT::runGVT(UpdateMsg *m)
 /// ENTRY: Gathers PVT reports; calculates and broadcasts GVT to PVTs
 void GVT::computeGVT(UpdateMsg *m)
 {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);
 #endif
@@ -727,7 +727,7 @@ void GVT::computeGVT(UpdateMsg *m)
   CkFreeMsg(m);
 
   if (done == reportsExpected+startOffset) { // all PVT reports are in
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
     if(pose_config.stats)
       localStats->GvtInc();
 #endif
@@ -829,7 +829,7 @@ void GVT::computeGVT(UpdateMsg *m)
       if(pose_config.lb_on)
 	{
 	  // perform load balancing
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
 	  if(pose_config.stats)
 	    localStats->SwitchTimer(LB_TIMER);
 #endif
@@ -841,7 +841,7 @@ void GVT::computeGVT(UpdateMsg *m)
 	      nextLBstart = 0;
 	    }
 	  }
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
 	  if(pose_config.stats)
 	    localStats->SwitchTimer(GVT_TIMER);
 #endif
@@ -868,7 +868,7 @@ void GVT::computeGVT(UpdateMsg *m)
       cur = tmp;
     }
   }
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif

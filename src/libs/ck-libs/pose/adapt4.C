@@ -68,12 +68,12 @@ void adapt4::Step()
     localPVT->incEventCount();
     specEventCount++;
     eventCount++;
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
     if(pose_config.trace)
       critStart = CmiWallTimer();  // trace timing
 #endif
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
     if(pose_config.trace)
       traceUserBracketEvent(10, critStart, CmiWallTimer());
 #endif
@@ -82,7 +82,7 @@ void adapt4::Step()
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
   }
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     if (iter > 0) localStats->Loop();
 #endif

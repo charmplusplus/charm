@@ -155,7 +155,7 @@ void eventQueue::InsertEventDeterministic(Event *e)
 }
 
 void eventQueue::CommitStatsHelper(sim *obj, Event *commitPtr) {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
   if (pose_config.stats) {
     localStats->Commit();

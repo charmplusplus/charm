@@ -4,7 +4,7 @@
 /// Basic Constructor
 strat::strat() 
 {
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif

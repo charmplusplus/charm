@@ -21,7 +21,7 @@
 class strat
 {
  protected:
-#ifndef CMK_TRACE_DISABLED
+#if !CMK_TRACE_DISABLED
   localStat *localStats;
 #endif
   /// Local PVT branch

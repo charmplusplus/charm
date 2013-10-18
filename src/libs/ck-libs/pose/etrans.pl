@@ -564,7 +564,7 @@ foreach my $incfile ($inC,@otherfiles)
 
 	$outChandle->print("$declaration\n");
 
-	$outChandle->print("#ifndef CMK_TRACE_DISABLED\n");
+	$outChandle->print("#if !CMK_TRACE_DISABLED\n");
 	$outChandle->print("$messagename->sanitize();\n");
 	$outChandle->print("  int tstat;\n");
 	$outChandle->print("  if(pose_config.stats){\n");
@@ -616,7 +616,7 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("    eq->InsertEvent(e);\n");
 	$outChandle->print("    Step();\n");
 	$outChandle->print("  }\n");
-	$outChandle->print("#ifndef CMK_TRACE_DISABLED\n");
+	$outChandle->print("#if !CMK_TRACE_DISABLED\n");
 	$outChandle->print("  if(pose_config.stats){\n");
 	$outChandle->print("    if (tstat)\n");
 	$outChandle->print("      localStats->SwitchTimer(tstat);\n");
@@ -638,7 +638,7 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print($returntype." ") if($returntype);
 	$outChandle->print(join('',$class,"::",$method,'(',$message,' *',$messagename,"){\n"));
 	$outChandle->print("  usesAtSync=true;\n");
-	$outChandle->print("#ifndef CMK_TRACE_DISABLED\n");
+	$outChandle->print("#if !CMK_TRACE_DISABLED\n");
 	$outChandle->print("  if(pose_config.stats)\n");
 	$outChandle->print("    {localStats->TimerStart(SIM_TIMER);}\n");
 	$outChandle->print("#endif\n");
@@ -649,12 +649,12 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("  $messagename->parent = this;\n");
 	$outChandle->print("  $messagename->str = myStrat;\n");
 	$outChandle->print("  POSE_TimeType _ts = $messagename->timestamp;\n");
-	$outChandle->print("#ifndef CMK_TRACE_DISABLED\n  if(pose_config.stats){\n    localStats->SwitchTimer(DO_TIMER);}\n#endif\n");
+	$outChandle->print("#if !CMK_TRACE_DISABLED\n  if(pose_config.stats){\n    localStats->SwitchTimer(DO_TIMER);}\n#endif\n");
 
 	$outChandle->print("  objID = new state_$method($messagename);\n");
-	$outChandle->print("#ifndef CMK_TRACE_DISABLED\n  if(pose_config.stats){\n    localStats->SwitchTimer(SIM_TIMER);}\n#endif\n");
+	$outChandle->print("#if !CMK_TRACE_DISABLED\n  if(pose_config.stats){\n    localStats->SwitchTimer(SIM_TIMER);}\n#endif\n");
 	$outChandle->print("  myStrat->init(eq, objID, this, thisIndex);\n");
-	$outChandle->print("#ifndef CMK_TRACE_DISABLED\n  if(pose_config.stats){\n    localStats->TimerStop();}\n#endif\n");
+	$outChandle->print("#if !CMK_TRACE_DISABLED\n  if(pose_config.stats){\n    localStats->TimerStop();}\n#endif\n");
 	$outChandle->print("#ifndef SEQUENTIAL_POSE\n");
 	$outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
 	$outChandle->print("  myPVTidx = pvt->objRegister(thisIndex, _ts, sync, this);\n");
@@ -813,7 +813,7 @@ foreach my $incfile ($inC,@otherfiles)
 	    }
 	    $outChandle->print("$count) {\n");
 	    $first = 0;
-	    $outChandle->print("#ifndef CMK_TRACE_DISABLED\n");
+	    $outChandle->print("#if !CMK_TRACE_DISABLED\n");
 	    $outChandle->print("  dop_override_evt = (POSE_TimeType)-1;\n");
 	    $outChandle->print("  if(pose_config.stats)\n");
 	    $outChandle->print("    if (!CpvAccess(stateRecovery)) {localStats->Do();\n");
@@ -823,7 +823,7 @@ foreach my $incfile ($inC,@otherfiles)
 	    $outChandle->print("#endif\n");
 
 	    $outChandle->print("    ((state_$key *) objID)->$i->[0](($i->[1] *)msg);\n");
-	    $outChandle->print("#ifndef CMK_TRACE_DISABLED\n");
+	    $outChandle->print("#if !CMK_TRACE_DISABLED\n");
 	    $outChandle->print("  if(pose_config.stats)\n");
 	    $outChandle->print("    if (!CpvAccess(stateRecovery)) {\n");
 	    $outChandle->print("    if(pose_config.dop){\n");
@@ -1276,10 +1276,10 @@ sub posefuncmap
 		  $output.="#endif\n";
 		  #$output.="char str[30];\n";
 		  #$output.="CkPrintf(\"[%d] SEND(event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="$msg->sanitize();\n";
 		  $output.="#endif\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
@@ -1288,7 +1288,7 @@ sub posefuncmap
 		  $output.="#endif\n";
 
 		  $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
@@ -1308,10 +1308,10 @@ sub posefuncmap
 		  $output.="}\n";
 		  #$output.="char str[30];\n";
 		  #$output.="CkPrintf(\"[%d] SEND(event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";		  
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="$msg->sanitize();\n";
 		  $output.="#endif\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
@@ -1320,7 +1320,7 @@ sub posefuncmap
 		  $output.="#endif\n";
 
 		  $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
@@ -1351,10 +1351,10 @@ sub posefuncmap
 		    $output.="#endif\n";
 		    #$output.="char str[30];\n";
 		    #$output.="CkPrintf(\"[%d] SEND(event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";		  
-		    $output.="#ifndef CMK_TRACE_DISABLED\n";
+		    $output.="#if !CMK_TRACE_DISABLED\n";
 		    $output.="$msg->sanitize();\n";
 		    $output.="#endif\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="   parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
@@ -1363,7 +1363,7 @@ sub posefuncmap
 		  $output.="#endif\n";
 
 		    $output.="(*(CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
@@ -1385,10 +1385,10 @@ sub posefuncmap
 		    $output.="}\n";
 		    #$output.="char str[30];\n";
 		    #$output.="CkPrintf(\"[%d] SEND(event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";		  
-		    $output.="#ifndef CMK_TRACE_DISABLED\n";
+		    $output.="#if !CMK_TRACE_DISABLED\n";
 		    $output.="$msg->sanitize();\n";
 		    $output.="#endif\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
@@ -1396,7 +1396,7 @@ sub posefuncmap
 		  $output.='CkError("invoking (*(CProxy_'.$segments[2].' *)&parent->thisProxy)[%d].insert('.$segments[1].'at line %d\n",_POSE_handle,__LINE__);'."\n";
 		  $output.="#endif\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
@@ -1424,15 +1424,15 @@ sub posefuncmap
 		      $output.="#endif\n";
 		      #$output.="char str[30];\n";
 		      #$output.="CkPrintf(\"[%d] SEND(event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, parent->thisIndex, $msg->timestamp, $msg->evID.sdump(str));\n";		  
-		      $output.="#ifndef CMK_TRACE_DISABLED\n";
+		      $output.="#if !CMK_TRACE_DISABLED\n";
 		      $output.="$msg->sanitize();\n";
 		      $output.="#endif\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&parent->thisProxy)[parent->thisIndex].".$segments[1].";\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
@@ -1450,10 +1450,10 @@ sub posefuncmap
 		      $output.="}\n";
 		      #$output.="char str[30];\n";
 		      #$output.="CkPrintf(\"[%d] SEND(event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, parent->thisIndex, $msg->timestamp, $msg->evID.sdump(str));\n";		  
-		      $output.="#ifndef CMK_TRACE_DISABLED\n";
+		      $output.="#if !CMK_TRACE_DISABLED\n";
 		      $output.="$msg->sanitize();\n";
 		      $output.="#endif\n";
-		      $output.="#ifndef CMK_TRACE_DISABLED\n";
+		      $output.="#if !CMK_TRACE_DISABLED\n";
 		      $output.="  if(pose_config.stats)\n";
 		      $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		      $output.="#endif\n";
@@ -1462,7 +1462,7 @@ sub posefuncmap
 		      $output.="#endif\n";
 
 		      $output.="(* (CProxy_".$simobjtype." *)&parent->thisProxy)[parent->thisIndex].".$segments[1].";\n";
-		  $output.="#ifndef CMK_TRACE_DISABLED\n";
+		  $output.="#if !CMK_TRACE_DISABLED\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
