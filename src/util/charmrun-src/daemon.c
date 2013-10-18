@@ -267,7 +267,7 @@ void goFaceless(void)
 		exit(0); /*Kill off the parent process, freeing terminal*/
 }
 
-char ** args2argv(const char *args,char **argv,char *exe) {
+const char ** args2argv(const char *args,const char **argv,const char *exe) {
 	int cur=0,len=strlen(args);
 	int argc=0;
         argv[argc++] = exe;
@@ -279,10 +279,13 @@ char ** args2argv(const char *args,char **argv,char *exe) {
 		end=cur;
 		if (start<end){
 			int i;
-			argv[argc]=(char *)malloc(sizeof(char)*(end-start+1));
+			char *tmp = (char *)malloc(sizeof(char)*(end-start+1));
 			for (i=0;i<end-start;i++)
-				argv[argc][i]=args[start+i];
-			argv[argc++][end-start]=0;/*Null-terminate*/
+				tmp[i]=args[start+i];
+
+			tmp[end - start] = 0;
+			argv[argc] = tmp;
+			argc++;
 		}
 	}
 	argv[argc]=0;/* Null-terminate arg list */
@@ -300,7 +303,7 @@ char startProgram(const char *exeName, const char *args,
 	
 	if (fork()==0)
 	{
-		char **argv=(char **)malloc(sizeof(char *)*1000);
+		const char **argv=(const char **)malloc(sizeof(char *)*1000);
 		ret|=chdir(cwd);
 		putenv(env);
 #if 1
@@ -311,7 +314,7 @@ char startProgram(const char *exeName, const char *args,
 		dup2(fd,2);
 #endif
 		for (fd=3;fd<1024;fd++) close(fd);
-		ret|=execvp(exeName,args2argv(args,argv,exeName));
+		ret|=execvp(exeName, (char *const *)args2argv(args, argv, exeName));
 		exit(1);
 	}
 	/*FIXME: parent needs to check on child's status, e.g., by 
