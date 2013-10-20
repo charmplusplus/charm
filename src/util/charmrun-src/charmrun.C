@@ -4686,7 +4686,7 @@ void restart_node(int crashed_node){
 	FILE *f;
 	char startScript[200];
 	int restart_rsh_pid;
-	char **restart_argv;
+	const char **restart_argv;
 	int status=0;
         char phase_str[10];
 	int i;
@@ -4701,7 +4701,7 @@ void restart_node(int crashed_node){
 	while(arg_argv[i]!= NULL){
 		i++;
 	}
-	restart_argv = (char **)malloc(sizeof(char *)*(i+4));
+	restart_argv = (const char **)malloc(sizeof(char *)*(i+4));
 	i=0;
 	while(arg_argv[i]!= NULL){
 		restart_argv[i] = arg_argv[i];
