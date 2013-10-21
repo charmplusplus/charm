@@ -47,6 +47,11 @@ namespace xi {
     type = t;
   }
 
+  SdagConstruct::~SdagConstruct() {
+    delete constructs;
+    delete text;
+  }
+
   void SdagConstruct::numberNodes(void) {
     switch(type) {
     case SSDAGENTRY: nodeNum = numSdagEntries++; break;
