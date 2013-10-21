@@ -3642,7 +3642,7 @@ void start_nodes_local(char ** env)
 {
   int ret, i;
   PROCESS_INFORMATION pi;     /* process Information for the process spawned */
-  char **p;
+  const char **p;
 
   char environment[10000];/*Doubly-null terminated environment strings*/
   char cmdLine[10000];/*Program command line, including executable name*/
