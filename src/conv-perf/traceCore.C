@@ -139,6 +139,7 @@ void TraceCore::startPtc(){
 	}
 	maxlID = 0;
 	numLangs = 0;
+    delete str;
 }
 
 

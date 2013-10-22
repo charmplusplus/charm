@@ -583,7 +583,7 @@ void TraceCounter::traceInit(char **argv)
   int i;
   // parse command line args
   char* counters = NULL;
-  CounterArg* commandLine_ = NULL;
+  commandLine_ = NULL;
   bool badArg = false;
   int numCounters = 0;
   if (CmiGetArgStringDesc(argv, "+counters", &counters, "Measure these performance counters")) {

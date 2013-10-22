@@ -63,6 +63,7 @@ void TraceBluegene::creatFiles()
   pfp = fopen(fname,"w");     
   if(pfp==NULL)
     CmiAbort("Cannot open Bluegene print file for writing.\n");
+  delete fname;
 }
 
 void TraceBluegene::tlineEnd(void** parentLogPtr){

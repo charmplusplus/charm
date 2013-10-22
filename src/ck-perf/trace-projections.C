@@ -1004,6 +1004,7 @@ void LogEntry::pup(PUP::er &p)
     case USER_SUPPLIED_NOTE:
 	  p|itime;
 	  int length;
+	  length=0;
 	  if (p.isPacking()) length = strlen(userSuppliedNote);
           p | length;
 	  char space;
@@ -1021,6 +1022,7 @@ void LogEntry::pup(PUP::er &p)
 	  p|iEndTime;
 	  p|event;
 	  int length2;
+	  length2=0;
 	  if (p.isPacking()) length2 = strlen(userSuppliedNote);
           p | length2;
 	  char space2;

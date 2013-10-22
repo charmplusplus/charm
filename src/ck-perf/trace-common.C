@@ -84,7 +84,7 @@ static void traceCommonInit(char **argv)
     CkpvAccess(verbose) = false;
   }
 
-  char *root;
+  char *root=NULL;
   char *temproot;
   char *temproot2;
   CkpvInitialize(char*, traceRoot);
@@ -185,6 +185,8 @@ static void traceCommonInit(char **argv)
       //    analysis is desired.
       findOutliers = true;
     }
+    if(root)
+        free(root);
   }
 
   
