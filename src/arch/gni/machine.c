@@ -1282,7 +1282,7 @@ INLINE_KEYWORD static void print_smsg_attr(gni_smsg_attr_t     *a)
 {
     printf("type=%d\n, credit=%d\n, size=%d\n, buf=%p, offset=%d\n", a->msg_type, a->mbox_maxcredit, a->buff_size, a->msg_buffer, a->mbox_offset);
 }
-
+#if 0
 INLINE_KEYWORD
 static void setup_smsg_connection(int destNode)
 {
@@ -1344,7 +1344,7 @@ static void setup_smsg_connection(int destNode)
         printf("[%d=%d]OK send post FMA \n", myrank, destNode);
 #endif
 }
-
+#endif
 /* useDynamicSMSG */
 INLINE_KEYWORD
 static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
