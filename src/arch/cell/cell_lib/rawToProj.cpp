@@ -101,6 +101,8 @@ int main(int argc, char* argv[]) {
   int numEntries = 0;
   if (sizeof(int) != fread((void*)(&numEntries), 1, sizeof(int), projFile)) {
     printf("ERROR : Unable to read total number of entries... exiting.\n");
+    // Close the projFile; necessary to avoid a Resource leak
+    fclose(projFile);
     return EXIT_FAILURE;
   }
 
@@ -112,6 +114,8 @@ int main(int argc, char* argv[]) {
 
   // Create sts file
   if (!createStsFile(numEntries, argv[2])) {
+    // Close the projFile; necessary to avoid a Resource leak
+    fclose(projFile);
     return EXIT_FAILURE;
   }
 
@@ -133,6 +137,8 @@ int main(int argc, char* argv[]) {
     logFile[i] = fopen(fileNameBuf, "w+");
     if (logFile[i] == NULL) {
       printf("ERROR : Unable to open \"%s\" for writing... exiting.\n", fileNameBuf);
+      // Close the projFile; necessary to avoid a Resource leak
+      fclose(projFile);
       return EXIT_FAILURE;
     }
 
@@ -171,6 +177,8 @@ int main(int argc, char* argv[]) {
     register size_t numBytesRead = fread((void*)projBuf, 1, numBytesToRead, projFile);
     if (numBytesRead != numBytesToRead) {
       printf("ERROR : Unable to read entries from file... exiting\n");
+      // Close the projFile; necessary to avoid a Resource leak
+      fclose(projFile);
       return EXIT_FAILURE;
     }
 
