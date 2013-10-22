@@ -1246,8 +1246,8 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	}
       }
     }
-    int *gotlocks;
-    int *lockw;
+    int *gotlocks=NULL;
+    int *lockw=NULL;
     if(nncount>0) {
       gotlocks = new int[nncount];
       lockw = new int[nncount];
@@ -1256,6 +1256,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
       gotlocks[i]=-1;
       lockw[i] = lockedNodes[i];
     }
+    // TODO: refactor this to handle nncount <= 0 correctly
     int gotlock = lockNodes(gotlocks,lockw,0,lockw,nncount);
     locked = true;
     numtries++;
