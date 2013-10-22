@@ -1471,6 +1471,8 @@ int chunk::joinCommLists(int nIdx, int shd, int *chk, int *idx, int *rChk,
       count++;
     }
   }
+  free(rChk);
+  free(rIdx);
   return count;
 }
 

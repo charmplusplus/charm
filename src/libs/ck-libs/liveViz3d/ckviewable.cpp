@@ -72,13 +72,13 @@ void CkImageCompressor::pup(PUP::er &p) {
 	stats::op_sentry stats_sentry(op_pack_impostors);
 	if (p.isUnpacking()) 
 	{ /* client side: decompression */
-		int colors,layout;
+		int colors=0,layout=0;
 		p|w; p|h; p|colors; p|layout;
 		gl_w=roundTo2(w); gl_h=roundTo2(h); 
 		img=new CkAllocImage(gl_w,gl_h,colors); 
 		img->setLayout((CkImage::layout_t)layout);
 		for (int y=0;y<gl_h;y++) {
-			int first_x, last_x;
+			int first_x=0, last_x=0;
 			if (y<h) {p|first_x; p|last_x;}
 			else {first_x=0; last_x=0;}
 			memset(img->getPixel(0,y),0,first_x*colors);

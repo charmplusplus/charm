@@ -162,8 +162,8 @@ public:
   ArmciMsg(pointer d, int n, int s, int h) :
     dst(d), nbytes(n), src_proc(s), hdl(h) { }
   static ArmciMsg* pup(PUP::er &p, ArmciMsg *m){
-    pointer d;
-    int n, s, h;
+    pointer d=NULL;
+    int n=0, s=0, h=0;
     if(p.isPacking() || p.isSizing()){
       d = m->dst;
       n = m->nbytes;
@@ -198,8 +198,8 @@ public:
   ArmciStridedMsg(pointer d, int l, int n, int s, int h) :
     dst(d), stride_levels(l), nbytes(n), src_proc(s), hdl(h) { }
   static ArmciStridedMsg* pup(PUP::er &p, ArmciStridedMsg *m){
-    pointer d;
-    int l, n, s, h;
+    pointer d=NULL;
+    int l=0, n=0, s=0, h=0;
     if(p.isPacking() || p.isSizing()){
       d = m->dst;
       l = m->stride_levels;
