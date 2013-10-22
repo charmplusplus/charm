@@ -1355,7 +1355,7 @@ void *CmiGetNonLocal(void) {
       * even there's only one worker thread, the polling of
       * network queue is still required.
       */
-    if (CmiNumPes() == 1) return NULL;
+    if (CmiNumPes() == 1 && CmiNumPartitions() == 1) return NULL;
 #endif
 
     MACHSTATE2(3, "[%p] CmiGetNonLocal begin %d{", cs, CmiMyPe());
