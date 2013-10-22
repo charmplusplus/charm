@@ -974,7 +974,11 @@ INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
 }
 
 INLINE_KEYWORD int pe_lToGTranslate(int pe, int partition) {
-  return node_lToGTranslate(CmiNodeOf(pe),partition)*CmiMyNodeSize() + CmiRankOf(pe);
+  if(pe < CmiPartitionSize(partition)*CmiMyNodeSize()) {
+    return node_lToGTranslate(CmiNodeOf(pe),partition)*CmiMyNodeSize() + CmiRankOf(pe);
+  }
+
+  return CmiNumPesGlobal() + node_lToGTranslate(pe - CmiPartitionSize(partition)*CmiMyNodeSize(), partition);
 }
 
 INLINE_KEYWORD int node_gToLTranslate(int node) {
