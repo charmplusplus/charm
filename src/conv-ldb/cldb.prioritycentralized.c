@@ -89,7 +89,6 @@ static void CldStoreCharemsg(void *msg)
     /* check whether there is processor with lower priority, it exists, push this task to that processor */
     /* find the processor with the highest priority */
     int i=0; 
-    unsigned int _max_ = *prioptr;
     int index = 1;
     double max_evaluation = 0;
     int old_load;

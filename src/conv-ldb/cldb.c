@@ -461,14 +461,18 @@ void CldMultipleSendPrio(int pe, int numToSend, int rank, int immed)
   msgSizes = (int *)calloc(numToSend, sizeof(int));
 
   tok = proc->sentinel->succ;
-  if (tok == proc->sentinel) return;
+  if (tok == proc->sentinel) {
+    free(msgs);
+    free(msgSizes);
+    return;
+  }
   tok = tok->succ;
   while (tok!=proc->sentinel) {
     tok = tok->succ;
     if (tok == proc->sentinel) break;
     CldGetTokenFromRankAt(&msgs[count], rank, tok->pred);
-    if (msgs[i] != 0) {
-	ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msgs[i]));
+    if (msgs[count] != 0) {
+	ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msgs[count]));
 	ifn(msgs[count], &pfn, &len, &queueing, &priobits, &prioptr);
 	msgSizes[count] = len;
 	CldSwitchHandler(msgs[count], CpvAccessOther(CldBalanceHandlerIndex, rank));

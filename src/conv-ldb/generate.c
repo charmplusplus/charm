@@ -131,6 +131,7 @@ static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int
         for (i=0;i<V;i++)
             varr[i]=calloc(2, sizeof(int));
 	
+  c1 = 1;
 	if (C>1) c1 = C-1;
 
 	for (i=0; i<= V/c1; i++)
@@ -517,6 +518,8 @@ static void diameter(VerticesListType *graph)
   printf("the diameter is: %d, average internode distance = %f\n", 
 	 dia, average);
   /*for (i = 0; i< 6; i++) printf("histo[%d] = %d\n", i, histogram[i]);*/
+  free(distance);
+  free(histogram);
 }
 
 /* ------------------------------------------------- */

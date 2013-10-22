@@ -895,7 +895,10 @@ public:
 		int i=0;
   	char *lbcopy = strdup(_lbtopo);
   	char *ptr = strchr(lbcopy, ':');
-  	if (ptr==NULL) return;
+    if (ptr==NULL) {
+      free(lbcopy);
+      return;
+    }
   	ptr = strtok(ptr+1, ",");
   	while (ptr) {
 			dim[i]=atoi(ptr);
@@ -910,6 +913,7 @@ public:
     CmiAssert(dimension>=1 && dimension<=16);
     CmiAssert(p>=1);
 		CmiAssert(procs==p);
+    free(lbcopy);
   }
 	
   ~LBTopo_itorus_nd() {
