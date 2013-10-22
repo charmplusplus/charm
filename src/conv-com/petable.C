@@ -473,25 +473,6 @@ int PeTable :: UnpackAndInsert(void *in) {
 int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist) {
   char *junk;
   char *t =(char *)in /*+CmiReservedHeaderSize*/;
-  int i,  
-    ufield,   // user field or ths stage of the iteration 
-    nmsgs,    // number of messages in combo message
-    refno,    // reference number
-    dummy;    // alignment dummy
-  
-  comID id;
-
-  /*
-    UNPACK(int, refno);      
-    UNPACK(comID, id);
-    
-    UNPACK(int, ufield);
-    UNPACK(int, nmsgs);
-    //UNPACK(int, dummy);
-    int header_size = sizeof(comID) + CmiReservedHeaderSize + 3 *sizeof(int);
-    if(header_size % 8 != 0)
-    t+= 8 - header_size % 8;
-  */
 
   AllToAllHdr ahdr;
   UNPACK(AllToAllHdr, ahdr);
@@ -499,10 +480,10 @@ int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist) {
   if((sizeof(AllToAllHdr) & 7) != 0)
     t += 8 - (sizeof(AllToAllHdr) & 7);
 
-  refno = ahdr.refno;
-  id = ahdr.id;
-  nmsgs = ahdr.nmsgs;
-  ufield = ahdr.ufield;
+  int refno = ahdr.refno;     // reference number
+  comID id = ahdr.id;
+  int nmsgs = ahdr.nmsgs;  // number of messages in combo message
+  int ufield = ahdr.ufield;  // user field or ths stage of the iteration 
 
   ComlibPrintf("[%d] unpack and insert all %d, %d\n", CkMyPe(), ufield, nmsgs);
   

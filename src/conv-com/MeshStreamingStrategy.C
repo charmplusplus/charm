@@ -143,7 +143,7 @@ void streaming_column_handler (void *msg)
         msgptr += msgsize + 3 * sizeof(int);
         */
 
-        int dest_pe;
+        int dest_pe=0;
         fp | dest_pe;
 
         //Returns a part of a message as an independent message and

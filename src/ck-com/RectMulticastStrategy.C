@@ -367,6 +367,7 @@ void RectMulticastStrategy::sendRectDest(ComlibRectSectionHashObject *obj, int s
   //now we have the list, fire off the message
   if(destpe == 0) {
     CmiFree(env);
+    delete [] pelist;
     return;    
   }
     
@@ -682,7 +683,7 @@ void RectMulticastStrategy::beginProcessing(int numElements){
     ainfo.getDestinationArray(dest, idx_list, nidx);
     sinfo = ComlibSectionInfo(dest, myInstanceID);
 
-    ComlibLearner *learner = new ComlibLearner();
+    //ComlibLearner *learner = new ComlibLearner();
     //setLearner(learner);
 }
 
