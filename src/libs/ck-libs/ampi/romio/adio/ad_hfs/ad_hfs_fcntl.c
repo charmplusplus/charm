@@ -169,7 +169,9 @@ void ADIOI_HFS_Fcntl(ADIO_File fd, int flag, ADIO_Fcntl_t *fcntl_struct, int *er
 		}
 	    }
 	    ADIOI_Free(buf);
+#ifdef SPPUX
 	}
+#endif
 	*error_code = MPI_SUCCESS;
 	break;
 

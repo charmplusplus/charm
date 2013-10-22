@@ -102,7 +102,7 @@
 #define PVT_DEBUG_BUFFER_LINE_LENGTH 1
 
 #if USE_LONG_TIMESTAMPS 
-#include "conv-autoconfig.h"
+#include "conv-config.h"
 #if CMK_LONG_LONG_DEFINED
 typedef long long int POSE_TimeType;
 #else

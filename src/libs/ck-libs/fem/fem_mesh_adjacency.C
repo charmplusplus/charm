@@ -531,7 +531,7 @@ void FEM_Mesh::createElemElemAdj()
   CmiMemoryCheck();
 #endif
 
-
+  delete g;
 }
 
 

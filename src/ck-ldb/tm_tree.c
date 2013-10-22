@@ -782,6 +782,8 @@ TIC;
 
   printf("val=%f\n",val);
 
+  free(graph);
+
 #ifdef DEBUG
   display_grouping(new_tab_node,M,arity,val);
 #endif

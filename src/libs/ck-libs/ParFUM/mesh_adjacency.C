@@ -509,6 +509,7 @@ void FEM_Mesh::createElemElemAdj()
 		  }
 	  }
   }
+  delete g;
 }
 
 

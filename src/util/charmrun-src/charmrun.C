@@ -202,7 +202,7 @@ pathfixlist pathfix_append(char *s1, char *s2, pathfixlist l)
   return pf;
 }
 
-char *pathfix(char *path, pathfixlist fixes)
+char *pathfix(const char *path, pathfixlist fixes)
 {
   char buffer[MAXPATHLEN]; pathfixlist l; 
   char buf2[MAXPATHLEN]; 
@@ -225,7 +225,7 @@ char *pathfix(char *path, pathfixlist fixes)
   return strdup(buffer);
 }
 
-char *pathextfix(char *path, pathfixlist fixes, char *ext)
+char *pathextfix(const char *path, pathfixlist fixes, char *ext)
 {
   char *newpath = pathfix(path, fixes);
   char *ret;
@@ -370,7 +370,7 @@ typedef struct s_ppdef
 static ppdef ppdefs;
 
 static int     pparam_pos;
-static char  **pparam_argv;
+static const char  **pparam_argv;
 static char    pparam_optc='-';
 char           pparam_error[100];
 
@@ -438,7 +438,7 @@ void pparam_str(const char **where,const char *defValue,
   def->doc=doc;
 }
 
-static int pparam_setdef(ppdef def, char *value)
+static int pparam_setdef(ppdef def, const char *value)
 {
   char *p;
   switch(def->type)
@@ -528,7 +528,7 @@ void pparam_delarg(int i)
     pparam_argv[j]=pparam_argv[j+1];
 }
 
-int pparam_countargs(char **argv)
+int pparam_countargs(const char **argv)
 {
   int argc;
   for (argc=0; argv[argc]; argc++);
@@ -538,7 +538,7 @@ int pparam_countargs(char **argv)
 int pparam_parseopt()
 {
   int ok; ppdef def=NULL;
-  char *opt = pparam_argv[pparam_pos];
+  const char *opt = pparam_argv[pparam_pos];
   /* handle ++ by skipping to end */
   if ((opt[1]=='+')&&(opt[2]==0))
     {
@@ -610,7 +610,7 @@ int pparam_parseopt()
   return 0;
 }
 
-int pparam_parsecmd(char optchr, char **argv)
+int pparam_parsecmd(char optchr, const char **argv)
 {
   pparam_error[0]=0;
   pparam_argv = argv;
@@ -618,7 +618,7 @@ int pparam_parsecmd(char optchr, char **argv)
   pparam_pos  = 0;
   while(1)
     {
-      char *opt = pparam_argv[pparam_pos];
+      const char *opt = pparam_argv[pparam_pos];
       if (opt==0) break;
       if (opt[0]!=optchr) pparam_pos++;
       else if (pparam_parseopt()<0) return -1;
@@ -669,7 +669,7 @@ dupargv (char **argv)
 #define MAX_NODES 1000
 #define MAX_LINE_LENGTH 1000
 
-char **arg_argv;
+const char **arg_argv;
 int    arg_argc;
 
 int   arg_requested_pes;
@@ -718,8 +718,8 @@ const char *arg_mylogin;
 int   arg_mpiexec;
 int   arg_no_va_rand;
 
-char *arg_nodeprog_a;
-char *arg_nodeprog_r;
+const char *arg_nodeprog_a;
+const char *arg_nodeprog_r;
 char *arg_currdir_a;
 char *arg_currdir_r;
 
@@ -735,7 +735,7 @@ int   arg_singlemaster;
 int   arg_skipmaster;
 #endif
 
-void arg_init(int argc, char **argv)
+void arg_init(int argc, const char **argv)
 {
   static char buf[1024];
   
@@ -835,7 +835,7 @@ void arg_init(int argc, char **argv)
 #ifdef HSTART
   if (!arg_hierarchical_start || arg_child_charmrun)
 #endif
-  arg_argv = argv+1; /*Skip over charmrun (0) here and program name (1) later*/
+  arg_argv = (argv)+1; /*Skip over charmrun (0) here and program name (1) later*/
   arg_argc = pparam_countargs(arg_argv);
   if (arg_argc<1) {
     fprintf(stderr,"ERROR> You must specify a node-program.\n");
@@ -1113,7 +1113,7 @@ void nodetab_add(nodetab_host *h)
   *nodetab_table[nodetab_size++] = *h;
 }
 
-void nodetab_makehost(char *name,nodetab_host *h)
+void nodetab_makehost(const char *name,nodetab_host *h)
 {
   h->name=strdup(name);
   h->ip = skt_innode_lookup_ip(name);
@@ -1199,7 +1199,7 @@ void nodetab_init_for_local()
   group.cpus = arg_ppn;
   i = 0;
   while (!done) {
-    char *hostname = "127.0.0.1";
+    const char *hostname = "127.0.0.1";
     for (group.rank = 0; group.rank<arg_ppn; group.rank++) {
       nodetab_makehost(hostname, &group);
       if (++i == arg_requested_pes) { done = 1; break; }
@@ -3371,7 +3371,7 @@ void read_global_segments_size(void);
 static void fast_idleFn(void) {sleep(0);}
 void finish_nodes(void);
 
-int main(int argc, char **argv, char **envp)
+int main(int argc, const char **argv, char **envp)
 {
   srand(time(0)); 
   skt_init();
@@ -3642,7 +3642,7 @@ void start_nodes_local(char ** env)
 {
   int ret, i;
   PROCESS_INFORMATION pi;     /* process Information for the process spawned */
-  char **p;
+  const char **p;
 
   char environment[10000];/*Doubly-null terminated environment strings*/
   char cmdLine[10000];/*Program command line, including executable name*/
@@ -3938,7 +3938,7 @@ int rsh_fork(int nodeno,const char *startScript)
   return pid;
 }
 
-void fprint_arg(FILE *f,char **argv)
+void fprint_arg(FILE *f, const char **argv)
 {
   while (*argv) { 
   	fprintf(f," %s",*argv); 
@@ -3950,7 +3950,7 @@ void rsh_Find(FILE *f,const char *program,const char *dest)
     fprintf(f,"Find %s\n",program);
     fprintf(f,"%s=$loc\n",dest);
 }
-void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
+void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv, int restart)
 {
   char *netstart;
   char *arg_nodeprog_r,*arg_currdir_r;
@@ -4483,7 +4483,7 @@ void start_nodes_rsh()
 /* for mpiexec, for once calling mpiexec to start on all nodes  */
 int rsh_fork_one(const char *startScript)
 {
-  char **rshargv;
+  const char **rshargv;
   int pid;
   int num=0;
   char npes[128];
@@ -4495,7 +4495,7 @@ int rsh_fork_one(const char *startScript)
     num++;
     s = skipblanks(e); e = skipstuff(s);
   }
-  rshargv = (char **)malloc(sizeof(char *)*(num+8));
+  rshargv = (const char **)malloc(sizeof(char *)*(num+8));
 
   num = 0;
   s=nodetab_shell(0); e=skipstuff(s);
@@ -4520,7 +4520,7 @@ int rsh_fork_one(const char *startScript)
   /*  unlink(startScript); */
       //removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
       for(i=3; i<1024; i++) close(i);
-      execvp(rshargv[0], rshargv);
+      execvp(rshargv[0], const_cast<char * const *>(rshargv));
       fprintf(stderr,"Charmrun> Couldn't find mpiexec program '%s'!\n",rshargv[0]);
       exit(1);
   }
@@ -4656,7 +4656,7 @@ void start_nodes_local(char ** env)
 	  if (-1!=(fd = open("/dev/null", O_RDWR))) {
 		dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
 	  }
-	  status = execve(pparam_argv[1], pparam_argv+1, envp);
+	  status = execve(pparam_argv[1], const_cast<char* const*>(pparam_argv)+1, envp);
 	  dup2(fd1, 1);
 	  printf("execve failed to start process \"%s\" with status: %d\n", pparam_argv[1], status);
 	  kill(getppid(), 9);
@@ -4686,7 +4686,7 @@ void restart_node(int crashed_node){
 	FILE *f;
 	char startScript[200];
 	int restart_rsh_pid;
-	char **restart_argv;
+	const char **restart_argv;
 	int status=0;
         char phase_str[10];
 	int i;
@@ -4701,7 +4701,7 @@ void restart_node(int crashed_node){
 	while(arg_argv[i]!= NULL){
 		i++;
 	}
-	restart_argv = (char **)malloc(sizeof(char *)*(i+4));
+	restart_argv = (const char **)malloc(sizeof(char *)*(i+4));
 	i=0;
 	while(arg_argv[i]!= NULL){
 		restart_argv[i] = arg_argv[i];
