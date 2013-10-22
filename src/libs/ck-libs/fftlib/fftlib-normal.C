@@ -305,7 +305,7 @@ NormalSlabArray::NormalSlabArray(NormalFFTinfo &info,
 				 CProxy_NormalSlabArray dest, 
 				 bool useCommlib, 
 				 ComlibInstanceHandle inst)  {
-    NormalSlabArray();
+  //NormalSlabArray();
     setup(info, src, dest, useCommlib, inst); 
 }
 
