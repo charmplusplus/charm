@@ -303,7 +303,6 @@ CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs){
     // Read second value from message. 
     numProcsRepresentedInMessage[i] = incomingMsgs[i].pop<numProcs_T>();
     totalProcsAcrossAllMessages += numProcsRepresentedInMessage[i];
-    delete numProcsRepresentedInMessage;
     //    CkPrintf("Number of procs in message[%d] is %d\n", i,  (int)numProcsRepresentedInMessage[i]);
   }
   
@@ -335,6 +334,7 @@ CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs){
   CkReductionMsg *m = CkReductionMsg::buildNew(dest2.datalength(),dest2.buffer());   
   dest.freeBuf();
   delete[] incomingMsgs;
+  delete[] numProcsRepresentedInMessage;
   return m;
 }
 
