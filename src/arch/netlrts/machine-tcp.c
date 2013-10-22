@@ -343,7 +343,7 @@ static void IntegrateMessageDatagram(char **msg, int len)
          CmiAbort("\n\n\t\tLength mismatch!!\n\n");
       if (node->asm_fill == node->asm_total) {
 	    //common core code  will handle where to send the messages
-		handleOneRecvedMsg(rank, newmsg);
+		handleOneRecvedMsg(node->asm_total, newmsg);
         node->asm_msg = 0;
       }
     } 
