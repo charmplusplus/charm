@@ -1543,7 +1543,6 @@ bool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
 /**********Added for cosmology (inline function handling without parameter marshalling)***********/
 
 LDObjHandle CkMigratable::timingBeforeCall(int* objstopped){
-
 	LDObjHandle objHandle;
 #if CMK_LBDB_ON
 	if (getLBDB()->RunningObject(&objHandle)) {
@@ -1553,36 +1552,10 @@ LDObjHandle CkMigratable::timingBeforeCall(int* objstopped){
 	myRec->startTiming(1);
 #endif
 
-  //DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
-	//bool isDeleted=false; //Enables us to detect deletion during processing
-	//deletedMarker=&isDeleted;
-/*#ifndef CMK_OPTIMIZE
-	if (msg) {  Tracing: 
-		envelope *env=UsrToEnv(msg);
-	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
-		if (_entryTable[epIdx]->traceEnabled)
-			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
-		    		 ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID(((CkGroupID)env->getArrayMgr())).idx);
-	}
-#endif*/
-
   return objHandle;
 }
 
 void CkMigratable::timingAfterCall(LDObjHandle objHandle,int *objstopped){
-  
-/*#ifndef CMK_OPTIMIZE
-	if (msg) {  Tracing: 
-		if (_entryTable[epIdx]->traceEnabled)
-			_TRACE_END_EXECUTE();
-	}
-#endif*/
-//#if CMK_LBDB_ON
-//        if (!isDeleted) checkBufferedMigration();   // check if should migrate
-//#endif
-//	if (isDeleted) return false;//We were deleted
-//	deletedMarker=NULL;
-//	return true;
 	myRec->stopTiming(1);
 #if CMK_LBDB_ON
 	if (*objstopped) {
