@@ -2710,11 +2710,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
 
   int i,nBlocks=0;
   CmiIsomallocBlockList *cur=NULL, *start=*lp;
-#if 0 /*#ifndef CMK_OPTIMIZE*/
-  if (CpvAccess(isomalloc_blocklist)!=NULL)
-    CmiAbort("Called CmiIsomallocBlockListPup while a blockList is active!\n"
-        "You should swap out the active blocklist before pupping.\n");
-#endif
+
   /*Count the number of blocks in the list*/
   if (!pup_isUnpacking(p)) {
     nBlocks=1; /*<- Since we have to skip the start block*/
