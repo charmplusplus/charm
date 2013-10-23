@@ -235,6 +235,7 @@ void add_to_list(group_list_t *list,tree_t **cur_group, int arity, double val){
   elem=new_group_list(tab,val,list->next);
   list->next=elem;
   list->val++;
+  /* cppcheck-suppress memleak */
 }
 
 
@@ -1187,6 +1188,7 @@ tree_t *build_level_topology(tree_t *tab_node,double **com_mat,int N,int arity,i
     free_tab_double(com_mat,N);
     free(obj_weight);
   }
+  /* cppcheck-suppress deallocDealloc */
   free_tab_double(new_com_mat,M);
   free(new_obj_weight);
 
