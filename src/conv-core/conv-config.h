@@ -73,14 +73,6 @@
 #define CMK_USE_MEMPOOL_ISOMALLOC 1
 #endif
 
-/* set up what production/non-production means */
-#ifdef CMK_OPTIMIZE
-/*
-#undef CMK_REPLAYSYSTEM
-#define CMK_REPLAYSYSTEM            0
-*/
-#endif    /* CMK_OPTIMIZE */
-
 #ifndef CMK_REPLAYSYSTEM
 #define CMK_REPLAYSYSTEM            1
 #endif
