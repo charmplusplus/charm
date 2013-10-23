@@ -510,7 +510,7 @@ int CmiAsyncMsgSent(CmiCommHandle handle) {
 }
 
 void CmiReleaseCommHandle(CmiCommHandle handle) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (*((int *)handle) != 0) CmiAbort("Released a CmiCommHandle not free!");
 #endif
     free(handle);

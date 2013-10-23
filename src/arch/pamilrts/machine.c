@@ -49,7 +49,7 @@ char *ALIGN_32(char *p) {
 #include "machine-persistent.h"
 #endif
 
-#if !CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 static int checksum_flag = 0;
 extern unsigned char computeCheckSum(unsigned char *data, int len);
 
@@ -618,7 +618,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
   /* checksum flag */
   if (CmiGetArgFlag(*argv,"+checksum")) {
-#if !CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     checksum_flag = 1;
     if (_Cmi_mynode == 0) CmiPrintf("Charm++: CheckSum checking enabled! \n");
 #else
