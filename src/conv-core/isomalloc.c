@@ -2114,7 +2114,9 @@ static void init_ranges(char **argv)
       if (CmiBarrier() == -1 && CmiMyPe()==0) 
         CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
       else {
+	/* cppcheck-suppress uninitStructMember */
         CmiUInt8 s = (CmiUInt8)freeRegion.start;
+	/* cppcheck-suppress uninitStructMember */
         CmiUInt8 e = (CmiUInt8)(freeRegion.start+freeRegion.len);
         int fd, i;
         char fname[128];
