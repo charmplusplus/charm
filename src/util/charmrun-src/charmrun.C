@@ -2003,7 +2003,7 @@ int req_handle_barrier0(ChMessage *msg,SOCKET fd)
 }
 
 
-int req_handle_abort(ChMessage *msg,SOCKET fd)
+void req_handle_abort(ChMessage *msg,SOCKET fd)
 {
   /*fprintf(stderr,"req_handle_abort called \n");*/
   if (msg->len==0) 
@@ -2245,7 +2245,7 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
   else if (strcmp(cmd,"barrier")==0)    return req_handle_barrier(msg,replyFd);
   else if (strcmp(cmd,"barrier0")==0)   return req_handle_barrier0(msg,replyFd);
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
-  else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
+  else if (strcmp(cmd,"abort")==0)      {req_handle_abort(msg,replyFd); return REQ_FAILED;}
 #ifdef __FAULT__	
   else if (strcmp(cmd,"crash_ack")==0)   return req_handle_crashack(msg,replyFd);
 #ifdef HSTART
