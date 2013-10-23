@@ -52,10 +52,10 @@
  * Copied from old convcomlib.h - Filippo
  ****************************************************************/
 extern int com_debug;
-#ifdef CMK_OPTIMIZE
-inline void ComlibPrintf(...) {}
-#else
+#if CMK_ERROR_CHECKING
 #define ComlibPrintf if(com_debug) CmiPrintf
+#else
+inline void ComlibPrintf(...) {}
 //#define ComlibPrintf  CmiPrintf
 #endif
 
