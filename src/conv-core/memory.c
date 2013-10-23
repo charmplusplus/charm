@@ -876,6 +876,7 @@ void* CmiMallocAligned(const size_t size, const unsigned int alignment) {
   *((char*)rtn + offset - 1) = offset;
 
   /* Return the address with offset */
+  /* cppcheck-suppress memleak */
   return (void*)((char*)rtn + offset);
 }
 
