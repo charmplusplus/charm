@@ -1491,12 +1491,12 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 
   //printf("deliver outgoing message, dest: %d \n", dst);
 #if CMK_ERROR_CHECKING
-    if (dst<0 || dst>=CmiNumPes())
+    if (dst<0 || dst>=CmiNumPesGlobal())
       CmiAbort("Send to out-of-bounds processor!");
 #endif
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
-    if (node->nodestart != Cmi_nodestart) {
+    if (node->nodestart != Cmi_nodestartGlobal) {
 #if !CMK_SMP_NOT_RELAX_LOCK	  		
         CmiCommLock();
 #endif		
@@ -1521,7 +1521,7 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
   MACHSTATE2(2,"Preparing outgoing message for pe %d, size %d",pe,size);
   ogm->size = size;
   ogm->data = data;
-  ogm->src = cs->pe;
+  ogm->src = CmiGetPeGlobal(cs->pe,CmiMyPartition());
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;
@@ -1549,6 +1549,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   MACHSTATE(1,"CmiGeneralSend {");
 
   CmiMsgHeaderSetLength(data, size);
+
   ogm=PrepareOutgoing(cs,pe,size,'F',data);
 
 #if CMK_SMP_NOT_RELAX_LOCK  
@@ -1650,7 +1651,7 @@ void LrtsAdvanceCommunication(int whileidle)
 /* must be called on every PE including communication processors */
 void LrtsBarrier()
 {
-  int numnodes = CmiNumNodes();
+  int numnodes = CmiNumNodesGlobal();
   static int barrier_phase = 0;
 
   if (Cmi_charmrun_fd == -1) return 0;                // standalone
@@ -1671,7 +1672,7 @@ void LrtsBarrier()
 int CmiBarrierZero()
 {
   int i;
-  int numnodes = CmiNumNodes();
+  int numnodes = CmiNumNodesGlobal();
   ChMessage msg;
 
   if (Cmi_charmrun_fd == -1) return 0;                // standalone
@@ -1682,9 +1683,9 @@ int CmiBarrierZero()
 
   if (CmiMyRank() == 0) {
     char str[64];
-    sprintf(str, "%d", CmiMyNode());
+    sprintf(str, "%d", CmiMyNodeGlobal());
     ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
-    if (CmiMyNode() == 0) {
+    if (CmiMyNodeGlobal() == 0) {
       while (barrierReceived != 2) {
         CmiCommLock();
         ctrl_getone();

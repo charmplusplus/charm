@@ -203,7 +203,8 @@ int Cmi_commthread = 1;
 #endif
 
 /*SHOULD BE MOVED TO MACHINE-SMP.C ??*/
-static int Cmi_nodestart;
+static int Cmi_nodestart = -1;
+static int Cmi_nodestartGlobal = -1;
 
 /*
  * Network progress utility variables. Period controls the rate at
@@ -571,7 +572,7 @@ if (MSG_STATISTIC)
 #if CMK_USE_OOB
     if (CpvAccess(_urgentSend)) mode |= OUT_OF_BAND;
 #endif
-    return LrtsSendFunc(destNode, destPE, size, msg, mode);
+    return LrtsSendFunc(destNode, CmiGetPeGlobal(destPE,CmiMyPartition()), size, msg, mode);
 }
 
 //I am changing this function to offload task to a generic function - the one
@@ -938,6 +939,12 @@ void CmiCreatePartitions(char **argv) {
   _Cmi_numnodes_global = _Cmi_numnodes;
   _Cmi_mynode_global = _Cmi_mynode;
   _Cmi_numpes_global = _Cmi_numnodes_global * _Cmi_mynodesize;
+
+  if(Cmi_nodestart != -1) {
+    Cmi_nodestartGlobal = Cmi_nodestart;
+  } else {
+    Cmi_nodestartGlobal =  _Cmi_mynode_global * _Cmi_mynodesize;
+  }
 
   //creates partitions, reset _Cmi_mynode to be the new local rank
   CmiAssert(_partitionInfo.numPartitions <= _Cmi_numnodes_global);

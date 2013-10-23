@@ -211,7 +211,7 @@ static void CommunicationServerNet(int sleepTime, int where)
     MACHSTATE(4,"Attempted to re-enter comm. server!") 
     return;
   });
-  LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+  LOG(GetClock(), Cmi_nodestartGlobal, 'I', 0, 0);
   MACHSTATE2(sleepTime?3:2,"CommunicationsServer(%d,%d) {",
 	     sleepTime,writeableAcks||writeableDgrams)  
 #if CMK_SMP
@@ -433,7 +433,7 @@ int TransmitImplicitDgram(ImplicitDgram dg)
   dest = dg->dest;
   /* first int is len of the packet */
   DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, len, dg->broot);
-  LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestartGlobal, 'T', dest->nodestart, dg->seqno);
   /*
   ChMessageHeader_new("data", len, &msg);
   if (-1==skt_sendN(dest->sock,(const char *)&msg,sizeof(msg))) 

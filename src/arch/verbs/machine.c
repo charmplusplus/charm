@@ -1535,7 +1535,7 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 
   //printf("deliver outgoing message, dest: %d \n", dst);
 #if CMK_ERROR_CHECKING
-    if (dst<0 || dst>=CmiNumPes())
+    if (dst<0 || dst>=CmiNumPesGlobal())
       CmiAbort("Send to out-of-bounds processor!");
 #endif
     node = nodes_by_pe[dst];
@@ -1565,7 +1565,7 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
   MACHSTATE2(2,"Preparing outgoing message for pe %d, size %d",pe,size);
   ogm->size = size;
   ogm->data = data;
-  ogm->src = cs->pe;
+  ogm->src = CmiGetPeGlobal(cs->pe,CmiMyPartition();
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;

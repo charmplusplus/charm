@@ -391,8 +391,9 @@ static void node_addresses_store(ChMessage *msg)
   for (i=0; i<_Cmi_numnodes; i++) {
     OtherNode node = nodes + i;
     OtherNode_init(node);
-    for (j=0; j<node->nodesize; j++)
+    for (j=0; j<node->nodesize; j++) {
       nodes_by_pe[j + node->nodestart] = node;
+    }
   }
 #ifdef CMK_CPV_IS_SMP
   /* index for communication threads */
