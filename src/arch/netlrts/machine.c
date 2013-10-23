@@ -1549,7 +1549,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   MACHSTATE(1,"CmiGeneralSend {");
 
   CmiMsgHeaderSetLength(data, size);
-  ogm=PrepareOutgoing(cs,pe,size,freemode,data);
+  ogm=PrepareOutgoing(cs,pe,size,'F',data);
 
 #if CMK_SMP_NOT_RELAX_LOCK  
   CmiCommLock();
