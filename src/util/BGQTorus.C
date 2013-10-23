@@ -11,7 +11,7 @@ CmiNodeLock bgq_lock;
 int bgq_isLocalSet = 0;
 
 void bgq_topo_init() {
-  static init_done = 0;
+  static int init_done = 0;
   if (!init_done) {
     bgq_lock = CmiCreateLock();
     init_done = 1;
