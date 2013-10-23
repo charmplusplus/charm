@@ -2751,11 +2751,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #if MACHINE_DEBUG
   debugLog=NULL;
 #endif
-#if CMK_USE_HP_MAIN_FIX
-#if FOR_CPLUS
-  _main(argc,argv);
-#endif
-#endif
   Cmi_startfn = fn; Cmi_usrsched = usc;
   Cmi_netpoll = 0;
 #if CMK_NETPOLL

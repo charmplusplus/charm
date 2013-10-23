@@ -49,10 +49,6 @@
   be eliminated entirely) */
 #define CMK_LBDB_OFF (!CMK_LBDB_ON)
 
-#ifndef CMK_USE_HP_MAIN_FIX
-# define CMK_USE_HP_MAIN_FIX	0
-#endif
-
 #if CMK_AMD64 && !defined(CMK_64BIT)
 #define CMK_64BIT		1
 #endif

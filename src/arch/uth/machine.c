@@ -312,12 +312,6 @@ int usched, initret;
 {
   CthThread t; int stacksize, i;
   
-#if CMK_USE_HP_MAIN_FIX
-#if FOR_CPLUS
-  _main(argc,argv);
-#endif
-#endif
-  
   CmiSwitchToPE = CmiSwitchToPEFn;
 
   CmiArgv = CmiCopyArgs(argv);

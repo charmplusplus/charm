@@ -1858,11 +1858,6 @@ static int net_default_skt_abort(int code,const char *msg)
 
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
-#if CMK_USE_HP_MAIN_FIX
-#if FOR_CPLUS
-  _main(argc,*argv);
-#endif
-#endif
   Cmi_netpoll = 0;
 #if CMK_NETPOLL
   Cmi_netpoll = 1;

@@ -1289,12 +1289,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     int largc=*argc;
     char** largv=*argv;
 
-#if CMK_USE_HP_MAIN_FIX
-#if FOR_CPLUS
-    _main(largc,largv);
-#endif
-#endif
-
     if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
 #if CMK_SMP
       Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
