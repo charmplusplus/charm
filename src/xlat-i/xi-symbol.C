@@ -1448,6 +1448,7 @@ Array::Array(int ln, attrib_t Nattr, NamedType *index,
 			bases_CBase = new TypeList(new NamedType(parentClassName), NULL);
 		}
 	}
+	// cppcheck-suppress memleak
 }
 
 static void
