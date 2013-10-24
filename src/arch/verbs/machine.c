@@ -1408,7 +1408,7 @@ static void CmiStdoutFlush(void) {
 void copyInfiAddr(ChInfiAddr *qpList);
 #endif
 
-#if CMK_IBVERBS_FAST_START
+#if CMK_USE_IBVERBS && CMK_IBVERBS_FAST_START
 static void send_partial_init()
 {
   ChMessageInt_t nodeNo = ChMessageInt_new(_Cmi_mynode);

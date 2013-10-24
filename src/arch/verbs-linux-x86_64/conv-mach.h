@@ -86,3 +86,22 @@
 #endif
 
 
+#undef CMK_USE_IBVERBS
+#define CMK_USE_IBVERBS				1
+
+#undef CMK_THREADS_USE_JCONTEXT
+#define CMK_THREADS_USE_JCONTEXT                           1
+
+/*
+#undef CMK_IMMEDIATE_MSG
+#define CMK_IMMEDIATE_MSG       0
+*/
+
+#undef CMK_DIRECT                 
+#define CMK_DIRECT                                        1
+
+#undef CMK_DISABLE_SYNC
+#define CMK_DISABLE_SYNC       1
+
+#undef CMK_IBVERBS_FAST_START
+#define CMK_IBVERBS_FAST_START                         0
