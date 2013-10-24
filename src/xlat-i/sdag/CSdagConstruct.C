@@ -395,12 +395,13 @@ namespace xi {
       pl = el->entry->param;
       if (!pl->isVoid()) {
         while(pl != NULL) {
-          sv = new CStateVar(pl);
-          stateVarsChildren->push_back(sv);
-          whensEntryMethodStateVars.push_back(sv);
-          whenCurEntry.push_back(sv);
-          el->entry->addEStateVar(sv);
-
+          if (pl->getGivenName() != NULL){//if the parameter doesn't have a name, ignore it 
+            sv = new CStateVar(pl);
+            stateVarsChildren->push_back(sv);
+            whensEntryMethodStateVars.push_back(sv);
+            whenCurEntry.push_back(sv);
+            el->entry->addEStateVar(sv);
+          }
           pl = pl->next;
         }
       }
