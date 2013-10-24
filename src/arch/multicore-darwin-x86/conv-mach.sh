@@ -1,10 +1,12 @@
 CMK_MACOSX=1
 CMK_DEFS=' -D_REENTRANT '
 
+CMK_MAC_ARGS="-fPIC -dynamic -fno-common -mmacosx-version-min=10.6 -m32 $CMK_DEFS"
+
 CMK_CPP_CHARM="/usr/bin/cpp -P"
 CMK_CPP_C="gcc -E -mmacosx-version-min=10.6"
-CMK_CC="gcc -fPIC -dynamic -fno-common -mmacosx-version-min=10.6 $CMK_DEFS "
-CMK_CXX="g++ -fPIC -dynamic -fno-common -mmacosx-version-min=10.6 $CMK_DEFS "
+CMK_CC="gcc $CMK_MAC_ARGS "
+CMK_CXX="g++ $CMK_MAC_ARGS "
 CMK_CXXPP="g++ -x g++ -E -mmacosx-version-min=10.6 "
 CMK_LDXX="$CMK_CXX -multiply_defined suppress -mmacosx-version-min=10.6 $CMK_DEFS "
 CMK_XIOPTS=""
