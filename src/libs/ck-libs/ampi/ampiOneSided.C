@@ -837,7 +837,7 @@ MPI_IGet_Data(MPI_Status status)
  */
 CDECL
 int AMPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr){
-  AMPIAPI("AMPI_Alloc_mem");
+  TCharmAPIRoutine apiRoutineSentry("AMPI_Alloc_mem", "ampi", false);
   *(void **)baseptr = malloc(size);
   return MPI_SUCCESS;
 }
@@ -849,7 +849,7 @@ int AMPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr){
  */
 CDECL
 int AMPI_Free_mem(void *baseptr){
-  AMPIAPI("AMPI_Free_mem");
+  TCharmAPIRoutine apiRoutineSentry("AMPI_Free_mem", "ampi", false);
   free(baseptr);
   return MPI_SUCCESS;
 }
