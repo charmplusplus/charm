@@ -128,3 +128,9 @@ then
   . $CHARMINC/conv-mach-pxshm.sh
 fi
 
+if [ -n "$GNI_CRAYXE" -o -n "$GNI_CRAYXC" ] && [ -z "$REGULARPAGE" ]
+then
+    echo "########################"
+  . $CHARMINC/conv-mach-hugepages.sh
+fi
+
