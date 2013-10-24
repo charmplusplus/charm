@@ -48,8 +48,10 @@
 #include "cmidirect.h"
 #endif
 
-#if !defined(LARGEPAGE)
+#if REGULARPAGE 
 #define     LARGEPAGE              0
+#else
+#define     LARGEPAGE              1
 #endif
 
 #if CMK_SMP
