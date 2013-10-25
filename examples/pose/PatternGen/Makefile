@@ -10,7 +10,6 @@
 # ***********************************************************************
 
 # For parallel simulation
-OPTS=-g #-O #-DCMK_TRACE_DISABLED=1 -DCMK_MEMCHECKS_OFF=1
 ETRANS_OPTS=
 
 # For sequential simulation

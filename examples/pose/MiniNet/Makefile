@@ -9,7 +9,6 @@
 #
 # ***********************************************************************
 
-OPTS=-O #-DSEQUENTIAL_POSE=1 #
 #USE THIS Line for sequential
 #OPTS=-O -DSEQUENTIAL_POSE=1 
 #USE THIS Line for sequential max speed no debugging

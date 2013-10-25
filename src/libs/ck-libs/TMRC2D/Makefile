@@ -1,4 +1,3 @@
-OPTS+= #-g -Wall #-O -DCMK_ERROR_CHECKING=0 -DCMK_MEMCHECKS_OFF=1
 CHARMDIR=../../../../
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 
