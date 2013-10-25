@@ -85,7 +85,7 @@ void *CkCallback::impl_thread_delay(void) const
  * because we need CkCallback before CProxyElement* are defined.
  */
 CkCallback::CkCallback(Chare *p, int ep, bool doInline) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendChare:sendChare;
@@ -93,14 +93,14 @@ CkCallback::CkCallback(Chare *p, int ep, bool doInline) {
 	d.chare.id=p->ckGetChareID();
 }
 CkCallback::CkCallback(Group *p, int ep, bool doInline) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendGroup:sendGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyPe();
 }
 CkCallback::CkCallback(NodeGroup *p, int ep, bool doInline) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendNodeGroup:sendNodeGroup;
@@ -108,7 +108,7 @@ CkCallback::CkCallback(NodeGroup *p, int ep, bool doInline) {
 }
 
 CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=bcastNodeGroup;
@@ -116,7 +116,7 @@ CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
 }
 
 CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendNodeGroup:sendNodeGroup;
@@ -124,7 +124,7 @@ CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline
 }
 
 CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendGroup:sendGroup;
@@ -133,7 +133,7 @@ CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
 	d.group.onPE=grpElt.ckGetGroupPe();
 }
 CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendArray:sendArray;
@@ -143,7 +143,7 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInlin
 }
 
 CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=bcastSection;
@@ -159,7 +159,7 @@ CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline) {
 }
 
 CkCallback::CkCallback(int ep, CkSectionID &id) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=bcastSection;
@@ -172,7 +172,7 @@ CkCallback::CkCallback(int ep, CkSectionID &id) {
 }
 
 CkCallback::CkCallback(ArrayElement *p, int ep,bool doInline) {
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_ERROR_CHECKING
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendArray:sendArray;
