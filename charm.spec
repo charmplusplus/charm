@@ -15,7 +15,7 @@ Name: Charm
 
 Version: 5.9
 Release: 12
-Copyright: GPL
+Copyright: UIUC Academic/Non-commercial
 Group: Applications/System
 BuildRoot: /var/tmp/%{name}-root
 Source: http://charm.cs.illinois.edu/distrib/Charm-%{version}-%{release}.tar.bz2
