@@ -5459,6 +5459,13 @@ int AMPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
 }
 
 CDECL
+int AMPI_Get_version(int *version, int *subversion){
+  AMPIAPI("AMPI_Get_version");
+  *version = MPI_VERSION;
+  *subversion = MPI_SUBVERSION;
+}
+
+CDECL
 int AMPI_Get_processor_name(char *name, int *resultlen){
   AMPIAPI("AMPI_Get_processor_name");
   ampiParent *ptr = getAmpiParent();
