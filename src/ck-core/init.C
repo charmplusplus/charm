@@ -1130,7 +1130,6 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkCallback();
 		_registertempo();
 		_registerwaitqd();
-		_registercharisma();
 		_registerCkCheckpoint();
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();

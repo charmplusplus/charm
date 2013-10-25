@@ -10,7 +10,6 @@
 #include "register.h"
 #include "stats.h"
 #include "ckfutures.h"
-#include "charisma.h"
 #include "TopoManager.h"
 
 #if CMK_ERROR_CHECKING

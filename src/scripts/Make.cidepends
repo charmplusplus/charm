@@ -4,7 +4,6 @@ BaseLB.decl.h BaseLB.def.h: BaseLB.ci.stamp
 BlockLB.decl.h BlockLB.def.h: BlockLB.ci.stamp
 BlueGene.decl.h BlueGene.def.h: BlueGene.ci.stamp
 CentralLB.decl.h CentralLB.def.h: CentralLB.ci.stamp
-charisma.decl.h charisma.def.h: charisma.ci.stamp
 CkArray.decl.h CkArray.def.h: ckarray.ci.stamp
 CkArrayReductionMgr.decl.h CkArrayReductionMgr.def.h: ckarrayreductionmgr.ci.stamp
 CkCallback.decl.h CkCallback.def.h: ckcallback.ci.stamp
