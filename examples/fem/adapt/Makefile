@@ -1,5 +1,3 @@
-OPTS+= #-g -Wall #-O -DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
-
 CHARMDIR=$(HOME)/charm
 CFLAGS=-I../
 CHARMC=$(CHARMDIR)/bin/charmc $(CFLAGS) $(OPTS)
