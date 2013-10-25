@@ -46,3 +46,4 @@
 /* call cpu timer for LB */
 #define CMK_LB_CPUTIMER					   0
 
+#define CMK_HAS_SIZE_IN_MSGHDR                             0

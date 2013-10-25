@@ -98,6 +98,7 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
 #endif
 #endif
 
+#include <assert.h>
 
 void CmiSyncBroadcastFn(int size, char *msg);
 CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg);
@@ -572,7 +573,7 @@ if (MSG_STATISTIC)
 #if CMK_USE_OOB
     if (CpvAccess(_urgentSend)) mode |= OUT_OF_BAND;
 #endif
-    return LrtsSendFunc(destNode, CmiGetPeGlobal(destPE,CmiMyPartition()), size, msg, mode);
+    return LrtsSendFunc(destNode, CmiGetPeGlobal(destPE,partition), size, msg, mode);
 }
 
 //I am changing this function to offload task to a generic function - the one
@@ -751,9 +752,9 @@ void create_topoaware_partitions() {
 #if CMK_ERROR_CHECKING
   testMap = (int*)calloc(CmiNumNodesGlobal(), sizeof(int));
   for(i = 0; i < CmiNumNodesGlobal(); i++) {
-    CmiAssert(_partitionInfo.nodeMap[i] >= 0);
-    CmiAssert(_partitionInfo.nodeMap[i] < CmiNumNodesGlobal());
-    CmiAssert(testMap[_partitionInfo.nodeMap[i]] == 0);
+    assert(_partitionInfo.nodeMap[i] >= 0);
+    assert(_partitionInfo.nodeMap[i] < CmiNumNodesGlobal());
+    assert(testMap[_partitionInfo.nodeMap[i]] == 0);
     testMap[_partitionInfo.nodeMap[i]] = 1;
   }
   free(testMap);
@@ -850,7 +851,7 @@ static int create_partition_map( char **argv)
   }
 
   if(_partitionInfo.type == PARTITION_DEFAULT) {
-    CmiAssert((_Cmi_numnodes_global % _partitionInfo.numPartitions) == 0);
+    assert((_Cmi_numnodes_global % _partitionInfo.numPartitions) == 0);
     _partitionInfo.partitionPrefix[0] = 0;
     _partitionInfo.partitionSize[0] = _Cmi_numnodes_global / _partitionInfo.numPartitions;
     for(i = 1; i < _partitionInfo.numPartitions; i++) {
@@ -859,7 +860,7 @@ static int create_partition_map( char **argv)
     } 
     _partitionInfo.myPartition = _Cmi_mynode_global / _partitionInfo.partitionSize[0];
   } else if(_partitionInfo.type == PARTITION_MASTER) {
-    CmiAssert(((_Cmi_numnodes_global-1) % (_partitionInfo.numPartitions-1)) == 0);
+    assert(((_Cmi_numnodes_global-1) % (_partitionInfo.numPartitions-1)) == 0);
     _partitionInfo.partitionSize[0] = 1;
     _partitionInfo.partitionPrefix[0] = 0;
     _partitionInfo.partitionSize[1] = (_Cmi_numnodes_global-1) / (_partitionInfo.numPartitions-1);
@@ -920,13 +921,13 @@ static int create_partition_map( char **argv)
     _partitionInfo.partitionPrefix[0] = 0;
     _partitionInfo.myPartition = 0;
     for(i = 1; i < _partitionInfo.numPartitions; i++) {
-      CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
+      assert(_partitionInfo.partitionSize[i-1] > 0);
       _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
       if((_Cmi_mynode_global >= _partitionInfo.partitionPrefix[i]) && (_Cmi_mynode_global < (_partitionInfo.partitionPrefix[i] + _partitionInfo.partitionSize[i]))) {
         _partitionInfo.myPartition = i;
       }
     } 
-    CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
+    assert(_partitionInfo.partitionSize[i-1] > 0);
   }
   _Cmi_mynode = _Cmi_mynode - _partitionInfo.partitionPrefix[_partitionInfo.myPartition];
 
@@ -947,7 +948,9 @@ void CmiCreatePartitions(char **argv) {
   }
 
   //creates partitions, reset _Cmi_mynode to be the new local rank
-  CmiAssert(_partitionInfo.numPartitions <= _Cmi_numnodes_global);
+  if(_partitionInfo.numPartitions > _Cmi_numnodes_global) {
+    CmiAbort("Number of partitions requested in greater than the number of nodes\n");
+  }
   create_partition_map(argv);
   
   //reset other local variables
@@ -1446,6 +1449,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
     }
 #endif
     LrtsStillIdle();
+    CsdResetPeriodic();
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
 }
 

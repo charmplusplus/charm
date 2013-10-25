@@ -688,10 +688,12 @@ static void CommunicationServerNet(int sleepTime, int where)
   sleepTime=0;
 #endif
   CmiCommLock();
+  inProgress[CmiMyRank()] = 1;
   /* in netpoll mode, only perform service to stdout */
   if (Cmi_netpoll && where == COMM_SERVER_FROM_INTERRUPT) {
     if (CmiStdoutNeedsService()) {CmiStdoutService();}
     CmiCommUnlock();
+    inProgress[CmiMyRank()] = 0;
     return;
   }
   CommunicationsClock();
@@ -717,6 +719,7 @@ static void CommunicationServerNet(int sleepTime, int where)
     }
   }
   CmiCommUnlock();
+  inProgress[CmiMyRank()] = 0;
 
   /* when called by communication thread or in interrupt */
   if (where == COMM_SERVER_FROM_SMP || where == COMM_SERVER_FROM_INTERRUPT) {

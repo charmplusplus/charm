@@ -275,6 +275,7 @@ int getDestHandler;
 #endif
 #endif
 
+int inProgress[64];
 
 static void CommunicationServerNet(int withDelayMs, int where);
 //static void CommunicationServer(int withDelayMs);
@@ -1497,13 +1498,17 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
     if (node->nodestart != Cmi_nodestartGlobal) {
-#if !CMK_SMP_NOT_RELAX_LOCK	  		
+#if !CMK_SMP_NOT_RELAX_LOCK
+      if(!inProgress[CmiMyRank()]) {
         CmiCommLock();
+      }
 #endif		
         DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
         GarbageCollectMsg(ogm);
 #if !CMK_SMP_NOT_RELAX_LOCK	  		
+      if(!inProgress[CmiMyRank()]) {
         CmiCommUnlock();
+      }
 #endif		
   }
 #if CMK_MULTICORE
@@ -1562,10 +1567,10 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   CmiCommUnlock();
 #endif  
   
-#if CMK_SMP
-  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
-    CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
-#endif
+//#if CMK_SMP
+//  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
+//  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
+//#endif
   MACHSTATE(1,"}  LrtsSend");
   return (CmiCommHandle)ogm;
 }
@@ -1625,7 +1630,7 @@ void LrtsPostNonLocal() {}
     
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl(){
-  LrtsAdvanceCommunication(5);
+  CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
 }
 #endif
 
@@ -1634,7 +1639,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP
   CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
 #else
-  CommunicationServerNet(5, COMM_SERVER_FROM_WORKER);
+  CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
 #endif
 
 }
@@ -1731,12 +1736,6 @@ void LrtsPostCommonInit(int everReturn)
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
 #endif
-  {
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
-  }
 
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
@@ -1821,7 +1820,7 @@ void LrtsExit()
     for(i = 0; i < CmiMyNodeSize(); i++) {
       ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
     }
-    while(1) CommunicationServerNet(5, COMM_SERVER_FROM_WORKER);
+    while(1) CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
   }
 }
 
@@ -1859,6 +1858,7 @@ static int net_default_skt_abort(int code,const char *msg)
 
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
+  int i;
   Cmi_netpoll = 0;
 #if CMK_NETPOLL
   Cmi_netpoll = 1;
@@ -1945,6 +1945,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
       Cmi_check_delay=1.0e30;
+
+  for(i = 0; i < _Cmi_mynodesize; i++)
+    inProgress[i] = 0;
 
 }
 
