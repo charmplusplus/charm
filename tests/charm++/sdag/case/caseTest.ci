@@ -7,7 +7,7 @@ mainmodule caseTest {
         serial {
           CkPrintf("running\n");
           thisProxy.test2();
-          thisProxy.test1(1); thisProxy.test3();
+          thisProxy.test1(1,2); thisProxy.test3();
           thisProxy.test5();
         }
 
@@ -29,7 +29,7 @@ mainmodule caseTest {
       }
     };
 
-    entry void test1(int a);
+    entry void test1(int a, int b);
     entry void test2();
     entry void test3();
     entry void test4();
