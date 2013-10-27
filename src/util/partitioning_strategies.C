@@ -17,8 +17,12 @@ using namespace std;
 #endif
 
 /** 
- *  Author: Harshitha Menon 
- *  Contact: gplkrsh2@illinois.edu 
+ *  Author: Harshitha Menon, Nikhil Jain 
+ *  Contact: gplkrsh2@illinois.edu, nikhil@illinois.edu
+ *
+ *  More details about this implementation of the Hilbert curve can be found
+ *  from https://github.com/straup/gae-spacetimeid/blob/master/hilbert.py
+ *  and this is a C++ implementation of what is given there.
  */
 static int gray_encode(int i) {
   //cout << "gray_encode " << i << " " << (i^(i/2)) << endl;
