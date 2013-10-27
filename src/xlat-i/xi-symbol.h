@@ -375,6 +375,7 @@ public:
     Type *getType(void) {return type;}
     const char *getArrayLen(void) const {return arrLen;}
     const char *getGivenName(void) const {return given_name;}
+    void setGivenName(const char* s) {given_name = s;}
     const char *getName(void) const {return name;}
     void printMsg(XStr& str) {
       type->print(str);
@@ -439,6 +440,7 @@ class ParamList {
     }
     int isPointer(void) const {return param->type->isPointer();}
     const char *getGivenName(void) const {return param->getGivenName();}
+    void setGivenName(const char* s) {param->setGivenName(s);}
     const char *getName(void) const {return param->getName();}
     int isMarshalled(void) const {
     	return !isVoid() && !isMessage();

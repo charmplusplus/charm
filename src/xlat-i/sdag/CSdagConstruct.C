@@ -391,16 +391,27 @@ namespace xi {
     EntryList *el;
     el = elist;
     ParamList *pl;
+    int cntr = 0;
+    bool dummy_var = false;
     while (el != NULL) {
       pl = el->entry->param;
       if (!pl->isVoid()) {
         while(pl != NULL) {
+          if (pl->getGivenName() == NULL){//if the parameter doesn't have a name, generate a dummy name
+            char s[128];
+            sprintf(s, "gen_name%d", cntr);
+            pl->setGivenName(s);
+            cntr++;
+            dummy_var = true;
+          }
           sv = new CStateVar(pl);
-          stateVarsChildren->push_back(sv);
-          whensEntryMethodStateVars.push_back(sv);
+          if(!dummy_var){ //only if it's not a dummy variable, propagate it to the children 
+            stateVarsChildren->push_back(sv);
+            whensEntryMethodStateVars.push_back(sv);
+          }
+          else dummy_var = false;
           whenCurEntry.push_back(sv);
           el->entry->addEStateVar(sv);
-
           pl = pl->next;
         }
       }
