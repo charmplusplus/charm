@@ -8,12 +8,14 @@
  *  Orion Sky Lawlor, olawlor@acm.org 9/29/2001
  */
 
+#include "hilbert.h"
 #include "charm++.h"
 #include "register.h"
 #include "ck.h"
 #include "trace.h"
 #include "TopoManager.h"
 #include <vector>
+#include <algorithm>
 #include<sstream>
 
 #if CMK_LBDB_ON
@@ -456,6 +458,141 @@ public:
       flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
       flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
+    }
+#if CMK_ERROR_CHECKING
+    else {
+      CkAbort("CkArrayIndex has more than 3 integers!");
+    }
+#endif
+
+    /** binSize used in DefaultArrayMap is the floor of numChares/numPes
+     *  but for this FastArrayMap, we need the ceiling */
+    return (flati / amaps[arrayHdl]->_binSizeCeil);
+  }
+
+  void pup(PUP::er& p){
+    DefaultArrayMap::pup(p);
+  }
+};
+
+/* *
+ * Hilbert map object -- This does hilbert mapping.
+ * Convert array indices into 1D fashion according to their Hilbert filling curve 
+ */
+
+typedef struct {
+    int intIndex;
+    std::vector<int> coords;
+}hilbert_pair;
+
+bool operator== ( hilbert_pair p1, hilbert_pair p2) 
+{
+    return p1.intIndex == p2.intIndex;
+}
+
+bool myCompare(hilbert_pair p1, hilbert_pair p2)
+{
+    return p1.intIndex < p2.intIndex;
+}
+
+class HilbertArrayMap: public DefaultArrayMap
+{
+    std::vector<hilbert_pair> allpairs;
+public:
+  HilbertArrayMap(void) {
+    DEBC((AA"Creating HilbertArrayMap\n"AB));
+  }
+
+  HilbertArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
+
+  int registerArray(const CkArrayIndex& i, CkArrayID aid)
+  {
+    int idx;
+    idx = DefaultArrayMap::registerArray(i, aid);
+   
+    if (i.nInts == 1) {
+      CkPrintf("1D %d\n", amaps[idx]->_nelems.data()[0]); 
+    } else if (i.nInts == 2) {
+      CkPrintf("2D %d:%d\n", amaps[idx]->_nelems.data()[0], amaps[idx]->_nelems.data()[1]); 
+      int dims = 2;
+      int nDim0 = amaps[idx]->_nelems.data()[0];
+      int nDim1 = amaps[idx]->_nelems.data()[1];
+      int index;
+      int counter = 0;
+      allpairs.resize(nDim0*nDim1);
+      for(int i=0; i<nDim0; i++)
+          for(int j=0; j<nDim1; j++)
+          {
+              allpairs[counter].coords.resize(2);
+              allpairs[counter].coords[0] = i;
+              allpairs[counter].coords[1] = j;
+              index = Hilbert_to_int( allpairs[counter].coords, dims);
+              //CkPrintf("(%d:%d)----------> %d \n", i, j, index);
+              allpairs[counter].intIndex = index;
+              counter++;
+          }
+      std::sort(allpairs.begin(), allpairs.end(), myCompare);
+    } else if (i.nInts == 3) {
+      CkPrintf("3D %d:%d:%d\n", amaps[idx]->_nelems.data()[0], amaps[idx]->_nelems.data()[1], amaps[idx]->_nelems.data()[2]); 
+      int dims = 3;
+      int nDim0 = amaps[idx]->_nelems.data()[0];
+      int nDim1 = amaps[idx]->_nelems.data()[1];
+      int nDim2 = amaps[idx]->_nelems.data()[2];
+      int index;
+      int counter = 0;
+      allpairs.resize(nDim0*nDim1*nDim2);
+      for(int i=0; i<nDim0; i++)
+          for(int j=0; j<nDim1; j++)
+              for(int k=0; k<nDim2; k++)
+          {
+              allpairs[counter].coords.resize(3);
+              allpairs[counter].coords[0] = i;
+              allpairs[counter].coords[1] = j;
+              allpairs[counter].coords[2] = k;
+              index = Hilbert_to_int( allpairs[counter].coords, dims);
+              //CkPrintf("(%d:%d)----------> %d \n", i, j, index);
+              allpairs[counter].intIndex = index;
+              counter++;
+          }
+      std::sort(allpairs.begin(), allpairs.end(), myCompare);
+
+    }
+   
+    //for(int i=0; i<allpairs.size(); i++)
+    //    CkPrintf(" %d (%d:%d --- %d)\n ", i, allpairs[i].coords[0], allpairs[i].coords[1], allpairs[i].intIndex);
+
+    return idx;
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int flati = 0;
+    int myInt;
+    if (amaps[arrayHdl]->_nelems.nInts == 0) {
+      return RRMap::procNum(arrayHdl, i);
+    }
+    std::vector<int> coords;
+    if (i.nInts == 1) {
+      flati = i.data()[0];
+    } else if (i.nInts == 2) {
+        hilbert_pair mypair;
+        mypair.coords.resize(2);
+        mypair.coords[0] = i.data()[0];
+        mypair.coords[1] = i.data()[1];
+        myInt = Hilbert_to_int(mypair.coords, 2);
+        mypair.intIndex = myInt;
+        flati = std::distance(allpairs.begin(), std::find(allpairs.begin(), allpairs.end(), mypair));
+        //CkPrintf("(%d:%d) my realIndex is %d  %d \n", i.data()[0], i.data()[1], flati, myInt);
+    } else if (i.nInts == 3) {
+        hilbert_pair mypair;
+        mypair.coords.resize(3);
+        mypair.coords[0] = i.data()[0];
+        mypair.coords[1] = i.data()[1];
+        mypair.coords[2] = i.data()[2];
+        myInt = Hilbert_to_int(mypair.coords, 3);
+        mypair.intIndex = myInt;
+        flati = std::distance(allpairs.begin(), std::find(allpairs.begin(), allpairs.end(), mypair));
+        //CkPrintf("(%d:%d:%d) my realIndex is %d  %d \n", i.data()[0], i.data()[1], i.data()[2], flati, myInt);
+
     }
 #if CMK_ERROR_CHECKING
     else {
@@ -942,6 +1079,7 @@ class CkMapsInit : public Chare
 {
 public:
 	CkMapsInit(CkArgMsg *msg) {
+		//_defaultArrayMapID = CProxy_HilbertArrayMap::ckNew();
 		_defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
 		_fastArrayMapID = CProxy_FastArrayMap::ckNew();
 		delete msg;
