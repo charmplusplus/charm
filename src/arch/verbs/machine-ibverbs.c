@@ -1462,10 +1462,12 @@ static void CommunicationServerNet(int sleepTime, int where){
 #if CMK_SMP
 	}
 	CmiCommLock();
+	inProgress[CmiMyRank()] = 1;
 #endif
 	CommunicationServer_nolock(0);
 #if CMK_SMP
 	CmiCommUnlock();
+	inProgress[CmiMyRank()] = 0;
 #endif
 
 	/* when called by communication thread or in interrupt */
@@ -1560,59 +1562,18 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 };
 
 void static inline handoverMessage(char *newmsg,int total_size,int rank,int broot,int toBuffer){
-#if CMK_BROADCAST_SPANNING_TREE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-		 if(toBuffer){
-		 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
-	 	}else{
-          		SendSpanningChildren(NULL, 0, total_size, newmsg,broot,rank);
-		}
-	}
-#elif CMK_BROADCAST_HYPERCUBE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-		 if(toBuffer){
-		 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
-		 }else{
-          		//SendHypercube(NULL, 0, total_size, newmsg,broot,rank);
-		}
-	}
-#endif
+	
+	if(toBuffer){
+		if((CMI_BROADCAST_ROOT(newmsg)!=0))
+			insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
+	}	
+	handleOneRecvedMsg(total_size, newmsg);
 
-	switch (rank) {
-    	case DGRAM_BROADCAST: {
-				int i;
-				for (i=1; i<_Cmi_mynodesize; i++){
-					CmiPushPE(i, CopyMsg(newmsg, total_size));
-				}
-          CmiPushPE(0, newmsg);
-          break;
-      }
-#if CMK_NODE_QUEUE_AVAILABLE
-        case DGRAM_NODEBROADCAST: 
-        case DGRAM_NODEMESSAGE: {
-          CmiPushNode(newmsg);
-          break;
-        }
-#endif
-        default:
-				{
-					
-          CmiPushPE(rank, newmsg);
-				}
-  	}    /* end of switch */
-		if(!toBuffer){
+	if(!toBuffer){
 //#if !CMK_SMP		
 		processAllBufferedMsgs();
 //#endif
-		}
+	}
 }
 
 
@@ -1983,25 +1944,10 @@ static inline void processBufferedBcast(){
 			}
 			start->bcastList[i].valid=0;
 			MACHSTATE3(3,"Buffered broadcast msg %p of size %d being processed at %d",start->bcastList[i].msg,start->bcastList[i].size,i);
-#if CMK_BROADCAST_SPANNING_TREE
-        if (start->bcastList[i].asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || start->bcastList[i].asm_rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-          	SendSpanningChildren(NULL, 0, start->bcastList[i].size,start->bcastList[i].msg, start->bcastList[i].broot,start->bcastList[i].asm_rank);
-		CmiFree(start->bcastList[i].msg);           /* gzheng */
-					}
-#elif CMK_BROADCAST_HYPERCUBE
-        if (start->bcastList[i].asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || start->bcastList[i].asm_rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-          	//SendHypercube(NULL, 0,start->bcastList[i].size,start->bcastList[i].msg ,start->bcastList[i].broot,start->bcastList[i].asm_rank);
-		CmiFree(start->bcastList[i].msg);           /* gzheng */
-					}
-#endif
+		
+			handleOneRecvedMsg(start->bcastList[i].size, start->bcastList[i].msg);
+			CmiFree(start->bcastList[i].msg);           // gzheng 
+		
 		}
 		if(start->count != 0){
 			MACHSTATE2(3,"]]] start %p start->count %d",start,start->count);
