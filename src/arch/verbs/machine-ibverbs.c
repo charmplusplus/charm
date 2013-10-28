@@ -1944,25 +1944,10 @@ static inline void processBufferedBcast(){
 			}
 			start->bcastList[i].valid=0;
 			MACHSTATE3(3,"Buffered broadcast msg %p of size %d being processed at %d",start->bcastList[i].msg,start->bcastList[i].size,i);
-#if CMK_BROADCAST_SPANNING_TREE
-        if (start->bcastList[i].asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || start->bcastList[i].asm_rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-		handleOneRecvedMsg(start->bcastList[i].size, start->bcastList[i].msg);
-		CmiFree(start->bcastList[i].msg);           // gzheng 
-					}
-#elif CMK_BROADCAST_HYPERCUBE
-        if (start->bcastList[i].asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || start->bcastList[i].asm_rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-		handleOneRecvedMsg(start->bcastList[i].size, start->bcastList[i].msg);
-		CmiFree(start->bcastList[i].msg);           // gzheng 
-					}
-#endif
+		
+			handleOneRecvedMsg(start->bcastList[i].size, start->bcastList[i].msg);
+			CmiFree(start->bcastList[i].msg);           // gzheng 
+		
 		}
 		if(start->count != 0){
 			MACHSTATE2(3,"]]] start %p start->count %d",start,start->count);
