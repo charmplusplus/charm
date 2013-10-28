@@ -89,7 +89,7 @@ static vector<int> unpack_coords(const vector<int> &coords, int dim) {
         if(coords[i] > biggest)
             biggest = coords[i];
     }
-    int nChunks = max(1, int( ceil( log( biggest + 1)/log(2.0f) ) ) );
+    int nChunks = max(1, int( ceil( log( (double)biggest + 1)/log(2.0f) ) ) );
     return transpose_bits( coords, nChunks );
 }
 
