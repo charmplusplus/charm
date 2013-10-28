@@ -57,7 +57,7 @@ static int pack_index(vector<int> chunks, int dim) {
   int chunk_size = chunks.size();
   int val = 0;
   for (int i = 0;i < chunk_size; i++) {
-    val += chunks[i] * p;
+      val = val*p + chunks[i] ;
   }
   return val;
 }
