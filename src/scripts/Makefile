@@ -935,9 +935,6 @@ pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h converse.h
 pvmc_main.o: pvmc_main.c pvmc.h pvm3.h converse.h
 	$(CHARMC) -o $@ pvmc_main.c
 
-hilbert.o: hilbert.C 
-	$(CHARMC) -o $@ hilbert.C 
-
 $(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C futil.f90
 	$(CHARMC) f90main.ci
 	$(CHARMC) -c -DAMPI_FORTRAN=1 f90main.C
