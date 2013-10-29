@@ -5463,6 +5463,7 @@ int AMPI_Get_version(int *version, int *subversion){
   AMPIAPI("AMPI_Get_version");
   *version = MPI_VERSION;
   *subversion = MPI_SUBVERSION;
+  return 0;
 }
 
 CDECL
