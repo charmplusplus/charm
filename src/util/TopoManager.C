@@ -561,7 +561,7 @@ extern "C" void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops) {
 extern "C" void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap) {
   if(scheme == 0) {
     if(!CmiMyNodeGlobal()) {
-      CmiPrintf("Charm++> Using rank ordered division (scheme 0) for topology aware partitions\n");
+      printf("Charm++> Using rank ordered division (scheme 0) for topology aware partitions\n");
     }
     int i;
     for(i = 0; i < CmiNumNodes(); i++) {
@@ -569,17 +569,17 @@ extern "C" void TopoManager_createPartitions(int scheme, int numparts, int *node
     }
   } else if(scheme == 1) {
     if(!CmiMyNodeGlobal()) {
-      CmiPrintf("Charm++> Using planar division (scheme 1) for topology aware partitions\n");
+      printf("Charm++> Using planar division (scheme 1) for topology aware partitions\n");
     }
     getPlanarList(nodeMap);
   } else if(scheme == 2) {
     if(!CmiMyNodeGlobal()) {
-      CmiPrintf("Charm++> Using hilber curve (scheme 2) for topology aware partitions\n");
+      printf("Charm++> Using hilber curve (scheme 2) for topology aware partitions\n");
     }
     getHilbertList(nodeMap);
   } else if(scheme == 3) {
     if(!CmiMyNodeGlobal()) {
-      CmiPrintf("Charm++> Using recursive bisection (scheme 3) for topology aware partitions\n");
+      printf("Charm++> Using recursive bisection (scheme 3) for topology aware partitions\n");
     }
     getRecursiveBisectionList(numparts,nodeMap);
   } else {
