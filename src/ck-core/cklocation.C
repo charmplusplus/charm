@@ -9,6 +9,7 @@
  */
 
 #include "hilbert.h"
+#include "partitioning_strategies.h"
 #include "charm++.h"
 #include "register.h"
 #include "ck.h"
@@ -602,7 +603,14 @@ public:
 
     /** binSize used in DefaultArrayMap is the floor of numChares/numPes
      *  but for this FastArrayMap, we need the ceiling */
-    return (flati / amaps[arrayHdl]->_binSizeCeil);
+    int *procList = new int[CkNumPes()]; 
+    getHilbertList(procList);
+    int block = flati / amaps[arrayHdl]->_binSizeCeil;
+    //for(int i=0; i<CkNumPes(); i++)
+    //    CkPrintf("(%d:%d) ", i, procList[i]);
+    //CkPrintf("\n");
+    //CkPrintf("block [%d:%d]\n", block, procList[block]);
+    return procList[block];
   }
 
   void pup(PUP::er& p){
