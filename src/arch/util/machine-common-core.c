@@ -145,6 +145,7 @@ int _Cmi_mype_global;
 int _Cmi_numpes_global;
 int _Cmi_mynode_global;
 int _Cmi_numnodes_global;
+static int _writeToStdout = 1;
 
 // Node state structure, local information for the partition
 int               _Cmi_mynodesize;/* Number of processors in my address space */
@@ -1092,6 +1093,7 @@ if (  MSG_STATISTIC)
             strerror(errno));
         CmiAbort("Error redirecting stdout to file.");
       }
+      _writeToStdout = 0;
       free(stdoutpath);
     }
 
