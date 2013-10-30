@@ -499,12 +499,20 @@ bool myCompare(hilbert_pair p1, hilbert_pair p2)
 class HilbertArrayMap: public DefaultArrayMap
 {
     std::vector<hilbert_pair> allpairs;
+    int *procList;
 public:
   HilbertArrayMap(void) {
+    procList = new int[CkNumPes()]; 
     DEBC((AA"Creating HilbertArrayMap\n"AB));
   }
 
   HilbertArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
+
+  ~HilbertArrayMap()
+  {
+      if(procList)
+          delete []procList;
+  }
 
   int registerArray(const CkArrayIndex& i, CkArrayID aid)
   {
@@ -568,10 +576,10 @@ public:
   int procNum(int arrayHdl, const CkArrayIndex &i) {
     int flati = 0;
     int myInt;
+    int dest;
     if (amaps[arrayHdl]->_nelems.nInts == 0) {
       return RRMap::procNum(arrayHdl, i);
     }
-    std::vector<int> coords;
     if (i.nInts == 1) {
       flati = i.data()[0];
     } else if (i.nInts == 2) {
@@ -603,7 +611,6 @@ public:
 
     /** binSize used in DefaultArrayMap is the floor of numChares/numPes
      *  but for this FastArrayMap, we need the ceiling */
-    int *procList = new int[CkNumPes()]; 
     getHilbertList(procList);
     int block = flati / amaps[arrayHdl]->_binSizeCeil;
     //for(int i=0; i<CkNumPes(); i++)
