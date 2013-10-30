@@ -503,6 +503,7 @@ class HilbertArrayMap: public DefaultArrayMap
 public:
   HilbertArrayMap(void) {
     procList = new int[CkNumPes()]; 
+    getHilbertList(procList);
     DEBC((AA"Creating HilbertArrayMap\n"AB));
   }
 
@@ -611,7 +612,6 @@ public:
 
     /** binSize used in DefaultArrayMap is the floor of numChares/numPes
      *  but for this FastArrayMap, we need the ceiling */
-    getHilbertList(procList);
     int block = flati / amaps[arrayHdl]->_binSizeCeil;
     //for(int i=0; i<CkNumPes(); i++)
     //    CkPrintf("(%d:%d) ", i, procList[i]);
