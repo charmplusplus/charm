@@ -679,9 +679,6 @@ const char *arg_nodelist;
 const char *arg_nodegroup;
 const char *arg_runscript; /* script to run the node-program with */
 const char *arg_charmrunip;
-#if CONVERSE_VERSION_VMI
-char *arg_vmispecfile;
-#endif
 
 int   arg_debug;
 int   arg_debug_no_pause;
@@ -803,9 +800,6 @@ void arg_init(int argc, const char **argv)
   }
   pparam_flag(&arg_debug,         0, "debug",         "turn on more verbose debug print");
 #endif
-#ifdef CONVERSE_VERSION_VMI
-  pparam_str (&arg_vmispecfile, 0, "specfile", "device specfile to load (VMI)");
-#endif
   pparam_str(&arg_runscript,    0, "runscript", "script to run node-program with");
   pparam_flag(&arg_help,	0, "help", "print help messages");
   pparam_int(&arg_ppn,          0, "ppn",             "number of pes per node");
@@ -910,17 +904,6 @@ void arg_init(int argc, const char **argv)
     arg_xterm = "xterm" ;
 
   arg_mylogin = mylogin();
-#endif
-
-#if CONVERSE_VERSION_VMI
-  if (!arg_vmispecfile) {
-    arg_vmispecfile = getenv ("VMI_SPECFILE");
-  }
-
-  if (!arg_vmispecfile) {
-    fprintf (stderr, "ERROR> ++specfile not specified and VMI_SPECFILE not given in environment\n");
-    exit (1);
-  }
 #endif
 
   /* find the current directory, absolute version */
@@ -4053,12 +4036,6 @@ void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv, int restart
   else
     fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
 
-#if CONVERSE_VERSION_VMI
-  /* VMI environment variable */
-  fprintf (f, "VMI_PROCS='%d'; export VMI_PROCS\n", arg_requested_pes);
-  fprintf (f, "VMI_KEY='charmrun%d'; export VMI_KEY\n", getpid ());
-  fprintf (f, "VMI_SPECFILE='%s'; export VMI_SPECFILE\n", arg_vmispecfile);
-#endif
 #ifdef CMK_G95
   fprintf(f,"G95_UNBUFFERED_ALL=TRUE; export G95_UNBUFFERED_ALL\n");
 #endif

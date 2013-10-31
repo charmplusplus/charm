@@ -10,10 +10,6 @@
 #define MAXINT 2147483647
 #endif
 
-#if CONVERSE_VERSION_VMI
-extern "C" int CmiGetCluster (int process);
-#endif
-
 void CreateGridCommRefineLB ();
 
 class PE_Data_T

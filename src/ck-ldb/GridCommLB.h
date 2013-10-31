@@ -17,10 +17,6 @@
 #define MAXDOUBLE 1e10
 #endif
 
-#if CONVERSE_VERSION_VMI
-extern "C" int CmiGetCluster (int process);
-#endif
-
 void CreateGridCommLB ();
 
 class PE_Data_T
