@@ -262,13 +262,10 @@ static void reportMsgHistogramInfo();
 
 /* ###End of POST_RECV related related macros ### */
 
-#if CMK_BLUEGENEL
-#define MAX_QLEN 8
-#define NETWORK_PROGRESS_PERIOD_DEFAULT 16
-#else
+
 #define NETWORK_PROGRESS_PERIOD_DEFAULT 0
 #define MAX_QLEN 200
-#endif
+
 /* =======End of Definitions of Performance-Specific Macros =======*/
 
 
@@ -357,9 +354,7 @@ void mpi_end_spare();
 
 /* =====Beginning of Declarations of Machine Specific Functions===== */
 /* Utility functions */
-#if CMK_BLUEGENEL
-extern void MPID_Progress_test();
-#endif
+
 static size_t CheckAllAsyncMsgsSent(void);
 static void ReleaseSentMessages(void);
 static int PumpMsgs(void);
@@ -567,9 +562,6 @@ static void ReleaseSentMessages(void) {
     int done;
     MPI_Status sts;
 
-#if CMK_BLUEGENEL
-    MPID_Progress_test();
-#endif
 
     MACHSTATE1(2,"ReleaseSentMessages begin on %d {", CmiMyPe());
     while (msg_tmp!=0) {
@@ -621,10 +613,6 @@ static int PumpMsgs(void) {
 
 #if CMI_EXERT_RECV_CAP || CMI_DYNAMIC_EXERT_CAP
     int recvCnt=0;
-#endif
-
-#if CMK_BLUEGENEL
-    MPID_Progress_test();
 #endif
 
     MACHSTATE(2,"PumpMsgs begin {");

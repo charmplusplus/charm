@@ -12,25 +12,7 @@
 #include "partitioning_strategies.h"
 
 TopoManager::TopoManager() {
-#if CMK_BLUEGENEL
-  dimX = bgltm.getDimX();
-  dimY = bgltm.getDimY();
-  dimZ = bgltm.getDimZ();
-
-  dimNX = bgltm.getDimNX();
-  dimNY = bgltm.getDimNY();
-  dimNZ = bgltm.getDimNZ();
-  dimNT = bgltm.getDimNT();
-
-  procsPerNode = bgltm.getProcsPerNode();
-  int *torus;
-  torus = bgltm.isTorus();
-  torusX = torus[0];
-  torusY = torus[1];
-  torusZ = torus[2];
-  torusT = torus[3];
-
-#elif CMK_BLUEGENEP
+#if CMK_BLUEGENEP
   dimX = bgptm.getDimX();
   dimY = bgptm.getDimY();
   dimZ = bgptm.getDimZ();
@@ -152,9 +134,7 @@ int TopoManager::hasMultipleProcsPerNode() const {
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
   CmiAssert( pe >= 0 && pe < numPes );
-#if CMK_BLUEGENEL
-  bgltm.rankToCoordinates(pe, x, y, z);
-#elif CMK_BLUEGENEP
+#if CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 	int t;
@@ -190,9 +170,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
   CmiAssert( pe >= 0 && pe < numPes );
-#if CMK_BLUEGENEL
-  bgltm.rankToCoordinates(pe, x, y, z, t);
-#elif CMK_BLUEGENEP
+#if CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z, t);
 #elif CMK_BLUEGENEQ
   bgqtm.rankToCoordinates(pe, x, y, z, t);
@@ -244,9 +222,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
     return x;
 #endif
 
-#if CMK_BLUEGENEL
-  return bgltm.coordinatesToRank(x, y, z);
-#elif CMK_BLUEGENEP
+
+#if CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   return xttm.coordinatesToRank(x, y, z, 0);
@@ -268,9 +245,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
     return t + x * dimNT;
 #endif
 
-#if CMK_BLUEGENEL
-  return bgltm.coordinatesToRank(x, y, z, t);
-#elif CMK_BLUEGENEP
+#if CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z, t);
 #elif CMK_BLUEGENEQ
   return bgqtm.coordinatesToRank(x, y, z, t);
@@ -321,11 +296,7 @@ void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
 
 /*
 int TopoManager::pickClosestRank(int mype, int *pes, int n) {
-#if CMK_BLUEGENEL
-  return(bgltm->pickClosestRank(mype, pes, n));
-#else 
   return(pickClosestRank(mype,pes,n));
-#endif
 }
 */
 

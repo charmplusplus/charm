@@ -1,4 +1,0 @@
-This BGL machine layer is based on the "new" BGL message layer 
-(aka BGX software), which has not been deployed on production 
-machines as of July, 2005. It's config scripts are also based
-on the experimental environment and need modifications later.

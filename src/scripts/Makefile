@@ -211,7 +211,7 @@ CONVCOMHEADERS= 3dgridrouter.h hypercuberouter.h hypercubetopology.h	\
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
-	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h BGQTorus.h \
+	sockRoutines.h sockRoutines.c ckpool.h BGPTorus.h BGQTorus.h \
 	TopoManager.h XTTorus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
 	crc32.h ckBIconfig.h rand48_replacement.h 
 
