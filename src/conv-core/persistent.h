@@ -1,5 +1,5 @@
 /*****************************************************************************
-                  Persistent Communication API for ELAN
+                  Persistent Communication API
 
 * PersistentHandle: 
 	persistent communication handler, created by CmiCreatePersistent()

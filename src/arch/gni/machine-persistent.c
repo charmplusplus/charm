@@ -1,5 +1,5 @@
 /** @file
- * Elan persistent communication
+ * persistent communication
  * @ingroup Machine
 */
 
@@ -354,7 +354,7 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
       /* used large page and from mempool, memory always registered */
     slot->destBuf[i].mem_hndl = GetMemHndl(buf);
     slot->destBuf[i].destAddress = buf;
-      /* note: assume first integer in elan converse header is the msg size */
+      /* note: assume first integer in converse header is the msg size */
     slot->destBuf[i].destSizeAddress = (unsigned int*)buf;
     memset(buf, 0, maxBytes+sizeof(int)*2);
   }

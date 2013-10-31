@@ -228,7 +228,7 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     _MEMCHECK(buf);
     memset(buf, 0, maxBytes+sizeof(CmiPAMIRzvRecv_t));
     slot->destBuf[i].destAddress = buf;
-    /* note: assume first integer in elan converse header is the msg size */
+    /* note: assume first integer in converse header is the msg size */
     //slot->destBuf[i].destSizeAddress = (unsigned int*)buf;
     memset(buf, 0, maxBytes+sizeof(CmiPAMIRzvRecv_t));
   }

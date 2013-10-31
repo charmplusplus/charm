@@ -153,7 +153,7 @@ PersistentHandle getFreeRecvSlot()
         allocate a free PersistentReceivesTable entry;
         allocate a message buffer of size maxSize for the communication;
         Send back a PersistentReqGrantedMsg with message address, etc for
-        elan_put;
+        rdma_put;
      3. Converse handler persistentReqGrantedHandler() executed on
         sender for the PersistentReqGrantedMsg. setup finish, send buffered
         message.
@@ -554,8 +554,6 @@ static void persistentRequestHandler(void *env)
   PersistentHandle h = getFreeRecvSlot();
   PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
 
-  /*slot->messagePtr = elan_CmiStaticAlloc(msg->maxBytes);*/
-
   /* build reply message */
   PersistentReqGrantedMsg *gmsg = CmiAlloc(sizeof(PersistentReqGrantedMsg));
 
@@ -698,7 +696,7 @@ void persistentDestroyHandler(void *env)
     CpvAccess(persistentReceivesTableTail) = slot->prev;
 
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) 
-    if (slot->destBuf[i].destAddress) /*elan_CmiStaticFree(slot->messagePtr);*/
+    if (slot->destBuf[i].destAddress) 
       PerFree((char*)slot->destBuf[i].destAddress);
 
   clearRecvSlot(slot);

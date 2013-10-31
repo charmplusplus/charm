@@ -212,10 +212,6 @@ void *CMI_VMI_CmiAlloc (int size);
 void CMI_VMI_CmiFree (void *ptr);
 #endif
 
-#if CONVERSE_VERSION_ELAN
-void* elan_CmiAlloc(int size);
-#endif
-
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
 void *infi_CmiAlloc(int size);
 void infi_CmiFree(void *ptr);
@@ -2870,9 +2866,7 @@ void *CmiAlloc(int size)
 
   size += envMaxExtraSize;
 
-#if CONVERSE_VERSION_ELAN
-  res = (char *) elan_CmiAlloc(size+sizeof(CmiChunkHeader));
-#elif CONVERSE_VERSION_VMI
+#if CONVERSE_VERSION_VMI
   res = (char *) CMI_VMI_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
   res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));
@@ -2966,9 +2960,7 @@ void CmiFree(void *blk)
     CpvAccess(BlocksAllocated)--;
 #endif
 
-#if CONVERSE_VERSION_ELAN
-    elan_CmiFree(BLKSTART(parentBlk));
-#elif CONVERSE_VERSION_VMI
+#if CONVERSE_VERSION_VMI
     CMI_VMI_CmiFree(BLKSTART(parentBlk));
 #elif CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
     arena_free(BLKSTART(parentBlk));

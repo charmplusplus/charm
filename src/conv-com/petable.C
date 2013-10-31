@@ -559,7 +559,7 @@ PTvectorlist PeTable :: ExtractAndVectorize(comID id, int ufield, int npe, int *
 
   int refno = id.refno;    
 
-  // SHOULD PACK THE SIZE, which is not available: fix elan and undo this cvs update
+  // SHOULD PACK THE SIZE, which is not available: fix and undo this cvs update
   PACK(int, refno);
   PACK(comID, id);
   PACK(int, ufield);
