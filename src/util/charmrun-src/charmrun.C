@@ -2216,7 +2216,7 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
         error_in_req_serve_client(replyFd);
     }
 #else	
-  if(recv_status < 0)  error_in_req_serve_client(replyFd);
+  if(recv_status < 0)  {error_in_req_serve_client(replyFd); return REQ_OK;}
 #endif
 #endif
 
@@ -2257,7 +2257,7 @@ void req_serve_client(SOCKET fd)
 #ifdef HSTART
   if(!arg_hierarchical_start && recv_status < 0) error_in_req_serve_client(fd);
 #else
-  if(recv_status < 0) error_in_req_serve_client(fd);
+  if(recv_status < 0) {error_in_req_serve_client(fd);return;}
 #endif
 #endif
 	
