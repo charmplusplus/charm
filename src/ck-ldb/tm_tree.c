@@ -24,10 +24,10 @@ void free_list_child(tree_t *tree){
     for(i=0;i<tree->arity;i++){
       free_list_child(tree->child[i]);
     }
+    free(tree->child);
+    if(tree->dumb)
+      free(tree);
   }
-  free(tree->child);
-  if(tree->dumb)
-    free(tree);
 }
 
 

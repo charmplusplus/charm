@@ -114,6 +114,7 @@ get_syms(int fd, ELFXX_TYPE_Shdr *symh, ELFXX_TYPE_Shdr *strh)
 	/* sanity */
 	if (symh->sh_size % sizeof(ELFXX_TYPE_Sym)) { 
 		fprintf(stderr, "elf_error\n");
+		free(sl);
 		goto out;
 	}
 
@@ -122,15 +123,18 @@ get_syms(int fd, ELFXX_TYPE_Shdr *symh, ELFXX_TYPE_Shdr *strh)
 	sl->sym = (ELFXX_TYPE_Sym *) malloc(symh->sh_size);
 	if (!sl->sym) {
 		fprintf(stderr, "Out of memory\n");
+		free(sl);
 		goto out;
 	}
 	rv = pread(fd, sl->sym, symh->sh_size, symh->sh_offset);
 	if (0 > rv) {
 		perror("read");
+		free(sl);
 		goto out;
 	}
 	if (rv != symh->sh_size) {
 		fprintf(stderr, "elf error\n");
+		free(sl);
 		goto out;
 	}
 
@@ -138,18 +142,23 @@ get_syms(int fd, ELFXX_TYPE_Shdr *symh, ELFXX_TYPE_Shdr *strh)
 	sl->str = (char *) malloc(strh->sh_size);
 	if (!sl->str) {
 		fprintf(stderr, "Out of memory\n");
+		free(sl);
 		goto out;
 	}
+
 	rv = pread(fd, sl->str, strh->sh_size, strh->sh_offset);
 	if (0 > rv) {
 		perror("read");
+		free(sl->str);
+		free(sl);
 		goto out;
 	}
 	if (rv != strh->sh_size) {
 		fprintf(stderr, "elf error");
+		free(sl->str);
+		free(sl);
 		goto out;
 	}
-
 	ret = sl;
 out:
 	return ret;

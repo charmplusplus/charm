@@ -127,6 +127,7 @@ class adjNode { // struct to store each node's adjacency info
         int numSharedPartitions;
         int adjElemCount;         // number of entries in adjElemList (below)
         // max length of adjElemList is 2*nodal degree
+	//cppcheck-suppress unsafeClassCanLeak
         adjElem *adjElemList;     // list of elems incident on this node
         adjNode() { 
             sharedWithPartition = NULL;

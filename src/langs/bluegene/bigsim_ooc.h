@@ -232,7 +232,7 @@ public:
 	}
 	fprintf(ofp, "\n");
 	fflush(ofp);
-	close(ofp);
+	fclose(ofp);
     }
 };
 

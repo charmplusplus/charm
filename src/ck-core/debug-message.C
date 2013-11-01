@@ -96,6 +96,7 @@ void envelope::pup(PUP::er &p) {
         p(attribs.mtype);
         int d;
         if (!p.isUnpacking()) d = attribs.queueing;
+	//cppcheck-suppress uninitvar
         p|d;
         if (p.isUnpacking()) attribs.queueing = d;
         if (!p.isUnpacking()) d = attribs.isPacked;

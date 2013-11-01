@@ -442,6 +442,7 @@ void BgTimeLog::pupCommon(PUP::er &p) {
 
   // pup for BgMsgEntry
   if (!p.isUnpacking()) l=msgs.length();
+  //cppcheck-suppress uninitvar
   p|l;
 
   // CmiPrintf("               *** number of messages: %d\n", l);

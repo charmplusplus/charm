@@ -75,16 +75,17 @@ int pvm_config(int *nhost, int *narch, struct pvmhostinfo **hostp)
 {
   int i, nh=0;
 
-#ifdef PVM_DEBUG
-  PRINTF("tid=%d:pvm_config(%x,%x,%x)\n",pvm_mytid(),nhost,narch,hostp);
-#endif
-
-  printf("tid=%d:pvm_config(%x,%x,%x)\n",pvm_mytid(),nhost,narch,hostp);
-  printf("%d\n",*nhost);
   /*  sleep(10); */
   
   if (nhost)
-    *nhost=nh=CmiNumPes();
+    {
+#ifdef PVM_DEBUG
+  PRINTF("tid=%d:pvm_config(%x,%x,%x)\n",pvm_mytid(),nhost,narch,hostp);
+#endif
+      printf("tid=%d:pvm_config(%x,%x,%x)\n",pvm_mytid(),nhost,narch,hostp);
+      printf("%d\n",*nhost);
+      *nhost=nh=CmiNumPes();
+    }
   else
     return -1;
 

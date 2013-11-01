@@ -555,6 +555,7 @@ void CkMemCheckPT::pupAllElements(PUP::er &p){
 	if(!p.isUnpacking()){
 		numElements = CkCountArrayElements();
 	}
+	//cppcheck-suppress uninitvar
 	p | numElements;
 	if(!p.isUnpacking()){
 		CKLOCMGR_LOOP(MemElementPacker packer(mgr,p);mgr->iterate(packer););

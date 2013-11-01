@@ -23,7 +23,7 @@ void METIS_PartMeshNodal(int *ne, int *nn, idxtype *elmnts, int *etype, int *num
                          int *nparts, int *edgecut, idxtype *epart, idxtype *npart)
 {
   int i, j, k, me;
-  idxtype *xadj, *adjncy, *pwgts;
+  idxtype *xadj, *adjncy, *pwgts, *adjncy_realloc;
   int options[10], pnumflag=0, wgtflag=0;
   int nnbrs, nbrind[200], nbrwgt[200], maxpwgt;
   int esize, esizes[] = {-1, 3, 4, 8, 4};
@@ -38,10 +38,14 @@ void METIS_PartMeshNodal(int *ne, int *nn, idxtype *elmnts, int *etype, int *num
 
   METIS_MeshToNodal(ne, nn, elmnts, etype, &pnumflag, xadj, adjncy);
 
-  adjncy = realloc(adjncy, xadj[*nn]*sizeof(idxtype));
-
+  adjncy_realloc = realloc(adjncy, xadj[*nn]*sizeof(idxtype));
+  if(!adjncy_realloc)
+    {
+      free(adjncy);
+      abort();
+    }
   options[0] = 0;
-  METIS_PartGraphKway(nn, xadj, adjncy, NULL, NULL, &wgtflag, &pnumflag, nparts, options, edgecut, npart);
+  METIS_PartGraphKway(nn, xadj, adjncy_realloc, NULL, NULL, &wgtflag, &pnumflag, nparts, options, edgecut, npart);
 
   /* OK, now compute an element partition based on the nodal partition npart */
   idxset(*ne, -1, epart);
@@ -98,7 +102,7 @@ void METIS_PartMeshNodal(int *ne, int *nn, idxtype *elmnts, int *etype, int *num
   if (*numflag == 1)
     ChangeMesh2FNumbering2((*ne)*esize, elmnts, *ne, *nn, epart, npart);
 
-  GKfree(&xadj, &adjncy, &pwgts, LTERM);
+  GKfree(&xadj, &adjncy_realloc, &pwgts, LTERM);
 
 }
 

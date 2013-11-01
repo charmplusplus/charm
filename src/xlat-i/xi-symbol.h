@@ -1343,6 +1343,7 @@ public:
   XStr *traceName;	
   SdagConstruct *next;
   ParamList *param;
+  //cppcheck-suppress unsafeClassCanLeak
   XStr *text;
   int nextBeginOrEnd;
   EntryList *elist;

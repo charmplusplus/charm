@@ -989,6 +989,7 @@ char *nodetab_file_find()
   if (getenv("NODELIST")) {
     char *path = getenv("NODELIST");        
     if (path && probefile(path)) return strdup(path);
+    //cppcheck-suppress nullPointer
     fprintf(stderr,"ERROR> Cannot find nodelist file %s\n",path);
     exit(1);
   }

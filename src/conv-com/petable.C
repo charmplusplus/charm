@@ -351,13 +351,19 @@ int PeTable :: UnpackAndInsert(void *in) {
   UNPACK(int, refno);
   ComlibPrintf("%d UnPackAndInsert\n", CkMyPe());
   UNPACK(comID, id);
+  //cppcheck-suppress uninitvar
   UNPACK(int, msgsize);
+  //cppcheck-suppress uninitvar
   UNPACK(int, ufield);
+  //cppcheck-suppress uninitvar
   UNPACK(int, nummsgs);
+  //cppcheck-suppress uninitvar
   UNPACK(int, npe);
 
   // unpack all messages into an array
+  //cppcheck-suppress uninitvar
   msgend = (char*)in + msgsize;
+  //cppcheck-suppress uninitvar
   msgcur = (char*)in + ALIGN8(sizeof(struct AllToAllHdr) + (npe+nummsgs+1)*sizeof(int));
   while (msgcur < msgend) {
     CmiChunkHeader *ch = (CmiChunkHeader *)msgcur;
@@ -379,10 +385,11 @@ int PeTable :: UnpackAndInsert(void *in) {
 
   pe = -1;
   //for (i=0;i<npe;i++) {
+  //cppcheck-suppress uninitvar
   for (i=0; i<nummsgs; ++i) {
     //UNPACK(int, pe);
     //pe *= -1;
-
+    //cppcheck-suppress uninitvar
     UNPACK(int, offset);
     if (offset <= 0) {
       pe = -1 * offset;
@@ -461,7 +468,7 @@ int PeTable :: UnpackAndInsert(void *in) {
   */
 
   ptrvec.removeAll();
-  
+  //cppcheck-suppress uninitvar  
   return(ufield);
 }
 

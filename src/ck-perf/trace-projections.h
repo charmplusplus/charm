@@ -280,6 +280,7 @@ class LogPool {
 
     int numPhases;
     bool hasFlushed;
+    //cppcheck-suppress unsafeClassCanLeak
     bool *keepPhase;  // one decision per phase
 
     int headerWritten;
