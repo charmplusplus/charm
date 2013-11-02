@@ -63,12 +63,12 @@ namespace SDAG {
   };
 
   struct MsgClosure : public Closure {
-    CkMessage* msg;
+    void* msg;
 
     MsgClosure() : msg(0) { init(); continuations = 0; }
     MsgClosure(CkMigrateMessage*) : msg(0) { init(); continuations = 0; }
 
-    MsgClosure(CkMessage* msg)
+    MsgClosure(void* msg)
       : msg(msg) {
       init();
       continuations = 0;
