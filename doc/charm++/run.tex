@@ -126,7 +126,7 @@ file, because {\tt rsh} does not run the {\tt .login} file.
 
 \end{enumerate}
 
-\item[{\tt ++scalable-start}]   Scalable start, or SMP-aware startup. It is useful for scalable process launch on multu-core systems since it creates only one ssh session per node and spawn all clients from the same ssh session                                                       
+\item[{\tt ++scalable-start}]   Scalable start, or SMP-aware startup. It is useful for scalable process launch on multi-core systems since it creates only one ssh session per node and spawn all clients from the same ssh session                                                       
 
 \item[{\tt ++batch}]            Ssh a set of node programs at a time, avoiding overloading Charmrun pe.  In this strategy, the nodes assigned to a charmrun are divided into sets of fixed size. Charmrun performs ssh to the nodes in the current set, waits for the clients to connect back and then performs ssh on the next set. We call the number of nodes in one ssh set as batch size. 
 
