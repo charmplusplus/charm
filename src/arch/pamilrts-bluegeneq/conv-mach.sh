@@ -23,6 +23,14 @@ else
   BGQ_LIB="-L$BGQ_INSTALL/comm/sys-fast/lib -lpami -L$BGQ_INSTALL/spi/lib -L$BGQ_ZLIB/lib -lSPI -lSPI_cnk -lpthread -lrt"
 fi
 
+# test if compiler binary present
+if test ! -x $BGQ_BIN/powerpc64-bgq-linux-g++
+then
+ echo "ERROR: Invalid BGQ_INSTALL or BGQ_FLOOR, C/C++ compiler missing"
+ exit 1
+fi
+
+
 GCC_OPTS="-Wno-deprecated "
 OPTS_CPP="$OPTS_CPP"
 OPTS_LD="$OPTS_LD"

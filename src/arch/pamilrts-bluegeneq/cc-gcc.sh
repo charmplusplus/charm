@@ -10,13 +10,6 @@ else
   BGQ_LIB="-L$BGQ_INSTALL/comm/sys-fast/lib -lpami -L$BGQ_INSTALL/spi/lib -L$BGQ_ZLIB/lib -lSPI -lSPI_cnk -lpthread -lrt"
 fi
 
-# test if compiler binary present
-if test ! -x $BGQ_BIN/powerpc64-bgq-linux-g++
-then
- echo "ERROR: Invalid BGQ_INSTALL or BGQ_FLOOR, C/C++ compiler missing"
- exit 1
-fi
-
 CMK_CPP_CHARM="$BGQ_BIN/powerpc64-bgq-linux-cpp -P"
 CMK_CPP_C="$BGQ_BIN/powerpc64-bgq-linux-cpp -E "
 CMK_CXX="$BGQ_BIN/powerpc64-bgq-linux-g++ $GCC_OPTS "
