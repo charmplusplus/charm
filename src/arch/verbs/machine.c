@@ -412,7 +412,6 @@ static void machine_atexit_check(void)
 {
   if (!machine_initiated_shutdown)
     CmiAbort("unexpected call to exit by user program. Must use CkExit, not exit!");
-  printf("Program finished.\n");
 #if 0 /*Wait for the user to press any key (for Win32 debugging)*/
   fgetc(stdin);
 #endif
@@ -587,7 +586,7 @@ void CmiEnableAsyncIO(int fd)
     CmiError("setting socket owner: %s\n", strerror(errno)) ;
     exit(1);
   }
-  if ( fcntl(fd, F_SETFL, FASYNC) < 0 ) {
+  if ( fcntl(fd, F_SETFL, O_ASYNC) < 0 ) {
     CmiError("setting socket async: %s\n", strerror(errno)) ;
     exit(1);
   }
@@ -1176,7 +1175,7 @@ void CmiPrintf(const char *fmt, ...)
   CpdSystemEnter();
   {
   va_list p; va_start(p, fmt);
-  if (Cmi_charmrun_fd!=-1)
+  if (Cmi_charmrun_fd!=-1 && _writeToStdout)
     InternalPrintf(fmt, p);
   else
     vfprintf(stdout,fmt,p);
@@ -1255,7 +1254,8 @@ static void CmiStdoutInit(void) {
 			{perror("building stdio redirection socketpair"); exit(1);}
 #endif
 		readStdout[i]=pair[0]; /*We get the read end of pipe*/
-		if (-1==dup2(srcFd,pair[1])) {perror("dup2 redirection pipe"); exit(1);}
+		if (-1==dup2(pair[1],srcFd)) {perror("dup2 redirection pipe"); exit(1);}
+		//if (-1==dup2(srcFd,pair[1])) {perror("dup2 redirection pipe"); exit(1);}
 		
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
@@ -1265,7 +1265,8 @@ static void CmiStdoutInit(void) {
                 if (Cmi_asyncio)
 		{
   /*No communication thread-- get a SIGIO on each write(), which keeps the buffer clean*/
-			CmiEnableAsyncIO(readStdout[i]);
+			//CmiEnableAsyncIO(readStdout[i]);
+			CmiEnableAsyncIO(pair[1]);
 		}
 #endif
 	}
@@ -1676,16 +1677,16 @@ void LrtsPostNonLocal() { }
     
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl(){
-    CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
+    CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
 }
 #endif
 
 void LrtsAdvanceCommunication(int whileidle)
 {
 #if CMK_SMP
-  CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
+  CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
 #else
-  CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
+  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
 #endif
 }
 
@@ -1704,9 +1705,9 @@ void LrtsBarrier()
   int numnodes = CmiNumNodes();
   static int barrier_phase = 0;
 
-  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (Cmi_charmrun_fd == -1) return;                // standalone
   if (numnodes == 1) {
-    return 0;
+    return;
   }
 
   ctrl_sendone_locking("barrier",NULL,0,NULL,0);
@@ -1760,7 +1761,18 @@ int CmiBarrierZero()
 
 void LrtsPreCommonInit(int everReturn)
 {
-  CmiNodeAllBarrier();
+#if !CMK_SMP
+#if !CMK_ASYNC_NOT_NEEDED
+  if (Cmi_asyncio)
+  {
+    CmiSignal(SIGIO, 0, 0, CommunicationInterrupt);
+    if (!Cmi_netpoll) {
+      if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
+      if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
+    }
+  }
+#endif
+#endif
 }
 
 void LrtsPostCommonInit(int everReturn)
