@@ -2785,8 +2785,8 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	
 	if(recvHandleTable == NULL){
 		recvHandleTable = createHandleTable();
-		recvHandleCount = malloc(sizeof(int)*_Cmi_numnodes);
-		for(i=0;i<_Cmi_numnodes;i++){
+		recvHandleCount = malloc(sizeof(int)*CmiMyNodeGlobal());
+		for(i=0;i<CmiMyNodeGlobal();i++){
 			recvHandleCount[i] = -1;
 		}
 	}
@@ -2827,7 +2827,7 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	table->handles[idx].rdmaPacket->localBuffer = &(table->handles[idx]);*/
 	
 	userHandle.handle = newHandle;
-	userHandle.recverNode = _Cmi_mynode; //this may need to change to CmiMyNodeGlobal
+	userHandle.recverNode = CmiMyNodeGlobal();
 	userHandle.senderNode = senderNode;
 	userHandle.recverBuf = recvBuf;
 	userHandle.recverBufSize = recvBufSize;
