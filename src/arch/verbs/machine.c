@@ -285,7 +285,6 @@ extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 
 static unsigned int dataport=0;
-static int Cmi_mach_id=0; /* Machine-specific identifier (GM-only) */
 static SOCKET       dataskt;
 
 extern void TokenUpdatePeriodic();
@@ -964,21 +963,13 @@ static void pingCharmrun(void *ignored)
   if (clock > Cmi_check_last + Cmi_check_delay) {
     MACHSTATE1(3,"CommunicationsClock pinging charmrun Cmi_charmrun_fd_sendflag=%d", Cmi_charmrun_fd_sendflag);
     Cmi_check_last = clock; 
-#if CMK_USE_GM || CMK_USE_MX
-    if (!Cmi_netpoll)  /* GM netpoll, charmrun service is done in interrupt */
-#endif
     CmiCommLockOrElse(return;); /*Already busy doing communication*/
     if (Cmi_charmrun_fd_sendflag) return; /*Busy talking to charmrun*/
     CmiCommLock();
     ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
     CmiCommUnlock();
   }
-#if 1
-#if CMK_USE_GM || CMK_USE_MX
-  if (!Cmi_netpoll)
-#endif
   CmiStdoutFlush(); /*Make sure stdout buffer hasn't filled up*/
-#endif
   }
 }
 
@@ -1481,7 +1472,6 @@ static void node_addresses_obtain(char **argv)
 	me.info.nPE=ChMessageInt_new(0);
 	/* me.info.IP=_skt_invalid_ip; */
         me.info.IP=skt_innode_my_ip();
-	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
 #if CMK_USE_IBUD
 	me.info.qp.lid=ChMessageInt_new(context->localAddr.lid);
 	me.info.qp.qpn=ChMessageInt_new(context->localAddr.qpn);
@@ -1542,7 +1532,7 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 #endif
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
-    if (node->nodestart != Cmi_nodestart) {
+    if (node->nodestart != Cmi_nodestartGlobal) {
 #if !CMK_SMP_NOT_RELAX_LOCK	  		
       if(!inProgress[CmiMyRank()]) {
         CmiCommLock();
@@ -1599,7 +1589,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   MACHSTATE(1,"CmiGeneralSend {");
 
   CmiMsgHeaderSetLength(data, size);
-  ogm=PrepareOutgoing(cs,pe,size,freemode,data);
+  ogm=PrepareOutgoing(cs,pe,size,'F',data);
 
 #if CMK_SMP_NOT_RELAX_LOCK  
   CmiCommLock();
@@ -1611,10 +1601,10 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   CmiCommUnlock();
 #endif
 
-#if CMK_SMP
-  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
-    CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
-#endif  
+//#if CMK_SMP
+//  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
+//    CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
+//#endif  
   
   MACHSTATE(1,"}  LrtsSend");
   return (CmiCommHandle)ogm;
@@ -1702,7 +1692,7 @@ void LrtsAdvanceCommunication(int whileidle)
 /* must be called on every PE including communication processors */
 void LrtsBarrier()
 {
-  int numnodes = CmiNumNodes();
+  int numnodes = CmiNumNodesGlobal();
   static int barrier_phase = 0;
 
   if (Cmi_charmrun_fd == -1) return;                // standalone
@@ -1724,7 +1714,7 @@ void LrtsBarrier()
 int CmiBarrierZero()
 {
   int i;
-  int numnodes = CmiNumNodes();
+  int numnodes = CmiNumNodesGlobal();
   ChMessage msg;
 
   if (Cmi_charmrun_fd == -1) return 0;                // standalone
@@ -1735,9 +1725,9 @@ int CmiBarrierZero()
 
   if (CmiMyRank() == 0) {
     char str[64];
-    sprintf(str, "%d", CmiMyNode());
+    sprintf(str, "%d", CmiMyNodeGlobal());
     ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
-    if (CmiMyNode() == 0) {
+    if (CmiMyNodeGlobal() == 0) {
       while (barrierReceived != 2) {
         CmiCommLock();
         ctrl_getone();
@@ -1861,10 +1851,6 @@ void LrtsPostCommonInit(int everReturn)
 #ifdef __ONESIDED_NO_HARDWARE
   putSrcHandler = CmiRegisterHandler((CmiHandler)handlePutSrc);
   putDestHandler = CmiRegisterHandler((CmiHandler)handlePutDest);
-  getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
-  getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
-#endif
-#ifdef __ONESIDED_GM_HARDWARE
   getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
   getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
 #endif
