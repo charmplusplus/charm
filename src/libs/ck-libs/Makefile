@@ -2,18 +2,21 @@ CHARMC=../../bin/charmc $(OPTS)
 CHARMINC=.
 
 SIMPLE_DIRS = completion cache sparseContiguousReducer tcharm ampi idxl \
-              parmetis multiphaseSharedArrays fem ParFUM io \
-              ifem armci collide mblock barrier irecv netfem liveViz \
-              taskGraph search datatransfer MeshStreamer NDMeshStreamer pose \
+              parmetis multiphaseSharedArrays ParFUM io \
+              armci collide mblock barrier irecv netfem liveViz \
+              taskGraph search MeshStreamer NDMeshStreamer pose \
               state_space_searchengine
 DIRS = $(SIMPLE_DIRS) pythonCCS
+FEM_DIRS = fem ifem datatransfer
 
 .PHONY: $(DIRS)
 
 all:  $(DIRS)
 
-$(SIMPLE_DIRS) ParFUM-Tops:
+$(SIMPLE_DIRS) ParFUM-Tops $(FEM_DIRS):
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+FEM: $(FEM_DIRS) netfem
 
 ampi:  tcharm
 idxl:  ampi

@@ -46,7 +46,8 @@ PVM: converse $(L)/libpvmc.a
 AMR: charm++ LIBS
 	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
 
-FEM: charm++ LIBS
+FEM: charm++ CONVLIBS
+	$(MAKE) -C libs/ck-libs/ FEM
 FEMC: FEM
 FEMF: FEM
 ParFUM: FEM
@@ -145,6 +146,7 @@ test-AMPI: AMPI
 
 test-fem: FEM
 	cd ../tests ; $(MAKE) test-fem  OPTS='$(OPTS)'
+	cd ../examples ; $(MAKE) test-fem  OPTS='$(OPTS)'
 
 ps-doc: basics
 	cd ../doc ; make ps
