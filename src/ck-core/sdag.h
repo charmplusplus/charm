@@ -352,12 +352,14 @@ namespace SDAG {
         for (std::list<Continuation*>::iterator iter2 = lst.begin();
              iter2 != lst.end();
 	     //cppcheck-suppress StlMissingComparison
-             ++iter2) {
+             ) {
           if ((*iter2)->speculationIndex == speculationIndex) {
             Continuation *cancelled = *iter2;
 	    //cppcheck-suppress StlMissingComparison
-            lst.erase(iter2++);
+            iter2 = lst.erase(iter2);
             delete cancelled;
+          } else {
+            iter2++;
           }
         }
       }
