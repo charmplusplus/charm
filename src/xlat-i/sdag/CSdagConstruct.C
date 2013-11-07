@@ -680,6 +680,10 @@ namespace xi {
     // remove all messages fetched from SDAG buffers
     defs << removeMessagesIfFound;
 
+    // remove the current speculative state for case statements
+    if (speculativeState)
+      defs << "    __dep->removeAllSpeculationIndex(" << speculativeState->name << "->speculationIndex);\n";
+
     // make call to next method
     defs << "    ";
 
@@ -691,10 +695,6 @@ namespace xi {
     // delete all buffered messages now that they are not needed
     defs << deleteMessagesIfFound;
 
-    // remove the current speculative state for case statements
-    if (speculativeState)
-      defs << "    __dep->removeAllSpeculationIndex(" << speculativeState->name << "->speculationIndex);\n";
-  
     defs << "    return 0;\n";
     defs << "  } else {\n";
     // did not find matching buffers, create a continuation
