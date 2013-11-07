@@ -19,7 +19,7 @@ ampi:  tcharm
 idxl:  ampi
 parmetis: ampi
 multiphaseSharedArrays:
-fem:  idxl ampi parmetis
+fem:  idxl ampi parmetis multiphaseSharedArrays
 ParFUM:	idxl ampi parmetis collide multiphaseSharedArrays
 ParFUM-Tops: ParFUM
 ifem: fem
@@ -32,7 +32,7 @@ netfem: tcharm
 liveViz:
 taskGraph:
 search:
-datatransfer: ampi fem
+datatransfer: ampi fem collide
 NDMeshStreamer: completion
 
 pythonCCS:
