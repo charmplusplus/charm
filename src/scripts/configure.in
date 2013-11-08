@@ -603,7 +603,7 @@ then
   AC_DEFINE_UNQUOTED(CMK_RANDOMIZED_MSGQ, 1, [enable the randomized msgq in the scheduler])
 else
   AC_DEFINE_UNQUOTED(CMK_RANDOMIZED_MSGQ, 0, [disable the randomized msgq in the scheduler])
-  if test "$with_prio_type" = "bitvec"
+  if test "$enable_randomized_msgq" = "yes"
   then
     Echo "Ignoring --enable-randomized-msg."
     Echo 'A randomized message queue is only available when --with-prio-type != bitvec.'
