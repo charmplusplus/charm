@@ -100,9 +100,11 @@ void msgQ<P>::enq(const msg_t *msg, const prio_t &prio, const bool isFifo)
 {
     // Find / create the bucket holding msgs of this priority
     bkt_t &bkt = msgbuckets[prio];
+    #if ! CMK_RANDOMIZED_MSGQ
     // If this deq is empty, insert corresponding priority into prioQ
     if (bkt.empty())
         prioQ.push( std::make_pair(prio, &bkt) );
+    #endif
     // Enq msg either at front or back of deq
     isFifo ? bkt.push_back(msg) : bkt.push_front(msg);
     // Increment the total number of msgs in this container
@@ -110,6 +112,8 @@ void msgQ<P>::enq(const msg_t *msg, const prio_t &prio, const bool isFifo)
 }
 
 
+
+#if ! CMK_RANDOMIZED_MSGQ // charm NOT built with a randomized queue
 
 // Iterative applications typically have a set of msg priority values that just
 // repeat over time. However, the arrival pattern of messages at a given PE is
@@ -158,6 +162,40 @@ const msg_t* msgQ<P>::deq()
     qSize--;
     return msg;
 }
+
+#else // If charm is built with a randomized msg queue
+
+/**
+ * For detecting races, and for a general check that applications dont
+ * depend on priorities or message ordering for correctness, charm can be built
+ * with a randomized scheduler queue. In this case, this container's deq()
+ * operation will not actually respect priorities. Instead it simply returns a
+ * randomly selected msg.
+ */
+template <typename P>
+const msg_t* msgQ<P>::deq()
+{
+    if (empty())
+        return NULL;
+
+    // Randomly select a bucket and a msg within it
+    int rnd          = rand();
+    typename bktmap_t::iterator itr = msgbuckets.begin();
+    std::advance(itr, rnd % msgbuckets.size());
+    bkt_t &bkt       = itr->second;
+    int idx          = rnd % bkt.size();
+    // Retrieve msg and remove it from bucket
+    const msg_t *msg = bkt[idx];
+    bkt.erase(bkt.begin() + idx);
+    // Remove bucket if its empty
+    if (bkt.empty())
+        msgbuckets.erase(itr);
+    // Decrement the total number of msgs in this container
+    qSize--;
+    return msg;
+}
+
+#endif // CMK_RANDOMIZED_MSGQ
 
 
 

@@ -18,6 +18,9 @@
 /* enable charmdebug */
 #undef CMK_CHARMDEBUG
 
+/* whether to use a randomized msg q in the charm scheduler */
+#undef CMK_RANDOMIZED_MSGQ
+
 /* whether c compiler knows of the c11 standard */
 #undef CMK_COMPILER_KNOWS_C11
 

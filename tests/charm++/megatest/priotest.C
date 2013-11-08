@@ -30,5 +30,8 @@ priotest_chare::recv(priotest_msg *m)
     megatest_finish();
 }
 
+#if ! CMK_RANDOMIZED_MSGQ
 MEGATEST_REGISTER_TEST(priotest,"mlind",1)
+#endif
+
 #include "priotest.def.h"

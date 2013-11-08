@@ -2130,6 +2130,9 @@ void CsdInit(argv)
    #if CMK_USE_STL_MSGQ
    if (CmiMyPe() == 0) CmiPrintf("Charm++> Using STL-based msgQ:\n");
    #endif
+   #if CMK_RANDOMIZED_MSGQ
+   if (CmiMyPe() == 0) CmiPrintf("Charm++> Using randomized msgQ. Priorities will not be respected!\n");
+   #endif
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
   CpvInitialize(void *,CsdObjQueue);
