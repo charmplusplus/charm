@@ -124,7 +124,7 @@ LIBS: CONVLIBS CHARMLIBS
 	cd libs; $(MAKE) otherlibs
 	echo "Built LIBS Successfully"
 
-bgtest: bigsim AMPI
+bgtest: bigsim AMPI FEM
 	cd ../tests ; $(MAKE) bgtest OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) bgtest OPTS='$(OPTS)'
 
