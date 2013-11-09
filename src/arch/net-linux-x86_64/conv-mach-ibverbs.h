@@ -11,11 +11,6 @@
 #undef CMK_MALLOC_USE_OS_BUILTIN
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#undef CMK_THREADS_USE_CONTEXT
-#undef CMK_THREADS_USE_JCONTEXT
-#define CMK_THREADS_USE_CONTEXT                            0
-#define CMK_THREADS_USE_JCONTEXT                           1
-
 /*
 #undef CMK_IMMEDIATE_MSG
 #define CMK_IMMEDIATE_MSG       0
