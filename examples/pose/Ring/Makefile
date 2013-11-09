@@ -10,11 +10,10 @@
 # ***********************************************************************
 
 # For parallel simulation
-OPTS=-O #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 ETRANS_OPTS=
 
 # For sequential simulation
-#OPTS=-O -DSEQUENTIAL_POSE=1 #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+#OPTS=-O -DSEQUENTIAL_POSE=1
 #ETRANS_OPTS=-s
 
 CHARMBASE=../../..

@@ -86,6 +86,7 @@ struct TraceCoreEvent *insert_TraceCoreEvent(struct TraceCoreEvent *root,int eID
 	p->next = (struct TraceCoreEvent *)malloc(sizeof(struct TraceCoreEvent));
 	p->next->next = NULL;
 	p->next->eID = eID;
+	//cppcheck-suppress memleak
 	return root;
 }
 
@@ -139,6 +140,7 @@ void TraceCore::startPtc(){
 	}
 	maxlID = 0;
 	numLangs = 0;
+    delete [] str;
 }
 
 

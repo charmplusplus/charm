@@ -427,7 +427,7 @@ public:
 		  sending empty pages. It also doesnt seem to do any allocation
 		  for the data variable while unpacking which seems to be wrong
 		*/
-		bool nulldata;
+		bool nulldata = false;
 		if(!p.isUnpacking()){
 			nulldata = (data == NULL);
 		}

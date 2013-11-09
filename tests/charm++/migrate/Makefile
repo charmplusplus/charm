@@ -17,7 +17,9 @@ migrateHello.o: migrateHello.C migrateHello.decl.h
 	$(CHARMC) -c migrateHello.C
 
 test: all
-	./charmrun ./migrateHello +p4 10 $(TESTOPTS)
+	./charmrun ./migrateHello +p2 10000 1 $(TESTOPTS)
+	./charmrun ./migrateHello +p2 10000 4096 $(TESTOPTS)
+	./charmrun ./migrateHello +p2 10000 65536 $(TESTOPTS)
 
 bgtest: all
-	./charmrun ./migrateHello +p4 10 +x2 +y2 +z1 $(TESTOPTS)
+	./charmrun ./migrateHello +p2 10000 +x2 +y1 +z1 $(TESTOPTS)

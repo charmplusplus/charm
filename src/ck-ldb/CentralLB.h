@@ -102,10 +102,15 @@ public:
   
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
+  void t_LoadBalance(void); 
   void ResumeClients(int);                      // Resuming clients needs
 
   void ResumeClients(CkReductionMsg *); // to be resumed via message
+  void InitiateScatter(LBMigrateMsg *msg);
+  void ScatterMigrationResults(LBScatterMsg *);
+  void ReceiveMigration(LBScatterMsg *);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
+  void ProcessMigrationDecision(CkReductionMsg *);
   void ProcessReceiveMigration(CkReductionMsg  *);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void ReceiveDummyMigration(int _step);
@@ -245,6 +250,7 @@ protected:
                       LBMigrateMsg* msg, LBSimulation* simResults);
   void removeNonMigratable(LDStats* statsDataList, int count);
 	CProxy_CentralLB thisProxy;
+  void loadbalance_with_thread() { use_thread = 1; }
 private:  
 //CProxy_CentralLB thisProxy;
   int myspeed;
@@ -258,8 +264,9 @@ private:
   int lbdone;
   double start_lb_time;
   LBMigrateMsg   *storedMigrateMsg;
+  LBScatterMsg   *storedScatterMsg;
   int  reduction_started;
-
+  int  use_thread;
 
   FutureModel *predicted_model;
 

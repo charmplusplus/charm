@@ -6,10 +6,14 @@ class mpi_main : public CBase_mpi_main
 {
 public:
   mpi_main(CkArgMsg* m) 
-  { 
+  {
     delete m;
-    CkExit();
+    thisProxy.exit();
   };
+
+  void exit() {
+    CkExit();
+  }
 };
 #include "mpi_main.def.h"
 

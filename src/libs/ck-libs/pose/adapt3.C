@@ -62,12 +62,12 @@ void adapt3::Step()
     ev->done = 2;
     specEventCount++;
     eventCount++;
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
     if(pose_config.trace)
       critStart = CmiWallTimer();  // trace timing
 #endif
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
     if(pose_config.trace)
       traceUserBracketEvent(10, critStart, CmiWallTimer());
 #endif
@@ -76,7 +76,7 @@ void adapt3::Step()
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr;
   }
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     if (iter > 0) localStats->Loop();
   //if (iter > 5) CkPrintf("Executed %d events on this iteration; SE=%d E=%d\n", iter, specEventCount, eventCount);

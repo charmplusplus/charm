@@ -8,6 +8,11 @@ message LBMigrateMsg {
   double expectedLoad[];
 };
 
+message LBScatterMsg {
+  int numMigratesPerPe[];
+  MigrateDecision moves[];
+};
+
 message LBVectorMigrateMsg {
   VectorMigrateInfo moves[];
 };

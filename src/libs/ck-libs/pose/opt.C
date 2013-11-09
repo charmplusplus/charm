@@ -30,7 +30,7 @@ void opt::Step()
       pm->setPriority(eq->currentPtr->timestamp-POSE_TimeMax);
       POSE_Objects[parent->thisIndex].Step(pm);
     }
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
     if(pose_config.stats)
       localStats->Loop();
 #endif  
@@ -40,12 +40,12 @@ void opt::Step()
 /// Rollback to predetermined RBevent
 void opt::Rollback()
 {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   double critStart;
   if(pose_config.trace)
     critStart = CmiWallTimer();  // trace timing
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->SwitchTimer(RB_TIMER);      
 #endif
@@ -59,11 +59,11 @@ void opt::Rollback()
   if (recoveryPoint == eq->currentPtr) {
     eq->SetCurrentPtr(eq->RBevent);
     eq->RBevent = NULL;
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
     if(pose_config.stats)
       localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
     if(pose_config.trace)
       traceUserBracketEvent(40, critStart, CmiWallTimer());
 #endif
@@ -76,7 +76,7 @@ void opt::Rollback()
   rbCount++;
   rbFlag = 1;
   // roll back over recovery point
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->Rollback();
 #endif
@@ -110,11 +110,11 @@ void opt::Rollback()
     (avgRBoffset*(rbCount-1)+(eq->currentPtr->timestamp-localPVT->getGVT()))/rbCount;
   eq->FindLargest();
   eq->RBevent = targetEvent = NULL; // reset RBevent & targetEvent
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.trace)
     traceUserBracketEvent(40, critStart, CmiWallTimer());
 #endif
@@ -128,7 +128,7 @@ void opt::UndoEvent(Event *e)
     eq->eventCount++;
     currentEvent = e;
     CancelSpawn(e); // cancel spawned events
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
     if(pose_config.stats)
       localStats->Undo();
 #endif
@@ -159,12 +159,12 @@ void opt::UndoEvent(Event *e)
 /// Cancel events in cancellation list that have arrived
 void opt::CancelEvents() 
 {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   double critStart;
   if(pose_config.trace)
     critStart = CmiWallTimer();  // trace timing
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->SwitchTimer(CAN_TIMER);      
 #endif
@@ -207,11 +207,11 @@ void opt::CancelEvents()
       }
       if (!found) { // "it" event has not arrived yet
 	if (it == last) {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	  if(pose_config.stats)
 	    localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	  if(pose_config.trace)
 	    traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
@@ -229,13 +229,13 @@ void opt::CancelEvents()
       eq->DeleteEvent(ev); // delete the event
     }
     else if (ev) { // it's been executed, so rollback
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
     if(pose_config.stats)
       localStats->SwitchTimer(RB_TIMER);
 #endif
       recoveryPoint = ev; // ev is the target rollback point
       tmp = eq->currentPtr->prev;    
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
       if(pose_config.stats)
 	localStats->Rollback();
 #endif
@@ -271,18 +271,18 @@ void opt::CancelEvents()
       while ((eq->currentPtr->prev->timestamp > POSE_UnsetTS) 
 	     && (eq->currentPtr->prev->done == 0))
 	eq->currentPtr = eq->currentPtr->prev;
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
       if(pose_config.stats)
 	localStats->SwitchTimer(CAN_TIMER);
 #endif
     }
     if (it == last) {
       parent->cancels.RemoveItem(it); // Clean up
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
       if(pose_config.stats)
 	localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
       if(pose_config.trace)
 	traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
@@ -290,11 +290,11 @@ void opt::CancelEvents()
     }
     else parent->cancels.RemoveItem(it); // Clean up
   } // end outer while which loops through entire cancellations list
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.trace)
     traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
@@ -303,12 +303,12 @@ void opt::CancelEvents()
 /// Cancel events in cancellation list that have arrived
 void opt::CancelUnexecutedEvents() 
 {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   double critStart;
   if(pose_config.trace)
     critStart = CmiWallTimer();  // trace timing
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->SwitchTimer(CAN_TIMER);      
 #endif
@@ -350,11 +350,11 @@ void opt::CancelUnexecutedEvents()
       }
       if (!found) { // "it" event has not arrived yet
 	if (it == last) {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	  if(pose_config.stats)
 	    localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	  if(pose_config.trace)
 	    traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
@@ -369,11 +369,11 @@ void opt::CancelUnexecutedEvents()
       eq->DeleteEvent(ev); // delete the event
       if (it == last) {
 	parent->cancels.RemoveItem(it); // Clean up
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	if(pose_config.stats)
 	  localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	if(pose_config.trace)
 	  traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
@@ -383,11 +383,11 @@ void opt::CancelUnexecutedEvents()
     }
     else if (ev && (ev->done == 1)) { 
       if (it == last) {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	if(pose_config.stats)
 	  localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	if(pose_config.trace)
 	  traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
@@ -397,11 +397,11 @@ void opt::CancelUnexecutedEvents()
     else if (!ev) {
       if (it == last) {
 	parent->cancels.RemoveItem(it); // Clean up
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	if(pose_config.stats)
 	  localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
 	if(pose_config.trace)
 	  traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif
@@ -410,11 +410,11 @@ void opt::CancelUnexecutedEvents()
       else parent->cancels.RemoveItem(it); // Clean up
     }
   } // end outer while which loops through entire cancellations list
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.trace)
     traceUserBracketEvent(20, critStart, CmiWallTimer());
 #endif

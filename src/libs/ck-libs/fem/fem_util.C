@@ -980,8 +980,8 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
       FEM_Modify_LockUpdate(mmod->fmMesh,adjnodes[i]);
     }
   }
-  free(adjnodes);
-  free(oldnodes);
+  delete [] adjnodes;
+  delete [] oldnodes;
   return newEl;
 }
 
@@ -1222,7 +1222,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	CkAssert(false);
       }
       
-      delete [] n2n1;
+      free(n2n1);
       delete [] n2e;
       if(n2nsize>0) delete [] n2n;
     }
@@ -1298,7 +1298,7 @@ void FEM_MUtil::StructureTest(FEM_Mesh *m) {
 	  CkPrintf("ERROR: ghost node %d has inconsistent adjacency list\n",ghostidx);
 	  CkAssert(false);
 	}
-	delete [] n2n1;
+	free(n2n1);
 	delete [] n2e;
       }
       if(n2nsize > 0) {
@@ -1340,7 +1340,7 @@ int FEM_MUtil::AreaTest(FEM_Mesh *m) {
       double area = mmod->fmAdaptAlgs->getArea(con[0],con[1],con[2]);
       if(fabs(area) < SLIVERAREA) {
 	CkAssert(false);
-	delete [] con;
+	free(con);
 	return -1;
       }
     }

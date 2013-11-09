@@ -14,7 +14,7 @@ entry [\uw{attribute1}, ..., \uw{attributeN}] void \uw{EntryMethod}(\uw{paramete
 
 \charmpp{} currently offers the following attributes that one may assign to 
 an entry method:
-\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local}, \kw{python}.
+\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{appwork}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local}, \kw{python}.
 
 \begin{description}
 \index{threaded}\item[threaded] \index{entry method}entry methods 
@@ -57,6 +57,8 @@ optimizations such as reusing the message memory. An example can be found in
 
 \index{notrace}\item[notrace] entry methods will not be traced during execution. As a result, they will not be considered and displayed in Projections for
 performance analysis.
+
+\index{appwork}\item[appwork] this entry method will be marked as executing application work. It will be used for performance analysis.
 
 \index{immediate}\item[immediate] entry methods are executed in an
 ``immediate'' fashion as they skip the message scheduling while other normal

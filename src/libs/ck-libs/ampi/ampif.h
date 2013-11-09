@@ -60,6 +60,9 @@
        integer, parameter :: MPI_MAX_PROCESSOR_NAME = 256
        integer, parameter :: MPI_MAX_ERROR_STRING = 256
 
+       integer, parameter :: MPI_VERSION = 1
+       integer, parameter :: MPI_SUBVERSION = 3
+
        integer, parameter :: MPI_DATATYPE_NULL = -1
        integer, parameter :: MPI_DOUBLE_PRECISION = 0
        integer, parameter :: MPI_REAL8 = 0

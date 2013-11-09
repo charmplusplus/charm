@@ -24,9 +24,7 @@
  *****************************************************************************/
 
 void LrtsStillIdle() {}
-
 void LrtsNotifyIdle() {}
-
 void LrtsBeginIdle() {}
 
 /****************************************************************************
@@ -115,10 +113,12 @@ void TransmitAckDatagram(OtherNode node)
   DgramAck ack; int i, seqno, slot; ExplicitDgram dg;
   int retval;
   
+  DgramHeader *head;
+
   seqno = node->recv_next;
   MACHSTATE2(3,"  TransmitAckDgram [seq %d to 'pe' %d]",seqno,node->nodestart)
-  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_net_magic, seqno, 0);
-  LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
+  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestartGlobal, Cmi_net_magic, seqno, 0);
+  LOG(Cmi_clock, Cmi_nodestartGlobal, 'A', node->nodestart, seqno);
   for (i=0; i<Cmi_window_size; i++) {
     slot = seqno % Cmi_window_size;
     dg = node->recv_window[slot];
@@ -129,8 +129,8 @@ void TransmitAckDatagram(OtherNode node)
           sizeof(unsigned int));
   node->send_ack_seqno = ((node->send_ack_seqno + 1) & DGRAM_SEQNO_MASK);
   retval = (-1);
-#ifdef CMK_USE_CHECKSUM
-  DgramHeader *head = (DgramHeader *)(&ack);
+#if CMK_ERROR_CHECKING
+  head = (DgramHeader *)(&ack);
   head->magic ^= computeCheckSum((unsigned char*)&ack, DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int));
 #endif
   while(retval==(-1))
@@ -162,10 +162,10 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   temp = *head;
   dest = dg->dest;
   DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_net_magic, dg->seqno, dg->broot);
-#ifdef CMK_USE_CHECKSUM
+#if CMK_ERROR_CHECKING
   head->magic ^= computeCheckSum((unsigned char*)head, len + DGRAM_HEADER_SIZE);
 #endif
-  LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestartGlobal, 'T', dest->nodestart, dg->seqno);
   retval = (-1);
   while(retval==(-1))
     retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
@@ -188,10 +188,10 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   temp = *head;
   dest = dg->dest;
   DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_net_magic, dg->seqno, dg->broot);
-#ifdef CMK_USE_CHECKSUM
+#if CMK_ERROR_CHECKING
   head->magic ^= computeCheckSum((unsigned char *)head, len + DGRAM_HEADER_SIZE);
 #endif
-  LOG(Cmi_clock, Cmi_nodestart, 'P', dest->nodestart, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestartGlobal, 'P', dest->nodestart, dg->seqno);
   retval = (-1);
   while (retval == (-1))
     retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
@@ -212,9 +212,9 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
 int TransmitAcknowledgement()
 {
   int skip; static int nextnode=0; OtherNode node;
-  for (skip=0; skip<_Cmi_numnodes; skip++) {
+  for (skip=0; skip<CmiNumNodesGlobal(); skip++) {
     node = nodes+nextnode;
-    nextnode = (nextnode + 1) % _Cmi_numnodes;
+    nextnode = (nextnode + 1) % CmiNumNodesGlobal();
     if (node->recv_ack_cnt) {
       if ((node->recv_ack_cnt > Cmi_half_window) ||
 	  (Cmi_clock >= node->recv_ack_time)) {
@@ -247,9 +247,9 @@ int TransmitDatagram()
   static int nextnode=0; int skip, count, slot;
   unsigned int seqno;
   
-  for (skip=0; skip<_Cmi_numnodes; skip++) {
+  for (skip=0; skip<CmiNumNodesGlobal(); skip++) {
     node = nodes+nextnode;
-    nextnode = (nextnode + 1) % _Cmi_numnodes;
+    nextnode = (nextnode + 1) % CmiNumNodesGlobal();
     dg = node->send_queue_h;
     if (dg) {
       seqno = dg->seqno;
@@ -327,7 +327,7 @@ void EnqueueOutgoingDgram
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy)
 {
   int size; char *data;
-  OtherNode myNode = nodes+CmiMyNode();
+  OtherNode myNode = nodes+CmiMyNodeGlobal();
 
   MACHSTATE2(3,"DeliverViaNetwork %d-byte message to pe %d",
 	     ogm->size,node->nodestart+rank);
@@ -362,11 +362,11 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 {
   int i;
   unsigned int size; char *msg;
-  OtherNode myNode = nodes+CmiMyNode();
+  OtherNode myNode = nodes+CmiMyNodeGlobal();
   
   MACHSTATE3(2,"  AssembleDatagram [seq %d from 'pe' %d, packet len %d]",
   	dg->seqno,node->nodestart,dg->len)
-  LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestartGlobal, 'X', dg->srcpe, dg->seqno);
   msg = node->asm_msg;
   if (msg == 0) {
     size = CmiMsgHeaderGetLength(dg->data);
@@ -376,7 +376,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
     if (!msg)
       fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
     if (size < dg->len) KillEveryoneCode(4559312);
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
     setMemoryTypeMessage(msg);
 #endif
     memcpy(msg, (char*)(dg->data), dg->len);
@@ -398,38 +398,8 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
       KillEveryoneCode(4559313);
   }
   if (node->asm_fill == node->asm_total) {
-    /* spanning tree broadcast - send first to avoid invalid msg ptr */
-#if CMK_BROADCAST_SPANNING_TREE
-    if (node->asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE 
-          || node->asm_rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendSpanningChildren(NULL, 0, node->asm_total, msg, dg->broot, dg->rank);
-#elif CMK_BROADCAST_HYPERCUBE
-    if (node->asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || node->asm_rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendHypercube(NULL, 0, node->asm_total, msg, dg->broot, dg->rank);
-#endif
-    if (node->asm_rank == DGRAM_BROADCAST) {
-      int len = node->asm_total;
-      for (i=1; i<_Cmi_mynodesize; i++)
-         CmiPushPE(i, CopyMsg(msg, len));
-      CmiPushPE(0, msg);
-    } else {
-#if CMK_NODE_QUEUE_AVAILABLE
-         if (node->asm_rank==DGRAM_NODEMESSAGE ||
-	     node->asm_rank==DGRAM_NODEBROADCAST) 
-	 {
-	   CmiPushNode(msg);
-         }
-	 else
-#endif
-	   CmiPushPE(node->asm_rank, msg);
-    }
+	//common core code  will handle where to send the messages
+    handleOneRecvedMsg(node->asm_total, msg);
     node->asm_msg = 0;
     myNode->recd_msgs++;
     myNode->recd_bytes += node->asm_total;
@@ -481,7 +451,7 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
   int seqno;
   unsigned int slot; OtherNode node;
 
-  LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestartGlobal, 'M', dg->srcpe, dg->seqno);
   MACHSTATE2(2,"  IntegrateMessageDatagram [seq %d from pe %d]", dg->seqno,dg->srcpe)
 
   node = nodes_by_pe[dg->srcpe];
@@ -502,11 +472,11 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
 	node->recv_ack_time = 0.0;
       if (seqno >= node->recv_expect)
 	node->recv_expect = ((seqno+1)&DGRAM_SEQNO_MASK);
-      LOG(Cmi_clock, Cmi_nodestart, 'Y', node->recv_next, dg->seqno);
+      LOG(Cmi_clock, Cmi_nodestartGlobal, 'Y', node->recv_next, dg->seqno);
       return;
     }
   }
-  LOG(Cmi_clock, Cmi_nodestart, 'y', node->recv_next, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestartGlobal, 'y', node->recv_next, dg->seqno);
   FreeExplicitDgram(dg);
 }
 
@@ -575,7 +545,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
   slot = seqno % Cmi_window_size;
   rxing = 0;
   node->stat_recv_ack++;
-  LOG(Cmi_clock, Cmi_nodestart, 'R', node->nodestart, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestartGlobal, 'R', node->nodestart, dg->seqno);
 
   tmp = node->recv_ack_seqno;
   /* check that the ack being received is actually appropriate */
@@ -601,7 +571,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
 	  /* remove those that have been received and are within a window
 	     of the first missing packet */
 	  node->stat_ack_pkts++;
-	  LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, seqno);
+	  LOG(Cmi_clock, Cmi_nodestartGlobal, 'r', node->nodestart, seqno);
 	  node->send_window[slot] = 0;
 	  DiscardImplicitDgram(idg);
 	  rxing = 1;
@@ -633,7 +603,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
 	  continue;
         }
 	node->stat_ack_pkts++;
-	LOG(Cmi_clock, Cmi_nodestart, 'o', node->nodestart, idg->seqno);
+	LOG(Cmi_clock, Cmi_nodestartGlobal, 'o', node->nodestart, idg->seqno);
 	node->send_window[slot] = 0;
 	DiscardImplicitDgram(idg);
       }
@@ -672,7 +642,7 @@ void ReceiveDatagram()
     DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno, dg->broot);
     MACHSTATE3(2,"  recv dgram [seq %d, for rank %d, from pe %d]",
 	       dg->seqno,dg->rank,dg->srcpe)
-#ifdef CMK_USE_CHECKSUM
+#if CMK_ERROR_CHECKING
     if (computeCheckSum((unsigned char*)dg->data, dg->len) == 0)
 #else
     if (magic == (Cmi_net_magic&DGRAM_MAGIC_MASK))
@@ -705,7 +675,7 @@ void CmiHandleImmediate();
 static void CommunicationServerNet(int sleepTime, int where)
 {
   unsigned int nTimes=0; /* Loop counter */
-  LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+  LOG(GetClock(), Cmi_nodestartGlobal, 'I', 0, 0);
   MACHSTATE2(1,"CommunicationsServer(%d,%d)",
 	     sleepTime,writeableAcks||writeableDgrams)  
 #if !CMK_SHARED_VARS_UNAVAILABLE /*SMP mode: comm. lock is precious*/
@@ -718,10 +688,12 @@ static void CommunicationServerNet(int sleepTime, int where)
   sleepTime=0;
 #endif
   CmiCommLock();
+  inProgress[CmiMyRank()] = 1;
   /* in netpoll mode, only perform service to stdout */
   if (Cmi_netpoll && where == COMM_SERVER_FROM_INTERRUPT) {
     if (CmiStdoutNeedsService()) {CmiStdoutService();}
     CmiCommUnlock();
+    inProgress[CmiMyRank()] = 0;
     return;
   }
   CommunicationsClock();
@@ -747,6 +719,7 @@ static void CommunicationServerNet(int sleepTime, int where)
     }
   }
   CmiCommUnlock();
+  inProgress[CmiMyRank()] = 0;
 
   /* when called by communication thread or in interrupt */
   if (where == COMM_SERVER_FROM_SMP || where == COMM_SERVER_FROM_INTERRUPT) {

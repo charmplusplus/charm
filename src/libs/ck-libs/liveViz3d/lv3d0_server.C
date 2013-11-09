@@ -685,7 +685,7 @@ Incoming response is a set of updated CkViews:
 */
 extern "C" void LV3D0_getViews(char *msg) {
 	PUP_toNetwork_unpack p(&msg[CmiMsgHeaderSizeBytes]);
-	int clientID; p|clientID; CmiFree(msg);
+	int clientID=0; p|clientID; CmiFree(msg);
 	mgrProxy.ckLocalBranch()->getViews(clientID);
 }
 
@@ -735,7 +735,7 @@ static void emptyDoneFn(void *param,void *msg) /* stage 3 */
 Outgoing request a 1-int clientID.
 */
 extern "C" void LV3D0_flush(char *msg) {
-	int clientID;
+	int clientID=0;
 	PUP_toNetwork_unpack p(&msg[CmiMsgHeaderSizeBytes]);
 	p|clientID;
 	CmiFree(msg);

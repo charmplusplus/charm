@@ -27,11 +27,11 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^multicore$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^win64$)|(^paragon$)|(^vmi$)|(^lapi$)|(^cell$)|(^gemini_gni$)|(^pami$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^win64$)|(^paragon$)|(^lapi$)|(^cell$)|(^gemini_gni$)|(^pami$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale clang'
-  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft causalft'
+  echo 'help smp gm tcp scyld clustermatic bigemulator ooc syncft mlogft causalft'
   echo 'papi pthreads lam'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
   if test $more = 1
@@ -68,7 +68,6 @@ syntax() {
   echo '  gm              use Myrinet for communication'
   echo '  tcp             use TCP sockets for communication (only for net version)'
   echo '  ibverbs         use the Infiniband OpenIB layer for communication (only for net-linux-x86_64 currently)'
-  echo "  vmi             use NCSA's VMI for communication (only for mpi version)"
   echo '  scyld           compile for Scyld Beowulf cluster based on bproc'
   echo '  clustermatic    compile for Clustermatic (support version 3 and 4) '
   echo '  pthreads        compile with pthreads Converse threads'

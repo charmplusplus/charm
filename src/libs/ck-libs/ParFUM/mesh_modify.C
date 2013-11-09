@@ -1571,11 +1571,11 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent, 
 	free(chknos);
 	free(inds);
 	if(permanent>=0) {
-	  free(newghost);
-	  free(ghostidx);
-	  free(losingThisNode);
-	  free(nodes);
-	  free(willBeGhost);
+	  delete [] newghost;
+	  delete [] ghostidx;
+	  delete [] losingThisNode;
+	  delete [] nodes;
+	  delete [] willBeGhost;
 	}
       }
     }

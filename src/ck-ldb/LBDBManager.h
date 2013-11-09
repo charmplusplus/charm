@@ -15,10 +15,13 @@
 #include "LBComm.h"
 #include "LBMachineUtil.h"
 
+class client;
+class receiver;
+
 class LocalBarrier {
 friend class LBDB;
 public:
-  LocalBarrier() { cur_refcount = 1; client_count = 0; max_client = 0;
+  LocalBarrier() { cur_refcount = 1; client_count = 0;
                    max_receiver= 0; at_count = 0; on = false; 
 	#if CMK_BIGSIM_CHARM
 	first_free_client_slot = 0;
@@ -41,22 +44,10 @@ private:
   void CheckBarrier();
   void ResumeClients(void);
 
-  struct client {
-    void* data;
-    LDResumeFn fn;
-    int refcount;
-  };
-  struct receiver {
-    void* data;
-    LDBarrierFn fn;
-    int on;
-  };
-
-  CkVec<client*> clients;
-  CkVec<receiver*> receivers;
+  std::list<client*> clients;
+  std::list<receiver*> receivers;
 
   int cur_refcount;
-  int max_client;
   int client_count;
   int max_receiver;
   int at_count;
@@ -78,6 +69,8 @@ public:
   void insert(LBOM *om);
 
   LDOMHandle AddOM(LDOMid _userID, void* _userData, LDCallbacks _callbacks);
+  void RemoveOM(LDOMHandle om);
+
   LDObjHandle AddObj(LDOMHandle _h, LDObjid _id, void *_userData,
 		     bool _migratable);
   void UnregisterObj(LDObjHandle _h);
@@ -220,6 +213,7 @@ public:
     double period;//Time (seconds) between builtin-atsyncs  
     double nextT;
     LDBarrierClient BH;//Handle for the builtin-atsync barrier 
+    bool gotoSyncCalled;
     static void gotoSync(void *bs);
     static void resumeFromSync(void *bs);
   public:

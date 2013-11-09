@@ -190,6 +190,10 @@ public:
     return LDRegisterOM(myLDHandle,userID, userptr, cb);
   };
 
+  inline void UnregisterOM(LDOMHandle omHandle) {
+    return LDUnregisterOM(myLDHandle, omHandle);
+  };
+
   inline void RegisteringObjects(LDOMHandle _om) {
     LDRegisteringObjects(_om);
   };
@@ -431,6 +435,8 @@ extern "C" void LBTurnCommOff();
 void LBClearLoads();
 
 inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }
+
+inline void CkStartLB() { LBDatabase::Object()->StartLB(); }
 
 inline void get_avail_vector(char * bitmap) {
   LBDatabaseObj()->get_avail_vector(bitmap);

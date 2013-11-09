@@ -117,7 +117,7 @@ DIRSSOURCES :
 	@xcopy /d /q  ..\..\src\Common.win32\*.h .
 	@xcopy /d /q  ..\..\src\Common.net\* .
 	@xcopy /d /q  ..\..\src\$(VERSION)\* .
-	@xcopy    /q /i /e /s /y ..\..\src\Common.net\charmrun  charmrun  
+	@xcopy    /q /i /e /s /y ..\..\src\Common\util\charmrun-src  charmrun  
 	@xcopy /d /q $(CONVLIBS_SRC)\commlib\*.C .
 	@xcopy /d /q $(CONVLIBS_SRC)\commlib\*.h .
 	@xcopy /d /q  $(CONVLIBS_SRC)\packLib\*.C .
@@ -146,7 +146,7 @@ CONVERSE : BASICS $(CVLIBS) CHARMRUN-IF-NEEDED DAEMON $(CONV_CPM)
 
 DAEMON : daemon.c sockRoutines.c
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\daemon.c
-	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\sockRoutines.c
+	$(CPP) $(CPP_PROJ) -DCMK_NOT_USE_CONVERSE=1 $(COMMON_SRC)\sockRoutines.c
 	$(LINK) $(LINK_FLAGS) ws2_32.lib advapi32.lib $(LINK_OTHER) \
 	/out:"$(HOST_DIR)\charmd.exe" daemon.obj sockRoutines.obj
 	$(CPP) $(CPP_PROJ) /D "FACELESS" $(COMMON_SRC)\daemon.c

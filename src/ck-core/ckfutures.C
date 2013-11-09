@@ -92,7 +92,7 @@ class CkSemaPool {
       freelist.enq(idx);
     }
     void _check(int idx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
       if(pool[idx]==0) {
 	      CkAbort("ERROR! operation attempted on invalid semaphore\n");
       }
@@ -193,7 +193,7 @@ void *CkWaitFutureID(CkFutureID handle)
   }
   fut = (fs->array)+handle;
   value = fut->value;
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (value==NULL) 
 	CkAbort("ERROR! CkWaitFuture would have to return NULL!\n"
 	"This can happen when a thread that calls a sync method "
@@ -232,7 +232,7 @@ static void setFuture(CkFutureID handle, void *pointer)
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
   fut->ready = 1;
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (pointer==NULL) CkAbort("setFuture called with NULL!");
 #endif
   fut->value = pointer;
@@ -367,7 +367,7 @@ public:
   FutureBOC(FutureInitMsg *m) { delete m; }
   FutureBOC(CkMigrateMessage *m) { }
   void SetFuture(FutureInitMsg * m) { 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (m==NULL) CkAbort("FutureBOC::SetFuture called with NULL!");
 #endif
     int key;
@@ -375,7 +375,7 @@ public:
     setFuture( key, m);
   }
   void SetSema(FutureInitMsg *m) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (m==NULL) CkAbort("FutureBOC::SetSema called with NULL!");
 #endif
     int idx;
@@ -410,7 +410,7 @@ CkSemaID CkSemaCreate(void)
 extern "C"
 void *CkSemaWait(CkSemaID id)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if(id.pe != CkMyPe()) {
     CkAbort("ERROR: Waiting on nonlocal semaphore! Aborting..\n");
   }
@@ -421,7 +421,7 @@ void *CkSemaWait(CkSemaID id)
 extern "C"
 void CkSemaWaitN(CkSemaID id, int n, void *marray[])
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if(id.pe != CkMyPe()) {
     CkAbort("ERROR: Waiting on nonlocal semaphore! Aborting..\n");
   }
@@ -440,7 +440,7 @@ void CkSemaSignal(CkSemaID id, void *m)
 extern "C"
 void CkSemaDestroy(CkSemaID id)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if(id.pe != CkMyPe()) {
     CkAbort("ERROR: destroying a nonlocal semaphore! Aborting..\n");
   }

@@ -71,8 +71,6 @@ private:
   int *individualDimensionSizes_;
   int *combinedDimensionSizes_;
 
-  int *startingIndexAtDimension_;
-
   int myIndex_;
   int *myLocationIndex_;
 
@@ -143,6 +141,22 @@ public:
   ~MeshStreamer();
 
   // entry
+
+  void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
+  void enablePeriodicFlushing(){
+    if (progressPeriodInMs_ <= 0) {
+      if (CkMyPe() == 0) {
+        CkPrintf("Using periodic flushing for NDMeshStreamer requires"
+                 " setting a valid periodic flush period. Defaulting"
+                 " to 10 ms.\n");
+      }
+      progressPeriodInMs_ = 10;
+    }
+
+    isPeriodicFlushEnabled_ = true;
+    registerPeriodicProgressFunction();
+  }
+  void finish();
   void init(int numLocalContributors, CkCallback startCb, CkCallback endCb,
             int prio, bool usePeriodicFlushing);
   void init(int numContributors, CkCallback startCb, CkCallback endCb,
@@ -150,14 +164,12 @@ public:
             int prio, bool usePeriodicFlushing);
   void init(CkArrayID senderArrayID, CkCallback startCb, CkCallback endCb,
             int prio, bool usePeriodicFlushing);
-  void init(CkCallback endCb, int prio);
+  void init(CkCallback startCb, int prio);
 
-  void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
   virtual void receiveAtDestination(MeshStreamerMessage<dtype> *msg) = 0;
-  void flushIfIdle();
-  void finish();
 
   // non entry
+  void flushIfIdle();
   inline bool isPeriodicFlushEnabled() {
     return isPeriodicFlushEnabled_;
   }
@@ -168,11 +180,6 @@ public:
                                int dimension, int destinationIndex);
 
   void registerPeriodicProgressFunction();
-  // flushing begins only after enablePeriodicFlushing has been invoked
-  inline void enablePeriodicFlushing(){
-    isPeriodicFlushEnabled_ = true;
-    registerPeriodicProgressFunction();
-  }
 
   inline void done(int numContributorsFinished = 1) {
 
@@ -269,19 +276,18 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
 
   int sumAlongAllDimensions = 0;
   individualDimensionSizes_ = new int[numDimensions_];
-  combinedDimensionSizes_ = new int[numDimensions_ + 1];
+  combinedDimensionSizes_ = new int[numDimensions_];
   myLocationIndex_ = new int[numDimensions_];
-  startingIndexAtDimension_ = new int[numDimensions_ + 1];
   memcpy(individualDimensionSizes_, dimensionSizes,
-	 numDimensions * sizeof(int));
-  combinedDimensionSizes_[0] = 1;
-  for (int i = 0; i < numDimensions; i++) {
+	 numDimensions_ * sizeof(int));
+  combinedDimensionSizes_[numDimensions - 1] = 1;
+  sumAlongAllDimensions += individualDimensionSizes_[numDimensions_ - 1];
+  for (int i = numDimensions_ - 2; i >= 0; i--) {
     sumAlongAllDimensions += individualDimensionSizes_[i];
-    combinedDimensionSizes_[i + 1] =
-      combinedDimensionSizes_[i] * individualDimensionSizes_[i];
+    combinedDimensionSizes_[i] =
+      combinedDimensionSizes_[i + 1] * individualDimensionSizes_[i + 1];
   }
-
-  CkAssert(combinedDimensionSizes_[numDimensions] == CkNumPes());
+  CkAssert(combinedDimensionSizes_[0] * individualDimensionSizes_[0]== CkNumPes());
 
   // a bufferSize input of 0 indicates it should be calculated by the library
   if (bufferSize_ == 0) {
@@ -317,13 +323,9 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
 
   myIndex_ = CkMyPe();
   int remainder = myIndex_;
-  startingIndexAtDimension_[numDimensions_] = 0;
-  for (int i = numDimensions_ - 1; i >= 0; i--) {
+  for (int i = 0; i < numDimensions_; i++) {
     myLocationIndex_[i] = remainder / combinedDimensionSizes_[i];
-    int dimensionOffset = combinedDimensionSizes_[i] * myLocationIndex_[i];
-    remainder -= dimensionOffset;
-    startingIndexAtDimension_[i] =
-      startingIndexAtDimension_[i+1] + dimensionOffset;
+    remainder -= combinedDimensionSizes_[i] * myLocationIndex_[i];
   }
 
   isPeriodicFlushEnabled_ = false;
@@ -354,7 +356,6 @@ MeshStreamer<dtype>::~MeshStreamer() {
   delete[] individualDimensionSizes_;
   delete[] combinedDimensionSizes_;
   delete[] myLocationIndex_;
-  delete[] startingIndexAtDimension_;
 
 #ifdef CACHE_LOCATIONS
   delete[] cachedLocations_;
@@ -383,11 +384,12 @@ determineLocation(int destinationPe, int dimensionReceivedAlong) {
 #endif
 
   MeshLocation destinationLocation;
-  int remainder =
-    destinationPe - startingIndexAtDimension_[dimensionReceivedAlong];
-  int dimensionIndex;
   for (int i = dimensionReceivedAlong - 1; i >= 0; i--) {
-    dimensionIndex = remainder / combinedDimensionSizes_[i];
+    int blockIndex = destinationPe / combinedDimensionSizes_[i];
+
+    int dimensionIndex =
+      blockIndex - blockIndex / individualDimensionSizes_[i]
+      * individualDimensionSizes_[i];
 
     if (dimensionIndex != myLocationIndex_[i]) {
       destinationLocation.dimension = i;
@@ -398,8 +400,6 @@ determineLocation(int destinationPe, int dimensionReceivedAlong) {
 #endif
       return destinationLocation;
     }
-
-    remainder -= combinedDimensionSizes_[i] * dimensionIndex;
   }
 
   CkAbort("Error. MeshStreamer::determineLocation called with destinationPe "
@@ -587,19 +587,21 @@ insertData(const dtype& dataItem, int destinationPe) {
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::init(CkCallback endCb, int prio) {
+void MeshStreamer<dtype>::init(CkCallback startCb, int prio) {
 
   useStagedCompletion_ = false;
   useCompletionDetection_ = false;
 
   yieldCount_ = 0;
-  userCallback_ = endCb;
+  userCallback_ = CkCallback();
   prio_ = prio;
 
   initLocalClients();
 
   hasSentRecently_ = false;
   enablePeriodicFlushing();
+
+  this->contribute(startCb);
 }
 
 template <class dtype>
@@ -675,13 +677,6 @@ init(int numContributors, CkCallback startCb, CkCallback endCb,
 
   detectorLocalObj_->start_detection(numContributors, startCb, flushCb,
                                      finish , 0);
-
-  if (progressPeriodInMs_ <= 0) {
-    CkPrintf("Using completion detection in NDMeshStreamer requires"
-	     " setting a valid periodic flush period. Defaulting"
-	     " to 10 ms\n");
-    progressPeriodInMs_ = 10;
-  }
 
   hasSentRecently_ = false;
   if (usePeriodicFlushing) {
@@ -1249,10 +1244,10 @@ public:
       = misdeliveredItems[arrayId];
 
     MeshLocation destinationLocation =
-      determineLocation(destinationPe, MeshStreamer
-                        <ArrayDataItem<dtype, itype> >::numDimensions_);
+      this->determineLocation(destinationPe, MeshStreamer
+                              <ArrayDataItem<dtype, itype> >::numDimensions_);
     for (int i = 0; i < bufferedItems.size(); i++) {
-      storeMessage(destinationPe, destinationLocation, &bufferedItems[i]);
+      this->storeMessage(destinationPe, destinationLocation, &bufferedItems[i]);
     }
 
     bufferedItems.clear();

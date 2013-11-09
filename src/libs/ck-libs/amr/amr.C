@@ -791,6 +791,7 @@ void Cell :: doIterations() {
     
     CkArrayIndexBitVec index(parent);
     arrayProxy[index].synchronise(new _RedMsg(2));
+    delete []size;
     return;
   }
 

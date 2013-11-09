@@ -164,7 +164,6 @@ struct s_groupinit {         // NodeBocInitMsg, BocInitMsg
 struct s_group {         // ForNodeBocMsg, ForBocMsg
         CkGroupID g;           ///< GroupID
         UShort arrayEp;        ///< Used only for array broadcasts
-        UInt bcastID;
 };
 
 struct s_array{             ///< ForArrayEltMsg
@@ -204,6 +203,28 @@ struct s_roData {    ///< RODataMsg for readonly data type
 struct s_roMsg {     ///< ROMsgMsg for readonlys defined in ci files
         UInt roIdx;
 };
+
+
+inline int getMaxExtrasize()
+{
+
+    int ret=0;
+    ret = sizeof(struct s_chare);
+    if(ret <  sizeof(struct s_groupinit))
+        ret = sizeof(struct s_groupinit);
+    if(ret < sizeof(struct s_group))
+        ret = sizeof(struct s_group);
+    if(ret < sizeof(struct s_arrayinit))
+        ret = sizeof(struct s_arrayinit);
+    if(ret < sizeof(struct s_array))
+        ret = sizeof(struct s_array);
+    if ( ret < sizeof(struct s_roData))
+        ret = sizeof(struct s_roData);
+    if(ret < sizeof(struct s_roMsg))
+        ret = sizeof(struct s_roMsg);
+    return ret;
+
+}
 
 inline UShort extraSize(CkEnvelopeType type)
 {
@@ -316,6 +337,9 @@ private:
       return totalsize - getPrioBytes() - sizeof(envelope) - extrasize; 
     }
     void   setUsersize(const UInt s) {
+      if (s == getUsersize()) {
+        return;
+      }
       CkAssert(s < getUsersize());
       UInt newPrioOffset = sizeof(envelope) + CkMsgAlignLength(s);
       UInt newExtraDataOffset = newPrioOffset + getPrioBytes();
@@ -330,7 +354,7 @@ private:
 
     // s specifies number of bytes to remove from user portion of message
     void shrinkUsersize(const UInt s) {
-      CkAssert(s < getUsersize());
+      CkAssert(s <= getUsersize());
       setUsersize(getUsersize() - s);
     }
 
@@ -497,8 +521,6 @@ private:
     UShort &getsetArrayEp(void) {return epIdx;}
     UShort &getsetArrayBcastEp(void) {return ((struct s_group*)extraData())->arrayEp;}
     UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->hopCount;}
-    UInt getBcastID() { CkAssert(getMsgtype() == ForBocMsg); return ((struct s_group*)extraData())->bcastID;}
-    void setBcastID(UInt bcastID_) { CkAssert(getMsgtype() == ForBocMsg); ((struct s_group*)extraData())->bcastID = bcastID_;}
     int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->ifNotThere;}
     void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); ((struct s_array*)extraData())->ifNotThere=nt;}
     int *getsetArrayListenerData(void) { CkAssert(getMsgtype() == ArrayEltInitMsg); return ((struct s_arrayinit*)extraData())->listenerData;}
@@ -523,6 +545,15 @@ private:
 
 };
 
+inline int CkEnvelopeMaxsize()
+{
+  return sizeof(envelope)+ getMaxExtrasize();
+}
+
+inline int CkEnvelopeBasicsize()
+{
+    return sizeof(envelope);
+}
 
 inline envelope *UsrToEnv(const void *const msg) {
   return (((envelope *) msg)-1);

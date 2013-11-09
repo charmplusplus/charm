@@ -409,8 +409,8 @@ static int  checkQp(struct ibv_qp *qp){
 }
 static void checkAllQps(){
 	int i;
-	for(i=0;i<_Cmi_numnodes;i++){
-		if(i != _Cmi_mynode){
+	for(i=0;i<CmiNumNodesGlobal();i++){
+		if(i != CmiMyNodeGlobal()){
 			if(!checkQp(nodes[i].infiData->qp)){
 				pollSendCq(0);
 				CmiAssert(0);
@@ -1153,7 +1153,7 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
 		MACHSTATE3(3,"ogm->data %p metadata %p key %p",ogm->data,METADATAFIELD(ogm->data),key);
 		
 		packet->header.code = INFIRDMA_START;
-		packet->header.nodeNo = _Cmi_mynode;
+		packet->header.nodeNo = CmiMyNodeGlobal();
 		packet->ogm = NULL;
 
 		rdmaPacket->type = INFI_MESG;
@@ -1202,7 +1202,7 @@ static inline void processAsyncEvents(){
 		return;
 		CmiAbort("get async event failed");
 	}
-	printf("[%d] async event %d \n",_Cmi_mynode, event.event_type);
+	printf("[%d] async event %d \n",CmiMyNodeGlobal(), event.event_type);
 	ibv_ack_async_event(&event);
 
 	
@@ -1212,7 +1212,7 @@ static void pollCmiDirectQ();
 
 static inline  void CommunicationServer_nolock(int toBuffer) {
 	int processed;
-	if(_Cmi_numnodes <= 1){
+	if(CmiNumNodesGlobal() <= 1){
 		pollCmiDirectQ();
 		return;
 	}
@@ -1357,9 +1357,9 @@ static inline int pollSendCq(const int toBuffer){
 	
 	for(i=0;i<ne;i++){
 		if(wc[i].status != IBV_WC_SUCCESS){
-			printf("[%d] wc[%d] status %d wc[i].opcode %d\n",_Cmi_mynode,i,wc[i].status,wc[i].opcode);
+			printf("[%d] wc[%d] status %d wc[i].opcode %d\n",CmiMyNodeGlobal(),i,wc[i].status,wc[i].opcode);
 #if CMK_IBVERBS_STATS
-	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d minTokensLeft %d \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft,minTokensLeft);
+	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d minTokensLeft %d \n",CmiMyNodeGlobal(),msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft,minTokensLeft);
 #endif
 			CmiAssert(0);
 		}
@@ -1462,10 +1462,12 @@ static void CommunicationServerNet(int sleepTime, int where){
 #if CMK_SMP
 	}
 	CmiCommLock();
+	inProgress[CmiMyRank()] = 1;
 #endif
 	CommunicationServer_nolock(0);
 #if CMK_SMP
 	CmiCommUnlock();
+	inProgress[CmiMyRank()] = 0;
 #endif
 
 	/* when called by communication thread or in interrupt */
@@ -1560,59 +1562,18 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 };
 
 void static inline handoverMessage(char *newmsg,int total_size,int rank,int broot,int toBuffer){
-#if CMK_BROADCAST_SPANNING_TREE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-		 if(toBuffer){
-		 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
-	 	}else{
-          		SendSpanningChildren(NULL, 0, total_size, newmsg,broot,rank);
-		}
-	}
-#elif CMK_BROADCAST_HYPERCUBE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-		 if(toBuffer){
-		 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
-		 }else{
-          		//SendHypercube(NULL, 0, total_size, newmsg,broot,rank);
-		}
-	}
-#endif
+	
+	if(toBuffer){
+		if((CMI_BROADCAST_ROOT(newmsg)!=0))
+			insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
+	}	
+	handleOneRecvedMsg(total_size, newmsg);
 
-	switch (rank) {
-    	case DGRAM_BROADCAST: {
-				int i;
-				for (i=1; i<_Cmi_mynodesize; i++){
-					CmiPushPE(i, CopyMsg(newmsg, total_size));
-				}
-          CmiPushPE(0, newmsg);
-          break;
-      }
-#if CMK_NODE_QUEUE_AVAILABLE
-        case DGRAM_NODEBROADCAST: 
-        case DGRAM_NODEMESSAGE: {
-          CmiPushNode(newmsg);
-          break;
-        }
-#endif
-        default:
-				{
-					
-          CmiPushPE(rank, newmsg);
-				}
-  	}    /* end of switch */
-		if(!toBuffer){
+	if(!toBuffer){
 //#if !CMK_SMP		
 		processAllBufferedMsgs();
 //#endif
-		}
+	}
 }
 
 
@@ -1983,25 +1944,10 @@ static inline void processBufferedBcast(){
 			}
 			start->bcastList[i].valid=0;
 			MACHSTATE3(3,"Buffered broadcast msg %p of size %d being processed at %d",start->bcastList[i].msg,start->bcastList[i].size,i);
-#if CMK_BROADCAST_SPANNING_TREE
-        if (start->bcastList[i].asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || start->bcastList[i].asm_rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-          	SendSpanningChildren(NULL, 0, start->bcastList[i].size,start->bcastList[i].msg, start->bcastList[i].broot,start->bcastList[i].asm_rank);
-		CmiFree(start->bcastList[i].msg);           /* gzheng */
-					}
-#elif CMK_BROADCAST_HYPERCUBE
-        if (start->bcastList[i].asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || start->bcastList[i].asm_rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-          	//SendHypercube(NULL, 0,start->bcastList[i].size,start->bcastList[i].msg ,start->bcastList[i].broot,start->bcastList[i].asm_rank);
-		CmiFree(start->bcastList[i].msg);           /* gzheng */
-					}
-#endif
+		
+			handleOneRecvedMsg(start->bcastList[i].size, start->bcastList[i].msg);
+			CmiFree(start->bcastList[i].msg);           // gzheng 
+		
 		}
 		if(start->count != 0){
 			MACHSTATE2(3,"]]] start %p start->count %d",start,start->count);
@@ -2098,7 +2044,7 @@ static inline void increaseTokens(OtherNode node){
 	//increase the size of the sendCq
 	int currentCqSize = context->sendCqSize;
 	if(ibv_resize_cq(context->sendCq,currentCqSize+increase)){
-		fprintf(stderr,"[%d] failed to increase cq by %d from %d totalTokens %d \n",_Cmi_mynode,increase,currentCqSize, node->infiData->totalTokens);
+		fprintf(stderr,"[%d] failed to increase cq by %d from %d totalTokens %d \n",CmiMyNodeGlobal() ,increase,currentCqSize, node->infiData->totalTokens);
 		CmiAssert(0);
 	}
 	context->sendCqSize+= increase;
@@ -2394,8 +2340,8 @@ static inline void *getInfiCmiChunk(int dataSize){
 #if CMK_IBVERBS_STATS
 	if(numAlloc>10000 && numAlloc%1000==0)
 	  {
-	  printf("[%d] numReg %d numUnReg %d numCurReg %d numAlloc %d numFree %d msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",_Cmi_mynode,numReg, numUnReg, numCurReg, numAlloc, numFree, msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
-	  /*	  printf("[%d]  numMultiSendUnreg %d numMultiSend %d  numMultiSendFree %d\n",_Cmi_mynode, numMultiSendUnreg, numMultiSend, numMultiSendFree);*/
+	  printf("[%d] numReg %d numUnReg %d numCurReg %d numAlloc %d numFree %d msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",CmiMyNodeGlobal(),numReg, numUnReg, numCurReg, numAlloc, numFree, msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
+	  /*	  printf("[%d]  numMultiSendUnreg %d numMultiSend %d  numMultiSendFree %d\n", CmiMyNodeGlobal(), numMultiSendUnreg, numMultiSend, numMultiSendFree);*/
 	  }
 #endif
         while(ratio > 0){
@@ -2839,8 +2785,8 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	
 	if(recvHandleTable == NULL){
 		recvHandleTable = createHandleTable();
-		recvHandleCount = malloc(sizeof(int)*_Cmi_numnodes);
-		for(i=0;i<_Cmi_numnodes;i++){
+		recvHandleCount = malloc(sizeof(int)*CmiNumNodesGlobal());
+		for(i=0;i<CmiNumNodesGlobal();i++){
 			recvHandleCount[i] = -1;
 		}
 	}
@@ -2866,7 +2812,7 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	table->handles[idx].buf = recvBuf;
 	table->handles[idx].size = recvBufSize;
 #if CMI_DIRECT_DEBUG
-	CmiPrintf("[%d] RDMA create addr %p %d sizeof(struct ibv_mr) %d\n",CmiMyNode(),table->handles[idx].buf,recvBufSize,sizeof(struct ibv_mr));
+	CmiPrintf("[%d] RDMA create addr %p %d sizeof(struct ibv_mr) %d\n",CmiMyNodeGlobal(),table->handles[idx].buf,recvBufSize,sizeof(struct ibv_mr));
 #endif
 	table->handles[idx].callbackFnPtr = callbackFnPtr;
 	table->handles[idx].callbackData = callbackData;
@@ -2881,7 +2827,7 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	table->handles[idx].rdmaPacket->localBuffer = &(table->handles[idx]);*/
 	
 	userHandle.handle = newHandle;
-	userHandle.recverNode = _Cmi_mynode;
+	userHandle.recverNode = CmiMyNodeGlobal();
 	userHandle.senderNode = senderNode;
 	userHandle.recverBuf = recvBuf;
 	userHandle.recverBufSize = recvBufSize;
@@ -2978,7 +2924,7 @@ To be called on the sender to do the actual data transfer
 void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 	int handle = userHandle->handle;
 	int recverNode = userHandle->recverNode;
-	if(recverNode == _Cmi_mynode){
+	if(recverNode == CmiMyNodeGlobal()){
 		/*when the sender and receiver are on the same
 		processor, just look up the sender and receiver
 		buffers and do a memcpy*/
@@ -2992,7 +2938,7 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 		/*find entry for this handle in sender table*/
 		calcHandleTableIdx(handle,&tableIdx,&idx);
 		CmiAssert(sendHandleTable!= NULL);
-		senderTable = sendHandleTable[_Cmi_mynode];
+		senderTable = sendHandleTable[CmiMyNodeGlobal()];
 		CmiAssert(senderTable != NULL);
 		for(i=0;i<tableIdx;i++){
 			senderTable = senderTable->next;
@@ -3094,7 +3040,7 @@ void CmiDirect_readyPollQ(struct infiDirectUserHandle *userHandle){
 		table = table->next;
 	}
 #if CMI_DIRECT_DEBUG
-  CmiPrintf("[%d] CmiDirect_ready receiver %p\n",CmiMyNode(),userHandle->recverBuf);
+  CmiPrintf("[%d] CmiDirect_ready receiver %p\n",CmiMyNodeGlobal(),userHandle->recverBuf);
 #endif	
 	addHandleToPollingQ(&(table->handles[idx]));
 	
@@ -3117,7 +3063,7 @@ void CmiDirect_ready(struct infiDirectUserHandle *userHandle){
 		table = table->next;
 	}
 #if CMI_DIRECT_DEBUG
-  CmiPrintf("[%d] CmiDirect_ready receiver %p\n",CmiMyNode(),userHandle->recverBuf);
+  CmiPrintf("[%d] CmiDirect_ready receiver %p\n",CmiMyNodeGlobal(),userHandle->recverBuf);
 #endif	
 	addHandleToPollingQ(&(table->handles[idx]));
 	
@@ -3142,7 +3088,7 @@ static void pollCmiDirectQ(){
 	while(ptr != NULL){
 		if(receivedDirectMessage(ptr->handle)){
 #if CMI_DIRECT_DEBUG
-      CmiPrintf("[%d] polling detected recvd message at buf %p\n",CmiMyNode(),ptr->handle->userHandle.recverBuf);
+      CmiPrintf("[%d] polling detected recvd message at buf %p\n",CmiMyNodeGlobal(),ptr->handle->userHandle.recverBuf);
 #endif
 			directPollingQNode *delPtr = ptr;
 			/** has been received and delete this node***/
@@ -3359,14 +3305,14 @@ int CmiBarrier()
   int status;
   int count = 0;
   OtherNode node;
-  int numnodes = CmiNumNodes();
+  int numnodes = CmiNumNodesGlobal();
   if (CmiMyRank() == 0) {
     /* every one send to pe 0 */
-    if (CmiMyNode() != 0) {
+    if (CmiMyNodeGlobal() != 0) {
       sendBarrierMessage(0);
     }
     /* printf("[%d] HERE\n", CmiMyPe()); */
-    if (CmiMyNode() == 0) 
+    if (CmiMyNodeGlobal() == 0) 
     {
       for (count = 1; count < numnodes; count ++) 
       {
@@ -3381,11 +3327,11 @@ int CmiBarrier()
       }
     }
     /* non 0 node waiting */
-    if (CmiMyNode() != 0) 
+    if (CmiMyNodeGlobal() != 0) 
     {
       recvBarrierMessage();
       for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-        int p = CmiMyNode();
+        int p = CmiMyNodeGlobal();
         p = BROADCAST_SPANNING_FACTOR*p + i;
         if (p > numnodes - 1) break;
         p = p%numnodes;
@@ -3405,11 +3351,11 @@ int CmiBarrierZero()
   int i;
 
   if (CmiMyRank() == 0) {
-    if (CmiMyNode()) {
+    if (CmiMyNodeGlobal()) {
       sendBarrierMessage(0);
     }
     else {
-      for (i=0; i<CmiNumNodes()-1; i++)
+      for (i=0; i<CmiNumNodesGlobal()-1; i++)
       {
         recvBarrierMessage();
       }

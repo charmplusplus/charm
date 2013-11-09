@@ -117,6 +117,7 @@ FDECL {
 #define mpi_dims_create FTN_NAME ( MPI_DIMS_CREATE , mpi_dims_create )
 #define mpi_cart_sub FTN_NAME ( MPI_CART_SUB , mpi_cart_sub )
 
+#define mpi_get_version FTN_NAME ( MPI_GET_VERSION , mpi_get_version )
 #define mpi_get_processor_name FTN_NAME ( MPI_GET_PROCESSOR_NAME , mpi_get_processor_name )
 #define mpi_errhandler_create FTN_NAME( MPI_ERRHANDLER_CREATE , mpi_errhandler_create )
 #define mpi_errhandler_set FTN_NAME( MPI_ERRHANDLER_SET , mpi_errhandler_set )
@@ -782,6 +783,11 @@ void mpi_dims_create(int *nnodes, int *ndims, int *dims, int* ierr)
 void mpi_cart_sub(int* comm, int *remain_dims, int* newcomm, int* ierr)
 {
   *ierr = AMPI_Cart_sub(*comm, remain_dims, newcomm);
+}
+
+void mpi_get_version(int *version, int *subversion, int *ierr)
+{
+  *ierr = AMPI_Get_version(version, subversion);
 }
 
 void mpi_get_processor_name(char* name, int *resultlen, int *ierr)

@@ -1,5 +1,0 @@
-module charisma {
-  group [migratable] Charisma {
-    entry Charisma(void);
-  };
-}

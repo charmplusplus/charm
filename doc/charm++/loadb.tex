@@ -233,18 +233,18 @@ manually. To switch to the manual mode, the application calls {\em TurnManualLBO
 on every processor to prevent the load balancer from starting automatically. {\em
 TurnManualLBOn()} should be called as early as possible in the program. It
 could be called at the initialization part of the program, for example from a
-global variable constructor, or in an initcall(Section~\ref{initcall}).  It can also be
-called in the constructor of a static array and definitely before the {\em
+global variable constructor, or in an initproc call (Section~\ref{initproc}).  It can also be
+called in the constructor of a static array or before the {\em
 doneInserting} call for a dynamic array.  It can be called multiple times on
 one processor, but only the last one takes effect.
 
-The function call {\em StartLB()} starts load balancing immediately. This call
-should be made at only one place on only one processor. This function is also
+The function call {\em CkStartLB()} starts load balancing immediately. This call
+should be made at only one place on only one processor. This function is
 not blocking, the object will continue to process messages and the load
-balancing when triggered happens in the background.
+balancing, when triggered, happens in the background.
 
 {\em TurnManualLBOff()} turns off manual load balancing and switches back to
-the automatic Load balancing mode.
+the automatic load balancing mode.
 %
 \end{enumerate}
 
@@ -305,7 +305,7 @@ configure the load balancer, etc. These functions are:
       is migratable or not\footnote{Currently not all load balancers 
       recognize this setting though.}.
 \item {\bf LBSetPeriod(double s)}: this function can be called
-      anywhere (even in Charm++ initcalls) to specify 
+      anywhere (even in Charm++ initnodes or initprocs) to specify 
       the load balancing period time in seconds. 
       It tells load balancer not to start next 
       load balancing in less than $s$ seconds. This can be used to prevent 

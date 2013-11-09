@@ -102,6 +102,10 @@ fi
 
 [ -z "$CMK_CELL" ] && CMK_CELL=0
 
+[ -z "$CMK_C_OPENMP" ] && CMK_C_OPENMP="-fopenmp"
+[ -z "$CMK_F_OPENMP" ] && CMK_F_OPENMP="$CMK_C_OPENMP"
+[ -z "$CMK_LD_OPENMP" ] && CMK_LD_OPENMP="$CMK_C_OPENMP"
+
 # apply incdir and libdir
 CMK_CC="$CMK_CC $CMK_INCDIR "
 CMK_CXX="$CMK_CXX $CMK_INCDIR "
@@ -122,5 +126,10 @@ CMK_LDXX="$CMK_LDXX $CMK_LIBDIR "
 if [ -n "$GNI_CRAYXE" -o -n "$GNI_CRAYXC" ] && [ -z "$CMK_SMP" ]
 then
   . $CHARMINC/conv-mach-pxshm.sh
+fi
+
+if [ -n "$GNI_CRAYXE" -o -n "$GNI_CRAYXC" ] && [ -z "$REGULARPAGE" ]
+then
+  . $CHARMINC/conv-mach-hugepages.sh
 fi
 

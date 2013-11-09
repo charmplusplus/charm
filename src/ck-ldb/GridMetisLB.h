@@ -39,10 +39,6 @@ extern "C" void METIS_mCPartGraphKway (int*, int*, int*, int*, int*,
 				       int*, int*, int*, int*, int*,
 				       int*, int*, int*);
 
-#if CONVERSE_VERSION_VMI
-extern "C" int CmiGetCluster (int process);
-#endif
-
 void CreateGridMetisLB ();
 
 class PE_Data_T

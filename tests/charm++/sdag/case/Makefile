@@ -16,7 +16,7 @@ clean:
 caseTest.decl.h: caseTest.ci
 	$(CHARMC) $(OPTS) caseTest.ci
 
-caseTest.o: caseTest.cc caseTest.decl.h
+caseTest.o: caseTest.C caseTest.decl.h
 	$(CHARMC) $(OPTS) -c $<
 
 caseTest: caseTest.o

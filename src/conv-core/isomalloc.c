@@ -79,6 +79,7 @@ static int read_randomflag(void)
   if (fp != NULL) {
     fscanf(fp, "%d", &random_flag);
     fclose(fp);
+    if(random_flag) random_flag = 1;
 #if CMK_HAS_ADDR_NO_RANDOMIZE
     if(random_flag)
     {
@@ -1691,7 +1692,7 @@ typedef struct {
 /*Estimate the top of the current stack*/
 static void *__cur_stack_frame(void)
 {
-  char __dummy;
+  char __dummy = 'A';
   void *top_of_stack=(void *)&__dummy;
   return top_of_stack;
 }
@@ -2113,7 +2114,9 @@ static void init_ranges(char **argv)
       if (CmiBarrier() == -1 && CmiMyPe()==0) 
         CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
       else {
+	/* cppcheck-suppress uninitStructMember */
         CmiUInt8 s = (CmiUInt8)freeRegion.start;
+	/* cppcheck-suppress uninitStructMember */
         CmiUInt8 e = (CmiUInt8)(freeRegion.start+freeRegion.len);
         int fd, i;
         char fname[128];
@@ -2511,8 +2514,8 @@ CmiInt8  CmiIsomallocLength(void *block)
 int CmiIsomallocInRange(void *addr)
 {
   if (isomallocStart==NULL) return 0; /* There is no range we manage! */
-  return pointer_ge((char *)addr,isomallocStart) && 
-    pointer_lt((char*)addr,isomallocEnd);
+  return (addr == NULL) || (pointer_ge((char *)addr,isomallocStart) && 
+    pointer_lt((char*)addr,isomallocEnd));
 }
 
 void CmiIsomallocInit(char **argv)
@@ -2709,11 +2712,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
 
   int i,nBlocks=0;
   CmiIsomallocBlockList *cur=NULL, *start=*lp;
-#if 0 /*#ifndef CMK_OPTIMIZE*/
-  if (CpvAccess(isomalloc_blocklist)!=NULL)
-    CmiAbort("Called CmiIsomallocBlockListPup while a blockList is active!\n"
-        "You should swap out the active blocklist before pupping.\n");
-#endif
+
   /*Count the number of blocks in the list*/
   if (!pup_isUnpacking(p)) {
     nBlocks=1; /*<- Since we have to skip the start block*/

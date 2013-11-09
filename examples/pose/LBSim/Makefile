@@ -9,8 +9,6 @@
 #
 # ***********************************************************************
 
-OPTS=-O#-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
-
 CHARMBASE=../../../
 CHARMBIN=$(CHARMBASE)/bin
 CHARMINC=$(CHARMBASE)/include

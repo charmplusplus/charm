@@ -262,13 +262,10 @@ static void reportMsgHistogramInfo();
 
 /* ###End of POST_RECV related related macros ### */
 
-#if CMK_BLUEGENEL
-#define MAX_QLEN 8
-#define NETWORK_PROGRESS_PERIOD_DEFAULT 16
-#else
+
 #define NETWORK_PROGRESS_PERIOD_DEFAULT 0
 #define MAX_QLEN 200
-#endif
+
 /* =======End of Definitions of Performance-Specific Macros =======*/
 
 
@@ -357,9 +354,7 @@ void mpi_end_spare();
 
 /* =====Beginning of Declarations of Machine Specific Functions===== */
 /* Utility functions */
-#if CMK_BLUEGENEL
-extern void MPID_Progress_test();
-#endif
+
 static size_t CheckAllAsyncMsgsSent(void);
 static void ReleaseSentMessages(void);
 static int PumpMsgs(void);
@@ -567,9 +562,6 @@ static void ReleaseSentMessages(void) {
     int done;
     MPI_Status sts;
 
-#if CMK_BLUEGENEL
-    MPID_Progress_test();
-#endif
 
     MACHSTATE1(2,"ReleaseSentMessages begin on %d {", CmiMyPe());
     while (msg_tmp!=0) {
@@ -621,10 +613,6 @@ static int PumpMsgs(void) {
 
 #if CMI_EXERT_RECV_CAP || CMI_DYNAMIC_EXERT_CAP
     int recvCnt=0;
-#endif
-
-#if CMK_BLUEGENEL
-    MPID_Progress_test();
 #endif
 
     MACHSTATE(2,"PumpMsgs begin {");
@@ -1289,12 +1277,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     int largc=*argc;
     char** largv=*argv;
 
-#if CMK_USE_HP_MAIN_FIX
-#if FOR_CPLUS
-    _main(largc,largv);
-#endif
-#endif
-
     if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
 #if CMK_SMP
       Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
@@ -1327,9 +1309,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     largc = *argc;
     largv = *argv;
     if(!CharmLibInterOperate) {
-			MPI_Comm_dup(MPI_COMM_WORLD,&charmComm);
+      MPI_Comm_dup(MPI_COMM_WORLD,&charmComm);
       MPI_Comm_size(charmComm, numNodes);
-			MPI_Comm_rank(charmComm, myNodeID);
+      MPI_Comm_rank(charmComm, myNodeID);
     }
 
     MPI_Bcast(&_Cmi_mynodesize, 1, MPI_INT, 0, charmComm);

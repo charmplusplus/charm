@@ -322,7 +322,7 @@ SearchNode::SearchNode( SearchNodeMsg *msg )
     {
         SequentialSolver solver;
         solver.setParentInfo(msg, mySearchDepth);
-        StateBase *parent;// = mySearchClass;
+        StateBase *parent=NULL;// = mySearchClass;
         int processed_nodes = 0;
         if(msg->nodes == 1){
             solver.initialize();

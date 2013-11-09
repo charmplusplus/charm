@@ -268,7 +268,10 @@ public:
 #else
     sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), myidx);
 #endif
-    mkstemp(fname);
+    if(mkstemp(fname) < 0)
+    {
+      CmiAbort("mkstemp fail in checkpoint");
+    }
 #else
     fname=tmpnam(NULL);
 #endif
@@ -348,8 +351,17 @@ CkMemCheckPT::CkMemCheckPT(int w)
   CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
   CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
 #endif
-	chkpTable[0] = NULL;
-	chkpTable[1] = NULL;
+#if CMK_CHKP_ALL
+  initEntry();
+#endif        
+}
+
+void CkMemCheckPT::initEntry()
+{
+#if CMK_CHKP_ALL
+  chkpTable[0].init(where, 0);
+  chkpTable[1].init(where, 1);
+#endif 
 }
 
 CkMemCheckPT::~CkMemCheckPT()
@@ -479,10 +491,9 @@ void CkMemCheckPT::recoverEntry(CkArrayCheckPTMessage *msg)
     // ack
   thisProxy[buddy].gotData();
 #else
-  chkpTable[0] = NULL;
-  chkpTable[1] = NULL;
-  recvArrayCheckpoint(msg);
+  initEntry();
   thisProxy[msg->bud2].gotData();
+  recvArrayCheckpoint(msg);
 #endif
 }
 
@@ -544,6 +555,7 @@ void CkMemCheckPT::pupAllElements(PUP::er &p){
 	if(!p.isUnpacking()){
 		numElements = CkCountArrayElements();
 	}
+	//cppcheck-suppress uninitvar
 	p | numElements;
 	if(!p.isUnpacking()){
 		CKLOCMGR_LOOP(MemElementPacker packer(mgr,p);mgr->iterate(packer););
@@ -572,9 +584,8 @@ void CkMemCheckPT::startArrayCheckpoint(){
 		pupAllElements(p);
 	}
 	thisProxy[msg->bud2].recvArrayCheckpoint((CkArrayCheckPTMessage *)CkCopyMsg((void **)&msg));
-    if (chkpTable[0]) delete chkpTable[0];
-	chkpTable[0] = msg;
-	recvCount++;
+	chkpTable[0].updateBuffer(msg);
+        recvCount++;
 #endif
 }
 
@@ -586,10 +597,7 @@ void CkMemCheckPT::recvArrayCheckpoint(CkArrayCheckPTMessage *msg)
 		idx = 0;
 	}
 	int isChkpting = msg->cp_flag;
-    if (isChkpting == 1){
-		if (chkpTable[idx]) delete chkpTable[idx];
-	}
-	chkpTable[idx] = msg;
+	chkpTable[idx].updateBuffer(msg);
 	if(isChkpting){
 		recvCount++;
 		if(recvCount == 2){
@@ -697,7 +705,10 @@ void CkMemCheckPT::syncFiles(CkReductionMsg *m)
 {
   delete m;
 #if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
-  system("sync");
+  if(system("sync")< 0)
+  {
+    CmiAbort("sync file failed");
+  }
 #endif
   contribute(CkCallback(CkReductionTarget(CkMemCheckPT, cpFinish), thisProxy[cpStarter]));
 }
@@ -949,14 +960,14 @@ void CkMemCheckPT::recoverBuddies()
   }
 #else
   //send to failed pe
-  if(CkMyPe()!=thisFailedPe&&chkpTable[1]!=NULL&&chkpTable[1]->bud1==thisFailedPe){
+  if(CkMyPe()!=thisFailedPe&&chkpTable[1].bud1==thisFailedPe){
 #if CK_NO_PROC_POOL
       // find a new buddy
       int budPe = BuddyPE(CkMyPe());
 #else
       int budPe = thisFailedPe;
 #endif
-      CkArrayCheckPTMessage *msg = (CkArrayCheckPTMessage *)CkCopyMsg((void **)&chkpTable[1]);
+      CkArrayCheckPTMessage *msg = chkpTable[1].getCopy();
       CkPrintf("[%d]got message for crashed pe %d\n",CkMyPe(),thisFailedPe);
 	  msg->cp_flag = 0;            // not checkpointing
       msg->bud1 = budPe;
@@ -1052,7 +1063,7 @@ void CkMemCheckPT::recoverArrayElements()
     count ++;
   }
 #else
-	CkArrayCheckPTMessage * msg = (CkArrayCheckPTMessage *)CkCopyMsg((void **)&chkpTable[0]);
+	CkArrayCheckPTMessage * msg = chkpTable[0].getCopy();
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
 	recoverAll(msg,gmap,imap);
 #else

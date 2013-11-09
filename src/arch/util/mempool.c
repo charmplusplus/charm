@@ -176,11 +176,10 @@ int checkblock(mempool_type *mptr,block_header *current,int power)
 void removeblocks(mempool_type *mptr)
 {
   block_header *current,*prev,*tofree,*tail;
-  mempool_freeblock freefn = mptr->freeblockfn;
 
-  if(mptr == NULL)
-    return;
-
+  mempool_freeblock freefn;
+  if(mptr == NULL) return;
+  freefn = mptr->freeblockfn;
   tail = (block_header*)((char*)mptr+mptr->block_tail);
   current = prev = &(mptr->block_head);
   current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
@@ -241,11 +240,10 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
 void mempool_destroy(mempool_type *mptr)
 {
   block_header *current,*tofree;
-  mempool_freeblock   freefn = mptr->freeblockfn;
 
-  if(mptr == NULL)
-    return;
-
+  mempool_freeblock freefn;
+  if(mptr == NULL) return;
+  freefn= mptr->freeblockfn;
   current = tofree = &(mptr->block_head);
 
   while(current != NULL) {

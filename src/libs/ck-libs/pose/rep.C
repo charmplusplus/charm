@@ -5,7 +5,7 @@
 void rep::update(POSE_TimeType t, double rt) { 
   ovt = (ovt < t) ? t : ovt;
   parent->eq->currentPtr->svt = ovt;
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.dop){
     ort = (ort < rt) ? rt : ort;
     parent->eq->currentPtr->srt = ort;

@@ -636,6 +636,7 @@ public:
 		} else 
 		{ // Unpacking phase: allocate and restore
 			allocatePages(nPages*pageSize);
+			//cppcheck-suppress uninitvar
 			p|pg;
 			while (pg!=-1) {
 				pupPage(p,pg);

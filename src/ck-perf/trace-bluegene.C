@@ -63,6 +63,7 @@ void TraceBluegene::creatFiles()
   pfp = fopen(fname,"w");     
   if(pfp==NULL)
     CmiAbort("Cannot open Bluegene print file for writing.\n");
+  delete[] fname;
 }
 
 void TraceBluegene::tlineEnd(void** parentLogPtr){
@@ -226,7 +227,6 @@ void TraceBluegene::userBracketEvent(const char* name, double bt, double et, voi
   CmiAssert(*parentLogPtr != NULL);
   tTIMELINEREC.logEntryInsert(newLog);
 }
-
 
 void TraceBluegene::userBracketEvent(const char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList){
    

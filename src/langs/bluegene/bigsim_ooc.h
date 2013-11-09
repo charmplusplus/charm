@@ -232,6 +232,7 @@ public:
 	}
 	fprintf(ofp, "\n");
 	fflush(ofp);
+	fclose(ofp);
     }
 };
 

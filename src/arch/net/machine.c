@@ -1910,7 +1910,7 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 #endif	  
     break;
   default:
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (dst<0 || dst>=CmiNumPes())
       CmiAbort("Send to out-of-bounds processor!");
 #endif
@@ -2044,7 +2044,7 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
     CmiPushImmediateMsg(data);
       /* only communication thread executes immediate messages in SMP */
     if (!_immRunning) CmiHandleImmediate();
-    return;
+    return NULL;
   }
 #endif
 
@@ -2750,11 +2750,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 {
 #if MACHINE_DEBUG
   debugLog=NULL;
-#endif
-#if CMK_USE_HP_MAIN_FIX
-#if FOR_CPLUS
-  _main(argc,argv);
-#endif
 #endif
   Cmi_startfn = fn; Cmi_usrsched = usc;
   Cmi_netpoll = 0;

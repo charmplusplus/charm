@@ -52,15 +52,15 @@ fttest: main
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(all) main main.prj charmrun *~
 
-main.o: main.cc jacobi3d.decl.h main.decl.h
-	$(CHARMC) -c main.cc
+main.o: main.C jacobi3d.decl.h main.decl.h
+	$(CHARMC) -c main.C
 
-main_j.o: main.cc main.decl.h  jacobi3d.decl.h
-	$(CHARMC) -DJACOBI=1 -c main.cc -o main_j.o
+main_j.o: main.C main.decl.h  jacobi3d.decl.h
+	$(CHARMC) -DJACOBI=1 -c main.C -o main_j.o
 
-main_ckloop.o: main.cc main.decl.h  jacobi3d.decl.h
-	$(CHARMC) -DJACOBI=1 -DCKLOOP=1 -c main.cc -o main_ckloop.o
+main_ckloop.o: main.C main.decl.h  jacobi3d.decl.h
+	$(CHARMC) -DJACOBI=1 -DCKLOOP=1 -c main.C -o main_ckloop.o
 
-main_omp.o: main.cc main.decl.h  jacobi3d.decl.h
-	$(CHARMC) $(OMP_FLAG) -o $(OBJS_OMP) -c main.cc
+main_omp.o: main.C main.decl.h  jacobi3d.decl.h
+	$(CHARMC) $(OMP_FLAG) -o $(OBJS_OMP) -c main.C
 

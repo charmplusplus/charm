@@ -6,7 +6,7 @@ CProxy_LBstrategy TheLBstrategy;
 
 LBgroup::LBgroup(void)
 {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
@@ -91,13 +91,13 @@ void LBgroup::objUpdate(int ldIdx, POSE_TimeType ovt, POSE_TimeType eet, int ne,
 void LBgroup::calculateLocalLoad(void)
 {
 
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(LB_TIMER);
 #endif
   if (busy) {
     TheLBG[CkMyPe()].calculateLocalLoad();
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
     if(pose_config.stats)
       localStats->TimerStop();
 #endif
@@ -119,7 +119,7 @@ void LBgroup::calculateLocalLoad(void)
   // reduce loads to strategy
   rootLB[reportTo].recvLoadReport(lr);
   reportTo = (reportTo + 1) % CkNumPes();
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -127,7 +127,7 @@ void LBgroup::calculateLocalLoad(void)
 
 void LBgroup::balance(BalanceSpecs *bs)
 {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(LB_TIMER);
 #endif
@@ -209,7 +209,7 @@ void LBgroup::balance(BalanceSpecs *bs)
   }
   CkFreeMsg(bs);
   busy = 0;
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
@@ -217,7 +217,7 @@ void LBgroup::balance(BalanceSpecs *bs)
 
 LBstrategy::LBstrategy(void)
 {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
@@ -306,7 +306,7 @@ int LBstrategy::findMinPE()
 
 void LBstrategy::recvLoadReport(LoadReport *lr)
 {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStart(LB_TIMER);
 #endif
@@ -328,7 +328,7 @@ void LBstrategy::recvLoadReport(LoadReport *lr)
 
     done = 0;
   }
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->TimerStop();
 #endif

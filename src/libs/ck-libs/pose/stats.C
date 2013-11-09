@@ -169,7 +169,12 @@ void globalStat::localStatReport(localStatSummary *m)
 
 void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
 {
-  CmiInt8 i, j;
+#if CMK_LONG_LONG_DEFINED
+  long long int i, j;
+#else
+  CmiInt8 i,j;
+#endif
+ 
   POSE_TimeType vinStart, vinEnd, gvtp = gvt + 1;
   double rinStart, rinEnd;
   FILE *fp;
@@ -188,6 +193,8 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
     fp = fopen(filename, "r");
     if (!fp) {
       CkPrintf("Cannot open file %s... exiting.\n", filename);
+      free(gvtDOP);
+      free(grtDOP);
       POSE_exit();
       return;
     }
@@ -233,4 +240,7 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
   fclose(fp);
   CkPrintf("Max model PEs: %d  Max simulation PEs: %d  Recommended #PEs: %lld\n",
 	   modelPEs, simulationPEs, avgPEs);
+  free(gvtDOP);
+  free(grtDOP);
+ 
 }

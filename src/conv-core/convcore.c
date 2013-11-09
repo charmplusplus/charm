@@ -145,7 +145,7 @@ CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
 int CharmLibInterOperate = 0;
-CpvDeclare(int,charmLibExitFlag);
+CpvDeclare(int,interopExitFlag);
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
 
@@ -207,15 +207,6 @@ CpvDeclare(int,   _urgentSend);
 
 CmiNodeLock _smp_mutex;               /* for smp */
 
-#if CONVERSE_VERSION_VMI
-void *CMI_VMI_CmiAlloc (int size);
-void CMI_VMI_CmiFree (void *ptr);
-#endif
-
-#if CONVERSE_VERSION_ELAN
-void* elan_CmiAlloc(int size);
-#endif
-
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
 void *infi_CmiAlloc(int size);
 void infi_CmiFree(void *ptr);
@@ -276,10 +267,17 @@ static void CmiAddCLA(const char *arg,const char *param,const char *desc) {
 	else { /* Printf doesn't work yet-- just add to the list.
 		This assumes the const char *'s are static references,
 		which is probably reasonable. */
+                CLA *temp;
 		i=CLAlistLen++;
 		if (CLAlistLen>CLAlistMax) { /*Grow the CLA list */
 			CLAlistMax=16+2*CLAlistLen;
-			CLAlist=realloc(CLAlist,sizeof(CLA)*CLAlistMax);\
+			temp=realloc(CLAlist,sizeof(CLA)*CLAlistMax);
+                        if(temp != NULL) {
+			  CLAlist=temp;
+                        } else {
+                          free(CLAlist);
+                          CmiAbort("Reallocation failed for CLAlist\n");
+                        }
 		}
 		CLAlist[i].arg=arg;
 		CLAlist[i].param=param;
@@ -1843,8 +1841,8 @@ void CsdScheduleForever(void)
   while (1) {
     /* The interoperation will cost this little overhead in scheduling */
     if(CharmLibInterOperate) {
-      if(CpvAccess(charmLibExitFlag)) {
-        CpvAccess(charmLibExitFlag) = 0;
+      if(CpvAccess(interopExitFlag)) {
+        CpvAccess(interopExitFlag) = 0;
         break;
       }
     }
@@ -2131,6 +2129,9 @@ void CsdInit(argv)
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
    #if CMK_USE_STL_MSGQ
    if (CmiMyPe() == 0) CmiPrintf("Charm++> Using STL-based msgQ:\n");
+   #endif
+   #if CMK_RANDOMIZED_MSGQ
+   if (CmiMyPe() == 0) CmiPrintf("Charm++> Using randomized msgQ. Priorities will not be respected!\n");
    #endif
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
@@ -2863,11 +2864,7 @@ void *CmiAlloc(int size)
 
   size += envMaxExtraSize;
 
-#if CONVERSE_VERSION_ELAN
-  res = (char *) elan_CmiAlloc(size+sizeof(CmiChunkHeader));
-#elif CONVERSE_VERSION_VMI
-  res = (char *) CMI_VMI_CmiAlloc(size+sizeof(CmiChunkHeader));
-#elif CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
+#if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
   res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));
 #elif CMK_USE_IBVERBS | CMK_USE_IBUD
   res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
@@ -2959,11 +2956,7 @@ void CmiFree(void *blk)
     CpvAccess(BlocksAllocated)--;
 #endif
 
-#if CONVERSE_VERSION_ELAN
-    elan_CmiFree(BLKSTART(parentBlk));
-#elif CONVERSE_VERSION_VMI
-    CMI_VMI_CmiFree(BLKSTART(parentBlk));
-#elif CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
+#if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
     arena_free(BLKSTART(parentBlk));
 #elif CMK_USE_IBVERBS | CMK_USE_IBUD
     /* is this message the head of a MultipleSend that we received?
@@ -3554,8 +3547,8 @@ void ConverseCommonInit(char **argv)
   CpvInitialize(int, cmiArgDebugFlag);
   CpvAccess(cmiArgDebugFlag) = 0;
 #endif
-  CpvInitialize(int,charmLibExitFlag);
-  CpvAccess(charmLibExitFlag) = 0;
+  CpvInitialize(int,interopExitFlag);
+  CpvAccess(interopExitFlag) = 0;
 
   CpvInitialize(int,_curRestartPhase);
   CpvAccess(_curRestartPhase)=1;
@@ -3761,7 +3754,7 @@ void CmiPrintf(const char *format, ...)
     CmiFlush(stdout);
   }
   va_end(args);
-#if CMK_CCS_AVAILABLE
+#if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
   if (CpvAccess(cmiArgDebugFlag)) {
     va_start(args,format);
     print_node0(format, args);
@@ -3781,7 +3774,7 @@ void CmiError(const char *format, ...)
   vfprintf(stderr,format, args);
   CmiFlush(stderr);  /* stderr is always flushed */
   va_end(args);
-#if CMK_CCS_AVAILABLE
+#if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
   if (CpvAccess(cmiArgDebugFlag)) {
     va_start(args,format);
     print_node0(format, args);

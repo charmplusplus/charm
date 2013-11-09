@@ -1,6 +1,6 @@
 
 /** @file
- * Basic NET implementation of Converse machine layer
+ * Basic NET-LRTS implementation of Converse machine layer
  * @ingroup NET
  */
 
@@ -275,6 +275,7 @@ int getDestHandler;
 #endif
 #endif
 
+int inProgress[64];
 
 static void CommunicationServerNet(int withDelayMs, int where);
 //static void CommunicationServer(int withDelayMs);
@@ -284,7 +285,6 @@ extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 
 static unsigned int dataport=0;
-static int Cmi_mach_id=0; /* Machine-specific identifier (GM-only) */
 static SOCKET       dataskt;
 
 extern void TokenUpdatePeriodic();
@@ -411,7 +411,6 @@ static void machine_atexit_check(void)
 {
   if (!machine_initiated_shutdown)
     CmiAbort("unexpected call to exit by user program. Must use CkExit, not exit!");
-  printf("Program finished.\n");
 #if 0 /*Wait for the user to press any key (for Win32 debugging)*/
   fgetc(stdin);
 #endif
@@ -586,7 +585,7 @@ void CmiEnableAsyncIO(int fd)
     CmiError("setting socket owner: %s\n", strerror(errno)) ;
     exit(1);
   }
-  if ( fcntl(fd, F_SETFL, FASYNC) < 0 ) {
+  if ( fcntl(fd, F_SETFL, O_ASYNC) < 0 ) {
     CmiError("setting socket async: %s\n", strerror(errno)) ;
     exit(1);
   }
@@ -964,21 +963,13 @@ static void pingCharmrun(void *ignored)
   if (clock > Cmi_check_last + Cmi_check_delay) {
     MACHSTATE1(3,"CommunicationsClock pinging charmrun Cmi_charmrun_fd_sendflag=%d", Cmi_charmrun_fd_sendflag);
     Cmi_check_last = clock; 
-#if CMK_USE_GM || CMK_USE_MX
-    if (!Cmi_netpoll)  /* GM netpoll, charmrun service is done in interrupt */
-#endif
     CmiCommLockOrElse(return;); /*Already busy doing communication*/
     if (Cmi_charmrun_fd_sendflag) return; /*Busy talking to charmrun*/
     CmiCommLock();
     ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
     CmiCommUnlock();
   }
-#if 1
-#if CMK_USE_GM || CMK_USE_MX
-  if (!Cmi_netpoll)
-#endif
   CmiStdoutFlush(); /*Make sure stdout buffer hasn't filled up*/
-#endif
   }
 }
 
@@ -1175,7 +1166,7 @@ void CmiPrintf(const char *fmt, ...)
   CpdSystemEnter();
   {
   va_list p; va_start(p, fmt);
-  if (Cmi_charmrun_fd!=-1)
+  if (Cmi_charmrun_fd!=-1 && _writeToStdout)
     InternalPrintf(fmt, p);
   else
     vfprintf(stdout,fmt,p);
@@ -1254,7 +1245,8 @@ static void CmiStdoutInit(void) {
 			{perror("building stdio redirection socketpair"); exit(1);}
 #endif
 		readStdout[i]=pair[0]; /*We get the read end of pipe*/
-		if (-1==dup2(srcFd,pair[1])) {perror("dup2 redirection pipe"); exit(1);}
+		if (-1==dup2(pair[1],srcFd)) {perror("dup2 redirection pipe"); exit(1);}
+		//if (-1==dup2(srcFd,pair[1])) {perror("dup2 redirection pipe"); exit(1);}
 		
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
@@ -1264,7 +1256,8 @@ static void CmiStdoutInit(void) {
                 if (Cmi_asyncio)
 		{
   /*No communication thread-- get a SIGIO on each write(), which keeps the buffer clean*/
-			CmiEnableAsyncIO(readStdout[i]);
+			//CmiEnableAsyncIO(readStdout[i]);
+			CmiEnableAsyncIO(pair[1]);
 		}
 #endif
 	}
@@ -1408,7 +1401,7 @@ static void CmiStdoutFlush(void) {
 void copyInfiAddr(ChInfiAddr *qpList);
 #endif
 
-#if CMK_IBVERBS_FAST_START
+#if CMK_USE_IBVERBS && CMK_IBVERBS_FAST_START
 static void send_partial_init()
 {
   ChMessageInt_t nodeNo = ChMessageInt_new(_Cmi_mynode);
@@ -1479,7 +1472,6 @@ static void node_addresses_obtain(char **argv)
 	me.info.nPE=ChMessageInt_new(0);
 	/* me.info.IP=_skt_invalid_ip; */
         me.info.IP=skt_innode_my_ip();
-	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
 #if CMK_USE_IBUD
 	me.info.qp.lid=ChMessageInt_new(context->localAddr.lid);
 	me.info.qp.qpn=ChMessageInt_new(context->localAddr.qpn);
@@ -1534,20 +1526,24 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
   dst = ogm->dst;
 
   //printf("deliver outgoing message, dest: %d \n", dst);
-#ifndef CMK_OPTIMIZE
-    if (dst<0 || dst>=CmiNumPes())
+#if CMK_ERROR_CHECKING
+    if (dst<0 || dst>=CmiNumPesGlobal())
       CmiAbort("Send to out-of-bounds processor!");
 #endif
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
-    if (node->nodestart != Cmi_nodestart) {
+    if (node->nodestart != Cmi_nodestartGlobal) {
 #if !CMK_SMP_NOT_RELAX_LOCK	  		
+      if(!inProgress[CmiMyRank()]) {
         CmiCommLock();
+      }
 #endif		
         DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
         GarbageCollectMsg(ogm);
 #if !CMK_SMP_NOT_RELAX_LOCK	  		
+      if(!inProgress[CmiMyRank()]) {
         CmiCommUnlock();
+      }
 #endif		
   }
 #if CMK_MULTICORE
@@ -1565,7 +1561,7 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
   MACHSTATE2(2,"Preparing outgoing message for pe %d, size %d",pe,size);
   ogm->size = size;
   ogm->data = data;
-  ogm->src = cs->pe;
+  ogm->src = CmiGetPeGlobal(cs->pe,CmiMyPartition());
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;
@@ -1593,7 +1589,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   MACHSTATE(1,"CmiGeneralSend {");
 
   CmiMsgHeaderSetLength(data, size);
-  ogm=PrepareOutgoing(cs,pe,size,freemode,data);
+  ogm=PrepareOutgoing(cs,pe,size,'F',data);
 
 #if CMK_SMP_NOT_RELAX_LOCK  
   CmiCommLock();
@@ -1605,10 +1601,10 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   CmiCommUnlock();
 #endif
 
-#if CMK_SMP
-  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
-    CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
-#endif  
+//#if CMK_SMP
+//  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
+//    CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
+//#endif  
   
   MACHSTATE(1,"}  LrtsSend");
   return (CmiCommHandle)ogm;
@@ -1662,29 +1658,25 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
 #endif
 
 
-void LrtsDrainResources()
-{
-}
+void LrtsDrainResources() { }
 
-void LrtsPostNonLocal()
-{
-}
+void LrtsPostNonLocal() { }
 
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some implementations*/
     
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl(){
-	LrtsAdvanceCommunication(5);
+    CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
 }
 #endif
 
 void LrtsAdvanceCommunication(int whileidle)
 {
 #if CMK_SMP
-  CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
+  CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
 #else
-  CommunicationServerNet(5, COMM_SERVER_FROM_WORKER);
+  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
 #endif
 }
 
@@ -1694,19 +1686,35 @@ void LrtsAdvanceCommunication(int whileidle)
  *
  *****************************************************************************/
 
-#if !CMK_BARRIER_USE_COMMON_CODE
+#if CMK_BARRIER_USE_COMMON_CODE
 
 /* happen at node level */
 /* must be called on every PE including communication processors */
 void LrtsBarrier()
 {
+  int numnodes = CmiNumNodesGlobal();
+  static int barrier_phase = 0;
+
+  if (Cmi_charmrun_fd == -1) return;                // standalone
+  if (numnodes == 1) {
+    return;
+  }
+
+  ctrl_sendone_locking("barrier",NULL,0,NULL,0);
+  while (barrierReceived != 1) {
+    CmiCommLock();
+    ctrl_getone();
+    CmiCommUnlock();
+  }
+  barrierReceived = 0;
+  barrier_phase ++;
 }
 
 
 int CmiBarrierZero()
 {
   int i;
-  int numnodes = CmiNumNodes();
+  int numnodes = CmiNumNodesGlobal();
   ChMessage msg;
 
   if (Cmi_charmrun_fd == -1) return 0;                // standalone
@@ -1717,9 +1725,9 @@ int CmiBarrierZero()
 
   if (CmiMyRank() == 0) {
     char str[64];
-    sprintf(str, "%d", CmiMyNode());
+    sprintf(str, "%d", CmiMyNodeGlobal());
     ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
-    if (CmiMyNode() == 0) {
+    if (CmiMyNodeGlobal() == 0) {
       while (barrierReceived != 2) {
         CmiCommLock();
         ctrl_getone();
@@ -1743,7 +1751,18 @@ int CmiBarrierZero()
 
 void LrtsPreCommonInit(int everReturn)
 {
-  CmiNodeAllBarrier();
+#if !CMK_SMP
+#if !CMK_ASYNC_NOT_NEEDED
+  if (Cmi_asyncio)
+  {
+    CmiSignal(SIGIO, 0, 0, CommunicationInterrupt);
+    if (!Cmi_netpoll) {
+      if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
+      if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
+    }
+  }
+#endif
+#endif
 }
 
 void LrtsPostCommonInit(int everReturn)
@@ -1766,12 +1785,6 @@ void LrtsPostCommonInit(int everReturn)
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
 #endif
-  {
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
-  }
 
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
@@ -1841,39 +1854,25 @@ void LrtsPostCommonInit(int everReturn)
   getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
   getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
 #endif
-#ifdef __ONESIDED_GM_HARDWARE
-  getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
-  getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
-#endif
 #endif
     
 }
 
 void LrtsExit()
 {
-  MACHSTATE(2,"ConverseExit {");
+  int i;
   machine_initiated_shutdown=1;
 
-  //CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
-  if (CmiMyRank()==0) CmiStdoutFlush();
+  CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
-    if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
-    else while (1) CmiYield();
-  }
-  else {
-    ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
-#if CMK_SHARED_VARS_UNAVAILABLE
+    exit(0); /*Standalone version-- just leave*/
+  } else {
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
-    while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
-#elif CMK_MULTICORE
-        if (!Cmi_commthread && CmiMyRank()==0) {
-          Cmi_check_delay = 1.0;    /* speed up checking of charmrun */
-          while (1) CommunicationServerNet(500, COMM_SERVER_FROM_WORKER);
-        }
-#endif
+    for(i = 0; i < CmiMyNodeSize(); i++) {
+      ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
+    }
+    while(1) CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
   }
-  MACHSTATE(2,"} ConverseExit");
-
 }
 
 static void set_signals(void)
@@ -1910,11 +1909,7 @@ static int net_default_skt_abort(int code,const char *msg)
 
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
-#if CMK_USE_HP_MAIN_FIX
-#if FOR_CPLUS
-  _main(argc,*argv);
-#endif
-#endif
+  int i;
   Cmi_netpoll = 0;
 #if CMK_NETPOLL
   Cmi_netpoll = 1;
@@ -1997,6 +1992,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
       Cmi_check_delay=1.0e30;
+
+  for(i = 0; i < _Cmi_mynodesize; i++)
+      inProgress[i] = 0;
 
 }
 

@@ -203,23 +203,27 @@ void HeapNode::dump()
 
 /// Dump all data fields in entire subheap
 char *HeapNode::dumpString() {
-  char str[PVT_DEBUG_BUFFER_LINE_LENGTH];
+  char *str=new char[PVT_DEBUG_BUFFER_LINE_LENGTH];
 #if USE_LONG_TIMESTAMPS
-  sprintf(str, "[HpNd: sz=%d event=%lld(%u.%d) ", subheapsize, e->timestamp, e->evID.id, e->evID.getPE());
+  snprintf(str, PVT_DEBUG_BUFFER_LINE_LENGTH,"[HpNd: sz=%d event=%lld(%u.%d) ", subheapsize, e->timestamp, e->evID.id, e->evID.getPE());
 #else
-  sprintf(str, "[HpNd: sz=%d event=%d(%u.%d) ", subheapsize, e->timestamp, e->evID.id, e->evID.getPE());
+  snprintf(str, PVT_DEBUG_BUFFER_LINE_LENGTH, "[HpNd: sz=%d event=%d(%u.%d) ", subheapsize, e->timestamp, e->evID.id, e->evID.getPE());
 #endif
   if (left) {
-    strcat(str, left->dumpString());
+    char *lstring=left->dumpString();
+    strncat(str, lstring, PVT_DEBUG_BUFFER_LINE_LENGTH);
+    delete [] lstring;
   } else {
-    strcat(str, "[NULL] ");
+    strncat(str, "[NULL] ",  PVT_DEBUG_BUFFER_LINE_LENGTH);
   }
   if (right) {
-    strcat(str, right->dumpString());
+    char *rstring=right->dumpString();
+    strncat(str, rstring, PVT_DEBUG_BUFFER_LINE_LENGTH);
+    delete [] rstring;
   } else {
-    strcat(str, "[NULL]");
+    strncat(str, "[NULL]", PVT_DEBUG_BUFFER_LINE_LENGTH);
   }
-  strcat(str, "] ");
+  strncat(str, "] ", PVT_DEBUG_BUFFER_LINE_LENGTH);
   return str;
 }
 
@@ -443,7 +447,7 @@ void EqHeap::dump()
 
 /// Dump entire heap to a string
 char *EqHeap::dumpString() {
-  char str[8192];
+  char *str= new char[8192];
   sprintf(str, "[EQHEAP: ");
   //if (top) {
   //  strcat(str, top->dumpString());

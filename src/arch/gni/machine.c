@@ -48,8 +48,10 @@
 #include "cmidirect.h"
 #endif
 
-#if !defined(LARGEPAGE)
+#if REGULARPAGE 
 #define     LARGEPAGE              0
+#else
+#define     LARGEPAGE              1
 #endif
 
 #if CMK_SMP
@@ -1282,7 +1284,7 @@ INLINE_KEYWORD static void print_smsg_attr(gni_smsg_attr_t     *a)
 {
     printf("type=%d\n, credit=%d\n, size=%d\n, buf=%p, offset=%d\n", a->msg_type, a->mbox_maxcredit, a->buff_size, a->msg_buffer, a->mbox_offset);
 }
-
+#if 0
 INLINE_KEYWORD
 static void setup_smsg_connection(int destNode)
 {
@@ -1344,7 +1346,7 @@ static void setup_smsg_connection(int destNode)
         printf("[%d=%d]OK send post FMA \n", myrank, destNode);
 #endif
 }
-
+#endif
 /* useDynamicSMSG */
 INLINE_KEYWORD
 static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
@@ -3730,9 +3732,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*local_event_handler)(gni_cq_entry_t *, void *)       = &LocalEventHandle;
     //void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
-   
-    status = PMI_Init(&first_spawned);
-    GNI_RC_CHECK("PMI_Init", status);
+  
+    if(!CharmLibInterOperate) {
+      status = PMI_Init(&first_spawned);
+      GNI_RC_CHECK("PMI_Init", status);
+    }
 
     status = PMI_Get_size(&mysize);
     GNI_RC_CHECK("PMI_Getsize", status);
@@ -4088,9 +4092,11 @@ void LrtsExit()
     //printf("FINAL [%d, %d]  register=%lld, send=%lld\n", myrank, CmiMyRank(), register_memory_size, buffered_send_msg); 
     mempool_destroy(CpvAccess(mempool));
 #endif
-    PMI_Barrier();
-    PMI_Finalize();
-    exit(0);
+    if(!CharmLibInterOperate) {
+      PMI_Barrier();
+      PMI_Finalize();
+      exit(0);
+    }
 }
 
 void LrtsDrainResources()

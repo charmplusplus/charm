@@ -1,0 +1,28 @@
+module TraceAutoPerf {
+    mainchare TraceAutoPerfInit {
+        entry TraceAutoPerfInit(CkArgMsg *m);
+    };
+
+    initproc void _initTraceAutoPerfBOC();
+    initnode void _initTraceNodeAutoPerfBOC();
+    readonly CkGroupID traceAutoPerfGID;
+    readonly CProxy_TraceAutoPerfBOC autoPerfProxy;
+    readonly CProxy_TraceNodeAutoPerfBOC autoPerfNodeProxy;
+
+    group [migratable] TraceAutoPerfBOC {
+        entry TraceAutoPerfBOC(void);
+        entry void setAutoPerfDoneCallback(CkCallback cb, bool frameworkShouldAdvancePhase); 
+        entry void timeStep(int reductionPE);
+        entry void getPerfData(int reductionPE, CkCallback cb);
+        entry void globalPerfAnalyze(CkReductionMsg *msg);
+        entry void localPerfQuery();
+    };
+
+    nodegroup TraceNodeAutoPerfBOC {
+        entry TraceNodeAutoPerfBOC(void);
+        entry void timeStep(int reductionPE);
+        entry void getPerfData(int reductionPE, CkCallback cb);
+    };
+
+};
+

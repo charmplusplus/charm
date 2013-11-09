@@ -1,24 +1,23 @@
-/* A Bison parser, made by GNU Bison 2.3.  */
+
+/* A Bison parser, made by GNU Bison 2.4.1.  */
 
 /* Skeleton interface for Bison's Yacc-like parsers in C
-
-   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005, 2006
+   
+      Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005, 2006
    Free Software Foundation, Inc.
-
-   This program is free software; you can redistribute it and/or modify
+   
+   This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2, or (at your option)
-   any later version.
-
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+   
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-
+   
    You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor,
-   Boston, MA 02110-1301, USA.  */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 /* As a special exception, you may create a larger work that contains
    part or all of the Bison parser skeleton and distribute that work
@@ -29,9 +28,10 @@
    special exception, which will cause the skeleton and the resulting
    Bison output files to be licensed under the GNU General Public
    License without this special exception.
-
+   
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
+
 
 /* Tokens.  */
 #ifndef YYTOKENTYPE
@@ -71,43 +71,44 @@
      CREATEHOME = 287,
      NOKEEP = 288,
      NOTRACE = 289,
-     VOID = 290,
-     CONST = 291,
-     PACKED = 292,
-     VARSIZE = 293,
-     ENTRY = 294,
-     FOR = 295,
-     FORALL = 296,
-     WHILE = 297,
-     WHEN = 298,
-     OVERLAP = 299,
-     ATOMIC = 300,
-     IF = 301,
-     ELSE = 302,
-     PYTHON = 303,
-     LOCAL = 304,
-     NAMESPACE = 305,
-     USING = 306,
-     IDENT = 307,
-     NUMBER = 308,
-     LITERAL = 309,
-     CPROGRAM = 310,
-     HASHIF = 311,
-     HASHIFDEF = 312,
-     INT = 313,
-     LONG = 314,
-     SHORT = 315,
-     CHAR = 316,
-     FLOAT = 317,
-     DOUBLE = 318,
-     UNSIGNED = 319,
-     ACCEL = 320,
-     READWRITE = 321,
-     WRITEONLY = 322,
-     ACCELBLOCK = 323,
-     MEMCRITICAL = 324,
-     REDUCTIONTARGET = 325,
-     CASE = 326
+     APPWORK = 290,
+     VOID = 291,
+     CONST = 292,
+     PACKED = 293,
+     VARSIZE = 294,
+     ENTRY = 295,
+     FOR = 296,
+     FORALL = 297,
+     WHILE = 298,
+     WHEN = 299,
+     OVERLAP = 300,
+     ATOMIC = 301,
+     IF = 302,
+     ELSE = 303,
+     PYTHON = 304,
+     LOCAL = 305,
+     NAMESPACE = 306,
+     USING = 307,
+     IDENT = 308,
+     NUMBER = 309,
+     LITERAL = 310,
+     CPROGRAM = 311,
+     HASHIF = 312,
+     HASHIFDEF = 313,
+     INT = 314,
+     LONG = 315,
+     SHORT = 316,
+     CHAR = 317,
+     FLOAT = 318,
+     DOUBLE = 319,
+     UNSIGNED = 320,
+     ACCEL = 321,
+     READWRITE = 322,
+     WRITEONLY = 323,
+     ACCELBLOCK = 324,
+     MEMCRITICAL = 325,
+     REDUCTIONTARGET = 326,
+     CASE = 327
    };
 #endif
 /* Tokens.  */
@@ -143,51 +144,55 @@
 #define CREATEHOME 287
 #define NOKEEP 288
 #define NOTRACE 289
-#define VOID 290
-#define CONST 291
-#define PACKED 292
-#define VARSIZE 293
-#define ENTRY 294
-#define FOR 295
-#define FORALL 296
-#define WHILE 297
-#define WHEN 298
-#define OVERLAP 299
-#define ATOMIC 300
-#define IF 301
-#define ELSE 302
-#define PYTHON 303
-#define LOCAL 304
-#define NAMESPACE 305
-#define USING 306
-#define IDENT 307
-#define NUMBER 308
-#define LITERAL 309
-#define CPROGRAM 310
-#define HASHIF 311
-#define HASHIFDEF 312
-#define INT 313
-#define LONG 314
-#define SHORT 315
-#define CHAR 316
-#define FLOAT 317
-#define DOUBLE 318
-#define UNSIGNED 319
-#define ACCEL 320
-#define READWRITE 321
-#define WRITEONLY 322
-#define ACCELBLOCK 323
-#define MEMCRITICAL 324
-#define REDUCTIONTARGET 325
-#define CASE 326
+#define APPWORK 290
+#define VOID 291
+#define CONST 292
+#define PACKED 293
+#define VARSIZE 294
+#define ENTRY 295
+#define FOR 296
+#define FORALL 297
+#define WHILE 298
+#define WHEN 299
+#define OVERLAP 300
+#define ATOMIC 301
+#define IF 302
+#define ELSE 303
+#define PYTHON 304
+#define LOCAL 305
+#define NAMESPACE 306
+#define USING 307
+#define IDENT 308
+#define NUMBER 309
+#define LITERAL 310
+#define CPROGRAM 311
+#define HASHIF 312
+#define HASHIFDEF 313
+#define INT 314
+#define LONG 315
+#define SHORT 316
+#define CHAR 317
+#define FLOAT 318
+#define DOUBLE 319
+#define UNSIGNED 320
+#define ACCEL 321
+#define READWRITE 322
+#define WRITEONLY 323
+#define ACCELBLOCK 324
+#define MEMCRITICAL 325
+#define REDUCTIONTARGET 326
+#define CASE 327
 
 
 
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 23 "xi-grammar.y"
 {
+
+/* Line 1676 of yacc.c  */
+#line 23 "xi-grammar.y"
+
   AstChildren<Module> *modlist;
   Module *module;
   ConstructList *conslist;
@@ -224,14 +229,17 @@ typedef union YYSTYPE
   WhenConstruct *when;
   XStr* xstrptr;
   AccelBlock* accelBlock;
-}
-/* Line 1529 of yacc.c.  */
-#line 230 "y.tab.h"
-	YYSTYPE;
+
+
+
+/* Line 1676 of yacc.c  */
+#line 237 "y.tab.h"
+} YYSTYPE;
+# define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
-# define YYSTYPE_IS_TRIVIAL 1
 #endif
 
 extern YYSTYPE yylval;
+
 

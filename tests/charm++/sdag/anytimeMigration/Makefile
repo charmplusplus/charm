@@ -13,7 +13,7 @@ all: $(TARGET)
 %.decl.h: %.ci
 	$(CXX) $(CXXFLAGS) $^
 
-$(TARGET).cc: $(TARGET).decl.h
+$(TARGET).C: $(TARGET).decl.h
 
 clean:
 	-rm -rf $(wildcard *.decl.h *.def.h *.o $(TARGET) charmrun *~)

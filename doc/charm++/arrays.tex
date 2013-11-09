@@ -346,42 +346,43 @@ pass the correct number of bytes to \kw{contribute}.
 
 \begin{enumerate}
 
-\item \kw{CkReduction::nop}-- no operation performed.
+\item \kw{CkReduction::nop} : no operation performed.
 
-\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double}-- the
+\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double} : the
 result will be the sum of the given numbers.
 
 \item \kw{CkReduction::product\_int}, \kw{product\_float},
-\kw{product\_double}-- the result will be the product of the given numbers.
+\kw{product\_double} : the result will be the product of the given numbers.
 
-\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double}-- the
+\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double} : the
 result will be the largest of the given numbers.
 
-\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double}-- the
+\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double} : the
 result will be the smallest of the given numbers.
 
-\item \kw{CkReduction::logical\_and}-- the result will be the logical AND of the given
+\item \kw{CkReduction::logical\_and} : the result will be the logical AND of the given
 integers.  0 is false, nonzero is true.
 
-\item \kw{CkReduction::logical\_or}-- the result will be the logical OR of the given
+\item \kw{CkReduction::logical\_or} : the result will be the logical OR of the given
 integers.
 
-\item \kw{CkReduction::bitvec\_and}-- the result will be the bitvector AND of the given numbers (represented as integers).
+\item \kw{CkReduction::bitvec\_and} : the result will be the bitvector AND of the given numbers (represented as integers).
 
-\item \kw{CkReduction::bitvec\_or}-- the result will be the bitvector OR of the given numbers (represented as integers).
+\item \kw{CkReduction::bitvec\_or} : the result will be the bitvector OR of the given numbers (represented as integers).
 
-\item \kw{CkReduction::set}-- the result will be a verbatim concatenation of
+\item \kw{CkReduction::bitvec\_xor} : the result will be the bitvector XOR of the given numbers (represented as integers).
+
+\item \kw{CkReduction::set} : the result will be a verbatim concatenation of
 all the contributed data, separated into \kw{CkReduction::setElement} records.
 The data contributed can be of any length, and can vary across array elements
 or reductions.  To extract the data from each element, see the description
 below.
 
-\item \kw{CkReduction::concat}-- the result will be a byte-by-byte
+\item \kw{CkReduction::concat} : the result will be a byte-by-byte
 concatentation of all the contributed data.  The contributed elements
 are not delimiter-separated. 
 
 \end{enumerate}
-
 
 \kw{CkReduction::set} returns a collection of \kw{CkReduction::setElement}
 objects, one per contribution.  This class has the definition:
@@ -390,25 +391,43 @@ objects, one per contribution.  This class has the definition:
 class CkReduction::setElement 
 \{
 public:
-  int dataSize;//The length of the data array below
-  char data[];//The (dataSize-long) array of data
+  int dataSize; //The length of the `data' array in bytes.
+  char data[1]; //A place holder that marks the start of the data array.
   CkReduction::setElement *next(void);
 \};
 \end{alltt}
 
-To extract the contribution of each array element from a reduction set, use the
-\uw{next} routine repeatedly:
+Example: Suppose you would like to contribute 3 integers from each array
+element. In the reduction method you would do the following:
 
 \begin{alltt}
-  //Inside a reduction handler-- 
-  //  data is our reduced data from CkReduction_set
-  CkReduction::setElement *cur=(CkReduction::setElement *)data;
-  while (cur!=NULL)
+void ArrayClass::methodName (CkCallback &cb)
+\{
+  int result[3];
+  result[0] = 1;            // Copy the desired values into the result.
+  result[1] = 2;
+  result[3] = 3;
+  // Contribute the result to the reductiontarget cb.
+  contribute(3*sizeof(int), result, CkReduction::set, cb);
+\}
+\end{alltt}
+
+Inside the reduction's target method, the contributions can be accessed by using
+the \texttt{CkReduction::setElement->next()} iterator.
+
+\begin{alltt}
+void SomeClass::reductionTargetMethod (CkReductionMsg *msg)
+\{
+  // Get the initial element in the set.
+  CkReduction::setElement *current = (CkReduction::setElement*) msg->getData();
+  while(current != NULL) // Loop over elements in set.
   \{
-    ... //Use cur->dataSize and cur->data
-    //Now advance to the next element's contribution
-    cur=cur->next();
+    // Get the pointer to the packed int's.
+    int *result = (int*) &current->data;
+    // Do something with result.
+    current = current->next(); // Iterate.
   \}
+\}
 \end{alltt}
 
 The reduction set order is undefined.  You should add a source field to the
@@ -419,7 +438,7 @@ data type, you will likely have to supply code for
 %reduction element data is complex.  
 serializing/deserializing them.
 Consider using the \kw{PUP}
-interface see ~\ref{sec:pup} to simplify your object serialization
+interface (\S~\ref{sec:pup}) to simplify your object serialization
 needs.
 
 If the outcome of your reduction is dependent on the order in which 

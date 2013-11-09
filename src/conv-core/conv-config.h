@@ -49,16 +49,8 @@
   be eliminated entirely) */
 #define CMK_LBDB_OFF (!CMK_LBDB_ON)
 
-#ifndef CMK_USE_HP_MAIN_FIX
-# define CMK_USE_HP_MAIN_FIX	0
-#endif
-
 #if CMK_AMD64 && !defined(CMK_64BIT)
 #define CMK_64BIT		1
-#endif
-
-#if CMK_BLUEGENEL
-#define CMK_VERSION_BLUEGENE	1
 #endif
 
 #if CMK_64BIT && !CMK_SIZET_64BIT
@@ -72,14 +64,6 @@
 #ifndef CMK_USE_MEMPOOL_ISOMALLOC
 #define CMK_USE_MEMPOOL_ISOMALLOC 1
 #endif
-
-/* set up what production/non-production means */
-#ifdef CMK_OPTIMIZE
-/*
-#undef CMK_REPLAYSYSTEM
-#define CMK_REPLAYSYSTEM            0
-*/
-#endif    /* CMK_OPTIMIZE */
 
 #ifndef CMK_REPLAYSYSTEM
 #define CMK_REPLAYSYSTEM            1

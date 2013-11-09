@@ -2065,7 +2065,7 @@ int FEM_Mesh::chkET(int elType) const {
 
 int FEM_Mesh::nElems(int t_max) const //Return total number of elements before type t_max
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if (t_max<0 || t_max>elem.size()) {
 		CkPrintf("FEM> Invalid element type %d used!\n");
 		CkAbort("FEM> Invalid element type");
@@ -2083,7 +2083,7 @@ int FEM_Mesh::nElems(int t_max) const //Return total number of elements before t
 int FEM_Mesh::getGlobalElem(int elType,int elNo) const
 {
 	int base=nElems(elType); //Global number of first element of this type
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if (elNo<0 || elNo>=elem[elType].size()) {
 		CkPrintf("FEM> Element number %d is invalid-- element type %d has only %d elements\n",
 			elNo,elType,elem[elType].size());

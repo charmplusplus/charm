@@ -30,8 +30,6 @@ CpvStaticDeclare(int, numOFrees);
   it belongs. I.e. the lg(block size).
 */
 
-/* TODO wrap ifndef CMK_OPTIMIZE around the stats collection bits */
-
 /* TODO figure out where we should apply CmiMemLock in here */
 
 /* Once it all works inline it */

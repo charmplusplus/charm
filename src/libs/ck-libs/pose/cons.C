@@ -8,13 +8,13 @@ void con::Step()
 {
   Event *ev;
 
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->SwitchTimer(CAN_TIMER);
 #endif
   if (!parent->cancels.IsEmpty())  // Cancel as much as possible
     CancelEvents();
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);
 #endif
@@ -25,14 +25,14 @@ void con::Step()
     currentEvent = ev;
     ev->done = 2;
     parent->DOs++;
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
     if(pose_config.stats){
       localStats->Do();
       localStats->SwitchTimer(DO_TIMER);
     }
 #endif
       parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
       if(pose_config.stats)
 	localStats->SwitchTimer(SIM_TIMER);
 #endif

@@ -192,9 +192,16 @@ IrrGroup::IrrGroup(void) {
 
 IrrGroup::~IrrGroup() {
   // remove the object pointer
-  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
-  CkpvAccess(_groupTable)->find(thisgroup).setObj(NULL);
-  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+  if (CkpvAccess(_destroyingNodeGroup)) {
+    CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
+    CksvAccess(_nodeGroupTable)->find(thisgroup).setObj(NULL);
+    CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+    CkpvAccess(_destroyingNodeGroup) = false;
+  } else {
+    CmiImmediateLock(CkpvAccess(_groupTableImmLock));
+    CkpvAccess(_groupTable)->find(thisgroup).setObj(NULL);
+    CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+  }
 }
 
 void IrrGroup::pup(PUP::er &p)
@@ -636,7 +643,11 @@ static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 #if CMK_TRACE_ENABLED 
   if (_entryTable[epIdx]->traceEnabled) {
     _TRACE_BEGIN_EXECUTE(env);
+    if(_entryTable[epIdx]->appWork)
+        _TRACE_BEGIN_APPWORK();
     _invokeEntryNoTrace(epIdx,env,obj);
+    if(_entryTable[epIdx]->appWork)
+        _TRACE_END_APPWORK();
     _TRACE_END_EXECUTE();
   }
   else
@@ -762,11 +773,15 @@ void _createGroup(CkGroupID groupID, envelope *env)
   register int epIdx = env->getEpIdx();
   int gIdx = _entryTable[epIdx]->chareIdx;
   CkNodeGroupID rednMgr;
+#if !GROUP_LEVEL_REDUCTION
   if(_chareTable[gIdx]->isIrr == 0){
 		CProxy_CkArrayReductionMgr rednMgrProxy = CProxy_CkArrayReductionMgr::ckNew(0, groupID);
 		rednMgr = rednMgrProxy;
 //		rednMgrProxy.setAttachedGroup(groupID);
-  }else{
+  }
+  else
+#endif
+  {
 	rednMgr.setZero();
   }
   env->setInitGroupNum(groupID);
@@ -1022,7 +1037,7 @@ static inline void _processDeleteVidMsg(CkCoreState *ck,envelope *env)
  Return a pointer to the local BOC of "groupID".
  The message "env" passed in has some known dependency on this groupID
  (either it is to be delivered to this BOC, or it depends on this BOC being there).
- Therefore, if the return value is NULL, this function buffers the massage so that
+ Therefore, if the return value is NULL, this function buffers the message so that
  it will be re-sent (by CkCreateLocalBranch) when this groupID is eventually constructed.
  The message passed in must have its handlers correctly set so that it can be
  scheduled again.

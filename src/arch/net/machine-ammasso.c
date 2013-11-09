@@ -2246,7 +2246,6 @@ void CmiAmmassoOpenQueuePairs() {
   // buffers from where the direct ACK will be sent
   sendBuffer = (AmmassoBuffer*) CmiAlloc(AMMASSO_INITIAL_BUFFERS*sizeof(AmmassoBuffer) + (contextBlock->numNodes-1)*sizeof(ammasso_ack_t));
 
-  ack_location = (ammasso_ack_t*)&(sendBuffer[AMMASSO_INITIAL_BUFFERS]);
   if (sendBuffer == NULL) {
 
     // Attempt to close the RNIC

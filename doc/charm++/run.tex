@@ -126,7 +126,11 @@ file, because {\tt rsh} does not run the {\tt .login} file.
 
 \end{enumerate}
 
-\item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a
+\item[{\tt ++scalable-start}]   Scalable start, or SMP-aware startup. It is useful for scalable process launch on multi-core systems since it creates only one ssh session per node and spawn all clients from the same ssh session                                                       
+
+\item[{\tt ++batch}]            Ssh a set of node programs at a time, avoiding overloading Charmrun pe.  In this strategy, the nodes assigned to a charmrun are divided into sets of fixed size. Charmrun performs ssh to the nodes in the current set, waits for the clients to connect back and then performs ssh on the next set. We call the number of nodes in one ssh set as batch size. 
+
+\item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a 
 time.
 
 \item[{\tt ++nodelist}] File containing list of nodes.
@@ -136,7 +140,13 @@ time.
 
 \item[{\tt ++help}]             print help messages
 
-\item[{\tt ++runscript}]        script to run node-program with
+\item[{\tt ++runscript}]        script to run node-program with. The specified run script is invoked with the node program and parameter. For example: 
+
+\begin{alltt}
+./charmrun +p4 ./pgm 100 2 3 ++runscript ./set\_env\_script
+\end{alltt}
+
+In this case, the {\tt set\_env\_script} is invoked on each node before launching {\tt pgm}.
 
 \item[{\tt ++xterm}]            which xterm to use
 
@@ -151,6 +161,8 @@ time.
 \item[{\tt ++useip}]            Use IP address provided for charmrun IP
 
 \item[{\tt ++usehostname}]      Send nodes our symbolic hostname instead of IP address
+
+
 
 \item[{\tt ++server-auth}]      CCS Authentication file
 

@@ -98,6 +98,13 @@ inline double TraceCpuTimer(double t) { return t - CkpvAccess(traceInitCpuTime);
 
 #define TRACE_WARN(msg) if (CkpvAccess(verbose)) CmiPrintf(msg)
 
+extern bool outlierAutomatic;
+extern bool findOutliers;
+extern int numKSeeds;
+extern int peNumKeep;
+extern bool outlierUsePhases;
+extern double entryThreshold;
+
 /** Tracing-specific registered Charm entities: */
 extern int _threadMsg, _threadChare, _threadEP;
 extern int _packMsg, _packChare, _packEP;
@@ -108,6 +115,21 @@ extern int _sdagMsg, _sdagChare, _sdagEP;
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
 
 extern "C" void (*registerMachineUserEvents())();
+
+#if CMK_HAS_COUNTER_PAPI
+#include <papi.h>
+#ifdef USE_SPP_PAPI
+#define NUMPAPIEVENTS 6
+#else
+#define NUMPAPIEVENTS 2
+#endif
+CkpvExtern(int, papiEventSet);
+CkpvExtern(LONG_LONG_PAPI*, papiValues);
+CkpvExtern(int, papiStarted);
+CkpvExtern(int, papiStopped);
+extern int papiEvents[NUMPAPIEVENTS];
+void initPAPI(); 
+#endif
 
 #endif
 

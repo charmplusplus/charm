@@ -13,7 +13,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/17/2002
 
 /*
 Library "fallback setup" routine.
-From an initcall, you register one of your routines 
+From an initproc, you register one of your routines 
 here in case the user doesn't write a TCHARM_User_setup
 routine.  Your fallback version sets up (only) your 
 library by creating some TCharm threads with the appropriate

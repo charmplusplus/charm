@@ -77,6 +77,9 @@ protected:
     virtual void userEvent(int eventID) {}
     // a pair of begin/end user event has just occured
     virtual void userBracketEvent(int eventID, double bt, double et) {}
+    //interact with application 
+    virtual void beginAppWork() {}
+    virtual void endAppWork() {}
 
     // a user supplied integer value(likely a timestep)
     virtual void userSuppliedData(int e) {}
@@ -206,6 +209,9 @@ public:
     inline void userEvent(int e) { ALLDO(userEvent(e));}
     inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
     
+    inline void beginAppWork() { ALLDO(beginAppWork());}
+    inline void endAppWork() { ALLDO(endAppWork());}
+
 	inline void userSuppliedData(int d) { ALLDO(userSuppliedData(d));}
 
 	inline void userSuppliedNote(char *note) { ALLDO(userSuppliedNote(note));}
@@ -314,6 +320,8 @@ extern "C" {
 
 #define _TRACE_USER_EVENT(x) _TRACE_ONLY(CkpvAccess(_traces)->userEvent(x))
 #define _TRACE_USER_EVENT_BRACKET(x,bt,et) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et))
+#define _TRACE_BEGIN_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->beginAppWork())
+#define _TRACE_END_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->endAppWork())
 #define _TRACE_CREATION_1(env) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,env->getEpIdx()))
 #define _TRACE_CREATION_DETAILED(env,ep) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,ep))
 #define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env, env->getEpIdx(), num))

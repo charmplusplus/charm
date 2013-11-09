@@ -41,7 +41,7 @@ void *strategyHandler(void *msg) {
     CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
     int instid = conv_header->stratid;
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     // check that the instid is not zero, meaning a possibly uninitialized value
     if (instid == 0) {
       CmiAbort("Comlib strategy ID is zero, did you forget to initialize a variable?\n");
@@ -414,7 +414,7 @@ void ConvComlibScheduleDoneInserting(int loc) {
   
 void ConvComlibManager::insertMessage(MessageHolder* msg, int instid) {
   ComlibPrintf("[%d] enqueuing message for strategy %d in tmplist\n",CmiMyPe(),instid);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (instid == 0) CmiAbort("Trying to send a message through comlib strategy zero, did you forget to initialize zome variable?\n");
 #endif
   if (isReady(instid)) {

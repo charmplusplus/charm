@@ -334,6 +334,7 @@ CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs){
   CkReductionMsg *m = CkReductionMsg::buildNew(dest2.datalength(),dest2.buffer());   
   dest.freeBuf();
   delete[] incomingMsgs;
+  delete[] numProcsRepresentedInMessage;
   return m;
 }
 

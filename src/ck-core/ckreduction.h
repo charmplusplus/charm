@@ -79,6 +79,13 @@ public:
 };
 
 
+class CkReductionInactiveMsg:public CMessage_CkReductionInactiveMsg {
+  public:
+    int id, redno;
+    CkReductionInactiveMsg(int i, int r) {id=i; redno = r;}
+};
+
+
 /**some data classes used by both ckreductionmgr and cknodereductionmgr**/
 class contributorInfo {
 public:
@@ -146,6 +153,9 @@ public:
 
                 // Compute the logical bitvector OR of the integers passed by each element.
                 bitvec_or,
+                
+                // Compute the logical bitvector XOR of the integers passed by each element.
+                bitvec_xor,
 
 	// Select one message at random to pass on
 		random,
@@ -165,8 +175,8 @@ public:
 	// and contains the data from one contribution.
 	class setElement {
 	public:
-	        int dataSize;//The length of the data array below
-	        char data[1];//The (dataSize-long) array of data
+	        int dataSize;//The allocated length of the `data' array, in bytes
+	        char data[1];//The beginning of the array of data
 		//Utility routine: get the next setElement,
 		// or return NULL if there are none.
 		setElement *next(void);
@@ -271,8 +281,8 @@ private:
   	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
 #if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_ )
     int sourceProcessorCount;
-    int fromPE;
 #endif
+    int fromPE;
 private:
 #if CMK_BIGSIM_CHARM
         void *log;
@@ -316,6 +326,7 @@ public:
 	CkNodeReductionMgr(CkMigrateMessage *m) : IrrGroup(m) {
           storedCallback = NULL;
         }
+        ~CkNodeReductionMgr();
 
 	typedef CkReductionClientFn clientFn;
 
@@ -485,9 +496,9 @@ public:
         CProxy_CkReductionMgr thisProxy;
 
 public:
-	CProxy_CkArrayReductionMgr nodeProxy; //holds the local branch of the nodegroup tree
-	CkReductionMgr(void);
+	CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr);
 	CkReductionMgr(CkMigrateMessage *m);
+        ~CkReductionMgr();
 
 	typedef CkReductionClientFn clientFn;
 
@@ -529,6 +540,7 @@ public:
 	void MigrantDied(CkReductionNumberMsg *m);
 
 	void RecvMsg(CkReductionMsg *m);
+  void AddToInactiveList(CkReductionInactiveMsg *m);
 
 	//Call back for using Node added by Sayantan
 	void ArrayReductionHandler(CkReductionMsg *m);
@@ -576,6 +588,10 @@ private:
 	int numEmigrantRecObjs;
 #endif
 
+#if !GROUP_LEVEL_REDUCTION
+	CProxy_CkArrayReductionMgr nodeProxy; //holds the local branch of the nodegroup tree
+#endif
+
 //Data members
 	//Stored callback function (may be NULL if none has been set)
 	CkCallback storedCallback;
@@ -593,6 +609,8 @@ private:
 
 	//Current local and remote contributions
 	int nContrib,nRemote;
+  // Is it inactive
+  bool is_inactive;
 
         // simple barrier
         CkCallback barrier_storedCallback;
@@ -609,11 +627,17 @@ private:
 	CkMsgQ<CkReductionMsg> futureRemoteMsgs;
 
 	CkMsgQ<CkReductionMsg> finalMsgs;
+  std::map<int, int> inactiveList;
 
 //State:
 	void startReduction(int number,int srcPE);
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
+  void checkIsActive();
+  void informParentInactive();
+  void checkAndAddToInactiveList(int id, int red_no);
+  void checkAndRemoveFromInactiveList(int id, int red_no);
+  void sendReductionStartingToKids(int red_no);
 
 //Reduction tree utilities
 	unsigned upperSize;

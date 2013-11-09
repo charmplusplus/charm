@@ -324,7 +324,7 @@ void CkPupChareData(PUP::er &p)
 // handle GroupTable and data
 void CkPupGroupData(PUP::er &p, bool create)
 {
-	int numGroups, i;
+	int numGroups = 0, i;
 
 	if (!p.isUnpacking()) {
 	  numGroups = CkpvAccess(_groupIDTable)->size();
@@ -386,7 +386,7 @@ void CkPupGroupData(PUP::er &p, bool create)
 // handle NodeGroupTable and data
 void CkPupNodeGroupData(PUP::er &p, bool create)
 {
-	int numNodeGroups, i;
+	int numNodeGroups = 0, i;
 	if (!p.isUnpacking()) {
 	  numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
 	}

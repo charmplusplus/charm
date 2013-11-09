@@ -15,7 +15,7 @@ Name: Charm
 
 Version: 5.9
 Release: 12
-Copyright: GPL
+Copyright: UIUC Academic/Non-commercial
 Group: Applications/System
 BuildRoot: /var/tmp/%{name}-root
 Source: http://charm.cs.illinois.edu/distrib/Charm-%{version}-%{release}.tar.bz2
@@ -29,7 +29,7 @@ Charm++ RPM for Linux
 %setup -n %{name}-%{version}-%{release}
 bzip2 -dc  %{_sourcedir}/Charm-%{version}-%{release}.tar.bz2 | tar xvf -
 %build
-./build AMPI net-linux %{charm_options} -O -DCMK_OPTIMIZE
+./build AMPI net-linux-x86_64 %{charm_options} --with-production
 %clean
 rm -rf $RPM_BUILD_ROOT
 %install

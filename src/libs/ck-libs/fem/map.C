@@ -46,7 +46,7 @@ static void checkRange(const char *what,int v,int max)
 
 static void checkArrayEntries(const int *arr,int nArr,int max,const char *what)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   //Check the array for out-of-bounds values
   for (int e=0;e<nArr;e++) checkRange(what,arr[e],max);
 #endif
@@ -891,10 +891,10 @@ int splitter::addGhostInner(const FEM_Entity &gEnt,int gNo, chunkList &gDest,
 //Basic debugging tool: check interlinked ghost element data structures for consistency
 void splitter::consistencyCheck(void)
 {
-#ifdef CMK_OPTIMIZE
-  bool skipCheck=true; /* Skip the check in production code */
-#else
+#if CMK_ERROR_CHECKING
   bool skipCheck=false;
+#else
+  bool skipCheck=true; /* Skip the check in production code */
 #endif
   if (skipCheck) return; //Skip check in production code
 

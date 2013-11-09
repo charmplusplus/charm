@@ -1,140 +1,376 @@
-#include <ckio.h>
-#include <errno.h>
+#include <string>
+#include <map>
 #include <algorithm>
+#include <sstream>
+
+typedef int FileToken;
+#include "CkIO.decl.h"
+#include "CkIO_impl.decl.h"
+
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <pup_stl.h>
 
 #if defined(_WIN32)
 #include <io.h>
-
-int pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
-{
-  long ret = _lseek(fd, offset, SEEK_SET);
-
-  if (ret == -1) {
-    return(-1);
-  }
-  return(_write(fd, buf, nbytes));
-}
-#define NO_UNISTD_NEEDED
 #endif
 
-#if defined(__PGIC__)
-// PGI compilers define funny feature flags that lead to standard
-// headers omitting this prototype
-ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
-#define NO_UNISTD_NEEDED
-#endif
-
-#if !defined(NO_UNISTD_NEEDED)
-#include <unistd.h>
-#endif
+using std::min;
+using std::max;
+using std::map;
+using std::string;
 
 namespace Ck { namespace IO {
-    Manager::Manager() : nextToken(0) {
-      run();
+    namespace impl {
+      CProxy_Director director;
+      Manager *manager;
     }
 
-    void Manager::prepareOutput(const char *name, size_t bytes,
-				CkCallback ready, CkCallback complete,
-				Options opts) {
-      thisProxy[0].prepareOutput_central(name, bytes, ready, complete, opts);
-    }
 
-    void Manager::write(Token token, const char *data, size_t bytes, size_t offset) {
-      Options &opts = files[token].opts;
-      while (bytes > 0) {
-        size_t stripeIndex = offset / opts.peStripe;
-        int peIndex = stripeIndex % opts.activePEs;
-        int pe = opts.basePE + peIndex * opts.skipPEs;
-        size_t bytesToSend = std::min(bytes, opts.peStripe - offset % opts.peStripe);
-	thisProxy[pe].write_forwardData(token, data, bytesToSend, offset);
-	data += bytesToSend;
-	offset += bytesToSend;
-	bytes -= bytesToSend;
+    namespace impl {
+      struct FileInfo {
+        string name;
+        CkCallback opened;
+        Options opts;
+        int fd;
+
+        FileInfo(string name_, CkCallback opened_, Options opts_)
+          : name(name_), opened(opened_), opts(opts_), fd(-1)
+        { }
+        FileInfo(string name_, Options opts_)
+          : name(name_), opened(), opts(opts_), fd(-1)
+        { }
+        FileInfo()
+          : fd(-1)
+        { }
+      };
+
+      void fatalError(string desc, string file) {
+        std::stringstream out;
+        out << "FATAL ERROR on PE " << CkMyPe()
+            << " working on file '" << file << "': "
+            << desc << "; system reported " << strerror(errno) << std::endl;
+        CkAbort(out.str().c_str());
       }
-    }
 
-    void Manager::write_forwardData(Token token, const char *data, size_t bytes,
-				    size_t offset) {
-      //files[token].bufferMap[(offset/stripeSize)*stripeSize] is the buffer to which this char should write to.
-      CkAssert(offset + bytes <= files[token].bytes);
-      // XXX: CkAssert(this is the right processor to receive this data)
+      class Director : public CBase_Director {
+        int filesOpened;
+        map<FileToken, impl::FileInfo> files;
+        CProxy_Manager managers;
+        int opnum, sessionID;
+        Director_SDAG_CODE
 
-      size_t stripeSize = files[token].opts.peStripe;   
-      while(bytes > 0)
-      {
-	size_t stripeOffset = (offset/stripeSize)*stripeSize;
-	size_t expectedBufferSize = std::min(files[token].bytes - stripeOffset, stripeSize);
-	struct impl::buffer & currentBuffer = files[token].bufferMap[stripeOffset];
-	size_t bytesInCurrentStripe = std::min(expectedBufferSize - offset%stripeSize, bytes);
+      public:
+        Director(CkArgMsg *m)
+          : filesOpened(0), opnum(0), sessionID(0)
+        {
+          delete m;
+          director = thisProxy;
+          managers = CProxy_Manager::ckNew();
+        }
 
-	//check if buffer this element already exists in map. If not, insert and resize buffer to stripe size
-	currentBuffer.expect(expectedBufferSize);
+        void openFile(string name, CkCallback opened, Options opts) {
+          if (-1 == opts.peStripe)
+            opts.peStripe = 16 * 1024 * 1024;
+          if (-1 == opts.writeStripe)
+            opts.writeStripe = 4 * 1024 * 1024;
+          if (-1 == opts.activePEs)
+            opts.activePEs = min(CkNumPes(), 32);
+          if (-1 == opts.basePE)
+            opts.basePE = 0;
+          if (-1 == opts.skipPEs)
+            opts.skipPEs = CkMyNodeSize();
 
-	currentBuffer.insertData(data, bytesInCurrentStripe, offset % stripeSize);
+          files[filesOpened] = FileInfo(name, opened, opts);
+          managers.openFile(opnum++, filesOpened++, name, opts);
+        }
 
-	// Ready to flush?
-	if(currentBuffer.isFull()) {
-	  //initializa params
-	  int l = currentBuffer.bytes_filled_so_far;
-	  char *d = &(currentBuffer.array[0]);
-	  size_t bufferOffset = stripeOffset;
-	  //write to file loop
-	  while (l > 0) {
-	    CmiInt8 ret = pwrite(files[token].fd, d, l, bufferOffset);
-	    if (ret < 0) {
-	      if (errno == EINTR) {
-		continue;
-	      } else {
-		CkPrintf("Output failed on PE %d: %s", CkMyPe(), strerror(errno));
-		CkAbort("Giving up");
-	      }
-            }
-	    l -= ret;
-	    d += ret;
-	    bufferOffset += ret;
-	  }
-	  //write complete - remove this element from bufferMap and call dataWritten
-	  thisProxy[0].write_dataWritten(token, currentBuffer.bytes_filled_so_far);
-	  files[token].bufferMap.erase(stripeOffset);
-	}
+        void fileOpened(FileToken file) {
+          files[file].opened.send(new FileReadyMsg(file));
+        }
 
-	bytes -= bytesInCurrentStripe;
-	data += bytesInCurrentStripe;
-	offset += bytesInCurrentStripe;
-      }
-    }
+        void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
+                                 CkCallback ready, CkCallback complete) {
+          Options &opts = files[file].opts;
 
-    void Manager::write_dataWritten(Token token, size_t bytes) {
-      CkAssert(CkMyPe() == 0);
+          // XXX: Replace with a direct calculation
+          int numStripes = 0, o = offset;
+          while (o < offset + bytes) {
+            numStripes++;
+            o += opts.peStripe - o % opts.peStripe;
+          }
 
-      files[token].total_written += bytes;
+          CkArrayOptions sessionOpts(numStripes);
+          //sessionOpts.setMap(managers);
+          CProxy_WriteSession session =
+            CProxy_WriteSession::ckNew(file, offset, bytes, complete, sessionOpts);
+          ready.send(new SessionReadyMsg(Session(file, bytes, offset, session)));
+        }
 
-      if (files[token].total_written == files[token].bytes)
-	files[token].complete.send();
-    }
+        void close(FileToken token, CkCallback closed) {
+          managers.close(opnum++, token, closed);
+          files.erase(token);
+        }
+      };
 
-    void Manager::prepareInput(const char *name, CkCallback ready, Options opts) {
-      CkAbort("not yet implemented");
-    }
+      class Manager : public CBase_Manager {
+        Manager_SDAG_CODE
+        int opnum;
 
-    void Manager::read(Token token, void *data, size_t bytes, size_t offset,
-		       CkCallback complete) {
-      CkAbort("not yet implemented");
-    }
+      public:
+        Manager()
+          : opnum(0)
+        {
+          manager = this;
+          thisProxy[CkMyPe()].run();
+        }
 
-    int Manager::openFile(const std::string& name) {
-      int fd;
+        void prepareFile(FileToken token, string name, Options opts) {
+          CkAssert(files.end() == files.find(token));
+          CkAssert(lastActivePE(opts) < CkNumPes());
+          CkAssert(opts.writeStripe <= opts.peStripe);
+          files[token] = impl::FileInfo(name, opts);
+
+          contribute(sizeof(FileToken), &token, CkReduction::max_int,
+                     CkCallback(CkReductionTarget(Director, fileOpened), director));
+        }
+
+        impl::FileInfo* get(FileToken token) {
+          CkAssert(files.find(token) != files.end());
+
+          // Open file if we're one of the active PEs
+          // XXX: Or maybe wait until the first write-out, to smooth the metadata load?
+          if (files[token].fd == -1) {
+            string& name = files[token].name;
 #if defined(_WIN32)
-      fd = _open(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
+            int fd = _open(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
 #else
-      fd = open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+            int fd = ::open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 #endif
-      if (-1 == fd)
-	CkAbort("Failed to open a file for parallel output");
-      return fd;
+            if (-1 == fd)
+              fatalError("Failed to open a file for parallel output", name);
+
+            files[token].fd = fd;
+          }
+
+          return &(files[token]);
+        }
+
+        void write(Session session, const char *data, size_t bytes, size_t offset) {
+          Options &opts = files[session.file].opts;
+          size_t stripe = opts.peStripe;
+
+          CkAssert(offset >= session.offset);
+          CkAssert(offset + bytes <= session.offset + session.bytes);
+
+          size_t sessionStripeBase = (session.offset / stripe) * stripe;
+
+          while (bytes > 0) {
+            size_t stripeIndex = (offset - sessionStripeBase) / stripe;
+            size_t bytesToSend = min(bytes, stripe - offset % stripe);
+
+            CProxy_WriteSession(session.sessionID)[stripeIndex]
+              .forwardData(data, bytesToSend, offset);
+
+            data += bytesToSend;
+            offset += bytesToSend;
+            bytes -= bytesToSend;
+          }
+        }
+
+        void doClose(FileToken token, CkCallback closed) {
+          int fd = files[token].fd;
+          if (fd != -1) {
+            int ret;
+            do {
+#if defined(_WIN32)
+              ret = _close(fd);
+#else
+              ret = ::close(fd);
+#endif
+            } while (ret < 0 && errno == EINTR);
+            if (ret < 0)
+              fatalError("close failed", files[token].name);
+          }
+          files.erase(token);
+          contribute(closed);
+        }
+
+        int procNum(int arrayHdl,const CkArrayIndex &element)
+        {
+#if 0
+          int peIndex = stripeIndex % opts.activePEs;
+          int pe = opts.basePE + peIndex * opts.skipPEs;
+#endif
+          return 0;
+        }
+
+      private:
+        map<FileToken, impl::FileInfo> files;
+
+        int lastActivePE(const Options &opts) {
+          return opts.basePE + (opts.activePEs-1)*opts.skipPEs;
+        }
+      };
+
+      class WriteSession : public CBase_WriteSession {
+        const FileInfo *file;
+        size_t sessionOffset, myOffset;
+        size_t sessionBytes, myBytes, myBytesWritten;
+        CkCallback complete;
+
+        struct buffer {
+          std::vector<char> array;
+          int bytes_filled_so_far;
+
+          buffer() {
+            bytes_filled_so_far = 0;
+          }
+
+          void expect(size_t bytes) {
+            array.resize(bytes);
+          }
+
+          void insertData(const char *data, size_t length, size_t offset) {
+            char *dest = &array[offset];
+            memcpy(dest, data, length);
+
+            bytes_filled_so_far += length;
+          }
+
+          bool isFull() {
+            return bytes_filled_so_far == array.size();
+          }
+        };
+        map<size_t, struct buffer> bufferMap;
+
+      public:
+        WriteSession(FileToken file_, size_t offset_, size_t bytes_, CkCallback complete_)
+          : file(manager->get(file_))
+          , sessionOffset(offset_)
+          , myOffset((sessionOffset / file->opts.peStripe + thisIndex)
+                     * file->opts.peStripe)
+          , sessionBytes(bytes_)
+          , myBytes(min(file->opts.peStripe, sessionOffset + sessionBytes - myOffset))
+          , myBytesWritten(0)
+          , complete(complete_)
+        {
+          CkAssert(file->fd != -1);
+          CkAssert(myOffset >= sessionOffset);
+          CkAssert(myOffset + myBytes <= sessionOffset + sessionBytes);
+        }
+
+        WriteSession(CkMigrateMessage *m) { }
+
+        void forwardData(const char *data, size_t bytes, size_t offset) {
+          CkAssert(offset >= myOffset);
+          CkAssert(offset + bytes <= myOffset + myBytes);
+
+          size_t stripeSize = file->opts.writeStripe;
+
+          while (bytes > 0) {
+            size_t stripeBase = (offset/stripeSize)*stripeSize;
+            size_t stripeOffset = max(stripeBase, myOffset);
+            size_t nextStripe = stripeBase + stripeSize;
+            size_t expectedBufferSize = min(nextStripe, myOffset + myBytes) - stripeOffset;
+            size_t bytesInCurrentStripe = min(nextStripe - offset, bytes);
+
+            buffer& currentBuffer = bufferMap[stripeOffset];
+            currentBuffer.expect(expectedBufferSize);
+
+            currentBuffer.insertData(data, bytesInCurrentStripe, offset - stripeOffset);
+
+            if (currentBuffer.isFull()) {
+              flushBuffer(currentBuffer, stripeOffset);
+              bufferMap.erase(stripeOffset);
+            }
+
+            bytes -= bytesInCurrentStripe;
+            data += bytesInCurrentStripe;
+            offset += bytesInCurrentStripe;
+          }
+
+          if (myBytesWritten == myBytes)
+            contribute(CkCallback(CkIndex_WriteSession::syncData(), thisProxy));
+        }
+
+        void syncData() {
+          CkAssert(bufferMap.size() == 0);
+#if CMK_HAS_FDATASYNC_FUNC
+          if (fdatasync(file->fd) < 0)
+            fatalError("fdatasync failed", file->name);
+#elif CMK_HAS_FSYNC_FUNC
+          if (fsync(file->fd) < 0)
+            fatalError("fsync failed", file->name);
+#elif defined(_WIN32)
+          intptr_t hFile = _get_osfhandle(file->fd);
+          if (FlushFileBuffers((HANDLE)hFile) == 0)
+            fatalError("FlushFileBuffers failed", file->name);
+#elif CMK_HAS_SYNC_FUNC
+#warning "Will call sync() for every completed write"
+          sync(); // No error reporting from sync()
+#else
+#warning "No file synchronization function available!"
+#endif
+
+          contribute(complete);
+          contribute(CkCallback(CkIndex_CkArray::ckDestroy(), CkGroupID(thisArrayID)));
+        }
+
+        void flushBuffer(buffer& buf, size_t bufferOffset) {
+          int l = buf.bytes_filled_so_far;
+          char *d = &(buf.array[0]);
+
+          CmiInt8 ret = CmiPwrite(file->fd, d, l, bufferOffset);
+          if (ret < 0)
+            fatalError("Call to pwrite failed", file->name);
+
+          CkAssert(ret == l);
+          myBytesWritten += l;
+        }
+      };
+
+      class Map : public CBase_Map {
+      public:
+        Map()
+          { }
+
+        int procNum(int arrayHdl, const CkArrayIndex &element) {
+          return 0;
+        }
+      };
     }
+
+    void open(string name, CkCallback opened, Options opts) {
+      impl::director.openFile(name, opened, opts);
+    }
+
+    void startSession(File file, size_t bytes, size_t offset,
+                      CkCallback ready, CkCallback complete) {
+      impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete);
+    }
+    void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
+                      const char *commitData, size_t commitBytes, size_t commitOffset,
+                      CkCallback complete) {
+      impl::director.prepareWriteSession(file.token, bytes, offset, ready,
+                                         commitData, commitBytes, commitOffset,
+                                         complete);
+    }
+
+    void write(Session session, const char *data, size_t bytes, size_t offset) {
+      impl::manager->write(session, data, bytes, offset);
+    }
+
+    void close(File file, CkCallback closed) {
+      impl::director.close(file.token, closed);
+    }
+
+    class SessionCommitMsg : public CMessage_SessionCommitMsg {
+
+    };
   }
 }
 
 #include "CkIO.def.h"
+#include "CkIO_impl.def.h"

@@ -1,6 +1,6 @@
                            Charm++
 
-       Copyright (C) 1989-2012 Regents of the University of Illinois
+       Copyright (C) 1989-2013 Regents of the University of Illinois
 
 INTRODUCTION
 ============
@@ -110,11 +110,11 @@ To choose <version>, your choice is determined by three options:
 option for networks of workstations, clusters, or single-machine 
 development and testing.
 
+	"gni-", "bluegene[lp]-", "pami-bluegeneq-" Charm++
+communicates using direct calls to the machine's communication primitives.
+
 	"mpi-" Charm++ communicates using MPI calls.  Use this for
 machines with a good MPI implementation (such as the Origin 2000).
-
-	"gemini_gni-", "bluegene[lp]-", "pami-bluegeneq-" Charm++
-communicates using direct calls to the machine's communication primitives.
 
 	"multicore-" Charm++ communicates using shared memory within a
 	single node
@@ -132,7 +132,6 @@ threads; "sim-" switches between processors and counts communications.
 	"darwin"      Apple Mac OS X
 	"sol"         Solaris
 	"aix"         IBM A/IX
-	"sp"          IBM SP A/IX
 
 
 3.)  Some operating systems have other architecture options, such as:
@@ -151,7 +150,7 @@ Your Charm++ version is made by concatenating the options, e.g.:
 "net-linux-x86_64"   Charm++ for a network of 64-bit Linux workstations,
                      compiled using g++.
 
-"mpi-crayxt"         Charm++ for Cray XT4/5 systems using the system's compiler.
+"gni-crayxc"         Charm++ for Cray XC30 systems using the system's compiler.
 
 
 **** How to choose <options> ****
@@ -228,11 +227,15 @@ the Charm++ source code into net-linux-x86_64/tmp, build the entire
 Charm++ runtime system in net-linux-x86_64/tmp, and link example programs
 into net-linux-x86_64/examples.
 
-Several #define's control the compilation of Charm++.  Some of these
-#define's can be found in src/<version>/conv-mach.h.  #define's can
-also be specified on the command line, using the -D option.  For
-example,
-    > ./build charm++ net-linux -O -DCMK_OPTIMIZE=1
+Charm++ can be compiled with several optional features enabled or
+disabled. These include runtime error checking, tracing, interactive
+debugging, deterministic record-replay, and more. They can be
+controlled by passing flags of the form --enable-featurename or
+--disable-featurename to the build command:
+    > ./build charm++ net-linux-x86_64 --disable-tracing
+
+The list of optional features available is shown in the output of
+    > ./build --help
 
 Production optimizations: Pass the configure option --with-production
 to ./build to turn on optimizations in Charm++/Converse. This disables

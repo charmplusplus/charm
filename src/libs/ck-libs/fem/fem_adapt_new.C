@@ -200,7 +200,7 @@ int FEM_Adapt::edge_flip_help(int e1, int e2, int n1, int n2, int e1_n1,
       delete fmsg;
     }
 
-    int *finall, numfinall=finalchkl.size();
+    int *finall=NULL, numfinall=finalchkl.size();
     if(numfinall>0) finall = new int[numfinall];
     for(int j=0; j<numfinall; j++) finall[j] = finalchkl[j];
     finalchkl.free();
@@ -425,7 +425,7 @@ int FEM_Adapt::edge_bisect_help(int e1, int e2, int n1, int n2, int e1_n1,
       delete fmsg;
     }
 
-    int *finall, numfinall=finalchkl.size();
+    int *finall=NULL, numfinall=finalchkl.size();
     if(numfinall>0) finall = new int[numfinall];
     for(int j=0; j<numfinall; j++) finall[j] = finalchkl[j];
     finalchkl.free();

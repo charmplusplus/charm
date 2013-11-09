@@ -9,11 +9,10 @@
 #
 # ***********************************************************************
 
-OPTS=-O #-DSEQUENTIAL_POSE=1 #
 #USE THIS Line for sequential
 #OPTS=-O -DSEQUENTIAL_POSE=1 
 #USE THIS Line for sequential max speed no debugging
-#OPTS=-O -DSEQUENTIAL_POSE=1 -DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+#OPTS=-O -DSEQUENTIAL_POSE=1 -DCMK_TRACE_DISABLED=1 -DCMK_MEMCHECKS_OFF=1
 
 CHARMBASE=../../..
 CHARMBIN=$(CHARMBASE)/bin

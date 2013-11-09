@@ -351,13 +351,19 @@ int PeTable :: UnpackAndInsert(void *in) {
   UNPACK(int, refno);
   ComlibPrintf("%d UnPackAndInsert\n", CkMyPe());
   UNPACK(comID, id);
+  //cppcheck-suppress uninitvar
   UNPACK(int, msgsize);
+  //cppcheck-suppress uninitvar
   UNPACK(int, ufield);
+  //cppcheck-suppress uninitvar
   UNPACK(int, nummsgs);
+  //cppcheck-suppress uninitvar
   UNPACK(int, npe);
 
   // unpack all messages into an array
+  //cppcheck-suppress uninitvar
   msgend = (char*)in + msgsize;
+  //cppcheck-suppress uninitvar
   msgcur = (char*)in + ALIGN8(sizeof(struct AllToAllHdr) + (npe+nummsgs+1)*sizeof(int));
   while (msgcur < msgend) {
     CmiChunkHeader *ch = (CmiChunkHeader *)msgcur;
@@ -379,10 +385,11 @@ int PeTable :: UnpackAndInsert(void *in) {
 
   pe = -1;
   //for (i=0;i<npe;i++) {
+  //cppcheck-suppress uninitvar
   for (i=0; i<nummsgs; ++i) {
     //UNPACK(int, pe);
     //pe *= -1;
-
+    //cppcheck-suppress uninitvar
     UNPACK(int, offset);
     if (offset <= 0) {
       pe = -1 * offset;
@@ -461,7 +468,7 @@ int PeTable :: UnpackAndInsert(void *in) {
   */
 
   ptrvec.removeAll();
-  
+  //cppcheck-suppress uninitvar  
   return(ufield);
 }
 
@@ -473,25 +480,6 @@ int PeTable :: UnpackAndInsert(void *in) {
 int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist) {
   char *junk;
   char *t =(char *)in /*+CmiReservedHeaderSize*/;
-  int i,  
-    ufield,   // user field or ths stage of the iteration 
-    nmsgs,    // number of messages in combo message
-    refno,    // reference number
-    dummy;    // alignment dummy
-  
-  comID id;
-
-  /*
-    UNPACK(int, refno);      
-    UNPACK(comID, id);
-    
-    UNPACK(int, ufield);
-    UNPACK(int, nmsgs);
-    //UNPACK(int, dummy);
-    int header_size = sizeof(comID) + CmiReservedHeaderSize + 3 *sizeof(int);
-    if(header_size % 8 != 0)
-    t+= 8 - header_size % 8;
-  */
 
   AllToAllHdr ahdr;
   UNPACK(AllToAllHdr, ahdr);
@@ -499,10 +487,10 @@ int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist) {
   if((sizeof(AllToAllHdr) & 7) != 0)
     t += 8 - (sizeof(AllToAllHdr) & 7);
 
-  refno = ahdr.refno;
-  id = ahdr.id;
-  nmsgs = ahdr.nmsgs;
-  ufield = ahdr.ufield;
+  int refno = ahdr.refno;     // reference number
+  comID id = ahdr.id;
+  int nmsgs = ahdr.nmsgs;  // number of messages in combo message
+  int ufield = ahdr.ufield;  // user field or ths stage of the iteration 
 
   ComlibPrintf("[%d] unpack and insert all %d, %d\n", CkMyPe(), ufield, nmsgs);
   
@@ -578,7 +566,7 @@ PTvectorlist PeTable :: ExtractAndVectorize(comID id, int ufield, int npe, int *
 
   int refno = id.refno;    
 
-  // SHOULD PACK THE SIZE, which is not available: fix elan and undo this cvs update
+  // SHOULD PACK THE SIZE, which is not available: fix and undo this cvs update
   PACK(int, refno);
   PACK(comID, id);
   PACK(int, ufield);

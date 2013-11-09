@@ -442,6 +442,7 @@ void BgTimeLog::pupCommon(PUP::er &p) {
 
   // pup for BgMsgEntry
   if (!p.isUnpacking()) l=msgs.length();
+  //cppcheck-suppress uninitvar
   p|l;
 
   // CmiPrintf("               *** number of messages: %d\n", l);
@@ -701,7 +702,7 @@ void BgTimeLineRec::pup(PUP::er &p)
 
 void BgTimeLineRec::winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, int& tLineLength) {
 
-  int l;
+  int l=0;
 
   if (!p.isUnpacking()) {
 

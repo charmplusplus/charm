@@ -343,14 +343,14 @@ class Block: public CBase_Block {
 //C++ function invoked from MPI, marks the begining of Charm++
 void kNeighbor(int numchares, int numsteps, int msgsize, int lbfreq)
 {
-	num_chares = num_chares;
+  num_chares = num_chares;
   gMsgSize = msgsize;
   if(num_chares < CkNumPes()) {
-		num_chares = CkNumPes();
+    num_chares = CkNumPes();
   }
-	if(CkMyPe() == 0) {
-		mainProxy.beginWork(numsteps,msgsize,lbfreq);
-	}
+  if(CkMyPe() == 0) {
+    mainProxy.beginWork(numsteps,msgsize,lbfreq);
+  }
   StartCharmScheduler();
 }
 #include "kNeighbor.def.h"

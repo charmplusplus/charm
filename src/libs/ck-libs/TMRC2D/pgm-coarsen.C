@@ -542,10 +542,6 @@ driver(void)
     //    if (t%512==0)
     //      FEM_Migrate();
     
-    vector2d *loc=new vector2d[2*g.nnodes];
-    for (i=0;i<g.nnodes;i++) {
-      loc[i]=g.coord[i];//+g.d[i];
-    }
     double *areas=new double[g.nelems];
     for (i=0;i<g.nelems;i++) {
       areas[i]=1.5*calcArea(g,i);

@@ -90,6 +90,9 @@ typedef int MPI_Fint;
 #define MPI_MAX_PROCESSOR_NAME	256
 #define MPI_MAX_ERROR_STRING	256
 
+#define MPI_VERSION     1
+#define MPI_SUBVERSION  3
+
 /* these values have to match values in ampif.h */
 /* base types */
 #define MPI_DATATYPE_NULL    -1
@@ -563,6 +566,8 @@ int AMPI_Dims_create(int nnodes, int ndims, int *dims);
 int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm);
 
 /***environment management***/
+#define MPI_Get_version AMPI_Get_version
+int AMPI_Get_version(int *version, int *subversion);
 #define MPI_Get_processor_name AMPI_Get_processor_name
 int AMPI_Get_processor_name(char *name, int *resultlen);
 #define MPI_Errhandler_create AMPI_Errhandler_create

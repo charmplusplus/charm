@@ -98,6 +98,7 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
 #endif
 #endif
 
+#include <assert.h>
 
 void CmiSyncBroadcastFn(int size, char *msg);
 CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg);
@@ -144,6 +145,7 @@ int _Cmi_mype_global;
 int _Cmi_numpes_global;
 int _Cmi_mynode_global;
 int _Cmi_numnodes_global;
+static int _writeToStdout = 1;
 
 // Node state structure, local information for the partition
 int               _Cmi_mynodesize;/* Number of processors in my address space */
@@ -176,8 +178,10 @@ static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
 
 
 #if CMK_SMP
-static volatile int commThdExit = 0;
-static CmiNodeLock  commThdExitLock = 0;
+volatile int commThdExit = 0;
+CmiNodeLock  commThdExitLock = 0;
+extern CmiNodeLock  interopCommThdExitLock;
+extern int CharmLibInterOperate;
 
 /**
  *  The macro defines whether to have a comm thd to offload some
@@ -201,7 +205,8 @@ int Cmi_commthread = 1;
 #endif
 
 /*SHOULD BE MOVED TO MACHINE-SMP.C ??*/
-static int Cmi_nodestart;
+static int Cmi_nodestart = -1;
+static int Cmi_nodestartGlobal = -1;
 
 /*
  * Network progress utility variables. Period controls the rate at
@@ -277,7 +282,7 @@ static void ConverseRunPE(int everReturn);
 /* Functions regarding machine running on every proc */
 static void AdvanceCommunication(int whenidle);
 static void CommunicationServer(int sleepTime);
-static void CommunicationServerThread(int sleepTime);
+void CommunicationServerThread(int sleepTime);
 void ConverseExit(void);
 
 /* Functions providing incoming network messages */
@@ -569,7 +574,7 @@ if (MSG_STATISTIC)
 #if CMK_USE_OOB
     if (CpvAccess(_urgentSend)) mode |= OUT_OF_BAND;
 #endif
-    return LrtsSendFunc(destNode, destPE, size, msg, mode);
+    return LrtsSendFunc(destNode, CmiGetPeGlobal(destPE,partition), size, msg, mode);
 }
 
 //I am changing this function to offload task to a generic function - the one
@@ -714,6 +719,7 @@ if (  MSG_STATISTIC)
 
 #include "TopoManager.h"
 extern void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
+extern void setDefaultPartitionParams();
 
 void create_topoaware_partitions() {
   int i, j, numparts_bak;
@@ -737,7 +743,7 @@ void create_topoaware_partitions() {
   if(_partitionInfo.scheme == 100) {
     createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);       
   } else {
-    TopoManager_createPartitions(_partitionInfo.scheme, _partitionInfo.nodeMap);
+    TopoManager_createPartitions(_partitionInfo.scheme, numparts_bak, _partitionInfo.nodeMap);
   }
   TopoManager_free();
   
@@ -747,9 +753,9 @@ void create_topoaware_partitions() {
 #if CMK_ERROR_CHECKING
   testMap = (int*)calloc(CmiNumNodesGlobal(), sizeof(int));
   for(i = 0; i < CmiNumNodesGlobal(); i++) {
-    CmiAssert(_partitionInfo.nodeMap[i] >= 0);
-    CmiAssert(_partitionInfo.nodeMap[i] < CmiNumNodesGlobal());
-    CmiAssert(testMap[_partitionInfo.nodeMap[i]] == 0);
+    assert(_partitionInfo.nodeMap[i] >= 0);
+    assert(_partitionInfo.nodeMap[i] < CmiNumNodesGlobal());
+    assert(testMap[_partitionInfo.nodeMap[i]] == 0);
     testMap[_partitionInfo.nodeMap[i]] = 1;
   }
   free(testMap);
@@ -766,13 +772,52 @@ void create_topoaware_partitions() {
   }
 }
 
+void CmiSetNumPartitions(int nump) {
+  _partitionInfo.numPartitions = nump;
+}
+
+void CmiSetMasterPartition() {
+  if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
+    CmiAbort("setMasterPartition used with incompatible option\n");
+  }
+  _partitionInfo.type = PARTITION_MASTER;
+} 
+
+void CmiSetPartitionSizes(char *sizes) {
+  int length = strlen(sizes);
+  _partitionInfo.partsizes = (char*)malloc((length+1)*sizeof(char));
+
+  if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
+    CmiAbort("setPartitionSizes used with incompatible option\n");
+  }
+
+  memcpy(_partitionInfo.partsizes, sizes, length*sizeof(char));
+  _partitionInfo.partsizes[length] = '\0';
+  _partitionInfo.type = PARTITION_PREFIX;
+}
+
+void CmiSetPartitionScheme(int scheme) {
+  _partitionInfo.scheme = scheme;
+  _partitionInfo.isTopoaware = 1;
+}
+
+void CmiSetCustomPartitioning() {
+  _partitionInfo.scheme = 100;
+  _partitionInfo.isTopoaware = 1;
+}
+
 static int create_partition_map( char **argv)
 {
-  char* partsizes = NULL, *token, *tptr;
-  int i;
-
+  char* token, *tptr;
+  int i, flag;
+  
   _partitionInfo.numPartitions = 1; 
   _partitionInfo.type = PARTITION_DEFAULT;
+  _partitionInfo.partsizes = NULL;
+  _partitionInfo.scheme = 0;
+  _partitionInfo.isTopoaware = 0;
+
+  setDefaultPartitionParams();
 
   if(!CmiGetArgIntDesc(argv,"+partitions", &_partitionInfo.numPartitions,"number of partitions")) {
     CmiGetArgIntDesc(argv,"+replicas", &_partitionInfo.numPartitions,"number of partitions");
@@ -785,21 +830,18 @@ static int create_partition_map( char **argv)
     _partitionInfo.type = PARTITION_MASTER;
   }
  
-  if (CmiGetArgStringDesc(argv, "+partition_sizes", &partsizes, "size of partitions")) {
+  if (CmiGetArgStringDesc(argv, "+partition_sizes", &_partitionInfo.partsizes, "size of partitions")) {
     if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
-      CmiAbort("+partition_sizes used with incompatible option, possibly +use_master\n");
+      CmiAbort("+partition_sizes used with incompatible option, possibly +master_partition\n");
     }
     _partitionInfo.type = PARTITION_PREFIX;
   }
 
-  _partitionInfo.scheme = 0;
   if (CmiGetArgFlagDesc(argv,"+partition_topology","topology aware partitions")) {
     _partitionInfo.isTopoaware = 1;
     _partitionInfo.scheme = 1;
-  } else {
-    _partitionInfo.isTopoaware = 0;
-  }
-  
+  }  
+
   if (CmiGetArgIntDesc(argv,"+partition_topology_scheme", &_partitionInfo.scheme, "topology aware partitioning scheme")) {
     _partitionInfo.isTopoaware = 1;
   }
@@ -810,7 +852,7 @@ static int create_partition_map( char **argv)
   }
 
   if(_partitionInfo.type == PARTITION_DEFAULT) {
-    CmiAssert((_Cmi_numnodes_global % _partitionInfo.numPartitions) == 0);
+    assert((_Cmi_numnodes_global % _partitionInfo.numPartitions) == 0);
     _partitionInfo.partitionPrefix[0] = 0;
     _partitionInfo.partitionSize[0] = _Cmi_numnodes_global / _partitionInfo.numPartitions;
     for(i = 1; i < _partitionInfo.numPartitions; i++) {
@@ -819,7 +861,7 @@ static int create_partition_map( char **argv)
     } 
     _partitionInfo.myPartition = _Cmi_mynode_global / _partitionInfo.partitionSize[0];
   } else if(_partitionInfo.type == PARTITION_MASTER) {
-    CmiAssert(((_Cmi_numnodes_global-1) % (_partitionInfo.numPartitions-1)) == 0);
+    assert(((_Cmi_numnodes_global-1) % (_partitionInfo.numPartitions-1)) == 0);
     _partitionInfo.partitionSize[0] = 1;
     _partitionInfo.partitionPrefix[0] = 0;
     _partitionInfo.partitionSize[1] = (_Cmi_numnodes_global-1) / (_partitionInfo.numPartitions-1);
@@ -832,7 +874,7 @@ static int create_partition_map( char **argv)
     if(!_Cmi_mynode_global) 
       _partitionInfo.myPartition = 0;
   } else if(_partitionInfo.type == PARTITION_PREFIX) {
-    token = strtok_r(partsizes, ",", &tptr);
+    token = strtok_r(_partitionInfo.partsizes, ",", &tptr);
     while (token)
     {
       int i,j;
@@ -880,13 +922,13 @@ static int create_partition_map( char **argv)
     _partitionInfo.partitionPrefix[0] = 0;
     _partitionInfo.myPartition = 0;
     for(i = 1; i < _partitionInfo.numPartitions; i++) {
-      CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
+      assert(_partitionInfo.partitionSize[i-1] > 0);
       _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
       if((_Cmi_mynode_global >= _partitionInfo.partitionPrefix[i]) && (_Cmi_mynode_global < (_partitionInfo.partitionPrefix[i] + _partitionInfo.partitionSize[i]))) {
         _partitionInfo.myPartition = i;
       }
     } 
-    CmiAssert(_partitionInfo.partitionSize[i-1] > 0);
+    assert(_partitionInfo.partitionSize[i-1] > 0);
   }
   _Cmi_mynode = _Cmi_mynode - _partitionInfo.partitionPrefix[_partitionInfo.myPartition];
 
@@ -900,8 +942,16 @@ void CmiCreatePartitions(char **argv) {
   _Cmi_mynode_global = _Cmi_mynode;
   _Cmi_numpes_global = _Cmi_numnodes_global * _Cmi_mynodesize;
 
+  if(Cmi_nodestart != -1) {
+    Cmi_nodestartGlobal = Cmi_nodestart;
+  } else {
+    Cmi_nodestartGlobal =  _Cmi_mynode_global * _Cmi_mynodesize;
+  }
+
   //creates partitions, reset _Cmi_mynode to be the new local rank
-  CmiAssert(_partitionInfo.numPartitions <= _Cmi_numnodes_global);
+  if(_partitionInfo.numPartitions > _Cmi_numnodes_global) {
+    CmiAbort("Number of partitions requested in greater than the number of nodes\n");
+  }
   create_partition_map(argv);
   
   //reset other local variables
@@ -935,7 +985,11 @@ INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
 }
 
 INLINE_KEYWORD int pe_lToGTranslate(int pe, int partition) {
-  return node_lToGTranslate(CmiNodeOf(pe),partition)*CmiMyNodeSize() + CmiRankOf(pe);
+  if(pe < CmiPartitionSize(partition)*CmiMyNodeSize()) {
+    return node_lToGTranslate(CmiNodeOf(pe),partition)*CmiMyNodeSize() + CmiRankOf(pe);
+  }
+
+  return CmiNumPesGlobal() + node_lToGTranslate(pe - CmiPartitionSize(partition)*CmiMyNodeSize(), partition);
 }
 
 INLINE_KEYWORD int node_gToLTranslate(int node) {
@@ -1039,6 +1093,7 @@ if (  MSG_STATISTIC)
             strerror(errno));
         CmiAbort("Error redirecting stdout to file.");
       }
+      _writeToStdout = 0;
       free(stdoutpath);
     }
 
@@ -1066,6 +1121,7 @@ if (  MSG_STATISTIC)
     CmiNodeStateInit(&CsvAccess(NodeState));
 #if CMK_SMP
     commThdExitLock = CmiCreateLock();
+    interopCommThdExitLock = CmiCreateLock();
 #endif
 
 #if CMK_OFFLOAD_BCAST_PROCESS
@@ -1157,22 +1213,19 @@ static void ConverseRunPE(int everReturn) {
        node barrier previously should take care of the node synchronization */
     _immediateReady = 1;
 
-    if(CharmLibInterOperate) {
-	/* !!! Not considering SMP mode now */
-	/* TODO: make interoperability working in SMP!!! */
-	Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-	CsdScheduler(-1);
-    } else {
-      /* communication thread */
-      if (CmiMyRank() == CmiMyNodeSize()) {
-        Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+    /* communication thread */
+    if (CmiMyRank() == CmiMyNodeSize()) {
+      Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+      if(!CharmLibInterOperate) {
         while (1) CommunicationServerThread(5);
-      } else { /* worker thread */
-        if (!everReturn) {
-          Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-          if (Cmi_usrsched==0) CsdScheduler(-1);
+      }
+    } else { /* worker thread */
+      if (!everReturn) {
+        Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+        if (Cmi_usrsched==0) CsdScheduler(-1);
+        if(!CharmLibInterOperate) {
           ConverseExit();
-        }
+        } 
       }
     }
 }
@@ -1228,12 +1281,13 @@ static void CommunicationServer(int sleepTime) {
 #if CMK_USE_XPMEM
         CmiExitXpmem();
 #endif
+        CmiNodeAllBarrier();
         LrtsExit();
     }
 #endif
 }
 
-static void CommunicationServerThread(int sleepTime) {
+void CommunicationServerThread(int sleepTime) {
     CommunicationServer(sleepTime);
 #if CMK_IMMEDIATE_MSG
     CmiHandleImmediate();
@@ -1284,7 +1338,11 @@ if (MSG_STATISTIC)
     CmiLock(commThdExitLock);
     commThdExit++;
     CmiUnlock(commThdExitLock);
-    while (1) CmiYield();
+    CmiNodeAllBarrier();
+    if(CharmLibInterOperate)
+      CmiYield();
+    else 
+      while (1) CmiYield();
 #endif
 }
 /* ##### End of Functions Related with Machine Running ##### */
@@ -1313,7 +1371,7 @@ void *CmiGetNonLocal(void) {
       * even there's only one worker thread, the polling of
       * network queue is still required.
       */
-    if (CmiNumPes() == 1) return NULL;
+    if (CmiNumPes() == 1 && CmiNumPartitions() == 1) return NULL;
 #endif
 
     MACHSTATE2(3, "[%p] CmiGetNonLocal begin %d{", cs, CmiMyPe());
@@ -1393,6 +1451,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
     }
 #endif
     LrtsStillIdle();
+    CsdResetPeriodic();
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
 }
 

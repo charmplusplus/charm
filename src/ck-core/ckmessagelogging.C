@@ -159,7 +159,7 @@ static int partnerFailureHandlerIdx;
 static double lastPingTime = -1;
 
 extern "C" void mpi_restart_crashed(int pe, int rank);
-extern "C" int  find_spare_mpirank(int pe);
+extern "C" int  find_spare_mpirank(int pe, int partition);
 
 void heartBeatPartner();
 void heartBeatHandler(void *msg);
@@ -313,7 +313,7 @@ void partnerFailureHandler(char *msg)
    int diepe = *(int *)(msg+CmiMsgHeaderSizeBytes);
 
    // send message to crash pe to let it restart
-   int newrank = find_spare_mpirank(diepe);
+   int newrank = find_spare_mpirank(diepe, CmiMyPartition());
    int buddy = getReverseCheckPointPE();
    if (buddy == diepe)  {
      mpi_restart_crashed(diepe, newrank);
@@ -1032,6 +1032,7 @@ void pupArrayElementsSkip(PUP::er &p, bool create, MigrationRecord *listToSkip,i
 	if(!p.isUnpacking()){
 		numElements = CkCountArrayElements();
 	}	
+	//cppcheck-suppress uninitvar
 	p | numElements;
 	DEBUG(printf("[%d] Number of arrayElements %d \n",CkMyPe(),numElements));
 	if(!p.isUnpacking()){
@@ -2048,6 +2049,7 @@ void MlogEntry::pup(PUP::er &p){
 			size = env->getTotalsize();
 		}	
 	}
+	//cppcheck-suppress uninitvar
 	p | size;
 	if(p.isUnpacking()){
 		if(size > 0){
@@ -2130,6 +2132,7 @@ void ChareMlogData::pup(PUP::er &p){
 	if(!p.isUnpacking()){
 		rssnTableSize = receivedSsnTable.numObjects();
 	}
+	//cppcheck-suppress uninitvar
 	p | rssnTableSize;
 	if(!p.isUnpacking()){
 		CkHashtableIterator *iter = receivedSsnTable.iterator();

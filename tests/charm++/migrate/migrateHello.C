@@ -3,6 +3,7 @@
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int numIterations;
+/*readonly*/ int dataSize;
 
 /*mainchare*/
 class Main : public CBase_Main
@@ -13,7 +14,9 @@ public:
   {
     //Process command-line arguments
     numIterations=1000;
+    dataSize = 1;
     if(m->argc >1 ) numIterations=atoi(m->argv[1]);
+    if(m->argc >2 ) dataSize=atoi(m->argv[2]);
     delete m;
 
     //Start the computation
@@ -30,9 +33,14 @@ double startTimer;
 /*array [1D]*/
 class MigrateHello : public CBase_MigrateHello
 {
+private:
+    char *data;
+
 public:
   MigrateHello()
   {
+      data = (char*)malloc(dataSize);
+      memset(data, '1', dataSize); 
     //CkPrintf("MigrateHello %d created\n",thisIndex);
   }
 
@@ -51,6 +59,13 @@ public:
       //CkPrintf("executing  %d  %d\n", CkMyPe(), hiNo);
       thisProxy[thisIndex].SayHi(hiNo+1);
       migrateMe(1-CkMyPe());
+  }
+
+  void pup(PUP::er &p)
+  {
+      CBase_MigrateHello::pup(p);
+      if(p.isUnpacking()) data = (char*)malloc(dataSize);
+      p(data, dataSize);
   }
 };
 

@@ -47,6 +47,11 @@ namespace xi {
     type = t;
   }
 
+  SdagConstruct::~SdagConstruct() {
+    delete constructs;
+    delete text;
+  }
+
   void SdagConstruct::numberNodes(void) {
     switch(type) {
     case SSDAGENTRY: nodeNum = numSdagEntries++; break;
@@ -386,16 +391,27 @@ namespace xi {
     EntryList *el;
     el = elist;
     ParamList *pl;
+    int cntr = 0;
+    bool dummy_var = false;
     while (el != NULL) {
       pl = el->entry->param;
       if (!pl->isVoid()) {
         while(pl != NULL) {
+          if (pl->getGivenName() == NULL){//if the parameter doesn't have a name, generate a dummy name
+            char s[128];
+            sprintf(s, "gen_name%d", cntr);
+            pl->setGivenName(s);
+            cntr++;
+            dummy_var = true;
+          }
           sv = new CStateVar(pl);
-          stateVarsChildren->push_back(sv);
-          whensEntryMethodStateVars.push_back(sv);
+          if(!dummy_var){ //only if it's not a dummy variable, propagate it to the children 
+            stateVarsChildren->push_back(sv);
+            whensEntryMethodStateVars.push_back(sv);
+          }
+          else dummy_var = false;
           whenCurEntry.push_back(sv);
           el->entry->addEStateVar(sv);
-
           pl = pl->next;
         }
       }
@@ -642,25 +658,31 @@ namespace xi {
     defs << "  if (" << haveAllBuffersCond << ") {\n";
 
 #if CMK_BIGSIM_CHARM
-    // TODO: instead of this, add a length field to EntryList
-    defs << "    void* logs1["<< entryLen << "]; \n";
-    defs << "    void* logs2["<< entryLen + 1 << "]; \n";
-    int localnum = 0;
-    cur = 0;
-    for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
-      XStr bufName("buf");
-      bufName << cur;
-      defs << "    logs1[" << localnum << "] = " << bufName << "->bgLog1; \n";
-      defs << "    logs2[" << localnum << "] = " << bufName << "->bgLog2; \n";
-      localnum++;
+    {
+      // TODO: instead of this, add a length field to EntryList
+      defs << "    void* logs1["<< entryLen << "]; \n";
+      defs << "    void* logs2["<< entryLen + 1 << "]; \n";
+      int localnum = 0;
+      int cur = 0;
+      for (EntryList *el = elist; el != NULL; el = el->next, cur++) {
+        XStr bufName("buf");
+        bufName << cur;
+        defs << "    logs1[" << localnum << "] = " << bufName << "->bgLog1; \n";
+        defs << "    logs2[" << localnum << "] = " << bufName << "->bgLog2; \n";
+        localnum++;
+      }
+      defs << "    logs2[" << localnum << "] = " << "_bgParentLog; \n";
+      generateEventBracket(defs, SWHEN);
+      defs << "    _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
     }
-    defs << "    logs2[" << localnum << "] = " << "_bgParentLog; \n";
-    generateEventBracket(defs, SWHEN);
-    defs << "    _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
 #endif
 
     // remove all messages fetched from SDAG buffers
     defs << removeMessagesIfFound;
+
+    // remove the current speculative state for case statements
+    if (speculativeState)
+      defs << "    __dep->removeAllSpeculationIndex(" << speculativeState->name << "->speculationIndex);\n";
 
     // make call to next method
     defs << "    ";
@@ -673,10 +695,6 @@ namespace xi {
     // delete all buffered messages now that they are not needed
     defs << deleteMessagesIfFound;
 
-    // remove the current speculative state for case statements
-    if (speculativeState)
-      defs << "    __dep->removeAllSpeculationIndex(" << speculativeState->name << "->speculationIndex);\n";
-  
     defs << "    return 0;\n";
     defs << "  } else {\n";
     // did not find matching buffers, create a continuation
@@ -765,23 +783,34 @@ namespace xi {
 
   void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry) {
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "  if (" << con1->text << ") {\n";
-    defs << "    ";
+
+    int indent = unravelClosuresBegin(defs);
+    indentBy(defs, indent);
+    defs << "if (" << con1->text << ") {\n";
+    indentBy(defs, indent + 1);
     generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "  } else {\n";
-    defs << "      ";
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
     generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "  }\n";
+    indentBy(defs, indent);
+    defs << "}\n";
+    unravelClosuresEnd(defs);
     endMethod(defs);
 
     generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "  if (" << con1->text << ") {\n";
-    defs << "    ";
+    indent = unravelClosuresBegin(defs);
+    indentBy(defs, indent);
+    defs << "if (" << con1->text << ") {\n";
+    indentBy(defs, indent + 1);
     generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    defs << "  } else {\n";
-    defs << "      ";
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
     generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "  }\n";
+    indentBy(defs, indent);
+    defs << "}\n";
+    unravelClosuresEnd(defs);
     endMethod(defs);
   }
 

@@ -11,6 +11,9 @@
 
 #if CMK_BLUEGENEQ
 
+extern int *bgq_localNodes;
+extern int bgq_isLocalSet;
+
 class BGQTorusManager {
   private:
     int dimA;	// dimension of the allocation in A (no. of processors)
@@ -43,6 +46,8 @@ class BGQTorusManager {
     ~BGQTorusManager() {
      }
 
+    void populateLocalNodes();
+
     inline int getDimX() { return dimA*dimB; }
     inline int getDimY() { return dimC*dimD; }
     inline int getDimZ() { return dimE; }
@@ -61,33 +66,8 @@ class BGQTorusManager {
     inline int getProcsPerNode() { return procsPerNode; }
     inline int* isTorus() { return torus; }
 
-#if 0
-    inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
-      if(mapping==NULL || (mapping!=NULL && mapping[0]=='X')) {
-        x = pe % rn_NX;
-        y = (pe % (rn_NX*rn_NY)) / rn_NX;
-        z = (pe % (rn_NX*rn_NY*rn_NZ)) / (rn_NX*rn_NY);
-        t = pe / (rn_NX*rn_NY*rn_NZ);
-      } else {
-        t = pe % hw_NT;
-        x = (pe % (hw_NT*rn_NX)) / hw_NT;
-        y = (pe % (hw_NT*rn_NX*rn_NY)) / (hw_NT*rn_NX);
-        z = pe / (hw_NT*rn_NX*rn_NY);
-      }
-    }
-
-    inline int coordinatesToRank(int x, int y, int z, int t) {
-      if(mapping==NULL || (mapping!=NULL && mapping[0]=='X'))
-        return x + (y + (z + t*rn_NZ) * rn_NY) * rn_NX;
-      else
-        return t + (x + (y + z*rn_NY) * rn_NX) * hw_NT;
-    }
-#else
-    //Make it smp-aware that each node could have different numbers of processes
-    //Basically the machine is viewed as NX*NY*NZ*(#cores/node), 
-    //(#cores/node) can be viewed as (#processes/node * #threads/process)
-    
     inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) { //5D Torus mapping to 3D logical network, don't know if it is useful!
+        pe = CmiGetPeGlobal(pe, CmiMyPartition());
         t = pe % (thdsPerProc*procsPerNode);
         int e = pe / (thdsPerProc*procsPerNode) % rn_NE;
         int d = pe / (thdsPerProc*procsPerNode*rn_NE) % (rn_ND);
@@ -103,6 +83,7 @@ class BGQTorusManager {
     inline void rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) {
         int tempdims[6];
 
+        pe = CmiGetPeGlobal(pe, CmiMyPartition());
         tempdims[order[0]] = pe % dims[order[0]];
         tempdims[order[1]] = (pe / dims[order[0]]) % dims[order[1]];
         tempdims[order[2]] = (pe / (dims[order[0]]*dims[order[1]])) % dims[order[2]];
@@ -117,13 +98,6 @@ class BGQTorusManager {
         e = tempdims[4];
         t = tempdims[5];
 
-        /*t = pe % (thdsPerProc*procsPerNode);
-        e = pe / (thdsPerProc*procsPerNode) % rn_NE;
-        d = pe / (thdsPerProc*procsPerNode*rn_NE) % (rn_ND);
-        c = pe / (thdsPerProc*procsPerNode*rn_NE*rn_ND) % (rn_NC);
-        b = pe / (thdsPerProc*procsPerNode*rn_NE*rn_ND*rn_NC) % (rn_NB);
-        a = pe / (thdsPerProc*procsPerNode*rn_NE*rn_ND*rn_NC*rn_NB);
-        */
     }
    
     inline int coordinatesToRank(int x, int y, int z, int t) {  //3D logic mapping to 5D torus, don't know if it is useful!
@@ -141,7 +115,14 @@ class BGQTorusManager {
         
         pe = (a * a_mult + b * b_mult + c * c_mult + d * d_mult + e) * thdsPerProc * procsPerNode + t;
         
-        return pe;
+        if(CmiNumPartitions() == 1 || !bgq_isLocalSet)
+          return pe;
+        else {
+          int node = CmiNodeOf(pe);
+          int rank = CmiRankOf(pe);
+          if(bgq_localNodes[node] == -1)     return -1;
+          else return (CmiNodeFirst(bgq_localNodes[node]) + rank);
+        }
     }    
 
     inline int coordinatesToRank(int a, int b, int c, int d, int e, int t) {
@@ -163,33 +144,29 @@ class BGQTorusManager {
         pe += (tempdims[order[4]]*dims[order[0]]*dims[order[1]]*dims[order[2]]*dims[order[3]]);
         pe += (tempdims[order[5]]*dims[order[0]]*dims[order[1]]*dims[order[2]]*dims[order[3]]*dims[order[4]]);
 
-        /*
-        int a_mult = rn_NB * rn_NC * rn_ND * rn_NE;
-        int b_mult = rn_NC * rn_ND * rn_NE;
-        int c_mult = rn_ND * rn_NE;
-        int d_mult = rn_NE;
-
-        pe = (a * a_mult + b * b_mult + c * c_mult + d * d_mult + e) * thdsPerProc * procsPerNode + t;
-        */
-
-        return pe;
+        if(CmiNumPartitions() == 1 || !bgq_isLocalSet)
+          return pe;
+        else {
+          int node = CmiNodeOf(pe);
+          int rank = CmiRankOf(pe);
+          if(bgq_localNodes[node] == -1)     return -1;
+          else return (CmiNodeFirst(bgq_localNodes[node]) + rank);
+        }
     }
      
-#endif        
-
-	inline int getTotalPhyNodes(){
-		return rn_NA * rn_NB * rn_NC * rn_ND * rn_NE;
-	}
-	inline int getMyPhyNodeID(int pe){
-		int x,y,z,t;
-		rankToCoordinates(pe, x, y, z, t);
-                int a = x/rn_NB;
-                int b = ((a % 2)==0)?(x % rn_NB) : (rn_NB - (x % rn_NB) - 1);
-                int c = y/rn_ND;
-                int d = ((c % 2)==0)?(y % rn_ND) : (rn_ND - (y % rn_ND) - 1);
-                int e = z;                
-		return a * rn_NB * rn_NC * rn_ND * rn_NE + b * rn_NC * rn_ND * rn_NE + c * rn_ND * rn_NE + d * rn_NE + e;
-	}
+    inline int getTotalPhyNodes(){
+      return rn_NA * rn_NB * rn_NC * rn_ND * rn_NE;
+    }
+    inline int getMyPhyNodeID(int pe){
+      int x,y,z,t;
+      rankToCoordinates(pe, x, y, z, t);
+      int a = x/rn_NB;
+      int b = ((a % 2)==0)?(x % rn_NB) : (rn_NB - (x % rn_NB) - 1);
+      int c = y/rn_ND;
+      int d = ((c % 2)==0)?(y % rn_ND) : (rn_ND - (y % rn_ND) - 1);
+      int e = z;                
+      return a * rn_NB * rn_NC * rn_ND * rn_NE + b * rn_NC * rn_ND * rn_NE + c * rn_ND * rn_NE + d * rn_NE + e;
+    }
 	
 };
 

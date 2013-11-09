@@ -45,7 +45,8 @@ int ParFUM_Collide(ParFUM_collider *c, double box_padding){
   // Call COLLIDE_Boxes_prio()
   
   // clean up arrays which can now be deallocated
-
+  delete [] boxes;
+  delete [] priorities;
   // return number of collisions
   return 0; 
 }

@@ -276,12 +276,14 @@ struct main : public CBase_main
     RUN_TEST(test_empty);
     RUN_TEST(test_one);
     RUN_TEST(test_two);
+#if ! CMK_RANDOMIZED_MSGQ
     RUN_TEST(test_fifo);
     RUN_TEST(test_lifo);
     RUN_TEST(test_enqueue_mixed);
-    RUN_TEST(test_enumerate);
     RUN_TEST(test_general_fifo);
     RUN_TEST(test_general_ififo);
+    RUN_TEST(test_enumerate);
+#endif
     RUN_TEST(perftest_general_ififo);
 
     if (fail) {

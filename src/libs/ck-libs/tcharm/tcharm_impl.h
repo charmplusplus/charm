@@ -283,6 +283,7 @@ class TCharmAPIRoutine {
 	int state; //stores if the isomallocblockactivate and ctginstall need to be skipped during activation
 	CtgGlobals oldGlobals;	// this is actually a pointer
         tlsseg_t   oldtlsseg;   // for TLS globals
+	bool actLikeMainThread; // Whether memory allocation and globals should switch away from the application thread
 #ifdef CMK_BIGSIM_CHARM
 	void *callEvent; // The BigSim-level event that called into the library
         int pe;          // in case thread migrates
@@ -290,7 +291,8 @@ class TCharmAPIRoutine {
 
  public:
 	// Entering Charm++ from user code
-	TCharmAPIRoutine(const char *routineName, const char *libraryName)
+	TCharmAPIRoutine(const char *routineName, const char *libraryName, bool actLikeMainThread_ = true)
+	  : actLikeMainThread(actLikeMainThread_)
 	{
 #ifdef CMK_BIGSIM_CHARM
 		// Start a new event, so we can distinguish between client 
@@ -301,22 +303,23 @@ class TCharmAPIRoutine {
 		_TRACE_BG_BEGIN_EXECUTE_NOMSG(routineName, &callEvent, 0);
 #endif
 
-		state = 0;
-		//TCharm *tc=CtvAccess(_curTCharm);
-		// if memory is not isomalloc (swap global not installed) 
-		// or thread has already been deactivated
-		if(CmiIsomallocBlockListCurrent() == NULL){
-			state |= 0x1; 	//skip CmiIsomallocBlockListActivate
+		if (actLikeMainThread) {
+			state = 0;
+			//TCharm *tc=CtvAccess(_curTCharm);
+			// if memory is not isomalloc (swap global not installed) 
+			// or thread has already been deactivated
+			if(CmiIsomallocBlockListCurrent() == NULL){
+				state |= 0x1; 	//skip CmiIsomallocBlockListActivate
+			}
+			if(CtgCurrentGlobals() == NULL){
+				state |= 0x10;	// skip CtgInstall
+			}
+			if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
+				CtgInstallTLS(&oldtlsseg, NULL); //switch to main thread
+			}
+			//Disable migratable memory allocation while in Charm++:
+			TCharm::deactivateThread();
 		}
-		if(CtgCurrentGlobals() == NULL){
-			state |= 0x10;	// skip CtgInstall
-		}
-                if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-                        CtgInstallTLS(&oldtlsseg, NULL); //switch to main thread
-                }
-		//Disable migratable memory allocation while in Charm++:
-		TCharm::deactivateThread();
-
 #if CMK_TRACE_ENABLED
 		TCHARM_Api_trace(routineName,libraryName);
 #endif
@@ -324,34 +327,35 @@ class TCharmAPIRoutine {
 
 	// Returning to user code from Charm++
 	~TCharmAPIRoutine() {
-		CmiIsomallocBlockList *oldHeapBlock; 
-		TCharm *tc=CtvAccess(_curTCharm);
-		if(tc != NULL){
-			if(state & 0x1){
-				oldHeapBlock = tc->heapBlocks;
-				tc->heapBlocks = NULL;
+		if (actLikeMainThread) {
+			CmiIsomallocBlockList *oldHeapBlock; 
+			TCharm *tc=CtvAccess(_curTCharm);
+			if(tc != NULL){
+				if(state & 0x1){
+					oldHeapBlock = tc->heapBlocks;
+					tc->heapBlocks = NULL;
+				}
+				if(state & 0x10){
+					oldGlobals = tc->threadGlobals;
+					tc->threadGlobals = NULL;
+				}	
 			}
-			if(state & 0x10){
-				oldGlobals = tc->threadGlobals;
-				tc->threadGlobals = NULL;
-			}	
-		}
 
-		//Reenable migratable memory allocation
-		TCharm::activateThread();
-		if(tc != NULL){
-			if(state & 0x1){
-				tc->heapBlocks = oldHeapBlock;
-			}	
-			if(state & 0x10){
-				tc->threadGlobals = oldGlobals;
+			//Reenable migratable memory allocation
+			TCharm::activateThread();
+			if(tc != NULL){
+				if(state & 0x1){
+					tc->heapBlocks = oldHeapBlock;
+				}	
+				if(state & 0x10){
+					tc->threadGlobals = oldGlobals;
+				}
+			}
+			if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
+				tlsseg_t cur;
+				CtgInstallTLS(&cur, &oldtlsseg);
 			}
 		}
-                if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-                        tlsseg_t cur;
-                        CtgInstallTLS(&cur, &oldtlsseg);
-                }
-
 #ifdef CMK_BIGSIM_CHARM
 		void *log;
 		_TRACE_BG_TLINE_END(&log);

@@ -58,6 +58,15 @@ public:
 		bzero(data,sizeof(MCount)*currentSize);
 	}
 
+        ~RSSN()
+        {
+          if(data != NULL)
+          {
+            delete []data;
+            data = NULL;
+          }
+        }
+
 	// Checks if a particular SSN is already in the data; if not, stores it		
 	// return value: 0 (sucess, value stored), 1 (value already there)
 	int checkAndStore(MCount ssn){

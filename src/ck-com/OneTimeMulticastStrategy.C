@@ -494,6 +494,8 @@ void OneTimeNodeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPE
     int numSend = numSendTree + numSendLocal;
     if(numSend <= 0){
       npes = 0;
+      delete[] repPeList;
+      repPeList = NULL;
       return;
     }
     
@@ -624,6 +626,8 @@ void OneTimeNodeTreeRingMulticastStrategy::determineNextHopPEs(const int totalDe
     int numSend = numSendTree + numSendLocal;
     if(numSend <= 0){
       npes = 0;
+      delete[] repPeList;
+      repPeList = NULL;
       return;
     }
     

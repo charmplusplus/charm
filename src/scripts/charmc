@@ -80,6 +80,7 @@ USE_FASTEST_CC=""
 PROG_EXT=""
 GENDEPENDS="no"
 COUNTTOKENS="no"
+USE_OPENMP="no"
 
 COPY_CHARMRUN=true
 USE_BUILD_OPTIONS=0
@@ -89,6 +90,7 @@ CHARM_SHARED="0"
 BUILD_SHARE="0"
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
+ROSE_OMP_TLS_GLOBALS="no"
 
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
@@ -98,6 +100,7 @@ SPU_USE_CPP=0
 SPU_EXTRA_LIBS=""
 
 MPI_INTEROPERATE=""
+NO_MAIN_MODULE=""
 NO_MAIN=""
 CUSTOM_PARTITION=""
 
@@ -127,7 +130,7 @@ printUsage() {
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
     echo "        -fmoddir <f90mod path>"
     echo "        -pg <opt> -build-shared -charm-shared -no-trace-mpi"
-    echo "        -mpi -nomain -custom-part"
+    echo "        -mpi -nomain-module -nomain -custom-part"
     echo
     echo "  Cell specific flags:"
     echo "        -spu-cpp -spu-lib <libname>"
@@ -500,11 +503,10 @@ do
 
 	"-tlsglobal"|"-tlsglobals")
 		TLSGLOBALS="1"
-		OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
-		OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
-		OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
-		OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
-		OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
+		;;
+
+	"-roseomptlsglobals")
+		ROSE_OMP_TLS_GLOBALS="yes"
 		;;
 
 	"-verbose")
@@ -790,12 +792,20 @@ do
 		MPI_INTEROPERATE="yes"
 		NO_MAIN="yes"
 		;;
+	-nomain-module)
+		NO_MAIN_MODULE="yes"
+		;;
 	-nomain)
 		NO_MAIN="yes"
 		;;
 	-custom-part)
 		CUSTOM_PARTITION="yes"
 		;;
+
+	-fopenmp|-openmp)
+		USE_OPENMP="yes"
+		;;
+
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
@@ -875,6 +885,38 @@ then
     then
         OPTS_CXX="$OPTS $CMK_ENABLE_CPP11"
     fi
+fi
+
+if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
+then
+    USE_OPENMP="yes"
+    TLSGLOBALS="1"
+
+    if [ ! -x "$CMK_ROSE_OMP_TOOL" ]
+    then
+	Abort "The environment variable CMK_ROSE_OMP_TOOL must contain the path to a built binary of the ROSE OpenMP variable privatization tool"
+    fi
+fi
+
+if [ "$USE_OPENMP" = "yes" ]
+then
+    [ -n "$VERBOSE" ] && echo OpenMP support enabled
+    OPTS_CC="$OPTS_CC $CMK_C_OPENMP"
+    OPTS_CXX="$OPTS_CXX $CMK_C_OPENMP"
+    OPTS_F90="$OPTS_F90 $CMK_F_OPENMP"
+    OPTS_LD="$OPTS_LD $CMK_LD_OPENMP"
+    OPTS_LDXX="$OPTS_LDXX $CMK_LD_OPENMP"
+else
+    [ -n "$VERBOSE" ] && echo OpenMP support not enabled
+fi
+
+if [ "$TLSGLOBALS" = "1" ]
+then
+    OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
+    OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
+    OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
+    OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
+    OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
 fi
 
 # Look up and add the dependencies for module $1
@@ -1029,7 +1071,7 @@ fi
 
 if [ -n "$CMK_F90_USE_MODDIR" ]
 then
-    CMK_CF90="$CMK_CF90 $CMK_CF90_MODINC$CHARMINC "
+    CMK_CF90="$CMK_CF90 $CMK_CF90_MODINC $CHARMINC $CMK_SYSINC"
 fi
 
 if [ -n "$SEQUENTIAL" ]
@@ -1226,7 +1268,7 @@ do
 	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
 	Do touch $BASE.cpm.h
 	Do $LN -f -s $FILE $TMP.c
-	Do $CMK_CPP_C -I$CHARMINC $OPTS_CC $OPTS_CPP $TMP.c > $TMP.i
+	Do $CMK_CPP_C -I$CHARMINC $CMK_SYSINC $OPTS_CC $OPTS_CPP $TMP.c > $TMP.i
 	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
 done
 
@@ -1278,6 +1320,30 @@ do
 		DESTO=""
 	fi
 	NU_OBJ=""
+
+	if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
+	then
+	    case "$FILE" in
+		*.c)
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE
+		    FILE="rose_$FILE"
+		    ;;
+		*.C|*.cc|*.cxx|*.cpp|*.c++)
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE
+		    FILE="rose_$FILE"
+		    ;;
+		*.f|*.F)
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 -c $FILE
+		    FILE="rose_$FILE"
+		    ;;
+		*.f90|*.F90)
+		    test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
+		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 $FILE
+		    FILE="rose_$FILE"
+		    ;;
+	    esac
+	fi
+
 	case "$FILE" in
 	*.ci)
                 XIOPTS=$CMK_XIOPTS
@@ -1290,26 +1356,26 @@ do
                 fi
 		;;
 	*.c|*.s)
-		Do $CMK_CC -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
+		Do $CMK_CC -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	bglmachine.C)
-		Do $CMK_GCXX -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
+		Do $CMK_GCXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu)
-		Do $CMK_CXX -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
+		Do $CMK_CXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.f|*.F)
 		test -z "$CMK_CF90_FIXED" && Abort "No F90 compiler (CMK_CF90_FIXED) defined"
-		Do $CMK_CF90_FIXED -I$CHARMINC $OPTS_CPP $OPTS_F90 -c $FILE $DESTO
+		Do $CMK_CF90_FIXED -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.f90|*.F90)
 		test -z "$CMK_CF90" && Abort "No F90 compiler (CMK_CF90) defined"
 		test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
-		Do $CMK_CF90 -I$CHARMINC $OPTS_CPP $OPTS_F90 $FILE $DESTO
+		Do $CMK_CF90 -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.fc|*.FC)
@@ -1504,7 +1570,7 @@ then
     fi
 
     # Make the spe object file to be included
-    Do $SPU_COMPILER -c -I$CHARMINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
+    Do $SPU_COMPILER -c -I$CHARMINC $CMK_SYSINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
     Do $SPU_LINKER -L$CHARMLIB -o main__funcLookup__.genSPECode main__funcLookup__.genSPECode.o $CMK_SPERT_LIBS $SPU_EXTRA_LIBS
     Do $CMK_PPU_EMBEDSPU spert_main main__funcLookup__.genSPECode main__funcLookup__.genSPECode.ppe.o
 
@@ -1569,7 +1635,7 @@ then
 fi
 
 # dummy main module
-if [ "$MPI_INTEROPERATE" != "" ]
+if [ "$MPI_INTEROPERATE" != "" -a "$NO_MAIN_MODULE" = "" ]
 then
 	OBJECTFILES="$CHARMLIB/mpi-mainmodule.o $OBJECTFILES"
 fi
@@ -1721,6 +1787,9 @@ for trace in $TRACEMODE; do
     elif test $trace = "controlPoints"
     then
       echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
+    elif test $trace = "autoPerf"
+    then
+      echo "  extern void _registerTraceAutoPerf();" >> $modInitSrc
     elif test $trace = "all"
     then
       echo "  extern void _registerTraceProjections();" >> $modInitSrc
@@ -1756,6 +1825,9 @@ for trace in $TRACEMODE; do
     elif test $trace = "controlPoints"
     then
       echo "  _registerTraceControlPoints();" >> $modInitSrc
+    elif test $trace = "autoPerf"
+    then
+      echo "  _registerTraceAutoPerf();" >> $modInitSrc
     elif test $trace = "all"
     then
       echo "  _registerTraceProjections();" >> $modInitSrc
@@ -1794,13 +1866,7 @@ Debug "About to perform final link..."
 MAKE_LDXX="0"
 MAKE_LD="0"
 
-CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ "
-
-if [ "$CUSTOM_PARTITION" = "" ]
-then
-	CORE_LIBS="$CORE_LIBS $CHARMLIB/custom_partitioner.o"
-fi
-
+CORE_LIBS="-lconv-core -lconv-util -lconv-partition $TRACE_OBJ "
 
 # get TAU stub makefile variables
 if test "$CMK_WITH_TAU" = "true"
@@ -1824,7 +1890,7 @@ case "$LANGUAGE" in
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
         if [ "$NO_MAIN" = "" ]
         then
-	  MIDDLE_LIBS="$CHARMLIB/main.o $MIDDLE_LIBS"
+	  MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
         fi
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
@@ -1838,7 +1904,7 @@ case "$LANGUAGE" in
 	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
         if [ "$NO_MAIN" = "" ]
         then
-	  MIDDLE_LIBS="$CHARMLIB/main.o $MIDDLE_LIBS"
+	  MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
         fi
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	if [ "$TAU_TRACE_MPI" = "1" ]
@@ -1883,9 +1949,9 @@ else
 # if interoperate, need a lib with moduleinit
   if [ "$MPI_INTEROPERATE" != "" ]
   then
-    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $PRE_LIBRARIES"
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $BAL_OBJ $PRE_LIBRARIES"
   else
-    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
   fi
 fi
 if [ "$TRACE_WITH_TAU" = 1 ]

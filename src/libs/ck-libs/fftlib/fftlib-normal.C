@@ -114,9 +114,6 @@ NormalSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, int 
 		     (fftw_complex*)dataPtr + p * planeSize,
 		     lineSize, 1, //stride, nextFFT
 		     NULL, 0, 0);
-#ifdef CMK_BLUEGENEL
-		CmiNetworkProgress();
-#endif
 	}
 	doneFFT(info_id);
     }
@@ -233,10 +230,6 @@ NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int
 		     (fftw_complex*)dataPtr + p * planeSize,
 		     lineSize, 1, //stride, nextFFT
 		     NULL, 0, 0);
-#ifdef CMK_BLUEGENEL
-		CmiNetworkProgress();
-#endif
-
 	}
 
 // Refactoring , so that FFT then IFFT would give us the original data
@@ -305,7 +298,7 @@ NormalSlabArray::NormalSlabArray(NormalFFTinfo &info,
 				 CProxy_NormalSlabArray dest, 
 				 bool useCommlib, 
 				 ComlibInstanceHandle inst)  {
-    NormalSlabArray();
+  //NormalSlabArray();
     setup(info, src, dest, useCommlib, inst); 
 }
 

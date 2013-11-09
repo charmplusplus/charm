@@ -396,8 +396,10 @@ int MPICH_AlltoAll_medium(
 	return MPI_ERR_OTHER;
         
   starray = (MPI_Status *) malloc(2*comm_size*sizeof(MPI_Status));
-  if (!starray) 
+  if (!starray) {
+        free(reqarray);
 	return MPI_ERR_OTHER;
+  }
         
   /* do the communication -- post all sends and receives: */
   for ( i=0; i<comm_size; i++ ) { 
@@ -408,8 +410,11 @@ int MPICH_AlltoAll_medium(
 						   MPI_ATA_TAG, comm,
 						   &reqarray[i]);
 	
-	if (mpi_errno)
+	if (mpi_errno) {
+          free(reqarray);
+          free(starray);
 	  return MPI_ERR_OTHER;
+        }
   }
 
   for ( i=0; i<comm_size; i++ ) { 
@@ -419,8 +424,11 @@ int MPICH_AlltoAll_medium(
 						   sendcount, sendtype, dst,
 						   MPI_ATA_TAG, comm,
 						   &reqarray[i+comm_size]);
-	if (mpi_errno)
+	if (mpi_errno) {
+          free(reqarray);
+          free(starray);
 	  return mpi_errno;
+        }
   }
   
   /* ... then wait for *all* of them to finish: */

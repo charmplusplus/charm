@@ -8,11 +8,11 @@
 
 /// Dump data fields to a string
 char *SRentry::dumpString() {
-  char str[32];
+  char *str= new char[32];
 #if USE_LONG_TIMESTAMPS
-  sprintf(str, "%llds%dr%d ", timestamp, sends, recvs);
+  snprintf(str, 32, "%llds%dr%d ", timestamp, sends, recvs);
 #else
-  sprintf(str, "%ds%dr%d ", timestamp, sends, recvs);
+  snprintf(str, 32, "%ds%dr%d ", timestamp, sends, recvs);
 #endif
   return str;
 }
@@ -524,25 +524,31 @@ void SRtable::dump()
 
 /// Dump data fields to a string
 char *SRtable::dumpString() {
-  char str[PVT_DEBUG_BUFFER_LINE_LENGTH], tempStr[32];
+  char *str= new char[PVT_DEBUG_BUFFER_LINE_LENGTH];
+  char *tempStr= new char[32];
   SRentry *tmp;
-  sprintf(str, "SRtable[");
+  snprintf(str, PVT_DEBUG_BUFFER_LINE_LENGTH, "SRtable[");
   for (int i=0; i<b; i++) {
     tmp = buckets[i];
-    sprintf(tempStr, "b%d: ", i);
-    strcat(str, tempStr);
+    snprintf(tempStr, 32, "b%d: ", i);
+    strncat(str, tempStr, PVT_DEBUG_BUFFER_LINE_LENGTH);
     while (tmp) {
-      strcat(str, tmp->dumpString());
+      char *stemp=tmp->dumpString();
+      strcat(str, stemp);
+      delete stemp;
       tmp = tmp->next;
     }
   }
   tmp = overflow;
-  strcat(str, " OF: ");
+  strncat(str, " OF: ", PVT_DEBUG_BUFFER_LINE_LENGTH);
   while (tmp) {
-    strcat(str, tmp->dumpString());
+    char *stemp=tmp->dumpString();
+    strcat(str, stemp);
+    delete [] stemp;
     tmp = tmp->next;
   }
-  strcat(str, "]");
+  strncat(str, "]", PVT_DEBUG_BUFFER_LINE_LENGTH);
+  delete [] tempStr;
   return str;
 }
 

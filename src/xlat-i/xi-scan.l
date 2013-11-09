@@ -102,6 +102,7 @@ struct rwtable rwtable[] = {
 {  "createhome",	CREATEHOME },
 {  "nokeep",	NOKEEP },
 {  "notrace",	NOTRACE },
+{  "appwork",	APPWORK},
 {  "template",	TEMPLATE },
 {  "class",	CLASS },
 {  "include",	INCLUDE },

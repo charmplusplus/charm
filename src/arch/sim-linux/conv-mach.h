@@ -1,8 +1,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_OPTIMIZE 1
-
 #define CMK_CCS_AVAILABLE                                  0
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    0

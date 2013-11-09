@@ -4,7 +4,6 @@
 #include "CkMemCheckpoint.decl.h"
 
 extern CkGroupID ckCheckPTGroupID;
-
 class CkArrayCheckPTReqMessage: public CMessage_CkArrayCheckPTReqMessage {
 public: 
   CkArrayCheckPTReqMessage()  {}
@@ -21,13 +20,6 @@ public:
 	int cp_flag;          // 1: from checkpoint 0: from recover
 };
 
-class CkCheckPTMessage: public CMessage_CkArrayCheckPTMessage {
-public:
-	double *packData;
-	int bud1, bud2;
-	int len;
-	int cp_flag;          // 1: from checkpoint 0: from recover
-};
 
 class CkProcCheckPTMessage: public CMessage_CkProcCheckPTMessage {
 public:
@@ -61,6 +53,87 @@ public:
 /// memory or disk checkpointing
 #define CkCheckPoint_inMEM   1
 #define CkCheckPoint_inDISK  2
+
+class CkCheckPTEntry{
+  CkArrayCheckPTMessage *data;
+  char * fname;
+public:
+  int bud1, bud2;
+  int where;
+  void init(int _where, int idx)
+  {
+    data = NULL;
+    where = _where;
+    if(where == CkCheckPoint_inDISK)
+    {
+#if CMK_USE_MKSTEMP
+      fname = new char[64];
+#if CMK_CONVERSE_MPI
+      sprintf(fname, "/tmp/ckpt%d-%d-%d-XXXXXX",CmiMyPartition(), CkMyPe(), idx);
+#else
+      sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), idx);
+#endif
+      if(mkstemp(fname)<0)
+	{
+	  CmiAbort("mkstemp fail in checkpoint");
+	}
+#else
+      fname=tmpnam(NULL);
+#endif
+    }
+  }
+
+  void updateBuffer(CkArrayCheckPTMessage * msg)
+  {
+    if(where == CkCheckPoint_inDISK)
+    {
+      envelope *env = UsrToEnv(msg);
+      CkUnpackMessage(&env);
+      data = (CkArrayCheckPTMessage *)EnvToUsr(env);
+      FILE *f = fopen(fname,"wb");
+      PUP::toDisk p(f);
+      CkPupMessage(p, (void **)&msg);
+      // delay sync to the end because otherwise the messages are blocked
+  //    fsync(fileno(f));
+      fclose(f);
+      bud1 = msg->bud1;
+      bud2 = msg->bud2;
+      delete msg;
+    }else
+    {
+      CmiAssert(where == CkCheckPoint_inMEM);
+      CmiAssert(msg!=NULL);
+      if (data) delete data;
+      data = msg;
+      bud1 = msg->bud1;
+      bud2 = msg->bud2;
+    }
+  }
+  
+  CkArrayCheckPTMessage * getCopy()
+  {
+    if(where == CkCheckPoint_inDISK)
+    {
+      CkArrayCheckPTMessage *msg;
+      FILE *f = fopen(fname,"rb");
+      PUP::fromDisk p(f);
+      CkPupMessage(p, (void **)&msg);
+      fclose(f);
+      msg->bud1 = bud1;				// update the buddies
+      msg->bud2 = bud2;
+      return msg;
+    }else
+    {
+      CmiAssert(where == CkCheckPoint_inMEM);
+      if (data == NULL) {
+        CmiPrintf("[%d] recoverArrayElements: element does not have checkpoint data.", CkMyPe());
+        CmiAbort("Abort!");
+      }
+      return (CkArrayCheckPTMessage *)CkCopyMsg((void **)&data);
+    }
+  }
+};
+
 
 class CkMemCheckPT: public CBase_CkMemCheckPT {
 public:
@@ -104,7 +177,7 @@ public:
   static char*  stage;
 private:
   CkVec<CkCheckPTInfo *> ckTable;
-  CkArrayCheckPTMessage * chkpTable[2];
+  CkCheckPTEntry chkpTable[2];
 
   int recvCount, peCount;
   int expectCount, ackCount;
@@ -116,6 +189,7 @@ private:
     /// to use memory or disk checkpointing
   int    where;
 private:
+  void initEntry();
   inline int isMaster(int pe);
 
   void failed(int pe);

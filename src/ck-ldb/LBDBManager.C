@@ -21,6 +21,7 @@ struct MigrateCB;
 void LBDB::batsyncer::gotoSync(void *bs)
 {
   LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
+  s->gotoSyncCalled = true;
   s->db->AtLocalBarrier(s->BH);
 }
 //Called at end of each load balancing cycle
@@ -35,7 +36,10 @@ void LBDB::batsyncer::resumeFromSync(void *bs)
   s->nextT = curT + s->period;
 #endif
 
-  CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, 1000*s->period, CkMyPe());
+  if (s->gotoSyncCalled) {
+    CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, 1000*s->period, CkMyPe());
+    s->gotoSyncCalled = false;
+  }
 }
 
 // initPeriod in seconds
@@ -45,6 +49,7 @@ void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
   period=initPeriod;
   nextT = CmiWallTimer() + period;
   BH = db->AddLocalBarrierClient((LDResumeFn)resumeFromSync,(void*)(this));
+  gotoSyncCalled = true;
   //This just does a CcdCallFnAfter
   resumeFromSync((void *)this);
 }
@@ -88,6 +93,14 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
   return newhandle;
 }
 
+void LBDB::RemoveOM(LDOMHandle om)
+{
+  delete oms[om.handle];
+  oms[om.handle] = NULL;
+  omCount--;
+}
+
+
 #if CMK_BIGSIM_CHARM
 #define LBOBJ_OOC_IDX 0x1
 #endif
@@ -101,7 +114,6 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
 //  newhandle.user_ptr = _userData;
   newhandle.id = _id;
   
-#if 1
 #if CMK_BIGSIM_CHARM
   if(_BgOutOfCoreFlag==2){ //taking object into memory
     //first find the first (LBOBJ_OOC_IDX) in objs and insert the object at that position
@@ -132,16 +144,6 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
   //BIGSIM_OOC DEBUGGING
   //CkPrintf("LBDBManager.C: New handle: %d, LBObj=%p\n", newhandle.handle, objs[newhandle.handle]);
 
-#else
-  LBObj *obj = new LBObj(this,_omh,_id,_userData,_migratable);
-  if (obj != NULL) {
-    newhandle.handle = objs.length();
-    objs.insertAtEnd(obj);
-  } else {
-    newhandle.handle = -1;
-  }
-  obj->DepositHandle(newhandle);
-#endif
   return newhandle;
 }
 
@@ -508,6 +510,19 @@ int LBDB::useMem() {
   return size;
 }
 
+class client {
+  friend class LocalBarrier;
+  void* data;
+  LDResumeFn fn;
+  int refcount;
+};
+class receiver {
+  friend class LocalBarrier;
+  void* data;
+  LDBarrierFn fn;
+  int on;
+};
+
 LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 {
   client* new_client = new client;
@@ -515,58 +530,33 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
   new_client->data = data;
   new_client->refcount = cur_refcount;
 
-  LDBarrierClient ret_val;
 #if CMK_BIGSIM_CHARM
-  ret_val.serial = first_free_client_slot;
-  clients.insert(ret_val.serial, new_client);
-
-  //looking for the next first free client slot
-  int nextfree=-1;
-  for(int i=first_free_client_slot+1; i<clients.size(); i++)
-    if(clients[i]==NULL) { nextfree = i; break; }
-  if(nextfree==-1) nextfree = clients.size();
-  first_free_client_slot = nextfree;
-
   if(_BgOutOfCoreFlag!=2){
     //during out-of-core emualtion for BigSim, if taking procs from disk to mem,
     //client_count should not be increased
     client_count++;
   }
-
 #else  
-  //ret_val.serial = max_client;
-  ret_val.serial = clients.size();
-  clients.insertAtEnd(new_client);
-  //max_client++;
   client_count++;
 #endif
 
-  return ret_val;
+  return LDBarrierClient(clients.insert(clients.end(), new_client));
 }
 
 void LocalBarrier::RemoveClient(LDBarrierClient c)
 {
-  const int cnum = c.serial;
+  delete *(c.i);
+  clients.erase(c.i);
+
 #if CMK_BIGSIM_CHARM
-  if (cnum < clients.size() && clients[cnum] != 0) {
-    delete (clients[cnum]);
-    clients[cnum] = 0;
-
-    if(cnum<=first_free_client_slot) first_free_client_slot = cnum;
-
-    if(_BgOutOfCoreFlag!=1){
-	//during out-of-core emulation for BigSim, if taking procs from mem to disk,
-	//client_count should not be increased
-	client_count--;
-    }
-  }
-#else
-  //if (cnum < max_client && clients[cnum] != 0) {
-  if (cnum < clients.size() && clients[cnum] != 0) {
-    delete (clients[cnum]);
-    clients[cnum] = 0;
+  //during out-of-core emulation for BigSim, if taking procs from mem to disk,
+  //client_count should not be increased
+  if(_BgOutOfCoreFlag!=1)
+  {
     client_count--;
   }
+#else
+  client_count--;
 #endif
 }
 
@@ -577,46 +567,28 @@ LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
   new_receiver->data = data;
   new_receiver->on = 1;
 
-  LDBarrierReceiver ret_val;
-//  ret_val.serial = max_receiver;
-  ret_val.serial = receivers.size();
-  receivers.insertAtEnd(new_receiver);
-//  max_receiver++;
-
-  return ret_val;
+  return LDBarrierReceiver(receivers.insert(receivers.end(), new_receiver));
 }
 
 void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
 {
-  const int cnum = c.serial;
-  //if (cnum < max_receiver && receivers[cnum] != 0) {
-  if (cnum < receivers.size() && receivers[cnum] != 0) {
-    delete (receivers[cnum]);
-    receivers[cnum] = 0;
-  }
+  delete *(c.i);
+  receivers.erase(c.i);
 }
 
 void LocalBarrier::TurnOnReceiver(LDBarrierReceiver c)
 {
-  const int cnum = c.serial;
-  //if (cnum < max_receiver && receivers[cnum] != 0) {
-  if (cnum < receivers.size() && receivers[cnum] != 0) {
-    receivers[cnum]->on = 1;
-  }
+  (*c.i)->on = 1;
 }
 
 void LocalBarrier::TurnOffReceiver(LDBarrierReceiver c)
 {
-  const int cnum = c.serial;
-  //if (cnum < max_receiver && receivers[cnum] != 0) {
-  if (cnum < receivers.size() && receivers[cnum] != 0) {
-    receivers[cnum]->on = 0;
-  }
+  (*c.i)->on = 0;
 }
 
 void LocalBarrier::AtBarrier(LDBarrierClient h)
 {
-  (clients[h.serial])->refcount++;
+  (*h.i)->refcount++;
   at_count++;
   CheckBarrier();
 }
@@ -634,9 +606,8 @@ void LocalBarrier::CheckBarrier()
   if (at_count >= client_count) {
     bool at_barrier = false;
 
-//    for(int i=0; i < max_client; i++)
-    for(int i=0; i < clients.size(); i++)
-      if (clients[i] != 0 && ((client*)clients[i])->refcount >= cur_refcount)
+    for(std::list<client*>::iterator i = clients.begin(); i != clients.end(); ++i)
+      if ((*i)->refcount >= cur_refcount)
 	at_barrier = true;
 		
     if (at_barrier) {
@@ -651,28 +622,23 @@ void LocalBarrier::CallReceivers(void)
 {
   bool called_receiver=false;
 
-//  for(int i=0; i < max_receiver; i++)
-//   for (int i=max_receiver-1; i>=0; i--) {
-   for (int i=receivers.size()-1; i>=0; i--) {
-      receiver *recv = receivers[i];
-      if (recv != 0 && recv->on) {
-        recv->fn(recv->data);
-        called_receiver = true;
-      }
+  for (std::list<receiver *>::iterator i = receivers.begin();
+       i != receivers.end(); ++i) {
+    receiver *recv = *i;
+    if (recv->on) {
+      recv->fn(recv->data);
+      called_receiver = true;
+    }
   }
 
   if (!called_receiver)
     ResumeClients();
-  
 }
 
 void LocalBarrier::ResumeClients(void)
 {
-//  for(int i=0; i < max_client; i++)
-  for(int i=0; i < clients.size(); i++)
-    if (clients[i] != 0) {
-      ((client*)clients[i])->fn(((client*)clients[i])->data);
-    }	
+  for (std::list<client *>::iterator i = clients.begin(); i != clients.end(); ++i)
+    (*i)->fn((*i)->data);
 }
 
 #endif

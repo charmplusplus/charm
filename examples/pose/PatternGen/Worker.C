@@ -116,7 +116,7 @@ void Worker::recvMessage(WorkMsg *wm) {
   case 3: {  // simultaneous ring without elapse
     if (((wm->msgID * totalNumWorkers) + wm->srcWorkerPID) < (P3_MESSAGES_TO_SEND - 1)) {
       // manually set evt for DOP analysis
-#ifndef CMK_OPTIMIZE
+#ifndef CMK_TRACE_DISABLED
       if ((pose_config.stats) && (pose_config.dop)) {
         parent->dop_override_evt = ovt + (POSE_TimeType)P3_ELAPSE_TIME;
       }

@@ -113,11 +113,7 @@ bool GridHybridSeedLB::QueryBalanceNow (int step)
 */
 int GridHybridSeedLB::Get_Cluster (int pe)
 {
-#if CONVERSE_VERSION_VMI
-  return (CmiGetCluster (pe));
-#else
   return (0);
-#endif
 }
 
 

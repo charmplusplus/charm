@@ -17,9 +17,9 @@
 #include <sys/bproc.h>
 #endif
 
-#if CMK_USE_CONVERSE
+#ifndef CMK_NOT_USE_CONVERSE
 #  include "converse.h" /* use real CmiTmpAlloc/Free */
-#else /* fake CmiTmpAlloc/Free via malloc */
+#elif CMK_NOT_USE_CONVERSE /* fake CmiTmpAlloc/Free via malloc */
 #  define CMI_TMP_SKIP
 #  define CmiTmpAlloc(size) malloc(size)
 #  define CmiTmpFree(ptr) free(ptr)
@@ -410,7 +410,7 @@ retry:
     if (skt_should_retry()) goto retry;
     else return skt_abort(93483,"Error creating server socket.");
   }
-  setsockopt(ret, SOL_SOCKET, SO_REUSEADDR, (void *) &on, sizeof(on));
+  setsockopt(ret, SOL_SOCKET, SO_REUSEADDR, (char *) &on, sizeof(on));
   
   if (bind(ret, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) 
 	  return skt_abort(93484,"Error binding server socket.");

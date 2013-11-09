@@ -399,6 +399,7 @@ public:
     offset += (nodeNum/numEmulatingPes)*numWth + pe%numWth;
     return 1;
   }
+  virtual ~CyclicMapInfo(){}
 };
 
 

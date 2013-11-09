@@ -186,6 +186,38 @@ struct MigrateInfo {
     }
 };
 
+struct MigrateDecision {
+  LDObjIndex dbIndex;
+  int fromPe;
+  int toPe;
+
+  MigrateDecision &operator=(const MigrateInfo &mInfo) {
+    dbIndex = mInfo.obj.handle;
+    fromPe = mInfo.from_pe;
+    toPe = mInfo.to_pe;
+
+    return *this;
+  }
+
+};
+
+class LBScatterMsg : public CMessage_LBScatterMsg {
+public:
+  int numMigrates;
+  int firstPeInSpan;
+  int lastPeInSpan;
+  int *numMigratesPerPe;
+  MigrateDecision *moves;
+
+  LBScatterMsg(int firstPe, int lastPe) {
+    numMigrates = 0;
+    firstPeInSpan = firstPe;
+    lastPeInSpan = lastPe;
+  }
+};
+
+
+
 /**
   message contains the migration decision from LB strategies.
 */

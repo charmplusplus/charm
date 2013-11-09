@@ -88,3 +88,5 @@ else      # version other than 10
 . $CHARMINC/cc-icc8.sh
 
 fi
+
+CMK_C_OPENMP="-openmp"

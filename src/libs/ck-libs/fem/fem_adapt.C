@@ -243,7 +243,10 @@ int FEM_Adapt::edge_contraction_help(int e1, int e2, int n1, int n2, int e1_n1,
     e2nbr2 = theMesh->e2e_getNbr(e2, mod_edge4);
     n4 = theMesh->e2n_getNode(e2, e2_n3);
   }
-
+  else
+    {
+      CkAbort("ERROR: e2 <= -1 case not handled\n");
+    }
   int *n2_nbrNodes, *n2_nbrElems;
   int nnsize, nesize;
   theMesh->n2n_getAll(n2, &n2_nbrNodes, &nnsize);

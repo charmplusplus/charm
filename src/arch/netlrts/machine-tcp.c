@@ -44,22 +44,6 @@ int TransmitDatagram(int pe);
  * CmiNotifyIdle()-- wait until a packet comes in
  *
  *****************************************************************************/
-typedef struct {
-  int sleepMs; /*Milliseconds to sleep while idle*/
-  int nIdles; /*Number of times we've been idle in a row*/
-  CmiState cs; /*Machine state*/
-} CmiIdleState;
-
-
-static CmiIdleState *CmiNotifyGetState(void) 
-{
-  CmiIdleState *s=(CmiIdleState *)malloc(sizeof(CmiIdleState));
-  s->sleepMs=0;
-  s->nIdles=0;
-  s->cs=CmiGetState();
-  return s;
-}
-
 
 void  LrtsNotifyIdle() { }
 void  LrtsBeginIdle() { }
@@ -215,7 +199,7 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
  * 
  * This function does the scheduling of the tasks related to the
  * message sends and receives. 
- * It first check the charmrun port for message, and poll the gm event
+ * It first check the charmrun port for message, and poll
  * for send complete and outcoming messages.
  *
  ***********************************************************************/
@@ -227,7 +211,7 @@ static void CommunicationServerNet(int sleepTime, int where)
     MACHSTATE(4,"Attempted to re-enter comm. server!") 
     return;
   });
-  LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+  LOG(GetClock(), Cmi_nodestartGlobal, 'I', 0, 0);
   MACHSTATE2(sleepTime?3:2,"CommunicationsServer(%d,%d) {",
 	     sleepTime,writeableAcks||writeableDgrams)  
 #if CMK_SMP
@@ -358,35 +342,8 @@ static void IntegrateMessageDatagram(char **msg, int len)
       if (node->asm_fill > node->asm_total)
          CmiAbort("\n\n\t\tLength mismatch!!\n\n");
       if (node->asm_fill == node->asm_total) {
-        /* do it at integration - the following function may re-entrant */
-#if CMK_BROADCAST_SPANNING_TREE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-           )
-          SendSpanningChildren(NULL, 0, node->asm_total, newmsg, broot, rank);
-#elif CMK_BROADCAST_HYPERCUBE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-           )
-          SendHypercube(NULL, 0, node->asm_total, newmsg, broot, rank);
-#endif
-        if (rank == DGRAM_BROADCAST) {
-          for (i=1; i<_Cmi_mynodesize; i++)
-            CmiPushPE(i, CopyMsg(newmsg, node->asm_total));
-          CmiPushPE(0, newmsg);
-        } else {
-#if CMK_NODE_QUEUE_AVAILABLE
-           if (rank==DGRAM_NODEMESSAGE || rank==DGRAM_NODEBROADCAST) {
-             CmiPushNode(newmsg);
-           }
-           else
-#endif
-             CmiPushPE(rank, newmsg);
-        }
+	    //common core code  will handle where to send the messages
+		handleOneRecvedMsg(node->asm_total, newmsg);
         node->asm_msg = 0;
       }
     } 
@@ -458,7 +415,7 @@ void ReceiveDatagram(int node)
  *
  * This function is responsible for all non-local transmission. It
  * first allocate a send token, if fails, put the send message to
- * penging message queue, otherwise invoke the GM send.
+ * penging message queue.
  ***********************************************************************/
 
 int TransmitImplicitDgram(ImplicitDgram dg)
@@ -476,7 +433,7 @@ int TransmitImplicitDgram(ImplicitDgram dg)
   dest = dg->dest;
   /* first int is len of the packet */
   DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, len, dg->broot);
-  LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestartGlobal, 'T', dest->nodestart, dg->seqno);
   /*
   ChMessageHeader_new("data", len, &msg);
   if (-1==skt_sendN(dest->sock,(const char *)&msg,sizeof(msg))) 
@@ -561,7 +518,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 /***********************************************************************
  * CmiMachineInit()
  *
- * This function intialize the GM board. Set receive buffer
+ * Set receive buffer
  *
  ***********************************************************************/
 

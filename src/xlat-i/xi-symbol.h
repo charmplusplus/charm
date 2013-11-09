@@ -375,6 +375,7 @@ public:
     Type *getType(void) {return type;}
     const char *getArrayLen(void) const {return arrLen;}
     const char *getGivenName(void) const {return given_name;}
+    void setGivenName(const char* s) {given_name = s;}
     const char *getName(void) const {return name;}
     void printMsg(XStr& str) {
       type->print(str);
@@ -439,6 +440,7 @@ class ParamList {
     }
     int isPointer(void) const {return param->type->isPointer();}
     const char *getGivenName(void) const {return param->getGivenName();}
+    void setGivenName(const char* s) {param->setGivenName(s);}
     const char *getName(void) const {return param->getName();}
     int isMarshalled(void) const {
     	return !isVoid() && !isMessage();
@@ -970,6 +972,7 @@ class Message : public TEntity {
 #define SACCEL        0x10000
 #define SMEM          0x20000
 #define SREDUCE       0x40000 // <- reduction target
+#define SAPPWORK      0x80000 // <- reduction target
 
 /* An entry construct */
 class Entry : public Member {
@@ -1100,6 +1103,7 @@ private:
     int isCreateHere(void) { return (attribs & SCREATEHERE); }
     int isPython(void) { return (attribs & SPYTHON); }
     int isNoTrace(void) { return (attribs & SNOTRACE); }
+    int isAppWork(void) { return (attribs & SAPPWORK); }
     int isNoKeep(void) { return (attribs & SNOKEEP); }
     int isSdag(void) { return (sdagCon!=0); }
 
@@ -1339,6 +1343,7 @@ public:
   XStr *traceName;	
   SdagConstruct *next;
   ParamList *param;
+  //cppcheck-suppress unsafeClassCanLeak
   XStr *text;
   int nextBeginOrEnd;
   EntryList *elist;
@@ -1360,6 +1365,8 @@ public:
 
   SdagConstruct(EToken t, XStr *txt) : type(t), traceName(NULL), text(txt), con1(0), con2(0), con3(0), con4(0), elist(0)
   { constructs = new std::list<SdagConstruct*>();  }
+
+  virtual ~SdagConstruct();
 
   void init(EToken& t);
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);

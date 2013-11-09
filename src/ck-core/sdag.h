@@ -3,8 +3,6 @@
 
 #include "pup.h"
 
-#define SINGLE_ARG(...) __VA_ARGS__
-
 namespace SDAG {
   struct Closure : public PUP::able {
     virtual void pup(PUP::er& p) = 0;
@@ -65,12 +63,12 @@ namespace SDAG {
   };
 
   struct MsgClosure : public Closure {
-    CkMessage* msg;
+    void* msg;
 
     MsgClosure() : msg(0) { init(); continuations = 0; }
     MsgClosure(CkMigrateMessage*) : msg(0) { init(); continuations = 0; }
 
-    MsgClosure(CkMessage* msg)
+    MsgClosure(void* msg)
       : msg(msg) {
       init();
       continuations = 0;
@@ -353,11 +351,15 @@ namespace SDAG {
 
         for (std::list<Continuation*>::iterator iter2 = lst.begin();
              iter2 != lst.end();
-             ++iter2) {
+	     //cppcheck-suppress StlMissingComparison
+             ) {
           if ((*iter2)->speculationIndex == speculationIndex) {
             Continuation *cancelled = *iter2;
-            lst.erase(iter2++);
+	    //cppcheck-suppress StlMissingComparison
+            iter2 = lst.erase(iter2);
             delete cancelled;
+          } else {
+            iter2++;
           }
         }
       }

@@ -1448,6 +1448,7 @@ Array::Array(int ln, attrib_t Nattr, NamedType *index,
 			bases_CBase = new TypeList(new NamedType(parentClassName), NULL);
 		}
 	}
+	// cppcheck-suppress memleak
 }
 
 static void
@@ -2734,7 +2735,7 @@ void ParamList::checkParamList(){
 }
 
 Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e) :
-  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), genClosureTypeName(0), entryPtr(0)
+  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), genClosureTypeName(0), genClosureTypeNameProxy(0), genClosureTypeNameProxyTemp(0), entryPtr(0)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -3053,6 +3054,8 @@ void Entry::genArrayDefs(XStr& str)
       if (!isNoTrace())
 	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
 	      << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
+      if(isAppWork())
+      str << " _TRACE_BEGIN_APPWORK();\n";    
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
@@ -3063,6 +3066,8 @@ void Entry::genArrayDefs(XStr& str)
       "  CpdAfterEp("<<epIdx()<<");\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
+      if(isAppWork())
+      str << " _TRACE_END_APPWORK();\n";    
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     }
@@ -3257,6 +3262,8 @@ void Entry::genGroupDefs(XStr& str)
       str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
       str << "  CkAssert(obj);\n";
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL);\n";
+      if(isAppWork())
+      str << " _TRACE_BEGIN_APPWORK();\n";    
       str << "#if CMK_LBDB_ON\n"
 "  // if there is a running obj being measured, stop it temporarily\n"
 "  LDObjHandle objHandle;\n"
@@ -3278,6 +3285,8 @@ void Entry::genGroupDefs(XStr& str)
       str << "#if CMK_LBDB_ON\n"
 "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
 "#endif\n";
+      if(isAppWork())
+      str << " _TRACE_BEGIN_APPWORK();\n";    
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     } else if(isSync()) {
@@ -4267,7 +4276,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
   if (!isMessage) {
     genClosureTypeName = new XStr();
     genClosureTypeNameProxy = new XStr();
-    *genClosureTypeNameProxy << " Closure_" << container->baseName() << "::";
+    *genClosureTypeNameProxy << "Closure_" << container->baseName() << "::";
     *genClosureTypeNameProxy << name << "_" << entryCount << "_closure";
     *genClosureTypeName << name << "_" << entryCount << "_closure";
 
@@ -4333,10 +4342,8 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
 #if CMK_BIGSIM_CHARM
   str << "  BgAttach(tid);\n";
 #endif
-  str << "  CthAwaken(tid);\n";
+  str << "  CthResume(tid);\n";
   str << "}\n";
-//  str << "  CthAwaken(CthCreate((CthVoidFn)"<<procFull
-//   <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<"));\n}\n";
 
   str << makeDecl("void")<<"::"<<procFull<<"(CkThrCallArg *impl_arg)\n";
   str << "{\n";\
@@ -4735,6 +4742,7 @@ XStr Entry::genRegEp(bool isForRedn)
   if ( !isForRedn && (attribs & SNOKEEP) ) str << "+CK_EP_NOKEEP";
   if (attribs & SNOTRACE) str << "+CK_EP_TRACEDISABLE";
   if (attribs & SIMMEDIATE) str << "+CK_EP_TRACEDISABLE";
+  if (attribs & SAPPWORK) str << "+CK_EP_APPWORK";
 
   /*MEICHAO*/
   if (attribs & SMEM) str << "+CK_EP_MEMCRITICAL";
@@ -5239,9 +5247,9 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {
   if (isMarshalled()) {
-    str << "        PUP::fromMem implP(impl_buf);\n";
+    str << "          PUP::fromMem implP(impl_buf);\n";
     callEach(&Parameter::beginUnmarshall,str);
-    str << "        impl_buf+=CK_ALIGN(implP.size(),16);\n";
+    str << "          impl_buf+=CK_ALIGN(implP.size(),16);\n";
     callEach(&Parameter::unmarshallArrayDataSDAG,str);
   }
 }

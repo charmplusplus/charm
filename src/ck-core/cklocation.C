@@ -8,12 +8,15 @@
  *  Orion Sky Lawlor, olawlor@acm.org 9/29/2001
  */
 
+#include "hilbert.h"
+#include "partitioning_strategies.h"
 #include "charm++.h"
 #include "register.h"
 #include "ck.h"
 #include "trace.h"
 #include "TopoManager.h"
 #include <vector>
+#include <algorithm>
 #include<sstream>
 
 #if CMK_LBDB_ON
@@ -164,6 +167,8 @@ CkArrayMap::CkArrayMap(void) { }
 CkArrayMap::~CkArrayMap() { }
 int CkArrayMap::registerArray(const CkArrayIndex& numElements, CkArrayID aid)
 {return 0;}
+void CkArrayMap::unregisterArray(int idx)
+{ }
 
 #define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
         int i; \
@@ -350,6 +355,12 @@ public:
     amaps[idx] = new arrayMapInfo(numElements);
     return idx;
   }
+
+  void unregisterArray(int idx)
+  {
+    delete amaps[idx];
+    amaps[idx] = NULL;
+  }
  
   int procNum(int arrayHdl, const CkArrayIndex &i) {
     int flati;
@@ -458,6 +469,155 @@ public:
     /** binSize used in DefaultArrayMap is the floor of numChares/numPes
      *  but for this FastArrayMap, we need the ceiling */
     return (flati / amaps[arrayHdl]->_binSizeCeil);
+  }
+
+  void pup(PUP::er& p){
+    DefaultArrayMap::pup(p);
+  }
+};
+
+/* *
+ * Hilbert map object -- This does hilbert mapping.
+ * Convert array indices into 1D fashion according to their Hilbert filling curve 
+ */
+
+typedef struct {
+    int intIndex;
+    std::vector<int> coords;
+}hilbert_pair;
+
+bool operator== ( hilbert_pair p1, hilbert_pair p2) 
+{
+    return p1.intIndex == p2.intIndex;
+}
+
+bool myCompare(hilbert_pair p1, hilbert_pair p2)
+{
+    return p1.intIndex < p2.intIndex;
+}
+
+class HilbertArrayMap: public DefaultArrayMap
+{
+    std::vector<hilbert_pair> allpairs;
+    int *procList;
+public:
+  HilbertArrayMap(void) {
+    procList = new int[CkNumPes()]; 
+    getHilbertList(procList);
+    DEBC((AA"Creating HilbertArrayMap\n"AB));
+  }
+
+  HilbertArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
+
+  ~HilbertArrayMap()
+  {
+      if(procList)
+          delete []procList;
+  }
+
+  int registerArray(const CkArrayIndex& i, CkArrayID aid)
+  {
+    int idx;
+    idx = DefaultArrayMap::registerArray(i, aid);
+   
+    if (i.nInts == 1) {
+      CkPrintf("1D %d\n", amaps[idx]->_nelems.data()[0]); 
+    } else if (i.nInts == 2) {
+      CkPrintf("2D %d:%d\n", amaps[idx]->_nelems.data()[0], amaps[idx]->_nelems.data()[1]); 
+      int dims = 2;
+      int nDim0 = amaps[idx]->_nelems.data()[0];
+      int nDim1 = amaps[idx]->_nelems.data()[1];
+      int index;
+      int counter = 0;
+      allpairs.resize(nDim0*nDim1);
+      for(int i=0; i<nDim0; i++)
+          for(int j=0; j<nDim1; j++)
+          {
+              allpairs[counter].coords.resize(2);
+              allpairs[counter].coords[0] = i;
+              allpairs[counter].coords[1] = j;
+              index = Hilbert_to_int( allpairs[counter].coords, dims);
+              //CkPrintf("(%d:%d)----------> %d \n", i, j, index);
+              allpairs[counter].intIndex = index;
+              counter++;
+          }
+      std::sort(allpairs.begin(), allpairs.end(), myCompare);
+    } else if (i.nInts == 3) {
+      CkPrintf("3D %d:%d:%d\n", amaps[idx]->_nelems.data()[0], amaps[idx]->_nelems.data()[1], amaps[idx]->_nelems.data()[2]); 
+      int dims = 3;
+      int nDim0 = amaps[idx]->_nelems.data()[0];
+      int nDim1 = amaps[idx]->_nelems.data()[1];
+      int nDim2 = amaps[idx]->_nelems.data()[2];
+      int index;
+      int counter = 0;
+      allpairs.resize(nDim0*nDim1*nDim2);
+      for(int i=0; i<nDim0; i++)
+          for(int j=0; j<nDim1; j++)
+              for(int k=0; k<nDim2; k++)
+          {
+              allpairs[counter].coords.resize(3);
+              allpairs[counter].coords[0] = i;
+              allpairs[counter].coords[1] = j;
+              allpairs[counter].coords[2] = k;
+              index = Hilbert_to_int( allpairs[counter].coords, dims);
+              //CkPrintf("(%d:%d)----------> %d \n", i, j, index);
+              allpairs[counter].intIndex = index;
+              counter++;
+          }
+      std::sort(allpairs.begin(), allpairs.end(), myCompare);
+
+    }
+   
+    //for(int i=0; i<allpairs.size(); i++)
+    //    CkPrintf(" %d (%d:%d --- %d)\n ", i, allpairs[i].coords[0], allpairs[i].coords[1], allpairs[i].intIndex);
+
+    return idx;
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int flati = 0;
+    int myInt;
+    int dest;
+    if (amaps[arrayHdl]->_nelems.nInts == 0) {
+      return RRMap::procNum(arrayHdl, i);
+    }
+    if (i.nInts == 1) {
+      flati = i.data()[0];
+    } else if (i.nInts == 2) {
+        hilbert_pair mypair;
+        mypair.coords.resize(2);
+        mypair.coords[0] = i.data()[0];
+        mypair.coords[1] = i.data()[1];
+        myInt = Hilbert_to_int(mypair.coords, 2);
+        mypair.intIndex = myInt;
+        flati = std::distance(allpairs.begin(), std::find(allpairs.begin(), allpairs.end(), mypair));
+        //CkPrintf("(%d:%d) my realIndex is %d  %d \n", i.data()[0], i.data()[1], flati, myInt);
+    } else if (i.nInts == 3) {
+        hilbert_pair mypair;
+        mypair.coords.resize(3);
+        mypair.coords[0] = i.data()[0];
+        mypair.coords[1] = i.data()[1];
+        mypair.coords[2] = i.data()[2];
+        myInt = Hilbert_to_int(mypair.coords, 3);
+        mypair.intIndex = myInt;
+        flati = std::distance(allpairs.begin(), std::find(allpairs.begin(), allpairs.end(), mypair));
+        //CkPrintf("(%d:%d:%d) my realIndex is %d  %d \n", i.data()[0], i.data()[1], i.data()[2], flati, myInt);
+
+    }
+#if CMK_ERROR_CHECKING
+    else {
+      CkAbort("CkArrayIndex has more than 3 integers!");
+    }
+#endif
+
+    /** binSize used in DefaultArrayMap is the floor of numChares/numPes
+     *  but for this FastArrayMap, we need the ceiling */
+    int block = flati / amaps[arrayHdl]->_binSizeCeil;
+    //for(int i=0; i<CkNumPes(); i++)
+    //    CkPrintf("(%d:%d) ", i, procList[i]);
+    //CkPrintf("\n");
+    //CkPrintf("block [%d:%d]\n", block, procList[block]);
+    return procList[block];
   }
 
   void pup(PUP::er& p){
@@ -917,6 +1077,10 @@ public:
     arrs[idx] = new arrInfo(numElements, speeds);
     return idx;
   }
+  void unregisterArray(int idx)
+  {
+    arrs[idx].destroy();
+  }
   int procNum(int arrayHdl, const CkArrayIndex &i)
   {
     return arrs[arrayHdl]->getMap(i);
@@ -930,6 +1094,7 @@ class CkMapsInit : public Chare
 {
 public:
 	CkMapsInit(CkArgMsg *msg) {
+		//_defaultArrayMapID = CProxy_HilbertArrayMap::ckNew();
 		_defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
 		_fastArrayMapID = CProxy_FastArrayMap::ckNew();
 		delete msg;
@@ -1088,7 +1253,7 @@ void CkMigratable::pup(PUP::er &p) {
   p(can_reset);
 	p(usesAutoMeasure);
 #if CMK_LBDB_ON 
-	int readyMigrate;
+	int readyMigrate = 0;
 	if (p.isPacking()) readyMigrate = myRec->isReadyMigrate();
 	p|readyMigrate;
 	if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
@@ -1540,7 +1705,6 @@ bool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
 /**********Added for cosmology (inline function handling without parameter marshalling)***********/
 
 LDObjHandle CkMigratable::timingBeforeCall(int* objstopped){
-
 	LDObjHandle objHandle;
 #if CMK_LBDB_ON
 	if (getLBDB()->RunningObject(&objHandle)) {
@@ -1550,36 +1714,10 @@ LDObjHandle CkMigratable::timingBeforeCall(int* objstopped){
 	myRec->startTiming(1);
 #endif
 
-  //DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
-	//bool isDeleted=false; //Enables us to detect deletion during processing
-	//deletedMarker=&isDeleted;
-/*#ifndef CMK_OPTIMIZE
-	if (msg) {  Tracing: 
-		envelope *env=UsrToEnv(msg);
-	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
-		if (_entryTable[epIdx]->traceEnabled)
-			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
-		    		 ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID(((CkGroupID)env->getArrayMgr())).idx);
-	}
-#endif*/
-
   return objHandle;
 }
 
 void CkMigratable::timingAfterCall(LDObjHandle objHandle,int *objstopped){
-  
-/*#ifndef CMK_OPTIMIZE
-	if (msg) {  Tracing: 
-		if (_entryTable[epIdx]->traceEnabled)
-			_TRACE_END_EXECUTE();
-	}
-#endif*/
-//#if CMK_LBDB_ON
-//        if (!isDeleted) checkBufferedMigration();   // check if should migrate
-//#endif
-//	if (isDeleted) return false;//We were deleted
-//	deletedMarker=NULL;
-//	return true;
 	myRec->stopTiming(1);
 #if CMK_LBDB_ON
 	if (*objstopped) {
@@ -1607,8 +1745,12 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 		envelope *env=UsrToEnv(msg);
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
 		if (_entryTable[epIdx]->traceEnabled)
-			_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
+        {
+            _TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
                                                       ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID(env->getArrayMgrIdx()));
+            if(_entryTable[epIdx]->appWork)
+                _TRACE_BEGIN_APPWORK();
+        }
 	}
 #endif
 
@@ -1621,7 +1763,11 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 #if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		if (_entryTable[epIdx]->traceEnabled)
+        {
+            if(_entryTable[epIdx]->appWork)
+                _TRACE_END_APPWORK();
 			_TRACE_END_EXECUTE();
+        }
 	}
 #endif
 #if CMK_LBDB_ON
@@ -2005,6 +2151,8 @@ inline void CkLocMgr::springCleaning(void)
   }
   CmiImmediateUnlock(hashImmLock);
   delete it;
+
+  setupSpringCleaning();
 }
 void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
 	DEBK((AA"Starting spring cleaning at %.2f\n"AB,CkWallTimer()));
@@ -2095,9 +2243,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	firstFree=localLen=0;
 	duringMigration=false;
 	nSprings=0;
-#if !CMK_GLOBAL_LOCATION_UPDATE
-	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
-#endif
+        setupSpringCleaning();
 
 //Register with the map object
 	mapID = opts.getMap();
@@ -2126,10 +2272,25 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	firstFree=localLen=0;
 	duringMigration=false;
 	nSprings=0;
-#if !CMK_GLOBAL_LOCATION_UPDATE
-	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
-#endif
+        setupSpringCleaning();
 	hashImmLock = CmiCreateImmediateLock();
+}
+
+void CkLocMgr::setupSpringCleaning() {
+#if !CMK_GLOBAL_LOCATION_UPDATE
+	springCleaningCcd = CcdCallOnConditionOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+#endif
+}
+
+CkLocMgr::~CkLocMgr() {
+#if CMK_LBDB_ON
+  the_lbdb->RemoveLocalBarrierClient(dummyBarrierHandle);
+  the_lbdb->RemoveLocalBarrierReceiver(lbBarrierReceiver);
+  the_lbdb->UnregisterOM(myLBHandle);
+#endif
+  CcdCancelCallOnCondition(CcdPERIODIC_1minute, springCleaningCcd);
+  map->unregisterArray(mapHandle);
+  CmiDestroyLock(hashImmLock);
 }
 
 void CkLocMgr::pup(PUP::er &p){
@@ -2151,7 +2312,7 @@ void CkLocMgr::pup(PUP::er &p){
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID, metalbID);
 #if __FAULT__
-        int count;
+        int count = 0;
         p | count;
         DEBUG(CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))    
@@ -2159,7 +2320,7 @@ void CkLocMgr::pup(PUP::er &p){
 #endif
         for(int i=0;i<count;i++){
             CkArrayIndex idx;
-            int pe;
+            int pe = 0;
             idx.pup(p);
             p | pe;
   //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
@@ -2257,6 +2418,28 @@ CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 	nManagers++;
 	firstManager=n;
 	return &n->elts;
+}
+
+void CkLocMgr::deleteManager(CkArrayID id, CkArrMgr *mgr) {
+  ManagerRec *&rec = managers.find(id);
+
+  ManagerRec **prev = &firstManager;
+  ManagerRec *cur = firstManager;
+  while (cur->mgr != mgr) {
+    prev = &cur->next;
+    ++cur;
+  }
+
+  CkAssert(cur);
+  CkAssert(cur == rec);
+
+  *prev = cur->next;
+  nManagers--;
+  delete cur;
+  rec = NULL; // Would like to remove the entry entirely, but it's in a direct-mapped array
+
+  if (nManagers == 0)
+    delete this;
 }
 
 /// Return the next unused local element index.
@@ -3317,7 +3500,7 @@ void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 	  us to call Registering/DoneRegistering during each AtSync,
 	  and this is the only way to do so.
 	*/
-	the_lbdb->AddLocalBarrierReceiver(
+	lbBarrierReceiver = the_lbdb->AddLocalBarrierReceiver(
 		(LDBarrierFn)staticRecvAtSync,(void*)(this));
 	dummyBarrierHandle = the_lbdb->AddLocalBarrierClient(
 		(LDResumeFn)staticDummyResumeFromSync,(void*)(this));

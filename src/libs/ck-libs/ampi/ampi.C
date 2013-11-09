@@ -2769,6 +2769,9 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 {
   AMPIAPI("AMPI_Recv");
 
+  MPI_Status tempStatus;
+  if(!status) status = &tempStatus;
+    
 #if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, src, 1, msg, 1);
@@ -2816,6 +2819,9 @@ int AMPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
     return ret;
 #endif
 
+  MPI_Status tempStatus;
+  if(!status) status = &tempStatus;
+
   AMPIAPI("AMPI_Probe");
   ampi *ptr = getAmpiInstance(comm);
   ptr->probe(tag,src, comm, (int*) status);
@@ -2833,6 +2839,8 @@ int AMPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
+  MPI_Status tempStatus;
+  if(!status) status = &tempStatus;
 
   ampi *ptr = getAmpiInstance(comm);
   *flag = ptr->iprobe(tag,src,comm,(int*) status);
@@ -2858,6 +2866,9 @@ int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
+
+  MPI_Status tempStatus;
+  if(!sts) sts = &tempStatus;
 
   int se=MPI_Send(sbuf,scount,stype,dest,stag,comm);
   int re=MPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts);
@@ -3551,6 +3562,10 @@ int SReq::wait(MPI_Status *sts){
 int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Wait");
+
+  MPI_Status tempStatus;
+  if(!sts) sts = &tempStatus;
+
   if(*request == MPI_REQUEST_NULL){
     stsempty(*sts);
     return 0;
@@ -3610,6 +3625,9 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   if(count==0) return MPI_SUCCESS;
   checkRequests(count,request);
   int i,j,oldPe;
+
+  MPI_Status tempStatus;
+
   AmpiRequestList* reqs = getReqs();
   CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
 
@@ -3652,7 +3670,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       int waitResult = -1;
       do{	
         AmpiRequest *waitReq = ((*reqs)[request[((*reqvec)[i])[j]]]);
-        waitResult = waitReq->wait(sts ? &sts[((*reqvec)[i])[j]] : (MPI_Status *)0);
+        waitResult = waitReq->wait(sts ? &sts[((*reqvec)[i])[j]] : &tempStatus);
         if(_BgInOutOfCoreMode){
           reqs = getReqs();
           reqvec = vecIndex(count, request);
@@ -3702,10 +3720,13 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Waitany");
-
+  
   USER_CALL_DEBUG("AMPI_Waitany("<<count<<")");
   if(count == 0) return MPI_SUCCESS;
   checkRequests(count,request);
+  MPI_Status tempStatus;
+  if(!sts) sts = &tempStatus;
+
   if(areInactiveReqs(count,request)){
     *idx=MPI_UNDEFINED;
     stsempty(*sts);
@@ -3751,7 +3772,8 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
       AMPI_Test(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
       if(flag == 1){ 
         array_of_indices[(*outcount)]=((*reqvec)[i])[0];
-        array_of_statuses[(*outcount)++]=sts;
+        if(array_of_statuses)
+          array_of_statuses[(*outcount)++]=sts;
         if(sts.MPI_COMM != 0)
           realflag=1; // there is real(non null) request
       }
@@ -3851,6 +3873,10 @@ void ATAReq::complete(MPI_Status *sts){
 int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Test");
+
+  MPI_Status tempStatus;
+  if(!sts) sts = &tempStatus;
+
   if(*request==MPI_REQUEST_NULL) {
     *flag = 1;
     stsempty(*sts);
@@ -3872,6 +3898,10 @@ CDECL
 int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
   AMPIAPI("AMPI_Testany");
   checkRequests(count,request);
+
+  MPI_Status tempStatus;
+  if(!sts) sts = &tempStatus;
+
   if(areInactiveReqs(count,request)){
     *flag=1;
     *index=MPI_UNDEFINED;
@@ -3936,7 +3966,8 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
     AMPI_Test(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
     if(flag == 1){
       array_of_indices[(*outcount)]=((*reqvec)[i])[0];
-      array_of_statuses[(*outcount)++]=sts;
+      if(array_of_statuses)
+        array_of_statuses[(*outcount)++]=sts;
     }
   }
   delete reqvec;
@@ -5324,6 +5355,7 @@ int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
   rroot = ptr->getIndexForRemoteRank(0);
   lhigh = high;
   lrank = ptr->getRank(intercomm);
+  first = 0;
 
   if(lrank==0){
     MPI_Status sts;
@@ -5423,6 +5455,14 @@ int AMPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
   AMPIAPI("AMPI_Pack_size");
   CkDDT_DataType* dttype = getDDT()->getType(datatype) ;
   *sz = incount*dttype->getSize() ;
+  return 0;
+}
+
+CDECL
+int AMPI_Get_version(int *version, int *subversion){
+  AMPIAPI("AMPI_Get_version");
+  *version = MPI_VERSION;
+  *subversion = MPI_SUBVERSION;
   return 0;
 }
 

@@ -384,6 +384,8 @@ inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
     /* IA64 seems to ignore mi.uordblks, but updates mi.hblkhd correctly */
+    if (skip_mallinfo) return 0;
+    else {
     struct mallinfo mi = mallinfo();
     CMK_TYPEDEF_UINT8 memtotal = (CMK_TYPEDEF_UINT8) mi.uordblks;   /* malloc */
     CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
@@ -393,6 +395,7 @@ static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
     if(memtotal2 > memtotal) memtotal = memtotal2;
 #endif
     return memtotal;
+    }
 }
 #endif
 
@@ -451,23 +454,48 @@ static CMK_TYPEDEF_UINT8 MemusageBGP(){
     struct mallinfo m = mallinfo();
     return m.hblkhd + m.uordblks;
 }
+#else
+static CMK_TYPEDEF_UINT8 MemusageBGP(){
+    return 0;
+}
 #endif
 
+typedef CMK_TYPEDEF_UINT8 (*CmiMemUsageFn)();
+
+/* this structure defines the order of testing for memory usage functions */
+struct CmiMemUsageStruct {
+    CmiMemUsageFn  fn;
+    char *name;
+} memtest_order[] = {
+    {MemusageBGP, "BlueGene/P"},
+    {MemusageWindows, "Windows"},
+    {MemusageMstats, "Mstats"},
+    {MemusageMallinfo, "Mallinfo"},
+    {MemusageProcSelfStat, "/proc/self/stat"},
+    {MemusageSbrk, "sbrk"},
+    {MemusagePS, "ps"},
+};
+
 CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
-#if CMK_BLUEGENEP
-    return MemusageBGP(); 
-#else
+    int i;
     CMK_TYPEDEF_UINT8 memtotal = 0;
-#ifdef _WIN32
-    if(!memtotal) memtotal = MemusageWindows();
-#endif
-    if(!memtotal) memtotal = MemusageMstats();
-    if(!memtotal && !skip_mallinfo) memtotal = MemusageMallinfo();
-    if(!memtotal) memtotal = MemusageProcSelfStat();
-    if(!memtotal) memtotal = MemusageSbrk();
-    if(!memtotal) memtotal = MemusagePS();
+    for (i=0; i<sizeof(memtest_order)/sizeof(struct CmiMemUsageStruct); i++) {
+        memtotal = memtest_order[i].fn();
+        if (memtotal) break;
+    }
     return memtotal;
-#endif
+}
+
+char *CmiMemoryUsageReporter(){
+    int i;
+    CMK_TYPEDEF_UINT8 memtotal = 0;
+    char *reporter = NULL;
+    for (i=0; i<sizeof(memtest_order)/sizeof(struct CmiMemUsageStruct); i++) {
+        memtotal = memtest_order[i].fn();
+        reporter = memtest_order[i].name;
+        if (memtotal) break;
+    }
+    return reporter;
 }
 
 /******End of a general way to get memory usage information*****/
@@ -848,6 +876,7 @@ void* CmiMallocAligned(const size_t size, const unsigned int alignment) {
   *((char*)rtn + offset - 1) = offset;
 
   /* Return the address with offset */
+  /* cppcheck-suppress memleak */
   return (void*)((char*)rtn + offset);
 }
 

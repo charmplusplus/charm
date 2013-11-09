@@ -1,4 +1,4 @@
-#define CMK_SUPPORT_LRTS	                           1
+#define CMK_USE_LRTS	                                   1
 
 #define	CMK_HAS_PARTITION		                   1
 
@@ -21,7 +21,7 @@
    Stratid is the stratgy id and root is used in the broadcast.
 */
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,root,xhdl,info,redID, rank;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,xhdl,info,redID,rank; CmiInt4 root;
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
@@ -37,10 +37,7 @@
 #define CMK_OBJECT_QUEUE_AVAILABLE		   	   0
 #define CMK_USE_SPECIAL_MESSAGE_QUEUE_CHECK                1
 
-#define CMK_BROADCAST_SPANNING_TREE    			   0
-#define CMK_BROADCAST_HYPERCUBE        			   0
-
-#define CMK_BARRIER_USE_COMMON_CODE                        0
+#define CMK_BARRIER_USE_COMMON_CODE                        1
 
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
 
@@ -49,3 +46,4 @@
 /* call cpu timer for LB */
 #define CMK_LB_CPUTIMER					   0
 
+#define CMK_HAS_SIZE_IN_MSGHDR                             0

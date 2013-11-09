@@ -11,6 +11,7 @@ public:
   MainHi(CkArgMsg *m) {
     mainHi = thisProxy;
     delete m;
+    thisProxy.StartHi(10);
   }
 
   void StartHi(int elems)

@@ -17,6 +17,8 @@ void traceResume(CmiObjId *);
 void traceSuspend(void);
 void traceAwaken(CthThread t);
 void traceUserEvent(int);
+void beginAppWork();
+void endAppWork();
 void traceUserBracketEvent(int, double, double);
 void traceUserSuppliedData(int);
 void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);

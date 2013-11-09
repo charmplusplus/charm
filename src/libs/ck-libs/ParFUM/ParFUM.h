@@ -508,12 +508,9 @@ FDECL void FTN_NAME(FEM_ADAPT_SIMPLECOARSENMESH, fem_adapt_simplecoarsenmesh)(in
 void ParFUM_SA_Init(int meshId);
 FDECL void FTN_NAME(PARFUM_SA_INIT,parfum_sa_init)(int *meshId);
 
+#ifdef __cplusplus
 }
-
-
-
-
-
+#endif
 
 #endif
 

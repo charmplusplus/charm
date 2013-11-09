@@ -213,6 +213,7 @@ void CmiInitMemAffinity(char **argv) {
         if (retval<0) {
             CmiAbort("set_mempolicy error w/ mem nodemap");
         }
+        free(nodemapArr);
     } else {
         /*use the affinity map set by the cpu affinity*/
         int myPhyRank = CpvAccess(myCPUAffToCore);

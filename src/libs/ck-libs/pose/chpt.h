@@ -42,7 +42,7 @@ inline void chpt<StateType>::registerTimestamp(int idx, eventMsg *m, POSE_TimeTy
 template<class StateType>
 void chpt<StateType>::checkpoint(StateType *data)
 {
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
   if(pose_config.stats)
     localStats->SwitchTimer(CP_TIMER);
@@ -77,14 +77,14 @@ void chpt<StateType>::checkpoint(StateType *data)
       *((StateType *)myStrat->currentEvent->cpData) = *data;
 #endif
       sinceLast = 0;
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
       //localStats->Checkpoint();
       //localStats->CPbytes(sizeof(StateType));
 #endif
     }
     else sinceLast++;
   }
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);
 #endif

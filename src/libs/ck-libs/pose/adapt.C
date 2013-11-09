@@ -33,7 +33,7 @@ void adapt::Step()
     ev = eq->currentPtr;
     iter++;
   }
-#ifndef CMK_OPTIMIZE
+#if !CMK_TRACE_DISABLED
   if(pose_config.stats)
     if (iter > 0) localStats->Loop();
 #endif  

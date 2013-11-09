@@ -425,7 +425,7 @@ public:
 			delete it;
 		}else{
 		/*Unpacking phase: add each hashtable item*/
-			int hasNext;
+			int hasNext=1;
 			p|hasNext;
 			while (hasNext) {
 				OBJ o; KEY k;

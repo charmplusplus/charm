@@ -218,11 +218,6 @@ typedef struct OtherNodeStruct
 #if CMK_USE_TCP 
   SOCKET	sock;		/* for TCP */
 #endif
-#if CMK_USE_MX
-  CmiUInt8 nic_id;
-  mx_endpoint_addr_t       endpoint_addr;
-  CdsFifo                  futureMsgs;   /* out-of-order */
-#endif
 
   unsigned int             send_last;    /* seqno of last dgram sent */
   ImplicitDgram           *send_window;  /* datagrams sent, not acked */
@@ -233,11 +228,6 @@ typedef struct OtherNodeStruct
   double                   send_primer;  /* time to send retransmit */
   unsigned int             send_ack_seqno; /* next ack seqno to send */
   int                      retransmit_leash; /*Maximum number of packets to retransmit*/
-#if CMK_USE_GM
-  struct PendingMsgStruct *sendhead, *sendtail;  /* gm send queue */
-  int 			   disable;
-  int 			   gm_pending;
-#endif
 
   int                      asm_rank;
   int                      asm_total;
@@ -282,14 +272,6 @@ static void OtherNode_init(OtherNode node)
     node->send_next=0;
     node->send_good=(unsigned int)(-1);
     node->send_ack_seqno=0;
-#if CMK_USE_GM
-    node->sendhead = node->sendtail = NULL;
-    node->disable = 0;
-    node->gm_pending = 0;
-#endif
-#if CMK_USE_MX
-    node->futureMsgs = CdsFifo_Create();
-#endif
 
     /*
     TODO: The initial values of the Ammasso related members will be set by the machine layer
@@ -383,13 +365,7 @@ static void node_addresses_store(ChMessage *msg)
     nodes[i].nodesize  = ChMessageInt(d[i].nPE);
     MACHSTATE2(3,"node %d nodesize %d",i,nodes[i].nodesize);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
-#if CMK_USE_MX
-    nodes[i].nic_id = ChMessageLong(d[i].nic_id);
-#endif
 
-#if CMK_USE_GM
-    CmiGmConvertMachineID(& nodes[i].mach_id);
-#endif
     nodes[i].IP=d[i].IP;
     if (i==_Cmi_mynode) {
       Cmi_nodestart=nodes[i].nodestart;
@@ -415,8 +391,9 @@ static void node_addresses_store(ChMessage *msg)
   for (i=0; i<_Cmi_numnodes; i++) {
     OtherNode node = nodes + i;
     OtherNode_init(node);
-    for (j=0; j<node->nodesize; j++)
+    for (j=0; j<node->nodesize; j++) {
       nodes_by_pe[j + node->nodestart] = node;
+    }
   }
 #ifdef CMK_CPV_IS_SMP
   /* index for communication threads */
@@ -618,18 +595,7 @@ static void CommunicationPeriodicCaller(void *ignored)
 /*void EnqueueOutgoingDgram(OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank, int broot);*/
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy);
 
-//void SendSpanningChildren(OutgoingMsg ogm, int root, int size, char *msg, unsigned int startpe, int nodesend);
-void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int curcycle, int nodesend);
-
-#if CMK_USE_GM
-
-#include "machine-gm.c"
-
-#elif CMK_USE_MX
-
-#include "machine-mx.c"
-
-#elif CMK_USE_TCP
+#if CMK_USE_TCP
 
 #include "machine-tcp.c"
 

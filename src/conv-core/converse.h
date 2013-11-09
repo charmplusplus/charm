@@ -142,9 +142,21 @@ typedef struct {
   int *partitionPrefix;
   int *nodeMap;
   int myPartition;
+  char *partsizes;
 } PartitionInfo;
 
 void CmiCreatePartitions(char **argv);
+#if defined(__cplusplus)
+extern "C" {
+#endif
+void CmiSetNumPartitions(int nump);
+void CmiSetMasterPartition();
+void CmiSetPartitionSizes(char *size);
+void CmiSetPartitionScheme(int scheme);
+void CmiSetCustomPartitioning();
+#if defined(__cplusplus)
+}
+#endif 
 
 extern int _Cmi_mype_global;
 extern int _Cmi_numpes_global;
@@ -756,6 +768,7 @@ void CmiMemoryMark(void); /* ignore current allocations, for -memory leak */
 void CmiMemoryMarkBlock(void *blk); /* ignore this allocation, for -memory leak */
 void CmiMemorySweep(const char *where); /* print current allocations, for -memory leak */
 CMK_TYPEDEF_UINT8 CmiMemoryUsage();
+char *CmiMemoryUsageReporter();
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage();
 void CmiResetMaxMemory();
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage();
@@ -2000,6 +2013,7 @@ CpvExtern(int,charmLibExitFlag);
 /******** I/O wrappers ***********/
 
 size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f);
+CmiInt8 CmiPwrite(int fd, char *buf, size_t bytes, size_t offset);
 FILE *CmiFopen(const char *path, const char *mode);
 int CmiFclose(FILE *fp);
 

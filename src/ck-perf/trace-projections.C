@@ -18,7 +18,7 @@
 #define DEBUGN(...)  // easy way to selectively disable DEBUGs
 
 #define DefaultLogBufSize      1000000
-
+#define  DEBUG_KMEANS 0
 // **CW** Simple delta encoding implementation
 // delta encoding is on by default. It may be turned off later in
 // the runtime.
@@ -98,14 +98,6 @@ On T3E, we need to have file number control by open/close files only when needed
   #define OPEN_LOG
   #define CLOSE_LOG
 #endif //CMK_TRACE_LOGFILE_NUM_CONTROL
-
-#if CMK_HAS_COUNTER_PAPI
-#ifdef USE_SPP_PAPI
-int papiEvents[NUMPAPIEVENTS];
-#else
-int papiEvents[NUMPAPIEVENTS] = { PAPI_L2_DCM, PAPI_FP_OPS };
-#endif
-#endif // CMK_HAS_COUNTER_PAPI
 
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
@@ -979,7 +971,7 @@ void LogEntry::pup(PUP::er &p)
       for (i=0; i<NUMPAPIEVENTS; i++) {
 	// not yet!!!
 	//	p|papiIDs[i]; 
-	p|papiValues[i];
+	p|CkpvAccess(papiValues)[i];
 	
       }
 #else
@@ -998,7 +990,7 @@ void LogEntry::pup(PUP::er &p)
       for (i=0; i<NUMPAPIEVENTS; i++) {
 	// not yet!!!
 	//	p|papiIDs[i];
-	p|papiValues[i];
+	p|CkpvAccess(papiValues)[i];
       }
 #else
       //p|numPapiEvents;  // non papi version has value 0
@@ -1012,6 +1004,7 @@ void LogEntry::pup(PUP::er &p)
     case USER_SUPPLIED_NOTE:
 	  p|itime;
 	  int length;
+	  length=0;
 	  if (p.isPacking()) length = strlen(userSuppliedNote);
           p | length;
 	  char space;
@@ -1029,6 +1022,7 @@ void LogEntry::pup(PUP::er &p)
 	  p|iEndTime;
 	  p|event;
 	  int length2;
+	  length2=0;
 	  if (p.isPacking()) length2 = strlen(userSuppliedNote);
           p | length2;
 	  char space2;
@@ -1185,97 +1179,7 @@ TraceProjections::TraceProjections(char **argv):
   funcCount=1;
 
 #if CMK_HAS_COUNTER_PAPI
-  // We initialize and create the event sets for use with PAPI here.
-  int papiRetValue;
-  if(CkMyRank()==0){
-    papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
-    if (papiRetValue != PAPI_VER_CURRENT) {
-      CmiAbort("PAPI Library initialization failure!\n");
-    }
-#if CMK_SMP
-    if(PAPI_thread_init(pthread_self) != PAPI_OK){
-      CmiAbort("PAPI could not be initialized in SMP mode!\n");
-    }
-#endif
-  }
-
-#if CMK_SMP
-  //PAPI_thread_init has to finish before calling PAPI_create_eventset
-  #if CMK_SMP_TRACE_COMMTHREAD
-      CmiNodeAllBarrier();
-  #else
-      CmiNodeBarrier();
-  #endif
-#endif
-  // PAPI 3 mandates the initialization of the set to PAPI_NULL
-  papiEventSet = PAPI_NULL; 
-  if (PAPI_create_eventset(&papiEventSet) != PAPI_OK) {
-    CmiAbort("PAPI failed to create event set!\n");
-  }
-#ifdef USE_SPP_PAPI
-  //  CmiPrintf("Using SPP counters for PAPI\n");
-  if(PAPI_query_event(PAPI_FP_OPS)==PAPI_OK) {
-    papiEvents[0] = PAPI_FP_OPS;
-  }else{
-    if(CmiMyPe()==0){
-      CmiAbort("WARNING: PAPI_FP_OPS doesn't exist on this platform!");
-    }
-  }
-  if(PAPI_query_event(PAPI_TOT_INS)==PAPI_OK) {
-    papiEvents[1] = PAPI_TOT_INS;
-  }else{
-    CmiAbort("WARNING: PAPI_TOT_INS doesn't exist on this platform!");
-  }
-  int EventCode;
-  int ret;
-  ret=PAPI_event_name_to_code("perf::PERF_COUNT_HW_CACHE_LL:MISS",&EventCode);
-  if(PAPI_query_event(EventCode)==PAPI_OK) {
-    papiEvents[2] = EventCode;
-  }else{
-    CmiAbort("WARNING: perf::PERF_COUNT_HW_CACHE_LL:MISS doesn't exist on this platform!");
-  }
-  ret=PAPI_event_name_to_code("DATA_PREFETCHER:ALL",&EventCode);
-  if(PAPI_query_event(EventCode)==PAPI_OK) {
-    papiEvents[3] = EventCode;
-  }else{
-    CmiAbort("WARNING: DATA_PREFETCHER:ALL doesn't exist on this platform!");
-  }
-  if(PAPI_query_event(PAPI_L1_DCA)==PAPI_OK) {
-    papiEvents[4] = PAPI_L1_DCA;
-  }else{
-    CmiAbort("WARNING: PAPI_L1_DCA doesn't exist on this platform!");
-  }
-  if(PAPI_query_event(PAPI_TOT_CYC)==PAPI_OK) {
-    papiEvents[5] = PAPI_TOT_CYC;
-  }else{
-    CmiAbort("WARNING: PAPI_TOT_CYC doesn't exist on this platform!");
-  }
-#else
-  // just uses { PAPI_L2_DCM, PAPI_FP_OPS } the 2 initialized PAPI_EVENTS
-#endif
-  papiRetValue = PAPI_add_events(papiEventSet, papiEvents, NUMPAPIEVENTS);
-  if (papiRetValue < 0) {
-    if (papiRetValue == PAPI_ECNFLCT) {
-      CmiAbort("PAPI events conflict! Please re-assign event types!\n");
-    } else {
-      char error_str[PAPI_MAX_STR_LEN];
-      PAPI_perror(papiRetValue,error_str,PAPI_MAX_STR_LEN);
-      CmiPrintf("PAPI failed with error %s val %d\n",error_str,papiRetValue);
-      CmiAbort("PAPI failed to add designated events!\n");
-    }
-  }
-  if(CkMyPe()==0)
-    {
-      CmiPrintf("Registered %d PAPI counters:",NUMPAPIEVENTS);
-      char nameBuf[PAPI_MAX_STR_LEN];
-      for(int i=0;i<NUMPAPIEVENTS;i++)
-	{
-	  PAPI_event_code_to_name(papiEvents[i], nameBuf);
-	  CmiPrintf("%s ",nameBuf);
-	}
-      CmiPrintf("\n");
-    }
-  memset(papiValues, 0, NUMPAPIEVENTS*sizeof(LONG_LONG_PAPI));
+  initPAPI();
 #endif
 }
 
@@ -1574,7 +1478,7 @@ void TraceProjections::creationDone(int num)
 void TraceProjections::beginExecute(CmiObjId *tid)
 {
 #if CMK_HAS_COUNTER_PAPI
-  if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
+  if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
     CmiAbort("PAPI failed to read at begin execute!\n");
   }
 #endif
@@ -1584,7 +1488,7 @@ void TraceProjections::beginExecute(CmiObjId *tid)
   _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP, TraceTimer(),
 		execEvent,CkMyPe(), 0, tid);
 #if CMK_HAS_COUNTER_PAPI
-  _logPool->addPapi(papiValues);
+  _logPool->addPapi(CkpvAccess(papiValues));
 #endif
   inEntry = 1;
 }
@@ -1593,7 +1497,7 @@ void TraceProjections::beginExecute(envelope *e)
 {
   if(e==0) {
 #if CMK_HAS_COUNTER_PAPI
-    if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
+    if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
       CmiAbort("PAPI failed to read at begin execute!\n");
     }
 #endif
@@ -1603,7 +1507,7 @@ void TraceProjections::beginExecute(envelope *e)
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP, TraceTimer(),
 		  execEvent,CkMyPe(), 0, NULL, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
-    _logPool->addPapi(papiValues);
+    _logPool->addPapi(CkpvAccess(papiValues));
 #endif
     inEntry = 1;
   } else {
@@ -1643,7 +1547,7 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
 				    int mlen, CmiObjId *idx)
 {
 #if CMK_HAS_COUNTER_PAPI
-  if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
+  if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
     CmiAbort("PAPI failed to read at begin execute!\n");
   }
 #endif
@@ -1654,7 +1558,7 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
   _logPool->add(BEGIN_PROCESSING,msgType,ep, TraceTimer(),event,
 		srcPe, mlen, idx, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
-  _logPool->addPapi(papiValues);
+  _logPool->addPapi(CkpvAccess(papiValues));
 #endif
   inEntry = 1;
 }
@@ -1685,7 +1589,7 @@ void TraceProjections::endExecute(char *msg)
 void TraceProjections::endExecuteLocal(void)
 {
 #if CMK_HAS_COUNTER_PAPI
-  if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
+  if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
     CmiAbort("PAPI failed to read at end execute!\n");
   }
 #endif
@@ -1700,7 +1604,7 @@ void TraceProjections::endExecuteLocal(void)
 		  execEvent, execPe, 0, NULL, 0.0, cputime);
   }
 #if CMK_HAS_COUNTER_PAPI
-  _logPool->addPapi(papiValues);
+  _logPool->addPapi(CkpvAccess(papiValues));
 #endif
   inEntry = 0;
 }
@@ -1776,8 +1680,12 @@ void TraceProjections::beginComputation(void)
   _logPool->add(BEGIN_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 #if CMK_HAS_COUNTER_PAPI
   // we start the counters here
-  if (PAPI_start(papiEventSet) != PAPI_OK) {
-    CmiAbort("PAPI failed to start designated counters!\n");
+  if(CkpvAccess(papiStarted) == 0)
+  {
+      if (PAPI_start(CkpvAccess(papiEventSet)) != PAPI_OK) {
+          CmiAbort("PAPI failed to start designated counters!\n");
+      }
+      CkpvAccess(papiStarted) = 1;
   }
 #endif
 }
@@ -1787,8 +1695,11 @@ void TraceProjections::endComputation(void)
 #if CMK_HAS_COUNTER_PAPI
   // we stop the counters here. A silent failure is alright since we
   // are already at the end of the program.
-  if (PAPI_stop(papiEventSet, papiValues) != PAPI_OK) {
-    CkPrintf("Warning: PAPI failed to stop correctly!\n");
+  if(CkpvAccess(papiStopped) == 0) {
+      if (PAPI_stop(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
+          CkPrintf("Warning: PAPI failed to stop correctly!\n");
+      }
+      CkpvAccess(papiStopped) = 1;
   }
   // NOTE: We should not do a complete close of PAPI until after the
   // sts writer is done.
@@ -2008,7 +1919,9 @@ void registerOutlierReduction() {
 extern "C" void TraceProjectionsExitHandler()
 {
 #if CMK_TRACE_ENABLED
-  // CkPrintf("[%d] TraceProjectionsExitHandler called!\n", CkMyPe());
+#if DEBUG_KMEANS
+  CkPrintf("[%d] TraceProjectionsExitHandler called!\n", CkMyPe());
+#endif
   CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
   bocProxy.traceProjectionsParallelShutdown(CkMyPe());
 #else
@@ -2046,31 +1959,6 @@ void initTraceProjectionsBOC()
 TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
   /** Options for Outlier Analysis */
   // defaults. Things will change with support for interactive analysis.
-  bool findOutliers = false;
-  bool outlierAutomatic = true;
-  int numKSeeds = 10; 
-
-  int peNumKeep = CkNumPes();  // used as a default
-  double entryThreshold = 0.0;
-  bool outlierUsePhases = false;
-  if (outlierAutomatic) {
-    CmiGetArgIntDesc(msg->argv, "+outlierNumSeeds", &numKSeeds,
-		     "Number of cluster seeds to apply at outlier analysis.");
-    CmiGetArgIntDesc(msg->argv, "+outlierPeNumKeep", 
-		     &peNumKeep, "Number of Processors to retain data");
-    CmiGetArgDoubleDesc(msg->argv, "+outlierEpThresh", &entryThreshold,
-			"Minimum significance of entry points to be considered for clustering (%).");
-    findOutliers =
-      CmiGetArgFlagDesc(msg->argv,"+outlier", "Find Outliers.");
-    outlierUsePhases = 
-      CmiGetArgFlagDesc(msg->argv,"+outlierUsePhases",
-			"Apply automatic outlier analysis to any available phases.");
-    if (outlierUsePhases) {
-      // if the user wants to use an outlier feature, it is assumed outlier
-      //    analysis is desired.
-      findOutliers = true;
-    }
-  }
   bool findStartTime = (CmiTimerAbsolute()==1);
   traceProjectionsGID = CProxy_TraceProjectionsBOC::ckNew(findOutliers, findStartTime);
   if (findOutliers) {
@@ -2086,7 +1974,9 @@ TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
 
 // Called on every processor.
 void TraceProjectionsBOC::traceProjectionsParallelShutdown(int pe) {
-  //CmiPrintf("[%d] traceProjectionsParallelShutdown called from . \n", CkMyPe(), pe);
+#if DEBUG_KMEANS
+  CmiPrintf("[%d] traceProjectionsParallelShutdown called from . \n", CkMyPe(), pe);
+#endif
   endPe = pe;                // the pe that starts CkExit()
   if (CkMyPe() == 0) {
     analysisStartTime = CmiWallTimer();

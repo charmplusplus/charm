@@ -154,6 +154,7 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
     /* Begin to send msgs */
     for(cnt>>=1; cnt>0; cnt>>=1){
         int nd = relDist + cnt;
+        char *newmsg;
         if (nd >= CmiNumNodes()) continue;
         nd = (nd+startNode)%CmiNumNodes();
         /*CmiPrintf("ND[%d]: send to node %d\n", CmiMyNode(), nd);*/
@@ -162,7 +163,7 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         CmiReference(msg);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, msg, BCAST_SYNC);
 #else
-        char *newmsg = CopyMsg(msg, size);
+        newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
 #endif
     }

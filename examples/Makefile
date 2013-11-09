@@ -1,4 +1,4 @@
-DIRS=charm++ converse ampi fem ParFUM armci bigsim
+DIRS=charm++ converse ampi ParFUM armci bigsim
 
 
 all:
@@ -10,6 +10,9 @@ test:
 	for d in $(DIRS); do \
 		(cd $$d; $(MAKE) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
+
+test-fem:
+	$(MAKE) -C fem test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
 bgtest:
 	for d in charm++ ampi fem armci; do \

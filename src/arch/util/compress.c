@@ -21,6 +21,7 @@
 #include <math.h>
 struct timeval tv;
 #include <sys/time.h>
+#include <assert.h>
 
 //#define USE_SSE 1 
 
@@ -148,13 +149,8 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     memcpy(dest, source, size*sizeof(float)); 
     *compressSize = s;
 #else
-    // Is this the first time we're sending stuff to this node?
-    if (baseData == NULL) {
-        baseData = (float*)malloc(size*sizeof(float));
-        memcpy(baseData, source, size*sizeof(float));
-        memcpy(dest, source, size*sizeof(float)); 
-        *compressSize = s;
-    } else {
+    assert(baseData != NULL);
+    {
         // Create message to receive the compressed buffer.
         register unsigned char *cdst = (unsigned char*)dest; 
         register int _dataIndex = (size+7)/8;
@@ -237,13 +233,9 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     memcpy(dest, source, size*sizeof(float)); 
     *compressSize = s;
 #else
+    assert(baseData != NULL);
     // Is this the first time we're sending stuff to this node?
-    if (baseData == NULL) {
-        baseData = (float*)malloc(size*sizeof(float));
-        memcpy(baseData, source, size*sizeof(float));
-        memcpy(dest, source, size*sizeof(float)); 
-        *compressSize = s;
-    } else {
+    {
         // Create message to receive the compressed buffer.
         register unsigned char *cdst = (unsigned char*)dest; 
         register int _dataIndex = (size+7)/8;
@@ -453,12 +445,9 @@ void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
     memcpy(dest, source, s); 
     *compressSize = s;
 #else
+    assert(baseData != NULL);
     // Is this the first time we're sending stuff to this node?
-    if (baseData == NULL) {
-        baseData = (double*)malloc(size*sizeof(double));
-        memcpy(baseData, source, s);
-        memcpy(dest, source, s); 
-    } else {
+    {
         *compressSize = s;
         // Create message to receive the compressed buffer.
         register unsigned char *cdst = (unsigned char*)dest; 

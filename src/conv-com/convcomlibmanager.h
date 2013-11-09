@@ -74,7 +74,7 @@ class ConvComlibManager {
 
   // private:  //Why do we need private here?? XLC breaks with this private decl
   inline void setStrategy(int loc, Strategy *s) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (loc == 0) CmiAbort("Trying to set strategy zero, not valid!\n");
 #endif
     strategyTable[loc].strategy = s;
