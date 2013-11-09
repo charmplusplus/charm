@@ -12,6 +12,8 @@ void check_size_approx(size_t s) {
   }
 }
 
+// Test cases for the approximate compression provided by
+// pup_{en,de}codeSize, as tested above by check_sizes_approx()
 size_t check_size_values[] =
 {
   0,
