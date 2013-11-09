@@ -433,6 +433,10 @@ static void CmiMachineInit(char **argv){
 	struct infiRdmaPacket **rdmaPktPtrs;
         int num_devices, idev;
 
+#if CMK_SMP
+        ibv_fork_init();
+#endif
+		 
 	MACHSTATE(3,"CmiMachineInit {");
 	MACHSTATE2(3,"_Cmi_numnodes %d CmiNumNodes() %d",_Cmi_numnodes,CmiNumNodes());
 	MACHSTATE1(3,"CmiMyNodeSize() %d",CmiMyNodeSize());
@@ -1456,13 +1460,13 @@ static void CommunicationServerNet(int sleepTime, int where){
 	if(where == COMM_SERVER_FROM_WORKER){
 		return;
 	}
+	CmiCommLock();
+	inProgress[CmiMyRank()] = 1;
 	if(where == COMM_SERVER_FROM_SMP){
 #endif
 		ServiceCharmrun_nolock();
 #if CMK_SMP
 	}
-	CmiCommLock();
-	inProgress[CmiMyRank()] = 1;
 #endif
 	CommunicationServer_nolock(0);
 #if CMK_SMP
@@ -1508,7 +1512,7 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 			
 //			CmiAssert(newmsg == NULL);
 			if(len > size){
-				CmiPrintf("size: %d, len:%d.\n", size, len);
+				//CmiPrintf("size: %d, len:%d.\n", size, len);
 				CmiAbort("\n\n\t\tLength mismatch!!\n\n");
 			}
 			newmsg = (char *)CmiAlloc(size);
@@ -1531,11 +1535,11 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 		case INFI_DATA:
 		{
 			if(node->asm_fill + len < node->asm_total && len != dataSize){
-				CmiPrintf("from node %d asm_total: %d, asm_fill: %d, len:%d.\n",node->infiData->nodeNo, node->asm_total, node->asm_fill, len);
+				//CmiPrintf("from node %d asm_total: %d, asm_fill: %d, len:%d.\n",node->infiData->nodeNo, node->asm_total, node->asm_fill, len);
 				CmiAbort("packet in the middle does not have expected length");
 			}
 			if(node->asm_fill+len > node->asm_total){
-				CmiPrintf("asm_total: %d, asm_fill: %d, len:%d.\n", node->asm_total, node->asm_fill, len);
+				//CmiPrintf("asm_total: %d, asm_fill: %d, len:%d.\n", node->asm_total, node->asm_fill, len);
 				CmiAbort("\n\n\t\tLength mismatch!!\n\n");
 			}
 			//tODO: remove this
@@ -2199,6 +2203,8 @@ static inline void fillBufferPools(){
 				if(i == 0){
 					metaData->owner->metaData->count = count;
 					metaData->nextBuf = NULL;
+                                        infiCmiChunkPools[thread][poolIdx].startBuf =  res - sizeof(infiCmiChunkHeader);
+                                        infiCmiChunkPools[thread][poolIdx].count++;
 				}else{
 					void *startBuf = res - sizeof(infiCmiChunkHeader);
 					metaData->nextBuf = infiCmiChunkPools[thread][poolIdx].startBuf;
