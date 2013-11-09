@@ -1,8 +1,8 @@
 To facilitate debugging of applications and to identify race conditions due to
 message order, the user can enable randomized scheduler queue. 
 
-Using the build command {\em --enable-randomized-msgq}, the charm message queue
+Using the build command {\em -{}-enable-randomized-msgq}, the charm message queue
 will be randomized. Note that a randomized message queue is only available when
 message priority type is not bit vector.  Therefore, the user needs to specify
 prio-type to be a data type long enough to hold the msg priorities in your
-application for eg: {\em --with-prio-type = int}.
+application for eg: {\em -{}-with-prio-type = int}.
