@@ -485,7 +485,7 @@ double RefinerComm::CommTable::overheadOnPe(int pe)
   return msgRecvCount[pe]  * PER_MESSAGE_RECV_OVERHEAD +
 	 msgSentCount[pe]  * _lb_args.alpha() +
 	 byteRecvCount[pe] * PER_BYTE_RECV_OVERHEAD +
-	 byteSentCount[pe] * _lb_args.beeta();
+	 byteSentCount[pe] * _lb_args.beta();
 }
 
 /*@}*/

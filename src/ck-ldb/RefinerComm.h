@@ -28,7 +28,7 @@ private:
     void clear() { byteSent=msgSent=byteRecv=msgRecv=0; }
     double cost() {
       return msgSent * _lb_args.alpha() + 
-             byteSent * _lb_args.beeta() +
+             byteSent * _lb_args.beta() +
              msgRecv * PER_MESSAGE_RECV_OVERHEAD + 
              byteRecv * PER_BYTE_RECV_OVERHEAD;
     }

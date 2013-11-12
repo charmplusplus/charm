@@ -594,14 +594,14 @@ void CmiInitCPUAffinity(char **argv)
      affLock = CmiCreateLock();
   }
 
-#if CMK_BLUEGENEP | CMK_BLUEGENEQ
+#if CMK_BLUEGENEP || CMK_BLUEGENEQ
   if(affinity_flag){
       affinity_flag = 0;
-      if(CmiMyPe()==0) CmiPrintf("Charm++> cpu affinity setting is not needed on BG/P, thus ignored.\n");
+      if(CmiMyPe()==0) CmiPrintf("Charm++> cpu affinity setting is not needed on Blue Gene, thus ignored.\n");
   }
   if(show_affinity_flag){
       show_affinity_flag = 0;
-      if(CmiMyPe()==0) CmiPrintf("Charm++> printing cpu affinity is not supported on BG/P.\n");
+      if(CmiMyPe()==0) CmiPrintf("Charm++> printing cpu affinity is not supported on Blue Gene.\n");
   }
 #endif
 

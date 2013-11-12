@@ -498,7 +498,7 @@ bool myCompare(hilbert_pair p1, hilbert_pair p2)
 
 class HilbertArrayMap: public DefaultArrayMap
 {
-    std::vector<hilbert_pair> allpairs;
+    std::vector<int> allpairs;
     int *procList;
 public:
   HilbertArrayMap(void) {
@@ -521,27 +521,27 @@ public:
     idx = DefaultArrayMap::registerArray(i, aid);
    
     if (i.nInts == 1) {
-      CkPrintf("1D %d\n", amaps[idx]->_nelems.data()[0]); 
+      //CkPrintf("1D %d\n", amaps[idx]->_nelems.data()[0]); 
     } else if (i.nInts == 2) {
-      CkPrintf("2D %d:%d\n", amaps[idx]->_nelems.data()[0], amaps[idx]->_nelems.data()[1]); 
+      //CkPrintf("2D %d:%d\n", amaps[idx]->_nelems.data()[0], amaps[idx]->_nelems.data()[1]); 
       int dims = 2;
       int nDim0 = amaps[idx]->_nelems.data()[0];
       int nDim1 = amaps[idx]->_nelems.data()[1];
       int index;
       int counter = 0;
+      std::vector<int> coords;
       allpairs.resize(nDim0*nDim1);
+      coords.resize(2);
       for(int i=0; i<nDim0; i++)
           for(int j=0; j<nDim1; j++)
           {
-              allpairs[counter].coords.resize(2);
-              allpairs[counter].coords[0] = i;
-              allpairs[counter].coords[1] = j;
-              index = Hilbert_to_int( allpairs[counter].coords, dims);
+              coords[0] = i;
+              coords[1] = j;
+              index = Hilbert_to_int( coords, dims);
               //CkPrintf("(%d:%d)----------> %d \n", i, j, index);
-              allpairs[counter].intIndex = index;
+              allpairs[counter] = index;
               counter++;
           }
-      std::sort(allpairs.begin(), allpairs.end(), myCompare);
     } else if (i.nInts == 3) {
       CkPrintf("3D %d:%d:%d\n", amaps[idx]->_nelems.data()[0], amaps[idx]->_nelems.data()[1], amaps[idx]->_nelems.data()[2]); 
       int dims = 3;
@@ -550,27 +550,22 @@ public:
       int nDim2 = amaps[idx]->_nelems.data()[2];
       int index;
       int counter = 0;
+      std::vector<int> coords;
       allpairs.resize(nDim0*nDim1*nDim2);
+      coords.resize(3);
       for(int i=0; i<nDim0; i++)
           for(int j=0; j<nDim1; j++)
               for(int k=0; k<nDim2; k++)
-          {
-              allpairs[counter].coords.resize(3);
-              allpairs[counter].coords[0] = i;
-              allpairs[counter].coords[1] = j;
-              allpairs[counter].coords[2] = k;
-              index = Hilbert_to_int( allpairs[counter].coords, dims);
-              //CkPrintf("(%d:%d)----------> %d \n", i, j, index);
-              allpairs[counter].intIndex = index;
-              counter++;
-          }
-      std::sort(allpairs.begin(), allpairs.end(), myCompare);
+              {
+                  coords[0] = i;
+                  coords[1] = j;
+                  coords[2] = k;
+                  index = Hilbert_to_int( coords, dims);
+                  allpairs[counter] = index;
+                  counter++;
+              }
 
     }
-   
-    //for(int i=0; i<allpairs.size(); i++)
-    //    CkPrintf(" %d (%d:%d --- %d)\n ", i, allpairs[i].coords[0], allpairs[i].coords[1], allpairs[i].intIndex);
-
     return idx;
   }
 
@@ -584,25 +579,18 @@ public:
     if (i.nInts == 1) {
       flati = i.data()[0];
     } else if (i.nInts == 2) {
-        hilbert_pair mypair;
-        mypair.coords.resize(2);
-        mypair.coords[0] = i.data()[0];
-        mypair.coords[1] = i.data()[1];
-        myInt = Hilbert_to_int(mypair.coords, 2);
-        mypair.intIndex = myInt;
-        flati = std::distance(allpairs.begin(), std::find(allpairs.begin(), allpairs.end(), mypair));
-        //CkPrintf("(%d:%d) my realIndex is %d  %d \n", i.data()[0], i.data()[1], flati, myInt);
+        int nDim0 = amaps[arrayHdl]->_nelems.data()[0];
+        int nDim1 = amaps[arrayHdl]->_nelems.data()[1];
+        myInt = i.data()[0] * nDim1 + i.data()[1]; 
+        flati = allpairs[myInt]; 
     } else if (i.nInts == 3) {
         hilbert_pair mypair;
         mypair.coords.resize(3);
-        mypair.coords[0] = i.data()[0];
-        mypair.coords[1] = i.data()[1];
-        mypair.coords[2] = i.data()[2];
-        myInt = Hilbert_to_int(mypair.coords, 3);
-        mypair.intIndex = myInt;
-        flati = std::distance(allpairs.begin(), std::find(allpairs.begin(), allpairs.end(), mypair));
-        //CkPrintf("(%d:%d:%d) my realIndex is %d  %d \n", i.data()[0], i.data()[1], i.data()[2], flati, myInt);
-
+        int nDim0 = amaps[arrayHdl]->_nelems.data()[0];
+        int nDim1 = amaps[arrayHdl]->_nelems.data()[1];
+        int nDim2 = amaps[arrayHdl]->_nelems.data()[2];
+        myInt = i.data()[0] * nDim1 *nDim2 + i.data()[1] * nDim2 + i.data()[2]; 
+        flati = allpairs[myInt]; 
     }
 #if CMK_ERROR_CHECKING
     else {
