@@ -189,8 +189,14 @@ struct TopoManagerWrapper {
       e_flags[e] = 1;
     }
     std::basic_ostringstream<char> iout;
+    int printTill = na;
     iout << "Charm++> " << "TORUS A SIZE " << na << " USING";
-    for ( int i=0; i<na; ++i ) { if ( a_flags[i] ) iout << " " << i; }
+    //no topology available, only print first few PE ranks
+    if((nb + nc +nd + ne) == 4) printTill = (na > 10) ? 10 : na;
+    for ( int i=0; i<printTill; ++i ) { if ( a_flags[i] ) iout << " " << i; }
+    if((nb + nc +nd + ne) == 4) {
+      if(printTill == 10 && na != 10)  iout << "...";
+    }
     iout << "\n" ;
     iout << "Charm++> " << "TORUS B SIZE " << nb << " USING";
     for ( int i=0; i<nb; ++i ) { if ( b_flags[i] ) iout << " " << i; }
