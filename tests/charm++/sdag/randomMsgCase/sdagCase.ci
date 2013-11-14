@@ -1,0 +1,42 @@
+mainmodule sdagCase {
+  readonly CProxy_Array arr;
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void sendMsgs();
+    entry [reductiontarget] void finished();
+  }
+
+  array [1d] Array {
+    entry Array();
+    entry void a();
+    entry void b();
+    entry void c();
+    entry void d();
+    entry void recvStats(int maina, int mainb, int mainc);
+    entry void main() {
+      while (recvMore) {
+        case {
+          when a() serial { acount++; }
+          when b() serial { bcount++; }
+          when c() serial { ccount++; }
+          when d() serial { recvMore = false; }
+        }
+      }
+      serial {
+        CkPrintf("%d: out of while loop\n", thisIndex);
+      }
+      when recvStats(int maina, int mainb, int mainc) {
+        serial {
+          CkAssert(maina == acount);
+          CkAssert(mainb == bcount);
+          CkAssert(mainc == ccount);
+        }
+      }
+      serial {
+        contribute(CkCallback(CkReductionTarget(Main,finished), mainProxy));
+      }
+    };
+  }
+}

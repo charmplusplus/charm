@@ -1,4 +1,4 @@
-DIRS=migration template case anytimeMigration
+DIRS=migration template case anytimeMigration randomMsgCase
 
 all:
 	for d in $(DIRS); do \
