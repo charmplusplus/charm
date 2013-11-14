@@ -36,62 +36,63 @@ etc.
 \end {description}
 
 In Table~\ref{tab:buildlist}, a list of build commands is provided for some of the commonly 
-used systems. Note that, in general, options such as {\em smp}, {\em
---with-production}, compiler specifiers etc can be used with all targets. It is
-advisable to build with {\em --with-production} to obtain the best performance.
-If one desires to perform trace collection (for Projections), {\em
---enable-tracing --enable-tracing-commthread} should also be passed to the build command.
+used systems. Note that, in general, options such as {\em smp},
+\verb|--with-production|, compiler specifiers etc can be used with all targets.
+It is advisable to build with \verb|--with-production| to obtain the best
+performance.  If one desires to perform trace collection (for Projections),
+\verb|--enable-tracing --enable-tracing-commthread| should also be passed to the
+build command.
 
 Details on all the available alternatives for each of the above mentioned
-parameters can be found by invoking {\em ./build --help}. One can also go through the 
-build process in an interactive manner. Run {\em ./build}, and it will be followed by 
+parameters can be found by invoking \verb|./build --help|. One can also go through the
+build process in an interactive manner. Run \verb|./build|, and it will be followed by
 a few queries to select appropiate choices for the build one wants to perform.
 
 
 \begin{table}[ht]
 \begin{tabular}{|p{6cm}|p{9cm}|}
 \hline
-Net with 32 bit Linux & ./build charm++ net-linux --with-production -j8
+Net with 32 bit Linux & \verb|./build charm++ net-linux --with-production -j8|
 \\\hline
-Multicore 64 bit Linux & ./build charm++ multicore-linux64 --with-production -j8
+Multicore 64 bit Linux & \verb|./build charm++ multicore-linux64 --with-production -j8|
 \\\hline
-Net with 64 bit Linux & ./build charm++ net-linux-x86\_64 --with-production -j8
+Net with 64 bit Linux & \verb|./build charm++ net-linux-x86_64 --with-production -j8|
 \\\hline
-Net with 64 bit Linux (intel compilers) & ./build charm++ net-linux-x86\_64 icc --with-production -j8
+Net with 64 bit Linux (intel compilers) & \verb|./build charm++ net-linux-x86_64 icc --with-production -j8|
 \\\hline
-Net with 64 bit Linux (shared memory) & ./build charm++ net-linux-x86\_64 smp --with-production -j8
+Net with 64 bit Linux (shared memory) & \verb|./build charm++ net-linux-x86_64 smp --with-production -j8|
 \\\hline
-Net with 64 bit Linux (checkpoint restart based fault tolerance) & ./build charm++ net-linux-x86\_64 syncft --with-production -j8
+Net with 64 bit Linux (checkpoint restart based fault tolerance) & \verb|./build charm++ net-linux-x86_64 syncft --with-production -j8|
 \\\hline
-MPI with 64 bit Linux & ./build charm++ mpi-linux-x86\_64 --with-production -j8
+MPI with 64 bit Linux & \verb|./build charm++ mpi-linux-x86_64 --with-production -j8|
 \\\hline
-MPI with 64 bit Linux (shared memory) & ./build charm++ mpi-linux-x86\_64 smp --with-production -j8
+MPI with 64 bit Linux (shared memory) & \verb|./build charm++ mpi-linux-x86_64 smp --with-production -j8|
 \\\hline
-MPI with 64 bit Linux (mpicxx wrappers) & ./build charm++ mpi-linux-x86\_64 mpicxx --with-production -j8
+MPI with 64 bit Linux (mpicxx wrappers) & \verb|./build charm++ mpi-linux-x86_64 mpicxx --with-production -j8|
 \\\hline
-IBVERBS with 64 bit Linux & ./build charm++ net-linux-x86\_64 ibverbs --with-production -j8
+IBVERBS with 64 bit Linux & \verb|./build charm++ net-linux-x86_64 ibverbs --with-production -j8|
 \\\hline
-Net with 32 bit Windows & ./build charm++ net-win32 --with-production -j8
+Net with 32 bit Windows & \verb|./build charm++ net-win32 --with-production -j8|
 \\\hline
-Net with 64 bit Windows & ./build charm++ net-win64 --with-production -j8
+Net with 64 bit Windows & \verb|./build charm++ net-win64 --with-production -j8|
 \\\hline
-MPI with 64 bit Windows & ./build charm++ mpi-win64 --with-production -j8
+MPI with 64 bit Windows & \verb|./build charm++ mpi-win64 --with-production -j8|
 \\\hline
-Net with 64 bit Mac & ./build charm++ net-darwin-x86\_64 --with-production -j8
+Net with 64 bit Mac & \verb|./build charm++ net-darwin-x86_64 --with-production -j8|
 \\\hline
-Blue Gene/L & ./build charm++ bluegenel xlc --with-production -j8
+Blue Gene/L & \verb|./build charm++ bluegenel xlc --with-production -j8|
 \\\hline
-Blue Gene/P & ./build charm++ bluegenep xlc --with-production -j8
+Blue Gene/P & \verb|./build charm++ bluegenep xlc --with-production -j8|
 \\\hline
-Blue Gene/Q & ./build charm++ pami-bluegeneq xlc --with-production -j8
+Blue Gene/Q & \verb|./build charm++ pami-bluegeneq xlc --with-production -j8|
 \\\hline
-Blue Gene/Q & ./build charm++ pamilrts-bluegeneq xlc --with-production -j8
+Blue Gene/Q & \verb|./build charm++ pamilrts-bluegeneq xlc --with-production -j8|
 \\\hline
-Cray XT3 & ./build charm++ mpi-crayxt3 --with-production -j8
+Cray XT3 & \verb|./build charm++ mpi-crayxt3 --with-production -j8|
 \\\hline
-Cray XT5 & ./build charm++ mpi-crayxt --with-production -j8
+Cray XT5 & \verb|./build charm++ mpi-crayxt --with-production -j8|
 \\\hline
-Cray XE6 & ./build charm++ gemini\_gni-crayxe --with-production -j8
+Cray XE6 & \verb|./build charm++ gemini_gni-crayxe --with-production -j8|
 \\\hline
 \end{tabular}
 \caption{Build command for some common cases}

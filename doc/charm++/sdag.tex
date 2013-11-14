@@ -37,12 +37,12 @@ public:
 
   void firstInput(Input i) \{
     first = i;
-    if (--expectedMessageCount == 0)
+    if (\verb|--expectedMessageCount == 0|)
       computeInteractions(first, second);
     \}
   void recv_second(Input j) \{
     second = j;
-    if (--expectedMessageCount == 0)
+    if (\verb|--expectedMessageCount == 0|)
       computeInteractions(first, second);
   \}
 
@@ -93,14 +93,14 @@ chare ComputeObject \{
   entry void firstInput(Input i) \{
     serial \{
       first = i;
-      if (--expectedMessageCount == 0)
+      if (\verb|--expectedMessageCount == 0|)
         computeInteractions(first, second);
     \}
   \};
   entry void secondInput(Input j) \{
     serial \{
       second = j;
-      if (--expectedMessageCount == 0)
+      if (\verb|--expectedMessageCount == 0|)
         computeInteractions(first, second);
     \}
   \};
@@ -142,7 +142,7 @@ follows:
   entry void firstInput(Input i) \{
     serial "process first" \{
       first = i;
-      if (--expectedMessageCount == 0)
+      if (\verb|--expectedMessageCount == 0|)
         computeInteractions(first, second);
     \}
   \};
