@@ -1243,18 +1243,19 @@ void TraceProjections::traceClose(void)
 #ifdef PROJ_ANALYSIS
   // CkPrintf("CkExit was not called on shutdown on [%d]\n", CkMyPe());
 
-  // sets the flag that tells the code not to make the CkExit call later
-  converseExit = 1;
-  if (CkMyPe() == 0) {
-    CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
-    bocProxy.traceProjectionsParallelShutdown(-1);
+  if (_logPool == NULL) {
+    return;
   }
-  if(CkMyRank() == CkMyNodeSize()){ //communication thread
-    CkpvAccess(_trace)->endComputation();
-    delete _logPool;              // will write
-    // remove myself from traceArray so that no tracing will be called.
-    CkpvAccess(_traces)->removeTrace(this);
+  if(CkMyPe()==0){
+    _logPool->writeSts(this);
+    _logPool->writeRC();
+    _logPool->writeTopo();
   }
+  CkpvAccess(_trace)->endComputation();
+  delete _logPool;              // will write
+  _logPool = NULL;
+  // remove myself from traceArray so that no tracing will be called.
+  CkpvAccess(_traces)->removeTrace(this);
 #else
   // we've already deleted the logpool, so multiple calls to traceClose
   // are tolerated.
@@ -1266,6 +1267,7 @@ void TraceProjections::traceClose(void)
   }
   CkpvAccess(_trace)->endComputation();
   delete _logPool;              // will write
+  _logPool = NULL;
   // remove myself from traceArray so that no tracing will be called.
   CkpvAccess(_traces)->removeTrace(this);
 
@@ -1282,7 +1284,7 @@ void TraceProjections::traceClose(void)
  */
 void TraceProjections::closeTrace() {
   //  CkPrintf("Close Trace called on [%d]\n", CkMyPe());
-  if (CkMyPe() == 0) {
+  if (CkMyPe() == 0 && _logPool!= NULL) {
     // CkPrintf("Pe 0 will now write sts and projrc files\n");
     _logPool->writeSts(this);
     _logPool->writeRC();
@@ -1981,19 +1983,22 @@ void TraceProjectionsBOC::traceProjectionsParallelShutdown(int pe) {
   if (CkMyPe() == 0) {
     analysisStartTime = CmiWallTimer();
   }
-  CkpvAccess(_trace)->endComputation();
-  // no more tracing for projections on this processor after this point. 
-  // Note that clear must be called after remove, or bad things will happen.
-  CkpvAccess(_traces)->removeTrace(CkpvAccess(_trace));
-  CkpvAccess(_traces)->clearTrace();
+  if (CkpvAccess(_trace)->_logPool != NULL ){
+      CkpvAccess(_trace)->endComputation();
+      // no more tracing for projections on this processor after this point. 
+      // Note that clear must be called after remove, or bad things will happen.
+      CkpvAccess(_traces)->removeTrace(CkpvAccess(_trace));
+      CkpvAccess(_traces)->clearTrace();
 
-  // From this point, we start multiple chains of reductions and broadcasts to
-  // perform final online analysis activities.
-
-  // Start all parallel operations at once. 
-  //   These MUST NOT modify base performance data in LogPool. If they must,
-  //   then the parallel operations must be phased (and this code to be
-  //   restructured as necessary)
+      // From this point, we start multiple chains of reductions and broadcasts to
+      // perform final online analysis activities.
+      //
+      // Start all parallel operations at once. 
+      //   These MUST NOT modify base performance data in LogPool. If they must,
+      //   then the parallel operations must be phased (and this code to be
+      //   restructured as necessary)
+      //
+  }
   CProxy_KMeansBOC kMeansProxy(kMeansGID);
   CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
   if (findOutliers) {
@@ -2885,7 +2890,7 @@ void TraceProjectionsBOC::endTimeDone(CkReductionMsg *msg)
 
   CkAssert(CkMyPe() == 0);
   parModulesRemaining--;
-  if (CkpvAccess(_trace) != NULL) {
+  if (CkpvAccess(_trace) != NULL && CkpvAccess(_trace)->_logPool != NULL) {
     CkpvAccess(_trace)->_logPool->globalEndTime = *(double *)msg->getData() - CkpvAccess(_trace)->_logPool->globalStartTime;
     // CkPrintf("End time determined to be %lf us\n",
     //	     (CkpvAccess(_trace)->_logPool->globalEndTime)*1e06);
