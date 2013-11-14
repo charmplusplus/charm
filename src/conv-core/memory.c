@@ -460,6 +460,22 @@ static CMK_TYPEDEF_UINT8 MemusageBGP(){
 }
 #endif
 
+#if CMK_BLUEGENEQ
+#include <spi/include/kernel/memory.h>
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageBGQ(){
+  CMK_TYPEDEF_UINT8 heapUsed;
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heapUsed);
+  return heapUsed;
+}
+#else
+static CMK_TYPEDEF_UINT8 MemusageBGQ(){
+    return 0;
+}
+#endif
+
 typedef CMK_TYPEDEF_UINT8 (*CmiMemUsageFn)();
 
 /* this structure defines the order of testing for memory usage functions */
@@ -467,6 +483,7 @@ struct CmiMemUsageStruct {
     CmiMemUsageFn  fn;
     char *name;
 } memtest_order[] = {
+    {MemusageBGQ, "BlueGene/Q"},
     {MemusageBGP, "BlueGene/P"},
     {MemusageWindows, "Windows"},
     {MemusageMstats, "Mstats"},
