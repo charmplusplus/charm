@@ -178,6 +178,9 @@ void CmiInitMemAffinity(char **argv) {
         int nodemapArrSize = 1;
         int prevIntStart,j;
         int curnid;
+        int myPhyRank = CpvAccess(myCPUAffToCore);
+        int myMemNid;
+        int retval = -1;
         for (i=0; i<strlen((const char *)nodemap); i++) {
             if (nodemap[i]==',') nodemapArrSize++;
         }
@@ -202,9 +205,7 @@ void CmiInitMemAffinity(char **argv) {
         }
         nodemapArr[j] = curnid;
 
-        int myPhyRank = CpvAccess(myCPUAffToCore);
-        int myMemNid = nodemapArr[myPhyRank%nodemapArrSize];
-        int retval = -1;
+        myMemNid = nodemapArr[myPhyRank%nodemapArrSize];
         if (policy==MPOL_INTERLEAVE) {
             retval = CmiSetMemAffinity(policy, nodemapArr, nodemapArrSize);
         } else {
