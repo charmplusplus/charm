@@ -139,7 +139,7 @@ void liveVizPollDeposit(ArrayElement *from,
 class LiveVizBoundElement : public CBase_LiveVizBoundElement {
 public:
 	LiveVizBoundElement(){}
-	LiveVizBoundElement(CkMigrateMessage *msg){}
+	LiveVizBoundElement(CkMigrateMessage *msg): CBase_LiveVizBoundElement(msg){}
 	~LiveVizBoundElement(){}
 	
 	void deposit(CkReductionMsg *msg){

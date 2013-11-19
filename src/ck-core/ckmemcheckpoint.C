@@ -1686,8 +1686,8 @@ void CkRegisterRestartHandler( )
 
 #if ! CMK_CONVERSE_MPI
   // print pid to kill
-//  CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
-//  sleep(4);
+  //CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
+  //sleep(4);
 #endif
 #endif
 }

@@ -38,7 +38,12 @@ void liveVizConfig::pupNetwork(PUP::er &p) {
 	p|version; 
 	bool isColor=(pixels!=pix_greyscale);
 	p|isColor;
-	p|serverPush;
+	if(isColor)
+        {
+          pixels = pix_color;
+          bytesPerPixel=3;
+        }
+        p|serverPush;
 	p|is3d;
 	if (is3d) {
 		p|box.min;

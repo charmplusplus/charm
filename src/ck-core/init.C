@@ -369,7 +369,7 @@ static void _discardHandler(envelope *env)
 
   DEBUGF(("[%d] _discardHandler called.\n", CkMyPe()));
 #if CMK_MEM_CHECKPOINT
-  CkPrintf("[%d] _discardHandler called!\n", CkMyPe());
+  //CkPrintf("[%d] _discardHandler called!\n", CkMyPe());
   if (CkInRestarting()) CpvAccess(_qd)->process();
 #endif
   CmiFree(env);
