@@ -985,6 +985,9 @@ INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
 }
 
 INLINE_KEYWORD int pe_lToGTranslate(int pe, int partition) {
+  if(_partitionInfo.type == PARTITION_SINGLETON) 
+    return pe;
+
   if(pe < CmiPartitionSize(partition)*CmiMyNodeSize()) {
     return node_lToGTranslate(CmiNodeOf(pe),partition)*CmiMyNodeSize() + CmiRankOf(pe);
   }
