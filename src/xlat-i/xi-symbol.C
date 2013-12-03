@@ -2136,7 +2136,7 @@ Message::genDefs(XStr& str)
     // alloc(int, size_t, int*, priobits)
     str << tspec << "void* " << ptype;
     str << "::alloc(int msgnum, size_t sz, int *sizes, int pb) {\n";
-    str << "  CkpvAccess(_offsets)[0] = ALIGN8(sz);\n";
+    str << "  CkpvAccess(_offsets)[0] = ALIGN_DEFAULT(sz);\n";
     for(i=0, count=0, ml=mvlist; i<num; i++, ml=ml->next) {
       mv = ml->msg_var;
       if (mv->isArray()) {
@@ -2144,7 +2144,7 @@ Message::genDefs(XStr& str)
         str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[0];\n";
         str << "  else\n";
         str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[" << count << "] + ";
-        str << "ALIGN8(sizeof(" << mv->type << ")*sizes[" << count << "]);\n";
+        str << "ALIGN_DEFAULT(sizeof(" << mv->type << ")*sizes[" << count << "]);\n";
         count ++;
       }
     }

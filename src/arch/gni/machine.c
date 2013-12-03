@@ -4016,7 +4016,7 @@ void* LrtsAlloc(int n_bytes, int header)
     if(n_bytes <= SMSG_MAX_MSG)
     {
         int totalsize = n_bytes+header;
-        ptr = malloc(totalsize);
+        ptr = memalign(ALIGNBUF, totalsize);
     }
     else {
         CmiAssert(header+sizeof(mempool_header) <= ALIGNBUF);
@@ -4048,7 +4048,9 @@ void* LrtsAlloc(int n_bytes, int header)
 
 void  LrtsFree(void *msg)
 {
-    CmiUInt4 size = SIZEFIELD((char*)msg+sizeof(CmiChunkHeader));
+    int headersize = sizeof(CmiChunkHeader);
+    char *aligned_addr = (char *)msg + headersize - ALIGNBUF;
+    CmiUInt4 size = SIZEFIELD((char*)msg+headersize);
 #if CMK_PERSISTENT_COMM_PUT
     if (IS_PERSISTENT_MEMORY(msg)) return;
 #endif
@@ -4060,20 +4062,20 @@ void  LrtsFree(void *msg)
         {
 #if LARGEPAGE
             int s = ALIGNHUGEPAGE(size+ALIGNBUF);
-            my_free_huge_pages((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF, s);
+            my_free_huge_pages(aligned_addr, s);
 #else
-            free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+            free((char*)msg + headersize - ALIGNBUF);
 #endif
         }
         else {
 #if    USE_LRTS_MEMPOOL
 #if CMK_SMP
-            mempool_free_thread((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF + sizeof(mempool_header));
+            mempool_free_thread(aligned_addr + sizeof(mempool_header));
 #else
-            mempool_free(CpvAccess(mempool), (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF + sizeof(mempool_header));
+            mempool_free(CpvAccess(mempool), aligned_addr + sizeof(mempool_header));
 #endif
 #else
-            free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+            free(aligned_addr);
 #endif
         }
     }

@@ -25,8 +25,7 @@
 #define _CHECK_USED(env) do{}while(0)
 #endif
 
-#define CkMsgAlignmentMask     (sizeof(double)-1)
-#define CkMsgAlignLength(x) (((x)+CkMsgAlignmentMask)&(~(CkMsgAlignmentMask)))
+#define CkMsgAlignLength(x)     ALIGN_DEFAULT(x)
 #define CkMsgAlignOffset(x)     (CkMsgAlignLength(x)-(x))
 #define CkPriobitsToInts(nBits)    ((nBits+CkIntbits-1)/CkIntbits)
 
@@ -292,15 +291,16 @@ private:
     CMK_REFNUM_TYPE ref;            ///< Used by futures
     UShort   extrasize;  ///< Byte count specific for message types
     s_attribs attribs;
-    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(CMK_REFNUM_TYPE)+sizeof(UShort)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
     
+    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(CMK_REFNUM_TYPE)+sizeof(UShort)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
+
     //This struct should now be sizeof(void*) aligned.
     UShort priobits;   ///< Number of bits of priority data after user data
     UShort epIdx;      ///< Entry point to call
     UInt   pe;         ///< source processor
     UInt   event;      ///< used by projections
     UInt   totalsize;  ///< Byte count from envelope start to end of priobits
-    
+
   public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CkObjID sender;

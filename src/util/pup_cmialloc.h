@@ -13,9 +13,6 @@
 /********  CMIALLOC buffer management functions ******/
 
 /* Given a user chunk m, extract the enclosing chunk header fields: */
-#define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
-#define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
-#define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
 
 //Align data sizes to 8 bytes
 #define ALIGN8_LONG(x)       (long)((~7)&((x)+7))

@@ -71,6 +71,7 @@ typedef struct used_header_
 typedef used_header mempool_header;
 
 // multiple mempool for different size allocation
+// make sure this is 16 byte aligned
 typedef struct block_header
 {
   mem_handle_t        mem_hndl;
@@ -82,9 +83,7 @@ typedef struct block_header
   int                 msgs_in_send;
   int                 msgs_in_recv;
 #endif
-#if ! CMK_64BIT
-  size_t              padding;              // fix for 32 bit machines
-#endif
+  size_t              padding;
 } block_header;
 
 // only at beginning of first block of mempool, representing the mempool
