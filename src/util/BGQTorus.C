@@ -53,9 +53,16 @@ BGQTorusManager::BGQTorusManager() {
   hw_ND = pers.Network_Config.Dnodes;
   hw_NE = pers.Network_Config.Enodes;
 
-  mapping = getenv("RANK_ORDER");
-  if(mapping != NULL) {
-    sscanf(mapping,"%d %d %d %d %d %d",&order[5],&order[4],&order[3],&order[2],&order[1],&order[0]);
+  unsigned int isFile = 0;
+  Kernel_GetMapping(10, mapping, &isFile);
+  if(!isFile) {
+    for(int i = 0; i < 6 ; i++) {
+      if(mapping[i] != 'T') {
+        order[5 - i] = mapping[i] - 'A';
+      } else {
+        order[5 - i] = 5;
+      }
+    }
   }
   //printf("Mapping %d %d %d %d %d %d\n",order[0],order[1],order[2],order[3],order[4],order[5]);
 

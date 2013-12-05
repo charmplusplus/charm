@@ -39,7 +39,7 @@ class BGQTorusManager {
     int procsPerNode; //the number of processes per node
     int torus[5];    
     int order[6], dims[6];
-    char *mapping; //temporarily only conside default mapping ABCDET
+    char mapping[10];
 
   public:
     BGQTorusManager();
