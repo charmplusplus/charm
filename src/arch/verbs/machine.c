@@ -1812,9 +1812,9 @@ void LrtsPostCommonInit(int everReturn)
     i.it_value.tv_sec = 0;
     i.it_value.tv_usec = 1000000/MEMORYUSAGE_OUTPUT_FREQ;
 #else
-    i.it_interval.tv_sec = 1;
+    i.it_interval.tv_sec = 10;
     i.it_interval.tv_usec = 0;
-    i.it_value.tv_sec = 1;
+    i.it_value.tv_sec = 10;
     i.it_value.tv_usec = 0;
 #endif
     setitimer(ITIMER_REAL, &i, NULL);
