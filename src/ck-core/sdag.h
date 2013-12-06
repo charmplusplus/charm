@@ -211,7 +211,7 @@ namespace SDAG {
 
   struct Dependency {
     std::vector<std::list<int> > entryToWhen;
-    std::map<int, std::list<Continuation*> > whenToContinuation;
+    std::vector<std::list<Continuation*> > whenToContinuation;
 
     // entry -> lst of buffers
     // @todo this will have sequential lookup time for specific reference
@@ -230,7 +230,8 @@ namespace SDAG {
     Dependency(int numEntries, int numWhens)
       : entryToWhen(numEntries)
       , buffer(numEntries)
-      , curSpeculationIndex(0) { }
+      , curSpeculationIndex(0)
+      , whenToContinuation(numWhens) { }
 
     // after a migration free the structures
     ~Dependency() {
@@ -243,11 +244,9 @@ namespace SDAG {
         }
       }
 
-      for (std::map<int, std::list<Continuation*> >::iterator iter = whenToContinuation.begin();
-           iter != whenToContinuation.end(); ++iter) {
-        std::list<Continuation*> lst = iter->second;
-        for (std::list<Continuation*>::iterator iter2 = lst.begin();
-             iter2 != lst.end(); ++iter2) {
+      for (int i = 0; i < whenToContinuation.size(); i++) {
+        for (std::list<Continuation*>::iterator iter2 = whenToContinuation[i].begin();
+             iter2 != whenToContinuation[i].end(); ++iter2) {
           delete *iter2;
         }
       }
@@ -263,14 +262,9 @@ namespace SDAG {
     }
 
     void dereg(Continuation *c) {
-      if (whenToContinuation.find(c->whenID) != whenToContinuation.end()) {
-        std::list<Continuation*>& lst = whenToContinuation[c->whenID];
-        lst.remove(c);
-	if (lst.size() == 0)
-	  whenToContinuation.erase(c->whenID);
-      } else {
-        CkAbort("trying to deregister: continuation not found");
-      }
+      CkAssert(c->whenID < whenToContinuation.size());
+      std::list<Continuation*>& lst = whenToContinuation[c->whenID];
+      lst.remove(c);
     }
 
     Buffer* pushBuffer(int entry, Closure *cl, CMK_REFNUM_TYPE refnum) {
@@ -285,15 +279,13 @@ namespace SDAG {
            ++iter) {
         int whenID = *iter;
 
-        if (whenToContinuation.find(whenID) != whenToContinuation.end()) {
-          for (std::list<Continuation*>::iterator iter2 = whenToContinuation[whenID].begin();
-               iter2 != whenToContinuation[whenID].end();
-               iter2++) {
-            Continuation* c = *iter2;
-            if (searchBufferedMatching(c)) {
-              dereg(c);
-              return c;
-            }
+        for (std::list<Continuation*>::iterator iter2 = whenToContinuation[whenID].begin();
+             iter2 != whenToContinuation[whenID].end();
+             iter2++) {
+          Continuation* c = *iter2;
+          if (searchBufferedMatching(c)) {
+            dereg(c);
+            return c;
           }
         }
       }
@@ -344,10 +336,10 @@ namespace SDAG {
     }
 
     void removeAllSpeculationIndex(int speculationIndex) {
-      for (std::map<int, std::list<Continuation*> >::iterator iter = whenToContinuation.begin();
+      for (std::vector<std::list<Continuation*> >::iterator iter = whenToContinuation.begin();
            iter != whenToContinuation.end();
            ++iter) {
-        std::list<Continuation*>& lst = iter->second;
+        std::list<Continuation*>& lst = *iter;
 
         for (std::list<Continuation*>::iterator iter2 = lst.begin();
              iter2 != lst.end();
