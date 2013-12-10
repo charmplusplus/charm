@@ -207,13 +207,7 @@ namespace xi {
 
     stateVars = new list<CStateVar*>();
     ParamList *pl = param;
-    if (pl->isVoid() == 1) {
-      sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
-      stateVars->push_back(sv);
-      std::list<CStateVar*> lst;
-      encap.push_back(new EncapState(this->entry, lst));
-    }
-    else {
+    if (!pl->isVoid()) {
       while (pl != NULL) {
         stateVars->push_back(new CStateVar(pl));
         pl = pl->next;
@@ -419,7 +413,8 @@ namespace xi {
       EncapState* state = new EncapState(el->entry, whenCurEntry);
       if (!el->entry->paramIsMarshalled() && !el->entry->param->isVoid())
         state->isMessage = true;
-      encap.push_back(state);
+      if (!el->entry->param->isVoid())
+	encap.push_back(state);
       whenCurEntry.clear();
       el = el->next;
     }
@@ -514,10 +509,13 @@ namespace xi {
       if (cur != encapState.size() - 1) op << ", ";
     }
 
+    int prev = cur;
+
     cur = 0;
     for (EntryList *el = elist; el != NULL; el = el->next, cur++)
       if (el->entry->intExpr) {
-        op << ",\n";
+        if (prev > 0) op << ",";
+	op << "\n";
         indentBy(op, indent + 1);
         op << "c->refnums[" << cur << "]";
       }
@@ -599,7 +597,7 @@ namespace xi {
         if (state->name) defs << *state->name; else defs << "gen" << cur;
         if (cur != encapState.size() - 1) defs << ", ";
       }
-      for (int i = 0; i < numRefs; i++) defs << ", refnum_" << i;
+      for (int i = 0; i < numRefs; i++) defs << (cur > 0 ? ", " : "") << "refnum_" << i;
       defs << ");\n";
 
       endMethod(defs);
@@ -1166,10 +1164,11 @@ namespace xi {
     }
     signature << ")";
 
-    decls << "  void " <<  signature << ";\n";
+    if (!entry->param->isVoid())
+      decls << "  void " <<  signature << ";\n";
 
     // generate wrapper for local calls to the function
-    if (entry->paramIsMarshalled() || entry->param->isVoid())
+    if (entry->paramIsMarshalled() && !entry->param->isVoid())
       generateLocalWrapper(decls, defs, entry->param->isVoid(), signature, entry, stateVars, con1->text);
 
     generateClosureSignature(decls, defs, entry, false, "void", con1->text, false, encapState);
@@ -1367,7 +1366,7 @@ namespace xi {
       if (cur != encap.size() - 1) op << ", ";
     }
 
-    for (int i = 0; i < numRefs; i++) op << ", int refnum_" << i;
+    for (int i = 0; i < numRefs; i++) op << (cur > 0 ? "," : "") << "int refnum_" << i;
 
     op << ")";
 
@@ -1385,7 +1384,7 @@ namespace xi {
       EncapState *state = *iter;
 
       if (state->type) {
-        if (cur > scope.size() - 1) {
+        if (cur >= scope.size()) {
           int offset = cur - scope.size();
           if (!state->isMessage)
             op << "static_cast<" << *state->type << "*>(buf" << offset << "->cl)";

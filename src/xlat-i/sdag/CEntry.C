@@ -76,7 +76,10 @@ namespace xi {
 
     XStr newSig;
 
-    if (needsParamMarshalling || isVoid) {
+    if (isVoid) {
+      newSig << *entry << "()";
+      decls << "  void " <<  newSig << ";\n";
+    } else if (needsParamMarshalling) {
       newSig << *entry << "(" << *decl_entry->genClosureTypeNameProxyTemp << "* genClosure)";
       decls << "  void " <<  newSig << ";\n";
       // generate local wrapper decls
@@ -107,7 +110,7 @@ namespace xi {
 
       // note that there will always be a closure even when the method has no
       // parameters for consistency
-      defs << "  __dep->pushBuffer(" << entryNum << ", genClosure, " <<
+      defs << "  __dep->pushBuffer(" << entryNum << ", " << (isVoid ? "0" : "genClosure") << ", " <<
         (refNumNeeded ? "genClosure->getP0()" : "0") <<");\n";
     } else {
       defs << "  CMK_REFNUM_TYPE refnum = ";
