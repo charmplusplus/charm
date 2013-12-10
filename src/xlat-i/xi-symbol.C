@@ -4455,11 +4455,11 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
           param->unmarshall(str);
           //} else if (param->isVoid()) {
           // no parameter
-        } else {
-          str << "genClosure";
+        } else if (!param->isVoid()) {
+	  str << "genClosure";
         }
         str << ");\n";
-	if (!param->isMessage())
+	if (!param->isMessage() && !param->isVoid())
 	  str << "  genClosure->deref();\n";
       } else {
         str<<"("; param->unmarshall(str); str<<");\n";
@@ -5240,9 +5240,6 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
         str << "  genClosure->_impl_buf_size = implP.size();\n";
       }
     }
-  } else if (isVoid()) {
-    str << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
-      " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
   }
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {

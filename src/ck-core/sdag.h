@@ -152,13 +152,14 @@ namespace SDAG {
     }
 
     void addClosure(Closure* cl) {
-      cl->ref();
+      if (cl) cl->ref();
       closure.push_back(cl);
     }
 
     virtual ~Continuation() {
       for (int i = 0; i < closure.size(); i++)
-        closure[i]->deref();
+        if (closure[i])
+	  closure[i]->deref();
     }
 
     PUPable_decl(Continuation);
@@ -184,7 +185,7 @@ namespace SDAG {
       , bgLog2(0)
 #endif
     {
-      cl->ref();
+      if (cl) cl->ref();
     }
 
     void pup(PUP::er& p) {
@@ -203,7 +204,7 @@ namespace SDAG {
     }
 
     virtual ~Buffer() {
-      cl->deref();
+      if (cl) cl->deref();
     }
 
     PUPable_decl(Buffer);
