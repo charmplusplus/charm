@@ -31,6 +31,7 @@ private:
   CentralLB *refineLB;
   CentralLB *metisLB;
   CentralLB *commRefineLB;
+  MetaBalancer* metabalancer;
 };
 
 #endif /* CENTRAL_ADAPTIVE_LB_H */

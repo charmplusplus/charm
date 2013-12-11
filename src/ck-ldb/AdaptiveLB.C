@@ -58,6 +58,12 @@ AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CentralLB(opt)
   }
   BaseLB *crlb = fn();
   commRefineLB = (CentralLB*)crlb;
+
+  if (_lb_args.metaLbOn()) {
+    metabalancer = (MetaBalancer*)CkLocalBranch(_metalb);
+  } else {
+    metabalancer = NULL;
+  }
 }
 
 void AdaptiveLB::work(LDStats* stats)
@@ -94,16 +100,20 @@ void AdaptiveLB::work(LDStats* stats)
   CkPrintf("AdaptiveLB> Total Comm Overhead %E Total Load %E\n", commOverhead, totalLoad);
 
   double tmp;
-  double refine_max_avg_ratio, lb_max_avg_ratio;
-  double greedy_max_avg_ratio;
-  int lb_type;
+  double refine_max_avg_ratio, lb_max_avg_ratio, greedy_max_avg_ratio;
+  int lb_type = -1;
   double comm_ratio, comm_refine_ratio;
 
-//  GetPrevLBData(lb_type, lb_max_avg_ratio, tmp);
-//  GetLBDataForLB(1, refine_max_avg_ratio, tmp);
-//  GetLBDataForLB(0, greedy_max_avg_ratio, tmp);
-//  GetLBDataForLB(2, tmp, comm_ratio);
-//  GetLBDataForLB(3, tmp, comm_refine_ratio);
+  refine_max_avg_ratio = lb_max_avg_ratio = greedy_max_avg_ratio = 1.0;
+  comm_ratio = comm_refine_ratio = 1.0;
+
+  if (metabalancer != NULL) {
+    metabalancer->GetPrevLBData(lb_type, lb_max_avg_ratio, tmp);
+    metabalancer->GetLBDataForLB(0, greedy_max_avg_ratio, tmp);
+    metabalancer->GetLBDataForLB(1, refine_max_avg_ratio, tmp);
+    metabalancer->GetLBDataForLB(2, tmp, comm_ratio);
+    metabalancer->GetLBDataForLB(3, tmp, comm_refine_ratio);
+  }
 
   CkPrintf("AdaptiveLB> Previous LB %d\n", lb_type);
 
