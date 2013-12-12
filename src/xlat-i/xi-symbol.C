@@ -5240,7 +5240,7 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
         str << "  genClosure->_impl_buf_size = implP.size();\n";
       }
     }
-  }
+  } else if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {
   if (isMarshalled()) {
