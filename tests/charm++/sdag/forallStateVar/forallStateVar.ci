@@ -1,0 +1,15 @@
+mainmodule forallStateVar {
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void recvTest(int a);
+    entry void testMethod() {
+      when recvTest(int a) {
+        forall [counter] (0:a,1) serial {
+          CkPrintf("%d: this is a test\n", counter);
+          if (counter == a) CkExit();
+        }
+      }
+    };
+  }
+
+}
