@@ -992,6 +992,9 @@ namespace xi {
 
   void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry) {
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
+
+    unravelClosuresBegin(defs);
+
     defs << "  int __first = (" << con2->text << "), __last = (" << con3->text
          << "), __stride = (" << con4->text << ");\n";
     defs << "  if (__first > __last) {\n";
@@ -1004,7 +1007,11 @@ namespace xi {
     defs << "    SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
     defs << "    ";
     generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+
     defs << "  }\n";
+
+    unravelClosuresEnd(defs);
+
     endMethod(defs);
 
     generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
