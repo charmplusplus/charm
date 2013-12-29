@@ -318,6 +318,12 @@ private:
 #define CK_BARRIER_CONTRIBUTE_METHODS_DECL \
   void barrier(const CkCallback &cb);\
 
+/**
+ * One CkReductionMgr runs a non-overlapping set of reductions.
+ * It collects messages from all local contributors, then sends
+ * the reduced message up the reduction tree to node zero, where
+ * they're passed to the user's client function.
+ */
 class CkNodeReductionMgr : public IrrGroup {
 public:
 	CProxy_CkNodeReductionMgr thisProxy;
@@ -481,14 +487,6 @@ class NodeGroup : public CkNodeReductionMgr {
     void contributeWithCounter(CkReductionMsg *msg,int count);
 };
 
-
-/**
- * One CkReductionMgr runs a non-overlapping set of reductions.
- * It collects messages from all local contributors, then sends
- * the reduced message up the reduction tree to node zero, where
- * they're passed to the user's client function.
- */
-class CkNodeReductionMgr;
 
 class CProxy_CkArrayReductionMgr;
 class CkReductionMgr : public CkGroupInitCallback {
