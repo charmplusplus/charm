@@ -1306,6 +1306,8 @@ void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID, int opts)
 
 void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 {
+	envelope *env = UsrToEnv(msg);
+	env->setMsgtype(ForBocMsg);
 	msg->array_ep_bcast()=ep;
 	if (ckIsDelegated()) //Just call our delegateMgr
 	  ckDelegatedTo()->ArrayBroadcast(ckDelegatedPtr(),ep,msg,_aid);
@@ -1389,7 +1391,7 @@ void CkArray::recvBroadcastViaTree(CkMessage *msg)
 void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index){
     if(homePe(*index)==CmiMyPe()){
         CkArrayMessage *bcast = (CkArrayMessage *)data;
-    int epIdx=bcast->array_ep_bcast();
+        int epIdx=bcast->array_ep();
         DEBUG(CmiPrintf("[%d] gid %d broadcastHomeElements to index %s entry name %s\n",CmiMyPe(),thisgroup.idx,idx2str(*index),_entryTable[bcast->array_ep_bcast()]->name));
         CkArrayMessage *copy = (CkArrayMessage *)   CkCopyMsg((void **)&bcast);
         envelope *env = UsrToEnv(copy);
