@@ -1402,7 +1402,6 @@ void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index
         env->setEpIdx(CkIndex_ArrayElement::recvBroadcast(0));
         env->setArrayMgr(thisgroup);
         env->getsetArrayIndex() = *index;
-    env->getsetArrayEp() = CkIndex_ArrayElement::recvBroadcast(0);
         env->setSrcPe(CkMyPe());
         rec->deliver(copy,CkDeliver_queue);
         _tempBroadcastCount++;
