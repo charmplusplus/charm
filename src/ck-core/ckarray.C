@@ -1225,22 +1225,21 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
   if (elBcastNo >= bcastNo) return false;
   elBcastNo++;
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
-  int epIdx=bcast->array_ep_bcast();
+
+  CkAssert(UsrToEnv(bcast)->getMsgtype() == ForArrayEltMsg);
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
   DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
   return true;
 #else
   if (!broadcastViaScheduler)
-    return el->ckInvokeEntry(epIdx, bcast, doFree);
+    return el->ckInvokeEntry(bcast->array_ep(), bcast, doFree);
   else {
     if (!doFree) {
       CkArrayMessage *newMsg = (CkArrayMessage *)CkCopyMsg((void **)&bcast);
       bcast = newMsg;
     }
     envelope *env = UsrToEnv(bcast);
-    env->getsetArrayEp() = epIdx;
-    env->setArrayMgr( el->ckGetArrayID() );
     env->getsetArrayIndex() = el->ckGetArrayIndex();
     CkArrayManagerDeliver(CkMyPe(), bcast, 0);
     return true;
