@@ -457,7 +457,7 @@ void getRecursiveBisectionList(int numparts, int *procList)
       tmgr.coords(procList[i],crds);
       printf("procList[%5d] part[%3d] %5d (%2d %2d %2d %2d %2d)\n",
         i, p, procList[i],
-        crds[0], crds[1], crds[2], crds[3], crds[4], crds[5]);
+        crds[0], crds[1], crds[2], crds[3], crds[4]);
     }
   }
 }
