@@ -6,6 +6,7 @@
 #define _ENVELOPE_H
 
 #include <pup.h>
+#include <charm.h>
 #include <middle.h>
 #include <ckarrayindex.h>
 #include <cklists.h>
