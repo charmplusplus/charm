@@ -794,11 +794,11 @@ inline int CkMemCheckPT::isMaster(int buddype)
 
 #if 0
 // helper class to pup all elements that belong to same ckLocMgr
-class ElementDestroyer : public CkLocIterator {
+class ElementDestoryer : public CkLocIterator {
 private:
         CkLocMgr *locMgr;
 public:
-        ElementDestroyer(CkLocMgr* mgr_):locMgr(mgr_){};
+        ElementDestoryer(CkLocMgr* mgr_):locMgr(mgr_){};
         void addLocation(CkLocation &loc) {
 		CkArrayIndex idx=loc.getIndex();
 		CkPrintf("[%d] destroy: ", CkMyPe()); idx.print();
@@ -834,7 +834,7 @@ void CkMemCheckPT::resetLB(int diepe)
 }
 
 // in case when failedPe dies, everybody go through its checkpoint table:
-// destroy all array elements
+// destory all array elements
 // recover lost buddies
 // reconstruct all array elements from check point data
 // called on all processors
@@ -887,13 +887,13 @@ void CkMemCheckPT::removeArrayElements()
   if (CkMyPe()==thisFailedPe) CmiAssert(len == 0);
 
   // get rid of all buffering and remote recs
-  // including destroying all array elements
+  // including destorying all array elements
 #if CK_NO_PROC_POOL  
 	CKLOCMGR_LOOP(mgr->flushAllRecs(););
 #else
 	CKLOCMGR_LOOP(mgr->flushLocalRecs(););
 #endif
-//  CKLOCMGR_LOOP(ElementDestroyer chk(mgr); mgr->iterate(chk););
+//  CKLOCMGR_LOOP(ElementDestoryer chk(mgr); mgr->iterate(chk););
 
   //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::resetReductionMgr(), thisProxy));
   barrier(CkCallback(CkIndex_CkMemCheckPT::resetReductionMgr(), thisProxy));
@@ -929,7 +929,7 @@ void CkMemCheckPT::recoverBuddies()
   int idx;
   int len = ckTable.length();
   // ready to flush reduction manager
-  // cannot be CkMemCheckPT::restart because destroy will modify states
+  // cannot be CkMemCheckPT::restart because destory will modify states
   double curTime = CmiWallTimer();
   if (CkMyPe() == thisFailedPe)
   CkPrintf("[%d] CkMemCheckPT ----- %s  in %f seconds\n",CkMyPe(), stage, curTime-startTime);
