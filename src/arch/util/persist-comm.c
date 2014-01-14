@@ -8,7 +8,6 @@
 */
 /*@{*/
 
-#define ALIGN16(x)       (size_t)((~15)&((x)+15))
 #include "converse.h"
 #if CMK_PERSISTENT_COMM
 //#define EXTERNAL_COMPRESS 1
