@@ -155,8 +155,6 @@ void (*notify_crash_fn)(int) = NULL;
 
 CpvDeclare(char *, _validProcessors);
 
-CmiUInt4 envMaxExtraSize = 60;      /*  must be more than the size of type-specific in envelope */
-
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -2861,8 +2859,6 @@ void *CmiAlloc(int size)
 {
 
   char *res;
-
-  size += envMaxExtraSize;
 
 #if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
   res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));

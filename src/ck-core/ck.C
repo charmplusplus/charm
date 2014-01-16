@@ -784,7 +784,7 @@ void _createGroup(CkGroupID groupID, envelope *env)
   {
 	rednMgr.setZero();
   }
-  env->setInitGroupNum(groupID);
+  env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setRednMgr(rednMgr);
   env->setGroupEpoch(CkpvAccess(_charmEpoch));
@@ -806,7 +806,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
   _CHECK_USED(env);
   _SET_USED(env, 1);
   register int epIdx = env->getEpIdx();
-  env->setInitGroupNum(groupID);
+  env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setGroupEpoch(CkpvAccess(_charmEpoch));
   if(CkNumNodes()>1) {
@@ -1132,7 +1132,7 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 
 void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
-  register CkGroupID groupID = env->getInitGroupNum();
+  register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
   if (!env->getGroupDep().isZero()) {      // dependence
     CkGroupID dep = env->getGroupDep();
@@ -1146,7 +1146,7 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
 
 void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 {
-  register CkGroupID groupID = env->getInitGroupNum();
+  register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
   CkCreateLocalNodeGroup(groupID, epIdx, env);
 }
@@ -1674,11 +1674,9 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   register envelope *env = UsrToEnv(msg);
-/*
 #if CMK_ERROR_CHECKING
   CkNodeGroupID nodeRedMgr;
 #endif
-*/
   _CHECK_USED(env);
   _SET_USED(env, 1);
 #if CMK_REPLAYSYSTEM
@@ -1688,12 +1686,10 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
-/*
 #if CMK_ERROR_CHECKING
   nodeRedMgr.setZero();
   env->setRednMgr(nodeRedMgr);
 #endif
-*/
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   criticalPath_send(env);
   automaticallySetMessagePriority(env);

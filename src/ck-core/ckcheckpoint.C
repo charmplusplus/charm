@@ -479,7 +479,6 @@ void CkPupGroupData(PUP::er &p)
 	    }
 	    void *m = CkAllocSysMsg();
 	    envelope* env = UsrToEnv((CkMessage *)m);
-            env->setMsgtype(BocInitMsg);
 	    CkCreateLocalGroup(gID, eIdx, env);
 	  }   // end of unPacking
 	  IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();

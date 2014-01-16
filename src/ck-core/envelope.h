@@ -106,6 +106,16 @@ typedef unsigned char  UChar;
 
 CkpvExtern(int, envelopeEventID);
 
+struct s_objid_o {
+  ck::ObjID id;              /// <ck::ObjID if it could be in a union
+#if CMK_SMP_TRACE_COMMTHREAD
+  UInt srcpe;
+#endif
+  UChar hopCount;           ///< number of times message has been routed
+  UChar ifNotThere;         ///< what to do if array element is missing
+};
+
+
 /**
 @{
 The class envelope defines a Charm++ message's header. The first
@@ -126,7 +136,6 @@ The following are a few terms that are used often:
                              [       Charm envelope        ] 
  User message pointer     -> [ User data/payload ... ]
  Priority pointer         -> [ Priority ints ... ]
- Extra data pointer       -> [ data specific to this message type ]
 </pre>
 
 The "message pointers" passed to and from users bypass the envelope and point
@@ -144,141 +153,52 @@ FIXME: Make CkMessage inherit from envelope,
 which would unify converse, envelope, and 
 user message pointers.
 */
-
- /**
-   These structures store the type-specific message information.
- */
-struct s_chare {  // NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidMsg
-        void *ptr;      ///< object pointer
-        UInt forAnyPe;  ///< Used only by newChare
-        int  bype;      ///< created by this pe
-};
-
-struct s_groupinit {         // NodeBocInitMsg, BocInitMsg
-        CkGroupID g;           ///< GroupID
-        CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
-        CkGroupID dep;         ///< create after dep is created (constructor only!)
-        int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
-};
-
-struct s_group {         // ForNodeBocMsg, ForBocMsg
-        CkGroupID g;           ///< GroupID
-        UShort arrayEp;        ///< Used only for array broadcasts
-};
-
-struct s_array{             ///< ForArrayEltMsg
-        CkArrayIndexBase index; ///< Array element index
-        CkGroupID arr;            ///< Array manager GID
-#if CMK_SMP_TRACE_COMMTHREAD
-        UInt srcpe; 
-#endif
-        UChar hopCount;           ///< number of times message has been routed
-        UChar ifNotThere;         ///< what to do if array element is missing
-};
-
-struct s_objid {
-        ck::ObjID id;
-#if CMK_SMP_TRACE_COMMTHREAD
-        UInt srcpe;
-#endif
-        UChar hopCount;           ///< number of times message has been routed
-        UChar ifNotThere;         ///< what to do if array element is missing
-};
-
-struct s_arrayinit{         ///< ArrayEltInitMsg
-        CkArrayIndexBase index; ///< Array element index
-        CkGroupID arr;            ///< Array manager GID
-#if CMK_SMP_TRACE_COMMTHREAD
-        UInt srcpe; 
-#endif
-        UChar hopCount;           ///< number of times message has been routed
-        UChar ifNotThere;         ///< what to do if array element is missing
-        int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
-};
-
-struct s_roData {    ///< RODataMsg for readonly data type
-        UInt count;
-};
-
-struct s_roMsg {     ///< ROMsgMsg for readonlys defined in ci files
-        UInt roIdx;
-};
-
-
-inline int getMaxExtrasize()
-{
-
-    int ret=0;
-    ret = sizeof(struct s_chare);
-    if(ret <  sizeof(struct s_groupinit))
-        ret = sizeof(struct s_groupinit);
-    if(ret < sizeof(struct s_group))
-        ret = sizeof(struct s_group);
-    if(ret < sizeof(struct s_arrayinit))
-        ret = sizeof(struct s_arrayinit);
-    if(ret < sizeof(struct s_array))
-        ret = sizeof(struct s_array);
-    if ( ret < sizeof(struct s_roData))
-        ret = sizeof(struct s_roData);
-    if(ret < sizeof(struct s_roMsg))
-        ret = sizeof(struct s_roMsg);
-    return ret;
-
-}
-
-inline UShort extraSize(CkEnvelopeType type)
-{
-  int ret = 0;
-  switch (type) {
-  case NewChareMsg:
-  case NewVChareMsg:
-  case ForChareMsg:
-  case ForVidMsg:
-  case FillVidMsg:
-  case DeleteVidMsg:
-    ret = sizeof(struct s_chare);
-    break;
-  case BocInitMsg:
-  case NodeBocInitMsg:
-    ret = sizeof(struct s_groupinit);
-    break;
-  case ForBocMsg:
-  case ForNodeBocMsg:
-    ret = sizeof(struct s_group);
-    break;
-  case ArrayEltInitMsg:
-    ret = sizeof(struct s_arrayinit);
-    break;
-  case ForArrayEltMsg:
-    ret = sizeof(struct s_array);
-    break;
-  case ForIDedObjMsg:
-    ret = sizeof(struct s_objid);
-    break;
-  case RODataMsg:
-    ret = sizeof(struct s_roData);
-    break;
-  case ROMsgMsg:
-    ret = sizeof(struct s_roMsg);
-    break;
-  case StartExitMsg:
-  case ExitMsg:
-  case ReqStatMsg:
-  case StatMsg:
-    break;
-  default:
-    CmiAbort("piggysize: unknown message type.");
-  }
-  return ret;
-}
-
-extern UInt  envMaxExtraSize;
-
 class envelope {
   private:
     /// Converse message envelope, Must be first field in this class
     char   core[CmiReservedHeaderSize];
 public:
+ /**
+   These structures store the type-specific message information.
+ */
+    union u_type {
+      struct s_chare {  // NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidMsg
+        void *ptr;      ///< object pointer
+        UInt forAnyPe;  ///< Used only by newChare
+        int  bype;      ///< created by this pe
+      } chare;
+      struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
+        CkGroupID g;           ///< GroupID
+        CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
+        CkGroupID dep;         ///< create after dep is created (constructor only!)
+        int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
+        UShort arrayEp;        ///< Used only for array broadcasts
+      } group;
+      struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
+        CkArrayIndexBase index; ///< Array element index
+        int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
+        CkGroupID arr;            ///< Array manager GID
+#if CMK_SMP_TRACE_COMMTHREAD
+        UInt srcpe; 
+#endif
+        UChar hopCount;           ///< number of times message has been routed
+        UChar ifNotThere;         ///< what to do if array element is missing
+      } array;
+      struct s_objid {
+        CmiUInt8 id;              /// <ck::ObjID if it could be in a union
+#if CMK_SMP_TRACE_COMMTHREAD
+        UInt srcpe;
+#endif
+        UChar hopCount;           ///< number of times message has been routed
+        UChar ifNotThere;         ///< what to do if array element is missing
+      } objid;
+      struct s_roData {    ///< RODataMsg for readonly data type
+        UInt count;
+      } roData;
+      struct s_roMsg {     ///< ROMsgMsg for readonlys defined in ci files
+        UInt roIdx;
+      } roMsg;
+    };
     struct s_attribs {  // Packed bitwise struct
       UChar msgIdx;     ///< Usertype of message (determines pack routine)
       UChar mtype;      ///< e.g., ForBocMsg
@@ -287,10 +207,8 @@ public:
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
     };
 private:
-    //u_type type;           ///< Depends on message type (attribs.mtype)
-    
+    u_type type;           ///< Depends on message type (attribs.mtype)
     CMK_REFNUM_TYPE ref;            ///< Used by futures
-    UShort   extrasize;  ///< Byte count specific for message types
     s_attribs attribs;
     
     UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(CMK_REFNUM_TYPE)+sizeof(UShort)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
@@ -323,7 +241,7 @@ private:
     UChar  getQueueing(void) const { return attribs.queueing; }
     void   setQueueing(const UChar q) { attribs.queueing=q; }
     UChar  getMsgtype(void) const { return attribs.mtype; }
-    void   setMsgtype(const UChar m) { if (attribs.mtype!=m) { int old = extrasize; extrasize = extraSize((CkEnvelopeType)m); totalsize += extrasize - old; } attribs.mtype = m; }
+    void   setMsgtype(const UChar m) { attribs.mtype = m; }
 #if CMK_ERROR_CHECKING
     UChar  isUsed(void) { return attribs.isUsed; }
     void   setUsed(const UChar u) { attribs.isUsed=u; }
@@ -335,7 +253,7 @@ private:
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
     UInt   getUsersize(void) const { 
-      return totalsize - getPrioBytes() - sizeof(envelope) - extrasize; 
+      return totalsize - getPrioBytes() - sizeof(envelope); 
     }
     void   setUsersize(const UInt s) {
       if (s == getUsersize()) {
@@ -343,13 +261,10 @@ private:
       }
       CkAssert(s < getUsersize());
       UInt newPrioOffset = sizeof(envelope) + CkMsgAlignLength(s);
-      UInt newExtraDataOffset = newPrioOffset + getPrioBytes();
-      UInt newTotalsize = newExtraDataOffset + getExtrasize();
+      UInt newTotalsize = newPrioOffset + getPrioBytes();
       void *newPrioPtr = (void *) ((char *) this + newPrioOffset); 
-      void *newExtraPtr = (void *) ((char *) this + newExtraDataOffset);
       // use memmove instead of memcpy in case memory areas overlap
       memmove(newPrioPtr, getPrioPtr(), getPrioBytes()); 
-      memmove(newExtraPtr, (void *) extraData(), getExtrasize());
       setTotalsize(newTotalsize); 
     }
 
@@ -359,8 +274,6 @@ private:
       setUsersize(getUsersize() - s);
     }
 
-    UShort getExtrasize(void) const { return extrasize; }
-    void   setExtrasize(const UShort s) { extrasize = s; }
     UChar  isPacked(void) const { return attribs.isPacked; }
     void   setPacked(const UChar p) { attribs.isPacked = p; }
     UShort getPriobits(void) const { return priobits; }
@@ -368,23 +281,20 @@ private:
     UShort getPrioWords(void) const { return CkPriobitsToInts(priobits); }
     UShort getPrioBytes(void) const { return getPrioWords()*sizeof(int); }
     void*  getPrioPtr(void) const { 
-      return (void *)((char *)this + totalsize - extrasize - getPrioBytes());
+      return (void *)((char *)this + totalsize - getPrioBytes());
     }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
-      CkAssert(type >= NewChareMsg && type < LAST_CK_ENVELOPE_TYPE);
-
+      CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
 #if CMK_USE_STL_MSGQ
       // Ideally, this should be a static compile-time assert. However we need API changes for that
       CkAssert(sizeof(CMK_MSG_PRIO_TYPE) >= sizeof(int)*CkPriobitsToInts(prio));
 #endif
 
-      register UShort extrasize = extraSize((CkEnvelopeType)type);
-      register UInt tsize0 = sizeof(envelope)+ 
+      register UInt tsize = sizeof(envelope)+ 
             CkMsgAlignLength(size)+
 	    sizeof(int)*CkPriobitsToInts(prio);
-      register UInt tsize = tsize0 + extrasize;
-      register envelope *env = (envelope *)CmiAlloc(tsize0);
+      register envelope *env = (envelope *)CmiAlloc(tsize);
 #if CMK_REPLAYSYSTEM
       //for record-replay
       memset(env, 0, sizeof(envelope));
@@ -392,11 +302,9 @@ private:
 #endif
       env->setMsgtype(type);
       env->totalsize = tsize;
-      env->extrasize = extrasize;
       env->priobits = prio;
       env->setPacked(0);
-      //env->type.group.dep.setZero();
-      ((struct s_groupinit *)env->extraData())->dep.setZero();
+      env->type.group.dep.setZero();
       _SET_USED(env, 0);
       env->setRef(0);
       env->setEpIdx(0);
@@ -421,8 +329,7 @@ private:
 #if CMK_REPLAYSYSTEM
       setEvent(++CkpvAccess(envelopeEventID));
 #endif
-      //type.group.dep.setZero();
-      ((struct s_groupinit *)extraData())->dep.setZero();
+      type.group.dep.setZero();
     }
     UShort getEpIdx(void) const { return epIdx; }
     void   setEpIdx(const UShort idx) { epIdx = idx; }
@@ -431,110 +338,100 @@ private:
     static void setSrcPe(char *env, const UInt s) { ((envelope*)env)->setSrcPe(s); }
 
 // Readonly-specific fields
-    inline char * extraData() const { return (char*)this+totalsize-extrasize; }
-
     UInt   getCount(void) const { 
-      CkAssert(getMsgtype()==RODataMsg); return ((struct s_roData *)extraData())->count; 
+      CkAssert(getMsgtype()==RODataMsg); return type.roData.count; 
     }
     void   setCount(const UInt c) { 
-      CkAssert(getMsgtype()==RODataMsg); ((struct s_roData *)extraData())->count = c; 
+      CkAssert(getMsgtype()==RODataMsg); type.roData.count = c; 
     }
     UInt   getRoIdx(void) const { 
-      CkAssert(getMsgtype()==ROMsgMsg); return ((struct s_roMsg*)extraData())->roIdx; 
+      CkAssert(getMsgtype()==ROMsgMsg); return type.roMsg.roIdx; 
     }
     void   setRoIdx(const UInt r) { 
-      CkAssert(getMsgtype()==ROMsgMsg); ((struct s_roMsg*)extraData())->roIdx = r; 
+      CkAssert(getMsgtype()==ROMsgMsg); type.roMsg.roIdx = r; 
     }
     
  // Chare-specific fields
     UInt isForAnyPE(void) { 
       CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
-      return ((struct s_chare*)extraData())->forAnyPe; 
+      return type.chare.forAnyPe; 
     }
     void setForAnyPE(UInt f) { 
       CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
-      ((struct s_chare*)extraData())->forAnyPe = f; 
+      type.chare.forAnyPe = f; 
     }
     void*  getVidPtr(void) const {
       CkAssert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
           || getMsgtype()==FillVidMsg ||  getMsgtype()==DeleteVidMsg);
-      return ((struct s_chare*)extraData())->ptr;
+      return type.chare.ptr;
     }
     void   setVidPtr(void *p) {
       CkAssert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
           || getMsgtype()==FillVidMsg ||  getMsgtype()==DeleteVidMsg);
-      ((struct s_chare*)extraData())->ptr = p;
+      type.chare.ptr = p;
     }
     void*  getObjPtr(void) const { 
-      CkAssert(getMsgtype()==ForChareMsg); return ((struct s_chare*)extraData())->ptr; 
+      CkAssert(getMsgtype()==ForChareMsg); return type.chare.ptr; 
     }
     void   setObjPtr(void *p) { 
-      CkAssert(getMsgtype()==ForChareMsg); ((struct s_chare*)extraData())->ptr = p; 
+      CkAssert(getMsgtype()==ForChareMsg); type.chare.ptr = p; 
     }
     UInt getByPe(void) { 
       CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
-      return ((struct s_chare*)extraData())->bype; 
+      return type.chare.bype; 
     }
     void setByPe(UInt pe) { 
       CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
-      ((struct s_chare*)extraData())->bype = pe; 
+      type.chare.bype = pe; 
     }
 
 // Group-specific fields
     CkGroupID   getGroupNum(void) const {
-      CkAssert(getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
-      return ((struct s_group*)extraData())->g;
+      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+      return type.group.g;
     }
     void   setGroupNum(const CkGroupID g) {
-      CkAssert(getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
-      ((struct s_group*)extraData())->g = g;
+      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+      type.group.g = g;
     }
-
-    CkGroupID getInitGroupNum(void) const {
-      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);
-      return ((struct s_groupinit*)extraData())->g;
-    }
-    void   setInitGroupNum(const CkGroupID g) {
-      CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);
-      ((struct s_groupinit*)extraData())->g = g;
-    }
-    void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); ((struct s_groupinit*)extraData())->epoch=epoch; }
-    int getGroupEpoch(void) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return ((struct s_groupinit*)extraData())->epoch; }
-    void setRednMgr(CkNodeGroupID r){CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);  ((struct s_groupinit*)extraData())->rednMgr = r; }
-    CkNodeGroupID getRednMgr(){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return ((struct s_groupinit*)extraData())->rednMgr; }
-    CkGroupID getGroupDep(){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return ((struct s_groupinit*)extraData())->dep; }
-    void setGroupDep(const CkGroupID &r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); ((struct s_groupinit*)extraData())->dep = r; }
+    void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.epoch=epoch; }
+    int getGroupEpoch(void) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.epoch; }
+    void setRednMgr(CkNodeGroupID r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.rednMgr = r; }
+    CkNodeGroupID getRednMgr(){  CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);  return type.group.rednMgr; }
+    CkGroupID getGroupDep(){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.dep; }
+    void setGroupDep(const CkGroupID &r){  CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); type.group.dep = r; }
 
 // Array-specific fields
-    CkGroupID getArrayMgr(void) const {
-        if (getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg)
-            return ((struct s_array*)extraData())->arr;
-        else if (getMsgtype() == ForIDedObjMsg)
-            return ((struct s_objid*)extraData())->id.getCollectionID();
-        else
+    CkGroupID getArrayMgr(void) const { 
+      if (getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg)
+	return type.array.arr;
+      else if (getMsgtype() == ForIDedObjMsg)
+	return ((struct s_objid_o *) &type.objid)->id.getCollectionID();
+      else
             CkAbort("Cannot return ArrayID from msg for non-array entity");
 	/* compiler appeasement, even though this will never be executed */
-	return ((struct s_array*)extraData())->arr;
+      return type.array.arr;
     }
-
-    void setArrayMgr(const CkGroupID gid) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); ((struct s_array*)extraData())->arr = gid; }
-    int getArrayMgrIdx(void) const { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->arr.idx;}
+    void setArrayMgr(const CkGroupID gid) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);  type.array.arr = gid; }
+    int getArrayMgrIdx(void) const {CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);  return type.array.arr.idx;}
     UShort &getsetArrayEp(void) {return epIdx;}
-    UShort &getsetArrayBcastEp(void) { CkAssert(getMsgtype() == ForBocMsg); return ((struct s_group*)extraData())->arrayEp;}
-    UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->hopCount;}
-    int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return ((struct s_array*)extraData())->ifNotThere;}
-    void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); ((struct s_array*)extraData())->ifNotThere=nt;}
-    int *getsetArrayListenerData(void) { CkAssert(getMsgtype() == ArrayEltInitMsg); return ((struct s_arrayinit*)extraData())->listenerData;}
+    UShort &getsetArrayBcastEp(void) {return type.group.arrayEp;}
 #if CMK_SMP_TRACE_COMMTHREAD
-    UInt &getsetArraySrcPe(void) {return ((struct s_array*)extraData())->srcpe;}
+    UInt &getsetArraySrcPe(void) {return type.array.srcpe;}
 #else
     UInt &getsetArraySrcPe(void) {return pe;}
 #endif
+    UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.hopCount;}
+    int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.ifNotThere;}
+    void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); type.array.ifNotThere=nt;}
+    int *getsetArrayListenerData(void) {return type.array.listenerData;}
     CkArrayIndex &getsetArrayIndex(void) 
-    {
-      CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
-      return *(CkArrayIndex *)&((struct s_array*)extraData())->index;
-    }
+    	{ 
+	  CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
+	  return *(CkArrayIndex *)&type.array.index;
+	}
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  public:
@@ -546,15 +443,6 @@ private:
 
 };
 
-inline int CkEnvelopeMaxsize()
-{
-  return sizeof(envelope)+ getMaxExtrasize();
-}
-
-inline int CkEnvelopeBasicsize()
-{
-    return sizeof(envelope);
-}
 
 inline envelope *UsrToEnv(const void *const msg) {
   return (((envelope *) msg)-1);
