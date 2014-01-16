@@ -238,12 +238,6 @@ void TCharm::pup(PUP::er &p) {
   //}
 
   checkPupMismatch(p,5134,"before TCHARM");
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    if(!isStopped){
-//      resumeAfterMigration = true;
-    }
-    isStopped = true;
-#endif
   p(isStopped); p(resumeAfterMigration); p(exitWhenDone); p(isSelfDone); p(skipResume);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
@@ -414,9 +408,6 @@ void TCharm::migrateDelayed(int destPE) {
 }
 void TCharm::ckJustMigrated(void) {
 	ArrayElement::ckJustMigrated();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-//  resumeAfterMigration = true;
-#endif
 	if (resumeAfterMigration) {
 	 	resumeAfterMigration=false;
 		resume(); //Start the thread running
@@ -507,10 +498,6 @@ void TCharm::stop(void)
     we're resuming from migration!  (OSL 2003/9/23)
    */
   TCharm *dis=TCharm::get();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
-/*  CpvAccess(_currentObj) = dis;
- *      printf("[%d] _currentObject set to TCharm index %d %p\n",CkMyPe(),dis->thisIndex,dis);*/
-#endif
   dis->isStopped=false;
   dis->startTiming();
   //CkPrintf("[%d] Thread resumed  for tid %p\n",dis->thisIndex,dis->tid);
@@ -524,12 +511,7 @@ void TCharm::start(void)
   DBG("thread resuming soon");
   //CkPrintf("TCharm[%d]::start()\n", thisIndex);
   //CmiPrintStackTrace(0);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-//CthAwakenPrio(tid, CQS_QUEUEING_BFIFO, 1, &prio);
   CthAwaken(tid);
-#else
-  CthAwaken(tid);
-#endif
 }
 
 //Block our thread, schedule, and come back:
