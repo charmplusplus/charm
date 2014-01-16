@@ -1105,6 +1105,7 @@ void _initCharm(int unused_argc, char **argv)
 	if(CkMyRank()==0)
 #endif
 	{
+		SDAG::registerPUPables();
 		CmiArgGroup("Charm++",NULL);
 		_parseCommandLineOpts(argv);
 		_registerInit();
