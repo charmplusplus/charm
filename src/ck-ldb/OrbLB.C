@@ -17,9 +17,20 @@
 
 CreateLBFunc_Def(OrbLB, "partition objects based on coordinates")
 
-OrbLB::OrbLB(const CkLBOptions &opt): CentralLB(opt)
+CkpvExtern(int, _lb_obj_index);
+
+void OrbLB::init()
 {
   lbname = "OrbLB";
+#if CMK_LB_USER_DATA
+  if (CkpvAccess(_lb_obj_index) == -1)
+    CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(CkArrayIndex));
+#endif
+}
+
+OrbLB::OrbLB(const CkLBOptions &opt): CentralLB(opt)
+{
+  init();
   if (CkMyPe() == 0)
     CkPrintf("[%d] OrbLB created\n",CkMyPe());
 }
@@ -325,9 +336,16 @@ void OrbLB::work(LDStats* stats)
     LDObjData &odata = stats->objData[i];
     if (odata.migratable == 0) continue;
     computeLoad[objIdx].id = objIdx;
+#if CMK_LB_USER_DATA
+    CkArrayIndex *idx = (CkArrayIndex *)odata.getUserData(CkpvAccess(_lb_obj_index));
+    computeLoad[objIdx].v[XDIR] = idx->data()[0];
+    computeLoad[objIdx].v[YDIR] = idx->data()[1];
+    computeLoad[objIdx].v[ZDIR] = idx->data()[2];
+#else
     computeLoad[objIdx].v[XDIR] = odata.objID().id[0];
     computeLoad[objIdx].v[YDIR] = odata.objID().id[1];
     computeLoad[objIdx].v[ZDIR] = odata.objID().id[2];
+#endif
 #if CMK_LB_CPUTIMER
     computeLoad[objIdx].load = _lb_args.useCpuTime()?odata.cpuTime:odata.wallTime;
 #else

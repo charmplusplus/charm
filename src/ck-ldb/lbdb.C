@@ -110,8 +110,17 @@ extern "C" void * LDObjUserData(LDObjHandle &_h)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
-  return obj->getUserData();
+  return obj->getLocalUserData();
 }
+
+#if CMK_LB_USER_DATA
+extern "C" void * LDDBObjUserData(LDObjHandle &_h, int idx)
+{
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
+  LBObj *const obj = db->LbObj(_h);
+  return obj->getDBUserData(idx);
+}
+#endif
 
 extern "C" void LDDumpDatabase(LDHandle _db)
 {

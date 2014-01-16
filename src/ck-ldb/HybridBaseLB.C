@@ -674,28 +674,14 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
     if (move.from_pe == CkMyPe()) {
       int toPe = move.to_pe;
       double load = move.load;
-      int count = 0;
-      // TODO: sort max => low
-      for (int obj=statsData->n_objs-1; obj>=0; obj--) {
-        LDObjData &objData = statsData->objData[obj];
-	if (!objData.migratable) continue;
-        if (objData.wallTime <= load) {
-          if (_lb_args.debug()>2)
-            CkPrintf("[%d] send obj: %d to PE %d (load: %f).\n", CkMyPe(), obj, toPe, objData.wallTime);
-          objs.push_back(objData);
-	  // send comm data
-          collectCommData(obj, comms, atlevel);
-          lData->outObjs.push_back(MigrationRecord(objData.handle, lData->children[statsData->from_proc[obj]], -1));
-          load -= objData.wallTime; 
-          statsData->removeObject(obj);
-          count ++;
-          if (load <= 0.0) break;
-        }
-      }
+
+      GetObjsToMigrate(toPe, load, statsData, atlevel, comms, objs);
+      int count = objs.size();
+
       if (_lb_args.debug()>1)
         CkPrintf("[%d] sending %d objects to %d at %f.\n", CkMyPe(), count, toPe, CkWallTimer());
       if (objs.size() > 0)
-        thisProxy[toPe].ObjsMigrated(objs.getVec(), objs.size(), comms.getVec(), comms.size(), atlevel);
+        thisProxy[toPe].ObjsMigrated(objs, objs.size(), comms.getVec(), comms.size(), atlevel);
       thisProxy[toPe].TotalObjMigrated(count, atlevel);
     }
     else if (move.to_pe == CkMyPe()) {
@@ -716,8 +702,39 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
 #endif
 }
 
+void HybridBaseLB::GetObjsToMigrate(int toPe, double load, LDStats *stats, int atlevel,
+    CkVec<LDCommData>& comms, CkVec<LDObjData>& objs) {
+  // TODO: sort max => low
+  for (int obj=stats->n_objs-1; obj>=0; obj--) {
+    LDObjData &objData = stats->objData[obj];
+    if (!objData.migratable) continue;
+    if (objData.wallTime <= load) {
+      if (_lb_args.debug()>2) {
+        CkPrintf("[%d] send obj: %d to PE %d (load: %f).\n", CkMyPe(), obj, toPe,
+          objData.wallTime);
+      }
+      objs.push_back(objData);
+      // send comm data
+      collectCommData(obj, comms, atlevel);
+      load -= objData.wallTime;
+      CreateMigrationOutObjs(atlevel, stats, obj);
+      stats->removeObject(obj);
+      if (load <= 0.0) break;
+    }
+  }
+}
+
+void HybridBaseLB::CreateMigrationOutObjs(int atlevel, LDStats* stats,
+    int objidx) {
+  LDObjData& objData = stats->objData[objidx];
+  LevelData *lData = levelData[atlevel];
+  lData->outObjs.push_back(MigrationRecord(objData.handle,
+      lData->children[stats->from_proc[objidx]], -1));
+}
+
 // objects arrives with only objdata
-void HybridBaseLB::ObjsMigrated(LDObjData *datas, int m, LDCommData *cdata, int n, int atlevel)
+void HybridBaseLB::ObjsMigrated(CkVec<LDObjData>& datas, int m,
+    LDCommData *cdata, int n, int atlevel)
 {
   int i;
   LevelData *lData = levelData[atlevel];

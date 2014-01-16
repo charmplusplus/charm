@@ -24,7 +24,7 @@ public:
 //    data.wallTime = 0.;
 //    data.minWall = 1e6;
 //    data.maxWall = 0.;
-    userData = usr_ptr;
+    localUserData = usr_ptr;
     parentDB = _parentDB;
 //    migratable = _migratable;
 //    registered = true;
@@ -96,11 +96,14 @@ public:
     *c = *w;
 #endif
   }
-  inline void *getUserData() { return  userData; }
+  inline void *getLocalUserData() { return  localUserData; }
+#if CMK_LB_USER_DATA
+  inline void *getDBUserData(int idx) { return  data.getUserData(idx); }
+#endif
 private:
 
   LBDB* parentDB;
-  void *userData;
+  void *localUserData;               // local user data, not in database
 //  LDOMHandle parentOM;
 //  LDObjHandle myhandle;
   LDObjData data;

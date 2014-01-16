@@ -124,6 +124,44 @@ typedef struct {
   inline void pup(PUP::er &p);
 } LDObjHandle;
 
+/* defines user data layout  */
+class LBUserDataLayout {
+int length;
+int count;
+public:
+  LBUserDataLayout(): length(0), count(0) {}
+  int claim(int size) {
+    count++;
+    int oldlen = length;
+    length+=size;
+    return oldlen;
+  }
+  int size() { return length; }
+};
+
+CkpvExtern(LBUserDataLayout, lbobjdatalayout);
+
+class LBObjUserData {
+  char *data;
+public:
+  LBObjUserData(): data(NULL) {}
+
+  LBObjUserData(const LBObjUserData &d) {
+    init();
+    memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
+  }
+
+  ~LBObjUserData() { delete [] data; }
+  LBObjUserData &operator = (const LBObjUserData &d) {
+    if (data==NULL) init();
+    memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
+    return *this;
+  }
+  inline void init() { data = new char[CkpvAccess(lbobjdatalayout).size()]; }
+  inline void pup(PUP::er &p);
+  void *getData(int idx) { if (data==NULL) init(); return (void*)(data+idx); }
+};
+
 typedef struct {
   LDObjHandle handle;
   LBRealType wallTime;
@@ -135,6 +173,9 @@ typedef struct {
 #endif
   bool migratable;
   bool asyncArrival;
+#if CMK_LB_USER_DATA
+  LBObjUserData   userData;
+#endif
   // An encoded approximation of the amount of data the object would pack;
   // call pup_decodeSize(pupSize) to get the actual approximate value
   CmiUInt2 pupSize;
@@ -143,6 +184,9 @@ typedef struct {
   inline const LDObjid &objID() const { return handle.id; }
   inline const LDObjid &id() const { return handle.id; }
   inline void pup(PUP::er &p);
+#if CMK_LB_USER_DATA
+  void* getUserData(int idx)  { return userData.getData(idx); }
+#endif
 } LDObjData;
 
 /* used by load balancer */
@@ -268,7 +312,10 @@ LDObjHandle LDRegisterObj(LDOMHandle h, LDObjid id, void *userptr,
 			  int migratable);
 void LDUnregisterObj(LDObjHandle h);
 
-void * LDObjUserData(LDObjHandle &_h);
+void *LDObjUserData(LDObjHandle &_h);
+#if CMK_LB_USER_DATA
+void *LDDBObjUserData(LDObjHandle &_h, int idx);
+#endif
 void LDObjTime(LDObjHandle &h, LBRealType walltime, LBRealType cputime);
 int  CLDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
@@ -441,6 +488,20 @@ inline void LDObjHandle::pup(PUP::er &p) {
 }
 PUPmarshall(LDObjHandle)
 
+inline void LBObjUserData::pup(PUP::er &p) {
+  int hasData;
+  if (!p.isUnpacking()) hasData = data != NULL;
+  p|hasData;
+  if (p.isUnpacking()) {
+    if (hasData)
+      data = new char[CkpvAccess(lbobjdatalayout).size()];
+    else
+      data = NULL;
+  }
+  if (data) p(data, CkpvAccess(lbobjdatalayout).size());
+}
+PUPmarshall(LBObjUserData);
+
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|wallTime;
@@ -453,6 +514,11 @@ inline void LDObjData::pup(PUP::er &p) {
 #endif
   p|migratable;
   if (_lb_version > -1) p|asyncArrival;
+#if CMK_LB_USER_DATA
+  if (_lb_version > 2) {
+    p|userData;
+  }
+#endif
   p|pupSize;
 }
 PUPmarshall(LDObjData)

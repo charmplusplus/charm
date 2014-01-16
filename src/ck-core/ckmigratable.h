@@ -83,6 +83,9 @@ public:
   virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
   void setObjTime(double cputime);
   double getObjTime();
+#if CMK_LB_USER_DATA
+  void *getObjUserData(int idx);
+#endif
 
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(int waitForMigration=1);

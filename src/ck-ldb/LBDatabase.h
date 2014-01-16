@@ -10,7 +10,7 @@
 #include "LBDBManager.h"
 #include "lbdb++.h"
 
-#define LB_FORMAT_VERSION     2
+#define LB_FORMAT_VERSION     3
 
 class MetaBalancer;
 extern int _lb_version;
@@ -218,6 +218,13 @@ public:
   inline void GetObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
     LDGetObjLoad(h,&walltime,&cputime);
   };
+
+#if CMK_LB_USER_DATA
+  inline void *GetDBObjUserData(LDObjHandle &h, int idx)
+  {
+    return LDDBObjUserData(h, idx);
+  }
+#endif
 
   inline void QueryKnownObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
     LDQueryKnownObjLoad(h,&walltime,&cputime);
@@ -427,6 +434,10 @@ void LBTurnPredictorOff();
 void LBChangePredictor(LBPredictorFunction *model);
 
 void LBSetPeriod(double second);
+
+#if CMK_LB_USER_DATA
+int LBRegisterObjUserData(int size);
+#endif
 
 extern "C" void LBTurnInstrumentOn();
 extern "C" void LBTurnInstrumentOff();

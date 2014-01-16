@@ -1,0 +1,3 @@
+Demonstrates the use of lb userdata. This functionality is used for setting user
+specified data in the lb database.
+Compile charm with -DCMK_LB_USER_DATA to enable the functionality.

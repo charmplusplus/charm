@@ -26,6 +26,7 @@
 #include "BaseLB.h"
 #include "init.h"
 #endif
+CkpvExtern(int, _lb_obj_index);                // for lbdb user data for obj index
 #endif // CMK_LBDB_ON
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -1317,6 +1318,28 @@ double CkMigratable::getObjTime() {
 	return myRec->getObjTime();
 }
 
+#if CMK_LB_USER_DATA
+/**
+* Use this method to set user specified data to the lbdatabase.
+*
+* Eg usage: 
+* In the application code,
+*   void *data = getObjUserData(CkpvAccess(_lb_obj_index));
+*   *(int *) data = val;
+*
+* In the loadbalancer or wherever this data is used do
+*   for (int i = 0; i < stats->n_objs; i++ ) {
+*     LDObjData &odata = stats->objData[i];
+*     int* udata = (int *) odata.getUserData(CkpvAccess(_lb_obj_index));
+*   }
+*
+* For a complete example look at tests/charm++/load_balancing/lb_userdata_test/
+*/
+void *CkMigratable::getObjUserData(int idx) {
+	return myRec->getObjUserData(idx);
+}
+#endif
+
 void CkMigratable::clearMetaLBData() {
 //  if (can_reset) {
     local_state = OFF;
@@ -1520,6 +1543,7 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 #else
 void CkMigratable::setObjTime(double cputime) {}
 double CkMigratable::getObjTime() {return 0.0;}
+void *CkMigratable::getObjUserData(int idx) { return NULL; }
 
 /* no load balancer: need dummy implementations to prevent link error */
 void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
@@ -1645,6 +1669,11 @@ double CkLocRec_local::getObjTime() {
         the_lbdb->GetObjLoad(ldHandle, walltime, cputime);
         return walltime;
 }
+#if CMK_LB_USER_DATA
+void* CkLocRec_local::getObjUserData(int idx) {
+        return the_lbdb->GetDBObjUserData(ldHandle, idx);
+}
+#endif
 #endif
 
 void CkLocRec_local::destroy(void) //User called destructor

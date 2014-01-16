@@ -17,6 +17,9 @@
 
 CkGroupID _lbdb;
 
+CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
+CkpvDeclare(int, _lb_obj_index);
+
 CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
 CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
@@ -159,6 +162,10 @@ void _loadbalancerInit()
   CkpvAccess(numLoadBalancers) = 0;
   CkpvInitialize(int, hasNullLB);
   CkpvAccess(hasNullLB) = 0;
+
+  CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
+  CkpvInitialize(int, _lb_obj_index);
+  CkpvAccess(_lb_obj_index) = -1;
 
   char **argv = CkGetArgv();
   char *balancer = NULL;
@@ -639,6 +646,11 @@ void LBSetPeriod(double second) {
   else
     _lb_args.lbperiod() = second;
 #endif
+}
+
+int LBRegisterObjUserData(int size)
+{
+  return CkpvAccess(lbobjdatalayout).claim(size);
 }
 
 #include "LBDatabase.def.h"

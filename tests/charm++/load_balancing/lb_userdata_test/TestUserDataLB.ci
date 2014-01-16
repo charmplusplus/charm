@@ -1,0 +1,10 @@
+module TestUserDataLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+
+group [migratable] TestUserDataLB : CentralLB {
+  entry void TestUserDataLB(const CkLBOptions &);  
+};
+
+};

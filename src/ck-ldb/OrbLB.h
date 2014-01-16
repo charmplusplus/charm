@@ -56,6 +56,7 @@ private:
   int npartition;
   int currentp, refno;
   
+  void init();
   void strategy();
   void rec_divide(int, Partition&);
   void setVal(int x, int y, int z);
@@ -69,7 +70,7 @@ public:
 
 public:
   OrbLB(const CkLBOptions &);
-  OrbLB(CkMigrateMessage *m):CentralLB(m) { lbname = "OrbLB"; }
+  OrbLB(CkMigrateMessage *m):CentralLB(m) { init(); }
 
   void work(LDStats* stats);
   bool QueryBalanceNow(int step);

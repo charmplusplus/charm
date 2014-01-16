@@ -149,7 +149,9 @@ public:
   };
 
   BaseLB(const CkLBOptions &opt)  { initLB(opt); }
-  BaseLB(CkMigrateMessage *m):CBase_BaseLB(m) {}
+  BaseLB(CkMigrateMessage *m):CBase_BaseLB(m) {
+    theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
+  }
   virtual ~BaseLB();
 
   void unregister(); 
