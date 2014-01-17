@@ -408,7 +408,7 @@ void CpdPupMessage(PUP::er &p, void *msg)
     int groupID = env->getGroupNum().idx;
     PUPn(groupID);
   } else if (envType == BocInitMsg || envType == NodeBocInitMsg) {
-    int groupID = env->getInitGroupNum().idx;
+    int groupID = env->getGroupNum().idx;
     PUPn(groupID);
   } else if (envType == NewVChareMsg || envType == ForVidMsg || envType == FillVidMsg) {
     p.comment("ptr");

@@ -116,8 +116,8 @@ void envelope::pup(PUP::er &p) {
 	case NodeBocInitMsg: case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
 		p|type.group.g;
 		p|type.group.rednMgr;
+		p|type.group.dep;
 		p|type.group.epoch;
-		p|type.group.arrayEp;
 		break;
 	case ArrayEltInitMsg: case ForArrayEltMsg:
 		p|type.array.arr;
@@ -127,6 +127,11 @@ void envelope::pup(PUP::er &p) {
 		p(type.array.hopCount);
 		p(type.array.ifNotThere);
 		break;
+	case ForIDedObjMsg:
+	        p(type.objid.id);
+	        p(type.array.hopCount);
+		p(type.array.ifNotThere);
+                break;
 	case RODataMsg:
 		p(type.roData.count);
 		break;

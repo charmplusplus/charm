@@ -1674,9 +1674,10 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   register envelope *env = UsrToEnv(msg);
-#if CMK_ERROR_CHECKING
+  /*#if CMK_ERROR_CHECKING
   CkNodeGroupID nodeRedMgr;
 #endif
+  */
   _CHECK_USED(env);
   _SET_USED(env, 1);
 #if CMK_REPLAYSYSTEM
@@ -1686,10 +1687,12 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
+  /*
 #if CMK_ERROR_CHECKING
   nodeRedMgr.setZero();
   env->setRednMgr(nodeRedMgr);
 #endif
+  */
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   criticalPath_send(env);
   automaticallySetMessagePriority(env);
