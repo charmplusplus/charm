@@ -14,7 +14,7 @@
 #endif
 
 #ifndef CK_ARRAYLISTENER_MAXLEN
-# define CK_ARRAYLISTENER_MAXLEN 3
+# define CK_ARRAYLISTENER_MAXLEN 2
 #endif
 
 /** @warning: fwd declaration of child class to support crazy ptr cast
