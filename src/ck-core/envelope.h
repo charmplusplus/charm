@@ -398,10 +398,18 @@ private:
     }
     void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.epoch=epoch; }
     int getGroupEpoch(void) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.epoch; }
-    void setRednMgr(CkNodeGroupID r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.rednMgr = r; }
-    CkNodeGroupID getRednMgr(){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg);  return type.group.rednMgr; }
-    CkGroupID getGroupDep(){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.dep; }
-    void setGroupDep(const CkGroupID &r){  CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg ); type.group.dep = r; }
+    void setRednMgr(CkNodeGroupID r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+ type.group.rednMgr = r; }
+    CkNodeGroupID getRednMgr(){       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+ return type.group.rednMgr; }
+    CkGroupID getGroupDep(){       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+ return type.group.dep; }
+    void setGroupDep(const CkGroupID &r){       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
+      type.group.dep = r; }
 
 // Array-specific fields
     CkGroupID getArrayMgr(void) const { 

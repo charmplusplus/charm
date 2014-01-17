@@ -419,6 +419,7 @@ void CkPupNodeGroupData(PUP::er &p, bool create)
 			int eIdx = tmpInfo[i].MigCtor;
 			void *m = CkAllocSysMsg();
 			envelope* env = UsrToEnv((CkMessage *)m);
+			env->setMsgtype(NodeBocInitMsg);
 			if(create){
 				CkCreateLocalNodeGroup(gID, eIdx, env);
 			}
@@ -479,6 +480,7 @@ void CkPupGroupData(PUP::er &p)
 	    }
 	    void *m = CkAllocSysMsg();
 	    envelope* env = UsrToEnv((CkMessage *)m);
+	    env->setMsgtype(BocInitMsg);
 	    CkCreateLocalGroup(gID, eIdx, env);
 	  }   // end of unPacking
 	  IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
@@ -527,6 +529,7 @@ void CkPupNodeGroupData(PUP::er &p)
 			int eIdx = tmpInfo[i].MigCtor;
 			void *m = CkAllocSysMsg();
 			envelope* env = UsrToEnv((CkMessage *)m);
+			env->setMsgtype(NodeBocInitMsg);
 			CkCreateLocalNodeGroup(gID, eIdx, env);
 		}
 		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(gID);

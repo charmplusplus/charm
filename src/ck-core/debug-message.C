@@ -118,6 +118,7 @@ void envelope::pup(PUP::er &p) {
 		p|type.group.rednMgr;
 		p|type.group.dep;
 		p|type.group.epoch;
+		p|type.group.arrayEp;
 		break;
 	case ArrayEltInitMsg: case ForArrayEltMsg:
 		p|type.array.arr;
