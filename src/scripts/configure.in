@@ -642,6 +642,19 @@ AC_DEFINE_UNQUOTED(CMK_SIZET_64BIT, $strictpass, [whether size_t 64bit])
 in64bit=$strictpass
 
 
+### Check if compiler supports std::alignment_of<> ###
+cat > $t <<EOT
+#include <type_traits>
+
+int foo()
+{
+  return std::alignment_of<int>::value;
+}
+EOT
+test_cxx "whether compiler supports std::alignment_of" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_ALIGNMENT_OF, $strictpass, [whether compiler supports std::alignment_of])
+
+
 #### check strings.h ####
 cat > $t <<EOT
 #include <strings.h>

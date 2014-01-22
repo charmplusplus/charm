@@ -84,6 +84,9 @@
 /* whether personality() and ADDR_NO_RANDOMIZE exist */
 #undef CMK_HAS_ADDR_NO_RANDOMIZE
 
+/* whether compiler supports std::alignment_of */
+#undef CMK_HAS_ALIGNMENT_OF
+
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
 
