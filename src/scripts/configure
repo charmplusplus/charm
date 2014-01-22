@@ -2373,7 +2373,7 @@ then
         # Record results for charmc's future use
         add_flag 'CMK_COMPILER_KNOWS_C11="1"' "c11"
         # For the rest of configure, append this to compilation flags
-        OPTS_CC="$CMK_ENABLE_C11 $OPTS"
+        OPTS_CC="$CMK_ENABLE_C11 $OPTS_CC"
 fi
 
 #### check if C++ compiler supports cpp11 compilation flags ####
@@ -2396,7 +2396,7 @@ then
         # Record results for charmc's future use
         add_flag 'CMK_COMPILER_KNOWS_CPP11="1"' "cpp11"
         # For the rest of configure, append this to compilation flags
-        OPTS_CXX="$CMK_ENABLE_CPP11 $OPTS"
+        OPTS_CXX="$CMK_ENABLE_CPP11 $OPTS_CXX"
 fi
 
 fi # endif USER_ASKED_FOR_NEW_STD
