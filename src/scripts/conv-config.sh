@@ -36,7 +36,8 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_F90_OPTIMIZE" ] && CMK_F90_OPTIMIZE="-O2"
 [ -z "$CMK_F90_DEBUG" ] && CMK_F90_DEBUG="-O"
 
-[ -z "$CMK_ENABLE_C11" ] && CMK_ENABLE_C11="-std=c1x"
+# Use gnu1x instead of c1x to get _GNU_SOURCE features and inline assembly extensions
+[ -z "$CMK_ENABLE_C11" ] && CMK_ENABLE_C11="-std=gnu1x"
 [ -z "$CMK_ENABLE_CPP11" ] && CMK_ENABLE_CPP11="-std=c++0x"
 
 [ -z "$CMK_CC" ] && CMK_CC='cc '
