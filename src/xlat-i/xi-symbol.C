@@ -594,6 +594,9 @@ Module::generate()
   "#include \"charm++.h\"\n"
   "#include \"envelope.h\"\n"
   "#include <memory>\n"
+#if CMK_HAS_ALIGNMENT_OF
+  "#include <type_traits>\n"
+#endif
   "#include \"sdag.h\"\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
@@ -2150,7 +2153,16 @@ Message::genDefs(XStr& str)
       str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[0];\n";
       str << "  else\n";
       str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[" << count << "] + ";
+#if CMK_HAS_ALIGNMENT_OF
+      str << "CMIALIGN_ARBITRARY(sizeof(" << mv->type << ")*sizes[" << count << "], ";
+      if (count == numArray-1)
+        str << "ALIGN_BYTES";
+      else
+        str << "std::alignment_of<" << arrayVars[count+1]->type << ">::value";
+      str << ");\n";
+#else
       str << "ALIGN_DEFAULT(sizeof(" << mv->type << ")*sizes[" << count << "]);\n";
+#endif
     }
     str << "  return CkAllocMsg(msgnum, CkpvAccess(_offsets)[" << numArray << "], pb);\n";
     str << "}\n";

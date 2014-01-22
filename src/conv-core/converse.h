@@ -33,10 +33,10 @@
 
 #include "conv-config.h"
 
-#define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
-/*#define ALIGN8(x)        (size_t)((~7)&((x)+7)) */
-#define ALIGN8(x)          CMIALIGN(x,8)
-#define ALIGN16(x)         CMIALIGN(x,16)
+#define CMIALIGN_POW2(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
+#define CMIALIGN_ARBITRARY(x, n) ((((x) + (n) - 1) / (n)) * (n))
+#define ALIGN8(x)          CMIALIGN_POW2(x,8)
+#define ALIGN16(x)         CMIALIGN_POW2(x,16)
 
 #if CMK_64BIT
 #define ALIGN_DEFAULT(x)      ALIGN16(x)
