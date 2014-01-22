@@ -428,7 +428,7 @@ ArrayElement::~ArrayElement()
 
 void ArrayElement::pup(PUP::er &p)
 {
-  DEBM((AA"  ArrayElement::pup()\n"AB));
+  DEBM((AA "  ArrayElement::pup()\n" AB));
   CkMigratable::pup(p);
   thisArrayID.pup(p);
   if (p.isUnpacking())
@@ -505,7 +505,7 @@ insertions done at creation, migration only at discrete points).
 
 inline void CkArray::springCleaning(void)
 {
-  DEBK((AA"Starting spring cleaning\n"AB));
+  DEBK((AA "Starting spring cleaning\n" AB));
   broadcaster->springCleaning();
   setupSpringCleaning();
 }
@@ -700,7 +700,7 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,
   	return;
   }
   
-  DEBC((AA"Proxy inserting element %s on Pe %d\n"AB,idx2str(idx),onPe));
+  DEBC((AA "Proxy inserting element %s on Pe %d\n" AB,idx2str(idx),onPe));
   CkArrayManagerInsert(onPe,m,_aid);
 }
 
@@ -950,14 +950,14 @@ bool CkArray::insertElement(CkMessage *me)
 
 void CProxy_ArrayBase::doneInserting(void)
 {
-  DEBC((AA"Broadcasting a doneInserting request\n"AB));
+  DEBC((AA "Broadcasting a doneInserting request\n" AB));
   //Broadcast a DoneInserting
   CProxy_CkArray(_aid).remoteDoneInserting();
 }
 
 void CProxy_ArrayBase::beginInserting(void)
 {
-  DEBC((AA"Broadcasting a beginInserting request\n"AB));
+  DEBC((AA "Broadcasting a beginInserting request\n" AB));
   CProxy_CkArray(_aid).remoteBeginInserting();
 }
 
@@ -977,7 +977,7 @@ void CkArray::remoteDoneInserting(void)
   CK_MAGICNUMBER_CHECK
   if (isInserting) {
     isInserting=false;
-    DEBC((AA"Done inserting objects\n"AB));
+    DEBC((AA "Done inserting objects\n" AB));
     for (int l=0;l<listeners.size();l++) listeners[l]->ckEndInserting();
     locMgr->doneInserting();
   }
@@ -989,7 +989,7 @@ void CkArray::remoteBeginInserting(void)
 
   if (!isInserting) {
     isInserting = true;
-    DEBC((AA"Begin inserting objects\n"AB));
+    DEBC((AA "Begin inserting objects\n" AB));
     for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
     locMgr->startInserting();
   }
@@ -1004,11 +1004,11 @@ bool CkArray::demandCreateElement(const CkArrayIndex &idx,
 	m->array_ep()=ctor;
 	
 	if ((onPe!=CkMyPe()) || (type==CkDeliver_queue)) {
-		DEBC((AA"Forwarding demand-creation request for %s to %d\n"AB,idx2str(idx),onPe));
+		DEBC((AA "Forwarding demand-creation request for %s to %d\n" AB,idx2str(idx),onPe));
 		CkArrayManagerInsert(onPe,m,thisgroup);
 	} else /* local message, non-queued */ {
 		//Call local constructor directly
-		DEBC((AA"Demand-creating %s\n"AB,idx2str(idx)));
+		DEBC((AA "Demand-creating %s\n" AB,idx2str(idx)));
 		return insertElement(m);
 	}
 	return true;
@@ -1207,7 +1207,7 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
   bcastNo++;
-  DEBB((AA"Received broadcast %d\n"AB,bcastNo));
+  DEBB((AA "Received broadcast %d\n" AB,bcastNo));
 
   if (stableLocations)
     return;
@@ -1224,7 +1224,7 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
   // if this array element already received this message, skip it
   if (elBcastNo >= bcastNo) return false;
   elBcastNo++;
-  DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
+  DEBB((AA "Delivering broadcast %d to element %s\n" AB,elBcastNo,idx2str(el)));
 
   CkAssert(UsrToEnv(bcast)->getMsgtype() == ForArrayEltMsg);
 
@@ -1256,7 +1256,7 @@ bool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
   {//This element needs some broadcasts-- it must have
    //been migrating during the broadcast.
     int i,nDeliver=bcastNo-elBcastNo;
-    DEBM((AA"Migrator %s missed %d broadcasts--\n"AB,idx2str(el),nDeliver));
+    DEBM((AA "Migrator %s missed %d broadcasts--\n" AB,idx2str(el),nDeliver));
 
     //Skip the old junk at the front of the bcast queue
     for (i=oldBcasts.length()-1;i>=nDeliver;i--)
@@ -1283,7 +1283,7 @@ void CkArrayBroadcaster::springCleaning(void)
   //Remove old broadcast messages
   int nDelete=oldBcasts.length()-(bcastNo-oldBcastNo);
   if (nDelete>0) {
-    DEBK((AA"Cleaning out %d old broadcasts\n"AB,nDelete));
+    DEBK((AA "Cleaning out %d old broadcasts\n" AB,nDelete));
     for (int i=0;i<nDelete;i++)
       delete oldBcasts.deq();
   }
@@ -1323,13 +1323,13 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 #else
 	  if (CkMyPe()==CpvAccess(serializer))
 	  {
-		DEBB((AA"Sending array broadcast\n"AB));
+		DEBB((AA "Sending array broadcast\n" AB));
 		if (skipsched)
 			CProxy_CkArray(_aid).recvExpeditedBroadcast(msg);
 		else
 			CProxy_CkArray(_aid).recvBroadcast(msg);
 	  } else {
-		DEBB((AA"Forwarding array broadcast to serializer node %d\n"AB,CpvAccess(serializer)));
+		DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,CpvAccess(serializer)));
 		CProxy_CkArray ap(_aid);
 		if (skipsched)
 			ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
