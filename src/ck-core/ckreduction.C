@@ -208,7 +208,7 @@ CkReductionMgr::CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr)
   barrier_nSource=0;
   barrier_nContrib=barrier_nRemote=0;
 
-  DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
+  DEBR((AA "In reductionMgr constructor at %d \n" AB,this));
 }
 
 CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
@@ -222,7 +222,7 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   nContrib=nRemote=0;
   is_inactive = false;
   maxStartRequest=0;
-  DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
+  DEBR((AA "In reductionMgr migratable constructor at %d \n" AB,this));
 
   barrier_gCount=0;
   barrier_nSource=0;
@@ -272,7 +272,7 @@ void CkReductionMgr::flushStates()
 //Add the given client function.  Overwrites any previous client.
 void CkReductionMgr::ckSetReductionClient(CkCallback *cb)
 {
-  DEBR((AA"Setting reductionClient in ReductionMgr groupid %d\n"AB,thisgroup.idx));
+  DEBR((AA "Setting reductionClient in ReductionMgr groupid %d\n" AB,thisgroup.idx));
 
   if (CkMyPe()!=0)
 	  CkError("WARNING: ckSetReductionClient should only be called from processor zero!\n");  
@@ -299,12 +299,12 @@ void contributorInfo::pup(PUP::er &p)
 // have been created.
 void CkReductionMgr::creatingContributors(void)
 {
-  DEBR((AA"Creating contributors...\n"AB));
+  DEBR((AA "Creating contributors...\n" AB));
   creating=true;
 }
 void CkReductionMgr::doneCreatingContributors(void)
 {
-  DEBR((AA"Done creating contributors...\n"AB));
+  DEBR((AA "Done creating contributors...\n" AB));
   creating=false;
   checkIsActive();
   if (startRequested) startReduction(redNo,CkMyPe());
@@ -314,7 +314,7 @@ void CkReductionMgr::doneCreatingContributors(void)
 //A new contributor will be created
 void CkReductionMgr::contributorStamped(contributorInfo *ci)
 {
-  DEBR((AA"Contributor %p stamped\n"AB,ci));
+  DEBR((AA "Contributor %p stamped\n" AB,ci));
   //There is another contributor
   gcount++;
   if (inProgress)
@@ -328,7 +328,7 @@ void CkReductionMgr::contributorStamped(contributorInfo *ci)
 //A new contributor was actually created
 void CkReductionMgr::contributorCreated(contributorInfo *ci)
 {
-  DEBR((AA"Contributor %p created in grp %d\n"AB,ci,thisgroup.idx));
+  DEBR((AA "Contributor %p created in grp %d\n" AB,ci,thisgroup.idx));
   //We've got another contributor
   lcount++;
   //He may not need to contribute to some of our reductions:
@@ -349,14 +349,14 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   // ignore from listener if it is during restart from crash
   if (CkInRestarting()) return;
 #endif
-  DEBR((AA"Contributor %p(%d) died\n"AB,ci,ci->redNo));
+  DEBR((AA "Contributor %p(%d) died\n" AB,ci,ci->redNo));
   //We lost a contributor
   gcount--;
 
   if (ci->redNo<redNo)
   {//Must have been migrating during reductions-- root is waiting for his
   // contribution, which will never come.
-    DEBR((AA"Dying guy %p must have been migrating-- he's at #%d!\n"AB,ci,ci->redNo));
+    DEBR((AA "Dying guy %p must have been migrating-- he's at #%d!\n" AB,ci,ci->redNo));
     for (int r=ci->redNo;r<redNo;r++)
       thisProxy[0].MigrantDied(new CkReductionNumberMsg(r));
   }
@@ -365,7 +365,7 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   int r;
   for (r=redNo;r<ci->redNo;r++)
   {//He already contributed to this reduction, but won't show up in global count.
-    DEBR((AA"Dead guy %p left contribution for #%d\n"AB,ci,r));
+    DEBR((AA "Dead guy %p left contribution for #%d\n" AB,ci,r));
     adj(r).gcount++;
   }
 
@@ -385,7 +385,7 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
 //Migrating away (note that global count doesn't change)
 void CkReductionMgr::contributorLeaving(contributorInfo *ci)
 {
-  DEBR((AA"Contributor %p(%d) migrating away\n"AB,ci,ci->redNo));
+  DEBR((AA "Contributor %p(%d) migrating away\n" AB,ci,ci->redNo));
   lcount--;//We lost a local
   //He's already contributed to several reductions here
   for (int r=redNo;r<ci->redNo;r++)
@@ -401,7 +401,7 @@ void CkReductionMgr::contributorLeaving(contributorInfo *ci)
 //Migrating in (note that global count doesn't change)
 void CkReductionMgr::contributorArriving(contributorInfo *ci)
 {
-  DEBR((AA"Contributor %p(%d) migrating in\n"AB,ci,ci->redNo));
+  DEBR((AA "Contributor %p(%d) migrating in\n" AB,ci,ci->redNo));
   lcount++;//We gained a local
 #if CMK_MEM_CHECKPOINT
   // ignore from listener if it is during restart from crash
@@ -426,7 +426,7 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 #if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&(m->log));
 #endif
-  DEBR((AA"Contributor %p contributed for %d in grp %d ismigratable %d \n"AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
+  DEBR((AA "Contributor %p contributed for %d in grp %d ismigratable %d \n" AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
   //m->ci=ci;
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
@@ -481,11 +481,11 @@ void CkReductionMgr::checkIsActive() {
   int c_inactive = 0;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= redNo) {
-      DEBR((AA"Kid %d is inactive from redNo %d\n"AB, it->first, it->second));
+      DEBR((AA "Kid %d is inactive from redNo %d\n" AB, it->first, it->second));
       c_inactive++;
     }
   }
-  DEBR((AA"CheckIsActive redNo %d, kids %d(inactive %d), lcount %d\n"AB, redNo,
+  DEBR((AA "CheckIsActive redNo %d, kids %d(inactive %d), lcount %d\n" AB, redNo,
     numKids, c_inactive, lcount));
 
   if(numKids == c_inactive && lcount == 0) {
@@ -534,7 +534,7 @@ void CkReductionMgr::checkAndRemoveFromInactiveList(int id, int red_no) {
   }
   if (it->second <= red_no) {
     inactiveList.erase(it);
-    DEBR((AA"Parent removing kid %d from inactivelist red_no %d\n"AB,
+    DEBR((AA "Parent removing kid %d from inactivelist red_no %d\n" AB,
       id, red_no));
   }
 }
@@ -542,7 +542,7 @@ void CkReductionMgr::checkAndRemoveFromInactiveList(int id, int red_no) {
 // Inform parent that I am inactive
 void CkReductionMgr::informParentInactive() {
   if (hasParent()) {
-    DEBR((AA"Inform parent to add to inactivelist red_no %d\n"AB, redNo));
+    DEBR((AA "Inform parent to add to inactivelist red_no %d\n" AB, redNo));
     thisProxy[treeParent()].AddToInactiveList(
       new CkReductionInactiveMsg(CkMyPe(), redNo));
   }
@@ -556,14 +556,14 @@ void CkReductionMgr::sendReductionStartingToKids(int red_no) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   for (int k=0;k<treeKids();k++)
   {
-    DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
+    DEBR((AA "Asking child PE %d to start #%d\n" AB,firstKid()+k,redNo));
     thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
   }
 #else
   std::map<int, int>::iterator it;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= red_no) {
-      DEBR((AA"Parent sending reductionstarting to inactive kid %d\n"AB,
+      DEBR((AA "Parent sending reductionstarting to inactive kid %d\n" AB,
         it->first));
       thisProxy[it->first].ReductionStarting(new CkReductionNumberMsg(red_no));
     }
@@ -581,16 +581,16 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 	//delete m;
 	//return;
  }
- DEBR((AA" Group ReductionStarting called for redNo %d\n"AB,m->num));
+ DEBR((AA " Group ReductionStarting called for redNo %d\n" AB,m->num));
  int srcPE = (UsrToEnv(m))->getSrcPe();
   if (isPresent(m->num) && !inProgress)
   {
-    DEBR((AA"Starting reduction #%d at parent's request\n"AB,m->num));
+    DEBR((AA "Starting reduction #%d at parent's request\n" AB,m->num));
     startReduction(m->num,srcPE);
     finishReduction();
   } else if (isFuture(m->num)){
 //   CkPrintf("[%d] arrays Mesg No %d redNo %d \n",CkMyPe(),m->num,redNo);
-	  DEBR((AA"Asked to startfuture Reduction %d \n"AB,m->num));
+	  DEBR((AA "Asked to startfuture Reduction %d \n" AB,m->num));
 	  if(maxStartRequest < m->num){
 		  maxStartRequest = m->num;
 	  }
@@ -598,7 +598,7 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 	  
     }
   else //is Past
-    DEBR((AA"Ignoring parent's late request to start #%d\n"AB,m->num));
+    DEBR((AA "Ignoring parent's late request to start #%d\n" AB,m->num));
   delete m;
 }
 
@@ -627,7 +627,7 @@ void CkReductionMgr::LateMigrantMsg(CkReductionMsg *m)
 void CkReductionMgr::MigrantDied(CkReductionNumberMsg *m)
 {
   if (CkMyPe() != 0 || m->num < completedRedNo) CkAbort("Late MigrantDied message recv'd!\n");
-  DEBR((AA"Migrant died before contributing to #%d\n"AB,m->num));
+  DEBR((AA "Migrant died before contributing to #%d\n" AB,m->num));
  // CkPrintf("[%d,%d]Migrant Died called\n",CkMyNode(),CkMyPe());	 		  
   adj(m->num).gcount--;//He won't be contributing to this one.
   finishReduction();
@@ -640,18 +640,18 @@ void CkReductionMgr::startReduction(int number,int srcPE)
   if (isFuture(number)){ /*CkAbort("Can't start reductions out of order!\n");*/ return;}
   if (isPast(number)) {/*CkAbort("Can't restart reduction that's already finished!\n");*/return;}
   if (inProgress){
-  	DEBR((AA"This reduction is already in progress\n"AB));
+  	DEBR((AA "This reduction is already in progress\n" AB));
   	return;//This reduction already started
   }
   if (creating) //Don't start yet-- we're creating elements
   {
-    DEBR((AA"Postponing start request #%d until we're done creating\n"AB,redNo));
+    DEBR((AA "Postponing start request #%d until we're done creating\n" AB,redNo));
     startRequested=true;
     return;
   }
 
 //If none of these cases, we need to start the reduction--
-  DEBR((AA"Starting reduction #%d  %d %d \n"AB,redNo,completedRedNo,number));
+  DEBR((AA "Starting reduction #%d  %d %d \n" AB,redNo,completedRedNo,number));
   inProgress=true;
  
 
@@ -669,7 +669,7 @@ void CkReductionMgr::startReduction(int number,int srcPE)
   sendReductionStartingToKids(redNo);
   //for (int k=0;k<treeKids();k++)
   //{
-  //  DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
+  //  DEBR((AA "Asking child PE %d to start #%d\n" AB,firstKid()+k,redNo));
   //  thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
   //}
 #else
@@ -699,7 +699,7 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 		temp = number;
 	}
 	for(int i=temp;i<=number;i++){
-	//	DEBR((AA"Asking all child PEs to start #%d \n"AB,i));
+	//	DEBR((AA "Asking all child PEs to start #%d \n" AB,i));
 		if(hasParent()){
 	  // kick-start your parent too ...
 			if(treeParent() != srcPE){
@@ -715,7 +715,7 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 	  {
 			if(firstKid()+k != srcPE){
 				if(CmiNodeAlive(kids[k])||allowMessagesOnly !=-1){
-			    DEBR((AA"Asking child PE %d to start #%d\n"AB,kids[k],redNo));
+			    DEBR((AA "Asking child PE %d to start #%d\n" AB,kids[k],redNo));
 			    thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(i));
 				}	
 			}	
@@ -733,17 +733,17 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
         CmiAbort("this version should not have late migrations");
 #else
 	//We've moved on-- forward late contribution straight to root
-    DEBR((AA"Migrant gives late contribution for #%d!\n"AB,m->redNo));
+    DEBR((AA "Migrant gives late contribution for #%d!\n" AB,m->redNo));
    	// if (!hasParent()) //Root moved on too soon-- should never happen
    	//   CkAbort("Late reduction contribution received at root!\n");
     thisProxy[0].LateMigrantMsg(m);
 #endif
   }
   else if (isFuture(m->redNo)) {//An early contribution-- add to future Q
-    DEBR((AA"Contributor gives early contribution-- for #%d\n"AB,m->redNo));
+    DEBR((AA "Contributor gives early contribution-- for #%d\n" AB,m->redNo));
     futureMsgs.enq(m);
   } else {// An ordinary contribution
-    DEBR((AA"Recv'd local contribution %d for #%d at %d\n"AB,nContrib,m->redNo,this));
+    DEBR((AA "Recv'd local contribution %d for #%d at %d\n" AB,nContrib,m->redNo,this));
    // CkPrintf("[%d] Local Contribution for %d in Mesg %d at %.6f\n",CkMyPe(),redNo,m->redNo,CmiWallTimer());
     startReduction(m->redNo,CkMyPe());
     msgs.enq(m);
@@ -758,41 +758,41 @@ nodegroup */
 void CkReductionMgr::finishReduction(void)
 {
   /*CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d (!inProgress) | creating) %d at %.6f\n",CkMyPe(),redNo, nContrib,(!inProgress) | creating,CmiWallTimer());*/
-  DEBR((AA"in finishReduction (inProgress=%d) in grp %d\n"AB,inProgress,thisgroup.idx));
+  DEBR((AA "in finishReduction (inProgress=%d) in grp %d\n" AB,inProgress,thisgroup.idx));
   if ((!inProgress) || creating){
-  	DEBR((AA"Either not in Progress or creating\n"AB));
+  	DEBR((AA "Either not in Progress or creating\n" AB));
   	return;
   }
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if (nContrib<(lcount+adj(redNo).lcount) - numImmigrantRecObjs + numEmigrantRecObjs){
-        DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
+        DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
 		return;//Need more local messages
 	}
 #else
   if (nContrib<(lcount+adj(redNo).lcount)){
-         DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
+         DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
 	 return;//Need more local messages
   }
 #endif
 
 #if GROUP_LEVEL_REDUCTION
   if (nRemote<treeKids()) {
-    DEBR((AA"Need more remote messages %d %d\n"AB,nRemote,treeKids()));
+    DEBR((AA "Need more remote messages %d %d\n" AB,nRemote,treeKids()));
     return;//Need more remote messages
   }
 	
 #endif
  
-  DEBR((AA"Reducing data... %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
+  DEBR((AA "Reducing data... %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
   CkReductionMsg *result=reduceMessages();
   result->redNo=redNo;
 
 #if GROUP_LEVEL_REDUCTION
   if (hasParent())
   {//Pass data up tree to parent
-    DEBR((AA"Passing reduced data up to parent node %d.\n"AB,treeParent()));
-    DEBR((AA"Message gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
+    DEBR((AA "Passing reduced data up to parent node %d.\n" AB,treeParent()));
+    DEBR((AA "Message gcount is %d+%d+%d.\n" AB,result->gcount,gcount,adj(redNo).gcount));
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     result->gcount+=gcount+adj(redNo).gcount;
 #else
@@ -802,20 +802,20 @@ void CkReductionMgr::finishReduction(void)
   }
   else 
   {//We are root-- pass data to client
-    DEBR((AA"Final gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
+    DEBR((AA "Final gcount is %d+%d+%d.\n" AB,result->gcount,gcount,adj(redNo).gcount));
     int totalElements=result->gcount+gcount+adj(redNo).gcount;
     if (totalElements>result->nSources()) 
     {
-      DEBR((AA"Only got %d of %d contributions (c'mon, migrators!)\n"AB,result->nSources(),totalElements));
+      DEBR((AA "Only got %d of %d contributions (c'mon, migrators!)\n" AB,result->nSources(),totalElements));
       msgs.enq(result);
       return; // Wait for migrants to contribute
     } else if (totalElements<result->nSources()) {
-      DEBR((AA"Got %d of %d contributions\n"AB,result->nSources(),totalElements));
+      DEBR((AA "Got %d of %d contributions\n" AB,result->nSources(),totalElements));
 #if !defined(_FAULT_CAUSAL_)
       CkAbort("ERROR! Too many contributions at root!\n");
 #endif
     }
-    DEBR((AA"Passing result to client function\n"AB));
+    DEBR((AA "Passing result to client function\n" AB));
     CkSetRefNum(result, result->getUserFlag());
     if (!result->callback.isInvalid())
 	    result->callback.send(result);
@@ -831,7 +831,7 @@ void CkReductionMgr::finishReduction(void)
 
   result->secondaryCallback = result->callback;
   result->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
-	DEBR((AA"Reduced mesg gcount %d localgcount %d\n"AB,result->gcount,gcount));
+	DEBR((AA "Reduced mesg gcount %d localgcount %d\n" AB,result->gcount,gcount));
 
   //CkPrintf("[%d] Got all local Messages in finishReduction %d in redNo %d\n",CkMyPe(),nContrib,redNo);
 
@@ -900,7 +900,7 @@ void CkReductionMgr::finishReduction(void)
   _TRACE_BG_TLINE_END(&m->log);
 #endif
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
-    DEBR((AA"Recv'd remote contribution %d for #%d\n"AB,nRemote,m->redNo));
+    DEBR((AA "Recv'd remote contribution %d for #%d\n" AB,nRemote,m->redNo));
     // If the remote contribution is real, then check whether we can remove the
     // child from the inactiveList if it is in the list
     if (m->nSources() > 0) {
@@ -912,7 +912,7 @@ void CkReductionMgr::finishReduction(void)
     finishReduction();
   }
   else if (isFuture(m->redNo)) {
-    DEBR((AA"Recv'd early remote contribution %d for #%d\n"AB,nRemote,m->redNo));
+    DEBR((AA "Recv'd early remote contribution %d for #%d\n" AB,nRemote,m->redNo));
     futureRemoteMsgs.enq(m);
   } 
   else CkAbort("Recv'd late remote contribution!\n");
@@ -924,7 +924,7 @@ void CkReductionMgr::AddToInactiveList(CkReductionInactiveMsg *m) {
   int last_redno = m->redno;
   delete m;
 
-  DEBR((AA"Parent add kid %d to inactive list from redno %d\n"AB,
+  DEBR((AA "Parent add kid %d to inactive list from redno %d\n" AB,
     id, last_redno));
   checkAndAddToInactiveList(id, last_redno);
 
@@ -1064,7 +1064,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   ret->sourceFlag=msgs_nSources;
 	ret->setMigratableContributor(isMigratableContributor);
   ret->fromPE = CkMyPe();
-  DEBR((AA"Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
+  DEBR((AA "Reduced gcount=%d; sourceFlag=%d\n" AB,ret->gcount,ret->sourceFlag));
 
   return ret;
 }
@@ -1551,7 +1551,7 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
     dataType *value=(dataType *)(msg[m]->getData());\
     for (i=0;i<nElem;i++)\
     {\
-      RED_DEB(("|\tmsg%d (from %d) [%d]="typeStr"\n",m,msg[m]->sourceFlag,i,value[i]));\
+      RED_DEB(("|\tmsg%d (from %d) [%d]=" typeStr "\n",m,msg[m]->sourceFlag,i,value[i]));\
       loop\
     }\
   }\
@@ -1859,7 +1859,7 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 
   creating=false;
   interrupt = 0;
-  DEBR((AA"In NodereductionMgr constructor at %d \n"AB,this));
+  DEBR((AA "In NodereductionMgr constructor at %d \n" AB,this));
 	/*
 		FAULT_EVAC
 	*/
@@ -1900,11 +1900,11 @@ void CkNodeReductionMgr::flushStates()
 //Add the given client function.  Overwrites any previous client.
 void CkNodeReductionMgr::ckSetReductionClient(CkCallback *cb)
 {
-  DEBR((AA"Setting reductionClient in NodeReductionMgr %d at %d\n"AB,cb,this));
+  DEBR((AA "Setting reductionClient in NodeReductionMgr %d at %d\n" AB,cb,this));
   if(cb->isInvalid()){
-  	DEBR((AA"Invalid Callback passed to setReductionClient in nodeReductionMgr\n"AB));
+  	DEBR((AA "Invalid Callback passed to setReductionClient in nodeReductionMgr\n" AB));
   }else{
-	DEBR((AA"Valid Callback passed to setReductionClient in nodeReductionMgr\n"AB));
+	DEBR((AA "Valid Callback passed to setReductionClient in nodeReductionMgr\n" AB));
   }
 
   if (CkMyNode()!=0)
@@ -1962,7 +1962,7 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
 //Sent down the reduction tree (used by barren PEs)
 void CkNodeReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 {
-  DEBR((AA"[%d] Received reductionStarting redNo %d\n"AB, CkMyPe(), m->num));
+  DEBR((AA "[%d] Received reductionStarting redNo %d\n" AB, CkMyPe(), m->num));
   CmiLock(lockEverything);
 	/*
 		FAULT_EVAC
@@ -1975,14 +1975,14 @@ void CkNodeReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
   int srcNode = CmiNodeOf((UsrToEnv(m))->getSrcPe());
   if (isPresent(m->num) && !inProgress)
   {
-    DEBR((AA"Starting Node reduction #%d at parent's request\n"AB,m->num));
+    DEBR((AA "Starting Node reduction #%d at parent's request\n" AB,m->num));
     startReduction(m->num,srcNode);
     finishReduction();
   } else if (isFuture(m->num)){
   	DEBR(("[%d][%d] Message num %d Present redNo %d \n",CkMyNode(),CkMyPe(),m->num,redNo));
   }
   else //is Past
-    DEBR((AA"Ignoring node parent's late request to start #%d\n"AB,m->num));
+    DEBR((AA "Ignoring node parent's late request to start #%d\n" AB,m->num));
   CmiUnlock(lockEverything);
   delete m;
 
@@ -2001,7 +2001,7 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 	}
 	
 	if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
-	    //DEBR((AA"Recv'd remote contribution %d for #%d at %d\n"AB,nRemote,m->redNo,this));
+	    //DEBR((AA "Recv'd remote contribution %d for #%d at %d\n" AB,nRemote,m->redNo,this));
 	    startReduction(m->redNo,CkMyNode());
 	    msgs.enq(m);
 	    nRemote++;
@@ -2009,7 +2009,7 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 	}
 	else {
 	    if (isFuture(m->redNo)) {
-	    	   // DEBR((AA"Recv'd early remote contribution %d for #%d\n"AB,nRemote,m->redNo));
+	    	   // DEBR((AA "Recv'd early remote contribution %d for #%d\n" AB,nRemote,m->redNo));
 		    futureRemoteMsgs.enq(m);
 	    }else{
 		   CkPrintf("BIG Problem Present %d Mesg RedNo %d \n",redNo,m->redNo);	
@@ -2049,18 +2049,18 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	if (isFuture(number)) CkAbort("Can't start reductions out of order!\n");
 	if (isPast(number)) CkAbort("Can't restart reduction that's already finished!\n");
 	if (inProgress){
-  		DEBR((AA"This Node reduction is already in progress\n"AB));
+  		DEBR((AA "This Node reduction is already in progress\n" AB));
 		return;//This reduction already started
 	}
 	if (creating) //Don't start yet-- we're creating elements
 	{
-		DEBR((AA" Node Postponing start request #%d until we're done creating\n"AB,redNo));
+		DEBR((AA " Node Postponing start request #%d until we're done creating\n" AB,redNo));
 		startRequested=true;
 		return;
 	}
 	
 	//If none of these cases, we need to start the reduction--
-	DEBR((AA"Starting Node reduction #%d on %p srcNode %d\n"AB,redNo,this,srcNode));
+	DEBR((AA "Starting Node reduction #%d on %p srcNode %d\n" AB,redNo,this,srcNode));
 	inProgress=true;
 
 	if(!_isNotifyChildInRed) return;
@@ -2070,17 +2070,17 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	for (int k=0;k<treeKids();k++)
 	{
 #ifdef BINOMIAL_TREE
-		DEBR((AA"Asking child Node %d to start #%d\n"AB,kids[k],redNo));
+		DEBR((AA "Asking child Node %d to start #%d\n" AB,kids[k],redNo));
 		thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
 #else
 		if(kids[k] != srcNode){
-			DEBR((AA"Asking child Node %d to start #%d\n"AB,kids[k],redNo));
+			DEBR((AA "Asking child Node %d to start #%d\n" AB,kids[k],redNo));
 			thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
 		}	
 #endif
 	}
 
-	DEBR((AA"Asking all local groups to start #%d\n"AB,redNo));
+	DEBR((AA "Asking all local groups to start #%d\n" AB,redNo));
 	// in case, nodegroup does not has the attached red group,
 	// it has to restart groups again
 	startLocalGroupReductions(number);
@@ -2109,10 +2109,10 @@ void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
 	}
 	
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
-		DEBR((AA"Contributor gives early node contribution-- for #%d\n"AB,m->redNo));
+		DEBR((AA "Contributor gives early node contribution-- for #%d\n" AB,m->redNo));
 		futureMsgs.enq(m);
 	} else {// An ordinary contribution
-		DEBR((AA"Recv'd local node contribution %d for #%d at %d\n"AB,nContrib,m->redNo,this));
+		DEBR((AA "Recv'd local node contribution %d for #%d at %d\n" AB,nContrib,m->redNo,this));
 		//    CmiPrintf("[%d,%d] Redcv'd Local Contribution for redNo %d number %d at %0.6f \n",CkMyNode(),CkMyPe(),m->redNo,nContrib+1,CkWallTimer());
 		startReduction(m->redNo,CkMyNode());
 		msgs.enq(m);
@@ -2144,11 +2144,11 @@ void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
 	}
 	
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
-		DEBR((AA"Latemigrant gives early node contribution-- for #%d\n"AB,m->redNo));
+		DEBR((AA "Latemigrant gives early node contribution-- for #%d\n" AB,m->redNo));
 //		CkPrintf("[%d,%d] NodeGroup %d> Latemigrant gives early node contribution %d in redNo %d\n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo,redNo);
 		futureLateMigrantMsgs.enq(m);
 	} else {// An ordinary contribution
-		DEBR((AA"Recv'd late migrant contribution %d for #%d at %d\n"AB,nContrib,m->redNo,this));
+		DEBR((AA "Recv'd late migrant contribution %d for #%d at %d\n" AB,nContrib,m->redNo,this));
 //		CkPrintf("[%d,%d] NodeGroup %d> Latemigrant contribution %d in redNo %d\n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo,redNo);
 		msgs.enq(m);
 		finishReduction();
@@ -2165,20 +2165,20 @@ up the reduction tree **/
 
 void CkNodeReductionMgr::finishReduction(void)
 {
-  DEBR((AA"in Nodegrp finishReduction %d treeKids %d \n"AB,inProgress,treeKids()));
+  DEBR((AA "in Nodegrp finishReduction %d treeKids %d \n" AB,inProgress,treeKids()));
   /***Check if reduction is finished in the next few ifs***/
   if ((!inProgress) || creating){
-  	DEBR((AA"Either not in Progress or creating\n"AB));
+  	DEBR((AA "Either not in Progress or creating\n" AB));
   	return;
   }
 
   if (nContrib<(lcount)){
-	DEBR((AA"Nodegrp Need more local messages %d %d\n"AB,nContrib,(lcount)));
+	DEBR((AA "Nodegrp Need more local messages %d %d\n" AB,nContrib,(lcount)));
 
 	 return;//Need more local messages
   }
   if (nRemote<treeKids()){
-	DEBR((AA"Nodegrp Need more Remote messages %d %d\n"AB,nRemote,treeKids()));
+	DEBR((AA "Nodegrp Need more Remote messages %d %d\n" AB,nRemote,treeKids()));
 
 	return;//Need more remote messages
   }
@@ -2188,7 +2188,7 @@ void CkNodeReductionMgr::finishReduction(void)
 	   CkAbort("Nodegrp Excess remote reduction message received!\n");
   }
 
-  DEBR((AA"Reducing node data...\n"AB));
+  DEBR((AA "Reducing node data...\n" AB));
 
   /**reduce all messages received at this node **/
   CkReductionMsg *result=reduceMessages();
@@ -2196,7 +2196,7 @@ void CkNodeReductionMgr::finishReduction(void)
   if (hasParent())
   {//Pass data up tree to parent
 	if(CmiNodeAlive(CkMyNode()) || killed == 0){
-    	DEBR((AA"Passing reduced data up to parent node %d. \n"AB,treeParent()));
+    	DEBR((AA "Passing reduced data up to parent node %d. \n" AB,treeParent()));
     	DEBR(("[%d,%d] Passing data up to parentNode %d at %.6f for redNo %d with ncontrib %d\n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer(),redNo,nContrib));
 		/*
 			FAULT_EVAC
@@ -2229,13 +2229,13 @@ void CkNodeReductionMgr::finishReduction(void)
 	    storedCallback->send(result);
     }
     else{
-    		DEBR((AA"Invalid Callback \n"AB));
+    		DEBR((AA "Invalid Callback \n" AB));
 	    CkAbort("No reduction client!\n"
 		    "You must register a client with either SetReductionClient or during contribute.\n");
 		}
   }
 
-  // DEBR((AA"Reduction %d finished in group!\n"AB,redNo));
+  // DEBR((AA "Reduction %d finished in group!\n" AB,redNo));
   //CkPrintf("[%d,%d]Reduction %d finished with %d\n",CkMyNode(),CkMyPe(),redNo,nContrib);
   redNo++;
 	updateTree();
@@ -2398,7 +2398,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 
   while(NULL!=(m=msgs.deq()))
   {
-    DEBR((AA"***** gcount=%d; sourceFlag=%d ismigratable %d \n"AB,m->gcount,m->nSources(),m->isMigratableContributor()));	  
+    DEBR((AA "***** gcount=%d; sourceFlag=%d ismigratable %d \n" AB,m->gcount,m->nSources(),m->isMigratableContributor()));	  
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
@@ -2485,7 +2485,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   ret->secondaryCallback = msgs_secondaryCallback;
   ret->sourceFlag=msgs_nSources;
   ret->setMigratableContributor(isMigratableContributor);
-  DEBR((AA"Node Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
+  DEBR((AA "Node Reduced gcount=%d; sourceFlag=%d\n" AB,ret->gcount,ret->sourceFlag));
 #if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&ret->log);
 #endif
