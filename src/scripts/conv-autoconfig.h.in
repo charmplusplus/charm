@@ -18,9 +18,6 @@
 /* enable charmdebug */
 #undef CMK_CHARMDEBUG
 
-/* whether to use a randomized msg q in the charm scheduler */
-#undef CMK_RANDOMIZED_MSGQ
-
 /* whether c compiler knows of the c11 standard */
 #undef CMK_COMPILER_KNOWS_C11
 
@@ -86,6 +83,9 @@
 
 /* whether personality() and ADDR_NO_RANDOMIZE exist */
 #undef CMK_HAS_ADDR_NO_RANDOMIZE
+
+/* whether compiler supports std::alignment_of */
+#undef CMK_HAS_ALIGNMENT_OF
 
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
@@ -293,6 +293,9 @@
 
 /* Python version */
 #undef CMK_PYTHON_VERSION
+
+/* disable the randomized msgq in the scheduler */
+#undef CMK_RANDOMIZED_MSGQ
 
 /* envelope refnum field set to UInt */
 #undef CMK_REFNUM_TYPE

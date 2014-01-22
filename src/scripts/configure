@@ -2499,6 +2499,23 @@ _ACEOF
 in64bit=$strictpass
 
 
+### Check if compiler supports std::alignment_of<> ###
+cat > $t <<EOT
+#include <type_traits>
+
+int foo()
+{
+  return std::alignment_of<int>::value;
+}
+EOT
+test_cxx "whether compiler supports std::alignment_of" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_ALIGNMENT_OF $strictpass
+_ACEOF
+
+
+
 #### check strings.h ####
 cat > $t <<EOT
 #include <strings.h>
