@@ -464,7 +464,7 @@ fi
 
 #echo "set C++ compiler as: $CMK_CXX $OPTS_CXX $OPTS"
 AC_MSG_CHECKING("C++ compiler as")
-AC_MSG_RESULT("$CMK_CXX $OPTS_CXX $OPTS")
+AC_MSG_RESULT("$CMK_CXX $OPTS_CXX")
 test_cxx "whether C++ compiler works" "ok" "no" ""
 if test $fail -eq 1
 then

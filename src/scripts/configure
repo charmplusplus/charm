@@ -2286,8 +2286,8 @@ fi
 #echo "set C++ compiler as: $CMK_CXX $OPTS_CXX $OPTS"
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking \"C++ compiler as\"" >&5
 $as_echo_n "checking \"C++ compiler as\"... " >&6; }
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"$CMK_CXX $OPTS_CXX $OPTS\"" >&5
-$as_echo "\"$CMK_CXX $OPTS_CXX $OPTS\"" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"$CMK_CXX $OPTS_CXX\"" >&5
+$as_echo "\"$CMK_CXX $OPTS_CXX\"" >&6; }
 test_cxx "whether C++ compiler works" "ok" "no" ""
 if test $fail -eq 1
 then
