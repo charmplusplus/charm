@@ -2,6 +2,7 @@
 using std::list;
 #include <algorithm>
 using std::for_each;
+#include <vector>
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include "CParsedFile.h"
@@ -2121,32 +2122,35 @@ Message::genDefs(XStr& str)
     }
     // new (size_t, int, int, ..., int, priobits)
     // degenerates to  new(size_t, priobits)  if no varsize
+    std::vector<MsgVar *> arrayVars;
     str << tspec << "void *"<< ptype << "::operator new(size_t s, ";
     for(i=0;i<numArray;i++)
       str << "int sz" << i << ", ";
     str << "const int p) {\n";
-    if (numArray>0) str << "  int sizes[" << numArray << "];\n";
-    for(i=0, count=0, ml=mvlist ;i<num; i++, ml=ml->next)
-      if (ml->msg_var->isArray()) {
-        str << "  sizes[" << count << "] = sz" << count << ";\n";
-        count ++;
+    if (numArray>0) {
+      str << "  int sizes[" << numArray << "];\n";
+      for(i=0, count=0, ml=mvlist ;i<num; i++, ml=ml->next) {
+        mv = ml->msg_var;
+        if (mv->isArray()) {
+          str << "  sizes[" << count << "] = sz" << count << ";\n";
+          count ++;
+          arrayVars.push_back(mv);
+        }
       }
+    }
     str << "  return " << mtype << "::alloc(__idx, s, " << (numArray>0?"sizes":"0") << ", p);\n";
     str << "}\n";
     // alloc(int, size_t, int*, priobits)
     str << tspec << "void* " << ptype;
     str << "::alloc(int msgnum, size_t sz, int *sizes, int pb) {\n";
     str << "  CkpvAccess(_offsets)[0] = ALIGN_DEFAULT(sz);\n";
-    for(i=0, count=0, ml=mvlist; i<num; i++, ml=ml->next) {
-      mv = ml->msg_var;
-      if (mv->isArray()) {
-        str << "  if(sizes==0)\n";
-        str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[0];\n";
-        str << "  else\n";
-        str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[" << count << "] + ";
-        str << "ALIGN_DEFAULT(sizeof(" << mv->type << ")*sizes[" << count << "]);\n";
-        count ++;
-      }
+    for(count = 0; count < numArray; count++) {
+      mv = arrayVars[count];
+      str << "  if(sizes==0)\n";
+      str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[0];\n";
+      str << "  else\n";
+      str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[" << count << "] + ";
+      str << "ALIGN_DEFAULT(sizeof(" << mv->type << ")*sizes[" << count << "]);\n";
     }
     str << "  return CkAllocMsg(msgnum, CkpvAccess(_offsets)[" << numArray << "], pb);\n";
     str << "}\n";
