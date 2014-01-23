@@ -537,14 +537,6 @@ void LrtsAbort(const char *message)
   already_aborting=1;
   MACHSTATE1(5,"CmiAbort(%s)",message);
 
-#if CMK_CCS_AVAILABLE
-  /* if CharmDebug is attached simply try to send a message to it */
-  if (CpvAccess(cmiArgDebugFlag)) {
-    CpdNotify(CPD_ABORT, message);
-    CpdFreeze();
-  }
-#endif
-  
   CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
   	"Reason: %s\n",CmiMyPe(),message);
   CmiPrintStackTrace(0);

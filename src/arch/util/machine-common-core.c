@@ -1351,6 +1351,8 @@ if (MSG_STATISTIC)
 /* ##### End of Functions Related with Machine Running ##### */
 
 void CmiAbort(const char *message) {
+  CpdAborting(message);
+
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif

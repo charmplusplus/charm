@@ -36,6 +36,7 @@ int  CpdIsFrozen(void);
 void CpdFreezeModeScheduler(void);
 void CpdStartGdb(void);
 void Cpd_CmiHandleMessage(void *msg);
+void CpdAborting(const char *message);
 
 extern int (*CpdIsDebugMessage)(void*);
 extern void * (*CpdGetNextMessage)(CsdSchedulerState_t*);

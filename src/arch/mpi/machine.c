@@ -1673,13 +1673,7 @@ void LrtsPostCommonInit(int everReturn) {
 
 void LrtsAbort(const char *message) {
     char *m;
-    /* if CharmDebug is attached simply try to send a message to it */
-#if CMK_CCS_AVAILABLE
-    if (CpvAccess(cmiArgDebugFlag)) {
-        CpdNotify(CPD_ABORT, message);
-        CpdFreeze();
-    }
-#endif
+
     CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
              "Reason: %s\n",CmiMyPe(),message);
     /*  CmiError(message); */
