@@ -211,7 +211,7 @@ private:
     CMK_REFNUM_TYPE ref;            ///< Used by futures
     s_attribs attribs;
     
-    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(CMK_REFNUM_TYPE)+sizeof(UShort)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
+    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(CMK_REFNUM_TYPE)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
 
     //This struct should now be sizeof(void*) aligned.
     UShort priobits;   ///< Number of bits of priority data after user data
