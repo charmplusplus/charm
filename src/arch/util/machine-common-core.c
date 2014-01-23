@@ -1353,6 +1353,10 @@ if (MSG_STATISTIC)
 void CmiAbort(const char *message) {
   CpdAborting(message);
 
+  CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
+           "Reason: %s\n",CmiMyPe(),message);
+  CmiPrintStackTrace(0);
+
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif

@@ -878,10 +878,6 @@ INLINE_KEYWORD void LrtsStillIdle() {}
 INLINE_KEYWORD void LrtsNotifyIdle() {}
 
 void LrtsAbort(const char *message) {
-    CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
-             "{snd:%d,rcv:%d} Reason: %s\n",CmiMyPe(),
-             msgQueueLen, outstanding_recvs, message);
-
 #if 0
     /* Since it's a abort, why bother to drain the resources? The system
      * should clean it self

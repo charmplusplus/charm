@@ -1674,10 +1674,6 @@ void LrtsPostCommonInit(int everReturn) {
 void LrtsAbort(const char *message) {
     char *m;
 
-    CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
-             "Reason: %s\n",CmiMyPe(),message);
-    /*  CmiError(message); */
-    CmiPrintStackTrace(0);
     m = CmiAlloc(CmiMsgHeaderSizeBytes);
     CmiSetHandler(m, machine_exit_idx);
     CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);

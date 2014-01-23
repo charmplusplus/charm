@@ -537,10 +537,6 @@ void LrtsAbort(const char *message)
   already_aborting=1;
   MACHSTATE1(5,"CmiAbort(%s)",message);
   
-  CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
-  	"Reason: %s\n",CmiMyPe(),message);
-  CmiPrintStackTrace(0);
-  
   /*Send off any remaining prints*/
   CmiStdoutFlush();
   

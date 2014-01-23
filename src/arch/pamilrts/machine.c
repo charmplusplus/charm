@@ -702,9 +702,6 @@ void LrtsExit()
 }
 
 void LrtsAbort(const char *message) {
-  CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
-      "Reason: %s\n",CmiMyPe(),message);
-  CmiPrintStackTrace(0);
   assert(0);
 }
 

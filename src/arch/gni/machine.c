@@ -4134,8 +4134,6 @@ void LrtsDrainResources()
 }
 
 void LrtsAbort(const char *message) {
-    fprintf(stderr, "[%d] CmiAbort: %s\n", myrank, message);
-    CmiPrintStackTrace(0);
     PMI_Abort(-1, message);
 }
 
