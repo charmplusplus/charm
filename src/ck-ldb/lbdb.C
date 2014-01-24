@@ -397,31 +397,28 @@ extern "C" void LDMigrated(LDObjHandle _h, int waitBarrier)
   db->Migrated(_h, waitBarrier);
 }
 
-extern "C" LDBarrierClient 
-LDAddLocalBarrierClient(LDHandle _db, LDResumeFn fn, void* data)
+LDBarrierClient LDAddLocalBarrierClient(LDHandle _db, LDResumeFn fn, void* data)
 {
   LBDB *const db = (LBDB*)(_db.handle);
 
   return db->AddLocalBarrierClient(fn,data);
 }
 
-extern "C" void LDRemoveLocalBarrierClient(LDHandle _db, LDBarrierClient h)
+void LDRemoveLocalBarrierClient(LDHandle _db, LDBarrierClient h)
 {
   LBDB *const db = (LBDB*)(_db.handle);
 
   db->RemoveLocalBarrierClient(h);
 }
 
-extern "C" LDBarrierReceiver 
-LDAddLocalBarrierReceiver(LDHandle _db,LDBarrierFn fn, void* data)
+LDBarrierReceiver LDAddLocalBarrierReceiver(LDHandle _db,LDBarrierFn fn, void* data)
 {
   LBDB *const db = (LBDB*)(_db.handle);
 
   return db->AddLocalBarrierReceiver(fn,data);
 }
 
-extern "C" void 
-LDRemoveLocalBarrierReceiver(LDHandle _db,LDBarrierReceiver h)
+void LDRemoveLocalBarrierReceiver(LDHandle _db,LDBarrierReceiver h)
 {
   LBDB *const db = (LBDB*)(_db.handle);
 

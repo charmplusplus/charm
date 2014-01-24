@@ -403,12 +403,6 @@ struct LDBarrierReceiver {
   : i(in) { }
 };
 
-LDBarrierClient LDAddLocalBarrierClient(LDHandle _lbdb,LDResumeFn fn,
-					void* data);
-void LDRemoveLocalBarrierClient(LDHandle _lbdb, LDBarrierClient h);
-LDBarrierReceiver LDAddLocalBarrierReceiver(LDHandle _lbdb,LDBarrierFn fn,
-					    void* data);
-void LDRemoveLocalBarrierReceiver(LDHandle _lbdb,LDBarrierReceiver h);
 void LDAtLocalBarrier(LDHandle _lbdb, LDBarrierClient h);
 void LDLocalBarrierOn(LDHandle _db);
 void LDLocalBarrierOff(LDHandle _db);
@@ -430,6 +424,12 @@ int LDMemusage(LDHandle _db);
 #endif /* _cplusplus */
 
 const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
+LDBarrierClient LDAddLocalBarrierClient(LDHandle _lbdb,LDResumeFn fn,
+					void* data);
+void LDRemoveLocalBarrierClient(LDHandle _lbdb, LDBarrierClient h);
+LDBarrierReceiver LDAddLocalBarrierReceiver(LDHandle _lbdb,LDBarrierFn fn,
+					    void* data);
+void LDRemoveLocalBarrierReceiver(LDHandle _lbdb,LDBarrierReceiver h);
 
 #if CMK_LBDB_ON
 PUPbytes(LDHandle)
