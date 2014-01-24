@@ -142,6 +142,7 @@ using namespace xi;
 int main(int argc, char *argv[])
 {
   char *fname=NULL;
+  char *origFile=NULL;
   fortranMode = 0;
   internalMode = 0;
   bool dependsMode = false;
@@ -157,6 +158,7 @@ int main(int argc, char *argv[])
       else if (strncmp(argv[i], "-M", 2)==0) dependsMode = true;
       else if (strcmp(argv[i], "-count-tokens")==0) countTokens = true;
       else if (strcmp(argv[i], "-chare-names")==0) chareNames = true;
+      else if (strcmp(argv[i], "-orig-file")==0) origFile = argv[++i];
       else abortxi(argv[0]);
     }
     else
@@ -181,7 +183,14 @@ int main(int argc, char *argv[])
 
   if (dependsMode)
   {
-      std::string ciFileBaseName = fname;
+      std::string ciFileBaseName;
+      if (fname != NULL) {
+        ciFileBaseName = fname;
+      } else if (origFile != NULL) {
+        ciFileBaseName = origFile;
+      } else {
+        abortxi(argv[0]);
+      }
       size_t loc = ciFileBaseName.rfind('/');
       if(loc != std::string::npos)
           ciFileBaseName = ciFileBaseName.substr(loc+1);

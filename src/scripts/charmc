@@ -638,7 +638,6 @@ do
 		OPTS="$OPTS $arg"
 		;;
 	"-M")
-		PREPROCESS=""
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		GENDEPENDS="yes"
@@ -1350,7 +1349,7 @@ do
                 test "$LANGUAGE" = "f90charm" && XIOPTS="$XIOPTS -f90"
                 if [ -n "$PREPROCESS" ]
                 then
-		  Do $CMK_CPP_CHARM $OPTS_CPP $FILE | Do $CHARMBIN/charmxi $XIOPTS
+		  Do $CMK_CPP_CHARM $OPTS_CPP $FILE | Do $CHARMBIN/charmxi $XIOPTS -orig-file $FILE
                 else
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi
