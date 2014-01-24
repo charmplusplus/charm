@@ -232,9 +232,10 @@ namespace SDAG {
 
     Dependency(int numEntries, int numWhens)
       : entryToWhen(numEntries)
+      , whenToContinuation(numWhens)
       , buffer(numEntries)
       , curSpeculationIndex(0)
-      , whenToContinuation(numWhens) { }
+      { }
 
     // after a migration free the structures
     ~Dependency() {
