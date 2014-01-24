@@ -1543,7 +1543,10 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 #else
 void CkMigratable::setObjTime(double cputime) {}
 double CkMigratable::getObjTime() {return 0.0;}
+
+#if CMK_LB_USER_DATA
 void *CkMigratable::getObjUserData(int idx) { return NULL; }
+#endif
 
 /* no load balancer: need dummy implementations to prevent link error */
 void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
