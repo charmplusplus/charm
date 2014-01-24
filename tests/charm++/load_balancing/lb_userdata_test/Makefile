@@ -1,4 +1,4 @@
-CHARMC=../../../../bin/charmc $(OPTS) -DCMK_LB_USER_DATA
+CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = hello.o TestUserDataLB.o
 LDFLAGS = -L. -language charm++ -module TestUserDataLB

@@ -18,9 +18,6 @@
 /* enable charmdebug */
 #undef CMK_CHARMDEBUG
 
-/* whether to use a randomized msg q in the charm scheduler */
-#undef CMK_RANDOMIZED_MSGQ
-
 /* whether c compiler knows of the c11 standard */
 #undef CMK_COMPILER_KNOWS_C11
 
@@ -261,6 +258,9 @@
 /* Setting load balancing timer type */
 #undef CMK_LBTIME_TYPE
 
+/* disable lb user data */
+#undef CMK_LB_USER_DATA
+
 /* whether long double works */
 #undef CMK_LONG_DOUBLE_DEFINED
 
@@ -293,6 +293,9 @@
 
 /* Python version */
 #undef CMK_PYTHON_VERSION
+
+/* disable the randomized msgq in the scheduler */
+#undef CMK_RANDOMIZED_MSGQ
 
 /* envelope refnum field set to UInt */
 #undef CMK_REFNUM_TYPE
