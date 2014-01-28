@@ -1350,25 +1350,35 @@ if (MSG_STATISTIC)
 }
 /* ##### End of Functions Related with Machine Running ##### */
 
-void CmiAbort(const char *message) {
-  CpdAborting(message);
+void CmiAbortHelper(const char *source, const char *message, const char *suggestion,
+                    int tellDebugger, int framesToSkip) {
+  if (tellDebugger)
+    CpdAborting(message);
 
   if (CmiNumPartitions() == 1) {
-    CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
-             "Reason: %s\n", CmiMyPe(), message);
+    CmiError("------------- Processor %d Exiting: %s ------------\n"
+             "Reason: %s\n", CmiMyPe(), source, message);
   } else {
-    CmiError("------- Partition %d Processor %d Exiting: Called CmiAbort ------\n"
-             "Reason: %s\n", CmiMyPartition(), CmiMyPe(), message);
+    CmiError("------- Partition %d Processor %d Exiting: %s ------\n"
+             "Reason: %s\n", CmiMyPartition(), CmiMyPe(), source, message);
   }
-  CmiPrintStackTrace(0);
+
+  if (suggestion && suggestion[0])
+    CmiError("Suggestion: %s\n", suggestion);
+
+  CmiPrintStackTrace(framesToSkip);
 
 #if CMK_USE_PXSHM
-    CmiExitPxshm();
+  CmiExitPxshm();
 #endif
 #if CMK_USE_XPMEM
-    CmiExitXpmem();
+  CmiExitXpmem();
 #endif
-    LrtsAbort(message);
+  LrtsAbort(message);
+}
+
+void CmiAbort(const char *message) {
+  CmiAbortHelper("Called CmiAbort", message, NULL, 1, 0);
 }
 
 /* ##### Beginning of Functions Providing Incoming Network Messages ##### */

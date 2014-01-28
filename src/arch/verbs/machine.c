@@ -344,6 +344,8 @@ int n;
 
 CpvExtern(int, freezeModeFlag);
 
+static int Cmi_truecrash;
+
 static void KillOnAllSigs(int sigNo)
 {
   const char *sig="unknown signal";
@@ -371,19 +373,19 @@ static void KillOnAllSigs(int sigNo)
 
   if (sigNo==SIGSEGV) {
      sig="segmentation violation";
-     suggestion="Try running with '++debug', or linking with '-memory paranoid' (memory paranoid requires '+netpoll' at runtime).\n";
+     suggestion="Try running with '++debug', or linking with '-memory paranoid' (memory paranoid requires '+netpoll' at runtime).";
   }
   if (sigNo==SIGFPE) {
      sig="floating point exception";
-     suggestion="Check for integer or floating-point division by zero.\n";
+     suggestion="Check for integer or floating-point division by zero.";
   }
   if (sigNo==SIGBUS) {
      sig="bus error";
-     suggestion="Check for misaligned reads or writes to memory.\n";
+     suggestion="Check for misaligned reads or writes to memory.";
   }
   if (sigNo==SIGILL) {
      sig="illegal instruction";
-     suggestion="Check for calls to uninitialized function pointers.\n";
+     suggestion="Check for calls to uninitialized function pointers.";
   }
   if (sigNo==SIGKILL) sig="caught signal KILL";
   if (sigNo==SIGQUIT) sig="caught signal QUIT";
@@ -393,18 +395,12 @@ static void KillOnAllSigs(int sigNo)
 #ifdef __FAULT__
   if(sigNo == SIGKILL || sigNo == SIGQUIT || sigNo == SIGTERM){
 		CmiPrintf("[%d] Caught but ignoring signal\n",CmiMyPe());
-  }else{
-#else
-	{
+  } else
 #endif
-   CmiError("------------- Processor %d Exiting: Caught Signal ------------\n"
-  	"Signal: %s\n",CmiMyPe(),sig);
-  	if (0!=suggestion[0])
-  		CmiError("Suggestion: %s",suggestion);
-  	CmiPrintStackTrace(1);
-  	charmrun_abort(sig);
-  	machine_exit(1);		
-	}	
+  {
+    Cmi_truecrash = 0;
+    CmiAbortHelper("Caught Signal", sig, suggestion, 0, 1);
+  }
 }
 
 static void machine_atexit_check(void)

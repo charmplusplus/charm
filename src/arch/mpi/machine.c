@@ -1208,20 +1208,8 @@ static void KillOnAllSigs(int sigNo) {
     char *m;
     if (already_in_signal_handler) return;   /* MPI_Abort(charmComm,1); */
     already_in_signal_handler = 1;
-#if CMK_CCS_AVAILABLE
-    if (CpvAccess(cmiArgDebugFlag)) {
-        CpdNotify(CPD_SIGNAL, sigNo);
-        CpdFreeze();
-    }
-#endif
-    CmiError("------------- Processor %d Exiting: Caught Signal ------------\n"
-             "Signal: %d\n",CmiMyPe(),sigNo);
-    CmiPrintStackTrace(1);
 
-    m = CmiAlloc(CmiMsgHeaderSizeBytes);
-    CmiSetHandler(m, machine_exit_idx);
-    CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
-    machine_exit(m);
+    CmiAbortHelper("Caught Signal", strsignal(sigNo), NULL, 1, 1);
 }
 /* ######End of functions related with exiting programs###### */
 
