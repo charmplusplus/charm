@@ -24,8 +24,6 @@
 
 #include <vector>
 
-using std::vector;
-
 void CreateDistributedLB();
 
 class DistributedLB : public DistBaseLB {
@@ -43,13 +41,13 @@ private:
   CProxy_DistributedLB thisProxy;
 
   int underloaded_pe_count;
-  vector<int> pe_no;
-  vector<double> loads;
-	vector<double> distribution;
+  std::vector<int> pe_no;
+  std::vector<double> loads;
+  std::vector<double> distribution;
 
   int total_migrates_ack;
   int total_migrates;
-  vector<MigrateInfo*> migrateInfo;
+  std::vector<MigrateInfo*> migrateInfo;
   LBMigrateMsg* msg;
   
   bool kUseAck;

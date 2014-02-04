@@ -9,6 +9,8 @@
 
 CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
 
+using std::vector;
+
 DistributedLB::DistributedLB(CkMigrateMessage *m) : DistBaseLB(m) {
 }
 
