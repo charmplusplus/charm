@@ -213,6 +213,7 @@ CkReductionMgr::CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr)
 
 CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
 {
+  numKids = -1;
   redNo=0;
   completedRedNo = -1;
   inProgress=false;
