@@ -593,6 +593,11 @@ void LocalBarrier::AtBarrier(LDBarrierClient h)
   CheckBarrier();
 }
 
+void LocalBarrier::DecreaseBarrier(LDBarrierClient h, int c)
+{
+  at_count-=c;
+}
+
 void LocalBarrier::CheckBarrier()
 {
   if (!on) return;

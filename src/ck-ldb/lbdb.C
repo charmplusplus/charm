@@ -432,6 +432,13 @@ extern "C" void LDAtLocalBarrier(LDHandle _db, LDBarrierClient h)
   db->AtLocalBarrier(h);
 }
 
+extern "C" void LDDecreaseLocalBarrier(LDHandle _db, LDBarrierClient h, int c)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+	
+  db->DecreaseLocalBarrier(h, c);
+}
+
 extern "C" void LDLocalBarrierOn(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);

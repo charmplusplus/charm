@@ -36,6 +36,7 @@ public:
   void TurnOnReceiver(LDBarrierReceiver h);
   void TurnOffReceiver(LDBarrierReceiver h);
   void AtBarrier(LDBarrierClient h);
+  void DecreaseBarrier(LDBarrierClient h, int c);
   void TurnOn() { on = true; CheckBarrier(); };
   void TurnOff() { on = false; };
 
@@ -195,6 +196,8 @@ public:
        { localBarrier.TurnOffReceiver(h); };
   inline void AtLocalBarrier(LDBarrierClient h) 
        { if (useBarrier) localBarrier.AtBarrier(h); };
+  inline void DecreaseLocalBarrier(LDBarrierClient h, int c) 
+       { if (useBarrier) localBarrier.DecreaseBarrier(h, c); };
   inline void ResumeClients() 
        { localBarrier.ResumeClients(); };
   inline void MeasuredObjTime(double wtime, double ctime) {

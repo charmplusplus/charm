@@ -1492,6 +1492,7 @@ void CkMigratable::staticResumeFromSync(void* data)
     el->mlogData->resumeCount++;
 #endif
 }
+
 void CkMigratable::setMigratable(int migratable) 
 {
 	myRec->setMigratable(migratable);
@@ -2305,6 +2306,7 @@ void CkLocMgr::setupSpringCleaning() {
 CkLocMgr::~CkLocMgr() {
 #if CMK_LBDB_ON
   the_lbdb->RemoveLocalBarrierClient(dummyBarrierHandle);
+  the_lbdb->DecreaseLocalBarrier(dummyBarrierHandle, 1);
   the_lbdb->RemoveLocalBarrierReceiver(lbBarrierReceiver);
   the_lbdb->UnregisterOM(myLBHandle);
 #endif

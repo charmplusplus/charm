@@ -404,6 +404,7 @@ struct LDBarrierReceiver {
 };
 
 void LDAtLocalBarrier(LDHandle _lbdb, LDBarrierClient h);
+void LDDecreaseLocalBarrier(LDHandle _lbdb, LDBarrierClient h, int c);
 void LDLocalBarrierOn(LDHandle _db);
 void LDLocalBarrierOff(LDHandle _db);
 void LDResumeClients(LDHandle _lbdb);
