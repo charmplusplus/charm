@@ -70,6 +70,22 @@ namespace Ck { namespace IO {
           managers = CProxy_Manager::ckNew();
         }
 
+        Director(CkMigrateMessage *m) : CBase_Director(m) { }
+
+        void pup(PUP::er &p) {
+          CBase_Director::pup(p);
+          __sdag_pup(p);
+
+          // FIXME: All files must be closed across checkpoint/restart
+          if (files.size() != 0)
+            CkAbort("CkIO: All files must be closed across checkpoint/restart");
+
+          p | filesOpened;
+          p | managers;
+          p | opnum;
+          p | sessionID;
+        }
+
         void openFile(string name, CkCallback opened, Options opts) {
           if (-1 == opts.peStripe)
             opts.peStripe = 16 * 1024 * 1024;
@@ -124,6 +140,19 @@ namespace Ck { namespace IO {
         {
           manager = this;
           thisProxy[CkMyPe()].run();
+        }
+
+        Manager(CkMigrateMessage *m) : CBase_Manager(m) { }
+
+        void pup(PUP::er &p) {
+          CBase_Manager::pup(p);
+          __sdag_pup(p);
+
+          p | opnum;
+
+          // FIXME: All files must be closed across checkpoint/restart
+          if (files.size() != 0)
+            CkAbort("CkIO: All files must be closed across checkpoint/restart");
         }
 
         void prepareFile(FileToken token, string name, Options opts) {

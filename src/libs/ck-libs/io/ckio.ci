@@ -17,7 +17,7 @@ module CkIO_impl {
       namespace impl {
         readonly CProxy_Director director;
 
-        mainchare Director
+        mainchare [migratable] Director
         {
           entry Director(CkArgMsg *);
 
@@ -50,7 +50,7 @@ module CkIO_impl {
           entry void close(FileToken token, CkCallback closed);
         }
 
-        group Manager
+        group [migratable] Manager
         {
           entry Manager();
           entry void run() {
