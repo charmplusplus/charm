@@ -267,8 +267,8 @@ test_cc() {
         AC_MSG_CHECKING("$1")
 	echo "### $1" >> $charmout
 	cat $tc >> $charmout
-	echo $CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 >> $charmout
-	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 > out 2>&1
+	echo $CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $CMK_SYSINC $OPTS_CC $OPTS_LD -c $tc -o test.o $4 >> $charmout
+	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $CMK_SYSINC $OPTS_CC $OPTS_LD -c $tc -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
@@ -291,8 +291,8 @@ test_cxx() {
         AC_MSG_CHECKING("$1")
 	echo "### $1" >> $charmout
 	cat $t >> $charmout
-	echo $CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 >> $charmout
-	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 > out 2>&1
+	echo $CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $CMK_SYSINC $OPTS_CXX $OPTS_LD -c $t -o test.o $4 >> $charmout
+	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $CMK_SYSINC $OPTS_CXX $OPTS_LD -c $t -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
@@ -315,8 +315,8 @@ test_link() {
         AC_MSG_CHECKING("$1")
 	echo "### $1" >> $charmout
 	cat $t >> $charmout
-	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
-	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
+	echo $CMK_CXX -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CXX -c $t -o test.o $4 >> $charmout
+	$CMK_CXX -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CXX -c $t -o test.o $4 > out 2>&1
         if test $? -ne 0
         then
           test_result 1 "$1" "$2" "$3"
@@ -348,8 +348,8 @@ test_linkc() {
         AC_MSG_CHECKING("$1")
 	echo "### $1" >> $charmout
 	cat $tc >> $charmout
-	echo $CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 >> $charmout
-	$CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 > out 2>&1
+	echo $CMK_CC -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CC -c $tc -o test.o $4 >> $charmout
+	$CMK_CC -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CC -c $tc -o test.o $4 > out 2>&1
         if test $? -ne 0
         then
           test_result 1 "$1" "$2" "$3"
@@ -380,14 +380,14 @@ test_linkso() {
         AC_MSG_CHECKING("$1")
 	echo $1 >> $charmout
 	cat $t >> $charmout
-	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX $CMK_PIC -c $t -o test.o $4 >> $charmout
-	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $CMK_PIC $t -o test.o $4 > out 2>&1
+	echo $CMK_CXX -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CXX $CMK_PIC -c $t -o test.o $4 >> $charmout
+	$CMK_CXX -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CXX -c $CMK_PIC $t -o test.o $4 > out 2>&1
         if test $? = 1
         then
           test_result 1 "$1" "$2" "$3"
         else
-	  echo $CMK_LD -I../include -I. $CMK_LIBDIR $OPTS_LD $CMK_LD_SHARED test.o -o testlink.$CMK_SHARED_SUF $4 >> $charmout
-	  $CMK_LD -I../include -I. $CMK_LIBDIR $OPTS_LD $CMK_LD_SHARED test.o -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
+	  echo $CMK_LD -I../include -I. $CMK_LIBDIR $OPTS_LD $CMK_LD_SHARED $CMK_SYSLIBS test.o -o testlink.$CMK_SHARED_SUF $4 >> $charmout
+	  $CMK_LD -I../include -I. $CMK_LIBDIR $OPTS_LD $CMK_LD_SHARED $CMK_SYSLIBS test.o -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
 	  test_result $? "$1" "$2" "$3"
 	fi
 	cat out >> $charmout
