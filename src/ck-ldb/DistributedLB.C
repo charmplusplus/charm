@@ -426,14 +426,12 @@ void DistributedLB::RecvAck(int obj_id, int assigned_pe, bool can_accept) {
     CkVec<int> obj_pe_no;
     MapObjsToPe(objs, obj_no, obj_pe_no);
 
-    // If a PE could be found to transfer this object, then send a message to it
-    // and wait for ack. Maybe at this point we can try to force it or just drop
-    // it.
+    // If a PE could be found to transfer this object, MapObjsToPe sends a
+    // message to it. Wait for the ack.
+    // Maybe at this point we can try to force it or just drop it.
     if (obj_pe_no.size() > 0) {
       total_migrates_ack++;
       total_migrates++;
-      thisProxy[obj_pe_no[0]].InformMigration(obj_id, CkMyPe(),
-          my_stats->objData[obj_id].wallTime, false);
     }
     InfoRecord* obj;
     while (NULL!=(obj=objs.deleteMin())) {
