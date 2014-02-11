@@ -29,6 +29,10 @@
 CkpvExtern(int, _lb_obj_index);                // for lbdb user data for obj index
 #endif // CMK_LBDB_ON
 
+#ifndef CMK_CHARE_USE_PTR
+CkpvExtern(int, currentChareIdx);
+#endif
+
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvExtern(void *, CkGridObject);
 #endif
@@ -2595,7 +2599,17 @@ bool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
 	i.locRec=rec;
 	i.chareType=_entryTable[ctorIdx]->chareIdx;
+
+#ifndef CMK_CHARE_USE_PTR
+  int callingChareIdx = CkpvAccess(currentChareIdx);
+  CkpvAccess(currentChareIdx) = -1;
+#endif
+
 	if (!rec->invokeEntry(elt,ctorMsg,ctorIdx,true)) return false;
+
+#ifndef CMK_CHARE_USE_PTR
+  CkpvAccess(currentChareIdx) = callingChareIdx;
+#endif
 
 #if CMK_OUT_OF_CORE
 	/* Register new element with out-of-core */

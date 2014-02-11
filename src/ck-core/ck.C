@@ -718,11 +718,18 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 
   CkpvAccess(_currentGroup) = groupID;
   CkpvAccess(_currentGroupRednMgr) = env->getRednMgr();
+
 #ifndef CMK_CHARE_USE_PTR
-  //((Chare *)obj)->chareIdx = -1;
+  int callingChareIdx = CkpvAccess(currentChareIdx);
   CkpvAccess(currentChareIdx) = -1;
 #endif
+
   _invokeEntryNoTrace(epIdx,env,obj); /* can't trace groups: would cause nested begin's */
+
+#ifndef CMK_CHARE_USE_PTR
+  CkpvAccess(currentChareIdx) = callingChareIdx;
+#endif
+
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
@@ -742,11 +749,18 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 // User may call CkLocalNodeBranch() inside the nodegroup constructor
 //  store nodegroup into _currentNodeGroupObj
   CkpvAccess(_currentNodeGroupObj) = obj;
+
 #ifndef CMK_CHARE_USE_PTR
-  //((Chare *)obj)->chareIdx = -1;
+  int callingChareIdx = CkpvAccess(currentChareIdx);
   CkpvAccess(currentChareIdx) = -1;
 #endif
+
   _invokeEntryNoTrace(epIdx,env,obj);
+
+#ifndef CMK_CHARE_USE_PTR
+  CkpvAccess(currentChareIdx) = callingChareIdx;
+#endif
+
   CkpvAccess(_currentNodeGroupObj) = NULL;
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
 
