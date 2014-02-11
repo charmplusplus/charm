@@ -719,7 +719,8 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(_currentGroup) = groupID;
   CkpvAccess(_currentGroupRednMgr) = env->getRednMgr();
 #ifndef CMK_CHARE_USE_PTR
-  CkAssert(CkpvAccess(currentChareIdx) == -1);
+  //((Chare *)obj)->chareIdx = -1;
+  CkpvAccess(currentChareIdx) = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj); /* can't trace groups: would cause nested begin's */
   _STATS_RECORD_PROCESS_GROUP_1();
@@ -742,7 +743,8 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 //  store nodegroup into _currentNodeGroupObj
   CkpvAccess(_currentNodeGroupObj) = obj;
 #ifndef CMK_CHARE_USE_PTR
-  CkAssert(CkpvAccess(currentChareIdx) == -1);
+  //((Chare *)obj)->chareIdx = -1;
+  CkpvAccess(currentChareIdx) = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj);
   CkpvAccess(_currentNodeGroupObj) = NULL;
@@ -920,9 +922,6 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
   CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
-#ifndef CMK_CHARE_USE_PTR
-  CkpvAccess(currentChareIdx) = -1;
-#endif
 }
 
 void CkCreateLocalChare(int epIdx, envelope *env)
@@ -963,9 +962,6 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
-#ifndef CMK_CHARE_USE_PTR
-  CkpvAccess(currentChareIdx) = -1;
-#endif
 }
 
 /************** Receive: Chares *************/
