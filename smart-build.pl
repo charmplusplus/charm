@@ -127,20 +127,18 @@ if($skip_choosing eq "false") {
   if($p eq "yes"){
 	print << "EOF";
 	
-Choose an interconnect from below: [1-11]
+Choose an interconnect from below: [1-10]
 	 1) MPI
-	 2) Infiniband (native ibverbs alpha version)
+	 2) Infiniband (ibverbs)
 	 3) Myrinet GM
 	 4) Myrinet MX
 	 5) LAPI
-	 6) Cray XT3, XT4
-         7) Cray XT5
-         8) Cray XE, XK
-	 9) Bluegene/L Native (only at T. J. Watson)
-	10) Bluegene/L MPI
-        11) Bluegene/P Native
-	12) Bluegene/P MPI
-	13) VMI
+         6) Cray XT5
+         7) Cray XE, XK
+         8) Cray XC
+         9) Blue Gene/P Native
+	10) Blue Gene/P MPI
+	11) Blue Gene/Q
 
 EOF
 	
@@ -165,34 +163,24 @@ EOF
 		$arch = "lapi";
 		last;
 	  } elsif($line eq "6"){
-		$arch = "mpi-crayxt3";
+		$arch = "mpi-crayxt";
 		last;
 	  } elsif($line eq "7"){
-	        $arch = "mpi-crayxt";
+	        $arch = "gni-crayxe";
 	        last;
 	  } elsif($line eq "8"){
-	        $arch = "gemini_gni-crayxe";
+	        $arch = "gni-crayxc";
 	        last;
 	  } elsif($line eq "9"){
-		$arch = "bluegenel";
-		$compilers = "xlc ";
-		$nobs = "--no-build-shared";
-		last;
-	  } elsif($line eq "10"){
-		$arch = "mpi-bluegenel";
-		$compilers = "xlc ";
-		$nobs = "--no-build-shared";
-		last;
-	  } elsif($line eq "11"){
 		$arch = "bluegenep";
 		$compilers = "xlc ";
 		last;
-	  } elsif($line eq "12"){
+	  } elsif($line eq "10"){
 		$arch = "mpi-bluegenep";
 		$compilers = "xlc ";
 		last;
-	  } elsif($line eq "13"){
-		$converse_network_type = "vmi";
+	  } elsif($line eq "11"){
+		$arch = "pamilrts-bluegeneq";
 		last;
 	  } else {
 		print "Invalid option, please try again :P\n"
