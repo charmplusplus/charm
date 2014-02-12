@@ -9,7 +9,7 @@ module NDMeshStreamer {
     dtype dataItems[];
   };
 
-  template<class dtype>
+  template<class dtype, class RouterType>
   group MeshStreamer {
     entry void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
     entry void enablePeriodicFlushing();
@@ -30,8 +30,8 @@ module NDMeshStreamer {
     entry void receiveAtDestination(MeshStreamerMessage<dtype> *msg);
   };
 
-  template<class dtype, class ClientType >
-    group GroupMeshStreamer : MeshStreamer<dtype> {
+  template<class dtype, class ClientType, class RouterType>
+    group GroupMeshStreamer : MeshStreamer<dtype, RouterType> {
     entry GroupMeshStreamer(
 	  int maxNumDataItemsBuffered, int numDimensions,
 	  int dimensionSizes[numDimensions],
@@ -45,9 +45,9 @@ module NDMeshStreamer {
 	  double progressPeriodInMs = -1.0);
   };
 
-  template<class dtype, class itype, class ClientType>
+  template<class dtype, class itype, class ClientType, class RouterType>
     group ArrayMeshStreamer :
-    MeshStreamer<ArrayDataItem<dtype, itype> > {
+    MeshStreamer<ArrayDataItem<dtype, itype>, RouterType> {
     entry ArrayMeshStreamer(
 	  int maxNumDataItemsBuffered, int numDimensions,
 	  int dimensionSizes[numDimensions], CkArrayID clientAID,
@@ -64,8 +64,8 @@ module NDMeshStreamer {
 
   };
 
-  template<class dtype, class ClientType>
-    group GroupChunkMeshStreamer : MeshStreamer<ChunkDataItem> {
+  template<class dtype, class ClientType, class RouterType>
+    group GroupChunkMeshStreamer : MeshStreamer<ChunkDataItem, RouterType> {
     entry GroupChunkMeshStreamer(
 	  int maxNumDataItemsBuffered, int numDimensions,
 	  int dimensionSizes[numDimensions], CkGroupID clientGID,

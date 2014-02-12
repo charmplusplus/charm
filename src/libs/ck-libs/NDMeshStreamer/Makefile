@@ -8,6 +8,7 @@ LIBOBJ=NDMeshStreamer.o
 HEADERS= $(INCDIR)/NDMeshStreamer.decl.h \
          $(INCDIR)/NDMeshStreamer.def.h \
          $(INCDIR)/NDMeshStreamer.h \
+	 $(INCDIR)/VirtualRouter.h \
          $(INCDIR)/DataItemTypes.h
 LIBDEST = $(CDIR)/lib/$(LIB)
 
@@ -21,6 +22,8 @@ $(INCDIR)/NDMeshStreamer.def.h: NDMeshStreamer.def.h
 	/bin/cp NDMeshStreamer.def.h $(CDIR)/include
 $(INCDIR)/NDMeshStreamer.h: NDMeshStreamer.h
 	/bin/cp NDMeshStreamer.h $(CDIR)/include
+$(INCDIR)/VirtualRouter.h: VirtualRouter.h
+	/bin/cp VirtualRouter.h $(CDIR)/include
 $(INCDIR)/DataItemTypes.h: DataItemTypes.h
 	/bin/cp DataItemTypes.h $(CDIR)/include
 
