@@ -216,7 +216,7 @@ DESTINATION_SUFFIX=""
 TAU_MAKEFILE=""
 QUIET=""
 
-[ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | more && exit 1
+[ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | ( less || more ) && exit 1
 [ $# -lt 2 ] && ./smart-build.pl && exit 1
 PROGRAM=$1
 shift
