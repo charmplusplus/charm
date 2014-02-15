@@ -22,8 +22,6 @@
 // **CW** Simple delta encoding implementation
 // delta encoding is on by default. It may be turned off later in
 // the runtime.
-int deltaLog;
-int nonDeltaLog;
 
 int checknested=0;		// check illegal nested begin/end execute 
 
@@ -183,39 +181,11 @@ void LogPool::openLog(const char *mode)
 {
 #if CMK_PROJECTIONS_USE_ZLIB
   if(compressed) {
-    if (nonDeltaLog) {
-      do {
-	zfp = gzopen(fname, mode);
-      } while (!zfp && (errno == EINTR || errno == EMFILE));
-      if(!zfp) CmiAbort("Cannot open Projections Compressed Non Delta Trace File for writing...\n");
-    }
-    if (deltaLog) {
-      do {
-	deltazfp = gzopen(dfname, mode);
-      } while (!deltazfp && (errno == EINTR || errno == EMFILE));
-      if (!deltazfp) 
-	CmiAbort("Cannot open Projections Compressed Delta Trace File for writing...\n");
-    }
+    do {
+      zfp = gzopen(fname, mode);
+    } while (!zfp && (errno == EINTR || errno == EMFILE));
+    if(!zfp) CmiAbort("Cannot open Projections Compressed Non Delta Trace File for writing...\n");
   } else {
-    if (nonDeltaLog) {
-      do {
-	fp = fopen(fname, mode);
-      } while (!fp && (errno == EINTR || errno == EMFILE));
-      if (!fp) {
-	CkPrintf("[%d] Attempting to open file [%s]\n",CkMyPe(),fname);
-	CmiAbort("Cannot open Projections Non Delta Trace File for writing...\n");
-      }
-    }
-    if (deltaLog) {
-      do {
-	deltafp = fopen(dfname, mode);
-      } while (!deltafp && (errno == EINTR || errno == EMFILE));
-      if (!deltafp) 
-	CmiAbort("Cannot open Projections Delta Trace File for writing...\n");
-    }
-  }
-#else
-  if (nonDeltaLog) {
     do {
       fp = fopen(fname, mode);
     } while (!fp && (errno == EINTR || errno == EMFILE));
@@ -224,12 +194,13 @@ void LogPool::openLog(const char *mode)
       CmiAbort("Cannot open Projections Non Delta Trace File for writing...\n");
     }
   }
-  if (deltaLog) {
-    do {
-      deltafp = fopen(dfname, mode);
-    } while (!deltafp && (errno == EINTR || errno == EMFILE));
-    if(!deltafp) 
-      CmiAbort("Cannot open Projections Delta Trace File for writing...\n");
+#else
+  do {
+    fp = fopen(fname, mode);
+  } while (!fp && (errno == EINTR || errno == EMFILE));
+  if (!fp) {
+    CkPrintf("[%d] Attempting to open file [%s]\n",CkMyPe(),fname);
+    CmiAbort("Cannot open Projections Non Delta Trace File for writing...\n");
   }
 #endif
 }
@@ -238,23 +209,14 @@ void LogPool::closeLog(void)
 {
 #if CMK_PROJECTIONS_USE_ZLIB
   if(compressed) {
-    if (nonDeltaLog) gzclose(zfp);
-    if (deltaLog) gzclose(deltazfp);
+    gzclose(zfp);
     return;
   }
 #endif
-  if (nonDeltaLog) { 
 #if !defined(_WIN32) || defined(__CYGWIN__)
-    fsync(fileno(fp)); 
+  fsync(fileno(fp)); 
 #endif
-    fclose(fp); 
-  }
-  if (deltaLog)  { 
-#if !defined(_WIN32) || defined(__CYGWIN__)
-    fsync(fileno(deltafp)); 
-#endif
-    fclose(deltafp);  
-  }
+  fclose(fp);
 }
 
 LogPool::LogPool(char *pgm) {
@@ -337,47 +299,16 @@ void LogPool::createFile(const char *fix)
   int len = strlen(pathPlusFilePrefix)+strlen(".logold")+strlen(pestr)+3;
 #endif
 
-  if (nonDeltaLog) {
-    fname = new char[len];
-  }
-  if (deltaLog) {
-    dfname = new char[len];
-  }
+  fname = new char[len];
 #if CMK_PROJECTIONS_USE_ZLIB
   if(compressed) {
-    if (deltaLog && nonDeltaLog) {
-      sprintf(fname, "%s.%s.logold.gz",  pathPlusFilePrefix, pestr);
-      sprintf(dfname, "%s.%s.log.gz", pathPlusFilePrefix, pestr);
-    } else {
-      if (nonDeltaLog) {
-	sprintf(fname, "%s.%s.log.gz", pathPlusFilePrefix,pestr);
-      } else {
-	sprintf(dfname, "%s.%s.log.gz", pathPlusFilePrefix, pestr);
-      }
-    }
-  } else {
-    if (deltaLog && nonDeltaLog) {
-      sprintf(fname, "%s.%s.logold", pathPlusFilePrefix, pestr);
-      sprintf(dfname, "%s.%s.log", pathPlusFilePrefix, pestr);
-    } else {
-      if (nonDeltaLog) {
-	sprintf(fname, "%s.%s.log", pathPlusFilePrefix, pestr);
-      } else {
-	sprintf(dfname, "%s.%s.log", pathPlusFilePrefix, pestr);
-      }
-    }
+    sprintf(fname, "%s.%s.log.gz", pathPlusFilePrefix,pestr);
+  }
+  else {
+    sprintf(fname, "%s.%s.log", pathPlusFilePrefix, pestr);
   }
 #else
-  if (deltaLog && nonDeltaLog) {
-    sprintf(fname, "%s.%s.logold", pathPlusFilePrefix, pestr);
-    sprintf(dfname, "%s.%s.log", pathPlusFilePrefix, pestr);
-  } else {
-    if (nonDeltaLog) {
-      sprintf(fname, "%s.%s.log", pathPlusFilePrefix, pestr);
-    } else {
-      sprintf(dfname, "%s.%s.log", pathPlusFilePrefix, pestr);
-    }
-  }
+  sprintf(fname, "%s.%s.log", pathPlusFilePrefix, pestr);
 #endif
   fileCreated = true;
   delete[] pathPlusFilePrefix;
@@ -473,31 +404,16 @@ void LogPool::writeHeader()
   if(!binary) {
 #if CMK_PROJECTIONS_USE_ZLIB
     if(compressed) {
-      if (nonDeltaLog) {
-	gzprintf(zfp, "PROJECTIONS-RECORD %d\n", numEntries);
-      }
-      if (deltaLog) {
-	gzprintf(deltazfp, "PROJECTIONS-RECORD %d DELTA\n", numEntries);
-      }
+      gzprintf(zfp, "PROJECTIONS-RECORD %d\n", numEntries);
     } 
     else /* else clause is below... */
 #endif
     /*... may hang over from else above */ {
-      if (nonDeltaLog) {
-	fprintf(fp, "PROJECTIONS-RECORD %d\n", numEntries);
-      }
-      if (deltaLog) {
-	fprintf(deltafp, "PROJECTIONS-RECORD %d DELTA\n", numEntries);
-      }
+      fprintf(fp, "PROJECTIONS-RECORD %d\n", numEntries);
     }
   }
   else { // binary
-      if (nonDeltaLog) {
-        fwrite(&numEntries,sizeof(numEntries),1,fp);
-      }
-      if (deltaLog) {
-        fwrite(&numEntries,sizeof(numEntries),1,deltafp);
-      }
+    fwrite(&numEntries,sizeof(numEntries),1,fp);
   }
 }
 
@@ -506,8 +422,7 @@ void LogPool::writeLog(void)
   createFile();
   OPEN_LOG
   writeHeader();
-  if (nonDeltaLog) write(0);
-  if (deltaLog) write(1);
+  write(0);
   CLOSE_LOG
 }
 
@@ -1159,10 +1074,6 @@ TraceProjections::TraceProjections(char **argv):
   // both logs (if both arguments appear on the command line).
 
   // switch to OLD log format until everything works // Gengbin
-  nonDeltaLog = 1;
-  deltaLog = 0;
-  deltaLog = CmiGetArgFlagDesc(argv, "+logDelta",
-				  "Generate Delta encoded and simple timestamped log files");
 
   _logPool = new LogPool(CkpvAccess(traceRoot));
   _logPool->setNumSubdirs(nSubdirs);
