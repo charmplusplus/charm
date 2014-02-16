@@ -283,11 +283,12 @@ private:
             individualDimensionSizes_[dimensionOfArrivingMsgs_] - 1;
         }
         // contributors that were not assigned a team
-        // for any receiving PE, there can be at most one such contributor
-        if (myLocationIndex_[numDimensions_ - 1]
-            + (numDimensions_ - myAssignedDim_) * teamSize_
-            < individualDimensionSizes_[numDimensions_ - 1]) {
+        int offset = myLocationIndex_[numDimensions_ - 1] +
+          (numDimensions_ - myAssignedDim_) * teamSize_;
+
+        while (offset < individualDimensionSizes_[numDimensions_ - 1]) {
           senderCount++;
+          offset += teamSize_;
         }
       }
     }
