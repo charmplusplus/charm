@@ -454,7 +454,8 @@ insertData(const void *dataItemHandle, int destinationPe) {
 
   const static bool copyIndirectly = true;
 
-  Route destinationRoute = myRouter_.determineInitialRoute(destinationPe);
+  Route destinationRoute;
+  myRouter_.determineInitialRoute(destinationPe, destinationRoute);
   storeMessage(destinationPe, destinationRoute, dataItemHandle,
                copyIndirectly);
   // release control to scheduler if requested by the user,
@@ -611,9 +612,9 @@ receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
     else if (destinationPe != TRAM_BROADCAST) {
       if (destinationPe != lastDestinationPe) {
         // do this once per sequence of items with the same destination
-        destinationRoute =
-          myRouter_.determineRoute(destinationPe,
-                                   myRouter_.dimensionReceived(msg->msgType));
+	myRouter_.determineRoute(destinationPe,
+				 myRouter_.dimensionReceived(msg->msgType),
+				 destinationRoute);
       }
       storeMessage(destinationPe, destinationRoute, &dataItem);
     }
@@ -1097,8 +1098,8 @@ public:
     std::vector<ArrayDataItem<dtype, itype> > &bufferedItems
       = misdeliveredItems[arrayId];
 
-    Route destinationRoute =
-      this->myRouter_.determineInitialRoute(destinationPe);
+    Route destinationRoute;
+    this->myRouter_.determineInitialRoute(destinationPe, destinationRoute);
     for (int i = 0; i < bufferedItems.size(); i++) {
       this->storeMessage(destinationPe, destinationRoute, &bufferedItems[i]);
     }
@@ -1117,8 +1118,8 @@ public:
       // but the search could be expensive; instead, with the current code
       // the items will be forwarded after being delivered to the previous owner
 
-//    Route oldLocation =
-//      myRouter_.determineInitialRoute(prevOwner);
+//    Route oldLocation;
+//    myRouter_.determineInitialRoute(prevOwner, oldLocation);
 
 //    MeshStreamerMessage<dtype> *messageBuffer = dataBuffers_
 //     [oldLocation.dimension][oldLocation.bufferIndex];

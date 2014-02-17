@@ -92,9 +92,11 @@ public:
   //   // inline frequently accessed and/or short functions
   //   void additionalInitialization();
   //   inline int nextPeAlongRoute(int dimension, int dimensionIndex);
-  //   inline Route determineInitialRoute(int destinationPe);
-  //   inline Route determineRoute(int destinationPe,
-  //                               int dimensionReceivedAlong);
+  //   inline void determineInitialRoute(int destinationPe,
+  //                                     Route &routeToDestination);
+  //   inline void determineRoute(int destinationPe,
+  //                              int dimensionReceivedAlong,
+  //                              Route &routeToDestination);
   //   void updateCompletionProgress(CompletionStatus &currentStatus);
   //   inline int numBuffersPerDimension(int dimension);
   //   inline int maxNumAllocatedBuffers();
@@ -154,14 +156,17 @@ public:
 
   }
 
-  inline Route determineInitialRoute(int destinationPe) {
+  inline void determineInitialRoute(int destinationPe,
+                                    Route &routeToDestination) {
     // treat newly inserted items as if they were received along
     // a higher dimension (e.g. for a 3D mesh, received along 4th dimension)
-    return static_cast<Derived*>(this)->
-      determineRoute(destinationPe, this->initialRoutingDimension_ + 1);
+    static_cast<Derived*>(this)->
+      determineRoute(destinationPe, this->initialRoutingDimension_ + 1,
+                     routeToDestination);
   }
 
-  inline Route determineRoute(int destinationPe, int dimensionReceivedAlong) {
+  inline void determineRoute(int destinationPe, int dimensionReceivedAlong,
+                             Route &routeToDestination) {
 
 #ifdef CMK_TRAM_CACHE_ROUTE
     if (this->isCached_[destinationPe]) {
@@ -169,18 +174,16 @@ public:
     }
 #endif
 
-    Route routeToDestination;
     for (int i = dimensionReceivedAlong - 1; i >= 0; i--) {
       int dimensionIndex = routeAlongDimension(destinationPe, i);
       if (dimensionIndex != this->myLocationIndex_[i]) {
         static_cast<Derived*>(this)->
           assignRoute(i, dimensionIndex, routeToDestination);
-        return routeToDestination;
+        return;
       }
     }
 
     routeToDestination.dimension = routeNotFound;
-    return routeToDestination;
   }
 
   void updateCompletionProgress(CompletionStatus &currentStatus) {
@@ -375,11 +378,11 @@ public:
     return destinationPe;
   }
 
-  inline Route determineRoute(int destinationPe, int dimensionReceivedAlong) {
+  inline void determineRoute(int destinationPe, int dimensionReceivedAlong,
+                             Route &routeToDestination) {
 
-    Route routeToDestination =
-      MeshRouter<NodeAwareMeshRouter>::determineRoute(destinationPe,
-                                                      dimensionReceivedAlong);
+    MeshRouter<NodeAwareMeshRouter>::
+      determineRoute(destinationPe, dimensionReceivedAlong, routeToDestination);
 
     if (routeToDestination.dimension == routeNotFound) {
       int dimensionIndex =
@@ -387,7 +390,6 @@ public:
       assignRoute(numDimensions_ - 1, dimensionIndex, routeToDestination);
     }
 
-    return routeToDestination;
   }
 
   void updateCompletionProgress(CompletionStatus &currentStatus) {
