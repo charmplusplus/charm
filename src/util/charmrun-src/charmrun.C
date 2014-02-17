@@ -3896,7 +3896,7 @@ int rsh_fork(int nodeno,const char *startScript)
   rshargv[num++]=nodetab_name(nodeno);
   rshargv[num++]="-l";
   rshargv[num++]=nodetab_login(nodeno);
-  rshargv[num++]="/bin/sh -f";
+  rshargv[num++]="/bin/bash -f";
   rshargv[num++]=0;
   if (arg_verbose) printf("Charmrun> Starting %s %s -l %s %s\n",nodetab_shell(nodeno), nodetab_name(nodeno),nodetab_login(nodeno), rshargv[num-2]);
 		  
