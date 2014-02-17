@@ -274,7 +274,7 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
   dataBuffers_.resize(numDimensions_);
   for (int i = 0; i < numDimensions; i++) {
     dataBuffers_[i].assign(myRouter_.numBuffersPerDimension(i),
-			   (MeshStreamerMessage<dtype> *) NULL);
+                           (MeshStreamerMessage<dtype> *) NULL);
   }
 
   // a bufferSize input of 0 indicates it should be calculated by the library
@@ -456,7 +456,7 @@ insertData(const void *dataItemHandle, int destinationPe) {
 
   Route destinationRoute = myRouter_.determineInitialRoute(destinationPe);
   storeMessage(destinationPe, destinationRoute, dataItemHandle,
-	       copyIndirectly);
+               copyIndirectly);
   // release control to scheduler if requested by the user,
   //   assume caller is threaded entry
   if (yieldFlag_ && ++yieldCount_ == 1024) {
@@ -559,7 +559,7 @@ init(int numContributors, CkCallback startCb, CkCallback endCb,
   CkCallback flushCb(CkIndex_MeshStreamer<dtype, RouterType>::
                      enablePeriodicFlushing(), this->thisProxy);
   CkCallback finish(CkIndex_MeshStreamer<dtype, RouterType>::finish(),
-		    this->thisProxy);
+                    this->thisProxy);
   detector_ = detector;
   detectorLocalObj_ = detector_.ckLocalBranch();
   initLocalClients();
@@ -651,9 +651,9 @@ inline void MeshStreamer<dtype, RouterType>::sendLargestBuffer() {
     maxSize = 0;
     for (int j = 0; j < messageBuffers.size(); j++) {
       if (messageBuffers[j] != NULL &&
-	  messageBuffers[j]->numDataItems > maxSize) {
-	maxSize = messageBuffers[j]->numDataItems;
-	flushIndex = j;
+          messageBuffers[j]->numDataItems > maxSize) {
+        maxSize = messageBuffers[j]->numDataItems;
+        flushIndex = j;
       }
     }
 
@@ -766,7 +766,7 @@ void periodicProgressFunction(void *MeshStreamerObj, double time) {
 template <class dtype, class RouterType>
 void MeshStreamer<dtype, RouterType>::registerPeriodicProgressFunction() {
   CcdCallFnAfter(periodicProgressFunction<dtype, RouterType>, (void *) this,
-		 progressPeriodInMs_);
+                 progressPeriodInMs_);
 }
 
 template <class dtype, class ClientType, class RouterType>
@@ -818,9 +818,9 @@ private:
 public:
 
   GroupMeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
-		    int *dimensionSizes,
-		    CkGroupID clientGID,
-		    bool yieldFlag = 0, double progressPeriodInMs = -1.0) {
+                    int *dimensionSizes,
+                    CkGroupID clientGID,
+                    bool yieldFlag = 0, double progressPeriodInMs = -1.0) {
     this->ctorHelper(maxNumDataItemsBuffered, numDimensions, dimensionSizes,
                0, yieldFlag, progressPeriodInMs);
     clientGID_ = clientGID;
@@ -829,8 +829,8 @@ public:
   }
 
   GroupMeshStreamer(int numDimensions, int *dimensionSizes,
-		    CkGroupID clientGID,
-		    int bufferSize, bool yieldFlag = 0,
+                    CkGroupID clientGID,
+                    int bufferSize, bool yieldFlag = 0,
                     double progressPeriodInMs = -1.0) {
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize,
                yieldFlag, progressPeriodInMs);
@@ -956,8 +956,8 @@ public:
   };
 
   ArrayMeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
-		    int *dimensionSizes, CkArrayID clientAID,
-		    bool yieldFlag = 0, double progressPeriodInMs = -1.0) {
+                    int *dimensionSizes, CkArrayID clientAID,
+                    bool yieldFlag = 0, double progressPeriodInMs = -1.0) {
 
     this->ctorHelper(maxNumDataItemsBuffered, numDimensions, dimensionSizes, 0,
                      yieldFlag, progressPeriodInMs);
@@ -967,7 +967,7 @@ public:
   }
 
   ArrayMeshStreamer(int numDimensions, int *dimensionSizes,
-		    CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
+                    CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
                     double progressPeriodInMs = -1.0) {
 
     this->ctorHelper(0, numDimensions, dimensionSizes, bufferSize, yieldFlag,
@@ -1069,17 +1069,17 @@ public:
       const DataItemHandle *tempHandle =
         (const DataItemHandle *) dataItemHandle;
       (destinationBuffer->dataItems)[numDataItems].arrayIndex =
-	tempHandle->arrayIndex;
+        tempHandle->arrayIndex;
       (destinationBuffer->dataItems)[numDataItems].sourcePe = this->myIndex_;
       (destinationBuffer->dataItems)[numDataItems].dataItem =
-	*(tempHandle->dataItem);
+        *(tempHandle->dataItem);
       return ++destinationBuffer->numDataItems;
     }
     else {
       // this is an item received along the route to destination
       // we can copy it from the received message
       return MeshStreamer<ArrayDataItem<dtype, itype>, RouterType>::
-	      copyDataItemIntoMessage(destinationBuffer, dataItemHandle);
+        copyDataItemIntoMessage(destinationBuffer, dataItemHandle);
     }
   }
 
