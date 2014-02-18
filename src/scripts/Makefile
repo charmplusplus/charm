@@ -27,7 +27,7 @@ INC=../include
 
 all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc
 
-all-test: bigsim AMPI
+all-test: bigsim LIBS
 	cd ../tests ; $(MAKE) all OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) all OPTS='$(OPTS)'
 
@@ -46,11 +46,13 @@ PVM: converse $(L)/libpvmc.a
 AMR: charm++ LIBS
 	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
 
-FEM: charm++ CONVLIBS
+FEM: charm++ AMPI
 	$(MAKE) -C libs/ck-libs/ FEM
 FEMC: FEM
 FEMF: FEM
+
 ParFUM: FEM
+	$(MAKE) -C libs/ck-libs/ ParFUM
 
 MBLOCK: AMPI MBLOCKC MBLOCKF
 
@@ -58,7 +60,12 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC
 
-AMPI:  charm++ LIBS
+AMPI:  charm++ ddt
+	$(MAKE) -C libs/ck-libs/ ampi
+
+ddt:  charm++
+	$(MAKE) -C libs/conv-libs/ $@
+
 AMPIC AMPIF: AMPI
 
 ARMCI: charm++ LIBS
@@ -124,14 +131,14 @@ LIBS: CONVLIBS CHARMLIBS
 	cd libs; $(MAKE) otherlibs
 	echo "Built LIBS Successfully"
 
-bgtest: bigsim AMPI FEM
+bgtest: bigsim LIBS
 	cd ../tests ; $(MAKE) bgtest OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) bgtest OPTS='$(OPTS)'
 
-syncfttest causalfttest mpisyncfttest mlogfttest: charm++ AMPI
+syncfttest causalfttest mpisyncfttest mlogfttest: charm++ LIBS
 	cd ../tests ; $(MAKE) $@ OPTS='$(OPTS)'
 
-test: bigsim AMPI
+test: bigsim LIBS
 	cd ../tests ; $(MAKE) test OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) test OPTS='$(OPTS)'
 
