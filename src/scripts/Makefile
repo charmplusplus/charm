@@ -145,7 +145,7 @@ test: bigsim LIBS
 test-converse: converse
 	cd ../tests ; $(MAKE) test-converse  OPTS='$(OPTS)'
 
-test-charm: charm++ METIS
+test-charm: charm++
 	cd ../tests ; $(MAKE) test-charm  OPTS='$(OPTS)'
 
 test-AMPI: AMPI
@@ -842,7 +842,7 @@ bigsim:  bigsim-target
 
 bigemulator: bigsim
 
-bigsim-target: charm++ $(L)/libconv-bigsim.a $(L)/libconv-bigsim-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a METIS
+bigsim-target: charm++ $(L)/libconv-bigsim.a $(L)/libconv-bigsim-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a
 
 $(L)/libbluegene.a: BlueGene.o
 	$(CHARMC) -o $@ $^
