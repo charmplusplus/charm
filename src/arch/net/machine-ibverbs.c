@@ -575,10 +575,9 @@ loop:
 			calcMaxSize = 10000;
 		}
 	}*/
-//	maxRecvBuffers=80;
 	maxRecvBuffers=calcMaxSize;
-	maxTokens = maxRecvBuffers;
-//	maxTokens = 80;
+	if (CmiGetArgIntDesc(argv,"+IBVMaxSendTokens",&maxTokens,"User Set IBV Max Outstanding Send Tokens") == 0)
+	  maxTokens = 1000; // this value may need to be tweaked later
 	context->tokensLeft=maxTokens;
 	context->qp=NULL;
 	//tokensPerProcessor=4;
