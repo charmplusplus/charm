@@ -12,6 +12,7 @@ Originally written by Karthik Mahesh, September 2000.
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <metis.h>
 #include "fem_impl.h"
 #include "cktimer.h"
 
@@ -194,18 +195,6 @@ void mesh2graph(const FEM_Mesh *m, Graph *g)
 }
 
 
-//FIXME: Shouldn't these prototypes come from some METIS header file?
-typedef int idxtype;
-extern "C" void 
-METIS_PartGraphRecursive(int *, int *, int *, idxtype *, idxtype *, 
-int *, int *, int *, int *, int *, idxtype *);
-
-extern "C" void
-METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
-                       int* wgtflag, int* numflag, int* nparts, int* options,
-                       int* edgecut, int* part);
-
-
 /*Partition this mesh's elements into n chunks,
  writing each element's 0-based chunk number to elem2chunk.
 */
@@ -223,17 +212,14 @@ void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 	int *adjStart; /*Maps elem # -> start index in adjacency list*/
 	int *adjList; /*Lists adjacent vertices for each element*/
 	g.toAdjList(adjStart,adjList);
-	int ecut,numflag=0;
-	int wgtflag = 0; // no weights associated with elements or edges
-	int opts[5];
-	opts[0] = 0; //use default values
+	int ecut,ncon=1;
 	time.start("FEM Split> Calling metis partitioner");
 	if (nchunks<8) /*Metis manual says recursive version is higher-quality here*/
-	  METIS_PartGraphRecursive(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
-                        &nchunks, opts, &ecut, elem2chunk);
+	  METIS_PartGraphRecursive(&nelems, &ncon, adjStart, adjList, NULL, NULL, NULL,
+                        &nchunks, NULL, NULL, NULL, &ecut, elem2chunk);
 	else /*For many chunks, Kway is supposedly faster */
-	  METIS_PartGraphKway(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
-                        &nchunks, opts, &ecut, elem2chunk);
+	  METIS_PartGraphKway(&nelems, &ncon, adjStart, adjList, NULL, NULL, NULL,
+                        &nchunks, NULL, NULL, NULL, &ecut, elem2chunk);
 	delete[] adjStart;
 	delete[] adjList;
 }

@@ -16,7 +16,7 @@
 #include "ParFUM_internals.h"
 #include "MsaHashtable.h"
 
-#include "../parmetis/parmetis.h"
+#include <parmetis.h>
 
 double elemlistaccTime=0;
 extern void clearPartition(void);

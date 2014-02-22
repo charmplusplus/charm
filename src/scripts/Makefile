@@ -455,9 +455,6 @@ QUICK_THREADS: $(CVHEADERS)
 	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
 	touch QUICK_THREADS
 
-METIS:  charm++
-	cd libs/ck-libs/parmetis/METISLib && $(MAKE) OPTS='$(OPTS)'
-
 CONVLIBS: converse
 	cd libs; $(MAKE) convlibs OPTS='$(OPTS)'
 

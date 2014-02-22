@@ -10,13 +10,13 @@
 
 
 #include <assert.h>
+#include <parmetis.h>
 #include "fem_impl.h"
 #include "fem.h"
 #include "fem.decl.h"
 #include "msa/msa.h"
 #include "cklists.h"
 #include "pup.h"
-#include "../parmetis/parmetis.h"
 #include "parallel_part.h"
 
 
