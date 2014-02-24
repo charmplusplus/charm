@@ -15,7 +15,7 @@ class LBObj
 friend class LBDB;
 
 public:
-  LBObj(LBDB *_parentDB, const LDObjHandle &_h, void *usr_ptr = NULL, bool _migratable=true, bool _asyncArrival = false) {
+  LBObj(const LDObjHandle &_h, void *usr_ptr = NULL, bool _migratable=true, bool _asyncArrival = false) {
     data.handle = _h;
     data.migratable = _migratable;
     data.asyncArrival = _asyncArrival;
@@ -25,7 +25,6 @@ public:
 //    data.minWall = 1e6;
 //    data.maxWall = 0.;
     localUserData = usr_ptr;
-    parentDB = _parentDB;
 //    migratable = _migratable;
 //    registered = true;
     startWTime = -1.0;
@@ -102,7 +101,6 @@ public:
 #endif
 private:
 
-  LBDB* parentDB;
   void *localUserData;               // local user data, not in database
 //  LDOMHandle parentOM;
 //  LDObjHandle myhandle;

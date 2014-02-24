@@ -33,7 +33,6 @@ void LBObj::Clear(void)
 
 void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
 {
-  parentDB->MeasuredObjTime(walltime,cputime);
   data.wallTime += walltime;
 #if CMK_LB_CPUTIMER
   data.cpuTime += cputime;

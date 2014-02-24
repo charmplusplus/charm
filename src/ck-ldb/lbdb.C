@@ -90,6 +90,7 @@ extern "C" void LDObjTime(LDObjHandle &_h,
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
   obj->IncrementTime(walltime,cputime);
+  db->MeasuredObjTime(walltime,cputime);
 }
   
 extern "C" void LDGetObjLoad(LDObjHandle &_h, LBRealType *wallT, LBRealType *cpuT)
@@ -264,6 +265,7 @@ extern "C" void LDObjectStop(const LDObjHandle &_h)
     LBRealType walltime, cputime;
     obj->StopTimer(&walltime,&cputime);
     obj->IncrementTime(walltime,cputime);
+    db->MeasuredObjTime(walltime,cputime);
   }
   db->NoRunningObj();
 }

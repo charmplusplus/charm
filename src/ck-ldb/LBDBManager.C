@@ -126,7 +126,7 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
     }
     if(newpos==-1) newpos = objs.length();
     newhandle.handle = newpos;
-    LBObj *obj = new LBObj(this, newhandle, _userData, _migratable);
+    LBObj *obj = new LBObj(newhandle, _userData, _migratable);
     objs.insert(newpos, obj);
     //objCount is not increased since it's the original object which is pupped
     //through out-of-core emulation. 
@@ -137,7 +137,7 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
     //BIGSIM_OOC DEBUGGING
     //CkPrintf("Proc[%d]: In AddObj for real migration\n", CkMyPe());
     newhandle.handle = objs.length();
-    LBObj *obj = new LBObj(this, newhandle, _userData, _migratable);
+    LBObj *obj = new LBObj(newhandle, _userData, _migratable);
     objs.insertAtEnd(obj);
     objCount++;
   }
