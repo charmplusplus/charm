@@ -6310,6 +6310,12 @@ int AMPI_System(const char *cmd) {
   return TCHARM_System(cmd);
 }
 
+CDECL
+int AMPI_Pcontrol(const int level, ...)
+{
+    return MPI_SUCCESS;
+}
+
 #if CMK_BIGSIM_CHARM
 
 extern "C" void startCFnCall(void *param,void *msg)

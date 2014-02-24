@@ -185,6 +185,8 @@ FDECL {
 #define mpi_info_dup FTN_NAME ( MPI_INFO_DUP , mpi_info_dup )
 #define mpi_info_free FTN_NAME ( MPI_INFO_FREE , mpi_info_free )
 
+#define mpi_pcontrol FTN_NAME ( MPI_PCONTROL , mpi_pcontrol )
+
 #define REDUCERF(caps, nocaps) \
 void FTN_NAME(caps, nocaps)(void *iv, void *iov, int *len, MPI_Datatype *dt){ \
   caps(iv, iov, len, dt); \
@@ -1100,6 +1102,10 @@ void mpi_info_maxmemory(){
 
 void mpi_info_memory(){
   CkPrintf("Memory %ld\n", CmiMemoryUsage());
+}
+
+void mpi_pcontrol(int *level) {
+  AMPI_Pcontrol(*level);
 }
 
 #define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)

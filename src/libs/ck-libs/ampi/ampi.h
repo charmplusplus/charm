@@ -598,7 +598,8 @@ int AMPI_Finalized(int *);
 int AMPI_Abort(MPI_Comm comm, int errorcode);
 
 /*** Profiling ***/
-/* int AMPI_Pcontrol(const int level, ...); */
+#define MPI_Pcontrol AMPI_Pcontrol
+int AMPI_Pcontrol(const int level, ...);
 
 /***extras***/
 #define MPI_Yield AMPI_Yield
