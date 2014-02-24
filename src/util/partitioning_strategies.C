@@ -17,8 +17,8 @@ using namespace std;
 #define PARTITION_TOPOLOGY_VERBOSE 0
 #endif
 
-/** 
- *  Author: Harshitha Menon, Nikhil Jain 
+/**
+ *  Author: Harshitha Menon, Nikhil Jain
  *  Contact: gplkrsh2@illinois.edu, nikhil@illinois.edu
  *
  *  More details about this implementation of the Hilbert curve can be found
@@ -70,10 +70,10 @@ void getHilbertList(int * procList)
 
     //check if physical node is allocatd to us
     for(int i = 0; i < numDims; i++) {
-      pdims[i] = hcoords[i]; 
+      pdims[i] = hcoords[i];
     }
     TopoManager_getRanks(&numranks, ranks, pdims);
-    if(numranks == 0) continue; 
+    if(numranks == 0) continue;
 
     //check if both chips on the gemini were allocated to us
     for(int j = 0; j < numranks; j++) {
@@ -90,7 +90,7 @@ void getHilbertList(int * procList)
 
 /** \brief A function to traverse the given processors, and get a planar list
  */
-void getPlanarList(int *procList) 
+void getPlanarList(int *procList)
 {
   int numDims;
   int *dims, *pdims;
@@ -119,7 +119,7 @@ void getPlanarList(int *procList)
       pdims[j] = (pdims[j]+1) % dims[j];
       if(pdims[j] != 0) break;
     }
-    if(numranks == 0) continue; 
+    if(numranks == 0) continue;
 
     for(int j = 0; j < numranks; j++) {
       procList[currPos++] = ranks[j];
