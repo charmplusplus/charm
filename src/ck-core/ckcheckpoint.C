@@ -33,6 +33,7 @@ typedef struct _GroupInfo{
         CkGroupID gID;
         int MigCtor, DefCtor;
         char name[256];
+        bool present;
 } GroupInfo;
 PUPbytes(GroupInfo)
 PUPmarshall(GroupInfo)
@@ -351,6 +352,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
     for (i = 0; i < numGroups; i++) {
       tmpInfo[i].gID = (*idTable)[i];
       TableEntry ent = objectTable->find(tmpInfo[i].gID);
+      tmpInfo[i].present = ent.getObj() != NULL;
       tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
       tmpInfo[i].DefCtor = _chareTable[ent.getcIdx()]->defCtor;
       strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
@@ -367,6 +369,9 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
 
   for (i = 0; i < numGroups; i++) 
   {
+    if (!tmpInfo[i].present)
+      continue;
+
     CkGroupID gID = tmpInfo[i].gID;
     if (p.isUnpacking()) {
       int eIdx = tmpInfo[i].MigCtor;
