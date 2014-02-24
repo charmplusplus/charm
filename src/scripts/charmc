@@ -763,9 +763,9 @@ do
 	-l*|*.a)
 		if [ -n "$POST_LANGUAGE" ]
 		then
-			POST_LIBRARIES=`AppendList $POST_LIBRARIES $arg`
+			POST_LIBRARIES="$POST_LIBRARIES $arg"
 		else
-			PRE_LIBRARIES=`AppendList $PRE_LIBRARIES $arg`
+			PRE_LIBRARIES="$PRE_LIBRARIES $arg"
 		fi
 		;;
 
