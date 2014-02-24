@@ -178,7 +178,7 @@ AC_ARG_ENABLE([lbuserdata],
             [AS_HELP_STRING([--enable-lbuserdata],
               [enable LB user data])],
             [enable_lbuserdata=$enableval],
-            [enable_lbuserdata=yes])
+            [enable_lbuserdata=no])
 
 if test "$enable_lbuserdata" = "yes"
 then
