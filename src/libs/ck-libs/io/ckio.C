@@ -146,7 +146,11 @@ namespace Ck { namespace IO {
           thisProxy[CkMyPe()].run();
         }
 
-        Manager(CkMigrateMessage *m) : CBase_Manager(m) { }
+        Manager(CkMigrateMessage *m)
+          : CBase_Manager(m)
+        {
+          manager = this;
+        }
 
         void pup(PUP::er &p) {
           CBase_Manager::pup(p);
