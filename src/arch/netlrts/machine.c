@@ -970,7 +970,13 @@ CmiPrintStackTrace(0);
   } else {
 	char msgBuf[80];
   	skt_set_abort(ignore_further_errors);
-	sprintf(msgBuf,"Fatal error on PE %d> ",CmiMyPe());
+    if (CmiNumPartitions() == 1) {
+        sprintf(msgBuf,"Fatal error on PE %d> ",CmiMyPe());
+    }
+    else
+    {
+        sprintf(msgBuf,"Fatal error on Partition %d PE %d> ", CmiMyPartition(), CmiMyPe());
+    }
   	ctrl_sendone_nolock("abort",msgBuf,strlen(msgBuf),s,strlen(s)+1);
   }
 }
