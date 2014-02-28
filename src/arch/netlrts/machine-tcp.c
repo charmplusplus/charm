@@ -303,7 +303,7 @@ static void IntegrateMessageDatagram(char **msg, int len)
       OtherNode node = nodes_by_pe[srcpe];
       newmsg = node->asm_msg;
       if (newmsg == NULL) {
-        size = CmiMsgHeaderGetLength(*msg);
+        size = CMI_MSG_SIZE(*msg);
         if (size < len) KillEveryoneCode(4559312);
 #if FRAGMENTATION
         if (size == len) {		/* whole message in one packet */

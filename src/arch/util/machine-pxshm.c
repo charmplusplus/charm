@@ -1,5 +1,4 @@
 /** @file
-			size = CmiMsgHeaderGetLength(msg);
  * pxshm --> posix shared memory based network layer for communication
  * between processes on the same node
  * This is not going to be the primary mode of communication 
@@ -35,7 +34,6 @@ There are three options here for synchronization:
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
-
 
 /************** 
    Determine which type of synchronization to use 
@@ -215,11 +213,6 @@ void CmiInitPxshm(char **argv){
 
 	pxshmContext = (PxshmContext *)calloc(1,sizeof(PxshmContext));
 
-#if CMK_NET_VERSION
-	if(Cmi_charmrun_pid <= 0){
-		CmiAbort("pxshm must be run with charmrun");
-	}
-#endif
 	calculateNodeSizeAndRank(argv);
 	if(pxshmContext->nodesize == 1) return;
 	
@@ -245,10 +238,8 @@ void CmiInitPxshm(char **argv){
         srand(getpid());
         int Cmi_charmrun_pid = rand();
         PMI_Bcast(&Cmi_charmrun_pid, sizeof(int));
-#elif !CMK_NET_VERSION
-        #error "need a unique number"
+        snprintf(&(pxshmContext->prefixStr[0]),PREFIXSTRLEN-1,"charm_pxshm_%d",Cmi_charmrun_pid);
 #endif
-	snprintf(&(pxshmContext->prefixStr[0]),PREFIXSTRLEN-1,"charm_pxshm_%d",Cmi_charmrun_pid);
 
 	MACHSTATE2(3,"CminitPxshm %s %d pre setupSharedBuffers",pxshmContext->prefixStr,pxshmContext->nodesize);
 
@@ -371,8 +362,8 @@ void CmiSendMessagePxshm(char *msg, int size, int dstnode, int *refcount)
 	double _startSendTime = CmiWallTimer();
 #endif
 
-        LrtsPrepareEnvelope(msg, size);
-	
+	LrtsPrepareEnvelope(msg, size);
+
 	int dstRank = PxshmRank(dstnode);
 	MEMDEBUG(CmiMemoryCheck());
   
@@ -739,9 +730,6 @@ inline int flushSendQ(PxshmSendQ *dstSendQ){
 		int ret = sendMessageRec(ogm,dstBuf,dstSendQ);
 		if(ret==1){
 			sent++;
-#if CMK_NET_VERSION
-                        GarbageCollectMsg(ogm);
-#endif
 		}
 		count--;
 	}
@@ -864,7 +852,6 @@ inline void flushAllSendQs(){
 	}	
 };
 
-void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int broot);
 
 void emptyRecvBuf(sharedBufData *recvBuf){
  	int numMessages = recvBuf->header->count;
@@ -879,21 +866,12 @@ void emptyRecvBuf(sharedBufData *recvBuf){
 		char *msg = ptr;
 		char *newMsg;
 
-#if CMK_NET_VERSION
-		DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
-		size = CmiMsgHeaderGetLength(msg);
-#else
-                size = CmiGetMsgSize(msg);
-#endif
+		size = CMI_MSG_SIZE(msg);
 	
 		newMsg = (char *)CmiAlloc(size);
 		memcpy(newMsg,msg,size);
 
-#if CMK_NET_VERSION
-		handoverPxshmMessage(newMsg,size,rank,broot);
-#else
-                handleOneRecvedMsg(size, newMsg);
-#endif
+		handleOneRecvedMsg(size, newMsg);
 		
 		ptr += size;
 
@@ -908,42 +886,6 @@ void emptyRecvBuf(sharedBufData *recvBuf){
 	recvBuf->header->count=0;
 	recvBuf->header->bytes=0;
 }
-
-
-#if CMK_NET_VERSION
-void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int broot){
-	CmiAssert(rank == 0);
-#if CMK_BROADCAST_SPANNING_TREE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-          	SendSpanningChildren(NULL, 0, total_size, newmsg,broot,rank);
-					}
-#elif CMK_BROADCAST_HYPERCUBE
-        if (rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || rank == DGRAM_NODEBROADCAST
-#endif
-         ){
-          		SendHypercube(NULL, 0, total_size, newmsg,broot,rank);
-					}
-#endif
-
-		switch (rank) {
-    	case DGRAM_BROADCAST: {
-          CmiPushPE(0, newmsg);
-          break;
-      }
-        default:
-				{
-					
-          CmiPushPE(rank, newmsg);
-				}
-  	}    /* end of switch */
-}
-#endif
 
 
 /**************************

@@ -9,7 +9,7 @@ charm++: hybridAPI
 .PHONY: hybridAPI
 endif
 
-$(L)/libconv-cplus-n.a: machine.c machine-common-core.c machine-dgram.c machine-tcp.c machine-eth.c machine.h machine-smp.c conv-onesided.c immediate.c machine-recover.c machine-commthd-util.c $(CVHEADERS)
+$(L)/libconv-cplus-n.a: machine.c machine-common-core.c machine-dgram.c machine-pxshm.c  machine-tcp.c machine-eth.c machine.h machine-smp.c conv-onesided.c immediate.c machine-recover.c machine-commthd-util.c $(CVHEADERS)
 
 charmrun: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS)
 	 cd charmrun-src ; $(MAKE) OPTS='$(OPTS) -Wno-error' -j1 

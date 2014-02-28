@@ -676,6 +676,9 @@ static void parse_netstart(void)
   	Cmi_charmrun_port=0;
   	Cmi_charmrun_pid=0;
         dataport = -1;
+#if CMK_USE_PXSHM
+    CmiAbort("pxshm must be run with charmrun");
+#endif
   }
 }
 
@@ -1541,7 +1544,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
   MACHSTATE(1,"CmiGeneralSend {");
 
-  CmiMsgHeaderSetLength(data, size);
+  CMI_MSG_SIZE(data) = size;
 
   ogm=PrepareOutgoing(cs,pe,size,'F',data);
 
@@ -1963,6 +1966,10 @@ void machine_OffloadAPIProgress() {
 }
 #endif
 
+void LrtsPrepareEnvelope(char *msg, int size)
+{
+  CMI_MSG_SIZE(msg) = size;
+}
 
 
 /*@}*/

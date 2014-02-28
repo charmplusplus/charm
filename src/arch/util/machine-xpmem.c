@@ -921,7 +921,7 @@ void emptyRecvBuf(sharedBufData *recvBuf){
 
 #if CMK_NET_VERSION
 		DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
-		size = CmiMsgHeaderGetLength(msg);
+		size = CMI_MSG_SIZE(msg);
 #else
                 size = CmiGetMsgSize(msg);
 #endif

@@ -369,7 +369,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   LOG(Cmi_clock, Cmi_nodestartGlobal, 'X', dg->srcpe, dg->seqno);
   msg = node->asm_msg;
   if (msg == 0) {
-    size = CmiMsgHeaderGetLength(dg->data);
+    size = CMI_MSG_SIZE(dg->data);
     MACHSTATE3(4,"  Assemble new datagram seq %d from 'pe' %d, len %d",
     	dg->seqno,node->nodestart,size)
     msg = (char *)CmiAlloc(size);
