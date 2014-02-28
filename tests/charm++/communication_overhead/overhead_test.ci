@@ -1,0 +1,34 @@
+mainmodule overhead_test {
+
+  readonly int kFactor;
+  readonly int minMsgSize;
+  readonly int maxMsgSize;
+  readonly int nCycles;
+
+  readonly CProxy_TestDriver testDriverProxy;
+
+  message SimpleMessage {
+    char data[];
+  };
+
+  mainchare TestDriver {
+    entry TestDriver (CkArgMsg *args);
+    entry [reductiontarget] void testDone();
+  };
+
+
+  group CommunicationGroup {
+    entry CommunicationGroup();
+    entry void startOperation(bool includeAlloc);
+    entry void receiveMessage(SimpleMessage *msg);
+    entry void operationFinished(SimpleMessage *msg);
+  };
+
+  array [1D] CommunicationArray {
+    entry CommunicationArray();
+    entry void startOperation(bool includeAlloc);
+    entry void receiveMessage(SimpleMessage *msg);
+    entry void operationFinished(SimpleMessage *msg);
+  };
+
+};
