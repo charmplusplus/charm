@@ -97,7 +97,17 @@ extern int traceBluegeneLinked;
         }	\
         if (connect) _TRACE_BG_ADD_BACKWARD_DEP(curLog);      \
 	}
-	
+
+#define TRACE_BG_AMPI_WAIT(reqs) 	\
+        {	\
+	CthThread th = getAmpiInstance(MPI_COMM_WORLD)->getThread();	\
+ 	TRACE_BG_AMPI_BREAK(th, "AMPI_WAIT", NULL, 0, 0);	\
+    	_TRACE_BG_ADD_BACKWARD_DEP(curLog);	\
+	if (*request != MPI_REQUEST_NULL) {	\
+    	  void *log = (*reqs)[*request]->event;	\
+    	  _TRACE_BG_ADD_BACKWARD_DEP(log);	\
+        }	\
+	}
 
 #define TRACE_BG_AMPI_WAITALL(reqs) 	\
         {	\

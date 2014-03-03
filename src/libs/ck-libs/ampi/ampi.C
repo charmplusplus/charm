@@ -3583,6 +3583,11 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
   }
 #endif
 
+#if CMK_BIGSIM_CHARM
+  void *curLog;		// store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+#endif
+
   AMPI_DEBUG("AMPI_Wait request=%d (*reqs)[*request]=%p (*reqs)[*request]->tag=%d\n", *request, (*reqs)[*request], (int)((*reqs)[*request]->tag) );
   AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   //(*reqs)[*request]->wait(sts);
@@ -3606,6 +3611,10 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
     PUParray(*(pptr->toPUPer), (char *)((*reqs)[*request]->buf), (pptr->pupBytes));
     PUParray(*(pptr->toPUPer), (char *)sts, sizeof(MPI_Status));
   }
+#endif
+
+#if CMK_BIGSIM_CHARM
+  TRACE_BG_AMPI_WAIT(reqs);   // setup forward and backward dependence
 #endif
 
   if((*reqs)[*request]->getType() != 1) { // only free non-blocking request
