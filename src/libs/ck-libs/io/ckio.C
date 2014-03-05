@@ -87,9 +87,9 @@ namespace Ck { namespace IO {
         }
 
         void openFile(string name, CkCallback opened, Options opts) {
-          if (-1 == opts.peStripe)
+          if (0 == opts.peStripe)
             opts.peStripe = 16 * 1024 * 1024;
-          if (-1 == opts.writeStripe)
+          if (0 == opts.writeStripe)
             opts.writeStripe = 4 * 1024 * 1024;
           if (-1 == opts.activePEs)
             opts.activePEs = min(CkNumPes(), 32);

@@ -10,7 +10,7 @@
 namespace Ck { namespace IO {
   struct Options {
     Options()
-      : peStripe(-1), writeStripe(-1), activePEs(-1), basePE(-1), skipPEs(-1)
+      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1)
       { }
 
     /// How much contiguous data (in bytes) should be assigned to each active PE
