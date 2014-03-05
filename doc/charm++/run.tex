@@ -1,7 +1,7 @@
 \section{Launching Programs with \kw{charmrun}}
 \label{charmrun}
 
-When compiling \charmpp{} programs, the charmc linker produces 
+When compiling \charmpp{} programs, the charmc linker produces
 both an executable file and an utility called {\tt charmrun},
 which is used to load the executable onto the parallel machine.
 
@@ -45,19 +45,19 @@ prints the total number of chare creation requests, and the total number of
 chare creation requests processed across all processors.
 
 \item[{\tt +cs}] Print statistics about the number of create chare messages
-requested and processed, the number of messages for chares requested and 
+requested and processed, the number of messages for chares requested and
 processed, and the number of messages for branch office chares requested and
-processed, on a per processor basis.  Note that the number of messages 
-created and processed for a particular type of message on a given node 
+processed, on a per processor basis.  Note that the number of messages
+created and processed for a particular type of message on a given node
 may not be the same, since a message may be processed by a different
 processor from the one originating the request.
 
 \item[{\tt user\_options}] Options that are be interpreted by the user
-program may be included mixed with the system options. 
+program may be included mixed with the system options.
 However, {\tt user\_options} cannot start with +.
-The {\tt user\_options} will be passed as arguments to the user program 
+The {\tt user\_options} will be passed as arguments to the user program
 via the usual {\tt argc/argv} construct to the {\tt main}
-entry point of the main chare. 
+entry point of the main chare.
 \charmpp{} system options will not appear in {\tt argc/argv}.
 
 \end{description}
@@ -71,9 +71,9 @@ The following {\tt ++} command line options are available in
 the network version:
 \begin{description}
 
-\item[{\tt ++local}] Run charm program only on local machines. No 
- remote shell invocation is needed in this case. It starts node programs 
- right on your local machine. This could be useful if you just want to 
+\item[{\tt ++local}] Run charm program only on local machines. No
+ remote shell invocation is needed in this case. It starts node programs
+ right on your local machine. This could be useful if you just want to
  run small program on only one machine, for example, your laptop.
 
 
@@ -122,15 +122,15 @@ man pages for {\tt xhost} and {\tt xauth}).
 the user's path.
 
 \item The path must be set in the {\tt .cshrc} file, not the {\tt .login}
-file, because {\tt rsh} does not run the {\tt .login} file. 
+file, because {\tt rsh} does not run the {\tt .login} file.
 
 \end{enumerate}
 
-\item[{\tt ++scalable-start}]   Scalable start, or SMP-aware startup. It is useful for scalable process launch on multi-core systems since it creates only one ssh session per node and spawn all clients from the same ssh session                                                       
+\item[{\tt ++scalable-start}]   Scalable start, or SMP-aware startup. It is useful for scalable process launch on multi-core systems since it creates only one ssh session per node and spawn all clients from the same ssh session
 
-\item[{\tt ++batch}]            Ssh a set of node programs at a time, avoiding overloading Charmrun pe.  In this strategy, the nodes assigned to a charmrun are divided into sets of fixed size. Charmrun performs ssh to the nodes in the current set, waits for the clients to connect back and then performs ssh on the next set. We call the number of nodes in one ssh set as batch size. 
+\item[{\tt ++batch}]            Ssh a set of node programs at a time, avoiding overloading Charmrun pe.  In this strategy, the nodes assigned to a charmrun are divided into sets of fixed size. Charmrun performs ssh to the nodes in the current set, waits for the clients to connect back and then performs ssh on the next set. We call the number of nodes in one ssh set as batch size.
 
-\item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a 
+\item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a
 time.
 
 \item[{\tt ++nodelist}] File containing list of nodes.
@@ -140,7 +140,7 @@ time.
 
 \item[{\tt ++help}]             print help messages
 
-\item[{\tt ++runscript}]        script to run node-program with. The specified run script is invoked with the node program and parameter. For example: 
+\item[{\tt ++runscript}]        script to run node-program with. The specified run script is invoked with the node program and parameter. For example:
 
 \begin{alltt}
 ./charmrun +p4 ./pgm 100 2 3 ++runscript ./set\_env\_script
@@ -239,8 +239,8 @@ defaults with the following runtime options:
 \section{Nodelist file}
 
 For network of workstations,
-the list of machines to run the program can be specified in a file.  
-Without a nodelist file, \charmpp{} runs the program only on the 
+the list of machines to run the program can be specified in a file.
+Without a nodelist file, \charmpp{} runs the program only on the
 local machine.
 
 The format of this file
@@ -259,7 +259,7 @@ the properties of all hosts that follow them.  The qualifiers are:
 \begin{tabbing}
 {\tt group <groupname>}~~~\= - subsequent hosts are members of specified group\\
 {\tt login <login>  }     \> - subsequent hosts use the specified login\\
-{\tt shell <shell>  }     \> - subsequent hosts use the specified remote 
+{\tt shell <shell>  }     \> - subsequent hosts use the specified remote
 shell\\
 %{\tt passwd <passwd>}     \> - subsequent hosts use the specified password\\
 {\tt setup <cmd>  }       \> - subsequent hosts should execute cmd\\
@@ -273,7 +273,7 @@ shell\\
 By default, charmrun uses a remote shell ``rsh'' to spawn node processes
 on the remote hosts. The {\tt shell} qualifier can be used to override
 it with say, ``ssh''. One can set the {\tt CONV\_RSH} environment variable
-or use charmrun option {\tt ++remote-shell} to override the default remote 
+or use charmrun option {\tt ++remote-shell} to override the default remote
 shell for all hosts with unspecified {\tt shell} qualifier.
 
 All qualifiers accept ``*'' as an argument, this resets the modifier to
@@ -329,25 +329,25 @@ The user is required to set up remote login permissions on all nodes
 using the ``.rhosts'' file in the home directory if ``rsh'' is used for remote
 login into the hosts. If ``ssh'' is used, the user will have to setup
 password-less login to remote hosts using
-RSA authentication based on a key-pair and adding public keys to 
+RSA authentication based on a key-pair and adding public keys to
 ``.ssh/authorized\_keys'' file. See ``ssh'' documentation for more information.
 
 In a network environment, {\tt charmrun} must
 be able to locate the directory of the executable.  If all workstations
 share a common file name space this is trivial.  If they don't, {\tt charmrun}
 will attempt to find the executable in a directory with the same path
-from the {\bf \$HOME} directory.  Pathname resolution is performed as 
+from the {\bf \$HOME} directory.  Pathname resolution is performed as
 follows:
 \begin{enumerate}
 	\item The system computes the absolute path of {\tt pgm}.
-	\item If the absolute path starts with the equivalent of {\bf \$HOME} 
-	or the current working directory, the beginning part of the 
-        path 
-	is replaced with the environment variable {\bf \$HOME} or the 
-	current working directory. However, if {\tt ++pathfix dir1 dir2} is 
+	\item If the absolute path starts with the equivalent of {\bf \$HOME}
+	or the current working directory, the beginning part of the
+        path
+	is replaced with the environment variable {\bf \$HOME} or the
+	current working directory. However, if {\tt ++pathfix dir1 dir2} is
         specified in the nodes file (see above), the part of
         the path matching {\tt dir1} is replaced with {\tt dir2}.
-	\item The system tries to locate this program (with modified 
+	\item The system tries to locate this program (with modified
 	pathname and appended extension if specified) on all nodes.
 \end{enumerate}
 
