@@ -220,6 +220,9 @@ wanted to use 3 cores from each socket, one could write this as {\tt
 \item[{\tt +commap p[,q,...]}] Bind communication threads to the
   listed cores, one per process.
 
+\item[{\tt +nodesize } ] The number of processes within one physical node
+that use pxshm for intra-node communication.
+
 \end{description}
 
 \subsection{IO buffering options}
