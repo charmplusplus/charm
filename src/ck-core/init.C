@@ -426,11 +426,7 @@ static inline void _printStats(void) {}
 static inline void _sendStats(void)
 {
   DEBUGF(("[%d] _sendStats\n", CkMyPe()));
-#if CMK_WITH_STATS
   envelope *env = UsrToEnv(CkpvAccess(_myStats));
-#else
-  envelope *env = _allocEnv(StatMsg);
-#endif
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
@@ -508,7 +504,9 @@ static void _exitHandler(envelope *env)
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
       /*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
+#if CMK_WITH_STATS
          _sendStats();
+#endif
       _mainDone = 1; // This is needed because the destructors for
                      // readonly variables will be called when the program
 		     // exits. If the destructor is called while _mainDone
@@ -530,18 +528,20 @@ static void _exitHandler(envelope *env)
       else
         CmiFree(env);
       //everyone exits here - there may be issues with leftover messages in the queue
-      if(CkMyPe()){
+#if CMK_WITH_STATS
+      if(CkMyPe())
+#endif
+      {
         DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
         if(CharmLibInterOperate)
           CpvAccess(interopExitFlag) = 1;
       }
       break;
+#if CMK_WITH_STATS
     case StatMsg:
       CkAssert(CkMyPe()==0);
-#if CMK_WITH_STATS
       _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
-#endif
       _numStatsRecd++;
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), _numStatsRecd));
 			/*FAULT_EVAC*/
@@ -553,6 +553,7 @@ static void _exitHandler(envelope *env)
           CpvAccess(interopExitFlag) = 1;
       }
       break;
+#endif
     default:
       CmiAbort("Internal Error(_exitHandler): Unknown-msg-type. Contact Developers.\n");
   }
