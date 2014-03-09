@@ -12,26 +12,6 @@
 #include "ckgraph.h"
 #include "metis.h"
 
-/*extern "C" void METIS_PartGraphRecursive(int*, int*, int*, int*, int*,
-			      int*, int*, int*, int*, int*, int*);
-extern "C" void METIS_PartGraphKway(int*, int*, int*, int*, int*,
-                              int*, int*, int*, int*, int*, int*);
-extern "C" void METIS_PartGraphVKway(int*, int*, int*, int*, int*,
-			      int*, int*, int*, int*, int*, int*);
-
-// the following are to compute a partitioning with a given partition weights
-// "W" means giving weights
-extern "C" void METIS_WPartGraphRecursive(int*, int*, int*, int*, int*,
-			      int*, int*, int*, float*, int*, int*, int*);
-extern "C" void METIS_WPartGraphKway(int*, int*, int*, int*, int*,
-			      int*, int*, int*, float*, int*, int*, int*);
-
-// the following are for multiple constraint partition "mC"
-extern "C" void METIS_mCPartGraphRecursive(int*, int*, int*, int*, int*, int*,
-			      int*, int*, int*, int*, int*, int*);
-extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
-                              int*, int*, int*, int*, int*, int*, int*);
-*/
 
 CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
 
@@ -81,13 +61,13 @@ void MetisLB::work(LDStats* stats)
   }
 
   /* adjacency list */
-  idxtype *xadj = new idxtype[numVertices + 1];
+  idx_t *xadj = new idx_t[numVertices + 1];
   /* id of the neighbors */
-  idxtype *adjncy = new idxtype[numEdges];
+  idx_t *adjncy = new idx_t[numEdges];
   /* weights of the vertices */
-  idxtype *vwgt = new idxtype[numVertices];
+  idx_t *vwgt = new idx_t[numVertices];
   /* weights of the edges */
-  idxtype *adjwgt = new idxtype[numEdges];
+  idx_t *adjwgt = new idx_t[numEdges];
 
   int edgeNum = 0;
   double ratio = 256.0/maxLoad;
@@ -109,58 +89,62 @@ void MetisLB::work(LDStats* stats)
   xadj[i] = edgeNum;
   CkAssert(edgeNum == numEdges);
 
-  int wgtflag = 3;	// weights both on vertices and edges
-  int numflag = 0;	// C Style numbering
-  int options[5];
-  options[0] = 0;	// use default values
-  int edgecut;		// number of edges cut by the partitioning
-  idxtype *pemap;
+  idx_t edgecut;		// number of edges cut by the partitioning
+  idx_t *pemap;
+
+  idx_t options[METIS_NOPTIONS];
+  METIS_SetDefaultOptions(options);
+  //options[METIS_OPTION_PTYPE] = METIS_PTYPE_RB;
+  // C style numbering
+  options[METIS_OPTION_NUMBERING] = 0;
+
+  // number of constrains
+  idx_t ncon = 1;
+  // number of partitions
+  idx_t numPes = parr->procs.size();
+  real_t ubvec[ncon];
+  // allow 10% imbalance
+  ubvec[0] = 1.1;
+
+  // mapping of objs to partitions
+  pemap = new idx_t[numVertices];
+
+  // Specifies size of vertices for computing the total communication volume
+  idx_t *vsize = NULL;
+  // This array of size nparts specifies the desired weight for each partition
+  // and setting it to NULL indicates graph should be equally divided among
+  // partitions
+  real_t *tpwgts = NULL;
 
   int option = 0;
-  int numPes = parr->procs.size();
-  pemap = new idxtype[numVertices];
-
-  if (0 == option) {
-    /** I intended to follow the instruction in the Metis 4.0 manual
-     *  which said that METIS_PartGraphKway is preferable to
-     *  METIS_PartGraphRecursive, when nparts > 8. However, it turned out that
-     *  there is a bug in METIS_PartGraphKway, and the function seg faulted when
-     *  nparts = 4 or 9. So right now I just comment that function out and
-     *  always use the other one.
-     */
-
-    /* if (n_pes > 8)
-      METIS_PartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt,
-		&wgtflag, &numflag, &n_pes, options, &edgecut, newmap);
-    else
-      METIS_PartGraphRecursive(&numVertices, xadj, adjncy, vwgt, adjwgt,
-		&wgtflag, &numflag, &numPes, options, &edgecut, pemap); */
-
-    METIS_PartGraphRecursive(&numVertices, xadj, adjncy, vwgt, adjwgt,
-		&wgtflag, &numflag, &numPes, options, &edgecut, pemap);
-  } else if (WEIGHTED == option) {
+  if (WEIGHTED == option) {
     // set up the different weights between 0 and 1
-    float *tpwgts = new float[numPes];
+    tpwgts = new real_t[numPes];
     for (i = 0; i < numPes; i++) {
-      tpwgts[i] = 1.0/(float)numPes;
+      tpwgts[i] = 1.0/(real_t)numPes;
     }
-
-    if (numPes > 8)
-      METIS_WPartGraphKway(&numVertices, xadj, adjncy, vwgt, adjwgt,
-	      &wgtflag, &numflag, &numPes, tpwgts, options, &edgecut, pemap);
-    else
-      METIS_WPartGraphRecursive(&numVertices, xadj, adjncy, vwgt, adjwgt,
-	      &wgtflag, &numflag, &numPes, tpwgts, options, &edgecut, pemap);
-    delete[] tpwgts;
   } else if (MULTI_CONSTRAINT == option) {
-    CkPrintf("Metis load balance strategy: ");
-    CkPrintf("multiple constraints not implemented yet.\n");
+    CkAbort("Multiple constraints not implemented.\n");
   }
+
+  // numVertices: num vertices in the graph; ncon: num balancing constrains
+  // xadj, adjncy: of size n+1 and adjncy of 2m, adjncy[xadj[i]] through and
+  // including adjncy[xadj[i+1]-1];
+  // vwgt: weight of the vertices; vsize: amt of data that needs to be sent
+  // for ith vertex is vsize[i]
+  // adjwght: the weight of edges; numPes: total parts
+  // tpwghts: target partition weight, can pass NULL to equally divide
+  // ubvec: of size ncon to indicate allowed load imbalance tolerance (> 1.0)
+  // options: array of options; edgecut: stores the edgecut; pemap: mapping
+  METIS_PartGraphRecursive(&numVertices, &ncon,  xadj, adjncy, vwgt, vsize, adjwgt,
+      &numPes, tpwgts, ubvec, options, &edgecut, pemap);
 
   delete[] xadj;
   delete[] adjncy;
   delete[] vwgt;
   delete[] adjwgt;
+  delete[] vsize;
+  delete[] tpwgts;
 
   if (_lb_args.debug() >= 1) {
    CkPrintf("[%d] MetisLB done! \n", CkMyPe());

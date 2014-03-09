@@ -73,13 +73,13 @@ void TeamLB::work(LDStats* stats)
   }
 
   /* adjacency list */
-  idxtype *xadj = new idxtype[numVertices + 1];
+  idx_t *xadj = new idx_t[numVertices + 1];
   /* id of the neighbors */
-  idxtype *adjncy = new idxtype[numEdges];
+  idx_t *adjncy = new idx_t[numEdges];
   /* weights of the vertices */
-  idxtype *vwgt = new idxtype[numVertices];
+  idx_t *vwgt = new idx_t[numVertices];
   /* weights of the edges */
-  idxtype *adjwgt = new idxtype[numEdges];
+  idx_t *adjwgt = new idx_t[numEdges];
 
   int edgeNum = 0;
 
@@ -95,28 +95,46 @@ void TeamLB::work(LDStats* stats)
   xadj[i] = edgeNum;
   CkAssert(edgeNum == numEdges);
 
-  int wgtflag = 3;      // weights both on vertices and edges
-  int numflag = 0;      // C Style numbering
-  int options[5];
-  options[0] = 0;       // use default values
-  int edgecut;          // number of edges cut by the partitioning
-  idxtype *pemap = new idxtype[numVertices];
+  idx_t options[METIS_NOPTIONS];
+  METIS_SetDefaultOptions(options);
+  //options[METIS_OPTION_PTYPE] = METIS_PTYPE_RB;
+  // C style numbering
+  options[METIS_OPTION_NUMBERING] = 0;
+
+  idx_t edgecut;          // number of edges cut by the partitioning
+  // mapping of objs to partitions
+  idx_t *pemap = new idx_t[numVertices];
+
+  // number of constrains
+  idx_t ncon = 1;
+  real_t ubvec[ncon];
+  // allow 10% imbalance tolerance
+  ubvec[0] = 1.1;
+
+  // Specifies size of vertices for computing the total communication volume
+  idx_t *vsize = NULL;
+  // This array of size nparts specifies the desired weight for each partition
+  // and setting it to NULL indicates graph should be equally divided among
+  // partitions
+  real_t *tpwgts = NULL;
 
   if (_lb_args.debug() >= 1)
   CkPrintf("[%d] calling METIS_PartGraphRecursive.\n", CkMyPe());
 
-  METIS_PartGraphRecursive(&numVertices, xadj, adjncy, vwgt, adjwgt,
-	    &wgtflag, &numflag, &numberTeams, options, &edgecut, pemap);
+  METIS_PartGraphRecursive(&numVertices, &ncon, xadj, adjncy, vwgt, vsize,
+      adjwgt, &numberTeams, tpwgts, ubvec, options, &edgecut, pemap);
 
   int *global_pemap = new int[numVertices];
 
   // partitioning each team
   if(teamSize > 1) {
-    idxtype *team_xadj = new idxtype[numVertices + 1];
-    idxtype *team_adjncy = new idxtype[numEdges];
-    idxtype *team_vwgt = new idxtype[numVertices];
-    idxtype *team_adjwgt = new idxtype[numEdges];
-    idxtype *team_pemap = new idxtype[numVertices];
+    idx_t *team_xadj = new idx_t[numVertices + 1];
+    idx_t *team_adjncy = new idx_t[numEdges];
+    idx_t *team_vwgt = new idx_t[numVertices];
+    idx_t *team_adjwgt = new idx_t[numEdges];
+    idx_t *team_pemap = new idx_t[numVertices];
+    idx_t *team_vsize = NULL;
+    real_t *team_tpwgts = NULL;
 
     int teamEdgecut, node;
     int *mapping = new int[numVertices];
@@ -154,9 +172,9 @@ void TeamLB::work(LDStats* stats)
       team_xadj[teamMembers] = teamIndex;
 
       // calling METIS library
-      METIS_PartGraphRecursive(&teamMembers, team_xadj, team_adjncy, team_vwgt,
-		  team_adjwgt, &wgtflag, &numflag, &teamSize, options,
-		  &teamEdgecut, team_pemap);
+      METIS_PartGraphRecursive(&teamMembers, &ncon, team_xadj, team_adjncy,
+        team_vwgt, team_vsize, team_adjwgt, &teamSize, team_tpwgts, ubvec,
+        options, &teamEdgecut, team_pemap);
 
       // converting local mapping into global mapping
       for(j = 0; j < teamMembers; j++) {
@@ -170,6 +188,8 @@ void TeamLB::work(LDStats* stats)
     delete[] team_vwgt;
     delete[] team_adjwgt;
     delete[] team_pemap;
+    delete[] team_vsize;
+    delete[] team_tpwgts;
 
     delete[] mapping;
     delete[] invMapping;
@@ -182,6 +202,9 @@ void TeamLB::work(LDStats* stats)
   delete[] adjncy;
   delete[] vwgt;
   delete[] adjwgt;
+  delete[] vsize;
+  delete[] tpwgts;
+
 
   if (_lb_args.debug() >= 1) {
    CkPrintf("[%d] TeamLB done! \n", CkMyPe());
