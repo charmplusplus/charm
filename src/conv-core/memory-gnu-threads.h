@@ -1,122 +1,92 @@
-/* Basic platform-independent macro definitions for mutexes and
-   thread-specific data.
-   Copyright (C) 1996, 1997, 1998, 2000 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
-   Contributed by Wolfram Gloger <wmglo@dent.med.uni-muenchen.de>, 1996.
+/* Basic platform-independent macro definitions for mutexes,
+   thread-specific data and parameters for malloc.
+   Posix threads (pthreads) version.
+   Copyright (C) 2004 Wolfram Gloger <wg@malloc.de>.
 
-   The GNU C Library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation; either
-   version 2.1 of the License, or (at your option) any later version.
+Permission to use, copy, modify, distribute, and sell this software
+and its documentation for any purpose is hereby granted without fee,
+provided that (i) the above copyright notices and this permission
+notice appear in all copies of the software and related documentation,
+and (ii) the name of Wolfram Gloger may not be used in any advertising
+or publicity relating to the software.
 
-   The GNU C Library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
+THE SOFTWARE IS PROVIDED "AS-IS" AND WITHOUT WARRANTY OF ANY KIND,
+EXPRESS, IMPLIED OR OTHERWISE, INCLUDING WITHOUT LIMITATION, ANY
+WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 
-   You should have received a copy of the GNU Lesser General Public
-   License along with the GNU C Library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA.  */
+IN NO EVENT SHALL WOLFRAM GLOGER BE LIABLE FOR ANY SPECIAL,
+INCIDENTAL, INDIRECT OR CONSEQUENTIAL DAMAGES OF ANY KIND, OR ANY
+DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER OR NOT ADVISED OF THE POSSIBILITY OF DAMAGE, AND ON ANY THEORY
+OF LIABILITY, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+*/
 
-/* $Id$
-   One out of _LIBC, USE_PTHREADS, USE_THR or USE_SPROC should be
-   defined, otherwise the token NO_THREADS and dummy implementations
-   of the macros will be defined.  */
+#ifndef __MALLOC_MACHINE_H
+#define __MALLOC_MACHINE_H
 
-#ifndef _THREAD_M_H
-#define _THREAD_M_H
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+
+#define USE_TSD_DATA_HACK 1
+#include <pthread.h>
 
 #undef thread_atfork_static
 
-#if defined(_LIBC) /* The GNU C library, a special case of Posix threads */
+/* Use fast inline spinlocks with gcc.  */
+#if (defined __i386__ || defined __x86_64__) && defined __GNUC__ && \
+    !defined USE_NO_SPINLOCKS
 
-#include <bits/libc-lock.h>
+#include <time.h>
+#include <sched.h>
 
-#ifdef PTHREAD_MUTEX_INITIALIZER
+typedef struct {
+  volatile unsigned int lock;
+  int pad0_;
+} mutex_t;
 
-typedef pthread_t thread_id;
+#define MUTEX_INITIALIZER          { 0 }
+#define mutex_init(m)              ((m)->lock = 0)
+static inline int mutex_lock(mutex_t *m) {
+  int cnt = 0, r;
+  struct timespec tm;
 
-/* mutex */
-typedef pthread_mutex_t	mutex_t;
+  for(;;) {
+    __asm__ __volatile__
+      ("xchgl %0, %1"
+       : "=r"(r), "=m"(m->lock)
+       : "0"(1), "m"(m->lock)
+       : "memory");
+    if(!r)
+      return 0;
+    if(cnt < 50) {
+      sched_yield();
+      cnt++;
+    } else {
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+      cnt = 0;
+    }
+  }
+}
+static inline int mutex_trylock(mutex_t *m) {
+  int r;
 
-#define MUTEX_INITIALIZER	PTHREAD_MUTEX_INITIALIZER
-
-/* Even if not linking with libpthread, ensure usability of mutex as
-   an `in use' flag, see also the NO_THREADS case below.  Assume
-   pthread_mutex_t is at least one int wide.  */
-
-#define mutex_init(m)		\
-   (__pthread_mutex_init != NULL \
-    ? __pthread_mutex_init (m, NULL) : (*(int *)(m) = 0))
-#define mutex_lock(m)		\
-   (__pthread_mutex_lock != NULL \
-    ? __pthread_mutex_lock (m) : ((*(int *)(m) = 1), 0))
-#define mutex_trylock(m)	\
-   (__pthread_mutex_trylock != NULL \
-    ? __pthread_mutex_trylock (m) : (*(int *)(m) ? 1 : ((*(int *)(m) = 1), 0)))
-#define mutex_unlock(m)		\
-   (__pthread_mutex_unlock != NULL \
-    ? __pthread_mutex_unlock (m) : (*(int*)(m) = 0))
-
-#define thread_atfork(prepare, parent, child) \
-   (__pthread_atfork != NULL ? __pthread_atfork(prepare, parent, child) : 0)
-
-#elif defined(MUTEX_INITIALIZER)
-/* Assume hurd, with cthreads */
-
-/* Cthreads `mutex_t' is a pointer to a mutex, and malloc wants just the
-   mutex itself.  */
-#undef mutex_t
-#define mutex_t struct mutex
-
-#undef mutex_init
-#define mutex_init(m) (__mutex_init(m), 0)
-
-#undef mutex_lock
-#define mutex_lock(m) (__mutex_lock(m), 0)
-
-#undef mutex_unlock
-#define mutex_unlock(m) (__mutex_unlock(m), 0)
-
-#define mutex_trylock(m) (!__mutex_trylock(m))
-
-#define thread_atfork(prepare, parent, child) do {} while(0)
-#define thread_atfork_static(prepare, parent, child) \
- text_set_element(_hurd_fork_prepare_hook, prepare); \
- text_set_element(_hurd_fork_parent_hook, parent); \
- text_set_element(_hurd_fork_child_hook, child);
-
-/* No we're *not* using pthreads.  */
-#define __pthread_initialize ((void (*)(void))0)
+  __asm__ __volatile__
+    ("xchgl %0, %1"
+     : "=r"(r), "=m"(m->lock)
+     : "0"(1), "m"(m->lock)
+     : "memory");
+  return r;
+}
+static inline int mutex_unlock(mutex_t *m) {
+  __asm__ __volatile__ ("movl %1, %0" : "=m" (m->lock) : "g"(0) : "memory");
+  return 0;
+}
 
 #else
 
-#define NO_THREADS
-
-#endif /* MUTEX_INITIALIZER && PTHREAD_MUTEX_INITIALIZER */
-
-#ifndef NO_THREADS
-
-/* thread specific data for glibc */
-
-#include <bits/libc-tsd.h>
-
-typedef int tsd_key_t[1];	/* no key data structure, libc magic does it */
-__libc_tsd_define (, MALLOC)	/* declaration/common definition */
-#define tsd_key_create(key, destr)	((void) (key))
-#define tsd_setspecific(key, data)	__libc_tsd_set (MALLOC, (data))
-#define tsd_getspecific(key, vptr)	((vptr) = __libc_tsd_get (MALLOC))
-
-#endif
-
-#elif defined(USE_PTHREADS) /* Posix threads */
-
-#include <pthread.h>
-
-typedef pthread_t thread_id;
-
-/* mutex */
+/* Normal pthread mutex.  */
 typedef pthread_mutex_t mutex_t;
 
 #define MUTEX_INITIALIZER          PTHREAD_MUTEX_INITIALIZER
@@ -124,6 +94,8 @@ typedef pthread_mutex_t mutex_t;
 #define mutex_lock(m)              pthread_mutex_lock(m)
 #define mutex_trylock(m)           pthread_mutex_trylock(m)
 #define mutex_unlock(m)            pthread_mutex_unlock(m)
+
+#endif /* (__i386__ || __x86_64__) && __GNUC__ && !USE_NO_SPINLOCKS */
 
 /* thread specific data */
 #if defined(__sgi) || defined(USE_TSD_DATA_HACK)
@@ -157,63 +129,11 @@ typedef pthread_key_t tsd_key_t;
 #define thread_atfork(prepare, parent, child) \
                                    pthread_atfork(prepare, parent, child)
 
-#elif USE_THR /* Solaris threads */
+#endif
 
-#include <thread.h>
+#ifndef mutex_init /* No threads, provide dummy macros */
 
-typedef thread_t thread_id;
-
-#define MUTEX_INITIALIZER          { 0 }
-#define mutex_init(m)              mutex_init(m, USYNC_THREAD, NULL)
-
-/*
- * Hack for thread-specific data on Solaris.  We can't use thr_setspecific
- * because that function calls malloc() itself.
- */
-typedef void *tsd_key_t[256];
-#define tsd_key_create(key, destr) do { \
-  int i; \
-  for(i=0; i<256; i++) (*key)[i] = 0; \
-} while(0)
-#define tsd_setspecific(key, data) (key[(unsigned)thr_self() % 256] = (data))
-#define tsd_getspecific(key, vptr) (vptr = key[(unsigned)thr_self() % 256])
-
-#define thread_atfork(prepare, parent, child) do {} while(0)
-
-#elif USE_SPROC /* SGI sproc() threads */
-
-#include <sys/wait.h>
-#include <sys/types.h>
-#include <sys/prctl.h>
-#include <abi_mutex.h>
-
-typedef int thread_id;
-
-typedef abilock_t mutex_t;
-
-#define MUTEX_INITIALIZER          { 0 }
-#define mutex_init(m)              init_lock(m)
-#define mutex_lock(m)              (spin_lock(m), 0)
-#define mutex_trylock(m)           acquire_lock(m)
-#define mutex_unlock(m)            release_lock(m)
-
-typedef int tsd_key_t;
-int tsd_key_next;
-#define tsd_key_create(key, destr) ((*key) = tsd_key_next++)
-#define tsd_setspecific(key, data) (((void **)(&PRDA->usr_prda))[key] = data)
-#define tsd_getspecific(key, vptr) (vptr = ((void **)(&PRDA->usr_prda))[key])
-
-#define thread_atfork(prepare, parent, child) do {} while(0)
-
-#else /* no _LIBC or USE_... are defined */
-
-#define NO_THREADS
-
-#endif /* defined(_LIBC) */
-
-#ifdef NO_THREADS /* No threads, provide dummy macros */
-
-typedef int thread_id;
+# define NO_THREADS
 
 /* The mutex functions used to do absolutely nothing, i.e. lock,
    trylock and unlock would always just return 0.  However, even
@@ -223,19 +143,34 @@ typedef int thread_id;
    be based on atomic test-and-set operations, for example. */
 typedef int mutex_t;
 
-#define MUTEX_INITIALIZER          0
-#define mutex_init(m)              (*(m) = 0)
-#define mutex_lock(m)              ((*(m) = 1), 0)
-#define mutex_trylock(m)           (*(m) ? 1 : ((*(m) = 1), 0))
-#define mutex_unlock(m)            (*(m) = 0)
+# define mutex_init(m)              (*(m) = 0)
+# define mutex_lock(m)              ((*(m) = 1), 0)
+# define mutex_trylock(m)           (*(m) ? 1 : ((*(m) = 1), 0))
+# define mutex_unlock(m)            (*(m) = 0)
 
 typedef void *tsd_key_t;
-#define tsd_key_create(key, destr) do {} while(0)
-#define tsd_setspecific(key, data) ((key) = (data))
-#define tsd_getspecific(key, vptr) (vptr = (key))
+# define tsd_key_create(key, destr) do {} while(0)
+# define tsd_setspecific(key, data) ((key) = (data))
+# define tsd_getspecific(key, vptr) (vptr = (key))
 
-#define thread_atfork(prepare, parent, child) do {} while(0)
+# define thread_atfork(prepare, parent, child) do {} while(0)
 
-#endif /* defined(NO_THREADS) */
+#endif /* !defined mutex_init */
 
-#endif /* !defined(_THREAD_M_H) */
+#ifndef atomic_full_barrier
+# define atomic_full_barrier() __asm ("" ::: "memory")
+#endif
+
+#ifndef atomic_read_barrier
+# define atomic_read_barrier() atomic_full_barrier ()
+#endif
+
+#ifndef atomic_write_barrier
+# define atomic_write_barrier() atomic_full_barrier ()
+#endif
+
+#ifndef DEFAULT_TOP_PAD
+# define DEFAULT_TOP_PAD 131072
+#endif
+
+#endif /* !defined(__MALLOC_MACHINE_H) */

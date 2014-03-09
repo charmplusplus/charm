@@ -380,8 +380,7 @@ TRACELIBS += $(L)/libtrace-projections.a  $(L)/libtrace-summary.a  \
 endif
 
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
-          $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
-	  $(L)/libmemory-paranoid.o \
+          $(L)/libmemory-verbose.o  $(L)/libmemory-paranoid.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o \
 	  $(L)/libmemory-os-verbose.o $(L)/libmemory-os-isomalloc.o \
 	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
@@ -527,7 +526,7 @@ $(L)/libldb-bluegene.o: cldb.bluegene.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.bluegene.c
 
 ## Memory allocation libraries (-memory)
-MEM_DEPS=memory.c memory-gnu.c memory-gnuold.c converse.h conv-mach.h $(CVHEADERS)
+MEM_DEPS=memory.c memory-gnu.c memory-gnu-internal.c converse.h conv-mach.h $(CVHEADERS)
 $(L)/libmemory-default.o: $(MEM_DEPS)
 	$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_DEFAULT memory.c
 
@@ -562,9 +561,6 @@ $(L)/libmemory-hooks-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
 #  This is OK, but then we can't use "-memory gnu" or friends.
 $(L)/libmemory-gnu.o: $(MEM_DEPS)
 	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_GNU memory.c || touch $@
-
-$(L)/libmemory-gnuold.o: $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_GNUOLD memory.c || touch $@
 
 $(L)/libmemory-verbose.o: memory-verbose.c $(MEM_DEPS)
 	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_VERBOSE memory.c || touch $@

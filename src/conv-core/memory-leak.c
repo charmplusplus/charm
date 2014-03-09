@@ -17,7 +17,7 @@
 
 #if ! CMK_MEMORY_BUILD_OS
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnuold.c"
+#include "memory-gnu.c"
 #endif
 
 

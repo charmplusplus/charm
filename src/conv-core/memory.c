@@ -59,8 +59,6 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
 /*Default to the system malloc-- perhaps the only possibility*/
 #  define CMK_MEMORY_BUILD_OS 1
 
-# elif CMK_MALLOC_USE_GNUOLD_MALLOC
-#  define CMK_MEMORY_BUILD_GNUOLD  1
 # else
 /*Choose a good all-around default malloc*/
 #  define CMK_MEMORY_BUILD_GNU 1
@@ -530,7 +528,7 @@ void CmiResetMinMemory() {}
 *Not* using the system malloc-- first pick the implementation:
 */
 
-#if CMK_MEMORY_BUILD_GNU || CMK_MEMORY_BUILD_GNUOLD
+#if CMK_MEMORY_BUILD_GNU 
 #define meta_malloc   mm_malloc
 #define meta_free     mm_free
 #define meta_calloc   mm_calloc
@@ -539,19 +537,12 @@ void CmiResetMinMemory() {}
 #define meta_memalign mm_memalign
 #define meta_valloc   mm_valloc
 
-#if CMK_MEMORY_BUILD_GNU
-#  include "memory-gnu.c"
+#include "memory-gnu.c"
 static void meta_init(char **argv) {
   CmiMemoryIs_flag |= CMI_MEMORY_IS_GNU;
 }
-#else
-#  include "memory-gnuold.c"
-static void meta_init(char **argv) {
-  CmiMemoryIs_flag |= CMI_MEMORY_IS_GNUOLD;
-}
-#endif
 
-#endif /* CMK_MEMORY_BUILD_GNU or old*/
+#endif /* CMK_MEMORY_BUILD_GNU */
 
 #define BEFORE_MALLOC_CALL   /*empty*/
 #define AFTER_MALLOC_CALL    /*empty*/
