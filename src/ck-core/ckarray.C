@@ -1132,6 +1132,13 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts)
 	}
 }
 
+void CkSetMsgArrayIfNotThere(void *msg) {
+  envelope *env = UsrToEnv((void *)msg);
+  env->setMsgtype(ForArrayEltMsg);
+  CkArrayMessage *m = (CkArrayMessage *)msg;
+  m->array_setIfNotThere(CkArray_IfNotThere_buffer);
+}
+
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts)
 {
   CkArrayMessage *m=(CkArrayMessage *)msg;

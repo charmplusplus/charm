@@ -256,6 +256,8 @@ void CkCallback::send(void *msg) const
 	case sendArray: //Send message to an array element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
+
+		CkSetMsgArrayIfNotThere(msg);
 		CkSendMsgArray(d.array.ep,msg,d.array.id,d.array.idx.asChild());
 		break;
 	case isendArray: //inline send-to-array element
