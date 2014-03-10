@@ -1,0 +1,17 @@
+mainmodule alignmentCheck {
+
+  message TestMessage {
+    char varArray1[];
+    char varArray2[];
+  };
+
+  mainchare TestDriver {
+    entry TestDriver(CkArgMsg *m);
+  };
+
+  chare Destination {
+    entry Destination();
+    entry void receiveMessage(TestMessage *msg);
+  };
+
+};
