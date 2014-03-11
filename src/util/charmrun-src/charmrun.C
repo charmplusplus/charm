@@ -2563,6 +2563,24 @@ static void error_in_req_serve_client(nodetab_process & p)
 
   crashed_process_common(p);
 }
+
+static int req_handle_crashnotify(ChMessage *msg, nodetab_process & buddy)
+{
+  int crashed_pe = ChMessageInt(*(ChMessageInt_t *)(msg->data));
+  nodetab_process & p = *pe_to_process_map[crashed_pe];
+
+  PRINT(("Charmrun> Process %d (host %s) failed: Detected by buddy %d (host %s)\n",
+         p.nodeno, p.host->name, buddy.nodeno, buddy.host->name));
+  fflush(stdout);
+
+  // This line is needed for demonstrations where a cable is unplugged
+  // Further research should distinguish between process faults and host faults
+  p.host->crashed = true;
+
+  crashed_process_common(p);
+
+  return REQ_OK;
+}
 #endif
 
 static int req_handler_dispatch(ChMessage *msg, nodetab_process & p)
@@ -2610,6 +2628,8 @@ static int req_handler_dispatch(ChMessage *msg, nodetab_process & p)
     return REQ_FAILED;
   }
 #ifdef __FAULT__
+  else if (strcmp(cmd,"crash") == 0)
+    return req_handle_crashnotify(msg, p);
   else if (strcmp(cmd, "crash_ack") == 0)
     return req_handle_crashack(msg, replyFd);
 #ifdef HSTART

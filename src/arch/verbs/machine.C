@@ -1017,6 +1017,11 @@ CmiPrintStackTrace(0);
 
 #ifdef __FAULT__
 #include "machine-recover.C"
+void notify_charmrun_crash(int crashed_pe)
+{
+  ChMessageInt_t crashed_pe_msg = ChMessageInt_new(crashed_pe);
+  ctrl_sendone_nolock("crash", (const char *)&crashed_pe_msg, sizeof(ChMessageInt_t), NULL, 0);
+}
 #endif
 
 static void node_addresses_store(ChMessage *msg);

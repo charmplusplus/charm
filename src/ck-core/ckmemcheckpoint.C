@@ -62,19 +62,19 @@ void noopck(const char*, ...)
 static int replicaDieHandlerIdx;
 static int replicaDieBcastHandlerIdx;
 static int changePhaseHandlerIdx;
+
 // assume NO extra processors--1
 // assume extra processors--0
-#if CMK_CONVERSE_MPI
 #define CK_NO_PROC_POOL				0
+
 static int pingHandlerIdx;
 static int pingCheckHandlerIdx;
+#if CMK_CONVERSE_MPI
 static int buddyDieHandlerIdx;
+#endif
 static double lastPingTime = -1;
 void pingBuddy();
 void pingCheckHandler();
-#else
-#define CK_NO_PROC_POOL				0
-#endif
 
 // 0 - use QD, 1 - use reduction
 #define CMK_CHKP_USE_REDN 1
@@ -369,14 +369,13 @@ CkMemCheckPT::CkMemCheckPT(int w)
   expectCount = -1;
   where = w;
 
-#if CMK_CONVERSE_MPI
   if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
     CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
     CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
   }
-#endif
+
 #if CMK_CHKP_ALL
   initEntry();
 #endif        
@@ -412,14 +411,13 @@ void CkMemCheckPT::pup(PUP::er& p)
 	ackCount = 0;
   	expectCount = -1;
         inCheckpointing = false;
-#if CMK_CONVERSE_MPI
+
   if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
     CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
     CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
   }
-#endif
   }
 }
 
@@ -1218,12 +1216,10 @@ void CkMemCheckPT::finishUp()
        if (!quietModeRequested)
          CkPrintf("CharmFT> Restart finished in %f seconds.\n", CkWallTimer()-restartT);
   }
-#if CMK_CONVERSE_MPI	
   if (CmiMyPe() == BuddyPE(thisFailedPe)) {
     lastPingTime = CmiWallTimer();
     CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
   }
-#endif
 
 #if CK_NO_PROC_POOL
 #if NODE_CHECKPOINT
@@ -1665,16 +1661,9 @@ static void notify_crash(int node)
 extern void (*notify_crash_fn)(int node);
 
 #if CMK_CONVERSE_MPI
-//static int pingHandlerIdx;
-//static int pingCheckHandlerIdx;
-//static int buddyDieHandlerIdx;
-//static double lastPingTime = -1;
-
 void mpi_restart_crashed(int pe, int rank);
 int  find_spare_mpirank(int pe,int partition);
 
-//void pingBuddy();
-//void pingCheckHandler();
 static void replicaDieHandler(char * msg){
 #if CMK_MEM_CHECKPOINT
 #if CMK_HAS_PARTITION
@@ -1714,6 +1703,10 @@ void buddyDieHandler(char *msg)
 #endif
 }
 
+#endif
+
+void notify_charmrun_crash(int crashed_pe);
+
 void pingHandler(void *msg)
 {
   lastPingTime = CmiWallTimer();
@@ -1730,17 +1723,19 @@ void pingCheckHandler()
     int buddy = obj->ReverseBuddyPE(CmiMyPe());
     if (!quietModeRequested)
       CkPrintf("CharmFT> Node %d detected buddy %d died at %f s (last ping: %f s). \n", CmiMyNode(), buddy, now, lastPingTime);
-    /*for (int pe = 0; pe < CmiNumPes(); pe++) {
-      if (obj->isFailed(pe) || pe == buddy) continue;
-      char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
-      *(int *)(msg+CmiMsgHeaderSizeBytes) = buddy;
-      CmiSetHandler(msg, buddyDieHandlerIdx);
-      CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
-    }*/
+#if CMK_CONVERSE_MPI
     char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
     *(int *)(msg+CmiMsgHeaderSizeBytes) = buddy;
     CmiSetHandler(msg, buddyDieHandlerIdx);
+#if 1
     CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+#else
+    for (int pe = 0; pe < CmiNumPes(); pe++) {
+      if (obj->isFailed(pe) || pe == buddy) continue;
+      CmiSyncSend(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+    }
+    CmiFree(msg);
+#endif
 #if CMK_HAS_PARTITION
     //notify processors in the other partition
     for(int i=0;i<CmiNumPartitions();i++){
@@ -1752,6 +1747,9 @@ void pingCheckHandler()
         CmiInterSyncSendAndFree(CkMyPe(),i,CmiMsgHeaderSizeBytes+sizeof(int),(char *)rMsg);
       }
     }
+#endif
+#else
+    notify_charmrun_crash(buddy);
 #endif
   }
   else 
@@ -1775,7 +1773,6 @@ void pingBuddy()
   CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
 #endif
 }
-#endif
 
 // initproc
 void CkRegisterRestartHandler( )
@@ -1789,9 +1786,9 @@ void CkRegisterRestartHandler( )
   reportChkpSeqHandlerIdx = CkRegisterHandler(reportChkpSeqHandler);
   getChkpSeqHandlerIdx = CkRegisterHandler(getChkpSeqHandler);
 
-#if CMK_CONVERSE_MPI
   pingHandlerIdx = CkRegisterHandler(pingHandler);
   pingCheckHandlerIdx = CkRegisterHandler(pingCheckHandler);
+#if CMK_CONVERSE_MPI
   buddyDieHandlerIdx = CkRegisterHandler(buddyDieHandler);
   replicaDieHandlerIdx = CkRegisterHandler(replicaDieHandler);
   replicaDieBcastHandlerIdx = CkRegisterHandler(replicaDieBcastHandler);
