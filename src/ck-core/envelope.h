@@ -153,14 +153,13 @@ FIXME: Make CkMessage inherit from envelope,
 which would unify converse, envelope, and 
 user message pointers.
 */
-class envelope {
-  private:
-    /// Converse message envelope, Must be first field in this class
-    char   core[CmiReservedHeaderSize];
-public:
- /**
-   These structures store the type-specific message information.
- */
+
+namespace ck {
+
+  namespace impl {
+    /**
+       These structures store the type-specific message information.
+    */
     union u_type {
       struct s_chare {  // NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidMsg
         void *ptr;      ///< object pointer
@@ -179,7 +178,7 @@ public:
         int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
         CkGroupID arr;            ///< Array manager GID
 #if CMK_SMP_TRACE_COMMTHREAD
-        UInt srcpe; 
+        UInt srcpe;
 #endif
         UChar hopCount;           ///< number of times message has been routed
         UChar ifNotThere;         ///< what to do if array element is missing
@@ -199,6 +198,7 @@ public:
         UInt roIdx;
       } roMsg;
     };
+
     struct s_attribs {  // Packed bitwise struct
       UChar msgIdx;     ///< Usertype of message (determines pack routine)
       UChar mtype;      ///< e.g., ForBocMsg
@@ -206,33 +206,60 @@ public:
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
     };
+
+  }
+}
+
+#if (defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
+#define CMK_ENVELOPE_FT_FIELDS                           \
+  CkObjID sender;                                        \
+  CkObjID recver;                                        \
+  MCount SN;                                             \
+  int incarnation;                                       \
+  int flags;                                             \
+  UInt piggyBcastIdx;
+#elif defined(_FAULT_CAUSAL_)
+#define CMK_ENVELOPE_FT_FIELDS                           \
+  CkObjID sender;                                        \
+  CkObjID recver;                                        \
+  MCount SN;                                             \
+  MCount TN;                                             \
+  int incarnation;                                       \
+  int flags;                                             \
+  UInt piggyBcastIdx;
+#else
+#define CMK_ENVELOPE_FT_FIELDS
+#endif
+
+#define CMK_ENVELOPE_FIELDS                                                    \
+  /* Converse message envelope, Must be first field in this class */           \
+  char   core[CmiReservedHeaderSize];                                          \
+  ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
+  CMK_REFNUM_TYPE ref; /* Used by futures */                                   \
+  ck::impl::s_attribs attribs;                                                 \
+  UShort priobits;     /* Number of bits of priority data after user data */   \
+  UShort epIdx;        /* Entry point to call */                               \
+  UInt   pe;           /* source processor */                                  \
+  UInt   event;        /* used by projections */                               \
+  UInt   totalsize;    /* Byte count from envelope start to end of priobits */
+
+class envelope {
 private:
-    u_type type;           ///< Depends on message type (attribs.mtype)
-    CMK_REFNUM_TYPE ref;            ///< Used by futures
-    s_attribs attribs;
-    
-    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(CMK_REFNUM_TYPE)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
 
-    //This struct should now be sizeof(void*) aligned.
-    UShort priobits;   ///< Number of bits of priority data after user data
-    UShort epIdx;      ///< Entry point to call
-    UInt   pe;         ///< source processor
-    UInt   event;      ///< used by projections
-    UInt   totalsize;  ///< Byte count from envelope start to end of priobits
+    class envelopeSizeHelper {
+      CMK_ENVELOPE_FIELDS
+      CMK_ENVELOPE_FT_FIELDS
+    };
 
-  public:
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CkObjID sender;
-    CkObjID recver;
-    MCount SN;
-#if defined(_FAULT_CAUSAL_)
-    MCount TN;
-    MCount mlogPadding;		//HACK: aligns envelope to double size (to make xlc work)
-#endif
-    int incarnation;
-    int flags;
-    UInt piggyBcastIdx;
-#endif
+    CMK_ENVELOPE_FIELDS
+
+public:
+
+    CMK_ENVELOPE_FT_FIELDS
+
+    // padding to ensure ALIGN_BYTES alignment
+    UChar align[CkMsgAlignOffset(sizeof(envelopeSizeHelper))];
+
     void pup(PUP::er &p);
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
