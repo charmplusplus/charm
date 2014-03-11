@@ -2481,6 +2481,35 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
   return 0;
 }
 
+static int req_handle_crashnotify(ChMessage *msg, nodetab_process & p)
+{
+  int crashed_pe = ChMessageInt(*(ChMessageInt_t *)(msg->data));
+  printf("Charmrun> req_handle_crashnotify: process %d failed\n", p.nodeno);
+  fflush(stdout);
+
+  const SOCKET fd = p.req_client;
+
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
+  skt_close(fd);
+#endif
+
+  // should also send a message to all the other processes telling them that this one has crashed
+  // announce_crash(p);
+
+  restart_node(p);
+
+  // After the crashed processor has been recreated
+  // it connects to Charmrun. That data must now be filled
+  // into the node table.
+  reconnect_crashed_client(p);
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  skt_close(fd);
+#endif
+
+  return REQ_OK;
+}
+
 #ifdef HSTART
 /* send initnode to root*/
 static int set_crashed_socket_id(ChMessage *msg, SOCKET fd)
@@ -2615,6 +2644,8 @@ static int req_handler_dispatch(ChMessage *msg, nodetab_process & p)
     return REQ_FAILED;
   }
 #ifdef __FAULT__
+  else if (strcmp(cmd,"crash") == 0)
+    return req_handle_crashnotify(msg, p);
   else if (strcmp(cmd, "crash_ack") == 0)
     return req_handle_crashack(msg, replyFd);
 #ifdef HSTART
