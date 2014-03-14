@@ -280,7 +280,11 @@ my_init_hook (void)
   __free_hook = meta_free_hook;
 }
 /* Override initializing hook from the C library. */
-void (*__malloc_initialize_hook) (void) = my_init_hook;
+#if defined(__MALLOC_HOOK_VOLATILE)
+void (* __MALLOC_HOOK_VOLATILE __malloc_initialize_hook) (void) = my_init_hook;
+#else
+void (* __malloc_initialize_hook) (void) = my_init_hook;
+#endif
 #else
 void *malloc(size_t size) { return meta_malloc(size); }
 void free(void *ptr) { meta_free(ptr); }
