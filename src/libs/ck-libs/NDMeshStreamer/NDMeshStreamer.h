@@ -150,6 +150,8 @@ public:
             int prio, bool usePeriodicFlushing);
   void init(CkCallback startCb, int prio);
 
+  void syncInit();
+
   virtual void receiveAtDestination(MeshStreamerMessage<dtype> *msg) = 0;
 
   // non entry
@@ -531,15 +533,25 @@ init(int numLocalContributors, CkCallback startCb, CkCallback endCb, int prio,
   numLocalContributors_ = numLocalContributors;
   initLocalClients();
 
-  if (numLocalContributors_ == 0) {
-    startStagedCompletion();
-  }
-
   hasSentRecently_ = false;
   if (usePeriodicFlushing) {
     enablePeriodicFlushing();
   }
+
+  CkCallback syncInitCb(CkIndex_MeshStreamer<dtype, RouterType>::syncInit(),
+                        this->thisProxy);
+  this->contribute(syncInitCb);
   this->contribute(startCb);
+}
+
+template <class dtype, class RouterType>
+void MeshStreamer<dtype, RouterType>::
+syncInit() {
+
+  if (numLocalContributors_ == 0) {
+    startStagedCompletion();
+  }
+
 }
 
 template <class dtype, class RouterType>

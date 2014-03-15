@@ -25,7 +25,7 @@ module NDMeshStreamer {
 		    CkCallback endCb, int prio,
 		    bool usePeriodicFlushing);
     entry void init(CkCallback endCb, int prio);
-
+    entry [reductiontarget] void syncInit();
 
     entry void receiveAtDestination(MeshStreamerMessage<dtype> *msg);
   };
