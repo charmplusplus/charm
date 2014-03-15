@@ -15,15 +15,15 @@ module NDMeshStreamer {
     entry void enablePeriodicFlushing();
     entry void finish();
     entry void init(int numLocalContributors, CkCallback startCb,
-		    CkCallback endCb, int prio,
-		    bool usePeriodicFlushing);
+                    CkCallback endCb, int prio,
+                    bool usePeriodicFlushing);
 
     entry void init(int numContributors, CkCallback startCb,
-		    CkCallback endCb, CProxy_CompletionDetector detector,
-		    int prio, bool usePeriodicFlushing);
+                    CkCallback endCb, CProxy_CompletionDetector detector,
+                    int prio, bool usePeriodicFlushing);
     entry void init(CkArrayID senderArrayID, CkCallback startCb,
-		    CkCallback endCb, int prio,
-		    bool usePeriodicFlushing);
+                    CkCallback endCb, int prio,
+                    bool usePeriodicFlushing);
     entry void init(CkCallback endCb, int prio);
     entry [reductiontarget] void syncInit();
 
@@ -33,32 +33,32 @@ module NDMeshStreamer {
   template<class dtype, class ClientType, class RouterType>
     group GroupMeshStreamer : MeshStreamer<dtype, RouterType> {
     entry GroupMeshStreamer(
-	  int maxNumDataItemsBuffered, int numDimensions,
-	  int dimensionSizes[numDimensions],
-	  CkGroupID clientGID,
-	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
+          int maxNumDataItemsBuffered, int numDimensions,
+          int dimensionSizes[numDimensions],
+          CkGroupID clientGID,
+          bool yieldFlag = 0, double progressPeriodInMs = -1.0);
 
     entry GroupMeshStreamer(
           int numDimensions, int dimensionSizes[numDimensions],
-	  CkGroupID clientGID,
-	  int bufferSize, bool yieldFlag = 0,
-	  double progressPeriodInMs = -1.0);
+          CkGroupID clientGID,
+          int bufferSize, bool yieldFlag = 0,
+          double progressPeriodInMs = -1.0);
   };
 
   template<class dtype, class itype, class ClientType, class RouterType>
     group ArrayMeshStreamer :
     MeshStreamer<ArrayDataItem<dtype, itype>, RouterType> {
     entry ArrayMeshStreamer(
-	  int maxNumDataItemsBuffered, int numDimensions,
-	  int dimensionSizes[numDimensions], CkArrayID clientAID,
-	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
+          int maxNumDataItemsBuffered, int numDimensions,
+          int dimensionSizes[numDimensions], CkArrayID clientAID,
+          bool yieldFlag = 0, double progressPeriodInMs = -1.0);
     entry ArrayMeshStreamer(
-	  int numDimensions, int dimensionSizes[numDimensions],
-	  CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
-	  double progressPeriodInMs = -1.0);
+          int numDimensions, int dimensionSizes[numDimensions],
+          CkArrayID clientAID, int bufferSize, bool yieldFlag = 0,
+          double progressPeriodInMs = -1.0);
 
     entry void processLocationRequest(itype arrayId, int deliveredToPe,
-				      int sourcePe);
+                                      int sourcePe);
     entry void resendMisdeliveredItems(itype arrayId, int destinationPe);
     entry void updateLocationAtSource(itype arrayId, int destinationPe);
 
@@ -67,16 +67,16 @@ module NDMeshStreamer {
   template<class dtype, class ClientType, class RouterType>
     group GroupChunkMeshStreamer : MeshStreamer<ChunkDataItem, RouterType> {
     entry GroupChunkMeshStreamer(
-	  int maxNumDataItemsBuffered, int numDimensions,
-	  int dimensionSizes[numDimensions], CkGroupID clientGID,
-	  bool yieldFlag = 0, double progressPeriodInMs = -1.0,
-	  bool userHandlesFreeing = false);
+          int maxNumDataItemsBuffered, int numDimensions,
+          int dimensionSizes[numDimensions], CkGroupID clientGID,
+          bool yieldFlag = 0, double progressPeriodInMs = -1.0,
+          bool userHandlesFreeing = false);
 
     entry GroupChunkMeshStreamer(
           int numDimensions, int dimensionSizes[numDimensions],
-	  CkGroupID clientGID, int bufferSize, bool yieldFlag = 0,
-	  double progressPeriodInMs = -1.0,
-	  bool userHandlesFreeing = false);
+          CkGroupID clientGID, int bufferSize, bool yieldFlag = 0,
+          double progressPeriodInMs = -1.0,
+          bool userHandlesFreeing = false);
 
   };
 
