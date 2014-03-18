@@ -279,27 +279,6 @@ AddList() {
     echo $ret
 }
 
-# Append the last word to this list, avoiding duplicates
-# the difference to previous AddList() is that when duplication happens,
-# only keep the last one, instead of keeping the first one as in AddList()
-# this helps to solve the multiple -lfoo in the link command. 
-AppendList() {
-	ret=""
-	search=$1
-	shift
-	while [ $# -gt 0 ] 
-	do
-		if notInList $search $@
-		then
-			ret="$ret $search"
-		fi
-		search=$1
-		shift
-	done
-	echo $ret $search
-}
-
-
 # TEMP_BASE is appended with this script's process ID (PID),
 # so multiple charmcs can run in parallel without overwriting
 # each other's temporary files.
