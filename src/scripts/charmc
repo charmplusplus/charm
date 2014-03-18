@@ -1986,7 +1986,7 @@ fi
 
 if [ "$BUILD_SHARE" = "1" -a "$CHARM_SHARED" = "1" ]
 then
-  # build an applicaiton .so linking with charm .so
+  # build an application .so linking with charm .so
   OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
   Debugf "Running ldro..."
   DoNoErrCheck $RM $OBJECT
