@@ -31,7 +31,7 @@ struct Slot {
 /*Doubly-linked allocated block list*/
 	Slot *next;
 	Slot *prev;
-	
+
 /*The number of bytes of user data*/
 	int userSize;
 
@@ -129,7 +129,7 @@ static void *setSlot(Slot *s,int userSize) {
 	s->prev=slot_first;
 	s->next->prev=s;
 	s->prev->next=s;
-	
+
 	s->magic=SLOTMAGIC;
 	s->userSize=userSize;
 	{
@@ -204,7 +204,7 @@ static void meta_free(void *mem)
     freeSlot(s);
     mm_free(((char *)mem)-meta_getpagesize());
   }
-  else if (s->magic==SLOTMAGIC) 
+  else if (s->magic==SLOTMAGIC)
   { /*Ordinary allocated block */
     freeSlot(s);
     mm_free(s);
@@ -247,10 +247,10 @@ static void *meta_memalign(size_t align, size_t size)
 {
   /*Allocate a whole extra page for our slot structure*/
   char *alloc=(char *)mm_memalign(align,meta_getpagesize()+size);
-  Slot *s=(Slot *)(alloc+meta_getpagesize()-sizeof(Slot));  
+  Slot *s=(Slot *)(alloc+meta_getpagesize()-sizeof(Slot));
   void *user=setSlot(s,size);
   s->magic=SLOTMAGIC_VALLOC;
-  return user;  
+  return user;
 }
 static void *meta_valloc(size_t size)
 {
