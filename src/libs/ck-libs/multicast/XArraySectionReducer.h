@@ -24,7 +24,7 @@ class XArraySectionReducer
         {
             CkAssert(numSubSections > 0);
             msgList = new CkReductionMsg*[numSubSections];
-            bzero( msgList, numSubSections*sizeof(CkReductionMsg*) );
+            memset( msgList, 0, numSubSections*sizeof(CkReductionMsg*) );
         }
 
         ///
@@ -56,7 +56,7 @@ class XArraySectionReducer
             for (int i=0; i < numSubSections; i++)
                 if (msgList[i] != finalMsg) delete msgList[i];
             // Reset the msg list and counters in preparation for the next redn
-            bzero( msgList, numSubSections*sizeof(CkReductionMsg*) );
+            memset( msgList, 0, numSubSections*sizeof(CkReductionMsg*) );
             numReceived = 0;
         }
 

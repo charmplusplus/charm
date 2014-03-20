@@ -330,7 +330,7 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     register int b;
     register int zers;
     register unsigned int xor_data;
-    bzero(dest, s);
+    memset(dest, 0, s);
     for (i = 0; i < size; ++i) {
         xor_data = (uptr[i])^(bptr[i]);
         zers = 0;
@@ -376,7 +376,7 @@ void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, 
     register unsigned int *compressData = (unsigned int*)cData;
     register unsigned int *decompressData = (unsigned int*)dData;
     register unsigned int *baseData = (unsigned int*)bData;
-    bzero(decompressData, s);
+    memset(decompressData, 0, s);
     register int index;
     register unsigned int xor_data;
     register int data = 0;
@@ -559,7 +559,7 @@ void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
     register int b;
     register int zers;
     register unsigned long xor_data;
-    bzero(dest, s);
+    memset(dest, 0, s);
     for (i = 0; i < size; ++i) {
         xor_data = (uptr[i])^(bptr[i]);
         zers = 0;
@@ -615,7 +615,7 @@ void decompressDouble(void *cData, void *dData, int s, int compressSize, void *b
         printf("d: %d ",compressData[k]);
     }*/
     
-    bzero(decompressData, s);
+    memset(decompressData, 0, s);
     register int index;
     register unsigned long xor_data;
     register unsigned long data = 0;

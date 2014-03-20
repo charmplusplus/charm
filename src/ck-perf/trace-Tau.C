@@ -148,7 +148,7 @@ void stopEntryEvent()
 void _createTraceTau(char **argv)
 {
   //TAU_INIT(1, argv);
-  bzero(events, sizeof(void *)*5000);
+  memset(events, 0, sizeof(void *)*5000);
   //CkPrintf("NEWEST VERSION");
   dprintf("arguments:\n");
   dprintf("[0] = %s, ", argv[0]);

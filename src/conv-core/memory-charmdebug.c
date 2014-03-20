@@ -1489,7 +1489,7 @@ static void *meta_malloc(size_t size) {
     AFTER_MALLOC_CALL;
   }
   if (cpdInitializeMemory) {
-    bzero(user, size); // for Record-Replay must initialize all memory otherwise paddings may differ (screwing up the CRC)
+    memset(user, 0, size); // for Record-Replay must initialize all memory otherwise paddings may differ (screwing up the CRC)
   }
   return user;
 }

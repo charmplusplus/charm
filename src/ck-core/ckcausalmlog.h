@@ -3,12 +3,6 @@
 
 #include "ckobjid.h"
 
-#if CMK_HAS_STRINGS_H
-#include <strings.h>            /* defines bzero */
-#else
-#define bzero(s,n)   memset(s,0,n)
-#endif
-
 CpvExtern(Chare *,_currentObj);
 CpvExtern(int, _numImmigrantRecObjs);
 
@@ -111,7 +105,7 @@ class SNToTicket{
 		SNToTicket(){
 			currentSize = INITSIZE_SNTOTICKET;
 			ticketVec = &initial[0];
-			bzero(ticketVec,sizeof(Ticket)*currentSize);
+			memset(ticketVec,0,sizeof(Ticket)*currentSize);
 			startSN = 0;
 			finishSN = 0;
 		}

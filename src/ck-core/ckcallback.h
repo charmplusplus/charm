@@ -116,14 +116,14 @@ public:
 
 	CkCallback(void) {
 #if CMK_REPLAYSYSTEM
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=invalid;
 	}
 	//This is how you create ignore, ckExit, and resumeThreads:
 	CkCallback(callbackType t) {
 #if CMK_REPLAYSYSTEM
-	  bzero(this, sizeof(CkCallback));
+	  memset(this, 0, sizeof(CkCallback));
 #endif
 	  if (t==resumeThread) impl_thread_init();
 	  type=t;
@@ -132,7 +132,7 @@ public:
     // Call a C function on the current PE
 	CkCallback(Ck1CallbackFn fn) {
 #if CMK_REPLAYSYSTEM
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=call1Fn;
 	  d.c1fn.fn=fn;
@@ -141,7 +141,7 @@ public:
     // Call a C function on the current PE
 	CkCallback(CkCallbackFn fn,void *param) {
 #if CMK_REPLAYSYSTEM
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=callCFn;
 	  d.cfn.onPE=CkMyPe(); d.cfn.fn=fn; d.cfn.param=param;
@@ -150,7 +150,7 @@ public:
     // Call a chare entry method
 	CkCallback(int ep,const CkChareID &id,bool doInline=false) {
 #if CMK_REPLAYSYSTEM
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?isendChare:sendChare;
 	  d.chare.ep=ep; d.chare.id=id;
@@ -162,7 +162,7 @@ public:
     // Bcast to a group or nodegroup
 	CkCallback(int ep,const CkGroupID &id, int isNodeGroup=0) {
 #if CMK_REPLAYSYSTEM
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=isNodeGroup?bcastNodeGroup:bcastGroup;
 	  d.group.ep=ep; d.group.id=id;
@@ -174,7 +174,7 @@ public:
     // Send to group/nodegroup element
 	CkCallback(int ep,int onPE,const CkGroupID &id,bool doInline=false, int isNodeGroup=0) {
 #if CMK_REPLAYSYSTEM
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?(isNodeGroup?isendNodeGroup:isendGroup):(isNodeGroup?sendNodeGroup:sendGroup); 
       d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;
@@ -186,7 +186,7 @@ public:
     // Bcast to array
 	CkCallback(int ep,const CkArrayID &id) {
 #if CMK_REPLAYSYSTEM
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=bcastArray;
 	  d.array.ep=ep; d.array.id=id;
@@ -195,7 +195,7 @@ public:
     // Send to array element
 	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool doInline=false) {
 #if CMK_REPLAYSYSTEM
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?isendArray:sendArray;
 	  d.array.ep=ep; d.array.id=id; d.array.idx = idx;
@@ -222,7 +222,7 @@ public:
 
 	CkCallback(const CcsDelayedReply &reply) {
 #if CMK_REPLAYSYSTEM
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=replyCCS;
 	  d.ccsReply.reply=reply;

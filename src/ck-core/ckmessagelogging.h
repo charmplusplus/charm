@@ -3,12 +3,6 @@
 
 #include "ckobjid.h"
 
-#if CMK_HAS_STRINGS_H
-#include <strings.h>            /* defines bzero */
-#else
-#define bzero(s,n)   memset(s,0,n)
-#endif
-
 CpvExtern(Chare *,_currentObj);
 CpvExtern(int, _numImmigrantRecObjs);
 
@@ -55,7 +49,7 @@ public:
 		start = 0;
 		end = 0;
 		data = new MCount[RSSN_INITIAL_SIZE];
-		bzero(data,sizeof(MCount)*currentSize);
+		memset(data,0,sizeof(MCount)*currentSize);
 	}
 
         ~RSSN()
@@ -98,7 +92,7 @@ public:
 			oldCS = currentSize;
 			currentSize *= 2;
 			data = new MCount[currentSize];
-			bzero(data,sizeof(MCount)*currentSize);
+			memset(data,0,sizeof(MCount)*currentSize);
 			for(i=start, num=0; i!=end; i=(i+1)%oldCS,num++){
 				data[num] = old[i];
 			}

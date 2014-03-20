@@ -471,7 +471,7 @@ void oocPrefetchBufSpace::newPrefetch(workThreadInfo *wthd){
     int fd = open(filename, O_RDONLY);
     if(fd<0) perror("Failed in opening file");
     
-    bzero((char *)&prefetchAioCb, sizeof(struct aiocb));
+    memset((char *)&prefetchAioCb, 0, sizeof(struct aiocb));
     prefetchAioCb.aio_buf = bufspace;
     prefetchAioCb.aio_fildes = fd;
     prefetchAioCb.aio_nbytes = usedBufSize;

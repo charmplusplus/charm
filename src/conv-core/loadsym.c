@@ -298,7 +298,7 @@ load_symtab(char *filename)
 		fprintf(stderr, "Out of memory\n");
 		return NULL;
 	}
-	bzero(symtab, sizeof(*symtab));
+	memset(symtab, 0, sizeof(*symtab));
 
 	fd = open(filename, O_RDONLY);
 	if (0 > fd) {
@@ -366,7 +366,7 @@ load_memmap()
 	}
 
 	/* Zero to ensure data is null terminated */
-	bzero(raw, sizeof(raw));
+	memset(raw, 0, sizeof(raw));
 	rv = read(fd, raw, sizeof(raw));
 	if (0 > rv) {
 		perror("read");

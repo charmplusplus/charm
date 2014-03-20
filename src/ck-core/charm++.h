@@ -7,12 +7,6 @@
 #include "charm.h"
 #include "middle.h"
 
-#if CMK_HAS_STRINGS_H
-  #include <strings.h>            /* defines bzero */
-#else
-  #define bzero(s,n)   memset(s,0,n)
-#endif
-
 class CMessage_CkArgMsg {
 public: static int __idx;
 };

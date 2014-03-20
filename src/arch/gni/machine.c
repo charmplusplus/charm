@@ -1298,7 +1298,7 @@ static void setup_smsg_connection(int destNode)
     {
         new_entry = (mdh_addr_list_t*)malloc(sizeof(mdh_addr_list_t));
         new_entry->addr = memalign(64, smsg_memlen*smsg_expand_slots);
-        bzero(new_entry->addr, smsg_memlen*smsg_expand_slots);
+        memset(new_entry->addr, 0, smsg_memlen*smsg_expand_slots);
 
         status = GNI_MemRegister(nic_hndl, (uint64_t)new_entry->addr,
             smsg_memlen*smsg_expand_slots, smsg_rx_cqh,
@@ -1359,7 +1359,7 @@ static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
         new_mailbox_entry = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
         new_mailbox_entry->size = smsg_memlen*avg_smsg_connection;
         new_mailbox_entry->mailbox_base = malloc(new_mailbox_entry->size);
-        bzero(new_mailbox_entry->mailbox_base, new_mailbox_entry->size);
+        memset(new_mailbox_entry->mailbox_base, 0, new_mailbox_entry->size);
         new_mailbox_entry->offset = 0;
         
         status = GNI_MemRegister(nic_hndl, (uint64_t)new_mailbox_entry->mailbox_base,
@@ -3452,7 +3452,7 @@ static void _init_dynamic_smsg()
     mailbox_list = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
     mailbox_list->size = smsg_memlen*avg_smsg_connection;
     posix_memalign(&mailbox_list->mailbox_base, 64, mailbox_list->size);
-    bzero(mailbox_list->mailbox_base, mailbox_list->size);
+    memset(mailbox_list->mailbox_base, 0, mailbox_list->size);
     mailbox_list->offset = 0;
     mailbox_list->next = 0;
     
@@ -3501,7 +3501,7 @@ static void _init_static_smsg()
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
     ret = posix_memalign(&smsg_mailbox_base, 64, smsg_memlen*(mysize));
     CmiAssert(ret == 0);
-    bzero(smsg_mailbox_base, smsg_memlen*(mysize));
+    memset(smsg_mailbox_base, 0, smsg_memlen*(mysize));
     
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
             smsg_memlen*(mysize), smsg_rx_cqh,

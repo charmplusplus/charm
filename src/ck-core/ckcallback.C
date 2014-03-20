@@ -86,7 +86,7 @@ void *CkCallback::impl_thread_delay(void) const
  */
 CkCallback::CkCallback(Chare *p, int ep, bool doInline) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?isendChare:sendChare;
 	d.chare.ep=ep; 
@@ -94,14 +94,14 @@ CkCallback::CkCallback(Chare *p, int ep, bool doInline) {
 }
 CkCallback::CkCallback(Group *p, int ep, bool doInline) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?isendGroup:sendGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyPe();
 }
 CkCallback::CkCallback(NodeGroup *p, int ep, bool doInline) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?isendNodeGroup:sendNodeGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyNode();
@@ -109,7 +109,7 @@ CkCallback::CkCallback(NodeGroup *p, int ep, bool doInline) {
 
 CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=bcastNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID();
@@ -117,7 +117,7 @@ CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
 
 CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?isendNodeGroup:sendNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID(); d.group.onPE=onPE;
@@ -125,7 +125,7 @@ CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline
 
 CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?isendGroup:sendGroup;
 	d.group.ep=ep; 
@@ -134,7 +134,7 @@ CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
 }
 CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?isendArray:sendArray;
 	d.array.ep=ep; 
@@ -144,7 +144,7 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInlin
 
 CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=bcastSection;
       d.section.ep=ep; 
@@ -160,7 +160,7 @@ CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline) {
 
 CkCallback::CkCallback(int ep, CkSectionID &id) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=bcastSection;
       d.section.ep=ep;
@@ -173,7 +173,7 @@ CkCallback::CkCallback(int ep, CkSectionID &id) {
 
 CkCallback::CkCallback(ArrayElement *p, int ep,bool doInline) {
 #if CMK_ERROR_CHECKING
-      bzero(this, sizeof(CkCallback));
+      memset(this, 0, sizeof(CkCallback));
 #endif
       type=doInline?isendArray:sendArray;
     d.array.ep=ep; 

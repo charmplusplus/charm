@@ -1102,7 +1102,7 @@ void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
 	LBDB *_myLBDB = theLbdb->getLBDB();
 	if(_restartFlag){
         dummyCounts = new int[CmiNumPes()];
-        bzero(dummyCounts,sizeof(int)*CmiNumPes());
+        memset(dummyCounts,0,sizeof(int)*CmiNumPes());
     }
 #endif
   for(i=0; i < m->n_moves; i++) {
