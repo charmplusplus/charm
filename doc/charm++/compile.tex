@@ -160,9 +160,14 @@ These routines will detect common mistakes such as buffer
 overruns, underruns, double-deletes, and use-after-delete.
 The extra checks slow down programs, so this version should
 not be used in production code.}
+\item{{\bf leak} Use a special set of memory routines and
+annotation functions for detecting memory leaks.
+Call CmiMemoryMark() to mark allocated memory as OK,
+do work which you suspect is leaking memory,
+then call CmiMemorySweep(const char *tag) to check.}
 \item{{\bf verbose} Use a tracing set of memory routines.
-Every memory-related call results in a line printed to 
-standard out. This version is useful for detecting memory leaks.}
+Every memory-related call results in a line printed to
+standard out.}
 \item{{\bf default} Use the default, which depends on the version of \charmpp.}
 \end{itemize}
 
