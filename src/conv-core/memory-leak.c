@@ -6,10 +6,11 @@
  *
  * The basic usage is:
  *    1.) Do your startup
- *    2.) Call memory_mark(), which marks all allocated memory as OK.
+ *    2.) Call CmiMemoryMark(), which marks all allocated memory as OK.
  *    3.) Do the work you think is leaking memory.
- *    4.) Call memory_sweep(), which prints out any mallocs since the 
- *        last sweep or mark.
+ *    4.) Call CmiMemorySweep(const char *where), which prints out any mallocs
+ *        since the last sweep or mark. The where argument is used to tag sweeps
+ *        and is concatenated to the initial print statement for the sweep.
  *
  * This version of malloc() only introduces a small constant amount
  * of slowdown per malloc/free.
