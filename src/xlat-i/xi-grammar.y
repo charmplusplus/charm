@@ -17,6 +17,7 @@ namespace xi {
 extern int macroDefined(const char *str, int istrue);
 extern const char *python_doc;
 void splitScopedName(const char* name, const char** scope, const char** basename);
+void ReservedWord(int token);
 }
 %}
 
@@ -175,8 +176,66 @@ OptSemiColon	: /* Empty */
 		{ $$ = 1; }
 		;
 
+// Commented reserved words introduce parsing conflicts, so they're currently not handled
 Name		: IDENT
 		{ $$ = $1; }
+		| MODULE { ReservedWord(MODULE); YYABORT; }
+		| MAINMODULE { ReservedWord(MAINMODULE); YYABORT; }
+		| EXTERN { ReservedWord(EXTERN); YYABORT; }
+		/* | READONLY { ReservedWord(READONLY); YYABORT; } */
+		| INITCALL { ReservedWord(INITCALL); YYABORT; }
+		| INITNODE { ReservedWord(INITNODE); YYABORT; }
+		| INITPROC { ReservedWord(INITPROC); YYABORT; }
+		/* | PUPABLE { ReservedWord(PUPABLE); YYABORT; } */
+		| CHARE { ReservedWord(CHARE); }
+		| MAINCHARE { ReservedWord(MAINCHARE); }
+		| GROUP { ReservedWord(GROUP); }
+		| NODEGROUP { ReservedWord(NODEGROUP); }
+		| ARRAY { ReservedWord(ARRAY); }
+		/* | MESSAGE { ReservedWord(MESSAGE); YYABORT; } */
+		/* | CONDITIONAL { ReservedWord(CONDITIONAL); YYABORT; } */
+		/* | CLASS { ReservedWord(CLASS); YYABORT; } */
+		| INCLUDE { ReservedWord(INCLUDE); YYABORT; }
+		| STACKSIZE { ReservedWord(STACKSIZE); YYABORT; }
+		| THREADED { ReservedWord(THREADED); YYABORT; }
+		| TEMPLATE { ReservedWord(TEMPLATE); YYABORT; }
+		| SYNC { ReservedWord(SYNC); YYABORT; }
+		| IGET { ReservedWord(IGET); YYABORT; }
+		| EXCLUSIVE { ReservedWord(EXCLUSIVE); YYABORT; }
+		| IMMEDIATE { ReservedWord(IMMEDIATE); YYABORT; }
+		| SKIPSCHED { ReservedWord(SKIPSCHED); YYABORT; }
+		| INLINE { ReservedWord(INLINE); YYABORT; }
+		| VIRTUAL { ReservedWord(VIRTUAL); YYABORT; }
+		| MIGRATABLE { ReservedWord(MIGRATABLE); YYABORT; }
+		| CREATEHERE { ReservedWord(CREATEHERE); YYABORT; }
+		| CREATEHOME { ReservedWord(CREATEHOME); YYABORT; }
+		| NOKEEP { ReservedWord(NOKEEP); YYABORT; }
+		| NOTRACE { ReservedWord(NOTRACE); YYABORT; }
+		| APPWORK { ReservedWord(APPWORK); YYABORT; }
+		/* | VOID { ReservedWord(VOID); YYABORT; } */
+		/* | CONST { ReservedWord(CONST); YYABORT; } */
+		| PACKED { ReservedWord(PACKED); YYABORT; }
+		| VARSIZE { ReservedWord(VARSIZE); YYABORT; }
+		| ENTRY { ReservedWord(ENTRY); YYABORT; }
+		| FOR { ReservedWord(FOR); YYABORT; }
+		| FORALL { ReservedWord(FORALL); YYABORT; }
+		| WHILE { ReservedWord(WHILE); YYABORT; }
+		| WHEN { ReservedWord(WHEN); YYABORT; }
+		| OVERLAP { ReservedWord(OVERLAP); YYABORT; }
+		| ATOMIC { ReservedWord(ATOMIC); YYABORT; }
+		| IF { ReservedWord(IF); YYABORT; }
+		| ELSE { ReservedWord(ELSE); YYABORT; }
+		/* | PYTHON { ReservedWord(PYTHON); YYABORT; } */
+		| LOCAL { ReservedWord(LOCAL); YYABORT; }
+		/* | NAMESPACE { ReservedWord(NAMESPACE); YYABORT; } */
+		| USING { ReservedWord(USING); YYABORT; }
+		| ACCEL { ReservedWord(ACCEL); YYABORT; }
+		/* | READWRITE { ReservedWord(READWRITE); YYABORT; } */
+		/* | WRITEONLY { ReservedWord(WRITEONLY); YYABORT; } */
+		| ACCELBLOCK { ReservedWord(ACCELBLOCK); YYABORT; }
+		| MEMCRITICAL { ReservedWord(MEMCRITICAL); YYABORT; }
+		| REDUCTIONTARGET { ReservedWord(REDUCTIONTARGET); YYABORT; }
+		| CASE { ReservedWord(CASE); YYABORT; }
 		;
 
 QualName	: IDENT

@@ -15,6 +15,11 @@
 
 namespace xi {
 
+// Reserved words
+struct rwentry {
+  const char *res;	int tok;
+};
+
 class Chare;
 class CParsedFile;
 class EncapState;

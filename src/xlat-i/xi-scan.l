@@ -74,12 +74,8 @@ nonIntExpr [^();,:]*
 .		{ Return Token(yytext[0]); }
 %%
 
-struct rwtable {
-  const char *res;	int tok;
-};
-
 /* Reserved word table */
-struct rwtable rwtable[] = {
+struct rwentry rwtable[] = {
 {  "module",	MODULE },
 {  "mainmodule",	MAINMODULE },
 {  "chare",	CHARE },

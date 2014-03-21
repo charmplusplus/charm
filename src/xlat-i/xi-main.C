@@ -11,14 +11,28 @@ using std::endl;
 extern FILE *yyin;
 extern void yyrestart ( FILE *input_file );
 extern int yyparse (void);
-extern int yyerror(char *);
+extern void yyerror(const char *);
 extern int yylex(void);
 
 extern xi::AstChildren<xi::Module> *modlist;
+extern xi::rwentry rwtable[];
 
 namespace xi {
 
 #include "xi-grammar.tab.h"
+
+void ReservedWord(int token) {
+  char text[300];
+  const char *word = 0;
+  for (int i = 0; rwtable[i].tok != 0; ++i) {
+    if (rwtable[i].tok == token) {
+      word = rwtable[i].res;
+      break;
+    }
+  }
+  sprintf(text, "Reserved word '%s' used as an identifier", word);
+  yyerror(text);
+}
 
 /******************* Macro defines ****************/
 class MacroDefinition {

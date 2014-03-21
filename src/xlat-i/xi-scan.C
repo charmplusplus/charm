@@ -2192,12 +2192,8 @@ void yyfree (void * ptr )
 
 
 
-struct rwtable {
-  const char *res;	int tok;
-};
-
 /* Reserved word table */
-struct rwtable rwtable[] = {
+struct rwentry rwtable[] = {
 {  "module",	MODULE },
 {  "mainmodule",	MAINMODULE },
 {  "chare",	CHARE },
