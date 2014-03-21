@@ -76,7 +76,7 @@ void ReservedWord(int token);
 %token STACKSIZE
 %token THREADED
 %token TEMPLATE
-%token SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE 
+%token SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE
 %token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK
 %token VOID
 %token CONST
@@ -93,7 +93,7 @@ void ReservedWord(int token);
 %token ELSE
 %token PYTHON LOCAL
 %token NAMESPACE
-%token USING 
+%token USING
 %token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 %token ACCEL
@@ -108,7 +108,7 @@ void ReservedWord(int token);
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
 %type <construct>	Construct ConstructSemi
-%type <strval>		Name QualName CCode CPROGRAM_List OptNameInit 
+%type <strval>		Name QualName CCode CPROGRAM_List OptNameInit
 %type <strval>		OptTraceName
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
