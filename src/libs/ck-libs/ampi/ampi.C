@@ -6191,19 +6191,21 @@ int AMPI_Dims_create(int nnodes, int ndims, int *dims) {
         d--;
       }
 
-  pdims = new int[d];
+  if(d > 0) {
+    pdims = new int[d];
 
-  if (!factors(n, d, pdims, 1))
-    CkAbort("MPI_Dims_Create: Factorization failed. Wonder why?");
+    if (!factors(n, d, pdims, 1))
+      CkAbort("MPI_Dims_Create: Factorization failed. Wonder why?");
 
-  int j = 0;
-  for (i = 0; i < ndims; i++)
-    if (dims[i] == 0) {
-      dims[i] = pdims[j];
-      j++;
-    }
+    int j = 0;
+    for (i = 0; i < ndims; i++)
+      if (dims[i] == 0) {
+        dims[i] = pdims[j];
+        j++;
+      }
 
-  delete [] pdims;
+    delete [] pdims;
+  }
 
   return 0;
 }
