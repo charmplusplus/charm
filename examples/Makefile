@@ -15,7 +15,7 @@ test-fem:
 	$(MAKE) -C fem test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
 
 bgtest:
-	for d in charm++ ampi fem armci; do \
+	for d in charm++ ampi armci; do \
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
