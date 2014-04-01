@@ -1741,8 +1741,8 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
 	if (!CqsEmpty(s->nodeQ)
-	 && !CqsPrioGT(CqsGetPriority(s->nodeQ),
-		       CqsGetPriority(s->schedQ))) {
+	 && CqsPrioGT(CqsGetPriority(s->schedQ),
+		       CqsGetPriority(s->nodeQ))) {
 	  if(CmiTryLock(s->nodeLock) == 0) {
 	    CqsDequeue(s->nodeQ,(void **)&msg);
 	    CmiUnlock(s->nodeLock);
