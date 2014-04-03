@@ -26,7 +26,7 @@ static void sendPerMsgHandler(char *msg)
   void *destAddr, *destSizeAddr;
   int ep;
 
-  msgSize = CmiMsgHeaderGetLength(msg);
+  msgSize = CMI_MSG_SIZE(msg);
   msgSize -= (2*sizeof(void *)+sizeof(int));
   ep = *(int*)(msg+msgSize);
   destAddr = *(void **)(msg + msgSize + sizeof(int));
@@ -59,7 +59,7 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     memcpy(newmsg+size+sizeof(int), &slot->destAddress[0], sizeof(void *));
     memcpy(newmsg+size+sizeof(int)+sizeof(void*), &slot->destSizeAddress[0], sizeof(void *));
     CmiFree(m);
-    CmiMsgHeaderSetLength(newmsg, newsize);
+    CMI_MSG_SIZE(newmsg)=newsize;
     CmiSetHandler(newmsg, persistentSendMsgHandlerIdx);
     phs = NULL; phsSize = 0;
     CmiSyncSendAndFree(slot->destPE, newsize, newmsg);

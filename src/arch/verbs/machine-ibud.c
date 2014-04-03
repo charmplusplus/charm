@@ -719,7 +719,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 	size=ogm->size;
 	data=ogm->data;
 	DgramHeaderMake(data, rank, ogm->src, Cmi_charmrun_pid, 1, broot); // May not be needed
-	CmiMsgHeaderSetLength(data,size);
+	CMI_MSG_SIZE(data)=size;
 	while(size>Cmi_dgram_max_data) {
 		EnqueueDataPacket(ogm, data, Cmi_dgram_max_data, node, rank, broot);
 		size -= Cmi_dgram_max_data;
@@ -808,7 +808,7 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 			int rank, srcpe, seqno, magic, i;
 			unsigned int broot;
 			DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot); //FIXME: what does this do?
-			size = CmiMsgHeaderGetLength(msg);
+			size = CMI_MSG_SIZE(msg);
 			MACHSTATE2(3,"START of a new message from node %d of total size %d",nodeNo,size);
 			newmsg = (char *)CmiAlloc(size); // FIXME: is there a better way than to do an alloc?
 			_MEMCHECK(newmsg);

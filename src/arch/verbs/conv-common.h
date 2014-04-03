@@ -21,7 +21,7 @@
    Stratid is the stratgy id and root is used in the broadcast.
 */
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,xhdl,info,redID,rank; CmiInt4 root;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,stratid,xhdl,info,redID,rank; CmiInt4 root, size;
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
@@ -49,4 +49,4 @@
 /* call cpu timer for LB */
 #define CMK_LB_CPUTIMER					   0
 
-#define CMK_HAS_SIZE_IN_MSGHDR                             0
+#define CMK_HAS_SIZE_IN_MSGHDR                             1

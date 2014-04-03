@@ -3,7 +3,6 @@
  * @ingroup NET
  * converse basic message header:<br>
  * d0 d1 d2 d3:  DgramHeader<br>
- * d4 d5:        msg length (32-bit number)<br>
  * hdl:          handler<br>
  * xhdl:         extended handler<br>
 
@@ -23,8 +22,6 @@
 
 #define DGRAM_HEADER_SIZE 8
 
-#define CmiMsgHeaderSetLength(msg, len) (((int*)(msg))[2] = (len))
-#define CmiMsgHeaderGetLength(msg)      (((int*)(msg))[2])
 #define CmiMsgNext(msg) (*((void**)(msg)))
 
 #define DGRAM_ROOTPE_MASK   (0xFFFFu)

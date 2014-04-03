@@ -1112,7 +1112,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 	
   DgramHeaderMake(data, rank, ogm->src, Cmi_charmrun_pid, 1, broot);
 	
-	CmiMsgHeaderSetLength(ogm->data,ogm->size);
+	CMI_MSG_SIZE(ogm->data)=ogm->size;
 
 	if(rdma && size > rdmaThreshold){
 			EnqueueRdmaPacket(ogm,node);
@@ -1504,7 +1504,7 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 			int rank, srcpe, seqno, magic, i;
 			unsigned int broot;
 			DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
-			size = CmiMsgHeaderGetLength(msg);
+			size = CMI_MSG_SIZE(msg);
 			MACHSTATE2(3,"START of a new message from node %d of total size %d",nodeNo,size);
 //			CmiAssert(size > 0);
 //			CmiAssert(nodes_by_pe[srcpe] == node);
@@ -1805,7 +1805,7 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		unsigned int broot;
 		char *msg = buffer->buf;
 		DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
-		size = CmiMsgHeaderGetLength(msg);
+		size = CMI_MSG_SIZE(msg);
 /*		CmiAssert(size == buffer->size);*/
 		handoverMessage(buffer->buf,size,rank,broot,toBuffer);
 	}
