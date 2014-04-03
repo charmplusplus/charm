@@ -6,10 +6,13 @@ LBLIB	= -module CommonLBs
 
 OBJS	= lb_test.o Topo.o
 
-all:	lb_test
+all:	lb_test lb_test.every
 
 lb_test: $(OBJS)
 	$(CHARMC) -language charm++ -o lb_test $(OBJS) $(LBLIB)
+
+lb_test.every: $(OBJS)
+	$(CHARMC) -language charm++ -o $@ $(OBJS) -module EveryLB
 
 lb_test.decl.h lb_test.def.h: lb_test.ci
 	$(CHARMC) lb_test.ci 
@@ -23,9 +26,10 @@ lb_test.o: lb_test.C lb_test.decl.h Topo.decl.h
 Topo.o: Topo.C Topo.h Topo.decl.h
 	$(CHARMC) -c Topo.C
 
-test:  lb_test
+test:  lb_test lb_test.every
 	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 $(TESTOPTS)
 	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 $(TESTOPTS)
+	./charmrun +p4 ./lb_test.every 100 100 10 40 10 1000 ring +balancer RecBipartLB +LBDebug 1 $(TESTOPTS)
 
 bgtest:  lb_test
 	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 +x2 +y2 +z1 +cth1 +wth1
@@ -34,5 +38,5 @@ bgdump:
 	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 mesh2d +balancer DummyLB +LBDebug 1 +LBSameCpus +LBNoBackground +bgconfig ./bg_config +LBDump 1 +LBDumpFile lb_test.dump
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o lb_test charmrun lb_test.exe lb_test.pdb lb_test.ilk
+	rm -f *.decl.h *.def.h conv-host *.o lb_test charmrun lb_test.exe lb_test.pdb lb_test.ilk lb_test.every
 

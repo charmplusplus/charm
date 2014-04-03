@@ -13,7 +13,7 @@
 
 #include "ScotchLB.h"
 #include "ckgraph.h"
-#include "scotch.h"
+#include <scotch.h>
 
 CreateLBFunc_Def(ScotchLB, "Load balancing using the Scotch graph partitioning library")
 

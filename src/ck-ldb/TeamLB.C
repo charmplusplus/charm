@@ -10,7 +10,7 @@
 
 #include "TeamLB.h"
 #include "ckgraph.h"
-#include "metis.h"
+#include <metis.h>
 
 CreateLBFunc_Def(TeamLB, "Use Metis(tm) to partition object graph at two levels: team level and processor level")
 

@@ -14,7 +14,7 @@
 #include "ScotchTopoLB.h"
 #include "TopoManager.h"
 #include "ckgraph.h"
-#include "scotch.h"
+#include <scotch.h>
 
 CreateLBFunc_Def(ScotchTopoLB, "Load balancing using the Scotch graph partitioning library")
 

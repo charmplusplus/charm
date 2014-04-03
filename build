@@ -23,6 +23,7 @@ syntax() {
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
   echo '  Tau             build the TAU tracing library for generating TAU performance data' 
   echo '  ChaNGa          compile Charm++ core and necessary libraries for ChaNGa'
+  echo '  everylb         compile EveryLB suite of load balancing strategies'
   echo ''
   fi
   echo '<versions>: ' 

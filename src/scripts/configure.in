@@ -1936,9 +1936,9 @@ then
     if test -r $with_metis/Lib/metis.h
     then
       add_flag 'CMK_INCDIR="$CMK_INCDIR -I$CMK_METIS/Lib"' "Include path for METIS 4"
-    elif test -r $with_metis/../../include/metis.h
+    elif test -r $with_metis/../include/metis.h
     then
-      add_flag 'CMK_INCDIR="$CMK_INCDIR -I$CMK_METIS/../../include"' "Include path for METIS 5"
+      add_flag 'CMK_INCDIR="$CMK_INCDIR -I$CMK_METIS/../include"' "Include path for METIS 5"
     else
       echo "I can't find metis.h, since the path you specified (which should point to the directory containing libmetis.a) is not laid out as I expect for version 4 or 5."
       test_finish 1

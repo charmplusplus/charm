@@ -10,7 +10,7 @@
 
 #include "MetisLB.h"
 #include "ckgraph.h"
-#include "metis.h"
+#include <metis.h>
 
 
 CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
