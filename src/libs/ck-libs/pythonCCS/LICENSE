@@ -1,0 +1,4 @@
+Use of this module requires that applications link against Python, as provided
+by the Python Software Foundation. Thus, such applications must comply with the
+PSF license for the version of Python against they link, which should be found
+as part of the local Python installation.
