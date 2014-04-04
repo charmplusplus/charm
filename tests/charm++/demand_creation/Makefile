@@ -14,7 +14,7 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o hello charmrun *.log *.sum *.sts
 
 hello.o: hello.C hello.decl.h
-	$(CHARMC) -c -O2 hello.C
+	$(CHARMC) -c hello.C
 
 test: all
 	./charmrun ./hello +p4 10 $(TESTOPTS)
