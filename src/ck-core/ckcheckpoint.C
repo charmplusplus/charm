@@ -31,7 +31,7 @@ CkGroupID _sysChkptMgr;
 
 typedef struct _GroupInfo{
         CkGroupID gID;
-        int MigCtor, DefCtor;
+        int MigCtor;
         char name[256];
         bool present;
 } GroupInfo;
@@ -354,7 +354,6 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
       TableEntry ent = objectTable->find(tmpInfo[i].gID);
       tmpInfo[i].present = ent.getObj() != NULL;
       tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
-      tmpInfo[i].DefCtor = _chareTable[ent.getcIdx()]->defCtor;
       strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
       //CkPrintf("[%d] CkPupPerPlaceData: %s group %s \n", CkMyPe(), p.typeString(), tmpInfo[i].name);
 
