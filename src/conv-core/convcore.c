@@ -2899,6 +2899,8 @@ void *CmiAlloc(int size)
 #endif
 
   res+=sizeof(CmiChunkHeader);
+  CmiAssert((intptr_t)res % ALIGN_BYTES == 0);
+
   SIZEFIELD(res)=size;
   REFFIELD(res)=1;
   return (void *)res;

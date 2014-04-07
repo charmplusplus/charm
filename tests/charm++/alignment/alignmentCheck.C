@@ -36,7 +36,11 @@ void alignmentTest(std::vector<TestMessage*> &allMsgs, const std::string &identi
     TestMessage *msg = allMsgs[i];
     envelope *env = UsrToEnv(msg);
 
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
+    intptr_t startHdr = (intptr_t) &(((infiCmiChunkHeader *) env)[-1]);
+#else
     intptr_t startHdr = (intptr_t) BLKSTART(env);
+#endif
     intptr_t startEnv = (intptr_t) env;
     intptr_t startUsr = (intptr_t) msg;
     intptr_t startVar1 = (intptr_t) msg->varArray1;

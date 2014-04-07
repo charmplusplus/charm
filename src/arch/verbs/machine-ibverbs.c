@@ -548,7 +548,7 @@ loop:
 	rdma=1;
 //	rdmaThreshold=32768;
 	rdmaThreshold=22000;
-	firstBinSize = 120;
+	firstBinSize = 128;
 	CmiAssert(rdmaThreshold > firstBinSize);
 	/*	blockAllocRatio=16;
 		blockThreshold=8;*/
@@ -2184,7 +2184,7 @@ static inline void fillBufferPools(){
 			}else{
 				count = 1;
 			}
-			res = malloc((allocSize+sizeof(infiCmiChunkHeader))*count);
+			posix_memalign(&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
 			hdr = res;
 			key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 			CmiAssert(key != NULL);
@@ -2271,7 +2271,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		if(poolIdx < blockThreshold){
 			count = blockAllocRatio;
 		}
-		res = malloc((allocSize+sizeof(infiCmiChunkHeader))*count);
+		posix_memalign(&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
 		_MEMCHECK(res);
 		hdr = res;
 		
@@ -2373,7 +2373,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                 if(poolIdx < blockThreshold){
                         count = blockAllocRatio;
                 }
-                res = malloc((allocSize+sizeof(infiCmiChunkHeader))*count);
+                posix_memalign(&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
                 hdr = (infiCmiChunkHeader *)res;
 
                 key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
@@ -2441,7 +2441,11 @@ void * infi_CmiAlloc(int size){
 #if CMK_IBVERBS_STATS
 	numAlloc++;
 #endif
-        if (Cmi_charmrun_fd == -1) return malloc(size);
+        if (Cmi_charmrun_fd == -1) {
+          posix_memalign(&res, ALIGN_BYTES, size + sizeof(void*));
+          res += sizeof(void*);
+          return res;
+	}
 #if THREAD_MULTI_POOL
 	res = getInfiCmiChunkThread(size-sizeof(CmiChunkHeader));
 	res -= sizeof(CmiChunkHeader);
@@ -2546,7 +2550,7 @@ void infi_CmiFree(void *ptr){
 
 	MACHSTATE(3,"Freeing");
 
-        if (Cmi_charmrun_fd == -1) return free(ptr);
+        if (Cmi_charmrun_fd == -1) { char *res = ptr; res -= sizeof(void*); free(res); return; }
         ptr += sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
@@ -2588,7 +2592,7 @@ void infi_CmiFree(void *ptr){
 	numFree++;
 #endif
 	
-        if (Cmi_charmrun_fd == -1) return free(ptr);
+        if (Cmi_charmrun_fd == -1) { char *res = ptr; res -= sizeof(void*); free(res); return; }
 #if CMK_SMP	
 	CmiMemLock();
 #endif

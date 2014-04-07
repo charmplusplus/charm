@@ -732,16 +732,28 @@ typedef struct {
   int size;
   int ref;
 #if ALIGN_BYTES > 8
-  char align[ALIGN_BYTES - sizeof(int)*2];
+  char align[ALIGN_BYTES
+             - sizeof(int)*2
+#if (CMK_USE_IBVERBS || CMK_USE_IBUD)
+             - sizeof(void *)
+#endif
+            ];
 #endif
 } CmiChunkHeader;
 
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
 struct infiCmiChunkMetaDataStruct;
 
+#define CMI_INFI_CHUNK_HEADER_FIELDS \
+struct infiCmiChunkMetaDataStruct *metaData;\
+CmiChunkHeader chunkHeader;
+
+struct infiCmiChunkHeaderHelper{
+  CMI_INFI_CHUNK_HEADER_FIELDS
+};
+
 typedef struct infiCmiChunkHeaderStruct{
-  struct infiCmiChunkMetaDataStruct *metaData;
-	CmiChunkHeader chunkHeader;
+  CMI_INFI_CHUNK_HEADER_FIELDS
 } infiCmiChunkHeader;
 
 struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
