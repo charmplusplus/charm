@@ -133,7 +133,9 @@ CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex)
 extern "C"
 void CkRegisterMessagePupFn(int epIndex,CkMessagePupFn m)
 {
+#if CMK_CHARMDEBUG
 	_entryTable[epIndex]->messagePup=m;
+#endif
 }
 extern "C"
 int CkDisableTracing(int epIdx) {

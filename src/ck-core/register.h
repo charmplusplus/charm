@@ -73,6 +73,7 @@ class EntryInfo {
     */
     CkMarshallUnpackFn marshallUnpack;
     
+#if CMK_CHARMDEBUG
     /** 
       A "message pup" function pups the message accepted by 
       this entry point.  This is *only* used to display the 
@@ -84,10 +85,14 @@ class EntryInfo {
       marshalled messages.
     */
     CkMessagePupFn messagePup;
+#endif
 
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
       name(n), call(c), msgIdx(m), chareIdx(ci), 
-      marshallUnpack(0), messagePup(0)
+      marshallUnpack(0)
+#if CMK_CHARMDEBUG
+        , messagePup(0)
+#endif
     { traceEnabled=true; noKeep=false; inCharm=false; appWork=false;}
 };
 
