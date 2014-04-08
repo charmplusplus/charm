@@ -105,7 +105,9 @@ void envelope::pup(PUP::er &p) {
         if (p.isUnpacking()) attribs.isUsed = d; 
 	p(epIdx);
 	p(pe);
+#if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
 	p(event);
+#endif
 	p((char*)getPrioPtr(),getPrioBytes());
 	switch(getMsgtype()) {
 	case NewChareMsg: case NewVChareMsg: 

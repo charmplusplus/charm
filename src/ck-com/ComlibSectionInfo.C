@@ -120,8 +120,9 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
     newenv->getsetArrayHops() = env->getsetArrayHops();
     newenv->getsetArrayIndex() = env->getsetArrayIndex();
 
-    // for trace projections
+#if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
     newenv->setEvent(env->getEvent());
+#endif
     newenv->setSrcPe(env->getSrcPe());
     
     return (ComlibMulticastMsg *)EnvToUsr(newenv);
@@ -185,7 +186,9 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
     envelope *usrenv = (envelope *) ccmsg->usrMsg;
     env = (envelope *)CmiAlloc(usrenv->getTotalsize());
     memcpy(env, usrenv, usrenv->getTotalsize());
+#if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
     env->setEvent(cb_env->getEvent());
+#endif
 }
 
 

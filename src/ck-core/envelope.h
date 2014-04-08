@@ -231,13 +231,20 @@ namespace ck {
 #define CMK_ENVELOPE_FT_FIELDS
 #endif
 
+#if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
+#define CMK_ENVELOPE_OPTIONAL_FIELDS                                           \
+  UInt   event;        /* used by projections and record-replay */
+#else
+#define CMK_ENVELOPE_OPTIONAL_FIELDS
+#endif
+
 #define CMK_ENVELOPE_FIELDS                                                    \
   /* Converse message envelope, Must be first field in this class */           \
   char   core[CmiReservedHeaderSize];                                          \
   ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
   UInt   pe;           /* source processor */                                  \
   UInt   totalsize;    /* Byte count from envelope start to end of priobits */ \
-  UInt   event;        /* used by projections and record-replay */             \
+  CMK_ENVELOPE_OPTIONAL_FIELDS                                                 \
   CMK_REFNUM_TYPE ref; /* Used by futures and SDAG */                          \
   UShort priobits;     /* Number of bits of priority data after user data */   \
   UShort epIdx;        /* Entry point to call */                               \
@@ -261,8 +268,10 @@ public:
     UChar align[CkMsgAlignOffset(sizeof(envelopeSizeHelper))];
 
     void pup(PUP::er &p);
+#if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
+#endif
     CMK_REFNUM_TYPE   getRef(void) const { return ref; }
     void   setRef(const CMK_REFNUM_TYPE r) { ref = r; }
     UChar  getQueueing(void) const { return attribs.queueing; }
@@ -499,9 +508,11 @@ inline void _resetEnv(envelope *env) {
   env->reset();
 }
 
+#if CMK_REPLAYSYSTEM
 inline void setEventID(envelope *env){
   env->setEvent(++CkpvAccess(envelopeEventID));
 }
+#endif
 
 /** @} */
 
