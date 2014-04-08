@@ -235,13 +235,13 @@ namespace ck {
   /* Converse message envelope, Must be first field in this class */           \
   char   core[CmiReservedHeaderSize];                                          \
   ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
+  UInt   pe;           /* source processor */                                  \
+  UInt   totalsize;    /* Byte count from envelope start to end of priobits */ \
+  UInt   event;        /* used by projections */                               \
   CMK_REFNUM_TYPE ref; /* Used by futures */                                   \
-  ck::impl::s_attribs attribs;                                                 \
   UShort priobits;     /* Number of bits of priority data after user data */   \
   UShort epIdx;        /* Entry point to call */                               \
-  UInt   pe;           /* source processor */                                  \
-  UInt   event;        /* used by projections */                               \
-  UInt   totalsize;    /* Byte count from envelope start to end of priobits */
+  ck::impl::s_attribs attribs;
 
 class envelope {
 private:
