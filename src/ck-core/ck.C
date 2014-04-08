@@ -2140,6 +2140,11 @@ void CkDeleteChares() {
   }
 }
 
+#if CMK_BIGSIM_CHARM
+void CthEnqueueBigSimThread(CthThreadToken* token, int s,
+                                   int pb,unsigned int *prio);
+#endif
+
 //------------------- Message Watcher (record/replay) ----------------
 
 #include "crc32.h"
@@ -2155,7 +2160,9 @@ int _recplay_logsize = 1024*1024;
 CkMessageWatcher::~CkMessageWatcher() { if (next!=NULL) delete next;}
 
 #include "trace-common.h" /* For traceRoot and traceRootBaseLength */
+#include "BaseLB.h" /* For LBMigrateMsg message */
 
+#if CMK_REPLAYSYSTEM
 static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
 
     char *fName = new char[CkpvAccess(traceRootBaseLength)+strlen(prefix)+strlen(suffix)+7];
@@ -2170,8 +2177,6 @@ static FILE *openReplayFile(const char *prefix, const char *suffix, const char *
     }
     return f;
 }
-
-#include "BaseLB.h" /* For LBMigrateMsg message */
 
 class CkMessageRecorder : public CkMessageWatcher {
   char *buffer;
@@ -2266,11 +2271,6 @@ private:
 
 extern "C" void CkMessageReplayQuiescence(void *rep, double time);
 extern "C" void CkMessageDetailReplayDone(void *rep, double time);
-
-#if CMK_BIGSIM_CHARM
-void CthEnqueueBigSimThread(CthThreadToken* token, int s,
-                                   int pb,unsigned int *prio);
-#endif
 
 class CkMessageReplay : public CkMessageWatcher {
   int counter;
@@ -2524,6 +2524,7 @@ extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
   CkPrintf("[%d] Detailed replay finished after %f seconds. Exiting.\n",CkMyPe(),CkWallTimer()-replay->starttime);
   ConverseExit();
 }
+#endif
 
 static bool CpdExecuteThreadResume(CthThreadToken *token) {
   CkCoreState *ck = CkpvAccess(_coreState);
@@ -2583,14 +2584,19 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     CmiGetArgIntDesc(argv,"+recplay-logsize",&_recplay_logsize,"Specify the size of the buffer used by the message recorder");
     REPLAYDEBUG("CkMessageWatcherInit ");
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
+#if CMK_REPLAYSYSTEM
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
           CkPrintf("Charm++> Recording full detail for processor %d\n",CkMyPe());
           CpdSetInitializeMemory(1);
           ck->addWatcher(new CkMessageDetailRecorder(openReplayFile("ckreplay_",".detail","w")));
         }
+#else
+        CkAbort("Option `+record-detail' requires that record-replay support be enabled at configure time (--enable-replay)");
+#endif
     }
     if (CmiGetArgFlagDesc(argv,"+record","Record message processing order")) {
+#if CMK_REPLAYSYSTEM
       if (CkMyPe() == 0) {
         CmiPrintf("Charm++> record mode.\n");
         if (!CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG)) {
@@ -2601,8 +2607,12 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
       CpdSetInitializeMemory(1);
       CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
       ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
+#else
+      CkAbort("Option `+record' requires that record-replay support be enabled at configure time (--enable-replay)");
+#endif
     }
 	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Replay the specified processors from recorded message content")) {
+#if CMK_REPLAYSYSTEM
 	    forceReplay = true;
 	    CpdSetInitializeMemory(1);
 	    // Set the parameters of the processor
@@ -2616,8 +2626,12 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 #endif
 	    _replaySystem = 1;
 	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".detail","r")));
+#else
+          CkAbort("Option `+replay-detail' requires that record-replay support be enabled at configure time (--enable-replay)");
+#endif
 	}
 	if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream") || forceReplay) {
+#if CMK_REPLAYSYSTEM
 	  if (CkMyPe() == 0)  {
 	    CmiPrintf("Charm++> replay mode.\n");
 	    if (!CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG)) {
@@ -2632,6 +2646,9 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	  CkNumberHandler(CpvAccess(CthResumeBigSimThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
 #endif
 	  ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
+#else
+          CkAbort("Option `+replay' requires that record-replay support be enabled at configure time (--enable-replay)");
+#endif
 	}
 	if (_recplay_crc && _recplay_checksum) {
 	  CmiAbort("Both +recplay-crc and +recplay-checksum options specified, only one allowed.");

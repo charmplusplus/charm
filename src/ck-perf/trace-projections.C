@@ -1276,6 +1276,7 @@ void TraceProjections::memoryUsage(double m)
 
 void TraceProjections::creation(envelope *e, int ep, int num)
 {
+#if CMK_TRACE_ENABLED
   double curTime = TraceTimer();
   if (e == 0) {
     CtvAccess(curThreadEvent) = curevent;
@@ -1294,6 +1295,7 @@ void TraceProjections::creation(envelope *e, int ep, int num)
 		    NULL, 0, 0.0);
     }
   }
+#endif
 }
 
 //This function is only called from a comm thread in SMP mode. 
@@ -1325,6 +1327,7 @@ void TraceProjections::traceCommSetMsgID(char *msg)
 
 void TraceProjections::traceGetMsgID(char *msg, int *pe, int *event)
 {
+#if CMK_TRACE_ENABLED
     // msg must be a charm message
     *pe = *event = -1;
     envelope *e = (envelope *)msg;
@@ -1333,10 +1336,12 @@ void TraceProjections::traceGetMsgID(char *msg, int *pe, int *event)
         *pe = e->getSrcPe();
         *event = e->getEvent();
     }
+#endif
 }
 
 void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
 {
+#if CMK_TRACE_ENABLED
        // msg must be a charm message
     envelope *e = (envelope *)msg;
     int ep = e->getEpIdx();
@@ -1347,6 +1352,7 @@ void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
         e->setSrcPe(pe);
         e->setEvent(event);
     }
+#endif
 }
 
 /* **CW** Non-disruptive attempt to add destination PE knowledge to
@@ -1357,6 +1363,7 @@ void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
 void TraceProjections::creationMulticast(envelope *e, int ep, int num,
 					 int *pelist)
 {
+#if CMK_TRACE_ENABLED
   double curTime = TraceTimer();
   if (e==0) {
     CtvAccess(curThreadEvent)=curevent;
@@ -1368,6 +1375,7 @@ void TraceProjections::creationMulticast(envelope *e, int ep, int num,
     _logPool->addCreationMulticast(type, ep, curTime, curevent++, CkMyPe(),
 				   e->getTotalsize(), 0, 0.0, num, pelist);
   }
+#endif
 }
 
 void TraceProjections::creationDone(int num)
@@ -1408,6 +1416,7 @@ void TraceProjections::beginExecute(CmiObjId *tid)
 
 void TraceProjections::beginExecute(envelope *e)
 {
+#if CMK_TRACE_ENABLED
   if(e==0) {
 #if CMK_HAS_COUNTER_PAPI
     if (PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues)) != PAPI_OK) {
@@ -1427,6 +1436,7 @@ void TraceProjections::beginExecute(envelope *e)
     beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),
 		 e->getSrcPe(),e->getTotalsize());
   }
+#endif
 }
 
 void TraceProjections::beginExecute(char *msg){
