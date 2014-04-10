@@ -2543,22 +2543,6 @@ _ACEOF
 
 
 
-#### check strings.h ####
-cat > $t <<EOT
-#include <strings.h>
-int main() {
-  char str[8];
-  bzero(str, 8);
-  return 0;
-}
-EOT
-test_cxx "whether has strings.h " "yes" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_HAS_STRINGS_H $pass
-_ACEOF
-
-
 #### test if has values.h ####
 cat > $t <<EOT
 #include <values.h>

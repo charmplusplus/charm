@@ -655,18 +655,6 @@ test_cxx "whether compiler supports std::alignment_of" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ALIGNMENT_OF, $strictpass, [whether compiler supports std::alignment_of])
 
 
-#### check strings.h ####
-cat > $t <<EOT
-#include <strings.h>
-int main() { 
-  char str[[8]];
-  bzero(str, 8);
-  return 0;
-}
-EOT
-test_cxx "whether has strings.h " "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_STRINGS_H, $pass, [whether has strings.h])
-
 #### test if has values.h ####
 cat > $t <<EOT
 #include <values.h>
