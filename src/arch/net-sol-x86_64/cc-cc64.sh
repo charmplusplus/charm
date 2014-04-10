@@ -5,7 +5,7 @@ CMK_CPP_C='cc -E '
 CMK_CC="cc $CMK_CFLAGS"
 CMK_CC_RELIABLE="cc $CMK_CFLAGS"
 CMK_CC_FASTEST="cc $CMK_CFLAGS"
-CMK_CXX="CC -library=Cstd $CMK_CXXFLAGS -instances=global "
+CMK_CXX="CC -library=Cstd $CMK_CXXFLAGS -instances=global -features=zla "
 CMK_CXXPP='CC -E '
 CMK_C_DEBUG='-g'
 CMK_C_OPTIMIZE='-xO5'
