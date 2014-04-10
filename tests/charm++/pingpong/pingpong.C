@@ -432,7 +432,7 @@ public:
 #ifdef USE_RDMA 
     rbuff=(char *) malloc(payload*sizeof(char));
     sbuff=(char *) malloc(payload*sizeof(char));
-    bzero(sbuff,payload);
+    memset(sbuff, 0, payload);
     // setup persistent comm sender and receiver side
     double OOB=9999999999.0;
     rhandle=CmiDirect_createHandle(nbr,rbuff,payload*sizeof(char),PingN::Wrapper_To_CallBack,(void *) this,OOB);
