@@ -4293,7 +4293,10 @@ fi
 
 if test "$CMK_BUILD_MPI" = "1"
 then
-echo "BANDWIDTH_INJECTION test disabled on MPI"
+echo "BALANCED_INJECTION test disabled on MPI"
+elif test "$GNI_CRAYXC" = "1"
+then
+echo "BALANCED_INJECTION test disabled on Aries network"
 else
 cat > $tc <<EOT
 #include <stdint.h>
