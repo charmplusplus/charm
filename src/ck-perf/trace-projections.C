@@ -886,7 +886,7 @@ void LogEntry::pup(PUP::er &p)
       for (i=0; i<NUMPAPIEVENTS; i++) {
 	// not yet!!!
 	//	p|papiIDs[i]; 
-	p|CkpvAccess(papiValues)[i];
+	p|papiValues[i];
 	
       }
 #else
@@ -905,7 +905,7 @@ void LogEntry::pup(PUP::er &p)
       for (i=0; i<NUMPAPIEVENTS; i++) {
 	// not yet!!!
 	//	p|papiIDs[i];
-	p|CkpvAccess(papiValues)[i];
+	p|papiValues[i];
       }
 #else
       //p|numPapiEvents;  // non papi version has value 0
