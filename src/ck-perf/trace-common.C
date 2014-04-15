@@ -848,10 +848,6 @@ void initPAPI() {
       papiRetValue = PAPI_is_initialized();
       if(papiRetValue != PAPI_NOT_INITED)
           return;
-      CkpvInitialize(int, papiStarted);
-      CkpvAccess(papiStarted) = 0;
-      CkpvInitialize(int, papiStopped);
-      CkpvAccess(papiStopped) = 0;
     papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
     if (papiRetValue != PAPI_VER_CURRENT) {
       CmiAbort("PAPI Library initialization failure!\n");
@@ -862,6 +858,10 @@ void initPAPI() {
     }
 #endif
   }
+  CkpvInitialize(int, papiStarted);
+  CkpvAccess(papiStarted) = 0;
+  CkpvInitialize(int, papiStopped);
+  CkpvAccess(papiStopped) = 0;
 
 #if CMK_SMP
   //PAPI_thread_init has to finish before calling PAPI_create_eventset
