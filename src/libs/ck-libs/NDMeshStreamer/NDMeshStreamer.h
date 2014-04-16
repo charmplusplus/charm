@@ -1017,8 +1017,8 @@ public:
     QdCreate(this->numMembers_);
 
     // deliver locally
-    ArrayDataItem<dtype, itype>& packedDataItem(TRAM_BROADCAST, this->myIndex_,
-                                                dataItem);
+    ArrayDataItem<dtype, itype> packedDataItem(TRAM_BROADCAST, this->myIndex_,
+                                               dataItem);
     localBroadcast(packedDataItem);
 
     DataItemHandle tempHandle;
