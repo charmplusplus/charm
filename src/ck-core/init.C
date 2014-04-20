@@ -1266,7 +1266,8 @@ void _initCharm(int unused_argc, char **argv)
     CmiNodeAllBarrier();
 
     if (!_replaySystem) {
-        if (faultFunc == NULL) {         // this is not restart
+        CkFtFn  faultFunc_restart = CkRestartMain;
+        if (faultFunc == NULL || faultFunc == faultFunc_restart) {         // this is not restart from memory
             // these two are blocking calls for non-bigsim
 #if ! CMK_BIGSIM_CHARM
 	  CmiInitCPUAffinity(argv);
