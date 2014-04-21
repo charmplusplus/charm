@@ -3,8 +3,8 @@
 */
 /*@{*/
 
-#ifndef _GREEDYLB_H_
-#define _GREEDYLB_H_
+#ifndef _TEMPAWAREFINELB_H_
+#define _TEMPAWAREFINELB_H_
 
 #include "CentralLB.h"
 #include "RefinerTemp.h"

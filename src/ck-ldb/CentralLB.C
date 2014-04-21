@@ -606,10 +606,10 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 
       statsData->n_objs += m->n_objs;
       statsData->n_comm += m->n_comm;
-#endif
 #if defined(TEMP_LDB)
 			procStat.pe_temp=m->pe_temp;
 			procStat.pe_speed=m->pe_speed;
+#endif
 #endif
 
       stats_msg_count++;
