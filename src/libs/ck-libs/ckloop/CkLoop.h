@@ -83,12 +83,7 @@ public:
         inited = 0;
     }
     int getNextChunkIdx() {
-#if !CMK_SMP
         return __sync_add_and_fetch(&curChunkIdx, 1);
-#else
-	CmiMemoryAtomicIncrement(curChunkIdx);
-	return curChunkIdx;
-#endif
     }
     void reportFinished(int counter) {
         if (counter==0) return;
