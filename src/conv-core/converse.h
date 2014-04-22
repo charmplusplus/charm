@@ -37,10 +37,15 @@
 /*#define ALIGN8(x)        (size_t)((~7)&((x)+7)) */
 #define ALIGN8(x)          CMIALIGN(x,8)
 #define ALIGN16(x)         CMIALIGN(x,16)
+#define ALIGN32(x)         CMIALIGN(x,32)
 
 #if !defined(ALIGN_BYTES)
 #if CMK_64BIT
+#if CMK_BLUEGENEQ
+#define ALIGN_BYTES           32
+#else
 #define ALIGN_BYTES           16
+#endif
 #else
 #define ALIGN_BYTES           8
 #endif
