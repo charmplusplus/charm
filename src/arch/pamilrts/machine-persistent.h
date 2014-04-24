@@ -1,3 +1,6 @@
+#ifndef MACHINE_PERSISTENT_H
+#define MACHINE_PERSISTENT_H
+
 /** @file
  * General implementation of persistent communication support
  * @ingroup Machine
@@ -79,3 +82,4 @@ void swapRecvSlotBuffers(PersistentReceivesTable *slot);
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes);
 void clearRecvSlot(PersistentReceivesTable *slot);
 
+#endif
