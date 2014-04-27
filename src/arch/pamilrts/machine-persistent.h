@@ -11,6 +11,7 @@
 */
 /*@{*/
 
+#include "pami.h"
 #define PERSIST_MIN_SIZE               EAGER_CUTOFF 
 //#define COPY_HISTORY                          1
 // one is for receive one is to store the previous msg
@@ -73,6 +74,7 @@ CpvExtern(PersistentHandle *, phs);
 CpvExtern(int, phsSize);
 CpvExtern(int, curphs);
 
+void _initPersistent( pami_context_t *contexts, int nc);
 PersistentHandle getPersistentHandle(PersistentHandle h, int toindex);
 void *PerAlloc(int size);
 void PerFree(char *msg);
