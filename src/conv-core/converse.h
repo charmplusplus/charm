@@ -2045,6 +2045,14 @@ CmiInt8 CmiPwrite(int fd, char *buf, size_t bytes, size_t offset);
 FILE *CmiFopen(const char *path, const char *mode);
 int CmiFclose(FILE *fp);
 
+#if CMK_HAS_LOG2
+#define CmiLog2   log2
+#define CmiILog2  log2
+#else
+extern unsigned int CmiILog2(unsigned int);
+extern double CmiLog2(double);
+#endif
+
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
 #endif
@@ -2078,15 +2086,6 @@ typedef struct {
   CmiUInt2 senderPe;
   CmiUInt2 destination;
 } CmiFragmentHeader;
-
-
-#if CMK_HAS_LOG2
-#define CmiLog2   log2
-#define CmiILog2  log2
-#else
-extern unsigned int CmiILog2(unsigned int);
-extern double CmiLog2(double);
-#endif
 
 #if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
 #if defined(__cplusplus)
