@@ -171,6 +171,7 @@ void DistBaseLB::Migrated(LDObjHandle h, int waitBarrier) {
 * migrateMsg
 */
 void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
+#if CMK_LBDB_ON
   strat_end_time = CkWallTimer() - strat_start_time;
   const int me = CkMyPe();
 
@@ -197,6 +198,7 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
   if (migrates_expected == migrates_completed && lb_started) {
     MigrationDone(1);
   }
+#endif
 }
 
 void DistBaseLB::MigrationDone(int balancing) {
