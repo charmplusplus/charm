@@ -25,6 +25,11 @@ SHELL=/bin/sh
 L=../lib
 INC=../include
 
+CC=$(CHARMC)
+CXX=$(CHARMC)
+CFLAGS=-I.
+CXXFLAGS=-I.
+
 all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc everylb
 
 all-test: bigsim LIBS
@@ -1036,7 +1041,7 @@ depends: cidepends commitid.c
 	      SRCFILE=`basename $$i .o`.C ; \
 	      [ ! -f $$SRCFILE ] && SRCFILE=`basename $$i .o`.c ;	\
               echo "checking dependencies for $$SRCFILE" ; \
-              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. $$<' >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
+              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then true ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
         done;  \
 
@@ -1062,7 +1067,7 @@ dependsCaseSensitive: cidepends
 	      found=`/usr/bin/find $$SRCDIR -depth 1 -name $$SRCFILE`; \
               [ ! $$found ] && SRCFILE=`basename $$i .o`.c ; \
               echo "checking dependencies for $$SRCFILE" ; \
-              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. $$<' >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
+              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then true ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
         done;  \
 
