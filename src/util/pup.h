@@ -926,8 +926,8 @@ inline void PUParray(PUP::er &p,T *t,int n) {
 
 /// Copy this type as raw memory (like memcpy).
 #define PUPbytes(type) \
-  inline void operator|(PUP::er &p,type &t) {p((char *)&t,sizeof(type));} \
-  inline void PUParray(PUP::er &p,type *ta,int n) { p((char *)ta,n*sizeof(type)); } \
+  namespace PUP { inline void operator|(PUP::er &p,type &t) {p((char *)&t,sizeof(type));} }  \
+  namespace PUP { inline void PUParray(PUP::er &p,type *ta,int n) { p((char *)ta,n*sizeof(type)); } }  \
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
   }; }
