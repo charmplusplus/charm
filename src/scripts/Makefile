@@ -266,7 +266,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  pathHistory.h envelope-path.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
-	  mpi-interoperate.h \
+	  mpi-interoperate.h mpi_main.decl.h  \
 	  $(CVHEADERS) $(CONVCOMHEADERS)
 
 BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h

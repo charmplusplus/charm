@@ -1956,7 +1956,9 @@ arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
  waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h ckevacuation.h \
  ckarrayreductionmgr.h trace.h trace-bluegene.h trace-controlPoints.h \
  trace.h envelope.h register.h trace-common.h LBDatabase.h \
- controlPoints.h conv-config.h pathHistory.h arrayRedistributor.h
+ controlPoints.h conv-config.h ControlPoints.decl.h charm++.h sdag.h \
+ charm-api.h arrayRedistributor.h pathHistory.h PathHistory.decl.h \
+ cp_effects.h ck.h qd.h register.h stats.h TopoManager.h ckarray.h
 	$(CHARMC) -c -I. $<
 
 autoPerfAPI.o: autoPerfAPI.C trace-autoPerf.h charm++.h charm.h \
@@ -2180,7 +2182,7 @@ ckarray.o: ckarray.C charm++.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h register.h ck.h qd.h stats.h TopoManager.h \
- pathHistory.h CkArray.def.h
+ pathHistory.h PathHistory.decl.h CkArray.def.h
 	$(CHARMC) -c -I. $<
 
 ckarrayreductionmgr.o: ckarrayreductionmgr.C charm++.h charm.h converse.h \
@@ -2587,10 +2589,12 @@ controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
  CkArray.decl.h ckfutures.h CkFutures.decl.h tempo.h tempo.decl.h \
  waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h ckevacuation.h \
  ckarrayreductionmgr.h trace.h trace-bluegene.h controlPoints.h \
- conv-config.h trace-controlPoints.h trace.h envelope.h register.h \
- trace-common.h LBDatabase.h charm++.h trace-projections.h ckhashtable.h \
- pup.h pathHistory.h cp_effects.h ck.h qd.h register.h stats.h \
- TopoManager.h ckarray.h
+ conv-config.h ControlPoints.decl.h charm++.h envelope.h sdag.h \
+ charm-api.h LBDatabase.h arrayRedistributor.h pathHistory.h \
+ PathHistory.decl.h cp_effects.h ck.h qd.h register.h stats.h \
+ TopoManager.h ckarray.h trace-controlPoints.h trace.h register.h \
+ trace-common.h trace-projections.h ckhashtable.h pup.h pathHistory.h \
+ cp_effects.h ControlPoints.def.h
 	$(CHARMC) -c -I. $<
 
 conv-ccs.o: conv-ccs.c converse.h conv-config.h conv-autoconfig.h \
@@ -2758,7 +2762,20 @@ debug-charm.o: debug-charm.C converse.h conv-config.h conv-autoconfig.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h debug-conv.h ckhashtable.h pup.h conv-ccs.h \
  sockRoutines.h ccs-server.h debug-charm.h debug-conv++.h cklists.h \
- charm.h middle.h middle-conv.h register.h
+ charm.h middle.h middle-conv.h register.h ck.h charm++.h ckbitvector.h \
+ ckstream.h init.h simd.h ckmessage.h pup.h CkMarshall.decl.h envelope.h \
+ charm.h middle.h ckarrayindex.h pup.h ckhashtable.h charm.h objid.h \
+ converse.h cklists.h objid.h sdag.h pup_stl.h envelope.h debug-charm.h \
+ ckarrayindex.h cksection.h ckcallback.h ckobjQ.h ckreduction.h \
+ CkReduction.decl.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
+ CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
+ lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h \
+ LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h MetaBalancer.h \
+ MetaBalancer.decl.h CkLocation.decl.h cklocrec.h ckmigratable.h \
+ CkArray.decl.h ckfutures.h CkFutures.decl.h tempo.h tempo.decl.h \
+ waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h ckevacuation.h \
+ ckarrayreductionmgr.h trace.h trace-bluegene.h qd.h stats.h \
+ TopoManager.h
 	$(CHARMC) -c -I. $<
 
 debug-conv++.o: debug-conv++.C converse.h conv-config.h conv-autoconfig.h \
@@ -3176,7 +3193,10 @@ pathHistory.o: pathHistory.C charm++.h charm.h converse.h conv-config.h \
  MetaBalancer.h MetaBalancer.decl.h CkLocation.decl.h cklocrec.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h tempo.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
- ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h
+ ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
+ PathHistory.decl.h charm++.h envelope.h sdag.h LBDatabase.h \
+ pathHistory.h register.h trace-projections.h trace.h trace-common.h \
+ ckhashtable.h pup.h PathHistory.def.h
 	$(CHARMC) -c -I. $<
 
 persist-comm.o: persist-comm.c converse.h conv-config.h conv-autoconfig.h \
