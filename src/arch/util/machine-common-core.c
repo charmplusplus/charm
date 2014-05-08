@@ -72,6 +72,9 @@ static int CmiNodesDim;
 #endif
 /* ###End of Broadcast related definitions ### */
 
+#if CMK_SMP_TRACE_COMMTHREAD
+extern double TraceTimerCommon();
+#endif
 
 static void handleOneBcastMsg(int size, char *msg);
 static void processBcastQs();
@@ -450,6 +453,11 @@ void CmiPushNode(void *msg) {
 
 /* This function handles the msg received as which queue to push into */
 static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
+
+#if CMK_SMP_TRACE_COMMTHREAD
+    TRACE_COMM_CREATION(TraceTimerCommon(), msg);
+#endif
+
     int isBcastMsg = 0;
 #if CMK_BROADCAST_SPANNING_TREE || CMK_BROADCAST_HYPERCUBE
     isBcastMsg = (CMI_BROADCAST_ROOT(msg)!=0);

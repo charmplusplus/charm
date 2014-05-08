@@ -60,6 +60,12 @@ int _packMsg, _packChare, _packEP;
 int _unpackMsg, _unpackChare, _unpackEP;
 int _sdagMsg, _sdagChare, _sdagEP;
 
+#if CMK_BIGSIM_CHARM
+extern "C" double TraceTimerCommon(){return TRACE_TIMER();}
+#else
+extern "C" double TraceTimerCommon(){return TRACE_TIMER() - CkpvAccess(traceInitTime);}
+#endif
+
 /// decide parameters from command line
 static void traceCommonInit(char **argv)
 {

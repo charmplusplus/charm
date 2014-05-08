@@ -100,13 +100,7 @@ CpvStaticDeclare(double, projTraceStart);
                         int isTraceEligible = traceBeginCommOp(msg); \
                         if(isTraceEligible) traceSendMsgComm(msg);
 #define END_TRACE_SENDCOMM(msg) if(isTraceEligible) traceEndCommOp(msg);
-#define START_TRACE_RECVCOMM(msg) CpvAccess(projTraceStart) = CmiWallTimer();
-#define END_TRACE_RECVCOMM(msg) \
-                        if(traceBeginCommOp(msg)){ \
-                            traceChangeLastTimestamp(CpvAccess(projTraceStart)); \
-                            traceSendMsgComm(msg); \
-                            traceEndCommOp(msg); \
-                        }
+
 #define CONDITIONAL_TRACE_USER_EVENT(x) \
                         do{ \
                             double etime = CmiWallTimer(); \
@@ -118,7 +112,6 @@ CpvStaticDeclare(double, projTraceStart);
 #define START_TRACE_SENDCOMM(msg)
 #define END_TRACE_SENDCOMM(msg)
 #define START_TRACE_RECVCOMM(msg)
-#define END_TRACE_RECVCOMM(msg)
 #define CONDITIONAL_TRACE_USER_EVENT(x)
 #endif
 
@@ -736,7 +729,6 @@ static int PumpMsgs(void) {
         }
 #if USE_ASYNC_RECV_FUNC        
         else {
-            START_EVENT();
             IRecvList one = irecvListEntryAllocate();
             if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, charmComm, &(one->req)))
                 CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
@@ -764,7 +756,6 @@ static int PumpMsgs(void) {
 			}
 	#endif
         
-            END_TRACE_RECVCOMM(msg);
             handleOneRecvedMsg(nbytes, msg);
         }
         
@@ -851,14 +842,12 @@ static int PumpMsgs(void) {
     MPI_Status sts;
     while(waitIrecvListHead->next) {
         IRecvList irecvEnt = waitIrecvListHead->next;
-        START_EVENT();
                 
         /*printf("PE[%d]: check irecv entry=%p\n", CmiMyPe(), irecvEnt);*/
         if(MPI_SUCCESS != MPI_Test(&(irecvEnt->req), &irecvDone, &sts))
             CmiAbort("PumpMsgs: MPI_Test failed!\n");
         if(!irecvDone) break; /* in-order recv */
 
-        END_TRACE_RECVCOMM((irecvEnt->msg));
         /*printf("PE[%d]: irecv entry=%p finished with size=%d, msg=%p\n", CmiMyPe(), irecvEnt, irecvEnt->size, irecvEnt->msg);*/
         
         handleOneRecvedMsg(irecvEnt->size, irecvEnt->msg);
@@ -905,14 +894,12 @@ static void PumpMsgsBlocking(void) {
     CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to check posted recvs, cancel them all, and then wait on any incoming message, and then re-post the recvs");
 #endif
 
-    START_TRACE_RECVCOMM(NULL);
     if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, charmComm,&sts))
         CmiAbort("PumpMsgs: PMP_Recv failed!\n");    
 
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
     memcpy(msg, buf, nbytes);
-    END_TRACE_RECVCOMM(msg);
 
 #if CMK_SMP_TRACE_COMMTHREAD && CMI_MPI_TRACE_MOREDETAILED
     char tmp[32];
@@ -1941,7 +1928,6 @@ static void consumeAllMsgs()
                 /* Indicating this entry has been tested before */
                 if (ptr->postedRecvBufs[i] == NULL) continue;
 
-                START_TRACE_RECVCOMM(NULL);
                 if (MPI_SUCCESS != MPI_Test(ptr->postedRecvReqs+i, &done, &sts))
                     CmiAbort("consumeAllMsgs failed in MPI_Test!\n");
                 if (done) {
@@ -1954,7 +1940,6 @@ static void consumeAllMsgs()
                     msg = (ptr->postedRecvBufs)[i];
                     (ptr->postedRecvBufs)[i] = NULL;
                     
-                    END_TRACE_RECVCOMM(msg);
                     handleOneRecvedMsg(nbytes, msg);
                 } else {
                     if (MPI_SUCCESS != MPI_Cancel(ptr->postedRecvReqs+i))

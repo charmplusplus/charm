@@ -96,6 +96,8 @@ inline double TraceCpuTimer() { return TRACE_CPUTIMER() - CkpvAccess(traceInitCp
 inline double TraceCpuTimer(double t) { return t - CkpvAccess(traceInitCpuTime); }
 #endif
 
+extern "C" double TraceTimerCommon(); //TraceTimer to be used in common lrts layers
+
 #define TRACE_WARN(msg) if (CkpvAccess(verbose)) CmiPrintf(msg)
 
 extern bool outlierAutomatic;
