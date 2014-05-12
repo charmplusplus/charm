@@ -65,15 +65,6 @@
 #define CMK_TIMER_USE_BLUEGENEL                            0
 
 
-/* In order to have a type with a fixed length across machines, these define the
-   different size integers, unsigned integers, and floats as the machine
-   specific types corresponding to the given sizes (2, 4, 8 bytes) */
-#define CMK_TYPEDEF_INT2 short
-#define CMK_TYPEDEF_INT4 int
-#define CMK_TYPEDEF_INT8 long
-#define CMK_TYPEDEF_UINT2 unsigned short
-#define CMK_TYPEDEF_UINT4 unsigned int
-#define CMK_TYPEDEF_UINT8 unsigned long long
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
 

@@ -57,10 +57,6 @@
 #include <intrinsics.h>
 #endif
 
-#if CMK_HAS_STDINT_H
-#include <stdint.h>
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -48,27 +48,6 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 
-#if CMK_HAS_STDINT_H
-#include <stdint.h>
-#define CMK_TYPEDEF_INT2 int16_t
-#define CMK_TYPEDEF_INT4 int32_t
-#define CMK_TYPEDEF_INT8 int64_t
-#define CMK_TYPEDEF_UINT2 uint16_t
-#define CMK_TYPEDEF_UINT4 uint32_t
-#define CMK_TYPEDEF_UINT8 uint64_t
-#else
-#define CMK_TYPEDEF_INT2 short
-#define CMK_TYPEDEF_INT4 int
-#define CMK_TYPEDEF_UINT2 unsigned short
-#define CMK_TYPEDEF_UINT4 unsigned int
-#if CMK_LONG_LONG_DEFINED
-#define CMK_TYPEDEF_INT8 long long
-#define CMK_TYPEDEF_UINT8 unsigned long long
-#else
-#error "No definition for a 64-bit integer"
-#endif
-#endif
-
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
 
