@@ -71,8 +71,6 @@
 #endif
 #endif
 
-#define CMK_TYPEDEF_FLOAT4 float
-#define CMK_TYPEDEF_FLOAT8 double
 
 #define CMK_64BIT   0 
 #define CMK_32BIT   1

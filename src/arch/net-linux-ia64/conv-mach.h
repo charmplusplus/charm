@@ -45,9 +45,6 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 
-#define CMK_TYPEDEF_FLOAT4 float
-#define CMK_TYPEDEF_FLOAT8 double
-
 #define CMK_64BIT    1
 
 #define CMK_NETPOLL                                        1

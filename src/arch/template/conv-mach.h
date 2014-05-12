@@ -64,15 +64,25 @@
 
 /* In order to have a type with a fixed length across machines, these define the
    different size integers, unsigned integers, and floats as the machine
-   specific types corresponding to the given sizes (2, 4, 8 bytes) */
+   specific types corresponding to the given sizes (2, 4, 8 bytes)
+
+   Delete on systems where stdint.h is present and floating point
+   formats are as defined in IEEE 754, respectively.
+*/
+#if defined(CMK_HAS_STDINT_H)
+#error "Your system has stdint.h. Delete custom integer width definitions."
+#else
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
-#define CMK_TYPEDEF_INT8 long
+#define CMK_TYPEDEF_INT8 long long
 #define CMK_TYPEDEF_UINT2 unsigned short
 #define CMK_TYPEDEF_UINT4 unsigned int
 #define CMK_TYPEDEF_UINT8 unsigned long long
-#define CMK_TYPEDEF_FLOAT4 float
-#define CMK_TYPEDEF_FLOAT8 double
+#endif
+
+#define CMK_CUSTOM_FP_FORMAT
+#define CMK_TYPEDEF_FLOAT4 something_like_float
+#define CMK_TYPEDEF_FLOAT8 something_like_double
 
 /* Specifies what the processor will do when it is idle, either sleep (1) or go
    into busy waiting mode (0). In convcore.c there are a few files included if

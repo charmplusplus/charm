@@ -57,8 +57,6 @@
 #define CMK_TYPEDEF_UINT2 unsigned short
 #define CMK_TYPEDEF_UINT4 unsigned int
 #define CMK_TYPEDEF_UINT8 unsigned __int64
-#define CMK_TYPEDEF_FLOAT4 float
-#define CMK_TYPEDEF_FLOAT8 double
 
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1

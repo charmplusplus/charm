@@ -54,8 +54,6 @@
 #define CMK_TIMER_SIM_USE_GETRUSAGE                        1
 #define CMK_TIMER_SIM_USE_TIMES                            0
 
-#define CMK_TYPEDEF_FLOAT4 float
-#define CMK_TYPEDEF_FLOAT8 double
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 

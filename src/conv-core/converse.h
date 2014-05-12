@@ -609,9 +609,14 @@ typedef __uint128     CmiUInt16;
 #else
 #define CMK_HAS_INT16         0
 #endif
+
+#if defined(CMK_CUSTOM_FP_FORMAT)
 typedef CMK_TYPEDEF_FLOAT4    CmiFloat4;
 typedef CMK_TYPEDEF_FLOAT8    CmiFloat8;
-
+#else
+typedef float                 CmiFloat4;
+typedef double                CmiFloat8;
+#endif
 
 typedef void  *CmiCommHandle;
 typedef void (*CmiHandler)(void *msg);
