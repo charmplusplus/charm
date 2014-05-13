@@ -114,7 +114,7 @@
 
 /* Without stdint.h, CMK_TYPEDEF_(U)INT{2,4,8} must be defined in the
    corresponding conv-mach.h */
-#if CMK_HAS_STDINT_H
+#if CMK_HAS_STDINT_H && !defined(CMK_TYPEDEF_INT2)
 #include <stdint.h>
 typedef int16_t CMK_TYPEDEF_INT2;
 typedef int32_t CMK_TYPEDEF_INT4;
