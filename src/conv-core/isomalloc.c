@@ -2397,7 +2397,7 @@ void *CmiIsomalloc(int size, CthThread tid)
 }
 #endif
 
-#define MALLOC_ALIGNMENT           (2*sizeof(size_t))
+#define MALLOC_ALIGNMENT           ALIGN_BYTES
 #define MINSIZE                    (sizeof(CmiIsomallocBlock))
 
 /** return an aligned isomalloc memory, the alignment occurs after the

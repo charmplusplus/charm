@@ -40,9 +40,9 @@
 
 #if !defined(ALIGN_BYTES)
 #if CMK_64BIT
-#define ALIGN_BYTES           16
+#define ALIGN_BYTES           16U
 #else
-#define ALIGN_BYTES           8
+#define ALIGN_BYTES           8U
 #endif
 #endif
 

@@ -57,7 +57,7 @@ struct _Slot {
 	void *from[STACK_LEN];
 
 /*Padding to detect writes before and after buffer*/
-#define PADLEN 32 /*Bytes of padding at start and end of buffer*/
+#define PADLEN 72 /*Bytes of padding at start and end of buffer*/
 	char pad[PADLEN];
 };
 typedef struct _Slot	Slot;
