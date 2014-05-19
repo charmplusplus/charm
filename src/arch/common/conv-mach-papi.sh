@@ -14,7 +14,7 @@ then
     else
       PAPI_LIBDIR="/usr/apps/tools/papi/lib"
     fi
-    CMK_LIBDIR="-L $PAPI_LIBDIR"
+    CMK_LIBDIR="-L$PAPI_LIBDIR"
     CMK_LD="$CMK_LD -Wl,-rpath,$PAPI_LIBDIR"
     CMK_LDXX="$CMK_LDXX -Wl,-rpath,$PAPI_LIBDIR"
   fi
@@ -26,7 +26,7 @@ then
   PAPI_LIBDIR="$HOME/papi/lib"
   PAPI_INCDIR="$HOME/papi/include"
   CMK_INCDIR="$CMK_INCDIR -I$PAPI_INCDIR"
-  CMK_LIBDIR="-L $PAPI_LIBDIR"
+  CMK_LIBDIR="-L$PAPI_LIBDIR"
   CMK_LD="$CMK_LD -Wl,-rpath,$PAPI_LIBDIR"
   CMK_LDXX="$CMK_LDXX -Wl,-rpath,$PAPI_LIBDIR" 
   CMK_LIBS="$CMK_LIBS -lpapi"
