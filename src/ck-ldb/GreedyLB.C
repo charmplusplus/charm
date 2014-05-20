@@ -80,10 +80,9 @@ void GreedyLB::work(LDStats* stats)
   }
   delete [] map;
 
-  // considering cpu speed
+  // Add the overhead to the total load 
   for (pe = 0; pe<procs.size(); pe++) {
     procs[pe].totalLoad() +=  procs[pe].overhead();
-    procs[pe].totalLoad() *= procs[pe].pe_speed();
   }
 
   // build object array
@@ -119,7 +118,7 @@ void GreedyLB::work(LDStats* stats)
 
     // Increment the time of the least loaded processor by the cpuTime of
     // the `heaviest' object
-    p.totalLoad() += objs[obj].getVertexLoad();
+    p.totalLoad() += objs[obj].getVertexLoad() / p.pe_speed();
 
     //Insert object into migration queue if necessary
     const int dest = p.getProcId();
