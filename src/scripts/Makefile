@@ -82,10 +82,10 @@ DEFAULT_LIBS= completion NDMeshStreamer multicast pythonCCS io
 
 default_libs: $(DEFAULT_LIBS)
 
-$(DEFAULT_LIBS) cache pose fftlib liveViz:
+$(DEFAULT_LIBS) cache pose fftlib liveViz ckloop:
 	$(MAKE) -C libs/ck-libs/$@
 
-ChaNGa: charm++ cache liveViz everylb
+ChaNGa: charm++ cache liveViz everylb ckloop
 
 cache: charm-core
 liveViz: charm-core
