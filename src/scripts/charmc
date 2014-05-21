@@ -272,10 +272,15 @@ AddModules() {
 # Add this word to this list, avoiding duplicates
 AddList() {
     ret=""
-    for M in "$@"
+    while [ $# -gt 1 ]
     do
-      notInList $M $ret && ret="$ret $M"
+        ret="$ret $1"
+        shift
     done
+    if notInList $1 $ret
+    then
+        ret="$ret $1"
+    fi
     echo $ret
 }
 
