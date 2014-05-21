@@ -452,6 +452,7 @@ void getRecursiveBisectionList(int numparts, int *procList)
   for(int i = 0; i < n; i++) {
     procList[i] = i;
   }
+  if ( numparts < 2 ) return;
   TopoManagerWrapper tmgr;
   recursive_bisect(
     0, numparts, procList, procList + n, tmgr);
