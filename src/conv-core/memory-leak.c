@@ -42,7 +42,7 @@ struct Slot {
 	int  magic;
 
 /* Controls the number of stack frames to print out */
-#define STACK_LEN 8
+#define STACK_LEN 9
 	void *from[STACK_LEN];
 };
 
