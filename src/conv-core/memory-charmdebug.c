@@ -79,9 +79,7 @@ struct _Slot {
   int magic;
 
   int chareID;
-  /* Controls the number of stack frames to print out. Should be always odd, so
-     the total size of this struct becomes multiple of 8 bytes everywhere */
-//#define STACK_LEN 15
+  /* Controls the number of stack frames to print out. */
   int stackLen;
   void **from;
 
