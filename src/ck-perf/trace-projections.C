@@ -225,6 +225,7 @@ LogPool::LogPool(char *pgm) {
   writeSummaryFiles = 0;
   writeData = true;
   numEntries = 0;
+  lastCreationEvent = -1;
   // **CW** for simple delta encoding
   prevTime = 0.0;
   timeErr = 0.0;
@@ -612,6 +613,7 @@ void LogPool::flushLogBuffer()
     writeLog();
     hasFlushed = true;
     numEntries = 0;
+    lastCreationEvent = -1;
     new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
     new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
     //CkPrintf("Warning: Projections log flushed to disk on PE %d.\n", CkMyPe());
@@ -685,6 +687,12 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
         default:
             break;
     }
+
+  if (type == CREATION ||
+      type == CREATION_MULTICAST ||
+      type == CREATION_BCAST) {
+    lastCreationEvent = numEntries;
+  }
   new (&pool[numEntries++])
     LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPe);
   if ((type == END_PHASE) || (type == END_COMPUTATION)) {
@@ -717,6 +725,11 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
 
 void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
 #ifndef CMK_BIGSIM_CHARM
+  if (type == CREATION ||
+      type == CREATION_MULTICAST ||
+      type == CREATION_BCAST) {
+    lastCreationEvent = numEntries;
+  }
   new (&pool[numEntries++])
 	LogEntry(time,type,funcID,lineNum,fileName);
   if(poolSize == numEntries){
@@ -729,6 +742,11 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
   
 void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
 #ifndef CMK_BIGSIM_CHARM
+  if (type == CREATION ||
+      type == CREATION_MULTICAST ||
+      type == CREATION_BCAST) {
+    lastCreationEvent = numEntries;
+  }
   new (&pool[numEntries++])
 	LogEntry(type,time,memUsage);
   if(poolSize == numEntries){
@@ -798,6 +816,7 @@ void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 				   int event, int pe, int ml, CmiObjId *id,
 				   double recvT, int numPe, int *pelist)
 {
+  lastCreationEvent = numEntries;
   new (&pool[numEntries++])
     LogEntry(time, mIdx, eIdx, event, pe, ml, id, recvT, numPe, pelist);
   if(poolSize==numEntries) {
@@ -1383,12 +1402,12 @@ void TraceProjections::creationDone(int num)
   // modified the creation done time of the last num log entries
   // FIXME: totally a hack
   double curTime = TraceTimer();
-  int idx = _logPool->numEntries-1;
+  int idx = _logPool->lastCreationEvent;
   while (idx >=0 && num >0 ) {
     LogEntry &log = _logPool->pool[idx];
     if ((log.type == CREATION) ||
-	(log.type == CREATION_BCAST) ||
-	(log.type == CREATION_MULTICAST)) {
+        (log.type == CREATION_BCAST) ||
+        (log.type == CREATION_MULTICAST)) {
       log.recvTime = curTime - log.time;
       num --;
     }

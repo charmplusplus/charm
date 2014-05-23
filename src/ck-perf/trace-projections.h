@@ -252,6 +252,7 @@ class LogPool {
     int writeSummaryFiles;
     unsigned int poolSize;
     unsigned int numEntries;
+    unsigned int lastCreationEvent;
     LogEntry *pool;
     FILE *fp;
     FILE *deltafp;
