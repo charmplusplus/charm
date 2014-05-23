@@ -87,8 +87,8 @@ struct _Slot {
   SlotStack *extraStack;
 
   /* CRC32 checksums */
-  unsigned int slotCRC;
-  unsigned int userCRC;
+  CmiUInt8 slotCRC;
+  CmiUInt8 userCRC;
 };
 
 struct _SlotStack {
@@ -887,10 +887,12 @@ static int reportMEM = 0;
 
 static int CpdCRC32 = 0;
 
+#define SLOT_CRC_LENGTH (sizeof(Slot) - 2*sizeof(CmiUInt8))
+
 static int checkSlotCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
   if (sl!=NULL) {
-    unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
+    unsigned int crc = crc32_initial((unsigned char*)sl, SLOT_CRC_LENGTH);
     crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
     return sl->slotCRC == crc;
   } else return 0;
@@ -910,7 +912,7 @@ static void resetUserCRC(void *userPtr) {
 static void resetSlotCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
   if (sl!=NULL) {
-    unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
+    unsigned int crc = crc32_initial((unsigned char*)sl, SLOT_CRC_LENGTH);
     crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
     sl->slotCRC = crc;
   }
@@ -921,7 +923,7 @@ static void ResetAllCRC() {
   unsigned int crc1, crc2;
 
   SLOT_ITERATE_START(cur)
-    crc1 = crc32_initial((unsigned char*)cur, sizeof(Slot)-2*sizeof(unsigned int));
+    crc1 = crc32_initial((unsigned char*)cur, SLOT_CRC_LENGTH);
     crc1 = crc32_update((unsigned char*)cur->from, cur->stackLen*sizeof(void*), crc1);
     crc2 = crc32_initial((unsigned char*)SlotToUser(cur), cur->userSize);
     cur->slotCRC = crc1;
@@ -934,7 +936,7 @@ static void CheckAllCRC() {
   unsigned int crc1, crc2;
 
   SLOT_ITERATE_START(cur)
-    crc1 = crc32_initial((unsigned char*)cur, sizeof(Slot)-2*sizeof(unsigned int));
+    crc1 = crc32_initial((unsigned char*)cur, SLOT_CRC_LENGTH);
     crc1 = crc32_update((unsigned char*)cur->from, cur->stackLen*sizeof(void*), crc1);
     crc2 = crc32_initial((unsigned char*)SlotToUser(cur), cur->userSize);
     /* Here we can check if a modification has occured */
@@ -1325,7 +1327,7 @@ static void *setSlot(Slot **sl,int userSize) {
   memcpy(s->from, &stackFrames[4], numStackFrames*sizeof(void*));
 
   if (CpdCRC32) {
-    unsigned int crc = crc32_initial((unsigned char*)s, sizeof(Slot)-2*sizeof(unsigned int));
+    unsigned int crc = crc32_initial((unsigned char*)s, SLOT_CRC_LENGTH);
     s->slotCRC = crc32_update((unsigned char*)s->from, numStackFrames*sizeof(void*), crc);
     s->userCRC = crc32_initial((unsigned char*)user, userSize);
   }
