@@ -76,7 +76,7 @@ if test -d "`cygpath -u \"$SDK_DIR/Lib/x64\"`"
 then
 LINK_COMMON="$LINK_COMMON /LIBPATH:`cygpath -d \"$SDK_DIR/Lib/x64\"`"
 else
-LINK_COMMON="$LINK_COMMON /LIBPATH:`cygpath -d \"$VCC_DIR/Lib/\"`"
+LINK_COMMON="$LINK_COMMON /LIBPATH:`cygpath -d \"$VCC_DIR/Lib/amd64\"`"
 fi
 LINK_O=$LINK_COMMON
 LINK_DEF=$LINK_COMMON

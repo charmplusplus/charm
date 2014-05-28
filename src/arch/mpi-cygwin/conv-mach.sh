@@ -1,11 +1,11 @@
-HPC_SDK="c:\Program Files\Microsoft HPC Pack 2008 SDK"
+HPC_SDK="c:\Program Files\Microsoft MPI"
 HPC_SDK=`cygpath -d "$HPC_SDK"`
 
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="gcc -E "
 CMK_CXXPP="g++ -x c++ -E "
-CMK_CC="gcc -mno-cygwin -I/usr/local/mingw/include -I `cygpath -u "$HPC_SDK\Include"`"
-CMK_CXX="g++ -mno-cygwin -I/usr/local/mingw/include -I `cygpath -u "$HPC_SDK\Include"`"
+CMK_CC="gcc -mno-cygwin -I/usr/local/mingw/include -I `cygpath -u "$HPC_SDK\Inc"`"
+CMK_CXX="g++ -mno-cygwin -I/usr/local/mingw/include -I `cygpath -u "$HPC_SDK\Inc"`"
 CMK_LD="$CMK_CC -L/usr/local/mingw/lib "
 CMK_LDXX="$CMK_CXX -L/usr/local/mingw/lib "
 CMK_LIBS=""
