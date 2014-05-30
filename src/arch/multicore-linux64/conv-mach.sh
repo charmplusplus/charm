@@ -39,3 +39,5 @@ else
     CMK_F90_USE_MODDIR=1
     CMK_F90_MODINC="-p"
 fi
+
+CMK_QT='generic64'
