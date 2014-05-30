@@ -8,7 +8,7 @@
  * Functionalities provided:
  * - detect multiple delete on a pointer
  * - stacktrace for all memory allocated
- * - division of the memory in differnt types of allocations
+ * - division of allocated memory among different types of allocations
  * - sweep of the memory searching for leaks
  */
 
