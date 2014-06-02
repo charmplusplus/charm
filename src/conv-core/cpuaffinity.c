@@ -464,7 +464,8 @@ static int search_pemap(char *pecoremap, int pe)
 {
   int *map = (int *)malloc(CmiNumPesGlobal()*sizeof(int));
   char *ptr = NULL;
-  int i, j, k, count;
+  int h, i, j, k, count;
+  int plusarr[128];
   char *str;
 
   char *mapstr = (char*)malloc(strlen(pecoremap)+1);
@@ -474,15 +475,24 @@ static int search_pemap(char *pecoremap, int pe)
   count = 0;
   while (str && count < CmiNumPesGlobal())
   {
-      int hasdash=0, hascolon=0, hasdot=0, hasstar1=0, hasstar2 = 0;
+      int hasdash=0, hascolon=0, hasdot=0, hasstar1=0, hasstar2=0, numplus=0;
       int start, end, stride=1, block=1;
       int iter=1;
+      plusarr[0] = 0;
       for (i=0; i<strlen(str); i++) {
           if (str[i] == '-' && i!=0) hasdash=1;
           else if (str[i] == ':') hascolon=1;
 	  else if (str[i] == '.') hasdot=1;
 	  else if (str[i] == 'x') hasstar1=1;
 	  else if (str[i] == 'X') hasstar2=1;
+	  else if (str[i] == '+') {
+            if (str[i+1] == '+' || str[i+1] == '-') {
+              printf("Warning: Check the format of \"%s\".\n", str);
+            } else if (sscanf(&str[i], "+%d", &plusarr[++numplus]) != 1) {
+              printf("Warning: Check the format of \"%s\".\n", str);
+              --numplus;
+            }
+          }
       }
       if (hasstar1 || hasstar2) {
           if (hasstar1) sscanf(str, "%dx", &iter);
@@ -514,12 +524,15 @@ static int search_pemap(char *pecoremap, int pe)
         printf("Warning: invalid block size in \"%s\" ignored.\n", str);
         block=1;
       }
-      //if (CmiMyPe() == 0) printf("iter: %d start: %d end: %d stride: %d, block: %d.\n", iter, start, end, stride, block);
+      //if (CmiMyPe() == 0) printf("iter: %d start: %d end: %d stride: %d, block: %d. plus %d \n", iter, start, end, stride, block, numplus);
       for (k = 0; k<iter; k++) {
         for (i = start; i<=end; i+=stride) {
           for (j=0; j<block; j++) {
             if (i+j>end) break;
-            map[count++] = i+j;
+            for (h=0; h<=numplus; h++) {
+              map[count++] = i+j+plusarr[h];
+              if (count == CmiNumPesGlobal()) break;
+            }
             if (count == CmiNumPesGlobal()) break;
           }
           if (count == CmiNumPesGlobal()) break;
