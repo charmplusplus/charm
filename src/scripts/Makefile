@@ -617,10 +617,10 @@ $(L)/libthreads-context-tls.o: $(LIBTHREADSDEPS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
 
 $(L)/libthreads-uJcontext.o: $(LIBTHREADSDEPS) uJcontext.c
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -U_FORTIFY_SOURCE -IQuickThreads -I. threads.c || touch $@
 
 $(L)/libthreads-uJcontext-tls.o: $(LIBTHREADSDEPS) uJcontext.c
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads -I. threads.c || touch $@
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -IQuickThreads -I. threads.c || touch $@
 
 $(L)/libthreads-pthreads.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_PTHREADS=1 -IQuickThreads threads.c || touch $@
@@ -641,7 +641,7 @@ $(L)/libthreads-context-memoryalias.o: $(LIBTHREADSDEPS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
 
 $(L)/libthreads-uJcontext-memoryalias.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
+	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_JCONTEXT=1 -U_FORTIFY_SOURCE -IQuickThreads -I. threads.c || touch $@
 
 ## Global swapping (-swapglobal)
 swapglobal-target: $(L)/libglobal-swap.o $(L)/libglobal-copy.o $(L)/loadsym.o
