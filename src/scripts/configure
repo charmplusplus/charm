@@ -1767,6 +1767,8 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_ERROR_CHECKING 0
 _ACEOF
 
+  add_flag 'OPTS_CC="$OPTS_CC -U_FORTIFY_SOURCE"' 'error checking'
+  add_flag 'OPTS_CXX="$OPTS_CXX -U_FORTIFY_SOURCE"' 'error checking'
 else
   Echo "Error checking is enabled"
 
