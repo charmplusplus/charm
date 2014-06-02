@@ -53,6 +53,12 @@ remove_flag() {
 }
 
 
+#clean up conv-mach-opt.sh
+sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$/d' > conv-mach-opt.sh.clean
+cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
+rm -f conv-mach-opt.sh.clean
+
+
 # enable/disable error checking
 AC_ARG_ENABLE([error-checking],
             [AS_HELP_STRING([--enable-error-checking],
@@ -215,11 +221,6 @@ else
   Echo "Invalid type specified for load balancing timer type"
   test_finish 1
 fi
-
-#clean up conv-mach-opt.sh
-sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$/d' > conv-mach-opt.sh.clean
-cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
-rm -f conv-mach-opt.sh.clean
 
 
 #
