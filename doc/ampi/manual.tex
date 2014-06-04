@@ -342,7 +342,7 @@ switch GOT contents at thread context-switch by the runtime system.
 
 
 The only thing that the user needs to do is to set flag {\tt -swapglobals}
-at compile and link time (e.g. ``ampicc Ðo prog prog.c -swapglobals"). It does not need 
+at compile and link time (e.g. ``ampicc -o prog prog.c -swapglobals"). It does not need 
 any change to the source code and works with any language (C, C++, Fortran, etc).
 However, it does not handle static variables and has a context switching overhead that grows with the number of global variables.
 Currently, this feature only works on x86 and x86\_64
