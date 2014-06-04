@@ -1086,6 +1086,7 @@ static void ServiceCharmrun_nolock();
 static void CmiNotifyStillIdle(CmiIdleState *s) {
 #if CMK_SMP
 	CmiCommLock();
+	inProgress[CmiMyRank()] += 1;
 /*	if(where == COMM_SERVER_FROM_SMP)*/
 #endif
 /*		ServiceCharmrun_nolock();*/
@@ -1093,6 +1094,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 	CommunicationServer_nolock(0);
 #if CMK_SMP
 	CmiCommUnlock();
+	inProgress[CmiMyRank()] -= 1;
 #endif
 }
 
@@ -1605,6 +1607,7 @@ static void CommunicationServer(int sleepTime, int where){
 		return;
 	}
 	CmiCommLock();
+	inProgress[CmiMyRank()] += 1;
 	if(where == COMM_SERVER_FROM_SMP){
 #endif
 	        ServiceCharmrun_nolock();
@@ -1614,6 +1617,7 @@ static void CommunicationServer(int sleepTime, int where){
 	CommunicationServer_nolock(0);
 #if CMK_SMP
 	CmiCommUnlock();
+	inProgress[CmiMyRank()] -= 1;
 #endif
 
 	/* when called by communication thread or in interrupt */

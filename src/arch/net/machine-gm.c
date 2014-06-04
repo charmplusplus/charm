@@ -224,8 +224,10 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   
   /* have to handle this event now */
   CmiCommLock();
+  inProgress[CmiMyRank()] += 1;
   nreadable = processEvent(e);
   CmiCommUnlock();
+  inProgress[CmiMyRank()] -= 1;
   if (nreadable) {
     return;
   }
@@ -340,8 +342,10 @@ static void CommunicationServer(int withDelayMs, int where)
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
 
   CmiCommLock();
+  inProgress[CmiMyRank()] += 1;
   CommunicationServer_nolock(withDelayMs);
   CmiCommUnlock();
+  inProgress[CmiMyRank()] -= 1;
 
 #if CMK_IMMEDIATE_MSG
   if (where == 0)

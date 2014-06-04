@@ -1519,8 +1519,10 @@ static void CommunicationServer(int withDelayMs, int where) {
   }
 
   CmiCommLock();
+  inProgress[CmiMyRank()] += 1;
   CommunicationServer_nolock(withDelayMs);
   CmiCommUnlock();
+  inProgress[CmiMyRank()] -= 1;
 
 #if CMK_IMMEDIATE_MSG
   if (where == 0)

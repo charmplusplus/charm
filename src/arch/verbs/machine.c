@@ -275,8 +275,6 @@ int getDestHandler;
 #endif
 #endif
 
-int inProgress[64];
-
 static void CommunicationServerNet(int withDelayMs, int where);
 //static void CommunicationServer(int withDelayMs);
 
@@ -791,10 +789,41 @@ void printLog(void)
  *
  *****************************************************************************/
 
-
 static CmiNodeLock    Cmi_scanf_mutex;
 static double         Cmi_clock;
 static double         Cmi_check_delay = 3.0;
+int inProgress[128];
+
+/** Mechanism to prevent dual locking when comm-layer functions, including prints, 
+ * are called recursively. (UN)LOCK_IF_AVAILABLE is used before and after a code piece
+ * which is guaranteed not to make any-recursive locking calls. (UN)LOCK_AND_(UN)SET 
+ * is used before and after a code piece that may make recursive locking calls.
+ */
+
+#define LOCK_IF_AVAILABLE() \
+  if(!inProgress[CmiMyRank()]) { \
+    CmiCommLock(); \
+  } 
+  
+#define UNLOCK_IF_AVAILABLE() \
+  if(!inProgress[CmiMyRank()]) { \
+    CmiCommUnlock(); \
+  }
+    
+#define LOCK_AND_SET() \
+    if(!inProgress[CmiMyRank()]) { \
+      CmiCommLock(); \
+      acqLock = 1; \
+    } \
+    inProgress[CmiMyRank()] += 1;    
+    
+#define UNLOCK_AND_UNSET() \
+    if(acqLock) { \
+      CmiCommUnlock(); \
+      acqLock = 0; \
+    } \
+    inProgress[CmiMyRank()] -= 1;
+
 
 /******************************************************************************
  *
@@ -913,9 +942,9 @@ static void ctrl_sendone_locking(const char *type,
 				const char *data1,int dataLen1,
 				const char *data2,int dataLen2)
 {
-  CmiCommLock();
+  LOCK_IF_AVAILABLE();
   ctrl_sendone_nolock(type,data1,dataLen1,data2,dataLen2);
-  CmiCommUnlock();
+  UNLOCK_IF_AVAILABLE();
 }
 
 #ifndef MEMORYUSAGE_OUTPUT
@@ -949,9 +978,9 @@ static void pingCharmrun(void *ignored)
     Cmi_check_last = clock; 
     CmiCommLockOrElse(return;); /*Already busy doing communication*/
     if (Cmi_charmrun_fd_sendflag) return; /*Busy talking to charmrun*/
-    CmiCommLock();
+    LOCK_IF_AVAILABLE();
     ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
-    CmiCommUnlock();
+    UNLOCK_IF_AVAILABLE();
   }
   CmiStdoutFlush(); /*Make sure stdout buffer hasn't filled up*/
   }
@@ -1080,11 +1109,11 @@ static void InternalPrintf(const char *f, va_list l)
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
-	  CmiCommLock();
+          LOCK_IF_AVAILABLE();
   	  ctrl_sendone_nolock("printsyn", buffer,strlen(buffer)+1,NULL,0);
   	  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
   	  ChMessage_free(&replymsg);
-	  CmiCommUnlock();
+          UNLOCK_IF_AVAILABLE();
   } else {
   	  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
   }
@@ -1100,10 +1129,10 @@ static void InternalError(const char *f, va_list l)
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
   	  ctrl_sendone_locking("printerrsyn", buffer,strlen(buffer)+1,NULL,0);
-	  CmiCommLock();
+          LOCK_IF_AVAILABLE();
   	  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
   	  ChMessage_free(&replymsg);
-	  CmiCommUnlock();
+          UNLOCK_IF_AVAILABLE();
   } else {
   	  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
   }
@@ -1131,14 +1160,14 @@ static int InternalScanf(char *fmt, va_list l)
   {/*Send charmrun the format string*/
         ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
         /*Wait for the reply (characters to scan) from charmrun*/
-        CmiCommLock();
+        LOCK_IF_AVAILABLE();
         ChMessage_recv(Cmi_charmrun_fd,&replymsg);
         i = sscanf((char*)replymsg.data, fmt,
                      ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
                      ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
                      ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
         ChMessage_free(&replymsg);
-        CmiCommUnlock();
+        UNLOCK_IF_AVAILABLE();
   } else
   {/*Just do the scanf normally*/
         i=scanf(fmt, ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
@@ -1348,9 +1377,9 @@ static int CmiStdoutNeedsService(void) {
 static void CmiStdoutFlush(void) {
 	if (servicingStdout) return; /* might be called by SIGALRM */
 	CmiCommLockOrElse( return; )
-	CmiCommLock();
+        LOCK_IF_AVAILABLE();
 	CmiStdoutServiceAll();
-	CmiCommUnlock();
+        UNLOCK_IF_AVAILABLE();
 }
 
 /***************************************************************************
@@ -1515,6 +1544,7 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 
   dst = ogm->dst;
 
+  int acqLock = 0;
   //printf("deliver outgoing message, dest: %d \n", dst);
 #if CMK_ERROR_CHECKING
     if (dst<0 || dst>=CmiNumPesGlobal())
@@ -1524,16 +1554,12 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
     rank = dst - node->nodestart;
     if (node->nodestart != Cmi_nodestartGlobal) {
 #if !CMK_SMP_NOT_RELAX_LOCK	  		
-      if(!inProgress[CmiMyRank()]) {
-        CmiCommLock();
-      }
+        LOCK_AND_SET();
 #endif		
         DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
         GarbageCollectMsg(ogm);
 #if !CMK_SMP_NOT_RELAX_LOCK	  		
-      if(!inProgress[CmiMyRank()]) {
-        CmiCommUnlock();
-      }
+        UNLOCK_AND_UNSET();
 #endif		
   }
 #if CMK_MULTICORE
@@ -1582,13 +1608,14 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   ogm=PrepareOutgoing(cs,pe,size,'F',data);
 
 #if CMK_SMP_NOT_RELAX_LOCK  
-  CmiCommLock();
+  int acqLock = 0;
+  LOCK_AND_SET();
 #endif  
   
   sendonnetwork = DeliverOutgoingMessage(ogm);
   
 #if CMK_SMP_NOT_RELAX_LOCK  
-  CmiCommUnlock();
+  UNLOCK_AND_UNSET();
 #endif
 
 //#if CMK_SMP
@@ -1692,9 +1719,9 @@ void LrtsBarrier()
 
   ctrl_sendone_locking("barrier",NULL,0,NULL,0);
   while (barrierReceived != 1) {
-    CmiCommLock();
+    LOCK_IF_AVAILABLE();
     ctrl_getone();
-    CmiCommUnlock();
+    UNLOCK_IF_AVAILABLE();
   }
   barrierReceived = 0;
   barrier_phase ++;
@@ -1719,9 +1746,9 @@ int CmiBarrierZero()
     ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
     if (CmiMyNodeGlobal() == 0) {
       while (barrierReceived != 2) {
-        CmiCommLock();
+        LOCK_IF_AVAILABLE();
         ctrl_getone();
-        CmiCommUnlock();
+        UNLOCK_IF_AVAILABLE();
       }
       barrierReceived = 0;
     }
@@ -1994,9 +2021,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #include "spert_ppu.h"
 
 void machine_OffloadAPIProgress() {
-  CmiCommLock();
+  LOCK_IF_AVAILABLE();
   OffloadAPIProgress();
-  CmiCommUnlock();
+  UNLOCK_IF_AVAILABLE();
 }
 #endif
 

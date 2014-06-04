@@ -1460,7 +1460,7 @@ static void CommunicationServerNet(int sleepTime, int where){
 		return;
 	}
 	CmiCommLock();
-	inProgress[CmiMyRank()] = 1;
+	inProgress[CmiMyRank()] += 1;
 	if(where == COMM_SERVER_FROM_SMP){
 #endif
 		ServiceCharmrun_nolock();
@@ -1470,7 +1470,7 @@ static void CommunicationServerNet(int sleepTime, int where){
 	CommunicationServer_nolock(0);
 #if CMK_SMP
 	CmiCommUnlock();
-	inProgress[CmiMyRank()] = 0;
+	inProgress[CmiMyRank()] -= 1;
 #endif
 
 	/* when called by communication thread or in interrupt */
