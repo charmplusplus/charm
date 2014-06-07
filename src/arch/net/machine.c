@@ -1878,11 +1878,10 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
   int i, rank, dst; OtherNode node;
 	
   int network = 1;
-
+  int acqLock = 0;
 	
   dst = ogm->dst;
 
-  int acqLock = 0;
   switch (dst) {
   case PE_BROADCAST_ALL:
 #if !CMK_SMP_NOT_RELAX_LOCK	  
@@ -2054,6 +2053,7 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
 CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 {
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
+  int acqLock = 0;
   MACHSTATE(1,"CmiGeneralNodeSend {");
 
   if (freemode == 'S') {
@@ -2076,7 +2076,6 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 
   CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,node,size,freemode,data);
-  int acqLock = 0;
   LOCK_AND_SET();
   DeliverOutgoingNodeMessage(ogm);
   UNLOCK_AND_UNSET();
@@ -2105,6 +2104,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 {
   int sendonnetwork;
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
+  int acqLock = 0;
   MACHSTATE(1,"CmiGeneralSend {");
 
   if (freemode == 'S') {
@@ -2158,7 +2158,6 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
 
-  int acqLock = 0;
 #if CMK_SMP_NOT_RELAX_LOCK  
   LOCK_AND_SET();
 #endif  
