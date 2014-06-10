@@ -38,9 +38,9 @@ For more information, please refer to BigSim and Projections manuals.
 	ant
 
 10- run Projections:
-	./bin/projections64 #open tproj.sts file
+	./bin/projections #open tproj.sts file
 
-After opeing the symbol file (file/open <tproj.sts>), you can use different features of Projections such as tools/Timelines.
+After opening the symbol file (file/open <tproj.sts>), you can use different features of Projections such as tools/Timelines.
 
 -by Ehsan (totoni2@illinois.edu) April 9, 2012
-
+	minor edit on June 10, 2014
