@@ -40,7 +40,7 @@ even if no performance analysis traces are desired. Developers of
 \charmpp{} applications who consider such an overhead to be
 unacceptable (e.g. for a production application which requires the
 absolute best performance) may recompile the \charmpp{} runtime with
-the {\tt -{}-with-production} flag which removes the instrumentation
+the \verb|--with-production| flag which removes the instrumentation
 stubs.
 
 To enable performance tracing of your application, users simply need
@@ -52,7 +52,7 @@ to as {\em tracemode(s)}). (see section \ref{sec::trace modules})
 
 \projections{} tracing modules dictate the type of performance data,
 data detail and data format each processor will record. They are also
-refereed to as ``tracemodes''. There are currently 2 tracemodes
+referred to as ``tracemodes''. There are currently 2 tracemodes
 available. Zero or more tracemodes may be specified at link-time. When
 no tracemodes are specified, no trace data is generated.
 
