@@ -1,0 +1,15 @@
+mainmodule taskSpawn{
+
+  readonly CProxy_main mainProxy;
+  readonly int delay;
+
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void results();
+  };
+
+  chare worker {
+    entry worker(int lowerIndex, int upperIndex);
+  }
+
+};
