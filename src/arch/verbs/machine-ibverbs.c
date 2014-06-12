@@ -319,8 +319,8 @@ typedef struct {
 	int count;
 } infiCmiChunkPool;
 
-#define INFINUMPOOLS 20
-#define INFIMAXPERPOOL 400
+#define INFINUMPOOLS 14
+#define INFIMAXPERPOOL 100
 #define INFIMULTIPOOL 0xDEAFB00D
 
 #if THREAD_MULTI_POOL
@@ -553,8 +553,8 @@ loop:
 	/*	blockAllocRatio=16;
 		blockThreshold=8;*/
 
-	blockAllocRatio=32;
-	blockThreshold=8;
+	blockAllocRatio=64;
+	blockThreshold=9;
 
 
 
