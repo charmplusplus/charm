@@ -31,6 +31,7 @@ CpvDeclare(void *, myProcStatFP);
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <errno.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -180,7 +181,7 @@ int set_thread_affinity(int cpuid) {
   thread = pthread_self();
   CPU_ZERO_S(size, cpusetp);
   CPU_SET_S(cpuid, size, cpusetp);
-  if (pthread_setaffinity_np(thread, size, cpusetp)) {
+  if (errno = pthread_setaffinity_np(thread, size, cpusetp)) {
     perror("pthread_setaffinity dynamically allocated");
     CPU_FREE(cpusetp);
     return -1;
@@ -198,8 +199,7 @@ int set_thread_affinity(int cpuid) {
   CPU_ZERO(&cpuset);
   CPU_SET(cpuid, &cpuset);
 
-  s = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
-  if (s != 0) {
+  if (errno = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset)) {
     perror("pthread_setaffinity");
     return -1;
   }
@@ -286,14 +286,14 @@ int print_thread_affinity() {
   size_t len = sizeof(mask);
 
 #if  CMK_HAS_PTHREAD_SETAFFINITY
-  int s, j;
+  int j;
   cpu_set_t cpuset;
   pthread_t thread;
   char str[256], pe[16];
 
   thread = pthread_self();
-  s = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
-  if (s != 0) {
+  
+  if (errno = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset)) {
     perror("pthread_getaffinity");
     return -1;
   }
