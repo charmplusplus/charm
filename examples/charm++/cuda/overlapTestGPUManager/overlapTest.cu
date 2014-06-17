@@ -35,6 +35,10 @@ matrixMul(float* C, float* A, float* B, int wA, int wB)
     // that is computed by the thread
     float Csub = 0;
 
+    // Thread ids with respect to grid.
+    int row = by * BLOCK_SIZE + ty;
+    int col = bx * BLOCK_SIZE + tx;
+
     // Loop over all the sub-matrices of A and B
     // required to compute the block sub-matrix
     for (int a = aBegin, b = bBegin;
@@ -48,12 +52,23 @@ matrixMul(float* C, float* A, float* B, int wA, int wB)
         // Declaration of the shared memory array Bs used to
         // store the sub-matrix of B
         __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE];
-
         // Load the matrices from device memory
         // to shared memory; each thread loads
         // one element of each matrix
-        As[ty][tx] = A[a + wA * ty + tx];
-        Bs[ty][tx] = B[b + wB * ty + tx];
+        // If a thread corresponds to an out-of-bounds index in 'A or B',
+        // set the corresponding index in 'As or Bs' to 0
+        if(aBegin + wA > a + tx && row < wA) {
+          As[ty][tx] = A[a + wA * ty + tx];
+        }
+        else {
+          As[ty][tx] = 0.0;
+        }
+        if(bBegin + wB*(wB-1) >= b+ wB*ty && col<wB) {
+          Bs[ty][tx] = B[b + wB * ty + tx];
+        }
+        else {
+          Bs[ty][tx] = 0.0;
+        }
 
         // Synchronize to make sure the matrices are loaded
         __syncthreads();
@@ -70,100 +85,103 @@ matrixMul(float* C, float* A, float* B, int wA, int wB)
         __syncthreads();
     }
 
-    // Write the block sub-matrix to device memory;
-    // each thread writes one element
-    int c = wB * BLOCK_SIZE * by + BLOCK_SIZE * bx;
-    C[c + wB * ty + tx] = Csub;
+    // Write to C buffer only if threads lie within the A and B matrix indices
+    if(row < wA && col < wB) {
+      // Write the block sub-matrix to device memory;
+      // each thread writes one element
+      int c = wB * BLOCK_SIZE * by + BLOCK_SIZE * bx;
+      C[c + wB * ty + tx] = Csub;
+    }
 }
 
-void hostMemorySetup(int matrixSize, ElementType **h_A_ptr, 
-		     ElementType **h_B_ptr, ElementType **h_C_ptr, void *cb) {
-  pinnedMemReq reqs; 
+void hostMemorySetup(int matrixSize, ElementType **h_A_ptr,
+                     ElementType **h_B_ptr, ElementType **h_C_ptr, void *cb) {
+  pinnedMemReq reqs;
 
-  int nBuffers = 3; 
-  int size = matrixSize * matrixSize * sizeof(ElementType); 
+  int nBuffers = 3;
+  int size = matrixSize * matrixSize * sizeof(ElementType);
 
   size_t *sizes = (size_t *) malloc(nBuffers * sizeof(size_t));
-  void ***hostPtrs = (void ***) malloc(nBuffers * sizeof(void **)); 
-  hostPtrs[0] = (void **) h_A_ptr; 
-  hostPtrs[1] = (void **) h_B_ptr; 
-  hostPtrs[2] = (void **) h_C_ptr; 
-  sizes[0] = size; 
+  void ***hostPtrs = (void ***) malloc(nBuffers * sizeof(void **));
+  hostPtrs[0] = (void **) h_A_ptr;
+  hostPtrs[1] = (void **) h_B_ptr;
+  hostPtrs[2] = (void **) h_C_ptr;
+  sizes[0] = size;
   sizes[1] = size;
-  sizes[2] = size; 
+  sizes[2] = size;
 
-  reqs.nBuffers = nBuffers; 
-  reqs.sizes = sizes; 
-  reqs.hostPtrs = hostPtrs; 
-  reqs.callbackFn = cb; 
+  reqs.nBuffers = nBuffers;
+  reqs.sizes = sizes;
+  reqs.hostPtrs = hostPtrs;
+  reqs.callbackFn = cb;
 
-  pinnedMallocHost(&reqs); 
+  pinnedMallocHost(&reqs);
 }
 
 void hostMemoryCleanup(ElementType *h_A, ElementType *h_B, ElementType *h_C) {
 
-  delayedFree(h_A); 
-  delayedFree(h_B); 
+  delayedFree(h_A);
+  delayedFree(h_B);
   delayedFree(h_C);
 
 }
 
-void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B, 
-		ElementType *h_C, int myIndex, void *cb) {
+void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
+                ElementType *h_C, int myIndex, void *cb) {
   int size = matrixSize * matrixSize * sizeof(ElementType);
-  dataInfo *AInfo, *BInfo, *CInfo; 
+  dataInfo *AInfo, *BInfo, *CInfo;
 
-  workRequest matmul; 
+  workRequest matmul;
   dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
-  matmul.dimGrid = dim3( ceil((float)matrixSize / threads.x), 
-			 ceil((float)matrixSize / threads.y) );
-  matmul.dimBlock = dim3(BLOCK_SIZE, BLOCK_SIZE); 
-  matmul.smemSize = 0; 
-  matmul.nBuffers = 3; 
+  matmul.dimGrid = dim3( ceil((float)matrixSize / threads.x),
+                         ceil((float)matrixSize / threads.y) );
+  matmul.dimBlock = dim3(BLOCK_SIZE, BLOCK_SIZE);
+  matmul.smemSize = 0;
+  matmul.nBuffers = 3;
   matmul.bufferInfo = (dataInfo *) malloc(matmul.nBuffers * sizeof(dataInfo));
 
-  AInfo = &(matmul.bufferInfo[0]); 
+  AInfo = &(matmul.bufferInfo[0]);
   AInfo->bufferID = BUFFERS_PER_CHARE * myIndex + A_INDEX;
-  AInfo->transferToDevice = YES; 
+  AInfo->transferToDevice = YES;
   AInfo->transferFromDevice = NO;
   AInfo->freeBuffer = YES;
-  AInfo->hostBuffer = h_A; 
-  AInfo->size = size; 
+  AInfo->hostBuffer = h_A;
+  AInfo->size = size;
 
-  BInfo = &(matmul.bufferInfo[1]); 
+  BInfo = &(matmul.bufferInfo[1]);
   BInfo->bufferID = BUFFERS_PER_CHARE * myIndex + B_INDEX;
-  BInfo->transferToDevice = YES; 
+  BInfo->transferToDevice = YES;
   BInfo->transferFromDevice = NO;
   BInfo->freeBuffer = YES;
-  BInfo->hostBuffer = h_B; 
-  BInfo->size = size; 
+  BInfo->hostBuffer = h_B;
+  BInfo->size = size;
 
-  CInfo = &(matmul.bufferInfo[2]); 
+  CInfo = &(matmul.bufferInfo[2]);
   CInfo->bufferID = BUFFERS_PER_CHARE * myIndex + C_INDEX;
-  CInfo->transferToDevice = NO; 
+  CInfo->transferToDevice = NO;
   CInfo->transferFromDevice = YES;
   CInfo->freeBuffer = YES;
-  CInfo->hostBuffer = h_C; 
-  CInfo->size = size; 
+  CInfo->hostBuffer = h_C;
+  CInfo->size = size;
 
   matmul.callbackFn = cb;
   matmul.id = MATMUL_KERNEL;
 
-  matmul.userData = malloc(sizeof(int)); 
-  memcpy(matmul.userData, &matrixSize, sizeof(int)); 
+  matmul.userData = malloc(sizeof(int));
+  memcpy(matmul.userData, &matrixSize, sizeof(int));
 
-  enqueue(wrQueue, &matmul); 
+  enqueue(wrQueue, &matmul);
 }
 
 void kernelSelect(workRequest *wr) {
 
   switch (wr->id) {
-  case MATMUL_KERNEL: 
+  case MATMUL_KERNEL:
     matrixMul<<< wr->dimGrid, wr->dimBlock, wr->smemSize, kernel_stream >>>
-      ((ElementType *) devBuffers[wr->bufferInfo[C_INDEX].bufferID], 
-       (ElementType *) devBuffers[wr->bufferInfo[A_INDEX].bufferID], 
+      ((ElementType *) devBuffers[wr->bufferInfo[C_INDEX].bufferID],
+       (ElementType *) devBuffers[wr->bufferInfo[A_INDEX].bufferID],
        (ElementType *) devBuffers[wr->bufferInfo[B_INDEX].bufferID],
-       *((int *) wr->userData), *((int *) wr->userData)); 
-    break;    
+       *((int *) wr->userData), *((int *) wr->userData));
+    break;
   }
 }
