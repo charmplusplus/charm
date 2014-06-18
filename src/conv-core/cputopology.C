@@ -83,6 +83,11 @@ struct _SYSTEM_INFO sysinfo;
 
 #ifdef _SC_NPROCESSORS_ONLN
   a = sysconf(_SC_NPROCESSORS_ONLN); /* number of active/running CPUs */
+#ifdef _SC_NPROCESSORS_CONF
+  /* also consider CPUs that are temporarily powered down by the OS */
+  const int b = sysconf(_SC_NPROCESSORS_CONF);
+  if ( b > a ) a = b;
+#endif
 #elif defined(_SC_CRAY_NCPU)
   a = sysconf(_SC_CRAY_NCPU);
 #elif defined(_SC_NPROC_ONLN)
@@ -92,7 +97,7 @@ struct _SYSTEM_INFO sysinfo;
   a *= Kernel_ProcessCount();
 #endif
 
-  if (a == -1) a = 1;
+  if (a < 1) a = 1;
 
   return a;
 }
