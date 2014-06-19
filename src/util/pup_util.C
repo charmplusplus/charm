@@ -17,6 +17,7 @@ virtual functions are defined here.
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "converse.h"
 #include "pup.h"
@@ -168,6 +169,25 @@ void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t)
 }
 
 extern "C" {
+
+int CmiOpen(const char *pathname, int flags, mode_t mode)
+{
+        int fd = -1;
+        while (1) {
+#if defined(_WIN32)
+          fd = _open(pathname, flags, mode);
+#else
+          fd = open(pathname, flags, mode);
+#endif
+          if (fd == -1 && errno==EINTR) {
+            CmiError("Warning: CmiOpen retrying on %s\n", pathname);
+            continue;
+          }
+          else
+            break;
+        }
+        return fd;
+}
 
 // dealing with short write
 size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)

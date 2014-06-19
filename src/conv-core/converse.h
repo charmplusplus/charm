@@ -2036,6 +2036,7 @@ CpvExtern(int,charmLibExitFlag);
 
 size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f);
 CmiInt8 CmiPwrite(int fd, char *buf, size_t bytes, size_t offset);
+int CmiOpen(const char *pathname, int flags, mode_t mode);
 FILE *CmiFopen(const char *path, const char *mode);
 int CmiFclose(FILE *fp);
 

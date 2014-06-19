@@ -173,9 +173,9 @@ namespace Ck { namespace IO {
           if (files[token].fd == -1) {
             string& name = files[token].name;
 #if defined(_WIN32)
-            int fd = _open(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
+            int fd = CmiOpen(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
 #else
-            int fd = ::open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+            int fd = CmiOpen(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 #endif
             if (-1 == fd)
               fatalError("Failed to open a file for parallel output", name);
