@@ -198,7 +198,7 @@ size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
           size_t ncur = fwrite(buf+nwritten*size,size,nmemb-nwritten,f);
           if (ncur <= 0) {
             if  (errno == EINTR)
-              printf("Warning: CmiFwrite retrying ...\n");
+              CmiError("Warning: CmiFwrite retrying ...\n");
             else
               break;
           }
@@ -235,7 +235,7 @@ size_t CmiFread(void *ptr, size_t size, size_t nmemb, FILE *f)
           size_t ncur = fread(buf + nread*size, size, nmemb-nread, f);
           if (ncur <= 0) {
             if  (errno == EINTR)
-              printf("Warning: CmiFread retrying ...\n");
+              CmiError("Warning: CmiFread retrying ...\n");
             else
               break;
           }
@@ -251,7 +251,7 @@ FILE *CmiFopen(const char *path, const char *mode)
         while (1) {
           fp = fopen(path, mode);
           if (fp == 0 && errno==EINTR) {
-            printf("Warning: CmiFopen retrying ...\n");
+            CmiError("Warning: CmiFopen retrying on %s\n", path);
             continue;
           }
           else
@@ -267,7 +267,7 @@ int CmiFclose(FILE *fp)
         while (1) {
           status = fflush(fp);
           if (status != 0 && errno==EINTR) {
-            printf("Warning: CmiFclose flush retrying ...\n");
+            CmiError("Warning: CmiFclose flush retrying ...\n");
             continue;
           }
           else
@@ -277,7 +277,7 @@ int CmiFclose(FILE *fp)
         while (1) {
           status = fclose(fp);
           if (status != 0 && errno==EINTR) {
-            printf("Warning: CmiFclose retrying ...\n");
+            CmiError("Warning: CmiFclose retrying ...\n");
             continue;
           }
           else
