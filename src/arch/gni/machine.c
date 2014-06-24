@@ -3977,6 +3977,16 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     init_comm_stats();
 #endif
 
+    /* checksum flag */
+    if (CmiGetArgFlag(*argv,"+checksum")) {
+#if CMK_ERROR_CHECKING
+        checksum_flag = 1;
+        if (myrank == 0) CmiPrintf("Charm++> CheckSum checking enabled! \n");
+#else
+        if (myrank == 0) CmiPrintf("Charm++> +checksum ignored in optimized version! \n");
+#endif
+    }
+
     /* init DMA buffer for medium message */
 
     //_init_DMA_buffer();
