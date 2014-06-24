@@ -2929,8 +2929,8 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                         buffered_recv_msg -= GetMempoolsize((void*)(tmp_pd->local_addr));
                     MACHSTATE5(8, "GO Recv done ack send from %d (%d,%d, %d) tag=%d\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size, msg_tag); 
 #endif
-                    CMI_CHECK_CHECKSUM((void*)tmp_pd->local_addr, tmp_pd->length);
-                    handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
+                    CMI_CHECK_CHECKSUM((void*)tmp_pd->local_addr, CmiGetMsgSize(tmp_pd->local_addr));
+                    handleOneRecvedMsg(CmiGetMsgSize(tmp_pd->local_addr), (void*)tmp_pd->local_addr);
                 }else if(msg_tag == BIG_MSG_TAG){
                     void *msg = (char*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG;
                     CmiSetMsgSeq(msg, CmiGetMsgSeq(msg)+1);
@@ -2943,8 +2943,8 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                         if( tmp_pd->cqwrite_value == 1)
                             TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_addr/1000000.0), (double)((tmp_pd->sync_flag_addr+1)/1000000.0), (double)((tmp_pd->sync_flag_addr+2)/1000000.0), (void*)tmp_pd->local_addr); 
 #endif
-                        CMI_CHECK_CHECKSUM(msg, tmp_pd->first_operand);
-                        handleOneRecvedMsg(tmp_pd->first_operand, msg); 
+                        CMI_CHECK_CHECKSUM(msg, CmiGetMsgSize(msg));
+                        handleOneRecvedMsg(CmiGetMsgSize(msg), msg);
                     }
                 }
             }
