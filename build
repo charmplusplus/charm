@@ -199,6 +199,7 @@ TestIfOption() {
 
 # start
 
+BUILD_CUDA=0
 MAKEOPTS=""
 OPTS=""
 BOPTS=""
@@ -438,11 +439,25 @@ do
           BOPTS="$BOPTS $1"
           [ $1 =  "bigemulator" ] && BUILD_EMULATOR=1
           [ $1 =  "bigsim" ] && BUILD_EMULATOR=1
+          [ $1 =  "cuda"   ] && BUILD_CUDA=1
         fi
         shift
 	;;
   esac
 done
+
+if [ $BUILD_CUDA -eq 1 ]; then
+  echo "checking for CUDA toolkit directory"
+  CUDA_CANDIDATE_DIRS="$CUDATOOLKIT_HOME /usr/local/cuda /usr/lib/nvidia-cuda-toolkit"
+  for dir in $CUDA_CANDIDATE_DIRS; do
+    if test -d "$dir"; then
+      CUDA_DIR="$dir"
+      HAVE_CUDA="yes"
+      echo "CUDA_DIR=$CUDA_DIR"
+      break
+    fi
+  done
+fi
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
 
@@ -599,6 +614,9 @@ then
     for i in $BOPTS
     do
       echo '#include "'conv-mach-$i.h'"' >> $ConvHeader
+      if [ $BUILD_CUDA -eq 1 ]; then
+        echo 'CUDA_DIR="'$CUDA_DIR'"'>>$ConvSh
+      fi
       echo '. $CHARMINC/'"conv-mach-$i.sh" >> $ConvSh
     done
 fi
