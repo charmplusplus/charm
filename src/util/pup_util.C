@@ -170,7 +170,7 @@ void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t)
 
 extern "C" {
 
-int CmiOpen(const char *pathname, int flags, mode_t mode)
+int CmiOpen(const char *pathname, int flags, int mode)
 {
         int fd = -1;
         while (1) {
