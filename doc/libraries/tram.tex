@@ -12,22 +12,22 @@
 
 \section{Overview}
 
-Mesh Streamer is a library for optimization of many-to-many and
-all-to-all collective communication patterns in Charm++
-applications. The library performs topological routing and aggregation
-of network communication in the context of a virtual mesh topology
-comprising the Charm++ Processing Elements (PEs) in the parallel
-run. The number of dimensions and their sizes within this topology are
-specified by the user when initializing an instance of the library.
+Topological Routing and Aggregation Module is a library for optimization of
+many-to-many and all-to-all collective communication patterns in Charm++
+applications. The library performs topological routing and aggregation of
+network communication in the context of a virtual mesh topology comprising the
+Charm++ Processing Elements (PEs) in the parallel run. The number of dimensions
+and their sizes within this topology are specified by the user when initializing
+an instance of the library.
 
-Mesh Streamer is implemented as a Charm++ group, so an \emph{instance}
-of Mesh Streamer has one object on every PE used in the run. We use
-the term \emph{local instance} to denote a member of the Mesh Streamer
-group on a particular PE. 
+TRAM is implemented as a Charm++ group, so an \emph{instance}
+of TRAM has one object on every PE used in the run. We use
+the term \emph{local instance} to denote a member of the TRAM
+group on a particular PE.
 
 Most collective communication patterns involve sending linear arrays
 of a single data type. In order to more efficiently aggregate and
-process network data, Mesh Streamer restricts the data sent using the
+process network data, TRAM restricts the data sent using the
 library to a single data type specified by the user through a template
 parameter when initializing an instance of the library. We use the
 term \emph{data item} to denote a single object of this datatype
@@ -36,7 +36,7 @@ submitted to the library for sending. While the library is active
 number of data items can be submitted to the library at each PE.
 
 Due to the underlying assumption of a mesh topology, the
-benefits of Mesh Streamer are most pronounced on systems with a mesh
+benefits of TRAM are most pronounced on systems with a mesh
 or torus network topology, where the virtual mesh of PEs is made to
 match the physical topology of the network. The latter can easily be
 accomplished using the Charm++ Topology Manager.
@@ -57,19 +57,19 @@ represent the coordinates of $j$ and $k$ within the mesh as $\left
 (j_0, j_1, \ldots, j_{N-1} \right) $ and $ \left (k_0, k_1, \ldots,
 k_{N-1} \right) $.  Also, let
 \[
-f(x, j, k) = 
-\begin{cases} 
+f(x, j, k) =
+\begin{cases}
 0, & \text{if } j_x = k_x \\
 1, & \text{if } j_x \ne k_x
 \end{cases}
 \]
 
-$j$ and $k$ are \emph{peers} if 
+$j$ and $k$ are \emph{peers} if
 \begin{equation}
 \sum_{d=0}^{N-1} f(d, j, k) = 1 .
 \label{eq:peer}
 \end{equation}
-When using Mesh Streamer, PEs communicate directly only with their
+When using TRAM, PEs communicate directly only with their
 peers. Sending to a PE which is not a peer is handled inside the
 library by routing the data through one or more \emph{intermediate
   destinations} along the route to the \emph{final destination}.
@@ -98,11 +98,11 @@ F(j,k) = \sum_{d=0}^{N-1}f(d, j, k) .
 \subsection{Aggregation}
 
 Communicating over the network of a parallel machine involves per
-message bandwidth and processing overhead. Mesh Streamer amortizes
+message bandwidth and processing overhead. TRAM amortizes
 this overhead by aggregating data items at the source and every
 intermediate destination along the route to the final destination.
 
-Every local instance of the Mesh Streamer group buffers the data items
+Every local instance of the TRAM group buffers the data items
 that have been submitted locally or received from another PE for
 forwarding. Because only peers communicate directly in the virtual
 mesh, it suffices to have a single buffer per PE for every
@@ -112,17 +112,17 @@ for dimension d can take. Consequently, each local instance allocates
 up to $s_d - 1 $ buffers per dimension, for a total of
 $\sum_{d=0}^{N-1} (s_d - 1) $ buffers. Buffers are of a constant
 size. This size can either be specified directly by the user when
-creating the Mesh Streamer instance or, when using an alternative
+creating the TRAM instance or, when using an alternative
 constructor, specified indirectly through a parameter denoting the
 maximum number of data items to be buffered at any point in time per
 local instance of the library.  This amount is multiplied by a
 constant \emph{overallocation factor} inside the library and divided
 by the number of peers when determining the size of each
 buffer. To prevent data allocation for peers which rarely or never
-communicate, Mesh Streamer allocates buffers on demand as soon as a
+communicate, TRAM allocates buffers on demand as soon as a
 data item needs to be sent out to a particular peer.
 
-Sending with Mesh Streamer is done by submitting a data item and a
+Sending with TRAM is done by submitting a data item and a
 destination identifier, either PE or array index, using a function
 call to the local instance.  If the index belongs to a peer, the
 library places the data item in the buffer for the peer's
@@ -142,7 +142,7 @@ when no single buffer is completely filled up. In that case the buffer
 with the greatest number of buffered data items is sent.
 
 %In the context of this document, a data item is a piece
-%of data sent in application code using Mesh Streamer. We do not use
+%of data sent in application code using TRAM. We do not use
 %the term message in this context to indicate that a data item does not
 %contain an envelope. Data items are aggregated into messages inside
 %the library. Aggregation is done on a per-dimension basis, as
@@ -151,7 +151,7 @@ with the greatest number of buffered data items is sent.
 %Each PE can be represented using its coordinates in the N-dimensional
 %topology as $ \left (i_0, i_1, \ldots, i_{N-1} \right) $. A PE
 %communicates directly with PEs whose coordinates match its own in all
-%but one of the dimensions. 
+%but one of the dimensions.
 
 %Let $s_d$, for $ d \in 0 \ldots N - 1$
 %denote the number of PEs along dimension d in the topology. Buffers
@@ -189,13 +189,13 @@ with the greatest number of buffered data items is sent.
 
 \section{Application User Interface}
 
-A typical usage scenario for Mesh Streamer involves a start-up phase
+A typical usage scenario for TRAM involves a start-up phase
 followed by one or more \emph{streaming steps}. We next describe the
 interface and details relevant to usage of the library, which normally
 follows these steps:
- 
+
 \begin{enumerate}
-\item{\textbf{Start-up}} Creation of a Mesh Streamer group of an
+\item{\textbf{Start-up}} Creation of a TRAM group of an
   appropriate type and set up of client arrays and groups
 \item{\textbf{Initialization}} Calling an appropriate initialization
   function, which returns through a callback
@@ -206,7 +206,7 @@ follows these steps:
   interface for the library and must be defined by the user
 \item{\textbf{Termination}} Termination of a streaming step
 \item{\textbf{Reinitialization}} Chare migration, potentially followed
-  by reinitialization of Mesh Streamer (step 2) for a new streaming step
+  by reinitialization of TRAM (step 2) for a new streaming step
 \end{enumerate}
 
 \subsection{Start-Up}
@@ -215,7 +215,7 @@ Start-up is typically performed once in a program, often inside the
 Main function of the mainchare, and involves creating the Mesh
 Streamer group.
 
-An instance of Mesh Streamer is restricted to sending data items of a
+An instance of TRAM is restricted to sending data items of a
 single user-specified type, which we denote by \emph{dtype}, to a
 single user-specified chare array or group. The target group or array
 should inherit from MeshStreamerGroupClient\textless{}dtype\textgreater{} and
@@ -223,30 +223,31 @@ MeshStreamerArrayClient\textless{}dtype, itype\textgreater{}, respectively.
 
 %\textbf{proposed change:
 %  remove client inheritance to simplify the interface. This will have
-%  the effect of removing support for anytime migration.} 
+%  the effect of removing support for anytime migration.}
 
 
 \subsubsection{Sending to a Group}
-To use Mesh Streamer for sending to a group, a GroupMeshStreamer group
+To use TRAM for sending to a group, a GroupMeshStreamer group
 should be created. Either of the following two GroupMeshStreamer
 constructors can be used for that purpose:
 
 \begin{alltt}
-template <class dtype>
-GroupMeshStreamer<dtype>::GroupMeshStreamer(
-                  int maxNumDataItemsBuffered, 
-                  int numDimensions, 
-                  int *dimensionSizes, 
-                  const CProxy_MeshStreamerGroupClient<dtype>& clientProxy, 
-                  bool yieldFlag = 0, 
-                  double progressPeriodInMs = -1.0); \\
-template <class dtype>
-GroupMeshStreamer<dtype>::GroupMeshStreamer(
-                  int numDimensions, 
-                  int *dimensionSizes, 
-                  const CProxy_MeshStreamerGroupClient<dtype>& clientProxy, 
-                  int bufferSize, 
-                  bool yieldFlag = 0, 
+template<class dtype, class ClientType, class RouterType>
+GroupMeshStreamer<dtype, ClientType, RouterType>::
+GroupMeshStreamer(int maxNumDataItemsBuffered,
+                  int numDimensions,
+                  int *dimensionSizes,
+                  CkGroupID clientGID,
+                  bool yieldFlag = 0,
+                  double progressPeriodInMs = -1.0);
+
+template<class dtype, class ClientType, class RouterType>
+GroupMeshStreamer<dtype, ClientType, RouterType>::
+GroupMeshStreamer(int numDimensions,
+                  int *dimensionSizes,
+                  CkGroupID clientGID,
+                  int bufferSize,
+                  bool yieldFlag = 0,
                   double progressPeriodInMs = -1.0);
 
 \end{alltt}
@@ -256,21 +257,22 @@ For sending to a chare array, an ArrayMeshStreamer group should be
 created, which has a similar constructor interface to GroupMeshStreamer:
 
 \begin{alltt}
-template <class dtype, class itype>
-ArrayMeshStreamer<dtype, itype>::ArrayMeshStreamer(
-                  int maxNumDataItemsBuffered, 
+template <class dtype, class itype, class ClientType, class RouterType>
+ArrayMeshStreamer<dtype, itype, ClientType, RouterType>::
+ArrayMeshStreamer(int maxNumDataItemsBuffered,
                   int numDimensions,
-                  int *dimensionSizes, 
-                  const CProxy_MeshStreamerArrayClient<dtype>& clientProxy,
-                  bool yieldFlag = 0, 
-                  double progressPeriodInMs = -1.0); \\
-template <class dtype, class itype>
-ArrayMeshStreamer<dtype, itype>::ArrayMeshStreamer(
-                  int numDimensions, 
-                  int *dimensionSizes, 
-                  const CProxy_MeshStreamerArrayClient<dtype>& clientProxy,
-                  int bufferSize, 
-                  bool yieldFlag = 0, 
+                  int *dimensionSizes,
+                  CkArrayID clientAID,
+                  bool yieldFlag = 0,
+                  double progressPeriodInMs = -1.0);
+
+template <class dtype, class itype, class ClientType, class RouterType>
+ArrayMeshStreamer<dtype, itype, ClientType, RouterType>::
+ArrayMeshStreamer(int numDimensions,
+                  int *dimensionSizes,
+                  CkArrayID clientAID,
+                  int bufferSize,
+                  bool yieldFlag = 0,
                   double progressPeriodInMs = -1.0);
 
 \end{alltt}
@@ -278,11 +280,12 @@ ArrayMeshStreamer<dtype, itype>::ArrayMeshStreamer(
 Description of parameters:
 \begin{itemize}
 \item maxNumDataItemsBuffered: maximum number of items that the
-  library is allowed to buffer per PE 
+  library is allowed to buffer per PE
 \item numDimensions: number of dimensions in mesh of PEs
 \item dimensionSizes: array of size numDimensions containing the size
   of each dimension in the mesh
-\item clientProxy: the proxy for the destination array or group
+\item clientGID: the group id for the client group
+\item clientAID: the array id for the client array
 \item bufferSize: size of the buffer for each peer,
   in terms of number of data items
 \item yieldFlag: when true, calls CthYield() after every 1024 item
@@ -300,31 +303,30 @@ template parameters:
 \item dtype: data item type
 \item itype: index type of client chare array (use int for
   CkArrayIndex1D and CkArrayIndex for all other index types)
+\item ClientType: type of client group or array
+\item RouterType: the routing protocol to be used (either SimpleMeshRouter or NodeAwareMeshRouter)
 \end{itemize}
-
-The group or array which receives data sent using Mesh Streamer needs
-to inherit from MeshStreamerGroupClient<dtype> or
-MeshStreamerArrayClient<dtype>.
 
 \subsection{Initialization}
 
-Before any sending can be done, the library needs to be
-initialized. There are currently two main modes of operation,
-depending on the type of termination used: staged completion and
-completion detection. The modes of termination are described
-later. Here, we present the interface for intializing a streaming step
-in each case.
+Before any sending can be done, the library needs to be initialized. There are
+currently three main modes of operation, depending on the type of termination
+used: staged completion, completion detection, or quiescence detection. The
+modes of termination are described later. Here, we present the interface for
+intializing a streaming step in each case.
 
-When using completion detection, each local instance of Mesh Streamer
+When using completion detection, each local instance of TRAM
 must be initialized using the following init function:
 
 \begin{alltt}
-void MeshStreamer<dtype>::init(
-                  int numContributors,
-                  CkCallback startCb, 
-                  CkCallback endCb, 
-                  CProxy_CompletionDetector detector, 
-                  int prio, bool usePeriodicFlushing);
+template <class dtype, class RouterType>
+void MeshStreamer<dtype, RouterType>::
+init(int numContributors,
+     CkCallback startCb,
+     CkCallback endCb,
+     CProxy_CompletionDetector detector,
+     int prio,
+     bool usePeriodicFlushing);
 \end{alltt}
 
 Description of parameters:
@@ -336,8 +338,8 @@ Description of parameters:
   initialization is complete
 \item endCb: callback to be invoked by the library after termination
   of this streaming step
-\item detector: an inactive CompletionDetector object
-\item prio: Charm++ prority to be used for messages sent using Mesh
+\item detector: an inactive CompletionDetector object to be used by TRAM
+\item prio: Charm++ priority to be used for messages sent using Mesh
   Streamer in this streaming step
 \item usePeriodicFlushing: specifies whether periodic flushing should
   be used for this streaming step
@@ -345,15 +347,18 @@ Description of parameters:
 
 When using staged completion, a completion detector object is not
 required as input, as the library performs its own specialized form of
-termination. In this case, each local instance of Mesh Streamer must
-be initialized using a different interface for the overloaded init function: 
+termination. In this case, each local instance of TRAM must
+be initialized using a different interface for the overloaded init function:
 
 \begin{alltt}
-void MeshStreamer<dtype>::init(
-                  int numLocalContributors, 
-                  CkCallback startCb, 
-                  CkCallback endCb, 
-                  int prio, bool usePeriodicFlushing);
+template <class dtype, class RouterType>
+void MeshStreamer<dtype, RouterType>::
+init(int numLocalContributors,
+     CkCallback startCb,
+     CkCallback endCb,
+     int prio,
+     bool usePeriodicFlushing);
+
 \end{alltt}
 
 Note that numLocalContributors denotes the local number of done calls
@@ -362,22 +367,30 @@ practice, this often precludes calling this version of init through a
 broadcast, as the desired number of done calls may be different on
 each PE.
 
-A common case is to have a single chare array perform all the sends in
-a streaming step, with each element of the array as a contributor. For
-this case there is a special version of init that takes as input the
-CkArrayID object for the chare array that will perform the sends: 
+A common case is to have a single chare array perform all the sends in a
+streaming step, with each element of the array as a contributor. For this case
+there is a special version of init that takes as input the CkArrayID object for
+the chare array that will perform the sends, precluding the need to manually
+determine the number of client chares per PE:
 
 \begin{alltt}
-void MeshStreamer<dtype>::init(
-                  CkArrayID senderArrayID,
-                  CkCallback startCb, 
-                  CkCallback endCb, 
-                  int prio, bool usePeriodicFlushing);
+template <class dtype, class RouterType>
+void MeshStreamer<dtype, RouterType>::
+init(CkArrayID senderArrayID,
+     CkCallback startCb,
+     CkCallback endCb,
+     int prio,
+     bool usePeriodicFlushing);
 \end{alltt}
+
+The init interface for using quiescence detection is:
+
+template <class dtype, class RouterType>
+void MeshStreamer<dtype, RouterType>::init(CkCallback startCb, int prio);
 
 After initialization is finished, the system invokes startCb,
 signalling to the user that the library is ready to accept data items
-for sending. 
+for sending.
 \\
 
 %\textbf{proposed addition: add a non-streaming all-to-all interface,
@@ -385,19 +398,22 @@ for sending.
 
 \subsection{Sending}
 
-Sending with Mesh Streamer is done through calls to insertData and broadcast. 
+Sending with TRAM is done through calls to insertData and broadcast.
 
 \begin{alltt}
-void GroupMeshStreamer<dtype>::insertData(
-                       const dtype &dataItem, 
-                       int destinationPe);
-\end{alltt}
+template <class dtype, class RouterType>
+void MeshStreamer<dtype, RouterType>::
+insertData(const dtype& dataItem,
+           int destinationPe);
 
-\begin{alltt}
-void ArrayMeshStreamer<dtype, itype>::insertData(
-                       const dtype &dataItem,
-                       itype arrayIndex);
-void MeshStreamer<dtype>::broadcast(const dtype& dataItem);
+template <class dtype, class itype, class ClientType, class RouterType>
+void ArrayMeshStreamer<dtype, itype, ClientType, RouterType>::
+insertData(const dtype& dataItem,
+           itype arrayIndex);
+
+template <class dtype, class RouterType>
+void MeshStreamer<dtype, RouterType>::
+broadcast(const dtype& dataItem);
 \end{alltt}
 
 \begin{itemize}
@@ -418,38 +434,40 @@ Broadcasting has the effect of delivering the data item:
 
 \subsection{Receiving}
 
-To receive data items sent using Mesh Streamer, the user must define
+To receive data items sent using TRAM, the user must define
 the process function for each client group and array:
 
 \begin{alltt}
-void MeshStreamerGroupClient<dtype>::process(const dtype &dataItem);
-void MeshStreamerArrayClient<dtype>::process(const dtype &dataItem);
+void process(const dtype  &ran);
 \end{alltt}
 
-process is called by the library on the destination processor once for
-every delivered item.
+process() is called by the library on the destination processor once for every
+delivered item. The call is made locally, so process does not need to be an
+entry method.
 
 \subsection{Termination}
 
 A termination mechanism is required due to the buffering of data items
-in Mesh Streamer local instances at the source and intermediate
+in TRAM local instances at the source and intermediate
 destinations. Without a flushing or termination mechanism, data items
 may remain buffered indefinitely without ever getting delivered to
 their final destinations. A termination scheme ensures that these
-items are delivered, preventing deadlock. 
+items are delivered, preventing deadlock.
 
-Currently, two means of termination are supported, staged completion
-and completion detection. Periodic flushing is a secondary mechanism
-which can be enabled or disabled when initiating one of the primary
-mechanisms. 
+Currently, three means of termination are supported, staged completion,
+completion detection, and quiescence detection. Periodic flushing is a secondary
+mechanism which can be enabled or disabled when initiating one of the primary
+mechanisms.
 
 In general, termination requires the user to issue a number of calls
 to the \emph{done} function:
 \begin{alltt}
- void MeshStreamer<dtype>::done(int numContributorsFinished = 1);
+template <class dtype, class RouterType>
+void MeshStreamer<dtype, RouterType>::
+done(int numContributorsFinished = 1);
 \end{alltt}
 When using completion detection, the number of done calls that are
-expected globally by the Mesh Streamer instance is specified using the
+expected globally by the TRAM instance is specified using the
 numContributors parameter to init. Safe termination requires that no
 calls to insertData or broadcast are made after the last call to
 \emph{done} is performed globally. Because order of execution is
@@ -463,9 +481,20 @@ involves setting the local number of expected done calls on each local
 instance using the numLocalContributors parameter in the init
 function. To ensure safe termination, no insertData or broadcast calls
 should be made on any PE that has received all its expected done
-calls. 
+calls.
 
-The final overloaded version of init, which takes a CkArrayID object as an
+Staged completion is not supported when array location data is not guaranteed to
+be correct, as this can potentially violate the termination conditions used to
+guarantee successful termination. In order to guarantee correct location data in
+applications with load balancing, Charm++ must be compiled with
+-DCMK\underline{\hspace{.2cm}}GLOBAL\underline{\hspace{.2cm}}LOCATION\underline{\hspace{.2cm}}UPDATE,
+which has the effect of performing a global broadcast of location data for chare
+array elements that migrate during load balancing. Unfortunately, this operation
+is expensive when migrating large numbers of elements. As an alternative,
+completion detection and quiescence detection modes will work properly without
+the global location update mechanism, and even in the case of anytime migration.
+
+Another version of init, which takes a CkArrayID object as an
 argument, provides a simplified interface in the common case when a
 single chare array performs all the sends within a streaming step,
 with each of its elements as a contributor. This version of init
@@ -473,7 +502,13 @@ determines the appropriate number of local contributors automatically
 and can be called through a broadcast. It also correctly handles
 the case of PEs without any contributors by immediately marking those
 PEs as having finished the streaming step. As such, this version of init
-should be preferred by the user when applicable. 
+should be preferred by the user when applicable.
+
+When using quiescence detection, no end callback is specified. Instead,
+termination of a streaming step would be achieved using quiescence detection
+framework, which allows passing a callback as parameter. TRAM is set up such
+that quiescence will not be detected until all items sent in the last streaming
+step have been delivered at the final destination.
 
 The choice of which termination mechanism to use is left to the
 user. There are cases where it may be easier to use the completion
@@ -482,21 +517,21 @@ completion should be preferred, as it achieves termination faster and
 does not involve the persistent overhead of completion detection due
 to reductions for determining when the global number of expected done
 calls is reached. Staged completion, unlike completion detection, does
-incur a small bandwidth overhead (4 bytes) for every Mesh Streamer
+incur a small bandwidth overhead (4 bytes) for every TRAM
 message, but in practice this is more than offset by the persistent
-traffic incurred by completion detection. 
+traffic incurred by completion detection.
 
 Periodic flushing is an auxiliary mechanism which checks at a regular
 interval whether any sends have taken place since the last time the
 check was performed. If not, the mechanism sends out all the data
 items buffered per local instance of the library. The period is
-specified by the user in the Mesh Streamer constructor. A typical use case
-for periodic flushing is when the submission of a data item A to
-Mesh Streamer happens as a result of the delivery of another data item B
-sent using the same Mesh Streamer instance. If B is buffered inside the library
+specified by the user in the TRAM constructor. A typical use case
+for periodic flushing is when the submission of a data item B to
+TRAM happens as a result of the delivery of another data item A
+sent using the same TRAM instance. If A is buffered inside the library
 and insufficient data items are submitted to cause the buffer holding
-B to be sent out, a deadlock could arise. With the periodic flushing
-mechanism, the buffer holding B is guaranteed to be sent out
+A to be sent out, a deadlock could arise. With the periodic flushing
+mechanism, the buffer holding A is guaranteed to be sent out
 eventually, and deadlock is prevented.
 
 %Staged completion is a termination mechanism with one stage per
@@ -509,67 +544,25 @@ eventually, and deadlock is prevented.
 %Flushes proceed from the ``outermost'' dimension to the
 %``innermost'' dimension. The flush for the ``outermost'' dimension is
 %carried out as soon as a \emph{done} call is received from all
-%producers local to that PE. 
-%A flush is carried out when it has been determined that all
-%the messages along 
-
-
-%aggregated along the dimension.  A staged
-%completion over an N-dimensional mesh produces N flushes at each
-%PE. 
-
-%A flush is the sending of all
-%buffered data 
-
-% of termination, with a
-%stage for flushing along each dimension. 
-
-
-%orderly manner of termination where
-%at each PE data is flushed in order from ``outermost'' to
-%``innermost'' dimensions.
+%producers local to that PE.
 
 \subsection{Reinitialization}
 
-A Mesh Streamer instance that has terminated cannot be used for
+A TRAM instance that has terminated cannot be used for
 sending more data items until it has been
 reinitialized. Reinitialization is achieved by calling init, which
 prepares the instance of the library for a new streaming
 step. Reinitialization is useful for time stepped applications. A new
 streaming step is normally done for each step of the application.
 
-Many applications perform load balancing between time steps. Mesh
-Streamer supports using load balancing in this fashion as long as
-migrations are not performed during a streaming step.
-
-A potential performance issue when using ArrayMeshStreamer with load
-balancing is that it bypasses the automatic array location updates
-performed by the runtime system. As such, when an array element is
-migrated, most data items submitted for sending to that destination
-will be routed to the wrong PE, and only then sent using the default
-Charm++ mechanism to the correct PE. To make matters worse, this does
-not not lead to the original sender finding out the correct updated
-location, leading to serious performance degradation. 
-
-
-
 %Updates of chare location data are normally performed in lazy fashion
 %by the Charm++ runtime system. When a message is delivered to a PE
 %where the destination chare no longer resides, a forwarding mechanism
 %finds the correct destination PE and sends it the message, but also
 %sends a control message back to the sender with the updated location
-%data.  When using Mesh Streamer, destination PEs are determined at the
+%data.  When using TRAM, destination PEs are determined at the
 %PE where a data item is submitted to the library. A data item that
 %reaches its destination PE may
-
-To fix this problem, Charm++ should be compiled with
--DCMK\underline{\hspace{.2cm}}GLOBAL
-\underline{\hspace{.2cm}}LOCATION\underline{\hspace{.2cm}}UPDATE for
-applications which use Mesh Streamer and load balancing. The option
-has the effect of performing a global broadcast of location data for
-every chare array that is migrated. Unfortunately, this operation is
-expensive when migrating large numbers of elements. A better workaround
-is in development. 
 
 %\subsection{Optimizations}
 
