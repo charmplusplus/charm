@@ -544,8 +544,8 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     CmiPrintf("CmiInitCPUTopology Warning: Can not get unique name for the compute nodes. \n");
     _noip = 1; 
   #endif
+    cpuTopo.numPes = CmiNumPes();
   }
-  cpuTopo.numPes = CmiNumPes();
 
   CmiNodeAllBarrier();
   if (_noip) return; 
