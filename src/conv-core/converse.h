@@ -504,20 +504,15 @@ for each processor in the node.
                         static int CMK_TAG(Cpv_inited_,v) = 0;  \
                         static t ** CMK_TAG(Cpv_addr_,v)
 #define CpvInitialize(t,v)\
-    do { \
-       if (CmiMyRank()) { \
-	       /*while (!CpvInitialized(v)) CMK_CPV_IS_SMP;*/\
-               CpvMemoryReadFence(); \
-	       while (CMK_TAG(Cpv_inited_,v)==0) { CMK_CPV_IS_SMP; CpvMemoryReadFence(); } \
-               CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
-               CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
-       } else { \
-               CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
-               CMK_TAG(Cpv_addr_,v)=CpvInit_Alloc(t*, 1+CmiMyNodeSize()); \
-               CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
-               CpvMemoryWriteFence();   \
-               CMK_TAG(Cpv_inited_,v)=1; \
-       } \
+    do {                                                               \
+      CmiMemLock();                                                    \
+      if (!(CMK_TAG(Cpv_inited_,v))) {                                 \
+        CMK_TAG(Cpv_addr_,v) = CpvInit_Alloc(t*, 1+CmiMyNodeSize());   \
+        CMK_TAG(Cpv_inited_,v) = 1;                                    \
+      }                                                                \
+      CmiMemUnlock();                                                  \
+      CMK_TAG(Cpv_,v) = CpvInit_Alloc_scalar(t);                       \
+      CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v);             \
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
 
