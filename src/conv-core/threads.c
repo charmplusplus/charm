@@ -404,7 +404,7 @@ static void CthThreadBaseInit(CthThreadBase *th)
   th->stacksize=0;
 
   th->tid.id[0] = CmiMyPe();
-  th->tid.id[1] = serialno++;
+  CmiMemoryAtomicFetchAndInc(serialno, th->tid.id[1]);
   th->tid.id[2] = 0;
 
   th->listener = NULL;
