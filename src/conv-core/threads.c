@@ -66,30 +66,30 @@
  *
  * void CthSetStrategy(CthThread t, CthAwkFn awakenfn, CthThFn choosefn)
  *
- *     This specifies the scheduling functions to be used for thread 't'.
+ *   - This specifies the scheduling functions to be used for thread 't'.
  *     The scheduling functions must have the following prototypes:
  *
-*          void awakenfn(CthThread t);
-*          CthThread choosefn();
-*
-*     These functions must be provided on a per-thread basis.  (Eg, if you
-    *     CthAwaken a thread X, then X's awakefn will be called.  If a thread Y
-    *     calls CthSuspend, then Y's choosefn will be called to pick the next
-    *     thread.)  Of course, you may use the same functions for all threads
-*     (the common case), but the specification on a per-thread basis gives
-*     you maximum flexibility in controlling scheduling.
-*
-*     See also: common code, CthSetStrategyDefault.
-  *
-* void CthYield()
-  *
-  *   - simply executes { CthAwaken(CthSelf()); CthSuspend(); }.  This
-  *     combination gives up control temporarily, but ensures that control
-  *     will eventually return.
-  *
-  *
-  * Note: there are several possible ways to implement threads.   
-  *****************************************************************************/
+ *          void awakenfn(CthThread t);
+ *          CthThread choosefn();
+ *
+ *     These functions must be provided on a per-thread basis.  (Eg, if you
+ *     CthAwaken a thread X, then X's awakefn will be called.  If a thread Y
+ *     calls CthSuspend, then Y's choosefn will be called to pick the next
+ *     thread.)  Of course, you may use the same functions for all threads
+ *     (the common case), but the specification on a per-thread basis gives
+ *     you maximum flexibility in controlling scheduling.
+ *
+ *     See also: common code, CthSetStrategyDefault.
+ *
+ * void CthYield()
+ *
+ *   - simply executes { CthAwaken(CthSelf()); CthSuspend(); }.  This
+ *     combination gives up control temporarily, but ensures that control
+ *     will eventually return.
+ *
+ *
+ * Note: there are several possible ways to implement threads.
+ *****************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
