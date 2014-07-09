@@ -521,11 +521,18 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 
 #else
 
+  bool topoInProgress = true;
+
   if (CmiMyPe() >= CmiNumPes()) {
     CmiNodeAllBarrier();         // comm thread waiting
 #if CMK_MACHINE_PROGRESS_DEFINED
 #if ! CMK_CRAYXT
-    while (done < CmiMyNodeSize()) CmiNetworkProgress();
+    while (topoInProgress) {
+      CmiNetworkProgress();
+      CmiLock(topoLock);
+      topoInProgress = done < CmiMyNodeSize();
+      CmiUnlock(topoLock);
+    }
 #endif
 #endif
     return;    /* comm thread return */
@@ -562,9 +569,13 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   msg->procs[0].nodeID = 0;
   CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
 
-    // blocking here
-  while (done != CmiMyNodeSize())
+  // blocking here
+  while (topoInProgress) {
     CsdSchedulePoll();
+    CmiLock(topoLock);
+    topoInProgress = done < CmiMyNodeSize();
+    CmiUnlock(topoLock);
+  }
 
   if (CmiMyPe() == 0) {
 #if CMK_BIGSIM_CHARM
