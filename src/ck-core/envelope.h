@@ -8,7 +8,6 @@
 #include <pup.h>
 #include <charm.h>
 #include <middle.h>
-#include <ckarrayindex.h>
 #include <cklists.h>
 #include <objid.h>
 
@@ -102,16 +101,6 @@ typedef unsigned char  UChar;
 
 CkpvExtern(int, envelopeEventID);
 
-struct s_objid_o {
-  ck::ObjID id;              /// <ck::ObjID if it could be in a union
-#if CMK_SMP_TRACE_COMMTHREAD
-  UInt srcpe;
-#endif
-  UChar hopCount;           ///< number of times message has been routed
-  UChar ifNotThere;         ///< what to do if array element is missing
-};
-
-
 /**
 @{
 The class envelope defines a Charm++ message's header. The first
@@ -170,8 +159,7 @@ namespace ck {
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
       struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
-        CkArrayIndexBase index; ///< Array element index
-        int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
+        CmiUInt8 id;              /// <ck::ObjID if it could be in a union
         CkGroupID arr;            ///< Array manager GID
 #if CMK_SMP_TRACE_COMMTHREAD
         UInt srcpe;
@@ -179,14 +167,6 @@ namespace ck {
         UChar hopCount;           ///< number of times message has been routed
         UChar ifNotThere;         ///< what to do if array element is missing
       } array;
-      struct s_objid {
-        CmiUInt8 id;              /// <ck::ObjID if it could be in a union
-#if CMK_SMP_TRACE_COMMTHREAD
-        UInt srcpe;
-#endif
-        UChar hopCount;           ///< number of times message has been routed
-        UChar ifNotThere;         ///< what to do if array element is missing
-      } objid;
       struct s_roData {    ///< RODataMsg for readonly data type
         UInt count;
       } roData;
@@ -448,8 +428,6 @@ public:
     CkGroupID getArrayMgr(void) const { 
       if (getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg)
 	return type.array.arr;
-      else if (getMsgtype() == ForIDedObjMsg)
-	return ((struct s_objid_o *) &type.objid)->id.getCollectionID();
       else
             CkAbort("Cannot return ArrayID from msg for non-array entity");
 	/* compiler appeasement, even though this will never be executed */
@@ -467,12 +445,18 @@ public:
     UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.hopCount;}
     int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); type.array.ifNotThere=nt;}
-    int *getsetArrayListenerData(void) {return type.array.listenerData;}
-    CkArrayIndex &getsetArrayIndex(void) 
-    	{ 
-	  CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
-	  return *(CkArrayIndex *)&type.array.index;
-	}
+
+    void setRecipientID(ck::ObjID objid)
+    {
+      CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
+      type.array.id = objid.getID();
+    }
+
+    CmiUInt8 getRecipientID()
+    {
+      CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
+      return type.array.id;
+    }
 
 #if USE_CRITICAL_PATH_HEADER_ARRAY
  public:

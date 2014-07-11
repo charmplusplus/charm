@@ -44,7 +44,7 @@ class Hello : public CBase_Hello
 public:
   Hello()
   {
-    CkPrintf("Hello %d created\n",thisIndex);
+    CkPrintf("[%d] Hello %d created\n", CkMyPe(), thisIndex);
   }
 
   Hello(CkMigrateMessage *m) {}
@@ -55,7 +55,7 @@ public:
       for (int j = 0; j < 3; ++j)
 	CkAssert(values[i][j] == 3*i + j);
 
-    CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
+    CkPrintf("[%d] Hi[%d] from element %d\n", CkMyPe(), hiNo, thisIndex);
     if (thisIndex < nElements-1)
       //Pass the hello on:
       thisProxy[thisIndex+1].SayHi(hiNo+1);

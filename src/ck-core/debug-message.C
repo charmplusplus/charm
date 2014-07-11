@@ -124,17 +124,10 @@ void envelope::pup(PUP::er &p) {
 		break;
 	case ArrayEltInitMsg: case ForArrayEltMsg:
 		p|type.array.arr;
-		p(type.array.index.nInts);
-		p(type.array.index.index,CK_ARRAYINDEX_MAXLEN);
-		p(type.array.listenerData,CK_ARRAYLISTENER_MAXLEN);
+                p|type.array.id;
 		p(type.array.hopCount);
 		p(type.array.ifNotThere);
 		break;
-	case ForIDedObjMsg:
-	        p(type.objid.id);
-	        p(type.array.hopCount);
-		p(type.array.ifNotThere);
-                break;
 	case RODataMsg:
 		p(type.roData.count);
 		break;

@@ -65,75 +65,6 @@ All these classes are defined in ckarray.C.
 */
 /*@{*/
 
-typedef int CkIndex1D;
-typedef struct {int x,y;} CkIndex2D;
-inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
-typedef struct {int x,y,z;} CkIndex3D;
-inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
-inline bool operator==(CkIndex3D& lhs, CkIndex3D& rhs) {return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;}
-typedef struct {short int w,x,y,z;} CkIndex4D;
-inline void operator|(PUP::er &p,CkIndex4D &i) {p(i.w); p(i.x); p(i.y); p(i.z);}
-typedef struct {short int v,w,x,y,z;} CkIndex5D;
-inline void operator|(PUP::er &p,CkIndex5D &i) {p(i.v); p(i.w); p(i.x); p(i.y); p(i.z);}
-typedef struct {short int x1,y1,z1,x2,y2,z2;} CkIndex6D;
-inline void operator|(PUP::er &p,CkIndex6D &i) {p(i.x1); p(i.y1); p(i.z1); p(i.x2); p(i.y2); p(i.z2);}
-typedef struct {int data[CK_ARRAYINDEX_MAXLEN];} CkIndexMax;
-inline void operator|(PUP::er &p,CkIndexMax &i) {
-  for (int j=0;j<CK_ARRAYINDEX_MAXLEN;j++) {
-    p|i.data[j];
-  }
-}
-
-/// Simple ArrayIndex classes: the key is just integer indices.
-class CkArrayIndex1D : public CkArrayIndex {
-public:
-	CkArrayIndex1D() {}
-	// CkIndex1D is an int, so that conversion is automatic
-	CkArrayIndex1D(int i0) { init(1, 1, i0); }
-};
-class CkArrayIndex2D : public CkArrayIndex {
-public:
-	CkArrayIndex2D() {}
-	CkArrayIndex2D(int i0,int i1) { init(2, 2, i0, i1); }
-	CkArrayIndex2D(CkIndex2D idx) { init(2, 2, idx.x, idx.y); }
-};
-class CkArrayIndex3D : public CkArrayIndex {
-public:
-	CkArrayIndex3D() {}
-	CkArrayIndex3D(int i0,int i1,int i2) { init(3, 3, i0, i1, i2); }
-	CkArrayIndex3D(CkIndex3D idx) { init(3, 3, idx.x, idx.y, idx.z); }
-};
-class CkArrayIndex4D : public CkArrayIndex {
-public:
-	CkArrayIndex4D(){}
-	CkArrayIndex4D(short int i0,short int i1,short int i2,short int i3) { init(2, 4, i0, i1, i2, i3); }
-	CkArrayIndex4D(CkIndex4D idx) { init(2, 4, idx.w, idx.x, idx.y, idx.z); }
-};
-class CkArrayIndex5D : public CkArrayIndex {
-public:
-	CkArrayIndex5D() {}
-	CkArrayIndex5D(short int i0,short int i1,short int i2,short int i3,short int i4) { init(3, 5, i0, i1, i2, i3, i4); }
-	CkArrayIndex5D(CkIndex5D idx) { init(3, 5, idx.v, idx.w, idx.x, idx.y, idx.z); }
-};
-class CkArrayIndex6D : public CkArrayIndex {
-public:
-	CkArrayIndex6D(){}
-	CkArrayIndex6D(short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) { init(3, 6, i0, i1, i2, i3, i4, i5); }
-	CkArrayIndex6D(CkIndex6D idx) { init(3, 6, idx.x1, idx.y1, idx.z1, idx.x2, idx.y2, idx.z2); }
-};
-
-/** A slightly more complex array index: the key is an object
- *  whose size is fixed at compile time.
- */
-template <class object> //Key object
-class CkArrayIndexT : public CkArrayIndex {
-public:
-	object obj;
-	CkArrayIndexT(const object &srcObj) {obj=srcObj;
-		nInts=sizeof(obj)/sizeof(int);
-		dimension=0; }
-};
-
 /********************* CkArrayListener ****************/
 ///An arrayListener is an object that gets informed whenever
 /// an array element is created, migrated, or destroyed.
@@ -572,6 +503,7 @@ public:
 	// for _PIPELINED_ALLREDUCE_, assembler entry method
 	inline void defrag(CkReductionMsg* msg);
   inline const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
+  inline ck::ObjID ckGetID(void) const { return ck::ObjID(thisArrayID, myRec->getID()); }
 
   inline int ckGetArraySize(void) const { return numInitialElements; }
 protected:
@@ -693,8 +625,9 @@ class CkArray : public CkReductionMgr {
   CkLocMgr *locMgr;
   CkGroupID locMgrID;
   CProxy_CkArray thisProxy;
-  // Stores a list of array elements.  These lists are kept by the array managers. 
-  std::map<CkArrayIndex, CkMigratable*> localElems;
+  // Separate mapping and storing the element pointers to speed iteration in broadcast
+  std::map<CmiUInt8, unsigned int> localElems;
+  std::vector<CkMigratable *> localElemVec;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     int *children;
     int numChildren;
@@ -721,39 +654,71 @@ public:
 	  {return locMgr->lastKnown(idx);}
   /// Deliver message to this element (directly if local)
   /// doFree if is local
-  inline int deliver(CkMessage *m,CkDeliver_t type,int opts=0)
-	  {return locMgr->deliverMsg(m,type,opts);}
+  inline void deliver(CkMessage *m, const CkArrayIndex &idx, CkDeliver_t type,int opts=0)
+  { locMgr->sendMsg((CkArrayMessage*)m, thisgroup, idx, type, opts); }
+  inline int deliver(CkArrayMessage *m, CkDeliver_t type)
+  { return locMgr->deliverMsg(m, thisgroup, m->array_element_id(), NULL, type); }
+  /// Fetch a local element via its ID (return NULL if not local)
+  inline ArrayElement *lookup(const CmiUInt8 id) { return (ArrayElement*) getEltFromArrMgr(id); }
   /// Fetch a local element via its index (return NULL if not local)
-  inline ArrayElement *lookup(const CkArrayIndex &index) { return (ArrayElement*) getEltFromArrMgr(index); }
-
-  virtual CkMigratable* getEltFromArrMgr(const CkArrayIndex &idx) {
-    std::map<CkArrayIndex, CkMigratable*>::iterator itr = localElems.find(idx);
-    return ( itr == localElems.end() ? NULL : itr->second );
+  inline ArrayElement *lookup(const CkArrayIndex &idx) { 
+    CkLocMgr::IdxIdMap::iterator itr = locMgr->idx2id.find(idx);
+    if (itr == locMgr->idx2id.end())
+      return NULL;
+    else
+      return (ArrayElement*) getEltFromArrMgr(itr->second);
   }
-  virtual void putEltInArrMgr(const CkArrayIndex &idx, CkMigratable* elt)
-  { localElems[idx] = elt; }
-  virtual void eraseEltFromArrMgr(const CkArrayIndex &idx)
-  { localElems.erase(idx); }
+
+  virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id) {
+    std::map<CmiUInt8, unsigned int>::iterator itr = localElems.find(id);
+    return ( itr == localElems.end() ? NULL : localElemVec[itr->second] );
+  }
+  virtual void putEltInArrMgr(const CmiUInt8 id, CkMigratable* elt)
+  {
+    localElems[id] = localElemVec.size();
+    localElemVec.push_back(elt);
+  }
+  virtual void eraseEltFromArrMgr(const CmiUInt8 id)
+  { localElems.erase(id); }
+
+  void deleteElt(const CmiUInt8 id) {
+    std::map<CmiUInt8, unsigned int>::iterator itr = localElems.find(id);
+    if (itr != localElems.end()) {
+      unsigned int offset = itr->second;
+      delete localElemVec[offset];
+      localElems.erase(itr);
+
+      if (offset != localElemVec.size() - 1) {
+        CkMigratable *moved = localElemVec[localElemVec.size()-1];
+        localElemVec[offset] = moved;
+        localElems[moved->ckGetID()] = offset;
+      }
+
+      localElemVec.pop_back();
+    }
+  }
 
 //Creation:
   /// Create-after-migrate:
   /// Create an uninitialized element after migration
   ///  The element's constructor will be called immediately after.
-  virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx,
-		  	CkElementCreation_t type);
+  virtual CkMigratable *allocateMigrated(int elChareType, CkElementCreation_t type);
 
   /// Prepare creation message:
-  void prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx);
+  void prepareCtorMsg(CkMessage *m, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
+
+  int findInitialHostPe(const CkArrayIndex &idx, int proposedPe);
 
   /// Create initial array elements:
-  virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg,int local=1);
+  virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg);
   virtual void doneInserting(void);
   virtual void beginInserting(void);
   void remoteDoneInserting(void);
   void remoteBeginInserting(void);
 
   /// Create manually:
-  virtual bool insertElement(CkMessage *);
+  bool insertElement(CkArrayMessage *, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
+  void insertElement(CkMarshalledMessage &, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
 
 /// Demand-creation:
   /// Demand-create an element at this index on this processor
@@ -782,8 +747,7 @@ private:
   bool isInserting;/// Are we currently inserting elements?
 
 /// Allocate space for a new array element
-  ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
-	CkMessage *msg,bool fromMigration);
+  ArrayElement *allocate(int elChareType, CkMessage *msg, bool fromMigration, int *listenerData);
 
 //Spring cleaning
   void springCleaning(void);

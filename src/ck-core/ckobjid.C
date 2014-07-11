@@ -101,25 +101,6 @@ void CkObjID::updatePosition(int PE){
 		return;
 	}
 	switch(type){
-		case TypeArray:
-			{
-					CkArrayID aid(data.array.id);
-					if(aid.ckLocalBranch() == NULL){
-						
-					}else{
-						char str[100];
-						CkLocMgr *mgr = aid.ckLocalBranch()->getLocMgr();
-//						CmiPrintf("[%d] location for object %s is %d\n",CmiMyPe(),toString(str),PE);
-						CkLocRec *rec = mgr->elementNrec(data.array.idx.asChild());
-						if(rec != NULL){
-							CmiPrintf("[%d] local object %s can not exist on another processor %d\n",CmiMyPe(),str,PE);
-							return;
-						}
-						mgr->inform(data.array.idx.asChild(),PE);
-					}	
-				}
-
-			break;
 		case TypeChare:
 		case TypeMainChare:
 			CkAssert(data.chare.id.onPE == PE);

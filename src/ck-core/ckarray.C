@@ -17,19 +17,19 @@ code paths used to create array elements:
 CProxy_foo::ckNew(msg,n);
  CProxy_ArrayBase::ckCreateArray
   CkArray::CkArray
-   CkLocMgr::populateInitial(numInitial)
+   CkLocMgr::populateInitial(numInitial) -> CkArrayMap::populateInitial(numInitial)
     for (idx=...)
      if (map->procNum(idx)==thisPe) 
       CkArray::insertInitial
        CkArray::prepareCtorMsg
        CkArray::insertElement
+    // OR map-specific insertion logic
 
 2.) Initial inserts: one at a time
 fooProxy[idx].insert(msg,n);
  CProxy_ArrayBase::ckInsertIdx
   CkArray::prepareCtorMsg
-  CkArrayManagerInsert
-   CkArray::insertElement
+  CkArray::insertElement
 
 3.) Demand creation (receive side)
 CkLocMgr::deliver
@@ -37,7 +37,7 @@ CkLocMgr::deliver
   CkLocMgr::demandCreateElement
    CkArray::demandCreateElement
     CkArray::prepareCtorMsg
-    CkArrayManagerInsert or direct CkArray::insertElement
+    CkArray::insertElement
 
 4.) Migration (receive side)
 CkLocMgr::migrateIncoming
@@ -784,7 +784,7 @@ void ckinsertIdxFunc(void *m)
   CmiFree(msg);
 }
 
-void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,
+void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int proposedPe,
 	const CkArrayIndex &idx)
 {
   if (m==NULL) m=(CkArrayMessage *)CkAllocSysMsg();
@@ -795,20 +795,24 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,
       msg->idx = idx;
       msg->m = m;
       msg->ctor = ctor;
-      msg->onPe = onPe;
+      msg->onPe = proposedPe;
       msg->_aid = _aid;
       CmiSetHandler(msg, ckinsertIdxHdl);
       ca = (CkArray *)lookupGroupAndBufferIfNotThere(CkpvAccess(_coreState), (envelope*)msg,_aid);
       if (ca == NULL) return;
   }
-  ca->prepareCtorMsg(m,onPe,idx);
+
+  int hostPe = ca->findInitialHostPe(idx, proposedPe);
+
+  int listenerData[CK_ARRAYLISTENER_MAXLEN];
+  ca->prepareCtorMsg(m, listenerData);
   if (ckIsDelegated()) {
-  	ckDelegatedTo()->ArrayCreate(ckDelegatedPtr(),ctor,m,idx,onPe,_aid);
-  	return;
+    ckDelegatedTo()->ArrayCreate(ckDelegatedPtr(),ctor,m,idx,hostPe,_aid);
+    return;
   }
   
-  DEBC((AA "Proxy inserting element %s on Pe %d\n" AB,idx2str(idx),onPe));
-  CkArrayManagerInsert(onPe,m,_aid);
+  DEBC((AA "Proxy inserting element %s on Pe %d\n" AB,idx2str(idx),hostPe));
+  CProxy_CkArray(_aid)[hostPe].insertElement(m, idx, listenerData);
 }
 
 void CProxyElement_ArrayBase::ckInsert(CkArrayMessage *m,int ctorIndex,int onPe)
@@ -910,7 +914,7 @@ static void CkCreateArrayAsync(void *vmsg)
 void _ckArrayInit(void)
 {
   CkpvInitialize(ArrayElement_initInfo,initInfo);
-  CkDisableTracing(CkIndex_CkArray::insertElement(0));
+  CkDisableTracing(CkIndex_CkArray::insertElement(0, CkArrayIndex(), 0));
   CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
     // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
@@ -1048,31 +1052,32 @@ void CkArray::pup(PUP::er &p){
 } while (0)
 
 //Called on send side to prepare array constructor message
-void CkArray::prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx)
+void CkArray::prepareCtorMsg(CkMessage *m, int *listenerData)
 {
   envelope *env=UsrToEnv((void *)m);
-  env->getsetArrayIndex()=idx;
-  int *listenerData=env->getsetArrayListenerData();
+  env->setMsgtype(ArrayEltInitMsg);
   CK_ARRAYLISTENER_STAMP_LOOP(listenerData);
-
-  int hostPe = locMgr->whichPE(idx);
-  if (onPe == -1) {
-    onPe = hostPe; // This new element is bound to an existing element
-  } else if (hostPe == onPe) {
-    // Yay, something higher up the stack got onPe right
-  } else if (hostPe != -1) {
-    CkAbort("hostPe for a bound element disagrees with an explicit onPe");
-  }
-
-  if (onPe==-1) onPe=procNum(idx);   // onPe may still be -1
-  if (onPe!=-1) //Let the local manager know where this el't is
-  	getLocMgr()->inform(idx,onPe);
 }
 
-CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx,
-			CkElementCreation_t type)
+int CkArray::findInitialHostPe(const CkArrayIndex &idx, int proposedPe)
 {
-	ArrayElement *ret=allocate(elChareType,idx,NULL,true);
+  int hostPe = locMgr->whichPE(idx);
+
+  if (hostPe == -1 && proposedPe == -1)
+    return procNum(idx);
+  if (hostPe == -1)
+    return proposedPe;
+  if (proposedPe == -1)
+    return hostPe;
+  if (hostPe == proposedPe)
+    return hostPe;
+
+  CkAbort("hostPe for a bound element disagrees with an explicit proposedPe");
+}
+
+CkMigratable *CkArray::allocateMigrated(int elChareType, CkElementCreation_t type)
+{
+	ArrayElement *ret=allocate(elChareType, NULL, true, NULL);
 	if (type==CkElementCreation_resume) 
 	{ // HACK: Re-stamp elements on checkpoint resume--
 	  //  this restores, e.g., reduction manager's gcount
@@ -1082,17 +1087,15 @@ CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx,
 	return ret;
 }
 
-ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
-		     CkMessage *msg,bool fromMigration) 
+ArrayElement *CkArray::allocate(int elChareType, CkMessage *msg, bool fromMigration, int *listenerData)
 {
 	//Stash the element's initialization information in the global "initInfo"
 	ArrayElement_initInfo &init=CkpvAccess(initInfo);
 	init.numInitial=numInitial;
 	init.thisArray=this;
 	init.thisArrayID=thisgroup;
-	if (msg) /*Have to *copy* data because msg will be deleted*/
-	  memcpy(init.listenerData,UsrToEnv(msg)->getsetArrayListenerData(),
-		 sizeof(init.listenerData));
+	if (listenerData) /*Have to *copy* data because msg will be deleted*/
+	  memcpy(init.listenerData, listenerData, sizeof(init.listenerData));
 	init.fromMigration=fromMigration;
 	
 	//Build the element
@@ -1102,25 +1105,28 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 	return elem;
 }
 
+void CkArray::insertElement(CkMarshalledMessage &m, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN])
+{
+  insertElement((CkArrayMessage*)m.getMessage(), idx, listenerData);
+}
+
 /// This method is called by ck.C or the user to add an element.
-bool CkArray::insertElement(CkMessage *me)
+bool CkArray::insertElement(CkArrayMessage *me, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN])
 {
   CK_MAGICNUMBER_CHECK
-  CkArrayMessage *m=(CkArrayMessage *)me;
-  const CkArrayIndex &idx=m->array_index();
   int onPe;
   if (locMgr->isRemote(idx,&onPe)) 
   { /* element's sibling lives somewhere else, so insert there */
-  	CkArrayManagerInsert(onPe,me,thisgroup);
-	return false;
+    thisProxy[onPe].insertElement(me, idx, listenerData);
+    return false;
   }
-  int ctorIdx=m->array_ep();
+  int ctorIdx = me->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
-  ArrayElement *elt=allocate(chareType,idx,me,false);
+  ArrayElement *elt=allocate(chareType, me, false, listenerData);
 #ifndef CMK_CHARE_USE_PTR
   ((Chare *)elt)->chareIdx = -1;
 #endif
-  if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return false;
+  if (!locMgr->addElement(thisgroup, idx, elt, ctorIdx, (void *)me)) return false;
   CK_ARRAYLISTENER_LOOP(listeners,
       if (!l->ckElementCreated(elt)) return false;);
   return true;
@@ -1173,41 +1179,36 @@ void CkArray::remoteBeginInserting(void)
   }
 }
 
-bool CkArray::demandCreateElement(const CkArrayIndex &idx,
-	int onPe,int ctor,CkDeliver_t type)
+bool CkArray::demandCreateElement(const CkArrayIndex &idx, int onPe, int ctor, CkDeliver_t type)
 {
 	CkArrayMessage *m=(CkArrayMessage *)CkAllocSysMsg();
-        UsrToEnv(m)->setMsgtype(ArrayEltInitMsg);
-	prepareCtorMsg(m,onPe,idx);
+        envelope *env = UsrToEnv(m);
+        env->setMsgtype(ArrayEltInitMsg);
+        env->setArrayMgr(thisgroup);
+        int listenerData[CK_ARRAYLISTENER_MAXLEN];
+	prepareCtorMsg(m, listenerData);
 	m->array_ep()=ctor;
 	
 	if ((onPe!=CkMyPe()) || (type==CkDeliver_queue)) {
 		DEBC((AA "Forwarding demand-creation request for %s to %d\n" AB,idx2str(idx),onPe));
-		CkArrayManagerInsert(onPe,m,thisgroup);
+		thisProxy[onPe].insertElement(m, idx, listenerData);
 	} else /* local message, non-queued */ {
 		//Call local constructor directly
 		DEBC((AA "Demand-creating %s\n" AB,idx2str(idx)));
-		return insertElement(m);
+		return insertElement(m, idx, listenerData);
 	}
 	return true;
 }
 
-void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local)
+void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg)
 {
 	CkArrayMessage *m=(CkArrayMessage *)ctorMsg;
-	if (local) {
-	  int onPe=CkMyPe();
-	  prepareCtorMsg(m,onPe,idx);
+        int listenerData[CK_ARRAYLISTENER_MAXLEN];
+	prepareCtorMsg(m, listenerData);
 #if CMK_BIGSIM_CHARM
-          BgEntrySplit("split-array-new");
+        BgEntrySplit("split-array-new");
 #endif
-	  insertElement(m);
-  	}
-	else {
-	  int onPe=-1;
-	  prepareCtorMsg(m,onPe,idx);
-	  CkArrayManagerInsert(onPe,m,getGroupID());
-	}
+        insertElement(m, idx, listenerData);
 }
 
 /********************* CkArray Messaging ******************/
@@ -1218,6 +1219,7 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
         env->setMsgtype(ForArrayEltMsg);
 	env->setArrayMgr(aid);
 	env->getsetArraySrcPe()=CkMyPe();
+        env->setRecipientID(ck::ObjID(0));
 #if CMK_SMP_TRACE_COMMTHREAD
         env->setSrcPe(CkMyPe());
 #endif
@@ -1256,21 +1258,20 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) cons
 		CkAbort("Array index length (nInts) is too long-- did you "
 			"use bytes instead of integers?\n");
 #endif
-	msg_prepareSend(msg,ep,ckGetArrayID());
-	msg->array_index()=_idx;//Insert array index
+	msg_prepareSend(msg, ep, ckGetArrayID());
 	if (ckIsDelegated()) //Just call our delegateMgr
 	  ckDelegatedTo()->ArraySend(ckDelegatedPtr(),ep,msg,_idx,ckGetArrayID());
 	else 
 	{ //Usual case: a direct send
 	  CkArray *localbranch = ckLocalBranch();
-	  if (localbranch == NULL) {             // array not created yet
-	    CkArrayManagerDeliver(CkMyPe(), msg, 0);
-          }
+	  if (localbranch == NULL) { // array not created yet
+	    CkAbort("Cannot send a message from an array without a local branch");
+	  }
 	  else {
 	    if (opts & CK_MSG_INLINE)
-	      localbranch->deliver(msg, CkDeliver_inline, opts & (~CK_MSG_INLINE));
+	      localbranch->deliver(msg, _idx, CkDeliver_inline, opts & (~CK_MSG_INLINE));
 	    else
-	      localbranch->deliver(msg, CkDeliver_queue, opts);
+	      localbranch->deliver(msg, _idx, CkDeliver_queue, opts);
 	  }
 	}
 }
@@ -1320,22 +1321,20 @@ void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex
 {
   CkArrayMessage *m=(CkArrayMessage *)msg;
   msg_prepareSend(m,entryIndex,aID);
-  m->array_index()=idx;
   CkArray *a=(CkArray *)_localBranch(aID);
   if (a == NULL)
-    CkArrayManagerDeliver(CkMyPe(), msg, 0);
+    CkAbort("Cannot receive a message for an array without a local branch");
   else
-    a->deliver(m,CkDeliver_queue,opts);
+    a->deliver(m, idx, CkDeliver_queue, opts);
 }
 
 void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts)
 {
   CkArrayMessage *m=(CkArrayMessage *)msg;
   msg_prepareSend(m,entryIndex,aID);
-  m->array_index()=idx;
   CkArray *a=(CkArray *)_localBranch(aID);
   int oldStatus = CkDisableTracing(entryIndex);     // avoid nested tracing
-  a->deliver(m,CkDeliver_inline,opts);
+  a->deliver(m, idx, CkDeliver_inline, opts);
   if (oldStatus) CkEnableTracing(entryIndex);
 }
 
@@ -1425,7 +1424,7 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
       bcast = newMsg;
     }
     envelope *env = UsrToEnv(bcast);
-    env->getsetArrayIndex() = el->ckGetArrayIndex();
+    env->setRecipientID(el->ckGetID());
     CkArrayManagerDeliver(CkMyPe(), bcast, 0);
     return true;
   }
@@ -1587,7 +1586,7 @@ void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index
         env->piggyBcastIdx = epIdx;
         env->setEpIdx(CkIndex_ArrayElement::recvBroadcast(0));
         env->setArrayMgr(thisgroup);
-        env->getsetArrayIndex() = *index;
+        env->setRecipientID(ck::ObjID(thisgroup, rec->getID());
         env->setSrcPe(CkMyPe());
         env->getsetArrayHops() = 0;
         deliver(copy,CkDeliver_queue);
@@ -1635,8 +1634,8 @@ void CkArray::recvBroadcast(CkMessage *m)
 	extern void stopVTimer();
 	extern void startVTimer();
 #endif
-    int len = localElems.size(), count = 0;
-    for (std::map<CkArrayIndex,CkMigratable*>::iterator itr = localElems.begin(); itr != localElems.end(); ++itr) {
+    int len = localElemVec.size();
+    for (unsigned int i = 0; i < len; ++i) {
 #if CMK_BIGSIM_CHARM
                 //BgEntrySplit("split-broadcast");
   		stopVTimer();
@@ -1645,8 +1644,8 @@ void CkArray::recvBroadcast(CkMessage *m)
   		startVTimer();
 #endif
 		bool doFree = false;
-		if (stableLocations && ++count == len) doFree = true;
-		broadcaster->deliver(msg, (ArrayElement*)itr->second, doFree);
+		if (stableLocations && i == len-1) doFree = true;
+		broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
 	}
 #endif
 
@@ -1690,8 +1689,8 @@ void CkArray::ckDestroy() {
   // to send messages to remote PEs with reclaimRemote messages.
   locMgr->setDuringDestruction(true);
 
-  for (std::map<CkArrayIndex, CkMigratable*>::iterator i = localElems.begin(); i != localElems.end(); ++i)
-    i->second->ckDestroy();
+  for (unsigned int i = 0; i < localElemVec.size(); ++i)
+    localElemVec[i]->ckDestroy();
 
   locMgr->deleteManager(CkGroupID(thisProxy), this);
   delete this;

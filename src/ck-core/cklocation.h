@@ -15,7 +15,7 @@ array proxies, or the details of element creation (see ckarray.h).
 class CkArrayMessage : public CkMessage {
 public:
   //These routines are implementation utilities
-  CkArrayIndex &array_index(void);
+  CmiUInt8 array_element_id(void);
   unsigned short &array_ep(void);
   unsigned short &array_ep_bcast(void);
   unsigned char &array_hops(void);
@@ -61,14 +61,20 @@ class CkArrayOptions;
 
 class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage {
 public:
+  CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_, int length_,
+                               int nManagers_, bool bounced_)
+    : idx(idx_), id(id_), ignoreArrival(ignoreArrival_), length(length_), nManagers(nManagers_), bounced(bounced_)
+  { }
+
 	CkArrayIndex idx; // Array index that is migrating
-	int ignoreArrival;   // if to inform LB of arrival
+        CmiUInt8 id; // ID of the elements with this index in this collection
+	bool ignoreArrival;   // if to inform LB of arrival
 	int length;//Size in bytes of the packed data
 	int nManagers; // Number of associated array managers
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CkGroupID gid; //gid of location manager
 #endif
-	bool bounced;
+	bool bounced; // Fault evac related?
 	char* packData;
 };
 
@@ -178,7 +184,8 @@ public:
 	
 	/// Look up and return the array index of this location.
 	const CkArrayIndex &getIndex(void) const;
-	
+	CmiUInt8 getID() const;
+
         void destroyAll();
 
 	/// Pup all the array elements at this location.
@@ -228,17 +235,50 @@ public:
 
 //Interface used by external users:
 	/// Home mapping
-	inline int     homePe (const CkArrayIndex &idx) const {return map->homePe(mapHandle,idx);}
-	inline int     procNum(const CkArrayIndex &idx) const {return map->procNum(mapHandle,idx);}
+	inline int homePe(const CkArrayIndex &idx) const {return map->homePe(mapHandle,idx);}
+        inline int homePe(const CmiUInt8 id) const {
+          if (compressor)
+            return homePe(compressor->decompress(id));
+
+          return id >> 24;
+        }
+	inline int procNum(const CkArrayIndex &idx) const {return map->procNum(mapHandle,idx);}
 	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
-	int whichPE(const CkArrayIndex &idx) const;
+  int whichPE(const CkArrayIndex &idx) const;
+  int whichPE(const CmiUInt8 id) const;
 	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx);
+	int lastKnown(CmiUInt8 id);
+
+        inline CmiUInt8 lookupID(const CkArrayIndex &idx) const {
+          if (compressor) {
+            return compressor->compress(idx);
+          } else {
+            CkLocMgr::IdxIdMap::const_iterator itr = idx2id.find(idx);
+            CkAssert(itr != idx2id.end());
+            return itr->second;
+          }
+        }
+
+        inline bool lookupID(const CkArrayIndex &idx, CmiUInt8& id) const {
+          if (compressor) {
+            id = compressor->compress(idx);
+            return true;
+          } else {
+            CkLocMgr::IdxIdMap::const_iterator itr = idx2id.find(idx);
+            if (itr == idx2id.end()) {
+              return false;
+            } else {
+              id = itr->second;
+              return true;
+            }
+          }
+        }
 
 	//Look up array element in hash table.  Index out-of-bounds if not found.
 	CkLocRec *elementRec(const CkArrayIndex &idx);
 	//Look up array element in hash table.  Return NULL if not there.
-	CkLocRec *elementNrec(const CkArrayIndex &idx);
+	CkLocRec *elementNrec(const CmiUInt8 id);
 
 	/// Return true if this array element lives on another processor
 	bool isRemote(const CkArrayIndex &idx,int *onPe) const;
@@ -254,12 +294,12 @@ public:
 	void iterate(CkLocIterator &dest);
 
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup), skip listeners
-	void restore(const CkArrayIndex &idx, PUP::er &p);
+	void restore(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p);
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	void resume(const CkArrayIndex &idx, PUP::er &p, bool create, int dummy=0);
+	void resume(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p, bool create, int dummy=0);
 #else
-	void resume(const CkArrayIndex &idx, PUP::er &p, bool notify=true,bool=false);
+	void resume(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p, bool notify=true,bool=false);
 #endif
 
 //Interface used by array manager and proxies
@@ -285,14 +325,15 @@ public:
 	unsigned int numLocalElements();
 
 	///Deliver message to this element:
-	int deliverMsg(CkMessage *m, CkDeliver_t type, int opts=0);
+	//int deliverMsg(CkMessage *m, CkArrayID mgr, const CkArrayIndex &idx, CkDeliver_t type, int opts = 0);
+	int deliverMsg(CkArrayMessage *m, CkArrayID mgr, CmiUInt8 id, const CkArrayIndex* idx, CkDeliver_t type, int opts = 0);
+
+        void sendMsg(CkArrayMessage *msg, CkArrayID mgr, const CkArrayIndex &idx, CkDeliver_t type, int opts);
 
 //Advisories:
 	///This index now lives on the given processor-- update local records
-	void inform(const CkArrayIndex &idx,int nowOnPe) {
-          idx2pe[idx] = nowOnPe;
-          deliverAnyBufferedMsgs(idx, bufferedMsgs);
-        }
+	void inform(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe);
+	void inform(CmiUInt8 id, int nowOnPe);
 
 	///This index now lives on the given processor-- tell the home processor
 	void informHome(const CkArrayIndex &idx,int nowOnPe);
@@ -316,12 +357,15 @@ public:
 	//This index will no longer be used-- delete the associated elements
 	void reclaim(const CkArrayIndex &idx);
 
-	bool demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type);
+	bool demandCreateElement(CkArrayMessage *msg, const CkArrayIndex &idx, int onPe, CkDeliver_t type);
+        void demandCreateElement(const CkArrayIndex &idx, int chareType, int onPe, CkArrayID mgr);
 
 //Communication:
 	void immigrate(CkArrayElementMigrateMessage *msg);
-        void requestLocation(const CkArrayIndex &idx, int peToTell, bool suppressIfHere);
-	void updateLocation(const CkArrayIndex &idx,int nowOnPe);
+        void requestLocation(const CkArrayIndex &idx, int peToTell, bool suppressIfHere, int ifNonExistent, int chareType, CkArrayID mgr);
+        void requestLocation(CmiUInt8 id, int peToTell, bool suppressIfHere);
+        void updateLocation(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe);
+        void updateLocation(CmiUInt8 id, int nowOnPe);
 	void reclaimRemote(const CkArrayIndex &idx,int deletedOnPe);
 	void dummyAtSync(void);
 
@@ -336,10 +380,10 @@ public:
 private:
 //Internal interface:
 	//Add given element array record at idx, replacing the existing record
-	void insertRec(CkLocRec *rec,const CkArrayIndex &idx);
+	void insertRec(CkLocRec *rec,const CmiUInt8 &id);
 
 	//Remove this entry from the table (does not delete record)
-	void removeFromTable(const CkArrayIndex &idx);
+	void removeFromTable(const CmiUInt8 id);
 
 	friend class CkLocation; //so it can call pupElementsFor
 	friend class ArrayElement;
@@ -358,10 +402,10 @@ private:
 	typedef void (CkMigratable::* CkMigratable_voidfn_arg_t)(void*);
 	void callMethod(CkLocRec *rec,CkMigratable_voidfn_arg_t fn, void*);
 
-	void deliverUnknown(CkArrayMessage *msg, CkDeliver_t type, int opts);
-	typedef std::map<CkArrayIndex, std::vector<CkArrayMessage*> > MsgBuffer;
+	void deliverUnknown(CkArrayMessage *msg, const CkArrayIndex* idx, CkDeliver_t type, int opts);
+	typedef std::map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
 	/// Deliver any buffered msgs to a newly created array element
-	void deliverAnyBufferedMsgs(const CkArrayIndex &idx, MsgBuffer &buffer);
+	void deliverAnyBufferedMsgs(CmiUInt8, MsgBuffer &buffer);
 
 	/// Create a new local record at this array index.
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -374,14 +418,25 @@ CkLocRec *createLocal(const CkArrayIndex &idx,
 		bool notifyHome);
 #endif
 
+        std::map<CkArrayIndex, std::vector<std::pair<int, bool> > > bufferedLocationRequests;
+
 public:
 	void callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn);
 
 //Data Members:
 	//Map array ID to manager and elements
     std::map<CkArrayID, CkArray*> managers;
-    // Map idx to location
-    std::map<CkArrayIndex, int> idx2pe;
+    // Map object ID to location
+    std::map<CmiUInt8, int> id2pe;
+
+    typedef std::map<CkArrayIndex, CmiUInt8> IdxIdMap;
+
+    // Map array element index to object ID
+    IdxIdMap idx2id;
+    // Next ID to assign newly constructed array elements
+    CmiUInt8 idCounter;
+    CmiUInt8 getNewObjectID(const CkArrayIndex &idx);
+
     /// Map idx to undelivered msgs
     /// @todo: We should not buffer msgs for uncreated array elements forever.
     /// After some timeout or other policy, we should throw errors or warnings
@@ -390,14 +445,13 @@ public:
     MsgBuffer bufferedRemoteMsgs;
     MsgBuffer bufferedShadowElemMsgs;
 
+    std::map<CkArrayIndex, std::vector<CkArrayMessage *> > bufferedIndexMsgs;
+
 	bool addElementToRec(CkLocRec *rec,CkArray *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 
 	CProxy_CkLocMgr thisProxy;
 	CProxyElement_CkLocMgr thislocalproxy;
-	/// The core of the location manager: map array index to element representative
-	CkHashtableT<CkArrayIndex,CkLocRec *> hash;
-	CmiImmediateLockType hashImmLock;
 
 	/// This flag is set while we delete an old copy of a migrator
 	bool duringMigration;
@@ -405,6 +459,10 @@ public:
 	bool duringDestruction;
 
 private:
+	/// The core of the location manager: map array index to element representative
+	CkHashtableT<CkHashtableAdaptorT<CmiUInt8>, CkLocRec *> hash;
+	CmiImmediateLockType hashImmLock;
+
 	//Map object
 	CkGroupID mapID;
 	int mapHandle;
@@ -414,9 +472,7 @@ private:
 	CkGroupID metalbID;
 
 	ck::ArrayIndexCompressor *compressor;
-#if CMK_ERROR_CHECKING
-	const CkArrayIndex bounds;
-#endif
+	CkArrayIndex bounds;
 	void checkInBounds(const CkArrayIndex &idx);
 
 #if CMK_LBDB_ON

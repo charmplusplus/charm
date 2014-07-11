@@ -25,7 +25,9 @@ public:
     chkpNodeNum = CkNumNodes();
     CkPrintf("Running Hello on %d processors for %d elements\n",CkNumPes(),nElements);
     mainProxy = thisProxy;
-    helloProxy = CProxy_Hello::ckNew(nElements);
+    CkArrayOptions helloOpts(nElements);
+    helloOpts.setBounds(10000);
+    helloProxy = CProxy_Hello::ckNew(helloOpts);
     helloProxy.SayHi();
 
     chelloProxy = CProxy_CHello::ckNew(0);

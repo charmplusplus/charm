@@ -110,7 +110,6 @@ Chare * CkFindObjectPtr(envelope *env)
     case ForVidMsg:
     case FillVidMsg:
       break;
-    case ForIDedObjMsg:
     case ForArrayEltMsg:
       obj = CkArrayMessageObjectPtr(env);
       break;

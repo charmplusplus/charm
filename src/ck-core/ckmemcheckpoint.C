@@ -1031,12 +1031,12 @@ void CkMemCheckPT::gotData()
   }
 }
 
-void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe)
+void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUInt8 *id, int nowOnPe)
 {
 
   for (int i=0; i<n; i++) {
     CkLocMgr *mgr = CProxy_CkLocMgr(g[i]).ckLocalBranch();
-    mgr->updateLocation(idx[i], nowOnPe);
+    mgr->updateLocation(idx[i], id[i], nowOnPe);
   }
 	thisProxy[nowOnPe].gotReply();
 }
@@ -1058,6 +1058,7 @@ void CkMemCheckPT::recoverArrayElements()
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
   CkVec<CkGroupID> * gmap = new CkVec<CkGroupID>[CkNumPes()];
   CkVec<CkArrayIndex> * imap = new CkVec<CkArrayIndex>[CkNumPes()];
+  CkVec<CkArrayIndex> * idmap = new CkVec<CmiUInt8>[CkNumPes()];
 #endif
 
 #if !CMK_CHKP_ALL
@@ -1086,6 +1087,7 @@ void CkMemCheckPT::recoverArrayElements()
     if (homePe != CkMyPe()) {
       gmap[homePe].push_back(msg->locMgr);
       imap[homePe].push_back(msg->index);
+      CkAbort("Missing element IDs");
     }
 #endif
     CkFreeMsg(msg);
@@ -1144,14 +1146,16 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 		for(int i=0;i<numElements;i++){
 			CkGroupID gID;
 			CkArrayIndex idx;
+                        CmiUInt8 id;
 			p|gID;
 			p|idx;
+                        p|id;
 			CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
     			int homePe = mgr->homePe(idx);
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
-			mgr->resume(idx,p,true,true);
+			mgr->resume(idx, id, p, true, true);
 #else
-			mgr->resume(idx,p,false,true);
+			mgr->resume(idx, id, p, false, true);
 #endif
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
 			homePe = mgr->homePe(idx);
