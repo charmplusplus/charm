@@ -3,24 +3,23 @@
 
 #define DEBUG
 
-extern void cudaMatMul(int matrixSize, ElementType *A, ElementType *B, ElementType *C, int myIndex, void *cb); 
+extern void cudaMatMul(int matrixSize, ElementType *A, ElementType *B, ElementType *C, int myIndex, void *cb,int useCublas);
 extern void hostMemorySetup(int matrixSize, ElementType **h_A, ElementType **h_B, ElementType **h_C, void *cb); 
 extern void hostMemoryCleanup(ElementType *h_A, ElementType *h_B, ElementType *h_C);
 
 CProxy_Main mainProxy; 
 int matrixSize;
-
+int useCublas=0;
 Main::Main(CkArgMsg *m) {
-  mainProxy = thisProxy; 
+  mainProxy = thisProxy;
 
-  if (m->argc >= 2) {
-    numChares = atoi(m->argv[1]); 
-  }
-  if (m->argc == 3) {
-    matrixSize = atoi(m->argv[2]); 
+  numChares = atoi(m->argv[1]);
+  matrixSize = atoi(m->argv[2]);
+
+  if (m->argc == 4) {
+    useCublas = atoi(m->argv[3]);
   }
   delete m;
-
   workers = CProxy_Workers::ckNew(numChares); 
 
   startTime = CkWallTimer(); 
@@ -66,7 +65,7 @@ void Workers::beginWork() {
   int size = matrixSize * matrixSize * sizeof(ElementType);
   memcpy(h_A, A, size);
   memcpy(h_B, B, size); 
-  cudaMatMul(matrixSize, h_A, h_B, h_C, thisIndex, (void *) cb);
+  cudaMatMul(matrixSize, h_A, h_B, h_C, thisIndex, (void *) cb,useCublas);
 }
 
 void Workers::complete() {
@@ -89,11 +88,14 @@ void Workers::complete() {
     }
     CkPrintf("\n");
   }
-  CkPrintf("[%d] C\n", thisIndex); 
+  CkPrintf("[%d] C\n", thisIndex);
   for (int i=0; i<matrixSize; i++) {
     CkPrintf("[%d] ", thisIndex);
     for (int j=0; j<matrixSize; j++) {
-      CkPrintf("%.2f ", C[i*matrixSize+j]); 
+      if(useCublas)
+        CkPrintf("%.2f ", C[j*matrixSize+i]);
+      else
+        CkPrintf("%.2f ", C[i*matrixSize+j]);
     }
     CkPrintf("\n");
   }

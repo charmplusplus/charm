@@ -2,7 +2,7 @@
 #include "wr.h"
 #include <stdio.h>
 #include <math.h>
-
+#include "cublas_v2.h"
 // matrix multiplication code adapted from the CUDA SDK
 
 __global__ void
@@ -127,7 +127,7 @@ void hostMemoryCleanup(ElementType *h_A, ElementType *h_B, ElementType *h_C) {
 }
 
 void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
-                ElementType *h_C, int myIndex, void *cb) {
+                ElementType *h_C, int myIndex, void *cb,int useCublas) {
   int size = matrixSize * matrixSize * sizeof(ElementType);
   dataInfo *AInfo, *BInfo, *CInfo;
 
@@ -165,7 +165,10 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
   CInfo->size = size;
 
   matmul.callbackFn = cb;
-  matmul.id = MATMUL_KERNEL;
+  if(useCublas)
+   matmul.id = BLAS_KERNEL;
+  else
+   matmul.id = MATMUL_KERNEL;
 
   matmul.userData = malloc(sizeof(int));
   memcpy(matmul.userData, &matrixSize, sizeof(int));
@@ -177,11 +180,23 @@ void kernelSelect(workRequest *wr) {
 
   switch (wr->id) {
   case MATMUL_KERNEL:
+    printf("MATMUL KERNEL");
     matrixMul<<< wr->dimGrid, wr->dimBlock, wr->smemSize, kernel_stream >>>
       ((ElementType *) devBuffers[wr->bufferInfo[C_INDEX].bufferID],
        (ElementType *) devBuffers[wr->bufferInfo[A_INDEX].bufferID],
        (ElementType *) devBuffers[wr->bufferInfo[B_INDEX].bufferID],
        *((int *) wr->userData), *((int *) wr->userData));
+    break;
+  case BLAS_KERNEL:
+    printf("CUBLAS KERNEL");
+    int size=*((int *) wr->userData);
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    cublasSetStream(handle,kernel_stream);
+    float alpha=1.0;
+    float beta=0.0;
+    cublasSgemm(handle, CUBLAS_OP_T, CUBLAS_OP_T, size, size, size, &alpha, (ElementType *) devBuffers[wr->bufferInfo[A_INDEX].bufferID], size, (ElementType *) devBuffers[wr->bufferInfo[B_INDEX].bufferID], size, &beta, (ElementType *) devBuffers[wr->bufferInfo[C_INDEX].bufferID], size);
+    cublasDestroy(handle);
     break;
   }
 }

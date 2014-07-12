@@ -6,7 +6,7 @@ NVCC = /usr/local/cuda/bin/nvcc
 NVCC_FLAGS = -O3 -c -use_fast_math #-device-debug -deviceemu 
 NVCC_INC = -I/usr/local/cuda/include  -I../../../../../src/arch/cuda/hybridAPI
 CHARMINC = -I../../../../include
-
+LD_LIBS= -lcublas
 all: overlapTest
 
 overlapTest: $(OBJS)
