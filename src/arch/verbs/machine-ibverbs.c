@@ -31,7 +31,12 @@
 
 #include <infiniband/verbs.h>
 
+
+#ifndef QLOGIC
 enum ibv_mtu mtu = IBV_MTU_2048;
+#else
+enum ibv_mtu mtu = IBV_MTU_4096;
+#endif
 static int page_size;
 static int mtu_size;
 static int packetSize;
@@ -807,8 +812,13 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	MACHSTATE(3,"qp state changed to RTR");
 	
 	attr.qp_state 	    = IBV_QPS_RTS;
+#ifndef QLOGIC
 	attr.timeout 	    = 26;
 	attr.retry_cnt 	    = 20;
+#else
+	attr.timeout 	    = 14;
+	attr.retry_cnt 	    = 7;
+#endif
 	attr.rnr_retry 	    = 7;
 	attr.sq_psn 	    = context->localAddr[node].psn;
 	attr.max_rd_atomic  = 1;
