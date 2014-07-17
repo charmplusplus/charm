@@ -105,9 +105,11 @@ unsigned int nextBuffer;
 #ifdef GPU_TRACE
 
 /* event types */
-#define DATA_SETUP          1            
-#define KERNEL_EXECUTION    2
-#define DATA_CLEANUP        3
+enum WorkRequestStage{
+DataSetup        = 1,
+KernelExecution  = 2,
+DataCleanup      = 3
+};
 
 typedef struct gpuEventTimer {
   int stage; 
@@ -131,9 +133,11 @@ extern "C" double CmiWallTimer();
 extern "C" int traceRegisterUserEvent(const char*x, int e);
 extern "C" void traceUserBracketEvent(int e, double beginT, double endT);
 
-#define GPU_MEM_SETUP 8800
-#define GPU_KERNEL_EXEC 8801
-#define GPU_MEM_CLEANUP 8802
+enum ProfilingStage{
+GpuMemSetup   = 8800,
+GpuKernelExec = 8801,
+GpuMemCleanup = 8802
+};
 
 #endif
 
@@ -453,9 +457,9 @@ void initHybridAPI(int myPe) {
   nextBuffer = NUM_BUFFERS;  
 
 #ifdef GPU_TRACE
-  traceRegisterUserEvent("GPU Memory Setup", GPU_MEM_SETUP);
-  traceRegisterUserEvent("GPU Kernel Execution", GPU_KERNEL_EXEC);
-  traceRegisterUserEvent("GPU Memory Cleanup", GPU_MEM_CLEANUP);
+  traceRegisterUserEvent("GPU Memory Setup", GpuMemSetup);
+  traceRegisterUserEvent("GPU Kernel Execution", GpuKernelExec);
+  traceRegisterUserEvent("GPU Memory Cleanup", GpuMemCleanup);
 #endif
 
 #ifdef GPU_MEMPOOL
@@ -517,6 +521,60 @@ createPool(sizes, nslots, memPoolFreeBufs);
 #endif
 }
 
+inline void gpuEventStart(workRequest *wr, int *index, WorkRequestStage event, ProfilingStage stage){
+#ifdef GPU_TRACE
+  gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
+  gpuEvents[timeIndex].eventType = event;
+  gpuEvents[timeIndex].ID = wr->id;
+  *index = timeIndex;
+  gpuEvents[timeIndex].stage = stage;
+  timeIndex++;
+#endif
+}
+
+inline void gpuEventEnd(int index){
+#ifdef GPU_TRACE
+  gpuEvents[index].cmiendTime = CmiWallTimer();
+  traceUserBracketEvent(gpuEvents[index].stage, gpuEvents[index].cmistartTime, gpuEvents[index].cmiendTime);
+#endif
+}
+
+inline void workRequestStartTime(workRequest *wr){
+#ifdef GPU_INSTRUMENT_WRS
+  wr->phaseStartTime = CmiWallTimer();
+#endif
+}
+
+inline void gpuProfiling(workRequest *wr, WorkRequestStage event){
+#ifdef GPU_INSTRUMENT_WRS
+  if(initializedInstrument()){
+    double tt = CmiWallTimer()-(wr->phaseStartTime);
+    int index = wr->chareIndex;
+    char type = wr->compType;
+    char phase = wr->compPhase;
+
+    CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
+    if(vec.length() <= phase){
+      vec.growAtLeast(phase);
+      vec.length() = phase+1;
+    }
+    switch(event){
+      case DataSetup:
+        vec[phase].transferTime += tt;
+        break;
+      case KernelExecution:
+        vec[phase].kernelTime += tt;
+        break;
+      case DataCleanup:
+        vec[phase].cleanupTime += tt;
+        vec[phase].n++;
+        break;
+      default:
+        printf("Error: Invalid event during gpuProfiling\n");
+    }
+  }
+#endif
+}
 /* gpuProgressFn
  *  called periodically to monitor work request progress, and perform
  *  the prefetch of data for a subsequent work request
@@ -537,83 +595,29 @@ void gpuProgressFn() {
   workRequest *third = thirdElement(wrQueue); 
 
   if (head->state == QUEUED) {
-#ifdef GPU_TRACE
-    gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-    gpuEvents[timeIndex].eventType = DATA_SETUP; 
-    gpuEvents[timeIndex].ID = head->id; 
-    dataSetupIndex = timeIndex; 
-    gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
-    timeIndex++; 
-#endif
-
-#ifdef GPU_INSTRUMENT_WRS
-    head->phaseStartTime = CmiWallTimer(); 
-#endif
-
+    gpuEventStart(head,&dataSetupIndex,DataSetup,GpuMemSetup);
+    workRequestStartTime(head);
     allocateBuffers(head); 
     setupData(head); 
     head->state = TRANSFERRING_IN; 
   }  
   if (head->state == TRANSFERRING_IN) {
     if ((returnVal = cudaStreamQuery(data_in_stream)) == cudaSuccess) {
-#ifdef GPU_TRACE
-      gpuEvents[dataSetupIndex].cmiendTime = CmiWallTimer();
-      traceUserBracketEvent(gpuEvents[dataSetupIndex].stage, 
-			    gpuEvents[dataSetupIndex].cmistartTime, 
-			    gpuEvents[dataSetupIndex].cmiendTime); 
-#endif
-
-#ifdef GPU_INSTRUMENT_WRS
-      {
-        if(initializedInstrument()){
-          double tt = CmiWallTimer()-(head->phaseStartTime);
-          int index = head->chareIndex;
-          char type = head->compType;
-          char phase = head->compPhase;
-
-          CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
-          if(vec.length() <= phase){
-            vec.growAtLeast(phase);
-            vec.length() = phase+1;
-          }
-          vec[phase].transferTime += tt;
-        }
-      }
-#endif
-
+      gpuEventEnd(dataSetupIndex);
+      gpuProfiling(head,DataSetup);
       if (second != NULL /*&& (second->state == QUEUED)*/) {
 	allocateBuffers(second); 
       }
-#ifdef GPU_TRACE
-      gpuEvents[timeIndex].stage = GPU_KERNEL_EXEC; 
-      gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-      gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
-      gpuEvents[timeIndex].ID = head->id; 
-      runningKernelIndex = timeIndex; 
-      timeIndex++; 
-#endif
-#ifdef GPU_INSTRUMENT_WRS
-      head->phaseStartTime = CmiWallTimer(); 
-#endif
-
+      gpuEventStart(head,&runningKernelIndex,KernelExecution,GpuKernelExec);
+      workRequestStartTime(head);
       //flushPinnedMemQueue();
       flushDelayedFrees();
       kernelSelect(head); 
 
       head->state = EXECUTING; 
       if (second != NULL) {
-#ifdef GPU_TRACE
-	gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
-	gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-	gpuEvents[timeIndex].eventType = DATA_SETUP; 
-	gpuEvents[timeIndex].ID = second->id; 
-	dataSetupIndex = timeIndex; 
-	timeIndex++; 
-#endif
-
-#ifdef GPU_INSTRUMENT_WRS
-        second->phaseStartTime = CmiWallTimer();
-#endif
+        gpuEventStart(second,&dataSetupIndex,DataSetup,GpuMemSetup);
+        workRequestStartTime(second);
 	setupData(second); 
 	second->state = TRANSFERRING_IN;
       }
@@ -627,121 +631,38 @@ void gpuProgressFn() {
   }
   if (head->state == EXECUTING) {
     if ((returnVal = cudaStreamQuery(kernel_stream)) == cudaSuccess) {
-#ifdef GPU_TRACE
-      gpuEvents[runningKernelIndex].cmiendTime = CmiWallTimer();
-      traceUserBracketEvent(gpuEvents[runningKernelIndex].stage, 
-			    gpuEvents[runningKernelIndex].cmistartTime, 
-			    gpuEvents[runningKernelIndex].cmiendTime); 
-#endif
-#ifdef GPU_INSTRUMENT_WRS
-      {
-        if(initializedInstrument()){
-          double tt = CmiWallTimer()-(head->phaseStartTime);
-          int index = head->chareIndex;
-          char type = head->compType;
-          char phase = head->compPhase;
-
-          CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
-          if(vec.length() <= phase){
-            vec.growAtLeast(phase);
-            vec.length() = phase+1;
-          }
-          vec[phase].kernelTime += tt;
-        }
-      }
-#endif
-
+      gpuEventEnd(runningKernelIndex);
+      gpuProfiling(head,KernelExecution);
       if (second != NULL && second->state == QUEUED) {
-#ifdef GPU_TRACE
-	gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
-	gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-	gpuEvents[timeIndex].eventType = DATA_SETUP; 
-	gpuEvents[timeIndex].ID = second->id; 
-	dataSetupIndex = timeIndex; 
-	timeIndex++; 
-#endif
-
-#ifdef GPU_INSTRUMENT_WRS
-        second->phaseStartTime = CmiWallTimer();
-#endif
-        
+        gpuEventStart(second,&dataSetupIndex,DataSetup,GpuMemSetup);
+        workRequestStartTime(second);
 	allocateBuffers(second); 
 	setupData(second); 
 	second->state = TRANSFERRING_IN; 	
       } 
       if (second != NULL && second->state == TRANSFERRING_IN) {
 	if (cudaStreamQuery(data_in_stream) == cudaSuccess) {
-#ifdef GPU_TRACE
-	  gpuEvents[dataSetupIndex].cmiendTime = CmiWallTimer();
-	  traceUserBracketEvent(gpuEvents[dataSetupIndex].stage, 
-				gpuEvents[dataSetupIndex].cmistartTime, 
-				gpuEvents[dataSetupIndex].cmiendTime); 
-#endif
-#ifdef GPU_INSTRUMENT_WRS
-          {
-            if(initializedInstrument()){
-              double tt = CmiWallTimer()-(second->phaseStartTime);
-              int index = second->chareIndex;
-              char type = second->compType;
-              char phase = second->compPhase;
-
-              CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
-              if(vec.length() <= phase){
-                vec.growAtLeast(phase);
-                vec.length() = phase+1;
-              }
-              vec[phase].transferTime += tt;
-            }
-          }
-#endif
-
+          gpuEventEnd(dataSetupIndex);
+          gpuProfiling(second,DataSetup);
 	  if (third != NULL /*&& (third->state == QUEUED)*/) {
 	    allocateBuffers(third); 
 	  }
-#ifdef GPU_TRACE
-	  gpuEvents[timeIndex].stage = GPU_KERNEL_EXEC; 
-	  gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-	  gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
-	  gpuEvents[timeIndex].ID = second->id; 
-	  runningKernelIndex = timeIndex; 
-	  timeIndex++; 
-#endif
-#ifdef GPU_INSTRUMENT_WRS
-          second->phaseStartTime = CmiWallTimer();
-#endif
+          gpuEventStart(second,&runningKernelIndex,KernelExecution,GpuKernelExec);
+          workRequestStartTime(second);
 	  //	    flushPinnedMemQueue();	    
           flushDelayedFrees();
 	  kernelSelect(second); 
 	  second->state = EXECUTING; 
 	  if (third != NULL) {
-#ifdef GPU_TRACE
-	    gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
-	    gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-	    gpuEvents[timeIndex].eventType = DATA_SETUP; 
-	    gpuEvents[timeIndex].ID = third->id; 
-	    dataSetupIndex = timeIndex; 
-	    timeIndex++; 
-#endif
-
-#ifdef GPU_INSTRUMENT_WRS
-            third->phaseStartTime = CmiWallTimer();
-#endif
+            gpuEventStart(third,&dataSetupIndex,DataSetup,GpuMemSetup);
+            workRequestStartTime(third);
 	    setupData(third); 
 	    third->state = TRANSFERRING_IN; 	
 	  }
 	}
       }
-#ifdef GPU_TRACE
-      gpuEvents[timeIndex].stage = GPU_MEM_CLEANUP; 
-      gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-      gpuEvents[timeIndex].eventType = DATA_CLEANUP; 
-      gpuEvents[timeIndex].ID = head->id; 
-      dataCleanupIndex = timeIndex; 	
-      timeIndex++; 
-#endif
-#ifdef GPU_INSTRUMENT_WRS
-      head->phaseStartTime = CmiWallTimer(); 
-#endif
+      gpuEventStart(head,&dataSetupIndex,DataSetup,GpuMemSetup);
+      workRequestStartTime(head);
       copybackData(head);
       head->state = TRANSFERRING_OUT;
     }
@@ -757,31 +678,8 @@ void gpuProgressFn() {
 	cudaStreamQuery(data_out_stream) == cudaSuccess && 
 	cudaStreamQuery(kernel_stream) == cudaSuccess){
       freeMemory(head); 
-#ifdef GPU_TRACE
-      gpuEvents[dataCleanupIndex].cmiendTime = CmiWallTimer();
-      traceUserBracketEvent(gpuEvents[dataCleanupIndex].stage, 
-			    gpuEvents[dataCleanupIndex].cmistartTime, 
-			    gpuEvents[dataCleanupIndex].cmiendTime); 
-#endif
-#ifdef GPU_INSTRUMENT_WRS
-      {
-        if(initializedInstrument()){
-          double tt = CmiWallTimer()-(head->phaseStartTime);
-          int index = head->chareIndex;
-          char type = head->compType;
-          char phase = head->compPhase;
-
-          CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
-          if(vec.length() <= phase){
-            vec.growAtLeast(phase);
-            vec.length() = phase+1;
-          }
-          vec[phase].cleanupTime += tt;
-          vec[phase].n++;
-        }
-      }
-#endif
-
+      gpuEventEnd(dataCleanupIndex);
+      gpuProfiling(head,DataCleanup);
       dequeue(wrQueue);
       CUDACallbackManager(head->callbackFn);
       gpuProgressFn(); 
@@ -822,13 +720,13 @@ void exitHybridAPI() {
 #ifdef GPU_TRACE
   for (int i=0; i<timeIndex; i++) {
     switch (gpuEvents[i].eventType) {
-    case DATA_SETUP:
+    case DataSetup:
       printf("Kernel %d data setup", gpuEvents[i].ID); 
       break;
-    case DATA_CLEANUP:
+    case DataCleanup:
       printf("Kernel %d data cleanup", gpuEvents[i].ID); 
       break; 
-    case KERNEL_EXECUTION:
+    case KernelExecution:
       printf("Kernel %d execution", gpuEvents[i].ID); 
       break;
     default:
