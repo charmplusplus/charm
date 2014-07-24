@@ -110,12 +110,16 @@ namespace Ck { namespace IO {
                                  CkCallback ready, CkCallback complete) {
           Options &opts = files[file].opts;
 
-          // XXX: Replace with a direct calculation
-          int numStripes = 0, o = offset;
-          while (o < offset + bytes) {
-            numStripes++;
-            o += opts.peStripe - o % opts.peStripe;
-          }
+	  int numStripes = 0;
+	  size_t bytesLeft = bytes, delta = opts.peStripe - offset % opts.peStripe;
+	  // Align to stripe boundary
+	  if (offset % opts.peStripe != 0 && delta < bytesLeft) {
+	    bytesLeft -= delta;
+	    numStripes++;
+	  }
+	  numStripes += bytesLeft / opts.peStripe;
+	  if (bytesLeft % opts.peStripe != 0)
+	    numStripes++;
 
           CkArrayOptions sessionOpts(numStripes);
           //sessionOpts.setMap(managers);
