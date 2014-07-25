@@ -147,7 +147,7 @@ FuncCkLoop::FuncCkLoop(int mode_, int numThreads_) {
 
         for (int i=0; i<numHelpers; i++) {
             CkChareID helper;
-            CProxy_FuncSingleHelper::ckNew(numHelpers, &helper, pestart+i);
+            CProxy_FuncSingleHelper::ckNew(&helper, pestart+i);
         }
     } else if (mode == CKLOOP_PTHREAD) {
         helperPtr = NULL;
@@ -159,6 +159,8 @@ FuncCkLoop::FuncCkLoop(int mode_, int numThreads_) {
         createPThreads();
     }
 }
+
+FuncCkLoop::FuncCkLoop(CkMigrateMessage *m) : CBase_FuncCkLoop(m) {}
 
 int FuncCkLoop::MAX_CHUNKS = 64;
 
@@ -332,6 +334,23 @@ void FuncCkLoop::reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int n
     }
 }
 
+void FuncCkLoop::registerHelper(HelperNotifyMsg* msg) {
+  helperPtr[msg->srcRank] = msg->localHelper;
+  msg->localHelper->thisCkLoop = this;
+  delete msg;
+}
+
+void FuncCkLoop::pup(PUP::er &p) {
+  CBase_FuncCkLoop::pup(p);
+  p|mode;
+  p|numHelpers;
+  p|useTreeBcast;
+  if (p.isUnpacking()) {
+    helperPtr = new FuncSingleHelper *[numHelpers];
+    globalCkLoop = this;
+  }
+}
+
 CpvStaticDeclare(int, NdhStealWorkHandler);
 static void RegisterCkLoopHdlrs() {
     CpvInitialize(int, NdhStealWorkHandler);
@@ -339,23 +358,32 @@ static void RegisterCkLoopHdlrs() {
 }
 
 extern int _charmHandlerIdx;
-FuncSingleHelper::FuncSingleHelper(int numHelpers) {
-    totalHelpers = numHelpers;
+
+FuncSingleHelper::FuncSingleHelper() {
+    CmiAssert(globalCkLoop!=NULL);
+    thisCkLoop = globalCkLoop;
+    totalHelpers = globalCkLoop->numHelpers;
+    funcckproxy = globalCkLoop->thisProxy;
+    useTreeBcast = globalCkLoop->useTreeBcast;
+
+    createNotifyMsg();
+
+    globalCkLoop->helperPtr[CkMyRank()] = this;
+}
+
+void FuncSingleHelper::createNotifyMsg() {
 #if USE_CONVERSE_NOTIFICATION
     notifyMsgBufSize = TASK_BUFFER_SIZE;
 #else
     notifyMsgBufSize = TASK_BUFFER_SIZE*totalHelpers;
 #endif
 
-    CmiAssert(globalCkLoop!=NULL);
-    thisCkLoop = globalCkLoop;
-
     nextFreeNotifyMsg = 0;
 #if USE_CONVERSE_NOTIFICATION
     notifyMsg = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*notifyMsgBufSize);
     for (int i=0; i<notifyMsgBufSize; i++) {
         ConverseNotifyMsg *tmp = notifyMsg+i;
-        if (thisCkLoop->useTreeBcast) {
+        if (useTreeBcast) {
             tmp->srcRank = CmiMyRank();
         } else {
             tmp->srcRank = -1;
@@ -369,7 +397,7 @@ FuncSingleHelper::FuncSingleHelper(int numHelpers) {
     for (int i=0; i<notifyMsgBufSize; i++) {
         CharmNotifyMsg *tmp = new(sizeof(int)*8)CharmNotifyMsg; //allow msg priority bits
         notifyMsg[i] = tmp;
-        if (thisCkLoop->useTreeBcast) {
+        if (useTreeBcast) {
             tmp->srcRank = CmiMyRank();
         } else {
             tmp->srcRank = -1;
@@ -387,7 +415,6 @@ FuncSingleHelper::FuncSingleHelper(int numHelpers) {
         taskBuffer[i] = new CurLoopInfo(FuncCkLoop::MAX_CHUNKS);
     }
 #endif
-    globalCkLoop->helperPtr[CkMyRank()] = this;
 }
 
 void FuncSingleHelper::stealWork(CharmNotifyMsg *msg) {
@@ -414,6 +441,22 @@ void FuncSingleHelper::stealWork(CharmNotifyMsg *msg) {
     }
     loop->stealWork();
 #endif
+}
+
+void FuncSingleHelper::pup(PUP::er &p) {
+  CBase_FuncSingleHelper::pup(p);
+  p|funcckproxy;
+  p|useTreeBcast;
+  if (p.isUnpacking()) {
+    HelperNotifyMsg* msg = new HelperNotifyMsg;
+    msg->srcRank = CkMyRank();
+    msg->localHelper = this;
+    // Register the helper with the node group proxy via message since the node
+    // group is not constructed yet.
+    funcckproxy[CkMyNode()].registerHelper(msg);
+
+    createNotifyMsg();
+  }
 }
 
 void SingleHelperStealWork(ConverseNotifyMsg *msg) {

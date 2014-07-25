@@ -119,6 +119,12 @@ public:
     void *ptr; //the loop info
 };
 
+class HelperNotifyMsg: public CMessage_HelperNotifyMsg {
+public:
+  int srcRank;
+  FuncSingleHelper *localHelper;
+};
+
 class FuncCkLoop : public CBase_FuncCkLoop {
     friend class FuncSingleHelper;
 
@@ -133,9 +139,18 @@ private:
 
 public:
     FuncCkLoop(int mode_, int numThreads_);
+
+    FuncCkLoop(CkMigrateMessage *m);
+
     ~FuncCkLoop() {
         delete [] helperPtr;
     }
+
+    // This entry method is used during restart. When the helper chares are
+    // restarted, the FuncCkLoop node group need not be constructed. So the
+    // helper chares send message to the node proxy on their node to register
+    // themselves.
+    void registerHelper(HelperNotifyMsg* msg);
 
     void createPThreads();
     void exit();
@@ -155,6 +170,7 @@ public:
                          void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
                         );
     void reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int numChunks);
+    void pup(PUP::er &p);
 };
 
 void SingleHelperStealWork(ConverseNotifyMsg *msg);
@@ -169,6 +185,9 @@ private:
     int notifyMsgBufSize;
 
     FuncCkLoop *thisCkLoop;
+    CProxy_FuncCkLoop funcckproxy;
+    int useTreeBcast;
+
 #if USE_CONVERSE_NOTIFICATION
     //this msg is shared across all SingleHelpers
     ConverseNotifyMsg *notifyMsg;
@@ -184,7 +203,7 @@ private:
     int nextFreeNotifyMsg;
 
 public:
-    FuncSingleHelper(int numHelpers);
+    FuncSingleHelper();
 
     ~FuncSingleHelper() {
 #if USE_CONVERSE_NOTIFICATION
@@ -233,7 +252,13 @@ public:
 
     void stealWork(CharmNotifyMsg *msg);
 
-    FuncSingleHelper(CkMigrateMessage *m) {}
+    FuncSingleHelper(CkMigrateMessage *m) : CBase_FuncSingleHelper(m) {}
+
+    void pup(PUP::er &p);
+
+ private:
+    void createNotifyMsg();
+
 };
 
 #endif
