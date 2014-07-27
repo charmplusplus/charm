@@ -23,13 +23,23 @@ void OrbLB::init()
 {
   lbname = "OrbLB";
 #if CMK_LB_USER_DATA
-  if (CkpvAccess(_lb_obj_index) == -1)
+  if (use_udata && CkpvAccess(_lb_obj_index) == -1)
     CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(CkArrayIndex));
 #endif
 }
 
+
+OrbLB::OrbLB(const CkLBOptions &opt, bool userdata): CentralLB(opt)
+{
+  use_udata = userdata;
+  init();
+  if (CkMyPe() == 0)
+    CkPrintf("[%d] OrbLB created\n",CkMyPe());
+}
+
 OrbLB::OrbLB(const CkLBOptions &opt): CentralLB(opt)
 {
+  use_udata = true;
   init();
   if (CkMyPe() == 0)
     CkPrintf("[%d] OrbLB created\n",CkMyPe());
@@ -337,10 +347,21 @@ void OrbLB::work(LDStats* stats)
     if (odata.migratable == 0) continue;
     computeLoad[objIdx].id = objIdx;
 #if CMK_LB_USER_DATA
-    CkArrayIndex *idx = (CkArrayIndex *)odata.getUserData(CkpvAccess(_lb_obj_index));
-    computeLoad[objIdx].v[XDIR] = idx->data()[0];
-    computeLoad[objIdx].v[YDIR] = idx->data()[1];
-    computeLoad[objIdx].v[ZDIR] = idx->data()[2];
+    int x, y, z;
+    if (use_udata) {
+      CkArrayIndex *idx =
+        (CkArrayIndex *)odata.getUserData(CkpvAccess(_lb_obj_index));
+      x = idx->data()[0];
+      y = idx->data()[1];
+      z = idx->data()[2];
+    } else {
+      x = odata.objID().id[0];
+      y = odata.objID().id[1];
+      z = odata.objID().id[2];
+    }
+    computeLoad[objIdx].v[XDIR] = x;
+    computeLoad[objIdx].v[YDIR] = y;
+    computeLoad[objIdx].v[ZDIR] = z;
 #else
     computeLoad[objIdx].v[XDIR] = odata.objID().id[0];
     computeLoad[objIdx].v[YDIR] = odata.objID().id[1];

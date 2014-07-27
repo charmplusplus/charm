@@ -55,6 +55,7 @@ private:
   Partition top_partition;
   int npartition;
   int currentp, refno;
+  bool use_udata;
   
   void init();
   void strategy();
@@ -70,6 +71,7 @@ public:
 
 public:
   OrbLB(const CkLBOptions &);
+  OrbLB(const CkLBOptions &, bool userdata);
   OrbLB(CkMigrateMessage *m):CentralLB(m) { init(); }
 
   void work(LDStats* stats);
