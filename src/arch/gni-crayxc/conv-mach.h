@@ -2,6 +2,7 @@
 #define _CONV_MACH_H
 
 #define CMK_CRAYXC                                         1
+#define CMK_SMSGS_FREE_AFTER_EVENT                         1
 
 // for cray xe we use the known conflict free counter set from the SPP project
 #define USE_SPP_PAPI                                       1
