@@ -86,9 +86,9 @@ of each timestep.  To save resources, the PUP routine can well omit
 the 8 intermediate matrices and checkpoint the matrix with the final
 results of each timestep.
 
-Group and nodegroup objects (Section~\ref{sec:group}) are normally not
-meant to be migrated. In order to checkpoint them, however, the user
-has to write PUP routines for the groups and declare them as {\tt
+Group, nodegroup (Section~\ref{sec:group}) and singleton chare objects are
+normally not meant to be migrated. In order to checkpoint them, however, the
+user has to write PUP routines for the groups and chare and declare them as {\tt
 [migratable]} in the .ci file. Some programs use {\it mainchares} to
 hold key control data like global object counts, and thus mainchares
 need to be checkpointed too. To do this, the programmer should write a
