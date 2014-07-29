@@ -17,9 +17,8 @@ static Ehdr* getELFHeader() {
 }
 
 static Phdr* getProgramHeader() {
-  void* p = (void*) getELFHeader();
-  p+=sizeof(Ehdr);
-  return (Phdr*) p;
+  Ehdr* ehdr = getELFHeader();
+  return (Phdr*)((char *)ehdr + ehdr->e_phoff);
 }
 
 Phdr* getTLSPhdrEntry() {
@@ -32,6 +31,14 @@ Phdr* getTLSPhdrEntry() {
   progHeader = getProgramHeader();
   for (i = 0; i < phnum; i++) {
     if (progHeader[i].p_type == PT_TLS) {
+#if CMK_ERROR_CHECKING
+      /* sanity check */
+      /* align is power of 2 */
+      int align = progHeader[i].p_align;
+      CmiAssert(align > 0 && ( (align & (align-1)) == 0));
+      /* total size is not less than the size of .tdata (initializer data) */
+      CmiAssert(progHeader[i].p_memsz >= progHeader[i].p_filesz);
+#endif
       return &progHeader[i];
     }
   }
@@ -43,8 +50,8 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
 
   phdr = getTLSPhdrEntry();
   if (phdr != NULL) {
-    t->size = phdr->p_memsz;
     t->align = phdr->p_align;
+    t->size = CMIALIGN(phdr->p_memsz, phdr->p_align);
     t->memseg = (Addr)CmiIsomallocAlign(t->align, t->size, th);
     memset((void*)t->memseg, 0, t->size);
     memcpy((void*)t->memseg, (void*) (phdr->p_vaddr), (size_t)(phdr->p_filesz));
