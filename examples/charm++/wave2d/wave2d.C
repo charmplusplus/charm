@@ -33,12 +33,13 @@ public:
     CkPrintf("Running wave2d on %d processors\n", CkNumPes());
 
     // Create new array of worker chares
-    arrayProxy = CProxy_Wave::ckNew(chareArrayWidth, chareArrayHeight);
+    CkArrayOptions opts(chareArrayWidth, chareArrayHeight);
+    arrayProxy = CProxy_Wave::ckNew(opts);
 
     // setup liveviz
     CkCallback c(CkIndex_Wave::requestNextFrame(0),arrayProxy);
     liveVizConfig cfg(liveVizConfig::pix_color,true);
-    liveVizInit(cfg,arrayProxy,c);
+    liveVizInit(cfg,arrayProxy,c, opts);
 
     //Start the computation
     arrayProxy.begin_iteration();
