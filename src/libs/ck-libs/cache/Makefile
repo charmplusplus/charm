@@ -1,7 +1,7 @@
 include ../common.mk
 
 LIB = libmoduleCkCache.a
-LIBOBJ = CkCache.o
+LIBOBJ = CkCache.o SmpCache.o
 
 HEADERS = $(CDIR)/include/CkCache.decl.h \
           $(CDIR)/include/CkCache.def.h \
@@ -14,7 +14,8 @@ CIFILES = CkCache.ci
 all: $(LIBDEST) $(HEADERS)
 
 $(LIBDEST): $(LIBOBJ)
-	$(CHARMC) -o $(LIBDEST) $(LIBOBJ) 
+	$(CHARMC) -o $(LIBDEST) $(LIBOBJ)
+	cp -f libmoduleCkCache.dep $(LIBDIR)/
 
 CkCache.def.h CkCache.decl.h: INTERFACE
 
@@ -32,7 +33,10 @@ INTERFACE: $(CIFILES)
 	touch INTERFACE
 
 CkCache.o: CkCache.C $(HEADERS)
-	$(CHARMC) -I../../.. -c -o CkCache.o CkCache.C
+	$(CHARMC) -I../../../../include -I../../.. -c -o CkCache.o CkCache.C
+
+SmpCache.o: SmpCache.cpp $(HEADERS)
+	$(CHARMC) -I../../../../include -I../../.. -c -o SmpCache.o SmpCache.cpp
 
 clean:
 	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB) INTERFACE

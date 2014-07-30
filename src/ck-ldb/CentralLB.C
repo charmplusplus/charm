@@ -1332,6 +1332,8 @@ void CentralLB::CheckMigrationComplete()
 
 // Remove edges from commData in LDStats which contains deleted elements
 void CentralLB::removeCommDataOfDeletedObjs(LDStats* stats) {
+  if (!_lb_args.traceComm()) return;
+
   stats->makeCommHash();
 
   CkVec<LDCommData> newCommData;

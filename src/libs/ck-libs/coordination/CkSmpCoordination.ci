@@ -1,0 +1,31 @@
+module CkSmpCoordination {
+  message CkSmpCoordinationMsg;
+  message CkSmpCoordinationLeaderMsg;
+  template<typename PayloadType>
+  message CkSmpCoordinationPayloadMsg;
+
+  initnode void CkSmpCoordinationRegisterReducers();
+
+  // ideally, this would be a group; however, it 
+  // appears that we cannot have sections over groups
+  // (CProxySection_XXX does not have methods ckNew()
+  // and ckSectionDelegate.
+  template<typename ClientType> 
+  array [1D] CkSmpCoordinator {
+    entry CkSmpCoordinator(CkGroupID mcastGid);
+
+    entry void setup(const CkCallback &cb);
+    entry void setup(CkSmpCoordinationLeaderMsg *msg);
+
+    //entry void count(CkSmpCoordinationMsg *dummy);
+    entry void findLeader(CkReductionMsg *result);
+    //entry void leader(CkVec<CkArrayIndex1D> &newSectionMembers);
+    entry void announce(CkSmpCoordinationLeaderMsg *msg);
+    entry void leaderSync(CkSmpCoordinationMsg *dummy); 
+    entry void syncDone();
+    entry void invoke(CkSmpCoordinationMsg *dummy);
+
+    template<typename PayloadType>
+    entry void mcast(CkSmpCoordinationPayloadMsg<PayloadType> *msg);
+  };
+};

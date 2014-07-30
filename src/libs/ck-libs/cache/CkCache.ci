@@ -1,34 +1,121 @@
 module CkCache {
-  template<class CkCacheKey> message CkCacheRequestMsg;
+  extern module CkSmpCoordination;
+  include "CkCacheFwdDecls.h";
 
-  template<class CkCacheKey> message CkCacheFillMsg {
+  template<typename CkCacheKey>
+  message CkCacheRequestMsg;
+
+  template<typename CkCacheKey>
+  message CkCacheFillMsg {
     char data[];
   };
 
+  template<typename CkCacheKey>
+  group [migratable] CkCacheManagerBase {
+    // don't use these ctors; instantiate a (concrete) base class
+    //entry CkCacheManagerBase(int size, CkGroupID gid);
+    //entry CkCacheManagerBase(int size, int n, CkGroupID gid[n]);
+    //entry CkCacheManagerBase(int size, int n, CkGroupID gid[n], int nWB, CkGroupID gidWB[nWB]);
 
-  template<class CkCacheKey> group [migratable] CkCacheManager {
+    // for receipt of remote data
+    entry void recvData(CkCacheFillMsg<CkCacheKey> *msg);
+    // for registration of fetched data elements with cache
+    entry [local] void recvData(CkCacheKey key, CkArrayIndex &from, CkCacheEntryType<CkCacheKey> *type, int chunk, void *data);
+
+    //entry void writebackChunk(int num);
+    entry void finishedChunk(int num, CmiUInt8 weight);
+    entry void collectStatistics(CkCallback &cb);
+
+  };
+
+  template<typename CkCacheKey>
+  group [migratable] CkCacheManager : CkCacheManagerBase<CkCacheKey> {
     entry CkCacheManager(int size, CkGroupID gid);
     entry CkCacheManager(int size, int n, CkGroupID gid[n]);
     entry CkCacheManager(int size, int n, CkGroupID gid[n], int nWB, CkGroupID gidWB[nWB]);
-    //entry [local] void * requestData(CkCacheKey what, CkArrayIndex &toWhom, int chunk, CkCacheEntryType *type, CkCacheRequestorData &req);
-    //entry [local] void * requestDataNoFetch(CkCacheKey key, int chunk);
-    entry [local] void cacheSync(int &numChunks, CkArrayIndex &chareIdx, int &localIdx);
+
+    //entry void writebackChunk(int num);
     entry void recvData(CkCacheFillMsg<CkCacheKey> *msg);
-    //entry [local] void recvData(CkCacheKey key, CkArrayIndex &from, CkCacheEntryType *type, int chunk, void *data);
-    entry void writebackChunk(int num);
-    entry void finishedChunk(int num, CmiUInt8 weight);
+    // for receipt of remote data
+    entry [local] void recvData(CkCacheKey key, CkArrayIndex &from, CkCacheEntryType<CkCacheKey> *type, int chunk, void *data);
+  };
+
+  template<typename CkCacheKey>
+  group [migratable] CkSmpCacheManager : CkCacheManagerBase<CkCacheKey> {
+    //entry CkSmpCacheManager(int size, CkGroupID gid);
+    //entry CkSmpCacheManager(int size, int n, CkGroupID gid[n]);
+    //entry CkSmpCacheManager(int size, int n, CkGroupID gid[n], int nWB, CkGroupID gidWB[nWB]);
+
+    entry void recvData(CkCacheFillMsg<CkCacheKey> *msg);
+    // for receipt of remote data
+    entry [local] void recvData(CkCacheKey key, CkArrayIndex &from, CkCacheEntryType<CkCacheKey> *type, int chunk, void *data);
+
+    entry void nodeReply(CkCacheKey key, const CkCachePointerContainer<void> &data);
+    //entry void writebackChunk(int num);
     entry void collectStatistics(CkCallback &cb);
-    //entry [local] std::map<CkCacheKey,CkCacheEntry*> *getCache();
-    //entry [local] CkCacheEntry *requestCacheEntryNoFetch(CkCacheKey key, int chunk);
+
+    entry void peFinishedChunkDone();
+
+    // initializes the section multicast apparatus
+    // to be called once before first use
+    entry void setup(CkSmpCacheHandle<CkCacheKey> &handle, const CkCallback &cb);
+
+    // This entry method will be called before checkpoint so that the smp cache
+    // manager can delete the coordinator array as well as itself.
+    entry void cleanupForCheckpoint(const CkCallback &cb);
+
+    // to be called once before first use, and subsequently,
+    // after every load balancing iteration, but before
+    // the cache is used
+    entry void registration(const CkCallback &cb);
+    entry void doneRegistration();
+
+  };
+
+  template<typename CkCacheKey>
+  group [migratable] CkOnefetchSmpCacheManager : CkSmpCacheManager<CkCacheKey> {
+    entry CkOnefetchSmpCacheManager(int size, CkGroupID gid);
+    entry CkOnefetchSmpCacheManager(int size, int n, CkGroupID gid[n]);
+    entry CkOnefetchSmpCacheManager(int size, int n, CkGroupID gid[n], int nWB, CkGroupID gidWB[nWB]);
+
+    entry void nodeRequest(CkCacheKey key, CkArrayIndex &owner, int chunk, const CkCachePointerContainer<CkCacheEntryType<CkCacheKey> > &typeContainer, int requestorPe);
+  };
+
+  template<typename CkCacheKey>
+  group [migratable] CkMultifetchSmpCacheManager : CkSmpCacheManager<CkCacheKey> {
+    entry CkMultifetchSmpCacheManager(int size, CkGroupID gid);
+    entry CkMultifetchSmpCacheManager(int size, int n, CkGroupID gid[n]);
+    entry CkMultifetchSmpCacheManager(int size, int n, CkGroupID gid[n], int nWB, CkGroupID gidWB[nWB]);
   };
 
   message CkCacheFillMsg<CmiUInt8>;
   message CkCacheRequestMsg<CmiUInt8>;
+
+  group CkCacheManagerBase<CmiUInt8>;
   group CkCacheManager<CmiUInt8>;
+  group CkSmpCacheManager<CmiUInt8>;
+  group CkOnefetchSmpCacheManager<CmiUInt8>;
+  group CkMultifetchSmpCacheManager<CmiUInt8>;
 
 #if CMK_HAS_INT16
   message CkCacheRequestMsg<CmiUInt16>;
   message CkCacheFillMsg<CmiUInt16>;
+
+  group CkCacheManagerBase<CmiUInt16>;
   group CkCacheManager<CmiUInt16>;
+  group CkSmpCacheManager<CmiUInt16>;
+  group CkOnefetchSmpCacheManager<CmiUInt16>;
+  group CkMultifetchSmpCacheManager<CmiUInt16>;
 #endif
+
+  array [1D] CkSmpCoordinator<CkSmpCacheManager<CmiUInt8> >;
+  extern entry void CkSmpCoordinator<CkSmpCacheManager<CmiUInt8> > mcast(CkSmpCoordinationPayloadMsg<CkCachePointerContainer<SmpCache<CmiUInt8> > > *m);
+  message CkSmpCoordinationPayloadMsg<CkCachePointerContainer<SmpCache<CmiUInt8> > >;
+
+#if CMK_HAS_INT16
+  array [1D] CkSmpCoordinator<CkSmpCacheManager<CmiUInt16> >;
+  extern entry void CkSmpCoordinator<CkSmpCacheManager<CmiUInt16> > mcast(CkSmpCoordinationPayloadMsg<CkCachePointerContainer<SmpCache<CmiUInt16> > > *m);
+  message CkSmpCoordinationPayloadMsg<CkCachePointerContainer<SmpCache<CmiUInt16> > >;
+#endif
+
 };
