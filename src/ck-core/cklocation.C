@@ -2324,7 +2324,6 @@ void CkLocMgr::pup(PUP::er &p){
 	p|mapHandle;
 	p|lbdbID;
   p|metalbID;
-	mapID = _defaultArrayMapID;
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;
 		CProxyElement_CkLocMgr newlocalproxy(thisgroup,CkMyPe());
@@ -2333,7 +2332,6 @@ void CkLocMgr::pup(PUP::er &p){
 		map=(CkArrayMap *)CkLocalBranch(mapID);
 		if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
                 CkArrayIndex emptyIndex;
-		map->registerArray(emptyIndex,thisgroup);
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID, metalbID);
 #if __FAULT__
