@@ -438,7 +438,7 @@ void CkPupNodeGroupData(PUP::er &p
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 {
  	int i;
-	// safe in both packing/unpakcing at this stage
+	// safe in both packing/unpacking at this stage
         int numGroups = CkpvAccess(_groupIDTable)->size();
 
 	// number of array elements on this processor

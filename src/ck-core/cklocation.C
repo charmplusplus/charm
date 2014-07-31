@@ -328,8 +328,8 @@ public:
     p|_numChares;
     p|_remChares;
     p|_numFirstSet;
-    p|_nRemChares;
     p|_nBinSizeFloor;
+    p|_nRemChares;
     p|_nNumFirstSet;
   }
 };
@@ -2324,7 +2324,7 @@ void CkLocMgr::pup(PUP::er &p){
 	p|mapHandle;
 	p|lbdbID;
   p|metalbID;
-	if(p.isUnpacking()){
+	if(p.isUnpacking()) {
 		thisProxy=thisgroup;
 		CProxyElement_CkLocMgr newlocalproxy(thisgroup,CkMyPe());
 		thislocalproxy=newlocalproxy;
