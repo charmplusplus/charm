@@ -478,7 +478,8 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
         if (notifyListeners)
         for(i=0;i<numGroups;i++) {
                 IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
-	  	obj->ckJustMigrated();
+		if (obj)
+                  obj->ckJustMigrated();
 	}
 }
 

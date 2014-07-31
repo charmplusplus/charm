@@ -34,7 +34,7 @@ restarting of Charm++ programs. ...
 #define  CKLOCMGR_LOOP(code)	\
   for(i=0;i<numGroups;i++) {	\
     IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();	\
-    if(obj->isLocMgr())  {	\
+    if(obj && obj->isLocMgr())  {	\
       CkLocMgr *mgr = (CkLocMgr*)obj;	\
       code	\
     }	\
