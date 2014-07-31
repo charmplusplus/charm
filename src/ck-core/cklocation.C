@@ -426,7 +426,8 @@ public:
     p|amaps;
     if (p.isUnpacking() && npes != CkNumPes())  {   // binSize needs update
       for (int i=0; i<amaps.size(); i++)
-        amaps[i]->compute_binsize();
+        if (amaps[i])
+          amaps[i]->compute_binsize();
     }
   }
 };
