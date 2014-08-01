@@ -473,7 +473,7 @@ void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){}
 #endif
 
 void CkReductionMgr::checkIsActive() {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) || CMK_MEM_CHECKPOINT
   return;
 #endif
 
@@ -554,7 +554,7 @@ void CkReductionMgr::informParentInactive() {
 *  for the specified red_no
 */
 void CkReductionMgr::sendReductionStartingToKids(int red_no) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) || CMK_MEM_CHECKPOINT
   for (int k=0;k<treeKids();k++)
   {
     DEBR((AA "Asking child PE %d to start #%d\n" AB,firstKid()+k,redNo));
