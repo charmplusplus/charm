@@ -102,8 +102,6 @@ void **devBuffers = NULL;
    specifies an invalid bufferID */
 unsigned int nextBuffer; 
 
-#ifdef GPU_TRACE
-
 /* event types */
 enum WorkRequestStage{
 DataSetup        = 1,
@@ -111,6 +109,18 @@ KernelExecution  = 2,
 DataCleanup      = 3
 };
 
+
+enum ProfilingStage{
+GpuMemSetup   = 8800,
+GpuKernelExec = 8801,
+GpuMemCleanup = 8802
+};
+
+unsigned int runningKernelIndex = 0;
+unsigned int dataSetupIndex = 0;
+unsigned int dataCleanupIndex = 0;
+
+#ifdef GPU_TRACE
 typedef struct gpuEventTimer {
   int stage; 
   double cmistartTime; 
@@ -121,26 +131,13 @@ typedef struct gpuEventTimer {
 
 gpuEventTimer gpuEvents[QUEUE_SIZE_INIT * 3]; 
 unsigned int timeIndex = 0; 
-unsigned int runningKernelIndex = 0; 
-unsigned int dataSetupIndex = 0; 
-unsigned int dataCleanupIndex = 0; 
 
 #if defined GPU_TRACE || defined GPU_INSTRUMENT_WRS
 extern "C" double CmiWallTimer(); 
 #endif
 
-#ifdef GPU_TRACE
 extern "C" int traceRegisterUserEvent(const char*x, int e);
 extern "C" void traceUserBracketEvent(int e, double beginT, double endT);
-
-enum ProfilingStage{
-GpuMemSetup   = 8800,
-GpuKernelExec = 8801,
-GpuMemCleanup = 8802
-};
-
-#endif
-
 #endif
 
 #ifdef GPU_INSTRUMENT_WRS
