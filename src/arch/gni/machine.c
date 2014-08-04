@@ -589,41 +589,33 @@ CpvDeclare(mempool_type*, mempool);
 CpvDeclare(mempool_type*, persistent_mempool);
 #endif
 
-#if CMK_SMSGS_FREE_AFTER_EVENT
-/* 
-  SMSGS pool 
-  the pool is to buffer sending smsgs until it can be free'ed .
-*/
-
-#if CMK_SMP
-#define SMSG_INIT_SIZE                4096
-#else
-#define SMSG_INIT_SIZE                1024
-#endif
-
-struct SmsgsStruct {
+#if REMOTE_EVENT || CMK_SMSGS_FREE_AFTER_EVENT 
+struct IndexStruct {
 void *addr;
 int next;
-int type;               /* 1: charm   2: control msg */
+int type;    
 };
 
-typedef struct SmsgsPool {
-    struct SmsgsStruct   *indexes;
+typedef struct IndexPool {
+    struct IndexStruct   *indexes;
     int                   size;
     int                   freehead;
     CmiNodeLock           lock;
-} SmsgsPool;
+    int                   maxsize;
+} IndexPool;
 
-static SmsgsPool  smsgsPool;
+#define  GetIndexType(pool, s)             (pool.indexes[s].type)
+#define  GetIndexAddress(pool, s)          (pool.indexes[s].addr)
 
-#define  GetSmsgsIndexType(pool, s)             (pool.indexes[s].type)
-#define  GetSmsgsIndexAddress(pool, s)          (pool.indexes[s].addr)
-
-static void SmsgsPool_init(SmsgsPool *pool)
+static void IndexPool_init(IndexPool *pool, int initsize, int maxsize)
 {
     int i;
-    pool->size = SMSG_INIT_SIZE;
-    pool->indexes = (struct SmsgsStruct *)malloc(pool->size*sizeof(struct SmsgsStruct));
+    pool->size = initsize;
+    pool->maxsize = maxsize;
+    pool->indexes = (struct IndexStruct *)malloc(pool->size*sizeof(struct IndexStruct));
+    if(pool->indexes == NULL) {
+        CmiAbort("malloc of pool is null\n");
+    }
     for (i=0; i<pool->size-1; i++) {
         pool->indexes[i].next = i+1;
     }
@@ -636,7 +628,7 @@ static void SmsgsPool_init(SmsgsPool *pool)
 #endif
 }
 
-static int SmsgsPool_getslot(SmsgsPool *pool, void *addr, int type)
+static int IndexPool_getslot(IndexPool *pool, void *addr, int type)
 {
     int s, i;
 #if MULTI_THREAD_SEND  
@@ -645,10 +637,17 @@ static int SmsgsPool_getslot(SmsgsPool *pool, void *addr, int type)
     s = pool->freehead;
     if (s == -1) {
         int newsize = pool->size * 2;
-        //printf("[%d] SmsgsPool_getslot %p expand to: %d\n", myrank, pool, newsize);
-        struct SmsgsStruct *old_pool = pool->indexes;
-        pool->indexes = (struct SmsgsStruct *)malloc(newsize*sizeof(struct SmsgsStruct));
-        memcpy(pool->indexes, old_pool, pool->size*sizeof(struct SmsgsStruct));
+        //printf("[%d] IndexPool_getslot %p expand to: %d\n", myrank, pool, newsize);
+        if (newsize > pool->maxsize) {
+            printf("[%d] Warning: IndexPool_getslot %p overflow when expanding to: %d\n", myrank, pool, newsize);
+            return -1;
+        }
+        struct IndexStruct *old_ackpool = pool->indexes;
+        pool->indexes = (struct IndexStruct *)malloc(newsize*sizeof(struct IndexStruct));
+        if(pool->indexes == NULL) {
+            CmiAbort("malloc of pool is null\n");
+        }
+        memcpy(pool->indexes, old_ackpool, pool->size*sizeof(struct IndexStruct));
         for (i=pool->size; i<newsize-1; i++) {
             pool->indexes[i].next = i+1;
         }
@@ -656,7 +655,7 @@ static int SmsgsPool_getslot(SmsgsPool *pool, void *addr, int type)
         pool->freehead = pool->size;
         s = pool->size;
         pool->size = newsize;
-        free(old_pool);
+        free(old_ackpool);
     }
     pool->freehead = pool->indexes[s].next;
     pool->indexes[s].addr = addr;
@@ -667,7 +666,7 @@ static int SmsgsPool_getslot(SmsgsPool *pool, void *addr, int type)
     return s;
 }
 
-static void SmsgsPool_freeslot(SmsgsPool *pool, int s)
+static void IndexPool_freeslot(IndexPool *pool, int s)
 {
     CmiAssert(s>=0 && s<pool->size);
 #if MULTI_THREAD_SEND
@@ -680,8 +679,15 @@ static void SmsgsPool_freeslot(SmsgsPool *pool, int s)
 #endif
 }
 
-#endif  /* CMK_SMSGS_FREE_AFTER_EVENT */
+#endif  
 
+#if CMK_SMSGS_FREE_AFTER_EVENT
+/* 
+  SMSGS pool 
+  the pool is to buffer sending smsgs until it can be free'ed .
+*/
+static IndexPool smsgsPool;
+#endif
 
 #if REMOTE_EVENT
 /* ack pool for remote events */
@@ -699,23 +705,10 @@ static int  SHIFT   =           18;
 #define DIRECT_EVENT(idx)      ( (1<<31) | (((idx) & INDEX_MASK)<<SHIFT) | myrank)
 
 #if CMK_SMP
-#define INIT_SIZE                4096
+#define POOL_INIT_SIZE                4096
 #else
-#define INIT_SIZE                1024
+#define POOL_INIT_SIZE                1024
 #endif
-
-struct IndexStruct {
-void *addr;
-int next;
-int type;     // 1: ACK   2: Persistent
-};
-
-typedef struct IndexPool {
-    struct IndexStruct   *indexes;
-    int                   size;
-    int                   freehead;
-    CmiNodeLock           lock;
-} IndexPool;
 
 static IndexPool  ackPool;
 #if CMK_PERSISTENT_COMM_PUT
@@ -724,90 +717,9 @@ static IndexPool  persistPool;
 #define persistPool ackPool 
 #endif
 
-#define  GetIndexType(pool, s)             (pool.indexes[s].type)
-#define  GetIndexAddress(pool, s)          (pool.indexes[s].addr)
-
-static void IndexPool_init(IndexPool *pool)
-{
-    int i;
-    if ((1<<SHIFT) < mysize) 
-        CmiAbort("Charm++ Error: Remote event's rank field overflow.");
-    pool->size = INIT_SIZE;
-    if ( (1<<(31-SHIFT)) < pool->size) CmiAbort("IndexPool_init: pool initial size is too big.");
-    pool->indexes = (struct IndexStruct *)malloc(pool->size*sizeof(struct IndexStruct));
-    for (i=0; i<pool->size-1; i++) {
-        pool->indexes[i].next = i+1;
-        pool->indexes[i].type = 0;
-    }
-    pool->indexes[i].next = -1;
-    pool->indexes[i].type = 0;
-    pool->freehead = 0;
-#if MULTI_THREAD_SEND || CMK_PERSISTENT_COMM_PUT
-    pool->lock  = CmiCreateLock();
-#else
-    pool->lock  = 0;
 #endif
-}
-
-static int IndexPool_getslot(IndexPool *pool, void *addr, int type)
-{
-    int s, i;
-#if MULTI_THREAD_SEND  
-    CmiLock(pool->lock);
-#endif
-    CmiAssert(type == 1 || type == 2);
-    s = pool->freehead;
-    if (s == -1) {
-        int newsize = pool->size * 2;
-        //printf("[%d] IndexPool_getslot %p expand to: %d\n", myrank, pool, newsize);
-        if (newsize > (1<<(32-SHIFT-1))) {
-            static int warned = 0;
-            if (!warned)
-              printf("[%d] Warning: IndexPool_getslot %p overflow when expanding to: %d\n", myrank, pool, newsize);
-            warned = 1;
-            return -1;
-            CmiAbort("IndexPool for remote events overflows, try compile Charm++ with remote event disabled.");
-        }
-        struct IndexStruct *old_ackpool = pool->indexes;
-        pool->indexes = (struct IndexStruct *)malloc(newsize*sizeof(struct IndexStruct));
-        memcpy(pool->indexes, old_ackpool, pool->size*sizeof(struct IndexStruct));
-        for (i=pool->size; i<newsize-1; i++) {
-            pool->indexes[i].next = i+1;
-            pool->indexes[i].type = 0;
-        }
-        pool->indexes[i].next = -1;
-        pool->indexes[i].type = 0;
-        pool->freehead = pool->size;
-        s = pool->size;
-        pool->size = newsize;
-        free(old_ackpool);
-    }
-    pool->freehead = pool->indexes[s].next;
-    pool->indexes[s].addr = addr;
-    CmiAssert(pool->indexes[s].type == 0);
-    pool->indexes[s].type = type;
-#if MULTI_THREAD_SEND
-    CmiUnlock(pool->lock);
-#endif
-    return s;
-}
-
-static void IndexPool_freeslot(IndexPool *pool, int s)
-{
-    CmiAssert(s>=0 && s<pool->size);
-#if MULTI_THREAD_SEND
-    CmiLock(pool->lock);
-#endif
-    pool->indexes[s].next = pool->freehead;
-    pool->indexes[s].type = 0;
-    pool->freehead = s;
-#if MULTI_THREAD_SEND
-    CmiUnlock(pool->lock);
-#endif
-}
 
 
-#endif   /* REMOTE_EVENT */
 
 /* =====Beginning of Definitions of Message-Corruption Related Macros=====*/
 #define CMI_MAGIC(msg)                   ((CmiMsgHeaderBasic *)msg)->magic
@@ -1586,7 +1498,9 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
 #endif
 
 #if CMK_SMSGS_FREE_AFTER_EVENT
-        msgid = SmsgsPool_getslot(&smsgsPool, msg, ischarm?1:2);
+        msgid = IndexPool_getslot(&smsgsPool, msg, ischarm?1:2);
+        if(msgid == -1)
+            CmiAbort("IndexPool for SMSG overflows.");
 #endif
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], NULL, 0, msg, size, msgid, tag);
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -1608,7 +1522,7 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         }else {
             status = GNI_RC_ERROR_RESOURCE;
 #if CMK_SMSGS_FREE_AFTER_EVENT
-            SmsgsPool_freeslot(&smsgsPool, msgid);
+            IndexPool_freeslot(&smsgsPool, msgid);
 #endif
         }
     }
@@ -3077,8 +2991,8 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
         else if  (type == GNI_CQ_EVENT_TYPE_SMSG) {
             // a SmsgsSend is done
             int msgid = GNI_CQ_GET_MSG_ID(ev);
-            int type = GetSmsgsIndexType(smsgsPool, msgid);
-            void *addr = GetSmsgsIndexAddress(smsgsPool, msgid);
+            int type = GetIndexType(smsgsPool, msgid);
+            void *addr = GetIndexAddress(smsgsPool, msgid);
             switch (type) {
             case 1:
                 CmiFree(addr);
@@ -3089,7 +3003,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
             default:
                 CmiAbort("Invalid SmsgsIndex");
             }
-            SmsgsPool_freeslot(&smsgsPool, msgid);
+            IndexPool_freeslot(&smsgsPool, msgid);
         }
 #endif
     } //end while
@@ -4153,16 +4067,20 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 //    ntk_return_t sts = NTK_System_GetSmpdCount(&_smpd_count);
 
 #if CMK_SMSGS_FREE_AFTER_EVENT
-    SmsgsPool_init(&smsgsPool);
+    int smsgPoolSize = 16384;
+    if(mysize*SMSG_MAX_CREDIT < smsgPoolSize)
+        smsgPoolSize = mysize*SMSG_MAX_CREDIT;
+    IndexPool_init(&smsgsPool, smsgPoolSize, 1u<<31-1);
 #endif
 
 #if  REMOTE_EVENT
     SHIFT = 1;
     while (1<<SHIFT < mysize) SHIFT++;
     CmiAssert(SHIFT < 31);
-    IndexPool_init(&ackPool);
+    if ( (1<<(31-SHIFT)) < POOL_INIT_SIZE) CmiAbort("IndexPool_init: pool initial size is too big.");
+    IndexPool_init(&ackPool, POOL_INIT_SIZE, 1u<<(31-SHIFT));
 #if CMK_PERSISTENT_COMM_PUT
-    IndexPool_init(&persistPool);
+    IndexPool_init(&persistPool, POOL_INIT_SIZE, 1u<<(31-SHIFT));
 #endif
 #endif
 }
