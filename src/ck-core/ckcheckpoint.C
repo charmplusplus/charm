@@ -45,7 +45,7 @@ int _chareRestored = 0;
 
 void CkCreateLocalChare(int epIdx, envelope *env);
 
-// help class to find how many array elements
+// helper class to get number of array elements
 class ElementCounter : public CkLocIterator {
 private:
 	int count;
@@ -77,11 +77,11 @@ extern void _initDone();
 
 static void bdcastRO(void){
 	int i;
-	//Determine the size of the RODataMessage
+	// Determine the size of the RODataMessage
 	PUP::sizer ps;
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
-	//Allocate and fill out the RODataMessage
+	// Allocate and fill out the RODataMessage
 	envelope *env = _allocEnv(RODataMsg, ps.size());
 	PUP::toMem pp((char *)EnvToUsr(env));
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
@@ -148,7 +148,7 @@ public:
 // broadcast
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	chkptStartTimer = CmiWallTimer();
-	// every body make dir in case it is local directory
+	// make dir on all PEs in case it is a local directory
 	CmiMkdir(dirname);
 
         if (CmiNumPartitions() > 1) {
@@ -261,9 +261,9 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 		}
 	}
 	// to update mainchare proxy
-	// only readonly variables of Chare Proxy is taken care of here;
-	// in general, if chare proxy is contained in some data structure
-	// for example CkCallback, it is user's responsibility to
+	// only readonly variables of Chare Proxy are taken care of here;
+	// in general, if chare proxy is contained in some data structure,
+	// such as CkCallback, it is user's responsibility to
 	// update them after restarting
 	if (p.isUnpacking() && CkMyPe()==0)
 		bdcastRO();
@@ -454,7 +454,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 
 	if (!p.isUnpacking())
 	{
-	  // let CkLocMgr to iterate and store every array elements
+	  // let CkLocMgr iterate over and store every array element
           CKLOCMGR_LOOP(ElementCheckpointer chk(mgr, p); mgr->iterate(chk););
         }
 	else {
