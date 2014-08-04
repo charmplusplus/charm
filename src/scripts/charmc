@@ -834,7 +834,7 @@ then
 fi
 
 # If we are debugging, add "-g -O0" to the C/C++ flags
-if [ -n "$CHARMDEBUG" ]; then
+if [ -n "$CHARMDEBUG" -a -z "$SEQUENTIAL" -a -z "$NATIVE" ]; then
        if [ -n "$CMK_BUILD_PYTHON" ]; then
          	AddModules PythonCCS charmdebug_python
 		POST_LIBRARIES=`AddList $POST_LIBRARIES -lpython${CMK_BUILD_PYTHON}`
