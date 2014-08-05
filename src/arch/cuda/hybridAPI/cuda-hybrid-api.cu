@@ -65,10 +65,10 @@ extern int CmiMyPe();
 workRequestQueue *wrQueue = NULL; 
 
 /* pending page-locked memory allocation requests */
-unsigned int pinnedMemQueueIndex = 0; 
+int pinnedMemQueueIndex = 0;
 pinnedMemReq pinnedMemQueue[MAX_PINNED_REQ];
 
-unsigned int currentDfr = 0;
+int currentDfr = 0;
 void *delayedFreeReqs[MAX_DELAYED_FREE_REQS];
 
 #ifdef GPU_MEMPOOL
@@ -100,7 +100,7 @@ void **devBuffers = NULL;
 
 /* used to assign bufferIDs automatically by the system if the user 
    specifies an invalid bufferID */
-unsigned int nextBuffer; 
+int nextBuffer;
 
 /* event types */
 enum WorkRequestStage{
@@ -116,9 +116,9 @@ GpuKernelExec = 8801,
 GpuMemCleanup = 8802
 };
 
-unsigned int runningKernelIndex = 0;
-unsigned int dataSetupIndex = 0;
-unsigned int dataCleanupIndex = 0;
+int runningKernelIndex = 0;
+int dataSetupIndex = 0;
+int dataCleanupIndex = 0;
 
 #ifdef GPU_TRACE
 typedef struct gpuEventTimer {
@@ -130,7 +130,7 @@ typedef struct gpuEventTimer {
 } gpuEventTimer; 
 
 gpuEventTimer gpuEvents[QUEUE_SIZE_INIT * 3]; 
-unsigned int timeIndex = 0; 
+int timeIndex = 0;
 
 #if defined GPU_TRACE || defined GPU_INSTRUMENT_WRS
 extern "C" double CmiWallTimer(); 
@@ -151,9 +151,9 @@ bool initializedInstrument();
  *  data for a subsequent kernel while the previous kernel is
  *  executing and transferring data out of the device. 
  */
-cudaStream_t kernel_stream; 
+cudaStream_t kernel_stream;
 cudaStream_t data_in_stream;
-cudaStream_t data_out_stream; 
+cudaStream_t data_out_stream;
 
 /* pinnedMallocHost
  *
