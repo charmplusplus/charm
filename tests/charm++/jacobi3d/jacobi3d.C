@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source: /cvsroot/charm/examples/bigsim/sdag/jacobi3d/jacobi3d.C,v $
- * $Author: bhatele $
- * $Date: 2009-06-04 21:50:17 $
- * $Revision: 1.5 $
- *****************************************************************************/
-
 /** \file jacobi3d.C
  *  Author: Abhinav S Bhatele
  *  Date Created: June 01st, 2009
