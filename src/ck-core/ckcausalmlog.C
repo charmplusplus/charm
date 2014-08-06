@@ -276,7 +276,7 @@ static void *doNothingMsg(int * size, void * data, void ** remote, int count){
  */
 void _messageLoggingInit(){
 	if(CkMyPe() == 0)
-		CkPrintf("[%d] Causal Message Logging Support",CkMyPe());
+		CkPrintf("[%d] Causal Message Logging Support\n",CkMyPe());
 
 	//current object
 	CpvInitialize(Chare *,_currentObj);
