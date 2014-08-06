@@ -1,0 +1,100 @@
+mainmodule jacobi2d {
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_GhostBuffer ghostProxy;  
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int blockDimX;
+  readonly int blockDimY;
+
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+
+  readonly int maxiterations;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void run() {
+      while (iterations < WARM_ITER) {
+	atomic {
+	  array.doStep(CkCallback(CkIndex_Main::report(NULL), thisProxy), 1);
+	}
+	when report(CkReductionMsg *msg) atomic {
+	  iterations++;
+	  delete msg;
+	}
+      }
+      atomic "start_timed_portion" {
+	startTime = CkWallTimer();
+	array.doStep(CkCallback(CkIndex_Main::report(NULL), thisProxy),
+		     maxiterations);
+      }
+      while (iterations < maxiterations) {
+	// Each worker reports back to here when it completes an iteration
+	// Asynchronous check on threshhold satisfaction
+	when report(CkReductionMsg *msg) atomic {
+	  iterations++;
+	  maxdifference=((double *) msg->getData())[0];
+	  delete msg;
+	  if (maxdifference - THRESHHOLD < 0)
+	    done(true);
+	}
+      }
+      atomic { done(false); }
+    };
+    entry void report(CkReductionMsg *m);
+  };
+
+  array [2D] Jacobi {
+    entry Jacobi(void);
+    entry void begin_iteration(void);
+    entry void receiveGhosts();
+    entry void requestMessage (int iter, int pe, int dir);
+    entry void doStep(CkCallback cb, int numSteps) {
+      atomic "begin_iteration" {
+	begin_iteration();
+      }
+      overlap {
+	for(imsg = 0; imsg < numExpected; imsg++) {
+	  // "iterations" keeps track of messages across steps
+	  when
+	    requestMessage [iterations] (int iter, int pe, int dir)
+	    atomic "send messages" {
+	    send(dir, pe, iter);
+	  }
+	}
+	
+	for (done_compute = false; !done_compute; done_compute = true) {
+	  // "iteration" keeps track of buffers set by neighbouring chares
+	  for(itmp = 0; itmp < numExpected; itmp++) {
+	    when
+	      receiveGhosts ()
+	      atomic "process ghosts" {
+	    }
+	  }
+	  atomic "doWork" {
+	    check_and_compute(cb, numSteps);
+	    ghostProxy.ckLocalBranch()->releaseBuffer(numExpected,thisProxy);
+	  }
+	}
+      }
+
+      atomic "finish_step" {
+	double *tmp;
+	tmp = temperature;
+	temperature = new_temperature;
+	new_temperature = tmp;
+
+	constrainBC();
+
+	if (numSteps > 1)
+	  doStep(cb, numSteps-1);
+      }
+    };
+  };
+  
+  group GhostBuffer {
+	entry GhostBuffer();
+	entry void setBuffer(CProxy_Jacobi proxy,int size, int iterations, int x, int y, int dir, double ghost[size]);
+};
+};
