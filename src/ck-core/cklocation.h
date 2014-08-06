@@ -97,7 +97,6 @@ public:
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
   virtual int homePe(int arrayHdl,const CkArrayIndex &element)
              { return procNum(arrayHdl, element); }
-//  virtual void pup(PUP::er &p) { CkGroupReadyCallback::pup(p); }
 };
 /*@}*/
 
