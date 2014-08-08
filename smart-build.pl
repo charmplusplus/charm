@@ -7,6 +7,7 @@
 # Authors: dooley, becker
 
 use strict;
+use warnings;
 
 # Turn off I/O buffering
 $| = 1;
