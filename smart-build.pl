@@ -97,11 +97,18 @@ if($cpu =~ m/i[0-9]86/){
 
 # default to net
 my $converse_network_type = "net";
+my $skip_choosing = "false";
 
+print "Are you building to run just on the local machine, and not across multiple nodes? [y/N]\n";
+{
+    my $p = promptUserYN();
+    if($p eq "yes"){
+	$converse_network_type = "multicore";
+	$skip_choosing = "true";
+    }
+}
 
 # check for MPI
-
-my $skip_choosing = "false";
 
 my $mpi_found = "false";
 my $m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
@@ -117,7 +124,7 @@ if($m == 0){
 }
 
 # Give option of just using the mpi version if mpicc and mpiCC are found
-if($mpi_found eq "true"){
+if($skip_choosing eq "false" && $mpi_found eq "true"){
   print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [y/N]: ";
   my $p = promptUserYN();
   if($p eq "yes"){
@@ -231,37 +238,34 @@ my $opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
 $opts =~ m/Supported options: (.*)/;
 $opts = $1;
 
-
-#always provide multicore and single-threaded versions
-print << "EOF";
-How do you want to handle SMP/Multicore: [1-4]
-         1) single-threaded [default]
-         2) multicore(single node only)
+my $smp_opts = <<EOF;
+      1) single-threaded [default]
 EOF
 
 # only add the smp or pxshm options if they are available
-my $counter = 3; # the next index used in the list
+my $counter = 1; # the last index used in the list
 
 my $smpIndex = -1;
 if($opts =~ m/smp/){
-  print "         $counter) SMP\n";
-  $smpIndex = $counter; 
   $counter ++;
+  $smp_opts = $smp_opts . "      $counter) SMP\n";
+  $smpIndex = $counter;
 }
 
 my $pxshmIndex = -1;
 if($opts =~ m/pxshm/){
-  print "         $counter) POSIX Shared Memory\n";
-  $pxshmIndex = $counter; 
   $counter ++;
+  $smp_opts = $smp_opts . "      $counter) POSIX Shared Memory\n";
+  $pxshmIndex = $counter;
 }
 
-while(my $line = <>){
+if ($counter != 1) {
+    print "How do you want to handle SMP/Multicore: [1-$counter]\n";
+    print $smp_opts;
+
+    while(my $line = <>){
 	chomp $line;
-	if($line eq "1" || $line eq ""){
-	    last;
-	} elsif($line eq "2"){
-	    $converse_network_type = "multicore";
+	if($line eq "" || $line eq "1"){
 	    last;
 	} elsif($line eq $smpIndex){
 	    $options = "$options smp ";
@@ -270,6 +274,7 @@ while(my $line = <>){
 	    $options = "$options pxshm ";
 	    last;
 	}
+    }
 }
 
 
