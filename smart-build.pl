@@ -99,10 +99,15 @@ if($cpu =~ m/i[0-9]86/){
 my $converse_network_type = "net";
 my $skip_choosing = "false";
 
-print "Are you building to run just on the local machine, and not across multiple nodes? [y/N]\n";
+print "Are you building to run just on the local machine, and not across multiple nodes? [";
+if($arch_os eq "darwin") {
+    print "Y/n]\n";
+} else {
+    print "y/N]\n";
+}
 {
     my $p = promptUserYN();
-    if($p eq "yes"){
+    if($p eq "yes" || ($arch_os eq "darwin" && $p eq "default")){
 	$converse_network_type = "multicore";
 	$skip_choosing = "true";
     }
