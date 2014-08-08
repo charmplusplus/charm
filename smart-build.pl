@@ -6,6 +6,7 @@
 #
 # Authors: dooley, becker
 
+use strict;
 
 # Turn off I/O buffering
 $| = 1;
@@ -14,7 +15,7 @@ $| = 1;
 
 # A subroutine that reads from input and returns a yes/no/default
 sub promptUserYN {
-  while($line = <>){
+  while(my $line = <>){
 	chomp $line;
 	if(lc($line) eq "y" || lc($line) eq "yes" ){
 	  return "yes";
@@ -35,20 +36,20 @@ print "\n============================================================\n\n\n";
 
 
 # Use uname to get the cpu type and OS information
-$os = `uname -s`;
-$cpu = `uname -m`;
+my $os = `uname -s`;
+my $cpu = `uname -m`;
 
 #Variables to hold the portions of the configuration:
-$nobs = "";
-$arch = "";
-$compilers = "";
-$options = "";
+my $nobs = "";
+my $arch = "";
+my $compilers = "";
+my $options = "";
 
 #remove newlines from these strings:
 chomp($os);
 chomp ($cpu);
 
-
+my $arch_os;
 # Determine OS kernel
 if ($os eq "Linux") {
   $arch_os = "linux";
@@ -68,7 +69,11 @@ if ($os eq "Linux") {
 }
 
 
-
+my $x86;
+my $amd64;
+my $ia64;
+my $ppc;
+my $alpha;
 # Determine architecture (x86, ppc, ...)
 if($cpu =~ m/i[0-9]86/){
   $x86 = 1;
@@ -90,15 +95,16 @@ if($cpu =~ m/i[0-9]86/){
 
 
 # default to net
-$converse_network_type = "net";
+my $converse_network_type = "net";
 
 
 # check for MPI
 
-$skip_choosing = "false";
+my $skip_choosing = "false";
 
-$mpi_found = "false";
-$m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
+my $mpi_found = "false";
+my $m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
+my $mpioption;
 if($m == 0){
     $mpi_found = "true";
     $mpioption = "";
@@ -112,7 +118,7 @@ if($m == 0){
 # Give option of just using the mpi version if mpicc and mpiCC are found
 if($mpi_found eq "true"){
   print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [y/N]: ";
-  $p = promptUserYN();
+  my $p = promptUserYN();
   if($p eq "yes"){
 	$converse_network_type = "mpi";
 	$skip_choosing = "true";
@@ -123,7 +129,7 @@ if($mpi_found eq "true"){
 if($skip_choosing eq "false") { 
   
   print "\nDo you have a special network interconnect? [y/N]: ";
-  $p = promptUserYN();
+  my $p = promptUserYN();
   if($p eq "yes"){
 	print << "EOF";
 	
@@ -142,7 +148,7 @@ Choose an interconnect from below: [1-10]
 
 EOF
 	
-	while($line = <>){
+	while(my $line = <>){
 	  chomp $line;
 	  if($line eq "1"){
 		$converse_network_type = "mpi";
@@ -217,13 +223,10 @@ if($arch eq "net-darwin"){
 } 
 
 
-
-
-
 #================ Choose SMP/PXSHM =================================
 
 # find what options are available
-$opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
+my $opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
 $opts =~ m/Supported options: (.*)/;
 $opts = $1;
 
@@ -236,23 +239,23 @@ How do you want to handle SMP/Multicore: [1-4]
 EOF
 
 # only add the smp or pxshm options if they are available
-$counter = 3; # the next index used in the list
+my $counter = 3; # the next index used in the list
 
-$smpIndex = -1;
+my $smpIndex = -1;
 if($opts =~ m/smp/){
   print "         $counter) SMP\n";
   $smpIndex = $counter; 
   $counter ++;
 }
 
-$pxshmIndex = -1;
+my $pxshmIndex = -1;
 if($opts =~ m/pxshm/){
   print "         $counter) POSIX Shared Memory\n";
   $pxshmIndex = $counter; 
   $counter ++;
 }
 
-while($line = <>){
+while(my $line = <>){
 	chomp $line;
 	if($line eq "1" || $line eq ""){
 	    last;
@@ -269,38 +272,33 @@ while($line = <>){
 }
 
 
-
-
-
-
-
 #================ Choose Compiler =================================
 
 # Lookup list of compilers
-$cs = `./build charm++ $arch help 2>&1 | grep "Supported compilers"`;
+my $cs = `./build charm++ $arch help 2>&1 | grep "Supported compilers"`;
 # prune away beginning of the line
 $cs =~ m/Supported compilers: (.*)/;
 $cs = $1;
 # split the line into an array
-@c_list = split(" ", $cs);
+my @c_list = split(" ", $cs);
 
 # print list of compilers
-$numc = @c_list;
+my $numc = @c_list;
 
 if ($numc > 0) {
     print "\nDo you want to specify a compiler? [y/N]";
-    $p = promptUserYN();
+    my $p = promptUserYN();
     if($p eq "yes" ){
         print "Choose a compiler: [1-$numc] \n";
 
-        $i = 1;
-        foreach $c (@c_list){
+        my $i = 1;
+        foreach my $c (@c_list){
             print "\t$i)\t$c\n";
             $i++;
         }
 
         # Choose compiler
-        while($line = <>){
+        while(my $line = <>){
             chomp $line;
             if($line =~ m/([0-9]*)/ && $1 > 0 && $1 <= $numc){
                 $compilers = $c_list[$1-1];
@@ -318,7 +316,7 @@ if ($numc > 0) {
 #================ Choose Options =================================
 
 #Create a hash table containing descriptions of various options
-%explanations = ();
+my %explanations = ();
 $explanations{"ooc"} = "Out-of-core execution support in Charm++";
 $explanations{"tcp"} = "Charm++ over TCP instead of UDP for net versions. TCP is slower";
 $explanations{"ifort"} = "Use Intel's ifort fortran compiler";
@@ -343,12 +341,12 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
   $opts =~ m/Supported options: (.*)/;
   $opts = $1;
 
-  @option_list = split(" ", $opts);
+  my @option_list = split(" ", $opts);
   
 
   # Prune out entries that would already have been chosen above, such as smp
-  @option_list_pruned = ();
-  foreach $o (@option_list){
+  my @option_list_pruned = ();
+  foreach my $o (@option_list){
 	if($o ne "smp" && $o ne "ibverbs" && $o ne "gm" && $o ne "mx"){
 	  @option_list_pruned = (@option_list_pruned , $o);
 	}
@@ -359,19 +357,19 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
   if (@option_list_pruned > 0) {
 
       print "\nDo you want to specify any Charm++ build options, such as fortran compilers? [y/N]";
-      $special_options = promptUserYN();
+      my $special_options = promptUserYN();
 
       if($special_options eq "yes"){
 
           # print out list for user to select from
           print "Please enter one or more numbers separated by spaces\n";
           print "Choices:\n";
-          $i = 1;
-          foreach $o (@option_list_pruned){
-              $exp = $explanations{$o};
+          my $i = 1;
+          foreach my $o (@option_list_pruned){
+              my $exp = $explanations{$o};
               print "\t$i)\t$o";
               # pad whitespace before options
-              for($j=0;$j<20-length($o);$j++){
+              for(my $j=0;$j<20-length($o);$j++){
                   print " ";
               }
               print ": $exp";
@@ -380,18 +378,18 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
           }
           print "\t$i)\tNone Of The Above\n";
 
-          $num_options = @option_list_pruned;
+          my $num_options = @option_list_pruned;
 
-          while($line = <>){
+          while(my $line = <>){
               chomp $line;
               $line =~ m/([0-9 ]*)/;
-              @entries = split(" ",$1);
+              my @entries = split(" ",$1);
               @entries = sort(@entries);
 
-              $additional_options = "";
-              foreach $e (@entries) {
+              my $additional_options = "";
+              foreach my $e (@entries) {
                   if($e>=1 && $e<= $num_options){
-                      $estring = $option_list_pruned[$e-1];
+                      my $estring = $option_list_pruned[$e-1];
                       $additional_options = "$additional_options $estring";
                   } elsif ($e == $num_options+1){
                       # user chose "None of the above"
@@ -411,13 +409,6 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
   }
 
 
-
-
-
-
-
-
-
 # Choose compiler flags
 print << "EOF";
 	
@@ -430,9 +421,9 @@ Choose a set of compiler flags [1-5]
 	
 EOF
 
-$compiler_flags = "";
+my $compiler_flags = "";
 
-while($line = <>){
+while(my $line = <>){
 	chomp $line;
 	if($line eq "1"){
 		last;
@@ -448,7 +439,7 @@ while($line = <>){
         }  elsif($line eq "5"){
 
 		print "Enter compiler options: ";
-		$input_line = <>;
+		my $input_line = <>;
 		chomp($input_line);
 		$compiler_flags = $input_line;
 		
@@ -463,7 +454,7 @@ while($line = <>){
 
 # Determine the target to build.
 # We want this simple so we just give 2 options
-$target = "";
+my $target = "";
 
 print << "EOF";
 
@@ -473,7 +464,7 @@ What do you want to build?
 
 EOF
 
-while($line = <>){
+while(my $line = <>){
 	chomp $line;
 	if($line eq "1" || $line eq ""){
 		$target = "charm++";
@@ -488,7 +479,7 @@ while($line = <>){
 }
 
 # Determine whether to use a -j flag for faster building
-$j = "";
+my $j = "";
     print << "EOF";
     
 Do you want to compile in parallel?
@@ -502,7 +493,7 @@ Do you want to compile in parallel?
 
 EOF
 
-    while($line = <>) {
+    while(my $line = <>) {
         chomp $line;
         if($line eq "1"){
 	    $j = "";
@@ -532,7 +523,7 @@ EOF
 
 
 # Compose the build line
-$build_line = "./build $target $arch $compilers $options $smp $j $nobs ${compiler_flags}\n";
+my $build_line = "./build $target $arch $compilers $options $j $nobs ${compiler_flags}\n";
 
 
 # Save the build line in the log
@@ -549,7 +540,7 @@ print "\t$build_line\n\n";
 
 # Execute the build line if the appropriate architecture directory exists
 print "Do you want to start the build now? [Y/n]";
-$p = promptUserYN();
+my $p = promptUserYN();
 if($p eq "yes" || $p eq "default"){
   if(-e "src/arch/$arch"){
 	print "Building with: ${build_line}\n";	
