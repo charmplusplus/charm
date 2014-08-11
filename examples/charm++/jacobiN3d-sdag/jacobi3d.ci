@@ -1,0 +1,80 @@
+mainmodule jacobi3d {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_GhostBuffer ghostProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int arrayDimZ;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int blockDimZ;
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int num_chare_z;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done(int iterations);
+  };
+
+  array [3D] Jacobi {
+    entry Jacobi(void);
+    entry void updateGhosts();
+    entry void requestMessage(int iter,int pe, int dir, int save);
+    entry [reductiontarget] void checkConverged(bool result);
+    entry void checkpointFinished();
+    entry void run() {
+      while (!converged) {
+        atomic { begin_iteration(); }
+	overlap {
+		for (remoteCount = 0; remoteCount < 6; remoteCount++) {
+
+			when requestMessage[iterations](int iter,int pe,int dir,int save)
+				atomic "send messages" {
+					send(dir,pe,iter,save);
+				}
+
+		}
+		for (done_compute = false; !done_compute; done_compute = true) {
+			for (remoteCount_2 = 0; remoteCount_2 < 6; remoteCount_2++) {
+				when updateGhosts() atomic "synchronizer"{}
+			}
+			atomic {
+				double error = computeKernel();
+				ghostProxy.ckLocalBranch()->releaseBuffer(6,thisProxy);
+				int conv = error < DELTA;
+				if (iterations % 5 == 1) {
+					contribute(sizeof(int), &conv, CkReduction::logical_and, CkCallback(CkReductionTarget(Jacobi, checkConverged), thisProxy));
+				}
+			}
+		}
+	}
+	
+	atomic "finish step " {
+		double *tmp;
+		tmp = temperature;
+		temperature = new_temperature;
+		new_temperature = tmp;
+
+		constrainBC();
+	}
+        if (++iterations % 5 == 0)
+          when checkConverged(bool result)
+            if (result) atomic { mainProxy.done(iterations); converged = true; }
+        if (iterations % LBPERIOD == 0) atomic { AtSync(); }
+        if (iterations % CHECKPOINTPERIOD == 0) {
+          atomic {
+            CkCallback cb(CkIndex_Jacobi::checkpointFinished(), thisProxy);
+            CkStartMemCheckpoint(cb);
+          }
+          when checkpointFinished() { }
+        }
+      }
+    };
+  };
+
+  group GhostBuffer {
+	entry GhostBuffer();
+	entry void setBuffer(CProxy_Jacobi proxy, int w,int h,int iterations, int x, int y, int z,int dir,double ghost[w*h],int save);
+  };
+
+};
