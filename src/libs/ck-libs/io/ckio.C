@@ -34,6 +34,8 @@ namespace Ck { namespace IO {
         CkCallback opened;
         Options opts;
         int fd;
+        CProxy_WriteSession session;
+        CkCallback complete;
 
         FileInfo(string name_, CkCallback opened_, Options opts_)
           : name(name_), opened(opened_), opts(opts_), fd(-1)
@@ -123,9 +125,18 @@ namespace Ck { namespace IO {
 
           CkArrayOptions sessionOpts(numStripes);
           //sessionOpts.setMap(managers);
-          CProxy_WriteSession session =
-            CProxy_WriteSession::ckNew(file, offset, bytes, complete, sessionOpts);
-          ready.send(new SessionReadyMsg(Session(file, bytes, offset, session)));
+          files[file].session =
+            CProxy_WriteSession::ckNew(file, offset, bytes, sessionOpts);
+          CkAssert(files[file].complete.isInvalid());
+          files[file].complete = complete;
+          ready.send(new SessionReadyMsg(Session(file, bytes, offset,
+                                                 files[file].session)));
+        }
+
+        void sessionComplete(FileToken token) {
+          files[token].session.ckDestroy();
+          files[token].complete.send();
+          files[token].complete = CkCallback(CkCallback::invalid);
         }
 
         void close(FileToken token, CkCallback closed) {
@@ -255,7 +266,7 @@ namespace Ck { namespace IO {
         const FileInfo *file;
         size_t sessionOffset, myOffset;
         size_t sessionBytes, myBytes, myBytesWritten;
-        CkCallback complete;
+        FileToken token;
 
         struct buffer {
           std::vector<char> array;
@@ -283,15 +294,15 @@ namespace Ck { namespace IO {
         map<size_t, struct buffer> bufferMap;
 
       public:
-        WriteSession(FileToken file_, size_t offset_, size_t bytes_, CkCallback complete_)
+        WriteSession(FileToken file_, size_t offset_, size_t bytes_)
           : file(manager->get(file_))
+          , token(file_)
           , sessionOffset(offset_)
           , myOffset((sessionOffset / file->opts.peStripe + thisIndex)
                      * file->opts.peStripe)
           , sessionBytes(bytes_)
           , myBytes(min(file->opts.peStripe, sessionOffset + sessionBytes - myOffset))
           , myBytesWritten(0)
-          , complete(complete_)
         {
           CkAssert(file->fd != -1);
           CkAssert(myOffset >= sessionOffset);
@@ -351,8 +362,8 @@ namespace Ck { namespace IO {
 #warning "No file synchronization function available!"
 #endif
 
-          contribute(complete);
-          contribute(CkCallback(CkIndex_CkArray::ckDestroy(), CkGroupID(thisArrayID)));
+          contribute(sizeof(FileToken), &token, CkReduction::max_int,
+                     CkCallback(CkReductionTarget(Director, sessionComplete), director));
         }
 
         void flushBuffer(buffer& buf, size_t bufferOffset) {
