@@ -5,11 +5,50 @@ This file describes the most significant changes. For more detail, use
 What's new in Charm++ 6.6.0
 ================================================================================
 
+- Machine target files for Cray XC systems ('gni-crayxc') have been added
 
+- Interoperability with MPI code using native communication interfaces on Blue
+  Gene Q (PAMI) and Cray XE/XK/XC (uGNI) systems, in addition to the universal
+  MPI communication interface
+
+- Support for partitioned jobs on all machine types, including TCP/IP and IB
+  Verbs networks using 'netlrts' and 'verbs' machine layers
+
+- A substantially improved version of our asynchronous library, CkIO, for
+  parallel output of large files
+
+- Narrowing the circumstances in which the runtime system will send
+  overhead-inducing ReductionStarting messages
+
+- A new fully distributed load balancing strategy, DistributedLB, that produces
+  high quality results with very low latency
+
+- An API for applications to feed custom per-object data to specialized load
+  balancing strategies (e.g. physical simulation coordinates)
+
+- SMP builds on LRTS-based machine layers (pamilrts, gni, mpi, netlrts, verbs)
+  support tracing messages through communication threads
+
+- Thread affinity mapping with +pemap now supports Intel's Hyperthreading more
+  conveniently
+
+- After restarting from a checkpoint, thread affinity will use new
+  +pemap/+commap arguments
+
+- Queue order randomization options were added to assist in debugging race
+  conditions in application and runtime code
+
+- The full runtime code and associated libraries can now compile under the C11
+  and C++11/14 standards.
+
+- Numerous bug fixes, performance enhancements, and smaller improvements in the
+  provided runtime facilities
 
 - Deprecations
   * The long-unsupported FEM library has been deprecated in favor of ParFUM
   * The CmiBool typedefs have been deleted, as C++ bool has long been universal
+  * Future versions of the runtime system and libraries will require some degree
+    of support for C++11 features from compilers
 
 ================================================================================
 What's new in Charm++ 6.5.0
