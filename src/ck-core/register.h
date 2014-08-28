@@ -269,11 +269,6 @@ public:
 	/// Add a heap-allocated registration record,
 	///  returning the index used.
 	int add(T *t) {
-#if CMK_ERROR_CHECKING
-		/* Make sure registrations only happen from rank 0: */
-		if (CkMyRank()!=0)
-			CkAbort("Can only do registrations from rank 0 processors");
-#endif
 		vec.push_back(t);
 		return vec.size()-1;
 	}
