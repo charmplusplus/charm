@@ -134,6 +134,7 @@ void BgSetNumNodes(int x);
    should only be called in BgGlobalInit() 
 */
 int  BgRegisterHandler(BgHandler h);
+int  BgRegisterHandlerEx(BgHandler h, void *userPtr);
 void BgNumberHandler(int, BgHandler h);
 void BgNumberHandlerEx(int, BgHandlerEx h, void *userPtr);
 

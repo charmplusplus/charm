@@ -42,6 +42,7 @@
 #define CkElapse   BgElapse
 
 #define CkRegisterHandler(x)        BgRegisterHandler((BgHandler)(x))
+#define CkRegisterHandlerEx(x, p)   BgRegisterHandlerEx((BgHandlerEx)(x), p)
 #define CkNumberHandler(n, x)       BgNumberHandler(n, (BgHandler)(x))
 #define CkNumberHandlerEx(n, x, p)  BgNumberHandlerEx(n, (BgHandlerEx)(x), p)
 

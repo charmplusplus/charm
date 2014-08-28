@@ -112,6 +112,7 @@ public:
 public:
   HandlerTable();
   inline int registerHandler(BgHandler h);
+  inline int registerHandlerEx(BgHandlerEx h, void *userPtr);
   inline void numberHandler(int idx, BgHandler h);
   inline void numberHandlerEx(int idx, BgHandlerEx h, void *userPtr);
   inline BgHandlerInfo* getHandle(int handler);

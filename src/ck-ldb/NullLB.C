@@ -27,7 +27,7 @@ static int _migDoneHandle;		// converse handler
 static void migrationDone(envelope *env, CkCoreState *ck)
 {
   // Since migrationsDone will deal with Charm++ messages,
-  // the LB must obey to the CkMessageWatcher orders.
+  // the LB must obey the CkMessageWatcher orders.
   if (ck->watcher!=NULL) {
     if (!ck->watcher->processMessage(&env,ck)) return;
   }
@@ -44,9 +44,7 @@ static void lbinit(void) {
 
 static void lbprocinit(void) {
 #if NULLLB_CONVERSE
-  _migDoneHandle = CkRegisterHandler((CmiHandler)migrationDone);
-  CkNumberHandlerEx(_migDoneHandle, (CmiHandlerEx)migrationDone, CkpvAccess(_coreState));
-  // FIXME: Really a function "CkRegisterHandlerEx" should exist...
+  _migDoneHandle = CkRegisterHandlerEx((CmiHandlerEx)migrationDone, CkpvAccess(_coreState));
 #endif
 }
 

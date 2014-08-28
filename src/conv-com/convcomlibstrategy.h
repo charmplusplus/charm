@@ -35,6 +35,8 @@
 #define CkNumPes CmiNumPes
 #undef CkRegisterHandler
 #define CkRegisterHandler(x) CmiRegisterHandler(x)
+#undef CkRegisterHandlerEx
+#define CkRegisterHandlerEx(x, p) CmiRegisterHandlerEx(x, p)
 #endif
 #endif
 

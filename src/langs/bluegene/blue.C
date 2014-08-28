@@ -281,6 +281,18 @@ inline int HandlerTable::registerHandler(BgHandler h)
     return cur;
 }
 
+inline int HandlerTable::registerHandlerEx(BgHandlerEx h, void *uPtr)
+{
+    ASSERT(!cva(simState).inEmulatorInit);
+    /* leave 0 as blank, so it can report error luckily */
+    int cur = handlerTableCount++;
+    if (cur >= MAX_HANDLERS)
+      CmiAbort("BG> HandlerID exceed the maximum.\n");
+    handlerTable[cur].fnPtr = h;
+    handlerTable[cur].userPtr = uPtr;
+    return cur;
+}
+
 inline void HandlerTable::numberHandler(int idx, BgHandler h)
 {
     ASSERT(!cva(simState).inEmulatorInit);
@@ -318,7 +330,6 @@ inline BgHandlerInfo * HandlerTable::getHandle(int handler)
 int BgRegisterHandler(BgHandler h)
 {
   ASSERT(!cva(simState).inEmulatorInit);
-  int cur;
 #if CMK_BIGSIM_NODE
   return tMYNODE->handlerTable.registerHandler(h);
 #else
@@ -330,6 +341,22 @@ int BgRegisterHandler(BgHandler h)
   }
 #endif
 }
+
+int BgRegisterHandlerEx(BgHandlerEx h, void *uPtr)
+{
+  ASSERT(!cva(simState).inEmulatorInit);
+#if CMK_BIGSIM_NODE
+  return tMYNODE->handlerTable.registerHandlerEx(h, uPtr);
+#else
+  if (tTHREADTYPE == COMM_THREAD) {
+    return tMYNODE->handlerTable.registerHandlerEx(h, uPtr);
+  }
+  else {
+    return tHANDLETAB.registerHandlerEx(h, uPtr);
+  }
+#endif
+}
+
 
 void BgNumberHandler(int idx, BgHandler h)
 {
