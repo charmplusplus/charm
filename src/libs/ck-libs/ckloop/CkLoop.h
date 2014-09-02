@@ -19,6 +19,8 @@
  * */
 #define USE_CONVERSE_NOTIFICATION 1
 
+ CmiNodeLock loop_info_inited_lock;
+
 class FuncSingleHelper;
 
 class CurLoopInfo {
@@ -56,7 +58,7 @@ public:
     }
 
     void set(int nc, HelperFn f, int lIdx, int uIdx, int numParams, void *p) {        /*
-      * WARNING: there's a rare data-racing case here. The current loop is
+      * The locking is to handle a rare data-racing case here. The current loop is
       * about to finish (just before setting inited to 0; A helper (say B)
       * just enters the stealWork and passes the inited check. The helper
       * (say A) is very fast, and starts the next loop, and happens enter
@@ -64,6 +66,7 @@ public:
       * task info as it is trying to execute the old loop task!
       * In reality for user cases, this case happens very rarely!! -Chao Mei
       */
+        CmiLock(loop_info_inited_lock);
         numChunks = nc;
         fnPtr = f;
         lowerIndex = lIdx;
@@ -74,13 +77,16 @@ public:
         finishFlag = 0;
         //needs to be set last
         inited = 1;
+        CmiUnlock(loop_info_inited_lock);
     }
 
     void waitLoopDone(int sync) {
         //while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
         if (sync) while (finishFlag!=numChunks);
         //finishFlag = 0;
+        CmiLock(loop_info_inited_lock);
         inited = 0;
+        CmiUnlock(loop_info_inited_lock);
     }
     int getNextChunkIdx() {
         return __sync_add_and_fetch(&curChunkIdx, 1);
@@ -143,6 +149,7 @@ public:
     FuncCkLoop(CkMigrateMessage *m);
 
     ~FuncCkLoop() {
+      CmiDestroyLock(loop_info_inited_lock);
         delete [] helperPtr;
     }
 

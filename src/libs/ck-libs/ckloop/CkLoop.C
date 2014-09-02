@@ -133,6 +133,7 @@ FuncCkLoop::FuncCkLoop(int mode_, int numThreads_) {
     traceRegisterUserEvent("ckloop finish signal",CKLOOP_FINISH_SIGNAL_EVENTID);
 
     mode = mode_;
+    loop_info_inited_lock = CmiCreateLock();
 
     CmiAssert(globalCkLoop==NULL);
     globalCkLoop = this;
@@ -160,7 +161,9 @@ FuncCkLoop::FuncCkLoop(int mode_, int numThreads_) {
     }
 }
 
-FuncCkLoop::FuncCkLoop(CkMigrateMessage *m) : CBase_FuncCkLoop(m) {}
+FuncCkLoop::FuncCkLoop(CkMigrateMessage *m) : CBase_FuncCkLoop(m) {
+  loop_info_inited_lock = CmiCreateLock();
+}
 
 int FuncCkLoop::MAX_CHUNKS = 64;
 
@@ -485,23 +488,38 @@ void SingleHelperStealWork(ConverseNotifyMsg *msg) {
 void CurLoopInfo::stealWork() {
     //indicate the current work hasn't been initialized
     //or the old work has finished.
-    if (inited == 0) return;
+    CmiLock(loop_info_inited_lock);
+    if (inited == 0) {
+      CmiUnlock(loop_info_inited_lock);
+      return;
+    }
+
+    int nextChunkId = getNextChunkIdx();
+    if (nextChunkId >= numChunks) {
+      CmiUnlock(loop_info_inited_lock);
+      return;
+    }
+
+    CmiUnlock(loop_info_inited_lock);
+    int execTimes = 0;
 
     int first, last;
     int unit = (upperIndex-lowerIndex+1)/numChunks;
     int remainder = (upperIndex-lowerIndex+1)-unit*numChunks;
     int markIdx = remainder*(unit+1);
 
-    int nextChunkId = getNextChunkIdx();
-    int execTimes = 0;
     while (nextChunkId < numChunks) {
-        if (nextChunkId < remainder) {
-            first = lowerIndex+(unit+1)*nextChunkId;
-            last = first+unit;
-        } else {
-            first = lowerIndex+(nextChunkId - remainder)*unit + markIdx;
-            last = first+unit-1;
-        }
+      if (nextChunkId < remainder) {
+        first = lowerIndex+(unit+1)*nextChunkId;
+        last = first+unit;
+      } else {
+        first = lowerIndex+(nextChunkId - remainder)*unit + markIdx;
+        last = first+unit-1;
+      }
+
+      if (first < lowerIndex || first > upperIndex || last < lowerIndex || last > upperIndex) {
+        CkAbort("Indices of CkLoop incorrect. There maybe a race condition!\n");
+      }
 
         fnPtr(first, last, redBufs[nextChunkId], paramNum, param);
         execTimes++;
