@@ -40,7 +40,7 @@ module CkIO_impl {
             }
             when sessionDone[sessionID](CkReductionMsg *m) serial {
               delete m;
-              impl::FileInfo* info = manager->get(file);
+              impl::FileInfo* info = CkpvAccess(manager)->get(file);
               CmiInt8 ret = CmiPwrite(info->fd, commitData, commitBytes, commitOffset);
               if (ret != commitBytes)
                 fatalError("Commit write failed", info->name);
