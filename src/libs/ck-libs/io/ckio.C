@@ -24,7 +24,7 @@ using std::string;
 namespace Ck { namespace IO {
     namespace impl {
       CProxy_Director director;
-      Manager *manager;
+      CkpvDeclare(Manager *, manager);
     }
 
 
@@ -153,14 +153,16 @@ namespace Ck { namespace IO {
         Manager()
           : opnum(0)
         {
-          manager = this;
+          CkpvInitialize(Manager*, manager);
+          CkpvAccess(manager) = this;
           thisProxy[CkMyPe()].run();
         }
 
         Manager(CkMigrateMessage *m)
           : CBase_Manager(m)
         {
-          manager = this;
+          CkpvInitialize(Manager*, manager);
+          CkpvAccess(manager) = this;
         }
 
         void pup(PUP::er &p) {
@@ -295,7 +297,7 @@ namespace Ck { namespace IO {
 
       public:
         WriteSession(FileToken file_, size_t offset_, size_t bytes_)
-          : file(manager->get(file_))
+          : file(CkpvAccess(manager)->get(file_))
           , token(file_)
           , sessionOffset(offset_)
           , myOffset((sessionOffset / file->opts.peStripe + thisIndex)
@@ -407,7 +409,8 @@ namespace Ck { namespace IO {
     }
 
     void write(Session session, const char *data, size_t bytes, size_t offset) {
-      impl::manager->write(session, data, bytes, offset);
+        using namespace impl;
+        CkpvAccess(manager)->write(session, data, bytes, offset);
     }
 
     void close(File file, CkCallback closed) {
