@@ -90,6 +90,7 @@ class main : public CBase_main
   CProxy_PingC cid;
   CProxy_PingG gid;
   CProxy_PingN ngid;
+  CProxy_PingMarshall arrM;
   bool warmupRun; 
 public:
   main(CkMigrateMessage *m) {}
@@ -118,6 +119,7 @@ public:
     arr2 = CProxy_Ping2::ckNew();
     arr3 = CProxy_Ping3::ckNew();
     arrF = CProxy_PingF::ckNew();
+    arrM = CProxy_PingMarshall::ckNew(2);
     arr2(0,0).insert(P1);
     arr2(0,1).insert(P2);
     arr2.doneInserting();
@@ -142,36 +144,39 @@ public:
 	arr1[0].start(reportTime);
 	break;
       case 1:
-        arr2(0,0).start(reportTime);
+        arrM[0].start(reportTime);
         break;
       case 2:
-        arr3(0,0,0).start(reportTime);
+        arr2(0,0).start(reportTime);
         break;
       case 3:
-        arrF[CkArrayIndexFancy("first")].start(reportTime);
+        arr3(0,0,0).start(reportTime);
         break;
       case 4:
+        arrF[CkArrayIndexFancy("first")].start(reportTime);
+        break;
+      case 5:
         cid.start(reportTime);
         break;
-      case 5:       
+      case 6:       
         isPipelined = false; 
         copyFragments = false;
         allocMsgs = false; 
         gid[0].start(reportTime, isPipelined, copyFragments, allocMsgs, 0);
         break;
-      case 6: 
+      case 7: 
         isPipelined = true; 
         copyFragments = false;
         allocMsgs = false;
         gid[0].start(reportTime, isPipelined, copyFragments, allocMsgs, pipeSize);
         break;
-      case 7:
+      case 8:
         isPipelined = true; 
         copyFragments = false; 
         allocMsgs = true;
         gid[0].start(reportTime, isPipelined, copyFragments, allocMsgs, pipeSize);
         break;
-      case 8:
+      case 9:
         isPipelined = true; 
         copyFragments = true; 
         allocMsgs = true;
@@ -181,16 +186,16 @@ public:
           pipeSize *= 2; 
           phase = 5; 
         } 
-        break;
 #ifndef USE_RDMA
-      case 9:
+      case 10:
         ngid[0].start(reportTime);
         break;
 #else
-      case 9:
+      case 10:
 	  ngid[0].startRDMA(reportTime);
 	  break;
 #endif
+
       default:
         CkExit();
     }
@@ -821,4 +826,49 @@ class PingC : public CBase_PingC
     }
   }
 };
+
+class PingMarshall : public CBase_PingMarshall
+{
+  bool printResult; 
+  CProxy_PingMarshall *pp;
+  int niter;
+  double start_time, end_time;
+  unsigned char *data;
+public:
+  PingMarshall()
+  {
+    pp = new CProxy_PingMarshall(thisArrayID);
+    niter = 0;
+    data = new unsigned char[payload];
+    memset(data, 0, payload);
+  }
+  PingMarshall(CkMigrateMessage *m) {}
+  void start(bool reportTime)
+  {
+    niter = 0;
+    printResult = reportTime; 
+    (*pp)(1).recv(data, payload);
+    start_time = CkWallTimer();
+  }
+  void recv(unsigned char *indata, int insize)
+  {
+    if(thisIndex==0) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        if (printResult) {
+          CkPrintf("Roundtrip time for 1D Arrays Marshalled is %lf us\n",
+                   1.0e6*(end_time-start_time)/iterations);
+        }
+        mainProxy.maindone();
+      } else {
+        (*pp)[1].recv(indata, payload);
+      }
+    } else {
+      (*pp)[0].recv(indata, payload);
+    }
+  }
+};
+
+
 #include "pingpong.def.h"

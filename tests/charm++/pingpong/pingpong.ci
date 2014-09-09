@@ -56,4 +56,10 @@ mainmodule pingpong {
     entry void start(bool reportTime);
     entry void recv(PingMsg *msg);
   };        	
+  array [1D] PingMarshall {
+    entry PingMarshall();
+    entry void start(bool reportTime);
+    entry void recv(unsigned char data[size], int size);
+  };        	
+
 };
