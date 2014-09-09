@@ -17,7 +17,7 @@ GETTING THE LATEST CHARM SOURCE
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
 
-    git clone git://charm.cs.illinois.edu/charm.git
+    git clone http://charm.cs.illinois.edu/gerrit/charm
 
 
 PICKING A VERSION
@@ -268,7 +268,7 @@ net-linux-x86_64/
 BUILDING A PROGRAM
 ==================
 
-To make a sample program, cd into pgms/charm++/queens/.
+To make a sample program, cd into examples/charm++/queens/.
 This program solves the N-queens problem-- find how many ways there 
 are to arrange N queens on an NxN chess board such that none may 
 attack another.
@@ -319,8 +319,6 @@ To use this option, just type:
 
 However, for best performance, you should launch one node program per processor.
 
-For more detailed information, please check the "INSTALLATION MANUAL" and "RUN MANUAL" 
-under doc/install.
 
 
 Build Charm++ in Dynamic libraries
