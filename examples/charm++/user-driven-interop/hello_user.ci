@@ -1,0 +1,15 @@
+mainmodule hello_user {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Hello hello_array; 
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry [reductiontarget] void done();
+  };
+
+  array[1D] Hello {
+    entry Hello();
+    entry void sayHello();
+    entry void rankReportingIn(int);
+  };
+};

@@ -3798,7 +3798,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
   
-    if(!CharmLibInterOperate) {
+    if(!CharmLibInterOperate || userDrivenMode) {
       status = PMI_Init(&first_spawned);
       GNI_RC_CHECK("PMI_Init", status);
     }
@@ -4182,7 +4182,7 @@ void LrtsExit()
     //printf("FINAL [%d, %d]  register=%lld, send=%lld\n", myrank, CmiMyRank(), register_memory_size, buffered_send_msg); 
     mempool_destroy(CpvAccess(mempool));
 #endif
-    if(!CharmLibInterOperate) {
+    if(!CharmLibInterOperate || userDrivenMode) {
       PMI_Barrier();
       PMI_Finalize();
       exit(0);

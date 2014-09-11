@@ -12,6 +12,8 @@ extern "C" void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
 extern "C" void CharmLibInit(int userComm, int argc, char **argv);
 #endif
 
+extern "C" void CharmInit(int argc, char **argv);
+
 extern "C" void CharmLibExit();
 
 extern "C" void LibCkExit(void);

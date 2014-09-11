@@ -115,4 +115,27 @@ option. Refer to examples/charm++/mpi-coexist/Makefile to view a working
 example. For execution on BG/Q systems, the following additional argument should be
 added to the launch command: {\em --envs PAMI\_CLIENTS=MPI,Converse}.
 
+\section{User Driven Mode}
+In addition to the above technique for interoperation, one can also interoperate
+with \charmpp{} in user driven mode. User driven mode is intended for cases
+where the developer has direct control over the both the \charmpp{} code and
+the non-\charmpp{} code, and would like a more tightly coupled relation between
+the two. When executing in user driven mode, {\em main} is called on every rank
+as in the above example. To initialize the \charmpp{} runtime, a call to
+{\em CharmInit} should be called on every rank:
 
+{\bf void CharmInit(int argc, char **argv)} \\
+
+{\em CharmInit} starts the \charmpp{} runtime in user driven mode, and executes
+the constructor of the main chare. Control returns to user code when a call to
+{\em CkExit} is made. Once control is returned, user code can do other work as
+needed, including creating chares, and invoking entry methods on proxies. Any
+messages created by the user code will be sent/received the next time the user
+calls {\em StartCharmScheduler}. Calls to {\em StartCharmScheduler} allow the
+\charmpp{} runtime to resume sending and processing messages, and control
+returns to user code when {\em CkExit} is called. The \charmpp{} scheduler can
+be started and stopped in this fashion as many times as necessary.
+{\em CharmLibExit} should be called by the user code at the end of execution.
+
+A small example of user driven interoperation can be found in
+examples/charm++/user-driven-interop.

@@ -156,6 +156,8 @@ int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
+extern int CharmLibInterOperate;
+extern int userDrivenMode;
 
 CpvDeclare(void*, CmiLocalQueue);
 
@@ -185,7 +187,6 @@ static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
 volatile int commThdExit = 0;
 CmiNodeLock  commThdExitLock = 0;
 extern CmiNodeLock  interopCommThdExitLock;
-extern int CharmLibInterOperate;
 
 /**
  *  The macro defines whether to have a comm thd to offload some
@@ -1413,7 +1414,7 @@ if (MSG_STATISTIC)
 #endif
     if (CmiMyRank() == 0) LrtsExit();
 #endif
-    if(CharmLibInterOperate)
+    if(CharmLibInterOperate && !userDrivenMode)
       CmiYield();
     else 
       while (1) CmiYield();

@@ -14,6 +14,8 @@ extern "C" int _cleanUp;
 
 #if CMK_CONVERSE_MPI
 extern  "C" { extern MPI_Comm charmComm ;}
+#else
+typedef int MPI_Comm;
 #endif
 
 extern int _ringexit;		    // for charm exit
@@ -21,6 +23,7 @@ extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
 extern "C" void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
+int userDrivenMode = 0;
 
 extern "C" void StartInteropScheduler();
 extern "C" void StopInteropScheduler();
@@ -100,33 +103,34 @@ void _libExitHandler(envelope *env)
   }
 }
 
-#if CMK_HAS_INTEROP
-#if CMK_CONVERSE_MPI
+// CharmInit simply calls CharmLibInit with userDrivenMode set to 1. This allows
+// user code to stop and start the charm scheduler multiple times throughout
+// execution without destroying its state.
 extern "C"
-void CharmLibInit(MPI_Comm userComm, int argc, char **argv){
-  //note CmiNumNodes and CmiMyNode should just be macros
-  MPI_Comm_dup(userComm, &charmComm);
-  MPI_Comm_size(charmComm, &_Cmi_numnodes);
-  MPI_Comm_rank(charmComm, &_Cmi_mynode);
+void CharmInit(int argc, char **argv) {
+  userDrivenMode = 1;
+  CharmLibInit(0, argc, argv);
+}
+
+extern "C"
+void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
+
+#if !CMK_HAS_INTEROP
+  if(!userDrivenMode) {
+    CmiAbort("mpi-interoperate not supported in this machine layer; did you mean to use CharmInit?");
+  }
+#endif
+
+#if CMK_CONVERSE_MPI
+  if(!userDrivenMode) {
+    MPI_Comm_dup(userComm, &charmComm);
+  }
+#endif
 
   CharmLibInterOperate = 1;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
   StartInteropScheduler();
 }
-#else 
-extern "C"
-void CharmLibInit(int userComm, int argc, char **argv){
-  CharmLibInterOperate = 1;
-  ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-  StartInteropScheduler();
-}
-#endif
-#else
-extern "C"
-void CharmLibInit(int userComm, int argc, char **argv){
-  CmiAbort("mpi-interoperate not supported in this machine layer");
-}
-#endif
 
 #undef CkExit
 #define CkExit CkExit

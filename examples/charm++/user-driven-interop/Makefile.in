@@ -1,0 +1,12 @@
+#multirun - works with MPI based Charm++ only since space division for Charm++
+#part only works for MPI based Charm++.
+
+#multirun_time - works on MPI, PAMILRTS, and GNI.
+
+#to run on BG/Q, add this argument to the runjob command: --envs PAMI_CLIENTS=MPI,Converse
+
+OPTS = -O3 
+CHARMDIR=../../..
+CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
+
+CXX=mpicxx -std=c++0x $(OPTS)

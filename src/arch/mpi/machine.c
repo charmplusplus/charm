@@ -1165,7 +1165,7 @@ void LrtsExit() {
 #endif
 #endif
     
-   if(!CharmLibInterOperate) {
+   if(!CharmLibInterOperate || userDrivenMode) {
 #if ! CMK_AUTOBUILD
       signal(SIGINT, signal_int);
       MPI_Finalize();
@@ -1263,7 +1263,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     *argc = CmiGetArgc(largv);     /* update it in case it is out of sync */
 
-    if(!CharmLibInterOperate) {
+    if(!CharmLibInterOperate || userDrivenMode) {
 #if CMK_MPI_INIT_THREAD
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV)
@@ -1284,11 +1284,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     largc = *argc;
     largv = *argv;
-    if(!CharmLibInterOperate) {
-      MPI_Comm_dup(MPI_COMM_WORLD,&charmComm);
-      MPI_Comm_size(charmComm, numNodes);
-      MPI_Comm_rank(charmComm, myNodeID);
+    if(!CharmLibInterOperate || userDrivenMode) {
+      MPI_Comm_dup(MPI_COMM_WORLD, &charmComm);
     }
+    MPI_Comm_size(charmComm, numNodes);
+    MPI_Comm_rank(charmComm, myNodeID);
 
     MPI_Bcast(&_Cmi_mynodesize, 1, MPI_INT, 0, charmComm);
 

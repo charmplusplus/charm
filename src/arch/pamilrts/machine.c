@@ -689,7 +689,7 @@ void LrtsExit()
   }
 
   CmiNodeBarrier();
-  if(!CharmLibInterOperate) {
+  if(!CharmLibInterOperate || userDrivenMode) {
 #if CMK_SMP
     if (rank0) {
       Delay(100000);
