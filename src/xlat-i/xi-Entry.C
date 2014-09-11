@@ -454,27 +454,28 @@ void Entry::genArrayDefs(XStr& str)
 
 void Entry::genArrayStaticConstructorDecl(XStr& str)
 {
+  if (!container->isArray())
+    die("Internal error - array declarations called for on non-array Chare type");
+
   if (container->getForWhom() == forIndividual)
       str<< //Element insertion routine
       "    void insert("<<paramComma(1,0)<<"int onPE=-1"<<eo(1)<<");";
   else if (container->getForWhom() == forAll) {
       str<< //With options
       "    static CkArrayID ckNew("<<paramComma(1,0)<<"const CkArrayOptions &opts"<<eo(1)<<");\n";
-      if (container->isArray()) {
-        XStr dim = ((Array*)container)->dim();
-        if (dim == (const char*)"1D") {
-          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1"<<eo(1)<<");\n";
-        } else if (dim == (const char*)"2D") {
-          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1, const int s2"<<eo(1)<<");\n";
-        } else if (dim == (const char*)"3D") {
-          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1, const int s2, const int s3"<<eo(1)<<");\n";
-        /*} else if (dim==(const char*)"4D") {
-          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4"<<eo(1)<<");\n";
-        } else if (dim==(const char*)"5D") {
-          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5"<<eo(1)<<");\n";
-        } else if (dim==(const char*)"6D") {
-          str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5, const short s6"<<eo(1)<<");\n"; */
-        }
+      XStr dim = ((Array*)container)->dim();
+      if (dim == (const char*)"1D") {
+        str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1"<<eo(1)<<");\n";
+      } else if (dim == (const char*)"2D") {
+        str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1, const int s2"<<eo(1)<<");\n";
+      } else if (dim == (const char*)"3D") {
+        str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1, const int s2, const int s3"<<eo(1)<<");\n";
+      /*} else if (dim==(const char*)"4D") {
+        str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4"<<eo(1)<<");\n";
+      } else if (dim==(const char*)"5D") {
+        str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5"<<eo(1)<<");\n";
+      } else if (dim==(const char*)"6D") {
+        str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4, const short s5, const short s6"<<eo(1)<<");\n"; */
       }
   }
   else if (container->getForWhom() == forSection) { }
@@ -482,6 +483,9 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
 
 void Entry::genArrayStaticConstructorDefs(XStr& str)
 {
+  if (!container->isArray())
+    die("Internal error - array definitions called for on non-array Chare type");
+
   if (container->getForWhom() == forIndividual)
       str<<
       makeDecl("void",1)<<"::insert("<<paramComma(0,0)<<"int onPE"<<eo(0)<<")\n"
@@ -503,43 +507,41 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
     str << decl << "(" << paramComma(0) << "const CkArrayOptions &opts" << eo(0) << ")\n"
         << head << tail;
 
-    if (container->isArray()) {
-      XStr dim = ((Array*)container)->dim();
-      XStr sizeParams, sizeArgs;
-      bool emit = true;
+    XStr dim = ((Array*)container)->dim();
+    XStr sizeParams, sizeArgs;
+    bool emit = true;
 
-      if (dim == (const char*)"1D") {
-        sizeParams << "const int s1";
-        sizeArgs << "s1";
-      } else if (dim == (const char*)"2D") {
-        sizeParams << "const int s1, const int s2";
-        sizeArgs << "s1, s2";
-      } else if (dim == (const char*)"3D") {
-        sizeParams << "const int s1, const int s2, const int s3";
-        sizeArgs << "s1, s2, s3";
-      }
+    if (dim == (const char*)"1D") {
+      sizeParams << "const int s1";
+      sizeArgs << "s1";
+    } else if (dim == (const char*)"2D") {
+      sizeParams << "const int s1, const int s2";
+      sizeArgs << "s1, s2";
+    } else if (dim == (const char*)"3D") {
+      sizeParams << "const int s1, const int s2, const int s3";
+      sizeArgs << "s1, s2, s3";
+    }
 #if 0
-      else if (dim==(const char*)"4D") {
-        sizeParams << "const short s1, const short s2, const short s3, const short s4";
-        sizeArgs << "s1, s2, s3, s4";
-      } else if (dim==(const char*)"5D") {
-        sizeParams << "const short s1, const short s2, const short s3, const short s4, "
-                   << "const short s5";
-        sizeArgs << "s1, s2, s3, s4, s5";
-      } else if (dim==(const char*)"6D") {
-        sizeParams << "const short s1, const short s2, const short s3, const short s4, "
-                   << "const short s5, const short s6";
-        sizeArgs << "s1, s2, s3, s4, s5, s6";
-      }
+    else if (dim==(const char*)"4D") {
+      sizeParams << "const short s1, const short s2, const short s3, const short s4";
+      sizeArgs << "s1, s2, s3, s4";
+    } else if (dim==(const char*)"5D") {
+      sizeParams << "const short s1, const short s2, const short s3, const short s4, "
+                 << "const short s5";
+      sizeArgs << "s1, s2, s3, s4, s5";
+    } else if (dim==(const char*)"6D") {
+      sizeParams << "const short s1, const short s2, const short s3, const short s4, "
+                 << "const short s5, const short s6";
+      sizeArgs << "s1, s2, s3, s4, s5, s6";
+    }
 #endif
-      else {
-        emit = false;
-      }
+    else {
+      emit = false;
+    }
 
-      if (emit) {
-        str << decl << "(" << paramComma(0) << sizeParams << eo(0) << ")\n"
-            << head << "  CkArrayOptions opts(" << sizeArgs << ");\n" << tail;
-      }
+    if (emit) {
+      str << decl << "(" << paramComma(0) << sizeParams << eo(0) << ")\n"
+          << head << "  CkArrayOptions opts(" << sizeArgs << ");\n" << tail;
     }
   }
 }
