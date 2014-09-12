@@ -719,10 +719,10 @@ void CkArrayListener::ckRegister(CkArray *arrMgr,int dataOffset_)
   dataOffset=dataOffset_;
 }
 
-CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
-					  const CkArrayOptions &opts_)
+static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
 {
-  CkArrayOptions opts(opts_);
+  //CkAssert(CkMyPe() == 0); // Will become mandatory under 64-bit ID
+
   CkGroupID locMgr = opts.getLocationManager();
   if (locMgr.isZero())
   { //Create a new location manager
@@ -747,9 +747,20 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   return (CkArrayID)ag;
 }
 
+CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
+					  const CkArrayOptions &opts)
+{
+  return CkCreateArray(m, ctor, opts);
+}
+
 CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
 {
   return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,CkArrayOptions());
+}
+
+void CProxy_ArrayBase::ckCreateEmptyArrayAsync(CkCallback cb)
+{
+  CkSendAsyncCreateArray(0, cb, CkArrayOptions(), (CkArrayMessage *)CkAllocSysMsg());
 }
 
 extern IrrGroup *lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkGroupID &groupID);
@@ -836,6 +847,65 @@ void CProxySection_ArrayBase::pup(PUP::er &p)
   for (int i=0; i<_nsid; ++i) _sid[i].pup(p);
 }
 
+/*
+ * Message type and code to create new chare arrays asynchronously.
+ * Post-startup, whatever non-0 PE calls for the creation of an array will pack
+ * up all of the arguments and send them to PE 0. PE 0 will then run the normal
+ * creation process and send the array ID to the provided callback. This
+ * ensures that up to the limit of available bits, array IDs can be represented
+ * as part of a compound fixed-size ID for their elements.
+ */
+struct CkCreateArrayAsyncMsg : public CMessage_CkCreateArrayAsyncMsg {
+  int ctor;
+  CkCallback cb;
+  CkArrayOptions opts;
+  char *ctorPayload;
+
+  CkCreateArrayAsyncMsg(int ctor_, CkCallback cb_, CkArrayOptions opts_)
+    : ctor(ctor_), cb(cb_), opts(opts_)
+  { }
+};
+
+static int ckArrayCreationHdl = 0;
+
+void CkSendAsyncCreateArray(int ctor, CkCallback cb, CkArrayOptions opts, void *ctorMsg)
+{
+  CkAssert(ctorMsg);
+  UsrToEnv(ctorMsg)->setMsgtype(ArrayEltInitMsg);
+  PUP::sizer ps;
+  CkPupMessage(ps, &ctorMsg);
+  CkCreateArrayAsyncMsg *msg = new (ps.size()) CkCreateArrayAsyncMsg(ctor, cb, opts);
+  PUP::toMem p(msg->ctorPayload);
+  CkPupMessage(p, &ctorMsg);
+  envelope *env = UsrToEnv(msg);
+  CmiSetHandler(env, ckArrayCreationHdl);
+  CkPackMessage(&env);
+  CmiSyncSendAndFree(0, env->getTotalsize(), (char*)env);
+}
+
+static void CkCreateArrayAsync(void *vmsg)
+{
+  envelope *venv = static_cast<envelope*>(vmsg);
+  CkUnpackMessage(&venv);
+  CkCreateArrayAsyncMsg *msg = static_cast<CkCreateArrayAsyncMsg*>(EnvToUsr(venv));
+
+  // Unpack arguments
+  PUP::fromMem p(msg->ctorPayload);
+  void *vm;
+  CkPupMessage(p, &vm);
+  CkArrayMessage *m = static_cast<CkArrayMessage*>(vm);
+
+  // Does the caller care about the constructed array ID?
+  if (!msg->cb.isInvalid()) {
+    CkArrayCreatedMsg *response = new CkArrayCreatedMsg;
+    response->aid = CkCreateArray(m, msg->ctor, msg->opts);
+
+    msg->cb.send(response);
+  } else {
+    CkCreateArray(m, msg->ctor, msg->opts);
+  }
+}
+
 /*********************** CkArray Creation *************************/
 void _ckArrayInit(void)
 {
@@ -846,6 +916,7 @@ void _ckArrayInit(void)
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
   // by default anytime migration is allowed
   ckinsertIdxHdl = CkRegisterHandler(ckinsertIdxFunc);
+  ckArrayCreationHdl = CkRegisterHandler(CkCreateArrayAsync);
 }
 
 CkArray::CkArray(CkArrayOptions &opts,

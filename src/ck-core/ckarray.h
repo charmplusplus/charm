@@ -377,6 +377,7 @@ public:
 #endif
 
 	static CkArrayID ckCreateEmptyArray(void);
+        static void ckCreateEmptyArrayAsync(CkCallback cb);
 	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts);
 
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx);
@@ -666,6 +667,12 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
 #include "CkArray.decl.h"
 #include "CkArrayReductionMgr.decl.h"
+
+void CkSendAsyncCreateArray(int ctor, CkCallback cb, CkArrayOptions opts, void *ctorMsg);
+
+struct CkArrayCreatedMsg : public CMessage_CkArrayCreatedMsg {
+  CkArrayID aid;
+};
 
 class CkArrayBroadcaster;
 class CkArrayReducer;

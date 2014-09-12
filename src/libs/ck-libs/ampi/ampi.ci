@@ -21,12 +21,12 @@ module ampi {
     entry void ssend_ack(int);
     entry void generic(AmpiMsg *);
     entry void reduceResult(CkReductionMsg *m);
-    entry void splitPhase1(CkReductionMsg *msg);
-    entry void commCreatePhase1(CkReductionMsg *msg);
-    entry void cartCreatePhase1(CkReductionMsg *msg);
-    entry void graphCreatePhase1(CkReductionMsg *msg);
-    entry void intercommCreatePhase1(CkReductionMsg *msg);
-    entry void intercommMergePhase1(CkReductionMsg *msg);
+    entry [threaded] void splitPhase1(CkReductionMsg *msg);
+    entry [threaded] void commCreatePhase1(CkReductionMsg *msg);
+    entry [threaded] void cartCreatePhase1(CkReductionMsg *msg);
+    entry [threaded] void graphCreatePhase1(CkReductionMsg *msg);
+    entry [threaded] void intercommCreatePhase1(CkReductionMsg *msg);
+    entry [threaded] void intercommMergePhase1(CkReductionMsg *msg);
     entry void setRemoteProxy(CProxy_ampi rproxy);
     entry void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype, 
 			   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,

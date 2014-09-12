@@ -462,15 +462,19 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
       str<< //Element insertion routine
       "    void insert("<<paramComma(1,0)<<"int onPE=-1"<<eo(1)<<");";
   else if (container->getForWhom() == forAll) {
-      str<< //With options
-      "    static CkArrayID ckNew("<<paramComma(1,0)<<"const CkArrayOptions &opts"<<eo(1)<<");\n";
+      //With options
+      str << "    static CkArrayID ckNew("<<paramComma(1,0)<<"const CkArrayOptions &opts"<<eo(1)<<");\n";
+      str << "    static void      ckNew("<<paramComma(1,0)<<"const CkArrayOptions &opts, CkCallback _ck_array_creation_cb"<<eo(1)<<");\n";
       XStr dim = ((Array*)container)->dim();
       if (dim == (const char*)"1D") {
-        str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1"<<eo(1)<<");\n";
+        str << "    static CkArrayID ckNew(" << paramComma(1,0) << "const int s1" << eo(1)<<");\n";
+        str << "    static void ckNew("      << paramComma(1,0) << "const int s1, CkCallback _ck_array_creation_cb" << eo(1) <<");\n";
       } else if (dim == (const char*)"2D") {
-        str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1, const int s2"<<eo(1)<<");\n";
+        str << "    static CkArrayID ckNew(" << paramComma(1,0) << "const int s1, const int s2"<<eo(1)<<");\n";
+        str << "    static void ckNew("      << paramComma(1,0) << "const int s1, const int s2, CkCallback _ck_array_creation_cb" << eo(1) <<");\n";
       } else if (dim == (const char*)"3D") {
-        str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const int s1, const int s2, const int s3"<<eo(1)<<");\n";
+        str << "    static CkArrayID ckNew(" << paramComma(1,0) << "const int s1, const int s2, const int s3" << eo(1)<<");\n";
+        str << "    static void ckNew("      << paramComma(1,0) << "const int s1, const int s2, const int s3, CkCallback _ck_array_creation_cb" << eo(1) <<");\n";
       /*} else if (dim==(const char*)"4D") {
         str<<"    static CkArrayID ckNew("<<paramComma(1,0)<<"const short s1, const short s2, const short s3, const short s4"<<eo(1)<<");\n";
       } else if (dim==(const char*)"5D") {
@@ -494,19 +498,26 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
       "   UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
       "   ckInsert((CkArrayMessage *)impl_msg,"<<epIdx()<<",onPE);\n}\n";
   else if (container->getForWhom() == forAll) {
-    XStr decl, head, tail;
-    decl << makeDecl("CkArrayID", 1) << "::ckNew";
+    XStr syncPrototype, asyncPrototype, head, syncTail, asyncTail;
+    syncPrototype << makeDecl("CkArrayID", 1) << "::ckNew";
+    asyncPrototype << makeDecl("void", 1) << "::ckNew";
 
     head << "{\n"
          << marshallMsg();
 
-    tail << "  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
+    syncTail << "  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
          << "  return ckCreateArray((CkArrayMessage *)impl_msg, "
          << epIdx() << ", opts);\n"
        "}\n";
 
-    str << decl << "(" << paramComma(0) << "const CkArrayOptions &opts" << eo(0) << ")\n"
-        << head << tail;
+    asyncTail  << "  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
+               << "  CkSendAsyncCreateArray(" << epIdx() << ", _ck_array_creation_cb, opts, impl_msg);\n"
+               << "}\n";
+
+    str << syncPrototype << "(" << paramComma(0) << "const CkArrayOptions &opts" << eo(0) << ")\n"
+        << head << syncTail;
+    str << asyncPrototype << "(" << paramComma(0) << "const CkArrayOptions &opts, CkCallback _ck_array_creation_cb"<< eo(0) << ")\n"
+        << head << asyncTail;
 
     XStr dim = ((Array*)container)->dim();
     XStr sizeParams, sizeArgs;
@@ -541,8 +552,10 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
     }
 
     if (emit) {
-      str << decl << "(" << paramComma(0) << sizeParams << eo(0) << ")\n"
-          << head << "  CkArrayOptions opts(" << sizeArgs << ");\n" << tail;
+      str << syncPrototype << "(" << paramComma(0) << sizeParams << eo(0) << ")\n"
+          << head << "  CkArrayOptions opts(" << sizeArgs << ");\n" << syncTail;
+      str << asyncPrototype << "(" << paramComma(0) << sizeParams << ", CkCallback _ck_array_creation_cb" << eo(0) << ")\n"
+          << head << "  CkArrayOptions opts(" << sizeArgs << ");\n" << asyncTail;
     }
   }
 }

@@ -1413,7 +1413,11 @@ CProxy_ampi ampi::createNewChildAmpiSync() {
   opts.setNumInitial(0);
   CkArrayID unusedAID;
   ampiCommStruct unusedComm;
-  CProxy_ampi newAmpi = CProxy_ampi::ckNew(unusedAID, unusedComm, opts);
+  CkCallback cb(CkCallback::resumeThread);
+  CProxy_ampi::ckNew(unusedAID, unusedComm, opts, cb);
+  CkArrayCreatedMsg *newAmpiMsg = static_cast<CkArrayCreatedMsg*>(cb.thread_delay());
+  CProxy_ampi newAmpi = newAmpiMsg->aid;
+  delete newAmpiMsg;
   newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
   return newAmpi;
 }

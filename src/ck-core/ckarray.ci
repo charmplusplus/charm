@@ -42,5 +42,12 @@ module CkArray {
 
   };
 
+  message CkCreateArrayAsyncMsg {
+    char ctorPayload[];
+  };
+
+  message CkArrayCreatedMsg {
+    CkArrayID aid;
+  };
 
 };

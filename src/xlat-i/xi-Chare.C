@@ -1126,6 +1126,7 @@ Array::genSubDecls(XStr& str)
 
     //Build a simple, empty array
     str << "\n    static CkArrayID ckNew(void) { return ckCreateEmptyArray(); }";
+    str << "\n    static void      ckNew(CkCallback cb) { ckCreateEmptyArrayAsync(cb); }";
 
     XStr etype; etype<<Prefix::ProxyElement<<type<<tvars();
     if (indexSuffix!=(const char*)"none")

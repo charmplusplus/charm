@@ -9,6 +9,7 @@ mainmodule hello {
 
   chare Other {
     entry Other(void);
+    entry void created(CkArrayCreatedMsg *);
   };
 
   array [1D] Hello {
