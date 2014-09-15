@@ -2032,6 +2032,9 @@ void machine_OffloadAPIProgress() {
 }
 #endif
 
-
+void LrtsPrepareEnvelope(char *msg, int size)
+{
+  CMI_MSG_SIZE(msg) = size;
+}
 
 /*@}*/
