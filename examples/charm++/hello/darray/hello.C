@@ -29,7 +29,7 @@ public:
   };
 };
 
-class Other : public Chare {
+class Other : public CBase_Other {
   public:
     Other(void) {
       CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
