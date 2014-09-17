@@ -1437,7 +1437,7 @@ void ampi::splitPhase1(CkReductionMsg *msg)
       lastAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
       lastAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
 
-      CkVec<int> indices; //Maps rank to array indices for new arrau
+      CkVec<int> indices; //Maps rank to array indices for new array
       for (int i=c;i<nKeys;i++) {
         if (keys[i].color!=lastColor) break; //Done with this color
         int idx=myComm.getIndexForRank(keys[i].rank);
