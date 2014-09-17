@@ -23,10 +23,9 @@ module ampi {
     entry void reduceResult(CkReductionMsg *m);
     entry [threaded] void splitPhase1(CkReductionMsg *msg);
     entry [threaded] void commCreatePhase1(CkReductionMsg *msg);
-    entry [threaded] void cartCreatePhase1(CkReductionMsg *msg);
-    entry [threaded] void graphCreatePhase1(CkReductionMsg *msg);
     entry [threaded] void intercommCreatePhase1(CkReductionMsg *msg);
     entry [threaded] void intercommMergePhase1(CkReductionMsg *msg);
+
     entry void setRemoteProxy(CProxy_ampi rproxy);
     entry void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype, 
 			   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,

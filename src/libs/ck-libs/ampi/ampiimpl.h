@@ -1334,13 +1334,12 @@ friend class SReq;
 
     void splitPhase1(CkReductionMsg *msg);
     void commCreatePhase1(CkReductionMsg *msg);
-    void cartCreatePhase1(CkReductionMsg *m);
-    void graphCreatePhase1(CkReductionMsg *m);
     void intercommCreatePhase1(CkReductionMsg *m);
     void intercommMergePhase1(CkReductionMsg *msg);
 
   private: // Used by the above entry methods that create new MPI_Comm objects
     CProxy_ampi createNewChildAmpiSync();
+    void insertNewChildAmpiElements(MPI_Comm *newComm, CProxy_ampi newAmpi);
 
   public: // to be used by MPI_* functions
 
