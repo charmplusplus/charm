@@ -144,7 +144,9 @@ CkpvExtern(LBUserDataLayout, lbobjdatalayout);
 class LBObjUserData {
   char *data;
 public:
-  LBObjUserData(): data(NULL) {}
+  LBObjUserData() {
+    init();
+  }
 
   LBObjUserData(const LBObjUserData &d) {
     init();
