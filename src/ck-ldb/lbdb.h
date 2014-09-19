@@ -144,19 +144,21 @@ CkpvExtern(LBUserDataLayout, lbobjdatalayout);
 class LBObjUserData {
   char *data;
 public:
-  LBObjUserData() {
-    init();
-  }
+  LBObjUserData() : data(NULL) {}
 
   LBObjUserData(const LBObjUserData &d) {
-    init();
-    memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
+    if (d.data != NULL) {
+      init();
+      memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
+    }
   }
 
   ~LBObjUserData() { delete [] data; }
   LBObjUserData &operator = (const LBObjUserData &d) {
-    if (data==NULL) init();
-    memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
+    if (d.data != NULL) {
+      if (data==NULL) init();
+      memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
+    }
     return *this;
   }
   inline void init() { data = new char[CkpvAccess(lbobjdatalayout).size()]; }
