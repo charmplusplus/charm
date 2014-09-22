@@ -4,8 +4,6 @@
 MPICXX_DEF=mpicxx
 MPICC_DEF=mpicc
 
-MPICXX=$MPICXX_DEF
-MPICC=$MPICC_DEF
 test "$MPICXX" != "$MPICXX_DEF" && /bin/rm -f $CHARMINC/MPIOPTS
 if test ! -f "$CHARMINC/MPIOPTS"
 then
