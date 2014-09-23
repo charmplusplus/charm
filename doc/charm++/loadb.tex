@@ -399,6 +399,28 @@ Or, if the METIS library has been installed, METIS based balancers can be built 
  make MetisLB
 \end{alltt}
 
+\item {\bf Write and use your own load balancer}
+
+Refer Section~\ref{lbWriteNewLB} for writing a new load balancer. Compile it in
+the form of library and name it {\em libmoduleFooLB.a} where {\em FooLB} is the
+new load balancer. Add the path to the library and link the load balancer into
+an application using {\em -module FooLB}. 
+
+You can create a library by modifying the Makefile in the following way. This
+will create {\em libmoduleFooLB.a}.
+\begin{alltt}
+libmoduleFooLB.a: FooLB.o
+  $(CHARMC) -o libmoduleFooLB.a FooLB.o
+\end{alltt}
+
+To include this balancer in your application, the Makefile can be changed in the
+following way
+\begin{alltt}
+$(TARGET): $(OBJECTS)
+  $(CHARMC) -o $(TARGET) -L/path-to-the-lib $(OBJS) -module FooLB 
+\end{alltt}
+
+
 \item {\bf runtime options:}
 
 Runtime balancer selection options are similar to the compile time
