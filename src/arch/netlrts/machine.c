@@ -1923,7 +1923,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   if (CmiGetArgFlagDesc(*argv,"+commthread","Use communication thread")) {
     Cmi_commthread = 1;
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
-    _Cmi_noprocforcommthread = 1;   /* worker thread go sleep */
+    _Cmi_sleepOnIdle = 1;   /* worker thread go sleep */
 #endif
     if (CmiMyPe() == 0) CmiPrintf("Charm++> communication thread is launched in multicore version. \n");
   }
