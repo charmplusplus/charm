@@ -308,6 +308,17 @@ extern void getAvailSysMem();
 
 #define BROADCAST_SPANNING_FACTOR		4
 
+/******************************************************************************
+ *
+ * Node state
+ *
+ *****************************************************************************/
+
+
+static CmiNodeLock    Cmi_scanf_mutex;
+static double         Cmi_clock;
+static double         Cmi_check_delay = 3.0;
+
 /****************************************************************************
  *
  * Handling Errors
@@ -442,7 +453,7 @@ static void machine_atexit_check(void)
 {
   if (!machine_initiated_shutdown)
     CmiAbort("unexpected call to exit by user program. Must use CkExit, not exit!");
-  printf("Program finished.\n");
+  printf("Program finished after %f seconds.\n", CmiWallTimer() - Cmi_clock);
 #if 0 /*Wait for the user to press any key (for Win32 debugging)*/
   fgetc(stdin);
 #endif
@@ -878,17 +889,6 @@ void printLog(void)
 #define LOG(t,s,k,d,q) /*empty*/
 
 #endif
-
-/******************************************************************************
- *
- * Node state
- *
- *****************************************************************************/
-
-
-static CmiNodeLock    Cmi_scanf_mutex;
-static double         Cmi_clock;
-static double         Cmi_check_delay = 3.0;
 
 /******************************************************************************
  *
