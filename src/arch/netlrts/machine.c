@@ -232,10 +232,6 @@ int _kq = -1;
 #include <poll.h>
 #endif
 
-#if CMK_MULTICORE
-int Cmi_commthread = 0;
-#endif
-
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "sockRoutines.h"
