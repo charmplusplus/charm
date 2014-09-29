@@ -107,9 +107,9 @@ class CkArrayIndex: public CkArrayIndexBase
         /// These routines allow CkArrayIndex to be used in a CkHashtableT
         inline CkHashCode hash(void) const
         {
-            register int i;
-            register const int *d=data();
-            register CkHashCode ret=d[0];
+            int i;
+            const int *d=data();
+            CkHashCode ret=d[0];
             for (i=1;i<nInts;i++)
                 ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
             return ret;

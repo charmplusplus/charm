@@ -327,10 +327,10 @@ public:
       CkAssert(sizeof(CMK_MSG_PRIO_TYPE) >= sizeof(int)*CkPriobitsToInts(prio));
 #endif
 
-      register UInt tsize = sizeof(envelope)+ 
+      UInt tsize = sizeof(envelope)+ 
             CkMsgAlignLength(size)+
 	    sizeof(int)*CkPriobitsToInts(prio);
-      register envelope *env = (envelope *)CmiAlloc(tsize);
+      envelope *env = (envelope *)CmiAlloc(tsize);
 #if CMK_REPLAYSYSTEM
       //for record-replay
       memset(env, 0, sizeof(envelope));
@@ -525,13 +525,13 @@ class MsgPool: public SafePool<void *> {
 private:
     static void *_alloc(void) {
       /* CkAllocSysMsg() called in .def.h is not thread of sigio safe */
-      register envelope *env = _allocEnv(ForChareMsg,0,0);
+      envelope *env = _allocEnv(ForChareMsg,0,0);
       env->setQueueing(_defaultQueueing);
       env->setMsgIdx(0);
       return EnvToUsr(env);
     }
     static void _reset(void* m) {
-      register envelope *env = UsrToEnv(m);
+      envelope *env = UsrToEnv(m);
       _resetEnv(env);
     }
 public:
