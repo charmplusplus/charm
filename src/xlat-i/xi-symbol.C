@@ -2660,9 +2660,9 @@ Readonly::genDefs(XStr& str)
     str <<    "(void *_impl_pup_er) {\n";
     str << "  PUP::er &_impl_p=*(PUP::er *)_impl_pup_er;\n";
     if(dims){
-	    str << "  _impl_p("<<qName()<<","; dims->printValue(str); str<<");\n";
+      str << "  _impl_p(&" << qName(); dims->printZeros(str); str << ", ("; dims->printValueProduct(str); str<<") );\n";
     }else{
-	    str << "  _impl_p|"<<qName()<<";\n";
+      str << "  _impl_p|"<<qName()<<";\n";
     }
     str << "}\n";
     templateGuardEnd(str);

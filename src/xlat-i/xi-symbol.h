@@ -96,9 +96,23 @@ class ValueList : public Printable {
         val->print(str);
       }
       if(next) {
-	  std::cout << "Unsupported type\n";
-	  abort();
+	die("Unsupported type");
       }
+    }
+    void printValueProduct(XStr& str) {
+      if (!val)
+	die("Must have a value for an array dimension");
+
+      str << "("; val->print(str); str << ")";
+      if (next) {
+	str << " * ";
+	next->printValueProduct(str);
+      }
+    }
+    void printZeros(XStr& str) {
+      str << "[0]";
+      if (next)
+	next->printZeros(str);
     }
 };
 
