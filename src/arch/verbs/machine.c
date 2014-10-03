@@ -2010,6 +2010,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
       Cmi_check_delay=1.0e30;
 
+  SetupPPN(argv);
   for(i = 0; i < _Cmi_mynodesize; i++)
       inProgress[i] = 0;
 

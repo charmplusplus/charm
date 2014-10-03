@@ -9,6 +9,13 @@
 #define INLINE_KEYWORD
 #endif
 
+int *ppnlist;
+int *ppn_prefix_sum;
+int types_ppn;
+int ppns_one_pattern;
+#include <string.h>
+
+
 #if MACHINE_DEBUG_LOG
 FILE *debugLog = NULL;
 #endif
@@ -378,16 +385,49 @@ INLINE_KEYWORD int CmiMyRank() {
     return CmiGetState()->rank;
 }
 INLINE_KEYWORD int CmiNodeFirst(int node) {
-    return node*_Cmi_mynodesize;
+  if(types_ppn==1)
+    return (node*ppns_one_pattern);
+  else
+    return (node/types_ppn*ppns_one_pattern +  ppn_prefix_sum[node%types_ppn]);
+
 }
 INLINE_KEYWORD int CmiNodeSize(int node) {
-    return _Cmi_mynodesize;
+  if(types_ppn==1)
+    return ppns_one_pattern;
+  else
+    return ppnlist[node%types_ppn];
 }
 INLINE_KEYWORD int CmiNodeOf(int pe) {
-    return (pe/_Cmi_mynodesize);
+    int mynode;
+    int mymod;
+    if(types_ppn==1)
+      return (pe/_Cmi_mynodesize); 
+    else
+    {
+      mymod = pe%ppns_one_pattern;
+      for(mynode=0; mynode<types_ppn+1; mynode++)
+      {
+        if(mymod<ppn_prefix_sum[mynode])
+          break;
+      }
+      return pe/ppns_one_pattern*types_ppn+(mynode-1);
+    }
 }
 INLINE_KEYWORD int CmiRankOf(int pe) {
-    return pe%_Cmi_mynodesize;
+    int mynode;
+    int mymod;
+    if(types_ppn==1)
+      return (pe%_Cmi_mynodesize);
+    else
+    {
+      mymod = pe%ppns_one_pattern;
+      for(mynode = 0; mynode<types_ppn+1; mynode++)
+      {
+        if(mymod<ppn_prefix_sum[mynode])
+          break;
+      }
+      return mymod-ppn_prefix_sum[mynode-1];
+    }
 }
 #endif
 /* ===== End of Processor/Node State-related Stuff =====*/
@@ -948,12 +988,12 @@ static int create_partition_map( char **argv)
 void CmiCreatePartitions(char **argv) {
   _Cmi_numnodes_global = _Cmi_numnodes;
   _Cmi_mynode_global = _Cmi_mynode;
-  _Cmi_numpes_global = _Cmi_numnodes_global * _Cmi_mynodesize;
+  _Cmi_numpes_global = CmiNumPes();
 
   if(Cmi_nodestart != -1) {
     Cmi_nodestartGlobal = Cmi_nodestart;
   } else {
-    Cmi_nodestartGlobal =  _Cmi_mynode_global * _Cmi_mynodesize;
+    Cmi_nodestartGlobal =  CmiNodeFirst(_Cmi_mynode_global);
   }
 
   //creates partitions, reset _Cmi_mynode to be the new local rank
@@ -1012,6 +1052,65 @@ INLINE_KEYWORD int pe_gToLTranslate(int pe) {
 }
 //end of functions related to partition
 
+void SetupPPN(char ***largv) {
+    char *token;
+    char *ppnlistStr = NULL;
+    int index=0;
+    char** argv=*largv;
+    int i, total_types;
+
+    _Cmi_mynodesize = 1;
+    if (!CmiGetArgStringDesc(argv,"+ppn", &ppnlistStr, "list of ppns"))
+        CmiGetArgStringDesc(argv,"++ppn", &ppnlistStr, "list of ppns");
+#if CMK_SMP
+    //count the number of different types of ppn
+    ppn_prefix_sum = NULL;
+    ppnlist = NULL;
+    total_types = 1;
+    if(ppnlistStr!= NULL)
+    {
+      for(i=0; ppnlistStr[i] != '\0'; i++);
+      {
+        if(ppnlistStr[i] == ',')
+          total_types++;
+      }
+    }
+    //allocate space
+    ppn_prefix_sum = (int*)malloc(sizeof(int)*total_types);
+    ppnlist = (int*)malloc(sizeof(int)*total_types);
+    //parse ppn
+    types_ppn = 0;
+    token = strtok(ppnlistStr, ",");
+    while(token != NULL)
+    {
+        ppnlist[types_ppn] = atoi(token);
+        if(types_ppn==0)
+            ppn_prefix_sum[types_ppn] = 0;
+        else
+            ppn_prefix_sum[types_ppn] = ppn_prefix_sum[types_ppn-1]+ppnlist[types_ppn-1];
+        ppns_one_pattern += ppnlist[types_ppn];
+        token = strtok(NULL, ",");
+        types_ppn++;
+    };
+    if(types_ppn == 0)
+    {
+        ppnlist[types_ppn] = 1;
+        ppn_prefix_sum[types_ppn] = 0;
+        ppns_one_pattern += ppnlist[types_ppn];
+        types_ppn++;
+    }
+    ppn_prefix_sum[types_ppn] = ppn_prefix_sum[types_ppn-1]+ppnlist[types_ppn-1];
+    _Cmi_mynodesize = ppnlist[_Cmi_mynode%types_ppn];
+    _Cmi_numpes = _Cmi_numnodes/types_ppn * ppns_one_pattern +  ppn_prefix_sum[_Cmi_numnodes%types_ppn];
+    Cmi_nodestart = _Cmi_mynode/types_ppn * ppns_one_pattern +  ppn_prefix_sum[(_Cmi_mynode)%types_ppn];
+#else
+    if ( ppnlistStr!= NULL && _Cmi_mynode == 0)
+        CmiAbort("+ppn cannot be used in non SMP version!\n");
+    _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
+    Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
+#endif
+}
+
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
@@ -1020,15 +1119,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     char *stdoutbase,*stdoutpath;
 #if CMK_WITH_STATS
     MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
-#endif
-
-    /* processor per node */
-    _Cmi_mynodesize = 1;
-    if (!CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize))
-        CmiGetArgInt(argv,"++ppn", &_Cmi_mynodesize);
-#if ! CMK_SMP
-    if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0)
-        CmiAbort("+ppn cannot be used in non SMP version!\n");
 #endif
 
     /* Network progress function is used to poll the network when for
@@ -1048,7 +1138,6 @@ if (  MSG_STATISTIC)
         msg_histogram[_ii] = 0;
 }
 #endif
-
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
 #if MACHINE_DEBUG_LOG
     char ln[200];
@@ -1066,7 +1155,7 @@ if (  MSG_STATISTIC)
       printf("Charm++> Running in non-SMP mode: numPes %d\n",_Cmi_numnodes);
       MACHSTATE1(4,"running nonsmp %d", _Cmi_mynode)
 #else
-      printf("Charm++> Running in SMP mode: numNodes %d,  %d worker threads per process\n", CmiNumNodes(),_Cmi_mynodesize);
+      printf("Charm++> Running in SMP mode: numNodes %d,  %d worker threads per process, total worker threads %d \n", CmiNumNodes(), _Cmi_mynodesize, CmiNumPes());
       if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
         printf("Charm++> The comm. thread both sends and receives messages\n");
       } else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
@@ -1083,8 +1172,6 @@ if (  MSG_STATISTIC)
 
     CmiCreatePartitions(argv);
 
-    _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
-    Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
     Cmi_argvcopy = CmiCopyArgs(argv);
     Cmi_argv = argv;
     Cmi_startfn = fn;
@@ -1334,7 +1421,12 @@ if (MSG_STATISTIC)
     if (CmiMyPe() == 0) 
       CmiPrintf("[Partition %d][Node %d] End of program\n",CmiMyPartition(),CmiMyNode());
 #endif
-
+#if CMK_SMP
+   if(CmiMyRank() == 0 && ppnlist != NULL)
+       free(ppnlist);
+   if(CmiMyRank() == 0 && ppn_prefix_sum != NULL)
+       free(ppn_prefix_sum);
+#endif
 #if !CMK_SMP || CMK_SMP_NO_COMMTHD
 #if CMK_USE_PXSHM
     CmiExitPxshm();

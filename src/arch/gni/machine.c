@@ -3895,6 +3895,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     *myNodeID = myrank;
     *numNodes = mysize;
   
+    SetupPPN(argv);
 #if MULTI_THREAD_SEND
     /* Currently, we only consider the case that comm. thread will only recv msgs */
     Cmi_smp_mode_setting = COMM_WORK_THREADS_SEND_RECV;
