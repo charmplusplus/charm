@@ -428,13 +428,11 @@ Type		: BaseType '&'
 		{ $$ = $1; }
 		;
 
-ArrayDim	: NUMBER
-		{ $$ = new Value($1); }
-		| QualName
+ArrayDim	: CCode
 		{ $$ = new Value($1); }
 		;
 
-Dim		: '[' ArrayDim ']'
+Dim		: SParamBracketStart ArrayDim SParamBracketEnd
 		{ $$ = $2; }
 		;
 
