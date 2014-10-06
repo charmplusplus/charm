@@ -672,6 +672,11 @@ then
     echo "CMK_WITH_TAU=\"true\"" >> $ConvSh
 fi
 
+if [ "$PROGRAM" = "ChaNGa" ]
+then
+  #Setting lbuserdata when the build is ChaNGa
+  CONFIG_OPTS="--enable-lbuserdata $CONFIG_OPTS"
+fi
 
 echo $BASEVERSION > $DESTINATION/tmp/.vdir
 echo $BASEVERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
