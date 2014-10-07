@@ -315,7 +315,7 @@ static void IntegrateMessageDatagram(char **msg, int len)
 	else {
           newmsg = (char *)CmiAlloc(size);
           if (!newmsg)
-            fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
+            fprintf(stderr, "%d: Out of mem\n", Lrts_myNode);
           memcpy(newmsg, *msg, len);
 	  if (len == PACKET_MAX) 
 	      freeMaxBuf(*msg);		/* free buffer, must be max size */
@@ -545,8 +545,8 @@ static void open_tcp_sockets()
   SOCKET skt;
   int val;
 
-  mype = _Cmi_mynode;
-  numpes = _Cmi_numnodes;
+  mype = Lrts_myNode;
+  numpes = Lrts_numNodes;
   MACHSTATE2(2,"  open_tcp_sockets (%d:%d)", mype, numpes);
   for (i=0; i<mype; i++) {
     unsigned int clientPort;

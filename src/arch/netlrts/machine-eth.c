@@ -374,7 +374,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
     	dg->seqno,node->nodestart,size)
     msg = (char *)CmiAlloc(size);
     if (!msg)
-      fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
+      fprintf(stderr, "%d: Out of mem\n", Lrts_myNode);
     if (size < dg->len) KillEveryoneCode(4559312);
 #if CMK_CHARMDEBUG
     setMemoryTypeMessage(msg);

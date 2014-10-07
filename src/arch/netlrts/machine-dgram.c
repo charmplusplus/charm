@@ -349,22 +349,22 @@ static void node_addresses_store(ChMessage *msg)
   int nodestart;
   int i,j,n;
   MACHSTATE(1,"node_addresses_store {");	
-  _Cmi_numnodes=ChMessageInt(n32[0]);
+  Lrts_numNodes=ChMessageInt(n32[0]);
 
-  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes)
+  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*Lrts_numNodes)
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
 
-  nodes = (OtherNode)malloc(_Cmi_numnodes * sizeof(struct OtherNodeStruct));
+  nodes = (OtherNode)malloc(Lrts_numNodes * sizeof(struct OtherNodeStruct));
   nodestart=0;
-  for (i=0; i<_Cmi_numnodes; i++) {
+  for (i=0; i<Lrts_numNodes; i++) {
     nodes[i].nodestart = nodestart;
     nodes[i].nodesize  = ChMessageInt(d[i].nPE);
     MACHSTATE2(3,"node %d nodesize %d",i,nodes[i].nodesize);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
 
     nodes[i].IP=d[i].IP;
-    if (i==_Cmi_mynode) {
+    if (i==Lrts_myNode) {
       Cmi_nodestart=nodes[i].nodestart;
       _Cmi_mynodesize=nodes[i].nodesize;
       Cmi_self_IP=nodes[i].IP;
@@ -381,11 +381,11 @@ static void node_addresses_store(ChMessage *msg)
   _Cmi_numpes=nodestart;
   n = _Cmi_numpes;
 #ifdef CMK_CPV_IS_SMP
-  n += _Cmi_numnodes;
+  n += Lrts_numNodes;
 #endif
   nodes_by_pe = (OtherNode*)malloc(n * sizeof(OtherNode));
   _MEMCHECK(nodes_by_pe);
-  for (i=0; i<_Cmi_numnodes; i++) {
+  for (i=0; i<Lrts_numNodes; i++) {
     OtherNode node = nodes + i;
     OtherNode_init(node);
     for (j=0; j<node->nodesize; j++) {
@@ -394,7 +394,7 @@ static void node_addresses_store(ChMessage *msg)
   }
 #ifdef CMK_CPV_IS_SMP
   /* index for communication threads */
-  for (i=_Cmi_numpes; i<_Cmi_numpes+_Cmi_numnodes; i++) {
+  for (i=_Cmi_numpes; i<_Cmi_numpes+Lrts_numNodes; i++) {
     OtherNode node = nodes + i-_Cmi_numpes;
     nodes_by_pe[i] = node;
   }

@@ -288,6 +288,9 @@ static SOCKET       dataskt;
 extern void TokenUpdatePeriodic();
 extern void getAvailSysMem();
 
+static int Lrts_numNodes;
+static int Lrts_myNode;
+
 /****************************************************************************
  *
  * Handling Errors
@@ -629,7 +632,7 @@ static void parse_forks(void) {
 		if(pid<0) CmiAbort("Fork returned an error");
 		if(pid==0) { /* forked process */
 			/* reset mynode,pe & exit loop */
-			_Cmi_mynode+=i;
+			Lrts_myNode+=i;
 			_Cmi_mype+=i;
 			break;
 		}
@@ -657,7 +660,7 @@ static void parse_netstart(void)
   {/*Read values set by Charmrun*/
         char Cmi_charmrun_name[1024];
         nread = sscanf(ns, "%d%s%d%d%d",
-                 &_Cmi_mynode,
+                 &Lrts_myNode,
                  Cmi_charmrun_name, &Cmi_charmrun_port,
                  &Cmi_charmrun_pid, &port);
 	Cmi_charmrun_IP=skt_lookup_ip(Cmi_charmrun_name);
@@ -668,7 +671,7 @@ static void parse_netstart(void)
         }
   } else 
   {/*No charmrun-- set flag values for standalone operation*/
-  	_Cmi_mynode=0;
+  	Lrts_myNode=0;
   	Cmi_charmrun_IP=_skt_invalid_ip;
   	Cmi_charmrun_port=0;
   	Cmi_charmrun_pid=0;
@@ -677,7 +680,7 @@ static void parse_netstart(void)
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
 	char *cmi_num_nodes = getenv("CmiNumNodes");
 	if(cmi_num_nodes != NULL){
-		sscanf(cmi_num_nodes,"%d",&_Cmi_numnodes);
+		sscanf(cmi_num_nodes,"%d",&Lrts_numNodes);
 	}
 #endif	
 }
@@ -726,7 +729,7 @@ static void log_init(void)
 static void log_done(void)
 {
   char logname[100]; FILE *f; int i, size;
-  sprintf(logname, "log.%d", _Cmi_mynode);
+  sprintf(logname, "log.%d", Lrts_myNode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   if (log_wrap) size = 50000; else size=log_pos;
@@ -745,8 +748,8 @@ void printLog(void)
   if (logged)
       return;
   logged = 1;
-  CmiPrintf("Logging: %d\n", _Cmi_mynode);
-  sprintf(logname, "log.%d", _Cmi_mynode);
+  CmiPrintf("Logging: %d\n", Lrts_myNode);
+  sprintf(logname, "log.%d", Lrts_myNode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   for (i = 5000; i; i--)
@@ -767,7 +770,7 @@ void printLog(void)
     }
   }
   fclose(f);
-  CmiPrintf("Done Logging: %d\n", _Cmi_mynode);
+  CmiPrintf("Done Logging: %d\n", Lrts_myNode);
 }
 
 #define LOG(t,s,k,d,q) { if (log_pos==50000) { log_pos=0; log_wrap=1;} { logent ent=log+log_pos; ent->time=t; ent->srcpe=s; ent->kind=k; ent->dstpe=d; ent->seqno=q; log_pos++; }}
@@ -1423,7 +1426,7 @@ void copyInfiAddr(ChInfiAddr *qpList);
 #if CMK_USE_IBVERBS && CMK_IBVERBS_FAST_START
 static void send_partial_init()
 {
-  ChMessageInt_t nodeNo = ChMessageInt_new(_Cmi_mynode);
+  ChMessageInt_t nodeNo = ChMessageInt_new(Lrts_myNode);
 	ctrl_sendone_nolock("partinit",(const char *)&(nodeNo),sizeof(nodeNo),NULL,0);
 }	
 #endif
@@ -1472,11 +1475,11 @@ static void node_addresses_obtain(char **argv)
   { /*Contact charmrun for machine info.*/
 	ChSingleNodeinfo me;
 
-  	me.nodeNo=ChMessageInt_new(_Cmi_mynode);
+  	me.nodeNo=ChMessageInt_new(Lrts_myNode);
 
 #if CMK_USE_IBVERBS
 	{
-		int qpListSize = (_Cmi_numnodes-1)*sizeof(ChInfiAddr);
+		int qpListSize = (Lrts_numNodes-1)*sizeof(ChInfiAddr);
 		me.info.qpList = malloc(qpListSize);
 		copyInfiAddr(me.info.qpList);
 		MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
@@ -2005,7 +2008,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   CmiCommunicationInit(*argv);
 
   skt_set_idle(CmiYield);
-  Cmi_check_delay = 1.0+0.25*_Cmi_numnodes;
+  Cmi_check_delay = 1.0+0.25*Lrts_numNodes;
 
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
       Cmi_check_delay=1.0e30;
@@ -2013,6 +2016,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   for(i = 0; i < _Cmi_mynodesize; i++)
       inProgress[i] = 0;
 
+  *numNodes = Lrts_numNodes;
+  *myNodeID = Lrts_myNode;
 }
 
 

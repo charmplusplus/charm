@@ -648,7 +648,7 @@ mr=ibv_reg_mr(context->pd, buffer, 128, IBV_ACCESS_LOCAL_WRITE);
         MACHSTATE3(3,"   wr_id=%i qp_num=%i lkey=%p",wr.wr_id,wr.wr.ud.remote_qpn,mr->lkey); 
 
 	if(retval = ibv_post_send(context->qp,&wr,&bad_wr)){ 
-		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",_Cmi_mynode,node->infiData->nodeNo,retval);
+		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",Lrts_myNode,node->infiData->nodeNo,retval);
 		CmiAssert(0);
     }
         ibv_dereg_mr(mr);
@@ -675,7 +675,7 @@ mr=ibv_reg_mr(context->pd, buffer, 128, IBV_ACCESS_LOCAL_WRITE);
 
 	if(ibv_post_send(context->qp,&(packet->wr),&bad_wr)){ 
 		MACHSTATE(2," problem sending");
-		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",_Cmi_mynode,node->infiData->nodeNo,retval);
+		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",Lrts_myNode,node->infiData->nodeNo,retval);
 		CmiAssert(0);
 	}
     MACHSTATE(2," here");
@@ -968,7 +968,7 @@ static inline  void CommunicationServer_lock(int toBuffer) {
 
 static inline  void CommunicationServer_nolock(int toBuffer) {
 /*
-	if(_Cmi_numnodes <= 1){
+	if(Lrts_numNodes <= 1){
 		pollCmiDirectQ();
 		return;
 	} 
@@ -1308,11 +1308,11 @@ void createqp(struct ibv_device *dev){
 void createah() {
 	int i,numnodes;
 
-	numnodes=_Cmi_numnodes;
+	numnodes=Lrts_numNodes;
 	context->ah=(struct ibv_ah **)malloc(sizeof(struct ibv_ah *)*numnodes);
 
 	for(i=0;i<numnodes;i++) { 
-//		if(i!=_Cmi_mynode) {
+//		if(i!=Lrts_myNode) {
             {
     			struct ibv_ah_attr ah_attr = {
     				.is_global     = 0,
@@ -1337,7 +1337,7 @@ void CmiMachineInit(char **argv)
 	int lid;
 
 	MACHSTATE(3,"CmiMachineInit {");
-	MACHSTATE2(3,"_Cmi_numnodes %d CmiNumNodes() %d",_Cmi_numnodes,CmiNumNodes());
+	MACHSTATE2(3,"Lrts_numNodes %d CmiNumNodes() %d",Lrts_numNodes,CmiNumNodes());
 	MACHSTATE1(3,"CmiMyNodeSize() %d",CmiMyNodeSize());
 
 	/* copied from ibverbs.c */
@@ -1380,9 +1380,9 @@ void CmiMachineInit(char **argv)
 	context->pd = ibv_alloc_pd(context->context); //protection domain
 	CmiAssert(context->pd != NULL);
 
-	context->header.nodeNo = _Cmi_mynode;
+	context->header.nodeNo = Lrts_myNode;
 
-	if(_Cmi_numnodes>1) {
+	if(Lrts_numNodes>1) {
 		createqp(ibud.dev);
 //MACHSTATE1(3,"pp post recv=%i",pp_post_recv());	
     }
@@ -1392,7 +1392,7 @@ void CmiMachineInit(char **argv)
 
 void CmiCommunicationInit(char **argv) {
 	MACHSTATE(3,"CmiCommunicationInit {");
-	if(_Cmi_numnodes>1) {
+	if(Lrts_numNodes>1) {
         	infiPostInitialRecvs();
 	 	createah();
 	}

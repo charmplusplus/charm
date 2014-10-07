@@ -366,26 +366,26 @@ static void node_addresses_store(ChMessage *msg)
   int nodestart;
   int i,j,n;
   MACHSTATE(1,"node_addresses_store {");	
-  _Cmi_numnodes=ChMessageInt(n32[0]);
+  Lrts_numNodes=ChMessageInt(n32[0]);
 
 #if CMK_USE_IBVERBS
-  ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes]);
+  ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*Lrts_numNodes]);
   if (Cmi_charmrun_fd == -1) {
     d = &((ChSingleNodeinfo*)n32)->info;
   }
-  else if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes +sizeof(ChInfiAddr)*_Cmi_numnodes )
+  else if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*Lrts_numNodes +sizeof(ChInfiAddr)*Lrts_numNodes )
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
 
 #else
 
-  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes)
+  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*Lrts_numNodes)
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
 #endif /*CMK_USE_IBVERBS*/
-  nodes = (OtherNode)malloc(_Cmi_numnodes * sizeof(struct OtherNodeStruct));
+  nodes = (OtherNode)malloc(Lrts_numNodes * sizeof(struct OtherNodeStruct));
   nodestart=0;
-  for (i=0; i<_Cmi_numnodes; i++) {
+  for (i=0; i<Lrts_numNodes; i++) {
     nodes[i].nodestart = nodestart;
     nodes[i].nodesize  = ChMessageInt(d[i].nPE);
     MACHSTATE2(3,"node %d nodesize %d",i,nodes[i].nodesize);
@@ -396,14 +396,14 @@ static void node_addresses_store(ChMessage *msg)
 #endif
 
     nodes[i].IP=d[i].IP;
-    if (i==_Cmi_mynode) {
+    if (i==Lrts_myNode) {
       Cmi_nodestart=nodes[i].nodestart;
       _Cmi_mynodesize=nodes[i].nodesize;
       Cmi_self_IP=nodes[i].IP;
     }
 
 #if CMK_USE_IBVERBS 
-    if(i != _Cmi_mynode){
+    if(i != Lrts_myNode){
 	int addr[3];
 	addr[0] =ChMessageInt(remoteInfiAddr[i].lid);
 	addr[1] =ChMessageInt(remoteInfiAddr[i].qpn);
@@ -421,11 +421,11 @@ static void node_addresses_store(ChMessage *msg)
   _Cmi_numpes=nodestart;
   n = _Cmi_numpes;
 #ifdef CMK_CPV_IS_SMP
-  n += _Cmi_numnodes;
+  n += Lrts_numNodes;
 #endif
   nodes_by_pe = (OtherNode*)malloc(n * sizeof(OtherNode));
   _MEMCHECK(nodes_by_pe);
-  for (i=0; i<_Cmi_numnodes; i++) {
+  for (i=0; i<Lrts_numNodes; i++) {
     OtherNode node = nodes + i;
     OtherNode_init(node);
     for (j=0; j<node->nodesize; j++)
@@ -433,7 +433,7 @@ static void node_addresses_store(ChMessage *msg)
   }
 #ifdef CMK_CPV_IS_SMP
   /* index for communication threads */
-  for (i=_Cmi_numpes; i<_Cmi_numpes+_Cmi_numnodes; i++) {
+  for (i=_Cmi_numpes; i<_Cmi_numpes+Lrts_numNodes; i++) {
     OtherNode node = nodes + i-_Cmi_numpes;
     nodes_by_pe[i] = node;
   }

@@ -443,7 +443,7 @@ static void CmiMachineInit(char **argv){
 #endif
 		 
 	MACHSTATE(3,"CmiMachineInit {");
-	MACHSTATE2(3,"_Cmi_numnodes %d CmiNumNodes() %d",_Cmi_numnodes,CmiNumNodes());
+	MACHSTATE2(3,"Lrts_numNodes %d CmiNumNodes() %d",Lrts_numNodes,CmiNumNodes());
 	MACHSTATE1(3,"CmiMyNodeSize() %d",CmiMyNodeSize());
 	
 	//TODO: make the device and ibport configureable by commandline parameter
@@ -456,7 +456,7 @@ static void CmiMachineInit(char **argv){
 	MACHSTATE1(3,"context allocated %p",context);
 	
 	//localAddr will store the local addresses of all the qps
-	context->localAddr = (struct infiAddr *)malloc(sizeof(struct infiAddr)*_Cmi_numnodes);
+	context->localAddr = (struct infiAddr *)malloc(sizeof(struct infiAddr)*Lrts_numNodes);
 	MACHSTATE1(3,"context->localAddr allocated %p",context->localAddr);
 
         idev = 0;
@@ -518,15 +518,15 @@ loop:
 #endif
 
 
-	context->header.nodeNo = _Cmi_mynode;
+	context->header.nodeNo = Lrts_myNode;
 
 	mtu_size=1200;
 	packetSize = mtu_size*4;
 	dataSize = packetSize-sizeof(struct infiPacketHeader);
 	
 	calcMaxSize=8000;
-/*	if(_Cmi_numnodes*50 > calcMaxSize){
-		calcMaxSize = _Cmi_numnodes*50;
+/*	if(Lrts_numNodes*50 > calcMaxSize){
+		calcMaxSize = Lrts_numNodes*50;
 		if(calcMaxSize > 10000){
 			calcMaxSize = 10000;
 		}
@@ -537,14 +537,14 @@ loop:
 	context->tokensLeft=maxTokens;
 	context->qp=NULL;
 	//tokensPerProcessor=4;
-	if(_Cmi_numnodes > 1){
+	if(Lrts_numNodes > 1){
 #if !CMK_IBVERBS_FAST_START
 		/* a barrier to make sure all nodes initialized the device */
   		ChMessage msg;
     		ctrl_sendone_nolock("barrier",NULL,0,NULL,0);
   		ChMessage_recv(Cmi_charmrun_fd,&msg);
 #endif
-		createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
+		createLocalQps(dev,ibPort,Lrts_myNode,Lrts_numNodes,context->localAddr);
 	}
 	
         if (Cmi_charmrun_fd == -1) return;
@@ -597,8 +597,8 @@ loop:
 	if(rdma){
 /*		int numPkts;
 		int k;
-		if( _Cmi_numnodes*4 < maxRecvBuffers/4){
-			numPkts = _Cmi_numnodes*4;
+		if( Lrts_numNodes*4 < maxRecvBuffers/4){
+			numPkts = Lrts_numNodes*4;
 		}else{
 			numPkts = maxRecvBuffers/4;
 		}
@@ -734,9 +734,9 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 void copyInfiAddr(ChInfiAddr *qpList){
 	int qpListIdx=0;
 	int i;
-	MACHSTATE1(3,"copyInfiAddr _Cmi_mynode %d",_Cmi_mynode);
-	for(i=0;i<_Cmi_numnodes;i++){
-		if(i == _Cmi_mynode){
+	MACHSTATE1(3,"copyInfiAddr Lrts_myNode %d",Lrts_myNode);
+	for(i=0;i<Lrts_numNodes;i++){
+		if(i == Lrts_myNode){
 		}else{
 			qpList[qpListIdx].lid = ChMessageInt_new(context->localAddr[i].lid);
 			qpList[qpListIdx].qpn = ChMessageInt_new(context->localAddr[i].qpn);
@@ -844,13 +844,13 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 void 	infiPostInitialRecvs(){
 	//create the pool and post the receives
 	int numPosts;
-/*	if(tokensPerProcessor*(_Cmi_numnodes-1) <= maxRecvBuffers){
-		numPosts = tokensPerProcessor*(_Cmi_numnodes-1);
+/*	if(tokensPerProcessor*(Lrts_numNodes-1) <= maxRecvBuffers){
+		numPosts = tokensPerProcessor*(Lrts_numNodes-1);
 	}else{
 		numPosts = maxRecvBuffers;
 	}*/
 
-	if(_Cmi_numnodes > 1){
+	if(Lrts_numNodes > 1){
 		numPosts = maxRecvBuffers;
 	}else{
 		numPosts = 0;
@@ -959,7 +959,7 @@ static inline void CommunicationServer_nolock(int toBuffer); //if buffer ==1 rec
 void MachineExit()
 {
 #if CMK_IBVERBS_STATS	
-	printf("[%d] numReg %d numUnReg %d numCurReg %d msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",_Cmi_mynode,numReg, numUnReg, numCurReg, msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
+	printf("[%d] numReg %d numUnReg %d numCurReg %d msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",Lrts_myNode,numReg, numUnReg, numCurReg, msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
 #endif
 
 }
@@ -1031,7 +1031,7 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 
 	struct ibv_send_wr *bad_wr=NULL;
 	if(retval = ibv_post_send(node->infiData->qp,&(packet->wr),&bad_wr)){
-		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",_Cmi_mynode,node->infiData->nodeNo,retval);
+		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",Lrts_myNode,node->infiData->nodeNo,retval);
 		CmiAssert(0);
 	}
 #if	CMK_IBVERBS_TOKENS_FLOW
@@ -1207,7 +1207,7 @@ static inline void processAsyncEvents(){
 		return;
 	}
 	if(ready == -1){
-//		printf("[%d] strerror %s \n",_Cmi_mynode,strerror(errno));
+//		printf("[%d] strerror %s \n",Lrts_myNode,strerror(errno));
 		return;
 	}
 	
@@ -2768,9 +2768,9 @@ infiDirectHandle *removeHandleFromPollingQ(){
 }*/
 
 static inline infiDirectHandleTable **createHandleTable(){
-	infiDirectHandleTable **table = malloc(_Cmi_numnodes*sizeof(infiDirectHandleTable *));
+	infiDirectHandleTable **table = malloc(Lrts_numNodes*sizeof(infiDirectHandleTable *));
 	int i;
-	for(i=0;i<_Cmi_numnodes;i++){
+	for(i=0;i<Lrts_numNodes;i++){
 		table[i] = NULL;
 	}
 	return table;
@@ -2924,7 +2924,7 @@ void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *se
 	
 	
 /*	table->handles[idx].packet = (struct infiDirectRequestPacket *)CmiAlloc(sizeof(struct infiDirectRequestPacket));
-	table->handles[idx].packet->senderProc = _Cmi_mynode;
+	table->handles[idx].packet->senderProc = Lrts_myNode;
 	table->handles[idx].packet->handle = handle;
 	table->handles[idx].packet->senderKey = *(table->handles[idx].key);
 	table->handles[idx].packet->senderBuf = sendBuf;
