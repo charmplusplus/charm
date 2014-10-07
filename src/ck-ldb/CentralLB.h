@@ -227,6 +227,7 @@ public:
   void readStatsMsgs(const char* filename);
   void writeStatsMsgs(const char* filename);
 
+  void removeCommDataOfDeletedObjs(LDStats* stats);
   void preprocess(LDStats* stats);
   virtual LBMigrateMsg* Strategy(LDStats* stats);
   virtual void work(LDStats* stats);
