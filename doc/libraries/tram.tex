@@ -65,10 +65,9 @@ f(x, j, k) =
 \]
 
 $j$ and $k$ are \emph{peers} if
-\begin{equation}
+\[
 \sum_{d=0}^{N-1} f(d, j, k) = 1 .
-\label{eq:peer}
-\end{equation}
+\]
 When using TRAM, PEs communicate directly only with their
 peers. Sending to a PE which is not a peer is handled inside the
 library by routing the data through one or more \emph{intermediate
@@ -90,10 +89,9 @@ using this routing process at $m$ and every subsequent intermediate
 destination along the route eventually leads to the data item being
 received at $k$. Consequently, the number of messages $F(j, k)$ that
 will carry the data item to the destination is
-\begin{equation}
+\[
 F(j,k) = \sum_{d=0}^{N-1}f(d, j, k) .
-\label{eq:nummsgs}
-\end{equation}
+\]
 
 \subsection{Aggregation}
 
@@ -565,6 +563,53 @@ streaming step is normally done for each step of the application.
 %reaches its destination PE may
 
 %\subsection{Optimizations}
+
+\section{Usage Details}
+
+\subsection{Linking Modules}
+
+Using TRAM requires linking in the NDMeshStreamer module by appending the
+following to the command for linking the executable:
+
+\begin{alltt}
+-module NDMeshStreamer
+\end{alltt}
+
+\subsection{Charm++ Registration of Templated Classes}
+
+Due to the use of templates in TRAM, the library template instances must be
+explicitly registered with the Charm++ runtime by the user of the library. This
+must be done in the ci file for the application, and typically involves three
+steps:
+
+\begin{itemize}
+\item{Registration of the message type}
+\begin{alltt}
+message MeshStreamerMessage<ItemType>;
+\end{alltt}
+\item{Registration of the base aggregator class}
+\begin{alltt}
+group MeshStreamer<ItemType, RouterType>;
+\end{alltt}
+\item{Registration of the derived (array of group) aggregator class}
+\begin{alltt}
+group GroupMeshStreamer<ItemType, ClientType, RouterType>;
+\end{alltt}
+\end{itemize}
+
+In the above, ItemType and ClientType would correspond to the types used in
+application code, while RouterType must be one of the routing choices supported
+by TRAM (currently either SimpleMeshRouter or NodeAwareMeshRouter).
+
+\section{Example}
+
+For an example code showing how to use TRAM, see the Charm++ implementation of
+the HPC Challenge Random Access benchmark. The code can be checked out using
+git:
+
+\begin{alltt}
+git clone  ssh://charm.cs.illinois.edu:9418/benchmarks/randomAccess
+\end{alltt}
 
 \thispagestyle{empty}
 \pagestyle{empty}
