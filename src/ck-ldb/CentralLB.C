@@ -680,6 +680,8 @@ void CentralLB::LoadBalance()
   for(proc = 0; proc < clients; proc++)
       statsData->procs[proc].available = (bool)availVector[proc];
 
+
+  removeCommDataOfDeletedObjs(statsData);
   preprocess(statsData);
 
 //    CkPrintf("Before Calling Strategy\n");
@@ -1332,6 +1334,28 @@ void CentralLB::CheckMigrationComplete()
     theLbdb->nextLoadbalancer(seqno);
   }
 #endif
+}
+
+// Remove edges from commData in LDStats which contains deleted elements
+void CentralLB::removeCommDataOfDeletedObjs(LDStats* stats) {
+  stats->makeCommHash();
+
+  CkVec<LDCommData> newCommData;
+  newCommData.resize(stats->n_comm);
+  int n_comm = 0;
+  for (int i=0; i<stats->n_comm; i++) {
+    LDCommData& cdata = stats->commData[i];
+    if (!cdata.from_proc()) {
+      int sidx = stats->getSendHash(cdata);
+      int ridx = stats->getRecvHash(cdata);
+      if (sidx == -1 || ridx == -1) continue;
+    }
+    stats->commData[n_comm] = cdata;
+    n_comm++;
+  }
+
+  stats->commData.resize(n_comm);
+  stats->n_comm = n_comm;
 }
 
 void CentralLB::preprocess(LDStats* stats)
