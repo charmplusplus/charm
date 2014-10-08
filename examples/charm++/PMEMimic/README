@@ -1,4 +1,0 @@
-Mimic PME communication pattern in NAMD.
-
-exec pes_per_node grid_x max_iteration
-

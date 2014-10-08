@@ -16,7 +16,7 @@ matmul \
 namespace \
 piArray \
 PUP \
-queens \
+NQueen \
 RedExample \
 ring \
 rings \
@@ -35,7 +35,7 @@ jacobi2d \
 load_balancing \
 piArray \
 PUP \
-queens \
+NQueen \
 RedExample \
 ring \
 rings \
