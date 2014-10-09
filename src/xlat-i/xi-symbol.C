@@ -1036,6 +1036,8 @@ Chare::genDecls(XStr& str)
       resetNumbers();
       myParsedFile.doProcess(classname, sdagDecls, sdagDefs);
       str << sdagDecls;
+    } else {
+      str << "#define " << baseName(0) << "_SDAG_CODE \n";
     }
   }
 
