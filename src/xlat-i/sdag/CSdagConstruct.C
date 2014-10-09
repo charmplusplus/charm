@@ -514,7 +514,7 @@ namespace xi {
     cur = 0;
     for (EntryList *el = elist; el != NULL; el = el->next, cur++)
       if (el->entry->intExpr) {
-        if ((cur+prev) > 0) op << ",";
+        if ((cur+prev) > 0) op << ", ";
 	op << "\n";
         indentBy(op, indent + 1);
         op << "c->refnums[" << cur << "]";
@@ -671,7 +671,7 @@ namespace xi {
       }
       defs << "    logs2[" << localnum << "] = " << "_bgParentLog; \n";
       generateEventBracket(defs, SWHEN);
-      defs << "    _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
+      defs << "    _TRACE_BG_FORWARD_DEPS(logs1, logs2, "<< localnum << ", _bgParentLog);\n";
     }
 #endif
 
@@ -1001,7 +1001,7 @@ namespace xi {
     defs << "    int __tmp=__first; __first=__last; __last=__tmp;\n";
     defs << "    __stride = -__stride;\n";
     defs << "  }\n";
-    defs << "  SDAG::CCounter *" << counter << " = new SDAG::CCounter(__first,__last,__stride);\n";
+    defs << "  SDAG::CCounter *" << counter << " = new SDAG::CCounter(__first, __last, __stride);\n";
     defs << "  for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
          << con1->text << "+=__stride) {\n";
     defs << "    SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
@@ -1373,7 +1373,7 @@ namespace xi {
       if (cur != encap.size() - 1) op << ", ";
     }
 
-    for (int i = 0; i < numRefs; i++) op << ((cur+i) > 0 ? "," : "") << "int refnum_" << i;
+    for (int i = 0; i < numRefs; i++) op << ((cur+i) > 0 ? ", " : "") << "int refnum_" << i;
 
     op << ")";
 
@@ -1519,7 +1519,7 @@ namespace xi {
   }
 
   void SdagConstruct::generateBeginExec(XStr& op, const char *name) {
-    op << "     " << "_TRACE_BG_BEGIN_EXECUTE_NOMSG(\""<<name<<"\",&_bgParentLog,1);\n"; 
+    op << "     " << "_TRACE_BG_BEGIN_EXECUTE_NOMSG(\""<<name<<"\", &_bgParentLog,1);\n";
   }
 
   void SdagConstruct::generateEndExec(XStr& op){
@@ -1549,13 +1549,13 @@ namespace xi {
     (void) eventType;
     //Trace this event
     op << "     _TRACE_BG_USER_EVENT_BRACKET(\"" << nameStr
-       << "\", __begintime, CkVTimer(),&_bgParentLog); \n";
+       << "\", __begintime, CkVTimer(), &_bgParentLog); \n";
   }
 
   void SdagConstruct::generateListEventBracket(XStr& op, int eventType) {
     (void) eventType;
-    op << "    _TRACE_BGLIST_USER_EVENT_BRACKET(\"" << nameStr
-       << "\",__begintime,CkVTimer(),&_bgParentLog, " << label
+    op << "     _TRACE_BGLIST_USER_EVENT_BRACKET(\"" << nameStr
+       << "\", __begintime,CkVTimer(), &_bgParentLog, " << label
        << "_bgLogList);\n";
   }
 
