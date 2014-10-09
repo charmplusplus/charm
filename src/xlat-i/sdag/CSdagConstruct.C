@@ -514,7 +514,7 @@ namespace xi {
     cur = 0;
     for (EntryList *el = elist; el != NULL; el = el->next, cur++)
       if (el->entry->intExpr) {
-        if (prev > 0) op << ",";
+        if ((cur+prev) > 0) op << ",";
 	op << "\n";
         indentBy(op, indent + 1);
         op << "c->refnums[" << cur << "]";
@@ -597,7 +597,7 @@ namespace xi {
         if (state->name) defs << *state->name; else defs << "gen" << cur;
         if (cur != encapState.size() - 1) defs << ", ";
       }
-      for (int i = 0; i < numRefs; i++) defs << (cur > 0 ? ", " : "") << "refnum_" << i;
+      for (int i = 0; i < numRefs; i++) defs << ((cur+i) > 0 ? ", " : "") << "refnum_" << i;
       defs << ");\n";
 
       endMethod(defs);
@@ -1373,7 +1373,7 @@ namespace xi {
       if (cur != encap.size() - 1) op << ", ";
     }
 
-    for (int i = 0; i < numRefs; i++) op << (cur > 0 ? "," : "") << "int refnum_" << i;
+    for (int i = 0; i < numRefs; i++) op << ((cur+i) > 0 ? "," : "") << "int refnum_" << i;
 
     op << ")";
 
