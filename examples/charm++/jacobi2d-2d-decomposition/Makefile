@@ -6,7 +6,7 @@ OBJS = jacobi2d.o
 all: jacobi2d
 
 jacobi2d: $(OBJS)
-	$(CHARMC) -language charm++ -module RefineLB -o jacobi2d $(OBJS)
+	$(CHARMC) -language charm++ -o jacobi2d $(OBJS)
 
 projections: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode projections -lz -o jacobi2d.prj $(OBJS)
@@ -24,4 +24,4 @@ jacobi2d.o: jacobi2d.C jacobi2d.decl.h
 	$(CHARMC) -c jacobi2d.C
 
 test: jacobi2d
-	./charmrun +p2 ./jacobi2d 20 10 +balancer Refine $(TESTOPTS)
+	./charmrun +p2 ./jacobi2d 32 16 $(TESTOPTS)

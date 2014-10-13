@@ -7,7 +7,9 @@ hello \
 integrate \
 integrate2 \
 integrateArray \
-jacobi2d \
+jacobi2d-1d-decomposition \
+jacobi2d-2d-decomposition \
+jacobi3d-2d-decomposition \
 leanmd \
 load_balancing \
 manyToMany \
@@ -29,7 +31,6 @@ hello \
 integrate \
 integrate2 \
 integrateArray \
-jacobi2d \
 load_balancing \
 piArray \
 PUP \

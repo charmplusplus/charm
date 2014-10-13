@@ -1,0 +1,7 @@
+Jacobi iteration with a 3D Array.
+
+This code uses a 2-D blocked decomposition of a 3-d array with more
+than one element per chare. 
+
+Boundary conditions are obeyed in this example.  Control is expressed
+using structured dagger.

@@ -14,9 +14,6 @@ projections: $(OBJS)
 summary: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode summary -lz -o jacobi3d.sum $(OBJS)
 
-autoPerf: $(OBJS)
-	$(CHARMC) -language charm++ -tracemode autoPerf -lz -o jacobi3d.ap $(OBJS)
-
 jacobi3d.decl.h: jacobi3d.ci
 	$(CHARMC)  jacobi3d.ci
 
@@ -27,4 +24,4 @@ jacobi3d.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) -c jacobi3d.C
 
 test: jacobi3d
-	./charmrun +p2 ./jacobi3d 20 10 +balancer Refine $(TESTOPTS)
+	./charmrun +p2 ./jacobi3d 32 16 $(TESTOPTS)
