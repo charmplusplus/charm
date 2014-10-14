@@ -1,1 +1,0 @@
-./charmrun +p8 ++local ./jacobi2d 8 56 10 +setcpuaffinity +pemap 0-7
