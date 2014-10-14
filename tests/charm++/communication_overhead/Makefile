@@ -14,7 +14,7 @@ overhead_test.o: overhead_test.C overhead_test.decl.h overhead_test.def.h
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: all
-	./charmrun +p2 ./overhead_test
+	./charmrun $(TESTOPTS) +p2 ./overhead_test
 
 clean:
 	rm -f overhead_test.decl.h overhead_test.def.h overhead_test.o
