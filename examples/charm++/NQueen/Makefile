@@ -48,8 +48,12 @@ counter.o: counter.C  Counter.decl.h Counter.def.h
 main.decl.h main.def.h : main.ci.stamp
 Counter.decl.h Counter.def.h : counter.ci.stamp
 
-test: all
-	 ./charmrun +p 4 ./nqueen 17 5 
+test: nqueen
+	 ./charmrun +p 4 ./nqueen 16 4 $(TESTOPTS)
+
+bgtest: all
+	 ./charmrun +p 4 ./nqueen 16 4 +x2 +y2 +z2 +bgstacksize 102400 $(TESTOPTS)
+
 clean:
 	rm -f main.decl.h main.def.h main.o
 	rm -f Counter.decl.h Counter.def.h nqueen.o
