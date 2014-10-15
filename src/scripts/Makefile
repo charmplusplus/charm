@@ -33,8 +33,8 @@ CXXFLAGS=-I.
 all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc everylb
 
 all-test: bigsim LIBS
-	cd ../tests ; $(MAKE) all OPTS='$(OPTS)'
-	cd ../examples ; $(MAKE) all OPTS='$(OPTS)'
+	$(MAKE) -C ../tests all OPTS='$(OPTS)'
+	$(MAKE) -C ../examples all OPTS='$(OPTS)'
 
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
@@ -49,7 +49,7 @@ SM: converse $(L)/libsm.a
 PVM: converse $(L)/libpvmc.a
 
 AMR: charm++ LIBS
-	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
+	$(MAKE) -C libs/ck-libs/amr all OPTS='$(OPTS)'
 
 FEM: charm++ AMPI
 	$(MAKE) -C libs/ck-libs/ FEM
@@ -106,11 +106,11 @@ $(L)/libckmain.a: main.o
 translators: charmxi conv-cpm
 
 msa: charm++
-	cd libs/ck-libs/multiphaseSharedArrays && $(MAKE)
+	$(MAKE) -C libs/ck-libs/multiphaseSharedArrays
 
 jade: charm++ msa
 #	make the lib, include
-	cd langs/jade && $(MAKE)
+	$(MAKE) -C langs/jade
 
 
 # This should be done offline, since the user does not need to compile
@@ -119,9 +119,9 @@ jade: charm++ msa
 # care of.
 #jadeall: jade
 #	make parser.g -> .java files
-#	cd langs/jade && $(MAKE) p
+#	$(MAKE) -C langs/jade p
 #	make the jade.jar file
-#	cd ../java/charm/jade && $(MAKE)
+#	$(MAKE) -C ../java/charm/jade
 
 #include TAU defs
 TAU_MAKEFILE=Make.tau
@@ -133,44 +133,44 @@ Tau:
 	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
 
 LIBS: CONVLIBS CHARMLIBS everylb
-	cd libs; $(MAKE) otherlibs
+	$(MAKE) -C libs otherlibs
 	echo "Built LIBS Successfully"
 
 bgtest: bigsim LIBS
-	cd ../tests ; $(MAKE) bgtest OPTS='$(OPTS)'
-	cd ../examples ; $(MAKE) bgtest OPTS='$(OPTS)'
+	$(MAKE) -C ../tests bgtest OPTS='$(OPTS)'
+	$(MAKE) -C ../examples bgtest OPTS='$(OPTS)'
 
 syncfttest causalfttest mpisyncfttest mlogfttest: charm++ LIBS
-	cd ../tests ; $(MAKE) $@ OPTS='$(OPTS)'
+	$(MAKE) -C ../tests $@ OPTS='$(OPTS)'
 
 test: bigsim LIBS
-	cd ../tests ; $(MAKE) test OPTS='$(OPTS)'
-	cd ../examples ; $(MAKE) test OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test OPTS='$(OPTS)'
+	$(MAKE) -C ../examples test OPTS='$(OPTS)'
 
 test-converse: converse
-	cd ../tests ; $(MAKE) test-converse  OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test-converse  OPTS='$(OPTS)'
 
 test-charm: charm++
-	cd ../tests ; $(MAKE) test-charm  OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test-charm  OPTS='$(OPTS)'
 
 test-AMPI: AMPI
-	cd ../tests ; $(MAKE) test-AMPI  OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test-AMPI  OPTS='$(OPTS)'
 
 test-fem: FEM
-	cd ../tests ; $(MAKE) test-fem  OPTS='$(OPTS)'
-	cd ../examples ; $(MAKE) test-fem  OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test-fem  OPTS='$(OPTS)'
+	$(MAKE) -C ../examples test-fem  OPTS='$(OPTS)'
 
 ps-doc: basics
-	cd ../doc ; make ps
+	$(MAKE) -C ../doc ps
 
 pdf-doc: basics
-	cd ../doc ; make pdf
+	$(MAKE) -C ../doc pdf
 
 html-doc: basics
-	cd ../doc ; make html
+	$(MAKE) -C ../doc html
 
 doc: basics
-	cd ../doc ; make doc
+	$(MAKE) -C ../doc doc
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
@@ -449,9 +449,9 @@ fmain-ok: fmain.f90
 	-@touch fmain-ok
 
 QUICK_THREADS: $(CVHEADERS)
-	-( cd QuickThreads && $(MAKE) clean )
+	-( $(MAKE) -C QuickThreads clean )
 	( cd QuickThreads;./configure )
-	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS) -Wno-error' ) || ( echo "Did you try to build net-linux on a 64-bit system? Try net-linux-x86_64" && false )
+	( $(MAKE) -C QuickThreads qt  OPTS='$(OPTS) -Wno-error' ) || ( echo "Did you try to build net-linux on a 64-bit system? Try net-linux-x86_64" && false )
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
@@ -460,7 +460,7 @@ QUICK_THREADS: $(CVHEADERS)
 	touch QUICK_THREADS
 
 CONVLIBS: converse
-	cd libs; $(MAKE) convlibs OPTS='$(OPTS)'
+	$(MAKE) -C libs convlibs OPTS='$(OPTS)'
 
 $(L)/libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) $(TAU_LIBS) -o $@ $(LIBCONV_CORE) 
@@ -681,7 +681,7 @@ charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
 charm-target: loadbalancers default_libs comlib_objs mpi-main 
 
 CHARMLIBS: charm++ CONVLIBS 
-	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
+	$(MAKE) -C libs charmlibs OPTS='$(OPTS)'
 
 $(L)/libck.a: $(LIBCK_CORE) 
 	$(CHARMC) -o $@ $(LIBCK_CORE)
@@ -986,11 +986,11 @@ clean:
 	rm -f core #*#
 	rm -f core *~
 	rm -f *.stamp
-	if [ -d charmrun-src ] ; then ( cd charmrun-src; make clean ) ; fi
-	-( cd doc && $(MAKE) clean )
-	( cd libs; $(MAKE) clean )
-	( cd ../examples && $(MAKE) clean )
-	( cd ../tests && $(MAKE) clean )
+	if [ -d charmrun-src ] ; then ( $(MAKE) -C charmrun-src clean ) ; fi
+	-( $(MAKE) -C doc clean )
+	( $(MAKE) -C libs clean )
+	( $(MAKE) -C ../examples clean )
+	( $(MAKE) -C ../tests clean )
 
 veryclean:
 	rm -rf ../bin
