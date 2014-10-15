@@ -75,11 +75,6 @@
 /* not the C++ compiler.  If this is C++, ignore them.       */
 #ifdef __cplusplus
 
-/// @todo: Cmi{Bool,False,True} are a relic from gory old days. Remove completely in charm v6.6
-typedef bool CmiBool;
-#define CmiFalse false
-#define CmiTrue true
-
 #if ! CMK_HAS_OFFSETOF
 #undef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
