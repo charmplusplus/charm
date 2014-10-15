@@ -560,6 +560,10 @@ void CmiNodeAllBarrier(void) {
  * woken up.
  **********************************************************/
 
+static int CmiIdleLock_hasMessage(CmiState cs) {
+  return cs->idle.hasMessages;
+}
+
 #if CMK_SHARED_VARS_NT_THREADS
 
 static void CmiIdleLock_init(CmiIdleLock *l) {

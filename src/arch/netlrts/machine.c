@@ -1540,13 +1540,13 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 /**
  * Set up an OutgoingMsg structure for this message.
  */
-static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char *data) {
+static OutgoingMsg PrepareOutgoing(int pe,int size,int freemode,char *data) {
   OutgoingMsg ogm;
   MallocOutgoingMsg(ogm);
   MACHSTATE2(2,"Preparing outgoing message for pe %d, size %d",pe,size);
   ogm->size = size;
   ogm->data = data;
-  ogm->src = CmiGetPeGlobal(cs->pe,CmiMyPartition());
+  ogm->src = CmiMyPeGlobal();
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;
@@ -1570,12 +1570,12 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
 CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freemode)
 {
   int sendonnetwork;
-  CmiState cs = CmiGetState(); OutgoingMsg ogm;
+  OutgoingMsg ogm;
   MACHSTATE(1,"CmiGeneralSend {");
 
   CMI_MSG_SIZE(data) = size;
 
-  ogm=PrepareOutgoing(cs,pe,size,'F',data);
+  ogm=PrepareOutgoing(pe,size,'F',data);
 
   int acqLock = 0;
 #if CMK_SMP_NOT_RELAX_LOCK  

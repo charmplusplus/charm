@@ -365,6 +365,7 @@ INLINE_KEYWORD CMIQueue CmiMyNodeQueue() {
     return CsvAccess(NodeState).NodeRecv;
 }
 #endif
+
 INLINE_KEYWORD int CmiMyPe() {
     return CmiGetState()->pe;
 }
@@ -390,6 +391,12 @@ INLINE_KEYWORD int CmiRankOf(int pe) {
     return pe%_Cmi_mynodesize;
 }
 #endif
+
+static int CmiState_hasMessage() {
+  CmiState cs = CmiGetState();
+  return CmiIdleLock_hasMessage(cs);
+}
+
 /* ===== End of Processor/Node State-related Stuff =====*/
 
 #include "machine-broadcast.c"

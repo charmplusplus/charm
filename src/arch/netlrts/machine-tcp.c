@@ -234,7 +234,7 @@ static void CommunicationServerNet(int sleepTime, int where)
   }
   CommunicationsClock();
   /*Don't sleep if a signal has stored messages for us*/
-  if (sleepTime&&CmiGetState()->idle.hasMessages) sleepTime=0;
+  if (sleepTime&&CmiState_hasMessage()) sleepTime=0;
   while (CheckSocketsReady(sleepTime, 1)>0) {
     int again=0;
     sleepTime=0;
