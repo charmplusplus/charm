@@ -6,38 +6,40 @@ DIRS=util charm++ converse ampi
 
 all:
 	for d in $(DIRS); do \
-		(cd $$d && $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
+		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 test:
 	for d in $(DIRS); do \
-		(cd $$d && $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
+		($(MAKE) -C $$d test OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 bgtest:
 	for d in charm++ ampi; do \
-		(cd $$d && $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
+		($(MAKE) -C $$d bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 syncfttest causalfttest mpisyncfttest mlogfttest:
 	for d in charm++ ampi; do \
-		(cd $$d && $(MAKE) $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
+		($(MAKE) -C $$d $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 test-converse:
-	cd converse; $(MAKE) test OPTS='$(OPTS)'
+	$(MAKE) -C converse test OPTS='$(OPTS)'
 
 test-charm:
-	cd charm++; $(MAKE) test OPTS='$(OPTS)'
+	$(MAKE) -C charm++ test OPTS='$(OPTS)'
 
 test-AMPI:
-	cd ampi; $(MAKE) test OPTS='$(OPTS)'
+	$(MAKE) -C ampi test OPTS='$(OPTS)'
 
 test-fem:
-	cd fem; $(MAKE) test OPTS='$(OPTS)'
+	$(MAKE) -C fem test OPTS='$(OPTS)'
 
 clean:
-	for d in $(DIRS); do (cd $$d && $(MAKE) clean OPTS='$(OPTS)'); done
+	for d in $(DIRS); do \
+		($(MAKE) -C $$d clean OPTS='$(OPTS)'); \
+	done
 	rm -f TAGS #*#
 	rm -f core *~
 
