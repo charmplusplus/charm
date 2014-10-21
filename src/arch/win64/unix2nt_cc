@@ -202,9 +202,17 @@ do
 		CL="$CL /D$1"
 		shift
 		;;
+	-U)
+		CL="$CL /U$1"
+		shift
+		;;
 	-D*)
 		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		CL="$CL /D$def"
+		;;
+	-U*)
+		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
+		CL="$CL /U$def"
 		;;
 	-I)
 		CL="$CL /I`cygpath -w $1`"
