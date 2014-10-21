@@ -1,6 +1,12 @@
 GNI_CRAYXE=1
-PMI_CFLAGS=`pkg-config --cflags cray-pmi`
-PMI_LIBS=`pkg-config --libs cray-pmi`
+
+PMI_CFLAGS=
+PMI_LIBS=
+if test -z "$CRAY_PMI_INCLUDE_OPTS"
+then
+  PMI_CFLAGS=`pkg-config --cflags cray-pmi`
+  PMI_LIBS=`pkg-config --libs cray-pmi`
+fi
 UGNI_CFLAGS=`pkg-config --cflags cray-ugni`
 UGNI_LIBS=`pkg-config --libs cray-ugni`
 
