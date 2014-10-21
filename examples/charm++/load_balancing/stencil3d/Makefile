@@ -28,4 +28,4 @@ test: stencil3d
 	./charmrun +p4 ./stencil3d 64 32 +balancer GreedyLB $(TESTOPTS)
 
 bgtest: stencil3d
-	./charmrun +p4 ./stencil3d 32 16 +balancer CommLB +x2 +y2 +z1 +cth1 +wth1
+	./charmrun +p4 ./stencil3d 32 16 +balancer CommLB +x2 +y2 +z1 +cth1 +wth1 $(TESTOPTS)

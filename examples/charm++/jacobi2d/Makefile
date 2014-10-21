@@ -20,4 +20,4 @@ test: all
 	./charmrun ./jacobi2d +p4 10 $(TESTOPTS)
 
 bgtest: all
-	./charmrun ./jacobi2d +p4 10 +x2 +y2 +z2
+	./charmrun ./jacobi2d +p4 10 +x2 +y2 +z2 $(TESTOPTS)

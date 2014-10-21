@@ -32,7 +32,7 @@ test:  lb_test lb_test.every
 	./charmrun +p4 ./lb_test.every 100 100 10 40 10 1000 ring +balancer RecBipartLB +LBDebug 1 $(TESTOPTS)
 
 bgtest:  lb_test
-	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 +x2 +y2 +z1 +cth1 +wth1
+	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 +x2 +y2 +z1 +cth1 +wth1 $(TESTOPTS)
 
 bgdump:
 	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 mesh2d +balancer DummyLB +LBDebug 1 +LBSameCpus +LBNoBackground +bgconfig ./bg_config +LBDump 1 +LBDumpFile lb_test.dump
