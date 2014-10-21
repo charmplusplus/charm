@@ -29,7 +29,7 @@ test: all
 
 bgtest: all
 	@echo "Intra-processor Pingpong.."
-	./charmrun ./pgm +p1 +x1 +y1 +z1
+	./charmrun ./pgm +p1 +x1 +y1 +z1 $(TESTOPTS)
 	@echo "Inter-processor Pingpong.."
-	./charmrun ./pgm +p2 +x2 +y1 +z1
+	./charmrun ./pgm +p2 +x2 +y1 +z1 $(TESTOPTS)
 
