@@ -1227,6 +1227,8 @@ void nodetab_init()
   nodetab_host global,group,host;
   char input_line[MAX_LINE_LENGTH];
   int rightgroup, basicsize, i, remain;
+  /* Store the previous host so we can make sure we aren't mixing localhost and non-localhost */
+  char *prevHostName = NULL;
   
   /* if arg_local is set, ignore the nodelist file */
   if (arg_local || arg_mpiexec) {
@@ -1281,10 +1283,18 @@ void nodetab_init()
 		const char *b3 = skipblanks(e2);
 		if (subeqs(b1,e1,"host")) {
 			if (rightgroup) {
+				/* check if we have a previous host, if it's different than our current host, and if one of them is localhost */
+				if(prevHostName && strcmp(b2,prevHostName) && (!strcmp(b2,"localhost") || !strcmp(prevHostName,"localhost"))){
+					fprintf(stderr,"ERROR> Mixing localhost with other hostnames will lead to connection failures.\n");
+					fprintf(stderr,"ERROR> The problematic line in group %s is: %s\n", arg_nodegroup, input_line);
+					exit(1);
+				}
 				host=group;
 				nodetab_args(b3,&host);
 				for (host.rank=0; host.rank<host.cpus; host.rank++)
 					nodetab_makehost(substr(b2,e2),&host);
+				free(prevHostName);
+				prevHostName = strdup(b2);
 			}
 		} else if (subeqs(b1,e1, "group")) {
 			group=global;
@@ -1326,6 +1336,7 @@ fin:
 		nodetab_init_hierarchical_start();		
 #endif
 
+  free(prevHostName);
 }
 
 /* Given a processor number, look up the nodetab info: */
