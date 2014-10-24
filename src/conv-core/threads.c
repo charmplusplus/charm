@@ -714,15 +714,19 @@ void CthSwitchThread(CthThread t)
  */
 void CthCheckThreadSanity()
 {
-  CthThreadBase *base_thread=B(CthCpvAccess(CthCurrent));
-
   /* use the address of a dummy variable on stack to see how large the stack is currently */
   int tmp;
-  void* curr_stack = (void*)(&tmp);
+  char* curr_stack;
+  char* base_stack;
+  CthThreadBase *base_thread=B(CthCpvAccess(CthCurrent));
+  
+  curr_stack = (char*)(&tmp);
+  base_stack = (char*)(base_thread->stack);
+
   /* stack pointer should be between start and end addresses of stack, regardless of direction */ 
   /* check to see if we actually allocated a stack (it is not main thread) */
   if ( base_thread->magic != THD_MAGIC_NUM ||
-      (base_thread->stack != 0 && (curr_stack < base_thread->stack || curr_stack > base_thread->stack + base_thread->stacksize)))
+      (base_stack != 0 && (curr_stack < base_stack || curr_stack > base_stack + base_thread->stacksize)))
     CmiAbort("Thread meta data is not sane! Check for memory corruption and stack overallocation. Use +stacksize to"
         "increase stack size or allocate in heap instead of stack.");
 }
@@ -735,13 +739,13 @@ Suspend: finds the next thread to execute, and resumes it
 void CthSuspend(void)
 {
 
-#if CMK_ERROR_CHECKING
-  CthCheckThreadSanity();
-#endif
-
   CthThread next;
   struct CthThreadListener *l;
   CthThreadBase *cur=B(CthCpvAccess(CthCurrent));
+
+#if CMK_ERROR_CHECKING
+  CthCheckThreadSanity();
+#endif
 
   if (cur->suspendable == 0)
     CmiAbort("Fatal Error> trying to suspend a non-suspendable thread!\n");
