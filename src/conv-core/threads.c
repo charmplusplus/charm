@@ -1986,6 +1986,7 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
     size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
     stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
     B(result)->stack = stack;
+    B(result)->stacksize = size;
   } else
     stack=CthAllocateStack(&result->base,&size,Migratable);
   CthAliasEnable(B(result)); /* Change to new thread's stack while setting args */
@@ -1993,6 +1994,7 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
   stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);
   CthAliasEnable(B(CthCpvAccess(CthCurrent)));
   result->stack = stack;
+  B(result)->stacksize = size;
   result->stackp = stackp;
   if (doProtect) {
 #ifdef QT_GROW_UP
