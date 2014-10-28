@@ -2389,11 +2389,9 @@ void *CmiReduceMergeFn_random(int *size, void *data, void** remote, int n) {
   return data;
 }
 
-#if CMK_MESSAGE_LOGGING
 void CmiResetGlobalReduceSeqID(){
 	CpvAccess(_reduce_seqID_global) = 0;
 }
-#endif
 
 static void CmiGlobalReduce(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReduction *red) {
   CmiAssert(red->localContributed == 0);
