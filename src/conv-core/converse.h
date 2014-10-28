@@ -1185,9 +1185,7 @@ CmiReductionID CmiGetGlobalReduction();
 CmiReductionID CmiGetDynamicReduction();
 void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data);
 
-#if CMK_MESSAGE_LOGGING
 void CmiResetGlobalReduceSeqID();
-#endif
 
 /* If the second parameter (the number of chunks to send) is negative, then
  * every message will be started aligned with 8 bytes, and a message header will

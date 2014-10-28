@@ -28,6 +28,7 @@ public:
 	int failedpe;
 	int cur_restart_phase;
 	int len;
+	int pointer;
 	char *packData;
 };
 
@@ -55,14 +56,16 @@ public:
 #define CkCheckPoint_inDISK  2
 
 class CkCheckPTEntry{
-  CkArrayCheckPTMessage *data;
+  CkArrayCheckPTMessage **data;
   char * fname;
 public:
   int bud1, bud2;
   int where;
   void init(int _where, int idx)
   {
-    data = NULL;
+    data = new CkArrayCheckPTMessage*[2];
+    data[0] = NULL;
+    data[1] = NULL;
     where = _where;
     if(where == CkCheckPoint_inDISK)
     {
@@ -83,13 +86,13 @@ public:
     }
   }
 
-  void updateBuffer(CkArrayCheckPTMessage * msg)
+  void updateBuffer(int pointer, CkArrayCheckPTMessage * msg)
   {
     if(where == CkCheckPoint_inDISK)
     {
       envelope *env = UsrToEnv(msg);
       CkUnpackMessage(&env);
-      data = (CkArrayCheckPTMessage *)EnvToUsr(env);
+      data[pointer] = (CkArrayCheckPTMessage *)EnvToUsr(env);
       FILE *f = fopen(fname,"wb");
       PUP::toDisk p(f);
       CkPupMessage(p, (void **)&msg);
@@ -103,14 +106,14 @@ public:
     {
       CmiAssert(where == CkCheckPoint_inMEM);
       CmiAssert(msg!=NULL);
-      if (data) delete data;
-      data = msg;
+      delete data[pointer];
+      data[pointer] = msg;
       bud1 = msg->bud1;
       bud2 = msg->bud2;
     }
   }
   
-  CkArrayCheckPTMessage * getCopy()
+  CkArrayCheckPTMessage * getCopy(int pointer)
   {
     if(where == CkCheckPoint_inDISK)
     {
@@ -125,11 +128,11 @@ public:
     }else
     {
       CmiAssert(where == CkCheckPoint_inMEM);
-      if (data == NULL) {
+      if (data[pointer] == NULL) {
         CmiPrintf("[%d] recoverArrayElements: element does not have checkpoint data.", CkMyPe());
         CmiAbort("Abort!");
       }
-      return (CkArrayCheckPTMessage *)CkCopyMsg((void **)&data);
+      return (CkArrayCheckPTMessage *)CkCopyMsg((void **)&data[pointer]);
     }
   }
 };
@@ -175,13 +178,15 @@ public:
   static int inLoadbalancing;
   static double startTime;
   static char*  stage;
+
 private:
   CkVec<CkCheckPTInfo *> ckTable;
   CkCheckPTEntry chkpTable[2];
 
   int recvCount, peCount;
   int expectCount, ackCount;
-    /// the processor who initiate the checkpointing
+  int recvChkpCount;//expect to receive both the processor checkpoint and array checkpoint from buddy PE
+  /// the processor who initiate the checkpointing
   int cpStarter;
   CkVec<int> failedPes;
   int thisFailedPe;
