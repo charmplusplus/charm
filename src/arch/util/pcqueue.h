@@ -35,6 +35,8 @@
 
 #endif
 
+#include <atomic>
+
 /* If we are using locks in PCQueue, we disable any other fence operation,
  * otherwise we use the ones provided by converse.h */
 #if CMK_PCQUEUE_LOCK
@@ -45,8 +47,8 @@
 #else
 #define PCQueue_CmiMemoryReadFence                 CmiMemoryReadFence
 #define PCQueue_CmiMemoryWriteFence                CmiMemoryWriteFence
-#define PCQueue_CmiMemoryAtomicIncrement           CmiMemoryAtomicIncrement
-#define PCQueue_CmiMemoryAtomicDecrement           CmiMemoryAtomicDecrement
+#define PCQueue_CmiMemoryAtomicIncrement(someInt)  std::atomic_fetch_add_explicit(&(someInt), 1, std::memory_order_release)
+#define PCQueue_CmiMemoryAtomicDecrement(someInt)  std::atomic_fetch_sub_explicit(&(someInt), 1, std::memory_order_release)
 #endif
 
 #if CMK_SMP
@@ -90,7 +92,7 @@ typedef struct PCQueueStruct
 #if CMK_SMP
   char _pad2[CMI_CACHE_LINE_SIZE - sizeof(CircQueue)]; // align to cache line
 #endif
-  int  len;
+  std::atomic<int> len;
 #if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiNodeLock  lock;
 #endif
@@ -191,8 +193,8 @@ static char *PCQueueTop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
+    if (std::atomic_load_explicit(&Q->len, std::memory_order_acquire) == 0) return 0;
 #if CMK_PCQUEUE_LOCK
-    if (Q->len == 0) return 0;        /* If atomic increment are used, Q->len is always right */
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
@@ -210,15 +212,14 @@ static char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
+    if (std::atomic_load_explicit(&Q->len, std::memory_order_acquire) == 0) return 0;
 #if CMK_PCQUEUE_LOCK
-    if (Q->len == 0) return 0;        /* If atomic increment are used, Q->len is always right */
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
     pull = circ->pull;
     data = circ->data[pull];
 
-    PCQueue_CmiMemoryReadFence();
 
 #if XT3_ONLY_PCQUEUE_WORKAROUND
     if (data && (Q->len > 0)) {
@@ -299,7 +300,6 @@ static void PCQueuePush(PCQueue Q, char *data)
     Q->tail->next = circ;
     Q->tail = circ;
   }
-  PCQueue_CmiMemoryWriteFence();
   
   circ1->data[push] = data;
   PCQueue_CmiMemoryAtomicIncrement(Q->len);
