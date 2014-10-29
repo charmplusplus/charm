@@ -7,7 +7,6 @@
 
 #define USE_TREE_BROADCAST_THRESHOLD 8
 #define TREE_BCAST_BRANCH (4)
-#define CACHE_LINE_SIZE 64
 /* 1. Using converse-level msg, then the msg is always of highest priority.
  * And the notification msg comes from the singlehelper where the loop parallelization
  * is initiated.
@@ -43,18 +42,33 @@ private:
     //a tag to indicate whether the task for this new loop has been inited
     //this tag is needed to prevent other helpers to run the old task
     int inited;
-
+    int bufSize;
+    int usedPEs;
 public:
-    CurLoopInfo(int maxChunks):numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0),
+    CurLoopInfo(int size=CACHE_LINE_SIZE):numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0),
             paramNum(0), param(NULL), curChunkIdx(-1), finishFlag(0), redBufs(NULL), bufSpace(NULL), inited(0) {
-        redBufs = new void *[maxChunks];
-        bufSpace = new char[maxChunks * CACHE_LINE_SIZE];
-        for (int i=0; i<maxChunks; i++) redBufs[i] = (void *)(bufSpace+i*CACHE_LINE_SIZE);
+        //int chunks = CkMyNodeSize();
+        int chunks = getMaxChunks();        
+        redBufs = new void *[chunks];
+        usedPEs = -1;
+        bufSize = size;
+        bufSpace = new char[chunks* bufSize];
+        memset(bufSpace, 0, chunks* bufSize);
+        for (int i=0; i<chunks; i++) redBufs[i] = (void *)(bufSpace+i*bufSize);
     }
 
     ~CurLoopInfo() {
         delete [] redBufs;
         delete [] bufSpace;
+    }
+
+    static int getMaxChunks()
+    {
+        int maxChunks=CkMyNodeSize();        
+#if !CMK_SMP
+        maxChunks = MAX_CHUNKS;
+#endif
+        return maxChunks;
     }
 
     void set(int nc, HelperFn f, int lIdx, int uIdx, int numParams, void *p) {        /*
@@ -105,6 +119,12 @@ public:
         return __sync_add_and_fetch(&curChunkIdx, 1);
 #endif
     }
+    int getUsedPEs() { return usedPEs; }
+    int getNextUsedPEs() {
+        return __sync_add_and_fetch(&usedPEs, 1);
+    }
+    int getBufSize() { return bufSize; }
+
     void reportFinished(int counter) {
         if (counter==0) return;
 #if defined(_WIN32)
@@ -129,6 +149,7 @@ public:
     }
 
     void stealWork();
+    void reset() { usedPEs = -1;}
 };
 
 /* FuncCkLoop is a nodegroup object */
@@ -162,11 +183,12 @@ private:
     int mode;
 
     int numHelpers; //in pthread mode, the counter includes itself
+    int bufsize;
     FuncSingleHelper **helperPtr; /* ptrs to the FuncSingleHelpers it manages */
     int useTreeBcast;
 
 public:
-    FuncCkLoop(int mode_, int numThreads_);
+    FuncCkLoop(int mode_, int numThreads_, int size);
 
     FuncCkLoop(CkMigrateMessage *m);
 
@@ -183,7 +205,7 @@ public:
 
     void createPThreads();
     void exit();
-    void init(int mode_, int numThreads_);
+    void init(int mode_, int numThreads_, int size_);
 
     int getNumHelpers() {
         return numHelpers;
@@ -191,17 +213,18 @@ public:
     int needTreeBcast() {
         return useTreeBcast;
     }
-
-    void parallelizeFunc(HelperFn func, /* the function that finishes a partial work on another thread */
+     void parallelizeFunc(HelperFn func, /* the function that finishes a partial work on another thread */
                          int paramNum, void * param, /* the input parameters for the above func */
                          int numChunks, /* number of chunks to be partitioned */
                          int lowerRange, int upperRange, /* the loop-like parallelization happens in [lowerRange, upperRange] */
                          int sync=1, /* whether the flow will continue until all chunks have finished */
-                         void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
+                         void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE, /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
+                         ReducerFn rfunc=NULL,    /* customized reduce function */
+                         int nbytes = CACHE_LINE_SIZE 
                         );
     void destroyHelpers();
-    void reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int numChunks);
     void pup(PUP::er &p);
+    void reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int numChunks, int redSize, ReducerFn rfunc);
 };
 
 void SingleHelperStealWork(ConverseNotifyMsg *msg);
@@ -218,6 +241,7 @@ private:
     FuncCkLoop *thisCkLoop;
     CProxy_FuncCkLoop funcckproxy;
     int useTreeBcast;
+    int size;
 
 #if USE_CONVERSE_NOTIFICATION
     //this msg is shared across all SingleHelpers
@@ -234,7 +258,7 @@ private:
     int nextFreeNotifyMsg;
 
 public:
-    FuncSingleHelper();
+    FuncSingleHelper(int numHelpers, int size);
 
     ~FuncSingleHelper() {
 #if USE_CONVERSE_NOTIFICATION
@@ -287,6 +311,8 @@ public:
     }
 
     FuncSingleHelper(CkMigrateMessage *m) : CBase_FuncSingleHelper(m) {}
+
+    void pup(PUP::er &p);
 
  private:
     void createNotifyMsg();
