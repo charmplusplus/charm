@@ -17,4 +17,4 @@ hello.o: hello.C
 	$(CHARMC) -c hello.C
 
 test: all
-	./charmrun hello +p4 10
+	./charmrun hello +p4 10 $(TESTOPTS)

@@ -1,4 +1,4 @@
-DIRS=charm++ converse ampi armci bigsim
+DIRS=charm++ converse ampi armci bigsim collide
 
 all:
 	for d in $(DIRS); do \
