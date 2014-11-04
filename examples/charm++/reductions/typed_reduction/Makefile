@@ -1,4 +1,4 @@
-CHARMC = ../../../bin/charmc
+CHARMC = ../../../../bin/charmc
 BINARY = typed_reduction
 
 CHARMCFLAGS = $(OPTS)

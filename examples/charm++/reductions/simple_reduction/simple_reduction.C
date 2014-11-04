@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "RedExample.decl.h"
+#include "simple_reduction.decl.h"
 #include <math.h>
 
 
@@ -7,7 +7,7 @@
 /*readonly*/ int units;
 /*readonly*/ double dOne;
 /*readonly*/ double dTwo;
-#include "RedExample.h"
+#include "simple_reduction.h"
 
 /*mainchare*/
 
@@ -27,7 +27,7 @@ main::main(CkArgMsg* m)
     
     arr = CProxy_RedExample::ckNew(units);
 
-    CkPrintf("RedExample for %d pes on %d units for %f and %f\n",
+    CkPrintf("simple_reduction for %d pes on %d units for %f and %f\n",
 	     CkNumPes(),units,dOne, dTwo);
 
     CkCallback *cb = new CkCallback(CkIndex_main::reportIn(NULL),  mainProxy);
@@ -37,4 +37,4 @@ main::main(CkArgMsg* m)
 
 
 
-#include "RedExample.def.h"
+#include "simple_reduction.def.h"

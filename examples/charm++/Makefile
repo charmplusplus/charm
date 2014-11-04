@@ -1,5 +1,4 @@
 DIRS	= \
-AllReduce \
 allToAll \
 cksequence \
 completion \
@@ -17,17 +16,15 @@ namespace \
 piArray \
 PUP \
 NQueen \
-RedExample \
+reductions \
 ring \
 rings \
 speeds \
 sync_square \
 threaded_ring \
-TRAM \
-typed_reduction
+TRAM
 
 BGDIRS=\
-AllReduce \
 hello \
 integrate \
 integrate2 \
@@ -37,7 +34,7 @@ load_balancing \
 piArray \
 PUP \
 NQueen \
-RedExample \
+reductions \
 ring \
 rings \
 speeds
