@@ -53,16 +53,9 @@ BGQTorusManager::BGQTorusManager() {
   hw_ND = pers.Network_Config.Dnodes;
   hw_NE = pers.Network_Config.Enodes;
 
-#if 0 //disable till drivers are updated
   unsigned int isFile = 0;
   Kernel_GetMapping(10, mapping, &isFile);
   if(!isFile) {
-#else
-  char *usr_mapping =  getenv("MAPPING");
-  if(usr_mapping != NULL) {
-    for(int i = 0; i < 6 ; i++) 
-      mapping[i] = usr_mapping[i];
-#endif
     for(int i = 0; i < 6 ; i++) {
       if(mapping[i] != 'T') {
         order[5 - i] = mapping[i] - 'A';
