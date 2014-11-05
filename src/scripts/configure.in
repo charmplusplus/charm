@@ -7,6 +7,7 @@ AC_CONFIG_COMMANDS([config-cleanup],
                    [sed -i -e 's:^#define\s\+PACKAGE://&:' conv-autoconfig.h])
 
 CHARMINC="."
+CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
 # Decimal representation of Charm++ release line and API revision
