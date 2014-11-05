@@ -1,9 +1,9 @@
-CMK_CC='unix2nt_cc '
+CMK_CC='$CHARMBIN/unix2nt_cc '
 CMK_CXX=$CMK_CC
 CMK_CXXPP=$CMK_CC
 CMK_CF77='f77'
 CMK_CF90='f90'
-CMK_AR='unix2nt_ar '
+CMK_AR='$CHARMBIN/unix2nt_ar '
 CMK_RANLIB='echo '
 CMK_LIBS=''
 CMK_XIOPTS=''

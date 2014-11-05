@@ -1694,6 +1694,7 @@ ac_config_commands="$ac_config_commands config-cleanup"
 
 
 CHARMINC="."
+CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
 # Decimal representation of Charm++ release line and API revision
