@@ -63,7 +63,10 @@
 #define CMK_WORKER_SINGLE_TASK     1
 #endif
 
+#if !CMK_CRAYXC
 #define REMOTE_EVENT               1
+#endif
+
 #define CQWRITE                    0
 
 #define CMI_EXERT_SEND_LARGE_CAP   0
