@@ -1764,7 +1764,7 @@ INLINE_KEYWORD static gni_return_t send_large_messages(SMSG_QUEUE *queue, int de
     MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh, NULL, status)
     if(status == GNI_RC_SUCCESS)
     {
-        status = send_smsg_message(queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, lmsg_tag, 0, NULL);  
+        status = send_smsg_message(queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, lmsg_tag, 0, NULL, 0);
 #if ! CMK_SMSGS_FREE_AFTER_EVENT
         if(status == GNI_RC_SUCCESS)
         {
@@ -3008,7 +3008,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
 
 #if CMK_DIRECT
             if (tmp_pd->amo_cmd == 1) {
-                status = send_smsg_message(queue, inst_id, cmk_direct_done_msg, sizeof(CMK_DIRECT_HEADER), msg_tag, 0, NULL); 
+                status = send_smsg_message(queue, inst_id, cmk_direct_done_msg, sizeof(CMK_DIRECT_HEADER), msg_tag, 0, NULL, 0);
 #if ! CMK_SMSGS_FREE_AFTER_EVENT
                 if (status == GNI_RC_SUCCESS) free(cmk_direct_done_msg); 
 #endif
@@ -3269,7 +3269,7 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
         break;
 #if CMK_PERSISTENT_COMM_PUT && !REMOTE_EVENT && !CQWRITE 
     case PUT_DONE_TAG:
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr, 0);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
         if(status == GNI_RC_SUCCESS)
         {
@@ -3280,7 +3280,7 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
 #endif
 #if CMK_DIRECT
     case DIRECT_PUT_DONE_TAG:
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1, ptr);  
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1, ptr, 0);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
         if(status == GNI_RC_SUCCESS)
         {
