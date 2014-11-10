@@ -886,14 +886,11 @@ static void CmiDestroyLocks()
 
 #endif
 
-CpvExtern(int,_charmEpoch);
-
 /*Add a message to this processor's receive queue 
   Must be called while holding comm. lock
 */
 
 extern double evacTime;
-
 
 /***************************************************************
  Communication with charmrun:
