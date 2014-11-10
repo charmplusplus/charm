@@ -1747,8 +1747,6 @@ void LrtsPreCommonInit(int everReturn)
 
 void LrtsPostCommonInit(int everReturn)
 {
-  CmiIdleState *s=CmiNotifyGetState();
-
    /* better to show the status here */
   if (CmiMyPe() == 0) {
     if (Cmi_netpoll == 1) {
