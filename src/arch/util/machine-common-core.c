@@ -1103,7 +1103,7 @@ if (  MSG_STATISTIC)
       if ( ! strcmp(stdoutpath, stdoutbase) ) {
         sprintf(stdoutpath, "%s.%d", stdoutbase, CmiMyPartition());
       }
-      if ( CmiMyNodeGlobal() == 0 ) {
+      if ( CmiMyPartition() == 0 && CmiMyNode() == 0 ) {
         printf("Redirecting stdout to files %s through %d\n",stdoutpath,CmiNumPartitions()-1);
       }
       if ( ! freopen(stdoutpath, "a", stdout) ) {
