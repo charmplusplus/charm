@@ -1487,7 +1487,10 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 #else
     LrtsPostNonLocal();
 
-    if (_Cmi_sleepOnIdle) {
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+    if (_Cmi_sleepOnIdle)
+#endif
+    {
     s->nIdles++;
     if (s->nIdles>SPINS_BEFORE_SLEEP) { /*Start giving some time back to the OS*/
         s->sleepMs+=2;
