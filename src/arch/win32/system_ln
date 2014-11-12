@@ -2,7 +2,7 @@
 
 if test "$OS" = 'Windows_NT'
 then
-  junction=`which createlink 2>/dev/null`
+  junction=`ls ../bin/createlink 2>/dev/null`
 fi
 test x$junction = x && junction='cp -f'
 

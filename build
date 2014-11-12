@@ -530,22 +530,17 @@ if [ "x_$WINNAME" = "x_win32" -o "x_$WINNAME" = "x_win64" ]
 then
 #Win32/64 version needs special compilers and *copied* (not linked)
 # source files.
-	[ -d $DESTINATION/bin ] || Echo "Creating dir: $DESTINATION/bin"
-	[ -d $DESTINATION/bin ] || mkdir $DESTINATION/bin
-	echo "Copying compilers for $WINNAME into $DESTINATION/bin directory"
-	cp -f $src/$WINNAME/unix2nt* $DESTINATION/bin
 	cp $src/win32/system_ln $DESTINATION/tmp
 	cp $src/win32/unistd.h $DESTINATION/tmp
 	echo "Compiling createlink.cpp ..."
-	(cd $src/win32; ../../../$DESTINATION/bin/unix2nt_cc  -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; ../../../$DESTINATION/bin/unix2nt_cc createlink.o)
+	(cd $src/win32; ../$WINNAME/unix2nt_cc  -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; ../$WINNAME/unix2nt_cc createlink.o)
+
 	if test ! -x $src/win32/createlink.exe
 	then
 		echo "VC++ is not properly installed!"
 		exit 1
 	fi
-	echo "Copying $src/win32/createlink.exe to $DESTINATION/bin directory"
-	cp $src/win32/createlink.exe $DESTINATION/bin
-        chmod +x $DESTINATION/tmp/system_ln
+	chmod +x $DESTINATION/tmp/system_ln
 	cp $src/win32/gathertree.local   $DESTINATION/tmp
 	cp $src/win32/gatherflat.local   $DESTINATION/tmp
 else

@@ -315,6 +315,10 @@ dirs+sources:
 	rm -rf QuickThreads
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
+	if case `cat .vdir` in *win32*) true;; *win64*) true;; *) false;; esac; then \
+		cp -f ../../src/arch/`cat .vdir | awk -F- '{print $$2}'`/unix2nt* ../bin; \
+		cp -f ../../src/arch/win32/createlink.exe ../bin; \
+	fi
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../lib_so ; mkdir ../lib_so; touch ../lib_so/.charmso
 	rm -rf ../examples
