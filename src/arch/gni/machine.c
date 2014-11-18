@@ -63,9 +63,7 @@
 #define CMK_WORKER_SINGLE_TASK     1
 #endif
 
-#if !CMK_CRAYXC
 #define REMOTE_EVENT               1
-#endif
 
 #define CQWRITE                    0
 
@@ -2261,7 +2259,7 @@ static void PumpNetworkSmsg()
         CMI_GNI_UNLOCK(smsg_rx_cq_lock)
         if(status != GNI_RC_SUCCESS) break;
 
-        inst_id = GNI_CQ_GET_INST_ID(event_data);
+        inst_id = GNI_CQ_GET_REM_INST_ID(event_data);
 #if REMOTE_EVENT
         inst_id = GET_RANK(inst_id);      /* important */
 #endif
@@ -2832,7 +2830,7 @@ static void PumpRemoteTransactions(gni_cq_handle_t rx_cqh)
         pump_count ++;
 #endif
 
-        inst_id = GNI_CQ_GET_INST_ID(ev);
+        inst_id = GNI_CQ_GET_REM_INST_ID(ev);
         index = GET_INDEX(inst_id);
         type = GET_TYPE(inst_id);
         switch (type) {
