@@ -1144,7 +1144,7 @@ void CkArrayPrefetch_writeToSwap(FILE *swapfile,void *objptr) {
 
   //Call the element's destructor in-place (so pointer doesn't change)
   CkpvAccess(CkSaveRestorePrefetch)=1;
-  elt->~CkMigratable(); //< because destuctor is virtual, destroys user class too.
+  elt->~CkMigratable(); //< because destructor is virtual, destroys user class too.
   CkpvAccess(CkSaveRestorePrefetch)=0;
 }
 	
