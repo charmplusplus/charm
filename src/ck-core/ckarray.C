@@ -1514,6 +1514,8 @@ void CkArray::flushStates() {
 }
 
 void CkArray::ckDestroy() {
+  isDestroying = true;
+
   int i = 0;
   ArrayElement *a = NULL;
   while ((a = elements->next(i))) {
