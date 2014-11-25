@@ -676,6 +676,7 @@ protected:
 	//whether to notify children that reduction starts
 	bool disableNotifyChildrenStart;
 	void resetCountersWhenFlushingStates() { gcount = lcount = 0; }
+        bool isDestroying;
 
 //Checkpointing utilities
 public:
