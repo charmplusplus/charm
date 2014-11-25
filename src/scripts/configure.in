@@ -1217,6 +1217,22 @@ mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
 
 fi
 
+if test "$BUILD_MPI" = "1"
+then
+
+cat > $t <<EOT
+#include <stdio.h>
+#include <mpi.h>
+
+int main (int argc, char** argv) {
+  return 0;
+}
+EOT
+test_cxx "whether macro conflicts occurs due to C++ MPI bindings" "no" "yes" ""
+AC_DEFINE_UNQUOTED(CMK_CXX_MPI_BINDINGS, $strictpass, [Disables conflicting macros.])
+fi
+
+
 ################### Syscalls and Libraries ###################
 
 #### test for getrusage with RUSAGE_THREAD ###
