@@ -36,6 +36,9 @@
 /* Cray MAXNID */
 #undef CMK_CRAY_MAXNID
 
+/* Disables conflicting macros. */
+#undef CMK_CXX_MPI_BINDINGS
+
 /* whether Xfence intrinsics works in C */
 #undef CMK_C_BUILTIN_IA32_XFENCE
 
