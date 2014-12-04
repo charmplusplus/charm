@@ -1,0 +1,10 @@
+Test of fine-grained all-to-all communication, comparing aggregation using a 2D
+TRAM grid topology to direct sending. Sends are done concurrently across PEs,
+with the order of destinations randomized. Sends of more than 32 B are performed
+in rounds at each sender, where in each round a single 32 B unit is sent to each
+destination PE. When using TRAM, individual sends are aggregated into larger
+buffers before being sent.
+
+Usage:
+
+ataTest dataSizeMin(default = 32) dataSizeMax(default = 16384) aggregationBufferSizeInBytes(default = 16384)
