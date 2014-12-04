@@ -23,6 +23,7 @@ rings \
 speeds \
 sync_square \
 threaded_ring \
+TRAM \
 typed_reduction
 
 BGDIRS=\
