@@ -185,7 +185,8 @@ public:
         if (!warmupRun && pipeSize < .5 * payload) {
           pipeSize *= 2; 
           phase = 5; 
-        } 
+        }
+        break;
 #ifndef USE_RDMA
       case 10:
         ngid[0].start(reportTime);
