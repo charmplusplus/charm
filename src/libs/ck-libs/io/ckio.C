@@ -346,13 +346,20 @@ namespace Ck { namespace IO {
         }
 
         void syncData() {
+          int status;
           CkAssert(bufferMap.size() == 0);
 #if CMK_HAS_FDATASYNC_FUNC
-          if (fdatasync(file->fd) < 0)
-            fatalError("fdatasync failed", file->name);
+          while ((status = fdatasync(file->fd)) < 0) {
+            if (errno != EINTR) {
+              fatalError("fdatasync failed", file->name);
+            }
+          }
 #elif CMK_HAS_FSYNC_FUNC
-          if (fsync(file->fd) < 0)
-            fatalError("fsync failed", file->name);
+          while ((status = fsync(file->fd)) < 0) {
+            if (errno != EINTR) {
+              fatalError("fsync failed", file->name);
+            }
+          }
 #elif defined(_WIN32)
           intptr_t hFile = _get_osfhandle(file->fd);
           if (FlushFileBuffers((HANDLE)hFile) == 0)
