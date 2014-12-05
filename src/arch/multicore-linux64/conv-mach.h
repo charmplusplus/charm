@@ -7,6 +7,9 @@
 #define CMK_AMD64					   1
 #define CMK_64BIT    1
 
+#undef CMK_IMMEDIATE_MSG
+#define CMK_IMMEDIATE_MSG                                  0
+
 #define CMK_ASYNC_NOT_NEEDED                               1
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
