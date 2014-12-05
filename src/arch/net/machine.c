@@ -453,7 +453,7 @@ static void machine_atexit_check(void)
 {
   if (!machine_initiated_shutdown)
     CmiAbort("unexpected call to exit by user program. Must use CkExit, not exit!");
-  printf("Program finished after %f seconds.\n", CmiWallTimer() - Cmi_clock);
+  printf("Program finished after %f seconds.\n", CmiWallTimer());
 #if 0 /*Wait for the user to press any key (for Win32 debugging)*/
   fgetc(stdin);
 #endif
