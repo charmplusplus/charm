@@ -25,7 +25,7 @@ random_access: $(OBJFILES)
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)
-	./charmrun +p4 ++local ./random_access 14
+	./charmrun +p4 ./random_access 14 $(TESTOPTS)
 
 clean:
 	rm -f *.o *.decl.h *.def.h $(BINARY) charmrun*
