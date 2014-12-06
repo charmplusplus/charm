@@ -8,6 +8,7 @@ CProxy_HelloGroup helloGroupProxy;
 CProxy_HelloNodeGroup helloNodeGroupProxy;
 int nElements;
 int chkpPENum;
+int chkpNodeNum;
 
 class Main : public CBase_Main {
   int step;
@@ -21,6 +22,7 @@ public:
     delete m;
     
     chkpPENum = CkNumPes();
+    chkpNodeNum = CkNumNodes();
     CkPrintf("Running Hello on %d processors for %d elements\n",CkNumPes(),nElements);
     mainProxy = thisProxy;
     helloProxy = CProxy_Hello::ckNew(nElements);
@@ -156,7 +158,7 @@ public:
     if(p.isUnpacking())
     {
       CkPrintf("[%d] data on NOdeGroup %d\n", CkMyNode(), data);
-      if(chkpPENum == CkNumPes())
+      if(chkpNodeNum == CkNumNodes())
       {
         if(data!=CkMyNode())
         {

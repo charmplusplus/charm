@@ -539,6 +539,8 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 	PUP::toDisk pRO(fRO);
 	int _numPes = CkNumPes();
 	pRO|_numPes;
+	int _numNodes = CkNumNodes();
+	pRO|_numNodes;
 	CkPupROData(pRO);
 	pRO|cb;
 	CmiFclose(fRO);
@@ -617,6 +619,8 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	int _numPes = -1;
 	PUP::fromDisk pRO(fRO);
 	pRO|_numPes;
+	int _numNodes = -1;
+	pRO|_numNodes;
 	CkPupROData(pRO);
 	pRO|cb;
 	CmiFclose(fRO);
@@ -663,7 +667,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
 	if(CkMyRank()==0){
                 FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "rb",
-                                                       (CkNumPes() == _numPes) ? CkMyNode() : 0);
+                                                       (CkNumNodes() == _numNodes) ? CkMyNode() : 0);
                 PUP::fromDisk pNodeGroups(fNodeGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CkPupNodeGroupData(pNodeGroups,true);
