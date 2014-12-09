@@ -12,18 +12,18 @@ all: pdf ps html
 
 ps:
 	[ -d $(IDIR)/ps ] || mkdir $(IDIR)/ps
-	for d in $(DIRS); do (cd $$d && $(LNCMD) && $(MAKE) ps) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) ps) || exit 1; done
 
 pdf:
 	[ -d $(IDIR)/pdf ] || mkdir $(IDIR)/pdf
-	for d in $(DIRS); do (cd $$d && $(LNCMD) && $(MAKE) pdf) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) pdf) || exit 1; done
 
 html:
 	[ -d $(IDIR)/html ] || mkdir $(IDIR)/html
-	for d in $(DIRS); do (cd $$d && $(LNCMD) && $(MAKE) html) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) html) || exit 1; done
 
 doc:
-	for d in $(DIRS); do (cd $$d && $(LNCMD) && $(MAKE) doc) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) doc) || exit 1; done
 
 web: doc
 	-rm -rf $(WEBDIR)/backup
@@ -37,5 +37,5 @@ web: doc
 	-rm -rf $(WEBDIR)/backup
 
 clean:
-	for d in $(DIRS); do (cd $$d && $(RMCMD) && $(MAKE) clean) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(RMCMD); $(MAKE) clean) || exit 1; done
 	rm -fr ps pdf html
