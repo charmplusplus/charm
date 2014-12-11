@@ -109,6 +109,17 @@ void Entry::check() {
       (*en)->check();
     }
   }
+
+  if (isTramTarget()) {
+    if (param && (!param->isMarshalled() || param->isVoid() || param->next != NULL))
+      XLAT_ERROR_NOCOL("'aggregate' entry methods must be parameter-marshalled "
+                       "and take a single argument",
+                       first_line_);
+
+    if (!((container->isGroup() && !container->isNodeGroup()) || container->isArray()))
+      XLAT_ERROR_NOCOL("'aggregate' entry methods can only be used in regular groups and chare arrays",
+                       first_line_);
+  }
 }
 
 void Entry::lookforCEntry(CEntry *centry)
@@ -579,9 +590,11 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
          << marshallMsg();
 
     syncTail << "  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
-         << "  return ckCreateArray((CkArrayMessage *)impl_msg, "
-         << epIdx() << ", opts);\n"
-       "}\n";
+         << "  CkArrayID gId = ckCreateArray((CkArrayMessage *)impl_msg, "
+         << epIdx() << ", opts);\n";
+
+    genTramInstantiation(syncTail);
+    syncTail << "  return gId;\n}\n";
 
     asyncTail  << "  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
                << "  CkSendAsyncCreateArray(" << epIdx() << ", _ck_array_creation_cb, opts, impl_msg);\n"
@@ -771,6 +784,190 @@ void Entry::genGroupDefs(XStr& str)
   }
 }
 
+XStr Entry::aggregatorIndexType() {
+  XStr indexType;
+  if (container->isGroup()) {
+    indexType << "int";
+  }
+  else if (container->isArray()) {
+    XStr dim, arrayIndexType;
+    dim << ( (Array*) container)->dim();
+    if (dim == "1D") {
+      indexType << "int";
+    }
+    else {
+      indexType << "CkArrayIndex";
+    }
+  }
+  return indexType;
+}
+
+XStr Entry::dataItemType() {
+  XStr itemType;
+  if (container->isGroup()) {
+    itemType << param->param->type;
+  }
+  else if (container->isArray()) {
+    itemType << "ArrayDataItem< " << param->param->type << ", "
+             << aggregatorIndexType() << " >";
+  }
+  return itemType;
+}
+
+XStr Entry::aggregatorType() {
+  XStr groupType;
+  if (container->isGroup()) {
+    groupType << "GroupMeshStreamer<" << param->param->type
+              << ", " << container->baseName() << ", SimpleMeshRouter"
+              << ", " << container->indexName() << "::_callmarshall_" << epStr()
+              << " >";
+  }
+  else if (container->isArray()) {
+    groupType << "ArrayMeshStreamer<" << param->param->type
+              << ", " << aggregatorIndexType() <<", "
+              << container->baseName() << ", "
+              << "SimpleMeshRouter, "
+              << container->indexName() << "::_callmarshall_" << epStr()
+              << " >";
+  }
+  return groupType;
+}
+
+XStr Entry::aggregatorName() {
+  XStr aggregatorName;
+  aggregatorName << epStr() << "TramAggregator";
+  return aggregatorName;
+}
+
+void Entry::genTramTypes() {
+  if (isTramTarget()) {
+    XStr typeString, nameString, itemTypeString;
+    typeString << aggregatorType();
+    nameString << aggregatorName();
+    itemTypeString << dataItemType();
+    container->tramInstances.
+      push_back(TramInfo(typeString.get_string(), nameString.get_string(),
+                         itemTypeString.get_string()));
+    tramInstanceIndex = container->tramInstances.size();
+  }
+}
+
+void Entry::genTramDefs(XStr &str) {
+
+  XStr retStr; retStr<<retType;
+  XStr msgTypeStr;
+
+  if (isLocal())
+    msgTypeStr<<paramType(0,1,0);
+  else
+    msgTypeStr<<paramType(0,1);
+  str << makeDecl(retStr,1)<<"::"<<name<<"("<<msgTypeStr<<") {\n"
+      << "  if (" << aggregatorName() << " == NULL) {\n";
+
+  if (container->isGroup()) {
+    str << "    CkGroupID gId = ckGetGroupID();\n";
+  }
+  else if (container->isArray()) {
+    str << "    CkArray *aMgr = ckLocalBranch();\n"
+        << "    CkGroupID gId = aMgr->getGroupID();\n";
+  }
+
+  str  << "    CkGroupID tramGid;\n"
+       << "    tramGid.idx = gId.idx + "<< tramInstanceIndex <<";\n"
+       << "    " << aggregatorName() << " = (" << aggregatorType() << "*)"
+       << " CkLocalBranch(tramGid);\n  }\n";
+
+  if (container->isGroup()) {
+    str << "  " << aggregatorName() << "->insertData(" << param->param->name
+        << ", " << "ckGetGroupPe());\n}\n";
+  }
+  else if (container->isArray()) {
+    XStr dim; dim << ((Array*)container)->dim();
+    str << "  const CkArrayIndex &myIndex = ckGetIndex();\n"
+        << "  " << aggregatorName() << "->insertData(" << param->param->name;
+    if (dim==(const char*)"1D") {
+      str << ", " << "myIndex.data()[0]);\n}\n";
+    }
+    else {
+      str << ", " << "myIndex);\n}\n";
+    }
+  }
+}
+
+// size of TRAM buffers in bytes
+const static int tramBufferSize = 16384;
+
+void Entry::genTramInstantiation(XStr& str) {
+  if (!container->tramInstances.empty()) {
+    str << "  int pesPerNode = CkMyNodeSize();\n"
+        << "  if (pesPerNode == 1) {\n"
+        << "    pesPerNode = CmiNumCores();\n"
+        << "  }\n"
+        << "  int nDims = 2;\n"
+        << "  int dims[nDims];\n"
+        << "  dims[0] = CkNumPes() / pesPerNode;\n"
+        << "  dims[1] = pesPerNode;\n"
+        << "  if (dims[0] * dims[1] != CkNumPes()) {\n"
+        << "    dims[0] = CkNumPes();\n"
+        << "    dims[1] = 1;\n"
+        << "  }\n"
+        << "  int tramBufferSize = " << tramBufferSize <<";\n";
+    for (int i = 0; i < container->tramInstances.size(); i++) {
+      str << "  {\n"
+          << "  int itemsPerBuffer = tramBufferSize / sizeof("
+          << container->tramInstances[i].itemType.c_str() <<");\n"
+          << "  if (itemsPerBuffer == 0) {\n"
+          << "    itemsPerBuffer = 1;\n"
+          << "  };\n"
+          << "  CProxy_" << container->tramInstances[i].type.c_str()
+          << " tramProxy =\n"
+          << "  CProxy_" << container->tramInstances[i].type.c_str()
+          << "::ckNew(2, dims, gId, itemsPerBuffer, false, 10.0);\n"
+          << "  tramProxy.enablePeriodicFlushing();\n"
+          << "  }";
+    }
+  }
+}
+
+XStr Entry::tramBaseType()
+{
+  XStr baseTypeString;
+  baseTypeString << "MeshStreamer<" << dataItemType()
+                 << ", SimpleMeshRouter >";
+
+  return baseTypeString;
+}
+
+void Entry::genTramRegs(XStr& str)
+{
+  if (isTramTarget()) {
+    XStr messageTypeString;
+    messageTypeString << "MeshStreamerMessage< " << dataItemType() << " >";
+
+    XStr baseTypeString = tramBaseType();
+
+    NamedType messageType(messageTypeString.get_string());
+    Message helper(-1, &messageType);
+    helper.genReg(str);
+
+    str << "\n  /* REG: group " << aggregatorType() << ": IrrGroup;\n  */\n"
+        << "  CkIndex_" << aggregatorType() << "::__register(\""
+        << aggregatorType() << "\", sizeof(" << aggregatorType() << "));\n"
+        << "  /* REG: group " << baseTypeString << ": IrrGroup;\n  */\n"
+        << "  CkIndex_" << baseTypeString << "::__register(\""
+        << baseTypeString << "\", sizeof(" << baseTypeString << "));\n";
+
+  }
+}
+
+void Entry::genTramPups(XStr& decls, XStr& defs)
+{
+  if (isTramTarget()) {
+    XStr aggregatorTypeString = aggregatorType();
+    container->genRecursivePup(aggregatorTypeString, "template <>\n", decls, defs);
+  }
+}
+
 void Entry::genGroupStaticConstructorDecl(XStr& str)
 {
   if (container->isForElement()) return;
@@ -796,7 +993,11 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
     str << "  if (impl_e_opts)\n";
     str << "    UsrToEnv(impl_msg)->setGroupDep(impl_e_opts->getGroupDepID());\n";
   }
-  str << "  return CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg);\n";
+  str << "  CkGroupID gId = CkCreate"<<node<<"Group("<<chareIdx()<<", "<<epIdx()<<", impl_msg);\n";
+
+  genTramInstantiation(str);
+
+  str << "  return gId;\n";
   str << "}\n";
 
   if (!param->isVoid()) {
@@ -1915,6 +2116,9 @@ void Entry::genDefs(XStr& str)
 
   if(isMigrationConstructor())
     {} //User cannot call the migration constructor
+  else if (isTramTarget() && container->isForElement()) {
+    genTramDefs(str);
+  }
   else if(container->isGroup()){
     genGroupDefs(str);
   } else if(container->isArray()) {
@@ -2327,6 +2531,7 @@ int Entry::isNoTrace(void) { return (attribs & SNOTRACE); }
 int Entry::isAppWork(void) { return (attribs & SAPPWORK); }
 int Entry::isNoKeep(void) { return (attribs & SNOKEEP); }
 int Entry::isSdag(void) { return (sdagCon!=0); }
+int Entry::isTramTarget(void) { return (attribs & SAGGREGATE); }
 
 // DMK - Accel support
 int Entry::isAccel(void) { return (attribs & SACCEL); }

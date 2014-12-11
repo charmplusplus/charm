@@ -310,6 +310,18 @@ ctorHelper(int maxNumDataItemsBuffered, int numDimensions,
            progressPeriodInMs_, maxNumBuffers);
 #endif
 
+  useStagedCompletion_ = false;
+  stagedCompletionStarted_ = false;
+  useCompletionDetection_ = false;
+
+  yieldCount_ = 0;
+  userCallback_ = CkCallback();
+  prio_ = -1;
+
+  initLocalClients();
+
+  hasSentRecently_ = false;
+
 }
 
 template <class dtype, class RouterType>
@@ -782,9 +794,9 @@ void MeshStreamer<dtype, RouterType>::registerPeriodicProgressFunction() {
                  progressPeriodInMs_);
 }
 
-template <class dtype, class ClientType, class RouterType>
+template <class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype, ClientType> >
 class GroupMeshStreamer :
-  public CBase_GroupMeshStreamer<dtype, ClientType, RouterType> {
+  public CBase_GroupMeshStreamer<dtype, ClientType, RouterType, EntryMethod> {
 private:
 
   CkGroupID clientGID_;
@@ -793,7 +805,7 @@ private:
   void receiveAtDestination(MeshStreamerMessage<dtype> *msg) {
     for (int i = 0; i < msg->numDataItems; i++) {
       const dtype& data = msg->getDataItem(i);
-      clientObj_->process(data);
+      EntryMethod((char *) &data, clientObj_);
     }
 
     if (this->useStagedCompletion_) {
@@ -813,7 +825,7 @@ private:
   }
 
   inline void localDeliver(const dtype& dataItem) {
-    clientObj_->process(dataItem);
+    EntryMethod((char *) &dataItem, clientObj_);
     if (this->useCompletionDetection_) {
       this->detectorLocalObj_->consume();
     }
@@ -853,7 +865,8 @@ public:
   }
 };
 
-template <class dtype, class ClientType>
+
+template <class dtype, class ClientType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
 class LocalBroadcaster : public CkLocIterator {
 
 public:
@@ -867,14 +880,14 @@ public:
     ClientType *clientObj =
       (ClientType *) clientArrMgr_->lookup(loc.getIndex());
     CkAssert(clientObj != NULL);
-    clientObj->process(*dataItem_);
+    EntryMethod((char *) dataItem_, clientObj);
   }
 
 };
 
-template <class dtype, class itype, class ClientType, class RouterType>
+template <class dtype, class itype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
 class ArrayMeshStreamer :
-  public CBase_ArrayMeshStreamer<dtype, itype, ClientType, RouterType> {
+  public CBase_ArrayMeshStreamer<dtype, itype, ClientType, RouterType, EntryMethod> {
 
 private:
 
@@ -906,7 +919,7 @@ private:
 #endif
 
     if (clientObj != NULL) {
-      clientObj->process(packedDataItem.dataItem);
+      EntryMethod((char *) &packedDataItem.dataItem, clientObj);
       if (this->useCompletionDetection_) {
         this->detectorLocalObj_->consume();
       }
@@ -934,7 +947,7 @@ private:
   inline
   void localBroadcast(const ArrayDataItem<dtype, itype>& packedDataItem) {
 
-    LocalBroadcaster<dtype, ClientType>
+    LocalBroadcaster<dtype, ClientType, EntryMethod>
       clientIterator(clientArrayMgr_, &packedDataItem.dataItem);
     clientLocMgr_->iterate(clientIterator);
 
@@ -1167,9 +1180,9 @@ struct ChunkOutOfOrderBuffer {
 
 };
 
-template <class dtype, class ClientType, class RouterType>
+template <class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
 class GroupChunkMeshStreamer
-  : public CBase_GroupChunkMeshStreamer<dtype, ClientType, RouterType> {
+  : public CBase_GroupChunkMeshStreamer<dtype, ClientType, RouterType, EntryMethod> {
 
 private:
   // implementation assumes very few buffers will be received out of order
@@ -1375,6 +1388,15 @@ public:
     // no action required
   }
 
+};
+
+template <typename dtype, typename RouterType>
+struct recursive_pup_impl<MeshStreamer<dtype, RouterType>, 1> {
+  typedef MeshStreamer<dtype, RouterType> T;
+  void operator()(T *obj, PUP::er &p) {
+    obj->parent_pup(p);
+    obj->T::pup(p);
+  }
 };
 
 #define CK_TEMPLATES_ONLY

@@ -43,4 +43,11 @@ public:
   
 };
 
+template <class dtype, class ClientType>
+inline int defaultMeshStreamerDeliver(char *data, void *clientObj_)
+{
+  ((ClientType *) clientObj_)->process(*((dtype *) data));
+  return 0;
+}
+
 #endif

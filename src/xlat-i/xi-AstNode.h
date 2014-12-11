@@ -26,6 +26,10 @@ class AstNode : public Printable {
   virtual void check() { }
   virtual void printChareNames() { }
 
+  virtual void genTramTypes() {}
+  virtual void genTramRegs(XStr &str) { (void)str; }
+  virtual void genTramPups(XStr &decls, XStr &defs) { (void)decls; (void)defs; }
+
   // DMK - Accel Support
   virtual int genAccels_spe_c_funcBodies(XStr& str) { (void)str; return 0; }
   virtual void genAccels_spe_c_regFuncs(XStr& str) { (void)str; }
@@ -72,6 +76,10 @@ class AstChildren : public virtual AstNode {
   void genDefs(XStr& str);
   void genReg(XStr& str);
   void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
+
+  void genTramTypes();
+  void genTramRegs(XStr& str);
+  void genTramPups(XStr &decls, XStr &defs);
 
   // Accelerated Entry Method support
   int genAccels_spe_c_funcBodies(XStr& str);
@@ -150,6 +158,68 @@ namespace details {
   void perElemGen(list<T*> &l, A* arg_, void (U::*fn_)(A*))
   {
     perElemGenC<T, U, A*>(l, arg_, fn_, NULL);
+  }
+
+  /**
+     Apply fn_ on each Construct in the list l, passing it arg as
+     the target. If between_ is passed, do that to arg between each
+     element.
+  */
+  template<typename T, typename U, typename A>
+  class perElemGen2C
+  {
+    void (U::*fn)(A,A);
+    void (*between)(A,A);
+    A arg1, arg2;
+
+  public:
+    perElemGen2C(list<T*> &l,
+                A arg1_, A arg2_,
+                void (U::*fn_)(A,A),
+                void (*between_)(A,A) = NULL)
+      : fn(fn_), between(between_), arg1(arg1_), arg2(arg2_)
+      {
+        for_each(l.begin(), l.end(), *this);
+      }
+    void operator()(T* m)
+      {
+        if (m)
+        {
+          (m->*fn)(arg1, arg2);
+          if (between)
+            between(arg1, arg2);
+        }
+      }
+  };
+
+  template<typename T, typename U, typename A>
+  void perElemGen2(list<T*> &l, A& arg1_, A& arg2_, void (U::*fn_)(A&,A&),
+  // Sun Studio 7 (C++ compiler version 5.4) can't handle this
+  //              void (*between_)(A&) = NULL)
+                  void (*between_)(A&,A&))
+  {
+    perElemGen2C<T, U, A&>(l, arg1_, arg2_, fn_, between_);
+  }
+
+  template<typename T, typename U, typename A>
+  void perElemGen2(list<T*> &l, A& arg1_, A& arg2_, void (U::*fn_)(A&,A&))
+  {
+    perElemGen2C<T, U, A&>(l, arg1_, arg2_, fn_, NULL);
+  }
+
+  template<typename T, typename U, typename A>
+  void perElemGen2(list<T*> &l, A* arg1_, A* arg2_, void (U::*fn_)(A*,A*),
+  // See above
+  //              void (*between_)(A*) = NULL)
+                  void (*between_)(A*,A*))
+  {
+    perElemGen2C<T, U, A*>(l, arg1_, arg2_, fn_, between_);
+  }
+
+  template<typename T, typename U, typename A>
+  void perElemGen2(list<T*> &l, A* arg1_, A* arg2_, void (U::*fn_)(A*,A*))
+  {
+    perElemGen2C<T, U, A*>(l, arg1_, arg2_, fn_, NULL);
   }
 
   /**
@@ -278,6 +348,25 @@ void AstChildren<Child>::printChareNames()
 {
   details::perElem(children, &Child::printChareNames);
 }
+
+template <typename Child>
+void
+AstChildren<Child>::genTramTypes() {
+  details::perElem(children, &Child::genTramTypes);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::genTramRegs(XStr &str) {
+  details::perElemGen(children, str, &Child::genTramRegs);
+}
+
+template <typename Child>
+void
+AstChildren<Child>::genTramPups(XStr &decls, XStr &defs) {
+  details::perElemGen2(children, decls, defs, &Child::genTramPups);
+}
+
 
 template <typename Child>
 int AstChildren<Child>::genAccels_spe_c_funcBodies(XStr& str) {

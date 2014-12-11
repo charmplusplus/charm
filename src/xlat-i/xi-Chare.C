@@ -111,6 +111,8 @@ Chare::genDecls(XStr& str)
     }
   }
 
+  genTramTypes();
+
   //Forward declaration of the user-defined implementation class*/
   str << tspec(false)<<" class "<<type<<";\n";
   str << tspec(false)<<" class "<<Prefix::Index<<type<<";\n";
@@ -142,7 +144,9 @@ Chare::genDecls(XStr& str)
     str << CIClassEnd;
   }
   str << "/* --------------- element proxy ------------------ */\n";
+  generateTramInits = true;
   genSubDecls(str);
+  generateTramInits = false;
   if (hasElement) {
     str << "/* ---------------- collective proxy -------------- */\n";
     forElement=forAll; genSubDecls(str); forElement=forIndividual;
@@ -251,6 +255,32 @@ XStr Chare::virtualPupDef(const XStr &name)
 }
 
 void
+Chare::genRecursivePup(XStr& scopedName, XStr templateSpec, XStr& decls, XStr& defs)
+{
+  templateGuardBegin(false, defs);
+
+  XStr rec_pup_impl_name, rec_pup_impl_sig, rec_pup_impl_body;
+  rec_pup_impl_name << "recursive_pup_impl<" << scopedName << ", 1>";
+  rec_pup_impl_sig << "operator()(" << scopedName << " *obj, PUP::er &p)";
+
+  rec_pup_impl_body << rec_pup_impl_sig << " {"
+                    << "\n    obj->parent_pup(p);";
+  if (hasSdagEntry)
+    rec_pup_impl_body << "\n    obj->_sdag_pup(p);";
+  rec_pup_impl_body << "\n    obj->" << scopedName << "::pup(p);"
+                    << "\n}\n";
+
+  decls << "\ntemplate <>"
+        << "\nvoid " << rec_pup_impl_name << "::" << rec_pup_impl_sig << ";\n";
+
+  defs << templateSpec
+       << "void " << rec_pup_impl_name
+       << "::" << rec_pup_impl_body;
+
+  templateGuardEnd(defs);
+}
+
+void
 Chare::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
 {
   if (isTemplateInstantiation())
@@ -263,6 +293,9 @@ Chare::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
 
   XStr scopedName;
   scopedName << scope << templatedType;
+
+  if (list)
+    list->genTramPups(decls, defs);
 
   if (!isTemplateDeclaration()) {
     // Leave out ArrayElement because of its funny inheritance
@@ -493,8 +526,15 @@ void Chare::sharedDisambiguation(XStr &str,const XStr &super)
     str << "}"
         << "\n    void pup(PUP::er &p)"
         << "\n    { ";
-    genProxyNames(str,"      ",NULL,"::pup(p); ","");
-    str << "}";
+    genProxyNames(str,"      ",NULL,"::pup(p);\n","");
+    if (isForElement() && !tramInstances.empty()) {
+      str << "      if (p.isUnpacking()) {\n";
+      for (int i = 0; i < tramInstances.size(); i++) {
+        str << "        " << tramInstances[i].name.c_str() << " = NULL;\n";
+      }
+      str << "      }\n";
+    }
+    str << "    }";
     if (isPython()) {
       str << "\n    void registerPython(const char *str)"
           << "\n    { CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), *this)); }";
@@ -795,6 +835,11 @@ Chare::genReg(XStr& str)
   if(external || templat)
     return;
   str << "  "<<indexName()<<"::__register(\""<<type<<"\", sizeof("<<type<<"));\n";
+
+  if (list) {
+    list->genTramRegs(str);
+  }
+
 }
 
 void
@@ -818,6 +863,31 @@ void Chare::lookforCEntry(CEntry *centry)
 {
   if(list)
     list->recurse(centry, &Member::lookforCEntry);
+}
+
+void Chare::genTramTypes() {
+  if (list) {
+    list->genTramTypes();
+  }
+}
+
+void Chare::genTramDecls(XStr &str) {
+  if (isForElement()) {
+    str << "\n    /* TRAM aggregators */\n";
+    for (int i = 0; i < tramInstances.size(); i++) {
+      str << "    " << tramInstances[i].type.c_str()
+          << "* " << tramInstances[i].name.c_str() << ";\n";
+    }
+    str << "\n";
+  }
+}
+
+void Chare::genTramInits(XStr &str) {
+  if (generateTramInits) {
+    for (int i = 0; i < tramInstances.size(); i++) {
+      str << "      " << tramInstances[i].name.c_str() << " = NULL;\n";
+    }
+  }
 }
 
 
@@ -864,25 +934,33 @@ void Group::genSubDecls(XStr& str)
     return;
   }
   str << ": ";
+
   genProxyNames(str, "public ",NULL, "", ", ");
   str << CIClassStart;
 
   genTypedefs(str);
 
+  genTramDecls(str);
+
+  XStr constructorBody;
+  constructorBody << "{\n";
+  genTramInits(constructorBody);
+  constructorBody << "    }\n";
+
   // Basic constructors:
-  str << "    "<<ptype<<"(void) {}\n";
+  str << "    "<<ptype<<"(void) " << constructorBody;
   str << "    "<<ptype<<"(const IrrGroup *g) : ";
   genProxyNames(str, "", NULL,"(g)", ", ");
-  str << "{  }\n";
+  str << constructorBody;
 
   if (forElement==forIndividual)
   {//For a single element
     str << "    "<<ptype<<"(CkGroupID _gid,int _onPE,CK_DELCTOR_PARAM) : ";
     genProxyNames(str, "", NULL,"(_gid,_onPE,CK_DELCTOR_ARGS)", ", ");
-    str << "{  }\n";
+    str << constructorBody;
     str << "    "<<ptype<<"(CkGroupID _gid,int _onPE) : ";
     genProxyNames(str, "", NULL,"(_gid,_onPE)", ", ");
-    str << "{  }\n";
+    str << constructorBody;
 
     disambig_group(str, super);
     str << "int ckGetGroupPe(void) const\n"
@@ -1014,12 +1092,19 @@ Array::genSubDecls(XStr& str)
 
   genTypedefs(str);
 
-  str << "    "<<ptype<<"(void) {}\n";//An empty constructor
+  genTramDecls(str);
+
+  XStr constructorBody;
+  constructorBody << "{\n";
+  genTramInits(constructorBody);
+  constructorBody << "    }\n";
+
+  str << "    "<<ptype<<"(void) " << constructorBody; //An empty constructor
   if (forElement!=forSection)
   { //Generate constructor based on array element
 	  str << "    "<<ptype<<"(const ArrayElement *e) : ";
     genProxyNames(str, "", NULL,"(e)", ", ");
-    str << "{  }\n";
+    str << constructorBody;
   }
 
   //Resolve multiple inheritance ambiguity
@@ -1047,11 +1132,15 @@ Array::genSubDecls(XStr& str)
     str << "\n    " <<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CK_DELCTOR_PARAM)"
         << "\n        :";
     genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");
-    str << "\n    {}"
+    str << "\n    {\n";
+    genTramInits(str);
+    str << "}"
         << "\n    " <<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)"
         << "\n        :";
     genProxyNames(str, "",NULL, "(aid,idx)", ", ");
-    str << "\n    {}"
+    str << "\n    {\n";
+    genTramInits(str);
+    str << "}"
         << "\n";
 
     if ((indexType != (const char*)"CkArrayIndex") && (indexType != (const char*)"CkArrayIndexMax"))
@@ -1064,11 +1153,15 @@ Array::genSubDecls(XStr& str)
       str << "\n    " <<ptype<<"(const CkArrayID &aid,const CkArrayIndex &idx,CK_DELCTOR_PARAM)"
           << "\n        :";
       genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");
-      str << "\n    {}"
+      str << "\n    {\n";
+      genTramInits(str);
+      str << "}"
           << "\n    " << ptype<<"(const CkArrayID &aid,const CkArrayIndex &idx)"
           << "\n        :";
       genProxyNames(str, "",NULL, "(aid,idx)", ", ");
-      str << "\n    {}"
+      str << "\n    {\n";
+      genTramInits(str);
+      str << "}"
           << "\n";
     }
   }

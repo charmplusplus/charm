@@ -1,0 +1,26 @@
+mainmodule randomAccess {
+
+  // log_2 of the local table size
+  readonly int                             N;
+  // The local table size
+  readonly CmiInt8                         localTableSize;
+  // Handle to the test driver (chare)
+  readonly CProxy_TestDriver               driverProxy;
+
+  mainchare TestDriver {
+    entry TestDriver (CkArgMsg *args);
+    entry [reductiontarget] void start();
+    entry [reductiontarget] void startVerificationPhase();
+    entry [reductiontarget] void reportErrors(CmiInt8 globalNumErrors);
+  };
+
+  group Updater {
+    entry Updater();
+    // This method generates keys that index into the global table.
+    // Each generated key is submitted to the communication library
+    entry [threaded]  void generateUpdates(const CkCallback& endCallback);
+    entry [aggregate] void insertData(const CmiUInt8 &key);
+    // Used for verification
+    entry [reductiontarget] void checkErrors();
+  };
+};

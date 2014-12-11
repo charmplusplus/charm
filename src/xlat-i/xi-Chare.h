@@ -1,6 +1,8 @@
 #ifndef _CHARE_H
 #define _CHARE_H
 
+#include <vector>
+
 #include "xi-AstNode.h"
 #include "xi-Template.h"
 #include "xi-Member.h"
@@ -8,6 +10,14 @@
 namespace xi {
 
 class CEntry;
+
+struct TramInfo {
+  std::string type;
+  std::string name;
+  std::string itemType;
+  TramInfo(const char* t, const char* n, const char* i)
+    : type(t), name(n), itemType(i) {}
+};
 
 /* Chare or group is a templated entity */
 class Chare : public TEntity {
@@ -27,6 +37,8 @@ class Chare : public TEntity {
    typedef unsigned int attrib_t;
    XStr sdagPUPReg;
    XStr sdagDefs, closuresDecl, closuresDef;
+   std::vector<TramInfo> tramInstances;
+   bool generateTramInits;
    NamedType *type;
 
  protected:
@@ -85,7 +97,12 @@ class Chare : public TEntity {
    void genReg(XStr& str);
    void genDecls(XStr &str);
    void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
+   void genRecursivePup(XStr &scopedName, XStr templateSpec, XStr &decls, XStr &defs);
    void preprocess();
+
+   void genTramTypes();
+   void genTramDecls(XStr &str);
+   void genTramInits(XStr &str);
 
    // DMK - Accel Support
    int genAccels_spe_c_funcBodies(XStr& str) {

@@ -108,7 +108,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token STACKSIZE
 %token THREADED
 %token TEMPLATE
-%token SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE
+%token SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE AGGREGATE
 %token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK
 %token VOID
 %token CONST
@@ -955,6 +955,18 @@ EAttrib		: THREADED
 		{ $$ = SMEM; }
                 | REDUCTIONTARGET
                 { $$ = SREDUCE; }
+                | AGGREGATE
+		{
+#ifdef CMK_USING_XLC
+        WARNING("a known bug in xl compilers (PMR 18366,122,000) currently breaks "
+                "aggregate entry methods.\n"
+                "Until a fix is released, this tag will be ignored on those compilers.",
+                @1.first_column, @1.last_column, @1.first_line);
+        $$ = 0;
+#else
+        $$ = SAGGREGATE;
+#endif
+    }
 		| error
 		{
 		  ERROR("invalid entry method attribute",

@@ -30,7 +30,7 @@ module NDMeshStreamer {
     entry void receiveAtDestination(MeshStreamerMessage<dtype> *msg);
   };
 
-  template<class dtype, class ClientType, class RouterType>
+  template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
     group GroupMeshStreamer : MeshStreamer<dtype, RouterType> {
     entry GroupMeshStreamer(
           int maxNumDataItemsBuffered, int numDimensions,
@@ -45,7 +45,7 @@ module NDMeshStreamer {
           double progressPeriodInMs = -1.0);
   };
 
-  template<class dtype, class itype, class ClientType, class RouterType>
+  template<class dtype, class itype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
     group ArrayMeshStreamer :
     MeshStreamer<ArrayDataItem<dtype, itype>, RouterType> {
     entry ArrayMeshStreamer(
@@ -64,7 +64,7 @@ module NDMeshStreamer {
 
   };
 
-  template<class dtype, class ClientType, class RouterType>
+  template<class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
     group GroupChunkMeshStreamer : MeshStreamer<ChunkDataItem, RouterType> {
     entry GroupChunkMeshStreamer(
           int maxNumDataItemsBuffered, int numDimensions,

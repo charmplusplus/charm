@@ -37,6 +37,7 @@ class WhenStatementEChecker;
 #define SMEM          0x20000
 #define SREDUCE       0x40000 // <- reduction target
 #define SAPPWORK      0x80000 // <- reduction target
+#define SAGGREGATE    0x100000
 
 /* An entry construct */
 class Entry : public Member {
@@ -95,6 +96,10 @@ class Entry : public Member {
     void genPythonStaticDefs(XStr& str);
     void genPythonStaticDocs(XStr& str);
 
+    void genTramTypes();
+    void genTramDefs(XStr &str);
+    void genTramInstantiation(XStr &str);
+
     // DMK - Accel Support
     void genAccelFullParamList(XStr& str, int makeRefs);
     void genAccelFullCallList(XStr& str);
@@ -106,6 +111,11 @@ class Entry : public Member {
     void genAccels_spe_c_regFuncs(XStr& str);
     void genAccels_ppe_c_regFuncs(XStr& str);
 
+    XStr aggregatorIndexType();
+    XStr dataItemType();
+    XStr tramBaseType();
+    XStr aggregatorType();
+    XStr aggregatorName();
     XStr paramType(int withDefaultVals,int withEO=0,int useConst=1);
     XStr paramComma(int withDefaultVals,int withEO=0);
     XStr eo(int withDefaultVals,int priorComma=1);
@@ -134,6 +144,8 @@ class Entry : public Member {
       estateVars.push_back(sv);
       stateVars.push_back(sv);
     }
+
+    int tramInstanceIndex;
 
     // DMK - Accel Support
     ParamList* accelParam;
@@ -173,6 +185,7 @@ class Entry : public Member {
     int isAppWork(void);
     int isNoKeep(void);
     int isSdag(void);
+    int isTramTarget(void);
 
     // DMK - Accel support
     int isAccel(void);
@@ -195,6 +208,8 @@ class Entry : public Member {
     void propagateState(int);
     void lookforCEntry(CEntry *centry);
     int getLine();
+    void genTramRegs(XStr& str);
+    void genTramPups(XStr& decls, XStr& defs);
 };
 
 // TODO(Ralf): why not simply use list<Entry*> instead?
