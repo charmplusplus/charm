@@ -227,6 +227,7 @@ void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){
 void CkPupROData(PUP::er &p)
 {
 	int _numReadonlies = 0;
+	int _numReadonlyMsgs = 0;
 	if (!p.isUnpacking()) _numReadonlies=_readonlyTable.size();
         p|_numReadonlies;
 	if (p.isUnpacking()) {
@@ -234,6 +235,12 @@ void CkPupROData(PUP::er &p)
 	    CkAbort("You cannot add readonlies and restore from checkpoint...");
 	}
 	for(int i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(p);
+	if (!p.isUnpacking()) _numReadonlyMsgs=_readonlyMsgs.size();
+        p|_numReadonlyMsgs;
+	for(int i=0;i<_numReadonlyMsgs; i++){
+		ReadonlyMsgInfo *c = _readonlyMsgs[i];
+		CkPupMessage(p,c->pMsg);
+	}
 }
 
 // handle main chare
