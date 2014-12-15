@@ -1,0 +1,5 @@
+[gerrit]
+host = charm.cs.illinois.edu
+port = 9418
+project = charm.git
+defaultbranch = charm
