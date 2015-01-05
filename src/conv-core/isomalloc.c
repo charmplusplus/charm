@@ -2018,28 +2018,27 @@ static void init_ranges(char **argv)
   /*Largest value a signed int can hold*/
   memRange_t intMax=(((memRange_t)1)<<(sizeof(int)*8-1))-1;
   int pagesize = 0;
-
-  /*Round slot size up to nearest page size*/
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  slotsize=1024*1024;
-#else
-  slotsize=16*1024;
-#endif 
-#if CMK_HAS_GETPAGESIZE
-  pagesize = getpagesize();
-#endif
-  if (pagesize < CMK_MEMORY_PAGESIZE)
-    pagesize = CMK_MEMORY_PAGESIZE;
-  slotsize=(slotsize+pagesize-1) & ~(pagesize-1);
-
-#if ISOMALLOC_DEBUG
-  if (CmiMyPe() == 0)
-    CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
-#endif
-  freeRegion.len=0u;
-
   if (CmiMyRank()==0 && numslots==0)
   { /* Find the largest unused region of virtual address space */
+    /*Round slot size up to nearest page size*/
+#if CMK_USE_MEMPOOL_ISOMALLOC
+    slotsize=1024*1024;
+#else
+    slotsize=16*1024;
+#endif 
+#if CMK_HAS_GETPAGESIZE
+    pagesize = getpagesize();
+#endif
+    if (pagesize < CMK_MEMORY_PAGESIZE)
+      pagesize = CMK_MEMORY_PAGESIZE;
+    slotsize=(slotsize+pagesize-1) & ~(pagesize-1);
+
+#if ISOMALLOC_DEBUG
+    if (CmiMyPe() == 0)
+      CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
+#endif
+    freeRegion.len=0u;
+
 #ifdef CMK_MMAP_START_ADDRESS /* Hardcoded start address, for machines where automatic fails */
     freeRegion.start=CMK_MMAP_START_ADDRESS;
     freeRegion.len=CMK_MMAP_LENGTH_MEGS*meg;
@@ -2244,8 +2243,10 @@ static void init_ranges(char **argv)
   CpvAccess(myss) = NULL;
 
 #if CMK_USE_MEMPOOL_ISOMALLOC
+  CmiLock(_smp_mutex);
   CtvInitialize(mempool_type *, threadpool);
   CtvAccess(threadpool) = NULL;
+  CmiUnlock(_smp_mutex);
 #endif
 
   if (isomallocStart!=NULL) {

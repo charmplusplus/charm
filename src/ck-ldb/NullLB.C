@@ -67,7 +67,7 @@ void NullLB::init()
   theLbdb->
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
-  _theNullLB = thisgroup;
+  if(CmiMyRank() == 0) _theNullLB = thisgroup;
 }
 
 NullLB::~NullLB()

@@ -139,14 +139,18 @@ void CkRegisterMessagePupFn(int epIndex,CkMessagePupFn m)
 }
 extern "C"
 int CkDisableTracing(int epIdx) {
+	CmiLock(_smp_mutex);
 	int oldStatus = _entryTable[epIdx]->traceEnabled;
 	_entryTable[epIdx]->traceEnabled=false;
+	CmiUnlock(_smp_mutex);
 	return oldStatus;
 }
 
 extern "C"
 void CkEnableTracing(int epIdx) {
+	CmiLock(_smp_mutex);
 	_entryTable[epIdx]->traceEnabled=true;
+	CmiUnlock(_smp_mutex);
 }
 
 #if CMK_CHARMDEBUG

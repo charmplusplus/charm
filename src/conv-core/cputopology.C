@@ -102,8 +102,8 @@ struct _SYSTEM_INFO sysinfo;
   return a;
 }
 
-static int cpuTopoHandlerIdx;
-static int cpuTopoRecvHandlerIdx;
+CpvStaticDeclare(int, cpuTopoHandlerIdx);
+CpvStaticDeclare(int, cpuTopoRecvHandlerIdx);
 
 struct _procInfo {
   skt_ip_t ip;
@@ -230,7 +230,7 @@ static void cpuTopoHandler(void *m)
     int i;
     hostTable = CmmNew();
     topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
-    CmiSetHandler((char *)topomsg, cpuTopoRecvHandlerIdx);
+    CmiSetHandler((char *)topomsg, CpvAccess(cpuTopoRecvHandlerIdx));
     topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
     for (i=0; i<CmiNumPes(); i++) topomsg->nodes[i] = -1;
   }
@@ -306,7 +306,7 @@ static void * combineMessage(int *size, void *data, void **remote, int count)
   hostnameMsg *msg = (hostnameMsg *)CmiAlloc(*size);
   msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
   msg->n = nprocs;
-  CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
+  CmiSetHandler((char *)msg, CpvAccess(cpuTopoHandlerIdx));
 
   int n=0;
   hostnameMsg *m = (hostnameMsg*)data;
@@ -410,13 +410,14 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 #if CMK_BIGSIM_CHARM
   if (BgNodeRank() == 0)
 #endif
-  {
-  cpuTopoHandlerIdx =
-     CmiRegisterHandler((CmiHandler)cpuTopoHandler);
-  cpuTopoRecvHandlerIdx =
-     CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
-  }
-
+    {
+      CpvInitialize(int, cpuTopoHandlerIdx);
+      CpvInitialize(int, cpuTopoRecvHandlerIdx);
+      CpvAccess(cpuTopoHandlerIdx) =
+	CmiRegisterHandler((CmiHandler)cpuTopoHandler);
+      CpvAccess(cpuTopoRecvHandlerIdx) =
+	CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
+    }
   if (!obtain_flag) {
     if (CmiMyRank() == 0) cpuTopo.sort();
     CmiNodeAllBarrier();
@@ -566,7 +567,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg)+sizeof(_procInfo));
   msg->n = 1;
   msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
-  CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
+  CmiSetHandler((char *)msg, CpvAccess(cpuTopoHandlerIdx));
   msg->procs[0].pe = CmiMyPe();
   msg->procs[0].ip = myip;
   msg->procs[0].ncores = CmiNumCores();

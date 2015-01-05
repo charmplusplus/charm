@@ -1610,18 +1610,20 @@ void CthInit(char **argv)
   CpvAccess(doomedThreadPool) = (CthThread)NULL;
 
   /* don't trust the _defaultStackSize */
+ if (CmiMyRank() == 0) {
 #ifdef MINSIGSTKSZ
-  if (CthCpvAccess(_defaultStackSize) < MINSIGSTKSZ) 
-    CthCpvAccess(_defaultStackSize) = MINSIGSTKSZ;
+    if (CthCpvAccess(_defaultStackSize) < MINSIGSTKSZ) 
+      CthCpvAccess(_defaultStackSize) = MINSIGSTKSZ;
 #endif
 #if CMK_THREADS_USE_CONTEXT
-  CmiThreadIs_flag |= CMI_THREAD_IS_CONTEXT;
+    CmiThreadIs_flag |= CMI_THREAD_IS_CONTEXT;
 #else
-  CmiThreadIs_flag |= CMI_THREAD_IS_UJCONTEXT;
+    CmiThreadIs_flag |= CMI_THREAD_IS_UJCONTEXT;
 #endif
 #if CMK_THREADS_ALIAS_STACK
-  CmiThreadIs_flag |= CMI_THREAD_IS_ALIAS;
+    CmiThreadIs_flag |= CMI_THREAD_IS_ALIAS;
 #endif
+ }
 }
 
 static void CthThreadFree(CthThread t)

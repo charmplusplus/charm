@@ -302,6 +302,7 @@ static void CmiPrintCLAs(void) {
  */
 void CmiArgInit(char **argv) {
 	int i;
+	CmiLock(_smp_mutex);
 	for (i=0;argv[i]!=NULL;i++)
 	{
 		if (0==strcmp(argv[i],"-?") ||
@@ -319,6 +320,7 @@ void CmiArgInit(char **argv) {
 		free(CLAlist); CLAlist=NULL;
 	}
 	usageChecked=1;
+	CmiUnlock(_smp_mutex);
 }
 
 /** Return 1 if we're currently printing command-line usage information. */
@@ -938,25 +940,27 @@ void CmiTimerInit(char **argv)
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
 
-  _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
-
+  int tmptime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
+  if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
 #endif
-
-  gettimeofday(&tv,0);
-  inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
+if(CmiMyRank() == 0) /* initialize only  once */
+  {
+    gettimeofday(&tv,0);
+    inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
 #ifndef RUSAGE_WHO
-  CpvAccess(inittime_virtual) = inittime_wallclock;
+    CpvAccess(inittime_virtual) = inittime_wallclock;
 #else
-  getrusage(RUSAGE_WHO, &ru); 
-  CpvAccess(inittime_virtual) =
-    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
-    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+    getrusage(RUSAGE_WHO, &ru); 
+    CpvAccess(inittime_virtual) =
+      (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+      (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 #endif
+  }
 
 #if !(__FAULT__)
   CmiBarrier();
@@ -2119,11 +2123,10 @@ void CsdInit(argv)
   CpvInitialize(void *, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
   CpvInitialize(int,   CsdLocalCounter);
-  if(!CmiGetArgIntDesc(argv,"+csdLocalMax",&CsdLocalMax,"Set the max number of local messages to process before forcing a check for remote messages."))
-    {
-      CsdLocalMax= CSD_LOCAL_MAX_DEFAULT;
-    }
-  CpvAccess(CsdLocalCounter) = CsdLocalMax;
+  int argCsdLocalMax=CSD_LOCAL_MAX_DEFAULT;
+  int argmaxset = CmiGetArgIntDesc(argv,"+csdLocalMax",&argCsdLocalMax,"Set the max number of local messages to process before forcing a check for remote messages.");
+  if (CmiMyRank() == 0 ) CsdLocalMax = argCsdLocalMax;
+  CpvAccess(CsdLocalCounter) = argCsdLocalMax;
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
    #if CMK_USE_STL_MSGQ
    if (CmiMyPe() == 0) CmiPrintf("Charm++> Using STL-based msgQ:\n");

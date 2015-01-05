@@ -2576,12 +2576,16 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     char *procs = NULL;
     _replaySystem = 0;
     if (CmiGetArgFlagDesc(argv,"+recplay-crc","Enable CRC32 checksum for message record-replay")) {
-      _recplay_crc = 1;
+      if(CmiMyRank() == 0) _recplay_crc = 1;
     }
     if (CmiGetArgFlagDesc(argv,"+recplay-xor","Enable simple XOR checksum for message record-replay")) {
-      _recplay_checksum = 1;
+      if(CmiMyRank() == 0) _recplay_checksum = 1;
     }
-    CmiGetArgIntDesc(argv,"+recplay-logsize",&_recplay_logsize,"Specify the size of the buffer used by the message recorder");
+    int tmplogsize;
+    if(CmiGetArgIntDesc(argv,"+recplay-logsize",&tmplogsize,"Specify the size of the buffer used by the message recorder"))
+      {
+	if(CmiMyRank() == 0) _recplay_logsize = tmplogsize;
+      }
     REPLAYDEBUG("CkMessageWatcherInit ");
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
 #if CMK_REPLAYSYSTEM
