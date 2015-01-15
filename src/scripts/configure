@@ -4260,7 +4260,7 @@ int main() {
     return 0;
 }
 EOT
-test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
+test_linkc "whether Cray rca library is available" "yes" "no" "$CRAY_RCA_POST_LINK_OPTS -lrca"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_RCALIB $pass
@@ -4278,7 +4278,7 @@ int main() {
     return 0;
 }
 EOT
-test_linkc "whether Cray rca_has get_max_dimension" "yes" "no" "-lrca"
+test_linkc "whether Cray rca_has get_max_dimension" "yes" "no" "$CRAY_RCA_POST_LINK_OPTS -lrca"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_RCA_MAX_DIMENSION $pass

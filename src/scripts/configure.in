@@ -2004,7 +2004,7 @@ int main() {
     return 0;
 }
 EOT
-test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
+test_linkc "whether Cray rca library is available" "yes" "no" "$CRAY_RCA_POST_LINK_OPTS -lrca"
 AC_DEFINE_UNQUOTED(CMK_HAS_RCALIB, $pass, [whether Cray rca library is available])
 
 #### test if Cray mesh dimension query function will work ####
@@ -2018,7 +2018,7 @@ int main() {
     return 0;
 }
 EOT
-test_linkc "whether Cray rca_has get_max_dimension" "yes" "no" "-lrca"
+test_linkc "whether Cray rca_has get_max_dimension" "yes" "no" "$CRAY_RCA_POST_LINK_OPTS -lrca"
 AC_DEFINE_UNQUOTED(CMK_HAS_RCA_MAX_DIMENSION, $pass, [whether Cray rca has rca_get_max_dimension])
 
 #### query Cray machine max NID if get_max_dimension not exist ####
