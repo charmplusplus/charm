@@ -13,11 +13,11 @@
 
 main::main(CkArgMsg *m)
 {
- //normal object construction
-  HeapObject exampleObject(20,false);
+  //normal object construction
+  HeapObject exampleObject(20, false);
 
   //normal chare array construction
-  CProxy_SimpleArray simpleProxy= CProxy_SimpleArray::ckNew(30);
+  CProxy_SimpleArray simpleProxy = CProxy_SimpleArray::ckNew(30);
 
   //pass object to remote method invocation on the chare array
   simpleProxy[29].acceptData(exampleObject);

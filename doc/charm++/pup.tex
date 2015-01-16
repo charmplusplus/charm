@@ -1,10 +1,10 @@
 \label{sec:pup}
 
-The \index{PUP} PUP framework is a generic way to describe the data in an object and to use that description for any task requiring serialization.
-The \charmpp\ system can use this description to pack the object 
-into a message, and unpack the message into a new object on another 
-processor. 
-The name thus is a contraction of the words Pack and UnPack (PUP). 
+The \index{PUP} PUP (Pack/Unpack) framework is a generic way to describe the
+data in an object and to use that description for serialization.
+The \charmpp\ system can use this description to pack the object
+into a message and unpack the message into a new object on another
+processor.
 
 Like many \CC\ concepts, the PUP framework is easier to use than 
 describe: 
@@ -30,11 +30,11 @@ class foo : public mySuperclass \{
 \};
 \end{alltt}
 
-This class's \uw{pup} method describes the fields of a \uw{foo} to \charmpp{}.
-This allows \charmpp\ to: marshall parameters of type \uw{foo} across processors,
-translate \uw{foo}s across processor architectures, read and write \uw{foo}s
-to disk files, inspect and modify \uw{foo} objects in the debugger, and 
-checkpoint and restart calculations involving \uw{foo}s.
+This class's \uw{pup} method describes the fields of the class to \charmpp{}.
+This allows \charmpp\ to marshall parameters of type \uw{foo} across processors,
+translate \uw{foo} objects across processor architectures, read and write
+\uw{foo} objects to files on disk, inspect and modify \uw{foo} objects in the
+debugger, and checkpoint and restart programs involving \uw{foo} objects.
 
 
 
@@ -330,6 +330,30 @@ Parameter marshalling requires serialization and is therefore
 implemented using the PUP framework.  User defined data types passed
 as parameters must abide by the standard PUP contract (see section
 \ref{sec:pupcontract}).
+
+A simple example of using PUP to marshall user defined data types follows:
+
+\begin{alltt}
+class Buffer \{
+public:
+//...other declarations
+  void pup(PUP::er &p) \{
+    // remember to pup your superclass if there is one
+    p|size;
+    if (p.isUnpacking())
+      data = new int[size];
+    PUParray(p, data, size);
+  \}
+
+private:
+  int size;
+  int *data;
+\};
+
+
+// In some .ci file
+entry void process(Buffer &buf);
+\end{alltt}
 
 For efficiency, arrays are always copied as blocks of bytes and passed
 via pointers.  This means classes that need their pup routines to be
