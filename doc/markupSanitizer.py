@@ -4,6 +4,14 @@ from bs4 import BeautifulSoup
 import sys
 import os
 
+if sys.version < '3':
+    import codecs
+    def u(x):
+        return codecs.unicode_escape_decode(x)[0]
+else:
+    def u(x):
+        return x
+
 # Accept filename as user input
 argc = len( sys.argv )
 if (argc < 2): raise Exception
@@ -60,14 +68,14 @@ if navmenu:
     # Insert navigation symbols to prev and next links
     prevsymbol = soup.new_tag('span')
     prevsymbol['class'] = 'navsymbol'
-    prevsymbol.string = u'\xab'
+    prevsymbol.string = u('\xab')
     prv = navmenu.find('li',id='nav-prev')
     if prv:
         prv.find('a').insert(0, prevsymbol)
 
     nextsymbol = soup.new_tag('span')
     nextsymbol['class'] = 'navsymbol'
-    nextsymbol.string = u'\xbb'
+    nextsymbol.string = u('\xbb')
     nxt = navmenu.find('li',id='nav-next')
     if nxt:
         nxt.find('a').append(nextsymbol)
