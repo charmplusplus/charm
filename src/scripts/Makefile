@@ -99,8 +99,8 @@ pythonCCS: charmxi
 completion: charmxi
 NDMeshStreamer: charm-core completion
 
-mpi-main: mpi-mainmodule.o
-	cp mpi-mainmodule.o ../lib
+$(L)/libmpi-mainmodule.a: mpi-mainmodule.o
+	$(CHARMC) -o $@ $<
 
 $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
@@ -375,7 +375,7 @@ dirs+sources:
 # Converse Libraries
 # 
 ###############################################################################
-CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o   $(L)/libldb-workstealing.o  $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
+CLBLIBS=$(L)/libldb-rand.a $(L)/libldb-spray.a   $(L)/libldb-workstealing.a  $(L)/libldb-neighbor.a $(L)/libldb-none.a $(L)/libldb-test.a $(L)/libldb-bluegene.a
 
 TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a 
 
@@ -389,31 +389,31 @@ TRACELIBS += $(L)/libtrace-projections.a  $(L)/libtrace-summary.a  \
              $(L)/libtrace-memory.a 
 endif
 
-MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
-          $(L)/libmemory-verbose.o  $(L)/libmemory-paranoid.o \
-	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o \
-	  $(L)/libmemory-os-verbose.o $(L)/libmemory-os-isomalloc.o \
-	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
-          $(L)/libmemory-os-lock.o $(L)/libmemory-os-wrapper.o
+MEMLIBS=$(L)/libmemory-default.a $(L)/libmemory-os.a $(L)/libmemory-gnu.a \
+          $(L)/libmemory-verbose.a  $(L)/libmemory-paranoid.a \
+	  $(L)/libmemory-leak.a $(L)/libmemory-isomalloc.a \
+	  $(L)/libmemory-os-verbose.a $(L)/libmemory-os-isomalloc.a \
+	  $(L)/libmemory-os-leak.a $(L)/libmemory-os-paranoid.a \
+          $(L)/libmemory-os-lock.a $(L)/libmemory-os-wrapper.a
 
 BUILD_CHARMDEBUG=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_CHARMDEBUG; fi )
 
 ifneq "$(BUILD_CHARMDEBUG)" "0"
-MEMLIBS += $(L)/libmemory-charmdebug.o $(L)/libmemory-charmdebug-mmap.o \
-	  $(L)/libmemory-charmdebug-slot.o  \
-          $(L)/libmemory-charmdebug-mmap-slot.o \
-	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-hooks-charmdebug.o
+MEMLIBS += $(L)/libmemory-charmdebug.a $(L)/libmemory-charmdebug-mmap.a \
+	  $(L)/libmemory-charmdebug-slot.a  \
+          $(L)/libmemory-charmdebug-mmap-slot.a \
+	  $(L)/libmemory-os-charmdebug.a $(L)/libmemory-hooks-charmdebug.a
 endif
 
-THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-default-tls.o  \
-          $(L)/libthreads-qt.o 	$(L)/libthreads-qt-tls.o  \
-	  $(L)/libthreads-context.o $(L)/libthreads-context-tls.o  \
-	  $(L)/libthreads-uJcontext.o  $(L)/libthreads-uJcontext-tls.o \
-	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
-	  $(L)/libthreads-stackcopy.o $(L)/libthreads-memoryalias.o \
-          $(L)/libthreads-qt-memoryalias.o	\
-	  $(L)/libthreads-context-memoryalias.o	\
-	  $(L)/libthreads-uJcontext-memoryalias.o
+THREADLIBS=$(L)/libthreads-default.a $(L)/libthreads-default-tls.a  \
+          $(L)/libthreads-qt.a 	$(L)/libthreads-qt-tls.a  \
+	  $(L)/libthreads-context.a $(L)/libthreads-context-tls.a  \
+	  $(L)/libthreads-uJcontext.a  $(L)/libthreads-uJcontext-tls.a \
+	  $(L)/libthreads-pthreads.a $(L)/libthreads-fibers.a \
+	  $(L)/libthreads-stackcopy.a $(L)/libthreads-memoryalias.a \
+          $(L)/libthreads-qt-memoryalias.a	\
+	  $(L)/libthreads-context-memoryalias.a	\
+	  $(L)/libthreads-uJcontext-memoryalias.a
 
 CVLIBS=$(L)/libconv-core.a \
 	$(L)/libconv-cplus-y.a $(L)/libconv-cplus-n.a \
@@ -502,32 +502,32 @@ pup_f.o: pup_f.f90 $(CVHEADERS)
 	-$(CHARMC) -c pup_f.f90 && $(CHARMC) -cpmod ../include pupmod.M || touch pup_f.o
 
 ## Converse load balancers (seed balancers, -balance)
-$(L)/libldb-none.o: cldb.none.c $(CVHEADERS)
+$(L)/libldb-none.a: cldb.none.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.none.c
 
-$(L)/libldb-rand.o: cldb.rand.c cldb.h $(CVHEADERS)
+$(L)/libldb-rand.a: cldb.rand.c cldb.h $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.rand.c
 
-$(L)/libldb-neighbor.o: cldb.neighbor.c cldb.neighbor.h graph.h $(CVHEADERS)
+$(L)/libldb-neighbor.a: cldb.neighbor.c cldb.neighbor.h graph.h $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.neighbor.c
 
-$(L)/libldb-workstealing.o: cldb.workstealing.c cldb.workstealing.h graph.h $(CVHEADERS)
+$(L)/libldb-workstealing.a: cldb.workstealing.c cldb.workstealing.h graph.h $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.workstealing.c
 
-$(L)/libldb-spray.o: cldb.spray.c $(CVHEADERS)
+$(L)/libldb-spray.a: cldb.spray.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.spray.c
 
 
-#$(L)/libldb-prioritycentralized.o: cldb.prioritycentralized.c cldb.prioritycentralized.h  $(CVHEADERS)
+#$(L)/libldb-prioritycentralized.a: cldb.prioritycentralized.c cldb.prioritycentralized.h  $(CVHEADERS)
 #	$(CHARMC) -o $@ cldb.prioritycentralized.c 
 
-#//$(L)/libldb-prioritycentralizedopt.o: cldb.prioritycentralizedopt.c cldb.prioritycentralizedopt.h  $(CVHEADERS)
+#//$(L)/libldb-prioritycentralizedopt.a: cldb.prioritycentralizedopt.c cldb.prioritycentralizedopt.h  $(CVHEADERS)
 #//	$(CHARMC) -o $@ cldb.prioritycentralizedopt.c 
 
-$(L)/libldb-test.o: cldb.test.c $(CVHEADERS)
+$(L)/libldb-test.a: cldb.test.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.test.c
 
-$(L)/libldb-bluegene.o: cldb.bluegene.c $(CVHEADERS)
+$(L)/libldb-bluegene.a: cldb.bluegene.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.bluegene.c
 
 ## Memory allocation libraries (-memory)
@@ -538,7 +538,7 @@ libmemory-%.c: memory.c
 
 # $1 is the name of the module, $2 is any additional dependency beyond memory.c and $(MEM_DEPS), $3 is extra arguments to charmc
 define libmem
-$(L)/libmemory-$1.o: libmemory-$1.c $(MEM_DEPS) $2
+$(L)/libmemory-$1.a: libmemory-$1.c $(MEM_DEPS) $2
 	$(CHARMC) -I. -o $$@ $3 $$<
 endef
 
@@ -577,7 +577,7 @@ libthreads-%.c: threads.c
 
 # $1 is the name of the module, $2 is any additional dependency beyond threads.c and $(LIBTHREADSDEPS), $3 is extra arguments to charmc
 define libthreads
-$(L)/libthreads-$1.o: libthreads-$1.c $(LIBTHREADSDEPS) $2
+$(L)/libthreads-$1.a: libthreads-$1.c $(LIBTHREADSDEPS) $2
 	$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$<
 endef
 
@@ -598,15 +598,15 @@ $(eval $(call libthreads,context-memoryalias,             ,-DCMK_THREADS_BUILD_C
 $(eval $(call libthreads,uJcontext-memoryalias,uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_ALIAS_STACK=1 -U_FORTIFY_SOURCE -touch-on-failure))
 
 ## Global swapping (-swapglobal)
-swapglobal-target: $(L)/libglobal-swap.o $(L)/libglobal-copy.o $(L)/loadsym.o
+swapglobal-target: $(L)/libglobal-swap.a $(L)/libglobal-copy.a $(L)/loadsym.a
 
-$(L)/libglobal-swap.o: global-elfgot.C $(CVHEADERS)
+$(L)/libglobal-swap.a: global-elfgot.C $(CVHEADERS)
 	-$(CHARMC) -c global-elfgot.C -o $@ || touch $@
 
-$(L)/libglobal-copy.o: global-elfcopy.C  $(CVHEADERS)
+$(L)/libglobal-copy.a: global-elfcopy.C  $(CVHEADERS)
 	-$(CHARMC) -c global-elfcopy.C -o $@ || touch $@
 
-$(L)/loadsym.o: loadsym.c  $(CVHEADERS)
+$(L)/loadsym.a: loadsym.c  $(CVHEADERS)
 	-$(CHARMC) -c loadsym.c -o $@ || touch $@
 
 ###############################################################################
@@ -632,7 +632,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
-charm-target: loadbalancers default_libs comlib_objs mpi-main 
+charm-target: loadbalancers default_libs comlib_objs $(L)/libmpi-mainmodule.a
 
 CHARMLIBS: charm++ CONVLIBS 
 	$(MAKE) -C libs charmlibs OPTS='$(OPTS)'

@@ -1639,7 +1639,7 @@ fi
 # dummy main module
 if [ "$MPI_INTEROPERATE" != "" -a "$NO_MAIN_MODULE" = "" ]
 then
-	OBJECTFILES="$CHARMLIB/mpi-mainmodule.o $OBJECTFILES"
+	POST_LIBRARIES="-lmpi-mainmodule $POST_LIBRARIES"
 fi
 
 # check if we're linking a sequential object
@@ -1699,13 +1699,16 @@ then
 fi
 
 BAL_EXT=`getExtention $BALANCE`
-if [ -z "$BAL_EXT" ]
-then
-# Balance has no extention-- is a library reference
-    BAL_OBJ="$CHARMLIB/libldb-$BALANCE.o"
+if [ -z "$BAL_EXT" ]; then
+  # Balance has no extension-- is a library reference
+  if [ -f "${CHARMLIB}/libldb-$BALANCE.a" ]; then
+    BAL_OBJ="${CHARMLIB}/libldb-$BALANCE.a"
+  else
+    BAL_OBJ="${CHARMLIBSO}/libldb-$BALANCE.so"
+  fi
 else
-# Balance has some extention-- must be a .o or .a file
-    BAL_OBJ="$BALANCE"
+  # Balance has some extension-- must be a .o or .a file
+  BAL_OBJ="$BALANCE"
 fi
 
 Debug "Finished with BAL_OBJ=$BAL_OBJ, TRACEMODE=$TRACEMODE..."
@@ -1724,7 +1727,11 @@ fi
 
 # Check for valid choice of MEMORY
 
-MEM_OBJ="$CHARMLIB/libmemory-$MEMORY.o"
+if [ -f "${CHARMLIB}/libmemory-${MEMORY}.a" ]; then
+  MEM_OBJ="${CHARMLIB}/libmemory-${MEMORY}.a"
+else
+  MEM_OBJ="${CHARMLIBSO}/libmemory-${MEMORY}.so"
+fi
 
 if [ ! -r $MEM_OBJ -o ! -s $MEM_OBJ ] 
 then
@@ -1735,7 +1742,11 @@ fi
 # For memory wrapping around the OS allocator, need to add also the wrapper object
 case $MEMORY in
   os-*)
-  MEM_OBJ=$MEM_OBJ" $CHARMLIB/libmemory-os-wrapper.o"
+    if [ -f "${CHARMLIB}/libmemory-os-wrapper.a" ]; then
+      MEM_OBJ=$MEM_OBJ" $CHARMLIB/libmemory-os-wrapper.a"
+    else
+      MEM_OBJ=$MEM_OBJ" $CHARMLIBSO/libmemory-os-wrapper.so"
+    fi
   ;;
 esac
 
@@ -1753,7 +1764,12 @@ then
     THREAD=${THREAD}-tls
   fi
 fi
-THREAD_OBJ="$CHARMLIB/libthreads-$THREAD.o"
+
+if [ -f "${CHARMLIB}/libthreads-${THREAD}.a" ]; then
+  THREAD_OBJ="${CHARMLIB}/libthreads-${THREAD}.a"
+else
+  THREAD_OBJ="${CHARMLIBSO}/libthreads-${THREAD}.so"
+fi
 
 if [ ! -r $THREAD_OBJ -o ! -s $THREAD_OBJ ] 
 then
@@ -1927,7 +1943,7 @@ esac
 
 if [ "$BUILD_SHARE" = "0" ]
 then
-	MIDDLE_LIBS="$MEM_OBJ $THREAD_OBJ $MIDDLE_LIBS"
+	MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
 fi
 
 if [ "$CHARM_SHARED" = "1" ]
@@ -1939,23 +1955,23 @@ then
   then
     LANG_LIBS="-L$CHARMLIBSO $OBJECTFILES $PRE_LIBRARIES"
   else
-    LANG_LIBS="-L$CHARMLIBSO $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+    LANG_LIBS="-L$CHARMLIBSO $OBJECTFILES $modInitObj $PRE_LIBRARIES"
   fi
 else
-# if interoperate, need a lib with moduleinit
+  # if interoperate, need a lib with moduleinit
   if [ "$MPI_INTEROPERATE" != "" ]
   then
-    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $BAL_OBJ $PRE_LIBRARIES"
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $PRE_LIBRARIES"
   else
-    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $OBJECTFILES $modInitObj $PRE_LIBRARIES"
   fi
 fi
 if [ "$TRACE_WITH_TAU" = 1 ]
 then
 	echo "Linking with the TAU libraries: $TAU_LIBS"
-	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS $TAU_LIBS"
+	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS $TAU_LIBS"
 else
-	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS"
+	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS"
 fi
 Debugf "All libraries are: $ALL_LIBS"
 
@@ -1973,9 +1989,14 @@ case "$OBJECT" in
         echo "CHARM_ALL_LIBS=\"$ALL_LIBS\""
 	Copyobj
 	;;
+*.so|*.so.*|*.sl|*.dylib)
+        echo "Warning: building shared library failed; for interoperation build
+        static library."
+        End 0
+	;;
 esac
 fi
-  
+
 if [ "$MPI_INTEROPERATE" != "" ]
 then
   ALL_LIBS="$OBJECTFILES $modInitObj $ALL_LIBS"
