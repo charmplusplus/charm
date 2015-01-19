@@ -571,52 +571,32 @@ $(eval $(call libmem,charmdebug-mmap-slot,memory-charmdebug.c,-DCMK_MEMORY_BUILD
 
 ## Thread libraries (-thread)
 
-LIBTHREADSDEPS = threads.c $(CVHEADERS) QUICK_THREADS
+LIBTHREADSDEPS = $(CVHEADERS) QUICK_THREADS
 
-$(L)/libthreads-default.o: $(LIBTHREADSDEPS)
-	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads -I. threads.c
+libthreads-%.c: threads.c
+	cp $< $@
 
-$(L)/libthreads-default-tls.o: $(LIBTHREADSDEPS)
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads -I. threads.c 2> /dev/null || touch $@
+# $1 is the name of the module, $2 is any additional dependency beyond threads.c and $(LIBTHREADSDEPS), $3 is extra arguments to charmc
+define libthreads
+$(L)/libthreads-$1.o: libthreads-$1.c $(LIBTHREADSDEPS) $2
+	$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$<
+endef
 
-$(L)/libthreads-qt.o: $(LIBTHREADSDEPS) 
-	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c
-
-$(L)/libthreads-qt-tls.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
-
-$(L)/libthreads-context.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
-
-$(L)/libthreads-context-tls.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
-
-$(L)/libthreads-uJcontext.o: $(LIBTHREADSDEPS) uJcontext.c
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -U_FORTIFY_SOURCE -IQuickThreads -I. threads.c || touch $@
-
-$(L)/libthreads-uJcontext-tls.o: $(LIBTHREADSDEPS) uJcontext.c
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -IQuickThreads -I. threads.c || touch $@
-
-$(L)/libthreads-pthreads.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_PTHREADS=1 -IQuickThreads threads.c || touch $@
-
-$(L)/libthreads-fibers.o: $(LIBTHREADSDEPS)
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
-
-$(L)/libthreads-stackcopy.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_STACKCOPY=1 -IQuickThreads threads.c || touch $@
-
-$(L)/libthreads-memoryalias.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads threads.c || touch $@
-
-$(L)/libthreads-qt-memoryalias.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c || touch $@
-
-$(L)/libthreads-context-memoryalias.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
-
-$(L)/libthreads-uJcontext-memoryalias.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_JCONTEXT=1 -U_FORTIFY_SOURCE -IQuickThreads -I. threads.c || touch $@
+$(eval $(call libthreads,default,                         ,-DCMK_THREADS_BUILD_DEFAULT=1))
+$(eval $(call libthreads,default-tls,                     ,-DCMK_THREADS_BUILD_DEFAULT -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure))
+$(eval $(call libthreads,qt,                              ,-DCMK_THREADS_BUILD_QT=1))
+$(eval $(call libthreads,qt-tls,                          ,-DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure))
+$(eval $(call libthreads,context,                         ,-DCMK_THREADS_BUILD_CONTEXT=1 -touch-on-failure))
+$(eval $(call libthreads,context-tls,                     ,-DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure))
+$(eval $(call libthreads,uJcontext,            uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -U_FORTIFY_SOURCE -touch-on-failure))
+$(eval $(call libthreads,uJcontext-tls,        uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -touch-on-failure))
+$(eval $(call libthreads,pthreads,                        ,-DCMK_THREADS_BUILD_PTHREADS=1 -touch-on-failure))
+$(eval $(call libthreads,fibers,                          ,-DCMK_THREADS_BUILD_FIBERS=1 -touch-on-failure))
+$(eval $(call libthreads,stackcopy,                       ,-DCMK_THREADS_BUILD_STACKCOPY=1 -touch-on-failure))
+$(eval $(call libthreads,memoryalias,                     ,-DCMK_THREADS_BUILD_DEFAULT=1 -DCMK_THREADS_ALIAS_STACK=1 -touch-on-failure))
+$(eval $(call libthreads,qt-memoryalias,                  ,-DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_ALIAS_STACK=1 -touch-on-failure))
+$(eval $(call libthreads,context-memoryalias,             ,-DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_ALIAS_STACK=1 -touch-on-failure))
+$(eval $(call libthreads,uJcontext-memoryalias,uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_ALIAS_STACK=1 -U_FORTIFY_SOURCE -touch-on-failure))
 
 ## Global swapping (-swapglobal)
 swapglobal-target: $(L)/libglobal-swap.o $(L)/libglobal-copy.o $(L)/loadsym.o
