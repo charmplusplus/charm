@@ -91,6 +91,7 @@ BUILD_SHARE="0"
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
+NOABORT=""
 
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
@@ -193,7 +194,7 @@ Do() {
 	DoNoErrCheck "$@"
 	Do_res=$?
 # The UNIX result code better be zero, or we die
-	[ $Do_res -eq 0 ] || Abort "Command $@ returned error code $Do_res"
+	[ $Do_res -eq 0 -o -n "$NOABORT" ] || Abort "Command $@ returned error code $Do_res"
 }
 
 # This procedure removes the extention (the ".c" in "./main.c") from
@@ -789,6 +790,10 @@ do
 		USE_OPENMP="yes"
 		;;
 
+	-touch-on-failure)
+		NOABORT="yes"
+		;;
+
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
@@ -1341,6 +1346,10 @@ do
 	*.c|*.s)
 		Do $CMK_CC -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
 		NU_OBJ=$BASEO
+		if [ "$Do_res" -ne 0 ]
+		then
+		    touch $BASEO
+		fi
 		;;
 	bglmachine.C)
 		Do $CMK_GCXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
@@ -1349,17 +1358,29 @@ do
 	*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu)
 		Do $CMK_CXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
 		NU_OBJ=$BASEO
+		if [ "$Do_res" -ne 0 ]
+		then
+		    touch $BASEO
+		fi
 		;;
 	*.f|*.F)
 		test -z "$CMK_CF90_FIXED" && Abort "No F90 compiler (CMK_CF90_FIXED) defined"
 		Do $CMK_CF90_FIXED -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 -c $FILE $DESTO
 		NU_OBJ=$BASEO
+		if [ "$Do_res" -ne 0 ]
+		then
+		    touch $BASEO
+		fi
 		;;
 	*.f90|*.F90)
 		test -z "$CMK_CF90" && Abort "No F90 compiler (CMK_CF90) defined"
 		test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
 		Do $CMK_CF90 -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 $FILE $DESTO
 		NU_OBJ=$BASEO
+		if [ "$Do_res" -ne 0 ]
+		then
+		    touch $BASEO
+		fi
 		;;
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
@@ -1420,15 +1441,20 @@ MakeSO() {
 	fi
 	DoNoErrCheck $soCmd
 	Do_res=$?
-	if [ $Do_res -ne 0 ] 
+	if [ $Do_res -ne 0 ]
 	then
-	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	echo "!!  Failed to compile Charm++ shared library. You can disable shared  !!"
-	echo "!!  lib compilation by providing --no-build-shared build option like: !!"
-	echo "!!     ./build charm++ net-linux --no-build-shared -O                 !!"
-	echo "!!  or reexecute this charmc command with --no-build-shared compile option        !!"
-	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	Abort "Command $soCmd returned error code $Do_res"
+	    if [ -n $NOABORT ]
+	    then
+		touch $OBJECT
+	    else
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!  Failed to compile Charm++ shared library. You can disable shared  !!"
+		echo "!!  lib compilation by providing --no-build-shared build option like: !!"
+		echo "!!     ./build charm++ net-linux --no-build-shared -O                 !!"
+		echo "!!  or reexecute this charmc command with --no-build-shared compile option        !!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		Abort "Command $soCmd returned error code $Do_res"
+	    fi
 	fi
 	Copyobj
 }
