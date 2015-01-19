@@ -532,68 +532,42 @@ $(L)/libldb-bluegene.o: cldb.bluegene.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.bluegene.c
 
 ## Memory allocation libraries (-memory)
-MEM_DEPS=memory.c memory-gnu.c memory-gnu-internal.c converse.h conv-mach.h $(CVHEADERS)
-$(L)/libmemory-default.o: $(MEM_DEPS)
-	$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_DEFAULT memory.c
+MEM_DEPS=memory-gnu.c memory-gnu-internal.c converse.h conv-mach.h $(CVHEADERS)
 
-$(L)/libmemory-os.o: $(MEM_DEPS)
-	$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_OS memory.c
+libmemory-%.c: memory.c
+	cp $< $@
 
-$(L)/libmemory-os-verbose.o: memory-verbose.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_VERBOSE memory.c || touch $@
+# $1 is the name of the module, $2 is any additional dependency beyond memory.c and $(MEM_DEPS), $3 is extra arguments to charmc
+define libmem
+$(L)/libmemory-$1.o: libmemory-$1.c $(MEM_DEPS) $2
+	$(CHARMC) -I. -o $$@ $3 $$<
+endef
 
-$(L)/libmemory-os-paranoid.o: memory-paranoid.c $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_PARANOID memory.c || touch $@
-
-$(L)/libmemory-os-leak.o: $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_LEAK memory.c || touch $@
-
-$(L)/libmemory-os-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_ISOMALLOC memory.c || touch $@
-
-$(L)/libmemory-os-lock.o: memory-lock.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_LOCK memory.c || touch $@
-
-$(L)/libmemory-os-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
-
-$(L)/libmemory-os-wrapper.o: memory-os-wrapper.C $(MEM_DEPS)
+$(eval $(call libmem,default,                           ,-DCMK_MEMORY_BUILD_DEFAULT))
+$(eval $(call libmem,os,                                ,-DCMK_MEMORY_BUILD_OS))
+$(eval $(call libmem,os-verbose,    memory-verbose.c,    -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_VERBOSE    -touch-on-failure))
+$(eval $(call libmem,os-paranoid,   memory-paranoid.c,   -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_PARANOID   -touch-on-failure))
+$(eval $(call libmem,os-leak,       memory-leak.c,       -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_LEAK       -touch-on-failure))
+$(eval $(call libmem,os-isomalloc,  memory-isomalloc.c,  -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_ISOMALLOC  -touch-on-failure))
+$(eval $(call libmem,os-lock,       memory-lock.c,       -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_LOCK       -touch-on-failure))
+$(eval $(call libmem,os-charmdebug, memory-charmdebug.c, -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_CHARMDEBUG -touch-on-failure))
+$(L)/libmemory-os-wrapper.a: memory-os-wrapper.C $(MEM_DEPS)
 	-$(CHARMC) -o $@ memory-os-wrapper.C || touch $@
 
-$(L)/libmemory-hooks-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_GNU_HOOKS -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
+$(eval $(call libmem,hooks-charmdebug,,-DCMK_MEMORY_BUILD_GNU_HOOKS -DCMK_MEMORY_BUILD_CHARMDEBUG -touch-on-failure))
 
 # If the system doesn't have sbrk, these compilations may fail.
 #  This is OK, but then we can't use "-memory gnu" or friends.
-$(L)/libmemory-gnu.o: $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_GNU memory.c || touch $@
-
-$(L)/libmemory-verbose.o: memory-verbose.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_VERBOSE memory.c || touch $@
-
-$(L)/libmemory-paranoid.o: memory-paranoid.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_PARANOID memory.c || touch $@
-
-$(L)/libmemory-leak.o: memory-leak.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_LEAK memory.c || touch $@
-
-$(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CACHE memory.c || touch $@
-
-$(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_ISOMALLOC memory.c || touch $@
-
-$(L)/libmemory-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -I. -optimize -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
-
-$(L)/libmemory-charmdebug-slot.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -I. -optimize -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCMK_SEPARATE_SLOT memory.c || touch $@
-
-$(L)/libmemory-charmdebug-mmap.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -I. -optimize -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP memory.c || touch $@
-
-$(L)/libmemory-charmdebug-mmap-slot.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -I. -optimize -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -DCMK_SEPARATE_SLOT memory.c || touch $@
+$(eval $(call libmem,gnu,                                    ,-DCMK_MEMORY_BUILD_GNU -touch-on-failure))
+$(eval $(call libmem,verbose,             memory-verbose.c   ,-DCMK_MEMORY_BUILD_VERBOSE -touch-on-failure))
+$(eval $(call libmem,paranoid,            memory-paranoid.c  ,-DCMK_MEMORY_BUILD_PARANOID -touch-on-failure))
+$(eval $(call libmem,leak,                memory-leak.c      ,-DCMK_MEMORY_BUILD_LEAK -touch-on-failure))
+$(eval $(call libmem,cache,               memory-cache.c     ,-DCMK_MEMORY_BUILD_CACHE -touch-on-failure))
+$(eval $(call libmem,isomalloc,           memory-isomalloc.c ,-DCMK_MEMORY_BUILD_ISOMALLOC -touch-on-failure))
+$(eval $(call libmem,charmdebug,          memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -optimize -touch-on-failure))
+$(eval $(call libmem,charmdebug-slot,     memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCMK_SEPARATE_SLOT -optimize -touch-on-failure))
+$(eval $(call libmem,charmdebug-mmap,     memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -optimize -touch-on-failure))
+$(eval $(call libmem,charmdebug-mmap-slot,memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -DCMK_SEPARATE_SLOT -optimize -touch-on-failure))
 
 ## Thread libraries (-thread)
 
