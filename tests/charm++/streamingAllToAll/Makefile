@@ -11,7 +11,7 @@ ataTest.decl.h: ataTest.ci
 	$(CHARMC)  ataTest.ci
 
 test: all
-	./charmrun +p4 ./ataTest
+	./charmrun +p4 ./ataTest $(TESTOPTS)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o ataTest charmrun
