@@ -2367,6 +2367,44 @@ then
   fi
 fi
 
+#### check if C++ compiler will accept early C++11 variadic templates without warning ####
+cat > $t <<EOT
+class CkMigrateMessage;
+
+template <class Parent>
+struct CBaseT1 : Parent {
+
+  CBaseT1(void) :Parent()  { }
+  CBaseT1(CkMigrateMessage *m) :Parent(m) { }
+
+  template <typename... Args>
+    CBaseT1(Args... args) : Parent(args...) { }
+};
+EOT
+got_cpp11=""
+test_cxx "whether C++ compiler supports variadic templates without flags" "yes" "no" ""
+if test $strictpass -eq 1
+then
+  got_cpp11="true"
+else
+# Flags for g++/clang++, xlC++, and pgCC, respectively
+for i in "-std=c++0x" "-qlanglvl=extended0x" "--c++11"; do
+    test_cxx "whether C++ compiler supports variadic templates with '$i'" "yes" "no" "$i"
+    if test $strictpass -eq 1
+    then
+      add_flag "$(echo OPTS_CXX=\"\$OPTS_CXX $i\")" "Enable C++11 support"
+      OPTS_CXX="$OPTS_CXX $i"
+      got_cpp11="true"
+      break
+    fi
+done
+fi
+
+if test -z $got_cpp11
+then
+  echo "Charm++ requires some C++11 support, but doesn't know the flag to enable it"
+  test_finish 1
+fi
 
 # Figure out if the user has asked to enable the latest language standards
 USER_ASKED_FOR_NEW_STD=`echo "$BUILDOPTS" | grep "-use-new-std" | wc -l`
