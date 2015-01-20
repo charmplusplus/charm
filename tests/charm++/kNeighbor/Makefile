@@ -35,6 +35,11 @@ kNeighbor.o: kNeighbor.C kNeighbor.decl.h
 kNeighbor.comp.o: kNeighbor.C kNeighbor.decl.h
 	$(CHARMC) -c -DDOCOMP kNeighbor.C -o kNeighbor.comp.o
 
+test: all
+	./charmrun +p7 ./kNeighbor 7 10 64 $(TESTOPTS)
+	./charmrun +p7 ./kNeighbor 7 10 256 $(TESTOPTS)
+	./charmrun +p7 ./kNeighbor 7 10 1024 $(TESTOPTS)
+	./charmrun +p7 ./kNeighbor 7 10 16384 $(TESTOPTS)
 
 test-smp: all
 	./charmrun +p7 ./kNeighbor.memos +setcpuaffinity 7 10000 64 ++ppn 7

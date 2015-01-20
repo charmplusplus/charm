@@ -87,7 +87,7 @@ public:
 
         int numElems = atoi(m->argv[1]);
 	if(numElems < CkNumPes()){
-		printf("Warning: #elements is forced to be euqal to #pes\n");
+		printf("Warning: #elements is forced to be equal to #pes\n");
 		numElems = CkNumPes();
 	}
 
