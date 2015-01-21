@@ -7,6 +7,7 @@
 
 #include "charm++.h"
 #include "collide_util.h"
+#include "collidecharm.decl.h"
 
 /********************** collideClient *****************
 A place for the assembled Collision lists to go.

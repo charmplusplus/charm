@@ -1,7 +1,7 @@
 include ../common.mk
 
 HEADERS=collide_util.h bbox.h collide_cfg.h collide_buffers.h \
-	collidecharm.h collidec.h collidef.h 
+	collidecharm.h collidec.h collidef.h collidecharm.decl.h 
 HEADDEP=$(HEADERS) collidecharm_impl.h \
 	collide_serial.h collide_buffers.h collide_cfg.h \
 	collide.decl.h collidecharm.decl.h headers
