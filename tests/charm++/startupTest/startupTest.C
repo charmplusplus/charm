@@ -210,31 +210,31 @@ void main::doneReport(CkReductionMsg *msg)
 int OneMap::procNum(int hdl, const CkArrayIndex &idx)
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
-  return(IntArrOne[idx1d.index]%CkNumPes());
+  return(IntArrOne[idx1d.index[0]]%CkNumPes());
 };
 
 int TwoMap::procNum(int hdl, const CkArrayIndex &idx)
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
-  return(IntArrTwo[idx1d.index]%CkNumPes());
+  return(IntArrTwo[idx1d.index[0]]%CkNumPes());
 };
 
 int ThreeMap::procNum(int hdl, const CkArrayIndex &idx)
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
-  return(IntArrThree[idx1d.index]%CkNumPes());
+  return(IntArrThree[idx1d.index[0]]%CkNumPes());
 };
 
 int FourMap::procNum(int hdl, const CkArrayIndex &idx)
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
-  return(IntArrFour[idx1d.index]%CkNumPes());
+  return(IntArrFour[idx1d.index[0]]%CkNumPes());
 };
 
 int FiveMap::procNum(int hdl, const CkArrayIndex &idx)
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
-  int retval=IntArrFive[idx1d.index]%CkNumPes();
+  int retval=IntArrFive[idx1d.index[0]]%CkNumPes();
   //  CkPrintf("procnum five %d %d\n",idx1d.index,retval);
   return(retval);
 };

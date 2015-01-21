@@ -1,9 +1,6 @@
-CHARMC=../../../bin/charmc $(OPTS) $(MOPTS) 
-#CHARMC=$(HOME)/charm/bin/charmc $(OPTS) $(MOPTS) 
-
+CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = startupTest.o
-
 
 all: startupTest
 
