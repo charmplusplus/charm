@@ -27,7 +27,7 @@ void printCollisionHandler(void *param,int nColl,Collision *colls)
 	mid.maindone();
 }
 
-class main : public Chare
+class main : public CBase_main
 {
 public:
   main(CkMigrateMessage *m) {}
@@ -56,7 +56,7 @@ public:
   };
 };
 
-class Hello : public ArrayElement1D
+class Hello : public CBase_Hello
 {
 	CollideHandle collide;
 	int nTimes;
@@ -68,9 +68,9 @@ public:
 	  CollideRegister(collide,thisIndex);
   }
 
-  Hello(CkMigrateMessage *m) :ArrayElement1D(m) {}
+  Hello(CkMigrateMessage *m) : CBase_Hello(m) {}
   void pup(PUP::er &p) {
-     ArrayElement1D::pup(p);
+     CBase_Hello::pup(p);
      p|collide;
      if (p.isUnpacking())
 	CollideRegister(collide,thisIndex);
