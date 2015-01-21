@@ -27,7 +27,6 @@ public:
 
   void migrationsDone(void);
   void pup(PUP::er &p){ 
-    CBase_NullLB::pup(p); 
     if(p.isUnpacking()) init(); 
     lbname="NullLB"; 
   }

@@ -25,7 +25,7 @@ class ScotchLB : public CBase_ScotchLB {
     ScotchLB(CkMigrateMessage *m) : CBase_ScotchLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CBase_ScotchLB::pup(p); }
+    void pup(PUP::er &p) {  }
 
   private:
     bool QueryBalanceNow(int _step);

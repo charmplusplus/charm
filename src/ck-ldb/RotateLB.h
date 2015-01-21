@@ -12,8 +12,7 @@ class RotateLB : public CBase_RotateLB
     RotateLB (CkMigrateMessage *m) : CBase_RotateLB (m) { };
 
     void work(LDStats *stats);
-
-    void pup (PUP::er &p) { CBase_RotateLB::pup(p); }
+    void pup (PUP::er &p) { }
 
   private:
     bool QueryBalanceNow (int step);

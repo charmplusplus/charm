@@ -52,7 +52,7 @@ class TopoLB : public CBase_TopoLB
   
     void work (LDStats *stats);
    // void work_fromFile (char *filename);
-    void pup (PUP::er &p) { CBase_TopoLB::pup(p); }
+    void pup (PUP::er &p) { }
     	
     LBTopology			*topo;
   

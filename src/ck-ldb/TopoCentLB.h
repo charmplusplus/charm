@@ -43,7 +43,7 @@ class TopoCentLB : public CBase_TopoCentLB
     
     void work (LDStats *stats);
 
-    void pup (PUP::er &p) { CBase_TopoCentLB::pup(p); }
+    void pup (PUP::er &p) { }
 
     struct HeapNode {
       double key;

@@ -32,7 +32,7 @@ public:
   graph * object_graph;
   GreedyCommLB(const CkLBOptions &);
   GreedyCommLB(CkMigrateMessage *m);
-  void pup(PUP::er &p){ CBase_GreedyCommLB::pup(p); }
+  void pup(PUP::er &p){  }
   bool QueryBalanceNow(int step);
   void work(LDStats* stats);
 

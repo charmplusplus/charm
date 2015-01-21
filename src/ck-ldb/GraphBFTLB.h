@@ -25,7 +25,7 @@ class GraphBFTLB : public CBase_GraphBFTLB {
     GraphBFTLB(CkMigrateMessage *m) : CBase_GraphBFTLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CBase_GraphBFTLB::pup(p); }
+    void pup(PUP::er &p) { }
 
   private:
     bool QueryBalanceNow(int _step);

@@ -1701,7 +1701,6 @@ void CentralLB::findSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBS
 }
 
 void CentralLB::pup(PUP::er &p) { 
-  CBase_CentralLB::pup(p);
   if (p.isUnpacking())  {
     initLB(CkLBOptions(seqno)); 
   }

@@ -85,7 +85,7 @@ class GridHybridLB : public CBase_GridHybridLB
 
     bool QueryBalanceNow (int step);
     void work (LDStats *stats);
-    void pup (PUP::er &p) { CBase_GridHybridLB::pup (p); }
+    void pup (PUP::er &p) { }
 
   private:
     int Get_Cluster (int pe);

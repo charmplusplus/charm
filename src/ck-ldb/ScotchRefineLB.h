@@ -23,7 +23,7 @@ class ScotchRefineLB : public CBase_ScotchRefineLB {
     ScotchRefineLB(CkMigrateMessage *m) : CBase_ScotchRefineLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CBase_ScotchRefineLB::pup(p); }
+    void pup(PUP::er &p) {  }
 
   private:
     bool QueryBalanceNow(int _step);

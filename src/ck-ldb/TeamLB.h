@@ -18,7 +18,7 @@ class TeamLB : public CBase_TeamLB {
     TeamLB(CkMigrateMessage *m):CBase_TeamLB(m) { lbname = "TeamLB"; }
 
     void work(LDStats* stats);
-    void pup(PUP::er &p) { CBase_TeamLB::pup(p); }
+    void pup(PUP::er &p) {  }
 
   private:
     int teamSize;

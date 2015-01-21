@@ -25,7 +25,7 @@ class ScotchTopoLB : public CBase_ScotchTopoLB {
     ScotchTopoLB(CkMigrateMessage *m) : CBase_ScotchTopoLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CBase_ScotchTopoLB::pup(p); }
+    void pup(PUP::er &p) {  }
 
   private:
     bool QueryBalanceNow(int _step);

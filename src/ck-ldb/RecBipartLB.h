@@ -23,7 +23,7 @@ class RecBipartLB : public CBase_RecBipartLB {
     RecBipartLB(CkMigrateMessage *m) : CBase_RecBipartLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CBase_RecBipartLB::pup(p); }
+    void pup(PUP::er &p) { }
 
   private:
     bool QueryBalanceNow(int _step);

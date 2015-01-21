@@ -12,8 +12,7 @@ class BlockLB : public CBase_BlockLB
     BlockLB (CkMigrateMessage *m) : CBase_BlockLB (m) { };
 
     void work (LDStats *stats);
-
-    void pup (PUP::er &p) { CBase_BlockLB::pup(p); }
+    void pup (PUP::er &p) { }
 
   private:
     bool QueryBalanceNow (int step);

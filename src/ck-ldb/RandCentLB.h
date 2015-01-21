@@ -15,7 +15,7 @@ class RandCentLB : public CBase_RandCentLB {
 public:
   RandCentLB(const CkLBOptions &opt);
   RandCentLB(CkMigrateMessage *m) : CBase_RandCentLB(m) { lbname = "RandCentLB"; }
-  void pup(PUP::er &p){ CBase_RandCentLB::pup(p); }
+  void pup(PUP::er &p){ }
 
   void work(LDStats* stats);
 private:

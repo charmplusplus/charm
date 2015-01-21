@@ -25,7 +25,7 @@ class GraphPartLB : public CBase_GraphPartLB {
     GraphPartLB(CkMigrateMessage *m) : CBase_GraphPartLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CBase_GraphPartLB::pup(p); }
+    void pup(PUP::er &p) { }
 
   private:
     bool QueryBalanceNow(int _step);

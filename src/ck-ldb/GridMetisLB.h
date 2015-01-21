@@ -78,7 +78,7 @@ class GridMetisLB : public CBase_GridMetisLB
 
     bool QueryBalanceNow (int step);
     void work (LDStats *stats);
-    void pup (PUP::er &p) { CBase_GridMetisLB::pup (p); }
+    void pup (PUP::er &p) { }
 
   private:
     int Get_Cluster (int pe);

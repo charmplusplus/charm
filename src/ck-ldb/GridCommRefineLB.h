@@ -46,7 +46,7 @@ class GridCommRefineLB : public CBase_GridCommRefineLB
 
     bool QueryBalanceNow (int step);
     void work (LDStats *stats);
-    void pup (PUP::er &p) { CBase_GridCommRefineLB::pup (p); }
+    void pup (PUP::er &p) { }
 
   private:
     int Get_Cluster (int pe);
