@@ -32,7 +32,7 @@ public:
     numW = numX = numY = numZ = 5;
     if(m->argc > 1) {
       if(m->argc != 5)
-	CkPrintf("4 arguments needed, one for each dimension\n");
+	CkPrintf("argc %d, 4 arguments needed, one for each dimension\n",m->argc);
       else {
 	numW = atoi(m->argv[1]);
 	numX = atoi(m->argv[2]);
@@ -58,20 +58,18 @@ public:
 	  for(int i4=0; i4<numZ; i4++) {
 	    arr(i1, i2, i3, i4).insert();
 	  }
+    arr.doneInserting();
     CkPrintf("Array created\n");
 
+
     CkVec<CkArrayIndex4D> elems;    // add array indices
-    for (short int i=0; i<1; i++)
-      for (short int j=0; j<2; j+=2)
-	for (short int k=0; k<3; k+=2)
-	  for (short int l=0; l<4; l+=2)
-	    elems.push_back(CkArrayIndex4D(i, j, k, l)); 
+    for (short int i=0; i<numW; i+=2)
+      for (short int j=0; j<numX; j+=3)
+	for (short int k=0; k<numY; k+=4)
+	  for (short int l=0; l<numZ; l+=5)
+	    elems.push_back(CkArrayIndex4D(i % numW, j % numX, k % numY, l % numZ)); 
     numElems = elems.size();
     secProxy = CProxySection_Hello::ckNew(arr, elems.getVec(), numElems);
-
-    CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
-    CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-    secProxy.ckSectionDelegate(mcastGrp);  // initialize section proxy
 
     CkPrintf("Section created\n");
 
@@ -152,12 +150,12 @@ class HelloMap : public CkArrayMap {
 	      mapping[i][j][k] = new int[z]; 
 	}
       }
-
+      /* naively fold onto the 1d rank array with z innermost */
       for(int i=0; i<w; i++)
 	for(int j=0; j<x; j++)
 	  for(int k=0; k<y; k++)
 	    for(int l=0; l<z; l++) {
-	      mapping[i][j][k][l] = i;
+	      mapping[i][j][k][l] = (i*x*y*z+ j*y*z + k*z +l)%CkNumPes();
 	    }
 
     }
