@@ -4,6 +4,7 @@
 #include <deque>
 #include <queue>
 #include <ostream>
+#include <functional>
 
 #if CMK_HAS_STD_UNORDERED_MAP
 #include <unordered_map>
