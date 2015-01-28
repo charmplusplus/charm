@@ -444,15 +444,10 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 
 LIBCONV_UTILF=pup_f.o
 
-converse: fmain-ok charmrun-target swapglobal-target conv-cpm
+converse: charmrun-target swapglobal-target conv-cpm
 
 charmrun-target: charmrun  sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS)
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
-
-fmain-ok: fmain.f90
-	-@$(CHARMC) -c fmain.f90
-	-@cp fmain.o ../lib
-	-@touch fmain-ok
 
 QUICK_THREADS: $(CVHEADERS)
 	-( $(MAKE) -C QuickThreads clean )

@@ -1634,13 +1634,6 @@ then
 	fi
 	
 	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
-        if [ -z "$SEQUENTIAL" -a ! -z "$CMK_F90OBJS" ] 
-        then
-          for f90obj in $CMK_F90OBJS
-          do
-            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
-          done
-        fi
 fi
 
 # dummy main module
