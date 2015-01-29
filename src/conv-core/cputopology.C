@@ -53,6 +53,8 @@ extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 using namespace BGConverse;
 #endif
 
+extern "C" void CommunicationServerPxshm();
+
 extern "C" int CmiNumCores(void) {
   int a = 1;
 #ifdef _WIN32

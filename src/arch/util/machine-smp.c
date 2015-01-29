@@ -452,7 +452,6 @@ static void CmiStartThreads(char **argv)
 
   MACHSTATE(4,"CmiStartThreads")
   CmiMemLock_lock=CmiCreateLock();
-  comm_mutex=CmiCreateLock();
   _smp_mutex = CmiCreateLock();
 #if defined(CMK_NO_ASM_AVAILABLE) && CMK_PCQUEUE_LOCK
   cmiMemoryLock = CmiCreateLock();

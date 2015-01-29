@@ -1114,7 +1114,9 @@ if (  MSG_STATISTIC)
       _writeToStdout = 0;
       free(stdoutpath);
     }
-
+#if CMK_SMP
+    comm_mutex=CmiCreateLock();
+#endif
 
 #if CMK_USE_PXSHM
     CmiInitPxshm(argv);
@@ -1292,10 +1294,7 @@ static void CommunicationServer(int sleepTime) {
         MACHSTATE(2, "} CommunicationServer EXIT");
 
         ConverseCommonExit();
-
-#if CMK_USE_PXSHM
-        CmiExitPxshm();
-#endif
+  
 #if CMK_USE_XPMEM
         CmiExitXpmem();
 #endif

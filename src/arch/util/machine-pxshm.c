@@ -54,40 +54,34 @@ There are three options here for synchronization:
 
 #define SENDQ_LIST     0
 
-/*** The following code was copied verbatim from pcqueue.h file ***/
+/*** The following code was copied verbatim from converse.h ***/
 #if ! CMK_SMP
-#undef CmiMemoryWriteFence
 #if PXSHM_FENCE
-#ifdef POWER_PC
-#define CmiMemoryWriteFence(startPtr,nBytes) asm volatile("eieio":::"memory")
-#else
-#define CmiMemoryWriteFence(startPtr,nBytes) asm volatile("sfence":::"memory")
-//#define CmiMemoryWriteFence(startPtr,nBytes) 
-#endif
-#else
-#undef CmiMemoryWriteFence
-#define CmiMemoryWriteFence(startPtr,nBytes)  
-#endif
 
 #undef CmiMemoryReadFence
-#if PXSHM_FENCE
-#ifdef POWER_PC
-#define CmiMemoryReadFence(startPtr,nBytes) asm volatile("eieio":::"memory")
-#else
-#define CmiMemoryReadFence(startPtr,nBytes) asm volatile("lfence":::"memory")
-//#define CmiMemoryReadFence(startPtr,nBytes) 
-#endif
-#else
-#define CmiMemoryReadFence(startPtr,nBytes) 
-#endif
+#undef CmiMemoryWriteFence
 
-#endif
+#if CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE
+#define CmiMemoryReadFence()                 __sync_synchronize()
+#define CmiMemoryWriteFence()                __sync_synchronize()
+#elif CMK_C_BUILTIN_IA32_XFENCE
+#define CmiMemoryReadFence()                 __builtin_ia32_lfence()
+#define CmiMemoryWriteFence()                __builtin_ia32_sfence()
+#elif CMK_GCC_X86_ASM
+#define CmiMemoryReadFence()               __asm__ __volatile__("lfence" ::: "memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("sfence" ::: "memory")
+#elif CMK_GCC_IA64_ASM
+#define CmiMemoryReadFence()               __asm__ __volatile__("mf" ::: "memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("mf" ::: "memory")
+#elif CMK_PPC_ASM
+#define CmiMemoryReadFence()               __asm__ __volatile__("sync":::"memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("sync":::"memory")
+#else
+#error Cannot build PXSHM with non-SMP on a machine with no ASM for atomic fence
+#endif /* CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE */
 
-/*
-#if CMK_SMP
-#error  "PXSHM can only be used in non-smp build of Charm++"
-#endif
-*/
+#endif //end of PXSHM_FENCE
+#endif //end of CMK_SMP
 
 /***************************************************************************************/
 
@@ -239,6 +233,11 @@ void CmiInitPxshm(char **argv){
         int Cmi_charmrun_pid = rand();
         PMI_Bcast(&Cmi_charmrun_pid, sizeof(int));
         snprintf(&(pxshmContext->prefixStr[0]),PREFIXSTRLEN-1,"charm_pxshm_%d",Cmi_charmrun_pid);
+#elif CMK_NET_VERSION
+        srand(Cmi_charmrun_pid);
+	snprintf(&(pxshmContext->prefixStr[0]),PREFIXSTRLEN-1,"charm_pxshm_%d",rand());
+#else
+#error PXSHM does not support the machine layer you are building on; please contact Charm++ develpers to report this.
 #endif
 
 	MACHSTATE2(3,"CminitPxshm %s %d pre setupSharedBuffers",pxshmContext->prefixStr,pxshmContext->nodesize);
@@ -380,12 +379,13 @@ void CmiSendMessagePxshm(char *msg, int size, int dstnode, int *refcount)
 #if PXSHM_OSSPINLOCK
 	if(! OSSpinLockTry(&dstBuf->header->lock)){
 #elif PXSHM_LOCK
-	if(sem_trywait(dstBuf->mutex) < 0){
+	if(sem_wait(dstBuf->mutex) != 0){
+	  //never comes here unless the mutex is buggy
 #elif PXSHM_FENCE
 	dstBuf->header->flagSender = 1;
 	dstBuf->header->turn = RECEIVER;
-	CmiMemoryReadFence(0,0);
-	CmiMemoryWriteFence(0,0);
+	CmiMemoryReadFence();
+	CmiMemoryWriteFence();
 	//if(dstBuf->header->flagReceiver && dstBuf->header->turn == RECEIVER){
 	if(dstBuf->header->flagReceiver){
 	        dstBuf->header->flagSender = 0;
@@ -434,8 +434,8 @@ void CmiSendMessagePxshm(char *msg, int size, int dstnode, int *refcount)
 #elif PXSHM_LOCK
 		 sem_post(dstBuf->mutex);
 #elif PXSHM_FENCE
-		 CmiMemoryReadFence(0,0);			
-		 CmiMemoryWriteFence(0,0);
+		 CmiMemoryReadFence();
+		 CmiMemoryWriteFence();
 		 dstBuf->header->flagSender = 0;
 #endif
 	}
@@ -454,7 +454,7 @@ inline void flushAllSendQs();
  * Extract all the messages from the recvBuffers you can
  * Flush all sendQs
  * ***/
-inline void CommunicationServerPxshm(){
+void CommunicationServerPxshm(){
 	
 #if PXSHM_STATS
 	double _startCommServerTime =CmiWallTimer();
@@ -551,14 +551,8 @@ void setupSharedBuffers(){
 			pxshmContext->sendBufs[i].header->bytes = 0;
 		}
 	}
-
-#if CMK_SMP && ( CMK_CRAYXE || CMK_CRAYXC )
-        if (PMI_Barrier() != GNI_RC_SUCCESS) return;
-#else
-        if (CmiBarrier() != 0) return;
-#endif
-        freeSharedBuffers();
-        pxshm_freed = 1;
+	
+	return LrtsBarrier();
 }
 
 void allocBufNameStrings(char ***bufName){
@@ -752,12 +746,12 @@ inline void emptyAllRecvBufs(){
 #if PXSHM_OSSPINLOCK
 				if(! OSSpinLockTry(&recvBuf->header->lock)){
 #elif PXSHM_LOCK
-				if(sem_trywait(recvBuf->mutex) < 0){
+				if(sem_wait(recvBuf->mutex) != 0){
 #elif PXSHM_FENCE
 				recvBuf->header->flagReceiver = 1;
 				recvBuf->header->turn = SENDER;
-				CmiMemoryReadFence(0,0);
-				CmiMemoryWriteFence(0,0);
+				CmiMemoryReadFence();
+				CmiMemoryWriteFence();
 				//if((recvBuf->header->flagSender && recvBuf->header->turn == SENDER)){
 				if((recvBuf->header->flagSender)){
 					recvBuf->header->flagReceiver = 0;
@@ -773,8 +767,8 @@ inline void emptyAllRecvBufs(){
 #elif PXSHM_LOCK
 					sem_post(recvBuf->mutex);
 #elif PXSHM_FENCE
-					CmiMemoryReadFence(0,0);
-					CmiMemoryWriteFence(0,0);
+					CmiMemoryReadFence();
+					CmiMemoryWriteFence();
 					recvBuf->header->flagReceiver = 0;
 #endif
 
@@ -805,12 +799,12 @@ inline void flushAllSendQs(){
 #if PXSHM_OSSPINLOCK
 		        if(OSSpinLockTry(&pxshmContext->sendBufs[i].header->lock)){
 #elif PXSHM_LOCK
-			if(sem_trywait(pxshmContext->sendBufs[i].mutex) >= 0){
+			if(sem_wait(pxshmContext->sendBufs[i].mutex) == 0){
 #elif PXSHM_FENCE
 			pxshmContext->sendBufs[i].header->flagSender = 1;
 			pxshmContext->sendBufs[i].header->turn = RECEIVER;
-			CmiMemoryReadFence(0,0);			
-			CmiMemoryWriteFence(0,0);
+			CmiMemoryReadFence();
+			CmiMemoryWriteFence();
 			if(!(pxshmContext->sendBufs[i].header->flagReceiver && pxshmContext->sendBufs[i].header->turn == RECEIVER)){
 #endif
 
@@ -822,8 +816,8 @@ inline void flushAllSendQs(){
 #elif PXSHM_LOCK
 				sem_post(pxshmContext->sendBufs[i].mutex);
 #elif PXSHM_FENCE
-				CmiMemoryReadFence(0,0);			
-				CmiMemoryWriteFence(0,0);
+				CmiMemoryReadFence();
+				CmiMemoryWriteFence();
 				pxshmContext->sendBufs[i].header->flagSender = 0;
 #endif
 			}else{

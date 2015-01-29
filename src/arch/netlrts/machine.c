@@ -214,6 +214,7 @@ int printf(const char *fmt, ...) {
 
 /* define machine debug */
 #include "machine.h"
+static int        Cmi_charmrun_pid;
 
 /******************* Producer-Consumer Queues ************************/
 #include "pcqueue.h"
@@ -600,7 +601,6 @@ void CmiEnableNonblockingIO(int fd) { }
 static skt_ip_t   Cmi_self_IP;
 static skt_ip_t   Cmi_charmrun_IP; /*Address of charmrun machine*/
 static int        Cmi_charmrun_port;
-static int        Cmi_charmrun_pid;
 static int        Cmi_charmrun_fd=-1;
 /* Magic number to be used for sanity check in messege header */
 static int 				Cmi_net_magic;
@@ -1843,7 +1843,12 @@ void LrtsExit()
     for(i = 0; i < CmiMyNodeSize(); i++) {
       ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
     }
-    while(1) CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
+    while(1) {
+#if CMK_USE_PXSHM
+      CommunicationServerPxshm();
+#endif
+      CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
+    }
   }
 }
 

@@ -1770,19 +1770,39 @@ extern "C"
 #endif*/
 void CmiMachineProgressImpl();
 
+#if CMK_USE_PXSHM
+#define CmiNetworkProgress() {CpvAccess(networkProgressCount) ++; \
+      if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \
+          CmiMachineProgressImpl(); \
+	  CommunicationServerPxshm(); \
+          CpvAccess(networkProgressCount) = 0; \
+      } \
+}
+#else
 #define CmiNetworkProgress() {CpvAccess(networkProgressCount) ++; \
       if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \
           CmiMachineProgressImpl(); \
           CpvAccess(networkProgressCount) = 0; \
       } \
-} \
+}
+#endif
 
+#if CMK_USE_PXSHM
+#define CmiNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
+      if(CpvAccess(networkProgressCount) >=  p) { \
+          CmiMachineProgressImpl(); \
+	  CommunicationServerPxshm(); \
+          CpvAccess(networkProgressCount) = 0; \
+      } \
+}
+#else
 #define CmiNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
       if(CpvAccess(networkProgressCount) >=  p) { \
           CmiMachineProgressImpl(); \
           CpvAccess(networkProgressCount) = 0; \
       } \
-} \
+}
+#endif
 
 #endif
 
