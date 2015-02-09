@@ -80,6 +80,79 @@ on these routines.
 
 Any user-defined types in the argument list must be declared 
 before including the ``.decl.h'' file.
-As usual in \CC, it is often dramatically more efficient to pass
-a large structure by reference than by value.
+Any user-defined types must be fully defined before the entry
+method declaration that consumes it.  This is typically done by
+including the header defining the type in the {\tt .ci} file.
+Alternatively, one may define it before inlcuding the
+{\tt .decl.h} file.  As usual in \CC, it is often dramatically
+ more efficient to pass a large structure by reference than by value.
 
+As an example, refer to the following code from \examplerefdir{PUP/HeapPUP}:
+
+\begin{alltt}
+// In HeapObject.h:
+
+class HeapObject \{
+ public:
+  int publicInt;
+
+  // ... other methods ...
+
+  void pup(PUP::er &p) \{
+    // remember to pup your superclass if there is one
+    p|publicInt;
+    p|privateBool;
+    if (p.isUnpacking())
+      data = new float[publicInt];
+    PUParray(p, data, publicInt);
+  \}
+
+ private:
+  bool privateBool;
+  float *data;
+\};
+
+// In SimplePup.ci:
+
+mainmodule SimplePUP \{
+  include "HeapObject.h";
+
+  // ... other Chare declarations ...
+
+  array [1D] SimpleArray\{
+    entry SimpleArray();
+    entry void acceptData(HeapObject &inData);
+  \};
+\};
+
+// In SimplePup.h:
+
+#include "SimplePUP.decl.h"
+
+// ... other definitions ...
+
+class SimpleArray : public CBase\_SimpleArray \{
+ public:
+  void acceptData(HeapObject &inData) \{
+    // ... code using marshalled parameter ...
+  \}
+\};
+
+// In SimplePup.C:
+
+#include "SimplePUP.h"
+
+main::main(CkArgMsg *m)
+\{
+  // normal object construction
+  HeapObject exampleObject(... parameters ...);
+
+  // normal chare array construction
+  CProxy\_SimpleArray simpleProxy = CProxy\_SimpleArray::ckNew(30);
+
+  // pass object to remote method invocation on the chare array
+  simpleProxy[29].acceptData(exampleObject);
+\}
+
+#include "SimplePUP.def.h"
+\end{alltt}
