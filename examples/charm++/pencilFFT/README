@@ -1,0 +1,7 @@
+Example to show the use of pencilFFT library.
+
+Steps:
+1. Build the pencilFFT library located at libs/ck-libs/pencilfft
+   Detailed instructions can be found here: http://charm.cs.illinois.edu/manuals/html/libraries/4.html
+2. Modify Makefile to set FFT library path.
+3. Compile and run.
