@@ -129,40 +129,43 @@ void FuncCkLoop::exit() {
 static FuncCkLoop *globalCkLoop = NULL;
 
 FuncCkLoop::FuncCkLoop(int mode_, int numThreads_) {
-    traceRegisterUserEvent("ckloop total work",CKLOOP_TOTAL_WORK_EVENTID);
-    traceRegisterUserEvent("ckloop finish signal",CKLOOP_FINISH_SIGNAL_EVENTID);
+  init(mode_, numThreads_);
+}
 
-    mode = mode_;
-    loop_info_inited_lock = CmiCreateLock();
+void FuncCkLoop::init(int mode_, int numThreads_) {
+  traceRegisterUserEvent("ckloop total work",CKLOOP_TOTAL_WORK_EVENTID);
+  traceRegisterUserEvent("ckloop finish signal",CKLOOP_FINISH_SIGNAL_EVENTID);
 
-    CmiAssert(globalCkLoop==NULL);
-    globalCkLoop = this;
+  mode = mode_;
+  loop_info_inited_lock = CmiCreateLock();
 
-    if (mode == CKLOOP_USECHARM) {
-        //CkPrintf("FuncCkLoop created on node %d\n", CkMyNode());
-        numHelpers = CkMyNodeSize();
-        helperPtr = new FuncSingleHelper *[numHelpers];
-        useTreeBcast = (numHelpers >= USE_TREE_BROADCAST_THRESHOLD);
+  CmiAssert(globalCkLoop==NULL);
+  globalCkLoop = this;
 
-        int pestart = CkNodeFirst(CkMyNode());
+  if (mode == CKLOOP_USECHARM) {
+      //CkPrintf("FuncCkLoop created on node %d\n", CkMyNode());
+      numHelpers = CkMyNodeSize();
+      helperPtr = new FuncSingleHelper *[numHelpers];
+      useTreeBcast = (numHelpers >= USE_TREE_BROADCAST_THRESHOLD);
 
-        for (int i=0; i<numHelpers; i++) {
-            CkChareID helper;
-            CProxy_FuncSingleHelper::ckNew(&helper, pestart+i);
-        }
-    } else if (mode == CKLOOP_PTHREAD) {
-        helperPtr = NULL;
+      int pestart = CkNodeFirst(CkMyNode());
 
-        numHelpers = numThreads_;
-        useTreeBcast = (numHelpers >= USE_TREE_BROADCAST_THRESHOLD);
-        pthdLoop = new CurLoopInfo(FuncCkLoop::MAX_CHUNKS);
-        mainHelper = this;
-        createPThreads();
-    }
+      for (int i=0; i<numHelpers; i++) {
+          CkChareID helper;
+          CProxy_FuncSingleHelper::ckNew(&helper, pestart+i);
+      }
+  } else if (mode == CKLOOP_PTHREAD) {
+      helperPtr = NULL;
+
+      numHelpers = numThreads_;
+      useTreeBcast = (numHelpers >= USE_TREE_BROADCAST_THRESHOLD);
+      pthdLoop = new CurLoopInfo(FuncCkLoop::MAX_CHUNKS);
+      mainHelper = this;
+      createPThreads();
+  }
 }
 
 FuncCkLoop::FuncCkLoop(CkMigrateMessage *m) : CBase_FuncCkLoop(m) {
-  loop_info_inited_lock = CmiCreateLock();
 }
 
 int FuncCkLoop::MAX_CHUNKS = 64;
@@ -347,10 +350,8 @@ void FuncCkLoop::pup(PUP::er &p) {
   CBase_FuncCkLoop::pup(p);
   p|mode;
   p|numHelpers;
-  p|useTreeBcast;
   if (p.isUnpacking()) {
-    helperPtr = new FuncSingleHelper *[numHelpers];
-    globalCkLoop = this;
+    init(mode, numHelpers);
   }
 }
 
@@ -444,22 +445,6 @@ void FuncSingleHelper::stealWork(CharmNotifyMsg *msg) {
     }
     loop->stealWork();
 #endif
-}
-
-void FuncSingleHelper::pup(PUP::er &p) {
-  CBase_FuncSingleHelper::pup(p);
-  p|funcckproxy;
-  p|useTreeBcast;
-  if (p.isUnpacking()) {
-    HelperNotifyMsg* msg = new HelperNotifyMsg;
-    msg->srcRank = CkMyRank();
-    msg->localHelper = this;
-    // Register the helper with the node group proxy via message since the node
-    // group is not constructed yet.
-    funcckproxy[CkMyNode()].registerHelper(msg);
-
-    createNotifyMsg();
-  }
 }
 
 void SingleHelperStealWork(ConverseNotifyMsg *msg) {

@@ -161,6 +161,7 @@ public:
 
     void createPThreads();
     void exit();
+    void init(int mode_, int numThreads_);
 
     int getNumHelpers() {
         return numHelpers;
@@ -260,8 +261,6 @@ public:
     void stealWork(CharmNotifyMsg *msg);
 
     FuncSingleHelper(CkMigrateMessage *m) : CBase_FuncSingleHelper(m) {}
-
-    void pup(PUP::er &p);
 
  private:
     void createNotifyMsg();
