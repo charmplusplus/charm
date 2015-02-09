@@ -11,13 +11,13 @@ module MetaBalancer {
     entry void MetaBalancer(void);  
     initnode void initnodeFn();
 
-    entry [immediate] void ReceiveMinStats(CkReductionMsg *msg);
-    entry [immediate] void LoadBalanceDecision(int req_no, int period);
-    entry [immediate] void LoadBalanceDecisionFinal(int req_no, int period);
-    entry [immediate] void ReceiveIterationNo(int);
-    entry [immediate] void RegisterNoObjCallback(int);
-    entry [immediate] void TriggerAdaptiveReduction();
-    entry [immediate] void MetaLBCallLBOnChares();
+    entry [expedited] void ReceiveMinStats(CkReductionMsg *msg);
+    entry [expedited] void LoadBalanceDecision(int req_no, int period);
+    entry [expedited] void LoadBalanceDecisionFinal(int req_no, int period);
+    entry [expedited] void ReceiveIterationNo(int);
+    entry [expedited] void RegisterNoObjCallback(int);
+    entry [expedited] void TriggerAdaptiveReduction();
+    entry [expedited] void MetaLBCallLBOnChares();
   }
 
   // This group is used only to handle reduction to obtain the maximum
@@ -26,7 +26,7 @@ module MetaBalancer {
   // with that as there is no specific order.
   group [migratable] MetaBalancerRedn {
     entry void MetaBalancerRedn(void);
-    entry [immediate, reductiontarget] void ReceiveIterNo(int max_iter);
+    entry [expedited, reductiontarget] void ReceiveIterNo(int max_iter);
     entry void getMaxIter(int);
   }
 
