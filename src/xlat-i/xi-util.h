@@ -76,22 +76,53 @@ class XStr {
 #define endx "\n"
 
 class Printable {
-  public:
-    virtual void print(XStr& str) = 0;
-    //This lets us cast printables to XStr
-    operator XStr () {XStr ret;print(ret);return ret;}
-    //These let us stream Printables to XStr.
-    virtual ~Printable(){}
-    friend XStr & operator << (XStr &str,Printable &p) {p.print(str);return str;}
-    friend XStr & operator << (XStr &str,Printable *p) {p->print(str);return str;}
+ public:
+  virtual void print(XStr& str) = 0;
+  //This lets us cast printables to XStr
+  operator XStr () {XStr ret;print(ret);return ret;}
+  //These let us stream Printables to XStr.
+  virtual ~Printable(){}
+  friend XStr & operator << (XStr &str,Printable &p) {p.print(str);return str;}
+  friend XStr & operator << (XStr &str,Printable *p) {p->print(str);return str;}
 };
 
 void templateGuardBegin(bool templateOnly, XStr &str);
 void templateGuardEnd(XStr &str);
 
- inline void indentBy(XStr& s, int num) {
-   for (int i = 0; i < num; i++) s << "  ";
- }
+inline void indentBy(XStr& s, int num) {
+    for (int i = 0; i < num; i++) s << "  ";
 }
+
+class TVarList;
+XStr generateTemplateSpec(TVarList* tspec);
+
+typedef enum {
+  forAll=0,forIndividual=1,forSection=2,forPython=3,forIndex=-1
+} forWhom;
+
+const char *forWhomStr(forWhom w);
+
+// FIXME: this same function is used for both syntax error messages as well as
+//        e.g. code generation errors
+void die(const char *why, int line=-1);
+
+char* fortranify(const char *s, const char *suff1="", const char *suff2="", const char *suff3="");
+
+void templateGuardBegin(bool templateOnly, XStr &str);
+void templateGuardEnd(XStr &str);
+
+
+}   // namespace xi
+
+namespace Prefix {
+
+extern const char *Proxy;
+extern const char *ProxyElement;
+extern const char *ProxySection;
+extern const char *Message;
+extern const char *Index;
+extern const char *Python;
+
+}   // namespace Prefix
 
 #endif

@@ -1,4 +1,5 @@
 #include "xi-util.h"
+#include "xi-Template.h"
 
 namespace xi {
 
@@ -120,4 +121,88 @@ void XStr::replace (const char a, const char b) {
   }
 }
 
+extern const char *cur_file;
+
+// Fatal error function
+void die(const char *why, int line)
+{
+	if (line==-1)
+		fprintf(stderr,"%s: Charmxi fatal error> %s\n",cur_file,why);
+	else
+		fprintf(stderr,"%s:%d: Charmxi fatal error> %s\n",cur_file,line,why);
+	exit(1);
 }
+
+char* fortranify(const char *s, const char *suff1, const char *suff2, const char *suff3)
+{
+  int i, len1 = strlen(s), len2 = strlen(suff1),
+         len3 = strlen(suff2), len4 = strlen(suff3);
+  int c = len1+len2+len3+len4;
+  char str[1024], strUpper[1024];
+  strcpy(str, s);
+  strcat(str, suff1);
+  strcat(str, suff2);
+  strcat(str, suff3);
+  for (i = 0; i < c+1; i++)
+    str[i] = tolower(str[i]);
+  for (i = 0; i < c+1; i++)
+    strUpper[i] = toupper(str[i]);
+  char *retVal;
+  retVal = new char[2*c+20];
+  strcpy(retVal, "FTN_NAME(");
+  strcat(retVal, strUpper);
+  strcat(retVal, ",");
+  strcat(retVal, str);
+  strcat(retVal, ")");
+
+  return retVal;
+}
+
+XStr generateTemplateSpec(TVarList* tspec)
+{
+  XStr str;
+
+  if(tspec) {
+    str << "template < ";
+    tspec->genLong(str);
+    str << " > ";
+  }
+
+  return str;
+}
+
+const char *forWhomStr(forWhom w)
+{
+  switch(w) {
+  case forAll: return Prefix::Proxy;
+  case forIndividual: return Prefix::ProxyElement;
+  case forSection: return Prefix::ProxySection;
+  case forIndex: return Prefix::Index;
+  case forPython: return "";
+  default: return NULL;
+  };
+}
+
+// Make the name lower case
+void templateGuardBegin(bool templateOnly, XStr &str) {
+  if (templateOnly)
+    str << "#ifdef " << "CK_TEMPLATES_ONLY\n";
+  else
+    str << "#ifndef " << "CK_TEMPLATES_ONLY\n";
+}
+void templateGuardEnd(XStr &str) {
+  str << "#endif /* CK_TEMPLATES_ONLY */\n";
+}
+
+}   // namespace xi
+
+namespace Prefix {
+
+const char *Proxy = "CProxy_";
+const char *ProxyElement = "CProxyElement_";
+const char *ProxySection = "CProxySection_";
+const char *Message = "CMessage_";
+const char *Index = "CkIndex_";
+const char *Python = "CkPython_";
+
+}   // namespace Prefix
