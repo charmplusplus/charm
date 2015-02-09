@@ -291,7 +291,7 @@ Charmrun is used to provide a uniform interface to run charm programs.
 On some platforms, charmrun is just a shell script which calls the 
 platform-specific start program, such as mpirun on mpi versions.
 
-For net- version, charmrun is an executable which invokes rsh or ssh to start 
+For net- version, charmrun is an executable which invokes ssh to start 
 node programs on remote machines. You should set up a ~/.nodelist that 
 enumerates all the machines you want to run jobs on, otherwise it will
 create a default ~/.nodelist for you that contains only localhost. Here is a 
@@ -300,11 +300,11 @@ typical .nodelist file:
 group main ++shell /bin/ssh
 host <machinename>
 
-The default remote shell program is rsh, but you can define different remote 
-shell you like to start remote processes in the ++shell option. You should 
-also make sure that you can rsh or ssh to these machines without password 
-authentication. Just type following command to verify:
-     > rsh <machinename> date
+The default remote shell program is ssh, but you can define a different remote 
+shell to start remote processes using the ++shell option. You should 
+also make sure that ssh or your alternative can connect to these machines without
+password authentication. Just type following command to verify:
+     > ssh <machinename> date
 If this gives you current date immediately, your running environment with this 
 node has been setup correctly.
 
@@ -312,7 +312,7 @@ Now, for test running purpose, net- version charmrun comes with an easy-to-use
 "++local" options. No remote shell invocation is needed in this case. It starts
 node programs right on your local machine. This could be useful if you just 
 want to run program on only one machine, for example, your laptop. This
-can save you all the hassle of setting up rsh/ssh or charmd daemons.
+can save you all the hassle of setting up ssh or charmd daemons.
 To use this option, just type:
      
      > ./charmrun ++local ./pgm 12 100 +p2

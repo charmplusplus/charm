@@ -79,7 +79,7 @@ the network version:
 
 \item[{\tt ++mpiexec}]
 \label{mpiexec}
-Use the cluster's {\tt mpiexec} job launcher instead of the built in rsh/ssh
+Use the cluster's {\tt mpiexec} job launcher instead of the built in ssh
 method.
 
 This will pass {\tt -n \$P} to indicate how many processes to
@@ -90,7 +90,7 @@ with `runmpi' replaced by the necessary name.
 Use of this option can potentially provide a few benefits:
 
 \begin{itemize}
-\item Faster startup compared to the SSH/RSH approach charmrun would
+\item Faster startup compared to the SSH approach charmrun would
   otherwise use
 \item No need to generate a nodelist file
 \item Multi-node job startup on clusters that do not allow connections
@@ -122,7 +122,7 @@ man pages for {\tt xhost} and {\tt xauth}).
 the user's path.
 
 \item The path must be set in the {\tt .cshrc} file, not the {\tt .login}
-file, because {\tt rsh} does not run the {\tt .login} file.
+file, because {\tt ssh} does not run the {\tt .login} file.
 
 \end{enumerate}
 
@@ -130,8 +130,8 @@ file, because {\tt rsh} does not run the {\tt .login} file.
 
 \item[{\tt ++batch}]            Ssh a set of node programs at a time, avoiding overloading Charmrun pe.  In this strategy, the nodes assigned to a charmrun are divided into sets of fixed size. Charmrun performs ssh to the nodes in the current set, waits for the clients to connect back and then performs ssh on the next set. We call the number of nodes in one ssh set as batch size.
 
-\item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a
-time.
+\item[{\tt ++maxssh}] Maximum number of {\tt ssh}'s to run at a
+time. For backwards compatibility, this option is also available as {\tt ++maxrsh}.
 
 \item[{\tt ++nodelist}] File containing list of nodes.
 
@@ -275,9 +275,9 @@ shell\\
 \end{tabbing}
 
 {\bf Note:}
-By default, charmrun uses a remote shell ``rsh'' to spawn node processes
+By default, charmrun uses a remote shell ``ssh'' to spawn node processes
 on the remote hosts. The {\tt shell} qualifier can be used to override
-it with say, ``ssh''. One can set the {\tt CONV\_RSH} environment variable
+it with say, ``rsh''. One can set the {\tt CONV\_RSH} environment variable
 or use charmrun option {\tt ++remote-shell} to override the default remote
 shell for all hosts with unspecified {\tt shell} qualifier.
 
@@ -330,12 +330,13 @@ Thus, if one specifies
 it will use ``localhost'' four times.  ``localhost'' is a Unix
 trick; it always find a name for whatever machine you're on.
 
-The user is required to set up remote login permissions on all nodes
-using the ``.rhosts'' file in the home directory if ``rsh'' is used for remote
-login into the hosts. If ``ssh'' is used, the user will have to setup
+Using ``ssh'', the user will have to setup
 password-less login to remote hosts using
-RSA authentication based on a key-pair and adding public keys to
+public key authentication based on a key-pair and adding public keys to
 ``.ssh/authorized\_keys'' file. See ``ssh'' documentation for more information.
+If ``rsh'' is used for remote
+login to the compute nodes, the user is required to set up remote login permissions on all nodes
+using the ``.rhosts'' file in their home directory.
 
 In a network environment, {\tt charmrun} must
 be able to locate the directory of the executable.  If all workstations

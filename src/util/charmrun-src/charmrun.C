@@ -65,7 +65,7 @@
 #  include <w32api/rpc.h>
 #endif
 #  if CMK_RSH_IS_A_COMMAND
-#    define RSH_CMD "rsh"
+#    define RSH_CMD "ssh"
 #  endif
 
 #endif
@@ -753,7 +753,7 @@ void arg_init(int argc, const char **argv)
   pparam_str(&arg_server_auth,   0, "server-auth",   "CCS Authentication file");
 #endif
   pparam_flag(&arg_local,	local_def, "local", "Start node programs locally without daemon");
-  pparam_int(&arg_batch_spawn,	 0, "batch", "Rsh several node programs at a time, avoiding overloading charmrun pe");
+  pparam_int(&arg_batch_spawn,	 0, "batch", "Launch connections to this many node programs at a time, avoiding overloading charmrun pe");
   pparam_flag(&arg_scalable_start, 0, "scalable-start", "scalable start");
 #ifdef HSTART
   pparam_flag(&arg_hierarchical_start, 0, "hierarchical-start", "hierarchical start");
@@ -778,7 +778,8 @@ void arg_init(int argc, const char **argv)
 #endif
 
   pparam_int(&arg_maxrsh,        16, "maxrsh",        "Maximum number of rsh's to run at a time");
-  pparam_str(&arg_shell,          0, "remote-shell",  "which remote shell to use");
+  pparam_int(&arg_maxrsh,        16, "maxssh",        "Maximum number of ssh's to run at a time");
+  pparam_str(&arg_shell,          0, "remote-shell",  "which remote shell to use (default $CONV_RSH or " RSH_CMD);
   pparam_str(&arg_debugger,       0, "debugger",      "which debugger to use");
   pparam_str(&arg_display,        0, "display",       "X Display for xterm");
   pparam_flag(&arg_ssh_display,   0, "ssh-display",   "use own X Display for each ssh session");
@@ -3910,7 +3911,7 @@ int rsh_fork(int nodeno,const char *startScript)
 		  
   pid = fork();
   if (pid < 0) 
-	{ perror("ERROR> starting rsh"); exit(1); }
+	{ perror("ERROR> starting remote shell"); exit(1); }
   if (pid == 0)
   {/*Child process*/
 	  int i;
@@ -3920,7 +3921,7 @@ int rsh_fork(int nodeno,const char *startScript)
 	  //removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
 	  for(i=3; i<1024; i++) close(i);
 	  execvp(rshargv[0], const_cast<char**>(rshargv));
-	  fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
+	  fprintf(stderr,"Charmrun> Couldn't find remote shell program '%s'!\n",rshargv[0]);
 	  exit(1);
   }
   free(rshargv);
@@ -4238,7 +4239,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv, int restart
       fprintf(f, " &");
   fprintf(f, "\n");
   
-  if (arg_verbose) fprintf(f,"Echo 'rsh phase successful.'\n");
+  if (arg_verbose) fprintf(f,"Echo 'remote shell phase successful.'\n");
   fprintf(f, /* Check for startup errors: */
      "sleep 1\n"
      "if [ -r /tmp/charmrun_err.$$ ]\n"
@@ -4280,7 +4281,7 @@ void read_global_segments_size() {
     dup2(2, 1);
     /*printf("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n",rshargv[0],rshargv[1],rshargv[2],rshargv[3],rshargv[4]);*/
     execvp(rshargv[0], const_cast<char**>(rshargv));
-    fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
+    fprintf(stderr,"Charmrun> Couldn't find remote shell program '%s'!\n",rshargv[0]);
     exit(1);
   } else {
     /* else we are in the parent */
@@ -4330,7 +4331,7 @@ void open_gdb_info() {
 			dup2(fderr[1],2);
 			for(i=3; i<1024; i++) close(i);
 			execvp(rshargv[0], const_cast<char**>(rshargv));
-			fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
+			fprintf(stderr,"Charmrun> Couldn't find remote shell program '%s'!\n",rshargv[0]);
 			exit(1);
 		  }
 		  /* else we are in the parent */
@@ -4561,7 +4562,7 @@ void finish_set_nodes(int start, int stop) {
 						rsh_pids[i]=0; /* process is finished */
 					} else {
   						host=nodetab_name(nodetab_rank0_table[i]);
-						fprintf(stderr,"Charmrun> Error %d returned from rsh (%s:%d)\n",
+						fprintf(stderr,"Charmrun> Error %d returned from remote shell (%s:%d)\n",
 						WEXITSTATUS(status),host,i);
 						exit(1);
 					} 
@@ -4591,7 +4592,7 @@ void kill_nodes()
   {
 	 const char *host=nodetab_name(nodetab_rank0_table[rank0no]);
 	 int status=0;
-	 if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d), pid %d\n",
+	 if (arg_verbose) printf("Charmrun> waiting for remote shell (%s:%d), pid %d\n",
 		host,rank0no,rsh_pids[rank0no]);
 	 kill(rsh_pids[rank0no],9);
 	 waitpid(rsh_pids[rank0no],&status,0); /*<- no zombies*/
@@ -4714,7 +4715,7 @@ void restart_node(int crashed_node){
 		waitpid(restart_rsh_pid,&status,0);
 	}while(!WIFEXITED(status));
   	if (WEXITSTATUS(status)!=0){
-  	 fprintf(stderr,"Charmrun> Error %d returned from new attempted rsh \n",
+         fprintf(stderr,"Charmrun> Error %d returned from new attempted remote shell \n",
          WEXITSTATUS(status));
          exit(1);
   	}     
