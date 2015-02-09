@@ -370,8 +370,6 @@ static void KillOnAllSigs(int sigNo)
   }
 #endif
   
-  CmiDestroyLocks();
-
   if (sigNo==SIGSEGV) {
      sig="segmentation violation";
      suggestion="Try running with '++debug', or linking with '-memory paranoid' (memory paranoid requires '+netpoll' at runtime).";

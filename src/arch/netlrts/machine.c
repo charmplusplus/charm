@@ -366,7 +366,6 @@ static void KillOnAllSigs(int sigNo)
   }
 #endif
   
-  CmiDestroyLocks();
 
   if (sigNo==SIGSEGV) {
      sig="segmentation violation";

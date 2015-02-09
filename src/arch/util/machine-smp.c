@@ -249,6 +249,7 @@ static void CmiStartThreads(char **argv)
 static void CmiDestroyLocks()
 {
   CloseHandle(comm_mutex);
+  comm_mutex = 0;
   CloseHandle(CmiMemLock_lock);
   CmiMemLock_lock = 0;
   CloseHandle(barrier_mutex);
@@ -522,6 +523,7 @@ static void CmiStartThreads(char **argv)
 static void CmiDestroyLocks()
 {
   CmiDestroyLock(comm_mutex);
+  comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
   pthread_mutex_destroy(&barrier_mutex);
