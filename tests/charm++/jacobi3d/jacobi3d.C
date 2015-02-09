@@ -27,11 +27,9 @@
 #include <vector>
 #include <utility>
 
-#define CKP_FREQ 200
-#define MAX_ITER		1000
-#define PRINT_FREQ	10
-
-// See README for documentation
+#define CKP_FREQ    100
+#define MAX_ITER    500
+#define PRINT_FREQ  10
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int arrayDimX;
