@@ -1,11 +1,13 @@
 CMK_MACOSX=1
 
+# Assumes Clang C/C++ compiler:
 CMK_CPP_CHARM="/usr/bin/cpp -P"
-CMK_CPP_C="gcc -m64 -E -mmacosx-version-min=10.6"
-CMK_CC="gcc -m64 -fPIC -dynamic -fno-common -mmacosx-version-min=10.6"
-CMK_CXX="g++ -m64 -fPIC -dynamic -fno-common -mmacosx-version-min=10.6"
-CMK_CXXPP="g++ -m64  -x g++ -E -mmacosx-version-min=10.6"
-CMK_LDXX="$CMK_CXX -multiply_defined suppress -mmacosx-version-min=10.6"
+CMK_CPP_C="clang -m64 -fPIC -E -mmacosx-version-min=10.6 "
+CMK_CC="clang -m64 -dynamic -fno-common -mmacosx-version-min=10.6 "
+CMK_LD="clang -mmacosx-version-min=10.6 "
+CMK_CXX="clang++ -m64 -fPIC -dynamic -fno-common -mmacosx-version-min=10.6 "
+CMK_CXXPP="clang++ -m64 -x clang++ -E -mmacosx-version-min=10.6 "
+CMK_LDXX="clang++ -multiply_defined suppress -mmacosx-version-min=10.6 "
 CMK_XIOPTS=""
 CMK_QT="generic64-light"
 CMK_LIBS="-lckqt"
@@ -18,7 +20,7 @@ CMK_CF90="g95 -arch x86_64 -mmacosx-version-min=10.6"
 # setting for shared lib
 # need -lstdc++ for c++ reference, and it needs to be put at very last 
 # of command line.
-# Mac environment varaible
+# Mac environment variable
 test -z "$MACOSX_DEPLOYMENT_TARGET" && export MACOSX_DEPLOYMENT_TARGET=10.5
 CMK_SHARED_SUF="dylib"
 CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "

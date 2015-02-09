@@ -35,10 +35,10 @@ CMK_QT="generic64-light"
 CMK_LIBS="-lckqt $CMK_SYSLIBS "
 CMK_RANLIB="ranlib"
 
-CMK_NATIVE_CC="gcc $CMK_GCC64 "
-CMK_NATIVE_LD="gcc $CMK_GCC64 "
-CMK_NATIVE_CXX="g++ $CMK_GCC64 "
-CMK_NATIVE_LDXX="g++ $CMK_GCC64 "
+CMK_NATIVE_CC="clang $CMK_GCC64 "
+CMK_NATIVE_LD="clang $CMK_GCC64 "
+CMK_NATIVE_CXX="clang++ $CMK_GCC64 "
+CMK_NATIVE_LDXX="clang++ $CMK_GCC64 "
 CMK_NATIVE_LIBS=""
 
 CMK_CF90=`which f95 2>/dev/null`
@@ -49,17 +49,16 @@ else
     CMK_CF77="g77 "
     CMK_CF90="f90 "
     CMK_CF90_FIXED="$CMK_CF90 -W132 "
-    CMK_F90LIBS="-L/usr/absoft/lib -L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math "
+    CMK_F90LIBS="-lf90math -lfio -lU77 -lf77math "
     CMK_F77LIBS="-lg2c "
     CMK_F90_USE_MODDIR=1
     CMK_F90_MODINC="-p"
 fi
 
-
 # setting for shared lib
 # need -lstdc++ for c++ reference, and it needs to be put at very last 
 # of command line.
-# Mac environment varaible
+# Mac environment variable
 test -z "$MACOSX_DEPLOYMENT_TARGET" && export MACOSX_DEPLOYMENT_TARGET=10.5
 CMK_SHARED_SUF="dylib"
 CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
