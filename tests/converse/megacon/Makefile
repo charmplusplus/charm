@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS=blkinhand.o megacon.o ringsimple.o ring.o fibobj.o fibthr.o broadc.o priotest.o deadlock.o vars.o nodenum.o specmsg.o bigmsg.o vecsend.o posixth.o future.o multicast.o multisend.o handler.o reduction.o
@@ -87,7 +88,7 @@ clean:
 	rm -f conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
 
 test: pgm
-	./charmrun ./pgm +p1 $(TESTOPTS)
-	./charmrun ./pgm +p2 $(TESTOPTS)
-	./charmrun ./pgm +p3 $(TESTOPTS)
-	./charmrun ./pgm +p4 $(TESTOPTS)
+	$(call run, ./pgm +p1 )
+	$(call run, ./pgm +p2 )
+	$(call run, ./pgm +p3 )
+	$(call run, ./pgm +p4 )

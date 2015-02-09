@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = taskSpawn.o
@@ -17,5 +18,5 @@ taskSpawn.o: taskSpawn.C taskSpawn.decl.h
 	$(CHARMC) -O3 -c taskSpawn.C
 
 test: all
-	./charmrun ./taskSpawn +p4 500000 1000 $(TESTOPTS)
+	$(call run, ./taskSpawn +p4 500000 1000 )
 

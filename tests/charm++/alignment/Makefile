@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = alignmentCheck.o
@@ -17,4 +18,4 @@ alignmentCheck.o: alignmentCheck.C alignmentCheck.decl.h
 	$(CHARMC) -c alignmentCheck.C
 
 test: all
-	./charmrun +p2 ./alignmentCheck $(TESTOPTS)
+	$(call run, +p2 ./alignmentCheck )

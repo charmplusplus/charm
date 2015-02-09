@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS) $(MOPTS) 
 
 OBJS = AllReduce.o
@@ -17,7 +18,7 @@ AllReduce.o: AllReduce.C AllReduce.decl.h AllReduce.h
 	$(CHARMC) -c AllReduce.C
 
 test: all
-	./charmrun ./AllReduce 20 100000 +p4 $(TESTOPTS)
+	$(call run, ./AllReduce 20 100000 +p4 )
 
 bgtest: all
-	./charmrun ./AllReduce 20 100000 +p4 +x2 +y2 +z2 $(TESTOPTS)
+	$(call run, ./AllReduce 20 100000 +p4 +x2 +y2 +z2 )

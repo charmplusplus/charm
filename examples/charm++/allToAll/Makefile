@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = allToAll.o
@@ -17,5 +18,5 @@ allToAll.o: allToAll.C allToAll.decl.h
 	$(CHARMC) -c allToAll.C
 
 test: all
-	./charmrun ./allToAll +p4 1024 $(TESTOPTS)
+	$(call run, ./allToAll +p4 1024 )
 

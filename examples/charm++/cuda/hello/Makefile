@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = hello.o helloCUDA.o
@@ -26,7 +27,7 @@ helloCUDA.o: helloCUDA.cu
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) $(CHARMINC) helloCUDA.cu
 
 test: all
-	./charmrun ./hello +p4 10
+	$(call run, ./hello +p4 10)
 
 bgtest: all
-	./charmrun ./hello +p4 10 +x2 +y2 +z1
+	$(call run, ./hello +p4 10 +x2 +y2 +z1)

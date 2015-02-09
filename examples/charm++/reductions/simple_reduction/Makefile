@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS) $(MOPTS) 
 
 OBJS = simple_reduction.o
@@ -17,7 +18,7 @@ simple_reduction.o: simple_reduction.C simple_reduction.decl.h simple_reduction.
 	$(CHARMC) -c simple_reduction.C
 
 test: all
-	./charmrun ./simple_reduction 20 4.5 10.3 +p4 $(TESTOPTS)
+	$(call run, ./simple_reduction 20 4.5 10.3 +p4 )
 
 bgtest: all
-	./charmrun ./simple_reduction 20 4.5 10.3 +p4 +x2 +y2 +z2 $(TESTOPTS)
+	$(call run, ./simple_reduction 20 4.5 10.3 +p4 +x2 +y2 +z2 )

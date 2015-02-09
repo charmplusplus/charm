@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 all: pgm
@@ -15,8 +16,8 @@ clean:
 	rm -f pgm *.o conv-host *.decl.h *.def.h *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
 
 test: pgm
-	./charmrun ./pgm +p2 1000 10 $(TESTOPTS)
+	$(call run, ./pgm +p2 1000 10 )
 
 bgtest: pgm
-	./charmrun ./pgm +p2 1000 10 +x2 +y2 +z1 $(TESTOPTS)
+	$(call run, ./pgm +p2 1000 10 +x2 +y2 +z1 )
 

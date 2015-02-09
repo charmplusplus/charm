@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = SimplePUP.o
@@ -17,8 +18,8 @@ SimplePUP.o: SimplePUP.C SimplePUP.h HeapObject.h SimplePUP.decl.h
 	$(CHARMC) -c SimplePUP.C
 
 test: all
-	./charmrun ./SimplePUP +p4  $(TESTOPTS)
-	./charmrun ./SimplePUP +p4  $(TESTOPTS)
+	$(call run, ./SimplePUP +p4  )
+	$(call run, ./SimplePUP +p4  )
 
 bgtest: all
-	./charmrun ./SimplePUP +p4 +x2 +y2 +z1
+	$(call run, ./SimplePUP +p4 +x2 +y2 +z1)

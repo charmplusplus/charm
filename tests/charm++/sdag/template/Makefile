@@ -1,10 +1,9 @@
+-include ../../../common.mk
 CHARMC = ../../../../bin/charmc
 CXX = $(CHARMC)
 CXXFLAGS = $(OPTS)
 
 BIN = pgm
-
-RUN=./charmrun
 
 ifndef $(PROCS)
 	PROCS=2
@@ -23,6 +22,6 @@ pgm: pgm.o
 	$(CHARMC) $(OPTS) -o $@ $^
 
 test: $(BIN)
-	$(RUN) +p$(PROCS) ./$<   $(TESTOPTS)
+	$(call run, +p$(PROCS) ./$< )
 
 .PHONY: all clean test

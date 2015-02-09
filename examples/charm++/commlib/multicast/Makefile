@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = pgm.o
@@ -17,7 +18,7 @@ pgm.o: pgm.C pgm.decl.h
 	$(CHARMC) -c pgm.C
 
 test: all
-	./charmrun ./pgm +p4 $(TESTOPTS)
+	$(call run, ./pgm +p4 )
 
 bgtest: all
-	./charmrun ./pgm +p4 +x2 +y2 +z1 $(TESTOPTS)
+	$(call run, ./pgm +p4 +x2 +y2 +z1 )

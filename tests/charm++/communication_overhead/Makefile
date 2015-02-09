@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 OPTS ?= -optimize -production
 CHARMCFLAGS = $(OPTS)
@@ -14,7 +15,7 @@ overhead_test.o: overhead_test.C overhead_test.decl.h overhead_test.def.h
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: all
-	./charmrun +p2 ./overhead_test $(TESTOPTS)
+	$(call run, +p2 ./overhead_test )
 
 clean:
 	rm -f overhead_test.decl.h overhead_test.def.h overhead_test.o

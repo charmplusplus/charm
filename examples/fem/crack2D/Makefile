@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 COMMON_OBJS=	config.o mesh.o node.o \
 	lst_NL.o lst_coh2.o
@@ -42,10 +43,10 @@ serial: $(SERIAL_OBJS)
 
 
 test: pgm
-	./charmrun ./pgm +p2 +vp4 $(TESTOPTS)
+	$(call run, ./pgm +p2 +vp4 )
 
 bgtest: pgm
-	./charmrun ./pgm +p2 +vp4 +x2 +y2 +z1 $(TESTOPTS)
+	$(call run, ./pgm +p2 +vp4 +x2 +y2 +z1 )
 
 clean:
 	rm -rf *.o pgm *.sts *.log *.bak *~ SunWS_cache ii_files ti_files

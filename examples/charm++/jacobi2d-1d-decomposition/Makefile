@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = jacobi1d.o
@@ -20,5 +21,5 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o jacobi1d jacobi1d.prj charmrun *~ *log *projrc *sts
 
 test: all
-	./charmrun +p4 ./jacobi1d 32 32 4 $(TESTOPTS)
+	$(call run, +p4 ./jacobi1d 32 32 4 )
 

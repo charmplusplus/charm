@@ -1,3 +1,4 @@
+-include ../../common.mk
 CXX = ../../../bin/charmc
 CXXFLAGS = $(OPTS)
 
@@ -27,5 +28,5 @@ comp.o: comp.C $(DECLS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 test: all
-	./charmrun +p1 ./$(EXEC_NAME) $(TESTOPTS)
-	./charmrun +p4 ./$(EXEC_NAME) $(TESTOPTS)
+	$(call run, +p1 ./$(EXEC_NAME) )
+	$(call run, +p4 ./$(EXEC_NAME) )

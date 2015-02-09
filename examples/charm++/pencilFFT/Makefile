@@ -1,3 +1,4 @@
+-include ../../common.mk
 #Set FFTW_HOME home to the fftw-2.1.5 local installation
 
 #FFTW_HOME=/bgl/local/fftw-2.1.5/
@@ -28,13 +29,13 @@ testpencil.o: testpencil.C
 
 test: all
 	@echo "Intra-processor Testpencil.."
-	./charmrun ./testpencil +p1
+	$(call run, ./testpencil +p1)
 	@echo "Inter-processor Testpencil.."
-	./charmrun ./testpencil +p2
+	$(call run, ./testpencil +p2)
 
 bgtest: all
 	@echo "Intra-processor Testpencil.."
-	./charmrun ./testpencil +p1 +x1 +y1 +z1
+	$(call run, ./testpencil +p1 +x1 +y1 +z1)
 	@echo "Inter-processor Testpencil.."
-	./charmrun ./testpencil +p2 +x2 +y1 +z1
+	$(call run, ./testpencil +p2 +x2 +y1 +z1)
 

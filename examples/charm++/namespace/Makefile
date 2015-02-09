@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC = ../../../bin/charmc
 BINARY = inherit
 
@@ -21,7 +22,7 @@ $(BINARY): $(patsubst %.C,%.o,$(wildcard *.C))
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)
-	./charmrun ./$(BINARY) $(TESTFLAGS)
+	$(call run, ./$(BINARY) $(TESTFLAGS))
 
 clean:
 	rm -f *.o *.decl.h *.def.h charmrun $(BINARY)

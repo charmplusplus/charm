@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = pupDisk.o
@@ -17,8 +18,8 @@ pupDisk.o: pupDisk.C pupDisk.h someData.h pupDisk.decl.h
 	$(CHARMC) -c pupDisk.C
 
 test: all
-	./charmrun ./pupDisk +p4 10 20 4 $(TESTOPTS)
-	./charmrun ./pupDisk +p4 10 20 4 r $(TESTOPTS)
+	$(call run, ./pupDisk +p4 10 20 4 )
+	$(call run, ./pupDisk +p4 10 20 4 r )
 
 bgtest: all
-	./charmrun ./pupDisk +p4 10 +x2 +y2 +z1
+	$(call run, ./pupDisk +p4 10 +x2 +y2 +z1)

@@ -1,3 +1,5 @@
+-include ../../common.mk
+-include ../../common.mk
 CHARMINC=../../../include
 CHARMBIN=../../../bin
 CHARMC=../../../bin/charmc $(OPTS)
@@ -102,10 +104,10 @@ clean:
 	rm -r -f conv-host pgm pgm.exe pgm.pdb pgm.ilk *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
 
 test: pgm
-	./charmrun ./pgm +p1 $(TESTOPTS)
-	./charmrun ./pgm +p2 $(TESTOPTS)
-	./charmrun ./pgm +p3 $(TESTOPTS)
-	./charmrun ./pgm +p4 $(TESTOPTS)
+	$(call run, ./pgm +p1 )
+	$(call run, ./pgm +p2 )
+	$(call run, ./pgm +p3 )
+	$(call run, ./pgm +p4 )
 
 depends:  $(CIFILES)
 	echo "Creating " $(DEPENDFILE) " ...";	\

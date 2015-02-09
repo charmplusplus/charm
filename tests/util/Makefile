@@ -1,3 +1,4 @@
+-include ../common.mk
 CHARMC=../../bin/charmc $(OPTS)
 
 LINKLINE=$(CHARMC) -o check check.o -language converse++
@@ -21,7 +22,7 @@ headerpad.o: headerpad.C headerpad.decl.h headerpad.h
 
 
 test: check
-	./charmrun +p1 ./check $(TESTOPTS)
+	$(call run, +p1 ./check )
 	@echo tests if MACHINE_DEBUG is enabled in machine.h and fails if it is set
 	@if test -f "debugLog.0"; then echo "MACHINE_DEBUG is enabled"; false; fi
 

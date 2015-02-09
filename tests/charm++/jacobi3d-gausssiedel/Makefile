@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS) $(MOPTS) -O3 -g
 
 OBJS = main.o 
@@ -43,10 +44,10 @@ jacobi3d.decl.h: jacobi3d.ci
 
 syncfttest causalfttest: fttest
 fttest: main
-	./charmrun ./main 256 128 +p8 +balancer DummyLB $(TESTOPTS)
-	./charmrun ./main 256 128 +p8 +balancer DummyLB +killFile kill_01.txt $(TESTOPTS)
-	./charmrun ./main 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_02.txt $(TESTOPTS)
-	./charmrun ./main 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_03.txt $(TESTOPTS)
+	$(call run, ./main 256 128 +p8 +balancer DummyLB )
+	$(call run, ./main 256 128 +p8 +balancer DummyLB +killFile kill_01.txt )
+	$(call run, ./main 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_02.txt )
+	$(call run, ./main 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_03.txt )
 
 
 clean:

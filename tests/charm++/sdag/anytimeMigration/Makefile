@@ -1,8 +1,9 @@
+-include ../../../common.mk
+-include ../../../common.mk
 CHARMC = ../../../../bin/charmc $(OPTS)
 CXX = $(CHARMC)
 CC = $(CXX)
 TARGET = migration
-RUN=./charmrun
 
 ifndef $(PROCS)
 	PROCS=2
@@ -19,4 +20,4 @@ clean:
 	-rm -rf $(wildcard *.decl.h *.def.h *.o $(TARGET) charmrun *~)
 
 test: migration
-	$(RUN) +p$(PROCS) ./$<  $(TESTOPTS)
+	$(call run, +p$(PROCS) ./$< )

@@ -1,3 +1,4 @@
+-include ../../common.mk
 SRC=../../../src
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -23,13 +24,13 @@ pingpong.o: pingpong.C cifiles
 
 test: all
 	@echo "Intra-processor Pingpong.."
-	./charmrun ./pgm +p1 $(TESTOPTS)
+	$(call run, ./pgm +p1 )
 	@echo "Inter-processor Pingpong.."
-	./charmrun ./pgm +p2 $(TESTOPTS)
+	$(call run, ./pgm +p2 )
 
 bgtest: all
 	@echo "Intra-processor Pingpong.."
-	./charmrun ./pgm +p1 +x1 +y1 +z1 $(TESTOPTS)
+	$(call run, ./pgm +p1 +x1 +y1 +z1 )
 	@echo "Inter-processor Pingpong.."
-	./charmrun ./pgm +p2 +x2 +y1 +z1 $(TESTOPTS)
+	$(call run, ./pgm +p2 +x2 +y1 +z1 )
 

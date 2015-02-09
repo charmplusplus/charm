@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = hello.o
@@ -17,7 +18,7 @@ hello.o: hello.C hello.decl.h
 	$(CHARMC) -c hello.C
 
 test: all
-	./charmrun ./hello +p4 10 $(TESTOPTS)
+	$(call run, ./hello +p4 10 )
 
 bgtest: all
-	./charmrun ./hello +p4 10 +x2 +y2 +z2 $(TESTOPTS)
+	$(call run, ./hello +p4 10 +x2 +y2 +z2 )

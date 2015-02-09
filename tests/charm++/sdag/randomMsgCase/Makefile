@@ -1,6 +1,6 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 ALL=sdagCase
-RUN=./charmrun
 
 ifndef $(PROCS)
         PROCS=2
@@ -23,4 +23,4 @@ sdagCase: sdagCase.o
 	$(CHARMC) -language charm++ $(OPTS) $^ -o $@
 
 test: $(ALL)
-	$(RUN) +p$(PROCS) ./$< $(TESTOPTS)
+	$(call run, +p$(PROCS) ./$< )

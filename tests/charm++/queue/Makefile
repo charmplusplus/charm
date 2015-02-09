@@ -1,11 +1,12 @@
+-include ../../common.mk
 CHARMC := ../../../bin/charmc
 CXX := $(CHARMC) $(OPTS)
 
 TARGETS = pgm msgqtest
 all: $(TARGETS)
 test: $(TARGETS)
-	./charmrun ./pgm $(TESTOPTS)
-	./charmrun ./msgqtest $(TESTOPTS)
+	$(call run, ./pgm )
+	$(call run, ./msgqtest )
 
 pgm.C: main.decl.h
 

@@ -1,3 +1,4 @@
+-include ../../common.mk
 # to disable various phases of the simulation:
 # -DNO_PARTITION
 # -DNO_FORCES
@@ -34,8 +35,8 @@ $(TARGET).%: $(TARGET)
 	mv $(TARGET) $@
 	mv charmrun charmrun.$*
 
-run: $(TARGET)
-	./$(TARGET) +LBPeriod 0.0001 +balancer NullLB -in=input_100000 -idepth=2 -fat=100 -tstop=0.225 -NPROC=$(NPROC) $(BARNES_OPTS) +p$(P) ++ppn$(P) 
+test: $(TARGET)
+	$(call run, ./$(TARGET) +LBPeriod 0.0001 +balancer NullLB -in=input_100000 -idepth=2 -fat=100 -tstop=0.225 -NPROC=$(NPROC) $(BARNES_OPTS) +p$(P) ++ppn$(P)) 
 
 grav.o: grav.C barnes.decl.h
 	$(CHARMC) -c grav.C

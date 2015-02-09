@@ -1,3 +1,4 @@
+-include ../../common.mk
 OPTS=-O3 
 CHARMBASE=../../../
 CHARMC=../../../bin/charmc -language ampi $(OPTS)
@@ -17,7 +18,7 @@ IGetTest-tokens:
 	rm IGetTest; make IGetTest OPTS="$(OPTS)";
 	
 test: all
-	./charmrun +p2 ./pgm 100000 16 +vp2
+	$(call run, +p2 ./pgm 100000 16 +vp2)
 
 clean:
 	rm -rf charmrun conv-host moduleinit* *.o GetPutTest IGetTest GetPutTest-mpi *~ *.sts core

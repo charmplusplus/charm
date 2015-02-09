@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC = ../../../bin/charmc -O3 $(OPTS) 
 default: all
 all: nqueen nqueen_neighbor nqueen_workstealing
@@ -49,10 +50,10 @@ main.decl.h main.def.h : main.ci.stamp
 Counter.decl.h Counter.def.h : counter.ci.stamp
 
 test: nqueen
-	 ./charmrun +p 4 ./nqueen 16 4 $(TESTOPTS)
+	$(call run, +p 4 ./nqueen 16 4 )
 
 bgtest: all
-	 ./charmrun +p 4 ./nqueen 16 4 +x2 +y2 +z2 +bgstacksize 102400 $(TESTOPTS)
+	$(call run, +p 4 ./nqueen 16 4 +x2 +y2 +z2 +bgstacksize 102400 )
 
 clean:
 	rm -f main.decl.h main.def.h main.o

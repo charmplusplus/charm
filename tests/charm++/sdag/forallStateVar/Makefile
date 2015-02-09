@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 ALL=forallStateVar
 RUN=./charmrun
@@ -23,4 +24,4 @@ forallStateVar: forallStateVar.o
 	$(CHARMC) -language charm++ $(OPTS) $^ -o $@
 
 test: $(ALL)
-	$(RUN) +p$(PROCS) ./$< $(TESTOPTS)
+	$(call run, +p$(PROCS) ./$< )

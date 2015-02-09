@@ -1,3 +1,4 @@
+-include ../../common.mk
 OPTS=-O3 
 CHARMC=../../../bin/charmc -language ampi $(OPTS)
 MPICC=mpicc $(OPTS)
@@ -15,7 +16,7 @@ pipe: pingpong-pipeline.c
 	$(MPICC) pingpong-pipeline.c -o pgm-pipe-mpi
 
 test: all
-	./charmrun +p2 ./pgm 100000 16 +vp2
+	$(call run, +p2 ./pgm 100000 16 +vp2)
 
 clean:
 	rm -rf charmrun conv-host moduleinit* *.o pingpong pgm pgm-mpi pgm-pipe pgm-pipe-mpi *~ *.sts core

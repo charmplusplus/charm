@@ -1,3 +1,4 @@
+-include ../../common.mk
 FFTW_HOME=/bgl/local/fftw-2.1.5/
 OPTS=-g -O3 
 
@@ -28,13 +29,13 @@ patch.o: patch.C
 
 test: all
 	@echo "Intra-processor TestPME.."
-	./charmrun ./testpme +p1
+	$(call run, ./testpme +p1)
 	@echo "Inter-processor TestPME.."
-	./charmrun ./testpme +p2
+	$(call run, ./testpme +p2)
 
 bgtest: all
 	@echo "Intra-processor TestPME.."
-	./charmrun ./testpme +p1 +x1 +y1 +z1
+	$(call run, ./testpme +p1 +x1 +y1 +z1)
 	@echo "Inter-processor TestPME.."
-	./charmrun ./testpme +p2 +x2 +y1 +z1
+	$(call run, ./testpme +p2 +x2 +y1 +z1)
 

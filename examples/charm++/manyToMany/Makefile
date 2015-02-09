@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = manyToMany.o
@@ -17,5 +18,5 @@ manyToMany.o: manyToMany.C manyToMany.decl.h
 	$(CHARMC) -c manyToMany.C
 
 test: all
-	./charmrun ./manyToMany +p4 1024 $(TESTOPTS)
+	$(call run, ./manyToMany +p4 1024 )
 

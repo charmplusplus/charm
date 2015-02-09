@@ -1,3 +1,4 @@
+-include ../../common.mk
 # NOTE: This is the basic Makefile template that includes the additional
 #       Makefile.simulation makefile that is found in the location of the
 #       current installation of POSE.
@@ -125,7 +126,7 @@ test: $(PGM)
 	./pgm 16 0
 
 partest: $(PGM)
-	./charmrun +p4 ./pgm 16 0
+	$(call run, +p4 ./pgm 16 0)
 
 seqtest: $(PGM).seq
 	./pgm.seq 16 0

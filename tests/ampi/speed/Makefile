@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = hello.o msgspeed.o test_mpi.o
@@ -23,7 +24,7 @@ msgspeed.o: msgspeed.c
 	$(CHARMC) -c $<
 
 test: all
-	./charmrun hello +p2
+	$(call run, hello +p2)
 
 
 # Various stand-alone (non-charm) API calls:

@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 all: bgMD
@@ -12,8 +13,8 @@ Handlers.o: bgMD.h Atom.h Cell.h SimParams.h Handlers.C
 	$(CHARMC) -c Handlers.C
 
 test: jacobi3D maxReduce
-	./charmrun ./jacobi3D +p2  3 3 3 2 10
-	./charmrun ./maxReduce +p2 +cth3 +wth10
+	$(call run, ./jacobi3D +p2  3 3 3 2 10)
+	$(call run, ./maxReduce +p2 +cth3 +wth10)
 
 clean:
 	rm -f core *.cpm.h

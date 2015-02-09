@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = ataTest.o
@@ -11,7 +12,7 @@ ataTest.decl.h: ataTest.ci
 	$(CHARMC)  ataTest.ci
 
 test: all
-	./charmrun +p4 ./ataTest $(TESTOPTS)
+	$(call run, +p4 ./ataTest )
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o ataTest charmrun

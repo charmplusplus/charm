@@ -1,3 +1,4 @@
+-include ../../common.mk
 SRC=../../../src
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -25,5 +26,5 @@ broadcast.o: broadcast.C cifiles
 
 test: all
 	@echo "Inter-processor broadcast.."
-	./charmrun ./pgm +p2 $(TESTOPTS)
+	$(call run, ./pgm +p2 )
 

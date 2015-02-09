@@ -1,3 +1,4 @@
+-include ../../common.mk
 SRC=../../../src
 CHARMC=../../../bin/charmc $(OPTS) -O3
 
@@ -25,13 +26,13 @@ ping.o: ping.C cifiles
 
 test: all
 	@echo "Intra-processor ping.."
-	./charmrun ./pgm +p1 $(TESTOPTS)
+	$(call run, ./pgm +p1 )
 	@echo "Inter-processor ping.."
-	./charmrun ./pgm +p2 $(TESTOPTS)
+	$(call run, ./pgm +p2 )
 
 bgtest: all
 	@echo "Intra-processor ping.."
-	./charmrun ./pgm +p1 +x1 +y1 +z1
+	$(call run, ./pgm +p1 +x1 +y1 +z1)
 	@echo "Inter-processor ping.."
-	./charmrun ./pgm +p2 +x2 +y1 +z1
+	$(call run, ./pgm +p2 +x2 +y1 +z1)
 

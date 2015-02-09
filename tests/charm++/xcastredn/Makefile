@@ -1,3 +1,4 @@
+-include ../../common.mk
 # Point this to your charm installation
 CHARMHOME = ../../..
 
@@ -22,7 +23,6 @@ OPTS     ?= -optimize -production
 CXXFLAGS += -language charm++ $(OPTS)
 CPPFLAGS +=
 LDFLAGS  += -module CkMulticast
-EXEC      = ./charmrun
 EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)
   EXECFLAGS += ++nodelist $(NODELIST)
@@ -46,7 +46,7 @@ again:
 
 test: all
 	@echo "########################################################################################"
-	$(EXEC) $(EXECFLAGS) ./$(TARGET) $(ARGS) $(TESTOPTS)
+	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS))
 
 
 ####### Pattern rules

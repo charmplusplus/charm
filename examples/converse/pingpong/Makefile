@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 all: pingpong pingpong_multipairs
@@ -14,7 +15,7 @@ pingpong_multipairs: pingpong_multipairs.o
 pingpong_multipairs.o: pingpong_multipairs.C
 	$(CHARMC) -language converse++ -c pingpong_multipairs.C
 test: pingpong
-	./charmrun ./pingpong +p2 $(TESTOPTS)
+	$(call run, ./pingpong +p2 )
 
 clean:
 	rm -f core *.cpm.h

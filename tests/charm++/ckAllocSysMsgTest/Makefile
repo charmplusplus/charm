@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS) $(MOPTS) 
 #CHARMC=$(HOME)/charm/bin/charmc $(OPTS) $(MOPTS) 
 
@@ -20,11 +21,11 @@ ckAllocSysMsgTest.o: ckAllocSysMsgTest.C ckAllocSysMsgTest.decl.h ckAllocSysMsgT
 	$(CHARMC) -c ckAllocSysMsgTest.C
 
 test: all
-	./charmrun ./ckAllocSysMsgTest 10 10 10 1 $(TESTOPTS) 
-	./charmrun ./ckAllocSysMsgTest 30 10 10 1 $(TESTOPTS) +p2 
-	./charmrun ./ckAllocSysMsgTest 40 5 2 1 $(TESTOPTS) +p2 
-	./charmrun ./ckAllocSysMsgTest 30 10 10 1 $(TESTOPTS) +p4
+	$(call run, ./ckAllocSysMsgTest 10 10 10 1  )
+	$(call run, ./ckAllocSysMsgTest 30 10 10 1  +p2 )
+	$(call run, ./ckAllocSysMsgTest 40 5 2 1  +p2 )
+	$(call run, ./ckAllocSysMsgTest 30 10 10 1  +p4)
 
 
 bgtest: all
-	./charmrun ./ckAllocSysMsgTest 30 10 10 1 $(TESTOPTS) +p4 +x2 +y2 +z2
+	$(call run, ./ckAllocSysMsgTest 30 10 10 1  +p4 +x2 +y2 +z2)

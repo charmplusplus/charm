@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = ldbDemo.o ldbDemof.o
@@ -17,7 +18,7 @@ balanceDemo.decl.h: ldbDemo.ci
 	$(CHARMC)   -language f90charm ldbDemo.ci 
 
 test: ldbDemo
-	./charmrun +p2 ./ldbDemo +balancer RotateLB +LBDebug 1
+	$(call run, +p2 ./ldbDemo +balancer RotateLB +LBDebug 1)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o ldbDemo charmrun *.mod

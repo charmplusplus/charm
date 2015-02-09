@@ -1,3 +1,4 @@
+-include ../../common.mk
 OPTS	= -O3
 CHARMC	= ../../../bin/charmc $(OPTS)
 
@@ -24,4 +25,4 @@ jacobi3d.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) -c jacobi3d.C
 
 test: jacobi3d
-	./charmrun +p2 ./jacobi3d 32 16 $(TESTOPTS)
+	$(call run, +p2 ./jacobi3d 32 16 )

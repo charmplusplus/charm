@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = hello.o hellof.o
@@ -17,7 +18,7 @@ hellof.o: hellof.f90
 	$(CHARMC) -c hellof.f90
 
 test: pgm
-	./charmrun +p2 ./pgm
+	$(call run, +p2 ./pgm)
 
 clean:
 	rm -f charmrun conv-host pgm *.o *.mod *.decl.h *.def.h

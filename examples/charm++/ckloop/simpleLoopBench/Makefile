@@ -1,3 +1,4 @@
+-include ../../../common.mk
 #NOTE: to compile the example, the CkLoop.decl/def.h should exist
 USEROPTS=-O3 -g -lpthread -fopenmp
 CHARMDIR=../../../..
@@ -23,10 +24,10 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o hello hello.prj charmrun *.log *.sum *.sts
 
 test: all
-	./charmrun ./hello +p4 10
+	$(call run, ./hello +p4 10)
 
 bgtest: all
-	./charmrun ./hello +p4 10 +x2 +y2 +z2 +cth1 +wth1
+	$(call run, ./hello +p4 10 +x2 +y2 +z2 +cth1 +wth1)
 
 module: $(CHARMLIB)/libmoduleCkLoop.a
 

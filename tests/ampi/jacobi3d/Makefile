@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS) $(MOPTS)
 
 OBJS = jacobi.o
@@ -11,8 +12,8 @@ jacobi.o: jacobi.C
 	$(CHARMC) -language ampic -swapglobals jacobi.C 
 
 syncfttest causalfttest: jacobi
-	time ./charmrun ./jacobi 2 2 2 200 +vp8 +p8 +balancer DummyLB +isomalloc_sync +killFile kill_01.txt $(TESTOPTS)
-	time ./charmrun ./jacobi 4 2 2 200 +vp16 +p8 +balancer DummyLB +isomalloc_sync +killFile kill_02.txt $(TESTOPTS)
+	$(call run, ./jacobi 2 2 2 200 +vp8 +p8 +balancer DummyLB +isomalloc_sync +killFile kill_01.txt )
+	$(call run, ./jacobi 4 2 2 200 +vp16 +p8 +balancer DummyLB +isomalloc_sync +killFile kill_02.txt )
 
 clean:
 	rm -f *.o jacobi jacobi.o *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls

@@ -1,3 +1,4 @@
+-include ../../../common.mk
 # Point this to your charm installation
 CHARM ?= ../../../..
 
@@ -24,7 +25,6 @@ CPPFLAGS +=
 CXXFLAGS += -language charm++ $(OPT)
 LDFLAGS  += -module CkMulticast
 LDLIBS   +=
-EXEC      = ./charmrun
 EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)
   EXECFLAGS += ++nodelist $(NODELIST)
@@ -48,7 +48,7 @@ again:
 
 test: all
 	@echo "########################################################################################"
-	$(EXEC) $(EXECFLAGS) $(TARGET) $(ARGS)
+	$(call run, $(EXECFLAGS) $(TARGET) $(ARGS))
 
 ####### Pattern rules
 # Rule to generate dependency information for C++ source files

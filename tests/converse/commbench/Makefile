@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS=memoryAccess.o commbench.o overhead.o timer.o proc.o smputil.o pingpong.o \
@@ -9,7 +10,7 @@ pgm: $(OBJS)
 	$(CHARMC) -o pgm $(OBJS) -language converse++
 
 test: pgm
-	./charmrun ./pgm +p4 $(TESTOPTS)
+	$(call run, ./pgm +p4 )
 
 memoryAccess.o: memoryAccess.c
 	$(CHARMC) memoryAccess.c

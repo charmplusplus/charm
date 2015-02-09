@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = hello.o
@@ -20,14 +21,14 @@ hello.o: hello.C hello.decl.h
 
 test: all
 	-rm -fr log
-	./charmrun ./hello +p3 $(TESTOPTS)
+	$(call run, ./hello +p3 )
 	-sync
-	./charmrun ./hello +p3 +restart log $(TESTOPTS)
-	./charmrun ./hello +p4 +restart log $(TESTOPTS)
-	./charmrun ./hello +p2 +restart log $(TESTOPTS)
+	$(call run, ./hello +p3 +restart log )
+	$(call run, ./hello +p4 +restart log )
+	$(call run, ./hello +p2 +restart log )
 
 bgtest: all
 	-rm -fr log
-	./charmrun ./hello +p2 +x3 +y1 +z1 $(TESTOPTS)
-	./charmrun ./hello +p2 +restart log  +x3 +y1 +z1 $(TESTOPTS)
-	./charmrun ./hello +p2 +restart log  +x2 +y2 +z1 $(TESTOPTS)
+	$(call run, ./hello +p2 +x3 +y1 +z1 )
+	$(call run, ./hello +p2 +restart log  +x3 +y1 +z1 )
+	$(call run, ./hello +p2 +restart log  +x2 +y2 +z1 )

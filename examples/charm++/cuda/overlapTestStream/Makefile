@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = overlapTest.o overlapTestCU.o
@@ -25,4 +26,4 @@ overlapTestCU.o: overlapTest.cu
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) $(CHARMINC) -o overlapTestCU.o overlapTest.cu
 
 test: all
-	./charmrun ./overlapTest +p2 2 8
+	$(call run, ./overlapTest +p2 2 8)

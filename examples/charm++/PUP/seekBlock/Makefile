@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = seek_block.o
@@ -17,8 +18,8 @@ seek_block.o: seek_block.C seek_block.h seek_block.decl.h
 	$(CHARMC) -c $<
 
 test: all
-	./charmrun ./seek_block +p4  $(TESTOPTS)
-	./charmrun ./seek_block +p4  $(TESTOPTS)
+	$(call run, ./seek_block +p4  )
+	$(call run, ./seek_block +p4  )
 
 bgtest: all
-	./charmrun ./seek_block +p4 +x2 +y2 +z1
+	$(call run, ./seek_block +p4 +x2 +y2 +z1)

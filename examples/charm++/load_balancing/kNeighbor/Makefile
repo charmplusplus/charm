@@ -1,3 +1,4 @@
+-include ../../../common.mk
 OPTS	= -O3
 CHARMC	= ../../../../bin/charmc $(OPTS)
 
@@ -21,8 +22,8 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o charmrun *~ kNeighbor kNeighbor.prj
 
 test: all
-	./charmrun +p4 ./kNeighbor 4 50 128 10 +balancer GreedyLB +LBDebug 1 $(TESTOPTS)
+	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer GreedyLB +LBDebug 1 )
 
 bgtest: all
-	./charmrun +p4 ./kNeighbor 4 50 128 10 +balancer GreedyLB +x2 +y2 +z1 +cth1 +wth1 +LBDebug 1 $(TESTOPTS)
+	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer GreedyLB +x2 +y2 +z1 +cth1 +wth1 +LBDebug 1 )
 

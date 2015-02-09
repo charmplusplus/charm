@@ -1,7 +1,8 @@
+-include ../../../common.mk
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 DEFAULT=test1
 ALL=test1
-RUN=./charmrun
 
 ifndef $(PROCS)
 	PROCS=2
@@ -24,4 +25,4 @@ test1: test1.o
 	$(CHARMC) -language charm++ $(OPTS) $^ -o $@
 
 test: test1
-	$(RUN) +p$(PROCS) ./test1   $(TESTOPTS)
+	$(call run, +p$(PROCS) ./test1 )

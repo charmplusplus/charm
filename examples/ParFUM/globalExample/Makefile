@@ -1,3 +1,4 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS) 
 
 all: pgm
@@ -9,10 +10,10 @@ pgm.o: pgm.C
 	$(CHARMC) -I../../../src/libs/ck-libs/ParFUM -c pgm.C #-DLOAD_BALANCE
 
 test: pgm
-	./charmrun ./glbEx +vp4 +p2
+	$(call run, ./glbEx +vp4 +p2)
 
 bgtest: pgm
-	./charmrun ./glbEx +vp4 +p2 +x2 +y2 +z1
+	$(call run, ./glbEx +vp4 +p2 +x2 +y2 +z1)
 
 clean:
 	rm -rf pgm glbEx fpgm *.o *sts *log *projrc *sum charmrun NetFEM Paraview* ParaView* *~

@@ -1,3 +1,4 @@
+-include ../../../common.mk
 OPTS	= -O3
 CHARMC	= ../../../../bin/charmc $(OPTS)
 SRC	= ../../../../src
@@ -26,5 +27,5 @@ stencil3d-msg.o: stencil3d.C stencil3d.decl.h
 
 # these test values are for sanity checking.  Wider and larger favors RDMA
 test: all
-	./charmrun ./stencil3d-msg +p4 20 10 100 2 2 2 10 $(TESTOPTS)
-	./charmrun ./stencil3d-ckdirect +p4 20 10 100 2 2 2 10 $(TESTOPTS)
+	$(call run, ./stencil3d-msg +p4 20 10 100 2 2 2 10 )
+	$(call run, ./stencil3d-ckdirect +p4 20 10 100 2 2 2 10 )

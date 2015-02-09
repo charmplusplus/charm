@@ -1,8 +1,8 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS) 
 OBJS=pgm.o ctests.o 
 FOBJS=$(OBJS) ftests.o
 COBJS=$(OBJS) ftests_fallback.o
-RUN=./charmrun $(TESTOPTS)
 
 all: pgm 
 
@@ -28,18 +28,18 @@ clean:
 	rm -f pgm fpgm *.o *.MOD *.mod charmrun
 
 test: pgm
-	$(RUN) ./pgm +p1 +vp1
-	$(RUN) ./pgm +p1 +vp2
-	$(RUN) ./pgm +p2 +vp1
-	$(RUN) ./pgm +p2 +vp2
-	$(RUN) ./pgm +p2 +vp3
-	$(RUN) ./pgm +p2 +vp4
+	$(call run, ./pgm +p1 +vp1)
+	$(call run, ./pgm +p1 +vp2)
+	$(call run, ./pgm +p2 +vp1)
+	$(call run, ./pgm +p2 +vp2)
+	$(call run, ./pgm +p2 +vp3)
+	$(call run, ./pgm +p2 +vp4)
 	-@rm -f fem_mesh_vp3_*
-	$(RUN) ./pgm +vp3 -write
-	$(RUN) ./pgm +vp3 -read
+	$(call run, ./pgm +vp3 -write)
+	$(call run, ./pgm +vp3 -read)
 	rm -f fem_mesh_vp3_*
 
 test-mig:
 	rm -fr pgm pgm.o
 	make OPTS="-DENABLE_MIG=1 -memory isomalloc -balancer RandCentLB" pgm
-	$(RUN) ./pgm +p2
+	$(call run, ./pgm +p2)
