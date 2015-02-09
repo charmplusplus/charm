@@ -68,9 +68,6 @@
 #    define RSH_CMD "rsh"
 #  endif
 
-#  if CMK_RSH_USE_REMSH
-#    define RSH_CMD "remsh"
-#  endif
 #endif
 
 #include "daemon.h"

@@ -33,8 +33,6 @@
 #define CMK_RSH_IS_A_COMMAND                               1
 #undef CMK_RSH_NOT_NEEDED                               
 #define CMK_RSH_NOT_NEEDED                                 0
-#undef CMK_RSH_USE_REMSH                               
-#define CMK_RSH_USE_REMSH                                  0
 
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0

@@ -27,7 +27,6 @@
 #define CMK_RSH_IS_A_COMMAND                               1
 #define CMK_RSH_KILL                                       1
 #define CMK_RSH_NOT_NEEDED                                 0
-#define CMK_RSH_USE_REMSH                                  0
 
 #define CMK_CONV_HOST_CSH_UNAVAILABLE			   1
 

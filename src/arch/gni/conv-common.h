@@ -43,7 +43,6 @@
 
 #define CMK_RSH_IS_A_COMMAND                               0
 #define CMK_RSH_NOT_NEEDED                                 1
-#define CMK_RSH_USE_REMSH                                  0
 
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
