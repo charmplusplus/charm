@@ -1348,6 +1348,22 @@ void _initCharm(int unused_argc, char **argv)
 		_allStats = new Stats*[CkNumPes()];
 #endif
 		register size_t i, nMains=_mainTable.size();
+
+		// Check CkArgMsg and warn if it contains any args starting with '+'.
+		// These args may be args intended for Charm++ but because of the specific
+		// build, were not parsed by the RTS.
+		int count = 0;
+		int argc = CmiGetArgc(argv);
+		for (int i = 1; i < argc; i++) {
+			if (argv[i][0] == '+') {
+				count++;
+				CmiPrintf("WARNING: %s is a command line argument beginning with a '+' but was not parsed by the RTS.\n", argv[i]);
+			}
+		}
+		if (count) {
+			CmiPrintf("If any of these arguments were intended for the RTS you may need to recompile Charm++ with different options.\n");
+		}
+
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
 			register int size = _chareTable[_mainTable[i]->chareIdx]->size;
