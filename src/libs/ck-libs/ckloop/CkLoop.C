@@ -383,10 +383,21 @@ void FuncCkLoop::pup(PUP::er &p) {
   }
 }
 
+static int _ckloopEP;
 CpvStaticDeclare(int, NdhStealWorkHandler);
 static void RegisterCkLoopHdlrs() {
     CpvInitialize(int, NdhStealWorkHandler);
     CpvAccess(NdhStealWorkHandler) = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
+#ifdef __BIGSIM__
+    if(BgNodeRank()==0) {
+#else
+      if(CkMyRank()==0) {
+#endif
+        int _ckloopMsg = CkRegisterMsg("ckloop_converse_msg", 0, 0, 0, 0);
+        int _ckloopChare = CkRegisterChare("ckloop_converse_chare", 0, TypeInvalid);
+        CkRegisterChareInCharm(_ckloopChare);
+        _ckloopEP = CkRegisterEp("CkLoop", (CkCallFnPtr)SingleHelperStealWork, _ckloopMsg, _ckloopChare, 0+CK_EP_INTRINSIC);
+      }
 }
 
 extern int _charmHandlerIdx;
@@ -495,7 +506,10 @@ void SingleHelperStealWork(ConverseNotifyMsg *msg) {
         }
     }
     CurLoopInfo *loop = (CurLoopInfo *)msg->ptr;
+
+    _TRACE_BEGIN_EXECUTE_DETAILED(0, 4, _ckloopEP, CkNodeFirst(CkMyNode())+srcRank, sizeof(ConverseNotifyMsg), NULL);
     loop->stealWork();
+    _TRACE_END_EXECUTE();
 }
 
 void CurLoopInfo::stealWork() {
