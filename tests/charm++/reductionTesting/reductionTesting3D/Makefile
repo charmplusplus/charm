@@ -5,7 +5,7 @@ CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 all: pgm
 
 pgm: Main.o sectionReduction.o
-	$(CHARMC) -memory charmdebug -o pgm sectionReduction.o Main.o -module CkMulticast 
+	$(CHARMC) -o pgm sectionReduction.o Main.o -module CkMulticast 
 
 Main.o: Main.C Main.h main.decl.h main.def.h sectionReduction.decl.h
 	$(CHARMC) -c Main.C
@@ -18,6 +18,9 @@ main.decl.h main.def.h: main.ci
 
 sectionReduction.decl.h sectionReduction.def.h: sectionReduction.ci
 	$(CHARMC) sectionReduction.ci
+
+test: all
+	$(call run, ./pgm +p4 20 20 20 5 )
 
 clean:
 	rm -f *.decl.h *.def.h *.o
