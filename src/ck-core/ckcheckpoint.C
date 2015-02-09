@@ -574,8 +574,8 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 	pRO|_numPes;
 	int _numNodes = CkNumNodes();
 	pRO|_numNodes;
-	CkPupROData(pRO);
 	pRO|cb;
+	CkPupROData(pRO);
 	CmiFclose(fRO);
 
 	// save mainchares into MainChares.dat
@@ -643,9 +643,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	char filename[1024];
 	CkCallback cb;
 	
-        _inrestart = 1;
-	_restarted = 1;
-	CkMemCheckPT::inRestarting = 1;
+        if (CmiMyRank() == 0) {
+          _inrestart = 1;
+          _restarted = 1;
+          CkMemCheckPT::inRestarting = 1;
+        }
 
 	// restore readonlys
 	FILE* fRO = openCheckpointFile(dirname, "RO", "rb");
@@ -654,8 +656,8 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	pRO|_numPes;
 	int _numNodes = -1;
 	pRO|_numNodes;
-	CkPupROData(pRO);
 	pRO|cb;
+	if (CmiMyRank() == 0) CkPupROData(pRO);
 	CmiFclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
         _oldNumPes = _numPes;
@@ -679,7 +681,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		PUP::fromDisk pChares(fChares);
 		CkPupChareData(pChares);
 		CmiFclose(fChares);
-		_chareRestored = 1;
+		if (CmiMyRank() == 0) _chareRestored = 1;
 	}
 #endif
 
