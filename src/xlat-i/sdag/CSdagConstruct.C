@@ -342,7 +342,6 @@ namespace xi {
       }
       break;
     case SFOR:
-    case SWHILE:
     case SELSE:
     case SSLIST:
     case SOVERLAP:
@@ -450,7 +449,6 @@ namespace xi {
       if(con2 != 0) con2->generateCode(decls, defs, entry);
       break;
     case SELSE: generateElse(decls, defs, entry); break;
-    case SWHILE: generateWhile(decls, defs, entry); break;
     case SFOR: generateFor(decls, defs, entry); break;
     case SCASE: case SOVERLAP: generateOverlap(decls, defs, entry); break;
     case SCASELIST: generateCaseList(decls, defs, entry); break;
@@ -777,39 +775,6 @@ namespace xi {
     endMethod(defs);
 
     generateChildrenCode(decls, defs, entry);
-  }
-
-  void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry) {
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-
-    int indent = unravelClosuresBegin(defs);
-    indentBy(defs, indent);
-    defs << "if (" << con1->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    indentBy(defs, indent);
-    defs << "}\n";
-    unravelClosuresEnd(defs);
-    endMethod(defs);
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-    indent = unravelClosuresBegin(defs);
-    indentBy(defs, indent);
-    defs << "if (" << con1->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    indentBy(defs, indent);
-    defs << "}\n";
-    unravelClosuresEnd(defs);
-    endMethod(defs);
   }
 
   void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry) {
@@ -1266,6 +1231,53 @@ namespace xi {
     indentBy(defs, 1);
     generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
+  }
+
+  void WhileConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
+
+    int indent = unravelClosuresBegin(defs);
+    indentBy(defs, indent);
+    defs << "if (" << con1->text << ") {\n";
+    indentBy(defs, indent + 1);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    indentBy(defs, indent);
+    defs << "}\n";
+    unravelClosuresEnd(defs);
+    endMethod(defs);
+
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+    indent = unravelClosuresBegin(defs);
+    indentBy(defs, indent);
+    defs << "if (" << con1->text << ") {\n";
+    indentBy(defs, indent + 1);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    indentBy(defs, indent);
+    defs << "}\n";
+    unravelClosuresEnd(defs);
+    endMethod(defs);
+
+    generateChildrenCode(decls, defs, entry);
+  }
+
+  void WhileConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
+    encapState = encap;
+
+    stateVars = new list<CStateVar*>();
+    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
+    stateVarsChildren = stateVars;
+
+    encapStateChild = encap;
+
+    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
   }
 
   void generateVarSignature(XStr& str,

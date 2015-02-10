@@ -191,6 +191,7 @@ class Entry : public Member {
     int getLine();
 };
 
+// TODO(Ralf): why not simply use list<Entry*> instead?
 class EntryList {
   public:
     Entry *entry;

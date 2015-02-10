@@ -43,4 +43,10 @@ AtomicConstruct::AtomicConstruct(const char *code, const char *trace_name)
   }
 }
 
+
+/***************** WhileConstruct **************/
+WhileConstruct::WhileConstruct(SdagConstruct *pred, SdagConstruct *body)
+: SdagConstruct(SWHILE, 0, pred, 0, 0, 0, body, 0)
+{ }
+
 }   // namespace xi

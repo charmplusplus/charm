@@ -103,6 +103,7 @@ class SdagConstruct {
   static void generateDummyBeginExecute(XStr& defs, int indent);
 };
 
+/***************** WhenConstruct **************/
 class WhenConstruct : public SdagConstruct {
  public:
   CStateVar* speculativeState;
@@ -114,12 +115,21 @@ class WhenConstruct : public SdagConstruct {
   void generateWhenCode(XStr& op, int indent);
 };
 
+/***************** AtomicConstruct **************/
 class AtomicConstruct : public SdagConstruct {
  public:
   void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateCode(XStr&, XStr&, Entry *);
   void generateTrace();
   AtomicConstruct(const char *code, const char *trace_name);
+};
+
+/***************** WhileConstruct **************/
+class WhileConstruct : public SdagConstruct {
+ public:
+  WhileConstruct(SdagConstruct *pred, SdagConstruct *body);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
+  void generateCode(XStr&, XStr&, Entry *);
 };
 
 }   // namespace xi
