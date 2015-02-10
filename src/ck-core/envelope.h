@@ -353,6 +353,7 @@ public:
       env->sender.type = TypeInvalid;
       env->recver.type = TypeInvalid;
       env->SN = 0;
+      env->flags = 0;
 #if defined(_FAULT_CAUSAL_)
       env->TN = 0;
 #endif
