@@ -132,6 +132,14 @@ class WhileConstruct : public SdagConstruct {
   void generateCode(XStr&, XStr&, Entry *);
 };
 
+/***************** IfConstruct **************/
+class IfConstruct : public SdagConstruct {
+ public:
+  IfConstruct(SdagConstruct *pred, SdagConstruct *then_body, SdagConstruct *else_body);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
+  void generateCode(XStr&, XStr&, Entry *);
+};
+
 }   // namespace xi
 
 #endif // ifndef _SDAG_CONSTRUCT_H

@@ -1127,9 +1127,9 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		{ $$ = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
 		                 new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $13, 0); }
 		| IF StartIntExpr CCode EndIntExpr SingleConstruct HasElse
-		{ $$ = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, $3), $6,0,0,$5,0); }
+		{ $$ = new IfConstruct(new SdagConstruct(SINT_EXPR, $3), $5, $6); }
 		| IF StartIntExpr CCode EndIntExpr '{' Slist '}' HasElse
-		{ $$ = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, $3), $8,0,0,$6,0); }
+		{ $$ = new IfConstruct(new SdagConstruct(SINT_EXPR, $3), $6, $8); }
 		| WHILE StartIntExpr CCode EndIntExpr SingleConstruct 
 		{ $$ = new WhileConstruct(new SdagConstruct(SINT_EXPR, $3), $5); }
 		| WHILE StartIntExpr CCode EndIntExpr '{' Slist '}' 

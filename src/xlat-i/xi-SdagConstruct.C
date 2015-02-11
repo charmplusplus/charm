@@ -49,4 +49,10 @@ WhileConstruct::WhileConstruct(SdagConstruct *pred, SdagConstruct *body)
 : SdagConstruct(SWHILE, 0, pred, 0, 0, 0, body, 0)
 { }
 
+
+/***************** IfConstruct **************/
+IfConstruct::IfConstruct(SdagConstruct *pred, SdagConstruct *then_body, SdagConstruct *else_body)
+: SdagConstruct(SIF, 0, pred, else_body, 0, 0, then_body, 0)
+{ }
+
 }   // namespace xi

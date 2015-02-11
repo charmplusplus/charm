@@ -4076,13 +4076,13 @@ yyreduce:
 
   case 333:
 #line 1130 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, (yyvsp[-3].strval)), (yyvsp[0].sc),0,0,(yyvsp[-1].sc),0); }
+    { (yyval.sc) = new IfConstruct(new SdagConstruct(SINT_EXPR, (yyvsp[-3].strval)), (yyvsp[-1].sc), (yyvsp[0].sc)); }
 #line 4081 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 334:
 #line 1132 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, (yyvsp[-5].strval)), (yyvsp[0].sc),0,0,(yyvsp[-2].sc),0); }
+    { (yyval.sc) = new IfConstruct(new SdagConstruct(SINT_EXPR, (yyvsp[-5].strval)), (yyvsp[-2].sc), (yyvsp[0].sc)); }
 #line 4087 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 

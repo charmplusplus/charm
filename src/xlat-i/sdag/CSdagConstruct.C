@@ -292,11 +292,6 @@ namespace xi {
         encap.push_back(state);
       }
       break;
-    case SIF:
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      stateVarsChildren = stateVars;
-      if(con2 != 0) con2->propagateState(encap, plist, wlist, uniqueVarNum);
-      break;
     case SCASELIST:
       stateVarsChildren = new list<CStateVar*>(plist);
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
@@ -445,9 +440,6 @@ namespace xi {
     case SSLIST: generateSlist(decls, defs, entry); break;
     case SOLIST: generateOlist(decls, defs, entry); break;
     case SFORALL: generateForall(decls, defs, entry); break;
-    case SIF: generateIf(decls, defs, entry);
-      if(con2 != 0) con2->generateCode(decls, defs, entry);
-      break;
     case SELSE: generateElse(decls, defs, entry); break;
     case SFOR: generateFor(decls, defs, entry); break;
     case SCASE: case SOVERLAP: generateOverlap(decls, defs, entry); break;
@@ -889,47 +881,6 @@ namespace xi {
     }
   }
 
-  void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry) {
-    strcpy(nameStr,label->charstar());
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs, SIF);
-#endif
-
-    int indent = unravelClosuresBegin(defs);
-
-    indentBy(defs, indent);
-    defs << "if (" << con1->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-    indentBy(defs, indent + 1);
-    if (con2 != 0)
-      generateCall(defs, encapStateChild, encapStateChild, con2->label);
-    else
-      generateCall(defs, encapStateChild, encapStateChild, label, "_end");
-    indentBy(defs, indent);
-    defs << "}\n";
-
-    unravelClosuresEnd(defs);
-
-    endMethod(defs);
-
-    strcpy(nameStr,label->charstar());
-    strcat(nameStr,"_end");
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs,SIF_END);
-#endif
-    indentBy(defs, 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    endMethod(defs);
-  }
-
   void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry) {
     strcpy(nameStr,label->charstar());
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
@@ -1268,6 +1219,51 @@ namespace xi {
     generateChildrenCode(decls, defs, entry);
   }
 
+  void IfConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
+    strcpy(nameStr,label->charstar());
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
+
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+    generateEventBracket(defs, SIF);
+#endif
+
+    int indent = unravelClosuresBegin(defs);
+
+    indentBy(defs, indent);
+    defs << "if (" << con1->text << ") {\n";
+    indentBy(defs, indent + 1);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
+    if (con2 != 0)
+      generateCall(defs, encapStateChild, encapStateChild, con2->label);
+    else
+      generateCall(defs, encapStateChild, encapStateChild, label, "_end");
+    indentBy(defs, indent);
+    defs << "}\n";
+
+    unravelClosuresEnd(defs);
+
+    endMethod(defs);
+
+    strcpy(nameStr,label->charstar());
+    strcat(nameStr,"_end");
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+    generateEventBracket(defs,SIF_END);
+#endif
+    indentBy(defs, 1);
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    endMethod(defs);
+
+    if (con2 != 0) con2->generateCode(decls, defs, entry);
+
+    generateChildrenCode(decls, defs, entry);
+  }
+
   void WhileConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
     encapState = encap;
 
@@ -1279,6 +1275,20 @@ namespace xi {
 
     propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
   }
+
+  void IfConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
+    encapState = encap;
+
+    stateVars = new list<CStateVar*>();
+    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
+    stateVarsChildren = stateVars;
+    if(con2 != 0) con2->propagateState(encap, plist, wlist, uniqueVarNum);
+
+    encapStateChild = encap;
+
+    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
+  }
+
 
   void generateVarSignature(XStr& str,
                          const XStr* name, const char* suffix,
