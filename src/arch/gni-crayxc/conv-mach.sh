@@ -48,9 +48,16 @@ CMK_NATIVE_LIBS=""
 CMK_RANLIB="ranlib"
 
 # for F90 compiler
+if test -n "$ICPC"
+then
+CMK_CF77="ftn -auto "
+CMK_CF90="ftn -auto "
+CMK_F90LIBS="-lifcore -lifport "
+else
 CMK_CF77="ftn "
 CMK_CF90="ftn "
 CMK_F90LIBS=""
+fi
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
 CMK_MOD_EXT="mod"
