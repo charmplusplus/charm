@@ -61,4 +61,10 @@ ForConstruct::ForConstruct(SdagConstruct *decl, SdagConstruct *pred, SdagConstru
 : SdagConstruct(SFOR, 0, decl, pred, advance, 0, body, 0)
 { }
 
+
+/***************** CaseConstruct **************/
+CaseConstruct::CaseConstruct(SdagConstruct *body)
+: SdagConstruct(SCASE, 0, 0, 0, 0, 0, body, 0)
+{ }
+
 }   // namespace xi

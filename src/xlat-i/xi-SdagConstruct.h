@@ -148,6 +148,14 @@ class ForConstruct : public SdagConstruct {
   void generateCode(XStr&, XStr&, Entry *);
 };
 
+/***************** CaseConstruct **************/
+class CaseConstruct : public SdagConstruct {
+ public:
+  CaseConstruct(SdagConstruct *body);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
+  void generateCode(XStr&, XStr&, Entry *);
+};
+
 }   // namespace xi
 
 #endif // ifndef _SDAG_CONSTRUCT_H

@@ -339,7 +339,6 @@ namespace xi {
     case SELSE:
     case SSLIST:
     case SOVERLAP:
-    case SCASE:
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
       break;
@@ -440,7 +439,7 @@ namespace xi {
     case SOLIST: generateOlist(decls, defs, entry); break;
     case SFORALL: generateForall(decls, defs, entry); break;
     case SELSE: generateElse(decls, defs, entry); break;
-    case SCASE: case SOVERLAP: generateOverlap(decls, defs, entry); break;
+    case SOVERLAP: generateOverlap(decls, defs, entry); break;
     case SCASELIST: generateCaseList(decls, defs, entry); break;
     default: break;
     }
@@ -877,6 +876,30 @@ namespace xi {
     endMethod(defs);
   }
 
+  void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry) {
+    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+    generateEventBracket(defs, SOVERLAP);
+#endif
+    defs << "  ";
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    endMethod(defs);
+
+    // trace
+    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+    strcat(nameStr,"_end");
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+    generateEventBracket(defs, SOVERLAP_END);
+#endif
+    defs << "  ";
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    endMethod(defs);
+  }
+
   void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry) {
     SdagConstruct *cn;
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
@@ -925,30 +948,6 @@ namespace xi {
     defs << "    ";
     generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     defs << "  }\n";
-    endMethod(defs);
-  }
-
-  void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry) {
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs, SOVERLAP);
-#endif
-    defs << "  ";
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    endMethod(defs);
-
-    // trace
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    strcat(nameStr,"_end");
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs, SOVERLAP_END);
-#endif
-    defs << "  ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 
@@ -1264,8 +1263,47 @@ namespace xi {
     generateChildrenCode(decls, defs, entry);
   }
 
+  void CaseConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
+    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+    generateEventBracket(defs, SOVERLAP);
+#endif
+    defs << "  ";
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    endMethod(defs);
+
+    // trace
+    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+    strcat(nameStr,"_end");
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+    generateEventBracket(defs, SOVERLAP_END);
+#endif
+    defs << "  ";
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    endMethod(defs);
+
+    generateChildrenCode(decls, defs, entry);
+  }
+
+
   // TODO(Ralf): eliminate redundancy
   void ForConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
+    encapState = encap;
+
+    stateVars = new list<CStateVar*>();
+    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
+    stateVarsChildren = stateVars;
+
+    encapStateChild = encap;
+
+    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
+  }
+
+  void CaseConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
     encapState = encap;
 
     stateVars = new list<CStateVar*>();

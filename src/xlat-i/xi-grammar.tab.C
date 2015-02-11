@@ -4042,7 +4042,7 @@ yyreduce:
 
   case 328:
 #line 1116 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new SdagConstruct(SCASE, 0, 0, 0, 0, 0, (yyvsp[-1].sc), 0); }
+    { (yyval.sc) = new CaseConstruct((yyvsp[-1].sc)); }
 #line 4047 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
