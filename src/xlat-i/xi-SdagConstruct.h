@@ -140,6 +140,14 @@ class IfConstruct : public SdagConstruct {
   void generateCode(XStr&, XStr&, Entry *);
 };
 
+/***************** ForConstruct **************/
+class ForConstruct : public SdagConstruct {
+ public:
+  ForConstruct(SdagConstruct *decl, SdagConstruct *pred, SdagConstruct *advance, SdagConstruct *body);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
+  void generateCode(XStr&, XStr&, Entry *);
+};
+
 }   // namespace xi
 
 #endif // ifndef _SDAG_CONSTRUCT_H

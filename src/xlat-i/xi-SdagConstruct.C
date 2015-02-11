@@ -55,4 +55,10 @@ IfConstruct::IfConstruct(SdagConstruct *pred, SdagConstruct *then_body, SdagCons
 : SdagConstruct(SIF, 0, pred, else_body, 0, 0, then_body, 0)
 { }
 
+
+/***************** ForConstruct **************/
+ForConstruct::ForConstruct(SdagConstruct *decl, SdagConstruct *pred, SdagConstruct *advance, SdagConstruct *body)
+: SdagConstruct(SFOR, 0, decl, pred, advance, 0, body, 0)
+{ }
+
 }   // namespace xi

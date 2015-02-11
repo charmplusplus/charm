@@ -587,9 +587,9 @@ static const yytype_uint16 yyrline[] =
     1041,  1043,  1048,  1049,  1054,  1055,  1057,  1061,  1063,  1067,
     1069,  1073,  1075,  1077,  1081,  1084,  1087,  1089,  1091,  1095,
     1097,  1099,  1101,  1103,  1105,  1109,  1111,  1113,  1115,  1117,
-    1120,  1123,  1126,  1129,  1131,  1133,  1135,  1137,  1139,  1146,
-    1147,  1149,  1153,  1157,  1161,  1163,  1167,  1169,  1173,  1176,
-    1180,  1184
+    1119,  1121,  1124,  1127,  1129,  1131,  1133,  1135,  1137,  1144,
+    1145,  1147,  1151,  1155,  1159,  1161,  1165,  1167,  1171,  1174,
+    1178,  1182
 };
 #endif
 
@@ -4048,150 +4048,148 @@ yyreduce:
 
   case 329:
 #line 1118 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, (yyvsp[-8].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-6].strval)),
-		             new SdagConstruct(SINT_EXPR, (yyvsp[-4].strval)), 0, (yyvsp[-1].sc), 0); }
-#line 4054 "xi-grammar.tab.c" /* yacc.c:1646  */
+    { (yyval.sc) = new ForConstruct(new SdagConstruct(SINT_EXPR, (yyvsp[-8].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-6].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-4].strval)), (yyvsp[-1].sc)); }
+#line 4053 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 330:
-#line 1121 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, (yyvsp[-6].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-4].strval)), 
-		         new SdagConstruct(SINT_EXPR, (yyvsp[-2].strval)), 0, (yyvsp[0].sc), 0); }
-#line 4061 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 1120 "xi-grammar.y" /* yacc.c:1646  */
+    { (yyval.sc) = new ForConstruct(new SdagConstruct(SINT_EXPR, (yyvsp[-6].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-4].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-2].strval)), (yyvsp[0].sc)); }
+#line 4059 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 331:
-#line 1124 "xi-grammar.y" /* yacc.c:1646  */
+#line 1122 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, (yyvsp[-9].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-6].strval)), 
 		             new SdagConstruct(SINT_EXPR, (yyvsp[-4].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-2].strval)), (yyvsp[0].sc), 0); }
-#line 4068 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4066 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 332:
-#line 1127 "xi-grammar.y" /* yacc.c:1646  */
+#line 1125 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, (yyvsp[-11].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-8].strval)), 
 		                 new SdagConstruct(SINT_EXPR, (yyvsp[-6].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[-4].strval)), (yyvsp[-1].sc), 0); }
-#line 4075 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4073 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 333:
-#line 1130 "xi-grammar.y" /* yacc.c:1646  */
+#line 1128 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = new IfConstruct(new SdagConstruct(SINT_EXPR, (yyvsp[-3].strval)), (yyvsp[-1].sc), (yyvsp[0].sc)); }
-#line 4081 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4079 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 334:
-#line 1132 "xi-grammar.y" /* yacc.c:1646  */
+#line 1130 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = new IfConstruct(new SdagConstruct(SINT_EXPR, (yyvsp[-5].strval)), (yyvsp[-2].sc), (yyvsp[0].sc)); }
-#line 4087 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4085 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 335:
-#line 1134 "xi-grammar.y" /* yacc.c:1646  */
+#line 1132 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = new WhileConstruct(new SdagConstruct(SINT_EXPR, (yyvsp[-2].strval)), (yyvsp[0].sc)); }
-#line 4093 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4091 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 336:
-#line 1136 "xi-grammar.y" /* yacc.c:1646  */
+#line 1134 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = new WhileConstruct(new SdagConstruct(SINT_EXPR, (yyvsp[-4].strval)), (yyvsp[-1].sc)); }
-#line 4099 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4097 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 337:
-#line 1138 "xi-grammar.y" /* yacc.c:1646  */
+#line 1136 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = new AtomicConstruct((yyvsp[-1].strval), NULL); }
-#line 4105 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4103 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 338:
-#line 1140 "xi-grammar.y" /* yacc.c:1646  */
+#line 1138 "xi-grammar.y" /* yacc.c:1646  */
     { printf("Unknown SDAG construct or malformed entry method definition.\n"
                          "You may have forgotten to terminate an entry method definition with a"
                          " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'\n"); YYABORT; }
-#line 4113 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4111 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 339:
-#line 1146 "xi-grammar.y" /* yacc.c:1646  */
+#line 1144 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = 0; }
-#line 4119 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4117 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 340:
-#line 1148 "xi-grammar.y" /* yacc.c:1646  */
+#line 1146 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = new SdagConstruct(SELSE, 0,0,0,0,0, (yyvsp[0].sc),0); }
-#line 4125 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4123 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 341:
-#line 1150 "xi-grammar.y" /* yacc.c:1646  */
+#line 1148 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.sc) = new SdagConstruct(SELSE, 0,0,0,0,0, (yyvsp[-1].sc),0); }
-#line 4131 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4129 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 342:
-#line 1154 "xi-grammar.y" /* yacc.c:1646  */
+#line 1152 "xi-grammar.y" /* yacc.c:1646  */
     { in_int_expr = 0; (yyval.intval) = 0; }
-#line 4137 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4135 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 343:
-#line 1158 "xi-grammar.y" /* yacc.c:1646  */
+#line 1156 "xi-grammar.y" /* yacc.c:1646  */
     { in_int_expr = 1; (yyval.intval) = 0; }
-#line 4143 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4141 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 344:
-#line 1162 "xi-grammar.y" /* yacc.c:1646  */
+#line 1160 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.entry) = new Entry(lineno, 0, 0, (yyvsp[-1].strval), (yyvsp[0].plist), 0, 0, 0); }
-#line 4149 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4147 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 345:
-#line 1164 "xi-grammar.y" /* yacc.c:1646  */
+#line 1162 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.entry) = new Entry(lineno, 0, 0, (yyvsp[-4].strval), (yyvsp[0].plist), 0, 0, (yyvsp[-2].strval)); }
-#line 4155 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4153 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 346:
-#line 1168 "xi-grammar.y" /* yacc.c:1646  */
+#line 1166 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.entrylist) = new EntryList((yyvsp[0].entry)); }
-#line 4161 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4159 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 347:
-#line 1170 "xi-grammar.y" /* yacc.c:1646  */
+#line 1168 "xi-grammar.y" /* yacc.c:1646  */
     { (yyval.entrylist) = new EntryList((yyvsp[-2].entry),(yyvsp[0].entrylist)); }
-#line 4167 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4165 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 348:
-#line 1174 "xi-grammar.y" /* yacc.c:1646  */
+#line 1172 "xi-grammar.y" /* yacc.c:1646  */
     { in_bracket=1; }
-#line 4173 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4171 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 349:
-#line 1177 "xi-grammar.y" /* yacc.c:1646  */
+#line 1175 "xi-grammar.y" /* yacc.c:1646  */
     { in_bracket=0; }
-#line 4179 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4177 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 350:
-#line 1181 "xi-grammar.y" /* yacc.c:1646  */
+#line 1179 "xi-grammar.y" /* yacc.c:1646  */
     { if (!macroDefined((yyvsp[0].strval), 1)) in_comment = 1; }
-#line 4185 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4183 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 351:
-#line 1185 "xi-grammar.y" /* yacc.c:1646  */
+#line 1183 "xi-grammar.y" /* yacc.c:1646  */
     { if (!macroDefined((yyvsp[0].strval), 0)) in_comment = 1; }
-#line 4191 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4189 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
 
-#line 4195 "xi-grammar.tab.c" /* yacc.c:1646  */
+#line 4193 "xi-grammar.tab.c" /* yacc.c:1646  */
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -4419,7 +4417,7 @@ yyreturn:
 #endif
   return yyresult;
 }
-#line 1188 "xi-grammar.y" /* yacc.c:1906  */
+#line 1186 "xi-grammar.y" /* yacc.c:1906  */
 
 void yyerror(const char *mesg)
 {

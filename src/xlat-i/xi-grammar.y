@@ -1115,11 +1115,9 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		| CASE '{' CaseList '}'
 		{ $$ = new SdagConstruct(SCASE, 0, 0, 0, 0, 0, $3, 0); }
 		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr '{' Slist '}'
-		{ $$ = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5),
-		             new SdagConstruct(SINT_EXPR, $7), 0, $10, 0); }
+		{ $$ = new ForConstruct(new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5), new SdagConstruct(SINT_EXPR, $7), $10); }
 		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr SingleConstruct
-		{ $$ = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5), 
-		         new SdagConstruct(SINT_EXPR, $7), 0, $9, 0); }
+		{ $$ = new ForConstruct(new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5), new SdagConstruct(SINT_EXPR, $7), $9); }
 		| FORALL '[' IDENT ']' StartIntExpr CCode ':' CCode ',' CCode  EndIntExpr SingleConstruct
 		{ $$ = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
 		             new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $12, 0); }

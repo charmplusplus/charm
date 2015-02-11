@@ -336,7 +336,6 @@ namespace xi {
         encap.push_back(state);
       }
       break;
-    case SFOR:
     case SELSE:
     case SSLIST:
     case SOVERLAP:
@@ -441,7 +440,6 @@ namespace xi {
     case SOLIST: generateOlist(decls, defs, entry); break;
     case SFORALL: generateForall(decls, defs, entry); break;
     case SELSE: generateElse(decls, defs, entry); break;
-    case SFOR: generateFor(decls, defs, entry); break;
     case SCASE: case SOVERLAP: generateOverlap(decls, defs, entry); break;
     case SCASELIST: generateCaseList(decls, defs, entry); break;
     default: break;
@@ -767,68 +765,6 @@ namespace xi {
     endMethod(defs);
 
     generateChildrenCode(decls, defs, entry);
-  }
-
-  void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry) {
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-#endif
-
-    int indent = unravelClosuresBegin(defs);
-
-    indentBy(defs, indent);
-    defs << con1->text << ";\n";
-    //Record only the beginning for FOR
-#if CMK_BIGSIM_CHARM
-    generateEventBracket(defs, SFOR);
-#endif
-    indentBy(defs, indent);
-    defs << "if (" << con2->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    indentBy(defs, indent);
-    defs << "}\n";
-
-    unravelClosuresEnd(defs);
-
-    endMethod(defs);
-
-    // trace
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    strcat(nameStr,"_end");
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-#endif
-    indent = unravelClosuresBegin(defs);
-
-    indentBy(defs, indent);
-    defs << con3->text << ";\n";
-    indentBy(defs, indent);
-    defs << "if (" << con2->text << ") {\n";
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    indentBy(defs, indent);
-    defs << "} else {\n";
-#if CMK_BIGSIM_CHARM
-    generateEventBracket(defs, SFOR_END);
-#endif
-    indentBy(defs, indent + 1);
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    indentBy(defs, indent);
-    defs << "}\n";
-
-    unravelClosuresEnd(defs);
-
-    endMethod(defs);
   }
 
   int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
@@ -1262,6 +1198,83 @@ namespace xi {
     if (con2 != 0) con2->generateCode(decls, defs, entry);
 
     generateChildrenCode(decls, defs, entry);
+  }
+
+  void ForConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
+    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+#endif
+
+    int indent = unravelClosuresBegin(defs);
+
+    indentBy(defs, indent);
+    defs << con1->text << ";\n";
+    //Record only the beginning for FOR
+#if CMK_BIGSIM_CHARM
+    generateEventBracket(defs, SFOR);
+#endif
+    indentBy(defs, indent);
+    defs << "if (" << con2->text << ") {\n";
+    indentBy(defs, indent + 1);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    indentBy(defs, indent);
+    defs << "} else {\n";
+    indentBy(defs, indent + 1);
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    indentBy(defs, indent);
+    defs << "}\n";
+
+    unravelClosuresEnd(defs);
+
+    endMethod(defs);
+
+    // trace
+    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
+    strcat(nameStr,"_end");
+
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+#if CMK_BIGSIM_CHARM
+    generateBeginTime(defs);
+#endif
+    indent = unravelClosuresBegin(defs);
+
+    indentBy(defs, indent);
+    defs << con3->text << ";\n";
+    indentBy(defs, indent);
+    defs << "if (" << con2->text << ") {\n";
+    indentBy(defs, indent + 1);
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+    indentBy(defs, indent);
+    defs << "} else {\n";
+#if CMK_BIGSIM_CHARM
+    generateEventBracket(defs, SFOR_END);
+#endif
+    indentBy(defs, indent + 1);
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    indentBy(defs, indent);
+    defs << "}\n";
+
+    unravelClosuresEnd(defs);
+
+    endMethod(defs);
+
+    generateChildrenCode(decls, defs, entry);
+  }
+
+  // TODO(Ralf): eliminate redundancy
+  void ForConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
+    encapState = encap;
+
+    stateVars = new list<CStateVar*>();
+    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
+    stateVarsChildren = stateVars;
+
+    encapStateChild = encap;
+
+    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
   }
 
   void WhileConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
