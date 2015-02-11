@@ -1027,7 +1027,7 @@ static void _speedHdlr(void *m)
 void _propMapInit(void)
 {
   speeds = new int[CkNumPes()];
-  int hdlr = CkRegisterHandler((CmiHandler)_speedHdlr);
+  int hdlr = CkRegisterHandler(_speedHdlr);
   CmiPrintf("[%d]Measuring processor speed for prop. mapping...\n", CkMyPe());
   int s = LDProcessorSpeed();
   speedMsg msg;

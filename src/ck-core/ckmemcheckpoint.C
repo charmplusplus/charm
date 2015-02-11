@@ -1753,22 +1753,22 @@ void pingBuddy()
 void CkRegisterRestartHandler( )
 {
 #if CMK_MEM_CHECKPOINT
-  notifyHandlerIdx = CkRegisterHandler((CmiHandler)notifyHandler);
-  askProcDataHandlerIdx = CkRegisterHandler((CmiHandler)askProcDataHandler);
-  recoverProcDataHandlerIdx = CkRegisterHandler((CmiHandler)recoverProcDataHandler);
-  restartBcastHandlerIdx = CkRegisterHandler((CmiHandler)restartBcastHandler);
-  restartBeginHandlerIdx = CkRegisterHandler((CmiHandler)restartBeginHandler);
-  reportChkpSeqHandlerIdx = CkRegisterHandler((CmiHandler)reportChkpSeqHandler);
-  getChkpSeqHandlerIdx = CkRegisterHandler((CmiHandler)getChkpSeqHandler);
+  notifyHandlerIdx = CkRegisterHandler(notifyHandler);
+  askProcDataHandlerIdx = CkRegisterHandler(askProcDataHandler);
+  recoverProcDataHandlerIdx = CkRegisterHandler(recoverProcDataHandler);
+  restartBcastHandlerIdx = CkRegisterHandler(restartBcastHandler);
+  restartBeginHandlerIdx = CkRegisterHandler(restartBeginHandler);
+  reportChkpSeqHandlerIdx = CkRegisterHandler(reportChkpSeqHandler);
+  getChkpSeqHandlerIdx = CkRegisterHandler(getChkpSeqHandler);
 
 #if CMK_CONVERSE_MPI
-  pingHandlerIdx = CkRegisterHandler((CmiHandler)pingHandler);
-  pingCheckHandlerIdx = CkRegisterHandler((CmiHandler)pingCheckHandler);
-  buddyDieHandlerIdx = CkRegisterHandler((CmiHandler)buddyDieHandler);
-  replicaDieHandlerIdx = CkRegisterHandler((CmiHandler)replicaDieHandler);
-  replicaDieBcastHandlerIdx = CkRegisterHandler((CmiHandler)replicaDieBcastHandler);
+  pingHandlerIdx = CkRegisterHandler(pingHandler);
+  pingCheckHandlerIdx = CkRegisterHandler(pingCheckHandler);
+  buddyDieHandlerIdx = CkRegisterHandler(buddyDieHandler);
+  replicaDieHandlerIdx = CkRegisterHandler(replicaDieHandler);
+  replicaDieBcastHandlerIdx = CkRegisterHandler(replicaDieBcastHandler);
 #endif
-  changePhaseHandlerIdx = CkRegisterHandler((CmiHandler)changePhaseHandler);
+  changePhaseHandlerIdx = CkRegisterHandler(changePhaseHandler);
 
   CpvInitialize(CkProcCheckPTMessage **, procChkptBuf);
   CpvAccess(procChkptBuf) = new CkProcCheckPTMessage *[2];

@@ -282,56 +282,56 @@ void _messageLoggingInit(){
 	CpvInitialize(Chare *,_currentObj);
 	
 	//registering handlers for message logging
-	_pingHandlerIdx = CkRegisterHandler((CmiHandler)_pingHandler);
+	_pingHandlerIdx = CkRegisterHandler(_pingHandler);
 		
 	//handlers for checkpointing
-	_storeCheckpointHandlerIdx = CkRegisterHandler((CmiHandler)_storeCheckpointHandler);
-	_checkpointAckHandlerIdx = CkRegisterHandler((CmiHandler) _checkpointAckHandler);
-	_removeProcessedLogHandlerIdx  = CkRegisterHandler((CmiHandler)_removeProcessedLogHandler);
-	_checkpointRequestHandlerIdx =  CkRegisterHandler((CmiHandler)_checkpointRequestHandler);
+	_storeCheckpointHandlerIdx = CkRegisterHandler(_storeCheckpointHandler);
+	_checkpointAckHandlerIdx = CkRegisterHandler( _checkpointAckHandler);
+	_removeProcessedLogHandlerIdx  = CkRegisterHandler(_removeProcessedLogHandler);
+	_checkpointRequestHandlerIdx =  CkRegisterHandler(_checkpointRequestHandler);
 
 	//handlers for restart
-	_getCheckpointHandlerIdx = CkRegisterHandler((CmiHandler)_getCheckpointHandler);
-	_recvCheckpointHandlerIdx = CkRegisterHandler((CmiHandler)_recvCheckpointHandler);
-	_updateHomeRequestHandlerIdx =CkRegisterHandler((CmiHandler)_updateHomeRequestHandler);
-	_updateHomeAckHandlerIdx =  CkRegisterHandler((CmiHandler) _updateHomeAckHandler);
-	_resendMessagesHandlerIdx = CkRegisterHandler((CmiHandler)_resendMessagesHandler);
-	_sendDetsHandlerIdx = CkRegisterHandler((CmiHandler)_sendDetsHandler);
-	_sendDetsReplyHandlerIdx = CkRegisterHandler((CmiHandler)_sendDetsReplyHandler);
-	_receivedTNDataHandlerIdx=CkRegisterHandler((CmiHandler)_receivedTNDataHandler);
-	_receivedDetDataHandlerIdx = CkRegisterHandler((CmiHandler)_receivedDetDataHandler);
-	_distributedLocationHandlerIdx=CkRegisterHandler((CmiHandler)_distributedLocationHandler);
-	_sendBackLocationHandlerIdx=CkRegisterHandler((CmiHandler)_sendBackLocationHandler);
-	_verifyAckRequestHandlerIdx = CkRegisterHandler((CmiHandler)_verifyAckRequestHandler);
-	_verifyAckHandlerIdx = CkRegisterHandler((CmiHandler)_verifyAckHandler);
-	_dummyMigrationHandlerIdx = CkRegisterHandler((CmiHandler)_dummyMigrationHandler);
+	_getCheckpointHandlerIdx = CkRegisterHandler(_getCheckpointHandler);
+	_recvCheckpointHandlerIdx = CkRegisterHandler(_recvCheckpointHandler);
+	_updateHomeRequestHandlerIdx =CkRegisterHandler(_updateHomeRequestHandler);
+	_updateHomeAckHandlerIdx =  CkRegisterHandler( _updateHomeAckHandler);
+	_resendMessagesHandlerIdx = CkRegisterHandler(_resendMessagesHandler);
+	_sendDetsHandlerIdx = CkRegisterHandler(_sendDetsHandler);
+	_sendDetsReplyHandlerIdx = CkRegisterHandler(_sendDetsReplyHandler);
+	_receivedTNDataHandlerIdx=CkRegisterHandler(_receivedTNDataHandler);
+	_receivedDetDataHandlerIdx = CkRegisterHandler(_receivedDetDataHandler);
+	_distributedLocationHandlerIdx=CkRegisterHandler(_distributedLocationHandler);
+	_sendBackLocationHandlerIdx=CkRegisterHandler(_sendBackLocationHandler);
+	_verifyAckRequestHandlerIdx = CkRegisterHandler(_verifyAckRequestHandler);
+	_verifyAckHandlerIdx = CkRegisterHandler(_verifyAckHandler);
+	_dummyMigrationHandlerIdx = CkRegisterHandler(_dummyMigrationHandler);
 
 	//TML: handlers for team-based message logging
-	_restartHandlerIdx = CkRegisterHandler((CmiHandler)_restartHandler);
-	_getRestartCheckpointHandlerIdx = CkRegisterHandler((CmiHandler)_getRestartCheckpointHandler);
-	_recvRestartCheckpointHandlerIdx = CkRegisterHandler((CmiHandler)_recvRestartCheckpointHandler);
+	_restartHandlerIdx = CkRegisterHandler(_restartHandler);
+	_getRestartCheckpointHandlerIdx = CkRegisterHandler(_getRestartCheckpointHandler);
+	_recvRestartCheckpointHandlerIdx = CkRegisterHandler(_recvRestartCheckpointHandler);
 
 	// handlers for causal message logging
-	_storeDeterminantsHandlerIdx = CkRegisterHandler((CmiHandler)_storeDeterminantsHandler);
-	_removeDeterminantsHandlerIdx = CkRegisterHandler((CmiHandler)_removeDeterminantsHandler);
+	_storeDeterminantsHandlerIdx = CkRegisterHandler(_storeDeterminantsHandler);
+	_removeDeterminantsHandlerIdx = CkRegisterHandler(_removeDeterminantsHandler);
 	
 	//handlers for load balancing
-	_receiveMlogLocationHandlerIdx=CkRegisterHandler((CmiHandler)_receiveMlogLocationHandler);
-	_receiveMigrationNoticeHandlerIdx=CkRegisterHandler((CmiHandler)_receiveMigrationNoticeHandler);
-	_receiveMigrationNoticeAckHandlerIdx=CkRegisterHandler((CmiHandler)_receiveMigrationNoticeAckHandler);
-	_getGlobalStepHandlerIdx=CkRegisterHandler((CmiHandler)_getGlobalStepHandler);
-	_recvGlobalStepHandlerIdx=CkRegisterHandler((CmiHandler)_recvGlobalStepHandler);
-	_checkpointBarrierHandlerIdx=CkRegisterHandler((CmiHandler)_checkpointBarrierHandler);
-	_checkpointBarrierAckHandlerIdx=CkRegisterHandler((CmiHandler)_checkpointBarrierAckHandler);
+	_receiveMlogLocationHandlerIdx=CkRegisterHandler(_receiveMlogLocationHandler);
+	_receiveMigrationNoticeHandlerIdx=CkRegisterHandler(_receiveMigrationNoticeHandler);
+	_receiveMigrationNoticeAckHandlerIdx=CkRegisterHandler(_receiveMigrationNoticeAckHandler);
+	_getGlobalStepHandlerIdx=CkRegisterHandler(_getGlobalStepHandler);
+	_recvGlobalStepHandlerIdx=CkRegisterHandler(_recvGlobalStepHandler);
+	_checkpointBarrierHandlerIdx=CkRegisterHandler(_checkpointBarrierHandler);
+	_checkpointBarrierAckHandlerIdx=CkRegisterHandler(_checkpointBarrierAckHandler);
 	
 	//handlers for updating locations
-	_receiveLocationHandlerIdx=CkRegisterHandler((CmiHandler)_receiveLocationHandler);
+	_receiveLocationHandlerIdx=CkRegisterHandler(_receiveLocationHandler);
 
    // handlers for failure detection in MPI layer
 #if CMK_CONVERSE_MPI
-	heartBeatHandlerIdx = CkRegisterHandler((CmiHandler)heartBeatHandler);
-	heartBeatCheckHandlerIdx = CkRegisterHandler((CmiHandler)heartBeatCheckHandler);
-	partnerFailureHandlerIdx = CkRegisterHandler((CmiHandler)partnerFailureHandler);
+	heartBeatHandlerIdx = CkRegisterHandler(heartBeatHandler);
+	heartBeatCheckHandlerIdx = CkRegisterHandler(heartBeatCheckHandler);
+	partnerFailureHandlerIdx = CkRegisterHandler(partnerFailureHandler);
 #endif
 
 	//Cpv variables for message logging

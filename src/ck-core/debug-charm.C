@@ -1087,7 +1087,7 @@ void CpdBgInit()
         // Register the BG handler for CCS. Notice that this is put into a variable shared by
         // the whole real processor. This because converse needs to find it. We check that all
         // virtual processors register the same index for this handler.
-        int bgCcsHandlerIdx = CkRegisterHandler((CmiHandler)req_fw_handler);
+        int bgCcsHandlerIdx = CkRegisterHandler(req_fw_handler);
         if (CpvAccess(_bgCcsHandlerIdx) == 0) CpvAccess(_bgCcsHandlerIdx) = bgCcsHandlerIdx;
         CkAssert(CpvAccess(_bgCcsHandlerIdx)==bgCcsHandlerIdx);
         CpvAccess(_bgCcsAck) ++;

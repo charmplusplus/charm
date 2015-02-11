@@ -2031,11 +2031,11 @@ void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
 { _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg); }
 
 void _ckModuleInit(void) {
-	index_skipCldHandler = CkRegisterHandler((CmiHandler)_skipCldHandler);
+	index_skipCldHandler = CkRegisterHandler(_skipCldHandler);
 #if CMK_OBJECT_QUEUE_AVAILABLE
-	index_objectQHandler = CkRegisterHandler((CmiHandler)_ObjectQHandler);
+	index_objectQHandler = CkRegisterHandler(_ObjectQHandler);
 #endif
-	index_tokenHandler = CkRegisterHandler((CmiHandler)_TokenHandler);
+	index_tokenHandler = CkRegisterHandler(_TokenHandler);
 	CkpvInitialize(TokenPool*, _tokenPool);
 	CkpvAccess(_tokenPool) = new TokenPool;
 }

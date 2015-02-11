@@ -444,17 +444,16 @@ extern void _skipCldHandler(void *converseMsg);
 
 void _discard_charm_message()
 {
-  CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-//  CkNumberHandler(CpvAccess(CldHandlerIndex), (CmiHandler)_discardHandler);
-  CkNumberHandler(index_skipCldHandler, (CmiHandler)_discardHandler);
+  CkNumberHandler(_charmHandlerIdx,_discardHandler);
+//  CkNumberHandler(CpvAccess(CldHandlerIndex), _discardHandler);
+  CkNumberHandler(index_skipCldHandler, _discardHandler);
 }
 
 void _resume_charm_message()
 {
-  CkNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler,
-  	CkpvAccess(_coreState));
-//  CkNumberHandler(CpvAccess(CldHandlerIndex), (CmiHandler)CldHandler);
-  CkNumberHandler(index_skipCldHandler, (CmiHandler)_skipCldHandler);
+  CkNumberHandlerEx(_charmHandlerIdx, _processHandler, CkpvAccess(_coreState));
+//  CkNumberHandler(CpvAccess(CldHandlerIndex), CldHandler);
+  CkNumberHandler(index_skipCldHandler, _skipCldHandler);
 }
 #endif
 
@@ -477,8 +476,8 @@ static void _exitHandler(envelope *env)
         return;
       }
       _exitStarted = 1;
-      CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-      CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+      CkNumberHandler(_charmHandlerIdx,_discardHandler);
+      CkNumberHandler(_bocHandlerIdx, _discardHandler);
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -500,8 +499,8 @@ static void _exitHandler(envelope *env)
       _messageLoggingExit();
 #endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
-      CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-      CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+      CkNumberHandler(_charmHandlerIdx,_discardHandler);
+      CkNumberHandler(_bocHandlerIdx, _discardHandler);
       /*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
 #if CMK_WITH_STATS
@@ -567,7 +566,7 @@ static void _exitHandler(envelope *env)
 static inline void _processBufferedBocInits(void)
 {
   CkCoreState *ck = CkpvAccess(_coreState);
-  CkNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler, ck);
+  CkNumberHandlerEx(_bocHandlerIdx,_processHandler, ck);
   register int i = 0;
   PtrVec &inits=*CkpvAccess(_bocInitVec);
   register int len = inits.size();
@@ -604,8 +603,7 @@ static inline void _processBufferedNodeBocInits(void)
 
 static inline void _processBufferedMsgs(void)
 {
-  CkNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler,
-  	CkpvAccess(_coreState));
+  CkNumberHandlerEx(_charmHandlerIdx, _processHandler, CkpvAccess(_coreState));
   envelope *env;
   while(NULL!=(env=(envelope*)CkpvAccess(_buffQ)->deq())) {
     if(env->getMsgtype()==NewChareMsg || env->getMsgtype()==NewVChareMsg) {
@@ -667,7 +665,7 @@ void _initDone(void)
   CkpvAccess(_initdone) ++;
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
   if (!CksvAccess(_triggersSent)) _sendTriggers();
-  CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler);
+  CkNumberHandler(_triggerHandlerIdx, _discardHandler);
   CmiNodeBarrier();
   if(CkMyRank() == 0) {
     _processBufferedNodeBocInits();
@@ -808,8 +806,8 @@ void _CkExit(void)
   CmiAssert(CkMyPe() == 0);
   // Shuts down Converse handlers for the upper layers on this processor
   //
-  CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-  CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+  CkNumberHandler(_charmHandlerIdx,_discardHandler);
+  CkNumberHandler(_bocHandlerIdx, _discardHandler);
   DEBUGF(("[%d] CkExit - _exitStarted:%d %d\n", CkMyPe(), _exitStarted, _exitHandlerIdx));
 
   if(CkMyPe()==0) {
@@ -1049,22 +1047,20 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_ckout) = new _CkOutStream();
 	CkpvAccess(_ckerr) = new _CkErrStream();
 
-	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
-	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
-	CkNumberHandlerEx(_initHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
-	_roRestartHandlerIdx = CkRegisterHandler((CmiHandler)_roRestartHandler);
-	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
+	_charmHandlerIdx = CkRegisterHandler(_bufferHandler);
+	_initHandlerIdx = CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState));
+	_roRestartHandlerIdx = CkRegisterHandler(_roRestartHandler);
+	_exitHandlerIdx = CkRegisterHandler(_exitHandler);
 	//added for interoperabilitY
-	_libExitHandlerIdx = CkRegisterHandler((CmiHandler)_libExitHandler);
-	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
-	CkNumberHandlerEx(_bocHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
+	_libExitHandlerIdx = CkRegisterHandler(_libExitHandler);
+	_bocHandlerIdx = CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState));
 
 #ifdef __BIGSIM__
 	if(BgNodeRank()==0) 
 #endif
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 
-	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
+	_triggerHandlerIdx = CkRegisterHandler(_triggerHandler);
 	_ckModuleInit();
 
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
@@ -1236,8 +1232,8 @@ void _initCharm(int unused_argc, char **argv)
 	for(int vProc=0;vProc<CkNumPes();vProc++){
 		CpvAccess(_validProcessors)[vProc]=1;
 	}
-	_ckEvacBcastIdx = CkRegisterHandler((CmiHandler)_ckEvacBcast);
-	_ckAckEvacIdx = CkRegisterHandler((CmiHandler)_ckAckEvac);
+	_ckEvacBcastIdx = CkRegisterHandler(_ckEvacBcast);
+	_ckAckEvacIdx = CkRegisterHandler(_ckAckEvac);
 #endif
 	CkpvAccess(startedEvac) = 0;
 	CpvAccess(serializer) = 0;
@@ -1430,11 +1426,8 @@ void _initCharm(int unused_argc, char **argv)
 	DEBUGF(("[%d,%d%.6lf] inCommThread %d\n",CmiMyPe(),CmiMyRank(),CmiWallTimer(),inCommThread));
 	// when I am a communication thread, I don't participate initDone.
         if (inCommThread) {
-                CkNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler,
-                                        CkpvAccess(_coreState));
-                CkNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler
-,
-                                        CkpvAccess(_coreState));
+                CkNumberHandlerEx(_bocHandlerIdx, _processHandler, CkpvAccess(_coreState));
+                CkNumberHandlerEx(_charmHandlerIdx, _processHandler, CkpvAccess(_coreState));
                 _processBufferedMsgs();
         }
 
