@@ -258,40 +258,6 @@ namespace xi {
 
     stateVars = new list<CStateVar*>();
     switch(type) {
-    case SFORALL:
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      stateVarsChildren = new list<CStateVar*>(plist);
-      sv = new CStateVar(0,"int", 0, con1->text->charstar(), 0,NULL, 0);
-      stateVarsChildren->push_back(sv);
-
-      {
-        list<CStateVar*> lst;
-        lst.push_back(sv);
-        EncapState *state = new EncapState(NULL, lst);
-        state->isForall = true;
-        state->type = new XStr("SDAG::ForallClosure");
-        XStr* name = new XStr();
-        *name << con1->text << "_cl";
-        state->name = name;
-        encap.push_back(state);
-      }
-
-      {
-        char txt[128];
-        sprintf(txt, "_cf%d", nodeNum);
-        counter = new XStr(txt);
-        sv = new CStateVar(0, "SDAG::CCounter *", 0, txt, 0, NULL, 1);
-        sv->isCounter = true;
-        stateVarsChildren->push_back(sv);
-
-        list<CStateVar*> lst;
-        lst.push_back(sv);
-        EncapState *state = new EncapState(NULL, lst);
-        state->type = new XStr("SDAG::CCounter");
-        state->name = new XStr(txt);
-        encap.push_back(state);
-      }
-      break;
     case SCASELIST:
       stateVarsChildren = new list<CStateVar*>(plist);
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
@@ -437,7 +403,6 @@ namespace xi {
     case SSDAGENTRY: generateSdagEntry(decls, defs, entry); break;
     case SSLIST: generateSlist(decls, defs, entry); break;
     case SOLIST: generateOlist(decls, defs, entry); break;
-    case SFORALL: generateForall(decls, defs, entry); break;
     case SELSE: generateElse(decls, defs, entry); break;
     case SOVERLAP: generateOverlap(decls, defs, entry); break;
     case SCASELIST: generateCaseList(decls, defs, entry); break;
@@ -841,41 +806,6 @@ namespace xi {
     endMethod(defs);
   }
 
-  void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry) {
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-
-    unravelClosuresBegin(defs);
-
-    defs << "  int __first = (" << con2->text << "), __last = (" << con3->text
-         << "), __stride = (" << con4->text << ");\n";
-    defs << "  if (__first > __last) {\n";
-    defs << "    int __tmp=__first; __first=__last; __last=__tmp;\n";
-    defs << "    __stride = -__stride;\n";
-    defs << "  }\n";
-    defs << "  SDAG::CCounter *" << counter << " = new SDAG::CCounter(__first, __last, __stride);\n";
-    defs << "  for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
-         << con1->text << "+=__stride) {\n";
-    defs << "    SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
-    defs << "    ";
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-
-    defs << "  }\n";
-
-    unravelClosuresEnd(defs);
-
-    endMethod(defs);
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "  " << counter << "->decrement(); /* DECREMENT 1 */ \n";
-    defs << "  " << con1->text << "_cl->deref();\n";
-    defs << "  if (" << counter << "->isDone()) {\n";
-    defs << "    " << counter << "->deref();\n";
-    defs << "    ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    defs << "  }\n";
-    endMethod(defs);
-  }
-
   void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry) {
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
@@ -1263,6 +1193,43 @@ namespace xi {
     generateChildrenCode(decls, defs, entry);
   }
 
+  void ForallConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
+    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
+
+    unravelClosuresBegin(defs);
+
+    defs << "  int __first = (" << con2->text << "), __last = (" << con3->text
+         << "), __stride = (" << con4->text << ");\n";
+    defs << "  if (__first > __last) {\n";
+    defs << "    int __tmp=__first; __first=__last; __last=__tmp;\n";
+    defs << "    __stride = -__stride;\n";
+    defs << "  }\n";
+    defs << "  SDAG::CCounter *" << counter << " = new SDAG::CCounter(__first, __last, __stride);\n";
+    defs << "  for(int " << con1->text << "=__first;" << con1->text << "<=__last;"
+         << con1->text << "+=__stride) {\n";
+    defs << "    SDAG::ForallClosure* " << con1->text << "_cl = new SDAG::ForallClosure(" << con1->text << ");\n";
+    defs << "    ";
+    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
+
+    defs << "  }\n";
+
+    unravelClosuresEnd(defs);
+
+    endMethod(defs);
+
+    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+    defs << "  " << counter << "->decrement(); /* DECREMENT 1 */ \n";
+    defs << "  " << con1->text << "_cl->deref();\n";
+    defs << "  if (" << counter << "->isDone()) {\n";
+    defs << "    " << counter << "->deref();\n";
+    defs << "    ";
+    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
+    defs << "  }\n";
+    endMethod(defs);
+
+    generateChildrenCode(decls, defs, entry);
+  }
+
   void CaseConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
@@ -1297,6 +1264,49 @@ namespace xi {
     stateVars = new list<CStateVar*>();
     stateVars->insert(stateVars->end(), plist.begin(), plist.end());
     stateVarsChildren = stateVars;
+
+    encapStateChild = encap;
+
+    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
+  }
+
+  void ForallConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
+    encapState = encap;
+
+    stateVars = new list<CStateVar*>();
+    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
+    stateVarsChildren = new list<CStateVar*>(plist);
+
+    CStateVar *sv = new CStateVar(0,"int", 0, con1->text->charstar(), 0,NULL, 0);
+    stateVarsChildren->push_back(sv);
+
+    {
+      list<CStateVar*> lst;
+      lst.push_back(sv);
+      EncapState *state = new EncapState(NULL, lst);
+      state->isForall = true;
+      state->type = new XStr("SDAG::ForallClosure");
+      XStr* name = new XStr();
+      *name << con1->text << "_cl";
+      state->name = name;
+      encap.push_back(state);
+    }
+
+    {
+      char txt[128];
+      sprintf(txt, "_cf%d", nodeNum);
+      counter = new XStr(txt);
+      sv = new CStateVar(0, "SDAG::CCounter *", 0, txt, 0, NULL, 1);
+      sv->isCounter = true;
+      stateVarsChildren->push_back(sv);
+
+      list<CStateVar*> lst;
+      lst.push_back(sv);
+      EncapState *state = new EncapState(NULL, lst);
+      state->type = new XStr("SDAG::CCounter");
+      state->name = new XStr(txt);
+      encap.push_back(state);
+    }
 
     encapStateChild = encap;
 

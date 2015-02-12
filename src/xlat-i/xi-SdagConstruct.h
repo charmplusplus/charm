@@ -148,6 +148,14 @@ class ForConstruct : public SdagConstruct {
   void generateCode(XStr&, XStr&, Entry *);
 };
 
+/***************** ForallConstruct **************/
+class ForallConstruct : public SdagConstruct {
+ public:
+  ForallConstruct(SdagConstruct *tag, SdagConstruct *begin, SdagConstruct *end, SdagConstruct *step, SdagConstruct *body);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
+  void generateCode(XStr&, XStr&, Entry *);
+};
+
 /***************** CaseConstruct **************/
 class CaseConstruct : public SdagConstruct {
  public:

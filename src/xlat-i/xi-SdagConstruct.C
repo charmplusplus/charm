@@ -62,6 +62,12 @@ ForConstruct::ForConstruct(SdagConstruct *decl, SdagConstruct *pred, SdagConstru
 { }
 
 
+/***************** ForallConstruct **************/
+ForallConstruct::ForallConstruct(SdagConstruct *tag, SdagConstruct *begin, SdagConstruct *end, SdagConstruct *step, SdagConstruct *body)
+: SdagConstruct(SFORALL, 0, tag, begin, end, step, body, 0)
+{ }
+
+
 /***************** CaseConstruct **************/
 CaseConstruct::CaseConstruct(SdagConstruct *body)
 : SdagConstruct(SCASE, 0, 0, 0, 0, 0, body, 0)

@@ -1119,11 +1119,11 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr SingleConstruct
 		{ $$ = new ForConstruct(new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5), new SdagConstruct(SINT_EXPR, $7), $9); }
 		| FORALL '[' IDENT ']' StartIntExpr CCode ':' CCode ',' CCode  EndIntExpr SingleConstruct
-		{ $$ = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
-		             new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $12, 0); }
+		{ $$ = new ForallConstruct(new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
+		             new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $12); }
 		| FORALL '[' IDENT ']' StartIntExpr CCode ':' CCode ',' CCode  EndIntExpr '{' Slist '}' 
-		{ $$ = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
-		                 new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $13, 0); }
+		{ $$ = new ForallConstruct(new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
+		             new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $13); }
 		| IF StartIntExpr CCode EndIntExpr SingleConstruct HasElse
 		{ $$ = new IfConstruct(new SdagConstruct(SINT_EXPR, $3), $5, $6); }
 		| IF StartIntExpr CCode EndIntExpr '{' Slist '}' HasElse
