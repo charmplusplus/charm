@@ -164,6 +164,14 @@ class CaseConstruct : public SdagConstruct {
   void generateCode(XStr&, XStr&, Entry *);
 };
 
+/***************** OverlapConstruct **************/
+class OverlapConstruct : public SdagConstruct {
+ public:
+  OverlapConstruct(SdagConstruct *olist);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
+  void generateCode(XStr&, XStr&, Entry *);
+};
+
 }   // namespace xi
 
 #endif // ifndef _SDAG_CONSTRUCT_H

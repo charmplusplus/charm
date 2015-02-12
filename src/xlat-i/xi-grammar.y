@@ -1109,7 +1109,7 @@ NonWhenConstruct : ATOMIC
 SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
                 { $$ = new AtomicConstruct($4, $2); }
 		| OVERLAP '{' Olist '}'
-		{ $$ = new SdagConstruct(SOVERLAP,0, 0,0,0,0,$3, 0); }	
+		{ $$ = new OverlapConstruct($3); }	
                 | WhenConstruct
                 { $$ = $1; }
 		| CASE '{' CaseList '}'

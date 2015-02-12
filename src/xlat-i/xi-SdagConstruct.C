@@ -73,4 +73,9 @@ CaseConstruct::CaseConstruct(SdagConstruct *body)
 : SdagConstruct(SCASE, 0, 0, 0, 0, 0, body, 0)
 { }
 
+/***************** OverlapConstruct **************/
+OverlapConstruct::OverlapConstruct(SdagConstruct *olist)
+: SdagConstruct(SOVERLAP, 0, 0, 0, 0, 0, olist, 0)
+{ }
+
 }   // namespace xi

@@ -4030,7 +4030,7 @@ yyreduce:
 
   case 326:
 #line 1112 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new SdagConstruct(SOVERLAP,0, 0,0,0,0,(yyvsp[-1].sc), 0); }
+    { (yyval.sc) = new OverlapConstruct((yyvsp[-1].sc)); }
 #line 4035 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
