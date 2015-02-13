@@ -510,13 +510,13 @@ then
   fi
 fi
 
-if echo "$base_version" | grep "linux" > /dev/null 2> /dev/null
+if echo "$CMK_CC" | grep -E "gcc|clang|icc" > /dev/null 2> /dev/null
 then
   test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"
   if test $strictpass -eq 1
   then
-	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "linux compiler"
-	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "linux compiler"
+	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "stack-protection disabling"
+	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "stack-protection disabling"
   fi
 fi
 
