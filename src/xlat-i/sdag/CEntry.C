@@ -1,5 +1,6 @@
 #include "CEntry.h"
 #include "xi-symbol.h"
+#include "constructs/Constructs.h"
 #include "CStateVar.h"
 
 using std::list;

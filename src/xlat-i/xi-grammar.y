@@ -4,6 +4,7 @@
 #include <string>
 #include <string.h>
 #include "xi-symbol.h"
+#include "sdag/constructs/Constructs.h"
 #include "EToken.h"
 using namespace xi;
 extern int yylex (void) ;

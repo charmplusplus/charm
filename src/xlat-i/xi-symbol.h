@@ -15,6 +15,7 @@
 #include "xi-Member.h"
 #include "xi-Entry.h"
 #include "xi-Value.h"
+#include "xi-Type.h"
 
 #include <iostream>
 #include <cstdio>
@@ -42,15 +43,6 @@ extern void generateVarSignature(XStr& decls, XStr& defs,
                               const Chare* chare, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
                               std::list<CStateVar*>* params);
-extern void generateClosureSignature(XStr& decls, XStr& defs,
-                                     const Chare* chare, bool declareStatic,
-                                     const char* returnType, const XStr* name, bool isEnd,
-                                     std::list<EncapState*> params, int numRefs = 0);
-extern void generateClosureSignature(XStr& decls, XStr& defs,
-                                     const Entry* entry, bool declareStatic,
-                                     const char* returnType, const XStr* name, bool isEnd,
-                                     std::list<EncapState*> params, int numRefs = 0);
-extern void endMethod(XStr& op);
 
 /******************* Utilities ****************/
 
