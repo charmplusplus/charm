@@ -15,7 +15,7 @@ INTF      = mylib.ci pgm.ci
 # Specify the exe name and the arguments to run it with
 NP        = 4
 TARGET    = testTemplateEP
-ARGS      = $(TESTOPTS)
+ARGS      =
 
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc

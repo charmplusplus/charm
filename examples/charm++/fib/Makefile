@@ -4,7 +4,7 @@ BINARY = fib
 
 CHARMCFLAGS = $(OPTS)
 CHARMCLINKFLAGS = -language charm++
-TESTFLAGS = $(TESTOPTS)
+TESTFLAGS =
 
 %.o: %.C
 

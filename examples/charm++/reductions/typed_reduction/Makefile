@@ -4,7 +4,7 @@ BINARY = typed_reduction
 
 CHARMCFLAGS = $(OPTS)
 CHARMCLINKFLAGS = -language charm++
-TESTFLAGS = $(TESTOPTS)
+TESTFLAGS =
 
 %.o: %.C
 
