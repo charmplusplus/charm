@@ -6,6 +6,7 @@
 #include "CEntry.h"
 #include "sdag-globals.h"
 
+#include "xi-BlockConstruct.h"
 #include "xi-Construct.h"
 #include "xi-Parameter.h"
 #include "xi-AstNode.h"

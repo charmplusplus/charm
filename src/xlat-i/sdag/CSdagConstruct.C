@@ -382,15 +382,6 @@ namespace xi {
   }
 
 
-  void AtomicConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist, int uniqueVarNum) {
-    stateVars = new list<CStateVar*>();
-    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-    stateVarsChildren = stateVars;
-
-    encapState = encap;
-    encapStateChild = encap;
-  }
-
   void SdagConstruct::propagateStateToChildren(list<EncapState*> encap, list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, int uniqueVarNum) {
     if (constructs != 0)
       for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end(); ++it)
@@ -1256,29 +1247,9 @@ namespace xi {
     generateChildrenCode(decls, defs, entry);
   }
 
-  void OverlapConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
-    encapState = encap;
-
-    stateVars = new list<CStateVar*>();
-    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-    stateVarsChildren = stateVars;
-
-    encapStateChild = encap;
-
-    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
-  }
-
-  // TODO(Ralf): eliminate redundancy
-  void ForConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
-    encapState = encap;
-
-    stateVars = new list<CStateVar*>();
-    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-    stateVarsChildren = stateVars;
-
-    encapStateChild = encap;
-
-    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
+  void IfConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
+    BlockConstruct::propagateState(encap, plist, wlist, uniqueVarNum);
+    if(con2 != 0) con2->propagateState(encap, plist, wlist, uniqueVarNum);
   }
 
   void ForallConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
@@ -1323,44 +1294,6 @@ namespace xi {
 
     propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
   }
-
-  void CaseConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
-    encapState = encap;
-
-    stateVars = new list<CStateVar*>();
-    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-    stateVarsChildren = stateVars;
-
-    encapStateChild = encap;
-
-    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
-  }
-
-  void WhileConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
-    encapState = encap;
-
-    stateVars = new list<CStateVar*>();
-    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-    stateVarsChildren = stateVars;
-
-    encapStateChild = encap;
-
-    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
-  }
-
-  void IfConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& plist, list<CStateVar*>& wlist,  int uniqueVarNum) {
-    encapState = encap;
-
-    stateVars = new list<CStateVar*>();
-    stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-    stateVarsChildren = stateVars;
-    if(con2 != 0) con2->propagateState(encap, plist, wlist, uniqueVarNum);
-
-    encapStateChild = encap;
-
-    propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
-  }
-
 
   void generateVarSignature(XStr& str,
                          const XStr* name, const char* suffix,
@@ -1700,4 +1633,4 @@ namespace xi {
       while (ptr != lend) *ptr++=' ';
     }
   }
-}
+}   // namespace xi
