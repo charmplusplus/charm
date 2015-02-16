@@ -41,5 +41,9 @@ WhileConstruct::WhileConstruct(SdagConstruct *pred, SdagConstruct *body)
     generateChildrenCode(decls, defs, entry);
   }
 
+void WhileConstruct::numberNodes(void) {
+  nodeNum = numWhiles++;
+  SdagConstruct::numberNodes();
+}
 
 }   // namespace xi

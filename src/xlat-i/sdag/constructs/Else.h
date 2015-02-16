@@ -9,6 +9,7 @@ class ElseConstruct : public BlockConstruct {
  public:
   ElseConstruct(SdagConstruct *body);
   void generateCode(XStr&, XStr&, Entry *);
+  void numberNodes();
 };
 
 }   // namespace xi

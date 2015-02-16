@@ -56,24 +56,14 @@ namespace xi {
   void SdagConstruct::numberNodes(void) {
     switch(type) {
     case SSDAGENTRY: nodeNum = numSdagEntries++; break;
-    case SOVERLAP: nodeNum = numOverlaps++; break;
-    case SWHEN: nodeNum = numWhens++; break;
-    case SFOR: nodeNum = numFors++; break;
-    case SWHILE: nodeNum = numWhiles++; break;
-    case SIF: nodeNum = numIfs++; if(con2!=0) con2->numberNodes(); break;
-    case SELSE: nodeNum = numElses++; break;
-    case SFORALL: nodeNum = numForalls++; break;
     case SSLIST: nodeNum = numSlists++; break;
     case SOLIST: nodeNum = numOlists++; break;
-    case SATOMIC: nodeNum = numAtomics++; break;
-    case SCASE: nodeNum = numCases++; break;
     case SCASELIST: nodeNum = numCaseLists++; break;
     case SINT_EXPR:
     case SIDENT: 
     default:
       break;
     }
-    SdagConstruct *cn;
     if (constructs != 0)
       for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::numberNodes));
   }

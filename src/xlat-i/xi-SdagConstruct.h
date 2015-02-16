@@ -81,7 +81,7 @@ class SdagConstruct {
 
   void init(EToken& t);
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
-  void numberNodes(void);
+  virtual void numberNodes();
   void labelNodes();
   XStr* createLabel(const char* str, int nodeNum);
   virtual void generateEntryList(std::list<CEntry*>&, WhenConstruct *);

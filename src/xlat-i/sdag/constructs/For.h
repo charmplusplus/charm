@@ -10,6 +10,7 @@ class ForConstruct : public BlockConstruct {
  public:
   ForConstruct(SdagConstruct *decl, SdagConstruct *pred, SdagConstruct *advance, SdagConstruct *body);
   void generateCode(XStr&, XStr&, Entry *);
+  void numberNodes();
 };
 
 }   // namespace xi

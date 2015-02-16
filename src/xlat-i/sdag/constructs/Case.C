@@ -32,4 +32,9 @@ CaseConstruct::CaseConstruct(SdagConstruct *body)
     generateChildrenCode(decls, defs, entry);
   }
 
+void CaseConstruct::numberNodes(void) {
+  nodeNum = numCases++;
+  SdagConstruct::numberNodes();
+}
+
 }   // namespace xi

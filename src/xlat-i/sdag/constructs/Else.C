@@ -34,4 +34,9 @@ void ElseConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateChildrenCode(decls, defs, entry);
 }
 
+void ElseConstruct::numberNodes(void) {
+  nodeNum = numElses++;
+  SdagConstruct::numberNodes();
+}
+
 }   // namespace xi

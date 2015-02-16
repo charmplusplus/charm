@@ -10,6 +10,7 @@ class IfConstruct : public BlockConstruct {
   IfConstruct(SdagConstruct *pred, SdagConstruct *then_body, SdagConstruct *else_body);
   void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateCode(XStr&, XStr&, Entry *);
+  void numberNodes();
 };
 
 }   // namespace xi

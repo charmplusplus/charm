@@ -16,6 +16,7 @@ class WhenConstruct : public BlockConstruct {
   void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateEntryName(XStr& defs, Entry* e, int curEntry);
   void generateWhenCode(XStr& op, int indent);
+  void numberNodes();
 };
 
 }   // namespace xi

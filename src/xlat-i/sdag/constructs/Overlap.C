@@ -32,4 +32,9 @@ void OverlapConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateChildrenCode(decls, defs, entry);
 }
 
+void OverlapConstruct::numberNodes(void) {
+  nodeNum = numOverlaps++;
+  SdagConstruct::numberNodes();
+}
+
 }   // namespace xi

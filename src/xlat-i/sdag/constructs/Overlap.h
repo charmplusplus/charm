@@ -10,6 +10,7 @@ class OverlapConstruct : public BlockConstruct {
  public:
   OverlapConstruct(SdagConstruct *olist);
   void generateCode(XStr&, XStr&, Entry *);
+  void numberNodes();
 };
 
 }   // namespace xi

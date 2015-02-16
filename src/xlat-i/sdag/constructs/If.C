@@ -58,4 +58,11 @@ IfConstruct::IfConstruct(SdagConstruct *pred, SdagConstruct *then_body, SdagCons
     if(con2 != 0) con2->propagateState(encap, plist, wlist, uniqueVarNum);
   }
 
+void IfConstruct::numberNodes(void) {
+  nodeNum = numIfs++;
+  if (con2 != 0) con2->numberNodes();
+  SdagConstruct::numberNodes();
+}
+
+
 }   // namespace xi

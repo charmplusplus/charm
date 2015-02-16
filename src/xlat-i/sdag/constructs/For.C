@@ -70,4 +70,9 @@ ForConstruct::ForConstruct(SdagConstruct *decl, SdagConstruct *pred, SdagConstru
     generateChildrenCode(decls, defs, entry);
   }
 
+void ForConstruct::numberNodes() {
+  nodeNum = numFors++;
+  SdagConstruct::numberNodes();
+}
+
 }   // namespace xi

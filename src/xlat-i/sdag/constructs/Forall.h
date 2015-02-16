@@ -10,6 +10,7 @@ class ForallConstruct : public BlockConstruct {
   ForallConstruct(SdagConstruct *tag, SdagConstruct *begin, SdagConstruct *end, SdagConstruct *step, SdagConstruct *body);
   void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateCode(XStr&, XStr&, Entry *);
+  void numberNodes();
 };
 
 }   // namespace xi

@@ -373,4 +373,9 @@ WhenConstruct::WhenConstruct(EntryList *el, SdagConstruct *body)
     generateChildrenCode(decls, defs, entry);
   }
 
+void WhenConstruct::numberNodes() {
+  nodeNum = numWhens++;
+  SdagConstruct::numberNodes();
+}
+
 }   // namespace xi

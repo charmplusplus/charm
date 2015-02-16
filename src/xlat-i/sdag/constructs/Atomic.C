@@ -87,4 +87,9 @@ void AtomicConstruct::generateTrace() {
   if (con1) con1->generateTrace();
 }
 
+void AtomicConstruct::numberNodes(void) {
+  nodeNum = numAtomics++;
+  SdagConstruct::numberNodes();
+}
+
 }   // namespace xi

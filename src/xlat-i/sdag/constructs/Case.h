@@ -10,6 +10,7 @@ class CaseConstruct : public BlockConstruct {
  public:
   CaseConstruct(SdagConstruct *body);
   void generateCode(XStr&, XStr&, Entry *);
+  void numberNodes();
 };
 
 }   // namespace xi

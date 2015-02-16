@@ -15,6 +15,7 @@ class AtomicConstruct : public BlockConstruct {
                                 int uniqueVarNum);
   void generateCode(XStr&, XStr&, Entry *);
   void generateTrace();
+  void numberNodes();
 };
 
 }   // namespace xi

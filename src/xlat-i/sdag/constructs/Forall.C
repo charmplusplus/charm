@@ -89,4 +89,9 @@ void ForallConstruct::propagateState(std::list<EncapState*> encap,
   propagateStateToChildren(encap, *stateVarsChildren, wlist, uniqueVarNum);
 }
 
+void ForallConstruct::numberNodes(void) {
+  nodeNum = numForalls++;
+  SdagConstruct::numberNodes();
+}
+
 }   // namespace xi

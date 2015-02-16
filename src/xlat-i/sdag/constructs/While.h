@@ -9,6 +9,7 @@ class WhileConstruct : public BlockConstruct {
  public:
   WhileConstruct(SdagConstruct *pred, SdagConstruct *body);
   void generateCode(XStr&, XStr&, Entry *);
+  void numberNodes();
 };
 
 }   // namespace xi
