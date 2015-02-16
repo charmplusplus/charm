@@ -3,6 +3,7 @@
 
 #include "Atomic.h"
 #include "Case.h"
+#include "Else.h"
 #include "Forall.h"
 #include "For.h"
 #include "If.h"

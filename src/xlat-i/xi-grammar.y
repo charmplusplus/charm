@@ -1144,9 +1144,9 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 HasElse		: /* Empty */
 		{ $$ = 0; }
 		| ELSE SingleConstruct
-		{ $$ = new SdagConstruct(SELSE, 0,0,0,0,0, $2,0); }
+		{ $$ = new ElseConstruct($2); }
 		| ELSE '{' Slist '}'
-		{ $$ = new SdagConstruct(SELSE, 0,0,0,0,0, $3,0); }
+		{ $$ = new ElseConstruct($3); }
 		;
 
 EndIntExpr	: ')'

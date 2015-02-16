@@ -4119,13 +4119,13 @@ yyreduce:
 
   case 340:
 #line 1147 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new SdagConstruct(SELSE, 0,0,0,0,0, (yyvsp[0].sc),0); }
+    { (yyval.sc) = new ElseConstruct((yyvsp[0].sc)); }
 #line 4124 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 
   case 341:
 #line 1149 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new SdagConstruct(SELSE, 0,0,0,0,0, (yyvsp[-1].sc),0); }
+    { (yyval.sc) = new ElseConstruct((yyvsp[-1].sc)); }
 #line 4130 "xi-grammar.tab.c" /* yacc.c:1646  */
     break;
 

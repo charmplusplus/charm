@@ -298,7 +298,6 @@ namespace xi {
         encap.push_back(state);
       }
       break;
-    case SELSE:
     case SSLIST:
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
@@ -332,7 +331,6 @@ namespace xi {
     case SSDAGENTRY: generateSdagEntry(decls, defs, entry); break;
     case SSLIST: generateSlist(decls, defs, entry); break;
     case SOLIST: generateOlist(decls, defs, entry); break;
-    case SELSE: generateElse(decls, defs, entry); break;
     case SCASELIST: generateCaseList(decls, defs, entry); break;
     default: break;
     }
@@ -405,31 +403,6 @@ namespace xi {
 
       defs << "}\n";
     }
-  }
-
-  void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry) {
-    strcpy(nameStr,label->charstar());
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-#if CMK_BIGSIM_CHARM
-    // trace
-    generateBeginTime(defs);
-    generateEventBracket(defs, SELSE);
-#endif
-    defs << "  ";
-    generateCall(defs, encapStateChild, encapStateChild, constructs->front()->label);
-    endMethod(defs);
-
-    // trace
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    strcat(nameStr,"_end");
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-#if CMK_BIGSIM_CHARM
-    generateBeginTime(defs);
-    generateEventBracket(defs,SELSE_END);
-#endif
-    defs << "  ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    endMethod(defs);
   }
 
   void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry) {
