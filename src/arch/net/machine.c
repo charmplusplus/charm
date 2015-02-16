@@ -2870,6 +2870,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   CmiCommunicationInit(argv);
 
+#if CMK_SMP
+  comm_mutex=CmiCreateLock();
+#endif
+
 #if CMK_USE_SYSVSHM
   CmiInitSysvshm(argv);
 #elif CMK_USE_PXSHM
