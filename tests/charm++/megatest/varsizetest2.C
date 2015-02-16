@@ -9,11 +9,19 @@ void varsizetest2_init(void)
 
 void varsizetest2_moduleinit(void) {}
 
+varsizetest2_Msg::varsizetest2_Msg(int s, int _isize, int _fsize ): seqnum(s), isize(_isize), fsize(_fsize)
+{
+  int i;
+  for(i=0; i<isize; i++)
+    iarray[i] = i*i*seqnum;
+  for(i=0; i<fsize;i++)
+    farray[i] = 2.0*i*i*seqnum;
+}
+
+
 varsizetest2_main::varsizetest2_main(void)
 {
-  int sizes[2];
-  sizes[0] = 100; sizes[1] = 300;
-  varsizetest2_Msg *m = new (sizes,0) varsizetest2_Msg();
+  varsizetest2_Msg *m = new (300, 100) varsizetest2_Msg(nextseq++, 300, 100);
   CkAssert(m->iarray && m->farray);
   m->myMain = thishandle;
   CProxy_varsizetest2_test::ckNew(m);
@@ -32,13 +40,14 @@ int varsizetest2_Msg::check(void)
 {
   int i;
   for(i=0; i<10; i++)
-    if(iarray[i] != 2*i*i*seqnum) {
-      return 1;
+    if(iarray[i] != i*i*seqnum) {
+      CkPrintf("iarray[%d] should be %d, is instead %d\n",i,i*i*seqnum,iarray[i]);
+      return 0;
     }
   for(i=0; i<10; i++)
-    if((fabs(farray[i]) - fabs(2.0*i*i*seqnum))>10.0) {
-      CkPrintf("farray[%d] should be %0.8f, is instead %0.8f\n",i,farray[i],2.0*i*i*seqnum);
-      return 1;
+    if(fabs(farray[i] - 2.0*i*i*seqnum)>10.0) {
+      CkPrintf("farray[%d] should be %0.8f, is instead %0.8f\n",i,2.0*i*i*seqnum,farray[i]);
+      return 0;
     }
   return 1;
 }
@@ -53,10 +62,7 @@ varsizetest2_test::varsizetest2_test(varsizetest2_Msg *m)
     return;
   }
   delete m;
-  int sizes[2];
-  sizes[0] = 300;
-  sizes[1] = 100;
-  m = new (sizes,0) varsizetest2_Msg();
+  m = new (300, 100) varsizetest2_Msg(currentSeqnum, 300, 100);
   CProxy_varsizetest2_main mainproxy(mhandle);
   mainproxy.exit(m); 
   delete this;
