@@ -58,6 +58,7 @@ void ReservedWord(int token);
   SdagConstruct *sc;
   WhenConstruct *when;
   SListConstruct *slist;
+  CaseListConstruct *clist;
   XStr* xstrptr;
   AccelBlock* accelBlock;
 }
@@ -148,8 +149,9 @@ void ReservedWord(int token);
 %type <mv>		Var
 %type <mvlist>		VarList
 %type <intval>		ParamBraceStart ParamBraceEnd SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
-%type <sc>		SingleConstruct Olist OptSdagCode HasElse CaseList
+%type <sc>		SingleConstruct Olist OptSdagCode HasElse
 %type <slist>		Slist
+%type <clist>		CaseList
 %type <when>            WhenConstruct NonWhenConstruct
 %type <intval>		PythonOptions
 
@@ -1074,9 +1076,9 @@ Olist		: SingleConstruct
 		;
 
 CaseList        : WhenConstruct
-                { $$ = new SdagConstruct(SCASELIST, $1); }
+                { $$ = new CaseListConstruct($1); }
 		| WhenConstruct CaseList
-		{ $$ = new SdagConstruct(SCASELIST, $1, $2); }
+		{ $$ = new CaseListConstruct($1, $2); }
                 | NonWhenConstruct
                 { yyerror("Case blocks in SDAG can only contain when clauses."); YYABORT; }
 		;

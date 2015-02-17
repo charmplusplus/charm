@@ -13,5 +13,6 @@
 #include "While.h"
 
 #include "SList.h"
+#include "CaseList.h"
 
 #endif // ifndef _CONSTRUCTS_H

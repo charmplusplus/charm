@@ -57,7 +57,6 @@ namespace xi {
     switch(type) {
     case SSDAGENTRY: nodeNum = numSdagEntries++; break;
     case SOLIST: nodeNum = numOlists++; break;
-    case SCASELIST: nodeNum = numCaseLists++; break;
     case SINT_EXPR:
     case SIDENT: 
     default:
@@ -243,31 +242,6 @@ namespace xi {
 
     stateVars = new list<CStateVar*>();
     switch(type) {
-    case SCASELIST:
-      stateVarsChildren = new list<CStateVar*>(plist);
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      {
-        char txt[128];
-        sprintf(txt, "_cs%d", nodeNum);
-        counter = new XStr(txt);
-        sv = new CStateVar(0, "SDAG::CSpeculator *", 0, txt, 0, NULL, 1);
-        sv->isSpeculator = true;
-        stateVarsChildren->push_back(sv);
-
-        for (std::list<SdagConstruct *>::iterator iter = constructs->begin();
-             iter != constructs->end();
-             ++iter) {
-          dynamic_cast<WhenConstruct*>(*iter)->speculativeState = sv;
-        }
-        list<CStateVar*> lst;
-        lst.push_back(sv);
-        EncapState *state = new EncapState(NULL, lst);
-        state->name = new XStr(txt);
-        state->type = new XStr("SDAG::CSpeculator");
-        encap.push_back(state);
-      }
-      
-      break;
     case SOLIST:
       stateVarsChildren = new list<CStateVar*>(plist);
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
@@ -315,7 +289,6 @@ namespace xi {
     switch(type) {
     case SSDAGENTRY: generateSdagEntry(decls, defs, entry); break;
     case SOLIST: generateOlist(decls, defs, entry); break;
-    case SCASELIST: generateCaseList(decls, defs, entry); break;
     default: break;
     }
     generateChildrenCode(decls, defs, entry);
@@ -437,31 +410,6 @@ namespace xi {
     defs << "    ";
     generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     defs << "  }\n";
-    endMethod(defs);
-  }
-
-  void SdagConstruct::generateCaseList(XStr& decls, XStr& defs, Entry* entry) {
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "  SDAG::CSpeculator* " << counter << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
-  
-    defs << "  SDAG::Continuation* c = 0;\n";
-    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
-         ++it) {
-      defs << "  c = ";
-      generateCall(defs, encapStateChild, encapStateChild, (*it)->label);
-      defs << "  if (!c) return;\n";
-      defs << "  else c->speculationIndex = " << counter << "->speculationIndex;\n";
-    }
-    endMethod(defs);
-
-    sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-    strcat(nameStr,"_end");
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-
-    defs << "  " << counter << "->deref();\n";
-    defs << "  ";
-    generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 
