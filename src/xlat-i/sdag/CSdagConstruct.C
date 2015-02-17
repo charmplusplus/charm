@@ -56,7 +56,6 @@ namespace xi {
   void SdagConstruct::numberNodes(void) {
     switch(type) {
     case SSDAGENTRY: nodeNum = numSdagEntries++; break;
-    case SSLIST: nodeNum = numSlists++; break;
     case SOLIST: nodeNum = numOlists++; break;
     case SCASELIST: nodeNum = numCaseLists++; break;
     case SINT_EXPR:
@@ -288,10 +287,6 @@ namespace xi {
         encap.push_back(state);
       }
       break;
-    case SSLIST:
-      stateVars->insert(stateVars->end(), plist.begin(), plist.end());
-      stateVarsChildren = stateVars;
-      break;
     case SINT_EXPR:
     case SIDENT:
     case SENTRY:
@@ -319,7 +314,6 @@ namespace xi {
   void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
     switch(type) {
     case SSDAGENTRY: generateSdagEntry(decls, defs, entry); break;
-    case SSLIST: generateSlist(decls, defs, entry); break;
     case SOLIST: generateOlist(decls, defs, entry); break;
     case SCASELIST: generateCaseList(decls, defs, entry); break;
     default: break;
@@ -468,21 +462,6 @@ namespace xi {
     defs << "  " << counter << "->deref();\n";
     defs << "  ";
     generateCall(defs, encapState, encapState, next->label, nextBeginOrEnd ? 0 : "_end");
-    endMethod(defs);
-  }
-
-  void SdagConstruct::generateSlist(XStr& decls, XStr& defs, Entry* entry) {
-    buildTypes(encapState);
-    buildTypes(encapStateChild);
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-    defs << "  ";
-    generateCall(defs, encapState, encapState, constructs->front()->label);
-    endMethod(defs);
-
-    generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
-    defs << "  ";
-    generateCall(defs, encapState, encapStateChild, next->label, nextBeginOrEnd ? 0 : "_end");
     endMethod(defs);
   }
 

@@ -12,4 +12,6 @@
 #include "When.h"
 #include "While.h"
 
+#include "SList.h"
+
 #endif // ifndef _CONSTRUCTS_H

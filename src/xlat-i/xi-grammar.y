@@ -57,6 +57,7 @@ void ReservedWord(int token);
   Chare::attrib_t cattr;
   SdagConstruct *sc;
   WhenConstruct *when;
+  SListConstruct *slist;
   XStr* xstrptr;
   AccelBlock* accelBlock;
 }
@@ -147,7 +148,8 @@ void ReservedWord(int token);
 %type <mv>		Var
 %type <mvlist>		VarList
 %type <intval>		ParamBraceStart ParamBraceEnd SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
-%type <sc>		Slist SingleConstruct Olist OptSdagCode HasElse CaseList
+%type <sc>		SingleConstruct Olist OptSdagCode HasElse CaseList
+%type <slist>		Slist
 %type <when>            WhenConstruct NonWhenConstruct
 %type <intval>		PythonOptions
 
@@ -1060,9 +1062,9 @@ OptSdagCode	: /* Empty */
 		;
 
 Slist		: SingleConstruct
-		{ $$ = new SdagConstruct(SSLIST, $1); }
+		{ $$ = new SListConstruct($1); }
 		| SingleConstruct Slist
-		{ $$ = new SdagConstruct(SSLIST, $1, $2);  }
+		{ $$ = new SListConstruct($1, $2);  }
 		;
 
 Olist		: SingleConstruct

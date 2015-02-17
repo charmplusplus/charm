@@ -4,6 +4,7 @@
 #include <list>
 
 #include "xi-util.h"
+#include "sdag-globals.h"
 
 #include "EToken.h"
 
@@ -17,6 +18,20 @@ class CStateVar;
 class ParamList;
 class CEntry;
 class Chare;
+//
+// TODO(Ralf): Find a good place to put these functions,
+//             which are used by all constructs.
+extern void generateClosureSignature(XStr& decls, XStr& defs,
+                                     const Chare* chare, bool declareStatic,
+                                     const char* returnType, const XStr* name,
+                                     bool isEnd, std::list<EncapState*> params,
+                                     int numRefs = 0);
+extern void generateClosureSignature(XStr& decls, XStr& defs,
+                                     const Entry* entry, bool declareStatic,
+                                     const char* returnType, const XStr* name,
+                                     bool isEnd, std::list<EncapState*> params,
+                                     int numRefs = 0);
+extern void endMethod(XStr& op);
 
 /******************* Structured Dagger Constructs ***************/
 class SdagConstruct { 
