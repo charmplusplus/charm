@@ -59,6 +59,7 @@ void ReservedWord(int token);
   WhenConstruct *when;
   SListConstruct *slist;
   CaseListConstruct *clist;
+  OListConstruct *olist;
   XStr* xstrptr;
   AccelBlock* accelBlock;
 }
@@ -149,9 +150,10 @@ void ReservedWord(int token);
 %type <mv>		Var
 %type <mvlist>		VarList
 %type <intval>		ParamBraceStart ParamBraceEnd SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
-%type <sc>		SingleConstruct Olist OptSdagCode HasElse
+%type <sc>		SingleConstruct OptSdagCode HasElse
 %type <slist>		Slist
 %type <clist>		CaseList
+%type <olist>		Olist
 %type <when>            WhenConstruct NonWhenConstruct
 %type <intval>		PythonOptions
 
@@ -1070,9 +1072,9 @@ Slist		: SingleConstruct
 		;
 
 Olist		: SingleConstruct
-		{ $$ = new SdagConstruct(SOLIST, $1); }
+		{ $$ = new OListConstruct($1); }
 		| SingleConstruct Slist
-		{ $$ = new SdagConstruct(SOLIST, $1, $2); } 
+		{ $$ = new OListConstruct($1, $2); }
 		;
 
 CaseList        : WhenConstruct
