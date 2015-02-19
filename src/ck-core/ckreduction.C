@@ -968,7 +968,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   CkReduction::reducerType r=CkReduction::invalid;
   int msgs_gcount=0;//Reduced gcount
   int msgs_nSources=0;//Reduced nSources
-  int msgs_userFlag=-1;
+  CMK_REFNUM_TYPE msgs_userFlag=(CMK_REFNUM_TYPE)-1;
   CkCallback msgs_callback;
   int i;
   int nMsgs=0;
@@ -993,7 +993,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
         r=m->reducer;
         if (!m->callback.isInvalid())
           msgs_callback=m->callback;
-        if (m->userFlag!=-1)
+        if (m->userFlag!=(CMK_REFNUM_TYPE)-1)
           msgs_userFlag=m->userFlag;
 	isMigratableContributor=m->isMigratableContributor();
       }
@@ -1141,8 +1141,6 @@ void CkReductionMgr::pup(PUP::er &p)
 //Callback for doing Reduction through NodeGroups added by Sayantan
 
 void CkReductionMgr::ArrayReductionHandler(CkReductionMsg *m){
-
-	int total = m->gcount+adj(m->redNo).gcount;
 	finalMsgs.enq(m);
 	//CkPrintf("ArrayReduction Handler Invoked for %d \n",m->redNo);
 	adj(m->redNo).mainRecvd = 1;
@@ -1159,7 +1157,7 @@ void CkReductionMgr :: endArrayReduction(){
   	CkReduction::reducerType r=CkReduction::invalid;
   	int msgs_gcount=0;//Reduced gcount
   	int msgs_nSources=0;//Reduced nSources
-  	int msgs_userFlag=-1;
+  	CMK_REFNUM_TYPE msgs_userFlag=(CMK_REFNUM_TYPE)-1;
   	CkCallback msgs_callback;
 	CkCallback msgs_secondaryCallback;
 	CkVec<CkReductionMsg *> tempMsgs;
@@ -1181,7 +1179,7 @@ void CkReductionMgr :: endArrayReduction(){
                   msgs_callback=m->callback;
                 if(!m->secondaryCallback.isInvalid())
                   msgs_secondaryCallback = m->secondaryCallback;
-                if (m->userFlag!=-1)
+                if (m->userFlag!=(CMK_REFNUM_TYPE)-1)
                   msgs_userFlag=m->userFlag;
                 tempMsgs.push_back(m);
               }
@@ -1469,7 +1467,7 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
   ret->dataSize=NdataSize;
   if (srcData!=NULL && !buf)
     memcpy(ret->data,srcData,NdataSize);
-  ret->userFlag=-1;
+  ret->userFlag=(CMK_REFNUM_TYPE)-1;
   ret->reducer=reducer;
   //ret->ci=NULL;
   ret->sourceFlag=-1000;
@@ -2392,7 +2390,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   CkReduction::reducerType r=CkReduction::invalid;
   int msgs_gcount=0;//Reduced gcount
   int msgs_nSources=0;//Reduced nSources
-  int msgs_userFlag=-1;
+  CMK_REFNUM_TYPE msgs_userFlag=(CMK_REFNUM_TYPE)-1;
   CkCallback msgs_callback;
   CkCallback msgs_secondaryCallback;
   int i;
@@ -2421,7 +2419,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
         if(!m->secondaryCallback.isInvalid()){
           msgs_secondaryCallback = m->secondaryCallback;
         }
-        if (m->userFlag!=-1)
+        if (m->userFlag!=(CMK_REFNUM_TYPE)-1)
           msgs_userFlag=m->userFlag;
 	isMigratableContributor= m->isMigratableContributor();
       }
