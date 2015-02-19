@@ -97,7 +97,7 @@ public:
     std::vector<TestMessage *> allMsgs;
     int prio = 1234;
     for (int i = 0; i < nCheck; i++) {
-      TestMessage *msg = new (msgSizes, prio) TestMessage();
+      TestMessage *msg = new (msgSizes, sizeof(int)*8) TestMessage();
       allMsgs.push_back(msg);
     }
     alignmentTest(allMsgs, "source");
