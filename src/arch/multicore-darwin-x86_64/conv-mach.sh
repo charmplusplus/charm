@@ -10,7 +10,7 @@ CMK_CXX="clang++ -arch x86_64 -m64 -fPIC -dynamic -fno-common -mmacosx-version-m
 CMK_CXXPP="clang++ -arch x86_64 -m64 -x clang++ -E -mmacosx-version-min=10.7 "
 CMK_LDXX="$CMK_CXX -multiply_defined suppress -mmacosx-version-min=10.7 $CMK_DEFS "
 CMK_XIOPTS=""
-CMK_QT="generic64"
+CMK_QT="generic64-light"
 CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
 

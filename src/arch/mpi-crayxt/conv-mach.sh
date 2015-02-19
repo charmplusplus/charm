@@ -48,7 +48,7 @@ CMK_NATIVE_LDXX="g++ "
 CMK_NATIVE_LIBS=""
 
 CMK_RANLIB="ranlib"
-CMK_QT="generic64"
+CMK_QT="generic64-light"
 
 # for F90 compiler
 CMK_CF77="ftn "

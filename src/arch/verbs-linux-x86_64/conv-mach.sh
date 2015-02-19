@@ -29,7 +29,7 @@ CMK_SEQ_CXX="$CMK_NATIVE_CXX"
 CMK_SEQ_LD="$CMK_NATIVE_LD"
 CMK_SEQ_LDXX="$CMK_NATIVE_LDXX"
 
-CMK_QT='generic64'
+CMK_QT='generic64-light'
 
 CMK_CF90=`which f95 2>/dev/null`
 if test -n "$CMK_CF90"

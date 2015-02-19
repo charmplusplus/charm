@@ -15,5 +15,5 @@ CMK_XIOPTS=''
 CMK_LD_SHARED="-G"
 CMK_LD_LIBRARY_PATH="-R $CHARMLIBSO/"
 
-CMK_QT='generic64'
+CMK_QT='generic64-light'
 #CMK_QT='generic'

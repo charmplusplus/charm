@@ -16,7 +16,7 @@ CMK_LD="eval $CMK_CC "
 CMK_LIBS='-lckqt'
 CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/ $PMI_LIBS $UGNI_LIBS"
 
-CMK_QT="generic64"
+CMK_QT="generic64-light"
 
 # compiler for compiling sequential programs
 if test -n "$PGCC"

@@ -10,7 +10,7 @@ CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 CMK_RANLIB="ranlib"
 CMK_LIBS="-lckqt "
-CMK_QT="generic64"
+CMK_QT="generic64-light"
 CMK_XIOPTS=""
 
 CMK_CF77="f77"

@@ -67,6 +67,6 @@ else
     CMK_F90_MODINC="-p"
 fi
 
-CMK_QT='generic64'
+CMK_QT='generic64-light'
 CMK_RANLIB="ranlib"
 

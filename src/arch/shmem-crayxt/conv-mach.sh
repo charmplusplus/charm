@@ -11,7 +11,7 @@ CMK_CXX="CC  $CMK_DEFS "
 CMK_LD="$CMK_CC $CMK_LD_DEFS"
 CMK_LDXX="$CMK_CXX $CMK_LD_DEFS"
 CMK_LIBS="-lckqt -lsma -lrca"
-CMK_QT='generic64'
+CMK_QT='generic64-light'
 
 CMK_RANLIB="ranlib"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
