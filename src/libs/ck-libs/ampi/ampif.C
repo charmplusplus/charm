@@ -151,6 +151,10 @@ FDECL {
 
 #define mpi_get_argc FTN_NAME( MPI_GET_ARGC , mpi_get_argc )
 #define mpi_get_argv FTN_NAME( MPI_GET_ARGV , mpi_get_argv )
+#define mpi_iargc FTN_NAME( MPI_IARGC , mpi_iargc )
+#define mpi_getarg FTN_NAME( MPI_GETARG , mpi_getarg )
+#define mpi_command_argument_count FTN_NAME( MPI_COMMAND_ARGUMENT_COUNT , mpi_command_argument_count )
+#define mpi_get_command_argument FTN_NAME( MPI_GET_COMMAND_ARGUMENT , mpi_get_command_argument )
 
 /* MPI-2 */
 #define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
@@ -920,23 +924,78 @@ void mpi_memcheckpoint(){
   AMPI_MemCheckpoint();
 }
 
+/* C-style cmd line arg parsing functions */
 void mpi_get_argc(int *c, int *ierr)
 {
   *c = CkGetArgc();
   *ierr = 0;
 }
 
-void mpi_get_argv(int *c, char *str, int *ierr, int len)
+void mpi_get_argv(int *c, char *str, int *ierr, int *len)
 {
   char ** argv = CkGetArgv();
+
   int nc = CkGetArgc();
   if (*c < nc) {
     strncpy(str, argv[*c], strlen(argv[*c]));
-    for (int j=strlen(argv[*c]); j<len; j++)  str[j] = ' ';
+    for (int j=strlen(argv[*c]); j<*len; j++)  str[j] = ' ';
     *ierr = 0;
   }
   else {
+    memset(str, ' ', *len);
+    *ierr = 1;
+  }
+}
+
+/* Fortran77-style cmd line arg parsing functions */
+int mpi_iargc()
+{
+  int argc = CkGetArgc();
+  if (argc > 0) {
+    return argc-1;
+  } else {
+    return 0;
+  }
+}
+
+void mpi_getarg(int *c, char *str)
+{
+  int len = 80; 
+  char **argv = CkGetArgv();
+ 
+  int nc = CkGetArgc()-1;
+  if (*c > 0 and *c <= nc) {
+    strncpy(str, argv[*c], strlen(argv[*c]));
+    for (int j=strlen(argv[*c]); j<len; j++)  str[j] = ' ';
+  }
+  else {
     memset(str, ' ', len);
+  }
+}
+
+/* Fortran2003-style cmd line arg parsing functions */
+int mpi_command_argument_count()
+{
+  int argc = CkGetArgc();
+  if (argc > 0) {
+    return argc-1;
+  } else {
+    return 0;
+  }
+}
+
+void mpi_get_command_argument(int *c, char *str, int *len, int *ierr)
+{
+  char **argv = CkGetArgv();
+ 
+  int nc = CkGetArgc()-1;
+  if (*c > 0 and *c <= nc) {
+    strncpy(str, argv[*c], strlen(argv[*c]));
+    for (int j=strlen(argv[*c]); j<*len; j++)  str[j] = ' ';
+    *ierr = 0;
+  }
+  else {
+    memset(str, ' ', *len);
     *ierr = 1;
   }
 }
