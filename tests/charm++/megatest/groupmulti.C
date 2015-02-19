@@ -15,7 +15,7 @@ groupmulti_main::groupmulti_main(void)
   int npes = CkNumPes();
   int *pes = new int[npes];
   for (int i=0; i<npes; i++) pes[i] = i;
-  CmiEstablishGroup(npes, pes);
+  cgrp = CmiEstablishGroup(npes, pes);
   groupmulti_SimpleMsg *sm = new groupmulti_SimpleMsg;
   sm->mainhandle = thishandle;
   gid=CProxy_groupmulti_group::ckNew(sm);
