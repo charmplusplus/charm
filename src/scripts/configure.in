@@ -524,6 +524,11 @@ fi
 cat > $t <<EOT
 class CkMigrateMessage;
 
+struct base { 
+  base(void) { }
+  base(CkMigrateMessage *) { }
+};
+
 template <class Parent>
 struct CBaseT1 : Parent {
 
@@ -533,6 +538,8 @@ struct CBaseT1 : Parent {
   template <typename... Args>
     CBaseT1(Args... args) : Parent(args...) { }
 };
+
+template struct CBaseT1<base>;
 EOT
 got_cpp11=""
 test_cxx "whether C++ compiler supports variadic templates without flags" "yes" "no" ""
