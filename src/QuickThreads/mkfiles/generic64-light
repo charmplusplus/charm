@@ -1,5 +1,5 @@
 
-CHARMC = ../../bin/charmc -seq -I. $(OPTS)
+CHARMC = ../../bin/charmc -seq -I. $(OPTS) -U_FORTIFY_SOURCE
 CHARMC_SHARED = ../../bin/charmc -seq -I. -shared $(OPTS)
 
 all: qt stp testpgm

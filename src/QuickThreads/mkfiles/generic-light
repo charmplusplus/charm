@@ -1,5 +1,5 @@
 
-CHARMC = ../../bin/charmc -seq -I.
+CHARMC = ../../bin/charmc -seq -I. -U_FORTIFY_SOURCE
 
 all: qt stp testpgm
 
