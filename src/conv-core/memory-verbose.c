@@ -12,6 +12,7 @@ Orion Sky Lawlor, olawlor@acm.org, 6/22/2001
 #endif
 
 static int memInit=0;
+static int inMemVerbose=0;
 
 static void meta_init(char **argv)
 {
@@ -31,8 +32,11 @@ static void *meta_malloc(size_t size)
 
 static void meta_free(void *mem)
 {
-  if (memInit) CmiPrintf("CMI_MEMORY(%d)> free(%p)\n",
-			 CmiMyPe(),mem);
+  if (memInit && !inMemVerbose) {
+    inMemVerbose = 1;
+    CmiPrintf("CMI_MEMORY(%d)> free(%p)\n", CmiMyPe(),mem);
+    inMemVerbose = 0;
+  }
   if (memInit>1) {int memBack=memInit; memInit=0; CmiPrintStackTrace(0); memInit=memBack;}
   mm_free(mem);
 }
