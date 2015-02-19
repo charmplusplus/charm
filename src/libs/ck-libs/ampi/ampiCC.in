@@ -41,16 +41,22 @@ fi
 charmarch=""
 CharmArch
 
+AMPICC_EXTRA_OPTIONS=""
+
 if test "$charmarch" = "mpi"
 then
-  ln $CHARMBIN/../include/mpi.h .   2>/dev/null
+    dirName = ampicc.inc.$$
+    mkdir $dirName
+    ln $CHARMBIN/../include/mpi.h $dirname/mpi.h   2>/dev/null
+    AMPICC_EXTRA_OPTIONS="-I./$dirName"
 fi
-$CHARMBIN/charmc -language ampi $@
+$CHARMBIN/charmc -language ampi $AMPICC_EXTRA_OPTIONS $@
 status=$?
 
 if test "$charmarch" = "mpi"
 then
-/bin/rm -f mpi.h 2>/dev/null
+    /bin/rm -f $dirName/mpi.h 2>/dev/null
+    rmdir $dirName
 fi
 
 exit $status
