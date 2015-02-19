@@ -10,9 +10,10 @@
 
 #include <stdlib.h>
 #include <converse.h>
+#define ENABLE_TIMER 0
 
 //Iterations for each message size
-enum {nCycles = 2000};
+enum {nCycles = 200};
 
 //Max message size
 enum { maxMsgSize = 1 << 18 };
@@ -72,10 +73,12 @@ void pingpongFinished(char *msg)
         (1e6*(CpvAccess(endTime)-CpvAccess(startTime)))/(2.*nCycles);
     double compute_time = cycle_time - 
         (1e6*(CpvAccess(IdleTime)))/(2.*nCycles);
-    
+
+#if ENABLE_TIMER
     CmiPrintf("[%d] %d \t %5.3lfus \t %5.3lfus\n", CmiMyPe(),
               CpvAccess(msgSize) - CmiMsgHeaderSizeBytes, 
               cycle_time, compute_time);
+#endif
     
     CpvAccess(sizeNum)++;
     
@@ -116,16 +119,18 @@ CmiHandler node0HandlerFunc(char *msg)
 
 CmiHandler node1HandlerFunc(char *msg)
 {
-    CpvAccess(msgSize) = *((int *)(msg+CmiMsgHeaderSizeBytes));
+    int msgSize = *((int *)(msg+CmiMsgHeaderSizeBytes));
     CmiSetHandler(msg,CpvAccess(node0Handler));
     
     int dest = CmiNumPes() - CmiMyPe() - 1;
-    CmiSyncSendAndFree(dest,CpvAccess(msgSize),msg);
+    CmiSyncSendAndFree(dest,msgSize,msg);
     return 0;
 }
 
 CmiStartFn mymain(int argc, char** argv)
 {
+    if(CmiMyRank() == CmiMyNodeSize()) return 0;
+
     CpvInitialize(int,msgSize);
     CpvInitialize(int,cycleNum);
     CpvInitialize(int,sizeNum);
@@ -142,8 +147,9 @@ CmiStartFn mymain(int argc, char** argv)
     CpvInitialize(double,startTime);
     CpvInitialize(double,endTime);
     
-    int otherPe = CmiMyPe() ^ 1;
-    
+    CpvInitialize(double, IdleStartTime);
+    CpvInitialize(double, IdleTime);
+
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, ApplIdleStart, NULL);
     CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE, ApplIdleEnd, NULL);
     
@@ -153,14 +159,14 @@ CmiStartFn mymain(int argc, char** argv)
         twoway = atoi(argv[1]);
 
     if(CmiMyPe() == 0) {
-        if(!twoway)
-            CmiPrintf("Starting Pingpong with oneway traffic \n");
-        else
-            CmiPrintf("Starting Pingpong with twoway traffic\n");
-        
-        if ((CmiMyPe() < CmiNumPes()/2) || twoway)
-            startPingpong();
+      if(!twoway)
+        CmiPrintf("Starting Pingpong with oneway traffic \n");
+      else
+        CmiPrintf("Starting Pingpong with twoway traffic\n");
     }
+
+    if ((CmiMyPe() < CmiNumPes()/2) || twoway)
+      startPingpong();
 
     return 0;
 }

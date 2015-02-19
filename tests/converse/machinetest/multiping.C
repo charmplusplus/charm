@@ -14,6 +14,7 @@
 
 #include <stdlib.h>
 #include <converse.h>
+#define ENABLE_TIMER 0
 
 //Number of iterations for each message size
 enum {nCycles = 100};
@@ -88,10 +89,12 @@ void operationFinished(char *msg)
 
     double compute_time = cycle_time - 
         (1e6*(CpvAccess(IdleTime)))/(1.0*nCycles*(CpvAccess(kFactor)+1));
-    
+
+#if ENABLE_TIMER
     CmiPrintf("[%d] %d \t %5.3lfus \t %5.3lfus\n", CmiMyPe(),
               CpvAccess(msgSize) - CmiMsgHeaderSizeBytes, 
               cycle_time, compute_time);
+#endif
     
     if (CpvAccess(msgSize) < maxMsgSize)
         startOperation();
@@ -153,6 +156,7 @@ CmiHandler node1HandlerFunc(char *msg)
 
 CmiStartFn mymain(int argc, char **argv)
 {
+    if(CmiMyRank() == CmiMyNodeSize()) return 0;
     int twoway = 0;
 
     CpvInitialize(int,msgSize);
@@ -175,6 +179,9 @@ CmiStartFn mymain(int argc, char **argv)
     CpvInitialize(double,startTime);
     CpvInitialize(double,endTime);
     
+    CpvInitialize(double, IdleStartTime);
+    CpvInitialize(double, IdleTime);
+
     if(argc > 1)
         twoway = atoi(argv[1]);
     

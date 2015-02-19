@@ -12,10 +12,10 @@ multiping: multiping.C
 test: all
 	$(call run, +p2 ./pingall 0)
 	$(call run, +p2 ./pingall 1)
-	$(call run, +p2 ./multiping 0 16)
-	$(call run, +p2 ./multiping 0 128)
-	$(call run, +p2 ./multiping 1 16)
-	$(call run, +p2 ./multiping 1 128)
+	$(call run, +p2 ./multiping 0 8)
+	$(call run, +p2 ./multiping 0 32)
+	$(call run, +p2 ./multiping 1 8)
+	$(call run, +p2 ./multiping 1 32)
 
 clean:
 	rm -f core *.cpm.h *~

@@ -1,4 +1,4 @@
-DIRS=commbench cthtest megacon
+DIRS=commbench cthtest megacon machinetest
 
 all:
 	for d in $(DIRS); do \
