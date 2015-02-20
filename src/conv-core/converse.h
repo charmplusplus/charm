@@ -744,9 +744,9 @@ struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
 #endif
 
 /* Given a user chunk m, extract the enclosing chunk header fields: */
-#define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
-#define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
-#define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
+#define BLKSTART(m) ((CmiChunkHeader *) (((intptr_t)m) - sizeof(CmiChunkHeader)))
+#define SIZEFIELD(m) ((BLKSTART(m))->size)
+#define REFFIELD(m) ((BLKSTART(m))->ref)
 
 extern void* malloc_nomigrate(size_t size);
 

@@ -490,11 +490,11 @@ public:
 
 
 inline envelope *UsrToEnv(const void *const msg) {
-  return (((envelope *) msg)-1);
+  return (envelope *)((intptr_t)msg - sizeof(envelope));
 }
 
 inline void *EnvToUsr(const envelope *const env) {
-  return ((void *)(env+1));
+  return (void *)((intptr_t)env + sizeof(envelope));
 }
 
 inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0) {
