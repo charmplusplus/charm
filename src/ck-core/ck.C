@@ -1646,8 +1646,8 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   if (destPE!=-1) {
     CpvAccess(_qd)->create();
+    sendChareMsg(env,destPE,_infoIdx,pCid);
   }
-	sendChareMsg(env,destPE,_infoIdx,pCid);
 #else
   _TRACE_CREATION_1(env);
   if (destPE!=-1) {
