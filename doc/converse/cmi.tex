@@ -465,7 +465,7 @@ should not be overwritten or freed before the communication is complete.}
 \label{reduce}
 
 Reductions are operations for which a message (or user data structure) is
-contributed by each partecipant processor. All these contributions are merged
+contributed by each participant processor. All these contributions are merged
 according to a merge-function provided by the user. A Converse handler is then
 invoked with the resulting message. Reductions can be on the entire set of
 processors, or on a subset of the whole.
@@ -524,7 +524,7 @@ is explicitly passed in ``Struct'' functions only, since for the message
 versions it is taken from the header of \uw{msg}. Moreover there are several
 other function pointers passed in by the user:
 
-\function{void * (*mergeFn)(int *size, void *local, void **remore, int count)}
+\function{void * (*mergeFn)(int *size, void *local, void **remote, int count)}
 \desc{Prototype for a \kw{CmiReduceMergeFn} function pointer argument.
 This function is used in all the CmiReduce forms to merge the local
 message/data structure deposited on a processor with all the messages incoming
