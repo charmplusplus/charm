@@ -7,6 +7,8 @@ CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt '
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
+CMK_QT="generic64-light"
+
 CMK_NATIVE_LIBS=''
 CMK_NATIVE_CC='xlc_r '
 CMK_NATIVE_LD='xlc_r '

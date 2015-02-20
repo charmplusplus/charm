@@ -9,7 +9,7 @@ CMK_CXXPP="xlC -E $CMK_DEFS "
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt -lhC -lpthreads'
 CMK_LD_SHARED='-G'
-CMK_QT='aix-light'
+CMK_QT='generic64-light'
 CMK_XIOPTS=''
 
 CMK_NATIVE_CXX='xlC -D_H_UNISTD -DYY_NEVER_INTERACTIVE=1 '

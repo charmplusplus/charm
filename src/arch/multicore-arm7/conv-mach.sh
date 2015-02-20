@@ -14,7 +14,6 @@ CMK_LD_SHARED="-shared"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
-CMK_CC64=true
 CMK_WARNINGS_ARE_ERRORS="-Werror"
 CMK_CXX_OPTIMIZE="-O3"
 
@@ -30,7 +29,7 @@ CMK_SEQ_CXX="$CMK_NATIVE_CXX"
 CMK_SEQ_LD="$CMK_NATIVE_LD"
 CMK_SEQ_LDXX="$CMK_NATIVE_LDXX"
 
-CMK_QT='generic-light' 
+CMK_QT='generic64-light' 
 CMK_CF90=`which f95 2>/dev/null`
 if test -n "$CMK_CF90"
 then

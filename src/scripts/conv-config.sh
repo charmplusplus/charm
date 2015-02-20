@@ -76,20 +76,6 @@ OPTS_CXX="$OPTS_CXX $USER_OPTS_CXX"
 OPTS_LD="$OPTS_LD $USER_OPTS_LD"
 OPTS_LDXX="$OPTS_LDXX $USER_OPTS_LDXX"
 
-if [ -n "$CMK_CC64" ] 
-then
-  QT=`echo $CMK_QT | sed -e 's/64$//'`
-  if test $QT = $CMK_QT
-  then
-    if echo $CMK_QT | grep '-' > /dev/null 2> /dev/null
-    then
-      CMK_QT=`echo $CMK_QT | sed -e 's/-/64-/'`
-    else
-      CMK_QT="${CMK_QT}64"
-    fi
-  fi
-fi
-
 [ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
 
 [ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"

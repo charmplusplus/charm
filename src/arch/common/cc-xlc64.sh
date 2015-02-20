@@ -3,7 +3,6 @@ CMK_CC='xlc_r -q64 '
 CMK_CXX='xlC_r -q64 '
 CMK_C_OPTIMIZE='-O3 -qstrict -Q!  '
 CMK_CXX_OPTIMIZE='-O3 -qstrict -Q! '
-CMK_CC64=true
 CMK_PIC='-qpic=small'
 
 CMK_LD="$CMK_CC "
