@@ -134,6 +134,10 @@ FDECL {
 #define mpi_finalized FTN_NAME( MPI_FINALIZED , mpi_finalized )
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
 
+#define mpi_my_pe FTN_NAME ( MPI_MY_PE , mpi_my_pe )
+#define mpi_my_node FTN_NAME ( MPI_MY_NODE , mpi_my_node )
+#define mpi_num_pes FTN_NAME ( MPI_NUM_PES , mpi_num_pes )
+#define mpi_num_nodes FTN_NAME ( MPI_NUM_NODES , mpi_num_nodes )
 #define mpi_yield FTN_NAME ( MPI_YIELD , mpi_yield )
 #define mpi_resume FTN_NAME ( MPI_RESUME, mpi_resume )
 #define mpi_print FTN_NAME( MPI_PRINT , mpi_print )
@@ -1165,6 +1169,22 @@ void mpi_info_memory(){
 
 void mpi_pcontrol(int *level) {
   AMPI_Pcontrol(*level);
+}
+
+int mpi_my_pe() {
+  return AMPI_My_pe();
+}
+
+int mpi_my_node() {
+  return AMPI_My_node();
+}
+
+int mpi_num_pes() {
+  return AMPI_Num_pes();
+}
+
+int mpi_num_nodes() {
+  return AMPI_Num_nodes();
 }
 
 #define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)
