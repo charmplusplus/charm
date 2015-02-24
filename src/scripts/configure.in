@@ -6,6 +6,11 @@ AC_CONFIG_HEADER(conv-autoconfig.h)
 AC_CONFIG_COMMANDS([config-cleanup],
                    [sed -i -e 's:^#define\s\+PACKAGE://&:' conv-autoconfig.h])
 
+#clean up conv-mach-opt.sh
+sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$/d' > conv-mach-opt.sh.clean
+cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
+rm -f conv-mach-opt.sh.clean
+
 CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
@@ -52,13 +57,6 @@ remove_flag() {
      cp tmp.$$ ../include/conv-mach-opt.sh
      /bin/rm -f tmp.$$
 }
-
-
-#clean up conv-mach-opt.sh
-sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$/d' > conv-mach-opt.sh.clean
-cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
-rm -f conv-mach-opt.sh.clean
-
 
 # enable/disable error checking
 AC_ARG_ENABLE([error-checking],
