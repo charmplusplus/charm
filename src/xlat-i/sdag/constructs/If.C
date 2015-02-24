@@ -6,7 +6,9 @@ namespace xi {
 
 IfConstruct::IfConstruct(SdagConstruct *pred, SdagConstruct *then_body, SdagConstruct *else_body)
 : BlockConstruct(SIF, 0, pred, else_body, 0, 0, then_body, 0)
-{ }
+{
+  label_str = "if";
+}
 
   void IfConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     strcpy(nameStr,label->charstar());
@@ -64,5 +66,9 @@ void IfConstruct::numberNodes(void) {
   SdagConstruct::numberNodes();
 }
 
+void IfConstruct::labelNodes() {
+  SdagConstruct::labelNodes();
+  if (con2 != 0) con2->labelNodes();
+}
 
 }   // namespace xi

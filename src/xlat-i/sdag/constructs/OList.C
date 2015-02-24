@@ -6,11 +6,15 @@ namespace xi {
 
 OListConstruct::OListConstruct(SdagConstruct *single_construct)
 : SdagConstruct(SOLIST, single_construct)
-{ }
+{
+  label_str = "olist";
+}
 
 OListConstruct::OListConstruct(SdagConstruct *single_construct, SListConstruct *tail)
 : SdagConstruct(SOLIST, single_construct, tail)
-{ }
+{
+  label_str = "olist";
+}
 
 void OListConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);

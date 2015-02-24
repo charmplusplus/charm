@@ -6,11 +6,16 @@ namespace xi {
 
 CaseListConstruct::CaseListConstruct(WhenConstruct *single_construct)
 : SdagConstruct(SCASELIST, single_construct)
-{ }
+{
+  label_str = "caselist";
+}
 
 CaseListConstruct::CaseListConstruct(WhenConstruct *single_construct, CaseListConstruct *tail)
 : SdagConstruct(SCASELIST, single_construct, tail)
-{ }
+{
+  label_str = "caselist";
+}
+
 
 void CaseListConstruct::numberNodes() {
   nodeNum = numCaseLists++;

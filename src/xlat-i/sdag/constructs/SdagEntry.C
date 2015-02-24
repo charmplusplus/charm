@@ -105,4 +105,9 @@ void SdagEntryConstruct::numberNodes() {
   SdagConstruct::numberNodes();
 }
 
+void SdagEntryConstruct::labelNodes() {
+  label = createLabel(con1->text->charstar(), -1);
+  SdagConstruct::labelNodes();
+}
+
 }   // namespace xi

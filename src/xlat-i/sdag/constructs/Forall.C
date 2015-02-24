@@ -9,7 +9,9 @@ ForallConstruct::ForallConstruct(SdagConstruct *tag,
                                  IntExprConstruct *step,
                                  SdagConstruct *body)
 : BlockConstruct(SFORALL, 0, tag, begin, end, step, body, 0)
-{ }
+{
+  label_str = "forall";
+}
 
 void ForallConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);

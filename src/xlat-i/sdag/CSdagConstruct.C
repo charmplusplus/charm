@@ -46,6 +46,7 @@ namespace xi {
     elist = 0;
     constructs = new list<SdagConstruct*>();
     type = t;
+    label_str = 0;
   }
 
   SdagConstruct::~SdagConstruct() {
@@ -69,28 +70,9 @@ namespace xi {
   }
 
   void SdagConstruct::labelNodes() {
-    switch(type) {
-    case SSDAGENTRY: label = createLabel(con1->text->charstar(), -1); break;
-    case SOVERLAP: label = createLabel("overlap", nodeNum); break;
-    case SWHEN: label = createLabel("when", nodeNum);
-      for (EntryList *el = elist; el != NULL; el = el->next)
-        el->entry->label = new XStr(el->entry->name);
-      break;
-    case SFOR: label = createLabel("for", nodeNum); break;
-    case SWHILE: label = createLabel("while", nodeNum); break;
-    case SIF: label = createLabel("if", nodeNum);
-      if (con2 != 0) con2->labelNodes();
-      break;
-    case SELSE: label = createLabel("else", nodeNum); break;
-    case SFORALL: label = createLabel("forall", nodeNum); break;
-    case SSLIST: label = createLabel("slist", nodeNum); break;
-    case SOLIST: label = createLabel("olist", nodeNum); break;
-    case SATOMIC: label = createLabel("atomic", nodeNum); break;
-    case SCASE: label = createLabel("case", nodeNum); break;
-    case SCASELIST: label = createLabel("caselist", nodeNum); break;
-    case SINT_EXPR: case SIDENT: default: break;
-    }
-    SdagConstruct *cn;
+    if (label_str != 0)
+      label = createLabel(label_str, nodeNum);
+
     if (constructs != 0)
       for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::labelNodes));
   }

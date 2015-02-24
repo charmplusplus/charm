@@ -7,7 +7,9 @@ namespace xi {
 WhenConstruct::WhenConstruct(EntryList *el, SdagConstruct *body)
 : BlockConstruct(SWHEN, 0, 0, 0, 0, 0, body, el)
 , speculativeState(0)
-{ }
+{
+  label_str = "when";
+}
 
   void WhenConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen) {
     elist->generateEntryList(CEntrylist, this);  /* con1 is the WHEN's ELIST */

@@ -12,6 +12,7 @@ class SdagEntryConstruct : public SdagConstruct {
   SdagEntryConstruct(SListConstruct *);
   void generateCode(XStr&, XStr&, Entry *);
   void numberNodes();
+  void labelNodes();
 };
 
 }   // namespace xi

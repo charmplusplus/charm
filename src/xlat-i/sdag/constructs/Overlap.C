@@ -4,7 +4,9 @@ namespace xi {
 
 OverlapConstruct::OverlapConstruct(SdagConstruct *olist)
 : BlockConstruct(SOVERLAP, 0, 0, 0, 0, 0, olist, 0)
-{ }
+{
+  label_str = "overlap";
+}
 
 void OverlapConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());

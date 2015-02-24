@@ -4,11 +4,15 @@ namespace xi {
 
 SListConstruct::SListConstruct(SdagConstruct *single_construct)
 : SdagConstruct(SSLIST, single_construct)
-{ }
+{
+  label_str = "slist";
+}
 
 SListConstruct::SListConstruct(SdagConstruct *single_construct, SListConstruct *tail)
 : SdagConstruct(SSLIST, single_construct, tail)
-{ }
+{
+  label_str = "slist";
+}
 
 void SListConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   buildTypes(encapState);

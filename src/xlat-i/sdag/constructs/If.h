@@ -11,6 +11,7 @@ class IfConstruct : public BlockConstruct {
   void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
   void generateCode(XStr&, XStr&, Entry *);
   void numberNodes();
+  void labelNodes();
 };
 
 }   // namespace xi

@@ -5,7 +5,9 @@ namespace xi {
 
 ElseConstruct::ElseConstruct(SdagConstruct *body)
 : BlockConstruct(SELSE, 0, 0, 0, 0, 0, body, 0)
-{ }
+{
+  label_str = "else";
+}
 
 void ElseConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   strcpy(nameStr,label->charstar());

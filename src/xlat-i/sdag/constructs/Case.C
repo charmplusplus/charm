@@ -4,7 +4,9 @@ namespace xi {
 
 CaseConstruct::CaseConstruct(SdagConstruct *body)
 : BlockConstruct(SCASE, 0, 0, 0, 0, 0, body, 0)
-{ }
+{
+  label_str = "case";
+}
 
   void CaseConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());

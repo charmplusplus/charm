@@ -19,6 +19,8 @@ AtomicConstruct::AtomicConstruct(const char *code, const char *trace_name)
     traceName = new XStr(tmp+1);
     free(tmp);
   }
+
+  label_str = "atomic";
 }
 
 void AtomicConstruct::propagateStateToChildren(std::list<EncapState*> encap,

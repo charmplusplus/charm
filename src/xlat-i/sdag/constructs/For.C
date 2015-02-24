@@ -8,7 +8,9 @@ ForConstruct::ForConstruct(IntExprConstruct *decl,
                            IntExprConstruct *advance,
                            SdagConstruct *body)
 : BlockConstruct(SFOR, 0, decl, pred, advance, 0, body, 0)
-{ }
+{
+  label_str = "for";
+}
 
   void ForConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());

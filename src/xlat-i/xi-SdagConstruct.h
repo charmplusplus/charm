@@ -62,6 +62,7 @@ class SdagConstruct {
   std::list<CStateVar *> *stateVars;
   std::list<EncapState*> encapState, encapStateChild;
   std::list<CStateVar *> *stateVarsChildren;
+  const char *label_str;
 
  public:
   int unravelClosuresBegin(XStr& defs, bool child = false);
@@ -97,7 +98,7 @@ class SdagConstruct {
   void init(EToken& t);
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
   virtual void numberNodes();
-  void labelNodes();
+  virtual void labelNodes();
   XStr* createLabel(const char* str, int nodeNum);
   virtual void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
   void propagateState(int);

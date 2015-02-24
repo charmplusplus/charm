@@ -4,7 +4,9 @@ namespace xi {
 
 WhileConstruct::WhileConstruct(SdagConstruct *pred, SdagConstruct *body)
 : BlockConstruct(SWHILE, 0, pred, 0, 0, 0, body, 0)
-{ }
+{
+  label_str = "while";
+}
 
   void WhileConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
