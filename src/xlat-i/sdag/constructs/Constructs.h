@@ -15,5 +15,6 @@
 #include "SList.h"
 #include "CaseList.h"
 #include "OList.h"
+#include "SdagEntry.h"
 
 #endif // ifndef _CONSTRUCTS_H

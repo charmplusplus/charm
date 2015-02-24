@@ -60,6 +60,7 @@ void ReservedWord(int token);
   SListConstruct *slist;
   CaseListConstruct *clist;
   OListConstruct *olist;
+  SdagEntryConstruct *sentry;
   XStr* xstrptr;
   AccelBlock* accelBlock;
 }
@@ -150,10 +151,11 @@ void ReservedWord(int token);
 %type <mv>		Var
 %type <mvlist>		VarList
 %type <intval>		ParamBraceStart ParamBraceEnd SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
-%type <sc>		SingleConstruct OptSdagCode HasElse
+%type <sc>		SingleConstruct HasElse
 %type <slist>		Slist
 %type <clist>		CaseList
 %type <olist>		Olist
+%type <sentry>		OptSdagCode
 %type <when>            WhenConstruct NonWhenConstruct
 %type <intval>		PythonOptions
 
@@ -1060,9 +1062,9 @@ OptStackSize	: /* Empty */
 OptSdagCode	: /* Empty */
 		{ $$ = 0; }
 		| SingleConstruct
-		{ $$ = new SdagConstruct(SSDAGENTRY, $1); }
+		{ $$ = new SdagEntryConstruct($1); }
 		| '{' Slist '}'
-		{ $$ = new SdagConstruct(SSDAGENTRY, $2); }
+		{ $$ = new SdagEntryConstruct($2); }
 		;
 
 Slist		: SingleConstruct
@@ -1114,11 +1116,11 @@ NonWhenConstruct : ATOMIC
                  ;
 
 SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
-                { $$ = new AtomicConstruct($4, $2); }
+		{ $$ = new AtomicConstruct($4, $2); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new OverlapConstruct($3); }	
-                | WhenConstruct
-                { $$ = $1; }
+		| WhenConstruct
+		{ $$ = $1; }
 		| CASE '{' CaseList '}'
 		{ $$ = new CaseConstruct($3); }
 		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr '{' Slist '}'
@@ -1141,11 +1143,11 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		{ $$ = new WhileConstruct(new SdagConstruct(SINT_EXPR, $3), $6); }
 		| ParamBraceStart CCode ParamBraceEnd
 		{ $$ = new AtomicConstruct($2, NULL); }
-                | error
-                { printf("Unknown SDAG construct or malformed entry method definition.\n"
-                         "You may have forgotten to terminate an entry method definition with a"
-                         " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'\n"); YYABORT; }
-                ;
+		| error
+		{ printf("Unknown SDAG construct or malformed entry method definition.\n"
+				 "You may have forgotten to terminate an entry method definition with a"
+				 " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'\n"); YYABORT; }
+		;
 
 HasElse		: /* Empty */
 		{ $$ = 0; }
