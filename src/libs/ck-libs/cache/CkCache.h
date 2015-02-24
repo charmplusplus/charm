@@ -368,10 +368,10 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
     CBase_CkCacheManager<CkCacheKey>::pup(p);
     p | numLocMgr;
     if (p.isUnpacking()) locMgr = new CkGroupID[numLocMgr];
-    PUParray(p,locMgr,numLocMgr);
+    PUP::PUParray(p,locMgr,numLocMgr);
     p | numLocMgrWB;
     if (p.isUnpacking()) locMgrWB = new CkGroupID[numLocMgrWB];
-    PUParray(p,locMgrWB,numLocMgrWB);
+    PUP::PUParray(p,locMgrWB,numLocMgrWB);
     p | maxSize;
   }
 
