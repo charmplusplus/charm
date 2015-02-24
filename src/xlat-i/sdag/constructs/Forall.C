@@ -1,8 +1,13 @@
 #include "Forall.h"
+#include "IntExpr.h"
 
 namespace xi {
 
-ForallConstruct::ForallConstruct(SdagConstruct *tag, SdagConstruct *begin, SdagConstruct *end, SdagConstruct *step, SdagConstruct *body)
+ForallConstruct::ForallConstruct(SdagConstruct *tag,
+                                 IntExprConstruct *begin,
+                                 IntExprConstruct *end,
+                                 IntExprConstruct *step,
+                                 SdagConstruct *body)
 : BlockConstruct(SFORALL, 0, tag, begin, end, step, body, 0)
 { }
 

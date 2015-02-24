@@ -6,9 +6,14 @@
 
 namespace xi {
 
+class IntExprConstruct;
+
 class ForConstruct : public BlockConstruct {
  public:
-  ForConstruct(SdagConstruct *decl, SdagConstruct *pred, SdagConstruct *advance, SdagConstruct *body);
+  ForConstruct(IntExprConstruct *decl,
+               IntExprConstruct *pred,
+               IntExprConstruct *advance,
+               SdagConstruct *body);
   void generateCode(XStr&, XStr&, Entry *);
   void numberNodes();
 };

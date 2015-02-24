@@ -7,6 +7,7 @@
 #include "Forall.h"
 #include "For.h"
 #include "If.h"
+#include "IntExpr.h"
 #include "Overlap.h"
 #include "Template.h"
 #include "When.h"

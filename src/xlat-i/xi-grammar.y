@@ -56,6 +56,7 @@ void ReservedWord(int token);
   int intval;
   Chare::attrib_t cattr;
   SdagConstruct *sc;
+  IntExprConstruct *intexpr;
   WhenConstruct *when;
   SListConstruct *slist;
   CaseListConstruct *clist;
@@ -152,6 +153,7 @@ void ReservedWord(int token);
 %type <mvlist>		VarList
 %type <intval>		ParamBraceStart ParamBraceEnd SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
 %type <sc>		SingleConstruct HasElse
+%type <intexpr>		IntExpr
 %type <slist>		Slist
 %type <clist>		CaseList
 %type <olist>		Olist
@@ -1123,24 +1125,24 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		{ $$ = $1; }
 		| CASE '{' CaseList '}'
 		{ $$ = new CaseConstruct($3); }
-		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr '{' Slist '}'
-		{ $$ = new ForConstruct(new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5), new SdagConstruct(SINT_EXPR, $7), $10); }
-		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr SingleConstruct
-		{ $$ = new ForConstruct(new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5), new SdagConstruct(SINT_EXPR, $7), $9); }
-		| FORALL '[' IDENT ']' StartIntExpr CCode ':' CCode ',' CCode  EndIntExpr SingleConstruct
-		{ $$ = new ForallConstruct(new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
-		             new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $12); }
-		| FORALL '[' IDENT ']' StartIntExpr CCode ':' CCode ',' CCode  EndIntExpr '{' Slist '}' 
-		{ $$ = new ForallConstruct(new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
-		             new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $13); }
-		| IF StartIntExpr CCode EndIntExpr SingleConstruct HasElse
-		{ $$ = new IfConstruct(new SdagConstruct(SINT_EXPR, $3), $5, $6); }
-		| IF StartIntExpr CCode EndIntExpr '{' Slist '}' HasElse
-		{ $$ = new IfConstruct(new SdagConstruct(SINT_EXPR, $3), $6, $8); }
-		| WHILE StartIntExpr CCode EndIntExpr SingleConstruct 
-		{ $$ = new WhileConstruct(new SdagConstruct(SINT_EXPR, $3), $5); }
-		| WHILE StartIntExpr CCode EndIntExpr '{' Slist '}' 
-		{ $$ = new WhileConstruct(new SdagConstruct(SINT_EXPR, $3), $6); }
+		| FOR StartIntExpr IntExpr ';' IntExpr ';' IntExpr  EndIntExpr '{' Slist '}'
+		{ $$ = new ForConstruct($3, $5, $7, $10); }
+		| FOR StartIntExpr IntExpr ';' IntExpr ';' IntExpr  EndIntExpr SingleConstruct
+		{ $$ = new ForConstruct($3, $5, $7, $9); }
+		| FORALL '[' IDENT ']' StartIntExpr IntExpr ':' IntExpr ',' IntExpr  EndIntExpr SingleConstruct
+		{ $$ = new ForallConstruct(new SdagConstruct(SIDENT, $3), $6,
+		             $8, $10, $12); }
+		| FORALL '[' IDENT ']' StartIntExpr IntExpr ':' IntExpr ',' IntExpr  EndIntExpr '{' Slist '}'
+		{ $$ = new ForallConstruct(new SdagConstruct(SIDENT, $3), $6,
+		             $8, $10, $13); }
+		| IF StartIntExpr IntExpr EndIntExpr SingleConstruct HasElse
+		{ $$ = new IfConstruct($3, $5, $6); }
+		| IF StartIntExpr IntExpr EndIntExpr '{' Slist '}' HasElse
+		{ $$ = new IfConstruct($3, $6, $8); }
+		| WHILE StartIntExpr IntExpr EndIntExpr SingleConstruct
+		{ $$ = new WhileConstruct($3, $5); }
+		| WHILE StartIntExpr IntExpr EndIntExpr '{' Slist '}'
+		{ $$ = new WhileConstruct($3, $6); }
 		| ParamBraceStart CCode ParamBraceEnd
 		{ $$ = new AtomicConstruct($2, NULL); }
 		| error
@@ -1155,6 +1157,10 @@ HasElse		: /* Empty */
 		{ $$ = new ElseConstruct($2); }
 		| ELSE '{' Slist '}'
 		{ $$ = new ElseConstruct($3); }
+		;
+
+IntExpr	: CCode
+		{ $$ = new IntExprConstruct($1); }
 		;
 
 EndIntExpr	: ')'

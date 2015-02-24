@@ -1,8 +1,12 @@
 #include "For.h"
+#include "IntExpr.h"
 
 namespace xi {
 
-ForConstruct::ForConstruct(SdagConstruct *decl, SdagConstruct *pred, SdagConstruct *advance, SdagConstruct *body)
+ForConstruct::ForConstruct(IntExprConstruct *decl,
+                           IntExprConstruct *pred,
+                           IntExprConstruct *advance,
+                           SdagConstruct *body)
 : BlockConstruct(SFOR, 0, decl, pred, advance, 0, body, 0)
 { }
 

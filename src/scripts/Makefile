@@ -840,8 +840,8 @@ conv-cpm.o: conv-cpm.c $(CVHEADERS)
 
 XIHEADERS=conv-autoconfig.h xi-AstNode.h xi-Construct.h xi-grammar.tab.h xi-Message.h xi-Parameter.h xi-SdagConstruct.h xi-BlockConstruct.h xi-Template.h xi-util.h xi-Chare.h xi-Entry.h xi-Member.h xi-Module.h xi-SdagCollection.h xi-symbol.h xi-Type.h xi-Value.h
 CHARMXIOBJ=xi-main.o xi-grammar.tab.o xi-scan.o xi-Template.o xi-AstNode.o xi-Entry.o xi-Member.o xi-Parameter.o xi-SdagConstruct.o xi-BlockConstruct.o xi-Type.o xi-Chare.o xi-Message.o xi-Construct.o xi-Module.o xi-SdagCollection.o xi-Value.o xi-util.o
-SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o CParsedFile.o CStateVar.o Atomic.o Case.o CaseList.o Else.o Forall.o For.o If.o OList.o Overlap.o SdagEntry.o SList.o Template.o When.o While.o
-SDAGHEADERS= CToken.h EToken.h CParsedFile.h sdag-globals.h CEntry.h Atomic.h Case.h CaseList.h Else.h Forall.h For.h If.h OList.h Overlap.h SdagEntry.h SList.h Template.h When.h While.h Constructs.h
+SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o CParsedFile.o CStateVar.o Atomic.o Case.o CaseList.o Else.o Forall.o For.o If.o IntExpr.o OList.o Overlap.o SdagEntry.o SList.o Template.o When.o While.o
+SDAGHEADERS= CToken.h EToken.h CParsedFile.h sdag-globals.h CEntry.h Atomic.h Case.h CaseList.h Else.h Forall.h For.h If.h IntExpr.h OList.h Overlap.h SdagEntry.h SList.h Template.h When.h While.h Constructs.h
 
 $(CHARMXIOBJ) $(SDAGOBJ): $(XIHEADERS) $(SDAGHEADERS)
 $(CHARMXIOBJ) $(SDAGOBJ): CXX=$(NATIVECHARMC)
