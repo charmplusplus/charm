@@ -433,19 +433,6 @@ AC_MSG_RESULT($CP)
 add_flag CP=\""$CP"\" "cp command"
  
 
-# try to decide the version of glibc
-get_glibc_version() {
-t=test.c
-cat > $t <<EOT
-#include <stdio.h>
-#include <gnu/libc-version.h>
-int main (void) { puts (gnu_get_libc_version ()); return 0; }
-EOT
-gcc -o gver test.c
-GLIBCVERSION=`./gver`
-/bin/rm -f $t gver
-}
-
 cat > $t <<EOT
 #include <stdio.h>
 void foo(void) {
