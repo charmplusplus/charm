@@ -45,7 +45,7 @@ AMPICC_EXTRA_OPTIONS=""
 
 if test "$charmarch" = "mpi"
 then
-    dirName = ampicc.inc.$$
+    dirName=ampicc.inc.$$
     mkdir $dirName
     ln $CHARMBIN/../include/mpi.h $dirname/mpi.h   2>/dev/null
     AMPICC_EXTRA_OPTIONS="-I./$dirName"
