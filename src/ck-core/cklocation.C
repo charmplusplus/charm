@@ -1220,6 +1220,7 @@ void CkMigratable::commonInit(void) {
 #if CMK_LBDB_ON
   if (_lb_args.metaLbOn()) {
     atsync_iteration = myRec->getMetaBalancer()->get_iteration();
+    myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
   }
 #endif
 
@@ -1294,6 +1295,10 @@ CkMigratable::~CkMigratable() {
 	  else
 		myRec->getLBDB()->RemoveLocalBarrierReceiver(ldBarrierRecvHandle);
 	}
+
+  if (_lb_args.metaLbOn()) {
+    myRec->getMetaBalancer()->AdjustCountForDeadContributor(atsync_iteration);
+  }
 #endif
 	//To detect use-after-delete
 	thisIndexMax.nInts=-12345;
@@ -1440,6 +1445,13 @@ void CkMigratable::AtSync(int waitForMigration)
   double tmp = prev_load;
   prev_load = myRec->getObjTime();
   double current_load = prev_load - tmp;
+
+  // If the load for the chares are based on certain model, then set the
+  // current_load to be whatever is the obj load.
+  if (!usesAutoMeasure) {
+    current_load = myRec->getObjTime();
+  }
+
   if (atsync_iteration <= myRec->getMetaBalancer()->get_finished_iteration()) {
     CkPrintf("[%d:%s] Error!! Contributing to iter %d < current iter %d\n",
       CkMyPe(), idx2str(thisIndexMax), atsync_iteration,

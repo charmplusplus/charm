@@ -74,6 +74,9 @@ public:
   void ResetAdaptive();
   int get_iteration();
   int get_finished_iteration();
+  void ContributeStats(int iteration);
+  void AdjustCountForDeadContributor(int iteration);
+  void AdjustCountForNewContributor(int iteration);
   bool AddLoad(int iteration, double load);
   void ReceiveMinStats(CkReductionMsg *);
   void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);

@@ -193,6 +193,40 @@ int MetaBalancer::get_finished_iteration() {
   return adaptive_struct.finished_iteration_no;
 }
 
+void MetaBalancer::AdjustCountForNewContributor(int it_n) {
+  int index;
+
+  // it_n is the first iteration this chare will contribute to.
+  // If the finished_iteration_no is < it_n, then we need to update the counts
+  // of all the other iterations from finished_iteration_no + 1 to it_n to
+  // discount the newly added chares.
+  for (int i = (get_finished_iteration()+1); i <= it_n; i++) {
+    index = i % VEC_SIZE;
+    total_count_vec[index]++;
+  }
+}
+
+void MetaBalancer::AdjustCountForDeadContributor(int it_n) {
+  int index;
+  // it_n is the last iteration this chare contributed to.
+  // If the finished_iteration_no is < it_n, then we need to update the counts
+  // of all the other iterations from finished_iteration_no + 1 to it_n.
+  for (int i = (get_finished_iteration() + 1); i <= it_n; i++) {
+    index = i % VEC_SIZE;
+    total_count_vec[index]--;
+  }
+
+  // Check whether any of the future iterations now become valid
+  for (int i = (it_n + 1); i <= adaptive_struct.lb_iteration_no; i++) {
+    index = i % VEC_SIZE;
+    // When this contributor dies, the objDataCount gets updated only later so
+    // we need to account for that by -1
+    if (total_count_vec[index] == (lbdatabase->getLBDB()->ObjDataCount() - 1)){
+      ContributeStats(i);
+    }
+  }
+}
+
 bool MetaBalancer::AddLoad(int it_n, double load) {
 #if CMK_LBDB_ON
   int index = it_n % VEC_SIZE;
@@ -214,57 +248,66 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
         total_count_vec[index], lbdatabase->getLBDB()->ObjDataCount());
     CkAbort("Abort!!! Received more contribution");
   }
-
-  if (total_count_vec[index] == lbdatabase->getLBDB()->ObjDataCount()) {
-    double idle_time, bg_walltime, cpu_bgtime;
-    lbdatabase->IdleTime(&idle_time);
-    lbdatabase->BackgroundLoad(&bg_walltime, &cpu_bgtime);
-
-    int sync_for_bg = adaptive_struct.total_syncs_called +
-        lbdatabase->getLBDB()->ObjDataCount();
-    bg_walltime = bg_walltime * lbdatabase->getLBDB()->ObjDataCount() / sync_for_bg;
-
-    if (it_n < NEGLECT_IDLE) {
-      prev_idle = idle_time;
-    }
-    idle_time -= prev_idle;
-
-    // The chares do not contribute their 0th iteration load. So the total syncs
-    // in reality is total_syncs_called + obj_counts
-    int total_countable_syncs = adaptive_struct.total_syncs_called +
-        (1 - NEGLECT_IDLE) * lbdatabase->getLBDB()->ObjDataCount(); // TODO: Fix me!
-    if (total_countable_syncs != 0) {
-      idle_time = idle_time * lbdatabase->getLBDB()->ObjDataCount() / total_countable_syncs;
-    }
-
-    double lb_data[STATS_COUNT];
-    lb_data[0] = it_n;
-    lb_data[1] = 1;
-    lb_data[2] = total_load_vec[index]; // For average load
-    lb_data[3] = total_load_vec[index]; // For max load
-    // Set utilization
-    if (total_load_vec[index] == 0.0) {
-    	lb_data[4] = 0.0;
-      lb_data[5] = 0.0;
-    } else {
-      lb_data[4] = total_load_vec[index]/(idle_time + total_load_vec[index]);
-      lb_data[5] = total_load_vec[index]/(idle_time + total_load_vec[index]);
-    }
-    lb_data[6] = lb_data[2] + bg_walltime; // For Avg load with bg
-    lb_data[7] = lb_data[6]; // For Max load with bg
-    total_load_vec[index] = 0.0;
-    total_count_vec[index] = 0;
-
-    adaptive_struct.finished_iteration_no = it_n;
-    DEBADDETAIL(("[%d] sends total load %lf idle time %lf utilization %lf at iter %d\n",
-        CkMyPe(), total_load_vec[index], idle_time,
-        lb_data[5], adaptive_struct.finished_iteration_no));
-
-    CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
-    contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
+  if ((total_count_vec[index] == lbdatabase->getLBDB()->ObjDataCount())){
+    ContributeStats(it_n);
   }
 #endif
   return true;
+}
+
+void MetaBalancer::ContributeStats(int it_n) {
+#if CMK_LBDB_ON
+  int index = it_n % VEC_SIZE;
+
+  double idle_time, bg_walltime, cpu_bgtime;
+  lbdatabase->IdleTime(&idle_time);
+  lbdatabase->BackgroundLoad(&bg_walltime, &cpu_bgtime);
+
+  int sync_for_bg = adaptive_struct.total_syncs_called +
+    lbdatabase->getLBDB()->ObjDataCount();
+  bg_walltime = bg_walltime * lbdatabase->getLBDB()->ObjDataCount() / sync_for_bg;
+
+  if (it_n < NEGLECT_IDLE) {
+    prev_idle = idle_time;
+  }
+  idle_time -= prev_idle;
+
+  // The chares do not contribute their 0th iteration load. So the total syncs
+  // in reality is total_syncs_called + obj_counts
+  int total_countable_syncs = adaptive_struct.total_syncs_called +
+    (1 - NEGLECT_IDLE) * lbdatabase->getLBDB()->ObjDataCount(); // TODO: Fix me!
+  if (total_countable_syncs != 0) {
+    idle_time = idle_time * lbdatabase->getLBDB()->ObjDataCount() / total_countable_syncs;
+  }
+
+  double lb_data[STATS_COUNT];
+  lb_data[0] = it_n;
+  lb_data[1] = 1;
+  lb_data[2] = total_load_vec[index]; // For average load
+  lb_data[3] = total_load_vec[index]; // For max load
+  // Set utilization
+  if (total_load_vec[index] == 0.0) {
+    lb_data[4] = 0.0;
+    lb_data[5] = 0.0;
+  } else {
+    lb_data[4] = total_load_vec[index]/(idle_time + total_load_vec[index]);
+    lb_data[5] = total_load_vec[index]/(idle_time + total_load_vec[index]);
+  }
+  lb_data[6] = lb_data[2] + bg_walltime; // For Avg load with bg
+  lb_data[7] = lb_data[6]; // For Max load with bg
+  total_load_vec[index] = 0.0;
+  total_count_vec[index] = 0;
+
+  adaptive_struct.finished_iteration_no = it_n;
+
+  DEBADDETAIL(("[%d] sends total load %lf idle time %lf utilization %lf at iter %d\n",
+        CkMyPe(), total_load_vec[index], idle_time,
+        lb_data[5], adaptive_struct.finished_iteration_no));
+
+  CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
+  contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
+
+#endif
 }
 
 void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
