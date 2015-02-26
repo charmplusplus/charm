@@ -8,7 +8,7 @@ mainmodule matmul {
   array [2D] Block {
     entry Block(bool randomInit, unsigned int blockSize, unsigned int numBlocks);
     entry void pdgemmSendInput(CProxy_Block output, bool aOrB) {
-      atomic {
+      serial {
         if (aOrB)
           output((thisIndex.x-thisIndex.y+numBlocks)%numBlocks, thisIndex.y).inputA(0, data, blockSize, blockSize);
         else
@@ -21,7 +21,7 @@ mainmodule matmul {
         when
           inputA[block](int blockIdA, double blockA[M*KA], unsigned int M, unsigned int KA),
           inputB[block](int blockIdB, double blockB[KB*N], unsigned int KB, unsigned int N)
-          atomic {
+          serial {
           CkAssert(KA == KB);
 
           // This DGEMM makes no attempt at optimization. For
@@ -43,7 +43,7 @@ mainmodule matmul {
           }
         }
       }
-      atomic {
+      serial {
         contribute(done);
       }
     };
