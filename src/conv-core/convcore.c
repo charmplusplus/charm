@@ -2563,7 +2563,7 @@ void CmiHandleReductionMessage(void *msg) {
   CmiReduction *red = CmiGetReduction(CmiGetRedID(msg));
   if (red->numRemoteReceived == red->numChildren) red = CmiGetReductionCreate(CmiGetRedID(msg), red->numChildren+4);
   red->remoteData[red->numRemoteReceived++] = msg;
-  /*CmiPrintf("[%d] CmiReduce::remote %hd\n",CmiMyPe(),red->seqID);*/
+  /*CmiPrintf("[%d] CmiReduce::remote %hd, remoteReceived: %d \n",CmiMyPe(),red->seqID, red->numRemoteReceived);*/
   CmiSendReduce(red);
 /*
   CpvAccess(_reduce_msg_list)[CpvAccess(_reduce_received)++] = msg;

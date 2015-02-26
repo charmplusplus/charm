@@ -82,7 +82,7 @@ void check_test(int argc, char** argv) {
   // BEFORE changing this test, make sure the CHARMDEBUG_MINOR version number is
   // incremented, and the CharmDebug correspondant enumeration (in
   // charm.debug.pdata.MsgInfo.java) is updated accordingly.
-  if (LAST_CK_ENVELOPE_TYPE != 20) {
+  if (LAST_CK_ENVELOPE_TYPE != 21) {
     CmiPrintf("Error: LAST_CK_ENVELOPE_TYPE changed. Update CharmDebug and fix this test:\n");
     CmiPrintf("       BEFORE changing this test, make sure the CHARMDEBUG_MINOR version number is incremented, and the CharmDebug correspondant enumeration (in charm.debug.pdata.MsgInfo.java) is updated accordingly.");
     exit(1);
