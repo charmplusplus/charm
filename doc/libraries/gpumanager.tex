@@ -1,0 +1,380 @@
+\newif\ifstandalone
+%\standalonetrue   % use if built stand alone
+\standalonefalse  % use if part of the manual
+
+\ifstandalone
+  \documentclass[10pt]{report}
+  \usepackage[hmargin=0.85in,vmargin=0.85in]{geometry}
+  \usepackage{alltt}
+  \usepackage{amsmath}
+  \usepackage[T1]{fontenc}
+\fi
+
+\setcounter{secnumdepth}{3}
+
+\ifstandalone
+  \begin{document}
+
+  \chapter{GPU Manager Library}
+
+  \newcommand{\charmpp}{Charm++}
+  \newcommand{\code}[1]{\texttt{\textbf{#1}}} % \textbf doesn't work here
+\else
+  \renewcommand{\code}[1]{\texttt{\textbf{#1}}} % \textbf doesn't work here
+\fi
+
+\newcommand{\cuda}{\code{CUDA}}
+
+GPU Manager is a task offload and management library for efficient use of
+CUDA-enabled GPUs in \charmpp{} applications. Compared to direct use of CUDA
+(through issuing kernel invocation and GPU data transfer calls in user
+code) GPU Manager provides the following advantages:
+\begin{enumerate}
+\item Automatic management and synchronization of tasks
+\item Automatic overlap of data transfer and kernel invocation for concurrent tasks
+\item A simplified work flow mechanism using CkCallback to return to user code after completion of each work request
+\item Reduced synchronization overhead through centralized management of all GPU tasks
+\end{enumerate}
+
+\section{Building GPU Manager}
+
+GPU Manager is not included by default when building \charmpp{}. In order to use
+GPU Manager, the user must build \charmpp{} using the \cuda{} option, e.g.
+
+\begin{alltt}
+./build charm++ netlrts-linux-x86_64 cuda -j8
+\end{alltt}
+Building GPU Manager requires an installation of the CUDA toolkit on the system.
+
+\section{Overview and Work Flow}
+
+GPUs are throughput-oriented devices with peak computational capabilities that
+greatly surpass equivalent-generation CPUs but with limited control logic that
+constraints them to use as accelerator devices controlled by code executing on
+the CPU.
+
+The GPU's dependendce on the CPU for dispatch and synchronization of
+coarse-grained data transfer and kernel execution has traditionally required
+programmers to either (a) halt the execution of work on the CPU whenever issuing
+GPU work to simplify synchronization or (b) issue GPU work asynchronously and
+carefully manage and synchronize concurrent GPU work in order to ensure
+satisfactory progress and good performance. Further, the latter option becomes
+significantly more difficult in the context of a parallel program with numerous
+concurrent objects that all issue kernel and data transfer calls to the same GPU.
+
+The \charmpp{} GPU Manager is a library designed to address this issue by
+automating the management of GPUs. Users of GPU Manager define \emph{work requests}
+that specify the GPU kernel and any data transfer operations required before
+and after completion of the kernel. The system controls the execution of the
+work requests submitted by all the chares on a particular processor. This allows
+it to effectively manage execution of work requests and overlap CPU-GPU data
+transfer with kernel execution. In steady-state operation, GPU Manager overlaps
+kernel execution of one work request with data transfer out of GPU memory for a
+preceding work request and the data transfer into GPU memory for a subsequent
+work request. This approach avoids blocking the CUDA DMA engine by only submitting
+data transfers when they are ready to execute. When using GPU Manager, the user
+does not need to poll for completion of GPU operations. The system manages
+execution of a work request throughout its life cycle and returns control to the
+user upon completion of a work request through a CkCallback object specified by
+the user per work request. Another advantage of using GPU Manager is that the
+system polls only for a handful of currently executing operations, which avoids
+the problem of multiple chares all polling the GPU when using CUDA streams
+directly. GPU Manager has options for recording profiling data for kernel
+execution and data transfer which can be visualized using the \charmpp{}
+Projections profiler.
+
+\subsection{Execution Model and Progress Engine}
+
+Like any \charmpp{} application, programs using GPU Manager typically consist of a
+large number of concurrently executing objects. Each object executes code in
+response to active messages received from some object within the parallel run,
+during which it can send its own active messages or issue one or more work
+requests to the GPU Manager for asynchronous execution. Work requests are always
+submitted to the local GPU Manager instance at the processing element where the
+call is issued. Incoming GPU work requests are simply copied into the GPU
+Manager's scheduling queue, at which point the library returns and the caller
+can continue with other work.
+
+\charmpp{} employs a message driven programming model. This includes a runtime
+system scheduler that is triggered every time a method finishes execution. Under
+typical CPU-only execution the scheduler examines the queue of incoming messages
+and selects one based on priority and location in the queue. In a \cuda{}
+build of \charmpp{}, the scheduler is also programmed to periodically invoke the
+GPU Manager progress engine.
+
+GPU Manager contains a queue of all pending work requests. When its progress
+function is called, GPU Manager determines whether pending GPU work has
+completed since the last time the progress function was called, and whether
+additional work requests can begin executing. A \code{workRequest} undergoes the
+following stages during its execution:
+
+\begin{enumerate}
+\item Device memory allocation and data transfer from host to device
+\item Kernel execution
+\item Data transfer back to host from device
+\item Invocation of a callback function (specified in the \code{workRequest})
+\end{enumerate}
+
+Based on the instructions contained in each work request, the GPU Manager will
+allocate the required buffers in GPU global memory and issue asynchronous CUDA
+data transfer operations directly. In order to execute kernels, the GPU Manager
+calls the \code{kernelSelect} function that must be defined by the user. This
+function specifies the CUDA kernel call for each work request type.
+
+Under steady state execution with multiple concurrent work requests, as
+one \code{workRequest} progresses to the execution stage, GPU Manager will
+initate the data transfer for the second
+\code{workRequest} in the queue, and so on.
+
+In a typical application, the work request definition,
+\code{kernelSelect} function, CUDA kernel defitinions, and code for submission
+of work requests would all go in a \code{.cu} file that is compiled with
+\code{nvcc} separately from the other files (e.g. \code{.C}, \code{.ci}) in the
+\charmpp{} application.
+We make a function call to \code{createWorkRequest} from a .C file to create
+and enqueue the workRequest.
+The various resulting object files of the application are then to be linked
+together into the final executable.
+
+
+\section{API}
+
+Using GPU Manager involves:
+\begin{enumerate}
+\item Definining CUDA kernels as in a regular CUDA application
+\item Defining work requests and their callback functions
+\item Defining the \code{void kernelSelect(workRequest *wr)} function, used by the GPU Manager to issue a kernel call based on the kernel identifier defined in the work request
+\item Submitting work requests to the GPU Manager
+\end{enumerate}
+
+\subsection{Work Request}
+\code{workRequest} is a simple structure which contains the necessary parameters
+for CUDA kernel execution along with some additional members for automating
+data transfer between the host and the device.
+A work request consists of the following data members:
+
+\begin{description}
+\item[dim3 dimGrid]- a triple which defines the grid structure for the kernel;
+in the example below \code{dimGrid.x} specifies the number of blocks.
+\code{dimGrid.y} and \code{dimGrid.z} are unused.
+
+\item[dim3 dimBlock]- a triple defining each block's structure;
+specifies the number of threads in up to three dimensions.
+
+\item[int smemSize]- the number of bytes in shared memory to be dynamically
+allocated per block for kernel execution.
+
+\item[int nBuffers]- number of buffers used by the work request.
+
+\item[dataInfo *bufferInfo]- array of \code{dataInfo} structs containing buffer
+information for the execution of the work request. This array must be of size \code{nBuffers}, e.g.
+\begin{alltt}
+code{wr->bufferInfo = (dataInfo *) malloc(wr->nBuffers * sizeof(dataInfo))}
+\end{alltt}
+We will explain the contents of \code{dataInfo} struct later.
+
+\item[void *callbackFn]- a pointer to a \code{CkCallback} object specified by the user;
+executed after the kernel and memory transfers have finished.
+
+\item[int id]- id to select the correct kernel in \code{void kernelSelect(workRequest *wr)}.
+
+\item[int state]- the stage of a \code{workRequest}'s execution, set and used internally by the GPU Manager
+
+\item[void *userData]-  may be used to pass scalar values to kernel
+calls, such as the size of an array.
+
+\end{description}
+
+\subsubsection{dataInfo}
+\begin{description}
+\item[int bufferID]- the ID of a buffer in the runtime system's buffer table.
+May be specified by the user if direct control over the buffer space is
+desired. Otherwise, if it is set to a negative value, the GPU Manager will
+assign a valid buffer ID.
+
+\item[int transferToDevice, transferFromDevice]- flags to indicate if the buffer
+should be transferred to the device prior to the execution of a kernel, and/or
+transferred out after the kernel
+
+\item[int freeBuffer]- a flag to indicate if the device buffer memory should be
+freed after execution of \code{workRequest}.
+
+\item[void *hostBuffer]- pointer to host data buffer. In order to allow
+asynchronous memory transfer and data computation on device this buffer must
+be allocated from page-locked memory.
+\begin{alltt}
+void *hostBuffer = hapi\_poolMalloc(size);
+\end{alltt}
+% code around memPool?
+This returns the buffer of required size from the GPU Manager's pool of pinned memory on the host.
+Direct allocation of pinned memory (e.g. using \code{cudaMallocHost}) is discouraged,
+as it will block the CPU until pending GPU work has finished executing.
+The user must add the \code{-DGPU\_MEMPOOL} flag while compiling CUDA files.
+This is required to enable fetching of page-locked memory from GPU Manager.
+You may add it with your \code{NVCC\_FLAGS}.
+
+\item[size\_t size]- size of buffer in bytes.
+\end{description}
+
+\subsubsection{Work Request Example}
+
+Here is an example method for creating a \code{workRequest} of the addition of
+two vectors A and B.
+
+\begin{alltt}
+#include "wr.h"
+#define BLOCK_SIZE 256
+void createWorkRequest(int vectorSize, float *h_A, float *h_B, float **h_C, int myIndex, void *cb)
+\{
+    dataInfo *info;
+    workRequest *vecAdd = new workRequest;
+    int size = vectorSize * sizeof(float);
+
+    vecAdd->dimGrid.x = (vectorSize - 1) / BLOCK_SIZE + 1;
+    vecAdd->dimBlock.x = BLOCK_SIZE;
+    vecAdd->smemSize = 0;
+    vecAdd->nBuffers = 3;
+    vecAdd->bufferInfo = new dataInfo[vecAdd->nBuffers];
+
+    /* Buffer A */
+    info = &(vecAdd->bufferInfo[0]);
+
+    /* The Buffer ID will be given by the API,
+       or it can be given by the user. */
+    info->bufferID = -1;
+
+    info->transferToDevice = YES;
+    info->transferFromDevice = NO;
+    info->freeBuffer = YES;
+
+    /* This fetches the pinned host memory already allocated by API,
+       required for asynchronous data transfers. */
+    info->hostBuffer = hapi_poolMalloc(size);
+
+    /* Copy the data to the workRequest's buffer. */
+    memcpy(info->hostBuffer, h_A, size);
+
+    info->size = size;
+
+    /* Buffer B will be same as A.*/
+
+    /* Buffer C */
+    info = &(vecAdd->bufferInfo[2]);
+    info->transferFromDevice = YES;
+    info->hostBuffer = hapi_poolMalloc(size)
+
+    / * We change the address to the address returned by the API
+        to read the copied result */
+    *h_C = (float *)info->hostBuffer;
+
+    /* a CkCallback pointer */
+    vecAdd->callbackFn = cb;
+
+    /* kernel id for kernelSelect */
+    vecAdd->id = ADD_KERNEL;
+
+    vecAdd->userData = new int;
+    memcpy(vecAdd->userData, &vectorSize, sizeof(int));
+
+    /* enqueue the workRequest in the workRequestQueue.
+    wrQueue is declared by our API during the init phase for every processor. */
+    enqueue(wrQueue, vecAdd);
+\}
+\end{alltt}
+
+\subsection{Writing Kernels}
+
+Writing a kernel is unchanged from normal CUDA programs.
+Kernels are written in one (or more) .cu files.
+Here is an example of \code{vectorAdd.cu}.
+The full example can be found in \code{examples/charm++/cuda/vectorAdd/}.
+
+\begin{alltt}
+__global__ void vecAdd(float *a, float *b, float *c, int n)
+\{
+    // Get our global thread ID
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Make sure we do not go out of bounds
+    if (id < n)
+        c[id] = a[id] + b[id];
+\}
+\end{alltt}
+
+\subsection{Launching Kernels}
+
+Kernel launches are identical to regular kernel launches in normal CUDA
+programs. We utilize a switch case to choose which kernel to launch.
+A kernel (and its associated \code{workRequest}) is identified by its id.
+Below is a simple example with one kernel launch. Larger programs
+can have multiple kernels with different kernel IDs.
+
+\begin{alltt}
+void kernelSelect(workRequest *wr)
+\{
+    switch (wr->id)
+    \{
+        case ADD_KERNEL :
+            printf("Add KERNEL \textbackslash{n}");
+/*
+ *  devBuffers is declared by our API during the init phase on every processor.
+ *  It jumps to the correct array index with the help of bufferID, 
+ *  which is supplied by the API or user.
+ */
+            vecAdd<<< wr->dimGrid, wr->dimBlock, wr->smemSize, kernel_stream>>>
+                ((float *) devBuffers[wr->bufferInfo[0].bufferID],
+                 (float *) devBuffers[wr->bufferInfo[1].bufferID],
+                 (float *) devBuffers[wr->bufferInfo[2].bufferID],
+                 *((int *) wr->userData));
+            break;
+    \}
+\}
+\end{alltt}
+
+\section{Compiling}
+
+As mentioned earlier, there are no changes to the \code{.ci} and \code{.C}
+files. Therefore there are no changes in compiling them.
+CUDA code, however, must be compiled using \code{nvcc}.
+You can use the following example makefile to compile a .cu file.
+More example codes can be found in the \code{examples/charm++/cuda} directory.
+
+\begin{alltt}
+CUDA_LEVEL=35
+
+NVCC = /usr/local/cuda/bin/nvcc
+
+NVCC_FLAGS = -O3 -c -use_fast_math -DGPU_MEMPOOL
+
+NVCC_FLAGS += -arch=compute_\$(CUDA_LEVEL) -code=sm_\$(CUDA_LEVEL)
+
+NVCC_INC = -I/usr/local/cuda/include
+
+CHARMINC = -I\$\{CHARMDIR\}/include
+
+LD_LIBS= -lcublas
+
+all: vectorAdd
+\qquad\$(NVCC) \$(NVCC_FLAGS) \$(NVCC_INC) \$(CHARMINC) -o vectorAddCU.o vectorAdd.cu
+\end{alltt}
+GPU Manager also supports \texttt{BLAS} routines in exactly the same way. \texttt{BLAS}
+routines must go in \code{kernelSelect}. Creating a \code{workRequest} for \texttt{BLAS} is same as any
+other kernel.
+
+
+\section{Debugging}
+
+A few useful things for debugging:
+
+\begin{enumerate}
+\item Enabling the \code{GPU\_MEMPOOL\_DEBUG} flag
+(using \code{-DGPU\_MEMPOOL\_DEBUG}) during execution prints debug
+statements, including when buffers are allocated and freed.
+
+\item When using \code{++debug}, add the debugging flags \code{-g} and
+\code{-G} during compilation.
+\end{enumerate}
+
+\ifstandalone
+  \end{document}
+\fi
