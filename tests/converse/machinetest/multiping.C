@@ -24,7 +24,7 @@ enum { maxMsgSize = 1 << 18 };
 //Variable declarations
 CpvDeclare(int,msgSize);
 CpvDeclare(int,cycleNum);
-CpvDeclare(double, ackCount);
+CpvDeclare(int, ackCount);
 CpvDeclare(int, twoway);
 
 CpvDeclare(int,exitHandler);
