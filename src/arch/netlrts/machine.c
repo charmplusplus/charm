@@ -1643,7 +1643,10 @@ void LrtsPostNonLocal() {}
     
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl(){
-  CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
+#if CMK_SMP && !CMK_MULTICORE
+  if (CmiMyRank() == CmiMyNodeSize())
+#endif
+    CommunicationServerNet(0, COMM_SERVER_FROM_SMP);
 }
 #endif
 
