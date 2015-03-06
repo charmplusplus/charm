@@ -258,7 +258,7 @@ int Refiner::multirefine()
   double max = computeMax();
 
   const double overloadStep = 0.01;
-  const double overloadStart = 1.001;
+  const double overloadStart = overLoad;
   double dCurOverload = max / avg;
                                                                                 
   int minOverload = 0;

@@ -35,7 +35,7 @@ void RefineLB::work(LDStats* stats)
   // Get a new buffer to refine into
   int* to_procs = Refiner::AllocProcs(n_pes, stats);
 
-  Refiner refiner(1.003);  // overload tolerance=1.05
+  Refiner refiner(1.05);  // overload tolerance=1.05
 
   refiner.Refine(n_pes, stats, from_procs, to_procs);
 
