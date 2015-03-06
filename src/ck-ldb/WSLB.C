@@ -36,7 +36,7 @@ void WSLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-WSLB::WSLB(const CkLBOptions &opt) : BaseLB(opt) 
+WSLB::WSLB(const CkLBOptions &opt) : CBase_WSLB(opt)
 {
 #if CMK_LBDB_ON
   thisProxy = CProxy_WSLB(thisgroup);

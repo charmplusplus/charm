@@ -56,7 +56,7 @@ static void get_hypergraph_edge_wgts(void *data, int numGID, int numLID, int num
 
 CreateLBFunc_Def(ZoltanLB, "Use Zoltan(tm) to partition object graph")
 
-ZoltanLB::ZoltanLB(const CkLBOptions &opt): CentralLB(opt)
+ZoltanLB::ZoltanLB(const CkLBOptions &opt): CBase_ZoltanLB(opt)
 {
   lbname = "ZoltanLB";
   if (CkMyPe() == 0)

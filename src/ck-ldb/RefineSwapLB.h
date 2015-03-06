@@ -12,7 +12,7 @@
 void CreateRefineSwapLB();
 BaseLB * AllocateRefineSwapLB();
 
-class RefineSwapLB : public CentralLB {
+class RefineSwapLB : public CBase_RefineSwapLB {
 
 public:
   struct HeapData {
@@ -22,7 +22,7 @@ public:
   };
 
   RefineSwapLB(const CkLBOptions &);
-  RefineSwapLB(CkMigrateMessage *m):CentralLB(m) { lbname = "RefineSwapLB"; }
+  RefineSwapLB(CkMigrateMessage *m):CBase_RefineSwapLB(m) { lbname = "RefineSwapLB"; }
   void work(LDStats* stats);
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};

@@ -15,7 +15,7 @@ extern LBAllocFn getLBAllocFn(const char *lbname);
 
 CreateLBFunc_Def(ComboCentLB, "Allow multiple strategies to work serially")
 
-ComboCentLB::ComboCentLB(const CkLBOptions &opt): CentralLB(opt)
+ComboCentLB::ComboCentLB(const CkLBOptions &opt): CBase_ComboCentLB(opt)
 {
   lbname = "ComboCentLB";
   const char *lbs = theLbdb->loadbalancer(opt.getSeqNo());

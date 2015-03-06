@@ -14,11 +14,11 @@ void CreateComboCentLB();
 /// for backward compatibility
 typedef LBMigrateMsg  CLBMigrateMsg;
 
-class ComboCentLB : public CentralLB
+class ComboCentLB : public CBase_ComboCentLB
 {
 public:
   ComboCentLB(const CkLBOptions &);
-  ComboCentLB(CkMigrateMessage *m):CentralLB(m) {}
+  ComboCentLB(CkMigrateMessage *m):CBase_ComboCentLB(m) {}
 
 protected:
   virtual bool QueryBalanceNow(int) { return true; };  

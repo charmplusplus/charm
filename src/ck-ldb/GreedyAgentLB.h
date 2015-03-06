@@ -12,7 +12,7 @@
 
 void CreateGreedyAgentLB();
 
-class GreedyAgentLB : public CentralLB {
+class GreedyAgentLB : public CBase_GreedyAgentLB {
 
 public:
   struct HeapData {
@@ -22,7 +22,7 @@ public:
   };
 
   GreedyAgentLB(const CkLBOptions &);
-  GreedyAgentLB(CkMigrateMessage *m):CentralLB(m) { lbname = "GreedyAgentLB"; }
+  GreedyAgentLB(CkMigrateMessage *m):CBase_GreedyAgentLB(m) { lbname = "GreedyAgentLB"; }
   void work(LDStats* stats);
 private:
 	TopologyAgent				*topologyAgent;

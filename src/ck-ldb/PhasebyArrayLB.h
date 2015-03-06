@@ -11,10 +11,10 @@
 
 void CreatePhasebyArrayLB();
 
-class PhasebyArrayLB : public CentralLB {
+class PhasebyArrayLB : public CBase_PhasebyArrayLB {
 public:
   PhasebyArrayLB(const CkLBOptions &);
-  PhasebyArrayLB(CkMigrateMessage *m):CentralLB(m) {}
+  PhasebyArrayLB(CkMigrateMessage *m):CBase_PhasebyArrayLB(m) {}
 private:
 	//CkVec<CProxy_ArrayBase> arrayProxies;
   BaseLB::LDStats *tempStats;

@@ -25,7 +25,7 @@ CreateLBFunc_Def(GreedyAgentLB,"always assign the heaviest obj onto lightest loa
 */
 #include "GreedyAgentLB.def.h"
 
-GreedyAgentLB::GreedyAgentLB(const CkLBOptions &opt): CentralLB(opt)
+GreedyAgentLB::GreedyAgentLB(const CkLBOptions &opt): CBase_GreedyAgentLB(opt)
 {
   lbname = "GreedyAgentLB";
   if (CkMyPe()==0)

@@ -101,7 +101,7 @@ double lower_threshold_temp;
 
 CreateLBFunc_Def(TempAwareCommLB, "always assign the heaviest obj onto lightest loaded processor.")
 
-TempAwareCommLB::TempAwareCommLB(const CkLBOptions &opt): CentralLB(opt)
+TempAwareCommLB::TempAwareCommLB(const CkLBOptions &opt): CBase_TempAwareCommLB(opt)
 {
 #ifdef TEMP_LDB
   lbname = "TempAwareCommLB";

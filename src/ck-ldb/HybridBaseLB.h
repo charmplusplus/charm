@@ -292,11 +292,11 @@ public:
   }
 };
 
-class HybridBaseLB : public BaseLB
+class HybridBaseLB : public CBase_HybridBaseLB
 {
 public:
   HybridBaseLB(const CkLBOptions &);
-  HybridBaseLB(CkMigrateMessage *m):BaseLB(m) {}
+  HybridBaseLB(CkMigrateMessage *m): CBase_HybridBaseLB(m) {}
   ~HybridBaseLB();
 
   static void staticAtSync(void*);

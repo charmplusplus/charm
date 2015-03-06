@@ -24,7 +24,7 @@ Date: 04/27/2005
 CreateLBFunc_Def(RefineTopoLB,"TopoLB: Balance objects based on the network topology")
 
 
-RefineTopoLB::RefineTopoLB(const CkLBOptions &opt) : TopoLB (opt)
+RefineTopoLB::RefineTopoLB(const CkLBOptions &opt) : CBase_RefineTopoLB (opt)
 {
   lbname = "RefineTopoLB";
   if (CkMyPe () == 0) {

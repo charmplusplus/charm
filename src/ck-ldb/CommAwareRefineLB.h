@@ -12,7 +12,7 @@
 void CreateCommAwareRefineLB();
 BaseLB * AllocateCommAwareRefineLB();
 
-class CommAwareRefineLB : public CentralLB {
+class CommAwareRefineLB : public CBase_CommAwareRefineLB {
 
 public:
   struct HeapData {
@@ -23,7 +23,7 @@ public:
   };
 
   CommAwareRefineLB(const CkLBOptions &);
-  CommAwareRefineLB(CkMigrateMessage *m):CentralLB(m) {
+  CommAwareRefineLB(CkMigrateMessage *m):CBase_CommAwareRefineLB(m) {
     lbname = "CommAwareRefineLB";
   }
   void work(LDStats* stats);

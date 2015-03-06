@@ -14,7 +14,7 @@
 
 CreateLBFunc_Def(ScotchRefineLB, "Load balancing using the Scotch graph partitioning library")
 
-ScotchRefineLB::ScotchRefineLB(const CkLBOptions &opt) : CentralLB(opt) {
+ScotchRefineLB::ScotchRefineLB(const CkLBOptions &opt) : CBase_ScotchRefineLB(opt) {
   lbname = "ScotchRefineLB";
   if(CkMyPe() == 0)
     CkPrintf("ScotchRefineLB created\n");

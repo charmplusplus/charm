@@ -16,7 +16,7 @@
 
 CreateLBFunc_Def(GraphPartLB, "Algorithm which uses graph partitioning for communication aware load balancing")
 
-GraphPartLB::GraphPartLB(const CkLBOptions &opt) : CentralLB(opt) {
+GraphPartLB::GraphPartLB(const CkLBOptions &opt) : CBase_GraphPartLB(opt) {
   lbname = "GraphPartLB";
   if(CkMyPe() == 0)
     CkPrintf("GraphPartLB created\n");

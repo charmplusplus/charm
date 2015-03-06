@@ -13,7 +13,7 @@ Status:
 
 CreateLBFunc_Def(RandCentLB, "Assign objects to processors randomly")
 
-RandCentLB::RandCentLB(const CkLBOptions &opt): CentralLB(opt)
+RandCentLB::RandCentLB(const CkLBOptions &opt): CBase_RandCentLB(opt)
 {
   lbname = "RandCentLB";
   if (CkMyPe() == 0)

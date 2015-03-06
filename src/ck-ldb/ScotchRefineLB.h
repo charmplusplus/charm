@@ -17,13 +17,13 @@
 
 void CreateScotchRefineLB();
 
-class ScotchRefineLB : public CentralLB {
+class ScotchRefineLB : public CBase_ScotchRefineLB {
   public:
     ScotchRefineLB(const CkLBOptions &opt);
-    ScotchRefineLB(CkMigrateMessage *m) : CentralLB (m) { };
+    ScotchRefineLB(CkMigrateMessage *m) : CBase_ScotchRefineLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CentralLB::pup(p); }
+    void pup(PUP::er &p) { CBase_ScotchRefineLB::pup(p); }
 
   private:
     bool QueryBalanceNow(int _step);

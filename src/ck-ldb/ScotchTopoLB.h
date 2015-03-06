@@ -19,13 +19,13 @@
 
 void CreateScotchTopoLB();
 
-class ScotchTopoLB : public CentralLB {
+class ScotchTopoLB : public CBase_ScotchTopoLB {
   public:
     ScotchTopoLB(const CkLBOptions &opt);
-    ScotchTopoLB(CkMigrateMessage *m) : CentralLB (m) { };
+    ScotchTopoLB(CkMigrateMessage *m) : CBase_ScotchTopoLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CentralLB::pup(p); }
+    void pup(PUP::er &p) { CBase_ScotchTopoLB::pup(p); }
 
   private:
     bool QueryBalanceNow(int _step);

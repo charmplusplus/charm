@@ -41,7 +41,7 @@ extern "C" {
 
 CreateLBFunc_Def(RecBisectBfLB, "Recursive partitioning with Breadth first enumeration")
 
-RecBisectBfLB::RecBisectBfLB(const CkLBOptions &opt): CentralLB(opt)
+RecBisectBfLB::RecBisectBfLB(const CkLBOptions &opt): CBase_RecBisectBfLB(opt)
 {
   lbname = (char*)"RecBisectBfLB";
   if (CkMyPe() == 0)

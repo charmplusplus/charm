@@ -14,11 +14,11 @@
 
 void CreateHybridLB();
 
-class HybridLB : public HybridBaseLB
+class HybridLB : public CBase_HybridLB
 {
 public:
   HybridLB(const CkLBOptions &);
-  HybridLB(CkMigrateMessage *m): HybridBaseLB(m) {}
+  HybridLB(CkMigrateMessage *m): CBase_HybridLB(m) {}
   ~HybridLB();
 
 protected:

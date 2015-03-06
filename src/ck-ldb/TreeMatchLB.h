@@ -11,10 +11,10 @@
 
 void CreateTreeMatchLB();
 
-class TreeMatchLB : public CentralLB {
+class TreeMatchLB : public CBase_TreeMatchLB {
 public:
   TreeMatchLB(const CkLBOptions &);
-  TreeMatchLB(CkMigrateMessage *m):CentralLB(m) {}
+  TreeMatchLB(CkMigrateMessage *m):CBase_TreeMatchLB(m) {}
   void work(BaseLB::LDStats* stats);
 private:
   bool QueryBalanceNow(int step);

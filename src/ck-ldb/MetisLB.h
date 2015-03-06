@@ -19,10 +19,10 @@
 void CreateMetisLB();
 BaseLB * AllocateMetisLB();
 
-class MetisLB : public CentralLB {
+class MetisLB : public CBase_MetisLB {
 public:
   MetisLB(const CkLBOptions &);
-  MetisLB(CkMigrateMessage *m):CentralLB(m) { lbname = "MetisLB"; }
+  MetisLB(CkMigrateMessage *m):CBase_MetisLB(m) { lbname = "MetisLB"; }
 private:
   bool QueryBalanceNow(int step) { return true; }
   void work(LDStats* stats);

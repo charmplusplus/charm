@@ -31,7 +31,7 @@ CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology")
 }*/
 
 
-TopoCentLB::TopoCentLB(const CkLBOptions &opt) : CentralLB (opt)
+TopoCentLB::TopoCentLB(const CkLBOptions &opt) : CBase_TopoCentLB (opt)
 {
   lbname = "TopoCentLB";
   if (CkMyPe () == 0) {

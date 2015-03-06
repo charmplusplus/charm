@@ -70,7 +70,7 @@ class Cluster_Data_T
     double scaled_cpu_power;
 };
 
-class GridMetisLB : public CentralLB
+class GridMetisLB : public CBase_GridMetisLB
 {
   public:
     GridMetisLB (const CkLBOptions &);
@@ -78,7 +78,7 @@ class GridMetisLB : public CentralLB
 
     bool QueryBalanceNow (int step);
     void work (LDStats *stats);
-    void pup (PUP::er &p) { CentralLB::pup (p); }
+    void pup (PUP::er &p) { CBase_GridMetisLB::pup (p); }
 
   private:
     int Get_Cluster (int pe);

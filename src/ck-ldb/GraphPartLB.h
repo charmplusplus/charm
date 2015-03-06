@@ -19,13 +19,13 @@
 
 void CreateGraphPartLB();
 
-class GraphPartLB : public CentralLB {
+class GraphPartLB : public CBase_GraphPartLB {
   public:
     GraphPartLB(const CkLBOptions &opt);
-    GraphPartLB(CkMigrateMessage *m) : CentralLB (m) { };
+    GraphPartLB(CkMigrateMessage *m) : CBase_GraphPartLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CentralLB::pup(p); }
+    void pup(PUP::er &p) { CBase_GraphPartLB::pup(p); }
 
   private:
     bool QueryBalanceNow(int _step);

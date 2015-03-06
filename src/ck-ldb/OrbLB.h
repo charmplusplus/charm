@@ -12,7 +12,7 @@
 void CreateOrbLB();
 BaseLB *AllocateOrbLB(void);
 
-class OrbLB : public CentralLB {
+class OrbLB : public CBase_OrbLB {
 public:/* <- Sun CC demands Partition be public for ComputeLoad to access it. */
 
   class Partition {
@@ -72,7 +72,7 @@ public:
 public:
   OrbLB(const CkLBOptions &);
   OrbLB(const CkLBOptions &, bool userdata);
-  OrbLB(CkMigrateMessage *m):CentralLB(m) { init(); }
+  OrbLB(CkMigrateMessage *m):CBase_OrbLB(m) { init(); }
 
   void work(LDStats* stats);
   bool QueryBalanceNow(int step);

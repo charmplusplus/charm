@@ -6,7 +6,7 @@ CkpvExtern(int, _lb_obj_index);
 
 CreateLBFunc_Def(TestUserDataLB, "to test user lbdata.")
 
-TestUserDataLB::TestUserDataLB(const CkLBOptions &opt): CentralLB(opt) {
+TestUserDataLB::TestUserDataLB(const CkLBOptions &opt): CBase_TestUserDataLB(opt) {
   lbname = "TestUserDataLB";
   if (CkMyPe()==0)
     CkPrintf("[%d] TestUserDataLB created\n",CkMyPe());

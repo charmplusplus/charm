@@ -58,7 +58,7 @@ class SpanningTree
 		void calcNumChildren(int n);
 };
 
-class CentralLB : public BaseLB
+class CentralLB : public CBase_CentralLB
 {
 private:
   CLBStatsMsg *statsMsg;
@@ -67,12 +67,12 @@ private:
 public:
   CkMarshalledCLBStatsMessage bufMsg;
   SpanningTree st;
-  CentralLB(const CkLBOptions & opt):BaseLB(opt) { initLB(opt); 
+  CentralLB(const CkLBOptions & opt) : CBase_CentralLB(opt) { initLB(opt);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         lbDecisionCount= resumeCount=0;
 #endif
 } 
-  CentralLB(CkMigrateMessage *m):BaseLB(m) {}
+  CentralLB(CkMigrateMessage *m) : CBase_CentralLB(m) {}
 #if defined(TEMP_LDB) 
 	float getTemp(int);
 	  FILE* logFD;

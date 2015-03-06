@@ -15,7 +15,7 @@
 
 CreateLBFunc_Def(NeighborCommLB, "The neighborhood load balancer with communication")
 
-NeighborCommLB::NeighborCommLB(const CkLBOptions &opt):NborBaseLB(opt)
+NeighborCommLB::NeighborCommLB(const CkLBOptions &opt):CBase_NeighborCommLB(opt)
 {
   lbname = "NeighborCommLB";
   if (CkMyPe() == 0)

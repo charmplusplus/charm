@@ -11,10 +11,10 @@ CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
 
 using std::vector;
 
-DistributedLB::DistributedLB(CkMigrateMessage *m) : DistBaseLB(m) {
+DistributedLB::DistributedLB(CkMigrateMessage *m) : CBase_DistributedLB(m) {
 }
 
-DistributedLB::DistributedLB(const CkLBOptions &opt) : DistBaseLB(opt) {
+DistributedLB::DistributedLB(const CkLBOptions &opt) : CBase_DistributedLB(opt) {
   lbname = "DistributedLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] DistributedLB created\n",CkMyPe());

@@ -11,11 +11,11 @@
 
 void CreateTopoLB ();
 
-class RefineTopoLB : public TopoLB
+class RefineTopoLB : public CBase_RefineTopoLB
 {
   public:
     RefineTopoLB (const CkLBOptions &opt);
-    RefineTopoLB (CkMigrateMessage *m) : TopoLB (m) { };
+    RefineTopoLB (CkMigrateMessage *m) : CBase_RefineTopoLB (m) { };
   
     void work (LDStats *stats);
     void pup (PUP::er &p) { TopoLB::pup(p); }

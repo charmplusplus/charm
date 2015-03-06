@@ -29,14 +29,14 @@ void GreedyCommLB::init()
     manager_init();
 }
 
-GreedyCommLB::GreedyCommLB(const CkLBOptions &opt): CentralLB(opt)
+GreedyCommLB::GreedyCommLB(const CkLBOptions &opt): CBase_GreedyCommLB(opt)
 {
     init();
     if (CkMyPe() == 0)
 	CkPrintf("[%d] GreedyCommLB created\n",CkMyPe());
 }
 
-GreedyCommLB::GreedyCommLB(CkMigrateMessage *m):CentralLB(m) {
+GreedyCommLB::GreedyCommLB(CkMigrateMessage *m):CBase_GreedyCommLB(m) {
     init();
 }
 

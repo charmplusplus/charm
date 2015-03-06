@@ -32,10 +32,10 @@ typedef struct {
 } PartitionList;
 
 
-class RecBisectBfLB : public CentralLB {
+class RecBisectBfLB : public CBase_RecBisectBfLB {
 public:
   RecBisectBfLB(const CkLBOptions &);
-  RecBisectBfLB(CkMigrateMessage *m):CentralLB(m) {}
+  RecBisectBfLB(CkMigrateMessage *m) : CBase_RecBisectBfLB(m) {}
 private:
   bool QueryBalanceNow(int step);
   void work(LDStats* stats);

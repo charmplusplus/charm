@@ -30,7 +30,7 @@ Date: 04/19/2005
 CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology")
 
 
-TopoLB::TopoLB(const CkLBOptions &opt) : CentralLB (opt)
+TopoLB::TopoLB(const CkLBOptions &opt) : CBase_TopoLB (opt)
 {
   lbname = "TopoLB";
   if (CkMyPe () == 0) {

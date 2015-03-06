@@ -13,7 +13,7 @@
 void CreateTempAwareRefineLB();
 BaseLB * AllocateTempAwareRefineLB();
 
-class TempAwareRefineLB : public CentralLB {
+class TempAwareRefineLB : public CBase_TempAwareRefineLB {
   friend void printCurrentTemperature(void *LB, double curWallTime);
 public: 
  struct HeapData {
@@ -27,7 +27,7 @@ public:
   float *procTemp,*avgChipTemp;
   void changeFreq(int);
   TempAwareRefineLB(const CkLBOptions &);
-  TempAwareRefineLB(CkMigrateMessage *m):CentralLB(m) { lbname = "TempAwareRefineLB"; }
+  TempAwareRefineLB(CkMigrateMessage *m):CBase_TempAwareRefineLB(m) { lbname = "TempAwareRefineLB"; }
   void work(LDStats* stats);
   float getTemp(int);
 private:

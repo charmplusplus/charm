@@ -8,7 +8,7 @@
 void CreateTempAwareCommLB();
 BaseLB * AllocateTempAwareCommLB();
 
-class TempAwareCommLB : public CentralLB {
+class TempAwareCommLB : public CBase_TempAwareCommLB {
 friend void printCurrentTemperature(void *LB, double curWallTime);
 public:
   struct HeapData {
@@ -28,7 +28,7 @@ public:
 
   float *procTemp,*avgChipTemp;
   TempAwareCommLB(const CkLBOptions &);
-  TempAwareCommLB(CkMigrateMessage *m):CentralLB(m) {
+  TempAwareCommLB(CkMigrateMessage *m):CBase_TempAwareCommLB(m) {
     lbname = "TempAwareCommLB";
   }
   void work(LDStats* stats);

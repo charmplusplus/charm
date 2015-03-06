@@ -14,12 +14,12 @@
  but doing nothing but resume from sync
  NullLB only is functioning when there is no other strategy created.
 */
-class NullLB : public BaseLB
+class NullLB : public CBase_NullLB
 {
 public:
-  NullLB(const CkLBOptions &opt): BaseLB(opt) 
+  NullLB(const CkLBOptions &opt): CBase_NullLB(opt)
 	{init(); lbname="NullLB";}
-  NullLB(CkMigrateMessage *m):BaseLB(m){ }
+  NullLB(CkMigrateMessage *m):CBase_NullLB(m){ }
   ~NullLB();
 
   static void staticAtSync(void*);
@@ -27,7 +27,7 @@ public:
 
   void migrationsDone(void);
   void pup(PUP::er &p){ 
-    BaseLB::pup(p); 
+    CBase_NullLB::pup(p); 
     if(p.isUnpacking()) init(); 
     lbname="NullLB"; 
   }

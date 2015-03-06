@@ -56,7 +56,7 @@ CreateLBFunc_Def (GridCommRefineLB, "Grid communication load balancer (refines o
 /**************************************************************************
 **
 */
-GridCommRefineLB::GridCommRefineLB (const CkLBOptions &opt) : CentralLB (opt)
+GridCommRefineLB::GridCommRefineLB (const CkLBOptions &opt) : CBase_GridCommRefineLB (opt)
 {
   char *value;
 
@@ -81,7 +81,7 @@ GridCommRefineLB::GridCommRefineLB (const CkLBOptions &opt) : CentralLB (opt)
 /**************************************************************************
 **
 */
-GridCommRefineLB::GridCommRefineLB (CkMigrateMessage *msg) : CentralLB (msg)
+GridCommRefineLB::GridCommRefineLB (CkMigrateMessage *msg) : CBase_GridCommRefineLB (msg)
 {
   char *value;
 

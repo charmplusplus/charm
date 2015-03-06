@@ -17,10 +17,10 @@ class maxheap;
 void CreateRefineCommLB();
 BaseLB *AllocateRefineCommLB();
 
-class RefineCommLB : public RefineLB {
+class RefineCommLB : public CBase_RefineCommLB {
 public:
   RefineCommLB(const CkLBOptions &);
-  RefineCommLB(CkMigrateMessage *m):RefineLB(m) {}
+  RefineCommLB(CkMigrateMessage *m):CBase_RefineCommLB(m) {}
 private:
   bool QueryBalanceNow(int step);
   void work(LDStats* stats);

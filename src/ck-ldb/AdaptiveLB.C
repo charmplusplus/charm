@@ -14,7 +14,7 @@ extern LBAllocFn getLBAllocFn(const char *lbname);
 
 CreateLBFunc_Def(AdaptiveLB, "Allow multiple strategies to work serially")
 
-AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CentralLB(opt)
+AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CBase_AdaptiveLB(opt)
 {
   lbname = "AdaptiveLB";
   const char *lbs = theLbdb->loadbalancer(opt.getSeqNo());

@@ -12,7 +12,7 @@
 void CreateGreedyLB();
 BaseLB * AllocateGreedyLB();
 
-class GreedyLB : public CentralLB {
+class GreedyLB : public CBase_GreedyLB {
 
 public:
   struct HeapData {
@@ -22,7 +22,7 @@ public:
   };
 
   GreedyLB(const CkLBOptions &);
-  GreedyLB(CkMigrateMessage *m):CentralLB(m) { lbname = "GreedyLB"; }
+  GreedyLB(CkMigrateMessage *m):CBase_GreedyLB(m) { lbname = "GreedyLB"; }
   void work(LDStats* stats);
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};

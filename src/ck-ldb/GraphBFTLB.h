@@ -19,13 +19,13 @@
 
 void CreateGraphBFTLB();
 
-class GraphBFTLB : public CentralLB {
+class GraphBFTLB : public CBase_GraphBFTLB {
   public:
     GraphBFTLB(const CkLBOptions &opt);
-    GraphBFTLB(CkMigrateMessage *m) : CentralLB (m) { };
+    GraphBFTLB(CkMigrateMessage *m) : CBase_GraphBFTLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CentralLB::pup(p); }
+    void pup(PUP::er &p) { CBase_GraphBFTLB::pup(p); }
 
   private:
     bool QueryBalanceNow(int _step);

@@ -12,7 +12,7 @@
 void CreateTempAwareGreedyLB();
 BaseLB * AllocateTempAwareGreedyLB();
 
-class TempAwareGreedyLB : public CentralLB {
+class TempAwareGreedyLB : public CBase_TempAwareGreedyLB {
 
 public:
   struct HeapData {
@@ -22,7 +22,7 @@ public:
   };
 
   TempAwareGreedyLB(const CkLBOptions &);
-  TempAwareGreedyLB(CkMigrateMessage *m):CentralLB(m) { lbname = "GreedyLB"; }
+  TempAwareGreedyLB(CkMigrateMessage *m) : CBase_TempAwareGreedyLB(m) { lbname = "GreedyLB"; }
   void work(LDStats* stats);
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};

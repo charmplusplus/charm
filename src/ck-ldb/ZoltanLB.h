@@ -19,10 +19,10 @@
 void CreateZoltanLB();
 BaseLB * AllocateZoltanLB();
 
-class ZoltanLB : public CentralLB {
+class ZoltanLB : public CBase_ZoltanLB {
 public:
   ZoltanLB(const CkLBOptions &);
-  ZoltanLB(CkMigrateMessage *m):CentralLB(m) { lbname = "ZoltanLB"; }
+  ZoltanLB(CkMigrateMessage *m) : CBase_ZoltanLB(m) { lbname = "ZoltanLB"; }
 private:
   bool QueryBalanceNow(int step) { return true; }
   void work(LDStats* stats);

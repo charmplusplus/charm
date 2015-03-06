@@ -1,8 +1,8 @@
 module RefineTopoLB
 {
-  extern module CentralLB;
+  extern module TopoLB;
   initnode void lbinit (void);
-  group [migratable] RefineTopoLB : CentralLB
+  group [migratable] RefineTopoLB : TopoLB
   {
     entry void RefineTopoLB (const CkLBOptions &);
   };

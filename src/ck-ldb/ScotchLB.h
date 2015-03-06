@@ -19,13 +19,13 @@
 
 void CreateScotchLB();
 
-class ScotchLB : public CentralLB {
+class ScotchLB : public CBase_ScotchLB {
   public:
     ScotchLB(const CkLBOptions &opt);
-    ScotchLB(CkMigrateMessage *m) : CentralLB (m) { };
+    ScotchLB(CkMigrateMessage *m) : CBase_ScotchLB (m) { };
 
     void work(LDStats *stats);
-    void pup(PUP::er &p) { CentralLB::pup(p); }
+    void pup(PUP::er &p) { CBase_ScotchLB::pup(p); }
 
   private:
     bool QueryBalanceNow(int _step);

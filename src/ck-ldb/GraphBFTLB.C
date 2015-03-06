@@ -17,7 +17,7 @@
 
 CreateLBFunc_Def(GraphBFTLB, "Algorithm which does breadth first traversal for communication aware load balancing")
 
-GraphBFTLB::GraphBFTLB(const CkLBOptions &opt) : CentralLB(opt) {
+GraphBFTLB::GraphBFTLB(const CkLBOptions &opt) : CBase_GraphBFTLB(opt) {
   lbname = "GraphBFTLB";
   if(CkMyPe() == 0)
     CkPrintf("GraphBFTLB created\n");

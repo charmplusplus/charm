@@ -16,7 +16,7 @@ CreateLBFunc_Def(TreeMatchLB, "TreeMatch load balancer, like a normal one but wi
 
 #include "TreeMatchLB.def.h"
 
-TreeMatchLB::TreeMatchLB(const CkLBOptions &opt): CentralLB(opt)
+TreeMatchLB::TreeMatchLB(const CkLBOptions &opt): CBase_TreeMatchLB(opt)
 {
   lbname = (char*)"TreeMatchLB";
   if (CkMyPe() == 0)

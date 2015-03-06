@@ -13,7 +13,7 @@
 
 CreateLBFunc_Def(RefineKLB, "Move objects away from overloaded processor to reach average")
 
-RefineKLB::RefineKLB(const CkLBOptions &opt): CentralLB(opt)
+RefineKLB::RefineKLB(const CkLBOptions &opt): CBase_RefineKLB(opt)
 {
   lbname = (char *)"RefineKLB";
   if (CkMyPe() == 0)

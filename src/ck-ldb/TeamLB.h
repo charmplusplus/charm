@@ -12,13 +12,13 @@
 void CreateTeamLB();
 BaseLB * AllocateTeamLB();
 
-class TeamLB : public CentralLB {
+class TeamLB : public CBase_TeamLB {
   public:
     TeamLB(const CkLBOptions &);
-    TeamLB(CkMigrateMessage *m):CentralLB(m) { lbname = "TeamLB"; }
+    TeamLB(CkMigrateMessage *m):CBase_TeamLB(m) { lbname = "TeamLB"; }
 
     void work(LDStats* stats);
-    void pup(PUP::er &p) { CentralLB::pup(p); }
+    void pup(PUP::er &p) { CBase_TeamLB::pup(p); }
 
   private:
     int teamSize;

@@ -67,11 +67,11 @@ public:
   }
 };
 
-class HbmLB : public BaseLB
+class HbmLB : public CBase_HbmLB
 {
 public:
   HbmLB(const CkLBOptions &);
-  HbmLB(CkMigrateMessage *m):BaseLB(m) {}
+  HbmLB(CkMigrateMessage *m):CBase_HbmLB(m) {}
   ~HbmLB();
 
   static void staticAtSync(void*);

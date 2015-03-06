@@ -21,11 +21,11 @@ void CreateWSLB();
 
 class WSLBStatsMsg;
 
-class WSLB : public BaseLB
+class WSLB : public CBase_WSLB
 {
 public:
   WSLB(const CkLBOptions &);
-  WSLB(CkMigrateMessage *m):BaseLB(m) {}
+  WSLB(CkMigrateMessage *m):CBase_WSLB(m) {}
   ~WSLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier

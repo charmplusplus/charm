@@ -34,16 +34,16 @@ extern "C" void METIS_mCPartGraphKway (int*, int*, int*, int*, int*,
 
 void CreateTopoCentLB ();
 
-class TopoCentLB : public CentralLB
+class TopoCentLB : public CBase_TopoCentLB
 {
   public:
     TopoCentLB (const CkLBOptions &opt);
-    TopoCentLB (CkMigrateMessage *m) : CentralLB (m) { };
+    TopoCentLB (CkMigrateMessage *m) : CBase_TopoCentLB (m) { };
     ~TopoCentLB();
     
     void work (LDStats *stats);
 
-    void pup (PUP::er &p) { CentralLB::pup(p); }
+    void pup (PUP::er &p) { CBase_TopoCentLB::pup(p); }
 
     struct HeapNode {
       double key;

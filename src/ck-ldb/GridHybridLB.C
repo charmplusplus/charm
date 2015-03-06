@@ -18,7 +18,7 @@ CreateLBFunc_Def (GridHybridLB, "Grid load balancer that uses hybrid technique t
 /**************************************************************************
 **
 */
-GridHybridLB::GridHybridLB (const CkLBOptions &opt) : CentralLB (opt)
+GridHybridLB::GridHybridLB (const CkLBOptions &opt) : CBase_GridHybridLB (opt)
 {
   char *value;
 
@@ -55,7 +55,7 @@ GridHybridLB::GridHybridLB (const CkLBOptions &opt) : CentralLB (opt)
 /**************************************************************************
 **
 */
-GridHybridLB::GridHybridLB (CkMigrateMessage *msg) : CentralLB (msg)
+GridHybridLB::GridHybridLB (CkMigrateMessage *msg) : CBase_GridHybridLB (msg)
 {
   char *value;
 

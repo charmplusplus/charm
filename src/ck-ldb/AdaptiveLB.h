@@ -14,11 +14,11 @@ void CreateAdaptiveLB();
 /// for backward compatibility
 typedef LBMigrateMsg  CLBMigrateMsg;
 
-class AdaptiveLB : public CentralLB
+class AdaptiveLB : public CBase_AdaptiveLB
 {
 public:
   AdaptiveLB(const CkLBOptions &);
-  AdaptiveLB(CkMigrateMessage *m):CentralLB(m) {}
+  AdaptiveLB(CkMigrateMessage *m):CBase_AdaptiveLB(m) {}
 
 protected:
   virtual bool QueryBalanceNow(int) { return true; };  

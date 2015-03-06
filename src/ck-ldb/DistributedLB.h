@@ -26,7 +26,7 @@
 
 void CreateDistributedLB();
 
-class DistributedLB : public DistBaseLB {
+class DistributedLB : public CBase_DistributedLB {
 public:
   DistributedLB(const CkLBOptions &);
   DistributedLB(CkMigrateMessage *m);

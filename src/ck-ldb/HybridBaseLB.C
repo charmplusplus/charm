@@ -35,7 +35,7 @@ void HybridBaseLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
+HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 {
 #if CMK_LBDB_ON
   lbname = (char *)"HybridBaseLB";

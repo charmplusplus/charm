@@ -5,15 +5,15 @@
 
 void CreateRotateLB ();
 
-class RotateLB : public CentralLB
+class RotateLB : public CBase_RotateLB
 {
   public:
     RotateLB (const CkLBOptions &opt);
-    RotateLB (CkMigrateMessage *m) : CentralLB (m) { };
+    RotateLB (CkMigrateMessage *m) : CBase_RotateLB (m) { };
 
     void work(LDStats *stats);
 
-    void pup (PUP::er &p) { CentralLB::pup(p); }
+    void pup (PUP::er &p) { CBase_RotateLB::pup(p); }
 
   private:
     bool QueryBalanceNow (int step);

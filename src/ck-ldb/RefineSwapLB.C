@@ -23,7 +23,7 @@ using std::endl;
 CreateLBFunc_Def(RefineSwapLB,
     "always assign the heaviest obj onto lightest loaded processor.")
 
-RefineSwapLB::RefineSwapLB(const CkLBOptions &opt): CentralLB(opt)
+RefineSwapLB::RefineSwapLB(const CkLBOptions &opt): CBase_RefineSwapLB(opt)
 {
   lbname = "RefineSwapLB";
   if (CkMyPe()==0)

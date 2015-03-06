@@ -105,7 +105,7 @@ int getProcFreqPtr(int *freqs,int numAvail,int freq)
 #endif
 FILE *migFile;
 double starting;
-TempAwareRefineLB::TempAwareRefineLB(const CkLBOptions &opt): CentralLB(opt)
+TempAwareRefineLB::TempAwareRefineLB(const CkLBOptions &opt): CBase_TempAwareRefineLB(opt)
 {
 #ifdef TEMP_LDB
 starting=CmiWallTimer();

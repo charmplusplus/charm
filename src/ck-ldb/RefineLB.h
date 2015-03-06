@@ -16,7 +16,7 @@ class maxheap;
 void CreateRefineLB();
 BaseLB *AllocateRefineLB();
 
-class RefineLB : public CentralLB {
+class RefineLB : public CBase_RefineLB {
 protected:
   computeInfo *computes;
   processorInfo *processors;
@@ -30,7 +30,7 @@ protected:
 
 public:
   RefineLB(const CkLBOptions &);
-  RefineLB(CkMigrateMessage *m):CentralLB(m) { lbname = (char *)"RefineLB"; }
+  RefineLB(CkMigrateMessage *m):CBase_RefineLB(m) { lbname = (char *)"RefineLB"; }
   void work(LDStats* stats);
 private:
   bool QueryBalanceNow(int step) { return true; }

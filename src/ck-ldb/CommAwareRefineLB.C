@@ -51,7 +51,7 @@ double lower_threshold;
 
 CreateLBFunc_Def(CommAwareRefineLB, "always assign the heaviest obj onto lightest loaded processor.")
 
-CommAwareRefineLB::CommAwareRefineLB(const CkLBOptions &opt): CentralLB(opt)
+CommAwareRefineLB::CommAwareRefineLB(const CkLBOptions &opt): CBase_CommAwareRefineLB(opt)
 {
   lbname = "CommAwareRefineLB";
   if (CkMyPe()==0)

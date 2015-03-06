@@ -15,7 +15,7 @@
 
 CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
 
-MetisLB::MetisLB(const CkLBOptions &opt): CentralLB(opt)
+MetisLB::MetisLB(const CkLBOptions &opt): CBase_MetisLB(opt)
 {
   lbname = "MetisLB";
   if (CkMyPe() == 0)

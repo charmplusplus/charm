@@ -18,14 +18,14 @@ typedef LBMigrateMsg NLBMigrateMsg;
 
 class NLBStatsMsg;
 
-class NborBaseLB : public BaseLB
+class NborBaseLB : public CBase_NborBaseLB
 {
 private:
   CProxy_NborBaseLB  thisProxy;
   LBTopology         *topo;
 public:
   NborBaseLB(const CkLBOptions &);
-  NborBaseLB(CkMigrateMessage *m):BaseLB(m) {}
+  NborBaseLB(CkMigrateMessage *m):CBase_NborBaseLB(m) {}
   ~NborBaseLB();
 
   static void staticAtSync(void*);

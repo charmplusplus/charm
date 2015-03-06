@@ -11,10 +11,10 @@
 
 void CreateDummyLB();
 
-class DummyLB : public CentralLB {
+class DummyLB : public CBase_DummyLB {
 public:
   DummyLB(const CkLBOptions &);
-  DummyLB(CkMigrateMessage *m):CentralLB(m) {}
+  DummyLB(CkMigrateMessage *m):CBase_DummyLB(m) {}
 private:
   bool QueryBalanceNow(int step);
   void work(LDStats* stats) {}

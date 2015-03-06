@@ -17,7 +17,7 @@
 
 CreateLBFunc_Def(ScotchLB, "Load balancing using the Scotch graph partitioning library")
 
-ScotchLB::ScotchLB(const CkLBOptions &opt) : CentralLB(opt) {
+ScotchLB::ScotchLB(const CkLBOptions &opt) : CBase_ScotchLB(opt) {
   lbname = "ScotchLB";
   if(CkMyPe() == 0)
     CkPrintf("ScotchLB created\n");

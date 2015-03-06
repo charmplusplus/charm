@@ -9,7 +9,7 @@
 
 CreateLBFunc_Def(NeighborLB, "The neighborhood load balancer")
 
-NeighborLB::NeighborLB(const CkLBOptions &opt):NborBaseLB(opt)
+NeighborLB::NeighborLB(const CkLBOptions &opt):CBase_NeighborLB(opt)
 {
   lbname = "NeighborLB";
   if (CkMyPe() == 0)

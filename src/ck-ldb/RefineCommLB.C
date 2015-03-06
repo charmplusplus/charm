@@ -9,7 +9,7 @@
 
 CreateLBFunc_Def(RefineCommLB, "Average load among processors by moving objects away from overloaded processor, communication aware")
 
-RefineCommLB::RefineCommLB(const CkLBOptions &opt): RefineLB(opt)
+RefineCommLB::RefineCommLB(const CkLBOptions &opt): CBase_RefineCommLB(opt)
 {
   lbname = (char *)"RefineCommLB";
   if (CkMyPe() == 0)

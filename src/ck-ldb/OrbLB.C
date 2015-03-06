@@ -29,7 +29,7 @@ void OrbLB::init()
 }
 
 
-OrbLB::OrbLB(const CkLBOptions &opt, bool userdata): CentralLB(opt)
+OrbLB::OrbLB(const CkLBOptions &opt, bool userdata): CBase_OrbLB(opt)
 {
   use_udata = userdata;
   init();
@@ -37,7 +37,7 @@ OrbLB::OrbLB(const CkLBOptions &opt, bool userdata): CentralLB(opt)
     CkPrintf("[%d] OrbLB created\n",CkMyPe());
 }
 
-OrbLB::OrbLB(const CkLBOptions &opt): CentralLB(opt)
+OrbLB::OrbLB(const CkLBOptions &opt): CBase_OrbLB(opt)
 {
   use_udata = true;
   init();

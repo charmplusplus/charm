@@ -29,7 +29,7 @@ void HbmLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-HbmLB::HbmLB(const CkLBOptions &opt): BaseLB(opt)
+HbmLB::HbmLB(const CkLBOptions &opt): CBase_HbmLB(opt)
 {
 #if CMK_LBDB_ON
   lbname = (char *)"HbmLB";

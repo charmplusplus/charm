@@ -24,7 +24,7 @@ struct graph{
 
 class processorInfo;
 
-class GreedyCommLB : public CentralLB {
+class GreedyCommLB : public CBase_GreedyCommLB {
 public:
   int nobj,npe, nmigobj;
   int * assigned_array;
@@ -32,7 +32,7 @@ public:
   graph * object_graph;
   GreedyCommLB(const CkLBOptions &);
   GreedyCommLB(CkMigrateMessage *m);
-  void pup(PUP::er &p){ CentralLB::pup(p); }
+  void pup(PUP::er &p){ CBase_GreedyCommLB::pup(p); }
   bool QueryBalanceNow(int step);
   void work(LDStats* stats);
 

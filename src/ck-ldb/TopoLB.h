@@ -44,15 +44,15 @@ extern "C" void METIS_mCPartGraphKway (int*, int*, int*, int*, int*,
 
 void CreateTopoLB ();
 
-class TopoLB : public CentralLB
+class TopoLB : public CBase_TopoLB
 {
   public:
     TopoLB (const CkLBOptions &opt);
-    TopoLB (CkMigrateMessage *m) : CentralLB (m) { };
+    TopoLB (CkMigrateMessage *m) : CBase_TopoLB (m) { };
   
     void work (LDStats *stats);
    // void work_fromFile (char *filename);
-    void pup (PUP::er &p) { CentralLB::pup(p); }
+    void pup (PUP::er &p) { CBase_TopoLB::pup(p); }
     	
     LBTopology			*topo;
   

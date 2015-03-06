@@ -25,7 +25,7 @@
 
 CreateLBFunc_Def(CommLB, "another variation of CommLB")
 
-CommLB::CommLB(const CkLBOptions &opt): CentralLB(opt)
+CommLB::CommLB(const CkLBOptions &opt): CBase_CommLB(opt)
 {
   if (CkMyPe() == 0)
     CkPrintf("[%d] CommLB created\n",CkMyPe());

@@ -50,7 +50,7 @@ CreateLBFunc_Def (GridCommLB, "Grid communication load balancer (evenly distribu
 /**************************************************************************
 **
 */
-GridCommLB::GridCommLB (const CkLBOptions &opt) : CentralLB (opt)
+GridCommLB::GridCommLB (const CkLBOptions &opt) : CBase_GridCommLB (opt)
 {
   char *value;
 
@@ -87,7 +87,7 @@ GridCommLB::GridCommLB (const CkLBOptions &opt) : CentralLB (opt)
 /**************************************************************************
 **
 */
-GridCommLB::GridCommLB (CkMigrateMessage *msg) : CentralLB (msg)
+GridCommLB::GridCommLB (CkMigrateMessage *msg) : CBase_GridCommLB (msg)
 {
   char *value;
 

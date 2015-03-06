@@ -152,7 +152,7 @@ void BQueue::push(Vertex *vert)
 }
 
 
-RecBipartLB::RecBipartLB(const CkLBOptions &opt) : CentralLB(opt) {
+RecBipartLB::RecBipartLB(const CkLBOptions &opt) : CBase_RecBipartLB(opt) {
   lbname = "RecBipartLB";
   if(CkMyPe() == 0)
     CkPrintf("RecBipartLB created\n");

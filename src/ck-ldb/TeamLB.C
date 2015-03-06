@@ -14,7 +14,7 @@
 
 CreateLBFunc_Def(TeamLB, "Use Metis(tm) to partition object graph at two levels: team level and processor level")
 
-TeamLB::TeamLB(const CkLBOptions &opt): CentralLB(opt)
+TeamLB::TeamLB(const CkLBOptions &opt): CBase_TeamLB(opt)
 {
   lbname = "TeamLB";
   if (CkMyPe() == 0)

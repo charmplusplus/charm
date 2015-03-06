@@ -18,7 +18,7 @@ CreateLBFunc_Def (GridMetisLB, "Grid load balancer that uses Metis to optimize c
 /**************************************************************************
 **
 */
-GridMetisLB::GridMetisLB (const CkLBOptions &opt) : CentralLB (opt)
+GridMetisLB::GridMetisLB (const CkLBOptions &opt) : CBase_GridMetisLB (opt)
 {
   char *value;
 
@@ -49,7 +49,7 @@ GridMetisLB::GridMetisLB (const CkLBOptions &opt) : CentralLB (opt)
 /**************************************************************************
 **
 */
-GridMetisLB::GridMetisLB (CkMigrateMessage *msg) : CentralLB (msg)
+GridMetisLB::GridMetisLB (CkMigrateMessage *msg) : CBase_GridMetisLB (msg)
 {
   char *value;
 

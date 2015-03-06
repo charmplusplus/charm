@@ -9,7 +9,7 @@ CreateLBFunc_Def(DummyLB, "Dummy load balancer, like a normal one but with empty
 
 #include "DummyLB.def.h"
 
-DummyLB::DummyLB(const CkLBOptions &opt): CentralLB(opt)
+DummyLB::DummyLB(const CkLBOptions &opt): CBase_DummyLB(opt)
 {
   lbname = (char*)"DummyLB";
   if (CkMyPe() == 0)

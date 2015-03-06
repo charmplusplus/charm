@@ -26,7 +26,7 @@ void NborBaseLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
+NborBaseLB::NborBaseLB(const CkLBOptions &opt): CBase_NborBaseLB(opt)
 {
 #if CMK_LBDB_ON
   lbname = (char *)"NborBaseLB";

@@ -24,7 +24,7 @@ using namespace std;
 
 CreateLBFunc_Def(GreedyLB, "always assign the heaviest obj onto lightest loaded processor.")
 
-GreedyLB::GreedyLB(const CkLBOptions &opt): CentralLB(opt)
+GreedyLB::GreedyLB(const CkLBOptions &opt): CBase_GreedyLB(opt)
 {
   lbname = "GreedyLB";
   if (CkMyPe()==0)

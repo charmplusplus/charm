@@ -45,7 +45,7 @@ class Object_Data_T
     double load;
 };
 
-class GridCommLB : public CentralLB
+class GridCommLB : public CBase_GridCommLB
 {
   public:
     GridCommLB (const CkLBOptions &);
@@ -53,7 +53,7 @@ class GridCommLB : public CentralLB
 
     bool QueryBalanceNow (int step);
     void work (LDStats *stats);
-    void pup (PUP::er &p) { CentralLB::pup (p); }
+    void pup (PUP::er &p) { CBase_GridCommLB::pup(p); }
 
   private:
     int Get_Cluster (int pe);

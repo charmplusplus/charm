@@ -19,7 +19,7 @@
 
 CreateLBFunc_Def(TempAwareGreedyLB, "always assign the heaviest obj onto lightest loaded processor.")
 
-TempAwareGreedyLB::TempAwareGreedyLB(const CkLBOptions &opt): CentralLB(opt)
+TempAwareGreedyLB::TempAwareGreedyLB(const CkLBOptions &opt): CBase_TempAwareGreedyLB(opt)
 {
   lbname = "TempAwareGreedyLB";
   if (CkMyPe()==0)

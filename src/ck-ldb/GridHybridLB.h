@@ -77,7 +77,7 @@ class Cluster_Data_T
     double scaled_cpu_power;
 };
 
-class GridHybridLB : public CentralLB
+class GridHybridLB : public CBase_GridHybridLB
 {
   public:
     GridHybridLB (const CkLBOptions &);
@@ -85,7 +85,7 @@ class GridHybridLB : public CentralLB
 
     bool QueryBalanceNow (int step);
     void work (LDStats *stats);
-    void pup (PUP::er &p) { CentralLB::pup (p); }
+    void pup (PUP::er &p) { CBase_GridHybridLB::pup (p); }
 
   private:
     int Get_Cluster (int pe);

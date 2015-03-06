@@ -16,10 +16,10 @@ void CreateDistBaseLB();
 typedef LBMigrateMsg NLBMigrateMsg;
 
 
-class DistBaseLB : public BaseLB {
+class DistBaseLB : public CBase_DistBaseLB {
 public:
   DistBaseLB(const CkLBOptions &);
-  DistBaseLB(CkMigrateMessage *m):BaseLB(m) {}
+  DistBaseLB(CkMigrateMessage *m) : CBase_DistBaseLB(m) {}
   ~DistBaseLB();
 
   static void staticAtSync(void*);

@@ -11,7 +11,7 @@ CreateLBFunc_Def(PhasebyArrayLB, "Load balancer which balances many arrays toget
 
 #include "PhasebyArrayLB.def.h"
 
-PhasebyArrayLB::PhasebyArrayLB(const CkLBOptions &opt): CentralLB(opt)
+PhasebyArrayLB::PhasebyArrayLB(const CkLBOptions &opt): CBase_PhasebyArrayLB(opt)
 {
   lbname = (char*)"PhasebyArrayLB";
   if (CkMyPe() == 0)

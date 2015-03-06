@@ -8,7 +8,7 @@ CreateLBFunc_Def (BlockLB, "Allocate objects in blocks to the remaining valid PE
 /**************************************************************************
 **
 */
-BlockLB::BlockLB (const CkLBOptions &opt) : CentralLB (opt)
+BlockLB::BlockLB (const CkLBOptions &opt) : CBase_BlockLB (opt)
 {
   lbname = "BlockLB";
 

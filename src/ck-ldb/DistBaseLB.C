@@ -35,7 +35,7 @@ void DistBaseLB::ProcessAtSync() {
   contribute(cb);
 }
 
-DistBaseLB::DistBaseLB(const CkLBOptions &opt): BaseLB(opt) {
+DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
 #if CMK_LBDB_ON
   lbname = (char *)"DistBaseLB";
   thisProxy = CProxy_DistBaseLB(thisgroup);

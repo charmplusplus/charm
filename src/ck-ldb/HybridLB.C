@@ -22,7 +22,7 @@
 
 CreateLBFunc_Def(HybridLB, "Hybrid load balancer")
 
-HybridLB::HybridLB(const CkLBOptions &opt): HybridBaseLB(opt)
+HybridLB::HybridLB(const CkLBOptions &opt): CBase_HybridLB(opt)
 {
 #if CMK_LBDB_ON
   lbname = (char *)"HybridLB";

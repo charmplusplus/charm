@@ -13,10 +13,10 @@
 
 void CreateNeighborLB();
 
-class NeighborLB : public NborBaseLB {
+class NeighborLB : public CBase_NeighborLB {
 public:
   NeighborLB(const CkLBOptions &);
-  NeighborLB(CkMigrateMessage *m):NborBaseLB(m) {}
+  NeighborLB(CkMigrateMessage *m):CBase_NeighborLB(m) {}
 private:
   bool QueryBalanceNow(int step) { return true; };
   virtual int max_neighbors() {

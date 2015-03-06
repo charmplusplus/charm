@@ -38,7 +38,7 @@ class Object_Data_T
     double load;
 };
 
-class GridCommRefineLB : public CentralLB
+class GridCommRefineLB : public CBase_GridCommRefineLB
 {
   public:
     GridCommRefineLB (const CkLBOptions &);
@@ -46,7 +46,7 @@ class GridCommRefineLB : public CentralLB
 
     bool QueryBalanceNow (int step);
     void work (LDStats *stats);
-    void pup (PUP::er &p) { CentralLB::pup (p); }
+    void pup (PUP::er &p) { CBase_GridCommRefineLB::pup (p); }
 
   private:
     int Get_Cluster (int pe);

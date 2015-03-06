@@ -18,7 +18,7 @@ CreateLBFunc_Def (RotateLB, "Rotate each object to the next higher PE")
 /**************************************************************************
 **
 */
-RotateLB::RotateLB (const CkLBOptions &opt) : CentralLB (opt)
+RotateLB::RotateLB (const CkLBOptions &opt) : CBase_RotateLB (opt)
 {
   lbname = "RotateLB";
 

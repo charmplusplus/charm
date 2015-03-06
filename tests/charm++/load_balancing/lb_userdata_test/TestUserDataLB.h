@@ -7,12 +7,12 @@
 void CreateTestUserDataLB();
 BaseLB * AllocateTestUserDataLB();
 
-class TestUserDataLB : public CentralLB {
+class TestUserDataLB : public CBase_TestUserDataLB {
 
 public:
 
   TestUserDataLB(const CkLBOptions &);
-  TestUserDataLB(CkMigrateMessage *m):CentralLB(m) { lbname = "TestUserDataLB"; }
+  TestUserDataLB(CkMigrateMessage *m):CBase_TestUserDataLB(m) { lbname = "TestUserDataLB"; }
   void work(LDStats* stats);
 private:	
   bool        QueryBalanceNow(int step);
