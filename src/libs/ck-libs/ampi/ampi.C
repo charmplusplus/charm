@@ -594,11 +594,6 @@ static void ampiProcInit(void){
   initAmpiProjections();
 
   char **argv=CkGetArgv();
-#if AMPI_COMLIB  
-  if(CkpvAccess(argvExtracted)==0){
-    enableStreaming=CmiGetArgFlagDesc(argv,"+ampi_streaming","Enable streaming comlib for ampi send/recv.");
-  }
-#endif
 
 #if AMPIMSGLOG
   msgLogWrite = CmiGetArgFlag(argv, "+msgLogWrite");
@@ -764,39 +759,7 @@ static ampi *ampiInit(char **argv)
 
       ampiCommStruct worldComm(new_world,empty,_nchunks);
       CProxy_ampi arr;
-
-
-#if AMPI_COMLIB
-
-      ComlibInstanceHandle ciStreaming = 1;
-      ComlibInstanceHandle ciBcast = 2;
-      ComlibInstanceHandle ciAllgather = 3;
-      ComlibInstanceHandle ciAlltoall = 4;
-
-      arr=CProxy_ampi::ckNew(parent, worldComm, ciStreaming, ciBcast, ciAllgather, ciAlltoall, opts);
-
-
-      CkPrintf("Using untested comlib code in ampi.C\n");
-
-      Strategy *sStreaming = new StreamingStrategy(1,10);
-      CkAssert(ciStreaming == ComlibRegister(sStreaming));
-
-      Strategy *sBcast = new BroadcastStrategy(USE_HYPERCUBE);
-      CkAssert(ciBcast = ComlibRegister(sBcast));
-
-      Strategy *sAllgather = new EachToManyMulticastStrategy(USE_HYPERCUBE,arr.ckGetArrayID(),arr.ckGetArrayID());
-      CkAssert(ciAllgather = ComlibRegister(sAllgather));
-
-      Strategy *sAlltoall = new EachToManyMulticastStrategy(USE_PREFIX, arr.ckGetArrayID(),arr.ckGetArrayID());
-      CkAssert(ciAlltoall = ComlibRegister(sAlltoall));
-
-      CmiPrintf("Created AMPI comlib strategies in new manner\n");
-
-      // FIXME: Propogate the comlib table here
-      CkpvAccess(conv_com_object).doneCreating();
-#else
       arr=CProxy_ampi::ckNew(parent,worldComm,opts);
-#endif
 
       //Broadcast info. to the mpi_worlds array
       // FIXME: remove race condition from MPI_COMM_UNIVERSE broadcast
@@ -1241,10 +1204,6 @@ ampi::ampi()
   posted_ireqs = CmmNew();
   nbcasts = 0;
 
-#if AMPI_COMLIB
-  comlibProxy = thisProxy; // Will later be associated with comlib
-#endif
-
   seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -1256,39 +1215,6 @@ ampi::ampi()
      *                                      CkArray *_myManager = thisProxy.ckLocalBranch();
      *                                              _myManager->setNumInitial(numElements);*/
   }
-#endif
-}
-
-ampi::ampi(CkArrayID parent_,const ampiCommStruct &s, ComlibInstanceHandle ciStreaming_,
-    ComlibInstanceHandle ciBcast_,ComlibInstanceHandle ciAllgather_,ComlibInstanceHandle ciAlltoall_)
-:parentProxy(parent_)
-{
-#if AMPI_COMLIB
-  ciStreaming = ciStreaming_;
-  ciBcast = ciBcast_;
-  ciAllgather = ciAllgather_;
-  ciAlltoall = ciAlltoall_;
-
-  init();
-
-  myComm=s; myComm.setArrayID(thisArrayID);
-  myRank=myComm.getRankForIndex(thisIndex);
-
-  findParent(false);
-
-  msgs = CmmNew();
-  posted_ireqs = CmmNew();
-  nbcasts = 0;
-
-  comlibProxy = thisProxy;
-  CmiPrintf("comlibProxy created as a copy of thisProxy, no associate call\n");
-
-#if AMPI_COMLIB
-  //  ComlibAssociateProxy(ciAlltoall, comlibProxy);
-#endif
-
-  seqEntries=parent->ckGetArraySize();
-  oorder.init (seqEntries);
 #endif
 }
 
@@ -1380,20 +1306,6 @@ void ampi::pup(PUP::er &p)
   p|tmpVec;
   p|remoteProxy;
   p|resumeOnRecv;
-#if AMPI_COMLIB
-  p|comlibProxy;
-  p|ciStreaming;
-  p|ciBcast;
-  p|ciAllgather;
-  p|ciAlltoall;
-
-  if(p.isUnpacking()){
-    //    ciStreaming.setSourcePe();
-    //    ciBcast.setSourcePe();
-    //    ciAllgather.setSourcePe();
-    //    ciAlltoall.setSourcePe();
-  }
-#endif
 
   msgs=CmmPup((pup_er)&p,msgs,cmm_pup_ampi_message);
 
@@ -1944,14 +1856,6 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,
   return msg;
 }
 
-#if AMPI_COMLIB
-  void
-ampi::comlibsend(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm)
-{
-  delesend(t,sRank,buf,count,type,rank,destcomm,comlibProxy);
-}
-#endif
-
   void
 ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, int sync)
 {
@@ -2192,15 +2096,10 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   int rootIdx=dest.getIndexForRank(root);
   if(rootIdx==thisIndex) {
-#if 0//AMPI_COMLIB
-    ciBcast.beginIteration();
-    comlibProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
-#else
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
     thisProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
-#endif
   }
   if(-1==recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM)) CkAbort("AMPI> Error in broadcast");
   nbcasts++;
@@ -2668,13 +2567,7 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-#if AMPI_COMLIB
-  if(enableStreaming){  
-    //    ptr->getStreaming().beginIteration();
-    ptr->comlibsend(tag,ptr->getRank(comm),msg,count,type,dest,comm);
-  } else
-#endif
-    ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm);
+  ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm);
 #if AMPI_COUNTER
   getAmpiParent()->counters.send++;
 #endif
@@ -2704,13 +2597,7 @@ int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-#if AMPI_COMLIB
-  if(enableStreaming){
-    ptr->getStreaming().beginIteration();
-    ptr->comlibsend(tag,ptr->getRank(comm),msg,count,type,dest,comm);
-  } else
-#endif
-    ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm, 1);
+  ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm, 1);
 #if AMPI_COUNTER
   getAmpiParent()->counters.send++;
 #endif
@@ -4185,13 +4072,7 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
 
   USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
   ampi *ptr = getAmpiInstance(comm);
-#if AMPI_COMLIB
-  if(enableStreaming){
-    //    ptr->getStreaming().beginIteration();
-    ptr->comlibsend(tag,ptr->getRank(comm),buf,count,type,dest,comm);
-  } else
-#endif
-    ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm);
+  ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm);
   *request = MPI_REQUEST_NULL;
 #if AMPI_COUNTER
   getAmpiParent()->counters.isend++;
@@ -4341,24 +4222,10 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int size = ptr->getSize(comm);
   int i;
 
-#if AMPI_COMLIB  
-
-  if(comm == MPI_COMM_WORLD) {
-    // commlib support
-
-    for(i=0;i<size;i++) {
-      ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-          sendtype, i, comm, ptr->getComlibProxy());
-    }
-    ptr->getAllgatherStrategy()->doneInserting();
-
-  } else 
-#endif
-
-    for(i=0;i<size;i++) {
-      ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-          sendtype, i, comm);
-    }
+  for(i=0;i<size;i++) {
+    ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+              sendtype, i, comm);
+  }
 
 
   MPI_Status status;
@@ -4407,21 +4274,10 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   int i;
-#if AMPI_COMLIB
-  if(comm == MPI_COMM_WORLD) {
-    // commlib support
-    //      ptr->getAllgather().beginIteration();
-    for(i=0;i<size;i++) {
-      ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-          sendtype, i, comm, ptr->getComlibProxy());
-    }
-    ptr->getAllgatherStrategy()->doneInserting();
-  } else 
-#endif
-    for(i=0;i<size;i++) {
-      ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-          sendtype, i, comm);
-    }
+  for(i=0;i<size;i++) {
+    ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+              sendtype, i, comm);
+  }
 
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
   int itemsize = dttype->getSize(recvcount) ;
@@ -4462,21 +4318,10 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   int i;
-#if AMPI_COMLIB
-  if(comm == MPI_COMM_WORLD) {
-    // commlib support
-    //      ptr->getAllgather().beginIteration();
-    for(i=0;i<size;i++) {
-      ptr->delesend(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-          sendtype, i, comm, ptr->getComlibProxy());
-    }
-    ptr->getAllgatherStrategy()->doneInserting();
-  } else
-#endif 
-    for(i=0;i<size;i++) {
-      ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-          sendtype, i, comm);
-    }
+  for(i=0;i<size;i++) {
+    ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+              sendtype, i, comm);
+  }
 
   MPI_Status status;
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
@@ -4667,7 +4512,6 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
       ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
           sendcount, sendtype, i, comm);
     }
-    //ptr->mcomlibEnd();
   }
 
   MPI_Status status;
@@ -4732,7 +4576,6 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
       ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
           sendcounts[i], sendtype, i, comm);
     }
-    //ptr->mcomlibEnd();
   }
 
   MPI_Status status;
@@ -4799,23 +4642,10 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   dttype = ptr->getDDT()->getType(sendtype) ;
   itemsize = dttype->getSize(sendcount) ;
-#if AMPI_COMLIB
-  if(comm == MPI_COMM_WORLD) {
-    // commlib support
-    ptr->getAlltoall().beginIteration();
-    for(i=0;i<size;i++) {
-      ptr->delesend(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
-          sendtype, i, comm, ptr->getComlibProxy());
-    }
-    ptr->getAlltoall().endIteration();
-  } else
-#endif 
-  {
-    for(i=0;i<size;i++) {
-      int dst = (rank+i) % size;
-      ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
-          sendtype, dst, comm);
-    }
+  for(i=0;i<size;i++) {
+    int dst = (rank+i) % size;
+    ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
+              sendtype, dst, comm);
   }
 
   // can use waitall if it is fixed for memory
@@ -4970,24 +4800,10 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     free((char *)tmp_buf); 
 
   }else if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG ) {
-#if AMPI_COMLIB
-    if(comm == MPI_COMM_WORLD) {
-      // commlib support
-      //      ptr->getAlltoall().beginIteration();
-      for(i=0;i<size;i++) {
-        CmiPrintf("delesend\n");
-        ptr->delesend(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
-            sendtype, i, comm, ptr->getComlibProxy());
-      }
-      ptr->getAlltoallStrategy()->doneInserting();
-    } else
-#endif 
-    { // Note that this block hangs off the conditional above
-      for(i=0;i<size;i++) {
-        int dst = (rank+i) % size;
-        ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
-            sendtype, dst, comm);
-      }
+    for(i=0;i<size;i++) {
+      int dst = (rank+i) % size;
+      ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
+                sendtype, dst, comm);
     }
     dttype = ptr->getDDT()->getType(recvtype) ;
     itemsize = dttype->getSize(recvcount) ;
@@ -5141,21 +4957,10 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int itemsize = dttype->getSize(sendcount) ;
   int i;
 
-#if AMPI_COMLIB
-  if(comm == MPI_COMM_WORLD) {
-    // commlib support
-    //      ptr->getAlltoall().beginIteration();
-    for(i=0;i<size;i++) {
-      ptr->delesend(MPI_ATA_TAG+reqsSize, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
-          sendtype, i, comm, ptr->getComlibProxy());
-    }
-    ptr->getAlltoallStrategy()->doneInserting();
-  } else
-#endif
-    for(i=0;i<size;i++) {
-      ptr->send(MPI_ATA_TAG+reqsSize, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
-          sendtype, i, comm);
-    }
+  for(i=0;i<size;i++) {
+    ptr->send(MPI_ATA_TAG+reqsSize, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
+              sendtype, i, comm);
+  }
 
   // copy+paste from MPI_Irecv
   ATAReq *newreq = new ATAReq(size);
@@ -5213,22 +5018,9 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize() ;
   int i;
-#if AMPI_COMLIB
-  if(comm == MPI_COMM_WORLD) {
-    // commlib support
-    //      ptr->getAlltoall().beginIteration();
-    for(i=0;i<size;i++) {
-      ptr->delesend(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
-          sendtype, i, comm, ptr->getComlibProxy());
-    }
-    ptr->getAlltoallStrategy()->doneInserting();
-  } else
-#endif
-  {
-    for(i=0;i<size;i++)  {
-      ptr->send(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
-          sendtype, i, comm);
-    }
+  for(i=0;i<size;i++)  {
+    ptr->send(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
+              sendtype, i, comm);
   }
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;

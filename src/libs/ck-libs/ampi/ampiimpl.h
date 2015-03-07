@@ -7,15 +7,6 @@
 #include "charm++.h"
 #include "ckliststring.h"
 
-#if AMPI_COMLIB
-//#warning COMPILING IN UNTESTED AMPI COMLIB SUPPORT
-#include "StreamingStrategy.h"
-#include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
-#include "BroadcastStrategy.h"
-#else
-#define ComlibInstanceHandle int
-#endif
-
 #if 0
 #define AMPI_DEBUG CkPrintf
 #else
@@ -1313,17 +1304,6 @@ friend class SReq;
     int myRank;
     groupStruct tmpVec; // stores temp group info
     CProxy_ampi remoteProxy; // valid only for intercommunicator
-
-#if AMPI_COMLIB
-    /// A proxy used when delegating message sends to comlib
-    CProxy_ampi comlibProxy;
-    
-    /// References to the comlib instance handles(currently just integers)
-    ComlibInstanceHandle ciStreaming;
-    ComlibInstanceHandle ciBcast;
-    ComlibInstanceHandle ciAllgather;
-    ComlibInstanceHandle ciAlltoall;
-#endif
     
     int seqEntries; //Number of elements in below arrays
     AmpiSeqQ oorder;
@@ -1335,8 +1315,6 @@ friend class SReq;
 
     ampi();
     ampi(CkArrayID parent_,const ampiCommStruct &s);
-    ampi(CkArrayID parent_,const ampiCommStruct &s,ComlibInstanceHandle ciStreaming_,
-    	ComlibInstanceHandle ciBcast_,ComlibInstanceHandle ciAllgather_,ComlibInstanceHandle ciAlltoall_);
     ampi(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     void ckJustRestored(void);
@@ -1369,9 +1347,6 @@ friend class SReq;
     AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                          int type,MPI_Comm destcomm, int sync=0);
 
-#if AMPI_COMLIB
-    inline void comlibsend(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm);
-#endif
     inline void send(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm, int sync=0);
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
@@ -1410,18 +1385,6 @@ friend class SReq;
     inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
     inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
     inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
-#if AMPI_COMLIB
-    inline const CProxy_ampi &getComlibProxy(void) const { return comlibProxy; }
-    inline ComlibInstanceHandle getStreaming(void) { return ciStreaming; }
-    inline ComlibInstanceHandle getBcast(void) { return ciBcast; }
-    inline ComlibInstanceHandle getAllgather(void) { return ciAllgather; }
-    inline ComlibInstanceHandle getAlltoall(void) { return ciAlltoall; }
-
-    inline Strategy* getStreamingStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciStreaming); }
-    inline Strategy* getBcastStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciBcast); }
-    inline Strategy* getAllgatherStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciAllgather); }
-    inline Strategy* getAlltoallStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciAlltoall); }
-#endif
     
     CkDDT *getDDT(void) {return parent->myDDT;}
     CthThread getThread() { return thread->getThread(); }
