@@ -216,7 +216,7 @@ class SlabArray: public CBase_SlabArray {
 
 class NormalSlabArray: public CBase_NormalSlabArray {
  public:
-	NormalSlabArray(CkMigrateMessage *m): SlabArray(m) {CkPrintf("migrate constructor called\n");}
+	NormalSlabArray(CkMigrateMessage *m): CBase_NormalSlabArray(m) {CkPrintf("migrate constructor called\n");}
 	NormalSlabArray() {
 #if VERBOSE
 	    CkPrintf("Empty constructor called\n");
@@ -254,7 +254,7 @@ protected:
 
 class NormalRealSlabArray: public CBase_NormalRealSlabArray {
  public:
-	NormalRealSlabArray(CkMigrateMessage *m): SlabArray(m) {}
+	NormalRealSlabArray(CkMigrateMessage *m): CBase_NormalRealSlabArray(m) {}
 	NormalRealSlabArray() {
 #if VERBOSE
 	    CkPrintf("Empty constructor called\n");
