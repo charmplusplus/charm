@@ -34,19 +34,6 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
     complex *temp;
 
     CProxy_NormalSlabArray destProxy_com;
-    ComlibInstanceHandle fftcommInstance = (infoVec[src_id]->fftcommInstance);
-
-    /* 
-   if (fftuseCommlib) {
-	if(fftinfo.isSrcSlab)
-	    destProxy_com = (CProxy_NormalSlabArray)destProxy;
-	else
-	    destProxy_com = (CProxy_NormalSlabArray)srcProxy;
-	ComlibAssociateProxy(&fftcommInstance, destProxy_com);
-	//ComlibBeginIteration(destProxy_com);
-	fftcommInstance.beginIteration();
-    }
-    */
 
     int pe, i;
     for(i = 0, pe = 0; i < fftinfo.srcSize[0]; i += fftinfo.destPlanesPerSlab, pe++) {
@@ -59,23 +46,9 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
 		       sizeof(complex) * lineSize);
 		temp += lineSize;
 	    }
-#if FFTLIB_USE_COMLIB
-	if (fftuseCommlib)	
-	((CProxy_NormalSlabArray)destProxy_com)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
-	else
 	((CProxy_NormalSlabArray)destProxy)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
-#else
-	((CProxy_NormalSlabArray)destProxy)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
-#endif
-
     }
 
-#if FFTLIB_USE_COMLIB
-    if (fftuseCommlib) {
-//	ComlibEndIteration(destProxy_com);
-	fftcommInstance.endIteration();
-    }
-#endif
     delete [] sendData;
 }
 
@@ -148,20 +121,6 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
 #endif
     }
     
- #if FFTLIB_USE_COMLIB
-    CProxy_NormalSlabArray srcProxy_com;
-    ComlibInstanceHandle fftcommInstance = (infoVec[src_id]->fftcommInstance);
-   if (fftuseCommlib) {
-	if(fftinfo.isSrcSlab)
-	    srcProxy_com = (CProxy_NormalSlabArray)destProxy;
-	else
-	    srcProxy_com = (CProxy_NormalSlabArray)srcProxy;
-	ComlibAssociateProxy(&fftcommInstance, srcProxy_com);
-	//ComlibBeginIteration(destProxy_com);
-	fftcommInstance.beginIteration();
-    }
-#endif
-
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
     int i, pe;
@@ -176,23 +135,8 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
 		       sizeof(complex) * lineSize);
 		temp += lineSize;
 	    }
-#if FFTLIB_USE_COMLIB
-   if (fftuseCommlib)
-	((CProxy_NormalSlabArray)srcProxy_com)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
-    else
 	((CProxy_NormalSlabArray)srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
-#else
-	((CProxy_NormalSlabArray)srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
-#endif
     }
-
-
-#if FFTLIB_USE_COMLIB
-    if (fftuseCommlib) {
-//	ComlibEndIteration(srcProxy_com);
-	fftcommInstance.endIteration();
-    }
-#endif
 
     delete [] sendData;
 }
@@ -260,14 +204,12 @@ void NormalSlabArray::createPlans(NormalFFTinfo &info)
 
 void NormalSlabArray::setup(NormalFFTinfo &info, 
 			    CProxy_NormalSlabArray src, 
-			    CProxy_NormalSlabArray dest,
-			    bool _useCommlib, ComlibInstanceHandle inst)
+			    CProxy_NormalSlabArray dest)
 {
     SlabArrayInfo *slabinfo = new SlabArrayInfo();
     
     slabinfo->info = info;
     slabinfo->count = 0;
-    slabinfo->fftcommInstance = inst;
     infoVec.insert(infoVec.size(), slabinfo);
 
     srcProxy = src;
@@ -275,31 +217,12 @@ void NormalSlabArray::setup(NormalFFTinfo &info,
 
     if((info.isSrcSlab && fwd2DPlan==NULL) || (!info.isSrcSlab && bwd2DPlan==NULL))
 	createPlans(info);
-
-    /** Currently Comlib is disabled for this library. 
-	Someone should update the library to use the new API */
-    fftuseCommlib = false;
-
-    /*
-    fftuseCommlib = _useCommlib;
-    fftcommInstance = ComlibInstanceHandle();
-    if (fftuseCommlib) {        
-	fftcommInstance = inst;
-	if(info.isSrcSlab)
-	    ComlibAssociateProxy(&inst, destProxy); 
-	else
-	    ComlibAssociateProxy(&inst, srcProxy); 
-   }
-*/
 }
 
 NormalSlabArray::NormalSlabArray(NormalFFTinfo &info, 
 				 CProxy_NormalSlabArray src, 
-				 CProxy_NormalSlabArray dest, 
-				 bool useCommlib, 
-				 ComlibInstanceHandle inst)  {
-  //NormalSlabArray();
-    setup(info, src, dest, useCommlib, inst); 
+				 CProxy_NormalSlabArray dest)  {
+    setup(info, src, dest); 
 }
 
 NormalSlabArray::~NormalSlabArray() 
@@ -339,8 +262,6 @@ void NormalSlabArray::pup(PUP::er &p)
 	}
     }
 */
-    p | fftuseCommlib;
-    // p | fftcommInstance;
 }
 
 

@@ -42,11 +42,6 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
 #ifdef VERBOSE
     CkPrintf("First FFT done at [%d %d] [%d %d]\n", thisIndex.x, thisIndex.y,sizeX,sizeZ);
 #endif
-#ifdef COMLIB
-    CkAssert(id != -1);
-    ckout << "xlines " << id << endl;
-    mgrProxy.ckLocalBranch()->beginIteration(id);
-#endif
     int baseX, ix, iy, iz;
     if(true) {//else if(pblock == PencilBlock::SQUAREBLOCK){
 	if(direction)
@@ -121,10 +116,6 @@ NormalLineArray::doFirstFFT(int fftid, int direction)
 		}
 	}
     }
-#ifdef COMLIB
-    mgrProxy.ckLocalBranch()->endIteration();
-#endif
-    
 }
 
 void
@@ -190,11 +181,6 @@ NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, in
 	CkPrintf("Second FFT done at [%d %d]\n", thisIndex.x, thisIndex.y);
 #endif
 		// thisIndex.y is x-coord
-#ifdef COMLIB
-	CkAssert(id != -1);
-	ckout << "ylines " << id << " " << CkMyPe() << endl;
-	mgrProxy.ckLocalBranch()->beginIteration(id);
-#endif
 	if(direction){
 	    int sendSquarewidth = ysquare[0]<=zsquare[0] ? ysquare[0]:zsquare[0];
 	    int sendDataSize = sendSquarewidth * ysquare[1] * zsquare[1];
@@ -263,9 +249,6 @@ NormalLineArray::doSecondFFT(int ypos, complex *val, int datasize, int fftid, in
 		    (xProxy)(y, zpos+z).doThirdFFT(msg);
 		}
 	}	
-#ifdef COMLIB
-	mgrProxy.ckLocalBranch()->endIteration();
-#endif
     }
 }
 
@@ -360,15 +343,15 @@ NormalLineArray::doneFFT(int id, int direction){
 #endif
 }
 
-NormalLineArray::NormalLineArray (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool _useCommlib, ComlibInstanceHandle &inst) {
+NormalLineArray::NormalLineArray (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy) {
 #ifdef VERBOSE
     CkPrintf("inserted line %d index[%d %d]\n", info.ptype, thisIndex.x, thisIndex.y);
 #endif
-    setup(info, _xProxy, _yProxy, _zProxy, _useCommlib, inst);
+    setup(info, _xProxy, _yProxy, _zProxy);
 }
 
 void
-NormalLineArray::setup (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy, bool _useCommlib, ComlibInstanceHandle &inst) {
+NormalLineArray::setup (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProxy_NormalLineArray _yProxy, CProxy_NormalLineArray _zProxy) {
 	xProxy = _xProxy;
 	yProxy = _yProxy;
 	zProxy = _zProxy;
@@ -376,12 +359,10 @@ NormalLineArray::setup (LineFFTinfo &info, CProxy_NormalLineArray _xProxy, CProx
 	PencilArrayInfo *pencilinfo = new PencilArrayInfo();
 	pencilinfo->info = info;
 	pencilinfo->count = 0;
-	pencilinfo->fftcommInstance = inst;
 	infoVec.insert(infoVec.size(), pencilinfo);
 	
 	line = NULL;
 	fwdplan = fftw_create_plan(info.sizeX, FFTW_FORWARD, FFTW_IN_PLACE);
 	bwdplan = fftw_create_plan(info.sizeY, FFTW_BACKWARD, FFTW_IN_PLACE);
 	id = -1;
-	fftuseCommlib = _useCommlib;
 }
