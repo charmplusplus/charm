@@ -508,7 +508,6 @@ CtvDeclare(void*,stackBottom);
 CtvDeclare(int, ampiFinalized);
 CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int,argvExtracted);
-static int enableStreaming = 0;
 
 CDECL long ampiCurrentStackUsage(){
   int localVariable;
