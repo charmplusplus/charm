@@ -29,9 +29,6 @@ PVT::PVT()
   optGVT = POSE_UnsetTS; conGVT = POSE_UnsetTS;
   rdone=0;
   SRs=NULL;
-#ifdef POSE_COMM_ON
-  //com_debug = 1;
-#endif
 #if !CMK_TRACE_DISABLED
   localStats = (localStat *)CkLocalBranch(theLocalStats);
   if (pose_config.stats) {
@@ -256,11 +253,6 @@ void PVT::setGVT(GVTMsg *m)
   CkAssert(m->estGVT >= estGVT);
   estGVT = m->estGVT;
   int i, end = objs.getNumSpaces();
-#ifdef POSE_COMM_ON  
-  //PrioStreaming *pstrat = (PrioStreaming *)(POSE_commlib_insthndl.getStrategy());
-  //pstrat->setBasePriority((estGVT+10) - POSE_TimeMax);
-  //pstrat->setBasePriority(estGVT+10);
-#endif
   simdone = m->done;
   CkFreeMsg(m);
   waitForFirst = 1;

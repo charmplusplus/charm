@@ -15,9 +15,6 @@ extern POSE_Config pose_config;
 class rep 
 {
  public:
-#if POSE_COMM_ON
-  CProxy_sim POSE_Objects;
-#endif
   /// Pointer to synchronization strategy
   strat *myStrat;          
   /// Pointer to poser wrapper
@@ -46,12 +43,6 @@ class rep
     ovt = 0; ort = 0.0; parent = NULL; myStrat = NULL; 
     anti_methods = 0;
     simulationStartGVT = (POSE_TimeType)-1;
-  #ifndef SEQUENTIAL_POSE
-  #ifdef POSE_COMM_ON    
-    POSE_Objects = POSE_Objects_RO;
-    ComlibDelegateProxy(&POSE_Objects);
-  #endif
-  #endif
 #ifdef MEM_TEMPORAL    
     localTimePool = (TimePool *)CkLocalBranch(TempMemID);
 #endif

@@ -11,9 +11,6 @@ CpvDeclare(int, stateRecovery);
 CpvDeclare(eventID, theEventID);
 
 void POSEreadCmdLine();
-#ifdef POSE_COMM_ON
-extern int com_debug;
-#endif
 double busyWait;
 double sim_timer;
 int POSE_inactDetect;
@@ -22,9 +19,6 @@ POSE_TimeType POSE_endtime;
 POSE_TimeType POSE_GlobalClock;
 POSE_TimeType POSE_GlobalTS;
 POSE_Config pose_config;
-#ifdef POSE_COMM_ON
-ComlibInstanceHandle POSE_commlib_insthndl;
-#endif
 int _POSE_SEQUENTIAL;
 int seqCheckpointInProgress;
 POSE_TimeType seqLastCheckpointGVT;
@@ -91,20 +85,6 @@ void POSE_init(int IDflag, int ET) // can specify both
   traceRegisterUserEvent("OptSync", 60);
 #endif
 #ifndef SEQUENTIAL_POSE
-#ifdef POSE_COMM_ON
-  // Create the communication library for POSE
-  POSE_commlib_insthndl = CkGetComlibInstance();
-  // Create the communication strategy for POSE
-  StreamingStrategy *strategy = new StreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);
-  //MeshStreamingStrategy *strategy = new MeshStreamingStrategy(COMM_TIMEOUT,COMM_MAXMSG);
-  //PrioStreaming *strategy = new PrioStreaming(COMM_TIMEOUT,COMM_MAXMSG);
-  //Register the strategy
-  POSE_commlib_insthndl.setStrategy(strategy);
-  //com_debug=1;
-  //CkPrintf("Simulation run with PrioStreaming(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
-  CkPrintf("Simulation run with StreamingStrategy(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
-  //CkPrintf("Simulation run with MeshStreaming(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
-#endif
   // Create a MemoryPool with global handle for memory recycling 
   MemPoolID = CProxy_MemoryPool::ckNew();
   // Create a Temporal Memory Manager
@@ -130,18 +110,7 @@ void POSE_init(int IDflag, int ET) // can specify both
 #endif
   CProxy_pose::ckNew(&POSE_Coordinator_ID, 0);
   // Create array to hold all POSE objects
-#ifdef POSE_COMM_ON  
-  POSE_Objects_RO = CProxy_sim::ckNew(); 
-  POSE_Objects = POSE_Objects_RO;
-#else
   POSE_Objects = CProxy_sim::ckNew(); 
-#endif
-  //#ifndef SEQUENTIAL_POSE
-  //#ifdef POSE_COMM_ON
-  // Make POSE_Objects use the comm lib
-  //  ComlibDelegateProxy(&POSE_Objects);
-  //#endif
-  //#endif
 
 #ifdef SEQUENTIAL_POSE
   if (CkNumPes() > 1) CkAbort("ERROR: Cannot run a sequential simulation on more than one processor!\n");
@@ -366,16 +335,6 @@ void POSEreadCmdLine()
   CmiGetArgIntDesc(argv, "+msgpoolsize_pose", &pose_config.msg_pool_size , "Store and reuse pools of messages under a certain size default 1000");
 
   CmiGetArgIntDesc(argv, "+msgpoolmax_pose", &pose_config.max_pool_msg_size , "Store and reuse pools of messages under a certain size");
-  char *strat;
-  CmiGetArgStringDesc(argv, "+commlib_strat_pose", &strat , "Use commlib with strat in {stream|mesh|prio}");
-  if(strcmp("stream",strat)==0)
-    pose_config.commlib_strat=stream;
-  if(strcmp("mesh",strat)==0)
-    pose_config.commlib_strat=mesh;
-  if(strcmp("prio",strat)==0)
-    pose_config.commlib_strat=prio;
-  CmiGetArgIntDesc(argv, "+commlib_timeout-pose", &pose_config.commlib_timeout , "Use commlib with timeout N; default 1ms");
-  CmiGetArgIntDesc(argv, "+commlib_maxmsg_pose", &pose_config.commlib_maxmsg , "Use commlib with max msg N;  default 5");
   */
   pose_config.lb_on=CmiGetArgFlagDesc(argv, "+lb_on_pose", "Use load balancing");
   CmiGetArgIntDesc(argv, "+lb_skip_pose", &pose_config.lb_skip , "Load balancing skip N; default 51");

@@ -31,17 +31,8 @@
 /// Uncomment to use temporally-blocked memory management
 //#define MEM_TEMPORAL
 
-/// Uncomment to make use of the Streaming Communication Library optimizations
-//#define POSE_COMM_ON 1
-
 /// Uncomment to turn on POSE load balancer
 //#define LB_ON 1
-
-#ifdef POSE_COMM_ON
-#include <StreamingStrategy.h>
-#include <MeshStreamingStrategy.h>
-#include <PrioStreaming.h>
-#endif
 
 #define COMM_TIMEOUT 1
 #define COMM_MAXMSG 20
@@ -131,7 +122,6 @@ const POSE_TimeType POSE_UnsetTS=-1;
 
 // POSE Command line struct
 //glorified struct
-enum POSE_Commlib_strat {nostrat, stream, mesh, prio};
 
 class POSE_Config 
 {
@@ -146,9 +136,6 @@ class POSE_Config
   bool msg_pool;
   int msg_pool_size;
   int max_pool_msg_size;
-  POSE_Commlib_strat commlib_strat;
-  int commlib_timeout;
-  int commlib_maxmsg;
   bool lb_on;
   int lb_skip;
   int lb_threshold;
@@ -184,7 +171,7 @@ class POSE_Config
 #endif
     dopSkipCalcs(false),
     max_usage(MAX_USAGE),
-/** MSG POOLING AND COMMLIB OPTIONS NOT SUPPORTED YET **/
+/** MSG POOLING OPTIONS NOT SUPPORTED YET **/
 #ifdef MSG_RECYCLING
     msg_pool(true),
 #else
@@ -192,13 +179,6 @@ class POSE_Config
 #endif
     msg_pool_size(40),
     max_pool_msg_size(1000),
-#ifdef POSE_COMM_ON
-    commlib_strat(nostrat),
-#else
-    commlib_strat(stream),
-#endif
-    commlib_timeout(COMM_TIMEOUT),
-    commlib_maxmsg(COMM_MAXMSG),
 #ifdef LB_ON
     lb_on(true),                  //w
 #else
