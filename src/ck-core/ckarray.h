@@ -658,8 +658,6 @@ class CkArrayReducer;
 
 void _ckArrayInit(void);
 
-//#include "ComlibArrayListener.h"  FILE DELETED!
-
 class CkArray : public CkReductionMgr, public CkArrMgr {
   friend class ArrayElement;
   friend class CProxy_ArrayBase;
@@ -737,11 +735,6 @@ public:
 
   void pup(PUP::er &p);
   void ckJustMigrated(void){ doneInserting(); }
-
-  // COMLIB HACK
-  // Ok, this has gone very far... getting rid of it!
-  //ComlibArrayListener * calistener;
-  //ComlibArrayListener * getComlibArrayListener() {return calistener;}
 
   virtual bool isArrMgr(void) {return true;}
 
