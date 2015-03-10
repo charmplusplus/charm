@@ -165,6 +165,7 @@ int    _exitHandlerIdx;
 #if CMK_WITH_STATS
 static Stats** _allStats = 0;
 #endif
+static int   _numStatsRecd = 0;
 static int   _exitStarted = 0;
 
 static InitCallTable _initCallTable;
@@ -422,53 +423,13 @@ static inline void _printStats(void)
 static inline void _printStats(void) {}
 #endif
 
-typedef struct _statsHeader
-{
-  int n;
-} statsHeader;
-
-static void * mergeStats(int *size, void *data, void **remote, int count)
-{
-  envelope *newData;
-  statsHeader *dataMsg = (statsHeader*)EnvToUsr((envelope*) data), *newDataMsg;
-  int nPes = dataMsg->n, currentIndex = 0;
-
-  for (int i = 0; i < count; ++i)
-  {
-    nPes += ((statsHeader *)EnvToUsr((envelope *)remote[i]))->n;
-  }
-
-  newData = _allocEnv(StatMsg, sizeof(statsHeader) + sizeof(Stats)*nPes);
-  *size = newData->getTotalsize();
-  newDataMsg = (statsHeader *)EnvToUsr(newData);
-  newDataMsg->n = nPes;
-
-  statsHeader *current = dataMsg;
-  Stats *currentStats = (Stats*)(current + 1), *destination = (Stats*)(newDataMsg + 1);
-  memcpy(destination + currentIndex, currentStats, sizeof(Stats) * current->n);
-  currentIndex += current->n;
-
-  for (int i = 0; i < count; ++i)
-  {
-    current = ((statsHeader *)EnvToUsr((envelope *)remote[i]));
-    currentStats = (Stats *)(current + 1);
-    memcpy(destination + currentIndex, currentStats, sizeof(Stats) * current->n);
-    currentIndex += current->n;
-  }
-
-  CmiFree(data);
-  return newData;
-}
-
 static inline void _sendStats(void)
 {
   DEBUGF(("[%d] _sendStats\n", CkMyPe()));
-  envelope *env = _allocEnv(StatMsg, sizeof(statsHeader) + sizeof(Stats));
-  statsHeader* msg = (statsHeader*)EnvToUsr(env);
-  msg->n = 1;
-  memcpy(msg+1, CkpvAccess(_myStats), sizeof(Stats));
+  envelope *env = UsrToEnv(CkpvAccess(_myStats));
+  env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _exitHandlerIdx);
-  CmiReduce(env, env->getTotalsize(), mergeStats);
+  CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 }
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -566,45 +527,30 @@ static void _exitHandler(envelope *env)
       else
         CmiFree(env);
       //everyone exits here - there may be issues with leftover messages in the queue
-#if !CMK_WITH_STATS
+#if CMK_WITH_STATS
       if(CkMyPe())
+#endif
       {
-        DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n",CkMyPe()));
+        DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
         if(CharmLibInterOperate)
           CpvAccess(interopExitFlag) = 1;
       }
-#endif
       break;
 #if CMK_WITH_STATS
     case StatMsg:
-    {
       CkAssert(CkMyPe()==0);
-      statsHeader* header = (statsHeader*)EnvToUsr(env);
-      int n = header->n;
-      for (int i = 0; i < n; ++i)
-      {
-        _allStats[i] = ((Stats*)(header+1) + i);
-      }
-      DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), n));
+      _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
+      _numStatsRecd++;
+      DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), _numStatsRecd));
 			/*FAULT_EVAC*/
-      _printStats();
-      // broadcast to all others that they can now exit
-      envelope* env = _allocEnv(StatDoneMsg);
-      CmiSetHandler(env, _exitHandlerIdx);
-      CmiSyncBroadcastAndFree(env->getTotalsize(), (char*)env);
-      DEBUGF(("[%d] Calling converse exit from StatMsg \n",CkMyPe()));
-      ConverseExit();
-      if(CharmLibInterOperate)
-        CpvAccess(interopExitFlag) = 1;
-    }
-    break;
-
-    case StatDoneMsg:
-      DEBUGF(("[%d] Calling converse exit from StatDoneMsg \n",CkMyPe()));
-      ConverseExit();
-      if (CharmLibInterOperate)
-        CpvAccess(interopExitFlag) = 1;
+      if(_numStatsRecd==CkNumValidPes()) {
+        _printStats();
+        DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+        ConverseExit();
+        if(CharmLibInterOperate)
+          CpvAccess(interopExitFlag) = 1;
+      }
       break;
 #endif
     default:

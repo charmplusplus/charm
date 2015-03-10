@@ -3,24 +3,22 @@
 
 class Stats {
   private:
-    UInt pe;
     UInt charesCreated; // # of new chare msgs sent
     UInt charesProcessed; // # of new chare msgs processed
     UInt forCharesCreated; // # of for chare msgs created
     UInt forCharesProcessed; // # of for chare msgs processed
     UInt groupInitsCreated; // # of group init msgs created
     UInt groupInitsProcessed; // # of groupinits processed
-    UInt groupMsgsCreated; // # of group msgs created
-    UInt groupMsgsProcessed; // # of group msgs processed
+    UInt groupMsgsCreated; // # of for group msgs created
+    UInt groupMsgsProcessed; // # of for group msgs processed
     UInt nodeGroupInitsCreated; // # of node group init msgs created
     UInt nodeGroupInitsProcessed; // # of node group inits processed
-    UInt nodeGroupMsgsCreated; // # of nodegroup msgs created
-    UInt nodeGroupMsgsProcessed; // # of nodegroup msgs processed
+    UInt nodeGroupMsgsCreated; // # of for nodegroup msgs created
+    UInt nodeGroupMsgsProcessed; // # of for nodegroup msgs processed
   public:
     void *operator new(size_t size) { return _allocMsg(StatMsg, size); }
     void operator delete(void *ptr) { CkFreeMsg(ptr); }
     Stats() {
-      pe = CkMyPe();
       charesCreated = 0; 
       charesProcessed = 0; 
       forCharesCreated = 0; 
