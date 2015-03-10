@@ -25,7 +25,7 @@ class ProcInfo {
     ProcInfo(int i, double ov, double tl, double sp, bool avail): id(i), _overhead(ov), _totalLoad(tl), _pe_speed(sp), available(avail) {}
     inline int getProcId() { return id; }
     inline void setProcId(int _id) { id = _id; }
-    inline double getTotalLoad() { return _totalLoad; }
+    inline double getTotalLoad() const { return _totalLoad; }
 //    inline void setTotalLoad(double load) { totalLoad = load; }
 //    inline double getOverhead() { return overhead; }
 //    inline void setOverhead(double oh) { overhead = oh; }
@@ -130,7 +130,7 @@ class Vertex {
         id(i), compLoad(cl), migratable(mig), currPe(curpe), newPe(newpe),
         pupSize(pupsize)  {}
     inline int getVertexId() { return id; }
-    inline double getVertexLoad() { return compLoad; }
+    inline double getVertexLoad() const { return compLoad; }
     inline int getCurrentPe() { return currPe; }
     inline int getNewPe() { return newPe; }
     inline void setNewPe(int _newpe) { newPe = _newpe; }
