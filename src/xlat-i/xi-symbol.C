@@ -1060,18 +1060,29 @@ Chare::genDecls(XStr& str)
   str << ", CProxy_" << type;
   if (templat) {
     templat->genVars(str);
-    str << " > {\npublic:\n\tCBase_" << type << "() : ";
-    str << "CBaseT" << b->length() << "<" << b << ", CProxy_" << type;
-    templat->genVars(str);
-    str << ">() {}\n";
-    str << "\tCBase_" << type << "(CkMigrateMessage* m) : ";
-    str << "CBaseT" << b->length() << "<" << b << ", CProxy_" << type;
-    templat->genVars(str);
-    str << ">(m) {}\n";
+    str <<
+      " > {\n"
+      "public:\n";
+
+    XStr CBaseT_type;
+    CBaseT_type << "CBaseT" << b->length() << "<" << b << ", CProxy_" << type;
+    templat->genVars(CBaseT_type);
+    CBaseT_type << ">";
+
+    str << "\tCBase_" << type << "() : "                    << CBaseT_type << "() {}\n"
+        << "\tCBase_" << type << "(CkMigrateMessage* m) : " << CBaseT_type << "(m) {}\n";
+
+    if (b->length() == 1) {
+      str <<
+        "\ttemplate <typename... Args>\n"
+        "\tCBase_" << type << "(Args... args)\n"
+        "\t: " << CBaseT_type << "(args...)\n"
+        "\t{ }\n"
+        ;
+    }
+
     str << "\tvoid pup(PUP::er& p) {\n";
-    str << "\t\tCBaseT" << b->length() << "<" << b << ", CProxy_" << type;
-    templat->genVars(str);
-    str << ">::pup(p);\n\t}\n};\n";
+    str << "\t\t" << CBaseT_type << "::pup(p);\n\t}\n};\n";
   } else {
     str << "> CBase_" << type << ";\n";
   }
