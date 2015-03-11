@@ -7,7 +7,7 @@ pingall: pingall.C
 	$(CHARMC) -o pingall pingall.C -language converse++
 
 multiping: multiping.C
-	$(CHARMC) -o multiping multiping.C -language converse++
+	$(CHARMC) -o multiping multiping.C -language converse++ -no-charmrun
 
 test: all
 	$(call run, +p2 ./pingall 0)
