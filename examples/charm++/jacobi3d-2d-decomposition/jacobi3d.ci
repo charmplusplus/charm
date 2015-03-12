@@ -42,7 +42,8 @@ mainmodule jacobi3d {
         }
         when recvConvergeResult(int result) serial "check_converge"{
           converged = result;
-        if ((result || iterations>=maxiterations) && thisIndex.x +thisIndex.y == 0) mainProxy.done(iterations);
+           if ((result || iterations>=maxiterations) &&
+               thisIndex.x + thisIndex.y + thisIndex.z == 0) mainProxy.done(iterations);
       }
       }
     };
