@@ -18,7 +18,7 @@ class RefineTopoLB : public CBase_RefineTopoLB
     RefineTopoLB (CkMigrateMessage *m) : CBase_RefineTopoLB (m) { };
   
     void work (LDStats *stats);
-    void pup (PUP::er &p) { TopoLB::pup(p); }
+    void pup (PUP::er &p) { CBase_RefineTopoLB::pup(p); }
     	
     //LBTopolog *topo;
   
