@@ -251,7 +251,7 @@ int Refiner::refine()
   return finish;
 }
 
-int Refiner::multirefine()
+int Refiner::multirefine(bool reset)
 {
   computeAverage();
   double avg = averageLoad;
@@ -291,6 +291,20 @@ int Refiner::multirefine()
       overLoad = curOverload * overloadStep + overloadStart;
       if (_lb_args.debug()>=1)
       CmiPrintf("Testing curOverload %d = %f [min,max]= %d, %d\n", curOverload, overLoad, minOverload, maxOverload);
+
+      // Reset the processors datastructure to the original
+      if (reset) {
+        int i;
+        for (i = 0; i < P; i++) {
+          processors[i].computeLoad = 0;
+          delete processors[i].computeSet;
+          processors[i].computeSet = new Set();
+        }
+        for (i = 0; i < numComputes; i++)
+          assign((computeInfo *) &(computes[i]),
+              (processorInfo *) &(processors[computes[i].oldProcessor]));
+      }
+
       if (refine())
         maxOverload = curOverload;
       else
@@ -327,7 +341,9 @@ void Refiner::Refine(int count, BaseLB::LDStats* stats,
     CkPrintf("\n");
   }
 
-  multirefine();
+  // Perform multi refine but reset it to the original state before changing the
+  // refinement load balancing threshold.
+  multirefine(true);
 
   int nmoves = 0;
   for (int pe=0; pe < P; pe++) {
