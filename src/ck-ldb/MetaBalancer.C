@@ -194,6 +194,7 @@ int MetaBalancer::get_finished_iteration() {
 }
 
 void MetaBalancer::AdjustCountForNewContributor(int it_n) {
+#if CMK_LBDB_ON
   int index;
 
   // it_n is the first iteration this chare will contribute to.
@@ -204,9 +205,11 @@ void MetaBalancer::AdjustCountForNewContributor(int it_n) {
     index = i % VEC_SIZE;
     total_count_vec[index]++;
   }
+#endif
 }
 
 void MetaBalancer::AdjustCountForDeadContributor(int it_n) {
+#if CMK_LBDB_ON
   int index;
   // it_n is the last iteration this chare contributed to.
   // If the finished_iteration_no is < it_n, then we need to update the counts
@@ -225,6 +228,7 @@ void MetaBalancer::AdjustCountForDeadContributor(int it_n) {
       ContributeStats(i);
     }
   }
+#endif
 }
 
 bool MetaBalancer::AddLoad(int it_n, double load) {
