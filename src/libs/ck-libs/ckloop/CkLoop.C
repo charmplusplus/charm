@@ -503,6 +503,8 @@ void CurLoopInfo::stealWork() {
       }
 
       if (first < lowerIndex || first > upperIndex || last < lowerIndex || last > upperIndex) {
+        CkPrintf("Error in CurLoopInfo::stealWork() node %d pe %d lowerIndex %d upperIndex %d numChunks %d first %d last %d\n",
+          CkMyNode(), CkMyPe(), lowerIndex, upperIndex, numChunks, first, last);
         CkAbort("Indices of CkLoop incorrect. There maybe a race condition!\n");
       }
 
@@ -543,6 +545,7 @@ void CkLoop_Parallelize(HelperFn func,
                             int numChunks, int lowerRange, int upperRange,
                             int sync,
                             void *redResult, REDUCTION_TYPE type) {
+    if ( numChunks > upperRange - lowerRange + 1 ) numChunks = upperRange - lowerRange + 1;
     globalCkLoop->parallelizeFunc(func, paramNum, param, numChunks, lowerRange, upperRange, sync, redResult, type);
 }
 #include "CkLoop.def.h"
