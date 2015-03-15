@@ -79,20 +79,20 @@ done
 
 cat >> pup_f.f90 << END_OF_HEADER
       interface pup
-        module procedure pi,pia1d,pia2d,pia3d,pia4d,pia5d,pia36d,pia7d
-        module procedure pc,pca1d,pca2d,pca3d,pca4d,pca5d,pca36d,pca7d
-        module procedure ps,psa1d,psa2d,psa3d,psa4d,psa5d,psa36d,psa7d
-        module procedure pr,pra1d,pra2d,pra3d,pra4d,pra5d,pra36d,pra7d
-        module procedure pd,pda1d,pda2d,pda3d,pda4d,pda5d,pda36d,pda7d
-        module procedure pl,pla1d,pla2d,pla3d,pla4d,pla5d,pla36d,pla7d
+        module procedure pi,pia1d,pia2d,pia3d,pia4d,pia5d,pia6d,pia7d
+        module procedure pc,pca1d,pca2d,pca3d,pca4d,pca5d,pca6d,pca7d
+        module procedure ps,psa1d,psa2d,psa3d,psa4d,psa5d,psa6d,psa7d
+        module procedure pr,pra1d,pra2d,pra3d,pra4d,pra5d,pra6d,pra7d
+        module procedure pd,pda1d,pda2d,pda3d,pda4d,pda5d,pda6d,pda7d
+        module procedure pl,pla1d,pla2d,pla3d,pla4d,pla5d,pla6d,pla7d
       end interface
       interface apup
-        module procedure apia1d,apia2d,apia3d,apia4d,apia5d,apia36d,apia7d 
-        module procedure apca1d,apca2d,apca3d,apca4d,apca5d,apca36d,apca7d
-        module procedure apsa1d,apsa2d,apsa3d,apsa4d,apsa5d,apsa36d,apsa7d
-        module procedure apra1d,apra2d,apra3d,apra4d,apra5d,apra36d,apra7d
-        module procedure apda1d,apda2d,apda3d,apda4d,apda5d,apda36d,apda7d
-        module procedure apla1d,apla2d,apla3d,apla4d,apla5d,apla36d,apla7d
+        module procedure apia1d,apia2d,apia3d,apia4d,apia5d,apia6d,apia7d
+        module procedure apca1d,apca2d,apca3d,apca4d,apca5d,apca6d,apca7d
+        module procedure apsa1d,apsa2d,apsa3d,apsa4d,apsa5d,apsa6d,apsa7d
+        module procedure apra1d,apra2d,apra3d,apra4d,apra5d,apra6d,apra7d
+        module procedure apda1d,apda2d,apda3d,apda4d,apda5d,apda6d,apda7d
+        module procedure apla1d,apla2d,apla3d,apla4d,apla5d,apla6d,apla7d
       end interface
       contains
       function pup_issz(p)
@@ -155,6 +155,7 @@ cat >> pup_f.f90 << END_OF_HEADER
         end do
       end subroutine
 
+
       subroutine fpup_chars_0(p, d, c)
         INTEGER :: p
         CHARACTER(LEN=*)     d
@@ -163,7 +164,7 @@ cat >> pup_f.f90 << END_OF_HEADER
       end subroutine
 END_OF_HEADER
 
-for data in "chars/character" "shorts/integer(kind=2)" "ints/integer(kind=4)" "longs/integer(kind=8)" "reals/real(kind=4)" "doubles/real(kind=8)"  "logicals/logical"
+for data in "chars/character" "shorts/integer(kind=2)" "ints/integer(kind=4)" "longs/integer(kind=8)" "reals/real(kind=4)" "doubles/real(kind=8)" "logicals/logical"
 do
  pupname=`echo $data | awk -F/ '{print $1}'`
  typename=`echo $data | awk -F/ '{print $2}'`
@@ -191,11 +192,12 @@ done
 #   The "p" routines just copy the data.
 #   The "ap" routines also allocate and free the buffer.
 #
-for data in "int/i/integer" "short/s/integer(kind=2)" "char/c/character" "real/r/real(kind=4)" "double/d/real(kind=8)" "logical/l/logical"
+for data in "int/ints/i/integer" "short/shorts/s/integer(kind=2)" "char/chars/c/character" "real/reals/r/real(kind=4)" "double/doubles/d/real(kind=8)" "logical/logicals/l/logical"
 do
 	pupname=`echo $data | awk -F/ '{print $1}'`
-	cname=`echo $data | awk -F/ '{print $2}'`
-	fname=`echo $data | awk -F/ '{print $3}'`
+	pupnames=`echo $data | awk -F/ '{print $2}'`
+	cname=`echo $data | awk -F/ '{print $3}'`
+	fname=`echo $data | awk -F/ '{print $4}'`
 	echo "Making pup routines for data type $pupname/$cname/$fname"
 	cat >> pup_f.f90 << END_OF_DATATYPE
 
@@ -209,39 +211,39 @@ do
       subroutine p${cname}a1d(p, arr)
         INTEGER :: p
         $fname, intent(inout), dimension(:) :: arr
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
       end subroutine
       subroutine p${cname}a2d(p, arr)
         INTEGER :: p
         $fname, intent(inout), dimension(:,:) :: arr
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
       end subroutine
       subroutine p${cname}a3d(p, arr)
         INTEGER :: p
         $fname, intent(inout), dimension(:,:,:) :: arr
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
       end subroutine
       subroutine p${cname}a4d(p, arr)
         INTEGER :: p
         $fname, intent(inout), dimension(:,:,:,:) :: arr
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
       end subroutine
       subroutine p${cname}a5d(p, arr)
         INTEGER :: p
         $fname, intent(inout), dimension(:,:,:,:,:) :: arr
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
       end subroutine
       subroutine p${cname}a6d(p, arr)
         INTEGER :: p
         $fname, intent(inout), dimension(:,:,:,:,:,:) :: arr
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
       end subroutine
       subroutine p${cname}a7d(p, arr)
         INTEGER :: p
         $fname, intent(inout), dimension(:,:,:,:,:,:,:) :: arr
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
       end subroutine
-      
+
       subroutine ap${cname}a1d(p, arr)
         INTEGER :: p
         $fname, pointer, dimension(:) :: arr
@@ -251,14 +253,14 @@ do
           ALLOCATE(arr(n(1)))
         ELSE
           n(1)=SIZE(arr,DIM=1)
-          CALL fpup_ints(p,n,1);
+          CALL fpup_ints(p,n,1)
         END IF
-        call fpup_${pupname}s(p, arr, n(1))
+        call fpup_${pupnames}(p, arr, n(1))
         IF (fpup_isdeleting(p)) THEN
           deallocate(arr)
         END IF
       end subroutine
-      
+
       subroutine ap${cname}a2d(p, arr)
         INTEGER :: p
         $fname, pointer, dimension(:,:) :: arr
@@ -269,14 +271,14 @@ do
         ELSE
           n(1)=SIZE(arr,DIM=1)
           n(2)=SIZE(arr,DIM=2)
-          CALL fpup_ints(p,n,2);
+          CALL fpup_ints(p,n,2)
         END IF
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
         IF (fpup_isdeleting(p)) THEN
           deallocate(arr)
         END IF
       end subroutine
-      
+
       subroutine ap${cname}a3d(p, arr)
         INTEGER :: p
         $fname, pointer, dimension(:,:,:) :: arr
@@ -288,9 +290,9 @@ do
           n(1)=SIZE(arr,DIM=1)
           n(2)=SIZE(arr,DIM=2)
           n(3)=SIZE(arr,DIM=3)
-          CALL fpup_ints(p,n,3);
+          CALL fpup_ints(p,n,3)
         END IF
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
         IF (fpup_isdeleting(p)) THEN
           deallocate(arr)
         END IF
@@ -308,9 +310,9 @@ do
           n(2)=SIZE(arr,DIM=2)
           n(3)=SIZE(arr,DIM=3)
           n(4)=SIZE(arr,DIM=4)
-          CALL fpup_ints(p,n,4);
+          CALL fpup_ints(p,n,4)
         END IF
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
         IF (fpup_isdeleting(p)) THEN
           deallocate(arr)
         END IF
@@ -329,9 +331,9 @@ do
           n(3)=SIZE(arr,DIM=3)
           n(4)=SIZE(arr,DIM=4)
           n(5)=SIZE(arr,DIM=5)
-          CALL fpup_ints(p,n,5);
+          CALL fpup_ints(p,n,5)
         END IF
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
         IF (fpup_isdeleting(p)) THEN
           deallocate(arr)
         END IF
@@ -351,9 +353,9 @@ do
           n(4)=SIZE(arr,DIM=4)
           n(5)=SIZE(arr,DIM=5)
           n(6)=SIZE(arr,DIM=6)
-          CALL fpup_ints(p,n,6);
+          CALL fpup_ints(p,n,6)
         END IF
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
         IF (fpup_isdeleting(p)) THEN
           deallocate(arr)
         END IF
@@ -374,17 +376,16 @@ do
           n(5)=SIZE(arr,DIM=5)
           n(6)=SIZE(arr,DIM=6)
           n(7)=SIZE(arr,DIM=7)
-          CALL fpup_ints(p,n,7);
+          CALL fpup_ints(p,n,7)
         END IF
-        call fpup_${pupname}s(p, arr, size(arr))
+        call fpup_${pupnames}(p, arr, size(arr))
         IF (fpup_isdeleting(p)) THEN
           deallocate(arr)
         END IF
       end subroutine
 
 END_OF_DATATYPE
-	
-	
+
 done
 
 

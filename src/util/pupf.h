@@ -8,6 +8,8 @@
       external fpup_reals
       external fpup_double
       external fpup_doubles
+      external fpup_logical
+      external fpup_logicals
       interface
         function fpup_issizing(p)
           INTEGER :: p
@@ -30,20 +32,20 @@
           logical fpup_isuserlevel
         end function
         subroutine fpup_complex(p,c)
-	  INTEGER p
+          INTEGER p
           complex c
         end subroutine
         subroutine fpup_complexes(p,c,size)
-	  INTEGER p
+          INTEGER p
           complex,pointer,dimension(:) :: c
           INTEGER size
         end subroutine
         subroutine fpup_doublecomplex(p,c)
-	  INTEGER p
+          INTEGER p
           double complex c
         end subroutine
         subroutine fpup_doublecomplexes(p,c,size)
-	  INTEGER p
+          INTEGER p
           double complex,pointer,dimension(:) :: c
           INTEGER size
         end subroutine
