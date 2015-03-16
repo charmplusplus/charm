@@ -250,13 +250,23 @@ do
         integer :: n(1)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,1)
-          ALLOCATE(arr(n(1)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_${pupnames}(p, arr, n(1))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_${pupnames}(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
         END IF
-        call fpup_${pupnames}(p, arr, n(1))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -267,14 +277,25 @@ do
         integer :: n(2)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,2)
-          ALLOCATE(arr(n(1),n(2)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
         END IF
-        call fpup_${pupnames}(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -285,15 +306,27 @@ do
         integer :: n(3)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,3)
-          ALLOCATE(arr(n(1),n(2),n(3)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
         END IF
-        call fpup_${pupnames}(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -304,16 +337,29 @@ do
         integer :: n(4)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,4)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
         END IF
-        call fpup_${pupnames}(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -324,17 +370,31 @@ do
         integer :: n(5)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,5)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
         END IF
-        call fpup_${pupnames}(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -345,18 +405,33 @@ do
         integer :: n(6)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,6)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
         END IF
-        call fpup_${pupnames}(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -367,22 +442,38 @@ do
         integer :: n(7)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,7)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          n(7)=SIZE(arr,DIM=7)
-          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_${pupnames}(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
         END IF
-        call fpup_${pupnames}(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
-      end subroutine
+        end subroutine
 
 END_OF_DATATYPE
 
