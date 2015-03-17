@@ -82,7 +82,9 @@ static char sockWriteStates[1000] = {0};
 
 #define CMK_PIPE_ADDREADWRITE(afd)	\
       CMK_PIPE_ADDREAD(afd);	\
-      if (nodes[i].send_queue_h) fds[(*nFds)-1].events |= POLLOUT;
+      CmiLock(nodes[i].send_queue_lock); \
+      if (nodes[i].send_queue_h) fds[(*nFds)-1].events |= POLLOUT; \
+      CmiUnlock(nodes[i].send_queue_lock);
 	
 #undef CMK_PIPE_CHECKWRITE
 #define CMK_PIPE_CHECKWRITE(afd)	\
@@ -108,8 +110,10 @@ static char sockWriteStates[1000] = {0};
     	  for (i=0; i<CmiNumNodes(); i++)	\
     	  {	\
       	    if (i == CmiMyNode()) continue;	\
+            CmiLock(nodes[i].send_queue_lock); \
       	    CMK_PIPE_ADDREAD(nodes[i].sock);	\
       	    if (nodes[i].send_queue_h) CMK_PIPE_ADDWRITE(nodes[i].sock);\
+            CmiUnlock(nodes[i].send_queue_lock); \
     	  }	\
   	}	 	
 
@@ -178,6 +182,7 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
       for (i=0; i<CmiNumNodes(); i++)
       {
         if (i == CmiMyNode()) continue;
+        CmiLock(nodes[i].send_queue_lock);
         if (nodes[i].send_queue_h) {
           sockWriteStates[i] = CMK_PIPE_CHECKWRITE(nodes[i].sock);
           if (sockWriteStates[i]) dataskt_ready_write = 1;
@@ -187,6 +192,7 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
           sockWriteStates[i] = 0;
         sockReadStates[i] = CMK_PIPE_CHECKREAD(nodes[i].sock);
         if (sockReadStates[i])  dataskt_ready_read = 1;
+        CmiUnlock(nodes[i].send_queue_lock);
       }
     }
   }
@@ -212,8 +218,7 @@ static void CommunicationServerNet(int sleepTime, int where)
     return;
   });
   LOG(GetClock(), Cmi_nodestartGlobal, 'I', 0, 0);
-  MACHSTATE2(sleepTime?3:2,"CommunicationsServer(%d,%d) {",
-	     sleepTime,writeableAcks||writeableDgrams)  
+  MACHSTATE1(sleepTime?3:2,"CommunicationsServer(%d) {", sleepTime)
 #if CMK_SMP
   if (sleepTime!=0) {/*Sleep *without* holding the comm. lock*/
     MACHSTATE(2,"CommServer going to sleep (NO LOCK)");
@@ -238,7 +243,7 @@ static void CommunicationServerNet(int sleepTime, int where)
   while (CheckSocketsReady(sleepTime, 1)>0) {
     int again=0;
     sleepTime=0;
-    CmiCheckSocks();
+    CmiCheckSocks(); /* Actual recv and send happens in here */
     if (ctrlskt_ready_read) {again=1;ctrl_getone();}
     if (dataskt_ready_read || dataskt_ready_write) {again=1;}
     if (CmiStdoutNeedsService()) {CmiStdoutService();}
@@ -461,14 +466,17 @@ int TransmitDatagram(int pe)
   unsigned int seqno;
   
   node = nodes+pe;
+  CmiLock(node->send_queue_lock);
   dg = node->send_queue_h;
   if (dg) {
-    if (TransmitImplicitDgram(dg)) {
-      node->send_queue_h = dg->next;
-      if (node->send_queue_h == NULL) node->send_queue_t = NULL;
+    node->send_queue_h = dg->next;
+    if (node->send_queue_h == NULL) node->send_queue_t = NULL;
+    CmiUnlock(node->send_queue_lock);
+    if (TransmitImplicitDgram(dg)) { /*Actual transmission of the datagram happens here*/
       DiscardImplicitDgram(dg);
     }
   }
+  else CmiUnlock(node->send_queue_lock);
   return 0;
 }
 
@@ -478,19 +486,19 @@ void EnqueueOutgoingDgram
   int seqno, dst, src; ImplicitDgram dg;
   src = ogm->src;
   dst = ogm->dst;
-  seqno = node->send_next;
-  node->send_next = ((seqno+1)&DGRAM_SEQNO_MASK);
   MallocImplicitDgram(dg);
   dg->dest = node;
   dg->srcpe = src;
   dg->rank = rank;
-  dg->seqno = seqno;
   dg->broot = broot;
   dg->dataptr = ptr;
   dg->datalen = len;
   dg->ogm = ogm;
   ogm->refcount++;
   dg->next = 0;
+  seqno = node->send_next;
+  node->send_next = ((seqno+1)&DGRAM_SEQNO_MASK);
+  dg->seqno = seqno;
   if (node->send_queue_h == 0) {
     node->send_queue_h = dg;
     node->send_queue_t = dg;
@@ -510,12 +518,14 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
  
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
+  CmiLock(node->send_queue_lock);
   while (size > Cmi_dgram_max_data) {
     EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank, broot);
     data += Cmi_dgram_max_data;
     size -= Cmi_dgram_max_data;
   }
   EnqueueOutgoingDgram(ogm, data, size, node, rank, broot);
+  CmiUnlock(node->send_queue_lock);
 }
 
 /***********************************************************************

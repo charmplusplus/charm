@@ -39,8 +39,11 @@ void LrtsBeginIdle() {}
  ***************************************************************************/
 
 int CheckSocketsReady(int withDelayMs)
-{   
-  int nreadable,dataWrite=writeableDgrams || writeableAcks;
+{
+  int nreadable,dataWrite;
+  CmiLock(Cmi_comm_var_mutex);
+  dataWrite = writeableDgrams || writeableAcks;
+  CmiUnlock(Cmi_comm_var_mutex);
   CMK_PIPE_DECL(withDelayMs);
 
 
@@ -250,6 +253,7 @@ int TransmitDatagram()
   for (skip=0; skip<CmiNumNodesGlobal(); skip++) {
     node = nodes+nextnode;
     nextnode = (nextnode + 1) % CmiNumNodesGlobal();
+    CmiLock(node->send_queue_lock);
     dg = node->send_queue_h;
     if (dg) {
       seqno = dg->seqno;
@@ -257,10 +261,13 @@ int TransmitDatagram()
       if (node->send_window[slot] == 0) {
 	node->send_queue_h = dg->next;
 	node->send_window[slot] = dg;
-	TransmitImplicitDgram(dg);
+	CmiUnlock(node->send_queue_lock);
+	TransmitImplicitDgram(dg); /*Actual transmisson happens here*/
+	CmiLock(node->send_queue_lock);
 	if (seqno == ((node->send_last+1)&DGRAM_SEQNO_MASK))
 	  node->send_last = seqno;
 	node->send_primer = Cmi_clock + Cmi_delay_retransmit;
+	CmiUnlock(node->send_queue_lock);
 	return 1;
       }
     }
@@ -268,15 +275,21 @@ int TransmitDatagram()
       slot = (node->send_last % Cmi_window_size);
       for (count=0; count<Cmi_window_size; count++) {
 	dg = node->send_window[slot];
-	if (dg) break;
+	if (dg) {
+          break;
+        }
 	slot = ((slot+Cmi_window_size-1) % Cmi_window_size);
       }
       if (dg) {
-	TransmitImplicitDgram1(node->send_window[slot]);
+	CmiUnlock(node->send_queue_lock);
+	TransmitImplicitDgram1(node->send_window[slot]); /*Actual transmisson happens here*/
+	CmiLock(node->send_queue_lock);
 	node->send_primer = Cmi_clock + Cmi_delay_retransmit;
+	CmiUnlock(node->send_queue_lock);
 	return 1;
       }
     }
+    CmiUnlock(node->send_queue_lock);
   }
   return 0;
 }
@@ -333,18 +346,22 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 	     ogm->size,node->nodestart+rank);
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
-  writeableDgrams++;
+
+  CmiLock(node->send_queue_lock);
   while (size > Cmi_dgram_max_data) {
     EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank, broot);
     data += Cmi_dgram_max_data;
     size -= Cmi_dgram_max_data;
   }
   EnqueueOutgoingDgram(ogm, data, size, node, rank, broot);
+  CmiUnlock(node->send_queue_lock);
 
   myNode->sent_msgs++;
   myNode->sent_bytes += ogm->size;
   /*Try to immediately send the packets off*/
+  CmiLock(Cmi_comm_var_mutex);
   writeableDgrams=1;
+  CmiUnlock(Cmi_comm_var_mutex);
 
 }
 
@@ -559,7 +576,9 @@ void IntegrateAckDatagram(ExplicitDgram dg)
     } 
   /* higher ack so adjust */
   node->recv_ack_seqno = ackseqno;
+  CmiLock(Cmi_comm_var_mutex);
   writeableDgrams=1; /* May have freed up some send slots */
+  CmiUnlock(Cmi_comm_var_mutex);
   
   for (i=Cmi_window_size-1; i>=0; i--) {
     slot--; if (slot== ((unsigned int)-1)) slot+=Cmi_window_size;
@@ -676,8 +695,7 @@ static void CommunicationServerNet(int sleepTime, int where)
 {
   unsigned int nTimes=0; /* Loop counter */
   LOG(GetClock(), Cmi_nodestartGlobal, 'I', 0, 0);
-  MACHSTATE2(1,"CommunicationsServer(%d,%d)",
-	     sleepTime,writeableAcks||writeableDgrams)  
+  MACHSTATE1(1,"CommunicationsServer(%d)", sleepTime)
 #if !CMK_SHARED_VARS_UNAVAILABLE /*SMP mode: comm. lock is precious*/
   if (sleepTime!=0) {/*Sleep *without* holding the comm. lock*/
     MACHSTATE(1,"CommServer going to sleep (NO LOCK)");
@@ -708,8 +726,17 @@ static void CommunicationServerNet(int sleepTime, int where)
     if (dataskt_ready_write) {
       if (writeableAcks) 
         if (0!=(writeableAcks=TransmitAcknowledgement())) again=1;
-      if (writeableDgrams)
-        if (0!=(writeableDgrams=TransmitDatagram())) again=1; 
+      CmiLock(Cmi_comm_var_mutex);
+      if (writeableDgrams) {
+        CmiUnlock(Cmi_comm_var_mutex);
+        int temp;
+        if (0!=(temp=TransmitDatagram())) {
+          again=1;
+          CmiLock(Cmi_comm_var_mutex);
+          writeableDgrams = temp;
+          CmiUnlock(Cmi_comm_var_mutex);
+        }
+      } else CmiUnlock(Cmi_comm_var_mutex);
     }
     if (CmiStdoutNeedsService()) {CmiStdoutService();}
     if (!again) break; /* Nothing more to do */

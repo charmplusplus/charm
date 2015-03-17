@@ -786,6 +786,7 @@ void printLog(void)
  *****************************************************************************/
 
 
+static CmiNodeLock    Cmi_comm_var_mutex;
 static CmiNodeLock    Cmi_scanf_mutex;
 static double         Cmi_clock;
 static double         Cmi_check_delay = 3.0;
@@ -1514,15 +1515,8 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
     rank = dst - node->nodestart;
     int acqLock = 0;
     if (node->nodestart != Cmi_nodestartGlobal) {
-#if !CMK_SMP_NOT_RELAX_LOCK
-        LOCK_AND_SET();
-#endif		
         DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
-        GarbageCollectMsg(ogm);
-#if !CMK_SMP_NOT_RELAX_LOCK	  		
-        UNLOCK_AND_UNSET();
-#endif		
-  }
+    }
 #if CMK_MULTICORE
   network = 0;
 #endif
@@ -1569,21 +1563,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
 
   ogm=PrepareOutgoing(pe,size,'F',data);
 
-  int acqLock = 0;
-#if CMK_SMP_NOT_RELAX_LOCK  
-  LOCK_AND_SET();
-#endif  
-  
   sendonnetwork = DeliverOutgoingMessage(ogm);
-  
-#if CMK_SMP_NOT_RELAX_LOCK  
-  UNLOCK_AND_UNSET();
-#endif  
-  
-//#if CMK_SMP
-//  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
-//  CommunicationServerNet(0, COMM_SERVER_FROM_WORKER);
-//#endif
   MACHSTATE(1,"}  LrtsSend");
   return (CmiCommHandle)ogm;
 }
@@ -1940,6 +1920,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
   extract_args(*argv);
   log_init();
+  Cmi_comm_var_mutex = CmiCreateLock();
+  Cmi_freelist_mutex = CmiCreateLock();
   Cmi_scanf_mutex = CmiCreateLock();
 
     /* NOTE: can not acutally call timer before timerInit ! GZ */
