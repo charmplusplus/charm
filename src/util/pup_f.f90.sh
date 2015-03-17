@@ -93,6 +93,12 @@ cat >> pup_f.f90 << END_OF_HEADER
         module procedure apra1d,apra2d,apra3d,apra4d,apra5d,apra6d,apra7d
         module procedure apda1d,apda2d,apda3d,apda4d,apda5d,apda6d,apda7d
         module procedure apla1d,apla2d,apla3d,apla4d,apla5d,apla6d,apla7d
+        module procedure apia1d_al,apia2d_al,apia3d_al,apia4d_al,apia5d_al,apia6d_al,apia7d_al
+        module procedure apca1d_al,apca2d_al,apca3d_al,apca4d_al,apca5d_al,apca6d_al,apca7d_al
+        module procedure apsa1d_al,apsa2d_al,apsa3d_al,apsa4d_al,apsa5d_al,apsa6d_al,apsa7d_al
+        module procedure apra1d_al,apra2d_al,apra3d_al,apra4d_al,apra5d_al,apra6d_al,apra7d_al
+        module procedure apda1d_al,apda2d_al,apda3d_al,apda4d_al,apda5d_al,apda6d_al,apda7d_al
+        module procedure apla1d_al,apla2d_al,apla3d_al,apla4d_al,apla5d_al,apla6d_al,apla7d_al
       end interface
       contains
       function pup_issz(p)
@@ -191,15 +197,16 @@ done
 # Create pup routines for each data type:
 #   The "p" routines just copy the data.
 #   The "ap" routines also allocate and free the buffer.
+# suffix _al means input is allocatable, otherwise its pointer
 #
 for data in "int/ints/i/integer" "short/shorts/s/integer(kind=2)" "char/chars/c/character" "real/reals/r/real(kind=4)" "double/doubles/d/real(kind=8)" "logical/logicals/l/logical"
 do
-	pupname=`echo $data | awk -F/ '{print $1}'`
-	pupnames=`echo $data | awk -F/ '{print $2}'`
-	cname=`echo $data | awk -F/ '{print $3}'`
-	fname=`echo $data | awk -F/ '{print $4}'`
-	echo "Making pup routines for data type $pupname/$cname/$fname"
-	cat >> pup_f.f90 << END_OF_DATATYPE
+	  pupname=`echo $data | awk -F/ '{print $1}'`
+  	pupnames=`echo $data | awk -F/ '{print $2}'`
+  	cname=`echo $data | awk -F/ '{print $3}'`
+  	fname=`echo $data | awk -F/ '{print $4}'`
+  	echo "Making pup routines for data type $pupname/$cname/$fname"
+  	cat >> pup_f.f90 << END_OF_DATATYPE
 
 
       subroutine p${cname}(p, i)
@@ -244,9 +251,27 @@ do
         call fpup_${pupnames}(p, arr, size(arr))
       end subroutine
 
-      subroutine ap${cname}a1d(p, arr)
+END_OF_DATATYPE
+done
+
+for arrkind in "pointer/associated/NULLIFY(arr)/" "allocatable/allocated/ /_al"
+do
+  pointer=`echo $arrkind | awk -F/ '{print $1}'`
+  associated=`echo $arrkind | awk -F/ '{print $2}'`
+  NULLIFY=`echo $arrkind | awk -F/ '{print $3}'`
+  suffix=`echo $arrkind | awk -F/ '{print $4}'`
+  for data in "int/ints/i/integer" "short/shorts/s/integer(kind=2)" "char/chars/c/character" "real/reals/r/real(kind=4)" "double/doubles/d/real(kind=8)" "logical/logicals/l/logical"
+  do
+	  pupname=`echo $data | awk -F/ '{print $1}'`
+  	pupnames=`echo $data | awk -F/ '{print $2}'`
+  	cname=`echo $data | awk -F/ '{print $3}'`
+  	fname=`echo $data | awk -F/ '{print $4}'`
+  	echo "Making pup routines for data type $pupname/$cname/$fname"
+  	cat >> pup_f.f90 << END_OF_DATATYPE
+
+      subroutine ap${cname}a1d$suffix(p, arr)
         INTEGER :: p
-        $fname, pointer, dimension(:) :: arr
+        $fname, $pointer, dimension(:) :: arr
         integer :: n(1)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,1)
@@ -254,10 +279,10 @@ do
             ALLOCATE(arr(n(1)))
             call fpup_${pupnames}(p, arr, n(1))
           ELSE
-            NULLIFY(arr)
+            $NULLIFY
           END If
         ELSE ! packing
-          If (associated(arr)) THEN
+          If ($associated(arr)) THEN
             n(1)=SIZE(arr,DIM=1)
             CALL fpup_ints(p,n,1)
             call fpup_${pupnames}(p, arr, n(1))
@@ -266,14 +291,14 @@ do
             CALL fpup_ints(p,n,1)
           End If
         END IF
-        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+        IF (fpup_isdeleting(p) .and. $associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
 
-      subroutine ap${cname}a2d(p, arr)
+      subroutine ap${cname}a2d$suffix(p, arr)
         INTEGER :: p
-        $fname, pointer, dimension(:,:) :: arr
+        $fname, $pointer, dimension(:,:) :: arr
         integer :: n(2)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,2)
@@ -281,10 +306,10 @@ do
             ALLOCATE(arr(n(1),n(2)))
             call fpup_${pupnames}(p, arr, size(arr))
           ELSE
-            NULLIFY(arr)
+            $NULLIFY
           END If
         ELSE ! packing
-          If (associated(arr)) THEN
+          If ($associated(arr)) THEN
             n(1)=SIZE(arr,DIM=1)
             n(2)=SIZE(arr,DIM=2)
             CALL fpup_ints(p,n,2)
@@ -295,14 +320,14 @@ do
             CALL fpup_ints(p,n,2)
           End If
         END IF
-        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+        IF (fpup_isdeleting(p) .and. $associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
 
-      subroutine ap${cname}a3d(p, arr)
+      subroutine ap${cname}a3d$suffix(p, arr)
         INTEGER :: p
-        $fname, pointer, dimension(:,:,:) :: arr
+        $fname, $pointer, dimension(:,:,:) :: arr
         integer :: n(3)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,3)
@@ -310,10 +335,10 @@ do
             ALLOCATE(arr(n(1),n(2),n(3)))
             call fpup_${pupnames}(p, arr, size(arr))
           ELSE
-            NULLIFY(arr)
+            $NULLIFY
           END If
         ELSE ! packing
-          If (associated(arr)) THEN
+          If ($associated(arr)) THEN
             n(1)=SIZE(arr,DIM=1)
             n(2)=SIZE(arr,DIM=2)
             n(3)=SIZE(arr,DIM=3)
@@ -326,14 +351,14 @@ do
             CALL fpup_ints(p,n,3)
           End If
         END IF
-        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+        IF (fpup_isdeleting(p) .and. $associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
 
-      subroutine ap${cname}a4d(p, arr)
+      subroutine ap${cname}a4d$suffix(p, arr)
         INTEGER :: p
-        $fname, pointer, dimension(:,:,:,:) :: arr
+        $fname, $pointer, dimension(:,:,:,:) :: arr
         integer :: n(4)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,4)
@@ -341,10 +366,10 @@ do
             ALLOCATE(arr(n(1),n(2),n(3),n(4)))
             call fpup_${pupnames}(p, arr, size(arr))
           ELSE
-            NULLIFY(arr)
+            $NULLIFY
           END If
         ELSE ! packing
-          If (associated(arr)) THEN
+          If ($associated(arr)) THEN
             n(1)=SIZE(arr,DIM=1)
             n(2)=SIZE(arr,DIM=2)
             n(3)=SIZE(arr,DIM=3)
@@ -359,14 +384,14 @@ do
             CALL fpup_ints(p,n,4)
           End If
         END IF
-        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+        IF (fpup_isdeleting(p) .and. $associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
 
-      subroutine ap${cname}a5d(p, arr)
+      subroutine ap${cname}a5d$suffix(p, arr)
         INTEGER :: p
-        $fname, pointer, dimension(:,:,:,:,:) :: arr
+        $fname, $pointer, dimension(:,:,:,:,:) :: arr
         integer :: n(5)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,5)
@@ -374,10 +399,10 @@ do
             ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
             call fpup_${pupnames}(p, arr, size(arr))
           ELSE
-            NULLIFY(arr)
+            $NULLIFY
           END If
         ELSE ! packing
-          If (associated(arr)) THEN
+          If ($associated(arr)) THEN
             n(1)=SIZE(arr,DIM=1)
             n(2)=SIZE(arr,DIM=2)
             n(3)=SIZE(arr,DIM=3)
@@ -394,14 +419,14 @@ do
             CALL fpup_ints(p,n,5)
           End If
         END IF
-        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+        IF (fpup_isdeleting(p) .and. $associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
 
-      subroutine ap${cname}a6d(p, arr)
+      subroutine ap${cname}a6d$suffix(p, arr)
         INTEGER :: p
-        $fname, pointer, dimension(:,:,:,:,:,:) :: arr
+        $fname, $pointer, dimension(:,:,:,:,:,:) :: arr
         integer :: n(6)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,6)
@@ -409,10 +434,10 @@ do
             ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
             call fpup_${pupnames}(p, arr, size(arr))
           ELSE
-            NULLIFY(arr)
+            $NULLIFY
           END If
         ELSE ! packing
-          If (associated(arr)) THEN
+          If ($associated(arr)) THEN
             n(1)=SIZE(arr,DIM=1)
             n(2)=SIZE(arr,DIM=2)
             n(3)=SIZE(arr,DIM=3)
@@ -431,14 +456,14 @@ do
             CALL fpup_ints(p,n,6)
           End If
         END IF
-        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+        IF (fpup_isdeleting(p) .and. $associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
 
-      subroutine ap${cname}a7d(p, arr)
+      subroutine ap${cname}a7d$suffix(p, arr)
         INTEGER :: p
-        $fname, pointer, dimension(:,:,:,:,:,:,:) :: arr
+        $fname, $pointer, dimension(:,:,:,:,:,:,:) :: arr
         integer :: n(7)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,7)
@@ -446,10 +471,10 @@ do
             ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
             call fpup_${pupnames}(p, arr, size(arr))
           ELSE
-            NULLIFY(arr)
+            $NULLIFY
           END If
         ELSE ! packing
-          If (associated(arr)) THEN
+          If ($associated(arr)) THEN
             n(1)=SIZE(arr,DIM=1)
             n(2)=SIZE(arr,DIM=2)
             n(3)=SIZE(arr,DIM=3)
@@ -470,15 +495,15 @@ do
             CALL fpup_ints(p,n,7)
           End If
         END IF
-        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+        IF (fpup_isdeleting(p) .and. $associated(arr)) THEN
           deallocate(arr)
         END IF
         end subroutine
 
 END_OF_DATATYPE
 
+  done
 done
-
 
 echo "    end module" >> pup_f.f90
 

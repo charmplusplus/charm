@@ -130,6 +130,12 @@
         module procedure apra1d,apra2d,apra3d,apra4d,apra5d,apra6d,apra7d
         module procedure apda1d,apda2d,apda3d,apda4d,apda5d,apda6d,apda7d
         module procedure apla1d,apla2d,apla3d,apla4d,apla5d,apla6d,apla7d
+        module procedure apia1d_al,apia2d_al,apia3d_al,apia4d_al,apia5d_al,apia6d_al,apia7d_al
+        module procedure apca1d_al,apca2d_al,apca3d_al,apca4d_al,apca5d_al,apca6d_al,apca7d_al
+        module procedure apsa1d_al,apsa2d_al,apsa3d_al,apsa4d_al,apsa5d_al,apsa6d_al,apsa7d_al
+        module procedure apra1d_al,apra2d_al,apra3d_al,apra4d_al,apra5d_al,apra6d_al,apra7d_al
+        module procedure apda1d_al,apda2d_al,apda3d_al,apda4d_al,apda5d_al,apda6d_al,apda7d_al
+        module procedure apla1d_al,apla2d_al,apla3d_al,apla4d_al,apla5d_al,apla6d_al,apla7d_al
       end interface
       contains
       function pup_issz(p)
@@ -544,146 +550,6 @@
         call fpup_ints(p, arr, size(arr))
       end subroutine
 
-      subroutine apia1d(p, arr)
-        INTEGER :: p
-        integer, pointer, dimension(:) :: arr
-        integer :: n(1)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,1)
-          ALLOCATE(arr(n(1)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          CALL fpup_ints(p,n,1)
-        END IF
-        call fpup_ints(p, arr, n(1))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apia2d(p, arr)
-        INTEGER :: p
-        integer, pointer, dimension(:,:) :: arr
-        integer :: n(2)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,2)
-          ALLOCATE(arr(n(1),n(2)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          CALL fpup_ints(p,n,2)
-        END IF
-        call fpup_ints(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apia3d(p, arr)
-        INTEGER :: p
-        integer, pointer, dimension(:,:,:) :: arr
-        integer :: n(3)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,3)
-          ALLOCATE(arr(n(1),n(2),n(3)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          CALL fpup_ints(p,n,3)
-        END IF
-        call fpup_ints(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apia4d(p, arr)
-        INTEGER :: p
-        integer, pointer, dimension(:,:,:,:) :: arr
-        integer :: n(4)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,4)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          CALL fpup_ints(p,n,4)
-        END IF
-        call fpup_ints(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apia5d(p, arr)
-        INTEGER :: p
-        integer, pointer, dimension(:,:,:,:,:) :: arr
-        integer :: n(5)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,5)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          CALL fpup_ints(p,n,5)
-        END IF
-        call fpup_ints(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apia6d(p, arr)
-        INTEGER :: p
-        integer, pointer, dimension(:,:,:,:,:,:) :: arr
-        integer :: n(6)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,6)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          CALL fpup_ints(p,n,6)
-        END IF
-        call fpup_ints(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apia7d(p, arr)
-        INTEGER :: p
-        integer, pointer, dimension(:,:,:,:,:,:,:) :: arr
-        integer :: n(7)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,7)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          n(7)=SIZE(arr,DIM=7)
-          CALL fpup_ints(p,n,7)
-        END IF
-        call fpup_ints(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
 
 
       subroutine ps(p, i)
@@ -726,146 +592,6 @@
         INTEGER :: p
         integer(kind=2), intent(inout), dimension(:,:,:,:,:,:,:) :: arr
         call fpup_shorts(p, arr, size(arr))
-      end subroutine
-
-      subroutine apsa1d(p, arr)
-        INTEGER :: p
-        integer(kind=2), pointer, dimension(:) :: arr
-        integer :: n(1)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,1)
-          ALLOCATE(arr(n(1)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          CALL fpup_ints(p,n,1)
-        END IF
-        call fpup_shorts(p, arr, n(1))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apsa2d(p, arr)
-        INTEGER :: p
-        integer(kind=2), pointer, dimension(:,:) :: arr
-        integer :: n(2)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,2)
-          ALLOCATE(arr(n(1),n(2)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          CALL fpup_ints(p,n,2)
-        END IF
-        call fpup_shorts(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apsa3d(p, arr)
-        INTEGER :: p
-        integer(kind=2), pointer, dimension(:,:,:) :: arr
-        integer :: n(3)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,3)
-          ALLOCATE(arr(n(1),n(2),n(3)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          CALL fpup_ints(p,n,3)
-        END IF
-        call fpup_shorts(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apsa4d(p, arr)
-        INTEGER :: p
-        integer(kind=2), pointer, dimension(:,:,:,:) :: arr
-        integer :: n(4)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,4)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          CALL fpup_ints(p,n,4)
-        END IF
-        call fpup_shorts(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apsa5d(p, arr)
-        INTEGER :: p
-        integer(kind=2), pointer, dimension(:,:,:,:,:) :: arr
-        integer :: n(5)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,5)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          CALL fpup_ints(p,n,5)
-        END IF
-        call fpup_shorts(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apsa6d(p, arr)
-        INTEGER :: p
-        integer(kind=2), pointer, dimension(:,:,:,:,:,:) :: arr
-        integer :: n(6)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,6)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          CALL fpup_ints(p,n,6)
-        END IF
-        call fpup_shorts(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apsa7d(p, arr)
-        INTEGER :: p
-        integer(kind=2), pointer, dimension(:,:,:,:,:,:,:) :: arr
-        integer :: n(7)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,7)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          n(7)=SIZE(arr,DIM=7)
-          CALL fpup_ints(p,n,7)
-        END IF
-        call fpup_shorts(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
       end subroutine
 
 
@@ -912,146 +638,6 @@
         call fpup_chars(p, arr, size(arr))
       end subroutine
 
-      subroutine apca1d(p, arr)
-        INTEGER :: p
-        character, pointer, dimension(:) :: arr
-        integer :: n(1)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,1)
-          ALLOCATE(arr(n(1)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          CALL fpup_ints(p,n,1)
-        END IF
-        call fpup_chars(p, arr, n(1))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apca2d(p, arr)
-        INTEGER :: p
-        character, pointer, dimension(:,:) :: arr
-        integer :: n(2)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,2)
-          ALLOCATE(arr(n(1),n(2)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          CALL fpup_ints(p,n,2)
-        END IF
-        call fpup_chars(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apca3d(p, arr)
-        INTEGER :: p
-        character, pointer, dimension(:,:,:) :: arr
-        integer :: n(3)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,3)
-          ALLOCATE(arr(n(1),n(2),n(3)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          CALL fpup_ints(p,n,3)
-        END IF
-        call fpup_chars(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apca4d(p, arr)
-        INTEGER :: p
-        character, pointer, dimension(:,:,:,:) :: arr
-        integer :: n(4)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,4)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          CALL fpup_ints(p,n,4)
-        END IF
-        call fpup_chars(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apca5d(p, arr)
-        INTEGER :: p
-        character, pointer, dimension(:,:,:,:,:) :: arr
-        integer :: n(5)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,5)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          CALL fpup_ints(p,n,5)
-        END IF
-        call fpup_chars(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apca6d(p, arr)
-        INTEGER :: p
-        character, pointer, dimension(:,:,:,:,:,:) :: arr
-        integer :: n(6)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,6)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          CALL fpup_ints(p,n,6)
-        END IF
-        call fpup_chars(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apca7d(p, arr)
-        INTEGER :: p
-        character, pointer, dimension(:,:,:,:,:,:,:) :: arr
-        integer :: n(7)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,7)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          n(7)=SIZE(arr,DIM=7)
-          CALL fpup_ints(p,n,7)
-        END IF
-        call fpup_chars(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
 
 
       subroutine pr(p, i)
@@ -1094,146 +680,6 @@
         INTEGER :: p
         real(kind=4), intent(inout), dimension(:,:,:,:,:,:,:) :: arr
         call fpup_reals(p, arr, size(arr))
-      end subroutine
-
-      subroutine apra1d(p, arr)
-        INTEGER :: p
-        real(kind=4), pointer, dimension(:) :: arr
-        integer :: n(1)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,1)
-          ALLOCATE(arr(n(1)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          CALL fpup_ints(p,n,1)
-        END IF
-        call fpup_reals(p, arr, n(1))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apra2d(p, arr)
-        INTEGER :: p
-        real(kind=4), pointer, dimension(:,:) :: arr
-        integer :: n(2)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,2)
-          ALLOCATE(arr(n(1),n(2)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          CALL fpup_ints(p,n,2)
-        END IF
-        call fpup_reals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apra3d(p, arr)
-        INTEGER :: p
-        real(kind=4), pointer, dimension(:,:,:) :: arr
-        integer :: n(3)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,3)
-          ALLOCATE(arr(n(1),n(2),n(3)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          CALL fpup_ints(p,n,3)
-        END IF
-        call fpup_reals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apra4d(p, arr)
-        INTEGER :: p
-        real(kind=4), pointer, dimension(:,:,:,:) :: arr
-        integer :: n(4)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,4)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          CALL fpup_ints(p,n,4)
-        END IF
-        call fpup_reals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apra5d(p, arr)
-        INTEGER :: p
-        real(kind=4), pointer, dimension(:,:,:,:,:) :: arr
-        integer :: n(5)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,5)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          CALL fpup_ints(p,n,5)
-        END IF
-        call fpup_reals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apra6d(p, arr)
-        INTEGER :: p
-        real(kind=4), pointer, dimension(:,:,:,:,:,:) :: arr
-        integer :: n(6)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,6)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          CALL fpup_ints(p,n,6)
-        END IF
-        call fpup_reals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apra7d(p, arr)
-        INTEGER :: p
-        real(kind=4), pointer, dimension(:,:,:,:,:,:,:) :: arr
-        integer :: n(7)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,7)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          n(7)=SIZE(arr,DIM=7)
-          CALL fpup_ints(p,n,7)
-        END IF
-        call fpup_reals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
       end subroutine
 
 
@@ -1280,146 +726,6 @@
         call fpup_doubles(p, arr, size(arr))
       end subroutine
 
-      subroutine apda1d(p, arr)
-        INTEGER :: p
-        real(kind=8), pointer, dimension(:) :: arr
-        integer :: n(1)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,1)
-          ALLOCATE(arr(n(1)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          CALL fpup_ints(p,n,1)
-        END IF
-        call fpup_doubles(p, arr, n(1))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apda2d(p, arr)
-        INTEGER :: p
-        real(kind=8), pointer, dimension(:,:) :: arr
-        integer :: n(2)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,2)
-          ALLOCATE(arr(n(1),n(2)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          CALL fpup_ints(p,n,2)
-        END IF
-        call fpup_doubles(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apda3d(p, arr)
-        INTEGER :: p
-        real(kind=8), pointer, dimension(:,:,:) :: arr
-        integer :: n(3)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,3)
-          ALLOCATE(arr(n(1),n(2),n(3)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          CALL fpup_ints(p,n,3)
-        END IF
-        call fpup_doubles(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apda4d(p, arr)
-        INTEGER :: p
-        real(kind=8), pointer, dimension(:,:,:,:) :: arr
-        integer :: n(4)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,4)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          CALL fpup_ints(p,n,4)
-        END IF
-        call fpup_doubles(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apda5d(p, arr)
-        INTEGER :: p
-        real(kind=8), pointer, dimension(:,:,:,:,:) :: arr
-        integer :: n(5)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,5)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          CALL fpup_ints(p,n,5)
-        END IF
-        call fpup_doubles(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apda6d(p, arr)
-        INTEGER :: p
-        real(kind=8), pointer, dimension(:,:,:,:,:,:) :: arr
-        integer :: n(6)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,6)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          CALL fpup_ints(p,n,6)
-        END IF
-        call fpup_doubles(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
-      subroutine apda7d(p, arr)
-        INTEGER :: p
-        real(kind=8), pointer, dimension(:,:,:,:,:,:,:) :: arr
-        integer :: n(7)
-        IF (fpup_isunpacking(p)) THEN
-          CALL fpup_ints(p,n,7)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          n(7)=SIZE(arr,DIM=7)
-          CALL fpup_ints(p,n,7)
-        END IF
-        call fpup_doubles(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
-          deallocate(arr)
-        END IF
-      end subroutine
-
 
 
       subroutine pl(p, i)
@@ -1464,19 +770,1190 @@
         call fpup_logicals(p, arr, size(arr))
       end subroutine
 
+
+      subroutine apia1d(p, arr)
+        INTEGER :: p
+        integer, pointer, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_ints(p, arr, n(1))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_ints(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia2d(p, arr)
+        INTEGER :: p
+        integer, pointer, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia3d(p, arr)
+        INTEGER :: p
+        integer, pointer, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia4d(p, arr)
+        INTEGER :: p
+        integer, pointer, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia5d(p, arr)
+        INTEGER :: p
+        integer, pointer, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia6d(p, arr)
+        INTEGER :: p
+        integer, pointer, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia7d(p, arr)
+        INTEGER :: p
+        integer, pointer, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apsa1d(p, arr)
+        INTEGER :: p
+        integer(kind=2), pointer, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_shorts(p, arr, n(1))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_shorts(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa2d(p, arr)
+        INTEGER :: p
+        integer(kind=2), pointer, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa3d(p, arr)
+        INTEGER :: p
+        integer(kind=2), pointer, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa4d(p, arr)
+        INTEGER :: p
+        integer(kind=2), pointer, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa5d(p, arr)
+        INTEGER :: p
+        integer(kind=2), pointer, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa6d(p, arr)
+        INTEGER :: p
+        integer(kind=2), pointer, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa7d(p, arr)
+        INTEGER :: p
+        integer(kind=2), pointer, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apca1d(p, arr)
+        INTEGER :: p
+        character, pointer, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_chars(p, arr, n(1))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_chars(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca2d(p, arr)
+        INTEGER :: p
+        character, pointer, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca3d(p, arr)
+        INTEGER :: p
+        character, pointer, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca4d(p, arr)
+        INTEGER :: p
+        character, pointer, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca5d(p, arr)
+        INTEGER :: p
+        character, pointer, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca6d(p, arr)
+        INTEGER :: p
+        character, pointer, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca7d(p, arr)
+        INTEGER :: p
+        character, pointer, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apra1d(p, arr)
+        INTEGER :: p
+        real(kind=4), pointer, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_reals(p, arr, n(1))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_reals(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra2d(p, arr)
+        INTEGER :: p
+        real(kind=4), pointer, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra3d(p, arr)
+        INTEGER :: p
+        real(kind=4), pointer, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra4d(p, arr)
+        INTEGER :: p
+        real(kind=4), pointer, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra5d(p, arr)
+        INTEGER :: p
+        real(kind=4), pointer, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra6d(p, arr)
+        INTEGER :: p
+        real(kind=4), pointer, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra7d(p, arr)
+        INTEGER :: p
+        real(kind=4), pointer, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apda1d(p, arr)
+        INTEGER :: p
+        real(kind=8), pointer, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_doubles(p, arr, n(1))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_doubles(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda2d(p, arr)
+        INTEGER :: p
+        real(kind=8), pointer, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda3d(p, arr)
+        INTEGER :: p
+        real(kind=8), pointer, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda4d(p, arr)
+        INTEGER :: p
+        real(kind=8), pointer, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda5d(p, arr)
+        INTEGER :: p
+        real(kind=8), pointer, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda6d(p, arr)
+        INTEGER :: p
+        real(kind=8), pointer, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda7d(p, arr)
+        INTEGER :: p
+        real(kind=8), pointer, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
       subroutine apla1d(p, arr)
         INTEGER :: p
         logical, pointer, dimension(:) :: arr
         integer :: n(1)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,1)
-          ALLOCATE(arr(n(1)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_logicals(p, arr, n(1))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_logicals(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
         END IF
-        call fpup_logicals(p, arr, n(1))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -1487,14 +1964,25 @@
         integer :: n(2)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,2)
-          ALLOCATE(arr(n(1),n(2)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
         END IF
-        call fpup_logicals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -1505,15 +1993,27 @@
         integer :: n(3)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,3)
-          ALLOCATE(arr(n(1),n(2),n(3)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
         END IF
-        call fpup_logicals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -1524,16 +2024,29 @@
         integer :: n(4)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,4)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
         END IF
-        call fpup_logicals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -1544,17 +2057,31 @@
         integer :: n(5)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,5)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
         END IF
-        call fpup_logicals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -1565,18 +2092,33 @@
         integer :: n(6)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,6)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
         END IF
-        call fpup_logicals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
@@ -1587,21 +2129,1429 @@
         integer :: n(7)
         IF (fpup_isunpacking(p)) THEN
           CALL fpup_ints(p,n,7)
-          ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
-        ELSE
-          n(1)=SIZE(arr,DIM=1)
-          n(2)=SIZE(arr,DIM=2)
-          n(3)=SIZE(arr,DIM=3)
-          n(4)=SIZE(arr,DIM=4)
-          n(5)=SIZE(arr,DIM=5)
-          n(6)=SIZE(arr,DIM=6)
-          n(7)=SIZE(arr,DIM=7)
-          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
         END IF
-        call fpup_logicals(p, arr, size(arr))
-        IF (fpup_isdeleting(p)) THEN
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apia1d_al(p, arr)
+        INTEGER :: p
+        integer, allocatable, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_ints(p, arr, n(1))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_ints(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
           deallocate(arr)
         END IF
       end subroutine
+
+      subroutine apia2d_al(p, arr)
+        INTEGER :: p
+        integer, allocatable, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia3d_al(p, arr)
+        INTEGER :: p
+        integer, allocatable, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia4d_al(p, arr)
+        INTEGER :: p
+        integer, allocatable, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia5d_al(p, arr)
+        INTEGER :: p
+        integer, allocatable, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia6d_al(p, arr)
+        INTEGER :: p
+        integer, allocatable, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apia7d_al(p, arr)
+        INTEGER :: p
+        integer, allocatable, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_ints(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apsa1d_al(p, arr)
+        INTEGER :: p
+        integer(kind=2), allocatable, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_shorts(p, arr, n(1))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_shorts(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa2d_al(p, arr)
+        INTEGER :: p
+        integer(kind=2), allocatable, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa3d_al(p, arr)
+        INTEGER :: p
+        integer(kind=2), allocatable, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa4d_al(p, arr)
+        INTEGER :: p
+        integer(kind=2), allocatable, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa5d_al(p, arr)
+        INTEGER :: p
+        integer(kind=2), allocatable, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa6d_al(p, arr)
+        INTEGER :: p
+        integer(kind=2), allocatable, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apsa7d_al(p, arr)
+        INTEGER :: p
+        integer(kind=2), allocatable, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_shorts(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apca1d_al(p, arr)
+        INTEGER :: p
+        character, allocatable, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_chars(p, arr, n(1))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_chars(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca2d_al(p, arr)
+        INTEGER :: p
+        character, allocatable, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca3d_al(p, arr)
+        INTEGER :: p
+        character, allocatable, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca4d_al(p, arr)
+        INTEGER :: p
+        character, allocatable, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca5d_al(p, arr)
+        INTEGER :: p
+        character, allocatable, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca6d_al(p, arr)
+        INTEGER :: p
+        character, allocatable, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apca7d_al(p, arr)
+        INTEGER :: p
+        character, allocatable, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_chars(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apra1d_al(p, arr)
+        INTEGER :: p
+        real(kind=4), allocatable, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_reals(p, arr, n(1))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_reals(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra2d_al(p, arr)
+        INTEGER :: p
+        real(kind=4), allocatable, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra3d_al(p, arr)
+        INTEGER :: p
+        real(kind=4), allocatable, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra4d_al(p, arr)
+        INTEGER :: p
+        real(kind=4), allocatable, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra5d_al(p, arr)
+        INTEGER :: p
+        real(kind=4), allocatable, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra6d_al(p, arr)
+        INTEGER :: p
+        real(kind=4), allocatable, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apra7d_al(p, arr)
+        INTEGER :: p
+        real(kind=4), allocatable, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_reals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apda1d_al(p, arr)
+        INTEGER :: p
+        real(kind=8), allocatable, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_doubles(p, arr, n(1))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_doubles(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda2d_al(p, arr)
+        INTEGER :: p
+        real(kind=8), allocatable, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda3d_al(p, arr)
+        INTEGER :: p
+        real(kind=8), allocatable, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda4d_al(p, arr)
+        INTEGER :: p
+        real(kind=8), allocatable, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda5d_al(p, arr)
+        INTEGER :: p
+        real(kind=8), allocatable, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda6d_al(p, arr)
+        INTEGER :: p
+        real(kind=8), allocatable, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apda7d_al(p, arr)
+        INTEGER :: p
+        real(kind=8), allocatable, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_doubles(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apla1d_al(p, arr)
+        INTEGER :: p
+        logical, allocatable, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_logicals(p, arr, n(1))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_logicals(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apla2d_al(p, arr)
+        INTEGER :: p
+        logical, allocatable, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apla3d_al(p, arr)
+        INTEGER :: p
+        logical, allocatable, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apla4d_al(p, arr)
+        INTEGER :: p
+        logical, allocatable, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apla5d_al(p, arr)
+        INTEGER :: p
+        logical, allocatable, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apla6d_al(p, arr)
+        INTEGER :: p
+        logical, allocatable, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apla7d_al(p, arr)
+        INTEGER :: p
+        logical, allocatable, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
 
     end module
