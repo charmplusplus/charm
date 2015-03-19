@@ -170,6 +170,25 @@ PUP_BASIC_DATATYPEF(REAL,real,float)
 PUP_BASIC_DATATYPEF(DOUBLE,double,double)
 PUP_BASIC_DATATYPEF(LOGICAL,logical,int)
 
+
+FDECL void FTN_NAME(FPUP_COMPLEX,fpup_complex)(pup_er p, float *v)
+{mp(v,2);}
+
+FDECL void FTN_NAME(FPUP_COMPLEXESG,fpup_complexesg)(pup_er p, float *arr, int *nItems)
+{mp(arr,2*(*nItems));}
+
+FDECL void FTN_NAME(FPUP_COMPLEXES,fpup_complexes)(pup_er p, float *arr, int *nItems)
+{mp(arr,2*(*nItems));}
+
+FDECL void FTN_NAME(FPUP_DOUBLECOMPLEX,fpup_doublecomplex)(pup_er p, double *v)
+{mp(v,2);}
+
+FDECL void FTN_NAME(FPUP_DOUBLECOMPLEXESG,fpup_doublecomplexesg)(pup_er p, double *arr, int *nItems)
+{mp(arr,2*(*nItems));}
+
+FDECL void FTN_NAME(FPUP_DOUBLECOMPLEXES,fpup_doublecomplexes)(pup_er p, double *arr, int *nItems)
+{mp(arr,2*(*nItems));}
+
 /*Pack/unpack untyped byte array:*/
 CDECL void pup_bytes(pup_er p,void *ptr,int nBytes)
 {

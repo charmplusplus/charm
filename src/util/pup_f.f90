@@ -52,6 +52,17 @@
           INTEGER :: p
           LOGICAL :: d
         end subroutine
+
+        subroutine fpup_complex(p, d)
+          INTEGER :: p
+          COMPLEX*8 :: d
+        end subroutine
+
+        subroutine fpup_doublecomplex(p, d)
+          INTEGER :: p
+          COMPLEX*16 :: d
+        end subroutine
+
       end interface
 
       interface fpup_chars
@@ -115,6 +126,26 @@
        module procedure fpup_logicals_7
       end interface fpup_logicals
 
+      interface fpup_complexes
+       module procedure fpup_complexes_1
+       module procedure fpup_complexes_2
+       module procedure fpup_complexes_3
+       module procedure fpup_complexes_4
+       module procedure fpup_complexes_5
+       module procedure fpup_complexes_6
+       module procedure fpup_complexes_7
+      end interface fpup_complexes
+
+      interface fpup_doublecomplexes
+       module procedure fpup_doublecomplexes_1
+       module procedure fpup_doublecomplexes_2
+       module procedure fpup_doublecomplexes_3
+       module procedure fpup_doublecomplexes_4
+       module procedure fpup_doublecomplexes_5
+       module procedure fpup_doublecomplexes_6
+       module procedure fpup_doublecomplexes_7
+      end interface fpup_doublecomplexes
+
       interface pup
         module procedure pi,pia1d,pia2d,pia3d,pia4d,pia5d,pia6d,pia7d
         module procedure pc,pca1d,pca2d,pca3d,pca4d,pca5d,pca6d,pca7d
@@ -122,6 +153,8 @@
         module procedure pr,pra1d,pra2d,pra3d,pra4d,pra5d,pra6d,pra7d
         module procedure pd,pda1d,pda2d,pda3d,pda4d,pda5d,pda6d,pda7d
         module procedure pl,pla1d,pla2d,pla3d,pla4d,pla5d,pla6d,pla7d
+        module procedure px,pxa1d,pxa2d,pxa3d,pxa4d,pxa5d,pxa6d,pxa7d
+        module procedure py,pya1d,pya2d,pya3d,pya4d,pya5d,pya6d,pya7d
       end interface
       interface apup
         module procedure apia1d,apia2d,apia3d,apia4d,apia5d,apia6d,apia7d
@@ -130,12 +163,16 @@
         module procedure apra1d,apra2d,apra3d,apra4d,apra5d,apra6d,apra7d
         module procedure apda1d,apda2d,apda3d,apda4d,apda5d,apda6d,apda7d
         module procedure apla1d,apla2d,apla3d,apla4d,apla5d,apla6d,apla7d
+        module procedure apxa1d,apxa2d,apxa3d,apxa4d,apxa5d,apxa6d,apxa7d
+        module procedure apya1d,apya2d,apya3d,apya4d,apya5d,apya6d,apya7d
         module procedure apia1d_al,apia2d_al,apia3d_al,apia4d_al,apia5d_al,apia6d_al,apia7d_al
         module procedure apca1d_al,apca2d_al,apca3d_al,apca4d_al,apca5d_al,apca6d_al,apca7d_al
         module procedure apsa1d_al,apsa2d_al,apsa3d_al,apsa4d_al,apsa5d_al,apsa6d_al,apsa7d_al
         module procedure apra1d_al,apra2d_al,apra3d_al,apra4d_al,apra5d_al,apra6d_al,apra7d_al
         module procedure apda1d_al,apda2d_al,apda3d_al,apda4d_al,apda5d_al,apda6d_al,apda7d_al
         module procedure apla1d_al,apla2d_al,apla3d_al,apla4d_al,apla5d_al,apla6d_al,apla7d_al
+        module procedure apxa1d_al,apxa2d_al,apxa3d_al,apxa4d_al,apxa5d_al,apxa6d_al,apxa7d_al
+        module procedure apya1d_al,apya2d_al,apya3d_al,apya4d_al,apya5d_al,apya6d_al,apya7d_al
       end interface
       contains
       function pup_issz(p)
@@ -164,41 +201,7 @@
         pup_isul = fpup_isuserlevel(p)
       end function
 
-      subroutine fpup_complex(p,c)
-        INTEGER p
-        complex c
-        call fpup_real(p,REAL(c))
-        call fpup_real(p,AIMAG(c))
-      end subroutine
-
-      subroutine fpup_complexes(p,c,size)
-        INTEGER p
-        complex,pointer,dimension(:) :: c
-        integer size
-        integer i
-        do i = 1, size, 1
-          call fpup_complex(p,c(i))
-        end do
-      end subroutine
-
-      subroutine fpup_doublecomplex(p,c)
-        INTEGER p
-        double complex c
-        call fpup_double(p,DBLE(c))
-        call fpup_double(p,DIMAG(c))
-      end subroutine
-
-      subroutine fpup_doublecomplexes(p,c,size)
-        INTEGER p
-        double complex,pointer,dimension(:) :: c
-        integer size
-        integer i
-        do i = 1, size, 1
-          call fpup_doublecomplex(p,c(i))
-        end do
-      end subroutine
-
-
+     
       subroutine fpup_chars_0(p, d, c)
         INTEGER :: p
         CHARACTER(LEN=*)     d
@@ -506,6 +509,92 @@
         call fpup_logicalsg(p, d, c)
        end subroutine
 
+       subroutine fpup_complexes_1(p, d, c)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:) :: d
+        INTEGER :: c
+        call fpup_complexesg(p, d, c)
+       end subroutine
+       subroutine fpup_complexes_2(p, d, c)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:) :: d
+        INTEGER :: c
+        call fpup_complexesg(p, d, c)
+       end subroutine
+       subroutine fpup_complexes_3(p, d, c)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:) :: d
+        INTEGER :: c
+        call fpup_complexesg(p, d, c)
+       end subroutine
+       subroutine fpup_complexes_4(p, d, c)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_complexesg(p, d, c)
+       end subroutine
+       subroutine fpup_complexes_5(p, d, c)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_complexesg(p, d, c)
+       end subroutine
+       subroutine fpup_complexes_6(p, d, c)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_complexesg(p, d, c)
+       end subroutine
+       subroutine fpup_complexes_7(p, d, c)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_complexesg(p, d, c)
+       end subroutine
+
+       subroutine fpup_doublecomplexes_1(p, d, c)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:) :: d
+        INTEGER :: c
+        call fpup_doublecomplexesg(p, d, c)
+       end subroutine
+       subroutine fpup_doublecomplexes_2(p, d, c)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:) :: d
+        INTEGER :: c
+        call fpup_doublecomplexesg(p, d, c)
+       end subroutine
+       subroutine fpup_doublecomplexes_3(p, d, c)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:) :: d
+        INTEGER :: c
+        call fpup_doublecomplexesg(p, d, c)
+       end subroutine
+       subroutine fpup_doublecomplexes_4(p, d, c)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_doublecomplexesg(p, d, c)
+       end subroutine
+       subroutine fpup_doublecomplexes_5(p, d, c)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_doublecomplexesg(p, d, c)
+       end subroutine
+       subroutine fpup_doublecomplexes_6(p, d, c)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_doublecomplexesg(p, d, c)
+       end subroutine
+       subroutine fpup_doublecomplexes_7(p, d, c)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_doublecomplexesg(p, d, c)
+       end subroutine
+
 
 
       subroutine pi(p, i)
@@ -768,6 +857,94 @@
         INTEGER :: p
         logical, intent(inout), dimension(:,:,:,:,:,:,:) :: arr
         call fpup_logicals(p, arr, size(arr))
+      end subroutine
+
+
+
+      subroutine px(p, i)
+        INTEGER :: p
+        complex*8, intent(inout) :: i
+        call fpup_complex(p, i)
+      end subroutine
+      
+      subroutine pxa1d(p, arr)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:) :: arr
+        call fpup_complexes(p, arr, size(arr))
+      end subroutine
+      subroutine pxa2d(p, arr)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:) :: arr
+        call fpup_complexes(p, arr, size(arr))
+      end subroutine
+      subroutine pxa3d(p, arr)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:) :: arr
+        call fpup_complexes(p, arr, size(arr))
+      end subroutine
+      subroutine pxa4d(p, arr)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:,:) :: arr
+        call fpup_complexes(p, arr, size(arr))
+      end subroutine
+      subroutine pxa5d(p, arr)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:,:,:) :: arr
+        call fpup_complexes(p, arr, size(arr))
+      end subroutine
+      subroutine pxa6d(p, arr)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:,:,:,:) :: arr
+        call fpup_complexes(p, arr, size(arr))
+      end subroutine
+      subroutine pxa7d(p, arr)
+        INTEGER :: p
+        complex*8, intent(inout), dimension(:,:,:,:,:,:,:) :: arr
+        call fpup_complexes(p, arr, size(arr))
+      end subroutine
+
+
+
+      subroutine py(p, i)
+        INTEGER :: p
+        complex*16, intent(inout) :: i
+        call fpup_doublecomplex(p, i)
+      end subroutine
+      
+      subroutine pya1d(p, arr)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:) :: arr
+        call fpup_doublecomplexes(p, arr, size(arr))
+      end subroutine
+      subroutine pya2d(p, arr)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:) :: arr
+        call fpup_doublecomplexes(p, arr, size(arr))
+      end subroutine
+      subroutine pya3d(p, arr)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:) :: arr
+        call fpup_doublecomplexes(p, arr, size(arr))
+      end subroutine
+      subroutine pya4d(p, arr)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:,:) :: arr
+        call fpup_doublecomplexes(p, arr, size(arr))
+      end subroutine
+      subroutine pya5d(p, arr)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:,:,:) :: arr
+        call fpup_doublecomplexes(p, arr, size(arr))
+      end subroutine
+      subroutine pya6d(p, arr)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:,:,:,:) :: arr
+        call fpup_doublecomplexes(p, arr, size(arr))
+      end subroutine
+      subroutine pya7d(p, arr)
+        INTEGER :: p
+        complex*16, intent(inout), dimension(:,:,:,:,:,:,:) :: arr
+        call fpup_doublecomplexes(p, arr, size(arr))
       end subroutine
 
 
@@ -2163,6 +2340,470 @@
         end subroutine
 
 
+      subroutine apxa1d(p, arr)
+        INTEGER :: p
+        complex*8, pointer, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_complexes(p, arr, n(1))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_complexes(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa2d(p, arr)
+        INTEGER :: p
+        complex*8, pointer, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa3d(p, arr)
+        INTEGER :: p
+        complex*8, pointer, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa4d(p, arr)
+        INTEGER :: p
+        complex*8, pointer, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa5d(p, arr)
+        INTEGER :: p
+        complex*8, pointer, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa6d(p, arr)
+        INTEGER :: p
+        complex*8, pointer, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa7d(p, arr)
+        INTEGER :: p
+        complex*8, pointer, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apya1d(p, arr)
+        INTEGER :: p
+        complex*16, pointer, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_doublecomplexes(p, arr, n(1))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_doublecomplexes(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya2d(p, arr)
+        INTEGER :: p
+        complex*16, pointer, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya3d(p, arr)
+        INTEGER :: p
+        complex*16, pointer, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya4d(p, arr)
+        INTEGER :: p
+        complex*16, pointer, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya5d(p, arr)
+        INTEGER :: p
+        complex*16, pointer, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya6d(p, arr)
+        INTEGER :: p
+        complex*16, pointer, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya7d(p, arr)
+        INTEGER :: p
+        complex*16, pointer, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            NULLIFY(arr)
+          END If
+        ELSE ! packing
+          If (associated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. associated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
       subroutine apia1d_al(p, arr)
         INTEGER :: p
         integer, allocatable, dimension(:) :: arr
@@ -3538,6 +4179,470 @@
             n(7)=SIZE(arr,DIM=7)
             CALL fpup_ints(p,n,7)
             call fpup_logicals(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apxa1d_al(p, arr)
+        INTEGER :: p
+        complex*8, allocatable, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_complexes(p, arr, n(1))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_complexes(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa2d_al(p, arr)
+        INTEGER :: p
+        complex*8, allocatable, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa3d_al(p, arr)
+        INTEGER :: p
+        complex*8, allocatable, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa4d_al(p, arr)
+        INTEGER :: p
+        complex*8, allocatable, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa5d_al(p, arr)
+        INTEGER :: p
+        complex*8, allocatable, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa6d_al(p, arr)
+        INTEGER :: p
+        complex*8, allocatable, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apxa7d_al(p, arr)
+        INTEGER :: p
+        complex*8, allocatable, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_complexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            n(7) = -1
+            CALL fpup_ints(p,n,7)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+        end subroutine
+
+
+      subroutine apya1d_al(p, arr)
+        INTEGER :: p
+        complex*16, allocatable, dimension(:) :: arr
+        integer :: n(1)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,1)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1)))
+            call fpup_doublecomplexes(p, arr, n(1))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            CALL fpup_ints(p,n,1)
+            call fpup_doublecomplexes(p, arr, n(1))
+          ELSE
+            n(1) = -1
+            CALL fpup_ints(p,n,1)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya2d_al(p, arr)
+        INTEGER :: p
+        complex*16, allocatable, dimension(:,:) :: arr
+        integer :: n(2)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,2)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            CALL fpup_ints(p,n,2)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            CALL fpup_ints(p,n,2)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya3d_al(p, arr)
+        INTEGER :: p
+        complex*16, allocatable, dimension(:,:,:) :: arr
+        integer :: n(3)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,3)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            CALL fpup_ints(p,n,3)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            CALL fpup_ints(p,n,3)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya4d_al(p, arr)
+        INTEGER :: p
+        complex*16, allocatable, dimension(:,:,:,:) :: arr
+        integer :: n(4)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,4)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            CALL fpup_ints(p,n,4)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            CALL fpup_ints(p,n,4)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya5d_al(p, arr)
+        INTEGER :: p
+        complex*16, allocatable, dimension(:,:,:,:,:) :: arr
+        integer :: n(5)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,5)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            CALL fpup_ints(p,n,5)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            CALL fpup_ints(p,n,5)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya6d_al(p, arr)
+        INTEGER :: p
+        complex*16, allocatable, dimension(:,:,:,:,:,:) :: arr
+        integer :: n(6)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,6)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            CALL fpup_ints(p,n,6)
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+            n(1) = -1
+            n(2) = -1
+            n(3) = -1
+            n(4) = -1
+            n(5) = -1
+            n(6) = -1
+            CALL fpup_ints(p,n,6)
+          End If
+        END IF
+        IF (fpup_isdeleting(p) .and. allocated(arr)) THEN
+          deallocate(arr)
+        END IF
+      end subroutine
+
+      subroutine apya7d_al(p, arr)
+        INTEGER :: p
+        complex*16, allocatable, dimension(:,:,:,:,:,:,:) :: arr
+        integer :: n(7)
+        IF (fpup_isunpacking(p)) THEN
+          CALL fpup_ints(p,n,7)
+          If (n(1) >= 0) THEN
+            ALLOCATE(arr(n(1),n(2),n(3),n(4),n(5),n(6),n(7)))
+            call fpup_doublecomplexes(p, arr, size(arr))
+          ELSE
+             
+          END If
+        ELSE ! packing
+          If (allocated(arr)) THEN
+            n(1)=SIZE(arr,DIM=1)
+            n(2)=SIZE(arr,DIM=2)
+            n(3)=SIZE(arr,DIM=3)
+            n(4)=SIZE(arr,DIM=4)
+            n(5)=SIZE(arr,DIM=5)
+            n(6)=SIZE(arr,DIM=6)
+            n(7)=SIZE(arr,DIM=7)
+            CALL fpup_ints(p,n,7)
+            call fpup_doublecomplexes(p, arr, size(arr))
           ELSE
             n(1) = -1
             n(2) = -1

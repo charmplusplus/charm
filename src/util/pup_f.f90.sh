@@ -58,11 +58,22 @@ cat > pup_f.f90 << END_OF_HEADER
           INTEGER :: p
           LOGICAL :: d
         end subroutine
+
+        subroutine fpup_complex(p, d)
+          INTEGER :: p
+          COMPLEX*8 :: d
+        end subroutine
+
+        subroutine fpup_doublecomplex(p, d)
+          INTEGER :: p
+          COMPLEX*16 :: d
+        end subroutine
+
       end interface
 
 END_OF_HEADER
 
-for t in chars ints longs reals doubles logicals
+for t in chars ints longs reals doubles logicals complexes doublecomplexes
 do
   echo "      interface fpup_${t}" >> pup_f.f90
   if test $t = "chars" 
@@ -85,6 +96,8 @@ cat >> pup_f.f90 << END_OF_HEADER
         module procedure pr,pra1d,pra2d,pra3d,pra4d,pra5d,pra6d,pra7d
         module procedure pd,pda1d,pda2d,pda3d,pda4d,pda5d,pda6d,pda7d
         module procedure pl,pla1d,pla2d,pla3d,pla4d,pla5d,pla6d,pla7d
+        module procedure px,pxa1d,pxa2d,pxa3d,pxa4d,pxa5d,pxa6d,pxa7d
+        module procedure py,pya1d,pya2d,pya3d,pya4d,pya5d,pya6d,pya7d
       end interface
       interface apup
         module procedure apia1d,apia2d,apia3d,apia4d,apia5d,apia6d,apia7d
@@ -93,12 +106,16 @@ cat >> pup_f.f90 << END_OF_HEADER
         module procedure apra1d,apra2d,apra3d,apra4d,apra5d,apra6d,apra7d
         module procedure apda1d,apda2d,apda3d,apda4d,apda5d,apda6d,apda7d
         module procedure apla1d,apla2d,apla3d,apla4d,apla5d,apla6d,apla7d
+        module procedure apxa1d,apxa2d,apxa3d,apxa4d,apxa5d,apxa6d,apxa7d
+        module procedure apya1d,apya2d,apya3d,apya4d,apya5d,apya6d,apya7d
         module procedure apia1d_al,apia2d_al,apia3d_al,apia4d_al,apia5d_al,apia6d_al,apia7d_al
         module procedure apca1d_al,apca2d_al,apca3d_al,apca4d_al,apca5d_al,apca6d_al,apca7d_al
         module procedure apsa1d_al,apsa2d_al,apsa3d_al,apsa4d_al,apsa5d_al,apsa6d_al,apsa7d_al
         module procedure apra1d_al,apra2d_al,apra3d_al,apra4d_al,apra5d_al,apra6d_al,apra7d_al
         module procedure apda1d_al,apda2d_al,apda3d_al,apda4d_al,apda5d_al,apda6d_al,apda7d_al
         module procedure apla1d_al,apla2d_al,apla3d_al,apla4d_al,apla5d_al,apla6d_al,apla7d_al
+        module procedure apxa1d_al,apxa2d_al,apxa3d_al,apxa4d_al,apxa5d_al,apxa6d_al,apxa7d_al
+        module procedure apya1d_al,apya2d_al,apya3d_al,apya4d_al,apya5d_al,apya6d_al,apya7d_al
       end interface
       contains
       function pup_issz(p)
@@ -127,41 +144,7 @@ cat >> pup_f.f90 << END_OF_HEADER
         pup_isul = fpup_isuserlevel(p)
       end function
 
-      subroutine fpup_complex(p,c)
-        INTEGER p
-        complex c
-        call fpup_real(p,REAL(c))
-        call fpup_real(p,AIMAG(c))
-      end subroutine
-
-      subroutine fpup_complexes(p,c,size)
-        INTEGER p
-        complex,pointer,dimension(:) :: c
-        integer size
-        integer i
-        do i = 1, size, 1
-          call fpup_complex(p,c(i))
-        end do
-      end subroutine
-
-      subroutine fpup_doublecomplex(p,c)
-        INTEGER p
-        double complex c
-        call fpup_double(p,DBLE(c))
-        call fpup_double(p,DIMAG(c))
-      end subroutine
-
-      subroutine fpup_doublecomplexes(p,c,size)
-        INTEGER p
-        double complex,pointer,dimension(:) :: c
-        integer size
-        integer i
-        do i = 1, size, 1
-          call fpup_doublecomplex(p,c(i))
-        end do
-      end subroutine
-
-
+     
       subroutine fpup_chars_0(p, d, c)
         INTEGER :: p
         CHARACTER(LEN=*)     d
@@ -170,7 +153,8 @@ cat >> pup_f.f90 << END_OF_HEADER
       end subroutine
 END_OF_HEADER
 
-for data in "chars/character" "shorts/integer(kind=2)" "ints/integer(kind=4)" "longs/integer(kind=8)" "reals/real(kind=4)" "doubles/real(kind=8)" "logicals/logical"
+for data in "chars/character" "shorts/integer(kind=2)" "ints/integer(kind=4)" "longs/integer(kind=8)" "reals/real(kind=4)" "doubles/real(kind=8)" "logicals/logical"\
+       "complexes/complex*8" "doublecomplexes/complex*16"
 do
  pupname=`echo $data | awk -F/ '{print $1}'`
  typename=`echo $data | awk -F/ '{print $2}'`
@@ -199,7 +183,8 @@ done
 #   The "ap" routines also allocate and free the buffer.
 # suffix _al means input is allocatable, otherwise its pointer
 #
-for data in "int/ints/i/integer" "short/shorts/s/integer(kind=2)" "char/chars/c/character" "real/reals/r/real(kind=4)" "double/doubles/d/real(kind=8)" "logical/logicals/l/logical"
+for data in "int/ints/i/integer" "short/shorts/s/integer(kind=2)" "char/chars/c/character" "real/reals/r/real(kind=4)" "double/doubles/d/real(kind=8)" "logical/logicals/l/logical"\
+      "complex/complexes/x/complex*8" "doublecomplex/doublecomplexes/y/complex*16"
 do
 	  pupname=`echo $data | awk -F/ '{print $1}'`
   	pupnames=`echo $data | awk -F/ '{print $2}'`
@@ -260,7 +245,8 @@ do
   associated=`echo $arrkind | awk -F/ '{print $2}'`
   NULLIFY=`echo $arrkind | awk -F/ '{print $3}'`
   suffix=`echo $arrkind | awk -F/ '{print $4}'`
-  for data in "int/ints/i/integer" "short/shorts/s/integer(kind=2)" "char/chars/c/character" "real/reals/r/real(kind=4)" "double/doubles/d/real(kind=8)" "logical/logicals/l/logical"
+  for data in "int/ints/i/integer" "short/shorts/s/integer(kind=2)" "char/chars/c/character" "real/reals/r/real(kind=4)" "double/doubles/d/real(kind=8)" "logical/logicals/l/logical"\
+    "complex/complexes/x/complex*8" "doublecomplex/doublecomplexes/y/complex*16"
   do
 	  pupname=`echo $data | awk -F/ '{print $1}'`
   	pupnames=`echo $data | awk -F/ '{print $2}'`
