@@ -2,20 +2,20 @@ CMK_MACOSX=1
 
 # Assumes Clang C/C++ compiler:
 CMK_CPP_CHARM="/usr/bin/cpp -P"
-CMK_CPP_C="clang -m64 -fPIC -E -mmacosx-version-min=10.6 "
-CMK_CC="clang -m64 -dynamic -fno-common -mmacosx-version-min=10.6 "
-CMK_LD="clang -mmacosx-version-min=10.6 "
-CMK_CXX="clang++ -m64 -fPIC -dynamic -fno-common -mmacosx-version-min=10.6 "
-CMK_CXXPP="clang++ -m64 -x clang++ -E -mmacosx-version-min=10.6 "
-CMK_LDXX="clang++ -multiply_defined suppress -mmacosx-version-min=10.6 "
+CMK_CPP_C="clang -m64 -fPIC -E -mmacosx-version-min=10.7 "
+CMK_CC="clang -m64 -dynamic -fno-common -mmacosx-version-min=10.7 "
+CMK_LD="clang -mmacosx-version-min=10.7 "
+CMK_CXX="clang++ -m64 -fPIC -dynamic -fno-common -mmacosx-version-min=10.7 "
+CMK_CXXPP="clang++ -m64 -x clang++ -E -mmacosx-version-min=10.7 "
+CMK_LDXX="clang++ -multiply_defined suppress -mmacosx-version-min=10.7 "
 CMK_XIOPTS=""
 CMK_QT="generic64-light"
 CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
 
 # Assumes GNU fortran compiler:
-CMK_CF77="g95 -arch x86_64 -mmacosx-version-min=10.6"
-CMK_CF90="g95 -arch x86_64 -mmacosx-version-min=10.6"
+CMK_CF77="g95 -arch x86_64 -mmacosx-version-min=10.7"
+CMK_CF90="g95 -arch x86_64 -mmacosx-version-min=10.7"
 
 # setting for shared lib
 # need -lstdc++ for c++ reference, and it needs to be put at very last 
