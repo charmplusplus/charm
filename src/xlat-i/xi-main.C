@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
+#include <vector>
 #include <string>
 #include <list>
 
@@ -15,16 +17,21 @@ extern void yyrestart(FILE *input_file);
 extern int yyparse(void);
 extern void yyerror(const char *);
 extern int yylex(void);
+extern void scan_string(const char *);
 
 extern xi::AstChildren<xi::Module> *modlist;
 extern xi::rwentry rwtable[];
 
 namespace xi {
 
+std::vector<std::string> inputBuffer;
+
 int fortranMode, internalMode;
 const char *cur_file;
 
 #include "xi-grammar.tab.h"
+
+char *fname;
 
 void ReservedWord(int token) {
   char text[300];
@@ -104,6 +111,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
   *scope = tmp;
 }
 
+/*
 FILE *openFile(char *interfacefile) {
   if (interfacefile == NULL) {
     cur_file = "STDIN";
@@ -120,7 +128,6 @@ FILE *openFile(char *interfacefile) {
   return NULL;
 }
 
-/*
 ModuleList *Parse(char *interfacefile)
 {
   cur_file=interfacefile;
@@ -137,17 +144,43 @@ ModuleList *Parse(char *interfacefile)
 }
 */
 
-AstChildren<Module> *Parse(FILE *fp) {
+std::string readFile(const char *interfaceFile) {
+  // istream::operator== was introduced in C++11.
+  // It seems the usual workaround to multiplex cin/ifstream is to use pointers.
+  std::istream *in;
+  std::string buffer;
+  if (interfaceFile) {
+    cur_file = interfaceFile;
+    in = new std::ifstream(interfaceFile);
+  } else {
+    cur_file = "STDIN";
+    in = &std::cin;
+  }
+
+  std::string line;
+  while (std::getline(*in, line)) {
+    buffer += line + "\n";
+    inputBuffer.push_back(line);
+  }
+
+  if (interfaceFile)
+    delete in;
+
+  return buffer;
+}
+
+AstChildren<Module> *Parse(std::string &str) {
   modlist = NULL;
-  yyin = fp;
+  scan_string(str.c_str());
   if (yyparse())
-      exit(1);
-  fclose(fp);
+    exit(1);
+  if (num_errors > 0)
+    exit(1);
   return modlist;
 }
 
-int count_tokens(FILE* fp) {
-  yyin = fp;
+int count_tokens(std::string &str) {
+  scan_string(str.c_str());
   int count = 0;
   while (yylex()) count++;
   return count;
@@ -162,9 +195,10 @@ void abortxi(char *name) {
 
 using namespace xi;
 
-int main(int argc, char *argv[]) {
-  char *fname = NULL;
-  char *origFile = NULL;
+int main(int argc, char *argv[])
+{
+  char *origFile=NULL;
+  fname = NULL;
   fortranMode = 0;
   internalMode = 0;
   bool dependsMode = false;
@@ -188,15 +222,19 @@ int main(int argc, char *argv[]) {
   }
   // if (fname==NULL) abortxi(argv[0]);
 
+  std::string buffer = readFile(fname);
+
   if (countTokens) {
-    cout << count_tokens(openFile(fname)) << endl;
+    cout << count_tokens(buffer) << endl;
     return 0;
   }
 
-  AstChildren<Module> *m = Parse(openFile(fname));
+  AstChildren<Module> *m = Parse(buffer);
   if (!m) return 0;
   m->preprocess();
   m->check();
+  if (num_errors != 0)
+    exit(1);
 
   if (chareNames) {
     m->printChareNames();

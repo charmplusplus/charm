@@ -66,7 +66,10 @@ Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, Sdag
 
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
   if(retType && !isSync() && !isIget() && !isLocal() && !retType->isVoid())
-    die("A remote method normally returns void.  To return non-void, you need to declare the method as [sync], which means it has blocking semantics.",line);
+    XLAT_ERROR_NOCOL("non-void return type in a non-sync/non-local entry method\n"
+                     "To return non-void, you need to declare the method as [sync], which means it has blocking semantics,"
+                     " or [local].",
+                     line);
   if (isPython()) pythonDoc = python_doc;
   if(!isLocal() && p){
     p->checkParamList();

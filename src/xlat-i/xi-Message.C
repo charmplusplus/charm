@@ -210,7 +210,9 @@ Message::genDefs(XStr& str)
       for(i=0, count=0, ml=mvlist; i<num; i++, ml=ml->next) {
         mv = ml->msg_var;
         if (mv->isConditional()) {
-          if (mv->type->isPointer()) die("conditional variable cannot be a pointer", line);
+          if (mv->type->isPointer())
+            XLAT_ERROR_NOCOL("conditional variable cannot be a pointer",
+                             line);
           str << "  CkConditional *cond_" << mv->name << " = static_cast<CkConditional*>(msg->" << mv->name << ");\n";
           str << "  if (cond_" << mv->name << "!=NULL) cond_" << mv->name << "->deallocate();\n";
         }

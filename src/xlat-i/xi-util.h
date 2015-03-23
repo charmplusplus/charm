@@ -7,7 +7,25 @@
 #include <stdio.h>
 #include "conv-config.h"
 
+#define XLAT_ERROR(...) \
+  if (xi::num_errors++ == xi::MAX_NUM_ERRORS) { \
+    exit(1);                                    \
+  } else {                                      \
+    pretty_msg("error", __VA_ARGS__);           \
+  }
+
+#define XLAT_ERROR_NOCOL(str,line) XLAT_ERROR((str), -1, -1, (line), (line))
+
+#define XLAT_NOTE(str,line) pretty_msg("note", (str), -1, -1, (line), (line));
+
+extern void pretty_msg(std::string type, std::string msg,
+                       int first_col=-1, int last_col=-1,
+                       int first_line=-1, int last_line=-1);
+
 namespace xi {
+
+extern const int MAX_NUM_ERRORS;
+extern int num_errors;
 
 #if CMK_ISATTY_DECL
 #ifdef __cplusplus

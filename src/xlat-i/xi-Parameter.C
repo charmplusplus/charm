@@ -229,8 +229,9 @@ void Parameter::marshallArraySizes(XStr &str)
 {
 	Type *dt=type->deref();//Type, without &
 	if (dt->isPointer())
-		die("can't pass pointers across processors--\n"
-		    "Indicate the array length with []'s, or pass a reference",line);
+		XLAT_ERROR_NOCOL("can't pass pointers across processors--\n"
+		                 "Indicate the array length with []'s, or pass a reference",
+		                 line);
 	if (isArray()) {
 		str<<"  int impl_off_"<<name<<", impl_cnt_"<<name<<";\n";
 		str<<"  impl_off_"<<name<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<dt<<"));\n";

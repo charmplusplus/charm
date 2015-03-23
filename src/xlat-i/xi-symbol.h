@@ -23,7 +23,6 @@
 #include <cstdlib>
 #include <list>
 
-
 namespace xi {
 
 // Reserved words

@@ -92,7 +92,9 @@ Readonly::genReg(XStr& str)
   if(external)
     return;
   if(msg) {
-    if(dims) die("readonly Message cannot be an array",line);
+    if (dims)
+      XLAT_ERROR_NOCOL("readonly message cannot be an array",
+                       line);
     str << "  CkRegisterReadonlyMsg(\""<<qName()<<"\",\""<<type<<"\",";
     str << "(void **)&"<<qName()<<");\n";
   } else {

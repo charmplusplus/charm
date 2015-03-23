@@ -1,26 +1,53 @@
 %expect 6
 %{
 #include <iostream>
+#include <vector>
 #include <string>
 #include <string.h>
 #include "xi-symbol.h"
 #include "sdag/constructs/Constructs.h"
 #include "EToken.h"
+
+// Has to be a macro since YYABORT can only be used within rule actions.
+#define ERROR(...) \
+  if (xi::num_errors++ == xi::MAX_NUM_ERRORS) { \
+    YYABORT;                                    \
+  } else {                                      \
+    pretty_msg("error", __VA_ARGS__);           \
+  }
+
+#define WARNING(...) \
+  if (enable_warnings) {                \
+    pretty_msg("warning", __VA_ARGS__); \
+  }
+
 using namespace xi;
 extern int yylex (void) ;
 extern unsigned char in_comment;
-void yyerror(const char *);
 extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
 extern std::list<Entry *> connectEntries;
 AstChildren<Module> *modlist;
+
+void yyerror(const char *);
+
 namespace xi {
+
+extern std::vector<std::string> inputBuffer;
+const int MAX_NUM_ERRORS = 10;
+int num_errors = 0;
+
+bool enable_warnings = true;
+
 extern int macroDefined(const char *str, int istrue);
 extern const char *python_doc;
+extern char *fname;
 void splitScopedName(const char* name, const char** scope, const char** basename);
 void ReservedWord(int token);
 }
 %}
+
+%locations
 
 %union {
   AstChildren<Module> *modlist;
@@ -309,7 +336,11 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         | ConstructSemi ';'
         { $$ = $1; }
         | ConstructSemi UnexpectedToken
-        { yyerror("The preceding construct must be semicolon terminated"); YYABORT; }
+        {
+          ERROR("preceding construct must be semicolon terminated",
+                @$.first_column, @$.last_column);
+          YYABORT;
+        }
         | OptExtern Module
         { $2->setExtern($1); $$ = $2; }
         | OptExtern Chare
@@ -329,7 +360,11 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         | AccelBlock
         { $$ = $1; }
         | error
-        { printf("Invalid construct\n"); YYABORT; }
+        {
+          ERROR("invalid construct",
+                @$.first_column, @$.last_column);
+          YYABORT;
+        }
         ;
 
 TParam		: Type
@@ -457,8 +492,8 @@ Readonly	: READONLY Type QualName DimList
 		{ $$ = new Readonly(lineno, $2, $3, $4); }
 		;
 
-ReadonlyMsg	: READONLY MESSAGE SimpleType '*'  Name
-		{ $$ = new Readonly(lineno, $3, $5, 0, 1); }
+ReadonlyMsg	: READONLY MESSAGE SimpleType '*'  QualName DimList
+		{ $$ = new Readonly(lineno, $3, $5, $6, 1); }
 		;
 
 OptVoid		: /*Empty*/
@@ -710,13 +745,20 @@ InitNode	: INITNODE OptVoid QualName
 					    ($5)->to_string() + '>').c_str()),
 				    1);
 		}
-                | INITCALL OptVoid QualName
-		{ printf("Warning: deprecated use of initcall. Use initnode or initproc instead.\n"); 
-		  $$ = new InitCall(lineno, $3, 1); }
+		| INITCALL OptVoid QualName
+		{
+		  WARNING("deprecated use of initcall. Use initnode or initproc instead",
+		          @1.first_column, @1.last_column);
+		  $$ = new InitCall(lineno, $3, 1);
+		}
 		| INITCALL OptVoid QualName '(' OptVoid ')'
-		{ printf("Warning: deprecated use of initcall. Use initnode or initproc instead.\n");
-		  $$ = new InitCall(lineno, $3, 1); }
+		{
+		  WARNING("deprecated use of initcall. Use initnode or initproc instead",
+		          @1.first_column, @1.last_column);
+		  $$ = new InitCall(lineno, $3, 1);
+		}
 		;
+
 
 InitProc	: INITPROC OptVoid QualName
 		{ $$ = new InitCall(lineno, $3, 0); }
@@ -745,12 +787,15 @@ IncludeFile    : LITERAL
 		{ $$ = new IncludeFile(lineno,$1); } 
 		;
 
-Member          : MemberBody ';'
-                { $$ = $1; }
-                // Error constructions
-                | MemberBody UnexpectedToken
-                { yyerror("The preceding entry method declaration must be semicolon-terminated."); YYABORT; }
-                ;
+Member : MemberBody ';'
+		{ $$ = $1; }
+		| MemberBody UnexpectedToken
+		{
+		  ERROR("preceding entry method declaration must be semicolon-terminated",
+		        @2.first_column, @2.last_column);
+		  YYABORT;
+		}
+		;
 
 MemberBody	: Entry
 		{ $$ = $1; }
@@ -806,10 +851,12 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                     $5->param = new ParamList($4);
                   }
 		  if (e->param && e->param->isCkMigMsgPtr()) {
-		    yyerror("Charm++ takes a CkMigrateMsg chare constructor for granted, but continuing anyway");
+		    WARNING("CkMigrateMsg chare constructor is taken for granted",
+		            @$.first_column, @$.last_column);
 		    $$ = NULL;
-		  } else
+		  } else {
 		    $$ = e;
+		  }
 		}
 		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name /* DMK : Accelerated Entry Method */
                 {
@@ -843,8 +890,11 @@ EAttribs	: /* Empty */
 		{ $$ = 0; }
 		| '[' EAttribList ']'
 		{ $$ = $2; }
-                | error
-                { printf("Invalid entry method attribute list\n"); YYABORT; }
+		| error
+		{ ERROR("invalid entry method attribute list",
+		        @$.first_column, @$.last_column);
+		  YYABORT;
+		}
 		;
 
 EAttribList	: EAttrib
@@ -886,7 +936,12 @@ EAttrib		: THREADED
                 | REDUCTIONTARGET
                 { $$ = SREDUCE; }
 		| error
-		{ printf("Invalid entry method attribute: %s\n", yylval); YYABORT; }
+		{
+		  ERROR("invalid entry method attribute",
+		        @1.first_column, @1.last_column);
+		  yyclearin;
+		  yyerrok;
+		}
 		;
 
 DefaultParameter: LITERAL
@@ -1085,8 +1140,12 @@ CaseList        : WhenConstruct
                 { $$ = new CaseListConstruct($1); }
 		| WhenConstruct CaseList
 		{ $$ = new CaseListConstruct($1, $2); }
-                | NonWhenConstruct
-                { yyerror("Case blocks in SDAG can only contain when clauses."); YYABORT; }
+		| NonWhenConstruct
+		{
+		  ERROR("case blocks can only contain when clauses",
+		        @1.first_column, @1.last_column);
+		  $$ = 0;
+		}
 		;
 
 OptTraceName	: LITERAL
@@ -1146,9 +1205,13 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		| ParamBraceStart CCode ParamBraceEnd
 		{ $$ = new AtomicConstruct($2, NULL); }
 		| error
-		{ printf("Unknown SDAG construct or malformed entry method definition.\n"
-				 "You may have forgotten to terminate an entry method definition with a"
-				 " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'\n"); YYABORT; }
+		{
+		  ERROR("unknown SDAG construct or malformed entry method definition.\n"
+		        "You may have forgotten to terminate a previous entry method definition with a"
+		        " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'",
+		        @$.first_column, @$.last_column);
+		  YYABORT;
+		}
 		;
 
 HasElse		: /* Empty */
@@ -1199,8 +1262,59 @@ HashIFDefComment: HASHIFDEF Name
 		;
 
 %%
-void yyerror(const char *mesg)
+
+std::string _get_caret_line(int err_line_start, int first_col, int last_col)
 {
-    std::cerr << cur_file<<":"<<lineno<<": Charmxi syntax error> "
-	      << mesg << std::endl;
+  std::string caret_line(first_col - err_line_start - 1, ' ');
+  caret_line += std::string(last_col - first_col + 1, '^');
+
+  return caret_line;
 }
+
+void _pretty_header(std::string type, std::string msg, int first_col, int last_col, int first_line, int last_line)
+{
+  std::cerr << cur_file << ":" << first_line << ":";
+
+  if (first_col != -1)
+    std::cerr << first_col << "-" << last_col << ": ";
+
+  std::cerr << type << ": " << msg << std::endl;
+}
+
+void _pretty_print(std::string type, std::string msg, int first_col, int last_col, int first_line, int last_line)
+{
+  _pretty_header(type, msg, first_col, last_col, first_line, last_line);
+
+  std::string err_line = inputBuffer[first_line-1];
+
+  if (err_line.length() != 0) {
+    int err_line_start = err_line.find_first_not_of(" \t\r\n");
+    err_line.erase(0, err_line_start);
+
+    std::string caret_line;
+    if (first_col != -1)
+      caret_line = _get_caret_line(err_line_start, first_col, last_col);
+
+    std::cerr << "  " << err_line << std::endl;
+
+    if (first_col != -1)
+      std::cerr << "  " << caret_line;
+    std::cerr << std::endl;
+  }
+}
+
+void pretty_msg(std::string type, std::string msg, int first_col, int last_col, int first_line, int last_line)
+{
+  if (first_line == -1) first_line = lineno;
+  if (last_line  == -1)  last_line = lineno;
+  _pretty_print(type, msg, first_col, last_col, first_line, last_line);
+}
+
+void pretty_msg_noline(std::string type, std::string msg, int first_col, int last_col, int first_line, int last_line)
+{
+  if (first_line == -1) first_line = lineno;
+  if (last_line  == -1)  last_line = lineno;
+  _pretty_header(type, msg, first_col, last_col, first_line, last_line);
+}
+
+void yyerror(const char *msg) { }
