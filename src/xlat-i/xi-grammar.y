@@ -1151,8 +1151,8 @@ Olist		: SingleConstruct
 		{ $$ = new OListConstruct($1, $2); }
 		;
 
-CaseList        : WhenConstruct
-                { $$ = new CaseListConstruct($1); }
+CaseList	: WhenConstruct
+		{ $$ = new CaseListConstruct($1); }
 		| WhenConstruct CaseList
 		{ $$ = new CaseListConstruct($1, $2); }
 		| NonWhenConstruct
@@ -1175,21 +1175,33 @@ WhenConstruct   : WHEN SEntryList '{' '}'
 		{ $$ = new WhenConstruct($2, $3); }
 		| WHEN SEntryList '{' Slist '}'
 		{ $$ = new WhenConstruct($2, $4); }
-                ;
+		;
 
-NonWhenConstruct : ATOMIC
-                 { $$ = 0; }
-                 | OVERLAP
-                 { $$ = 0; }
-                 | FOR
-                 { $$ = 0; }
-                 | FORALL
-                 { $$ = 0; }
-                 | IF
-                 { $$ = 0; }
-                 | WHILE
-                 { $$ = 0; }
-                 ;
+NonWhenConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
+		{ $$ = 0; }
+		| OVERLAP '{' Olist '}'
+		{ $$ = 0; }
+		| CASE '{' CaseList '}'
+		{ $$ = 0; }
+		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr '{' Slist '}'
+		{ $$ = 0; }
+		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr SingleConstruct
+		{ $$ = 0; }
+		| FORALL '[' IDENT ']' StartIntExpr CCode ':' CCode ',' CCode  EndIntExpr SingleConstruct
+		{ $$ = 0; }
+		| FORALL '[' IDENT ']' StartIntExpr CCode ':' CCode ',' CCode  EndIntExpr '{' Slist '}' 
+		{ $$ = 0; }
+		| IF StartIntExpr CCode EndIntExpr SingleConstruct HasElse
+		{ $$ = 0; }
+		| IF StartIntExpr CCode EndIntExpr '{' Slist '}' HasElse
+		{ $$ = 0; }
+		| WHILE StartIntExpr CCode EndIntExpr SingleConstruct 
+		{ $$ = 0; }
+		| WHILE StartIntExpr CCode EndIntExpr '{' Slist '}' 
+		{ $$ = 0; }
+		| ParamBraceStart CCode ParamBraceEnd
+		{ $$ = 0; }
+		;
 
 SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		{ $$ = new AtomicConstruct($4, $2); }
