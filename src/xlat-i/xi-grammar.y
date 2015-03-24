@@ -804,14 +804,8 @@ IncludeFile    : LITERAL
 		{ $$ = new IncludeFile(lineno,$1); } 
 		;
 
-Member : MemberBody ';'
+Member : MemberBody
 		{ $$ = $1; }
-		| MemberBody UnexpectedToken
-		{
-		  ERROR("preceding entry method declaration must be semicolon-terminated",
-		        @2.first_column, @2.last_column);
-		  YYABORT;
-		}
 		;
 
 MemberBody	: Entry
@@ -821,7 +815,7 @@ MemberBody	: Entry
                   $2->tspec = $1;
                   $$ = $2;
                 }
-		| NonEntryMember
+		| NonEntryMember ';'
 		{ $$ = $1; }
 		;
 
@@ -875,7 +869,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		    $$ = e;
 		  }
 		}
-		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name /* DMK : Accelerated Entry Method */
+		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name ';' /* DMK : Accelerated Entry Method */
                 {
                   int attribs = SACCEL;
                   const char* name = $6;
@@ -1131,11 +1125,11 @@ OptStackSize	: /* Empty */
 		{ $$ = new Value($3); }
 		;
 
-OptSdagCode	: /* Empty */
+OptSdagCode	: ';' /* Empty */
 		{ $$ = 0; }
 		| SingleConstruct
 		{ $$ = new SdagEntryConstruct($1); }
-		| '{' Slist '}'
+		| '{' Slist '}' OptSemiColon
 		{ $$ = new SdagEntryConstruct($2); }
 		;
 
@@ -1233,8 +1227,8 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		{ $$ = new AtomicConstruct($2, NULL); }
 		| error
 		{
-		  ERROR("unknown SDAG construct or malformed entry method definition.\n"
-		        "You may have forgotten to terminate a previous entry method definition with a"
+		  ERROR("unknown SDAG construct or malformed entry method declaration.\n"
+		        "You may have forgotten to terminate a previous entry method declaration with a"
 		        " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'",
 		        @$.first_column, @$.last_column);
 		  YYABORT;
