@@ -638,6 +638,7 @@ enable_controlpoint
 enable_lbuserdata
 with_numa
 with_lbtime_type
+with_qlogic
 with_refnum_type
 with_prio_type
 enable_randomized_msgq
@@ -1271,6 +1272,7 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-numa             support memory affinity with NUMA
   --with-lbtime-type=type load balancing timer type
+  --with-qlogic           QLogic based Infiniband
   --with-refnum-type=type size of the envelope refnum field
   --with-prio-type=type   size of expected message priorities
   --with-metis            support the METIS graph partitioner and associated
@@ -2035,6 +2037,30 @@ else
   test_finish 1
 fi
 
+
+# Check whether --with-qlogic was given.
+if test "${with_qlogic+set}" = set; then :
+  withval=$with_qlogic;
+else
+  with_qlogic=yes
+fi
+
+
+if test "$with_qlogic" = "no"
+then
+
+cat >>confdefs.h <<_ACEOF
+#define QLOGIC 0
+_ACEOF
+
+else
+  Echo "QLogic based Infiniband"
+
+cat >>confdefs.h <<_ACEOF
+#define QLOGIC 1
+_ACEOF
+
+fi
 
 #
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking machine name" >&5

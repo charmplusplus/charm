@@ -223,6 +223,18 @@ else
   test_finish 1
 fi
 
+AC_ARG_WITH([qlogic],
+            [AS_HELP_STRING([--with-qlogic],
+              [QLogic based Infiniband])], ,
+            [with_qlogic=yes])
+
+if test "$with_qlogic" = "no"
+then
+  AC_DEFINE_UNQUOTED(QLOGIC, 0, [disable qlogic])
+else
+  Echo "QLogic based Infiniband"
+  AC_DEFINE_UNQUOTED(QLOGIC, 1, [enable qlogic])
+fi
 
 #
 AC_MSG_CHECKING(machine name)
