@@ -1,4 +1,4 @@
-DIRS=megatest alignment pingpong simplearrayhello load_balancing chkpt delegation queue sdag ckAllocSysMsgTest method_templates xcastredn demand_creation migrate communication_overhead taskSpawn taskSpawnRecursive streamingAllToAll startupTest kNeighbor topology
+DIRS=megatest alignment pingpong simplearrayhello load_balancing chkpt delegation queue sdag ckAllocSysMsgTest method_templates xcastredn demand_creation migrate communication_overhead taskSpawn taskSpawnRecursive streamingAllToAll startupTest kNeighbor topology io
 
 all:
 	for d in $(DIRS); do \
