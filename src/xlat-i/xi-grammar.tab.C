@@ -3357,7 +3357,7 @@ yyreduce:
 #line 749 "xi-grammar.y" /* yacc.c:1646  */
     {
 		  WARNING("deprecated use of initcall. Use initnode or initproc instead",
-		          (yylsp[-2]).first_column, (yylsp[-2]).last_column);
+		          (yylsp[-2]).first_column, (yylsp[-2]).last_column, (yylsp[-2]).first_line);
 		  (yyval.member) = new InitCall(lineno, (yyvsp[0].strval), 1);
 		}
 #line 3364 "xi-grammar.tab.C" /* yacc.c:1646  */
@@ -3367,7 +3367,7 @@ yyreduce:
 #line 755 "xi-grammar.y" /* yacc.c:1646  */
     {
 		  WARNING("deprecated use of initcall. Use initnode or initproc instead",
-		          (yylsp[-5]).first_column, (yylsp[-5]).last_column);
+		          (yylsp[-5]).first_column, (yylsp[-5]).last_column, (yylsp[-5]).first_line);
 		  (yyval.member) = new InitCall(lineno, (yyvsp[-3].strval), 1);
 		}
 #line 3374 "xi-grammar.tab.C" /* yacc.c:1646  */

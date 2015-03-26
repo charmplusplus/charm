@@ -60,8 +60,8 @@ nonIntExpr [^();,:]*
 
 %%
 {nonBracket}	{ if (in_bracket)  {Yval; update_position(); return Token(CPROGRAM);} else REJECT;}
-{nonBraces}		{ if (in_braces)   {Yval; lineno += count_newlines(yytext); return Token(CPROGRAM);} else REJECT;}
-{nonIntExpr}	{ if (in_int_expr) {Yval; return Token(CPROGRAM);} else REJECT;}
+{nonBraces}		{ if (in_braces)   {Yval; lineno += count_newlines(yytext); update_position(); return Token(CPROGRAM);} else REJECT;}
+{nonIntExpr}	{ if (in_int_expr) {Yval; update_position(); return Token(CPROGRAM);} else REJECT;}
 "//".*		{ update_position(); /* ignore single line comments */ }
 "\r"		{ update_position(); /* ignore ^M characters for dos-unix compat */ }
 "/*"		{ update_position(); in_comment = 1; /* Single line C-style comments */ }

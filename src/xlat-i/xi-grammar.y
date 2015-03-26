@@ -748,13 +748,13 @@ InitNode	: INITNODE OptVoid QualName
 		| INITCALL OptVoid QualName
 		{
 		  WARNING("deprecated use of initcall. Use initnode or initproc instead",
-		          @1.first_column, @1.last_column);
+		          @1.first_column, @1.last_column, @1.first_line);
 		  $$ = new InitCall(lineno, $3, 1);
 		}
 		| INITCALL OptVoid QualName '(' OptVoid ')'
 		{
 		  WARNING("deprecated use of initcall. Use initnode or initproc instead",
-		          @1.first_column, @1.last_column);
+		          @1.first_column, @1.last_column, @1.first_line);
 		  $$ = new InitCall(lineno, $3, 1);
 		}
 		;

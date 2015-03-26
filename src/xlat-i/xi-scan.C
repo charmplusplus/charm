@@ -1129,13 +1129,13 @@ case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
 #line 63 "xi-scan.l"
-{ if (in_braces)   {Yval; lineno += count_newlines(yytext); return Token(CPROGRAM);} else REJECT;}
+{ if (in_braces)   {Yval; lineno += count_newlines(yytext); update_position(); return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
 #line 64 "xi-scan.l"
-{ if (in_int_expr) {Yval; return Token(CPROGRAM);} else REJECT;}
+{ if (in_int_expr) {Yval; update_position(); return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
