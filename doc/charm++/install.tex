@@ -52,17 +52,17 @@ a few queries to select appropiate choices for the build one wants to perform.
 \begin{table}[ht]
 \begin{tabular}{|p{6cm}|p{9cm}|}
 \hline
-Net with 32 bit Linux & \verb|./build charm++ net-linux --with-production -j8|
+Net with 32 bit Linux & \verb|./build charm++ netlrts-linux --with-production -j8|
 \\\hline
-Multicore 64 bit Linux & \verb|./build charm++ multicore-linux64 --with-production -j8|
+Multicore (single node, shared memory) 64 bit Linux & \verb|./build charm++ multicore-linux64 --with-production -j8|
 \\\hline
-Net with 64 bit Linux & \verb|./build charm++ net-linux-x86_64 --with-production -j8|
+Net with 64 bit Linux & \verb|./build charm++ netlrts-linux-x86_64 --with-production -j8|
 \\\hline
-Net with 64 bit Linux (intel compilers) & \verb|./build charm++ net-linux-x86_64 icc --with-production -j8|
+Net with 64 bit Linux (intel compilers) & \verb|./build charm++ netlrts-linux-x86_64 icc --with-production -j8|
 \\\hline
-Net with 64 bit Linux (shared memory) & \verb|./build charm++ net-linux-x86_64 smp --with-production -j8|
+Net with 64 bit Linux (shared memory) & \verb|./build charm++ netlrts-linux-x86_64 smp --with-production -j8|
 \\\hline
-Net with 64 bit Linux (checkpoint restart based fault tolerance) & \verb|./build charm++ net-linux-x86_64 syncft --with-production -j8|
+Net with 64 bit Linux (checkpoint restart based fault tolerance) & \verb|./build charm++ netlrts-linux-x86_64 syncft --with-production -j8|
 \\\hline
 MPI with 64 bit Linux & \verb|./build charm++ mpi-linux-x86_64 --with-production -j8|
 \\\hline
@@ -74,27 +74,21 @@ IBVERBS with 64 bit Linux & \verb|./build charm++ verbs-linux-x86_64 --with-prod
 \\\hline
 IBVERBS with 64 bit Linux (QLogic) & \verb|./build charm++ verbs-linux-x86_64 --with-production --with-qlogic -j8|
 \\\hline
-Net with 32 bit Windows & \verb|./build charm++ net-win32 --with-production -j8|
-\\\hline
 Net with 64 bit Windows & \verb|./build charm++ net-win64 --with-production -j8|
 \\\hline
 MPI with 64 bit Windows & \verb|./build charm++ mpi-win64 --with-production -j8|
 \\\hline
-Net with 64 bit Mac & \verb|./build charm++ net-darwin-x86_64 --with-production -j8|
-\\\hline
-Blue Gene/L & \verb|./build charm++ bluegenel xlc --with-production -j8|
-\\\hline
-Blue Gene/P & \verb|./build charm++ bluegenep xlc --with-production -j8|
+Net with 64 bit Mac & \verb|./build charm++ netlrts-darwin-x86_64 --with-production -j8|
 \\\hline
 Blue Gene/Q & \verb|./build charm++ pami-bluegeneq xlc --with-production -j8|
 \\\hline
 Blue Gene/Q & \verb|./build charm++ pamilrts-bluegeneq xlc --with-production -j8|
 \\\hline
-Cray XT3 & \verb|./build charm++ mpi-crayxt3 --with-production -j8|
+Cray XE6 & \verb|./build charm++ gni-crayxe --with-production -j8|
 \\\hline
-Cray XT5 & \verb|./build charm++ mpi-crayxt --with-production -j8|
+Cray XK7 & \verb|./build charm++ gni-crayxe-cuda --with-production -j8|
 \\\hline
-Cray XE6 & \verb|./build charm++ gemini_gni-crayxe --with-production -j8|
+Cray XC30 & \verb|./build charm++ gni-crayxc --with-production -j8|
 \\\hline
 \end{tabular}
 \caption{Build command for some common cases}
@@ -144,7 +138,7 @@ Test \charmpp{} programs used by autobuild.
 
 On most computers, \charmpp{} programs are simple binaries, and they pose
 no more security issues than any other program would.  The only exception
-is the network version {\tt net-*}, which has the following issues. 
+is the network version {\tt netlrts-*}, which has the following issues. 
 
 The network versions utilize many unix processes communicating with
 each other via UDP.  Only a simple attempt is currently made to filter out
