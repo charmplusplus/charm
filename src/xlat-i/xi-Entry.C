@@ -45,6 +45,10 @@ void Entry::check() {
       XLAT_ERROR_NOCOL("non-constructor entry methods must specify a return type (probably void)",
                        first_line_);
   }
+
+  if (isSync() && retType && !(retType->isVoid() || retType->isMessage()))
+    XLAT_ERROR_NOCOL("sync methods must return either void or a message",
+                     first_line_);
 }
 
 void Entry::lookforCEntry(CEntry *centry)
