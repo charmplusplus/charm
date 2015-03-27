@@ -44,7 +44,34 @@ void Entry::check() {
     if (!isConstructor() && !retType)
       XLAT_ERROR_NOCOL("non-constructor entry methods must specify a return type (probably void)",
                        first_line_);
+
+    if (isConstructor() && (isSync() || isIget())) {
+      XLAT_ERROR_NOCOL("constructors cannot have the 'sync' attribute",
+                       first_line_);
+      attribs ^= SSYNC;
+    }
+
+    if (param->isCkArgMsgPtr() && (!isConstructor() || !container->isMainChare()))
+      XLAT_ERROR_NOCOL("CkArgMsg can only be used in mainchare's constructor",
+                       first_line_);
+
+    if (isExclusive() && isConstructor())
+        XLAT_ERROR_NOCOL("constructors cannot be 'exclusive'",
+                         first_line_);
   }
+
+  if (!isThreaded() && stacksize)
+    XLAT_ERROR_NOCOL("the 'stacksize' attribute is only applicable to methods declared 'threaded'",
+                     first_line_);
+
+  if (retType && !isSync() && !isIget() && !isLocal() && !retType->isVoid())
+    XLAT_ERROR_NOCOL("non-void return type in a non-sync/non-local entry method\n"
+                     "To return non-void, you need to declare the method as [sync], which means it has blocking semantics,"
+                     " or [local].",
+                     first_line_);
+
+  if (!isLocal() && param)
+    param->checkParamList();
 
   if (isSync() && retType && !(retType->isVoid() || retType->isMessage()))
     XLAT_ERROR_NOCOL("sync methods must return either void or a message",
@@ -53,6 +80,15 @@ void Entry::check() {
   if (isPython() && !container->isPython())
     XLAT_ERROR_NOCOL("python entry method declared in non-python chare",
                      first_line_);
+
+  // check the parameter passed to the function, it must be only an integer
+  if (isPython() && (!param || param->next || !param->param->getType()->isBuiltin() || !((BuiltinType*)param->param->getType())->isInt()))
+    XLAT_ERROR_NOCOL("python entry methods take only one parameter, which is of type 'int'",
+                     first_line_);
+
+  if (isExclusive() && !container->isNodeGroup())
+      XLAT_ERROR_NOCOL("only nodegroup methods can be 'exclusive'",
+                       first_line_);
 }
 
 void Entry::lookforCEntry(CEntry *centry)
@@ -79,19 +115,7 @@ Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, Sdag
   isWhenEntry=0;
   if (param && param->isMarshalled() && !isThreaded()) attribs|=SNOKEEP;
 
-  if (!isThreaded() && stacksize)
-    XLAT_ERROR_NOCOL("the 'stacksize' attribute is only applicable to methods declared 'threaded'",
-                     first_line_);
-
-  if (retType && !isSync() && !isIget() && !isLocal() && !retType->isVoid())
-    XLAT_ERROR_NOCOL("non-void return type in a non-sync/non-local entry method\n"
-                     "To return non-void, you need to declare the method as [sync], which means it has blocking semantics,"
-                     " or [local].",
-                     first_line_);
   if (isPython()) pythonDoc = python_doc;
-  if(!isLocal() && p){
-    p->checkParamList();
-  }
   ParamList *plist = p;
   while (plist != NULL) {
     plist->entry = this;
@@ -713,11 +737,6 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
 void Entry::genPythonDecls(XStr& str) {
   str <<"/* STATIC DECLS: "; print(str); str << " */\n";
   if (isPython()) {
-    // check the parameter passed to the function, it must be only an integer
-    if (!param || param->next || !param->param->getType()->isBuiltin() || !((BuiltinType*)param->param->getType())->isInt())
-      XLAT_ERROR_NOCOL("python entry methods take only one parameter, which is of type 'int'",
-                       first_line_);
-
     str << "PyObject *_Python_"<<container->baseName()<<"_"<<name<<"(PyObject *self, PyObject *arg);\n";
   }
 }
@@ -1690,10 +1709,6 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
   bool isMigMain=false;
   bool isSDAGGen = sdagCon || isWhenEntry;
 
-  if (param->isCkArgMsgPtr() && (!isConstructor() || !container->isMainChare()))
-    XLAT_ERROR_NOCOL("CkArgMsg can only be used in mainchare's constructor",
-                     first_line_);
-
   if (isConstructor() && container->isMainChare() &&
       (!param->isVoid()) && (!param->isCkArgMsgPtr())){
   	if(param->isCkMigMsgPtr()) isMigMain = true;
@@ -1879,30 +1894,17 @@ void Entry::genDefs(XStr& str)
   if(isSync() || isIget()) {
   //A synchronous method can return a value, and must finish before
   // the caller can proceed.
-    if (isConstructor()) {
-      XLAT_ERROR_NOCOL("constructors cannot have the 'sync' attribute",
-                       first_line_);
-      attribs ^= SSYNC;
+    preMarshall<< "  int impl_ref = CkGetRefNum(impl_msg), impl_src = CkGetSrcPe(impl_msg);\n";
+    preCall<< "  void *impl_retMsg=";
+    if(retType->isVoid()) {
+      preCall << "CkAllocSysMsg();\n  ";
     } else {
-      preMarshall<< "  int impl_ref = CkGetRefNum(impl_msg), impl_src = CkGetSrcPe(impl_msg);\n";
-      preCall<< "  void *impl_retMsg=";
-      if(retType->isVoid()) {
-        preCall << "CkAllocSysMsg();\n  ";
-      } else {
-        preCall << "(void *) ";
-      }
-
-      postCall << "  CkSendToFutureID(impl_ref, impl_retMsg, impl_src);\n";
+      preCall << "(void *) ";
     }
+
+    postCall << "  CkSendToFutureID(impl_ref, impl_retMsg, impl_src);\n";
   } else if(isExclusive()) {
   //An exclusive method
-    if (!container->isNodeGroup())
-        XLAT_ERROR_NOCOL("only nodegroup methods can be 'exclusive'",
-                         first_line_);
-    if (isConstructor())
-        XLAT_ERROR_NOCOL("constructors cannot be 'exclusive'",
-                         first_line_);
-
     preMarshall << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"; /*Resend msg. if lock busy*/
     /******* DANGER-- RESEND CODE UNTESTED **********/
     if (param->isMarshalled()) {
