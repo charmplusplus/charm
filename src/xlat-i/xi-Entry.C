@@ -38,10 +38,12 @@ void Entry::print(XStr& str)
 void Entry::check() {
   if (!external) {
     if (isConstructor() && retType && !retType->isVoid())
-      die("Constructors cannot return a value",line);
+      XLAT_ERROR_NOCOL("constructors cannot return a value",
+                       first_line_);
 
     if (!isConstructor() && !retType)
-      die("Non-constructor entry methods must specify a return type (probably void)", line);
+      XLAT_ERROR_NOCOL("non-constructor entry methods must specify a return type (probably void)",
+                       first_line_);
   }
 }
 
@@ -69,12 +71,15 @@ Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, Sdag
   isWhenEntry=0;
   if (param && param->isMarshalled() && !isThreaded()) attribs|=SNOKEEP;
 
-  if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
-  if(retType && !isSync() && !isIget() && !isLocal() && !retType->isVoid())
+  if (!isThreaded() && stacksize)
+    XLAT_ERROR_NOCOL("the 'stacksize' attribute is only applicable to methods declared 'threaded'",
+                     first_line_);
+
+  if (retType && !isSync() && !isIget() && !isLocal() && !retType->isVoid())
     XLAT_ERROR_NOCOL("non-void return type in a non-sync/non-local entry method\n"
                      "To return non-void, you need to declare the method as [sync], which means it has blocking semantics,"
                      " or [local].",
-                     line);
+                     first_line_);
   if (isPython()) pythonDoc = python_doc;
   if(!isLocal() && p){
     p->checkParamList();
@@ -701,9 +706,9 @@ void Entry::genPythonDecls(XStr& str) {
   str <<"/* STATIC DECLS: "; print(str); str << " */\n";
   if (isPython()) {
     // check the parameter passed to the function, it must be only an integer
-    if (!param || param->next || !param->param->getType()->isBuiltin() || !((BuiltinType*)param->param->getType())->isInt()) {
-      die("A python entry method must accept only one parameter of type `int`");
-    }
+    if (!param || param->next || !param->param->getType()->isBuiltin() || !((BuiltinType*)param->param->getType())->isInt())
+      XLAT_ERROR_NOCOL("python entry methods take only one parameter, which is of type 'int'",
+                       first_line_);
 
     str << "PyObject *_Python_"<<container->baseName()<<"_"<<name<<"(PyObject *self, PyObject *arg);\n";
   }
@@ -1032,7 +1037,8 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
   int numDMAListEntries = accel_numArrays;
   if (accel_numScalars > 0) { numDMAListEntries++; }
   if (numDMAListEntries <= 0) {
-    die("Accel entry with no parameters");
+    XLAT_ERROR_NOCOL("accel entry with no parameters",
+                     first_line_);
   }
 
   // DMK - NOTE : TODO : FIXME - For now, force DMA lists to only be the static length or less.
@@ -1488,9 +1494,6 @@ void Entry::genDecls(XStr& str)
     return;
 
   str << "/* DECLS: "; print(str); str << " */\n";
-  if(retType==0 && !isConstructor())
-    die("Entry methods must specify a return type-- \n"
-        "use void if necessary",line);
 
   if (isMigrationConstructor())
     {} //User cannot call the migration constructor
@@ -1680,7 +1683,8 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
   bool isSDAGGen = sdagCon || isWhenEntry;
 
   if (param->isCkArgMsgPtr() && (!isConstructor() || !container->isMainChare()))
-    die("CkArgMsg can only be used in mainchare's constructor.\n");
+    XLAT_ERROR_NOCOL("CkArgMsg can only be used in mainchare's constructor",
+                     first_line_);
 
   if (isConstructor() && container->isMainChare() &&
       (!param->isVoid()) && (!param->isCkArgMsgPtr())){
@@ -1867,20 +1871,30 @@ void Entry::genDefs(XStr& str)
   if(isSync() || isIget()) {
   //A synchronous method can return a value, and must finish before
   // the caller can proceed.
-    if(isConstructor()) die("Constructors cannot be [sync]",line);
-    preMarshall<< "  int impl_ref = CkGetRefNum(impl_msg), impl_src = CkGetSrcPe(impl_msg);\n";
-    preCall<< "  void *impl_retMsg=";
-    if(retType->isVoid()) {
-      preCall << "CkAllocSysMsg();\n  ";
+    if (isConstructor()) {
+      XLAT_ERROR_NOCOL("constructors cannot have the 'sync' attribute",
+                       first_line_);
+      attribs ^= SSYNC;
     } else {
-      preCall << "(void *) ";
-    }
+      preMarshall<< "  int impl_ref = CkGetRefNum(impl_msg), impl_src = CkGetSrcPe(impl_msg);\n";
+      preCall<< "  void *impl_retMsg=";
+      if(retType->isVoid()) {
+        preCall << "CkAllocSysMsg();\n  ";
+      } else {
+        preCall << "(void *) ";
+      }
 
-    postCall << "  CkSendToFutureID(impl_ref, impl_retMsg, impl_src);\n";
+      postCall << "  CkSendToFutureID(impl_ref, impl_retMsg, impl_src);\n";
+    }
   } else if(isExclusive()) {
   //An exclusive method
-    if(!container->isNodeGroup()) die("only nodegroup methods can be exclusive",line);
-    if(isConstructor()) die("Constructors cannot be [exclusive]",line);
+    if (!container->isNodeGroup())
+        XLAT_ERROR_NOCOL("only nodegroup methods can be 'exclusive'",
+                         first_line_);
+    if (isConstructor())
+        XLAT_ERROR_NOCOL("constructors cannot be 'exclusive'",
+                         first_line_);
+
     preMarshall << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"; /*Resend msg. if lock busy*/
     /******* DANGER-- RESEND CODE UNTESTED **********/
     if (param->isMarshalled()) {
@@ -2143,7 +2157,7 @@ void Entry::preprocess() {
           case Parameter::ACCEL_BUFFER_TYPE_READWRITE:  accel_dmaList_numReadWrite++;  break;
           case Parameter::ACCEL_BUFFER_TYPE_READONLY:   accel_dmaList_numReadOnly++;   break;
           case Parameter::ACCEL_BUFFER_TYPE_WRITEONLY:  accel_dmaList_numWriteOnly++;  break;
-          default:     die("Unknown accel param type");                            break;
+          default:     XLAT_ERROR_NOCOL("unknown accel param type", first_line_);      break;
         }
       } else {
         accel_numScalars++;
@@ -2151,7 +2165,7 @@ void Entry::preprocess() {
           case Parameter::ACCEL_BUFFER_TYPE_READWRITE:  accel_dmaList_scalarNeedsWrite++;  break;
           case Parameter::ACCEL_BUFFER_TYPE_READONLY:                                      break;
           case Parameter::ACCEL_BUFFER_TYPE_WRITEONLY:  accel_dmaList_scalarNeedsWrite++;  break;
-          default:     die("Unknown accel param type");                                break;
+          default:     XLAT_ERROR_NOCOL("unknown accel param type", first_line_);          break;
         }
       }
       curParam = curParam->next;

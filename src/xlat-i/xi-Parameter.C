@@ -591,9 +591,10 @@ void ParamList::genMsgProxyName(XStr &str) {
 }
 
 void ParamList::checkParamList(){
-  if(manyPointers){ 
-    die("You may pass only a single pointer to a non-local entry method. It should point to a message.", param->line);
-    abort();
+  if (manyPointers) {
+    XLAT_ERROR_NOCOL("multiple pointers passed to a non-local entry method\n"
+                     "You may pass only a single pointer to it, which should point to a message.",
+                     param->line);
   }
 }
 
