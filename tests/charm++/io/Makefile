@@ -1,6 +1,8 @@
 -include ../../common.mk
 CHARMC=../../../bin/charmc
 
+all: pgm
+
 pgm: iotest.ci iotest.C
 	$(CHARMC) iotest.ci
 	$(CHARMC) -g iotest.C -o $@ -module CkIO
