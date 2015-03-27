@@ -49,6 +49,10 @@ void Entry::check() {
   if (isSync() && retType && !(retType->isVoid() || retType->isMessage()))
     XLAT_ERROR_NOCOL("sync methods must return either void or a message",
                      first_line_);
+
+  if (isPython() && !container->isPython())
+    XLAT_ERROR_NOCOL("python entry method declared in non-python chare",
+                     first_line_);
 }
 
 void Entry::lookforCEntry(CEntry *centry)
