@@ -172,7 +172,7 @@ namespace Ck { namespace IO {
 
         void prepareFile(FileToken token, string name, Options opts) {
           CkAssert(files.end() == files.find(token));
-          CkAssert(lastActivePE(opts) < CkNumPes());
+          //CkAssert(lastActivePE(opts) < CkNumPes());
           CkAssert(opts.writeStripe <= opts.peStripe);
           files[token] = impl::FileInfo(name, opts);
 
