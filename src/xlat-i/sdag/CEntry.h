@@ -16,8 +16,11 @@ namespace xi {
 
   class CEntry{
     std::list<CStateVar*> myParameters;
+    // TODO: decide whether this should be private or public
+    std::list<Entry*> candidateEntries_;
 
   public:
+    int first_line_, last_line_;
     XStr *entry;
     Entry *decl_entry;			// point to the real Entry of the Chare
     //CParseNode *paramlist;
@@ -26,7 +29,8 @@ namespace xi {
     int needsParamMarshalling;
     int refNumNeeded;
     std::list<WhenConstruct*> whenList;
-    CEntry(XStr *e, ParamList *p, const std::list<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
+    CEntry(XStr *e, ParamList *p, const std::list<CStateVar*>& list, int pm, int fl=-1, int ll=-1)
+        : entry(e), paramlist(p), needsParamMarshalling(pm), first_line_(fl), last_line_(ll) {
       CStateVar *sv;
       myParameters = list;
       entryNum = numEntries++;
@@ -41,6 +45,9 @@ namespace xi {
 
     void generateCode(XStr& decls, XStr& defs);
     void generateDeps(XStr& op);
+
+    std::list<Entry*> getCandidates();
+    void addCandidate(Entry *e);
   };
 
 }

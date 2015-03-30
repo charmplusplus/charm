@@ -93,6 +93,7 @@ class ParamList {
     ParamList(ParamList *pl);
     ParamList(Parameter *Nparam,ParamList *Nnext=NULL);
     void print(XStr &str,int withDefaultValues=0,int useConst=1);
+    void printTypes(XStr &str,int withDefaultValues=0,int useConst=1);
     void printAddress(XStr &str);
     void printValue(XStr &str);
     int isNamed(void) const;

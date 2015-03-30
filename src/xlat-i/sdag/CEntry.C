@@ -170,4 +170,15 @@ namespace xi {
     defs << "}\n\n";
     templateGuardEnd(defs);
   }
+
+list<Entry*> CEntry::getCandidates()
+{
+  return candidateEntries_;
+}
+
+void CEntry::addCandidate(Entry *e)
+{
+  candidateEntries_.push_front(e);
+}
+
 }

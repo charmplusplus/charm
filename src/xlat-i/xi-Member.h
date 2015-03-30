@@ -7,6 +7,7 @@ namespace xi {
 
 class SdagCollection;
 class ValueList;
+class WhenStatementEChecker;
 
 /* Member of a chare or group, i.e. entry, RO or ROM */
 class Member : public Construct {
@@ -21,6 +22,7 @@ class Member : public Construct {
   virtual void setChare(Chare *c) { container = c; }
   virtual int isSdag(void) { return 0; }
   virtual void collectSdagCode(SdagCollection *) { return; }
+  virtual void collectSdagCode(WhenStatementEChecker *) { return; }
   XStr makeDecl(const XStr &returnType,int forProxy=0, bool isStatic = false);
   virtual void genPythonDecls(XStr& ) {}
   virtual void genIndexDecls(XStr& ) {}

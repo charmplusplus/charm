@@ -246,5 +246,6 @@ template void AstChildren<Member>::recurse<XStr&>(XStr&, void (Member::*)(XStr&)
 template void AstChildren<Member>::recurse<SdagCollection*>(SdagCollection*, void (Member::*)(SdagCollection*));
 template void AstChildren<Member>::recurse<CEntry*>(CEntry*, void (Member::*)(CEntry*));
 template void AstChildren<Module>::recurse<const char *>(const char*, void (Module::*)(const char*));
+template void AstChildren<Member>::recurse<WhenStatementEChecker*>(WhenStatementEChecker*, void (Member::*)(WhenStatementEChecker*));
 
 } // namespace xi

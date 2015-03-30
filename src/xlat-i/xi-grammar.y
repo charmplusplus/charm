@@ -319,7 +319,7 @@ ConstructSemi   : USING NAMESPACE QualName
                 { $2->setExtern($1); $$ = $2; }
                 | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters
                 {
-                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0);
+                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, @1.first_line, @$.last_line);
                   int isExtern = 1;
                   e->setExtern(isExtern);
                   e->targs = $6;
@@ -833,7 +833,7 @@ UnexpectedToken : ENTRY
 
 Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
-                  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7); 
+                  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, (const char *) NULL, @1.first_line, @$.last_line);
 		  if ($7 != 0) { 
 		    $7->con1 = new SdagConstruct(SIDENT, $4);
                     $7->entry = $$;
@@ -843,7 +843,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
 		{ 
-                  Entry *e = new Entry(lineno, $2, 0, $3, $4,  0, $5);
+                  Entry *e = new Entry(lineno, $2, 0, $3, $4,  0, $5, (const char *) NULL, @1.first_line, @$.last_line);
                   if ($5 != 0) {
 		    $5->con1 = new SdagConstruct(SIDENT, $3);
                     $5->entry = e;
@@ -1235,9 +1235,13 @@ StartIntExpr	: '('
 		;
 
 SEntry		: IDENT EParameters
-		{ $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0); }
+		{
+		  $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, @$.first_line, @$.last_line);
+		}
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
-		{ $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3); }
+		{
+		  $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, @$.first_line, @$.last_line);
+		}
 		;
 
 SEntryList	: SEntry 

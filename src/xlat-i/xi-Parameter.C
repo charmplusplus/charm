@@ -97,6 +97,18 @@ void ParamList::print(XStr &str,int withDefaultValues,int useConst)
     		next->print(str,withDefaultValues,useConst);
     	}
 }
+
+void ParamList::printTypes(XStr &str,int withDefaultValues,int useConst)
+{
+    XStr typeStr;
+    param->getType()->print(typeStr);
+    str << typeStr;
+    if (next) {
+      str << ", ";
+      next->printTypes(str,withDefaultValues,useConst);
+    }
+}
+
 void Parameter::print(XStr &str,int withDefaultValues,int useConst)
 {
 	if (arrLen!=NULL)

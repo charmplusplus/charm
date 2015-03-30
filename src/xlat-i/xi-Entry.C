@@ -3,6 +3,8 @@
 #include "xi-Value.h"
 #include "xi-SdagCollection.h"
 
+#include "sdag/constructs/When.h"
+
 namespace xi {
 
 extern int fortranMode;
@@ -47,6 +49,9 @@ void Entry::lookforCEntry(CEntry *centry)
 {
    // compare name
    if (strcmp(name, *centry->entry) != 0) return;
+
+   centry->addCandidate(this);
+
    // compare param
    if (param && !centry->paramlist) return;
    if (!param && centry->paramlist) return;
@@ -56,8 +61,8 @@ void Entry::lookforCEntry(CEntry *centry)
    centry->decl_entry = this;
 }
 
-Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e) :
-  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), genClosureTypeName(0), genClosureTypeNameProxy(0), genClosureTypeNameProxyTemp(0), entryPtr(0)
+Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int fl, int ll) :
+  attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), genClosureTypeName(0), genClosureTypeNameProxy(0), genClosureTypeNameProxyTemp(0), entryPtr(0), first_line_(fl), last_line_(ll)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -141,6 +146,13 @@ void Entry::collectSdagCode(SdagCollection *sc)
 {
   if (isSdag()) {
     sc->addNode(this);
+  }
+}
+
+void Entry::collectSdagCode(WhenStatementEChecker *wsec)
+{
+  if (isSdag()) {
+    wsec->addNode(this);
   }
 }
 

@@ -137,7 +137,7 @@ namespace xi {
     }
     if(!found) {
       CEntry *newEntry;
-      newEntry = new CEntry(new XStr(name), param, estateVars, paramIsMarshalled() );
+      newEntry = new CEntry(new XStr(name), param, estateVars, paramIsMarshalled(), first_line_, last_line_);
       CEntrylist.push_back(newEntry);
       entryPtr = newEntry;
       newEntry->whenList.push_back(thisWhen);

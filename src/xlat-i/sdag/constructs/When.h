@@ -6,6 +6,18 @@
 
 namespace xi {
 
+class WhenStatementEChecker {
+ private:
+  std::list<Entry*> nodeList_;
+  std::list<CEntry*> entryList_;
+  Chare *container_;
+
+ public:
+  WhenStatementEChecker(Chare *c);
+  void addNode(Entry *e);
+  void check();
+};
+
 class WhenConstruct : public BlockConstruct {
  public:
   // TODO(Ralf): Make this be private?

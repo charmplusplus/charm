@@ -13,6 +13,7 @@ class Value;
 class CStateVar;
 // class SdagConstruct;
 class WhenConstruct;
+class WhenStatementEChecker;
 
 /******************* Entry Point ****************/
 // Entry attributes
@@ -43,6 +44,8 @@ class Entry : public Member {
   XStr* genClosureTypeNameProxy;
   XStr* genClosureTypeNameProxyTemp;
   int line,entryCount;
+  int first_line_, last_line_;
+
  private:    
   int attribs;    
   Type *retType;
@@ -146,7 +149,7 @@ class Entry : public Member {
     int accel_dmaList_numWriteOnly;
     int accel_dmaList_scalarNeedsWrite;
 
-    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0);
+    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0, int fl=-1, int ll=-1);
     void setChare(Chare *c);
     int paramIsMarshalled(void);
     int getStackSize(void);
@@ -186,6 +189,7 @@ class Entry : public Member {
     char *getEntryName();
     void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
     void collectSdagCode(SdagCollection *sc);
+    void collectSdagCode(WhenStatementEChecker *sc);
     void propagateState(int);
     void lookforCEntry(CEntry *centry);
     int getLine();
