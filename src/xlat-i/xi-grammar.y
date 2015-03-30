@@ -1,4 +1,4 @@
-%expect 6
+%expect 7
 %{
 #include <iostream>
 #include <vector>
@@ -151,7 +151,7 @@ void ReservedWord(int token);
 %type <cattr>		ArrayAttribs ArrayAttribList ArrayAttrib
 %type <tparam>		TParam
 %type <tparlist>	TParamList TParamEList OptTParams
-%type <type>		BaseType Type SimpleType OptTypeInit EReturn
+%type <type>		BaseDataType BaseType RestrictedType Type SimpleType OptTypeInit EReturn
 %type <type>		BuiltinType
 %type <ftype>		FuncType
 %type <ntype>		NamedType QualNamedType ArrayIndexType
@@ -461,11 +461,28 @@ BaseType	: SimpleType
 		{ $$ = $1; }
 		| FuncType
 		{ $$ = $1; }
-		//{ $$ = $1; }
 		| CONST BaseType 
 		{ $$ = new ConstType($2); }
 		| BaseType CONST
 		{ $$ = new ConstType($1); }
+		;
+
+BaseDataType	: SimpleType
+		{ $$ = $1; }
+		| OnePtrType
+		{ $$ = $1; }
+		| PtrType
+		{ $$ = $1; }
+		| CONST BaseDataType
+		{ $$ = new ConstType($2); }
+		| BaseDataType CONST
+		{ $$ = new ConstType($1); }
+		;
+
+RestrictedType : BaseDataType '&'
+		{ $$ = new ReferenceType($1); }
+		| BaseDataType
+		{ $$ = $1; }
 		;
 
 Type		: BaseType '&'
@@ -880,9 +897,7 @@ AccelBlock      : ACCELBLOCK ParamBraceStart CCode ParamBraceEnd ';'
                 { $$ = new AccelBlock(lineno, NULL); }
                 ;
 
-EReturn		: VOID
-		{ $$ = new BuiltinType("void"); }
-		| OnePtrType
+EReturn	: RestrictedType
 		{ $$ = $1; }
 		;
 
