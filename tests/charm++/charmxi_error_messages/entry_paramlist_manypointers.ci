@@ -1,0 +1,8 @@
+mainmodule m {
+    message m1_t;
+    message m2_t;
+    mainchare c {
+        entry void foo(m1_t *a, m2_t *b);
+        entry void bar(m1_t *a, int c, m2_t *b);
+    }
+}

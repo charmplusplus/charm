@@ -1,0 +1,3 @@
+mainmodule m {
+  foo_construct{}
+};

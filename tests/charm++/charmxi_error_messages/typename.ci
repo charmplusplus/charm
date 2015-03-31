@@ -1,0 +1,7 @@
+mainmodule m {
+  template <typename T>
+  array [1D] A {
+    entry A();
+    entry void help(const typename T :  :X&);
+  };
+};

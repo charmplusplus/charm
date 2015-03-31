@@ -1,0 +1,8 @@
+mainmodule m {
+  mainchare Chare {
+    entry double plusgood();
+    entry foo_t ball();
+    entry name::space bar();
+    entry a* search();
+  };
+};

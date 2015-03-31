@@ -1,0 +1,6 @@
+mainmodule m {
+  mainchare A {
+    entry void foo()
+    entry void bar();
+  }
+}

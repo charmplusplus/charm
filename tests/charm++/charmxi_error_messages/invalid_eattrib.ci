@@ -1,0 +1,8 @@
+mainmodule m {
+  mainchare A {
+    entry A(CkArgMsg*);
+    entry [foobar,local,robaaf] void fun();
+    entry [woohoo,local,aahaaw] void bar();
+    entry [an attribute] void baz();
+  };
+};

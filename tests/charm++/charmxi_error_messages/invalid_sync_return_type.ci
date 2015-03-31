@@ -1,0 +1,9 @@
+mainmodule m {
+    message m_t;
+    array [2D] Foo {
+        entry [sync] int foo();
+        entry [sync] m_t* bar();
+        entry [sync] void bar();
+        entry [sync] double* bar();
+    };
+};

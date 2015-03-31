@@ -1,0 +1,8 @@
+mainmodule m {
+    message a;
+    readonly message a* b[10];
+
+    mainchare c {
+        entry c();
+    }
+}
