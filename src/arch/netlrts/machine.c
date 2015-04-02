@@ -906,7 +906,7 @@ by the commlock.*/
 static int Cmi_charmrun_fd_sendflag=0;
 
 /* ctrl_sendone */
-static int sendone_abort_fn(int code,const char *msg) {
+static int sendone_abort_fn(SOCKET skt,int code,const char *msg) {
 	fprintf(stderr,"Socket error %d in ctrl_sendone! %s\n",code,msg);
 	machine_exit(1);
 	return -1;
@@ -988,7 +988,7 @@ static void pingCharmrunPeriodic(void *ignored)
   CcdCallFnAfter((CcdVoidFn)pingCharmrunPeriodic,NULL,1000);
 }
 
-static int ignore_further_errors(int c,const char *msg) {machine_exit(2);return -1;}
+static int ignore_further_errors(SOCKET skt,int c,const char *msg) {machine_exit(2);return -1;}
 static void charmrun_abort(const char *s)
 {
   if (Cmi_charmrun_fd==-1) {/*Standalone*/
@@ -1860,7 +1860,7 @@ static void set_signals(void)
 */
 static void obtain_idleFn(void) {sleep(0);}
 
-static int net_default_skt_abort(int code,const char *msg)
+static int net_default_skt_abort(SOCKET skt,int code,const char *msg)
 {
   fprintf(stderr,"Fatal socket error: code %d-- %s\n",code,msg);
   machine_exit(1);

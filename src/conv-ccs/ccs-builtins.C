@@ -53,7 +53,7 @@ static void ccs_killport(char *msg)
   CmiFree(msg);
 }
 /*Send any registered clients kill messages before we exit*/
-static int noMoreErrors(int c,const char *m) {return -1;}
+static int noMoreErrors(SOCKET skt, int c, const char *m) {return -1;}
 extern "C" void CcsImpl_kill(void)
 {
   skt_set_abort(noMoreErrors);

@@ -369,7 +369,7 @@ receive a ccs request from the network.
 Returns 1 if a request was successfully received.
 reqData is allocated with malloc(hdr->len).
 */
-static int req_abortFn(int code,const char *msg) {
+static int req_abortFn(SOCKET skt, int code, const char *msg) {
 	/*Just ignore bad requests-- indicates a client is messed up*/
 	fprintf(stderr,"CCS ERROR> Socket abort during request-- ignoring\n");
 	return -1;
@@ -440,7 +440,7 @@ int CcsServer_recvRequest(CcsImplHeader *hdr,void **reqData)
   return ret;
 }
 
-static int reply_abortFn(int code,const char *msg) {
+static int reply_abortFn(SOCKET skt, int code, const char *msg) {
 	/*Just ignore bad replies-- just indicates a client has died*/
 	fprintf(stderr,"CCS ERROR> Socket abort during reply-- ignoring\n");
 	return -1;

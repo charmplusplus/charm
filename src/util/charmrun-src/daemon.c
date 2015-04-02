@@ -24,7 +24,7 @@ Otherwise, the daemon logs things to its DOS window.
 
 FILE *logfile;/*Status messages to standard output*/
 
-int abort_writelog(int code,const char *msg) {
+int abort_writelog(SOCKET skt,int code,const char *msg) {
 	fprintf(logfile,"Socket error %d-- %s!\n",code,msg);
 	fclose(logfile);
 	exit(3);

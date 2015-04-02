@@ -145,7 +145,7 @@ void skt_init(void);
 
 /*Error and idle handling*/
 typedef void (*skt_idleFn)(void);
-typedef int (*skt_abortFn)(int errCode,const char *msg);
+typedef int (*skt_abortFn)(SOCKET skt, int errCode, const char *msg);
 void skt_set_idle(skt_idleFn f);
 skt_abortFn skt_set_abort(skt_abortFn f);
 
@@ -294,6 +294,8 @@ typedef struct {
   ChMessageInt_t pe;/*Destination processor number*/
   char handler[CCS_HANDLERLEN];/*Handler name for message to follow*/
 } CcsMessageHeader;
+
+extern const char *skt_to_name(SOCKET skt);
 
 #ifdef __cplusplus
 }
