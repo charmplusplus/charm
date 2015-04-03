@@ -504,7 +504,10 @@ static void CmiStartThreads(char **argv)
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
-    if (ok<0) PerrorExit("pthread_create"); 
+    if (ok!=0){
+      CmiPrintf("CmiStartThreads: %s(%d)\n", strerror(errno), errno);
+      PerrorExit("pthread_create");
+    }
     pthread_attr_destroy(&attr);
   }
 #if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
