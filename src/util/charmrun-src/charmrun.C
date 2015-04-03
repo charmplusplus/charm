@@ -26,6 +26,8 @@
 #endif
 #include <sys/stat.h>
 
+#include <vector>
+
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 /*Win32 has screwy names for the standard UNIX calls:*/
@@ -79,6 +81,7 @@
 #define MAXPATHLEN 1024
 #endif
 
+const int MAX_NUM_RETRIES = 3;
 
 //#define HSTART
 #ifdef HSTART
@@ -4549,6 +4552,7 @@ void finish_set_nodes(int start, int stop) {
 
 	if (!rsh_pids) return; /*nothing to do*/
 
+	std::vector<int> num_retries(stop-start, 0);
 	done=0;
 	while(!done) {
 		done=1;
@@ -4561,10 +4565,21 @@ void finish_set_nodes(int start, int stop) {
 					if (!WEXITSTATUS(status)) { /* good */
 						rsh_pids[i]=0; /* process is finished */
 					} else {
-  						host=nodetab_name(nodetab_rank0_table[i]);
+						host=nodetab_name(nodetab_rank0_table[i]);
 						fprintf(stderr,"Charmrun> Error %d returned from remote shell (%s:%d)\n",
-						WEXITSTATUS(status),host,i);
-						exit(1);
+						        WEXITSTATUS(status),host,i);
+
+						if (WEXITSTATUS(status) != 255)
+							exit(1);
+
+						if (++num_retries[i-start] <= MAX_NUM_RETRIES) {
+							fprintf(stderr, "Charmrun> Reconnection attempt %d of %d\n",
+							        num_retries[i-start], MAX_NUM_RETRIES);
+							start_one_node_rsh(i);
+						} else {
+							fprintf(stderr, "Charmrun> Too many reconnection attempts; bailing out\n");
+							exit(1);
+						}
 					} 
 				}
 			}
