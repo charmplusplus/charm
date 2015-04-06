@@ -860,7 +860,14 @@ void ampiParent::pup(PUP::er &p) {
   myDDT->pup(p);
   p|splitComm;
   p|groupComm;
+  p|cartComm;
+  p|graphComm;
+  p|interComm;
+  p|intraComm;
+  
   p|groups;
+  p|winStructList;
+  p|infos;
 
   //BIGSIM_OOC DEBUGGING
   //if(!p.isUnpacking()){
@@ -876,10 +883,9 @@ void ampiParent::pup(PUP::er &p) {
   //    ampiReqs.print();
   //}
 
+  p|kvlist;
   p|RProxyCnt;
   p|tmpRProxy;
-  p|winStructList;
-  p|infos;
 
   p|ampiInitCallDone;
 }
