@@ -16,6 +16,7 @@ module CommonLBs {
   extern module OrbLB;
   extern module BlockLB;
   extern module GreedyCommLB;
+  extern module NodeLevelLB;
 
   initnode void initCommonLBs(void);
 };

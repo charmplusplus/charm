@@ -15,6 +15,7 @@ COMMON_LDBS=\
    $(L)/libmoduleOrbLB.a \
    $(L)/libmoduleBlockLB.a \
    $(L)/libmoduleGreedyCommLB.a \
+   $(L)/libmoduleNodeLevelLB.a \
    manager.o
 
 ALL_LDBS=\
@@ -33,6 +34,7 @@ ALL_LDBS=\
    $(L)/libmoduleOrbLB.a \
    $(L)/libmoduleBlockLB.a \
    $(L)/libmoduleGreedyCommLB.a \
+   $(L)/libmoduleNodeLevelLB.a \
    $(L)/libmoduleGraphPartLB.a \
    $(L)/libmoduleGraphBFTLB.a \
    $(L)/libmoduleGridCommLB.a \
@@ -168,6 +170,14 @@ $(L)/libmoduleGreedyCommLB.a: GreedyCommLB.o manager.o
 	$(CHARMC) -o $(L)/libmoduleGreedyCommLB.a GreedyCommLB.o manager.o
 	
 LBHEADERS += GreedyCommLB.h GreedyCommLB.decl.h
+
+NodeLevelLB: NodeLevelLB.o 
+	$(CHARMC) -o $(L)/libmoduleNodeLevelLB.a NodeLevelLB.o 
+
+$(L)/libmoduleNodeLevelLB.a: NodeLevelLB.o 
+	$(CHARMC) -o $(L)/libmoduleNodeLevelLB.a NodeLevelLB.o 
+	
+LBHEADERS += NodeLevelLB.h NodeLevelLB.decl.h
 
 GraphPartLB: GraphPartLB.o 
 	$(CHARMC) -o $(L)/libmoduleGraphPartLB.a GraphPartLB.o 
@@ -395,6 +405,7 @@ ALL_LB_OBJS=EveryLB.o \
     OrbLB.o \
     BlockLB.o \
     GreedyCommLB.o \
+    NodeLevelLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
     GridCommLB.o \
@@ -443,6 +454,7 @@ EVERYLB_DEPS=EveryLB.o \
     OrbLB.o \
     BlockLB.o \
     GreedyCommLB.o \
+    NodeLevelLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
     GridCommLB.o \
@@ -479,6 +491,7 @@ COMMONLBS_DEPS=CommonLBs.o \
     OrbLB.o \
     BlockLB.o \
     GreedyCommLB.o \
+    NodeLevelLB.o \
     manager.o \
 
 EveryLB: $(EVERYLB_DEPS)

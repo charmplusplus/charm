@@ -1,0 +1,12 @@
+module NodeLevelLB {
+
+extern module LBDatabase;
+extern module HybridBaseLB;
+
+initnode void lbinit(void);
+
+group [migratable] NodeLevelLB : HybridBaseLB {
+  entry void NodeLevelLB(const CkLBOptions &);
+};
+
+};
