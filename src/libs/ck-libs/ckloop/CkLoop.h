@@ -89,15 +89,33 @@ public:
         CmiUnlock(loop_info_inited_lock);
     }
     int getNextChunkIdx() {
+#if defined(_WIN32)
+#if CMK_SMP
+        CmiLock(cmiMemoryLock);
+        curChunkIdx=curChunkIdx+1;
+        CmiUnlock(cmiMemoryLock);
+        return curChunkIdx;
+#else
+        curChunkIdx++;
+        return curChunkIdx;
+#endif
+#else
         return __sync_add_and_fetch(&curChunkIdx, 1);
+#endif
     }
     void reportFinished(int counter) {
         if (counter==0) return;
-//#if !CMK_SMP
+#if defined(_WIN32)
+#if CMK_SMP
+        CmiLock(cmiMemoryLock);
+        finishFlag=finishFlag+counter;
+        CmiUnlock(cmiMemoryLock);
+#else
+        finishFlag=finishFlag+counter;
+#endif
+#else
         __sync_add_and_fetch(&finishFlag, counter);
-//#else
-//	CmiMemoryAtomicFetchAndInc(finishFlag, counter);
-//#endif
+#endif
     }
 
     int isFree() {

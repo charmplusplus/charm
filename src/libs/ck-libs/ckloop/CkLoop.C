@@ -1,5 +1,7 @@
 #include "CkLoop.h"
+#if !defined(_WIN32)
 #include <pthread.h>
+#endif
 
 #if !USE_CONVERSE_NOTIFICATION
 #include "qd.h"
@@ -7,6 +9,7 @@
 
 #define CKLOOP_USECHARM 1
 #define CKLOOP_PTHREAD 2
+#define CKLOOP_NOOP 3
 
 /*====Beginning of pthread-related variables and impelementation====*/
 //__thread is not portable, but it works almost everywhere if pthread works
@@ -20,9 +23,11 @@ static FuncCkLoop *mainHelper = NULL;
 static int mainHelperPhyRank = 0;
 static int numPhysicalPEs = 0;
 static CurLoopInfo *pthdLoop = NULL; //the pthread-version is always synchronized
+#if !defined(_WIN32)
 static pthread_mutex_t **allLocks = NULL;
 static pthread_cond_t **allConds = NULL;
 static pthread_t *ndhThreads = NULL;
+#endif
 static volatile int gCrtCnt = 0;
 static volatile int exitFlag = 0;
 
@@ -47,7 +52,7 @@ static int HelperOnCore() {
 }
 
 static void *ndhThreadWork(void *id) {
-#if !CMK_SMP
+#if !CMK_SMP && !defined(_WIN32)
     size_t myId = (size_t) id;
 
     //further improvement of this affinity setting!!
@@ -88,6 +93,7 @@ static void *ndhThreadWork(void *id) {
 }
 
 void FuncCkLoop::createPThreads() {
+#if !defined(_WIN32)
     int numThreads = numHelpers - 1;
     allLocks = (pthread_mutex_t **)malloc(sizeof(void *)*numThreads);
     allConds = (pthread_cond_t **)malloc(sizeof(void *)*numThreads);
@@ -105,9 +111,11 @@ void FuncCkLoop::createPThreads() {
         pthread_create(ndhThreads+i, &attr, ndhThreadWork, (void *)i);
     }
     while (gCrtCnt != numThreads); //wait for all threads to finish creation
+#endif
 }
 
 void FuncCkLoop::exit() {
+#if !defined(_WIN32)
     if (mode == CKLOOP_PTHREAD) {
         exitFlag = 1;
         for (int i=0; i<numHelpers-1; i++)
@@ -117,6 +125,7 @@ void FuncCkLoop::exit() {
         free(allConds);
         delete pthdLoop;
     }
+#endif
 }
 
 /*====End of pthread-related variables and impelementation====*/
@@ -266,6 +275,8 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
         }
 #endif
     } else if (mode == CKLOOP_PTHREAD) {
+
+#if !defined(_WIN32)
         int numThreads = numHelpers-1;
         curLoop = pthdLoop;
         curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
@@ -280,6 +291,10 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
         }
         //in this mode, it's always synced
         sync = 1;
+#endif
+    } else if (mode == CKLOOP_NOOP) {
+      func(lowerRange, upperRange, redResult, paramNum, param);
+      return;
     }
     if(curLoop) curLoop->stealWork();
     TRACE_BRACKET(CKLOOP_TOTAL_WORK_EVENTID);
@@ -527,6 +542,8 @@ CProxy_FuncCkLoop CkLoop_Init(int numThreads) {
 #else
     CkPrintf("CkLoopLib is used in SMP with a simple dynamic scheduling (charm-level notifiation) but not using node-level queue\n");
 #endif
+#elif defined(WIN32)
+    mode = CKLOOP_NOOP;
 #else
     mode = CKLOOP_PTHREAD;
     CkPrintf("CkLoopLib is used with extra %d pthreads via a simple dynamic scheduling\n", numThreads);
