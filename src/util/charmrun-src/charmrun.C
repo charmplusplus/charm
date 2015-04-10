@@ -1223,12 +1223,6 @@ const char *nodetab_args(const char *args, nodetab_host *h)
       return args;
     args = skipblanks(e2);
   }
-#if CMK_SHARED_VARS_UNAVAILABLE
-  if (h->cpus != 1) {
-    fprintf(stderr, "Warning> Invalid cpus %d in nodelist ignored.\n", h->cpus);
-    h->cpus = 1;
-  }
-#endif
   return args;
 }
 
@@ -1381,7 +1375,14 @@ void nodetab_init()
           }
           host = group;
           nodetab_args(b3, &host);
+#if !CMK_SMP
+          /* Non-SMP workaround */
+          int cpus = host.cpus;
+          host.cpus = 1;
+          for (int rank = 0; rank < cpus; rank++)
+#else
           for (host.rank = 0; host.rank < host.cpus; host.rank++)
+#endif
             nodetab_makehost(substr(b2, e2), &host);
           free(prevHostName);
           prevHostName = strdup(b2);
