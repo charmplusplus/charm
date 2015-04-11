@@ -26,7 +26,9 @@
 #endif
 #include <sys/stat.h>
 
+#include <map>
 #include <vector>
+#include <utility>
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 /*Win32 has screwy names for the standard UNIX calls:*/
@@ -1177,7 +1179,6 @@ void nodetab_makehost(const char *name, nodetab_host *h)
   }
   if (nodetab_size == nodetab_max)
     return;
-  nodetab_add(h);
 }
 
 const char *nodetab_args(const char *args, nodetab_host *h)
@@ -1258,6 +1259,7 @@ void nodetab_init_for_local()
     const char *hostname = "127.0.0.1";
     for (group.rank = 0; group.rank < arg_ppn; group.rank++) {
       nodetab_makehost(hostname, &group);
+      nodetab_add(&group);
       if (++i == arg_requested_pes) {
         done = 1;
         break;
@@ -1300,10 +1302,12 @@ void nodetab_init()
   char *nodesfile;
   nodetab_host global, group, host;
   char input_line[MAX_LINE_LENGTH];
-  int rightgroup, basicsize, i, remain;
+  int rightgroup, i, remain, lineNo;
   /* Store the previous host so we can make sure we aren't mixing localhost and
    * non-localhost */
   char *prevHostName = NULL;
+  std::vector< std::pair<int, nodetab_host> > hosts;
+  std::multimap<int, nodetab_host> binned_hosts;
 
   /* if arg_local is set, ignore the nodelist file */
   if (arg_local || arg_mpiexec) {
@@ -1342,6 +1346,7 @@ void nodetab_init()
   group = global;
   rightgroup = (strcmp(arg_nodegroup, "main") == 0);
 
+  lineNo = 1;
   while (fgets(input_line, sizeof(input_line) - 1, f) != 0) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if (nodetab_size == arg_read_pes)
@@ -1383,7 +1388,10 @@ void nodetab_init()
 #else
           for (host.rank = 0; host.rank < host.cpus; host.rank++)
 #endif
+          {
             nodetab_makehost(substr(b2, e2), &host);
+            hosts.push_back(std::make_pair(lineNo, host));
+          }
           free(prevHostName);
           prevHostName = strdup(b2);
         }
@@ -1397,19 +1405,26 @@ void nodetab_init()
         exit(1);
       }
     }
+    lineNo++;
   }
   fclose(f);
   if (nodetab_tempName != NULL)
     unlink(nodetab_tempName);
 
-  /*Wrap nodes in table around if there aren't enough yet*/
-  basicsize = nodetab_size;
-  if (basicsize == 0) {
+  if (hosts.size() == 0) {
     fprintf(stderr, "ERROR> No hosts in group %s\n", arg_nodegroup);
     exit(1);
   }
-  while (nodetab_size < arg_requested_pes)
-    nodetab_add(nodetab_table[nodetab_size % basicsize]);
+
+  /*Wrap nodes in table around if there aren't enough yet*/
+  for (int i = 0; binned_hosts.size() < arg_requested_pes; ++i) {
+    binned_hosts.insert(hosts[i % hosts.size()]);
+  }
+
+  for (std::multimap<int, nodetab_host>::iterator it = binned_hosts.begin();
+       it != binned_hosts.end(); ++it) {
+    nodetab_add(&(it->second));
+  }
 
 fin:
   /*Clip off excess CPUs at end*/
@@ -4013,6 +4028,7 @@ arg_ppn);
       group.rank = rank;
 #endif
       nodetab_makehost(hostname, &group);
+      nodetab_add(&group);
       if (++npes == arg_requested_pes)
         break;
     }
@@ -4045,6 +4061,7 @@ arg_ppn);
         group.rank = rank;
 #endif
         nodetab_makehost(nodetab_name(node), &group);
+        nodetab_add(&group);
         if (++node == orig_size)
           node = startnode;
         if (++npes == arg_requested_pes)
