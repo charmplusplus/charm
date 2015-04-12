@@ -103,6 +103,7 @@ public:
   double totalIdleTime;
 
   CommunicationGroup() {
+    nReceived = 0;
     beginHandlerId = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
                                          idleStartHandler, (void *) this);
     endHandlerId = CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,
@@ -233,6 +234,7 @@ public:
   double totalIdleTime;
 
   CommunicationArray() {
+    nReceived = 0;
     beginHandlerId = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
                                          idleStartHandlerArray, (void *) this);
     endHandlerId = CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,
