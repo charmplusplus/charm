@@ -10,6 +10,23 @@
 
 #include "TopoManager.h"
 #include "partitioning_strategies.h"
+#include <vector>
+#include <algorithm>
+
+struct CompareRankDist {
+  std::vector<int> peDist;
+
+  CompareRankDist(int *root, int *pes, int n, TopoManager *tmgr) : peDist(n) {
+    for(int p = 0; p < n; p++) {
+      peDist[p] = tmgr->getHopsBetweenRanks(root, pes[p]);
+    }
+  }
+
+  bool operator() (int i, int j) {
+    return (peDist[i] < peDist[j]);
+  }
+};
+
 
 TopoManager::TopoManager() {
 #if CMK_BLUEGENEP
@@ -283,22 +300,39 @@ int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
 #endif
 }
 
-void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
-  /* The next three lines appear to do nothing other than waste time.
-     int minHops = getHopsBetweenRanks(pe, pes[0]);
-     int minIdx = 0;
-     int nowHops, tmp;
-  */
-  for(int i=0;i<n;i++)
-    idx[i] = i;
-  quicksort(pe, pes, idx, 0, n-1);
+int TopoManager::getHopsBetweenRanks(int *pe1, int pe2) {
+  CmiAssert( pe2 >= 0 && pe2 < numPes );
+#if CMK_BLUEGENEQ
+  int a2, b2, c2, d2, e2, t2; 
+  rankToCoordinates(pe2, a2, b2, c2, d2, e2, t2);
+  return (absA(a2-pe1[0])+absB(b2-pe1[1])+absC(c2-pe1[2]) + 
+      absD(d2-pe1[3])+absE(e2-pe1[4]));  
+#else
+  int x2, y2, z2, t2;
+  rankToCoordinates(pe2, x2, y2, z2, t2);
+  return (absX(x2-pe1[0])+absY(y2-pe1[1])+absZ(z2-pe1[2]));
+#endif
 }
 
-/*
-int TopoManager::pickClosestRank(int mype, int *pes, int n) {
-  return(pickClosestRank(mype,pes,n));
+void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
+#if CMK_BLUEGENEQ
+  int root_coords[6];
+  rankToCoordinates(pe, root_coords[0], root_coords[1], root_coords[2],
+      root_coords[3], root_coords[4], root_coords[5]);
+#else
+  int root_coords[4];
+  rankToCoordinates(pe, root_coords[0], root_coords[1], root_coords[2],
+      root_coords[3]);
+#endif
+  sortRanksByHops(root_coords, pes, idx, n);
 }
-*/
+
+void TopoManager::sortRanksByHops(int* root_coords, int *pes, int *idx, int n) {
+  for(int i=0;i<n;i++)
+    idx[i] = i;
+  CompareRankDist comparator(root_coords, pes, n, this);
+  std::sort(&idx[0], idx + n, comparator);
+}
 
 int TopoManager::pickClosestRank(int mype, int *pes, int n){
   int minHops = getHopsBetweenRanks(mype, pes[0]);
@@ -341,35 +375,6 @@ int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) {
   else
     return 0;
 #endif
-}
-
-void TopoManager::quicksort(int pe, int *pes, int *arr, int left, int right) {
-  if(left<right) {
-    int split = partition(pe, pes, arr, left, right);
-    quicksort(pe, pes, arr, left, split);
-    quicksort(pe, pes, arr, split+1, right);
-  }
-}
-
-int TopoManager::partition(int pe, int *pes, int *idx, int left, int right) {
-  int val = getHopsBetweenRanks(pe, pes[idx[(left+right)/2]]);
-  int lm = left-1;
-  int rm = right+1;
-  for(;;) {
-    do
-      rm--;
-    while(getHopsBetweenRanks(pe, pes[idx[rm]]) > val);
-    do
-      lm++;
-    while(getHopsBetweenRanks(pe, pes[idx[lm]]) < val);
-    if(lm < rm) {
-      int tmp = idx[rm];
-      idx[rm] = idx[lm];
-      idx[lm] = tmp;
-    }
-    else
-      return rm;
-  }
 }
 
 #if CMK_BLUEGENEQ

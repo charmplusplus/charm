@@ -84,7 +84,9 @@ class TopoManager {
     int coordinatesToRank(int x, int y, int z, int t);
     int coordinatesToRank(int a, int b, int c, int d, int e, int t);
     int getHopsBetweenRanks(int pe1, int pe2);
+    int getHopsBetweenRanks(int *pe1, int pe2);
     void sortRanksByHops(int pe, int *pes, int *idx, int n);
+    void sortRanksByHops(int *pe, int *pes, int *idx, int n);
     int pickClosestRank(int mype, int *pes, int n);
     int areNeighbors(int pe1, int pe2, int pe3, int distance);
     void printAllocation(FILE *fp);
@@ -196,9 +198,6 @@ class TopoManager {
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     XTTorusManager xttm;
 #endif
-
-    void quicksort(int pe, int *pes, int *arr, int left, int right);
-    int partition(int pe, int *pes, int *idx, int left, int right);
 };
 #endif
 #endif //_TOPO_MANAGER_H_
