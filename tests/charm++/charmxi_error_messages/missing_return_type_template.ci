@@ -1,0 +1,23 @@
+module MyModule
+{
+  template< typename T >
+  chare A
+  {
+    entry A();
+    entry foo(); // missing 'void'
+  };
+
+  template< typename T >
+  array [1D] B
+  {
+    entry B();
+    entry foo(); // missing 'void'
+  }
+
+  template< typename T >
+  group C
+  {
+    entry C();
+    entry foo(); // missing 'void'
+  }
+}

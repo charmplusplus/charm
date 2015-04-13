@@ -85,6 +85,7 @@ class Template : public Construct {
     void genVars(XStr& str);
     void outputClosuresDecl(XStr& str);
     void outputClosuresDef(XStr& str);
+    void check();
 
     // DMK - Accel Support
     int genAccels_spe_c_funcBodies(XStr& str);
