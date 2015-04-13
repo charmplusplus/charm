@@ -4820,7 +4820,7 @@ void reconnect_crashed_client(int socket_index,int crashed_node){
 			client_connect_problem(socket_index,socket_index,"Timeout waiting forrestarted node-program to connect");
 	}
 	req_clients[socket_index] = skt_accept(server_fd,&clientIP,&clientPort);
-	skt_client_table[req_clients[client]] = socket_index;
+	skt_client_table[req_clients[socket_index]] = socket_index;
 
 	if(req_clients[socket_index] == SOCKET_ERROR){
 		client_connect_problem(socket_index,socket_index,"Failure in restarted node accept");
