@@ -693,7 +693,6 @@ char **dupargv(char **argv)
  *
  *****************************************************************************/
 
-#define MAX_NODES 1000
 #define MAX_LINE_LENGTH 1000
 
 const char **arg_argv;
@@ -1408,7 +1407,7 @@ void nodetab_init()
     fprintf(stderr, "ERROR> No hosts in group %s\n", arg_nodegroup);
     exit(1);
   }
-  while ((nodetab_size < arg_requested_pes) && (arg_requested_pes != MAX_NODES))
+  while (nodetab_size < arg_requested_pes)
     nodetab_add(nodetab_table[nodetab_size % basicsize]);
 
 fin:
