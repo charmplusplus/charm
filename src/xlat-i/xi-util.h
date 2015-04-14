@@ -8,15 +8,17 @@
 #include "conv-config.h"
 
 #define XLAT_ERROR(...) \
-  if (xi::num_errors++ == xi::MAX_NUM_ERRORS) { \
-    exit(1);                                    \
-  } else {                                      \
-    pretty_msg("error", __VA_ARGS__);           \
-  }
+  do {                                            \
+    if (xi::num_errors++ == xi::MAX_NUM_ERRORS) { \
+      exit(1);                                    \
+    } else {                                      \
+      pretty_msg("error", __VA_ARGS__);           \
+    }                                             \
+  } while (0)
 
 #define XLAT_ERROR_NOCOL(str,line) XLAT_ERROR((str), -1, -1, (line), (line))
 
-#define XLAT_NOTE(str,line) pretty_msg("note", (str), -1, -1, (line), (line));
+#define XLAT_NOTE(str,line) pretty_msg("note", (str), -1, -1, (line), (line))
 
 extern void pretty_msg(std::string type, std::string msg,
                        int first_col=-1, int last_col=-1,
