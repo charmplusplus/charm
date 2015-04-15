@@ -2040,9 +2040,9 @@ fi
 
 # Check whether --with-qlogic was given.
 if test "${with_qlogic+set}" = set; then :
-  withval=$with_qlogic;
+  withval=$with_qlogic; with_qlogic=yes
 else
-  with_qlogic=yes
+  with_qlogic=no
 fi
 
 
