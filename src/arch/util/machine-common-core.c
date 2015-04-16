@@ -196,7 +196,7 @@ extern int CharmLibInterOperate;
  *
  */
 #ifndef CMK_SMP_NO_COMMTHD
-#define CMK_SMP_NO_COMMTHD 0
+#define CMK_SMP_NO_COMMTHD CMK_MULTICORE
 #endif
 
 #if CMK_SMP_NO_COMMTHD

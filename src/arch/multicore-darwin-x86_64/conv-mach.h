@@ -3,7 +3,6 @@
 
 #define CMK_SMP                                            1
 #define CMK_MULTICORE                                      1
-#define CMK_SMP_NO_COMMTHD                                 1
 
 #undef CMK_IMMEDIATE_MSG
 #define CMK_IMMEDIATE_MSG                                  0
