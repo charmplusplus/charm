@@ -157,7 +157,7 @@ typedef struct {
 
 PxshmContext *pxshmContext = NULL; // global context
 
-void calculateNodeSizeAndRank(char **);
+void calculateNodeSizeAndRank();
 void setupSharedBuffers();
 void initAllSendQs();
 
@@ -173,7 +173,11 @@ void CmiInitPxshm(char **argv)
   if (Cmi_charmrun_pid <= 0) {
     CmiAbort("pxshm must be run with charmrun");
   }
-  calculateNodeSizeAndRank(argv);
+  CmiDeprecateArgInt(argv, "+nodesize", "Number of cores in this node",
+                     "Charmrun> Deprecation warning: charmrun now figures "
+                     "out the nodesize on its own.");
+
+  calculateNodeSizeAndRank();
   if (pxshmContext->nodesize == 1) {
     return;
   }
@@ -396,15 +400,14 @@ static void CmiNotifyStillIdlePxshm(CmiIdleState *s)
 
 static void CmiNotifyBeginIdlePxshm(CmiIdleState *s) { CmiNotifyStillIdle(s); }
 
-void calculateNodeSizeAndRank(char **argv)
+void calculateNodeSizeAndRank()
 {
   pxshmContext->nodesize = 1;
   MACHSTATE(3, "calculateNodeSizeAndRank start");
   // CmiGetArgIntDesc(argv, "+nodesize", &(pxshmContext->nodesize),"Number of
   // cores in this node (for non-smp case).Used by the shared memory
   // communication layer");
-  CmiGetArgIntDesc(argv, "+nodesize", &(pxshmContext->nodesize),
-                   "Number of cores in this node");
+  pxshmContext->nodesize = _Cmi_myphysnode_numprocesses;
   MACHSTATE1(3, "calculateNodeSizeAndRank argintdesc %d",
              pxshmContext->nodesize);
 

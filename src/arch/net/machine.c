@@ -688,6 +688,7 @@ void CmiEnableNonblockingIO(int fd) { }
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_numnodes;  /* Total number of address spaces */
+int               _Cmi_myphysnode_numprocesses;  /* Total number of processors within this node */
 int               _Cmi_numpes;    /* Total number of processors */
 static int        Cmi_nodestart; /* First processor in this address space */
 static skt_ip_t   Cmi_self_IP;
@@ -1753,6 +1754,9 @@ static void node_addresses_obtain(char **argv)
   	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
         MACHSTATE(2,"} recv initnode");
   }
+  ChMessageInt_t *n32 = (ChMessageInt_t *) nodetabmsg.data;
+  ChNodeinfo *d = (ChNodeinfo *) (n32+1);
+  _Cmi_myphysnode_numprocesses = ChMessageInt(d[_Cmi_mynode].nProcessesInPhysNode);
 //#if CMK_USE_IBVERBS	
 //#else
   node_addresses_store(&nodetabmsg);

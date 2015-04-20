@@ -267,7 +267,8 @@ typedef struct {
 
 
 typedef struct {
-	ChMessageInt_t nPE; /* Number of compute processors on this node */
+    ChMessageInt_t nProcessesInPhysNode; /* Number of distinct OS processes on this physical hardware node */
+	ChMessageInt_t nPE;       /* Number of worker threads in this OS process */
 #if CMK_USE_IBVERBS
 	ChInfiAddr *qpList; /** An array of queue pair identifiers of length CmiNumNodes()-1*/
 #endif

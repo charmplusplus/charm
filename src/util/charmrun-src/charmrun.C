@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 
 #include <map>
+#include <string>
 #include <vector>
 #include <utility>
 
@@ -85,6 +86,7 @@ const int MAX_NUM_RETRIES = 3;
 #include <map>
 
 std::map<SOCKET, int> skt_client_table;
+std::map<std::string, int> host_sizes;
 
 const char *nodetab_name(int i);
 const char *skt_to_name(SOCKET skt)
@@ -1266,6 +1268,7 @@ void nodetab_init_for_local()
       }
     }
   }
+  host_sizes["127.0.0.1"] = (arg_requested_pes + arg_ppn - 1) / arg_ppn;
 }
 
 #ifdef HSTART
@@ -1422,6 +1425,13 @@ void nodetab_init()
   /*Wrap nodes in table around if there aren't enough yet*/
   for (int i = 0; binned_hosts.size() < arg_requested_pes; ++i) {
     binned_hosts.insert(hosts[i % hosts.size()]);
+    host_sizes[hosts[i % hosts.size()].second.name]++;
+  }
+
+  /* Only increase counter for each new process */
+  for (std::map<std::string, int>::iterator it = host_sizes.begin();
+       it != host_sizes.end(); ++it) {
+    it->second = (it->second + arg_ppn - 1) / arg_ppn;
   }
 
   for (std::multimap<int, nodetab_host>::iterator it = binned_hosts.begin();
@@ -1514,6 +1524,8 @@ void nodeinfo_add(const ChSingleNodeinfo *in, SOCKET ctrlfd)
   }
   nt = nodetab_rank0_table[node]; /*Nodetable index for this node*/
   i.nPE = ChMessageInt_new(nodetab_cpus(nt));
+  i.nProcessesInPhysNode = ChMessageInt_new(host_sizes[nodetab_name(nt)]);
+
   if (arg_mpiexec)
     nodetab_getinfo(nt)->ip = i.IP; /* get IP */
   i.IP = nodetab_ip(nt);
