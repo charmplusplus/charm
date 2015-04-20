@@ -1,8 +1,6 @@
 #undef CMK_SMP
 #define CMK_SMP						   1
 
-#undef CMK_NODE_QUEUE_AVAILABLE
-#define CMK_NODE_QUEUE_AVAILABLE                           1
 
 #undef CMK_SHARED_VARS_UNAVAILABLE
 #undef CMK_SHARED_VARS_POSIX_THREADS_SMP

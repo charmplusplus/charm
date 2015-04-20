@@ -23,7 +23,6 @@
 
 /* specifies if there is a node queue. it is used in convcore.c and it is
    tipically set to 1 in smp versions */
-#define CMK_NODE_QUEUE_AVAILABLE                           0
 
 /* the following definitions set the type of shared variables to be used. only
    one of them must be 1, all the others 0. The different implementations are in

@@ -132,3 +132,6 @@ typedef CMK_TYPEDEF_UINT4     CmiIntPtr;
 #endif
 
 #endif
+
+/* Enable node queue for all SMP and multicore builds */
+#define CMK_NODE_QUEUE_AVAILABLE CMK_SMP

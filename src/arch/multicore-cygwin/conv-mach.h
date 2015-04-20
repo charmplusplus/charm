@@ -22,7 +22,6 @@
 #define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             1
 
-#define CMK_NODE_QUEUE_AVAILABLE                           1
 
 #define CMK_RSH_IS_A_COMMAND                               1
 #define CMK_RSH_KILL                                       1
