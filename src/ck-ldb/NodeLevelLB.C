@@ -11,6 +11,11 @@ extern LBAllocFn getLBAllocFn(const char *lbname);
 
 CreateLBFunc_Def(NodeLevelLB, "Node level load balancer")
 
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+  /* strtok is thread safe in Windows */
+#define strtok_r(x,y,z) strtok(x,y)
+#endif
+
 NodeLevelLB::NodeLevelLB(const CkLBOptions &opt): CBase_NodeLevelLB(opt) {
   lbname = "NodeLevelLB";
   const char *lbs = theLbdb->loadbalancer(opt.getSeqNo());
@@ -19,19 +24,21 @@ NodeLevelLB::NodeLevelLB(const CkLBOptions &opt): CBase_NodeLevelLB(opt) {
 
   char *lbcopy = strdup(lbs);
   char *p = strchr(lbcopy, ':');
+  char *ptr = NULL;
+  char *lbname;
   if (p==NULL) {
     CmiAbort("LB> Nodelevel load balancer not specified\n");
   }
-  p = strtok(p+1, ",");
-  while (p) {
-    LBAllocFn fn = getLBAllocFn(p);
+  lbname = strtok_r(p+1, ",", &ptr);
+  while (lbname) {
+    LBAllocFn fn = getLBAllocFn(lbname);
     if (fn == NULL) {
-      CkPrintf("LB> Invalid load balancer: %s.\n", p);
+      CkPrintf("LB> Invalid load balancer: %s.\n", lbname);
       CmiAbort("");
     }
     BaseLB *alb = fn();
     clbs.push_back((CentralLB*)alb);
-    p = strtok(NULL, ",");
+    lbname = strtok_r(NULL, ",", &ptr);
   }
 
   // HybridBaseLB constructs a default tree
