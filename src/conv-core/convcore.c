@@ -514,6 +514,14 @@ int CmiGetArgFlag(char **argv,const char *arg) {
 	return CmiGetArgFlagDesc(argv,arg,"");
 }
 
+void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char *warning)
+{
+  int dummy = 0, found = CmiGetArgIntDesc(argv, arg, &dummy, desc);
+
+  /* FIXME: apparently stderr hasn't been properly forwarded yet at this point */
+  /* if (found) */
+  /*   fprintf(stderr, warning); */
+}
 
 /*****************************************************************************
  *

@@ -1700,6 +1700,7 @@ void CmiDeleteArgs(char **argv,int k);
 int CmiGetArgc(char **argv);
 char **CmiCopyArgs(char **argv);
 int CmiArgGivingUsage(void);
+void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char *warning);
 
 /** 
    Extract the function-return pointers listed in the stack
