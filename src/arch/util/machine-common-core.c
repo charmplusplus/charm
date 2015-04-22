@@ -151,6 +151,7 @@ int _Cmi_numnodes_global;
 static int _writeToStdout = 1;
 
 // Node state structure, local information for the partition
+int               _Cmi_myphysnode_numprocesses;  /* Total number of processes within this node */
 int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_numnodes;  /* Total number of address spaces */
