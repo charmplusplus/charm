@@ -6,7 +6,7 @@
 
 BgTimeLineRec* currTline = NULL;
 int currTlineIdx=0;
-const char* traceFileName="bgTrace";
+char* traceFileName="bgTrace";
 
 //Used for parallel file I/O
 int BgReadProc(int procNum, int numWth ,int numEmulatingPes, int totalWorkerProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec){
