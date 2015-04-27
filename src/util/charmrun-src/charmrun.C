@@ -4190,9 +4190,12 @@ int rsh_fork(int nodeno, const char *startScript)
   rshargv[num++] = nodetab_login(nodeno);
   rshargv[num++] = "/bin/bash -f";
   rshargv[num++] = 0;
+
+  std::string cmd_str = rshargv[0];
+  for (int n = 1; n < num-1; ++n)
+    cmd_str += " " + std::string(rshargv[n]);
   if (arg_verbose)
-    printf("Charmrun> Starting %s %s -l %s %s\n", nodetab_shell(nodeno),
-           nodetab_name(nodeno), nodetab_login(nodeno), rshargv[num - 2]);
+    printf("Charmrun> Starting %s\n", cmd_str.c_str());
 
   pid = fork();
   if (pid < 0) {
