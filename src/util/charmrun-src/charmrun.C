@@ -4188,6 +4188,8 @@ int rsh_fork(int nodeno, const char *startScript)
   rshargv.push_back("KbdInteractiveAuthentication=no");
   rshargv.push_back("-o");
   rshargv.push_back("PasswordAuthentication=no");
+  rshargv.push_back("-o");
+  rshargv.push_back("NoHostAuthenticationForLocalhost=yes");
   rshargv.push_back("/bin/bash -f");
   rshargv.push_back((const char *) NULL);
 
