@@ -1789,9 +1789,6 @@ for trace in $TRACEMODE; do
     elif test $trace = "controlPoints"
     then
       echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
-    elif test $trace = "autoPerf"
-    then
-      echo "  extern void _registerTraceAutoPerf();" >> $modInitSrc
     elif test $trace = "all"
     then
       echo "  extern void _registerTraceProjections();" >> $modInitSrc
@@ -1827,9 +1824,6 @@ for trace in $TRACEMODE; do
     elif test $trace = "controlPoints"
     then
       echo "  _registerTraceControlPoints();" >> $modInitSrc
-    elif test $trace = "autoPerf"
-    then
-      echo "  _registerTraceAutoPerf();" >> $modInitSrc
     elif test $trace = "all"
     then
       echo "  _registerTraceProjections();" >> $modInitSrc

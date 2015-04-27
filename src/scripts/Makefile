@@ -208,7 +208,6 @@ include Make.extlib
 CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       msgq.h queueing.h conv-cpath.h conv-cpm.h persistent.h\
       trace.h trace-common.h trace-bluegene.h trace-projections.h  \
-	  trace-autoPerf.h  autoPerfAPI.h \
       trace-simple.h trace-controlPoints.h charm-api.h \
       conv-ccs.h ccs-client.c ccs-client.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
@@ -257,7 +256,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           BaseLB.decl.h \
 	  NborBaseLB.decl.h DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
-          TraceSummary.decl.h TraceProjections.decl.h TraceAutoPerf.decl.h \
+          TraceSummary.decl.h TraceProjections.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
 	  TraceUtilization.decl.h BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
@@ -387,7 +386,7 @@ TRACELIBS += $(L)/libtrace-projections.a  $(L)/libtrace-summary.a  \
              $(L)/libtrace-utilization.a  $(L)/libtrace-simple.a \
              $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	     $(L)/libtrace-projector.a $(L)/libtrace-all.a  \
-             $(L)/libtrace-memory.a $(L)/libtrace-autoPerf.a
+             $(L)/libtrace-memory.a 
 endif
 
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
@@ -674,10 +673,6 @@ LIBTRACE_SIMPLE=trace-simple.o
 $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
 	$(CHARMC) -o $@ $(LIBTRACE_SIMPLE)
 
-LIBTRACE_AP=trace-autoPerf.o autoPerfAPI.o
-$(L)/libtrace-autoPerf.a: $(LIBTRACE_AP)
-	    $(CHARMC) -o $@ $(LIBTRACE_AP)
-
 libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h \
   conv-mach-ifort.h pup_c.h conv-cpm.h conv-cpath.h conv-qd.h \
@@ -716,7 +711,7 @@ LIBTRACE_MEMORY=trace-memory.o
 $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o autoPerfAPI.o trace-autoPerf.o \
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o \
 $(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
@@ -741,7 +736,7 @@ tracef_f.o: tracef_f.f90
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
-          trace-memory.o autoPerfAPI.o trace-autoPerf.o
+          trace-memory.o 
 
 ###############################################################################
 #

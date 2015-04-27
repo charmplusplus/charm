@@ -1886,26 +1886,6 @@ arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
  charm-api.h arrayRedistributor.h pathHistory.h PathHistory.decl.h \
  cp_effects.h ck.h qd.h register.h stats.h TopoManager.h ckarray.h
 
-autoPerfAPI.o: autoPerfAPI.C trace-autoPerf.h charm++.h charm.h \
- converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
- conv-mach-opt.h cmiqueue.h pup_c.h queueing.h conv-cpm.h conv-cpath.h \
- conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
- debug-conv.h pup.h middle.h middle-conv.h cklists.h ckbitvector.h \
- ckstream.h init.h ckhashtable.h debug-charm.h debug-conv++.h simd.h \
- ckmessage.h pup.h CkMarshall.decl.h envelope.h charm.h middle.h \
- ckarrayindex.h pup.h ckhashtable.h charm.h objid.h converse.h cklists.h \
- objid.h sdag.h pup_stl.h envelope.h debug-charm.h ckarrayindex.h \
- cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h \
- ckreduction.h CkReduction.decl.h CkArrayReductionMgr.decl.h \
- ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
- cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
- LBMachineUtil.h lbdb++.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
- MetaBalancer.h MetaBalancer.decl.h CkLocation.decl.h cklocrec.h \
- ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h tempo.h \
- tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
- ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h register.h \
- trace-common.h TraceAutoPerf.decl.h trace-projections.h autoPerfAPI.h
-
 bigsim_api.o: bigsim_api.C blue.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
  pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
@@ -2193,7 +2173,7 @@ ckcheckpoint.o: ckcheckpoint.C charm++.h charm.h converse.h conv-config.h \
 ckdll.o: ckdll.C converse.h conv-config.h conv-autoconfig.h conv-common.h \
  conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h conv-cpm.h \
  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
- persistent.h debug-conv.h ckdll.h ckdll_dlopen.C ckdll_system.C
+ persistent.h debug-conv.h ckdll.h ckdll_dlopen.C
 
 ckevacuation.o: ckevacuation.C charm++.h charm.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -2481,7 +2461,7 @@ conv-ccs.o: conv-ccs.c converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h debug-conv.h conv-ccs.h sockRoutines.h \
- ccs-server.h ckhashtable.h pup.h
+ ccs-server.h ckhashtable.h pup.h ccs-server.c ccs-auth.h ccs-auth.c
 
 conv-conds.o: conv-conds.c converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \
@@ -3268,27 +3248,6 @@ topology.o: topology.C cklists.h pup.h converse.h conv-config.h \
  conv-lists.h conv-trace.h persistent.h debug-conv.h topology.h
 
 trace-all.o: trace-all.C
-
-trace-autoPerf.o: trace-autoPerf.C charm++.h charm.h converse.h \
- conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
- conv-mach-opt.h cmiqueue.h pup_c.h queueing.h conv-cpm.h conv-cpath.h \
- conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
- debug-conv.h pup.h middle.h middle-conv.h cklists.h ckbitvector.h \
- ckstream.h init.h ckhashtable.h debug-charm.h debug-conv++.h simd.h \
- ckmessage.h pup.h CkMarshall.decl.h envelope.h charm.h middle.h \
- ckarrayindex.h pup.h ckhashtable.h charm.h objid.h converse.h cklists.h \
- objid.h sdag.h pup_stl.h envelope.h debug-charm.h ckarrayindex.h \
- cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h \
- ckreduction.h CkReduction.decl.h CkArrayReductionMgr.decl.h \
- ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
- cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
- LBMachineUtil.h lbdb++.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
- MetaBalancer.h MetaBalancer.decl.h CkLocation.decl.h cklocrec.h \
- ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h tempo.h \
- tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
- ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
- TraceAutoPerf.decl.h trace-autoPerf.h register.h trace-common.h \
- trace-projections.h trace-perf.C TraceAutoPerf.def.h
 
 trace-bluegene.o: trace-bluegene.C charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
