@@ -294,33 +294,59 @@ void CkPupChareData(PUP::er &p)
 		chare_type = CkpvAccess(chare_types)[i];
 	}
 	p | chare_type;
-	if (p.isUnpacking()) {
-		int migCtor = _chareTable[chare_type]->migCtor;
-		if(migCtor==-1) {
-			char buf[512];
-			sprintf(buf,"Chare %s needs a migration constructor and PUP'er routine for restart.\n", _chareTable[chare_type]->name);
-			CkAbort(buf);
-		}
-	        void *m = CkAllocSysMsg();
-	        envelope* env = UsrToEnv((CkMessage *)m);
-		CkCreateLocalChare(migCtor, env);
-		CkFreeSysMsg(m);
+	bool pup_flag = true;
+	if (!p.isUnpacking()) {
+	  if(CkpvAccess(chare_objs)[i] == NULL){
+	    pup_flag = false;
+	  }
 	}
-	Chare *obj = (Chare*)CkpvAccess(chare_objs)[i];
-	obj->virtual_pup(p);
+	p|pup_flag;
+	if(pup_flag)
+	{
+	  if (p.isUnpacking()) {
+		  int migCtor = _chareTable[chare_type]->migCtor;
+		  if(migCtor==-1) {
+			  char buf[512];
+			  sprintf(buf,"Chare %s needs a migration constructor and PUP'er routine for restart.\n", _chareTable[chare_type]->name);
+			  CkAbort(buf);
+		  }
+		  void *m = CkAllocSysMsg();
+		  envelope* env = UsrToEnv((CkMessage *)m);
+		  CkCreateLocalChare(migCtor, env);
+		  CkFreeSysMsg(m);
+	  }
+	  Chare *obj = (Chare*)CkpvAccess(chare_objs)[i];
+	  obj->virtual_pup(p);
+	}
+	else
+	{
+	  CkpvAccess(chare_objs)[i] = NULL;
+	}
   }
 
   if (!p.isUnpacking()) n = CkpvAccess(vidblocks).size();
   p|n;
   for (i=0; i<n; i++) {
 	VidBlock *v;
-	if (p.isUnpacking()) {
-		v = new VidBlock();
-		CkpvAccess(vidblocks).push_back(v);
+	bool pup_flag = true;
+	if (!p.isUnpacking()) {
+	  if(CkpvAccess(vidblocks)[i]==NULL)
+	  {
+	    pup_flag = false;
+	  }
 	}
-	else
-		v = CkpvAccess(vidblocks)[i];
-	v->pup(p);
+	p|pup_flag;
+	if(pup_flag)
+	{
+	  if (p.isUnpacking()) {
+		  v = new VidBlock();
+		  CkpvAccess(vidblocks).push_back(v);
+	  }
+	  else{
+		  v = CkpvAccess(vidblocks)[i];
+	  }
+	  v->pup(p);
+	}
   }
 }
 #else
