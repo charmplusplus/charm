@@ -151,6 +151,8 @@ public:
   FuncSingleHelper *localHelper;
 };
 
+class DestroyNotifyMsg: public CMessage_DestroyNotifyMsg {};
+
 class FuncCkLoop : public CBase_FuncCkLoop {
     friend class FuncSingleHelper;
 
@@ -197,6 +199,7 @@ public:
                          int sync=1, /* whether the flow will continue until all chunks have finished */
                          void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
                         );
+    void destroyHelpers();
     void reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int numChunks);
     void pup(PUP::er &p);
 };
@@ -279,6 +282,9 @@ public:
 #endif
 
     void stealWork(CharmNotifyMsg *msg);
+    void destroyMyself() {
+      delete this;
+    }
 
     FuncSingleHelper(CkMigrateMessage *m) : CBase_FuncSingleHelper(m) {}
 

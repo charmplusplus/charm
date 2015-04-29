@@ -323,6 +323,21 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
      /*CkPrintf("CkLoop Reduce: %d\n", result);*/ \
     }\
 }
+
+void FuncCkLoop::destroyHelpers() {
+  int pe = CmiMyRank()+1;
+  for (int i = 0; i < numHelpers; i++) {
+    if (pe >= CmiMyNodeSize()) pe -= CmiMyNodeSize();
+    DestroyNotifyMsg *tmp = new DestroyNotifyMsg;
+    envelope *env = UsrToEnv(tmp);
+    env->setMsgtype(ForChareMsg);
+    env->setEpIdx(CkIndex_FuncSingleHelper::destroyMyself());
+    env->setSrcPe(CkMyPe());
+    CmiSetHandler(env, _charmHandlerIdx);
+    CmiPushPE(pe, (void *)(env));
+  }
+}
+
 void FuncCkLoop::reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int numChunks) {
     switch (type) {
     case CKLOOP_INT_SUM: {
@@ -562,5 +577,9 @@ void CkLoop_Parallelize(HelperFn func,
                             void *redResult, REDUCTION_TYPE type) {
     if ( numChunks > upperRange - lowerRange + 1 ) numChunks = upperRange - lowerRange + 1;
     globalCkLoop->parallelizeFunc(func, paramNum, param, numChunks, lowerRange, upperRange, sync, redResult, type);
+}
+
+void CkLoop_DestroyHelpers() {
+  globalCkLoop->destroyHelpers();
 }
 #include "CkLoop.def.h"

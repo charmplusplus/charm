@@ -3,6 +3,7 @@ module CkLoop{
 
     message CharmNotifyMsg;
     message HelperNotifyMsg;
+    message DestroyNotifyMsg;
 
 	nodegroup [migratable] FuncCkLoop{
 		entry FuncCkLoop(int mode, int numThreads);
@@ -12,5 +13,6 @@ module CkLoop{
 	chare [migratable] FuncSingleHelper{
 		entry FuncSingleHelper();
 		entry void stealWork(CharmNotifyMsg *msg);
+		entry void destroyMyself();
 	};
 };

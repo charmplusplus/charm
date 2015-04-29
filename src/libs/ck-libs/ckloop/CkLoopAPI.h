@@ -33,4 +33,6 @@ extern void CkLoop_Parallelize(
     int sync=1, /* whether the flow will continue unless all chunks have finished */
     void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
 );
+
+extern void CkLoop_DestroyHelpers();
 #endif
