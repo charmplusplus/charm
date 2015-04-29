@@ -4161,38 +4161,34 @@ void removeEnv(const char *doomedEnv)
 
 int rsh_fork(int nodeno, const char *startScript)
 {
-  const char **rshargv;
+  std::vector<const char *> rshargv;
   int pid;
-  int num = 0;
   const char *s, *e;
 
   /* figure out size and dynamic allocate */
   s = nodetab_shell(nodeno);
   e = skipstuff(s);
   while (*s) {
-    num++;
     s = skipblanks(e);
     e = skipstuff(s);
   }
-  rshargv = (const char **) malloc(sizeof(char *) * (num + 6));
 
-  num = 0;
   s = nodetab_shell(nodeno);
   e = skipstuff(s);
   while (*s) {
-    rshargv[num++] = substr(s, e);
+    rshargv.push_back(substr(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
 
-  rshargv[num++] = nodetab_name(nodeno);
-  rshargv[num++] = "-l";
-  rshargv[num++] = nodetab_login(nodeno);
-  rshargv[num++] = "/bin/bash -f";
-  rshargv[num++] = 0;
+  rshargv.push_back(nodetab_name(nodeno));
+  rshargv.push_back("-l");
+  rshargv.push_back(nodetab_login(nodeno));
+  rshargv.push_back("/bin/bash -f");
+  rshargv.push_back(NULL);
 
   std::string cmd_str = rshargv[0];
-  for (int n = 1; n < num-1; ++n)
+  for (int n = 1; n < rshargv.size()-1; ++n)
     cmd_str += " " + std::string(rshargv[n]);
   if (arg_verbose)
     printf("Charmrun> Starting %s\n", cmd_str.c_str());
@@ -4210,12 +4206,11 @@ int rsh_fork(int nodeno, const char *startScript)
     // removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
     for (i = 3; i < 1024; i++)
       close(i);
-    execvp(rshargv[0], const_cast<char **>(rshargv));
+    execvp(rshargv[0], const_cast<char **>(&rshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find remote shell program '%s'!\n",
             rshargv[0]);
     exit(1);
   }
-  free(rshargv);
   if (arg_verbose)
     fprintf(stderr, "Charmrun> remote shell (%s:%d) started\n",
             nodetab_name(nodeno), nodeno);
@@ -4567,7 +4562,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv,
    and ".bss" segments inside the program memory */
 void read_global_segments_size()
 {
-  const char **rshargv;
+  std::vector<const char *> rshargv;
   char *tmp;
   int childPid;
 
@@ -4575,15 +4570,14 @@ void read_global_segments_size()
   arg_nodeprog_r =
       pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
 
-  rshargv = (const char **) malloc(sizeof(char *) * 6);
-  rshargv[0] = nodetab_shell(0);
-  rshargv[1] = nodetab_name(0);
-  rshargv[2] = "-l";
-  rshargv[3] = nodetab_login(0);
+  rshargv.push_back(nodetab_shell(0));
+  rshargv.push_back(nodetab_name(0));
+  rshargv.push_back("-l");
+  rshargv.push_back(nodetab_login(0));
   tmp = (char *) malloc(sizeof(char) * 9 + strlen(arg_nodeprog_r));
   sprintf(tmp, "size -A %s", arg_nodeprog_r);
-  rshargv[4] = tmp;
-  rshargv[5] = 0;
+  rshargv.push_back(tmp);
+  rshargv.push_back(NULL);
 
   childPid = fork();
   if (childPid < 0) {
@@ -4594,14 +4588,13 @@ void read_global_segments_size()
     dup2(2, 1);
     /*printf("executing: \"%s\" \"%s\" \"%s\" \"%s\"
      * \"%s\"\n",rshargv[0],rshargv[1],rshargv[2],rshargv[3],rshargv[4]);*/
-    execvp(rshargv[0], const_cast<char **>(rshargv));
+    execvp(rshargv[0], const_cast<char **>(&rshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find remote shell program '%s'!\n",
             rshargv[0]);
     exit(1);
   } else {
     /* else we are in the parent */
     free(tmp);
-    free(rshargv);
     waitpid(childPid, NULL, 0);
   }
 }
@@ -4609,7 +4602,7 @@ void read_global_segments_size()
 /* open a rsh connection with processor 0 and open a gdb session for info */
 void open_gdb_info()
 {
-  const char **rshargv;
+  std::vector<const char *> rshargv;
   char *tmp;
   int fdin[2];
   int fdout[2];
@@ -4620,15 +4613,14 @@ void open_gdb_info()
   arg_nodeprog_r =
       pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
 
-  rshargv = (const char **) malloc(sizeof(char *) * 6);
-  rshargv[0] = nodetab_shell(0);
-  rshargv[1] = nodetab_name(0);
-  rshargv[2] = "-l";
-  rshargv[3] = nodetab_login(0);
+  rshargv.push_back(nodetab_shell(0));
+  rshargv.push_back(nodetab_name(0));
+  rshargv.push_back("-l");
+  rshargv.push_back(nodetab_login(0));
   tmp = (char *) malloc(sizeof(char) * 8 + strlen(arg_nodeprog_r));
   sprintf(tmp, "gdb -q %s", arg_nodeprog_r);
-  rshargv[4] = tmp;
-  rshargv[5] = 0;
+  rshargv.push_back(tmp);
+  rshargv.push_back(NULL);
 
   pipe(fdin);
   pipe(fdout);
@@ -4650,14 +4642,13 @@ void open_gdb_info()
     dup2(fderr[1], 2);
     for (i = 3; i < 1024; i++)
       close(i);
-    execvp(rshargv[0], const_cast<char **>(rshargv));
+    execvp(rshargv[0], const_cast<char **>(&rshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find remote shell program '%s'!\n",
             rshargv[0]);
     exit(1);
   }
   /* else we are in the parent */
   free(tmp);
-  free(rshargv);
   gdb_info_std[0] = fdin[1];
   gdb_info_std[1] = fdout[0];
   gdb_info_std[2] = fderr[0];
@@ -4797,9 +4788,8 @@ void start_nodes_rsh()
 /* for mpiexec, for once calling mpiexec to start on all nodes  */
 int rsh_fork_one(const char *startScript)
 {
-  const char **rshargv;
+  std::vector<const char *> rshargv;
   int pid;
-  int num = 0;
   char npes[128];
   const char *s, *e;
 
@@ -4807,26 +4797,23 @@ int rsh_fork_one(const char *startScript)
   s = nodetab_shell(0);
   e = skipstuff(s);
   while (*s) {
-    num++;
     s = skipblanks(e);
     e = skipstuff(s);
   }
-  rshargv = (const char **) malloc(sizeof(char *) * (num + 8));
 
-  num = 0;
   s = nodetab_shell(0);
   e = skipstuff(s);
   while (*s) {
-    rshargv[num++] = substr(s, e);
+    rshargv.push_back(substr(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
 
-  rshargv[num++] = "-n";
+  rshargv.push_back("-n");
   sprintf(npes, "%d", nodetab_rank0_size);
-  rshargv[num++] = npes;
-  rshargv[num++] = (char *) startScript;
-  rshargv[num++] = 0;
+  rshargv.push_back(npes);
+  rshargv.push_back((char *) startScript);
+  rshargv.push_back(NULL);
   if (arg_verbose)
     printf("Charmrun> Starting %s %s \n", nodetab_shell(0), startScript);
 
@@ -4841,12 +4828,11 @@ int rsh_fork_one(const char *startScript)
     // removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
     for (i = 3; i < 1024; i++)
       close(i);
-    execvp(rshargv[0], const_cast<char *const *>(rshargv));
+    execvp(rshargv[0], const_cast<char *const *>(&rshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find mpiexec program '%s'!\n",
             rshargv[0]);
     exit(1);
   }
-  free(rshargv);
   if (arg_verbose)
     fprintf(stderr, "Charmrun> mpiexec started\n");
   return pid;
