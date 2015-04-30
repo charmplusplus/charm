@@ -823,17 +823,44 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	attr.sq_psn 	    = context->localAddr[node].psn;
 	attr.max_rd_atomic  = 1;
 
-	
-	if (ibv_modify_qp(ret->qp, &attr,
+	if (err = ibv_modify_qp(ret->qp, &attr,
 	  IBV_QP_STATE              |
 	  IBV_QP_TIMEOUT            |
 	  IBV_QP_RETRY_CNT          |
 	  IBV_QP_RNR_RETRY          |
 	  IBV_QP_SQ_PSN             |
 	  IBV_QP_MAX_QP_RD_ATOMIC)) {
-			fprintf(stderr, "Failed to modify QP to RTS\n");
-			exit(1);
-	}
+          MACHSTATE1(3,"ERROR changing qp state to RTS %d: will retry",err);
+        }
+
+	// Error code 22 means that there was an invalid parameter when calling to this verbs, try with alternate parameters
+        if(err == 22) {
+          //use inverted logic
+#ifdef QLOGIC
+          mtu = IBV_MTU_2048;
+          attr.timeout 	            = 26;
+          attr.retry_cnt 	    = 20;
+#else
+          mtu = IBV_MTU_4096;
+          attr.timeout 	            = 14;
+          attr.retry_cnt 	    = 7;
+#endif
+
+          MACHSTATE3(3,"Retry:dlid 0x%x qp 0x%x psn 0x%x",attr.ah_attr.dlid,attr.dest_qp_num,attr.sq_psn);
+          if (err = ibv_modify_qp(ret->qp, &attr,
+                IBV_QP_STATE              |
+                IBV_QP_TIMEOUT            |
+                IBV_QP_RETRY_CNT          |
+                IBV_QP_RNR_RETRY          |
+                IBV_QP_SQ_PSN             |
+                IBV_QP_MAX_QP_RD_ATOMIC)) {
+            MACHSTATE1(3,"ERROR changing qp state to RTS %d",err);
+            CmiAbort("Failed to change qp state to RTS: you may need some device-specific parameters in machine-ibverbs");
+          }
+        } else if(err) {
+          CmiAbort("Failed to change qp state to RTS");
+        }
+
 	MACHSTATE(3,"qp state changed to RTS");
 
 	MACHSTATE(3,"} initInfiOtherNodeData");
