@@ -71,10 +71,6 @@
 #undef CMK_USE_POLL
 #define CMK_USE_POLL                                       0
 #define CMK_USE_KQUEUE                                     1
-#define PXSHM_OSSPINLOCK                                   1
-#define PXSHM_LOCK                                         0
-#define PXSHM_FENCE                                        0
-
 
 #endif
 
