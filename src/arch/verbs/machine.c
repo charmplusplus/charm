@@ -1519,6 +1519,9 @@ static void node_addresses_obtain(char **argv)
   	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
         MACHSTATE(2,"} recv initnode");
   }
+  ChMessageInt_t *n32 = (ChMessageInt_t *) nodetabmsg.data;
+  ChNodeinfo *d = (ChNodeinfo *) (n32+1);
+  _Cmi_myphysnode_numprocesses = ChMessageInt(d[Lrts_myNode].nProcessesInPhysNode);
 //#if CMK_USE_IBVERBS	
 //#else
   node_addresses_store(&nodetabmsg);
