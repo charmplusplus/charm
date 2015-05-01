@@ -4313,7 +4313,7 @@ yyreduce:
 
   case 336:
 #line 1201 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new AtomicConstruct((yyvsp[-1].strval), (yyvsp[-3].strval)); }
+    { (yyval.sc) = new AtomicConstruct((yyvsp[-1].strval), (yyvsp[-3].strval), (yylsp[-2]).first_line); }
 #line 4318 "xi-grammar.tab.C" /* yacc.c:1646  */
     break;
 
@@ -4387,7 +4387,7 @@ yyreduce:
 
   case 348:
 #line 1227 "xi-grammar.y" /* yacc.c:1646  */
-    { (yyval.sc) = new AtomicConstruct((yyvsp[-1].strval), NULL); }
+    { (yyval.sc) = new AtomicConstruct((yyvsp[-1].strval), NULL, (yyloc).first_line); }
 #line 4392 "xi-grammar.tab.C" /* yacc.c:1646  */
     break;
 

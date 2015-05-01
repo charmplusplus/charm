@@ -194,6 +194,28 @@ void templateGuardEnd(XStr &str) {
   str << "#endif /* CK_TEMPLATES_ONLY */\n";
 }
 
+// This replaces the line containing a single '#' token with a '#line'
+// directive, as described in AtomicConstruct::generateCode.
+std::string addLineNumbers(char *str, const char *filename)
+{
+  int lineNo = 1;
+  std::string s(str);
+  for (int i = 0; i < s.length(); ++i) {
+    switch (s[i]) {
+      case '\n':
+        lineNo++;
+        break;
+      case '#':
+        if (i > 0 && s[i-1] == '\n' && s[i+1] == '\n') {
+          std::stringstream ss;
+          ss << "#line " << lineNo+1 << " \"" << filename << "\"";
+          s.replace(s.begin() + i, s.begin() + i + 1, ss.str());
+        }
+    }
+  }
+  return s;
+}
+
 }   // namespace xi
 
 namespace Prefix {

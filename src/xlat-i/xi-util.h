@@ -1,7 +1,10 @@
 #ifndef _XI_UTIL_H
 #define _XI_UTIL_H
 
+#include <string>
+#include <sstream>
 #include <iostream>
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -131,6 +134,7 @@ char* fortranify(const char *s, const char *suff1="", const char *suff2="", cons
 void templateGuardBegin(bool templateOnly, XStr &str);
 void templateGuardEnd(XStr &str);
 
+std::string addLineNumbers(char *str, const char *filename);
 
 }   // namespace xi
 

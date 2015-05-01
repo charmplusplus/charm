@@ -8,7 +8,7 @@ namespace xi {
 
 class AtomicConstruct : public BlockConstruct {
  public:
-  AtomicConstruct(const char *code, const char *trace_name);
+  AtomicConstruct(const char *code, const char *trace_name, int line_no);
   void propagateStateToChildren(std::list<EncapState*> encap,
                                 std::list<CStateVar*>& stateVarsChildren,
                                 std::list<CStateVar*>& wlist,
@@ -16,6 +16,9 @@ class AtomicConstruct : public BlockConstruct {
   void generateCode(XStr&, XStr&, Entry *);
   void generateTrace();
   void numberNodes();
+
+ private:
+  int line_no_;
 };
 
 }   // namespace xi

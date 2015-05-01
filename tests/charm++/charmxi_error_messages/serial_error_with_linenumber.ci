@@ -1,0 +1,10 @@
+mainmodule m {
+    mainchare c {
+        entry c();
+        entry void run() {
+            serial {
+                fun(undefined);
+            }
+        }
+    };
+};

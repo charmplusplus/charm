@@ -125,8 +125,10 @@ void Module::generate()
 	<<botname.get_string()<<" for writing!!\n";
     die("cannot create output files (check directory permissions)\n");
   }
+
+  std::string defstr_with_line_numbers = addLineNumbers(defstr.get_string(), botname.get_string());
   decl<<declstr.get_string();
-  def<<defstr.get_string();
+  def<<defstr_with_line_numbers.c_str();
 
   // DMK - Accel Support
   #if CMK_CELL != 0

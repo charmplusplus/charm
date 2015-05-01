@@ -1198,7 +1198,7 @@ NonWhenConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		;
 
 SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
-		{ $$ = new AtomicConstruct($4, $2); }
+		{ $$ = new AtomicConstruct($4, $2, @3.first_line); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new OverlapConstruct($3); }	
 		| WhenConstruct
@@ -1224,7 +1224,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		| WHILE StartIntExpr IntExpr EndIntExpr '{' Slist '}'
 		{ $$ = new WhileConstruct($3, $6); }
 		| ParamBraceStart CCode ParamBraceEnd
-		{ $$ = new AtomicConstruct($2, NULL); }
+		{ $$ = new AtomicConstruct($2, NULL, @$.first_line); }
 		| error
 		{
 		  ERROR("unknown SDAG construct or malformed entry method declaration.\n"
