@@ -518,9 +518,8 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
 {
   int dummy = 0, found = CmiGetArgIntDesc(argv, arg, &dummy, desc);
 
-  /* FIXME: apparently stderr hasn't been properly forwarded yet at this point */
-  /* if (found) */
-  /*   fprintf(stderr, warning); */
+  if (found)
+    CmiPrintf(warning);
 }
 
 /*****************************************************************************
