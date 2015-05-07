@@ -1346,6 +1346,9 @@ void nodetab_init()
   group = global;
   rightgroup = (strcmp(arg_nodegroup, "main") == 0);
 
+  if (arg_ppn == 0)
+    arg_ppn = 1;
+
   lineNo = 1;
   while (fgets(input_line, sizeof(input_line) - 1, f) != 0) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
