@@ -39,6 +39,7 @@ private:
     char *bufSpace;
 
     volatile int finishFlag;
+    volatile int numRunning;
 
     //a tag to indicate whether the task for this new loop has been inited
     //this tag is needed to prevent other helpers to run the old task
@@ -46,7 +47,8 @@ private:
 
 public:
     CurLoopInfo(int maxChunks):numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0),
-            paramNum(0), param(NULL), curChunkIdx(-1), finishFlag(0), redBufs(NULL), bufSpace(NULL), inited(0) {
+            paramNum(0), param(NULL), curChunkIdx(-1), finishFlag(0),
+            numRunning(0), redBufs(NULL), bufSpace(NULL), inited(0) {
         redBufs = new void *[maxChunks];
         bufSpace = new char[maxChunks * CACHE_LINE_SIZE];
         for (int i=0; i<maxChunks; i++) redBufs[i] = (void *)(bufSpace+i*CACHE_LINE_SIZE);
@@ -104,22 +106,38 @@ public:
 #endif
     }
     void reportFinished(int counter) {
-        if (counter==0) return;
 #if defined(_WIN32)
 #if CMK_SMP
         CmiLock(cmiMemoryLock);
         finishFlag=finishFlag+counter;
+        numRunning--;
         CmiUnlock(cmiMemoryLock);
 #else
         finishFlag=finishFlag+counter;
+        numRunning--;
 #endif
 #else
-        __sync_add_and_fetch(&finishFlag, counter);
+        if ( counter) __sync_add_and_fetch(&finishFlag, counter);
+        __sync_add_and_fetch(&numRunning, -1);
+#endif
+    }
+
+    void reportStarting() {
+#if defined(_WIN32)
+#if CMK_SMP
+        CmiLock(cmiMemoryLock);
+        numRunning++;
+        CmiUnlock(cmiMemoryLock);
+#else
+        numRunning++;
+#endif
+#else
+        __sync_add_and_fetch(&numRunning, 1);
 #endif
     }
 
     int isFree() {
-        return finishFlag == numChunks;
+        return numRunning==0;
     }
 
     void **getRedBufs() {

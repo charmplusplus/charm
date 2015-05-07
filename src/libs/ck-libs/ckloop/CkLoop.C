@@ -196,7 +196,6 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
     double _start; //may be used for tracing
 
     if (numChunks > MAX_CHUNKS) {
-        CkPrintf("CkLoop[%d]: WARNING! chunk is set to MAX_CHUNKS=%d\n", CmiMyPe(), MAX_CHUNKS);
         numChunks = MAX_CHUNKS;
     }
 
@@ -493,8 +492,10 @@ void CurLoopInfo::stealWork() {
       return;
     }
 
+    reportStarting();  // must be before getNextChunkIdx();
     int nextChunkId = getNextChunkIdx();
     if (nextChunkId >= numChunks) {
+      reportFinished(0);
       CmiUnlock(loop_info_inited_lock);
       return;
     }
