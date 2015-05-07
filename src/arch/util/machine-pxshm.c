@@ -506,7 +506,18 @@ void calculateNodeSizeAndRank(char **argv)
   // CmiGetArgIntDesc(argv, "+nodesize", &(pxshmContext->nodesize),"Number of
   // cores in this node (for non-smp case).Used by the shared memory
   // communication layer");
+#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
+  // On Cray machines, PXSHM is initialized twice: before and after initializing
+  // the CPU topology mechanism. The information below is only accurate on the
+  // second phase. In other words, other LRTS-based machine layers need to get
+  // that information elsewhere, e.g. from charmrun.
+  pxshmContext->nodesize =
+      (CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyNode())) +
+       CmiMyNodeSize() - 1) /
+      CmiMyNodeSize();
+#else
   pxshmContext->nodesize = _Cmi_myphysnode_numprocesses;
+#endif
   MACHSTATE1(3, "calculateNodeSizeAndRank argintdesc %d",
              pxshmContext->nodesize);
 
