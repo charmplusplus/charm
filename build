@@ -609,6 +609,29 @@ then
 fi
 if test -n "$BOPTS"
 then
+    # pxshm+smp note: When combining the 'smp' and 'pxshm' directives, it is
+    #                 important that they be included in $ConvHeader in that
+    #                 exact order. See bug #717.
+    TMP=""
+    HAS_PXSHM=0
+    HAS_SMP=0
+    for i in $BOPTS; do
+      if [ "$i" == "smp" ]; then
+        HAS_SMP=1
+      elif [ "$i" == "pxshm" ]; then
+        HAS_PXSHM=1
+      else
+        TMP="$TMP $i"
+      fi
+    done
+    if [ $HAS_PXSHM -eq 1 ]; then
+      TMP="pxshm $TMP"
+    fi
+    if [ $HAS_SMP -eq 1 ]; then
+      TMP="smp $TMP"
+    fi
+
+    BOPTS=$TMP
     for i in $BOPTS
     do
       echo '#include "'conv-mach-$i.h'"' >> $ConvHeader
