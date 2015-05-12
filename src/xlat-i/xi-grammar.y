@@ -817,6 +817,12 @@ MemberBody	: Entry
                 }
 		| NonEntryMember ';'
 		{ $$ = $1; }
+        | error
+        {
+          ERROR("invalid SDAG member",
+                @$.first_column, @$.last_column);
+          YYABORT;
+        }
 		;
 
 UnexpectedToken : ENTRY
