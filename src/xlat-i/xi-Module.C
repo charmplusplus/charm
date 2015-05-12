@@ -127,8 +127,10 @@ void Module::generate()
   }
 
   std::string defstr_with_line_numbers = addLineNumbers(defstr.get_string(), botname.get_string());
+  std::string sanitizedDefs(defstr_with_line_numbers.c_str());
+  desanitizeCode(sanitizedDefs);
   decl<<declstr.get_string();
-  def<<defstr_with_line_numbers.c_str();
+  def<<sanitizedDefs.c_str();
 
   // DMK - Accel Support
   #if CMK_CELL != 0

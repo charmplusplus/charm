@@ -216,6 +216,61 @@ std::string addLineNumbers(char *str, const char *filename)
   return s;
 }
 
+// The following three functions are a workaround for bug #734.
+void sanitizeRange(std::string &code, int i, int j)
+{
+  for (int k = i; k <= j; ++k) {
+    switch (code[k]) {
+      case '{': code[k] = 0x0E; break;
+      case '}': code[k] = 0x0F; break;
+      default: break;
+    }
+  }
+}
+
+void desanitizeCode(std::string &code)
+{
+  for (int i = 0; i < code.size(); ++i) {
+    switch (code[i]) {
+      case 0x0E: code[i] = '{'; break;
+      case 0x0F: code[i] = '}'; break;
+      default: break;
+    }
+  }
+}
+
+void sanitizeComments(std::string &code)
+{
+  int h, i;
+  for (i = 0; i < code.size() - 1; ++i) {
+    if (code[i] == '/') {
+      h = i+2;
+      switch (code[i+1]) {
+        case '*':
+          // Case 1: /* */
+          i += 2;
+          for (; !(code[i] == '*' && code[i+1] == '/'); ++i);
+          break;
+
+        case '/':
+          // Case 2: //
+          while (code[++i] != '\n');
+          break;
+
+        default:
+          // Case 3: not a comment
+          continue;
+          break;
+      }
+
+      sanitizeRange(code, h, i-1);
+      ++i;
+    }
+  }
+}
+
+
+
 }   // namespace xi
 
 namespace Prefix {

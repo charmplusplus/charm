@@ -135,6 +135,8 @@ void templateGuardBegin(bool templateOnly, XStr &str);
 void templateGuardEnd(XStr &str);
 
 std::string addLineNumbers(char *str, const char *filename);
+extern void sanitizeComments(std::string &code);
+extern void desanitizeCode(std::string &code);
 
 }   // namespace xi
 

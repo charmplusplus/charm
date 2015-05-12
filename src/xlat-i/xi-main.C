@@ -223,6 +223,7 @@ int main(int argc, char *argv[])
   // if (fname==NULL) abortxi(argv[0]);
 
   std::string buffer = readFile(fname);
+  sanitizeComments(buffer);
 
   if (countTokens) {
     cout << count_tokens(buffer) << endl;
