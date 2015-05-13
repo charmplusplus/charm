@@ -4752,21 +4752,25 @@ void _pretty_print(std::string type, std::string msg, int first_col, int last_co
 {
   _pretty_header(type, msg, first_col, last_col, first_line, last_line);
 
-  std::string err_line = inputBuffer[first_line-1];
+  if (first_line <= inputBuffer.size() &&
+      first_line <= last_line &&
+      first_col <= last_col) {
+    std::string err_line = inputBuffer[first_line-1];
 
-  if (err_line.length() != 0) {
-    int err_line_start = err_line.find_first_not_of(" \t\r\n");
-    err_line.erase(0, err_line_start);
+    if (err_line.length() != 0) {
+      int err_line_start = err_line.find_first_not_of(" \t\r\n");
+      err_line.erase(0, err_line_start);
 
-    std::string caret_line;
-    if (first_col != -1)
-      caret_line = _get_caret_line(err_line_start, first_col, last_col);
+      std::string caret_line;
+      if (first_col != -1)
+        caret_line = _get_caret_line(err_line_start, first_col, last_col);
 
-    std::cerr << "  " << err_line << std::endl;
+      std::cerr << "  " << err_line << std::endl;
 
-    if (first_col != -1)
-      std::cerr << "  " << caret_line;
-    std::cerr << std::endl;
+      if (first_col != -1)
+        std::cerr << "  " << caret_line;
+      std::cerr << std::endl;
+    }
   }
 }
 
