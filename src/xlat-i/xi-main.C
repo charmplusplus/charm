@@ -31,7 +31,7 @@ const char *cur_file;
 
 #include "xi-grammar.tab.h"
 
-char *fname;
+char *fname, *origFile;
 
 void ReservedWord(int token) {
   char text[300];
@@ -153,7 +153,7 @@ std::string readFile(const char *interfaceFile) {
     cur_file = interfaceFile;
     in = new std::ifstream(interfaceFile);
   } else {
-    cur_file = "STDIN";
+    cur_file = (origFile != NULL) ? origFile : "STDIN";
     in = &std::cin;
   }
 
@@ -197,7 +197,7 @@ using namespace xi;
 
 int main(int argc, char *argv[])
 {
-  char *origFile=NULL;
+  origFile = NULL;
   fname = NULL;
   fortranMode = 0;
   internalMode = 0;
