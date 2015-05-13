@@ -269,6 +269,28 @@ void sanitizeComments(std::string &code)
   }
 }
 
+void sanitizeStrings(std::string &code)
+{
+  int h, i;
+  bool in_string = false;
+  for (i = 0; i < code.size(); ++i) {
+    if (code[i] == '\\') {
+      // The next character cannot possibly end a string since this '\'
+      // would escape it; just skip over it.
+      ++i;
+    } else if (code[i] == '"') {
+      if (in_string) {
+        sanitizeRange(code, h, i-1);
+        in_string = false;
+      } else {
+        h = i+1;
+        in_string = true;
+      }
+    }
+  }
+}
+
+
 
 
 }   // namespace xi

@@ -224,6 +224,7 @@ int main(int argc, char *argv[])
 
   std::string buffer = readFile(fname);
   sanitizeComments(buffer);
+  sanitizeStrings(buffer);
 
   if (countTokens) {
     cout << count_tokens(buffer) << endl;
