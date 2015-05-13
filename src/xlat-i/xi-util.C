@@ -223,6 +223,13 @@ void sanitizeRange(std::string &code, int i, int j)
     switch (code[k]) {
       case '{': code[k] = 0x0E; break;
       case '}': code[k] = 0x0F; break;
+      case '(': code[k] = 0x10; break;
+      case ')': code[k] = 0x11; break;
+      case '[': code[k] = 0x12; break;
+      case ']': code[k] = 0x13; break;
+      case ';': code[k] = 0x14; break;
+      case ':': code[k] = 0x15; break;
+      case ',': code[k] = 0x16; break;
       default: break;
     }
   }
@@ -234,6 +241,13 @@ void desanitizeCode(std::string &code)
     switch (code[i]) {
       case 0x0E: code[i] = '{'; break;
       case 0x0F: code[i] = '}'; break;
+      case 0x10: code[i] = '('; break;
+      case 0x11: code[i] = ')'; break;
+      case 0x12: code[i] = '['; break;
+      case 0x13: code[i] = ']'; break;
+      case 0x14: code[i] = ';'; break;
+      case 0x15: code[i] = ':'; break;
+      case 0x16: code[i] = ','; break;
       default: break;
     }
   }
