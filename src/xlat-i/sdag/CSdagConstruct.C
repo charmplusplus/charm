@@ -625,14 +625,4 @@ namespace xi {
     if (con2) con2->generateTraceEp(decls, defs, chare);
     if (con3) con3->generateTraceEp(decls, defs, chare);
   }
-
-
-  void RemoveSdagComments(char *str) {
-    char *ptr = str;
-    while ((ptr = strstr(ptr, "//"))) {
-      char *lend = strstr(ptr, "\n");
-      if (lend==NULL) break;
-      while (ptr != lend) *ptr++=' ';
-    }
-  }
 }   // namespace xi

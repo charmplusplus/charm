@@ -1,0 +1,12 @@
+mainmodule m {
+  mainchare A {
+    entry A(CkArgMsg*);
+    entry void fun() {
+      serial {
+        // now you see me
+        /* now you don't */
+        CkPrintf("this line will always show"); // this bit
+      }
+    }
+  }
+}

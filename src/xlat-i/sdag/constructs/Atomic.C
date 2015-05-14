@@ -8,7 +8,6 @@ AtomicConstruct::AtomicConstruct(const char *code, const char *trace_name, int l
 : BlockConstruct(SATOMIC, NULL, 0, 0, 0, 0, 0, 0), line_no_(line_no)
 {
   char *tmp = strdup(code);
-  RemoveSdagComments(tmp);
   text = new XStr(tmp);
   free(tmp);
 
