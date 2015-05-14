@@ -1719,8 +1719,15 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
   } else {
     //Normal case: Unmarshall variables
     if (redn_wrapper) param->beginRednWrapperUnmarshall(str, isSDAGGen);
-    else if (!isSDAGGen) param->beginUnmarshall(str);
-    else param->beginUnmarshallSDAGCall(str, usesImplBuf);
+    else {
+      if (isSDAGGen)
+        param->beginUnmarshallSDAGCall(str, usesImplBuf);
+      else
+        param->beginUnmarshall(str);
+
+      if (param->isVoid() && !isNoKeep())
+        str<<"  CkFreeSysMsg(impl_msg);\n";
+    }
   }
 
   str << preCall;
