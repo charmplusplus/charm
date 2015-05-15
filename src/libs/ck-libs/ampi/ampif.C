@@ -968,7 +968,7 @@ void mpi_getarg(int *c, char *str)
   char **argv = CkGetArgv();
  
   int nc = CkGetArgc()-1;
-  if (*c > 0 and *c <= nc) {
+  if (*c > 0 && *c <= nc) {
     strncpy(str, argv[*c], strlen(argv[*c]));
     for (int j=strlen(argv[*c]); j<len; j++)  str[j] = ' ';
   }
@@ -993,7 +993,7 @@ void mpi_get_command_argument(int *c, char *str, int *len, int *ierr)
   char **argv = CkGetArgv();
  
   int nc = CkGetArgc()-1;
-  if (*c > 0 and *c <= nc) {
+  if (*c > 0 && *c <= nc) {
     strncpy(str, argv[*c], strlen(argv[*c]));
     for (int j=strlen(argv[*c]); j<*len; j++)  str[j] = ' ';
     *ierr = 0;
