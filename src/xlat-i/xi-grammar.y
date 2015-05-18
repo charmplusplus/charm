@@ -1,7 +1,6 @@
 %expect 7
 %{
 #include <iostream>
-#include <vector>
 #include <string>
 #include <string.h>
 #include "xi-symbol.h"
@@ -13,12 +12,12 @@
   if (xi::num_errors++ == xi::MAX_NUM_ERRORS) { \
     YYABORT;                                    \
   } else {                                      \
-    pretty_msg("error", __VA_ARGS__);           \
+    xi::pretty_msg("error", __VA_ARGS__);       \
   }
 
 #define WARNING(...) \
-  if (enable_warnings) {                \
-    pretty_msg("warning", __VA_ARGS__); \
+  if (enable_warnings) {                    \
+    xi::pretty_msg("warning", __VA_ARGS__); \
   }
 
 using namespace xi;
@@ -33,7 +32,6 @@ void yyerror(const char *);
 
 namespace xi {
 
-extern std::vector<std::string> inputBuffer;
 const int MAX_NUM_ERRORS = 10;
 int num_errors = 0;
 
@@ -1293,63 +1291,5 @@ HashIFDefComment: HASHIFDEF Name
 		;
 
 %%
-
-std::string _get_caret_line(int err_line_start, int first_col, int last_col)
-{
-  std::string caret_line(first_col - err_line_start - 1, ' ');
-  caret_line += std::string(last_col - first_col + 1, '^');
-
-  return caret_line;
-}
-
-void _pretty_header(std::string type, std::string msg, int first_col, int last_col, int first_line, int last_line)
-{
-  std::cerr << cur_file << ":" << first_line << ":";
-
-  if (first_col != -1)
-    std::cerr << first_col << "-" << last_col << ": ";
-
-  std::cerr << type << ": " << msg << std::endl;
-}
-
-void _pretty_print(std::string type, std::string msg, int first_col, int last_col, int first_line, int last_line)
-{
-  _pretty_header(type, msg, first_col, last_col, first_line, last_line);
-
-  if (first_line <= inputBuffer.size() &&
-      first_line <= last_line &&
-      first_col <= last_col) {
-    std::string err_line = inputBuffer[first_line-1];
-
-    if (err_line.length() != 0) {
-      int err_line_start = err_line.find_first_not_of(" \t\r\n");
-      err_line.erase(0, err_line_start);
-
-      std::string caret_line;
-      if (first_col != -1)
-        caret_line = _get_caret_line(err_line_start, first_col, last_col);
-
-      std::cerr << "  " << err_line << std::endl;
-
-      if (first_col != -1)
-        std::cerr << "  " << caret_line;
-      std::cerr << std::endl;
-    }
-  }
-}
-
-void pretty_msg(std::string type, std::string msg, int first_col, int last_col, int first_line, int last_line)
-{
-  if (first_line == -1) first_line = lineno;
-  if (last_line  == -1)  last_line = lineno;
-  _pretty_print(type, msg, first_col, last_col, first_line, last_line);
-}
-
-void pretty_msg_noline(std::string type, std::string msg, int first_col, int last_col, int first_line, int last_line)
-{
-  if (first_line == -1) first_line = lineno;
-  if (last_line  == -1)  last_line = lineno;
-  _pretty_header(type, msg, first_col, last_col, first_line, last_line);
-}
 
 void yyerror(const char *msg) { }

@@ -123,7 +123,7 @@ extern int yydebug;
 
 union YYSTYPE
 {
-#line 52 "xi-grammar.y" /* yacc.c:1909  */
+#line 50 "xi-grammar.y" /* yacc.c:1909  */
 
   AstChildren<Module> *modlist;
   Module *module;
