@@ -1,4 +1,5 @@
 #include "CParsedFile.h"
+#include "xi-Chare.h"
 #include <algorithm>
 
 using std::for_each;

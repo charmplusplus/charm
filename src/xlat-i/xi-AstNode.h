@@ -3,6 +3,7 @@
 
 #include "xi-util.h"
 #include <list>
+#include <algorithm>
 
 namespace xi {
 
@@ -84,6 +85,236 @@ class AstChildren : public virtual AstNode {
   void recurse(T arg, void (Child::*fn)(T));
   void recursev(void (Child::*fn)());
 };
+
+namespace details {
+  using std::list;
+  using std::for_each;
+
+  /**
+     Apply fn_ on each Construct in the list l, passing it arg as
+     the target. If between_ is passed, do that to arg between each
+     element.
+  */
+  template<typename T, typename U, typename A>
+  class perElemGenC
+  {
+    void (U::*fn)(A);
+    void (*between)(A);
+    A arg;
+
+  public:
+    perElemGenC(list<T*> &l,
+                A arg_,
+                void (U::*fn_)(A),
+                void (*between_)(A) = NULL)
+      : fn(fn_), between(between_), arg(arg_)
+      {
+        for_each(l.begin(), l.end(), *this);
+      }
+    void operator()(T* m)
+      {
+        if (m)
+        {
+          (m->*fn)(arg);
+          if (between)
+            between(arg);
+        }
+      }
+  };
+
+  template<typename T, typename U, typename A>
+  void perElemGen(list<T*> &l, A& arg_, void (U::*fn_)(A&),
+  // Sun Studio 7 (C++ compiler version 5.4) can't handle this
+  //              void (*between_)(A&) = NULL)
+                  void (*between_)(A&))
+  {
+    perElemGenC<T, U, A&>(l, arg_, fn_, between_);
+  }
+
+  template<typename T, typename U, typename A>
+  void perElemGen(list<T*> &l, A& arg_, void (U::*fn_)(A&))
+  {
+    perElemGenC<T, U, A&>(l, arg_, fn_, NULL);
+  }
+
+  template<typename T, typename U, typename A>
+  void perElemGen(list<T*> &l, A* arg_, void (U::*fn_)(A*),
+  // See above
+  //              void (*between_)(A*) = NULL)
+                  void (*between_)(A*))
+  {
+    perElemGenC<T, U, A*>(l, arg_, fn_, between_);
+  }
+
+  template<typename T, typename U, typename A>
+  void perElemGen(list<T*> &l, A* arg_, void (U::*fn_)(A*))
+  {
+    perElemGenC<T, U, A*>(l, arg_, fn_, NULL);
+  }
+
+  /**
+     Apply fn_ on each non-NULL element in the list l.
+     If between_ is passed, do that between each element.
+  */
+  template<typename T, typename U>
+  class perElemC
+  {
+    void (U::*fn)();
+  public:
+    perElemC(list<T*> &l,
+             void (U::*fn_)())
+      : fn(fn_)
+      {
+        for_each(l.begin(), l.end(), *this);
+      }
+    void operator()(T* m)
+      {
+        if (m) {
+          (m->*fn)();
+        }
+      }
+  };
+
+  template<typename T, typename U>
+  void perElem(list<T*> &l, void (U::*fn_)())
+  {
+    perElemC<T, U>(l, fn_);
+  }
+
+  void newLine(XStr &str);
+} // namespace details
+
+
+template <typename Child>
+void AstChildren<Child>::push_back(Child *m)
+{
+  children.push_back(m);
+}
+
+template <typename Child>
+void AstChildren<Child>::print(XStr& str)
+{
+  details::perElemGen(children, str, &Child::print);
+}
+
+template <typename Child>
+void AstChildren<Child>::preprocess()
+{
+  details::perElem(children, &Child::preprocess);
+}
+
+template <typename Child>
+void AstChildren<Child>::check() {
+  details::perElem(children, &Child::check);
+}
+
+template <typename Child>
+void AstChildren<Child>::genDecls(XStr& str)
+{
+  details::perElemGen(children, str, &Child::genDecls, details::newLine);
+}
+
+template <typename Child>
+void AstChildren<Child>::genClosureEntryDecls(XStr& str)
+{
+  details::perElemGen(children, str, &Child::genClosureEntryDecls, details::newLine);
+}
+
+template <typename Child>
+void AstChildren<Child>::genClosureEntryDefs(XStr& str)
+{
+  details::perElemGen(children, str, &Child::genClosureEntryDefs, details::newLine);
+}
+
+template <typename Child>
+void AstChildren<Child>::outputClosuresDecl(XStr& str)
+{
+  details::perElemGen(children, str, &Child::outputClosuresDecl, details::newLine);
+}
+
+template <typename Child>
+void AstChildren<Child>::outputClosuresDef(XStr& str)
+{
+  details::perElemGen(children, str, &Child::outputClosuresDef, details::newLine);
+}
+
+template <typename Child>
+void AstChildren<Child>::genDefs(XStr& str)
+{
+  details::perElemGen(children, str, &Child::genDefs, details::newLine);
+}
+
+template <typename Child>
+void AstChildren<Child>::genReg(XStr& str)
+{
+  details::perElemGen(children, str, &Child::genReg, details::newLine);
+}
+
+template <typename Child>
+template <typename T>
+void AstChildren<Child>::recurse(T t, void (Child::*fn)(T))
+{
+  details::perElemGen(children, t, fn);
+}
+
+template <typename Child>
+void AstChildren<Child>::recursev(void (Child::*fn)())
+{
+  details::perElem(children, fn);
+}
+
+template <typename Child>
+void AstChildren<Child>::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
+{
+  for (typename std::list<Child*>::iterator i = children.begin(); i != children.end(); ++i) {
+    if (*i) {
+      (*i)->genGlobalCode(scope, decls, defs);
+    }
+  }
+}
+
+template <typename Child>
+void AstChildren<Child>::printChareNames()
+{
+  details::perElem(children, &Child::printChareNames);
+}
+
+template <typename Child>
+int AstChildren<Child>::genAccels_spe_c_funcBodies(XStr& str) {
+  int rtn = 0;
+  for (typename std::list<Child*>::iterator i = children.begin(); i != children.end(); ++i) {
+	if (*i) {
+	  rtn += (*i)->genAccels_spe_c_funcBodies(str);
+    }
+  }
+  return rtn;
+}
+
+template <typename Child>
+void AstChildren<Child>::genAccels_spe_c_regFuncs(XStr& str) {
+  details::perElemGen(children, str, &Child::genAccels_spe_c_regFuncs);
+}
+
+template <typename Child>
+void AstChildren<Child>::genAccels_spe_c_callInits(XStr& str) {
+  details::perElemGen(children, str, &Child::genAccels_spe_c_callInits);
+}
+
+template <typename Child>
+void AstChildren<Child>::genAccels_spe_h_includes(XStr& str) {
+  details::perElemGen(children, str, &Child::genAccels_spe_h_includes);
+}
+
+template <typename Child>
+void AstChildren<Child>::genAccels_spe_h_fiCountDefs(XStr& str) {
+  details::perElemGen(children, str, &Child::genAccels_spe_h_fiCountDefs);
+}
+
+template <typename Child>
+void AstChildren<Child>::genAccels_ppe_c_regFuncs(XStr& str) {
+  details::perElemGen(children, str, &Child::genAccels_ppe_c_regFuncs);
+}
+
 
 } // namespace xi
 

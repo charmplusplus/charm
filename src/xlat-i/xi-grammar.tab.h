@@ -1,8 +1,8 @@
-/* A Bison parser, made by GNU Bison 3.0.4.  */
+/* A Bison parser, made by GNU Bison 3.0.2.  */
 
 /* Bison interface for Yacc-like parsers in C
 
-   Copyright (C) 1984, 1989-1990, 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 1984, 1989-1990, 2000-2013 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -30,8 +30,8 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
-#ifndef YY_YY_XI_GRAMMAR_TAB_H_INCLUDED
-# define YY_YY_XI_GRAMMAR_TAB_H_INCLUDED
+#ifndef YY_YY_Y_TAB_H_INCLUDED
+# define YY_YY_Y_TAB_H_INCLUDED
 /* Debug traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 0
@@ -117,13 +117,84 @@ extern int yydebug;
     CASE = 327
   };
 #endif
+/* Tokens.  */
+#define MODULE 258
+#define MAINMODULE 259
+#define EXTERN 260
+#define READONLY 261
+#define INITCALL 262
+#define INITNODE 263
+#define INITPROC 264
+#define PUPABLE 265
+#define CHARE 266
+#define MAINCHARE 267
+#define GROUP 268
+#define NODEGROUP 269
+#define ARRAY 270
+#define MESSAGE 271
+#define CONDITIONAL 272
+#define CLASS 273
+#define INCLUDE 274
+#define STACKSIZE 275
+#define THREADED 276
+#define TEMPLATE 277
+#define SYNC 278
+#define IGET 279
+#define EXCLUSIVE 280
+#define IMMEDIATE 281
+#define SKIPSCHED 282
+#define INLINE 283
+#define VIRTUAL 284
+#define MIGRATABLE 285
+#define CREATEHERE 286
+#define CREATEHOME 287
+#define NOKEEP 288
+#define NOTRACE 289
+#define APPWORK 290
+#define VOID 291
+#define CONST 292
+#define PACKED 293
+#define VARSIZE 294
+#define ENTRY 295
+#define FOR 296
+#define FORALL 297
+#define WHILE 298
+#define WHEN 299
+#define OVERLAP 300
+#define ATOMIC 301
+#define IF 302
+#define ELSE 303
+#define PYTHON 304
+#define LOCAL 305
+#define NAMESPACE 306
+#define USING 307
+#define IDENT 308
+#define NUMBER 309
+#define LITERAL 310
+#define CPROGRAM 311
+#define HASHIF 312
+#define HASHIFDEF 313
+#define INT 314
+#define LONG 315
+#define SHORT 316
+#define CHAR 317
+#define FLOAT 318
+#define DOUBLE 319
+#define UNSIGNED 320
+#define ACCEL 321
+#define READWRITE 322
+#define WRITEONLY 323
+#define ACCELBLOCK 324
+#define MEMCRITICAL 325
+#define REDUCTIONTARGET 326
+#define CASE 327
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-
+typedef union YYSTYPE YYSTYPE;
 union YYSTYPE
 {
-#line 50 "xi-grammar.y" /* yacc.c:1909  */
+#line 51 "xi-grammar.y" /* yacc.c:1909  */
 
   AstChildren<Module> *modlist;
   Module *module;
@@ -156,7 +227,7 @@ union YYSTYPE
   IncludeFile *includeFile;
   const char *strval;
   int intval;
-  Chare::attrib_t cattr;
+  unsigned int cattr; // actually Chare::attrib_t, but referring to that creates nasty #include issues
   SdagConstruct *sc;
   IntExprConstruct *intexpr;
   WhenConstruct *when;
@@ -167,10 +238,8 @@ union YYSTYPE
   XStr* xstrptr;
   AccelBlock* accelBlock;
 
-#line 171 "xi-grammar.tab.h" /* yacc.c:1909  */
+#line 242 "y.tab.h" /* yacc.c:1909  */
 };
-
-typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1
 #endif
@@ -192,5 +261,6 @@ struct YYLTYPE
 
 extern YYSTYPE yylval;
 extern YYLTYPE yylloc;
+int yyparse (void);
 
-#endif /* !YY_YY_XI_GRAMMAR_TAB_H_INCLUDED  */
+#endif /* !YY_YY_Y_TAB_H_INCLUDED  */

@@ -3,10 +3,10 @@
 
 #include "xi-AstNode.h"
 #include "xi-Template.h"
+#include "xi-Member.h"
 
 namespace xi {
 
-class Member;
 class CEntry;
 
 /* Chare or group is a templated entity */

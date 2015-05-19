@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "sdag-globals.h"
 #include "xi-symbol.h"
+#include "xi-Chare.h"
 #include "constructs/Constructs.h"
 #include "CParsedFile.h"
 #include "EToken.h"

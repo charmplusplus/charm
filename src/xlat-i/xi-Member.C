@@ -1,5 +1,6 @@
 #include "xi-Member.h"
 #include "xi-Value.h"
+#include "xi-Chare.h"
 
 namespace xi {
 

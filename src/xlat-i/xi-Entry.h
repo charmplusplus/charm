@@ -3,6 +3,7 @@
 
 #include "xi-Member.h"
 #include "xi-SdagConstruct.h"
+#include "xi-Template.h"
 #include "CEntry.h"
 
 using std::cerr;

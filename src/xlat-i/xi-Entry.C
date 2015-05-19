@@ -2,6 +2,7 @@
 #include "xi-Parameter.h"
 #include "xi-Value.h"
 #include "xi-SdagCollection.h"
+#include "xi-Chare.h"
 
 #include "sdag/constructs/When.h"
 

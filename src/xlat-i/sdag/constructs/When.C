@@ -1,4 +1,5 @@
 #include "When.h"
+#include "xi-Chare.h"
 
 using std::list;
 

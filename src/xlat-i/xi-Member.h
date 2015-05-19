@@ -1,13 +1,17 @@
 #ifndef _MEMBER_H
 #define _MEMBER_H
 
-#include "xi-Chare.h"
+#include "xi-Construct.h"
 
 namespace xi {
 
 class SdagCollection;
 class ValueList;
 class WhenStatementEChecker;
+class Chare;
+class CEntry;
+class Type;
+class NamedType;
 
 /* Member of a chare or group, i.e. entry, RO or ROM */
 class Member : public Construct {

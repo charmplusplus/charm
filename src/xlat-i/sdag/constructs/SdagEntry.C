@@ -2,6 +2,7 @@
 #include "CStateVar.h"
 #include "xi-Entry.h"
 #include "xi-Parameter.h"
+#include "xi-Chare.h"
 #include <list>
 
 namespace xi {

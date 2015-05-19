@@ -22,14 +22,15 @@ extern void scan_string(const char *);
 extern xi::AstChildren<xi::Module> *modlist;
 extern xi::rwentry rwtable[];
 
+using namespace xi;
+#include "xi-grammar.tab.h"
+
 namespace xi {
 
 std::vector<std::string> inputBuffer;
 
 int fortranMode, internalMode;
 const char *cur_file;
-
-#include "xi-grammar.tab.h"
 
 char *fname, *origFile;
 

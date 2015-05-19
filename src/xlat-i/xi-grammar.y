@@ -6,6 +6,7 @@
 #include "xi-symbol.h"
 #include "sdag/constructs/Constructs.h"
 #include "EToken.h"
+#include "xi-Chare.h"
 
 // Has to be a macro since YYABORT can only be used within rule actions.
 #define ERROR(...) \
@@ -79,7 +80,7 @@ void ReservedWord(int token);
   IncludeFile *includeFile;
   const char *strval;
   int intval;
-  Chare::attrib_t cattr;
+  unsigned int cattr; // actually Chare::attrib_t, but referring to that creates nasty #include issues
   SdagConstruct *sc;
   IntExprConstruct *intexpr;
   WhenConstruct *when;
