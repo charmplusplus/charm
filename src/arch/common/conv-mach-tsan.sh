@@ -1,4 +1,4 @@
-CMK_CC="$CMK_CC -fsanitize=thread"
-CMK_CXX="$CMK_CXX -fsanitize=thread"
-CMK_LD="$CMK_LD -fsanitize=thread"
-CMK_LDXX="$CMK_LDXX -fsanitize=thread"
+CMK_CC="$CMK_CC -fsanitize=thread -fPIC"
+CMK_CXX="$CMK_CXX -fsanitize=thread -fPIC"
+CMK_LD="$CMK_LD -fsanitize=thread -pie"
+CMK_LDXX="$CMK_LDXX -fsanitize=thread -pie"
