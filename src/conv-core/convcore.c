@@ -3508,6 +3508,23 @@ int CmiEndianness()
   return  _cmi_endianness;
 }
 
+#if CMK_USE_TSAN
+/* This fixes bug #713, which is caused by tsan deadlocking inside
+ * a 'write' syscall inside a mutex. */
+static void checkTSanOptions()
+{
+  char *env = getenv("TSAN_OPTIONS");
+
+  if (!env ||
+      !strstr(env, "log_path=") ||
+      strstr(env, "log_path=stdout") ||
+      strstr(env, "log_path=stderr")) {
+    CmiAbort("TSAN output must be redirected to disk.\n"
+             "Run this program with TSAN_OPTIONS=\"log_path=filename\"");
+  }
+}
+#endif
+
 /**
   Main Converse initialization routine.  This routine is 
   called by the machine file (machine.c) to set up Converse.
@@ -3605,6 +3622,10 @@ void ConverseCommonInit(char **argv)
 /*initTraceCore(argv);*/ /* projector */
 #endif
   CmiProcessPriority(argv);
+
+#if CMK_USE_TSAN
+  checkTSanOptions();
+#endif
 
   CmiPersistentInit();
   CmiIsomallocInit(argv);
