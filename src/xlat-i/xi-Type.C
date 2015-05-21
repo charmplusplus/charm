@@ -9,6 +9,7 @@ void FuncType::print(XStr& str) {
   str << "(*" << name << ")(";
   if(params)
     params->print(str);
+  str << ")";
 }
 
 void
