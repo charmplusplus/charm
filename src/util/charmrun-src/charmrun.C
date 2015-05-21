@@ -4185,7 +4185,7 @@ int rsh_fork(int nodeno, const char *startScript)
   rshargv.push_back("-l");
   rshargv.push_back(nodetab_login(nodeno));
   rshargv.push_back("/bin/bash -f");
-  rshargv.push_back(NULL);
+  rshargv.push_back((const char *) NULL);
 
   std::string cmd_str = rshargv[0];
   for (int n = 1; n < rshargv.size()-1; ++n)
@@ -4577,7 +4577,7 @@ void read_global_segments_size()
   tmp = (char *) malloc(sizeof(char) * 9 + strlen(arg_nodeprog_r));
   sprintf(tmp, "size -A %s", arg_nodeprog_r);
   rshargv.push_back(tmp);
-  rshargv.push_back(NULL);
+  rshargv.push_back((const char *) NULL);
 
   childPid = fork();
   if (childPid < 0) {
@@ -4620,7 +4620,7 @@ void open_gdb_info()
   tmp = (char *) malloc(sizeof(char) * 8 + strlen(arg_nodeprog_r));
   sprintf(tmp, "gdb -q %s", arg_nodeprog_r);
   rshargv.push_back(tmp);
-  rshargv.push_back(NULL);
+  rshargv.push_back((const char *) NULL);
 
   pipe(fdin);
   pipe(fdout);
@@ -4813,7 +4813,7 @@ int rsh_fork_one(const char *startScript)
   sprintf(npes, "%d", nodetab_rank0_size);
   rshargv.push_back(npes);
   rshargv.push_back((char *) startScript);
-  rshargv.push_back(NULL);
+  rshargv.push_back((const char *) NULL);
   if (arg_verbose)
     printf("Charmrun> Starting %s %s \n", nodetab_shell(0), startScript);
 
