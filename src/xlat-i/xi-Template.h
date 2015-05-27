@@ -81,7 +81,7 @@ class Template : public Construct {
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
-    void genSpec(XStr& str);
+    void genSpec(XStr& str, bool printDefault = true);
     void genVars(XStr& str);
     void outputClosuresDecl(XStr& str);
     void outputClosuresDef(XStr& str);
@@ -102,13 +102,13 @@ class TEntity : public Construct {
     Template *templat;
   public:
     void setTemplate(Template *t);
-    virtual XStr tspec(void) const;
+    virtual XStr tspec(bool printDefault = true) const;
     virtual XStr tvars(void) const;
 };
 /* A formal argument of a template */
 class TVar : public Printable {
   public:
-    virtual void genLong(XStr& str) = 0;
+    virtual void genLong(XStr& str, bool printDefault = true) = 0;
     virtual void genShort(XStr& str) = 0;
 };
 
@@ -119,7 +119,7 @@ class TType : public TVar {
   public:
     TType(Type *t, Type *i=0);
     void print(XStr& str);
-    void genLong(XStr& str);
+    void genLong(XStr& str, bool printDefault = true);
     void genShort(XStr& str);
 };
 
@@ -130,7 +130,7 @@ class TFunc : public TVar {
   public:
     TFunc(FuncType *t, const char *v=0);
     void print(XStr& str);
-    void genLong(XStr& str);
+    void genLong(XStr& str, bool printDefault = true);
     void genShort(XStr& str);
 };
 
@@ -142,7 +142,7 @@ class TName : public TVar {
   public:
     TName(Type *t, const char *n, const char *v=0);
     void print(XStr& str);
-    void genLong(XStr& str);
+    void genLong(XStr& str, bool printDefault = true);
     void genShort(XStr& str);
 };
 
@@ -153,7 +153,7 @@ class TVarList : public Printable {
   public:
     TVarList(TVar *v, TVarList *n=0);
     void print(XStr& str);
-    void genLong(XStr& str);
+    void genLong(XStr& str, bool printDefault = true);
     void genShort(XStr& str);
 };
 

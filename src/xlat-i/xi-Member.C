@@ -17,8 +17,8 @@ XStr Member::makeDecl(const XStr &returnType, int forProxy, bool isStatic)
   XStr str;
 
   if (container->isTemplated())
-    str << container->tspec() << "\n";
-  str << generateTemplateSpec(tspec) << "\n";
+    str << container->tspec(false) << "\n";
+  str << generateTemplateSpec(tspec, false) << "\n";
   if (isStatic)
     str << "static ";
   str << returnType<<" ";

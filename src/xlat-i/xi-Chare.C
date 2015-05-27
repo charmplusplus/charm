@@ -77,7 +77,7 @@ Chare::genRegisterMethodDef(XStr& str)
   if(external || type->isTemplated())
     return;
   templateGuardBegin(isTemplated(), str);
-  str <<  tspec() <<
+  str <<  tspec(false) <<
   "void "<<indexName()<<"::__register(const char *s, size_t size) {\n"
   "  __idx = CkRegisterChare(s, size,";
   if (isMainChare()) str << " TypeMainChare";
@@ -133,15 +133,15 @@ Chare::genDecls(XStr& str)
   }
 
   //Forward declaration of the user-defined implementation class*/
-  str << tspec()<<" class "<<type<<";\n";
-  str << tspec()<<" class "<<Prefix::Index<<type<<";\n";
-  str << tspec()<<" class "<<Prefix::Proxy<<type<<";\n";
+  str << tspec(false)<<" class "<<type<<";\n";
+  str << tspec(false)<<" class "<<Prefix::Index<<type<<";\n";
+  str << tspec(false)<<" class "<<Prefix::Proxy<<type<<";\n";
   if (hasElement)
-    str << tspec()<<" class "<<Prefix::ProxyElement<<type<<";\n";
+    str << tspec(false)<<" class "<<Prefix::ProxyElement<<type<<";\n";
   if (hasSection)
-    str << tspec()<<" class "<<Prefix::ProxySection<<type<<";\n";
+    str << tspec(false)<<" class "<<Prefix::ProxySection<<type<<";\n";
   if (isPython())
-    str << tspec()<<" class "<<Prefix::Python<<type<<";\n";
+    str << tspec(false)<<" class "<<Prefix::Python<<type<<";\n";
 
  //Generate index class
   str << "/* --------------- index object ------------------ */\n";
@@ -691,7 +691,7 @@ Chare::genDefs(XStr& str)
   templateGuardBegin(isTemplated(), str);
   if(!type->isTemplated()) {
     if(external) str << "extern ";
-    str << tspec()<<" int "<<indexName()<<"::__idx";
+    str << tspec(false)<<" int "<<indexName()<<"::__idx";
     if(!external) str << "=0";
     str << ";\n";
   }
@@ -731,7 +731,7 @@ Chare::genDefs(XStr& str)
 
   XStr templateSpec;
   if (templat)
-    templat->genSpec(templateSpec);
+    templat->genSpec(templateSpec, false);
   else
     templateSpec << "template <>";
   templateSpec << "\n";

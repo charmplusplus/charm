@@ -1633,7 +1633,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
 
     if (isDef) {
       if (container->isTemplated()) {
-        decls << container->tspec() << "\n";
+        decls << container->tspec(false) << "\n";
       }
       decls << generateTemplateSpec(tspec) << "\n";
       decls << "    struct " << *genClosureTypeNameProxy <<" : public SDAG::Closure" << " {\n";
@@ -2033,10 +2033,10 @@ void Entry::genDefs(XStr& str)
   //if ((param->isMarshalled() || param->isVoid()) /* && (sdagCon || isWhenEntry) */)
   if ((param->isMarshalled() || param->isVoid()) && genClosureTypeNameProxy) {
     if (container->isTemplated())
-      str << container->tspec();
+      str << container->tspec(false);
     if (tspec) {
       str << "template <";
-      tspec->genLong(str);
+      tspec->genLong(str, false);
       str << "> ";
     }
 

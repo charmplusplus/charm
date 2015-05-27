@@ -122,7 +122,7 @@ inline void indentBy(XStr& s, int num) {
 }
 
 class TVarList;
-XStr generateTemplateSpec(TVarList* tspec);
+XStr generateTemplateSpec(TVarList* tspec, bool printDefault = true);
 
 typedef enum {
   forAll=0,forIndividual=1,forSection=2,forPython=3,forIndex=-1

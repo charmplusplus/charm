@@ -158,13 +158,13 @@ char* fortranify(const char *s, const char *suff1, const char *suff2, const char
   return retVal;
 }
 
-XStr generateTemplateSpec(TVarList* tspec)
+XStr generateTemplateSpec(TVarList* tspec, bool printDefault)
 {
   XStr str;
 
   if(tspec) {
     str << "template < ";
-    tspec->genLong(str);
+    tspec->genLong(str, printDefault);
     str << " > ";
   }
 

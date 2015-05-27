@@ -72,9 +72,9 @@ void UsingScope::print(XStr& str) {
 }
 
 void TEntity::setTemplate(Template *t) { templat = t; }
-XStr TEntity::tspec(void) const {
+XStr TEntity::tspec(bool printDefault) const {
     XStr str; 
-    if (templat) templat->genSpec(str); 
+    if (templat) templat->genSpec(str, printDefault); 
     return str;
 }
 XStr TEntity::tvars(void) const {
@@ -87,7 +87,7 @@ TType::TType(Type *t, Type *i) : type(t), init(i) {}
 
 TFunc::TFunc(FuncType *t, const char *v) : type(t), init(v) {}
 void TFunc::print(XStr& str) { type->print(str); if(init) str << "=" << init; }
-void TFunc::genLong(XStr& str){ type->print(str); if(init) str << "=" << init; }
+void TFunc::genLong(XStr& str, bool printDefault){ type->print(str); if(init && printDefault) str << "=" << init; }
 void TFunc::genShort(XStr& str) {str << type->getBaseName(); }
 
 TName::TName(Type *t, const char *n, const char *v) : type(t), name(n), val(v) {}
@@ -123,9 +123,9 @@ Template::genVars(XStr& str)
 }
 
 void
-Template::genSpec(XStr& str)
+Template::genSpec(XStr& str, bool printDefault)
 {
-  str << generateTemplateSpec(tspec);
+  str << generateTemplateSpec(tspec, printDefault);
 }
 
 void
@@ -176,13 +176,13 @@ void Template::check()
 }
 
 void
-TVarList::genLong(XStr& str)
+TVarList::genLong(XStr& str, bool printDefault)
 {
   if(tvar)
-    tvar->genLong(str);
+    tvar->genLong(str, printDefault);
   if(next) {
     str << ", ";
-    next->genLong(str);
+    next->genLong(str, printDefault);
   }
 }
 
@@ -197,12 +197,12 @@ TVarList::genShort(XStr& str)
   }
 }
 
-void TType::genLong(XStr& str)
+void TType::genLong(XStr& str, bool printDefault)
 {
   str << "class ";
   if(type)
     type->print(str);
-  if(init) {
+  if(init && printDefault) {
     str << "=";
     init->print(str);
   }
@@ -214,12 +214,12 @@ void TType::genShort(XStr& str)
     type->print(str);
 }
 
-void TName::genLong(XStr& str)
+void TName::genLong(XStr& str, bool printDefault)
 {
   if(type)
     type->print(str);
   str << " "<<name;
-  if(val) {
+  if(val && printDefault) {
     str << "="<<val;
   }
 }
