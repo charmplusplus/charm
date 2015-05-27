@@ -284,7 +284,6 @@ QualName	: IDENT
 		  $$ = tmp;
 		}
 		;
-
 Module		: MODULE Name ConstructEList
 		{ 
 		    $$ = new Module(lineno, $2, $3); 
@@ -686,6 +685,13 @@ OptNameInit	: /* Empty */
 		{ $$ = $2; }
 		| '=' LITERAL
 		{ $$ = $2; }
+		| '=' QualNamedType
+		{
+		  XStr typeStr;
+		  $2->print(typeStr);
+		  char *tmp = strdup(typeStr.get_string());
+		  $$ = tmp;
+		}
 		;
 
 TVar		: CLASS Name OptTypeInit
