@@ -196,12 +196,52 @@ void abortxi(char *name) {
 
 using namespace xi;
 
+int processAst(AstChildren<Module> *m, const bool chareNames,
+               const bool dependsMode, const int fortranMode_,
+               const int internalMode_, char* fname_, char* origFile_) {
+  // set globals based on input params
+  fortranMode = fortranMode_;
+  internalMode = internalMode_;
+  origFile = origFile_;
+  fname = fname_;
+
+  if (!m) return 0;
+  m->preprocess();
+  m->check();
+  if (num_errors != 0)
+    exit(1);
+
+  if (chareNames) {
+    m->printChareNames();
+    return 0;
+  }
+
+  if (dependsMode) {
+    std::string ciFileBaseName;
+    if (fname != NULL) {
+      ciFileBaseName = fname;
+    } else if (origFile != NULL) {
+      ciFileBaseName = origFile;
+    } else {
+      abortxi(fname);
+    }
+    size_t loc = ciFileBaseName.rfind('/');
+    if (loc != std::string::npos)
+        ciFileBaseName = ciFileBaseName.substr(loc+1);
+    m->recurse(ciFileBaseName.c_str(), &Module::genDepend);
+  } else {
+    m->recursev(&Module::generate);
+  }
+
+  return 0;
+}
+
 int main(int argc, char *argv[])
 {
-  origFile = NULL;
-  fname = NULL;
-  fortranMode = 0;
-  internalMode = 0;
+  char* origFile = NULL;
+  char* fname = NULL;
+  int fortranMode = 0;
+  int internalMode = 0;
   bool dependsMode = false;
   bool countTokens = false;
   bool chareNames = false;
@@ -222,7 +262,6 @@ int main(int argc, char *argv[])
     }
   }
   // if (fname==NULL) abortxi(argv[0]);
-
   std::string buffer = readFile(fname);
   sanitizeComments(buffer);
   sanitizeStrings(buffer);
@@ -233,33 +272,5 @@ int main(int argc, char *argv[])
   }
 
   AstChildren<Module> *m = Parse(buffer);
-  if (!m) return 0;
-  m->preprocess();
-  m->check();
-  if (num_errors != 0)
-    exit(1);
-
-  if (chareNames) {
-    m->printChareNames();
-    return 0;
-  }
-
-  if (dependsMode) {
-    std::string ciFileBaseName;
-    if (fname != NULL) {
-      ciFileBaseName = fname;
-    } else if (origFile != NULL) {
-      ciFileBaseName = origFile;
-    } else {
-      abortxi(argv[0]);
-    }
-    size_t loc = ciFileBaseName.rfind('/');
-    if (loc != std::string::npos)
-        ciFileBaseName = ciFileBaseName.substr(loc+1);
-    m->recurse(ciFileBaseName.c_str(), &Module::genDepend);
-  } else {
-    m->recursev(&Module::generate);
-  }
-
-  return 0;
+  return processAst(m, chareNames, dependsMode, fortranMode, internalMode, fname, origFile);
 }
