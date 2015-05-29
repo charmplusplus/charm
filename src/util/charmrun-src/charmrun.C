@@ -4453,9 +4453,9 @@ void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv,
       fprintf(f, "$F_XTERM");
       fprintf(f, " -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
       if (strcmp(dbg, "idb") == 0)
-        fprintf(f, " -e $F_DBG %s -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+        fprintf(f, " -e $F_DBG \"%s\" -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
       else
-        fprintf(f, " -e $F_DBG %s -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+        fprintf(f, " -e $F_DBG \"%s\" -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
     } else if (strcmp(dbg, "dbx") == 0) {
       fprintf(f, "cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
       fprintf(f, "sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
