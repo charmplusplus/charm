@@ -1213,8 +1213,6 @@ void nodetab_makehost(const char *name, nodetab_host *h)
       exit(1);
     }
   }
-  if (nodetab_size == nodetab_max)
-    return;
 }
 
 const char *nodetab_args(const char *args, nodetab_host *h)
