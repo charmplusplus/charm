@@ -46,7 +46,7 @@ module completion_test {
       }
       when finish_test(CkReductionMsg *m) atomic {
 	  int num = 10;
-	  CProxy_completion_array::ckNew(detector, num, num);
+	  CProxy_completion_array::ckNew(detector, num, num, CkCallback());
 	  detector.start_detection(num, CkCallback(), CkCallback(),
 				   CkCallback(CkIndex_completion_tester::finish_test(0),
 					      thisProxy), 0);

@@ -35,7 +35,7 @@ module CkMemCheckpoint {
 	entry void gotReply();
 	entry void quiescence(CkCallback&);
         entry void inmem_restore(CkArrayCheckPTMessage *m);
-	entry void updateLocations(int n, CkGroupID g[n], CkArrayIndex idx[n],int nowOnPe);
+	entry void updateLocations(int n, CkGroupID g[n], CkArrayIndex idx[n], CmiUInt8 id[n], int nowOnPe);
   };
 
   initproc void CkRegisterRestartHandler();

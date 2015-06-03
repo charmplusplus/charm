@@ -4,7 +4,7 @@ void synctest_moduleinit(void) {}
 
 void synctest_init(void) 
 {
-  CProxy_synctest_main::ckNew();
+  CProxy_synctest_main::ckNew(0);
 }
 
 synctest_main::synctest_main(void) 

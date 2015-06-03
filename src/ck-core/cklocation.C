@@ -18,6 +18,9 @@
 #include <vector>
 #include <algorithm>
 #include<sstream>
+#include <map>
+
+using std::map;
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
@@ -36,10 +39,6 @@ CkpvExtern(int, currentChareIdx);
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvExtern(void *, CkGridObject);
 #endif
-
-static const char *idx2str(const CkArrayMessage *m) {
-  return idx2str(((CkArrayMessage *)m)->array_index());
-}
 
 #define ARRAY_DEBUG_OUTPUT 0
 
@@ -72,6 +71,10 @@ static const char *idx2str(const CkArrayMessage *m) {
 
 //whether to use block mapping in the SMP node level
 bool useNodeBlkMapping;
+
+/// Message size above which the runtime will buffer messages directed at
+/// unlocated array elements
+int _messageBufferingThreshold;
 
 #if CMK_LBDB_ON
 /*LBDB object handles are fixed-sized, and not necc.
@@ -132,9 +135,9 @@ void UpdateLocation(MigrateInfo& migData) {
 #endif
 
 /*********************** Array Messages ************************/
-CkArrayIndex &CkArrayMessage::array_index(void)
+CmiUInt8 CkArrayMessage::array_element_id(void)
 {
-    return UsrToEnv((void *)this)->getsetArrayIndex();
+  return ck::ObjID(UsrToEnv((void *)this)->getRecipientID()).getElementID();
 }
 unsigned short &CkArrayMessage::array_ep(void)
 {
@@ -208,7 +211,7 @@ void CkArrayMap::unregisterArray(int idx)
           } \
 	}
 
-void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr)
+void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArray *mgr)
 {
 	if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
@@ -698,7 +701,7 @@ public:
 	DEBC((AA "Creating BlockMap\n" AB));
   }
   BlockMap(CkMigrateMessage *m):RRMap(m){ }
-  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr){
+  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArray *mgr){
 	if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
@@ -758,25 +761,18 @@ public:
   {
      return CLD_ANYWHERE;   // -1
   }
-  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr)  {
+  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArray *mgr)  {
         if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
         int thisPe=CkMyPe();
         int numPes=CkNumPes();
-        //CkArrayIndex idx;
 
         CKARRAYMAP_POPULATE_INITIAL(i%numPes==thisPe);
-	/*for (idx=numElements.begin(); idx<numElements; idx.getNext(numElements)) {
-          //for (int i=0;i<numElements;i++)
-                        if((idx.getRank(numElements))%numPes==thisPe)
-                                mgr->insertInitial(CkArrayIndex1D(i),CkCopyMsg(&ctorMsg),0);
-        }*/
         mgr->doneInserting();
         CkFreeMsg(ctorMsg);
   }
-
 };
 
 
@@ -875,7 +871,7 @@ public:
   ConfigurableRRMap(CkMigrateMessage *m):RRMap(m){ }
 
 
-  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr){
+  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArray *mgr){
     // Try to load the configuration from command line argument
     CkAssert(haveConfigurableRRMap());
     ConfigurableRRMapLoader &loader =  CkpvAccess(myConfigRRMapState);
@@ -1103,15 +1099,8 @@ CkMigratable * CkArrayMessageObjectPtr(envelope *env) {
       return NULL;   // not an array msg
 
   ///@todo: Delegate this to the array manager which can then deal with ForArrayEltMsg or ForIDedObjMsg
-  CkArrayID aid = env->getArrayMgr();
-  CkArray *mgr=(CkArray *)_localBranch(aid);
-  if (mgr) {
-    CkLocMgr *locMgr = mgr->getLocMgr();
-    if (locMgr) {
-      return locMgr->lookup(env->getsetArrayIndex(),aid);
-    }
-  }
-  return NULL;
+  CkArray *mgr = CProxy_CkArray(env->getArrayMgr()).ckLocalBranch();
+  return mgr ? mgr->lookup(ck::ObjID(env->getRecipientID()).getElementID()) : NULL;
 }
 
 /****************************** Out-of-Core support ********************/
@@ -1183,7 +1172,7 @@ static void _CkMigratable_prefetchInit(void)
  */
 class CkMigratable_initInfo {
 public:
-	CkLocRec_local *locRec;
+	CkLocRec *locRec;
 	int chareType;
 	bool forPrefetch; /* If true, this creation is only a prefetch restore-from-disk.*/
 };
@@ -1573,36 +1562,7 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 #endif
 
 
-/*CkMigratableList*/
-CkMigratableList::CkMigratableList() {}
-CkMigratableList::~CkMigratableList() {}
-
-void CkMigratableList::setSize(int s) {
-	el.resize(s);
-}
-
-void CkMigratableList::put(CkMigratable *v,int atIdx) {
-#if CMK_ERROR_CHECKING
-	if (atIdx>=length())
-		CkAbort("Internal array manager error (CkMigrableList::put index out of bounds)");
-#endif
-	el[atIdx]=v;
-}
-
-
 /************************** Location Records: *********************************/
-
-//---------------- Base type:
-void CkLocRec::weAreObsolete(const CkArrayIndex &idx) {}
-CkLocRec::~CkLocRec() { }
-void CkLocRec::beenReplaced(void)
-    {/*Default: ignore replacement*/}
-
-//Return the represented array element; or NULL if there is none
-CkMigratable *CkLocRec::lookupElement(CkArrayID aid) {return NULL;}
-
-//Return the last known processor; or -1 if none
-int CkLocRec::lookupProcessor(void) {return -1;}
 
 
 /*----------------- Local:
@@ -1610,9 +1570,9 @@ Matches up the array index with the local index, an
 interfaces with the load balancer on behalf of the
 represented array elements.
 */
-CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,bool fromMigration,
-  bool ignoreArrival, const CkArrayIndex &idx_,int localIdx_)
-	:CkLocRec(mgr),idx(idx_),localIdx(localIdx_),
+CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
+                   bool ignoreArrival, const CkArrayIndex &idx_, CmiUInt8 id_)
+  :myLocMgr(mgr),idx(idx_), id(id_),
 	 running(false),deletedMarker(NULL)
 {
 #if CMK_LBDB_ON
@@ -1646,17 +1606,17 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,bool fromMigration,
 	*/
 	asyncEvacuate = true;
 }
-CkLocRec_local::~CkLocRec_local()
+CkLocRec::~CkLocRec()
 {
 	if (deletedMarker!=NULL) *deletedMarker=true;
-	myLocMgr->reclaim(idx,localIdx);
+	myLocMgr->reclaim(idx);
 #if CMK_LBDB_ON
 	stopTiming();
 	DEBL((AA "Unregistering element %s from load balancer\n" AB,idx2str(idx)));
 	the_lbdb->UnregisterObj(ldHandle);
 #endif
 }
-void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
+void CkLocRec::migrateMe(int toPe) //Leaving this processor
 {
 	//This will pack us up, send us off, and delete us
 //	printf("[%d] migrating migrateMe to %d \n",CkMyPe(),toPe);
@@ -1664,80 +1624,35 @@ void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 }
 
 #if CMK_LBDB_ON
-void CkLocRec_local::informIdealLBPeriod(int lb_ideal_period) {
-  myLocMgr->informLBPeriod(this, lb_ideal_period);
-}
-
-void CkLocRec_local::metaLBCallLB() {
-	myLocMgr->metaLBCallLB(this);
-}
-
-void CkLocRec_local::startTiming(int ignore_running) {
+void CkLocRec::startTiming(int ignore_running) {
   	if (!ignore_running) running=true;
 	DEBL((AA "Start timing for %s at %.3fs {\n" AB,idx2str(idx),CkWallTimer()));
   	if (enable_measure) the_lbdb->ObjectStart(ldHandle);
 }
-void CkLocRec_local::stopTiming(int ignore_running) {
+void CkLocRec::stopTiming(int ignore_running) {
 	DEBL((AA "} Stop timing for %s at %.3fs\n" AB,idx2str(idx),CkWallTimer()));
   	if ((ignore_running || running) && enable_measure) the_lbdb->ObjectStop(ldHandle);
   	if (!ignore_running) running=false;
 }
-void CkLocRec_local::setObjTime(double cputime) {
+void CkLocRec::setObjTime(double cputime) {
 	the_lbdb->EstObjLoad(ldHandle, cputime);
 }
-double CkLocRec_local::getObjTime() {
+double CkLocRec::getObjTime() {
         LBRealType walltime, cputime;
         the_lbdb->GetObjLoad(ldHandle, walltime, cputime);
         return walltime;
 }
 #if CMK_LB_USER_DATA
-void* CkLocRec_local::getObjUserData(int idx) {
+void* CkLocRec::getObjUserData(int idx) {
         return the_lbdb->GetDBObjUserData(ldHandle, idx);
 }
 #endif
 #endif
 
-void CkLocRec_local::destroy(void) //User called destructor
+void CkLocRec::destroy(void) //User called destructor
 {
 	//Our destructor does all the needed work
 	delete this;
-}
-//Return the represented array element; or NULL if there is none
-CkMigratable *CkLocRec_local::lookupElement(CkArrayID aid) {
-	return myLocMgr->lookupLocal(localIdx,aid);
-}
-
-//Return the last known processor; or -1 if none
-int CkLocRec_local::lookupProcessor(void) {
-	return CkMyPe();
-}
-
-CkLocRec::RecType CkLocRec_local::type(void)
-{
-	return local;
-}
-
-void CkLocRec_local::addedElement(void) 
-{
-	//Push everything in the half-created queue into the system--
-	// anything not ready yet will be put back in.
-	while (!halfCreated.isEmpty()) 
-		CkArrayManagerDeliver(CkMyPe(),halfCreated.deq());
-}
-
-bool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
-{ 
-	int len=halfCreated.length();
-	if (len!=0) {
-		/* This is suspicious-- the halfCreated queue should be extremely
-		 transient.  It's possible we just looked at the wrong time, though;
-		 so this is only a warning. 
-		*/
-		CkPrintf("CkLoc WARNING> %d messages still around for uncreated element %s!\n",
-			 len,idx2str(idx));
-	}
-	//A local element never expires
-	return false;
 }
 
 /**********Added for cosmology (inline function handling without parameter marshalling)***********/
@@ -1768,7 +1683,7 @@ void CkMigratable::timingAfterCall(LDObjHandle objHandle,int *objstopped){
 /****************************************************************************/
 
 
-bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
+bool CkLocRec::invokeEntry(CkMigratable *obj,void *msg,
 	int epIdx,bool doFree) 
 {
 
@@ -1816,93 +1731,28 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	return true;
 }
 
-bool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
-{
-
-	if (type==CkDeliver_queue) { /*Send via the message queue */
-		if (opts & CK_MSG_KEEP)
-			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-		CkArrayManagerDeliver(CkMyPe(),msg,opts);
-		return true;
-	}
-	else
-	{
-		CkMigratable *obj=myLocMgr->lookupLocal(localIdx,
-			UsrToEnv(msg)->getArrayMgr());
-		if (obj==NULL) {//That sibling of this object isn't created yet!
-			if (opts & CK_MSG_KEEP)
-				msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-			if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) {
-				return myLocMgr->demandCreateElement(msg,CkMyPe(),type);
-			}
-			else {
-				DEBS((AA "   BUFFERING message for nonexistent element %s!\n" AB,idx2str(this->idx)));
-				halfCreated.enq(msg);
-				return true;
-			}
-		}
-			
-		if (msg->array_hops()>1)
-			myLocMgr->multiHop(msg);
-		bool doFree = (bool)!(opts & CK_MSG_KEEP);
-#if CMK_LBDB_ON
-		// if there is a running obj being measured, stop it temporarily
-		LDObjHandle objHandle;
-		int objstopped = 0;
-		if (the_lbdb->RunningObject(&objHandle)) {
-			objstopped = 1;
-			the_lbdb->ObjectStop(objHandle);
-		}
-#endif
-#if CMK_GRID_QUEUE_AVAILABLE
-		// retain a pointer to the sending object (needed later)
-		CpvAccess(CkGridObject) = obj;
-#endif
-
-	bool status = invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
-	
-#if CMK_GRID_QUEUE_AVAILABLE
-		CpvAccess(CkGridObject) = NULL;
-#endif
-#if CMK_LBDB_ON
-		if (objstopped) the_lbdb->ObjectStart(objHandle);
-#endif
-		return status;
-	}
-
-
-}
-
 #if CMK_LBDB_ON
 
-void CkLocRec_local::staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period) {
-	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
+void CkLocRec::staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period) {
+	CkLocRec *el=(CkLocRec *)LDObjUserData(h);
 	DEBL((AA "MetaBalancer wants to resume waiting chare %s\n" AB,idx2str(el->idx)));
-	el->metaLBResumeWaitingChares(lb_ideal_period);
+	el->myLocMgr->informLBPeriod(el, lb_ideal_period);
 }
 
-void CkLocRec_local::metaLBResumeWaitingChares(int lb_ideal_period) {
-  informIdealLBPeriod(lb_ideal_period);
-}
-
-void CkLocRec_local::staticMetaLBCallLBOnChares(LDObjHandle h) {
-	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
+void CkLocRec::staticMetaLBCallLBOnChares(LDObjHandle h) {
+	CkLocRec *el=(CkLocRec *)LDObjUserData(h);
 	DEBL((AA "MetaBalancer wants to call LoadBalance on chare %s\n" AB,idx2str(el->idx)));
-	el->metaLBCallLBOnChares();
+	el->myLocMgr->metaLBCallLB(el);
 }
 
-void CkLocRec_local::metaLBCallLBOnChares() {
-  metaLBCallLB();
-}
-
-void CkLocRec_local::staticMigrate(LDObjHandle h, int dest)
+void CkLocRec::staticMigrate(LDObjHandle h, int dest)
 {
-	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
+	CkLocRec *el=(CkLocRec *)LDObjUserData(h);
 	DEBL((AA "Load balancer wants to migrate %s to %d\n" AB,idx2str(el->idx),dest));
 	el->recvMigrate(dest);
 }
 
-void CkLocRec_local::recvMigrate(int toPe)
+void CkLocRec::recvMigrate(int toPe)
 {
 	// we are in the mode of delaying actual migration
  	// till readyMigrate()
@@ -1910,13 +1760,13 @@ void CkLocRec_local::recvMigrate(int toPe)
 	else nextPe = toPe;
 }
 
-void CkLocRec_local::AsyncMigrate(bool use)  
+void CkLocRec::AsyncMigrate(bool use)  
 {
         asyncMigrate = use; 
 	the_lbdb->UseAsyncMigrate(ldHandle, use);
 }
 
-bool CkLocRec_local::checkBufferedMigration()
+bool CkLocRec::checkBufferedMigration()
 {
 	// we don't migrate in user's code when calling ReadyMigrate(true)
 	// we postphone the action to here until we exit from the user code.
@@ -1931,14 +1781,14 @@ bool CkLocRec_local::checkBufferedMigration()
 	return false;
 }
 
-int CkLocRec_local::MigrateToPe()
+int CkLocRec::MigrateToPe()
 {
 	int pe = nextPe;
 	nextPe = -1;
 	return pe;
 }
 
-void CkLocRec_local::setMigratable(int migratable)
+void CkLocRec::setMigratable(int migratable)
 {
 	if (migratable)
   	  the_lbdb->Migratable(ldHandle);
@@ -1946,255 +1796,18 @@ void CkLocRec_local::setMigratable(int migratable)
   	  the_lbdb->NonMigratable(ldHandle);
 }
 
-void CkLocRec_local::setPupSize(size_t obj_pup_size) {
+void CkLocRec::setPupSize(size_t obj_pup_size) {
   the_lbdb->setPupSize(ldHandle, obj_pup_size);
 }
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CkLocRec_local::Migrated(){
+void CkLocRec::Migrated(){
     the_lbdb->Migrated(ldHandle, true);
 }
 #endif
 #endif
 
-/**
- * Represents a deleted array element (and prevents re-use).
- * These are a debugging aid, usable only by uncommenting a line in
- * the element destruction code.
- */
-class CkLocRec_dead:public CkLocRec {
-public:
-	CkLocRec_dead(CkLocMgr *Narr):CkLocRec(Narr) {}
-  
-	virtual RecType type(void) {return dead;}
-  
-	virtual bool deliver(CkArrayMessage *msg,CkDeliver_t type,int opts=0) {
-		CkPrintf("Dead array element is %s.\n",idx2str(msg->array_index()));
-		CkAbort("Send to dead array element!\n");
-		return false;
-	}
-	virtual void beenReplaced(void) 
-		{CkAbort("Can't re-use dead array element!\n");}
-  
-	//Return if this element is now obsolete (it isn't)
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx) {return false;}	
-};
 
-/**
- * This is the abstract superclass of arrayRecs that keep track of their age,
- * and eventually expire. Its kids are remote and buffering.
- */
-class CkLocRec_aging:public CkLocRec {
-private:
-	int lastAccess;//Age when last accessed
-protected:
-	//Update our access time
-	inline void access(void) {
-		lastAccess=myLocMgr->getSpringCount();
-	}
-	//Return if we are "stale"-- we were last accessed a while ago
-	bool isStale(void) {
-		if (myLocMgr->getSpringCount()-lastAccess>3) return true;
-		else return false;
-	}
-public:
-	CkLocRec_aging(CkLocMgr *Narr):CkLocRec(Narr) {
-		lastAccess=myLocMgr->getSpringCount();
-	}
-	//Return if this element is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)=0;
-	//virtual void pup(PUP::er &p) { CkLocRec::pup(p); p(lastAccess); }
-};
-
-
-/**
- * Represents a remote array element.  This is just a PE number.
- */
-class CkLocRec_remote:public CkLocRec_aging {
-private:
-	int onPe;//The last known Pe for this element
-public:
-	CkLocRec_remote(CkLocMgr *Narr,int NonPe)
-		:CkLocRec_aging(Narr)
-		{
-			onPe=NonPe;
-#if CMK_ERROR_CHECKING
-			if (onPe==CkMyPe())
-				CkAbort("ERROR!  'remote' array element on this Pe!\n");
-#endif
-		}
-	//Return the last known processor for this element
-	int lookupProcessor(void) {
-		return onPe;
-	}  
-	virtual RecType type(void) {return remote;}
-  
-	//Send a message for this element.
-	virtual bool deliver(CkArrayMessage *msg,CkDeliver_t type,int opts=0) {
-		/*FAULT_EVAC*/
-		int destPE = onPe;
-		if((!CmiNodeAlive(onPe) && onPe != allowMessagesOnly)){
-//			printf("Delivery failed because process %d is invalid\n",onPe);
-			/*
-				Send it to its home processor instead
-			*/
-			const CkArrayIndex &idx=msg->array_index();
-			destPE = getNextPE(idx);
-		}
-		access();//Update our modification date
-		msg->array_hops()++;
-		DEBS((AA "   Forwarding message for element %s to %d (REMOTE)\n" AB,
-		      idx2str(msg->array_index()),destPE));
-		if (opts & CK_MSG_KEEP)
-			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-		CkArrayManagerDeliver(destPE,msg,opts);
-		return true;
-	}
-	//Return if this element is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx) {
-		if (myLocMgr->isHome(idx)) 
-			//Home elements never become obsolete
-			// if they did, we couldn't deliver messages to that element.
-			return false;
-		else if (isStale())
-			return true;//We haven't been used in a long time
-		else
-			return false;//We're fairly recent
-	}
-	//virtual void pup(PUP::er &p) { CkLocRec_aging::pup(p); p(onPe); }
-};
-
-
-/**
- * Buffers messages until record is replaced in the hash table, 
- * then delivers all messages to the replacing record.  This is 
- * used when a message arrives for a local element that has not
- * yet been created, buffering messages until the new element finally
- * checks in.
- *
- * It's silly to send a message to an element you won't ever create,
- * so this kind of record causes an abort "Stale array manager message!"
- * if it's left undelivered too long.
- */
-class CkLocRec_buffering:public CkLocRec_aging {
-private:
-	CkQ<CkArrayMessage *> buffer;//Buffered messages.
-public:
-	CkLocRec_buffering(CkLocMgr *Narr):CkLocRec_aging(Narr) {}
-	virtual ~CkLocRec_buffering() {
-		if (0!=buffer.length()) {
-			CkPrintf("[%d] Warning: Messages abandoned in array manager buffer!\n", CkMyPe());
-			CkArrayMessage *m;
-			while (NULL!=(m=buffer.deq()))  {
-				delete m;
-			}
-		}
-	}
-  
-	virtual RecType type(void) {return buffering;}
-  
-	//Buffer a message for this element.
-	virtual bool deliver(CkArrayMessage *msg,CkDeliver_t type,int opts=0) {
-		DEBS((AA " Queued message for %s\n" AB,idx2str(msg->array_index())));
-		if (opts & CK_MSG_KEEP)
-			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-		buffer.enq(msg);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-		envelope *env = UsrToEnv(msg);
-		env->sender = CpvAccess(_currentObj)->mlogData->objID;
-#endif
-		return true;
-	}
- 
-	//This is called when this ArrayRec is about to be replaced.
-	// We dump all our buffered messages off on the next guy,
-	// who should know what to do with them.
-	virtual void beenReplaced(void) {
-		DEBS((AA " Delivering queued messages:\n" AB));
-		CkArrayMessage *m;
-		while (NULL!=(m=buffer.deq())) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))         
-		DEBUG(CmiPrintf("[%d] buffered message being sent\n",CmiMyPe()));
-		envelope *env = UsrToEnv(m);
-		Chare *oldObj = CpvAccess(_currentObj);
-		CpvAccess(_currentObj) =(Chare *) env->sender.getObject();
-		env->sender.type = TypeInvalid;
-#endif
-		DEBS((AA "Sending buffered message to %s\n" AB,idx2str(m->array_index())));
-		myLocMgr->deliverViaQueue(m);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))         
-		CpvAccess(_currentObj) = oldObj;
-#endif
-		}
-	}
-  
-	//Return if this element is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx) {
-		if (isStale() && buffer.length()>0) {
-			/*This indicates something is seriously wrong--
-			  buffers should be short-lived.*/
-			CkPrintf("[%d] WARNING: %d stale array message(s) found!\n",CkMyPe(),buffer.length());
-			CkArrayMessage *msg=buffer[0];
-			CkPrintf("Addressed to: ");
-			CkPrintEntryMethod(msg->array_ep());
-			CkPrintf(" index %s\n",idx2str(idx));
-			if (myLocMgr->isHome(idx)) 
-				CkPrintf("is this an out-of-bounds array index, or was it never created?\n");
-			else //Idx is a remote-home index
-				CkPrintf("why weren't they forwarded?\n");
-			
-			// CkAbort("Stale array manager message(s)!\n");
-		}
-		return false;
-	}
-  
-/*  virtual void pup(PUP::er &p) {
-    CkLocRec_aging::pup(p);
-    CkArray::pupArrayMsgQ(buffer, p);
-    }*/
-};
-
-/*********************** Spring Cleaning *****************/
-/**
- * Used to periodically flush out unused remote element pointers.
- *
- * Cleaning often will free up memory quickly, but slow things
- * down because the cleaning takes time and some not-recently-referenced
- * remote element pointers might be valid and used some time in 
- * the future.
- *
- * Also used to determine if buffered messages have become stale.
- */
-inline void CkLocMgr::springCleaning(void)
-{
-  nSprings++;
-
-  //Poke through the hash table for old ArrayRecs.
-  void *objp;
-  void *keyp;
-  
-  CkHashtableIterator *it=hash.iterator();
-  CmiImmediateLock(hashImmLock);
-  while (NULL!=(objp=it->next(&keyp))) {
-    CkLocRec *rec=*(CkLocRec **)objp;
-    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-    if (rec->isObsolete(nSprings,idx)) {
-      //This record is obsolete-- remove it from the table
-      DEBK((AA "Cleaning out old record %s\n" AB,idx2str(idx)));
-      hash.remove(*(CkArrayIndex *)&idx);
-      delete rec;
-      it->seek(-1);//retry this hash slot
-    }
-  }
-  CmiImmediateUnlock(hashImmLock);
-  delete it;
-
-  setupSpringCleaning();
-}
-void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
-	DEBK((AA "Starting spring cleaning at %.2f\n" AB,CkWallTimer()));
-	((CkLocMgr *)forWhom)->springCleaning();
-}
 //doesn't delete if there is extra pe
 void CkLocMgr::flushLocalRecs(void)
 {
@@ -2205,10 +1818,8 @@ void CkLocMgr::flushLocalRecs(void)
   while (NULL!=(objp=it->next(&keyp))) {
     CkLocRec *rec=*(CkLocRec **)objp;
     CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-    if (rec->type() == CkLocRec::local) {
-        callMethod((CkLocRec_local*)rec, &CkMigratable::ckDestroy);
-        it->seek(-1);//retry this hash slot
-    }
+    callMethod((CkLocRec*)rec, &CkMigratable::ckDestroy);
+    it->seek(-1);//retry this hash slot
   }
   delete it;
   CmiImmediateUnlock(hashImmLock);
@@ -2223,22 +1834,8 @@ void CkLocMgr::flushAllRecs(void)
   CmiImmediateLock(hashImmLock);
   while (NULL!=(objp=it->next(&keyp))) {
     CkLocRec *rec=*(CkLocRec **)objp;
-    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-    if (rec->type() != CkLocRec::local) {
-      //In the case of taking core out of memory (in BigSim's emulation)
-      //the meta data in the location manager are not deleted so we need
-      //this condition
-      
-      if(_BgOutOfCoreFlag!=1){
-	hash.remove(*(CkArrayIndex *)&idx);
-        delete rec;
-        it->seek(-1);//retry this hash slot
-      }
-    }
-    else {
-        callMethod((CkLocRec_local*)rec, &CkMigratable::ckDestroy);
-        it->seek(-1);//retry this hash slot
-    }
+    callMethod(rec, &CkMigratable::ckDestroy);
+    it->seek(-1);//retry this hash slot
   }
   delete it;
   CmiImmediateUnlock(hashImmLock);
@@ -2266,21 +1863,14 @@ void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
-#if CMK_ERROR_CHECKING
+	, idCounter(1)
         , bounds(opts.getBounds())
-#endif
 {
 	DEBC((AA "Creating new location manager %d\n" AB,thisgroup));
 // moved to _CkMigratable_initInfoInit()
 //	CkpvInitialize(CkMigratable_initInfo,mig_initInfo);
 
-	managers.init();
-	nManagers=0;
-  	firstManager=NULL;
-	firstFree=localLen=0;
-	duringMigration=false;
-	nSprings=0;
-        setupSpringCleaning();
+	duringMigration = false;
 
 //Register with the map object
 	mapID = opts.getMap();
@@ -2289,7 +1879,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	mapHandle=map->registerArray(opts.getNumInitial(), thisgroup);
 
         // Figure out the mapping from indices to object IDs if one is possible
-        compressor = ck::FixedArrayIndexCompressor::make(opts.getBounds());
+        compressor = ck::FixedArrayIndexCompressor::make(bounds);
 
 //Find and register with the load balancer
 #if CMK_LBDB_ON
@@ -2303,20 +1893,8 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	:IrrGroup(m),thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),hash(17,0.3)
 {
-	managers.init();
-	nManagers=0;
-	firstManager=NULL;
-	firstFree=localLen=0;
-	duringMigration=false;
-	nSprings=0;
-        setupSpringCleaning();
+	duringMigration = false;
 	hashImmLock = CmiCreateImmediateLock();
-}
-
-void CkLocMgr::setupSpringCleaning() {
-#if !CMK_GLOBAL_LOCATION_UPDATE
-	springCleaningCcd = CcdCallOnConditionOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
-#endif
 }
 
 CkLocMgr::~CkLocMgr() {
@@ -2326,7 +1904,6 @@ CkLocMgr::~CkLocMgr() {
   the_lbdb->RemoveLocalBarrierReceiver(lbBarrierReceiver);
   the_lbdb->UnregisterOM(myLBHandle);
 #endif
-  CcdCancelCallOnCondition(CcdPERIODIC_1minute, springCleaningCcd);
   map->unregisterArray(mapHandle);
   CmiDestroyLock(hashImmLock);
 }
@@ -2336,7 +1913,8 @@ void CkLocMgr::pup(PUP::er &p){
 	p|mapID;
 	p|mapHandle;
 	p|lbdbID;
-  p|metalbID;
+        p|metalbID;
+        p|bounds;
 	if(p.isUnpacking()) {
 		thisProxy=thisgroup;
 		CProxyElement_CkLocMgr newlocalproxy(thisgroup,CkMyPe());
@@ -2347,6 +1925,7 @@ void CkLocMgr::pup(PUP::er &p){
                 CkArrayIndex emptyIndex;
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID, metalbID);
+                compressor = ck::FixedArrayIndexCompressor::make(bounds);
 #if __FAULT__
         int count = 0;
         p | count;
@@ -2360,7 +1939,7 @@ void CkLocMgr::pup(PUP::er &p){
             idx.pup(p);
             p | pe;
   //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
-            inform(idx,pe);
+            inform(idx, idx2id[idx], pe);
             CkLocRec *rec = elementNrec(idx);
             CmiAssert(rec!=NULL);
             CmiAssert(lastKnown(idx) == pe);
@@ -2383,143 +1962,38 @@ void CkLocMgr::pup(PUP::er &p){
         void *keyp;
         CkVec<int> pe_list;
         CkVec<CkArrayIndex> idx_list;
-        CkHashtableIterator *it = hash.iterator();
-      while (NULL!=(objp=it->next(&keyp))) {
-          CkLocRec *rec=*(CkLocRec **)objp;
-          CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-            if(rec->type() != CkLocRec::local){
-                if(homePe(idx) == CmiMyPe()){
-                  int pe;
-                  CkArrayIndex max = idx;
-                  pe = rec->lookupProcessor();
-                  idx_list.push_back(max);
-                  pe_list.push_back(pe);
-                    count++;
-                }
+        for (std::map<CkArrayIndex, int>::iterator itr = idx2pe.begin(); itr != idx2pe.end(); ++itr)
+            if (homePe(itr->first) == CmiMyPe() && itr->second != CmiMyPe())
+            {
+                idx_list.push_back(itr->first);
+                pe_list.push_back(itr->second);
+                count++;
             }
-        }
+
         p | count;
-
-		// releasing iterator memory
-		delete it;
-
       for(int i=0;i<pe_list.length();i++){
-        CkArrayIndex max = idx_list[i];
-        max.pup(p);
+        p|idx_list[i];
         p|pe_list[i];
       }
-    /*    it = hash.iterator();
-      while (NULL!=(objp=it->next(&keyp))) {
-      CkLocRec *rec=*(CkLocRec **)objp;
-        CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-            CkArrayIndex max = idx;
-            if(rec->type() != CkLocRec::local){
-                if(homePe(idx) == CmiMyPe()){
-                    int pe;
-                    max.pup(p);
-                    pe = rec->lookupProcessor();
-                    p | pe;
-                    count1++;
-                }
-            }
-        }
-      //  CmiAssert(count == count1);
-
-		// releasing iterator memory
-		delete it;*/
-
 #endif
 
 	}
-}
-
-void _CkLocMgrInit(void) {
-  /* Don't trace our deliver method--it does its own tracing */
-  CkDisableTracing(CkIndex_CkLocMgr::deliverInline(0));
 }
 
 /// Add a new local array manager to our list.
-/// Returns a new CkMigratableList for the manager to store his
-/// elements in.
-CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
+void CkLocMgr::addManager(CkArrayID id,CkArray *mgr)
 {
 	CK_MAGICNUMBER_CHECK
 	DEBC((AA "Adding new array manager\n" AB));
-	//Link new manager into list
-	ManagerRec *n=new ManagerRec;
-	managers.find(id)=n;
-	n->next=firstManager;
-	n->mgr=mgr;
-	n->elts.setSize(localLen);
-	nManagers++;
-	firstManager=n;
-	return &n->elts;
+	managers[id] = mgr;
 }
 
-void CkLocMgr::deleteManager(CkArrayID id, CkArrMgr *mgr) {
-  ManagerRec *&rec = managers.find(id);
+void CkLocMgr::deleteManager(CkArrayID id, CkArray *mgr) {
+  CkAssert(managers[id] == mgr);
+  managers.erase(id);
 
-  ManagerRec **prev = &firstManager;
-  ManagerRec *cur = firstManager;
-  while (cur->mgr != mgr) {
-    prev = &cur->next;
-    ++cur;
-  }
-
-  CkAssert(cur);
-  CkAssert(cur == rec);
-
-  *prev = cur->next;
-  nManagers--;
-  delete cur;
-  rec = NULL; // Would like to remove the entry entirely, but it's in a direct-mapped array
-
-  if (nManagers == 0)
+  if (managers.size() == 0)
     delete this;
-}
-
-/// Return the next unused local element index.
-int CkLocMgr::nextFree(void) {
-	if (firstFree>=localLen)
-	{//Need more space in the local index arrays-- enlarge them
-		int oldLen=localLen;
-		localLen=localLen*2+8;
-		DEBC((AA "Growing the local list from %d to %d...\n" AB,oldLen,localLen));
-		for (ManagerRec *m=firstManager;m!=NULL;m=m->next)
-			m->elts.setSize(localLen);
-		//Update the free list
-		freeList.resize(localLen);
-		for (int i=oldLen;i<localLen;i++)
-			freeList[i]=i+1;
-	}
-	int localIdx=firstFree;
-	if (localIdx==-1) CkAbort("CkLocMgr free list corrupted!");
-	firstFree=freeList[localIdx];
-	freeList[localIdx]=-1; //Mark as used
-	return localIdx;
-}
-
-CkLocRec_remote *CkLocMgr::insertRemote(const CkArrayIndex &idx,int nowOnPe)
-{
-	DEBS((AA "Remote element %s lives on %d\n" AB,idx2str(idx),nowOnPe));
-	CkLocRec_remote *rem=new CkLocRec_remote(this,nowOnPe);
-	insertRec(rem,idx);
-	return rem;
-}
-
-//This element now lives on the given Pe
-void CkLocMgr::inform(const CkArrayIndex &idx,int nowOnPe)
-{
-	if (nowOnPe==CkMyPe())
-		return; //Never insert a "remote" record pointing here
-	CkLocRec *rec=elementNrec(idx);
-	if (rec!=NULL && rec->type()==CkLocRec::local){
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CmiPrintf("[%d]WARNING!!! Element %d:%s is local but is being told it exists on %d\n",CkMyPe(),idx.dimension,idx2str(idx), nowOnPe);
-#endif
-		return; //Never replace a local element's record!
-	}
-	insertRemote(idx,nowOnPe);
 }
 
 //Tell this element's home processor it now lives "there"
@@ -2533,49 +2007,106 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 //#if defined(_FAULT_MLOG_)
 //        informLocationHome(thisgroup,idx,home,CkMyPe());
 //#else
-		thisProxy[home].updateLocation(idx,nowOnPe);
+		thisProxy[home].updateLocation(idx, lookupID(idx), nowOnPe);
 //#endif
 	}
 }
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-CkLocRec_local *CkLocMgr::createLocal(const CkArrayIndex &idx,
+CkLocRec *CkLocMgr::createLocal(const CkArrayIndex &idx,
         bool forMigration, bool ignoreArrival,
         bool notifyHome,int dummy)
 {
-    int localIdx=nextFree();
-    DEBC((AA "Adding new record for element %s at local index %d\n" AB,idx2str(idx),localIdx));
-    CkLocRec_local *rec=new CkLocRec_local(this,forMigration,ignoreArrival,idx,localIdx);
+    DEBC((AA "Adding new record for element %s\n" AB,idx2str(idx)));
+    CkLocRec *rec=new CkLocRec(this,forMigration,ignoreArrival,idx);
     if(!dummy){
         insertRec(rec,idx); //Add to global hashtable
+        idx2pe[idx] = CkMyPe();
+        deliverAnyBufferedMsgs(idx, bufferedMsgs);
     }   
     if (notifyHome) informHome(idx,CkMyPe());
     return rec; 
 }
 #else
-CkLocRec_local *CkLocMgr::createLocal(const CkArrayIndex &idx, 
+CkLocRec *CkLocMgr::createLocal(const CkArrayIndex &idx, 
 		bool forMigration, bool ignoreArrival,
 		bool notifyHome)
 {
-	int localIdx=nextFree();
-	DEBC((AA "Adding new record for element %s at local index %d\n" AB,idx2str(idx),localIdx));
-	CkLocRec_local *rec=new CkLocRec_local(this,forMigration,ignoreArrival,idx,localIdx);
-	insertRec(rec,idx); //Add to global hashtable
+	DEBC((AA "Adding new record for element %s\n" AB,idx2str(idx)));
+	CmiUInt8 id = lookupID(idx);
 
+	CkLocRec *rec=new CkLocRec(this, forMigration, ignoreArrival, idx, id);
+	insertRec(rec, id);
+        inform(idx, id, CkMyPe());
 
-	if (notifyHome) informHome(idx,CkMyPe());
+	if (notifyHome) { informHome(idx,CkMyPe()); }
 	return rec;
 }
 #endif
 
+
+void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer &buffer)
+{
+    MsgBuffer::iterator itr = buffer.find(id);
+    // If there are no buffered msgs, don't do anything
+    if (itr == buffer.end()) return;
+
+    std::vector<CkArrayMessage*> messagesToFlush;
+    messagesToFlush.swap(itr->second);
+
+    // deliver all buffered messages
+    for (int i = 0; i < messagesToFlush.size(); ++i)
+    {
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+        envelope *env = UsrToEnv(messagesToFlush[i]);
+        Chare *oldObj = CpvAccess(_currentObj);
+        CpvAccess(_currentObj) =(Chare *) env->sender.getObject();
+        env->sender.type = TypeInvalid;
+#endif
+        CkArrayMessage *m = messagesToFlush[i];
+        deliverMsg(m, UsrToEnv(m)->getArrayMgr(), id, CkDeliver_queue);
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+        CpvAccess(_currentObj) = oldObj;
+#endif
+    }
+
+    CkAssert(itr->second.empty()); // Nothing should have been added, since we
+                                   // ostensibly know where the object lives
+
+    // and then, delete the entry in this table of buffered msgs
+    buffer.erase(itr);
+}
+
+CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex &idx)
+{
+  CmiUInt8 id;
+
+  if (compressor) {
+    id = compressor->compress(idx);
+    idx2id[idx] = id;
+    return id;
+  }
+
+  CkLocMgr::IdxIdMap::iterator itr = idx2id.find(idx);
+  if (itr == idx2id.end()) {
+    id = idCounter++ + ((CmiUInt8)CkMyPe() << 24);
+    idx2id[idx] = id;
+  } else {
+    id = itr->second;
+  }
+  return id;
+}
+
 //Add a new local array element, calling element's constructor
-bool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
+bool CkLocMgr::addElement(CkArrayID mgr,const CkArrayIndex &idx,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg)
 {
 	CK_MAGICNUMBER_CHECK
-	CkLocRec *oldRec=elementNrec(idx);
-	CkLocRec_local *rec;
-	if (oldRec==NULL||oldRec->type()!=CkLocRec::local) 
+
+        CmiUInt8 id = getNewObjectID(idx);
+
+	CkLocRec *rec = elementNrec(id);
+	if (rec == NULL)
 	{ //This is the first we've heard of that element-- add new local record
 		rec=createLocal(idx,false,false,true);
 #if CMK_GLOBAL_LOCATION_UPDATE
@@ -2586,23 +2117,23 @@ bool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
                 }
 #endif
                 
-	} else 
-	{ //rec is *already* local-- must not be the first insertion	
-		rec=((CkLocRec_local *)oldRec);
-		rec->addedElement();
 	}
-	if (!addElementToRec(rec,managers.find(id),elt,ctorIdx,ctorMsg)) return false;
+	//rec is *already* local-- must not be the first insertion	
+        else
+		deliverAnyBufferedMsgs(id, bufferedShadowElemMsgs);
+	if (!addElementToRec(rec, managers[mgr], elt, ctorIdx, ctorMsg)) return false;
 	elt->ckFinishConstruction();
 	return true;
 }
 
 //As above, but shared with the migration code
-bool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
+bool CkLocMgr::addElementToRec(CkLocRec *rec,CkArray *mgr,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg)
 {//Insert the new element into its manager's local list
-	int localIdx=rec->getLocalIndex();
-	if (m->elts.get(localIdx)!=NULL) CkAbort("Cannot insert array element twice!");
-	m->elts.put(elt,localIdx); //Local element table
+  CmiUInt8 id = lookupID(rec->getIndex());
+  if (mgr->getEltFromArrMgr(id))
+    CkAbort("Cannot insert array element twice!");
+  mgr->putEltInArrMgr(id, elt); //Local element table
 
 //Call the element's constructor
 	DEBC((AA "Constructing element %s of array\n" AB,idx2str(rec->getIndex())));
@@ -2632,43 +2163,137 @@ bool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 }
 
 void CkLocMgr::requestLocation(const CkArrayIndex &idx, const int peToTell,
-                               bool suppressIfHere) {
+                               bool suppressIfHere, int ifNonExistent, int chareType, CkArrayID mgr) {
   int onPe = -1;
+  //CkPrintf("%d requestLocation for %s peToTell %d\n", CkMyPe(), idx2str(idx), peToTell);
 
   if (peToTell == CkMyPe())
     return;
 
-  onPe = lastKnown(idx);
-  CkAssert(onPe != -1);
+  CkLocMgr::IdxIdMap::iterator itr = idx2id.find(idx);
+  if (itr == idx2id.end()) {
+    CkPrintf("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx));
+    bufferedLocationRequests[idx].push_back(make_pair(peToTell, suppressIfHere));
 
-  if (suppressIfHere && onPe == CkMyPe())
+    switch (ifNonExistent) {
+    case CkArray_IfNotThere_createhome:
+      demandCreateElement(idx, chareType, CkMyPe(), mgr);
+      break;
+    case CkArray_IfNotThere_createhere:
+      demandCreateElement(idx, chareType, peToTell, mgr);
+      break;
+    default:
+      break;
+    }
+
+    return;
+  }
+
+  onPe = lastKnown(idx);
+
+  if (suppressIfHere && peToTell == CkMyPe())
     return;
 
-  thisProxy[peToTell].updateLocation(idx, onPe);
+  thisProxy[peToTell].updateLocation(idx, idx2id[idx], onPe);
 }
 
-void CkLocMgr::updateLocation(const CkArrayIndex &idx, int nowOnPe) {
-  inform(idx, nowOnPe);
+void CkLocMgr::requestLocation(CmiUInt8 id, const int peToTell,
+                               bool suppressIfHere) {
+  int onPe = -1;
+  //CkPrintf("%d requestLocation for %u peToTell %d\n", CkMyPe(), id, peToTell);
+
+  if (peToTell == CkMyPe())
+    return;
+
+  onPe = lastKnown(id);
+
+  if (suppressIfHere && peToTell == CkMyPe())
+    return;
+
+  thisProxy[peToTell].updateLocation(id, onPe);
 }
+
+void CkLocMgr::updateLocation(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe) {
+  //CkPrintf("%d updateLocation for %s on %d\n", CkMyPe(), idx2str(idx), nowOnPe);
+  inform(idx, id, nowOnPe);
+  deliverAnyBufferedMsgs(id, bufferedRemoteMsgs);
+}
+
+void CkLocMgr::updateLocation(CmiUInt8 id, int nowOnPe) {
+  //CkPrintf("%d updateLocation for %s on %d\n", CkMyPe(), idx2str(idx), nowOnPe);
+  inform(id, nowOnPe);
+  deliverAnyBufferedMsgs(id, bufferedRemoteMsgs);
+}
+
+void CkLocMgr::inform(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe) {
+  // On restart, conservatively determine the next 'safe' ID to
+  // generate for new elements by the max over all of the elements with
+  // IDs corresponding to each PE
+  if (CkInRestarting()) {
+    CmiUInt8 maskedID = id & ((1u << 24) - 1);
+    CmiUInt8 origPe = id >> 24;
+    if (origPe == CkMyPe()) {
+      if (maskedID >= idCounter)
+        idCounter = maskedID + 1;
+    } else {
+      if (origPe < CkNumPes())
+        thisProxy[origPe].updateLocation(idx, id, nowOnPe);
+    }
+  }
+
+  idx2id[idx] = id;
+  id2pe[id] = nowOnPe;
+
+  std::map<CkArrayIndex, std::vector<std::pair<int, bool> > >::iterator itr =
+    bufferedLocationRequests.find(idx);
+  if (itr != bufferedLocationRequests.end()) {
+    for (std::vector<std::pair<int, bool> >::iterator i = itr->second.begin();
+         i != itr->second.end(); ++i) {
+      int peToTell = i->first;
+      //CkPrintf("%d Replying to buffered ID/location req to pe %d\n", CkMyPe(), peToTell);
+      if (peToTell != CkMyPe())
+        thisProxy[peToTell].updateLocation(idx, id, nowOnPe);
+    }
+    bufferedLocationRequests.erase(itr);
+  }
+
+  deliverAnyBufferedMsgs(id, bufferedMsgs);
+
+  std::map<CkArrayIndex, std::vector<CkArrayMessage*> >::iterator idx_itr =
+    bufferedIndexMsgs.find(idx);
+  if (idx_itr != bufferedIndexMsgs.end()) {
+    vector<CkArrayMessage*> &msgs = idx_itr->second;
+    for (int i = 0; i < msgs.size(); ++i) {
+      envelope *env = UsrToEnv(msgs[i]);
+      CkGroupID mgr = ck::ObjID(env->getRecipientID()).getCollectionID();
+      env->setRecipientID(ck::ObjID(mgr, id));
+      deliverMsg(msgs[i], mgr, id, CkDeliver_queue);
+    }
+    bufferedIndexMsgs.erase(idx_itr);
+  }
+}
+
+void CkLocMgr::inform(CmiUInt8 id, int nowOnPe) {
+  id2pe[id] = nowOnPe;
+  deliverAnyBufferedMsgs(id, bufferedMsgs);
+}
+
+
 
 /*************************** LocMgr: DELETION *****************************/
 /// This index will no longer be used-- delete the associated elements
-void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
+void CkLocMgr::reclaim(const CkArrayIndex &idx) {
 	CK_MAGICNUMBER_CHECK
-	DEBC((AA "Destroying element %s (local %d)\n" AB,idx2str(idx),localIdx));
+	DEBC((AA "Destroying element %s\n" AB,idx2str(idx)));
 	//Delete, and mark as empty, each array element
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		delete m->elts.get(localIdx);
-		m->elts.empty(localIdx);
-	}
+        CmiUInt8 id = lookupID(idx);
+    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin();
+            itr != managers.end(); ++itr) {
+      itr->second->deleteElt(id);
+    }
 	
-	removeFromTable(idx);
+	removeFromTable(id);
 	
-	//Link local index into free list
-	freeList[localIdx]=firstFree;
-	firstFree=localIdx;
-	
-		
 	if (!duringMigration) 
 	{ //This is a local element dying a natural death
 	    #if CMK_BIGSIM_CHARM
@@ -2687,31 +2312,32 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	        if (!CkInRestarting()) // all array elements are removed anyway
 #endif
 			thisProxy[home].reclaimRemote(idx,CkMyPe());
-	/*	//Install a zombie to keep the living from re-using this index.
-		insertRecN(new CkLocRec_dead(this),idx); */
 	}
 }
 
 void CkLocMgr::reclaimRemote(const CkArrayIndex &idx,int deletedOnPe) {
 	DEBC((AA "Our element %s died on PE %d\n" AB,idx2str(idx),deletedOnPe));
-	CkLocRec *rec=elementNrec(idx);
+
+        CmiUInt8 id;
+        if (!lookupID(idx, id)) return;
+
+	CkLocRec *rec=elementNrec(id);
 	if (rec==NULL) return; //We never knew him
-	if (rec->type()==CkLocRec::local) return; //He's already been reborn
-	removeFromTable(idx);
+	removeFromTable(id);
 	delete rec;
 }
-void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
+void CkLocMgr::removeFromTable(const CmiUInt8 id) {
 #if CMK_ERROR_CHECKING
 	//Make sure it's actually in the table before we delete it
-	if (NULL==elementNrec(idx))
+	if (NULL==elementNrec(id))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
         CmiImmediateLock(hashImmLock);
-	hash.remove(*(CkArrayIndex *)&idx);
+	hash.remove(id);
         CmiImmediateUnlock(hashImmLock);
 #if CMK_ERROR_CHECKING
 	//Make sure it's really gone
-	if (NULL!=elementNrec(idx))
+	if (NULL!=elementNrec(id))
 		CkAbort("CkLocMgr::removeFromTable called, but element still there!");
 #endif
 }
@@ -2719,187 +2345,307 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 /************************** LocMgr: MESSAGING *************************/
 /// Deliver message to this element, going via the scheduler if local
 /// @return 0 if object local, 1 if not
-int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
-	DEBS((AA "deliver \n" AB));
-	CK_MAGICNUMBER_CHECK
-	CkArrayMessage *msg=(CkArrayMessage *)m;
+int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, CkDeliver_t type, int opts) {
+  CkLocRec *rec = elementNrec(id);
 
-
-	const CkArrayIndex &idx=msg->array_index();
-	DEBS((AA "deliver %s\n" AB,idx2str(idx)));
-	if (type==CkDeliver_queue)
-		_TRACE_CREATION_DETAILED(UsrToEnv(m),msg->array_ep());
-	CkLocRec *rec=elementNrec(idx);
-	if(rec != NULL){
-		DEBS((AA "deliver %s of type %d \n" AB,idx2str(idx),rec->type()));
-	}else{
-		DEBS((AA "deliver %s rec is null\n" AB,idx2str(idx)));
-	}
-//#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-//#if !defined(_FAULT_MLOG_)
-#if CMK_LBDB_ON
-
-        LDObjid ldid = idx2LDObjid(idx);
+#if CMK_LBDB_ON && 0
+  LDObjid ldid = idx2LDObjid(idx);
 #if CMK_GLOBAL_LOCATION_UPDATE
-        ldid.locMgrGid = thisgroup.idx;
+  ldid.locMgrGid = thisgroup.idx;
 #endif        
-	if (type==CkDeliver_queue) {
-		if (!(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats()) {
-		if(rec!=NULL) the_lbdb->Send(myLBHandle,ldid,UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor(), 1);
-		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,ldid,UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()), 1);
-		}
-	}
+  if (type==CkDeliver_queue && !(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats())
+    the_lbdb->Send(myLBHandle
+                   , ldid
+                   , UsrToEnv(msg)->getTotalsize()
+                   , lastKnown(id)
+                   , 1);
 #endif
-//#endif
-#if CMK_GRID_QUEUE_AVAILABLE
-	int gridSrcPE;
-	int gridSrcCluster;
-	int gridDestPE;
-	int gridDestCluster;
-	CkMigratable *obj;
-	ArrayElement *obj2;
-	CkGroupID gid;
-	int *data;
 
-	obj = (CkMigratable *) CpvAccess(CkGridObject);   // CkGridObject is a pointer to the sending object (retained earlier)
-	if (obj != NULL) {
-	  obj2 = dynamic_cast<ArrayElement *> (obj);
-	  if (obj2 > 0) {
-	    // Get the sending object's array gid and indexes.
-	    // These are guaranteed to exist due to the succeeding dynamic cast above.
-	    gid = obj2->ckGetArrayID ();
-	    data = obj2->thisIndexMax.data ();
-
-	    // Get the source PE and destination PE.
-	    gridSrcPE = CkMyPe ();
-	    if (rec != NULL) {
-	      gridDestPE = rec->lookupProcessor ();
-	    } else {
-	      gridDestPE = homePe (msg->array_index ());
-	    }
-
-	    // Get the source cluster and destination cluster.
-	    gridSrcCluster = CmiGetCluster (gridSrcPE);
-	    gridDestCluster = CmiGetCluster (gridDestPE);
-
-	    // If the Grid queue interval is greater than zero, it means that the more complicated
-	    // technique for registering border objects that exceed a specified threshold of
-	    // cross-cluster messages within a specified interval (and deregistering border objects
-	    // that do not meet this threshold) is used.  Otherwise a much simpler technique is used
-	    // where a border object is registered immediately upon sending a single cross-cluster
-	    // message (and deregistered when load balancing takes place).
-	    if (obj2->grid_queue_interval > 0) {
-	      // Increment the sending object's count of all messages.
-	      obj2->msg_count += 1;
-
-	      // If the source cluster and destination cluster differ, this is a Grid message.
-	      // (Increment the count of all Grid messages.)
-	      if (gridSrcCluster != gridDestCluster) {
-		obj2->msg_count_grid += 1;
-	      }
-
-	      // If the number of messages exceeds the interval, check to see if the object has
-	      // sent enough cross-cluster messages to qualify as a border object.
-	      if (obj2->msg_count >= obj2->grid_queue_interval) {
-		if (obj2->msg_count_grid >= obj2->grid_queue_threshold) {
-		  // The object is a border object; if it is not already registered, register it.
-		  if (!obj2->border_flag) {
-		    CmiGridQueueRegister (gid.idx, obj2->thisIndexMax.nInts, data[0], data[1], data[2]);
-		  }
-		  obj2->border_flag = 1;
-		} else {
-		  // The object is not a border object; if it is registered, deregister it.
-		  if (obj2->border_flag) {
-		    CmiGridQueueDeregister (gid.idx, obj2->thisIndexMax.nInts, data[0], data[1], data[2]);
-		  }
-		  obj2->border_flag = 0;
-		}
-		// Reset the counts.
-		obj2->msg_count = 0;
-		obj2->msg_count_grid = 0;
-	      }
-	    } else {
-	      if (gridSrcCluster != gridDestCluster) {
-		CmiGridQueueRegister (gid.idx, obj2->thisIndexMax.nInts, data[0], data[1], data[2]);
-	      }
-	    }
-	  }
-
-	  // Reset the CkGridObject pointer.
-	  CpvAccess(CkGridObject) = NULL;
-	}
+  // Known, remote location or unknown location
+  if (rec == NULL)
+  {
+    if (opts & CK_MSG_KEEP)
+      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+    // known location
+    int destPE = whichPE(id);
+    if (destPE != -1)
+    {
+      if((!CmiNodeAlive(destPE) && destPE != allowMessagesOnly)){
+        // Send it to its home processor instead
+        CkAbort("Unimplemented");
+#if 0
+        destPE = getNextPE(idx);
 #endif
-	/**FAULT_EVAC*/
-	if (rec!=NULL){
-		bool result = rec->deliver(msg,type,opts);
-		// if result is false, than rec is not valid anymore, as the object
-		// the message was just delivered to has died or migrated out.
-		// Therefore rec->type() cannot be invoked!
-		if (result==true && rec->type()==CkLocRec::local) return 0;
-		else return 1;
-		/*if(!result){
-			//DEBS((AA "deliver %s failed type %d \n" AB,idx2str(idx),rec->type()));
-			DEBS((AA "deliver %s failed \n" AB,idx2str(idx)));
-			if(rec->type() == CkLocRec::remote){
-				if (opts & CK_MSG_KEEP)
-					msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-				deliverUnknown(msg,type);
-			}
-		}*/
-	}else /* rec==NULL*/ {
-		if (opts & CK_MSG_KEEP)
-			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
-		deliverUnknown(msg,type,opts);
-		return 1;
-	}
+      }
+      msg->array_hops()++;
+      CkArrayManagerDeliver(destPE,msg,opts);
+      return true;
+    }
+    // unknown location
+    deliverUnknown(msg,type,opts);
+    return true;
+  }
 
+  // Send via the msg q
+  if (type==CkDeliver_queue)
+  {
+    if (opts & CK_MSG_KEEP)
+      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+    CkArrayManagerDeliver(CkMyPe(),msg,opts);
+    return true;
+  }
+
+  ///@todo: Isnt there a chance that a local record exists, but all the managers are not created yet?
+  /// in which case it should be buffered in bufferedMsgs
+  CkMigratable *obj = managers[UsrToEnv(msg)->getArrayMgr()]->lookup(id);
+  if (obj==NULL) {//That sibling of this object isn't created yet!
+    if (opts & CK_MSG_KEEP)
+      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+    if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer)
+      return demandCreateElement(msg, rec->getIndex(), CkMyPe(),type);
+    else { // BUFFERING message for nonexistent element
+      bufferedShadowElemMsgs[id].push_back(msg);
+      return true;
+    }
+  }
+        
+  if (msg->array_hops()>1)
+    multiHop(msg);
+#if CMK_LBDB_ON
+  // if there is a running obj being measured, stop it temporarily
+  LDObjHandle objHandle;
+  bool wasAnObjRunning = false;
+  if (wasAnObjRunning = the_lbdb->RunningObject(&objHandle))
+    the_lbdb->ObjectStop(objHandle);
+#endif
+  // Finally, call the entry method
+  bool result = ((CkLocRec*)rec)->invokeEntry(obj,(void *)msg,msg->array_ep(),!(opts & CK_MSG_KEEP));
+#if CMK_LBDB_ON
+  if (wasAnObjRunning) the_lbdb->ObjectStart(objHandle);
+#endif
+  return result;
 }
+
+void CkLocMgr::sendMsg(CkArrayMessage *msg, CkArrayID mgr, const CkArrayIndex &idx, CkDeliver_t type, int opts) {
+  CK_MAGICNUMBER_CHECK
+  DEBS((AA "send %s\n" AB,idx2str(idx)));
+  envelope *env = UsrToEnv(msg);
+  env->setMsgtype(ForArrayEltMsg);
+
+  if (type==CkDeliver_queue)
+    _TRACE_CREATION_DETAILED(env, msg->array_ep());
+
+  CmiUInt8 id;
+  if (lookupID(idx, id)) {
+    env->setRecipientID(ck::ObjID(mgr, id));
+    deliverMsg(msg, mgr, id, type, opts);
+    return;
+  }
+
+  env->setRecipientID(ck::ObjID(mgr, 0));
+
+  int home = homePe(idx);
+  if (home != CkMyPe()) {
+    if (bufferedIndexMsgs.find(idx) == bufferedIndexMsgs.end())
+      thisProxy[home].requestLocation(idx, CkMyPe(), false, msg->array_ifNotThere(), _entryTable[env->getEpIdx()]->chareIdx, mgr);
+    bufferedIndexMsgs[idx].push_back(msg);
+
+    return;
+  }
+
+  // We are the home, and there's no ID for this index yet - i.e. its
+  // construction hasn't reached us yet.
+  if (managers.find(mgr) == managers.end()) {
+    // Even the manager for this array hasn't been constructed here yet
+    if (CkInRestarting()) {
+      // during restarting, this message should be ignored
+      delete msg;
+    } else {
+      // Eventually, the manager will be created, and the element inserted, and
+      // it will get pulled back out
+      // 
+      // XXX: Is demand creation ever possible in this case? I don't see why not
+      bufferedIndexMsgs[idx].push_back(msg);
+    }
+    return;
+  }
+
+  // Copy the msg, if nokeep
+  if (opts & CK_MSG_KEEP)
+    msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+
+  // Buffer the msg
+  bufferedIndexMsgs[idx].push_back(msg);
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  envelope *env = UsrToEnv(msg);
+  env->sender = CpvAccess(_currentObj)->mlogData->objID;
+#endif
+
+  // If requested, demand-create the element:
+  if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) {
+    demandCreateElement(msg, idx, -1, type);
+  }
+}
+
+#if 0
+int CkLocMgr::deliverMsg(CkMessage *m, CkArrayID mgr, const CkArrayIndex &idx, CkDeliver_t type, int opts) {
+  CK_MAGICNUMBER_CHECK
+    CkArrayMessage *msg=(CkArrayMessage *)m;
+  DEBS((AA "deliver %s\n" AB,idx2str(idx)));
+  if (type==CkDeliver_queue)
+    _TRACE_CREATION_DETAILED(UsrToEnv(m),msg->array_ep());
+
+  CkLocRec *rec = NULL;
+  CmiUInt8 id;
+  CkLocMgr::IdxIdMap::iterator itr = idx2id.find(idx);
+  if (itr != idx2id.end()) {
+    id = itr->second;
+    if (UsrToEnv(m)->getRecipientID() == 0)
+      UsrToEnv(m)->setRecipientID(ck::ObjID(mgr, id));
+    else
+      CkAssert(UsrToEnv(m)->getRecipientID() == ck::ObjID(mgr, id).getID());
+    rec = elementNrec(id);
+  }
+
+#if CMK_LBDB_ON
+  LDObjid ldid = idx2LDObjid(idx);
+#if CMK_GLOBAL_LOCATION_UPDATE
+  ldid.locMgrGid = thisgroup.idx;
+#endif        
+  if (type==CkDeliver_queue && !(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats())
+    the_lbdb->Send(myLBHandle
+                   , ldid
+                   , UsrToEnv(msg)->getTotalsize()
+                   , lastKnown(msg->array__index())
+                   , 1);
+#endif
+
+  // Known, remote location or unknown location
+  if (rec == NULL)
+  {
+    if (opts & CK_MSG_KEEP)
+      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+    // known location
+    if (whichPE(idx) != -1)
+    {
+      int destPE = lastKnown(idx);
+      if((!CmiNodeAlive(destPE) && destPE != allowMessagesOnly)){
+        // Send it to its home processor instead
+        destPE = getNextPE(idx);
+      }
+      msg->array_hops()++;
+      CkArrayManagerDeliver(destPE,msg,opts);
+      return true;
+    }
+    // unknown location
+    deliverUnknown(msg,type,opts);
+    return true;
+  }
+
+  // Send via the msg q
+  if (type==CkDeliver_queue)
+  {
+    if (opts & CK_MSG_KEEP)
+      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+    CkArrayManagerDeliver(CkMyPe(),msg,opts);
+    return true;
+  }
+
+  ///@todo: Isnt there a chance that a local record exists, but all the managers are not created yet?
+  /// in which case it should be buffered in bufferedMsgs
+  CkMigratable *obj = managers[UsrToEnv(msg)->getArrayMgr()]->lookup(id);
+  if (obj==NULL) {//That sibling of this object isn't created yet!
+    if (opts & CK_MSG_KEEP)
+      msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+    if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer)
+      return demandCreateElement(msg, rec->getIndex(), CkMyPe(), type);
+    else { // BUFFERING message for nonexistent element
+      bufferedShadowElemMsgs[id].push_back(msg);
+      return true;
+    }
+  }
+        
+  if (msg->array_hops()>1)
+    multiHop(msg);
+#if CMK_LBDB_ON
+  // if there is a running obj being measured, stop it temporarily
+  LDObjHandle objHandle;
+  bool wasAnObjRunning = false;
+  if (wasAnObjRunning = the_lbdb->RunningObject(&objHandle))
+    the_lbdb->ObjectStop(objHandle);
+#endif
+  // Finally, call the entry method
+  bool result = ((CkLocRec*)rec)->invokeEntry(obj,(void *)msg,msg->array_ep(),!(opts & CK_MSG_KEEP));
+#if CMK_LBDB_ON
+  if (wasAnObjRunning) the_lbdb->ObjectStart(objHandle);
+#endif
+  return result;
+}
+#endif
 
 /// This index is not hashed-- somehow figure out what to do.
-bool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts)
+void CkLocMgr::deliverUnknown(CkArrayMessage *msg, CkDeliver_t type, int opts)
 {
-	CK_MAGICNUMBER_CHECK
-	const CkArrayIndex &idx=msg->array_index();
-	int onPe=homePe(idx);
-	if (onPe!=CkMyPe()) 
-	{// Forward the message to its home processor
-		DEBM((AA "Forwarding message for unknown %s to home %d \n" AB,idx2str(idx),onPe));
-		msg->array_hops()++;
-		CkArrayManagerDeliver(onPe,msg,opts);
-		return true;
-	}
-	else
-	{ // We *are* the home processor:
-	//Check if the element's array manager has been registered yet:
-	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getArrayMgr())->mgr;
-	  if (!mgr) { //No manager yet-- postpone the message (stupidly)
-	    if (CkInRestarting()) {
-	      // during restarting, this message should be ignored
-	      delete msg;
-	    }
-	    else {
-	      CkArrayManagerDeliver(CkMyPe(),msg); 
-            }
-	  }
-	  else { // Has a manager-- must buffer the message
-	    DEBC((AA "Adding buffer for unknown element %s\n" AB,idx2str(idx)));
-	    CkLocRec *rec=new CkLocRec_buffering(this);
-	    insertRecN(rec,idx);
-	    rec->deliver(msg,type);
-	  
-	    if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) 
-	    { //Demand-create the element:
-	      return demandCreateElement(msg,-1,type);
-	    }
-	  }
-	  return true;
-	}
+  CK_MAGICNUMBER_CHECK
+  CmiUInt8 id = msg->array_element_id();
+  int home = homePe(id);
+
+  if (home != CkMyPe()) {// Forward the message to its home processor
+    if (UsrToEnv(msg)->getTotalsize() < _messageBufferingThreshold) {
+      DEBM((AA "Forwarding message for unknown %u to home %d \n" AB, id, home));
+      msg->array_hops()++;
+      CkArrayManagerDeliver(home, msg, opts);
+    } else {
+      DEBM((AA "Buffering message for unknown %u, home %d \n" AB, id, home));
+      if (bufferedRemoteMsgs.find(id) == bufferedRemoteMsgs.end())
+        thisProxy[home].requestLocation(id, CkMyPe(), false);
+      bufferedRemoteMsgs[id].push_back(msg);
+    }
+  } else { // We *are* the home processor:
+    //Check if the element's array manager has been registered yet:
+    //No manager yet-- postpone the message (stupidly)
+    if (managers.find(UsrToEnv((void*)msg)->getArrayMgr()) == managers.end()) {
+      if (CkInRestarting()) {
+        // during restarting, this message should be ignored
+        delete msg;
+      } else {
+        CkArrayManagerDeliver(CkMyPe(),msg);
+      }
+    } else { // Has a manager-- must buffer the message
+      // Copy the msg, if nokeep
+      if (opts & CK_MSG_KEEP)
+        msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
+      // Buffer the msg
+      bufferedMsgs[id].push_back(msg);
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+      envelope *env = UsrToEnv(msg);
+      env->sender = CpvAccess(_currentObj)->mlogData->objID;
+#endif
+      // If requested, demand-create the element:
+      if (msg->array_ifNotThere()!=CkArray_IfNotThere_buffer) {
+        CkAbort("unimplemented");
+        //demandCreateElement(msg, NULL, -1, type);
+      }
+    }
+  }
 }
 
-bool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type)
+void CkLocMgr::demandCreateElement(const CkArrayIndex &idx, int chareType, int onPe, CkArrayID mgr)
+{
+  int ctor=_chareTable[chareType]->getDefaultCtor();
+  if (ctor==-1) CkAbort("Can't create array element to handle message--\n"
+                        "The element has no default constructor in the .ci file!\n");
+
+  //Find the manager and build the element
+  DEBC((AA "Demand-creating element %s on pe %d\n" AB,idx2str(idx),onPe));
+  inform(idx, getNewObjectID(idx), onPe);
+  managers[mgr]->demandCreateElement(idx, onPe, ctor, CkDeliver_inline);
+}
+
+bool CkLocMgr::demandCreateElement(CkArrayMessage *msg, const CkArrayIndex &idx, int onPe,CkDeliver_t type)
 {
 	CK_MAGICNUMBER_CHECK
-	const CkArrayIndex &idx=msg->array_index();
 	int chareType=_entryTable[msg->array_ep()]->chareIdx;
 	int ctor=_chareTable[chareType]->getDefaultCtor();
 	if (ctor==-1) CkAbort("Can't create array element to handle message--\n"
@@ -2914,23 +2660,21 @@ bool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type
 	
 	//Find the manager and build the element
 	DEBC((AA "Demand-creating element %s on pe %d\n" AB,idx2str(idx),onPe));
-	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getArrayMgr())->mgr;
-	if (!mgr) CkAbort("Tried to demand-create for nonexistent arrMgr");
-	return mgr->demandCreateElement(idx,onPe,ctor,type);
+	return managers[UsrToEnv((void *)msg)->getArrayMgr()]
+        ->demandCreateElement(idx,onPe,ctor,type);
 }
 
 //This message took several hops to reach us-- fix it
 void CkLocMgr::multiHop(CkArrayMessage *msg)
 {
-
 	CK_MAGICNUMBER_CHECK
 	int srcPe=msg->array_getSrcPe();
 	if (srcPe==CkMyPe())
-		DEB((AA "Odd routing: local element %s is %d hops away!\n" AB,idx2str(msg),msg->array_hops()));
+          DEB((AA "Odd routing: local element %u is %d hops away!\n" AB, msg->array_element_id(),msg->array_hops()));
 	else
 	{//Send a routing message letting original sender know new element location
-		DEBS((AA "Sending update back to %d for element\n" AB,srcPe,idx2str(msg)));
-		thisProxy[srcPe].updateLocation(msg->array_index(),CkMyPe());
+          DEBS((AA "Sending update back to %d for element %u\n" AB, srcPe, msg->array_element_id()));
+          thisProxy[srcPe].updateLocation(msg->array_element_id(), CkMyPe());
 	}
 }
 
@@ -2951,11 +2695,15 @@ void CkLocMgr::checkInBounds(const CkArrayIndex &idx)
 }
 
 /************************** LocMgr: ITERATOR *************************/
-CkLocation::CkLocation(CkLocMgr *mgr_, CkLocRec_local *rec_)
+CkLocation::CkLocation(CkLocMgr *mgr_, CkLocRec *rec_)
 	:mgr(mgr_), rec(rec_) {}
 	
 const CkArrayIndex &CkLocation::getIndex(void) const {
 	return rec->getIndex();
+}
+
+CmiUInt8 CkLocation::getID() const {
+	return rec->getID();
 }
 
 void CkLocation::destroyAll() {
@@ -2977,10 +2725,8 @@ void CkLocMgr::iterate(CkLocIterator &dest) {
 
   while (NULL!=(objp=it->next())) {
     CkLocRec *rec=*(CkLocRec **)objp;
-    if (rec->type()==CkLocRec::local) {
-      CkLocation loc(this,(CkLocRec_local *)rec);
-      dest.addLocation(loc);
-    }
+    CkLocation loc(this,(CkLocRec *)rec);
+    dest.addLocation(loc);
   }
   CmiImmediateUnlock(hashImmLock);
   delete it;
@@ -2991,29 +2737,27 @@ void CkLocMgr::iterate(CkLocIterator &dest) {
 
 /************************** LocMgr: MIGRATION *************************/
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
+void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
         CkElementCreation_t type, bool create, int dummy)
 {
     p.comment("-------- Array Location --------");
-    register ManagerRec *m;
-    int localIdx=rec->getLocalIndex();
     CkVec<CkMigratable *> dummyElts;
 
-    for (m=firstManager;m!=NULL;m=m->next) {
+    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
         int elCType;
         if (!p.isUnpacking())
         { //Need to find the element's existing type
-            CkMigratable *elt=m->element(localIdx);
+            CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getIndex());
             if (elt) elCType=elt->ckGetChareType();
             else elCType=-1; //Element hasn't been created
         }
         p(elCType);
         if (p.isUnpacking() && elCType!=-1) {
-            CkMigratable *elt=m->mgr->allocateMigrated(elCType,rec->getIndex(),type);
+            CkMigratable *elt = itr->second->allocateMigrated(elCType,rec->getIndex(),type);
             int migCtorIdx=_chareTable[elCType]->getMigCtor();
                 if(!dummy){
 			if(create)
-                    		if (!addElementToRec(rec,m,elt,migCtorIdx,NULL)) return;
+                    		if (!addElementToRec(rec, itr->second, elt, migCtorIdx, NULL)) return;
  				}else{
                     CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
                     i.locRec=rec;
@@ -3024,8 +2768,8 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
         }
     }
     if(!dummy){
-        for (m=firstManager;m!=NULL;m=m->next) {
-            CkMigratable *elt=m->element(localIdx);
+        for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+            CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getIndex());
             if (elt!=NULL)
                 {
                        elt->virtual_pup(p);
@@ -3039,43 +2783,39 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
         		}
                 delete elt;
             }
-			for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-                m->elts.empty(localIdx);
+            for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+                itr->second->eraseEltFromArrMgr(rec->getIndex());
             }
-        freeList[localIdx]=firstFree;
-        firstFree=localIdx;
     }
 }
 #else
-void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
+void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
 		CkElementCreation_t type,bool rebuild)
 {
 	p.comment("-------- Array Location --------");
-	register ManagerRec *m;
-	int localIdx=rec->getLocalIndex();
 
 	//First pup the element types
 	// (A separate loop so ckLocal works even in element pup routines)
-	for (m=firstManager;m!=NULL;m=m->next) {
+    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
 		int elCType;
 		if (!p.isUnpacking())
 		{ //Need to find the element's existing type
-			CkMigratable *elt=m->element(localIdx);
+			CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getID());
 			if (elt) elCType=elt->ckGetChareType();
 			else elCType=-1; //Element hasn't been created
 		}
 		p(elCType);
 		if (p.isUnpacking() && elCType!=-1) {
 			//Create the element
-			CkMigratable *elt=m->mgr->allocateMigrated(elCType,rec->getIndex(),type);
+			CkMigratable *elt = itr->second->allocateMigrated(elCType, type);
 			int migCtorIdx=_chareTable[elCType]->getMigCtor();
 			//Insert into our tables and call migration constructor
-			if (!addElementToRec(rec,m,elt,migCtorIdx,NULL)) return;
+			if (!addElementToRec(rec,itr->second,elt,migCtorIdx,NULL)) return;
 		}
 	}
 	//Next pup the element data
-	for (m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *elt=m->element(localIdx);
+    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+		CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getID());
 		if (elt!=NULL)
                 {
                         elt->virtual_pup(p);
@@ -3106,39 +2846,34 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 #endif
 
 /// Call this member function on each element of this location:
-void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn)
+void CkLocMgr::callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn)
 {
-	int localIdx=rec->getLocalIndex();
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *el=m->element(localIdx);
+    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getID());
 		if (el) (el->* fn)();
 	}
 }
 
 /// Call this member function on each element of this location:
-void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_arg_t fn,     void * data)
+void CkLocMgr::callMethod(CkLocRec *rec,CkMigratable_voidfn_arg_t fn,     void * data)
 {
-	int localIdx=rec->getLocalIndex();
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *el=m->element(localIdx);
+    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getID());
 		if (el) (el->* fn)(data);
 	}
 }
 
 /// return a list of migratables in this local record
-void CkLocMgr::migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list)
+void CkLocMgr::migratableList(CkLocRec *rec, CkVec<CkMigratable *> &list)
 {
-        register ManagerRec *m;
-        int localIdx=rec->getLocalIndex();
-
-        for (m=firstManager;m!=NULL;m=m->next) {
-                CkMigratable *elt=m->element(localIdx);
+        for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+                CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getID());
                 if (elt) list.push_back(elt);
         }
 }
 
 /// Migrate this local element away to another processor.
-void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
+void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 {
 	CK_MAGICNUMBER_CHECK
 	if (toPe==CkMyPe()) return; //You're already there!
@@ -3151,12 +2886,12 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		return;
 	}
 	CkArrayIndex idx=rec->getIndex();
+        CmiUInt8 id = rec->getID();
 
 #if CMK_OUT_OF_CORE
-	int localIdx=rec->getLocalIndex();
 	/* Load in any elements that are out-of-core */
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *el=m->element(localIdx);
+    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getIndex());
 		if (el) if (!el->isInCore) CooBringIn(el->prefetchObjID);
 	}
 #endif
@@ -3175,20 +2910,11 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 
 //Allocate and pack into message
 	CkArrayElementMigrateMessage *msg = 
-		new (bufSize, 0) CkArrayElementMigrateMessage;
-	msg->idx=idx;
-	msg->length=bufSize;
-        msg->nManagers = nManagers;
+          new (bufSize, 0) CkArrayElementMigrateMessage(idx, id, rec->isAsyncMigrate(), bufSize,
+                                                        managers.size(), rec->isBounced());
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     msg->gid = ckGetGroupID();
 #endif
-#if CMK_LBDB_ON
-	msg->ignoreArrival = rec->isAsyncMigrate()?1:0;
-#endif
-	/*
-		FAULT_EVAC
-	*/
-	msg->bounced = rec->isBounced();
 	{
 		PUP::toMem p(msg->packData); 
 		p.becomeDeleting(); 
@@ -3217,7 +2943,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	
 	duringMigration=false;
 	//The element now lives on another processor-- tell ourselves and its home
-	inform(idx,toPe);
+	inform(idx, id, toPe);
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
 //#if !defined(_FAULT_MLOG_)    
 	informHome(idx,toPe);
@@ -3233,11 +2959,11 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 }
 
 #if CMK_LBDB_ON
-void CkLocMgr::informLBPeriod(CkLocRec_local *rec, int lb_ideal_period) {
+void CkLocMgr::informLBPeriod(CkLocRec *rec, int lb_ideal_period) {
 	callMethod(rec,&CkMigratable::recvLBPeriod, (void *)&lb_ideal_period);
 }
 
-void CkLocMgr::metaLBCallLB(CkLocRec_local *rec) {
+void CkLocMgr::metaLBCallLB(CkLocRec *rec) {
 	callMethod(rec, &CkMigratable::metaLBCallLB);
 }
 #endif
@@ -3251,21 +2977,23 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		
 	PUP::fromMem p(msg->packData); 
 	
-	if (msg->nManagers < nManagers)
+	if (msg->nManagers < managers.size())
 		CkAbort("Array element arrived from location with fewer managers!\n");
-	if (msg->nManagers > nManagers) {
+	if (msg->nManagers > managers.size()) {
 		//Some array managers haven't registered yet-- throw it back
 		DEBM((AA "Busy-waiting for array registration on migrating %s\n" AB,idx2str(idx)));
 		thisProxy[CkMyPe()].immigrate(msg);
 		return;
 	}
 
+        idx2id[idx] = msg->id;
+
 	//Create a record for this element
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
 //#if !defined(_FAULT_MLOG_)     
-	CkLocRec_local *rec=createLocal(idx,true,msg->ignoreArrival,false /* home told on departure */ );
+	CkLocRec *rec=createLocal(idx,true,msg->ignoreArrival,false /* home told on departure */ );
 //#else
-//    CkLocRec_local *rec=createLocal(idx,true,true,false /* home told on departure */ );
+//    CkLocRec *rec=createLocal(idx,true,true,false /* home told on departure */ );
 //#endif
 	
 	//Create the new elements as we unpack the message
@@ -3275,7 +3003,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 			"packing PUP::er, but %d bytes in the unpacking PUP::er!\n",
 			msg->length,p.size());
 		CkError("(I have %d managers; he claims %d managers)\n",
-			nManagers, msg->nManagers);
+			managers.size(), msg->nManagers);
 		
 		CkAbort("Array element's pup routine has a direction mismatch.\n");
 	}
@@ -3301,21 +3029,21 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	if(CkpvAccess(startedEvac)){
 		int newhomePE = getNextPE(idx);
 		DEBM((AA "Migrated into failed processor index size %s resent to %d \n" AB,idx2str(idx),newhomePE));	
-		CkLocMgr *mgr = rec->getLocMgr();
 		int targetPE=getNextPE(idx);
 		//set this flag so that load balancer is not informed when
 		//this element migrates
 		rec->AsyncMigrate(true);
 		rec->Bounced(true);
-		mgr->emigrate(rec,targetPE);
-		
+		emigrate(rec,targetPE);
 	}
 
 	delete msg;
 }
 
-void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
+void CkLocMgr::restore(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p)
 {
+	idx2id[idx] = id;
+
 	//This is in broughtIntoMem during out-of-core emulation in BigSim,
 	//informHome should not be called since such information is already
 	//immediately updated real migration
@@ -3323,7 +3051,7 @@ void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 	if(_BgOutOfCoreFlag!=2)
 	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
 #endif
-	CkLocRec_local *rec=createLocal(idx,false,false,false);
+	CkLocRec *rec=createLocal(idx,false,false,false);
 	
 	//BIGSIM_OOC DEBUGGING
 	//CkPrintf("Proc[%d]: Registering element %s with LDB\n", CkMyPe(), idx2str(idx));
@@ -3337,20 +3065,18 @@ void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 
 /// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, bool create, int dummy)
+void CkLocMgr::resume(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p, bool create, int dummy)
 {
-	CkLocRec_local *rec;
-	CkLocRec *recGlobal;	
+	idx2id[idx] = id;
+
+	CkLocRec *rec;
 
 	if(create){
 		rec = createLocal(idx,false,false,true && !dummy /* home doesn't know yet */,dummy );
 	}else{
-		recGlobal = elementNrec(idx);
-		if(recGlobal == NULL) 
+		rec = elementNrec(idx);
+		if(rec == NULL) 
 			CmiAbort("Local object not found");
-		if(recGlobal->type() != CkLocRec::local)
-			CmiAbort("Local object not local, :P");
-		rec = (CkLocRec_local *)recGlobal;
 	}
         
     pupElementsFor(p,rec,CkElementCreation_resume,create,dummy);
@@ -3360,9 +3086,11 @@ void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, bool create, int dumm
     }
 }
 #else
-void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, bool notify,bool rebuild)
+void CkLocMgr::resume(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p, bool notify,bool rebuild)
 {
-	CkLocRec_local *rec=createLocal(idx,false,false,notify /* home doesn't know yet */ );
+	idx2id[idx] = id;
+
+	CkLocRec *rec=createLocal(idx,false,false,notify /* home doesn't know yet */ );
 
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_resume,rebuild);
@@ -3383,18 +3111,26 @@ void CkMagicNumber_impl::badMagicNumber(
 }
 CkMagicNumber_impl::CkMagicNumber_impl(int m) :magic(m) { }
 
-//Look up the object with this array index, or return NULL
-CkMigratable *CkLocMgr::lookup(const CkArrayIndex &idx,CkArrayID aid) {
-	CkLocRec *rec=elementNrec(idx);
-	if (rec==NULL) return NULL;
-	else return rec->lookupElement(aid);
+int CkLocMgr::whichPE(const CkArrayIndex &idx)
+{
+  CmiUInt8 id;
+  if (!lookupID(idx, id))
+    return -1;
+
+  std::map<CmiUInt8, int>::iterator itr = id2pe.find(id);
+  return (itr != id2pe.end() ? itr->second : -1);
 }
+
+int CkLocMgr::whichPE(const CmiUInt8 id)
+{
+  std::map<CmiUInt8, int>::iterator itr = id2pe.find(id);
+  return (itr != id2pe.end() ? itr->second : -1);
+}
+
 //"Last-known" location (returns a processor number)
 int CkLocMgr::lastKnown(const CkArrayIndex &idx) {
 	CkLocMgr *vthis=(CkLocMgr *)this;//Cast away "const"
-	CkLocRec *rec=vthis->elementNrec(idx);
-	int pe=-1;
-	if (rec!=NULL) pe=rec->lookupProcessor();
+	int pe = whichPE(idx);
 	if (pe==-1) return homePe(idx);
 	else{
 		/*
@@ -3402,32 +3138,51 @@ int CkLocMgr::lastKnown(const CkArrayIndex &idx) {
 			if the lastKnownPE is invalid return homePE and delete this record
 		*/
 		if(!CmiNodeAlive(pe)){
+#if 0
 			removeFromTable(idx);
+#endif
+                        CkAbort("Unimplemented");
 			return homePe(idx);
 		}
 		return pe;
 	}	
 }
+
+//"Last-known" location (returns a processor number)
+int CkLocMgr::lastKnown(CmiUInt8 id) {
+  int pe = whichPE(id);
+  if (pe==-1) return homePe(id);
+  else{
+    /*
+      FAULT_EVAC
+      if the lastKnownPE is invalid return homePE and delete this record
+    */
+    if(!CmiNodeAlive(pe)){
+#if 0
+      removeFromTable(idx);
+#endif
+      CkAbort("Unimplemented");
+      return homePe(id);
+    }
+    return pe;
+  }	
+}
+
 /// Return true if this array element lives on another processor
 bool CkLocMgr::isRemote(const CkArrayIndex &idx,int *onPe) const
 {
-	CkLocMgr *vthis=(CkLocMgr *)this;//Cast away "const"
-	CkLocRec *rec=vthis->elementNrec(idx);
-	if (rec==NULL || rec->type()!=CkLocRec::remote) 
-		return false; /* not definitely a remote element */
-	else /* element is indeed remote */
-	{
-		*onPe=rec->lookupProcessor();
-		return true;
-	}
+    int pe = const_cast<CkLocMgr*>(this)->whichPE(idx);
+    /* not definitely a remote element */
+    if (pe == -1 || pe == CkMyPe())
+        return false;
+    // element is indeed remote
+    *onPe = pe;
+    return true;
 }
 
 static const char *rec2str[]={
     "base (INVALID)",//Base class (invalid type)
     "local",//Array element that lives on this Pe
-    "remote",//Array element that lives on some other Pe
-    "buffering",//Array element that was just created
-    "dead"//Deleted element (for debugging)
 };
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -3438,30 +3193,14 @@ void CkLocMgr::setDuringMigration(bool _duringMigration){
 
 
 //Add given element array record at idx, replacing the existing record
-void CkLocMgr::insertRec(CkLocRec *rec,const CkArrayIndex &idx) {
-	CkLocRec *old=elementNrec(idx);
-	insertRecN(rec,idx);
-	if (old!=NULL) {
-		DEBC((AA "  replaces old rec(%s) for %s\n" AB,rec2str[old->type()],idx2str(idx)));
-		//There was an old element at this location
-		if (old->type()==CkLocRec::local && rec->type()==CkLocRec::local) {
-		    if (!CkInRestarting()) {    // ok if it is restarting
-			CkPrintf("ERROR! Duplicate array index: %s\n",idx2str(idx));
-			CkAbort("Duplicate array index used");
-		    }
-		}
-		old->beenReplaced();
-		delete old;
-	}
-}
+void CkLocMgr::insertRec(CkLocRec *rec, const CmiUInt8 &id) {
+    CkLocRec *old_rec = elementNrec(id);
 
-//Add given record, when there is guarenteed to be no prior record
-void CkLocMgr::insertRecN(CkLocRec *rec,const CkArrayIndex &idx) {
-	DEBC((AA "  adding new rec(%s) for %s\n" AB,rec2str[rec->type()],idx2str(idx)));
-        checkInBounds(idx);
-        CmiImmediateLock(hashImmLock);
-	hash.put(*(CkArrayIndex *)&idx)=rec;
-        CmiImmediateUnlock(hashImmLock);
+    CmiImmediateLock(hashImmLock);
+    hash.put(id) = rec;
+    CmiImmediateUnlock(hashImmLock);
+
+    delete old_rec;
 }
 
 //Call this on an unrecognized array index
@@ -3475,18 +3214,22 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 #if ! CMK_ERROR_CHECKING
 //Assume the element will be found
-	return hash.getRef(idx);
+  return hash.getRef(lookupID(idx));
 #else
 //Include an out-of-bounds check if the element isn't found
-	CkLocRec *rec=elementNrec(idx);
-	if (rec==NULL) abort_out_of_bounds(idx);
+  CmiUInt8 id;
+  CkLocRec *rec;
+  if (lookupID(idx, id) && (rec = elementNrec(id))) {
 	return rec;
+  } else {
+	if (rec==NULL) abort_out_of_bounds(idx);
+  }
 #endif
 }
 
 //Look up array element in hash table.  Return NULL if not there.
-CkLocRec *CkLocMgr::elementNrec(const CkArrayIndex &idx) {
-	return hash.get(idx);
+CkLocRec *CkLocMgr::elementNrec(const CmiUInt8 id) {
+  return hash.get(id);
 }
 
 struct LocalElementCounter :  public CkLocIterator
@@ -3531,13 +3274,13 @@ void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 	LDOMid myId;
 	myId.id = thisgroup;
 	LDCallbacks myCallbacks;
-	myCallbacks.migrate = (LDMigrateFn)CkLocRec_local::staticMigrate;
+	myCallbacks.migrate = (LDMigrateFn)CkLocRec::staticMigrate;
 	myCallbacks.setStats = NULL;
 	myCallbacks.queryEstLoad = NULL;
   myCallbacks.metaLBResumeWaitingChares =
-      (LDMetaLBResumeWaitingCharesFn)CkLocRec_local::staticMetaLBResumeWaitingChares;
+      (LDMetaLBResumeWaitingCharesFn)CkLocRec::staticMetaLBResumeWaitingChares;
   myCallbacks.metaLBCallLBOnChares =
-      (LDMetaLBCallLBOnCharesFn)CkLocRec_local::staticMetaLBCallLBOnChares;
+      (LDMetaLBCallLBOnCharesFn)CkLocRec::staticMetaLBCallLBOnChares;
 	myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);
 
 	// Tell the lbdb that I'm registering objects

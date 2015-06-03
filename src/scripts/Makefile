@@ -632,7 +632,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
-charm-target: loadbalancers default_libs comlib_objs mpi-main 
+charm-target: loadbalancers default_libs mpi-main
 
 CHARMLIBS: charm++ CONVLIBS 
 	$(MAKE) -C libs charmlibs OPTS='$(OPTS)'
@@ -769,7 +769,7 @@ CONVERSE_COM_OBJS = gridrouter.o hypercuberouter.o treerouter.o petable.o \
 		routerstrategy.o convcomlibmanager.o pipebroadcastconverse.o \
 		pipelinestrategy.o prefixrouter.o
 
-COMLIB_OBJS = $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
+COMLIB_OBJS = #$(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
 comlib_objs: $(L)/libmodulecomlib.a $(L)/libconvcom.a
 

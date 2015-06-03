@@ -101,6 +101,7 @@ void CkObjID::updatePosition(int PE){
 		return;
 	}
 	switch(type){
+#if 0
 		case TypeArray:
 			{
 					CkArrayID aid(data.array.id);
@@ -112,16 +113,15 @@ void CkObjID::updatePosition(int PE){
 //						CmiPrintf("[%d] location for object %s is %d\n",CmiMyPe(),toString(str),PE);
 						CkLocRec *rec = mgr->elementNrec(data.array.idx.asChild());
 						if(rec != NULL){
-							if(rec->type() == CkLocRec::local){
-								CmiPrintf("[%d] local object %s can not exist on another processor %d\n",CmiMyPe(),str,PE);
-								return;
-							}
+                            CmiPrintf("[%d] local object %s can not exist on another processor %d\n",CmiMyPe(),str,PE);
+                            return;
 						}
 						mgr->inform(data.array.idx.asChild(),PE);
 					}	
 				}
 
 			break;
+#endif
 		case TypeChare:
 		case TypeMainChare:
 			CkAssert(data.chare.id.onPE == PE);

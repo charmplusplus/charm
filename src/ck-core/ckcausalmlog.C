@@ -2109,19 +2109,17 @@ void _getCheckpointHandler(RestartRequest *restartMsg){
 void _verifyAckRequestHandler(VerifyAckMsg *verifyRequest){
 	CkLocMgr *locMgr =  (CkLocMgr*)CkpvAccess(_groupTable)->find(verifyRequest->migRecord.gID).getObj();
 	CkLocRec *rec = locMgr->elementNrec(verifyRequest->migRecord.idx);
-	if(rec != NULL && rec->type() == CkLocRec::local){
+	if(rec != NULL) {
 			//this location exists on this processor
 			//and needs to be removed	
-			CkLocRec_local *localRec = (CkLocRec_local *) rec;
 			CmiPrintf("[%d] Found element gid %d idx %s that needs to be removed\n",CmiMyPe(),verifyRequest->migRecord.gID.idx,idx2str(verifyRequest->migRecord.idx));
 			
-			int localIdx = localRec->getLocalIndex();
-			LBDatabase *lbdb = localRec->getLBDB();
-			LDObjHandle ldHandle = localRec->getLdHandle();
+			LBDatabase *lbdb = rec->getLBDB();
+			LDObjHandle ldHandle = rec->getLdHandle();
 				
 			locMgr->setDuringMigration(true);
 			
-			locMgr->reclaim(verifyRequest->migRecord.idx,localIdx);
+			locMgr->reclaim(verifyRequest->migRecord.idx);
 			lbdb->UnregisterObj(ldHandle);
 			
 			locMgr->setDuringMigration(false);
@@ -3068,7 +3066,7 @@ public:
 		}
 			
 		CkArrayIndexMax idx = loc.getIndex();
-		CkLocRec_local *rec = loc.getLocalRecord();
+		CkLocRec *rec = loc.getLocalRecord();
 		CkLocMgr *locMgr = loc.getManager();
 		CkVec<CkMigratable *> eltList;
 			
@@ -3077,7 +3075,7 @@ public:
 
 		// incrementing number of emigrant objects
 		CpvAccess(_numEmigrantRecObjs)++;
-    	locMgr->migratableList((CkLocRec_local *)rec,eltList);
+    	locMgr->migratableList((CkLocRec *)rec,eltList);
 		CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[0]->mlogData->objID.data.array.id).getObj();
 		
 		// let everybody else know the object is leaving
@@ -3149,7 +3147,7 @@ void _sendBackLocationHandler(char *receivedMsg){
 	// decrementing number of emigrant objects at reduction manager
 	CkVec<CkMigratable *> eltList;
 	CkLocRec *rec = mgr->elementRec(idx);
-	mgr->migratableList((CkLocRec_local *)rec,eltList);
+	mgr->migratableList((CkLocRec *)rec,eltList);
 	CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[0]->mlogData->objID.data.array.id).getObj();
 	reductionMgr->decNumEmigrantRecObjs();
 	reductionMgr->decGCount();
@@ -3184,14 +3182,14 @@ void _distributedLocationHandler(char *receivedMsg){
 	idx.print();
 
 	CkLocRec *rec = mgr->elementRec(idx);
-	CmiAssert(rec->type() == CkLocRec::local);
+	CmiAssert(rec != NULL);
 
 	// adding object to the list of immigrant recovery objects
-	CpvAccess(_immigrantRecObjs)->push_back(new CkLocation(mgr,(CkLocRec_local *)rec));
+	CpvAccess(_immigrantRecObjs)->push_back(new CkLocation(mgr,rec));
 	CpvAccess(_numImmigrantRecObjs)++;
 	
 	CkVec<CkMigratable *> eltList;
-	mgr->migratableList((CkLocRec_local *)rec,eltList);
+	mgr->migratableList((CkLocRec *)rec,eltList);
 	for(int i=0;i<eltList.size();i++){
 		if(eltList[i]->mlogData->toResumeOrNot == 1 && eltList[i]->mlogData->resumeCount < globalResumeCount){
 			CpvAccess(_currentObj) = eltList[i];
@@ -3283,7 +3281,7 @@ public:
 	};
 	void addLocation(CkLocation &loc){
 		CkVec<CkMigratable *> list;
-		CkLocRec_local *local = loc.getLocalRecord();
+		CkLocRec *local = loc.getLocalRecord();
 		locMgr->migratableList (local,list);
 		for(int i=0;i<list.size();i++){
 			CkMigratable *migratableElement = list[i];
@@ -3354,7 +3352,7 @@ void sendBackImmigrantRecObjs(){
 	CkLocation *loc;
 	CkLocMgr *locMgr;
 	CkArrayIndexMax idx;
-	CkLocRec_local *rec;
+	CkLocRec *rec;
 	PUP::sizer psizer;
 	int targetPE;
 	CkVec<CkMigratable *> eltList;
@@ -3368,7 +3366,7 @@ void sendBackImmigrantRecObjs(){
 		idx = loc->getIndex();
 		rec = loc->getLocalRecord();
 		locMgr = loc->getManager();
-    	locMgr->migratableList((CkLocRec_local *)rec,eltList);
+    	locMgr->migratableList(rec,eltList);
 		targetPE = eltList[i]->mlogData->immigrantSourcePE;
 
 		// decrement counter at array manager
@@ -3674,13 +3672,13 @@ void _receiveLocationHandler(CurrentLocationMsg *data){
 	CkLocRec *rec = mgr->elementNrec(data->idx);
 	DEBUG(CmiPrintf("[%d] location from %d is %d for gid %d idx %s rec %p \n",CkMyPe(),data->fromPE,data->locationPE,data->mgrID,idx2str(data->idx),rec));
 	if(rec != NULL){
-		if(mgr->lastKnown(data->idx) == CmiMyPe() && data->locationPE != CmiMyPe() && rec->type() == CkLocRec::local){
+		if(mgr->lastKnown(data->idx) == CmiMyPe() && data->locationPE != CmiMyPe()){
 			if(data->fromPE == data->locationPE){
 				CmiAbort("Another processor has the same object");
 			}
 		}
 	}
-	if(rec!= NULL && rec->type() == CkLocRec::local && data->fromPE != CmiMyPe()){
+	if(rec!= NULL && data->fromPE != CmiMyPe()){
 		int targetPE = data->fromPE;
 		data->fromPE = CmiMyPe();
 		data->locationPE = CmiMyPe();

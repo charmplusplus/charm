@@ -7,17 +7,18 @@ module CkLocation {
 
   group [migratable] CkLocMgr {
 	entry CkLocMgr(CkArrayOptions opts);
-	entry void deliverInline(CkMessage *m);
 	entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
         entry [expedited] void requestLocation(CkArrayIndex idx, int peToTell,
+                                               bool suppressIfHere, int ifNonExistent, int chareType, CkArrayID mgr);
+        entry [expedited] void requestLocation(CmiUInt8 id, int peToTell,
                                                bool suppressIfHere);
-	entry [expedited] void updateLocation(CkArrayIndex idx,int nowOnPe);
+	entry [expedited] void updateLocation(CkArrayIndex idx, CmiUInt8 id, int nowOnPe);
+        entry [expedited] void updateLocation(CmiUInt8 id, int nowOnPe);
 	entry void reclaimRemote(CkArrayIndex idx,int deletedOnPe);
 	
 	//Load balancing:
 	entry void dummyAtSync(void);
   };
-  initnode void _CkLocMgrInit(void);
   
   // Array Map object support:
   group [migratable] CkArrayMap {

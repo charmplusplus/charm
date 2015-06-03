@@ -3,7 +3,7 @@
 
 class CkMigratable : public Chare {
 protected:
-  CkLocRec_local *myRec;
+  CkLocRec *myRec;
 private:
   int thisChareType;//My chare type
   void commonInit(void);
@@ -31,6 +31,7 @@ public:
 
   virtual int ckGetChareType(void) const;// {return thisChareType;}
   const CkArrayIndex &ckGetArrayIndex(void) const {return myRec->getIndex();}
+  CmiUInt8 ckGetID(void) const { return myRec->getID(); }
 
 #if CMK_LBDB_ON  //For load balancing:
   //Suspend load balancer measurements (e.g., before CthSuspend)

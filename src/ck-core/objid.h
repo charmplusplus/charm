@@ -7,18 +7,6 @@
 
 namespace ck {
 
-#define ELEMENT_BITS    48
-#define COLLECTION_BITS 13
-#define TYPE_TAG_BITS    3
-
-#if (ELEMENT_BITS+COLLECTION_BITS+TYPE_TAG_BITS) != 64
-#error "Object ID is broken"
-#endif
-
-#define ELEMENT_MASK    ((1ULL << ELEMENT_BITS) - 1)
-#define COLLECTION_MASK (((1ULL << COLLECTION_BITS) - 1) << ELEMENT_BITS)
-#define TYPE_TAG_MASK   (((1ULL << TYPE_TAG_BITS) - 1) << (ELEMENT_BITS + COLLECTION_BITS))
-
 /**
  * The basic element identifier
  */
@@ -27,6 +15,7 @@ class ObjID {
     public:
         ObjID(): id(0) {}
         ///
+        ObjID(const CmiUInt8 id_) : id(id_) { }
         ObjID(const CkGroupID gid, const CmiUInt8 eid)
             : id( ((CmiUInt8)gid.idx << ELEMENT_BITS) | eid)
         {
@@ -41,21 +30,33 @@ class ObjID {
             gid.idx = (id & COLLECTION_MASK) >> ELEMENT_BITS;
             return gid;
         }
-    private:
-
         /// get element id
         inline CmiUInt8 getElementID() const { return id & ELEMENT_MASK; }
+        inline CmiUInt8 getID() const { return id & (COLLECTION_MASK | ELEMENT_MASK); }
+
+        enum bits {
+          ELEMENT_BITS    = 48,
+          COLLECTION_BITS = 13,
+          TYPE_TAG_BITS   = 3
+        };
+        enum masks {
+          ELEMENT_MASK =   ((1ULL << ELEMENT_BITS) - 1),
+          COLLECTION_MASK = (((1ULL << COLLECTION_BITS) - 1) << ELEMENT_BITS),
+          TYPE_TAG_MASK =   (((1ULL << TYPE_TAG_BITS) - 1) << (ELEMENT_BITS + COLLECTION_BITS))
+        };
+
+    private:
+
         /// The actual id data
         CmiUInt8 id;
 };
 
-// Undef all the macros used here to avoid leaking them
-#undef ELEMENT_BITS
-#undef COLLECTION_BITS
-#undef TYPE_TAG_BITS
-#undef ELEMENT_MASK
-#undef COLLECTION_MASK
-#undef TYPE_TAG_MASK
+inline bool operator==(ObjID lhs, ObjID rhs) {
+  return lhs.getID() == rhs.getID();
+}
+inline bool operator!=(ObjID lhs, ObjID rhs) {
+  return !(lhs == rhs);
+}
 
 } // end namespace ck
 

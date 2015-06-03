@@ -65,8 +65,10 @@ public:
         void addLocation(CkLocation &loc) {
                 CkArrayIndex idx=loc.getIndex();
 		CkGroupID gID = locMgr->ckGetGroupID();
+                CmiUInt8 id = loc.getID();
 		p|gID;	    // store loc mgr's GID as well for easier restore
                 p|idx;
+                p|id;
 	        p|loc;
 		//CkPrintf("[%d] addLocation: ", CkMyPe()), idx.print();
         }
@@ -496,14 +498,16 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	  for (int i=0; i<numElements; i++) {
 		CkGroupID gID;
 		CkArrayIndex idx;
+                CmiUInt8 id;
 		p|gID;
                 p|idx;
+                p|id;
 		CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
 		if (notifyListeners){
-  		  mgr->resume(idx,p,true);
+		  mgr->resume(idx, id, p, true);
 		}
                 else{
-  		  mgr->restore(idx,p);
+		  mgr->restore(idx, id, p);
 		}
 	  }
 	}

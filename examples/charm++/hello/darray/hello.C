@@ -32,9 +32,12 @@ public:
 class Other : public CBase_Other {
   public:
     Other(void) {
-      CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
-      arr[0].SayHi(17);
+      CProxy_Hello::ckNew(nElements, CkCallback(CkIndex_Other::created(NULL), thisProxy));
     }
+
+  void created(CkArrayCreatedMsg *m) {
+    CProxy_Hello(m->aid).SayHi(17);
+  }
 };
 
 /*array [1D]*/

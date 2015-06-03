@@ -170,7 +170,7 @@ void ArrayElement::init_checkpt() {
 	  CkPrintf("[%d] Warning: init_checkpt called during restart, possible bug in migration constructor!\n");
 	}
 	// only master init checkpoint
-        if (thisArray->getLocMgr()->firstManager->mgr!=thisArray) return;
+        if (thisArray->getLocMgr()->managers.begin()->second != thisArray) return;
 
         budPEs[0] = CkMyPe();
         budPEs[1] = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->BuddyPE(CkMyPe());
@@ -417,9 +417,11 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
 #endif
 
   // find a list of array elements bound together
-  ArrayElement *elt = (ArrayElement *)mgr->lookup(m->index, m->aid);
+  CkArray *arrmgr = m->aid.ckLocalBranch();
+  CmiAssert(arrmgr);
+  ArrayElement *elt = arrmgr->lookup(m->index);
   CmiAssert(elt);
-  CkLocRec_local *rec = elt->myRec;
+  CkLocRec *rec = elt->myRec;
   CkVec<CkMigratable *> list;
   mgr->migratableList(rec, list);
   CmiAssert(list.length() > 0);
@@ -1032,12 +1034,12 @@ void CkMemCheckPT::gotData()
   }
 }
 
-void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe)
+void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUInt8 *id, int nowOnPe)
 {
 
   for (int i=0; i<n; i++) {
     CkLocMgr *mgr = CProxy_CkLocMgr(g[i]).ckLocalBranch();
-    mgr->updateLocation(idx[i], nowOnPe);
+    mgr->updateLocation(idx[i], id[i], nowOnPe);
   }
 	thisProxy[nowOnPe].gotReply();
 }
@@ -1059,6 +1061,7 @@ void CkMemCheckPT::recoverArrayElements()
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
   CkVec<CkGroupID> * gmap = new CkVec<CkGroupID>[CkNumPes()];
   CkVec<CkArrayIndex> * imap = new CkVec<CkArrayIndex>[CkNumPes()];
+  CkVec<CkArrayIndex> * idmap = new CkVec<CmiUInt8>[CkNumPes()];
 #endif
 
 #if !CMK_CHKP_ALL
@@ -1087,6 +1090,7 @@ void CkMemCheckPT::recoverArrayElements()
     if (homePe != CkMyPe()) {
       gmap[homePe].push_back(msg->locMgr);
       imap[homePe].push_back(msg->index);
+      CkAbort("Missing element IDs");
     }
 #endif
     CkFreeMsg(msg);
@@ -1145,14 +1149,16 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gma
 		for(int i=0;i<numElements;i++){
 			CkGroupID gID;
 			CkArrayIndex idx;
+                        CmiUInt8 id;
 			p|gID;
 			p|idx;
+                        p|id;
 			CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
     			int homePe = mgr->homePe(idx);
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
-			mgr->resume(idx,p,true,true);
+			mgr->resume(idx, id, p, true, true);
 #else
-			mgr->resume(idx,p,false,true);
+			mgr->resume(idx, id, p, false, true);
 #endif
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
 			homePe = mgr->homePe(idx);

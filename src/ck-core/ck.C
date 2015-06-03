@@ -1166,19 +1166,11 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 }
 
 /************** Receive: Arrays *************/
-
-static void _processArrayEltInitMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
-  if (mgr) {
-    _SET_USED(env, 0);
-    mgr->insertElement((CkMessage *)EnvToUsr(env));
-  }
-}
 static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
-    mgr->getLocMgr()->deliverInline((CkMessage *)EnvToUsr(env));
+    mgr->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_inline);
   }
 }
 
@@ -1254,11 +1246,6 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       break;
 
 // Array support
-    case ArrayEltInitMsg:
-      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ArrayEltInitMsg\n", CkMyPe());)
-      if(env->isPacked()) CkUnpackMessage(&env);
-      _processArrayEltInitMsg(ck,env);
-      break;
     case ForIDedObjMsg:
     case ForArrayEltMsg:
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForArrayEltMsg\n", CkMyPe());)
@@ -2043,9 +2030,6 @@ void _ckModuleInit(void) {
 
 /************** Send: Arrays *************/
 
-extern void CkArrayManagerInsert(int onPe,void *msg);
-//extern void CkArrayManagerDeliver(int onPe,void *msg);
-
 static void _prepareOutgoingArrayMsg(envelope *env,int type)
 {
   _CHECK_USED(env);
@@ -2056,14 +2040,6 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
 #endif
   CmiSetHandler(env, _charmHandlerIdx);
   CpvAccess(_qd)->create();
-}
-
-extern "C"
-void CkArrayManagerInsert(int pe,void *msg,CkGroupID aID) {
-  register envelope *env = UsrToEnv(msg);
-  env->setArrayMgr(aID);
-  _prepareOutgoingArrayMsg(env,ArrayEltInitMsg);
-  _CldEnqueue(pe, env, _infoIdx);
 }
 
 extern "C"

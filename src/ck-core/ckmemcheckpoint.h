@@ -163,7 +163,7 @@ public:
   void finishUp();
   void gotReply();
   void inmem_restore(CkArrayCheckPTMessage *m);
-  void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe);
+  void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUInt8 *id, int nowOnPe);
   void resetLB(int diepe);
   int  isFailed(int pe);
   void pupAllElements(PUP::er &p);

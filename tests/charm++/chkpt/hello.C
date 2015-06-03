@@ -25,7 +25,9 @@ public:
     chkpNodeNum = CkNumNodes();
     CkPrintf("Running Hello on %d processors for %d elements\n",CkNumPes(),nElements);
     mainProxy = thisProxy;
-    helloProxy = CProxy_Hello::ckNew(nElements);
+    CkArrayOptions helloOpts(nElements);
+    helloOpts.setBounds(10000);
+    helloProxy = CProxy_Hello::ckNew(helloOpts);
     helloProxy.SayHi();
 
     chelloProxy = CProxy_CHello::ckNew(0);
@@ -53,6 +55,11 @@ public:
     CkPrintf("Main's MigCtor. a=%d(%p), b[0]=%d(%p), b[1]=%d, old PE number %d\n",a,&a,b[0],b,b[1], chkpPENum);
   }
 
+  void restart() {
+    helloProxy[nElements++].insert();
+    helloProxy.SayHi();
+  }
+
   void myClient(CkReductionMsg *m){
     step++;
 
@@ -63,7 +70,7 @@ public:
     CkAssert(step == stepInc);
     CkPrintf("myClient. a=%d(%p), b[0]=%d(%p), b[1]=%d\n",a,&a,b[0],b,b[1]);
     if(step == 3){
-      CkCallback cb(CkIndex_Hello::SayHi(),helloProxy);
+      CkCallback cb(CkIndex_Main::restart(),thisProxy);
       CkStartCheckpoint("log",cb);
     }else{
       helloProxy.SayHi();

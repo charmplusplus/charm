@@ -68,6 +68,7 @@ never be excluded...
 #include "trace.h"
 #include "CkCheckpoint.decl.h"
 #include <sstream>
+#include <limits.h>
 
 void CkRestartMain(const char* dirname);
 
@@ -203,6 +204,7 @@ extern int diskCkptFlag;
 int _defaultObjectQ = 0;            // for obejct queue
 int _ringexit = 0;		    // for charm exit
 int _ringtoken = 8;
+extern int _messageBufferingThreshold;
 
 
 /*
@@ -301,6 +303,12 @@ static inline void _parseCommandLineOpts(char **argv)
         fastRecovery = true;
     }
 #endif
+
+        if (!CmiGetArgIntDesc(argv, "+messageBufferingThreshold",
+                              &_messageBufferingThreshold,
+                              "Message size above which the runtime will buffer messages directed at unlocated array elements")) {
+          _messageBufferingThreshold = INT_MAX;
+        }
 
 	/* Anytime migration flag */
 	_isAnytimeMigration = true;

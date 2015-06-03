@@ -393,17 +393,8 @@ void CpdPupMessage(PUP::er &p, void *msg)
   if (envType == ForArrayEltMsg || envType == ArrayEltInitMsg) {
     int arrID = env->getArrayMgr().idx;
     PUPn(arrID);
-    CkArrayIndex &idx = env->getsetArrayIndex();
-    int nInts = idx.nInts;
-    int dimension = idx.dimension;
-    PUPn(nInts);
-    PUPn(dimension);
-    p.comment("index");
-    if (dimension >=4 && dimension <=6) {
-      p((short int *)idx.index, dimension);
-    } else {
-      p(idx.index, nInts);
-    }
+    CmiUInt8 id = env->getRecipientID();
+    PUPn(id);
   } else if (envType == ForNodeBocMsg || envType == ForBocMsg) {
     int groupID = env->getGroupNum().idx;
     PUPn(groupID);

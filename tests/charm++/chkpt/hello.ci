@@ -10,6 +10,7 @@ mainmodule hello {
   mainchare [migratable] Main {
     entry Main(CkArgMsg *m);
     entry void myClient(CkReductionMsg *);
+    entry void restart();
   };
 
   array [1D] Hello {

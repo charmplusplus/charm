@@ -902,7 +902,7 @@ private:
 #ifdef CMK_TRAM_CACHE_ARRAY_METADATA
     clientObj = clientObjs_[arrayId];
 #else
-    clientObj = (ClientType *) clientArrayMgr_->lookup(arrayId);
+    clientObj = (ClientType *) clientArrayMgr_->lookup((CkArrayIndex)arrayId);
 #endif
 
     if (clientObj != NULL) {
@@ -1045,13 +1045,13 @@ public:
       destinationPe =  destinationPes_[arrayIndex];
     }
     else {
-      destinationPe = clientArrayMgr_->lastKnown(arrayIndex);
+      destinationPe = clientArrayMgr_->lastKnown((CkArrayIndex)arrayIndex);
       isCachedArrayMetadata_[arrayIndex] = true;
       destinationPes_[arrayIndex] = destinationPe;
     }
 #else
     destinationPe =
-      clientArrayMgr_->lastKnown(arrayIndex);
+      clientArrayMgr_->lastKnown((CkArrayIndex)arrayIndex);
 #endif
 
     if (destinationPe == this->myIndex_) {
@@ -1098,7 +1098,7 @@ public:
 
   // always called on homePE for array element arrayId
   void processLocationRequest(itype arrayId, int deliveredToPe, int sourcePe) {
-    int ownerPe = clientArrayMgr_->lastKnown(arrayId);
+    int ownerPe = clientArrayMgr_->lastKnown((CkArrayIndex)arrayId);
     this->thisProxy[deliveredToPe].resendMisdeliveredItems(arrayId, ownerPe);
     this->thisProxy[sourcePe].updateLocationAtSource(arrayId, sourcePe);
   }
@@ -1121,7 +1121,7 @@ public:
 
   void updateLocationAtSource(itype arrayId, int destinationPe) {
 
-    int prevOwner = clientArrayMgr_->lastKnown(arrayId);
+    int prevOwner = clientArrayMgr_->lastKnown((CkArrayIndex)arrayId);
 
     if (prevOwner != destinationPe) {
       clientLocMgr_->updateLocation(arrayId, destinationPe);

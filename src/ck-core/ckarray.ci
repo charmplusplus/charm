@@ -8,7 +8,7 @@ module CkArray {
   group [migratable] CkArray : CkReductionMgr {
 	entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg, CkNodeGroupID nodereductionProxy);
 	//Insertion
-	entry void insertElement(CkMessage *);
+        entry [inline] void insertElement(CkMarshalledMessage, CkArrayIndex, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
 	entry void remoteBeginInserting(void);
 	entry void remoteDoneInserting(void);
 	//Broadcast
@@ -42,5 +42,12 @@ module CkArray {
 
   };
 
+  message CkCreateArrayAsyncMsg {
+    char ctorPayload[];
+  };
+
+  message CkArrayCreatedMsg {
+    CkArrayID aid;
+  };
 
 };

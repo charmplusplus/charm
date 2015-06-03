@@ -8,7 +8,6 @@
 #include <pup.h>
 #include <charm.h>
 #include <middle.h>
-#include <ckarrayindex.h>
 #include <cklists.h>
 #include <objid.h>
 
@@ -174,8 +173,7 @@ namespace ck {
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
       struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
-        CkArrayIndexBase index; ///< Array element index
-        int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
+        CmiUInt8 id;              /// <ck::ObjID if it could be in a union
         CkGroupID arr;            ///< Array manager GID
 #if CMK_SMP_TRACE_COMMTHREAD
         UInt srcpe;
@@ -471,12 +469,18 @@ public:
     UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.hopCount;}
     int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); type.array.ifNotThere=nt;}
-    int *getsetArrayListenerData(void) {return type.array.listenerData;}
-    CkArrayIndex &getsetArrayIndex(void) 
-    	{ 
-	  CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
-	  return *(CkArrayIndex *)&type.array.index;
-	}
+
+    void setRecipientID(ck::ObjID objid)
+    {
+      CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
+      type.array.id = objid.getID();
+    }
+
+    CmiUInt8 getRecipientID()
+    {
+      CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
+      return type.array.id;
+    }
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  public:

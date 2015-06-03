@@ -1407,6 +1407,21 @@ CDECL int compareAmpiSplitKey(const void *a_, const void *b_) {
   return a->rank-b->rank;
 }
 
+CProxy_ampi ampi::createNewChildAmpiSync() {
+  CkArrayOptions opts;
+  opts.bindTo(parentProxy);
+  opts.setNumInitial(0);
+  CkArrayID unusedAID;
+  ampiCommStruct unusedComm;
+  CkCallback cb(CkCallback::resumeThread);
+  CProxy_ampi::ckNew(unusedAID, unusedComm, opts, cb);
+  CkArrayCreatedMsg *newAmpiMsg = static_cast<CkArrayCreatedMsg*>(cb.thread_delay());
+  CProxy_ampi newAmpi = newAmpiMsg->aid;
+  delete newAmpiMsg;
+  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
+  return newAmpi;
+}
+
 void ampi::splitPhase1(CkReductionMsg *msg)
 {
   //Order the keys, which orders the ranks properly:
@@ -1430,12 +1445,8 @@ void ampi::splitPhase1(CkReductionMsg *msg)
     { //Hit a new color-- need to build a new communicator and array
       lastColor=keys[c].color;
       lastRoot=c;
-      CkArrayOptions opts;
-      opts.bindTo(parentProxy);
-      opts.setNumInitial(0);
-      CkArrayID unusedAID; ampiCommStruct unusedComm;
-      lastAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
-      lastAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
+
+      lastAmpi = createNewChildAmpiSync();
 
       CkVec<int> indices; //Maps rank to array indices for new array
       for (int i=c;i<nKeys;i++) {
@@ -1497,23 +1508,20 @@ void ampi::commCreate(const groupStruct vec,MPI_Comm* newcomm){
   }
 }
 
+void ampi::insertNewChildAmpiElements(MPI_Comm *nextComm, CProxy_ampi newAmpi) {
+  ampiCommStruct newCommStruct = ampiCommStruct(*nextComm, newAmpi, tmpVec.size(), tmpVec);
+
+  for (int i = 0; i < tmpVec.size(); ++i)
+    newAmpi[tmpVec[i]].insert(parentProxy, newCommStruct);
+}
+
 void ampi::commCreatePhase1(CkReductionMsg *msg){
   MPI_Comm *nextGroupComm = (int *)msg->getData();
 
-  CkArrayOptions opts;
-  opts.bindTo(parentProxy);
-  opts.setNumInitial(0);
-  CkArrayID unusedAID;
-  ampiCommStruct unusedComm;
-  CProxy_ampi newAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
-  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
+  CProxy_ampi newAmpi = createNewChildAmpiSync();
 
-  groupStruct indices = tmpVec;
-  ampiCommStruct newCommstruct = ampiCommStruct(*nextGroupComm,newAmpi,indices.size(),indices);
-  for(int i=0;i<indices.size();i++){
-    int newIdx=indices[i];
-    newAmpi[newIdx].insert(parentProxy,newCommstruct);
-  }
+  insertNewChildAmpiElements(nextGroupComm, newAmpi);
+
   delete msg;
 }
 
@@ -1528,7 +1536,7 @@ void ampiParent::groupChildRegister(const ampiCommStruct &s) {
 void ampi::cartCreate(const groupStruct vec,MPI_Comm* newcomm){
   int rootIdx=vec[0];
   tmpVec = vec;
-  CkCallback cb(CkIndex_ampi::cartCreatePhase1(NULL),CkArrayIndex1D(rootIdx),myComm.getProxy());
+  CkCallback cb(CkIndex_ampi::commCreatePhase1(NULL),CkArrayIndex1D(rootIdx),myComm.getProxy());
 
   MPI_Comm nextcart = parent->getNextCart();
   contribute(sizeof(nextcart), &nextcart,CkReduction::max_int,cb);
@@ -1539,27 +1547,6 @@ void ampi::cartCreate(const groupStruct vec,MPI_Comm* newcomm){
     *newcomm = retcomm;
   }else
     *newcomm = MPI_COMM_NULL;
-}
-
-void ampi::cartCreatePhase1(CkReductionMsg *msg){
-  MPI_Comm *nextCartComm = (int *)msg->getData();
-
-  CkArrayOptions opts;
-  opts.bindTo(parentProxy);
-  opts.setNumInitial(0);
-  CkArrayID unusedAID;
-  ampiCommStruct unusedComm;
-  CProxy_ampi newAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
-  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
-
-  groupStruct indices = tmpVec;
-  ampiCommStruct newCommstruct = ampiCommStruct(*nextCartComm,newAmpi,indices.
-      size(),indices);
-  for(int i=0;i<indices.size();i++){
-    int newIdx=indices[i];
-    newAmpi[newIdx].insert(parentProxy,newCommstruct);
-  }
-  delete msg;
 }
 
 void ampiParent::cartChildRegister(const ampiCommStruct &s) {
@@ -1575,7 +1562,7 @@ void ampiParent::cartChildRegister(const ampiCommStruct &s) {
 void ampi::graphCreate(const groupStruct vec,MPI_Comm* newcomm){
   int rootIdx=vec[0];
   tmpVec = vec;
-  CkCallback cb(CkIndex_ampi::graphCreatePhase1(NULL),CkArrayIndex1D(rootIdx),
+  CkCallback cb(CkIndex_ampi::commCreatePhase1(NULL),CkArrayIndex1D(rootIdx),
       myComm.getProxy());
   MPI_Comm nextgraph = parent->getNextGraph();
   contribute(sizeof(nextgraph), &nextgraph,CkReduction::max_int,cb);
@@ -1586,27 +1573,6 @@ void ampi::graphCreate(const groupStruct vec,MPI_Comm* newcomm){
     *newcomm = retcomm;
   }else
     *newcomm = MPI_COMM_NULL;
-}
-
-void ampi::graphCreatePhase1(CkReductionMsg *msg){
-  MPI_Comm *nextGraphComm = (int *)msg->getData();
-
-  CkArrayOptions opts;
-  opts.bindTo(parentProxy);
-  opts.setNumInitial(0);
-  CkArrayID unusedAID;
-  ampiCommStruct unusedComm;
-  CProxy_ampi newAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
-  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
-
-  groupStruct indices = tmpVec;
-  ampiCommStruct newCommstruct = ampiCommStruct(*nextGraphComm,newAmpi,indices
-      .size(),indices);
-  for(int i=0;i<indices.size();i++){
-    int newIdx=indices[i];
-    newAmpi[newIdx].insert(parentProxy,newCommstruct);
-  }
-  delete msg;
 }
 
 void ampiParent::graphChildRegister(const ampiCommStruct &s) {
@@ -1635,15 +1601,9 @@ void ampi::intercommCreate(const groupStruct rvec, const int root, MPI_Comm *nco
 void ampi::intercommCreatePhase1(CkReductionMsg *msg){
   MPI_Comm *nextInterComm = (int *)msg->getData();
 
-  groupStruct lgroup = myComm.getIndices();
-  CkArrayOptions opts;
-  opts.bindTo(parentProxy);
-  opts.setNumInitial(0);
-  CkArrayID unusedAID;
-  ampiCommStruct unusedComm;
-  CProxy_ampi newAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
-  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
+  CProxy_ampi newAmpi = createNewChildAmpiSync();
 
+  groupStruct lgroup = myComm.getIndices();
   ampiCommStruct newCommstruct = ampiCommStruct(*nextInterComm,newAmpi,lgroup.size(),lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
     int newIdx=lgroup[i];
@@ -1687,19 +1647,10 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm){ // first valid only at lo
 void ampi::intercommMergePhase1(CkReductionMsg *msg){  // gets called on two roots, first root creates the comm
   if(tmpVec.size()==0) { delete msg; return; }
   MPI_Comm *nextIntraComm = (int *)msg->getData();
-  CkArrayOptions opts;
-  opts.bindTo(parentProxy);
-  opts.setNumInitial(0);
-  CkArrayID unusedAID;
-  ampiCommStruct unusedComm;
-  CProxy_ampi newAmpi=CProxy_ampi::ckNew(unusedAID,unusedComm,opts);
-  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
+  CProxy_ampi newAmpi = createNewChildAmpiSync();
 
-  ampiCommStruct newCommstruct = ampiCommStruct(*nextIntraComm,newAmpi,tmpVec.size(),tmpVec);
-  for(int i=0;i<tmpVec.size();i++){
-    int newIdx=tmpVec[i];
-    newAmpi[newIdx].insert(parentProxy,newCommstruct);
-  }
+  insertNewChildAmpiElements(nextIntraComm, newAmpi);
+
   delete msg;
 }
 

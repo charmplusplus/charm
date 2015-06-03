@@ -11,70 +11,19 @@ class CkMigratable;//Migratable object
  * CkLocRec *'s.
  */
 class CkLocRec {
-protected:
+private:
   CkLocMgr *myLocMgr;
-  //int lastAccess;//Age when last accessed. Removed since unused and colliding with a inheriting class, Filippo
-  //Called when we discover we are obsolete before we delete ourselves
-  virtual void weAreObsolete(const CkArrayIndex &idx);
-public:
-  CkLocRec(CkLocMgr *mgr) :myLocMgr(mgr) { }
-  virtual ~CkLocRec();
-  inline CkLocMgr *getLocMgr(void) const {return myLocMgr;}
-
-  /// Return the type of this ArrayRec:
-  typedef enum {
-    base=0,//Base class (invalid type)
-    local,//Array element that lives on this Pe
-    remote,//Array element that lives on some other Pe
-    buffering,//Array element that was just created
-    dead//Deleted element (for debugging)
-  } RecType;
-  virtual RecType type(void)=0;
-  
-  /// Accept a message for this element
-  virtual bool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0)=0;
-  
-  /// This is called when this ArrayRec is about to be replaced.
-  /// It is only used to deliver buffered element messages.
-  virtual void beenReplaced(void);
-  
-  /// Return if this rec is now obsolete
-  virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)=0;
-
-  /// Return the represented array element; or NULL if there is none
-  virtual CkMigratable *lookupElement(CkArrayID aid);
-
-  /// Return the last known processor; or -1 if none
-  virtual int lookupProcessor(void);
-};
-
-/**
- * Represents a local array element.
- */
-class CkLocRec_local : public CkLocRec {
   CkArrayIndex idx;/// Element's array index
-  int localIdx; /// Local index (into array manager's element lists)
+  CmiUInt8 id;
   bool running; /// True when inside a startTiming/stopTiming pair
   bool *deletedMarker; /// Set this if we're deleted during processing
-  CkQ<CkArrayMessage *> halfCreated; /// Stores messages for nonexistent siblings of existing elements
 public:
+
   //Creation and Destruction:
-  CkLocRec_local(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival,
-  	const CkArrayIndex &idx_,int localIdx_);
+  CkLocRec(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival, const CkArrayIndex &idx_, CmiUInt8 id);
   void migrateMe(int toPe); //Leave this processor
-  void informIdealLBPeriod(int lb_ideal_period);
-  void metaLBCallLB();
   void destroy(void); //User called destructor
-  virtual ~CkLocRec_local();
-
-  /// A new element has been added to this index
-  void addedElement(void);
-
-  /**
-   *  Accept a message for this element.
-   *  Returns false if the element died during the receive.
-   */
-  virtual bool deliver(CkArrayMessage *m,CkDeliver_t type,int opts=0);
+  ~CkLocRec();
 
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
@@ -82,9 +31,6 @@ public:
    *    if false, the message can be reused.
    */
   bool invokeEntry(CkMigratable *obj,void *msg,int idx,bool doFree);
-
-  virtual RecType type(void);
-  virtual bool isObsolete(int nSprings,const CkArrayIndex &idx);
 
 #if CMK_LBDB_ON  //For load balancing:
   /// Control the load balancer:
@@ -97,10 +43,8 @@ public:
   inline void startTiming(int ignore_running=0) {  }
   inline void stopTiming(int ignore_running=0) { }
 #endif
-  inline int getLocalIndex(void) const {return localIdx;}
   inline const CkArrayIndex &getIndex(void) const {return idx;}
-  virtual CkMigratable *lookupElement(CkArrayID aid);
-  virtual int lookupProcessor(void);
+  inline CmiUInt8 getID() const { return id; }
 
 #if CMK_LBDB_ON
 public:
@@ -110,8 +54,6 @@ public:
   static void staticMigrate(LDObjHandle h, int dest);
   static void staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period);
   static void staticMetaLBCallLBOnChares(LDObjHandle h);
-  void metaLBResumeWaitingChares(int lb_ideal_period);
-  void metaLBCallLBOnChares();
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
   void setPupSize(size_t obj_pup_size);
@@ -149,7 +91,6 @@ public:
 	bool isBounced(){return bounced;}
 	void Bounced(bool set){bounced = set;}
 };
-class CkLocRec_remote;
 
 #endif // CK_LOC_REC_H
 
