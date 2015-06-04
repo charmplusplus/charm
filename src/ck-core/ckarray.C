@@ -753,14 +753,14 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   return CkCreateArray(m, ctor, opts);
 }
 
-CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
+CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(CkArrayOptions opts)
 {
-  return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,CkArrayOptions());
+  return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,opts);
 }
 
-void CProxy_ArrayBase::ckCreateEmptyArrayAsync(CkCallback cb)
+void CProxy_ArrayBase::ckCreateEmptyArrayAsync(CkCallback cb, CkArrayOptions opts)
 {
-  CkSendAsyncCreateArray(0, cb, CkArrayOptions(), (CkArrayMessage *)CkAllocSysMsg());
+  CkSendAsyncCreateArray(0, cb, opts, (CkArrayMessage *)CkAllocSysMsg());
 }
 
 extern IrrGroup *lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkGroupID &groupID);

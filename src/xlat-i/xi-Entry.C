@@ -135,11 +135,17 @@ void Entry::setChare(Chare *c) {
 	Removed old treatment for CkArgMsg to allow argc, argv or void
 	constructors for mainchares.
 	* **************************************************************/
-        if (isConstructor() && container->isMainChare() && param->isVoid()) {
-          //Main chare always magically takes CkArgMsg
-          Type *t = new PtrType(new NamedType("CkArgMsg"));
-          param=new ParamList(new Parameter(line,t));
-          std::cerr << "Charmxi> " << line << ": Deprecation warning: mainchare constructors should explicitly take CkArgMsg* if that's how they're implemented.\n";
+        if (isConstructor() && param->isVoid()) {
+          if (container->isMainChare()) {
+            //Main chare always magically takes CkArgMsg
+            Type *t = new PtrType(new NamedType("CkArgMsg"));
+            param=new ParamList(new Parameter(line,t));
+            std::cerr << "Charmxi> " << line << ": Deprecation warning: mainchare constructors should explicitly take CkArgMsg* if that's how they're implemented.\n";
+          }
+          if (container->isArray()) {
+            Array *a = dynamic_cast<Array*>(c);
+            a->hasVoidConstructor = true;
+          }
         }
 
 	entryCount=c->nextEntry();
@@ -462,9 +468,10 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
       str<< //Element insertion routine
       "    void insert("<<paramComma(1,0)<<"int onPE=-1"<<eo(1)<<");";
   else if (container->getForWhom() == forAll) {
-      //With options
-      str << "    static CkArrayID ckNew("<<paramComma(1,0)<<"const CkArrayOptions &opts"<<eo(1)<<");\n";
-      str << "    static void      ckNew("<<paramComma(1,0)<<"const CkArrayOptions &opts, CkCallback _ck_array_creation_cb"<<eo(1)<<");\n";
+      //With options to specify size (including potentially empty, covering the param->isVoid() case)
+      str << "    static CkArrayID ckNew(" << paramComma(1,0) << "const CkArrayOptions &opts = CkArrayOptions()" << eo(1) << ");\n";
+      str << "    static void      ckNew(" << paramComma(1,0) << "const CkArrayOptions &opts, CkCallback _ck_array_creation_cb" << eo(1) << ");\n";
+
       XStr dim = ((Array*)container)->dim();
       if (dim == (const char*)"1D") {
         str << "    static CkArrayID ckNew(" << paramComma(1,0) << "const int s1" << eo(1)<<");\n";

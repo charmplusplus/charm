@@ -42,24 +42,25 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, AstChildren<Memb
 	bases_CBase=NULL;
 	setTemplate(0);
 	hasSdagEntry=0;
-	if (list)
-	{
-          list->recurse(this, &Member::setChare);
-      		//Add migration constructor to MemberList
-		if(isMigratable()) {
-			Entry *e=new Entry(ln,SMIGRATE,NULL,
-			  (char *)type->getBaseName(),
-			  new ParamList(new Parameter(line,
-				new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
-			e->setChare(this);
-			list->push_back(e);
-		}
-	}
-	if (bases==NULL) //Always add Chare as a base class
-		bases = new TypeList(new NamedType("Chare"), NULL);
 }
 
 void Chare::check() {
+  if (list)
+  {
+    list->recurse(this, &Member::setChare);
+    //Add migration constructor to MemberList
+    if(isMigratable()) {
+      Entry *e=new Entry(line,SMIGRATE,NULL,
+                         (char *)type->getBaseName(),
+                         new ParamList(new Parameter(line,
+                                                     new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
+      e->setChare(this);
+      list->push_back(e);
+    }
+  }
+  if (bases==NULL) //Always add Chare as a base class
+    bases = new TypeList(new NamedType("Chare"), NULL);
+
   if (list) {
     list->check();
 
@@ -1017,7 +1018,7 @@ void Group::genSubDecls(XStr& str)
 //Array Constructor
 Array::Array(int ln, attrib_t Nattr, NamedType *index,
              NamedType *t, TypeList *b, AstChildren<Member> *l)
-    : Chare(ln,Nattr|CARRAY|CMIGRATABLE,t,b,l)
+  : Chare(ln,Nattr|CARRAY|CMIGRATABLE,t,b,l), hasVoidConstructor(false)
 {
         hasElement=1;
 	forElement=forIndividual;
@@ -1124,9 +1125,14 @@ Array::genSubDecls(XStr& str)
   {/*Collective, indexible version*/
     disambig_array(str, super);
 
-    //Build a simple, empty array
-    str << "\n    static CkArrayID ckNew(void) { return ckCreateEmptyArray(); }";
-    str << "\n    static void      ckNew(CkCallback cb) { ckCreateEmptyArrayAsync(cb); }";
+    // If there is a void constructor, the code that it generates covers empty
+    // array construction, and would produce a conflicting overload if we still
+    // emitted this.
+    if (!hasVoidConstructor) {
+      str << "\n    // Empty array construction";
+      str << "\n    static CkArrayID ckNew(CkArrayOptions opts = CkArrayOptions()) { return ckCreateEmptyArray(opts); }";
+      str << "\n    static void      ckNew(CkCallback cb, CkArrayOptions opts = CkArrayOptions()) { ckCreateEmptyArrayAsync(cb, opts); }\n";
+    }
 
     XStr etype; etype<<Prefix::ProxyElement<<type<<tvars();
     if (indexSuffix!=(const char*)"none")
@@ -1351,8 +1357,8 @@ disambig_array(XStr &str, const XStr &super)
       << "\n    inline CkLocMgr *ckLocMgr(void) const"
       << "\n    { return " << super << "::ckLocMgr(); }"
       << "\n"
-      << "\n    inline static CkArrayID ckCreateEmptyArray(void)"
-      << "\n    { return " << super << "::ckCreateEmptyArray(); }"
+      << "\n    inline static CkArrayID ckCreateEmptyArray(CkArrayOptions opts = CkArrayOptions())"
+      << "\n    { return " << super << "::ckCreateEmptyArray(opts); }"
       << "\n    inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)"
       << "\n    { return " << super << "::ckCreateArray(m,ctor,opts); }"
       << "\n    inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx)"

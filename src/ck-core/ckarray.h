@@ -376,8 +376,8 @@ public:
 	inline void ckCheck(void) const {}
 #endif
 
-	static CkArrayID ckCreateEmptyArray(void);
-        static void ckCreateEmptyArrayAsync(CkCallback cb);
+	static CkArrayID ckCreateEmptyArray(CkArrayOptions opts);
+        static void ckCreateEmptyArrayAsync(CkCallback cb, CkArrayOptions opts);
 	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts);
 
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx);

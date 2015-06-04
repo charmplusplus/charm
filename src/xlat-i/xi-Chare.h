@@ -145,6 +145,7 @@ class Array : public Chare {
     virtual const char* dim(void) {return indexSuffix.get_string_const();}
     virtual void genSubDecls(XStr& str);
     virtual char *chareTypeName(void) {return (char *) "array";}
+    bool hasVoidConstructor;
 };
 
 class Group : public Chare {
