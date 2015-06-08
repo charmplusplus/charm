@@ -216,11 +216,6 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       blue.h blue-conv.h bgconverse.h cmipool.h mempool.h cmiqueue.h \
       cmidirect.h cmidirectmanytomany.h cmitls.h
 
-CONVCOMHEADERS= 3dgridrouter.h hypercuberouter.h hypercubetopology.h	\
-	routerstrategy.h convcomlibstrategy.h  convcomlib.h dummyconversestrategy.h  treerouter.h \
-	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
-	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h
-
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
@@ -238,8 +233,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
           ckmessagelogging.h ckcausalmlog.h ckobjid.h\
 	  ckobjQ.h readonly.h \
-          comlib.h ComlibArrayListener.h ComlibStrategy.h \
-	  ComlibLearner.h $(UTILHEADERS) \
+          $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h MetaBalancer.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
           LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
 	  RefinerTemp.h Refiner.h RefinerApprox.h RefinerComm.h ckgraphTemp.h ckgraph.h ckheap.h \
@@ -259,21 +253,13 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           TraceSummary.decl.h TraceProjections.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
 	  TraceUtilization.decl.h BlueGene.decl.h \
-	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
-	  MulticastStrategy.h DirectMulticastStrategy.h RingMulticastStrategy.h	\
-	  ChunkMulticastStrategy.h OneTimeMulticastStrategy.h MultiRingMulticast.h \
-	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
-	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
-          PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
-	  BroadcastStrategy.h ComlibSectionInfo.h AAPLearner.h \
-	  AAMLearner.h ComlibStats.h \
-	  RectMulticastStrategy.h ckdirect.h \
+	  ckdirect.h \
 	  ControlPoints.decl.h PathHistory.decl.h \
 	  pathHistory.h envelope-path.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
 	  mpi-interoperate.h mpi_main.decl.h  \
-	  $(CVHEADERS) $(CONVCOMHEADERS)
+	  $(CVHEADERS)
 
 BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
 
@@ -334,9 +320,7 @@ dirs+sources:
 	./gatherflat $(SRCBASE)/ck-perf          .
 	./gatherflat $(SRCBASE)/ck-tune          .
 	./gatherflat $(SRCBASE)/ck-ldb           .
-	./gatherflat $(SRCBASE)/ck-com           .
 	./gatherflat $(SRCBASE)/ck-cp            .
-	./gatherflat $(SRCBASE)/conv-com         .
 	./gatherflat $(SRCBASE)/langs/simplemsg  .
 	./gatherflat $(SRCBASE)/langs/pvmc       .
 	./gatherflat $(SRCBASE)/langs/bluegene   .
@@ -429,11 +413,6 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
 	cmitls.o memoryaffinity.o commitid.o sdag.o conv-interoperate.o
-
-#############################################
-#Comlib Core objects that go into libck.a
-COMLIB_CORE_OBJS = ComlibModuleInterface.o 
-##############################################
 
 LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
@@ -626,13 +605,13 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o DistBaseLB.o \
            ckgraphTemp.o ckgraph.o LButil.o RefinerTemp.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
-	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) modifyScheduler.o \
+	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
 					 trace-controlPoints.o mpi-interoperate.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
-charm-target: loadbalancers default_libs comlib_objs $(L)/libmpi-mainmodule.a
+charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a
 
 CHARMLIBS: charm++ CONVLIBS 
 	$(MAKE) -C libs charmlibs OPTS='$(OPTS)'
@@ -684,8 +663,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
   cklocation.h LBDatabase.h MetaBalancer.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
   LBMachineUtil.h lbdb++.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
-  CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h objid.h envelope.h envelope-path.h CkFutures.decl.h \
+  CkLocation.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h CkFutures.decl.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h trace-simple.h \
@@ -747,39 +725,6 @@ TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 loadbalancers: $(COMMON_LDBS) $(L)/libmoduleCommonLBs.a
 
 everylb: $(ALL_LDBS) $(L)/libmoduleEveryLB.a
-
-######################################################################
-#
-#Communication Optimization Library
-#
-######################################################################
-
-STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
-                DummyStrategy.o NodeMulticast.o ChunkMulticastStrategy.o OneTimeMulticastStrategy.o \
-		EachToManyMulticastStrategy.o ComlibSectionInfo.o \
-                AAPLearner.o ComlibStats.o AAMLearner.o \
-                MsgPacker.o MulticastStrategy.o DirectMulticastStrategy.o \
-		RingMulticastStrategy.o MultiRingMulticast.o\
-                PipeBroadcastStrategy.o MeshStreamingStrategy.o \
-                PrioStreaming.o BroadcastStrategy.o RectMulticastStrategy.o \
-		convcomlibstrategy.o ComlibManager.o ComlibStrategy.o 
-
-CONVERSE_COM_OBJS = gridrouter.o hypercuberouter.o treerouter.o petable.o \
-		3dgridrouter.o graphrouter.o hypercubetopology.o \
-		routerstrategy.o convcomlibmanager.o pipebroadcastconverse.o \
-		pipelinestrategy.o prefixrouter.o
-
-COMLIB_OBJS = $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
-
-comlib_objs: $(L)/libmodulecomlib.a $(L)/libconvcom.a
-
-$(L)/libconvcom.a: $(COMLIB_OBJS)
-	$(CHARMC) -o $(L)/libconvcom.a $(CONVERSE_COM_OBJS)
-
-#for backward compatibility, keep libmodulecommlib.a with double m.
-$(L)/libmodulecomlib.a: $(COMLIB_OBJS)
-	$(CHARMC) -o $(L)/libmodulecomlib.a $(COMLIB_OBJS)
-	cp -f $(L)/libmodulecomlib.a $(L)/libmodulecommlib.a
 
 
 ###############################################################################
@@ -978,7 +923,7 @@ depends: cidepends commitid.c
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
 	processFiles=''; 	\
-        for i in $(sort $(LIBCONV_CORE) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(OTHER_OBJS)) ; do \
+        for i in $(sort $(LIBCONV_CORE) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(OTHER_OBJS)) ; do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\
@@ -1002,7 +947,7 @@ dependsCaseSensitive: cidepends
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
 	processFiles=''; 	\
-        for i in $(sort $(LIBCONV_CORE) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(OTHER_OBJS)); do \
+        for i in $(sort $(LIBCONV_CORE) $(LIBCONV_UTIL) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(OTHER_OBJS)); do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\
