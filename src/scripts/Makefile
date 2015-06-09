@@ -913,17 +913,17 @@ OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o BlueGene.o set_partitio
 ###############################################################################
 
 install:
-	@test ! -d $(DESTDIR)/include && mkdir -p $(DESTDIR)/include || true
-	@test ! -d $(DESTDIR)/lib && mkdir -p $(DESTDIR)/lib || true
-	@test ! -d $(DESTDIR)/lib_so && mkdir -p $(DESTDIR)/lib_so || true
-	@test ! -d $(DESTDIR)/bin && mkdir -p $(DESTDIR)/bin || true
-	# cp -f ../include/*   $(DESTDIR)/include
-	for f in ../include/*; do if test -f $$f; then cp -f $$f $(DESTDIR)/include; fi; done
-	cp -f ../lib/*       $(DESTDIR)/lib
-	cp -f ../lib_so/*    $(DESTDIR)/lib_so || true
-#	cp -f ../bin/*       $(DESTDIR)/bin
-	for f in ../bin/*; do if test -f $$f; then cp -f $$f $(DESTDIR)/bin; fi; done
-
+	@echo "Installing build files in:" $(DESTDIR);
+	for dir in {include,lib,lib_so,bin}; do  \
+	  if [ ! -d $(DESTDIR)/$$dir ]; then     \
+	    mkdir -p $(DESTDIR)/$$dir;           \
+          fi;                                    \
+	  for f in ../$$dir/*; do                \
+	    if [ -f $$f ]; then                  \
+	      cp -f $$f $(DESTDIR)/$$dir;        \
+	    fi;                                  \
+	  done;                                  \
+	done;
 
 clean:
 	rm -f conv-autoconfig.h config.cache
