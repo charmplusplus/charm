@@ -9,6 +9,19 @@
 #
 ##############################################################################
 
+###
+### FUNCTION ``set_var_two_conds''
+###   arg $1: variable literal name, output variable
+###   arg $2: variable literal name, input 1, overrides $1 if $2 set
+###   arg $3: variable literal name, input 2, overrides $1 if $2 is not set, and $3 is
+###
+###   Description: function to test two input variables ($2,$3) and if
+###   they are empty, set output variable remains the same, otherwise
+###   they are set in order $2 and then $3
+function  set_var_two_conds {
+    export $1=`(! [ -z ${!2} ] && echo ${!2}) || (! [ -z ${!3} ] && echo ${!3}) || echo ${!1}`;
+}
+
 #Prepare aliases for the external commands we use--
 # Note that adding /bin/ to everything breaks Cygwin32.
 RM="rm -f"
@@ -17,6 +30,8 @@ MV="mv"
 LN="ln"
 WC="wc"
 SED="sed"
+
+
 
 MACHTYPE=""
 SEQUENTIAL=""
@@ -1000,30 +1015,9 @@ then
 	esac
 fi
 
-if [ -n "$OVERRIDE_CC" ]
-then
-    CMK_CC="$OVERRIDE_CC"
-fi
-Debug "set 2"
-if [ -n "$OVERRIDE_CXX" ]
-then
-    CMK_CXX="$OVERRIDE_CXX"
-fi
-
-if [ -n "$OVERRIDE_F90" ]
-then
-    CMK_CF90="$OVERRIDE_F90"
-fi
-
-if [ -n "$OVERRIDE_LD" ]
-then
-    CMK_LD="$OVERRIDE_LD"
-fi
-
-if [ -n "$OVERRIDE_LDXX" ]
-then
-    CMK_LDXX="$OVERRIDE_LDXX"
-fi
+for compiler in {CC,CXX,F90,LD,LDXX}; do
+    set_var_two_conds CMK_$compiler EXTERNAL_$compiler OVERRIDE_$compiler
+done
 
 if [ -n "$USE_RELIABLE_CC" ]
 then
