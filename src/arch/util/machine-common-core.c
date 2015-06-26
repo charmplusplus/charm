@@ -1400,7 +1400,6 @@ void CmiAbort(const char *message) {
 void *CmiGetNonLocal(void) {
     CmiState cs = CmiGetState();
     void *msg = NULL;
-
 #if !CMK_SMP || CMK_SMP_NO_COMMTHD
     /**
       * In SMP mode with comm thread, it's possible a normal
@@ -1418,7 +1417,7 @@ void *CmiGetNonLocal(void) {
     /* ?????although it seems that lock is not needed, I found it crashes very often
        on mpi-smp without lock */
     msg = CMIQueuePop(cs->recv);
-#if !CMK_SMP || CMK_SMP_NO_COMMTHD
+#if (!CMK_SMP || CMK_SMP_NO_COMMTHD) && !CMK_MULTICORE
     if (!msg) {
        AdvanceCommunication(0);
        msg = CMIQueuePop(cs->recv);
@@ -1470,7 +1469,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s) {
 #define SPINS_BEFORE_SLEEP 20
 static void CmiNotifyStillIdle(CmiIdleState *s) {
     MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
-#if !CMK_SMP || CMK_SMP_NO_COMMTHD
+#if (!CMK_SMP || CMK_SMP_NO_COMMTHD) && !CMK_MULTICORE
     AdvanceCommunication(1);
 #else
     LrtsPostNonLocal();
