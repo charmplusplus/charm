@@ -35,7 +35,7 @@ struct test : public CBase_test {
     sprintf(out, "%9d\n", thisIndex);
     //Ck::IO::write(token, out, 10, 10*thisIndex); // This line was here previously
     
-    Ck::IO::read(token,out,20,20*thisIndex);
+    Ck::IO::read(token, out, 20, 20*thisIndex);
     //for (i = 0; i < 20; i++)
       //CkPrintf(" %d", out[i]);
     
