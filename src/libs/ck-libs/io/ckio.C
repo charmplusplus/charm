@@ -11,7 +11,7 @@ typedef int FileToken;
 #include <fcntl.h>
 #include <errno.h>
 #include <pup_stl.h>
-
+#include <unistd.h>
 #if defined(_WIN32)
 #include <io.h>
 #else
@@ -37,6 +37,7 @@ namespace Ck { namespace IO {
         Options opts;
         int fd;
         CProxy_WriteSession session;
+        CProxy_ReadSession  sessionRead;
         CkCallback complete;
 
         FileInfo(string name_, CkCallback opened_, Options opts_)
@@ -101,6 +102,7 @@ namespace Ck { namespace IO {
 
           files[filesOpened] = FileInfo(name, opened, opts);
           managers.openFile(opnum++, filesOpened++, name, opts);
+
         }
 
         void fileOpened(FileToken file) {
@@ -109,18 +111,21 @@ namespace Ck { namespace IO {
 
         void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
                                  CkCallback ready, CkCallback complete) {
+          
+          CkPrintf("Preparing the Write Session \n");
+          
           Options &opts = files[file].opts;
 
-	  int numStripes = 0;
-	  size_t bytesLeft = bytes, delta = opts.peStripe - offset % opts.peStripe;
-	  // Align to stripe boundary
-	  if (offset % opts.peStripe != 0 && delta < bytesLeft) {
-	    bytesLeft -= delta;
-	    numStripes++;
-	  }
-	  numStripes += bytesLeft / opts.peStripe;
-	  if (bytesLeft % opts.peStripe != 0)
-	    numStripes++;
+	         int numStripes = 0;
+	         size_t bytesLeft = bytes, delta = opts.peStripe - offset % opts.peStripe;
+	         // Align to stripe boundary
+	         if (offset % opts.peStripe != 0 && delta < bytesLeft) {
+	           bytesLeft -= delta;
+	           numStripes++;
+	         }
+	         numStripes += bytesLeft / opts.peStripe;
+	         if (bytesLeft % opts.peStripe != 0)
+	           numStripes++;
 
           CkArrayOptions sessionOpts(numStripes);
           //sessionOpts.setMap(managers);
@@ -130,6 +135,38 @@ namespace Ck { namespace IO {
           files[file].complete = complete;
           ready.send(new SessionReadyMsg(Session(file, bytes, offset,
                                                  files[file].session)));
+        }
+
+        void prepareReadSession(FileToken file, size_t bytes, size_t offset,
+                                 CkCallback ready, CkCallback complete){
+
+          
+          
+          Options &opts = files[file].opts;
+
+           int numStripes = 0;
+           size_t bytesLeft = bytes, delta = opts.peStripe - offset % opts.peStripe;
+           // Align to stripe boundary
+           if (offset % opts.peStripe != 0 && delta < bytesLeft) {
+             bytesLeft -= delta;
+             numStripes++;
+           }
+           numStripes += bytesLeft / opts.peStripe;
+           if (bytesLeft % opts.peStripe != 0)
+             numStripes++;
+
+          CkArrayOptions sessionOpts(numStripes);
+          //sessionOpts.setMap(managers);
+          files[file].session =
+            CProxy_ReadSession::ckNew(file, offset, bytes, sessionOpts);
+          
+          
+          CkAssert(files[file].complete.isInvalid());
+          files[file].complete = complete;
+          ready.send(new SessionReadyMsg(Session(file, bytes, offset,
+                                                 files[file].session)));
+
+
         }
 
         void sessionComplete(FileToken token) {
@@ -182,17 +219,39 @@ namespace Ck { namespace IO {
                      CkCallback(CkReductionTarget(Director, fileOpened), director));
         }
 
-        impl::FileInfo* get(FileToken token) {
+        //impl::FileInfo* get(FileToken token) {
+        impl::FileInfo *get(FileToken token){
           CkAssert(files.find(token) != files.end());
+
+          Options opts = files[token].opts;  // Get the opts structure
 
           // Open file if we're one of the active PEs
           // XXX: Or maybe wait until the first write-out, to smooth the metadata load?
           if (files[token].fd == -1) {
             string& name = files[token].name;
 #if defined(_WIN32)
-            int fd = CmiOpen(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
+            int fd;
+            if (opts.peRW == WritePe) { // if its the write 
+              fd = CmiOpen(name.c_str(), O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE);
+            }
+            else {// if it is not write then it must be read
+              fd = CmiOpen(name.c_str(), O_WRONLY , _S_IREAD | _S_IWRITE); // TODO: Set the read parameters accordingly.
+            }
+
+            //int fd = CmiOpen(name.c_str(), _O_WRONLY | _O_CREAT, _S_IREAD | _S_IWRITE); This was here when the library was supporting only the write
 #else
-            int fd = CmiOpen(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+            int fd;
+            if (opts.peRW == WritePe) {// if its a write
+              fd = CmiOpen(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR); 
+              CkPrintf("Opening the File for writing \n");
+
+            }
+            else{ // if it is not write then it must be read
+              fd = CmiOpen(name.c_str(), O_RDONLY, S_IRUSR); //TODO: set the read parameters
+              CkPrintf("Opening file named %s \n", name.c_str());
+            }
+
+            //int fd = CmiOpen(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR); This was here when the Library was supporting only the write
 #endif
             if (-1 == fd)
               fatalError("Failed to open a file for parallel output", name);
@@ -204,6 +263,7 @@ namespace Ck { namespace IO {
         }
 
         void write(Session session, const char *data, size_t bytes, size_t offset) {
+          
           Options &opts = files[session.file].opts;
           size_t stripe = opts.peStripe;
 
@@ -219,10 +279,42 @@ namespace Ck { namespace IO {
             CProxy_WriteSession(session.sessionID)[stripeIndex]
               .forwardData(data, bytesToSend, offset);
 
+            data   += bytesToSend;
+            offset += bytesToSend;
+            bytes  -= bytesToSend;
+            
+          }
+        }
+
+        /// Read the file into the data pointer that is passed to the read function
+        /// version 1: Just for testing let's just define the function, let the input be the same
+        /// function 
+
+        void read(Session session, const char *data, size_t bytes, size_t offset){
+            
+          
+
+          /*Options &opts = files[session.file].opts;
+          size_t stripe = opts.peStripe;
+
+          CkAssert(offset >= session.offset);
+          CkAssert(offset + bytes <= session.offset + session.bytes);
+
+          size_t sessionStripeBase = (session.offset / stripe) * stripe;
+
+          while (bytes > 0) {
+            size_t stripeIndex = (offset - sessionStripeBase) / stripe;
+            size_t bytesToSend = min(bytes, stripe - offset % stripe);
+
+            CProxy_ReadSession(session.sessionID)[stripeIndex]
+              .forwardData(data, bytesToSend, offset);
+
             data += bytesToSend;
             offset += bytesToSend;
             bytes -= bytesToSend;
-          }
+          
+          }*/
+
         }
 
         void doClose(FileToken token, CkCallback closed) {
@@ -384,6 +476,98 @@ namespace Ck { namespace IO {
         }
       };
 
+      // Read Session Class
+      class ReadSession : public CBase_ReadSession {
+        const FileInfo *file;
+        size_t sessionOffset, myOffset;
+        size_t sessionBytes, myBytes, myBytesRead;
+        FileToken token;
+
+        struct buffer {
+          std::vector<char> array;
+          int bytes_filled_so_far;
+
+          buffer() {
+            bytes_filled_so_far = 0;
+          }
+
+          void expect(size_t bytes) {
+            array.resize(bytes);
+          }
+
+          void insertData(const char *data, size_t length, size_t offset) {
+            char *dest = &array[offset];
+            memcpy(dest, data, length);
+
+            bytes_filled_so_far += length;
+          }
+
+          bool isFull() {
+            return bytes_filled_so_far == array.size();
+          }
+        };
+        map<size_t, struct buffer> bufferMap;
+
+      public:
+        ReadSession(FileToken file_, size_t offset_, size_t bytes_)
+          : file(CkpvAccess(manager)->get(file_))
+          , token(file_)
+          , sessionOffset(offset_)
+          , myOffset((sessionOffset / file->opts.peStripe )
+                     * file->opts.peStripe)
+          , sessionBytes(bytes_)
+          , myBytes(min(file->opts.peStripe, sessionOffset + sessionBytes - myOffset))
+          , myBytesRead(0)
+        {
+          CkAssert(file->fd != -1);
+          CkAssert(myOffset >= sessionOffset);
+          CkAssert(myOffset + myBytes <= sessionOffset + sessionBytes);
+        }
+
+        ReadSession(CkMigrateMessage *m) { }
+
+        void forwardData(const char *data, size_t bytes, size_t offset) {
+          CkAssert(offset >= myOffset);
+          CkAssert(offset + bytes <= myOffset + myBytes);
+
+          size_t stripeSize = file->opts.writeStripe;
+
+          while (bytes > 0) {
+            size_t stripeBase = (offset/stripeSize)*stripeSize;
+            size_t stripeOffset = max(stripeBase, myOffset);
+            size_t nextStripe = stripeBase + stripeSize;
+            size_t expectedBufferSize = min(nextStripe, myOffset + myBytes) - stripeOffset;
+            size_t bytesInCurrentStripe = min(nextStripe - offset, bytes);
+
+            buffer& currentBuffer = bufferMap[stripeOffset];
+            currentBuffer.expect(expectedBufferSize);
+
+            currentBuffer.insertData(data, bytesInCurrentStripe, offset - stripeOffset);
+
+            
+            bytes -= bytesInCurrentStripe;
+            data += bytesInCurrentStripe;
+            offset += bytesInCurrentStripe;
+          }
+
+          
+        }
+
+        int ReadBuffer(buffer& buf, size_t bufferOffset) {
+          
+          CmiInt8 ret = CmiPread(file->fd, d, l, bufferOffset);
+          if (ret < 0)
+            fatalError("Unable to read File \n", file->name);
+
+          CkAssert(ret == l);
+          myBytesWritten += l;
+        }
+      
+      };
+
+
+
+
       class Map : public CBase_Map {
       public:
         Map()
@@ -395,25 +579,75 @@ namespace Ck { namespace IO {
       };
     }
 
+
+
     void open(string name, CkCallback opened, Options opts) {
       impl::director.openFile(name, opened, opts);
     }
 
     void startSession(File file, size_t bytes, size_t offset,
                       CkCallback ready, CkCallback complete) {
-      impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete);
+
+      //impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete); Previously this was here
+
+      // Check if its a Read or Write. Open Read Session if its a Read and Write if its a 
+      // write session
+      
+      Ck::IO::Options opts; // The Opts is defined as the read session TODO: Check this flag why its not working
+
+      opts.peRW = ReadPe;
+
+      if (opts.peRW == WritePe){
+        printf("Going to prepare Write Session  \n");  
+        impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete);
+        
+      }
+      else{
+        printf(" Going to prepare Read Session \n");
+        impl::director.prepareReadSession(file.token, bytes, offset, ready, complete);
+        
+      }
+
     }
     void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
                       const char *commitData, size_t commitBytes, size_t commitOffset,
                       CkCallback complete) {
-      impl::director.prepareWriteSession(file.token, bytes, offset, ready,
+    
+      // The below line was previously here 
+      //impl::director.prepareWriteSession(file.token, bytes, offset, ready,
+      //                                   commitData, commitBytes, commitOffset,
+      //                                   complete);
+      
+      Ck::IO::Options opts;
+
+      opts.peRW = ReadPe; // TODO: See how we can use this flag
+
+      if (opts.peRW == WritePe){
+        CkPrintf("This is a write Session \n");
+        
+        impl::director.prepareWriteSession(file.token, bytes, offset, ready,
                                          commitData, commitBytes, commitOffset,
                                          complete);
+      }
+      else{
+        CkPrintf("Going to Prepare the Read Session \n");  
+        impl::director.prepareReadSession(file.token, bytes, offset, ready,
+                                         commitData, commitBytes, commitOffset,
+                                         complete);
+
+      }      
+
+
     }
 
     void write(Session session, const char *data, size_t bytes, size_t offset) {
         using namespace impl;
         CkpvAccess(manager)->write(session, data, bytes, offset);
+    }
+    //// This is the read function 
+    void read(Session session, const char *data, size_t bytes, size_t offset) {
+        using namespace impl;
+        CkpvAccess(manager)->read(session,data, bytes,offset);
     }
 
     void close(File file, CkCallback closed) {

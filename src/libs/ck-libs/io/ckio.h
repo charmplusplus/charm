@@ -8,11 +8,13 @@
 #include <CkIO.decl.h>
 
 namespace Ck { namespace IO {
+  enum FileOps { ReadPe, WritePe };
+
   /// Note: The values in options are not currently a stable or working interface.
   /// Users should not set anything in them.
   struct Options {
     Options()
-      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1)
+      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1), peRW(ReadPe)
       { }
 
     /// How much contiguous data (in bytes) should be assigned to each active PE
@@ -26,12 +28,15 @@ namespace Ck { namespace IO {
     /// How should active PEs be spaced out?
     int skipPEs;
 
+    int peRW; // Is this the read Pe or Write Pe 
+
     void pup(PUP::er &p) {
       p|peStripe;
       p|writeStripe;
       p|activePEs;
       p|basePE;
       p|skipPEs;
+      p|peRW;
     }
   };
 
@@ -67,6 +72,12 @@ namespace Ck { namespace IO {
   /// offset is relative to the file as a whole, not to the session's offset.
   void write(Session session, const char *data, size_t bytes, size_t offset);
 
+  /// Read the file into the data pointer that is passed to the read function
+  /// version 1: Just for testing let's just define the function, let the input be the same
+  /// function 
+
+  void read(Session session, const char *data, size_t bytes, size_t offset); // defined by Rohan 
+
   /// Close a previously-opened file. All sessions on that file must have
   /// already signalled that they are complete.
   void close(File file, CkCallback closed);
@@ -98,6 +109,7 @@ namespace Ck { namespace IO {
   class Session {
     int file;
     size_t bytes, offset;
+    int    ReadWriteFlag = Ck::IO::FileOps::WritePe; // ReadWrite Flag tells if its a read or a write
     CkArrayID sessionID;
     friend class Ck::IO::impl::Manager;
   public:
@@ -111,6 +123,7 @@ namespace Ck { namespace IO {
       p|bytes;
       p|offset;
       p|sessionID;
+      p|ReadWriteFlag;
     }
   };
 

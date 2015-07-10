@@ -47,6 +47,28 @@ module CkIO_impl {
               complete.send(CkReductionMsg::buildNew(0, NULL));
             }
           };
+          // Newly Added
+          entry void prepareReadSession(FileToken file, size_t bytes, size_t offset,
+                                         CkCallback ready, CkCallback complete);
+          entry void prepareReadSession(FileToken file, size_t bytes, size_t offset,
+                                         CkCallback ready, const char commitData[commitBytes],
+                                         size_t commitBytes, size_t commitOffset,
+                                         CkCallback complete) {
+            serial {
+              CkCallback committed(CkIndex_Director::sessionDone(NULL), thisProxy);
+              committed.setRefnum(++sessionID);
+              prepareReadSession(file, bytes, offset, ready, committed);
+            }
+            when sessionDone[sessionID](CkReductionMsg *m) serial {
+              delete m;
+              impl::FileInfo* info = CkpvAccess(manager)->get(file);
+              CmiInt8 ret = CmiPwrite(info->fd, commitData, commitBytes, commitOffset);
+              if (ret != commitBytes)
+                fatalError("Commit write failed", info->name);
+              complete.send(CkReductionMsg::buildNew(0, NULL));
+            }
+          };                                 
+
           entry void sessionDone(CkReductionMsg *);
           entry void close(FileToken token, CkCallback closed);
         }
@@ -76,6 +98,10 @@ module CkIO_impl {
           entry WriteSession(FileToken file, size_t offset, size_t bytes);
           entry void forwardData(const char data[bytes], size_t bytes, size_t offset);
           entry void syncData();
+        };
+        array [1D] ReadSession
+        {
+          entry ReadSession(FileToken file, size_t offset, size_t bytes);
         };
 
         group Map : CkArrayMap
