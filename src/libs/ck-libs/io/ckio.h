@@ -76,7 +76,7 @@ namespace Ck { namespace IO {
   /// version 1: Just for testing let's just define the function, let the input be the same
   /// function 
 
-  void read(Session session, const char *data, size_t bytes, size_t offset); // defined by Rohan 
+  void read(Session session, char *data, size_t bytes, size_t offset); // defined by Rohan 
 
   /// Close a previously-opened file. All sessions on that file must have
   /// already signalled that they are complete.

@@ -290,9 +290,9 @@ namespace Ck { namespace IO {
         /// version 1: Just for testing let's just define the function, let the input be the same
         /// function 
 
-        void read(Session session, const char *data, size_t bytes, size_t offset){
+        void read(Session session, char *data, size_t bytes, size_t offset){
             
-          
+          CmiPread(files[session.file].fd, data, bytes, offset);
 
           /*Options &opts = files[session.file].opts;
           size_t stripe = opts.peStripe;
@@ -555,12 +555,7 @@ namespace Ck { namespace IO {
 
         int ReadBuffer(buffer& buf, size_t bufferOffset) {
           
-          CmiInt8 ret = CmiPread(file->fd, d, l, bufferOffset);
-          if (ret < 0)
-            fatalError("Unable to read File \n", file->name);
-
-          CkAssert(ret == l);
-          myBytesWritten += l;
+          
         }
       
       };
@@ -645,7 +640,7 @@ namespace Ck { namespace IO {
         CkpvAccess(manager)->write(session, data, bytes, offset);
     }
     //// This is the read function 
-    void read(Session session, const char *data, size_t bytes, size_t offset) {
+    void read(Session session, char *data, size_t bytes, size_t offset) {
         using namespace impl;
         CkpvAccess(manager)->read(session,data, bytes,offset);
     }

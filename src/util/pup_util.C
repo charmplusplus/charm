@@ -257,6 +257,25 @@ size_t CmiFread(void *ptr, size_t size, size_t nmemb, FILE *f)
         return nread;
 }
 
+CmiInt8 CmiPread(int fd, char *buf, size_t bytes, size_t offset)
+{
+  size_t origBytes = bytes;
+  while (bytes > 0) {
+    CmiInt8 ret = pread(fd, buf, bytes, offset);
+    if (ret < 0) {
+      if (errno == EINTR) {
+        continue;
+      } else {
+        return ret;
+      }
+    }
+    bytes -= ret;
+    buf += ret;
+    offset += ret;
+  }
+  return origBytes;
+}
+
 FILE *CmiFopen(const char *path, const char *mode)
 {
         FILE *fp = NULL;
