@@ -220,10 +220,10 @@ class CkVerboseListener : public CkArrayListener {
 class CkArrayOptions {
 	friend class CkArray;
 
+	CkArrayIndex start, end, step;
 	CkArrayIndex numInitial;///< Number of elements to create
-        /// Limits of element counts in each dimension of this and all bound
-        /// arrays
-        CkArrayIndex bounds;
+	/// Limits of element counts in each dimension of this and all bound arrays
+	CkArrayIndex bounds;
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
@@ -231,10 +231,14 @@ class CkArrayOptions {
 	bool anytimeMigration; // Elements are allowed to move freely
 	bool disableNotifyChildInRed; //Child elements are not notified when reduction starts
 	bool staticInsertion; // Elements are only inserted at construction
-        bool broadcastViaScheduler;     // broadcast inline or through scheduler
+	bool broadcastViaScheduler;     // broadcast inline or through scheduler
 
 	/// Set various safe defaults for all the constructors
 	void init();
+
+	/// Helper functions to keep numInitial and start/step/end consistent
+	void updateIndices();
+	void updateNumInitial();
 
  public:
  //Used by external world:
@@ -242,35 +246,42 @@ class CkArrayOptions {
 	CkArrayOptions(int ni1_); ///< With initial elements 1D
 	CkArrayOptions(int ni1_, int ni2_); ///< With initial elements 2D 
 	CkArrayOptions(int ni1_, int ni2_, int ni3); ///< With initial elements 3D
-	//CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_); ///< With initial elements 4D
-	//CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_, short ni5_); ///< With initial elements 5D
-	//CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_, short ni5_, short ni6_); ///< With initial elements 6D
+	CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_); ///< With initial elements 4D
+	CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_, short ni5_); ///< With initial elements 5D
+	CkArrayOptions(short ni1_, short ni2_, short ni3, short ni4_, short ni5_, short ni6_); ///< With initial elements 6D
+	CkArrayOptions(CkArrayIndex s, CkArrayIndex e, CkArrayIndex step); ///< Initialize the start, end, and step
 
 	/**
 	 * These functions return "this" so you can string them together, e.g.:
 	 *   foo(CkArrayOptions().setMap(mid).bindTo(aid));
 	 */
 
+	/// Set the start, end, and step for the initial elements to populate
+	CkArrayOptions &setStart(CkArrayIndex s)
+		{ start = s; updateNumInitial(); return *this; }
+	CkArrayOptions &setEnd(CkArrayIndex e)
+		{ end = e; updateNumInitial(); return *this; }
+	CkArrayOptions &setStep(CkArrayIndex s)
+		{ step = s; updateNumInitial(); return *this; }
+
 	/// Create this many initial elements 1D
 	CkArrayOptions &setNumInitial(int ni)
-		{numInitial=CkArrayIndex1D(ni); return *this;}
+		{numInitial=CkArrayIndex1D(ni); updateIndices(); return *this;}
 	/// Create this many initial elements 2D
 	CkArrayOptions &setNumInitial(int ni1, int ni2)
-		{numInitial=CkArrayIndex2D(ni1, ni2); return *this;}
+		{numInitial=CkArrayIndex2D(ni1, ni2); updateIndices(); return *this;}
 	/// Create this many initial elements 3D
 	CkArrayOptions &setNumInitial(int ni1, int ni2, int ni3)
-		{numInitial=CkArrayIndex3D(ni1 ,ni2, ni3); return *this;}
-        /*
+		{numInitial=CkArrayIndex3D(ni1, ni2, ni3); updateIndices(); return *this;}
 	/// Create this many initial elements 4D
 	CkArrayOptions &setNumInitial(short ni1, short ni2, short ni3, short ni4)
-		{numInitial=CkArrayIndex4D(ni1, ni2, ni3, ni4); return *this;}
+		{numInitial=CkArrayIndex4D(ni1, ni2, ni3, ni4); updateIndices(); return *this;}
 	/// Create this many initial elements 5D
 	CkArrayOptions &setNumInitial(short ni1, short ni2, short ni3, short ni4, short ni5)
-		{numInitial=CkArrayIndex5D(ni1, ni2, ni3, ni4, ni5); return *this;}
+		{numInitial=CkArrayIndex5D(ni1, ni2, ni3, ni4, ni5); updateIndices(); return *this;}
 	/// Create this many initial elements 6D
 	CkArrayOptions &setNumInitial(short ni1, short ni2, short ni3, short ni4, short ni5, short ni6)
-		{numInitial=CkArrayIndex6D(ni1, ni2, ni3, ni4, ni5, ni6); return *this;}
-        */
+		{numInitial=CkArrayIndex6D(ni1, ni2, ni3, ni4, ni5, ni6); updateIndices(); return *this;}
 
 	/// Allow up to this many elements in 1D
 	CkArrayOptions &setBounds(int ni)
@@ -312,6 +323,9 @@ class CkArrayOptions {
 	{ reductionClient = cb; return *this; }
 
   //Used by the array manager:
+	const CkArrayIndex &getStart(void) const {return start;}
+	const CkArrayIndex &getEnd(void) const {return end;}
+	const CkArrayIndex &getStep(void) const {return step;}
 	const CkArrayIndex &getNumInitial(void) const {return numInitial;}
 	const CkArrayIndex &getBounds(void) const {return bounds;}
 	const CkGroupID &getMap(void) const {return map;}

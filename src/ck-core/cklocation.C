@@ -176,41 +176,79 @@ void CkArrayMap::unregisterArray(int idx)
 { }
 
 #define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
-        int i; \
-	for (int i1=0; i1<numElements.data()[0]; i1++) { \
-          if (numElements.dimension == 1) { \
-            /* Make 1D indices */ \
-            i = i1; \
-            CkArrayIndex1D idx(i1); \
-            if (POPULATE_CONDITION) \
-              mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
-          } else { \
-            /* higher dimensionality */ \
-            for (int i2=0; i2<numElements.data()[1]; i2++) { \
-              if (numElements.dimension == 2) { \
-                /* Make 2D indices */ \
-                i = i1 * numElements.data()[1] + i2; \
-                CkArrayIndex2D idx(i1, i2); \
-                if (POPULATE_CONDITION) \
-                  mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
-              } else { \
-                /* higher dimensionality */ \
-                CkAssert(numElements.dimension == 3); \
-                for (int i3=0; i3<numElements.data()[2]; i3++) { \
-                  /* Make 3D indices */ \
-                  i = (i1 * numElements.data()[1] + i2) * numElements.data()[2] + i3; \
-                  CkArrayIndex3D idx(i1, i2, i3 ); \
-                  if (POPULATE_CONDITION) \
-                    mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
-                } \
+int i; \
+int index[6]; \
+int start_data[6], end_data[6], step_data[6]; \
+for (int d = 0; d < 6; d++) { \
+  start_data[d] = 0; \
+  end_data[d] = step_data[d] = 1; \
+  if (end.dimension >= 4 && d < end.dimension) { \
+    start_data[d] = ((short int*)start.data())[d]; \
+    end_data[d] = ((short int*)end.data())[d]; \
+    step_data[d] = ((short int*)step.data())[d]; \
+  } else if (d < end.dimension) { \
+    start_data[d] = start.data()[d]; \
+    end_data[d] = end.data()[d]; \
+    step_data[d] = step.data()[d]; \
+  } \
+} \
+ \
+for (index[0] = start_data[0]; index[0] < end_data[0]; index[0] += step_data[0]) { \
+  for (index[1] = start_data[1]; index[1] < end_data[1]; index[1] += step_data[1]) { \
+    for (index[2] = start_data[2]; index[2] < end_data[2]; index[2] += step_data[2]) { \
+      for (index[3] = start_data[3]; index[3] < end_data[3]; index[3] += step_data[3]) { \
+        for (index[4] = start_data[4]; index[4] < end_data[4]; index[4] += step_data[4]) { \
+          for (index[5] = start_data[5]; index[5] < end_data[5]; index[5] += step_data[5]) { \
+            if (end.dimension == 1) { \
+              i = index[0]; \
+              CkArrayIndex1D idx(index[0]); \
+              if (POPULATE_CONDITION) { \
+                mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+              } \
+            } else if (end.dimension == 2) { \
+              i = index[0] * end_data[1] + index[1]; \
+              CkArrayIndex2D idx(index[0], index[1]); \
+              if (POPULATE_CONDITION) { \
+                mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+              } \
+            } else if (end.dimension == 3) { \
+              i = (index[0]*end_data[1] + index[1]) * end_data[2] + index[2]; \
+              CkArrayIndex3D idx(index[0], index[1], index[2]); \
+              if (POPULATE_CONDITION) { \
+                mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+              } \
+            } else if (end.dimension == 4) { \
+              i = ((index[0]*end_data[1] + index[1]) * end_data[2] + index[2]) * end_data[3] + index[3]; \
+              CkArrayIndex4D idx(index[0], index[1], index[2], index[3]); \
+              if (POPULATE_CONDITION) { \
+                mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+              } \
+            } else if (end.dimension == 5) { \
+              i = (((index[0]*end_data[1] + index[1]) * end_data[2] + index[2]) * end_data[3] + index[3]) * end_data[4] + index[4]; \
+              CkArrayIndex5D idx(index[0], index[1], index[2], index[3], index[4]); \
+              if (POPULATE_CONDITION) { \
+                mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+              } \
+            } else if (end.dimension == 6) { \
+              i = ((((index[0]*end_data[1] + index[1]) * end_data[2] + index[2]) * end_data[3] + index[3]) * end_data[4] + index[4]) * end_data[5] + index[5]; \
+              CkArrayIndex6D idx(index[0], index[1], index[2], index[3], index[4], index[5]); \
+              if (POPULATE_CONDITION) { \
+                mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
               } \
             } \
           } \
-	}
-
-void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr)
+        } \
+      } \
+    } \
+  } \
+}
+  
+void CkArrayMap::populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArrMgr *mgr)
 {
-	if (numElements.nInts==0) {
+  CkArrayIndex start = options.getStart();
+  CkArrayIndex end = options.getEnd();
+  CkArrayIndex step = options.getStep();
+	if (end.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
@@ -698,20 +736,23 @@ public:
 	DEBC((AA "Creating BlockMap\n" AB));
   }
   BlockMap(CkMigrateMessage *m):RRMap(m){ }
-  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr){
-	if (numElements.nInts==0) {
+  void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArrMgr *mgr){
+  CkArrayIndex start = options.getStart();
+  CkArrayIndex end = options.getEnd();
+  CkArrayIndex step = options.getStep();
+	if (end.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
 	int thisPe=CkMyPe();
 	int numPes=CkNumPes();
         int binSize;
-        if (numElements.nInts == 1) {
-          binSize = (int)ceil((double)numElements.data()[0]/(double)numPes);
-        } else if (numElements.nInts == 2) {
-          binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1])/(double)numPes);
-        } else if (numElements.nInts == 3) {
-          binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1]*numElements.data()[2])/(double)numPes);
+        if (end.nInts == 1) {
+          binSize = (int)ceil((double)end.data()[0]/(double)numPes);
+        } else if (end.nInts == 2) {
+          binSize = (int)ceil((double)(end.data()[0]*end.data()[1])/(double)numPes);
+        } else if (end.nInts == 3) {
+          binSize = (int)ceil((double)(end.data()[0]*end.data()[1]*end.data()[2])/(double)numPes);
         } else {
           CkAbort("CkArrayIndex has more than 3 integers!");
         }
@@ -758,8 +799,11 @@ public:
   {
      return CLD_ANYWHERE;   // -1
   }
-  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr)  {
-        if (numElements.nInts==0) {
+  void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArrMgr *mgr)  {
+        CkArrayIndex start = options.getStart();
+        CkArrayIndex end = options.getEnd();
+        CkArrayIndex step = options.getStep();
+        if (end.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
@@ -875,19 +919,22 @@ public:
   ConfigurableRRMap(CkMigrateMessage *m):RRMap(m){ }
 
 
-  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr){
+  void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArrMgr *mgr){
+    CkArrayIndex start = options.getStart();
+    CkArrayIndex end = options.getEnd();
+    CkArrayIndex step = options.getStep();
     // Try to load the configuration from command line argument
     CkAssert(haveConfigurableRRMap());
     ConfigurableRRMapLoader &loader =  CkpvAccess(myConfigRRMapState);
-    if (numElements.nInts==0) {
+    if (end.nInts==0) {
       CkFreeMsg(ctorMsg);
       return;
     }
     int thisPe=CkMyPe();
-    int maxIndex = numElements.data()[0];
-    DEBUG(("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(),(int)numElements.data()[0], (int)numElements.data()[1], (int)numElements.data()[2]));
+    int maxIndex = end.data()[0];
+    DEBUG(("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(),(int)end.data()[0], (int)end.data()[1], (int)end.data()[2]));
 
-    if (numElements.nInts != 1) {
+    if (end.nInts != 1) {
       CkAbort("ConfigurableRRMap only supports dimension 1!");
     }
 	
@@ -2286,7 +2333,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 	mapID = opts.getMap();
 	map=(CkArrayMap *)CkLocalBranch(mapID);
 	if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
-	mapHandle=map->registerArray(opts.getNumInitial(), thisgroup);
+	mapHandle=map->registerArray(opts.getEnd(), thisgroup);
 
         // Figure out the mapping from indices to object IDs if one is possible
         compressor = ck::FixedArrayIndexCompressor::make(opts.getBounds());
