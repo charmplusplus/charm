@@ -102,7 +102,7 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 	}
 }
 
-static void checkpointOne(const char* dirname, CkCallback& cb);
+static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus);
 
 static void addPartitionDirectory(ostringstream &path) {
         if (CmiNumPartitions() > 1) {
@@ -137,20 +137,23 @@ class CkCheckpointMgr : public CBase_CkCheckpointMgr {
 private:
 	CkCallback restartCB;
 	double chkptStartTimer;
+	bool requestStatus;
+	int chkpStatus;
 public:
 	CkCheckpointMgr() { }
 	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
-	void Checkpoint(const char *dirname,CkCallback& cb);
+	void Checkpoint(const char *dirname,CkCallback& cb, bool requestStatus = false);
 	void SendRestartCB(CkReductionMsg *m);
 	void pup(PUP::er& p){ p|restartCB; }
 };
 
 // broadcast
-void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
+void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb, bool _requestStatus){
 	chkptStartTimer = CmiWallTimer();
+	requestStatus = _requestStatus;
 	// make dir on all PEs in case it is a local directory
 	CmiMkdir(dirname);
-
+	bool success = true;
         if (CmiNumPartitions() > 1) {
           ostringstream partDir;
           partDir << dirname;
@@ -159,7 +162,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
         }
 
 	if (CkMyPe() == 0) {
-          checkpointOne(dirname, cb);
+          success = success && checkpointOne(dirname, cb, requestStatus);
  	}
 
 #ifndef CMK_CHARE_USE_PTR
@@ -167,7 +170,10 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", CkMyPe());
 	PUP::toDisk pChares(fChares);
 	CkPupChareData(pChares);
-	CmiFclose(fChares);
+	if(pChares.checkError())
+	  success = false;
+	if(CmiFclose(fChares)!=0)
+	  success = false;
 #endif
 
 	// save groups into Groups.dat
@@ -179,8 +185,10 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 #else
         CkPupGroupData(pGroups);
 #endif
-
-	CmiFclose(fGroups);
+	if(pGroups.checkError())
+	  success = false;
+	if(CmiFclose(fGroups)!=0)
+	  success = false;
 
 	// save nodegroups into NodeGroups.dat
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
@@ -192,15 +200,20 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 #else
           CkPupNodeGroupData(pNodeGroups);
 #endif
-
-	  CmiFclose(fNodeGroups);
+	  if(pNodeGroups.checkError())
+	    success = false;
+	  if(CmiFclose(fNodeGroups)!=0)
+	    success = false;
   	}
 
 	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
 	FILE *datFile = openCheckpointFile(dirname, "arr", "wb", CkMyPe());
 	PUP::toDisk  p(datFile);
 	CkPupArrayElementsData(p);
-	CmiFclose(datFile);
+	if(p.checkError())
+	  success = false;
+	if(CmiFclose(datFile)!=0)
+	  success = false;
 
 #if ! CMK_DISABLE_SYNC
 #if CMK_HAS_SYNC_FUNC
@@ -209,7 +222,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	system("sync");
 #endif
 #endif
-
+	chkpStatus = success?CK_CHECKPOINT_SUCCESS:CK_CHECKPOINT_FAILURE;
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
 	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),0,thisgroup);
@@ -221,7 +234,13 @@ void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){
 	delete m; 
 	DEBCHK("[%d]Sending out the cb\n",CkMyPe());
 	CkPrintf("Checkpoint to disk finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
-	restartCB.send(); 
+	if(requestStatus)
+	{
+	  CkCheckpointStatusMsg * m = new CkCheckpointStatusMsg(chkpStatus);
+	  restartCB.send(m);
+	}
+	else
+	  restartCB.send();
 }
 
 void CkPupROData(PUP::er &p)
@@ -563,7 +582,7 @@ void CkPupProcessorData(PUP::er &p)
 }
 
 // called only on pe 0
-static void checkpointOne(const char* dirname, CkCallback& cb){
+static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus){
 	CmiAssert(CkMyPe()==0);
 	char filename[1024];
 	
@@ -576,15 +595,33 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 	pRO|_numNodes;
 	pRO|cb;
 	CkPupROData(pRO);
-	CmiFclose(fRO);
+	pRO|requestStatus;
+	
+	if(pRO.checkError())
+	{
+	  return false;
+	}
+	
+	if(CmiFclose(fRO)!=0)
+	{
+	  return false;
+	}
 
 	// save mainchares into MainChares.dat
 	{
 		FILE* fMain = openCheckpointFile(dirname, "MainChares", "wb");
 		PUP::toDisk pMain(fMain);
 		CkPupMainChareData(pMain, NULL);
-		CmiFclose(fMain);
+		if(pMain.checkError())
+		{
+		  return false;
+		}
+		if(CmiFclose(fMain) != 0)
+		{
+		  return false;
+		}
 	}
+	return true;
 }
 
 void CkRemoveArrayElements()
@@ -616,7 +653,7 @@ void CkTestArrayElements()
 }
 */
 
-void CkStartCheckpoint(const char* dirname,const CkCallback& cb)
+void CkStartCheckpoint(const char* dirname,const CkCallback& cb, bool requestStatus)
 {
   if(cb.isInvalid()) 
     CkAbort("callback after checkpoint is not set properly");
@@ -628,7 +665,7 @@ void CkStartCheckpoint(const char* dirname,const CkCallback& cb)
 	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	
 	// hand over to checkpoint managers for per-processor checkpointing
-	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint(dirname, cb);
+	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint(dirname, cb, requestStatus);
 }
 
 /**
@@ -658,6 +695,8 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	pRO|_numNodes;
 	pRO|cb;
 	if (CmiMyRank() == 0) CkPupROData(pRO);
+	bool requestStatus = false;
+	pRO|requestStatus;
 	CmiFclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
         _oldNumPes = _numPes;
@@ -732,8 +771,15 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	CkMemCheckPT::inRestarting = 0;
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
-		
-		cb.send();
+		if(requestStatus)
+		{
+		  CkCheckpointStatusMsg * m = new CkCheckpointStatusMsg(CK_CHECKPOINT_SUCCESS);
+		  cb.send(m); 
+		}
+		else
+		{
+		  cb.send();
+		}
 	}
 }
 
@@ -748,4 +794,5 @@ public:
 };
 
 #include "CkCheckpoint.def.h"
+#include "CkCheckpointStatus.def.h"
 

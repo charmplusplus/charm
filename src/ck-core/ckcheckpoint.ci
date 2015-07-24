@@ -1,8 +1,9 @@
 module CkCheckpoint {
   readonly CkGroupID _sysChkptMgr;
+  extern module CkCheckpointStatus;
   group [migratable] CkCheckpointMgr {
 	entry CkCheckpointMgr(void);
-	entry void Checkpoint(char dirname[strlen(dirname)+1],CkCallback cb);
+	entry void Checkpoint(char dirname[strlen(dirname)+1],CkCallback cb, bool requestStatus);
 	entry void SendRestartCB(CkReductionMsg *m);
   };
   mainchare CkCheckpointInit {

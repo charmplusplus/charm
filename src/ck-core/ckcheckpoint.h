@@ -29,6 +29,7 @@ restarting of Charm++ programs. ...
 #include <pup.h>
 #include <ckcallback.h>
 #include <ckmessage.h>
+#include "CkCheckpointStatus.decl.h"
 
 // loop over all CkLocMgr and do "code"
 #define  CKLOCMGR_LOOP(code)	\
@@ -56,7 +57,7 @@ void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
 //void CkTestArrayElements();
 
-void CkStartCheckpoint(const char* dirname,const CkCallback& cb);
+void CkStartCheckpoint(const char* dirname,const CkCallback& cb, bool requestStatus = false);
 void CkRestartMain(const char* dirname, CkArgMsg *args);
 #if __FAULT__
 int  CkCountArrayElements();
@@ -67,5 +68,13 @@ extern int _inrestart;           // 1: if is during restart process
 extern int _restarted;           // 1: if this run is after restart
 extern int _oldNumPes;           // number of processors in the last run
 extern int _chareRestored;       // 1: if chare is restored at restart
+
+enum{CK_CHECKPOINT_SUCCESS, CK_CHECKPOINT_FAILURE};
+
+class CkCheckpointStatusMsg:public CMessage_CkCheckpointStatusMsg{
+public:
+  int status;
+  CkCheckpointStatusMsg(int _status): status(_status){}
+};
 
 #endif //_CKCHECKPOINT_H

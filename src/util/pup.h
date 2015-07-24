@@ -447,11 +447,13 @@ class toDisk : public disk {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  bool error;
  public:
   // Write data to the given file pointer
   // (must be opened for binary write)
   // You must close the file yourself when done.
-  toDisk(FILE *f):disk(IS_PACKING,f) {}
+  toDisk(FILE *f):disk(IS_PACKING,f) {error = false;}
+  bool checkError(){return error;}
 };
 
 //For unpacking from a disk file
