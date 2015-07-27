@@ -6,7 +6,7 @@
 #include "../ccs-auth.c"
 #include "../ccs-server.h"
 #include "../ccs-server.c"
-#include <hwloc.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -363,7 +363,6 @@ char *getenv_display()
     strcpy(result, e);
   return result;
 }
-
 char *getenv_display_no_tamper()
 {
   static char result[100], ipBuf[200];
@@ -731,6 +730,10 @@ int arg_help; /* print help message */
 int arg_ppn;  /* pes per node */
 int arg_usehostname;
 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+int arg_read_pes = 0;
+#endif
+
 #if CMK_USE_RSH
 int arg_maxrsh;
 const char *arg_shell;
@@ -754,12 +757,6 @@ int arg_server_port = 0;
 const char *arg_server_auth = NULL;
 int replay_single = 0;
 
-#if CMK_AUTOCMD
-int arg_autocmd = 1;
-#else
-int arg_autocmd = 0;
-#endif 
-
 #if CMK_BPROC
 int arg_startpe;
 int arg_endpe;
@@ -767,166 +764,26 @@ int arg_singlemaster;
 int arg_skipmaster;
 #endif
 
-
-/* When enabled, automatically determine command line parameters based on 
-what can be automatically be discerned.  Constraints will be sought based on the platform's measurable characteristics and the job's operational environment. 
-
-Supported arguments:
- +p TBD
- +ppn TBD
- +setcpuaffinity TBD
- +pemap TBD
- +commap TBD
- ++runscript?
-*/
-struct env_struct {
-  short env_type;
-  bool nodelist;
-};
-
-struct platform_struct {
-  int numPUs;
-  int numCores;
-};
-
-short auto_env_detect(env_struct *env){
-  env->env_type=0;
-  env->nodelist=false;
-  return env->env_type;
-}
-
-void get_platform_characteristics(platform_struct *platform)
-{
-    int depth;
-    unsigned i, n;
-    unsigned long size;
-    int levels;
-    char string[128];
-    char cpustring[128];
-    int topodepth;
-    hwloc_topology_t topology;
-    hwloc_cpuset_t cpuset;
-    hwloc_obj_t obj;
-    /* Allocate and initialize topology object. */
-    hwloc_topology_init(&topology);
-    /* Perform the topology detection. */
-    hwloc_topology_load(topology);
-    /* Get topology depth. */
-    printf("calling hwloc\n");
-    topodepth = hwloc_topology_get_depth(topology);
-    /*    for (depth = 0; depth < topodepth; depth++) {
-        printf("*** Objects at level %d\n", depth);
-        for (i = 0; i < hwloc_get_nbobjs_by_depth(topology, depth); 
-             i++) {
-            hwloc_obj_snprintf(string, sizeof(string), topology,
-                       hwloc_get_obj_by_depth(topology, depth, i),
-                       "#", 0);
-            printf("Index %u: %s\n", i, string);
-        }
-    }
-    */
-    depth = hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
-    if(depth == HWLOC_TYPE_DEPTH_UNKNOWN)
-      printf("*** The number of cores is unknown\n");
-    else
-      platform->numCores=hwloc_get_nbobjs_by_depth(topology, depth);
-
-    depth = hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
-    if(depth == HWLOC_TYPE_DEPTH_UNKNOWN)
-      printf("*** The number of PUs is unknown\n");
-    else
-      platform->numPUs=hwloc_get_nbobjs_by_depth(topology, depth);
-    printf("*** %u core(s)\n", platform->numCores);
-    printf("*** %u PU(s)\n", platform->numPUs);
-
-    
-  /*3a. Cores per node */
-  /*3b. Virtual Cores per node */
-  /*3c. Number of NUMA regions */
-  /* note, indices from hwloc vs the pemap indexing scheme presents an issue */
-  /* for consistency it would be best to use hwloc for both */
-}
-
-
-void auto_update_params ()
-{
-  printf("auto updating parameters\n");
-  short env_type=0;
-  /*1. Figure out which scheduler/allocator we're in, if any. */
-  env_struct env;
-  env_type=auto_env_detect(&env);
-  /*2. Parse environment based on type. */
-  /*3. Check platform characteristics */
-  platform_struct platform;
-  get_platform_characteristics(&platform);
-  /*4. Figure out what to do */
-  
-  switch (env_type) {
-  case 0: /* no discernible environment */
-    /* nodelist should be your guide, but there is an order of
-       operations issue */
-    if(env.nodelist)
-      {
-      }
-    else /* assume desktop */
-      {
-#if CMK_MULTICORE
-	// vestigial code unless multicore build is modified to use a real charmrun
-	arg_ppn=platform.numPUs;
-	arg_requested_pes=platform.numPUs;
-#elif  CMK_SMP
-	arg_ppn=platform.numPUs-1;
-	arg_requested_pes=platform.numPUs-1;
-#else
-	arg_requested_pes=platform.numPUs;
-#endif
-
-
-	/* +p should be ppn * num nodes*/
-	/* num_nodes will have to come from env. */
-	/* multicore doesn't care about commthread, so no -1 */
-	/* smp should leave a PU free for commthread */
-	/* possibly leave a full core free for commthread */
-
-	/*	const char *plusparg= (const char *) malloc(120);
-	snprintf((char *) plusparg, 120, "+p%d", platform.numPUs);
-	arg_argv++;
-	arg_argc++;
-	arg_argv[arg_argc] = (const char *) malloc(sizeof(char) * strnlen((const char *) plusparg,120));
-	strcpy((char *) arg_argv[arg_argc++], plusparg);
-	arg_argv[arg_argc] = NULL;
-	for(int i=0;i<arg_argc;i++)
-	  {
-	    printf("arg_argc is %d %d is %s\n",arg_argc, i, arg_argv[i]);
-	  }
-	*/
-      }
-    break;
-  default:
-    break;
-  }
-
-
-}
-
-
-
-
-
 void arg_init(int argc, const char **argv)
 {
   static char buf[1024];
 
   int i, local_def = 0;
 #if CMK_CHARMRUN_LOCAL
-  local_def=1; /*++local is the default*/
+  local_def = 1; /*++local is the default*/
 #endif
-  
-  pparam_int(&arg_requested_pes, 1, "p",             "number of processes to create");
-  pparam_int(&arg_timeout,      60, "timeout",       "seconds to wait per host connection");
-  pparam_flag(&arg_verbose,      0, "verbose",       "Print diagnostic messages");
-  pparam_str(&arg_nodelist,      0, "nodelist",      "file containing list of nodes");
-  pparam_str(&arg_nodegroup,"main", "nodegroup",     "which group of nodes to use");
+
+  pparam_int(&arg_requested_pes, 1, "p", "number of processes to create");
+  pparam_int(&arg_timeout, 60, "timeout",
+             "seconds to wait per host connection");
+  pparam_flag(&arg_verbose, 0, "verbose", "Print diagnostic messages");
+  pparam_str(&arg_nodelist, 0, "nodelist", "file containing list of nodes");
+  pparam_str(&arg_nodegroup, "main", "nodegroup",
+             "which group of nodes to use");
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  pparam_int(&arg_read_pes, 0, "readpe",
+             "number of host names to read into the host table");
+#endif
 
 #if CMK_CCS_AVAILABLE
   pparam_flag(&arg_server, 0, "server", "Enable client-server (CCS) mode");
@@ -1004,14 +861,12 @@ void arg_init(int argc, const char **argv)
 #ifdef HSTART
   arg_argv = dupargv(argv);
 #endif
-  pparam_flag(&arg_autocmd, 0, "autocmd", "automatically default unset parameters (+p,+ppn, etc.) from env and platform");
 
   if (pparam_parsecmd('+', argv) < 0) {
     fprintf(stderr, "ERROR> syntax: %s\n", pparam_error);
     pparam_printdocs();
     exit(1);
   }
-
 
   /* Check for (but do *not* remove) the "-?", "-h", or "--help" flags */
   for (i = 0; argv[i]; i++) {
@@ -1054,7 +909,6 @@ void arg_init(int argc, const char **argv)
   arg_argv++;
   arg_argc--;
 #endif
-
 
   if (arg_server_port || arg_server_auth)
     arg_server = 1;
@@ -1176,81 +1030,17 @@ void arg_init(int argc, const char **argv)
     printf("++debug cannot be used with ++local.\n");
     exit(0);
   }
-  if (arg_autocmd)
-    {
-      auto_update_params();
-    }
-
 }
-
-
-
 
 /****************************************************************************
  *
  * NODETAB:  The nodes file and nodes table.
  *
  ****************************************************************************/
+
 static int portOk = 1;
 static const char *nodetab_tempName = NULL;
-
-char *create_nodelist_from_hostfile(const char *hostfile, const char *jobid)
-{
-  char *buffer=new char[1024];
-  strncpy(buffer, "./nodelist",1024);
-  strncat(buffer, jobid, 1024);
-  FILE *f = fopen(buffer, "w");
-  if (f == NULL) {
-    fprintf(stderr, "ERROR> Cannot create a 'nodelist' file.\n");
-    exit(1);
-  }
-  FILE *hostfd = fopen(hostfile, "r");
-  fprintf(f, "group main\n");
-  char thishost[1024];
-  char *leftside=NULL;
-  char lasthost[1024];
-  int lines=0;
-  bool outputhost=true;
-  while(leftside=fgets(thishost,1024,hostfd))
-    {
-      thishost[strcspn(thishost,"\r\n")]=0;
-      
-#if CMK_SMP
-      if(lines>0)
-	{
-	  if(strcmp(thishost,lasthost)==0)
-	    {
-	      outputhost=false;
-	    }
-	  else
-	    { outputhost=true;
-	    }
-	}
-      else
-	{
-	  outputhost=true;
-	}
-      if(outputhost) 
-	{
-	  fprintf(f, "host %s ++cpus %d\n",thishost, arg_ppn);
-	  lines++;
-	}
-      strcpy(lasthost,thishost);
-#else
-      fprintf(f, "host %s\n",thishost);
-      lines++;
-#endif
-    }
-  fclose(f);
-  fclose(hostfd);
-  if(arg_autocmd) arg_requested_pes=lines*arg_ppn;
-  printf("set +p to %d +ppn to %d based on hostcount %d\n",arg_requested_pes, arg_ppn, lines);
-  nodetab_tempName = strdup(buffer);
-  return buffer;
-}
-
-
-char *nodetab_file_find(bool autonodelist=false)
+char *nodetab_file_find()
 {
   char buffer[MAXPATHLEN];
 
@@ -1271,32 +1061,6 @@ char *nodetab_file_find(bool autonodelist=false)
     fprintf(stderr, "ERROR> Cannot find nodelist file %s\n", path);
     exit(1);
   }
-  if(autonodelist)
-    {
-      // extract host from scheduler environment
-      char *hostpath=NULL;
-      char *jobid=NULL;
-      if(getenv("PBS_NODEFILE")){
-	hostpath =getenv("PBS_NODEFILE");
-	jobid =getenv("PBS_JOBID");
-      }
-      else if(getenv("SLURM_NODELIST")){
-	hostpath =getenv("SLURM_NODEFILE");
-	jobid=getenv("SLURM_JOB_ID");
-      }
-      else if(getenv("SLURM_JOB_NODELIST")){
-	hostpath =getenv("SLURM_JOB_NODEFILE");
-	jobid= getenv("LOADL_JOB_NAME");
-      }
-      else if(getenv("LOADL_HOSTFILE"))	{
-	hostpath =getenv("LOADL_HOSTFILE");
-	jobid= getenv("LOADL_JOB_NAME");
-      }	
-      if(hostpath)
-	{ 
-	  return strdup(create_nodelist_from_hostfile(hostpath, jobid));
-	}
-    }
   /* Find a nodes-file by looking under 'nodelist' in the current directory */
   if (probefile("./nodelist"))
     return strdup("./nodelist");
@@ -1357,6 +1121,10 @@ int nodetab_max;
 int nodetab_size;
 int *nodetab_rank0_table;
 int nodetab_rank0_size;
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+int loaded_max_pe;
+#endif
 
 void nodetab_reset(nodetab_host *h)
 {
@@ -1467,6 +1235,12 @@ void nodetab_init_for_local()
   int tablesize, i, done = 0;
   nodetab_host group;
 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  if (arg_read_pes == 0) {
+    arg_read_pes = arg_requested_pes;
+  }
+#endif
+
   tablesize = arg_requested_pes;
   nodetab_table = (nodetab_host **) malloc(tablesize * sizeof(nodetab_host *));
   nodetab_rank0_table = (int *) malloc(tablesize * sizeof(int));
@@ -1545,7 +1319,7 @@ void nodetab_init()
   }
 
   /* Open the NODES_FILE. */
-  nodesfile = nodetab_file_find(arg_autocmd);
+  nodesfile = nodetab_file_find();
   if (arg_verbose)
     fprintf(stderr, "Charmrun> using %s as nodesfile\n", nodesfile);
   if (!(f = fopen(nodesfile, "r"))) {
@@ -1553,18 +1327,42 @@ void nodetab_init()
     exit(1);
   }
   free(nodesfile);
- 
-  nodetab_table=(nodetab_host**)malloc(arg_requested_pes*sizeof(nodetab_host*));
-  nodetab_rank0_table=(int*)malloc(arg_requested_pes*sizeof(int));
-  nodetab_max=arg_requested_pes;
-  
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  if (arg_read_pes == 0) {
+    arg_read_pes = arg_requested_pes;
+  }
+  nodetab_table =
+      (nodetab_host **) malloc(arg_read_pes * sizeof(nodetab_host *));
+  nodetab_rank0_table = (int *) malloc(arg_read_pes * sizeof(int));
+  nodetab_max = arg_read_pes;
+  fprintf(stderr, "arg_read_pes %d arg_requested_pes %d\n", arg_read_pes,
+          arg_requested_pes);
+#else
+  nodetab_table =
+      (nodetab_host **) malloc(arg_requested_pes * sizeof(nodetab_host *));
+  nodetab_rank0_table = (int *) malloc(arg_requested_pes * sizeof(int));
+  nodetab_max = arg_requested_pes;
+#endif
+
   nodetab_reset(&global);
-  group=global;
-  rightgroup = (strcmp(arg_nodegroup,"main")==0);
-  
-  while(fgets(input_line,sizeof(input_line)-1,f)!=0) {
-    if (nodetab_size == arg_requested_pes) break;
-    if (input_line[0]=='#') continue;
+  group = global;
+  rightgroup = (strcmp(arg_nodegroup, "main") == 0);
+
+  if (arg_ppn == 0)
+    arg_ppn = 1;
+
+  lineNo = 1;
+  while (fgets(input_line, sizeof(input_line) - 1, f) != 0) {
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    if (nodetab_size == arg_read_pes)
+      break;
+#else
+    if (nodetab_size == arg_requested_pes)
+      break;
+#endif
+    if (input_line[0] == '#')
+      continue;
     zap_newline(input_line);
     if (!nodetab_args(input_line, &global)) {
       /*An option line-- also add options to current group*/
@@ -1633,8 +1431,7 @@ void nodetab_init()
   /* Only increase counter for each new process */
   for (std::map<std::string, int>::iterator it = host_sizes.begin();
        it != host_sizes.end(); ++it) {
-    if(arg_ppn>0) it->second = (it->second + arg_ppn - 1) / arg_ppn;
-      
+    it->second = (it->second + arg_ppn - 1) / arg_ppn;
   }
 
   for (std::multimap<int, nodetab_host>::iterator it = binned_hosts.begin();
@@ -1651,6 +1448,9 @@ fin:
       nodetab_table[i]->cpus = remain;
   }
 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  loaded_max_pe = arg_requested_pes - 1;
+#endif
 #ifdef HSTART
   if (arg_hierarchical_start)
     nodetab_init_hierarchical_start();
@@ -2294,7 +2094,11 @@ int req_handle_ending(ChMessage *msg, SOCKET fd)
   int i;
   req_ending++;
 
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   if (req_ending == nodetab_size)
+#else
+  if (req_ending == arg_requested_pes)
+#endif
   {
     for (i = 0; i < req_nClients; i++)
       skt_close(req_clients[i]);
@@ -2394,6 +2198,10 @@ static int _crash_socket_charmrun_index = 0; /* last restart socket */
 int crashed_pe_id;
 int restarted_pe_id;
 #endif
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+static int numCrashes = 0; /*number of crashes*/
+static SOCKET last_crashed_fd = -1;
+#endif
 
 /**
  * @brief Handles an ACK after a crash. Once it has received all the pending
@@ -2413,19 +2221,25 @@ int req_handle_crashack(ChMessage *msg, SOCKET fd)
       req_handle_initnodetab1(NULL, req_clients[_crash_socket_charmrun_index]);
       _last_crash = 0;
       count = 0;
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+      last_crashed_fd = -1;
+#endif
     }
   }
 
   else
 
 #endif
-    if (count == req_nClients - 1) {
+      if (count == req_nClients - 1) {
     // only after everybody else update its nodetab, can this restarted process
     // continue
     printf("Charmrun> continue node: %d\n", _last_crash);
     req_handle_initnodetab(NULL, req_clients[_crash_socket_index]);
     _last_crash = 0;
     count = 0;
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    last_crashed_fd = -1;
+#endif
   }
 }
 
@@ -2516,8 +2330,9 @@ void error_in_req_serve_client(SOCKET fd)
     }
 
   fflush(stdout);
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   skt_close(fd);
-
+#endif
   crashed_pe = i;
   node_index = i - nodetab_rank(crashed_pe);
   for (i = 0; i < nodetab_rank0_size; i++) {
@@ -2545,6 +2360,9 @@ void error_in_req_serve_client(SOCKET fd)
   }
   socket_index = i;
   reconnect_crashed_client(socket_index, crashed_node);
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  skt_close(fd);
+#endif
 }
 #endif
 
@@ -2564,21 +2382,47 @@ int req_handler_dispatch(ChMessage *msg, SOCKET replyFd)
 #ifdef HSTART
   if (!arg_hierarchical_start)
 #endif
-  if(recv_status < 0)  {error_in_req_serve_client(replyFd); return REQ_OK;}
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    if (recv_status < 0) {
+      if (replyFd == last_crashed_fd) {
+        return REQ_OK;
+      }
+      DEBUGF(("recv_status %d on socket %d \n", recv_status, replyFd));
+      error_in_req_serve_client(replyFd);
+    }
+#else
+  if (recv_status < 0) {
+    error_in_req_serve_client(replyFd);
+    return REQ_OK;
+  }
+#endif
 #endif
 
-       if (strcmp(cmd,"ping")==0)       return REQ_OK;
-  else if (strcmp(cmd,"print")==0)      return req_handle_print(msg,replyFd);
-  else if (strcmp(cmd,"printerr")==0)   return req_handle_printerr(msg,replyFd);
-  else if (strcmp(cmd,"printsyn")==0)  return req_handle_printsyn(msg,replyFd);
-  else if (strcmp(cmd,"printerrsyn")==0) return req_handle_printerrsyn(msg,replyFd);
-  else if (strcmp(cmd,"scanf")==0)      return req_handle_scanf(msg,replyFd);
-  else if (strcmp(cmd,"barrier")==0)    return req_handle_barrier(msg,replyFd);
-  else if (strcmp(cmd,"barrier0")==0)   return req_handle_barrier0(msg,replyFd);
-  else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
-  else if (strcmp(cmd,"abort")==0)      {req_handle_abort(msg,replyFd); return REQ_FAILED;}
-#ifdef __FAULT__	
-  else if (strcmp(cmd,"crash_ack")==0)   return req_handle_crashack(msg,replyFd);
+  if (strcmp(cmd, "ping") == 0)
+    return REQ_OK;
+  else if (strcmp(cmd, "print") == 0)
+    return req_handle_print(msg, replyFd);
+  else if (strcmp(cmd, "printerr") == 0)
+    return req_handle_printerr(msg, replyFd);
+  else if (strcmp(cmd, "printsyn") == 0)
+    return req_handle_printsyn(msg, replyFd);
+  else if (strcmp(cmd, "printerrsyn") == 0)
+    return req_handle_printerrsyn(msg, replyFd);
+  else if (strcmp(cmd, "scanf") == 0)
+    return req_handle_scanf(msg, replyFd);
+  else if (strcmp(cmd, "barrier") == 0)
+    return req_handle_barrier(msg, replyFd);
+  else if (strcmp(cmd, "barrier0") == 0)
+    return req_handle_barrier0(msg, replyFd);
+  else if (strcmp(cmd, "ending") == 0)
+    return req_handle_ending(msg, replyFd);
+  else if (strcmp(cmd, "abort") == 0) {
+    req_handle_abort(msg, replyFd);
+    return REQ_FAILED;
+  }
+#ifdef __FAULT__
+  else if (strcmp(cmd, "crash_ack") == 0)
+    return req_handle_crashack(msg, replyFd);
 #ifdef HSTART
   else if (strcmp(cmd, "initnode") == 0)
     return req_handle_crash(msg, replyFd);
@@ -4340,6 +4184,12 @@ int rsh_fork(int nodeno, const char *startScript)
   rshargv.push_back(nodetab_name(nodeno));
   rshargv.push_back("-l");
   rshargv.push_back(nodetab_login(nodeno));
+  rshargv.push_back("-o");
+  rshargv.push_back("KbdInteractiveAuthentication=no");
+  rshargv.push_back("-o");
+  rshargv.push_back("PasswordAuthentication=no");
+  rshargv.push_back("-o");
+  rshargv.push_back("NoHostAuthenticationForLocalhost=yes");
   rshargv.push_back("/bin/bash -f");
   rshargv.push_back((const char *) NULL);
 
@@ -5227,27 +5077,48 @@ processor to connect it to a new one**/
          GetClock() - ftTimer);
 }
 
-void refill_nodetab_entry(int crashed_node){
-	int pe =  nodetab_rank0_table[crashed_node];
-	nodetab_host *h = nodetab_table[pe];
-	*h = *(replacement_host(pe));
+void refill_nodetab_entry(int crashed_node)
+{
+  int pe = nodetab_rank0_table[crashed_node];
+  nodetab_host *h = nodetab_table[pe];
+  *h = *(replacement_host(pe));
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  fprintf(stderr, "Charmrun>>> New pe %d is on host %s \n", pe,
+          nodetab_name(pe));
+#endif
 }
 
-nodetab_host *replacement_host(int pe){
-	int x=pe;
-	while(x == pe){
-#ifdef HSTART         
-	 if(arg_hierarchical_start){ 
-	 	x = nodetab_rank0_table[rand()%nodetab_rank0_size];	
-	 	crashed_pe_id = pe;
-		restarted_pe_id = x;
-	 }
-	 else
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+nodetab_host *replacement_host(int pe)
+{
+  int x = loaded_max_pe + 1;
+
+  x = x % arg_read_pes;
+  loaded_max_pe += 1;
+  /*  while(x == pe){
+   *       x = rand()%nodetab_size;
+   *           }*/
+  fprintf(stderr, "Charmrun>>> replacing pe %d with %d host %s with %s \n", pe,
+          x, nodetab_name(pe), nodetab_name(x));
+  return nodetab_table[x];
+}
+#else
+nodetab_host *replacement_host(int pe)
+{
+  int x = pe;
+  while (x == pe) {
+#ifdef HSTART
+    if (arg_hierarchical_start) {
+      x = nodetab_rank0_table[rand() % nodetab_rank0_size];
+      crashed_pe_id = pe;
+      restarted_pe_id = x;
+    } else
 #endif
       x = rand() % nodetab_size;
   }
   return nodetab_table[x];
 }
+#endif
 
 /**
  * @brief Reconnects a crashed node. It waits for the I-tuple from the just
