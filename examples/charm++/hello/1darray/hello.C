@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "hello.decl.h"
+#include <amp.h>
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int nElements;
@@ -46,6 +47,31 @@ public:
   void SayHi(int hiNo)
   {
     CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
+#if 1
+    using namespace concurrency;
+    std::vector<int> data(5);
+    for (int count = 0; count < 5; count++)
+    {
+         data[count] = thisIndex + count;
+    }
+
+    array<int, 1> a(5, data.begin(), data.end());
+
+    parallel_for_each(
+        a.get_extent(),
+        [=, &a](index<1> idx) restrict(amp)
+        {
+            a[idx] = a[idx] * 10;
+        }
+    );
+
+    data = a;
+    for (int i = 0; i < 5; i++)
+    {
+        CkPrintf("%d ", data[i]);
+    }
+    CkPrintf("\n");
+#endif
     if (thisIndex < nElements-1)
       //Pass the hello on:
       thisProxy[thisIndex+1].SayHi(hiNo+1);

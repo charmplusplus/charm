@@ -1,4 +1,8 @@
 -include ../../../common.mk
+LD=-ld clang++
+CXX_OPT=$(shell clamp-config --build --cxxflags | tr ' ' "\n" |  sed -e 's/^/\-c\+\+\-option\ /g' | xargs)
+LDXX_OPT=$(shell clamp-config --build --ldflags | tr ' ' "\n" |  sed -e 's/^/\-ld\+\+\-option\ /g' | xargs)
+OPTS+=$(CXX_OPT) $(LD) $(LDXX_OPT)
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = hello.o

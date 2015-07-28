@@ -71,6 +71,9 @@ then
 . $CHARMINC/conv-mach-opt.sh
 fi
 
+# strip out c++0x flag while we're under amp mode
+OPTS_CXX=`echo $OPTS_CXX | awk '/c\+\+amp/{ gsub(/\-std\=c\+\+0x/, ""); print; }'`
+
 OPTS_CC="$OPTS_CC $USER_OPTS_CC"
 OPTS_CXX="$OPTS_CXX $USER_OPTS_CXX"
 OPTS_LD="$OPTS_LD $USER_OPTS_LD"
