@@ -6149,7 +6149,6 @@ int AMPI_Set_startevent(MPI_Comm comm)
   if(-1==ptr->recv(MPI_BCAST_TAG, -1, NULL, 0, MPI_INT, MPI_COMM_WORLD))
     CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
 
-  printf("AMPI_Set_startevent done %d\n", CkMyPe());
   return 0;
 }
 #endif
