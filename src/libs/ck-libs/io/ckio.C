@@ -36,9 +36,10 @@ namespace Ck { namespace IO {
         CkCallback opened;
         Options opts;
         int fd;
-        CProxy_WriteSession session;
+        CProxy_WriteSession sessionWrite;
         CProxy_ReadSession  sessionRead;
         CkCallback complete;
+      //  CkCallback readDone; // Defined on 23rd July For performing the read
 
         FileInfo(string name_, CkCallback opened_, Options opts_)
           : name(name_), opened(opened_), opts(opts_), fd(-1)
@@ -129,19 +130,16 @@ namespace Ck { namespace IO {
 
           CkArrayOptions sessionOpts(numStripes);
           //sessionOpts.setMap(managers);
-          files[file].session =
+          files[file].sessionWrite =
             CProxy_WriteSession::ckNew(file, offset, bytes, sessionOpts);
           CkAssert(files[file].complete.isInvalid());
           files[file].complete = complete;
           ready.send(new SessionReadyMsg(Session(file, bytes, offset,
-                                                 files[file].session)));
+                                                 files[file].sessionWrite)));
         }
 
         void prepareReadSession(FileToken file, size_t bytes, size_t offset,
-                                 CkCallback ready, CkCallback complete){
-
-          
-          
+                                 CkCallback ready, CkCallback complete){    
           Options &opts = files[file].opts;
 
            int numStripes = 0;
@@ -157,20 +155,27 @@ namespace Ck { namespace IO {
 
           CkArrayOptions sessionOpts(numStripes);
           //sessionOpts.setMap(managers);
-          files[file].session =
+          files[file].sessionRead =
             CProxy_ReadSession::ckNew(file, offset, bytes, sessionOpts);
           
           
           CkAssert(files[file].complete.isInvalid());
           files[file].complete = complete;
           ready.send(new SessionReadyMsg(Session(file, bytes, offset,
-                                                 files[file].session)));
+                                                 files[file].sessionRead)));
 
 
         }
 
         void sessionComplete(FileToken token) {
-          CProxy_CkArray(files[token].session.ckGetArrayID()).ckDestroy();
+
+          Options opts;
+
+          if (opts.peRW == ReadPe)
+            CProxy_CkArray(files[token].sessionRead.ckGetArrayID()).ckDestroy();
+          else
+            CProxy_CkArray(files[token].sessionWrite.ckGetArrayID()).ckDestroy();
+          
           files[token].complete.send(CkReductionMsg::buildNew(0, NULL));
           files[token].complete = CkCallback(CkCallback::invalid);
         }
@@ -290,11 +295,9 @@ namespace Ck { namespace IO {
         /// version 1: Just for testing let's just define the function, let the input be the same
         /// function 
 
-        void read(Session session, char *data, size_t bytes, size_t offset){
-            
-          CmiPread(files[session.file].fd, data, bytes, offset);
-
-          /*Options &opts = files[session.file].opts;
+        void read(Session session, char *data, size_t bytes, size_t offset) {//, CkCallback readCompleted){
+          
+          Options &opts = files[session.file].opts;
           size_t stripe = opts.peStripe;
 
           CkAssert(offset >= session.offset);
@@ -302,20 +305,38 @@ namespace Ck { namespace IO {
 
           size_t sessionStripeBase = (session.offset / stripe) * stripe;
 
-          while (bytes > 0) {
+          CkPrintf("readPtr: %x\n", data); 
+
+          int i = 0;         
+
+           while (bytes > 0) {
             size_t stripeIndex = (offset - sessionStripeBase) / stripe;
-            size_t bytesToSend = min(bytes, stripe - offset % stripe);
+            size_t bytesToRead = min(bytes, stripe - offset % stripe);
 
             CProxy_ReadSession(session.sessionID)[stripeIndex]
-              .forwardData(data, bytesToSend, offset);
+              .readData(bytesToRead, offset, (long )data, thisProxy); // use thisProxy in the code to send the message back
 
-            data += bytesToSend;
-            offset += bytesToSend;
-            bytes -= bytesToSend;
-          
-          }*/
+            //CkPrintf("0 %d ********* \n",i++);
+
+              data += bytesToRead;
+              offset += bytesToRead;
+              bytes -= bytesToRead;
+             
+
+           }
 
         }
+
+        void readDone(unsigned int dataPtr, int offset,int size, char *data){
+
+
+          //CkPrintf("Data before writing %d %d %d \n",*(unsigned char *)(dataPtr + 0), *(unsigned char *)(dataPtr + 1), *(unsigned char *)(dataPtr + 2));          
+
+          for(int count = 0 ; count < size; count++){
+            *(unsigned char *)(dataPtr + count) = data[count];
+          }
+
+      }
 
         void doClose(FileToken token, CkCallback closed) {
           int fd = files[token].fd;
@@ -526,35 +547,30 @@ namespace Ck { namespace IO {
 
         ReadSession(CkMigrateMessage *m) { }
 
-        void forwardData(const char *data, size_t bytes, size_t offset) {
+        void readData(size_t bytes, size_t offset,int dataPtr, CProxy_Manager indexP) {
+          
+
+          char *data = new char[bytes]; // TODO : Must free this buffer somewhere
+
           CkAssert(offset >= myOffset);
           CkAssert(offset + bytes <= myOffset + myBytes);
 
-          size_t stripeSize = file->opts.writeStripe;
+          size_t stripeSize = file->opts.readStripe;
 
-          while (bytes > 0) {
-            size_t stripeBase = (offset/stripeSize)*stripeSize;
-            size_t stripeOffset = max(stripeBase, myOffset);
-            size_t nextStripe = stripeBase + stripeSize;
-            size_t expectedBufferSize = min(nextStripe, myOffset + myBytes) - stripeOffset;
-            size_t bytesInCurrentStripe = min(nextStripe - offset, bytes);
+          size_t readBytes = CmiPread(file->fd, data, bytes, offset);
 
-            buffer& currentBuffer = bufferMap[stripeOffset];
-            currentBuffer.expect(expectedBufferSize);
+          
+          CkPrintf("Requested Bytes %d Read Bytes %d Offset %d %x\n", bytes, readBytes,offset, dataPtr);
+          //CkPrintf("Read Data %d %d %d %d %d %d %d %d %d %d \n",data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9]);  
 
-            currentBuffer.insertData(data, bytesInCurrentStripe, offset - stripeOffset);
-
-            
-            bytes -= bytesInCurrentStripe;
-            data += bytesInCurrentStripe;
-            offset += bytesInCurrentStripe;
-          }
+         indexP.readDone(dataPtr,offset,bytes,data);
 
           
         }
 
-        int ReadBuffer(buffer& buf, size_t bufferOffset) {
-          
+          if (readBytes < 0){
+            fatalError("Call to pread failed", file->name);
+          }
           
         }
       
@@ -640,13 +656,21 @@ namespace Ck { namespace IO {
         CkpvAccess(manager)->write(session, data, bytes, offset);
     }
     //// This is the read function 
-    void read(Session session, char *data, size_t bytes, size_t offset) {
+    //void read(Session session, char *data, size_t bytes, size_t offset) {
+    void read(Session session, char *data, size_t bytes, size_t offset, CkCallback readCompleted) {
         using namespace impl;
-        CkpvAccess(manager)->read(session,data, bytes,offset);
+        //CkpvAccess(manager)->read(session, data, bytes,offset);
+        CkpvAccess(manager)->read(session, data, bytes, offset);//, readCompleted);
     }
 
     void close(File file, CkCallback closed) {
       impl::director.close(file.token, closed);
+    }
+
+    void endSession(Session session){
+      using namespace impl;
+      impl::director.sessionComplete(session.file);
+      
     }
 
     class SessionCommitMsg : public CMessage_SessionCommitMsg {

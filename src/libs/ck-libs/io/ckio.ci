@@ -61,16 +61,20 @@ module CkIO_impl {
             }
             when sessionDone[sessionID](CkReductionMsg *m) serial {
               delete m;
+              CkPrintf("*************Session is Done **********\n");
               impl::FileInfo* info = CkpvAccess(manager)->get(file);
-              CmiInt8 ret = CmiPwrite(info->fd, commitData, commitBytes, commitOffset);
+              CmiInt8 ret = CmiPread(info->fd, commitData, commitBytes, commitOffset);
               if (ret != commitBytes)
                 fatalError("Commit write failed", info->name);
               complete.send(CkReductionMsg::buildNew(0, NULL));
+              CkPrintf("Session Done \n");
             }
           };                                 
 
+
           entry void sessionDone(CkReductionMsg *);
           entry void close(FileToken token, CkCallback closed);
+          //entry void sessionClose(Session session);
         }
 
         group [migratable] Manager
@@ -91,6 +95,10 @@ module CkIO_impl {
           entry void openFile(unsigned int opnum,
                               FileToken token, std::string name, Options opts);
           entry void close(unsigned int opnum, FileToken token, CkCallback closed);
+
+          //entry void readDone(unsigned int dataPtr, int offset, int size, char data[size],CkCallback readCompleted);  
+
+          entry void readDone(unsigned int dataPtr, int offset, int size, char data[size]);
         };
 
         array [1D] WriteSession
@@ -102,6 +110,8 @@ module CkIO_impl {
         array [1D] ReadSession
         {
           entry ReadSession(FileToken file, size_t offset, size_t bytes);
+          //entry void readData(char data[bytes], size_t bytes, size_t offset);
+          entry void readData(size_t bytes, size_t offset, int dataPtr, CProxy_Manager indexP);  // TODO :: Define the ReadSession Callback
         };
 
         group Map : CkArrayMap

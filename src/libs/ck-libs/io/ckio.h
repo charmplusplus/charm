@@ -14,13 +14,15 @@ namespace Ck { namespace IO {
   /// Users should not set anything in them.
   struct Options {
     Options()
-      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1), peRW(ReadPe)
+      : peStripe(0), writeStripe(0), readStripe(0), activePEs(-1), basePE(-1), skipPEs(-1), peRW(ReadPe)
       { }
 
     /// How much contiguous data (in bytes) should be assigned to each active PE
     size_t peStripe;
     /// How much contiguous data (in bytes) should a PE gather before writing it out
     size_t writeStripe;
+
+    size_t readStripe;
     /// How many PEs should participate in this activity
     int activePEs;
     /// Which PE should be the first to participate in this activity
@@ -33,11 +35,13 @@ namespace Ck { namespace IO {
     void pup(PUP::er &p) {
       p|peStripe;
       p|writeStripe;
+      p|readStripe;
       p|activePEs;
       p|basePE;
       p|skipPEs;
       p|peRW;
     }
+
   };
 
   class File;
@@ -76,11 +80,17 @@ namespace Ck { namespace IO {
   /// version 1: Just for testing let's just define the function, let the input be the same
   /// function 
 
-  void read(Session session, char *data, size_t bytes, size_t offset); // defined by Rohan 
+  void read(Session session, char *data, size_t bytes, size_t offset, CkCallback cb); // defined by Rohan 
 
   /// Close a previously-opened file. All sessions on that file must have
   /// already signalled that they are complete.
   void close(File file, CkCallback closed);
+
+
+  void endSession(Session session);
+
+  /// In order to do the callback for the read stripe 
+
 
   class File {
     int token;
@@ -112,6 +122,7 @@ namespace Ck { namespace IO {
     int    ReadWriteFlag = Ck::IO::FileOps::WritePe; // ReadWrite Flag tells if its a read or a write
     CkArrayID sessionID;
     friend class Ck::IO::impl::Manager;
+    friend void endSession(Session session);
   public:
     Session(int file_, size_t bytes_, size_t offset_,
             CkArrayID sessionID_)
