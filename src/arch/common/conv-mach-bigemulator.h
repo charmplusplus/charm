@@ -13,3 +13,6 @@
 #define CMK_IMMEDIATE_MSG				   0
 
 #define BIGSIM_OUT_OF_CORE                                 0
+
+#undef CMK_WITH_STATS
+#define CMK_WITH_STATS                                     0

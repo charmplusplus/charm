@@ -20,3 +20,6 @@
 
 #undef CMK_WITH_CONTROLPOINT
 #define CMK_WITH_CONTROLPOINT                              0
+
+#undef CMK_WITH_STATS
+#define CMK_WITH_STATS                                     0
