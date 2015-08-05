@@ -116,7 +116,9 @@ struct test : public CBase_test {
     
   }
 
-  void readCompleted(Ck::IO::SessionReadyMsg* m) {}
+  void readCompleted(Ck::IO::SessionReadyMsg* m) {
+      CkPrintf("In the callback\n");
+  }
 
   void done(Ck::IO::Session token, int n) { // This is done function
       
