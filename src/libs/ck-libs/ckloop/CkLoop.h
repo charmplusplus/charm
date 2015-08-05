@@ -91,10 +91,12 @@ public:
     int getNextChunkIdx() {
 #if defined(_WIN32)
 #if CMK_SMP
+        int next_chunk_id;
         CmiLock(cmiMemoryLock);
         curChunkIdx=curChunkIdx+1;
+        next_chunk_id = curChunkIdx;
         CmiUnlock(cmiMemoryLock);
-        return curChunkIdx;
+        return next_chunk_id;
 #else
         curChunkIdx++;
         return curChunkIdx;
