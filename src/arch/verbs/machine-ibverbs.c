@@ -1602,11 +1602,7 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 };
 
 void static inline handoverMessage(char *newmsg,int total_size,int rank,int broot,int toBuffer){
-	
-	if(toBuffer){
-		if((CMI_BROADCAST_ROOT(newmsg)!=0))
-			insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
-	}	
+
 	handleOneRecvedMsg(total_size, newmsg);
 
 	if(!toBuffer){

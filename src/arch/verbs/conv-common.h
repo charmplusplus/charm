@@ -37,9 +37,6 @@
 #define CMK_OBJECT_QUEUE_AVAILABLE		   	   0
 #define CMK_USE_SPECIAL_MESSAGE_QUEUE_CHECK                1
 
-#define CMK_BROADCAST_SPANNING_TREE    			   0
-#define CMK_BROADCAST_HYPERCUBE        			   0
-
 #define CMK_BARRIER_USE_COMMON_CODE                        1
 
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
