@@ -50,9 +50,9 @@ public:
 
       char ReadDataFromFile[100*100];
 
-      size_t readData = pread(fd, ReadDataFromFile, 100, 2);
+      size_t readData = pread(fd, ReadDataFromFile, 90, 0);
 
-      for(int i = 0; i < 100; i++)
+      for(int i = 0; i < 90; i++)
         CkPrintf ("%d %d %d \n", ReadArray[i], ReadDataFromFile[i], readData);
 
       if(strcmp(ReadArray,ReadDataFromFile)==0)
@@ -72,11 +72,7 @@ public:
     
       memcpy(ReadArray + offset, data,size);
 
-
-   /*for(int i = 0; i < 2; i++)
-        CkPrintf ("%d %d %d %d %d", data[i], data[i+1],data[i+2],data[i+3],data[i+4]);
-
-      CkPrintf("\n");*/
+ 
   } 
 
 };
@@ -84,9 +80,13 @@ public:
 struct test : public CBase_test {
   int numDone=0;
   int instance = 0;
+  Ck::IO::Session savedToken;
+  int numChares;
+  char *readData;
+  
   test(Ck::IO::Session token,int n) { // Pass the number of chare elements in our case they are n elements
     
-    char* out = new char[20];
+    readData = new char[20];
     int fd;
     int i = 0;
     int bytes = 20;
@@ -98,14 +98,14 @@ struct test : public CBase_test {
     
     //Ck::IO::readTag tag = Ck::IO::read(token, out, 10, 10*thisIndex);
      
-    Ck::IO::read(token, out, 10, 10*thisIndex, myCB);
+    Ck::IO::read(token, readData, 10, 10*thisIndex, myCB);
+
+    savedToken = token;
+    numChares = n;
 
     //CkPrintf("This index %d \n", thisIndex);
 
-
-    //CkPrintf("On %d (0x%x): %d %d %d %d %d %d %d %d %d %d\n", thisIndex, out, out[0],out[1],out[2],out[3],out[4],out[5],out[6],out[7],out[8],out[9]);  
-
-
+  //CkPrintf("On %d (0x%x): %d %d %d %d %d %d %d %d %d %d\n", thisIndex, out, out[0],out[1],out[2],out[3],out[4],out[5],out[6],out[7],out[8],out[9]);  
     //mainProxy.testReadFiles(10*thisIndex,10, out);
     
     //thisProxy[0].done(token,n); // Pass the token with the done function, 
@@ -117,7 +117,12 @@ struct test : public CBase_test {
   }
 
   void readCompleted(Ck::IO::SessionReadyMsg* m) {
-      CkPrintf("In the callback\n");
+     // CkPrintf("In the callback %d \n", m->token);
+
+    mainProxy.testReadFiles(10*thisIndex,10,readData);
+
+    CkPrintf("On %d (0x%x): %d %d %d %d %d %d %d %d %d %d\n", thisIndex,readData, readData[0],readData[1],readData[2],readData[3],readData[4],readData[5],readData[6],readData[7],readData[8],readData[9]);  
+    thisProxy[0].done(savedToken,numChares);   
   }
 
   void done(Ck::IO::Session token, int n) { // This is done function

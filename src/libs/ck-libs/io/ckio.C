@@ -105,7 +105,7 @@ namespace Ck { namespace IO {
           managers.openFile(opnum++, filesOpened++, name, opts);
 
         }
-
+   
         void fileOpened(FileToken file) {
           files[file].opened.send(new FileReadyMsg(file));
         }
@@ -198,6 +198,7 @@ namespace Ck { namespace IO {
           long dataPtr; // DataPtr of the caller
           long totalReads; // Total number of reads
           long CompletedReads; // This will tell how many reads are completed so far  
+          long offset; // This field contains the offset of the buffer
         };
 
         CallerTable CallerTableData;
@@ -309,13 +310,16 @@ namespace Ck { namespace IO {
         /// version 1: Just for testing let's just define the function, let the input be the same
         /// function 
 
-        void read(Session session, char *data, size_t bytes, size_t offset) {
+        void read(Session session, char *data, size_t bytes, size_t offset, CkCallback readCompleted){
+          
           
           Options &opts = files[session.file].opts;
-          int Bytes = bytes;
-          int Offset = offset;
+          size_t Bytes = bytes;
+          size_t Offset = offset;
 
           size_t stripe = opts.peStripe;
+
+          int key = genKeyID;
 
           CkAssert(offset >= session.offset);
           CkAssert(offset + bytes <= session.offset + session.bytes);
@@ -332,11 +336,11 @@ namespace Ck { namespace IO {
           CallerTableData.dataPtr = (long)data;
           CallerTableData.totalReads =  0; // TODO : This needs to be updated 
           CallerTableData.CompletedReads = 0;
-
+          CallerTableData.offset = 0; // FixMe: make sure we are writing at the right offset
       
           while(Bytes > 0){
-            size_t stripeIndex = (offset - sessionStripeBase) / stripe;
-            size_t bytesToRead = min(bytes, stripe - offset % stripe);
+            size_t stripeIndex = (Offset - sessionStripeBase) / stripe;
+            size_t bytesToRead = min(Bytes, stripe - Offset % stripe);
 
             CallerTableData.totalReads++;
             
@@ -355,22 +359,15 @@ namespace Ck { namespace IO {
             CProxy_ReadSession(session.sessionID)[stripeIndex]
               .readData(key, CkMyPe(), bytesToRead, offset, thisProxy); // use thisProxy in the code to send the message back
 
-            //CkPrintf("0 %d ********* \n",i++);
-
-              data += bytesToRead;
               offset += bytesToRead;
               bytes -= bytesToRead;
-           }
-
+          }
         }
 
-        void readDone(int key, int offset, int size, char *data){
-
-
-          //CkPrintf("Data before writing %d %d %d \n",*(unsigned char *)(dataPtr + 0), *(unsigned char *)(dataPtr + 1), *(unsigned char *)(dataPtr + 2));          
+        void readDone(int key, int size, char *data){
 
           for(int count = 0 ; count < size; count++){
-            *(unsigned char *)(MapTable[key].dataPtr + count + offset) = data[count];
+            *(unsigned char *)(MapTable[key].dataPtr + MapTable[key].offset + count) = data[count];
           }
 
 
@@ -380,9 +377,16 @@ namespace Ck { namespace IO {
           if(MapTable[key].totalReads == MapTable[key].CompletedReads) {
             CkPrintf("Looks like we're all done!\n");
             MapTable[key].myCB.send();
-            MapTable.erase(key);
+           // delete  data;
+            //MapTable.erase(key);
           }
-       }
+          else{
+          
+            MapTable[key].offset += size ;
+
+          }
+
+        }
 
         void doClose(FileToken token, CkCallback closed) {
           int fd = files[token].fd;
@@ -475,6 +479,7 @@ namespace Ck { namespace IO {
           size_t stripeSize = file->opts.writeStripe;
 
           while (bytes > 0) {
+
             size_t stripeBase = (offset/stripeSize)*stripeSize;
             size_t stripeOffset = max(stripeBase, myOffset);
             size_t nextStripe = stripeBase + stripeSize;
@@ -604,14 +609,8 @@ namespace Ck { namespace IO {
           size_t stripeSize = file->opts.readStripe;
 
           size_t readBytes = CmiPread(file->fd, data, bytes, offset);
-
-          
-          CkPrintf("Requested Bytes %d Read Bytes %d Offset %d %x\n", bytes, readBytes,offset, key);
-          //CkPrintf("Read Data %d %d %d %d %d %d %d %d %d %d \n",data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9]);  
-
-
-          indexP[pe].readDone(key,offset,bytes,data);
-
+     
+          indexP[pe].readDone(key,bytes,data);
 
           if (readBytes < 0){
             fatalError("Call to pread failed", file->name);

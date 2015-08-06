@@ -74,7 +74,7 @@ module CkIO_impl {
 
           entry void sessionDone(CkReductionMsg *);
           entry void close(FileToken token, CkCallback closed);
-          //entry void sessionClose(Session session);
+
         }
 
         group [migratable] Manager
@@ -98,7 +98,7 @@ module CkIO_impl {
 
           //entry void readDone(unsigned int dataPtr, int offset, int size, char data[size],CkCallback readCompleted);  
 
-          entry void readDone(int key, int offset, int size, char data[size]);
+          entry void readDone(int key, int size, char data[size]);
         };
 
         array [1D] WriteSession
