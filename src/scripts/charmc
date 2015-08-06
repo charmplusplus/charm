@@ -41,7 +41,7 @@ OVERRIDE_LDXX=""
 OPTS=""
 #Specific options
 #charm internal flag, only pass to c and cxx, not f90
-OPTS_CPP_INTERNAL="-D__CHARMC__=1 "
+OPTS_CPP_INTERNAL="-D__CHARMC__=1"
 OPTS_CPP=
 OPTS_LDRO="" 
 OPTS_CC=""
@@ -104,6 +104,7 @@ MPI_INTEROPERATE=""
 NO_MAIN_MODULE=""
 NO_MAIN=""
 CUSTOM_PARTITION=""
+PREPROCESS_CI="yes"
 
 ####################################################################
 #
@@ -134,7 +135,8 @@ printUsage() {
     echo "        -f90 <new f90> -f90-option <opt> -fmoddir <f90mod path>"
     echo "        -flibs -rpath <path> -custom-part -touch-on-failure"
     echo "        -mpi -openmp -no-trace-mpi -build-shared -charm-shared"
-    echo "        -no-charmrun -nomain-module -nomain -nof90main -f90main"
+    echo "        -no-charmrun -no-preprocess-ci -nomain-module -nomain"
+    echo "        -nof90main -f90main"
     echo
     echo "  Charmc compiles C, C++, f77, f90, AMPI, Converse, Converse++, Charm, "
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
@@ -616,7 +618,11 @@ do
         "-preprocess")
 # Run preprocessor as an extra step, continue after preprocessing
 		PREPROCESS="yes"
-                ;;
+		;;
+	"-no-preprocess-ci")
+# Turn off the preprocessor for ci files
+		PREPROCESS_CI="no"
+		;;
 	"-P"|"-S")
 # Run preprocessor/assembler only
 		SKIPLINK="yes"
@@ -1336,7 +1342,7 @@ do
 	*.ci)
                 XIOPTS=$CMK_XIOPTS
                 test "$LANGUAGE" = "f90charm" && XIOPTS="$XIOPTS -f90"
-                if [ -n "$PREPROCESS" ]
+                if [ "$PREPROCESS_CI" = "yes" ]
                 then
 		  Do $CMK_CPP_CHARM $OPTS_CPP $FILE | Do $CHARMBIN/charmxi $XIOPTS -orig-file $FILE
                 else
