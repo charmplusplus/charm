@@ -7,7 +7,7 @@ namespace xi {
 
 class Module;
 
-class Construct : public virtual AstNode {
+class Construct : virtual public AstNode {
  protected:
   int external;
 
@@ -32,6 +32,7 @@ class AccelBlock : public Construct {
 
  private:
   void outputCode(XStr& str);
+  void outputCudaCode(XStr& str);
 
  public:
   /// Constructor(s)/Destructor ///
@@ -46,6 +47,7 @@ class AccelBlock : public Construct {
 
   /// Construct Accel Support Methods ///
   int genAccels_spe_c_funcBodies(XStr& str);
+  int genAccels_cuda_c_funcBodies(XStr& str);
 };
 
 } // namespace xi

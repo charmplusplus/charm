@@ -145,6 +145,11 @@ struct rwentry rwtable[] = {
 {  "memcritical", MEMCRITICAL },
 {  "reductiontarget", REDUCTIONTARGET },
 {  "case",       CASE },
+{  "triggered",  TRIGGERED },
+{  "shared",     SHARED },
+{  "splittable", SPLITTABLE },
+{  "threadsperblock", THREADSPERBLOCK },
+{  "persist",    PERSIST },
 {  "",		0 }
 };
 

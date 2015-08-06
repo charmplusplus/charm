@@ -3656,8 +3656,9 @@ void ConverseCommonInit(char **argv)
 
 #ifdef CMK_CUDA
   initHybridAPI(CmiMyPe()); 
+  void CmiInitTriggeredAccel();
+  CmiInitTriggeredAccel();
 #endif
-
   /* main thread is suspendable */
 /*
   CthSetSuspendable(CthSelf(), 0);
@@ -3718,6 +3719,17 @@ void CmiInitCell()
 #include "cell-api.c"
 
 #endif
+
+#if CMK_CUDA != 0
+
+extern void register_accel_cuda_funcs();
+
+void CmiInitTriggeredAccel() {
+  register_accel_cuda_funcs();
+}
+
+#endif
+
 
 /****
  * CW Lee - 9/14/2005

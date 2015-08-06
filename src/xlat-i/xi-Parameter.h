@@ -27,6 +27,8 @@ class Parameter {
     // DMK - Added field for accelerator options
     int accelBufferType;
     XStr* accelInstName;
+    int isSharedFlag;
+    int isPersistFlag;
     bool podType;
 
     friend class ParamList;
@@ -77,6 +79,11 @@ class Parameter {
     int getAccelBufferType();
     void setAccelInstName(XStr* ain);
     XStr* getAccelInstName(void);
+    void setShared(int sf);
+    int isShared();
+    void setPersist(int pf);
+    int isPersist();
+
 };
 
 class ParamList {
@@ -132,6 +139,6 @@ class ParamList {
     void checkParamList();
 };
 
-}   // namespace xi 
+}   // namespace xi
 
 #endif // ifndef _TYPE_H

@@ -20,6 +20,17 @@ void AccelBlock::outputCode(XStr& str) {
     str << "\n";
   }
 }
+ void AccelBlock:: outputCudaCode(XStr& str) {
+    if (code != NULL) {
+      str << "\n";
+      templateGuardBegin(false, str);
+      str << "__device__ "
+          << (*(code)) <<"\n"
+          << "\n/***** Accel_Block End *****/\n";
+      templateGuardEnd(str);
+      str << "\n";
+    }
+  }
 
 AccelBlock::AccelBlock(int l, XStr* c) { line = l; code = c; }
 AccelBlock::~AccelBlock() { delete code; }
@@ -33,4 +44,6 @@ void AccelBlock::genDefs(XStr& str) { outputCode(str); }
 /// Construct Accel Support Methods ///
 int AccelBlock::genAccels_spe_c_funcBodies(XStr& str) { outputCode(str); return 0; }
 
-}   // namespace xi
+ int AccelBlock::genAccels_cuda_c_funcBodies(XStr& str) {
+   outputCode(str); return 0; }
+ }   // namespace xi

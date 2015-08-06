@@ -37,6 +37,7 @@ class WhenStatementEChecker;
 #define SMEM          0x20000
 #define SREDUCE       0x40000 // <- reduction target
 #define SAPPWORK      0x80000 // <- reduction target
+#define STRIGGERED    0x100000 // <- "triggered" (must also be an accelerated entry method)
 
 /* An entry construct */
 class Entry : public Member {
@@ -106,6 +107,15 @@ class Entry : public Member {
     void genAccels_spe_c_regFuncs(XStr& str);
     void genAccels_ppe_c_regFuncs(XStr& str);
 
+    // CUDA
+    void genAccelIndexWrapperDecl_cuda(XStr& str);
+    void genAccelIndexWrapperDef_cuda(XStr& str);
+    int genAccels_cuda_c_funcBodies(XStr& str);
+    void genAccels_cuda_c_regFuncs(XStr& str);
+    void genAccels_cuda_host_c_regFuncs(XStr& str);
+    void genAccels_cuda_h_includes(XStr& str) { }
+    void genAccels_cuda_h_fiCountDefs(XStr& str) { }
+
     XStr paramType(int withDefaultVals,int withEO=0,int useConst=1);
     XStr paramComma(int withDefaultVals,int withEO=0);
     XStr eo(int withDefaultVals,int priorComma=1);
@@ -137,10 +147,16 @@ class Entry : public Member {
     // DMK - Accel Support
     ParamList* accelParam;
     XStr* accelCodeBody;
+    XStr* splitAmount;
+    XStr* cudaManualThreadsPerBlock;
     XStr* accelCallbackName;
     void setAccelParam(ParamList* apl);
     void setAccelCodeBody(XStr* acb);
     void setAccelCallbackName(XStr* acbn);
+    void setAccelSplitAmount(XStr* sa);
+    void setCudaManualThreadsPerBlock(XStr *cmtpb);
+
+
 
     // DMK - Accel Support
     int accel_numScalars;
@@ -175,6 +191,10 @@ class Entry : public Member {
 
     // DMK - Accel support
     int isAccel(void);
+    int isTriggered(void);
+    XStr* getAccelSplitAmount();
+    XStr* getCudaManualThreadsPerBlock();
+
 
     int isMemCritical(void);
     int isReductionTarget(void);

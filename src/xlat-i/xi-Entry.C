@@ -415,7 +415,7 @@ void Entry::genArrayDefs(XStr& str)
 	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
 	      << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       if(isAppWork())
-      str << " _TRACE_BEGIN_APPWORK();\n";    
+      str << " _TRACE_BEGIN_APPWORK();\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
@@ -427,7 +427,7 @@ void Entry::genArrayDefs(XStr& str)
       "#endif\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
       if(isAppWork())
-      str << " _TRACE_END_APPWORK();\n";    
+      str << " _TRACE_END_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     }
@@ -639,7 +639,7 @@ void Entry::genGroupDefs(XStr& str)
       str << "  CkAssert(obj);\n";
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL);\n";
       if(isAppWork())
-      str << " _TRACE_BEGIN_APPWORK();\n";    
+      str << " _TRACE_BEGIN_APPWORK();\n";
       str << "#if CMK_LBDB_ON\n"
 "  // if there is a running obj being measured, stop it temporarily\n"
 "  LDObjHandle objHandle;\n"
@@ -662,7 +662,7 @@ void Entry::genGroupDefs(XStr& str)
 "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
 "#endif\n";
       if(isAppWork())
-      str << " _TRACE_BEGIN_APPWORK();\n";    
+      str << " _TRACE_BEGIN_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     } else if(isSync()) {
@@ -893,24 +893,336 @@ void Entry::genAccelIndexWrapperDecl_general(XStr& str) {
   str << "    static void _accelCall_general_" << epStr() << "(";
   genAccelFullParamList(str, 1);
   str << ");\n";
+   #if (CMK_CUDA != 0) || (CMK_CELL != 0)
+    str << "    static void _accelCall_generalDelayRestart_" << epStr() << "(void *ptr);\n";
+    str << "    static void _accelCall_generalDelay_" << epStr() << "(";
+    genAccelFullParamList(str, 1);
+    str << ");\n";
+    str << "    static int accel_cuda_func_index__" << epStr() << ";\n";
+  #endif
+
+  str << "\n";
+
 }
 
+/* This code might be useful, need to fix this: Harshit
+  str << "    static void _accelCall_general_" << epStr() << "(";
+  genf (isAccel()) {
+     str << "  // AEM : \"" << container->baseName() << "::" << epStr() << "\"\n"
+         << "  // Check to see if there is enough room in the table (increase the size of the table if not) and\n"
+         << "  //   and then add the entry for \"" << container->baseName() << "::" << epStr() << "\".\n"
+         << "  if (curIndex >= funcLookupTable_maxLen) {\n"
+         << "    int newTableLen = funcLookupTable_maxLen + 16;\n"
+         << "    FuncLookupTableEntry *newTable = new FuncLookupTableEntry[newTableLen];\n"
+         << "    if (funcLookupTable_maxLen > 0 && funcLookupTable != NULL) {\n"
+         << "      memcpy(newTable, funcLookupTable, sizeof(FuncLookupTableEntry) * curIndex);\n"
+         << "      delete [] funcLookupTable;\n"
+         << "    }\n"
+         << "    funcLookupTable = newTable;\n"
+         << "    funcLookupTable_maxLen = newTableLen;\n"
+         << "  }\n"
+         << "  funcLookupTable[curIndex  ].funcIndex = curIndex;\n"
+ << "  funcLookupTable[curIndex  ].funcIndex = curIndex;\n"
+         << "  funcLookupTable[curIndex++].funcPtr = __cudaFuncHost__" << container->baseName() << "__" << epStr() << ";\n\n";
+   }
+ }*/
+
+
+void Entry::genAccels_cuda_c_regFuncs(XStr& str) {
+   //if (isAccel() && isTriggered()) {
+   if (isAccel()) {
+     str << "  // AEM : \"" << container->baseName() << "::" << epStr() << "\"\n"
+         << "  // Check to see if there is enough room in the table (increase the size of the table if not) and\n"
+         << "  //   and then add the entry for \"" << container->baseName() << "::" << epStr() << "\".\n"
+         << "  if (curIndex >= funcLookupTable_maxLen) {\n"
+         << "    int newTableLen = funcLookupTable_maxLen + 16;\n"
+         << "    FuncLookupTableEntry *newTable = new FuncLookupTableEntry[newTableLen];\n"
+         << "    if (funcLookupTable_maxLen > 0 && funcLookupTable != NULL) {\n"
+         << "      memcpy(newTable, funcLookupTable, sizeof(FuncLookupTableEntry) * curIndex);\n"
+         << "      delete [] funcLookupTable;\n"
+         << "    }\n"
+         << "    funcLookupTable = newTable;\n"
+         << "    funcLookupTable_maxLen = newTableLen;\n"
+         << "  }\n"
+         << "  funcLookupTable[curIndex  ].funcIndex = curIndex;\n"
+         << "  funcLookupTable[curIndex++].funcPtr = __cudaFuncHost__" << container->baseName() << "__" << epStr() << ";\n\n";
+   }
+ }
+
+
+void Entry::genAccels_cuda_host_c_regFuncs(XStr& str) {
+  //if (isAccel() && isTriggered()) {
+  if (isAccel()) {
+    // DMK - DEBUG - register user events for performance testing
+
+    //str << "  traceRegisterUserEvent(\"__cudaFuncHost__" << container->baseName() << "__" << epStr() << "\", 54718 + curIndex);\n";
+    str << "  traceRegisterUserEvent(\"__cudaFuncHost__" << container->baseName() << "__" << epStr() << " - contribute\", 54718 + (3 * curIndex));\n";
+    str << "  traceRegisterUserEvent(\"__cudaFuncHost__" << container->baseName() << "__" << epStr() << " - active\", 54718 + (3 * curIndex) + 1);\n";
+    str << "  traceRegisterUserEvent(\"__cudaFuncHost__" << container->baseName() << "__" << epStr() << " - callback\", 54718 + (3 * curIndex) + 2);\n";
+
+    //str << "  traceRegisterUserEvent(\"__cudaFunc_contributeTo__" << container->baseName() << "__" << epStr() << "\", 24875 + curIndex);\n";
+
+    str << "  " << indexName() << "::accel_cuda_func_index__" << epStr() << " = curIndex++;\n";
+  }
+}
+
+
+
+
+
 void Entry::genAccelIndexWrapperDef_general(XStr& str) {
-  str << makeDecl("void") << "::_accelCall_general_" << epStr() << "(";
+ParamList *curParam = NULL;
+
+  ///// The delay restart function for the general function on the host /////
+
+  // If there is no actual accelerator (support), then there is no need for delayed calls
+  #if (CMK_CUDA != 0) || (CMK_CELL != 0)
+
+    curParam = param;
+    int numPassedParams = 0;
+    if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+    while (curParam != NULL) {
+      numPassedParams++;
+      curParam = curParam->next;
+    }
+    if (numPassedParams > 0) {
+ str << "// AEM : \"" << container->baseName() << "::" << epStr() << "\"\n"
+          << "//   A data structure for storing the passed parameters when the AEM is delayed (allowing the message to be free'd)\n"
+          << "typedef struct __accelCall_" << container->baseName() << "_" << epStr() << "_passedParams {\n";
+      curParam = param;
+      if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+      while (curParam != NULL) {
+        Parameter *p = curParam->param;
+        const char *n = p->getName();
+        const char *t = p->getType()->getBaseName();
+        if (p->isArray()) {
+          str << "  " << t << " *" << n << ";\n";
+        } else {
+          str << "  " << t << " " << n << ";\n";
+        }
+        curParam = curParam->next;
+      }
+      str << "} AccelCall_" << container->baseName() << "_" << epStr() << "_PassedParams;\n\n";
+    }
+
+    str << "// A function used to 'restart' a delayed AEM invocation\n"
+        << "void _accelCall_generalDelayRestart_" << container->baseName() << "_" << epStr() << "(AccelDelayCallData* dataPtr) {\n"
+        << "  " << indexName() << "::_accelCall_generalDelayRestart_" << epStr() << "(dataPtr);\n"
+        << "};\n"
+        << makeDecl("void") << "::_accelCall_generalDelayRestart_" << epStr() << "(void* ptr) {\n\n"
+        << "  // Grab the data and object pointers related to the delayed AEM invocation\n"
+        << "  AccelDelayCallData *dataPtr = (AccelDelayCallData*)ptr;\n"
+ << "  if (dataPtr->funcPtr != ::_accelCall_generalDelayRestart_" << container->baseName() << "_" << epStr() << ") {\n"
+        << "    CkPrintf(\"[ACCEL-ERROR] :: PE %d :: (generated code - host delay restart) - function pointer mismatch detected! (" << container->baseName() << " " << epStr() << ")\\n\", CkMyPe());\n"
+        << "  }\n"
+        << "  " << container->baseName() << " *impl_obj = (" << container->baseName() << "*)(dataPtr->objPtr);\n\n";
+if (numPassedParams > 0) {
+      str << "  // Unpack the passed parameters\n"
+          << "  AccelCall_" << container->baseName() << "_" << epStr() << "_PassedParams *passedParams = (AccelCall_" << container->baseName() << "_" << epStr() << "_PassedParams*)(dataPtr->passedParams);\n";
+      curParam = param;
+      if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+      while (curParam != NULL) {
+        Parameter *p = curParam->param;
+        const char *n = p->getName();
+        const char *t = p->getType()->getBaseName();
+        if (p->isArray()) {
+          str << "  " << t << " *" << n << " = passedParams->" << n << ";\n";
+        } else {
+          str << "  " << t << " " << n << " = passedParams->" << n << ";\n";
+        }
+        curParam = curParam->next;
+      }
+      str << "\n";
+    }
+
+    str << "  // Invoke the AEM\n"
+        << " _accelCall_general_" << epStr() << "("; genAccelFullCallList(str); str << ");\n\n";
+
+    if (numPassedParams > 0) {
+      str << "  // Delete the passed parameters\n";
+      curParam = param;
+ if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+      while (curParam != NULL) {
+        Parameter *p = curParam->param;
+        const char *n = p->getName();
+        const char *t = p->getType()->getBaseName();
+        if (p->isArray()) {
+          str << "  delete [] passedParams->" << n << ";\n";
+        }
+        curParam = curParam->next;
+      }
+      str << "  delete passedParams; passedParams = NULL; dataPtr->passedParams = NULL;\n\n";
+    }
+
+    str << "  // 'Free' the data structure related to the delayed call\n"
+        << "  AccelManager *manager = AccelManager::getAccelManager();\n"
+        << "  if (manager == NULL) { CkPrintf(\"[ACCEL-ERROR] :: PE %d :: (generated code - host delay restart) - Unable to get pointer to accelerator manager! (" << container->baseName() << ", " << epStr() << ")\\n\", CkMyPe()); fflush(NULL); }\n"
+        << "  manager->freeAccelDelayCallData(dataPtr);\n"
+        << "}\n\n";
+
+    str << "// A function to 'delay' AEM invocations on the host core so that they can be executed at a later time\n"
+        << makeDecl("void") << "::_accelCall_generalDelay_" << epStr() << "(";
+    genAccelFullParamList(str, 1);
+    str << ") {\n\n"
+        << "  // Get a pointer to the accelerator manager\n"
+        << "  AccelManager *manager = AccelManager::getAccelManager();\n"
+        << "  if (manager == NULL) { CkPrintf(\"[ACCEL-ERROR] :: PE %d :: (generated code - host delay) - Unable to get pointer to accelerator manager! (" << container->baseName() << ", " << epStr() << ")\\n\", CkMyPe()); fflush(NULL); }\n\n"
+        << "  // Get a 'delayed call' data structure and fill it in with information regarding this AEM invocation\n"
+        << "  AccelDelayCallData *structPtr = manager->allocAccelDelayCallData();\n"
+        << "  if (structPtr == NULL) { CkPrintf(\"[ACCEL-ERROR] :: PE %d :: (generated code - host delay) - Unable to allocate accel call delay data structure! (" << container->baseName() << ", " << epStr() << ")\\n\", CkMyPe()); fflush(NULL); }\n"
+   << "  structPtr->objPtr = impl_obj;\n"
+        << "  structPtr->funcPtr = ::_accelCall_generalDelayRestart_" << container->baseName() << "_" << epStr() << ";\n"
+ << "  structPtr->objPtr = impl_obj;\n"
+        << "  structPtr->funcPtr = ::_accelCall_generalDelayRestart_" << container->baseName() << "_" << epStr() << ";\n"
+    #if CMK_CUDA != 0
+        << "  structPtr->funcIndex = " << indexName() << "::accel_cuda_func_index__" << epStr() << ";\n"
+    #else
+        << "  structPtr->funcIndex = " << indexName() << "::accel_spe_func_index__" << epStr() << ";\n"
+    #endif
+        << "\n";
+
+    if (numPassedParams > 0) {
+      str << "  // Copy the passed parameters so that the message object can be free'd before the AEM is actually executed\n"
+          << "  //   since keeping messages around for a while is bad for some machine layers\n"
+          << "  AccelCall_" << container->baseName() << "_" << epStr() << "_PassedParams *passedParams = new AccelCall_" << container->baseName() << "_" << epStr() << "_PassedParams;\n";
+      curParam = param;
+      if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+      while (curParam != NULL) {
+        Parameter *p = curParam->param;
+        const char *n = p->getName();
+        const char *t = p->getType()->getBaseName();
+        if (p->isArray()) {
+          str << "  passedParams->" << n << " = new " << t << "[" << p->getArrayLen() << "]; memcpy(passedParams->" << n << ", " << n << ", sizeof(" << t << ") * (" << p->getArrayLen() << "));\n";
+        } else {
+   str << "  passedParams->" << n << " = " << n << ";\n";
+        }
+        curParam = curParam->next;
+      }
+      str << "  structPtr->passedParams = (void*)passedParams;\n\n";
+    } else {
+      str << "  // No passed parameters for this AEM, so set the passedParams pointer to NULL\n"
+          << "  structPtr->passedParams = NULL;\n\n";
+    }
+
+    str << "  // Register this AEM invocation as a delayed invocation with the accelerator manager\n"
+        << "  manager->delayGeneralCall(structPtr);\n"
+        <<" }\n\n";
+
+  #endif  // need to create delayed function calls for this AEM
+
+  ///// The general function for executing the code on the host /////
+
+  str << "// The host version of the AEM used to execute the AEM on the host core\n"
+      << makeDecl("void") << "::_accelCall_general_" << epStr() << "(";
   genAccelFullParamList(str, 1);
   str << ") {\n\n";
 
-  //// DMK - DEBUG
-  //str << "  // DMK - DEBUG\n";
-  //str << "  CkPrintf(\"[DEBUG-ACCEL] :: [PPE] - "
-  //    << makeDecl("void") << "::_accelCall_general_" << epStr()
-  //    << "(...) - Called...\\n\");\n\n";
+  // If accelerators are actually supported in this build of the runtime system, then go ahead and include code
+  //   that allows the host version of the host to interoperate with the device versions of the code.
+  #if (CMK_CUDA != 0) || (CMK_CELL != 0)
 
-  str << (*accelCodeBody);
+    str << "  // Begin timing\n"
+        << "  double __startTime_userCode = CmiWallTimer();\n\n";
 
-  str << "\n\n";
-  str << "  impl_obj->" << (*accelCallbackName) << "();\n";
-  str << "}\n";
+    str << "  // Get a pointer to the accelerator manager\n"
+        << "  AccelManager *manager = AccelManager::getAccelManager();\n\n";
+        // Pull any persistent data associated with the AEM
+ #if CMK_CUDA != 0
+      curParam = accelParam;
+      while (curParam != NULL) {  // For each local parameter
+        Parameter *p = curParam->param;
+        if (p->isArray() && p->isPersist()) {
+          const char *n = p->getName();
+          str << "  // Accel Param: \"" << n << "\" (persist buffer)\n"
+              << "  AccelPersistBuffer *persistBuffer_" << n << " = manager->getPersistBuffer(" << n << ");\n"
+              << "  if (persistBuffer_" << n << " != NULL) {  // NOTE: If there is no persist buffer object, the host copy is up to date\n";
+          // NOTE: If the buffer is write only, its actual contents don't matter, so don't bother pulling
+          if (p->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READWRITE || p->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READONLY) {
+            str << "    persistBuffer_" << n << "->pullFromDevice(); // NOTE: Will only actually pull if the host copy is dirty\n";
+          }
+          str << "  }\n"
+              << "  persistBuffer_" << n << "->markDataAsOnHost(); // NOTE: Not actually dirty yet, but it will be once this function has completed\n"
+              << "\n";
+        }
+        curParam = curParam->next;
+      }
+    #endif // end if CMK_CUDA != 0 (need to process persist buffers)
+  #endif
+
+  // If this is a splittable entry method, create the numSplits loop
+  XStr* splitAmount = getAccelSplitAmount();
+if (splitAmount != NULL) {
+    str << "  // Since this AEM is splittable, determine the number of splits that will be used and create\n"
+        << "  //   a loop that executes the splits serially.\n"
+    #if CMK_CUDA != 0
+        << "  int numSplits = (" << (*splitAmount) << ") >> 8;\n"
+        << "  if (numSplits <= 0) { numSplits = 1; }\n"
+    #else
+        << "  int numSplits = 1;\n"
+    #endif
+        << "  for (int splitIndex = 0; splitIndex < numSplits; splitIndex++) {\n";
+  }
+
+  // Include the function body of the AEM
+  str << "    { /***** START USER CODE (AEM FUNCTION BODY) *****/\n"
+      << (*accelCodeBody)
+      << "\n"
+      << "    } /***** END USER CODE (AEM FUNCTION BODY) *****/\n";
+
+  // If this is a splittable entry method, finish the numSplits loop and include
+  //   a gpu process call for each iteration of the loop
+  if (splitAmount != NULL) {
+    #if CMK_CUDA != 0
+      str << "\n    // Since GPGPUs are supported include a progress call to the Hybrid API between splits so\n"
+          << "    //   that the host core is more responsive to the GPGPU's needs.\n"
+          << "    gpuProgressFn();\n";
+    #endif
+ str << "  }\n";
+  }
+  str << "\n";
+// If accelerators are actually supported in this build of the runtime system, then go ahead and include code
+  //   that allows the host version of the host to interoperate with the device versions of the code.
+  #if (CMK_CUDA != 0) || (CMK_CELL != 0)
+
+    // Push any persistent data associated with the AEM
+    #if CMK_CUDA != 0
+      curParam = accelParam;
+      while (curParam != NULL) {  // For each local parameter
+        Parameter *p = curParam->param;
+        if (p->isArray() && p->isPersist()) {
+          const char *n = p->getName();
+          str << "  // Accel Param: " << n << "\n"
+              << "  if (persistBuffer_" << n << " != NULL) {  // NOTE: If there is no persist buffer object, the host copy is up to date\n";
+          // NOTE: If the buffer is read only, its actual contents don't matter, so don't bother pushing
+          if (p->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READWRITE || p->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_WRITEONLY) {
+            str << "    persistBuffer_" << n << "->pushToDevice(); // NOTE: Will only actually pull if the host copy is dirty\n";
+          }
+          str << "  }\n"
+       //<< "  persistBuffer_" << n << "->markDataAsOnDevice(); // NOTE: Not actually dirty yet, but will be once this function has completed\n"
+              << "\n";
+        }
+        curParam = curParam->next;
+      }
+    #endif
+
+    str << "  // Stop timing\n"
+        << "  double __endTime_userCode = CmiWallTimer();\n\n";
+
+    str << "  // Pass the timing information to the accelerator manager\n"
+    #if CMK_CUDA != 0
+        << "  if (manager != NULL) { manager->userHostCodeTiming(accel_cuda_func_index__" << epStr() << ", __startTime_userCode, __endTime_userCode); }\n"
+    #elif CMK_CELL != 0
+        << "  if (manager != NULL) { manager->userHostCodeTiming(accel_spe_func_index__" << epStr() << ", __startTime_userCode, __endTime_userCode); }\n"
+    #endif
+        << "\n";
+
+  #endif
+
+  str << "  // Finish of the host version of the AEM by immediately calling the callback function\n"
+      << "  impl_obj->" << (*accelCallbackName) << "();\n"
+      << "}\n\n";
+
+
 }
 
 void Entry::genAccelIndexWrapperDecl_spe(XStr& str) {
@@ -1258,7 +1570,7 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
         str << "  dmaList[" << dmaList_curIndex << "].size = ROUNDUP_128("
 	    << "sizeof(" << curParam->param->getType()->getBaseName() << ") * "
             << "(" << curParam->param->getArrayLen() << "));\n"
-  	    << "  dmaList[" << dmaList_curIndex << "].ea = (unsigned int)(" << (*(curParam->param->getAccelInstName())) << ");\n";
+	    << "  dmaList[" << dmaList_curIndex << "].ea = (unsigned int)(" << (*(curParam->param->getAccelInstName())) << ");\n";
         dmaList_curIndex++;
       } else {
         str << "  *((" << curParam->param->getType()->getBaseName() << "*)scalar_buf_offset) = "
@@ -1432,6 +1744,771 @@ int Entry::genAccels_spe_c_funcBodies(XStr& str) {
 
   return 1;
 }
+void Entry::genAccelIndexWrapperDecl_cuda(XStr& str) {
+
+  if (!(isAccel())) { return; }
+
+  // Function to issue work request and callback function (as members of CkIndex_xxxx class)
+  str << "    // AEM : \"" << container->baseName() << "::" << epStr() << "\"\n"
+      << "    static void _accelCall_cuda_" << epStr() << "(";
+  genAccelFullParamList(str, 0);
+  str << ", int numElements, int issueFlag);\n"
+      << "    static void _accelCall_cuda_callback_" << epStr() << "(void* userPtr);\n\n";
+}
+
+void Entry::genAccelIndexWrapperDef_cuda(XStr& str) {
+
+  XStr containerType = container->baseName();
+  ParamList *curParam = NULL;
+
+  if (!(isAccel())) { return; }
+
+  // Precompute the number of scalar parameters
+  int numScalars = 0;
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    if (!(curParam->param->isArray())) { numScalars++; }
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+  while (curParam != NULL) {
+    if (!(curParam->param->isArray())) { numScalars++; }
+    curParam = curParam->next;
+  }
+
+  ///// Generate the kernel callback function /////
+
+  // NOTE: Create a global function that simply calls the member function on the related CkIndex class for this chare class
+  str << "// AEM : \"" << container->baseName() << "::" << epStr() << "\"\n"
+      << "//   A global function that simply calls the CkIndex_xxxx generated callback function\n"
+      << "void _accelCall_cuda_callback_" << containerType << "_" << epStr() << "(void *param, void *msg) {\n"
+      << "  " << container->indexName() << "::_accelCall_cuda_callback_" << epStr() << "(param);\n"
+      << "}\n\n";
+
+  // NOTE: Create the actual function that is executed as the callback when a kernel completes
+str << "// AEM : \"" << container->baseName() << "::" << epStr() << "\"\n"
+      << "//   A callback function that is invoked after the kernel is finished executing\n"
+      << makeDecl("void") << "::_accelCall_cuda_callback_" << epStr() << "(void* userPtr) {\n\n"
+      << "  // Notify the accelerator manager that a kernel has finished\n"
+      << "  markKernelEnd();\n\n"
+      << "  // Grab a pointer to the accelerator manager\n"
+      << "  AccelManager *accelManager = AccelManager::getAccelManager();\n\n"
+      << "  // Grab the pointer to the data structure representing the kernel (AEM batch)\n"
+      << "  AccelCallbackStruct *cbStruct = (AccelCallbackStruct*)userPtr;\n\n"
+      << "  // Check to see if the individual callback functions should be executed (i.e. the batch has not been abandoned)\n"
+      << "  if (cbStruct->abandonFlag == 0) {\n\n"
+      << "    // Note the time that the callbacks are starting to be processed\n"
+      << "    cbStruct->callbackStartTime = CmiWallTimer();\n\n"
+      << "    // Cast the batch data pointer to an int pointer for easy access to the header fields\n"
+      << "    int *__dataPtr_int = (int*)(cbStruct->wrData);\n\n"
+      << "    // Test for the bit patterns written by the kernel to verify that the kernel was actually executed\n"
+      << "    if ((__dataPtr_int[ACCEL_CUDA_KERNEL_BIT_PATTERN_0_INDEX] != ACCEL_CUDA_KERNEL_BIT_PATTERN_0) && \n"
+      << "        (__dataPtr_int[ACCEL_CUDA_KERNEL_BIT_PATTERN_1_INDEX] != ACCEL_CUDA_KERNEL_BIT_PATTERN_1)\n"
+      << "     ) {\n"
+      << "      CkPrintf(\"[ACCEL-ERROR] :: Invalid bit patterns detected in callback for \\\"" << containerType << "_" << epStr() << "\\\" - The kernel may not have executed.\\n\");\n"
+      << "    }\n\n"
+      << "    // Test for an error code being passed back from the device\n"
+      << "    if (__dataPtr_int[ACCEL_CUDA_KERNEL_ERROR_INDEX] != 0) {\n"
+      << "      CkPrintf(\"[ACCEL-ERROR] :: Error code set for \\\"" << containerType << "_" << epStr() << "\\\": error code = %d...\\n\", __dataPtr_int[ACCEL_CUDA_KERNEL_ERROR_INDEX]);\n"
+      << "    }\n\n"
+      << "    // Cast the batch data pointer to a char pointer\n"
+      << "    char *__dataPtr = (char*)(cbStruct->wrData);\n\n"
+      << "    // Create a loop that will iterate through each individual AEM invocation within this batch of invocations\n"
+      << "    for (int i = 0; i < cbStruct->numElements_count; i++) {\n\n"
+      << "      // Get the object and associated data pointers for AEM invocation i\n"
+      << "      " << containerType << "* impl_obj = (" << containerType << "*)(cbStruct->impl_objs[i]);\n"
+      << "      int __dataOffset = __dataPtr_int[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << numScalars << " + i];\n\n";
+
+  // For each scalar, declare the associated variable with its value
+  // NOTE: Declare scalars before arrays since array lengths rely on scalar values
+  int scalarArrayIndex = 0;
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (!(p->isArray())) {
+      str << "      // Passed Parameter (Scalar) : \"" << n << "\"\n"
+          << "      " << t << " " << n << " = ((" << t << "*)(__dataPtr + (__dataPtr_int[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << scalarArrayIndex << "])))[i];\n\n";
+      scalarArrayIndex++;
+    }
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+ while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (!(p->isArray())) {
+      str << "      // Local Parameter (Scalar) : \"" << n << "\"\n"
+          << "      " << t << " " << n << " = ((" << t << "*)(__dataPtr + (__dataPtr_int[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << scalarArrayIndex << "])))[i];\n\n";
+      scalarArrayIndex++;
+    }
+    curParam = curParam->next;
+  }
+
+  // Process the array parameters
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (p->isArray()) {
+      str << "      // Passed Parameter (Array) : " << n << "\n"
+          << "      if (__dataOffset % sizeof(" << t << ") != 0) {\n"
+          << "        __dataOffset += (sizeof(" << t << ") - (__dataOffset % sizeof(" << t << ")));\n"
+          << "      }\n"
+          << "      __dataOffset += sizeof(" << t << ") * (" << p->getArrayLen() << ");\n\n";
+    }
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (p->isArray()) {
+      if (p->isPersist()) {
+        str << "      // Local Parameter (Persist Array) : \"" << n << "\"\n"
+            << "      if (__dataOffset % sizeof(void*) != 0) {\n"
+            << "        __dataOffset += (sizeof(void*) - (__dataOffset % sizeof(void*)));\n"
+            << "      }\n"
+            << "      __dataOffset += sizeof(void*);\n\n";
+      } else if (p->isShared()) {
+        str << "      // Local Parameter (Shared Array) : \"" << n << "\"\n"
+            << "      if (__dataOffset % sizeof(int) != 0) {  // Alignment\n"
+            << "        __dataOffset += (sizeof(int) - (__dataOffset % sizeof(int)));\n"
+            << "      }\n"
+            << "      " << t << " *__" << n << " = NULL;  // NOTE: Will be present on first reference, should remain NULL for all following references so as not to copy multiple times\n"
+            << "      int __dataSkip_" << n << " = ((int*)(__dataPtr + __dataOffset))[1];\n"
+            << "      __dataOffset += (2 * sizeof(int));\n"
+            << "      if (__dataSkip_" << n << " > 0) {  // The actual data is included here\n"
+            << "        if (__dataOffset % sizeof(" << t << ") != 0) {\n"
+            << "          __dataOffset += (sizeof(" << t << ") - (__dataOffset % sizeof(" << t << ")));\n"
+            << "        }\n"
+            << "        __" << n << " = (" << t << "*)(__dataPtr + __dataOffset);\n"
+            << "      }\n"
+            << "      __dataOffset += __dataSkip_" << n << ";\n\n";
+ } else {
+        str << "      // Local Parameter (Array) : \"" << n << "\"\n"
+            << "      if (__dataOffset % sizeof(" << t << ") != 0) {  // Alignment\n"
+            << "        __dataOffset += (sizeof(" << t << ") - (__dataOffset % sizeof(" << t << ")));\n"
+            << "      }\n"
+            << "      " << t << " *__" << n << " = (" << t << "*)(__dataPtr + __dataOffset);\n"
+            << "      __dataOffset += sizeof(" << t << ") * (" << p->getArrayLen() << ");\n\n";
+      }
+    }
+    curParam = curParam->next;
+  }
+
+  // Copy the data from the kernel buffer in to the chare's memory
+  // NOTE: Remote parameters are read-only by definition, so skip them
+  str << "      // Copy back the data that actually requires copying back into the object\n";
+  curParam = accelParam;
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if ((p->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READWRITE) ||
+        (p->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_WRITEONLY)
+       ) {
+      if (p->isArray()) {
+        if (!p->isPersist()) {
+          if (p->isShared()) {
+            str << "      if (__" << n << " != NULL) {\n  ";  // NOTE: Extra spaces to indent next line
+          }
+          str << "      memcpy((void*)(" << (*(p->getAccelInstName())) << "), (void*)(__" << n << "), sizeof(" << t << ") * (" << p->getArrayLen() << "));\n";
+          if (p->isShared()) {
+            str << "      }\n";
+          }
+        }
+      } else {
+        str << "      " << (*(p->getAccelInstName())) << " = " << n << ";\n";
+      }
+    }
+
+    curParam = curParam->next;
+  }
+  str << "\n";
+
+  str << "      // Call the callback function on the object associated with this AEM invocation\n"
+      << "      impl_obj->" << (*accelCallbackName) << "();\n\n"
+      << "    } // end for (i < cbStruct->numElements_count)\n\n"
+      << "    // End timing and submit user events related to this batch of AEMs\n"
+      << "    double callbackEndTime = CmiWallTimer();\n"
+      << "    int userEventIndex = 54718 + (3 * " << indexName() << "::accel_cuda_func_index__" << epStr() << ");\n"
+      << "    // traceUserBracketEvent(userEventIndex, cbStruct->contribStartTime, cbStruct->issueTime);\n"
+      << "    traceUserBracketEvent(userEventIndex + 1, cbStruct->issueTime, cbStruct->callbackStartTime);\n"
+      << "    traceUserBracketEvent(userEventIndex + 2, cbStruct->callbackStartTime, callbackEndTime);\n\n"
+      << "    // Adjust the IDLE time tracking in the AccelManager\n"
+      << "    if (accelManager != NULL) { accelManager->adjustCallbackTime(callbackEndTime - cbStruct->callbackStartTime); }\n\n"
+      << "  } else { // else if (cbStruct->abandonFlag != 0)\n\n"
+      << "    // Notify the accelerator manager that an abandoned batch has completed (record keeping)\n"
+ << "    accelManager->notifyAbandonedRequestCompletion(cbStruct);\n\n"
+      << "  } // end if (cbStruct->abandonFlag != 0)\n\n"
+      << "  // Free the memory associated with the callback structure\n"
+      << "  kernelCleanup(cbStruct->wr, cbStruct->di);\n"
+      #if CMK_CUDA!= 0
+        << "  hapi_poolFree(cbStruct->wrData);\n"
+      #else
+        << "  delete [] ((char*)(cbStruct->wrData));\n"
+      #endif
+      << "  cbStruct->wrData = NULL;\n"
+      << "  if (accelManager != NULL) { accelManager->freeAccelCallbackStruct(cbStruct); }\n"
+      << "}\n\n";
+
+  ///// Generate the function to issue work request /////
+
+  str << "// AEM : \"" << container->baseName() << "::" << epStr() << "\"\n"
+      << "//   A function that batches and issues AEMs to the GPGPU device via the accelerator manager\n"
+      << makeDecl("void") << "::_accelCall_cuda_" << epStr() << "(";
+  genAccelFullParamList(str, 0);  // NOTE: This will always output at least one parameter (impl_obj)
+  str << ", int numElements, int issueFlag) {\n\n"
+      << "  // Get a pointer to the accelerator manager for use within this function\n"
+      << "  AccelManager *accelManager = AccelManager::getAccelManager();\n\n";
+
+  // For splittable AEMs, get the number of splits and set a splitMultiplier for later use
+  //   in this generation code
+  XStr *numSplitsStr = getAccelSplitAmount();
+  int splitMultiplier = 1;
+  if (numSplitsStr != NULL) {
+    str << "  // Since this is a splittable AEM, get the number of splits indicated by the user\n"
+        << "  int numSplits = (int)(" << numSplitsStr->get_string() << ");\n\n";
+    splitMultiplier = 2;
+  }
+
+  str << "  // Get the callback structure from the accelerator manager (used for batch related info)\n"
+      << "  AccelCallbackStruct *cbStruct = accelManager->getCurrentCallbackStruct(accel_cuda_func_index__" << epStr() << ");\n"
+      << "  if (cbStruct == NULL || cbStruct->issueTime > 0.0) {    // If no current batch or last batch was issued\n"
+      << "    cbStruct = accelManager->allocAccelCallbackStruct();  //   then get and initialize a new data structure\n"
+      << "    cbStruct->numElements = numElements;\n"
+      << "    cbStruct->funcIndex = accel_cuda_func_index__" << epStr() << ";\n"
+      << "    cbStruct->callbackPtr = (void*)(new CkCallback(_accelCall_cuda_callback_" << containerType << "_" << epStr() << ", cbStruct));\n"
+      << "    cbStruct->numSplitsSubArray = NULL;\n"
+      << "    accelManager->setCurrentCallbackStruct(accel_cuda_func_index__" << epStr() << ", cbStruct);\n"
+      << "  }\n\n"
+
+
+      << "  // If this is the first element being included in the batch, note the time.  Otherwise, verify\n"
+      << "  //   the number of total local elements to verify that load balancing did not occur during the\n"
+      << "  //   the batching process.\n"
+      << "  if (cbStruct->numElements_count == 0) {\n"
+      << "    cbStruct->contribStartTime = CmiWallTimer();\n"
+      << "  } else {\n"
+      << "    if (cbStruct->numElements != numElements) {\n"
+      << "      CkPrintf(\"[ACCEL-ERROR] :: PE %d :: (generated host code) - numElements mismatch detected for \\\"" << container->baseName() << "::" << epStr() << "\\\"! An element may have migrated during batching period. (%d vs %d)\\n\", CkMyPe(), cbStruct->numElements, numElements);\n"
+      << "    }\n"
+      << "  }\n\n"
+      << "  // Record this impl_obj pointer\n"
+ << "  cbStruct->impl_objs[cbStruct->numElements_count] = impl_obj;\n\n"
+      << "  ///// Calculate the total size of all the data associated with this entry method /////\n\n"
+      << "  int dataSize = 0;\n\n";
+
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (p->isArray()) {
+      str << "  // Passed Parameter (Array) : " << n << "\n"
+          << "  int dataSize_" << n << "_align = 0;\n"
+          << "  if (dataSize % sizeof(" << t << ") != 0) {  // If not aligned, add some bytes for alignment\n"
+          << "    dataSize_" << n << "_align = (sizeof(" << t << ") - (dataSize % sizeof(" << t << ")));\n"
+          << "  }\n"
+          << "  int dataSize_" << n << " = sizeof(" << t << ") * (" << p->getArrayLen() << ");  // Data size associated with the parameter\n"
+          << "  dataSize += (dataSize_" << n << " + dataSize_" << n << "_align);\n\n";
+    }
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (p->isArray()) {
+      if (p->isPersist()) {
+        str << "  // Local Parameter (Persist Array): " << n << "\n"
+            << "  int dataSize_" << n << "_align = 0;\n"
+            << "  if (dataSize % sizeof(void*) != 0) {  // If not aligned, add some bytes for alignment\n"
+            << "    dataSize_" << n << "_align = (sizeof(void*) - (dataSize % sizeof(void*)));\n"
+            << "  }\n"
+            << "  int dataSize_" << n << " = sizeof(void*);  // Include enough room for a device pointer\n"
+            << "  dataSize += (dataSize_" << n << " + dataSize_" << n << "_align);\n\n";
+      } else if (p->isShared()) {
+        str << "  // Local Parameter (Shared Array): " << n << "\n"
+            << "  int sharedOffset_" << n << " = cbStruct->sharedLookup->lookupOffset(" << n << ", " << p->getArrayLen() << "); // Lookup to see if data has already been included\n"
+            << "  int dataSize_" << n << "_align = 0;          // An int[2] is always included\n"
+            << "  int dataSize_" << n << " = 2 * sizeof(int);  //   (offset, skip amount)\n"
+            << "  int dataSize_" << n << "_data_align = 0;     // Bytes associated with actual data\n"
+            << "  int dataSize_" << n << "_data = 0;\n"
+            << "  if (dataSize % sizeof(int) != 0) {  // Align for int[2]\n"
+            << "    dataSize_" << n << "_align = (sizeof(int) - (dataSize % sizeof(int)));\n"
+            << "  }\n"
+            << "  dataSize += (dataSize_" << n << " + dataSize_" << n << "_align);\n"
+            << "  if (sharedOffset_" << n << " < 0) {  // If data hasn't been included so far, include it now\n"
+            << "    if (dataSize % sizeof(" << t << ") != 0) {  // Alignment\n"
+            << "      dataSize_" << n << "_data_align = (sizeof(" << t << ") - (dataSize % sizeof(" << t << ")));\n"
+            << "    }\n"
+            << "    dataSize_" << n << "_data = sizeof(" << t << ") * (" << p->getArrayLen() << ");\n"
+            << "  }\n"
+            << "  dataSize += (dataSize_" << n << "_data_align + dataSize_" << n << "_data);\n\n";
+      } else {
+        str << "  // Local Parameter (Array): " << n << "\n"
+     << "  int dataSize_" << n << "_align = 0;\n"
+            << "  if (dataSize % sizeof(" << t << ") != 0) {  // Alignment\n"
+            << "    dataSize_" << n << "_align = (sizeof(" << t << ") - (dataSize % sizeof(" << t << ")));\n"
+            << "  }\n"
+            << "  int dataSize_" << n << " = sizeof(" << t << ") * (" << p->getArrayLen() << ");\n"
+            << "  dataSize += (dataSize_" << n << " + dataSize_" << n << "_align);\n\n";
+      }
+    }
+    curParam = curParam->next;
+  }
+
+  str << "  // Enforce alignment for the start of individual element records (push forward offset so\n"
+      << "  //   next element will be aligned and padding is included at the end so DMA transfers lengths\n"
+      << "  //   are multiples of cache line sizes via setting ACCEL_CUDA_ELEMENT_ALIGN for performance)\n"
+      << "  if (dataSize % ACCEL_CUDA_ELEMENT_ALIGN != 0) { dataSize += (ACCEL_CUDA_ELEMENT_ALIGN - (dataSize % ACCEL_CUDA_ELEMENT_ALIGN)); }\n\n"
+      << "  ///// Grow the current buffer if needed /////\n\n"
+      << "  if (cbStruct->wrDataLen + dataSize > cbStruct->wrDataLen_max) {\n\n"
+      << "    // Calculate the number of elements total (setSize) and the number of elements remaining to be batched\n"
+      << "    int setSize = ((numElements < ACCEL_AEMs_PER_GPU_KERNEL) ? (numElements) : (ACCEL_AEMs_PER_GPU_KERNEL));\n"
+      << "    int elementsRemaining = setSize - cbStruct->numElements_count + 1;\n\n"
+      << "    // Try to estimate the amount of memory that will be required by the batch\n"
+      << "    int newWRDataLen_max = (cbStruct->wrDataLen + (dataSize * elementsRemaining) + (10 * 1024));\n"
+      << "    if (cbStruct->wrData == NULL) { // If this is the first element, include header and scalar array sizes\n"
+      << "      newWRDataLen_max += (sizeof(int) * (ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << numScalars << " + (" << splitMultiplier << " * setSize))); // header + scalar array offsets + element data offsets [ + individual numSplits ]\n";
+
+  // Add memory for each of the scalar arrays (+ 128 byte aligned = 32 4-byte words... based on banked shared memory hardware)
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (!(p->isArray())) {
+      str << "      newWRDataLen_max += (128 + (setSize * sizeof(" << t << ")));  // Passed Parameter (Scalar) : \"" << n << "\"\n";
+    }
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (!(p->isArray())) {
+      str << "      newWRDataLen_max += (128 + (setSize * sizeof(" << t << ")));  // Local Parameter (Scalar) : \"" << n << "\"\n";
+    }
+     curParam = curParam->next;
+  }
+
+  str << "    }\n"
+      << "    newWRDataLen_max += 1024 - (newWRDataLen_max % 1024); // enforce 1K multiple\n\n"
+      << "    // Allocate the batch data buffer\n"
+      #if CMK_CUDA != 0
+      << "    void *newWRData = hapi_poolMalloc(newWRDataLen_max);\n"
+#else
+        << "    void *newWRData = (void*)(new char[newWRDataLen_max]);\n"
+      #endif
+      << "    if (newWRData == NULL) { CkPrintf(\"[ERROR] :: Unable to allocate memory for newWRData...\\n\"); }\n\n"
+      << "    // If there was data previously, copy it into the new buffer and delete the old batch data buffer\n"
+      << "    if (cbStruct->wrData != NULL) {\n"
+      << " CkPrintf(\" memcpy \\n\");\n\n"
+      << "      memcpy(newWRData, cbStruct->wrData, cbStruct->wrDataLen);\n"
+      #if CMK_CUDA != 0
+        << "      hapi_poolFree(cbStruct->wrData);\n"
+      #else
+        << "      delete [] (char*)(cbStruct->wrData);\n"
+      #endif
+      << "    } else { // Otherwise, this is the first buffer being allocated, so do some setup\n"
+      << "      int scalarArrayOffset = sizeof(int) * (ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << numScalars << " + (" << splitMultiplier << " * setSize));\n";
+
+  // Add memory for each of the scalar arrays (128 byte aligned for performance)
+  scalarArrayIndex = 0;
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (!(p->isArray())) {
+      str << "      // Passed Parameter (Scalar) : \"" << n << "\"\n"
+          << "       if (scalarArrayOffset % 128 != 0) { scalarArrayOffset += (128 - (scalarArrayOffset % 128)); }\n"
+          << "       ((int*)newWRData)[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << scalarArrayIndex << "] = scalarArrayOffset;\n"
+          << "       scalarArrayOffset += sizeof(" << t << ") * setSize;\n";
+      scalarArrayIndex++;
+    }
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (!(p->isArray())) {
+      str << "      // Local Parameter (Scalar) : \"" << n << "\"\n"
+          << "       if (scalarArrayOffset % 128 != 0) { scalarArrayOffset += (128 - (scalarArrayOffset % 128)); }\n"
+          << "       ((int*)newWRData)[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << scalarArrayIndex << "] = scalarArrayOffset;\n"
+          << "       scalarArrayOffset += sizeof(" << t << ") * setSize;\n";
+      scalarArrayIndex++;
+    }
+    curParam = curParam->next;
+  }
+
+  str << "      // After the scalar arrays have been included, align for the first element\n"
+      << "       if (scalarArrayOffset % ACCEL_CUDA_ELEMENT_ALIGN != 0) { scalarArrayOffset += (ACCEL_CUDA_ELEMENT_ALIGN - (scalarArrayOffset % ACCEL_CUDA_ELEMENT_ALIGN)); }\n"
+      << "      cbStruct->wrDataLen = scalarArrayOffset;  // Record the current offset\n";
+
+  if (numSplitsStr != NULL) {
+    str << "      ((int*)newWRData)[ACCEL_CUDA_KERNEL_NUM_SPLITS] = numSplits;  // This is the first element, so all splits are equal in size so far (this value > 0)\n";
+  } else {
+ str << "      ((int*)newWRData)[ACCEL_CUDA_KERNEL_NUM_SPLITS] = 1;  // There are no splits, so numSplits = 1\n";
+  }
+
+  str << "      ((int*)newWRData)[ACCEL_CUDA_KERNEL_SET_SIZE] = setSize;  // Indicates the maximum number of elements this batch data buffer can accommodate (not the actual number of elements)\n"
+      << "    }\n"
+      << "    cbStruct->wrData = newWRData;\n"
+      << "    cbStruct->wrDataLen_max = newWRDataLen_max;\n"
+      << "  }\n\n"
+      << "  // Grab the setSize for this batch (maximum number of elements that can be included in this batch)\n"
+      << "  const int setSize = ((int*)(cbStruct->wrData))[ACCEL_CUDA_KERNEL_SET_SIZE];\n\n"
+      << "  // Record the start of this element's data\n"
+      << "  ((int*)(cbStruct->wrData))[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << numScalars << " + cbStruct->numElements_count] = cbStruct->wrDataLen;\n\n";
+
+  if (numSplitsStr != NULL) {
+    str << "  // Record the number of splits for this element\n"
+        << "  int *numSplitsSubArray = ((int*)(cbStruct->wrData)) + (ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << numScalars << " + setSize);\n"
+        << "  cbStruct->numSplitsSubArray = numSplitsSubArray;\n"
+        << "  numSplitsSubArray[cbStruct->numElements_count] = numSplits;\n"
+        << "  if (numSplitsSubArray[0] != numSplits) { ((int*)(cbStruct->wrData))[ACCEL_CUDA_KERNEL_NUM_SPLITS] = -1; }  // Flag if there are unequal numSplits values across the elements\n\n";
+  }
+
+  str << "  ///// Serialize the parameters (remote and local) into the batch data buffer /////\n\n"
+      << "  const char *dataBasePtr = (char*)(cbStruct->wrData);\n"
+      << "  const int *dataBasePtr_int = (int*)dataBasePtr;\n"
+      << "  char *curDataPtr = ((char*)dataBasePtr) + cbStruct->wrDataLen;\n\n";
+
+  scalarArrayIndex = 0;
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (p->isArray()) {
+      str << "  // Passed Parameter (Array) : " << n << "\n"
+          << "  curDataPtr += dataSize_" << n << "_align;\n"
+          << "  memcpy((void*)curDataPtr, " << n << ", dataSize_" << n << ");\n"
+          << "  curDataPtr += dataSize_" << n << ";\n\n";
+    } else {
+      str << "  // Passed Parameter (Scalar) : " << n << "\n"
+          << "  ((" << t << "*)(dataBasePtr + (dataBasePtr_int[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << scalarArrayIndex << "])))[cbStruct->numElements_count] = " << n << ";\n\n";
+      scalarArrayIndex++;
+    }
+    curParam = curParam->next;
+  }
+curParam = accelParam;
+  while (curParam != NULL) {
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+    if (p->isArray()) {
+      if (p->isPersist()) {
+        str << "  // Local Parameter (Persist Array) : " << n << "\n"
+            << "  curDataPtr += dataSize_" << n << "_align;  // Alignment\n"
+            << "  AccelPersistBuffer *persistBuffer_" << n << " = accelManager->getPersistBuffer(" << n << ");\n"
+            << "  if (persistBuffer_" << n << " == NULL) {\n"
+            << "    int persistDataSize = sizeof(" << t << ") * (" << p->getArrayLen() << ");\n"
+            << "    persistBuffer_" << n << " = accelManager->newPersistBuffer(impl_obj, " << n << ", persistDataSize);\n"
+            << "    if (persistBuffer_" << n << " == NULL) { CkPrintf(\"[ACCEL-ERROR] :: PE %d :: (generated host code) - Unable to create persist buffer pointer for persist local parameter \\\"" << n << "\\\".\\n\", CkMyPe()); }\n"
+            << "  } else {\n"
+            << "    if (persistBuffer_" << n << "->getObjectPtr() != impl_obj) { CkPrintf(\"[ACCEL-ERROR] :: PE %d :: (generated host code) - Pointer mismatch detected (persist buffer object pointer != impl_obj) for \\\"" << n << "\\\".\\n\", CkMyPe()); }\n"
+            << "  }\n"
+            << "  ((void**)curDataPtr)[0] = (void*)(persistBuffer_" << n << "->getDeviceBuffer());\n";
+        if (p->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READWRITE || p->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READONLY) {  // Don't need to push writeonly since actual contents aren't required
+          str << "  persistBuffer_" << n << "->pushToDevice();  // NOTE: Will only actually push if device copy is dirty (e.g. if the previous invocation of this AEM was on the host)\n";
+        }
+        str << "  persistBuffer_" << n << "->markDataAsOnDevice();\n"
+            << "  curDataPtr += dataSize_" << n << ";\n\n";
+      } else if (p->isShared()) {
+        str << "  // Local Parameter (Shared Array) : " << n << "\n"
+            << "  curDataPtr += dataSize_" << n << "_align; // Alignment of int[2]\n"
+            << "  if (sharedOffset_" << n << " >= 0) {\n"
+            << "    *(((int*)curDataPtr) + 0) = sharedOffset_" << n << ";  // Offset within batch data buffer\n"
+            << "    *(((int*)curDataPtr) + 1) = 0;                         // Skip amount (> 0 means data is included here)\n"
+            << "  } else {\n"
+            << "    *(((int*)curDataPtr) + 0) = (curDataPtr - dataBasePtr) + dataSize_" << n << " + dataSize_" << n << "_data_align;\n"
+            << "    *(((int*)curDataPtr) + 1) = dataSize_" << n << "_data_align + dataSize_" << n << "_data;\n"
+            << "  }\n"
+            << "  curDataPtr += dataSize_" << n << ";\n"
+            << "  if (sharedOffset_" << n << " < 0) {  // Need to include the data here\n"
+            << "    curDataPtr += dataSize_" << n << "_data_align;  // Alignment of data\n"
+            << "    int sharedOffset = curDataPtr - dataBasePtr;    // Offset of data within batch data buffer\n"
+            << "    cbStruct->sharedLookup->insertOffset(" << n << ", " << p->getArrayLen() << ", sharedOffset);\n"
+            << "    memcpy((void*)curDataPtr, " << n << ", dataSize_" << n << "_data);\n"
+            << "    curDataPtr += dataSize_" << n << "_data;\n"
+            << "  }\n\n";
+      }
+else {
+        str << "  // Local Parameter (Array) : " << n << "\n"
+            << "  curDataPtr += dataSize_" << n << "_align;  // Alignment\n";
+        if (p->getAccelBufferType() != Parameter::ACCEL_BUFFER_TYPE_WRITEONLY) {
+          str << "  memcpy((void*)curDataPtr, " << n << ", dataSize_" << n << ");  // Copy the actual data\n";
+        }
+        str << "  curDataPtr += dataSize_" << n << ";\n\n";
+      }
+    } else {
+      str << "  // Local Parameter (Scalar) : " << n << "\n"
+          << "  ((" << t << "*)(dataBasePtr + (dataBasePtr_int[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << scalarArrayIndex << "])))[cbStruct->numElements_count] = " << n << ";\n\n";
+      scalarArrayIndex++;
+    }
+    curParam = curParam->next;
+  }
+
+
+  str << "  // Advance the offset to the start of the next element's data and count this element\n"
+      << "  cbStruct->wrDataLen += dataSize;\n"
+      << "  (cbStruct->numElements_count)++;\n\n"
+      << "  // Update the time of the last contribute for this batch\n"
+      << "  accelManager->updateLastContribTime(cbStruct);\n\n"
+      << "  // If the decision returned by the accelerator manager indicates that the batch should be\n"
+      << "  //   issued (or if the maximum batch size has been reached), then issue the batch\n"
+      << "  if (issueFlag != 0 || cbStruct->numElements_count >= setSize || cbStruct->numElements_count >= ACCEL_AEMs_PER_GPU_KERNEL) {\n"
+      << "    accelManager->submitPendingRequest(cbStruct);\n"
+      << "  }\n";
+
+ str << "}\n";
+}
+
+int Entry::genAccels_cuda_c_funcBodies(XStr& str) {
+
+  XStr containerType = container->baseName();
+  ParamList *curParam = NULL;
+
+  // Make sure this is an accelerated entry method (just return if not)
+  //if (!(isAccel() && isTriggered())) { return 0; }
+  if (!(isAccel())) { return 0; }
+
+  // Precompute the number of scalar parameters
+  int numScalars = 0;
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    if (!(curParam->param->isArray())) { numScalars++; }
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+  while (curParam != NULL) {
+    if (!(curParam->param->isArray())) { numScalars++; }
+    curParam = curParam->next;
+  }
+
+  // Declare the cuda kernel
+  str << "// AEM : \"" << container->baseName() << "::" << epStr() << "\"'s kernel function (executed on the GPGPU device)\n"
+      << "__global__ void __cudaFuncKernel__" << containerType << "__" << epStr() << "(void *__wrData, int __totalThreads) {\n\n" //, int __splitAmount) {\n\n"
+      << "  // Calculate the thread index (unique value from 0 to numThreads - 1) for each GPGPU thread\n"
+      << "  int __threadIndex = (blockIdx.x * blockDim.x) + threadIdx.x;\n\n"
+      << "  // If extra threads were included as part of the block and grid calculations, have the extra threads\n"
+ << "  if (__threadIndex < __totalThreads) {\n\n";
+
+  // Declare __elementIndex, along with splitIndex and numSplits if needed
+  // NOTE: To save the registers, only declare the last two if actually splittable
+  // NOTE: Declare multiple variables incase user code overwrites something needed (e.g. numSplits
+  //   used by user code, __splitAmount used by generated code)
+  if (getAccelSplitAmount() != NULL) {
+    str << "    // Yeah, this function is splittable!  Way to go bro.  Let's do this...\n"
+        << "    // NOTE: numSplits < 0 indicates that each element can have a different number of splits.\n"
+        << "    //       numSplits > 0 indicates all split amounts matched during the batching process.\n"
+        << "    int numSplits = ((int*)__wrData)[ACCEL_CUDA_KERNEL_NUM_SPLITS];\n"
+        << "    int __elementIndex = -1;\n"
+        << "    int splitIndex = -1;\n"
+        << "    if (numSplits < 0) { // Need to count because each element has a different number of splits\n"
+        << "      int __setSize = ((int*)__wrData)[ACCEL_CUDA_KERNEL_SET_SIZE];\n"
+        << "      int *numSplitsSubArray = ((int*)__wrData) + (ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << numScalars << " + __setSize);\n"
+        << "      __elementIndex = 0;\n"
+        << "      numSplits = __threadIndex; // Borrow numSplits variable to count down the threads\n"
+        << "      for (int i = 0; i < __setSize; i++) {\n"
+        << "        if (numSplits < numSplitsSubArray[i]) { break; }\n"
+        << "        __elementIndex += 1;\n"
+        << "        numSplits -= numSplitsSubArray[i];\n"
+        << "      }\n"
+        << "      splitIndex = numSplits;\n"
+        << "      numSplits = numSplitsSubArray[__elementIndex];\n"
+        << "      // NOTE: If __threadIndex >= __totalThreads, splitIndex and numSplits will be invalid, but will go unused\n"
+        << "    } else { // All elements have the same splits amount, so take advantage to avoid looping\n"
+        << "      __elementIndex = __threadIndex / numSplits;\n"
+        << "      splitIndex = __threadIndex % numSplits;\n"
+  << "    }\n\n";
+  } else {
+    str << "    int __elementIndex = __threadIndex;\n\n";
+#if 0
+    printf("[INFO] :: A non-splittable accelerated entry method was detected (\"%s::%s\")\n"
+           "[INFO] ::   Consider making the AEM \"splittable\" for better performance.\n",
+           *(container->baseName()), *(epStr())
+          );
+#endif
+  }
+
+  str << "    // Lookup the data offset for this element (start of the element's streamed parameters)\n"
+      << "    int __dataOffset = ((int*)__wrData)[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << numScalars << " + __elementIndex];\n\n";
+
+  // Create the parameters by name
+  int scalarArrayIndex = 0;
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+
+    str << "    // Passed Parameter: " << n << "\n";
+if (p->isArray()) {
+      str << "    if (__dataOffset % sizeof(" << t << ") != 0) { __dataOffset += sizeof(" << t << ") - (__dataOffset % sizeof(" << t << ")); }\n"
+          << "    register " << t << " *" << n << " = (" << t << "*)(((char*)__wrData) + __dataOffset);\n"
+          << "    __dataOffset += sizeof(" << t << ") * (" << p->getArrayLen() << ");\n\n";
+    } else {
+      str << "    register " << t << " &" << n << " = ((" << t << "*)(((char*)__wrData) + ((int*)__wrData)[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << scalarArrayIndex << "]))[__elementIndex];\n\n";
+      scalarArrayIndex++;
+    }
+
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+  while (curParam != NULL) {
+
+    Parameter *p = curParam->param;
+    const char *n = p->getName();
+    const char *t = p->getType()->getBaseName();
+
+    str << "    // Local Parameter: " << n << "\n";
+                                                          if (p->isArray()) {
+      if (p->isPersist()) {
+        str << "    if (__dataOffset % sizeof(void*) != 0) { __dataOffset += sizeof(void*) - (__dataOffset % sizeof(void*)); }\n"
+            << "    register " << t << " *" << n << " = ((" << t << "**)(((char*)__wrData) + __dataOffset))[0];\n"
+            << "    __dataOffset += sizeof(void*);\n\n";
+      } else if (p->isShared()) {
+        str << "    if (__dataOffset % sizeof(int) != 0) { __dataOffset += sizeof(int) - (__dataOffset % sizeof(int)); }\n"
+            << "    int __" << n << "_offset = ((int*)(((char*)__wrData) + __dataOffset))[0];\n"
+            << "    int __" << n << "_skip = ((int*)(((char*)__wrData) + __dataOffset))[1];\n"
+            << "    register " << t << " *" << n << " = (" << t << "*)(((char*)__wrData) + __" << n << "_offset);\n"
+            << "    __dataOffset += (2 * sizeof(int)) + __" << n << "_skip;\n\n";
+      } else {
+        str << "    if (__dataOffset % sizeof(" << t << ") != 0) { __dataOffset += sizeof(" << t << ") - (__dataOffset % sizeof(" << t << ")); }\n"
+            << "    register " << t << " *" << n << " = (" << t << "*)(((char*)__wrData) + __dataOffset);\n"
+            << "    __dataOffset += sizeof(" << t << ") * (" << p->getArrayLen() << ");\n\n";
+      }
+    } else {
+      str << "    register " << t << " &" << n << " = ((" << t << "*)(((char*)__wrData) + ((int*)__wrData)[ACCEL_CUDA_TRIGGERED_BUFFER_HEADER_SIZE + " << scalarArrayIndex << "]))[__elementIndex];\n\n";
+      scalarArrayIndex++;
+    }
+
+    curParam = curParam->next;
+  }
+// Include the function body (create a new scope for it so any variables we need to declare aren't overwritten)
+  str  << "    // Include the function body of the AEM\n"
+  //     <<"    printf(\"A[63]=\t %f \t B[63]=  %f  )\\n\", A[63], B[63]);\n"
+       << "    {\n"
+       << "      /********** Start User Code **********/\n"
+       << accelCodeBody->get_string()
+       << "      /********** End User Code **********/\n"
+       << "    }\n\n";
+
+  str << "  } // end if (__threadIndex < __totalThreads)\n\n";
+// Write the bit patterns
+  str << "  // Write out the header bit patterns (different thread for each pattern; host will check for these to ensure the kernel executed)\n"
+      << "  ((int*)__wrData)[ACCEL_CUDA_KERNEL_BIT_PATTERN_0_INDEX] = ACCEL_CUDA_KERNEL_BIT_PATTERN_0; \n"
+      << "  ((int*)__wrData)[ACCEL_CUDA_KERNEL_BIT_PATTERN_1_INDEX] = ACCEL_CUDA_KERNEL_BIT_PATTERN_1; \n";
+
+  str << "}\n\n";
+
+  XStr *threadsPerBlock = getCudaManualThreadsPerBlock();
+
+  // Create a info message if threadsPerBlock is not set (which can be removed once CUDA error checking is
+  //   reliable and doesn't cause further issues once one error occurs).
+  // DMK - NOTE | TODO | FIXME - The CUDA error reporting mechanism is used by the generated code (below) to test
+  //   various threads-per-block values.  However, when using the generated code, we noticed that a success status
+  //   was sometimes read from the stream even though the kernel itself had failed to execute.  This usually
+  //   happened if resources where just below the maximum available (e.g. using 98% of the physical registers).
+  //   So, for now, I'm including this error message until the generated code is fixed and/or the CUDA error
+  //   reporting mechanism is known to be 100% reliable.
+#if 0
+  if (threadsPerBlock == NULL) {
+    printf("[INFO] :: An accelerated entry method that does not use \"threadsperblock\" was detected (\"%s::%s\")\n"
+  "[INFO] ::   Consider specifying the number of threads per block to use.  Otherwise, code relying on\n"
+           "[INFO] ::   the CUDA error mechanism will be used.  At the time this message was written, the CUDA error\n"
+           "[INFO] ::   mechanism wasn't completely reliable, resulting in the generated code failing in some cases.\n",
+           *(container->baseName()), *(epStr())
+          );
+  }
+
+#endif
+  // Declare the host side of the cuda kernel (launch location)
+  str << "// AEM : \"" << container->baseName() << "::" << epStr() << "\"\n"
+      << "// Declare the host side function that actually launches the kernel (called by kernelSelect function)\n"
+      << "void __cudaFuncHost__" << containerType << "__" << epStr() << "(workRequest *wr) {\n\n"
+
+      << "  // Declare a static variable that keeps track of how many threads to use per block\n"
+      << "  // DMK - NOTE | TODO | FIXME - This mechanism is not SMP-safe (use of static variable)\n"
+      << "  static int discThreadsPerSM = " << ((threadsPerBlock == NULL) ? ("-1") : (*threadsPerBlock)) << ";\n\n"
+
+      << "  // Read the total number of threads that should be used for this kernel execution\n"
+      << "  int totalThreads = wr->dimBlock.x;\n\n"
+
+      << "  // If the number of threads to use has not been discovered, discover it now\n"
+      << "  if (discThreadsPerSM == -1) {\n\n"
+
+      << "    int maxThreadsPerSM = 256;\n"
+      << "    int threadsPerWarp = 32;\n"
+      << "    int threadsPerBlock = ((maxThreadsPerSM < totalThreads) ? (maxThreadsPerSM) : (totalThreads));\n"
+      << "    if (threadsPerBlock % threadsPerWarp != 0) { threadsPerBlock += threadsPerWarp - (threadsPerBlock % threadsPerWarp); }\n"
+ << "    int numBlocks = -1;\n\n"
+
+      << "    // Create a loop that tests different threadsPerBlock values until a successful kernel launch occurs\n"
+      << "    cudaError_t cudaErrorCode;\n"
+      << "    for (; threadsPerBlock > 0; threadsPerBlock -= threadsPerWarp) {\n\n"
+      << "      // Calculate the block and grid sizes based on threadsPerBlock\n"
+      << "      discThreadsPerSM = threadsPerBlock;\n"
+      << "      numBlocks = (totalThreads / threadsPerBlock) + ((totalThreads % threadsPerBlock) ? (1) : (0));\n"
+      << "      wr->dimGrid.x = numBlocks;\n"
+      << "      wr->dimBlock.x = threadsPerBlock;\n\n"
+      << "      // Try to issue the kernel, checking any error code returned\n"
+      << "      cudaStreamSynchronize(kernel_stream);\n"
+      << "      __cudaFuncKernel__" << containerType << "__" << epStr() << "<<<wr->dimGrid, wr->dimBlock, wr->smemSize, kernel_stream>>>(devBuffers[wr->bufferInfo[0].bufferID], totalThreads);\n"
+      << "      cudaStreamSynchronize(kernel_stream);\n"
+      << "      cudaErrorCode = cudaStreamQuery(kernel_stream);\n"
+      << "      if (cudaErrorCode == cudaErrorLaunchOutOfResources) {\n"
+      << "        continue;  // Try again with fewer threads per block\n"
+      << "      } else {\n"
+      << "        break;  // Success or some other error besides 'out of resources'\n"
+      << "      }\n"
+      << "    } // end for (threadsPerBlock > 0)\n\n"
+
+      << "    // If the above loop resulted in any error code besides cudaSuccess, report it\n"
+      << "    if (cudaErrorCode != cudaSuccess) {\n"
+      << "      printf(\"[ACCEL-ERROR] - __cudaFuncKernel__" << containerType << "__" << epStr() << " (generated code) -- kernel execution failed! (CUDA reports - %d: \\\"%s\\\")\\n\", cudaErrorCode, cudaGetErrorString(cudaErrorCode));\n"
+      << "    } else {\n"
+      << "      traceKernelIssueTime();\n"
+      << "    }\n\n"
+
+  << "  // Otherwise, just use the previously discovered amount\n"
+      << "  } else {\n"
+      << "    wr->dimGrid.x = (totalThreads / discThreadsPerSM) + ((totalThreads % discThreadsPerSM) ? (1) : (0));\n"
+      << "    wr->dimBlock.x = discThreadsPerSM;\n"
+      << "    traceKernelIssueTime();\n"
+      << "    __cudaFuncKernel__" << containerType << "__" << epStr() << "<<<wr->dimGrid, wr->dimBlock, wr->smemSize, kernel_stream>>>(devBuffers[wr->bufferInfo[0].bufferID], totalThreads);\n" //, splitAmount);\n"
+      << "  }\n"
+      << "}\n\n";
+
+  return 1;
+}
+
+
+
 
 void Entry::genAccels_spe_c_regFuncs(XStr& str) {
   if (isAccel()) {
@@ -1445,6 +2522,12 @@ void Entry::genAccels_ppe_c_regFuncs(XStr& str) {
     str << "  " << indexName() << "::accel_spe_func_index__" << epStr() << " = curIndex++;\n";
   }
 }
+
+ void Entry::setAccelSplitAmount(XStr* sa) { splitAmount = sa; }
+ void Entry::setCudaManualThreadsPerBlock(XStr *cmtpb) { cudaManualThreadsPerBlock = cmtpb; }
+ int Entry::isTriggered(void) { return (attribs & STRIGGERED); }
+ XStr* Entry::getAccelSplitAmount() { return splitAmount; }
+ XStr* Entry::getCudaManualThreadsPerBlock() { return cudaManualThreadsPerBlock; }
 
 
 /******************* Shared Entry Point Code **************************/
@@ -1497,6 +2580,9 @@ void Entry::genIndexDecls(XStr& str)
     genAccelIndexWrapperDecl_general(str);
     #if CMK_CELL != 0
       genAccelIndexWrapperDecl_spe(str);
+    #endif
+    #if CMK_CUDA != 0
+      genAccelIndexWrapperDecl_cuda(str);
     #endif
   }
 
@@ -1781,24 +2867,82 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
   }
 
   // DMK : Accel Support
-  else if (isAccel()) {
+ else if (isAccel()) {
 
-    #if CMK_CELL != 0
-      str << "  if (1) {   // DMK : TODO : For now, hardcode the condition (i.e. for now, do not dynamically load-balance between host and accelerator)\n";
-      str << "    _accelCall_spe_" << epStr() << "(";
-      genAccelFullCallList(str);
-      str << ");\n";
-      str << "  } else {\n  ";
+    // TODO : Add a test to see if this is an array element or a singleton
+
+    #if CMK_CELL != 0 || CMK_CUDA != 0
+
+      // Grab the local accelerator manager
+      str << "\n  // Get a pointer to the accelerator manager\n"
+          << "  AccelManager *accelMgr = AccelManager::getAccelManager();\n\n"
+          << "  // Get some info related to the AEM and use that information as part of the decision process\n"
+          << "  // NOTE | TODO | FIXME : This is a bit of a hack for now.  Calling CkLocMgr::numLocalElements()\n"
+          << "  //   is very expensive (iterates through the element records), so we want to call it as few times\n"
+          << "  //   as possible.  For now, we will have the accelerator manager buffer the element counts (which\n"
+          << "  //   will be reset upon load balancing finishing).\n"
+          << "  int numElements = accelMgr->numElementsLookup(((ArrayElement*)impl_obj)->getLocMgr());\n"
+          << "  int isTriggered = " << ((isTriggered()) ? ("-1") : ("0")) << ";\n"
+          << "  int isSplittable = " << ((getAccelSplitAmount() != NULL) ? ("-1") : ("0")) << ";\n"
+      #if CMK_CELL != 0
+          << "  int funcIndex = " << indexName() << "::accel_spe_func_index__" << epStr() << ";\n\n"
+      #elif CMK_CUDA != 0
+          << "  int funcIndex = " << indexName() << "::accel_cuda_func_index__" << epStr() << ";\n\n"
+      #endif
+          << "  // Get a decision about what should be done with this AEM invocation\n"
+          << "  AccelDecision decision;\n"
+          << "  AccelError err = accelMgr->decide(funcIndex, 1, numElements, isTriggered, isSplittable, decision, impl_obj);\n"
+          << "  if (err != ACCEL_SUCCESS) { printf(\"[ERROR] :: AccelManager::decide returned with error %s...\\n\", accelErrorString(err)); }\n\n"
+          << "  // Direct the AEM to the chosen device\n"
+          << "  switch (decision.deviceType) {\n";
+
+      // Add in a case for CELL SPEs
+      #if CMK_CELL != 0
+        str << "\n"
+            << "    case ACCEL_DEVICE_SPE:  // The SPE cores on the Cell processor\n"
+            << "      _accelCall_spe_" << epStr() << "(";
+        genAccelFullCallList(str);
+        str << ");\n"
+            << "      break;\n";
+      #endif
+
+      // Add in a case for CUDA-based GPUs
+      #if CMK_CUDA != 0
+        str << "\n"
+            << "    case ACCEL_DEVICE_GPU_CUDA:  // CUDA-based GPGPU devices\n"
+            << "      _accelCall_cuda_" << epStr() << "("; genAccelFullCallList(str); str << ", numElements, decision.issueFlag);\n"
+            << "      break;\n";
+      #endif
+
+        // Add in a case for delayed host function invocations
+      str << "\n"
+          << "    case ACCEL_DEVICE_HOST_DELAY:  // Delayed host invocations\n"
+          << "      _accelCall_generalDelay_" << epStr() << "("; genAccelFullCallList(str); str << ");\n"
+          << "      break;\n";
+
+      // Start the default case and use the general call that is always
+      //   included as the body of the case
+      str << "\n"
+            << "    default:\n    ";  // NOTE: Add some spaces for formatting
+
     #endif
 
-    str << "  _accelCall_general_" << epStr() << "(";
-    genAccelFullCallList(str);
-    str << ");\n";
+    // NOTE: Do this outside of the accelerator support checks so that it is always present, even if there is not switch statement
+    str << "  _accelCall_general_" << epStr() << "("; genAccelFullCallList(str); str << ");\n";
 
-    #if CMK_CELL != 0
-      str << "  }\n";
+    // Finish off the switch statement started above
+    #if CMK_CELL != 0 || CMK_CUDA != 0
+
+      str << "      break; // Not needed, but included for completeness\n"
+          << "  }\n\n";
+
+      // NOTE: This might cause issues if the host calls are a mixture of HOST and HOST_DELAYED (strategies should choose one or the other)
+      str << "  // If the accelerator manager indicated that pending delayed host calls should be executed after this\n"
+          << "  //   AEM has been processed, then do so now\n"
+          << "  if (decision.issueDelayedFlag == ACCEL_ISSUE_TRUE) {\n"
+          << "    accelMgr->issueDelayedGeneralCalls(" << indexName() << "::accel_cuda_func_index__" << epStr() << ");\n"
+          << "  }\n\n";
     #endif
-
   }
 
   else { //Normal case: call regular method
@@ -1919,6 +3063,12 @@ void Entry::genDefs(XStr& str)
       str << "int " << indexName() << "::" << "accel_spe_func_index__" << epStr() << "=0;\n";
     }
   #endif
+#if CMK_CUDA != 0
+    //if (isAccel() && isTriggered())
+    if (isAccel()) {
+      str << "int " << indexName() << "::" << "accel_cuda_func_index__" << epStr() << " = 0;\n";
+    }
+  #endif
 
   // Add special pre- and post- call code
   if(isSync() || isIget()) {
@@ -1993,6 +3143,9 @@ void Entry::genDefs(XStr& str)
     genAccelIndexWrapperDef_general(str);
     #if CMK_CELL != 0
       genAccelIndexWrapperDef_spe(str);
+    #endif
+    #if CMK_CUDA != 0
+      genAccelIndexWrapperDef_cuda(str);
     #endif
   }
 

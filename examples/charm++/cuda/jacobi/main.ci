@@ -1,0 +1,16 @@
+mainmodule main {
+
+  readonly CProxy_Main mainProxy;
+
+  extern module jacobi;
+
+  readonly CProxy_Jacobi jacobiProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg *msg);
+    entry void createdCheckIn();
+    entry void maxErrorReductionClient(CkReductionMsg *msg);
+    entry void reportMaxError(float, int);
+  };
+
+};

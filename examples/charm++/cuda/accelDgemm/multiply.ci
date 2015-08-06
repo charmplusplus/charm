@@ -1,0 +1,30 @@
+mainmodule multiply {
+  readonly int matrixSize;
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void finishWork(CkReductionMsg *m);
+  };
+
+  array [1D] Workers {
+    entry Workers();
+    entry [ triggered splittable(matrixSize) threadsperblock(192)  accel]  void beginWork(int matrixSize)
+                                 [  readonly : float    A[matrixSize*matrixSize]<impl_obj->A>,
+                                    readonly  : float    B[matrixSize*matrixSize]<impl_obj->B>,
+                                    writeonly  : float   C[matrixSize*matrixSize]<impl_obj->C>
+                              ]{
+
+      for (int i=splitIndex; i<matrixSize; i+=numSplits) {
+        for (int j=0; j<matrixSize; j++) {
+          C[i*matrixSize + j] = 0;
+          for (int k=0; k<matrixSize; k++) {
+            C[i*matrixSize + j]+= A[i*matrixSize +k] * B[k * matrixSize + j];
+          }
+        }
+      }
+    }complete;
+    entry void complete();
+ };
+};
+

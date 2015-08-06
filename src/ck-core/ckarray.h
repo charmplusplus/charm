@@ -600,6 +600,10 @@ public:
   int msg_count_grid;
   int border_flag;
 #endif
+/* DMK - Accelerated Entry Method (AEM) Support - The accelerator manager and generated code from charmxi require information from the location manager.*/
+#if CMK_CUDA != 0
+  public : CkLocMgr* getLocMgr();
+#endif
 };
 inline int *CkArrayListener::ckGetData(ArrayElement *el) const
   {return &el->listenerData[dataOffset];}

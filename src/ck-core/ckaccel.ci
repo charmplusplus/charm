@@ -1,0 +1,20 @@
+module ckaccel {
+
+  readonly CProxy_AccelManagerGroup accelManagerGroupProxy;
+
+  group [migratable] AccelManagerGroup {
+
+    entry AccelManagerGroup();
+
+    entry void strategyAdjustPerf_setPercentDevice(float pd);
+    entry void accelStrategy_setPercentDevice(float pd);
+
+    entry void accelStrategy_crawler_setOffsets(int numOffsets, float offsets[numOffsets]);
+
+    entry void accelStrategy_notifyLBFinished();
+
+    entry void shutdown();
+    entry void shutdownCheckin();
+  };
+
+};

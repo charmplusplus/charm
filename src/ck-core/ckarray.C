@@ -54,6 +54,10 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ck.h"
 #include "pathHistory.h"
 
+#if CMK_CUDA
+#include "ckaccel.h"
+#endif
+
 CpvDeclare(int ,serializer);
 
 bool _isAnytimeMigration;
@@ -450,6 +454,12 @@ void ArrayElement::pup(PUP::er &p)
     border_flag = 0;
   }
 #endif
+#if CMK_CUDA
+  AccelManager *manager = AccelManager::getAccelManager();
+  if (manager != NULL) {
+    manager->notifyObjectIsPacking(this);
+  }
+#endif
 }
 
 char *ArrayElement::ckDebugChareName(void) {
@@ -494,6 +504,10 @@ void ArrayElement::recvBroadcast(CkMessage *m){
     ckInvokeEntry(epIdx,bcast,true);
 #endif
 }
+// DMK - See header (ckarray.h) for comment
+#if CMK_CUDA != 0 || CMK_CELL != 0
+  CkLocMgr* ArrayElement::getLocMgr() { return thisArray->getLocMgr(); }
+#endif
 
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts

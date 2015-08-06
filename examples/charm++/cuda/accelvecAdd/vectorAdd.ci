@@ -1,0 +1,26 @@
+mainmodule vectorAdd {
+  readonly int vectorSize;
+  readonly CProxy_Main mainProxy;
+
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void finishWork(CkReductionMsg *m);
+  };
+
+  array [1D] Workers {
+    entry Workers();
+    entry [triggered splittable(vectorSize) accel]  void beginWork(int vectorSize)
+                                 [  readonly : float    A[vectorSize]<impl_obj->A>,
+                                    readonly : float    B[vectorSize]<impl_obj->B>,
+                                    writeonly : float   C[vectorSize]<impl_obj->C>
+                                 ]{
+      for(int i=splitIndex;i<vectorSize;i+=numSplits){
+       C[i]=A[i]+ B[i];
+      }
+
+    }complete;
+    entry void complete();
+  };
+};
+

@@ -1,0 +1,281 @@
+module jacobi {
+
+  message EastWestGhost;
+  message NorthSouthGhost;
+
+  accelblock { #include "jacobi_config.h" };
+
+  array [1D] Jacobi {
+
+    entry Jacobi(void);
+
+    entry void startIteration(void);
+
+    entry void northData(int size, float ghostData[size], int iterRef);
+    entry void southData(int size, float ghostData[size], int iterRef);
+    entry void eastData(int size, float ghostData[size], int iterRef);
+    entry void westData(int size, float ghostData[size], int iterRef);
+
+    entry void northData_msg(NorthSouthGhost*);
+    entry void southData_msg(NorthSouthGhost*);
+    entry void eastData_msg(EastWestGhost*);
+    entry void westData_msg(EastWestGhost*);
+
+    entry [triggered splittable(NUM_ROWS) threadsperblock(192) accel] void doCalculation()
+        [  readonly : float    matrix[DATA_BUFFER_SIZE] <impl_obj->matrix>,
+          writeonly : float matrixTmp[DATA_BUFFER_SIZE] <impl_obj->matrixTmp>,
+          writeonly : float       tmpMaxError[NUM_ROWS] <impl_obj->tmpMaxError>
+        ] {
+
+      //#if !CMK_CUDA_DEVICE
+      //  printf("[DMK-DEBUG] :: PE %d :: Jacobi::doCalculation() - Called...\n", CkMyPe());
+      //#endif
+
+      #if 0  // SIMD (DMK - NOTE - Currently code not working - there seems to be something wrong with the rotation operations)
+
+      for (int y = splitIndex + 1; y <= NUM_ROWS; y += numSplits) {
+
+        int x = 1;
+        float maxError = 0.0f;
+
+        // Loop until a SIMD boundary is reached
+        while (x <= NUM_COLS && x % simdia_vecf_numElems != 0) {
+
+          int index = GET_DATA_I(x, y);
+
+          matrixTmp[index] = ((0.25f * matrix[index - DATA_BUFFER_COLS - 1]) +
+                              (0.50f * matrix[index - DATA_BUFFER_COLS    ]) +
+                              (0.25f * matrix[index - DATA_BUFFER_COLS + 1]) +
+                              (0.50f * matrix[index - 1]                   ) +
+                              (2.00f * matrix[index    ]                   ) +
+                              (0.50f * matrix[index + 1]                   ) +
+                              (0.25f * matrix[index + DATA_BUFFER_COLS - 1]) +
+                              (0.50f * matrix[index + DATA_BUFFER_COLS    ]) +
+                              (0.25f * matrix[index + DATA_BUFFER_COLS + 1])
+                             ) * (0.2f);  // Divide by 5.0f
+
+          // Hold tile element (1,1) constant at 1.0f on every tile
+          if (y == 1 && x == 1) { matrixTmp[GET_DATA_I(x,y)] = 1.0f; }
+
+          float tmpError = matrixTmp[index] - matrix[index];
+          if (tmpError < 0) { tmpError = -1.0f * tmpError; }
+          if (tmpError > maxError) { maxError = tmpError; }
+
+          x++;
+        }
+
+        const simdia_vecf c025 = simdia_vspreadf(0.25f);
+        const simdia_vecf c050 = simdia_vspreadf(0.50f);
+        const simdia_vecf c200 = simdia_vspreadf(2.00f);
+        const simdia_vecf c020 = simdia_vspreadf(0.20f);
+
+        // Do as many SIMD calculations as possible
+        while (x + (simdia_vecf_numElems - 1) <= NUM_COLS) {
+
+          float *row0 = matrix + ((y - 1) * DATA_BUFFER_COLS);
+          float *row1 = matrix + ( y      * DATA_BUFFER_COLS);
+          float *row2 = matrix + ((y + 1) * DATA_BUFFER_COLS);
+
+          simdia_vecf *inRow0 = (simdia_vecf*)row0;
+          simdia_vecf *inRow1 = (simdia_vecf*)row1;
+          simdia_vecf *inRow2 = (simdia_vecf*)row2;
+
+          simdia_vecf in0 = inRow0[x / simdia_vecf_numElems];
+          simdia_vecf in1 = inRow1[x / simdia_vecf_numElems];
+          simdia_vecf in2 = inRow2[x / simdia_vecf_numElems];
+          simdia_vecf in0l = simdia_vrothf(in0, 1); in0l = simdia_vinsertf(in0l, row0[x - 1], 0);
+          simdia_vecf in1l = simdia_vrothf(in1, 1); in1l = simdia_vinsertf(in1l, row1[x - 1], 0);
+          simdia_vecf in2l = simdia_vrothf(in2, 1); in2l = simdia_vinsertf(in2l, row2[x - 1], 0);
+          simdia_vecf in0r = simdia_vrotlf(in0, 1); in0r = simdia_vinsertf(in0r, row0[x + simdia_vecf_numElems], simdia_vecf_numElems - 1);
+          simdia_vecf in1r = simdia_vrotlf(in1, 1); in1r = simdia_vinsertf(in1r, row1[x + simdia_vecf_numElems], simdia_vecf_numElems - 1);
+          simdia_vecf in2r = simdia_vrotlf(in2, 1); in2r = simdia_vinsertf(in2r, row2[x + simdia_vecf_numElems], simdia_vecf_numElems - 1);
+
+          simdia_vecf tmp0 = simdia_vmulf(in0l, c025);
+          simdia_vecf tmp1 = simdia_vmaddf(in1l, c050, tmp0);
+          simdia_vecf tmp2 = simdia_vmulf(in2l, c025);
+          simdia_vecf tmp3 = simdia_vmaddf(in0, c050, tmp2);
+          simdia_vecf tmp4 = simdia_vmulf(in1, c200);
+          simdia_vecf tmp5 = simdia_vmaddf(in2, c050, tmp3);
+          simdia_vecf tmp6 = simdia_vmulf(in0r, c025);
+          simdia_vecf tmp7 = simdia_vmaddf(in1r, c050, tmp4);
+          simdia_vecf tmp9 = simdia_vaddf(tmp1, tmp3);
+          simdia_vecf tmp10 = simdia_vaddf(tmp5, tmp7);
+          simdia_vecf tmp8 = simdia_vmaddf(in2r, c025, tmp9);
+          simdia_vecf tmp11 = simdia_vaddf(tmp10, tmp8);
+          simdia_vecf value = simdia_vmulf(c020, tmp11);
+
+          simdia_vecf *outRow = (simdia_vecf*)(matrixTmp + (y * DATA_BUFFER_COLS));
+          outRow[x / simdia_vecf_numElems] = value;
+
+          simdia_vecf diff = simdia_vsubf(value, in1);
+          //simdia_vecf ndiff = simdia_vsubf(in1 - value);
+          //simdia_veci cmp0 simdia_vcmpgtf(diff, ndiff); // set diff > 0, unset diff < 0
+          for (int i = 0; i < simdia_vecf_numElems; i++) {
+            float tmpError = simdia_vextractf(diff, i);
+            if (tmpError < 0) { tmpError *= -1.0f; }
+            if (tmpError > maxError) { maxError = tmpError; }
+          }
+
+          x += simdia_vecf_numElems;
+        }
+
+        // Finish any remaining elements
+        while (x <= NUM_COLS) {
+
+          int index = GET_DATA_I(x, y);
+
+          matrixTmp[index] = ((0.25f * matrix[index - DATA_BUFFER_COLS - 1]) +
+                              (0.50f * matrix[index - DATA_BUFFER_COLS    ]) +
+                              (0.25f * matrix[index - DATA_BUFFER_COLS + 1]) +
+                              (0.50f * matrix[index - 1]                   ) +
+                              (2.00f * matrix[index    ]                   ) +
+                              (0.50f * matrix[index + 1]                   ) +
+                              (0.25f * matrix[index + DATA_BUFFER_COLS - 1]) +
+                              (0.50f * matrix[index + DATA_BUFFER_COLS    ]) +
+                              (0.25f * matrix[index + DATA_BUFFER_COLS + 1])
+                             ) * (0.2f);  // Divide by 5.0f
+
+          // Hold tile element (1,1) constant at 1.0f on every tile
+          if (y == 1 && x == 1) { matrixTmp[GET_DATA_I(x,y)] = 1.0f; }
+
+          float tmpError = matrixTmp[index] - matrix[index];
+          if (tmpError < 0) { tmpError = -1.0f * tmpError; }
+          if (tmpError > maxError) { maxError = tmpError; }
+
+          x++;
+        }
+
+        tmpMaxError[y-1] = maxError;
+      }
+
+      #elif 1
+
+      for (int y = splitIndex + 1; y <= NUM_ROWS; y += numSplits) {
+
+        float maxError = 0.0f;
+
+        for (int x = 1; x <= NUM_COLS; x++) {
+
+          int index = GET_DATA_I(x, y);
+
+          #if 0  // Pattern selection (5-point stencil)
+
+          matrixTmp[index] = (matrix[index] +
+                              matrix[GET_DATA_I(x - 1, y)] +
+                              matrix[GET_DATA_I(x + 1, y)] +
+                              matrix[GET_DATA_I(x, y - 1)] +
+                              matrix[GET_DATA_I(x, y + 1)]
+                             ) * (0.2f);  // Divide by 5.0f
+
+          #elif 1  // Pattern selection (5-point weighted stencil)
+
+          matrixTmp[index] = ((2.00f * matrix[index]) +
+                              (0.75f * matrix[GET_DATA_I(x - 1, y)]) +
+                              (0.75f * matrix[GET_DATA_I(x + 1, y)]) +
+                              (0.75f * matrix[GET_DATA_I(x, y - 1)]) +
+                              (0.75f * matrix[GET_DATA_I(x, y + 1)])
+                             ) * (0.2f);  // Divide by 5.0f
+
+          #else // Pattern selection (9-point weighted stencil)
+
+          matrixTmp[index] = ((0.25f * matrix[index - DATA_BUFFER_COLS - 1]) +
+                              (0.50f * matrix[index - DATA_BUFFER_COLS    ]) +
+                              (0.25f * matrix[index - DATA_BUFFER_COLS + 1]) +
+                              (0.50f * matrix[index - 1]                   ) +
+                              (2.00f * matrix[index    ]                   ) +
+                              (0.50f * matrix[index + 1]                   ) +
+                              (0.25f * matrix[index + DATA_BUFFER_COLS - 1]) +
+                              (0.50f * matrix[index + DATA_BUFFER_COLS    ]) +
+                              (0.25f * matrix[index + DATA_BUFFER_COLS + 1])
+                             ) * (0.2f);  // Divide by 5.0f
+
+          #endif // Pattern selection
+
+          //// Eliminate subnormals on the host core
+          //#if !CMK_CUDA_DEVICE && !CMK_CELL_SPE
+          //  if (fpclassify(matrixTmp[index]) == FP_SUBNORMAL) { matrixTmp[index] = 0.0f; }
+          //#endif
+
+          //// DMK - DEBUG
+          //#if !CMK_CUDA_DEVICE
+          //float val = matrixTmp[index];
+          //if (FP_SUBNORMAL == fpclassify(val)) {
+          //  printf("SUBNORMAL DETECTED! (%e)\n", val);
+          //  CkExit();
+          //}
+          //#endif
+
+          // Hold tile element (1,1) constant at 1.0f on every tile
+          if (y == 1 && x == 1) { matrixTmp[GET_DATA_I(x,y)] = 1.0f; }
+
+          float tmpError = matrixTmp[index] - matrix[index];
+          if (tmpError < 0) { tmpError = -1.0f * tmpError; }
+          if (tmpError > maxError) { maxError = tmpError; }
+        }
+
+        tmpMaxError[y-1] = maxError;
+      }
+
+
+      #else
+
+      register int x = splitIndex + 1; // NOTE: Want (1, NUM_COLS), not (0, NUM_COLS]
+      register int y = 0;
+      register float oneFifth_f = 1.0f / 5.0f;
+      register float maxError = 0.0f;
+
+      // Do the test to see if this call is the most northwestern tile in the overall matrix
+      register int isNorthwestern = (matrix[DATA_BUFFER_COLS - 1] == 1.0f);
+      if (splitIndex == 0) {
+        matrixTmp[GET_DATA_I(DATA_BUFFER_COLS - 1, 0)] = ((isNorthwestern) ? (1.0f) : (0.0f)); // set northwest flag in matrixTmp buffer
+      }
+
+      // Peel off the first iteration of the y loop (i.e. y = 1) since the starting x
+      //   values depending on the value of isNorthwestern
+      if (!(isNorthwestern && splitIndex == 0)) {
+        register int index = GET_DATA_I(x, 1);
+        matrixTmp[index] = (matrix[index] +
+                            matrix[GET_DATA_I(x - 1, 1)] +
+                            matrix[GET_DATA_I(x + 1, 1)] +
+                            matrix[GET_DATA_I(x    , 0)] +
+                            matrix[GET_DATA_I(x    , 2)]
+                           ) * oneFifth_f;
+        register float tmp = matrixTmp[index] - matrix[index];
+        if (tmp < 0.0f) { tmp *= -1.0f; }  // absf
+        if (maxError < tmp) { maxError = tmp; }
+      } else {
+        matrixTmp[GET_DATA_I(1, 1)] = 1.0f;  // Hold this one location in the overall matrix constant
+      }
+
+      // Calculate the rest of the values
+      for (y = 2; y < (DATA_BUFFER_ROWS - 1); y++) {
+        register int index = GET_DATA_I(x, y);
+        matrixTmp[index] = (matrix[index] +
+                            matrix[GET_DATA_I(x - 1, y    )] +
+                            matrix[GET_DATA_I(x + 1, y    )] +
+                            matrix[GET_DATA_I(x    , y - 1)] +
+                            matrix[GET_DATA_I(x    , y + 1)]
+                           ) * oneFifth_f;
+        register float tmp = matrixTmp[index] - matrix[index];
+        if (tmp < 0.0f) { tmp *= -1.0f; }  // absf
+        if (maxError < tmp) { maxError = tmp; }
+      }
+
+      if (splitIndex == 0) {  // Fill in the corners of matrixTmp (just for completeness)
+        matrixTmp[GET_DATA_I(0, 0)] = 0.0f;
+        matrixTmp[GET_DATA_I(0, DATA_BUFFER_ROWS - 1)] = 0.0f;
+        matrixTmp[GET_DATA_I(DATA_BUFFER_COLS - 1, DATA_BUFFER_ROWS - 1)] = 0.0f;
+      }
+
+      // Record this split's maxError
+      tmpMaxError[splitIndex] = maxError;
+
+      #endif
+
+    } doCalculation_post;
+
+    entry void doCalculation_post();
+
+  };
+
+};

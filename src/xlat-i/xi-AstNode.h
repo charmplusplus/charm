@@ -33,6 +33,13 @@ class AstNode : public Printable {
   virtual void genAccels_spe_h_includes(XStr& str) { (void)str; }
   virtual void genAccels_spe_h_fiCountDefs(XStr& str) { (void)str; }
   virtual void genAccels_ppe_c_regFuncs(XStr& str) { (void)str; }
+
+   virtual int genAccels_cuda_c_funcBodies(XStr& str) { (void)str; return 0; }
+   virtual void genAccels_cuda_c_regFuncs(XStr& str) {  (void)str; }
+   virtual void genAccels_cuda_host_c_regFuncs(XStr& str) { (void)str; }
+   virtual void genAccels_cuda_h_includes(XStr& str) {  (void)str; }
+   virtual void genAccels_cuda_h_fiCountDefs(XStr& str) {  (void)str; }
+
 };
 
 template <typename Child>
@@ -80,6 +87,13 @@ class AstChildren : public virtual AstNode {
   void genAccels_spe_h_includes(XStr& str);
   void genAccels_spe_h_fiCountDefs(XStr& str);
   void genAccels_ppe_c_regFuncs(XStr& str);
+
+  int genAccels_cuda_c_funcBodies(XStr& str);
+  void genAccels_cuda_c_regFuncs(XStr& str);
+  void genAccels_cuda_host_c_regFuncs(XStr& str);
+  void genAccels_cuda_h_includes(XStr& str);
+  void genAccels_cuda_h_fiCountDefs(XStr& str);
+
 
   template <typename T>
   void recurse(T arg, void (Child::*fn)(T));
@@ -314,6 +328,40 @@ template <typename Child>
 void AstChildren<Child>::genAccels_ppe_c_regFuncs(XStr& str) {
   details::perElemGen(children, str, &Child::genAccels_ppe_c_regFuncs);
 }
+template <typename Child>
+int AstChildren<Child>::genAccels_cuda_c_funcBodies(XStr& str) {
+
+  //details::perElemGen(children, str, &Child::genAccels_cuda_c_funcBodies);
+
+    int rtn = 0;
+  for (typename std::list<Child*>::iterator i = children.begin(); i != children.end(); ++i)
+	if (*i){
+	    rtn += (*i)->genAccels_cuda_c_funcBodies(str);
+}
+    return rtn;
+
+}
+template <typename Child>
+void
+AstChildren<Child>::genAccels_cuda_c_regFuncs(XStr& str) {
+    details::perElemGen(children, str, &Child::genAccels_cuda_c_regFuncs);
+}
+template <typename Child>
+void
+AstChildren<Child>::genAccels_cuda_host_c_regFuncs(XStr& str) {
+    details::perElemGen(children, str, &Child::genAccels_cuda_host_c_regFuncs);
+}
+template <typename Child>
+void
+AstChildren<Child>::genAccels_cuda_h_includes(XStr& str) {
+    details::perElemGen(children, str, &Child::genAccels_cuda_h_includes);
+}
+template <typename Child>
+void
+AstChildren<Child>::genAccels_cuda_h_fiCountDefs(XStr& str) {
+    details::perElemGen(children, str, &Child::genAccels_cuda_h_fiCountDefs);
+}
+
 
 
 } // namespace xi

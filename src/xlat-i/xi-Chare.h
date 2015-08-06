@@ -108,6 +108,23 @@ class Chare : public TEntity {
    void genAccels_ppe_c_regFuncs(XStr& str) {
      if (list) { list->genAccels_ppe_c_regFuncs(str); }
    }
+   int genAccels_cuda_c_funcBodies(XStr& str) {
+      int rtn = 0;
+      if (list) { rtn += list->genAccels_cuda_c_funcBodies(str); }
+        return rtn;
+    }
+    void genAccels_cuda_c_regFuncs(XStr& str) {
+      if (list) { list->genAccels_cuda_c_regFuncs(str); }
+    }
+    void genAccels_cuda_host_c_regFuncs(XStr& str) {
+      if (list) { list->genAccels_cuda_host_c_regFuncs(str); }
+    }
+    void genAccels_cuda_h_includes(XStr& str) {
+      if (list) { list->genAccels_cuda_h_includes(str); }
+    }
+    void genAccels_cuda_h_fiCountDefs(XStr& str) {
+      if (list) { list->genAccels_cuda_h_fiCountDefs(str); }
+    }
 
    int nextEntry(void) {return entryCount++;}
    virtual void genSubDecls(XStr& str);
@@ -132,6 +149,7 @@ class MainChare : public Chare {
               NamedType *t, TypeList *b=0, AstChildren<Member> *l=0):
 	    Chare(ln, Nattr|CMAINCHARE, t,b,l) {}
     virtual char *chareTypeName(void) {return (char *) "mainchare";}
+    
 };
 
 class Array : public Chare {

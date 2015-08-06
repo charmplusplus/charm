@@ -40,6 +40,10 @@ void Scope::genGlobalCode(XStr scope, XStr &decls, XStr &defs) {
   scope << name_ << "::";
   AstChildren<Construct>::genGlobalCode(scope, decls, defs);
 }
+int Scope::genAccels_cuda_c_funcBodies(XStr& str){
+  AstChildren<Construct>::genAccels_cuda_c_funcBodies(str);
+}
+
 
 void Scope::print(XStr& str) {
     str << "namespace " << name_ << "{\n";
@@ -58,6 +62,19 @@ void Scope::outputClosuresDef(XStr& str) {
   AstChildren<Construct>::outputClosuresDef(str);
   str << "} // namespace " << name_ << "\n";
 }
+void Scope::genAccels_cuda_c_regFuncs(XStr& str) {
+ AstChildren<Construct>::genAccels_cuda_c_regFuncs(str);
+}
+void Scope::genAccels_cuda_host_c_regFuncs(XStr& str) {
+ AstChildren<Construct>::genAccels_cuda_host_c_regFuncs(str);
+}
+void Scope::genAccels_cuda_h_includes(XStr& str) {
+ AstChildren<Construct>::genAccels_cuda_h_includes(str);
+}
+void Scope::genAccels_cuda_h_fiCountDefs(XStr& str) {
+  AstChildren<Construct>::genAccels_cuda_h_fiCountDefs(str);
+}
+
 
 UsingScope::UsingScope(const char* name, bool symbol) : name_(name), symbol_(symbol) {}
 void UsingScope::genDecls(XStr& str) {
@@ -167,6 +184,27 @@ void Template::genAccels_spe_h_fiCountDefs(XStr& str) {
 
 void Template::genAccels_ppe_c_regFuncs(XStr& str) {
   if (!external && entity) { entity->genAccels_ppe_c_regFuncs(str); }
+}
+int Template::genAccels_cuda_c_funcBodies(XStr& str) {
+  int rtn = 0;
+  if (!external && entity) { rtn += entity->genAccels_cuda_c_funcBodies(str); }
+  return rtn;
+}
+
+void Template::genAccels_cuda_c_regFuncs(XStr& str) {
+  if (!external && entity) { entity->genAccels_cuda_c_regFuncs(str); }
+}
+
+void Template::genAccels_cuda_host_c_regFuncs(XStr& str) {
+ if (!external && entity) { entity->genAccels_cuda_host_c_regFuncs(str); }
+}
+
+void Template::genAccels_cuda_h_includes(XStr& str) {
+  if (!external && entity) { entity->genAccels_cuda_h_includes(str); }
+}
+
+void Template::genAccels_cuda_h_fiCountDefs(XStr& str) {
+  if (!external && entity) { entity->genAccels_cuda_h_fiCountDefs(str); }
 }
 
 void Template::check()

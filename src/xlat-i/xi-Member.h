@@ -68,6 +68,13 @@ public:
     // DMK - Accel Support
     void genAccels_spe_c_callInits(XStr& str);
 
+    // DMK - Triggered Accel Support
+    int genAccels_cuda_c_funcBodies(XStr& str) {return 0; }
+    void genAccels_cuda_c_regFuncs(XStr& str) { }
+    void genAccels_cuda_host_c_regFuncs(XStr& str) { }
+    void genAccels_cuda_h_includes(XStr& str) { }
+    void genAccels_cuda_h_fiCountDefs(XStr& str) { }
+
     void setAccel();
     void clearAccel();
     int isAccel();
@@ -89,6 +96,24 @@ public:
     void genAccels_spe_h_includes(XStr& str);
     void genAccels_spe_h_fiCountDefs(XStr& str);
     void genAccels_ppe_c_regFuncs(XStr& str);
+    // DMK - Triggered Accel Support
+     int genAccels_cuda_c_funcBodies(XStr& str) {
+       int rtn=0;
+       if (next) { rtn += next->genAccels_cuda_c_funcBodies(str); }
+       return rtn;
+     }
+     void genAccels_cuda_c_regFuncs(XStr& str) {
+       if (next) { next->genAccels_cuda_c_regFuncs(str); }
+     }
+     void genAccels_cuda_host_c_regFuncs(XStr& str) {
+       if (next) { next->genAccels_cuda_host_c_regFuncs(str); }
+     }
+     void genAccels_cuda_h_includes(XStr& str) {
+       if (next) { next->genAccels_cuda_h_includes(str); }
+     }
+     void genAccels_cuda_h_fiCountDefs(XStr& str) {
+       if (next) { next->genAccels_cuda_h_fiCountDefs(str); }
+     }
 };
 
 class IncludeFile : public Member {

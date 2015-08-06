@@ -33,6 +33,12 @@ class Module : public Construct {
   void genAccels_spe_h_includes(XStr& str);
   void genAccels_spe_h_fiCountDefs(XStr& str);
   void genAccels_ppe_c_regFuncs(XStr& str);
+  int  genAccels_cuda_c_funcBodies(XStr& str);
+  void genAccels_cuda_c_regFuncs(XStr& str);
+  void genAccels_cuda_c_callInits(XStr& str);
+  void genAccels_cuda_h_includes(XStr& str);
+  void genAccels_cuda_h_fiCountDefs(XStr& str);
+  void genAccels_cuda_host_c_regFuncs(XStr& str);
 };
 
 } // namespace xi

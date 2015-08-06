@@ -17,7 +17,8 @@ MV="mv"
 LN="ln"
 WC="wc"
 SED="sed"
-
+CMK_CUDA=1
+CMK_CUDA_USE_GPU_MEMPOOL=1
 MACHTYPE=""
 SEQUENTIAL=""
 NATIVE=""
@@ -1594,6 +1595,33 @@ then
 
   fi
 fi
+## DMK - Triggered Accel Support - If there are any generated triggered entry method files, they
+##   also need to be built and included into the executable.
+if [ $CMK_CUDA -eq 1 ]
+then
+
+  if [ "$LANGUAGE" = "charm++" ]
+  then
+
+    if [ -e "__triggered_main.genCUDACode.cu" ]
+    then
+
+      # DMK - DEBUG
+      echo "File \"__triggered_main.genCUDACode.cu\" Found..."
+
+      ## Compile the generated CUDA code
+      CMK_NVCC_TR=/usr/local/cuda/bin/nvcc
+      CMK_NVCC_FLAGS_TR="-c -use_fast_math -g -G" #-DGPU_PROFILE -DGPU_TRACE #-DGPU_MEMPOOL_DEBUG -DGPU_WRQ_VERBOSE #-device-debug -deviceemu
+      echo $CMK_NVCC_TR $CMK_NVCC_FLAGS_TR -I/usr/local/cuda-6.5/include/ -I../../../../include -I../../../../../src/arch/cuda/hybridAPI  -L/usr/local/cuda-6.5/lib64  -o __triggered_main.genCUDACode.o __triggered_main.genCUDACode.cu -DCMK_CUDA_DEVICE=1 --ptxas-options=-v -O3 -lcudart
+      Do $CMK_NVCC_TR $CMK_NVCC_FLAGS_TR -I/usr/local/cuda-6.5/include/ -I../../../../include -I../../../../../src/arch/cuda/hybridAPI  -L/usr/local/cuda-6.5/lib64  -o  __triggered_main.genCUDACode.o __triggered_main.genCUDACode.cu -DCMK_CUDA_DEVICE=1 --ptxas-options=-v -O3 -lcudart 
+
+      ## Include the generated object file for linking into the main executable
+      POST_LIBRARIES="$POST_LIBRARIES __triggered_main.genCUDACode.o"
+
+    fi
+  fi
+fi
+
 
 if [ "$AMPIMAIN" != "" ]
 then

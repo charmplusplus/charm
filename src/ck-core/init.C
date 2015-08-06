@@ -965,6 +965,15 @@ extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
 extern "C" void CmiInitPxshm(char **argv);
 
+#if CMK_CUDA
+// Functions for initalizing and cleaning up the AccelManager
+// NOTE: These functions are always defined, but may not do anything (e.g. in cases
+//   where the runtime system was not built with support for any accelerator type)
+// TODO: Find a cleaner way to include this prototype
+  extern "C" void initAccelManager();
+  extern "C" void exitAccelManager();
+  extern void _registerckaccel();
+#endif
 //extern "C" void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
@@ -1200,7 +1209,9 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();
 #endif
-
+#if CMK_CUDA
+                _registerckaccel();
+#endif
 
 		/*
 		  Setup Control Point Automatic Tuning Framework.
@@ -1290,6 +1301,14 @@ void _initCharm(int unused_argc, char **argv)
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     _messageLoggingInit();
+#endif
+/* Initalize the AccelManager object for this PE.  Also
+       register a cleanup function to be called as the program
+       exits. - DMK
+    */
+#if CMK_CUDA
+    initAccelManager();
+    registerExitFn(exitAccelManager);
 #endif
 
 #ifndef __BIGSIM__

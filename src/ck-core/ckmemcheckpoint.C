@@ -46,6 +46,9 @@ TODO:
 #include "register.h"
 #include "conv-ccs.h"
 #include <signal.h>
+#if CMK_CUDA
+#include "ckaccel.h"
+#endif
 
 void noopck(const char*, ...)
 {}
@@ -887,7 +890,10 @@ void CkMemCheckPT::restart(int diePe)
   if (CkMyPe() == diePe) CmiAssert(ckTable.length() == 0);
 
   inRestarting = 1;
-                                                                                
+#if CMK_CUDA
+  AccelManager *accelManager = AccelManager::getAccelManager();
+  if (accelManager != NULL) { accelManager->notifyFlushAccel(); }
+#endif
   // disable load balancer's barrier
   if (CkMyPe() != diePe) resetLB(diePe);
 

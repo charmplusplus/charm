@@ -1,0 +1,11 @@
+module AccelGreedyLB {
+
+  extern module CentralLB;
+
+  initnode void lbinit(void);
+
+  group [migratable] AccelGreedyLB : CentralLB {
+    entry void AccelGreedyLB(const CkLBOptions &);
+  };
+
+};

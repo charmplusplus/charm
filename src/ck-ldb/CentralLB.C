@@ -10,6 +10,9 @@
 #include "CentralLB.h"
 #include "LBDBManager.h"
 #include "LBSimulation.h"
+#if CMK_CUDA
+#include "ckaccel.h"
+#endif
 
 #define  DEBUGF(x)       // CmiPrintf x;
 #define  DEBUG(x)        // x;
@@ -1208,6 +1211,13 @@ void CentralLB::MigrationDone(int balancing)
   LBDatabase::Object()->MigrationDone();    // call registered callbacks
 
   LoadbalanceDone(balancing);        // callback
+
+ // DMK - ACCEL - Notify the Accelerator Manager that load balancing is finsished
+#if CMK_CUDA
+  AccelManager *accelManager = AccelManager::getAccelManager();
+  if (accelManager != NULL) { accelManager->notifyLBFinished(); }
+#endif
+
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   // if sync resume invoke a barrier
   if (balancing && _lb_args.syncResume()) {

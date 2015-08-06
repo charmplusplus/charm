@@ -55,6 +55,11 @@ class Scope : public ConstructList {
     void print(XStr& str);
     void outputClosuresDecl(XStr& str);
     void outputClosuresDef(XStr& str);
+    int genAccels_cuda_c_funcBodies(XStr& str);
+    void genAccels_cuda_c_regFuncs(XStr& str);
+    void genAccels_cuda_host_c_regFuncs(XStr& str);
+    void genAccels_cuda_h_includes(XStr& str);
+    void genAccels_cuda_h_fiCountDefs(XStr& str);
 };
 
 class UsingScope : public Construct {
@@ -94,6 +99,12 @@ class Template : public Construct {
     void genAccels_spe_h_includes(XStr& str);
     void genAccels_spe_h_fiCountDefs(XStr& str);
     void genAccels_ppe_c_regFuncs(XStr& str);
+
+    int genAccels_cuda_c_funcBodies(XStr& str);
+    void genAccels_cuda_c_regFuncs(XStr& str);
+    void genAccels_cuda_host_c_regFuncs(XStr& str);
+    void genAccels_cuda_h_includes(XStr& str);
+    void genAccels_cuda_h_fiCountDefs(XStr& str);
 };
 
 /* An entity that could be templated, i.e. chare, group or a message */

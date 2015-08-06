@@ -43,7 +43,8 @@ BaseLB.o: BaseLB.C charm++.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h BaseLB.h LBSimulation.h charm++.h CentralLB.h \
- CentralLB.decl.h CentralLBMsg.h BaseLB.def.h
+ CentralLB.decl.h CentralLBMsg.h BaseLB.def.h  ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 BlockLB.o: BlockLB.C BlockLB.decl.h charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -64,7 +65,7 @@ BlockLB.o: BlockLB.C BlockLB.decl.h charm++.h charm.h converse.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  CentralLB.decl.h CentralLBMsg.h BlockLB.h CentralLB.h BaseLB.h \
- BlockLB.def.h
+ BlockLB.def.h  ckaccel_common.h ckaccel.h  ckaccel.decl.h
 
 BlueGene.o: BlueGene.C BlueGene.h BlueGene.decl.h charm++.h charm.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -106,7 +107,7 @@ CentralLB.o: CentralLB.C charm++.h charm.h converse.h conv-config.h \
  charm++.h envelope.h qd.h register.h stats.h ckfutures.h TopoManager.h \
  converse.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h sdag.h \
  BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h LBDBManager.h \
- LBSimulation.h CentralLB.def.h
+ LBSimulation.h CentralLB.def.h  ckaccel_common.h ckaccel.h  ckaccel.decl.h
 
 CentralPredictor.o: CentralPredictor.C charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -148,7 +149,7 @@ ComboCentLB.o: ComboCentLB.C ComboCentLB.h CentralLB.h BaseLB.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- ComboCentLB.decl.h ComboCentLB.def.h
+ ComboCentLB.decl.h ComboCentLB.def.h  ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 CommAwareRefineLB.o: CommAwareRefineLB.C CommAwareRefineLB.h CentralLB.h \
  BaseLB.h LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
@@ -169,7 +170,27 @@ CommAwareRefineLB.o: CommAwareRefineLB.C CommAwareRefineLB.h CentralLB.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- CommAwareRefineLB.decl.h ckgraph.h CommAwareRefineLB.def.h
+ CommAwareRefineLB.decl.h ckgraph.h CommAwareRefineLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
+
+ AccelGreedyLB.o: AccelGreedyLB.C AccelGreedyLB.h CentralLB.h BaseLB.h \
+ LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
+ conv-common.h conv-mach.h conv-mach-opt.h conv-mach-cuda.h pup_c.h \
+ queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+ conv-trace.h persistent.h debug-conv.h charm.h pup.h middle.h \
+ middle-conv.h LBDBManager.h cklists.h LBObj.h LBOM.h LBComm.h \
+ LBMachineUtil.h lbdb++.h LBDatabase.decl.h charm++.h ckbitvector.h \
+ ckstream.h init.h ckhashtable.h debug-charm.h debug-conv++.h simd.h \
+ CkMarshall.decl.h ckarrayindex.h cksection.h ckcallback.h conv-ccs.h \
+ sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+ CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+ readonly.h ckarray.h cklocation.h CkLocation.decl.h CkArray.decl.h \
+ ckfutures.h CkFutures.decl.h tempo.h \
+ tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+ CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
+ trace-bluegene.h envelope.h NullLB.decl.h BaseLB.decl.h CentralLB.decl.h \
+ CentralLBMsg.h AccelGreedyLB.decl.h ckgraph.h ckaccel.h ckaccel_common.h \
+ ckaccel.decl.h AccelGreedyLB.def.h
+
 
 CommLB.o: CommLB.C CommLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -191,7 +212,8 @@ CommLB.o: CommLB.C CommLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  trace-bluegene.h NullLB.decl.h BaseLB.decl.h CentralLB.decl.h \
  CentralLBMsg.h CommLB.decl.h charm++.h envelope.h sdag.h \
  CentralLB.decl.h CommLBHeap.h GreedyCommLB.h CentralLB.h \
- GreedyCommLB.decl.h CommLB.def.h
+ GreedyCommLB.decl.h CommLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
+
 
 CommLBHeap.o: CommLBHeap.C charm++.h charm.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -236,7 +258,9 @@ CommonLBs.o: CommonLBs.C LBDatabase.h lbdb.h converse.h conv-config.h \
  DistBaseLB.decl.h HybridLB.decl.h HybridBaseLB.decl.h NeighborLBMsg.h \
  HybridLBMsg.h ComboCentLB.decl.h RefineSwapLB.decl.h NeighborLB.decl.h \
  NborBaseLB.decl.h OrbLB.decl.h BlockLB.decl.h GreedyCommLB.decl.h \
- NodeLevelLB.decl.h CommonLBs.def.h
+ NodeLevelLB.decl.h CommonLBs.def.h AccelGreedyLB.decl.h  ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
+
 
 CrayNid.o: CrayNid.c converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \
@@ -304,7 +328,7 @@ DummyLB.o: DummyLB.C DummyLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- DummyLB.decl.h DummyLB.def.h
+ DummyLB.decl.h DummyLB.def.h  ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 EveryLB.o: EveryLB.C LBDatabase.h lbdb.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -334,7 +358,8 @@ EveryLB.o: EveryLB.C LBDatabase.h lbdb.h converse.h conv-config.h \
  GridCommLB.decl.h GridCommRefineLB.decl.h HbmLB.decl.h RefineKLB.decl.h \
  TempAwareCommLB.decl.h TreeMatchLB.decl.h GreedyAgentLB.decl.h \
  NeighborCommLB.decl.h PhasebyArrayLB.decl.h RecBipartLB.decl.h \
- CommAwareRefineLB.decl.h AdaptiveLB.decl.h EveryLB.def.h
+ CommAwareRefineLB.decl.h AdaptiveLB.decl.h EveryLB.def.h  ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 GraphBFTLB.o: GraphBFTLB.C GraphBFTLB.h CentralLB.h BaseLB.h LBDatabase.h \
  lbdb.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -355,7 +380,8 @@ GraphBFTLB.o: GraphBFTLB.C GraphBFTLB.h CentralLB.h BaseLB.h LBDatabase.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- GraphBFTLB.decl.h ckgraph.h GraphBFTLB.def.h
+ GraphBFTLB.decl.h ckgraph.h GraphBFTLB.def.h ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 GraphPartLB.o: GraphPartLB.C GraphPartLB.h CentralLB.h BaseLB.h \
  LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
@@ -376,7 +402,8 @@ GraphPartLB.o: GraphPartLB.C GraphPartLB.h CentralLB.h BaseLB.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- GraphPartLB.decl.h ckgraph.h GraphPartLB.def.h
+ GraphPartLB.decl.h ckgraph.h GraphPartLB.def.h ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 GreedyAgentLB.o: GreedyAgentLB.C LBSimulation.h charm++.h charm.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -398,7 +425,8 @@ GreedyAgentLB.o: GreedyAgentLB.C LBSimulation.h charm++.h charm.h \
  ckarrayreductionmgr.h trace.h trace-bluegene.h CentralLB.h BaseLB.h \
  CentralLB.decl.h CentralLBMsg.h GreedyAgentLB.h CentralLB.h \
  GreedyAgentLB.decl.h charm++.h envelope.h sdag.h CentralLB.decl.h \
- LBAgent.h topology.h GreedyAgentLB.def.h
+ LBAgent.h topology.h GreedyAgentLB.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 GreedyCommLB.o: GreedyCommLB.C elements.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -419,7 +447,8 @@ GreedyCommLB.o: GreedyCommLB.C elements.h converse.h conv-config.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- GreedyCommLB.decl.h CommLBHeap.h manager.h GreedyCommLB.def.h
+ GreedyCommLB.decl.h CommLBHeap.h manager.h GreedyCommLB.def.h \
+ ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 GreedyLB.o: GreedyLB.C charm++.h charm.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -439,7 +468,8 @@ GreedyLB.o: GreedyLB.C charm++.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h ckgraph.h BaseLB.h GreedyLB.h CentralLB.h \
- CentralLB.decl.h CentralLBMsg.h GreedyLB.decl.h GreedyLB.def.h
+ CentralLB.decl.h CentralLBMsg.h GreedyLB.decl.h GreedyLB.def.h \
+ ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 GridCommLB.o: GridCommLB.C GridCommLB.decl.h charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -460,7 +490,7 @@ GridCommLB.o: GridCommLB.C GridCommLB.decl.h charm++.h charm.h converse.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  CentralLB.decl.h CentralLBMsg.h GridCommLB.h CentralLB.h BaseLB.h \
- manager.h GridCommLB.def.h
+ manager.h GridCommLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 GridCommRefineLB.o: GridCommRefineLB.C GridCommRefineLB.decl.h charm++.h \
  charm.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -481,7 +511,8 @@ GridCommRefineLB.o: GridCommRefineLB.C GridCommRefineLB.decl.h charm++.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h CentralLB.decl.h CentralLBMsg.h GridCommRefineLB.h \
- CentralLB.h BaseLB.h manager.h GridCommRefineLB.def.h
+ CentralLB.h BaseLB.h manager.h GridCommRefineLB.def.h ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 GridHybridLB.o: GridHybridLB.C GridHybridLB.decl.h charm++.h charm.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -502,7 +533,7 @@ GridHybridLB.o: GridHybridLB.C GridHybridLB.decl.h charm++.h charm.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  CentralLB.decl.h CentralLBMsg.h GridHybridLB.h CentralLB.h BaseLB.h \
- manager.h GridHybridLB.def.h
+ manager.h GridHybridLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 GridHybridSeedLB.o: GridHybridSeedLB.C GridHybridSeedLB.decl.h charm++.h \
  charm.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -523,7 +554,8 @@ GridHybridSeedLB.o: GridHybridSeedLB.C GridHybridSeedLB.decl.h charm++.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h CentralLB.decl.h CentralLBMsg.h GridHybridSeedLB.h \
- CentralLB.h BaseLB.h manager.h GridHybridSeedLB.def.h
+ CentralLB.h BaseLB.h manager.h GridHybridSeedLB.def.h ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 GridMetisLB.o: GridMetisLB.C GridMetisLB.decl.h charm++.h charm.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -544,7 +576,7 @@ GridMetisLB.o: GridMetisLB.C GridMetisLB.decl.h charm++.h charm.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  CentralLB.decl.h CentralLBMsg.h GridMetisLB.h CentralLB.h BaseLB.h \
- manager.h GridMetisLB.def.h
+ manager.h GridMetisLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 HbmLB.o: HbmLB.C HbmLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -568,7 +600,8 @@ HbmLB.o: HbmLB.C HbmLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  NeighborLBMsg.h HybridLBMsg.h topology.h GreedyLB.h GreedyLB.decl.h \
  GreedyCommLB.h GreedyCommLB.decl.h CommLBHeap.h RefineCommLB.h \
  RefinerComm.h Refiner.h elements.h ckset.h ckheap.h RefineLB.h \
- RefineLB.decl.h RefineCommLB.decl.h HbmLB.def.h
+ RefineLB.decl.h RefineCommLB.decl.h HbmLB.def.h ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 HybridBaseLB.o: HybridBaseLB.C HybridBaseLB.h charm++.h charm.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -592,7 +625,8 @@ HybridBaseLB.o: HybridBaseLB.C HybridBaseLB.h charm++.h charm.h \
  NeighborLBMsg.h HybridLBMsg.h topology.h GreedyLB.h GreedyLB.decl.h \
  GreedyCommLB.h GreedyCommLB.decl.h CommLBHeap.h RefineCommLB.h \
  RefinerComm.h Refiner.h elements.h ckset.h ckheap.h RefineLB.h \
- RefineLB.decl.h RefineCommLB.decl.h HybridBaseLB.def.h
+ RefineLB.decl.h RefineCommLB.decl.h HybridBaseLB.def.h ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 HybridLB.o: HybridLB.C HybridLB.h CentralLB.h BaseLB.h LBDatabase.h \
  lbdb.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -617,7 +651,8 @@ HybridLB.o: HybridLB.C HybridLB.h CentralLB.h BaseLB.h LBDatabase.h \
  topology.h HybridLB.decl.h GreedyLB.h GreedyLB.decl.h GreedyCommLB.h \
  GreedyCommLB.decl.h CommLBHeap.h RefineCommLB.h RefinerComm.h Refiner.h \
  elements.h ckset.h ckheap.h RefineLB.h RefineLB.decl.h \
- RefineCommLB.decl.h MetisLB.h MetisLB.decl.h HybridLB.def.h
+ RefineCommLB.decl.h MetisLB.h MetisLB.decl.h HybridLB.def.h ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 LBAgent.o: LBAgent.C LBAgent.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -683,7 +718,7 @@ LBDatabase.o: LBDatabase.C converse.h conv-config.h conv-autoconfig.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h LBSimulation.h charm++.h CentralLB.h \
  BaseLB.h CentralLB.decl.h CentralLBMsg.h topology.h NullLB.h BaseLB.h \
- LBDatabase.def.h
+ LBDatabase.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 LBMachineUtil.o: LBMachineUtil.C LBDatabase.h lbdb.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -823,7 +858,8 @@ MetisLB.o: MetisLB.C MetisLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- MetisLB.decl.h ckgraph.h MetisLB.def.h
+ MetisLB.decl.h ckgraph.h MetisLB.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 NborBaseLB.o: NborBaseLB.C BaseLB.h LBDatabase.h lbdb.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -844,7 +880,8 @@ NborBaseLB.o: NborBaseLB.C BaseLB.h LBDatabase.h lbdb.h converse.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h NborBaseLB.h NborBaseLB.decl.h \
- NeighborLBMsg.h topology.h NborBaseLB.def.h
+ NeighborLBMsg.h topology.h NborBaseLB.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 NeighborCommLB.o: NeighborCommLB.C elements.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -865,7 +902,8 @@ NeighborCommLB.o: NeighborCommLB.C elements.h converse.h conv-config.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h NborBaseLB.decl.h NeighborLBMsg.h topology.h \
- NeighborCommLB.decl.h NeighborCommLB.def.h
+ NeighborCommLB.decl.h NeighborCommLB.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 NeighborLB.o: NeighborLB.C elements.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -886,7 +924,7 @@ NeighborLB.o: NeighborLB.C elements.h converse.h conv-config.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h NborBaseLB.decl.h NeighborLBMsg.h topology.h \
- NeighborLB.decl.h NeighborLB.def.h
+ NeighborLB.decl.h NeighborLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 NodeLevelLB.o: NodeLevelLB.C NodeLevelLB.h CentralLB.h BaseLB.h \
  LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
@@ -929,7 +967,7 @@ NullLB.o: NullLB.C NullLB.h BaseLB.h LBDatabase.h lbdb.h converse.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h NullLB.decl.h BaseLB.decl.h NullLB.decl.h ck.h \
  charm++.h envelope.h qd.h register.h stats.h ckfutures.h TopoManager.h \
- converse.h NullLB.def.h
+ converse.h NullLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 OrbLB.o: OrbLB.C OrbLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -950,7 +988,7 @@ OrbLB.o: OrbLB.C OrbLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h OrbLB.decl.h \
- OrbLB.def.h
+ OrbLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 PhasebyArrayLB.o: PhasebyArrayLB.C PhasebyArrayLB.h CentralLB.h BaseLB.h \
  LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
@@ -971,7 +1009,8 @@ PhasebyArrayLB.o: PhasebyArrayLB.C PhasebyArrayLB.h CentralLB.h BaseLB.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- PhasebyArrayLB.decl.h PhasebyArrayLB.def.h
+ PhasebyArrayLB.decl.h PhasebyArrayLB.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 RTH.o: RTH.C RTH.h pup.h converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \
@@ -997,7 +1036,8 @@ RandCentLB.o: RandCentLB.C RandCentLB.h CentralLB.h BaseLB.h LBDatabase.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- RandCentLB.decl.h RandCentLB.def.h
+ RandCentLB.decl.h RandCentLB.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 RecBipartLB.o: RecBipartLB.C RecBipartLB.h CentralLB.h BaseLB.h \
  LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
@@ -1018,7 +1058,8 @@ RecBipartLB.o: RecBipartLB.C RecBipartLB.h CentralLB.h BaseLB.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- RecBipartLB.decl.h ckgraph.h RecBipartLB.def.h
+ RecBipartLB.decl.h ckgraph.h RecBipartLB.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 RefineCommLB.o: RefineCommLB.C elements.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -1040,7 +1081,7 @@ RefineCommLB.o: RefineCommLB.C elements.h converse.h conv-config.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
  RefinerComm.h Refiner.h RefineLB.h RefineLB.decl.h RefineCommLB.decl.h \
- RefineCommLB.def.h
+ RefineCommLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 RefineKLB.o: RefineKLB.C elements.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -1061,7 +1102,8 @@ RefineKLB.o: RefineKLB.C elements.h converse.h conv-config.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- RefinerApprox.h Refiner.h RefineKLB.decl.h RefineKLB.def.h
+ RefinerApprox.h Refiner.h RefineKLB.decl.h RefineKLB.def.h ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 RefineLB.o: RefineLB.C elements.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -1082,7 +1124,7 @@ RefineLB.o: RefineLB.C elements.h converse.h conv-config.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h Refiner.h \
- RefineLB.decl.h RefineLB.def.h
+ RefineLB.decl.h RefineLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 RefineSwapLB.o: RefineSwapLB.C RefineSwapLB.h CentralLB.h BaseLB.h \
  LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
@@ -1103,7 +1145,8 @@ RefineSwapLB.o: RefineSwapLB.C RefineSwapLB.h CentralLB.h BaseLB.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- RefineSwapLB.decl.h ckgraph.h RefineSwapLB.def.h
+ RefineSwapLB.decl.h ckgraph.h RefineSwapLB.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 RefineTopoLB.o: RefineTopoLB.C RefineTopoLB.decl.h charm++.h charm.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -1124,7 +1167,8 @@ RefineTopoLB.o: RefineTopoLB.C RefineTopoLB.decl.h charm++.h charm.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  TopoLB.decl.h CentralLB.decl.h CentralLBMsg.h RefineTopoLB.h CentralLB.h \
- BaseLB.h TopoLB.h topology.h RefineTopoLB.def.h
+ BaseLB.h TopoLB.h topology.h RefineTopoLB.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 Refiner.o: Refiner.C Refiner.h elements.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -1226,7 +1270,7 @@ RotateLB.o: RotateLB.C RotateLB.decl.h charm++.h charm.h converse.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  CentralLB.decl.h CentralLBMsg.h RotateLB.h CentralLB.h BaseLB.h \
- RotateLB.def.h
+ RotateLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 ScotchLB.o: ScotchLB.C ScotchLB.h CentralLB.h BaseLB.h LBDatabase.h \
  lbdb.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -1247,7 +1291,7 @@ ScotchLB.o: ScotchLB.C ScotchLB.h CentralLB.h BaseLB.h LBDatabase.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- ScotchLB.decl.h ckgraph.h ScotchLB.def.h
+ ScotchLB.decl.h ckgraph.h ScotchLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 TeamLB.o: TeamLB.C TeamLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -1268,7 +1312,7 @@ TeamLB.o: TeamLB.C TeamLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- TeamLB.decl.h ckgraph.h TeamLB.def.h
+ TeamLB.decl.h ckgraph.h TeamLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 TempAwareCommLB.o: TempAwareCommLB.C TempAwareCommLB.h CentralLB.h \
  BaseLB.h LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
@@ -1310,7 +1354,8 @@ TempAwareGreedyLB.o: TempAwareGreedyLB.C TempAwareGreedyLB.h CentralLB.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h \
- TempAwareGreedyLB.decl.h ckgraph.h TempAwareGreedyLB.def.h
+ TempAwareGreedyLB.decl.h ckgraph.h TempAwareGreedyLB.def.h ckaccel_common.h \
+ ckaccel.h ckaccel.decl.h
 
 TempAwareRefineLB.o: TempAwareRefineLB.C TempAwareRefineLB.h CentralLB.h \
  BaseLB.h LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
@@ -1353,7 +1398,7 @@ TopoCentLB.o: TopoCentLB.C TopoCentLB.decl.h charm++.h charm.h converse.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  CentralLB.decl.h CentralLBMsg.h TopoCentLB.h CentralLB.h BaseLB.h \
- topology.h TopoCentLB.def.h
+ topology.h TopoCentLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 TopoLB.o: TopoLB.C TopoLB.decl.h charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -1374,7 +1419,7 @@ TopoLB.o: TopoLB.C TopoLB.decl.h charm++.h charm.h converse.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  CentralLB.decl.h CentralLBMsg.h TopoLB.h CentralLB.h BaseLB.h topology.h \
- TopoLB.def.h
+ TopoLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 TopoManager.o: TopoManager.C TopoManager.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -1402,7 +1447,7 @@ TreeMatchLB.o: TreeMatchLB.C charm++.h charm.h converse.h conv-config.h \
  tm_mapping.h TreeMatchLB.h CentralLB.h BaseLB.h LBDatabase.h \
  CentralLB.decl.h charm++.h envelope.h sdag.h BaseLB.decl.h \
  LBDatabase.decl.h CentralLBMsg.h TreeMatchLB.decl.h ckgraph.h \
- TreeMatchLB.def.h
+ TreeMatchLB.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 WSLB.o: WSLB.C elements.h converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \
@@ -1422,7 +1467,8 @@ WSLB.o: WSLB.C elements.h converse.h conv-config.h conv-autoconfig.h \
  cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h \
  tempo.h tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
- NullLB.decl.h BaseLB.decl.h WSLB.decl.h topology.h WSLB.def.h
+ NullLB.decl.h BaseLB.decl.h WSLB.decl.h topology.h WSLB.def.h \
+ ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -1630,7 +1676,8 @@ ckarray.o: ckarray.C charm++.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h register.h ck.h qd.h stats.h TopoManager.h \
- pathHistory.h PathHistory.decl.h CkArray.def.h
+ pathHistory.h PathHistory.decl.h CkArray.def.h ckaccel.h \
+ ckaccel_common.h ckaccel.decl.h
 
 ckarrayreductionmgr.o: ckarrayreductionmgr.C charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -1650,7 +1697,8 @@ ckarrayreductionmgr.o: ckarrayreductionmgr.C charm++.h charm.h converse.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h tempo.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h ck.h qd.h \
- register.h stats.h TopoManager.h CkArrayReductionMgr.def.h
+ register.h stats.h TopoManager.h CkArrayReductionMgr.def.h ckaccel.h \
+ ckaccel_common.h ckaccel.decl.h
 
 ckbitvector.o: ckbitvector.C charm++.h charm.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -1688,7 +1736,8 @@ ckcallback.o: ckcallback.C charm++.h charm.h converse.h conv-config.h \
  CkLocation.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
- trace-bluegene.h ckcallback-ccs.h CkCallback.decl.h CkCallback.def.h
+ trace-bluegene.h ckcallback-ccs.h CkCallback.decl.h CkCallback.def.h \
+ ckaccel.h ckaccel_common.h ckaccel.decl.h
 
 ckcausalmlog.o: ckcausalmlog.C charm.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -1729,7 +1778,8 @@ ckcheckpoint.o: ckcheckpoint.C charm++.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h ck.h qd.h register.h stats.h TopoManager.h \
- CkCheckpoint.decl.h CkCheckpoint.def.h
+ CkCheckpoint.decl.h CkCheckpoint.def.h ckaccel.h ckaccel_common.h \
+ ckaccel.decl.h
 
 ckdll.o: ckdll.C converse.h conv-config.h conv-autoconfig.h conv-common.h \
  conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h conv-cpm.h \
@@ -1773,7 +1823,7 @@ ckfutures.o: ckfutures.C charm++.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h ck.h qd.h register.h stats.h TopoManager.h \
- CkFutures.def.h
+ CkFutures.def.h ckaccel.h ckaccel_common.h ckaccel.decl.h
 
 ckgraph.o: ckgraph.C ckgraph.h BaseLB.h LBDatabase.h lbdb.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -1850,7 +1900,7 @@ cklocation.o: cklocation.C hilbert.h partitioning_strategies.h charm++.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h register.h ck.h qd.h stats.h TopoManager.h \
- CkLocation.def.h
+ CkLocation.def.h ckaccel.h ckaccel_common.h ckaccel.decl.h
 
 ckmemcheckpoint.o: ckmemcheckpoint.C charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -1870,7 +1920,8 @@ ckmemcheckpoint.o: ckmemcheckpoint.C charm++.h charm.h converse.h \
  ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h tempo.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h ck.h qd.h \
- register.h stats.h TopoManager.h CkMemCheckpoint.def.h
+ register.h stats.h TopoManager.h CkMemCheckpoint.def.h ckaccel.h \
+ ckaccel_common.h ckaccel.decl.h
 
 ckmessagelogging.o: ckmessagelogging.C charm.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -1949,7 +2000,7 @@ ckreduction.o: ckreduction.C charm++.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
  trace-bluegene.h ck.h qd.h register.h stats.h TopoManager.h \
- CkReduction.def.h
+ CkReduction.def.h ckaccel.h ckaccel_common.h ckaccel.decl.h
 
 ckset.o: ckset.C elements.h converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \
@@ -2348,6 +2399,23 @@ modifyScheduler.o: modifyScheduler.C charm++.h charm.h converse.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h
 
+ ckaccel.o: ckaccel.C charm++.h charm.h converse.h conv-config.h \
+ conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h \
+ conv-mach-cuda.h pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
+ conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
+ middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+ ckhashtable.h debug-charm.h debug-conv++.h simd.h CkMarshall.decl.h \
+ ckarrayindex.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
+ ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+ CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+ readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+ LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+ NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h ckfutures.h \
+ CkFutures.decl.h tempo.h tempo.decl.h \
+ waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+ ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h envelope.h \
+ ckaccel.h ckaccel_common.h ckaccel.decl.h ckaccel.def.h
+
 mpi-interoperate.o: mpi-interoperate.C mpi-interoperate.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
  conv-mach-opt.h cmiqueue.h pup_c.h queueing.h conv-cpm.h conv-cpath.h \
@@ -2573,7 +2641,7 @@ tempo.o: tempo.C charm++.h charm.h converse.h conv-config.h \
  CkLocation.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h ckevacuation.h ckarrayreductionmgr.h trace.h \
- trace-bluegene.h tempo.def.h
+ trace-bluegene.h tempo.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 tm_bucket.o: tm_bucket.c tm_tree.h tm_bucket.h tm_timings.h
 
@@ -2640,7 +2708,8 @@ trace-controlPoints.o: trace-controlPoints.C charm++.h charm.h converse.h \
  tempo.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  trace-controlPoints.h register.h trace-common.h trace-controlPointsBOC.h \
- TraceControlPoints.decl.h TraceControlPoints.def.h
+ TraceControlPoints.decl.h TraceControlPoints.def.h ckaccel_common.h ckaccel.h \
+ ckaccel.decl.h
 
 trace-converse.o: trace-converse.c conv-trace.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -2771,7 +2840,7 @@ trace-summary.o: trace-summary.C charm++.h charm.h converse.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
  trace-summary.h register.h trace-common.h trace-summaryBOC.h \
  ckcallback-ccs.h CkCallback.decl.h TraceSummary.decl.h \
- TraceSummary.def.h
+ TraceSummary.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 
 trace-utilization.o: trace-utilization.C trace-utilization.h charm++.h \
  charm.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -2862,5 +2931,5 @@ waitqd.o: waitqd.C waitqd.h charm++.h charm.h converse.h conv-config.h \
  CkLocation.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
  CkFutures.decl.h tempo.h tempo.decl.h ckcheckpoint.h ckcallback.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
- waitqd.decl.h waitqd.def.h
+ waitqd.decl.h waitqd.def.h ckaccel_common.h ckaccel.h ckaccel.decl.h
 

@@ -85,6 +85,11 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
                   type = type->deref();
                 }
 	}
+ // DMK - Accel Support
+        accelBufferType = Parameter::ACCEL_BUFFER_TYPE_UNKNOWN;
+        accelInstName = NULL;
+        isSharedFlag = 0;
+        isPersistFlag = 0;
 }
 
 ParamList::ParamList(ParamList *pl) : manyPointers(false), param(pl->param), next(pl->next) {}
@@ -546,6 +551,12 @@ void Parameter::setAccelBufferType(int abt) {
 int   Parameter::getAccelBufferType() { return accelBufferType; }
 void  Parameter::setAccelInstName(XStr* ain) { accelInstName = ain; }
 XStr* Parameter::getAccelInstName(void) { return accelInstName; }
+
+void Parameter::setShared(int sf) { isSharedFlag = ((sf) ? (1) : (0)); }
+int Parameter::isShared() { return isSharedFlag; }
+void Parameter::setPersist(int pf) { isPersistFlag = ((pf) ? (1) : (0)); }
+int Parameter::isPersist() { return isPersistFlag; }
+
 
 ParamList::ParamList(Parameter *Nparam,ParamList *Nnext)
   :param(Nparam), next(Nnext) { 

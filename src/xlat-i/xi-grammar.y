@@ -1,4 +1,4 @@
-%expect 7
+%expect 8
 %{
 #include <iostream>
 #include <string>
@@ -135,6 +135,11 @@ void ReservedWord(int token);
 %token MEMCRITICAL
 %token REDUCTIONTARGET
 %token CASE
+%token TRIGGERED
+%token SHARED
+%token SPLITTABLE
+%token THREADSPERBLOCK
+%token PERSIST
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
@@ -164,8 +169,9 @@ void ReservedWord(int token);
 %type <pname>           Parameter ParamBracketStart AccelParameter AccelArrayParam
 %type <plist>           ParamList EParameters AccelParamList AccelEParameters
 %type <intval>          AccelBufferType
-%type <xstrptr>         AccelInstName
+%type <xstrptr>         AccelInstName OptionalSplittable OptionalCudaManualThreadsPerBlock
 %type <accelBlock>      AccelBlock
+%type <intval>          OptionalTriggered OptionalShared OptionalPersist
 %type <typelist>	BaseList OptBaseList
 %type <mbrlist>		MemberEList MemberList
 %type <member>		Member MemberBody NonEntryMember InitNode InitProc UnexpectedToken
@@ -830,6 +836,27 @@ MemberBody	: Entry
         }
 		;
 
+OptionalTriggered : TRIGGERED
+                  { $$ = 1; }
+                  |
+                  { $$ = 0; }
+                  ;
+
+OptionalSplittable : SPLITTABLE '(' NUMBER ')'
+                   { $$ = new XStr(); *($$) << $3; }
+                   | SPLITTABLE '(' Name ')'
+                   { $$ = new XStr($3); }
+                   |
+                   { $$ = NULL; }
+                   ;
+
+
+OptionalCudaManualThreadsPerBlock : THREADSPERBLOCK '(' NUMBER ')'
+                                  { $$ = new XStr(); *($$) << $3; }
+                                  |
+                                  { $$ = NULL; }
+                                  ;
+
 UnexpectedToken : ENTRY
                 { $$ = 0; }
                 | '}'
@@ -853,7 +880,8 @@ UnexpectedToken : ENTRY
                 | READONLY
                 { $$ = 0; }
 
-Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
+
+Entry		:ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
                   $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, (const char *) NULL, @1.first_line, @$.last_line);
 		  if ($7 != 0) { 
@@ -880,6 +908,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		    $$ = e;
 		  }
 		}
+
 		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name ';' /* DMK : Accelerated Entry Method */
                 {
                   int attribs = SACCEL;
@@ -893,6 +922,33 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                   $$->setAccelParam(accelParamList);
                   $$->setAccelCodeBody(codeBody);
                   $$->setAccelCallbackName(new XStr(callbackName));
+                  printf("[DMK-DEBUG] :: SIMPLE!\n");
+                }
+		| ENTRY '[' OptionalTriggered OptionalSplittable OptionalCudaManualThreadsPerBlock  ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name ';' /* DMK : Accelerated Entry Method */
+                {
+                  int attribs = SACCEL;
+                  if ($3 != 0) {
+                    attribs |= STRIGGERED;
+                    printf("[DMK-DEBUG] :: Triggered AEM Detected!\n");
+                    #if CMK_CUDA
+		      printf("[DMK-DEBUG] ::   CUDA Detected!\n");
+                    #endif
+                  }
+                  XStr* splitAmount = $4;
+                  XStr* threadsPerBlock = $5;
+                  const char* name = $9;
+                  ParamList* paramList = $10;
+                  ParamList* accelParamList = $11;
+		  XStr* codeBody = new XStr($13);
+                  const char* callbackName = $15;
+                  printf("[DMK-DEBUG] :: COMPLEX!\n");
+
+                  $$ = new Entry(lineno, attribs, new BuiltinType("void"), name, paramList, 0, 0, 0 );
+                  $$->setAccelParam(accelParamList);
+                  $$->setAccelCodeBody(codeBody);
+                  $$->setAccelCallbackName(new XStr(callbackName));
+                  $$->setAccelSplitAmount(splitAmount);
+                  $$->setCudaManualThreadsPerBlock(threadsPerBlock);
                 }
 		;
 
@@ -1085,12 +1141,25 @@ AccelArrayParam : ParamBracketStart CCode ']'
                   $$ = new Parameter(lineno, $1->getType(), $1->getName(), $2);
                 }
                 ;
+OptionalShared  : SHARED
+                { $$ = 1; }
+                |
+                { $$ = 0; }
+                ;
 
-AccelParameter	: AccelBufferType ':' Type Name '<' AccelInstName '>'
+OptionalPersist : PERSIST
+                { $$ = 1; }
+                |
+                { $$ = 0; }
+                ;
+
+AccelParameter	: AccelBufferType OptionalPersist OptionalShared ':' Type Name '<' AccelInstName '>'
                 {
-                  $$ = new Parameter(lineno, $3, $4);
-                  $$->setAccelInstName($6);
+                  $$ = new Parameter(lineno, $5, $6);
+                  $$->setAccelInstName($8);
                   $$->setAccelBufferType($1);
+                  $$->setShared($3);
+                  $$->setPersist($2);
                 }
                 | Type Name '<' AccelInstName '>'
                 {
@@ -1098,11 +1167,13 @@ AccelParameter	: AccelBufferType ':' Type Name '<' AccelInstName '>'
                   $$->setAccelInstName($4);
                   $$->setAccelBufferType(Parameter::ACCEL_BUFFER_TYPE_READWRITE);
 		}
-                | AccelBufferType ':' AccelArrayParam '<' AccelInstName '>'
+                | AccelBufferType OptionalPersist OptionalShared ':' AccelArrayParam '<' AccelInstName '>'
                 {
-                  $$ = $3;
-                  $$->setAccelInstName($5);
+                  $$ = $5;
+                  $$->setAccelInstName($7);
                   $$->setAccelBufferType($1);
+                  $$->setShared($3);
+                  $$->setPersist($2);
 		}
 		;
 

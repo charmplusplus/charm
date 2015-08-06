@@ -433,7 +433,8 @@ void initHybridAPI(int myPe) {
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
 
-  cudaSetDevice(myPe % deviceCount); 
+ // cudaSetDevice(myPe % deviceCount);
+  cudaSetDevice(0);
 
   initWRqueue(&wrQueue);
 

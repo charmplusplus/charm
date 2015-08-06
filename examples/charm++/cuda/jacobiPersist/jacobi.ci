@@ -1,0 +1,124 @@
+module jacobi {
+
+  message EastWestGhost;
+  message NorthSouthGhost;
+
+  accelblock { #include "jacobi_config.h" };
+
+  array [1D] Jacobi {
+
+    entry Jacobi(void);
+
+    entry void startIteration(void);
+
+    entry void northData(int size, float ghostData[size], int iterRef);
+    entry void southData(int size, float ghostData[size], int iterRef);
+    entry void eastData(int size, float ghostData[size], int iterRef);
+    entry void westData(int size, float ghostData[size], int iterRef);
+
+    entry void northData_msg(NorthSouthGhost*);
+    entry void southData_msg(NorthSouthGhost*);
+    entry void eastData_msg(EastWestGhost*);
+    entry void westData_msg(EastWestGhost*);
+
+    entry [triggered splittable(NUM_ROWS) threadsperblock(192) accel] void doCalculation()
+        [  readonly persist : float    matrix[DATA_BUFFER_SIZE] <impl_obj->matrix>,
+          writeonly persist : float matrixTmp[DATA_BUFFER_SIZE] <impl_obj->matrixTmp>,
+          writeonly         : float       tmpMaxError[NUM_ROWS] <impl_obj->tmpMaxError>,
+           readonly         : float    northGhostData[NUM_COLS] <impl_obj->northGhostData>,
+           readonly         : float    southGhostData[NUM_COLS] <impl_obj->southGhostData>,
+           readonly         : float     eastGhostData[NUM_ROWS] <impl_obj->eastGhostData>,
+           readonly         : float     westGhostData[NUM_ROWS] <impl_obj->westGhostData>,
+          writeonly         : float northGhostDataOut[NUM_COLS] <impl_obj->northGhostDataOut>,
+          writeonly         : float southGhostDataOut[NUM_COLS] <impl_obj->southGhostDataOut>,
+          writeonly         : float  eastGhostDataOut[NUM_ROWS] <impl_obj->eastGhostDataOut>,
+          writeonly         : float  westGhostDataOut[NUM_ROWS] <impl_obj->westGhostDataOut>
+        ] {
+
+      //// DMK - DEBUG
+      //#if CMK_CUDA_DEVICE
+      //  if (__threadIndex == 0) {
+      //    ((int*)__wrData)[ACCEL_CUDA_KERNEL_ERROR_INDEX] = ((int*)(&matrixTmp))[0];
+      //  }
+      //#endif
+
+      for (int y = splitIndex + 1; y <= NUM_ROWS; y += numSplits) {
+
+        float maxError = 0.0f;
+
+        #if 1
+
+        // Copy this row's east and west ghost data
+        matrix[GET_DATA_I(0, y)] = westGhostData[y - 1];
+        matrix[GET_DATA_I(NUM_COLS + 1, y)] = eastGhostData[y - 1];
+
+        for (int x = 1; x <= NUM_COLS; x++) {
+
+          int index = GET_DATA_I(x, y);
+
+          // Copy in north and south ghosts as we move down the row
+          if (y == 1) { matrix[GET_DATA_I(x, y - 1)] = northGhostData[x - 1]; }
+          if (y == NUM_ROWS) { matrix[GET_DATA_I(x, y + 1)] = southGhostData[x - 1]; }
+
+          #if 1  // Pattern selection (5 point stencil)
+
+          matrixTmp[index] = ((2.00f * matrix[index]) +
+                              (0.75f * matrix[GET_DATA_I(x - 1, y)]) +
+                              (0.75f * matrix[GET_DATA_I(x + 1, y)]) +
+                              (0.75f * matrix[GET_DATA_I(x, y - 1)]) +
+                              (0.75f * matrix[GET_DATA_I(x, y + 1)])
+                             ) * (0.2f);  // Divide by 5.0f
+
+          #else // Pattern selection (9 point stencil with weights)
+
+          matrixTmp[index] = ((0.25f * matrix[index - DATA_BUFFER_COLS - 1]) +
+                              (0.50f * matrix[index - DATA_BUFFER_COLS    ]) +
+                              (0.25f * matrix[index - DATA_BUFFER_COLS + 1]) +
+                              (0.50f * matrix[index - 1]                   ) +
+                              (2.00f * matrix[index    ]                   ) +
+                              (0.50f * matrix[index + 1]                   ) +
+                              (0.25f * matrix[index + DATA_BUFFER_COLS - 1]) +
+                              (0.50f * matrix[index + DATA_BUFFER_COLS    ]) +
+                              (0.25f * matrix[index + DATA_BUFFER_COLS + 1])
+                             ) * (0.2f);  // Divide by 5.0f
+
+          #endif // Pattern selection
+
+          // Hold tile element (1,1) constant at 1.0f on every tile
+          if (y == 1 && x == 1) { matrixTmp[GET_DATA_I(x,y)] = 1.0f; }
+
+          float tmpError = matrixTmp[index] - matrix[index];
+          if (tmpError < 0) { tmpError = -1.0f * tmpError; }
+          if (tmpError > maxError) { maxError = tmpError; }
+
+          // Copy out north and south output ghosts as we move down the row
+          if (y == 1) { northGhostDataOut[x - 1] = matrixTmp[GET_DATA_I(x, y)]; }
+          if (y == NUM_ROWS) { southGhostDataOut[x - 1] = matrixTmp[GET_DATA_I(x, y)]; }
+
+          //// DMK - DEBUG
+          //if (y == 1) { matrixTmp[GET_DATA_I(x, y - 1)] = matrixTmp[GET_DATA_I(x, y)]; }
+          //if (y == NUM_ROWS) { matrixTmp[GET_DATA_I(x, y + 1)] = matrixTmp[GET_DATA_I(x, y)]; }
+
+        }
+
+        // Copy this row's east and west output ghost data
+        westGhostDataOut[y - 1] = matrixTmp[GET_DATA_I(1, y)];
+        eastGhostDataOut[y - 1] = matrixTmp[GET_DATA_I(NUM_COLS, y)];
+
+        //// DMK - DEBUG
+        //matrixTmp[GET_DATA_I(0, y)] = matrixTmp[GET_DATA_I(1, y)];
+        //matrixTmp[GET_DATA_I(NUM_COLS + 1, y)] = matrixTmp[GET_DATA_I(NUM_COLS, y)];
+
+        #endif
+
+        tmpMaxError[y-1] = maxError;
+
+      } // end for (y <= NUM_ROWS)
+
+    } doCalculation_post;
+
+    entry void doCalculation_post();
+
+  };
+
+};
