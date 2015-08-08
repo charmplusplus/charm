@@ -52,15 +52,14 @@ public:
 
       size_t readData = pread(fd, ReadDataFromFile, 90, 0);
 
-      for(int i = 0; i < 90; i++)
-        CkPrintf ("%d %d %d \n", ReadArray[i], ReadDataFromFile[i], readData);
+      for(int i = 0; i < readData; i++)
+        CkPrintf ("%d %d %d %d\n", ReadArray[i], ReadDataFromFile[i], readData, numdone);
 
       if(strcmp(ReadArray,ReadDataFromFile)==0)
         CkPrintf("ReadData is Corrrect \n");
       else {
         CkPrintf("ReadData is not Valid \n");
       } 
-      //CmiClose(fd);   
 
       CkExit();
 
@@ -92,24 +91,12 @@ struct test : public CBase_test {
     int bytes = 20;
     
     CkCallback myCB(CkIndex_test::readCompleted(NULL), thisProxy[thisIndex]);
-    
-    //sprintf(out, "%9d\n", thisIndex);
-    //Ck::IO::write(token, out, 10, 10*thisIndex); // This line was here previously
-    
-    //Ck::IO::readTag tag = Ck::IO::read(token, out, 10, 10*thisIndex);
      
     Ck::IO::read(token, readData, 10, 10*thisIndex, myCB);
 
     savedToken = token;
     numChares = n;
-
-    //CkPrintf("This index %d \n", thisIndex);
-
-  //CkPrintf("On %d (0x%x): %d %d %d %d %d %d %d %d %d %d\n", thisIndex, out, out[0],out[1],out[2],out[3],out[4],out[5],out[6],out[7],out[8],out[9]);  
-    //mainProxy.testReadFiles(10*thisIndex,10, out);
-    
-    //thisProxy[0].done(token,n); // Pass the token with the done function, 
-  
+ 
   }
   
   test(CkMigrateMessage *m) {
@@ -117,7 +104,6 @@ struct test : public CBase_test {
   }
 
   void readCompleted(Ck::IO::SessionReadyMsg* m) {
-     // CkPrintf("In the callback %d \n", m->token);
 
     mainProxy.testReadFiles(10*thisIndex,10,readData);
 
@@ -128,8 +114,6 @@ struct test : public CBase_test {
   void done(Ck::IO::Session token, int n) { // This is done function
       
     numDone++;
-    //CkPrintf("NumDone is %d %d\n",numDone,token);
-      
       if(numDone == n){ // When numDone equals to the total number of Pe close
         Ck::IO::endSession(token);   // Create End Session in the Library and End the Session
       }

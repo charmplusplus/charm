@@ -89,7 +89,7 @@ namespace Ck { namespace IO {
 
   void endSession(Session session);
 
-  /// In order to do the callback for the read stripe 
+  
 
 
   class File {

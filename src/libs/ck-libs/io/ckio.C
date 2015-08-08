@@ -204,6 +204,7 @@ namespace Ck { namespace IO {
         CallerTable CallerTableData;
 
         std::map<char,CallerTable> MapTable;
+        
 
       public:
         Manager()
@@ -290,6 +291,7 @@ namespace Ck { namespace IO {
           CkAssert(offset >= session.offset);
           CkAssert(offset + bytes <= session.offset + session.bytes);
 
+
           size_t sessionStripeBase = (session.offset / stripe) * stripe;
 
           while (bytes > 0) {
@@ -316,10 +318,14 @@ namespace Ck { namespace IO {
           Options &opts = files[session.file].opts;
           size_t Bytes = bytes;
           size_t Offset = offset;
+          
+
 
           size_t stripe = opts.peStripe;
 
           int key = genKeyID;
+
+          int offsetToWrite = 0;
 
           CkAssert(offset >= session.offset);
           CkAssert(offset + bytes <= session.offset + session.bytes);
@@ -336,7 +342,7 @@ namespace Ck { namespace IO {
           CallerTableData.dataPtr = (long)data;
           CallerTableData.totalReads =  0; // TODO : This needs to be updated 
           CallerTableData.CompletedReads = 0;
-          CallerTableData.offset = 0; // FixMe: make sure we are writing at the right offset
+        
       
           while(Bytes > 0){
             size_t stripeIndex = (Offset - sessionStripeBase) / stripe;
@@ -353,21 +359,28 @@ namespace Ck { namespace IO {
            
 
            while (bytes > 0) {
+
             size_t stripeIndex = (offset - sessionStripeBase) / stripe;
             size_t bytesToRead = min(bytes, stripe - offset % stripe);
 
             CProxy_ReadSession(session.sessionID)[stripeIndex]
-              .readData(key, CkMyPe(), bytesToRead, offset, thisProxy); // use thisProxy in the code to send the message back
+              .readData(key, CkMyPe(), bytesToRead, offset, offsetToWrite, thisProxy); // use thisProxy in the code to send the message back
 
               offset += bytesToRead;
               bytes -= bytesToRead;
-          }
+              offsetToWrite++;
+                 
+           }
+
         }
 
-        void readDone(int key, int size, char *data){
+        void readDone(int key, int size, int offsetToWrite, char *data){
+
+          
+          int offset = offsetToWrite * size;
 
           for(int count = 0 ; count < size; count++){
-            *(unsigned char *)(MapTable[key].dataPtr + MapTable[key].offset + count) = data[count];
+            *(unsigned char *)(MapTable[key].dataPtr + offset + count) = data[count];
           }
 
 
@@ -377,14 +390,11 @@ namespace Ck { namespace IO {
           if(MapTable[key].totalReads == MapTable[key].CompletedReads) {
             CkPrintf("Looks like we're all done!\n");
             MapTable[key].myCB.send();
-           // delete  data;
+              
             //MapTable.erase(key);
           }
-          else{
           
-            MapTable[key].offset += size ;
-
-          }
+           // delete the allocated memory because we are done copying the data
 
         }
 
@@ -598,7 +608,7 @@ namespace Ck { namespace IO {
 
         ReadSession(CkMigrateMessage *m) { }
 
-        void readData(int key, int pe, size_t bytes, size_t offset, CProxy_Manager indexP) {
+        void readData(int key, int pe, size_t bytes, size_t offset, int offsetToWrite, CProxy_Manager indexP) {
           
 
           char *data = new char[bytes]; // TODO : Must free this buffer somewhere
@@ -609,8 +619,9 @@ namespace Ck { namespace IO {
           size_t stripeSize = file->opts.readStripe;
 
           size_t readBytes = CmiPread(file->fd, data, bytes, offset);
-     
-          indexP[pe].readDone(key,bytes,data);
+
+          
+          indexP[pe].readDone(key,bytes,offsetToWrite, data);
 
           if (readBytes < 0){
             fatalError("Call to pread failed", file->name);
@@ -677,6 +688,7 @@ namespace Ck { namespace IO {
       opts.peRW = ReadPe; // TODO: See how we can use this flag
 
       if (opts.peRW == WritePe){
+
         CkPrintf("This is a write Session \n");
         
         impl::director.prepareWriteSession(file.token, bytes, offset, ready,
@@ -684,6 +696,7 @@ namespace Ck { namespace IO {
                                          complete);
       }
       else{
+
         CkPrintf("Going to Prepare the Read Session \n");  
         impl::director.prepareReadSession(file.token, bytes, offset, ready,
                                          commitData, commitBytes, commitOffset,
