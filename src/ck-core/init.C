@@ -517,6 +517,7 @@ static void _exitHandler(envelope *env)
       _exitStarted = 1;
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
+#if !CMK_BIGSIM_THREAD
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -531,7 +532,11 @@ static void _exitHandler(envelope *env)
         CmiFree(env);
       }else{
 	CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
-      }	
+      }
+#else
+      CmiFree(env);
+      ConverseExit();
+#endif
       break;
     case ReqStatMsg:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
