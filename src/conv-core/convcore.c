@@ -2280,7 +2280,6 @@ CmiReduction* CmiGetReductionCreate(int id, short int numChildren) {
   }
   if (red == NULL || red->numChildren < numChildren) {
     CmiReduction *newred;
-    if (red != NULL) CmiPrintf("[%d] Reduction structure reallocated\n",CmiMyPe());
     CmiAssert(red == NULL || red->localContributed == 0);
     if (numChildren == 0) numChildren = 4;
     newred = (CmiReduction*)malloc(sizeof(CmiReduction)+numChildren*sizeof(void*));
