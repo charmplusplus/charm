@@ -130,13 +130,11 @@ struct test : public CBase_test {
     if (remainingReadBytes > 0 && thisIndex == 0){
       
       remainingReadBytes = remainingReadBytes + fixedReadBytes;
-      CkPrintf("Remaining bytes to read %d ************** if\n",remainingReadBytes);
       Ck::IO::read(token, readData, remainingReadBytes, remainingReadBytes*thisIndex, myCB);
      
       
     }else{
     
-      CkPrintf("fixed bytes to read %d ************** else\n",fixedReadBytes);
       Ck::IO::read(token, readData, fixedReadBytes, fixedReadBytes*thisIndex + remainingReadBytes, myCB);
     
     }

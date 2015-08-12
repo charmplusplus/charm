@@ -331,8 +331,6 @@ namespace Ck { namespace IO {
 
           size_t sessionStripeBase = (session.offset / stripe) * stripe;
 
-          CkPrintf("readPtr: %x\n", data); 
-
           int i = 0;
 
           genKeyID++;
