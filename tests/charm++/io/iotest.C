@@ -15,21 +15,48 @@
 
 CProxy_Main mainProxy;
 
+
 class Main : public CBase_Main {
   Main_SDAG_CODE
 
   CProxy_test testers;
   int n, numdone;
-  char ReadArray[100*100];
+  char *ReadArray; // ReadArray pointer contains the pointer for the read buffer
+  char fileName[50];
+  int fileSize;
+  int remainingBytes;
+  int fixedBytesToRead;
+ 
   std::vector<Ck::IO::File> f;  
 public:
   Main(CkArgMsg *m) {
     numdone = 0;
     n = atoi(m->argv[1]);
 
+    sprintf(fileName,"%s", m->argv[m->argc - 1]);
+
+    FILE *fp = fopen(fileName, "r");
+
+    if(fp == NULL)
+      CkPrintf("Unable to open the file \n");
+    
+    fseek(fp, 0L, SEEK_END); // This iterate through the file 
+    
+    fileSize = ftell(fp);     //This will give you the file size
+
+    fclose(fp);
+
+    fixedBytesToRead = floor(fileSize / n);
+    remainingBytes = fileSize % n;
+    ReadArray = new char[fileSize];
+
+    CkPrintf("Numchares = %d Bytes %d \n", atoi(m->argv[m->argc - 2]), fileSize);
+    
     f.resize(1);      
-    for (int i = 0; i < f.size(); ++i)
+    
+    for (int i = 0; i < f.size(); ++i){
       thisProxy.run(4*i);
+    }
 
     mainProxy= thisProxy;
 
@@ -44,33 +71,32 @@ public:
     if (numdone == f.size()){
       
    
-      int fd = open("test0", O_RDONLY);
+      int fd = open(fileName, O_RDONLY);
       if(fd  < 0)
         CkPrintf("Cannot Open File \n");
 
-      char ReadDataFromFile[100*100];
+      char ReadDataFromFile[fileSize];
 
-      size_t readData = pread(fd, ReadDataFromFile, 90, 0);
+      size_t readData = pread(fd, ReadDataFromFile, fileSize, 0);
 
-      for(int i = 0; i < readData; i++)
-        CkPrintf ("%d %d %d %d\n", ReadArray[i], ReadDataFromFile[i], readData, numdone);
+      for(int i = 0; i < readData; i++){
+        //CkPrintf ("%d %d %d %d\n", ReadArray[i], ReadDataFromFile[i], readData, numdone);
+        if(ReadArray[i] != ReadDataFromFile[i]){
+          CkPrintf("ReadData is not Valid \n");  
+          CkExit(); 
+        }
+      }
 
-      if(strcmp(ReadArray,ReadDataFromFile)==0)
-        CkPrintf("ReadData is Corrrect \n");
-      else {
-        CkPrintf("ReadData is not Valid \n");
-      } 
-
-      CkExit();
+      CkPrintf("ReadData is Corrrect \n");
+      CkExit();   
+      
 
     }
   }
 
   void testReadFiles(int offset, int size, char data[]){
   
-    
       memcpy(ReadArray + offset, data,size);
-
  
   } 
 
@@ -82,18 +108,40 @@ struct test : public CBase_test {
   Ck::IO::Session savedToken;
   int numChares;
   char *readData;
+  int fixedReadBytes;
+  int remainingReadBytes;
+
   
-  test(Ck::IO::Session token,int n) { // Pass the number of chare elements in our case they are n elements
+  int issuedRead = 0;
+
+  test(Ck::IO::Session token,int n, int fixedBytesToRead, int remainingBytes) { // Pass the number of chare elements in our case they are n elements
     
-    readData = new char[20];
+    readData = new char[fixedBytesToRead];
     int fd;
     int i = 0;
     int bytes = 20;
-    
+
+    fixedReadBytes = fixedBytesToRead;
+    remainingReadBytes = remainingBytes;
+
+
     CkCallback myCB(CkIndex_test::readCompleted(NULL), thisProxy[thisIndex]);
      
-    Ck::IO::read(token, readData, 10, 10*thisIndex, myCB);
+    if (remainingReadBytes > 0 && thisIndex == 0){
+      
+      remainingReadBytes = remainingReadBytes + fixedReadBytes;
+      CkPrintf("Remaining bytes to read %d ************** if\n",remainingReadBytes);
+      Ck::IO::read(token, readData, remainingReadBytes, remainingReadBytes*thisIndex, myCB);
+     
+      
+    }else{
+    
+      CkPrintf("fixed bytes to read %d ************** else\n",fixedReadBytes);
+      Ck::IO::read(token, readData, fixedReadBytes, fixedReadBytes*thisIndex + remainingReadBytes, myCB);
+    
+    }
 
+    
     savedToken = token;
     numChares = n;
  
@@ -105,9 +153,11 @@ struct test : public CBase_test {
 
   void readCompleted(Ck::IO::SessionReadyMsg* m) {
 
-    mainProxy.testReadFiles(10*thisIndex,10,readData);
+    if (remainingReadBytes > 0 && thisIndex == 0)
+      mainProxy.testReadFiles(remainingReadBytes*thisIndex, remainingReadBytes,readData);
+    else
+      mainProxy.testReadFiles(fixedReadBytes*thisIndex + remainingReadBytes, fixedReadBytes,readData);
 
-    CkPrintf("On %d (0x%x): %d %d %d %d %d %d %d %d %d %d\n", thisIndex,readData, readData[0],readData[1],readData[2],readData[3],readData[4],readData[5],readData[6],readData[7],readData[8],readData[9]);  
     thisProxy[0].done(savedToken,numChares);   
   }
 

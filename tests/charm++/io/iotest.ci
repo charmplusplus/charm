@@ -14,9 +14,7 @@ mainmodule iotest {
         opts.peRW = Operation;
         CkCallback opened(CkIndex_Main::ready(NULL), thisProxy);
         opened.setRefnum(iter + 0);
-        char name[20];
-        sprintf(name, "test%d", iter);
-        Ck::IO::open(name, opened, opts);
+        Ck::IO::open(fileName, opened, opts);
       }
       when ready[iter + 0](Ck::IO::FileReadyMsg *m) serial {
         
@@ -36,7 +34,7 @@ mainmodule iotest {
         CkPrintf("Main saw file ready\n");
       }
       when start_io[iter + 1](Ck::IO::SessionReadyMsg *m) serial{  
-        testers = CProxy_test::ckNew(m->session, n, n);
+        testers = CProxy_test::ckNew(m->session, n, fixedBytesToRead, remainingBytes, n);
         CkPrintf("Main saw session ready\n");
         delete m;
       }
@@ -54,7 +52,8 @@ mainmodule iotest {
   };
 
   array [1D] test {
-    entry test(Ck::IO::Session token,int n);
+    //entry test(Ck::IO::Session token,int n);
+    entry test(Ck::IO::Session token,int n, int fixedBytesToRead, int remainingBytes);
     entry void readCompleted(Ck::IO::SessionReadyMsg *m);
     entry void done(Ck::IO::Session token, int n);
   }

@@ -198,7 +198,6 @@ namespace Ck { namespace IO {
           long dataPtr; // DataPtr of the caller
           long totalReads; // Total number of reads
           long CompletedReads; // This will tell how many reads are completed so far  
-          long offset; // This field contains the offset of the buffer
         };
 
         CallerTable CallerTableData;
@@ -386,16 +385,11 @@ namespace Ck { namespace IO {
 
           MapTable[key].CompletedReads++;
 
-          CkPrintf("totalReads=%d completedReads=%d\n", MapTable[key].totalReads, MapTable[key].CompletedReads);
           if(MapTable[key].totalReads == MapTable[key].CompletedReads) {
-            CkPrintf("Looks like we're all done!\n");
             MapTable[key].myCB.send();
-              
-            //MapTable.erase(key);
           }
           
            // delete the allocated memory because we are done copying the data
-
         }
 
         void doClose(FileToken token, CkCallback closed) {
@@ -653,8 +647,6 @@ namespace Ck { namespace IO {
     void startSession(File file, size_t bytes, size_t offset,
                       CkCallback ready, CkCallback complete) {
 
-      //impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete); Previously this was here
-
       // Check if its a Read or Write. Open Read Session if its a Read and Write if its a 
       // write session
       
@@ -678,11 +670,7 @@ namespace Ck { namespace IO {
                       const char *commitData, size_t commitBytes, size_t commitOffset,
                       CkCallback complete) {
     
-      // The below line was previously here 
-      //impl::director.prepareWriteSession(file.token, bytes, offset, ready,
-      //                                   commitData, commitBytes, commitOffset,
-      //                                   complete);
-      
+   
       Ck::IO::Options opts;
 
       opts.peRW = ReadPe; // TODO: See how we can use this flag

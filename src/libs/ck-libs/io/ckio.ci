@@ -61,13 +61,11 @@ module CkIO_impl {
             }
             when sessionDone[sessionID](CkReductionMsg *m) serial {
               delete m;
-              CkPrintf("*************Session is Done **********\n");
               impl::FileInfo* info = CkpvAccess(manager)->get(file);
               CmiInt8 ret = CmiPread(info->fd, commitData, commitBytes, commitOffset);
               if (ret != commitBytes)
                 fatalError("Commit write failed", info->name);
               complete.send(CkReductionMsg::buildNew(0, NULL));
-              CkPrintf("Session Done \n");
             }
           };                                 
 
@@ -96,9 +94,6 @@ module CkIO_impl {
                               FileToken token, std::string name, Options opts);
           entry void close(unsigned int opnum, FileToken token, CkCallback closed);
 
-          //entry void readDone(unsigned int dataPtr, int offset, int size, char data[size],CkCallback readCompleted);  
-
-          //entry void readDone(int key, int size, char data[size]);
           entry void readDone(int key, int size, int offsetToWrite, char data[size]);
         };
 
@@ -111,8 +106,6 @@ module CkIO_impl {
         array [1D] ReadSession
         {
           entry ReadSession(FileToken file, size_t offset, size_t bytes);
-
-          //entry void readData(int key, int pe, size_t bytes, size_t offset, CProxy_Manager indexP);  // TODO :: Define the ReadSession Callback
           entry void readData(int key, int pe, size_t bytes, size_t offset, int offsetToWrite, CProxy_Manager indexP);
         };
 
