@@ -1,6 +1,6 @@
                            Charm++
 
-       Copyright (C) 1989-2013 Regents of the University of Illinois
+       Copyright (C) 1989-2015 Regents of the University of Illinois
 
 INTRODUCTION
 ============
@@ -23,7 +23,7 @@ code, as follows:
 PICKING A VERSION
 =================
 
-First, you need to decide which version of charm++ to use. The "build" 
+First, you need to decide which version of charm++ to use. The "build"
 script in charm source directory takes several command line options to
 compile Charm++. The command line syntax is:
 
@@ -36,44 +36,44 @@ For detailed help messages, pass -h or --help to the build script, i.e.
 
 REQUIRED:
 ---------
-<target> specifies the parts of Charm++ to compile.  The most often used 
-  <target> is "charm++", which will compile the key Charm++ executables and 
+<target> specifies the parts of Charm++ to compile.  The most often used
+  <target> is "charm++", which will compile the key Charm++ executables and
   runtime libraries.  Other common targets are "AMPI" and "FEM".
-<versions> defines the CPU, OS and Communication layer of the machines.  See 
+<versions> defines the CPU, OS and Communication layer of the machines.  See
   "How to choose a <version>" below for details.
 
 OPTIONAL:
 ---------
-<options> defines more detailed information of the compilations, including 
+<options> defines more detailed information of the compilations, including
   compilers, features to support, etc.  See "How to choose <option>"
   below.
 [--libdir=dir] specify additional lib paths for building Charm++.
 [--incdir=dir] specify additional include paths for building Charm++.
-[--basedir=dir] a shortcut to specify additional include and lib paths for 
-               building Charm++, the include path is dir/include and lib path 
+[--basedir=dir] a shortcut to specify additional include and lib paths for
+               building Charm++, the include path is dir/include and lib path
                is dir/lib.
 
 
-Running build script, a directory of the name of combination of version and 
-options like "<version>-<option1>-<option2>-..." will be created and 
+Running build script, a directory of the name of combination of version and
+options like "<version>-<option1>-<option2>-..." will be created and
 the build script will compile Charm++ under this directory.
 
 For example, on an ordinary Linux PC:
 
-   ./build charm++ net-linux-x86_64
+   ./build charm++ netlrts-linux-x86_64
 
-will build charm++ in the directory: net-linux-x86_64/. The communication
+will build charm++ in the directory: netlrts-linux-x86_64/. The communication
 defaults to UDP packets and the compiler to gcc.
 
-For a more complex example, on a Scyld workstation with the Intel C++ 
-compiler, where you want the communication to happen over TCP sockets:
+For a more complex example, consider building shared-memory build with the
+Intel C++ compiler, where you want the communication to happen over TCP sockets:
 
-   ./build charm++ net-linux scyld icc tcp
+   ./build charm++ netlrts-linux-x86_64 smp icc tcp
 
-will build charm++ in the directory: net-linux-scyld-tcp-icc/.
+will build charm++ in the directory: netlrts-linux-x86_64-smp-tcp-icc/.
 
-You can specify multiple options, however you can use at most one compiler 
-option. The sequence of the options are not important given in build script, 
+You can specify multiple options, however you can use at most one compiler
+option. The sequence of the options are not important given in build script,
 only one directory name will be generated, following the rules:
 1. compiler option will be at the end;
 2. other options are sorted alphabetically.
@@ -81,11 +81,11 @@ only one directory name will be generated, following the rules:
 **** How to choose a <version> ****
 
 Here is the table for choosing correct version. The default setting of compiler
-in Charm version is gcc/g++. However, one can use <options> to specify other 
+in Charm version is gcc/g++. However, one can use <options> to specify other
 compilers. See the detailed explanation of the <options> below.
 (Note: this isn't a complete list.  Run ./build for a complete listing)
 
-Charm version          OS        Communication    Default Compiler  
+Charm version          OS        Communication    Default Compiler
 -------------       ---------    --------------   --------------------
 net-linux-x86_64     Opteron Linux  UDP           GNU compiler
 net-darwin-x86_64    MacOS X        UDP           GNU C++ compiler
@@ -93,7 +93,7 @@ net-linux            Linux (32 bit) UDP/Myrinet   GNU compiler
 net-sol              Solaris        UDP           GNU compiler
 net-win32            Win32          UDP           MS Visual C++
 net-cygwin           Win32/cygwin   UDP           GNU compiler
-mpi-sp               IBM A/IX       MPI           A/IX xlC Compiler 
+mpi-sp               IBM A/IX       MPI           A/IX xlC Compiler
 net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
 mpi-linux            PC Linux       MPI           GNU compiler
 mpi-darwin-x86_64    MacOS X        MPI           GNU C++ compiler
@@ -105,12 +105,12 @@ To choose <version>, your choice is determined by three options:
 
 1.)  The way a parallel program written in Charm++ will communicate:
 
-	"net-" Charm++ communicates using the regular TCP/IP stack
+	"netlrts-" Charm++ communicates using the regular TCP/IP stack
 (UDP packets), which works everywhere but is fairly slow.  Use this
-option for networks of workstations, clusters, or single-machine 
+option for networks of workstations, clusters, or single-machine
 development and testing.
 
-	"gni-", "bluegene[lp]-", "pami-bluegeneq-" Charm++
+	"gni-", "bluegene[lp]-", "pamilrts-bluegeneq-" Charm++
 communicates using direct calls to the machine's communication primitives.
 
 	"mpi-" Charm++ communicates using MPI calls.  Use this for
@@ -155,9 +155,9 @@ Your Charm++ version is made by concatenating the options, e.g.:
 
 **** How to choose <options> ****
 
-<version> above defines the most important OS, CPU and Communication of 
-your machine, and most of time, it use the GNU gcc as default compiler. 
-To use different compiler or demand additional special feature support, you 
+<version> above defines the most important OS, CPU and Communication of
+your machine, and most of time, it use the GNU gcc as default compiler.
+To use different compiler or demand additional special feature support, you
 need to choose <options> from the following list:
 
 * gcc3  - GNU GCC/G++ version 3
@@ -180,13 +180,13 @@ need to choose <options> from the following list:
         tcp will switch to TCP. TCP version of CHarm++ is usually slower
         than UDP, but it is more reliable.
 * smp - Enable direct SMP support.  An "smp" version communicates using
-        shared memory within a machine; but normal message passing across 
-        machines. Because of locking, "smp" may slightly impact non-SMP 
-        performance. Try your application to decide if enabling smp mode 
+        shared memory within a machine; but normal message passing across
+        machines. Because of locking, "smp" may slightly impact non-SMP
+        performance. Try your application to decide if enabling smp mode
         improves performance.
 
 * bigsim - compile Charm++ as running on the BigSim emulator.
-* help - show supported options for a version. For example, for net-linux, 
+* help - show supported options for a version. For example, for net-linux,
          running:
          > ./build charm++ net-linux help
          will give:
@@ -198,7 +198,7 @@ BUILDING THE SOURCE
 
 If you have downloaded a binary version of Charm++, you can skip
 this step-- Charm++ should already be compiled.  For win32/win64 systems,
-see README.win; for Cygwin version, see README.cygwin; for net- version, 
+see README.win; for Cygwin version, see README.cygwin; for net- version,
 see README.net.
 
 Once you have decided on a version, unpack Charm++, cd into charm,
@@ -214,9 +214,9 @@ and run
 
 <version> is described above
 
-<opts> are build-time options (such as the compiler or "smp"), 
+<opts> are build-time options (such as the compiler or "smp"),
 or command line options passed to the charmc compile script.
-Common compile time options such as -g, -O, -Ipath, -Lpath, -llib are 
+Common compile time options such as -g, -O, -Ipath, -Lpath, -llib are
 accepted.
 
 For example, on a Linux machine, you would run
@@ -269,8 +269,8 @@ BUILDING A PROGRAM
 ==================
 
 To make a sample program, cd into examples/charm++/queens/.
-This program solves the N-queens problem-- find how many ways there 
-are to arrange N queens on an NxN chess board such that none may 
+This program solves the N-queens problem-- find how many ways there
+are to arrange N queens on an NxN chess board such that none may
 attack another.
 
 To build the program, type make.  You should get an
@@ -288,33 +288,33 @@ This should run for a few seconds, and print out:
 There are 14200 Solutions to 12 queens. Finish time=4.030000
 
 Charmrun is used to provide a uniform interface to run charm programs.
-On some platforms, charmrun is just a shell script which calls the 
+On some platforms, charmrun is just a shell script which calls the
 platform-specific start program, such as mpirun on mpi versions.
 
-For net- version, charmrun is an executable which invokes ssh to start 
-node programs on remote machines. You should set up a ~/.nodelist that 
+For net- version, charmrun is an executable which invokes ssh to start
+node programs on remote machines. You should set up a ~/.nodelist that
 enumerates all the machines you want to run jobs on, otherwise it will
-create a default ~/.nodelist for you that contains only localhost. Here is a 
+create a default ~/.nodelist for you that contains only localhost. Here is a
 typical .nodelist file:
 
 group main ++shell /bin/ssh
 host <machinename>
 
-The default remote shell program is ssh, but you can define a different remote 
-shell to start remote processes using the ++shell option. You should 
+The default remote shell program is ssh, but you can define a different remote
+shell to start remote processes using the ++shell option. You should
 also make sure that ssh or your alternative can connect to these machines without
 password authentication. Just type following command to verify:
      > ssh <machinename> date
-If this gives you current date immediately, your running environment with this 
+If this gives you current date immediately, your running environment with this
 node has been setup correctly.
 
-Now, for test running purpose, net- version charmrun comes with an easy-to-use 
+Now, for test running purpose, net- version charmrun comes with an easy-to-use
 "++local" options. No remote shell invocation is needed in this case. It starts
-node programs right on your local machine. This could be useful if you just 
+node programs right on your local machine. This could be useful if you just
 want to run program on only one machine, for example, your laptop. This
 can save you all the hassle of setting up ssh or charmd daemons.
 To use this option, just type:
-     
+
      > ./charmrun ++local ./pgm 12 100 +p2
 
 However, for best performance, you should launch one node program per processor.
@@ -325,19 +325,19 @@ Build Charm++ in Dynamic libraries
 =============================
 
 In order to compile Charm++ into dynamic libraries, one need to specify
-"-build-shared" option as one of the Charm compiler script "charmc" 
+"-build-shared" option as one of the Charm compiler script "charmc"
 at link time. For example, to compile Charm++ under net-linux/tmp, run
 
 make charm++ OPTS='-O -build-shared'
 
-Charm++'s dynamic libraries are compiled into lib_so/ directory. 
+Charm++'s dynamic libraries are compiled into lib_so/ directory.
 Typically, they are with ".so" suffix.
 
-Note, "-build-shared" option is automatically turned on when building 
-Charm++ using "build" script. So you don't need to pass "-build-shared" 
+Note, "-build-shared" option is automatically turned on when building
+Charm++ using "build" script. So you don't need to pass "-build-shared"
 option to "build".
 
-One can compile a Charm++ applicaiton linking against Charm++ dynamic 
+One can compile a Charm++ applicaiton linking against Charm++ dynamic
 libraries, run charmc with "-charm-shared" as one of the link options.
 For example:
 
@@ -354,7 +354,7 @@ The Charm++ web page, with documentation, more programs,
 and the latest version of Charm++, is at
 	http://charm.cs.illinois.edu/
 
-The Charm++ mailing list, for questions, comments, suggestions, 
+The Charm++ mailing list, for questions, comments, suggestions,
 improvements, or bug reports is
 	charm@cs.illinois.edu
 
@@ -362,7 +362,7 @@ improvements, or bug reports is
 AUTHORS
 =======
 
-Charm++ was created and is maintained by the Parallel Programming Lab, 
+Charm++ was created and is maintained by the Parallel Programming Lab,
 in the Computer Science department at the University of Illinois at
 Urbana-Champaign.  Our managing professor is Dr. L.V. Kale; students
 have included (in rough time order) Wennie Shu, Kevin Nomura, Wayne
@@ -370,9 +370,9 @@ Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh B. Sinha, Manish
 Gupta, Attila Gursoy, Balkrishna Ramkumar, Amitabh B. Sinha, Nimish
 Shah, Sanjeev Krishnan, Jayant DeSouza, Parthasarathy Ramachandran,
 Jeff Wright, Michael Lang, Jackie Wang, Fang Hu, Michael Denardo,
-Joshua Yelon, Narain Jagathesan, Zehra Sura, Krishnan Varadarajan, 
-Sameer Paranjpye, Milind Bhandarkar, Robert Brunner and Jayant Desouza. 
-Current developers include Terry Wilmarth, Gengbin Zheng, Orion Lawlor, 
+Joshua Yelon, Narain Jagathesan, Zehra Sura, Krishnan Varadarajan,
+Sameer Paranjpye, Milind Bhandarkar, Robert Brunner and Jayant Desouza.
+Current developers include Terry Wilmarth, Gengbin Zheng, Orion Lawlor,
 Karthik Mahesh, and Neelam Saboo.
 
 
