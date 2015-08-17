@@ -336,6 +336,38 @@ void LBDatabase::initnodeFn()
 
   _expectedLoad = new LBRealType[num_proc];
   for (proc=0; proc<num_proc; proc++) _expectedLoad[proc]=0.0;
+
+  _registerCommandLineOpt("+balancer");
+  _registerCommandLineOpt("+LBPeriod");
+  _registerCommandLineOpt("+LBLoop");
+  _registerCommandLineOpt("+LBTopo");
+  _registerCommandLineOpt("+LBNumMoves");
+  _registerCommandLineOpt("+LBPredictor");
+  _registerCommandLineOpt("+LBPredictorDelay");
+  _registerCommandLineOpt("+LBPredictorWindow");
+  _registerCommandLineOpt("+LBVersion");
+  _registerCommandLineOpt("+LBCentPE");
+  _registerCommandLineOpt("+LBDump");
+  _registerCommandLineOpt("+LBDumpSteps");
+  _registerCommandLineOpt("+LBDumpFile");
+  _registerCommandLineOpt("+LBSim");
+  _registerCommandLineOpt("+LBSimSteps");
+  _registerCommandLineOpt("+LBSimProcs");
+  _registerCommandLineOpt("+LBShowDecisions");
+  _registerCommandLineOpt("+LBSyncResume");
+  _registerCommandLineOpt("+LBDebug");
+  _registerCommandLineOpt("+teamSize");
+  _registerCommandLineOpt("+LBPrintSummary");
+  _registerCommandLineOpt("+LBNoBackground");
+  _registerCommandLineOpt("+LBObjOnly");
+  _registerCommandLineOpt("+LBTestPESpeed");
+  _registerCommandLineOpt("+LBSameCpus");
+  _registerCommandLineOpt("+LBUseCpuTime");
+  _registerCommandLineOpt("+LBOff");
+  _registerCommandLineOpt("+LBCommOff");
+  _registerCommandLineOpt("+MetaLB");
+  _registerCommandLineOpt("+LBAlpha");
+  _registerCommandLineOpt("+LBBeta");
 }
 
 // called my constructor

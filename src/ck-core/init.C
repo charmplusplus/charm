@@ -216,6 +216,16 @@ void processRaiseEvacFile(char *raiseEvacFile);
 
 extern bool useNodeBlkMapping;
 
+// Modules are required to register command line opts they will parse. These
+// options are stored in the _optSet, and then when parsing command line opts
+// users will be warned about options starting with a '+' that are not in this
+// table. This usually implies that they are attempting to use a Charm++ option
+// without having compiled Charm++ to use the module that options belongs to.
+std::set<std::string> _optSet;
+void _registerCommandLineOpt(const char* opt) {
+  _optSet.insert(opt);
+}
+
 static inline void _parseCommandLineOpts(char **argv)
 {
   if (CmiGetArgFlagDesc(argv,"+cs", "Print extensive statistics at shutdown"))
@@ -1405,13 +1415,13 @@ void _initCharm(int unused_argc, char **argv)
 		int count = 0;
 		int argc = CmiGetArgc(argv);
 		for (int i = 1; i < argc; i++) {
-			if (argv[i][0] == '+') {
+			if (argv[i][0] == '+' && _optSet.count(argv[i]) == 0) {
 				count++;
 				CmiPrintf("WARNING: %s is a command line argument beginning with a '+' but was not parsed by the RTS.\n", argv[i]);
 			}
 		}
 		if (count) {
-			CmiPrintf("If any of these arguments were intended for the RTS you may need to recompile Charm++ with different options.\n");
+			CmiPrintf("If any of the above arguments were intended for the RTS you may need to recompile Charm++ with different options.\n");
 		}
 
 		for(i=0;i<nMains;i++)  /* Create all mainchares */

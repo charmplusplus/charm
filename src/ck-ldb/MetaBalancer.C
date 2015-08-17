@@ -93,6 +93,7 @@ MetaLBInit::MetaLBInit(CkArgMsg *m) {
 
 // called from init.C
 void _metabalancerInit() {
+  _registerCommandLineOpt("+MetaLBNoObjTimer");
   CkpvInitialize(int, metalbInited);
   CkpvAccess(metalbInited) = 0;
   char **argv = CkGetArgv();

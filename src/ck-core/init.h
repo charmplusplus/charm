@@ -152,6 +152,7 @@ static inline IrrGroup *_localBranch(CkGroupID gID)
   return CkpvAccess(_groupTable)->find(gID).getObj();
 }
 
+extern void _registerCommandLineOpt(const char* opt);
 extern void _initCharm(int argc, char **argv);
 
 /** This routine registers the user's main module.  It is normally
