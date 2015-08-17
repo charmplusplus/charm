@@ -279,6 +279,7 @@ for w in $VERSOPTS; do
           BOPTS="$BOPTS $w"
           [ $w =  "bigemulator" ] && BUILD_EMULATOR=1
           [ $w =  "bigsim" ] && BUILD_EMULATOR=1
+          [ $w =  "cuda"   ] && BUILD_CUDA=1
         fi
 done
 
