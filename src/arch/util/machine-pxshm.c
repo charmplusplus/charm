@@ -349,14 +349,14 @@ inline static int CmiValidPxshm(int node, int size)
              : 0;
 };
 
-inline int PxshmRank(int dstnode) { return dstnode - pxshmContext->nodestart; }
+int PxshmRank(int dstnode) { return dstnode - pxshmContext->nodestart; }
 
 inline void pushSendQ(PxshmSendQ *q, char *msg, int size, int *refcount);
 inline int sendMessage(char *msg, int size, int *refcount,
                        sharedBufData *dstBuf, PxshmSendQ *dstSendQ);
-inline int flushSendQ(PxshmSendQ *q);
+int flushSendQ(PxshmSendQ *q);
 
-inline int sendMessageRec(OutgoingMsgRec *omg, sharedBufData *dstBuf,
+int sendMessageRec(OutgoingMsgRec *omg, sharedBufData *dstBuf,
                           PxshmSendQ *dstSendQ)
 {
   return sendMessage(omg->data, omg->size, omg->refcount, dstBuf, dstSendQ);
@@ -467,8 +467,8 @@ insert into q and retain the message*/
   MEMDEBUG(CmiMemoryCheck());
 };
 
-inline void emptyAllRecvBufs();
-inline void flushAllSendQs();
+void emptyAllRecvBufs();
+void flushAllSendQs();
 
 /**********
  * Extract all the messages from the recvBuffers you can
