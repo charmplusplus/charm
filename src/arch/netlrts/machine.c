@@ -1828,8 +1828,13 @@ void LrtsExit()
 
   CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
-    exit(0); /*Standalone version-- just leave*/
-  } else {
+#if CMK_MULTICORE
+    pthread_exit(0);
+#else
+    exit(0);
+#endif
+  }
+  else {
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
     for(i = 0; i < CmiMyNodeSize(); i++) {
       ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
