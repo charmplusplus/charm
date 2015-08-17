@@ -32,7 +32,7 @@ class ArrayElement;
 
 class CkCallback {
 public:
-	typedef enum {
+	enum callbackType {
 	invalid=0, //Invalid callback
 	ignore, //Do nothing
 	ckExit, //Call ckExit
@@ -52,7 +52,7 @@ public:
 	bcastArray, //Broadcast to an array (d.array)
 	bcastSection,//Broadcast to a section(d.section)
 	replyCCS // Reply to a CCS message (d.ccsReply)
-	} callbackType;
+	};
 private:
 	union callbackData {
 	struct s_thread { //resumeThread
