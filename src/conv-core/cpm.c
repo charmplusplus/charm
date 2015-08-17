@@ -215,7 +215,6 @@ void CpmThread3(void *msg)
   int *env = (int *)CpmEnv(msg);
   CmiHandlerInfo *h=&CmiHandlerToInfo(env[0]);
   (h->hdlr)(msg,h->userPtr);
-  CmiFree(msg);
   CthFree(CthSelf()); CthSuspend();
 }
 

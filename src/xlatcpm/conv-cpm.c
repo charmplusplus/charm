@@ -1900,6 +1900,7 @@ void gen_func_recv()
   }
   fprintf(file_cpm,"%s", func_name);
   gen_actual_args(file_cpm);
+  fprintf(file_cpm,"CmiFree(CpmM);\n");
   fprintf(file_cpm, "}\n");
 }
 

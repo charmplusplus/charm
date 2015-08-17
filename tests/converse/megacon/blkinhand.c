@@ -42,8 +42,8 @@ CpmInvokable blk_fibthr(int n, int pe, accum resp)
   else {
     struct accum acc;
     acc.total = 0; acc.countdown = 2; acc.pending = CthSelf();
-    Cpm_blk_fibthr(CpmSend(blk_randpe()), n-1, CmiMyPe(), &acc);
-    Cpm_blk_fibthr(CpmSend(blk_randpe()), n-2, CmiMyPe(), &acc);
+    Cpm_blk_fibthr(CpmMakeThread(blk_randpe()), n-1, CmiMyPe(), &acc);
+    Cpm_blk_fibthr(CpmMakeThread(blk_randpe()), n-2, CmiMyPe(), &acc);
     CthSuspend();
     result = acc.total;
   }
@@ -56,7 +56,7 @@ CpmInvokable blk_fibtop(int n)
 {
   struct accum acc;
   acc.total = 0; acc.countdown = 1; acc.pending = CthSelf();
-  Cpm_blk_fibthr(CpmSend(blk_randpe()), n, CmiMyPe(), &acc);
+  Cpm_blk_fibthr(CpmMakeThread(blk_randpe()), n, CmiMyPe(), &acc);
   CthSuspend();
   if (acc.total != 21) {
     CmiPrintf("blkinhand failed. %08x\n", CthSelf());
@@ -68,7 +68,7 @@ CpmInvokable blk_fibtop(int n)
 
 void blkinhand_init()
 {
-  Cpm_blk_fibtop(CpmSend(0), 8);
+  Cpm_blk_fibtop(CpmMakeThread(0), 8);
 }
 
 void blkinhand_moduleinit()
