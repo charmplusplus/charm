@@ -223,6 +223,9 @@ static int Cmi_nodestartGlobal = -1;
 CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
+#if CMK_CCS_AVAILABLE
+int ccsRunning;
+#endif
 
 /* ===== Beginning of Common Function Declarations ===== */
 void CmiAbort(const char *message);
@@ -1164,7 +1167,6 @@ if (  MSG_STATISTIC)
 
 extern void ConverseCommonInit(char **argv);
 extern void CthInit(char **argv);
-
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
@@ -1409,7 +1411,11 @@ void *CmiGetNonLocal(void) {
       * even there's only one worker thread, the polling of
       * network queue is still required.
       */
+#if CMK_CCS_AVAILABLE
+    if (CmiNumPes() == 1 && CmiNumPartitions() == 1 && ccsRunning != 1) return NULL;
+#else
     if (CmiNumPes() == 1 && CmiNumPartitions() == 1) return NULL;
+#endif
 #endif
 
     MACHSTATE2(3, "[%p] CmiGetNonLocal begin %d{", cs, CmiMyPe());
@@ -1425,6 +1431,12 @@ void *CmiGetNonLocal(void) {
 #else
 //    LrtsPostNonLocal();
 #endif
+#if CMK_CCS_AVAILABLE
+    if(msg != NULL && CmiNumPes() == 1 && CmiNumPartitions() == 1 )
+    {
+      ccsRunning = 0;
+    }
+#endif    
 
     MACHSTATE3(3,"[%p] CmiGetNonLocal from queue %p with msg %p end }",CmiGetState(),(cs->recv), msg);
 

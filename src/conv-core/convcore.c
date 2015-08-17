@@ -3524,6 +3524,10 @@ static void checkTSanOptions()
 }
 #endif
 
+#if CMK_CCS_AVAILABLE
+extern int ccsRunning;
+#endif
+
 /**
   Main Converse initialization routine.  This routine is 
   called by the machine file (machine.c) to set up Converse.
@@ -3631,6 +3635,7 @@ void ConverseCommonInit(char **argv)
   CmiDeliversInit();
   CsdInit(argv);
 #if CMK_CCS_AVAILABLE
+  ccsRunning = 0;
   CcsInit(argv);
 #endif
   CpdInit();
