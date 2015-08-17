@@ -225,7 +225,7 @@ int CtgGlobalList::isUserSymbol(const char *name) {
 	/**
 		if the name is on the blacklist, it is not a user symbol
 	*/
-	for(int i=0;i<_blacklist.size();i++){
+	for(unsigned int i=0;i<_blacklist.size();i++){
 		if(strlen(name) == strlen(_blacklist[i]) && strncmp(name,_blacklist[i],strlen(name)) == 0){
 			return 0;
 		}
@@ -424,7 +424,7 @@ static CtgGlobalStruct *_ctgListGlobals=NULL;
 void CtgInit(void) {
 	CpvInitialize(int, CmiPICMethod);
 	CpvAccess(CmiPICMethod) = 1;
-	CpvInitialize(CtgGlobal,_curCtg);
+	CpvInitialize(CtgGlobals,_curCtg);
 	
 	if (!_ctgList) 
 	{
