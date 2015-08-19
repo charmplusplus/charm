@@ -29,7 +29,6 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   vectorAddReq->bufferInfo = (dataInfo *) malloc(vectorAddReq->nBuffers * sizeof(dataInfo));
 
   AInfo = &(vectorAddReq->bufferInfo[0]);
- // AInfo->bufferID = BUFFERS_PER_CHARE * myIndex + A_INDEX;
   AInfo->bufferID = -1;
   AInfo->transferToDevice = YES;
   AInfo->transferFromDevice = NO;
@@ -39,7 +38,6 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   AInfo->size = size;
 
   BInfo = &(vectorAddReq->bufferInfo[1]);
- // BInfo->bufferID = BUFFERS_PER_CHARE * myIndex + B_INDEX;
   BInfo->bufferID = -1;
   BInfo->transferToDevice = YES;
   BInfo->transferFromDevice = YES;
@@ -49,7 +47,6 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   BInfo->size = size;
 
   CInfo = &(vectorAddReq->bufferInfo[2]);
-  //CInfo->bufferID = BUFFERS_PER_CHARE * myIndex + C_INDEX;
   CInfo->bufferID = -1;
   CInfo->transferToDevice = NO;
   CInfo->transferFromDevice = YES;
@@ -64,11 +61,12 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   vectorAddReq->userData = malloc(sizeof(int));
   memcpy(vectorAddReq->userData, &vectorSize, sizeof(int));
 
-  enqueue(wrQueue, vectorAddReq);
+  enqueue(vectorAddReq);
 }
 
 void kernelSelect(workRequest *wr) {
-
+  cudaStream_t kernel_stream = getKernelStream();
+  void** devBuffers = getdevBuffers();
   switch (wr->id) {
     case VECTOR_KERNEL:
       printf("VECTOR KERNEL");
@@ -79,4 +77,7 @@ void kernelSelect(workRequest *wr) {
        *((int *) wr->userData));
     break;
   }
+  hapi_poolFree(wr->bufferInfo[C_INDEX].hostBuffer);
+  hapi_poolFree(wr->bufferInfo[B_INDEX].hostBuffer);
+  hapi_poolFree(wr->bufferInfo[A_INDEX].hostBuffer);
 }

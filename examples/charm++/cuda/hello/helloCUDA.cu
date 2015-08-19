@@ -18,11 +18,12 @@ void kernelSetup(void *cb) {
   wr.callbackFn = cb; 
   wr.id = 0; 
 
-  enqueue(wrQueue, &wr); 
+  enqueue(&wr);
 
 }
 
 void kernelSelect(workRequest *wr) {
+  cudaStream_t kernel_stream = getKernelStream();
   printf("inside kernelSelect\n"); 
   switch (wr->id) {
   case 0: 

@@ -13,6 +13,8 @@
 
 #include "wr.h"
 
+namespace wrqueue {
+
 /* number of work requests the queue is initialized to handle */
 #define QUEUE_SIZE_INIT 100
 
@@ -32,6 +34,13 @@
  *
  */
 void initWRqueue(workRequestQueue **qptr); 
+
+/* enqueue
+ *
+ * add a work request to the queue to be later executed on the GPU
+ *
+ */
+void enqueue(workRequestQueue *q, workRequest *wr);
 
 /* dequeue
  *
@@ -83,5 +92,7 @@ workRequest * thirdElement(workRequestQueue *q);
  * 0 otherwise
  */
 int isEmpty(workRequestQueue *q);
+
+} // namespace wrqueue
 
 #endif

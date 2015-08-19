@@ -141,7 +141,7 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
   matmul.bufferInfo = (dataInfo *) malloc(matmul.nBuffers * sizeof(dataInfo));
 
   AInfo = &(matmul.bufferInfo[0]);
-  AInfo->bufferID = BUFFERS_PER_CHARE * myIndex + A_INDEX;
+  AInfo->bufferID = -1;
   AInfo->transferToDevice = YES;
   AInfo->transferFromDevice = NO;
   AInfo->freeBuffer = YES;
@@ -149,7 +149,7 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
   AInfo->size = size;
 
   BInfo = &(matmul.bufferInfo[1]);
-  BInfo->bufferID = BUFFERS_PER_CHARE * myIndex + B_INDEX;
+  BInfo->bufferID = -1;
   BInfo->transferToDevice = YES;
   BInfo->transferFromDevice = NO;
   BInfo->freeBuffer = YES;
@@ -157,7 +157,7 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
   BInfo->size = size;
 
   CInfo = &(matmul.bufferInfo[2]);
-  CInfo->bufferID = BUFFERS_PER_CHARE * myIndex + C_INDEX;
+  CInfo->bufferID = -1;
   CInfo->transferToDevice = NO;
   CInfo->transferFromDevice = YES;
   CInfo->freeBuffer = YES;
@@ -173,10 +173,12 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
   matmul.userData = malloc(sizeof(int));
   memcpy(matmul.userData, &matrixSize, sizeof(int));
 
-  enqueue(wrQueue, &matmul);
+  enqueue(&matmul);
 }
 
 void kernelSelect(workRequest *wr) {
+  cudaStream_t kernel_stream = getKernelStream();
+  void** devBuffers = getdevBuffers();
 
   switch (wr->id) {
   case MATMUL_KERNEL:

@@ -3837,7 +3837,9 @@ void ConverseCommonInit(char **argv)
 #endif
 
 #if CMK_CUDA
-  initHybridAPI(CmiMyPe()); 
+  if (CmiMyRank() == 0) {
+    initHybridAPI();
+  }
 #endif
 
   /* main thread is suspendable */
@@ -3869,7 +3871,9 @@ void ConverseCommonExit(void)
 #endif
 
 #if CMK_CUDA
-  exitHybridAPI(); 
+  if (CmiMyRank() == 0) {
+    exitHybridAPI();
+  }
 #endif
   seedBalancerExit();
   EmergencyExit();

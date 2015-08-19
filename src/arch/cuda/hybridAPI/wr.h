@@ -170,6 +170,7 @@ typedef struct {
  *
  */
 void enqueue(workRequestQueue *q, workRequest *wr); 
+void enqueue(workRequest *wr);
 void setWRCallback(workRequest *wr, void *cb);
 
 #ifdef GPU_MEMPOOL
@@ -178,9 +179,8 @@ void *hapi_poolMalloc(int size);
 #endif
 /* external declarations needed by the user */
 
-extern workRequestQueue *wrQueue; 
-extern void **devBuffers; 
-extern cudaStream_t kernel_stream; 
+void** getdevBuffers();
+cudaStream_t getKernelStream();
 
 #ifdef GPU_INSTRUMENT_WRS
 struct RequestTimeInfo {

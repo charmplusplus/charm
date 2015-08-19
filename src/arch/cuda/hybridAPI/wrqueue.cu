@@ -19,6 +19,8 @@ extern int CmiMyPe();
 extern void QdCreate(int n); 
 extern void QdProcess(int n); 
 
+namespace wrqueue {
+
 void initWRqueue(workRequestQueue **qptr) {
 
   (*qptr) = (workRequestQueue*) malloc(sizeof(workRequestQueue));  
@@ -161,3 +163,5 @@ int isEmpty(workRequestQueue *q) {
     return 0; 
   }
 }
+
+} // namespace wrqueue
