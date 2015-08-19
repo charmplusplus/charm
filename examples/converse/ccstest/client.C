@@ -10,7 +10,7 @@ static void  usage(void)
   exit(1);
 }
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   CcsServer svr;
   CcsSec_secretKey *key=NULL,keySto;

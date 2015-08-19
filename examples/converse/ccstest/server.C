@@ -24,7 +24,7 @@ int i;
   
 }
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   ConverseInit(argc, argv, user_main, 0, 0);
 }
