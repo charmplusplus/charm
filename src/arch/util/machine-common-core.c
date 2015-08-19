@@ -224,7 +224,7 @@ CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 #if CMK_CCS_AVAILABLE
-extern int ccsRunning;
+int ccsRunning;
 #endif
 
 /* ===== Beginning of Common Function Declarations ===== */

@@ -3525,7 +3525,7 @@ static void checkTSanOptions()
 #endif
 
 #if CMK_CCS_AVAILABLE
-int ccsRunning;
+extern int ccsRunning;
 #endif
 
 /**
