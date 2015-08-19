@@ -282,7 +282,7 @@ the code for a typed reduction that yields an {\tt int}, would look like this:
   // In the .ci file...
   entry [reductiontarget] void done(int result);
 
-  // In some .cc file: 
+  // In some .C file: 
   // Create a callback that invokes the typed reduction client
   // driverProxy is a proxy to the chare object on which 
   // the reduction target method {\em done} is called upon completion 
@@ -339,7 +339,7 @@ individual contributions.  Any of them may be passed as an argument of type
 \kw{CkReduction::reducerType} to \kw{contribute}.
 
 The first four operations ({\tt sum}, {\tt product}, {\tt max}, and {\tt min}) work on {\tt int},
-{\tt float}, or {\tt double} data as indicated by the suffix.  The logical
+{\tt long}, {\tt float}, or {\tt double} data as indicated by the suffix.  The logical
 reductions ({\tt and}, {\tt or}) only work on integer data.  All the built-in
 reductions work on either single numbers (pass a pointer) or arrays-- just
 pass the correct number of bytes to \kw{contribute}.
@@ -348,16 +348,16 @@ pass the correct number of bytes to \kw{contribute}.
 
 \item \kw{CkReduction::nop} : no operation performed.
 
-\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double} : the
+\item \kw{CkReduction::sum\_int}, \kw{sum\_long}, \kw{sum\_float}, \kw{sum\_double} : the
 result will be the sum of the given numbers.
 
-\item \kw{CkReduction::product\_int}, \kw{product\_float},
+\item \kw{CkReduction::product\_int}, \kw{product\_long}, \kw{product\_float},
 \kw{product\_double} : the result will be the product of the given numbers.
 
-\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double} : the
+\item \kw{CkReduction::max\_int}, \kw{max\_long}, \kw{max\_float}, \kw{max\_double} : the
 result will be the largest of the given numbers.
 
-\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double} : the
+\item \kw{CkReduction::min\_int}, \kw{min\_long}, \kw{min\_float}, \kw{min\_double} : the
 result will be the smallest of the given numbers.
 
 \item \kw{CkReduction::logical\_and} : the result will be the logical AND of the given
@@ -406,7 +406,7 @@ void ArrayClass::methodName (CkCallback &cb)
   int result[3];
   result[0] = 1;            // Copy the desired values into the result.
   result[1] = 2;
-  result[3] = 3;
+  result[2] = 3;
   // Contribute the result to the reductiontarget cb.
   contribute(3*sizeof(int), result, CkReduction::set, cb);
 \}
