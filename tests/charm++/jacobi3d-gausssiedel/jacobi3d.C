@@ -29,7 +29,9 @@
 
 #include "CkLoopAPI.h"
 CProxy_FuncCkLoop ckLoopProxy;
+#ifdef JACOBI_OPENMP
 #include <omp.h>
+#endif
 
 //#define PRINT_DEBUG 1
 #define  LOW_VALUE 0 

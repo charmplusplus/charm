@@ -36,7 +36,9 @@
 
 #include "CkLoopAPI.h"
 CProxy_FuncCkLoop ckLoopProxy;
+#ifdef JACOBI_OPENMP
 #include <omp.h>
+#endif
 
 /*readonly*/ int gaussIter;  
 /*readonly*/ double convergeDelta;
