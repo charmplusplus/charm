@@ -13,6 +13,9 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #include "ckcallback-ccs.h"
 #include "CkCallback.decl.h"
 #include "envelope.h"
+
+extern "C" void LibCkExit(void);
+
 /*readonly*/ CProxy_ckcallback_group _ckcallbackgroup;
 
 typedef CkHashtableT<CkHashtableAdaptorT<unsigned int>, CkCallback*> threadCB_t;
@@ -201,6 +204,10 @@ void CkCallback::send(void *msg) const
 	case ckExit: //Call ckExit
 		if (msg) CkFreeMsg(msg);
 		CkExit();
+		break;
+	case libCkExit:
+		if (msg) CkFreeMsg(msg);
+		LibCkExit();
 		break;
 	case resumeThread: //Resume a waiting thread
 		if (d.thread.onPE==CkMyPe()) {

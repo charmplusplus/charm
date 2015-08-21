@@ -17,6 +17,7 @@ extern "C" void CharmLibExit();
 extern "C" void LibCkExit(void);
 
 extern "C" void StartCharmScheduler();
+extern "C" void RunCharmSchedulerToQD();
 extern "C" void StopCharmScheduler();
 #define CkExit LibCkExit
 

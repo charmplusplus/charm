@@ -36,6 +36,7 @@ public:
 	invalid=0, //Invalid callback
 	ignore, //Do nothing
 	ckExit, //Call ckExit
+	libCkExit, //Call LibCkExit
 	resumeThread, //Resume a waiting thread (d.thread)
 	callCFn, //Call a C function pointer with a parameter (d.cfn)
 	call1Fn, //Call a C function pointer on any processor (d.c1fn)

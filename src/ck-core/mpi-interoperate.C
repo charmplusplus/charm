@@ -32,6 +32,13 @@ void StartCharmScheduler() {
 }
 
 extern "C"
+void RunCharmSchedulerToQD() {
+  CmiNodeAllBarrier();
+  CkStartQD(CkCallback(CkCallback::libCkExit));
+  StartInteropScheduler();
+}
+
+extern "C"
 void StopCharmScheduler() {
   StopInteropScheduler();
 }
