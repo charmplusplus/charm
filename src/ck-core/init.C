@@ -1419,7 +1419,17 @@ void _initCharm(int unused_argc, char **argv)
 		int count = 0;
 		int argc = CmiGetArgc(argv);
 		for (int i = 1; i < argc; i++) {
-			if (argv[i][0] == '+' && _optSet.count(argv[i]) == 0) {
+			// The +vp option for TCharm is a special case that needs to be checked
+			// separately, because the number passed does not need a space after
+			// the vp, and the option can be specified with a '+' or a '-'.
+			if (strncmp(argv[i],"+vp",3) == 0) {
+				if (_optSet.count("+vp") == 0) {
+					count++;
+					CmiPrintf("WARNING: %s is a TCharm command line argument, but you have not compiled with TCharm\n", argv[i]);
+				}
+			} else if (strncmp(argv[i],"-vp",3) == 0) {
+				CmiPrintf("WARNING: %s is no longer valid because -vp has been deprecated. Please use +vp.\n", argv[i]);
+			} else if (argv[i][0] == '+' && _optSet.count(argv[i]) == 0) {
 				count++;
 				CmiPrintf("WARNING: %s is a command line argument beginning with a '+' but was not parsed by the RTS.\n", argv[i]);
 			}
