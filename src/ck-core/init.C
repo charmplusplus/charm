@@ -223,7 +223,11 @@ extern bool useNodeBlkMapping;
 // without having compiled Charm++ to use the module that options belongs to.
 std::set<std::string> _optSet;
 void _registerCommandLineOpt(const char* opt) {
-  _optSet.insert(opt);
+  // The command line options are only checked during init on PE0, so this makes
+  // thread safety easy.
+  if (CkMyPe() == 0) {
+    _optSet.insert(opt);
+  }
 }
 
 static inline void _parseCommandLineOpts(char **argv)
