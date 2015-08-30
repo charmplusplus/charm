@@ -50,9 +50,7 @@ waits for the migrant contributions to straggle in.
 #include "charm++.h"
 #include "ck.h"
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 #include "pathHistory.h"
-#endif
 
 #if CMK_DEBUG_REDUCTIONS
 //Debugging messages:
@@ -1032,7 +1030,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 
 
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
 
 #if CRITICAL_PATH_DEBUG > 3
   CkPrintf("combining critical path information from messages in CkReductionMgr::reduceMessages\n");
@@ -1240,7 +1238,7 @@ void CkReductionMgr :: endArrayReduction(){
   	}
 
 	
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
 
 #if CRITICAL_PATH_DEBUG > 3
 	CkPrintf("[%d] combining critical path information from messages in CkReductionMgr::endArrayReduction(). numMsgs=%d\n", CkMyPe(), numMsgs);
@@ -2456,7 +2454,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   }
 
 	
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
 #if CRITICAL_PATH_DEBUG > 3
 	CkPrintf("[%d] combining critical path information from messages in CkNodeReductionMgr::reduceMessages(). numMsgs=%d\n", CkMyPe(), nMsgs);
 #endif

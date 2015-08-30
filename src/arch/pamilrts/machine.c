@@ -75,6 +75,8 @@ if (checksum_flag)      \
 #define CMI_CHECK_CHECKSUM(msg, len)
 #endif
 
+#define CmiGetMsgSize(m)     ((CmiMsgHeaderExt*)m)->size
+#define CmiSetMsgSize(m,s)   ((((CmiMsgHeaderExt*)m)->size)=(s))
 #if CMK_SMP && !CMK_MULTICORE
 //static volatile int commThdExit = 0;
 //static CmiNodeLock commThdExitLock = 0;
@@ -186,6 +188,12 @@ static void CmiSendPeer (int rank, int size, char *msg) {
   CmiPushPE (rank, msg);
 }
 #endif
+
+INLINE_KEYWORD void LrtsPrepareEnvelope(char *msg, int size)
+{
+    CmiSetMsgSize(msg, size);
+    CMI_SET_CHECKSUM(msg, size);
+}
 
 
 static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t result) 

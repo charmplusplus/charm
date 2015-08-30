@@ -404,20 +404,20 @@ static inline int LZ4_compressCtx(void** ctx,
 		token = op++;
 		if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) >= oend) return 0; 		// Check output limit
 #ifdef _MSC_VER
-		if (length>=(int)RUN_MASK) 
-		{ 
-			int len = length-RUN_MASK; 
-			*token=(RUN_MASK<<ML_BITS); 
+		if (length>=(int)RUN_MASK)
+		{
+			int len = length-RUN_MASK;
+			*token=(RUN_MASK<<ML_BITS);
 			if (len>254)
 			{
 				do { *op++ = 255; len -= 255; } while (len>254);
-				*op++ = (BYTE)len; 
+				*op++ = (BYTE)len;
 				memcpy(op, anchor, length);
 				op += length;
 				goto _next_match;
 			}
 			else
-			*op++ = (BYTE)len; 
+			*op++ = (BYTE)len;
 		}
 		else *token = (length<<ML_BITS);
 #else
@@ -568,20 +568,20 @@ static inline int LZ4_compress64kCtx(void** ctx,
 		token = op++;
 		if unlikely(op + length + (2 + 1 + LASTLITERALS) + (length>>8) >= oend) return 0; 		// Check output limit
 #ifdef _MSC_VER
-		if (length>=(int)RUN_MASK) 
-		{ 
-			int len = length-RUN_MASK; 
-			*token=(RUN_MASK<<ML_BITS); 
+		if (length>=(int)RUN_MASK)
+		{
+			int len = length-RUN_MASK;
+			*token=(RUN_MASK<<ML_BITS);
 			if (len>254)
 			{
 				do { *op++ = 255; len -= 255; } while (len>254);
-				*op++ = (BYTE)len; 
+				*op++ = (BYTE)len;
 				memcpy(op, anchor, length);
 				op += length;
 				goto _next_match;
 			}
 			else
-			*op++ = (BYTE)len; 
+			*op++ = (BYTE)len;
 		}
 		else *token = (length<<ML_BITS);
 #else
@@ -648,9 +648,9 @@ _last_literals:
 }
 
 
-int LZ4_compress_limitedOutput(const char* source, 
-							   char* dest, 
-							   int isize, 
+int LZ4_compress_limitedOutput(const char* source,
+							   char* dest,
+							   int isize,
 							   int maxOutputSize)
 {
 #if HEAPMODE
@@ -861,8 +861,8 @@ _output_error:
 
 void  lz4_wrapper_compress(void *src, void *dst, int in_size, int *out_size)
 {
-    
-    *out_size = LZ4_compress(src, dst, in_size); 
+
+    *out_size = LZ4_compress(src, dst, in_size);
 }
 int lz4_wrapper_decompress(void *src, void *dst, int in_size, int out_size)
 {

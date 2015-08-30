@@ -51,6 +51,9 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
   if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=true;
   if (ck_ep_flags & CK_EP_TRACEDISABLE) e->traceEnabled=false;
   if (ck_ep_flags & CK_EP_APPWORK) e->appWork=true;
+#if USE_MIRROR
+  if (ck_ep_flags & CK_EP_MIRROR) e->mirror=true;
+#endif
 #if ADAPT_SCHED_MEM
   if (ck_ep_flags & CK_EP_MEMCRITICAL){
      e->isMemCritical=true;
@@ -103,6 +106,14 @@ void CkRegisterBase(int derivedIdx, int baseIdx)
 {
   if (baseIdx!=-1)
     _chareTable[derivedIdx]->addBase(baseIdx);
+}
+
+int CkGetChareIdx(char *name){
+  for(int i=0; i<_chareTable.size(); i++){
+    if(strcmp(name, _chareTable[i]->name)==0)
+      return i;
+  }
+  return -1;
 }
 
 extern "C"

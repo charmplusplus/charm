@@ -151,6 +151,8 @@ class er {
   enum {IS_SIZING   =0x0100,
   	IS_PACKING  =0x0200,
         IS_UNPACKING=0x0400,
+        IS_SYNCING=0x0800,
+        IS_UNSYNCING=0x1000,
         TYPE_MASK   =0xFF00
   };
   unsigned int PUP_er_state;
@@ -163,6 +165,10 @@ class er {
   bool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0?true:false;}
   bool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0?true:false;}
   bool isUnpacking(void) const {return (PUP_er_state&IS_UNPACKING)!=0?true:false;}
+  bool isSyncing(void) const {return (PUP_er_state&IS_SYNCING)!=0?true:false;}
+  bool isUnsyncing(void) const {return (PUP_er_state&IS_UNSYNCING)!=0?true:false;}
+  void setSyncing(void) {PUP_er_state = IS_SYNCING;}
+  void setUnsyncing(void) {PUP_er_state = IS_UNSYNCING;}
   const char *  typeString() const;
   unsigned int getStateFlags(void) const {return PUP_er_state;}
 
@@ -403,6 +409,8 @@ class toMem : public mem {
   //Write data to the given buffer
   toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
 };
+
+
 template <class T>
 inline void toMemBuf(T &t,void *buf, size_t len) {
 	PUP::toMem p(buf);
@@ -420,6 +428,7 @@ class fromMem : public mem {
   //Read data from the given buffer
   fromMem(const void *Nbuf):mem(IS_UNPACKING,(myByte *)Nbuf) {}
 };
+
 template <class T>
 inline void fromMemBuf(T &t,void *buf,int len) {
 	PUP::fromMem p(buf);

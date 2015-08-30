@@ -86,7 +86,7 @@ static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
      * earlier, then during the bcast msg forwarding period,
      * the msg could be already freed on the worker thread.
      * As a result, the forwarded message could be wrong!
-     * 
+     *
      */
     CmiPushNode(msg);
 }
@@ -230,10 +230,10 @@ void CmiSyncBroadcastFn1(int size, char *msg) {
 	return;
     }
     #endif
-	
+
     for ( i=mype+1; i<_Cmi_numpes; i++ )
         CmiSyncSendFn(i, size, msg) ;
-	
+
     for ( i=0; i<mype; i++ )
         CmiSyncSendFn(i, size, msg) ;
 #endif
@@ -355,7 +355,7 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
      * node-level queue could be immediately followed a pop of this msg on
      * other cores on the same node even when this msg has not been sent to
      * other nodes. This is the reason CmiSendNodeSelf must be called after
-     * CmiSyncNodeBroadcastFn 
+     * CmiSyncNodeBroadcastFn
      */
     CmiSendNodeSelf(msg);
 }

@@ -589,7 +589,7 @@ static void _exitHandler(envelope *env)
       DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n",CkMyPe()));
       ConverseExit();
       if(CharmLibInterOperate)
-	CpvAccess(interopExitFlag) = 1;
+        CpvAccess(interopExitFlag) = 1;
 #endif
       break;
 #if CMK_WITH_STATS
@@ -602,7 +602,7 @@ static void _exitHandler(envelope *env)
       for (int i = 0; i < n; ++i)
       {
         _allStats[currentStats->getPe()] = currentStats;
-	currentStats++;
+        currentStats++;
       }
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), n));
 			/*FAULT_EVAC*/
@@ -1215,10 +1215,10 @@ void _initCharm(int unused_argc, char **argv)
 		  in.
 		  
 		*/
-#if CMK_WITH_CONTROLPOINT
 		_registerPathHistory();
-		_registerControlPoints();
-		_registerTraceControlPoints();
+#if CMK_WITH_CONTROLPOINT
+	//	_registerControlPoints();
+	//	_registerTraceControlPoints();
 #endif
 
 

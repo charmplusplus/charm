@@ -734,7 +734,7 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
   void controlPointManager::setTiming(double time){
     currentPhaseData()->times.push_back(time);
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
        
     // First we should register this currently executing message as a path, because it is likely an important one to consider.
     //    registerTerminalEntryMethod();
@@ -923,7 +923,7 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 
 
   void controlPointManager::doExitNow(){
-          _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL);
+          _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL, this);
 	  writeOutputToDisk();
 	  //	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
 	  CkExit();
@@ -1239,7 +1239,6 @@ extern "C" void controlPointShutdown(){
 
 /// A function called at startup on each node to register controlPointShutdown() to be called at CkExit()
 void controlPointInitNode(){
-//  CkPrintf("controlPointInitNode()\n");
   registerExitFn(controlPointShutdown);
 }
 

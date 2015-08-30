@@ -643,10 +643,6 @@ do
 		      OBJECT="a.out"
 		fi
 		;;
-        -print-prog-name=*)
-                echo $arg | cut -d'=' -f2
-                exit 0
-                ;;
 	"-c")
 		if [ "$EXPLICIT_OBJECT" = "no" ]
 		then
@@ -1474,9 +1470,6 @@ fi
 
 Debug "About to link..."
 
-# if interoperate dont create the library now, wait to collect all info
-if [ "$MPI_INTEROPERATE" = "" ]
-then
 case "$OBJECT" in
 *.o)
 	Debugf "Converting $FILES to $OBJECTFILES"
@@ -1532,7 +1525,6 @@ case "$OBJECT" in
 	Copyobj
 	;;
 esac
-fi
 # If the above case returns, we're not creating a .o or .a file,
 # so linking is needed.
 
@@ -1799,6 +1791,9 @@ for trace in $TRACEMODE; do
     elif test $trace = "projections"
     then
       echo "  extern void _registerTraceProjections();" >> $modInitSrc
+    elif test $trace = "controlPoints"
+    then
+      echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
     elif test $trace = "simple"
     then
       echo "  extern void _registerTraceSimple();" >> $modInitSrc
@@ -1811,9 +1806,16 @@ for trace in $TRACEMODE; do
     elif test $trace = "controlPoints"
     then
       echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
+    elif test $trace = "autoPerf"
+    then
+      echo "  extern void _registerTraceAutoPerf();" >> $modInitSrc
+    elif test $trace = "autoTuner"
+    then
+      echo "  extern void _registerTraceAutoTuner();" >> $modInitSrc
     elif test $trace = "all"
     then
       echo "  extern void _registerTraceProjections();" >> $modInitSrc
+      echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
       echo "  extern void _registerTraceSummary();" >> $modInitSrc
     fi
 done
@@ -1833,6 +1835,9 @@ for trace in $TRACEMODE; do
     elif test $trace = "projections"
     then
       echo "  _registerTraceProjections();" >> $modInitSrc
+    elif test $trace = "controlPoints"
+    then
+      echo "  _registerTraceControlPoints();" >> $modInitSrc
     elif test $trace = "Tau"
     then
       TRACE_WITH_TAU=1
@@ -1846,9 +1851,16 @@ for trace in $TRACEMODE; do
     elif test $trace = "controlPoints"
     then
       echo "  _registerTraceControlPoints();" >> $modInitSrc
+    elif test $trace = "autoPerf"
+    then
+      echo "  _registerTraceAutoPerf();" >> $modInitSrc
+    elif test $trace = "autoTuner"
+    then
+      echo "  _registerTraceAutoTuner();" >> $modInitSrc
     elif test $trace = "all"
     then
       echo "  _registerTraceProjections();" >> $modInitSrc
+      echo "  _registerTraceControlPoints();" >> $modInitSrc
       echo "  _registerTraceSummary();" >> $modInitSrc
     fi
 done
@@ -2039,6 +2051,8 @@ then
   then
 	DoNoErrCheck $RM $targ
 	Do $CP $CHARMBIN/$targ $targ
+	Do $CP $CHARMBIN/tree.txt tree.txt
+	Do $CP $CHARMBIN/fuzzytree.txt fuzzytree.txt
   fi
 fi
 

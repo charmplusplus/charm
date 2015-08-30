@@ -106,6 +106,9 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 
 #define CK_EP_MEMCRITICAL (1<<5)
 #define CK_EP_APPWORK     (1<<6)
+#if USE_MIRROR
+#define CK_EP_MIRROR      (1<<7)
+#endif
 
 /** type of a chare */
 #if CMK_MESSAGE_LOGGING

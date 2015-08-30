@@ -8,7 +8,7 @@ static int compress_mode;
 #define     CMODE_LZ4     3
 #define OUT_PLACE 1
 
-//quicklz crashes 
+//quicklz crashes
 #include <sys/time.h>
 
 /*
@@ -34,7 +34,7 @@ void initCompress()
     }
 
 }
-//#define DEBUG  1 
+//#define DEBUG  1
 
 void compressZlib(void *src, void *dst, int size, int *compressSize, void *bData)
 {
@@ -51,7 +51,7 @@ void compressZlib(void *src, void *dst, int size, int *compressSize, void *bData
     char *xor=malloc(size);
     register int i;
     for(i=0; i<size; i++)
-        xor[i] = (src_ptr[i])^(bdata_ptr[i]);       
+        xor[i] = (src_ptr[i])^(bdata_ptr[i]);
     zlib_compress(xor, dst, size, compressSize);
 #if DEBUG
     double t = get_clock()-t1;
@@ -68,9 +68,9 @@ void decompressZlib(void *cData, void *dData, int size, int compressSize, void *
     zlib_decompress(cData, xor, compressSize, size);
     register int i;
     char *dptr = (char*)dData;
-    char *bptr = (char*)bData; 
+    char *bptr = (char*)bData;
     for(i=0; i<size; i++)
-        dptr[i] = (bptr[i])^(xor[i]); 
+        dptr[i] = (bptr[i])^(xor[i]);
     free(xor);
 #if DEBUG
     double t = get_clock()-t1;
@@ -93,7 +93,7 @@ void compressLz4(void *src, void *dst, int size, int *compressSize, void *bData)
     char *xor=malloc(size);
     register int i;
     for(i=0; i<size; i++)
-        xor[i] = (src_ptr[i])^(bdata_ptr[i]);       
+        xor[i] = (src_ptr[i])^(bdata_ptr[i]);
     lz4_wrapper_compress(xor, dst, size, compressSize);
 #if DEBUG
     double t = get_clock()-t1;
@@ -110,9 +110,9 @@ void decompressLz4(void *cData, void *dData, int size, int compressSize, void *b
     lz4_wrapper_decompress(cData, xor, compressSize, size);
     register int i;
     char *dptr = (char*)dData;
-    char *bptr = (char*)bData; 
+    char *bptr = (char*)bData;
     for(i=0; i<size; i++)
-        dptr[i] = (bptr[i])^(xor[i]); 
+        dptr[i] = (bptr[i])^(xor[i]);
     free(xor);
 #if DEBUG
     double t = get_clock()-t1;

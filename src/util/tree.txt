@@ -1,0 +1,28 @@
+#inter-leaf key                 avg-min-max     key_in_int              OP      flag        value/index     symbol  parent
+-1      Root
+0       CPU_Util                AVG            UtilizationPercentage    SUB         -1          0.90      GT     1   Root 
+0       High_Overhead           AVG            OverheadPercentage       SUB         -1          0.1      GT     1   Root
+0       High_Idle               AVG             IdlePercentage          SUB         -1          0.1      GT     1   Root
+0       Small_Message           AVG             BytesPerMsg             SUB         -1          300      LT     1   High_Overhead 
+0       High_CacheMissRate      AVG             CacheMissRate           SUB         -1          0.1      GT     1   CPU_Util 
+0       LOW_CacheMissRate       AVG             CacheMissRate           SUB         -1          0.1      LT     1   CPU_Util 
+0       Small_Entry             AVG             EntryMethodDuration     SUB         -1          0.00006  LT     1   High_Overhead 
+0       Small_Entry_1           AVG             EntryMethodDuration_1   SUB         -1          0.00006  LT     1   High_Overhead 
+0       Small_Entry_2           AVG             EntryMethodDuration_2   SUB         -1          0.00006  LT     1   High_Overhead 
+0       Long_Entry              MAX             EntryMethodDuration     DIV         0           AVG       LoadPerPE        GT    1.2      1      High_Idle 
+0       Long_Entry_1            MAX             EntryMethodDuration_1   DIV         0           AVG       LoadPerPE        GT    1.2      1      High_Idle 
+0       Long_Entry_2            MAX             EntryMethodDuration_2   DIV         0           AVG       LoadPerPE        GT    1.2      1      High_Idle 
+0       Long_Object             MAX             LoadPerObject           DIV         0           AVG       LoadPerPE        GT    1.2      1      High_Idle 
+0       Load_Imbalance          MAX             LoadPerPE               DIV         0           AVG       LoadPerPE         GT   1.1      1      High_Idle     
+0       Long_Critical_Path      MAX             CriticalPathLength      DIV         0           AVG       LoadPerPE         GT   1.2      1      High_Idle    
+0       FEW_INVOC               AVG             NumInvocations          SUB         -1          1         LT      1       High_Idle
+0       FEW_ENTRIES             AVG             EntryMethodDuration     SUB         0           AVG       LoadPerPE        GT    0        1      High_Idle
+1       Leaf_Up_Grainsize       UP              PICS_EFF_GRAINSIZE      1           Small_Entry 
+1       Leaf_Down_Grainsize     DOWN            PICS_EFF_GRAINSIZE      5           Long_Entry  Long_Object    Long_Critical_Path   FEW_ENTRIES FEW_INVOC
+1       Leaf_Up_Aggregation     UP              PICS_EFF_AGGREGATION    1           Small_Message
+1       Leaf_Up_LDB_Frequency   UP              PICS_EFF_LDBFREQUENCY   1           Load_Imbalance
+1       Leaf_Up_Msgsize         UP              PICS_EFF_MESSAGESIZE    1           Small_Message
+1       Leaf_Down_Grainsize_1   DOWN            PICS_EFF_GRAINSIZE_1    1           Long_Entry_1  
+1       Leaf_Down_Grainsize_2   DOWN            PICS_EFF_GRAINSIZE_2    1           Long_Entry_2  
+1       Leaf_Up_Grainsize_1     UP              PICS_EFF_GRAINSIZE_1    1           Small_Entry_1
+1       Leaf_Up_Grainsize_2     UP              PICS_EFF_GRAINSIZE_2    1           Small_Entry_2

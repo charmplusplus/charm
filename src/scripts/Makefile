@@ -209,6 +209,9 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       msgq.h queueing.h conv-cpath.h conv-cpm.h persistent.h\
       trace.h trace-common.h trace-bluegene.h trace-projections.h  \
       trace-simple.h trace-controlPoints.h charm-api.h \
+			trace-perf.h picsdefs.h  picsautoperf.h picstreenode.h \
+			picsdecisiontree.h picstunableparameter.h \
+	    picsautoperfAPI.h picsautoperfAPIC.h picsautotunerAPI.h picsautotuner.h \
       conv-ccs.h ccs-client.c ccs-client.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
@@ -250,7 +253,8 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           BaseLB.decl.h \
 	  NborBaseLB.decl.h DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
-          TraceSummary.decl.h TraceProjections.decl.h \
+          TraceSummary.decl.h TraceAutoPerf.decl.h TraceProjections.decl.h \
+		  TraceAutoTuner.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
 	  TraceUtilization.decl.h BlueGene.decl.h \
 	  ckdirect.h \
@@ -318,6 +322,7 @@ dirs+sources:
 	./gatherflat $(SRCBASE)/conv-perf	.
 	./gatherflat $(SRCBASE)/ck-core          .
 	./gatherflat $(SRCBASE)/ck-perf          .
+	./gatherflat $(SRCBASE)/ck-pics          .
 	./gatherflat $(SRCBASE)/ck-tune          .
 	./gatherflat $(SRCBASE)/ck-ldb           .
 	./gatherflat $(SRCBASE)/ck-cp            .
@@ -341,6 +346,8 @@ dirs+sources:
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
+	-./system_ln  ../tmp/tree.txt ../bin/
+	-./system_ln  ../tmp/fuzzytree.txt ../bin/
 #	-ln -s ../../java/bin charmjavabin
 #	-ln -s ../../java/bin ../bin/charmjavabin
 #	-ln -s charmjavabin/* ../bin/
@@ -366,11 +373,12 @@ TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a
 BUILD_TRACING=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
 
 ifneq "$(BUILD_TRACING)" "0"
-TRACELIBS += $(L)/libtrace-projections.a  $(L)/libtrace-summary.a  \
+TRACELIBS += $(L)/libtrace-projections.a $(L)/libtrace-controlPoints.a  $(L)/libtrace-summary.a \
+			 $(L)/libtrace-autoPerf.a $(L)/libtrace-autoTuner.a \
              $(L)/libtrace-utilization.a  $(L)/libtrace-simple.a \
              $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
-	     $(L)/libtrace-projector.a $(L)/libtrace-all.a  \
-             $(L)/libtrace-memory.a 
+	     $(L)/libtrace-all.a  \
+             $(L)/libtrace-memory.a $(L)/libtrace-autoPerf.a
 endif
 
 MEMLIBS=$(L)/libmemory-default.a $(L)/libmemory-os.a $(L)/libmemory-gnu.a \
@@ -607,8 +615,8 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
-           pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
-					 trace-controlPoints.o mpi-interoperate.o
+           pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o  \
+					 trace-controlPoints.o mpi-interoperate.o 
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a
@@ -636,9 +644,21 @@ charmmod.o: charmmod.f90
 	-$(CHARMC) -cpmod ../include charm.M
 
 ## Tracing libraries (profiling, -tracemode)
-LIBTRACE_PROJ=trace-projections.o
+LIBTRACE_PROJ=trace-projections.o 
 $(L)/libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -o $@ $(LIBTRACE_PROJ)
+
+LIBTRACE_CP=trace-controlPoints.o
+$(L)/libtrace-controlPoints.a: $(LIBTRACE_CP)
+	$(CHARMC) -o $@ $(LIBTRACE_CP)
+
+LIBTRACE_AP=trace-perf.o picsautoperf.o picsautoperfAPI.o PowerLogger.o picstreenode.o picsdecisiontree.o
+$(L)/libtrace-autoPerf.a: $(LIBTRACE_AP)
+	$(CHARMC) -o $@ $(LIBTRACE_AP)
+
+LIBTRACE_AUTOTUNER=picsautotuner.o picsautotunerAPI.o picstunableparameter.o
+$(L)/libtrace-autoTuner.a: $(LIBTRACE_AUTOTUNER)
+	$(CHARMC) -o $@ $(LIBTRACE_AUTOTUNER)
 
 LIBTRACE_SUMM=trace-summary.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
@@ -689,15 +709,11 @@ LIBTRACE_MEMORY=trace-memory.o
 $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o \
-$(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o picsautoperfAPI.o picsautoperf.o trace-perf.o PowerLogger.o picstunableparameter.o picsautotuner.o picsautotunerAPI.o trace-summary.o trace-simple.o  \
+$(TAU_TRACE_OBJ) traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
-
-LIBTRACE_PROJECTOR=trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
-$(L)/libtrace-projector.a: $(LIBTRACE_PROJECTOR)
-	$(CHARMC) -o  $@ $(LIBTRACE_PROJECTOR)
 
 LIBTRACE_CONVERSE=trace-converse.o
 $(L)/libtrace-converse.a: $(LIBTRACE_CONVERSE)
@@ -711,10 +727,10 @@ tracef_f.o: tracef_f.f90
 	-$(CHARMC) -o $@ -c tracef_f.f90 && $(CHARMC) -cpmod ../include tracemod.M  || touch $@
 
 # used for make depends
-TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
+TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o trace-perf.o picsautoperfAPI.o picsautoperf.o PowerLogger.o picsautotuner.o picstunableparameter.o trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
-	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
-          trace-memory.o 
+	      trace-bluegene.o trace-converse.o trace-all.o \
+				trace-memory.o picsautotuner.o picsautotunerAPI.o picstunableparameter.o 
 
 ###############################################################################
 #

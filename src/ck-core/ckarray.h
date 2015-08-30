@@ -30,6 +30,12 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ckmemcheckpoint.h" // for CkArrayCheckPTReqMessage
 #include "ckarrayindex.h"
 
+#if 0
+class SyncDataMessage : public  CMessage_SyncDataMessage {
+public:
+    char *data;
+};
+#endif
 /***********************************************************
 	Utility defines, includes, etc.
 */
@@ -230,8 +236,11 @@ class CkArrayOptions {
 	CkCallback reductionClient; // Default target of reductions
 	bool anytimeMigration; // Elements are allowed to move freely
 	bool disableNotifyChildInRed; //Child elements are not notified when reduction starts
-	bool staticInsertion; // Elements are only inserted at construction
-	bool broadcastViaScheduler;     // broadcast inline or through scheduler
+  bool staticInsertion; // Elements are only inserted at construction
+  bool broadcastViaScheduler;     // broadcast inline or through scheduler
+#if USE_MIRROR
+  bool mirrorFlag;
+#endif
 
 	/// Set various safe defaults for all the constructors
 	void init();
@@ -317,6 +326,10 @@ class CkArrayOptions {
 	CkArrayOptions &addListener(CkArrayListener *listener);
 
 	CkArrayOptions &setAnytimeMigration(bool b) { anytimeMigration = b; return *this; }
+#if USE_MIRROR
+	CkArrayOptions &setMirror(bool b) { mirrorFlag = b; return *this; }
+  bool getMirror() { return mirrorFlag;}
+#endif
 	CkArrayOptions &setStaticInsertion(bool b);
 	CkArrayOptions &setBroadcastViaScheduler(bool b) { broadcastViaScheduler = b; return *this; }
 	CkArrayOptions &setReductionClient(CkCallback cb)
@@ -354,8 +367,8 @@ class ArrayBase { /*empty*/ };
  */
 class CProxy_ArrayBase :public CProxy {
 private:
-	CkArrayID _aid;
 public:
+    CkArrayID _aid;
 	CProxy_ArrayBase() {
 #if CMK_ERROR_CHECKING
 		_aid.setZero();
@@ -379,7 +392,7 @@ public:
 	static CkArrayID ckCreateEmptyArray(CkArrayOptions opts);
         static void ckCreateEmptyArrayAsync(CkCallback cb, CkArrayOptions opts);
 	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts);
-
+	static CkArrayID ckCreateArray_internal(CkArrayMessage *m,int ctor,const CkArrayOptions &opts);
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx);
 	void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
@@ -400,13 +413,16 @@ PUPmarshall(CProxy_ArrayBase)
 class CProxyElement_ArrayBase:public CProxy_ArrayBase {
 private:
 	CkArrayIndex _idx;//<- our element's array index
+    int ackCnt;
+    void _init() {
+    }
 public:
-	CProxyElement_ArrayBase() { }
-	CProxyElement_ArrayBase(const CkArrayID &aid,
-		const CkArrayIndex &idx,CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _idx(idx) { }
-        CProxyElement_ArrayBase(const CkArrayID &aid, const CkArrayIndex &idx)
-                :CProxy_ArrayBase(aid), _idx(idx) { }
+	CProxyElement_ArrayBase() {_init(); }
+    CProxyElement_ArrayBase(const CkArrayID &aid,
+        const CkArrayIndex &idx,CK_DELCTOR_PARAM)
+        :CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _idx(idx) { _init();}
+    CProxyElement_ArrayBase(const CkArrayID &aid, const CkArrayIndex &idx)
+        :CProxy_ArrayBase(aid), _idx(idx) { _init(); }
 	CProxyElement_ArrayBase(const ArrayElement *e);
 
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
@@ -535,7 +551,13 @@ public:
   virtual ~ArrayElement();
 
 /// Pack/unpack routine (called before and after migration)
-  void pup(PUP::er &p);
+  virtual void pup(PUP::er &p);
+#if USE_MIRROR
+  virtual char* mirrorData(int *size);
+  virtual void unmirrorData(CkMirrorSyncMessage *buffer, int size);
+  virtual void recvSyncMirrorData(CkMirrorSyncMessage *);
+  void syncMirror(CkCallback& cb);
+#endif
 
 //Overridden functions:
   /// Called by the system just before and after migration to another processor:
@@ -566,6 +588,7 @@ public:
 #endif
 	// for _PIPELINED_ALLREDUCE_, assembler entry method
 	inline void defrag(CkReductionMsg* msg);
+  void recvAck();
   inline const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
 
   inline int ckGetArraySize(void) const { return numInitialElements; }
@@ -579,7 +602,8 @@ protected:
 private:
 //Array implementation methods:
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
-
+  int ackCnt;  
+  CkCallback cbResume; 
 #if CMK_MEM_CHECKPOINT
 friend class CkMemCheckPT;
 friend class CkLocMgr;
@@ -664,7 +688,6 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 \addtogroup CkArrayImpl
 */
 /*@{*/
-
 #include "CkArray.decl.h"
 #include "CkArrayReductionMgr.decl.h"
 
@@ -804,7 +827,27 @@ public:
 };
 
 
-
 /*@}*/
 
+#if USE_MIRROR
+class MirrorUpdate : public CBase_MirrorUpdate{
+private:
+    std::map<int, int> mirrorMap;
+
+public:
+
+    MirrorUpdate(void);
+    MirrorUpdate(CkMigrateMessage *m) : CBase_MirrorUpdate(m) {}
+    void update(int id1, int id2);
+    int find(int a) ;
+
+    int getMirrorIndex(const CkArrayIndex  &aidx, int i, int aid);
+    void pup(PUP::er &p);
+};
+
+class MirrorInit : public CBase_MirrorInit {
+public:
+    MirrorInit(CkArgMsg *m);
+};
+#endif
 #endif

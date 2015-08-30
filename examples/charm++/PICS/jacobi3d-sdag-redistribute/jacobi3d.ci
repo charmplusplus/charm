@@ -1,0 +1,69 @@
+mainmodule jacobi3d {
+  readonly CProxy_Main mainProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int arrayDimZ;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int blockDimZ;
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int num_chare_z;
+
+  message   redistributeMsg {
+      double data[];
+  };
+
+  mainchare Main {
+      entry Main(CkArgMsg *m);
+      entry void registerTune();
+      entry void newRun();
+      entry [reductiontarget] void report(double maxdiff);
+      entry [reductiontarget] void redistributeDone();
+      entry [threaded] void run() {
+          atomic "start_timed_portion" {
+              if(iterations %2 == 0)
+              {
+                  PICS_startStep(true);
+                  PICS_startPhase(true, 0);
+              }
+              array.doStep();
+          }
+          // Each worker reports back to here when it completes an iteration
+          // Asynchronous check on threshhold satisfaction
+          when report(double maxdiff)
+          {
+              atomic {
+                iterations++;
+                if(iterations %2 == 0)
+                {
+                    PICS_endPhase(true);
+                    PICS_endStepResumeCb(true, CkCallbackResumeThread());
+                }
+                  maxdifference = maxdiff ;
+                  done(false);
+              }
+          }
+      };
+  };
+
+  array [3D] Jacobi {
+    entry Jacobi(int x, int y, int z, int bx, int by, int bz);
+    entry void updateGhosts(int ref, int dir, int w, int h, double gh[w*h]);
+    entry void redistribute(CProxy_Jacobi, double);
+    entry void construct(redistributeMsg* msg);
+    entry void doStep() {
+        atomic { begin_iteration(); }
+        for (remoteCount = 0; remoteCount < neighbors; remoteCount++) {
+            when updateGhosts[iterations](int ref, int dir, int w, int h, double buf[w*h]) atomic {
+                updateBoundary(dir, w, h, buf);
+            }
+        }
+        atomic {
+          error = computeKernel();
+          iterations++;
+          contribute(sizeof(double), &error, CkReduction::max_double, CkCallback(CkReductionTarget(Main, report), mainProxy));
+        }
+    };
+  };
+};

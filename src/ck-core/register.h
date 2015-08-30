@@ -52,6 +52,10 @@ class EntryInfo {
     int msgIdx;
     /// Our chare's index into the _chareTable
     int chareIdx;
+    int compressAlgoIdx;
+#if USE_MIRROR
+    bool mirror;
+#endif
     /// Charm++ Tracing enabled for this ep (can change dynamically)
     bool traceEnabled; 
     /// Method doesn't keep (and delete) message passed in to it.
@@ -91,9 +95,13 @@ class EntryInfo {
       name(n), call(c), msgIdx(m), chareIdx(ci), 
       marshallUnpack(0)
 #if CMK_CHARMDEBUG
-        , messagePup(0)
+      , messagePup(0)
 #endif
-    { traceEnabled=true; noKeep=false; inCharm=false; appWork=false;}
+     { traceEnabled=true; noKeep=false; inCharm=false; appWork=false;
+#if USE_MIRROR
+       mirror=false;
+#endif
+     }
 };
 
 /**
@@ -302,6 +310,8 @@ extern CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 
 extern void _registerInit(void);
 extern void _registerDone(void);
+
+extern int CkGetChareIdx(char *name);
 
 /*@}*/
 #endif

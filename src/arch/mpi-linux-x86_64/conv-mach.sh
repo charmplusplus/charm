@@ -44,7 +44,7 @@ CMK_NATIVE_CXX="g++ $CMK_GCC64 "
 CMK_NATIVE_LDXX="g++ $CMK_GCC64 "
 CMK_NATIVE_LIBS=""
 
-# fortran compiler 
+# fortran compiler
 CMK_CF90=`which f95 2>/dev/null`
 if test -n "$CMK_CF90"
 then

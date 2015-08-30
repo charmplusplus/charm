@@ -1,0 +1,29 @@
+module TraceAutoTuner {
+
+  readonly CProxy_AutoTunerBOC autoTunerProxy;
+
+  message ParameterMsg;
+
+  message TunnableParameterUpdateMsg
+  {
+    char   names[];
+    double values[];
+  };
+
+  initproc void initTunerPerCore();  
+
+  mainchare AutoTuneInit {
+    entry AutoTuneInit(CkArgMsg *m);
+  };
+
+  group [migratable] AutoTunerBOC {
+    entry AutoTunerBOC(void);
+    entry [inline,expedited] void registerParameter(ParameterMsg*);
+    entry [expedited] void tune( vector<IntDoubleMap> solutions, int numOfSets);
+    entry [inline,expedited] void updateTP(TunnableParameterUpdateMsg*);
+    entry [inline,expedited] void updateMe(TunnableParameterUpdateMsg*);
+    entry [local] void broadcastResults(TunnableParameterUpdateMsg *msg, int index, int configSize, bool bcast);
+    entry [inline,expedited] void packAndBroadcast();
+    entry [expedited] void applyTuneResults();
+  };
+};
