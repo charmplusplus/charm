@@ -709,10 +709,10 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   PtrQ *ptrq = CkpvAccess(_groupTable)->find(groupID).getPending();
   if(ptrq) {
     void *pending;
-    while((pending=ptrq->deq())!=0)
-      _CldEnqueue(CkMyPe(), pending, _infoIdx);
-//    delete ptrq;
-      CkpvAccess(_groupTable)->find(groupID).clearPending();
+    while((pending=ptrq->deq())!=0) {
+      CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
+    }
+    CkpvAccess(_groupTable)->find(groupID).clearPending();
   }
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 
