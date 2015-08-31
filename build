@@ -617,9 +617,9 @@ then
     HAS_PXSHM=0
     HAS_SMP=0
     for i in $BOPTS; do
-      if [ "$i" == "smp" ]; then
+      if [ "$i" = "smp" ]; then
         HAS_SMP=1
-      elif [ "$i" == "pxshm" ]; then
+      elif [ "$i" = "pxshm" ]; then
         HAS_PXSHM=1
       else
         TMP="$TMP $i"
