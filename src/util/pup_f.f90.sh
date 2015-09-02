@@ -108,6 +108,12 @@ cat >> pup_f.f90 << END_OF_HEADER
         module procedure apla1d,apla2d,apla3d,apla4d,apla5d,apla6d,apla7d
         module procedure apxa1d,apxa2d,apxa3d,apxa4d,apxa5d,apxa6d,apxa7d
         module procedure apya1d,apya2d,apya3d,apya4d,apya5d,apya6d,apya7d
+
+      ! NOTE: for compilers with full Fortran2003 support (GNU-4.9+, IC-15.0+, etc.)
+      ! ... we can provide a single apup interface for both pointers and allocatables
+      ! ... by simply removing the next two lines.
+      end interface
+      interface apup_al
         module procedure apia1d_al,apia2d_al,apia3d_al,apia4d_al,apia5d_al,apia6d_al,apia7d_al
         module procedure apca1d_al,apca2d_al,apca3d_al,apca4d_al,apca5d_al,apca6d_al,apca7d_al
         module procedure apsa1d_al,apsa2d_al,apsa3d_al,apsa4d_al,apsa5d_al,apsa6d_al,apsa7d_al
