@@ -91,13 +91,20 @@ bool _isNotifyChildInRed;
 class CkArrayBroadcaster : public CkArrayListener {
   inline int &getData(ArrayElement *el) {return *ckGetData(el);}
 public:
+  bool elemsCreated;
   CkArrayBroadcaster(bool _stableLocations, bool _broadcastViaScheduler);
   CkArrayBroadcaster(CkMigrateMessage *m);
   virtual void pup(PUP::er &p);
   virtual ~CkArrayBroadcaster();
   PUPable_decl(CkArrayBroadcaster);
 
-  virtual void ckElementStamp(int *eltInfo) {*eltInfo=bcastNo;}
+  virtual void ckElementStamp(int *eltInfo, bool initDone = true ) {
+    if(initDone) {
+      *eltInfo=bcastNo;
+    } else {
+      *eltInfo = 0;
+    }
+  }
 
   ///Element was just created on this processor
   /// Return false if the element migrated away or deleted itself.
@@ -116,6 +123,10 @@ public:
   void springCleaning(void);
 
   void flushState();
+
+  void elemCreationDone() {
+    elemsCreated = true;
+  }
 private:
   int bcastNo;//Number of broadcasts received (also serial number)
   int oldBcastNo;//Above value last spring cleaning
@@ -146,7 +157,9 @@ public:
   void ckBeginInserting(void) {mgr->creatingContributors();}
   void ckEndInserting(void) {mgr->doneCreatingContributors();}
 
-  void ckElementStamp(int *eltInfo) {mgr->contributorStamped((I)eltInfo);}
+  void ckElementStamp(int *eltInfo, bool initDone = true) {
+    mgr->contributorStamped((I)eltInfo);
+  }
 
   void ckElementCreating(ArrayElement *elt)
     {mgr->contributorCreated(getData(elt));}
@@ -194,7 +207,7 @@ void CkVerboseListener::ckEndInserting(void)
   VL_PRINT<<"INIT  Done inserting elements"<<endl;
 }
 
-void CkVerboseListener::ckElementStamp(int *eltInfo)
+void CkVerboseListener::ckElementStamp(int *eltInfo, bool init)
 {
   VL_PRINT<<"LIFE  Stamping element"<<endl;
 }
@@ -929,7 +942,8 @@ CkArray::CkArray(CkArrayOptions &opts,
     // Register with our location manager
     elements((ArrayElementList *)locMgr->addManager(thisgroup,this)),
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
-    numInitial(opts.getNumInitial()), isInserting(true)
+    numInitial(opts.getNumInitial()), isInserting(true),
+    elemsCreated(false)
 {
   setupSpringCleaning();
 
@@ -953,9 +967,7 @@ CkArray::CkArray(CkArrayOptions &opts,
 
   for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
 
-  ///Set up initial elements (if any)
-  locMgr->populateInitial(opts,initMsg.getMessage(),this);
-
+  thisProxy[CkMyPe()].populateInitial(opts, initMsg);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// creating the spanning tree to be used for broadcast
 	children = (int *) CmiAlloc(sizeof(int) * _MLOG_BCAST_BFACTOR_);
@@ -997,6 +1009,7 @@ CkArray::CkArray(CkArrayOptions &opts,
 CkArray::CkArray(CkMigrateMessage *m)
 	:CkReductionMgr(m), thisProxy(thisgroup)
 {
+  elemsCreated = true;
   locMgr=NULL;
   isInserting=true;
 }
@@ -1006,6 +1019,15 @@ CkArray::~CkArray()
   if (!stableLocations)
     CcdCancelCallOnCondition(CcdPERIODIC_1minute, springCleaningCcd);
 }
+
+void CkArray::populateInitial(CkArrayOptions& opts,
+  CkMarshalledMessage& ctorMsg) {
+  ///Set up initial elements (if any)
+  locMgr->populateInitial(opts,ctorMsg.getMessage(),this);
+  elemsCreated = true;
+  broadcaster->elemCreationDone();
+}
+
 
 #if CMK_ERROR_CHECKING
 inline void testPup(PUP::er &p,int shouldBe) {
@@ -1041,7 +1063,7 @@ void CkArray::pup(PUP::er &p){
   int dataOffset=0; \
   for (int lNo=0;lNo<listeners.size();lNo++) { \
     CkArrayListener *l=listeners[lNo]; \
-    l->ckElementStamp(&listenerData[dataOffset]); \
+    l->ckElementStamp(&listenerData[dataOffset], elemsCreated); \
     dataOffset+=l->ckGetLen(); \
   } \
 } while (0)
@@ -1353,11 +1375,13 @@ CkArrayReducer::~CkArrayReducer() {}
 
 CkArrayBroadcaster::CkArrayBroadcaster(bool stableLocations_, bool broadcastViaScheduler_)
     :CkArrayListener(1), //Each array element carries a broadcast number
-     bcastNo(0), oldBcastNo(0), stableLocations(stableLocations_), broadcastViaScheduler(broadcastViaScheduler_)
+     bcastNo(0), oldBcastNo(0), stableLocations(stableLocations_),
+     broadcastViaScheduler(broadcastViaScheduler_), elemsCreated(false)
 { }
 
 CkArrayBroadcaster::CkArrayBroadcaster(CkMigrateMessage *m)
-    :CkArrayListener(m), bcastNo(-1), oldBcastNo(-1), broadcastViaScheduler(false)
+    :CkArrayListener(m), bcastNo(-1), oldBcastNo(-1),
+      broadcastViaScheduler(false), elemsCreated(true)
 { }
 
 void CkArrayBroadcaster::pup(PUP::er &p) {
@@ -1367,6 +1391,7 @@ void CkArrayBroadcaster::pup(PUP::er &p) {
   p|bcastNo;
   p|stableLocations;
   p|broadcastViaScheduler;
+  p|elemsCreated;
   if (p.isUnpacking()) {
     oldBcastNo=bcastNo; /* because we threw away oldBcasts */
   }
@@ -1383,7 +1408,7 @@ void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
   bcastNo++;
   DEBB((AA "Received broadcast %d\n" AB,bcastNo));
 
-  if (stableLocations)
+  if (elemsCreated && stableLocations)
     return;
 
   CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
@@ -1424,7 +1449,7 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
 /// Deliver all needed broadcasts to the given local element
 bool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 {
-  if (stableLocations) return true;
+  if (elemsCreated && stableLocations) return true;
   int &elBcastNo=getData(el);
   if (elBcastNo<bcastNo)
   {//This element needs some broadcasts-- it must have
@@ -1641,7 +1666,9 @@ void CkArray::recvBroadcast(CkMessage *m)
   		startVTimer();
 #endif
 		bool doFree = false;
-		if (stableLocations && ++count == len) doFree = true;
+		if (elemsCreated && stableLocations && ++count == len) {
+                  doFree = true;
+                }
 		broadcaster->deliver(msg, el, doFree);
 	}
 #endif

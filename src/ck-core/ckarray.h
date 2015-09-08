@@ -165,7 +165,7 @@ class CkArrayListener : public PUP::able {
 //The stamp/creating/created/died sequence happens, in order, exactly
 // once per array element.  Migrations don't show up here.
   ///Element creation message is about to be sent
-  virtual void ckElementStamp(int *eltInfo) {}
+  virtual void ckElementStamp(int *eltInfo, bool initDone = true) {}
   ///Element is about to be created on this processor
   virtual void ckElementCreating(ArrayElement *elt) {}
   ///Element was just created on this processor
@@ -202,7 +202,7 @@ class CkVerboseListener : public CkArrayListener {
   virtual void ckBeginInserting(void);
   virtual void ckEndInserting(void);
 
-  virtual void ckElementStamp(int *eltInfo);
+  virtual void ckElementStamp(int *eltInfo, bool initDone = true);
   virtual void ckElementCreating(ArrayElement *elt);
   virtual bool ckElementCreated(ArrayElement *elt);
   virtual void ckElementDied(ArrayElement *elt);
@@ -696,6 +696,7 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
 #endif
 private:
   bool stableLocations;
+  bool elemsCreated;
 
 public:
 //Array Creation:
@@ -731,6 +732,7 @@ public:
   void prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx);
 
   /// Create initial array elements:
+  void populateInitial(CkArrayOptions& opts, CkMarshalledMessage& ctorMsg);
   virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg,int local=1);
   virtual void doneInserting(void);
   virtual void beginInserting(void);
