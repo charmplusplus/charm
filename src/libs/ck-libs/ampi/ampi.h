@@ -98,6 +98,7 @@ typedef int MPI_Fint;
 #define MPI_DATATYPE_NULL    -1
 #define MPI_DOUBLE            0
 #define MPI_INT               1
+#define MPI_INTEGER           MPI_INT
 #define MPI_FLOAT             2
 #define MPI_COMPLEX           3
 #define MPI_LOGICAL           4
