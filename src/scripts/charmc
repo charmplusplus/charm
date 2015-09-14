@@ -1602,26 +1602,26 @@ fi
 
 if [ "$SWAPGLOBALS" = "1" ]
 then
-	swapo="$CHARMLIB/libglobal-swap.o"
+	swapo="$CHARMLIB/libglobal-swap.a"
 	if [ ! -r "$swapo" -o ! -s "$swapo" ]
 	then
 		echo "Global-swapping library $swapo missing--"
 		echo "  Is -swapglobals supported on this machine?"
 		exit 1
 	else
-		OBJECTFILES="$swapo $OBJECTFILES"
+		MIDDLE_LIBS="-lglobal-swap $MIDDLE_LIBS"
 	fi
 fi
 if [ "$SWAPGLOBALS" = "2" ]
 then
-	swapo="$CHARMLIB/libglobal-copy.o"
+	swapo="$CHARMLIB/libglobal-copy.a"
 	if [ ! -r "$swapo" -o ! -s "$swapo" ]
 	then
 		echo "Global-copying library $swapo missing--"
 		echo "  Is -copyglobals supported on this machine?"
 		exit 1
 	else
-		OBJECTFILES="$swapo $OBJECTFILES $CHARMLIB/loadsym.o"
+		MIDDLE_LIBS="-lglobal-copy $MIDDLE_LIBS"
 	fi
 fi
 
@@ -1730,6 +1730,7 @@ then
 	fi
 fi
 
+BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
 
 # Check for valid choice of MEMORY
 
@@ -1745,14 +1746,12 @@ then
   Abort "charmc : No such memory mode $MEMORY"
 fi
 
+MEM_OBJ="-lmemory-${MEMORY}"
+
 # For memory wrapping around the OS allocator, need to add also the wrapper object
 case $MEMORY in
   os-*)
-    if [ -f "${CHARMLIB}/libmemory-os-wrapper.a" ]; then
-      MEM_OBJ=$MEM_OBJ" $CHARMLIB/libmemory-os-wrapper.a"
-    else
-      MEM_OBJ=$MEM_OBJ" $CHARMLIBSO/libmemory-os-wrapper.so"
-    fi
+     MEM_OBJ=$MEM_OBJ" -lmemory-os-wrapper"
   ;;
 esac
 
@@ -1782,6 +1781,8 @@ then
   (cd $CHARMLIB ; list=`ls libthreads-* 2>/dev/null`; test -n "$list" && for i in $list; do [ -s $i ] && ls -l $i; done )
   Abort "charmc : No such thread mode $THREAD"
 fi
+
+THREAD_OBJ="-lthreads-${THREAD}"
 
 ################# Build the module initialization function ##################
 modInitName="moduleinit$$"
@@ -1901,10 +1902,15 @@ then
 fi
 # done getting TAU variables
 
+if [ "$BUILD_SHARE" = "0" ]
+then
+       MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
+fi
+
 case "$LANGUAGE" in
 "f90charm")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
+	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-cplus-y $CORE_LIBS "
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
         if [ "$NO_MAIN" = "" ]
         then
@@ -1919,7 +1925,7 @@ case "$LANGUAGE" in
 	;;
 "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
+	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-cplus-y $CORE_LIBS "
         if [ "$NO_MAIN" = "" ]
         then
 	  MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
@@ -1934,7 +1940,7 @@ case "$LANGUAGE" in
 	;;
 "converse")
 	MAKE_LD="1"
-	MIDDLE_LIBS="-lconv-cplus-n $CORE_LIBS -ltrace-converse "
+	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-cplus-n $CORE_LIBS -ltrace-converse "
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	;;
 "converse++"|"bluegene"|"bigsim"|"bgconverse++")
