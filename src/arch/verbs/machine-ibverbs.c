@@ -1603,7 +1603,12 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 
 void static inline handoverMessage(char *newmsg,int total_size,int rank,int broot,int toBuffer){
 
-	handleOneRecvedMsg(total_size, newmsg);
+	if(toBuffer){
+		if((CMI_BROADCAST_ROOT(newmsg)!=0))
+			insertBufferedBcast(newmsg,total_size,broot,rank);
+		else handleOneRecvedMsg(total_size, newmsg);
+	}
+	else handleOneRecvedMsg(total_size, newmsg);
 
 	if(!toBuffer){
 //#if !CMK_SMP		
@@ -1982,7 +1987,7 @@ static inline void processBufferedBcast(){
 			MACHSTATE3(3,"Buffered broadcast msg %p of size %d being processed at %d",start->bcastList[i].msg,start->bcastList[i].size,i);
 		
 			handleOneRecvedMsg(start->bcastList[i].size, start->bcastList[i].msg);
-			CmiFree(start->bcastList[i].msg);           // gzheng 
+			start->bcastList[i].msg = NULL;
 		
 		}
 		if(start->count != 0){
