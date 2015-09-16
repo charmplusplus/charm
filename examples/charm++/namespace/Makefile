@@ -12,8 +12,8 @@ all: $(BINARY)
 $(BINARY): $(patsubst %.C,%.o,$(wildcard *.C))
 	$(CHARMC) $(CHARMCLINKFLAGS) -o $@ $+
 
-.SECONDARY: $(patsubst %.C,%.decl.h,$(wildcard *.C))
-.SECONDARY: $(patsubst %.C,%.def.h,$(wildcard *.C))
+C.o: B.decl.h B.def.h A.decl.h A.def.h
+B.o: A.decl.h A.def.h
 
 %.o: %.C %.decl.h %.def.h
 	$(CHARMC) $(CHARMCFLAGS) $<
