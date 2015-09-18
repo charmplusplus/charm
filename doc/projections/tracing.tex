@@ -40,8 +40,11 @@ even if no performance analysis traces are desired. Developers of
 \charmpp{} applications who consider such an overhead to be
 unacceptable (e.g. for a production application which requires the
 absolute best performance) may recompile the \charmpp{} runtime with
-the \verb|--with-production| flag which removes the instrumentation
-stubs.
+the \verb|--with-production| flag, which removes the instrumentation
+stubs.  To enable the instrumentation stubs while retaining the other
+optimizations enabled by \verb|--with-production|, one may
+compile \charmpp{} with both \verb|--with-production|
+and \verb|--enable-tracing|, which explicitly enabled Projections tracing.
 
 To enable performance tracing of your application, users simply need
 to link the appropriate trace data generation module(s) (also referred
