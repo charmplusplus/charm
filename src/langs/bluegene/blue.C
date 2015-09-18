@@ -1792,6 +1792,7 @@ CmiStartFn bgMain(int argc, char **argv)
 
   if (CmiMyRank() == 0)
     initLock = CmiCreateLock();     // used for BnvInitialize
+  CmiNodeAllBarrier(); //barrier to make sure initLock is created
 
   bgstreaming.init(cva(numNodes));
 
