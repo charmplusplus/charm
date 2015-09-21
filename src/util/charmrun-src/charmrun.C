@@ -1026,10 +1026,7 @@ void arg_init(int argc, const char **argv)
     exit(1);
   }
 #endif
-  if (arg_debug && arg_local) {
-    printf("++debug cannot be used with ++local.\n");
-    exit(0);
-  }
+
 }
 
 /****************************************************************************
@@ -4731,6 +4728,7 @@ int start_set_node_rsh(int client)
   /* a search function could be inserted here instead of sequential lookup for
    * more complex node lists (e.g. interleaving) */
   int clientgroup;
+
 #if defined(_WIN32)
   clientgroup = client + 1; /* smp already handles this functionality */
 #else
@@ -4945,6 +4943,29 @@ void kill_nodes()
   free(rsh_pids);
 }
 
+
+/* find the absolute path for an executable in the path */
+char *find_abs_path(const char *target)
+{
+  char *thepath=getenv("PATH");
+  char *path=strdup(thepath);
+  char *subpath=strtok(path,":");
+  char *abspath=(char*) malloc(PATH_MAX + strlen(target) + 2);
+  while(subpath!=NULL) {
+    strcpy(abspath,subpath);
+    strcat(abspath,"/");
+    strcat(abspath,target);
+    if(probefile(abspath)){
+      delete path;
+      return abspath;
+    }
+    subpath=strtok(NULL,":");
+  }
+  free(abspath);
+  free(path);
+  return NULL;
+}
+
 /* simple version of charmrun that avoids the rshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
 void start_nodes_local(char **env)
@@ -4952,10 +4973,13 @@ void start_nodes_local(char **env)
   char **envp;
   int envc, rank0no, i;
   int extra = 0;
-
+  
+  char **dparamp;
+  int dparamc;
 #if CMK_AIX && CMK_SMP
   extra = 1;
 #endif
+
 
   /* copy environ and expanded to hold NETSTART and CmiNumNodes */
   for (envc = 0; env[envc]; envc++)
@@ -4970,6 +4994,60 @@ void start_nodes_local(char **env)
   sprintf(envp[envc + 2], "MALLOCMULTIHEAP=1");
 #endif
   envp[envc + 2 + extra] = 0;
+  for (i = 0; i < envc; i++)
+    envp[i] = env[i];
+  envp[envc] = (char *) malloc(256);
+  envp[envc + 1] = (char *) malloc(256);
+  int dparamoutc=0;
+  int dparamoutmax=7;
+
+  /* insert xterm gdb in front of command line and pass args to gdb */
+  if(arg_debug || arg_debug_no_pause) {
+    int argstringlen=0;
+    for (dparamc = 0, argstringlen=0; pparam_argv[dparamc]; dparamc++)
+      { 
+        if(dparamc>1) argstringlen+=strlen(pparam_argv[dparamc]);
+      }
+    if(arg_debug_no_pause) dparamoutmax+=2;
+
+    dparamp = (char **) malloc((dparamoutmax) * sizeof(void *));
+    char *abs_xterm=find_abs_path(arg_xterm);
+    if(!abs_xterm)
+      {
+	printf("Charmrun> cannot find xterm for gdb, please add it to your path\n");
+	exit(1);
+      }
+    dparamp[dparamoutc++] = strdup(abs_xterm);
+    dparamp[dparamoutc++] = strdup("-e");
+    dparamp[dparamoutc++] = strdup(arg_debugger);
+    dparamp[dparamoutc++] = strdup(pparam_argv[1]);
+    dparamp[dparamoutc++] = strdup("-ex");
+    dparamp[dparamoutc] = (char *) malloc(argstringlen + 11 + dparamc);
+    strcpy(dparamp[dparamoutc], "set args");
+    for(int i=2; i< dparamc; i++)
+      {
+	strcat(dparamp[dparamoutc], " ");
+	strcat(dparamp[dparamoutc], pparam_argv[i]);
+      }
+    if(arg_debug_no_pause)
+      {
+	dparamp[++dparamoutc] = strdup("-ex");
+	dparamp[++dparamoutc] = strdup("r");
+      }
+    dparamp[++dparamoutc]=0;  // null terminate your argv or face the wrath of
+    // undefined behavior
+    if (arg_verbose)
+      {
+	printf("Charmrun> gdb args : ");
+	for (i = 0; i < dparamoutc; i++)
+	  printf(" %s ",dparamp[i]);
+	printf("\n");
+      }
+  }
+  else
+    {
+      dparamp=(char **) (pparam_argv+1);
+    }
 
   for (rank0no = 0; rank0no < nodetab_rank0_size; rank0no++) {
     int status = 0;
@@ -4991,15 +5069,21 @@ void start_nodes_local(char **env)
         dup2(fd, 1);
         dup2(fd, 2);
       }
-      status = execve(pparam_argv[1],
-                      const_cast<char *const *>(pparam_argv) + 1, envp);
+      status = execve(dparamp[0],
+		      const_cast<char *const *>(dparamp), envp);
+
       dup2(fd1, 1);
       printf("execve failed to start process \"%s\" with status: %d\n",
-             pparam_argv[1], status);
+             pparam_argv[0], status);
       kill(getppid(), 9);
       exit(1);
     }
   }
+  if(arg_debug || arg_debug_no_pause)
+    {
+      for(dparamoutc; dparamoutc>=0;dparamoutc--) free(dparamp[dparamoutc]);
+      free(dparamp);
+    }
   free(envp[envc]);
   free(envp[envc + 1]);
 #if CMK_AIX && CMK_SMP
