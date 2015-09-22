@@ -240,20 +240,20 @@ skt_ip_t skt_my_ip(void)
   skt_ip_t ip = _skt_invalid_ip;
     /* Code snippet from  Jens Alfke
  *     http://lists.apple.com/archives/macnetworkprog/2008/May/msg00013.html */
-  struct ifaddrs *interfaces=0;
+  struct ifaddrs *ifaces=0;
   int ifcount = 0;
-  if( getifaddrs(&interfaces) == 0 ) {
-        struct ifaddrs *interface;
-        for( interface=interfaces; interface; interface=interface->ifa_next ) {
-            if( (interface->ifa_flags & IFF_UP) && ! (interface->ifa_flags & IFF_LOOPBACK) ) {
-                const struct sockaddr_in *addr = (const struct sockaddr_in*)interface->ifa_addr;
+  if( getifaddrs(&ifaces) == 0 ) {
+        struct ifaddrs *iface;
+        for( iface=ifaces; iface; iface=iface->ifa_next ) {
+            if( (iface->ifa_flags & IFF_UP) && ! (iface->ifa_flags & IFF_LOOPBACK) ) {
+                const struct sockaddr_in *addr = (const struct sockaddr_in*)iface->ifa_addr;
                 if( addr && addr->sin_family==AF_INET ) {
                     ifcount ++;
                     memcpy(&ip, &addr->sin_addr, sizeof(ip));
                 }
             }
         }
-        freeifaddrs(interfaces);
+        freeifaddrs(ifaces);
   }
   /* fprintf(stderr, "My IP is %d.%d.%d.%d\n", ip.data[0],ip.data[1],ip.data[2],ip.data[3]); */
   if (ifcount==1) return ip;
