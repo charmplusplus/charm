@@ -1642,6 +1642,12 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     toPup << "        }\n";
   }
 
+  // Generate code for ensuring we don't migrate active local closures
+  if (isLocal()) {
+    toPup.clear();
+    toPup << "        CkAbort(\"Can\'t migrate while a local SDAG method is active.\");\n";
+  }
+
   if (!isMessage) {
     genClosureTypeName = new XStr();
     genClosureTypeNameProxy = new XStr();

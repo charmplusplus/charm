@@ -75,6 +75,7 @@ class XStr {
     XStr(const char *_s);
     XStr(const XStr &_s); //Copy constructor
     ~XStr() { delete[] s; }
+    void clear();
     char *get_string(void) const { return s; }
     const char *get_string_const(void) const { return s; }
     // this is to allow XStr to be substituted for CString in

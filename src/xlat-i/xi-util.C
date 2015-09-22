@@ -43,6 +43,11 @@ XStr::XStr() {initTo("");}
 XStr::XStr(const char *_s) {initTo(_s);}
 XStr::XStr(const XStr &_s) {initTo(_s.get_string_const());}
 
+void XStr::clear() {
+  delete[] s;
+  initTo("");
+}
+
 XStr& XStr::operator << (int i) {
       char tmp[100]; 
       sprintf(tmp, "%d", i); 
