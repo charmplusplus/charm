@@ -70,6 +70,7 @@ typedef struct {int x,y;} CkIndex2D;
 inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
 typedef struct {int x,y,z;} CkIndex3D;
 inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
+inline bool operator==(CkIndex3D& lhs, CkIndex3D& rhs) {return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;}
 typedef struct {short int w,x,y,z;} CkIndex4D;
 inline void operator|(PUP::er &p,CkIndex4D &i) {p(i.w); p(i.x); p(i.y); p(i.z);}
 typedef struct {short int v,w,x,y,z;} CkIndex5D;
