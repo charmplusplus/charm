@@ -27,7 +27,11 @@ When it is time to start completion detection, invoke the following method of th
 library on {\em all} branches of the completion detection group:
 
 \begin{alltt}
-void start_detection(int num_producers, CkCallback start, CkCallback allProduced, CkCallback finish, int prio_);
+void start_detection(int num_producers,
+                     CkCallback start,
+                     CkCallback all_produced,
+                     CkCallback finish,
+                     int prio);
 \end{alltt}
 
 The \verb|num_producers| parameter is the number of objects (chares)
@@ -38,7 +42,7 @@ The \verb|start| callback notifies your program that it is safe to
 begin producing and consuming (this state is reached when the module
 has finished its internal initialization).
 
-The \verb|allProduced| callback notifies your program when the client has
+The \verb|all_produced| callback notifies your program when the client has
 called \verb|done| with arguments summing to \verb|num_producers|.
 
 The \verb|finish| callback is invoked when completion has been
@@ -52,14 +56,19 @@ application's priority if possible.
 For example, the call
 
 \begin{alltt}
-detector.start_detection(10, CkCallback(CkIndex_chare1::start_test(0), thisProxy),
-                             CkCallback(CkIndex_chare2::finish_test(0), thisProxy), 0);
+detector.start_detection(10,
+                         CkCallback(CkIndex_chare1::start_test(), thisProxy),
+                         CkCallback(CkIndex_chare1::produced_test(), thisProxy),
+                         CkCallback(CkIndex_chare1::finish_test(), thisProxy),
+                         0);
 \end{alltt}
 
 sets up completion detection for 10 producers. Once initialization is done, the callback 
-associated with the {\tt start\_test} method will be invoked. Furthermore, when the system
-detects completion, the callback associated with {\tt finish\_test} will be invoked. Finally,
-the priority given to the completion detection library is set to 0 in this case.
+associated with the {\tt start\_test} method will be invoked. Once all 10 producers have
+called \verb|done| on the completion detector, the {\tt produced\_test} method
+will be invoked. Furthermore, when the system detects completion, the callback associated
+with {\tt finish\_test} will be invoked. Finally, the priority given to the completion
+detection library is set to 0 in this case.
 
 Once initialization is complete (the ``start'' callback is triggered),
 make the following call to the library:
