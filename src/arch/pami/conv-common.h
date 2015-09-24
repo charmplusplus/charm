@@ -31,6 +31,9 @@
 //#define CMK_IMMEDIATE_MSG				   1
 #define CMK_MACHINE_PROGRESS_DEFINED                       0
 
+#undef CMK_HAS_FDATASYNC_FUNC
+#define CMK_HAS_FDATASYNC_FUNC                             0
+
 //#define CMI_DIRECT_MANY_TO_MANY_DEFINED                    0
 
 #define CMK_PERSISTENT_COMM                                0
