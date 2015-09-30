@@ -1240,7 +1240,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		{
 		  ERROR("unknown SDAG construct or malformed entry method declaration.\n"
 		        "You may have forgotten to terminate a previous entry method declaration with a"
-		        " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'",
+		        " semicolon or forgotten to mark a block of sequential SDAG code as 'serial'",
 		        @$.first_column, @$.last_column);
 		  YYABORT;
 		}
