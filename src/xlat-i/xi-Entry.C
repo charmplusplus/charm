@@ -2079,7 +2079,7 @@ void Entry::genDefs(XStr& str)
       tspec->genShort(str);
       str << ">";
     }
-      str << "));\n";
+    str << "))\n";
   }
 
   templateGuardEnd(str);
