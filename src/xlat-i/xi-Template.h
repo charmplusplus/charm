@@ -83,6 +83,7 @@ class Template : public Construct {
     void genDefs(XStr& str);
     void genSpec(XStr& str, bool printDefault = true);
     void genVars(XStr& str);
+    void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
     void outputClosuresDecl(XStr& str);
     void outputClosuresDef(XStr& str);
     void preprocess();

@@ -143,6 +143,13 @@ Template::genDefs(XStr& str)
     entity->genDefs(str);
 }
 
+void
+Template::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
+{
+  if(!external && entity)
+    entity->genGlobalCode(scope, decls, defs);
+}
+
 int Template::genAccels_spe_c_funcBodies(XStr& str) {
   int rtn = 0;
   if (!external && entity) { rtn += entity->genAccels_spe_c_funcBodies(str); }
