@@ -1,24 +1,24 @@
 \section{Introduction}
 
-If array elements compute a small piece of a large 2D image, then these 
-image chunks can be combined across processors to form one large 
-image using the liveViz library. In other 
-words, liveViz provides a way to reduce 2D-image data, which 
+If array elements compute a small piece of a large 2D image, then these
+image chunks can be combined across processors to form one large
+image using the liveViz library. In other
+words, liveViz provides a way to reduce 2D-image data, which
 combines small chunks of images deposited by chares into one large image.
 
 This visualization library follows the client server model.
-The server, a parallel Charm++ program, does all image assembly, 
-and opens a network (CCS) socket which clients use to request and 
+The server, a parallel Charm++ program, does all image assembly,
+and opens a network (CCS) socket which clients use to request and
 download images.  The client is a small Java program.
 A typical use of this is:
 \begin{alltt}
-	cd charm/examples/charm++/lvServer
+	cd charm/examples/charm++/wave2d
 	make
-	./charmrun ./lvServer +p2 ++server ++server-port 1234 
-	~/ccs\_tools/bin/lvClient localhost 1234
+	./charmrun ./wave2d +p2 ++server ++server-port 1234
+	~/ccs\_tools/bin/liveViz localhost 1234
 \end{alltt}
 
-Use git to obtain a copy of ccs\_tools (prior to using lvClient)
+Use git to obtain a copy of ccs\_tools (prior to using liveViz)
  and build it by:
 
 \begin{alltt}
@@ -32,14 +32,14 @@ Use git to obtain a copy of ccs\_tools (prior to using lvClient)
 
 The liveViz routines are in the Charm++ header ``liveViz.h''.
 
-A typical program provides a chare array with one entry method 
+A typical program provides a chare array with one entry method
 with the following prototype:
 
 \begin{alltt}
   entry void functionName(liveVizRequestMsg *m);
 \end{alltt}
 
-This entry method is supposed to deposit its (array element's) chunk of 
+This entry method is supposed to deposit its (array element's) chunk of
 the image. This entry method has following structure:
 
 \begin{alltt}
@@ -60,14 +60,14 @@ This will show up on the client's assembled image at 0-based pixel
 (startX,startY).  The client's display width and height are stored
 in m->req.wid and m->req.ht.
 
-By default, liveViz combines image chunks by doing a saturating sum of 
-overlapping pixel values. If you want liveViz to combine image chunks by using 
-max (i.e. for overlapping pixels in deposited image chunks, final image will 
+By default, liveViz combines image chunks by doing a saturating sum of
+overlapping pixel values. If you want liveViz to combine image chunks by using
+max (i.e. for overlapping pixels in deposited image chunks, final image will
 have the pixel with highest intensity or in other words largest value), you need
 to pass one more parameter (liveVizCombine\_t) to the ``liveVizDeposit'' function:
 
 \begin{alltt}
- liveVizDeposit (m, startX, startY, width, height, imageBuff, this, 
+ liveVizDeposit (m, startX, startY, width, height, imageBuff, this,
                    max\_image\_data);
 \end{alltt}
 
@@ -88,13 +88,13 @@ by 3 consecutive bytes representing red, green, and blue intensity.
 
 If the image is floating-point, each pixel is represented by a single
 `float', and after assembly colorized by calling the user-provided
-routine below.  This routine converts fully assembled `float' pixels 
+routine below.  This routine converts fully assembled `float' pixels
 to RGB 3-byte pixels, and is called only on processor 0 after each
 client request.
 
 \begin{alltt}
 extern "C"
-void liveVizFloatToRGB(liveVizRequest &req, 
+void liveVizFloatToRGB(liveVizRequest &req,
         const float *floatSrc, unsigned char *destRgb,
         int nPixels);
 \end{alltt}
@@ -102,19 +102,19 @@ void liveVizFloatToRGB(liveVizRequest &req,
 
 \section{liveViz Initialization}
 
-liveViz library needs to be initialized before it can be used for 
+liveViz library needs to be initialized before it can be used for
 visualization. For initialization follow the following steps
 from your main chare:
 
 \begin{enumerate}
-\item Create your chare array (array proxy object 'a') with the entry 
+\item Create your chare array (array proxy object 'a') with the entry
       method 'functionName' (described above). You must create the chare array
       using a CkArrayOptions 'opts' parameter. For instance,
 \begin{alltt}
 	CkArrayOptions opts(rows, cols);
 	array = CProxy_Type::ckNew(opts);
 \end{alltt}
-\item Create a CkCallback object ('c'), specifying 'functionName' as the 
+\item Create a CkCallback object ('c'), specifying 'functionName' as the
       callback function.  This callback will be invoked whenever the
       client requests a new image.
 \item Create a liveVizConfig object ('cfg').  LiveVizConfig takes a number
@@ -130,7 +130,7 @@ The liveVizConfig parameters are:
        \item ``true'' or liveVizConfig::pix\_color means a color image (3 RGB bytes per pixel).
        \item liveVizConfig::pix\_float means a floating-point color image (1 float per pixel, can only be used with sum\_float\_image\_data or max\_float\_image\_data).
      \end{itemize}
-   \item The second parameter is the flag ``serverPush'', which is passed to the client application. If set to true, the client will repeatedly request for images. When set to false the client will only request for images when its window is resized and needs to be updated.     
+   \item The second parameter is the flag ``serverPush'', which is passed to the client application. If set to true, the client will repeatedly request for images. When set to false the client will only request for images when its window is resized and needs to be updated.
    \item The third parameter is an optional 3D bounding box (type CkBbox3d).  If present, this puts the client into a 3D visualization mode.
 \end{itemize}
 
@@ -141,9 +141,9 @@ A typical 2D, RGB, non-push call to liveVizConfig looks like this:
 
 \section{Compilation}
 
-A \charmpp{} program that uses liveViz must be linked with '-module liveViz'. 
+A \charmpp{} program that uses liveViz must be linked with '-module liveViz'.
 
-Before compiling a liveViz program, the liveViz library may need to be compiled. 
+Before compiling a liveViz program, the liveViz library may need to be compiled.
 To compile the liveViz library:
 \begin{itemize}
 \item go to .../charm/tmp/libs/ck-libs/liveViz
@@ -153,10 +153,10 @@ To compile the liveViz library:
 
 \section{Poll Mode}
 
-In some cases you may want a server to deposit images only when it is ready to do so. 
+In some cases you may want a server to deposit images only when it is ready to do so.
 For this case the server will not register a callback function that triggers image generation, but rather the server will deposit an image at its convenience.
 For example a server may want to create a movie or series of images corresponding to some
-timesteps in a simulation. The server will have a timestep loop in which an array computes 
+timesteps in a simulation. The server will have a timestep loop in which an array computes
 some data for a timestep. At the end of each iteration the server will deposit the image. The use of LiveViz's Poll Mode supports this type of server generation of images.
 
 Poll Mode contains a few significant differences to the standard mode. First we describe the use of Poll Mode, and then we will describe the differences. liveVizPoll must get control during the creation of your array,
@@ -187,11 +187,11 @@ The last two parameters are optional. By default they are set to sum\_image\_dat
 A sample liveVizPoll server and client are available at:
 \begin{alltt}
            .../charm/examples/charm++/lvServer
-           .../charm/java/bin/lvClient
+           .../ccs_tools/bin/lvClient
 \end{alltt}
 This example server uses a PythonCCS command to cause an image to be generated by the server. The client also then gets the image.
 
-LiveViz provides multiple image combiner types. Any supported type can be used as a parameter to liveVizPollDeposit. Valid combiners include: sum\_float\_image\_data, max\_float\_image\_data, sum\_image\_data, and max\_image\_data. 
+LiveViz provides multiple image combiner types. Any supported type can be used as a parameter to liveVizPollDeposit. Valid combiners include: sum\_float\_image\_data, max\_float\_image\_data, sum\_image\_data, and max\_image\_data.
 
 The differences in Poll Mode may be apparent. There is no callback function which causes the server to generate and deposit an image. Furthermore, a server may generate an image before or after a client has sent a request. The deposit function, therefore is more complicated, as the server will specify information about the image that it is generating. The client will no longer specify the desired size or other configuration options, since the server may generate the image before the client request is available to the server. The liveVizPollInit call takes no parameters.
 
