@@ -321,6 +321,16 @@ template <typename T, int automatic>
 struct recursive_pup_impl {
   void operator()(T *obj, PUP::er &p);
 };
+
+template <typename T>
+struct recursive_pup_impl<T, 1> {
+  void operator()(T *obj, PUP::er &p) {
+    obj->parent_pup(p);
+    obj->_sdag_pup(p);
+    obj->T::pup(p);
+  }
+};
+
 template <typename T>
 struct recursive_pup_impl<T, 0> {
   void operator()(T *obj, PUP::er &p) {
@@ -343,6 +353,7 @@ void recursive_pup(T *obj, PUP::er &p) {
   typedef typename CProxy_Derived::element_t element_t;       \
   CProxy_Derived thisProxy;                                   \
   void pup(PUP::er &p) { }                                    \
+  inline void _sdag_pup(PUP::er &p) { }                       \
   void virtual_pup(PUP::er &p)
 
 /*Templated implementation of CBase_* classes.*/

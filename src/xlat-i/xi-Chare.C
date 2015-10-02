@@ -253,53 +253,23 @@ XStr Chare::virtualPupDef(const XStr &name)
 void
 Chare::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
 {
+  if (isTemplateInstantiation())
+    return;
+
   XStr templatedType;
   templatedType << type;
   if (templat)
     templat->genVars(templatedType);
 
-  XStr templateSpec;
-  if (templat)
-    templat->genSpec(templateSpec);
-  else
-    templateSpec << "template <>";
-  templateSpec << "\n";
-
   XStr scopedName;
   scopedName << scope << templatedType;
 
-  // XXX: This may cause problems if someone tries to partially
-  // specialize a chare template.
   if (!isTemplateDeclaration()) {
-    templateGuardBegin(false, defs);
-
-    XStr rec_pup_impl_name, rec_pup_impl_sig, rec_pup_impl_body;
-    rec_pup_impl_name << "recursive_pup_impl<" << scopedName << ", 1>";
-    rec_pup_impl_sig << "operator()(" << scopedName << " *obj, PUP::er &p)";
-
-    rec_pup_impl_body << rec_pup_impl_sig << " {"
-                      << "\n    obj->parent_pup(p);";
-    if (hasSdagEntry)
-      rec_pup_impl_body << "\n    obj->_sdag_pup(p);";
-    rec_pup_impl_body << "\n    obj->" << scopedName << "::pup(p);"
-                      << "\n}\n";
-
-    decls << "\ntemplate <>"
-          << "\nvoid " << rec_pup_impl_name << "::" << rec_pup_impl_sig << ";\n";
-
-    defs << templateSpec
-         << "void " << rec_pup_impl_name
-         << "::" << rec_pup_impl_body;
-
-    templateGuardEnd(defs);
-  }
-
-  if (!isTemplateInstantiation() && !isTemplateDeclaration()) {
     // Leave out ArrayElement because of its funny inheritance
     // structure. It doesn't inherit from CBase_ArrayElement anyway.
     if (0 != strcmp(type->getBaseName(),"ArrayElement")) {
       templateGuardBegin(false, defs);
-      defs << templateSpec
+      defs << "template <>\n"
            << "void " << scope
            << "CBase_"<< baseName(true) << "::" << virtualPupDef(scopedName) << "\n";
       templateGuardEnd(defs);
@@ -781,6 +751,7 @@ Chare::genDefs(XStr& str)
 
     // PUP-related methods
     str << "\n  void pup(PUP::er &p) { }"
+        << "\n  void _sdag_pup(PUP::er &p) { }"
         << "\n  void " << virtualPupDef(baseName(true))
         << "\n  void parent_pup(PUP::er &p) {";
     for (TypeList* t = b; t; t = t->next) {
