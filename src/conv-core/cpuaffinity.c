@@ -800,10 +800,15 @@ void CmiInitCPUAffinityUtil(){
 
 #else           /* not supporting affinity */
 
+int CmiSetCPUAffinity(int mycore)
+{
+  return -1;
+}
 
 int CmiPrintCPUAffinity()
 {
   CmiPrintf("Warning: CmiPrintCPUAffinity not supported.\n");
+  return -1;
 }
 
 void CmiInitCPUAffinity(char **argv)
@@ -820,6 +825,14 @@ void CmiInitCPUAffinity(char **argv)
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   if (affinity_flag && CmiMyPe()==0)
     CmiPrintf("sched_setaffinity() is not supported, +setcpuaffinity disabled.\n");
+  if (excludecore != -1 && CmiMyPe()==0)
+    CmiPrintf("sched_setaffinity() is not supported, +excludecore disabled.\n");
+  if (pemap && CmiMyPe()==0)
+    CmiPrintf("sched_setaffinity() is not supported, +pemap disabled.\n");
+  if (pemapfile && CmiMyPe()==0)
+    CmiPrintf("sched_setaffinity() is not supported, +pemapfile disabled.\n");
+  if (commap && CmiMyPe()==0)
+    CmiPrintf("sched_setaffinity() is not supported, +commap disabled.\n");
 }
 
 /* called in ConverseCommonInit to initialize basic variables */
