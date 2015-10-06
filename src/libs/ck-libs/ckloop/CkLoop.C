@@ -14,7 +14,7 @@
 /*====Beginning of pthread-related variables and impelementation====*/
 //__thread is not portable, but it works almost everywhere if pthread works
 //After C++11, this should be thread_local
-#if !CMK_SMP
+#if !CMK_SMP && !defined(_WIN32)
 static __thread pthread_cond_t thdCondition; //the signal var of each pthread to be notified
 static __thread pthread_mutex_t thdLock; //the lock associated with the condition variables
 #endif
