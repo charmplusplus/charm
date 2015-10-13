@@ -1828,7 +1828,7 @@ void LrtsExit()
 
   CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
-#if CMK_MULTICORE
+#if CMK_MULTICORE && CMK_SHARED_VARS_POSIX_THREADS_SMP
     pthread_exit(0);
 #else
     exit(0);
