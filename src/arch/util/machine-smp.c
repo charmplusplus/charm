@@ -79,6 +79,7 @@ CmiIdleLock_checkMessage
 */
 
 #include "machine-smp.h"
+#include "sockRoutines.h"
 
 void CmiStateInit(int pe, int rank, CmiState state);
 void CommunicationServerInit();

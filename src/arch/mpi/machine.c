@@ -26,9 +26,6 @@
 #include <wincon.h>
 #include <sys/types.h>
 #include <sys/timeb.h>
-static void sleep(int secs) {
-    Sleep(1000*secs);
-}
 static char* strsignal(int sig) {
   static char outbuf[32];
   sprintf(outbuf, "%d", sig);
