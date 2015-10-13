@@ -788,7 +788,9 @@ extern void traceEndFuncIndexProj(int);
 
 #if CMK_BIGSIM_CHARM
 #define MPI_Set_startevent AMPI_Set_startevent
+#define MPI_Set_endevent AMPI_Set_endevent
 int AMPI_Set_startevent(MPI_Comm comm);
+int AMPI_Set_endevent();
 #endif
 
 /* Determine approximate depth of stack at the point of this call */

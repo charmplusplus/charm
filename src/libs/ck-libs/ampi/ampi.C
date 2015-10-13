@@ -6128,6 +6128,13 @@ int AMPI_Set_startevent(MPI_Comm comm)
 
   return 0;
 }
+
+CDECL
+int AMPI_Set_endevent() 
+{
+  AMPIAPI("AMPI_BgSetEndEvent");
+}
+
 #endif
 
 #if CMK_CUDA
