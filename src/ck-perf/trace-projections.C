@@ -1042,10 +1042,9 @@ void LogEntry::pup(PUP::er &p)
 TraceProjections::TraceProjections(char **argv): 
   curevent(0), inEntry(0), computationStarted(0), 
 	converseExit(0), endTime(0.0), traceNestedEvents(0),
-	currentPhaseID(0), lastPhaseEvent(NULL)
+	currentPhaseID(0), lastPhaseEvent(NULL), _logPool(NULL)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
-
   if (CkpvAccess(traceOnPe) == 0) return;
 
   CtvInitialize(int,curThreadEvent);
