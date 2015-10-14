@@ -48,6 +48,7 @@ to the emulator.
 
 #include "bigsim_ooc.h" //out-of-core module
 #include "bigsim_debug.h"
+#include "errno.h"
 
 //#define  DEBUGF(x)      //CmiPrintf x;
 
@@ -2211,6 +2212,11 @@ static void writeToDisk()
      #endif	
       BgTimeLineRec &t = cva(nodeinfo)[j].timelines[i];
       procOffsets[j*cva(bgMach).numWth + i] = ftell(f);
+      if(procOffsets[j*cva(bgMach).numWth + i] == -1) {
+        CmiPrintf("ftell operation failure while writing bigsim logs to %s with"
+                  " error %s (%d)\n", d, strerror(errno), errno);
+        CmiAbort("Error while writing logs\n");
+      }
       t.pup(p);
     }
   }
