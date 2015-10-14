@@ -216,7 +216,7 @@ class TraceUtilization : public Trace {
 
 
   TraceUtilization() {
-    execEp == TRACEON_EP;
+    execEp = TRACEON_EP;
     cpuTime = NULL;
     lastBinUsed = -1;
     numBinsSent = 0;
