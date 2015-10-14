@@ -303,7 +303,7 @@ void TraceArray::traceEndOnCommThread() {
 }
 
 #if CMK_MULTICORE
-extern int Cmi_commthread;
+extern "C" int Cmi_commthread;
 #endif
 
 /*Install the beginIdle/endIdle condition handlers.*/
