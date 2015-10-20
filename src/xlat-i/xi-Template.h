@@ -85,6 +85,7 @@ class Template : public Construct {
     void genVars(XStr& str);
     void outputClosuresDecl(XStr& str);
     void outputClosuresDef(XStr& str);
+    void preprocess();
     void check();
 
     // DMK - Accel Support

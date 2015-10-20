@@ -169,6 +169,12 @@ void Template::genAccels_ppe_c_regFuncs(XStr& str) {
   if (!external && entity) { entity->genAccels_ppe_c_regFuncs(str); }
 }
 
+void Template::preprocess()
+{
+  if (entity)
+    entity->preprocess();
+}
+
 void Template::check()
 {
   if (entity)

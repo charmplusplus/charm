@@ -45,22 +45,6 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, AstChildren<Memb
 }
 
 void Chare::check() {
-  if (list)
-  {
-    list->recurse(this, &Member::setChare);
-    //Add migration constructor to MemberList
-    if(isMigratable()) {
-      Entry *e=new Entry(line,SMIGRATE,NULL,
-                         (char *)type->getBaseName(),
-                         new ParamList(new Parameter(line,
-                                                     new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
-      e->setChare(this);
-      list->push_back(e);
-    }
-  }
-  if (bases==NULL) //Always add Chare as a base class
-    bases = new TypeList(new NamedType("Chare"), NULL);
-
   if (list) {
     list->check();
 
@@ -217,7 +201,23 @@ Chare::genDecls(XStr& str)
 void
 Chare::preprocess()
 {
-  if(list) list->preprocess();
+  if(list)
+  {
+    list->preprocess();
+    list->recurse(this, &Member::setChare);
+    //Add migration constructor to MemberList
+    if(isMigratable()) {
+      Entry *e=new Entry(line,SMIGRATE,NULL,
+                         (char *)type->getBaseName(),
+                         new ParamList(new Parameter(line,
+                                                     new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
+      e->setChare(this);
+      list->push_back(e);
+    }
+  }
+
+  if (bases==NULL) //Always add Chare as a base class
+    bases = new TypeList(new NamedType("Chare"), NULL);
 }
 
 /*This disambiguation code is needed to support
