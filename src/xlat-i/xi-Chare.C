@@ -47,12 +47,6 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, AstChildren<Memb
 void Chare::check() {
   if (list) {
     list->check();
-
-    // (?) Check that every when statement has a corresponding entry method
-    // declaration. Otherwise, print all candidates tested (as in clang, gcc.)
-    WhenStatementEChecker wsec(this);
-    list->recurse(&wsec, &Member::collectSdagCode);
-    wsec.check();
   }
 }
 
@@ -852,21 +846,6 @@ void Chare::lookforCEntry(CEntry *centry)
 {
   if(list)
     list->recurse(centry, &Member::lookforCEntry);
-
-  if (centry->decl_entry == NULL) {
-    XStr str;
-    centry->paramlist->printTypes(str);
-    std::string msg = "no matching declaration for entry method \'" +
-                      std::string(centry->entry->get_string_const()) +
-                      "(" + std::string(str.get_string_const()) + ")\'";
-    XLAT_ERROR_NOCOL(msg, centry->first_line_);
-
-    std::list<Entry*> clist = centry->getCandidates();
-    if (!clist.empty())
-      for (std::list<Entry*>::iterator it = clist.begin(); it != clist.end(); ++it)
-        XLAT_NOTE("candidate method not viable: type signatures must match exactly",
-                  (*it)->first_line_);
-  }
 }
 
 

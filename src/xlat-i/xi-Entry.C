@@ -6,6 +6,9 @@
 
 #include "sdag/constructs/When.h"
 
+#include <list>
+using std::list;
+
 namespace xi {
 
 extern int fortranMode;
@@ -90,6 +93,18 @@ void Entry::check() {
   if (isExclusive() && !container->isNodeGroup())
       XLAT_ERROR_NOCOL("only nodegroup methods can be 'exclusive'",
                        first_line_);
+
+  // (?) Check that every when statement has a corresponding entry method
+  // declaration. Otherwise, print all candidates tested (as in clang, gcc.)
+  if (isSdag()) {
+    list<CEntry*> whenEntryList;
+    sdagCon->generateEntryList(whenEntryList, NULL);
+
+    for (list<CEntry*>::iterator en = whenEntryList.begin(); en != whenEntryList.end(); ++en) {
+      container->lookforCEntry(*en);
+      (*en)->check();
+    }
+  }
 }
 
 void Entry::lookforCEntry(CEntry *centry)
@@ -152,7 +167,17 @@ void Entry::setChare(Chare *c) {
 
 	//Make a special "callmarshall" method, for communication optimizations to use:
 	hasCallMarshall=param->isMarshalled() && !isThreaded() && !isSync() && !isExclusive() && !fortranMode;
-	if (isSdag()) container->setSdag(1);
+	if (isSdag())
+	{
+	  container->setSdag(1);
+
+	  list<CEntry*> whenEntryList;
+	  sdagCon->generateEntryList(whenEntryList, NULL);
+
+	  for (list<CEntry*>::iterator i = whenEntryList.begin(); i != whenEntryList.end(); ++i) {
+	    container->lookforCEntry(*i);
+	  }
+	}
 }
 
 // "parameterType *msg" or "void".
@@ -190,13 +215,6 @@ void Entry::collectSdagCode(SdagCollection *sc)
 {
   if (isSdag()) {
     sc->addNode(this);
-  }
-}
-
-void Entry::collectSdagCode(WhenStatementEChecker *wsec)
-{
-  if (isSdag()) {
-    wsec->addNode(this);
   }
 }
 

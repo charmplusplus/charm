@@ -381,25 +381,4 @@ void WhenConstruct::numberNodes() {
   SdagConstruct::numberNodes();
 }
 
-/****************** Checks *****************/
-WhenStatementEChecker::WhenStatementEChecker(Chare *c)
-  : container_(c)
-{ }
-
-void WhenStatementEChecker::addNode(Entry *e)
-{
-  nodeList_.push_back(e);
-}
-
-void WhenStatementEChecker::check()
-{
-  for (list<Entry*>::iterator cn = nodeList_.begin(); cn != nodeList_.end(); ++cn) {
-    (*cn)->sdagCon->generateEntryList(entryList_, NULL);
-  }
-
-  for (list<CEntry*>::iterator en = entryList_.begin(); en != entryList_.end(); ++en) {
-    container_->lookforCEntry(*en);
-  }
-}
-
 }   // namespace xi

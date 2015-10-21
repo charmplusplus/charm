@@ -190,7 +190,6 @@ class Entry : public Member {
     char *getEntryName();
     void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
     void collectSdagCode(SdagCollection *sc);
-    void collectSdagCode(WhenStatementEChecker *sc);
     void propagateState(int);
     void lookforCEntry(CEntry *centry);
     int getLine();

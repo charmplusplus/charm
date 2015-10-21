@@ -48,6 +48,7 @@ namespace xi {
 
     std::list<Entry*> getCandidates();
     void addCandidate(Entry *e);
+    void check();
   };
 
 }
