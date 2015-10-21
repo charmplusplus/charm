@@ -24,6 +24,7 @@ class Member : public Construct {
   Member() : container(0), tspec(0) { }
   inline Chare *getContainer() const { return container; }
   virtual void setChare(Chare *c) { container = c; }
+  virtual void preprocessSDAG() { }
   virtual int isSdag(void) { return 0; }
   virtual void collectSdagCode(SdagCollection *) { return; }
   virtual void collectSdagCode(WhenStatementEChecker *) { return; }

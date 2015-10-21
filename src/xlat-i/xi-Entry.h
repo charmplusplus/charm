@@ -187,6 +187,7 @@ class Entry : public Member {
     void genReg(XStr& str);
     XStr genRegEp(bool isForRedn = false);
     void preprocess();
+    void preprocessSDAG();
     char *getEntryName();
     void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
     void collectSdagCode(SdagCollection *sc);

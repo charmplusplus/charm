@@ -180,6 +180,16 @@ void Entry::setChare(Chare *c) {
 	}
 }
 
+void Entry::preprocessSDAG()
+{
+  if (isSdag() || isWhenEntry) {
+    if (container->isNodeGroup())
+      {
+	attribs &= SLOCKED; // Make the method [exclusive] to preclude races on SDAG control structures
+      }
+  }
+}
+
 // "parameterType *msg" or "void".
 // Suitable for use as the only parameter
 XStr Entry::paramType(int withDefaultVals,int withEO,int useConst)

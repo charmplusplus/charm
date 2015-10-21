@@ -199,6 +199,7 @@ Chare::preprocess()
   {
     list->preprocess();
     list->recurse(this, &Member::setChare);
+    list->recursev(&Member::preprocessSDAG);
     //Add migration constructor to MemberList
     if(isMigratable()) {
       Entry *e=new Entry(line,SMIGRATE,NULL,
