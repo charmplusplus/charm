@@ -185,7 +185,7 @@ void Entry::preprocessSDAG()
   if (isSdag() || isWhenEntry) {
     if (container->isNodeGroup())
       {
-	attribs &= SLOCKED; // Make the method [exclusive] to preclude races on SDAG control structures
+	attribs |= SLOCKED; // Make the method [exclusive] to preclude races on SDAG control structures
       }
   }
 }
