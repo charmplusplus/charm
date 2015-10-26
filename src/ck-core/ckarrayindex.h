@@ -59,6 +59,16 @@ struct CkArrayIndexBase
             p|dimension;
             for (int i=0;i<nInts;i++) p|index[i];
         }
+
+        bool operator==(CkArrayIndexBase &other) {
+          if(nInts != other.nInts) return false;
+          if(dimension != other.dimension) return false;
+          for (int i=0;i<nInts;i++) {
+            if(index[i] != other.index[i]) return false;
+          }
+          return true;
+        }
+
 };
 
 

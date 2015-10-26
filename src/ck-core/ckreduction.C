@@ -991,13 +991,22 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
       if (nMsgs == 0 || m->reducer != CkReduction::random) {
         msgArr[nMsgs++]=m;
         r=m->reducer;
-        if (!m->callback.isInvalid())
+        if (!m->callback.isInvalid()){
+#if CMK_ERROR_CHECKING
+          if(nMsgs > 1 && !(msgs_callback == m->callback))
+            CkAbort("mis-matched client callbacks in reduction messages\n");
+#endif
           msgs_callback=m->callback;
+        }
         if (m->userFlag!=(CMK_REFNUM_TYPE)-1)
           msgs_userFlag=m->userFlag;
 	isMigratableContributor=m->isMigratableContributor();
       }
       else {
+#if CMK_ERROR_CHECKING
+        if(!(msgs_callback == m->callback))
+          CkAbort("mis-matched client callbacks in reduction messages\n");
+#endif  
         delete m;
       }
     }
@@ -2414,8 +2423,13 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
       if (nMsgs == 0 || m->reducer != CkReduction::random) {
         msgArr[nMsgs++]=m;
         r=m->reducer;
-        if (!m->callback.isInvalid())
+        if (!m->callback.isInvalid()){
+#if CMK_ERROR_CHECKING
+          if(nMsgs > 1 && !(msgs_callback == m->callback))
+            CkAbort("mis-matched client callbacks in reduction messages\n");
+#endif  
           msgs_callback=m->callback;
+	}
         if(!m->secondaryCallback.isInvalid()){
           msgs_secondaryCallback = m->secondaryCallback;
         }
@@ -2424,6 +2438,10 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 	isMigratableContributor= m->isMigratableContributor();
       }
       else {
+#if CMK_ERROR_CHECKING
+        if(!(msgs_callback == m->callback))
+          CkAbort("mis-matched client callbacks in reduction messages\n");
+#endif  
         delete m;
       }
     }
