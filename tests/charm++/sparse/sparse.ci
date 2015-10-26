@@ -1,0 +1,220 @@
+mainmodule sparse {
+  readonly bool verbose;
+  readonly CProxy_Main main_proxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry [reductiontarget] void testDone(int result);
+    entry void run_tests() {
+      serial {
+        CkPrintf("=========================================================\n");
+        CkPrintf("= 1D Tests ==============================================\n");
+        CkPrintf("Testing default constructor\n");
+        int end = 10;
+        setExpected(CkArrayIndex1D(0), CkArrayIndex1D(end), CkArrayIndex1D(1));
+        CkArrayOptions options(end);
+        test1D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing new constructor\n");
+        CkArrayIndex1D start(3);
+        CkArrayIndex1D end(20);
+        CkArrayIndex1D step(4);
+        setExpected(start, end, step);
+        CkArrayOptions options(start, end, step);
+        test1D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing by setting one at a time\n");
+        CkArrayIndex1D start(3);
+        CkArrayIndex1D end(20);
+        CkArrayIndex1D step(4);
+        setExpected(start, end, step);
+        CkArrayOptions options;
+        options.setStart(start).setEnd(end).setStep(step);
+        test1D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("= 2D Tests ==============================================\n");
+        CkPrintf("Testing default constructor\n");
+        CkArrayIndex2D upper_bound(3,4);
+        int end_x = 3, end_y = 4;
+        setExpected(CkArrayIndex2D(end_x, end_y));
+        CkArrayOptions options(end_x, end_y);
+        test2D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing new CkArrayIndex constructor\n");
+        CkArrayIndex2D start(3,0);
+        CkArrayIndex2D end(7,12);
+        CkArrayIndex2D step(1,4);
+        setExpected(start, end, step);
+        CkArrayOptions options(start, end, step);
+        test2D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing by setting one at a time\n");
+        CkArrayIndex2D start(3,0);
+        CkArrayIndex2D end(7,12);
+        CkArrayIndex2D step(1,4);
+        setExpected(start, end, step);
+        CkArrayOptions options;
+        options.setStart(start).setEnd(end).setStep(step);
+        test2D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("= 3D Tests ==============================================\n");
+        CkPrintf("Testing default constructor\n");
+        int end_x = 3, end_y = 4, end_z = 2;
+        setExpected(CkArrayIndex3D(end_x, end_y, end_z));
+        CkArrayOptions options(end_x, end_y, end_z);
+        test3D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing new CkArrayIndex constructor\n");
+        CkArrayIndex3D start(3,0,1);
+        CkArrayIndex3D end(7,12,8);
+        CkArrayIndex3D step(1,4,6);
+        setExpected(start, end, step);
+        CkArrayOptions options(start, end, step);
+        test3D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing by setting one at a time\n");
+        CkArrayIndex3D start(3,0,1);
+        CkArrayIndex3D end(7,12,8);
+        CkArrayIndex3D step(1,4,6);
+        setExpected(start, end, step);
+        CkArrayOptions options;
+        options.setStart(start).setEnd(end).setStep(step);
+        test3D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("= 4D Tests ==============================================\n");
+        CkPrintf("Testing default constructor\n");
+        int end_w = 3, end_x = 4, end_y = 2, end_z = 1;
+        setExpected(CkArrayIndex4D(end_w, end_x, end_y, end_z));
+        CkArrayOptions options(end_w, end_x, end_y, end_z);
+        test4D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing new CkArrayIndex constructor\n");
+        CkArrayIndex4D start(3,0,1,17);
+        CkArrayIndex4D end(7,12,8,20);
+        CkArrayIndex4D step(1,4,6,2);
+        setExpected(start, end, step);
+        CkArrayOptions options(start, end, step);
+        test4D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing by setting one at a time\n");
+        CkArrayIndex4D start(3,0,1,17);
+        CkArrayIndex4D end(7,12,8,20);
+        CkArrayIndex4D step(1,4,6,2);
+        setExpected(start, end, step);
+        CkArrayOptions options;
+        options.setStart(start).setEnd(end).setStep(step);
+        test4D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("= 5D Tests ==============================================\n");
+        CkPrintf("Testing default constructor\n");
+        int end_v = 3, end_w = 4, end_x = 2, end_y = 1, end_z = 5;
+        setExpected(CkArrayIndex5D(end_v, end_w, end_x, end_y, end_z));
+        CkArrayOptions options(end_v, end_w, end_x, end_y, end_z);
+        test5D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing new CkArrayIndex constructor\n");
+        CkArrayIndex5D start(3,0,1,17,10);
+        CkArrayIndex5D end(7,12,8,20,20);
+        CkArrayIndex5D step(1,4,6,2,6);
+        setExpected(start, end, step);
+        CkArrayOptions options(start, end, step);
+        test5D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing by setting one at a time\n");
+        CkArrayIndex5D start(3,0,1,17,10);
+        CkArrayIndex5D end(7,12,8,20,20);
+        CkArrayIndex5D step(1,4,6,2,6);
+        setExpected(start, end, step);
+        CkArrayOptions options;
+        options.setStart(start).setEnd(end).setStep(step);
+        test5D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("= 6D Tests ==============================================\n");
+        CkPrintf("Testing default constructor\n");
+        int end_x1 = 3, end_y1 = 4, end_z1 = 2, end_x2 = 1, end_y2 = 5, end_z2 = 6;
+        setExpected(CkArrayIndex6D(end_x1, end_y1, end_z1, end_x2, end_y2, end_z2));
+        CkArrayOptions options(end_x1, end_y1, end_z1, end_x2, end_y2, end_z2);
+        test6D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing new CkArrayIndex constructor\n");
+        CkArrayIndex6D start(0,1,2,3,4,5);
+        CkArrayIndex6D end(2,4,6,8,10,12);
+        CkArrayIndex6D step(1,2,3,4,5,6);
+        setExpected(start, end, step);
+        CkArrayOptions options(start, end, step);
+        test6D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkPrintf("Testing by setting one at a time\n");
+        CkArrayIndex6D start(0,1,2,3,4,5);
+        CkArrayIndex6D end(2,4,6,8,10,12);
+        CkArrayIndex6D step(1,2,3,4,5,6);
+        setExpected(start, end, step);
+        CkArrayOptions options;
+        options.setStart(start).setEnd(end).setStep(step);
+        test6D(options);
+      } when testDone(int result) serial {
+        checkTest(result);
+        CkPrintf("=========================================================\n");
+        CkExit();
+      }
+    };
+  };
+  array [1D] Array1D {
+    entry Array1D();
+    entry void ping();
+  };
+  array [2D] Array2D {
+    entry Array2D();
+    entry void ping();
+  };
+  array [3D] Array3D {
+    entry Array3D();
+    entry void ping();
+  };
+  array [4D] Array4D {
+    entry Array4D();
+    entry void ping();
+  };
+  array [5D] Array5D {
+    entry Array5D();
+    entry void ping();
+  };
+  array [6D] Array6D {
+    entry Array6D();
+    entry void ping();
+  };
+};
