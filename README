@@ -38,7 +38,7 @@ REQUIRED:
 ---------
 <target> specifies the parts of Charm++ to compile.  The most often used
   <target> is "charm++", which will compile the key Charm++ executables and
-  runtime libraries.  Other common targets are "AMPI" and "FEM".
+  runtime libraries.  Other common targets are "AMPI" and "LIBS".
 <versions> defines the CPU, OS and Communication layer of the machines.  See
   "How to choose a <version>" below for details.
 
@@ -85,23 +85,20 @@ in Charm version is gcc/g++. However, one can use <options> to specify other
 compilers. See the detailed explanation of the <options> below.
 (Note: this isn't a complete list.  Run ./build for a complete listing)
 
-Charm version          OS        Communication    Default Compiler
--------------       ---------    --------------   --------------------
-net-linux-x86_64     Opteron Linux  UDP           GNU compiler
-net-darwin-x86_64    MacOS X        UDP           GNU C++ compiler
-net-linux            Linux (32 bit) UDP/Myrinet   GNU compiler
-net-sol              Solaris        UDP           GNU compiler
-net-win32            Win32          UDP           MS Visual C++
-net-cygwin           Win32/cygwin   UDP           GNU compiler
-mpi-sp               IBM A/IX       MPI           A/IX xlC Compiler
-net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
-mpi-linux            PC Linux       MPI           GNU compiler
-mpi-darwin-x86_64    MacOS X        MPI           GNU C++ compiler
-mpi-linux-ia64       IA64 Linux     MPI           GNU compiler
-mpi-linux-x86_64     Opteron Linux  MPI           GNU compiler
+Charm version                OS         Communication    Default Compiler
+-------------             ---------     --------------   --------------------
+netlrts-linux-x86_64       Linux            UDP            GNU compiler
+netlrts-darwin-x86_64      MacOS X          UDP            Clang C++ compiler
+mpi-linux-x86_64           Linux            MPI            GNU compiler
+mpi-darwin-x86_64          MacOS X          MPI            Clang C++ compiler
+pamilrts-bluegeneq         CNK              PAMI           XLC
+gni-crayxe                 Linux            GNI            GNU compiler
+verbs-linux-x86_64         Linux            IB Verbs       GNU compiler
+net-win32                  Win32            UDP            MS Visual C++
+net-cygwin                 Cygwin           UDP            GNU compiler
 
 
-To choose <version>, your choice is determined by three options:
+To choose <version>, your choice is determined by two options:
 
 1.)  The way a parallel program written in Charm++ will communicate:
 
@@ -110,11 +107,11 @@ To choose <version>, your choice is determined by three options:
 option for networks of workstations, clusters, or single-machine
 development and testing.
 
-	"gni-", "bluegene[lp]-", "pamilrts-bluegeneq-" Charm++
+	"gni-", "bluegene[lp]-", "pamilrts-", "verbs-" Charm++
 communicates using direct calls to the machine's communication primitives.
 
 	"mpi-" Charm++ communicates using MPI calls.  Use this for
-machines with a good MPI implementation (such as the Origin 2000).
+machines with a good MPI implementation.
 
 	"multicore-" Charm++ communicates using shared memory within a
 	single node
@@ -126,24 +123,14 @@ threads; "sim-" switches between processors and counts communications.
 
 2.)  Your operating system:
 
-	"linux"       Linux
-	"win{32,64}"  MS Windows with MS Visual C++ compiler (32/64-bit, resp.)
-	"cygwin"      MS Windows with Cygnus' Cygwin Unix layer
-	"darwin"      Apple Mac OS X
-	"sol"         Solaris
-	"aix"         IBM A/IX
+	"linux-x86_64"       Linux with AMD64 64-bit x86 instructions
+	"win{32,64}"         MS Windows with MS Visual C++ compiler
+	"cygwin"             MS Windows with Cygnus' Cygwin Unix layer
+	"darwin-x86_64"      Apple Mac OS X
+        "bluegeneq"          IBM's Blue Gene/Q
+        "cray{xe/xc}"        Cray's X-Series Supercomputer
+        "linux-ppc"          POWER/PowerPC
 
-
-3.)  Some operating systems have other architecture options, such as:
-
-	"-x86"     For Solaris and Mac OS X, target x86 hardware (instead of
-	           SPARC or PPC).
-	"-ppc"     POWER/PowerPC
-	"-mips64"  MIPS, such as for SiCortex systems
-        "-ia64"    Use Itanium(tm) IA-64 instructions (instead of x86).
-        "-x86_64"  Use AMD64/EM64T 64-bit x86 instructions (instead of 32 bit).
-	"-cell"    Sony/Toshiba/IBM Cell PPE (e.g. Playstation 3,
-	           Mercury blades, Roadrunner)
 
 Your Charm++ version is made by concatenating the options, e.g.:
 
@@ -160,6 +147,10 @@ your machine, and most of time, it use the GNU gcc as default compiler.
 To use different compiler or demand additional special feature support, you
 need to choose <options> from the following list:
 
+* icc - Intel C/C++ compiler.
+* ifort - Intel Fortran compiler
+* xlc - IBM XLC compiler.
+* mpicxx - Use MPI-wrappers for MPI builds.
 * gcc3  - GNU GCC/G++ version 3
 * acc  - HP aC++ compiler
 * cc  - For Sun WorkShop C++ compilers;
@@ -167,23 +158,29 @@ need to choose <options> from the following list:
 * cxx - DIGITAL C++ compiler;
 * kcc - KAI C++ compiler;
 * pgcc - Portland Group's C++ compiler;
-* icc - Intel C/C++ compiler for Linux IA32
-* ecc - Intel C/C++ compiler for Linux IA64
 * mpcc - SUN Solaris C++ compiler for MPI.
+
+* smp - Enable direct SMP support.  An "smp" version communicates using
+        shared memory within a machine; but normal message passing across
+        machines. Because of locking, "smp" may slightly impact non-SMP
+        performance. Try your application to decide if enabling smp mode
+        improves performance.
 
 * scyld - support Beowulf Scyld based on bproc;
 * clustermatic - for Clustermatic Beowulf cluster based on bproc;
 * gm - support MyriCom's Myrinet GM library;
 * vmi - support NCSA's VMI library;
 
-* tcp - for net- version, default communication is via UDP. Using option
-        tcp will switch to TCP. TCP version of CHarm++ is usually slower
+* tcp - for netlrts- version, default communication is via UDP. Using option
+        tcp will switch to TCP. TCP version of Charm++ is usually slower
         than UDP, but it is more reliable.
-* smp - Enable direct SMP support.  An "smp" version communicates using
-        shared memory within a machine; but normal message passing across
-        machines. Because of locking, "smp" may slightly impact non-SMP
-        performance. Try your application to decide if enabling smp mode
-        improves performance.
+* async - For Blue Gene/Q, this option enables use of hardware communication 
+          threads. For applications with significant communication on large
+          scale, this option typically improves performance.
+* regularpages - on Cray systems, Charm++'s default is to use hugepages. This
+                 option disables hugepages, and uses regular malloc for messages.
+* persistent - on Cray systems, this option enables use of persitent mode for
+               communication.
 
 * bigsim - compile Charm++ as running on the BigSim emulator.
 * help - show supported options for a version. For example, for net-linux,
@@ -220,19 +217,19 @@ Common compile time options such as -g, -O, -Ipath, -Lpath, -llib are
 accepted.
 
 For example, on a Linux machine, you would run
-     > ./build charm++ net-linux-x86_64 -O
+     > ./build charm++ netlrts-linux-x86_64 -O
 
-This will construct a net-linux-x86_64 directory, link over all
-the Charm++ source code into net-linux-x86_64/tmp, build the entire
-Charm++ runtime system in net-linux-x86_64/tmp, and link example programs
-into net-linux-x86_64/examples.
+This will construct a netlrts-linux-x86_64 directory, link over all
+the Charm++ source code into netlrts-linux-x86_64/tmp, build the entire
+Charm++ runtime system in netlrts-linux-x86_64/tmp, and link example
+programs into netlrts-linux-x86_64/examples.
 
 Charm++ can be compiled with several optional features enabled or
 disabled. These include runtime error checking, tracing, interactive
 debugging, deterministic record-replay, and more. They can be
 controlled by passing flags of the form --enable-featurename or
 --disable-featurename to the build command:
-    > ./build charm++ net-linux-x86_64 --disable-tracing
+    > ./build charm++ netlrts-linux-x86_64 --disable-tracing
 
 The list of optional features available is shown in the output of
     > ./build --help
@@ -244,7 +241,11 @@ runtime. This option should be used only after the program has been
 debugged. Also, this option disables Converse/Charm++ tracing
 mechanisms such as projections and summary.
 
-When Charm++ is built successfully, the diretory structure under the
+Performance analysis: Pass the configuration option "--with-production 
+--enable-tracing" to enable tracing and generation of logs for analysis with 
+Projections. This is the recommended way to analyze performance of applications.
+
+When Charm++ is built successfully, the directory structure under the
 target directory will look like:
 
 net-linux-x86_64/
@@ -291,7 +292,7 @@ Charmrun is used to provide a uniform interface to run charm programs.
 On some platforms, charmrun is just a shell script which calls the
 platform-specific start program, such as mpirun on mpi versions.
 
-For net- version, charmrun is an executable which invokes ssh to start
+For netlrts- version, charmrun is an executable which invokes ssh to start
 node programs on remote machines. You should set up a ~/.nodelist that
 enumerates all the machines you want to run jobs on, otherwise it will
 create a default ~/.nodelist for you that contains only localhost. Here is a
@@ -337,7 +338,7 @@ Note, "-build-shared" option is automatically turned on when building
 Charm++ using "build" script. So you don't need to pass "-build-shared"
 option to "build".
 
-One can compile a Charm++ applicaiton linking against Charm++ dynamic
+One can compile a Charm++ application linking against Charm++ dynamic
 libraries, run charmc with "-charm-shared" as one of the link options.
 For example:
 
@@ -365,14 +366,20 @@ AUTHORS
 Charm++ was created and is maintained by the Parallel Programming Lab,
 in the Computer Science department at the University of Illinois at
 Urbana-Champaign.  Our managing professor is Dr. L.V. Kale; students
-have included (in rough time order) Wennie Shu, Kevin Nomura, Wayne
+and staff have included (in rough time order) Wennie Shu, Kevin Nomura, Wayne
 Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh B. Sinha, Manish
-Gupta, Attila Gursoy, Balkrishna Ramkumar, Amitabh B. Sinha, Nimish
-Shah, Sanjeev Krishnan, Jayant DeSouza, Parthasarathy Ramachandran,
-Jeff Wright, Michael Lang, Jackie Wang, Fang Hu, Michael Denardo,
-Joshua Yelon, Narain Jagathesan, Zehra Sura, Krishnan Varadarajan,
-Sameer Paranjpye, Milind Bhandarkar, Robert Brunner and Jayant Desouza.
-Current developers include Terry Wilmarth, Gengbin Zheng, Orion Lawlor,
-Karthik Mahesh, and Neelam Saboo.
+Gupta, Attila Gursoy, Nimish Shah, Sanjeev Krishnan, Jayant DeSouza,
+Parthasarathy Ramachandran, Jeff Wright, Michael Lang, Jackie Wang,
+Fang Hu, Michael Denardo, Joshua Yelon, Narain Jagathesan, Zehra Sura,
+Krishnan Varadarajan, Sameer Paranjpye, Milind Bhandarkar, Robert Brunner,
+Terry Wilmarth, Gengbin Zheng, Orion Lawlor, Celso Mendes, Karthik Mahesh,
+Neelam Saboo, Greg Koenig, Sameer Kumar, Sayantan Chakravorty, Chao Huang,
+Chee Lee, Fillipo Gioachin, Isaac Dooley, Abhinav Bhatele, Aaron Becker,
+Ryan Mokos, Ramprasad Venkataraman, Gagan Gupta, Pritish Jetley, Lukasz
+Wesolowski, Esteban Meneses, Chao Mei, David Kunzman, Osman Sarood,
+Abhishek Gupta, Yanhua Sun, Ehsan Totoni, and Akhil Langer. Current developers
+include Eric Bohm, Phil Miller, Jonathan Lifflander, Xiang Ni, Harshitha Menon,
+Nikhil Jain, Bilge Acun, Ronak Buch, Michael Robson, Eric Mikida, and Harshit
+Dokania.
 
 
