@@ -679,14 +679,15 @@ then
           TAU_MAKEFILE=""
 	fi
 fi
-[ -z "$TAU_MAKEFILE" ] && TAU_MAKEFILE="Make.tau"
-SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
-
-sed -e $SED_CHARMC $srcbase/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ $srcbase/scripts/Makefile && rm -f  .Makefile.$$
-sed -e $SED_CHARMC $srcbase/scripts/charmc > .charmc.$$ && cp .charmc.$$ $srcbase/scripts/charmc && rm -f .charmc.$$
 
 if test $WITH_TAU -eq 1
 then
+    [ -z "$TAU_MAKEFILE" ] && TAU_MAKEFILE="Make.tau"
+    SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
+
+    sed -e $SED_CHARMC $srcbase/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ $srcbase/scripts/Makefile && rm -f  .Makefile.$$
+    sed -e $SED_CHARMC $srcbase/scripts/charmc > .charmc.$$ && cp .charmc.$$ $srcbase/scripts/charmc && rm -f .charmc.$$
+
     echo "#define CMK_WITH_TAU               1" >> $ConvHeader
     echo "#define pthread_create             tau_pthread_create" >> $ConvHeader
     echo "#define pthread_exit               tau_pthread_exit" >> $ConvHeader
