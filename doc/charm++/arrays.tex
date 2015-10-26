@@ -137,18 +137,21 @@ creates a 1D \index{array}array containing elements indexed (0, 1, \ldots,
 \uw{dimX}-1):
 %
 \begin{alltt}
-CProxy_ArrayA a1 = CProxy_ArrayA::ckNew(\uw{parameters}, dimX);
+CProxy_ArrayA a1 = CProxy_ArrayA::ckNew(\uw{params}, dimX);
 \end{alltt}
 %
 Likewise, a dense multidimensional array can be created by passing the extents
 at creation time to \kw{ckNew}.
 %
 \begin{alltt}
-CProxy_ArrayB a2 = CProxy_ArrayB::ckNew(\uw{parameters}, dimX, dimY);
-CProxy_ArrayC a3 = CProxy_ArrayC::ckNew(\uw{parameters}, dimX, dimY, dimZ);
+CProxy_ArrayB a2 = CProxy_ArrayB::ckNew(\uw{params}, dimX, dimY);
+CProxy_ArrayC a3 = CProxy_ArrayC::ckNew(\uw{params}, dimX, dimY, dimZ);
+CProxy_ArrayD a4 = CProxy_ArrayC::ckNew(\uw{params}, dimW, dimX, dimY, dimZ);
+CProxy_ArrayE a5 = CProxy_ArrayC::ckNew(\uw{params}, dimV, dimW, dimX, dimY, dimZ);
+CProxy_ArrayF a6 = CProxy_ArrayC::ckNew(\uw{params}, dimX1, dimY1, dimZ1, dimX2, dimY2, dimZ2);
 \end{alltt}
 %
-For 4D, 5D, 6D and user-defined arrays, this functionality cannot be used.  The
+For user-defined arrays, this functionality cannot be used.  The
 array elements must be inserted individually as described in
 section~\ref{dynamic_insertion}.
 

@@ -84,7 +84,46 @@ Examples of bulk construction are commonplace, see
 for a demonstration of the slightly more complicated case of
 multidimensional chare array bulk construction.
 
-\kw{CkArrayOptions} contains a few flags that the runtime can use to
+\kw{CkArrayOptions} can also be used for bulk creation of sparse arrays when
+the sparsity of the array can be described in terms of a start index, an end
+index, and a step index. The start, end, and step can either be passed into the
+\kw{CkArrayOptions} constructor, or set one at a time. The following shows two
+different ways to create \kw{CkArrayOptions} for a 2D array with only the odd
+indices from (1,1) to (10,10) being populated:
+
+\begin{alltt}
+// Set at construction
+CkArrayOptions options(CkArrayIndex2D(1,1),
+                       CkArrayIndex2D(10,10),
+                       CkArrayIndex(2,2));
+
+// Set one at a time
+CkArrayOptions options;
+options.setStart(CkArrayIndex2D(1,1))
+       .setEnd(CkArrayIndex2D(10,10))
+       .setStep(CkArrayIndex2D(2,2));
+\end{alltt}
+
+The default for start is $0^d$ and the default for step is $1^d$ (where $d$ is
+the dimension of the array), so the following are equivalent:
+
+\begin{alltt}
+// Specify just the number of elements
+CkArrayOptions options(nElements);
+
+// Specify just the end index
+CkArrayOptions options;
+options.setEnd(CkArrayIndex1D(nElements));
+
+// Specify all three indices
+CkArrayOptions options;
+options.setStart(CkArrayIndex1D(0))
+       .setEnd(CkArrayIndex1D(nElements))
+       .setStep(CkArrayIndex1D(1));
+\end{alltt}
+
+In addition to controlling how many elements and at which indices to create
+them, \kw{CkArrayOptions} contains a few flags that the runtime can use to
 optimize handling of a given array. If the array elements will only
 migrate at controlled points (such as periodic load balancing with
 {\tt AtASync()}), this is signalled to the runtime by calling {\tt
