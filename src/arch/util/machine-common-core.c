@@ -871,7 +871,9 @@ static int create_partition_map( char **argv)
   }
 
   if(_partitionInfo.type == PARTITION_DEFAULT) {
-    assert((_Cmi_numnodes_global % _partitionInfo.numPartitions) == 0);
+    if((_Cmi_numnodes_global % _partitionInfo.numPartitions) != 0) {
+      CmiAbort("Number of partitions does not evenly divide number of processes. Aborting\n");
+    }
     _partitionInfo.partitionPrefix[0] = 0;
     _partitionInfo.partitionSize[0] = _Cmi_numnodes_global / _partitionInfo.numPartitions;
     for(i = 1; i < _partitionInfo.numPartitions; i++) {
@@ -880,7 +882,9 @@ static int create_partition_map( char **argv)
     } 
     _partitionInfo.myPartition = _Cmi_mynode_global / _partitionInfo.partitionSize[0];
   } else if(_partitionInfo.type == PARTITION_MASTER) {
-    assert(((_Cmi_numnodes_global-1) % (_partitionInfo.numPartitions-1)) == 0);
+    if(((_Cmi_numnodes_global-1) % (_partitionInfo.numPartitions-1)) != 0) {
+      CmiAbort("Number of non-master partitions does not evenly divide number of processes minus one. Aborting\n");
+    }
     _partitionInfo.partitionSize[0] = 1;
     _partitionInfo.partitionPrefix[0] = 0;
     _partitionInfo.partitionSize[1] = (_Cmi_numnodes_global-1) / (_partitionInfo.numPartitions-1);
@@ -941,13 +945,17 @@ static int create_partition_map( char **argv)
     _partitionInfo.partitionPrefix[0] = 0;
     _partitionInfo.myPartition = 0;
     for(i = 1; i < _partitionInfo.numPartitions; i++) {
-      assert(_partitionInfo.partitionSize[i-1] > 0);
+      if(_partitionInfo.partitionSize[i-1] <= 0) {
+        CmiAbort("Partition size has to be greater than zero.\n");
+      }
       _partitionInfo.partitionPrefix[i] = _partitionInfo.partitionPrefix[i-1] + _partitionInfo.partitionSize[i-1];
       if((_Cmi_mynode_global >= _partitionInfo.partitionPrefix[i]) && (_Cmi_mynode_global < (_partitionInfo.partitionPrefix[i] + _partitionInfo.partitionSize[i]))) {
         _partitionInfo.myPartition = i;
       }
     } 
-    assert(_partitionInfo.partitionSize[i-1] > 0);
+    if(_partitionInfo.partitionSize[i-1] <= 0) {
+      CmiAbort("Partition size has to be greater than zero.\n");
+    }
   }
   _Cmi_mynode = _Cmi_mynode - _partitionInfo.partitionPrefix[_partitionInfo.myPartition];
 
