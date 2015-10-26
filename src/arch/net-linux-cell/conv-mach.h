@@ -23,8 +23,8 @@
 #define CMK_MEMORY_PROTECTABLE                             0
 
 
-#define CMK_RSH_IS_A_COMMAND                               1
-#define CMK_RSH_NOT_NEEDED                                 0
+#define CMK_SSH_IS_A_COMMAND                               1
+#define CMK_SSH_NOT_NEEDED                                 0
 
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0

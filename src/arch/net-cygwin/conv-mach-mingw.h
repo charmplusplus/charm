@@ -19,8 +19,8 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_NT_THREADS                         1
 
-#undef CMK_RSH_KILL
-#undef CMK_RSH_NOT_NEEDED
-#define CMK_RSH_KILL                                       0
-#define CMK_RSH_NOT_NEEDED                                 1
+#undef CMK_SSH_KILL
+#undef CMK_SSH_NOT_NEEDED
+#define CMK_SSH_KILL                                       0
+#define CMK_SSH_NOT_NEEDED                                 1
 

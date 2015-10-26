@@ -24,8 +24,8 @@
 #define CMK_IS_HETERO                                      1
 
 
-#define CMK_RSH_IS_A_COMMAND                               0
-#define CMK_RSH_NOT_NEEDED                                 1
+#define CMK_SSH_IS_A_COMMAND                               0
+#define CMK_SSH_NOT_NEEDED                                 1
 
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0

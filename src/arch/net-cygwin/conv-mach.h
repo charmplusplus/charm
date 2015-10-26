@@ -18,9 +18,9 @@
 #define CMK_MEMORY_PROTECTABLE                             0
 
 
-#define CMK_RSH_IS_A_COMMAND                               1
-#define CMK_RSH_KILL                                       1
-#define CMK_RSH_NOT_NEEDED                                 0
+#define CMK_SSH_IS_A_COMMAND                               1
+#define CMK_SSH_KILL                                       1
+#define CMK_SSH_NOT_NEEDED                                 0
 
 #define CMK_CONV_HOST_CSH_UNAVAILABLE			   1
 

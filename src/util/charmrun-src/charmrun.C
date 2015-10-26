@@ -56,11 +56,11 @@
 #define DIRSEP "/"
 #endif
 
-#if CMK_RSH_NOT_NEEDED /*No RSH-- use daemon to start node-programs*/
-#define CMK_USE_RSH 0
+#if CMK_SSH_NOT_NEEDED /*No SSH-- use daemon to start node-programs*/
+#define CMK_USE_SSH 0
 
-#else /*Use RSH to start node-programs*/
-#define CMK_USE_RSH 1
+#else /*Use SSH to start node-programs*/
+#define CMK_USE_SSH 1
 #ifdef __MINGW_H
 #include <rpc.h>
 #elif !defined(__CYGWIN__)
@@ -68,8 +68,8 @@
 #else
 #include <w32api/rpc.h>
 #endif
-#if CMK_RSH_IS_A_COMMAND
-#define RSH_CMD "ssh"
+#if CMK_SSH_IS_A_COMMAND
+#define SSH_CMD "ssh"
 #endif
 
 #endif
@@ -118,7 +118,7 @@ static double ftTimer;
 
 double start_timer;
 
-int *rsh_pids = NULL;
+int *ssh_pids = NULL;
 
 double GetClock(void)
 {
@@ -344,13 +344,13 @@ const char *skipstuff(const char *p)
   return p;
 }
 
-#if CMK_USE_RSH
-const char *getenv_rsh()
+#if CMK_USE_SSH
+const char *getenv_ssh()
 {
   char *e;
 
   e = getenv("CONV_RSH");
-  return e ? e : RSH_CMD;
+  return e ? e : SSH_CMD;
 }
 #endif
 
@@ -743,8 +743,8 @@ int arg_usehostname;
 int arg_read_pes = 0;
 #endif
 
-#if CMK_USE_RSH
-int arg_maxrsh;
+#if CMK_USE_SSH
+int arg_maxssh;
 const char *arg_shell;
 int arg_in_xterm;
 const char *arg_debugger;
@@ -818,7 +818,7 @@ void arg_init(int argc, const char **argv)
              "Use IP address provided for charmrun IP");
   pparam_flag(&arg_mpiexec, 0, "mpiexec", "use mpiexec to start jobs");
   pparam_flag(&arg_mpiexec_no_n, 0, "mpiexec-no-n", "use mpiexec to start jobs without -n procs");
-#if CMK_USE_RSH
+#if CMK_USE_SSH
   pparam_flag(&arg_debug, 0, "debug",
               "Run each node under gdb in an xterm window");
   pparam_flag(&arg_debug_no_pause, 0, "debug-no-pause",
@@ -837,12 +837,10 @@ void arg_init(int argc, const char **argv)
               "Used only when charmrun is started by charmdebug");
 #endif
 
-  pparam_int(&arg_maxrsh, 16, "maxrsh",
-             "Maximum number of rsh's to run at a time");
-  pparam_int(&arg_maxrsh, 16, "maxssh",
+  pparam_int(&arg_maxssh, 16, "maxssh",
              "Maximum number of ssh's to run at a time");
   pparam_str(&arg_shell, 0, "remote-shell",
-             "which remote shell to use (default $CONV_RSH or " RSH_CMD);
+             "which remote shell to use (default $CONV_RSH or " SSH_CMD);
   pparam_str(&arg_debugger, 0, "debugger", "which debugger to use");
   pparam_str(&arg_display, 0, "display", "X Display for xterm");
   pparam_flag(&arg_ssh_display, 0, "ssh-display",
@@ -953,13 +951,13 @@ void arg_init(int argc, const char **argv)
   }
 #endif
 
-#if CMK_USE_RSH
+#if CMK_USE_SSH
   /* Find the current value of the CONV_RSH variable */
   if (!arg_shell) {
     if (arg_mpiexec)
       arg_shell = "mpiexec";
     else
-      arg_shell = getenv_rsh();
+      arg_shell = getenv_ssh();
   }
 
   /* Find the current value of the DISPLAY variable */
@@ -1116,8 +1114,8 @@ typedef struct nodetab_host {
   /*These fields are set during node-startup*/
   int dataport;  /*UDP port number*/
   SOCKET ctrlfd; /*Connection to control port*/
-#if CMK_USE_RSH
-  const char *shell;    /*Rsh to use*/
+#if CMK_USE_SSH
+  const char *shell;    /*Ssh to use*/
   const char *debugger; /*Debugger to use*/
   const char *xterm;    /*Xterm to use*/
   const char *login;    /*User login name to use*/
@@ -1157,7 +1155,7 @@ void nodetab_reset(nodetab_host *h)
   h->forks = 0;
   h->dataport = -1;
   h->ctrlfd = -1;
-#if CMK_USE_RSH
+#if CMK_USE_SSH
   h->shell = arg_shell;
   h->debugger = arg_debugger;
   h->xterm = arg_xterm;
@@ -1210,7 +1208,7 @@ const char *nodetab_args(const char *args, nodetab_host *h)
     const char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
     while (*b1 == '+')
       b1++; /*Skip over "++" on parameters*/
-#if CMK_USE_RSH
+#if CMK_USE_SSH
     if (subeqs(b1, e1, "login"))
       h->login = substr(b2, e2);
     else if (subeqs(b1, e1, "passwd"))
@@ -1503,7 +1501,7 @@ unsigned int nodetab_rank(int i) { return nodetab_getinfo(i)->rank; }
 int nodetab_dataport(int i) { return nodetab_getinfo(i)->dataport; }
 int nodetab_nice(int i) { return nodetab_getinfo(i)->nice; }
 SOCKET nodetab_ctrlfd(int i) { return nodetab_getinfo(i)->ctrlfd; }
-#if CMK_USE_RSH
+#if CMK_USE_SSH
 const char *nodetab_setup(int i) { return nodetab_getinfo(i)->setup; }
 const char *nodetab_shell(int i) { return nodetab_getinfo(i)->shell; }
 const char *nodetab_debugger(int i) { return nodetab_getinfo(i)->debugger; }
@@ -3402,10 +3400,10 @@ void req_charmrun_connect(void)
 
 #ifndef CMK_BPROC
 
-void start_one_node_rsh(int rank0no);
+void start_one_node_ssh(int rank0no);
 void finish_one_node(int rank0no);
 void finish_set_nodes(int start, int stop);
-int start_set_node_rsh(int client);
+int start_set_node_ssh(int client);
 
 void req_client_start_and_connect(void)
 {
@@ -3429,14 +3427,14 @@ void req_client_start_and_connect(void)
 
     for (counter = 0; counter < batch;
          counter++) { /* initiate batch number of nodes */
-      clientgroup = start_set_node_rsh(client);
+      clientgroup = start_set_node_ssh(client);
       client += clientgroup;
       if (client >= req_nClients) {
         client = req_nClients;
         break;
       }
     }
-#if CMK_USE_RSH
+#if CMK_USE_SSH
     /* ssh x11 forwarding will make sure ssh exit */
     if (!arg_ssh_display)
 #endif
@@ -3483,7 +3481,7 @@ void req_client_start_and_connect(void)
 #endif
   if (arg_verbose)
     printf("Charmrun> IP tables sent.\n");
-  free(rsh_pids); /* done with rsh_pids */
+  free(ssh_pids); /* done with ssh_pids */
 }
 
 #endif
@@ -3630,7 +3628,7 @@ void init_mynodes(void)
  *
  ****************************************************************************/
 void start_nodes_daemon(void);
-void start_nodes_rsh(void);
+void start_nodes_ssh(void);
 void start_nodes_mpiexec();
 #ifdef HSTART
 void start_next_level_charmruns(void);
@@ -3706,7 +3704,7 @@ int main(int argc, const char **argv, char **envp)
         start_next_level_charmruns();
       } else {
         if (!arg_batch_spawn)
-          start_nodes_rsh();
+          start_nodes_ssh();
         else
           req_client_start_and_connect();
       }
@@ -3724,7 +3722,7 @@ int main(int argc, const char **argv, char **envp)
         if (arg_mpiexec)
           start_nodes_mpiexec();
         else
-          start_nodes_rsh();
+          start_nodes_ssh();
       } else
         req_client_start_and_connect();
     } else
@@ -3734,9 +3732,9 @@ int main(int argc, const char **argv, char **envp)
 
   if (arg_charmdebug) {
 #if (defined(_WIN32) && !defined(__CYGWIN__)) || CMK_BPROC
-    /* Gdb stream (and charmdebug) currently valid only with rsh subsystem */
+    /* Gdb stream (and charmdebug) currently valid only with ssh subsystem */
     fprintf(stderr,
-            "Charmdebug is supported currently only with the rsh subsystem\n");
+            "Charmdebug is supported currently only with the ssh subsystem\n");
     abort();
 #else
     /* Open an additional connection to node 0 with a gdb to grab info */
@@ -3755,7 +3753,7 @@ int main(int argc, const char **argv, char **envp)
 #ifdef HSTART
   /* Hierarchical startup*/
   if (arg_hierarchical_start) {
-#if !CMK_RSH_KILL
+#if !CMK_SSH_KILL
     if (!arg_batch_spawn || (!arg_child_charmrun))
       finish_nodes();
 #endif
@@ -3769,14 +3767,14 @@ int main(int argc, const char **argv, char **envp)
   else
 #endif
   {
-#if !CMK_RSH_KILL
+#if !CMK_SSH_KILL
     if (!arg_batch_spawn)
       finish_nodes();
 #endif
     if (!arg_batch_spawn)
       req_client_connect();
   }
-#if CMK_RSH_KILL
+#if CMK_SSH_KILL
   kill_nodes();
 #endif
   if (arg_verbose)
@@ -3890,15 +3888,15 @@ void start_nodes_daemon(void)
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 /*Sadly, interprocess communication on Win32 is quite
-  different, so we can't use Rsh on win32 yet.
+  different, so we can't use Ssh on win32 yet.
   Fall back to the daemon.*/
-void start_nodes_rsh() { start_nodes_daemon(); }
+void start_nodes_ssh() { start_nodes_daemon(); }
 void finish_nodes(void) {}
-void start_one_node_rsh(int rank0no) {}
+void start_one_node_ssh(int rank0no) {}
 void finish_one_node(int rank0no) {}
 void start_nodes_mpiexec() {}
 
-int start_set_node_rsh(int client) { return 0; }
+int start_set_node_ssh(int client) { return 0; }
 void finish_set_nodes(int start, int stop) {}
 
 void envCat(char *dest, LPTSTR oldEnv)
@@ -3916,7 +3914,7 @@ void envCat(char *dest, LPTSTR oldEnv)
   FreeEnvironmentStrings(oldEnv);
 }
 
-/* simple version of charmrun that avoids the rshd or charmd,   */
+/* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
 void start_nodes_local(char **env)
 {
@@ -4163,10 +4161,10 @@ void start_nodes_scyld(void)
 void finish_nodes(void) {}
 
 #else
-/*Unix systems can use Rsh normally*/
-/********** RSH-ONLY CODE *****************************************/
+/*Unix systems can use Ssh normally*/
+/********** SSH-ONLY CODE *****************************************/
 /*                                                                          */
-/* Rsh_etc                                                                  */
+/* Ssh_etc                                                                  */
 /*                                                                          */
 /* this starts all the node programs.  It executes fully in the background. */
 /*                                                                          */
@@ -4186,36 +4184,36 @@ void removeEnv(const char *doomedEnv)
   *oe = NULL; /*NULL-terminate list*/
 }
 
-int rsh_fork(int nodeno, const char *startScript)
+int ssh_fork(int nodeno, const char *startScript)
 {
-  std::vector<const char *> rshargv;
+  std::vector<const char *> sshargv;
   int pid;
   const char *s, *e;
 
   s = nodetab_shell(nodeno);
   e = skipstuff(s);
   while (*s) {
-    rshargv.push_back(substr(s, e));
+    sshargv.push_back(substr(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
 
-  rshargv.push_back(nodetab_name(nodeno));
-  rshargv.push_back("-l");
-  rshargv.push_back(nodetab_login(nodeno));
-  rshargv.push_back("-o");
-  rshargv.push_back("KbdInteractiveAuthentication=no");
-  rshargv.push_back("-o");
-  rshargv.push_back("PasswordAuthentication=no");
-  rshargv.push_back("-o");
-  rshargv.push_back("NoHostAuthenticationForLocalhost=yes");
-  rshargv.push_back("/bin/bash -f");
-  rshargv.push_back((const char *) NULL);
+  sshargv.push_back(nodetab_name(nodeno));
+  sshargv.push_back("-l");
+  sshargv.push_back(nodetab_login(nodeno));
+  sshargv.push_back("-o");
+  sshargv.push_back("KbdInteractiveAuthentication=no");
+  sshargv.push_back("-o");
+  sshargv.push_back("PasswordAuthentication=no");
+  sshargv.push_back("-o");
+  sshargv.push_back("NoHostAuthenticationForLocalhost=yes");
+  sshargv.push_back("/bin/bash -f");
+  sshargv.push_back((const char *) NULL);
 
   if (arg_verbose) {
-    std::string cmd_str = rshargv[0];
-    for (int n = 1; n < rshargv.size()-1; ++n)
-      cmd_str += " " + std::string(rshargv[n]);
+    std::string cmd_str = sshargv[0];
+    for (int n = 1; n < sshargv.size()-1; ++n)
+      cmd_str += " " + std::string(sshargv[n]);
     printf("Charmrun> Starting %s\n", cmd_str.c_str());
   }
 
@@ -4231,9 +4229,9 @@ int rsh_fork(int nodeno, const char *startScript)
     // removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
     for (int i = 3; i < 1024; i++)
       close(i);
-    execvp(rshargv[0], const_cast<char **>(&rshargv[0]));
+    execvp(sshargv[0], const_cast<char **>(&sshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find remote shell program '%s'!\n",
-            rshargv[0]);
+            sshargv[0]);
     exit(1);
   }
   if (arg_verbose)
@@ -4249,12 +4247,12 @@ void fprint_arg(FILE *f, const char **argv)
     argv++;
   }
 }
-void rsh_Find(FILE *f, const char *program, const char *dest)
+void ssh_Find(FILE *f, const char *program, const char *dest)
 {
   fprintf(f, "Find %s\n", program);
   fprintf(f, "%s=$loc\n", dest);
 }
-void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv,
+void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
                 int restart)
 {
   char *netstart;
@@ -4276,7 +4274,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv,
           "  then\n"
           "    Echo Exiting with error code $1\n"
           "  fi\n"
-#if CMK_RSH_KILL /*End by killing ourselves*/
+#if CMK_SSH_KILL /*End by killing ourselves*/
           "  sleep 5\n" /*Delay until any error messages are flushed*/
           "  kill -9 $$\n"
 #else            /*Exit normally*/
@@ -4402,15 +4400,15 @@ void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv,
            arg_nodeprog_r, arg_currdir_r, nodeno);
   }
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
-    rsh_Find(f, nodetab_xterm(nodeno), "F_XTERM");
+    ssh_Find(f, nodetab_xterm(nodeno), "F_XTERM");
     if (!arg_ssh_display && !arg_debug_no_xrdb)
-      rsh_Find(f, "xrdb", "F_XRDB");
+      ssh_Find(f, "xrdb", "F_XRDB");
     if (arg_verbose)
       fprintf(f, "Echo 'using xterm' $F_XTERM\n");
   }
 
   if (arg_debug || arg_debug_no_pause) { /*Look through PATH for debugger*/
-    rsh_Find(f, dbg, "F_DBG");
+    ssh_Find(f, dbg, "F_DBG");
     if (arg_verbose)
       fprintf(f, "Echo 'using debugger' $F_DBG\n");
   }
@@ -4562,7 +4560,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv,
   }
 
   /* End the node-program subshell. To minimize the number
-     of open ports on the front-end, we must close down rsh;
+     of open ports on the front-end, we must close down ssh;
      to do this, we have to close stdin, stdout, stderr, and
      run the subshell in the background. */
   fprintf(f, ")");
@@ -4589,7 +4587,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, const char **argv,
    and ".bss" segments inside the program memory */
 void read_global_segments_size()
 {
-  std::vector<const char *> rshargv;
+  std::vector<const char *> sshargv;
   char *tmp;
   int childPid;
 
@@ -4597,14 +4595,14 @@ void read_global_segments_size()
   arg_nodeprog_r =
       pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
 
-  rshargv.push_back(nodetab_shell(0));
-  rshargv.push_back(nodetab_name(0));
-  rshargv.push_back("-l");
-  rshargv.push_back(nodetab_login(0));
+  sshargv.push_back(nodetab_shell(0));
+  sshargv.push_back(nodetab_name(0));
+  sshargv.push_back("-l");
+  sshargv.push_back(nodetab_login(0));
   tmp = (char *) malloc(sizeof(char) * 9 + strlen(arg_nodeprog_r));
   sprintf(tmp, "size -A %s", arg_nodeprog_r);
-  rshargv.push_back(tmp);
-  rshargv.push_back((const char *) NULL);
+  sshargv.push_back(tmp);
+  sshargv.push_back((const char *) NULL);
 
   childPid = fork();
   if (childPid < 0) {
@@ -4614,10 +4612,10 @@ void read_global_segments_size()
     /* child process */
     dup2(2, 1);
     /*printf("executing: \"%s\" \"%s\" \"%s\" \"%s\"
-     * \"%s\"\n",rshargv[0],rshargv[1],rshargv[2],rshargv[3],rshargv[4]);*/
-    execvp(rshargv[0], const_cast<char **>(&rshargv[0]));
+     * \"%s\"\n",sshargv[0],sshargv[1],sshargv[2],sshargv[3],sshargv[4]);*/
+    execvp(sshargv[0], const_cast<char **>(&sshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find remote shell program '%s'!\n",
-            rshargv[0]);
+            sshargv[0]);
     exit(1);
   } else {
     /* else we are in the parent */
@@ -4626,10 +4624,10 @@ void read_global_segments_size()
   }
 }
 
-/* open a rsh connection with processor 0 and open a gdb session for info */
+/* open a ssh connection with processor 0 and open a gdb session for info */
 void open_gdb_info()
 {
-  std::vector<const char *> rshargv;
+  std::vector<const char *> sshargv;
   char *tmp;
   int fdin[2];
   int fdout[2];
@@ -4640,14 +4638,14 @@ void open_gdb_info()
   arg_nodeprog_r =
       pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
 
-  rshargv.push_back(nodetab_shell(0));
-  rshargv.push_back(nodetab_name(0));
-  rshargv.push_back("-l");
-  rshargv.push_back(nodetab_login(0));
+  sshargv.push_back(nodetab_shell(0));
+  sshargv.push_back(nodetab_name(0));
+  sshargv.push_back("-l");
+  sshargv.push_back(nodetab_login(0));
   tmp = (char *) malloc(sizeof(char) * 8 + strlen(arg_nodeprog_r));
   sprintf(tmp, "gdb -q %s", arg_nodeprog_r);
-  rshargv.push_back(tmp);
-  rshargv.push_back((const char *) NULL);
+  sshargv.push_back(tmp);
+  sshargv.push_back((const char *) NULL);
 
   pipe(fdin);
   pipe(fdout);
@@ -4662,16 +4660,16 @@ void open_gdb_info()
     close(fdin[1]);
     close(fdout[0]);
     close(fderr[0]);
-    printf("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n", rshargv[0],
-           rshargv[1], rshargv[2], rshargv[3], rshargv[4]);
+    printf("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n", sshargv[0],
+           sshargv[1], sshargv[2], sshargv[3], sshargv[4]);
     dup2(fdin[0], 0);
     dup2(fdout[1], 1);
     dup2(fderr[1], 2);
     for (i = 3; i < 1024; i++)
       close(i);
-    execvp(rshargv[0], const_cast<char **>(&rshargv[0]));
+    execvp(sshargv[0], const_cast<char **>(&sshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find remote shell program '%s'!\n",
-            rshargv[0]);
+            sshargv[0]);
     exit(1);
   }
   /* else we are in the parent */
@@ -4713,18 +4711,18 @@ void start_next_level_charmruns()
         exit(1);
       }
     }
-    rsh_script(f, pe, client, arg_argv, 0);
+    ssh_script(f, pe, client, arg_argv, 0);
     fclose(f);
-    if (!rsh_pids)
-      rsh_pids = (int *) malloc(sizeof(int) * branchfactor);
-    rsh_pids[nextIndex++] = rsh_fork(pe, startScript);
+    if (!ssh_pids)
+      ssh_pids = (int *) malloc(sizeof(int) * branchfactor);
+    ssh_pids[nextIndex++] = ssh_fork(pe, startScript);
     client += nodes_per_child;
   }
 }
 #endif
 
 /* returns pid */
-void start_one_node_rsh(int rank0no)
+void start_one_node_ssh(int rank0no)
 {
   int pe = nodetab_rank0_table[rank0no];
   FILE *f;
@@ -4740,14 +4738,14 @@ void start_one_node_rsh(int rank0no)
       exit(1);
     }
   }
-  rsh_script(f, pe, rank0no, arg_argv, 0);
+  ssh_script(f, pe, rank0no, arg_argv, 0);
   fclose(f);
-  if (!rsh_pids)
-    rsh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
-  rsh_pids[rank0no] = rsh_fork(pe, startScript);
+  if (!ssh_pids)
+    ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
+  ssh_pids[rank0no] = ssh_fork(pe, startScript);
 }
 
-int start_set_node_rsh(int client)
+int start_set_node_ssh(int client)
 {
   /* a search function could be inserted here instead of sequential lookup for
    * more complex node lists (e.g. interleaving) */
@@ -4759,7 +4757,7 @@ int start_set_node_rsh(int client)
 
 #ifdef HSTART
   if (!arg_scalable_start && !arg_hierarchical_start)
-    clientgroup = client + 1; /* only launch 1 core per rsh call */
+    clientgroup = client + 1; /* only launch 1 core per ssh call */
   else {
     clientgroup = client;
     do {
@@ -4779,7 +4777,7 @@ int start_set_node_rsh(int client)
 
 #else
   if (!arg_scalable_start)
-    clientgroup = client + 1; /* only launch 1 core per rsh call */
+    clientgroup = client + 1; /* only launch 1 core per ssh call */
   else {
     clientgroup = client;
     do {
@@ -4794,29 +4792,29 @@ int start_set_node_rsh(int client)
 #endif
   nodetab_getnodeinfo(client)->forks =
       clientgroup - client - 1; /* already have 1 process launching */
-  start_one_node_rsh(client);
+  start_one_node_ssh(client);
   return clientgroup - client; /* return number of entries in group */
 }
 
-void start_nodes_rsh()
+void start_nodes_ssh()
 {
   int client, clientgroup;
-  rsh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
+  ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
 
   if (arg_verbose)
-    printf("start_nodes_rsh\n");
+    printf("start_nodes_ssh\n");
   client = 0;
   while (client < nodetab_rank0_size) {
     /* start a group of processes per node */
-    clientgroup = start_set_node_rsh(client);
+    clientgroup = start_set_node_ssh(client);
     client += clientgroup;
   }
 }
 
 /* for mpiexec, for once calling mpiexec to start on all nodes  */
-int rsh_fork_one(const char *startScript)
+int ssh_fork_one(const char *startScript)
 {
-  std::vector<const char *> rshargv;
+  std::vector<const char *> sshargv;
   int pid;
   char npes[128];
   const char *s, *e;
@@ -4832,18 +4830,18 @@ int rsh_fork_one(const char *startScript)
   s = nodetab_shell(0);
   e = skipstuff(s);
   while (*s) {
-    rshargv.push_back(substr(s, e));
+    sshargv.push_back(substr(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
 
   if ( ! arg_mpiexec_no_n ) {
-    rshargv.push_back("-n");
+    sshargv.push_back("-n");
     sprintf(npes, "%d", nodetab_rank0_size);
-    rshargv.push_back(npes);
+    sshargv.push_back(npes);
   }
-  rshargv.push_back((char *) startScript);
-  rshargv.push_back((const char *) NULL);
+  sshargv.push_back((char *) startScript);
+  sshargv.push_back((const char *) NULL);
   if (arg_verbose)
     printf("Charmrun> Starting %s %s \n", nodetab_shell(0), startScript);
 
@@ -4858,9 +4856,9 @@ int rsh_fork_one(const char *startScript)
     // removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
     for (i = 3; i < 1024; i++)
       close(i);
-    execvp(rshargv[0], const_cast<char *const *>(&rshargv[0]));
+    execvp(sshargv[0], const_cast<char *const *>(&sshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find mpiexec program '%s'!\n",
-            rshargv[0]);
+            sshargv[0]);
     exit(1);
   }
   if (arg_verbose)
@@ -4886,12 +4884,12 @@ void start_nodes_mpiexec()
       exit(1);
     }
   }
-  rsh_script(f, 0, 0, arg_argv, 0);
+  ssh_script(f, 0, 0, arg_argv, 0);
   fclose(f);
-  rsh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
-  rsh_pids[0] = rsh_fork_one(startScript);
+  ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
+  ssh_pids[0] = ssh_fork_one(startScript);
   for (i = 0; i < nodetab_rank0_size; i++)
-    rsh_pids[i] = 0; /* skip finish_nodes */
+    ssh_pids[i] = 0; /* skip finish_nodes */
 }
 
 void finish_set_nodes(int start, int stop)
@@ -4899,7 +4897,7 @@ void finish_set_nodes(int start, int stop)
   int status, done, i;
   const char *host;
 
-  if (!rsh_pids)
+  if (!ssh_pids)
     return; /*nothing to do*/
 
   std::vector<int> num_retries(stop - start, 0);
@@ -4907,13 +4905,13 @@ void finish_set_nodes(int start, int stop)
   while (!done) {
     done = 1;
     for (i = start; i < stop; i++) { /* check all nodes */
-      if (rsh_pids[i] != 0) {
+      if (ssh_pids[i] != 0) {
         done = 0; /* we are not finished yet */
         status = 0;
-        waitpid(rsh_pids[i], &status, 0); /* check if the process is finished */
+        waitpid(ssh_pids[i], &status, 0); /* check if the process is finished */
         if (WIFEXITED(status)) {
           if (!WEXITSTATUS(status)) { /* good */
-            rsh_pids[i] = 0;          /* process is finished */
+            ssh_pids[i] = 0;          /* process is finished */
           } else {
             host = nodetab_name(nodetab_rank0_table[i]);
             fprintf(stderr,
@@ -4926,7 +4924,7 @@ void finish_set_nodes(int start, int stop)
             if (++num_retries[i - start] <= MAX_NUM_RETRIES) {
               fprintf(stderr, "Charmrun> Reconnection attempt %d of %d\n",
                       num_retries[i - start], MAX_NUM_RETRIES);
-              start_one_node_rsh(i);
+              start_one_node_ssh(i);
             } else {
               fprintf(
                   stderr,
@@ -4948,25 +4946,25 @@ void finish_nodes()
   else
 #endif
     finish_set_nodes(0, nodetab_rank0_size);
-  free(rsh_pids);
+  free(ssh_pids);
 }
 
 void kill_nodes()
 {
   int rank0no;
-  if (!rsh_pids)
+  if (!ssh_pids)
     return; /*nothing to do*/
-  /*Now wait for all the rsh'es to finish*/
+  /*Now wait for all the ssh'es to finish*/
   for (rank0no = 0; rank0no < nodetab_rank0_size; rank0no++) {
     const char *host = nodetab_name(nodetab_rank0_table[rank0no]);
     int status = 0;
     if (arg_verbose)
       printf("Charmrun> waiting for remote shell (%s:%d), pid %d\n", host,
-             rank0no, rsh_pids[rank0no]);
-    kill(rsh_pids[rank0no], 9);
-    waitpid(rsh_pids[rank0no], &status, 0); /*<- no zombies*/
+             rank0no, ssh_pids[rank0no]);
+    kill(ssh_pids[rank0no], 9);
+    waitpid(ssh_pids[rank0no], &status, 0); /*<- no zombies*/
   }
-  free(rsh_pids);
+  free(ssh_pids);
 }
 
 
@@ -4992,7 +4990,7 @@ char *find_abs_path(const char *target)
   return NULL;
 }
 
-/* simple version of charmrun that avoids the rshd or charmd,   */
+/* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
 void start_nodes_local(char **env)
 {
@@ -5133,7 +5131,7 @@ void restart_node(int crashed_node)
   int pe = nodetab_rank0_table[crashed_node];
   FILE *f;
   char startScript[200];
-  int restart_rsh_pid;
+  int restart_ssh_pid;
   const char **restart_argv;
   int status = 0;
   char phase_str[10];
@@ -5164,17 +5162,17 @@ void restart_node(int crashed_node)
   /** change the nodetable entry of the crashed
 processor to connect it to a new one**/
   refill_nodetab_entry(crashed_node);
-  rsh_script(f, pe, crashed_node, restart_argv, 1);
+  ssh_script(f, pe, crashed_node, restart_argv, 1);
   fclose(f);
   /**start the new processor */
-  restart_rsh_pid = rsh_fork(pe, startScript);
+  restart_ssh_pid = ssh_fork(pe, startScript);
   /**wait for the reply from the new process*/
   status = 0;
   if (arg_debug_no_pause || arg_debug)
     ;
   else {
     do {
-      waitpid(restart_rsh_pid, &status, 0);
+      waitpid(restart_ssh_pid, &status, 0);
     } while (!WIFEXITED(status));
     if (WEXITSTATUS(status) != 0) {
       fprintf(stderr,
@@ -5330,4 +5328,4 @@ void announce_crash(int socket_index, int crashed_node)
 
 #endif
 
-#endif /*CMK_USE_RSH*/
+#endif /*CMK_USE_SSH*/
