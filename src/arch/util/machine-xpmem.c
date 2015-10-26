@@ -248,13 +248,18 @@ void CmiInitXpmem(char **argv){
 
 	MACHSTATE2(3,"CminitXpmem %s %d done",xpmemContext->prefixStr,xpmemContext->nodesize);
 
-        signal(SIGSEGV, cleanupOnAllSigs);
-        signal(SIGFPE, cleanupOnAllSigs);
-        signal(SIGILL, cleanupOnAllSigs);
-        signal(SIGTERM, cleanupOnAllSigs);
-        signal(SIGABRT, cleanupOnAllSigs);
-        signal(SIGQUIT, cleanupOnAllSigs);
-        signal(SIGBUS, cleanupOnAllSigs);
+    struct sigaction sa;
+    sa.sa_handler = cleanupOnAllSigs;
+    sigemptyset(&sa.sa_mask);    
+    sa.sa_flags = SA_RESTART;
+
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGFPE, &sa, NULL);
+    sigaction(SIGILL, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
+    sigaction(SIGQUIT, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
 };
 
 /**************

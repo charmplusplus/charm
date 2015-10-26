@@ -1999,7 +1999,7 @@ void ConverseCleanup(void)
 
       skt_close(Cmi_charmrun_fd);
       // Avoid crash by SIGALRM
-      signal(SIGALRM, SIG_IGN);
+      sigaction(SIGALRM, SIG_IGN, NULL);
 
 #if CMK_USE_IBVERBS
       CmiMachineCleanup();
@@ -2040,18 +2040,25 @@ void ConverseCleanup(void)
 static void set_signals(void)
 {
   if(!Cmi_truecrash) {
-    signal(SIGSEGV, KillOnAllSigs);
-    signal(SIGFPE, KillOnAllSigs);
-    signal(SIGILL, KillOnAllSigs);
-    signal(SIGINT, KillOnAllSigs);
-    signal(SIGTERM, KillOnAllSigs);
-    signal(SIGABRT, KillOnAllSigs);
+    struct sigaction sa;
+    sa.sa_handler = KillOnAllSigs;
+    sigemptyset(&sa.sa_mask);    
+    sa.sa_flags = SA_RESTART;
+
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGFPE, &sa, NULL);
+    sigaction(SIGILL, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
+
 #   if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
-    signal(SIGQUIT, KillOnAllSigs);
-    signal(SIGBUS, KillOnAllSigs);
+    sigaction(SIGQUIT, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
 #     if CMK_HANDLE_SIGUSR
-    signal(SIGUSR1, HandleUserSignals);
-    signal(SIGUSR2, HandleUserSignals);
+    sa.sa_handler = HandleUserSignals;
+    sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
 #     endif
 #   endif /*UNIX*/
   }

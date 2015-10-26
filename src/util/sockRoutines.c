@@ -81,6 +81,7 @@ void skt_close(SOCKET fd)
 
 typedef void (*skt_signal_handler_fn)(int sig);
 static skt_signal_handler_fn skt_fallback_SIGPIPE=NULL;
+static struct sigaction sa;
 static void skt_SIGPIPE_handler(int sig) {
 	if (skt_ignore_SIGPIPE) {
 		fprintf(stderr,"Caught SIGPIPE.\n");
@@ -96,7 +97,12 @@ void skt_init(void)
 	  This prevents us from dying when one of our network
 	  connections goes down
 	*/
-	skt_fallback_SIGPIPE=signal(SIGPIPE,skt_SIGPIPE_handler);
+	struct sigaction old_action;
+	sa.sa_handler = skt_SIGPIPE_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	sigaction(SIGPIPE, &sa, &old_action);
+	skt_fallback_SIGPIPE = old_action.sa_handler;
 }
 void skt_close(SOCKET fd)
 {

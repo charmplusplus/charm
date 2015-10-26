@@ -266,17 +266,20 @@ void CmiInitPxshm(char **argv)
   pxshmContext->commServerTime = 0;
   pxshmContext->lockRecvCount = 0;
 #endif
+  struct sigaction sa;
+  sa.sa_handler = cleanupOnAllSigs;
+  sigemptyset(&sa.sa_mask);    
+  sa.sa_flags = SA_RESTART;
 
-  signal(SIGSEGV, cleanupOnAllSigs);
-  signal(SIGFPE, cleanupOnAllSigs);
-  signal(SIGILL, cleanupOnAllSigs);
-  signal(SIGTERM, cleanupOnAllSigs);
-  signal(SIGABRT, cleanupOnAllSigs);
-  signal(SIGQUIT, cleanupOnAllSigs);
-  signal(SIGBUS, cleanupOnAllSigs);
-  signal(SIGINT, cleanupOnAllSigs);
-  signal(SIGTRAP, cleanupOnAllSigs);
-
+  sigaction(SIGSEGV, &sa, NULL);
+  sigaction(SIGFPE, &sa, NULL);
+  sigaction(SIGILL, &sa, NULL);
+  sigaction(SIGTERM, &sa, NULL);
+  sigaction(SIGABRT, &sa, NULL);
+  sigaction(SIGQUIT, &sa, NULL);
+  sigaction(SIGBUS, &sa, NULL);
+  sigaction(SIGINT, &sa, NULL);
+  sigaction(SIGTRAP, &sa, NULL);
 #if 0
         char name[64];
         gethostname(name,64);
