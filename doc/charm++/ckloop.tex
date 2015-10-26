@@ -7,7 +7,11 @@ Otherwise, the runtime that handles distributed-memory programming may
 interfere with resource contention because the two independent runtime systems
 are not coordinated.  If spare cores are allocated, in the same way of
 launching a MPI+OpenMP hybrid program, \charmpp{} will work perfectly with any
-shared-memory parallel programming languages (e.g. OpenMP).
+shared-memory parallel programming languages (e.g. OpenMP). As with ordinary
+OpenMP applications, the number of threads used in the OpenMP parts of the
+program can be controlled with the {\tt OMP\_NUM\_THREADS} environment
+variable.  See Sec.~\ref{charmrun} for details on how to propagate such
+environment variables.
 
 If there are no spare cores allocated, to avoid resouce contention, a
 \emph{unified runtime} is needed to support both intra-node shared-memory
