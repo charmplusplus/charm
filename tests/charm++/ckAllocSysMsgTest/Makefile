@@ -21,11 +21,11 @@ ckAllocSysMsgTest.o: ckAllocSysMsgTest.C ckAllocSysMsgTest.decl.h ckAllocSysMsgT
 	$(CHARMC) -c ckAllocSysMsgTest.C
 
 test: all
-	$(call run, ./ckAllocSysMsgTest 10 10 10 1  )
-	$(call run, ./ckAllocSysMsgTest 30 10 10 1  +p2 )
-	$(call run, ./ckAllocSysMsgTest 40 5 2 1  +p2 )
-	$(call run, ./ckAllocSysMsgTest 30 10 10 1  +p4)
+	$(call run, ./ckAllocSysMsgTest 10 10 10 3  )
+	$(call run, ./ckAllocSysMsgTest 30 10 10 3  +p2 )
+	$(call run, ./ckAllocSysMsgTest 40 5 2 3  +p2 )
+	$(call run, ./ckAllocSysMsgTest 30 10 10 3  +p4)
 
 
 bgtest: all
-	$(call run, ./ckAllocSysMsgTest 30 10 10 1  +p4 +x2 +y2 +z2)
+	$(call run, ./ckAllocSysMsgTest 30 10 10 3  +p4 +x2 +y2 +z2)
