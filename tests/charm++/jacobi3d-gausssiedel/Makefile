@@ -42,12 +42,16 @@ main.decl.h: main.ci
 jacobi3d.decl.h: jacobi3d.ci
 	$(CHARMC)   jacobi3d.ci
 
+test: main main.ckloop
+	$(call run, ./main -X 256 -Y 256 -Z 256 -x 128 -y 128 -z 128 +p8 +balancer DummyLB )
+	$(call run, ./main.ckloop -X 256 -Y 256 -Z 256 -x 128 -y 128 -z 128 +p8 +balancer DummyLB )
+
 syncfttest causalfttest: fttest
 fttest: main
-	$(call run, ./main 256 128 +p8 +balancer DummyLB )
-	$(call run, ./main 256 128 +p8 +balancer DummyLB +killFile kill_01.txt )
-	$(call run, ./main 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_02.txt )
-	$(call run, ./main 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_03.txt )
+	$(call run, ./main -X 256 -Y 256 -Z 256 -x 128 -y 128 -z 128 +p8 +balancer DummyLB )
+	$(call run, ./main -X 256 -Y 256 -Z 256 -x 128 -y 128 -z 128 +p8 +balancer DummyLB +killFile kill_01.txt )
+	$(call run, ./main -X 256 -Y 256 -Z 256 -x 64 -y 64 -z 32 +p8 +balancer DummyLB +killFile kill_02.txt )
+	$(call run, ./main -X 256 -Y 256 -Z 256 -x 64 -y 64 -z 32 +p8 +balancer DummyLB +killFile kill_03.txt )
 
 
 clean:
