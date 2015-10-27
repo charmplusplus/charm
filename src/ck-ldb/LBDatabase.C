@@ -321,6 +321,7 @@ void _loadbalancerInit()
 
 int LBDatabase::manualOn = 0;
 char *LBDatabase::avail_vector = NULL;
+bool LBDatabase::avail_vector_set = false;
 CmiNodeLock avail_vector_lock;
 
 static LBRealType * _expectedLoad = NULL;
@@ -485,16 +486,28 @@ void LBDatabase::pup(PUP::er& p)
   int np;
   if (!p.isUnpacking()) np = CkNumPes();
   p|np;
-  CmiAssert(avail_vector);
   // in case number of processors changes
-  if (p.isUnpacking() && np > CkNumPes()) {
+  if (p.isUnpacking()) {
     CmiLock(avail_vector_lock);
-    delete [] avail_vector;
-    avail_vector = new char[np];
-    for (int i=0; i<np; i++) avail_vector[i] = 1;
+    if(!avail_vector_set){
+      avail_vector_set = true;
+      CmiAssert(avail_vector);
+      if(np>CkNumPes()){
+        delete [] avail_vector;
+        avail_vector = new char[np];
+        for (int i=0; i<np; i++) avail_vector[i] = 1;
+      }
+      p(avail_vector, np);
+    } else{
+      char * tmp_avail_vector = new char[np];
+      p(tmp_avail_vector, np);
+      delete [] tmp_avail_vector;
+    }
     CmiUnlock(avail_vector_lock);
+  } else{
+    CmiAssert(avail_vector);
+    p(avail_vector, np);
   }
-  p(avail_vector, np);
   p|mystep;
   if(p.isUnpacking()) {
     nloadbalancers = 0;

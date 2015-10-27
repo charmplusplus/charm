@@ -392,6 +392,7 @@ private:
   int mystep;
   LDHandle myLDHandle;
   static char *avail_vector;	// processor bit vector
+  static bool avail_vector_set;
   int new_ld_balancer;		// for Node 0
   CkVec<BaseLB *>   loadbalancers;
   int nloadbalancers;
