@@ -108,9 +108,79 @@ private:
 	//constructor()=default;
 	};
 
-public:	
+public:
 	callbackType type;
 	callbackData d;
+
+	bool operator==(CkCallback & other){
+	  if(type != other.type)
+	    return false;
+	  switch (type) {
+	    case resumeThread:
+	      return (d.thread.onPE == other.d.thread.onPE &&
+		  d.thread.cb == other.d.thread.cb);
+	      break;
+	    case isendChare:
+	    case sendChare:
+	      return (d.chare.ep == other.d.chare.ep &&
+		  d.chare.id.onPE == other.d.chare.id.onPE &&
+		  d.chare.hasRefnum == other.d.chare.hasRefnum &&
+		  d.chare.refnum == other.d.chare.refnum);
+	      break;
+	    case isendGroup:
+	    case sendGroup:
+	    case isendNodeGroup:
+	    case sendNodeGroup:
+	      return (d.group.ep == other.d.group.ep &&
+		  d.group.id == other.d.group.id &&
+		  d.group.onPE == other.d.group.onPE &&
+		  d.group.hasRefnum == other.d.group.hasRefnum &&
+		  d.group.refnum == other.d.group.refnum);
+	      break;
+	    case bcastNodeGroup:
+	    case bcastGroup:
+	      return (d.group.ep == other.d.group.ep &&
+		  d.group.id == other.d.group.id &&
+		  d.group.hasRefnum == other.d.group.hasRefnum &&
+		  d.group.refnum == other.d.group.refnum);
+	      break;
+	    case isendArray:
+	    case sendArray:
+	      return (d.array.ep == other.d.array.ep &&
+		  d.array.id == other.d.array.id &&
+		  d.array.idx == other.d.array.idx &&
+		  d.array.hasRefnum == other.d.array.hasRefnum &&
+		  d.array.refnum == other.d.array.refnum);
+	      break;
+	    case bcastArray:
+	      return (d.array.ep == other.d.array.ep &&
+		  d.array.id == other.d.array.id &&
+		  d.array.hasRefnum == other.d.array.hasRefnum &&
+		  d.array.refnum == other.d.array.refnum);
+	      break;
+	    case replyCCS:
+	      return true;
+	      break;
+	    case call1Fn:
+	      return (d.c1fn.fn == other.d.c1fn.fn);
+	      break;
+	    case callCFn:
+	      return (d.cfn.fn == other.d.cfn.fn &&
+		  d.cfn.onPE == other.d.cfn.onPE &&
+		  d.cfn.param == other.d.cfn.param);
+	      break;
+	    case ignore:
+	    case ckExit:
+	    case invalid:
+            case bcastSection:
+	      return true;
+	      break;
+	    default:
+	      CkAbort("Inconsistent CkCallback type");
+	  }
+	}
+
+
 	void impl_thread_init(void);
 	void *impl_thread_delay(void) const;
 
@@ -154,6 +224,8 @@ public:
 #endif
       type=doInline?isendChare:sendChare;
 	  d.chare.ep=ep; d.chare.id=id;
+          d.chare.hasRefnum = false;
+          d.chare.refnum = 0;
 	}
 
     // Bcast to nodegroup
@@ -166,6 +238,8 @@ public:
 #endif
       type=isNodeGroup?bcastNodeGroup:bcastGroup;
 	  d.group.ep=ep; d.group.id=id;
+          d.group.hasRefnum = false;
+          d.group.refnum = 0;
 	}
 
     // Send to nodegroup element
@@ -178,7 +252,9 @@ public:
 #endif
       type=doInline?(isNodeGroup?isendNodeGroup:isendGroup):(isNodeGroup?sendNodeGroup:sendGroup); 
       d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;
-	}
+	  d.group.hasRefnum = false;
+          d.group.refnum = 0;
+        }
 
     // Send to specified group element
 	CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline=false);
@@ -190,7 +266,9 @@ public:
 #endif
       type=bcastArray;
 	  d.array.ep=ep; d.array.id=id;
-	}
+	  d.array.hasRefnum = false;
+          d.array.refnum = 0;
+        }
 
     // Send to array element
 	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool doInline=false) {
@@ -199,7 +277,9 @@ public:
 #endif
       type=doInline?isendArray:sendArray;
 	  d.array.ep=ep; d.array.id=id; d.array.idx = idx;
-	}
+	  d.array.hasRefnum = false;
+          d.array.refnum = 0;
+        }
 
     // Bcast to array
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline=false);

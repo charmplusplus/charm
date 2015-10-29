@@ -91,6 +91,8 @@ CkCallback::CkCallback(Chare *p, int ep, bool doInline) {
       type=doInline?isendChare:sendChare;
 	d.chare.ep=ep; 
 	d.chare.id=p->ckGetChareID();
+        d.chare.hasRefnum= false;
+        d.chare.refnum = 0;
 }
 CkCallback::CkCallback(Group *p, int ep, bool doInline) {
 #if CMK_ERROR_CHECKING
@@ -98,6 +100,8 @@ CkCallback::CkCallback(Group *p, int ep, bool doInline) {
 #endif
       type=doInline?isendGroup:sendGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyPe();
+        d.group.hasRefnum= false;
+        d.group.refnum = 0;
 }
 CkCallback::CkCallback(NodeGroup *p, int ep, bool doInline) {
 #if CMK_ERROR_CHECKING
@@ -105,6 +109,8 @@ CkCallback::CkCallback(NodeGroup *p, int ep, bool doInline) {
 #endif
       type=doInline?isendNodeGroup:sendNodeGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyNode();
+        d.group.hasRefnum= false;
+        d.group.refnum = 0;
 }
 
 CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
@@ -113,6 +119,8 @@ CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
 #endif
       type=bcastNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID();
+        d.group.hasRefnum= false;
+        d.group.refnum = 0;
 }
 
 CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline) {
@@ -121,6 +129,8 @@ CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline
 #endif
       type=doInline?isendNodeGroup:sendNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID(); d.group.onPE=onPE;
+        d.group.hasRefnum= false;
+        d.group.refnum = 0;
 }
 
 CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
@@ -131,6 +141,8 @@ CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
 	d.group.ep=ep; 
 	d.group.id=grpElt.ckGetGroupID(); 
 	d.group.onPE=grpElt.ckGetGroupPe();
+        d.group.hasRefnum= false;
+        d.group.refnum = 0;
 }
 CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline) {
 #if CMK_ERROR_CHECKING
@@ -140,6 +152,8 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInlin
 	d.array.ep=ep; 
 	d.array.id=arrElt.ckGetArrayID(); 
 	d.array.idx = arrElt.ckGetIndex();
+        d.array.hasRefnum= false;
+        d.array.refnum = 0;
 }
 
 CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline) {
@@ -156,6 +170,8 @@ CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline) {
       d.section.npes = secID.npes;
       secID._elems = NULL;
       secID.pelist = NULL;
+      d.section.hasRefnum = false;
+      d.section.refnum = 0;
 }
 
 CkCallback::CkCallback(int ep, CkSectionID &id) {
@@ -179,6 +195,8 @@ CkCallback::CkCallback(ArrayElement *p, int ep,bool doInline) {
     d.array.ep=ep; 
 	d.array.id=p->ckGetArrayID(); 
 	d.array.idx = p->ckGetArrayIndex();
+        d.array.hasRefnum= false;
+        d.array.refnum = 0;
 }
 
 
