@@ -441,7 +441,7 @@ void Entry::genArrayDefs(XStr& str)
       str << "#endif\n";
       if (!isNoTrace())
 	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
-	      << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
+	      << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx), this);\n";
       if(isAppWork())
       str << " _TRACE_BEGIN_APPWORK();\n";    
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
@@ -665,7 +665,7 @@ void Entry::genGroupDefs(XStr& str)
       XStr unmarshallStr; param->unmarshall(unmarshallStr);
       str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
       str << "  CkAssert(obj);\n";
-      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL);\n";
+      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL, NULL);\n";
       if(isAppWork())
       str << " _TRACE_BEGIN_APPWORK();\n";    
       str << "#if CMK_LBDB_ON\n"

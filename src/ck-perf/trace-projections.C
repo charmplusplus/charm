@@ -145,7 +145,7 @@ void traceThreadListener_resume(struct CthThreadListener *l)
   /* here, we activate the appropriate trace codes for the appropriate
      registered modules */
   _TRACE_BEGIN_EXECUTE_DETAILED(a->event,a->msgType,a->ep,a->srcPe,a->ml,
-				CthGetThreadID(a->base.thread));
+				CthGetThreadID(a->base.thread), NULL);
   a->event=-1;
   a->srcPe=CkMyPe(); /* potential lie to migrated threads */
   a->ml=0;

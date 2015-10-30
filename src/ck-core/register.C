@@ -105,6 +105,14 @@ void CkRegisterBase(int derivedIdx, int baseIdx)
     _chareTable[derivedIdx]->addBase(baseIdx);
 }
 
+int CkGetChareIdx(char *name){
+  for(int i=0; i<_chareTable.size(); i++){
+    if(strcmp(name, _chareTable[i]->name)==0)
+      return i;
+  }
+  return -1;
+}
+
 extern "C"
 void CkRegisterReadonly(const char *name,const char *type,
 	int size, void *ptr,CkPupReadonlyFnPtr pup_fn)

@@ -303,5 +303,7 @@ extern CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 extern void _registerInit(void);
 extern void _registerDone(void);
 
+extern int CkGetChareIdx(char *name);
+
 /*@}*/
 #endif

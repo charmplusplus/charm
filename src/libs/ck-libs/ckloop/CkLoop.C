@@ -507,7 +507,8 @@ void SingleHelperStealWork(ConverseNotifyMsg *msg) {
     }
     CurLoopInfo *loop = (CurLoopInfo *)msg->ptr;
 
-    _TRACE_BEGIN_EXECUTE_DETAILED(0, 4, _ckloopEP, CkNodeFirst(CkMyNode())+srcRank, sizeof(ConverseNotifyMsg), NULL);
+    _TRACE_BEGIN_EXECUTE_DETAILED(0, 4, _ckloopEP,
+      CkNodeFirst(CkMyNode())+srcRank, sizeof(ConverseNotifyMsg), NULL, NULL);
     loop->stealWork();
     _TRACE_END_EXECUTE();
 }

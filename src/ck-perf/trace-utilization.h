@@ -240,9 +240,9 @@ class TraceUtilization : public Trace {
 
   void creation(envelope *e, int epIdx, int num=1) {}
 
-  void beginExecute(envelope *e);
+  void beginExecute(envelope *e, void *obj);
   void beginExecute(CmiObjId  *tid);
-  void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL);
+  void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL, void *obj=NULL);
   void endExecute(void);
   void beginIdle(double currT) {}
   void endIdle(double currT) {}

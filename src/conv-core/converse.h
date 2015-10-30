@@ -2127,6 +2127,8 @@ extern "C" int CmiIsMyNodeIdle();
 extern int CmiIsMyNodeIdle();
 #endif
 
+#define COMPRESS_EVENT_NO       392 
+#define DECOMPRESS_EVENT_NO       393 
 #endif /* CONVERSE_H */
 
 

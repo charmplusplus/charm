@@ -181,7 +181,7 @@ public:
   std::map<std::string,int> controlPoints; // The control point values for this phase(don't vary within the phase)
   std::vector<double> times;  // A list of times observed for iterations in this phase
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
   std::vector<PathHistoryTableEntry> criticalPaths;
 #endif
   

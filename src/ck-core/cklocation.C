@@ -2035,7 +2035,8 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
 		if (_entryTable[epIdx]->traceEnabled)
         {
-            _TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(), ForChareMsg,epIdx,env->getSrcPe(), env->getTotalsize(), idx.getProjectionID(env->getArrayMgrIdx()));
+            _TRACE_BEGIN_EXECUTE(env, obj);
+            //_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(), ForChareMsg,epIdx,env->getSrcPe(), env->getTotalsize(), idx.getProjectionID(env->getArrayMgrIdx()));
             if(_entryTable[epIdx]->appWork)
                 _TRACE_BEGIN_APPWORK();
         }

@@ -7,16 +7,7 @@
 #define DEBUGF(x)           // CmiPrintf x
 
 CkpvStaticDeclare(Trace*, _traceproj);
-class UsrEvent {
-public:
-  int e;
-  char *str;
-  UsrEvent(int _e, char* _s): e(_e),str(_s) {}
-};
-typedef CkVec<UsrEvent *>   UsrEventVec;
-CkpvStaticDeclare(UsrEventVec, usrEvents);
-
-
+CkpvStaticDeclare(CkVec<UsrEvent *>, usrEventsProjector);
 #if ! CMK_TRACE_ENABLED
 static int warned=0;
 #define OPTIMIZED_VERSION 	\
@@ -34,7 +25,7 @@ void _createTraceprojector(char **argv)
 {
   DEBUGF(("%d createTraceProjector\n", CkMyPe()));
   CkpvInitialize(Trace*, _traceproj);
-  CkpvInitialize(CkVec<UsrEvent *>, usrEvents);
+  CkpvInitialize(CkVec<UsrEvent *>, usrEventsProjector);
   CkpvAccess(_traceproj) = new  TraceProjector(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_traceproj));
 }
@@ -54,8 +45,8 @@ CkAssert(e==-1 || e>=0);
   CkAssert(evt != NULL);
   int event;
   int biggest = -1;
-  for (int i=0; i<CkpvAccess(usrEvents).length(); i++) {
-    int cur = CkpvAccess(usrEvents)[i]->e;
+  for (int i=0; i<CkpvAccess(usrEventsProjector).length(); i++) {
+    int cur = CkpvAccess(usrEventsProjector)[i]->e;
     if (cur == e) 
       CmiAbort("UserEvent double registered!");
     if (cur > biggest) biggest = cur;
@@ -64,7 +55,7 @@ CkAssert(e==-1 || e>=0);
   // hence automatically assigned events will start from id of 0.
   if (e==-1) event = biggest+1; // automatically assign new event id
   else event = e;
-  CkpvAccess(usrEvents).push_back(new UsrEvent(event,(char *)evt));
+  CkpvAccess(usrEventsProjector).push_back(new UsrEvent(event,(char *)evt));
   return event;
 }
 
@@ -87,11 +78,11 @@ extern "C" void writeSts(){
 		CmiAbort("Cannot open projections sts file for writing.\n");
 	delete[] fname;
 		    
-	 fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
-	 traceWriteSTS(stsfp,CkpvAccess(usrEvents).length());
+	 fprintf(stsfp, "VERSION 9.0 \n");
+	 traceWriteSTS(stsfp,CkpvAccess(usrEventsProjector).length());
 	 int i;
-	 for(i=0;i<CkpvAccess(usrEvents).length();i++)
-	      fprintf(stsfp, "EVENT %d %s\n", CkpvAccess(usrEvents)[i]->e, CkpvAccess(usrEvents)[i]->str);
+	 for(i=0;i<CkpvAccess(usrEventsProjector).length();i++)
+	      fprintf(stsfp, "EVENT %d %s\n", CkpvAccess(usrEventsProjector)[i]->e, CkpvAccess(usrEventsProjector)[i]->str);
 	 fprintf(stsfp, "END\n");
 	fclose(stsfp);
 			     

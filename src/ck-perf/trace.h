@@ -80,7 +80,9 @@ protected:
     //interact with application 
     virtual void beginAppWork() {}
     virtual void endAppWork() {}
-
+    virtual void countNewChare() {}
+    virtual void beginTuneOverhead() {}
+    virtual void endTuneOverhead() {}
     // a user supplied integer value(likely a timestep)
     virtual void userSuppliedData(int e) {}
 
@@ -100,7 +102,8 @@ protected:
 				     int *pelist=NULL) {}
     virtual void creationDone(int num=1) {}
     // ???
-    virtual void messageRecv(char *env, int pe) {}
+    virtual void messageRecv(void *env, int size) {}
+    virtual void messageSend(void *env, int pe, int size) {}
     virtual void beginSDAGBlock(
       int event,   // event type defined in trace-common.h
       int msgType, // message type
@@ -114,7 +117,7 @@ protected:
     // begin/end execution of a Charm++ entry point
     // NOTE: begin/endPack and begin/endUnpack can be called in between
     //       a beginExecute and its corresponding endExecute.
-    virtual void beginExecute(envelope *) {}
+    virtual void beginExecute(envelope *, void *) {}
     virtual void beginExecute(char *) {}
     virtual void beginExecute(CmiObjId *tid) {}
     virtual void beginExecute(
@@ -123,7 +126,8 @@ protected:
       int ep,      // Charm++ entry point (will correspond to sts file) 
       int srcPe,   // Which PE originated the call
       int ml,      // message size
-      CmiObjId* idx)    // index
+      CmiObjId* idx,
+      void* obj)    // index
     { }
     virtual void changeLastEntryTimestamp(double ts) {}
     virtual void endExecute(void) {}
@@ -211,6 +215,9 @@ public:
     
     inline void beginAppWork() { ALLDO(beginAppWork());}
     inline void endAppWork() { ALLDO(endAppWork());}
+    inline void countNewChare() { ALLDO(countNewChare());}
+    inline void beginTuneOverhead() { ALLDO(beginTuneOverhead());}
+    inline void endTuneOverhead() { ALLDO(endTuneOverhead());}
 
 	inline void userSuppliedData(int d) { ALLDO(userSuppliedData(d));}
 
@@ -234,14 +241,15 @@ public:
     inline void creationDone(int num=1) { ALLDO(creationDone(num)); }
     inline void beginSDAGBlock(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginSDAGBlock(event, msgType, ep, srcPe, mlen,idx));}
     inline void endSDAGBlock(void) {ALLREVERSEDO(endExecute());}
-    inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
+    inline void beginExecute(envelope *env, void *obj) {ALLDO(beginExecute(env, obj));}
     inline void beginExecute(char *msg) {ALLDO(beginExecute(msg));}
     inline void beginExecute(CmiObjId *tid) {ALLDO(beginExecute(tid));}
-    inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen,idx));}
+    inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL, void *obj=NULL) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen,idx, obj));}
     inline void endExecute(void) {ALLREVERSEDO(endExecute());}
     inline void endExecute(char *msg) {ALLREVERSEDO(endExecute(msg));}
     inline void changeLastEntryTimestamp(double ts) {ALLDO(changeLastEntryTimestamp(ts));}
-    inline void messageRecv(char *env, int pe) {ALLDO(messageRecv(env, pe));}
+    inline void messageRecv(void *env, int size) {ALLDO(messageRecv(env, size));}
+    inline void messageSend(void *env, int pe, int size) {ALLDO(messageSend(env, pe, size));}
     inline void beginPack(void) {ALLDO(beginPack());}
     inline void endPack(void) {ALLDO(endPack());}
     inline void beginUnpack(void) {ALLDO(beginUnpack());}
@@ -322,6 +330,9 @@ extern "C" {
 #define _TRACE_USER_EVENT_BRACKET(x,bt,et) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et))
 #define _TRACE_BEGIN_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->beginAppWork())
 #define _TRACE_END_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->endAppWork())
+#define _TRACE_NEW_CHARE()  _TRACE_ONLY(CkpvAccess(_traces)->countNewChare())
+#define _TRACE_BEGIN_TUNEOVERHEAD() _TRACE_ONLY(CkpvAccess(_traces)->beginTuneOverhead())
+#define _TRACE_END_TUNEOVERHEAD() _TRACE_ONLY(CkpvAccess(_traces)->endTuneOverhead())
 #define _TRACE_CREATION_1(env) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,env->getEpIdx()))
 #define _TRACE_CREATION_DETAILED(env,ep) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,ep))
 #define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env, env->getEpIdx(), num))
@@ -329,10 +340,11 @@ extern "C" {
 #define _TRACE_CREATION_DONE(num) _TRACE_ONLY(CkpvAccess(_traces)->creationDone(num))
 #define _TRACE_BEGIN_SDAG(env) _TRACE_ONLY(CkpvAccess(_traces)->beginSDAGBlock(env))
 #define _TRACE_END_SDAG(env) _TRACE_ONLY(CkpvAccess(_traces)->endSDAGBlock(env))
-#define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env))
-#define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen,idx) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen,idx))
+#define _TRACE_BEGIN_EXECUTE(env, obj) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env, obj))
+#define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen,idx, obj) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen,idx, obj))
 #define _TRACE_END_EXECUTE() _TRACE_ONLY(CkpvAccess(_traces)->endExecute())
-#define _TRACE_MESSAGE_RECV(env, pe) _TRACE_ONLY(CkpvAccess(_traces)->messageRecv(env, pe))
+#define _TRACE_MESSAGE_RECV(env, size) _TRACE_ONLY(CkpvAccess(_traces)->messageRecv(env, size))
+#define _TRACE_MESSAGE_SEND(env, pe, size) _TRACE_ONLY(CkpvAccess(_traces)->messageSend(env, pe, size))
 #define _TRACE_BEGIN_PACK() _TRACE_ONLY(CkpvAccess(_traces)->beginPack())
 #define _TRACE_END_PACK() _TRACE_ONLY(CkpvAccess(_traces)->endPack())
 #define _TRACE_BEGIN_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->beginUnpack())

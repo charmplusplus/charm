@@ -34,6 +34,7 @@ class TraceBluegene;
 CkpvDeclare(TraceBluegene*, _tracebg);
 int traceBluegeneLinked=0;			// if trace-bluegene is linked
 
+CkpvDeclare(bool,   dumpData);
 CkpvDeclare(double, traceInitTime);
 CkpvDeclare(double, traceInitCpuTime);
 CpvDeclare(int, traceOn);
@@ -43,7 +44,6 @@ CkpvDeclare(char*, partitionRoot);
 CkpvDeclare(int, traceRootBaseLength);
 CkpvDeclare(char*, selective);
 CkpvDeclare(bool, verbose);
-
 bool outlierAutomatic;
 bool findOutliers;
 int numKSeeds;
@@ -73,6 +73,8 @@ static void traceCommonInit(char **argv)
   DEBUGF(("[%d] in traceCommonInit.\n", CkMyPe()));
   CkpvInitialize(double, traceInitTime);
   CkpvAccess(traceInitTime) = CmiStartTimer();
+  CkpvInitialize(bool, dumpData);
+  CkpvAccess(dumpData) = true; 
   CkpvInitialize(double, traceInitCpuTime);
   CkpvAccess(traceInitCpuTime) = TRACE_CPUTIMER();
   CpvInitialize(int, traceOn);
@@ -104,7 +106,7 @@ static void traceCommonInit(char **argv)
     subdir[0]='\0';
   }
 
-  if (CmiGetArgStringDesc(argv, "+traceroot", &temproot, "Directory to write trace files to")) {
+   if (CmiGetArgStringDesc(argv, "+traceroot", &temproot, "Directory to write trace files to")) {
     int i;
     // Trying to decide if the traceroot path is absolute or not. If it is not
     // then create an absolute pathname for it.
@@ -371,6 +373,13 @@ static int checkTraceOnPe(char **argv)
     CkListString procList(procs);
     traceOnPE = procList.includes(CkMyPe());
   }
+
+  if (CmiGetArgFlagDesc(argv, "+traceselective", " Whether only dump data for PEs based on autoPerf"))
+  {
+      if(CkMyPe() !=0)
+          CkpvAccess(dumpData) = false; 
+  }
+ 
   // must include pe 0, otherwise sts file is not generated
   if (CkMyPe()==0) traceOnPE = 1;
 #if !CMK_TRACE_IN_CHARM
@@ -535,6 +544,40 @@ void endAppWork()
     if (CpvAccess(traceOn) && CkpvAccess(_traces))
     {
         CkpvAccess(_traces)->endAppWork();
+    }
+#endif
+}
+
+extern "C" 
+void countNewChare()
+{
+#if CMK_TRACE_ENABLED
+    if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    {
+        CkpvAccess(_traces)->countNewChare();
+    }
+#endif
+}
+
+
+extern "C" 
+void beginTuneOverhead()
+{
+#if CMK_TRACE_ENABLED
+    if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    {
+        CkpvAccess(_traces)->beginTuneOverhead();
+    }
+#endif
+}
+
+extern "C" 
+void endTuneOverhead()
+{
+#if CMK_TRACE_ENABLED
+    if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    {
+        CkpvAccess(_traces)->endTuneOverhead();
     }
 #endif
 }
@@ -841,7 +884,7 @@ CkpvDeclare(int, papiStopped);
 #ifdef USE_SPP_PAPI
 int papiEvents[NUMPAPIEVENTS];
 #else
-int papiEvents[NUMPAPIEVENTS] = { PAPI_L2_DCM, PAPI_FP_OPS };
+int papiEvents[NUMPAPIEVENTS] = { PAPI_L1_TCM, PAPI_L1_TCA, PAPI_L2_TCM, PAPI_L2_TCA};
 #endif
 #endif // CMK_HAS_COUNTER_PAPI
 
@@ -930,7 +973,7 @@ void initPAPI() {
       CmiAbort("PAPI events conflict! Please re-assign event types!\n");
     } else {
       char error_str[PAPI_MAX_STR_LEN];
-      PAPI_perror(error_str);
+      //PAPI_perror(error_str);
       //PAPI_perror(papiRetValue,error_str,PAPI_MAX_STR_LEN);
       CmiPrintf("PAPI failed with error %s val %d\n",error_str,papiRetValue);
       CmiAbort("PAPI failed to add designated events!\n");
@@ -953,5 +996,23 @@ void initPAPI() {
 #endif
 }
 #endif
+
+extern "C"
+void traceSend(void *env, int pe, int size)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+      CkpvAccess(_traces)->messageSend(env, pe, size);
+#endif
+}
+
+extern "C"
+void traceRecv(void *env , int size)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+      CkpvAccess(_traces)->messageRecv(env, size);
+#endif
+}
 
 /*@}*/

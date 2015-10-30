@@ -37,8 +37,6 @@
 #define CK_REDUCTION_MSG_MLOG 	0x8
 #endif
 
-//#define USE_CRITICAL_PATH_HEADER_ARRAY
-
 /**
     \addtogroup CriticalPathFramework 
     @{
@@ -46,46 +44,59 @@
 
 /** A class that is used to track the entry points and other information 
     about a critical path as a charm++ program executes.
-
     This class won't do useful things unless USE_CRITICAL_PATH_HEADER_ARRAY is defined
 */
 class PathHistoryEnvelope {
- protected:
-  // When passing paths forward, store information on PEs, in backward pass, lookup necessary information
-  int sender_history_table_idx;
-  double totalTime;
- public:
-  double getTotalTime() const{ return totalTime; }
-  int get_sender_history_table_idx() const{ return sender_history_table_idx; }
-  void set_sender_history_table_idx(int i) { sender_history_table_idx = i; }
-  PathHistoryEnvelope(){ 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-    reset(); 
-#endif
-  }
-  double getTime() const{ return totalTime; }
-  void setTime(double t){ totalTime = t; }
-  void pup(PUP::er &p) {
-    p | sender_history_table_idx;
-    p | totalTime;
-  } 
-  void reset();
-  void print() const;
-  /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
-  void printHTMLToString(char* buf) const{
-    buf[0] = '\0';
-    sprintf(buf+strlen(buf), "Path Time=%lf<br> Sender idx=%d", (double)totalTime, (int)sender_history_table_idx);
-  }
-  /// The number of available EP counts 
-  int getNumUsed() const;
-  /// Return the count value for the idx'th available EP  
-  int getUsedCount(int idx) const;
-  /// Return the idx'th available EP 
-  int getUsedEp(int idx) const;
-  int getEpCount(int ep) const;
-  void incrementTotalTime(double time);
-  //  void createPath(envelope *originatingMsg);
-  void setDebug100();
+protected:
+    // When passing paths forward, store information on PEs, in backward pass, lookup necessary information
+    int sender_history_table_idx;
+    double totalTime;
+    int    hops;
+public:
+    double getTotalTime() const{ return totalTime; }
+    int    getHops()  const { return hops; }
+    int get_sender_history_table_idx() const{ return sender_history_table_idx; }
+    void set_sender_history_table_idx(int i) { sender_history_table_idx = i; }
+    PathHistoryEnvelope(){ 
+        reset(); 
+    }
+    double getTime() const{ return totalTime; }
+    void setTime(double t){ totalTime = t; }
+    void setHops(int h) { hops = h; }
+    void pup(PUP::er &p) {
+        p | sender_history_table_idx;
+        p | totalTime;
+    } 
+    void reset()
+    {
+        totalTime = 0.0;
+        sender_history_table_idx = -1;
+    }
+    void print() const
+    {
+        CkPrintf("print() is not implemented\n");
+    }
+    /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
+    void printHTMLToString(char* buf) const{
+        buf[0] = '\0';
+        sprintf(buf+strlen(buf), "Path Time=%lf<br> Sender idx=%d", (double)totalTime, (int)sender_history_table_idx);
+    }
+    /// The number of available EP counts 
+    int getNumUsed() const;
+    /// Return the count value for the idx'th available EP  
+    int getUsedCount(int idx) const;
+    /// Return the idx'th available EP 
+    int getUsedEp(int idx) const;
+    int getEpCount(int ep) const;
+    void incrementTotalTime(double time)
+    {
+        totalTime += time;
+    }
+    //  void createPath(envelope *originatingMsg);
+    void setDebug100()
+    {
+        totalTime = 100.0;   
+    }
 };
 /** @} */
 
@@ -231,24 +242,17 @@ namespace ck {
 #define CMK_ENVELOPE_FT_FIELDS
 #endif
 
-#if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
-#define CMK_ENVELOPE_OPTIONAL_FIELDS                                           \
-  UInt   event;        /* used by projections and record-replay */
-#else
-#define CMK_ENVELOPE_OPTIONAL_FIELDS
-#endif
-
 #define CMK_ENVELOPE_FIELDS                                                    \
   /* Converse message envelope, Must be first field in this class */           \
   char   core[CmiReservedHeaderSize];                                          \
   ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
-  UInt   pe;           /* source processor */                                  \
-  UInt   totalsize;    /* Byte count from envelope start to end of priobits */ \
-  CMK_ENVELOPE_OPTIONAL_FIELDS                                                 \
-  CMK_REFNUM_TYPE ref; /* Used by futures and SDAG */                          \
+  CMK_REFNUM_TYPE ref; /* Used by futures */                                   \
+  ck::impl::s_attribs attribs;                                                 \
   UShort priobits;     /* Number of bits of priority data after user data */   \
   UShort epIdx;        /* Entry point to call */                               \
-  ck::impl::s_attribs attribs;
+  UInt   pe;           /* source processor */                                  \
+  UInt   event;        /* used by projections */                               \
+  UInt   totalsize;    /* Byte count from envelope start to end of priobits */
 
 class envelope {
 private:
@@ -268,10 +272,8 @@ public:
     UChar align[CkMsgAlignOffset(sizeof(envelopeSizeHelper))];
 
     void pup(PUP::er &p);
-#if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
-#endif
     CMK_REFNUM_TYPE   getRef(void) const { return ref; }
     void   setRef(const CMK_REFNUM_TYPE r) { ref = r; }
     UChar  getQueueing(void) const { return attribs.queueing; }
@@ -345,7 +347,7 @@ public:
       env->setRef(0);
       env->setEpIdx(0);
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
       env->pathHistory.reset();
 #endif
 
@@ -353,7 +355,6 @@ public:
       env->sender.type = TypeInvalid;
       env->recver.type = TypeInvalid;
       env->SN = 0;
-      env->flags = 0;
 #if defined(_FAULT_CAUSAL_)
       env->TN = 0;
 #endif
@@ -478,7 +479,7 @@ public:
 	  return *(CkArrayIndex *)&type.array.index;
 	}
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
  public:
     /** The information regarding the entry methods that executed along the path to this one.
 	\addtogroup CriticalPathFramework
@@ -490,11 +491,11 @@ public:
 
 
 inline envelope *UsrToEnv(const void *const msg) {
-  return (envelope *)((intptr_t)msg - sizeof(envelope));
+  return (((envelope *) msg)-1);
 }
 
 inline void *EnvToUsr(const envelope *const env) {
-  return (void *)((intptr_t)env + sizeof(envelope));
+  return ((void *)(env+1));
 }
 
 inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0) {
@@ -509,11 +510,9 @@ inline void _resetEnv(envelope *env) {
   env->reset();
 }
 
-#if CMK_REPLAYSYSTEM
 inline void setEventID(envelope *env){
   env->setEvent(++CkpvAccess(envelopeEventID));
 }
-#endif
 
 /** @} */
 
