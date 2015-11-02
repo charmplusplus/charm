@@ -1,0 +1,51 @@
+module TraceAutoPerf {
+  mainchare TraceAutoPerfInit {
+    entry TraceAutoPerfInit(CkArgMsg *m);
+  };
+
+  initproc void _initTraceAutoPerfBOC();
+  readonly CProxy_TraceAutoPerfBOC autoPerfProxy;
+
+  readonly bool isPeriodicalAnalysis;
+  readonly int  treeGroupSize;
+  readonly int  numGroups;
+  readonly int  treeBranchFactor;
+  readonly bool isIdleAnalysis;
+  readonly bool isPerfDumpOn;
+
+  readonly int WARMUP_STEP;
+  readonly int PAUSE_STEP;
+
+  readonly int PICS_collection_mode;
+  readonly int PICS_evaluation_mode;
+
+  group [migratable] TraceAutoPerfBOC {
+    entry TraceAutoPerfBOC(void);
+    entry void registerPerfGoal(int goalIndex);
+    entry void setAutoPerfDoneCallback(CkCallback cb);
+    entry void setUserDefinedGoal(double value);
+    entry void setNumOfPhases(int num, char names[num*40]);
+    entry [expedited,inline] void startStep();
+    entry [expedited,inline] void endStep(bool fromGlobal, int pe, int incSteps);
+    entry [expedited,inline] void endPhaseAndStep(bool fromGlobal, int pe);
+    entry void resume();
+    entry [expedited,inline] void endStepResumeCb(bool fromGlobal, int pe, CkCallback cb);
+    entry void run(bool fromGlobal, int fromPE);
+    entry void setCbAndRun(bool fromGlobal, int fromPE, CkCallback cb) ;
+    entry [expedited,inline] void startPhase(int phaseId);
+    entry [expedited,inline] void endPhase();
+    entry [expedited,inline] void getPerfData(int reductionPE, CkCallback cb);
+    entry [expedited,inline] void gatherSummary(CkReductionMsg *msg);
+    entry [expedited,inline] void globalPerfAnalyze(CkReductionMsg *msg);
+    entry void setProjectionsOutput();
+    entry void recvGlobalSummary(CkReductionMsg *msg);
+    entry [expedited,inline] void tuneDone();
+    entry [expedited,inline] void globalDecision(double metrics, int source);
+    entry [expedited,inline] void analyzeAndTune();
+    entry void startTimeNextStep();
+
+    entry void PICS_markLDBStart(int appStep);
+    entry void PICS_markLDBEnd();
+  };
+};
+

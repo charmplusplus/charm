@@ -250,7 +250,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           BaseLB.decl.h \
 	  NborBaseLB.decl.h DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
-          TraceSummary.decl.h TraceProjections.decl.h \
+          TraceSummary.decl.h TraceAutoPerf.decl.h TraceProjections.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
 	  TraceUtilization.decl.h BlueGene.decl.h \
 	  ckdirect.h \
@@ -259,6 +259,9 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
 	  mpi-interoperate.h mpi_main.decl.h  \
+			trace-perf.h picsdefs.h  picsautoperf.h picstreenode.h \
+			picsdecisiontree.h \
+	    picsautoperfAPI.h picsautoperfAPIC.h \
 	  $(CVHEADERS)
 
 BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
@@ -318,6 +321,7 @@ dirs+sources:
 	./gatherflat $(SRCBASE)/conv-perf	.
 	./gatherflat $(SRCBASE)/ck-core          .
 	./gatherflat $(SRCBASE)/ck-perf          .
+	./gatherflat $(SRCBASE)/ck-pics          .
 	./gatherflat $(SRCBASE)/ck-tune          .
 	./gatherflat $(SRCBASE)/ck-ldb           .
 	./gatherflat $(SRCBASE)/ck-cp            .
@@ -342,6 +346,8 @@ dirs+sources:
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
 	-./system_ln  $(SRCBASE)/scripts/testrun ../bin/
+	-./system_ln  ../tmp/tree.txt ../bin/
+	-./system_ln  ../tmp/fuzzytree.txt ../bin/
 #	-ln -s ../../java/bin charmjavabin
 #	-ln -s ../../java/bin ../bin/charmjavabin
 #	-ln -s charmjavabin/* ../bin/
@@ -367,11 +373,11 @@ TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a
 BUILD_TRACING=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
 
 ifneq "$(BUILD_TRACING)" "0"
-TRACELIBS += $(L)/libtrace-projections.a  $(L)/libtrace-summary.a  \
+TRACELIBS += $(L)/libtrace-projections.a $(L)/libtrace-controlPoints.a  $(L)/libtrace-summary.a \
              $(L)/libtrace-utilization.a  $(L)/libtrace-simple.a \
              $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	     $(L)/libtrace-projector.a $(L)/libtrace-all.a  \
-             $(L)/libtrace-memory.a 
+             $(L)/libtrace-memory.a $(L)/libtrace-perfReport.a
 endif
 
 MEMLIBS=$(L)/libmemory-default.a $(L)/libmemory-os.a $(L)/libmemory-gnu.a \
@@ -641,6 +647,14 @@ LIBTRACE_PROJ=trace-projections.o
 $(L)/libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -o $@ $(LIBTRACE_PROJ)
 
+LIBTRACE_CP=trace-controlPoints.o
+$(L)/libtrace-controlPoints.a: $(LIBTRACE_CP)
+	$(CHARMC) -o $@ $(LIBTRACE_CP)
+
+LIBTRACE_AP=trace-perf.o picsautoperf.o picsautoperfAPI.o picstreenode.o picsdecisiontree.o
+$(L)/libtrace-perfReport.a: $(LIBTRACE_AP)
+	$(CHARMC) -o $@ $(LIBTRACE_AP)
+
 LIBTRACE_SUMM=trace-summary.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
@@ -690,7 +704,7 @@ LIBTRACE_MEMORY=trace-memory.o
 $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o \
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o picsautoperfAPI.o picsautoperf.o trace-perf.o trace-summary.o trace-simple.o  \
 $(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
@@ -712,7 +726,7 @@ tracef_f.o: tracef_f.f90
 	-$(CHARMC) -o $@ -c tracef_f.f90 && $(CHARMC) -cpmod ../include tracemod.M  || touch $@
 
 # used for make depends
-TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
+TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o trace-perf.o picsautoperfAPI.o picsautoperf.o trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
           trace-memory.o 
