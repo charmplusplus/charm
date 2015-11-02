@@ -28,10 +28,10 @@ class TraceBluegene : public Trace {
     void bgAmpiLog(unsigned short op, unsigned int size);
     void bgSetInfo(char *msg, const char *str, void **logs, int count);
     void bgEndExec(int);
-    virtual void beginExecute(envelope *);
+    virtual void beginExecute(envelope *, void *);
     virtual void beginExecute(char *) {}
     virtual void beginExecute(CmiObjId *tid) {}
-    virtual void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx);
+    virtual void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx, void *obj);
     void addBackwardDep(void *log);
     void userBracketEvent(int eventID, double bt, double et) {}	// from trace.h
     void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr);

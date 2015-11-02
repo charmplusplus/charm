@@ -50,7 +50,7 @@ void TraceUtilization::beginExecute(CmiObjId *tid)
   beginExecute(-1,-1,_threadEP,-1);
 }
 
-void TraceUtilization::beginExecute(envelope *e)
+void TraceUtilization::beginExecute(envelope *e, void *obj)
 {
   // no message means thread execution
   if (e==NULL) {
@@ -61,7 +61,7 @@ void TraceUtilization::beginExecute(envelope *e)
   }  
 }
 
-void TraceUtilization::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx)
+void TraceUtilization::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx, void *obj)
 {
   if (execEp != INVALIDEP) {
     TRACE_WARN("Warning: TraceUtilization two consecutive BEGIN_PROCESSING!\n");
