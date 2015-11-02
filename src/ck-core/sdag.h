@@ -29,7 +29,9 @@ namespace SDAG {
 #include <debug-charm.h>
 
 class CkMessage;
-
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+class MergeablePathHistory;
+#endif
 namespace SDAG {
   struct TransportableBigSimLog : public Closure {
     void* log;
@@ -134,7 +136,6 @@ namespace SDAG {
     std::vector<CMK_REFNUM_TYPE> entries, refnums;
     std::vector<int> anyEntries;
     int speculationIndex;
-
     Continuation() : speculationIndex(-1) { }
     Continuation(CkMigrateMessage*) : speculationIndex(-1) { }
 
@@ -156,6 +157,13 @@ namespace SDAG {
       closure.push_back(cl);
     }
 
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+    MergeablePathHistory *saved;
+    void setPath(MergeablePathHistory *tmp) {saved = tmp;}
+
+    MergeablePathHistory *getPath() { return saved;}
+#endif
+
     virtual ~Continuation() {
       for (size_t i = 0; i < closure.size(); i++)
         if (closure[i])
@@ -169,7 +177,9 @@ namespace SDAG {
     int entry;
     CMK_REFNUM_TYPE refnum;
     Closure* cl;
-
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+    MergeablePathHistory *savedPath;
+#endif
 #if CMK_BIGSIM_CHARM
     void *bgLog1, *bgLog2;
 #endif
@@ -184,10 +194,24 @@ namespace SDAG {
       , bgLog1(0)
       , bgLog2(0)
 #endif
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+      ,savedPath(NULL)
+#endif
     {
       if (cl) cl->ref();
     }
 
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+    void  setPath(MergeablePathHistory* p)
+    {
+        savedPath = p;
+    }
+
+    MergeablePathHistory* getPath() 
+    {
+        return savedPath;
+    }
+#endif
     void pup(PUP::er& p) {
       p | entry;
       p | refnum;

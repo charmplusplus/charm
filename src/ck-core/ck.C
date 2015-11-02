@@ -10,10 +10,7 @@ clients, including the rest of Charm++, are actually C++.
 #include "trace.h"
 #include "queueing.h"
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 #include "pathHistory.h"
-void automaticallySetMessagePriority(envelope *env); // in control point framework.
-#endif
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
@@ -1223,12 +1220,9 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
                 }
         }
 #endif
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  //  CkPrintf("START\n");
-  criticalPath_start(env);
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+  CK_CRITICALPATH_START(env)
 #endif
-
 
   switch(env->getMsgtype()) {
 // Group support
@@ -1317,11 +1311,9 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 #endif
 
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  criticalPath_end();
-  //  CkPrintf("STOP\n");
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+  CK_CRITICALPATH_END()
 #endif
-
 
 }
 
@@ -1575,9 +1567,10 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
   env->setMsgtype(ForChareMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  criticalPath_send(env);
-  automaticallySetMessagePriority(env);
+
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+  CK_CRITICALPATH_SEND(env)
+  //CK_AUTOMATE_PRIORITY(env)
 #endif
 #if CMK_CHARMDEBUG
   setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
@@ -1622,9 +1615,10 @@ static inline int _prepareImmediateMsg(int eIdx,void *msg,const CkChareID *pCid)
   int destPE = _prepareMsg(eIdx, msg, pCid);
   if (destPE != -1) {
     register envelope *env = UsrToEnv(msg);
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-    criticalPath_send(env);
-    automaticallySetMessagePriority(env);
+    //criticalPath_send(env);
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+    CK_CRITICALPATH_SEND(env)
+    //CK_AUTOMATE_PRIORITY(env)
 #endif
     CmiBecomeImmediate(env);
   }
@@ -1712,10 +1706,11 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   nodeRedMgr.setZero();
   env->setRednMgr(nodeRedMgr);
 #endif
-  */
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  criticalPath_send(env);
-  automaticallySetMessagePriority(env);
+*/
+  //criticalPath_send(env);
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+  CK_CRITICALPATH_SEND(env)
+  //CK_AUTOMATE_PRIORITY(env)
 #endif
 #if CMK_CHARMDEBUG
   setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
@@ -1727,9 +1722,9 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
 static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   envelope *env = _prepareMsgBranch(eIdx, msg, gID, type);
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  criticalPath_send(env);
-  automaticallySetMessagePriority(env);
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+  CK_CRITICALPATH_SEND(env)
+  //CK_AUTOMATE_PRIORITY(env)
 #endif
   CmiBecomeImmediate(env);
   return env;
@@ -2697,6 +2692,4 @@ int isCharmEnvelope(void *msg) {
     return 1;
 }
 
-
 #include "CkMarshall.def.h"
-

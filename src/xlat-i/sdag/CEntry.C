@@ -143,6 +143,10 @@ namespace xi {
     // found a continuation
     defs << "  if (c) {\n";
 
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+    defs << "    MergeablePathHistory *currentSaved = c->getPath();\n";
+    defs << "    mergePathHistory(currentSaved);\n";
+#endif
     SdagConstruct::generateTraceEndCall(defs, 2);
 #if CMK_BIGSIM_CHARM
     SdagConstruct::generateEndExec(defs);
@@ -168,6 +172,12 @@ namespace xi {
     defs << "    delete c;\n";
     defs << "  }\n";
 
+#if USE_CRITICAL_PATH_HEADER_ARRAY
+    defs << "else {\n";
+    defs << "    MergeablePathHistory *currentSaved = saveCurrentPath();\n";
+    defs << "    buff0->setPath(currentSaved);\n";
+    defs << "}\n";
+#endif
     defs << "}\n\n";
     templateGuardEnd(defs);
   }

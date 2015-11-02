@@ -734,7 +734,7 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
   void controlPointManager::setTiming(double time){
     currentPhaseData()->times.push_back(time);
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
        
     // First we should register this currently executing message as a path, because it is likely an important one to consider.
     //    registerTerminalEntryMethod();

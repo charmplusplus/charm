@@ -1051,6 +1051,7 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "ckarrayreductionmgr.h"
 #include "trace.h"
 #include "envelope.h"
+#include "pathHistory.h"
 
 
 

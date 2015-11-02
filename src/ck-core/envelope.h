@@ -37,8 +37,6 @@
 #define CK_REDUCTION_MSG_MLOG 	0x8
 #endif
 
-//#define USE_CRITICAL_PATH_HEADER_ARRAY
-
 /**
     \addtogroup CriticalPathFramework 
     @{
@@ -59,9 +57,7 @@ class PathHistoryEnvelope {
   int get_sender_history_table_idx() const{ return sender_history_table_idx; }
   void set_sender_history_table_idx(int i) { sender_history_table_idx = i; }
   PathHistoryEnvelope(){ 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
     reset(); 
-#endif
   }
   double getTime() const{ return totalTime; }
   void setTime(double t){ totalTime = t; }
@@ -345,7 +341,7 @@ public:
       env->setRef(0);
       env->setEpIdx(0);
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
       env->pathHistory.reset();
 #endif
 
@@ -478,7 +474,7 @@ public:
 	  return *(CkArrayIndex *)&type.array.index;
 	}
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if USE_CRITICAL_PATH_HEADER_ARRAY
  public:
     /** The information regarding the entry methods that executed along the path to this one.
 	\addtogroup CriticalPathFramework
