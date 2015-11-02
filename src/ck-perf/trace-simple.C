@@ -66,7 +66,7 @@ void TraceSimple::beginExecute(CmiObjId *tid)
   CkPrintf("[%d] Entry Method invoked using object id\n", CkMyPe());
 }
 
-void TraceSimple::beginExecute(envelope *e)
+void TraceSimple::beginExecute(envelope *e, void *obj)
 {
   // no message means thread execution
   if (e == NULL) {
@@ -83,7 +83,7 @@ void TraceSimple::beginExecute(envelope *e)
 }
 
 void TraceSimple::beginExecute(int event,int msgType,int ep,int srcPe, 
-			       int mlen, CmiObjId *idx)
+			       int mlen, CmiObjId *idx, void *obj)
 {
   CkPrintf("[%d] Entry Method %d invoked by parameters\n", CkMyPe(),
 	   ep);

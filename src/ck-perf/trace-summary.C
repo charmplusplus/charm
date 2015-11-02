@@ -679,7 +679,7 @@ void TraceSummary::beginExecute(CmiObjId *tid)
   beginExecute(-1,-1,_threadEP,-1);
 }
 
-void TraceSummary::beginExecute(envelope *e)
+void TraceSummary::beginExecute(envelope *e, void *obj)
 {
   // no message means thread execution
   if (e==NULL) {
@@ -703,7 +703,7 @@ void TraceSummary::beginExecute(char *msg)
 #endif
 }
 
-void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx)
+void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx, void *obj)
 {
   if (execEp == TRACEON_EP) {
     endExecute();
@@ -1306,7 +1306,7 @@ extern "C" void CombineSummary()
       sumProxy.traceSummaryParallelShutdown(-1);
   }
   else {
-    _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL);
+    _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL, NULL);
     CkExit();
   }
 #else

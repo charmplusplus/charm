@@ -648,7 +648,7 @@ static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 #endif
 #if CMK_TRACE_ENABLED 
   if (_entryTable[epIdx]->traceEnabled) {
-    _TRACE_BEGIN_EXECUTE(env);
+    _TRACE_BEGIN_EXECUTE(env, obj);
     if(_entryTable[epIdx]->appWork)
         _TRACE_BEGIN_APPWORK();
     _invokeEntryNoTrace(epIdx,env,obj);

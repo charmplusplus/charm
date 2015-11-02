@@ -145,7 +145,7 @@ void traceThreadListener_resume(struct CthThreadListener *l)
   /* here, we activate the appropriate trace codes for the appropriate
      registered modules */
   _TRACE_BEGIN_EXECUTE_DETAILED(a->event,a->msgType,a->ep,a->srcPe,a->ml,
-				CthGetThreadID(a->base.thread));
+				CthGetThreadID(a->base.thread), NULL);
   a->event=-1;
   a->srcPe=CkMyPe(); /* potential lie to migrated threads */
   a->ml=0;
@@ -1467,8 +1467,17 @@ void TraceProjections::beginExecute(char *msg){
 #endif
 }
 
+void TraceProjections::beginExecute(envelope *e, void *obj){
+#if CMK_SMP_TRACE_COMMTHREAD
+    //This function is called from comm thread in SMP mode
+    int ep = e->getEpIdx();
+    if(_entryTable[ep]->traceEnabled)
+        beginExecute(e);
+#endif
+}
+
 void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
-				    int mlen, CmiObjId *idx)
+				    int mlen, CmiObjId *idx, void *obj )
 {
   if (traceNestedEvents) {
     if (! nestedEvents.isEmpty()) {
