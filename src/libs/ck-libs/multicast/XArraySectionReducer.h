@@ -47,7 +47,7 @@ class XArraySectionReducer
         void finalReducer()
         {
             // Get a handle on the reduction function for this message
-            CkReduction::reducerFn f = CkReduction::reducerTable[ msgList[0]->reducer ];
+            CkReduction::reducerFn f = CkReduction::reducerTable[ msgList[0]->reducer ].fn;
             // Perform an extra reduction step on all the subsection reduction msgs
             CkReductionMsg *finalMsg = (*f)(numSubSections, msgList);
             // Send the final reduced msg to the client

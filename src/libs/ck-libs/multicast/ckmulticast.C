@@ -1151,7 +1151,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
 
     // Figure out (from one of the msg fragments) which reducer function to use
     CkReduction::reducerType reducer = rmsgs[0]->reducer;
-    CkReduction::reducerFn f= CkReduction::reducerTable[reducer];
+    CkReduction::reducerFn f= CkReduction::reducerTable[reducer].fn;
     CkAssert(NULL != f);
 
     // Check if migration occurred in any of the subtrees, and pick one valid callback

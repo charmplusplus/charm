@@ -46,9 +46,18 @@ void CkArrayReductionMgr::flushStates(){
 }
 
 void CkArrayReductionMgr::collectAllMessages(){
-	if(count == size){
+  // if the queue isn't full, but there is at least one message and the
+  // reduction is streamable, do a partial reduction
+  bool partialReduction = count < size && my_msgs.length() > 0 &&             \
+    CkReduction::reducerTable[my_msgs.peek()->reducer].streamable;
+
+	if(count == size || partialReduction) {
 		ARPRINT("[%d] CollectAll messages  for %d with %d on %p\n",CkMyNode(),redNo,count,this);
 		CkReductionMsg *result = reduceMessages();
+                if (partialReduction) {
+                  my_msgs.enq(result);
+                  return;
+                }
 		result->redNo = redNo;
 		/**keep a count of elements that contributed to the original reduction***/
 		contributeWithCounter(result,result->gcount);
@@ -144,7 +153,7 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 		if(nMsgs == 1){
 			ret = msgArr[0];
 		}else{
-			CkReduction::reducerFn f=CkReduction::reducerTable[r];
+			CkReduction::reducerFn f=CkReduction::reducerTable[r].fn;
     	ret=(*f)(nMsgs,msgArr);
 		}
                 ret->reducer=r;
