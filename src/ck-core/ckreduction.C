@@ -769,23 +769,41 @@ void CkReductionMgr::finishReduction(void)
   	DEBR((AA "Either not in Progress or creating\n" AB));
   	return;
   }
+
+  bool partialReduction = false;
+
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if (nContrib<(lcount+adj(redNo).lcount) - numImmigrantRecObjs + numEmigrantRecObjs){
-        DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
-		return;//Need more local messages
+          if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+            partialReduction = true;
+          }
+          else {
+            DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
+            return; //Need more local messages
+          }
 	}
 #else
   if (nContrib<(lcount+adj(redNo).lcount)){
-         DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
-	 return;//Need more local messages
+         if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+           partialReduction = true;
+         }
+         else {
+           DEBR((AA "Need more local messages %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
+           return; //Need more local messages
+         }
   }
 #endif
 
 #if GROUP_LEVEL_REDUCTION
   if (nRemote<treeKids()) {
-    DEBR((AA "Need more remote messages %d %d\n" AB,nRemote,treeKids()));
-    return;//Need more remote messages
+    if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+      partialReduction = true;
+    }
+    else {
+      DEBR((AA "Need more remote messages %d %d\n" AB,nRemote,treeKids()));
+      return; //Need more remote messages
+    }
   }
 	
 #endif
@@ -793,6 +811,11 @@ void CkReductionMgr::finishReduction(void)
   DEBR((AA "Reducing data... %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
   CkReductionMsg *result=reduceMessages();
   result->redNo=redNo;
+
+  if (partialReduction) {
+    msgs.enq(result);
+    return;
+  }
 
 #if GROUP_LEVEL_REDUCTION
   if (hasParent())
@@ -1033,7 +1056,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
         msgArr[0] = msgArr[nMsgs - 1];
         nMsgs--;
       }
-      CkReduction::reducerFn f=CkReduction::reducerTable[r];
+      CkReduction::reducerFn f=CkReduction::reducerTable[r].fn;
       ret=(*f)(nMsgs,msgArr);
     }
     ret->reducer=r;
@@ -1230,7 +1253,7 @@ void CkReductionMgr :: endArrayReduction(){
   		//No valid reducer in the whole vector
     		ret=CkReductionMsg::buildNew(0,NULL);
   	else{//Use the reducer to reduce the messages
-    		CkReduction::reducerFn f=CkReduction::reducerTable[r];
+               CkReduction::reducerFn f=CkReduction::reducerTable[r].fn;
 		// has to be corrected elements from above need to be put into a temporary vector
     		CkReductionMsg **msgArr=&tempMsgs[0];//<-- HACK!
 
@@ -1579,7 +1602,6 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
   SIMPLE_REDUCTION(nameBase##_float,float,"%f",loop) \
   SIMPLE_REDUCTION(nameBase##_double,double,"%f",loop)
 
-
 //Compute the sum the numbers passed by each element.
 SIMPLE_POLYMORPH_REDUCTION(sum,ret[i]+=value[i];)
 
@@ -1731,60 +1753,79 @@ CkReduction::CkReduction() {} //Dummy private constructor
 
 //Add the given reducer to the list.  Returns the new reducer's
 // reducerType.  Must be called in the same order on every node.
-CkReduction::reducerType CkReduction::addReducer(reducerFn fn)
+CkReduction::reducerType CkReduction::addReducer(reducerFn fn, bool streamable)
 {
-  reducerTable[nReducers]=fn;
+  reducerTable[nReducers].fn=fn;
+  reducerTable[nReducers].streamable=streamable;
   return (reducerType)nReducers++;
 }
 
-/*Reducer table: maps reducerTypes to reducerFns.
+/*Reducer table: maps reducerTypes to reducerStructs.
 It's indexed by reducerType, so the order in this table
 must *exactly* match the reducerType enum declaration.
 The names don't have to match, but it helps.
 */
 int CkReduction::nReducers=CkReduction::lastSystemReducer;
 
-CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
-    ::invalid_reducer,
-    ::nop,
-  //Compute the sum the numbers passed by each element.
-    ::sum_int,::sum_long,::sum_float,::sum_double,
+CkReduction::reducerStruct CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
+    CkReduction::reducerStruct(::invalid_reducer, true),
+    CkReduction::reducerStruct(::nop, true),
+    //Compute the sum the numbers passed by each element.
+    CkReduction::reducerStruct(::sum_int, true),
+    CkReduction::reducerStruct(::sum_long, true),
+    // The floating point sums are marked as unstreamable to avoid
+    // implictly stating that they will always be precision oblivious.
+    CkReduction::reducerStruct(::sum_float, false),
+    CkReduction::reducerStruct(::sum_double, false),
 
-  //Compute the product the numbers passed by each element.
-    ::product_int,::product_long,::product_float,::product_double,
+    //Compute the product the numbers passed by each element.
+    CkReduction::reducerStruct(::product_int, true),
+    CkReduction::reducerStruct(::product_long, true),
+    CkReduction::reducerStruct(::product_float, true),
+    CkReduction::reducerStruct(::product_double, true),
 
-  //Compute the largest number passed by any element.
-    ::max_int,::max_long,::max_float,::max_double,
+    //Compute the largest number passed by any element.
+    CkReduction::reducerStruct(::max_int, true),
+    CkReduction::reducerStruct(::max_long, true),
+    CkReduction::reducerStruct(::max_float, true),
+    CkReduction::reducerStruct(::max_double, true),
 
-  //Compute the smallest number passed by any element.
-    ::min_int,::min_long,::min_float,::min_double,
+    //Compute the smallest number passed by any element.
+    CkReduction::reducerStruct(::min_int, true),
+    CkReduction::reducerStruct(::min_long, true),
+    CkReduction::reducerStruct(::min_float, true),
+    CkReduction::reducerStruct(::min_double, true),
 
-  //Compute the logical AND of the integers passed by each element.
-  // The resulting integer will be zero if any source integer is zero.
-    ::logical_and,
+    //Compute the logical AND of the integers passed by each element.
+    // The resulting integer will be zero if any source integer is zero.
+    CkReduction::reducerStruct(::logical_and, true),
 
-  //Compute the logical OR of the integers passed by each element.
-  // The resulting integer will be 1 if any source integer is nonzero.
-    ::logical_or,
+    //Compute the logical OR of the integers passed by each element.
+    // The resulting integer will be 1 if any source integer is nonzero.
+    CkReduction::reducerStruct(::logical_or, true),
 
     // Compute the logical bitvector AND of the integers passed by each element.
-    ::bitvec_and,
+    CkReduction::reducerStruct(::bitvec_and, true),
 
     // Compute the logical bitvector OR of the integers passed by each element.
-    ::bitvec_or,
+    CkReduction::reducerStruct(::bitvec_or, true),
     
     // Compute the logical bitvector XOR of the integers passed by each element.
-    ::bitvec_xor,
+    CkReduction::reducerStruct(::bitvec_xor, true),
 
     // Select one of the messages at random to pass on
-    ::random,
+    CkReduction::reducerStruct(::random, true),
 
-  //Concatenate the (arbitrary) data passed by each element
-    ::concat,
+    //Concatenate the (arbitrary) data passed by each element
+    // This reduction is marked as unstreamable because of the n^2
+    // work required to stream it
+    CkReduction::reducerStruct(::concat, false),
 
-  //Combine the data passed by each element into an list of setElements.
-  // Each element may contribute arbitrary data (with arbitrary length).
-    ::set
+    //Combine the data passed by each element into an list of setElements.
+    // Each element may contribute arbitrary data (with arbitrary length).
+    // This reduction is marked as unstreamable because of the n^2
+    // work required to stream it
+    CkReduction::reducerStruct(::set, false)
 };
 
 
@@ -2185,15 +2226,25 @@ void CkNodeReductionMgr::finishReduction(void)
   	return;
   }
 
-  if (nContrib<(lcount)){
-	DEBR((AA "Nodegrp Need more local messages %d %d\n" AB,nContrib,(lcount)));
+  bool partialReduction = false;
 
-	 return;//Need more local messages
+  if (nContrib<(lcount)){
+    if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+      partialReduction = true;
+    }
+    else {
+      DEBR((AA "Nodegrp Need more local messages %d %d\n" AB,nContrib,(lcount)));
+      return;//Need more local messages
+    }
   }
   if (nRemote<treeKids()){
-	DEBR((AA "Nodegrp Need more Remote messages %d %d\n" AB,nRemote,treeKids()));
-
-	return;//Need more remote messages
+    if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+      partialReduction = true;
+    }
+    else {
+      DEBR((AA "Nodegrp Need more Remote messages %d %d\n" AB,nRemote,treeKids()));
+      return;//Need more remote messages
+    }
   }
   if (nRemote>treeKids()){
 
@@ -2205,6 +2256,11 @@ void CkNodeReductionMgr::finishReduction(void)
 
   /**reduce all messages received at this node **/
   CkReductionMsg *result=reduceMessages();
+
+  if (partialReduction) {
+    msgs.enq(result);
+    return;
+  }
 
   if (hasParent())
   {//Pass data up tree to parent
@@ -2467,7 +2523,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
         msgArr[0] = msgArr[nMsgs - 1];
         nMsgs--;
       }
-      CkReduction::reducerFn f=CkReduction::reducerTable[r];
+      CkReduction::reducerFn f=CkReduction::reducerTable[r].fn;
       ret=(*f)(nMsgs,msgArr);
     }
     ret->reducer=r;
@@ -2856,7 +2912,7 @@ void CkReductionMgr::sanitycheck()
 {
 #if CMK_ERROR_CHECKING
   int count = 0;
-  while (CkReduction::reducerTable[count] != NULL) count++;
+  while (CkReduction::reducerTable[count].fn != NULL) count++;
   CmiAssert(CkReduction::nReducers == count);
 #endif
 }

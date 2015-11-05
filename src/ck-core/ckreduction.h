@@ -189,9 +189,15 @@ public:
 	//  msgs[i] contains a contribution or summed contribution.
 	typedef CkReductionMsg *(*reducerFn)(int nMsg,CkReductionMsg **msgs);
 
+  struct reducerStruct {
+    reducerFn fn;
+    bool streamable;
+    reducerStruct(reducerFn f=NULL, bool s=false) : fn(f), streamable(s) {}
+  };
+
 	//Add the given reducer to the list.  Returns the new reducer's
 	// reducerType.  Must be called in the same order on every node.
-	static reducerType addReducer(reducerFn fn);
+	static reducerType addReducer(reducerFn fn, bool streamable=false);
 
 private:
 	friend class CkReductionMgr;
@@ -205,7 +211,7 @@ private:
 	enum {MAXREDUCERS=256};
 
 	//Reducer table: maps reducerTypes to reducerFns.
-	static reducerFn reducerTable[MAXREDUCERS];
+	static reducerStruct reducerTable[MAXREDUCERS];
 	static int nReducers;//Number of reducers currently in table above
 
 	//Don't instantiate a CkReduction object-- it's just a namespace.
