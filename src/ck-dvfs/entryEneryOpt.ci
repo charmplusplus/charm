@@ -1,0 +1,14 @@
+module entryEneryOpt{
+
+  readonly CkGroupID _energyOptimizer;
+
+  mainchare EnergyOptMain {
+    entry EnergyOptMain(CkArgMsg*);
+  };
+
+  group [migratable] EnergyOptimizer {
+    entry EnergyOptimizer();
+    //initnode void energyOptInitNode();
+  };
+
+};
