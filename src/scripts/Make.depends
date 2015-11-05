@@ -1765,7 +1765,8 @@ ckcheckpoint.o: ckcheckpoint.C charm++.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h CkCheckpointStatus.decl.h ckevacuation.h \
  ckarrayreductionmgr.h trace.h trace-bluegene.h ck.h qd.h register.h \
- stats.h TopoManager.h CkCheckpoint.decl.h CkCheckpoint.def.h
+ stats.h TopoManager.h CkCheckpoint.decl.h CkCheckpoint.def.h \
+ CkCheckpointStatus.def.h
 
 ckdll.o: ckdll.C converse.h conv-config.h conv-autoconfig.h conv-common.h \
  conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h conv-cpm.h \
@@ -2214,6 +2215,8 @@ edgelist.o: edgelist.c graphdefs.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
  pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h debug-conv.h
+
+entryEneryOpt.o: entryEneryOpt.C entryEneryOpt.def.h
 
 futures.o: futures.c converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \
