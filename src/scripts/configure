@@ -635,6 +635,7 @@ enable_charmdebug
 enable_replay
 enable_ccs
 enable_controlpoint
+enable_energyopt
 enable_lbuserdata
 with_numa
 with_lbtime_type
@@ -1263,6 +1264,7 @@ Optional Features:
   --enable-replay         enable record/replay
   --enable-ccs            enable CCS
   --enable-controlpoint   enable control point
+  --enable-energyopt      enable entry method based energy optimization
   --enable-lbuserdata     enable LB user data
   --enable-randomized-msgq
                           enable a randomized msg queue (for debugging etc)
@@ -1973,6 +1975,32 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 fi
+
+# Check whether --enable-energyopt was given.
+if test "${enable_energyopt+set}" = set; then :
+  enableval=$enable_energyopt; enable_energyopt=$enableval
+else
+  enable_energyopt=no
+fi
+
+
+if test "$enable_entryenergyopt" = "yes"
+then
+  Echo "Charm entry based energy optimization is enabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_ENEGRY_OPT 1
+_ACEOF
+
+else
+  Echo "Charm entry based energy optimization is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_ENEGRY_OPT 0
+_ACEOF
+
+fi
+
 
 # Check whether --enable-lbuserdata was given.
 if test "${enable_lbuserdata+set}" = set; then :

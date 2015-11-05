@@ -181,6 +181,22 @@ else
   AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 0, [disable controlpoint])
 fi
 
+AC_ARG_ENABLE([energyopt],
+            [AS_HELP_STRING([--enable-energyopt],
+              [enable entry method based energy optimization])],
+            [enable_energyopt=$enableval],
+            [enable_energyopt=no])
+
+if test "$enable_entryenergyopt" = "yes"
+then
+  Echo "Charm entry based energy optimization is enabled"
+  AC_DEFINE_UNQUOTED(CMK_WITH_ENEGRY_OPT, 1, [enable energy opt])
+else
+  Echo "Charm entry based energy optimization is disabled"
+  AC_DEFINE_UNQUOTED(CMK_WITH_ENEGRY_OPT, 0, [disable energy opt])
+fi
+
+
 AC_ARG_ENABLE([lbuserdata],
             [AS_HELP_STRING([--enable-lbuserdata],
               [enable LB user data])],
