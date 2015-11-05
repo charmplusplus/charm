@@ -3,8 +3,8 @@
 */
 /*@{*/
 
-#include "entryEneryOpt.h"
+#include "energyOpt.h"
 
 //void energyOptInitNode(){ }
 
-#include "entryEneryOpt.def.h"
+#include "energyOpt.def.h"

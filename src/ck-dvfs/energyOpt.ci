@@ -1,4 +1,4 @@
-module entryEneryOpt{
+module energyOpt{
 
   readonly CkGroupID _energyOptimizer;
 

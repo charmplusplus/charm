@@ -3,13 +3,13 @@
 */
 /*@{*/
 
-#ifndef ENTRYENERGYOPT_H
-#define ENTRYENERGYOPT_H
+#ifndef ENERGYOPT_H
+#define ENERGYOPT_H
 
 //#include "register.h" // for _entryTable
 #include "charm.h"
 #include "converse.h"
-#include "entryEneryOpt.decl.h"
+#include "energyOpt.decl.h"
 
 //the frequency settings are specific for Intel HASWELL architecture
 //the settings with HASWELL may need to be changed for other architectures
@@ -73,6 +73,7 @@ class EnergyOptimizer : public CBase_EnergyOptimizer {
 
   public:
 	EnergyOptimizer(void){
+		CkPrintf("[%d] EnergyOptimizer created!", CkMyNode());
 #ifdef HASWELL
 		num_cores = 4;
 		num_avail_freqs = 16;
@@ -149,4 +150,4 @@ class EnergyOptimizer : public CBase_EnergyOptimizer {
 }; //end of EnergyOptimizer 
 
 
-#endif /* ENTRYENERGYOPT_H */
+#endif /* ENERGYOPT_H */

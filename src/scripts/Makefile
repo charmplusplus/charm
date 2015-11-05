@@ -102,6 +102,10 @@ NDMeshStreamer: charm-core completion
 $(L)/libmpi-mainmodule.a: mpi-mainmodule.o
 	$(CHARMC) -o $@ $<
 
+#energy optimization module
+$(L)/libmoduleenergyOpt.a: energyOpt.o
+	$(CHARMC) -o $@ $<
+
 $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
 
@@ -259,7 +263,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
 	  mpi-interoperate.h mpi_main.decl.h  \
-	  entryEneryOpt.h entryEneryOpt.decl.h \
+	  energyOpt.h energyOpt.decl.h \
 	  $(CVHEADERS)
 
 BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
@@ -617,10 +621,10 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
            trace-controlPoints.o mpi-interoperate.o \
-           entryEneryOpt.o
+           energyOpt.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
-charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a
+charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a $(L)/libmoduleenergyOpt.a
 
 CHARMLIBS: charm++ CONVLIBS 
 	$(MAKE) -C libs charmlibs OPTS='$(OPTS)'
@@ -724,6 +728,7 @@ TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
           trace-memory.o 
+
 
 ###############################################################################
 #

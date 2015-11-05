@@ -2216,7 +2216,25 @@ edgelist.o: edgelist.c graphdefs.h converse.h conv-config.h \
  pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h debug-conv.h
 
-entryEneryOpt.o: entryEneryOpt.C entryEneryOpt.def.h
+energyOpt.o: energyOpt.C energyOpt.h charm.h converse.h conv-config.h \
+ conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
+ pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
+ conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
+ energyOpt.decl.h charm++.h middle.h middle-conv.h cklists.h \
+ ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+ debug-conv++.h simd.h ckmessage.h pup.h CkMarshall.decl.h envelope.h \
+ charm.h middle.h ckarrayindex.h pup.h ckhashtable.h charm.h objid.h \
+ converse.h cklists.h objid.h sdag.h pup_stl.h envelope.h debug-charm.h \
+ ckarrayindex.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
+ ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+ CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+ readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+ LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+ NullLB.decl.h BaseLB.decl.h MetaBalancer.h MetaBalancer.decl.h \
+ CkLocation.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
+ CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+ ckcheckpoint.h ckcallback.h CkCheckpointStatus.decl.h ckevacuation.h \
+ ckarrayreductionmgr.h trace.h trace-bluegene.h energyOpt.def.h
 
 futures.o: futures.c converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \
