@@ -1316,7 +1316,7 @@ static void * minChkpNumMsg(int * size, void * data, void ** remote, int count)
   for(int i = 0; i < count;i++)
   {
     int num = *(int *)((char *)(remote[i])+CmiMsgHeaderSizeBytes);
-    if(num != -1 && num < minNum)
+    if(num != -1 && (num < minNum || minNum == -1))
     {
       minNum = num;
     }
