@@ -18,6 +18,7 @@
 #include <time.h>
 #include <assert.h>
 #include <math.h>
+#include <limits.h>
 #if CMK_BPROC
 #include <sys/bproc.h>
 #endif
