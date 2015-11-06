@@ -34,7 +34,6 @@ class EntryEnergyInfo{
 
 };
 
-
 //collect entry method statistics for entry in each chare
 class ChareEntry {
   private:
@@ -49,7 +48,6 @@ class ChareEntry {
     ~ChareEntry(){
         delete entryStats;
     };
-
 };
 
 //collect entry method statistics for each chare
@@ -68,7 +66,6 @@ class ChareStats {
             delete chareStats[i];
         delete chareStats;
     };
-
 };
 
 class EnergyOptMain : public Chare {
@@ -135,6 +132,6 @@ class EnergyOptimizer : public IrrGroup {
         }
     };
 
-}; //end of EnergyOptimizer 
+}; //end of EnergyOptimizer
 
 #endif /* ENERGYOPT_H */

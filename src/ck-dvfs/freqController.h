@@ -165,7 +165,6 @@ class FreqController {
 };
 
 //CkpvExtern(FreqController*, _freqController);
-
 void energyCharmInit(char **argv); //init energy module in ck
 
 #endif /* FREQCONTROLLER_H */
