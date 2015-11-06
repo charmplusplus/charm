@@ -1978,25 +1978,25 @@ fi
 
 # Check whether --enable-energyopt was given.
 if test "${enable_energyopt+set}" = set; then :
-  enableval=$enable_energyopt; enable_energyopt=$enableval
+  enableval=$enable_energyopt;
 else
   enable_energyopt=no
 fi
 
 
-if test "$enable_entryenergyopt" = "yes"
+if test "$enable_energyopt" = "yes"
 then
   Echo "Charm entry based energy optimization is enabled"
 
 cat >>confdefs.h <<_ACEOF
-#define CMK_WITH_ENEGRY_OPT 1
+#define CMK_WITH_ENERGY_OPT 1
 _ACEOF
 
 else
   Echo "Charm entry based energy optimization is disabled"
 
 cat >>confdefs.h <<_ACEOF
-#define CMK_WITH_ENEGRY_OPT 0
+#define CMK_WITH_ENERGY_OPT 0
 _ACEOF
 
 fi

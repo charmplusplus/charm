@@ -19,6 +19,10 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
+#if CMK_WITH_ENERGY_OPT
+#include "freqController.h"
+#endif
+
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
 CkpvDeclare(CkVec<void *>, chare_objs);
@@ -639,7 +643,9 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 {
-
+#if CMK_WITH_ENERGY_OPT
+  CkpvAccess(_freqController)->changeFreq(12);
+#endif
 #if CMK_TRACE_ENABLED 
   if (_entryTable[epIdx]->traceEnabled) {
     _TRACE_BEGIN_EXECUTE(env);

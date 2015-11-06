@@ -29,6 +29,10 @@
 CkpvExtern(int, _lb_obj_index);                // for lbdb user data for obj index
 #endif // CMK_LBDB_ON
 
+#if CMK_WITH_ENERGY_OPT
+#include "freqController.h"
+#endif
+
 #ifndef CMK_CHARE_USE_PTR
 CkpvExtern(int, currentChareIdx);
 #endif
@@ -2022,6 +2026,9 @@ void CkMigratable::timingAfterCall(LDObjHandle objHandle,int *objstopped){
 bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	int epIdx,bool doFree) 
 {
+#if CMK_WITH_ENERGY_OPT
+	CkpvAccess(_freqController)->changeFreq(16);
+#endif
 
 	DEBS((AA "   Invoking entry %d on element %s\n" AB,epIdx,idx2str(idx)));
 	bool isDeleted=false; //Enables us to detect deletion during processing

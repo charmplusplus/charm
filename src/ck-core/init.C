@@ -69,6 +69,10 @@ never be excluded...
 #include "CkCheckpoint.decl.h"
 #include <sstream>
 
+#if CMK_WITH_ENERGY_OPT
+#include "freqController.h"
+#endif
+
 void CkRestartMain(const char* dirname);
 
 #define  DEBUGF(x)     //CmiPrintf x;
@@ -950,8 +954,8 @@ extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
 extern void _registerControlPoints(void);
 #endif
-#if CMK_WITH_ENEGRY_OPT
-extern void _registerEneryOpt(void);
+#if CMK_WITH_ENERGY_OPT
+extern void _registerenergyOpt(void);
 #endif
 extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
@@ -1149,7 +1153,12 @@ void _initCharm(int unused_argc, char **argv)
         // initialize trace module in ck
         traceCharmInit(argv);
 #endif
- 	
+
+#if CMK_WITH_ENERGY_OPT
+	CmiPrintf("energyCharmInit\n");
+	energyCharmInit(argv);
+#endif
+
     CkpvInitialize(int, envelopeEventID);
     CkpvAccess(envelopeEventID) = 0;
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
@@ -1224,8 +1233,8 @@ void _initCharm(int unused_argc, char **argv)
 		_registerTraceControlPoints();
 #endif
 
-#if CMK_WITH_ENEGRY_OPT
-		_registerEneryOpt();
+#if CMK_WITH_ENERGY_OPT
+		_registerenergyOpt();
 #endif
 
 		/**

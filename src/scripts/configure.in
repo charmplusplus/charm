@@ -183,17 +183,16 @@ fi
 
 AC_ARG_ENABLE([energyopt],
             [AS_HELP_STRING([--enable-energyopt],
-              [enable entry method based energy optimization])],
-            [enable_energyopt=$enableval],
+              [enable entry method based energy optimization])], ,
             [enable_energyopt=no])
 
-if test "$enable_entryenergyopt" = "yes"
+if test "$enable_energyopt" = "yes"
 then
   Echo "Charm entry based energy optimization is enabled"
-  AC_DEFINE_UNQUOTED(CMK_WITH_ENEGRY_OPT, 1, [enable energy opt])
+  AC_DEFINE_UNQUOTED(CMK_WITH_ENERGY_OPT, 1, [enable energy opt])
 else
   Echo "Charm entry based energy optimization is disabled"
-  AC_DEFINE_UNQUOTED(CMK_WITH_ENEGRY_OPT, 0, [disable energy opt])
+  AC_DEFINE_UNQUOTED(CMK_WITH_ENERGY_OPT, 0, [disable energy opt])
 fi
 
 

@@ -1623,8 +1623,8 @@ ck.o: ck.C ck.h charm++.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h CkCheckpointStatus.decl.h ckevacuation.h \
  ckarrayreductionmgr.h trace.h trace-bluegene.h qd.h register.h stats.h \
- TopoManager.h crc32.h trace-common.h BaseLB.h ckliststring.h \
- CkMarshall.def.h
+ TopoManager.h freqController.h crc32.h trace-common.h BaseLB.h \
+ ckliststring.h CkMarshall.def.h
 
 ckIgetControl.o: ckIgetControl.C charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -1888,7 +1888,7 @@ cklocation.o: cklocation.C hilbert.h partitioning_strategies.h charm++.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h CkCheckpointStatus.decl.h ckevacuation.h \
  ckarrayreductionmgr.h trace.h trace-bluegene.h register.h ck.h qd.h \
- stats.h TopoManager.h CkLocation.def.h
+ stats.h TopoManager.h freqController.h CkLocation.def.h
 
 ckmemcheckpoint.o: ckmemcheckpoint.C charm++.h charm.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -2216,17 +2216,17 @@ edgelist.o: edgelist.c graphdefs.h converse.h conv-config.h \
  pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h debug-conv.h
 
-energyOpt.o: energyOpt.C energyOpt.h charm.h converse.h conv-config.h \
- conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
- pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
- conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
- energyOpt.decl.h charm++.h middle.h middle-conv.h cklists.h \
- ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
- debug-conv++.h simd.h ckmessage.h pup.h CkMarshall.decl.h envelope.h \
- charm.h middle.h ckarrayindex.h pup.h ckhashtable.h charm.h objid.h \
- converse.h cklists.h objid.h sdag.h pup_stl.h envelope.h debug-charm.h \
- ckarrayindex.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
- ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+energyOpt.o: energyOpt.C energyOpt.h freqController.h charm.h converse.h \
+ conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+ conv-mach-opt.h cmiqueue.h pup_c.h queueing.h conv-cpm.h conv-cpath.h \
+ conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
+ debug-conv.h pup.h cklists.h register.h energyOpt.decl.h charm++.h \
+ middle.h middle-conv.h ckbitvector.h ckstream.h init.h ckhashtable.h \
+ debug-charm.h debug-conv++.h simd.h ckmessage.h pup.h CkMarshall.decl.h \
+ envelope.h charm.h middle.h ckarrayindex.h pup.h ckhashtable.h charm.h \
+ objid.h converse.h cklists.h objid.h sdag.h pup_stl.h envelope.h \
+ debug-charm.h ckarrayindex.h cksection.h ckcallback.h conv-ccs.h \
+ sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
@@ -2235,6 +2235,12 @@ energyOpt.o: energyOpt.C energyOpt.h charm.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckcheckpoint.h ckcallback.h CkCheckpointStatus.decl.h ckevacuation.h \
  ckarrayreductionmgr.h trace.h trace-bluegene.h energyOpt.def.h
+
+freqController.o: freqController.C charm.h converse.h conv-config.h \
+ conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
+ pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
+ conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h middle.h \
+ middle-conv.h cklists.h ckliststring.h freqController.h register.h
 
 futures.o: futures.c converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \
@@ -2278,7 +2284,7 @@ init.o: init.C ckcheckpoint.h pup.h converse.h conv-config.h \
  CkFutures.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
  ckevacuation.h ckarrayreductionmgr.h trace.h conv-trace.h \
  trace-bluegene.h ck.h qd.h register.h stats.h TopoManager.h \
- CkCheckpoint.decl.h
+ CkCheckpoint.decl.h freqController.h
 
 isomalloc.o: isomalloc.c converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h queueing.h \

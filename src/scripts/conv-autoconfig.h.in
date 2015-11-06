@@ -345,6 +345,9 @@
 /* disable controlpoint */
 #undef CMK_WITH_CONTROLPOINT
 
+/* disable energy optimization */
+#undef CMK_WITH_ENERGY_OPT
+
 /* enable statistics collection */
 #undef CMK_WITH_STATS
 
