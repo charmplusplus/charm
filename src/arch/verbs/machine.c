@@ -618,7 +618,7 @@ static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
 
-#if ! CMK_SMP && ! defined(_WIN32)
+#if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
 static void parse_forks(void) {
   char *forkstr;
@@ -634,7 +634,9 @@ static void parse_forks(void) {
 		if(pid==0) { /* forked process */
 			/* reset mynode,pe & exit loop */
 			Lrts_myNode+=i;
+#if ! CMK_SMP
 			_Cmi_mype+=i;
+#endif
 			break;
 		}
 	}
@@ -1974,7 +1976,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   atexit(machine_atexit_check);
   parse_netstart();
   parse_magic();
-#if ! CMK_SMP && ! defined(_WIN32)
+#if ! defined(_WIN32)
   /* only get forks in non-smp mode */
   parse_forks();
 #endif
