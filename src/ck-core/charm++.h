@@ -7,6 +7,13 @@
 #include "charm.h"
 #include "middle.h"
 
+#define MIRROR_SAME 0
+#if CMK_HAS_STRINGS_H
+  #include <strings.h>            /* defines bzero */
+#else
+  #define bzero(s,n)   memset(s,0,n)
+#endif
+
 class CMessage_CkArgMsg {
 public: static int __idx;
 };
@@ -216,6 +223,7 @@ class Chare {
     Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
+    virtual void pupDistribute(PUP::er &p, double factor, int sub);//<- pack/unpack routine
 
     /// Pack/UnPack - tell the runtime how to serialize this class's
     /// data for migration, checkpoint, etc.

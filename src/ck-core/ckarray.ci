@@ -4,7 +4,19 @@ module CkArray {
   extern module CkArrayReductionMgr;
 
   readonly bool _isAnytimeMigration;
-  
+#if USE_MIRROR
+  readonly CProxy_MirrorUpdate MirrorProxy;
+
+  mainchare MirrorInit {
+      entry MirrorInit(CkArgMsg *m);
+  }
+
+  group [migratable] MirrorUpdate {
+      entry MirrorUpdate(void);
+      entry void update(int id1, int id2);
+  };
+#endif
+
   group [migratable] CkArray : CkReductionMgr {
 	entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg, CkNodeGroupID nodereductionProxy);
 	//Insertion
@@ -39,7 +51,11 @@ module CkArray {
     entry void inmem_checkpoint(CkArrayCheckPTReqMessage *);
     // _PIPELINED_ALLREDUCE_
     entry void defrag(CkReductionMsg*);
-
+#if USE_MIRROR
+    entry void recvSyncMirrorData(CkMirrorSyncMessage *msg);
+    entry void syncMirror(CkCallback& cb);
+    entry void recvAck();
+#endif
   };
 
   message CkCreateArrayAsyncMsg {

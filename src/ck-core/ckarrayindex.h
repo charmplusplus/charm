@@ -83,6 +83,11 @@ class CkArrayIndex: public CkArrayIndexBase
         /// Return a const pointer to the actual index data
         const int *data(void) const {return index; }
 
+        void reSize (int times)
+        {
+            if(nInts>0)
+                index[0] *= times;
+        }
         /// Return the total number of elements (assuming a dense chare array)
         int getCombinedCount(void) const
         {
@@ -213,6 +218,7 @@ typedef CkArrayIndex CkArrayIndexMax;
 class CkArray;
 
 class CkArrayID {
+public:
 	CkGroupID _gid;
 public:
 	CkArrayID() : _gid() { }

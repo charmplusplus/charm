@@ -150,6 +150,26 @@ void Chare::pup(PUP::er &p)
 #endif
 }
 
+void Chare::pupDistribute(PUP::er &p, double factor, int sub)
+{
+  p(thishandle.onPE);
+  thishandle.objPtr=(void *)this;
+#ifndef CMK_CHARE_USE_PTR
+  p(chareIdx);
+  if (chareIdx != -1) thishandle.objPtr=(void*)(CmiIntPtr)chareIdx;
+#endif
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	if(p.isUnpacking()){
+		if(mlogData == NULL || !mlogData->teamRecoveryFlag)
+        	mlogData = new ChareMlogData();
+	}
+	mlogData->pup(p);
+#endif
+#if CMK_ERROR_CHECKING
+  p(magic);
+#endif
+}
+
 int Chare::ckGetChareType() const {
   return -3;
 }

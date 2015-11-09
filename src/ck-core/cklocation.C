@@ -302,6 +302,44 @@ public:
   }
 };
 
+class RRNodeMap : public CkArrayMap
+{
+public:
+  RRNodeMap(void)
+  {
+	  DEBC((AA "Creating RRNodeMap\n" AB));
+  }
+  RRNodeMap(CkMigrateMessage *m):CkArrayMap(m){}
+  int procNum(int /*arrayHdl*/, const CkArrayIndex &i)
+  {
+#if 1
+    if (i.nInts==1) {
+      //Map 1D integer indices in simple round-robin fashion
+      int node = (i.data()[0])%CkNumNodes();
+      int rank = ((i.data()[0])/CkNumNodes())%CkNodeSize(CkMyNode());
+      int ans = CkNodeFirst(node)+rank;
+      while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CkpvAccess(startedEvac))){
+        ans = (ans +1 )%CkNumPes();
+      }
+      return ans;
+    }
+    else
+#endif
+      {
+	//Map other indices based on their hash code, mod a big prime.
+	unsigned int hash=(i.hash()+739)%1280107;
+    int node = hash%CkNumNodes();
+    int rank = hash%CkNodeSize(CkMyNode());
+    int ans = CkNodeFirst(node)+rank;
+	while(!CmiNodeAlive(ans)){
+		ans = (ans +1 )%CkNumPes();
+	}
+	return ans;
+
+      }
+  }
+};
+
 /** 
  * Class used to store the dimensions of the array and precalculate numChares,
  * binSize and other values for the DefaultArrayMap -- ASB
@@ -1461,6 +1499,9 @@ void CkMigratable::commonInit(void) {
 	thisIndexMax=myRec->getIndex();
 	thisChareType=i.chareType;
 	usesAtSync=false;
+#if USE_MIRROR
+	usesAsMirror =false;
+#endif
 	usesAutoMeasure=true;
 	barrierRegistered=false;
 
@@ -1496,6 +1537,9 @@ void CkMigratable::pup(PUP::er &p) {
 	Chare::pup(p);
 	p|thisIndexMax;
 	p(usesAtSync);
+#if USE_MIRROR
+	p(usesAsMirror);
+#endif
   p(can_reset);
 	p(usesAutoMeasure);
 #if CMK_LBDB_ON 
@@ -1543,8 +1587,12 @@ CkMigratable::~CkMigratable() {
 	  DEBL((AA "Removing barrier for element %s\n" AB,idx2str(thisIndexMax)));
 	  if (usesAtSync)
 		myRec->getLBDB()->RemoveLocalBarrierClient(ldBarrierHandle);
-	  else
-		myRec->getLBDB()->RemoveLocalBarrierReceiver(ldBarrierRecvHandle);
+	  else {
+#if USE_MIRROR
+      if(!usesAsMirror)
+#endif
+      myRec->getLBDB()->RemoveLocalBarrierReceiver(ldBarrierRecvHandle);
+    }
 	}
 
   if (_lb_args.metaLbOn()) {
@@ -1652,9 +1700,15 @@ void CkMigratable::ckFinishConstruction(void)
         if (usesAtSync)
 	  ldBarrierHandle = myRec->getLBDB()->AddLocalBarrierClient(
 		(LDBarrierFn)staticResumeFromSync,(void*)(this));
+        else {
+#if USE_MIRROR
+        if(usesAsMirror)
+          myRec->setMigratable(false);
         else
+#endif
 	  ldBarrierRecvHandle = myRec->getLBDB()->AddLocalBarrierReceiver(
 		(LDBarrierFn)staticResumeFromSync,(void*)(this));
+        }
 	barrierRegistered=true;
 }
 

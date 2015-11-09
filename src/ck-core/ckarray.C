@@ -54,6 +54,10 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ck.h"
 #include "pathHistory.h"
 
+#if USE_MIRROR 
+CProxy_MirrorUpdate MirrorProxy;
+#endif
+
 CpvDeclare(int ,serializer);
 
 bool _isAnytimeMigration;
@@ -607,6 +611,9 @@ void CkArrayOptions::init()
     reductionClient.type = CkCallback::invalid;
     disableNotifyChildInRed = !_isNotifyChildInRed;
     broadcastViaScheduler = false;
+#if USE_MIRROR
+    mirrorFlag = false;
+#endif
 }
 
 CkArrayOptions &CkArrayOptions::setStaticInsertion(bool b)
@@ -719,6 +726,60 @@ void CkArrayListener::ckRegister(CkArray *arrMgr,int dataOffset_)
   dataOffset=dataOffset_;
 }
 
+#if USE_MIRROR
+static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
+{
+
+   CkArrayOptions opts1(opts);
+   CkArrayID aid = CProxy_ArrayBase::ckCreateArray_internal(m, ctor, opts1); 
+   if(opts1.getMirror())
+   {
+       int chareType=_entryTable[ctor]->chareIdx;
+       int migCtorIdx=_chareTable[chareType]->getMigCtor();
+       CkArrayMessage *m2 = (CkArrayMessage*)CkAllocSysMsg();
+       UsrToEnv(m2)->setMsgtype(ArrayEltInitMsg);
+       CkArrayOptions opts2(opts);
+       CProxy_RRNodeMap rrmap = CProxy_RRNodeMap::ckNew();
+       opts2.setMap(rrmap);
+       CkArrayID bid = CProxy_ArrayBase::ckCreateArray_internal(m2, migCtorIdx, opts2);
+       MirrorProxy.update(aid._gid.idx, bid._gid.idx);
+   }
+
+  return aid;
+}
+
+CkArrayID CProxy_ArrayBase::ckCreateArray_internal(CkArrayMessage *m,int ctor,
+					  const CkArrayOptions &opts_)
+{
+  //CkAssert(CkMyPe() == 0); // Will become mandatory under 64-bit ID
+
+  CkArrayOptions opts(opts_);
+  CkGroupID locMgr = opts.getLocationManager();
+  if (locMgr.isZero())
+  { //Create a new location manager
+    CkEntryOptions  e_opts;
+    e_opts.setGroupDepID(opts.getMap());       // group creation dependence
+    locMgr = CProxy_CkLocMgr::ckNew(opts, &e_opts);
+    opts.setLocationManager(locMgr);
+  }
+  //Create the array manager
+  m->array_ep()=ctor;
+  CkMarshalledMessage marsh(m);
+  CkEntryOptions  e_opts;
+  e_opts.setGroupDepID(locMgr);       // group creation dependence
+#if !GROUP_LEVEL_REDUCTION
+  CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy,&e_opts);
+  nodereductionProxy.setAttachedGroup(ag);
+#else
+  CkNodeGroupID dummyid;
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid,&e_opts);
+#endif
+  return (CkArrayID)ag;
+}
+
+
+#else
 static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
 {
   //CkAssert(CkMyPe() == 0); // Will become mandatory under 64-bit ID
@@ -746,6 +807,7 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
 #endif
   return (CkArrayID)ag;
 }
+#endif
 
 CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
 					  const CkArrayOptions &opts)
@@ -1249,6 +1311,31 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) cons
 	msg->array_index()=_idx;//Insert array index
 	if (ckIsDelegated()) //Just call our delegateMgr
 	  ckDelegatedTo()->ArraySend(ckDelegatedPtr(),ep,msg,_idx,ckGetArrayID());
+#if USE_MIRROR
+  else {
+    CkArrayID aid = ckGetArrayID();
+    envelope *env=UsrToEnv((void *)msg);
+    int epIdx = env->getEpIdx();
+    MirrorUpdate *dup = MirrorProxy.ckLocalBranch();
+    int ibid = dup->find(aid._gid.idx);
+#if MIRROR_SAME
+    int valid=0;
+    int mirror_num =  (int)(PICS_getTunedParameter("MIRROR_NUM_SAME", &valid));
+    if(valid == 0)
+    mirror_num = 0;
+#else
+    int mirror_num =  0;
+#endif
+    int randnum = rand()%(mirror_num+1);
+    if(ibid != -1 && _entryTable[epIdx]->mirror && randnum < mirror_num && mirror_num>0) {
+      CkGroupID gid;
+      gid.idx = ibid;
+      CkArrayID bid(gid);
+      int myidx = dup->getMirrorIndex(_idx, randnum, aid._gid.idx);
+      CkArrayIndex mirrorIdx(myidx);
+      CkSendMsgArray(epIdx, msg, bid, mirrorIdx,  opts);
+    }
+#endif
 	else 
 	{ //Usual case: a direct send
 	  CkArray *localbranch = ckLocalBranch();
@@ -1262,6 +1349,9 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) cons
 	      localbranch->deliver(msg, CkDeliver_queue, opts);
 	  }
 	}
+#if USE_MIRROR
+  }
+#endif
 }
 
 void *CProxyElement_ArrayBase::ckSendSync(CkArrayMessage *msg, int ep) const
@@ -1691,6 +1781,117 @@ void CkArray::ckDestroy() {
   locMgr->deleteManager(CkGroupID(thisProxy), this);
   delete this;
 }
+
+#if USE_MIRROR
+void ArrayElement::unmirrorData(CkMirrorSyncMessage* buffer, int size)
+{
+}
+
+char* ArrayElement::mirrorData(int *size)
+{
+  return "";
+}
+
+void ArrayElement::recvAck( )
+{
+    ackCnt++;
+    CkArrayIndex _idx= ckGetArrayIndex();
+    int valid;
+    int mirror_num =  (int)(PICS_getTunedParameter("MIRROR_NUM_SAME", &valid));
+    if(valid == 0)
+        mirror_num = 0;
+    if(ackCnt == mirror_num)
+    {
+        contribute(cbResume);
+    }
+}
+
+void ArrayElement::recvSyncMirrorData(CkMirrorSyncMessage *msg)
+{
+    CProxyElement_ArrayElement rep(msg->aid, msg->aindex);
+    unmirrorData(msg, msg->size);
+    rep.recvAck();
+}
+
+void ArrayElement::syncMirror( CkCallback& cb)
+{
+    ackCnt = 0;
+    cbResume = cb;
+    CkArrayIndex _idx= ckGetArrayIndex();
+    int valid;
+    int mirror_num =  (int)(PICS_getTunedParameter("MIRROR_NUM_SAME", &valid));
+    if(valid == 0)
+        mirror_num = 0;
+    MirrorUpdate *dup = MirrorProxy.ckLocalBranch();
+    int ibid = dup->find(thisArrayID._gid.idx);
+    if(ibid != -1 &&  mirror_num>0)
+    {
+       CkGroupID gid;
+       gid.idx = ibid ;
+       CkArrayID _bid(gid);
+       int size;
+       char *data = mirrorData(&size);
+       for(int i= 0; i<mirror_num; i++){
+           CkArrayIndex _rdx ( dup->getMirrorIndex(_idx, i, thisArrayID._gid.idx)); 
+           CProxyElement_ArrayElement rep(_bid,_rdx);
+           CkMirrorSyncMessage *msg = new (size) CkMirrorSyncMessage;
+           memcpy(msg->packData, data, size);
+           msg->size = size;
+           msg->aid = thisArrayID;
+           msg->aindex = _idx;
+           msg->mirrorIndex = i;
+           msg->cb = cb;
+           rep.recvSyncMirrorData(msg);
+       }
+       delete data;
+    }
+    else
+    {
+        contribute(cb);
+    }
+}
+
+MirrorInit::MirrorInit(CkArgMsg *m)
+{
+    MirrorProxy = CProxy_MirrorUpdate::ckNew();
+}
+
+MirrorUpdate::MirrorUpdate(void) {}
+
+void MirrorUpdate::update(int id1, int id2) 
+{
+    if(CkMyPe() == 0)
+        CkPrintf("charmrun> using mirror API updating map  on PE %d  %d %d \n", CkMyPe(), id1, id2);
+    mirrorMap[id1] = id2;
+}
+
+int MirrorUpdate::find(int aid)
+{
+    std::map<int, int>::iterator  iter = mirrorMap.find(aid);
+    if(iter != mirrorMap.end())
+        return iter->second;
+    else
+        return -1;
+}
+
+void MirrorUpdate::pup(PUP::er &p)
+{
+    CBase_MirrorUpdate::pup(p);
+    p|mirrorMap;
+}
+
+//CkArrayIndex MirrorUpdate::getMirrorIndex(const CkArrayIndex  &aindex, int i, int _aid)
+int MirrorUpdate::getMirrorIndex(const CkArrayIndex  &aindex, int i, int _aid)
+{
+    int valid;
+    int mirror_num =  (int)(PICS_getTunedParameter("MIRROR_NUM_SAME", &valid));
+    if(valid == 0)
+        mirror_num = 0;
+    int myidx = aindex.data()[0]*mirror_num+i; //this only works with 1D array TODO
+    return  myidx;
+}
+
+#endif
 
 #include "CkArray.def.h"
 

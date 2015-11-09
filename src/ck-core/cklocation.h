@@ -20,7 +20,7 @@ public:
   unsigned int array_getSrcPe(void);
   unsigned int array_ifNotThere(void);
   void array_setIfNotThere(unsigned int);
-  
+
   //This allows us to delete bare CkArrayMessages
   void operator delete(void *p){CkFreeMsg(p);}
 };
@@ -69,6 +69,19 @@ public:
 	bool bounced;
 	char* packData;
 };
+#if USE_MIRROR
+class CkMirrorSyncMessage :  public CMessage_CkMirrorSyncMessage {
+public:
+    int iter;
+    CkArrayID  aid;
+    CkArrayIndex aindex;
+    int mirrorIndex;
+    CkCallback cb;
+    int size;
+    char *packData;
+
+};
+#endif
 
 /******************* Map object ******************/
 
@@ -82,7 +95,7 @@ class CkArrMgr;
 */
 /*@{*/
 
-/** The "map" is used by the array manager to map an array index to 
+/** The "map" is used by the array manager to map an array index to
  * a home processor number.
  */
 class CkArrayMap : public IrrGroup // : public CkGroupReadyCallback
@@ -122,23 +135,23 @@ extern void _CkMigratable_initInfoInit(void);
 #if CMK_OUT_OF_CORE
 #  include "conv-ooc.h"
 extern CooPrefetchManager CkArrayElementPrefetcher;
-// If this flag is set, this creation/deletion is just 
+// If this flag is set, this creation/deletion is just
 //   a "fake" constructor/destructor call for prefetching.
 CkpvExtern(int,CkSaveRestorePrefetch);
 #endif
 
 #include "ckmigratable.h"
 
-/** 
- * Stores a list of array elements.  These lists are 
- * kept by the array managers. 
+/**
+ * Stores a list of array elements.  These lists are
+ * kept by the array managers.
  */
 class CkMigratableList {
 	CkVec< CkZeroPtr<CkMigratable> > el;
  public:
 	CkMigratableList();
 	~CkMigratableList();
-	
+
 	void setSize(int s);
 	inline int length(void) const {return el.length();}
 
@@ -204,26 +217,26 @@ class CkMagicNumber : public CkMagicNumber_impl {
 /**
  * The "data" class passed to a CkLocIterator, which refers to a bound
  * glob of array elements.
- * This is a transient class-- do not attempt to store it or send 
+ * This is a transient class-- do not attempt to store it or send
  * it across processors.
  */
 
-        
+
 class CkLocation {
 	CkLocMgr *mgr;
 	CkLocRec_local *rec;
 public:
 	CkLocation(CkLocMgr *mgr_, CkLocRec_local *rec_);
-	
+
 	/// Find our location manager
 	inline CkLocMgr *getManager(void) const {return mgr;}
-	
+
 	/// Find the local record that refers to this element
 	inline CkLocRec_local *getLocalRecord(void) const {return rec;}
-	
+
 	/// Look up and return the array index of this location.
 	const CkArrayIndex &getIndex(void) const;
-	
+
         void destroyAll();
 
 	/// Pup all the array elements at this location.
@@ -237,7 +250,7 @@ public:
 class CkLocIterator {
 public:
 	virtual ~CkLocIterator();
-	
+
 	/// This location is part of the calling location manager.
 	virtual void addLocation(CkLocation &loc) =0;
 };
@@ -247,16 +260,16 @@ enum CkElementCreation_t {
   CkElementCreation_resume=3,  // Create object after checkpoint
   CkElementCreation_restore=4  // Create object after checkpoint, skip listeners
 };
-/// Abstract superclass of all array manager objects 
+/// Abstract superclass of all array manager objects
 class CkArrMgr {
 public:
 	virtual ~CkArrMgr() {}
 	/// Insert this initial element on this processor
 	virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local=1)=0;
-	
+
 	/// Done with initial insertions
 	virtual void doneInserting(void)=0;
-	
+
 	/// Create an uninitialized element after migration
 	///  The element's constructor will be called immediately after.
 	virtual CkMigratable *allocateMigrated(int elChareType,
@@ -344,6 +357,7 @@ public:
 
 	//Migrate us to another processor
 	void emigrate(CkLocRec_local *rec,int toPe);
+	void sendSyncData(CkLocRec_local *rec);
     void informLBPeriod(CkLocRec_local *rec, int lb_ideal_period);
     void metaLBCallLB(CkLocRec_local *rec);
 
@@ -405,7 +419,7 @@ public:
 	void flushAllRecs(void);
 	void flushLocalRecs(void);
 	void pup(PUP::er &p);
-	
+
 	//Look up array element in hash table.  Index out-of-bounds if not found.
 	CkLocRec *elementRec(const CkArrayIndex &idx);
 	//Look up array element in hash table.  Return NULL if not there.
@@ -449,7 +463,7 @@ CkLocRec_local *createLocal(const CkArrayIndex &idx,
         bool forMigration, bool ignoreArrival,
         bool notifyHome,int dummy=0);
 #else
-	CkLocRec_local *createLocal(const CkArrayIndex &idx, 
+	CkLocRec_local *createLocal(const CkArrayIndex &idx,
 		bool forMigration, bool ignoreArrival,
 		bool notifyHome);
 #endif

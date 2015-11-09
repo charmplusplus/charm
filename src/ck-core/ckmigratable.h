@@ -73,12 +73,14 @@ public:
 protected:
   /// A more verbose form of abort
   virtual void CkAbort(const char *str) const;
-
   bool usesAtSync;//You must set this in the constructor to use AtSync().
   bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
   bool barrierRegistered;//True iff barrier handle below is set
 
 public:
+#if USE_MIRROR
+  bool usesAsMirror;
+#endif
   virtual void ResumeFromSync(void);
   virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
   void setObjTime(double cputime);

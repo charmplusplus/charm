@@ -4,6 +4,11 @@ module CkLocation {
   message CkArrayElementMigrateMessage {
 	char packData[];
   };
+#if USE_MIRROR
+  message CkMirrorSyncMessage {
+      char packData[];
+  };
+#endif
 
   group [migratable] CkLocMgr {
 	entry CkLocMgr(CkArrayOptions opts);
@@ -13,18 +18,22 @@ module CkLocation {
                                                bool suppressIfHere);
 	entry [expedited] void updateLocation(CkArrayIndex idx,int nowOnPe);
 	entry void reclaimRemote(CkArrayIndex idx,int deletedOnPe);
-	
+
 	//Load balancing:
 	entry void dummyAtSync(void);
   };
   initnode void _CkLocMgrInit(void);
-  
+
   // Array Map object support:
   group [migratable] CkArrayMap {
   };
 
   group [migratable] RRMap : CkArrayMap {
     entry RRMap(void);
+  };
+
+  group [migratable] RRNodeMap : CkArrayMap {
+    entry RRNodeMap(void);
   };
 
   readonly CkGroupID _defaultArrayMapID;
