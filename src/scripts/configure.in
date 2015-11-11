@@ -545,7 +545,7 @@ then
   got_cpp11="true"
 else
 # Flags for g++/clang++, xlC++, and pgCC, respectively
-for i in "-std=c++0x" "-qlanglvl=extended0x" "--c++11"; do
+for i in "-std=c++0x" "-qlanglvl=extended0x" "--c++11" "-h std=c++11"; do
     test_cxx "whether C++ compiler supports variadic templates with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
