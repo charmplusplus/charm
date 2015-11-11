@@ -14,6 +14,12 @@
 
 #if defined(__VEC__)
   #include "altivec.h"
+  #ifdef pixel
+  #undef pixel
+  #endif
+  #ifdef bool
+  #undef bool
+  #endif
 #endif
 
 
@@ -933,7 +939,6 @@ inline __simdia_veci __simdia_vcmplelf(const  __simdia_vecf a, const  __simdia_v
     #define simdia_vcmplelf __simdia_vcmplelf
   #endif
 
-
 /*******************************************************************************
  *******************************************************************************
  ***** Mapping to Generic C Implementation
@@ -1138,5 +1143,10 @@ inline __simdia_veci __simdia_vcmplelf(const  __simdia_vecf a, const  __simdia_v
 #define  simdia_vmaddfss(a, b, c)  ( simdia_vmaddf((a),  simdia_vsetf(b),  simdia_vsetf(c)))
 #define simdia_vmaddlfss(a, b, c)  (simdia_vmaddlf((a), simdia_vsetlf(b), simdia_vsetlf(c)))
 
+#if defined(__VEC__)
+  #ifdef vector
+  #undef vector
+  #endif
+#endif
 
 #endif //__SIMDIA_H__
