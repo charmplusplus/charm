@@ -87,6 +87,7 @@ public:
 #endif
 
 
+typedef void (*MPI_MigrateFn)(void);
 
 void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec);
 PUPfunctionpointer(MPI_Op)
@@ -1053,14 +1054,19 @@ class ampiParent : public CBase_ampiParent {
     int RProxyCnt;
     CProxy_ampi tmpRProxy;
 
+    MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
+
 public:
     int ampiInitCallDone;
 
 public:
     ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
     ampiParent(CkMigrateMessage *msg);
+    void ckAboutToMigrate(void);
     void ckJustMigrated(void);
     void ckJustRestored(void);
+    void setUserAboutToMigrateFn(MPI_MigrateFn f);
+    void setUserJustMigratedFn(MPI_MigrateFn f);
     ~ampiParent();
 
     ampi *lookupComm(MPI_Comm comm) {
