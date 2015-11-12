@@ -566,7 +566,7 @@ fi
 
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Make.depends" $DESTINATION/tmp/Make.depends
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
-if test -f src/ck-ldb/Make.lb
+if test -f "$srcbase/ck-ldb/Make.lb"
 then
 $DESTINATION/tmp/system_ln "$srcbase/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 else
