@@ -834,6 +834,8 @@ class ampiWorlds : public CBase_ampiWorlds {
   STARTUP_DEBUG("ampiParent> starting up")
     thread=NULL;
   worldPtr=NULL;
+  userAboutToMigrateFn=NULL;
+  userJustMigratedFn=NULL;
   myDDT=&myDDTsto;
   prepareCtv();
 
@@ -852,6 +854,8 @@ ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
 
   AsyncEvacuate(false);
 }
+
+PUPfunctionpointer(MPI_MigrateFn)
 
 void ampiParent::pup(PUP::er &p) {
   p|threads;
@@ -886,6 +890,9 @@ void ampiParent::pup(PUP::er &p) {
   p|kvlist;
   p|RProxyCnt;
   p|tmpRProxy;
+
+  p|userAboutToMigrateFn;
+  p|userJustMigratedFn;
 
   p|ampiInitCallDone;
 }
@@ -948,9 +955,26 @@ void ampiParent::finalize(){
 #endif
 }
 
+void ampiParent::setUserAboutToMigrateFn(MPI_MigrateFn f) {
+  userAboutToMigrateFn = f;
+}
+
+void ampiParent::setUserJustMigratedFn(MPI_MigrateFn f) {
+  userJustMigratedFn = f;
+}
+
+void ampiParent::ckAboutToMigrate(void) {
+  if (userAboutToMigrateFn) {
+    (*userAboutToMigrateFn)();
+  }
+}
+
 void ampiParent::ckJustMigrated(void) {
   ArrayElement1D::ckJustMigrated();
   prepareCtv();
+  if (userJustMigratedFn) {
+    (*userJustMigratedFn)();
+  }
 }
 
 void ampiParent::ckJustRestored(void) {
@@ -2349,6 +2373,20 @@ CDECL void AMPI_Setmigratable(MPI_Comm comm, int mig){
 #else
   CkPrintf("Warning: MPI_Setmigratable and load balancing are not supported in this version.\n");
 #endif
+}
+
+CDECL void AMPI_About_to_migrate(MPI_MigrateFn f)
+{
+  AMPIAPI("AMPI_About_to_migrate");
+  ampiParent *thisParent = getAmpiParent();
+  thisParent->setUserAboutToMigrateFn(f);
+}
+
+CDECL void AMPI_Just_migrated(MPI_MigrateFn f)
+{
+  AMPIAPI("AMPI_Just_migrated");
+  ampiParent *thisParent = getAmpiParent();
+  thisParent->setUserJustMigratedFn(f);
 }
 
 CDECL int AMPI_Init(int *p_argc, char*** p_argv)

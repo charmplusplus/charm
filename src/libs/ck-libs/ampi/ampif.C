@@ -150,6 +150,8 @@ FDECL {
 #define mpi_async_migrate FTN_NAME( MPI_ASYNC_MIGRATE , mpi_async_migrate )
 #define mpi_allow_migrate FTN_NAME( MPI_ALLOW_MIGRATE , mpi_allow_migrate )
 #define mpi_setmigratable FTN_NAME (MPI_SETMIGRATABLE , mpi_setmigratable )
+#define mpi_about_to_migrate FTN_NAME (MPI_ABOUT_TO_MIGRATE , mpi_about_to_migrate )
+#define mpi_just_migrated FTN_NAME (MPI_JUST_MIGRATED , mpi_just_migrated )
 #define mpi_checkpoint FTN_NAME( MPI_CHECKPOINT , mpi_checkpoint )
 #define mpi_memcheckpoint FTN_NAME( MPI_MEMCHECKPOINT , mpi_memcheckpoint )
 
@@ -893,6 +895,16 @@ void mpi_setmigratable(int *comm, int *mig)
 void mpi_migrateto(int *destPE)
 {
   AMPI_Migrateto(*destPE);
+}
+
+void mpi_about_to_migrate(MPI_MigrateFn f)
+{
+  AMPI_About_to_migrate(f);
+}
+
+void mpi_just_migrated(MPI_MigrateFn f)
+{
+  AMPI_Just_migrated(f);
 }
 
 void mpi_start_measure()           /* turn on auto load instrumentation */

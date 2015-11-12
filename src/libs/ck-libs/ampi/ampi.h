@@ -246,7 +246,7 @@ int MPI_DUP_FN ( MPI_Comm, int, void *, void *, void *, int * );
 #include "pup_c.h"
 
 typedef void (*MPI_PupFn)(pup_er, void*);
-
+typedef void (*MPI_MigrateFn)(void);
 
 /********************** MPI-2 prototypes and defines ***************************/
 /* for the datatype decoders */
@@ -644,6 +644,10 @@ void AMPI_Async_Migrate(void);
 void AMPI_Allow_Migrate(void);
 #define MPI_Setmigratable AMPI_Setmigratable
 void AMPI_Setmigratable(int comm, int mig);
+#define MPI_About_to_migrate AMPI_About_to_migrate
+void AMPI_About_to_migrate(MPI_MigrateFn f);
+#define MPI_Just_migrated AMPI_Just_migrated
+void AMPI_Just_migrated(MPI_MigrateFn f);
 #define MPI_Checkpoint AMPI_Checkpoint
 void AMPI_Checkpoint(char *dname);
 #define MPI_MemCheckpoint AMPI_MemCheckpoint
