@@ -433,9 +433,10 @@ static void *call_startfn(void *vindex)
         CmiNodeAllBarrier();
       } else {
         if (CmiMyRank() == CmiMyNodeSize()) {
-          while (1) { CommunicationServerThread(5); }
+          while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
         } else { 
           CsdScheduler(-1);
+          CmiNodeAllBarrier();
         }
         break;
       }

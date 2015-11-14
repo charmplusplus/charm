@@ -6,14 +6,22 @@
 #define DEBUG(a) 
 #endif
 
-static bool   _libExitStarted = false;
-int    _libExitHandlerIdx;
-extern "C" int _cleanUp;
+int _libExitHandlerIdx;
+static bool _libExitStarted = false;
+
+extern std::atomic<int> ckExitComplete;
+extern std::atomic<int> _cleanUp;
 
 #if CMK_CONVERSE_MPI
 extern MPI_Comm charmComm;
 #else
 typedef int MPI_Comm;
+#endif
+
+#if CMK_USE_LRTS
+extern void LrtsDrainResources(); /* used when exit */
+#else
+void LrtsDrainResources() { }
 #endif
 
 extern bool _ringexit;		    // for charm exit
@@ -78,7 +86,7 @@ void _libExitHandler(envelope *env)
       }else{
         DEBUG(printf("[%d] Broadcast Exit for %d PE %d nodes\n",CmiMyPe(),CmiNumPes(),CmiNumNodes());)
         CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
-      }	
+      }
       break;
     case ReqStatMsg:
       DEBUG(printf("[%d] Receive Exit for %d PE %d nodes\n",CmiMyPe(),CmiNumPes(),CmiNumNodes());)
@@ -93,7 +101,10 @@ void _libExitHandler(envelope *env)
       else
         CmiFree(env);
       //everyone exits here - there may be issues with leftover messages in the queue
-      DEBUG(printf("[%d] Am done here\n",CmiMyPe());)
+      DEBUG(printf("[%d/%d] Am done here\n",CmiMyRank(),CmiMyPe());)
+#if !CMK_SMP
+      LrtsDrainResources();
+#endif
       _libExitStarted = false;
       StopCharmScheduler();
       break;
@@ -176,8 +187,9 @@ void CharmLibExit() {
     CkExit();
   }
   if (CmiMyRank() == CmiMyNodeSize()) {
-    while (1) { CommunicationServerThread(5); }
+    while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
   } else { 
     CsdScheduler(-1);
+    CmiNodeAllBarrier();
   }
 }

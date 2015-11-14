@@ -15,13 +15,19 @@
 #error "Configure should have errored on missing C++11 atomic library support"
 #endif
 
+#if CMK_USE_LRTS
+extern void LrtsDrainResources();
+#else
+void LrtsDrainResources() { }
+#endif
+
 static std::atomic<int> interopCommThdExit{0};
+std::atomic<int> _cleanUp{0};
 
 CpvCExtern(int,interopExitFlag);
 
 extern "C"
 {
-  int _cleanUp = 0;
 
 #if CMK_USE_LRTS
   extern void CommunicationServerThread(int sleepTime);
@@ -39,10 +45,12 @@ extern "C"
         CommunicationServerThread(5);
       }
       DEBUG(printf("[%d] Commthread Exit Scheduler\n",CmiMyPe()););
+      LrtsDrainResources();
       interopCommThdExit = 0;
     } else {
       CsdScheduler(-1);
     }
+    CmiNodeAllBarrier();
   }
 
   void StopInteropScheduler() {

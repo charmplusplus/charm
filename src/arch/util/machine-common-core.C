@@ -199,8 +199,12 @@ void CmiSuspendedTaskEnqueue(int targetRank, void *data);
 void* CmiSuspendedTaskPop();
 #endif
 
-#if CMK_SMP
 #include <atomic>
+
+extern int CharmLibInterOperate;
+std::atomic<int> ckExitComplete {0};
+
+#if CMK_SMP
 std::atomic<int> commThdExit {0};
 
 /**
@@ -1661,6 +1665,10 @@ static void CommunicationServer(int sleepTime) {
 #endif
         CmiNodeAllBarrier();
         LrtsExit(_exitcode);
+        if(CharmLibInterOperate) {
+          ckExitComplete = 1;
+          CmiNodeAllBarrier();
+        }
     }
 #endif
 }
