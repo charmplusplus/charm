@@ -1,5 +1,5 @@
 include Makefile.in
-all: multirun
+all: multirun multirun_time
 
 #Charm++ libraries to be used for Interoperation
 LIBS=libmodulehi.a libmodulehello.a libmodulekNeighbor.a
