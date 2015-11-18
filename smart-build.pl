@@ -95,8 +95,8 @@ if($cpu =~ m/i[0-9]86/){
 
 
 
-# default to net
-my $converse_network_type = "net";
+# default to netlrts
+my $converse_network_type = "netlrts";
 my $skip_choosing = "false";
 
 print "Are you building to run just on the local machine, and not across multiple nodes? [";
@@ -163,8 +163,7 @@ EOF
 		$converse_network_type = "mpi";
 		last;
 	  } elsif($line eq "2"){
-		$converse_network_type = "net";
-		$options = "$options ibverbs ";
+		$converse_network_type = "verbs";
 		last;
 	  } elsif($line eq "3"){
 	        $arch = "gni-crayxe";
