@@ -5437,10 +5437,35 @@ int AMPI_Group_free(MPI_Group *group)
 int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
 {
   AMPIAPI("AMPI_Comm_create");
+  int rank, rank_in_group, key, color, zero;
+  MPI_Group group_of_comm;
+
   groupStruct vec = getAmpiParent()->group2vec(group);
   if(vec.size()==0) CkAbort("AMPI> Abort: Does it really make sense to create an empty communicator?");
-  getAmpiInstance(comm)->commCreate(vec, newcomm);
-  AMPI_Barrier(comm);
+
+  if(getAmpiParent()->isInter(comm)){
+    /* inter-communicator: create a single new comm. */
+    getAmpiInstance(comm)->commCreate(vec, newcomm);
+    AMPI_Barrier(comm);
+  }
+  else{
+    /* intra-communicator: create comm's for disjoint subgroups,
+     * by calculating (color, key) and splitting comm. */
+    AMPI_Group_rank(group, &rank_in_group);
+    if(rank_in_group == MPI_UNDEFINED){
+      color = MPI_UNDEFINED;
+      key = 0;
+    }
+    else{
+      /* use rank in 'comm' of the 0th rank in 'group'
+       * as identical 'color' of all ranks in 'group' */
+      AMPI_Comm_group(comm, &group_of_comm);
+      zero = 0;
+      MPI_Group_translate_ranks(group, 1, &zero, group_of_comm, &color);
+      key = rank_in_group;
+    }
+    return AMPI_Comm_split(comm, color, key, newcomm);
+  }
   return 0;
 }
 
