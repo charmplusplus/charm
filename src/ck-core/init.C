@@ -67,6 +67,7 @@ never be excluded...
 #include "ck.h"
 #include "trace.h"
 #include "CkCheckpoint.decl.h"
+#include "OOC.decl.h"
 #include <sstream>
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
@@ -153,6 +154,13 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
 CpvCExtern(int,interopExitFlag);
+
+#if CMK_OUT_OF_CORE
+extern "C" void * checkNodeQueue();
+extern "C" void  processNodeQueue(void * obj);
+extern "C" void * checkPrivateObjQ();
+extern "C" void  processPrivateObjQ(void * obj);
+#endif
 
 #if CMK_SHRINK_EXPAND
 //for shrink expand cleanup
@@ -1007,6 +1015,13 @@ extern void _initChareTables();
 #if CMK_MEM_CHECKPOINT
 extern void init_memcheckpt(char **argv);
 #endif
+#if CMK_OUT_OF_CORE
+extern OOCCheckFn OOCPrivateCheck;
+extern OOCProcessFn OOCPrivateProcess;
+extern OOCCheckFn OOCNodeCheck;
+extern OOCProcessFn OOCNodeProcess;
+extern void initOOC(char ** argv);
+#endif
 extern "C" void initCharmProjections();
 extern "C" void CmiInitCPUTopology(char **argv);
 extern "C" void CmiInitCPUAffinity(char **argv);
@@ -1193,6 +1208,14 @@ void _initCharm(int unused_argc, char **argv)
         init_memcheckpt(argv);
 #endif
 
+#if CMK_OUT_OF_CORE
+        initOOC(argv);
+        OOCPrivateCheck = checkPrivateObjQ;
+        OOCPrivateProcess = processPrivateObjQ;
+        OOCNodeCheck = checkNodeQueue;
+        OOCNodeProcess = processNodeQueue;
+#endif
+
 	initCharmProjections();
 #if CMK_TRACE_IN_CHARM
         // initialize trace module in ck
@@ -1252,6 +1275,10 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();
 #endif
+
+#if CMK_OUT_OF_CORE
+                _registerOOC();
+#endif        
 
 
 		/*

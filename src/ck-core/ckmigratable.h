@@ -1,5 +1,15 @@
 #ifndef CKMIGRATABLE_H
 #define CKMIGRATABLE_H
+#include <queue>
+struct CkTask{
+  int epIdx;
+  char * msg;
+  int srcPe;
+  CkMigratable * obj;
+  bool doFree;
+  CkTask(int _epIdx, char * _msg, bool _doFree) : epIdx(_epIdx), msg(_msg), doFree(_doFree){srcPe = CkMyPe();}
+  CkTask(int _epIdx, char * _msg, CkMigratable * _obj, bool _doFree) : epIdx(_epIdx), msg(_msg), obj(_obj), doFree(_doFree){srcPe = CkMyPe();}
+};
 
 class CkMigratable : public Chare {
 protected:
@@ -108,20 +118,14 @@ public:
   void ckFinishConstruction(void) { }
 #endif
 
-#if CMK_OUT_OF_CORE
-private:
-  friend class CkLocMgr;
-  friend int CkArrayPrefetch_msg2ObjId(void *msg);
-  friend void CkArrayPrefetch_writeToSwap(FILE *swapfile,void *objptr);
-  friend void CkArrayPrefetch_readFromSwap(FILE *swapfile,void *objptr);
-  int prefetchObjID; //From CooRegisterObject
-  bool isInCore; //If true, the object is present in memory
-#endif
-
   // FAULT_EVAC
   void AsyncEvacuate(bool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
 public:
   bool isAsyncEvacuate(){return asyncEvacuate;};
+
+  CmiNodeLock pendingQLock;
+  std::queue<CkTask *> pendingQ;
+  bool inUse;
 };
 
 #endif // CKMIGRATABLE_H

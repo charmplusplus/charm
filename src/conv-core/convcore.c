@@ -79,10 +79,6 @@ extern const char * const CmiCommitID;
 extern void initQd(char **argv);
 #endif
 
-#if CMK_OUT_OF_CORE
-#include "conv-ooc.h"
-#endif
-
 #if CONVERSE_POOL
 #include "cmipool.h"
 #endif
@@ -189,12 +185,6 @@ void  *CmiGetNonLocalNodeQ();
 #endif
 
 CpvDeclare(void*, CsdSchedQueue);
-
-#if CMK_OUT_OF_CORE
-/* The Queue where the Prefetch Thread puts the messages from CsdSchedQueue  */
-CpvDeclare(void*, CsdPrefetchQueue);
-pthread_mutex_t prefetchLock;
-#endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(void*, CsdNodeQueue);
@@ -1959,7 +1949,8 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	  CqsDequeue(s->schedQ,(void **)&msg);
           if (msg!=NULL) return msg;	    
         }
-	return NULL;
+
+        return NULL;
 }
 
 
@@ -2020,6 +2011,13 @@ extern void CkClearAllArrayElements();
 
 extern void machine_OffloadAPIProgress();
 
+#if CMK_OUT_OF_CORE
+OOCCheckFn OOCPrivateCheck = NULL;
+OOCProcessFn OOCPrivateProcess = NULL;
+OOCCheckFn OOCNodeCheck = NULL;
+OOCProcessFn OOCNodeProcess = NULL;
+#endif
+
 /** The main scheduler loop that repeatedly executes messages from a queue, forever. */
 void CsdScheduleForever(void)
 {
@@ -2043,42 +2041,68 @@ void CsdScheduleForever(void)
         break;
       }
     }
-    msg = CsdNextMessage(&state);
-    if (msg!=NULL) { /*A message is available-- process it*/
-      if (isIdle) {isIdle=0;CsdEndIdle();}
-      SCHEDULE_MESSAGE
+    #if CMK_OUT_OF_CORE
+    int OOCHasTask = 0;
+    if(OOCPrivateCheck != NULL){
+      void * obj = OOCPrivateCheck();
+      if(obj != NULL){
+        OOCHasTask = 1;
+        if (isIdle) {isIdle=0;CsdEndIdle();}
+        OOCPrivateProcess(obj);
+      }
+    }
+    if(OOCHasTask == 0)
+    #endif  
+    {
+      msg = CsdNextMessage(&state);
+      if (msg!=NULL) { /*A message is available-- process it*/
+        if (isIdle) {isIdle=0;CsdEndIdle();}
+        SCHEDULE_MESSAGE
 
-      #if CMK_CELL
-        if (progressCount <= 0) {
+        #if CMK_CELL
+          if (progressCount <= 0) {
+            /*OffloadAPIProgress();*/
+            machine_OffloadAPIProgress();
+            progressCount = CMK_CELL_PROGRESS_FREQ;
+          }
+          progressCount--;
+        #endif
+
+        #ifdef CMK_CUDA
+          if (cudaProgressCount == 0) {
+            gpuProgressFn(); 
+            cudaProgressCount = CMK_CUDA_PROGRESS_FREQ; 
+          }
+          cudaProgressCount--; 
+        #endif
+
+      } else { /*No message available-- go (or remain) idle*/
+        #if CMK_OUT_OF_CORE
+        OOCHasTask = 0;
+        if(OOCNodeCheck != NULL){
+          void * obj = OOCNodeCheck();
+          if(obj != NULL){
+            OOCHasTask = 1;
+            if (isIdle) {isIdle=0;CsdEndIdle();}
+            OOCNodeProcess(obj);
+          }
+        }
+        if(OOCHasTask == 0)
+        #endif  
+          SCHEDULE_IDLE
+
+        #if CMK_CELL
           /*OffloadAPIProgress();*/
           machine_OffloadAPIProgress();
           progressCount = CMK_CELL_PROGRESS_FREQ;
-	}
-        progressCount--;
-      #endif
+        #endif
 
-      #ifdef CMK_CUDA
-	if (cudaProgressCount == 0) {
-	  gpuProgressFn(); 
-	  cudaProgressCount = CMK_CUDA_PROGRESS_FREQ; 
-	}
-	cudaProgressCount--; 
-      #endif
+        #ifdef CMK_CUDA
+          gpuProgressFn(); 
+          cudaProgressCount = CMK_CUDA_PROGRESS_FREQ;
+        #endif
 
-    } else { /*No message available-- go (or remain) idle*/
-      SCHEDULE_IDLE
-
-      #if CMK_CELL
-        /*OffloadAPIProgress();*/
-        machine_OffloadAPIProgress();
-        progressCount = CMK_CELL_PROGRESS_FREQ;
-      #endif
-
-      #ifdef CMK_CUDA
-	gpuProgressFn(); 
-	cudaProgressCount = CMK_CUDA_PROGRESS_FREQ;
-      #endif
-
+      }
     }
     CsdPeriodic();
   }

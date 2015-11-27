@@ -29,6 +29,9 @@ class Parameter {
     XStr* accelInstName;
     bool podType;
 
+    //out of core support
+    int oocBufferType;
+
     friend class ParamList;
     void pup(XStr &str);
     void copyPtr(XStr &str);
@@ -45,6 +48,7 @@ class Parameter {
     Entry *entry;
     Parameter(int Nline,Type *Ntype,const char *Nname=0,
     	const char *NarrLen=0,Value *Nvalue=0);
+    Parameter(int Nline,const char *Nname=0);
     void setConditional(int c);
     void print(XStr &str,int withDefaultValues=0,int useConst=1);
     void printAddress(XStr &str);
@@ -73,10 +77,18 @@ class Parameter {
       ACCEL_BUFFER_TYPE_WRITEONLY = 3,
       ACCEL_BUFFER_TYPE_MAX       = 3
     };
+    enum{
+      OOC_BUFFER_TYPE_READONLY = 0,
+      OOC_BUFFER_TYPE_READWRITE = 1,
+      OOC_BUFFER_TYPE_WRITEONLY = 2,
+    };
     void setAccelBufferType(int abt);
     int getAccelBufferType();
     void setAccelInstName(XStr* ain);
     XStr* getAccelInstName(void);
+
+    void setOOCBufferType(int abt);
+    int getOOCBufferType();
 };
 
 class ParamList {

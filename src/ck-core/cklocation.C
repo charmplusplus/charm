@@ -1375,68 +1375,6 @@ CkMigratable * CkArrayMessageObjectPtr(envelope *env) {
   return NULL;
 }
 
-/****************************** Out-of-Core support ********************/
-
-#if CMK_OUT_OF_CORE
-CooPrefetchManager CkArrayElementPrefetcher;
-CkpvDeclare(int,CkSaveRestorePrefetch);
-
-/**
- * Return the out-of-core objid (from CooRegisterObject)
- * that this Converse message will access.  If the message
- * will not access an object, return -1.
- */
-int CkArrayPrefetch_msg2ObjId(void *msg) {
-  envelope *env=(envelope *)msg;
-  CkMigratable *elt = CkArrayMessageObjectPtr(env);
-  return elt?elt->prefetchObjID:-1;
-}
-
-/**
- * Write this object (registered with RegisterObject)
- * to this writable file.
- */
-void CkArrayPrefetch_writeToSwap(FILE *swapfile,void *objptr) {
-  CkMigratable *elt=(CkMigratable *)objptr;
-
-  //Save the element's data to disk:
-  PUP::toDisk p(swapfile);
-  elt->virtual_pup(p);
-
-  //Call the element's destructor in-place (so pointer doesn't change)
-  CkpvAccess(CkSaveRestorePrefetch)=1;
-  elt->~CkMigratable(); //< because destructor is virtual, destroys user class too.
-  CkpvAccess(CkSaveRestorePrefetch)=0;
-}
-	
-/**
- * Read this object (registered with RegisterObject)
- * from this readable file.
- */
-void CkArrayPrefetch_readFromSwap(FILE *swapfile,void *objptr) {
-  CkMigratable *elt=(CkMigratable *)objptr;
-  //Call the element's migration constructor in-place
-  CkpvAccess(CkSaveRestorePrefetch)=1;
-  int ctorIdx=_chareTable[elt->thisChareType]->migCtor;
-  elt->myRec->invokeEntry(elt,(CkMigrateMessage *)0,ctorIdx,true);
-  CkpvAccess(CkSaveRestorePrefetch)=0;
-  
-  //Restore the element's data from disk:
-  PUP::fromDisk p(swapfile);
-  elt->virtual_pup(p);
-}
-
-static void _CkMigratable_prefetchInit(void) 
-{
-  CkpvExtern(int,CkSaveRestorePrefetch);
-  CkpvAccess(CkSaveRestorePrefetch)=0;
-  CkArrayElementPrefetcher.msg2ObjId=CkArrayPrefetch_msg2ObjId;
-  CkArrayElementPrefetcher.writeToSwap=CkArrayPrefetch_writeToSwap;
-  CkArrayElementPrefetcher.readFromSwap=CkArrayPrefetch_readFromSwap;
-  CooRegisterManager(&CkArrayElementPrefetcher, _charmHandlerIdx);
-}
-#endif
-
 /****************************** CkMigratable ***************************/
 /**
  * This tiny class is used to convey information to the 
@@ -1454,19 +1392,10 @@ CkpvStaticDeclare(CkMigratable_initInfo,mig_initInfo);
 
 void _CkMigratable_initInfoInit(void) {
   CkpvInitialize(CkMigratable_initInfo,mig_initInfo);
-#if CMK_OUT_OF_CORE
-  _CkMigratable_prefetchInit();
-#endif
 }
 
 void CkMigratable::commonInit(void) {
 	CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
-#if CMK_OUT_OF_CORE
-	isInCore=true;
-	if (CkpvAccess(CkSaveRestorePrefetch))
-		return; /* Just restoring from disk--don't touch object */
-	prefetchObjID=-1; //Unregistered
-#endif
 	myRec=i.locRec;
 	thisIndexMax=myRec->getIndex();
 	thisChareType=i.chareType;
@@ -1489,6 +1418,9 @@ void CkMigratable::commonInit(void) {
 	FAULT_EVAC
 	*/
 	AsyncEvacuate(true);
+        
+        pendingQLock = CmiCreateLock();
+        inUse = false;
 }
 
 CkMigratable::CkMigratable(void) {
@@ -1535,16 +1467,6 @@ void CkMigratable::ckJustRestored(void) { }
 
 CkMigratable::~CkMigratable() {
 	DEBC((AA "In CkMigratable::~CkMigratable %s\n" AB,idx2str(thisIndexMax)));
-#if CMK_OUT_OF_CORE
-	isInCore=false;
-	if (CkpvAccess(CkSaveRestorePrefetch)) 
-		return; /* Just saving to disk--don't deregister anything. */
-	/* We're really leaving or dying-- unregister from the ooc system*/
-	if (prefetchObjID!=-1) {
-		CooDeregisterObject(prefetchObjID);
-		prefetchObjID=-1;
-	}
-#endif
 	/*Might want to tell myRec about our doom here--
 	it's difficult to avoid some kind of circular-delete, though.
 	*/
@@ -2051,12 +1973,15 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
         }
 	}
 #endif
-
-	if (doFree) 
-	   CkDeliverMessageFree(epIdx,msg,obj);
-	else /* !doFree */
-	   CkDeliverMessageReadonly(epIdx,msg,obj);
-
+        if(_entryTable[epIdx]->isDiskPrefetch){
+          _entryTable[epIdx]->precall(epIdx, msg, obj, doFree);
+        }
+        else{
+	  if (doFree) 
+	    CkDeliverMessageFree(epIdx,msg,obj);
+	  else /* !doFree */
+	    CkDeliverMessageReadonly(epIdx,msg,obj);
+        }
 
 #if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
@@ -2882,13 +2807,6 @@ bool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
   CkpvAccess(currentChareIdx) = callingChareIdx;
 #endif
 
-#if CMK_OUT_OF_CORE
-	/* Register new element with out-of-core */
-	PUP::sizer p_getSize;
-	elt->virtual_pup(p_getSize);
-	elt->prefetchObjID=CooRegisterObject(&CkArrayElementPrefetcher,p_getSize.size(),elt);
-#endif
-	
 	return true;
 }
 
@@ -3413,15 +3331,6 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		return;
 	}
 	CkArrayIndex idx=rec->getIndex();
-
-#if CMK_OUT_OF_CORE
-	int localIdx=rec->getLocalIndex();
-	/* Load in any elements that are out-of-core */
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *el=m->element(localIdx);
-		if (el) if (!el->isInCore) CooBringIn(el->prefetchObjID);
-	}
-#endif
 
 	//Let all the elements know we're leaving
 	callMethod(rec,&CkMigratable::ckAboutToMigrate);

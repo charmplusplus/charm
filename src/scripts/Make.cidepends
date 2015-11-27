@@ -13,6 +13,7 @@ CkFutures.decl.h CkFutures.def.h: ckfutures.ci.stamp
 CkLocation.decl.h CkLocation.def.h: cklocation.ci.stamp
 CkMarshall.decl.h CkMarshall.def.h: ckmarshall.ci.stamp
 CkMemCheckpoint.decl.h CkMemCheckpoint.def.h: ckmemcheckpoint.ci.stamp
+OOC.decl.h OOC.def.h: ckooc.ci.stamp
 CkReduction.decl.h CkReduction.def.h: ckreduction.ci.stamp
 ComboCentLB.decl.h ComboCentLB.def.h: ComboCentLB.ci.stamp
 CommAwareRefineLB.decl.h CommAwareRefineLB.def.h: CommAwareRefineLB.ci.stamp

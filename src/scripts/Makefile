@@ -259,6 +259,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
 	  mpi-interoperate.h mpi_main.decl.h  \
+	  oocAPI.h ckooc.h OOC.decl.h OOC.def.h\
 	  $(CVHEADERS)
 
 BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
@@ -609,7 +610,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
-					 trace-controlPoints.o mpi-interoperate.o
+					 trace-controlPoints.o mpi-interoperate.o ckooc.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a

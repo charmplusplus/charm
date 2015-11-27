@@ -1573,6 +1573,14 @@ void Entry::genIndexDecls(XStr& str)
       << "\n    static void _call_" << epStr() << "(void* impl_msg, void* impl_obj);";
   str << templateSpecLine
       << "\n    static void _call_sdag_" << epStr() << "(void* impl_msg, void* impl_obj);";
+  
+  if(isDiskPrefetch()){
+    str << templateSpecLine
+        << "\n    static void _preprocess_" << epStr() << "(int epIdx, void * impl_msg, void * impl_obj, bool doFree);";
+    str << templateSpecLine
+        << "\n    static void _postprocess_" << epStr() << "(void * impl_msg, void * impl_obj);";
+  }
+
   if(isThreaded()) {
     str  << templateSpecLine
          << "\n    static void _callthr_"<<epStr()<<"(CkThrCallArg *);";
@@ -1947,6 +1955,14 @@ void Entry::genDefs(XStr& str)
   str << "\n// Entry point registration function"
       << "\n" << makeDecl("int") << "::reg_" << epStr() << "() {"
       << "\n  int epidx = " << genRegEp() << ";";
+      
+  if(attribs & SDISK){
+    str << "\n CkRegisterOOC(epidx,";
+    str << "_preprocess_" << epStr(false, true);
+    str << ",_postprocess_" << epStr(false, true);
+    str<<");";
+  }
+
   if (hasCallMarshall)
     str << "\n  CkRegisterMarshallUnpackFn(epidx, "
         << "_callmarshall_" << epStr(false, true) << ");";
@@ -2067,6 +2083,10 @@ void Entry::genDefs(XStr& str)
     #endif
   }
 
+  if(isDiskPrefetch()){
+    genOOCDef(str);
+  }
+
   //Generate the call-method body
   str << makeDecl("void")<<"::_call_"<<epStr()<<"(void* impl_msg, void* impl_obj_void)\n";
   str << "{\n"
@@ -2150,6 +2170,46 @@ void Entry::genDefs(XStr& str)
   templateGuardEnd(str);
 }
 
+void Entry::genOOCDef(XStr & str)
+{
+  str<<makeDecl("void")<<"::_preprocess_"<<epStr()<<"(int epIdx, void* impl_msg, void* impl_obj_void, bool doFree)\n{\n";
+  str << "  " << container->baseName() << "* impl_obj = static_cast<"
+      << container->baseName() << " *>(impl_obj_void);\n";
+      
+  if (param->isMarshalled()) {
+    if (param->hasConditional()) str << "  MarshallMsg_"<<epStr()<<" *impl_msg_typed=(MarshallMsg_"<<epStr()<<" *)impl_msg;\n";
+    else str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
+    str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
+    param->beginUnmarshall(str);
+  }
+
+  ParamList * curParam = oocParam;
+  while(curParam != NULL){
+    str<<"addOOCDep(&(impl_obj->"<<curParam->param->getName()<<"));\n";
+    str<<"(impl_obj->"<<curParam->param->getName()<<").setType("<<curParam->param->getOOCBufferType()<<");\n";
+    curParam = curParam->next;
+  }
+  str<<"addAllOOCDeps(impl_obj_void, impl_msg, epIdx, doFree);\n}\n";
+  
+  str<<makeDecl("void")<<"::_postprocess_"<<epStr()<<"(void * impl_msg, void* impl_obj_void)\n{\n";
+  str << "  " << container->baseName() << "* impl_obj = static_cast<"
+      << container->baseName() << " *>(impl_obj_void);\n";
+  
+  if (param->isMarshalled()) {
+    if (param->hasConditional()) str << "  MarshallMsg_"<<epStr()<<" *impl_msg_typed=(MarshallMsg_"<<epStr()<<" *)impl_msg;\n";
+    else str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
+    str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
+    param->beginUnmarshall(str);
+  }
+  
+  curParam = oocParam;
+  while(curParam != NULL){
+    str<<"releaseOOCDep(&(impl_obj->"<<curParam->param->getName()<<"));\n";
+    curParam = curParam->next;
+  }
+  str<<"releaseAllOOCDeps();\n}\n";
+}
+
 XStr Entry::genRegEp(bool isForRedn)
 {
   XStr str;
@@ -2187,8 +2247,12 @@ XStr Entry::genRegEp(bool isForRedn)
 
   /*MEICHAO*/
   if (attribs & SMEM) str << "+CK_EP_MEMCRITICAL";
+
+  //data may reside in indisk
+  if(attribs & SDISK) str << "+CK_EP_DISKPREFETCH";
   
   if (internalMode) str << "+CK_EP_INTRINSIC";
+
   str << ")";
   return str;
 }
@@ -2304,6 +2368,7 @@ void Entry::setAccelParam(ParamList* apl) { accelParam = apl; }
 void Entry::setAccelCodeBody(XStr* acb) { accelCodeBody = acb; }
 void Entry::setAccelCallbackName(XStr* acbn) { accelCallbackName = acbn; }
 
+void Entry::setOOCParam(ParamList * opl) {oocParam = opl;}
 int Entry::isThreaded(void) { return (attribs & STHREADED); }
 int Entry::isSync(void) { return (attribs & SSYNC); }
 int Entry::isIget(void) { return (attribs & SIGET); }
@@ -2325,6 +2390,9 @@ int Entry::isSdag(void) { return (sdagCon!=0); }
 
 // DMK - Accel support
 int Entry::isAccel(void) { return (attribs & SACCEL); }
+
+// out of core support
+int Entry::isDiskPrefetch(void) {return (attribs & SDISK);}
 
 int Entry::isMemCritical(void) { return (attribs & SMEM); }
 int Entry::isReductionTarget(void) { return (attribs & SREDUCE); }

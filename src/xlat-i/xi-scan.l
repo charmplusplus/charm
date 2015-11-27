@@ -144,6 +144,7 @@ struct rwentry rwtable[] = {
 {  "accelblock", ACCELBLOCK },
 {  "memcritical", MEMCRITICAL },
 {  "reductiontarget", REDUCTIONTARGET },
+{  "diskprefetch", DISKPREFETCH },
 {  "case",       CASE },
 {  "",		0 }
 };

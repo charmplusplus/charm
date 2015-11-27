@@ -119,13 +119,6 @@ extern void _CkMigratable_initInfoInit(void);
 /** This is the superclass of all migratable parallel objects.
  *  Currently, that's just array elements.
  */
-#if CMK_OUT_OF_CORE
-#  include "conv-ooc.h"
-extern CooPrefetchManager CkArrayElementPrefetcher;
-// If this flag is set, this creation/deletion is just 
-//   a "fake" constructor/destructor call for prefetching.
-CkpvExtern(int,CkSaveRestorePrefetch);
-#endif
 
 #include "ckmigratable.h"
 

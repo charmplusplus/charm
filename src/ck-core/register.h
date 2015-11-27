@@ -4,6 +4,7 @@
 */
 #ifndef _REGISTER_H
 #define _REGISTER_H
+#include "charm++.h"
 /** \addtogroup CkRegister */
 /*@{*/
 
@@ -48,6 +49,8 @@ class EntryInfo {
       Chares.
     */
     CkCallFnPtr call;
+    CkPreCallFnPtr precall;
+    CkPostCallFnPtr postcall;
     /// Our parameters' index into the _msgTable
     int msgIdx;
     /// Our chare's index into the _chareTable
@@ -63,6 +66,7 @@ class EntryInfo {
    /// true if this EP is used to be rescheduled when adjusting memory usage
    bool isMemCritical;
 #endif
+   bool isDiskPrefetch;
     /** 
       A "marshall unpack" function:
         1.) Pups method parameters out of the buffer passed in to it.

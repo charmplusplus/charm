@@ -55,6 +55,7 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
   , conditional(0)
   , given_name(Nname)
   , podType(false)
+  , oocBufferType(-1)
 {
 	if (isMessage()) {
 		name="impl_msg";
@@ -86,6 +87,10 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
                 }
 	}
 }
+
+Parameter::Parameter(int Nline, const char * Nname)
+  : line(Nline)
+  , name(Nname){}
 
 ParamList::ParamList(ParamList *pl) : manyPointers(false), param(pl->param), next(pl->next) {}
 
@@ -555,10 +560,16 @@ int   Parameter::getAccelBufferType() { return accelBufferType; }
 void  Parameter::setAccelInstName(XStr* ain) { accelInstName = ain; }
 XStr* Parameter::getAccelInstName(void) { return accelInstName; }
 
+void Parameter::setOOCBufferType(int obt){
+  oocBufferType = obt;
+}
+
+int Parameter::getOOCBufferType(){return oocBufferType; }
+
 ParamList::ParamList(Parameter *Nparam,ParamList *Nnext)
   :param(Nparam), next(Nnext) { 
       manyPointers = false;
-      if(next != NULL && (param->isMessage() || next->isMessage())){
+      if(param->oocBufferType == -1 && next != NULL && (param->isMessage() || next->isMessage())){
         manyPointers = true;
       }
 }

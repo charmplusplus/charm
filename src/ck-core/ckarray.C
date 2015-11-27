@@ -246,10 +246,6 @@ CkpvStaticDeclare(ArrayElement_initInfo,initInfo);
 
 void ArrayElement::initBasics(void)
 {
-#if CMK_OUT_OF_CORE
-  if (CkpvAccess(CkSaveRestorePrefetch)) 
-    return; /* Just restoring from disk--don't try to set up anything. */
-#endif
 #if CMK_GRID_QUEUE_AVAILABLE
 	grid_queue_interval = 0;
 	grid_queue_threshold = 0;
@@ -418,10 +414,6 @@ void ArrayElement::ckDestroy(void)
 //Destructor (virtual)
 ArrayElement::~ArrayElement()
 {
-#if CMK_OUT_OF_CORE
-  if (CkpvAccess(CkSaveRestorePrefetch)) 
-    return; /* Just saving to disk--don't trash anything. */
-#endif
   //To detect use-after-delete: 
   thisArray=(CkArray *)0xDEADa7a1;
 }

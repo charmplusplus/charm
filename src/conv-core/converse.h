@@ -150,6 +150,11 @@ typedef struct {
   char *partsizes;
 } PartitionInfo;
 
+#if CMK_OUT_OF_CORE
+typedef void * (*OOCCheckFn)();
+typedef void (*OOCProcessFn)(void *);
+#endif
+
 void CmiCreatePartitions(char **argv);
 #if defined(__cplusplus)
 extern "C" {

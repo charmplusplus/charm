@@ -37,6 +37,7 @@ class WhenStatementEChecker;
 #define SMEM          0x20000
 #define SREDUCE       0x40000 // <- reduction target
 #define SAPPWORK      0x80000 // <- reduction target
+#define SDISK         0x100000
 
 /* An entry construct */
 class Entry : public Member {
@@ -106,6 +107,9 @@ class Entry : public Member {
     void genAccels_spe_c_regFuncs(XStr& str);
     void genAccels_ppe_c_regFuncs(XStr& str);
 
+    //out of core support
+    void genOOCDef(XStr & str);
+
     XStr paramType(int withDefaultVals,int withEO=0,int useConst=1);
     XStr paramComma(int withDefaultVals,int withEO=0);
     XStr eo(int withDefaultVals,int priorComma=1);
@@ -151,6 +155,10 @@ class Entry : public Member {
     int accel_dmaList_numWriteOnly;
     int accel_dmaList_scalarNeedsWrite;
 
+    // out-of-core support
+    ParamList * oocParam;
+    void setOOCParam(ParamList * opl);
+    
     Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0, int fl=-1, int ll=-1);
     void setChare(Chare *c);
     int paramIsMarshalled(void);
@@ -177,6 +185,9 @@ class Entry : public Member {
     // DMK - Accel support
     int isAccel(void);
 
+    // out of core support
+    int isDiskPrefetch(void);
+    
     int isMemCritical(void);
     int isReductionTarget(void);
 

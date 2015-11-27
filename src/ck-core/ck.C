@@ -591,6 +591,9 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   _entryTable[epIdx]->call(msg, obj);
+  if(_entryTable[epIdx]->isDiskPrefetch){
+    _entryTable[epIdx]->postcall(msg, obj);
+  }
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -625,6 +628,9 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
   _entryTable[epIdx]->call(deliverMsg, obj);
+  if(_entryTable[epIdx]->isDiskPrefetch){
+    _entryTable[epIdx]->postcall((void *)msg, obj);
+  }
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -2697,6 +2703,151 @@ int isCharmEnvelope(void *msg) {
     return 1;
 }
 
+#include <queue>
+std::queue<CkMigratable *> objQ;
+CmiNodeLock objQLock;
+std::vector<std::queue<CkTask *>> privateObjQ; 
+bool objQInUse = false;
+
+void initNodeQueue(){
+  objQLock = CmiCreateLock();
+  objQInUse = true;
+  privateObjQ.resize(CmiMyNodeSize());
+}
+
+extern "C"
+void * checkPrivateObjQ(){
+  CkTask * t = NULL;
+  if(privateObjQ[CmiMyRank()].size() > 0){
+    t = privateObjQ[CmiMyRank()].front();
+    privateObjQ[CmiMyRank()].pop();
+  }
+  return t;
+}
+
+extern "C"
+void processPrivateObjQ(void * o){
+  CkTask * task = (CkTask *)o;
+  if(task != NULL){
+    void * msg = task->msg;
+    int epIdx = task->epIdx;
+    CkMigratable * obj = task->obj;
+    bool doFree = task->doFree;
+    delete task;
+#if CMK_TRACE_ENABLED
+    if (msg) { /* Tracing: */
+      envelope *env=UsrToEnv(msg);
+      if (_entryTable[epIdx]->traceEnabled)
+      {
+        env->setEpIdx(epIdx);
+        _TRACE_CREATION_1(env);
+        _TRACE_CREATION_DONE(1);
+        
+        CkArrayIndex idx = obj->ckGetArrayIndex();
+        _TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(), ForChareMsg,epIdx,task->srcPe, env->getTotalsize(), idx.getProjectionID(env->getArrayMgrIdx()), obj);
+        if(_entryTable[epIdx]->appWork)
+          _TRACE_BEGIN_APPWORK();
+      }
+    }
+#endif
+    
+    if(doFree)
+      CkDeliverMessageFree(epIdx,msg,obj);
+    else
+      CkDeliverMessageReadonly(epIdx,msg,obj);
+  
+#if CMK_TRACE_ENABLED
+    if (msg) { /* Tracing: */
+      if (_entryTable[epIdx]->traceEnabled)
+      {
+        if(_entryTable[epIdx]->appWork)
+          _TRACE_END_APPWORK();
+	_TRACE_END_EXECUTE();
+      }
+    }
+#endif
+  }
+}
+
+extern "C"
+void * checkNodeQueue(){
+  if(!objQInUse)
+    return NULL;
+  CkMigratable * obj = NULL;  
+  CmiLock(objQLock);
+  if(objQ.size()>0){
+    obj = objQ.front();
+    objQ.pop();
+  }
+  CmiUnlock(objQLock);
+  return obj;
+}
+
+
+extern "C"
+void processNodeQueue(void * o){
+  CkMigratable * obj = (CkMigratable *)o;
+  if(obj != NULL){
+    CkTask * task;
+    CmiLock(obj->pendingQLock);
+    task = obj->pendingQ.front();
+    obj->pendingQ.pop();
+    obj->inUse = true;
+    CmiUnlock(obj->pendingQLock);
+    //CkPrintf("[%d]executing object\n", CkMyPe());  
+    //execute the task
+    void * msg = task->msg;
+    int epIdx = task->epIdx;
+    bool doFree = task->doFree;
+    delete task;
+#if CMK_TRACE_ENABLED
+    if (msg) { /* Tracing: */
+      envelope *env=UsrToEnv(msg);
+      if (_entryTable[epIdx]->traceEnabled)
+      {
+        env->setEpIdx(epIdx);
+        _TRACE_CREATION_1(env);
+        _TRACE_CREATION_DONE(1);
+        
+        CkArrayIndex idx = obj->ckGetArrayIndex();
+        _TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(), ForChareMsg,epIdx,task->srcPe, env->getTotalsize(), idx.getProjectionID(env->getArrayMgrIdx()), obj);
+        if(_entryTable[epIdx]->appWork)
+          _TRACE_BEGIN_APPWORK();
+      }
+    }
+#endif
+    if(doFree)
+      CkDeliverMessageFree(epIdx,msg,obj);
+    else
+      CkDeliverMessageReadonly(epIdx,msg,obj);
+  
+#if CMK_TRACE_ENABLED
+    if (msg) { /* Tracing: */
+      if (_entryTable[epIdx]->traceEnabled)
+      {
+        if(_entryTable[epIdx]->appWork)
+          _TRACE_END_APPWORK();
+	_TRACE_END_EXECUTE();
+      }
+    }
+#endif
+
+    //check whether to put the obj back to Q
+    bool empty;
+    CmiLock(obj->pendingQLock);
+    //CkPrintf("[%d]executing object done %d\n", CkMyPe(), obj->pendingQ.size());  
+    obj->inUse = false;
+    empty = obj->pendingQ.size()==0?true:false;
+    CmiUnlock(obj->pendingQLock);
+    
+    if(!empty){
+      //CkPrintf("[%d]put object back\n", CkMyPe());
+      CmiLock(objQLock);
+      objQ.push(obj);
+      CmiUnlock(objQLock);
+    }
+  }
+}
 
 #include "CkMarshall.def.h"
 

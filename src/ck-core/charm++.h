@@ -35,6 +35,11 @@ PUPbytes(CmiGroup)
 
 CkpvExtern(size_t *, _offsets);
 
+/** OOC related registration */
+typedef void  (*CkPreCallFnPtr) (int epIdx, void *msg, void *obj, bool doFree);
+typedef void  (*CkPostCallFnPtr) (void * msg, void * obj);
+extern void CkRegisterOOC(int idx, CkPreCallFnPtr preCall, CkPostCallFnPtr postCall);
+
 class CkArray;
 
 //This is for passing a single Charm++ message via parameter marshalling

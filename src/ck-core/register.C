@@ -60,7 +60,19 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
     e->isMemCritical=false;
   }
 #endif
+  if(ck_ep_flags & CK_EP_DISKPREFETCH){
+    e->isDiskPrefetch = true;   
+  }else{
+    e->isDiskPrefetch = false;
+  }
+
   return _entryTable.add(e);
+}
+
+void CkRegisterOOC(int idx, CkPreCallFnPtr preCall, CkPostCallFnPtr postCall)
+{
+  _entryTable[idx]->precall = preCall;
+  _entryTable[idx]->postcall = postCall;
 }
 
 extern "C"

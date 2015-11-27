@@ -1,6 +1,5 @@
 module CkLocation {
   extern module CkMarshall;
-
   message CkArrayElementMigrateMessage {
 	char packData[];
   };

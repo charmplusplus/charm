@@ -1,0 +1,13 @@
+module OOC{
+  readonly long CkOOCMemLimit;
+  readonly std::string CkOOCPrefix;
+  readonly int CkOOCMode;
+  readonly CProxy_CkOOCManager CkOOCProxy;
+  //initnode void initNodeOOC();
+  //initproc void initProcOOC();
+  
+  group CkOOCManager{
+    entry CkOOCManager();
+    entry void printAnalysis();
+  };
+};

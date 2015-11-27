@@ -133,6 +133,7 @@ void ReservedWord(int token);
 %token WRITEONLY
 %token ACCELBLOCK
 %token MEMCRITICAL
+%token DISKPREFETCH
 %token REDUCTIONTARGET
 %token CASE
 
@@ -161,9 +162,9 @@ void ReservedWord(int token);
 %type <entry>		Entry SEntry
 %type <entrylist>	SEntryList
 %type <templat>		Template
-%type <pname>           Parameter ParamBracketStart AccelParameter AccelArrayParam
-%type <plist>           ParamList EParameters AccelParamList AccelEParameters
-%type <intval>          AccelBufferType
+%type <pname>           Parameter ParamBracketStart AccelParameter AccelArrayParam OOCParameter
+%type <plist>           ParamList EParameters AccelParamList AccelEParameters OOCParamList OOCEParameters
+%type <intval>          AccelBufferType OOCBufferType
 %type <xstrptr>         AccelInstName
 %type <accelBlock>      AccelBlock
 %type <typelist>	BaseList OptBaseList
@@ -271,6 +272,7 @@ Name		: IDENT
 		/* | WRITEONLY { ReservedWord(WRITEONLY); YYABORT; } */
 		| ACCELBLOCK { ReservedWord(ACCELBLOCK); YYABORT; }
 		| MEMCRITICAL { ReservedWord(MEMCRITICAL); YYABORT; }
+		| DISKPREFETCH { ReservedWord(DISKPREFETCH); YYABORT; }
 		| REDUCTIONTARGET { ReservedWord(REDUCTIONTARGET); YYABORT; }
 		| CASE { ReservedWord(CASE); YYABORT; }
 		;
@@ -894,6 +896,13 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                   $$->setAccelCodeBody(codeBody);
                   $$->setAccelCallbackName(new XStr(callbackName));
                 }
+                | ENTRY '[' DISKPREFETCH ']' VOID Name EParameters OOCEParameters ';' 
+                {
+                  const char* name = $6;
+                  ParamList* paramList = $7;
+                  $$ = new Entry(lineno, SDISK, new BuiltinType("void"), name, paramList, 0, 0, 0 );
+                  $$->setOOCParam($8);
+                }
 		;
 
 AccelBlock      : ACCELBLOCK ParamBraceStart CCode ParamBraceEnd ';'
@@ -1054,6 +1063,11 @@ AccelBufferType : READONLY  { $$ = Parameter::ACCEL_BUFFER_TYPE_READONLY; }
                 | WRITEONLY { $$ = Parameter::ACCEL_BUFFER_TYPE_WRITEONLY; }
                 ;
 
+OOCBufferType   : READONLY  { $$ = Parameter::OOC_BUFFER_TYPE_READONLY; }
+                | READWRITE { $$ = Parameter::OOC_BUFFER_TYPE_READWRITE; }
+                | WRITEONLY { $$ = Parameter::OOC_BUFFER_TYPE_WRITEONLY; }
+                ;
+
 AccelInstName   : Name { $$ = new XStr($1); }
                 | AccelInstName '-' '>' Name { $$ = new XStr(""); *($$) << *($1) << "->" << $4; }
                 | AccelInstName '.' Name { $$ = new XStr(""); *($$) << *($1) << "." << $3; }
@@ -1106,6 +1120,27 @@ AccelParameter	: AccelBufferType ':' Type Name '<' AccelInstName '>'
 		}
 		;
 
+OOCParameter    :  OOCBufferType ':' Name SParamBracketStart CCode SParamBracketEnd
+                {
+                  char *tmp = new char[strlen($3)+strlen($5)+3];
+                  sprintf(tmp,"%s[%s]", $3, $5);
+                  $$ = new Parameter(lineno, tmp);
+                  $$->setOOCBufferType($1);
+                }
+                | OOCBufferType ':' Name StartIntExpr CCode EndIntExpr
+                {
+                  char *tmp = new char[strlen($3)+strlen($5)+3];
+                  sprintf(tmp,"%s(%s)", $3, $5);
+                  $$ = new Parameter(lineno, tmp);
+                  $$->setOOCBufferType($1);
+                }
+                |  OOCBufferType ':' Name
+                {
+                  $$ = new Parameter(lineno,$3);
+                  $$->setOOCBufferType($1);
+                }
+                ;
+
 ParamList	: Parameter
 		{ $$ = new ParamList($1); }
 		| Parameter ',' ParamList
@@ -1118,6 +1153,12 @@ AccelParamList	: AccelParameter
 		{ $$ = new ParamList($1,$3); }
 		;
 
+OOCParamList	: OOCParameter
+		{ $$ = new ParamList($1); }
+		| OOCParameter ',' OOCParamList
+		{ $$ = new ParamList($1,$3); }
+                ;
+
 EParameters	: '(' ParamList ')'
 		{ $$ = $2; }
 		| '(' ')'
@@ -1129,6 +1170,10 @@ AccelEParameters  : '[' AccelParamList ']'
 		  | '[' ']'
 		  { $$ = 0; }
 		  ;
+
+OOCEParameters  : '[' OOCParamList ']'
+                { $$ = $2;}
+                ;
 
 OptStackSize	: /* Empty */
 		{ $$ = 0; }
