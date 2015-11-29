@@ -202,18 +202,22 @@ size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
               CmiError("Warning: CmiFwrite retrying ...\n");
             else if(errno == ENOMEM)
 	    {
+#ifndef CMK_BIGSIM_CHARM
 	      if(firsttime == 0) firsttime = CmiWallTimer();
-	      if(CmiWallTimer()-firsttime > 300)
+              if(CmiWallTimer()-firsttime > 300)
 		break;
-	    }
+#endif
+            }
 	    else
               break;
           }
           else
             nwritten += ncur;
         }
+#ifndef CMK_BIGSIM_CHARM
 	if(firsttime != 0)
 	  CmiError("Warning: CmiFwrite retried for %lf ...\n", CmiWallTimer() - firsttime);
+#endif
 
         return nwritten;
 }
