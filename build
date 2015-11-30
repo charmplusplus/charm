@@ -1,8 +1,15 @@
 #!/bin/sh
 
 # Silly shorthand, used for source reorganization
-srcbase="$(cd $(dirname $0)/src/; pwd)"
-src="$srcbase/arch/"
+if [ $(dirname $0) = "." ]
+then
+  srcbaseabs="./src"
+  srcbase="../../src"
+else
+  srcbaseabs="$(cd $(dirname $0)/src/; pwd)"
+  srcbase=$srcbaseabs
+fi
+src="$srcbaseabs/arch/"
 
 more=0
 
@@ -82,8 +89,8 @@ syntax() {
   echo "  --build-shared     build Charm++ dynamic libraries (.so) "
   echo ''
   echo 'Enable/disable features:'
-  $srcbase/scripts/configure --help | grep enable-
-  $srcbase/scripts/configure --help | grep with-
+  $srcbaseabs/scripts/configure --help | grep enable-
+  $srcbaseabs/scripts/configure --help | grep with-
   echo "  --with-production       build Charm++ with all optimizations for maximum performance, and disabling all above features"
   echo ''
   echo 'Miscellaneous options:'
@@ -507,6 +514,13 @@ then
   DESTINATION="$VERSION"
 fi
 
+if [ $(dirname $DESTINATION) != "." ]
+then
+  srcbaseabs="$(cd $srcbaseabs; pwd)"
+  srcbase=$srcbaseabs
+  src="$srcbaseabs/arch/"
+fi
+
 if [ -n "$DESTINATION_SUFFIX" ]
 then
   DESTINATION="$DESTINATION-$DESTINATION_SUFFIX"
@@ -566,7 +580,7 @@ fi
 
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Make.depends" $DESTINATION/tmp/Make.depends
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
-if test -f "$srcbase/ck-ldb/Make.lb"
+if test -f "$srcbaseabs/ck-ldb/Make.lb"
 then
 $DESTINATION/tmp/system_ln "$srcbase/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 else
@@ -685,8 +699,8 @@ then
     [ -z "$TAU_MAKEFILE" ] && TAU_MAKEFILE="Make.tau"
     SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
 
-    sed -e $SED_CHARMC $srcbase/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ $srcbase/scripts/Makefile && rm -f  .Makefile.$$
-    sed -e $SED_CHARMC $srcbase/scripts/charmc > .charmc.$$ && cp .charmc.$$ $srcbase/scripts/charmc && rm -f .charmc.$$
+    sed -e $SED_CHARMC $srcbaseabs/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ $srcbaseabs/scripts/Makefile && rm -f  .Makefile.$$
+    sed -e $SED_CHARMC $srcbaseabs/scripts/charmc > .charmc.$$ && cp .charmc.$$ $srcbaseabs/scripts/charmc && rm -f .charmc.$$
 
     echo "#define CMK_WITH_TAU               1" >> $ConvHeader
     echo "#define pthread_create             tau_pthread_create" >> $ConvHeader
