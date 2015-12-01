@@ -3044,14 +3044,14 @@ void req_set_client_connect(int start, int end)
   ChMessage msg;
   int client, i;
   int done, maxdesc;
-  int *finished;
+  int *finished;  // -1 if client i not finished, otherwise the node id of client i
   int curclient, curclientend, curclientstart;
 
   curclient = curclientend = curclientstart = start;
 
   finished = (int *) malloc((end - start) * sizeof(int));
   for (i = 0; i < (end - start); i++)
-    finished[i] = 0;
+    finished[i] = -1;
 
 #if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
   for (i = start; i < end; i++) {
@@ -3080,20 +3080,25 @@ void req_set_client_connect(int start, int end)
         if (skt_select1(req_clients[client], 1) != 0) {
           ChMessage_recv(req_clients[client], &msg);
           req_handle_initnode(&msg, req_clients[client]);
-          finished[client - start] = 1;
+          finished[client - start] = 
+            ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
         }
       }
 
     /* test if done */
     done = 1;
     for (i = curclientstart - start; i < (end - start); i++)
-      if (finished[i] == 0) {
+      if (finished[i] == -1) {
         curclientstart = start + i;
         done = 0;
         break;
       }
   }
   ChMessage_free(&msg);
+
+  // correct mapping in skt_client_table so that socket points to node using the socket
+  for (i = start; i < (end - start); i++)
+    skt_client_table[req_clients[i]] = finished[i];
 
   free(finished);
 }
@@ -3105,14 +3110,14 @@ void req_set_client_connect(int start, int end)
   ChMessage msg;
   int client, i;
   int done, maxdesc;
-  int *finished;
+  int *finished;  // -1 if client i not finished, otherwise the node id of client i
   int curclient, curclientend, curclientstart;
 
   curclient = curclientend = curclientstart = start;
 
   finished = malloc((end - start) * sizeof(int));
   for (i = 0; i < (end - start); i++)
-    finished[i] = 0;
+    finished[i] = -1;
 
   if (arg_child_charmrun && start == 0)
     myNodesInfo = malloc(sizeof(ChSingleNodeinfo) * nodetab_rank0_size);
@@ -3155,20 +3160,25 @@ void req_set_client_connect(int start, int end)
             } else /* hier-start with 2nd leval*/
               add_singlenodeinfo_to_mynodeinfo(&msg, req_clients[client]);
           }
-          finished[client - start] = 1;
+          finished[client - start] = 
+              ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
         }
       }
 
     /* test if done */
     done = 1;
     for (i = curclientstart - start; i < (end - start); i++)
-      if (finished[i] == 0) {
+      if (finished[i] == -1) {
         curclientstart = start + i;
         done = 0;
         break;
       }
   }
   ChMessage_free(&msg);
+
+  // correct mapping in skt_client_table so that socket points to node using the socket
+  for (i = start; i < (end - start); i++)
+    skt_client_table[req_clients[i]] = finished[i];
 
   free(finished);
 }
@@ -5212,7 +5222,7 @@ void reconnect_crashed_client(int socket_index, int crashed_node)
         "Timeout waiting for restarted node-program to connect");
   }
   req_clients[socket_index] = skt_accept(server_fd, &clientIP, &clientPort);
-  skt_client_table[req_clients[socket_index]] = socket_index;
+  skt_client_table[req_clients[socket_index]] = crashed_node;
 
   if (req_clients[socket_index] == SOCKET_ERROR) {
     client_connect_problem(socket_index, socket_index,
