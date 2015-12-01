@@ -1009,7 +1009,7 @@ void arg_init(int argc, const char **argv)
   if (arg_hierarchical_start) {
     printf("Charmrun> Hierarchical scalable start enabled. \n");
     if (arg_debug || arg_debug_no_pause) {
-      fprintf(stderr, "Charmrun> Error: ++hierarchial-start does not support "
+      fprintf(stderr, "Charmrun> Error: ++hierarchical-start does not support "
                       "debugging mode. \n");
       exit(1);
     }
@@ -2304,9 +2304,7 @@ int req_handle_crash(ChMessage *msg, SOCKET fd)
 #ifdef __FAULT__
 void error_in_req_serve_client(SOCKET fd)
 {
-  SOCKET *new_req_clients =
-      (SOCKET *) malloc((req_nClients - 1) * sizeof(SOCKET));
-  int count = 0, i;
+  int i;
   int crashed_node, crashed_pe, node_index, socket_index;
   fprintf(stdout, "Socket %d failed \n", fd);
 
@@ -3685,7 +3683,7 @@ int main(int argc, const char **argv, char **envp)
       start_nodes_local(envp);
   }
 
-  /* Normanl startup*/
+  /* Normal startup*/
   else
 
 #endif
@@ -4163,14 +4161,6 @@ int rsh_fork(int nodeno, const char *startScript)
   int pid;
   const char *s, *e;
 
-  /* figure out size and dynamic allocate */
-  s = nodetab_shell(nodeno);
-  e = skipstuff(s);
-  while (*s) {
-    s = skipblanks(e);
-    e = skipstuff(s);
-  }
-
   s = nodetab_shell(nodeno);
   e = skipstuff(s);
   while (*s) {
@@ -4191,11 +4181,12 @@ int rsh_fork(int nodeno, const char *startScript)
   rshargv.push_back("/bin/bash -f");
   rshargv.push_back((const char *) NULL);
 
-  std::string cmd_str = rshargv[0];
-  for (int n = 1; n < rshargv.size()-1; ++n)
-    cmd_str += " " + std::string(rshargv[n]);
-  if (arg_verbose)
+  if (arg_verbose) {
+    std::string cmd_str = rshargv[0];
+    for (int n = 1; n < rshargv.size()-1; ++n)
+      cmd_str += " " + std::string(rshargv[n]);
     printf("Charmrun> Starting %s\n", cmd_str.c_str());
+  }
 
   pid = fork();
   if (pid < 0) {
@@ -4203,12 +4194,11 @@ int rsh_fork(int nodeno, const char *startScript)
     exit(1);
   }
   if (pid == 0) { /*Child process*/
-    int i;
     int fdScript = open(startScript, O_RDONLY);
     /**/ unlink(startScript); /**/
     dup2(fdScript, 0);        /*Open script as standard input*/
     // removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
-    for (i = 3; i < 1024; i++)
+    for (int i = 3; i < 1024; i++)
       close(i);
     execvp(rshargv[0], const_cast<char **>(&rshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find remote shell program '%s'!\n",
@@ -5220,7 +5210,7 @@ void reconnect_crashed_client(int socket_index, int crashed_node)
   if (0 == skt_select1(server_fd, arg_timeout * 1000)) {
     client_connect_problem(
         socket_index, socket_index,
-        "Timeout waiting forrestarted node-program to connect");
+        "Timeout waiting for restarted node-program to connect");
   }
   req_clients[socket_index] = skt_accept(server_fd, &clientIP, &clientPort);
   skt_client_table[req_clients[socket_index]] = socket_index;
