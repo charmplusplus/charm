@@ -797,7 +797,7 @@ void arg_init(int argc, const char **argv)
   pparam_int(&arg_batch_spawn, 0, "batch", "Launch connections to this many "
                                            "node programs at a time, avoiding "
                                            "overloading charmrun pe");
-  pparam_flag(&arg_scalable_start, 0, "scalable-start", "scalable start");
+  pparam_flag(&arg_scalable_start, 1, "scalable-start", "scalable start");
 #ifdef HSTART
   pparam_flag(&arg_hierarchical_start, 0, "hierarchical-start",
               "hierarchical start");
@@ -915,6 +915,10 @@ void arg_init(int argc, const char **argv)
     arg_server = 1;
 
   if (arg_debug || arg_debug_no_pause) {
+    fprintf(stderr, "Charmrun> scalable start disabled under ++debug:\n"
+                    "NOTE: will make an SSH connection per process launched,"
+                    " instead of per physical node.\n");
+    arg_scalable_start = 0;
     arg_verbose = 1;
     /*Pass ++debug along to program (used by machine.c)*/
     arg_argv[arg_argc++] = "++debug";
@@ -998,11 +1002,6 @@ void arg_init(int argc, const char **argv)
   }
   if (arg_scalable_start) {
     printf("Charmrun> scalable start enabled. \n");
-    if (arg_debug || arg_debug_no_pause) {
-      fprintf(stderr, "Charmrun> Error: ++scalable-start does not support "
-                      "debugging mode. \n");
-      exit(1);
-    }
   }
 
 #ifdef HSTART
