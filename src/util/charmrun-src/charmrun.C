@@ -5125,11 +5125,11 @@ void restart_node(int crashed_node)
   restart_argv[i + 2] = "+restartisomalloc";
   restart_argv[i + 3] = NULL;
 
-  rsh_script(f, pe, crashed_node, restart_argv, 1);
-  fclose(f);
   /** change the nodetable entry of the crashed
 processor to connect it to a new one**/
   refill_nodetab_entry(crashed_node);
+  rsh_script(f, pe, crashed_node, restart_argv, 1);
+  fclose(f);
   /**start the new processor */
   restart_rsh_pid = rsh_fork(pe, startScript);
   /**wait for the reply from the new process*/
