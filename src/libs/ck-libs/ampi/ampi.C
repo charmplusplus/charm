@@ -3784,7 +3784,10 @@ int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Sta
 int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Testall");
-  if(count==0) return MPI_SUCCESS;
+  if(count==0){
+    *flag = 1;
+    return MPI_SUCCESS;
+  }
   checkRequests(count,request);
   int tmpflag;
   int i,j;
