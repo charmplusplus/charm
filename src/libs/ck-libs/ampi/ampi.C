@@ -2719,8 +2719,8 @@ int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
   MPI_Status tempStatus;
   if(!sts) sts = &tempStatus;
 
-  int se=MPI_Send(sbuf,scount,stype,dest,stag,comm);
-  int re=MPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts);
+  int se=AMPI_Send(sbuf,scount,stype,dest,stag,comm);
+  int re=AMPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts);
   if (se) return se;
   else return re;
 }
@@ -3800,7 +3800,7 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
     }
   }
   if(flag) 
-    MPI_Waitall(count,request,sts);
+    AMPI_Waitall(count,request,sts);
   delete reqvec;	
   return 0;
 }
@@ -5461,7 +5461,7 @@ int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
        * as identical 'color' of all ranks in 'group' */
       AMPI_Comm_group(comm, &group_of_comm);
       zero = 0;
-      MPI_Group_translate_ranks(group, 1, &zero, group_of_comm, &color);
+      AMPI_Group_translate_ranks(group, 1, &zero, group_of_comm, &color);
       key = rank_in_group;
     }
     return AMPI_Comm_split(comm, color, key, newcomm);
@@ -6168,7 +6168,7 @@ GPUReq::GPUReq()
   comm = MPI_COMM_SELF;
   isComplete = false;
   isvalid = true;
-  MPI_Comm_rank(comm, &src);
+  AMPI_Comm_rank(comm, &src);
   buf = getAmpiInstance(comm);
 }
 
@@ -6237,7 +6237,7 @@ int AMPI_GPU_Invoke(workRequest *to_call)
 
   MPI_Request req;
   AMPI_GPU_Iinvoke(to_call, &req);
-  MPI_Wait(&req, MPI_STATUS_IGNORE);
+  AMPI_Wait(&req, MPI_STATUS_IGNORE);
 
   return 0;
 }
