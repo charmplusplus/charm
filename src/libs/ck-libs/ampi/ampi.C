@@ -3802,7 +3802,7 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
       *flag *= tmpflag;
     }
   }
-  if(flag) 
+  if(*flag)
     AMPI_Waitall(count,request,sts);
   delete reqvec;	
   return 0;
