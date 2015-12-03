@@ -3789,11 +3789,10 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
     return MPI_SUCCESS;
   }
   checkRequests(count,request);
-  int tmpflag;
-  int i,j;
+  int i,j,tmpflag;
   AmpiRequestList* reqs = getReqs();
   CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
-  *flag = 1;  
+  *flag = 1;
   for(i=0;i<reqvec->size();i++){
     for(j=0;j<((*reqvec)[i]).size();j++){
       if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL)
@@ -3804,7 +3803,7 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
   }
   if(*flag)
     AMPI_Waitall(count,request,sts);
-  delete reqvec;	
+  delete reqvec;
   return 0;
 }
 
