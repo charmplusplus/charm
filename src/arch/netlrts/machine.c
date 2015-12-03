@@ -1828,11 +1828,7 @@ void LrtsExit()
 
   CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
-#if CMK_MULTICORE && CMK_SHARED_VARS_POSIX_THREADS_SMP
-    pthread_exit(0);
-#else
     exit(0);
-#endif
   }
   else {
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */

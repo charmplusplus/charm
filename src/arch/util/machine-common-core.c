@@ -1359,7 +1359,7 @@ if (MSG_STATISTIC)
       CmiPrintf("[Partition %d][Node %d] End of program\n",CmiMyPartition(),CmiMyNode());
 #endif
 
-#if !CMK_SMP || CMK_SMP_NO_COMMTHD
+#if !CMK_SMP
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif
@@ -1374,6 +1374,13 @@ if (MSG_STATISTIC)
     commThdExit++;
     CmiUnlock(commThdExitLock);
     CmiNodeAllBarrier();
+#if CMK_SMP_NO_COMMTHD
+#if CMK_USE_XPMEM
+    if (CmiMyRank() == 0) CmiExitXpmem();
+    CmiNodeAllBarrier();
+#endif
+    if (CmiMyRank() == 0) LrtsExit();
+#endif
     if(CharmLibInterOperate)
       CmiYield();
     else 
