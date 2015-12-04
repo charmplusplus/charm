@@ -639,7 +639,11 @@ static int IndexPool_getslot(IndexPool *pool, void *addr, int type)
         int newsize = pool->size * 2;
         //printf("[%d] IndexPool_getslot %p expand to: %d\n", myrank, pool, newsize);
         if (newsize > pool->maxsize) {
-            printf("[%d] Warning: IndexPool_getslot %p overflow when expanding to: %d\n", myrank, pool, newsize);
+            static bool overflow = false;
+            if(!overflow){
+                printf("[%d] Warning: IndexPool_getslot %p overflow when expanding to: %d\n", myrank, pool, newsize);
+                overflow = true;
+            }
             return -1;
         }
         struct IndexStruct *old_ackpool = pool->indexes;
