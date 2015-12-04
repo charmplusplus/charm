@@ -2,6 +2,31 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.7.0
+================================================================================
+
+- New API for efficient formula-based distributed spare array creation.
+
+- CkLoop is now built by default.
+
+- CommLib has been removed.
+
+- PXSHM now auto-detects the node size, so '+nodesize' is deprecated
+
+- Out-of-tree builds are now supported
+
+- New machine target for multicore Linux ARM7: multicore-linux-arm7
+
+- CmiBool has been dropped in favor of C++'s bool
+
+- CBase_Foo::pup need not be called from Foo::pup in user code anymore
+
+- Improved AMPI Fortran2003 PUP interface 'apup', similiar to C++'s STL PUP
+
+- Further MPI standard compliance in AMPI allows users to build and run
+  Hypre-2.10.1 on AMPI with virtualization, migration, etc.
+
+================================================================================
 What's new in Charm++ 6.6.0
 ================================================================================
 
