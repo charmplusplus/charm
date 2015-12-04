@@ -3359,7 +3359,7 @@ int IReq::wait(MPI_Status *sts){
     //in the outer function call.	
     if(_BgInOutOfCoreMode)
       return -1;
-#endif	
+#endif
   }   // end of while
   ptr->resumeOnRecv=false;
 
@@ -3444,9 +3444,11 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
   do{
     AmpiRequest *waitReq = (*reqs)[*request];
     waitResult = waitReq->wait(sts);
+#if CMK_BIGSIM_CHARM
     if(_BgInOutOfCoreMode){
       reqs = getReqs();
     }
+#endif
   }while(waitResult==-1);
 
 
@@ -3529,11 +3531,13 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       do{	
         AmpiRequest *waitReq = ((*reqs)[request[((*reqvec)[i])[j]]]);
         waitResult = waitReq->wait(sts ? &sts[((*reqvec)[i])[j]] : &tempStatus);
+
+#if CMK_BIGSIM_CHARM
         if(_BgInOutOfCoreMode){
           reqs = getReqs();
           reqvec = vecIndex(count, request);
         }
-
+#endif
 #if AMPIMSGLOG
         if(msgLogWrite && record_msglog(pptr->thisIndex)){
           (pptr->pupBytes) = getDDT()->getSize(waitReq->type) * (waitReq->count);
