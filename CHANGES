@@ -5,26 +5,52 @@ This file describes the most significant changes. For more detail, use
 What's new in Charm++ 6.7.0
 ================================================================================
 
-- New API for efficient formula-based distributed spare array creation.
+Over 120 bugs fixed, spanning areas across the entire system
 
-- CkLoop is now built by default.
+Charm++ Features
 
-- CommLib has been removed.
+- New API for efficient formula-based distributed spare array creation
 
-- PXSHM now auto-detects the node size, so '+nodesize' is deprecated
+- CkLoop is now built by default
 
-- Out-of-tree builds are now supported
+- CBase_Foo::pup need not be called from Foo::pup in user code anymore - runtime
+  code handles this automatically
 
-- New machine target for multicore Linux ARM7: multicore-linux-arm7
+- Error reporting and recovery in .ci files is greatly improved, providing more
+  precise line numbers and often column information
 
-- CmiBool has been dropped in favor of C++'s bool
+- Many data races occurring under shared-memory builds (smp, multicore) were
+  fixed, facilitating use of tools like ThreadSanitizer and Helgrind
 
-- CBase_Foo::pup need not be called from Foo::pup in user code anymore
-
-- Improved AMPI Fortran2003 PUP interface 'apup', similiar to C++'s STL PUP
+AMPI Enhancements
 
 - Further MPI standard compliance in AMPI allows users to build and run
   Hypre-2.10.1 on AMPI with virtualization, migration, etc.
+
+- Improved AMPI Fortran2003 PUP interface 'apup', similiar to C++'s STL PUP
+
+Platforms and Portability
+
+- Compiling Charm++ now requires support for C++11 variadic templates. In GCC,
+  this became available with version 4.3, released in 2008
+
+- New machine target for multicore Linux ARM7: multicore-linux-arm7
+
+- Preliminary support for POWER8 processors, in preparation for the upcoming
+  Summit and Sierra supercomputers
+
+- The charmrun process launcher is now much more robust in the face of slow
+  or rate-limited connections to compute nodes
+
+- PXSHM now auto-detects the node size, so the '+nodesize' is no longer needed
+
+- Out-of-tree builds are now supported
+
+Deprecations
+
+- CommLib has been removed.
+
+- CmiBool has been dropped in favor of C++'s bool
 
 ================================================================================
 What's new in Charm++ 6.6.0
