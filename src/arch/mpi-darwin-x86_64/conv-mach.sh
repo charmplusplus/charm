@@ -36,9 +36,9 @@ CMK_LIBS="-lckqt $CMK_SYSLIBS "
 CMK_RANLIB="ranlib"
 
 CMK_NATIVE_CC="clang $CMK_GCC64 "
-CMK_NATIVE_LD="clang $CMK_GCC64 "
+CMK_NATIVE_LD="clang -Wl,-no_pie $CMK_GCC64 "
 CMK_NATIVE_CXX="clang++ $CMK_GCC64 "
-CMK_NATIVE_LDXX="clang++ $CMK_GCC64 "
+CMK_NATIVE_LDXX="clang++ -Wl,-no_pie $CMK_GCC64 "
 CMK_NATIVE_LIBS=""
 
 CMK_CF90=`which f95 2>/dev/null`
