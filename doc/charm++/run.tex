@@ -83,7 +83,11 @@ Use the cluster's {\tt mpiexec} job launcher instead of the built in ssh
 method.
 
 This will pass {\tt -n \$P} to indicate how many processes to
-launch. An executable named something other than {\tt mpiexec} can be
+launch.
+If {\tt -n \$P} is not required because the number of processes
+to launch is determined via queueing system environment varibles
+then use {\tt ++mpiexec-no-n} rather than {\tt ++mpiexec}.
+An executable named something other than {\tt mpiexec} can be
 used with the additional argument {\tt ++remote-shell} {\it runmpi},
 with `runmpi' replaced by the necessary name.
 
@@ -99,8 +103,9 @@ Use of this option can potentially provide a few benefits:
 
 At present, this option depends on the environment variables for some
 common MPI implementations. It supports OpenMPI ({\tt OMPI\_COMM\_WORLD\_RANK} and
-{\tt OMPI\_COMM\_WORLD\_SIZE}) and M(VA)PICH ({\tt MPIRUN\_RANK} and {\tt
-  MPIRUN\_NPROCS} or {\tt PMI\_RANK} and {\tt PMI\_SIZE}).
+{\tt OMPI\_COMM\_WORLD\_SIZE}), M(VA)PICH ({\tt MPIRUN\_RANK} and {\tt
+  MPIRUN\_NPROCS} or {\tt PMI\_RANK} and {\tt PMI\_SIZE}),
+and IBM POE ({\tt MP\_CHILD} and {\tt MP\_PROCS}).
 
 \item[{\tt ++debug}] Run each node under gdb in an xterm window, prompting
 the user to begin execution.

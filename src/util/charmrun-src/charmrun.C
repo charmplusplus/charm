@@ -746,6 +746,7 @@ int arg_ssh_display;
 const char *arg_mylogin;
 #endif
 int arg_mpiexec;
+int arg_mpiexec_no_n;
 int arg_no_va_rand;
 
 const char *arg_nodeprog_a;
@@ -808,6 +809,7 @@ void arg_init(int argc, const char **argv)
   pparam_str(&arg_charmrunip, 0, "useip",
              "Use IP address provided for charmrun IP");
   pparam_flag(&arg_mpiexec, 0, "mpiexec", "use mpiexec to start jobs");
+  pparam_flag(&arg_mpiexec_no_n, 0, "mpiexec-no-n", "use mpiexec to start jobs without -n procs");
 #if CMK_USE_RSH
   pparam_flag(&arg_debug, 0, "debug",
               "Run each node under gdb in an xterm window");
@@ -879,6 +881,8 @@ void arg_init(int argc, const char **argv)
     pparam_printdocs();
     /*exit(0);*/
   }
+
+  if ( arg_mpiexec_no_n ) arg_mpiexec = arg_mpiexec_no_n;
 
 #ifdef HSTART
   if (!arg_hierarchical_start || arg_child_charmrun)
@@ -4815,9 +4819,11 @@ int rsh_fork_one(const char *startScript)
     e = skipstuff(s);
   }
 
-  rshargv.push_back("-n");
-  sprintf(npes, "%d", nodetab_rank0_size);
-  rshargv.push_back(npes);
+  if ( ! arg_mpiexec_no_n ) {
+    rshargv.push_back("-n");
+    sprintf(npes, "%d", nodetab_rank0_size);
+    rshargv.push_back(npes);
+  }
   rshargv.push_back((char *) startScript);
   rshargv.push_back((const char *) NULL);
   if (arg_verbose)
