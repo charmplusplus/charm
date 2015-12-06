@@ -1,49 +1,107 @@
 
+Adaptive MPI (AMPI)
+-------------------
+AMPI is an implementation of the MPI standard written on top of Charm++, meant
+to give MPI applications access to high-level, application-independent features
+such as overdecomposition (processor virtualization), dynamic load balancing,
+automatic fault tolerance, and overlap of computation and communication. For
+more information on all topics related to AMPI, consult the AMPI manual here:
+
+    http://charm.cs.illinois.edu/manuals/html/ampi/manual.html
+
+
 Building AMPI
 -------------
-AMPI has its own target in the build system, which can be specified with
-your architecture and other options. For example:
+AMPI has its own target in the build system. You can run the top-level
+build script interactively using "./build", or you can specify your
+architecture, operating system, compilers, and other options directly.
+For example:
 
-    ./build AMPI net-linux gm -O2
+    ./build AMPI netlrts-linux-x86_64 gfortran gcc --with-production
 
 
 Compiling and Linking AMPI Programs
 -----------------------------------
-AMPI source files can be compiled with charmc or with the wrappers found
-in /bin: mpiCC, mpicxx, mpif77, and mppif90. Note that you need to specify
-a fortran compiler when building charm for fortran compilation to work.
+AMPI source files can be compiled and linked with the wrappers found
+in bin/, such as ampicc, ampicxx, ampif77, and ampif90, or with
+"charmc -language ampi". For example:
 
-To link, use charmc -language ampi. For example:
+    ampif90 pgm.f90 -o pgm
 
-    charmc -language ampi -o myexecutable source1.o source2.o
+To enable transparent migration of user heap data, link with
+"-memory isomalloc". To perform dynamic load balancing, link in a Charm++
+load balancer (suite) using "-module <LB>". For example:
+
+    ampicc pgm.c -o pgm -memory isomalloc -module CommonLBs
+
+Note that you need to specify a Fortran compiler when building Charm++/AMPI
+for Fortran compilation to work.
 
 
 Running AMPI Programs
 ---------------------
-AMPI programs can be run with charmrun like any other Charm program. In
+AMPI programs can be run with charmrun like any other Charm++ program. In
 addition to the number of processes, specified with "+p n", AMPI programs
-can also specify the number of virtual processors (VPs) with "+vp n". For more
-information on using virtual processors, consult the AMPI manual.
+also take the total number of virtual processors (VPs) to run with as "+vp n".
+For example, to run an AMPI program 'pgm' on 4 processors using 32 ranks, do:
+
+    ./charmrun +p 4 ./pgm +vp 32
+
+To run with dynamic load balancing, add "+balancer <LB>":
+
+    ./charmrun +p 4 ./pgm +vp 32 +balancer RefineLB
 
 
 Porting to AMPI
 ---------------
-Global and static variables are unusable in virtualized AMPI programs, because
-a separate copy would be needed for each VP. Therefore, to run with more than
-1 VP per processor, all globals and statics must be modified to use local 
-storage.
+Global and static variables are unsafe for use in virtualized AMPI programs.
+This is because globals are defined at the process level, and AMPI ranks are
+implemented as user-level threads, which may share a process with other ranks
+Therefore, to run with more than 1 VP per processor, all globals and statics
+that are non-readonly and whose value does not depend on rank must be modified
+to use local storage. Consult the AMPI manual for more information on global
+variable privatization and automated approaches to privatization.
 
+AMPI programs must have the following main function signatures, so that AMPI
+can bootstrap before invoking the user's main function:
+    * C/C++ programs should use "int main(int argc, char **argv)"
+    * Fortran programs should use "Subroutine MPI_Main" instead of
+      "Program Main"
+
+
+Incompatibilities and Extensions
+--------------------------------
 AMPI has some known flaws and incompatibilities with other MPI implementations:
     * MPI_Cancel does not actually cancel pending communication.
-    * Creating MPI_Requests sometimes fails.
     * MPI_Sendrecv_replace gives incorrect results.
-    * Persistent sends with IRSend don't work.
-    * MPI_TestAll improperly frees requests.
-    * ISend/IRecv do not work when using MPI_LONG_DOUBLE.
+    * Persistent sends with Irsend don't work.
+    * Isend/Irecv do not work when using MPI_LONG_DOUBLE.
     * MPI_Get_elements returns the expected number of elements instead of the 
       actual number received.
     * MPI_Unpack gives incorrect results.
     * Data alignment in user defined types does not match the MPI standard.
     * Scatter/gather using noncontiguous types gives incorrect results.
     * Datatypes are not reused, freed, or reference counted.
+    * The PMPI profiling interface is not implemented in AMPI.
 
+AMPI also has extensions to the MPI standard to enable use of the high-level
+features provided by the Charm++ adaptive runtime system:
+    * MPI_Migrate checks for load imbalance and rebalances the load using
+      the strategy linked in and specified at job launch.
+    * MPI_Checkpoint performs a checkpoint to disk.
+    * MPI_MemCheckpoint performs a double in-memory checkpoint.
+    * MPI_Register is used to register PUP routines and user data.
+    * MPI_Get_userdata returns a pointer to user data managed by the runtime.
+    * MPI_Register_main is used to register multiple AMPI modules.
+    * MPI_Set_load sets the calling rank's load to the given user value.
+    * MPI_Start_measure starts load balance information collection.
+    * MPI_Stop_measure stops load balance information collection.
+    * MPI_MigrateTo migrates the calling rank to the given PE.
+    * MPI_Setmigratable sets the migratability of the given communicator.
+    * MPI_Num_nodes returns the total number of nodes.
+    * MPI_Num_pes returns the total number of PEs.
+    * MPI_My_node returns the local node number.
+    * MPI_My_pe returns the local node number.
+
+Note that AMPI defines a preprocessor symbol "AMPI" so that user codes can
+check for AMPI's presence at compile time using "#ifdef AMPI".
