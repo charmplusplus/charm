@@ -93,6 +93,11 @@ typedef int MPI_Fint;
 #define MPI_VERSION     1
 #define MPI_SUBVERSION  3
 
+#define MPI_THREAD_SINGLE     1
+#define MPI_THREAD_FUNNELED   2
+#define MPI_THREAD_SERIALIZED 3
+#define MPI_THREAD_MULTIPLE   4
+
 /* these values have to match values in ampif.h */
 /* base types */
 #define MPI_DATATYPE_NULL    -1
@@ -587,6 +592,12 @@ int AMPI_Error_class(int errorcode, int *errorclass);
 double AMPI_Wtime(void);
 #define MPI_Wtick AMPI_Wtick
 double AMPI_Wtick(void);
+#define MPI_Is_thread_main AMPI_Is_thread_main
+int AMPI_Is_thread_main(int *flag);
+#define MPI_Query_thread AMPI_Query_thread
+int AMPI_Query_thread(int *provided);
+#define MPI_Init_thread AMPI_Init_thread
+int AMPI_Init_thread(int *argc, char*** argv, int required, int *provided);
 #define MPI_Init AMPI_Init
 int AMPI_Init(int *argc, char*** argv);
 #define MPI_Initialized AMPI_Initialized

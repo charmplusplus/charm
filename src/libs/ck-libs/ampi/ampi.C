@@ -2389,6 +2389,28 @@ CDECL void AMPI_Just_migrated(MPI_MigrateFn f)
   thisParent->setUserJustMigratedFn(f);
 }
 
+CDECL int AMPI_Is_thread_main(int *flag)
+{
+  AMPIAPI("AMPI_Is_thread_main");
+  *flag=1;
+  return MPI_SUCCESS;
+}
+
+CDECL int AMPI_Query_thread(int *provided)
+{
+  AMPIAPI("AMPI_Query_thread");
+  *provided = MPI_THREAD_SINGLE;
+  return MPI_SUCCESS;
+}
+
+CDECL int AMPI_Init_thread(int *p_argc, char*** p_argv, int required, int *provided)
+{
+  AMPIAPI("AMPI_Init_thread");
+  *provided = MPI_THREAD_SINGLE;
+  AMPI_Init(p_argc, p_argv);
+  return MPI_SUCCESS;
+}
+
 CDECL int AMPI_Init(int *p_argc, char*** p_argv)
 {
   //AMPIAPI("AMPI_Init");

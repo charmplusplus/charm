@@ -127,6 +127,9 @@ FDECL {
 #define mpi_error_class FTN_NAME( MPI_ERROR_CLASS , mpi_error_class )
 #define mpi_wtime FTN_NAME( MPI_WTIME , mpi_wtime )
 #define mpi_wtick FTN_NAME( MPI_WTICK , mpi_wtick )
+#define mpi_is_thread_main FTN_NAME( MPI_IS_THREAD_MAIN , mpi_is_thread_main )
+#define mpi_query_thread FTN_NAME( MPI_QUERY_THREAD , mpi_query_thread )
+#define mpi_init_thread FTN_NAME( MPI_INIT_THREAD , mpi_init_thread )
 #define mpi_init FTN_NAME( MPI_INIT , mpi_init )
 #define mpi_initialized FTN_NAME( MPI_INITIALIZED , mpi_initialized )
 #define mpi_init_universe FTN_NAME( MPI_INIT_UNIVERSE , mpi_init_universe )
@@ -237,6 +240,18 @@ void mpi_init_universe(int *unicomm)
   {
     unicomm[i] = MPI_COMM_UNIVERSE[i];
   }
+}
+
+void mpi_is_thread_main(int *flag, int *ierr){
+  *ierr = AMPI_Is_thread_main(flag);
+}
+
+void mpi_query_thread(int *provided, int *ierr){
+  *ierr = AMPI_Query_thread(provided);
+}
+
+void mpi_init_thread(int *required, int *provided, int *ierr){
+  *ierr = AMPI_Init_thread(NULL, NULL, *required, provided);
 }
 
 void mpi_init(int *ierr){
