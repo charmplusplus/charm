@@ -191,7 +191,9 @@ int FuncCkLoop::MAX_CHUNKS = 64;
 void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
                                      int numChunks, int lowerRange,
                                      int upperRange, int sync,
-                                     void *redResult, REDUCTION_TYPE type) {
+                                     void *redResult, REDUCTION_TYPE type,
+                                     CallerFn cfunc,
+                                     int cparamNum, void * cparam) {
 
     double _start; //may be used for tracing
 
@@ -293,8 +295,17 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
 #endif
     } else if (mode == CKLOOP_NOOP) {
       func(lowerRange, upperRange, redResult, paramNum, param);
+      if (cfunc != NULL) {
+        cfunc(cparamNum, cparam);
+      }
       return;
     }
+
+    // Call the function on the caller PE before it starts working on chunks
+    if (cfunc != NULL) {
+      cfunc(cparamNum, cparam);
+    }
+
     if(curLoop) curLoop->stealWork();
     TRACE_BRACKET(CKLOOP_TOTAL_WORK_EVENTID);
 
@@ -588,9 +599,12 @@ void CkLoop_Parallelize(HelperFn func,
                             int paramNum, void * param,
                             int numChunks, int lowerRange, int upperRange,
                             int sync,
-                            void *redResult, REDUCTION_TYPE type) {
+                            void *redResult, REDUCTION_TYPE type,
+                            CallerFn cfunc,
+                            int cparamNum, void* cparam) {
     if ( numChunks > upperRange - lowerRange + 1 ) numChunks = upperRange - lowerRange + 1;
-    globalCkLoop->parallelizeFunc(func, paramNum, param, numChunks, lowerRange, upperRange, sync, redResult, type);
+    globalCkLoop->parallelizeFunc(func, paramNum, param, numChunks, lowerRange,
+        upperRange, sync, redResult, type, cfunc, cparamNum, cparam);
 }
 
 void CkLoop_DestroyHelpers() {
