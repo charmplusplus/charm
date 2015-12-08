@@ -197,7 +197,9 @@ public:
                          int numChunks, /* number of chunks to be partitioned */
                          int lowerRange, int upperRange, /* the loop-like parallelization happens in [lowerRange, upperRange] */
                          int sync=1, /* whether the flow will continue until all chunks have finished */
-                         void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
+                         void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE, /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
+                         CallerFn cfunc=NULL, /* the caller PE will call this function before starting to work on the chunks */
+                         int cparamNum=0, void* cparam=NULL /* the input parameters to the above function */
                         );
     void destroyHelpers();
     void reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int numChunks);
