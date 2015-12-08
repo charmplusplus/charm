@@ -63,6 +63,11 @@
        integer, parameter :: MPI_VERSION = 1
        integer, parameter :: MPI_SUBVERSION = 3
 
+       integer, parameter :: MPI_THREAD_SINGLE = 1
+       integer, parameter :: MPI_THREAD_FUNNELED = 2
+       integer, parameter :: MPI_THREAD_SERIALIZED = 3
+       integer, parameter :: MPI_THREAD_MULTIPLE = 4
+
        integer, parameter :: MPI_DATATYPE_NULL = -1
        integer, parameter :: MPI_DOUBLE_PRECISION = 0
        integer, parameter :: MPI_REAL8 = 0
