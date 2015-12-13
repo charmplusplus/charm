@@ -2427,7 +2427,7 @@ CDECL int AMPI_Init(int *p_argc, char*** p_argv)
     CkAbort("AMPI_Init> Charm is not initialized!");
   }
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL int AMPI_Initialized(int *isInit)
@@ -2439,14 +2439,14 @@ CDECL int AMPI_Initialized(int *isInit)
   else /* !nodeinit_has_been_called */ {
     *isInit=nodeinit_has_been_called;
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL int AMPI_Finalized(int *isFinalized)
 {
   AMPIAPI("AMPI_Initialized");     /* in case charm init not called */
   *isFinalized=CtvAccess(ampiFinalized);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL int AMPI_Comm_rank(MPI_Comm comm, int *rank)
@@ -2462,7 +2462,7 @@ CDECL int AMPI_Comm_rank(MPI_Comm comm, int *rank)
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     PUParray(*(pptr->fromPUPer), (char*)rank, sizeof(int));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -2473,7 +2473,7 @@ CDECL int AMPI_Comm_rank(MPI_Comm comm, int *rank)
     PUParray(*(pptr->toPUPer), (char*)rank, sizeof(int));
   }
 #endif
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -2490,7 +2490,7 @@ int AMPI_Comm_size(MPI_Comm comm, int *size)
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     PUParray(*(pptr->fromPUPer), (char*)size, sizeof(int));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -2502,7 +2502,7 @@ int AMPI_Comm_size(MPI_Comm comm, int *size)
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -2530,7 +2530,7 @@ int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
     if(equal==1) *result=MPI_CONGRUENT;
     else *result=MPI_UNEQUAL;
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL void AMPI_Exit(int /*exitCode*/)
@@ -2567,7 +2567,7 @@ int AMPI_Finalize(void)
 
   //  getAmpiInstance(MPI_COMM_WORLD)->outputCounter();
   AMPI_Exit(0);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -2584,7 +2584,7 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   AMPIAPI("AMPI_Send");
 #if AMPIMSGLOG
   if(msgLogRead){
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -2597,7 +2597,7 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   //  ptr->yield();
   //  //  processRemoteMlogMessages();
 #endif
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -2614,7 +2614,7 @@ int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
   AMPIAPI("AMPI_Ssend");
 #if AMPIMSGLOG
   if(msgLogRead){
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -2624,7 +2624,7 @@ int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
   getAmpiParent()->counters.send++;
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -2647,7 +2647,7 @@ int AMPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     PUParray(*(pptr->fromPUPer), (char *)request, sizeof(MPI_Request));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -2669,7 +2669,7 @@ int AMPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -2694,7 +2694,7 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
     (*(pptr->fromPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->fromPUPer), (char *)msg, (pptr->pupBytes));
     PUParray(*(pptr->fromPUPer), (char *)status, sizeof(MPI_Status));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -2714,7 +2714,7 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -2734,7 +2734,7 @@ int AMPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
   AMPIAPI("AMPI_Probe");
   ampi *ptr = getAmpiInstance(comm);
   ptr->probe(tag,src, comm, (int*) status);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -2753,7 +2753,7 @@ int AMPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
 
   ampi *ptr = getAmpiInstance(comm);
   *flag = ptr->iprobe(tag,src,comm,(int*) status);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -2818,7 +2818,7 @@ int AMPI_Barrier(MPI_Comm comm)
 #if AMPI_COUNTER
   getAmpiParent()->counters.barrier++;
 #endif
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -2835,14 +2835,14 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
 #endif
 
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Bcast not allowed for Inter-communicator!");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     (*(pptr->fromPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->fromPUPer), (char *)buf, (pptr->pupBytes));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -2864,7 +2864,7 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
   //  //  processRemoteMlogMessages();
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 /// This routine is called with the results of a Reduce or AllReduce
@@ -2944,7 +2944,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   if(msgLogRead){
     (*(pptr->fromPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->fromPUPer), (char *)outbuf, (pptr->pupBytes));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -2987,7 +2987,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3021,7 +3021,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
     (*(pptr->fromPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->fromPUPer), (char *)outbuf, (pptr->pupBytes));
     //    CkExit();
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -3049,7 +3049,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3086,7 +3086,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
   AmpiRequestList* reqs = getReqs();
   IReq *newreq = new IReq(outbuf,count,type,MPI_REDUCE_SOURCE,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
   *request = reqs->insert(newreq);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3125,7 +3125,7 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
       recvbuf, recvcounts[ptr->getRank(comm)], datatype, 0, comm);
   free(tmpbuf);
   delete [] displs;	// < memory leak ! // gzheng
-  return 0;
+  return MPI_SUCCESS;
 }
 
 /***** MPI_Scan algorithm (from MPICH) *******
@@ -3206,21 +3206,21 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MP
 #if AMPI_COUNTER
   getAmpiParent()->counters.scan++;
 #endif
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
   //AMPIAPI("AMPI_Op_create");
   *op = function;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Op_free(MPI_Op *op){
   //AMPIAPI("AMPI_Op_free");
   *op = MPI_OP_NULL;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 
@@ -3273,7 +3273,7 @@ int AMPI_Start(MPI_Request *request)
   if(-1==(*reqs)[*request]->start()) {
     CkAbort("MPI_Start could be used only on persistent communication requests!");
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -3285,7 +3285,7 @@ int AMPI_Startall(int count, MPI_Request *requests){
     if(-1==(*reqs)[requests[i]]->start())
       CkAbort("MPI_Start could be used only on persistent communication requests!");
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
 /* organize the indices of requests into a vector of a vector: 
@@ -3477,7 +3477,7 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 
   if(*request == MPI_REQUEST_NULL){
     stsempty(*sts);
-    return 0;
+    return MPI_SUCCESS;
   }
   checkRequest(*request);
   AmpiRequestList* reqs = getReqs();
@@ -3488,7 +3488,7 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
     (*(pptr->fromPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->fromPUPer), (char *)((*reqs)[*request]->buf), (pptr->pupBytes));
     PUParray(*(pptr->fromPUPer), (char *)sts, sizeof(MPI_Status));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -3535,7 +3535,7 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 
   AMPI_DEBUG("End of AMPI_Wait\n");
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3566,7 +3566,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
         PUParray(*(pptr->fromPUPer), (char *)(&sts[((*reqvec)[i])[j]]), sizeof(MPI_Status));
       }
     }
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -3635,7 +3635,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
     }
   }
   delete reqvec;
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3662,7 +3662,7 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
       if(flag == 1 && sts->MPI_COMM != 0){ // to skip MPI_REQUEST_NULL
         *idx = ((*reqvec)[i])[0];
         USER_CALL_DEBUG("AMPI_Waitany returning "<<*idx);
-        return 0;
+        return MPI_SUCCESS;
       }
     }
     /* no requests have finished yet-- schedule and try again */
@@ -3671,7 +3671,7 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
   *idx = MPI_UNDEFINED;
   USER_CALL_DEBUG("AMPI_Waitany returning UNDEFINED");
   delete reqvec;
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3703,7 +3703,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
     if(realflag && outcount>0) break;
   }
   delete reqvec;
-  return 0;
+  return MPI_SUCCESS;
 }
 
   bool PersReq::test(MPI_Status *sts){
@@ -3802,7 +3802,7 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
   if(*request==MPI_REQUEST_NULL) {
     *flag = 1;
     stsempty(*sts);
-    return 0;
+    return MPI_SUCCESS;
   }
   checkRequest(*request);
   AmpiRequestList* reqs = getReqs();
@@ -3813,7 +3813,7 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
       *request = MPI_REQUEST_NULL;
     }
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -3836,12 +3836,12 @@ int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Sta
     AMPI_Test(&request[((*reqvec)[i])[0]], flag, sts);
     if(*flag==1 && sts->MPI_COMM!=0){ // skip MPI_REQUEST_NULL
       *index = ((*reqvec)[i])[0];
-      return 0;
+      return MPI_SUCCESS;
     }
   }
   *index = MPI_UNDEFINED;
   delete reqvec;
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3868,7 +3868,7 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
   if(*flag)
     AMPI_Waitall(count,request,sts);
   delete reqvec;
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3895,18 +3895,18 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
     }
   }
   delete reqvec;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Request_free(MPI_Request *request){
   AMPIAPI("AMPI_Request_free");
-  if(*request==MPI_REQUEST_NULL) return 0;
+  if(*request==MPI_REQUEST_NULL) return MPI_SUCCESS;
   checkRequest(*request);
   AmpiRequestList* reqs = getReqs();
   reqs->free(*request);
   *request = MPI_REQUEST_NULL;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -3919,7 +3919,7 @@ CDECL
 int AMPI_Test_cancelled(MPI_Status* status, int* flag) {
   /* FIXME: always returns success */
   *flag = 1;
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3941,7 +3941,7 @@ int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
   AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,src,tag,comm,2);
   *req = reqs->insert(newreq);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3963,7 +3963,7 @@ int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
   AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,1);
   *req = reqs->insert(newreq);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3985,7 +3985,7 @@ int AMPI_Ssend_init(void *buf, int count, int type, int dest, int tag,
   AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,3);
   *req = reqs->insert(newreq);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -3994,7 +3994,7 @@ int AMPI_Type_contiguous(int count, MPI_Datatype oldtype,
 {
   AMPIAPI("AMPI_Type_contiguous");
   getDDT()->newContiguous(count, oldtype, newtype);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4003,7 +4003,7 @@ int AMPI_Type_vector(int count, int blocklength, int stride,
 {
   AMPIAPI("AMPI_Type_vector");
   getDDT()->newVector(count, blocklength, stride, oldtype, newtype);
-  return 0 ;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4012,7 +4012,7 @@ int AMPI_Type_hvector(int count, int blocklength, MPI_Aint stride,
 {
   AMPIAPI("AMPI_Type_hvector");
   getDDT()->newHVector(count, blocklength, stride, oldtype, newtype);
-  return 0 ;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4021,7 +4021,7 @@ int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
 {
   AMPIAPI("AMPI_Type_indexed");
   getDDT()->newIndexed(count, arrBlength, arrDisp, oldtype, newtype);
-  return 0 ;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4030,7 +4030,7 @@ int AMPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
 {
   AMPIAPI("AMPI_Type_hindexed");
   getDDT()->newHIndexed(count, arrBlength, arrDisp, oldtype, newtype);
-  return 0 ;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4039,14 +4039,14 @@ int AMPI_Type_struct(int count, int* arrBlength, int* arrDisp,
 {
   AMPIAPI("AMPI_Type_struct");
   getDDT()->newStruct(count, arrBlength, arrDisp, oldtype, newtype);
-  return 0 ;
+  return MPI_SUCCESS;
 }
 
   CDECL
 int AMPI_Type_commit(MPI_Datatype *datatype)
 {
   AMPIAPI("AMPI_Type_commit");
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4054,7 +4054,7 @@ int AMPI_Type_free(MPI_Datatype *datatype)
 {
   AMPIAPI("AMPI_Type_free");
   getDDT()->freeType(datatype);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 
@@ -4063,7 +4063,7 @@ int AMPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent)
 {
   AMPIAPI("AMPI_Type_extent");
   *extent = getDDT()->getExtent(datatype);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4071,7 +4071,7 @@ int AMPI_Type_size(MPI_Datatype datatype, int *size)
 {
   AMPIAPI("AMPI_Type_size");
   *size=getDDT()->getSize(datatype);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4094,7 +4094,7 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     PUParray(*(pptr->fromPUPer), (char *)request, sizeof(MPI_Request));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -4112,7 +4112,7 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4128,7 +4128,7 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
     return ret;
 #endif
 
-  if(src==MPI_PROC_NULL) { *request = MPI_REQUEST_NULL; return 0; }
+  if(src==MPI_PROC_NULL) { *request = MPI_REQUEST_NULL; return MPI_SUCCESS; }
   USER_CALL_DEBUG("AMPI_Irecv("<<type<<","<<src<<","<<tag<<","<<comm<<")");
   AmpiRequestList* reqs = getReqs();
   IReq *newreq = new IReq(buf,count,type,src,tag,comm);
@@ -4138,7 +4138,7 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     PUParray(*(pptr->fromPUPer), (char *)request, sizeof(MPI_Request));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -4183,7 +4183,7 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4220,7 +4220,7 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
     IReq *newreq = new IReq(recvbuf,count,type,0,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
     *request = reqs->insert(newreq);
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4267,7 +4267,7 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #if AMPI_COUNTER
   getAmpiParent()->counters.allgather++;
 #endif
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4320,7 +4320,7 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   *request = reqs->insert(newreq);
   AMPI_DEBUG("MPI_Iallgather: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4362,7 +4362,7 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #if AMPI_COUNTER
   getAmpiParent()->counters.allgather++;
 #endif
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4389,7 +4389,7 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(msgLogRead){
     (*(pptr->fromPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -4430,7 +4430,7 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4463,7 +4463,7 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
       (*(pptr->fromPUPer))|(pptr->pupBytes);
       PUParray(*(pptr->fromPUPer), (char *)(((char*)recvbuf)+(itemsize*displs[i])), (pptr->pupBytes));
     }
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -4494,7 +4494,7 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4525,7 +4525,7 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(msgLogRead){
     (*(pptr->fromPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -4558,7 +4558,7 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4589,7 +4589,7 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
   if(msgLogRead){
     (*(pptr->fromPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
-    return 0;
+    return MPI_SUCCESS;
   }
 #endif
 
@@ -4622,7 +4622,7 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4882,7 +4882,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
 #endif
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4946,7 +4946,7 @@ int AMPI_Alltoall2(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
 #endif
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -4998,7 +4998,7 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
   *request = reqs->insert(newreq);
   AMPI_DEBUG("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5007,7 +5007,7 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
     int *rdispls_, MPI_Datatype recvtype, MPI_Comm comm)
 {
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoallv not allowed for Inter-communicator!");
-  if(comm==MPI_COMM_SELF) return 0;
+  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
 
 #if CMK_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -5068,7 +5068,7 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
     delete [] recvcounts;
     delete [] rdispls;
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5097,42 +5097,42 @@ int AMPI_Comm_split(int src,int color,int key,int *dest)
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     PUParray(*(pptr->fromPUPer), (char *)dest, sizeof(int));
-    return 0;
+    return MPI_SUCCESS;
   }
   else if(msgLogWrite && record_msglog(pptr->thisIndex)){
     PUParray(*(pptr->toPUPer), (char *)dest, sizeof(int));
   }
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
 int AMPI_Comm_free(int *comm)
 {
   AMPIAPI("AMPI_Comm_free");
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Comm_test_inter(MPI_Comm comm, int *flag){
   AMPIAPI("AMPI_Comm_test_inter");
   *flag = getAmpiParent()->isInter(comm);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Comm_remote_size(MPI_Comm comm, int *size){
   AMPIAPI("AMPI_Comm_remote_size");
   *size = getAmpiParent()->getRemoteSize(comm);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group){
   AMPIAPI("AMPI_Comm_remote_group");
   *group = getAmpiParent()->getRemoteGroup(comm);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5172,7 +5172,7 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm rcomm, int rlead
   }
 
   ptr->intercommCreate(rvec,root,newintercomm);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5199,7 +5199,7 @@ int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
   }
 
   ptr->intercommMerge(first, newintracomm);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5220,28 +5220,28 @@ int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count){
   } else {
     *count = sts->MPI_LENGTH/itemsize;
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Type_lb(MPI_Datatype dtype, MPI_Aint* displacement){
   AMPIAPI("AMPI_Type_lb");
   *displacement = getDDT()->getLB(dtype);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Type_ub(MPI_Datatype dtype, MPI_Aint* displacement){
   AMPIAPI("AMPI_Type_ub");
   *displacement = getDDT()->getUB(dtype);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Address(void* location, MPI_Aint *address){
   AMPIAPI("AMPI_Address");
   *address = (MPI_Aint)(unsigned long)(char *)location;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5251,7 +5251,7 @@ int AMPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
   int basesize = dttype->getBaseSize() ;
   if(basesize==0) basesize=dttype->getSize();
   *count = sts->MPI_LENGTH/basesize;
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5263,7 +5263,7 @@ int AMPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
   int itemsize = dttype->getSize();
   dttype->serialize((char*)inbuf, ((char*)outbuf)+(*position), incount, 1);
   *position += (itemsize*incount);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5275,7 +5275,7 @@ int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
   int itemsize = dttype->getSize();
   dttype->serialize((char*)outbuf, ((char*)inbuf+(*position)), outcount, -1);
   *position += (itemsize*outcount);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5284,7 +5284,7 @@ int AMPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
   AMPIAPI("AMPI_Pack_size");
   CkDDT_DataType* dttype = getDDT()->getType(datatype) ;
   *sz = incount*dttype->getSize() ;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5292,7 +5292,7 @@ int AMPI_Get_version(int *version, int *subversion){
   AMPIAPI("AMPI_Get_version");
   *version = MPI_VERSION;
   *subversion = MPI_SUBVERSION;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5301,7 +5301,7 @@ int AMPI_Get_processor_name(char *name, int *resultlen){
   ampiParent *ptr = getAmpiParent();
   sprintf(name,"AMPI_VP[%d]_PE[%d]",ptr->thisIndex,ptr->getMyPe());
   *resultlen = strlen(name);
-  return 0;
+  return MPI_SUCCESS;
 }
 
 /* Error handling */
@@ -5366,7 +5366,7 @@ int AMPI_Comm_group(MPI_Comm comm, MPI_Group *group)
 {
   AMPIAPI("AMPI_Comm_Group");
   *group = getAmpiParent()->comm2group(comm);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5379,7 +5379,7 @@ int AMPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
   vec2 = ptr->group2vec(group2);
   newvec = unionOp(vec1,vec2);
   *newgroup = ptr->saveGroupStruct(newvec);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5392,7 +5392,7 @@ int AMPI_Group_intersection(MPI_Group group1, MPI_Group group2, MPI_Group *newgr
   vec2 = ptr->group2vec(group2);
   newvec = intersectOp(vec1,vec2);
   *newgroup = ptr->saveGroupStruct(newvec);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5405,7 +5405,7 @@ int AMPI_Group_difference(MPI_Group group1, MPI_Group group2, MPI_Group *newgrou
   vec2 = ptr->group2vec(group2);
   newvec = diffOp(vec1,vec2);
   *newgroup = ptr->saveGroupStruct(newvec);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5413,7 +5413,7 @@ int AMPI_Group_size(MPI_Group group, int *size)
 {
   AMPIAPI("AMPI_Group_size");
   *size = (getAmpiParent()->group2vec(group)).size();
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5421,7 +5421,7 @@ int AMPI_Group_rank(MPI_Group group, int *rank)
 {
   AMPIAPI("AMPI_Group_rank");
   *rank = getAmpiParent()->getRank(group);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5433,7 +5433,7 @@ int AMPI_Group_translate_ranks (MPI_Group group1, int n, int *ranks1, MPI_Group 
   vec1 = ptr->group2vec(group1);
   vec2 = ptr->group2vec(group2);
   translateRanksOp(n, vec1, ranks1, vec2, ranks2);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5445,7 +5445,7 @@ int AMPI_Group_compare(MPI_Group group1,MPI_Group group2, int *result)
   vec1 = ptr->group2vec(group1);
   vec2 = ptr->group2vec(group2);
   *result = compareVecOp(vec1, vec2);
-  return 0;
+  return MPI_SUCCESS;
 }
 
   CDECL
@@ -5457,7 +5457,7 @@ int AMPI_Group_incl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
   vec = ptr->group2vec(group);
   newvec = inclOp(n,ranks,vec);
   *newgroup = ptr->saveGroupStruct(newvec);
-  return 0;
+  return MPI_SUCCESS;
 }
   CDECL
 int AMPI_Group_excl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
@@ -5469,7 +5469,7 @@ int AMPI_Group_excl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
   newvec = exclOp(n,ranks,vec);
   *newgroup = ptr->saveGroupStruct(newvec);
   //outputOp(vec); outputOp(newvec);
-  return 0;
+  return MPI_SUCCESS;
 }
   CDECL
 int AMPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
@@ -5480,7 +5480,7 @@ int AMPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *ne
   vec = ptr->group2vec(group);
   newvec = rangeInclOp(n,ranges,vec);
   *newgroup = ptr->saveGroupStruct(newvec);
-  return 0;
+  return MPI_SUCCESS;
 }
   CDECL
 int AMPI_Group_range_excl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
@@ -5491,13 +5491,13 @@ int AMPI_Group_range_excl(MPI_Group group, int n, int ranges[][3], MPI_Group *ne
   vec = ptr->group2vec(group);
   newvec = rangeExclOp(n,ranges,vec);
   *newgroup = ptr->saveGroupStruct(newvec);
-  return 0;
+  return MPI_SUCCESS;
 }
   CDECL
 int AMPI_Group_free(MPI_Group *group)
 {
   AMPIAPI("AMPI_Group_free");
-  return 0;
+  return MPI_SUCCESS;
 }
   CDECL
 int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
@@ -5532,7 +5532,7 @@ int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
     }
     return AMPI_Comm_split(comm, color, key, newcomm);
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
 /* Charm++ Extentions to MPI standard: */
@@ -5660,7 +5660,7 @@ int AMPI_Cart_map(MPI_Comm comm, int ndims, int *dims, int *periods,
 
   AMPI_Comm_rank(comm, newrank);
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5669,7 +5669,7 @@ int AMPI_Graph_map(MPI_Comm comm, int nnodes, int *index, int *edges,
   AMPIAPI("AMPI_Graph_map");
   AMPI_Comm_rank(comm, newrank);
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5708,7 +5708,7 @@ int AMPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
   c.setdims(dimsv);
   c.setperiods(periodsv);
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5741,7 +5741,7 @@ int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
 
   c.setedges(edges_);
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5756,7 +5756,7 @@ int AMPI_Topo_test(MPI_Comm comm, int *status) {
     *status = MPI_GRAPH;
   else *status = MPI_UNDEFINED;
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5765,7 +5765,7 @@ int AMPI_Cartdim_get(MPI_Comm comm, int *ndims) {
 
   *ndims = getAmpiParent()->getCart(comm).getndims();
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5795,7 +5795,7 @@ int AMPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods,
     rank = (int) (rank / dims_[i]);
   }
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5825,7 +5825,7 @@ int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
 
   *rank = r;
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5842,7 +5842,7 @@ int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
     rank = (int) (rank / dims[i]);
   }
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 // Offset coords[direction] by displacement, and set the rank that
@@ -5891,7 +5891,7 @@ int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp,
   cart_clamp_coord(comm, dims, periods, coords, direction, -disp, rank_source);
 
   delete [] coords;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5903,7 +5903,7 @@ int AMPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges) {
   const CkVec<int> &index = c.getindex();
   *nedges = index[(*nnodes) - 1];
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5926,7 +5926,7 @@ int AMPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index,
   for (i = 0; i < maxedges; i++)
     edges[i] = edges_[i];
 
-  return 0;
+  return MPI_SUCCESS;
 } 
 
 CDECL
@@ -5945,7 +5945,7 @@ int AMPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
   else 
     *nneighbors = index[rank] - index[rank - 1];
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -5974,7 +5974,7 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
     for (int i = 0; i < maxneighbors; i++)
       neighbors[i] = edges[index[rank - 1] + i];
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 /* Factorization code by Orion. Idea thrashed out by Orion and Prakash */
@@ -6052,7 +6052,7 @@ int AMPI_Dims_create(int nnodes, int ndims, int *dims) {
     delete [] pdims;
   }
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 /* Implemented with call to MPI_Comm_Split. Color and key are single integer
@@ -6104,7 +6104,7 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   newc.setperiods(periodsv);
 
   delete [] coords;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 void _registerampif(void)
@@ -6158,21 +6158,21 @@ CDECL
 int AMPI_Suspend(int comm) {
   AMPIAPI("AMPI_Suspend");
   getAmpiInstance(comm)->block();
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Yield(int comm) {
   AMPIAPI("AMPI_Yield");
   getAmpiInstance(comm)->yield();
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Resume(int dest, int comm) {
   AMPIAPI("AMPI_Resume");
   getAmpiInstance(comm)->getProxy()[dest].unblock();
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -6217,7 +6217,7 @@ int AMPI_Set_startevent(MPI_Comm comm)
   if(-1==ptr->recv(MPI_BCAST_TAG, -1, NULL, 0, MPI_INT, MPI_COMM_WORLD))
     CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -6305,7 +6305,7 @@ int AMPI_GPU_Invoke(workRequest *to_call)
   AMPI_GPU_Iinvoke(to_call, &req);
   AMPI_Wait(&req, MPI_STATUS_IGNORE);
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 #endif
