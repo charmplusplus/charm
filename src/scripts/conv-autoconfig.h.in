@@ -377,3 +377,6 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* enable qlogic */
+#undef QLOGIC
