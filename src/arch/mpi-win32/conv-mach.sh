@@ -1,10 +1,10 @@
 HPC_SDK="c:\Program Files\Microsoft MPI"
 HPC_SDK=`cygpath -d "$HPC_SDK"`
 
-CMK_CC="$CHARMBIN/unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE -I `cygpath -u "$HPC_SDK/Inc"`"
+CMK_CC="$CHARMBIN/unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE -I `cygpath -u "$HPC_SDK/Inc"` -I `cygpath -u "$HPC_SDK\Include"`"
 CMK_CPP_CHARM="/usr/bin/cpp -P"
 CMK_CPP_C="$CMK_CC -E"
-CMK_CXX="$CHARMBIN/unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE  -I `cygpath -u "$HPC_SDK/Inc"`"
+CMK_CXX="$CHARMBIN/unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE  -I `cygpath -u "$HPC_SDK/Inc"` -I `cygpath -u "$HPC_SDK\Include"`"
 CMK_CXXPP=$CMK_CC
 CMK_LD="$CMK_CC -L`cygpath -u "$HPC_SDK/Lib/i386"` -lmsmpi"
 CMK_LDXX="$CMK_CXX -L`cygpath -u "$HPC_SDK/Lib/i386"` -lmsmpi"
