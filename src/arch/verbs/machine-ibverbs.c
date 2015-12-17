@@ -32,7 +32,7 @@
 #include <infiniband/verbs.h>
 
 
-#ifndef QLOGIC
+#if ! QLOGIC
 enum ibv_mtu mtu = IBV_MTU_2048;
 #else
 enum ibv_mtu mtu = IBV_MTU_4096;
@@ -812,7 +812,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	MACHSTATE(3,"qp state changed to RTR");
 	
 	attr.qp_state 	    = IBV_QPS_RTS;
-#ifndef QLOGIC
+#if ! QLOGIC
 	attr.timeout 	    = 26;
 	attr.retry_cnt 	    = 20;
 #else
@@ -836,7 +836,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	// Error code 22 means that there was an invalid parameter when calling to this verbs, try with alternate parameters
         if(err == 22) {
           //use inverted logic
-#ifdef QLOGIC
+#if QLOGIC
           mtu = IBV_MTU_2048;
           attr.timeout 	            = 26;
           attr.retry_cnt 	    = 20;

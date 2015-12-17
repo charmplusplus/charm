@@ -32,7 +32,7 @@
 #include <infiniband/verbs.h>
 
 //#define QLOGIC
-#ifndef QLOGIC
+#if ! QLOGIC
 enum ibv_mtu mtu = IBV_MTU_2048;
 #else
 enum ibv_mtu mtu = IBV_MTU_4096;
@@ -871,7 +871,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	
 	attr.qp_state 	    = IBV_QPS_RTS;
 // Here NON_SRQ is for QLOGIC
-#ifndef QLOGIC
+#if ! QLOGIC
 	attr.timeout 	    = 26;
 	attr.retry_cnt 	    = 20;
 #else
@@ -898,7 +898,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	if (err == 22)
 	{
           //use inverted logic
-#ifdef QLOGIC
+#if QLOGIC
           mtu = IBV_MTU_2048;
           attr.timeout 	            = 26;
           attr.retry_cnt 	    = 20;
