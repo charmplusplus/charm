@@ -102,6 +102,10 @@ features provided by the Charm++ adaptive runtime system:
     * MPI_Num_pes returns the total number of PEs.
     * MPI_My_node returns the local node number.
     * MPI_My_pe returns the local node number.
+    * MPI_Command_argument_count returns the number of command line arguments
+      given to a Fortran AMPI program excluding charmrun and AMPI parameters.
+    * MPI_Get_command_argument returns an argument from the command line
+      to a Fortran AMPI program.
 
 Note that AMPI defines a preprocessor symbol "AMPI" so that user codes can
 check for AMPI's presence at compile time using "#ifdef AMPI".
