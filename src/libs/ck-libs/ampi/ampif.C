@@ -1153,20 +1153,20 @@ void mpi_pcontrol(int *level) {
   AMPI_Pcontrol(*level);
 }
 
-int mpi_my_pe() {
-  return AMPI_My_pe();
+void mpi_my_pe(int *my_pe) {
+  AMPI_My_pe(my_pe);
 }
 
-int mpi_my_node() {
-  return AMPI_My_node();
+void mpi_my_node(int *my_node) {
+  AMPI_My_node(my_node);
 }
 
-int mpi_num_pes() {
-  return AMPI_Num_pes();
+void mpi_num_pes(int *num_pes) {
+  AMPI_Num_pes(num_pes);
 }
 
-int mpi_num_nodes() {
-  return AMPI_Num_nodes();
+void mpi_num_nodes(int *num_nodes) {
+  AMPI_Num_nodes(num_nodes);
 }
 
 #define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)
