@@ -615,13 +615,13 @@ int AMPI_Pcontrol(const int level, ...);
 
 /***extras***/
 #define MPI_My_pe AMPI_My_pe
-int AMPI_My_pe(void);
+void AMPI_My_pe(int *my_pe);
 #define MPI_My_node AMPI_My_node
-int AMPI_My_node(void);
+void AMPI_My_node(int *my_node);
 #define MPI_Num_pes AMPI_Num_pes
-int AMPI_Num_pes(void);
+void AMPI_Num_pes(int *num_pes);
 #define MPI_Num_nodes AMPI_Num_nodes
-int AMPI_Num_nodes(void);
+void AMPI_Num_nodes(int *num_nodes);
 #define MPI_Yield AMPI_Yield
 int AMPI_Yield(int comm);
 #define MPI_Resume AMPI_Resume

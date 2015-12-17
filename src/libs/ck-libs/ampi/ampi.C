@@ -6131,27 +6131,27 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[
 /******** AMPI-specific (not standard MPI) calls *********/
 
 CDECL
-int AMPI_My_pe() {
+void AMPI_My_pe(int *my_pe) {
   AMPIAPI("AMPI_My_pe");
-  return CkMyPe();
+  *my_pe = CkMyPe();
 }
 
 CDECL
-int AMPI_My_node() {
+void AMPI_My_node(int *my_node) {
   AMPIAPI("AMPI_My_node");
-  return CkMyNode();
+  *my_node = CkMyNode();
 }
 
 CDECL
-int AMPI_Num_pes() {
+void AMPI_Num_pes(int *num_pes) {
   AMPIAPI("AMPI_Num_pes");
-  return CkNumPes();
+  *num_pes = CkNumPes();
 }
 
 CDECL
-int AMPI_Num_nodes() {
+void AMPI_Num_nodes(int *num_nodes) {
   AMPIAPI("AMPI_Num_nodes");
-  return CkNumNodes();
+  *num_nodes = CkNumNodes();
 }
 
 CDECL
