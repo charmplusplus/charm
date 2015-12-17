@@ -1359,7 +1359,7 @@ if (MSG_STATISTIC)
       CmiPrintf("[Partition %d][Node %d] End of program\n",CmiMyPartition(),CmiMyNode());
 #endif
 
-#if !CMK_SMP
+#if !CMK_SMP || CMK_BLUEGENEQ
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif
