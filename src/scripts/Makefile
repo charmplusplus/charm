@@ -481,7 +481,7 @@ sockRoutines-seq.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(SEQCHARMC) -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o sockRoutines.c
 
 pup_f.f90: pup_f.f90.sh
-	./pup_f.f90.sh
+	rm -f pup_f.f90 && ./pup_f.f90.sh
 
 pup_f.o: pup_f.f90 $(CVHEADERS)
 	-$(CHARMC) -c pup_f.f90 && $(CHARMC) -cpmod ../include pupmod.M || touch pup_f.o

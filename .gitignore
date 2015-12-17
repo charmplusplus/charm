@@ -17,6 +17,7 @@ include
 lib
 lib_so
 tmp
+src/util/pup_f.f90
 
 # Ignore directories created from compilation
 /net-*
