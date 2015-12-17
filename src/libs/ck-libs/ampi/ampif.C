@@ -158,12 +158,10 @@ FDECL {
 #define mpi_checkpoint FTN_NAME( MPI_CHECKPOINT , mpi_checkpoint )
 #define mpi_memcheckpoint FTN_NAME( MPI_MEMCHECKPOINT , mpi_memcheckpoint )
 
-#define mpi_get_argc FTN_NAME( MPI_GET_ARGC , mpi_get_argc )
-#define mpi_get_argv FTN_NAME( MPI_GET_ARGV , mpi_get_argv )
-#define mpi_iargc FTN_NAME( MPI_IARGC , mpi_iargc )
-#define mpi_getarg FTN_NAME( MPI_GETARG , mpi_getarg )
 #define mpi_command_argument_count FTN_NAME( MPI_COMMAND_ARGUMENT_COUNT , mpi_command_argument_count )
 #define mpi_get_command_argument FTN_NAME( MPI_GET_COMMAND_ARGUMENT , mpi_get_command_argument )
+#define mpi_iargc FTN_NAME( MPI_IARGC , mpi_iargc )
+#define mpi_getarg FTN_NAME( MPI_GETARG , mpi_getarg )
 
 /* MPI-2 */
 #define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
@@ -955,64 +953,10 @@ void mpi_memcheckpoint(){
   AMPI_MemCheckpoint();
 }
 
-/* C-style cmd line arg parsing functions */
-void mpi_get_argc(int *c, int *ierr)
+/* Fortran2003 standard cmd line arg parsing functions */
+void mpi_command_argument_count(int *count)
 {
-  *c = CkGetArgc();
-  *ierr = 0;
-}
-
-void mpi_get_argv(int *c, char *str, int *ierr, int *len)
-{
-  char ** argv = CkGetArgv();
-
-  int nc = CkGetArgc();
-  if (*c < nc) {
-    strncpy(str, argv[*c], strlen(argv[*c]));
-    for (int j=strlen(argv[*c]); j<*len; j++)  str[j] = ' ';
-    *ierr = 0;
-  }
-  else {
-    memset(str, ' ', *len);
-    *ierr = 1;
-  }
-}
-
-/* Fortran77-style cmd line arg parsing functions */
-int mpi_iargc()
-{
-  int argc = CkGetArgc();
-  if (argc > 0) {
-    return argc-1;
-  } else {
-    return 0;
-  }
-}
-
-void mpi_getarg(int *c, char *str)
-{
-  int len = 80; 
-  char **argv = CkGetArgv();
- 
-  int nc = CkGetArgc()-1;
-  if (*c > 0 && *c <= nc) {
-    strncpy(str, argv[*c], strlen(argv[*c]));
-    for (int j=strlen(argv[*c]); j<len; j++)  str[j] = ' ';
-  }
-  else {
-    memset(str, ' ', len);
-  }
-}
-
-/* Fortran2003-style cmd line arg parsing functions */
-int mpi_command_argument_count()
-{
-  int argc = CkGetArgc();
-  if (argc > 0) {
-    return argc-1;
-  } else {
-    return 0;
-  }
+  *count = CkGetArgc()-1;
 }
 
 void mpi_get_command_argument(int *c, char *str, int *len, int *ierr)
@@ -1029,6 +973,17 @@ void mpi_get_command_argument(int *c, char *str, int *len, int *ierr)
     memset(str, ' ', *len);
     *ierr = 1;
   }
+}
+
+/* Fortran77-style GNU extensions for cmd line arg parsing functions */
+void mpi_iargc(int *count)
+{
+  mpi_command_argument_count(count);
+}
+
+void mpi_getarg(int *c, char *str, int *len, int *ierr)
+{
+  mpi_get_command_argument(c, str, len, ierr);
 }
 
 void mpi_comm_remote_size(int *comm, int *size, int *ierr){
