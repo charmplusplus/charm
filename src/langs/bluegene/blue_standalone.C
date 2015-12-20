@@ -28,7 +28,7 @@ extern "C" void CmiError(const char *fmt, ...) {
 
 extern "C" void *CmiTmpAlloc(int size) {return malloc(size);}
 extern "C" void CmiTmpFree(void *p) {free(p);}
-extern "C" void __cmi_assert(const char *expr, const char *file, int line) { CmiAbort(expr);}
+extern "C" void __cmi_assert(const char *errmsg) { CmiAbort(errmsg);}
 
 extern "C" void *CmiAlloc(int size) { return malloc(size); }
 extern "C" void CmiFree(void *blk) { return free(blk); }

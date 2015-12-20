@@ -948,13 +948,23 @@ void  CmiError(const char *format, ...);
 #define __CMK_STRING(x) "x"
 #endif
 
+#define __CMK_XSTRING(x) __CMK_STRING(x)
+
+extern void __cmi_assert(const char *);
+#define CmiEnforce(expr) \
+  ((void) ((expr) ? 0 :                   \
+     (__cmi_assert ("Assertion \"" __CMK_STRING(expr) \
+                    "\" failed in file " __FILE__ \
+                    " line " __CMK_XSTRING(__LINE__) "."), 0)))
+
 #if ! CMK_ERROR_CHECKING
 #define CmiAssert(expr) ((void) 0)
 #else
-extern void __cmi_assert(const char *, const char *, int);
 #define CmiAssert(expr) \
   ((void) ((expr) ? 0 :                   \
-     (__cmi_assert (__CMK_STRING(expr), __FILE__, __LINE__), 0)))
+     (__cmi_assert ("Assertion \"" __CMK_STRING(expr) \
+                    "\" failed in file " __FILE__ \
+                    " line " __CMK_XSTRING(__LINE__) "."), 0)))
 #endif
 
 typedef void (*CmiStartFn)(int argc, char **argv);
