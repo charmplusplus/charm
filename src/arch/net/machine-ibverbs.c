@@ -900,12 +900,14 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
           //use inverted logic
 #if QLOGIC
           mtu = IBV_MTU_2048;
-          attr.timeout 	            = 26;
-          attr.retry_cnt 	    = 20;
+          attr.path_mtu             = mtu;
+          attr.timeout              = 26;
+          attr.retry_cnt            = 20;
 #else
           mtu = IBV_MTU_4096;
-          attr.timeout 	            = 14;
-          attr.retry_cnt 	    = 7;
+          attr.path_mtu             = mtu;
+          attr.timeout              = 14;
+          attr.retry_cnt            = 7;
 #endif
 
           MACHSTATE3(3,"Retry:dlid 0x%x qp 0x%x psn 0x%x",attr.ah_attr.dlid,attr.dest_qp_num,attr.sq_psn);
