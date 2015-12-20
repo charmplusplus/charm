@@ -3818,11 +3818,10 @@ void CmiError(const char *format, ...)
 
 #endif
 
-void __cmi_assert(const char *expr, const char *file, int line)
+void __cmi_assert(const char *errmsg)
 {
-  CmiError("[%d] Assertion \"%s\" failed in file %s line %d.\n",
-      CmiMyPe(), expr, file, line);
-  CmiAbort("");
+  CmiError("[%d] %s\n", CmiMyPe(), errmsg);
+  CmiAbort(errmsg);
 }
 
 char *CmiCopyMsg(char *msg, int len)

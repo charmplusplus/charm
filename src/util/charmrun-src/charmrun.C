@@ -1879,6 +1879,7 @@ int req_handle_initnode(ChMessage *msg, SOCKET fd)
       sizeof(ChSingleNodeinfo) +
           (nodetab_rank0_size - 1) * sizeof(ChInfiAddr)) {
     fprintf(stderr, "Charmrun: Bad initnode data length. Aborting\n");
+    fprintf(stderr, "Charmrun: possibly because: %s.\n", msg->data);
     exit(1);
   }
   nodeInfo->info.qpList =
