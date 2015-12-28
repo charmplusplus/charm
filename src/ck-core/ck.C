@@ -710,7 +710,13 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0) {
+#if CMK_BIGSIM_CHARM
+      //In BigSim, CpvAccess(CsdSchedQueue) is not used. _CldEnqueue resets the
+      //handler to converse-level BigSim handler.
+      _CldEnqueue(CkMyPe(), pending, _infoIdx);
+#else
       CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
+#endif
     }
     CkpvAccess(_groupTable)->find(groupID).clearPending();
   }
