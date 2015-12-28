@@ -62,8 +62,10 @@ static void BroadcastShutdown(void *null, double t)
   CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
 
   CmiDeliverMsgs(-1);
-  CmiPrintf("\nBG> BigSim emulator shutdown gracefully!\n");
-  CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
+  if(CmiMyPe() == 0) {
+    CmiPrintf("\nBG> BigSim emulator shutdown gracefully!\n");
+    CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
+  }
   CsdExitScheduler();
 /*
   ConverseExit();
@@ -93,9 +95,11 @@ void BgShutdown()
 
     if(bgUseOutOfCore)
         deInitTblThreadInMem();
-
-    CmiPrintf("\nBG> BigSim emulator shutdown gracefully!\n");
-    CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
+    
+    if(CmiMyPe() == 0) {
+      CmiPrintf("\nBG> BigSim emulator shutdown gracefully!\n");
+      CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
+    }
     ConverseExit();
     exit(0);
   }

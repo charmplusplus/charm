@@ -2225,7 +2225,8 @@ static void writeToDisk()
   p(procOffsets,numLocalProcs);
   fclose(f);
 
-  CmiPrintf("[%d] Wrote to disk for %d BG nodes. \n", CmiMyPe(), cva(numNodes));
+  if(CmiMyPe() == 0) 
+    CmiPrintf("[%d] Wrote to disk for %d BG nodes. \n", CmiMyPe(), cva(numNodes));
 }
 
 
