@@ -132,7 +132,8 @@ void BgWriteTimelines(int seqno, BgTimeLineRec **tlinerecs, int nlocalProcs, cha
   p(procOffsets,nlocalProcs);
   fclose(f);
 
-  CmiPrintf("BgWriteTimelines> Wrote to disk for %d simulated nodes. \n", nlocalProcs);
+  if(CmiMyPe() == 0) 
+    CmiPrintf("BgWriteTimelines> Wrote to disk for %d simulated nodes on PE0. \n", nlocalProcs);
   delete [] procOffsets;
   delete [] d;
 }
