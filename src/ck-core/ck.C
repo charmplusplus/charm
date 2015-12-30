@@ -784,10 +784,10 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();
   if(ptrq) {
     void *pending;
-    while((pending=ptrq->deq())!=0)
+    while((pending=ptrq->deq())!=0) {
       _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
-//    delete ptrq;
-      CksvAccess(_nodeGroupTable)->find(groupID).clearPending();
+    }
+    CksvAccess(_nodeGroupTable)->find(groupID).clearPending();
   }
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 }
