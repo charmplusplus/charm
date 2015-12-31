@@ -98,6 +98,14 @@ const char *skt_to_name(SOCKET skt)
     return "UNKNOWN";
   }
 }
+int skt_to_node(SOCKET skt)
+{
+  if (skt_client_table.find(skt) != skt_client_table.end()) {
+    return skt_client_table[skt];
+  } else {
+    return -1;
+  }
+}
 
 //#define HSTART
 #ifdef HSTART
@@ -2626,9 +2634,9 @@ int socket_error_in_poll(SOCKET skt, int code, const char *msg)
   int i;
   skt_set_abort(ignore_socket_errors);
   const char *name = skt_to_name(skt);
-  fprintf(stderr, "Charmrun> error on request socket to node '%s'--\n"
+  fprintf(stderr, "Charmrun> error on request socket to node %d '%s'--\n"
                   "%s\n",
-          name, msg);
+          skt_to_node(skt), name, msg);
 #ifndef __FAULT__
   for (i = 0; i < req_nClients; i++)
     skt_close(req_clients[i]);
