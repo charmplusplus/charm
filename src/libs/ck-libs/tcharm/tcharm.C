@@ -5,18 +5,11 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
  */
 #include "tcharm_impl.h"
 #include "tcharm.h"
-#include "mempool.h"
 #include "ckevacuation.h"
 #include <ctype.h>
+#include "memory-isomalloc.h"
 
 CtvDeclare(TCharm *,_curTCharm);
-
-#if CMK_USE_MEMPOOL_ISOMALLOC
-extern "C"
-{
-CtvExtern(mempool_type *, threadpool);
-}
-#endif
 
 static int lastNumChunks=0;
 
@@ -208,9 +201,10 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
   if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) {
-  	heapBlocks=CmiIsomallocBlockListNew(tid);
-  } else
-  	heapBlocks=0;
+    heapBlocks = CmiIsomallocBlockListNew();
+  } else {
+    heapBlocks = 0;
+  }
   nUd=0;
   usesAtSync=true;
   run();
@@ -336,12 +330,10 @@ void TCharm::pup(PUP::er &p) {
 void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
     checkPupMismatch(pc,5138,"before TCHARM thread"); 
-#if CMK_USE_MEMPOOL_ISOMALLOC
-    CmiIsomallocBlockListPup(p,&heapBlocks,tid);
-#else
+
     if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-      CmiIsomallocBlockListPup(p,&heapBlocks,tid);
-#endif
+      CmiIsomallocBlockListPup(p,&heapBlocks);
+
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
@@ -391,19 +383,14 @@ TCharm::~TCharm()
 {
   //BIGSIM_OOC DEBUGGING
   //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
-  
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  mempool_type *mptr = CtvAccess(threadpool);
-#else
+
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
-#endif
+
   CthFree(tid);
 #if CMI_SWAPGLOBALS
   CtgFree(threadGlobals);
 #endif
-#if CMK_USE_MEMPOOL_ISOMALLOC 
-  if(mptr != NULL) mempool_destroy(mptr);
-#endif
+
   delete initMsg;
 }
 
@@ -442,15 +429,8 @@ void TCharm::ckAboutToMigrate(){
 // clear the data before restarting from disk
 void TCharm::clear()
 {
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  mempool_type *mptr = CtvAccess(threadpool);
-#else 
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
-#endif
   CthFree(tid);
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  if(mptr != NULL) mempool_destroy(mptr);
-#endif
   delete initMsg;
 }
 

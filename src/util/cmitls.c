@@ -3,6 +3,7 @@
 
 #include "converse.h"
 #include "cmitls.h"
+#include "memory-isomalloc.h"
 
 #if CMK_HAS_TLS_VARIABLES && CMK_HAS_ELF_H \
     && ((CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT) || CMK_HAS_DL_ITERATE_PHDR)
@@ -143,7 +144,7 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
 
   if (t->size > 0) {
     t->size = CMIALIGN(t->size, t->align);
-    t->memseg = (Addr)CmiIsomallocAlign(t->align, t->size, th);
+    t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size);
     memcpy((void*)t->memseg, (char *)getTLS() - t->size, t->size);
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
     /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
@@ -155,11 +156,6 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
 
 void switchTLS(tlsseg_t* , tlsseg_t* ) CMI_NOOPTIMIZE;
 void currentTLS(tlsseg_t*) CMI_NOOPTIMIZE;
-
-/* void allocNewTLSSegEmpty(tlsseg_t* t) {
- *   void* aux = CmiIsomallocAlign(t->align, t->size);
- *     t->memseg = (Addr) (aux + t->size);
- *     } */
 
 void currentTLS(tlsseg_t* cur) {
   cur->memseg = (Addr)getTLS();

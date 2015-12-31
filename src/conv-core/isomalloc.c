@@ -2128,29 +2128,14 @@ static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
 
 /************** External interface ***************/
 #if CMK_USE_MEMPOOL_ISOMALLOC
-static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size, CthThread tid)
+static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size, mempool_type *pool)
 {
-  CmiInt8 s,n,i;
-  CmiIsomallocBlock *blk;
-  if (isomallocStart==NULL) return disabled_map(size);
-  if(tid != NULL) {
-    if(CtvAccessOther(tid,threadpool) == NULL) {
-      DEBUG_PRINT("Init Mempool in %d for %d\n",CthSelf(), tid);
-      CtvAccessOther(tid,threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn,0);
-    }
-    blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccessOther(tid,threadpool),size+sizeof(CmiIsomallocBlock),1);
-  } else {
-    if(CtvAccess(threadpool) == NULL) {
-      DEBUG_PRINT("Init Mempool in %d\n",CthSelf());
-      CtvAccess(threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn,0);
-    }
-    blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
-  }
-  blk->slot=(CmiInt8)(uintptr_t)blk;
+  CmiIsomallocBlock *blk = (CmiIsomallocBlock*)mempool_malloc(pool, size, 1);
+  blk->slot = (CmiInt8)(uintptr_t)blk;
   return blk;
 }
 #else
-static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size, CthThread tid)
+static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
@@ -2178,9 +2163,17 @@ static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size, CthThread 
 }
 #endif
 
-void *CmiIsomalloc(size_t size, CthThread tid)
+#if CMK_USE_MEMPOOL_ISOMALLOC
+void* CmiIsomallocFromPool(size_t size, mempool_type *pool)
+#else
+void *CmiIsomallocPlain(int size)
+#endif
 {
-  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock), tid);
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock)
+#if CMK_USE_MEMPOOL_ISOMALLOC
+    , pool
+#endif
+    );
   blk->length = size;
   blk->align = 0;
   blk->alignoffset = 0;
@@ -2218,20 +2211,19 @@ static void *isomalloc_internal_perform_alignment(CmiIsomallocBlock *blk, size_t
 }
 
 /* alignment occurs after blocklistsize bytes */
-static void *isomalloc_internal_alloc_aligned(size_t useralign, size_t usersize, size_t blocklistsize, CthThread tid)
+static void *isomalloc_internal_alloc_aligned(size_t useralign, size_t usersize, size_t blocklistsize, CmiIsomallocBlockList *list)
 {
   size_t size = usersize + blocklistsize;
   size_t align = isomalloc_internal_validate_align(useralign);
-  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock) + align, tid);
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock) + align
+#if CMK_USE_MEMPOOL_ISOMALLOC
+    , list->pool
+#endif
+    );
   blk->length = size;
   blk->align = align;
   blk->alignoffset = blocklistsize;
   return isomalloc_internal_perform_alignment(blk, align, blocklistsize);
-}
-
-void *CmiIsomallocAlign(size_t align, size_t size, CthThread t)
-{
-  return isomalloc_internal_alloc_aligned(align, size, 0, t);
 }
 
 int CmiIsomallocEnabled(void)
@@ -2379,10 +2371,19 @@ static char *Slot_toUser(CmiIsomallocBlockList *s) {return (char *)(s+1);}
 static CmiIsomallocBlockList *Slot_fmUser(void *s) {return ((CmiIsomallocBlockList *)s)-1;}
 
 /*Build a new blockList.*/
-CmiIsomallocBlockList *CmiIsomallocBlockListNew(CthThread tid)
+CmiIsomallocBlockList *CmiIsomallocBlockListNew(void)
 {
   CmiIsomallocBlockList *ret;
-  ret=(CmiIsomallocBlockList *)CmiIsomalloc(sizeof(*ret),tid);
+
+#if CMK_USE_MEMPOOL_ISOMALLOC
+  mempool_type *pool = mempool_init(2*(sizeof(CmiIsomallocBlock)+sizeof(mempool_header)) + sizeof(mempool_type),
+                                    isomallocfn, isofreefn, 0);
+  ret = (CmiIsomallocBlockList *)CmiIsomallocFromPool(sizeof(*ret), pool);
+  ret->pool = pool;
+#else
+  ret = (CmiIsomallocBlockList *)CmiIsomallocPlain(sizeof(*ret));
+#endif
+
   ret->next=ret; /*1-entry circular linked list*/
   ret->prev=ret;
   return ret;
@@ -2396,7 +2397,7 @@ static void print_myslots(void);
   have to restore the pointers-- they'll be restored automatically!
   */
 #if CMK_USE_MEMPOOL_ISOMALLOC
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid)
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 {
   mempool_type *mptr;
   block_header *current, *block_head;
@@ -2410,7 +2411,10 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   int numBlocks = 0, numSlots = 0, flag = 1;
 
   if(!pup_isUnpacking(p)) {
-    if(CtvAccessOther(tid,threadpool) == NULL) {
+    CmiAssert(*lp);
+    mptr = (*lp)->pool;
+
+    if(mptr == NULL) {
       dopup = 0;
     } else {
       dopup = 1;
@@ -2420,11 +2424,10 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   pup_int(p,&dopup);
   if(!dopup)  return;
 
-  DEBUG_PRINT("[%d] My rank is %lld Pupping for %lld with isUnpack %d isDelete %d \n",
-              CmiMyPe(),CthSelf(),tid,pup_isUnpacking(p),pup_isDeleting(p));
+  DEBUG_PRINT("[%d] My rank is %lld Pupping with isUnpack %d isDelete %d \n",
+              CmiMyPe(),CthSelf(),pup_isUnpacking(p),pup_isDeleting(p));
   flags[0] = 0; flags[1] = 1;
   if(!pup_isUnpacking(p)) {
-    mptr = CtvAccessOther(tid,threadpool);
     current = MEMPOOL_GetBlockHead(mptr);
     while(current != NULL) {
       numBlocks++;
@@ -2504,12 +2507,12 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   }
   pup_bytes(p,lp,sizeof(int*));
   if(pup_isDeleting(p)) {
-    mempool_destroy(CtvAccessOther(tid,threadpool));
+    mempool_destroy(mptr);
     *lp=NULL;
   }
 }
 #else
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid)
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 {
   /* BIGSIM_OOC DEBUGGING */
   /* if(!pup_isUnpacking(p)) print_myslots(); */
@@ -2551,19 +2554,32 @@ void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l)
 {
   CmiIsomallocBlockList *start=l;
   CmiIsomallocBlockList *cur=start;
+#if CMK_USE_MEMPOOL_ISOMALLOC
+  mempool_type *pool;
+#endif
   if (cur==NULL) return; /*Already deleted*/
+#if CMK_USE_MEMPOOL_ISOMALLOC
+  pool = cur->pool;
+#endif
   do {
     CmiIsomallocBlockList *doomed=cur;
     cur=cur->next; /*Have to stash next before deleting cur*/
     CmiIsomallocFree(doomed);
   } while (cur!=start);
+#if CMK_USE_MEMPOOL_ISOMALLOC
+  mempool_destroy(pool);
+#endif
 }
 
-/*Allocate a block from this blockList*/
+/*Allocate a block into this blockList*/
 void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 {
   CmiIsomallocBlockList *n; /*Newly created slot*/
-  n=(CmiIsomallocBlockList *)CmiIsomalloc(sizeof(CmiIsomallocBlockList)+nBytes,NULL);
+#if CMK_USE_MEMPOOL_ISOMALLOC
+  n = (CmiIsomallocBlockList *)CmiIsomallocFromPool(sizeof(CmiIsomallocBlockList)+nBytes, l->pool);
+#else
+  n = (CmiIsomallocBlockList *)CmiIsomallocPlain(sizeof(CmiIsomallocBlockList)+nBytes);
+#endif
   /*Link the new block into the circular blocklist*/
   n->prev=l;
   n->next=l->next;
@@ -2572,11 +2588,11 @@ void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
   return Slot_toUser(n);
 }
 
-/*Allocate a block from this blockList with alighment */
+/*Allocate a block into this blockList with alignment */
 void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes)
 {
   CmiIsomallocBlockList *n; /*Newly created slot*/
-  n=(CmiIsomallocBlockList *)isomalloc_internal_alloc_aligned(align,nBytes,sizeof(CmiIsomallocBlockList),NULL);
+  n=(CmiIsomallocBlockList *)isomalloc_internal_alloc_aligned(align, nBytes, sizeof(CmiIsomallocBlockList), l);
   /*Link the new block into the circular blocklist*/
   n->prev=l;
   n->next=l->next;
@@ -2605,6 +2621,3 @@ static void print_myslots(void) {
   CmiPrintf("[%d] my slot set=%p\n", CmiMyPe(), CpvAccess(myss));
   print_slots(CpvAccess(myss));
 }
-
-
-

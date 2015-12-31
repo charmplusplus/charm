@@ -58,6 +58,7 @@ A more readable summary is at:
 #include <algorithm>
 #include "converse.h"
 #include "pup.h"
+#include "memory-isomalloc.h"
 
 #include <elf.h>
 
@@ -375,7 +376,7 @@ public:
       seg_size=size;
         /* global data segment need to be isomalloc */
       if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-        data_seg=CmiIsomalloc(seg_size,tid);
+        data_seg=CmiIsomallocMallocForThread(tid, seg_size);
       else
         data_seg=malloc(seg_size);
     }
@@ -389,7 +390,7 @@ public:
         if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
         {
 #if !CMK_USE_MEMPOOL_ISOMALLOC
-          CmiIsomallocFree(data_seg);
+          CmiIsomallocBlockListFree(data_seg);
 #endif
         }
         else

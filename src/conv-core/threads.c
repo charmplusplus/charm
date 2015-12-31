@@ -107,6 +107,7 @@ void *memalign(size_t align, size_t size) CMK_THROW;
 #endif
 
 #include "qt.h"
+#include "memory-isomalloc.h"
 
 #include "conv-trace.h"
 #include <sys/types.h>
@@ -178,7 +179,11 @@ void *memalign(size_t align, size_t size) CMK_THROW;
   size_t     datasize;   /* size of thread-private data, in bytes */
 
   int isMigratable; /* thread is migratable (isomalloc or aliased stack) */
+#if CMK_THREADS_ALIAS_STACK
   int aliasStackHandle; /* handle for aliased stack */
+#endif
+  CmiIsomallocBlockList *isomallocBlockList;
+
   void      *stack; /*Pointer to thread stack*/
   int        stacksize; /*Size of thread stack (bytes)*/
   struct CthThreadListener *listener; /* pointer to the first of the listeners */
@@ -423,7 +428,11 @@ static void CthThreadBaseInit(CthThreadBase *th)
   CthSetStrategyDefault(S(th));
 
   th->isMigratable=0;
+#if CMK_THREADS_ALIAS_STACK
   th->aliasStackHandle=0;
+#endif
+  th->isomallocBlockList = NULL;
+
   th->stack=NULL;
   th->stacksize=0;
 
@@ -453,11 +462,13 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
     th->aliasStackHandle=CthAliasCreate(*stackSize);
     ret=CMK_THREADS_ALIAS_LOCATION;
 #else /* isomalloc */
+  if (th->isomallocBlockList == NULL && CmiIsomallocEnabled())
+    th->isomallocBlockList = CmiIsomallocBlockListNew();
 #if defined(__APPLE__) && CMK_64BIT
       /* MAC OS needs 16-byte aligned stack */
-    ret=CmiIsomallocAlign(16, *stackSize, (CthThread)th);
+    ret=CmiIsomallocBlockListMallocAlign(th->isomallocBlockList, 16, *stackSize);
 #else
-    ret=CmiIsomalloc(*stackSize, (CthThread)th);
+    ret=CmiIsomallocBlockListMalloc(th->isomallocBlockList, *stackSize);
 #endif
 #endif
   }
@@ -494,10 +505,6 @@ static void CthThreadBaseFree(CthThreadBase *th)
   if (th->isMigratable) {
 #if CMK_THREADS_ALIAS_STACK
     CthAliasFree(th->aliasStackHandle);
-#else /* isomalloc */
-#if !CMK_USE_MEMPOOL_ISOMALLOC
-    CmiIsomallocFree(th->stack);
-#endif
 #endif
   } 
   else if (th->stack!=NULL) {
@@ -507,6 +514,9 @@ static void CthThreadBaseFree(CthThreadBase *th)
   VALGRIND_STACK_DEREGISTER(th->valgrindStackID);
 #endif
   th->stack=NULL;
+
+  if (th->isomallocBlockList)
+    CmiIsomallocBlockListDelete(th->isomallocBlockList);
 }
 
 #if CMK_THREADS_BUILD_TLS
@@ -661,6 +671,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
   pup_bytes(p,(void *)t->data,t->datasize);
   pup_int(p,&t->isMigratable);
   pup_int(p,&t->stacksize);
+  CmiIsomallocBlockListPup(p, &t->isomallocBlockList);
   if (t->isMigratable) {
 #if CMK_THREADS_ALIAS_STACK
     if (pup_isUnpacking(p)) { 
@@ -671,11 +682,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 #elif CMK_THREADS_USE_STACKCOPY
     /* do nothing */
 #else /* isomalloc */
-#if CMK_USE_MEMPOOL_ISOMALLOC
     pup_bytes(p,&t->stack,sizeof(char*));
-#else
-    CmiIsomallocPup(p,&t->stack);
-#endif
 #endif
   } 
   else {
@@ -697,11 +704,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
     pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
     aux = ((char*)(t->tlsseg.memseg)) - t->tlsseg.size;
     /* fixme: tls global variables handling needs isomalloc */
-#if CMK_USE_MEMPOOL_ISOMALLOC
     pup_bytes(p,&aux,sizeof(char*));
-#else
-    CmiIsomallocPup(p, &aux);
-#endif
     /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
   }
 #endif
@@ -2205,3 +2208,16 @@ void CthPrintThdMagic(CthThread t){
   CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
 }
 
+void *CmiIsomallocMallocForThread(CthThread th, size_t nBytes)
+{
+  if (B(th)->isomallocBlockList == NULL && CmiIsomallocEnabled())
+    B(th)->isomallocBlockList = CmiIsomallocBlockListNew();
+  return CmiIsomallocBlockListMalloc(B(th)->isomallocBlockList, nBytes);
+}
+
+void *CmiIsomallocMallocAlignForThread(CthThread th, size_t align, size_t nBytes)
+{
+  if (B(th)->isomallocBlockList == NULL && CmiIsomallocEnabled())
+    B(th)->isomallocBlockList = CmiIsomallocBlockListNew();
+  return CmiIsomallocBlockListMallocAlign(B(th)->isomallocBlockList, align, nBytes);
+}
