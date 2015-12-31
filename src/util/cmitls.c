@@ -3,6 +3,7 @@
 
 #include "converse.h"
 #include "cmitls.h"
+#include "memory-isomalloc.h"
 
 #if CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES
 
@@ -52,7 +53,7 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
   if (phdr != NULL) {
     t->align = phdr->p_align;
     t->size = CMIALIGN(phdr->p_memsz, phdr->p_align);
-    t->memseg = (Addr)CmiIsomallocAlign(t->align, t->size, th);
+    t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size);
     memset((void*)t->memseg, 0, t->size);
     memcpy((void*)t->memseg, (void*) (phdr->p_vaddr), (size_t)(phdr->p_filesz));
     t->memseg = (Addr)( ((void*)(t->memseg)) + t->size );
@@ -66,11 +67,6 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
 
 void switchTLS(tlsseg_t* , tlsseg_t* ) __attribute__((optimize(0)));
 void currentTLS(tlsseg_t*) __attribute__((optimize(0)));
-
-/* void allocNewTLSSegEmpty(tlsseg_t* t) {
- *   void* aux = CmiIsomallocAlign(t->align, t->size);
- *     t->memseg = (Addr) (aux + t->size);
- *     } */
 
 void currentTLS(tlsseg_t* cur) {
 #if CMK_TLS_SWITCHING64

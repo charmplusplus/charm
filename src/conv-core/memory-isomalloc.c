@@ -196,7 +196,7 @@ void free_nomigrate(void *mem)
 mallocs.  Returns the old blocklist.*/
 CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
 {
-	register CmiIsomallocBlockList **s=&CpvAccess(isomalloc_blocklist);
+	CmiIsomallocBlockList **s=&CpvAccess(isomalloc_blocklist);
 	CmiIsomallocBlockList *ret=*s;
 	*s=l;
 	return ret;
