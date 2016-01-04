@@ -548,8 +548,11 @@ public:
 	///  other requests just abort.
 	virtual int start(void){ return -1; }
 
-	/// Return true if this request is finished (progress).
+	/// Return true if this request is finished (progress):
+	///  test always yields before returning false.
+	///  itest does not yield before returning false for IReq's and SReq's.
 	virtual bool test(MPI_Status *sts) =0;
+	virtual bool itest(MPI_Status *sts) =0;
 
 	/// Completes the operation hanging on the request
 	virtual void complete(MPI_Status *sts) =0;
@@ -601,6 +604,7 @@ public:
 	~PersReq(){ }
 	int start();
 	bool test(MPI_Status *sts);
+	bool itest(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
@@ -625,6 +629,7 @@ public:
 	IReq(): statusIreq(false){};
 	~IReq(){ }
 	bool test(MPI_Status *sts);
+	bool itest(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	inline int getType(void){ return 2; }
@@ -677,6 +682,7 @@ public:
 		return (++idx);
 	}
 	bool test(MPI_Status *sts);
+	bool itest(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
@@ -710,6 +716,7 @@ public:
 	SReq(): statusIreq(false) {}
 	~SReq(){ }
 	bool test(MPI_Status *sts);
+	bool itest(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
@@ -729,6 +736,7 @@ public:
     GPUReq();
     int getType() { return 5; }
     bool test(MPI_Status *sts);
+    bool itest(MPI_Status *sts);
     void complete(MPI_Status *sts);
     int wait(MPI_Status *sts);
     void receive(ampi *ptr, AmpiMsg *msg);
