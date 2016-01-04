@@ -438,19 +438,21 @@ void Entry::genArrayDefs(XStr& str)
 	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
 	      << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       if(isAppWork())
-      str << " _TRACE_BEGIN_APPWORK();\n";    
+	str << " _TRACE_BEGIN_APPWORK();\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
-      str << "#if CMK_CHARMDEBUG\n"
-      "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
-      "#endif\n   ";
+      str <<
+	"#if CMK_CHARMDEBUG\n"
+	"  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
+	"#endif\n   ";
       if (!retType->isVoid()) str << retType<< " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str << "#if CMK_CHARMDEBUG\n"
-      "  CpdAfterEp("<<epIdx()<<");\n"
-      "#endif\n";
+      str <<
+	"#if CMK_CHARMDEBUG\n"
+	"  CpdAfterEp("<<epIdx()<<");\n"
+	"#endif\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
       if(isAppWork())
-      str << " _TRACE_END_APPWORK();\n";    
+	str << " _TRACE_END_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     }
@@ -651,38 +653,38 @@ void Entry::genGroupDefs(XStr& str)
       str << "  CkAssert(obj);\n";
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL);\n";
       if(isAppWork())
-      str << " _TRACE_BEGIN_APPWORK();\n";    
-      str << "#if CMK_LBDB_ON\n"
-"  // if there is a running obj being measured, stop it temporarily\n"
-"  LDObjHandle objHandle;\n"
-"  int objstopped = 0;\n"
-"  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
-"  if (the_lbdb->RunningObject(&objHandle)) {\n"
-"    objstopped = 1;\n"
-"    the_lbdb->ObjectStop(objHandle);\n"
-"  }\n"
-"#endif\n";
-      str << "#if CMK_CHARMDEBUG\n"
-      "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
-      "#endif\n  ";
+	str << " _TRACE_BEGIN_APPWORK();\n";
+      str <<
+	"#if CMK_LBDB_ON\n"
+	"  // if there is a running obj being measured, stop it temporarily\n"
+	"  LDObjHandle objHandle;\n"
+	"  int objstopped = 0;\n"
+	"  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
+	"  if (the_lbdb->RunningObject(&objHandle)) {\n"
+	"    objstopped = 1;\n"
+	"    the_lbdb->ObjectStop(objHandle);\n"
+	"  }\n"
+	"#endif\n";
+      str <<
+	"#if CMK_CHARMDEBUG\n"
+	"  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
+	"#endif\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
       str << "#if CMK_CHARMDEBUG\n"
-      "  CpdAfterEp("<<epIdx()<<");\n"
-      "#endif\n";
+	"  CpdAfterEp("<<epIdx()<<");\n"
+	"#endif\n";
       str << "#if CMK_LBDB_ON\n"
-"  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
-"#endif\n";
+	"  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
+	"#endif\n";
       if(isAppWork())
-      str << " _TRACE_BEGIN_APPWORK();\n";    
+	str << " _TRACE_BEGIN_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     } else if(isSync()) {
       str << syncReturn() <<
         "CkRemote"<<node<<"BranchCall("<<paramg<<", ckGetGroupPe()));\n";
-    }
-    else
-    { //Non-sync entry method
+    } else { // Non-sync, non-local entry method
       if (forElement)
       {// Send
         str << "  if (ckIsDelegated()) {\n";
