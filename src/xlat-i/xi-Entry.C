@@ -678,7 +678,7 @@ void Entry::genGroupDefs(XStr& str)
 	"  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
 	"#endif\n";
       if(isAppWork())
-	str << " _TRACE_BEGIN_APPWORK();\n";
+	str << " _TRACE_END_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     } else if(isSync()) {
