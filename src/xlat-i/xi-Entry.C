@@ -422,39 +422,57 @@ void Entry::genArrayDefs(XStr& str)
     else
       str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
     str << "{\n  ckCheck();\n";
-    if (!isLocal()) {
-      str << marshallMsg();
-      str << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
-      str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
-      str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
+
+    XStr inlineCall;
+    inlineCall << "  LDObjHandle objHandle;\n  int objstopped=0;\n";
+    if (!isNoTrace())
+      inlineCall << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
+		 << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
+    if(isAppWork())
+      inlineCall << " _TRACE_BEGIN_APPWORK();\n";
+    inlineCall << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
+    inlineCall <<
+      "#if CMK_CHARMDEBUG\n"
+      "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
+      "#endif\n   ";
+    if (!retType->isVoid()) inlineCall << retType<< " retValue = ";
+    inlineCall << "obj->" << name << "(";
+    param->unmarshall(inlineCall);
+    inlineCall << ");\n";
+    inlineCall <<
+      "#if CMK_CHARMDEBUG\n"
+      "  CpdAfterEp("<<epIdx()<<");\n"
+      "#endif\n";
+    inlineCall << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
+    if(isAppWork())
+      inlineCall << " _TRACE_END_APPWORK();\n";
+    if (!isNoTrace()) inlineCall << "  _TRACE_END_EXECUTE();\n";
+    if (!retType->isVoid()) {
+      inlineCall << "  return retValue;\n";
     } else {
-      XStr unmarshallStr; param->unmarshall(unmarshallStr);
-      str << "  LDObjHandle objHandle;\n  int objstopped=0;\n";
-      str << "  "<<container->baseName()<<" *obj = ckLocal();\n";
+      inlineCall << "  return;\n";
+    }
+
+    XStr prepareMsg;
+    prepareMsg << marshallMsg();
+    prepareMsg << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
+    prepareMsg << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
+    prepareMsg << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
+
+    if (!isLocal()) {
+      if (isInline() && container->isForElement()) {
+	str << "  "<< container->baseName() << " *obj = ckLocal();\n";
+	str << "  if (obj) {\n"
+	    << inlineCall
+	    << "  }\n";
+      }
+      str << prepareMsg;
+    } else {
+      str << "  "<< container->baseName() << " *obj = ckLocal();\n";
       str << "#if CMK_ERROR_CHECKING\n";
       str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
       str << "#endif\n";
-      if (!isNoTrace())
-	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
-	      << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
-      if(isAppWork())
-	str << " _TRACE_BEGIN_APPWORK();\n";
-      str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
-      str <<
-	"#if CMK_CHARMDEBUG\n"
-	"  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
-	"#endif\n   ";
-      if (!retType->isVoid()) str << retType<< " retValue = ";
-      str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str <<
-	"#if CMK_CHARMDEBUG\n"
-	"  CpdAfterEp("<<epIdx()<<");\n"
-	"#endif\n";
-      str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
-      if(isAppWork())
-	str << " _TRACE_END_APPWORK();\n";
-      if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
-      if (!retType->isVoid()) str << "  return retValue;\n";
+      str << inlineCall;
     }
     if(isIget()) {
 	    str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg,"<<epIdx()<<",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"<<"\n";
@@ -468,7 +486,6 @@ void Entry::genArrayDefs(XStr& str)
       XStr opts;
       opts << ",0";
       if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
-      if (isInline())  opts << "+CK_MSG_INLINE";
       if(!isIget()) {
       if (container->isForElement() || container->isForSection()) {
         str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
