@@ -60,8 +60,16 @@ void Entry::check() {
                        first_line_);
 
     if (isExclusive() && isConstructor())
-        XLAT_ERROR_NOCOL("constructors cannot be 'exclusive'",
-                         first_line_);
+      XLAT_ERROR_NOCOL("constructors cannot be 'exclusive'",
+		       first_line_);
+
+    if (isImmediate() && !container->isNodeGroup())
+      XLAT_ERROR_NOCOL("[immediate] entry methods are only allowed on 'nodegroup' types",
+		       first_line_);
+
+    if (isLocal() && (container->isChare() || container->isNodeGroup()))
+      XLAT_ERROR_NOCOL("[local] entry methods are only allowed on 'array' and 'group' types",
+		       first_line_);
   }
 
   if (!isThreaded() && stacksize)
@@ -316,15 +324,6 @@ void Entry::genChareDecl(XStr& str)
 
 void Entry::genChareDefs(XStr& str)
 {
-  if (isImmediate()) {
-      cerr << (char *)container->baseName() << ": Chare does not allow immediate message.\n";
-      exit(1);
-  }
-  if (isLocal()) {
-    cerr << (char*)container->baseName() << ": Chare does not allow LOCAL entry methods.\n";
-    exit(1);
-  }
-
   if(isConstructor()) {
     genChareStaticConstructorDefs(str);
   } else {
@@ -404,10 +403,6 @@ void Entry::genArrayDecl(XStr& str)
 void Entry::genArrayDefs(XStr& str)
 {
   if(isIget() && !container->isForElement()) return;
-  if (isImmediate()) {
-      cerr << (char *)container->baseName() << ": Chare Array does not allow immediate message.\n";
-      exit(1);
-  }
 
   if (isConstructor())
     genArrayStaticConstructorDefs(str);
@@ -600,17 +595,6 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
 
 void Entry::genGroupDecl(XStr& str)
 {
-#if 0
-  if (isImmediate() && !container->isNodeGroup()) {
-      cerr << (char *)container->baseName() << ": Group does not allow immediate message.\n";
-      exit(1);
-  }
-#endif
-  if (isLocal() && container->isNodeGroup()) {
-    cerr << (char*)container->baseName() << ": Nodegroup does not allow LOCAL entry methods.\n";
-    exit(1);
-  }
-
   if(isConstructor()) {
     str << "    " << generateTemplateSpec(tspec) << "\n";
     genGroupStaticConstructorDecl(str);
