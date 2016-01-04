@@ -1,0 +1,11 @@
+mainmodule m {
+    chare c {
+        entry [immediate] void foo();
+    }
+    array [1D] a {
+        entry [immediate] void foo();
+    }
+    group g {
+        entry [immediate] void foo();
+    }
+}
