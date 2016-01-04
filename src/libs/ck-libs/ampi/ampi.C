@@ -2287,6 +2287,28 @@ inline void checkRequests(int n, MPI_Request* reqs){
 #endif
 }
 
+int testRequest(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
+  MPI_Status tempStatus;
+  if(!sts) sts = &tempStatus;
+
+  if(*reqIdx==MPI_REQUEST_NULL){
+    *flag = 1;
+    stsempty(*sts);
+    return MPI_SUCCESS;
+  }
+  checkRequest(*reqIdx);
+  AmpiRequestList* reqList = getReqs();
+  AmpiRequest& req = *(*reqList)[*reqIdx];
+  if(1 == (*flag = req.itest(sts))){
+    req.complete(sts);
+    if(req.getType() != 1) { // only free non-blocking request
+      reqList->free(*reqIdx);
+      *reqIdx = MPI_REQUEST_NULL;
+    }
+  }
+  return MPI_SUCCESS;
+}
+
 CDECL void AMPI_Migrate(void)
 {
   //  AMPIAPI("AMPI_Migrate");
@@ -3658,7 +3680,7 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
   CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
   while(count>0){ /* keep looping until some request finishes: */
     for(int i=0;i<reqvec->size();i++){
-      AMPI_Test(&request[((*reqvec)[i])[0]], &flag, sts);
+      testRequest(&request[((*reqvec)[i])[0]], &flag, sts);
       if(flag == 1 && sts->MPI_COMM != 0){ // to skip MPI_REQUEST_NULL
         *idx = ((*reqvec)[i])[0];
         USER_CALL_DEBUG("AMPI_Waitany returning "<<*idx);
@@ -3691,7 +3713,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
   *outcount = 0;
   while(1){
     for(i=0;i<reqvec->size();i++){
-      AMPI_Test(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
+      testRequest(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
       if(flag == 1){ 
         array_of_indices[(*outcount)]=((*reqvec)[i])[0];
         if(array_of_statuses)
@@ -3700,23 +3722,30 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
           realflag=1; // there is real(non null) request
       }
     }
-    if(realflag && outcount>0) break;
+    if(realflag && *outcount>0)
+      break;
+    else
+      AMPI_Yield(MPI_COMM_WORLD);
   }
   delete reqvec;
   return MPI_SUCCESS;
 }
 
-  bool PersReq::test(MPI_Status *sts){
-    if(sndrcv == 2) 	// recv request
-      return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
-    else			// send request
-      return 1;
+bool PersReq::test(MPI_Status *sts){
+  if(sndrcv == 2) // recv request
+    return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
+  else            // send request
+    return 1;
+}
 
-  }
-  void PersReq::complete(MPI_Status *sts){
-    if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
-      CkAbort("AMPI> Error in persistent request complete");
-  }
+bool PersReq::itest(MPI_Status *sts){
+  return test(sts);
+}
+
+void PersReq::complete(MPI_Status *sts){
+  if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
+    CkAbort("AMPI> Error in persistent request complete");
+}
 
 bool IReq::test(MPI_Status *sts){
   if (statusIreq == true) {           
@@ -3733,12 +3762,32 @@ bool IReq::test(MPI_Status *sts){
    */
 }
 
+bool IReq::itest(MPI_Status *sts){
+  if (statusIreq == true) {
+    if(sts)
+      sts->MPI_LENGTH = length;
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
 bool SReq::test(MPI_Status *sts){
   if (statusIreq == true) {
     return true;
   }
   else {
     getAmpiInstance(comm)->yield();
+    return false;
+  }
+}
+
+bool SReq::itest(MPI_Status *sts){
+  if (statusIreq == true) {
+    return true;
+  }
+  else {
     return false;
   }
 }
@@ -3782,6 +3831,11 @@ bool ATAReq::test(MPI_Status *sts){
   }
   return flag;
 }
+
+bool ATAReq::itest(MPI_Status *sts){
+  return test(sts);
+}
+
 void ATAReq::complete(MPI_Status *sts){
   int i;
   for(i=0;i<count;i++){
@@ -3795,24 +3849,9 @@ void ATAReq::complete(MPI_Status *sts){
 int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Test");
-
-  MPI_Status tempStatus;
-  if(!sts) sts = &tempStatus;
-
-  if(*request==MPI_REQUEST_NULL) {
-    *flag = 1;
-    stsempty(*sts);
-    return MPI_SUCCESS;
-  }
-  checkRequest(*request);
-  AmpiRequestList* reqs = getReqs();
-  if(1 == (*flag = (*reqs)[*request]->test(sts))){
-    (*reqs)[*request]->complete(sts);
-    if((*reqs)[*request]->getType() != 1) { // only free non-blocking request
-      reqs->free(*request);
-      *request = MPI_REQUEST_NULL;
-    }
-  }
+  testRequest(request, flag, sts);
+  if(*flag != 1)
+    AMPI_Yield(MPI_COMM_WORLD);
   return MPI_SUCCESS;
 }
 
@@ -3833,7 +3872,7 @@ int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Sta
   CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
   *flag=0;
   for(int i=0;i<reqvec->size();i++){
-    AMPI_Test(&request[((*reqvec)[i])[0]], flag, sts);
+    testRequest(&request[((*reqvec)[i])[0]], flag, sts);
     if(*flag==1 && sts->MPI_COMM!=0){ // skip MPI_REQUEST_NULL
       *index = ((*reqvec)[i])[0];
       return MPI_SUCCESS;
@@ -3841,6 +3880,7 @@ int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Sta
   }
   *index = MPI_UNDEFINED;
   delete reqvec;
+  AMPI_Yield(MPI_COMM_WORLD);
   return MPI_SUCCESS;
 }
 
@@ -3861,13 +3901,15 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
     for(j=0;j<((*reqvec)[i]).size();j++){
       if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL)
         continue;
-      tmpflag = (*reqs)[request[((*reqvec)[i])[j]]]->test(&sts[((*reqvec)[i])[j]]);
+      tmpflag = (*reqs)[request[((*reqvec)[i])[j]]]->itest(&sts[((*reqvec)[i])[j]]);
       *flag *= tmpflag;
     }
   }
+  delete reqvec;
   if(*flag)
     AMPI_Waitall(count,request,sts);
-  delete reqvec;
+  else
+    AMPI_Yield(MPI_COMM_WORLD);
   return MPI_SUCCESS;
 }
 
@@ -3887,7 +3929,7 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
   CkVec<CkVec<int> > *reqvec = vecIndex(incount,array_of_requests);
   *outcount = 0;
   for(i=0;i<reqvec->size();i++){
-    AMPI_Test(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
+    testRequest(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
     if(flag == 1){
       array_of_indices[(*outcount)]=((*reqvec)[i])[0];
       if(array_of_statuses)
@@ -3895,6 +3937,8 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
     }
   }
   delete reqvec;
+  if(*outcount==0)
+    AMPI_Yield(MPI_COMM_WORLD);
   return MPI_SUCCESS;
 }
 
@@ -6241,6 +6285,11 @@ GPUReq::GPUReq()
 bool GPUReq::test(MPI_Status *sts)
 {
   return isComplete;
+}
+
+bool GPUReq::itest(MPI_Status *sts)
+{
+  return test(sts);
 }
 
 void GPUReq::complete(MPI_Status *sts)
