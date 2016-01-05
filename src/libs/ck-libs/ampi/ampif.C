@@ -953,7 +953,12 @@ void mpi_memcheckpoint(){
   AMPI_MemCheckpoint();
 }
 
-/* Fortran2003 standard cmd line arg parsing functions */
+/* Fortran2003 standard cmd line arg parsing functions:
+ *    - command_argument_count() returns the number of arguments
+ *      NOT including the program name.
+ *    - get_command_argument() returns the i'th argument, where
+ *      if 'i' is zero the program name is returned.
+ */
 void mpi_command_argument_count(int *count)
 {
   *count = CkGetArgc()-1;
