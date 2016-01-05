@@ -505,7 +505,7 @@ inline void LBObjUserData::pup(PUP::er &p) {
   }
   if (data) p(data, CkpvAccess(lbobjdatalayout).size());
 }
-PUPmarshall(LBObjUserData);
+PUPmarshall(LBObjUserData)
 
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;

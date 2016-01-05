@@ -134,7 +134,7 @@ typedef enum Partition_Type {
       PARTITION_SINGLETON,
       PARTITION_DEFAULT,
       PARTITION_MASTER,
-      PARTITION_PREFIX,
+      PARTITION_PREFIX
 } Partition_Type;
 
 //variables and functions for partition
