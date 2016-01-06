@@ -165,7 +165,7 @@ namespace PUP {
 	  p.syncComment(sync_item);
 	  dtype n;
 	  p|n;
-	  c.push_back(n);
+	  c.push_back(std::move(n));
 	} 
       }
     else PUP_stl_container_items<container, dtype>(p,c);
