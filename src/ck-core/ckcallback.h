@@ -119,14 +119,12 @@ public:
 	    case resumeThread:
 	      return (d.thread.onPE == other.d.thread.onPE &&
 		  d.thread.cb == other.d.thread.cb);
-	      break;
 	    case isendChare:
 	    case sendChare:
 	      return (d.chare.ep == other.d.chare.ep &&
 		  d.chare.id.onPE == other.d.chare.id.onPE &&
 		  d.chare.hasRefnum == other.d.chare.hasRefnum &&
 		  d.chare.refnum == other.d.chare.refnum);
-	      break;
 	    case isendGroup:
 	    case sendGroup:
 	    case isendNodeGroup:
@@ -136,14 +134,12 @@ public:
 		  d.group.onPE == other.d.group.onPE &&
 		  d.group.hasRefnum == other.d.group.hasRefnum &&
 		  d.group.refnum == other.d.group.refnum);
-	      break;
 	    case bcastNodeGroup:
 	    case bcastGroup:
 	      return (d.group.ep == other.d.group.ep &&
 		  d.group.id == other.d.group.id &&
 		  d.group.hasRefnum == other.d.group.hasRefnum &&
 		  d.group.refnum == other.d.group.refnum);
-	      break;
 	    case isendArray:
 	    case sendArray:
 	      return (d.array.ep == other.d.array.ep &&
@@ -151,32 +147,27 @@ public:
 		  d.array.idx == other.d.array.idx &&
 		  d.array.hasRefnum == other.d.array.hasRefnum &&
 		  d.array.refnum == other.d.array.refnum);
-	      break;
 	    case bcastArray:
 	      return (d.array.ep == other.d.array.ep &&
 		  d.array.id == other.d.array.id &&
 		  d.array.hasRefnum == other.d.array.hasRefnum &&
 		  d.array.refnum == other.d.array.refnum);
-	      break;
 	    case replyCCS:
 	      return true;
-	      break;
 	    case call1Fn:
 	      return (d.c1fn.fn == other.d.c1fn.fn);
-	      break;
 	    case callCFn:
 	      return (d.cfn.fn == other.d.cfn.fn &&
 		  d.cfn.onPE == other.d.cfn.onPE &&
 		  d.cfn.param == other.d.cfn.param);
-	      break;
 	    case ignore:
 	    case ckExit:
 	    case invalid:
-            case bcastSection:
+	    case bcastSection:
 	      return true;
-	      break;
 	    default:
 	      CkAbort("Inconsistent CkCallback type");
+	      return false;
 	  }
 	}
 
