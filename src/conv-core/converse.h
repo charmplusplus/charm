@@ -1455,6 +1455,7 @@ struct CthThreadListener;
 
 typedef void (*CthThreadListener_suspend)(struct CthThreadListener *l);
 typedef void (*CthThreadListener_resume)(struct CthThreadListener *l);
+typedef void (*CthThreadListener_awaken)(struct CthThreadListener *l);
 typedef void (*CthThreadListener_free)(struct CthThreadListener *l);
 
 struct CthThreadListener {
@@ -1463,6 +1464,9 @@ struct CthThreadListener {
 
        /** This thread is about to begin execution after blocking. */
        CthThreadListener_resume resume;
+
+       /** This thread is being scheduled to resume execution. */
+       CthThreadListener_awaken awaken;
 
        /** This thread is being destroyed.  */
        CthThreadListener_free free;

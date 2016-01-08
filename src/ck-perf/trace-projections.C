@@ -140,6 +140,7 @@ void traceThreadListener_suspend(struct CthThreadListener *l)
   /* here, we activate the appropriate trace codes for the appropriate
      registered modules */
   traceSuspend();
+  a->event=-1;
 }
 
 extern "C"
@@ -153,6 +154,15 @@ void traceThreadListener_resume(struct CthThreadListener *l)
   a->event=-1;
   a->srcPe=CkMyPe(); /* potential lie to migrated threads */
   a->ml=0;
+}
+
+extern "C"
+void traceThreadListener_awaken(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+
+  traceAwaken(NULL);
+  a->event=CtvAccess(curThreadEvent);
 }
 
 extern "C"
@@ -170,12 +180,20 @@ void TraceProjections::traceAddThreadListeners(CthThread tid, envelope *e)
   
   a->base.suspend=traceThreadListener_suspend;
   a->base.resume=traceThreadListener_resume;
+  a->base.awaken=traceThreadListener_awaken;
   a->base.free=traceThreadListener_free;
-  a->event=e->getEvent();
-  a->msgType=e->getMsgtype();
-  a->ep=e->getEpIdx();
-  a->srcPe=e->getSrcPe();
-  a->ml=e->getTotalsize();
+  if (e)
+  {
+    a->event=e->getEvent();
+    a->msgType=e->getMsgtype();
+    a->ep=e->getEpIdx();
+    a->srcPe=e->getSrcPe();
+    a->ml=e->getTotalsize();
+  }
+  else
+  {
+    a->event=-1;
+  }
 
   CthAddListener(tid, (CthThreadListener *)a);
 #endif
