@@ -2,7 +2,7 @@
 CHARMBIN=`dirname $0`
 
 ln $CHARMBIN/../include/mpif.h .
-$CHARMBIN/charmc -language ampif $@
+$CHARMBIN/charmc -language ampif -default-to-aout $@
 status=$?
 /bin/rm -f mpif.h
 exit $status
