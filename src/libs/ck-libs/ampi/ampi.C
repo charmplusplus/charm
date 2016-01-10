@@ -1135,7 +1135,7 @@ void ampiParent::ResumeThread(void){
   thread->resume();
 }
 
-int ampiParent::createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
+int ampiParent::createKeyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_delete_attr_function *delete_fn,
     int *keyval, void* extra_state){
   KeyvalNode* newnode = new KeyvalNode(copy_fn, delete_fn, extra_state);
   int idx = kvlist.size();
@@ -2116,18 +2116,18 @@ ampi::Alltoall_RemoteIGet(int disp, int cnt, MPI_Datatype type, int tag)
   return msg;
 }
 
-int MPI_null_copy_fn (MPI_Comm comm, int keyval, void *extra_state,
+int MPI_comm_null_copy_fn (MPI_Comm comm, int keyval, void *extra_state,
     void *attr_in, void *attr_out, int *flag){
   (*flag) = 0;
   return (MPI_SUCCESS);
 }
-int MPI_dup_fn(MPI_Comm comm, int keyval, void *extra_state,
+int MPI_comm_dup_fn (MPI_Comm comm, int keyval, void *extra_state,
     void *attr_in, void *attr_out, int *flag){
   (*(void **)attr_out) = attr_in;
   (*flag) = 1;
   return (MPI_SUCCESS);
 }
-int MPI_null_delete_fn (MPI_Comm comm, int keyval, void *attr, void *extra_state ){
+int MPI_comm_null_delete_fn (MPI_Comm comm, int keyval, void *attr, void *extra_state){
   return (MPI_SUCCESS);
 }
 
@@ -4051,12 +4051,20 @@ int AMPI_Type_vector(int count, int blocklength, int stride,
 }
 
   CDECL
-int AMPI_Type_hvector(int count, int blocklength, MPI_Aint stride, 
+int AMPI_Type_create_hvector(int count, int blocklength, MPI_Aint stride,
+    MPI_Datatype oldtype, MPI_Datatype*  newtype)
+{
+  AMPIAPI("AMPI_Type_create_hvector");
+  getDDT()->newHVector(count, blocklength, stride, oldtype, newtype);
+  return MPI_SUCCESS;
+}
+
+  CDECL
+int AMPI_Type_hvector(int count, int blocklength, MPI_Aint stride,
     MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("AMPI_Type_hvector");
-  getDDT()->newHVector(count, blocklength, stride, oldtype, newtype);
-  return MPI_SUCCESS;
+  return AMPI_Type_create_hvector(count, blocklength, stride, oldtype, newtype);
 }
 
   CDECL
@@ -4069,11 +4077,28 @@ int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
 }
 
   CDECL
+int AMPI_Type_create_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
+    MPI_Datatype oldtype, MPI_Datatype*  newtype)
+{
+  AMPIAPI("AMPI_Type_create_hindexed");
+  getDDT()->newHIndexed(count, arrBlength, arrDisp, oldtype, newtype);
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
     MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("AMPI_Type_hindexed");
-  getDDT()->newHIndexed(count, arrBlength, arrDisp, oldtype, newtype);
+  return AMPI_Type_create_hindexed(count, arrBlength, arrDisp, oldtype, newtype);
+}
+
+  CDECL
+int AMPI_Type_create_struct(int count, int* arrBlength, int* arrDisp,
+    MPI_Datatype* oldtype, MPI_Datatype*  newtype)
+{
+  AMPIAPI("AMPI_Type_create_struct");
+  getDDT()->newStruct(count, arrBlength, arrDisp, oldtype, newtype);
   return MPI_SUCCESS;
 }
 
@@ -4082,8 +4107,7 @@ int AMPI_Type_struct(int count, int* arrBlength, int* arrDisp,
     MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("AMPI_Type_struct");
-  getDDT()->newStruct(count, arrBlength, arrDisp, oldtype, newtype);
-  return MPI_SUCCESS;
+  return AMPI_Type_create_struct(count, arrBlength, arrDisp, oldtype, newtype);
 }
 
   CDECL
@@ -4103,11 +4127,20 @@ int AMPI_Type_free(MPI_Datatype *datatype)
 
 
   CDECL
+int AMPI_Type_get_extent(MPI_Datatype datatype, MPI_Aint *lb, MPI_Aint *extent)
+{
+  AMPIAPI("AMPI_Type_get_extent");
+  *lb = getDDT()->getLB(datatype);
+  *extent = getDDT()->getExtent(datatype);
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent)
 {
   AMPIAPI("AMPI_Type_extent");
-  *extent = getDDT()->getExtent(datatype);
-  return MPI_SUCCESS;
+  MPI_Aint tmpLB;
+  return AMPI_Type_get_extent(datatype, &tmpLB, extent);
 }
 
   CDECL
@@ -5282,10 +5315,16 @@ int AMPI_Type_ub(MPI_Datatype dtype, MPI_Aint* displacement){
 }
 
 CDECL
-int AMPI_Address(void* location, MPI_Aint *address){
-  AMPIAPI("AMPI_Address");
+int AMPI_Get_address(void* location, MPI_Aint *address){
+  AMPIAPI("AMPI_Get_address");
   *address = (MPI_Aint)(unsigned long)(char *)location;
   return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Address(void* location, MPI_Aint *address){
+  AMPIAPI("AMPI_Address");
+  return AMPI_Get_address(location, address);
 }
 
 CDECL
@@ -5356,27 +5395,51 @@ void error_handler ( MPI_Comm *, int * );
 #endif
 
 CDECL
+int AMPI_Comm_create_errhandler(MPI_Comm_errhandler_fn *function, MPI_Errhandler *errhandler){
+  AMPIAPI("AMPI_Comm_create_errhandler");
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Comm_set_errhandler(MPI_Comm comm, MPI_Errhandler errhandler){
+  AMPIAPI("AMPI_Comm_set_errhandler");
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Comm_get_errhandler(MPI_Comm comm, MPI_Errhandler *errhandler){
+  AMPIAPI("AMPI_Comm_get_errhandler");
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Comm_free_errhandler(MPI_Errhandler *errhandler){
+  AMPIAPI("AMPI_Comm_free_errhandler");
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Errhandler_create(MPI_Handler_function *function, MPI_Errhandler *errhandler){
   AMPIAPI("AMPI_Errhandler_create");
-  return MPI_SUCCESS;
+  return AMPI_Comm_create_errhandler(function, errhandler);
 }
 
 CDECL
 int AMPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler){
   AMPIAPI("AMPI_Errhandler_set");
-  return MPI_SUCCESS;
+  return AMPI_Comm_set_errhandler(comm, errhandler);
 }
 
 CDECL
 int AMPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler){
   AMPIAPI("AMPI_Errhandler_get");
-  return MPI_SUCCESS;
+  return AMPI_Comm_get_errhandler(comm, errhandler);
 }
 
 CDECL
 int AMPI_Errhandler_free(MPI_Errhandler *errhandler){
   AMPIAPI("AMPI_Errhandler_free");
-  return MPI_SUCCESS;
+  return AMPI_Comm_free_errhandler(errhandler);
 }
 
 CDECL
@@ -5668,33 +5731,65 @@ void AMPI_Register_main(MPI_MainFn mainFn,const char *name)
 }
 
 CDECL
-int AMPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state){
-  AMPIAPI("AMPI_Keyval_create");
+int AMPI_Comm_create_keyval(MPI_Comm_copy_attr_function *copy_fn,
+        MPI_Comm_delete_attr_function *delete_fn, int *keyval, void* extra_state){
+  AMPIAPI("AMPI_Comm_create_keyval");
   return getAmpiParent()->createKeyval(copy_fn,delete_fn,keyval,extra_state);
+}
+
+CDECL
+int AMPI_Comm_free_keyval(int *keyval){
+  AMPIAPI("AMPI_Comm_free_keyval");
+  return getAmpiParent()->freeKeyval(keyval);
+}
+
+CDECL
+int AMPI_Comm_set_attr(MPI_Comm comm, int keyval, void* attribute_val){
+  AMPIAPI("AMPI_Comm_set_attr");
+  return getAmpiParent()->putAttr(comm,keyval,attribute_val);
+}
+
+CDECL
+int AMPI_Comm_get_attr(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
+  AMPIAPI("AMPI_Comm_get_attr");
+  return getAmpiParent()->getAttr(comm,keyval,attribute_val,flag);
+}
+
+CDECL
+int AMPI_Comm_delete_attr(MPI_Comm comm, int keyval){
+  AMPIAPI("AMPI_Comm_delete_attr");
+  return getAmpiParent()->deleteAttr(comm,keyval);
+}
+
+CDECL
+int AMPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
+        int *keyval, void* extra_state){
+  AMPIAPI("AMPI_Keyval_create");
+  return AMPI_Comm_create_keyval(copy_fn, delete_fn, keyval, extra_state);
 }
 
 CDECL
 int AMPI_Keyval_free(int *keyval){
   AMPIAPI("AMPI_Keyval_free");
-  return getAmpiParent()->freeKeyval(keyval);
+  return AMPI_Comm_free_keyval(keyval);
 }
 
 CDECL
 int AMPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val){
   AMPIAPI("AMPI_Attr_put");
-  return getAmpiParent()->putAttr(comm,keyval,attribute_val);
+  return AMPI_Comm_set_attr(comm, keyval, attribute_val);
 }
 
 CDECL
 int AMPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
   AMPIAPI("AMPI_Attr_get");
-  return getAmpiParent()->getAttr(comm,keyval,attribute_val,flag);
+  return AMPI_Comm_get_attr(comm, keyval, attribute_val, flag);
 }
 
 CDECL
 int AMPI_Attr_delete(MPI_Comm comm, int keyval){
   AMPIAPI("AMPI_Attr_delete");
-  return getAmpiParent()->deleteAttr(comm,keyval);
+  return AMPI_Comm_delete_attr(comm, keyval);
 }
 
 CDECL

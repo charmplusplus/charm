@@ -230,23 +230,37 @@ typedef int MPI_Errhandler;
 #define MPI_ERRORS_RETURN	1
 #define MPI_ERRORS_ARE_FATAL	2
 
+typedef void (MPI_Comm_errhandler_fn)(MPI_Comm *, int *, ...);
+typedef void (MPI_Comm_errhandler_function)(MPI_Comm *, int *, ...);
+typedef int  (MPI_Comm_copy_attr_function)(MPI_Comm oldcomm, int keyval,
+                    void *extra_state, void *attribute_val_in,
+                    void *attribute_val_out, int *flag);
+typedef int  (MPI_Comm_delete_attr_function)(MPI_Comm comm, int keyval,
+                          void *attribute_val, void *extra_state);
+
 typedef void (MPI_Handler_function)(MPI_Comm *, int *, ...);
 typedef int  (MPI_Copy_function)(MPI_Comm oldcomm, int keyval,
                     void *extra_state, void *attribute_val_in,
                     void *attribute_val_out, int *flag);
 typedef int  (MPI_Delete_function)(MPI_Comm comm, int keyval,
                           void *attribute_val, void *extra_state);
+
 typedef void (MPI_User_function) (void *invec, void *inoutvec, 
                                   int *len, MPI_Datatype *datatype);
 typedef void (*MPI_Op) (void *invec, void *inoutvec, 
                        int *len, MPI_Datatype *datatype);
 
-#define MPI_NULL_COPY_FN   MPI_null_copy_fn
-#define MPI_NULL_DELETE_FN MPI_null_delete_fn
-#define MPI_DUP_FN         MPI_dup_fn
-int MPI_NULL_COPY_FN ( MPI_Comm, int, void *, void *, void *, int * );
-int MPI_NULL_DELETE_FN ( MPI_Comm, int, void *, void * );
-int MPI_DUP_FN ( MPI_Comm, int, void *, void *, void *, int * );
+#define MPI_COMM_NULL_COPY_FN   MPI_comm_null_copy_fn
+#define MPI_COMM_NULL_DELETE_FN MPI_comm_null_delete_fn
+#define MPI_COMM_DUP_FN         MPI_comm_dup_fn
+
+#define MPI_NULL_COPY_FN   MPI_comm_null_copy_fn
+#define MPI_NULL_DELETE_FN MPI_comm_null_delete_fn
+#define MPI_DUP_FN         MPI_comm_dup_fn
+
+int MPI_COMM_NULL_COPY_FN ( MPI_Comm, int, void *, void *, void *, int * );
+int MPI_COMM_NULL_DELETE_FN ( MPI_Comm, int, void *, void * );
+int MPI_COMM_DUP_FN ( MPI_Comm, int, void *, void *, void *, int * );
 
 #include "pup_c.h"
 
@@ -351,23 +365,33 @@ int AMPI_Type_contiguous(int count, MPI_Datatype oldtype,
 #define MPI_Type_vector AMPI_Type_vector
 int AMPI_Type_vector(int count, int blocklength, int stride,
                      MPI_Datatype oldtype, MPI_Datatype *newtype);
+#define MPI_Type_create_hvector AMPI_Type_create_hvector
+int AMPI_Type_create_hvector(int count, int blocklength, MPI_Aint stride,
+                             MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_hvector AMPI_Type_hvector
 int AMPI_Type_hvector(int count, int blocklength, MPI_Aint stride,
                       MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_indexed AMPI_Type_indexed
 int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
                       MPI_Datatype oldtype, MPI_Datatype *newtype);
+#define MPI_Type_create_hindexed AMPI_Type_create_hindexed
+int AMPI_Type_create_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
+                              MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_hindexed AMPI_Type_hindexed
 int AMPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
                        MPI_Datatype oldtype, MPI_Datatype *newtype);
+#define MPI_Type_create_struct AMPI_Type_create_struct
+int AMPI_Type_create_struct(int count, int* arrBLength, MPI_Aint* arrDisp,
+                            MPI_Datatype *oldType, MPI_Datatype *newType);
 #define MPI_Type_struct AMPI_Type_struct
-
 int AMPI_Type_struct(int count, int* arrBLength, MPI_Aint* arrDisp,
-                      MPI_Datatype *oldType, MPI_Datatype *newType);
+                     MPI_Datatype *oldType, MPI_Datatype *newType);
 #define MPI_Type_commit AMPI_Type_commit
 int AMPI_Type_commit(MPI_Datatype *datatype);
 #define MPI_Type_free AMPI_Type_free
 int AMPI_Type_free(MPI_Datatype *datatype);
+#define MPI_Type_get_extent AMPI_Type_get_extent
+int AMPI_Type_get_extent(MPI_Datatype datatype, MPI_Aint *lb, MPI_Aint *extent);
 #define MPI_Type_extent AMPI_Type_extent
 int AMPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent);
 #define MPI_Type_size AMPI_Type_size
@@ -376,6 +400,8 @@ int AMPI_Type_size(MPI_Datatype datatype, int *size);
 int AMPI_Type_lb(MPI_Datatype datatype, MPI_Aint* displacement);
 #define MPI_Type_ub AMPI_Type_ub
 int AMPI_Type_ub(MPI_Datatype datatype, MPI_Aint* displacement);
+#define MPI_Get_address AMPI_Get_address
+int AMPI_Get_address(void* location, MPI_Aint *address);
 #define MPI_Address AMPI_Address
 int AMPI_Address(void* location, MPI_Aint *address);
 #define MPI_Get_elements AMPI_Get_elements
@@ -478,7 +504,6 @@ int AMPI_Group_rank(MPI_Group group, int *rank);
 int AMPI_Group_translate_ranks(MPI_Group group1, int n, int *ranks1, MPI_Group group2, int *ranks2);
 #define MPI_Group_compare AMPI_Group_compare
 int AMPI_Group_compare(MPI_Group group1,MPI_Group group2, int *result);
-
 #define MPI_Comm_group AMPI_Comm_group
 int AMPI_Comm_group(MPI_Comm comm, MPI_Group *group);
 #define MPI_Group_union AMPI_Group_union
@@ -497,9 +522,15 @@ int AMPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *ne
 int AMPI_Group_range_excl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup);
 #define MPI_Group_free AMPI_Group_free
 int AMPI_Group_free(MPI_Group *group);
+
+#define MPI_Intercomm_create AMPI_Intercomm_create
+int AMPI_Intercomm_create(MPI_Comm local_comm, int local_leader, MPI_Comm peer_comm,
+			int remote_leader, int tag, MPI_Comm *newintercomm);
+#define MPI_Intercomm_merge AMPI_Intercomm_merge
+int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm);
+
 #define MPI_Comm_create AMPI_Comm_create
 int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm);
-
 #define MPI_Comm_size AMPI_Comm_size
 int AMPI_Comm_size(MPI_Comm comm, int *size);
 #define MPI_Comm_rank AMPI_Comm_rank
@@ -518,11 +549,26 @@ int AMPI_Comm_test_inter(MPI_Comm comm, int *flag);
 int AMPI_Comm_remote_size(MPI_Comm comm, int *size);
 #define MPI_Comm_remote_group AMPI_Comm_remote_group
 int AMPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group);
-#define MPI_Intercomm_create AMPI_Intercomm_create
-int AMPI_Intercomm_create(MPI_Comm local_comm, int local_leader, MPI_Comm peer_comm, 
-			int remote_leader, int tag, MPI_Comm *newintercomm);
-#define MPI_Intercomm_merge AMPI_Intercomm_merge
-int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm);
+#define MPI_Comm_create_errhandler AMPI_Comm_create_errhandler
+int AMPI_Comm_create_errhandler(MPI_Comm_errhandler_fn *function, MPI_Errhandler *errhandler);
+#define MPI_Comm_set_errhandler AMPI_Comm_set_errhandler
+int AMPI_Comm_set_errhandler(MPI_Comm comm, MPI_Errhandler errhandler);
+#define MPI_Comm_get_errhandler AMPI_Comm_get_errhandler
+int AMPI_Comm_get_errhandler(MPI_Comm comm, MPI_Errhandler *errhandler);
+#define MPI_Comm_free_errhandler AMPI_Comm_free_errhandler
+int AMPI_Comm_free_errhandler(MPI_Errhandler *errhandler);
+#define MPI_Comm_create_keyval AMPI_Comm_create_keyval
+int AMPI_Comm_create_keyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_delete_attr_function *delete_fn,
+			int *keyval, void* extra_state);
+#define MPI_Comm_free_keyval AMPI_Comm_free_keyval
+int AMPI_Comm_free_keyval(int *keyval);
+#define MPI_Comm_set_attr AMPI_Comm_set_attr
+int AMPI_Comm_set_attr(MPI_Comm comm, int keyval, void* attribute_val);
+#define MPI_Comm_get_attr AMPI_Comm_get_attr
+int AMPI_Comm_get_attr(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
+#define MPI_Comm_delete_attr AMPI_Comm_delete_attr
+int AMPI_Comm_delete_attr(MPI_Comm comm, int keyval);
+
 #define MPI_Keyval_create AMPI_Keyval_create
 int AMPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, 
 			int *keyval, void* extra_state);

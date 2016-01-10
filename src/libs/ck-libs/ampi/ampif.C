@@ -32,15 +32,20 @@ FDECL {
 #define mpi_type_contiguous FTN_NAME( MPI_TYPE_CONTIGUOUS , mpi_type_contiguous )
 #define mpi_type_vector FTN_NAME( MPI_TYPE_VECTOR , mpi_type_vector )
 #define mpi_type_hvector FTN_NAME( MPI_TYPE_HVECTOR , mpi_type_hvector )
+#define mpi_type_create_hvector FTN_NAME( MPI_TYPE_CREATE_HVECTOR , mpi_type_create_hvector )
 #define mpi_type_indexed FTN_NAME( MPI_TYPE_INDEXED , mpi_type_indexed )
+#define mpi_type_create_hindexed FTN_NAME( MPI_TYPE_CREATE_HINDEXED , mpi_type_create_hindexed )
 #define mpi_type_hindexed FTN_NAME( MPI_TYPE_HINDEXED , mpi_type_hindexed )
+#define mpi_type_create_struct FTN_NAME( MPI_TYPE_CREATE_STRUCT , mpi_type_create_struct )
 #define mpi_type_struct FTN_NAME( MPI_TYPE_STRUCT , mpi_type_struct )
 #define mpi_type_commit FTN_NAME( MPI_TYPE_COMMIT , mpi_type_commit )
 #define mpi_type_free FTN_NAME( MPI_TYPE_FREE , mpi_type_free )
+#define mpi_type_get_extent FTN_NAME( MPI_TYPE_GET_EXTENT , mpi_type_get_extent )
 #define mpi_type_extent FTN_NAME( MPI_TYPE_EXTENT , mpi_type_extent )
 #define mpi_type_size FTN_NAME( MPI_TYPE_SIZE , mpi_type_size )
 #define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
+#define mpi_get_address FTN_NAME( MPI_GET_ADDRESS , mpi_get_address )
 #define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
 #define mpi_get_elements FTN_NAME( MPI_GET_ELEMENTS , mpi_get_elements )
 #define mpi_pack FTN_NAME( MPI_PACK , mpi_pack )
@@ -72,7 +77,6 @@ FDECL {
 #define mpi_group_rank FTN_NAME( MPI_GROUP_RANK, mpi_group_rank)
 #define mpi_group_translate_ranks FTN_NAME(MPI_GROUP_TRANSLATE_RANKS, mpi_group_translate_ranks)
 #define mpi_group_compare FTN_NAME(MPI_GROUP_COMPARE, mpi_group_compare)
-
 #define mpi_comm_group FTN_NAME( MPI_COMM_GROUP, mpi_comm_group)
 #define mpi_group_union FTN_NAME(MPI_GROUP_UNION, mpi_group_union)
 #define mpi_group_intersection FTN_NAME(MPI_GROUP_INTERSECTION, mpi_group_intersection)
@@ -82,8 +86,11 @@ FDECL {
 #define mpi_group_range_incl FTN_NAME(MPI_GROUP_RANGE_INCL, mpi_group_range_incl)
 #define mpi_group_range_excl FTN_NAME(MPI_GROUP_RANGE_EXCL, mpi_group_range_excl)
 #define mpi_group_free FTN_NAME(MPI_GROUP_FREE, mpi_group_free)
-#define mpi_comm_create FTN_NAME(MPI_COMM_CREATE, mpi_comm_create)
 
+#define mpi_intercomm_create FTN_NAME ( MPI_INTERCOMM_CREATE , mpi_intercomm_create )
+#define mpi_intercomm_merge FTN_NAME ( MPI_INTERCOMM_MERGE , mpi_intercomm_merge )
+
+#define mpi_comm_create FTN_NAME(MPI_COMM_CREATE, mpi_comm_create)
 #define mpi_comm_rank FTN_NAME( MPI_COMM_RANK , mpi_comm_rank )
 #define mpi_comm_size FTN_NAME( MPI_COMM_SIZE , mpi_comm_size )
 #define mpi_comm_dup FTN_NAME( MPI_COMM_DUP , mpi_comm_dup )
@@ -92,8 +99,16 @@ FDECL {
 #define mpi_comm_test_inter FTN_NAME( MPI_COMM_TEST_INTER , mpi_comm_test_inter )
 #define mpi_comm_remote_size FTN_NAME ( MPI_COMM_REMOTE_SIZE , mpi_comm_remote_size )
 #define mpi_comm_remote_group FTN_NAME ( MPI_COMM_REMOTE_GROUP , mpi_comm_remote_group )
-#define mpi_intercomm_create FTN_NAME ( MPI_INTERCOMM_CREATE , mpi_intercomm_create )
-#define mpi_intercomm_merge FTN_NAME ( MPI_INTERCOMM_MERGE , mpi_intercomm_merge )
+#define mpi_comm_create_errhandler FTN_NAME( MPI_COMM_CREATE_ERRHANDLER , mpi_comm_create_errhandler )
+#define mpi_comm_set_errhandler FTN_NAME( MPI_COMM_SET_ERRHANDLER , mpi_comm_set_errhandler )
+#define mpi_comm_get_errhandler FTN_NAME( MPI_COMM_GET_ERRHANDLER , mpi_comm_get_errhandler )
+#define mpi_comm_free_errhandler FTN_NAME( MPI_COMM_FREE_ERRHANDLER , mpi_comm_free_errhandler )
+#define mpi_comm_create_keyval FTN_NAME ( MPI_COMM_CREATE_KEYVAL , mpi_comm_create_keyval )
+#define mpi_comm_free_keyval FTN_NAME ( MPI_COMM_FREE_KEYVAL , mpi_comm_free_keyval )
+#define mpi_comm_set_attr FTN_NAME ( MPI_COMM_SET_ATTR , mpi_comm_set_attr )
+#define mpi_comm_get_attr FTN_NAME ( MPI_COMM_GET_ATTR , mpi_comm_get_attr )
+#define mpi_comm_delete_attr FTN_NAME ( MPI_COMM_DELETE_ATTR , mpi_comm_delete_attr )
+
 #define mpi_keyval_create FTN_NAME ( MPI_KEYVAL_CREATE , mpi_keyval_create )
 #define mpi_keyval_free FTN_NAME ( MPI_KEYVAL_FREE , mpi_keyval_free )
 #define mpi_attr_put FTN_NAME ( MPI_ATTR_PUT , mpi_attr_put )
@@ -482,6 +497,12 @@ void mpi_type_vector(int *count, int *blocklength, int *stride,
   *ierr = AMPI_Type_vector(*count, *blocklength, *stride, *oldtype, newtype);
 }
 
+void mpi_type_create_hvector(int *count, int *blocklength, int *stride,
+   int* oldtype, int* newtype, int* ierr)
+{
+  *ierr = AMPI_Type_create_hvector(*count, *blocklength, *stride, *oldtype, newtype);
+}
+
 void mpi_type_hvector(int *count, int *blocklength, int *stride,
    int* oldtype, int* newtype, int* ierr)
 {
@@ -494,10 +515,22 @@ void mpi_type_indexed(int *count, int* arrBlength, int* arrDisp,
   *ierr = AMPI_Type_indexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
+void mpi_type_create_hindexed(int* count, int* arrBlength, int* arrDisp,
+   int* oldtype, int* newtype, int* ierr)
+{
+  *ierr = AMPI_Type_create_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
+}
+
 void mpi_type_hindexed(int* count, int* arrBlength, int* arrDisp,
    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
+}
+
+void mpi_type_create_struct(int* count, int* arrBlength, int* arrDisp,
+   int* oldtype, int* newtype, int* ierr)
+{
+  *ierr = AMPI_Type_create_struct(*count, arrBlength, arrDisp, oldtype, newtype);
 }
 
 void mpi_type_struct(int* count, int* arrBlength, int* arrDisp,
@@ -515,6 +548,11 @@ void mpi_type_commit(int *type, int *ierr)
 void mpi_type_free(int *type, int *ierr)
 {
   *ierr = AMPI_Type_free(type);
+}
+
+void  mpi_type_get_extent(int* type, int* lb, int* extent, int* ierr)
+{
+  *ierr = AMPI_Type_get_extent(*type, lb, extent);
 }
 
 void  mpi_type_extent(int* type, int* extent, int* ierr)
@@ -535,6 +573,11 @@ void mpi_type_lb(int* datatype, int* displacement, int* ierr)
 void mpi_type_ub(int* datatype, int* displacement, int* ierr)
 {
   *ierr = AMPI_Type_ub(*datatype, displacement);
+}
+
+void mpi_get_address(int* location, int *address, int* ierr)
+{
+  *ierr = AMPI_Get_address(location, address);
 }
 
 void mpi_address(int* location, int *address, int* ierr)
@@ -820,10 +863,16 @@ void mpi_get_processor_name(char* name, int *resultlen, int *ierr)
   *ierr = AMPI_Get_processor_name(name, resultlen);
 }
 
+void mpi_comm_create_errhandler(int *function, int *errhandler, int *ierr){  *ierr = 0;  }
+void mpi_comm_set_errhandler(int* comm, int* errhandler, int *ierr){  *ierr = 0;  }
+void mpi_comm_get_errhandler(int* comm, int *errhandler, int *ierr){  *ierr = 0;  }
+void mpi_comm_free_errhandler(int *errhandler, int *ierr){  *ierr = 0;  }
+
 void mpi_errhandler_create(int *function, int *errhandler, int *ierr){  *ierr = 0;  }
 void mpi_errhandler_set(int* comm, int* errhandler, int *ierr){  *ierr = 0;  }
 void mpi_errhandler_get(int* comm, int *errhandler, int *ierr){  *ierr = 0;  }
 void mpi_errhandler_free(int *errhandler, int *ierr){  *ierr = 0;  }
+
 void mpi_error_string(int* errorcode, char *string, int *resultlen, int *ierr)
 {
   *ierr = AMPI_Error_string(*errorcode, string, resultlen);
@@ -1007,7 +1056,29 @@ void mpi_intercomm_merge(int *intercomm, int *high, int *newintracomm, int *ierr
   *ierr = AMPI_Intercomm_merge(*intercomm, *high, newintracomm);
 }
 
-void mpi_keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state, int *ierr) {
+void mpi_comm_create_keyval(MPI_Comm_copy_attr_function *copy_fn,
+        MPI_Comm_delete_attr_function *delete_fn, int *keyval, void* extra_state, int *ierr){
+  *ierr = AMPI_Comm_create_keyval(copy_fn, delete_fn, keyval, extra_state);
+}
+
+void mpi_comm_free_keyval(int *keyval, int *ierr){
+  *ierr = AMPI_Comm_free_keyval(keyval);
+}
+
+void mpi_comm_set_attr(int *comm, int *keyval, void* attribute_val, int *ierr){
+  *ierr = AMPI_Comm_set_attr(*comm, *keyval, attribute_val);
+}
+
+void mpi_comm_get_attr(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr){
+  *ierr = AMPI_Comm_get_attr(*comm, *keyval, attribute_val, flag);
+}
+
+void mpi_comm_delete_attr(int *comm, int *keyval, int *ierr) {
+  *ierr = AMPI_Comm_delete_attr(*comm, *keyval);
+}
+
+void mpi_keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
+        int *keyval, void* extra_state, int *ierr){
   *ierr = AMPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
 }
 
