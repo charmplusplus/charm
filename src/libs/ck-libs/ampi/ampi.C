@@ -1168,7 +1168,7 @@ int ampiParent::createKeyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_dele
     return 0;
   }
 
-  int ampiParent::putAttr(MPI_Comm comm, int keyval, void* attribute_val){
+  int ampiParent::setAttr(MPI_Comm comm, int keyval, void* attribute_val){
     if(keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
       return -1;
     ampiCommStruct &cs=*(ampiCommStruct *)&comm2CommStruct(comm);
@@ -1214,7 +1214,7 @@ int ampiParent::getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *fla
 }
 int ampiParent::deleteAttr(MPI_Comm comm, int keyval){
   /* no way to delete an attribute: just overwrite it with 0 */
-  return putAttr(comm,keyval,0);
+  return setAttr(comm,keyval,0);
 }
 
 //----------------------- ampi -------------------------
@@ -5925,7 +5925,7 @@ int AMPI_Comm_free_keyval(int *keyval){
 CDECL
 int AMPI_Comm_set_attr(MPI_Comm comm, int keyval, void* attribute_val){
   AMPIAPI("AMPI_Comm_set_attr");
-  return getAmpiParent()->putAttr(comm,keyval,attribute_val);
+  return getAmpiParent()->setAttr(comm,keyval,attribute_val);
 }
 
 CDECL
