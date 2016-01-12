@@ -1343,6 +1343,7 @@ friend class SReq;
     void block(void);
     void unblock(void);
     void yield(void);
+    void blockOnRecv(void);
     void generic(AmpiMsg *);
     void ssend_ack(int sreq);
     void reduceResult(CkReductionMsg *m);

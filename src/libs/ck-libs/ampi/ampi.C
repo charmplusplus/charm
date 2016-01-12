@@ -1726,6 +1726,12 @@ void ampi::unblock(void){
   thread->resume();
 }
 
+void ampi::blockOnRecv(void){
+  resumeOnRecv = true;
+  thread->suspend();
+  resumeOnRecv = false;
+}
+
   void ampi::ssend_ack(int sreq_idx){
     if (sreq_idx == 1)
       thread->resume();           // MPI_Ssend
@@ -3781,8 +3787,8 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
         return MPI_SUCCESS;
       }
     }
-    /* no requests have finished yet-- schedule and try again */
-    AMPI_Yield(MPI_COMM_WORLD);
+    /* no requests have finished yet-- block until one does */
+    getAmpiInstance(MPI_COMM_WORLD)->blockOnRecv();
   }
   *idx = MPI_UNDEFINED;
   USER_CALL_DEBUG("AMPI_Waitany returning UNDEFINED");
@@ -3819,7 +3825,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
     if(realflag && *outcount>0)
       break;
     else
-      AMPI_Yield(MPI_COMM_WORLD);
+      getAmpiInstance(MPI_COMM_WORLD)->blockOnRecv();
   }
   delete reqvec;
   return MPI_SUCCESS;
