@@ -1252,7 +1252,7 @@ public:
     int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
                      int *keyval, void* extra_state);
     int freeKeyval(int *keyval);
-    int putAttr(MPI_Comm comm, int keyval, void* attribute_val);
+    int setAttr(MPI_Comm comm, int keyval, void* attribute_val);
     int getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
     int deleteAttr(MPI_Comm comm, int keyval);
 
