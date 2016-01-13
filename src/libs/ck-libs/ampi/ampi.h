@@ -566,6 +566,8 @@ int AMPI_Comm_test_inter(MPI_Comm comm, int *flag);
 int AMPI_Comm_remote_size(MPI_Comm comm, int *size);
 #define MPI_Comm_remote_group AMPI_Comm_remote_group
 int AMPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group);
+#define MPI_Comm_call_errhandler AMPI_Comm_call_errhandler
+int AMPI_Comm_call_errhandler(MPI_Comm comm, int errorcode);
 #define MPI_Comm_create_errhandler AMPI_Comm_create_errhandler
 int AMPI_Comm_create_errhandler(MPI_Comm_errhandler_fn *function, MPI_Errhandler *errhandler);
 #define MPI_Comm_set_errhandler AMPI_Comm_set_errhandler
@@ -647,10 +649,16 @@ int AMPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler);
 int AMPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler);
 #define MPI_Errhandler_free AMPI_Errhandler_free
 int AMPI_Errhandler_free(MPI_Errhandler *errhandler);
-#define MPI_Error_string AMPI_Error_string
-int AMPI_Error_string(int errorcode, char *string, int *resultlen);
+#define MPI_Add_error_code AMPI_Add_error_code
+int AMPI_Add_error_code(int errorclass, int *errorcode);
+#define MPI_Add_error_class AMPI_Add_error_class
+int AMPI_Add_error_class(int *errorclass);
+#define MPI_Add_error_string AMPI_Add_error_string
+int AMPI_Add_error_string(int errorcode, const char *errorstring);
 #define MPI_Error_class AMPI_Error_class
 int AMPI_Error_class(int errorcode, int *errorclass);
+#define MPI_Error_string AMPI_Error_string
+int AMPI_Error_string(int errorcode, char *string, int *resultlen);
 #define MPI_Wtime AMPI_Wtime
 double AMPI_Wtime(void);
 #define MPI_Wtick AMPI_Wtick

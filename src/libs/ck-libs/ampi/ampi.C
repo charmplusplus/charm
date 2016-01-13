@@ -5427,6 +5427,12 @@ void error_handler ( MPI_Comm *, int * );
 #endif
 
 CDECL
+int AMPI_Comm_call_errhandler(MPI_Comm comm, int errorcode){
+  AMPIAPI("AMPI_Comm_call_errhandler");
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Comm_create_errhandler(MPI_Comm_errhandler_fn *function, MPI_Errhandler *errhandler){
   AMPIAPI("AMPI_Comm_create_errhandler");
   return MPI_SUCCESS;
@@ -5475,6 +5481,24 @@ int AMPI_Errhandler_free(MPI_Errhandler *errhandler){
 }
 
 CDECL
+int AMPI_Add_error_code(int errorclass, int *errorcode){
+  AMPIAPI("AMPI_Add_error_code");
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Add_error_class(int *errorclass){
+  AMPIAPI("AMPI_Add_error_class");
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Add_error_string(int errorcode, const char *errorstring){
+  AMPIAPI("AMPI_Add_error_string");
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Error_class(int errorcode, int *errorclass){
   AMPIAPI("AMPI_Error_class");
   *errorclass = errorcode;
@@ -5497,7 +5521,6 @@ int AMPI_Error_string(int errorcode, char *string, int *resultlen)
   strcpy(string,ret);
   return MPI_SUCCESS;
 }
-
 
 /* Group operations */
   CDECL
