@@ -55,9 +55,11 @@
        integer, parameter :: MPI_ERR_UNSUPPORTED_OPERATION =52
        integer, parameter :: MPI_ERR_WIN                 =53
        integer, parameter :: MPI_ERR_LASTCODE            =53
+       integer, parameter :: MPI_ERR_LASTUSEDCODE        =53
 
-       integer, parameter :: MPI_ERRORS_ARE_FATAL        =119
-       integer, parameter :: MPI_ERRORS_RETURN           =120
+       integer, parameter :: MPI_ERRHANDLER_NULL         =0
+       integer, parameter :: MPI_ERRORS_RETURN           =1
+       integer, parameter :: MPI_ERRORS_ARE_FATAL        =2
 
        integer, parameter :: MPI_MAX_PROCESSOR_NAME = 256
        integer, parameter :: MPI_MAX_ERROR_STRING = 256
@@ -90,6 +92,14 @@
        integer, parameter :: MPI_UB = 24
        integer, parameter :: MPI_DOUBLE_COMPLEX = 26
 
+       integer, parameter :: MPI_COMBINER_NAMED = 1
+       integer, parameter :: MPI_COMBINER_CONTIGUOUS = 2
+       integer, parameter :: MPI_COMBINER_VECTOR = 3
+       integer, parameter :: MPI_COMBINER_HVECTOR = 4
+       integer, parameter :: MPI_COMBINER_INDEXED = 5
+       integer, parameter :: MPI_COMBINER_HINDEXED = 6
+       integer, parameter :: MPI_COMBINER_STRUCT = 7
+
        integer, parameter :: MPI_PROC_NULL = -2
        integer, parameter :: MPI_ANY_SOURCE = -1
        integer, parameter :: MPI_ANY_TAG = -1
@@ -105,9 +115,10 @@
        integer, parameter :: MPI_BOTTOM = 0
        integer, parameter :: MPI_UNDEFINED = -32766
 
-       integer, parameter :: MPI_IDENT    = 0
-       integer, parameter :: MPI_SIMILAR  = 1
-       integer, parameter :: MPI_UNEQUAL  = 2
+       integer, parameter :: MPI_IDENT = 0
+       integer, parameter :: MPI_SIMILAR = 1
+       integer, parameter :: MPI_CONGRUENT = 2
+       integer, parameter :: MPI_UNEQUAL = 3
 
        integer, parameter :: MPI_OP_NULL = 0
 
@@ -115,6 +126,11 @@
        integer, parameter :: MPI_CART = 2
 
        integer, parameter :: MPI_TAG_UB = -10
+       integer, parameter :: MPI_HOST = -11
+       integer, parameter :: MPI_IO = -12
+       integer, parameter :: MPI_WTIME_IS_GLOBAL = -13
+
+       integer, parameter :: MPI_TAG_UB_VALUE = 1073741824
 
        integer, parameter :: MPI_STATUS_SIZE=8
        integer, parameter :: MPI_TAG=1
@@ -133,6 +149,8 @@
        integer, parameter :: MPI_COMM_SELF = 8000000
        integer, parameter :: MPI_COMM_WORLD = 9000000
        integer, parameter :: MPI_MAX_COMM_WORLDS=8
+       integer, parameter :: MPI_UNIVERSE_SIZE = MPI_COMM_WORLD
+       integer, parameter :: MPI_APPNUM = 0
        integer :: MPI_COMM_UNIVERSE(1:MPI_MAX_COMM_WORLDS)
 
 !       integer, external :: MPI_Register
@@ -150,7 +168,14 @@
        integer, parameter :: MPI_BXOR = 109
        integer, parameter :: MPI_MAXLOC = 110
        integer, parameter :: MPI_MINLOC = 111
-!
+
        integer, parameter :: MPI_OFFSET_KIND = 8
        integer, parameter :: MPI_ADDRESS_KIND = 8
 
+       integer, parameter :: MPI_BSEND_OVERHEAD = 1
+       integer, parameter :: MPI_MAX_OBJECT_NAME = 255
+       integer, parameter :: MPI_MAX_INFO_KEY = 255
+       integer, parameter :: MPI_MAX_INFO_VAL = 1024
+       integer, parameter :: MPI_LOCK_SHARED = 54
+       integer, parameter :: MPI_LOCK_EXCLUSIVE = 55
+       integer, parameter :: MPI_WIN_NULL = -1
