@@ -99,6 +99,7 @@ FDECL {
 #define mpi_comm_test_inter FTN_NAME( MPI_COMM_TEST_INTER , mpi_comm_test_inter )
 #define mpi_comm_remote_size FTN_NAME ( MPI_COMM_REMOTE_SIZE , mpi_comm_remote_size )
 #define mpi_comm_remote_group FTN_NAME ( MPI_COMM_REMOTE_GROUP , mpi_comm_remote_group )
+#define mpi_comm_call_errhandler FTN_NAME( MPI_COMM_CALL_ERRHANDLER , mpi_comm_call_errhandler )
 #define mpi_comm_create_errhandler FTN_NAME( MPI_COMM_CREATE_ERRHANDLER , mpi_comm_create_errhandler )
 #define mpi_comm_set_errhandler FTN_NAME( MPI_COMM_SET_ERRHANDLER , mpi_comm_set_errhandler )
 #define mpi_comm_get_errhandler FTN_NAME( MPI_COMM_GET_ERRHANDLER , mpi_comm_get_errhandler )
@@ -138,8 +139,11 @@ FDECL {
 #define mpi_errhandler_set FTN_NAME( MPI_ERRHANDLER_SET , mpi_errhandler_set )
 #define mpi_errhandler_get FTN_NAME( MPI_ERRHANDLER_GET , mpi_errhandler_get )
 #define mpi_errhandler_free FTN_NAME( MPI_ERRHANDLER_FREE , mpi_errhandler_free )
-#define mpi_error_string FTN_NAME( MPI_ERROR_STRING , mpi_error_string )
+#define mpi_add_error_code FTN_NAME( MPI_ADD_ERROR_CODE , mpi_add_error_code )
+#define mpi_add_error_class FTN_NAME( MPI_ADD_ERROR_CLASS , mpi_add_error_class )
+#define mpi_add_error_string FTN_NAME( MPI_ADD_ERROR_STRING , mpi_add_error_string )
 #define mpi_error_class FTN_NAME( MPI_ERROR_CLASS , mpi_error_class )
+#define mpi_error_string FTN_NAME( MPI_ERROR_STRING , mpi_error_string )
 #define mpi_wtime FTN_NAME( MPI_WTIME , mpi_wtime )
 #define mpi_wtick FTN_NAME( MPI_WTICK , mpi_wtick )
 #define mpi_is_thread_main FTN_NAME( MPI_IS_THREAD_MAIN , mpi_is_thread_main )
@@ -873,13 +877,25 @@ void mpi_errhandler_set(int* comm, int* errhandler, int *ierr){  *ierr = 0;  }
 void mpi_errhandler_get(int* comm, int *errhandler, int *ierr){  *ierr = 0;  }
 void mpi_errhandler_free(int *errhandler, int *ierr){  *ierr = 0;  }
 
-void mpi_error_string(int* errorcode, char *string, int *resultlen, int *ierr)
+void mpi_add_error_code(int *errorclass, int *errorcode, int *ierr)
 {
-  *ierr = AMPI_Error_string(*errorcode, string, resultlen);
+  *ierr = AMPI_Add_error_code(*errorcode, errorcode);
+}
+void mpi_add_error_class(int *errorclass, int *ierr)
+{
+  *ierr = AMPI_Add_error_class(errorclass);
+}
+void mpi_add_error_string(int *errorcode, const char *errorstring, int *ierr)
+{
+  *ierr = AMPI_Add_error_string(*errorcode, errorstring);
 }
 void mpi_error_class(int* errorcode, int *errorclass, int *ierr)
 {
   *ierr = AMPI_Error_class(*errorcode, errorclass);
+}
+void mpi_error_string(int* errorcode, char *string, int *resultlen, int *ierr)
+{
+  *ierr = AMPI_Error_string(*errorcode, string, resultlen);
 }
 
 void mpi_group_size(int* group, int* size, int* ierror){
