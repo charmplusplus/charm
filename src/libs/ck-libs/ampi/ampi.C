@@ -305,61 +305,68 @@ void MPI_MAXLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 
   switch (*datatype) {
     case MPI_FLOAT_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((FloatInt *)invec)[i].val > ((FloatInt *)inoutvec)[i].val)
           ((FloatInt *)inoutvec)[i] = ((FloatInt *)invec)[i];
         else if(((FloatInt *)invec)[i].val == ((FloatInt *)inoutvec)[i].val)
           ((FloatInt *)inoutvec)[i].idx = MIN(((FloatInt *)inoutvec)[i].idx, ((FloatInt *)invec)[i].idx);
+      }
       break;
     case MPI_DOUBLE_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((DoubleInt *)invec)[i].val > ((DoubleInt *)inoutvec)[i].val)
           ((DoubleInt *)inoutvec)[i] = ((DoubleInt *)invec)[i];
         else if(((DoubleInt *)invec)[i].val == ((DoubleInt *)inoutvec)[i].val)
           ((DoubleInt *)inoutvec)[i].idx = MIN(((DoubleInt *)inoutvec)[i].idx, ((DoubleInt *)invec)[i].idx);
-
+      }
       break;
     case MPI_LONG_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((LongInt *)invec)[i].val > ((LongInt *)inoutvec)[i].val)
           ((LongInt *)inoutvec)[i] = ((LongInt *)invec)[i];
         else if(((FloatInt *)invec)[i].val == ((FloatInt *)inoutvec)[i].val)
           ((LongInt *)inoutvec)[i].idx = MIN(((LongInt *)inoutvec)[i].idx, ((LongInt *)invec)[i].idx);
+      }
       break;
     case MPI_2INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((IntInt *)invec)[i].val > ((IntInt *)inoutvec)[i].val)
           ((IntInt *)inoutvec)[i] = ((IntInt *)invec)[i];
         else if(((IntInt *)invec)[i].val == ((IntInt *)inoutvec)[i].val)
           ((IntInt *)inoutvec)[i].idx = MIN(((IntInt *)inoutvec)[i].idx, ((IntInt *)invec)[i].idx);
+      }
       break;
     case MPI_SHORT_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((ShortInt *)invec)[i].val > ((ShortInt *)inoutvec)[i].val)
           ((ShortInt *)inoutvec)[i] = ((ShortInt *)invec)[i];
         else if(((ShortInt *)invec)[i].val == ((ShortInt *)inoutvec)[i].val)
           ((ShortInt *)inoutvec)[i].idx = MIN(((ShortInt *)inoutvec)[i].idx, ((ShortInt *)invec)[i].idx);
+      }
       break;
     case MPI_LONG_DOUBLE_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((LongdoubleInt *)invec)[i].val > ((LongdoubleInt *)inoutvec)[i].val)
           ((LongdoubleInt *)inoutvec)[i] = ((LongdoubleInt *)invec)[i];
         else if(((LongdoubleInt *)invec)[i].val == ((LongdoubleInt *)inoutvec)[i].val)
           ((LongdoubleInt *)inoutvec)[i].idx = MIN(((LongdoubleInt *)inoutvec)[i].idx, ((LongdoubleInt *)invec)[i].idx);
+      }
       break;
     case MPI_2FLOAT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((FloatFloat *)invec)[i].val > ((FloatFloat *)inoutvec)[i].val)
           ((FloatFloat *)inoutvec)[i] = ((FloatFloat *)invec)[i];
         else if(((FloatFloat *)invec)[i].val == ((FloatFloat *)inoutvec)[i].val)
           ((FloatFloat *)inoutvec)[i].idx = MIN(((FloatFloat *)inoutvec)[i].idx, ((FloatFloat *)invec)[i].idx);
+      }
       break;
     case MPI_2DOUBLE:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((DoubleDouble *)invec)[i].val > ((DoubleDouble *)inoutvec)[i].val)
           ((DoubleDouble *)inoutvec)[i] = ((DoubleDouble *)invec)[i];
         else if(((DoubleDouble *)invec)[i].val == ((DoubleDouble *)inoutvec)[i].val)
           ((DoubleDouble *)inoutvec)[i].idx = MIN(((DoubleDouble *)inoutvec)[i].idx, ((DoubleDouble *)invec)[i].idx);
+      }
       break;
     default:
       ckerr << "Type " << *datatype << " with Op MPI_MAXLOC not supported." << endl;
@@ -370,60 +377,68 @@ void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   int i;  
   switch (*datatype) {
     case MPI_FLOAT_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((FloatInt *)invec)[i].val < ((FloatInt *)inoutvec)[i].val)
           ((FloatInt *)inoutvec)[i] = ((FloatInt *)invec)[i];
         else if(((FloatInt *)invec)[i].val == ((FloatInt *)inoutvec)[i].val)
           ((FloatInt *)inoutvec)[i].idx = MIN(((FloatInt *)inoutvec)[i].idx, ((FloatInt *)invec)[i].idx);
+      }
       break;
     case MPI_DOUBLE_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((DoubleInt *)invec)[i].val < ((DoubleInt *)inoutvec)[i].val)
           ((DoubleInt *)inoutvec)[i] = ((DoubleInt *)invec)[i];
         else if(((DoubleInt *)invec)[i].val == ((DoubleInt *)inoutvec)[i].val)
           ((DoubleInt *)inoutvec)[i].idx = MIN(((DoubleInt *)inoutvec)[i].idx, ((DoubleInt *)invec)[i].idx);
+      }
       break;
     case MPI_LONG_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((LongInt *)invec)[i].val < ((LongInt *)inoutvec)[i].val)
           ((LongInt *)inoutvec)[i] = ((LongInt *)invec)[i];
         else if(((LongInt *)invec)[i].val == ((LongInt *)inoutvec)[i].val)
           ((LongInt *)inoutvec)[i].idx = MIN(((LongInt *)inoutvec)[i].idx, ((LongInt *)invec)[i].idx);
+      }
       break;
     case MPI_2INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((IntInt *)invec)[i].val < ((IntInt *)inoutvec)[i].val)
           ((IntInt *)inoutvec)[i] = ((IntInt *)invec)[i];
         else if(((IntInt *)invec)[i].val == ((IntInt *)inoutvec)[i].val)
           ((IntInt *)inoutvec)[i].idx = MIN(((IntInt *)inoutvec)[i].idx, ((IntInt *)invec)[i].idx);
+      }
       break;
     case MPI_SHORT_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((ShortInt *)invec)[i].val < ((ShortInt *)inoutvec)[i].val)
           ((ShortInt *)inoutvec)[i] = ((ShortInt *)invec)[i];
         else if(((ShortInt *)invec)[i].val == ((ShortInt *)inoutvec)[i].val)
           ((ShortInt *)inoutvec)[i].idx = MIN(((ShortInt *)inoutvec)[i].idx, ((ShortInt *)invec)[i].idx);
+      }
       break;
     case MPI_LONG_DOUBLE_INT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((LongdoubleInt *)invec)[i].val < ((LongdoubleInt *)inoutvec)[i].val)
           ((LongdoubleInt *)inoutvec)[i] = ((LongdoubleInt *)invec)[i];
         else if(((LongdoubleInt *)invec)[i].val == ((LongdoubleInt *)inoutvec)[i].val)
           ((LongdoubleInt *)inoutvec)[i].idx = MIN(((LongdoubleInt *)inoutvec)[i].idx, ((LongdoubleInt *)invec)[i].idx);
+      }
       break;
     case MPI_2FLOAT:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((FloatFloat *)invec)[i].val < ((FloatFloat *)inoutvec)[i].val)
           ((FloatFloat *)inoutvec)[i] = ((FloatFloat *)invec)[i];
         else if(((FloatFloat *)invec)[i].val == ((FloatFloat *)inoutvec)[i].val)
           ((FloatFloat *)inoutvec)[i].idx = MIN(((FloatFloat *)inoutvec)[i].idx, ((FloatFloat *)invec)[i].idx);
+      }
       break;
     case MPI_2DOUBLE:
-      for(i=0;i<(*len);i++)
+      for(i=0;i<(*len);i++){
         if(((DoubleDouble *)invec)[i].val < ((DoubleDouble *)inoutvec)[i].val)
           ((DoubleDouble *)inoutvec)[i] = ((DoubleDouble *)invec)[i];
         else if(((DoubleDouble *)invec)[i].val == ((DoubleDouble *)inoutvec)[i].val)
           ((DoubleDouble *)inoutvec)[i].idx = MIN(((DoubleDouble *)inoutvec)[i].idx, ((DoubleDouble *)invec)[i].idx);
+      }
       break;
     default:
       ckerr << "Type " << *datatype << " with Op MPI_MINLOC not supported." << endl;
@@ -1455,9 +1470,10 @@ void ampi::splitPhase1(CkReductionMsg *msg)
   qsort(keys,nKeys,sizeof(ampiSplitKey),compareAmpiSplitKey);
 
   MPI_Comm newComm = -1;
-  for(int i=0;i<nKeys;i++)
+  for(int i=0;i<nKeys;i++){
     if(keys[i].nextSplitComm>newComm)
       newComm = keys[i].nextSplitComm;
+  }
 
   //Loop over the sorted keys, which gives us the new arrays:
   int lastColor=keys[0].color-1; //The color we're building an array for
@@ -3344,10 +3360,12 @@ inline void sortedIndex(int n, int* arr, int* idx){
   int i,j;
   for(i=0;i<n;i++) 
     idx[i]=i;
-  for (i=0; i<n-1; i++) 
-    for (j=0; j<n-1-i; j++)
+  for (i=0; i<n-1; i++) {
+    for (j=0; j<n-1-i; j++) {
       if (arr[idx[j+1]] < arr[idx[j]]) 
         swapInt(idx[j+1],idx[j]);
+    }
+  }
 }
 CkVec<CkVec<int> > *vecIndex(int count, int* arr){
   CkAssert(count!=0);
@@ -5950,14 +5968,16 @@ int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
   int r = 0;
 
   for (int i = ndims - 1; i >= 0; i--) {
-    if ((coords[i] < 0) || (coords[i] >= dims[i]))
-      if (periods[i] == 1)
-        if (coords[i] > 0)
+    if ((coords[i] < 0) || (coords[i] >= dims[i])) {
+      if (periods[i] == 1) {
+        if (coords[i] > 0) {
           coords[i] %= dims[i];
-        else {
+        } else {
           //coords[i] += (((-coords[i] / dims[i]) + 1) * dims[i]) % dims[i];
           while (coords[i] < 0) coords[i]+=dims[i];
         }
+      }
+    }
     r += prod * coords[i];
     prod *= dims[i];
   }
@@ -6106,13 +6126,13 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
   if ((rank >= index.size()) || (rank < 0))
     CkAbort("MPI_Graph_neighbors: rank not within range");
 
-  if (rank == 0)
+  if (rank == 0) {
     for (int i = 0; i < maxneighbors; i++)
       neighbors[i] = edges[i];
-  else
+  } else {
     for (int i = 0; i < maxneighbors; i++)
       neighbors[i] = edges[index[rank - 1] + i];
-
+  }
   return MPI_SUCCESS;
 }
 
@@ -6146,12 +6166,13 @@ int integerRoot(int n,int d) {
     }
     else { /* induction case */
       int k_up=integerRoot(n,d);
-      for (int k=k_up;k>=m;k--)
+      for (int k=k_up;k>=m;k--) {
         if (n%k==0) { /* k divides n-- try it as a factor */
           dims[0]=k;
           if (factors(n/k,d-1,&dims[1],k))
             return true;
         }
+      }
     }
     /* If we fall out here, there were no factors available */
     return false;
@@ -6166,14 +6187,16 @@ int AMPI_Dims_create(int nnodes, int ndims, int *dims) {
   n = nnodes;
   d = ndims;
 
-  for (i = 0; i < ndims; i++)
-    if (dims[i] != 0)
-      if (n % dims[i] != 0)
+  for (i = 0; i < ndims; i++) {
+    if (dims[i] != 0) {
+      if (n % dims[i] != 0) {
         CkAbort("MPI_Dims_Create: Value in dimensions array infeasible!");
-      else {
+      } else {
         n = n / dims[i];
         d--;
       }
+    }
+  }
 
   if(d > 0) {
     pdims = new int[d];
@@ -6182,12 +6205,12 @@ int AMPI_Dims_create(int nnodes, int ndims, int *dims) {
       CkAbort("MPI_Dims_Create: Factorization failed. Wonder why?");
 
     int j = 0;
-    for (i = 0; i < ndims; i++)
+    for (i = 0; i < ndims; i++) {
       if (dims[i] == 0) {
         dims[i] = pdims[j];
         j++;
       }
-
+    }
     delete [] pdims;
   }
 
@@ -6215,15 +6238,17 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   coords = new int [ndims];
   AMPI_Cart_coords(comm, rank, ndims, coords);
 
-  for (i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++) {
     if (remain_dims[i]) {
       /* key single integer encoding*/
       key = key * dims[i] + coords[i];
       num_remain_dims++;
     }
-    else
+    else {
       /* color */
       color = color * dims[i] + coords[i];
+    }
+  }
 
   getAmpiInstance(comm)->split(color, key, newcomm, CART_TOPOL);
 
@@ -6233,12 +6258,12 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   const CkVec<int> &periods = c.getperiods();
   CkVec<int> periodsv;
 
-  for (i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++) {
     if (remain_dims[i]) {
       dimsv.push_back(dims[i]);
       periodsv.push_back(periods[i]);
     }
-
+  }
   newc.setdims(dimsv);
   newc.setperiods(periodsv);
 
