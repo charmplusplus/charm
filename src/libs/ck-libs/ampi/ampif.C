@@ -1046,12 +1046,18 @@ void mpi_command_argument_count(int *count)
 void mpi_get_command_argument(int *c, char *str, int *len, int *ierr)
 {
   char **argv = CkGetArgv();
- 
   int nc = CkGetArgc()-1;
+  int arglen = strlen(argv[*c]);
+
   if (*c >= 0 && *c <= nc) {
-    strncpy(str, argv[*c], strlen(argv[*c]));
-    for (int j=strlen(argv[*c]); j<*len; j++)  str[j] = ' ';
-    *ierr = 0;
+    if (arglen <= *len) {
+      memcpy(str, argv[*c], arglen);
+      for (int j=arglen; j<*len; j++) str[j] = ' ';
+      *ierr = 0;
+    } else {
+      memcpy(str, argv[*c], *len);
+      *ierr = -1;
+    }
   }
   else {
     memset(str, ' ', *len);
