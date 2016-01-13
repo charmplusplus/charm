@@ -507,6 +507,9 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
 #define MPI_Scan AMPI_Scan
 int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, 
 		MPI_Op op, MPI_Comm comm );
+#define MPI_Exscan AMPI_Exscan
+int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+		MPI_Op op, MPI_Comm comm);
 #define MPI_Op_create AMPI_Op_create
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op);
 #define MPI_Op_free AMPI_Op_free

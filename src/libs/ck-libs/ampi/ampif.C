@@ -70,6 +70,7 @@ FDECL {
 #define mpi_iallreduce FTN_NAME( MPI_IALLREDUCE , mpi_iallreduce )
 #define mpi_reduce_scatter FTN_NAME( MPI_REDUCE_SCATTER , mpi_reduce_scatter )
 #define mpi_scan FTN_NAME( MPI_SCAN , mpi_scan )
+#define mpi_exscan FTN_NAME( MPI_EXSCAN , mpi_exscan )
 #define mpi_op_create FTN_NAME( MPI_OP_CREATE , mpi_op_create )
 #define mpi_op_free FTN_NAME( MPI_OP_FREE , mpi_op_free )
 
@@ -733,6 +734,12 @@ void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* opc,
 {
   MPI_Op op = GET_MPI_OP(*opc);
   *ierr = AMPI_Scan(sendbuf,recvbuf,*count,*datatype,op,*comm );
+}
+
+void mpi_exscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* opc, int* comm, int* ierr)
+{
+  MPI_Op op = GET_MPI_OP(*opc);
+  *ierr = AMPI_Exscan(sendbuf,recvbuf,*count,*datatype,op,*comm);
 }
 
 void mpi_op_create(int* function, int* commute, int* opc, int* ierr){

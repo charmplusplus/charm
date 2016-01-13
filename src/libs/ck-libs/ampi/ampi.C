@@ -3262,6 +3262,68 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MP
 }
 
 CDECL
+int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm){
+  AMPIAPI("AMPI_Exscan");
+
+#if CMK_ERROR_CHECKING
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CmiAbort("AMPI_Exscan does not implement MPI_IN_PLACE");
+
+  int ret;
+  ret = errorCheck(comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Exscan not allowed for Inter-communicator!");
+  MPI_Status sts;
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize(comm);
+  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
+  int rank = ptr->getRank(comm);
+  int mask = 0x1;
+  int dst, flag;
+  void* tmp_buf = malloc(blklen);
+  void* partial_scan = malloc(blklen);
+
+  memcpy(recvbuf, sendbuf, blklen);
+  memcpy(partial_scan, sendbuf, blklen);
+  flag = 0;
+  mask = 0x1;
+  while(mask < size){
+    dst = rank^mask;
+    if(dst < size){
+      AMPI_Sendrecv(partial_scan,count,datatype,dst,MPI_EXSCAN_TAG,
+                   tmp_buf,count,datatype,dst,MPI_EXSCAN_TAG,comm,&sts);
+      if(rank > dst){
+        (op)(tmp_buf,partial_scan,&count,&datatype);
+        if(rank != 0){
+          if(flag == 0){
+            memcpy(recvbuf,tmp_buf,blklen);
+            flag = 1;
+          }
+          else{
+            (op)(tmp_buf,recvbuf,&count,&datatype);
+          }
+        }
+      }
+      else{
+        (op)(partial_scan,tmp_buf,&count,&datatype);
+        memcpy(partial_scan,tmp_buf,blklen);
+      }
+      mask <<= 1;
+    }
+  }
+
+  free(tmp_buf);
+  free(partial_scan);
+#if AMPI_COUNTER
+  getAmpiParent()->counters.exscan++;
+#endif
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
   //AMPIAPI("AMPI_Op_create");
   *op = function;
