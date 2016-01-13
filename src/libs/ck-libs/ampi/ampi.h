@@ -85,7 +85,8 @@ typedef int MPI_Fint;
 #define MPI_ERR_UNSUPPORTED_OPERATION	52
 #define MPI_ERR_WIN			53
 #define MPI_ERR_LASTCODE                53
-/* 0=MPI_SUCCESS<MPI_ERRs(...)<MPI_ERR<=MPI_ERR_LASTCODE */
+#define MPI_LASTUSEDCODE                53
+/* 0=MPI_SUCCESS<MPI_ERRs(...)<MPI_ERR<=MPI_ERR_LASTCODE<=MPI_LASTCODEUSED */
 
 #define MPI_MAX_PROCESSOR_NAME	256
 #define MPI_MAX_ERROR_STRING	256
@@ -154,6 +155,9 @@ typedef int MPI_Fint;
 #define MPI_CONGRUENT   2
 #define MPI_UNEQUAL	3
 
+#define MPI_ORDER_C 0
+#define MPI_ORDER_FORTRAN 1
+
 #define MPI_OP_NULL  (MPI_Op)NULL
 void MPI_MAX      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
 void MPI_MIN      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
@@ -178,19 +182,21 @@ void MPI_MINLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatyp
 #define MPI_TAG_UB_VALUE  1073741824
 
 /** These are the builtin MPI keyvals.  You can pass them to 
-  MPI_Attr_get for any communicator.
+  MPI_Comm_get_attr for any communicator.
 */
 #define MPI_TAG_UB -10
 #define MPI_HOST -11
 #define MPI_IO -12
 #define MPI_WTIME_IS_GLOBAL -13
+#define MPI_APPNUM -14
+#define MPI_UNIVERSE_SIZE -15
 
 /** These are AMPI-specific keyvals. They return information about
 the real (non-virtual) processors. */
-#define AMPI_KEYVAL_MYPE -14
-#define AMPI_KEYVAL_NUMPES -15
-#define AMPI_KEYVAL_MYNODE -16
-#define AMPI_KEYVAL_NUMNODES -17
+#define AMPI_KEYVAL_MYPE -16
+#define AMPI_KEYVAL_NUMPES -17
+#define AMPI_KEYVAL_MYNODE -18
+#define AMPI_KEYVAL_NUMNODES -19
 
 
 /** Communicators give a communication context to a set of processors.
@@ -262,6 +268,14 @@ int MPI_COMM_NULL_COPY_FN ( MPI_Comm, int, void *, void *, void *, int * );
 int MPI_COMM_NULL_DELETE_FN ( MPI_Comm, int, void *, void * );
 int MPI_COMM_DUP_FN ( MPI_Comm, int, void *, void *, void *, int * );
 
+#define MPI_TYPE_NULL_DELETE_FN MPI_type_null_delete_fn
+#define MPI_TYPE_NULL_COPY_FN MPI_type_null_copy_fn
+#define MPI_TYPE_DUP_FN MPI_type_dup_fn
+
+int MPI_TYPE_NULL_COPY_FN ( MPI_Datatype, int, void *, void *, void *, int * );
+int MPI_TYPE_NULL_DELETE_FN ( MPI_Datatype, int, void *, void * );
+int MPI_TYPE_DUP_FN ( MPI_Datatype, int, void *, void *, void *, int * );
+
 #include "pup_c.h"
 
 typedef void (*MPI_PupFn)(pup_er, void*);
@@ -276,6 +290,9 @@ typedef void (*MPI_MigrateFn)(void);
 #define MPI_COMBINER_INDEXED       5
 #define MPI_COMBINER_HINDEXED      6
 #define MPI_COMBINER_STRUCT        7
+#define MPI_COMBINER_DARRAY        8
+#define MPI_COMBINER_RESIZED       9
+#define MPI_COMBINER_SUBARRAY     10
 
 /********************** MPI-1.1 Functions ***************************/
 /***pt2pt***/
@@ -747,8 +764,30 @@ int AMPI_GPU_Invoke(workRequest *to_call);
 #define MPI_LOCK_EXCLUSIVE 55
 #define MPI_WIN_NULL -1
 
+#define MPI_WIN_BASE 0
+#define MPI_WIN_SIZE 1
+#define MPI_WIN_DISP_UNIT 2
+#define MPI_WIN_MODEL 3
+#define MPI_WIN_CREATE_FLAVOR 4
+
+#define MPI_WIN_FLAVOR_CREATE 1
+#define MPI_WIN_FLAVOR_ALLOCATE 2
+#define MPI_WIN_FLAVOR_DYNAMIC 3
+#define MPI_WIN_FLAVOR_SHARED 4
+
+#define MPI_WIN_UNIFIED 0
+#define MPI_WIN_SEPARATE 1
+
 typedef int MPI_Info;
 typedef int MPI_Win;
+
+#define MPI_WIN_NULL_DELETE_FN MPI_win_null_delete_fn
+#define MPI_WIN_NULL_COPY_FN MPI_win_null_copy_fn
+#define MPI_WIN_DUP_FN MPI_win_dup_fn
+
+int MPI_WIN_NULL_COPY_FN ( MPI_Win, int, void *, void *, void *, int * );
+int MPI_WIN_NULL_DELETE_FN ( MPI_Win, int, void *, void * );
+int MPI_WIN_DUP_FN ( MPI_Win, int, void *, void *, void *, int * );
 
 #define MPI_Win_create AMPI_Win_create
 int AMPI_Win_create(void *base, MPI_Aint size, int disp_unit,

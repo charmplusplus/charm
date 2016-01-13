@@ -2147,6 +2147,20 @@ int MPI_comm_null_delete_fn (MPI_Comm comm, int keyval, void *attr, void *extra_
   return (MPI_SUCCESS);
 }
 
+int MPI_type_null_copy_fn (MPI_Datatype type, int keyval, void *extra_state,
+    void *attr_in, void *attr_out, int *flag){
+  (*flag) = 0;
+  return (MPI_SUCCESS);
+}
+int MPI_type_dup_fn (MPI_Datatype type, int keyval, void *extra_state,
+    void *attr_in, void *attr_out, int *flag){
+  (*(void **)attr_out) = attr_in;
+  (*flag) = 1;
+  return (MPI_SUCCESS);
+}
+int MPI_type_null_delete_fn (MPI_Datatype type, int keyval, void *attr, void *extra_state){
+  return (MPI_SUCCESS);
+}
 
 void AmpiSeqQ::init(int numP) 
 {
