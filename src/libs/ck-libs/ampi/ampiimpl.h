@@ -76,12 +76,12 @@ class fromzDisk : public zdisk {
 #if AMPI_COUNTER
 class AmpiCounters{
 public:
-	int send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan;
+	int send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,exscan;
 	AmpiCounters(){
-		send=0;recv=0;isend=0;irecv=0;barrier=0;bcast=0;gather=0;scatter=0;allgather=0;alltoall=0;reduce=0;allreduce=0;scan=0;
+		send=0;recv=0;isend=0;irecv=0;barrier=0;bcast=0;gather=0;scatter=0;allgather=0;alltoall=0;reduce=0;allreduce=0;scan=0;exscan=0;
 	}
 	void output(int idx){
-		printf("[%d]send=%d;recv=%d;isend=%d;irecv=%d;barrier=%d;bcast=%d;gather=%d;scatter=%d;allgather=%d;alltoall=%d;reduce=%d;allreduce=%d;scan=%d\n",idx,send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan);
+		printf("[%d]send=%d;recv=%d;isend=%d;irecv=%d;barrier=%d;bcast=%d;gather=%d;scatter=%d;allgather=%d;alltoall=%d;reduce=%d;allreduce=%d;scan=%d;exscan=%d\n",idx,send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,exscan);
 	}
 };
 #endif
@@ -515,7 +515,8 @@ extern int _mpi_nworlds;
 #define MPI_GATHER_TAG  MPI_TAG_UB_VALUE+13
 #define MPI_SCATTER_TAG MPI_TAG_UB_VALUE+14
 #define MPI_SCAN_TAG 	MPI_TAG_UB_VALUE+15
-#define MPI_ATA_TAG	MPI_TAG_UB_VALUE+16
+#define MPI_EXSCAN_TAG  MPI_TAG_UB_VALUE+16
+#define MPI_ATA_TAG     MPI_TAG_UB_VALUE+17
 
 #define MyAlign8(x) (((x)+7)&(~7))
 
