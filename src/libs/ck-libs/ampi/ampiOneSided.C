@@ -887,3 +887,20 @@ int AMPI_Win_get_name(MPI_Win win, char *name, int *length) {
   return MPI_SUCCESS;
 }
 
+int MPI_win_null_copy_fn (MPI_Win win, int keyval, void *extra_state,
+    void *attr_in, void *attr_out, int *flag){
+  (*flag) = 0;
+  return MPI_SUCCESS;
+}
+
+int MPI_win_dup_fn (MPI_Win win, int keyval, void *extra_state,
+    void *attr_in, void *attr_out, int *flag){
+  (*(void **)attr_out) = attr_in;
+  (*flag) = 1;
+  return MPI_SUCCESS;
+}
+
+int MPI_win_null_delete_fn (MPI_Win win, int keyval, void *attr, void *extra_state){
+  return MPI_SUCCESS;
+}
+

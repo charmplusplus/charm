@@ -99,6 +99,9 @@
        integer, parameter :: MPI_COMBINER_INDEXED = 5
        integer, parameter :: MPI_COMBINER_HINDEXED = 6
        integer, parameter :: MPI_COMBINER_STRUCT = 7
+       integer, parameter :: MPI_COMBINER_DARRAY = 8
+       integer, parameter :: MPI_COMBINER_RESIZED = 9
+       integer, parameter :: MPI_COMBINER_SUBARRAY = 10
 
        integer, parameter :: MPI_PROC_NULL = -2
        integer, parameter :: MPI_ANY_SOURCE = -1
@@ -120,6 +123,9 @@
        integer, parameter :: MPI_CONGRUENT = 2
        integer, parameter :: MPI_UNEQUAL = 3
 
+       integer, parameter :: MPI_ORDER_C = 0
+       integer, parameter :: MPI_ORDER_FORTRAN = 1
+
        integer, parameter :: MPI_OP_NULL = 0
 
        integer, parameter :: MPI_GRAPH = 1
@@ -129,6 +135,12 @@
        integer, parameter :: MPI_HOST = -11
        integer, parameter :: MPI_IO = -12
        integer, parameter :: MPI_WTIME_IS_GLOBAL = -13
+       integer, parameter :: MPI_APPNUM = -14
+       integer, parameter :: MPI_UNIVERSE_SIZE = -15
+       integer, parameter :: AMPI_KEYVAL_MYPE = -16
+       integer, parameter :: AMPI_KEYVAL_NUMPES = -17
+       integer, parameter :: AMPI_KEYVAL_MYNODE = -18
+       integer, parameter :: AMPI_KEYVAL_NUMNODES = -19
 
        integer, parameter :: MPI_TAG_UB_VALUE = 1073741824
 
@@ -149,8 +161,6 @@
        integer, parameter :: MPI_COMM_SELF = 8000000
        integer, parameter :: MPI_COMM_WORLD = 9000000
        integer, parameter :: MPI_MAX_COMM_WORLDS=8
-       integer, parameter :: MPI_UNIVERSE_SIZE = MPI_COMM_WORLD
-       integer, parameter :: MPI_APPNUM = 0
        integer :: MPI_COMM_UNIVERSE(1:MPI_MAX_COMM_WORLDS)
 
 !       integer, external :: MPI_Register
@@ -179,3 +189,17 @@
        integer, parameter :: MPI_LOCK_SHARED = 54
        integer, parameter :: MPI_LOCK_EXCLUSIVE = 55
        integer, parameter :: MPI_WIN_NULL = -1
+
+       integer, parameter :: MPI_WIN_BASE = 0
+       integer, parameter :: MPI_WIN_SIZE = 1
+       integer, parameter :: MPI_WIN_DISP_UNIT = 2
+       integer, parameter :: MPI_WIN_MODEL = 3
+       integer, parameter :: MPI_WIN_CREATE_FLAVOR = 4
+
+       integer, parameter :: MPI_WIN_FLAVOR_CREATE = 1
+       integer, parameter :: MPI_WIN_FLAVOR_ALLOCATE = 2
+       integer, parameter :: MPI_WIN_FLAVOR_DYNAMIC = 3
+       integer, parameter :: MPI_WIN_FLAVOR_SHARED = 4
+
+       integer, parameter :: MPI_WIN_UNIFIED = 0
+       integer, parameter :: MPI_WIN_SEPARATE = 1
