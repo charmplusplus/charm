@@ -38,6 +38,7 @@ FDECL {
 #define mpi_type_hindexed FTN_NAME( MPI_TYPE_HINDEXED , mpi_type_hindexed )
 #define mpi_type_create_struct FTN_NAME( MPI_TYPE_CREATE_STRUCT , mpi_type_create_struct )
 #define mpi_type_struct FTN_NAME( MPI_TYPE_STRUCT , mpi_type_struct )
+#define mpi_type_create_subarray FTN_NAME( MPI_TYPE_CREATE_SUBARRAY , mpi_type_create_subarray )
 #define mpi_type_commit FTN_NAME( MPI_TYPE_COMMIT , mpi_type_commit )
 #define mpi_type_free FTN_NAME( MPI_TYPE_FREE , mpi_type_free )
 #define mpi_type_get_extent FTN_NAME( MPI_TYPE_GET_EXTENT , mpi_type_get_extent )
@@ -544,6 +545,12 @@ void mpi_type_struct(int* count, int* arrBlength, int* arrDisp,
   *ierr = AMPI_Type_struct(*count, arrBlength, arrDisp, oldtype, newtype);
 }
 
+void mpi_type_create_subarray(int* ndims, int* array_of_sizes, int* array_of_subsizes,
+   int* array_of_starts, int* order, int* oldtype, int* newtype, int* ierr)
+{
+  *ierr = AMPI_Type_create_subarray(*ndims, array_of_sizes, array_of_subsizes,
+                                   array_of_starts, *order, *oldtype, newtype);
+}
 
 void mpi_type_commit(int *type, int *ierr)
 {
