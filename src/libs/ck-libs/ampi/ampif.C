@@ -190,7 +190,14 @@ FDECL {
 
 #define mpi_win_create FTN_NAME ( MPI_WIN_CREATE , mpi_win_create )
 #define mpi_win_free  FTN_NAME ( MPI_WIN_FREE  , mpi_win_free )
+#define mpi_win_create_errhandler FTN_NAME ( MPI_WIN_CREATE_ERRHANDLER , mpi_win_create_errhandler )
+#define mpi_win_get_errhandler FTN_NAME ( MPI_WIN_GET_ERRHANDLER , mpi_win_get_errhandler )
+#define mpi_win_set_errhandler FTN_NAME ( MPI_WIN_SET_ERRHANDLER , mpi_win_set_errhandler )
+#define mpi_win_create_keyval FTN_NAME ( MPI_WIN_CREATE_KEYVAL , mpi_win_create_keyval )
+#define mpi_win_free_keyval FTN_NAME ( MPI_WIN_FREE_KEYVAL , mpi_win_free_keyval )
 #define mpi_win_delete_attr  FTN_NAME ( MPI_WIN_DELETE_ATTR  , mpi_win_delete_attr )
+#define mpi_win_get_attr  FTN_NAME ( MPI_WIN_GET_ATTR  , mpi_win_get_attr )
+#define mpi_win_set_attr  FTN_NAME ( MPI_WIN_SET_ATTR  , mpi_win_set_attr )
 #define mpi_win_get_group  FTN_NAME ( MPI_WIN_GET_GROUP  , mpi_win_get_group )
 #define mpi_win_set_name  FTN_NAME ( MPI_WIN_SET_NAME  , mpi_win_set_name )
 #define mpi_win_get_name  FTN_NAME ( MPI_WIN_GET_NAME  , mpi_win_get_name )
@@ -1156,8 +1163,40 @@ void mpi_win_free(int *win, int *ierr) {
   *ierr = AMPI_Win_free(win);
 }
 
-void mpi_win_delete_attr(int win, int *key, int *ierr){
-  *ierr = AMPI_Win_delete_attr(win, *key);
+void mpi_win_create_errhandler(MPI_Win_errhandler_function *win_errhandler_fn,
+                              int *errhandler, int *ierr){
+  *ierr = AMPI_Win_create_errhandler(win_errhandler_fn, errhandler);
+}
+
+void mpi_win_get_errhandler(MPI_Win *win, int *errhandler, int *ierr){
+  *ierr = AMPI_Win_get_errhandler(*win, errhandler);
+}
+
+void mpi_win_set_errhandler(MPI_Win *win, int *errhandler, int *ierr){
+  *ierr = AMPI_Win_set_errhandler(*win, *errhandler);
+}
+
+void mpi_win_create_keyval(MPI_Win_copy_attr_function *copy_fn,
+                          MPI_Win_delete_attr_function *delete_fn,
+                          int *keyval, void *extra_state, int *ierr){
+  *ierr = AMPI_Win_create_keyval(copy_fn, delete_fn, keyval, extra_state);
+}
+
+void mpi_win_free_keyval(int *keyval, int *ierr){
+  *ierr = AMPI_Win_free_keyval(keyval);
+}
+
+void mpi_win_delete_attr(int *win, int *key, int *ierr){
+  *ierr = AMPI_Win_delete_attr(*win, *key);
+}
+
+void mpi_win_get_attr(int *win, int *win_keyval, void *attribute_val, int *flag,
+                     int *ierr){
+  *ierr = AMPI_Win_get_attr(*win, *win_keyval, attribute_val, flag);
+}
+
+void mpi_win_set_attr(int *win, int *win_keyval, void *attribute_val, int *ierr){
+  *ierr = AMPI_Win_set_attr(*win, *win_keyval, attribute_val);
 }
 
 void mpi_win_get_group(int win, int *group, int *ierr){
