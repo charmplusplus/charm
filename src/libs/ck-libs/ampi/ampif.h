@@ -135,15 +135,17 @@
        integer, parameter :: MPI_HOST = -2
        integer, parameter :: MPI_IO = -3
        integer, parameter :: MPI_WTIME_IS_GLOBAL = -4
-       integer, parameter :: MPI_WIN_BASE = -5
-       integer, parameter :: MPI_WIN_SIZE = -6
-       integer, parameter :: MPI_WIN_DISP_UNIT = -7
-       integer, parameter :: MPI_WIN_MODEL = -8
-       integer, parameter :: MPI_WIN_CREATE_FLAVOR = -9
-       integer, parameter :: AMPI_KEYVAL_MYPE = -10
-       integer, parameter :: AMPI_KEYVAL_NUMPES = -11
-       integer, parameter :: AMPI_KEYVAL_MYNODE = -12
-       integer, parameter :: AMPI_KEYVAL_NUMNODES = -13
+       integer, parameter :: MPI_APPNUM = -5
+       integer, parameter :: MPI_UNIVERSE_SIZE = -6
+       integer, parameter :: MPI_WIN_BASE = -7
+       integer, parameter :: MPI_WIN_SIZE = -8
+       integer, parameter :: MPI_WIN_DISP_UNIT = -9
+       integer, parameter :: MPI_WIN_MODEL = -10
+       integer, parameter :: MPI_WIN_CREATE_FLAVOR = -11
+       integer, parameter :: AMPI_KEYVAL_MYPE = -12
+       integer, parameter :: AMPI_KEYVAL_NUMPES = -13
+       integer, parameter :: AMPI_KEYVAL_MYNODE = -14
+       integer, parameter :: AMPI_KEYVAL_NUMNODES = -15
 
        integer, parameter :: MPI_TAG_UB_VALUE = 1073741824
 

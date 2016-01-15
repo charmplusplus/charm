@@ -186,15 +186,17 @@ void MPI_MINLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatyp
 #define MPI_HOST -2
 #define MPI_IO -3
 #define MPI_WTIME_IS_GLOBAL -4
-#define MPI_WIN_BASE -5
-#define MPI_WIN_SIZE -6
-#define MPI_WIN_DISP_UNIT -7
-#define MPI_WIN_MODEL -8
-#define MPI_WIN_CREATE_FLAVOR -9
-#define AMPI_KEYVAL_MYPE -10
-#define AMPI_KEYVAL_NUMPES -11
-#define AMPI_KEYVAL_MYNODE -12
-#define AMPI_KEYVAL_NUMNODES -13
+#define MPI_APPNUM -5
+#define MPI_UNIVERSE_SIZE -6
+#define MPI_WIN_BASE -7
+#define MPI_WIN_SIZE -8
+#define MPI_WIN_DISP_UNIT -9
+#define MPI_WIN_MODEL -10
+#define MPI_WIN_CREATE_FLAVOR -11
+#define AMPI_KEYVAL_MYPE -12
+#define AMPI_KEYVAL_NUMPES -13
+#define AMPI_KEYVAL_MYNODE -14
+#define AMPI_KEYVAL_NUMNODES -15
 
 /** Communicators give a communication context to a set of processors.
     An intercommunicator can be used for point to point messaging between two groups.

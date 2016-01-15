@@ -474,7 +474,7 @@ CkReduction::reducerType AmpiReducer;
 
 class Builtin_kvs{
   public:
-    int tag_ub,host,io,wtime_is_global;
+    int tag_ub,host,io,wtime_is_global,appnum,universe_size;
     void* win_base;
     int win_size,win_disp_unit,win_create_flavor,win_model;
     int keyval_mype,keyval_numpes,keyval_mynode,keyval_numnodes;
@@ -483,6 +483,8 @@ class Builtin_kvs{
       host = MPI_PROC_NULL;
       io = 0;
       wtime_is_global = 0;
+      appnum = 0;
+      universe_size = 0;
       win_base = NULL;
       win_size = 0;
       win_disp_unit = 0;
@@ -806,6 +808,7 @@ static ampi *ampiInit(char **argv)
 #endif
 
   init_operations();     // initialize fortran reduction operation table
+  getAmpiParent()->setCommAttr(MPI_COMM_WORLD, MPI_UNIVERSE_SIZE, &_nchunks);
 
   getAmpiParent()->ampiInitCallDone = 0;
 
@@ -1206,6 +1209,8 @@ bool ampiParent::kv_set_builtin(int keyval, void* attribute_val) {
     case MPI_HOST:              /*immutable*/ return false;
     case MPI_IO:                /*immutable*/ return false;
     case MPI_WTIME_IS_GLOBAL:   /*immutable*/ return false;
+    case MPI_APPNUM:            /*immutable*/ return false;
+    case MPI_UNIVERSE_SIZE:     (CkpvAccess(bikvs).universe_size)     = *((int*)attribute_val); return true;
     case MPI_WIN_BASE:          (CkpvAccess(bikvs).win_base)          = attribute_val;          return true;
     case MPI_WIN_SIZE:          (CkpvAccess(bikvs).win_size)          = *((int*)attribute_val); return true;
     case MPI_WIN_DISP_UNIT:     (CkpvAccess(bikvs).win_disp_unit)     = *((int*)attribute_val); return true;
@@ -1225,6 +1230,8 @@ bool ampiParent::kv_get_builtin(int keyval) {
     case MPI_HOST:              kv_builtin_storage = &(CkpvAccess(bikvs).host);              return true;
     case MPI_IO:                kv_builtin_storage = &(CkpvAccess(bikvs).io);                return true;
     case MPI_WTIME_IS_GLOBAL:   kv_builtin_storage = &(CkpvAccess(bikvs).wtime_is_global);   return true;
+    case MPI_APPNUM:            kv_builtin_storage = &(CkpvAccess(bikvs).appnum);            return true;
+    case MPI_UNIVERSE_SIZE:     kv_builtin_storage = &(CkpvAccess(bikvs).universe_size);     return true;
     case MPI_WIN_BASE:          win_base_storage   = &(CkpvAccess(bikvs).win_base);          return true;
     case MPI_WIN_SIZE:          kv_builtin_storage = &(CkpvAccess(bikvs).win_size);          return true;
     case MPI_WIN_DISP_UNIT:     kv_builtin_storage = &(CkpvAccess(bikvs).win_disp_unit);     return true;
