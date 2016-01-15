@@ -37,8 +37,8 @@ CMK_RANLIB="ranlib"
 
 CMK_NATIVE_CC="clang $CMK_GCC64 "
 CMK_NATIVE_LD="clang -Wl,-no_pie $CMK_GCC64 "
-CMK_NATIVE_CXX="clang++ $CMK_GCC64 "
-CMK_NATIVE_LDXX="clang++ -Wl,-no_pie $CMK_GCC64 "
+CMK_NATIVE_CXX="clang++ $CMK_GCC64 -stdlib=libc++ "
+CMK_NATIVE_LDXX="clang++ -Wl,-no_pie $CMK_GCC64 -stdlib=libc++ "
 CMK_NATIVE_LIBS=""
 
 CMK_CF90=`which f95 2>/dev/null`
@@ -56,11 +56,11 @@ else
 fi
 
 # setting for shared lib
-# need -lstdc++ for c++ reference, and it needs to be put at very last 
+# need -lc++ for c++ reference, and it needs to be put at very last 
 # of command line.
 # Mac environment variable
 test -z "$MACOSX_DEPLOYMENT_TARGET" && export MACOSX_DEPLOYMENT_TARGET=10.5
 CMK_SHARED_SUF="dylib"
 CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
-CMK_LD_SHARED_LIBS="-lstdc++"
+CMK_LD_SHARED_LIBS="-lc++"
 CMK_LD_SHARED_ABSOLUTE_PATH=true
