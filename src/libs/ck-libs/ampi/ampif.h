@@ -131,16 +131,19 @@
        integer, parameter :: MPI_GRAPH = 1
        integer, parameter :: MPI_CART = 2
 
-       integer, parameter :: MPI_TAG_UB = -10
-       integer, parameter :: MPI_HOST = -11
-       integer, parameter :: MPI_IO = -12
-       integer, parameter :: MPI_WTIME_IS_GLOBAL = -13
-       integer, parameter :: MPI_APPNUM = -14
-       integer, parameter :: MPI_UNIVERSE_SIZE = -15
-       integer, parameter :: AMPI_KEYVAL_MYPE = -16
-       integer, parameter :: AMPI_KEYVAL_NUMPES = -17
-       integer, parameter :: AMPI_KEYVAL_MYNODE = -18
-       integer, parameter :: AMPI_KEYVAL_NUMNODES = -19
+       integer, parameter :: MPI_TAG_UB = -1
+       integer, parameter :: MPI_HOST = -2
+       integer, parameter :: MPI_IO = -3
+       integer, parameter :: MPI_WTIME_IS_GLOBAL = -4
+       integer, parameter :: MPI_WIN_BASE = -5
+       integer, parameter :: MPI_WIN_SIZE = -6
+       integer, parameter :: MPI_WIN_DISP_UNIT = -7
+       integer, parameter :: MPI_WIN_MODEL = -8
+       integer, parameter :: MPI_WIN_CREATE_FLAVOR = -9
+       integer, parameter :: AMPI_KEYVAL_MYPE = -10
+       integer, parameter :: AMPI_KEYVAL_NUMPES = -11
+       integer, parameter :: AMPI_KEYVAL_MYNODE = -12
+       integer, parameter :: AMPI_KEYVAL_NUMNODES = -13
 
        integer, parameter :: MPI_TAG_UB_VALUE = 1073741824
 
@@ -189,12 +192,6 @@
        integer, parameter :: MPI_LOCK_SHARED = 54
        integer, parameter :: MPI_LOCK_EXCLUSIVE = 55
        integer, parameter :: MPI_WIN_NULL = -1
-
-       integer, parameter :: MPI_WIN_BASE = 0
-       integer, parameter :: MPI_WIN_SIZE = 1
-       integer, parameter :: MPI_WIN_DISP_UNIT = 2
-       integer, parameter :: MPI_WIN_MODEL = 3
-       integer, parameter :: MPI_WIN_CREATE_FLAVOR = 4
 
        integer, parameter :: MPI_WIN_FLAVOR_CREATE = 1
        integer, parameter :: MPI_WIN_FLAVOR_ALLOCATE = 2

@@ -474,12 +474,20 @@ CkReduction::reducerType AmpiReducer;
 
 class Builtin_kvs{
   public:
-    int tag_ub,host,io,wtime_is_global,keyval_mype,keyval_numpes,keyval_mynode,keyval_numnodes;
+    int tag_ub,host,io,wtime_is_global;
+    void* win_base;
+    int win_size,win_disp_unit,win_create_flavor,win_model;
+    int keyval_mype,keyval_numpes,keyval_mynode,keyval_numnodes;
     Builtin_kvs(){
       tag_ub = MPI_TAG_UB_VALUE; 
       host = MPI_PROC_NULL;
       io = 0;
       wtime_is_global = 0;
+      win_base = NULL;
+      win_size = 0;
+      win_disp_unit = 0;
+      win_create_flavor = MPI_WIN_FLAVOR_CREATE;
+      win_model = MPI_WIN_SEPARATE;
       keyval_mype = CkMyPe();
       keyval_numpes = CkNumPes();
       keyval_mynode = CkMyNode();
@@ -1159,62 +1167,138 @@ int ampiParent::createKeyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_dele
   *keyval = idx;
   return 0;
 }
-  int ampiParent::freeKeyval(int *keyval){
-    if(*keyval <0 || *keyval >= kvlist.size() || !kvlist[*keyval])
-      return -1;
-    delete kvlist[*keyval];
-    kvlist[*keyval] = NULL;
-    *keyval = MPI_KEYVAL_INVALID;
-    return 0;
-  }
 
-  int ampiParent::setAttr(MPI_Comm comm, int keyval, void* attribute_val){
-    if(keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
-      return -1;
-    ampiCommStruct &cs=*(ampiCommStruct *)&comm2CommStruct(comm);
-    // Enlarge the keyval list:
-    while (cs.getKeyvals().size()<=keyval) cs.getKeyvals().push_back(0);
-    cs.getKeyvals()[keyval]=attribute_val;
-    return 0;
-  }
+int ampiParent::freeKeyval(int *keyval){
+  if(*keyval <0 || *keyval >= kvlist.size() || !kvlist[*keyval])
+    return MPI_ERR_KEYVAL;
+  delete kvlist[*keyval];
+  kvlist[*keyval] = NULL;
+  *keyval = MPI_KEYVAL_INVALID;
+  return MPI_SUCCESS;
+}
 
-int ampiParent::kv_is_builtin(int keyval) {
+int ampiParent::setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val){
+  if(keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
+    return MPI_ERR_KEYVAL;
+  ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(comm);
+  // Enlarge the keyval list:
+  while (cs.getKeyvals().size()<=keyval) cs.getKeyvals().push_back(0);
+  cs.getKeyvals()[keyval]=attribute_val;
+  return MPI_SUCCESS;
+}
+
+int ampiParent::setWinAttr(MPI_Win win, int keyval, void* attribute_val){
+  if(kv_set_builtin(keyval,attribute_val))
+    return MPI_SUCCESS;
+  MPI_Comm comm = (getAmpiParent()->getWinStruct(win)).comm;
+  return setUserKeyval(comm, keyval, attribute_val);
+}
+
+int ampiParent::setCommAttr(MPI_Comm comm, int keyval, void* attribute_val){
+  if(kv_set_builtin(keyval,attribute_val))
+    return MPI_SUCCESS;
+  return setUserKeyval(comm, keyval, attribute_val);
+}
+
+bool ampiParent::kv_set_builtin(int keyval, void* attribute_val) {
   switch(keyval) {
-    case MPI_TAG_UB: kv_builtin_storage=&(CkpvAccess(bikvs).tag_ub); return 1;
-    case MPI_HOST: kv_builtin_storage=&(CkpvAccess(bikvs).host); return 1;
-    case MPI_IO: kv_builtin_storage=&(CkpvAccess(bikvs).io); return 1;
-    case MPI_WTIME_IS_GLOBAL: kv_builtin_storage=&(CkpvAccess(bikvs).wtime_is_global); return 1;
-    case AMPI_KEYVAL_MYPE: kv_builtin_storage=&(CkpvAccess(bikvs).keyval_mype); return 1;
-    case AMPI_KEYVAL_NUMPES: kv_builtin_storage=&(CkpvAccess(bikvs).keyval_numpes); return 1;
-    case AMPI_KEYVAL_MYNODE: kv_builtin_storage=&(CkpvAccess(bikvs).keyval_mynode); return 1;
-    case AMPI_KEYVAL_NUMNODES: kv_builtin_storage=&(CkpvAccess(bikvs).keyval_numnodes); return 1;
-    default: return 0;
+    case MPI_TAG_UB:            /*immutable*/ return false;
+    case MPI_HOST:              /*immutable*/ return false;
+    case MPI_IO:                /*immutable*/ return false;
+    case MPI_WTIME_IS_GLOBAL:   /*immutable*/ return false;
+    case MPI_WIN_BASE:          (CkpvAccess(bikvs).win_base)          = attribute_val;          return true;
+    case MPI_WIN_SIZE:          (CkpvAccess(bikvs).win_size)          = *((int*)attribute_val); return true;
+    case MPI_WIN_DISP_UNIT:     (CkpvAccess(bikvs).win_disp_unit)     = *((int*)attribute_val); return true;
+    case MPI_WIN_CREATE_FLAVOR: (CkpvAccess(bikvs).win_create_flavor) = *((int*)attribute_val); return true;
+    case MPI_WIN_MODEL:         (CkpvAccess(bikvs).win_model)         = *((int*)attribute_val); return true;
+    case AMPI_KEYVAL_MYPE:      (CkpvAccess(bikvs).keyval_mype)       = *((int*)attribute_val); return true;
+    case AMPI_KEYVAL_NUMPES:    (CkpvAccess(bikvs).keyval_numpes)     = *((int*)attribute_val); return true;
+    case AMPI_KEYVAL_MYNODE:    (CkpvAccess(bikvs).keyval_mynode)     = *((int*)attribute_val); return true;
+    case AMPI_KEYVAL_NUMNODES:  (CkpvAccess(bikvs).keyval_numnodes)   = *((int*)attribute_val); return true;
+    default: return false;
   };
 }
 
-int ampiParent::getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
-  *flag = false;
-  if (kv_is_builtin(keyval)) { /* Allow access to special builtin flags */
-    *flag=true;
-    *(int **)attribute_val = kv_builtin_storage;  // all default tags are ints
-    return 0;
-  }
-  if(keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
-    return -1; /* invalid keyval */
+bool ampiParent::kv_get_builtin(int keyval) {
+  switch(keyval) {
+    case MPI_TAG_UB:            kv_builtin_storage = &(CkpvAccess(bikvs).tag_ub);            return true;
+    case MPI_HOST:              kv_builtin_storage = &(CkpvAccess(bikvs).host);              return true;
+    case MPI_IO:                kv_builtin_storage = &(CkpvAccess(bikvs).io);                return true;
+    case MPI_WTIME_IS_GLOBAL:   kv_builtin_storage = &(CkpvAccess(bikvs).wtime_is_global);   return true;
+    case MPI_WIN_BASE:          win_base_storage   = &(CkpvAccess(bikvs).win_base);          return true;
+    case MPI_WIN_SIZE:          kv_builtin_storage = &(CkpvAccess(bikvs).win_size);          return true;
+    case MPI_WIN_DISP_UNIT:     kv_builtin_storage = &(CkpvAccess(bikvs).win_disp_unit);     return true;
+    case MPI_WIN_CREATE_FLAVOR: kv_builtin_storage = &(CkpvAccess(bikvs).win_create_flavor); return true;
+    case MPI_WIN_MODEL:         kv_builtin_storage = &(CkpvAccess(bikvs).win_model);         return true;
+    case AMPI_KEYVAL_MYPE:      kv_builtin_storage = &(CkpvAccess(bikvs).keyval_mype);       return true;
+    case AMPI_KEYVAL_NUMPES:    kv_builtin_storage = &(CkpvAccess(bikvs).keyval_numpes);     return true;
+    case AMPI_KEYVAL_MYNODE:    kv_builtin_storage = &(CkpvAccess(bikvs).keyval_mynode);     return true;
+    case AMPI_KEYVAL_NUMNODES:  kv_builtin_storage = &(CkpvAccess(bikvs).keyval_numnodes);   return true;
+    default: return false;
+  };
+}
 
+bool ampiParent::getBuiltinKeyval(int keyval, void *attribute_val) {
+  if (kv_get_builtin(keyval)){
+    /* All builtin keyvals are ints except MPI_WIN_BASE, which is a pointer
+     * to the window's base address in C but an integer representation of
+     * the base address in Fortran. */
+    if (keyval == MPI_WIN_BASE)
+      *((void**)attribute_val) = *win_base_storage;
+    else
+      *(int **)attribute_val = kv_builtin_storage;
+    return true;
+  }
+  return false;
+}
+
+bool ampiParent::getUserKeyval(MPI_Comm comm, int keyval, void *attribute_val, int *flag) {
+  *flag = false;
+  if (keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
+    return false;
   ampiCommStruct &cs=*(ampiCommStruct *)&comm2CommStruct(comm);
   if (keyval>=cs.getKeyvals().size())  
-    return 0; /* we don't have a value yet */
+    return true; /* we don't have a value yet */
   if (cs.getKeyvals()[keyval]==0)
-    return 0; /* we had a value, but now it's zero */
+    return true; /* we had a value, but now it's zero */
   /* Otherwise, we have a good value */
   *flag = true;
   *(void **)attribute_val = cs.getKeyvals()[keyval];
-  return 0;
+  return true;
 }
-int ampiParent::deleteAttr(MPI_Comm comm, int keyval){
+
+int ampiParent::getCommAttr(MPI_Comm comm, int keyval, void *attribute_val, int *flag) {
+  *flag = false;
+  if (getBuiltinKeyval(keyval, attribute_val)) {
+    *flag = true;
+    return MPI_SUCCESS;
+  }
+  if (getUserKeyval(comm, keyval, attribute_val, flag))
+    return MPI_SUCCESS;
+  return MPI_ERR_KEYVAL;
+}
+
+int ampiParent::getWinAttr(MPI_Win win, int keyval, void *attribute_val, int *flag) {
+  *flag = false;
+  if (getBuiltinKeyval(keyval, attribute_val)) {
+    *flag = true;
+    return MPI_SUCCESS;
+  }
+  MPI_Comm comm = (getAmpiParent()->getWinStruct(win)).comm;
+  if (getUserKeyval(comm, keyval, attribute_val, flag))
+    return MPI_SUCCESS;
+  return MPI_ERR_KEYVAL;
+}
+
+int ampiParent::deleteCommAttr(MPI_Comm comm, int keyval){
   /* no way to delete an attribute: just overwrite it with 0 */
-  return setAttr(comm,keyval,0);
+  return setUserKeyval(comm, keyval, 0);
+}
+
+int ampiParent::deleteWinAttr(MPI_Win win, int keyval){
+  /* no way to delete an attribute: just overwrite it with 0 */
+  MPI_Comm comm = (getAmpiParent()->getWinStruct(win)).comm;
+  return setUserKeyval(comm, keyval, 0);
 }
 
 //----------------------- ampi -------------------------
@@ -5931,19 +6015,19 @@ int AMPI_Comm_free_keyval(int *keyval){
 CDECL
 int AMPI_Comm_set_attr(MPI_Comm comm, int keyval, void* attribute_val){
   AMPIAPI("AMPI_Comm_set_attr");
-  return getAmpiParent()->setAttr(comm,keyval,attribute_val);
+  return getAmpiParent()->setCommAttr(comm,keyval,attribute_val);
 }
 
 CDECL
 int AMPI_Comm_get_attr(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
   AMPIAPI("AMPI_Comm_get_attr");
-  return getAmpiParent()->getAttr(comm,keyval,attribute_val,flag);
+  return getAmpiParent()->getCommAttr(comm,keyval,attribute_val,flag);
 }
 
 CDECL
 int AMPI_Comm_delete_attr(MPI_Comm comm, int keyval){
   AMPIAPI("AMPI_Comm_delete_attr");
-  return getAmpiParent()->deleteAttr(comm,keyval);
+  return getAmpiParent()->deleteCommAttr(comm,keyval);
 }
 
 CDECL

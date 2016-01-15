@@ -181,23 +181,20 @@ void MPI_MINLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatyp
  */
 #define MPI_TAG_UB_VALUE  1073741824
 
-/** These are the builtin MPI keyvals.  You can pass them to 
-  MPI_Comm_get_attr for any communicator.
-*/
-#define MPI_TAG_UB -10
-#define MPI_HOST -11
-#define MPI_IO -12
-#define MPI_WTIME_IS_GLOBAL -13
-#define MPI_APPNUM -14
-#define MPI_UNIVERSE_SIZE -15
-
-/** These are AMPI-specific keyvals. They return information about
-the real (non-virtual) processors. */
-#define AMPI_KEYVAL_MYPE -16
-#define AMPI_KEYVAL_NUMPES -17
-#define AMPI_KEYVAL_MYNODE -18
-#define AMPI_KEYVAL_NUMNODES -19
-
+/* These are the builtin MPI keyvals, plus some AMPI specific ones. */
+#define MPI_TAG_UB -1
+#define MPI_HOST -2
+#define MPI_IO -3
+#define MPI_WTIME_IS_GLOBAL -4
+#define MPI_WIN_BASE -5
+#define MPI_WIN_SIZE -6
+#define MPI_WIN_DISP_UNIT -7
+#define MPI_WIN_MODEL -8
+#define MPI_WIN_CREATE_FLAVOR -9
+#define AMPI_KEYVAL_MYPE -10
+#define AMPI_KEYVAL_NUMPES -11
+#define AMPI_KEYVAL_MYNODE -12
+#define AMPI_KEYVAL_NUMNODES -13
 
 /** Communicators give a communication context to a set of processors.
     An intercommunicator can be used for point to point messaging between two groups.
@@ -779,12 +776,6 @@ int AMPI_GPU_Invoke(workRequest *to_call);
 #define MPI_LOCK_SHARED  54   
 #define MPI_LOCK_EXCLUSIVE 55
 #define MPI_WIN_NULL -1
-
-#define MPI_WIN_BASE 0
-#define MPI_WIN_SIZE 1
-#define MPI_WIN_DISP_UNIT 2
-#define MPI_WIN_MODEL 3
-#define MPI_WIN_CREATE_FLAVOR 4
 
 #define MPI_WIN_FLAVOR_CREATE 1
 #define MPI_WIN_FLAVOR_ALLOCATE 2
