@@ -599,6 +599,10 @@ int AMPI_Win_create(void *base, MPI_Aint size, int disp_unit,
   AMPIAPI("AMPI_Win_create");
   ampi *ptr = getAmpiInstance(comm);
   *newwin = ptr->createWinInstance(base, size, disp_unit, info);
+  /* set the builtin attributes on the window */
+  AMPI_Win_set_attr(*newwin, MPI_WIN_BASE, &base);
+  AMPI_Win_set_attr(*newwin, MPI_WIN_SIZE, &size);
+  AMPI_Win_set_attr(*newwin, MPI_WIN_DISP_UNIT, &disp_unit);
   /* need to reduction here: to make sure every processor participates */
   AMPI_Barrier(comm);
   return MPI_SUCCESS;
@@ -620,12 +624,6 @@ int AMPI_Win_free(MPI_Win *win){
   ptr->deleteWinInstance(*win);
   /* Need a barrier here: to ensure that every process participates */
   AMPI_Barrier(winStruct.comm);
-  return MPI_SUCCESS;
-}
-
-CDECL
-int AMPI_Win_delete_attr(MPI_Win win, int key){
-  AMPIAPI("AMPI_Win_delete_attr");
   return MPI_SUCCESS;
 }
 
@@ -864,9 +862,21 @@ int AMPI_Win_get_group(MPI_Win win, MPI_Group *group) {
 }
 
 CDECL
+int AMPI_Win_delete_attr(MPI_Win win, int key){
+  AMPIAPI("AMPI_Win_delete_attr");
+  return getAmpiParent()->deleteWinAttr(win,key);
+}
+
+CDECL
+int AMPI_Win_get_attr(MPI_Win win, int key, void* value, int* flag) {
+  AMPIAPI("AMPI_Win_get_attr");
+  return getAmpiParent()->getWinAttr(win,key,value,flag);
+}
+
+CDECL
 int AMPI_Win_set_attr(MPI_Win win, int key, void* value) {
   AMPIAPI("AMPI_Win_set_attr");
-  return MPI_SUCCESS;
+  return getAmpiParent()->setWinAttr(win,key,value);
 }
 
 CDECL
@@ -879,11 +889,21 @@ int AMPI_Win_set_name(MPI_Win win, char *name) {
 }
 
 CDECL
-int AMPI_Win_get_name(MPI_Win win, char *name, int *length) {
-  AMPIAPI("AMPI_Win_get_name");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
-  ptr->winGetName(winStruct, name, length);
+int AMPI_Win_create_errhandler(MPI_Win_errhandler_function *win_errhandler_fn,
+                              MPI_Errhandler *errhandler) {
+  AMPIAPI("AMPI_Win_create_errhandler");
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Win_get_errhandler(MPI_Win win, MPI_Errhandler *errhandler) {
+  AMPIAPI("AMPI_Win_get_errhandler");
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Win_set_errhandler(MPI_Win win, MPI_Errhandler errhandler) {
+  AMPIAPI("AMPI_Win_set_errhandler");
   return MPI_SUCCESS;
 }
 
@@ -904,3 +924,25 @@ int MPI_win_null_delete_fn (MPI_Win win, int keyval, void *attr, void *extra_sta
   return MPI_SUCCESS;
 }
 
+CDECL
+int AMPI_Win_create_keyval(MPI_Win_copy_attr_function *copy_fn,
+                          MPI_Win_delete_attr_function *delete_fn,
+                          int *keyval, void *extra_state) {
+  AMPIAPI("AMPI_Win_create_keyval");
+  return getAmpiParent()->createKeyval(copy_fn,delete_fn,keyval,extra_state);
+}
+
+CDECL
+int AMPI_Win_free_keyval(int *keyval) {
+  AMPIAPI("AMPI_Win_free_keyval");
+  return getAmpiParent()->freeKeyval(keyval);
+}
+
+CDECL
+int AMPI_Win_get_name(MPI_Win win, char *name, int *length) {
+  AMPIAPI("AMPI_Win_get_name");
+  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct.comm);
+  ptr->winGetName(winStruct, name, length);
+  return MPI_SUCCESS;
+}

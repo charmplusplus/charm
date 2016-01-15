@@ -785,8 +785,23 @@ int AMPI_GPU_Invoke(workRequest *to_call);
 #define MPI_WIN_UNIFIED 0
 #define MPI_WIN_SEPARATE 1
 
+#define MPI_MODE_NOCHECK 1
+#define MPI_MODE_NOPRECEDE 2
+#define MPI_MODE_NOPUT 4
+#define MPI_MODE_NOSTORE 8
+#define MPI_MODE_NOSUCCEED 16
+
 typedef int MPI_Info;
 typedef int MPI_Win;
+
+typedef void (MPI_Win_errhandler_fn)(MPI_Win *, int *, ...);
+typedef void (MPI_Win_errhandler_function)(MPI_Win *, int *, ...);
+
+typedef int  (MPI_Win_copy_attr_function)(MPI_Win oldwin, int keyval,
+                    void *extra_state, void *attribute_val_in,
+                    void *attribute_val_out, int *flag);
+typedef int  (MPI_Win_delete_attr_function)(MPI_Win win, int keyval,
+                    void *attribute_val, void *extra_state);
 
 #define MPI_WIN_NULL_DELETE_FN MPI_win_null_delete_fn
 #define MPI_WIN_NULL_COPY_FN MPI_win_null_copy_fn
@@ -801,8 +816,25 @@ int AMPI_Win_create(void *base, MPI_Aint size, int disp_unit,
 	       MPI_Info info, MPI_Comm comm, MPI_Win *newwin);
 #define MPI_Win_free AMPI_Win_free
 int AMPI_Win_free(MPI_Win *win);
+#define MPI_Win_create_errhandler AMPI_Win_create_errhandler
+int AMPI_Win_create_errhandler(MPI_Win_errhandler_function *win_errhandler_fn,
+                              MPI_Errhandler *errhandler);
+#define MPI_Win_get_errhandler AMPI_Win_get_errhandler
+int AMPI_Win_get_errhandler(MPI_Win win, MPI_Errhandler *errhandler);
+#define MPI_Win_set_errhandler AMPI_Win_set_errhandler
+int AMPI_Win_set_errhandler(MPI_Win win, MPI_Errhandler errhandler);
+#define MPI_Win_create_keyval AMPI_Win_create_keyval
+int AMPI_Win_create_keyval(MPI_Win_copy_attr_function *copy_fn,
+                          MPI_Win_delete_attr_function *delete_fn,
+                          int *keyval, void *extra_state);
+#define MPI_Win_free_keyval AMPI_Win_free_keyval
+int AMPI_Win_free_keyval(int *keyval);
 #define MPI_Win_delete_attr AMPI_Win_delete_attr
 int AMPI_Win_delete_attr(MPI_Win win, int key);
+#define MPI_Win_get_attr AMPI_Win_get_attr
+int AMPI_Win_get_attr(MPI_Win win, int win_keyval, void *attribute_val, int *flag);
+#define MPI_Win_set_attr AMPI_Win_set_attr
+int AMPI_Win_set_attr(MPI_Win win, int win_keyval, void *attribute_val);
 #define MPI_Win_get_group AMPI_Win_get_group
 int AMPI_Win_get_group(MPI_Win win, MPI_Group *group);
 #define MPI_Win_set_name AMPI_Win_set_name
