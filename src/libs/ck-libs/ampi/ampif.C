@@ -1199,44 +1199,44 @@ void mpi_win_set_attr(int *win, int *win_keyval, void *attribute_val, int *ierr)
   *ierr = AMPI_Win_set_attr(*win, *win_keyval, attribute_val);
 }
 
-void mpi_win_get_group(int win, int *group, int *ierr){
-  *ierr = AMPI_Win_get_group(win, group);
+void mpi_win_get_group(int *win, int *group, int *ierr){
+  *ierr = AMPI_Win_get_group(*win, group);
 }
 
-void mpi_win_set_name(int win, char *name, int *ierr){
-  *ierr = AMPI_Win_set_name(win, name);
+void mpi_win_set_name(int *win, char *name, int *ierr){
+  *ierr = AMPI_Win_set_name(*win, name);
 }
 
-void mpi_win_get_name(int win, char *name, int *length, int *ierr){
-  *ierr = AMPI_Win_get_name(win, name, length);
+void mpi_win_get_name(int *win, char *name, int *length, int *ierr){
+  *ierr = AMPI_Win_get_name(*win, name, length);
 }
 
-void mpi_win_fence(int *assertion, int win, int *ierr){
-  *ierr = AMPI_Win_fence(*assertion, win);
+void mpi_win_fence(int *assertion, int *win, int *ierr){
+  *ierr = AMPI_Win_fence(*assertion, *win);
 }
 
-void mpi_win_lock(int *lock_type, int *rank, int *assert, int win, int *ierr){
-  *ierr = AMPI_Win_lock(*lock_type, *rank, *assert, win);
+void mpi_win_lock(int *lock_type, int *rank, int *assert, int *win, int *ierr){
+  *ierr = AMPI_Win_lock(*lock_type, *rank, *assert, *win);
 }
 
-void mpi_win_unlock(int *rank, int win, int *ierr){
-  *ierr = AMPI_Win_unlock(*rank, win);
+void mpi_win_unlock(int *rank, int *win, int *ierr){
+  *ierr = AMPI_Win_unlock(*rank, *win);
 }
 
-void mpi_win_post(int *group, int *assertion, int win, int *ierr){
-  *ierr = AMPI_Win_post(*group, *assertion, win);
+void mpi_win_post(int *group, int *assertion, int *win, int *ierr){
+  *ierr = AMPI_Win_post(*group, *assertion, *win);
 }
 
-void mpi_win_wait(int win, int *ierr){
-  *ierr = AMPI_Win_wait(win);
+void mpi_win_wait(int *win, int *ierr){
+  *ierr = AMPI_Win_wait(*win);
 }
 
-void mpi_win_start(int *group, int *assertion, int win, int *ierr){
-  *ierr = AMPI_Win_start(*group, *assertion, win);
+void mpi_win_start(int *group, int *assertion, int *win, int *ierr){
+  *ierr = AMPI_Win_start(*group, *assertion, *win);
 }
 
-void mpi_win_complete(int win, int *ierr){
-  *ierr = AMPI_Win_complete(win);
+void mpi_win_complete(int *win, int *ierr){
+  *ierr = AMPI_Win_complete(*win);
 }
 
 void mpi_alloc_mem(int *size, int *info, void *baseptr, int *ierr){
@@ -1248,20 +1248,20 @@ void mpi_free_mem(void *base, int *ierr){
 }
 
 void mpi_put(void *orgaddr, int *orgcnt, int *orgtype, int *rank, 
-	    int *targdisp, int *targcnt, int *targtype, int win, int *ierr){
-  *ierr = AMPI_Put(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, win);
+	    int *targdisp, int *targcnt, int *targtype, int *win, int *ierr){
+  *ierr = AMPI_Put(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *win);
 }
 
 void mpi_get(void *orgaddr, int *orgcnt, int *orgtype, int *rank, 
-	    int *targdisp, int *targcnt, int *targtype, int win, int *ierr){
-  *ierr = AMPI_Get(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, win);
+	    int *targdisp, int *targcnt, int *targtype, int *win, int *ierr){
+  *ierr = AMPI_Get(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *win);
 }
 
 void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 		   int *targdisp, int *targcnt, int *targtype, 
-		   int *opc, int win, int *ierr){
+		   int *opc, int *win, int *ierr){
   MPI_Op op = GET_MPI_OP(*opc);
-  *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, op, win);
+  *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, op, *win);
 }
 
 void mpi_info_create(int* info, int* ierr){
