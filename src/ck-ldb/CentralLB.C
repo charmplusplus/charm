@@ -542,7 +542,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   delete m;
 }
 
-void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
+void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
 {
 #if CMK_LBDB_ON
   if (statsMsgsList == NULL) {
@@ -629,7 +629,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 }
 
 /** added by Abhinav for receiving msgs via spanning tree */
-void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg)
+void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &&msg)
 {
 #if CMK_LBDB_ON
 	CmiAssert(CkMyPe() != 0);

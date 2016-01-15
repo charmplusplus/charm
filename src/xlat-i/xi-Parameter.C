@@ -455,7 +455,7 @@ void ParamList::unmarshall(XStr &str, int isFirst)  //Pass-by-value
 {
     	if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
     	else if (!isVoid()) {
-    		str<<param->getName();
+		str << "std::move(" << param->getName() << ")";
 		if (next) {
     			str<<", ";
     			next->unmarshall(str, 0);

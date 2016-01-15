@@ -271,9 +271,9 @@ public:
 	}
        next();
     }
-    void flatRef(flatStruct &s) {s.check(); next();}
-    void pupped(pupStruct &s) {s.check(); next();}
-    void puppedSubclass(pupStruct &s) {
+    void flatRef(flatStruct &&s) {s.check(); next();}
+    void pupped(pupStruct &&s) {s.check(); next();}
+    void puppedSubclass(pupStruct &&s) {
 	s.check(); 
 	checkChild(s.getSubclass());
 	next();
@@ -295,7 +295,7 @@ public:
         checkArr(&arr2[1],4,arr1[0]-1+n);
         next();
     }
-    void msgQ(int n,msgQ_t &q) {
+    void msgQ(int n,msgQ_t &&q) {
     	if (n!=q.length()) CkAbort("Message queue length corrupted during marshalling");
 	for (int i=0;i<n;i++)
 		checkMsg(q.deq(),5,13+2*i);

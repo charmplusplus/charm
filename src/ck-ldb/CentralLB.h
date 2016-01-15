@@ -97,8 +97,8 @@ public:
                             // making projections output look funny
   void SendStats();
   void ReceiveCounts(CkReductionMsg *);
-  void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
-  void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
+  void ReceiveStats(CkMarshalledCLBStatsMessage &&msg);	// Receive stats on PE 0
+  void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &&msg); // Receive stats using a tree structure
   
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 

@@ -232,7 +232,7 @@ void NborBaseLB::Migrated(LDObjHandle h, int waitBarrier)
   }
 }
 
-void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
+void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &&data)
 {
 #if CMK_LBDB_ON
   NLBStatsMsg *m = data.getMessage();

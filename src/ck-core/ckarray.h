@@ -700,7 +700,7 @@ private:
 
 public:
 //Array Creation:
-  CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionProxy);
+  CkArray(CkArrayOptions &&c,CkMarshalledMessage &&initMsg,CkNodeGroupID nodereductionProxy);
   CkArray(CkMigrateMessage *m);
   ~CkArray();
   CkGroupID &getGroupID(void) {return thisgroup;}

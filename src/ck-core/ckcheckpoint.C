@@ -142,13 +142,13 @@ private:
 public:
 	CkCheckpointMgr() { }
 	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
-	void Checkpoint(const char *dirname,CkCallback& cb, bool requestStatus = false);
+	void Checkpoint(const char *dirname,CkCallback&& cb, bool requestStatus = false);
 	void SendRestartCB(CkReductionMsg *m);
 	void pup(PUP::er& p){ p|restartCB; }
 };
 
 // broadcast
-void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb, bool _requestStatus){
+void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback&& cb, bool _requestStatus){
 	chkptStartTimer = CmiWallTimer();
 	requestStatus = _requestStatus;
 	// make dir on all PEs in case it is a local directory

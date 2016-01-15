@@ -303,7 +303,7 @@ public:
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void);
 
-  void ReceiveStats(CkMarshalledCLBStatsMessage &m, int fromlevel); 
+  void ReceiveStats(CkMarshalledCLBStatsMessage &&m, int fromlevel);
   void ResumeClients(CkReductionMsg *msg);
   void ResumeClients(int balancing);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
@@ -318,7 +318,7 @@ public:
   void Migrated(LDObjHandle h, int waitBarrier);
 
   void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
-  void ObjsMigrated(CkVec<LDObjData>& data, int m, LDCommData *cdata, int n, int level);
+  void ObjsMigrated(CkVec<LDObjData>&& data, int m, LDCommData *cdata, int n, int level);
   void VectorDone(int atlevel);
   void MigrationDone(int balancing);  // Call when migration is complete
   void StatsDone(int level);  // Call when LDStats migration is complete

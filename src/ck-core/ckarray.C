@@ -919,8 +919,8 @@ void _ckArrayInit(void)
   ckArrayCreationHdl = CkRegisterHandler(CkCreateArrayAsync);
 }
 
-CkArray::CkArray(CkArrayOptions &opts,
-		 CkMarshalledMessage &initMsg,
+CkArray::CkArray(CkArrayOptions &&opts,
+		 CkMarshalledMessage &&initMsg,
 		 CkNodeGroupID nodereductionID)
   : CkReductionMgr(nodereductionID),
     locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
