@@ -242,7 +242,7 @@ class ampiCommStruct {
 	CkVec<int> dims;
 	CkVec<int> periods;
 	
-	// For communicator attributes (MPI_Attr_get): indexed by keyval
+	// For communicator attributes (MPI_*_get_attr): indexed by keyval
 	CkVec<void *> keyvals;
 
 	// graph virtual topology parameters
@@ -1054,10 +1054,14 @@ class ampiParent : public CBase_ampiParent {
     }
     void intraChildRegister(const ampiCommStruct &s);
 
-    // MPI MPI_Attr_get C binding returns a *pointer* to an integer,
-    //  so there needs to be some storage somewhere to point to.
+    /* MPI_*_get_attr C binding returns a *pointer* to an integer,
+     *  so there needs to be some storage somewhere to point to.
+     * All builtin keyvals are ints, except for MPI_WIN_BASE, which
+     *  is a pointer. */
     int* kv_builtin_storage;
-    int kv_is_builtin(int keyval);
+    void** win_base_storage;
+    bool kv_set_builtin(int keyval, void* attribute_val);
+    bool kv_get_builtin(int keyval);
     CkPupPtrVec<KeyvalNode> kvlist;
 
     int RProxyCnt;
@@ -1252,9 +1256,17 @@ public:
     int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
                      int *keyval, void* extra_state);
     int freeKeyval(int *keyval);
-    int setAttr(MPI_Comm comm, int keyval, void* attribute_val);
-    int getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
-    int deleteAttr(MPI_Comm comm, int keyval);
+    bool getBuiltinKeyval(int keyval, void *attribute_val);
+    int setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val);
+    bool getUserKeyval(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
+
+    int setCommAttr(MPI_Comm comm, int keyval, void *attribute_val);
+    int getCommAttr(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
+    int deleteCommAttr(MPI_Comm comm, int keyval);
+
+    int setWinAttr(MPI_Win win, int keyval, void *attribute_val);
+    int getWinAttr(MPI_Win win, int keyval, void *attribute_val, int *flag);
+    int deleteWinAttr(MPI_Win win, int keyval);
 
     CkDDT myDDTsto;
     CkDDT *myDDT;
