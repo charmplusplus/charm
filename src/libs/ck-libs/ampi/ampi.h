@@ -570,6 +570,10 @@ int AMPI_Comm_test_inter(MPI_Comm comm, int *flag);
 int AMPI_Comm_remote_size(MPI_Comm comm, int *size);
 #define MPI_Comm_remote_group AMPI_Comm_remote_group
 int AMPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group);
+#define MPI_Comm_set_name AMPI_Comm_set_name
+int AMPI_Comm_set_name(MPI_Comm comm, const char *name);
+#define MPI_Comm_get_name AMPI_Comm_get_name
+int AMPI_Comm_get_name(MPI_Comm comm, char *comm_name, int *resultlen);
 #define MPI_Comm_call_errhandler AMPI_Comm_call_errhandler
 int AMPI_Comm_call_errhandler(MPI_Comm comm, int errorcode);
 #define MPI_Comm_create_errhandler AMPI_Comm_create_errhandler

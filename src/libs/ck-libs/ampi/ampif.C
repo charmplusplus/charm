@@ -102,6 +102,8 @@ FDECL {
 #define mpi_comm_test_inter FTN_NAME( MPI_COMM_TEST_INTER , mpi_comm_test_inter )
 #define mpi_comm_remote_size FTN_NAME ( MPI_COMM_REMOTE_SIZE , mpi_comm_remote_size )
 #define mpi_comm_remote_group FTN_NAME ( MPI_COMM_REMOTE_GROUP , mpi_comm_remote_group )
+#define mpi_comm_set_name FTN_NAME ( MPI_COMM_SET_NAME , mpi_comm_set_name )
+#define mpi_comm_get_name FTN_NAME ( MPI_COMM_GET_NAME , mpi_comm_get_name )
 #define mpi_comm_call_errhandler FTN_NAME( MPI_COMM_CALL_ERRHANDLER , mpi_comm_call_errhandler )
 #define mpi_comm_create_errhandler FTN_NAME( MPI_COMM_CREATE_ERRHANDLER , mpi_comm_create_errhandler )
 #define mpi_comm_set_errhandler FTN_NAME( MPI_COMM_SET_ERRHANDLER , mpi_comm_set_errhandler )
@@ -1110,6 +1112,14 @@ void mpi_intercomm_create(int *local_comm, int *local_leader, int *peer_comm, in
 
 void mpi_intercomm_merge(int *intercomm, int *high, int *newintracomm, int *ierr){
   *ierr = AMPI_Intercomm_merge(*intercomm, *high, newintracomm);
+}
+
+void mpi_comm_set_name(int *comm, const char *comm_name, int *ierr){
+  *ierr = AMPI_Comm_set_name(*comm, comm_name);
+}
+
+void mpi_comm_get_name(int *comm, char *comm_name, int *resultlen, int *ierr){
+  *ierr = AMPI_Comm_get_name(*comm, comm_name, resultlen);
 }
 
 void mpi_comm_create_keyval(MPI_Comm_copy_attr_function *copy_fn,

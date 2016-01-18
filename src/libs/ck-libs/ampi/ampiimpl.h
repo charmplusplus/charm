@@ -245,6 +245,10 @@ class ampiCommStruct {
 	// For communicator attributes (MPI_*_get_attr): indexed by keyval
 	CkVec<void *> keyvals;
 
+	// For communicator names
+	char *commName;
+	int commNameLen;
+
 	// graph virtual topology parameters
 	int nvertices;
 	CkVec<int> index;
@@ -278,6 +282,22 @@ public:
 	}
 	const CkVec<int> &getRemoteIndices(void) const {return remoteIndices;}
 	CkVec<void *> &getKeyvals(void) {return keyvals;}
+
+	void setName(const char *src, int len) {
+	  if (commName == NULL) commName = new char[MPI_MAX_OBJECT_NAME];
+	  commNameLen = len;
+	  memcpy(commName, src, len);
+	  commName[len] = '\0';
+	}
+
+	void getName(char *name, int *len) {
+	  if (commName == NULL) {
+	    *len = 0;
+	    return;
+	  }
+	  *len = commNameLen;
+	  memcpy(name, commName, *len+1);
+	}
 
 	//Get the proxy for the entire array
 	CProxy_ampi getProxy(void) const;
@@ -1422,6 +1442,8 @@ friend class SReq;
         else return myComm.getSize();
     }
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
+    inline void setCommName(const char *name, int len){myComm.setName(name, len);}
+    inline void getCommName(char *name, int *len){myComm.getName(name,len);}
     inline CkVec<int> getIndices(void) const { return myComm.getindices(); }
     inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
     inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}

@@ -6029,6 +6029,20 @@ void AMPI_Register_main(MPI_MainFn mainFn,const char *name)
 }
 
 CDECL
+int AMPI_Comm_set_name(MPI_Comm comm, const char *comm_name){
+  AMPIAPI("AMPI_Comm_set_name");
+  getAmpiInstance(comm)->setCommName(comm_name, strlen(comm_name));
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Comm_get_name(MPI_Comm comm, char *comm_name, int *resultlen){
+  AMPIAPI("AMPI_Comm_get_name");
+  getAmpiInstance(comm)->getCommName(comm_name, resultlen);
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Comm_create_keyval(MPI_Comm_copy_attr_function *copy_fn,
         MPI_Comm_delete_attr_function *delete_fn, int *keyval, void* extra_state){
   AMPIAPI("AMPI_Comm_create_keyval");
