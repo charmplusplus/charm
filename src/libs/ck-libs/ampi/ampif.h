@@ -142,10 +142,10 @@
        integer, parameter :: MPI_WIN_DISP_UNIT = -9
        integer, parameter :: MPI_WIN_MODEL = -10
        integer, parameter :: MPI_WIN_CREATE_FLAVOR = -11
-       integer, parameter :: AMPI_KEYVAL_MYPE = -12
-       integer, parameter :: AMPI_KEYVAL_NUMPES = -13
-       integer, parameter :: AMPI_KEYVAL_MYNODE = -14
-       integer, parameter :: AMPI_KEYVAL_NUMNODES = -15
+       integer, parameter :: AMPI_MY_PE = -12
+       integer, parameter :: AMPI_NUM_PES = -13
+       integer, parameter :: AMPI_MY_NODE = -14
+       integer, parameter :: AMPI_NUM_NODES = -15
 
        integer, parameter :: MPI_TAG_UB_VALUE = 1073741824
 

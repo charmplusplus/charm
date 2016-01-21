@@ -477,7 +477,6 @@ class Builtin_kvs{
     int tag_ub,host,io,wtime_is_global,appnum,universe_size;
     void* win_base;
     int win_size,win_disp_unit,win_create_flavor,win_model;
-    int keyval_mype,keyval_numpes,keyval_mynode,keyval_numnodes;
     Builtin_kvs(){
       tag_ub = MPI_TAG_UB_VALUE; 
       host = MPI_PROC_NULL;
@@ -490,10 +489,6 @@ class Builtin_kvs{
       win_disp_unit = 0;
       win_create_flavor = MPI_WIN_FLAVOR_CREATE;
       win_model = MPI_WIN_SEPARATE;
-      keyval_mype = CkMyPe();
-      keyval_numpes = CkNumPes();
-      keyval_mynode = CkMyNode();
-      keyval_numnodes = CkNumNodes();
     }
 };
 
@@ -1216,15 +1211,16 @@ bool ampiParent::kv_set_builtin(int keyval, void* attribute_val) {
     case MPI_WIN_DISP_UNIT:     (CkpvAccess(bikvs).win_disp_unit)     = *((int*)attribute_val); return true;
     case MPI_WIN_CREATE_FLAVOR: (CkpvAccess(bikvs).win_create_flavor) = *((int*)attribute_val); return true;
     case MPI_WIN_MODEL:         (CkpvAccess(bikvs).win_model)         = *((int*)attribute_val); return true;
-    case AMPI_KEYVAL_MYPE:      (CkpvAccess(bikvs).keyval_mype)       = *((int*)attribute_val); return true;
-    case AMPI_KEYVAL_NUMPES:    (CkpvAccess(bikvs).keyval_numpes)     = *((int*)attribute_val); return true;
-    case AMPI_KEYVAL_MYNODE:    (CkpvAccess(bikvs).keyval_mynode)     = *((int*)attribute_val); return true;
-    case AMPI_KEYVAL_NUMNODES:  (CkpvAccess(bikvs).keyval_numnodes)   = *((int*)attribute_val); return true;
+    case AMPI_MY_PE:            /*immutable*/ return false;
+    case AMPI_NUM_PES:          /*immutable*/ return false;
+    case AMPI_MY_NODE:          /*immutable*/ return false;
+    case AMPI_NUM_NODES:        /*immutable*/ return false;
     default: return false;
   };
 }
 
 bool ampiParent::kv_get_builtin(int keyval) {
+  int my_pe, num_pes, my_node, num_nodes;
   switch(keyval) {
     case MPI_TAG_UB:            kv_builtin_storage = &(CkpvAccess(bikvs).tag_ub);            return true;
     case MPI_HOST:              kv_builtin_storage = &(CkpvAccess(bikvs).host);              return true;
@@ -1237,10 +1233,10 @@ bool ampiParent::kv_get_builtin(int keyval) {
     case MPI_WIN_DISP_UNIT:     kv_builtin_storage = &(CkpvAccess(bikvs).win_disp_unit);     return true;
     case MPI_WIN_CREATE_FLAVOR: kv_builtin_storage = &(CkpvAccess(bikvs).win_create_flavor); return true;
     case MPI_WIN_MODEL:         kv_builtin_storage = &(CkpvAccess(bikvs).win_model);         return true;
-    case AMPI_KEYVAL_MYPE:      kv_builtin_storage = &(CkpvAccess(bikvs).keyval_mype);       return true;
-    case AMPI_KEYVAL_NUMPES:    kv_builtin_storage = &(CkpvAccess(bikvs).keyval_numpes);     return true;
-    case AMPI_KEYVAL_MYNODE:    kv_builtin_storage = &(CkpvAccess(bikvs).keyval_mynode);     return true;
-    case AMPI_KEYVAL_NUMNODES:  kv_builtin_storage = &(CkpvAccess(bikvs).keyval_numnodes);   return true;
+    case AMPI_MY_PE:            my_pe     = CkMyPe();     kv_builtin_storage = &my_pe;       return true;
+    case AMPI_NUM_PES:          num_pes   = CkNumPes();   kv_builtin_storage = &num_pes;     return true;
+    case AMPI_MY_NODE:          my_node   = CkMyNode();   kv_builtin_storage = &my_node;     return true;
+    case AMPI_NUM_NODES:        num_nodes = CkNumNodes(); kv_builtin_storage = &num_nodes;   return true;
     default: return false;
   };
 }
