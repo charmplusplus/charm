@@ -4148,6 +4148,7 @@ int AMPI_Cancel(MPI_Request *request){
 
 CDECL
 int AMPI_Test_cancelled(MPI_Status* status, int* flag) {
+  AMPIAPI("AMPI_Test_cancelled");
   /* FIXME: always returns success */
   *flag = 1;
   return MPI_SUCCESS;
