@@ -91,8 +91,8 @@ typedef int MPI_Fint;
 #define MPI_MAX_PROCESSOR_NAME	256
 #define MPI_MAX_ERROR_STRING	256
 
-#define MPI_VERSION     1
-#define MPI_SUBVERSION  3
+#define MPI_VERSION     2
+#define MPI_SUBVERSION  2
 
 #define MPI_THREAD_SINGLE     1
 #define MPI_THREAD_FUNNELED   2
