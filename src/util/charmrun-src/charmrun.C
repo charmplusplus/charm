@@ -5091,7 +5091,7 @@ void start_nodes_local(char **env)
 
       dup2(fd1, 1);
       printf("execve failed to start process \"%s\" with status: %d\n",
-             pparam_argv[0], status);
+             dparamp[0], status);
       kill(getppid(), 9);
       exit(1);
     }
