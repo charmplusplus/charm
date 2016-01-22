@@ -131,7 +131,7 @@ file, because {\tt ssh} does not run the {\tt .login} file.
 
 \end{enumerate}
 
-\item[{\tt ++scalable-start}]   Scalable start, or SMP-aware startup. It is useful for scalable process launch on multi-core systems since it creates only one ssh session per node and spawn all clients from the same ssh session
+\item[{\tt ++scalable-start}]   Scalable start, or SMP-aware startup. It is useful for scalable process launch on multi-core systems since it creates only one ssh session per node and spawns all clients from that ssh session. This is the default startup strategy and the option is retained for backward compatibility.
 
 \item[{\tt ++batch}]            Ssh a set of node programs at a time, avoiding overloading Charmrun pe.  In this strategy, the nodes assigned to a charmrun are divided into sets of fixed size. Charmrun performs ssh to the nodes in the current set, waits for the clients to connect back and then performs ssh on the next set. We call the number of nodes in one ssh set as batch size.
 
@@ -141,11 +141,11 @@ time. For backwards compatibility, this option is also available as {\tt ++maxrs
 \item[{\tt ++nodelist}] File containing list of nodes.
 
 
-\item[{\tt ++ppn}]              number of pes per node
+\item[{\tt ++ppn}]              Number of pes per node
 
-\item[{\tt ++help}]             print help messages
+\item[{\tt ++help}]             Print help messages
 
-\item[{\tt ++runscript}]        script to run node-program with. The specified run script is invoked with the node program and parameter. For example:
+\item[{\tt ++runscript}]        Script to run node-program with. The specified run script is invoked with the node program and parameter. For example:
 
 \begin{alltt}
 ./charmrun +p4 ./pgm 100 2 3 ++runscript ./set\_env\_script
@@ -153,15 +153,15 @@ time. For backwards compatibility, this option is also available as {\tt ++maxrs
 
 In this case, the {\tt set\_env\_script} is invoked on each node before launching {\tt pgm}.
 
-\item[{\tt ++xterm}]            which xterm to use
+\item[{\tt ++xterm}]            Which xterm to use
 
 \item[{\tt ++in-xterm}]         Run each node in an xterm window
 
 \item[{\tt ++display}]          X Display for xterm
 
-\item[{\tt ++debugger}]         which debugger to use
+\item[{\tt ++debugger}]         Which debugger to use
 
-\item[{\tt ++remote-shell}]     which remote shell to use
+\item[{\tt ++remote-shell}]     Which remote shell to use
 
 \item[{\tt ++useip}]            Use IP address provided for charmrun IP
 
@@ -175,35 +175,35 @@ In this case, the {\tt set\_env\_script} is invoked on each node before launchin
 
 \item[{\tt ++server}]           Enable client-server (CCS) mode
 
-\item[{\tt ++nodegroup}]        which group of nodes to use
+\item[{\tt ++nodegroup}]        Which group of nodes to use
 
 \item[{\tt ++verbose}]          Print diagnostic messages
 
-\item[{\tt ++timeout}]          seconds to wait per host connection
+\item[{\tt ++timeout}]          Seconds to wait per host connection
 
-\item[{\tt ++p}]                number of processes to create
+\item[{\tt ++p}]                Number of processes to create
 
 \end{description}
 
-\subsection{Multicore Options}
+\subsection{SMP and Multicore Options}
 
 On multicore platforms, operating systems (by default) are free to move
 processes and threads among cores to balance load. This however sometimes can
 degrade the performance of Charm++ applications due to the extra overhead of
-moving processes and threads, especailly when Charm++ applications has already
-implemented its own dynamic load balancing.
+moving processes and threads, especially for Charm++ applications that already
+implement their own dynamic load balancing.
 
 Charm++ provides the following runtime options to set the processor affinity
 automatically so that processes or threads no longer move. When cpu affinity
 is supported by an operating system (tested at Charm++ configuration time),
-same runtime options can be used for all flavors of Charm++ versions including
-network and MPI versions, smp and non-smp versions.
+the same runtime options can be used for all flavors of Charm++ versions
+including network and MPI versions, smp and non-smp versions.
 
 \begin{description}
 
-\item[{\tt +setcpuaffinity}]             set cpu affinity automatically for processes (when Charm++ is based on non-smp versions) or threads (when smp)
+\item[{\tt +setcpuaffinity}]             Set cpu affinity automatically for processes (when Charm++ is based on non-smp versions) or threads (when smp). This option is the default on platforms that support it.
 
-\item[{\tt +excludecore <core \#>}]       does not set cpu affinity for the given core number. One can use this option multiple times to provide a list of core numbers to avoid.
+\item[{\tt +excludecore <core \#>}]       Do not set cpu affinity for the given core number. One can use this option multiple times to provide a list of core numbers to avoid.
 
 \item[{\tt +pemap L[-U[:S[.R]+O]][,...]}] Bind the execution threads to
   the sequence of cores described by the arguments using the operating
@@ -226,9 +226,6 @@ wanted to use 3 cores from each socket, one could write this as {\tt
 
 \item[{\tt +commap p[,q,...]}] Bind communication threads to the
   listed cores, one per process.
-
-\item[{\tt +nodesize } ] The number of processes within one physical node
-that use pxshm for intra-node communication.
 
 \end{description}
 
