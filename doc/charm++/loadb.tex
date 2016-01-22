@@ -474,7 +474,10 @@ seconds between two consecutive load balancing steps. The default value is
 1 second after the last load balancing step.
 \item {\em +LBSameCpus} \\
      This option simply tells load balancer that all processors are of same speed.
-     The load balancer will then skip the measurement of CPU speed at runtime.
+     The load balancer will then skip the measurement of CPU speed at runtime. This is the default.
+\item {\em +LBTestPESpeed} \\
+     This option tells the load balancer to test the speed of all processors at runtime.
+     The load balancer may use this measurement to perform speed-aware load balancing.
 \item {\em +LBObjOnly} \\
      This tells load balancer to ignore processor background load when making migration decisions.
 \item {\em +LBSyncResume} \\
