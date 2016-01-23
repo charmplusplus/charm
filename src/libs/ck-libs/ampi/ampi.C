@@ -2448,6 +2448,24 @@ int testRequest(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
   return MPI_SUCCESS;
 }
 
+int testRequestNoFree(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
+  MPI_Status tempStatus;
+  if(!sts) sts = &tempStatus;
+
+  if(*reqIdx==MPI_REQUEST_NULL){
+    *flag = 1;
+    stsempty(*sts);
+    return MPI_SUCCESS;
+  }
+  checkRequest(*reqIdx);
+  AmpiRequestList* reqList = getReqs();
+  AmpiRequest& req = *(*reqList)[*reqIdx];
+  *flag = req.itest(sts);
+  if(*flag)
+    req.complete(sts);
+  return MPI_SUCCESS;
+}
+
 CDECL void AMPI_Migrate(void)
 {
   //  AMPIAPI("AMPI_Migrate");
@@ -4046,6 +4064,16 @@ void ATAReq::complete(MPI_Status *sts){
           myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int*)sts))
       CkAbort("AMPI> Error in alltoall request complete");
   }
+}
+
+  CDECL
+int AMPI_Request_get_status(MPI_Request request, int *flag, MPI_Status *sts)
+{
+  AMPIAPI("AMPI_Request_get_status");
+  testRequestNoFree(&request, flag, sts);
+  if(*flag != 1)
+    AMPI_Yield(MPI_COMM_WORLD);
+  return MPI_SUCCESS;
 }
 
   CDECL

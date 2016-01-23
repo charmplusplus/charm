@@ -345,6 +345,8 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
 #define MPI_Testsome AMPI_Testsome
 int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount, 
 		int *array_of_indices, MPI_Status *array_of_statuses);
+#define MPI_Request_get_status AMPI_Request_get_status
+int AMPI_Request_get_status(MPI_Request request, int *flag, MPI_Status *sts);
 #define MPI_Request_free AMPI_Request_free
 int AMPI_Request_free(MPI_Request *request);
 #define MPI_Cancel AMPI_Cancel

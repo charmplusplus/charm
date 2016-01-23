@@ -19,6 +19,7 @@ FDECL {
 #define mpi_testall FTN_NAME( MPI_TESTALL , mpi_testall )
 #define mpi_waitsome FTN_NAME( MPI_WAITSOME , mpi_waitsome )
 #define mpi_testsome FTN_NAME( MPI_TESTSOME , mpi_testsome )
+#define mpi_request_get_status FTN_NAME(MPI_REQUEST_GET_STATUS , mpi_request_get_status)
 #define mpi_request_free FTN_NAME(MPI_REQUEST_FREE , mpi_request_free)
 #define mpi_cancel FTN_NAME(MPI_CANCEL, mpi_cancel)
 #define mpi_test_cancelled FTN_NAME(MPI_TEST_CANCELLED, mpi_test_cancelled)
@@ -477,6 +478,11 @@ void mpi_testany(int *count, int *request, int *index, int *flag, int *status, i
 void mpi_test(int *request, int *flag, int *status, int *ierr)
 {
   *ierr = AMPI_Test((MPI_Request*) request, flag, (MPI_Status*) status);
+}
+
+void mpi_request_get_status(int *request, int *flag, int *status, int *ierr)
+{
+  *ierr = AMPI_Request_get_status(*((MPI_Request*)request), flag, (MPI_Status*) status);
 }
 
 void mpi_request_free(int *request, int *ierr)
