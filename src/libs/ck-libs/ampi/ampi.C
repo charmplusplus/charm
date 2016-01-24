@@ -4315,68 +4315,6 @@ int AMPI_Type_struct(int count, int* arrBlength, int* arrDisp,
 }
 
   CDECL
-int AMPI_Type_create_subarray(int ndims, const int array_of_sizes[],
-    const int array_of_subsizes[], const int array_of_starts[], int order,
-    MPI_Datatype oldtype, MPI_Datatype *newtype)
-{
-  AMPIAPI("AMPI_Type_create_subarray");
-  MPI_Datatype lasttype;
-  MPI_Aint size, displ, extent;
-  int i, step, end;
-
-  AMPI_Type_extent(oldtype, &extent);
-
-  if (ndims < 2) {
-    if (ndims == 0) {
-      *newtype = MPI_TYPE_NULL;
-      return MPI_SUCCESS;
-    }
-    AMPI_Type_contiguous(array_of_subsizes[0], oldtype, &lasttype);
-    size = array_of_sizes[0];
-    displ = array_of_starts[0];
-
-    MPI_Aint displs[1] = {displ*extent};
-    int blength[1] = {1};
-    AMPI_Type_create_hindexed(1, blength, displs, lasttype, newtype);
-    AMPI_Type_free(&lasttype);
-    return MPI_SUCCESS;
-  }
-
-  if (order == MPI_ORDER_C) {
-    i = ndims-1;
-    step = -1;
-    end = -1;
-  } else {
-    i = 0;
-    step = 1;
-    end = ndims;
-  }
-
-  AMPI_Type_vector(array_of_subsizes[i+step], array_of_subsizes[i], array_of_sizes[i],
-                  oldtype, newtype);
-
-  lasttype = *newtype;
-  size = (MPI_Aint)array_of_sizes[i] * (MPI_Aint)array_of_sizes[i+step];
-  displ = (MPI_Aint)array_of_starts[i] + (MPI_Aint)array_of_starts[i+step] *
-          (MPI_Aint)array_of_sizes[i];
-  for (i += (2*step); i != end; i += step) {
-    AMPI_Type_create_hvector(array_of_subsizes[i], 1, size*extent, lasttype, newtype);
-    AMPI_Type_free(&lasttype);
-
-    displ += size * array_of_starts[i];
-    size *= array_of_sizes[i];
-    lasttype = *newtype;
-  }
-
-  MPI_Aint displs[1] = {displ*extent};
-  int blength[1] = {1};
-  AMPI_Type_create_hindexed(1, blength, displs, lasttype, newtype);
-  AMPI_Type_free(&lasttype);
-
-  return MPI_SUCCESS;
-}
-
-  CDECL
 int AMPI_Type_commit(MPI_Datatype *datatype)
 {
   AMPIAPI("AMPI_Type_commit");
