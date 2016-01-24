@@ -405,11 +405,6 @@ int AMPI_Type_create_struct(int count, int* arrBLength, MPI_Aint* arrDisp,
 #define MPI_Type_struct AMPI_Type_struct
 int AMPI_Type_struct(int count, int* arrBLength, MPI_Aint* arrDisp,
                      MPI_Datatype *oldType, MPI_Datatype *newType);
-#define MPI_Type_create_subarray AMPI_Type_create_subarray
-int AMPI_Type_create_subarray(int ndims, const int array_of_sizes[],
-                              const int array_of_subsizes[],
-                              const int array_of_starts[], int order,
-                              MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_commit AMPI_Type_commit
 int AMPI_Type_commit(MPI_Datatype *datatype);
 #define MPI_Type_free AMPI_Type_free
