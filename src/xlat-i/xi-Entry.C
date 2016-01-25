@@ -662,72 +662,87 @@ void Entry::genGroupDefs(XStr& str)
       msgTypeStr<<paramType(0,1);
     str << makeDecl(retStr,1)<<"::"<<name<<"("<<msgTypeStr<<")\n";
     str << "{\n  ckCheck();\n";
-    if (!isLocal()) str <<marshallMsg();
+
+    XStr inlineCall;
+    inlineCall << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
+    inlineCall << "  CkAssert(obj);\n";
+    if (!isNoTrace())
+      inlineCall << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL);\n";
+    if(isAppWork())
+      inlineCall << " _TRACE_BEGIN_APPWORK();\n";
+    inlineCall <<
+      "#if CMK_LBDB_ON\n"
+      "  // if there is a running obj being measured, stop it temporarily\n"
+      "  LDObjHandle objHandle;\n"
+      "  int objstopped = 0;\n"
+      "  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
+      "  if (the_lbdb->RunningObject(&objHandle)) {\n"
+      "    objstopped = 1;\n"
+      "    the_lbdb->ObjectStop(objHandle);\n"
+      "  }\n"
+      "#endif\n";
+    inlineCall <<
+      "#if CMK_CHARMDEBUG\n"
+      "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
+      "#endif\n  ";
+    if (!retType->isVoid()) inlineCall << retType << " retValue = ";
+    inlineCall << "obj->"<<name<<"(";
+    param->unmarshall(inlineCall);
+    inlineCall << ");\n";
+    inlineCall << "#if CMK_CHARMDEBUG\n"
+      "  CpdAfterEp("<<epIdx()<<");\n"
+      "#endif\n";
+    inlineCall << "#if CMK_LBDB_ON\n"
+      "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
+      "#endif\n";
+    if(isAppWork())
+      inlineCall << " _TRACE_END_APPWORK();\n";
+    if (!isNoTrace()) inlineCall << "  _TRACE_END_EXECUTE();\n";
+    if (!retType->isVoid()) inlineCall << "  return retValue;\n";
 
     if (isLocal()) {
-      XStr unmarshallStr; param->unmarshall(unmarshallStr);
-      str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
-      str << "  CkAssert(obj);\n";
-      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL);\n";
-      if(isAppWork())
-	str << " _TRACE_BEGIN_APPWORK();\n";
-      str <<
-	"#if CMK_LBDB_ON\n"
-	"  // if there is a running obj being measured, stop it temporarily\n"
-	"  LDObjHandle objHandle;\n"
-	"  int objstopped = 0;\n"
-	"  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
-	"  if (the_lbdb->RunningObject(&objHandle)) {\n"
-	"    objstopped = 1;\n"
-	"    the_lbdb->ObjectStop(objHandle);\n"
-	"  }\n"
-	"#endif\n";
-      str <<
-	"#if CMK_CHARMDEBUG\n"
-	"  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
-	"#endif\n  ";
-      if (!retType->isVoid()) str << retType << " retValue = ";
-      str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str << "#if CMK_CHARMDEBUG\n"
-	"  CpdAfterEp("<<epIdx()<<");\n"
-	"#endif\n";
-      str << "#if CMK_LBDB_ON\n"
-	"  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
-	"#endif\n";
-      if(isAppWork())
-	str << " _TRACE_END_APPWORK();\n";
-      if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
-      if (!retType->isVoid()) str << "  return retValue;\n";
-    } else if(isSync()) {
-      str << syncReturn() <<
-        "CkRemote"<<node<<"BranchCall("<<paramg<<", ckGetGroupPe()));\n";
-    } else { // Non-sync, non-local entry method
-      if (forElement)
-      {// Send
-        str << "  if (ckIsDelegated()) {\n";
-        str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-        str << "     ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
-        str << "  } else CkSendMsg"<<node<<"Branch"<<"("<<parampg<<opts<<");\n";
+      str << inlineCall;
+    } else {
+      if (isInline() && container->isForElement()) {
+        str << "  " << container->baseName() << " *obj = ckLocalBranch();\n";
+        str << "  if (obj) {\n"
+            << inlineCall
+            << "  }\n";
       }
-      else if (container->isForSection())
-      {// Multicast
-        str << "  if (ckIsDelegated()) {\n";
-        str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-        str << "     ckDelegatedTo()->"<<node<<"GroupSectionSend(ckDelegatedPtr(),"<<params<<", ckGetNumSections(), ckGetSectionIDs());\n";
-        str << "  } else {\n";
-        str << "    void *impl_msg_tmp = (ckGetNumSections()>1) ? CkCopyMsg((void **) &impl_msg) : impl_msg;\n";
-        str << "    for (int i=0; i<ckGetNumSections(); ++i) {\n";
-        str << "       impl_msg_tmp= (i<ckGetNumSections()-1) ? CkCopyMsg((void **) &impl_msg):impl_msg;\n";
-        str << "       CkSendMsg"<<node<<"BranchMulti("<<epIdx()<<", impl_msg_tmp, ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"<<opts<<");\n";
-        str << "    }\n";
-        str << "  }\n";
-      }
-      else
-      {// Broadcast
-        str << "  if (ckIsDelegated()) {\n";
-        str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-        str << "     ckDelegatedTo()->"<<node<<"GroupBroadcast(ckDelegatedPtr(),"<<paramg<<");\n";
-        str << "  } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<opts<<");\n";
+
+      str << marshallMsg();
+
+      if(isSync()) {
+        str << syncReturn() <<
+          "CkRemote"<<node<<"BranchCall("<<paramg<<", ckGetGroupPe()));\n";
+      } else { // Non-sync, non-local entry method
+        if (forElement)
+        {// Send
+          str << "  if (ckIsDelegated()) {\n";
+          str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
+          str << "     ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
+          str << "  } else CkSendMsg"<<node<<"Branch"<<"("<<parampg<<opts<<");\n";
+        }
+        else if (container->isForSection())
+        {// Multicast
+          str << "  if (ckIsDelegated()) {\n";
+          str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
+          str << "     ckDelegatedTo()->"<<node<<"GroupSectionSend(ckDelegatedPtr(),"<<params<<", ckGetNumSections(), ckGetSectionIDs());\n";
+          str << "  } else {\n";
+          str << "    void *impl_msg_tmp = (ckGetNumSections()>1) ? CkCopyMsg((void **) &impl_msg) : impl_msg;\n";
+          str << "    for (int i=0; i<ckGetNumSections(); ++i) {\n";
+          str << "       impl_msg_tmp= (i<ckGetNumSections()-1) ? CkCopyMsg((void **) &impl_msg):impl_msg;\n";
+          str << "       CkSendMsg"<<node<<"BranchMulti("<<epIdx()<<", impl_msg_tmp, ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"<<opts<<");\n";
+          str << "    }\n";
+          str << "  }\n";
+        }
+        else
+        {// Broadcast
+          str << "  if (ckIsDelegated()) {\n";
+          str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
+          str << "     ckDelegatedTo()->"<<node<<"GroupBroadcast(ckDelegatedPtr(),"<<paramg<<");\n";
+          str << "  } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<opts<<");\n";
+        }
       }
     }
     str << "}\n";
