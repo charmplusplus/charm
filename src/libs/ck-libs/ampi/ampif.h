@@ -124,9 +124,6 @@
        integer, parameter :: MPI_CONGRUENT = 2
        integer, parameter :: MPI_UNEQUAL = 3
 
-       integer, parameter :: MPI_ORDER_C = 0
-       integer, parameter :: MPI_ORDER_FORTRAN = 1
-
        integer, parameter :: MPI_OP_NULL = 0
 
        integer, parameter :: MPI_GRAPH = 1
