@@ -999,6 +999,7 @@ extern void init_memcheckpt(char **argv);
 extern "C" void initCharmProjections();
 extern "C" void CmiInitCPUTopology(char **argv);
 extern "C" void CmiInitCPUAffinity(char **argv);
+extern "C" void CmiCheckAffinity();
 extern "C" void CmiInitMemAffinity(char **argv);
 extern "C" void CmiInitPxshm(char **argv);
 
@@ -1469,6 +1470,8 @@ void _initCharm(int unused_argc, char **argv)
 			CmiPrintf("If any of the above arguments were intended for the RTS you may need to recompile Charm++ with different options.\n");
 		}
 
+		CmiCheckAffinity(); // check for thread oversubscription
+
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
 			size_t size = _chareTable[_mainTable[i]->chareIdx]->size;
@@ -1532,6 +1535,10 @@ void _initCharm(int unused_argc, char **argv)
 		CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
 		CpvAccess(_qd)->create(CkNumPes()-1);
 		_initDone();
+	} else {
+		// check for thread oversubscription
+		CmiCheckAffinity();
+		// NOTE: this assumes commthreads will not block from this point on
 	}
 
 	DEBUGF(("[%d,%d%.6lf] inCommThread %d\n",CmiMyPe(),CmiMyRank(),CmiWallTimer(),inCommThread));

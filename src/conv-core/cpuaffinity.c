@@ -58,6 +58,12 @@ static int excludecount = 0;
 
 static int affinity_doneflag = 0;
 
+#ifndef _WIN32
+static int affMsgsRecvd = 1;  // number of affinity messages received at PE0
+static cpu_set_t core_usage;  // used to record union of CPUs used by every PE in physical node
+static int aff_is_set = 0;
+#endif
+
 static int in_exclude(int core)
 {
   int i;
@@ -319,6 +325,40 @@ int CmiPrintCPUAffinity()
 #endif
 }
 
+#ifndef _WIN32
+int get_cpu_affinity(cpu_set_t *cpuset) {
+  CPU_ZERO(cpuset);
+  if (sched_getaffinity(0, sizeof(cpuset), cpuset) < 0) {
+    perror("sched_getaffinity");
+    return -1;
+  }
+  return 0;
+}
+
+#if CMK_SMP
+int get_thread_affinity(cpu_set_t *cpuset) {
+#if CMK_HAS_PTHREAD_SETAFFINITY
+  CPU_ZERO(cpuset);
+  if (errno = pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), cpuset)) {
+    perror("pthread_getaffinity");
+    return -1;
+  }
+  return 0;
+#else
+  return -1;
+#endif
+}
+#endif
+
+int get_affinity(cpu_set_t *cpuset) {
+#if CMK_SMP
+  return get_thread_affinity(cpuset);
+#else
+  return get_cpu_affinity(cpuset);
+#endif
+}
+#endif
+
 int CmiOnCore() {
 #if CMK_OS_IS_LINUX
   /*
@@ -351,6 +391,7 @@ int CmiOnCore() {
 
 static int cpuAffinityHandlerIdx;
 static int cpuAffinityRecvHandlerIdx;
+static int cpuPhyNodeAffinityRecvHandlerIdx;
 
 typedef struct _hostnameMsg {
   char core[CmiMsgHeaderSizeBytes];
@@ -366,6 +407,13 @@ typedef struct _rankMsg {
   int *ranks;                  /* PE => core rank mapping */
   int *nodes;                  /* PE => node number mapping */
 } rankMsg;
+
+typedef struct _affMsg {
+  char core[CmiMsgHeaderSizeBytes];
+#ifndef _WIN32
+  cpu_set_t affinity;
+#endif
+} affMsg;
 
 static rankMsg *rankmsg = NULL;
 static CmmTable hostTable;
@@ -452,6 +500,17 @@ static void cpuAffinityRecvHandler(void *msg)
     CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
     CmiAbort("set cpu affinity abort!\n");
   }
+  CmiFree(m);
+}
+
+/* called on first PE in physical node, receive affinity set from other PEs in phy node */
+static void cpuPhyNodeAffinityRecvHandler(void *msg)
+{
+  affMsg *m = (affMsg *)msg;
+#ifndef _WIN32
+  CPU_OR(&core_usage, &core_usage, &m->affinity);
+  affMsgsRecvd++;
+#endif
   CmiFree(m);
 }
 
@@ -552,6 +611,54 @@ static int search_pemap(char *pecoremap, int pe)
 extern int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
+/**
+ * Check that there are not multiple PEs assigned to the same core.
+ * If a pemap has been computed by this module (or passed by the user) this
+ * function will print a warning if oversubscription detected. If no affinity
+ * has been set explicitly by this module, it will print error and abort if
+ * oversubscription detected.
+ */
+void CmiCheckAffinity()
+{
+#if !defined(_WIN32) && CMK_SMP && CMK_HAS_PTHREAD_SETAFFINITY
+
+  if (!CmiCpuTopologyEnabled()) return;  // only works if cpu topology enabled
+
+  if (CmiMyPe() == 0) {
+    // wait for every PE affinity from my physical node (for now only done on phy node 0)
+
+    cpu_set_t my_aff;
+    if (get_affinity(&my_aff) == -1) CmiAbort("get_affinity failed\n");
+    CPU_OR(&core_usage, &core_usage, &my_aff); // add my affinity (pe0)
+    int N = CmiNumPesOnPhysicalNode(0);
+    while (affMsgsRecvd < N)
+      CmiDeliverSpecificMsg(cpuPhyNodeAffinityRecvHandlerIdx);
+
+    // NOTE this test is simple and may not detect every possible case of
+    // oversubscription
+    if (CPU_COUNT(&core_usage) < N) {
+      // TODO suggest command line arguments?
+      if (!aff_is_set) {
+        CmiAbort("Multiple PEs assigned to same core. Set affinity "
+        "options to correct or lower the number of threads.\n");
+      } else {
+        CmiPrintf("WARNING: Multiple PEs assigned to same core, recommend "
+        "adjusting processor affinity or passing +CmiSleepOnIdle to reduce "
+        "interference.\n");
+      }
+    }
+  } else if ((CmiPhysicalNodeID(CmiMyPe()) == 0) && (CmiMyPe() < CmiNumPes())) {
+    // send my affinity to first PE on physical node (only done on phy node 0 for now)
+    affMsg *m = (affMsg*)CmiAlloc(sizeof(affMsg));
+    CmiSetHandler((char *)m, cpuPhyNodeAffinityRecvHandlerIdx);
+    if (get_affinity(&m->affinity) == -1) { // put my affinity in msg
+      CmiFree(m);
+      CmiAbort("get_affinity failed\n");
+    }
+    CmiSyncSendAndFree(0, sizeof(affMsg), (void *)m);
+  }
+#endif
+}
 
 void CmiInitCPUAffinity(char **argv)
 {
@@ -606,9 +713,13 @@ void CmiInitCPUAffinity(char **argv)
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
   cpuAffinityRecvHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
+  cpuPhyNodeAffinityRecvHandlerIdx =
+       CmiRegisterHandler((CmiHandler)cpuPhyNodeAffinityRecvHandler);
 
   if (CmiMyRank() ==0) {
      affLock = CmiCreateLock();
+     aff_is_set = affinity_flag;
+     CPU_ZERO(&core_usage);
   }
 
 #if CMK_BLUEGENEQ
