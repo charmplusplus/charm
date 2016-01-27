@@ -762,7 +762,7 @@ void mpi_exscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op
   *ierr = AMPI_Exscan(sendbuf,recvbuf,*count,*datatype,op,*comm);
 }
 
-void mpi_op_create(int* function, int* commute, int* opc, int* ierr){
+void mpi_op_create(void* function, int* commute, int* opc, int* ierr){
   MPI_Op op;
   *ierr = MPI_Op_create((MPI_User_function *)function, *commute, (MPI_Op *)&op);
   GET_MPI_OP(CtvAccess(mpi_opc)++) = op;
