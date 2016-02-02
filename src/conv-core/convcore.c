@@ -212,9 +212,14 @@ void infi_freeMultipleSend(void *ptr);
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
-#if CMK_SMP && CMK_BLUEGENEQ && (CMK_USE_L2ATOMICS || SPECIFIC_PCQUEUE)
+#if CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
 void * CmiAlloc_bgq (int     size);
 void   CmiFree_bgq  (void  * buf);
+#endif
+
+#if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
+void * CmiAlloc_ppcq (int     size);
+void   CmiFree_ppcq  (void  * buf);
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -1274,6 +1279,149 @@ double CmiWallTimer()
 {
   unsigned long long currenttime;
   currenttime = GetTimeBase();
+  return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
+}
+
+double CmiCpuTimer()
+{
+  return CmiWallTimer();
+}
+
+double CmiTimer()
+{
+  return CmiWallTimer();
+}
+
+#endif
+
+
+#if CMK_TIMER_USE_PPC64
+
+#include <sys/time.h>
+#include <endian.h>
+
+#define SPRN_TBRU 0x10D
+#define SPRN_TBRL 0x10C
+
+CpvStaticDeclare(uint64_t, inittime);
+CpvStaticDeclare(double, clocktick);
+
+int CmiTimerIsSynchronized()
+{
+  return 1;
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return CpvAccess(inittime);
+}
+
+static inline uint64_t PPC64_TimeBase()
+{
+  unsigned temp;
+  union
+  {
+#if __BYTE_ORDER  == __LITTLE_ENDIAN
+    struct { unsigned lo, hi; } w;
+#else
+#warning "PPC64 Is BigEndian"
+    struct { unsigned hi, lo; } w;
+#endif
+    uint64_t d;
+  } result;
+
+  do {
+    asm volatile ("mfspr %0,%1" : "=r" (temp)        : "i" (SPRN_TBRU));
+    asm volatile ("mfspr %0,%1" : "=r" (result.w.lo) : "i" (SPRN_TBRL));
+    asm volatile ("mfspr %0,%1" : "=r" (result.w.hi) : "i" (SPRN_TBRU));
+  }
+  while (temp != result.w.hi);
+
+  return result.d;
+}
+
+uint64_t __micro_timer () {
+  struct timeval tv;
+  gettimeofday( &tv, 0 );
+  return tv.tv_sec * 1000000ULL + tv.tv_usec;
+}
+
+void CmiTimerInit(char **argv)
+{
+  CpvInitialize(double, clocktick);
+  CpvInitialize(unsigned long, inittime);
+
+  //Initialize PPC64 timers
+
+  uint64_t sampleTime = 100ULL; //sample time in usec
+  uint64_t timeStart = 0ULL, timeStop = 0ULL;
+  uint64_t startBase = 0ULL, endBase = 0ULL;
+  uint64_t overhead = 0ULL, tbf = 0ULL, tbi = 0ULL;
+  uint64_t ticks = 0ULL;
+  int      iter = 0ULL;
+
+  do {
+    tbi = PPC64_TimeBase();
+    tbf = PPC64_TimeBase();
+    tbi = PPC64_TimeBase();
+    tbf = PPC64_TimeBase();
+
+    overhead = tbf - tbi;
+    timeStart = __micro_timer();
+
+    //wait for system time to change
+    while (__micro_timer() == timeStart)
+      timeStart = __micro_timer();
+
+    while (1) {
+      timeStop = __micro_timer();
+      if ((timeStop - timeStart) > 1) {
+        startBase = PPC64_TimeBase();
+        break;
+      }
+    }
+    timeStart = timeStop;
+
+    while (1) {
+      timeStop = __micro_timer();
+      if ((timeStop - timeStart) > sampleTime) {
+        endBase = PPC64_TimeBase();
+        break;
+      }
+    }
+
+    ticks = ((endBase - startBase) + (overhead));
+    iter++;
+    if (iter == 10ULL)
+      CmiAbort("Warning: unable to initialize high resolution timer.\n");
+
+  } while (endBase <= startBase);
+
+  CpvAccess (clocktick) = (1e-6) / ((double)ticks/(double)sampleTime);
+
+  /* try to synchronize calling barrier */
+#if !(__FAULT__)
+  CmiBarrier();
+  CmiBarrier();
+  CmiBarrier();
+#endif
+  CpvAccess(inittime) = PPC64_TimeBase ();
+}
+
+double CmiWallTimer()
+{
+  uint64_t currenttime;
+  currenttime = PPC64_TimeBase();
   return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
 }
 
@@ -2877,8 +3025,10 @@ void *CmiAlloc(int size)
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
   MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
-#elif CMK_SMP && CMK_BLUEGENEQ && (CMK_USE_L2ATOMICS || SPECIFIC_PCQUEUE)
+#elif CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
   res = (char *) CmiAlloc_bgq(size+sizeof(CmiChunkHeader));
+#elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
+  res = (char *) CmiAlloc_ppcq(size+sizeof(CmiChunkHeader));
 #else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
 #endif
@@ -2980,8 +3130,10 @@ void CmiFree(void *blk)
     CmiPoolFree(BLKSTART(parentBlk));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
     MPI_Free_mem(parentBlk);
-#elif CMK_SMP && CMK_BLUEGENEQ && (CMK_USE_L2ATOMICS || SPECIFIC_PCQUEUE)
+#elif CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
     CmiFree_bgq(BLKSTART(parentBlk));
+#elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
+    CmiFree_ppcq(BLKSTART(parentBlk));
 #else
     free_nomigrate(BLKSTART(parentBlk));
 #endif

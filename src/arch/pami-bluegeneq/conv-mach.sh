@@ -46,8 +46,8 @@ CMK_CC="bgxlc_r -qcpluscmt -qhalt=e -qnokeyword=__int128 -qtls=local-exec"
 CMK_CXXPP="$BGQ_BIN/powerpc64-bgq-linux-g++ -E "
 CMK_GCXX="$BGQ_BIN/powerpc64-bgq-linux-g++ $GCC_OPTS "
 CMK_CF77="bgxlf_r "
-CMK_CF90="bgxlf90_r  -qsuffix=f=f90" 
-CMK_CF90_FIXED="bgxlf90_r " 
+CMK_CF90="bgxlf90_r  -qsuffix=f=f90"
+CMK_CF90_FIXED="bgxlf90_r "
 
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
@@ -64,7 +64,7 @@ CMK_QT="aix"
 
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_LIBS='-lckqt'
-CMK_SYSINC="$BGQ_INC" 
+CMK_SYSINC="$BGQ_INC"
 CMK_SYSLIBS="$BGQ_LIB"
 CMK_F90LIBS="-lxlf90 -lxlopt -lxl -lxlfmath"
 CMK_MOD_NAME_ALLCAPS=1
