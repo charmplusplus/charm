@@ -798,7 +798,7 @@ void printLog(void)
 static CmiNodeLock    Cmi_scanf_mutex;
 static double         Cmi_clock;
 static double         Cmi_check_delay = 3.0;
-int inProgress[128];
+int* inProgress;
 
 /** Mechanism to prevent dual locking when comm-layer functions, including prints, 
  * are called recursively. (UN)LOCK_IF_AVAILABLE is used before and after a code piece
@@ -1884,6 +1884,7 @@ void LrtsExit()
 {
   int i;
   machine_initiated_shutdown=1;
+  free(inProgress);
 
   CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
@@ -2015,8 +2016,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
       Cmi_check_delay=1.0e30;
 
-  for(i = 0; i < _Cmi_mynodesize; i++)
-      inProgress[i] = 0;
+  inProgress = calloc(_Cmi_mynodesize, sizeof(int));
 
   *numNodes = Lrts_numNodes;
   *myNodeID = Lrts_myNode;

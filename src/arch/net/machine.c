@@ -896,7 +896,7 @@ void printLog(void)
  * SMP implementation moved to machine-smp.c
  *****************************************************************************/
 
-int inProgress[128];
+int* inProgress;
 
 /** Mechanism to prevent dual locking when comm-layer functions, including prints, 
  * are called recursively. (UN)LOCK_IF_AVAILABLE is used before and after a code piece
@@ -2705,6 +2705,8 @@ void ConverseExit(void)
 {
   MACHSTATE(2,"ConverseExit {");
   machine_initiated_shutdown=1;
+  free(inProgress);
+
   if (CmiMyRank()==0) {
     if(Cmi_print_stats)
       printNetStatistics();
@@ -2889,6 +2891,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
       Cmi_check_delay=1.0e30;
+
+  inProgress = calloc(_Cmi_mynodesize, sizeof(int));
 
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
