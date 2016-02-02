@@ -88,8 +88,9 @@ typedef int MPI_Fint;
 #define MPI_LASTUSEDCODE                53
 /* 0=MPI_SUCCESS<MPI_ERRs(...)<MPI_ERR<=MPI_ERR_LASTCODE<=MPI_LASTCODEUSED */
 
-#define MPI_MAX_PROCESSOR_NAME	256
-#define MPI_MAX_ERROR_STRING	256
+#define MPI_MAX_PROCESSOR_NAME         256
+#define MPI_MAX_ERROR_STRING           256
+#define MPI_MAX_LIBRARY_VERSION_STRING 256
 
 #define MPI_VERSION     2
 #define MPI_SUBVERSION  2
@@ -647,6 +648,8 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm);
 /***environment management***/
 #define MPI_Get_version AMPI_Get_version
 int AMPI_Get_version(int *version, int *subversion);
+#define MPI_Get_library_version AMPI_Get_library_version
+int AMPI_Get_library_version(char *version, int *resultlen);
 #define MPI_Get_processor_name AMPI_Get_processor_name
 int AMPI_Get_processor_name(char *name, int *resultlen);
 #define MPI_Errhandler_create AMPI_Errhandler_create

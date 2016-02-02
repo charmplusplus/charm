@@ -137,6 +137,7 @@ FDECL {
 #define mpi_cart_sub FTN_NAME ( MPI_CART_SUB , mpi_cart_sub )
 
 #define mpi_get_version FTN_NAME ( MPI_GET_VERSION , mpi_get_version )
+#define mpi_get_library_version FTN_NAME ( MPI_GET_LIBRARY_VERSION , mpi_get_library_version )
 #define mpi_get_processor_name FTN_NAME ( MPI_GET_PROCESSOR_NAME , mpi_get_processor_name )
 #define mpi_errhandler_create FTN_NAME( MPI_ERRHANDLER_CREATE , mpi_errhandler_create )
 #define mpi_errhandler_set FTN_NAME( MPI_ERRHANDLER_SET , mpi_errhandler_set )
@@ -887,6 +888,11 @@ void mpi_cart_sub(int* comm, int *remain_dims, int* newcomm, int* ierr)
 void mpi_get_version(int *version, int *subversion, int *ierr)
 {
   *ierr = AMPI_Get_version(version, subversion);
+}
+
+void mpi_get_library_version(char* name, int *resultlen, int *ierr)
+{
+  *ierr = AMPI_Get_library_version(name, resultlen);
 }
 
 void mpi_get_processor_name(char* name, int *resultlen, int *ierr)
