@@ -23,6 +23,9 @@
 #define STARTUP_DEBUG(x)  //ckout<<"ampi[pe "<<CkMyPe()<<"] "<< x <<endl; 
 #define FUNCCALL_DEBUG(x) //x /* empty */
 
+/* For MPI_Get_library_version */
+extern const char * const CmiCommitID;
+
 static CkDDT *getDDT(void) {
   return getAmpiParent()->myDDT;
 }
@@ -5634,6 +5637,16 @@ int AMPI_Get_version(int *version, int *subversion){
   AMPIAPI("AMPI_Get_version");
   *version = MPI_VERSION;
   *subversion = MPI_SUBVERSION;
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Get_library_version(char *version, int *resultlen){
+  AMPIAPI("AMPI_Get_library_version");
+  const char *ampiNameStr = "Adaptive MPI ";
+  strncpy(version, ampiNameStr, MPI_MAX_LIBRARY_VERSION_STRING);
+  strncat(version, CmiCommitID, MPI_MAX_LIBRARY_VERSION_STRING - strlen(version));
+  *resultlen = strlen(version);
   return MPI_SUCCESS;
 }
 
