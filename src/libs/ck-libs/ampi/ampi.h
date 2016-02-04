@@ -173,6 +173,7 @@ void MPI_BXOR     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatyp
 void MPI_MAXLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
 void MPI_MINLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
 void MPI_REPLACE  ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_NO_OP    ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
 
 #define MPI_GRAPH 1
 #define MPI_CART 2
