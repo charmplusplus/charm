@@ -214,6 +214,9 @@ void MPI_REPLACE( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype)
 #undef MPI_OP_IMPL
 }
 
+void MPI_NO_OP( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  /* no-op */
+}
 
 void MPI_LAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   int i;  
@@ -740,6 +743,7 @@ static void init_operations()
   tab[i++] = MPI_MAXLOC;
   tab[i++] = MPI_MINLOC;
   tab[i++] = MPI_REPLACE;
+  tab[i++] = MPI_NO_OP;
 
   CtvInitialize(int, mpi_opc);
   CtvAccess(mpi_opc) = i;

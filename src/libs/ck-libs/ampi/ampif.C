@@ -250,6 +250,7 @@ REDUCERF(MPI_BXOR   , mpi_bxor)
 REDUCERF(MPI_MAXLOC , mpi_maxloc)
 REDUCERF(MPI_MINLOC , mpi_minloc)
 REDUCERF(MPI_REPLACE , mpi_replace)
+REDUCERF(MPI_NO_OP  , mpi_no_op)
 #endif
 
 typedef MPI_Op  MPI_Op_Array[128];
