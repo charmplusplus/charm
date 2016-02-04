@@ -69,17 +69,19 @@ void Refiner::assign(computeInfo *c, int processor)
 
 void Refiner::assign(computeInfo *c, processorInfo *p)
 {
+   double speed_ratio = processors[c->oldProcessor].pe_speed / p->pe_speed;
    c->processor = p->Id;
    p->computeSet->insert((InfoRecord *) c);
-   p->computeLoad += c->load;
+   p->computeLoad += c->load * speed_ratio;
    p->load = p->computeLoad + p->backgroundLoad;
 }
 
 void  Refiner::deAssign(computeInfo *c, processorInfo *p)
 {
+   double speed_ratio = processors[c->oldProcessor].pe_speed / p->pe_speed;
    c->processor = -1;
    p->computeSet->remove(c);
-   p->computeLoad -= c->load;
+   p->computeLoad -= c->load * speed_ratio;
    p->load = p->computeLoad + p->backgroundLoad;
 }
 
@@ -205,9 +207,10 @@ int Refiner::refine()
 	    donor->computeSet->next((Iterator *)&nextCompute);
           continue;
         }
+	double speed_ratio = processors[c->oldProcessor].pe_speed / p->pe_speed;
 	//CkPrintf("c->load: %f p->load:%f overLoad*averageLoad:%f \n",
 	//c->load, p->load, overLoad*averageLoad);
-	if ( c->load + p->load < overLoad*averageLoad) {
+	if ( c->load * speed_ratio + p->load < overLoad*averageLoad) {
 	  // iout << iINFO << "Considering Compute : " 
 	  //      << c->Id << " with load " 
 	  //      << c->load << "\n" << endi;

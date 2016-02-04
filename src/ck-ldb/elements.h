@@ -49,7 +49,7 @@ public:
    double backgroundLoad; // background work pre-assigned to the processor.
    double computeLoad;    //load due to computes. The total load is computed
                           // by adding these two.		     
-   int pe_speed;
+   double pe_speed;
    double utilization;
    bool available;
    Set *computeSet; // caller to ReBalancer should leave this field NULL.
