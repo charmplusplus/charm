@@ -466,19 +466,25 @@ inline groupStruct exclOp(int n,int* ranks,groupStruct vec){
   }
   return retvec;
 }
-inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec){
+inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *flag){
   groupStruct retvec;
   int first,last,stride;
   for(int i=0;i<n;i++){
     first = ranges[i][0];
     last = ranges[i][1];
     stride = ranges[i][2];
-    for(int j=0;j<=(last-first)/stride;j++)
-      retvec.push_back(vec[first+stride*j]);
+    if(stride!=0){
+      for(int j=0;j<=(last-first)/stride;j++)
+        retvec.push_back(vec[first+stride*j]);
+    }else{
+      *flag = MPI_ERR_ARG;
+      return retvec;
+    }
   }
+  *flag = MPI_SUCCESS;
   return retvec;
 }
-inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
+inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *flag){
   groupStruct retvec;
   CkVec<int> ranksvec;
   int first,last,stride;
@@ -488,13 +494,19 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
     first = ranges[i][0];
     last = ranges[i][1];
     stride = ranges[i][2];
-    for(j=0;j<=(last-first)/stride;j++)
-      ranksvec.push_back(first+stride*j);
+    if(stride!=0){
+      for(j=0;j<=(last-first)/stride;j++)
+        ranksvec.push_back(first+stride*j);
+    }else{
+      *flag = MPI_ERR_ARG;
+      return retvec;
+    }
   }
   cnt=ranksvec.size();
   ranks=new int[cnt];
   for(i=0;i<cnt;i++)
     ranks[i]=ranksvec[i];
+  *flag = MPI_SUCCESS;
   return exclOp(cnt,ranks,vec);
 }
 

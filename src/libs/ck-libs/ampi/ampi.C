@@ -5865,22 +5865,34 @@ int AMPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *ne
 {
   AMPIAPI("AMPI_Group_range_incl");
   groupStruct vec, newvec;
+  int ret;
   ampiParent *ptr = getAmpiParent();
   vec = ptr->group2vec(group);
-  newvec = rangeInclOp(n,ranges,vec);
-  *newgroup = ptr->saveGroupStruct(newvec);
-  return MPI_SUCCESS;
+  newvec = rangeInclOp(n,ranges,vec,&ret);
+  if(ret != MPI_SUCCESS){
+    *newgroup = MPI_GROUP_EMPTY;
+    return ret;
+  }else{
+    *newgroup = ptr->saveGroupStruct(newvec);
+    return MPI_SUCCESS;
+  }
 }
   CDECL
 int AMPI_Group_range_excl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
 {
   AMPIAPI("AMPI_Group_range_excl");
   groupStruct vec, newvec;
+  int ret;
   ampiParent *ptr = getAmpiParent();
   vec = ptr->group2vec(group);
-  newvec = rangeExclOp(n,ranges,vec);
-  *newgroup = ptr->saveGroupStruct(newvec);
-  return MPI_SUCCESS;
+  newvec = rangeExclOp(n,ranges,vec,&ret);
+  if(ret != MPI_SUCCESS){
+    *newgroup = MPI_GROUP_EMPTY;
+    return ret;
+  }else{
+    *newgroup = ptr->saveGroupStruct(newvec);
+    return MPI_SUCCESS;
+  }
 }
   CDECL
 int AMPI_Group_free(MPI_Group *group)
