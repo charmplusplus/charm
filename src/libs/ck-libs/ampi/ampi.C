@@ -2698,16 +2698,27 @@ int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
   AMPIAPI("AMPI_Comm_compare");
   if(comm1==comm2) *result=MPI_IDENT;
   else{
-    int equal=1;
+    int congruent=1;
     CkVec<int> ind1, ind2;
     ind1 = getAmpiInstance(comm1)->getIndices();
     ind2 = getAmpiInstance(comm2)->getIndices();
     if(ind1.size()==ind2.size()){
-      for(int i=0;i<ind1.size();i++)
-        if(ind1[i] != ind2[i]) { equal=0; break; }
+      for(int i=0;i<ind1.size();i++){
+        int equal=0;
+        for(int j=0;j<ind2.size();j++){
+          if(ind1[i]==ind2[j]){
+            equal=1;
+            if(i!=j) congruent=0;
+          }
+        }
+        if(!equal){
+          *result=MPI_UNEQUAL;
+          return MPI_SUCCESS;
+        }
+      }
     }
-    if(equal==1) *result=MPI_CONGRUENT;
-    else *result=MPI_UNEQUAL;
+    if(congruent==1) *result=MPI_CONGRUENT;
+    else *result=MPI_SIMILAR;
   }
   return MPI_SUCCESS;
 }
