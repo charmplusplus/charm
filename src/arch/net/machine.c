@@ -2705,7 +2705,10 @@ void ConverseExit(void)
 {
   MACHSTATE(2,"ConverseExit {");
   machine_initiated_shutdown=1;
-  free(inProgress);
+#if CMK_SMP
+  if(CmiMyRank() == CmiMyNodeSize())
+#endif
+    free(inProgress);
 
   if (CmiMyRank()==0) {
     if(Cmi_print_stats)
