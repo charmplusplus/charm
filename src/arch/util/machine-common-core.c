@@ -54,6 +54,10 @@ CsvDeclare(CMIQueue, nodeBcastQ);
 #endif
 #endif
 
+#if CMK_SMP
+CpvDeclare(int, convExitHandlerIdx);
+#endif
+
 #if CMK_WITH_STATS
 static int  MSG_STATISTIC = 0;
 int     msg_histogram[22];
@@ -541,6 +545,13 @@ static int refcount = 0;
 
 #if CMK_USE_OOB
 CpvExtern(int, _urgentSend);
+#endif
+
+#if CMK_SMP
+static void ConvExitHandler(void *msg) {
+  commThdExit++;
+  CmiFree(msg);
+}
 #endif
 
 //declaration so that it can be used
@@ -1244,6 +1255,11 @@ static void ConverseRunPE(int everReturn) {
 
     LrtsPostCommonInit(everReturn);
 
+#if CMK_SMP
+    CpvInitialize(int, convExitHandlerIdx);
+    CpvAccess(convExitHandlerIdx) = CmiRegisterHandler((CmiHandler)ConvExitHandler);
+#endif
+
 #if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
     CmiInitNotifyCommThdScheme();
 #endif
@@ -1370,9 +1386,10 @@ if (MSG_STATISTIC)
 #else
     /* In SMP, the communication thread will exit */
     /* atomic increment */
-    CmiLock(commThdExitLock);
-    commThdExit++;
-    CmiUnlock(commThdExitLock);
+    void *exitMsg = CmiAlloc(sizeof(CmiChunkHeader));
+    CmiSetHandler(exitMsg, CpvAccess(convExitHandlerIdx));
+    CmiBecomeImmediate(exitMsg);
+    CmiPushImmediateMsg(exitMsg);
     CmiNodeAllBarrier();
 #if CMK_SMP_NO_COMMTHD
 #if CMK_USE_XPMEM
