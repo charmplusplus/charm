@@ -1039,6 +1039,15 @@ void arg_init(int argc, const char **argv)
   }
 #endif
 
+  /*If number of pes per node does not divide number of pes*/
+  if(arg_requested_pes && arg_ppn){
+    if(arg_requested_pes % arg_ppn != 0){
+      fprintf(
+          stderr,
+          "Charmrun> Error: ++ppn (number of pes per node) does not divide +p (number of pes) \n");
+      exit(1);
+    }
+  }
 }
 
 /****************************************************************************
