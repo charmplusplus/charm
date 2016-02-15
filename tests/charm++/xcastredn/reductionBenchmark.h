@@ -21,6 +21,7 @@ enum CommMechanism
     bcastConverse,
     rednCkMulticast,
     rednCharm,
+    setRednCharm,
     rednConverse,
     EndOfTest
 };

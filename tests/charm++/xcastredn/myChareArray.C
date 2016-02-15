@@ -58,6 +58,10 @@ void MyChareArray::crunchData(DataMsg *msg)
             contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double);
             break;
 
+        case setRednCharm:
+            contribute(msg->rednSize*sizeof(double), returnData, CkReduction::set);
+            break;
+
         case rednConverse:
         {
             CkReductionMsg *redMsg = CkReductionMsg::buildNew( msg->rednSize*sizeof(double), returnData, CkReduction::sum_double);

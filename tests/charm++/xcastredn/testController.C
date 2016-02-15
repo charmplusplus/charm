@@ -16,6 +16,7 @@ char commName[][commNameLen] = {
                                  "Converse-Bcast",
                                  "CkMulticast-Redn",
                                  "Charm-Redn",
+                                 "Charm-SetRedn",
                                  "Converse-Redn",
                                };
 
@@ -220,6 +221,11 @@ void TestController::sendMulticast(const CommMechanism commType, const int msgSi
             break;
 
         case rednCharm:
+            timeStart = CmiWallTimer();
+            arraySections[0].crunchData(msg);
+            break;
+
+        case setRednCharm:
             timeStart = CmiWallTimer();
             arraySections[0].crunchData(msg);
             break;
