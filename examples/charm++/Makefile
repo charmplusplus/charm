@@ -5,7 +5,7 @@ completion \
 fib \
 hello \
 integrate \
-integrate2 \
+integratePUPable \
 integrateArray \
 jacobi2d-1d-decomposition \
 jacobi2d-2d-decomposition \

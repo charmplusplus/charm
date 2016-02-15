@@ -35,7 +35,7 @@ main::main(CkArgMsg * m)
   int slicesPerChare=slices/numChares;
   slices=slicesPerChare*numChares; //Make slices an even multiple of numChares
 
-  myFunction *f=new myFunction(2.0);
+  myFunction *f=new myFunction(1.0);
   double xLeft=0.0; //Left end of integration domain
   double xRight=1.0; //Right end of integration domain
   double dx=(xRight-xLeft)/slices;
