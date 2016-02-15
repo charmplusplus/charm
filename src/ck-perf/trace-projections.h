@@ -494,7 +494,6 @@ public:
     void creation(char *m);
     void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);
     void creationDone(int num=1);
-    void beginExecute(envelope *e);
     void beginExecute(envelope *e, void *obj=NULL);
     void beginExecute(char *msg);
     void beginExecute(CmiObjId  *tid);

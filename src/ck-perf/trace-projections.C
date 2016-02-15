@@ -1432,7 +1432,7 @@ void TraceProjections::beginExecute(CmiObjId *tid)
   inEntry = 1;
 }
 
-void TraceProjections::beginExecute(envelope *e)
+void TraceProjections::beginExecute(envelope *e, void *obj)
 {
 #if CMK_TRACE_ENABLED
   if(e==0) {
@@ -1464,15 +1464,6 @@ void TraceProjections::beginExecute(char *msg){
     int ep = e->getEpIdx();
     if(_entryTable[ep]->traceEnabled)
 		beginExecute(e);
-#endif
-}
-
-void TraceProjections::beginExecute(envelope *e, void *obj){
-#if CMK_SMP_TRACE_COMMTHREAD
-    //This function is called from comm thread in SMP mode
-    int ep = e->getEpIdx();
-    if(_entryTable[ep]->traceEnabled)
-        beginExecute(e);
 #endif
 }
 

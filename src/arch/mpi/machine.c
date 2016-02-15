@@ -112,7 +112,6 @@ CpvStaticDeclare(double, projTraceStart);
 #else
 #define START_TRACE_SENDCOMM(msg)
 #define END_TRACE_SENDCOMM(msg)
-#define START_TRACE_RECVCOMM(msg)
 #define CONDITIONAL_TRACE_USER_EVENT(x)
 #endif
 
@@ -623,7 +622,6 @@ static int PumpMsgs(void) {
         if (recvCnt >= dynamicRecvCap) break;
 #endif
 
-        START_TRACE_RECVCOMM(NULL);
 #if USE_MPI_CTRLMSG_SCHEME
 	doSyncRecv = 0;
 	nbytes = recvViaCtrlMsg();
