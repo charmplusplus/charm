@@ -1840,10 +1840,6 @@ void LrtsExit()
 {
   int i;
   machine_initiated_shutdown=1;
-#if CMK_SMP
-  if(CmiMyRank() == CmiMyNodeSize())
-#endif
-    free(inProgress);
 
   CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
