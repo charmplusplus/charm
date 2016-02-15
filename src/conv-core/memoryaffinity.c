@@ -25,6 +25,8 @@ CpvExtern(int, myCPUAffToCore);
 #include <string.h>
 #include <sched.h>
 #include <math.h>
+#include <dirent.h>
+#include <sys/types.h>
 typedef unsigned long mem_aff_mask;
 static void MEM_MASK_ZERO(mem_aff_mask *mem_mask) {
     memset(mem_mask, 0, sizeof(mem_aff_mask));
@@ -56,13 +58,7 @@ int print_mem_affinity() {
     return 0;
 }
 static int CmiNumNUMANodes(void) {
-    FILE *fp_nodes;
-    int max_node=-1;
-    char command[]="ls -1d /sys/devices/system/node/node*|wc|awk '{print $1}'";
-    fp_nodes = popen(command,"r");
-    fscanf(fp_nodes,"%d",&max_node);
-    pclose(fp_nodes);
-    return max_node;
+    return numa_max_node()+1;
 }
 static int getNUMANidByRank(int coreid) {
     int i;
@@ -73,22 +69,24 @@ static int getNUMANidByRank(int coreid) {
     /*Assume each NUMA node has the same number of cores*/
     /*int nCoresPerNode = totalCores/totalNUMANodes;*/
     /*CmiAssert(totalCores%totalNUMANodes==0);*/
-    char command[256];
+    char nodeStr[256];
+    DIR* nodeDir;
+    struct dirent* nodeDirEnt;
+    int cpuid = -1;
     for (i=0; i<totalNUMANodes; i++) {
-        FILE *cmd;
-        int cpuid;
-        sprintf(command, "ls -1d /sys/devices/system/node/node%d/cpu[0-9]* | cut -d'u' -f2", i);
-        cmd = popen(command, "r");
-        while (1) {
-            int ret=fscanf(cmd, "%d\n", &cpuid);
-            if (ret==EOF) break;
-            if (cpuid == coreid) {
-                pclose(cmd);
-                /*free(coreids);*/
-                return i;
+        snprintf(nodeStr, 256, "/sys/devices/system/node/node%d", i);
+        nodeDir = opendir(nodeStr);
+        if (nodeDir) {
+            while ((nodeDirEnt = readdir(nodeDir))) {
+                if (sscanf(nodeDirEnt->d_name, "cpu%d", &cpuid) == 1) {
+                    if(cpuid == coreid) {
+                        closedir(nodeDir);
+	                return i;
+                    }
+                }
             }
+            closedir(nodeDir);
         }
-        pclose(cmd);
     }
     /*free(coreids);*/
     CmiPrintf("%d: the corresponding NUMA node for cpu id %d is not found!\n", CmiMyPe(), coreid);
