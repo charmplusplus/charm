@@ -405,6 +405,7 @@ typedef struct s_ppdef {
   const char *lname; /*Argument name on command line*/
   const char *doc;
   char type; /*One of i, r, s, f.*/
+  bool initFlag; // if 0 means, user input paramater is inserted. 1 means, it holds a default value
   struct s_ppdef *next;
 } * ppdef;
 
@@ -434,6 +435,7 @@ static ppdef pparam_cell(const char *lname)
   def->type = 's';
   def->doc = "(undocumented)";
   def->next = ppdefs;
+  def->initFlag = true;
   ppdefs = def;
   return def;
 }
@@ -468,6 +470,7 @@ void pparam_real(double *where, double defValue, const char *arg,
   def->lname = arg;
   def->doc = doc;
 }
+
 void pparam_str(const char **where, const char *defValue, const char *arg,
                 const char *doc)
 {
@@ -482,6 +485,13 @@ void pparam_str(const char **where, const char *defValue, const char *arg,
 static int pparam_setdef(ppdef def, const char *value)
 {
   char *p;
+  if (def->initFlag)
+    def->initFlag = false;
+  else {
+    fprintf(stderr, "Option \'%s\' is used more than once. Please remove duplicate arguments for this option\n", def->lname);
+    exit(1);
+  }
+
   switch (def->type) {
   case 'i':
     *def->where.i = strtol(value, &p, 10);
@@ -498,7 +508,6 @@ static int pparam_setdef(ppdef def, const char *value)
     *def->where.s = (char *) calloc(strlen(value) + 1, sizeof(char));
     char *parsed_value = (char *) *def->where.s;
     for (int i = 0, j = 0; i < strlen(value); i++) {
-      // fprintf(stderr, "i = %d, j = %d, value[i] = \n", i, j);
       if (i + 1 < strlen(value)) {
         if (value[i] == '\\' && value[i + 1] == 'n') {
           parsed_value[j++] = '\n';
