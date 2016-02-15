@@ -51,6 +51,8 @@
 #define OFI_OP_LONG  0x2
 #define OFI_OP_ACK   0x3
 
+#define USNIC 1
+
 struct OFIRequest;
 typedef  void (*callback_fn) (struct fi_cq_tagged_entry *, struct OFIRequest *);
 
@@ -63,6 +65,8 @@ static void poll_netlrts();
 #  define unlikely(x_) (x_)
 #  define likely(x_)   (x_)
 #endif
+
+static void poll_netlrts();
 
 #define OFI_RETRY(func)                    \
     do{                                    \
@@ -247,6 +251,9 @@ void CmiMachineInit(char **argv)
     hints->caps                         = FI_TAGGED;
     hints->caps                        |= FI_RMA;
     hints->caps                        |= FI_REMOTE_READ;
+#if USNIC
+    hints->fabric_attr->prov_name=strdup("usnic");
+#endif
 
     /**
      * FI_VERSION provides binary backward and forward compatibility support
@@ -256,8 +263,9 @@ void CmiMachineInit(char **argv)
     fi_version = FI_VERSION(1, 0);
 
     ret = fi_getinfo(fi_version, NULL, NULL, 0ULL, hints, &providers);
+
     if (ret < 0) {
-        MACHSTATE1(3, "fi_getinfo error: %d", ret);
+        MACHSTATE1(3, "fi_getinfo error: %s", fi_strerror(ret));
         CmiAbort("fi_getinfo error");
     }
 
