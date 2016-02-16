@@ -287,7 +287,7 @@ public:
     inline void endFunc(char *name){ ALLDO(endFunc(name)); }
     inline void endFunc(int idx){ ALLDO(endFunc(idx)); }
 
-    /* Phase Demarkation */
+    /* Phase Demarcation */
     inline void endPhase() { ALLDO(endPhase()); }
 
     /* Memory tracing */

@@ -85,7 +85,7 @@ public:
     CkPrintf("Array Dimensions: %d %d\n", arrayDimX, arrayDimY);
     CkPrintf("Block Dimensions: %d %d\n", blockDimX, blockDimY);
     CkPrintf("max iterations %d\n", maxiterations);
-    CkPrintf("Threshhold %.10g\n", THRESHOLD);
+    CkPrintf("Threshold %.10g\n", THRESHOLD);
 
     array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y);
     // start computation
