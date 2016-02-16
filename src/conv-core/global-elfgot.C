@@ -423,7 +423,7 @@ static CtgGlobalStruct *_ctgListGlobals=NULL;
 /** Initialize the globals support (called on each processor). */
 void CtgInit(void) {
 	CpvInitialize(int, CmiPICMethod);
-	CpvAccess(CmiPICMethod) = 1;
+	CpvAccess(CmiPICMethod) = CMI_PIC_ELFGOT;
 	CpvInitialize(CtgGlobals,_curCtg);
 	
 	if (!_ctgList) 

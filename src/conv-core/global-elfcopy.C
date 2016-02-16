@@ -273,7 +273,7 @@ extern "C" int init_symtab(char *exename);
 /** Initialize the globals support (called on each processor). */
 void CtgInit(void) {
   CpvInitialize(int, CmiPICMethod);
-  CpvAccess(CmiPICMethod) = 2;
+  CpvAccess(CmiPICMethod) = CMI_PIC_ELFCOPY;
   CpvInitialize(CtgGlobals,_curCtg);
 
   if (!_ctgList) 

@@ -11,7 +11,7 @@ CpvDeclare(int, CmiPICMethod);
 
 void CtgInit(void) {
 	CpvInitialize(int, CmiPICMethod);
-        CpvAccess(CmiPICMethod) = 0;
+        CpvAccess(CmiPICMethod) = CMI_PIC_NOP;
 }
 void CtgInstall(CtgGlobals g) {}
 CtgGlobals CtgCreate(CthThread tid) {return 0;}

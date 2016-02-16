@@ -1411,7 +1411,11 @@ typedef struct CtgGlobalStruct *CtgGlobals;
 
 /** Initialize the globals support (called on each processor). */
 void CtgInit(void);
-/** PIC method used: 0 = nop, 1 = elfgot, 2 = elfcopy */
+
+/** PIC method used. **/
+#define CMI_PIC_NOP     0
+#define CMI_PIC_ELFGOT  1
+#define CMI_PIC_ELFCOPY 2
 CpvExtern(int, CmiPICMethod);
 
 /** Copy the current globals into this new set */

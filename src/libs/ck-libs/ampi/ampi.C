@@ -1906,7 +1906,7 @@ ampi::inorder(AmpiMsg* msg)
     int tags[3], sts[3];
   tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
   IReq *ireq = NULL;
-  if (CpvAccess(CmiPICMethod) != 2) {
+  if (CpvAccess(CmiPICMethod) != CMI_PIC_ELFCOPY) {
 #if 0
     //IReq *ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
     ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
@@ -3647,8 +3647,8 @@ int PersReq::wait(MPI_Status *sts){
 }
 
 int IReq::wait(MPI_Status *sts){
-  if(CpvAccess(CmiPICMethod) == 2) {
-    AMPI_DEBUG("In weird clause of IReq::wait\n");
+  if(CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY) {
+    AMPI_DEBUG("In IReq::wait calling recv with CmiPICMethod == CMI_PIC_ELFCOPY\n");
     if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
       CkAbort("AMPI> Error in non-blocking request wait");
 
@@ -4530,7 +4530,7 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
   // message already arraved?
   ampi *ptr = getAmpiInstance(comm);
   AmpiMsg *msg = NULL;
-  if (CpvAccess(CmiPICMethod) != 2)       // not copyglobals 
+  if (CpvAccess(CmiPICMethod) != CMI_PIC_ELFCOPY)
   {
     msg = ptr->getMessage(tag, src, comm, &newreq->tag);
   }
@@ -5417,7 +5417,7 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
   int *sdispls = sdispls_;
   int *recvcounts = recvcounts_;
   int *rdispls = rdispls_;
-  if (CpvAccess(CmiPICMethod) == 2)       // copyglobals make separate copy
+  if (CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY)
   {
     // FIXME: we don't need to make copy if it is not global variable
     sendcounts = new int[size];
@@ -5450,7 +5450,7 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
 #endif
-  if (CpvAccess(CmiPICMethod) == 2)       // copyglobals
+  if (CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY)
   {
     delete [] sendcounts;
     delete [] sdispls;
