@@ -550,6 +550,13 @@ extern int _mpi_nworlds;
 #define MPI_EXSCAN_TAG  MPI_TAG_UB_VALUE+16
 #define MPI_ATA_TAG     MPI_TAG_UB_VALUE+17
 
+#define MPI_PERS_REQ 1
+#define MPI_I_REQ    2
+#define MPI_ATA_REQ  3
+#define MPI_IATA_REQ 4
+#define MPI_S_REQ    5
+#define MPI_GPU_REQ  6
+
 #define MyAlign8(x) (((x)+7)&(~7))
 
 /**
@@ -600,8 +607,8 @@ public:
 	virtual void free(void){ isvalid=false; }
 	inline bool isValid(void){ return isvalid; }
 
-	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq,
-	/// 4-SReq, 5-GPUReq, 6-IATAReq
+	/// Returns the type of request:
+	///  MPI_PERS_REQ, MPI_I_REQ, MPI_ATA_REQ, MPI_IATA_REQ, MPI_S_REQ, MPI_GPU_REQ
 	virtual int getType(void) =0;
 
 	virtual void pup(PUP::er &p) {
@@ -641,7 +648,7 @@ public:
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
-	inline int getType(void){ return 1; }
+	inline int getType(void){ return MPI_PERS_REQ; }
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
 		p(sndrcv);
@@ -665,7 +672,7 @@ public:
 	bool itest(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
-	inline int getType(void){ return 2; }
+	inline int getType(void){ return MPI_I_REQ; }
 	void receive(ampi *ptr, AmpiMsg *msg); 
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
@@ -720,7 +727,7 @@ public:
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
 	inline int getCount(void){ return elmcount; }
-	inline int getType(void){ return 3; }
+	inline int getType(void){ return MPI_ATA_REQ; }
 // 	inline void free(void){ isvalid=false; delete [] myreqs; }
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
@@ -753,7 +760,7 @@ public:
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
-	inline int getType(void){ return 4; }
+	inline int getType(void){ return MPI_S_REQ; }
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
 		p|statusIreq;
@@ -767,7 +774,7 @@ class GPUReq : public AmpiRequest {
 
 public:
     GPUReq();
-    int getType() { return 5; }
+    int getType() { return MPI_GPU_REQ; }
     bool test(MPI_Status *sts);
     bool itest(MPI_Status *sts);
     void complete(MPI_Status *sts);
@@ -796,7 +803,7 @@ public:
 	int wait(MPI_Status *sts);
 	void receive(ampi *ptr, AmpiMsg *msg) {}
 	inline int getCount(void){ return elmcount; }
-	inline int getType(void){ return 6; }
+	inline int getType(void){ return MPI_IATA_REQ; }
 // 	inline void free(void){ isvalid=false; delete [] myreqs; }
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);

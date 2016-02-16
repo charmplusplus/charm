@@ -2368,16 +2368,16 @@ void AmpiRequestList::pup(PUP::er &p) {
     if(nonnull != 0){
       if(p.isUnpacking()){
         switch(nonnull){
-          case 1:
+          case MPI_PERS_REQ:
             block[i] = new PersReq;
             break;
-          case 2:	
+          case MPI_I_REQ:
             block[i] = new IReq;
             break;
-          case 3:	
+          case MPI_ATA_REQ:
             block[i] = new ATAReq;
             break;
-          case 6:
+          case MPI_IATA_REQ:
             block[i] = new IATAReq;
             break;
         }
@@ -2448,7 +2448,7 @@ int testRequest(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
   AmpiRequest& req = *(*reqList)[*reqIdx];
   if(1 == (*flag = req.itest(sts))){
     req.complete(sts);
-    if(req.getType() != 1) { // only free non-blocking request
+    if(req.getType() != MPI_PERS_REQ) { // only free non-blocking request
       reqList->free(*reqIdx);
       *reqIdx = MPI_REQUEST_NULL;
     }
@@ -3817,7 +3817,7 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
   TRACE_BG_AMPI_WAIT(reqs);   // setup forward and backward dependence
 #endif
 
-  if((*reqs)[*request]->getType() != 1) { // only free non-blocking request
+  if((*reqs)[*request]->getType() != MPI_PERS_REQ) { // only free non-blocking request
     reqs->free(*request);
     *request = MPI_REQUEST_NULL;
   }
@@ -3918,7 +3918,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   for(i=0;i<count;i++){ 
     if(request[i] == MPI_REQUEST_NULL)
       continue;
-    if((*reqs)[request[i]]->getType() != 1) { // only free non-blocking request
+    if((*reqs)[request[i]]->getType() != MPI_PERS_REQ) { // only free non-blocking request
       reqs->free(request[i]);
       request[i] = MPI_REQUEST_NULL;
     }
