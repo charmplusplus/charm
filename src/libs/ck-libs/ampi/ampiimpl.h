@@ -601,7 +601,7 @@ public:
 	inline bool isValid(void){ return isvalid; }
 
 	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq,
-	/// 4-SReq, 5-GPUReq
+	/// 4-SReq, 5-GPUReq, 6-IATAReq
 	virtual int getType(void) =0;
 
 	virtual void pup(PUP::er &p) {
@@ -774,6 +774,46 @@ public:
     int wait(MPI_Status *sts);
     void receive(ampi *ptr, AmpiMsg *msg);
     void setComplete();
+};
+
+class IATAReq : public AmpiRequest {
+	IReq *myreqs;
+	int elmcount;
+	int idx;
+public:
+	IATAReq(int c_):elmcount(c_),idx(0){ myreqs = new IReq[c_]; isvalid=true; }
+	IATAReq(){};
+	~IATAReq(void) { if(myreqs) delete [] myreqs; }
+	int addReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_){
+		myreqs[idx].buf=buf_;	myreqs[idx].count=count_;
+		myreqs[idx].type=type_;	myreqs[idx].src=src_;
+		myreqs[idx].tag=tag_;	myreqs[idx].comm=comm_;
+		return (++idx);
+	}
+	bool test(MPI_Status *sts);
+	bool itest(MPI_Status *sts);
+	void complete(MPI_Status *sts);
+	int wait(MPI_Status *sts);
+	void receive(ampi *ptr, AmpiMsg *msg) {}
+	inline int getCount(void){ return elmcount; }
+	inline int getType(void){ return 6; }
+// 	inline void free(void){ isvalid=false; delete [] myreqs; }
+	virtual void pup(PUP::er &p){
+		AmpiRequest::pup(p);
+		p(elmcount);
+		p(idx);
+		if(p.isUnpacking()){
+			myreqs = new IReq[elmcount];
+		}
+		for(int i=0;i<idx;i++){
+			myreqs[i].pup(p);
+		}
+		if(p.isDeleting()){
+			delete [] myreqs;
+		}
+	}
+	//added due to BIGSIM_OOC DEBUGGING
+	virtual void print();
 };
 
 /// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h

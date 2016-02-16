@@ -2334,6 +2334,11 @@ void ATAReq::print(){ //not complete for myreqs
   CmiPrintf("In ATAReq: elmcount=%d, idx=%d\n", elmcount, idx);
 } 
 
+void IATAReq::print(){ //not complete for myreqs
+  AmpiRequest::print();
+  CmiPrintf("In IATAReq: elmcount=%d, idx=%d\n", elmcount, idx);
+}
+
 void SReq::print(){
   AmpiRequest::print();
   CmiPrintf("In SReq: this=%p, status=%d\n", this, statusIreq);
@@ -2371,6 +2376,9 @@ void AmpiRequestList::pup(PUP::er &p) {
             break;
           case 3:	
             block[i] = new ATAReq;
+            break;
+          case 6:
+            block[i] = new IATAReq;
             break;
         }
       }	
@@ -3716,6 +3724,27 @@ int ATAReq::wait(MPI_Status *sts){
   return 0;
 }
 
+int IATAReq::wait(MPI_Status *sts){
+  int i;
+  for(i=0;i<elmcount;i++){
+    if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
+                                                 myreqs[i].count, myreqs[i].type,
+                                                 myreqs[i].comm, (int *)sts))
+      CkAbort("AMPI> Error in ialltoall request wait");
+#if CMK_BIGSIM_CHARM
+    _TRACE_BG_TLINE_END(&myreqs[i].event);
+#endif
+  }
+#if CMK_BIGSIM_CHARM
+  //TRACE_BG_AMPI_NEWSTART(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "IATAReq", NULL, 0);
+  TRACE_BG_AMPI_BREAK(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "IATAReq_wait", NULL, 0, 1);
+  for (i=0; i<elmcount; i++)
+    _TRACE_BG_ADD_BACKWARD_DEP(myreqs[i].event);
+  _TRACE_BG_TLINE_END(&event);
+#endif
+  return 0;
+}
+
 int SReq::wait(MPI_Status *sts){
   ampi *ptr = getAmpiInstance(comm);
   while (statusIreq == false) {
@@ -4080,6 +4109,34 @@ void ATAReq::complete(MPI_Status *sts){
     if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
           myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int*)sts))
       CkAbort("AMPI> Error in alltoall request complete");
+  }
+}
+
+bool IATAReq::test(MPI_Status *sts){
+  for(int i=0;i<elmcount;i++){
+    if(false==myreqs[i].itest(sts)){
+      getAmpiInstance(comm)->yield();
+      return false;
+    }
+  }
+  return true;
+}
+
+bool IATAReq::itest(MPI_Status *sts){
+  bool flag=true;
+  for(int i=0;i<elmcount;i++){
+    if(false==myreqs[i].itest(sts))
+      return false;
+  }
+  return true;
+}
+
+void IATAReq::complete(MPI_Status *sts){
+  for(int i=0;i<elmcount;i++){
+    if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
+                                                 myreqs[i].count, myreqs[i].type,
+                                                 myreqs[i].comm, (int*)sts))
+      CkAbort("AMPI> Error in ialltoall request complete");
   }
 }
 
@@ -4644,16 +4701,15 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
   int itemsize = dttype->getSize(recvcount) ;
 
-  // copy+paste from MPI_Irecv
+  // use an IATAReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  ATAReq *newreq = new ATAReq(size);
+  IATAReq *newreq = new IATAReq(size);
   for(i=0;i<size;i++){
     if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
-      CkAbort("MPI_Iallgather: Error adding requests into ATAReq!");
+      CkAbort("MPI_Iallgather: Error adding requests into IATAReq!");
   }
   *request = reqs->insert(newreq);
   AMPI_DEBUG("MPI_Iallgather: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
-
   return MPI_SUCCESS;
 }
 
@@ -5311,24 +5367,23 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Ialltoall not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
-  ampi *ptr = getAmpiInstance(comm);
-  AmpiRequestList* reqs = getReqs();
-  int size = ptr->getSize(comm);
-  int reqsSize = reqs->size();
-  CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-  int itemsize = dttype->getSize(sendcount) ;
-  int i;
 
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize(comm);
+  CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype);
+  int itemsize = dttype->getSize(sendcount);
+  int i;
   for(i=0;i<size;i++) {
-    ptr->send(MPI_ATA_TAG+reqsSize, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
+    ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
               sendtype, i, comm);
   }
 
-  // copy+paste from MPI_Irecv
-  ATAReq *newreq = new ATAReq(size);
+  // use an IATAReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  IATAReq *newreq = new IATAReq(size);
   for(i=0;i<size;i++){
-    if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_ATA_TAG+reqsSize,comm)!=(i+1))
-      CkAbort("MPI_Ialltoall: Error adding requests into ATAReq!");
+    if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
+      CkAbort("MPI_Ialltoall: Error adding requests into IATAReq!");
   }
   *request = reqs->insert(newreq);
   AMPI_DEBUG("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
