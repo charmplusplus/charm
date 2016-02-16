@@ -3262,22 +3262,26 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
   }
 #endif
 
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
-
-  checkRequest(*request);
   if(op == MPI_OP_NULL) CkAbort("MPI_Iallreduce called with MPI_OP_NULL!!!");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iallreduce not allowed for Inter-communicator!");
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
-
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
+
   CkCallback allreduceCB(CkIndex_ampi::reduceResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
-  // using irecv instead recv to non-block the call and get request pointer
+  // use an IReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
   IReq *newreq = new IReq(outbuf,count,type,MPI_REDUCE_SOURCE,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
   *request = reqs->insert(newreq);
+  int tags[3] = { MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, MPI_REDUCE_COMM };
+  CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
+
+#if AMPI_COUNTER
+  getAmpiParent()->counters.allreduce++;
+#endif
   return MPI_SUCCESS;
 }
 
@@ -4528,20 +4532,28 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
 #endif
 
   if(op == MPI_OP_NULL) CkAbort("MPI_Ireduce called with MPI_OP_NULL!!!");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Ireduce not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
+
   CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
   msg->setCallback(reduceCB);
   ptr->contribute(msg);
 
   if (ptr->thisIndex == rootIdx){
-    // using irecv instead recv to non-block the call and get request pointer
+    // use an IReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    IReq *newreq = new IReq(recvbuf,count,type,0,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
+    IReq *newreq = new IReq(recvbuf,count,type,MPI_REDUCE_SOURCE,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
     *request = reqs->insert(newreq);
+    int tags[3] = { MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, MPI_REDUCE_COMM };
+    CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
   }
+
+#if AMPI_COUNTER
+  getAmpiParent()->counters.reduce++;
+#endif
   return MPI_SUCCESS;
 }
 
