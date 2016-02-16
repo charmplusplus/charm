@@ -1046,6 +1046,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     int tmp;
     //handle output to files for partition if requested
     char *stdoutbase,*stdoutpath;
+
+#if CMK_CCS_AVAILABLE
+  CpvInitialize(int, cmiArgDebugFlag);
+  CpvAccess(cmiArgDebugFlag) = 0;
+#endif
+
 #if CMK_WITH_STATS
     MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
 #endif

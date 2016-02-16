@@ -2799,6 +2799,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #else
   Cmi_idlepoll = 1;
 #endif
+#if CMK_CCS_AVAILABLE
+  CpvInitialize(int, cmiArgDebugFlag);
+  CpvAccess(cmiArgDebugFlag) = 0;
+#endif
   Cmi_truecrash = 0;
   if (CmiGetArgFlagDesc(argv,"+truecrash","Do not install signal handlers") ||
       CmiGetArgFlagDesc(argv,"++debug",NULL /*meaning: don't show this*/)) Cmi_truecrash = 1;

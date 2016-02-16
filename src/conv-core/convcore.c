@@ -3762,10 +3762,6 @@ void ConverseCommonInit(char **argv)
  */
   CpvInitialize(int, _urgentSend);
   CpvAccess(_urgentSend) = 0;
-#if CMK_CCS_AVAILABLE
-  CpvInitialize(int, cmiArgDebugFlag);
-  CpvAccess(cmiArgDebugFlag) = 0;
-#endif
   CpvInitialize(int,interopExitFlag);
   CpvAccess(interopExitFlag) = 0;
 
