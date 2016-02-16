@@ -758,8 +758,8 @@ public:
       hilbert_pair mypair;
       mypair.coords.resize(3);
       int nDim[2];
-      for (int i = 0; i < 2; i++) {
-        nDim[i] = amaps[arrayHdl]->_nelems.data()[i+1];
+      for (int j = 0; j < 2; j++) {
+        nDim[j] = amaps[arrayHdl]->_nelems.data()[j+1];
       }
       myInt = i.data()[0] * nDim[0] * nDim[1] + i.data()[1] * nDim[1] + i.data()[2];
       flati = allpairs[myInt];
@@ -767,8 +767,8 @@ public:
       hilbert_pair mypair;
       mypair.coords.resize(4);
       short int nDim[3];
-      for (int i = 0; i < 3; i++) {
-        nDim[i] = ((short int*)amaps[arrayHdl]->_nelems.data())[i+1];
+      for (int j = 0; j < 3; j++) {
+        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j+1];
       }
       myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] +
               ((short int*)i.data())[1] * nDim[1] * nDim[2] +
@@ -779,8 +779,8 @@ public:
       hilbert_pair mypair;
       mypair.coords.resize(5);
       short int nDim[4];
-      for (int i = 0; i < 4; i++) {
-        nDim[i] = ((short int*)amaps[arrayHdl]->_nelems.data())[i+1];
+      for (int j = 0; j < 4; j++) {
+        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j+1];
       }
       myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] +
               ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] +
@@ -792,8 +792,8 @@ public:
       hilbert_pair mypair;
       mypair.coords.resize(6);
       short int nDim[5];
-      for (int i = 0; i < 5; i++) {
-        nDim[i] = ((short int*)amaps[arrayHdl]->_nelems.data())[i+1];
+      for (int j = 0; j < 5; j++) {
+        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j+1];
       }
       myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] * nDim[4] +
               ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] * nDim[4] +
