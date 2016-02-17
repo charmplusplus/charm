@@ -447,6 +447,10 @@ int AMPI_Ibcast(void *buf, int count, int type, int root, MPI_Comm comm,
 int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                void *recvbuf, int recvcount, MPI_Datatype recvtype,
                int root, MPI_Comm comm);
+#define MPI_Igather AMPI_Igather
+int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+               void *recvbuf, int recvcount, MPI_Datatype recvtype,
+               int root, MPI_Comm comm, MPI_Request *request);
 #define MPI_Gatherv AMPI_Gatherv
 int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 void *recvbuf, int *recvcounts, int *displs,
@@ -455,6 +459,10 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
                 int root, MPI_Comm comm);
+#define MPI_Iscatter AMPI_Iscatter
+int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                int root, MPI_Comm comm, MPI_Request *request);
 #define MPI_Scatterv AMPI_Scatterv
 int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,

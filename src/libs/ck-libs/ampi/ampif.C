@@ -59,8 +59,10 @@ FDECL {
 #define mpi_bcast FTN_NAME( MPI_BCAST , mpi_bcast )
 #define mpi_ibcast FTN_NAME( MPI_IBCAST , mpi_ibcast )
 #define mpi_gather FTN_NAME( MPI_GATHER , mpi_gather )
+#define mpi_igather FTN_NAME( MPI_IGATHER , mpi_igather )
 #define mpi_gatherv FTN_NAME( MPI_GATHERV , mpi_gatherv )
 #define mpi_scatter FTN_NAME( MPI_SCATTER , mpi_scatter )
+#define mpi_iscatter FTN_NAME( MPI_ISCATTER , mpi_iscatter )
 #define mpi_scatterv FTN_NAME( MPI_SCATTERV , mpi_scatterv )
 #define mpi_allgather FTN_NAME( MPI_ALLGATHER , mpi_allgather )
 #define mpi_iallgather FTN_NAME( MPI_IALLGATHER , mpi_iallgather )
@@ -695,6 +697,14 @@ void mpi_gather(void *sendbuf, int *sendcount, int *sendtype,
                       *recvtype, *root, *comm);
 }
 
+void mpi_igather(void *sendbuf, int *sendcount, int *sendtype,
+   void *recvbuf, int *recvcount, int *recvtype,
+   int *root, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Igather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+                      *recvtype, *root, *comm, request);
+}
+
 void mpi_scatterv(void *sendbuf, int *sendcounts, int *displs, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype, int *root, int *comm, int *ierr)
 {
@@ -708,6 +718,14 @@ void mpi_scatter(void *sendbuf, int *sendcount, int *sendtype,
 {
   *ierr = AMPI_Scatter(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                       *recvtype, *root, *comm);
+}
+
+void mpi_iscatter(void *sendbuf, int *sendcount, int *sendtype,
+   void *recvbuf, int *recvcount, int *recvtype,
+   int *root, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Iscatter(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+                      *recvtype, *root, *comm, request);
 }
 
 void mpi_alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
