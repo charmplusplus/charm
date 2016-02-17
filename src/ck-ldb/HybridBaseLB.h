@@ -364,6 +364,7 @@ protected:
     return Strategy(stats);
   }
 
+  virtual CLBStatsMsg* AssembleStats();
   virtual int     useMem();
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index
 
@@ -442,7 +443,6 @@ protected:
 
 private:
   void FindNeighbors();
-  CLBStatsMsg* AssembleStats();
   void buildStats(int level);
   CLBStatsMsg * buildCombinedLBStatsMessage(int atlevel);
   void depositLBStatsMessage(CLBStatsMsg *msg, int atlevel);
