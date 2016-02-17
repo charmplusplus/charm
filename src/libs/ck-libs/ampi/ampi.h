@@ -455,6 +455,11 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 void *recvbuf, int *recvcounts, int *displs,
                 MPI_Datatype recvtype, int root, MPI_Comm comm);
+#define MPI_Igatherv AMPI_Igatherv
+int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                 void *recvbuf, int *recvcounts, int *displs,
+                 MPI_Datatype recvtype, int root, MPI_Comm comm,
+                 MPI_Request *request);
 #define MPI_Scatter AMPI_Scatter
 int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
@@ -467,6 +472,10 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  int root, MPI_Comm comm);
+#define MPI_Iscatterv AMPI_Iscatterv
+int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                  int root, MPI_Comm comm, MPI_Request *request);
 #define MPI_Allgather AMPI_Allgather
 int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
@@ -479,6 +488,10 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int *recvcounts, int *displs,
                    MPI_Datatype recvtype, MPI_Comm comm) ;
+#define MPI_Iallgatherv AMPI_Iallgatherv
+int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                    void *recvbuf, int *recvcounts, int *displs,
+                    MPI_Datatype recvtype, MPI_Comm comm, MPI_Request *request);
 #define MPI_Alltoall AMPI_Alltoall
 int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
@@ -491,6 +504,11 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
                   int *rdispls, MPI_Datatype recvtype, MPI_Comm comm);
+#define MPI_Ialltoallv AMPI_Ialltoallv
+int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+                   MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
+                   int *rdispls, MPI_Datatype recvtype, MPI_Comm comm,
+                   MPI_Request *request);
 #define MPI_Alltoall_long MPICH_AlltoAll_long
 int  MPICH_AlltoAll_long(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,

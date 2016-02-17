@@ -4830,6 +4830,52 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
   CDECL
+int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+    void *recvbuf, int *recvcounts, int *displs,
+    MPI_Datatype recvtype, MPI_Comm comm, MPI_Request *request)
+{
+  AMPIAPI("AMPI_Iallgatherv");
+
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CmiAbort("AMPI_Iallgatherv does not implement MPI_IN_PLACE");
+
+#if CMK_ERROR_CHECKING
+  int ret;
+  ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iallgatherv not allowed for Inter-communicator!");
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize(comm);
+  int i;
+  for(i=0;i<size;i++) {
+    ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
+              sendtype, i, comm);
+  }
+
+  CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
+  int itemsize = dttype->getSize() ;
+
+  // use an IATAReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  IATAReq *newreq = new IATAReq(size);
+  for(i=0;i<size;i++){
+    if(newreq->addReq(((char*)recvbuf)+(itemsize*displs[i]),recvcounts[i],recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
+      CkAbort("MPI_Iallgatherv: Error adding requests into IATAReq!");
+  }
+  *request = reqs->insert(newreq);
+  AMPI_DEBUG("MPI_Iallgatherv: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+#if AMPI_COUNTER
+  getAmpiParent()->counters.allgather++;
+#endif
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     void *recvbuf, int recvcount, MPI_Datatype recvtype,
     int root, MPI_Comm comm)
@@ -5037,6 +5083,77 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
   CDECL
+int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+    void *recvbuf, int *recvcounts, int *displs,
+    MPI_Datatype recvtype, int root, MPI_Comm comm, MPI_Request *request)
+{
+  AMPIAPI("AMPI_Igatherv");
+
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CmiAbort("AMPI_Igatherv does not implement MPI_IN_PLACE");
+
+#if CMK_ERROR_CHECKING
+  int ret;
+  ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+
+  int itemsize = getDDT()->getSize(recvtype);
+
+#if AMPIMSGLOG
+  ampiParent* pptr = getAmpiParent();
+  if(msgLogRead){
+    int commsize;
+    (*(pptr->fromPUPer))|commsize;
+    for(int i=0;i<commsize;i++){
+      (*(pptr->fromPUPer))|(pptr->pupBytes);
+      PUParray(*(pptr->fromPUPer), (char *)(((char*)recvbuf)+(itemsize*displs[i])), (pptr->pupBytes));
+    }
+    return MPI_SUCCESS;
+  }
+#endif
+
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Igatherv not allowed for Inter-communicator!");
+
+  ampi *ptr = getAmpiInstance(comm);
+  ptr->send(MPI_GATHER_TAG,ptr->getRank(comm),sendbuf,sendcount,sendtype,root,comm);
+
+  int size = ptr->getSize(comm);
+  if(ptr->getRank(comm) == root) {
+    // use an IATAReq to non-block the caller and get a request ptr
+    AmpiRequestList* reqs = getReqs();
+    IATAReq *newreq = new IATAReq(size);
+    for(int i=0;i<size;i++){
+      if(newreq->addReq((void*)(((char*)recvbuf)+(itemsize*displs[i])),recvcounts[i],recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
+        CkAbort("MPI_Igatherv: Error adding requests into IATAReq!");
+    }
+    *request = reqs->insert(newreq);
+    AMPI_DEBUG("MPI_Igatherv: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  }
+  else {
+    *request = MPI_REQUEST_NULL;
+  }
+#if AMPI_COUNTER
+  getAmpiParent()->counters.gather++;
+#endif
+
+#if AMPIMSGLOG
+  if(msgLogWrite && record_msglog(pptr->thisIndex)){
+    for(int i=0;i<size;i++){
+      (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcounts[i];
+      (*(pptr->toPUPer))|(pptr->pupBytes);
+      PUParray(*(pptr->toPUPer), (char *)(((char*)recvbuf)+(itemsize*displs[i])), (pptr->pupBytes));
+    }
+  }
+#endif
+
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     void *recvbuf, int recvcount, MPI_Datatype recvtype,
     int root, MPI_Comm comm)
@@ -5216,6 +5333,74 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
   MPI_Status status;
   if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm, (int*)(&status)))
     CkAbort("AMPI> Error in MPI_Scatterv recv");
+
+#if AMPI_COUNTER
+  getAmpiParent()->counters.scatter++;
+#endif
+
+#if AMPIMSGLOG
+  if(msgLogWrite && record_msglog(pptr->thisIndex)){
+    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount;
+    (*(pptr->toPUPer))|(pptr->pupBytes);
+    PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
+  }
+#endif
+
+  return MPI_SUCCESS;
+}
+
+  CDECL
+int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+    void *recvbuf, int recvcount, MPI_Datatype recvtype,
+    int root, MPI_Comm comm, MPI_Request *request)
+{
+  AMPIAPI("AMPI_Iscatterv");
+
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CmiAbort("AMPI_Iscatterv does not implement MPI_IN_PLACE");
+
+#if CMK_ERROR_CHECKING
+  int ret;
+  ret = errorCheck(comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+  ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iscatterv not allowed for Inter-communicator!");
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
+
+#if AMPIMSGLOG
+  ampiParent* pptr = getAmpiParent();
+  if(msgLogRead){
+    (*(pptr->fromPUPer))|(pptr->pupBytes);
+    PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
+    return MPI_SUCCESS;
+  }
+#endif
+
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize(comm);
+  int i;
+
+  if(ptr->getRank(comm) == root) {
+    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
+    int itemsize = dttype->getSize() ;
+    for(i=0;i<size;i++) {
+      ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
+          sendcounts[i], sendtype, i, comm);
+    }
+  }
+
+  // use an IReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  IReq *newreq = new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm);
+  *request = reqs->insert(newreq);
+  int tags[3];
+  tags[0]=MPI_SCATTER_TAG; tags[1]=root; tags[2]=comm;
+  CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 
 #if AMPI_COUNTER
   getAmpiParent()->counters.scatter++;
@@ -5664,6 +5849,81 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
     AMPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
         i, MPI_GATHER_TAG, comm, &status);
   }
+#if AMPI_COUNTER
+  getAmpiParent()->counters.alltoall++;
+#endif
+  if (CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY)
+  {
+    delete [] sendcounts;
+    delete [] sdispls;
+    delete [] recvcounts;
+    delete [] rdispls;
+  }
+  return MPI_SUCCESS;
+}
+
+  CDECL
+int AMPI_Ialltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
+    MPI_Datatype sendtype, void *recvbuf, int *recvcounts_,
+    int *rdispls_, MPI_Datatype recvtype, MPI_Comm comm, MPI_Request *request)
+{
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Ialltoallv not allowed for Inter-communicator!");
+  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
+
+#if CMK_ERROR_CHECKING
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CmiAbort("MPI_Ialltoallv does not accept MPI_IN_PLACE");
+
+  int ret;
+  ret = errorCheck(comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+  ret = errorCheck(comm, 1, 0, 0, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize(comm);
+  int *sendcounts = sendcounts_;
+  int *sdispls = sdispls_;
+  int *recvcounts = recvcounts_;
+  int *rdispls = rdispls_;
+  if (CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY)
+  {
+    // FIXME: we don't need to make copy if it is not global variable
+    sendcounts = new int[size];
+    sdispls = new int[size];
+    recvcounts = new int[size];
+    rdispls = new int[size];
+    for (int i=0; i<size; i++) {
+      sendcounts[i] = sendcounts_[i];
+      sdispls[i] = sdispls_[i];
+      recvcounts[i] = recvcounts_[i];
+      rdispls[i] = rdispls_[i];
+    }
+  }
+  AMPIAPI("AMPI_Ialltoallv");
+  CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
+  int itemsize = dttype->getSize() ;
+  int i;
+  for(i=0;i<size;i++)  {
+    ptr->send(MPI_ATA_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
+              sendtype, i, comm);
+  }
+
+  dttype = ptr->getDDT()->getType(recvtype) ;
+  itemsize = dttype->getSize() ;
+
+  // use an IATAReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  IATAReq *newreq = new IATAReq(size);
+  for(i=0;i<size;i++){
+    if(newreq->addReq((void*)(((char*)recvbuf)+(itemsize*rdispls[i])),recvcounts[i],recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
+      CkAbort("MPI_Ialltoallv: Error adding requests into IATAReq!");
+  }
+  *request = reqs->insert(newreq);
+  AMPI_DEBUG("MPI_Ialltoallv: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
 #endif

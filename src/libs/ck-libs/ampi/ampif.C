@@ -61,15 +61,19 @@ FDECL {
 #define mpi_gather FTN_NAME( MPI_GATHER , mpi_gather )
 #define mpi_igather FTN_NAME( MPI_IGATHER , mpi_igather )
 #define mpi_gatherv FTN_NAME( MPI_GATHERV , mpi_gatherv )
+#define mpi_igatherv FTN_NAME( MPI_IGATHERV , mpi_igatherv )
 #define mpi_scatter FTN_NAME( MPI_SCATTER , mpi_scatter )
 #define mpi_iscatter FTN_NAME( MPI_ISCATTER , mpi_iscatter )
 #define mpi_scatterv FTN_NAME( MPI_SCATTERV , mpi_scatterv )
+#define mpi_iscatterv FTN_NAME( MPI_ISCATTERV , mpi_iscatterv )
 #define mpi_allgather FTN_NAME( MPI_ALLGATHER , mpi_allgather )
 #define mpi_iallgather FTN_NAME( MPI_IALLGATHER , mpi_iallgather )
 #define mpi_allgatherv FTN_NAME( MPI_ALLGATHERV , mpi_allgatherv )
+#define mpi_iallgatherv FTN_NAME( MPI_IALLGATHERV , mpi_iallgatherv )
 #define mpi_alltoall FTN_NAME( MPI_ALLTOALL , mpi_alltoall )
 #define mpi_ialltoall FTN_NAME( MPI_IALLTOALL , mpi_ialltoall )
 #define mpi_alltoallv FTN_NAME( MPI_ALLTOALLV , mpi_alltoallv )
+#define mpi_ialltoallv FTN_NAME( MPI_IALLTOALLV , mpi_ialltoallv )
 #define mpi_reduce FTN_NAME( MPI_REDUCE , mpi_reduce )
 #define mpi_ireduce FTN_NAME( MPI_IREDUCE , mpi_ireduce )
 #define mpi_allreduce FTN_NAME( MPI_ALLREDUCE , mpi_allreduce )
@@ -673,6 +677,14 @@ void mpi_allgatherv(void *sendbuf, int *sendcount, int *sendtype,
                           displs, *recvtype, *comm);
 }
 
+void mpi_iallgatherv(void *sendbuf, int *sendcount, int *sendtype,
+   void *recvbuf, int *recvcounts, int *displs,
+   int *recvtype, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Iallgatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
+                          displs, *recvtype, *comm, request);
+}
+
 void mpi_allgather(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *comm, int *ierr)
@@ -687,6 +699,14 @@ void mpi_gatherv(void *sendbuf, int *sendcount, int *sendtype,
 {
   *ierr = AMPI_Gatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
                        displs, *recvtype, *root, *comm);
+}
+
+void mpi_igatherv(void *sendbuf, int *sendcount, int *sendtype,
+   void *recvbuf, int *recvcounts, int *displs,
+   int *recvtype, int *root, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Igatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
+                       displs, *recvtype, *root, *comm, request);
 }
 
 void mpi_gather(void *sendbuf, int *sendcount, int *sendtype,
@@ -712,6 +732,14 @@ void mpi_scatterv(void *sendbuf, int *sendcounts, int *displs, int *sendtype,
                        *recvtype, *root, *comm);
 }
 
+void mpi_iscatterv(void *sendbuf, int *sendcounts, int *displs, int *sendtype,
+   void *recvbuf, int *recvcount, int *recvtype, int *root, int *comm,
+   int *request, int *ierr)
+{
+  *ierr = AMPI_Iscatterv(sendbuf, sendcounts, displs, *sendtype, recvbuf, *recvcount,
+                        *recvtype, *root, *comm, request);
+}
+
 void mpi_scatter(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *root, int *comm, int *ierr)
@@ -734,6 +762,14 @@ void mpi_alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
 {
   *ierr = AMPI_Alltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
                          recvcounts, rdispls, *recvtype, *comm);
+}
+
+void mpi_ialltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+   int *sendtype, void *recvbuf, int *recvcounts,
+   int *rdispls, int *recvtype, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Ialltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
+                         recvcounts, rdispls, *recvtype, *comm, request);
 }
 
 void mpi_alltoall(void *sendbuf, int *sendcount, int *sendtype,
