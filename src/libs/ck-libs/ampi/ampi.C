@@ -24,7 +24,7 @@
 #define FUNCCALL_DEBUG(x) //x /* empty */
 
 /* For MPI_Get_library_version */
-extern const char * const CmiCommitID;
+extern "C" const char * const CmiCommitID;
 
 static CkDDT *getDDT(void) {
   return getAmpiParent()->myDDT;
