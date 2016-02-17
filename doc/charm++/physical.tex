@@ -1,0 +1,46 @@
+
+The following calls provide information about the mapping of physical hardware to
+ the logical processing elements(PE) in Charm++.
+A processing element (PE) refers to a single unit of mapping and scheduling,
+whereas a physical node refers to an actual hardware node 
+(or, more precisely, an operating system instance on which Charm++ processes execute,
+ or, in networking terminology, a host).
+
+
+Note that a physical node is different from a logical node. A logical node is a set of processing elements that share
+one or more PEs. One may partition a physical node into multiple logical nodes.
+In the implementation, a separate process exists for each logical node and all PEs within the logical node
+ share the same memory address space.
+In theory, communication between PEs in the same physical node is faster than communication
+ between different physical nodes, since various interconnect layers can be bypassed.
+PEs are ranked in range 0 to {\em CmiNumPes()}.
+
+%\section{Physical Node API}
+
+Charm++ provides a set of functions for querying information about the mapping of PE's to physical nodes. 
+ Class cputopology.C, contains the following member functions:
+
+
+\begin{description}
+\item [int CmiPeOnSamePhysicalNode(int pe1, int pe2)] Returns 1 if PE's pe1 and pe2 are on the same physical node and 0 otherwise.
+
+\item [int CmiNumPhysicalNodes()] Returns the number of physical nodes that the program is running on.
+
+\item [int CmiNumPesOnPhysicalNode(int node)] Returns the number of PE's  that reside within a physical node.
+
+\item [void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num)] After execution pelist will point to a 
+list of all PE's that reside within a physical node and num will point to the length of the list. One should be careful
+to not free or alter pelist since it points to system memory.
+
+\item [int CmiPhysicalRank(int pe)] Returns the rank of a PE among all PE's running on the same physical node.
+
+\item [int CmiPhysicalNodeID(int pe)] Returns the node ID of the physical node in which a PE resides.
+
+\item [int CmiGetFirstPeOnPhysicalNode(int node)]  Returns the lowest numbered processor on a physical node.
+\end{description}
+
+
+
+
+
+
