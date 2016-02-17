@@ -35,8 +35,8 @@ CXXFLAGS=-I.
 all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc everylb
 
 all-test: bigsim LIBS
-	$(MAKE) -C ../tests all OPTS='$(OPTS)'
-	$(MAKE) -C ../examples all OPTS='$(OPTS)'
+	$(MAKE) -C ../tests all
+	$(MAKE) -C ../examples all
 
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
@@ -51,7 +51,7 @@ SM: converse $(L)/libsm.a
 PVM: converse $(L)/libpvmc.a
 
 AMR: charm++ LIBS
-	$(MAKE) -C libs/ck-libs/amr all OPTS='$(OPTS)'
+	$(MAKE) -C libs/ck-libs/amr all
 
 FEM: charm++ AMPI
 	$(MAKE) -C libs/ck-libs/ FEM
@@ -139,28 +139,28 @@ LIBS: CONVLIBS CHARMLIBS everylb
 	echo "Built LIBS Successfully"
 
 bgtest: bigsim LIBS
-	$(MAKE) -C ../tests bgtest OPTS='$(OPTS)'
-	$(MAKE) -C ../examples bgtest OPTS='$(OPTS)'
+	$(MAKE) -C ../tests bgtest
+	$(MAKE) -C ../examples bgtest
 
 syncfttest causalfttest mpisyncfttest mlogfttest: charm++ LIBS
-	$(MAKE) -C ../tests $@ OPTS='$(OPTS)'
+	$(MAKE) -C ../tests $@
 
 test: bigsim LIBS
-	$(MAKE) -C ../tests test OPTS='$(OPTS)'
-	$(MAKE) -C ../examples test OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test
+	$(MAKE) -C ../examples test
 
 test-converse: converse
-	$(MAKE) -C ../tests test-converse  OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test-converse
 
 test-charm: charm++
-	$(MAKE) -C ../tests test-charm  OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test-charm
 
 test-AMPI: AMPI
-	$(MAKE) -C ../tests test-AMPI  OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test-AMPI
 
 test-fem: FEM
-	$(MAKE) -C ../tests test-fem  OPTS='$(OPTS)'
-	$(MAKE) -C ../examples test-fem  OPTS='$(OPTS)'
+	$(MAKE) -C ../tests test-fem
+	$(MAKE) -C ../examples test-fem
 
 ps-doc: basics
 	$(MAKE) -C ../doc ps
@@ -442,7 +442,7 @@ QUICK_THREADS: $(CVHEADERS)
 	touch QUICK_THREADS
 
 CONVLIBS: converse
-	$(MAKE) -C libs convlibs OPTS='$(OPTS)'
+	$(MAKE) -C libs convlibs
 
 $(L)/libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) $(TAU_LIBS) -o $@ $(LIBCONV_CORE) 
@@ -620,7 +620,7 @@ charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a
 
 CHARMLIBS: charm++ CONVLIBS 
-	$(MAKE) -C libs charmlibs OPTS='$(OPTS)'
+	$(MAKE) -C libs charmlibs
 
 $(L)/libck.a: $(LIBCK_CORE) 
 	$(CHARMC) -o $@ $(LIBCK_CORE)
@@ -974,7 +974,7 @@ dependsCaseSensitive: cidepends
 # The build script should have spit out the build options into this makefile
 -include buildopts.mk
 # If OPTS was not defined, use the build time options
-OPTS ?= $(OPTSATBUILDTIME)
+export OPTS ?= $(OPTSATBUILDTIME)
 ifeq ($(strip $(OPTS)),)
 $(warning Variable OPTS is defined to an empty string. Are you sure this is what you want?)
 endif
