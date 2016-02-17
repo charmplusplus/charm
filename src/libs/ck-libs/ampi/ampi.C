@@ -3022,6 +3022,33 @@ int AMPI_Barrier(MPI_Comm comm)
 }
 
   CDECL
+int AMPI_Ibarrier(MPI_Comm comm, MPI_Request *request)
+{
+  AMPIAPI("AMPI_Ibarrier");
+
+#if CMK_ERROR_CHECKING
+  if(checkCommunicator(comm) != MPI_SUCCESS)
+    return checkCommunicator(comm);
+#endif
+
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Ibarrier not allowed for Inter-communicator!");
+
+#if CMK_BIGSIM_CHARM
+  TRACE_BG_AMPI_LOG(MPI_BARRIER, 0);
+#endif
+
+  //HACK: Use collective operation as a barrier.
+  AMPI_Iallreduce(NULL,NULL,0,MPI_INT,MPI_SUM,comm,request);
+
+  //BIGSIM_OOC DEBUGGING
+  //CkPrintf("%d: in AMPI_Ibarrier, after AMPI_Iallreduce\n", getAmpiParent()->thisIndex);
+#if AMPI_COUNTER
+  getAmpiParent()->counters.barrier++;
+#endif
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
     MPI_Comm comm)
 {
@@ -3062,6 +3089,53 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   //  ptr->yield();
   //  //  processRemoteMlogMessages();
+#endif
+
+  return MPI_SUCCESS;
+}
+
+  CDECL
+int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
+    MPI_Comm comm, MPI_Request *request)
+{
+  AMPIAPI("AMPI_Ibcast");
+
+#if CMK_ERROR_CHECKING
+  int ret;
+  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, root, 1, buf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Ibcast not allowed for Inter-communicator!");
+  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
+
+#if AMPIMSGLOG
+  ampiParent* pptr = getAmpiParent();
+  if(msgLogRead){
+    (*(pptr->fromPUPer))|(pptr->pupBytes);
+    PUParray(*(pptr->fromPUPer), (char *)buf, (pptr->pupBytes));
+    return MPI_SUCCESS;
+  }
+#endif
+
+  ampi* ptr = getAmpiInstance(comm);
+  ptr->bcast(root, buf, count, type, comm);
+  *request = MPI_REQUEST_NULL;
+#if AMPI_COUNTER
+  getAmpiParent()->counters.bcast++;
+#endif
+
+#if AMPIMSGLOG
+  if(msgLogWrite && record_msglog(pptr->thisIndex)) {
+    (pptr->pupBytes) = getDDT()->getSize(type) * count;
+    (*(pptr->toPUPer))|(pptr->pupBytes);
+    PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
+  }
+#endif
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  //ptr->yield();
+  //processRemoteMlogMessages();
 #endif
 
   return MPI_SUCCESS;

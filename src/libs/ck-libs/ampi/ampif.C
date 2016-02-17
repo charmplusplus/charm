@@ -55,7 +55,9 @@ FDECL {
 #define mpi_pack_size FTN_NAME( MPI_PACK_SIZE , mpi_pack_size )
 
 #define mpi_barrier FTN_NAME( MPI_BARRIER , mpi_barrier )
+#define mpi_ibarrier FTN_NAME( MPI_IBARRIER , mpi_ibarrier )
 #define mpi_bcast FTN_NAME( MPI_BCAST , mpi_bcast )
+#define mpi_ibcast FTN_NAME( MPI_IBCAST , mpi_ibcast )
 #define mpi_gather FTN_NAME( MPI_GATHER , mpi_gather )
 #define mpi_gatherv FTN_NAME( MPI_GATHERV , mpi_gatherv )
 #define mpi_scatter FTN_NAME( MPI_SCATTER , mpi_scatter )
@@ -385,6 +387,11 @@ void mpi_barrier(int *comm, int *ierr)
   *ierr = AMPI_Barrier(*comm);
 }
 
+void mpi_ibarrier(int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Ibarrier(*comm, request);
+}
+
 void mpi_yield(int *comm, int *ierr)
 {
   *ierr = AMPI_Yield(*comm);
@@ -399,6 +406,12 @@ void mpi_bcast(void *buf, int *count, int *type, int *root, int *comm,
    int *ierr)
 {
   *ierr = AMPI_Bcast(buf, *count, *type, *root, *comm);
+}
+
+void mpi_ibcast(void *buf, int *count, int *type, int *root, int *comm,
+   int *request, int *ierr)
+{
+  *ierr = AMPI_Ibcast(buf, *count, *type, *root, *comm, request);
 }
 
 void mpi_reduce(void *inbuf, void *outbuf, int *count, int *type,

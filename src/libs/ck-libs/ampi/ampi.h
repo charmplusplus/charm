@@ -436,8 +436,13 @@ int AMPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz);
 /***collective***/
 #define MPI_Barrier AMPI_Barrier
 int AMPI_Barrier(MPI_Comm comm);
+#define MPI_Ibarrier AMPI_Ibarrier
+int AMPI_Ibarrier(MPI_Comm comm, MPI_Request *request);
 #define MPI_Bcast AMPI_Bcast
 int AMPI_Bcast(void *buf, int count, int type, int root, MPI_Comm comm);
+#define MPI_Ibcast AMPI_Ibcast
+int AMPI_Ibcast(void *buf, int count, int type, int root, MPI_Comm comm,
+               MPI_Request *request);
 #define MPI_Gather AMPI_Gather
 int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                void *recvbuf, int recvcount, MPI_Datatype recvtype,
