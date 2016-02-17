@@ -357,6 +357,34 @@ extern "C" void traceEnd(void) {
 #endif
 }
 
+extern "C" void traceBeginComm(void) {
+#if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
+#if CMK_MULTICORE
+  if (Cmi_commthread)
+#endif
+    if (CmiMyRank() == 0) {
+      if (CkpvAccessOther(traceOn, CmiMyNodeSize()) != 1) {
+        CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();
+        CkpvAccessOther(traceOn, CmiMyNodeSize()) = 1;
+      }
+    }
+#endif
+}
+
+extern "C" void traceEndComm(void) {
+#if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
+#if CMK_MULTICORE
+  if (Cmi_commthread)
+#endif
+    if (CmiMyRank() == 0) {
+      if (CkpvAccessOther(traceOn, CmiMyNodeSize()) != 0) {
+        CkpvAccessOther(_traces, CmiMyNodeSize())->traceEndOnCommThread();
+        CkpvAccessOther(traceOn, CmiMyNodeSize()) = 0;
+      }
+    }
+#endif
+}
+
 static int checkTraceOnPe(char **argv)
 {
   int traceOnPE = 1;

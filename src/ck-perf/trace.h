@@ -63,6 +63,8 @@ protected:
     virtual void traceEnd() {}
 
     // for tracing comm thread only
+    virtual void traceBeginComm() {}
+    virtual void traceEndComm() {}
     virtual void traceBeginOnCommThread() {}   
     virtual void traceEndOnCommThread() {}
     virtual void traceCommSetMsgID(char *) {}
@@ -275,6 +277,8 @@ public:
     void traceEnd();
 
     // for tracing comm thread only
+    void traceBeginComm();
+    void traceEndComm();
     void traceBeginOnCommThread();
     void traceEndOnCommThread();
     void traceCommSetMsgID(char *msg)  { ALLDO(traceCommSetMsgID(msg)); }
