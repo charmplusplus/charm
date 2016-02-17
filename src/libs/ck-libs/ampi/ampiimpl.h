@@ -189,11 +189,11 @@ class win_obj {
 class KeyvalPair{
 protected:
   int klen, vlen;
-  char* key;
-  char* val;
+  const char* key;
+  const char* val;
 public:
   KeyvalPair(void){ }
-  KeyvalPair(char* k, char* v);
+  KeyvalPair(const char* k, const char* v);
   ~KeyvalPair(void);
   void pup(PUP::er& p){
     p|klen; p|vlen;
@@ -201,8 +201,8 @@ public:
       key=new char[klen];
       val=new char[vlen];
     }
-    p(key,klen);
-    p(val,vlen);
+    p((char*)key,klen);
+    p((char*)val,vlen);
   }
 friend class InfoStruct;
 };
@@ -214,11 +214,11 @@ public:
   InfoStruct(void):valid(true) { }
   void setvalid(bool valid_){ valid = valid_; }
   bool getvalid(void){ return valid; }
-  void set(char* k, char* v);
+  void set(const char* k, const char* v);
   void dup(InfoStruct& src);
-  int get(char* k, int vl, char*& v); // return flag
-  int deletek(char* k); // return -1 when not found
-  int get_valuelen(char* k, int* vl); // return flag
+  int get(const char* k, int vl, char*& v); // return flag
+  int deletek(const char* k); // return -1 when not found
+  int get_valuelen(const char* k, int* vl); // return flag
   int get_nkeys(void) { return nodes.size(); }
   int get_nthkey(int n,char* k);
   void myfree(void);
@@ -1367,10 +1367,10 @@ public:
 public:
     MPI_Info createInfo(void);
     MPI_Info dupInfo(MPI_Info info);
-    void setInfo(MPI_Info info, char *key, char *value);
-    int deleteInfo(MPI_Info info, char *key);    
-    int getInfo(MPI_Info info, char *key, int valuelen, char *value);
-    int getInfoValuelen(MPI_Info info, char *key, int *valuelen);
+    void setInfo(MPI_Info info, const char *key, const char *value);
+    int deleteInfo(MPI_Info info, const char *key);
+    int getInfo(MPI_Info info, const char *key, int valuelen, char *value);
+    int getInfoValuelen(MPI_Info info, const char *key, int *valuelen);
     int getInfoNkeys(MPI_Info info);
     int getInfoNthkey(MPI_Info info, int n, char *key);
     void freeInfo(MPI_Info info);

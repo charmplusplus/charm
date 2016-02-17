@@ -5,15 +5,15 @@
 #include <string.h>
 #include "ampiimpl.h"
 
-KeyvalPair::KeyvalPair(char* k, char* v){
+KeyvalPair::KeyvalPair(const char* k, const char* v){
   key = strdup(k);
   val = strdup(v);
   klen = strlen(k);
   vlen = strlen(v);
 }
 KeyvalPair::~KeyvalPair(void){
-  free(key); 
-  free(val);
+  free((char*)key);
+  free((char*)val);
 }
 
 void InfoStruct::pup(PUP::er& p){
@@ -21,12 +21,12 @@ void InfoStruct::pup(PUP::er& p){
   p|valid;
 }
 
-void InfoStruct::set(char* k, char* v){
+void InfoStruct::set(const char* k, const char* v){
   int sz=nodes.size();
   int found=0;
   for(int i=0;i<sz;i++){
     if(!strcmp(nodes[i]->key, k)){
-      free(nodes[i]->val);
+      free((char*)(nodes[i]->val));
       nodes[i]->val = strdup(v);
       found=1;
       break;
@@ -46,7 +46,7 @@ void InfoStruct::dup(InfoStruct& src){
   }
 }
 
-int InfoStruct::deletek(char* k){
+int InfoStruct::deletek(const char* k){
   int sz=nodes.size();
   int found=0;
   for(int i=0;i<sz;i++){
@@ -60,7 +60,7 @@ int InfoStruct::deletek(char* k){
   return found;
 }
 
-int InfoStruct::get(char* k, int vl, char*& v){
+int InfoStruct::get(const char* k, int vl, char*& v){
   int sz=nodes.size();
   int found=0;
   for(int i=0;i<sz;i++){
@@ -74,7 +74,7 @@ int InfoStruct::get(char* k, int vl, char*& v){
   return found;
 }
 
-int InfoStruct::get_valuelen(char* k, int* vl){
+int InfoStruct::get_valuelen(const char* k, int* vl){
   int sz=nodes.size();
   int found=0;
   for(int i=0;i<sz;i++){
@@ -118,25 +118,25 @@ MPI_Info ampiParent::dupInfo(MPI_Info info){
   return (MPI_Info)(infos.size()-1);
 }
 
-void ampiParent::setInfo(MPI_Info info, char *key, char *value){
+void ampiParent::setInfo(MPI_Info info, const char *key, const char *value){
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     CkAbort("AMPI_Info_set: invalid info\n");
   infos[info]->set(key,value);
 }
 
-int ampiParent::deleteInfo(MPI_Info info, char *key){
+int ampiParent::deleteInfo(MPI_Info info, const char *key){
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     CkAbort("AMPI_Info_delete: invalid info\n");
   return infos[info]->deletek(key);
 }
 
-int ampiParent::getInfo(MPI_Info info, char *key, int valuelen, char *value){
+int ampiParent::getInfo(MPI_Info info, const char *key, int valuelen, char *value){
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     CkAbort("AMPI_Info_get: invalid info\n");
   return infos[info]->get(key,valuelen,value);
 }
 
-int ampiParent::getInfoValuelen(MPI_Info info, char *key, int *valuelen){
+int ampiParent::getInfoValuelen(MPI_Info info, const char *key, int *valuelen){
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     CkAbort("AMPI_Info_get_valuelen: invalid info\n");
   return infos[info]->get_valuelen(key,valuelen);
@@ -172,7 +172,7 @@ int AMPI_Info_create(MPI_Info *info){
 }
 
 CDECL
-int AMPI_Info_set(MPI_Info info, char *key, char *value){
+int AMPI_Info_set(MPI_Info info, const char *key, const char *value){
   AMPIAPI("AMPI_Info_set");
   if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0) 
     CkAbort("AMPI_Info_set: invalid key\n");
@@ -184,7 +184,7 @@ int AMPI_Info_set(MPI_Info info, char *key, char *value){
 }
 
 CDECL
-int AMPI_Info_delete(MPI_Info info, char *key){
+int AMPI_Info_delete(MPI_Info info, const char *key){
   AMPIAPI("AMPI_Info_delete");
   ampiParent *ptr = getAmpiParent();
   if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0) 
@@ -195,7 +195,7 @@ int AMPI_Info_delete(MPI_Info info, char *key){
 }
 
 CDECL
-int AMPI_Info_get(MPI_Info info, char *key, int valuelen, char *value, int *flag){
+int AMPI_Info_get(MPI_Info info, const char *key, int valuelen, char *value, int *flag){
   AMPIAPI("AMPI_Info_get");
   if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0) 
     CkAbort("AMPI_Info_get: invalid key\n");
@@ -209,7 +209,7 @@ int AMPI_Info_get(MPI_Info info, char *key, int valuelen, char *value, int *flag
 }
 
 CDECL
-int AMPI_Info_get_valuelen(MPI_Info info, char *key, int *valuelen, int *flag){
+int AMPI_Info_get_valuelen(MPI_Info info, const char *key, int *valuelen, int *flag){
   AMPIAPI("AMPI_Info_get_valuelen");
   if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0) 
     CkAbort("AMPI_Info_get_valuelen: invalid key\n");

@@ -888,13 +888,13 @@ char* MPI_IGet_Data(MPI_Status status);
 #define MPI_Info_create AMPI_Info_create
 int AMPI_Info_create(MPI_Info *info);
 #define MPI_Info_set AMPI_Info_set
-int AMPI_Info_set(MPI_Info info, char *key, char *value);
+int AMPI_Info_set(MPI_Info info, const char *key, const char *value);
 #define MPI_Info_delete AMPI_Info_delete
-int AMPI_Info_delete(MPI_Info info, char *key);
+int AMPI_Info_delete(MPI_Info info, const char *key);
 #define MPI_Info_get AMPI_Info_get
-int AMPI_Info_get(MPI_Info info, char *key, int valuelen, char *value, int *flag);
+int AMPI_Info_get(MPI_Info info, const char *key, int valuelen, char *value, int *flag);
 #define MPI_Info_get_valuelen AMPI_Info_get_valuelen
-int AMPI_Info_get_valuelen(MPI_Info info, char *key, int *valuelen, int *flag);
+int AMPI_Info_get_valuelen(MPI_Info info, const char *key, int *valuelen, int *flag);
 #define MPI_Info_get_nkeys AMPI_Info_get_nkeys
 int AMPI_Info_get_nkeys(MPI_Info info, int *nkeys);
 #define MPI_Info_get_nthkey AMPI_Info_get_nthkey
