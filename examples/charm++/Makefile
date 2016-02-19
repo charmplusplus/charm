@@ -29,7 +29,7 @@ TRAM
 BGDIRS=\
 hello \
 integrate \
-integrate2 \
+integratePUPable \
 integrateArray \
 load_balancing \
 piArray \
