@@ -1170,7 +1170,6 @@ class arrInfo {
  private:
    CkArrayIndex _nelems;
    int *_map;
-   void distrib(int *speeds);
  public:
    arrInfo(void):_map(NULL){}
    arrInfo(const CkArrayIndex& n, int *speeds)
@@ -1181,6 +1180,7 @@ class arrInfo {
    }
    ~arrInfo() { delete[] _map; }
    int getMap(const CkArrayIndex &i);
+   void distrib(int *speeds);
    void pup(PUP::er& p){
      p|_nelems;
      int totalElements = _nelems.getCombinedCount();
@@ -1331,7 +1331,17 @@ public:
     return arrs[arrayHdl]->getMap(i);
   }
   void pup(PUP::er& p){
+    int oldNumPes = -1;
+    if(p.isPacking()){
+      oldNumPes = CkNumPes();
+    }
+    p|oldNumPes;
     p|arrs;
+    if(p.isUnpacking() && oldNumPes != CkNumPes()){
+      for(int idx = 0; idx < arrs.length(); ++idx){
+        arrs[idx]->distrib(speeds);
+      }
+    }
   }
 };
 
