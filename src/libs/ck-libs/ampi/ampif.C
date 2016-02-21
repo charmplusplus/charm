@@ -48,6 +48,8 @@ FDECL {
 #define mpi_type_size FTN_NAME( MPI_TYPE_SIZE , mpi_type_size )
 #define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
+#define mpi_type_set_name FTN_NAME( MPI_TYPE_SET_NAME , mpi_type_set_name )
+#define mpi_type_get_name FTN_NAME( MPI_TYPE_GET_NAME , mpi_type_get_name )
 #define mpi_get_address FTN_NAME( MPI_GET_ADDRESS , mpi_get_address )
 #define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
 #define mpi_status_set_elements FTN_NAME( MPI_STATUS_SET_ELEMENTS , mpi_status_set_elements )
@@ -628,6 +630,16 @@ void mpi_type_lb(int* datatype, int* displacement, int* ierr)
 void mpi_type_ub(int* datatype, int* displacement, int* ierr)
 {
   *ierr = AMPI_Type_ub(*datatype, displacement);
+}
+
+void mpi_type_set_name(int* datatype, char* name, int* ierr)
+{
+  *ierr = AMPI_Type_set_name(*datatype, name);
+}
+
+void mpi_type_get_name(int* datatype, char* name, int* resultlen, int* ierr)
+{
+  *ierr = AMPI_Type_get_name(*datatype, name, resultlen);
 }
 
 void mpi_get_address(int* location, int *address, int* ierr)

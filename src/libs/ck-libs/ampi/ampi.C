@@ -4539,6 +4539,22 @@ int AMPI_Type_size(MPI_Datatype datatype, int *size)
 }
 
   CDECL
+int AMPI_Type_set_name(MPI_Datatype datatype, char *name)
+{
+  AMPIAPI("AMPI_Type_set_name");
+  getDDT()->setName(datatype, name, strlen(name));
+  return MPI_SUCCESS;
+}
+
+  CDECL
+int AMPI_Type_get_name(MPI_Datatype datatype, char *name, int *resultlen)
+{
+  AMPIAPI("AMPI_Type_get_name");
+  getDDT()->getName(datatype, name, resultlen);
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
     int tag, MPI_Comm comm, MPI_Request *request)
 {

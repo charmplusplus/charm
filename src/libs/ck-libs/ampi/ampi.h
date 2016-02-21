@@ -420,6 +420,10 @@ int AMPI_Type_size(MPI_Datatype datatype, int *size);
 int AMPI_Type_lb(MPI_Datatype datatype, MPI_Aint* displacement);
 #define MPI_Type_ub AMPI_Type_ub
 int AMPI_Type_ub(MPI_Datatype datatype, MPI_Aint* displacement);
+#define MPI_Type_set_name AMPI_Type_set_name
+int AMPI_Type_set_name(MPI_Datatype datatype, char *name);
+#define MPI_Type_get_name AMPI_Type_get_name
+int AMPI_Type_get_name(MPI_Datatype datatype, char *name, int *resultlen);
 #define MPI_Get_address AMPI_Get_address
 int AMPI_Get_address(void* location, MPI_Aint *address);
 #define MPI_Address AMPI_Address

@@ -50,6 +50,8 @@
 #define CkDDT_COMBINER_HINDEXED      6
 #define CkDDT_COMBINER_STRUCT        7
 
+#define CkDDT_MAX_NAME_LEN         255
+
 typedef int CkDDT_Type ;
 class CkDDT ;
 
@@ -68,6 +70,8 @@ class CkDDT ;
   count -  count of base datatype present in this datatype
   baseSize - size of Base Datatype
   baseExtent - extent of Base dataType
+  name - user specified name for datatype
+  nameLen - length of user specified name for datatype
 
   Methods:
 
@@ -80,6 +84,9 @@ class CkDDT ;
   serialize - This is the function which actually copies the contents from
     user's space to buffer if dir=1 or reverse if dir=0
     according to the datatype.
+
+  setName - set the name of datatype
+  getName - get the name of datatype
 */
 
 class CkDDT_DataType {
@@ -99,6 +106,8 @@ class CkDDT_DataType {
     int baseExtent;
     CkDDT_DataType *baseType;
     int baseIndex;
+    char *name;
+    int nameLen;
 
   public:
     CkDDT_DataType() { }
@@ -125,6 +134,23 @@ class CkDDT_DataType {
     virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
                            int array_of_integers[], int array_of_addresses[], int array_of_datatypes[]);
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
+
+    void setName(char *src, int len) {
+      CmiAssert(len < CkDDT_MAX_NAME_LEN-1);
+      if (name == NULL) name = new char[CkDDT_MAX_NAME_LEN];
+      nameLen = len;
+      memcpy(name, src, len);
+      name[len] = '\0';
+    }
+
+    void getName(char *dest, int *len) {
+      if (name == NULL) {
+        *len = 0;
+        return;
+      }
+      *len = nameLen;
+      memcpy(dest, name, *len+1);
+    }
 };
 
 /*
@@ -411,6 +437,8 @@ class CkDDT {
   int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner);
   int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,
                  int array_of_integers[], int array_of_addresses[], int array_of_datatypes[]);
+  void setName(int nIndex, char *name, int len);
+  void getName(int nIndex, char *name, int *len);
   ~CkDDT() ;
 };
 
