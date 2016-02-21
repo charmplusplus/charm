@@ -350,6 +350,8 @@ int AMPI_Request_free(MPI_Request *request);
 int AMPI_Cancel(MPI_Request *request);
 #define MPI_Test_cancelled AMPI_Test_cancelled
 int AMPI_Test_cancelled(MPI_Status *status, int *flag);  /* FIXME: always returns success */
+#define MPI_Status_set_cancelled AMPI_Status_set_cancelled
+int AMPI_Status_set_cancelled(MPI_Status *status, int flag);
 #define MPI_Iprobe AMPI_Iprobe
 int AMPI_Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
 #define MPI_Probe AMPI_Probe
@@ -422,6 +424,8 @@ int AMPI_Type_ub(MPI_Datatype datatype, MPI_Aint* displacement);
 int AMPI_Get_address(void* location, MPI_Aint *address);
 #define MPI_Address AMPI_Address
 int AMPI_Address(void* location, MPI_Aint *address);
+#define MPI_Status_set_elements AMPI_Status_set_elements
+int AMPI_Status_set_elements(MPI_Status *status, MPI_Datatype datatype, int count);
 #define MPI_Get_elements AMPI_Get_elements
 int AMPI_Get_elements(MPI_Status *status, MPI_Datatype datatype, int *count);
 #define MPI_Pack AMPI_Pack

@@ -4346,6 +4346,13 @@ int AMPI_Test_cancelled(MPI_Status* status, int* flag) {
   return MPI_SUCCESS;
 }
 
+CDECL
+int AMPI_Status_set_cancelled(MPI_Status *status, int flag){
+  AMPIAPI("AMPI_Status_set_cancelled");
+  /* AMPI_Test_cancelled always returns true */
+  return MPI_SUCCESS;
+}
+
   CDECL
 int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
     MPI_Comm comm, MPI_Request *req)
@@ -6118,6 +6125,18 @@ CDECL
 int AMPI_Address(void* location, MPI_Aint *address){
   AMPIAPI("AMPI_Address");
   return AMPI_Get_address(location, address);
+}
+
+CDECL
+int AMPI_Status_set_elements(MPI_Status *sts, MPI_Datatype dtype, int count){
+  AMPIAPI("AMPI_Status_set_elements");
+  if(sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE)
+    return MPI_SUCCESS;
+  CkDDT_DataType* dttype = getDDT()->getType(dtype);
+  int basesize = dttype->getBaseSize();
+  if(basesize==0) basesize = dttype->getSize();
+  sts->MPI_LENGTH = basesize * count;
+  return MPI_SUCCESS;
 }
 
 CDECL

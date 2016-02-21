@@ -23,6 +23,7 @@ FDECL {
 #define mpi_request_free FTN_NAME(MPI_REQUEST_FREE , mpi_request_free)
 #define mpi_cancel FTN_NAME(MPI_CANCEL, mpi_cancel)
 #define mpi_test_cancelled FTN_NAME(MPI_TEST_CANCELLED, mpi_test_cancelled)
+#define mpi_status_set_cancelled FTN_NAME( MPI_STATUS_SET_CANCELLED , mpi_status_set_cancelled )
 #define mpi_iprobe FTN_NAME( MPI_IPROBE , mpi_iprobe )
 #define mpi_probe FTN_NAME( MPI_PROBE , mpi_probe )
 #define mpi_send_init FTN_NAME( MPI_SEND_INIT , mpi_send_init )
@@ -49,6 +50,7 @@ FDECL {
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
 #define mpi_get_address FTN_NAME( MPI_GET_ADDRESS , mpi_get_address )
 #define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
+#define mpi_status_set_elements FTN_NAME( MPI_STATUS_SET_ELEMENTS , mpi_status_set_elements )
 #define mpi_get_elements FTN_NAME( MPI_GET_ELEMENTS , mpi_get_elements )
 #define mpi_pack FTN_NAME( MPI_PACK , mpi_pack )
 #define mpi_unpack FTN_NAME( MPI_UNPACK , mpi_unpack )
@@ -521,6 +523,11 @@ void mpi_test_cancelled(int *status, int *flag, int *ierr)
   *ierr = AMPI_Test_cancelled((MPI_Status *)status, flag);
 }
 
+void mpi_status_set_cancelled(int *status, int *flag, int *ierr)
+{
+  *ierr = AMPI_Status_set_cancelled((MPI_Status *)status, *flag);
+}
+
 void mpi_recv_init(void *buf, int *count, int *type, int *srcpe,
    int *tag, int *comm, int *req, int *ierr)
 {
@@ -631,6 +638,11 @@ void mpi_get_address(int* location, int *address, int* ierr)
 void mpi_address(int* location, int *address, int* ierr)
 {
   *ierr = AMPI_Address(location, address);
+}
+
+void mpi_status_set_elements(int *status, int* datatype, int *count, int* ierr)
+{
+  *ierr = AMPI_Status_set_elements((MPI_Status*) status, *datatype, *count);
 }
 
 void mpi_get_elements(int *status, int* datatype, int *count, int* ierr)
