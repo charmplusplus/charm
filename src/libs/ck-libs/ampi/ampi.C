@@ -5980,6 +5980,95 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
 }
 
   CDECL
+int AMPI_Alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
+                  MPI_Datatype *sendtypes, void *recvbuf, int *recvcounts,
+                  int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm)
+{
+  AMPIAPI("AMPI_Alltoallw");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoallw not allowed for Inter-communicator!");
+  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
+
+#if CMK_ERROR_CHECKING
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CkAbort("MPI_Alltoallw does not accept MPI_IN_PLACE");
+
+  int ret;
+  ret = errorCheck(comm, 1, 0, 0, sendtypes[0], 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+  ret = errorCheck(comm, 1, 0, 0, recvtypes[0], 1, 0, 0, 0, 0, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  /* displs are in terms of bytes for Alltoallw (unlike Alltoallv) */
+  ampi *ptr = getAmpiInstance(comm);
+  int i, size = ptr->getSize(comm);
+  for(i=0;i<size;i++){
+    ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+sdispls[i],
+              sendcounts[i], sendtypes[i], i, comm);
+  }
+
+  for(i=0;i<size;i++){
+    if(-1==ptr->recv(MPI_ATA_TAG, i, ((char*)recvbuf)+rdispls[i], recvcounts[i],
+                     recvtypes[i], comm))
+      CkAbort("MPI_Alltoallw failed in recv\n");
+  }
+
+#if AMPI_COUNTER
+  getAmpiParent()->counters.alltoall++;
+#endif
+  return MPI_SUCCESS;
+}
+
+  CDECL
+int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
+                   MPI_Datatype *sendtypes, void *recvbuf, int *recvcounts,
+                   int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm,
+                   MPI_Request *request)
+{
+  AMPIAPI("AMPI_Ialltoallw");
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Ialltoallw not allowed for Inter-communicator!");
+  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
+
+#if CMK_ERROR_CHECKING
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CkAbort("MPI_Ialltoallw does not accept MPI_IN_PLACE");
+
+  int ret;
+  ret = errorCheck(comm, 1, 0, 0, sendtypes[0], 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+  ret = errorCheck(comm, 1, 0, 0, recvtypes[0], 1, 0, 0, 0, 0, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  /* displs are in terms of bytes for Alltoallw (unlike Alltoallv) */
+  ampi *ptr = getAmpiInstance(comm);
+  int i, size = ptr->getSize(comm);
+  for(i=0;i<size;i++){
+    ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+sdispls[i],
+              sendcounts[i], sendtypes[i], i, comm);
+  }
+
+  // use an IATAReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  IATAReq *newreq = new IATAReq(size);
+  for(i=0;i<size;i++){
+    if(newreq->addReq((void*)(((char*)recvbuf)+rdispls[i]), recvcounts[i],
+                      recvtypes[i], i, MPI_ATA_TAG, comm) != (i+1))
+      CkAbort("MPI_Ialltoallw: Error adding requests into IATAReq!");
+  }
+  *request = reqs->insert(newreq);
+
+#if AMPI_COUNTER
+  getAmpiParent()->counters.alltoall++;
+#endif
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Comm_dup(int comm, int *newcomm)
 {
   AMPIAPI("AMPI_Comm_dup");

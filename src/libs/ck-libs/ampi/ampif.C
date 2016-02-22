@@ -78,6 +78,8 @@ FDECL {
 #define mpi_ialltoall FTN_NAME( MPI_IALLTOALL , mpi_ialltoall )
 #define mpi_alltoallv FTN_NAME( MPI_ALLTOALLV , mpi_alltoallv )
 #define mpi_ialltoallv FTN_NAME( MPI_IALLTOALLV , mpi_ialltoallv )
+#define mpi_alltoallw FTN_NAME( MPI_ALLTOALLW , mpi_alltoallw )
+#define mpi_ialltoallw FTN_NAME( MPI_IALLTOALLW , mpi_ialltoallw )
 #define mpi_reduce FTN_NAME( MPI_REDUCE , mpi_reduce )
 #define mpi_ireduce FTN_NAME( MPI_IREDUCE , mpi_ireduce )
 #define mpi_allreduce FTN_NAME( MPI_ALLREDUCE , mpi_allreduce )
@@ -795,6 +797,23 @@ void mpi_ialltoallv(void *sendbuf, int *sendcounts, int *sdispls,
 {
   *ierr = AMPI_Ialltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
                          recvcounts, rdispls, *recvtype, *comm, request);
+}
+
+void ampi_alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
+   int *sendtypes, void *recvbuf, int *recvcounts, int *rdispls,
+   int *recvtypes, int *comm, int *ierr)
+{
+  *ierr = AMPI_Alltoallw(sendbuf, sendcounts, sdispls, sendtypes,
+                         recvbuf, recvcounts, rdispls, recvtypes, *comm);
+}
+
+void ampi_ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
+   int *sendtypes, void *recvbuf, int *recvcounts, int *rdispls,
+   int *recvtypes, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Ialltoallw(sendbuf, sendcounts, sdispls, sendtypes,
+                          recvbuf, recvcounts, rdispls, recvtypes,
+                          *comm, request);
 }
 
 void mpi_alltoall(void *sendbuf, int *sendcount, int *sendtype,

@@ -517,6 +517,15 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                    MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
                    int *rdispls, MPI_Datatype recvtype, MPI_Comm comm,
                    MPI_Request *request);
+#define MPI_Alltoallw AMPI_Alltoallw
+int AMPI_Alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
+                  MPI_Datatype *sendtypes, void *recvbuf, int *recvcounts,
+                  int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm);
+#define MPI_Ialltoallw AMPI_Ialltoallw
+int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
+                   MPI_Datatype *sendtypes, void *recvbuf, int *recvcounts,
+                   int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm,
+                   MPI_Request *request);
 #define MPI_Alltoall_long MPICH_AlltoAll_long
 int  MPICH_AlltoAll_long(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
