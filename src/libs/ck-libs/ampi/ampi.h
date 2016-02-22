@@ -541,6 +541,9 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 #define MPI_Iallreduce AMPI_Iallreduce
 int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm, MPI_Request *request);
+#define MPI_Reduce_local AMPI_Reduce_local
+int AMPI_Reduce_local(void *inbuf, void *outbuf, int count,
+                     MPI_Datatype datatype, MPI_Op op);
 #define MPI_Reduce_scatter AMPI_Reduce_scatter
 int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);

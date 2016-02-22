@@ -3368,6 +3368,25 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
 }
 
   CDECL
+int AMPI_Reduce_local(void *inbuf, void *outbuf, int count, int type, MPI_Op op)
+{
+  AMPIAPI("AMPI_Reduce_local");
+
+#if CMK_ERROR_CHECKING
+  if (inbuf == MPI_IN_PLACE || outbuf == MPI_IN_PLACE)
+    CkAbort("MPI_Reduce_local does not implement MPI_IN_PLACE");
+
+  int ret;
+  ret = errorCheck(MPI_COMM_SELF, 1, count, 1, type, 1, 0, 0, 0, 1, inbuf, 1, outbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  (op)(inbuf,outbuf,&count,&type);
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
     MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {
