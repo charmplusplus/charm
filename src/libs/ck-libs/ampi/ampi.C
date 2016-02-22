@@ -3387,6 +3387,34 @@ int AMPI_Reduce_local(void *inbuf, void *outbuf, int count, int type, MPI_Op op)
 }
 
   CDECL
+int AMPI_Reduce_scatter_block(void* sendbuf, void* recvbuf, int count,
+    MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
+{
+  AMPIAPI("AMPI_Reduce_scatter_block");
+
+  handle_MPI_IN_PLACE(sendbuf, recvbuf);
+
+#if CMK_ERROR_CHECKING
+  int ret;
+  ret = errorCheck(comm, 1, 0, 0, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Reduce_scatter_block not allowed for Inter-communicator!");
+  if(comm==MPI_COMM_SELF) return copyDatatype(comm, datatype, count, sendbuf, recvbuf);
+
+  ampi *ptr = getAmpiInstance(comm);
+  void *tmpbuf = malloc(ptr->getDDT()->getType(datatype)->getSize(count));
+
+  AMPI_Reduce(sendbuf, tmpbuf, count, datatype, op, MPI_REDUCE_SOURCE, comm);
+  AMPI_Scatter(tmpbuf, count, datatype, recvbuf, count, datatype, MPI_REDUCE_SOURCE, comm);
+
+  free(tmpbuf);
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
     MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {

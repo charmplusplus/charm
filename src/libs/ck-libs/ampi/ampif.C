@@ -85,6 +85,7 @@ FDECL {
 #define mpi_allreduce FTN_NAME( MPI_ALLREDUCE , mpi_allreduce )
 #define mpi_iallreduce FTN_NAME( MPI_IALLREDUCE , mpi_iallreduce )
 #define mpi_reduce_local FTN_NAME( MPI_REDUCE_LOCAL , mpi_reduce_local )
+#define mpi_reduce_scatter_block FTN_NAME( MPI_REDUCE_SCATTER_BLOCK , mpi_reduce_scatter_block )
 #define mpi_reduce_scatter FTN_NAME( MPI_REDUCE_SCATTER , mpi_reduce_scatter )
 #define mpi_scan FTN_NAME( MPI_SCAN , mpi_scan )
 #define mpi_exscan FTN_NAME( MPI_EXSCAN , mpi_exscan )
@@ -863,6 +864,13 @@ void mpi_reduce_local(void *inbuf, void *outbuf, int *count, int *type,
 {
   MPI_Op op = GET_MPI_OP(*opc);
   *ierr = AMPI_Reduce_local(inbuf, outbuf, *count, *type, op);
+}
+
+void ampi_reduce_scatter_block(void* sendbuf, void* recvbuf, int *count,
+                               int *type, int *opc, int *comm, int *ierr)
+{
+  MPI_Op op = GET_MPI_OP(*opc);
+  *ierr = AMPI_Reduce_scatter_block(sendbuf, recvbuf, *count, *type, op, *comm);
 }
 
 void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
