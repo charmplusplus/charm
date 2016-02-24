@@ -842,6 +842,12 @@ static int create_partition_map( char **argv)
     CmiGetArgIntDesc(argv,"+replicas", &_partitionInfo.numPartitions,"number of partitions");
   }
 
+#if CMK_MULTICORE
+  if(_partitionInfo.numPartitions != 1) {
+    CmiAbort("+partitions other than 1 is not allowed for multicore build\n");
+  }
+#endif
+
   _partitionInfo.partitionSize = (int*)calloc(_partitionInfo.numPartitions,sizeof(int));
   _partitionInfo.partitionPrefix = (int*)calloc(_partitionInfo.numPartitions,sizeof(int));
   
