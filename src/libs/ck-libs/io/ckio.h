@@ -8,6 +8,8 @@
 #include <CkIO.decl.h>
 
 namespace Ck { namespace IO {
+  /// Note: The values in options are not currently a stable or working interface.
+  /// Users should not set anything in them.
   struct Options {
     Options()
       : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1)
@@ -39,6 +41,8 @@ namespace Ck { namespace IO {
   /// Open the named file on the selected subset of PEs, and send a
   /// FileReadyMsg to the opened callback when the system is ready to accept
   /// session requests on that file.
+  /// Note: The values in options are not currently a stable or working interface.
+  /// Users should not set anything in them.
   void open(std::string name, CkCallback opened, Options opts);
 
   /// Prepare to write data into the file described by token, in the window
