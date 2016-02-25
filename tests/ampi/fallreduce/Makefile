@@ -1,13 +1,19 @@
+-include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-pgm: test.o
-	$(CHARMC) -o pgm test.o -language ampif
+all: pgm
 
-test.o: test.f90
-	$(CHARMC) -c test.f90
+pgm: pgm.o
+	$(CHARMC) -o pgm pgm.o -language ampif
+
+pgm.o: pgm.f90
+	$(CHARMC) -c pgm.f90
 
 #
 # clean up .o, .mod, .exe and EMACS backup files
 #
 clean:
 	rm -f *.o *.mod pgm *~ conv-host charmrun
+
+test: pgm
+	$(call run, ./pgm +p2 +vp4 )

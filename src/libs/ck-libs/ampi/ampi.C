@@ -655,20 +655,6 @@ static inline int record_msglog(int rank){
 }
 #endif
 
-void AMPI_Install_Idle_Timer(){
-#if AMPI_PRINT_IDLE
-  beginHandle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)BeginIdle,NULL);
-  endHandle = CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,(CcdVoidFn)EndIdle,NULL);
-#endif
-}
-
-void AMPI_Uninstall_Idle_Timer(){
-#if AMPI_PRINT_IDLE
-  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,beginHandle);
-  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,endHandle);
-#endif
-}
-
 PUPfunctionpointer(MPI_MainFn)
 
   class MPI_threadstart_t {
@@ -2227,7 +2213,7 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
 
 
   AmpiMsg* 
-ampi::Alltoall_RemoteIGet(int disp, int cnt, MPI_Datatype type, int tag)
+ampi::Alltoall_RemoteIget(int disp, int cnt, MPI_Datatype type, int tag)
 {
   CkAssert(tag==MPI_ATA_TAG && AlltoallGetFlag);
   int unit;
@@ -2472,108 +2458,6 @@ int testRequestNoFree(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
   if(*flag)
     req.complete(sts);
   return MPI_SUCCESS;
-}
-
-CDECL void AMPI_Migrate(void)
-{
-  //  AMPIAPI("AMPI_Migrate");
-#if 0
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_SUSPEND();
-#endif
-#endif
-  TCHARM_Migrate();
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  ampi *currentAmpi = getAmpiInstance(MPI_COMM_WORLD);
-  CpvAccess(_currentObj) = currentAmpi;
-#endif
-
-#if CMK_BIGSIM_CHARM
-  //  TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
-  TRACE_BG_ADD_TAG("AMPI_MIGRATE");
-#endif
-}
-
-
-CDECL void AMPI_Evacuate(void)
-{
-  TCHARM_Evacuate();
-}
-
-
-
-CDECL void AMPI_Migrateto(int destPE)
-{
-  AMPIAPI("AMPI_MigrateTo");
-#if 0
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_SUSPEND();
-#endif
-#endif
-  TCHARM_Migrate_to(destPE);
-#if CMK_BIGSIM_CHARM
-  //TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATETO")
-  TRACE_BG_ADD_TAG("AMPI_MIGRATETO");
-#endif
-}
-
-CDECL void AMPI_MigrateTo(int destPE)
-{
-  AMPI_Migrateto(destPE);
-}
-
-CDECL void AMPI_Async_Migrate(void)
-{
-  AMPIAPI("AMPI_Async_Migrate");
-#if 0
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_SUSPEND();
-#endif
-#endif
-  TCHARM_Async_Migrate();
-#if CMK_BIGSIM_CHARM
-  //TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
-  TRACE_BG_ADD_TAG("AMPI_ASYNC_MIGRATE");
-#endif
-}
-
-CDECL void AMPI_Allow_Migrate(void)
-{
-  AMPIAPI("AMPI_Allow_Migrate");
-#if 0
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_SUSPEND();
-#endif
-#endif
-  TCHARM_Allow_Migrate();
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_ADD_TAG("AMPI_ALLOW_MIGRATE");
-#endif
-}
-
-CDECL void AMPI_Setmigratable(MPI_Comm comm, int mig){
-#if CMK_LBDB_ON
-  //AMPIAPI("AMPI_Setmigratable");
-  ampi *ptr=getAmpiInstance(comm);
-  ptr->setMigratable(mig);
-#else
-  CkPrintf("Warning: MPI_Setmigratable and load balancing are not supported in this version.\n");
-#endif
-}
-
-CDECL void AMPI_About_to_migrate(MPI_MigrateFn f)
-{
-  AMPIAPI("AMPI_About_to_migrate");
-  ampiParent *thisParent = getAmpiParent();
-  thisParent->setUserAboutToMigrateFn(f);
-}
-
-CDECL void AMPI_Just_migrated(MPI_MigrateFn f)
-{
-  AMPIAPI("AMPI_Just_migrated");
-  ampiParent *thisParent = getAmpiParent();
-  thisParent->setUserJustMigratedFn(f);
 }
 
 CDECL int AMPI_Is_thread_main(int *flag)
@@ -5748,15 +5632,15 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
   CDECL
-int AMPI_Alltoall2(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     void *recvbuf, int recvcount, MPI_Datatype recvtype,
     MPI_Comm comm)
 {
-  AMPIAPI("AMPI_Alltoall2");
+  AMPIAPI("AMPI_Alltoall_iget");
 
 #if CMK_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
-    CkAbort("AMPI_Alltoall2 does not accept MPI_IN_PLACE");
+    CkAbort("AMPI_Alltoall_iget does not accept MPI_IN_PLACE");
 
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
@@ -5767,7 +5651,7 @@ int AMPI_Alltoall2(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
-  if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoall not allowed for Inter-communicator!");
+  if(getAmpiParent()->isInter(comm)) CkAbort("AMPI_Alltoall_iget not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   CProxy_ampi pa(ptr->ckGetArrayID());
@@ -5778,7 +5662,7 @@ int AMPI_Alltoall2(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int myrank;
   int i;
   // Set flags for others to get
-  ptr->setA2AIGetFlag((void*)sendbuf);
+  ptr->setA2AIgetFlag((void*)sendbuf);
   MPI_Comm_rank(comm,&myrank);
   recvdisp = myrank*recvcount;
 
@@ -5786,7 +5670,7 @@ int AMPI_Alltoall2(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   // post receives
   MPI_Request *reqs = new MPI_Request[size];
   for(i=0;i<size;i++) {
-    reqs[i] = pa[i].Alltoall_RemoteIGet(recvdisp, recvcount, recvtype,
+    reqs[i] = pa[i].Alltoall_RemoteIget(recvdisp, recvcount, recvtype,
         MPI_ATA_TAG);
   }
 
@@ -5803,7 +5687,7 @@ int AMPI_Alltoall2(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   AMPI_Barrier(comm);
 
   // Reset flags 
-  ptr->resetA2AIGetFlag();
+  ptr->resetA2AIgetFlag();
 
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
@@ -7180,94 +7064,6 @@ int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
   return MPI_SUCCESS;
 }
 
-/* Charm++ Extentions to MPI standard: */
-  CDECL
-void AMPI_Checkpoint(char *dname)
-{
-  AMPI_Barrier(MPI_COMM_WORLD);
-  AMPIAPI("AMPI_Checkpoint");
-  getAmpiParent()->startCheckpoint(dname);
-}
-
-  CDECL
-void AMPI_MemCheckpoint()
-{
-#if CMK_MEM_CHECKPOINT
-  AMPI_Barrier(MPI_COMM_WORLD);
-  AMPIAPI("AMPI_Checkpoint");
-  getAmpiParent()->startCheckpoint("");
-#else
-  CkPrintf("Error: In memory checkpoint/restart is not on! \n");
-  CkAbort("Error: recompile Charm++ with CMK_MEM_CHECKPOINT. \n");
-#endif
-}
-
-  CDECL
-void AMPI_Print(char *str)
-{
-  AMPIAPI("AMPI_Print");
-  ampiParent *ptr = getAmpiParent();
-  CkPrintf("[%d] %s\n", ptr->thisIndex, str);
-}
-
-  CDECL
-int AMPI_Register(void *d, MPI_PupFn f)
-{
-  AMPIAPI("AMPI_Register");
-  return TCHARM_Register(d,f);
-}
-
-  CDECL
-void *MPI_Get_userdata(int idx)
-{
-  AMPIAPI("AMPI_Get_userdata");
-  return TCHARM_Get_userdata(idx);
-}
-
-  CDECL
-void AMPI_Start_measure()
-{
-  AMPIAPI("AMPI_Start_measure");
-  ampiParent *ptr = getAmpiParent();
-  ptr->start_measure();
-}
-
-  CDECL
-void AMPI_Stop_measure()
-{
-  AMPIAPI("AMPI_Stop_measure");
-  ampiParent *ptr = getAmpiParent();
-  ptr->stop_measure();
-}
-
-  CDECL
-void AMPI_Set_load(double load)
-{
-  AMPIAPI("AMPI_Set_load");
-  ampiParent *ptr = getAmpiParent();
-  ptr->setObjTime(load);
-}
-
-  CDECL
-void AMPI_Register_main(MPI_MainFn mainFn,const char *name)
-{
-  AMPIAPI("AMPI_Register_main");
-  if (TCHARM_Element()==0)
-  { // I'm responsible for building the TCHARM threads:
-    ampiCreateMain(mainFn,name,strlen(name));
-  }
-}
-  FDECL
-  void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
-(MPI_MainFn mainFn,const char *name,int nameLen)
-{
-  AMPIAPI("AMPI_register_main");
-  if (TCHARM_Element()==0)
-  { // I'm responsible for building the TCHARM threads:
-    ampiCreateMain(mainFn,name,nameLen);
-  }
-}
-
 CDECL
 int AMPI_Comm_set_name(MPI_Comm comm, const char *comm_name){
   AMPIAPI("AMPI_Comm_set_name");
@@ -7834,15 +7630,6 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   return MPI_SUCCESS;
 }
 
-void _registerampif(void)
-{
-  _registerampi();
-}
-
-void AMPI_Datatype_iscontig(MPI_Datatype datatype, int *flag){
-  *flag = getDDT()->isContig(datatype);
-}
-
 CDECL
 int AMPI_Type_get_envelope(MPI_Datatype datatype, int *ni, int *na, int *nd, int *combiner){
   AMPIAPI("AMPI_Type_get_envelope");
@@ -7855,66 +7642,304 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[
   return getDDT()->getContents(datatype,ni,na,nd,i,a,d);
 }
 
-/******** AMPI-specific (not standard MPI) calls *********/
+CDECL
+int AMPI_Pcontrol(const int level, ...) {
+  return MPI_SUCCESS;
+}
+
+/******** AMPI Extensions to the MPI standard *********/
 
 CDECL
-void AMPI_My_pe(int *my_pe) {
-  AMPIAPI("AMPI_My_pe");
-  *my_pe = CkMyPe();
+int AMPI_Migrate(MPI_Info hints)
+{
+#if 0 && CMK_BIGSIM_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
+  int nkeys, exists;
+  char key[MPI_MAX_INFO_KEY], value[MPI_MAX_INFO_VAL];
+
+  AMPI_Info_get_nkeys(hints, &nkeys);
+
+  for (int i=0; i<nkeys; i++) {
+    AMPI_Info_get_nthkey(hints, i, key);
+    AMPI_Info_get(hints, key, MPI_MAX_INFO_VAL, value, &exists);
+    if (!exists) {
+      continue;
+    }
+    else if (strncmp(key, "ampi_load_balance", MPI_MAX_INFO_KEY) == 0) {
+
+      if (strncmp(value, "sync", MPI_MAX_INFO_VAL) == 0) {
+        TCHARM_Migrate();
+      }
+      else if (strncmp(value, "async", MPI_MAX_INFO_VAL) == 0) {
+        TCHARM_Async_Migrate();
+      }
+      else if (strncmp(value, "false", MPI_MAX_INFO_VAL) == 0) {
+        /* do nothing */
+      }
+      else {
+        CkPrintf("WARNING: Unknown MPI_Info value (%s) given to AMPI_Migrate for key: %s\n", value, key);
+      }
+    }
+    else if (strncmp(key, "ampi_checkpoint", MPI_MAX_INFO_KEY) == 0) {
+
+      if (strncmp(value, "true", MPI_MAX_INFO_VAL) == 0) {
+        CkAbort("AMPI> Error: Value \"true\" is not supported for AMPI_Migrate key \"ampi_checkpoint\"!\n");
+      }
+      else if (strncmp(value, "to_file=", strlen("to_file=")) == 0) {
+        int offset = strlen("to_file=");
+        int restart_dir_name_len = 0;
+        AMPI_Info_get_valuelen(hints, key, &restart_dir_name_len, &exists);
+        if (restart_dir_name_len > offset) {
+          value[restart_dir_name_len] = '\0';
+        }
+        else {
+          CkAbort("AMPI> Error: No checkpoint directory name given to AMPI_Migrate\n");
+        }
+        AMPI_Barrier(MPI_COMM_WORLD);
+        getAmpiParent()->startCheckpoint(&value[offset]);
+      }
+      else if (strncmp(value, "in_memory", MPI_MAX_INFO_VAL) == 0) {
+#if CMK_MEM_CHECKPOINT
+        AMPI_Barrier(MPI_COMM_WORLD);
+        getAmpiParent()->startCheckpoint("");
+#else
+        CkPrintf("AMPI> Error: In-memory checkpoint/restart is not enabled!\n");
+        CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MEM_CHECKPOINT.\n");
+#endif
+      }
+      else if (strncmp(value, "message_logging", MPI_MAX_INFO_VAL) == 0) {
+#if CMK_MESSAGE_LOGGING
+        TCHARM_Migrate();
+#else
+        CkPrintf("AMPI> Error: Message logging is not enabled!\n");
+        CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MESSAGE_LOGGING.\n");
+#endif
+      }
+      else if (strncmp(value, "false", MPI_MAX_INFO_VAL) == 0) {
+        /* do nothing */
+      }
+      else {
+        CkPrintf("WARNING: Unknown MPI_Info value (%s) given to AMPI_Migrate for key: %s\n", value, key);
+      }
+    }
+    else {
+      CkPrintf("WARNING: Unknown MPI_Info key given to AMPI_Migrate: %s\n", key);
+    }
+  }
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  ampi *currentAmpi = getAmpiInstance(MPI_COMM_WORLD);
+  CpvAccess(_currentObj) = currentAmpi;
+#endif
+
+#if CMK_BIGSIM_CHARM
+  //TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
+  TRACE_BG_ADD_TAG("AMPI_MIGRATE");
+#endif
+  return MPI_SUCCESS;
 }
 
 CDECL
-void AMPI_My_node(int *my_node) {
-  AMPIAPI("AMPI_My_node");
-  *my_node = CkMyNode();
+int AMPI_Evacuate(void)
+{
+  TCHARM_Evacuate();
+  return MPI_SUCCESS;
 }
 
 CDECL
-void AMPI_Num_pes(int *num_pes) {
-  AMPIAPI("AMPI_Num_pes");
-  *num_pes = CkNumPes();
+int AMPI_Migrate_to_pe(int dest)
+{
+  AMPIAPI("AMPI_Migrate_to_pe");
+#if 0 && CMK_BIGSIM_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
+  TCHARM_Migrate_to(dest);
+#if CMK_BIGSIM_CHARM
+  //TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE_TO_PE")
+  TRACE_BG_ADD_TAG("AMPI_MIGRATE_TO_PE");
+#endif
+  return MPI_SUCCESS;
 }
 
 CDECL
-void AMPI_Num_nodes(int *num_nodes) {
-  AMPIAPI("AMPI_Num_nodes");
-  *num_nodes = CkNumNodes();
+int AMPI_Comm_set_migratable(MPI_Comm comm, int mig){
+#if CMK_LBDB_ON
+  //AMPIAPI("AMPI_Comm_set_migratable");
+  ampi *ptr=getAmpiInstance(comm);
+  ptr->setMigratable(mig);
+#else
+  CkPrintf("WARNING: MPI_Comm_set_migratable is not supported in this build of Charm++/AMPI.\n");
+#endif
+  return MPI_SUCCESS;
 }
 
 CDECL
-int AMPI_Suspend(int comm) {
+int AMPI_Load_start_measure(void)
+{
+  AMPIAPI("AMPI_Load_start_measure");
+  ampiParent *ptr = getAmpiParent();
+  ptr->start_measure();
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Load_stop_measure(void)
+{
+  AMPIAPI("AMPI_Load_stop_measure");
+  ampiParent *ptr = getAmpiParent();
+  ptr->stop_measure();
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Load_set_value(double value)
+{
+  AMPIAPI("AMPI_Load_set_value");
+  ampiParent *ptr = getAmpiParent();
+  ptr->setObjTime(value);
+  return MPI_SUCCESS;
+}
+
+void _registerampif(void) {
+  _registerampi();
+}
+
+CDECL
+int AMPI_Register_main(MPI_MainFn mainFn,const char *name)
+{
+  AMPIAPI("AMPI_Register_main");
+  if (TCHARM_Element()==0)
+  { // I'm responsible for building the TCHARM threads:
+    ampiCreateMain(mainFn,name,strlen(name));
+  }
+  return MPI_SUCCESS;
+}
+
+FDECL
+void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
+(MPI_MainFn mainFn,const char *name,int nameLen)
+{
+  AMPIAPI("AMPI_register_main");
+  if (TCHARM_Element()==0)
+  { // I'm responsible for building the TCHARM threads:
+    ampiCreateMain(mainFn,name,nameLen);
+  }
+}
+
+CDECL
+int AMPI_Register_pup(MPI_PupFn fn, void *data, int *idx)
+{
+  AMPIAPI("AMPI_Register_pup");
+  *idx = TCHARM_Register(data, fn);
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Register_about_to_migrate(MPI_MigrateFn fn)
+{
+  AMPIAPI("AMPI_Register_about_to_migrate");
+  ampiParent *thisParent = getAmpiParent();
+  thisParent->setUserAboutToMigrateFn(fn);
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Register_just_migrated(MPI_MigrateFn fn)
+{
+  AMPIAPI("AMPI_Register_just_migrated");
+  ampiParent *thisParent = getAmpiParent();
+  thisParent->setUserJustMigratedFn(fn);
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Get_pup_data(int idx, void *data)
+{
+  AMPIAPI("AMPI_Get_pup_data");
+  data = TCHARM_Get_userdata(idx);
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_is_contiguous(MPI_Datatype datatype, int *flag)
+{
+  *flag = getDDT()->isContig(datatype);
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Print(char *str)
+{
+  AMPIAPI("AMPI_Print");
+  ampiParent *ptr = getAmpiParent();
+  CkPrintf("[%d] %s\n", ptr->thisIndex, str);
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Suspend(MPI_Comm comm)
+{
   AMPIAPI("AMPI_Suspend");
   getAmpiInstance(comm)->block();
   return MPI_SUCCESS;
 }
 
 CDECL
-int AMPI_Yield(int comm) {
+int AMPI_Yield(MPI_Comm comm)
+{
   AMPIAPI("AMPI_Yield");
   getAmpiInstance(comm)->yield();
   return MPI_SUCCESS;
 }
 
 CDECL
-int AMPI_Resume(int dest, int comm) {
+int AMPI_Resume(int dest, MPI_Comm comm)
+{
   AMPIAPI("AMPI_Resume");
   getAmpiInstance(comm)->getProxy()[dest].unblock();
   return MPI_SUCCESS;
 }
 
 CDECL
-int AMPI_System(const char *cmd) {
+int AMPI_System(const char *cmd)
+{
   return TCHARM_System(cmd);
 }
 
 CDECL
-int AMPI_Pcontrol(const int level, ...)
+int AMPI_Trace_begin(void)
 {
-    return MPI_SUCCESS;
+  traceBegin();
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Trace_end(void)
+{
+  traceEnd();
+  return MPI_SUCCESS;
+}
+
+int AMPI_Install_idle_timer(void)
+{
+#if AMPI_PRINT_IDLE
+  beginHandle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)BeginIdle,NULL);
+  endHandle = CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,(CcdVoidFn)EndIdle,NULL);
+#endif
+  return MPI_SUCCESS;
+}
+
+int AMPI_Uninstall_idle_timer(void)
+{
+#if AMPI_PRINT_IDLE
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,beginHandle);
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,endHandle);
+#endif
+  return MPI_SUCCESS;
 }
 
 #if CMK_BIGSIM_CHARM
-
 extern "C" void startCFnCall(void *param,void *msg)
 {
   BgSetStartEvent();
@@ -7923,8 +7948,8 @@ extern "C" void startCFnCall(void *param,void *msg)
   delete (CkReductionMsg*)msg;
 }
 
-  CDECL
-int AMPI_Set_startevent(MPI_Comm comm)
+CDECL
+int AMPI_Set_start_event(MPI_Comm comm)
 {
   AMPIAPI("AMPI_BgSetStartEvent");
   CkAssert(comm == MPI_COMM_WORLD);
@@ -7948,12 +7973,12 @@ int AMPI_Set_startevent(MPI_Comm comm)
 }
 
 CDECL
-int AMPI_Set_endevent() 
+int AMPI_Set_end_event(void)
 {
   AMPIAPI("AMPI_BgSetEndEvent");
+  return MPI_SUCCESS;
 }
-
-#endif
+#endif // CMK_BIGSIM_CHARM
 
 #if CMK_CUDA
 GPUReq::GPUReq()
@@ -8039,8 +8064,7 @@ int AMPI_GPU_Invoke(workRequest *to_call)
 
   return MPI_SUCCESS;
 }
-
-#endif
+#endif // CMK_CUDA
 
 #include "ampi.def.h"
 

@@ -36,7 +36,9 @@ Chee Wai Lee, Isaac Dooley, and Sindhura Bandhakavi
 Adaptive MPI (AMPI) is an implementation of the MPI interface on top
 of \charmpp{}. As with standard MPI programs, the appropriate semantic
 context for performance analysis is captured through the observation
-of MPI calls within C/C++/Fortran functions. Unfortunately, AMPI's
+of MPI calls within C/C++/Fortran functions. Users can selectively begin
+and end tracing in AMPI programs using the routines \texttt{AMPI\_Trace\_begin}
+and \texttt{AMPI\_Trace\_end}. Unfortunately, AMPI's
 implementation does not grant the runtime access to information about
 user function calls. As a result, the tracing framework must provide
 an explicit API for capturing this piece of performance information in
@@ -48,7 +50,7 @@ follows:
 \begin{itemize}
 \item 
 \begin{verbatim}
-int _TRACE_REGISTER_FUNCTION_NAME(const char *name);
+int AMPI_Trace_register_function_name(const char *name);
 \end{verbatim}
 This function registers an AMPI function {\tt name}. The tracing
 framework assigns to function {\tt name} a unique id and returns
@@ -60,7 +62,7 @@ application, just after {\tt MPI\_Init}.
 
 \item
 \begin{verbatim}
-int _TRACE_REGISTER_FUNCTION_ID(const char *name, int idx);
+int AMPI_Trace_register_function_id(const char *name, int idx);
 \end{verbatim}
 This function registers an AMPI function {\tt name} to be associated
 explicitly to the id {\tt idx}. It is the user's responsibility to 
@@ -72,7 +74,7 @@ the start of the application just after {\tt MPI\_Init}.
 
 \item
 \begin{verbatim}
-void _TRACE_BEGIN_FUNCTION_NAME(const char *name);
+void AMPI_Trace_begin_function_name(const char *name);
 \end{verbatim}
 This function tells the tracing framework to record a begin event
 associated with the registered function {\tt name}. If this were called
@@ -81,7 +83,7 @@ the function call will also be recorded.
 
 \item
 \begin{verbatim}
-void _TRACE_BEGIN_FUNCTION_ID(int idx);
+void AMPI_Trace_begin_function_id(int idx);
 \end{verbatim}
 This function tells the tracing framework to record a begin event
 associated with the registered function indexed by {\tt idx}. If this were
@@ -90,14 +92,14 @@ of the function call will also be recorded.
 
 \item
 \begin{verbatim}
-void _TRACE_END_FUNCTION_NAME(const char *name);
+void AMPI_Trace_end_function_name(const char *name);
 \end{verbatim}
 This function tells the tracing framework to record a end event
 associated with the registered function {\tt name}.
 
 \item
 \begin{verbatim}
-void _TRACE_END_FUNCTION_ID(int idx);
+void AMPI_Trace_end_function_id(int idx);
 \end{verbatim}
 This function tells the tracing framework to record a end event
 associated with the registered function indexed by {\tt idx}.

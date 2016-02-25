@@ -116,7 +116,7 @@ main(int argc, char **argv){
   if(1){
 	// warm up, not instrumented
 	for(i=0; i<max_msgs; i++) {
-	  MPI_Alltoall_long(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
+	  AMPI_Alltoall_long(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 
 	memset(recvbuf,0,msg_size*p);
@@ -129,7 +129,7 @@ main(int argc, char **argv){
 	  Start_Timer (0, ITIMER_REAL); 
 	}
 	for(i=0; i<max_msgs; i++) {
-	  MPI_Alltoall_long(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
+	  AMPI_Alltoall_long(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 	memory_after = CmiMemoryUsage();
@@ -157,7 +157,7 @@ main(int argc, char **argv){
   {
 	// warm up, not instrumented
 	for(i=0; i<max_msgs; i++) {
-	  MPI_Alltoall_short(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
+	  AMPI_Alltoall_short(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 
 	memset(recvbuf,0,msg_size*p);
@@ -170,7 +170,7 @@ main(int argc, char **argv){
 	  Start_Timer (0, ITIMER_REAL); 
 	}
 	for(i=0; i<max_msgs; i++) {
-	  MPI_Alltoall_short(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
+	  AMPI_Alltoall_short(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 	memory_after = CmiMemoryUsage();
@@ -196,7 +196,7 @@ main(int argc, char **argv){
   if(1){
 	// warm up, not instrumented
 	for(i=0; i<max_msgs; i++) {
-	  MPI_Alltoall_medium(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
+	  AMPI_Alltoall_medium(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 
 	memset(recvbuf,0,msg_size*p);
@@ -209,7 +209,7 @@ main(int argc, char **argv){
 	  Start_Timer (0, ITIMER_REAL); 
 	}
 	for(i=0; i<max_msgs; i++) {
-	  MPI_Alltoall_medium(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
+	  AMPI_Alltoall_medium(sndbuf, msg_size, MPI_CHAR, recvbuf, msg_size, MPI_CHAR, MPI_COMM_WORLD);
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 	memory_after = CmiMemoryUsage();

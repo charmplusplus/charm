@@ -342,21 +342,21 @@ ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targ
 
 
 int
-ampi::winIGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+ampi::winIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win, 
 	     MPI_Request *req){
   // Send the request to data and handle of Future to remote side
   CProxy_ampi pa(thisArrayID);
   AMPI_DEBUG("    Rank[%d:%d] request Remote iget at [%d]\n", thisIndex, myRank, rank);
-  *req = pa[rank].winRemoteIGet(orgdisp, orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
+  *req = pa[rank].winRemoteIget(orgdisp, orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
   return MPI_SUCCESS;
 }
 
 
 AmpiMsg*
-ampi::winRemoteIGet(int orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+ampi::winRemoteIget(int orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
                    MPI_Datatype targtype, int winIndex) {
-  AMPI_DEBUG("    RemoteIGet invoked at Rank[%d:%d]\n", thisIndex, myRank);
+  AMPI_DEBUG("    RemoteIget invoked at Rank[%d:%d]\n", thisIndex, myRank);
 // FIX: no need for stargaddr??
 // FIX: what is targaddr pointing??
   int orgunit, targunit;
@@ -384,21 +384,22 @@ stargtotalsize,myComm.getComm());
  }
 
 int
-ampi::winIGetWait(MPI_Request *request, MPI_Status *status) {
+ampi::winIgetWait(MPI_Request *request, MPI_Status *status) {
   // Wait on the Future object
-  AMPI_DEBUG("    [%d] IGet Waiting\n", thisIndex, *request);
+  AMPI_DEBUG("    [%d] Iget Waiting\n", thisIndex, *request);
   status->msg = (AmpiMsg*)CkWaitReleaseFuture(*request);
-  AMPI_DEBUG("    [%d] IGet Waiting [%d] awaken\n", thisIndex, *request);
+  AMPI_DEBUG("    [%d] Iget Waiting [%d] awaken\n", thisIndex, *request);
   return MPI_SUCCESS;
 }
 
 int
-ampi::winIGetFree(MPI_Request *request, MPI_Status *status) {
-  AMPI_DEBUG("    [%d] : IGet [%d] frees buffer\n", thisIndex, *request);
+ampi::winIgetFree(MPI_Request *request, MPI_Status *status) {
+  AMPI_DEBUG("    [%d] : Iget [%d] frees buffer\n", thisIndex, *request);
 
-  
-  if(!(MPI_IGet_Data(*status))) {
-    AMPI_DEBUG("    [%d] IGet [%d] attempt to free NULL buffer \n", thisIndex, *request);
+  void *data;
+  AMPI_Iget_data(data, *status);
+  if(!data) {
+    AMPI_DEBUG("    [%d] Iget [%d] attempt to free NULL buffer \n", thisIndex, *request);
     return MPI_ERR_BUFFER;
   }
   else {
@@ -788,38 +789,40 @@ int AMPI_Win_complete(MPI_Win win){
 
 // FIX PLACE II
 CDECL
-int AMPI_IGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
         MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
         MPI_Request *request) {
-  AMPIAPI("AMPI_IGet");
+  AMPIAPI("AMPI_Iget");
   WinStruct winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct.comm);
   // winGet is a local function which will call the remote method on #rank processor
-  return  ptr->winIGet(orgdisp, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct,
+  return  ptr->winIget(orgdisp, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct,
 		       request);
 }
 
 CDECL
-int AMPI_IGet_Wait(MPI_Request *request, MPI_Status *status, MPI_Win win) {
-  AMPIAPI("AMPI_IGet_Wait");
+int AMPI_Iget_wait(MPI_Request *request, MPI_Status *status, MPI_Win win) {
+  AMPIAPI("AMPI_Iget_wait");
   WinStruct winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct.comm);
   // winGet is a local function which will call the remote method on #rank processor
-  return  ptr->winIGetWait(request,status);
+  return  ptr->winIgetWait(request,status);
 }
 
 CDECL
-int AMPI_IGet_Free(MPI_Request *request, MPI_Status *status, MPI_Win win) {
-  AMPIAPI("AMPI_IGet_Free");
+int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win) {
+  AMPIAPI("AMPI_Iget_free");
   WinStruct winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct.comm);
   // winGet is a local function which will call the remote method on #rank processor
-  return  ptr->winIGetFree(request, status);
+  return  ptr->winIgetFree(request, status);
 }
 
-char* 
-MPI_IGet_Data(MPI_Status status) 
-{ return (char*)((AmpiMsg*)status.msg)->data; }
+CDECL
+int AMPI_Iget_data(void *data, MPI_Status status) {
+  data = (void*)((AmpiMsg*)status.msg)->data;
+  return MPI_SUCCESS;
+}
 
 /*
  * int AMPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr) 

@@ -85,26 +85,23 @@ AMPI has some known flaws and incompatibilities with other MPI implementations:
     * The PMPI profiling interface is not implemented in AMPI.
 
 AMPI also has extensions to the MPI standard to enable use of the high-level
-features provided by the Charm++ adaptive runtime system:
-    * MPI_Migrate checks for load imbalance and rebalances the load using
-      the strategy linked in and specified at job launch.
-    * MPI_Checkpoint performs a checkpoint to disk.
-    * MPI_MemCheckpoint performs a double in-memory checkpoint.
-    * MPI_Register is used to register PUP routines and user data.
-    * MPI_Get_userdata returns a pointer to user data managed by the runtime.
-    * MPI_Register_main is used to register multiple AMPI modules.
-    * MPI_Set_load sets the calling rank's load to the given user value.
-    * MPI_Start_measure starts load balance information collection.
-    * MPI_Stop_measure stops load balance information collection.
-    * MPI_MigrateTo migrates the calling rank to the given PE.
-    * MPI_Setmigratable sets the migratability of the given communicator.
-    * MPI_Num_nodes returns the total number of nodes.
-    * MPI_Num_pes returns the total number of PEs.
-    * MPI_My_node returns the local node number.
-    * MPI_My_pe returns the local node number.
-    * MPI_Command_argument_count returns the number of command line arguments
+features provided by the Charm++ adaptive runtime system. All extensions are
+prefixed with AMPI_:
+    * AMPI_Migrate tells the runtime system that the application has reached a
+      point at which the runtime system may serialize and migrate ranks.
+      It is used for dynamic load balancing and fault tolerance. See the AMPI
+      manual for more information on how to use it.
+    * AMPI_Register_pup is used to register PUP routines and user data.
+    * AMPI_Get_pup_data returns a pointer to user data managed by the runtime.
+    * AMPI_Register_main is used to register multiple AMPI modules.
+    * AMPI_Load_set_value sets the calling rank's load to the given user value.
+    * AMPI_Load_start_measure starts load balance information collection.
+    * AMPI_Load_stop_measure stops load balance information collection.
+    * AMPI_Migrate_to_pe migrates the calling rank to the given PE.
+    * AMPI_Comm_set_migratable sets the migratability of the given communicator.
+    * AMPI_Command_argument_count returns the number of command line arguments
       given to a Fortran AMPI program excluding charmrun and AMPI parameters.
-    * MPI_Get_command_argument returns an argument from the command line
+    * AMPI_Get_command_argument returns an argument from the command line
       to a Fortran AMPI program.
 
 Note that AMPI defines a preprocessor symbol "AMPI" so that user codes can

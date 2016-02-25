@@ -1528,18 +1528,18 @@ friend class SReq;
 	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
     int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
 	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
-    int winIGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+    int winIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
                MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win, 
 	       MPI_Request *req);
-    int winIGetWait(MPI_Request *request, MPI_Status *status);
-    int winIGetFree(MPI_Request *request, MPI_Status *status);
+    int winIgetWait(MPI_Request *request, MPI_Status *status);
+    int winIgetFree(MPI_Request *request, MPI_Status *status);
     void winRemotePut(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
 		      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 		      int winIndex, CkFutureID ftHandle, int pe_src);
     void winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, 
 		      int targcnt, MPI_Datatype targtype, 
     		      int winIndex, CkFutureID ftHandle, int pe_src);
-    AmpiMsg* winRemoteIGet(int orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+    AmpiMsg* winRemoteIget(int orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
 			   int targcnt, MPI_Datatype targtype, int winIndex);
     int winLock(int lock_type, int rank, WinStruct win);
     int winUnlock(int rank, WinStruct win);
@@ -1557,13 +1557,13 @@ friend class SReq;
     win_obj* getWinObjInstance(WinStruct win); 
     int getNewSemaId(); 
 
-    AmpiMsg* Alltoall_RemoteIGet(int disp, int targcnt, MPI_Datatype targtype, int tag);
+    AmpiMsg* Alltoall_RemoteIget(int disp, int targcnt, MPI_Datatype targtype, int tag);
 private:
     int AlltoallGetFlag;
     void *Alltoallbuff;
 public:
-    void setA2AIGetFlag(void* ptr) {AlltoallGetFlag=1;Alltoallbuff=ptr;}
-    void resetA2AIGetFlag() {AlltoallGetFlag=0;Alltoallbuff=NULL;} 
+    void setA2AIgetFlag(void* ptr) {AlltoallGetFlag=1;Alltoallbuff=ptr;}
+    void resetA2AIgetFlag() {AlltoallGetFlag=0;Alltoallbuff=NULL;}
     //------------------------ End of code by YAN ---------------------
 };
 

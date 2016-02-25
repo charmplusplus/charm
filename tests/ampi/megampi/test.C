@@ -242,6 +242,10 @@ void MPI_Tester::drain(void) {
 void MPI_Tester::testMigrate(void) {
 	beginTest(2,"Migration");
 	int srcPe=CkMyPe();
+    MPI_Info hints;
+
+    MPI_Info_create(&hints);
+    MPI_Info_set(hints, "ampi_load_balance", "true");
 	
 	// Before migrating, send a message to the next guy:
 	//    this tests out migration with pending messages
@@ -250,7 +254,7 @@ void MPI_Tester::testMigrate(void) {
 	TEST_MPI(MPI_Send,(&dest,1,MPI_INT, dest,tag,comm));
 	TEST_MPI(MPI_Barrier,(comm));
 	
-	MPI_Migrate();
+	AMPI_Migrate(hints);
 	
 	TEST_MPI(MPI_Barrier,(comm));
 	int recv=-1; MPI_Status sts;

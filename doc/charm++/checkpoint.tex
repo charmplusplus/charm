@@ -208,11 +208,33 @@ programmer is responsible for choosing when to activate checkpointing
 so that the size of a global checkpoint state, and consequently the
 time to record it, is minimized.
 
-In AMPI applications, the user just needs to call the following
-function to record a checkpoint:
+In AMPI applications, the user just needs to create an MPI\_Info object with
+the key ``ampi\_checkpoint'' and a value of either ``in\_memory'' (for a double
+in-memory checkpoint) or ``to\_file=file\_name'' (to checkpoint to disk), and
+pass that object to the function AMPI\_Migrate() as in the following:
+
 \begin{alltt}
-      void AMPI_MemCheckpoint()
+// Setup
+MPI_Info in_memory, to_file;
+
+MPI_Info_create(&in_memory);
+MPI_Info_set(in_memory, "ampi_checkpoint", "in_memory");
+
+MPI_Info_create(&to_file);
+MPI_Info_set(to_file, "ampi_checkpoint", "to_file=chkpt_dir");
+
+...
+
+// Main time-stepping loop
+for (int iter=0; iter < max_iters; iter++) \{
+
+  // Time step work ...
+
+  if (iter \% chkpt_freq == 0)
+    AMPI_Migrate(in_memory);
+\}
 \end{alltt}
+
 
 \subsection{Restarting}
 

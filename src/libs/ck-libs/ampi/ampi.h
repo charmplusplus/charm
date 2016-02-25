@@ -23,6 +23,8 @@ extern "C" {
 
 int AMPI_Main(int argc,char **argv); /* prototype for C main routine */
 
+typedef void (*MPI_MainFn) (int,char**);
+
 typedef int MPI_Datatype;
 typedef int MPI_Aint;/* should be "long", but must be "int" for f90... */
 typedef int MPI_Fint;
@@ -406,6 +408,13 @@ int AMPI_Type_create_struct(int count, int* arrBLength, MPI_Aint* arrDisp,
 #define MPI_Type_struct AMPI_Type_struct
 int AMPI_Type_struct(int count, int* arrBLength, MPI_Aint* arrDisp,
                      MPI_Datatype *oldType, MPI_Datatype *newType);
+#define MPI_Type_get_envelope AMPI_Type_get_envelope
+int AMPI_Type_get_envelope(MPI_Datatype datatype, int *num_integers, int *num_addresses,
+                          int *num_datatypes, int *combiner);
+#define MPI_Type_get_contents AMPI_Type_get_contents
+int AMPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addresses,
+                          int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
+                          MPI_Datatype array_of_datatypes[]);
 #define MPI_Type_commit AMPI_Type_commit
 int AMPI_Type_commit(MPI_Datatype *datatype);
 #define MPI_Type_free AMPI_Type_free
@@ -504,10 +513,10 @@ int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  MPI_Comm comm);
-#define MPI_Alltoall2 AMPI_Alltoall2
-int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+#define MPI_Ialltoall AMPI_Ialltoall
+int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                 MPI_Comm comm);
+                 MPI_Comm comm, MPI_Request *request);
 #define MPI_Alltoallv AMPI_Alltoallv
 int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
@@ -534,10 +543,6 @@ int  MPICH_AlltoAll_long(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int  MPICH_AlltoAll_medium(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  MPI_Comm comm);
-#define MPI_Ialltoall AMPI_Ialltoall
-int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                 MPI_Comm comm, MPI_Request *request);
 #define MPI_Reduce AMPI_Reduce
 int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type,
                MPI_Op op, int root, MPI_Comm comm);
@@ -786,84 +791,6 @@ int AMPI_Abort(MPI_Comm comm, int errorcode);
 #define MPI_Pcontrol AMPI_Pcontrol
 int AMPI_Pcontrol(const int level, ...);
 
-/***extras***/
-#define MPI_My_pe AMPI_My_pe
-void AMPI_My_pe(int *my_pe);
-#define MPI_My_node AMPI_My_node
-void AMPI_My_node(int *my_node);
-#define MPI_Num_pes AMPI_Num_pes
-void AMPI_Num_pes(int *num_pes);
-#define MPI_Num_nodes AMPI_Num_nodes
-void AMPI_Num_nodes(int *num_nodes);
-#define MPI_Yield AMPI_Yield
-int AMPI_Yield(int comm);
-#define MPI_Resume AMPI_Resume
-int AMPI_Resume(int dest, int comm);
-#define MPI_Print AMPI_Print
-void AMPI_Print(char *str);
-
-/* for load balancing */
-#define MPI_Register AMPI_Register
-int AMPI_Register(void *, MPI_PupFn);
-
-#define MPI_Start_measure AMPI_Start_measure
-void AMPI_Start_measure();
-#define MPI_Stop_measure AMPI_Stop_measure
-void AMPI_Stop_measure();
-#define MPI_Set_load AMPI_Set_load
-void AMPI_Set_load(double load);
-
-#define MPI_Migrate AMPI_Migrate
-void AMPI_Migrate(void);
-
-#define MPI_Evacuate AMPI_Evacuate
-void AMPI_Evacuate(void);
-
-#define MPI_Migrateto AMPI_Migrateto
-void AMPI_Migrateto(int destPE);
-
-#define MPI_Async_Migrate AMPI_Async_Migrate
-void AMPI_Async_Migrate(void);
-#define MPI_Allow_Migrate AMPI_Allow_Migrate
-void AMPI_Allow_Migrate(void);
-#define MPI_Setmigratable AMPI_Setmigratable
-void AMPI_Setmigratable(int comm, int mig);
-#define MPI_About_to_migrate AMPI_About_to_migrate
-void AMPI_About_to_migrate(MPI_MigrateFn f);
-#define MPI_Just_migrated AMPI_Just_migrated
-void AMPI_Just_migrated(MPI_MigrateFn f);
-#define MPI_Checkpoint AMPI_Checkpoint
-void AMPI_Checkpoint(char *dname);
-#define MPI_MemCheckpoint AMPI_MemCheckpoint
-void AMPI_MemCheckpoint();
-#define MPI_Get_userdata AMPI_Get_userdata
-void *AMPI_Get_userdata(int);
-#define MPI_Datatype_iscontig AMPI_Datatype_iscontig
-void AMPI_Datatype_iscontig(MPI_Datatype datatype, int *flag);
-/*Create a new threads array and attach to it*/
-typedef void (*MPI_MainFn) (int,char**);
-#define MPI_Register_main AMPI_Register_main
-void AMPI_Register_main(MPI_MainFn mainFn, const char *name);
-/* Execute this shell command (just like "system()") */
-int AMPI_System(const char *cmd);
-
-/*** MPI-2 Functions (Unsorted, no Fortran support) ***/
-#define MPI_Type_get_envelope AMPI_Type_get_envelope
-int AMPI_Type_get_envelope(MPI_Datatype datatype, int *num_integers, int *num_addresses,
-                          int *num_datatypes, int *combiner);
-#define MPI_Type_get_contents AMPI_Type_get_contents
-int AMPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addresses,
-                          int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
-                          MPI_Datatype array_of_datatypes[]);
-
-#if CMK_CUDA
-typedef struct workRequest workRequest;
-
-/* AMPI GPU Request interface */
-int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request);
-int AMPI_GPU_Invoke(workRequest *to_call);
-#endif
-
 /*********************One sided communication routines *****************/ 
 /*  MPI_Win : an index into a list in ampiParent (just like MPI_Group) */
 /* name length for COMM, TYPE and WIN */
@@ -967,16 +894,6 @@ int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                    MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                    MPI_Op op, MPI_Win win);
 
-#define MPI_IGet AMPI_IGet
-int AMPI_IGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
-        MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
-	MPI_Request *request);
-#define MPI_IGet_Wait AMPI_IGet_Wait
-int AMPI_IGet_Wait(MPI_Request *request, MPI_Status *status, MPI_Win win);
-#define MPI_IGet_Free AMPI_IGet_Free
-int AMPI_IGet_Free(MPI_Request *request, MPI_Status *status, MPI_Win win);
-char* MPI_IGet_Data(MPI_Status status);
-
 #define MPI_Info_create AMPI_Info_create
 int AMPI_Info_create(MPI_Info *info);
 #define MPI_Info_set AMPI_Info_set
@@ -1013,8 +930,59 @@ int AMPI_Info_free(MPI_Info *info);
 #define MPI_Win_c2f(win)   (MPI_Fint)(win)
 #define MPI_Win_f2c(win)   (MPI_Win)(win)
 
-void AMPI_Install_Idle_Timer();
-void AMPI_Uninstall_Idle_Timer();
+/*** AMPI Extensions ***/
+int AMPI_Migrate(MPI_Info hints);
+int AMPI_Load_start_measure(void);
+int AMPI_Load_stop_measure(void);
+int AMPI_Load_set_value(double value);
+int AMPI_Migrate_to_pe(int dest);
+int AMPI_Comm_set_migratable(MPI_Comm comm, int mig);
+int AMPI_Register_pup(MPI_PupFn fn, void *data, int *idx);
+int AMPI_Get_pup_data(int idx, void *data);
+int AMPI_Register_main(MPI_MainFn mainFn, const char *name);
+int AMPI_Register_about_to_migrate(MPI_MigrateFn fn);
+int AMPI_Register_just_migrated(MPI_MigrateFn fn);
+int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+              MPI_Win win, MPI_Request *request);
+int AMPI_Iget_wait(MPI_Request *request, MPI_Status *status, MPI_Win win);
+int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win);
+int AMPI_Iget_data(void *data, MPI_Status status);
+int AMPI_Type_is_contiguous(MPI_Datatype datatype, int *flag);
+int AMPI_Evacuate(void);
+int AMPI_Yield(MPI_Comm comm);
+int AMPI_Suspend(MPI_Comm comm);
+int AMPI_Resume(int dest, MPI_Comm comm);
+int AMPI_Print(char *str);
+int AMPI_Trace_begin(void);
+int AMPI_Trace_end(void);
+int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                       void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                       MPI_Comm comm);
+#define AMPI_Alltoall_medium MPICH_AlltoAll_medium
+int  MPICH_AlltoAll_medium(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                           void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                           MPI_Comm comm);
+#define AMPI_Alltoall_long MPICH_AlltoAll_long
+int  MPICH_AlltoAll_long(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                         void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                         MPI_Comm comm);
+
+#if CMK_BIGSIM_CHARM
+int AMPI_Set_start_event(MPI_Comm comm);
+int AMPI_Set_end_event(void);
+void beginTraceBigSim(char* msg);
+void endTraceBigSim(char* msg, char* param);
+#endif
+
+#if CMK_CUDA
+typedef struct workRequest workRequest;
+int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request);
+int AMPI_GPU_Invoke(workRequest *to_call);
+#endif
+
+/* Execute this shell command (just like "system()") */
+int AMPI_System(const char *cmd);
 
 extern int traceRegisterFunction(const char *name, int idx);
 extern void traceBeginFuncProj(char *,char *,int);
@@ -1022,35 +990,16 @@ extern void traceEndFuncProj(char *);
 extern void traceBeginFuncIndexProj(int, char *, int);
 extern void traceEndFuncIndexProj(int);
 
-#if CMK_BIGSIM_CHARM
-#define MPI_Set_startevent AMPI_Set_startevent
-#define MPI_Set_endevent AMPI_Set_endevent
-int AMPI_Set_startevent(MPI_Comm comm);
-int AMPI_Set_endevent();
-#endif
-
 /* Determine approximate depth of stack at the point of this call */
 extern long ampiCurrentStackUsage();
 
+#define AMPI_Trace_register_function_id(x, id) traceRegisterFunction(x, id);
+#define AMPI_Trace_begin_function_id(id) traceBeginFuncIndexProj(id, __FILE__, __LINE__);
+#define AMPI_Trace_end_function_id(id) traceEndFuncIndexProj(id);
 
-/*
-#define TRACEFUNC(code,name) traceBeginFuncProj(name,__FILE__,__LINE__); \
-code;\
-traceEndFuncProj(name);
-#define REGISTER_FUNCTION(x) traceRegisterFunction(x, -999);
-#define REG_FUNC_WITHID(x, id) traceRegisterFunction(x, id);
-*/
-
-#define _TRACE_REGISTER_FUNCTION_ID(x, id) traceRegisterFunction(x, id);
-#define _TRACE_BEGIN_FUNCTION_ID(id) traceBeginFuncIndexProj(id, __FILE__, __LINE__);
-#define _TRACE_END_FUNCTION_ID(id) traceEndFuncIndexProj(id);
-
-#define _TRACE_REGISTER_FUNCTION_NAME(x) traceRegisterFunction(x, -999);
-#define _TRACE_BEGIN_FUNCTION_NAME(name) traceBeginFuncProj(name, __FILE__, __LINE__);
-#define _TRACE_END_FUNCTION_NAME(name) traceEndFuncProj(name);
-
-void beginTraceBigSim(char* msg);
-void endTraceBigSim(char* msg, char* param);
+#define AMPI_Trace_register_function_name(x) traceRegisterFunction(x, -999);
+#define AMPI_Trace_begin_function_name(name) traceBeginFuncProj(name, __FILE__, __LINE__);
+#define AMPI_Trace_end_function_name(name) traceEndFuncProj(name);
 
 #include "ampiProjections.h"
 #ifdef __cplusplus

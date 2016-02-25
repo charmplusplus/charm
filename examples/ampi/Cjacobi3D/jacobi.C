@@ -107,8 +107,9 @@ static void copyin(double *d, double t[DIMX+2][DIMY+2][DIMZ+2],
 int main(int ac, char** av)
 {
   int i,j,k,m,cidx;
-  int iter, niter;
+  int iter, niter, cp_idx;
   MPI_Status status;
+  MPI_Info hints;
   double error, tval, maxerr, tmpmaxerr, starttime, endtime, itertime;
   chunk *cp;
   int thisIndex, ierr, nblocks;
@@ -135,10 +136,9 @@ int main(int ac, char** av)
   else
     niter = 20;
 
-/*
-  if(thisIndex == 0)
-    niter = 20;
-*/
+  /* Set up MPI_Info hints for AMPI_Migrate() */
+  MPI_Info_create(&hints);
+  MPI_Info_set(hints, "ampi_load_balance", "true");
 
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -148,7 +148,7 @@ int main(int ac, char** av)
   cp = new chunk;
 #endif
 #if defined(AMPI) && ! defined(NO_PUP)
-  MPI_Register((void*)&cp, (MPI_PupFn) chunk_pup);
+  AMPI_Register_pup((MPI_PupFn)chunk_pup, (void*)&cp, &cp_idx);
 #endif
 
   index3d(thisIndex, cp->xidx, cp->yidx, cp->zidx);
@@ -231,7 +231,7 @@ int main(int ac, char** av)
     starttime = MPI_Wtime();
 #ifdef AMPI
     if(iter%20 == 10) {
-      MPI_Migrate();
+      AMPI_Migrate(hints);
     }
 #endif
   }

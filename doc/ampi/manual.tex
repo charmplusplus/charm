@@ -16,12 +16,13 @@ derived data types support, has been developed by Neelam Saboo.
 
 \section{Introduction}
 
-This manual describes Adaptive MPI~(\ampi{}), which is an implementation of a
-significant subset\footnote{Currently, the PMPI profiling interface is missing
-from \ampi{} and the MPI-3.0 standard is under development.} of the MPI-2.0
-Standard over \charmpp{}. \charmpp{} is a \CC{}-based parallel programming
-library being developed by Prof. Laxmikant (Sanjay) Kal\'{e} and his students
-since 1992 at the University of Illinois at Urbana-Champaign.
+This manual describes Adaptive MPI~(\ampi{}), which is an implementation of the
+MPI-2.2 standard\footnote{Currently, MPI-2.2's PMPI profiling interface is missing
+from \ampi{} and the MPI-3.1 standard is under active development, though we already
+support non-blocking and neighborhood collectives.} on top of \charmpp{}. \charmpp{} is a
+\CC{}-based parallel programming library being developed by Prof.
+Laxmikant (Sanjay) Kale and his students since 1992 at the University of
+Illinois at Urbana-Champaign.
 
 We first describe the philosophy behind Adaptive MPI. Then we give a brief
 introduction to \charmpp{} and rationale for \ampi{}. We then describe
@@ -222,8 +223,7 @@ advantage of dynamic load balancing and other \charmpp{} features. This is
 indeed impractical. However, \converse{} -- the runtime system of \charmpp{} --
 supports interoperability between different parallel programming paradigms
 such as parallel objects and threads. Using this feature, we developed
-\ampi{}, an implementation of a significant subset of the MPI-2.0
-standard over \charmpp{}.  \ampi{} is described in the next section.
+\ampi{}, which is described in more detail in the next section.
 
 \section{AMPI}
 
@@ -236,19 +236,19 @@ track of the computational loads of each thread as well as the communication gra
 between \ampi{} threads, and can migrate these threads in order to balance the
 overall load while simultaneously minimizing communication overhead.
 
-\subsection{AMPI Status}
+\subsection{AMPI Compliance to MPI Standards}
 
-Currently all the MPI-1.1 Standard functions are supported in \ampi{}, with a
-collection of our extentions explained in detail in this manual. One-sided
+Currently \ampi{} supports the MPI-2.2 standard, with preliminary support for some MPI-3.1
+features and a collection of extensions explained in detail in this manual. One-sided
 communication calls in MPI-2 and MPI-3 are implemented, but they do not yet
 take advantage of RMA features. Non-blocking collectives have been defined in
 \ampi{} since before MPI-3.0's adoption of them. Also
 ROMIO\footnote{http://www-unix.mcs.anl.gov/romio/} has been integrated into
-\ampi{}to support parallel I/O features. Link with {\tt -lampiromio}
-to take advantage of this library.
+\ampi{} to support parallel I/O features. Build \ampi{} with {\tt --with-romio}
+and link your application with {\tt -lampiromio} to take advantage of this library.
 
-The following MPI-1.1 basic datatypes are supported in \ampi{}. (Some are not
-available in Fortran binding. Refer to the MPI-1.1 Standard for details.)
+The following MPI basic datatypes are supported in \ampi{}. (Some are not
+available in the Fortran binding. Refer to the MPI Standard for details.)
 \begin{alltt}
 MPI_DATATYPE_NULL  MPI_BYTE            MPI_UNSIGNED_LONG MPI_LONG_DOUBLE_INT
 MPI_DOUBLE         MPI_PACKED          MPI_LONG_DOUBLE   MPI_2FLOAT
@@ -259,23 +259,37 @@ MPI_LOGICAL        MPI_UNSIGNED_SHORT  MPI_2INT
 MPI_CHAR           MPI_UNSIGNED        MPI_SHORT_INT
 \end{alltt}
 
-The following MPI-1.1 reduction operations are supported in \ampi{}.
+The following MPI reduction operations are supported in \ampi{}.
 
 \begin{alltt}
-MPI_MAX   MPI_MIN   MPI_SUM   MPI_PROD  MPI_MAXLOC  MPI_MINLOC
-MPI_LAND  MPI_LOR   MPI_LXOR  MPI_BAND  MPI_BOR     MPI_BXOR
+MPI_MAX   MPI_MIN   MPI_SUM   MPI_PROD  MPI_MAXLOC  MPI_MINLOC  MPI_REPLACE
+MPI_LAND  MPI_LOR   MPI_LXOR  MPI_BAND  MPI_BOR     MPI_BXOR    MPI_NO_OP
 \end{alltt}
 
-The following are AMPI extension calls, which will be explained in detail in this
-manual.
+The following are AMPI extensions to the MPI standard, which will be explained in
+detail in this manual. All AMPI extensions to the MPI standard are prefixed with
+\texttt{AMPI\_} rather than \texttt{MPI\_}. All extensions are available in C, C++, and Fortran,
+with the exception of \texttt{AMPI\_Command\_argument\_count} and
+\texttt{AMPI\_Get\_command\_argument} which are only available in Fortran.
+
 \begin{alltt}
-MPI_Migrate        MPI_Checkpoint     MPI_MemCheckpoint  MPI_Register
-MPI_MigrateTo      MPI_Register_main  MPI_Setmigratable  MPI_Get_userdata
-MPI_Start_measure  MPI_Stop_measure   MPI_Just_migrated  MPI_About_to_migrate
-MPI_My_pe          MPI_My_node        MPI_Num_pes        MPI_Num_nodes
-MPI_Set_load       MPI_Command_argument_count            MPI_Get_command_argument
+AMPI_Migrate          AMPI_Register_pup            AMPI_Get_pup_data
+AMPI_Migrate_to_pe    AMPI_Comm_set_migratable     AMPI_Evacuate
+AMPI_Load_set_value   AMPI_Load_start_measure      AMPI_Load_stop_measure
+AMPI_Iget             AMPI_Iget_wait               AMPI_Iget_data
+AMPI_Iget_free        AMPI_Type_is_contiguous      AMPI_Register_main
+AMPI_Alltoall_iget    AMPI_Alltoall_medium         AMPI_Alltoall_long
+AMPI_Yield            AMPI_Suspend                 AMPI_Resume
+AMPI_Register_just_migrated         AMPI_Register_about_to_migrate
+AMPI_Command_argument_count         AMPI_Get_command_argument
 \end{alltt}
 
+AMPI also provides a set of built-in attributes on all communicators and windows
+to find the PE or Node number that a virtual processor is currently running on,
+as well as the total number of PEs and Nodes in the job. The built-in attributes
+are \texttt{AMPI\_MY\_PE}, \texttt{AMPI\_MY\_NODE}, \texttt{AMPI\_NUM\_PES}, and
+\texttt{AMPI\_NUM\_NODES}. These attributes are accessible from any rank by
+calling \texttt{MPI\_Comm\_get\_attr}.
 
 \subsection{Name for Main Program}
 
@@ -597,7 +611,7 @@ Scheme     & X86 & IA64 & Opteron & Mac OS X & IBM SP & SUN & BG/P & Cray/XT & W
 							   \end{table*}
 \subsection{Extensions for Migrations}
 
-AMPI provides fully automated support for migrating MPI ranks between nodes of a
+\ampi{} provides fully automated support for migrating MPI ranks between nodes of a
 system without any application-specific code at all. We do so using a memory
 allocator, Isomalloc, that allocates memory per user-level thread to globally
 unique virtual memory addresses. This means that every PE in the system reserves
@@ -630,13 +644,12 @@ cannot determine what size the data is, or whether the registered data contains
 pointers to other places in memory. For this purpose, a packing subroutine also
 needs to be provided to the \ampi{} runtime system along with registered data.
 (See next section for writing packing subroutines.) The call provided by
-\ampi{} for doing this is \texttt{MPI\_Register}. This function takes two
-arguments: A data item to be transported along with the rank, and the pack
-subroutine, and returns an integer denoting the registration identifier. In
-C/\CC{} programs, it may be necessary to use this return value after migration
-completes and control returns to the rank, using function
-\texttt{MPI\_Get\_userdata}. Therefore, the return value should be stored in a
-local variable.
+\ampi{} for doing this is \texttt{AMPI\_Register\_pup}. This function takes three
+arguments: a data item to be transported along with the rank, the pack
+subroutine, and a pointer to an integer which denotes the registration identifier.
+In C/\CC{} programs, it may be necessary to use this integer value after migration
+completes and control returns to the rank with the function
+\texttt{AMPI\_Get\_pup\_data}.
 
 \subsubsection{Migration}
 
@@ -651,11 +664,11 @@ only once in the beginning, load imbalance at that stage would not matter much.
 Therefore, we want the demand to perform load balance check to be initiated by
 the application.
 
-\ampi{} provides a subroutine \texttt{MPI\_Migrate} for this purpose. Each
-rank periodically calls \texttt{MPI\_Migrate}. Typical CSE applications are
-iterative and perform multiple time-steps. One should call
-\texttt{MPI\_Migrate} in each rank at the end of some fixed number of
-timesteps. The frequency of \texttt{MPI\_Migrate} should be determined by a
+\ampi{} provides a subroutine \texttt{AMPI\_Migrate(MPI\_Info hints);} for
+this purpose. Each rank periodically calls \texttt{AMPI\_Migrate}. Typical
+CSE applications are iterative and perform multiple time-steps. One should call
+\texttt{AMPI\_Migrate} in each rank at the end of some fixed number of
+timesteps. The frequency of \texttt{AMPI\_Migrate} should be determined by a
 tradeoff between conflicting factors such as the load balancing overhead, and
 performance degradation caused by load imbalance. In some other applications,
 where application suspects that load imbalance may have occurred, as in the
@@ -663,21 +676,60 @@ case of adaptive mesh refinement; it would be more effective if it performs a
 couple of timesteps before telling the system to re-map ranks. This will give
 the \ampi{} runtime system some time to collect the new load and communication
 statistics upon which it bases its migration decisions. Note that
-\texttt{MPI\_Migrate} does NOT tell the system to migrate the rank, but
+\texttt{AMPI\_Migrate} does NOT tell the system to migrate the rank, but
 merely tells the system to check the load balance after all the ranks call
-\texttt{MPI\_Migrate}. To migrate the rank or not is decided only by the
-system's load balancing strategy. We also provide callbacks that user code
-can register with the runtime system to be invoked just before and right after
-migration: \texttt{MPI\_About\_to\_migrate} and \texttt{MPI\_Just\_migrated}
-respectively.
+\texttt{AMPI\_Migrate}. To migrate the rank or not is decided only by the
+system's load balancing strategy.
+
+Essentially, a call to \texttt{AMPI\_Migrate} signifies to the runtime system
+that the application has reached a point at which it is safe to serialize
+the local state. Knowing this, the runtime system can act in several ways.
+
+The MPI\_Info object taken as a parameter by \texttt{AMPI\_Migrate} gives
+users a way to influence the runtime system's decision-making and behavior.
+Users should set the \texttt{MPI\_Info} key \texttt{"ampi\_load\_balance"} to one
+of the following values: \texttt{"sync"}, \texttt{"async"}, or \texttt{"false"}.
+Synchronous load balancing assumes that the application is already at a
+synchronization point. Asynchronous load balancing does not assume this, and a
+value of \texttt{"false"} is the same as not requesting load balancing at all.
+
+\begin{alltt}
+// Setup
+MPI_Info hints;
+MPI_Info_create(&hints);
+MPI_Info_set(hints, "ampi_load_balance", "sync");
+
+...
+
+// Main time-stepping loop
+for (int iter=0; iter < max_iters; iter++) \{
+
+  // Time step work ...
+
+  if (iter \% lb_freq == 0)
+    AMPI_Migrate(hints);
+\}
+\end{alltt}
+
+We also provide callbacks that user code can register with the runtime system
+to be invoked just before and right after migration:
+\texttt{AMPI\_Register\_about\_to\_migrate} and
+\texttt{AMPI\_Register\_just\_migrated} respectively. We also provide routines
+for starting and stopping load measurements, and for users to explicitly set the
+load value of a rank using the following: \texttt{AMPI\_Load\_start\_measure},
+\texttt{AMPI\_Load\_stop\_measure}, and \texttt{AMPI\_Load\_set\_value}.
+And since \ampi{} builds on top of \charmpp{}, users can experiment with the
+suite of load balancing strategies included with \charmpp{}, as well as write
+their own strategies based on user-level information and heuristics.
 
 \subsubsection{Packing/Unpacking Thread Data}
 
 Once the \ampi{} runtime system decides which ranks to send to which
 processors, it calls the specified pack subroutine for that rank, with the
 rank-specific data that was registered with the system using
-\texttt{MPI\_Register}. This section explains how a subroutine should be
-written for performing pack/unpack.
+\texttt{AMPI\_Register\_pup}. If an \ampi{} application uses Isomalloc, then
+the system will define the Pack/Unpack routines for the user. This section
+explains how a subroutine should be written for performing explicit pack/unpack.
 
 There are three steps for transporting the rank's data to another processor.
 First, the system calls a subroutine to get the size of the buffer required to
@@ -889,18 +941,56 @@ Just as in load balancing, no application specific code is required when using
 Isomalloc: the \ampi{} runtime takes care of all the details involved in
 migrating data.
 
-A subroutine for checkpoint purpose has been added to AMPI:
-\texttt{void MPI\_Checkpoint(char *dirname);}
-This subroutine takes a directory name as its argument. It is a collective
-function, meaning every virtual processor in the program needs to call this
-subroutine and specify the same directory name. (Typically, in an
-iterative AMPI program, the iteration number, converted to a character string,
-can serve as a checkpoint directory name.) This directory is created, and the
-entire state of the program is checkpointed to this directory.  One can restart
-the program from the checkpointed state by specifying \texttt{"+restart
-dirname"} on the command-line. This capability is powered by the \charmpp{}
-runtime system. For more information about checkpoint/restart
-mechanisms in \charmpp{} please refer to \charmpp{} manual.
+To perform a checkpoint in an \ampi{} program, all you have to do is make a call
+to \texttt{int AMPI\_Migrate(MPI\_Info hints)} with an \texttt{MPI\_Info} object that
+specifies how you would like to checkpoint. Checkpointing can be thought of as
+migrating \ampi{} ranks to storage. Users set the checkpointing policy
+on an \texttt{MPI\_Info} object's \texttt{"ampi\_checkpoint"} key to one of the
+following values: \texttt{"to\_file=directory\_name"}, \texttt{"in\_memory"},
+or \texttt{"false"}.
+
+Checkpointing to file tells the runtime system to save checkpoints in a given
+directory. (Typically, in an iterative program, the iteration number, converted to a
+character string, can serve as a checkpoint directory name.) This directory
+is created, and the entire state of the program is checkpointed to this directory.
+One can restart the program from the checkpointed state (using the same, more, or
+fewer physical processors than were checkpointed with) by specifying \texttt{"+restart
+directory\_name"} on the command-line.
+
+Checkpointing in memory allows applications to transparently tolerate failures online.
+The checkpointing scheme used here is a double in-memory checkpoint, in which
+virtual processors exchange checkpoints pairwise across nodes in each other's memory
+such that if one node fails, that failed node's \ampi{} ranks can be restarted by its
+buddy once the failure is detected by the runtime system. As long as no two buddy
+nodes fail in the same checkpointing interval, the system can restart online without
+intervention from the user (provided the job scheduler does not revoke its allocation).
+Any load imbalance resulting from the restart can then be managed by the runtime system.
+Use of this scheme is illustrated in the code snippet below.
+
+\begin{alltt}
+// Setup
+MPI_Info hints;
+MPI_Info_create(&hints);
+MPI_Info_set(hints, "ampi_checkpoint", "in_memory");
+
+...
+
+// Main time-stepping loop
+for (int iter=0; iter < max_iters; iter++) \{
+
+  // Time step work ...
+
+  if (iter \% chkpt_freq == 0)
+    AMPI_Migrate(hints);
+\}
+\end{alltt}
+
+A value of \texttt{"false"} results in no checkpoint being done that step.
+Note that \texttt{AMPI\_Migrate} is a collective function, meaning every
+virtual processor in the program needs to call this subroutine with the
+same MPI\_Info object. The checkpointing capabilities of \ampi{} are powered by
+the \charmpp{} runtime system. For more information about checkpoint/restart
+mechanisms please refer to the \charmpp{} manual~\ref{sec:checkpoint}.
 
 \subsection{Extensions for Memory Efficiency}
 
@@ -909,26 +999,25 @@ functions being called. For unblocking communication primitives, sometimes the u
 like to do lazy memory allocation until the data actually arrives, which gives the
 oppotunities to write more memory efficient programs.
 We provide a set of \ampi{} functions as an extension to the standard MPI-2 one-sided calls,
-where we provide a split phase MPI\_Get called MPI\_IGet. MPI\_IGet preserves the similar
-semantics as MPI\_Get except that no user buffer is provided to hold incoming data.
-MPI\_IGet\_Wait will block until the requested data arrives and runtime system takes
+where we provide a split phase \texttt{MPI\_Get} called \texttt{AMPI\_Iget}. \texttt{AMPI\_Iget} preserves the similar
+semantics as \texttt{MPI\_Get} except that no user buffer is provided to hold incoming data.
+\texttt{AMPI\_Iget\_wait} will block until the requested data arrives and runtime system takes
 care to allocate space, do appropriate unpacking based on data type, and return.
-MPI\_IGet\_Free lets the runtime system free the resources being used for this get request
-including the data buffer. And MPI\_IGet\_Data is the utility program that returns the
-actual data.
+\texttt{AMPI\_Iget\_free} lets the runtime system free the resources being used for this get request
+including the data buffer. Finally, \texttt{AMPI\_Iget\_data} is the routine used to access the data.
  
 
 \begin{alltt}
 
-int MPI_IGet(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
-             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
-             MPI_Request *request);
+int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
+              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
+              MPI_Request *request);
 
-int MPI_IGet_Wait(MPI_Request *request, MPI_Status *status, MPI_Win win);
+int AMPI_Iget_wait(MPI_Request *request, MPI_Status *status, MPI_Win win);
 
-int MPI_IGet_Free(MPI_Request *request, MPI_Status *status, MPI_Win win);
+int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win);
 
-char* MPI_IGet_Data(MPI_Status status);
+int AMPI_Iget_data(void *data, MPI_Status status);
 
 \end{alltt}
 
@@ -960,14 +1049,14 @@ subroutine called \texttt{MPI\_Setup}.
 !FORTRAN EXAMPLE
 SUBROUTINE MPI_Setup
   USE ampi
-  CALL MPI_Register_main(Solids_Main)
-  CALL MPI_Register_main(Fluids_Main)
+  CALL AMPI_Register_main(Solids_Main)
+  CALL AMPI_Register_main(Fluids_Main)
 END SUBROUTINE
 
 //C Example
 void MPI_Setup()\{
-  MPI_Register_main(Solids_Main);
-  MPI_Register_main(Fluids_Main);
+  AMPI_Register_main(Solids_Main);
+  AMPI_Register_main(Fluids_Main);
 \}
 \end{alltt}
 
@@ -1075,34 +1164,6 @@ command line options are required as well.
 > ./pgm +msgLogRead +msgLogRank 2 +msgLogFilename "msg2.log"
 \end{alltt}
 
-\subsection{Communication Optimizations for AMPI}
-AMPI is powered by the \charmpp{} communication optimization support now!
-Currently the user needs to specify the communication pattern by command
-line option. In the future this can be done automatically by the system.
-
-Currently there are four strategies available: USE\_DIRECT, USE\_MESH,
-USE\_HYPERCUBE and USE\_GRID. USE\_DIRECT sends the message directly. 
-USE\_MESH imposes a 2d Mesh virtual topology on the processors so each 
-processor sends messages to its neighbors in its row and column of the 
-mesh which forward the messages to their correct destinations. USE\_HYPERCUBE 
-and USE\_GRID impose a hypercube and a 3d Grid topologies on the processors. 
-USE\_HYPERCUBE will do best for very small messages and small number of 
-processors, 3d has better performance for slightly higher message sizes 
-and then Mesh starts performing best. The programmer is encouraged to try 
-out all the strategies. (Stolen from the CommLib manual by Sameer :)
-
-For more details please refer to the CommLib paper \footnote{L. V. Kale and 
-Sameer Kumar and Krishnan Vardarajan, 2002. 
-http://finesse.cs.uiuc.edu/papers/CommLib.pdf}. 
-
-Specifying the strategy is as simple as a command line option +strategy. For
-example:
-\begin{alltt}
-> ./charmrun +p64 alltoall +vp64 1000 100 +strategy USE\_MESH
-\end{alltt}
-tells the system to use MESH strategy for CommLib. By default USE\_DIRECT is
-used.
-
 \subsection{User Defined Initial Mapping}
                                                                                 
 You can define the initial mapping of virtual processors (vp) to physical
@@ -1152,6 +1213,23 @@ the load balancing framework aware of the heterogeneity of the system, the flag
 
 If you want to define your own mapping scheme, please contact us for assistance.
 
+\subsection{Performance Visualization}
+\ampi{} users can take advantage of \charmpp{}'s tracing framework and
+associated performance visualization tool, Projections. Projections
+provides a number of different views of performance data that help
+users diagnose performance issues.
+
+\ampi{} defines the following extensions for tracing support:
+
+\begin{alltt}
+AMPI_Trace_begin                      AMPI_Trace_end
+AMPI_Trace_register_function_name     AMPI_Trace_register_function_id
+AMPI_Trace_start_function_name        AMPI_Trace_start_function_id
+AMPI_Trace_end_function_name          AMPI_Trace_end_function_id
+\end{alltt}
+
+See the Projections manual for information on how to visualize traces.
+
 \subsection{Compiling AMPI Programs}
 
 \charmpp{} provides a cross-platform compile-and-link script called \charmc{}
@@ -1170,7 +1248,8 @@ In spite of the platform-neutral syntax of \charmc{}, one may have to specify
 some platform-specific options for compiling and building \ampi{} codes.
 Fortunately, if \charmc{} does not recognize any particular options on its
 command line, it promptly passes it to all the individual compilers and linkers
-it invokes to compile the program.
+it invokes to compile the program. See the appendix for more details on
+building and running AMPI programs.
 
 \appendix
 
@@ -1196,15 +1275,15 @@ libraries needed by \ampi{}), specify \verb+<target>+ to be \verb+AMPI+. And
 script.  Common compile time options such as \texttt{-g, -O, -Ipath, -Lpath,
 -llib} are accepted.
 
-To build a debugging version of \ampi{}, use the option: ``\texttt{-g}''. 
-To build a production version of \ampi{}, use the options: ``\texttt{
---with-production}''.
+To build a debugging version of \ampi{}, use the option: \texttt{-g}.
+To build a production version of \ampi{}, use the option: \texttt{
+--with-production}.
 
 \verb+<version>+ depends on the machine, operating system, and the underlying
 communication library one wants to use for running \ampi{} programs.
 See the charm/README file for details on picking the proper version.
 Following is an example of how to build a production version of AMPI under
-linux and ethernet environment, with debugging info produced:
+linux and ethernet environment, with debugging symbols produced:
 
 \begin{alltt}
 > build AMPI netlrts-linux-x86_64 --with-production -g

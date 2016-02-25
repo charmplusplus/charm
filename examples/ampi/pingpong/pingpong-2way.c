@@ -39,9 +39,6 @@ int main(int argc, char **argv)
   
   if( my_id < p/2 ) {
     startTime = MPI_Wtime();
-#ifdef AMPI
-    AMPI_Install_Idle_Timer();
-#endif
     
     MPI_Send(message_s, msg_size, MPI_CHAR, my_id+p/2, 0, MPI_COMM_WORLD);
     for(i=0; i<max_msgs; i++){
@@ -53,9 +50,6 @@ int main(int argc, char **argv)
     MPI_Barrier(MPI_COMM_WORLD); 
 
     elapsed_time_sec = MPI_Wtime() - startTime; 
-#ifdef AMPI
-    AMPI_Uninstall_Idle_Timer();
-#endif
     fprintf(stdout, "Totaltime: %8.6f s\n",elapsed_time_sec);
     elapsed_time_sec /= 2;  //We want the ping performance not round-trip.
     elapsed_time_sec /= max_msgs; //time for each message
@@ -67,9 +61,6 @@ int main(int argc, char **argv)
     
   }
   else {
-#ifdef AMPI
-    AMPI_Install_Idle_Timer();
-#endif
     MPI_Send(message_s, msg_size, MPI_CHAR, my_id-p/2, 0, MPI_COMM_WORLD);
     for(i=0; i<max_msgs; i++){
       MPI_Recv(message_r, msg_size, MPI_CHAR, my_id-p/2, 0, MPI_COMM_WORLD, 
@@ -78,9 +69,6 @@ int main(int argc, char **argv)
     }
     
     MPI_Barrier(MPI_COMM_WORLD); 
-#ifdef AMPI
-    AMPI_Uninstall_Idle_Timer();
-#endif
   }	    
   
   free(message_s);

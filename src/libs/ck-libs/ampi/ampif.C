@@ -183,36 +183,9 @@ FDECL {
 #define mpi_init_thread FTN_NAME( MPI_INIT_THREAD , mpi_init_thread )
 #define mpi_init FTN_NAME( MPI_INIT , mpi_init )
 #define mpi_initialized FTN_NAME( MPI_INITIALIZED , mpi_initialized )
-#define mpi_init_universe FTN_NAME( MPI_INIT_UNIVERSE , mpi_init_universe )
 #define mpi_finalize FTN_NAME( MPI_FINALIZE , mpi_finalize )
 #define mpi_finalized FTN_NAME( MPI_FINALIZED , mpi_finalized )
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
-
-#define mpi_my_pe FTN_NAME ( MPI_MY_PE , mpi_my_pe )
-#define mpi_my_node FTN_NAME ( MPI_MY_NODE , mpi_my_node )
-#define mpi_num_pes FTN_NAME ( MPI_NUM_PES , mpi_num_pes )
-#define mpi_num_nodes FTN_NAME ( MPI_NUM_NODES , mpi_num_nodes )
-#define mpi_yield FTN_NAME ( MPI_YIELD , mpi_yield )
-#define mpi_resume FTN_NAME ( MPI_RESUME, mpi_resume )
-#define mpi_print FTN_NAME( MPI_PRINT , mpi_print )
-#define mpi_Start_measure FTN_NAME( MPI_START_MEASURE, mpi_start_measure)
-#define mpi_Stop_measure FTN_NAME( MPI_STOP_MEASURE, mpi_stop_measure)
-#define mpi_set_load FTN_NAME( MPI_SET_LOAD, mpi_set_load)
-#define mpi_register FTN_NAME( MPI_REGISTER , mpi_register )
-#define mpi_migrate FTN_NAME( MPI_MIGRATE , mpi_migrate )
-#define mpi_migrateto FTN_NAME( MPI_MIGRATETO , mpi_migrateto )
-#define mpi_async_migrate FTN_NAME( MPI_ASYNC_MIGRATE , mpi_async_migrate )
-#define mpi_allow_migrate FTN_NAME( MPI_ALLOW_MIGRATE , mpi_allow_migrate )
-#define mpi_setmigratable FTN_NAME (MPI_SETMIGRATABLE , mpi_setmigratable )
-#define mpi_about_to_migrate FTN_NAME (MPI_ABOUT_TO_MIGRATE , mpi_about_to_migrate )
-#define mpi_just_migrated FTN_NAME (MPI_JUST_MIGRATED , mpi_just_migrated )
-#define mpi_checkpoint FTN_NAME( MPI_CHECKPOINT , mpi_checkpoint )
-#define mpi_memcheckpoint FTN_NAME( MPI_MEMCHECKPOINT , mpi_memcheckpoint )
-
-#define mpi_command_argument_count FTN_NAME( MPI_COMMAND_ARGUMENT_COUNT , mpi_command_argument_count )
-#define mpi_get_command_argument FTN_NAME( MPI_GET_COMMAND_ARGUMENT , mpi_get_command_argument )
-#define mpi_iargc FTN_NAME( MPI_IARGC , mpi_iargc )
-#define mpi_getarg FTN_NAME( MPI_GETARG , mpi_getarg )
 
 /* MPI-2 */
 #define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
@@ -256,13 +229,55 @@ FDECL {
 
 #define mpi_pcontrol FTN_NAME ( MPI_PCONTROL , mpi_pcontrol )
 
+/* AMPI extensions */
+#define ampi_migrate FTN_NAME( AMPI_MIGRATE , ampi_migrate )
+#define ampi_load_start_measure FTN_NAME( AMPI_LOAD_START_MEASURE, ampi_load_start_measure )
+#define ampi_load_stop_measure FTN_NAME( AMPI_LOAD_STOP_MEASURE, ampi_load_stop_measure )
+#define ampi_load_set_value FTN_NAME( AMPI_SET_LOAD_VALUE, ampi_load_set_value )
+#define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
+#define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
+#define ampi_comm_set_migratable FTN_NAME ( AMPI_COMM_SET_MIGRATABLE , ampi_comm_set_migratable )
+#define ampi_init_universe FTN_NAME( AMPI_INIT_UNIVERSE , ampi_init_universe )
+#define ampi_register_main FTN_NAME( AMPI_REGISTER_MAIN , ampi_register_main )
+#define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
+#define ampi_register_about_to_migrate FTN_NAME ( AMPI_REGISTER_ABOUT_TO_MIGRATE , ampi_register_about_to_migrate )
+#define ampi_register_just_migrated FTN_NAME ( AMPI_REGISTER_JUST_MIGRATED , ampi_register_just_migrated )
+#define ampi_type_is_contiguous FTN_NAME ( AMPI_TYPE_IS_CONTIGUOUS , ampi_type_is_contiguous )
+#define ampi_get_pup_data FTN_NAME ( AMPI_GET_PUP_DATA , ampi_get_pup_data )
+#define ampi_iget FTN_NAME ( AMPI_IGET  , ampi_iget )
+#define ampi_iget_wait FTN_NAME ( AMPI_IGET_WAIT  , ampi_iget_wait )
+#define ampi_iget_data FTN_NAME ( AMPI_IGET_DATA  , ampi_iget_data )
+#define ampi_iget_free FTN_NAME ( AMPI_IGET_FREE  , ampi_iget_free )
+#define ampi_alltoall_iget FTN_NAME( AMPI_ALLTOALL_IGET , ampi_alltoall_iget )
+#define ampi_alltoall_medium FTN_NAME( AMPI_ALLTOALL_MEDIUM , ampi_alltoall_medium )
+#define ampi_alltoall_long FTN_NAME( AMPI_ALLTOALL_LONG , ampi_alltoall_long )
+#define ampi_yield FTN_NAME ( AMPI_YIELD , ampi_yield )
+#define ampi_suspend FTN_NAME ( AMPI_SUSPEND , ampi_suspend )
+#define ampi_resume FTN_NAME ( AMPI_RESUME, ampi_resume )
+#define ampi_print FTN_NAME( AMPI_PRINT , ampi_print )
+#define ampi_install_idle_timer FTN_NAME( AMPI_INSTALL_IDLE_TIMER , ampi_install_idle_timer )
+#define ampi_uninstall_idle_timer FTN_NAME( AMPI_UNINSTALL_IDLE_TIMER , ampi_uninstall_idle_timer )
+
+/* Fortran-specific AMPI extensions */
+#define ampi_command_argument_count FTN_NAME( AMPI_COMMAND_ARGUMENT_COUNT , ampi_command_argument_count )
+#define ampi_get_command_argument FTN_NAME( AMPI_GET_COMMAND_ARGUMENT , ampi_get_command_argument )
+
+#if CMK_BIGSIM_CHARM
+#define ampi_set_start_event FTN_NAME( AMPI_SET_START_EVENT , ampi_set_start_event )
+#define ampi_set_end_event FTN_NAME( AMPI_SET_END_EVENT , ampi_set_end_event )
+#define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)
+#define endtracebigsim FTN_NAME (ENDTRACEBIGSIM , endtracebigsim)
+#endif
+
+#if CMK_CUDA
+#define ampi_gpu_invoke FTN_NAME ( AMPI_GPU_INVOKE  , ampi_gpu_invoke )
+#define ampi_gpu_iinvoke FTN_NAME ( AMPI_GPU_IINVOKE  , ampi_gpu_iinvoke )
+#endif
+
 #define REDUCERF(caps, nocaps) \
 void FTN_NAME(caps, nocaps)(void *iv, void *iov, int *len, MPI_Datatype *dt){ \
   caps(iv, iov, len, dt); \
 }
-
-#define mpi_info_maxmemory FTN_NAME (MPI_INFO_MAXMEMORY, mpi_info_maxmemory)
-#define mpi_info_memory FTN_NAME (MPI_INFO_MEMORY, mpi_info_memory)    
 
 #if !CMK_FORTRAN_USES_ALLCAPS
 REDUCERF(MPI_MAX    , mpi_max)
@@ -290,15 +305,6 @@ CtvExtern(int, mpi_opc);
 
 //#define GET_MPI_OP(idx)      (CkAssert(idx - MPI_OP_FIRST >= 0 && idx - MPI_OP_FIRST < CtvAccess(mpi_opc)), CtvAccess(mpi_ops)[idx - MPI_OP_FIRST])
 inline MPI_Op & GET_MPI_OP(int idx)      { MPI_Op *tab=CtvAccess(mpi_ops); return tab[idx - MPI_OP_FIRST]; }
-
-void mpi_init_universe(int *unicomm)
-{
-  AMPIAPI("mpi_init_universe");
-  for(int i=0;i<_mpi_nworlds; i++)
-  {
-    unicomm[i] = MPI_COMM_UNIVERSE[i];
-  }
-}
 
 void mpi_is_thread_main(int *flag, int *ierr){
   *ierr = AMPI_Is_thread_main(flag);
@@ -414,16 +420,6 @@ void mpi_barrier(int *comm, int *ierr)
 void mpi_ibarrier(int *comm, int *request, int *ierr)
 {
   *ierr = AMPI_Ibarrier(*comm, request);
-}
-
-void mpi_yield(int *comm, int *ierr)
-{
-  *ierr = AMPI_Yield(*comm);
-}
-
-void mpi_resume(int *dest, int *comm, int *ierr)
-{
-  *ierr = AMPI_Resume(*dest, *comm);
 }
 
 void mpi_bcast(void *buf, int *count, int *type, int *root, int *comm, 
@@ -1212,117 +1208,6 @@ void mpi_get_count(int *sts, int *dtype, int *cnt, int *ierr)
   *ierr = AMPI_Get_count((MPI_Status*) sts, *dtype, cnt);
 }
 
-void mpi_print(char *str, int *len)
-{
-  char *buf = new char[*len+1];
-  memcpy(buf, str, *len);
-  buf[*len] = '\0';
-  AMPI_Print(buf);
-  delete [] buf;
-}
-
-void mpi_migrate(void)
-{
-  AMPI_Migrate();
-}
-
-void mpi_setmigratable(int *comm, int *mig)
-{
-  AMPI_Setmigratable(*comm, * mig);
-}
-
-void mpi_migrateto(int *destPE)
-{
-  AMPI_Migrateto(*destPE);
-}
-
-void mpi_about_to_migrate(MPI_MigrateFn f)
-{
-  AMPI_About_to_migrate(f);
-}
-
-void mpi_just_migrated(MPI_MigrateFn f)
-{
-  AMPI_Just_migrated(f);
-}
-
-void mpi_start_measure()           /* turn on auto load instrumentation */
-{
-  AMPI_Start_measure();
-}
-
-void mpi_stop_measure()
-{
-  AMPI_Stop_measure();
-}
-
-void mpi_set_load(double *load)
-{
-  AMPI_Set_load(*load);
-}
-
-void mpi_register(void *d, MPI_PupFn f)
-{
-  AMPI_Register(d,f);
-}
-
-void mpi_get_userdata(int* dn, void *data)
-{
-  data = AMPI_Get_userdata(*dn); 
-}
-
-void mpi_checkpoint(char *dname){
-  AMPI_Checkpoint(dname);
-}
-
-void mpi_memcheckpoint(){
-  AMPI_MemCheckpoint();
-}
-
-/* Fortran2003 standard cmd line arg parsing functions:
- *    - command_argument_count() returns the number of arguments
- *      NOT including the program name.
- *    - get_command_argument() returns the i'th argument, where
- *      if 'i' is zero the program name is returned.
- */
-void mpi_command_argument_count(int *count)
-{
-  *count = CkGetArgc()-1;
-}
-
-void mpi_get_command_argument(int *c, char *str, int *len, int *ierr)
-{
-  char **argv = CkGetArgv();
-  int nc = CkGetArgc()-1;
-  int arglen = strlen(argv[*c]);
-
-  if (*c >= 0 && *c <= nc) {
-    if (arglen <= *len) {
-      memcpy(str, argv[*c], arglen);
-      for (int j=arglen; j<*len; j++) str[j] = ' ';
-      *ierr = 0;
-    } else {
-      memcpy(str, argv[*c], *len);
-      *ierr = -1;
-    }
-  }
-  else {
-    memset(str, ' ', *len);
-    *ierr = 1;
-  }
-}
-
-/* Fortran77-style GNU extensions for cmd line arg parsing functions */
-void mpi_iargc(int *count)
-{
-  mpi_command_argument_count(count);
-}
-
-void mpi_getarg(int *c, char *str, int *len, int *ierr)
-{
-  mpi_get_command_argument(c, str, len, ierr);
-}
-
 void mpi_comm_remote_size(int *comm, int *size, int *ierr){
   *ierr = AMPI_Comm_remote_size(*comm, size);
 }
@@ -1515,16 +1400,16 @@ void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 void mpi_info_create(int* info, int* ierr){
   *ierr = MPI_Info_create(info);
 }
-void mpi_info_set(int* info, char *key, char *value, int* ierr){
+void mpi_info_set(int* info, const char *key, const char *value, int* ierr){
   *ierr = MPI_Info_set(*info, key, value);
 }
-void mpi_info_delete(int* info, char* key, int* ierr){
+void mpi_info_delete(int* info, const char* key, int* ierr){
   *ierr = MPI_Info_delete(*info, key);
 }
-void mpi_info_get(int* info, char *key, int *valuelen, char *value, int *flag, int* ierr){
+void mpi_info_get(int* info, const char *key, int *valuelen, char *value, int *flag, int* ierr){
   *ierr = MPI_Info_get(*info, key, *valuelen, value, flag);
 }
-void mpi_info_get_valuelen(int* info, char *key, int *valuelen, int *flag, int* ierr){
+void mpi_info_get_valuelen(int* info, const char *key, int *valuelen, int *flag, int* ierr){
   *ierr = MPI_Info_get_valuelen(*info, key, valuelen, flag);
 }
 void mpi_info_get_nkeys(int* info, int *nkeys, int* ierr){
@@ -1540,41 +1425,188 @@ void mpi_info_free(int* info, int* ierr){
   *ierr = MPI_Info_free(info);
 }
 
-void mpi_info_maxmemory(){
-  CkPrintf("MaxMemory %ld\n", CmiMaxMemoryUsage());
-}
-
-void mpi_info_memory(){
-  CkPrintf("Memory %ld\n", CmiMemoryUsage());
-}
-
 void mpi_pcontrol(int *level) {
   AMPI_Pcontrol(*level);
 }
 
-void mpi_my_pe(int *my_pe) {
-  AMPI_My_pe(my_pe);
+/* AMPI Extensions */
+void ampi_migrate(int *hints, int *ierr) {
+  *ierr = AMPI_Migrate(*hints);
 }
 
-void mpi_my_node(int *my_node) {
-  AMPI_My_node(my_node);
+void ampi_load_start_measure(int *ierr) {
+  *ierr = AMPI_Load_start_measure();
 }
 
-void mpi_num_pes(int *num_pes) {
-  AMPI_Num_pes(num_pes);
+void ampi_load_stop_measure(int *ierr) {
+  *ierr = AMPI_Load_stop_measure();
 }
 
-void mpi_num_nodes(int *num_nodes) {
-  AMPI_Num_nodes(num_nodes);
+void ampi_load_set_value(double *value, int *ierr) {
+  *ierr = AMPI_Load_set_value(*value);
 }
 
-#define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)
-#define endtracebigsim FTN_NAME (ENDTRACEBIGSIM , endtracebigsim)
+void ampi_evacuate(int *ierr) {
+  *ierr = AMPI_Evacuate();
+}
+
+void ampi_migrate_to_pe(int *dest, int *ierr) {
+  *ierr = AMPI_Migrate_to_pe(*dest);
+}
+
+void ampi_comm_set_migratable(int *comm, int *mig, int *ierr) {
+  *ierr = AMPI_Comm_set_migratable(*comm, *mig);
+}
+
+void ampi_register_main(MPI_MainFn fn, const char *name, int *ierr) {
+  *ierr = AMPI_Register_main(fn, name);
+}
+
+void ampi_register_pup(MPI_PupFn fn, void *data, int *idx, int *ierr) {
+  *ierr = AMPI_Register_pup(fn, data, idx);
+}
+
+void ampi_register_about_to_migrate(MPI_MigrateFn fn, int *ierr) {
+  *ierr = AMPI_Register_about_to_migrate(fn);
+}
+
+void ampi_register_just_migrated(MPI_MigrateFn fn, int *ierr) {
+  *ierr = AMPI_Register_just_migrated(fn);
+}
+
+void ampi_type_is_contiguous(int *datatype, int *flag, int *ierr) {
+  *ierr = AMPI_Type_is_contiguous(*datatype, flag);
+}
+
+void ampi_get_pup_data(int *idx, void *data, int *ierr) {
+  *ierr = AMPI_Get_pup_data(*idx, data);
+}
+
+void ampi_iget(int *orgdisp, int *orgcnt, int *orgtype, int *rank,
+        int *targdisp, int *targcnt, int *targtype, int *win,
+        int *request, int *ierr) {
+  *ierr = AMPI_Iget(*orgdisp, *orgcnt, *orgtype, *rank, *targdisp, *targcnt,
+                    *targtype, *win, request);
+}
+
+void ampi_iget_wait(int *request, int *status, int *win, int *ierr) {
+  *ierr = AMPI_Iget_wait(request, (MPI_Status*)status, *win);
+}
+
+void ampi_iget_free(int *request, int *status, int *win, int *ierr) {
+  *ierr = AMPI_Iget_free(request, (MPI_Status*)status, *win);
+}
+
+void ampi_iget_data(void *data, int *status, int *ierr) {
+  *ierr = AMPI_Iget_data(data, *((MPI_Status*)status));
+}
+
+void ampi_alltoall_iget(void *data, int *sendcount, int *sendtype,
+                        void *recvbuf, int *recvcount, int *recvtype,
+                        int *comm, int *ierr) {
+  *ierr = AMPI_Alltoall_iget(data, *sendcount, *sendtype, recvbuf,
+                             *recvcount, *recvtype, *comm);
+}
+
+void ampi_alltoall_medium(void *data, int *sendcount, int *sendtype,
+                          void *recvbuf, int *recvcount, int *recvtype,
+                          int *comm, int *ierr) {
+  *ierr = MPICH_AlltoAll_medium(data, *sendcount, *sendtype, recvbuf,
+                                *recvcount, *recvtype, *comm);
+}
+
+void ampi_alltoall_long(void *data, int *sendcount, int *sendtype,
+                        void *recvbuf, int *recvcount, int *recvtype,
+                        int *comm, int *ierr) {
+  *ierr = MPICH_AlltoAll_long(data, *sendcount, *sendtype, recvbuf,
+                              *recvcount, *recvtype, *comm);
+}
+
+void ampi_yield(int *comm, int *ierr) {
+  *ierr = AMPI_Yield(*comm);
+}
+
+void ampi_suspend(int *comm, int *ierr) {
+  *ierr = AMPI_Suspend(*comm);
+}
+
+void ampi_resume(int *dest, int *comm, int *ierr) {
+  *ierr = AMPI_Resume(*dest, *comm);
+}
+
+void ampi_print(char *str, int *ierr) {
+  char *buf = new char[MPI_MAX_ERROR_STRING];
+  memcpy(buf, str, MPI_MAX_ERROR_STRING);
+  buf[MPI_MAX_ERROR_STRING-1] = '\0';
+  AMPI_Print(buf);
+  delete [] buf;
+}
+
+#if CMK_BIGSIM_CHARM
+int ampi_set_start_event(int *comm, int *ierr) {
+  *ierr = AMPI_Set_start_event(*comm);
+}
+
+void ampi_set_end_event(int *ierr) {
+  *ierr = AMPI_Set_end_event();
+}
+
 void begintracebigsim(char* msg){
   beginTraceBigSim(msg);
 }
+
 void endtracebigsim(char* msg, char* param){
   endTraceBigSim(msg, param);
+}
+#endif
+
+#if CMK_CUDA
+void ampi_gpu_iinvoke(int *to_call, int *request, int *ierr) {
+  *ierr = AMPI_GPU_Iinvoke(to_call, request);
+}
+
+void ampi_gpu_invoke(int *to_call, int *ierr) {
+  *ierr = AMPI_GPU_Invoke(to_call);
+}
+#endif
+
+/* Fortran2003 standard cmd line arg parsing functions:
+ *    - command_argument_count() returns the number of arguments
+ *      NOT including the program name.
+ *    - get_command_argument() returns the i'th argument, where
+ *      if 'i' is zero the program name is returned.
+ */
+void ampi_command_argument_count(int *count) {
+  *count = CkGetArgc()-1;
+}
+
+void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) {
+  char **argv = CkGetArgv();
+  int nc = CkGetArgc()-1;
+  int arglen = strlen(argv[*c]);
+
+  if (*c >= 0 && *c <= nc) {
+    if (arglen <= *len) {
+      memcpy(str, argv[*c], arglen);
+      for (int j=arglen; j<*len; j++) str[j] = ' ';
+      *ierr = 0;
+    } else {
+      memcpy(str, argv[*c], *len);
+      *ierr = -1;
+    }
+  }
+  else {
+    memset(str, ' ', *len);
+    *ierr = 1;
+  }
+}
+
+void ampi_init_universe(int *unicomm, int *ierr) {
+  AMPIAPI("AMPI_Init_universe");
+  for(int i=0; i<_mpi_nworlds; i++) {
+    unicomm[i] = MPI_COMM_UNIVERSE[i];
+  }
+  *ierr = MPI_SUCCESS;
 }
 
 } // extern "C"

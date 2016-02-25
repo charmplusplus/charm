@@ -10,11 +10,11 @@
 
 int main(int argc, char **argv)
 {
-  int my_id,next_id;            /* process id */
-  int p;                /* number of processes */
+  int my_id, next_id;           /* process id */
+  int p;                        /* number of processes */
   char* message_s, *message_r;  /* storage for the message */
   int i, j, max_msgs, msg_size;
-  MPI_Status status;    /* return status for receive */
+  MPI_Status status;            /* return status for receive */
   double elapsed_time_sec;
   double bandwidth;
   double startTime = 0;
@@ -35,7 +35,7 @@ int main(int argc, char **argv)
   //allocate data   
   message_s = (char*)malloc (msg_size);
 
-  //init data for verifying purpose
+  //init data for verification
   message_s[0] = 'a';
 
   //create window
@@ -46,26 +46,26 @@ int main(int argc, char **argv)
   startTime = MPI_Wtime();
 
   next_id = my_id+1>=p ? 0 : my_id+1;
-  // combined local transpose with global all-to-all
+  //combined local transpose with global all-to-all
   for(i=0; i<max_msgs; i++){
-      MPI_IGet(0, msg_size, MPI_CHAR, next_id, 0, msg_size, MPI_CHAR, win, &req);
-      MPI_IGet_Wait(&req, &status, win);	
-      message_r = (char*)MPI_IGet_Data(status); //MPI_IGet_Data(status);
-      fprintf(stdout, "[%d] get %c\n", my_id, message_r[0]);
-      MPI_IGet_Free(&req, &status, win);
+      AMPI_Iget(0, msg_size, MPI_CHAR, next_id, 0, msg_size, MPI_CHAR, win, &req);
+      AMPI_Iget_wait(&req, &status, win);
+      AMPI_Iget_data((char*)message_r, status);
+      //fprintf(stdout, "[%d] get %c\n", my_id, message_r[0]);
+      AMPI_Iget_free(&req, &status, win);
   }
   MPI_Win_fence(0, win);
 
   MPI_Barrier(MPI_COMM_WORLD);
   elapsed_time_sec = MPI_Wtime() - startTime;
-  fprintf(stdout, "Get Performance:\n");
-  fprintf(stdout, "Totaltime: %8.3f s\n",elapsed_time_sec);
+  fprintf(stdout, "Iget Performance:\n");
+  fprintf(stdout, "Totaltime: %8.3f s\n", elapsed_time_sec);
   elapsed_time_sec /= max_msgs; //time for each message
   bandwidth = msg_size / elapsed_time_sec; //bandwidth
 
-  fprintf (stdout, "%5d %7d\t ", max_msgs, msg_size);
-  fprintf (stdout,"%8.3f us,\t %8.3f MB/sec\n",
-           elapsed_time_sec * 1e6, bandwidth / 1e6);
+  fprintf(stdout, "%5d %7d\t ", max_msgs, msg_size);
+  fprintf(stdout, "%8.3f us,\t %8.3f MB/sec\n",
+          elapsed_time_sec * 1e6, bandwidth / 1e6);
 
   //deallocate data and stuff
   MPI_Win_free(&win);
