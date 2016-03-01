@@ -2660,6 +2660,16 @@ void Entry::genDefs(XStr& str) {
     str << ");\n";
     str << "}\n";
 
+    if (isReductionTarget()) {
+      str << "extern \"C\" ";
+      str << "int ";
+      str << fortranify(container->baseName(), "_ReductionTarget_", name);
+      str << "(void)\n";
+      str << "{\n";
+      str << "  return CkReductionTarget(" << container->baseName() << ", " << name << ");\n";
+      str << "}\n";
+    }
+
     str << "/* FORTRAN SECTION END */\n";
   }
 

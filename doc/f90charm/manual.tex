@@ -190,7 +190,7 @@ functions. The syntax is same as in Charm++.
           entry void SayHi(int a, double b, int n, int arr[n]);
 
           // Other entry points go here
-
+          entry [reductiontarget] void MyReduction(int result);
         };              
       };
 \end{verbatim}
@@ -264,6 +264,18 @@ Now that you have the chare and the chare constructor function, you can start
       else 
           call CkExit()
       endif
+\end{verbatim}
+
+Preliminary support for reductions is available as well. Support is limited to
+reducing from a chare array to the first member of the same array. Only basic
+built-in reducers are available. For an entry method named MyReduction, tagged
+as a reduction target in the interface file, a contribution can be made as
+follows:
+
+\begin{verbatim}
+      external Hello_ReductionTarget_MyReduction
+
+      call Hello_contribute(objPtr%aid, myIndex, sizeof(myIndex), myValue, CHARM_SUM_INT, Hello_ReductionTarget_MyReduction)
 \end{verbatim}
 
 Now, you can write the main program to create the chare array and start the 

@@ -687,6 +687,36 @@ void Chare::genDefs(XStr& str) {
     }
     str << "}\n";
 
+    // define reduction interface function
+    if (dim == (const char*)"1D") {
+      str << "extern \"C\" void "
+          << fortranify(baseName(), "_contribute")
+          << "(long* aindex, int *index1, int *size, void *data, int *op, int (*target)())\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "  CProxy_" << baseName() << " h(*aid);\n";
+      str << "  h[*index1].ckLocal()->contribute(*size, data, CkReduction::reducerType(*op), CkCallback(target(), h[0]));\n";
+    }
+    else if (dim == (const char*)"2D") {
+      str << "extern \"C\" void "
+          << fortranify(baseName(), "_contribute")
+          << "(long* aindex, int *index1, int *index2, int *size, void *data, int *op, int (*target)())\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "  CProxy_" << baseName() << " h(*aid);\n";
+      str << "  h(*index1, *index2).ckLocal()->contribute(*size, data, CkReduction::reducerType(*op), CkCallback(target(), h(0, 0)));\n";
+    }
+    else if (dim == (const char*)"3D") {
+      str << "extern \"C\" void "
+          << fortranify(baseName(), "_contribute")
+          << "(long* aindex, int *index1, int *index2, int *index3, int *size, void *data, int *op, int (*target)())\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "  CProxy_" << baseName() << " h(*aid);\n";
+      str << "  h(*index1, *index2, *index3).ckLocal()->contribute(*size, data, CkReduction::reducerType(*op), CkCallback(target(), h(0, 0, 0)));\n";
+    }
+    str << "}\n";
+
     str << "/* FORTRAN END */\n\n";
   } // fortranMode
 

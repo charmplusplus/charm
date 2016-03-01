@@ -123,6 +123,7 @@ public:
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  */
 
+  // KEEPINSYNC: charmmod.f90
 	typedef enum {
 	//A placeholder invalid reduction type
 		invalid=0,
@@ -159,6 +160,7 @@ public:
 
 	//Compute the logical XOR of the values passed by each element.
 	// The resulting value will be 1 if an odd number of source value is nonzero.
+	// logical_xor does not exist
                 logical_xor_int,logical_xor_bool,
 
                 // Compute the logical bitvector AND of the values passed by each element.

@@ -1887,6 +1887,7 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
 
   //Compute the logical XOR of the values passed by each element.
   // The resulting value will be 1 if an odd number of source values is nonzero.
+  // logical_xor does not exist
   vec.emplace_back(logical_xor_int_fn, true, "CkReduction::logical_xor_int");
   vec.emplace_back(logical_xor_bool_fn, true, "CkReduction::logical_xor_bool");
 
