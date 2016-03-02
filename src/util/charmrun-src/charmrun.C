@@ -56,6 +56,8 @@
 #define DIRSEP "/"
 #endif
 
+#define PRINT(a) (arg_quiet ? : printf a)
+
 #if CMK_SSH_NOT_NEEDED /*No SSH-- use daemon to start node-programs*/
 #define CMK_USE_SSH 0
 
@@ -736,6 +738,7 @@ const char *
     arg_debug_commands; /* commands that are provided by a ++debug-commands
                            flag. These are passed into gdb. */
 
+int arg_quiet;       /* omit charmrun standard output */
 int arg_local;       /* start node programs directly by exec on localhost */
 int arg_batch_spawn; /* control starting node programs, several at a time */
 int arg_scalable_start;
@@ -796,6 +799,7 @@ void arg_init(int argc, const char **argv)
   pparam_int(&arg_timeout, 60, "timeout",
              "seconds to wait per host connection");
   pparam_flag(&arg_verbose, 0, "verbose", "Print diagnostic messages");
+  pparam_flag(&arg_quiet, 0, "quiet", "Omit non-error runtime messages");
   pparam_str(&arg_nodelist, 0, "nodelist", "file containing list of nodes");
   pparam_str(&arg_nodegroup, "main", "nodegroup",
              "which group of nodes to use");
@@ -866,7 +870,7 @@ void arg_init(int argc, const char **argv)
   pparam_flag(&arg_skipmaster, 0, "skipmaster",
               "Donot assign any process to master node(SCYLD)");
   if (arg_skipmaster && arg_singlemaster) {
-    printf("Charmrun> 'singlemaster' is ignored due to 'skipmaster'. \n");
+    PRINT(("Charmrun> 'singlemaster' is ignored due to 'skipmaster'. \n"));
     arg_singlemaster = 0;
   }
   pparam_flag(&arg_debug, 0, "debug", "turn on more verbose debug print");
@@ -933,15 +937,20 @@ void arg_init(int argc, const char **argv)
   if (arg_server_port || arg_server_auth)
     arg_server = 1;
 
+  if (arg_verbose) arg_quiet = 0;
+
   if (arg_debug || arg_debug_no_pause) {
     fprintf(stderr, "Charmrun> scalable start disabled under ++debug:\n"
                     "NOTE: will make an SSH connection per process launched,"
                     " instead of per physical node.\n");
     arg_scalable_start = 0;
+    arg_quiet = 0;
     arg_verbose = 1;
     /*Pass ++debug along to program (used by machine.c)*/
     arg_argv[arg_argc++] = "++debug";
   }
+  /* pass ++quiet to program */
+  if (arg_quiet) arg_argv[arg_argc++] = "++quiet";
 
   /* Check for +replay-detail to know we have to load only one single processor
    */
@@ -1000,9 +1009,9 @@ void arg_init(int argc, const char **argv)
     /*If it starts with - or +, it ain't a node program.
       Chances are, the user screwed up and passed some
       unknown flag to charmrun*/
-    printf("Charmrun does not recognize the flag '%s'.\n", arg_nodeprog_r);
+    fprintf(stderr, "Charmrun does not recognize the flag '%s'.\n", arg_nodeprog_r);
     if (arg_nodeprog_r[0] == '+')
-      printf("Charm++'s flags need to be placed *after* the program name.\n");
+      fprintf(stderr, "Charm++'s flags need to be placed *after* the program name.\n");
     pparam_printdocs();
     exit(1);
   }
@@ -1020,12 +1029,12 @@ void arg_init(int argc, const char **argv)
     arg_nodeprog_a = strdup(buf);
   }
   if (arg_scalable_start) {
-    printf("Charmrun> scalable start enabled. \n");
+    PRINT(("Charmrun> scalable start enabled. \n"));
   }
 
 #ifdef HSTART
   if (arg_hierarchical_start) {
-    printf("Charmrun> Hierarchical scalable start enabled. \n");
+    PRINT(("Charmrun> Hierarchical scalable start enabled. \n"));
     if (arg_debug || arg_debug_no_pause) {
       fprintf(stderr, "Charmrun> Error: ++hierarchical-start does not support "
                       "debugging mode. \n");
@@ -1361,8 +1370,8 @@ void nodetab_init()
       (nodetab_host **) malloc(arg_read_pes * sizeof(nodetab_host *));
   nodetab_rank0_table = (int *) malloc(arg_read_pes * sizeof(int));
   nodetab_max = arg_read_pes;
-  fprintf(stderr, "arg_read_pes %d arg_requested_pes %d\n", arg_read_pes,
-          arg_requested_pes);
+  PRINT(("arg_read_pes %d arg_requested_pes %d\n", arg_read_pes,
+          arg_requested_pes));
 #else
   nodetab_table =
       (nodetab_host **) malloc(arg_requested_pes * sizeof(nodetab_host *));
@@ -1559,7 +1568,7 @@ void nodeinfo_add(const ChSingleNodeinfo *in, SOCKET ctrlfd)
   for (pe = 0; pe < nodetab_cpus(nt); pe++) {
     nodetab_table[nt + pe]->ctrlfd = ctrlfd;
   }
-/* printf("Charmrun> client %d connected\n", nt); */
+/* PRINT(("Charmrun> client %d connected\n", nt)); */
 #else
   dataport = ChMessageInt(i.dataport);
   if (0 == dataport) {
@@ -2243,7 +2252,7 @@ int req_handle_crashack(ChMessage *msg, SOCKET fd)
     if (count == nodetab_rank0_size - 1) {
       /* only after everybody else update its nodetab, can this
          restarted process continue */
-      printf("Charmrun> continue node: %d\n", _last_crash);
+      PRINT(("Charmrun> continue node: %d\n", _last_crash));
       req_handle_initnodetab1(NULL, req_clients[_crash_socket_charmrun_index]);
       _last_crash = 0;
       count = 0;
@@ -2259,7 +2268,7 @@ int req_handle_crashack(ChMessage *msg, SOCKET fd)
       if (count == req_nClients - 1) {
     // only after everybody else update its nodetab, can this restarted process
     // continue
-    printf("Charmrun> continue node: %d\n", _last_crash);
+    PRINT(("Charmrun> continue node: %d\n", _last_crash));
     req_handle_initnodetab(NULL, req_clients[_crash_socket_index]);
     _last_crash = 0;
     count = 0;
@@ -2303,9 +2312,9 @@ int req_handle_crash(ChMessage *msg, SOCKET fd)
   }
   _crash_socket_charmrun_index = i;
 
-  fprintf(stdout, "Root charmrun : Socket %d failed %d\n", fd,
+  fprintf(stderr, "Root charmrun : Socket %d failed %d\n", fd,
           _crash_socket_charmrun_index);
-  fflush(stdout);
+  fflush(stderr);
   ChSingleNodeinfo *nodeInfo = (ChSingleNodeinfo *) msg->data;
   int crashed_node = ChMessageInt(nodeInfo->nodeNo);
   _last_crash = crashed_node;
@@ -2334,7 +2343,7 @@ void error_in_req_serve_client(SOCKET fd)
 {
   int i;
   int crashed_node, crashed_pe, node_index, socket_index;
-  fprintf(stdout, "Socket %d failed \n", fd);
+  fprintf(stderr, "Socket %d failed \n", fd);
 
 #ifdef HSTART
   if (arg_hierarchical_start) {
@@ -2371,7 +2380,7 @@ void error_in_req_serve_client(SOCKET fd)
   /*announce_crash(socket_index,crashed_node);*/
   restart_node(crashed_node);
 
-  fprintf(stdout, "charmrun says Processor %d failed on Node %d\n", crashed_pe,
+  fprintf(stderr, "charmrun says Processor %d failed on Node %d\n", crashed_pe,
           crashed_node);
   /** after the crashed processor has been recreated
    it connects to charmrun. That data must now be filled
@@ -3509,7 +3518,7 @@ void req_start_server(void)
     /* user specify the env  */
     strcpy(server_addr, arg_charmrunip);
   else if (skt_ip_match(ip, _skt_invalid_ip)) {
-    printf("Charmrun> Warning-- cannot find IP address for your hostname.  "
+    fprintf(stderr, "Charmrun> Warning-- cannot find IP address for your hostname.  "
            "Using loopback.\n");
     strcpy(server_addr, "127.0.0.1");
   } else if (arg_usehostname || skt_ip_match(ip, skt_lookup_ip("127.0.0.1")))
@@ -3702,7 +3711,7 @@ int main(int argc, const char **argv, char **envp)
     start_nodes_scyld();
 #else
 #if CMK_USE_IBVERBS
-    printf("Charmrun> IBVERBS version of charmrun\n");
+    PRINT(("Charmrun> IBVERBS version of charmrun\n"));
 #endif
 
 #ifdef HSTART
@@ -3747,7 +3756,7 @@ int main(int argc, const char **argv, char **envp)
     abort();
 #else
     /* Open an additional connection to node 0 with a gdb to grab info */
-    printf("opening connection with node 0 for info gdb\n");
+    PRINT(("opening connection with node 0 for info gdb\n"));
     read_global_segments_size();
     open_gdb_info();
     gdb_stream = fdopen(dup(2), "a");
@@ -3789,8 +3798,8 @@ int main(int argc, const char **argv, char **envp)
   if (arg_verbose)
     fprintf(stderr, "Charmrun> node programs all connected\n");
   /* report time */
-  fprintf(stderr, "Charmrun> started all node programs in %.3f seconds.\n",
-          GetClock() - start_timer);
+  PRINT(("Charmrun> started all node programs in %.3f seconds.\n",
+          GetClock() - start_timer));
 
 /* enter request-service mode */
 #ifdef HSTART
@@ -3987,7 +3996,7 @@ void start_nodes_local(char **env)
                 fflush(logfile);
       */
       int error = GetLastError();
-      printf("startProcess failed to start process \"%s\" with status: %d\n",
+      fprintf(stderr, "startProcess failed to start process \"%s\" with status: %d\n",
              pparam_argv[1], error);
       exit(1);
     }
@@ -4152,12 +4161,12 @@ void start_nodes_scyld(void)
       if (nodeno == -1) {
         status = execve(pparam_argv[1], pparam_argv + 1, envp);
         dup2(fd1, 1);
-        printf("execve failed to start process \"%s\" with status: %d\n",
+        fprintf(stderr, "execve failed to start process \"%s\" with status: %d\n",
                pparam_argv[1], status);
       } else {
         status = bproc_execmove(nodeno, pparam_argv[1], pparam_argv + 1, envp);
         dup2(fd1, 1);
-        printf("bproc_execmove failed to start remote process \"%s\" with "
+        fprintf(stderr, "bproc_execmove failed to start remote process \"%s\" with "
                "status: %d\n",
                pparam_argv[1], status);
       }
@@ -4669,8 +4678,8 @@ void open_gdb_info()
     close(fdin[1]);
     close(fdout[0]);
     close(fderr[0]);
-    printf("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n", sshargv[0],
-           sshargv[1], sshargv[2], sshargv[3], sshargv[4]);
+    PRINT(("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n", sshargv[0],
+           sshargv[1], sshargv[2], sshargv[3], sshargv[4]));
     dup2(fdin[0], 0);
     dup2(fdout[1], 1);
     dup2(fderr[1], 2);
@@ -5047,8 +5056,8 @@ void start_nodes_local(char **env)
     char *abs_xterm=find_abs_path(arg_xterm);
     if(!abs_xterm)
       {
-	printf("Charmrun> cannot find xterm for gdb, please add it to your path\n");
-	exit(1);
+      fprintf(stderr, "Charmrun> cannot find xterm for gdb, please add it to your path\n");
+      exit(1);
       }
     dparamp[dparamoutc++] = strdup(abs_xterm);
     dparamp[dparamoutc++] = strdup("-e");
@@ -5106,7 +5115,7 @@ void start_nodes_local(char **env)
 		      const_cast<char *const *>(dparamp), envp);
 
       dup2(fd1, 1);
-      printf("execve failed to start process \"%s\" with status: %d\n",
+      fprintf(stderr, "execve failed to start process \"%s\" with status: %d\n",
              dparamp[0], status);
       kill(getppid(), 9);
       exit(1);
@@ -5190,8 +5199,8 @@ processor to connect it to a new one**/
       exit(1);
     }
   }
-  printf("Charmrun finished launching new process in %fs\n",
-         GetClock() - ftTimer);
+  PRINT(("Charmrun finished launching new process in %fs\n",
+         GetClock() - ftTimer));
 }
 
 void refill_nodetab_entry(int crashed_node)
@@ -5285,7 +5294,7 @@ void reconnect_crashed_client(int socket_index, int crashed_node)
       fprintf(stderr, "Charmrun: Bad initnode data length. Aborting\n");
       fprintf(stderr, "Charmrun: possibly because: %s.\n", msg.data);
     }
-    fprintf(stdout, "socket_index %d crashed_node %d reconnected fd %d  \n",
+    fprintf(stderr, "socket_index %d crashed_node %d reconnected fd %d  \n",
             socket_index, crashed_node, req_clients[socket_index]);
 
     /** update the nodetab entry corresponding to

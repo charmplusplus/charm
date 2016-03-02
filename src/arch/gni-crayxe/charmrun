@@ -8,6 +8,7 @@ args=""
 pes=1
 ppn=1
 machinefile=""
+QUIET=0
 
 while [ $# -gt 0 ]
 do
@@ -41,6 +42,10 @@ do
 		args=" "$1" "$2" "$args
 		shift
 		;;
+	++quiet)
+		QUIET=1
+		args=$args" "$1
+		;;
 	*) 
 		args=$args" "$1
 		;;
@@ -58,7 +63,7 @@ else
   pes=$quot
 fi 
 
-printf "\nRunning on $pes processors: $args\n"
+test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 
 
 if [ -n "$PBS_NODEFILE" ]
@@ -67,7 +72,7 @@ then
   aprun=`which aprun 2>/dev/null`
   if test -n "$aprun"
   then
-    echo  aprun -n $pes -d `expr $ppn + 1` $args
+    test $QUIET -eq 0 && echo  aprun -n $pes -d `expr $ppn + 1` $args
     $aprun -n $pes -d `expr $ppn + 1` $args
   else
     mpirun_cmd=`which mpirun 2>/dev/null`
@@ -84,7 +89,7 @@ then
         #    mpdallexit
       else   # normal case
         test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
-        echo mpirun -np $pes $args
+        test $QUIET -eq 0 && echo mpirun -np $pes $args
         mpirun -np $pes $args
       fi
     else
@@ -95,7 +100,7 @@ then
 elif [ -n "$LSB_HOSTS" ]
 then
 # Tungsten
-  echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
+  test $QUIET -eq 0 && echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
   cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
 elif [ -n "$PBS_QUEUE" -o -n "$LSF_QUEUE" ]
 then
@@ -280,18 +285,18 @@ else
       # Disables randomization of the virtual address  space  (turns  on
       #          ADDR_NO_RANDOMIZE).
       cur_arch=`uname -m`
-      echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $pes $args"
+      test $QUIET -eq 0 && echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $pes $args"
       $setarch_cmd $cur_arch -R  mpirun -np $pes $args
     else
-      echo "charmrun> mpirun -np $pes $args"
+      test $QUIET -eq 0 && echo "charmrun> mpirun -np $pes $args"
       mpirun -np $pes $args
     fi
   else
     mpiexec_cmd=`which mpiexec 2>/dev/null`
     if test -n "$mpiexec_cmd"
     then
-      echo "charmrun> $mpiexec_cmd -n $pes $args"
-      echo
+      test $QUIET -eq 0 && echo "charmrun> $mpiexec_cmd -n $pes $args"
+      test $QUIET -eq 0 && echo
       "$mpiexec_cmd" -n $pes $args
     else
       echo "Don't know how to run MPI program."

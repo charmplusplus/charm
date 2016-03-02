@@ -3718,6 +3718,9 @@ static void checkTSanOptions()
 int ccsRunning;
 #endif
 
+int quietModeRequested;  // user has requested quiet mode
+int quietMode; // quiet mode active (CmiPrintf's are disabled)
+
 /**
   Main Converse initialization routine.  This routine is 
   called by the machine file (machine.c) to set up Converse.
@@ -3966,6 +3969,7 @@ void CmiIOInit(char **argv) {
 
 void CmiPrintf(const char *format, ...)
 {
+  if (quietMode) return;
   CpdSystemEnter();
   {
   va_list args;

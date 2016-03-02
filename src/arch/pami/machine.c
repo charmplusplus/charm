@@ -610,7 +610,7 @@ pamix_progress_disable_fn   cmi_progress_disable;
 
 int CMI_Progress_init(int start, int ncontexts) {
   if (CmiMyPe() == 0)
-    printf("Enabling communication threads\n");
+    CmiPrintf("Enabling communication threads\n");
   
   PAMI_EXTENSION_OPEN(cmi_pami_client,"EXT_async_progress",&cmi_ext_progress);
   cmi_progress_register = PAMI_EXTENSION_FUNCTION(pamix_progress_register_fn, "register", cmi_ext_progress);
@@ -649,9 +649,16 @@ int CMI_Progress_finalize(int start, int ncontexts) {
 
 #include "manytomany.c"
 
+extern int quietMode;
+extern int quietModeRequested;
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
     int n, i, count;
+
+    if (CmiGetArgFlagDesc(argv,"++quiet","Omit non-error runtime messages")) {
+      quietModeRequested = quietMode = 1;
+    }
 
     /* processor per node */
     _Cmi_mynodesize = 1;
@@ -666,7 +673,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     query.name = PAMI_CLIENT_NUM_CONTEXTS;
     pami_result_t rc = PAMI_Client_query(cmi_pami_client, &query, 1);
     unsigned possible_contexts = query.value.intval;
-    //fprintf(stdout, "Creating client with %d contexts\n", possible_contexts);
+    //CmiPrintf("Creating client with %d contexts\n", possible_contexts);
 
     size_t _n = 1;
 #if CMK_PAMI_MULTI_CONTEXT
@@ -834,7 +841,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       }
 
     if (_Cmi_mynode == 0)
-      printf ("Choosing optimized barrier algorithm name %s\n",
+      CmiPrintf ("Choosing optimized barrier algorithm name %s\n",
 	      always_works_md[opt_alg]);
 	      
     pami_barrier.cb_done   = pami_barrier_done;
@@ -923,7 +930,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     //Initialize the manytomany api
     _cmidirect_m2m_initialize (cmi_pami_contexts, _n);
 
-    //printf ("Starting Threads\n");
+    //CmiPrintf ("Starting Threads\n");
     CmiStartThreads(argv);
 
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
@@ -1035,6 +1042,8 @@ void spin_wait_barrier () {
 
 void ConverseExit(void) {
 
+  if (quietModeRequested) quietMode = 1;
+
   while (MSGQLEN() > 0 || ORECVS() > 0) {
     AdvanceCommunications();
   }
@@ -1050,7 +1059,7 @@ void ConverseExit(void) {
   ConverseCommonExit();
 
   if (CmiMyPe() == 0) {
-    printf("End of program\n");
+    CmiPrintf("End of program\n");
   }
 
   int rank0 = 0;
