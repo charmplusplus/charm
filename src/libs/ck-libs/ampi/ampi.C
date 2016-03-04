@@ -6097,6 +6097,215 @@ int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
 }
 
   CDECL
+int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+         void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm)
+{
+  AMPIAPI("AMPI_Neighbor_allgather");
+
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CkAbort("MPI_Neighbor_allgather does not implement MPI_IN_PLACE");
+
+#if CMK_ERROR_CHECKING
+  int ret;
+  ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+  ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if (getAmpiParent()->isInter(comm)) CkAbort("MPI_Neighbor_allgather not allowed for Inter-communicator!");
+  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+
+  int num_neighbors, rank_in_comm;
+  int *neighbors;
+  ampi *ptr = getAmpiInstance(comm);
+  rank_in_comm = ptr->getRank(comm);
+
+  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
+  if (num_neighbors == 0) return MPI_SUCCESS;
+  neighbors = new int[num_neighbors];
+  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+
+  for (int i=0; i<num_neighbors; i++) {
+    ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+  }
+  int itemsize = getDDT()->getType(recvtype)->getSize(recvcount);
+  for (int j=0; j<num_neighbors; j++) {
+    if (-1==ptr->recv(MPI_GATHER_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*j)),
+                      recvcount, recvtype, comm))
+      CkAbort("AMPI> Error in MPI_Neighbor_allgather recv");
+  }
+
+#if AMPI_COUNTER
+  getAmpiParent()->counters.nbor_allgather++;
+#endif
+  delete [] neighbors;
+  return MPI_SUCCESS;
+}
+
+  CDECL
+int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+         void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm,
+         MPI_Request *request)
+{
+  AMPIAPI("AMPI_Ineighbor_allgather");
+
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CkAbort("MPI_Ineighbor_allgather does not implement MPI_IN_PLACE");
+
+#if CMK_ERROR_CHECKING
+  int ret;
+  ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+  ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if (getAmpiParent()->isInter(comm)) CkAbort("MPI_Ineighbor_allgather not allowed for Inter-communicator!");
+  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+
+  int num_neighbors, rank_in_comm;
+  int *neighbors;
+  ampi *ptr = getAmpiInstance(comm);
+  rank_in_comm = ptr->getRank(comm);
+
+  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
+  if (num_neighbors == 0) return MPI_SUCCESS;
+  neighbors = new int[num_neighbors];
+  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+
+  for (int i=0; i<num_neighbors; i++) {
+    ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+  }
+
+  // use an IATAReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  IATAReq *newreq = new IATAReq(num_neighbors);
+  int itemsize = getDDT()->getType(recvtype)->getSize(recvcount);
+  for (int j=0; j<num_neighbors; j++) {
+    if(newreq->addReq(((char*)recvbuf)+(itemsize*j), recvcount, recvtype,
+                      neighbors[j], MPI_GATHER_TAG, comm)!=(j+1))
+      CkAbort("MPI_Ineighbor_allgather: Error adding requests into IATAReq!");
+  }
+  *request = reqs->insert(newreq);
+
+#if AMPI_COUNTER
+  getAmpiParent()->counters.nbor_allgather++;
+#endif
+  delete [] neighbors;
+  return MPI_SUCCESS;
+}
+
+  CDECL
+int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+         void* recvbuf, int *recvcounts, int *displs, MPI_Datatype recvtype,
+         MPI_Comm comm)
+{
+  AMPIAPI("AMPI_Neighbor_allgatherv");
+
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CkAbort("MPI_Neighbor_allgatherv does not implement MPI_IN_PLACE");
+
+#if CMK_ERROR_CHECKING
+  int ret;
+  ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+  ret = errorCheck(comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if (getAmpiParent()->isInter(comm)) CkAbort("MPI_Neighbor_allgatherv not allowed for Inter-communicator!");
+  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+
+  int num_neighbors, rank_in_comm;
+  int *neighbors;
+  ampi *ptr = getAmpiInstance(comm);
+  rank_in_comm = ptr->getRank(comm);
+
+  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
+  if (num_neighbors == 0) return MPI_SUCCESS;
+  neighbors = new int[num_neighbors];
+  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+
+  for (int i=0; i<num_neighbors; i++) {
+    ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+  }
+  int itemsize = getDDT()->getType(recvtype)->getSize();
+  for (int j=0; j<num_neighbors; j++) {
+    if (-1==ptr->recv(MPI_GATHER_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*displs[j])),
+                      recvcounts[j], recvtype, comm))
+      CkAbort("AMPI> Error in MPI_Neighbor_allgatherv recv");
+  }
+
+#if AMPI_COUNTER
+  getAmpiParent()->counters.nbor_allgather++;
+#endif
+  delete [] neighbors;
+  return MPI_SUCCESS;
+}
+
+  CDECL
+int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+         void* recvbuf, int* recvcounts, int* displs, MPI_Datatype recvtype,
+         MPI_Comm comm, MPI_Request *request)
+{
+  AMPIAPI("AMPI_Ineighbor_allgatherv");
+
+  if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
+    CkAbort("MPI_Ineighbor_allgatherv does not implement MPI_IN_PLACE");
+
+#if CMK_ERROR_CHECKING
+  int ret;
+  ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+  ret = errorCheck(comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  if (getAmpiParent()->isInter(comm)) CkAbort("MPI_Ineighbor_allgatherv not allowed for Inter-communicator!");
+  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+
+  int num_neighbors, rank_in_comm;
+  int *neighbors;
+  ampi *ptr = getAmpiInstance(comm);
+  rank_in_comm = ptr->getRank(comm);
+
+  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
+  if (num_neighbors == 0) return MPI_SUCCESS;
+  neighbors = new int[num_neighbors];
+  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+
+  for (int i=0; i<num_neighbors; i++) {
+    ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+  }
+
+  // use an IATAReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  IATAReq *newreq = new IATAReq(num_neighbors);
+  int itemsize = getDDT()->getType(recvtype)->getSize();
+  for (int j=0; j<num_neighbors; j++) {
+    if(newreq->addReq(((char*)recvbuf)+(itemsize*displs[j]), recvcounts[j], recvtype,
+                      neighbors[j], MPI_GATHER_TAG, comm)!=(j+1))
+      CkAbort("MPI_Ineighbor_allgatherv: Error adding requests into IATAReq!");
+  }
+  *request = reqs->insert(newreq);
+
+#if AMPI_COUNTER
+  getAmpiParent()->counters.nbor_allgather++;
+#endif
+  delete [] neighbors;
+  return MPI_SUCCESS;
+}
+
+  CDECL
 int AMPI_Comm_dup(int comm, int *newcomm)
 {
   AMPIAPI("AMPI_Comm_dup");
@@ -7143,6 +7352,37 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
       neighbors[i] = edges[index[rank - 1] + i];
   }
   return MPI_SUCCESS;
+}
+
+/* Used by MPI_Neighbor_* routines */
+int ampi::getNumTopologyNeighbors(MPI_Comm comm, int rank) {
+  int num_dims, num_neighbors = 0;
+  ampiParent *ptr = getAmpiParent();
+  if (ptr->isGraph(comm)) {
+    AMPI_Graph_neighbors_count(comm, rank, &num_neighbors);
+  }
+  else if (ptr->isCart(comm)) {
+    AMPI_Cartdim_get(comm, &num_dims);
+    num_neighbors = 2*num_dims;
+  }
+  return num_neighbors;
+}
+
+void ampi::getTopologyNeighborRanks(MPI_Comm comm, int rank, int num_neighbors, int *neighbors) {
+  ampiParent *ptr = getAmpiParent();
+  if (ptr->isGraph(comm)) {
+    AMPI_Graph_neighbors(comm, rank, num_neighbors, neighbors);
+  }
+  else if (ptr->isCart(comm)) {
+    for (int i=0; i<num_neighbors; i++) {
+      int src, dest;
+      AMPI_Cart_shift(comm, i/2, (i%2==0)?1:-1, &src, &dest);
+      neighbors[i] = dest;
+    }
+  }
+  else {
+    for (int i=0; i<num_neighbors; i++) neighbors[i] = MPI_PROC_NULL;
+  }
 }
 
 /* Factorization code by Orion. Idea thrashed out by Orion and Prakash */

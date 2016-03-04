@@ -565,6 +565,21 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
 #define MPI_Exscan AMPI_Exscan
 int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
 		MPI_Op op, MPI_Comm comm);
+#define MPI_Neighbor_allgather AMPI_Neighbor_allgather
+int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+        void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm);
+#define MPI_Ineighbor_allgather AMPI_Ineighbor_allgather
+int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+        void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm,
+        MPI_Request *request);
+#define MPI_Neighbor_allgatherv AMPI_Neighbor_allgatherv
+int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+        void* recvbuf, int* recvcounts, int* displs, MPI_Datatype recvtype,
+        MPI_Comm comm);
+#define MPI_Ineighbor_allgatherv AMPI_Ineighbor_allgatherv
+int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+        void* recvbuf, int* recvcounts, int* displs, MPI_Datatype recvtype,
+        MPI_Comm comm, MPI_Request *request);
 #define MPI_Op_create AMPI_Op_create
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op);
 #define MPI_Op_free AMPI_Op_free

@@ -76,12 +76,12 @@ class fromzDisk : public zdisk {
 #if AMPI_COUNTER
 class AmpiCounters{
 public:
-	int send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,exscan;
+	int send,recv,isend,irecv,nbor_allgather,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,exscan;
 	AmpiCounters(){
-		send=0;recv=0;isend=0;irecv=0;barrier=0;bcast=0;gather=0;scatter=0;allgather=0;alltoall=0;reduce=0;allreduce=0;scan=0;exscan=0;
+		send=0;recv=0;isend=0;irecv=0;nbor_allgather=0;barrier=0;bcast=0;gather=0;scatter=0;allgather=0;alltoall=0;reduce=0;allreduce=0;scan=0;exscan=0;
 	}
 	void output(int idx){
-		printf("[%d]send=%d;recv=%d;isend=%d;irecv=%d;barrier=%d;bcast=%d;gather=%d;scatter=%d;allgather=%d;alltoall=%d;reduce=%d;allreduce=%d;scan=%d;exscan=%d\n",idx,send,recv,isend,irecv,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,exscan);
+		CkPrintf("[%d]send=%d;recv=%d;isend=%d;irecv=%d;nbor_allgather=%d;barrier=%d;bcast=%d;gather=%d;scatter=%d;allgather=%d;alltoall=%d;reduce=%d;allreduce=%d;scan=%d;exscan=%d\n",idx,send,recv,isend,irecv,nbor_allgather,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,exscan);
 	}
 };
 #endif
@@ -1497,6 +1497,8 @@ friend class SReq;
     inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
     inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
     inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
+    int getNumTopologyNeighbors(MPI_Comm comm, int rank);
+    void getTopologyNeighborRanks(MPI_Comm comm, int rank, int num_neighbors, int *neighbors);
     
     CkDDT *getDDT(void) {return parent->myDDT;}
     CthThread getThread() { return thread->getThread(); }

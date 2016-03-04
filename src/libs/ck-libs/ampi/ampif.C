@@ -89,6 +89,10 @@ FDECL {
 #define mpi_reduce_scatter FTN_NAME( MPI_REDUCE_SCATTER , mpi_reduce_scatter )
 #define mpi_scan FTN_NAME( MPI_SCAN , mpi_scan )
 #define mpi_exscan FTN_NAME( MPI_EXSCAN , mpi_exscan )
+#define mpi_neighbor_allgather FTN_NAME( MPI_NEIGHBOR_ALLGATHER , mpi_neighbor_allgather )
+#define mpi_ineighbor_allgather FTN_NAME( MPI_INEIGHBOR_ALLGATHER , mpi_ineighbor_allgather )
+#define mpi_neighbor_allgatherv FTN_NAME( MPI_NEIGHBOR_ALLGATHERV , mpi_neighbor_allgatherv )
+#define mpi_ineighbor_allgatherv FTN_NAME( MPI_INEIGHBOR_ALLGATHERV , mpi_ineighbor_allgatherv )
 #define mpi_op_create FTN_NAME( MPI_OP_CREATE , mpi_op_create )
 #define mpi_op_free FTN_NAME( MPI_OP_FREE , mpi_op_free )
 
@@ -891,6 +895,38 @@ void mpi_exscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op
 {
   MPI_Op op = GET_MPI_OP(*opc);
   *ierr = AMPI_Exscan(sendbuf,recvbuf,*count,*datatype,op,*comm);
+}
+
+void mpi_neighbor_allgather(void* sendbuf, int *sendcount, int *sendtype,
+                            void *recvbuf, int *recvcount, int *recvtype,
+                            int *comm, int *ierr)
+{
+  *ierr = AMPI_Neighbor_allgather(sendbuf, *sendcount, *sendtype, recvbuf,
+                                 *recvcount, *recvtype, *comm);
+}
+
+void mpi_ineighbor_allgather(void* sendbuf, int *sendcount, int *sendtype,
+                            void *recvbuf, int *recvcount, int *recvtype,
+                            int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Ineighbor_allgather(sendbuf, *sendcount, *sendtype, recvbuf,
+                                  *recvcount, *recvtype, *comm, request);
+}
+
+void mpi_neighbor_allgatherv(void* sendbuf, int *sendcount, int *sendtype,
+                             void *recvbuf, int *recvcounts, int *displs,
+                             int *recvtype, int *comm, int *ierr)
+{
+  *ierr = AMPI_Neighbor_allgatherv(sendbuf, *sendcount, *sendtype, recvbuf,
+                                  recvcounts, displs, *recvtype, *comm);
+}
+
+void mpi_ineighbor_allgatherv(void* sendbuf, int *sendcount, int *sendtype,
+                             void *recvbuf, int *recvcounts, int *displs,
+                             int *recvtype, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Ineighbor_allgatherv(sendbuf, *sendcount, *sendtype, recvbuf,
+                                   recvcounts, displs, *recvtype, *comm, request);
 }
 
 void mpi_op_create(void* function, int* commute, int* opc, int* ierr){
