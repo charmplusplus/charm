@@ -129,16 +129,21 @@ public:
 		invalid=0,
                 nop,
 	//Compute the sum the numbers passed by each element.
-		sum_int,sum_long,sum_float,sum_double,
+		sum_int,sum_long,sum_long_long, sum_uint,
+                sum_ulong,sum_ulong_long,sum_float,sum_double,
 
 	//Compute the product the numbers passed by each element.
-		product_int,product_long,product_float,product_double,
+		product_int,product_long,product_long_long,
+                product_uint,product_ulong, product_ulong_long,
+                product_float,product_double,
 
 	//Compute the largest number passed by any element.
-		max_int,max_long,max_float,max_double,
+		max_int,max_long,max_long_long, max_uint,
+                max_ulong,max_ulong_long,max_float,max_double,
 
 	//Compute the smallest number passed by any element.
-		min_int,min_long,min_float,min_double,
+		min_int,min_long,min_long_long, min_uint,
+                min_ulong,min_ulong_long,min_float,min_double,
 
 	//Compute the logical AND of the integers passed by each element.
 	// The resulting integer will be zero if any source integer is zero.
