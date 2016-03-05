@@ -912,7 +912,7 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
     void print(){
 	for(int i=0; i<len; i++){
 	    if(block[i]==NULL) continue;
-	    CmiPrintf("AmpiRequestList Element %d [%p]: \n", i+1, block[i]);
+	    CkPrintf("AmpiRequestList Element %d [%p]: \n", i+1, block[i]);
 	    block[i]->print();
 	}
     }

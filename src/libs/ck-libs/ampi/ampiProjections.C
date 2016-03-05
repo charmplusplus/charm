@@ -81,7 +81,7 @@ extern "C" void ampi_msgSend(int tag,int dest,int count,int size){
 	iData[1] = dest;
 	iData[2] = count;
 	iData[3] = size;
-	//CmiPrintf("Size = %d\n",size);
+	//CkPrintf("Size = %d\n",size);
 	LogEvent1(_AMPI_LANG_ID,_E_AMPI_MSG_SEND,4,iData);
 }
 
