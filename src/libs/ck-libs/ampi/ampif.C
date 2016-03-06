@@ -89,6 +89,12 @@ FDECL {
 #define mpi_reduce_scatter FTN_NAME( MPI_REDUCE_SCATTER , mpi_reduce_scatter )
 #define mpi_scan FTN_NAME( MPI_SCAN , mpi_scan )
 #define mpi_exscan FTN_NAME( MPI_EXSCAN , mpi_exscan )
+#define mpi_neighbor_alltoall FTN_NAME( MPI_NEIGHBOR_ALLTOALL , mpi_neighbor_alltoall )
+#define mpi_ineighbor_alltoall FTN_NAME( MPI_INEIGHBOR_ALLTOALL , mpi_ineighbor_alltoall )
+#define mpi_neighbor_alltoallv FTN_NAME( MPI_NEIGHBOR_ALLTOALLV , mpi_neighbor_alltoallv )
+#define mpi_ineighbor_alltoallv FTN_NAME( MPI_INEIGHBOR_ALLTOALLV , mpi_ineighbor_alltoallv )
+#define mpi_neighbor_alltoallw FTN_NAME( MPI_NEIGHBOR_ALLTOALLW , mpi_neighbor_alltoallw )
+#define mpi_ineighbor_alltoallw FTN_NAME( MPI_INEIGHBOR_ALLTOALLW , mpi_ineighbor_alltoallw )
 #define mpi_neighbor_allgather FTN_NAME( MPI_NEIGHBOR_ALLGATHER , mpi_neighbor_allgather )
 #define mpi_ineighbor_allgather FTN_NAME( MPI_INEIGHBOR_ALLGATHER , mpi_ineighbor_allgather )
 #define mpi_neighbor_allgatherv FTN_NAME( MPI_NEIGHBOR_ALLGATHERV , mpi_neighbor_allgatherv )
@@ -895,6 +901,62 @@ void mpi_exscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op
 {
   MPI_Op op = GET_MPI_OP(*opc);
   *ierr = AMPI_Exscan(sendbuf,recvbuf,*count,*datatype,op,*comm);
+}
+
+void mpi_neighbor_alltoall(void* sendbuf, int *sendcount, int *sendtype,
+                           void *recvbuf, int *recvcount, int *recvtype,
+                           int *comm, int *ierr)
+{
+  *ierr = AMPI_Neighbor_alltoall(sendbuf, *sendcount, *sendtype, recvbuf,
+                                *recvcount, *recvtype, *comm);
+}
+
+void mpi_ineighbor_alltoall(void* sendbuf, int *sendcount, int *sendtype,
+                           void *recvbuf, int *recvcount, int *recvtype,
+                           int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Ineighbor_alltoall(sendbuf, *sendcount, *sendtype, recvbuf,
+                                 *recvcount, *recvtype, *comm, request);
+}
+
+void mpi_neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
+                            int *sendtype, void *recvbuf, int *recvcounts,
+                            int *rdispls, int *recvtype, int *comm,
+                            int *ierr)
+{
+  *ierr = AMPI_Neighbor_alltoallv(sendbuf, sendcounts, sdispls, *sendtype,
+                                  recvbuf, recvcounts, rdispls, *recvtype,
+                                  *comm);
+}
+
+void mpi_ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
+                             int *sendtype, void *recvbuf, int *recvcounts,
+                             int *rdispls, int *recvtype, int *comm,
+                             int *request, int *ierr)
+{
+  *ierr = AMPI_Ineighbor_alltoallv(sendbuf, sendcounts, sdispls, *sendtype,
+                                   recvbuf, recvcounts, rdispls, *recvtype,
+                                   *comm, request);
+}
+
+void mpi_neighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
+                            int *sendtypes, void *recvbuf, int *recvcounts,
+                            int *rdispls, int *recvtypes, int *comm,
+                            int *ierr)
+{
+  *ierr = AMPI_Neighbor_alltoallw(sendbuf, sendcounts, sdispls, sendtypes,
+                                  recvbuf, recvcounts, rdispls, recvtypes,
+                                  *comm);
+}
+
+void mpi_ineighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
+                             int *sendtypes, void *recvbuf, int *recvcounts,
+                             int *rdispls, int *recvtypes, int *comm,
+                             int *request, int *ierr)
+{
+  *ierr = AMPI_Ineighbor_alltoallw(sendbuf, sendcounts, sdispls, sendtypes,
+                                   recvbuf, recvcounts, rdispls, recvtypes,
+                                   *comm, request);
 }
 
 void mpi_neighbor_allgather(void* sendbuf, int *sendcount, int *sendtype,

@@ -565,6 +565,29 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
 #define MPI_Exscan AMPI_Exscan
 int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
 		MPI_Op op, MPI_Comm comm);
+#define MPI_Neighbor_alltoall AMPI_Neighbor_alltoall
+int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+        void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm);
+#define MPI_Ineighbor_alltoall AMPI_Ineighbor_alltoall
+int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+        void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm,
+        MPI_Request* request);
+#define MPI_Neighbor_alltoallv AMPI_Neighbor_alltoallv
+int AMPI_Neighbor_alltoallv(void* sendbuf, int* sendcounts, int* sdispls,
+        MPI_Datatype sendtype, void* recvbuf, int* recvcounts, int* rdispls,
+        MPI_Datatype recvtype, MPI_Comm comm);
+#define MPI_Ineighbor_alltoallv AMPI_Ineighbor_alltoallv
+int AMPI_Ineighbor_alltoallv(void* sendbuf, int* sendcounts, int* sdispls,
+        MPI_Datatype sendtype, void* recvbuf, int* recvcounts, int* rdispls,
+        MPI_Datatype recvtype, MPI_Comm comm, MPI_Request* request);
+#define MPI_Neighbor_alltoallw AMPI_Neighbor_alltoallw
+int AMPI_Neighbor_alltoallw(void* sendbuf, int* sendcounts, int* sdipls,
+        MPI_Datatype* sendtypes, void* recvbuf, int* recvcounts, int* rdispls,
+        MPI_Datatype* recvtypes, MPI_Comm comm);
+#define MPI_Ineighbor_alltoallw AMPI_Ineighbor_alltoallw
+int AMPI_Ineighbor_alltoallw(void* sendbuf, int* sendcounts, int* sdispls,
+        MPI_Datatype* sendtypes, void* recvbuf, int* recvcounts, int* rdispls,
+        MPI_Datatype* recvtypes, MPI_Comm comm, MPI_Request* request);
 #define MPI_Neighbor_allgather AMPI_Neighbor_allgather
 int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
         void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm);
