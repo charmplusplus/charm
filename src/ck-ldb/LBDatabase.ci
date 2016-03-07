@@ -10,6 +10,7 @@ module LBDatabase {
 
   group [migratable] LBDatabase {
     entry void LBDatabase(void);  
+    entry void ResumeClients();
     initnode void initnodeFn();
   };
 
