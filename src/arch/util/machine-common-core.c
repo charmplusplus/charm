@@ -1604,4 +1604,35 @@ int CmiBarrier() {
     return 0;
 }
 
+/**********Lock Related Functions**********/
+#if CMK_USE_COMMON_LOCK
+#if CMK_SHARED_VARS_UNAVAILABLE /*Non-smp version of locks*/
 
+LrtsNodeLock LrtsCreateLock(void){ return 0; }
+void LrtsLock(LrtsNodeLock lock){ (lock)++; }
+void LrtsUnlock(LrtsNodeLock lock){ (lock)--; }
+int LrtsTryLock(LrtsNodeLock lock){ return ((lock)?1:((lock)=1,0)); }
+void LrtsDestroyLock(LrtsNodeLock lock){ /* empty */ }
+
+#else /*smp version, uses pthread mutex*/
+
+LrtsNodeLock LrtsCreateLock(void){
+    LrtsNodeLock l = (LrtsNodeLock)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(l,(pthread_mutexattr_t *)0);
+    return l;
+}
+void LrtsLock(LrtsNodeLock lock){
+    pthread_mutex_lock((pthread_mutex_t*)lock);
+}
+void LrtsUnlock(LrtsNodeLock lock){
+    pthread_mutex_unlock((pthread_mutex_t*)lock);
+}
+int LrtsTryLock(LrtsNodeLock lock){
+    return pthread_mutex_trylock((pthread_mutex_t*)lock);
+}
+void LrtsDestroyLock(LrtsNodeLock lock){
+    pthread_mutex_destroy((pthread_mutex_t*)lock);
+    free(lock);
+}
+#endif //CMK_SHARED_VARS_UNAVAILABLE
+#endif //CMK_USE_COMMON_LOCK

@@ -255,12 +255,16 @@ extern void CmiMemUnlock();
 #define CmiNodeAllBarrier() /*empty*/
 #define CmiSvAlloc CmiAlloc
 
+#if CMK_USE_LRTS /*LRTS provides locking*/
+#include "lrtslock.h"
+#else
 typedef int CmiNodeLock;
 #define CmiCreateLock() (0)
 #define CmiLock(lock) {(lock)++;}
 #define CmiUnlock(lock)  {(lock)--;}
 #define CmiTryLock(lock)  ((lock)?1:((lock)=1,0))
 #define CmiDestroyLock(lock) /*empty*/
+#endif // CMK_USE_LRTS
 
 #define CmiInCommThread() (0)
 
@@ -299,6 +303,9 @@ extern void CmiNodeBarrier(void);
 extern void CmiNodeAllBarrier(void);
 #define CmiSvAlloc CmiAlloc
 
+#if CMK_USE_LRTS
+#include "lrtslock.h"
+#else
 #if CMK_HAS_SPINLOCK && CMK_USE_SPINLOCK
 typedef pthread_spinlock_t *CmiNodeLock;
 #define CmiLock(lock) (pthread_spin_lock(lock))
@@ -312,6 +319,7 @@ typedef pthread_mutex_t *CmiNodeLock;
 #endif
 extern CmiNodeLock CmiCreateLock();
 extern void CmiDestroyLock(CmiNodeLock lock);
+#endif // CMK_USE_LRTS
 
 extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)

@@ -47,3 +47,5 @@
 #define CMK_LB_CPUTIMER					   0
 
 #define CMK_HAS_SIZE_IN_MSGHDR                             1
+
+#define CMK_USE_COMMON_LOCK                                1

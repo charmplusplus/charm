@@ -48,3 +48,5 @@
 #define CMK_PERSISTENT_COMM                                0
 
 #define  CMI_DIRECT_MANY_TO_MANY_DEFINED                   1
+
+#define CMK_USE_COMMON_LOCK                                1

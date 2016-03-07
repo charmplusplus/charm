@@ -36,4 +36,8 @@ void  LrtsNotifyIdle();
 void  LrtsBeginIdle();
 void  LrtsStillIdle();
 void  LrtsBarrier();
+
+/* ### lock functions ### */
+#include "lrtslock.h"
+
 #endif

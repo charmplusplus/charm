@@ -214,7 +214,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
       blue.h blue-conv.h bgconverse.h cmipool.h mempool.h cmiqueue.h \
-      cmidirect.h cmidirectmanytomany.h cmitls.h
+      cmidirect.h cmidirectmanytomany.h cmitls.h lrtslock.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.

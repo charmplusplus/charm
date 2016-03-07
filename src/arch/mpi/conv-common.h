@@ -48,3 +48,5 @@
 #if CMK_CXX_MPI_BINDINGS==0
 #define MPICH_IGNORE_CXX_SEEK //for build issues with mpich + intel
 #endif
+
+#define CMK_USE_COMMON_LOCK                                1

@@ -117,6 +117,7 @@ CmiState CmiGetState()
 }
 #endif
 
+#if !CMK_USE_LRTS
 CmiNodeLock CmiCreateLock(void)
 {
   HANDLE hMutex = CreateMutex(NULL, FALSE, NULL);
@@ -127,6 +128,7 @@ void CmiDestroyLock(CmiNodeLock lk)
 {
   CloseHandle(lk);
 }
+#endif
 
 void CmiYield(void) 
 { 
@@ -300,6 +302,7 @@ CmiState CmiGetState() {
 #endif
 
 
+#if !CMK_USE_LRTS
 #if CMK_HAS_SPINLOCK && CMK_USE_SPINLOCK
 CmiNodeLock CmiCreateLock()
 {
@@ -329,6 +332,7 @@ void CmiDestroyLock(CmiNodeLock lk)
   free(lk);
 }
 #endif
+#endif //CMK_USE_LRTS
 
 void CmiYield(void) { sched_yield(); }
 
