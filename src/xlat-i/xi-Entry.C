@@ -6,6 +6,8 @@
 
 #include "sdag/constructs/When.h"
 
+#include <iostream>
+
 namespace xi {
 
 extern int fortranMode;
@@ -3383,7 +3385,99 @@ int Entry::getStackSize(void) {
 }
 
 void Entry::setAccelParam(ParamList* apl) { accelParam = apl; }
-void Entry::setAccelCodeBody(XStr* acb) { accelCodeBody = acb; }
+void Entry::setAccelCodeBody(XStr* acb) {
+#ifdef ACBDEBUG
+  std::cout << *acb;
+#endif // ACBDEBUG
+
+// Method 1: Change $'s to #'s in .ci code
+//  Thus we can pass #ifdef's through as $ifdef
+//  and they will be auto translated and not
+//  stripped out
+#if 0
+  acb->replace('$', '#');
+  accelCodeBody = acb;
+#else
+
+// Method 2: Actually parse the accel code body a bit for
+//  $version tags that we then translate into #ifdefs
+  std::string * translatedCode = new std::string(*acb);
+
+#if 0  // Method 2.A: #pragma cmk
+  const std::string preamble = "#pragma cmk target";
+#else  // Method 2.B: $version
+  const std::string preamble = "$version";
+#endif // Method 2.A
+
+  std::string replacementString;
+  bool inVersion = false;
+  // TODO convert to a for loop?
+  std::size_t preamblePos = translatedCode->find(preamble);
+  while (preamblePos != translatedCode->npos) {
+    std::size_t endOfLinePos = translatedCode->find('\n', preamblePos);
+    if (endOfLinePos == translatedCode->npos) {
+      // TODO change to correct error print
+      std::cout << "ERROR: Reached end of the program before finding a newline"
+        << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    std::string target = translatedCode->substr(preamblePos
+        + preamble.length()
+        + 1 /* for the space */,
+        endOfLinePos
+        - preamblePos /* get length */
+        - preamble.length()
+        - 1 /* skip EOL character */);
+    // TODO fix if/n/def in different cases
+    if (target == "cuda") {
+      if (inVersion) {
+        replacementString = "#elif defined CMK_CUDA_DEVICE";
+      }
+      else /* starting a version block */ {
+        replacementString = "#ifdef CMK_CUDA_DEVICE";
+        inVersion = true;
+      }
+    }
+    else if (target == "cpu") {
+      if (inVersion) {
+        replacementString = "#else";
+      }
+      else /* starting a version block */ {
+        replacementString = "#ifndef CMK_CUDA_DEVICE";
+        inVersion = true;
+      }
+    }
+    // TODO add other targets: phi, all, multi-version, etc
+    else if (target == "end") {
+      replacementString = "#endif";
+      inVersion = false;
+    }
+    else /* unrecognized version target */ {
+      // TODO change to correct error print
+#ifdef ACBDEBUG
+      std::cout << "DEBUG" << std::endl
+        << "preamblePos" << preamblePos << std::endl
+        << "endOfLinePos" << endOfLinePos << std::endl
+        << "preamble" << preamble << std::endl
+        << "preamble.length()" << preamble.length() << std::endl;
+#endif // ACBDEBUG
+      std::cout << "Unrecognized target (" << target
+        << ") in version preamble." << std::endl;
+      exit(EXIT_FAILURE);
+    }
+
+    translatedCode->replace(preamblePos, endOfLinePos - preamblePos, replacementString);
+
+    preamblePos = translatedCode->find(preamble, preamblePos + replacementString.length());
+  }
+
+#ifdef ACBDEBUG
+  std::cout << *translatedCode;
+#endif // ACBDEBUG
+
+  accelCodeBody = new XStr(translatedCode->c_str());
+#endif // Method 2
+}
 void Entry::setAccelCallbackName(XStr* acbn) { accelCallbackName = acbn; }
 
 int Entry::isThreaded(void) { return (attribs & STHREADED); }
