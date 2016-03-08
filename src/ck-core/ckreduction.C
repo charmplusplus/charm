@@ -68,6 +68,7 @@ waits for the migrant contributions to straggle in.
 // For status and data messages from the builtin reducer functions.
 #define RED_DEB(x) //CkPrintf x
 #define DEBREVAC(x) CkPrintf x
+#define DEB_TUPLE(x) CkPrintf x
 #else
 //No debugging info-- empty defines
 #define DEBR(x) // CkPrintf x
@@ -77,6 +78,7 @@ waits for the migrant contributions to straggle in.
 #define DEBN(x) //CkPrintf x
 #define RED_DEB(x) //CkPrintf x
 #define DEBREVAC(x) //CkPrintf x
+#define DEB_TUPLE(x) //CkPrintf x
 #endif
 
 #ifndef INT_MAX
@@ -1494,8 +1496,8 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
 {
   int len[1];
   len[0]=NdataSize;
-  CkReductionMsg *ret = buf? buf:new(len,0)CkReductionMsg();
-  
+  CkReductionMsg *ret = buf ? buf : new(len,0) CkReductionMsg();
+
   ret->dataSize=NdataSize;
   if (srcData!=NULL && !buf)
     memcpy(ret->data,srcData,NdataSize);
@@ -1752,6 +1754,213 @@ CkReduction::setElement *CkReduction::setElement::next(void)
     return n;//This is just another element
 }
 
+
+///////// statisticsElement
+
+CkReduction::statisticsElement::statisticsElement(double initialValue)
+  : count(1)
+  , mean(initialValue)
+  , m2(0.0)
+{}
+
+// statistics reducer
+// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
+// Chan, Tony F.; Golub, Gene H.; LeVeque, Randall J. (1979),
+// "Updating Formulae and a Pairwise Algorithm for Computing Sample Variances." (PDF),
+// Technical Report STAN-CS-79-773, Department of Computer Science, Stanford University.
+static CkReductionMsg* statistics(int nMsgs, CkReductionMsg** msg)
+{
+  int nElem = msg[0]->getLength() / sizeof(CkReduction::statisticsElement);
+  CkReduction::statisticsElement* ret = (CkReduction::statisticsElement*)(msg[0]->getData());
+  for (int m = 1; m < nMsgs; m++)
+  {
+    CkReduction::statisticsElement* value = (CkReduction::statisticsElement*)(msg[m]->getData());
+    for (int i = 0; i < nElem; i++)
+    {
+      double a_count = ret[i].count;
+      ret[i].count += value[i].count;
+      double delta = value[i].mean - ret[i].mean;
+      ret[i].mean += delta * value[i].count / ret[i].count;
+      ret[i].m2 += value[i].m2 + delta * delta * value[i].count * a_count / ret[i].count;
+    }
+  }
+  return CkReductionMsg::buildNew(
+    nElem*sizeof(CkReduction::statisticsElement),
+    (void *)ret,
+    CkReduction::invalid,
+    msg[0]);
+}
+
+///////// tupleElement
+
+CkReduction::tupleElement::tupleElement()
+  : dataSize(0)
+  , data(nullptr)
+  , reducer(CkReduction::invalid)
+  , owns_data(false)
+{}
+CkReduction::tupleElement::tupleElement(size_t dataSize_, void* data_, CkReduction::reducerType reducer_)
+  : dataSize(dataSize_)
+  , data((char*)data_)
+  , reducer(reducer_)
+  , owns_data(false)
+{
+}
+CkReduction::tupleElement::tupleElement::tupleElement(CkReduction::tupleElement&& rhs_move)
+  : dataSize(rhs_move.dataSize)
+  , data(rhs_move.data)
+  , reducer(rhs_move.reducer)
+  , owns_data(rhs_move.owns_data)
+{
+  rhs_move.dataSize = 0;
+  rhs_move.data = 0;
+  rhs_move.reducer = CkReduction::invalid;
+  rhs_move.owns_data = false;
+}
+CkReduction::tupleElement& CkReduction::tupleElement::operator=(CkReduction::tupleElement&& rhs_move)
+{
+  if (owns_data)
+    delete[] data;
+  dataSize = rhs_move.dataSize;
+  data = rhs_move.data;
+  reducer = rhs_move.reducer;
+  owns_data = rhs_move.owns_data;
+  rhs_move.dataSize = 0;
+  rhs_move.data = 0;
+  rhs_move.reducer = CkReduction::invalid;
+  rhs_move.owns_data = false;
+  return *this;
+}
+CkReduction::tupleElement::~tupleElement()
+{
+  if (owns_data)
+    delete[] data;
+}
+
+void CkReduction::tupleElement::pup(PUP::er &p) {
+  p|dataSize;
+  // TODO - it might be better to pack these raw, then we don't have to
+  //  transform & copy them out on unpacking, we could just use the message's
+  //  memory directly
+  if (p.isUnpacking()) {
+    data = new char[dataSize];
+    owns_data = true;
+  }
+  PUParray(p, data, dataSize);
+  if (p.isUnpacking()){
+    int temp;
+    p|temp;
+    reducer=(CkReduction::reducerType)temp;
+  } else {
+    int temp=(int)reducer;
+    p|temp;
+  }
+}
+
+CkReductionMsg* CkReductionMsg::buildFromTuple(CkReduction::tupleElement* reductions, int num_reductions)
+{
+  PUP::sizer ps;
+  ps|num_reductions;
+  PUParray(ps, reductions, num_reductions);
+
+  CkReductionMsg* msg = CkReductionMsg::buildNew(ps.size(), nullptr, CkReduction::tuple);
+  PUP::toMem p(msg->data);
+  p|num_reductions;
+  PUParray(p, reductions, num_reductions);
+  if (p.size() != ps.size()) CmiAbort("Size mismatch packing CkReduction::tupleElement::tupleToBuffer\n");
+  return msg;
+}
+
+void CkReductionMsg::toTuple(CkReduction::tupleElement** out_reductions, int* num_reductions)
+{
+  PUP::fromMem p(this->getData());
+  p|(*num_reductions);
+  *out_reductions = new CkReduction::tupleElement[*num_reductions];
+  PUParray(p, *out_reductions, *num_reductions);
+}
+
+// tuple reducer
+CkReductionMsg* CkReduction::tupleReduction(int num_messages, CkReductionMsg** messages)
+{
+  CkReduction::tupleElement** tuple_data = new CkReduction::tupleElement*[num_messages];
+  int num_reductions = 0;
+  for (int message_idx = 0; message_idx < num_messages; ++message_idx)
+  {
+    int itr_num_reductions = 0;
+    messages[message_idx]->toTuple(&tuple_data[message_idx], &itr_num_reductions);
+
+    // each message must submit the same reductions
+    if (num_reductions == 0)
+      num_reductions = itr_num_reductions;
+    else if (num_reductions != itr_num_reductions)
+      CmiAbort("num_reductions mismatch in CkReduction::tupleReduction");
+  }
+
+  DEB_TUPLE(("tupleReduction {\n  num_messages=%d,\n  num_reductions=%d,\n  length=%d\n",
+           num_messages, num_reductions, messages[0]->getLength()));
+
+  CkReduction::tupleElement* return_data = new CkReduction::tupleElement[num_reductions];
+  // using a raw buffer to avoid CkReductionMsg constructor/destructor, we want to manage
+  //  the inner memory of these temps ourselves to avoid unneeded copies
+  char* simulated_messages_buffer = new char[sizeof(CkReductionMsg) * num_reductions * num_messages];
+  CkReductionMsg** simulated_messages = new CkReductionMsg*[num_messages];
+
+  // imagine the given data in a 2D layout where the messages are rows and reductions are columns
+  // here we grab each column and run that reduction
+
+  for (int reduction_idx = 0; reduction_idx < num_reductions; ++reduction_idx)
+  {
+    DEB_TUPLE(("  reduction_idx=%d {\n", reduction_idx));
+    CkReduction::reducerType reducerType = CkReduction::invalid;
+    for (int message_idx = 0; message_idx < num_messages; ++message_idx)
+    {
+      CkReduction::tupleElement* reductions = (CkReduction::tupleElement*)(tuple_data[message_idx]);
+      CkReduction::tupleElement& element = reductions[reduction_idx];
+      DEB_TUPLE(("    msg %d, length=%d : { dataSize=%d, data=%p, reducer=%d },\n",
+               message_idx, messages[message_idx]->getLength(), element.dataSize, element.data, element.reducer));
+
+      reducerType = element.reducer;
+
+      size_t sim_idx = (reduction_idx * num_messages + message_idx) * sizeof(CkReductionMsg);
+      CkReductionMsg& simulated_message = *(CkReductionMsg*)&simulated_messages_buffer[sim_idx];
+      simulated_message.dataSize = element.dataSize;
+      simulated_message.data = element.data;
+      simulated_message.reducer = element.reducer;
+      simulated_message.sourceFlag = -1000;
+      simulated_message.userFlag = (CMK_REFNUM_TYPE)-1;
+      simulated_message.gcount = 0;
+      simulated_message.migratableContributor = true;
+#if CMK_BIGSIM_CHARM
+      simulated_message.log = NULL;
+#endif
+      simulated_messages[message_idx] = &simulated_message;
+    }
+
+    // run the reduction and copy the result back to our data structure
+    const auto& reducerFp = CkReduction::reducerTable[reducerType].fn;
+    CkReductionMsg* result = reducerFp(num_messages, simulated_messages);
+    DEB_TUPLE(("    result_len=%d\n  },\n", result->getLength()));
+    return_data[reduction_idx] = CkReduction::tupleElement(result->getLength(), result->getData(), reducerType);
+    // TODO - leak - the built in reducers all reuse message memory, so this is not safe to delete
+    // delete result;
+  }
+
+  CkReductionMsg* retval = CkReductionMsg::buildFromTuple(return_data, num_reductions);
+  DEB_TUPLE(("} tupleReduction msg_size=%d\n", retval->getSize()));
+
+  for (int message_idx = 0; message_idx < num_messages; ++message_idx)
+    delete[] tuple_data[message_idx];
+  delete[] tuple_data;
+  delete[] return_data;
+  delete[] simulated_messages_buffer;
+  // note that although this is a 2d array, we don't need to delete the inner objects,
+  //  their memory is tracked in simulated_messages_buffer
+  delete[] simulated_messages;
+  return retval;
+}
+
+
+
 /////////////////// Reduction Function Table /////////////////////
 CkReduction::CkReduction() {} //Dummy private constructor
 
@@ -1845,7 +2054,10 @@ CkReduction::reducerStruct CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     // Each element may contribute arbitrary data (with arbitrary length).
     // This reduction is marked as unstreamable because of the n^2
     // work required to stream it
-    CkReduction::reducerStruct(::set, false)
+    CkReduction::reducerStruct(::set, false),
+
+    CkReduction::reducerStruct(::statistics, true),
+    CkReduction::reducerStruct(CkReduction::tupleReduction, false),
 };
 
 

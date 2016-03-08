@@ -1,4 +1,5 @@
 mainmodule TypedReduction {
+    readonly CProxy_Driver driverProxy;
     mainchare Driver {
         entry Driver(CkArgMsg*);
         entry void untyped_done(CkReductionMsg* msg);
@@ -6,6 +7,7 @@ mainmodule TypedReduction {
         entry [reductiontarget] void typed_array_done(int results[n], int n);
         entry [reductiontarget] void typed_array_done2(int x, int y, int z);
         entry [reductiontarget] void typed_array_done3(int n, double results[n]);
+        entry [reductiontarget] void tuple_reducer_done(CkReductionMsg* msg);
     }
 
     array [1d] Worker {
@@ -13,5 +15,6 @@ mainmodule TypedReduction {
         entry void reduce(void);
         entry void reduce_array(void);
         entry void reduce_array_doubles(void);
+        entry void reduce_tuple(void);
     }
 }
