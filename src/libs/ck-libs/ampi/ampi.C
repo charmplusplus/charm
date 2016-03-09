@@ -5595,7 +5595,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
       my_tree_root <<= i;
 
       if (dst < comm_size) {
-        MPI_Sendrecv(((char *)tmp_buf +
+        AMPI_Sendrecv(((char *)tmp_buf +
               my_tree_root*sendbuf_extent),
             curr_cnt, sendtype,
             dst, MPI_ATA_SEQ_TAG, 
@@ -5607,7 +5607,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
         /* in case of non-power-of-two nodes, less data may be
            received than specified */
-        MPI_Get_count(&status, sendtype, &last_recv_cnt);
+        AMPI_Get_count(&status, sendtype, &last_recv_cnt);
         curr_cnt += last_recv_cnt;
       }
 
@@ -5647,7 +5647,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
               (rank < tree_root + nprocs_completed)
               && (dst >= tree_root + nprocs_completed)) {
             /* send the data received in this step above */
-            MPI_Send(((char *)tmp_buf +
+            AMPI_Send(((char *)tmp_buf +
                   dst_tree_root*sendbuf_extent),
                 last_recv_cnt, sendtype,
                 dst, MPI_ATA_SEQ_TAG,
@@ -5658,13 +5658,13 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
           else if ((dst < rank) && 
               (dst < tree_root + nprocs_completed) &&
               (rank >= tree_root + nprocs_completed)) {
-            MPI_Recv(((char *)tmp_buf +
+            AMPI_Recv(((char *)tmp_buf +
                   dst_tree_root*sendbuf_extent),
                 sendcount*comm_size*mask, 
                 sendtype,   
                 dst, MPI_ATA_SEQ_TAG,
                 comm, &status); 
-            MPI_Get_count(&status, sendtype, &last_recv_cnt);
+            AMPI_Get_count(&status, sendtype, &last_recv_cnt);
             curr_cnt += last_recv_cnt;
           }
           tmp_mask >>= 1;
@@ -5731,7 +5731,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
       }
 
       MPI_Status status;
-      MPI_Sendrecv(((char *)sendbuf + dst*itemsize),
+      AMPI_Sendrecv(((char *)sendbuf + dst*itemsize),
           sendcount, sendtype, dst,
           MPI_ATA_TAG,
           ((char *)recvbuf + src*itemsize),
