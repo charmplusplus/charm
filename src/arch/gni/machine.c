@@ -4026,7 +4026,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         _tlbpagesize = CmiReadSize(env);
     */
     /* real gethugepagesize() is only available when hugetlb module linked */
+#if LARGEPAGE
     _tlbpagesize = gethugepagesize();
+#else
+    _tlbpagesize = getpagesize();
+#endif
     if (myrank == 0) {
         CmiPrintf("Charm++> Cray TLB page size: %1.fK\n", _tlbpagesize/1024.0);
     }
