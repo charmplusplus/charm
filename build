@@ -578,6 +578,8 @@ EOF
   $DESTINATION/tmp/system_ln $DESTINATION/include/VERSION VERSION
 fi
 
+$DESTINATION/tmp/system_ln "$srcbase/scripts/testrun" $DESTINATION/tmp/bin/testrun
+
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Make.depends" $DESTINATION/tmp/Make.depends
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
 if test -f "$srcbaseabs/ck-ldb/Make.lb"

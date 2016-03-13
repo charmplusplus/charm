@@ -1,0 +1,60 @@
+#!/bin/bash
+
+#check if ppn divides p
+ppn_found=0
+ppn=0
+#parse the arguments to extract the ppn number
+IFS=' ' read -r -a array <<< "$*"
+for i in "${array[@]}"
+do
+  if [ $ppn_found -eq 1 ] ; then
+    ppn=$i
+    #echo "FOUND ppn:" $i
+    break
+  fi
+  if [[ $i == *"ppn"* ]]; then
+    ppn=$(echo $i | cut -d'n' -f 2)
+    if [ -z "$ppn" ]
+    then
+        ppn_found=1
+    else
+        break
+    fi
+  fi
+
+done
+
+#now parse the arguments to run to find the p number
+p=0
+p_found=0
+s=$*
+IFS=' ' read -r -a array <<< "$*"
+for i in "${array[@]}"
+do
+  if [ $p_found -eq 1 ] ; then
+    p=$i
+    #echo "FOUND p:" $p
+    break
+  fi
+  if [[ $i == "+p"* ]]; then
+    p=$(echo $i | cut -d'p' -f 2)
+    if [ -z "$p" ]
+    then
+        p_found=1
+    else
+        break
+    fi
+  fi
+done
+
+#check if p divides ppn
+m=`expr $p % $ppn`
+if [[ $m -eq 0 ]] ; then
+  #if it divides run the test
+  echo "calling charmrun"
+  ./charmrun $*
+else
+  #if it does not divide, give a warning and do not run
+  echo "Warning: ppn does not divide p. Skipping the test."
+fi
+
