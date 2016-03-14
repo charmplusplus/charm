@@ -5934,7 +5934,7 @@ $as_echo "$as_me: executing $ac_file commands" >&6;}
 
 
   case $ac_file$ac_mode in
-    "config-cleanup":C) sed -i -e 's:^#define\s\+PACKAGE://&:' conv-autoconfig.h ;;
+    "config-cleanup":C) sed -i -e 's:^#define\s\+PACKAGE.*:/* & */:' conv-autoconfig.h ;;
     "default":C) chmod +x libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun
  ;;
 
