@@ -1681,6 +1681,10 @@ void CkArray::flushStates() {
 
 void CkArray::ckDestroy() {
   isDestroying = true;
+  // Set the duringDestruction flag in the location manager. This is used to
+  // indicate that the location manager is going to be destroyed so don't need
+  // to send messages to remote PEs with reclaimRemote messages.
+  locMgr->setDuringDestruction(true);
 
   int i = 0;
   ArrayElement *a = NULL;

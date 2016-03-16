@@ -2932,7 +2932,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 		
 	if (!duringMigration) 
 	{ //This is a local element dying a natural death
-	    #if CMK_BIGSIM_CHARM
+#if CMK_BIGSIM_CHARM
 		//After migration, reclaimRemote will be called through 
 		//the CkRemoveArrayElement in the pupping routines for those 
 		//objects that are not on the home processors. However,
@@ -2941,15 +2941,16 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 		//that seeking where is the object will be accumulated (a circular
 		//msg chain) and causes the program no progress
 		if(_BgOutOfCoreFlag==1) return; 
-	    #endif
+#endif
 		int home=homePe(idx);
 		if (home!=CkMyPe())
 #if CMK_MEM_CHECKPOINT
 	        if (!CkInRestarting()) // all array elements are removed anyway
 #endif
-			thisProxy[home].reclaimRemote(idx,CkMyPe());
-	/*	//Install a zombie to keep the living from re-using this index.
-		insertRecN(new CkLocRec_dead(this),idx); */
+	        if (!duringDestruction)
+	            thisProxy[home].reclaimRemote(idx,CkMyPe());
+	        /*  //Install a zombie to keep the living from re-using this index.
+	            insertRecN(new CkLocRec_dead(this),idx); */
 	}
 }
 
@@ -3697,6 +3698,9 @@ void CkLocMgr::setDuringMigration(bool _duringMigration){
 }
 #endif
 
+void CkLocMgr::setDuringDestruction(bool _duringDestruction) {
+  duringDestruction = _duringDestruction;
+}
 
 //Add given element array record at idx, replacing the existing record
 void CkLocMgr::insertRec(CkLocRec *rec,const CkArrayIndex &idx) {

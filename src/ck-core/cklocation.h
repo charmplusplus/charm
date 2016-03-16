@@ -380,6 +380,8 @@ public:
 	void setDuringMigration(bool _duringMigration);
 #endif
 
+	void setDuringDestruction(bool _duringDestruction);
+
 	/// Pass each of our locations (each separate array index) to this destination.
 	void iterate(CkLocIterator &dest);
 
@@ -494,6 +496,8 @@ public:
 
 	/// This flag is set while we delete an old copy of a migrator
 	bool duringMigration;
+	/// This flag is set while we are deleting location manager
+	bool duringDestruction;
 
 	//Occasionally clear out stale remote pointers
 	static void staticSpringCleaning(void *mgr,double curWallTime);
