@@ -2724,7 +2724,7 @@ void CkLocMgr::deleteManager(CkArrayID id, CkArrMgr *mgr) {
   ManagerRec *cur = firstManager;
   while (cur->mgr != mgr) {
     prev = &cur->next;
-    ++cur;
+    cur = cur->next;
   }
 
   CkAssert(cur);
