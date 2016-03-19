@@ -122,6 +122,8 @@ processor to an underloaded processor, it swaps objects to reduce the load on
 the overloaded processor. This strategy limits the number of objects migrated.
 \item {\bf RefineCommLB}:     Same idea as in RefineLB, but takes communication into account.
 \item {\bf RefineTopoLB}:       Same idea as in RefineLB, but takes processor topology into account.
+\item {\bf BlockLB}: This strategy does a blocked distribution of objects to
+processors.
 \item {\bf ComboCentLB}:  A special load balancer that can be used to combine any number of centralized load balancers mentioned above.
 \end{itemize}
 
@@ -129,6 +131,9 @@ Listed below are the distributed load balancers:
 \begin{itemize}
 \item {\bf NeighborLB}:   A neighborhood load balancer in which each processor tries to average out its load only among its neighbors.
 \item {\bf WSLB}:   A load balancer for workstation clusters, which can detect load changes on desktops (and other timeshared processors) and adjust load without interfering with other's use of the desktop.
+\item {\bf DistributedLB}: A load balancer which uses partial information about
+underloaded and overloaded processors in the system to do probabilistic transfer
+of load. This is a refinement based strategy.
 \end{itemize}
 
 An example of a hierarchical strategy can be found in:
