@@ -51,11 +51,12 @@ class FreqController {
     }
 
     //change the frequency of the processor to the specified freq level
+    //return 1 on success, 0 on failure to change
     int changeFreq(int level){
         //check if current frequency is already at the desired level
         if(cur_freq_level == level) return 1;
 
-        CkPrintf("[%d]: Change freq to: %d\n", CkMyNode(), level);
+        CkPrintf("[%d]: Change freq to level %d : %d\n", CkMyNode(), level, freqs[level]);
         FILE *f;
         char path[300];
         sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",CkMyNode()%num_cores);
@@ -77,6 +78,13 @@ class FreqController {
             return changeFreq(cur_freq_level+1);
         else return 0;
     }
+	int decrementFreqLevel(){
+        if(cur_freq_level > 0)
+            return changeFreq(cur_freq_level-1);
+        else return 0;
+	}
+	int getCurFreqLevel(){ return cur_freq_level; }
+
     //change the frequency governor
     //options are: conservative ondemand userspace powersave performance 
     int changeGovernor(char* governor){

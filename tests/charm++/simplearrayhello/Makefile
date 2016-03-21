@@ -6,7 +6,8 @@ OBJS = hello.o
 all: hello
 
 hello: $(OBJS)
-	$(CHARMC) -language charm++ -o hello $(OBJS)
+	$(CHARMC) -language charm++ -module energyOpt -o hello $(OBJS)
+	#$(CHARMC) -language charm++ -o hello $(OBJS)
 
 hello.decl.h: hello.ci
 	$(CHARMC)  hello.ci

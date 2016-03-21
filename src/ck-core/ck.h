@@ -18,6 +18,10 @@
 #define _CHECK_VALID(p, msg) do { } while(0)
 #endif
 
+#if CMK_WITH_ENERGY_OPT
+#include "energyOpt.h"
+#endif
+
 // Flag that tells the system if we are replaying using Record/Replay
 extern "C" int _replaySystem;
 

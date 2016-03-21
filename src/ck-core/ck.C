@@ -19,10 +19,6 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
-#if CMK_WITH_ENERGY_OPT
-#include "freqController.h"
-#endif
-
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
 CkpvDeclare(CkVec<void *>, chare_objs);
@@ -589,12 +585,26 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 //      printf("[%d] CurrentObj set to %p\n",CkMyPe(),obj);
 #endif
   //BIGSIM_OOC DEBUGGING
-  //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
+  CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
   //fflush(stdout);
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
-#endif    
+#endif
+#if CMK_WITH_ENERGY_OPT
+	EnergyOptimizer *the_energyOptimizer = (EnergyOptimizer *)CkLocalBranch(_energyOptimizer);
+	the_energyOptimizer->powerCounterReset();
+
+	double startTime = CkWallTimer();
+	CkPrintf("[%d] Starting..\n", CkMyNode());
+#endif
   _entryTable[epIdx]->call(msg, obj);
+
+#if CMK_WITH_ENERGY_OPT
+    int chareIdx = CkpvAccess(currentChareIdx);
+	the_energyOptimizer->addEntryStat(CkWallTimer()-startTime, epIdx, chareIdx);
+	//CkpvAccess(_freqController)->changeFreq(16);
+#endif
+
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -643,9 +653,6 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 {
-#if CMK_WITH_ENERGY_OPT
-  CkpvAccess(_freqController)->changeFreq(12);
-#endif
 #if CMK_TRACE_ENABLED 
   if (_entryTable[epIdx]->traceEnabled) {
     _TRACE_BEGIN_EXECUTE(env, obj);
@@ -659,7 +666,6 @@ static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
   else
 #endif
     _invokeEntryNoTrace(epIdx,env,obj);
-
 }
 
 /********************* Creation ********************/
