@@ -47,14 +47,17 @@ do
   fi
 done
 
-#check if p divides ppn
-m=`expr $p % $ppn`
-if [[ $m -eq 0 ]] ; then
-  #if it divides run the test
-  echo "calling charmrun"
-  ./charmrun $*
-else
-  #if it does not divide, give a warning and do not run
-  echo "Warning: ppn does not divide p. Skipping the test."
+#if p or ppn is zero, don't do division test
+if [[ $p -eq 0 || $ppn -eq 0 ]] ; then
+    ./charmrun $*
+else #division test
+    #check if p divides ppn
+    m=`expr $p % $ppn`
+    if [[ $m -eq 0 ]] ; then
+      #if it divides run the test
+      ./charmrun $*
+    else
+      #if it does not divide, give a warning and do not run
+      echo "Warning: ppn does not divide p. Skipping the test."
+    fi
 fi
-
