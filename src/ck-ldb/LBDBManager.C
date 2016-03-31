@@ -558,8 +558,6 @@ void LocalBarrier::RemoveClient(LDBarrierClient c)
 #else
   client_count--;
 #endif
-
-  CheckBarrier();
 }
 
 LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
