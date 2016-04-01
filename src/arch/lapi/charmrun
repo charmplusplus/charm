@@ -6,7 +6,6 @@
 
 args=""
 pes=1
-QUIET=0
 
 while [ $# -gt 0 ]
   do
@@ -46,10 +45,6 @@ while [ $# -gt 0 ]
       +name)
 	  jobname=$2
 	  shift
-	  ;;
-      ++quiet)
-	  QUIET=1
-	  args=$args" "$1
 	  ;;
       *)
 	  args=$args"$1 "
@@ -316,7 +311,7 @@ fi
 if [ $interactive -eq 0 ]
     then
     # submit the job as poe, iterating 
-    test $QUIET -eq 0 && echo "Running interactively> poe $executable $args -llfile $filename"
+    echo "Running interactively> poe $executable $args -llfile $filename"
     poe $executable $args -llfile $filename
     status=$?
     if [ $status -eq 255 ];
@@ -327,7 +322,7 @@ if [ $interactive -eq 0 ]
     fi
     until (exit $llstatus);
       do
-      test $QUIET -eq 0 && echo "Retrying in two minutes..."
+      echo "Retrying in two minutes..."
       sleep 120
       poe $executable $args -llfile $filename;
       status=$?
@@ -342,7 +337,7 @@ if [ $interactive -eq 0 ]
     
 else
     # append the command at the end of the file and llsubmit it
-    test $QUIET -eq 0 && echo "Submitting batch> poe $executable $args"
+    echo "Submitting batch> poe $executable $args"
     cat >> $filename <<EOF
 
 poe $executable $args

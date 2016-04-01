@@ -1186,8 +1186,6 @@ static int InternalScanf(char *fmt, va_list l)
 /*New stdarg.h declarations*/
 void CmiPrintf(const char *fmt, ...)
 {
-  extern int quietMode;
-  if (quietMode) return;
   CpdSystemEnter();
   {
   va_list p; va_start(p, fmt);
@@ -1999,7 +1997,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 	skt_tcp_no_nagle(Cmi_charmrun_fd);
 	CmiStdoutInit();
   } else {/*Standalone operation*/
-  	CmiPrintf("Charm++: standalone mode (not using charmrun)\n");
+  	printf("Charm++: standalone mode (not using charmrun)\n");
   	dataskt=-1;
   	Cmi_charmrun_fd=-1;
   }

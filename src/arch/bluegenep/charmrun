@@ -9,7 +9,6 @@
 args=""
 pes=1
 machinefile=""
-QUIET=0
 
 while [ $# -gt 0 ]
 do
@@ -37,10 +36,6 @@ do
 		args=" "$1" "$2" "$args
 		shift
 		;;
-	++quiet)
-		QUIET=1
-		args=$args" "$1
-		;;
 	*) 
 		args=$args" "$1
 		;;
@@ -49,12 +44,12 @@ do
 done
 
 
-test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
+printf "\nRunning on $pes processors: $args\n"
 
 if test -n "$COBALT_JOBID"
 then
   # charmrun called from script
-  test $QUIET -eq 0 && echo "Running> cobalt-mpirun -nofree -env BG_MAXALIGNEXP=0 -np $pes $args"
+  echo "Running> cobalt-mpirun -nofree -env BG_MAXALIGNEXP=0 -np $pes $args"
   cobalt-mpirun -nofree -env BG_MAXALIGNEXP=0 -np $pes $args
 else
 
@@ -65,8 +60,8 @@ queue_sub=qsub
 while [ true ]
 do
 
-test $QUIET -eq 0 && echo "Submitting batch job for> $pes $args"
-test $QUIET -eq 0 && echo " using the command> $queue_sub -t 30 -n $pes  $args"
+echo "Submitting batch job for> $pes $args"
+echo " using the command> $queue_sub -t 30 -n $pes  $args"
 jobid=""
 while [ -z "$jobid" ]
 do
@@ -79,7 +74,7 @@ do
   fi
   sleep 10
 done
-test $QUIET -eq 0 && echo "Job enqueued under job ID $jobid"
+echo "Job enqueued under job ID $jobid"
 
 output=$jobid.output
 err=$jobid.error

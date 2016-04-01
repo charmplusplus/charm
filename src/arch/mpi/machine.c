@@ -1295,8 +1295,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     MPI_Get_version(&ver, &subver);
     if(!CharmLibInterOperate) {
       if (myNID == 0) {
-        CmiPrintf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
-        CmiPrintf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
+        printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
+        printf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
       }
     }
 
@@ -1304,7 +1304,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV && _thread_provided != MPI_THREAD_MULTIPLE) {
         Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV; 
         if (myNID == 0) {
-          CmiPrintf("Charm++> +comm_thread_only_recv disabled\n");
+          printf("Charm++> +comm_thread_only_recv disabled\n");
         }
     }
 #endif
@@ -1314,12 +1314,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
         int debug_no_pause = CmiGetArgFlag(largv,"++debug-no-pause");
         if (debug || debug_no_pause) {  /*Pause so user has a chance to start and attach debugger*/
 #if CMK_HAS_GETPID
-            CmiPrintf("CHARMDEBUG> Processor %d has PID %d\n",myNID,getpid());
+            printf("CHARMDEBUG> Processor %d has PID %d\n",myNID,getpid());
             fflush(stdout);
             if (!debug_no_pause)
                 sleep(15);
 #else
-            CmiPrintf("++debug ignored.\n");
+            printf("++debug ignored.\n");
 #endif
         }
     }
@@ -1392,7 +1392,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     idleblock = CmiGetArgFlag(largv, "+idleblocking");
     if (idleblock && _Cmi_mynode == 0) {
-        CmiPrintf("Charm++: Running in idle blocking mode.\n");
+        printf("Charm++: Running in idle blocking mode.\n");
     }
 
 #if CMK_CHARMDEBUG
@@ -1415,7 +1415,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     if (CmiGetArgFlag(largv,"+no_outstanding_sends")) {
         no_outstanding_sends = 1;
         if (myNID == 0)
-            CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
+            printf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
                    no_outstanding_sends?"":" not");
     }
 
@@ -1435,7 +1435,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     if (MPI_POST_RECV_LOWERSIZE>MPI_POST_RECV_UPPERSIZE) MPI_POST_RECV_UPPERSIZE = MPI_POST_RECV_LOWERSIZE;
     MPI_POST_RECV_SIZE = MPI_POST_RECV_UPPERSIZE;
     if (myNID==0) {
-        CmiPrintf("Charm++: using post-recv scheme with %d pre-posted recvs ranging from %d to %d (bytes) with msg count threshold %d and msg histogram bucket size %d, #buf increment every %d msgs. The buffers are checked every %d msgs\n",
+        printf("Charm++: using post-recv scheme with %d pre-posted recvs ranging from %d to %d (bytes) with msg count threshold %d and msg histogram bucket size %d, #buf increment every %d msgs. The buffers are checked every %d msgs\n",
                MPI_POST_RECV_COUNT, MPI_POST_RECV_LOWERSIZE, MPI_POST_RECV_UPPERSIZE,
                MPI_POST_RECV_MSG_CNT_THRESHOLD, MPI_POST_RECV_INC, MPI_POST_RECV_MSG_INC, MPI_POST_RECV_FREQ);
     }
@@ -1444,20 +1444,20 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #if USE_MPI_CTRLMSG_SCHEME
 	CmiGetArgInt(largv, "+ctrlMsgCnt", &MPI_CTRL_MSG_CNT);
 	if(myNID == 0){
-		CmiPrintf("Charm++: using the alternative ctrl msg scheme with %d pre-posted ctrl msgs\n", MPI_CTRL_MSG_CNT);
+		printf("Charm++: using the alternative ctrl msg scheme with %d pre-posted ctrl msgs\n", MPI_CTRL_MSG_CNT);
 	}
 #endif
 
 #if CMI_EXERT_SEND_CAP
     CmiGetArgInt(largv, "+dynCapSend", &SEND_CAP);
     if (myNID==0) {
-        CmiPrintf("Charm++: using static send cap %d\n", SEND_CAP);
+        printf("Charm++: using static send cap %d\n", SEND_CAP);
     }
 #endif
 #if CMI_EXERT_RECV_CAP
     CmiGetArgInt(largv, "+dynCapRecv", &RECV_CAP);
     if (myNID==0) {
-        CmiPrintf("Charm++: using static recv cap %d\n", RECV_CAP);
+        printf("Charm++: using static recv cap %d\n", RECV_CAP);
     }
 #endif
 #if CMI_DYNAMIC_EXERT_CAP 
@@ -1465,7 +1465,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     CmiGetArgInt(largv, "+dynCapSend", &CMI_DYNAMIC_SEND_CAPSIZE);
     CmiGetArgInt(largv, "+dynCapRecv", &CMI_DYNAMIC_RECV_CAPSIZE);
     if (myNID==0) {
-        CmiPrintf("Charm++: using dynamic flow control with outgoing threshold %d, send cap %d, recv cap %d\n",
+        printf("Charm++: using dynamic flow control with outgoing threshold %d, send cap %d, recv cap %d\n",
                CMI_DYNAMIC_OUTGOING_THRESHOLD, CMI_DYNAMIC_SEND_CAPSIZE, CMI_DYNAMIC_RECV_CAPSIZE);
     }
 #endif
@@ -1473,7 +1473,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #if USE_ASYNC_RECV_FUNC
     CmiGetArgInt(largv, "+irecvMsgThreshold", &IRECV_MSG_THRESHOLD);
     if(myNID==0) {
-        CmiPrintf("Charm++: for msg size larger than %d, MPI_Irecv is going to be used.\n", IRECV_MSG_THRESHOLD);
+        printf("Charm++: for msg size larger than %d, MPI_Irecv is going to be used.\n", IRECV_MSG_THRESHOLD);
     }
 #endif
 

@@ -1037,9 +1037,6 @@ INLINE_KEYWORD int pe_gToLTranslate(int pe) {
 }
 //end of functions related to partition
 
-extern int quietMode;
-extern int quietModeRequested;
-
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
@@ -1055,10 +1052,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #if CMK_WITH_STATS
     MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
 #endif
-
-  if (CmiGetArgFlagDesc(argv,"++quiet","Omit non-error runtime messages")) {
-    quietModeRequested = quietMode = 1;
-  }
 
     /* processor per node */
     _Cmi_mynodesize = 1;
@@ -1102,25 +1095,25 @@ if (  MSG_STATISTIC)
 
     if (_Cmi_mynode==0) {
 #if !CMK_SMP 
-      CmiPrintf("Charm++> Running in non-SMP mode: numPes %d\n",_Cmi_numnodes);
+      printf("Charm++> Running in non-SMP mode: numPes %d\n",_Cmi_numnodes);
       MACHSTATE1(4,"running nonsmp %d", _Cmi_mynode)
 #else
 
 #if !CMK_MULTICORE
-      CmiPrintf("Charm++> Running in SMP mode: numNodes %d,  %d worker threads per process\n", CmiNumNodes(),_Cmi_mynodesize);
+      printf("Charm++> Running in SMP mode: numNodes %d,  %d worker threads per process\n", CmiNumNodes(),_Cmi_mynodesize);
       if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
-        CmiPrintf("Charm++> The comm. thread both sends and receives messages\n");
+        printf("Charm++> The comm. thread both sends and receives messages\n");
       } else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
-        CmiPrintf("Charm++> The comm. thread only receives messages, while work threads send messages\n");
+        printf("Charm++> The comm. thread only receives messages, while work threads send messages\n");
       } else if (Cmi_smp_mode_setting == COMM_WORK_THREADS_SEND_RECV) {
-        CmiPrintf("Charm++> Both  comm. thread and worker thread send and messages\n");
+        printf("Charm++> Both  comm. thread and worker thread send and messages\n");
       } else if (Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST) {
-        CmiPrintf("Charm++> There's no comm. thread. Work threads both send and receive messages\n");
+        printf("Charm++> There's no comm. thread. Work threads both send and receive messages\n");
       } else {
         CmiAbort("Charm++> Invalid SMP mode setting\n");
       }
 #else
-      CmiPrintf("Charm++> Running in Multicore mode:  %d threads\n", _Cmi_mynodesize);
+      printf("Charm++> Running in Multicore mode:  %d threads\n", _Cmi_mynodesize);
 #endif
       
 #endif
@@ -1142,7 +1135,7 @@ if (  MSG_STATISTIC)
         sprintf(stdoutpath, "%s.%d", stdoutbase, CmiMyPartition());
       }
       if ( CmiMyPartition() == 0 && CmiMyNode() == 0 ) {
-        CmiPrintf("Redirecting stdout to files %s through %d\n",stdoutpath,CmiNumPartitions()-1);
+        printf("Redirecting stdout to files %s through %d\n",stdoutpath,CmiNumPartitions()-1);
       }
       if ( ! freopen(stdoutpath, "a", stdout) ) {
         fprintf(stderr,"Rank %d failed redirecting stdout to file %s: %s\n", CmiMyNodeGlobal(), stdoutpath,
@@ -1350,7 +1343,6 @@ void CommunicationServerThread(int sleepTime) {
 
 void ConverseExit(void) {
     int i;
-    if (quietModeRequested) quietMode = 1;
 #if !CMK_SMP || CMK_SMP_NO_COMMTHD
     LrtsDrainResources();
 #else

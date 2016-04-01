@@ -452,7 +452,7 @@ static void machine_atexit_check(void)
 {
   if (!machine_initiated_shutdown)
     CmiAbort("unexpected call to exit by user program. Must use CkExit, not exit!");
-  CmiPrintf("Program finished after %f seconds.\n", CmiWallTimer());
+  printf("Program finished after %f seconds.\n", CmiWallTimer());
 #if 0 /*Wait for the user to press any key (for Win32 debugging)*/
   fgetc(stdin);
 #endif
@@ -1403,15 +1403,11 @@ static int InternalScanf(char *fmt, va_list l)
   return i;
 }
 
-extern int quietModeRequested;
-extern int quietMode;
-
 #if CMK_CMIPRINTF_IS_A_BUILTIN
 
 /*New stdarg.h declarations*/
 void CmiPrintf(const char *fmt, ...)
 {
-  if (quietMode) return;
   CpdSystemEnter();
   {
   va_list p; va_start(p, fmt);
@@ -2783,9 +2779,6 @@ FILE *debugLog = NULL;
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 {
-  if (CmiGetArgFlagDesc(argv,"++quiet","Omit non-error runtime messages")) {
-    quietModeRequested = quietMode = 1;
-  }
 #if MACHINE_DEBUG
   debugLog=NULL;
 #endif
@@ -2874,7 +2867,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 	skt_tcp_no_nagle(Cmi_charmrun_fd);
 	CmiStdoutInit();
   } else {/*Standalone operation*/
-  	CmiPrintf("Charm++: standalone mode (not using charmrun)\n");
+  	printf("Charm++: standalone mode (not using charmrun)\n");
   	dataskt=-1;
   	Cmi_charmrun_fd=-1;
   }

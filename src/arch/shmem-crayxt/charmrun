@@ -7,7 +7,6 @@
 args=""
 pes=1
 machinefile=""
-QUIET=0
 
 while [ $# -gt 0 ]
 do
@@ -31,10 +30,6 @@ do
 		args=" "$1" "$2" "$args
 		shift
 		;;
-	++quiet)
-		QUIET=1
-		args=$args" "$1
-		;;
 	*) 
 		args=$args" "$1
 		;;
@@ -43,7 +38,7 @@ do
 done
 
 
-test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
+printf "\nRunning on $pes processors: $args\n"
 
 
 if [ -n "$PBS_NODEFILE" ]
@@ -52,7 +47,7 @@ then
   aprun=`which aprun 2>/dev/null`
   if test -n "$aprun"
   then
-    test $QUIET -eq 0 && echo aprun -n $pes $args
+    echo aprun -n $pes $args
     $aprun -n $pes $args
   else
     mpirun_cmd=`which mpirun 2>/dev/null`
@@ -69,7 +64,7 @@ then
         #    mpdallexit
       else   # normal case
         test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
-        test $QUIET -eq 0 && echo mpirun -np $pes $args
+        echo mpirun -np $pes $args
         mpirun -np $pes $args
       fi
     else
@@ -80,7 +75,7 @@ then
 elif [ -n "$LSB_HOSTS" ]
 then
 # Tungsten
-  test $QUIET -eq 0 && echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
+  echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
   cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
 elif [ -n "$PBS_QUEUE" -o -n "$LSF_QUEUE" ]
 then
@@ -265,18 +260,18 @@ else
       # Disables randomization of the virtual address  space  (turns  on
       #          ADDR_NO_RANDOMIZE).
       cur_arch=`uname -m`
-      test $QUIET -eq 0 && echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $pes $args"
+      echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $pes $args"
       $setarch_cmd $cur_arch -R  mpirun -np $pes $args
     else
-      test $QUIET -eq 0 && echo "charmrun> mpirun -np $pes $args"
+      echo "charmrun> mpirun -np $pes $args"
       mpirun -np $pes $args
     fi
   else
     mpiexec_cmd=`which mpiexec 2>/dev/null`
     if test -n "$mpiexec_cmd"
     then
-      test $QUIET -eq 0 && echo "charmrun> $mpiexec_cmd -n $pes $args"
-      test $QUIET -eq 0 && echo
+      echo "charmrun> $mpiexec_cmd -n $pes $args"
+      echo
       "$mpiexec_cmd" -n $pes $args
     else
       echo "Don't know how to run MPI program."
