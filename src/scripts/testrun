@@ -47,13 +47,13 @@ do
   fi
 done
 
-#if p or ppn is zero, don't do division test
-if [[ $p -eq 0 || $ppn -eq 0 ]] ; then
+#if ppn is zero, don't do division test
+if [[ $ppn -eq 0 ]] ; then
     ./charmrun $*
 else #division test
     #check if p divides ppn
     m=`expr $p % $ppn`
-    if [[ $m -eq 0 ]] ; then
+    if [[ $p -ne 0 && $m -eq 0 ]] ; then
       #if it divides run the test
       ./charmrun $*
     else
