@@ -7392,8 +7392,6 @@ int AMPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
   for (int i = 0; i < ndims; i++) {
     dimsv.push_back(dims[i]);
     periodsv.push_back(periods[i]);
-    if ((periods[i] != 0) && (periods[i] != 1))
-      CkAbort("MPI_Cart_create: periods should be all booleans\n");
   }
 
   c.setdims(dimsv);
@@ -7503,7 +7501,7 @@ int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
 
   for (int i = ndims - 1; i >= 0; i--) {
     if ((coords[i] < 0) || (coords[i] >= dims[i])) {
-      if (periods[i] == 1) {
+      if (periods[i] != 0) {
         if (coords[i] > 0) {
           coords[i] %= dims[i];
         } else {
@@ -7547,7 +7545,7 @@ static void cart_clamp_coord(MPI_Comm comm, const CkVec<int> &dims,
   int base_coord = coords[direction];
   coords[direction] += displacement;
 
-  if (periodicity[direction] == 1) {
+  if (periodicity[direction] != 0) {
     while (coords[direction] < 0)
       coords[direction] += dims[direction];
     while (coords[direction] >= dims[direction])
