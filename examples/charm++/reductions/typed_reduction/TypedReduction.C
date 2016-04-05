@@ -66,7 +66,7 @@ void Driver::typed_array_done3(int n, double* results)
 void Driver::tuple_reducer_done(CkReductionMsg* msg)
 {
     CkPrintf("\n");
-    CkReduction::tupleElement* results = nullptr;
+    CkReduction::tupleElement* results = NULL;
     int num_reductions = 0;
     msg->toTuple(&results, &num_reductions);
 
