@@ -418,8 +418,10 @@ pamix_progress_register_fn  cmi_progress_register;
 pamix_progress_enable_fn    cmi_progress_enable;
 pamix_progress_disable_fn   cmi_progress_disable;
 
+extern int quietMode;
+
 int CMI_Progress_init(int start, int ncontexts) {
-  if (CmiMyPe() == 0)
+  if ((CmiMyPe() == 0) && (!quietMode))
     printf("Enabling communication threads\n");
 
   PAMI_EXTENSION_OPEN(cmi_pami_client,"EXT_async_progress",&cmi_ext_progress);
@@ -597,7 +599,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
       break;
     }
 
-  if (_Cmi_mynode == 0)
+  if ((_Cmi_mynode == 0) && (!quietMode))
     printf ("Choosing optimized barrier algorithm name %s\n",
         always_works_md[opt_alg]);
 

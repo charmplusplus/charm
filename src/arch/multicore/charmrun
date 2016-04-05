@@ -1,5 +1,6 @@
 
 args=""
+QUIET=0
 
 while [ $# -gt 0 ]
 do
@@ -15,13 +16,17 @@ do
                 args=$args" "$1
                 shift
                 ;;
+	++quiet)
+		QUIET=1
+		args=$args" "$1
+		;;
         *)
 		break;
 		;;
 	esac
 done
 
-echo Running command: $* $args
-echo
+test $QUIET -eq 0 && echo Running command: $* $args
+test $QUIET -eq 0 && echo
 
 exec $* $args

@@ -1238,6 +1238,8 @@ static char *thread_level_tostring(int thread_level) {
 #endif
 }
 
+extern int quietMode;
+
 /**
  *  Obtain the number of nodes, my node id, and consuming machine layer
  *  specific arguments
@@ -1294,7 +1296,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     MPI_Get_version(&ver, &subver);
     if(!CharmLibInterOperate) {
-      if (myNID == 0) {
+      if ((myNID == 0) && (!quietMode)) {
         printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
         printf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
       }
@@ -1303,7 +1305,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV && _thread_provided != MPI_THREAD_MULTIPLE) {
         Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV; 
-        if (myNID == 0) {
+        if ((myNID == 0) && (!quietMode)) {
           printf("Charm++> +comm_thread_only_recv disabled\n");
         }
     }
@@ -1314,12 +1316,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
         int debug_no_pause = CmiGetArgFlag(largv,"++debug-no-pause");
         if (debug || debug_no_pause) {  /*Pause so user has a chance to start and attach debugger*/
 #if CMK_HAS_GETPID
-            printf("CHARMDEBUG> Processor %d has PID %d\n",myNID,getpid());
+            if (!quietMode) printf("CHARMDEBUG> Processor %d has PID %d\n",myNID,getpid());
             fflush(stdout);
             if (!debug_no_pause)
                 sleep(15);
 #else
-            printf("++debug ignored.\n");
+            if (!quietMode) printf("++debug ignored.\n");
 #endif
         }
     }
@@ -1391,7 +1393,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
 
     idleblock = CmiGetArgFlag(largv, "+idleblocking");
-    if (idleblock && _Cmi_mynode == 0) {
+    if (idleblock && _Cmi_mynode == 0 && !quietMode) {
         printf("Charm++: Running in idle blocking mode.\n");
     }
 
@@ -1414,7 +1416,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
     if (CmiGetArgFlag(largv,"+no_outstanding_sends")) {
         no_outstanding_sends = 1;
-        if (myNID == 0)
+        if ((myNID == 0) && (!quietMode))
             printf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
                    no_outstanding_sends?"":" not");
     }
@@ -1434,7 +1436,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     if (MPI_POST_RECV_COUNT<=0) MPI_POST_RECV_COUNT=1;
     if (MPI_POST_RECV_LOWERSIZE>MPI_POST_RECV_UPPERSIZE) MPI_POST_RECV_UPPERSIZE = MPI_POST_RECV_LOWERSIZE;
     MPI_POST_RECV_SIZE = MPI_POST_RECV_UPPERSIZE;
-    if (myNID==0) {
+    if ((myNID==0) && (!quietMode)) {
         printf("Charm++: using post-recv scheme with %d pre-posted recvs ranging from %d to %d (bytes) with msg count threshold %d and msg histogram bucket size %d, #buf increment every %d msgs. The buffers are checked every %d msgs\n",
                MPI_POST_RECV_COUNT, MPI_POST_RECV_LOWERSIZE, MPI_POST_RECV_UPPERSIZE,
                MPI_POST_RECV_MSG_CNT_THRESHOLD, MPI_POST_RECV_INC, MPI_POST_RECV_MSG_INC, MPI_POST_RECV_FREQ);
@@ -1443,20 +1445,20 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 	
 #if USE_MPI_CTRLMSG_SCHEME
 	CmiGetArgInt(largv, "+ctrlMsgCnt", &MPI_CTRL_MSG_CNT);
-	if(myNID == 0){
+	if((myNID == 0) && (!quietMode)){
 		printf("Charm++: using the alternative ctrl msg scheme with %d pre-posted ctrl msgs\n", MPI_CTRL_MSG_CNT);
 	}
 #endif
 
 #if CMI_EXERT_SEND_CAP
     CmiGetArgInt(largv, "+dynCapSend", &SEND_CAP);
-    if (myNID==0) {
+    if ((myNID==0) && (!quietMode)) {
         printf("Charm++: using static send cap %d\n", SEND_CAP);
     }
 #endif
 #if CMI_EXERT_RECV_CAP
     CmiGetArgInt(largv, "+dynCapRecv", &RECV_CAP);
-    if (myNID==0) {
+    if ((myNID==0) && (!quietMode)) {
         printf("Charm++: using static recv cap %d\n", RECV_CAP);
     }
 #endif
@@ -1464,7 +1466,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     CmiGetArgInt(largv, "+dynCapThreshold", &CMI_DYNAMIC_OUTGOING_THRESHOLD);
     CmiGetArgInt(largv, "+dynCapSend", &CMI_DYNAMIC_SEND_CAPSIZE);
     CmiGetArgInt(largv, "+dynCapRecv", &CMI_DYNAMIC_RECV_CAPSIZE);
-    if (myNID==0) {
+    if ((myNID==0) && (!quietMode)) {
         printf("Charm++: using dynamic flow control with outgoing threshold %d, send cap %d, recv cap %d\n",
                CMI_DYNAMIC_OUTGOING_THRESHOLD, CMI_DYNAMIC_SEND_CAPSIZE, CMI_DYNAMIC_RECV_CAPSIZE);
     }
@@ -1472,7 +1474,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
 #if USE_ASYNC_RECV_FUNC
     CmiGetArgInt(largv, "+irecvMsgThreshold", &IRECV_MSG_THRESHOLD);
-    if(myNID==0) {
+    if((myNID==0) && (!quietMode)) {
         printf("Charm++: for msg size larger than %d, MPI_Irecv is going to be used.\n", IRECV_MSG_THRESHOLD);
     }
 #endif

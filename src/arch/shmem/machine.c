@@ -560,8 +560,12 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   ConverseRunPE(initret);
 }
 
+extern int quietModeRequested;
+extern int quietMode;
+
 void ConverseExit()
 {
+  if (quietModeRequested) quietMode = 1;
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
   if (CmiMyPe() == 0){
     CmiPrintf("End of program\n");

@@ -2120,7 +2120,7 @@ static void init_ranges(char **argv)
         int fd, i;
         char fname[128];
 
-        if (CmiMyNode()==0) printf("Charm++> synchronizing isomalloc memory region...\n");
+        if (CmiMyNode()==0) CmiPrintf("Charm++> synchronizing isomalloc memory region...\n");
 
         sprintf(fname,".isomalloc.%d", CmiMyNode());
 

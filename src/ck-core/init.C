@@ -216,6 +216,9 @@ void processRaiseEvacFile(char *raiseEvacFile);
 
 extern bool useNodeBlkMapping;
 
+extern "C" int quietMode;
+extern "C" int quietModeRequested;
+
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts
 // users will be warned about options starting with a '+' that are not in this
@@ -1449,7 +1452,9 @@ void _initCharm(int unused_argc, char **argv)
 			register CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
+      quietMode = 0;  // allow printing any mainchare user messages
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
+      if (quietModeRequested) quietMode = 1;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
             CpvAccess(_currentObj) = (Chare *)obj;
 #endif
@@ -1525,6 +1530,7 @@ void _initCharm(int unused_argc, char **argv)
         }
 #endif
 
+  quietMode = 0;    // re-enable CmiPrintf's if they were disabled
 }
 
 // this is needed because on o2k, f90 programs have to have main in

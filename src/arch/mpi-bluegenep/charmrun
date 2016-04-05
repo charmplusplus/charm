@@ -17,6 +17,7 @@ fi
 firstArg=""
 args=""
 pes=1
+QUIET=0
 
 while [ $# -gt 0 ]
 do
@@ -28,6 +29,10 @@ do
 	+p*)
 		pes=`echo $1 | awk '{print substr($1,3)}'`
 		;;
+	++quiet)
+		QUIET=1
+		args=$args" "$1
+		;;
 	*) 
 		[ -z "$firstArg" ] && firstArg="$1"
 		args="$args $1"
@@ -38,10 +43,10 @@ done
 
 if [ $firstArg -nt $BL_HOME/$firstArg ]
 then
-  echo "Copying $firstArg to $BL_HOME..."
+  test $QUIET -eq 0 && echo "Copying $firstArg to $BL_HOME..."
   cp $firstArg $BL_HOME 
   [ $? -ne 0 ] && exit 1
 fi
 
-echo "Running on $pes processors: $args"
+test $QUIET -eq 0 && echo "Running on $pes processors: $args"
 exec /BlueLight/bin/CIORUN -p $pes $args

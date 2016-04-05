@@ -3777,6 +3777,8 @@ void LrtsPreCommonInit(int everReturn){
 #endif
 }
 
+extern int quietMode;
+
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
     register int            i;
@@ -3853,7 +3855,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     if (avg_smsg_connection>mysize) avg_smsg_connection = mysize;
     //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
     
-    if(myrank == 0)
+    if ((myrank == 0) && (!quietMode))
     {
         printf("Charm++> Running on Gemini (GNI) with %d processes\n", mysize);
         printf("Charm++> %s SMSG\n", useDynamicSMSG?"dynamic":"static");
@@ -3941,7 +3943,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     env = getenv("CHARM_UGNI_MAX_MEMORY_ON_NODE");
     if (env) {
         _totalmem = CmiReadSize(env);
-        if (myrank == 0)
+        if ((myrank == 0) && (!quietMode))
             printf("Charm++> total registered memory available per node is %.1fGB\n", (float)(_totalmem*1.0/oneGB));
     }
 
@@ -3980,17 +3982,17 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     if (MAX_BUFF_SEND > MAX_REG_MEM)  MAX_BUFF_SEND = MAX_REG_MEM;
 
     if (myrank==0) {
-        printf("Charm++> memory pool init block size: %1.fMB, total memory pool limit %1.fMB (0 means no limit)\n", _mempool_size/1024.0/1024, _mempool_size_limit/1024.0/1024);
-        printf("Charm++> memory pool registered memory limit: %1.fMB, send limit: %1.fMB\n", MAX_REG_MEM/1024.0/1024, MAX_BUFF_SEND/1024.0/1024);
+        if (!quietMode) printf("Charm++> memory pool init block size: %1.fMB, total memory pool limit %1.fMB (0 means no limit)\n", _mempool_size/1024.0/1024, _mempool_size_limit/1024.0/1024);
+        if (!quietMode) printf("Charm++> memory pool registered memory limit: %1.fMB, send limit: %1.fMB\n", MAX_REG_MEM/1024.0/1024, MAX_BUFF_SEND/1024.0/1024);
         if (MAX_REG_MEM < BIG_MSG * 2 + oneMB)  {
             /* memblock can expand to BIG_MSG * 2 size */
-            printf("Charm++ Error: The mempool maximum size is too small, please use command line option +gni-mempool-max or environment variable CHARM_UGNI_MEMPOOL_MAX to increase the value to at least %1.fMB.\n",  BIG_MSG * 2.0/1024/1024 + 1);
+            if (!quietMode) printf("Charm++ Error: The mempool maximum size is too small, please use command line option +gni-mempool-max or environment variable CHARM_UGNI_MEMPOOL_MAX to increase the value to at least %1.fMB.\n",  BIG_MSG * 2.0/1024/1024 + 1);
             CmiAbort("mempool maximum size is too small. \n");
         }
 #if MULTI_THREAD_SEND
-        printf("Charm++> worker thread sending messages\n");
+        if (!quietMode) printf("Charm++> worker thread sending messages\n");
 #elif COMM_THREAD_SEND
-        printf("Charm++> only comm thread send/recv messages\n");
+        if (!quietMode) printf("Charm++> only comm thread send/recv messages\n");
 #endif
     }
 
@@ -4015,7 +4017,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     env = getenv("CHARM_UGNI_RDMA_MAX");
     if (env)  {
         RDMA_pending = atoi(env);
-        if (myrank == 0)
+        if ((myrank == 0) && (!quietMode))
             printf("Charm++> Max pending RDMA set to: %d\n", RDMA_pending);
     }
 #endif
@@ -4031,7 +4033,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #else
     _tlbpagesize = getpagesize();
 #endif
-    if (myrank == 0) {
+    if ((myrank == 0) && (!quietMode)) {
         printf("Charm++> Cray TLB page size: %1.fK\n", _tlbpagesize/1024.0);
     }
 
