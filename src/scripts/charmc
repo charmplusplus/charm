@@ -1887,7 +1887,7 @@ Debug "About to perform final link..."
 MAKE_LDXX="0"
 MAKE_LD="0"
 
-CORE_LIBS="-lconv-core -lconv-util -lconv-partition $TRACE_OBJ "
+CORE_LIBS="-lconv-core -ltmgr -lconv-util -lconv-partition $TRACE_OBJ"
 
 # get TAU stub makefile variables
 if test "$CMK_WITH_TAU" = "true"

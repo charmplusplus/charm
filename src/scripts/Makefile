@@ -102,6 +102,10 @@ NDMeshStreamer: charm-core completion
 $(L)/libmpi-mainmodule.a: mpi-mainmodule.o
 	$(CHARMC) -o $@ $<
 
+tmgr: $(L)/libtmgr.a
+$(L)/libtmgr.a:
+	$(MAKE) -C topomanager -f Makefile_charm
+
 $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
 
@@ -217,8 +221,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
-	sockRoutines.h sockRoutines.c BGPTorus.h BGQTorus.h \
-	TopoManager.h XTTorus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
+	sockRoutines.h sockRoutines.c cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
 	crc32.h ckBIconfig.h rand48_replacement.h 
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
@@ -274,6 +277,7 @@ basics: headers
 
 # Headers is used only for the dependencies
 headers: dirs+sources
+	$(MAKE) -C topomanager -f Makefile_charm headers
 	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
@@ -426,11 +430,11 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
 	conv-lists.o persist-comm.o mempool.o graph.o \
-	TopoManager.o CrayNid.o BGQTorus.o crc32.o  lz4.o partitioning_strategies.o hilbert.o
+	crc32.o  lz4.o partitioning_strategies.o hilbert.o
 
 LIBCONV_UTILF=pup_f.o
 
-converse: charmrun-target swapglobal-target conv-cpm
+converse: charmrun-target swapglobal-target conv-cpm tmgr
 
 charmrun-target: charmrun  sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS)
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
@@ -616,7 +620,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o cktaskQ.
 					 trace-controlPoints.o mpi-interoperate.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
-charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a
+charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
 
 CHARMLIBS: charm++ CONVLIBS 
 	$(MAKE) -C libs charmlibs

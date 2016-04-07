@@ -9,7 +9,9 @@
  */
 
 #include "TopoManager.h"
+#ifndef __TPM_STANDALONE__
 #include "partitioning_strategies.h"
+#endif
 #include <vector>
 #include <algorithm>
 
@@ -417,9 +419,17 @@ extern void bgq_topo_free();
 
 CmiNodeLock _topoLock = 0;
 TopoManager *_tmgr = NULL;
+#ifdef __TPM_STANDALONE__
+int _tpm_numpes = 0;
+int _tpm_numthreads = 1;
+#endif
 
-extern "C" void TopoManager_init()
-{
+#ifndef __TPM_STANDALONE__
+extern "C" void TopoManager_init() {
+#else
+extern "C" void TopoManager_init(int numpes) {
+  _tpm_numpes = numpes;
+#endif
   if(_topoLock == 0) {
     _topoLock = CmiCreateLock();
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
@@ -428,7 +438,17 @@ extern "C" void TopoManager_init()
     bgq_topo_init();
 #endif
   }
+#ifdef __TPM_STANDALONE__
+  if(_tmgr) delete _tmgr;
+  _tmgr = new TopoManager;
+#endif
 }
+
+#ifdef __TPM_STANDALONE__
+extern "C" void TopoManager_setNumThreads(int t) {
+  _tpm_numthreads = t;
+}
+#endif
 
 extern "C" void TopoManager_reset() {
   CmiLock(_topoLock);
@@ -455,7 +475,12 @@ extern "C" void TopoManager_free() {
 }
 
 extern "C" void TopoManager_printAllocation(FILE *fp) {
+#ifndef __TPM_STANDALONE__
   if(_tmgr == NULL) { TopoManager_reset(); }
+#else
+  if(_tmgr == NULL) { printf("ERROR: TopoManager NOT initialized. Aborting...\n"); exit(1); }
+#endif
+
   _tmgr->printAllocation(fp);
 }
 
@@ -468,7 +493,12 @@ extern "C" void TopoManager_getDimCount(int *ndims) {
 }
 
 extern "C" void TopoManager_getDims(int *dims) {
+#ifndef __TPM_STANDALONE__
   if(_tmgr == NULL) { TopoManager_reset(); }
+#else
+  if(_tmgr == NULL) { printf("ERROR: TopoManager NOT initialized. Aborting...\n"); exit(1); }
+#endif
+
 #if CMK_BLUEGENEQ
   dims[0] = _tmgr->getDimNA();
   dims[1] = _tmgr->getDimNB();
@@ -485,7 +515,12 @@ extern "C" void TopoManager_getDims(int *dims) {
 }
 
 extern "C" void TopoManager_getCoordinates(int rank, int *coords) {
+#ifndef __TPM_STANDALONE__
   if(_tmgr == NULL) { TopoManager_reset(); }
+#else
+  if(_tmgr == NULL) { printf("ERROR: TopoManager NOT initialized. Aborting...\n"); exit(1); }
+#endif
+
   int t;
 #if CMK_BLUEGENEQ
   _tmgr->rankToCoordinates(CmiNodeFirst(rank),coords[0],coords[1],coords[2],coords[3],coords[4],t);
@@ -495,7 +530,12 @@ extern "C" void TopoManager_getCoordinates(int rank, int *coords) {
 }
 
 extern "C" void TopoManager_getPeCoordinates(int rank, int *coords) {
+#ifndef __TPM_STANDALONE__
   if(_tmgr == NULL) { TopoManager_reset(); }
+#else
+  if(_tmgr == NULL) { printf("ERROR: TopoManager NOT initialized. Aborting...\n"); exit(1); }
+#endif
+
 #if CMK_BLUEGENEQ
   _tmgr->rankToCoordinates(rank,coords[0],coords[1],coords[2],coords[3],coords[4],coords[5]);
 #else
@@ -504,7 +544,12 @@ extern "C" void TopoManager_getPeCoordinates(int rank, int *coords) {
 }
 
 void TopoManager_getRanks(int *rank_cnt, int *ranks, int *coords) {
+#ifndef __TPM_STANDALONE__
   if(_tmgr == NULL) { TopoManager_reset(); }
+#else
+  if(_tmgr == NULL) { printf("ERROR: TopoManager NOT initialized. Aborting...\n"); exit(1); }
+#endif
+
   int rank, numRanks = _tmgr->getDimNT()/CmiMyNodeSize();
   *rank_cnt = 0;
   for(int t = 0; t < _tmgr->getDimNT(); t += CmiMyNodeSize()) {
@@ -521,7 +566,12 @@ void TopoManager_getRanks(int *rank_cnt, int *ranks, int *coords) {
 }
 
 extern "C" void TopoManager_getPeRank(int *rank, int *coords) {
+#ifndef __TPM_STANDALONE__
   if(_tmgr == NULL) { TopoManager_reset(); }
+#else
+  if(_tmgr == NULL) { printf("ERROR: TopoManager NOT initialized. Aborting...\n"); exit(1); }
+#endif
+
 #if CMK_BLUEGENEQ
   *rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3],coords[4],coords[5]);
 #else
@@ -530,10 +580,16 @@ extern "C" void TopoManager_getPeRank(int *rank, int *coords) {
 }
 
 extern "C" void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops) {
+#ifndef __TPM_STANDALONE__
   if(_tmgr == NULL) { TopoManager_reset(); }
+#else
+  if(_tmgr == NULL) { printf("ERROR: TopoManager NOT initialized. Aborting...\n"); exit(1); }
+#endif
+
   *hops = _tmgr->getHopsBetweenRanks(pe1, pe2);
 }
 
+#ifndef __TPM_STANDALONE__
 extern "C" void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap) {
   if(scheme == 0) {
     if(!CmiMyNodeGlobal()) {
@@ -562,4 +618,4 @@ extern "C" void TopoManager_createPartitions(int scheme, int numparts, int *node
     CmiAbort("Specified value for topology scheme is not supported\n");
   }
 }
-
+#endif

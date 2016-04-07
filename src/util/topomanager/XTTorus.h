@@ -7,7 +7,12 @@
 #ifndef _XT_TORUS_H_
 #define _XT_TORUS_H_
 
+#include "topomanager_config.h"
+#ifndef __TPM_STANDALONE__
 #include "converse.h"
+#else
+#include "tpm_standalone.h"
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>

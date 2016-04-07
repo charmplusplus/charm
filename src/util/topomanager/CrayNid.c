@@ -7,8 +7,13 @@
  *  can be called from C++ files
  */
 
+#include "topomanager_config.h"
 #include <stdlib.h>
+#ifndef __TPM_STANDALONE__
 #include "converse.h"
+#else
+#include "tpm_standalone.h"
+#endif
 
 #if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
 
@@ -96,7 +101,6 @@ void pidtonid(int numpes) {
   }
 
   getDimension(&maxNID,&maxX,&maxY,&maxZ);
-  int numCores = CmiNumCores();
   
   pid2nid = (int *)malloc(sizeof(int) * numpes);
 

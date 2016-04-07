@@ -1,0 +1,34 @@
+#=============================================================================
+# Common Variables
+
+CC      = cc
+CXX     = CC
+COPTS   = -c -O3
+CXXOPTS = -c -O3 -std=c++11 -DC11_AVAIL=1
+
+LOPTS   = -lrca
+
+all:    libtmgr.a
+
+libtmgr.a: TopoManager.o CrayNid.o
+	ar -q libtmgr.a TopoManager.o CrayNid.o
+
+TopoManager.o: TopoManager.h TopoManager.C XTTorus.h topomanager_config.h
+	$(CXX) $(CXXOPTS) -o TopoManager.o TopoManager.C
+
+CrayNid.o: CrayNid.c topomanager_config.h
+	$(CC) $(COPTS) -o CrayNid.o CrayNid.c
+
+test:  topomanager_test.c libtmgr.a topomanager_config.h
+	$(CC) $(COPTS) topomanager_test.c -o topomanager_test.o
+	$(CXX) -o topomanager_test topomanager_test.o -ltmgr -L./ $(LOPTS)
+
+topomanager_config.h:
+	echo "#define __TPM_STANDALONE__ 1" > topomanager_config.h
+	echo "#define CMK_CRAYXE 1" >> topomanager_config.h
+	echo "#define XE6_TOPOLOGY 1" >> topomanager_config.h
+	echo "#define CMK_HAS_PMI_GET_NID 1" >> topomanager_config.h
+	echo "#define CMK_HAS_RCALIB 1" >> topomanager_config.h
+
+clean:
+	rm -f *.o libtmgr.a topomanager_config.h

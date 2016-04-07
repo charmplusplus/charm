@@ -142,7 +142,7 @@ BGQTorusManager::BGQTorusManager() {
 
 void BGQTorusManager::populateLocalNodes() {
   if(CmiNumPartitions() == 1) return;
-
+#ifndef __TPM_STANDALONE__
   CmiLock(bgq_lock);
   if(bgq_isLocalSet) {
     CmiUnlock(bgq_lock);
@@ -170,6 +170,7 @@ void BGQTorusManager::populateLocalNodes() {
   bgq_isLocalSet = 1;
 
   CmiUnlock(bgq_lock);
+#endif
 }
 
 #endif

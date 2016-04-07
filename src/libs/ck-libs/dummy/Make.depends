@@ -52,7 +52,7 @@ ckdummy.o: ckdummy.C ../../../../tmp/charm++.h \
   ../../../../tmp/treeStrategy_nodeAware_minGens.h \
   ../../../../tmp/treeStrategy_nodeAware_minBytes.h \
   ../../../../tmp/treeStrategy_3dTorus_minHops.h \
-  ../../../../tmp/TopoManager.h \
+  ../../../../include/TopoManager.h \
   ../../../../tmp/treeStrategy_3dTorus_minBytesHops.h \
   CkDummy.def.h
 	$(CHARMC) -I../../../../tmp -o ckdummy.o ckdummy.C

@@ -7,7 +7,13 @@
 #ifndef _BGQ_TORUS_H_
 #define _BGQ_TORUS_H_
 
+#include "topomanager_config.h"
+
+#ifndef __TPM_STANDALONE__
 #include "converse.h"
+#else
+#include "tpm_standalone.h"
+#endif
 
 #if CMK_BLUEGENEQ
 
@@ -115,6 +121,7 @@ class BGQTorusManager {
         
         pe = (a * a_mult + b * b_mult + c * c_mult + d * d_mult + e) * thdsPerProc * procsPerNode + t;
         
+#ifndef __TPM_STANDALONE__
         if(CmiNumPartitions() == 1 || !bgq_isLocalSet)
           return pe;
         else {
@@ -123,6 +130,9 @@ class BGQTorusManager {
           if(bgq_localNodes[node] == -1)     return -1;
           else return (CmiNodeFirst(bgq_localNodes[node]) + rank);
         }
+#else
+        return pe;
+#endif
     }    
 
     inline int coordinatesToRank(int a, int b, int c, int d, int e, int t) {
@@ -144,6 +154,7 @@ class BGQTorusManager {
         pe += (tempdims[order[4]]*dims[order[0]]*dims[order[1]]*dims[order[2]]*dims[order[3]]);
         pe += (tempdims[order[5]]*dims[order[0]]*dims[order[1]]*dims[order[2]]*dims[order[3]]*dims[order[4]]);
 
+#ifndef __TPM_STANDALONE__
         if(CmiNumPartitions() == 1 || !bgq_isLocalSet)
           return pe;
         else {
@@ -152,6 +163,9 @@ class BGQTorusManager {
           if(bgq_localNodes[node] == -1)     return -1;
           else return (CmiNodeFirst(bgq_localNodes[node]) + rank);
         }
+#else
+        return pe;
+#endif
     }
      
     inline int getTotalPhyNodes(){

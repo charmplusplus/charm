@@ -12,14 +12,26 @@
 #ifndef _TOPO_MANAGER_H_
 #define _TOPO_MANAGER_H_
 
+#include "topomanager_config.h"
+
+#ifndef __TPM_STANDALONE__
 #include "converse.h"
+#else
+#include "tpm_standalone.h"
+#include "string.h"
+#endif
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
 /** basic initialization */
+#ifndef __TPM_STANDALONE__
 void TopoManager_init();
+#else
+void TopoManager_init(int numpes);
+void TopoManager_setNumThreads(int t);  // num threads per process, NOTE that, if used, this must be called before TopoManager_init
+#endif
 /** redo the initialization */
 void TopoManager_reset();
 /** free the current occupant */
@@ -40,8 +52,10 @@ void TopoManager_getRanks(int *rank_cnt, int *ranks, int *coords);
 void TopoManager_getPeRank(int *rank, int *coords);
 /** get hops betweens Pes */
 void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops);
+#ifndef __TPM_STANDALONE__
 /** topoaware partition using scheme s */
 void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap);
+#endif
 
 #if defined(__cplusplus)
 }
