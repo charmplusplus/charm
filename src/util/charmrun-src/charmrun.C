@@ -56,7 +56,7 @@
 #define DIRSEP "/"
 #endif
 
-#define PRINT(a) (arg_quiet ? : printf a)
+#define PRINT(a) (arg_quiet ? 1 : printf a)
 
 #if CMK_SSH_NOT_NEEDED /*No SSH-- use daemon to start node-programs*/
 #define CMK_USE_SSH 0
