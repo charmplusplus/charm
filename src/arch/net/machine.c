@@ -2707,6 +2707,7 @@ static void ConverseRunPE(int everReturn)
 
 void ConverseExit(void)
 {
+  if (quietModeRequested) quietMode = 1;
   MACHSTATE(2,"ConverseExit {");
   machine_initiated_shutdown=1;
 

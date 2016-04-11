@@ -740,6 +740,7 @@ void _initDone(void)
   CmiNodeBarrier();
   if(CkMyRank() == 0) {
     _processBufferedNodeBocInits();
+    quietMode = 0; // re-enable CmiPrintf's if they were disabled
   }
   CmiNodeBarrier(); // wait for all nodegroups to be created
   _processBufferedBocInits();
@@ -1530,7 +1531,6 @@ void _initCharm(int unused_argc, char **argv)
         }
 #endif
 
-  quietMode = 0;    // re-enable CmiPrintf's if they were disabled
 }
 
 // this is needed because on o2k, f90 programs have to have main in
