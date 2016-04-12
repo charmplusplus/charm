@@ -249,7 +249,7 @@ skt_ip_t skt_my_ip(void)
                 const struct sockaddr_in *addr = (const struct sockaddr_in*)iface->ifa_addr;
                 if( addr && addr->sin_family==AF_INET ) {
                     ifcount ++;
-                    memcpy(&ip, &addr->sin_addr, sizeof(ip));
+                    if ( ifcount==1 ) memcpy(&ip, &addr->sin_addr, sizeof(ip));
                 }
             }
         }
@@ -259,8 +259,11 @@ skt_ip_t skt_my_ip(void)
   if (ifcount==1) return ip;
 #endif
   
-  if (gethostname(hostname, 999)==0)
-      return skt_lookup_ip(hostname);
+  if (gethostname(hostname, 999)==0) {
+      skt_ip_t ip2 = skt_lookup_ip(hostname);
+      if ( ip2.data[0] != 127 ) return ip2;
+      else if ( ifcount != 0 ) return ip;
+  }
 
   return _skt_invalid_ip;
 }
