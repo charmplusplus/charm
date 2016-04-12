@@ -50,6 +50,9 @@ char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
 
+extern int quietMode;
+extern int quietModeRequested;
+
 /*To reduce the buffer used in broadcast and distribute the load from
   broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of
   spanning tree broadcast algorithm.
@@ -607,9 +610,6 @@ pami_extension_t            cmi_ext_progress;
 pamix_progress_register_fn  cmi_progress_register;
 pamix_progress_enable_fn    cmi_progress_enable;
 pamix_progress_disable_fn   cmi_progress_disable;
-
-extern int quietMode;
-extern int quietModeRequested;
 
 int CMI_Progress_init(int start, int ncontexts) {
   if ((CmiMyPe() == 0) && (!quietMode))
