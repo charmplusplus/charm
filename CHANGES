@@ -52,6 +52,30 @@ Deprecations
 
 - CmiBool has been dropped in favor of C++'s bool
 
+
+================================================================================
+What's new in Charm++ 6.6.1
+================================================================================
+
+Changes in this release are primarily bug fixes for 6.6.0. A concise list of
+affected components follows:
+
+- CkIO
+
+- Reductions with syncFT
+
+- mpicxx based MPI builds
+
+- Increased support for macros in CI file
+
+- GNI + RDMA related communication
+
+- MPI_STATUSES_IGNORE support for AMPIF
+
+- Restart on different node count with chkpt
+
+- Immediate msgs on multicore builds
+
 ================================================================================
 What's new in Charm++ 6.6.0
 ================================================================================
