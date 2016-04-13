@@ -536,10 +536,8 @@ void CcsInit(char **argv)
   CpvInitialize(int, _bgCcsAck);
   CpvAccess(_bgCcsAck) = 0;
 #endif
-  CpvInitialize(int, cmiArgDebugFlag);
   CpvInitialize(char *, displayArgument);
   CpvInitialize(int, cpdSuspendStartup);
-  CpvAccess(cmiArgDebugFlag) = 0;
   CpvAccess(displayArgument) = NULL;
   CpvAccess(cpdSuspendStartup) = 0;
   

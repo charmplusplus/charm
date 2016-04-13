@@ -1047,10 +1047,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     //handle output to files for partition if requested
     char *stdoutbase,*stdoutpath;
 
-#if CMK_CCS_AVAILABLE
-  CpvInitialize(int, cmiArgDebugFlag);
-  CpvAccess(cmiArgDebugFlag) = 0;
-#endif
 
 #if CMK_WITH_STATS
     MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
@@ -1204,6 +1200,22 @@ extern void CthInit(char **argv);
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
+
+#if CMK_CCS_AVAILABLE
+/**
+ * The reason to initialize this variable here:
+ * cmiArgDebugFlag is possibly accessed in CmiPrintf/CmiError etc.,
+ * therefore, we have to initialize this variable before any calls
+ * to those functions (such as CmiPrintf). Otherwise, we may encounter
+ * a memory segmentation fault (bad memory access). Note, even
+ * testing CpvInitialized(cmiArgDebugFlag) doesn't help to solve
+ * this problem because the variable indicating whether cmiArgDebugFlag is
+ * initialized or not is not initialized, thus possibly causing another
+ * bad memory access. --Chao Mei
+ */
+  CpvInitialize(int, cmiArgDebugFlag);
+  CpvAccess(cmiArgDebugFlag) = 0;
+#endif
 
     LrtsPreCommonInit(everReturn);
 

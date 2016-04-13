@@ -3748,18 +3748,6 @@ int quietMode; // quiet mode active (CmiPrintf's are disabled)
 */
 void ConverseCommonInit(char **argv)
 {
-
-/**
- * The reason to initialize this variable here:
- * cmiArgDebugFlag is possibly accessed in CmiPrintf/CmiError etc.,
- * therefore, we have to initialize this variable before any calls
- * to those functions (such as CmiPrintf). Otherwise, we may encounter
- * a memory segmentation fault (bad memory access). Note, even
- * testing CpvInitialized(cmiArgDebugFlag) doesn't help to solve
- * this problem because the variable indicating whether cmiArgDebugFlag is 
- * initialized or not is not initialized, thus possibly causing another
- * bad memory access. --Chao Mei
- */
   CpvInitialize(int, _urgentSend);
   CpvAccess(_urgentSend) = 0;
   CpvInitialize(int,interopExitFlag);
