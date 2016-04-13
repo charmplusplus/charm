@@ -239,6 +239,26 @@ CkDDT::newHIndexed(int count, int* arrbLength, int* arrDisp,
 }
 
 void
+CkDDT::newIndexedBlock(int count, int Blocklength, int *arrDisp, CkDDT_Type oldtype,
+                  CkDDT_Type *newtype)
+{
+  int index = *newtype = getNextFreeIndex();
+  CkDDT_DataType *type = new CkDDT_Indexed_Block(count, Blocklength, arrDisp, oldtype, typeTable[oldtype]);
+  typeTable[index] = type;
+  types[index] = CkDDT_INDEXED_BLOCK;
+}
+
+void
+CkDDT::newHIndexedBlock(int count, int Blocklength, int *arrDisp, CkDDT_Type oldtype,
+                  CkDDT_Type *newtype)
+{
+  int index = *newtype = getNextFreeIndex();
+  CkDDT_DataType *type = new CkDDT_HIndexed_Block(count, Blocklength, arrDisp, oldtype, typeTable[oldtype]);
+  typeTable[index] = type;
+  types[index] = CkDDT_HINDEXED_BLOCK;
+}
+
+void
 CkDDT::newStruct(int count, int* arrbLength, int* arrDisp,
                  CkDDT_Type *oldtype, CkDDT_Type* newType)
 {
@@ -843,6 +863,182 @@ int CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], int a[], int d[
   for(int z=0;z<i[0];z++){
     i[z+1] = arrayBlockLength[z];
     a[z] = arrayDisplacements[z];
+  }
+  d[0] = baseIndex;
+  return 0;
+}
+
+CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, int *ArrDisp, int index,
+  CkDDT_DataType *type)     : CkDDT_DataType(CkDDT_INDEXED_BLOCK, 0, 0, count, numeric_limits<int>::max(),
+         numeric_limits<int>::min(), 0, type->getSize(), type->getExtent(),
+         type, index),
+    BlockLength(Blength), arrayDisplacements(new int[count])
+{
+  for(int i=0; i<count; i++) {
+    arrayDisplacements[i] = ArrDisp[i] ;
+    size += ( BlockLength * baseSize) ;
+    extent += ((BlockLength*baseExtent) + (arrayDisplacements[i]*baseExtent));
+  }
+
+  lb = baseType->getLB();
+  ub = lb + extent;
+}
+
+CkDDT_Indexed_Block::CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj)
+{
+
+}
+
+CkDDT_Indexed_Block& CkDDT_Indexed_Block::operator=(const CkDDT_Indexed_Block &obj)
+{
+
+}
+
+CkDDT_Indexed_Block::~CkDDT_Indexed_Block()
+{
+  delete [] arrayDisplacements;
+}
+
+int CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int dir)
+{
+  char* tbuf = userdata;
+  int bytesCopied = 0;
+
+  for(;num;num--) {
+    for(int i = 0 ; i < count; i++) {
+      userdata = tbuf + baseSize * arrayDisplacements[i] ;
+      for(int j = 0; j < BlockLength ; j++) {
+        bytesCopied +=  baseType->serialize(userdata, buffer, 1, dir);
+        buffer += baseSize ;
+        userdata += baseExtent ;
+      }
+    }
+  }
+  return bytesCopied;
+}
+
+void CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
+{
+  p(datatype);
+  p(size);
+  p(extent);
+  p(count);
+  p(baseSize);
+  p(baseExtent);
+  p(baseIndex);
+  p(lb);
+  p(ub);
+  p(iscontig);
+  p(BlockLength);
+
+  if(p.isUnpacking() )  arrayDisplacements = new int[count] ;
+  p(arrayDisplacements, count);
+
+  if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+}
+
+int CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner)
+{
+  *ni = count*2+1;
+  *na = 0;
+  *nd = 1;
+  *combiner = CkDDT_COMBINER_INDEXED_BLOCK;
+  return 0;
+}
+
+int CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], int a[], int d[])
+{
+  i[0] = count;
+  i[1] = BlockLength;
+  for(int z=0;z<i[0];z++) {
+    i[z+2] = arrayDisplacements[z];
+  }
+  d[0] = baseIndex;
+  return 0;
+}
+
+CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, int *ArrDisp, int index,
+  CkDDT_DataType *type)     : CkDDT_Indexed_Block(count, Blength,ArrDisp,index,type)
+{
+  for(int i=0; i<count; i++) {
+    arrayDisplacements[i] = ArrDisp[i] ;
+    size += ( BlockLength * baseSize) ;
+    extent += ((BlockLength*baseExtent) + (arrayDisplacements[i]));
+  }
+
+  lb = baseType->getLB();
+  ub = lb + extent;
+}
+
+CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(const CkDDT_Indexed_Block &obj)
+{
+
+}
+
+CkDDT_HIndexed_Block& CkDDT_HIndexed_Block::operator=(const CkDDT_Indexed_Block &obj)
+{
+
+}
+
+CkDDT_HIndexed_Block::~CkDDT_HIndexed_Block()
+{
+  delete [] arrayDisplacements;
+}
+
+int CkDDT_HIndexed_Block::CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num,
+  int dir)
+{
+  char* tbuf = userdata;
+  int bytesCopied = 0;
+
+  for(;num;num--) {
+    for(int i = 0 ; i < count; i++) {
+      userdata = tbuf + arrayDisplacements[i] ;
+      for(int j = 0; j < BlockLength ; j++) {
+        bytesCopied +=  baseType->serialize(userdata, buffer, 1, dir);
+        buffer += baseSize ;
+        userdata += baseExtent ;
+      }
+    }
+  }
+  return bytesCopied;
+}
+
+void CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
+{
+  p(datatype);
+  p(size);
+  p(extent);
+  p(count);
+  p(baseSize);
+  p(baseExtent);
+  p(baseIndex);
+  p(lb);
+  p(ub);
+  p(iscontig);
+  p(BlockLength);
+
+  if(p.isUnpacking() )  arrayDisplacements = new int[count] ;
+  p(arrayDisplacements, count);
+
+  if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+}
+
+int CkDDT_HIndexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner)
+{
+  *ni = count*2+1;
+  *na = 0;
+  *nd = 1;
+  *combiner = CkDDT_COMBINER_HINDEXED_BLOCK;
+  return 0;
+}
+
+int CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], int a[], int d[])
+{
+  i[0] = count;
+  i[1] = BlockLength;
+  for(int z=0;z<i[0];z++) {
+    i[z+2] = arrayDisplacements[z];
   }
   d[0] = baseIndex;
   return 0;

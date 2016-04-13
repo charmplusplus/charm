@@ -39,6 +39,8 @@ FDECL {
 #define mpi_type_indexed FTN_NAME( MPI_TYPE_INDEXED , mpi_type_indexed )
 #define mpi_type_create_hindexed FTN_NAME( MPI_TYPE_CREATE_HINDEXED , mpi_type_create_hindexed )
 #define mpi_type_hindexed FTN_NAME( MPI_TYPE_HINDEXED , mpi_type_hindexed )
+#define mpi_type_create_indexed_block FTN_NAME( MPI_TYPE_CREATE_INDEXED_BLOCK , mpi_type_create_indexed_block )
+#define mpi_type_create_hindexed_block FTN_NAME( MPI_TYPE_CREATE_HINDEXED_BLOCK , mpi_type_create_hindexed_block )
 #define mpi_type_create_struct FTN_NAME( MPI_TYPE_CREATE_STRUCT , mpi_type_create_struct )
 #define mpi_type_struct FTN_NAME( MPI_TYPE_STRUCT , mpi_type_struct )
 #define mpi_type_commit FTN_NAME( MPI_TYPE_COMMIT , mpi_type_commit )
@@ -592,6 +594,18 @@ void mpi_type_hindexed(int* count, int* arrBlength, int* arrDisp,
    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
+}
+
+void mpi_type_create_indexed_block(int* count, int* Blength, int* arr,
+    int* oldtype, int* newtype, int* ierr)
+{
+  *ierr = AMPI_Type_create_indexed_block(*count, *Blength, arr, *oldtype, newtype);
+}
+
+void mpi_type_create_hindexed_block(int* count, int* Blength, int* arr,
+    int* oldtype, int* newtype, int* ierr)
+{
+  *ierr = AMPI_Type_create_hindexed_block(*count, *Blength, arr, *oldtype, newtype);
 }
 
 void mpi_type_create_struct(int* count, int* arrBlength, int* arrDisp,

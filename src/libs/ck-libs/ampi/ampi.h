@@ -284,16 +284,18 @@ typedef void (*MPI_MigrateFn)(void);
 
 /********************** MPI-2 prototypes and defines ***************************/
 /* for the datatype decoders */
-#define MPI_COMBINER_NAMED         1
-#define MPI_COMBINER_CONTIGUOUS    2
-#define MPI_COMBINER_VECTOR        3
-#define MPI_COMBINER_HVECTOR       4
-#define MPI_COMBINER_INDEXED       5
-#define MPI_COMBINER_HINDEXED      6
-#define MPI_COMBINER_STRUCT        7
-#define MPI_COMBINER_DARRAY        8
-#define MPI_COMBINER_RESIZED       9
-#define MPI_COMBINER_SUBARRAY     10
+#define MPI_COMBINER_NAMED           1
+#define MPI_COMBINER_CONTIGUOUS      2
+#define MPI_COMBINER_VECTOR          3
+#define MPI_COMBINER_HVECTOR         4
+#define MPI_COMBINER_INDEXED         5
+#define MPI_COMBINER_HINDEXED        6
+#define MPI_COMBINER_STRUCT          7
+#define MPI_COMBINER_DARRAY          8
+#define MPI_COMBINER_RESIZED         9
+#define MPI_COMBINER_SUBARRAY       10
+#define MPI_COMBINER_INDEXED_BLOCK  11
+#define MPI_COMBINER_HINDEXED_BLOCK 12
 
 /********************** MPI-1.1 Functions ***************************/
 /***pt2pt***/
@@ -399,6 +401,12 @@ int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
 #define MPI_Type_create_hindexed AMPI_Type_create_hindexed
 int AMPI_Type_create_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
                               MPI_Datatype oldtype, MPI_Datatype *newtype);
+#define MPI_Type_create_indexed_block AMPI_Type_create_indexed_block
+int AMPI_Type_create_indexed_block(int count, int Blength, MPI_Aint *arr,
+                                   MPI_Datatype oldtype, MPI_Datatype *newtype);
+#define MPI_Type_create_hindexed_block AMPI_Type_create_hindexed_block
+int AMPI_Type_create_hindexed_block(int count, int Blength, MPI_Aint *arr,
+                                    MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_hindexed AMPI_Type_hindexed
 int AMPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
                        MPI_Datatype oldtype, MPI_Datatype *newtype);

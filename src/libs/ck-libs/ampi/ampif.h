@@ -103,6 +103,8 @@
        integer, parameter :: MPI_COMBINER_DARRAY = 8
        integer, parameter :: MPI_COMBINER_RESIZED = 9
        integer, parameter :: MPI_COMBINER_SUBARRAY = 10
+       integer, parameter :: MPI_COMBINER_INDEXED_BLOCK = 11
+       integer, parameter :: MPI_COMBINED_HINDEXED_BLOCK = 12
 
        integer, parameter :: MPI_PROC_NULL = -2
        integer, parameter :: MPI_ANY_SOURCE = -1

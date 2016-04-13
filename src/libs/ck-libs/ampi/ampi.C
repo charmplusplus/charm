@@ -4449,6 +4449,24 @@ int AMPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
 }
 
 CDECL
+int AMPI_Type_create_indexed_block(int count, int Blength, MPI_Aint *arr,
+    MPI_Datatype oldtype, MPI_Datatype *newtype)
+{
+  AMPIAPI("AMPI_Type_create_indexed_block");
+  getDDT()->newIndexedBlock(count,Blength, arr, oldtype, newtype);
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_create_hindexed_block(int count, int Blength, MPI_Aint *arr,
+    MPI_Datatype oldtype, MPI_Datatype *newtype)
+{
+  AMPIAPI("AMPI_Type_create_hindexed_block");
+  getDDT()->newHIndexedBlock(count,Blength, arr, oldtype, newtype);
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Type_create_struct(int count, int* arrBlength, int* arrDisp,
     MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {

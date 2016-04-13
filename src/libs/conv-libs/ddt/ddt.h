@@ -40,15 +40,19 @@
 #define CkDDT_INDEXED         39
 #define CkDDT_HINDEXED        40
 #define CkDDT_STRUCT          41
+#define CkDDT_INDEXED_BLOCK   42
+#define CkDDT_HINDEXED_BLOCK  43
 
 /* for the datatype decoders */
-#define CkDDT_COMBINER_NAMED         1
-#define CkDDT_COMBINER_CONTIGUOUS    2
-#define CkDDT_COMBINER_VECTOR        3
-#define CkDDT_COMBINER_HVECTOR       4
-#define CkDDT_COMBINER_INDEXED       5
-#define CkDDT_COMBINER_HINDEXED      6
-#define CkDDT_COMBINER_STRUCT        7
+#define CkDDT_COMBINER_NAMED          1
+#define CkDDT_COMBINER_CONTIGUOUS     2
+#define CkDDT_COMBINER_VECTOR         3
+#define CkDDT_COMBINER_HVECTOR        4
+#define CkDDT_COMBINER_INDEXED        5
+#define CkDDT_COMBINER_HINDEXED       6
+#define CkDDT_COMBINER_STRUCT         7
+#define CkDDT_COMBINER_INDEXED_BLOCK  8
+#define CkDDT_COMBINER_HINDEXED_BLOCK 9
 
 #define CkDDT_MAX_NAME_LEN         255
 
@@ -285,6 +289,67 @@ class CkDDT_HIndexed : public CkDDT_Indexed {
 };
 
 /*
+  The Indexed_Block type allows one to specify a noncontiguous data
+  layout where displacements between
+  successive blocks need not be equal.
+  This allows one to gather arbitrary entries from an array
+  and make a single buffer out of it.
+  All block displacements are measured  in units of oldtype extent.
+  The only difference between this Datatype and CkDDT_Indexed is the fact that
+    all blockLengths are the same here, so there is no array of BlockLengths
+
+  BlockLength - the length of all blocks
+  arrayDisplacements - holds the array of displacements.
+*/
+
+class CkDDT_Indexed_Block : public CkDDT_DataType
+{
+  protected:
+    int BlockLength;
+    int *arrayDisplacements;
+
+  public:
+    CkDDT_Indexed_Block(int count, int Blength, int *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj);
+    CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
+    CkDDT_Indexed_Block() { };
+    ~CkDDT_Indexed_Block() ;
+    virtual int serialize(char *userdata, char *buffer, int num, int dir);
+    virtual void pupType(PUP::er &p, CkDDT *ddt);
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
+    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+};
+
+/*
+  The HIndexed_Block type allows one to specify a noncontiguous data
+  layout where displacements between
+  successive blocks need not be equal.
+  Unlike in Indexed_Block type, these displacements are now specified in bytes as ap
+  This allows one to gather arbitrary entries from an array
+  and make a single buffer out of it.
+  All block displacements are measured  in units of oldtype extent.
+  The only difference between this Datatype and CkDDT_Indexed is the fact that
+    all blockLengths are the same here, so there is no array of BlockLengths
+
+  BlockLength - the length of all blocks
+  arrayDisplacements - holds the array of displacements.
+*/
+
+class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
+{
+  public:
+    CkDDT_HIndexed_Block(int count, int Blength, int *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_HIndexed_Block(const CkDDT_Indexed_Block &obj);
+    CkDDT_HIndexed_Block& operator=(const CkDDT_Indexed_Block &obj);
+    CkDDT_HIndexed_Block() { };
+    ~CkDDT_HIndexed_Block() ;
+    virtual int serialize(char *userdata, char *buffer, int num, int dir);
+    virtual void pupType(PUP::er &p, CkDDT *ddt);
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
+    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+};
+
+/*
   CkDDT_Struct is the most general type constructor.
   It further generalizes CkDDT_HIndexed in
   that it allows each block to consist of replications of
@@ -422,6 +487,10 @@ class CkDDT {
                  CkDDT_Type* newtype);
   void newHIndexed(int count, int* arrbLength, int* arrDisp , CkDDT_Type oldtype,
                   CkDDT_Type* newtype);
+  void newIndexedBlock(int count, int Blocklength, int *arrDisp, CkDDT_Type oldtype,
+                      CkDDT_Type *newtype);
+  void newHIndexedBlock(int count, int Blocklength, int *arrDisp, CkDDT_Type oldtype,
+                       CkDDT_Type *newtype);
   void newStruct(int count, int* arrbLength, int* arrDisp , CkDDT_Type *oldtype,
                 CkDDT_Type* newtype);
   void  freeType(int* index);
