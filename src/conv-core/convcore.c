@@ -56,6 +56,8 @@
 #ifndef _WIN32
 #include <sys/time.h>
 #include <sys/resource.h>
+#else
+#define snprintf _snprintf
 #endif
 
 #include "converse.h"
