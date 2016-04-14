@@ -236,12 +236,12 @@ skt_ip_t _skt_invalid_ip={{0}};
 skt_ip_t skt_my_ip(void)
 {
   char hostname[1000];
-#if CMK_HAS_GETIFADDRS
   skt_ip_t ip = _skt_invalid_ip;
+  int ifcount = 0;
+#if CMK_HAS_GETIFADDRS
     /* Code snippet from  Jens Alfke
  *     http://lists.apple.com/archives/macnetworkprog/2008/May/msg00013.html */
   struct ifaddrs *ifaces=0;
-  int ifcount = 0;
   if( getifaddrs(&ifaces) == 0 ) {
         struct ifaddrs *iface;
         for( iface=ifaces; iface; iface=iface->ifa_next ) {
