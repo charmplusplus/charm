@@ -81,7 +81,7 @@ static inline void PPC_AtomicStore(volatile ppc_atomic_t *counter, ppc_atomic_ty
 
 static inline void PPC_AtomicReadFence()
 {
-#if !CMK_BLUEGENEQ  //full memory barrier executed on Producer
+#if !CMK_BLUEGENQ  //full memory barrier executed on Producer
   __asm__ __volatile__ ("isync":::"memory");
 #endif
 }
