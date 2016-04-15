@@ -140,8 +140,11 @@ int main(int ac, char** av)
 
   /* Set up MPI_Info hints for AMPI_Migrate() */
   MPI_Info_create(&hints);
+#ifdef CMK_MEM_CHECKPOINT
   MPI_Info_set(hints, "ampi_checkpoint", "in_memory");
+#elif CMK_MESSAGE_LOGGING
   MPI_Info_set(hints, "ampi_checkpoint", "message_logging");
+#endif
 
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
