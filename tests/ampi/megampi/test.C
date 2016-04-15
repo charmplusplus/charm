@@ -245,7 +245,7 @@ void MPI_Tester::testMigrate(void) {
     MPI_Info hints;
 
     MPI_Info_create(&hints);
-    MPI_Info_set(hints, "ampi_load_balance", "true");
+    MPI_Info_set(hints, "ampi_load_balance", "sync");
 	
 	// Before migrating, send a message to the next guy:
 	//    this tests out migration with pending messages
