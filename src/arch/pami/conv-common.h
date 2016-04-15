@@ -5,7 +5,7 @@
 
 #define CMK_HANDLE_SIGUSR                                  1
 
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; 
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
@@ -34,7 +34,8 @@
 #undef CMK_HAS_FDATASYNC_FUNC
 #define CMK_HAS_FDATASYNC_FUNC                             0
 
-#define CMI_DIRECT_MANY_TO_MANY_DEFINED                    0
+//#define CMI_DIRECT_MANY_TO_MANY_DEFINED                    0
 
 #define CMK_PERSISTENT_COMM                                0
 
+#define  CMI_DIRECT_MANY_TO_MANY_DEFINED                   1

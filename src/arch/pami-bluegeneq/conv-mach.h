@@ -46,14 +46,6 @@
 // This needs to be compiled with gcc only
 #define CMK_TIMER_USE_BLUEGENEQ			           1
 
-#define CMK_TYPEDEF_INT2 short
-#define CMK_TYPEDEF_INT4 int
-#define CMK_TYPEDEF_INT8 long long
-#define CMK_TYPEDEF_UINT2 unsigned short
-#define CMK_TYPEDEF_UINT4 unsigned int
-#define CMK_TYPEDEF_UINT8 unsigned long long
-#define CMK_TYPEDEF_FLOAT4 float
-#define CMK_TYPEDEF_FLOAT8 double
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
@@ -71,9 +63,6 @@
 #define CMK_BLUEGENEQ_OPTCOPY                              1
 
 #define CMK_NO_ISO_MALLOC                                  1
-
-#undef CMI_DIRECT_MANY_TO_MANY_DEFINED
-#define CMI_DIRECT_MANY_TO_MANY_DEFINED                    1
 
 #endif
 

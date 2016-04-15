@@ -1,8 +1,3 @@
-
-#define _GNU_SOURCE
-#include <pthread.h>
-#include <sched.h>
-
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -15,18 +10,18 @@
 #include "assert.h"
 #include "malloc.h"
 
-#if CMK_BLUEGENEQ
 #include <hwi/include/bqc/A2_inlines.h>
 #include "spi/include/kernel/process.h"
 #include "spi/include/kernel/memory.h"
-#endif
-
 #include "pami.h"
 #include "pami_sys.h"
 
 #if MACHINE_DEBUG_LOG
 FILE *debugLog = NULL;
 #endif
+//#if CMK_SMP
+//#define CMK_USE_L2ATOMICS   1
+//#endif
 
 #if !CMK_SMP
 #if CMK_ENABLE_ASYNC_PROGRESS
@@ -34,13 +29,11 @@ FILE *debugLog = NULL;
 #endif
 #endif
 
-#if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-#include "PPCAtomicQueue.h"
-#include "memalloc.c"
-#endif
 
-#if CMK_SMP && CMK_PPC_ATOMIC_MUTEX
-#include "PPCAtomicMutex.h"
+#if CMK_SMP && CMK_USE_L2ATOMICS
+#include "L2AtomicQueue.h"
+#include "L2AtomicMutex.h"
+#include "memalloc.c"
 #endif
 
 #define CMI_LIKELY(x)    (__builtin_expect(x,1))
@@ -59,7 +52,12 @@ extern int quietModeRequested;
   This will use the fourth short in message as an indicator of spanning tree
   root.
 */
+#if CMK_SMP
 #define CMK_BROADCAST_SPANNING_TREE    1
+#else
+#define CMK_BROADCAST_SPANNING_TREE    1
+#endif /* CMK_SMP */
+
 #define BROADCAST_SPANNING_FACTOR     4
 
 //The root of the message infers the type of the message
@@ -77,21 +75,14 @@ extern int quietModeRequested;
 /* FIXME: need a random number that everyone agrees ! */
 #define CHARM_MAGIC_NUMBER               126
 
+
 #define CMI_PAMI_SHORT_DISPATCH           7
 #define CMI_PAMI_RZV_DISPATCH             8
 #define CMI_PAMI_ACK_DISPATCH             9
 #define CMI_PAMI_DISPATCH                10
 
-#ifdef CMK_BLUEGENEQ
 #define SHORT_CUTOFF   128
 #define EAGER_CUTOFF   4096
-#else
-#define SHORT_CUTOFF   1920
-#define EAGER_CUTOFF   2000000000
-#endif
-
-//typically this can be enabled when LTPS==0
-#define FREE_LIST_SEND_NO_COPY     0
 
 #if CMK_ERROR_CHECKING
 static int checksum_flag = 0;
@@ -140,27 +131,34 @@ CpvDeclare(void*, CmiLocalQueue);
 
 
 typedef struct ProcState {
-#if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-  PPCAtomicQueue   atomic_queue;
-  char            _pad[128-sizeof(PPCAtomicQueue)];
+    /* PCQueue      sendMsgBuf; */  /* per processor message sending queue */
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    L2AtomicQueue   atomic_queue;
 #endif
+  /* CmiNodeLock  recvLock;  */            /* for cs->recv */
 } ProcState;
 
 static ProcState  *procState;
 
-#if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-static PPCAtomicQueue node_recv_atomic_q;
-#endif
-
-#if CMK_SMP && CMK_PPC_ATOMIC_MUTEX
-static PPCAtomicMutex *node_recv_mutex;
+#if CMK_SMP && CMK_USE_L2ATOMICS
+static L2AtomicMutex *node_recv_mutex;
+static L2AtomicQueue node_recv_atomic_q;
 #endif
 
 #if CMK_SMP && !CMK_MULTICORE
+//static volatile int commThdExit = 0;
+//static CmiNodeLock commThdExitLock = 0;
+
 //The random seed to pick destination context
 __thread uint32_t r_seed = 0xdeadbeef;
 __thread int32_t _cmi_bgq_incommthread = 0;
 #endif
+
+//int CmiInCommThread () {
+//  //if (_cmi_bgq_incommthread)
+//  //printf ("CmiInCommThread: %d\n", _cmi_bgq_incommthread);
+//  return _cmi_bgq_incommthread;
+//}
 
 void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
@@ -223,8 +221,8 @@ void CmiPushPE(int pe,void *msg) {
     }
 #endif
     
-#if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-    PPCAtomicEnqueue(&procState[pe].atomic_queue, msg);
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    L2AtomicEnqueue(&procState[pe].atomic_queue, msg);
 #else
     PCQueuePush(cs->recv,(char *)msg);
 #endif
@@ -244,10 +242,12 @@ static void CmiPushNode(void *msg) {
       return;
     }
 #endif
-#if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-    PPCAtomicEnqueue(&node_recv_atomic_q, msg);
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    L2AtomicEnqueue(&node_recv_atomic_q, msg);    
 #else
+    CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
+    CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
 #endif
     //CmiState cs=CmiGetStateN(0);
     //CmiIdleLock_addMessage(&cs->idle);
@@ -266,13 +266,13 @@ static void CmiPushNode(void *msg) {
 volatile int msgQueueLen [MAX_NUM_CONTEXTS];
 volatile int outstanding_recvs [MAX_NUM_CONTEXTS];
 
-#if CMK_BLUEGENEQ
+//#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
+//#define THREADS_PER_CONTEXT 2
+//#define LTPS                1 //Log Threads Per Context (TPS)
+//#else
 #define THREADS_PER_CONTEXT 4
 #define LTPS                2 //Log Threads Per Context (TPS)
-#else
-#define THREADS_PER_CONTEXT 1
-#define LTPS                0 //Log Threads Per Context (TPS)
-#endif //endif CMK_BLUEGENEQ
+//#endif
 
 #define  MY_CONTEXT_ID() (CmiMyRank() >> LTPS)
 #define  MY_CONTEXT()    (cmi_pami_contexts[CmiMyRank() >> LTPS])
@@ -296,12 +296,12 @@ volatile int outstanding_recvs;
 #define  INCR_ORECVS()   (outstanding_recvs ++)
 #define  DECR_ORECVS()   (outstanding_recvs --)
 #define  ORECVS()        (outstanding_recvs)
-#endif //CMK_SMP
+#endif
 
 #if CMK_SMP  && !CMK_ENABLE_ASYNC_PROGRESS
 #define PAMIX_CONTEXT_LOCK_INIT(x)
 #define PAMIX_CONTEXT_LOCK(x)        if(LTPS) PAMI_Context_lock(x)
-#define PAMIX_CONTEXT_UNLOCK(x)      if(LTPS) {CmiMemoryWriteFence(); PAMI_Context_unlock(x);}
+#define PAMIX_CONTEXT_UNLOCK(x)      if(LTPS) {ppc_msync(); PAMI_Context_unlock(x);}
 #define PAMIX_CONTEXT_TRYLOCK(x)     ((LTPS)?(PAMI_Context_trylock(x) == PAMI_SUCCESS):(1))
 #else
 #define PAMIX_CONTEXT_LOCK_INIT(x)
@@ -361,10 +361,8 @@ static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t resul
 {
     char *msg = (char *) clientdata;
     int sndlen = ((CmiMsgHeaderBasic *) msg)->size;
-#if FREE_LIST_SEND_NO_COPY
-    int rank = *(int *) (msg + sndlen); //get rank from bottom of the message
-    CMI_DEST_RANK(msg) = rank;
-#endif
+    //int rank = *(int *) (msg + sndlen); //get rank from bottom of the message
+    //CMI_DEST_RANK(msg) = rank;
 
     //fprintf (stderr, "%d Recv message done \n", CmiMyPe());
     /* then we do what PumpMsgs used to do:
@@ -383,7 +381,7 @@ static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t resul
 
 #if CMK_NODE_QUEUE_AVAILABLE
 #if CMK_BROADCAST_SPANNING_TREE
-    if (CMI_IS_BCAST_ON_NODES(msg))
+    if (CMI_IS_BCAST_ON_NODES(msg)) 
       SendSpanningChildrenNode(sndlen, msg, 1);
 #endif
     if (CMI_DEST_RANK(msg) == SMP_NODEMESSAGE)
@@ -399,16 +397,15 @@ typedef struct _cmi_pami_rzv {
   void           * buffer;
   size_t           offset;
   int              bytes;
-  int              rank;
   int              dst_context;
+  pami_memregion_t mregion;
 }CmiPAMIRzv_t;  
 
 typedef struct _cmi_pami_rzv_recv {
-  int              rank;  //Read in recv_done
-  int              size;
   void           * msg;
   void           * src_buffer;
   int              src_ep;
+  int              size;
   pami_memregion_t rmregion;
 } CmiPAMIRzvRecv_t;
 
@@ -421,15 +418,13 @@ static void pkt_dispatch (pami_context_t       context,
 			  pami_endpoint_t      origin,
 			  pami_recv_t         * recv)        
 {
-    //fprintf (stderr, "%d Received Message of size %d %p\n", CmiMyPe(), pipe_size, recv);
+    //fprintf (stderr, "Received Message of size %d %p\n", pipe_size, recv);
     INCR_ORECVS();    
     int alloc_size = pipe_size;
-#if !FREE_LIST_SEND_NO_COPY
     char * buffer  = (char *)CmiAlloc(alloc_size);
-#else
-    char * buffer  = (char *)CmiAlloc(alloc_size + sizeof(int));
-    *(int *)(buffer+alloc_size) = *(int *)header_addr;
-#endif
+    //char * buffer  = (char *)CmiAlloc(alloc_size + sizeof(int));
+    //*(int *)(buffer+alloc_size) = *(int *)header_addr;
+
     if (recv) {
       recv->local_fn = recv_done;
       recv->cookie   = buffer;
@@ -453,9 +448,10 @@ static void short_pkt_dispatch (pami_context_t       context,
 				pami_endpoint_t      origin,
 				pami_recv_t         * recv)        
 {
-  //fprintf(stderr, "%d short dispatch\n", CmiMyPe());
   int alloc_size = pipe_size;
   char * buffer  = (char *)CmiAlloc(alloc_size);
+  //char * buffer  = (char *)CmiAlloc(alloc_size + sizeof(int));
+  //*(int *)(buffer+alloc_size) = *(int *)header_addr;
   
   memcpy (buffer, pipe_addr, pipe_size);
   char *smsg = (char *)pipe_addr;
@@ -467,13 +463,7 @@ static void short_pkt_dispatch (pami_context_t       context,
     CmiAbort("Charm++ Warning: Non Charm++ Message Received. If your application has a large number of messages, this may be because of overflow in the low-level FIFOs. Please set the environment variable MUSPI_INJFIFOSIZE if the application has large number of small messages (<=4K bytes), and/or PAMI_RGETINJFIFOSIZE if the application has a large number of large messages. The default value of these variable is 65536 which is sufficient for 1000 messages in flight; please try a larger value. Please note that the memory used for these FIFOs eats up the memory = 10*FIFO_SIZE per core. Please contact Charm++ developers for further information. \n");     
   }
  
-#if FREE_LIST_SEND_NO_COPY
-  int dst_rank = *(int*) header_addr;
-  CMI_DEST_RANK(msg) = dst_rank;
-  CmiPushPE(dst_rank, (void *)msg);
-#else
-  CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
-#endif
+  CmiPushPE(CMI_DEST_RANK(smsg), (void *)msg);
 }
 
 
@@ -499,7 +489,6 @@ void rzv_recv_done   (pami_context_t     ctxt,
 		      void             * clientdata, 
 		      pami_result_t      result); 
 
-#if CMK_BLUEGENEQ
 //approx sleep command
 size_t mysleep_iter = 0;
 void mysleep (unsigned long cycles) {
@@ -513,10 +502,10 @@ void mysleep (unsigned long cycles) {
 
     return;
 }
-#endif
 
 static void * test_buf;
 volatile int pami_barrier_flag = 0;
+typedef pami_result_t (*pamix_proc_memalign_fn) (void**, size_t, size_t, const char*);
 
 void pami_barrier_done (void *ctxt, void * clientdata, pami_result_t err)
 {
@@ -542,6 +531,7 @@ CmiPAMIMemRegion_t  cmi_pami_memregion[64];
 #endif
 
 #include "malloc.h"
+void *l2atomicbuf;
 
 void _alias_rank (int rank) {
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
@@ -652,8 +642,7 @@ int CMI_Progress_finalize(int start, int ncontexts) {
 
 #include "manytomany.c"
 
-void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
-{
+void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int n, i, count;
 
     if (CmiGetArgFlagDesc(argv,"++quiet","Omit non-error runtime messages")) {
@@ -669,12 +658,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
     
     PAMI_Client_create (clientname, &cmi_pami_client, NULL, 0);
-    pami_configuration_t query;
-    query.name = PAMI_CLIENT_NUM_CONTEXTS;
-    pami_result_t rc = PAMI_Client_query(cmi_pami_client, &query, 1);
-    unsigned possible_contexts = query.value.intval;
-    //fprintf(stdout, "Creating client with %d contexts\n", possible_contexts);
-
     size_t _n = 1;
 #if CMK_PAMI_MULTI_CONTEXT
     if ((_Cmi_mynodesize % THREADS_PER_CONTEXT) == 0)
@@ -684,18 +667,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
 
     cmi_pami_contexts = (pami_context_t *) malloc (sizeof(pami_context_t) * _n);
-
-    int  cfgval=0;
-#if 1 //CMK_BLUEGENEQ
-    pami_configuration_t *config = NULL;
-#else
-    pami_configuration_t config[3];
-    config[cfgval].name = PAMI_CLIENT_CONST_CONTEXTS:
-    config[cfgval].value.intval = 1;
-    cfgval++;
-#endif
-
-    rc = PAMI_Context_createv (cmi_pami_client, config, cfgval, cmi_pami_contexts, _n);
+    pami_result_t rc = PAMI_Context_createv (cmi_pami_client, NULL, 0, cmi_pami_contexts, _n);
     if (rc != PAMI_SUCCESS) {
       fprintf(stderr, "PAMI_Context_createv failed for %d contexts\n", _n);
       assert(0);
@@ -724,18 +696,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     }
 #endif
 
-    pami_dispatch_hint_t soptions = (pami_dispatch_hint_t) {0};
-    pami_dispatch_hint_t loptions = (pami_dispatch_hint_t) {0};
 
-    soptions.long_header    = PAMI_HINT_DISABLE;
-    soptions.recv_immediate = PAMI_HINT_ENABLE;
-    soptions.use_rdma       = PAMI_HINT_DISABLE;
-
-    loptions.long_header     = PAMI_HINT_DISABLE;
-    loptions.recv_contiguous = PAMI_HINT_ENABLE;
-    //loptions.recv_immediate = PAMI_HINT_ENABLE;
-    loptions.recv_copy       = PAMI_HINT_ENABLE;
-
+    pami_dispatch_hint_t options = (pami_dispatch_hint_t) {0};
     pami_dispatch_callback_function pfn;
     for (i = 0; i < _n; ++i) {
       pfn.p2p = pkt_dispatch;
@@ -743,31 +705,31 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 			 CMI_PAMI_DISPATCH,
 			 pfn,
 			 NULL,
-			 loptions);
+			 options);
       
       pfn.p2p = ack_pkt_dispatch;
       PAMI_Dispatch_set (cmi_pami_contexts[i],
 			 CMI_PAMI_ACK_DISPATCH,
 			 pfn,
 			 NULL,
-			 soptions);
+			 options);
       
       pfn.p2p = rzv_pkt_dispatch;
       PAMI_Dispatch_set (cmi_pami_contexts[i],
 			 CMI_PAMI_RZV_DISPATCH,
 			 pfn,
 			 NULL,
-			 soptions);
+			 options);      
 
       pfn.p2p = short_pkt_dispatch;
       PAMI_Dispatch_set (cmi_pami_contexts[i],
 			 CMI_PAMI_SHORT_DISPATCH,
 			 pfn,
 			 NULL,
-			 soptions);
+			 options);      
     }
 
-#if CMK_BLUEGENEQ
+#if 1
     size_t bytes_out;
     void * buf = malloc(sizeof(long));    
     uint32_t retval;
@@ -879,52 +841,49 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
 
-#if CMK_SMP
-    posix_memalign((void**)&procState, 128, (_Cmi_mynodesize) * sizeof(ProcState));
-#endif
-
-#if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-#if CMK_BLUEGENEQ // we may enable communication threads
+#if CMK_SMP && CMK_USE_L2ATOMICS
     //max available hardware threads
     int actualNodeSize = 64/Kernel_ProcessCount(); 
-#else
-    int actualNodeSize = _Cmi_mynodesize;
+    //printf("Ranks per node %d, actualNodeSize %d CmiMyNodeSize() %d\n",
+    //	   Kernel_ProcessCount(), actualNodeSize, _Cmi_mynodesize);
+    
+    //pami_result_t rc;
+    pami_extension_t l2;
+    pamix_proc_memalign_fn PAMIX_L2_proc_memalign;
+    size_t size = (_Cmi_mynodesize + 2*actualNodeSize + 1) 
+      * sizeof(L2AtomicState) + sizeof(L2AtomicMutex);
+
+    rc = PAMI_Extension_open(NULL, "EXT_bgq_l2atomic", &l2);
+    CmiAssert (rc == 0);
+    PAMIX_L2_proc_memalign = (pamix_proc_memalign_fn)PAMI_Extension_symbol(l2, "proc_memalign");
+    rc = PAMIX_L2_proc_memalign(&l2atomicbuf, 64, size, NULL);
+    CmiAssert (rc == 0);    
 #endif
 
-#if CMK_PPC_ATOMIC_MUTEX
-    //Allocate for PPC Atomic Mutex as well
-    size_t size = (_Cmi_mynodesize + 3*actualNodeSize + 1)
-      * sizeof(PPCAtomicState) + 2*sizeof(PPCAtomicMutex);
-#else
-    size_t size = (_Cmi_mynodesize + 3*actualNodeSize + 1)
-      * sizeof(PPCAtomicState);
-#endif
-    void *atomic_buf;
-    PPC_AtomicCounterAllocate(&atomic_buf, size);
-
-    char *atomic_start = (char *) atomic_buf;
+    char *l2_start = (char *) l2atomicbuf;
+    procState = (ProcState *)malloc((_Cmi_mynodesize) * sizeof(ProcState));
     for (i=0; i<_Cmi_mynodesize; i++) {
-      PPCAtomicQueueInit (atomic_start + sizeof(PPCAtomicState)*i,
-			  sizeof(PPCAtomicState),
-			  &procState[i].atomic_queue,
-			  1, /*use overflow*/
-			  DEFAULT_SIZE /*2048 entries*/);
-    }
-    atomic_start += _Cmi_mynodesize * sizeof(PPCAtomicState);
-
-    CmiMemAllocInit_ppcq(atomic_start,3*actualNodeSize*sizeof(PPCAtomicState));
-    atomic_start += 3*actualNodeSize*sizeof(PPCAtomicState);
-
-    PPCAtomicQueueInit (atomic_start,
-			sizeof(PPCAtomicState),
-			&node_recv_atomic_q,
-			1, /*use overflow*/
-			DEFAULT_SIZE /*2048 entries*/);
-    atomic_start += sizeof(PPCAtomicState);
-
-#if CMK_PPC_ATOMIC_MUTEX
-    node_recv_mutex = PPCAtomicMutexInit(atomic_start, sizeof(PPCAtomicMutex));
+#if CMK_SMP && CMK_USE_L2ATOMICS
+	L2AtomicQueueInit (l2_start + sizeof(L2AtomicState)*i,
+			   sizeof(L2AtomicState),
+			   &procState[i].atomic_queue,
+			   1, /*use overflow*/
+			   DEFAULT_SIZE /*1024 entries*/);
 #endif
+    }
+
+#if CMK_SMP && CMK_USE_L2ATOMICS    
+    l2_start += _Cmi_mynodesize * sizeof(L2AtomicState);
+    CmiMemAllocInit_bgq (l2_start, 2*actualNodeSize*sizeof(L2AtomicState)); 
+    l2_start += 2*actualNodeSize*sizeof(L2AtomicState); 
+
+    L2AtomicQueueInit (l2_start,
+		       sizeof(L2AtomicState),
+		       &node_recv_atomic_q,
+		       1, /*use overflow*/
+		       DEFAULT_SIZE /*1024 entries*/);	 
+    l2_start += sizeof(L2AtomicState);  
+    node_recv_mutex = L2AtomicMutexInit(l2_start, sizeof(L2AtomicMutex));   
 #endif
     
     //Initialize the manytomany api
@@ -947,9 +906,11 @@ int PerrorExit (char *err) {
     return -1;
 }
 
+
 void ConverseRunPE(int everReturn) {
     //    printf ("ConverseRunPE on rank %d\n", CmiMyPe());    
 
+    CmiIdleState *s=CmiNotifyGetState();
     CmiState cs;
     char** CmiMyArgv;
     CmiNodeAllBarrier();
@@ -965,35 +926,19 @@ void ConverseRunPE(int everReturn) {
 
     CthInit(CmiMyArgv);
 
-    CmiBarrier();
-    CmiBarrier();
-    CmiBarrier();
-    CmiBarrier();
-
     //printf ("Before Converse Common Init\n");
     ConverseCommonInit(CmiMyArgv);
-
-#if CMK_TRACE_ENABLED
-    //Register memory allocator events
-    traceRegisterUserEvent("CmiAlloc_ppcq", 30001);
-    traceRegisterUserEvent("CmiFree_ppcq",  30002);
-    traceRegisterUserEvent("machine_send",  30003);
-    traceRegisterUserEvent("CmiSendPeer",   30004);
-    traceRegisterUserEvent("PAMI_Context_advance",   30005);
-    traceRegisterUserEvent("m2m_start",   30006);
-    traceRegisterUserEvent("PAMI_Context_post",   30007);
-#endif
 
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
 
     //printf ("before calling CmiBarrier() \n");
+    CmiBarrier();
 
     /* Converse initialization finishes, immediate messages can be processed.
        node barrier previously should take care of the node synchronization */
     _immediateReady = 1;
 
     //printf("calling the startfn\n");
-    CmiBarrier();
 
     if (!everReturn) {
       Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -1075,9 +1020,7 @@ void ConverseExit(void) {
 #if CMK_SMP
   CmiNodeBarrier();
   if (rank0) {
-#if CMK_BLUEGENEQ
     Delay(100000);
-#endif
     exit(0); 
   }
   else
@@ -1103,20 +1046,15 @@ void CmiAbort(const char * message) {
 
 #if CMK_NODE_QUEUE_AVAILABLE
 char *CmiGetNonLocalNodeQ(void) {
+    //CmiState cs = CmiGetState();
     char *result = 0;
+    //CmiIdleLock_checkMessage(&cs->idle);
 
-#if CMK_SMP && CMK_PPC_ATOMIC_MUTEX && CMK_PPC_ATOMIC_QUEUE
-    if (!PPCAtomicQueueEmpty(&node_recv_atomic_q)) {
-      if (PPCAtomicMutexTryAcquire(node_recv_mutex) == 0) {
-        result = (char*)PPCAtomicDequeue(&node_recv_atomic_q);
-        PPCAtomicMutexRelease(node_recv_mutex);
-      }
-    }
-#elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-    if (!PPCAtomicQueueEmpty(&node_recv_atomic_q)) {
-      if (CmiTryLock(CsvAccess(NodeState).CmiNodeRecvLock) == 0) {
-        result = (char*)PPCAtomicDequeue(&node_recv_atomic_q);
-        CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    if (!L2AtomicQueueEmpty(&node_recv_atomic_q)) {
+      if (L2AtomicMutexTryAcquire(node_recv_mutex) == 0) {
+	result = (char*)L2AtomicDequeue(&node_recv_atomic_q);
+	L2AtomicMutexRelease(node_recv_mutex);
       }
     }
 #else
@@ -1124,6 +1062,7 @@ char *CmiGetNonLocalNodeQ(void) {
       MACHSTATE1(3,"CmiGetNonLocalNodeQ begin %d {", CmiMyPe());
       
       if (CmiTryLock(CsvAccess(NodeState).CmiNodeRecvLock) == 0) {
+	//CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
 	result = (char *) PCQueuePop(CsvAccess(NodeState).NodeRecv);
 	CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
       }
@@ -1143,12 +1082,12 @@ void *CmiGetNonLocal() {
     CmiState cs = CmiGetState();
     //CmiIdleLock_checkMessage(&cs->idle);
 
-#if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-    msg = PPCAtomicDequeue(&procState[CmiMyRank()].atomic_queue);
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    msg = L2AtomicDequeue(&procState[CmiMyRank()].atomic_queue);
 #if !(CMK_ENABLE_ASYNC_PROGRESS)
     if (msg == NULL) {
       AdvanceCommunications();     
-      msg = PPCAtomicDequeue(&procState[CmiMyRank()].atomic_queue);
+      msg = L2AtomicDequeue(&procState[CmiMyRank()].atomic_queue);
     }
 #endif
 #else
@@ -1157,6 +1096,9 @@ void *CmiGetNonLocal() {
     if (PCQueueLength(cs->recv)==0) return NULL;
     msg =  PCQueuePop(cs->recv);
 #endif
+
+    //if (msg != NULL)
+    //fprintf(stderr, "%d: Returning a message\n", CmiMyPe());
 
     return msg;
 }
@@ -1176,15 +1118,8 @@ static void CmiSendSelf(char *msg) {
 
 #if CMK_SMP
 static void CmiSendPeer (int rank, int size, char *msg) {
-  //fprintf(stderr, "%d Send messages to peer\n", CmiMyPe());
-#if CMK_TRACE_ENABLED
-  double start = CmiWallTimer();
-#endif
-  CmiPushPE (rank, msg);
-
-#if CMK_TRACE_ENABLED
-  traceUserBracketEvent(30004, start, CmiWallTimer());
-#endif
+    //fprintf(stderr, "%d Send messages to peer\n", CmiMyPe());
+    CmiPushPE (rank, msg);
 }
 #endif
 
@@ -1225,8 +1160,8 @@ void CmiGeneralFreeSendN(int node, int rank, int size, char * msg, int to_lock)
 #if CMK_SMP
     CMI_DEST_RANK(msg) = rank;
     if (node == CmiMyNode()) {
-      CmiSendPeer (rank, size, msg);
-      return;
+        CmiSendPeer (rank, size, msg);
+        return;
     }
 #endif
 
@@ -1268,23 +1203,17 @@ void  machine_send       (pami_context_t      context,
 {
     CMI_DEST_RANK(msg) = rank;
 
-#if CMK_TRACE_ENABLED
-    double start = CmiWallTimer();
-#endif
-
-    CmiAssert (node != CmiMyNode());
-
     pami_endpoint_t target;
 #if CMK_PAMI_MULTI_CONTEXT
-    size_t dst_context = (rank != SMP_NODEMESSAGE) ? (rank>>LTPS) : (myrand(&r_seed) % cmi_pami_numcontexts);
+    //size_t dst_context = (rank != SMP_NODEMESSAGE) ? (rank>>LTPS) : (rand_r(&r_seed) % cmi_pami_numcontexts);
     //Choose a context at random
-    //size_t dst_context = myrand(&r_seed) % cmi_pami_numcontexts;
+    size_t dst_context = myrand(&r_seed) % cmi_pami_numcontexts;
 #else
     size_t dst_context = 0;
 #endif
     PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)node, dst_context, &target);
     
-    //fprintf (stderr, "%d Calling PAMI Send to node %d peer %d magic %d size %d\n", CmiMyPe(), node, dst_context, CMI_MAGIC(msg), size);
+    //fprintf (stderr, "Calling PAMI Send to %d magic %d size %d\n", node, CMI_MAGIC(msg), size);
     if (CMI_LIKELY(size < SHORT_CUTOFF)) {
       pami_send_immediate_t parameters;
       
@@ -1296,20 +1225,15 @@ void  machine_send       (pami_context_t      context,
 	  //use short callback if not a bcast and not an SMP node message
 	  parameters.dispatch        = CMI_PAMI_SHORT_DISPATCH;
 
-#if FREE_LIST_SEND_NO_COPY
-      parameters.header.iov_base = &rank;
-      parameters.header.iov_len  = sizeof(int);
-#else
-      parameters.header.iov_base = NULL;
-      parameters.header.iov_len  = 0;
-#endif
+      parameters.header.iov_base = NULL; //&rank;
+      parameters.header.iov_len  = 0;    //sizeof(int);
       parameters.data.iov_base   = msg;
       parameters.data.iov_len    = size;
       parameters.dest = target;
       
       if(to_lock)
 	PAMIX_CONTEXT_LOCK(context);
-
+      
       PAMI_Send_immediate (context, &parameters);
       
       if(to_lock)
@@ -1319,13 +1243,8 @@ void  machine_send       (pami_context_t      context,
     else if (size < EAGER_CUTOFF) {
       pami_send_t parameters;
       parameters.send.dispatch        = CMI_PAMI_DISPATCH;
-#if FREE_LIST_SEND_NO_COPY
-      parameters.send.header.iov_base = &rank;
-      parameters.send.header.iov_len  = sizeof(int);
-#else
-      parameters.send.header.iov_base = NULL;
-      parameters.send.header.iov_len  = 0;
-#endif
+      parameters.send.header.iov_base = NULL; //&rank;
+      parameters.send.header.iov_len  = 0;    //sizeof(int);
       parameters.send.data.iov_base   = msg;
       parameters.send.data.iov_len    = size;
       parameters.events.cookie        = msg;
@@ -1342,50 +1261,29 @@ void  machine_send       (pami_context_t      context,
 	PAMIX_CONTEXT_UNLOCK(context);
     }
     else {
-      if(to_lock)
-        PAMIX_CONTEXT_LOCK(context);
-
       CmiPAMIRzv_t   rzv;
       rzv.bytes       = size;
       rzv.buffer      = msg;
-      rzv.rank        = rank;
-#if CMK_BLUEGENEQ
       rzv.offset      = (size_t)msg - (size_t)cmi_pami_memregion[0].baseVA;
-#else
-      rzv.offset      = (size_t)msg;
-      size_t bytes_out;
-      pami_memregion_t mregion;
-      //In use for PAMI_Get
-      PAMI_Memregion_create (context,
-                             msg,
-                             size,
-                             &bytes_out,
-                             &mregion);
-#endif
       rzv.dst_context = dst_context;
+      memcpy(&rzv.mregion, &cmi_pami_memregion[0].mregion, sizeof(pami_memregion_t));
 
       pami_send_immediate_t parameters;
       parameters.dispatch        = CMI_PAMI_RZV_DISPATCH;
       parameters.header.iov_base = &rzv;
       parameters.header.iov_len  = sizeof(rzv);
-#if CMK_BLUEGENEQ
-      parameters.data.iov_base   = &cmi_pami_memregion[0].mregion;
-      parameters.data.iov_len    = sizeof(pami_memregion_t);
-#else
       parameters.data.iov_base   = NULL;
       parameters.data.iov_len    = 0;
-#endif
       parameters.dest = target;
+      
+      if(to_lock)
+	PAMIX_CONTEXT_LOCK(context);
       
       PAMI_Send_immediate (context, &parameters);
       
       if(to_lock)
 	PAMIX_CONTEXT_UNLOCK(context);
     }
-
-#if CMK_TRACE_ENABLED
-    traceUserBracketEvent(30003, start, CmiWallTimer());
-#endif
 }
 
 void CmiSyncSendFn(int destPE, int size, char *msg) {
@@ -1539,27 +1437,15 @@ void CmiFreeBroadcastAllFn(int size, char *msg) {
 void AdvanceCommunications() {
     pami_context_t my_context = MY_CONTEXT();
 
-#if CMK_TRACE_ENABLED
-    double start = CmiWallTimer(), end;
-#endif
-
 #if CMK_SMP
     //CmiAssert (my_context != NULL);
     if (PAMIX_CONTEXT_TRYLOCK(my_context))
     {
-      //fprintf(stderr, "%d advancing context %d\n", CmiMyPe(), MY_CONTEXT_ID());
       PAMI_Context_advance(my_context, 1);
       PAMIX_CONTEXT_UNLOCK(my_context);
     }
 #else
     PAMI_Context_advance(my_context, 1);
-#endif
-
-#if CMK_TRACE_ENABLED
-    end = CmiWallTimer();
-    //only log 1us or larger events
-    if (end - start > 1e-6)
-      traceUserBracketEvent(30005, start, end);
 #endif
 }
 #endif
@@ -1567,24 +1453,24 @@ void AdvanceCommunications() {
 
 void CmiNotifyIdle() {
   AdvanceCommunications();
-#if CMK_BLUEGENEQ && CMK_SMP && CMK_PAMI_MULTI_CONTEXT
-#if !CMK_ENABLE_ASYNC_PROGRESS && CMK_PPC_ATOMIC_QUEUE
+#if CMK_SMP && CMK_PAMI_MULTI_CONTEXT
+#if !CMK_ENABLE_ASYNC_PROGRESS && CMK_USE_L2ATOMICS
   //Wait on the atomic queue to get a message with very low core
   //overheads. One thread calls advance more frequently
   if ((CmiMyRank()% THREADS_PER_CONTEXT) == 0)
     //spin wait for 2-4us when idle
     //process node queue messages every 10us
     //Idle cores will only use one LMQ slot and an int sum
-    PPCAtomicQueue2QSpinWait(&procState[CmiMyRank()].atomic_queue,
-                             &node_recv_atomic_q,
-                             10);
+    L2AtomicQueue2QSpinWait(&procState[CmiMyRank()].atomic_queue, 
+			    &node_recv_atomic_q,
+			    10);
   else
 #endif
-#if CMK_PPC_ATOMIC_QUEUE
+#if CMK_USE_L2ATOMICS
     //spin wait for 50-100us when idle waiting for a message
-    PPCAtomicQueue2QSpinWait(&procState[CmiMyRank()].atomic_queue,
-                             &node_recv_atomic_q,
-                             1000);
+    L2AtomicQueue2QSpinWait(&procState[CmiMyRank()].atomic_queue, 
+			    &node_recv_atomic_q,
+			    1000);
 #endif
 #endif
 }
@@ -1675,7 +1561,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
 
     //Fast path
     if (npes == 1) {
-      CmiGeneralFreeSend(pes[0], size, msg);
+      CmiGeneralFreeSendN(CmiNodeOf(pes[0]), CmiRankOf(pes[0]), size, msg, 1);
       return;
     }
 
@@ -1700,29 +1586,10 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
 void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int size, char *msg) {
     int i;
     char *copymsg;
-
-    PAMIX_CONTEXT_LOCK(my_context);
-
-    for (i=0;i<npes;i++) {
-        if (CmiNodeOf(pes[i]) != CmiMyNode()){
-#if !CMK_SMP || (CMK_SMP && FREE_LIST_SEND_NO_COPY)
-          CmiReference(msg);
-          copymsg = msg;
-          machine_send(my_context, CmiNodeOf(pes[i]), CmiRankOf(pes[i]), size, copymsg, 0);
-#else
-          copymsg = (char *)CmiAlloc(size);
-          CmiAssert(copymsg != NULL);
-          CmiMemcpy(copymsg,msg,size);
-          CmiGeneralFreeSendN(CmiNodeOf(pes[i]), CmiRankOf(pes[i]), size, copymsg, 0);
-#endif
-        }
-    }
-
-    PAMIX_CONTEXT_UNLOCK(my_context);
-
 #if CMK_SMP
     for (i=0; i<npes; i++) {
       if (CmiNodeOf(pes[i]) == CmiMyNode()) {
+	//CmiSyncSend(pes[i], size, msg);
 	copymsg = (char *)CmiAlloc(size);
 	CmiAssert(copymsg != NULL);
 	CmiMemcpy(copymsg,msg,size);	  
@@ -1737,8 +1604,31 @@ void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int si
     }
 #endif
 
-    //Free the original message
-    CmiFree(msg);
+    PAMIX_CONTEXT_LOCK(my_context);
+    
+    for (i=0;i<npes;i++) {
+        if (CmiNodeOf(pes[i]) == CmiMyNode());
+        else if (i < npes - 1) {
+#if !CMK_SMP
+	    CmiReference(msg);
+	    copymsg = msg;
+#else
+	    copymsg = (char *)CmiAlloc(size);
+	    CmiAssert(copymsg != NULL);
+	    CmiMemcpy(copymsg,msg,size);
+#endif
+	    CmiGeneralFreeSendN(CmiNodeOf(pes[i]), CmiRankOf(pes[i]), size, copymsg, 0);
+	    //machine_send(my_context, CmiNodeOf(pes[i]), CmiRankOf(pes[i]), size, copymsg, 0);
+        }
+    }
+
+    if (npes  && CmiNodeOf(pes[npes-1]) != CmiMyNode())
+      CmiGeneralFreeSendN(CmiNodeOf(pes[npes-1]), CmiRankOf(pes[npes-1]), size, msg, 0);
+      //machine_send(my_context, CmiNodeOf(pes[npes-1]), CmiRankOf(pes[npes-1]), size, msg, 0);      
+    else
+      CmiFree(msg);    
+
+    PAMIX_CONTEXT_UNLOCK(my_context);
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg) {
@@ -1913,6 +1803,25 @@ void CmiDestroyLock(CmiNodeLock lock);
 
 #endif
 
+/** IMMEDIATE MESSAGES
+
+ * If immediate messages are supported, the following function is needed. There
+ * is an exeption if the machine progress is also defined (see later for this).
+
+ * Moreover, the file "immediate.c" should be included, otherwise all its
+ * functions and variables have to be redefined.
+*/
+
+#if CMK_CCS_AVAILABLE
+
+#include "immediate.c"
+
+#if ! CMK_MACHINE_PROGRESS_DEFINED /* Hack for some machines */
+void CmiProbeImmediateMsg();
+#endif
+
+#endif
+
 
 /* Dummy implementation */
 extern int CmiBarrier() {
@@ -1976,10 +1885,12 @@ void CmiSendNodeSelf(char *msg) {
       return;
     }
 #endif    
-#if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-    PPCAtomicEnqueue(&node_recv_atomic_q, msg);
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    L2AtomicEnqueue(&node_recv_atomic_q, msg);    
 #else
+    CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
+    CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
 #endif
 }
 
@@ -2145,7 +2056,9 @@ void rzv_pkt_dispatch (pami_context_t       context,
   CmiPAMIRzv_t  *rzv_hdr = (CmiPAMIRzv_t *) header_addr;
   CmiAssert (header_size == sizeof(CmiPAMIRzv_t));  
   int alloc_size = rzv_hdr->bytes;
-  char *buffer  = (char *)CmiAlloc(alloc_size + sizeof(CmiPAMIRzvRecv_t));
+  char * buffer  = (char *)CmiAlloc(alloc_size + sizeof(CmiPAMIRzvRecv_t));
+  //char *buffer=(char*)CmiAlloc(alloc_size+sizeof(CmiPAMIRzvRecv_t)+sizeof(int))
+  //*(int *)(buffer+alloc_size) = *(int *)header_addr;  
   CmiAssert (recv == NULL);
 
   CmiPAMIRzvRecv_t *rzv_recv = (CmiPAMIRzvRecv_t *)(buffer+alloc_size);
@@ -2153,12 +2066,11 @@ void rzv_pkt_dispatch (pami_context_t       context,
   rzv_recv->src_ep     = origin;
   rzv_recv->src_buffer = rzv_hdr->buffer;
   rzv_recv->size       = rzv_hdr->bytes;
-  rzv_recv->rank       = rzv_hdr->rank;
-
-#ifdef CMK_BLUEGENEQ
-  CmiAssert (pipe_addr != NULL);
-  CmiAssert (pipe_size == sizeof(pami_memregion_t));
-  memcpy(&rzv_recv->rmregion, pipe_addr, sizeof(pami_memregion_t));
+  
+  //CmiAssert (pipe_addr != NULL);
+  //CmiAssert (pipe_size == sizeof(pami_memregion_t));
+  //pami_memregion_t *mregion = (pami_memregion_t *) pipe_addr;
+  memcpy(&rzv_recv->rmregion, &rzv_hdr->mregion, sizeof(pami_memregion_t));
 
   //Rzv inj fifos are on the 17th core shared by all contexts
   pami_rget_simple_t  rget;
@@ -2179,31 +2091,6 @@ void rzv_pkt_dispatch (pami_context_t       context,
   pami_result_t rc;
   rc = PAMI_Rget (context, &rget);  
   //CmiAssert(rc == PAMI_SUCCESS);
-#else
-  size_t bytes_out;
-  pami_memregion_t mregion;
-  //In use for PAMI_Get
-  PAMI_Memregion_create (context,
-			 buffer,
-			 rzv_hdr->bytes,
-			 &bytes_out,
-			 &mregion);
-
-  pami_get_simple_t get;
-  memset(&get, 0, sizeof(get));
-  get.rma.dest = origin;
-  get.rma.bytes = rzv_hdr->bytes;
-  get.rma.cookie = rzv_recv;
-  get.rma.done_fn = rzv_recv_done;
-  get.rma.hints.use_rdma = PAMI_HINT_ENABLE;
-  get.rma.hints.buffer_registered = PAMI_HINT_ENABLE;
-  get.rma.hints.use_shmem = PAMI_HINT_DEFAULT;
-  get.rma.hints.remote_async_progress = PAMI_HINT_DEFAULT;
-  get.addr.local = buffer;
-  get.addr.remote = (void*)rzv_hdr->offset;
-  PAMI_Get(context, &get);
-#endif
-
 }
 
 void ack_pkt_dispatch (pami_context_t       context,   
@@ -2219,6 +2106,4 @@ void ack_pkt_dispatch (pami_context_t       context,
   CmiFree (*buf);
 }
 
-#if CMK_BLUEGENEQ
 #include "cmimemcpy_qpx.h"
-#endif

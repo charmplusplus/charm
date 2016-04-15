@@ -60,7 +60,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 
@@ -1941,13 +1940,8 @@ extern CmiNodeLock cmiMemoryLock;
 #define CmiMemoryReadFence()               __asm__ __volatile__("mf" ::: "memory")
 #define CmiMemoryWriteFence()              __asm__ __volatile__("mf" ::: "memory")
 #elif CMK_PPC_ASM
-#if CMK_BLUEGENEQ
 #define CmiMemoryReadFence()               __asm__ __volatile__("sync":::"memory")
 #define CmiMemoryWriteFence()              __asm__ __volatile__("sync":::"memory")
-#else
-#define CmiMemoryReadFence()               __asm__ __volatile__("isync":::"memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("lwsync":::"memory")
-#endif
 #else
 #define CMK_NO_ASM_AVAILABLE    1
 extern CmiNodeLock cmiMemoryLock;

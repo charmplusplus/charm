@@ -595,10 +595,6 @@ void CmiInitCPUAffinity(char **argv)
 
   if (pemap!=NULL || commap!=NULL) affinity_flag = 1;
 
-#if CMK_PAMI_LINUX_PPC8
-  affinity_flag = 1;
-#endif
-
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
 						"print cpu affinity");
 
@@ -653,13 +649,13 @@ void CmiInitCPUAffinity(char **argv)
     }
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
-#if !CMK_CRAYXT && !CMK_CRAYXE && !CMK_CRAYXC && !CMK_BLUEGENEQ && !CMK_PAMI_LINUX_PPC8
+#if !CMK_CRAYXT && !CMK_CRAYXE && !CMK_CRAYXC && !CMK_BLUEGENEQ
       if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
         while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
 #else
 #if CMK_SMP
-        #error "Machine progress call needs to be implemented for cpu affinity!"
+       #error "Machine progress call needs to be implemented for cpu affinity!"
 #endif
 #endif
       }
@@ -731,43 +727,6 @@ void CmiInitCPUAffinity(char **argv)
   if (CmiMyPe() < CmiNumPes()) 
   CmiNodeAllBarrier();
   CmiNodeAllBarrier();
-#elif CMK_SMP && CMK_PAMI_LINUX_PPC8
-#define CMK_PAMI_LINUX_PPC8_CORES_PER_NODE      20
-#define CMK_PAMI_LINUX_PPC8_THREADS_PER_CORE     8
-#define CMK_PAMI_LINUX_PPC8_SKIP_CORE_0          0
-  int cores_per_node = CMK_PAMI_LINUX_PPC8_CORES_PER_NODE;
-  int threads_per_core = CMK_PAMI_LINUX_PPC8_THREADS_PER_CORE;
-
-  CmiGetArgInt(argv,"+cores_per_node", &cores_per_node);
-  CmiGetArgInt(argv,"+threads_per_core", &threads_per_core);
-
-  int my_core   = CmiMyPe() % cores_per_node;
-  int my_core_2 = CmiMyPe() % (cores_per_node/2);
-#if CMK_PAMI_LINUX_PPC8_SKIP_CORE_0
-  my_core_2 = (my_core_2 + 1) % (CMK_PAMI_LINUX_PPC8_CORES_PER_NODE/2);
-#endif
-
-  int cpu = 0;
-  if (my_core < (cores_per_node/2))
-    cpu = my_core_2 * threads_per_core;
-  else
-    cpu = (my_core_2 + CMK_PAMI_LINUX_PPC8_CORES_PER_NODE/2) * threads_per_core;
-
-  cpu_set_t cset;
-  CPU_ZERO(&cset);
-  CPU_SET(cpu, &cset);
-  CPU_SET(cpu+1, &cset);
-  if(sched_setaffinity(0, sizeof(cpu_set_t), &cset) < 0)
-    perror("sched_setaffinity");
-
-  CPU_ZERO(&cset);
-  if (sched_getaffinity(0, sizeof(cset), &cset) < 0)
-    perror("sched_getaffinity");
-
-  sched_yield();
-  if(CmiMyPe() == 0)
-    printf("Setting default affinity\n");
-  return;
 #else
     /* get my ip address */
   if (CmiMyRank() == 0)

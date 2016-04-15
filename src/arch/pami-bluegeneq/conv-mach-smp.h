@@ -23,8 +23,5 @@
 
 #define CMK_FAKE_SCHED_YIELD                               1
 
-#define CMK_PPC_ATOMIC_QUEUE                               1
-#define CMK_PPC_ATOMIC_MUTEX                               1
+#define CMK_USE_L2ATOMICS                                  1
 
-//We use an L2 atomic version
-#define CMK_PPC_ATOMIC_DEFAULT_IMPL                        0
