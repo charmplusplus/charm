@@ -517,15 +517,11 @@ then
   fi
 fi
 
-#### check if C++ compiler will accept C++11 features without warning ####
-# C++11 features in use:
-# early variadic templates
-# R-value and move semantics
-# auto
+#### check if C++ compiler will accept early C++11 variadic templates without warning ####
 cat > $t <<EOT
 class CkMigrateMessage;
 
-struct base {
+struct base { 
   base(void) { }
   base(CkMigrateMessage *) { }
 };
@@ -535,7 +531,6 @@ struct CBaseT1 : Parent {
 
   CBaseT1(void) :Parent()  { }
   CBaseT1(CkMigrateMessage *m) :Parent(m) { }
-  CBaseT1(CBaseT1&& rhs) :Parent() { }
 
   template <typename... Args>
     CBaseT1(Args... args) : Parent(args...) { }
@@ -544,14 +539,14 @@ struct CBaseT1 : Parent {
 template struct CBaseT1<base>;
 EOT
 got_cpp11=""
-test_cxx "whether C++ compiler supports C++11 without flags" "yes" "no" ""
+test_cxx "whether C++ compiler supports variadic templates without flags" "yes" "no" ""
 if test $strictpass -eq 1
 then
   got_cpp11="true"
 else
-# Flags for g++/clang++/icc(icpc), xlC++, pgCC, and CrayCC respectively
+# Flags for g++/clang++, xlC++, and pgCC, respectively
 for i in "-std=c++0x" "-qlanglvl=extended0x" "--c++11" "-h std=c++11"; do
-    test_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
+    test_cxx "whether C++ compiler supports variadic templates with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
       add_flag "$(echo OPTS_CXX=\"\$OPTS_CXX $i\")" "Enable C++11 support"
