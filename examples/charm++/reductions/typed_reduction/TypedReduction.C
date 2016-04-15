@@ -1,10 +1,7 @@
 #include "TypedReduction.h"
 #include <stdlib.h>
 
-/*readonly*/ CProxy_Driver driverProxy;
-
 Driver::Driver(CkArgMsg* args) {
-    driverProxy = this;
     int array_size = 10;
     if (args->argc > 1) array_size = strtol(args->argv[1], NULL, 10);
     w = CProxy_Worker::ckNew(array_size);
@@ -58,31 +55,8 @@ void Driver::typed_array_done3(int n, double* results)
     CkPrintf("Typed Sum: [ ");
     for (int i=0; i<n; ++i) CkPrintf("%.5g ", results[i]);
     CkPrintf("]\n");
-
-    CkPrintf("Random data for tuple & statistics reduction: ");
-    w.reduce_tuple();
-}
-
-void Driver::tuple_reducer_done(CkReductionMsg* msg)
-{
-    CkPrintf("\n");
-    CkReduction::tupleElement* results = nullptr;
-    int num_reductions = 0;
-    msg->toTuple(&results, &num_reductions);
-
-    int min_result = *(int*)results[0].data;
-    int max_result = *(int*)results[1].data;
-    int sum_result = *(int*)results[2].data;
-    CkReduction::statisticsElement& stats_result = *(CkReduction::statisticsElement*)results[3].data;
-    CkPrintf("Tuple Reduction: Min: %d, Max: %d, Sum: %d\n",
-             min_result, max_result, sum_result);
-    CkPrintf("Statistics Reduction: Count: %d, Mean: %.2f, Standard Deviation: %.2f\n",
-             stats_result.count, stats_result.mean, stats_result.stddev());
-
-    delete[] results;
     CkExit();
 }
-
 
 Worker::Worker() { }
 
@@ -99,25 +73,6 @@ void Worker::reduce_array() {
 void Worker::reduce_array_doubles() {
     double contribution[3] = { 0.16180, 0.27182, 0.31415 };
     contribute(3*sizeof(double), contribution, CkReduction::sum_double);
-}
-
-void Worker::reduce_tuple() {
-    int val = drand48() * 100.0 + drand48() * 100.0;
-    CkPrintf("%d, ", val);
-    CkReduction::statisticsElement stats(val);
-
-    int tuple_size = 4;
-    CkReduction::tupleElement tuple_reduction[] = {
-        CkReduction::tupleElement(sizeof(int), &val, CkReduction::min_int),
-        CkReduction::tupleElement(sizeof(int), &val, CkReduction::max_int),
-        CkReduction::tupleElement(sizeof(int), &val, CkReduction::sum_int),
-        CkReduction::tupleElement(sizeof(CkReduction::statisticsElement), &stats, CkReduction::statistics) };
-
-    CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
-
-    CkCallback cb(CkReductionTarget(Driver, tuple_reducer_done), driverProxy);
-    msg->setCallback(cb);
-    contribute(msg);
 }
 
 #include "TypedReduction.def.h"

@@ -158,7 +158,7 @@ public:
 
                 // Compute the logical bitvector OR of the integers passed by each element.
                 bitvec_or,
-
+                
                 // Compute the logical bitvector XOR of the integers passed by each element.
                 bitvec_xor,
 
@@ -170,13 +170,7 @@ public:
 
 	//Combine the data passed by each element into an list of setElements.
 	// Each element may contribute arbitrary data (with arbitrary length).
-        set,
-
-        // Calculate the count, mean, and variance / standard deviation of the data
-        statistics,
-
-        // Combine multiple data/reducer pairs into one reduction
-        tuple,
+		set,
 
 	//Last system-defined reducer number (user-defined reducers follow)
 		lastSystemReducer
@@ -191,31 +185,7 @@ public:
 		//Utility routine: get the next setElement,
 		// or return NULL if there are none.
 		setElement *next(void);
-    };
-
-    // Structure containing the payload of a statistics reduction
-    struct statisticsElement {
-        int count;
-        double mean;
-        double m2;
-        statisticsElement(double initialValue);
-        double variance() const { return count > 1 ? m2 / (double(count) - 1.0) : 0.0; }
-        double stddev() const { return sqrt(variance()); }
-    };
-
-    struct tupleElement {
-        size_t dataSize;
-        char* data;
-        CkReduction::reducerType reducer;
-        bool owns_data;
-        tupleElement();
-        tupleElement(size_t dataSize, void* data, CkReduction::reducerType reducer);
-        tupleElement(CkReduction::tupleElement&& rhs_move);
-        tupleElement& operator=(CkReduction::tupleElement&& rhs_move);
-        ~tupleElement();
-
-        void pup(PUP::er &p);
-    };
+	};
 
 //Support for adding new reducerTypes:
 	//A reducerFunction is used to combine several contributions
@@ -248,10 +218,6 @@ private:
 	//Reducer table: maps reducerTypes to reducerFns.
 	static reducerStruct reducerTable[MAXREDUCERS];
 	static int nReducers;//Number of reducers currently in table above
-
-    // tupleReduction needs access to the reducerTable that lives in this namespace
-    // so it is not a standalone function in ckreduction.C like other reduction implementations
-    static CkReductionMsg* tupleReduction(int nMsgs, CkReductionMsg** msgs);
 
 	//Don't instantiate a CkReduction object-- it's just a namespace.
 	CkReduction();
@@ -302,10 +268,6 @@ public:
 	inline bool isMigratableContributor(void) const {return migratableContributor;}
 	inline void setMigratableContributor(bool _mig){ migratableContributor = _mig;}
 
-    // Tuple reduction
-    static CkReductionMsg* buildFromTuple(CkReduction::tupleElement* reductions, int num_reductions);
-    void toTuple(CkReduction::tupleElement** out_reductions, int* num_reductions);
-
 	~CkReductionMsg();
 
 //Implementation-only fields (don't access these directly!)
@@ -351,7 +313,7 @@ private:
 	int no;
 
 	//Default constructor is private so you must use "buildNew", above
-    CkReductionMsg();
+	CkReductionMsg();
 };
 
 
@@ -362,7 +324,7 @@ private:
 	const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1); \
   void contribute(CkReductionMsg *msg); \
   void contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);\
-  void contribute(CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);
+  void contribute(CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);\
 
 #define CK_BARRIER_CONTRIBUTE_METHODS_DECL \
   void barrier(const CkCallback &cb);\
