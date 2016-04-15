@@ -138,7 +138,7 @@ int main(int ac, char** av)
 
   /* Set up MPI_Info hints for AMPI_Migrate() */
   MPI_Info_create(&hints);
-  MPI_Info_set(hints, "ampi_load_balance", "true");
+  MPI_Info_set(hints, "ampi_load_balance", "sync");
 
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
