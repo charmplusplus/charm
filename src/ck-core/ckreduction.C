@@ -1806,7 +1806,7 @@ CkReduction::tupleElement::tupleElement(size_t dataSize_, void* data_, CkReducti
   , owns_data(false)
 {
 }
-CkReduction::tupleElement::tupleElement(CkReduction::tupleElement&& rhs_move)
+CkReduction::tupleElement::tupleElement::tupleElement(CkReduction::tupleElement&& rhs_move)
   : dataSize(rhs_move.dataSize)
   , data(rhs_move.data)
   , reducer(rhs_move.reducer)
