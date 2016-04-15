@@ -1795,7 +1795,7 @@ static CkReductionMsg* statistics(int nMsgs, CkReductionMsg** msg)
 
 CkReduction::tupleElement::tupleElement()
   : dataSize(0)
-  , data(NULL)
+  , data(nullptr)
   , reducer(CkReduction::invalid)
   , owns_data(false)
 {}
@@ -1863,7 +1863,7 @@ CkReductionMsg* CkReductionMsg::buildFromTuple(CkReduction::tupleElement* reduct
   ps|num_reductions;
   PUParray(ps, reductions, num_reductions);
 
-  CkReductionMsg* msg = CkReductionMsg::buildNew(ps.size(), NULL, CkReduction::tuple);
+  CkReductionMsg* msg = CkReductionMsg::buildNew(ps.size(), nullptr, CkReduction::tuple);
   PUP::toMem p(msg->data);
   p|num_reductions;
   PUParray(p, reductions, num_reductions);
