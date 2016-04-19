@@ -2,6 +2,43 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.7.1
+================================================================================
+
+Changes in this release are primarily bug fixes for 6.7.0. The major exception
+is AMPI, which has seen changes to its extension APIs and now complies with more
+of the MPI standard. A brief list of changes follows:
+
+Charm++ Bug Fixes
+
+- Startup and exit sequences are more robust
+
+- Error and warning messages are generally more informative
+
+- CkMulticast's set and concat reducers work correctly
+
+AMPI Features
+
+- AMPI's extensions have been renamed to use the prefix AMPI_ instead of MPI_
+  and to generally follow MPI's naming conventions
+
+- AMPI_Migrate(MPI_Info) is now used for dynamic load balancing and all fault
+  tolerance schemes (see the AMPI manual)
+
+- AMPI officially supports MPI-2.2, and also implements the non-blocking
+  collectives and neighborhood collectives from MPI-3.1
+
+Platforms and Portability
+
+- Cray regularpages build target has been fixed
+
+- Clang compiler target for BlueGene/Q systems added
+
+- Comm. thread tracing for SMP mode added
+
+- AMPI's compiler wrappers are easier to use with autoconf and cmake
+
+================================================================================
 What's new in Charm++ 6.7.0
 ================================================================================
 
