@@ -2549,12 +2549,19 @@ void CmiIsomallocInit(char **argv)
   }
   else {
     if (CmiMyPe() == 0) {
+      int _sync_iso_warned = 0;
       if (read_randomflag() == 1) {    /* randomization stack pointer */
         if (_sync_iso == 1)
           printf("Warning> Randomization of stack pointer is turned on in kernel.\n");
-        else
+        else {
+          _sync_iso_warned = 1;
           printf("Warning> Randomization of stack pointer is turned on in kernel, thread migration may not work! Run 'echo 0 > /proc/sys/kernel/randomize_va_space' as root to disable it, or try run with '+isomalloc_sync'.  \n");
+        }
       }
+#if CMK_SMP
+      if (_sync_iso == 0 && _sync_iso_warned == 0)
+        printf("Warning> using Isomalloc in SMP mode, you may need to run with '+isomalloc_sync'.\n");
+#endif
     }
     init_ranges(argv);
   }
