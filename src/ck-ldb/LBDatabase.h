@@ -36,6 +36,8 @@ private:
   int _lb_central_pe;           // processor number for centralized startegy
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
   int _lb_teamSize;		// specifies the team size for TeamLB
+  int _lb_maxDistPhases;  // Specifies the max number of LB phases in DistributedLB
+  double _lb_targetRatio; // Specifies the target load ratio for LBs that aim for a particular load ratio
   int _lb_metaLbOn;
 public:
   CkLBArgs() {
@@ -51,6 +53,8 @@ public:
     _lb_loop = 0;
     _lb_central_pe = 0;
     _lb_teamSize = 1;
+    _lb_maxDistPhases = 10;
+    _lb_targetRatio = 1.05;
     _lb_metaLbOn = 0;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
@@ -71,6 +75,8 @@ public:
   inline double & alpha() { return _lb_alpha; }
   inline double & beta() { return _lb_beta; }
   inline int & percentMovesAllowed() { return _lb_percentMovesAllowed;}
+  inline int & maxDistPhases() { return _lb_maxDistPhases; }
+  inline double & targetRatio() { return _lb_targetRatio; }
   inline int & metaLbOn() {return _lb_metaLbOn;}
 };
 

@@ -12,6 +12,7 @@
 #include "LBDatabase.h"
 #include "LBSimulation.h"
 #include "topology.h"
+#include "DistributedLB.h"
 
 #include "NullLB.h"
 
@@ -175,6 +176,9 @@ void _loadbalancerInit()
     if (CkMyRank() == 0)
       lbRegistry.addRuntimeBalancer(balancer);   /* lbRegistry is a static */
   }
+
+  CmiGetArgDoubleDesc(argv,"+DistLBTargetRatio", &_lb_args.targetRatio(),"The max/avg load ratio that DistributedLB will attempt to achieve");
+  CmiGetArgIntDesc(argv,"+DistLBMaxPhases", &_lb_args.maxDistPhases(),"The maximum number of phases that DistributedLB will attempt");
 
   // set up init value for LBPeriod time in seconds
   // it can also be set by calling LDSetLBPeriod()
