@@ -558,7 +558,7 @@ loop:
 	/*	blockAllocRatio=16;
 		blockThreshold=8;*/
 
-	blockAllocRatio=64;
+	blockAllocRatio=128;
 	blockThreshold=9;
 
 
@@ -2316,7 +2316,8 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		hdr = res;
 		
 		key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-		CmiAssert(key != NULL);
+	        if(key == NULL)
+                    CmiAbort("ibv_reg_mr failed to pin memory\n");
 #if CMK_IBVERBS_STATS
 		numCurReg++;
 		numReg++;
