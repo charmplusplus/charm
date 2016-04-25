@@ -21,11 +21,15 @@ hello.o: hello.C hello.decl.h
 
 test: all
 	-rm -fr log
-	$(call run, ./hello +p6 )
+	$(call run, ./hello +p4 )
 	-sync
-	$(call run, ./hello +p6 +restart log )
 	$(call run, ./hello +p4 +restart log )
-	$(call run, ./hello +p8 +restart log )
+	$(call run, ./hello +p2 +restart log )
+	-sync
+	-rm -fr log
+	$(call run, ./hello +p2 )
+	-sync
+	$(call run, ./hello +p4 +restart log )
 
 bgtest: all
 	-rm -fr log
