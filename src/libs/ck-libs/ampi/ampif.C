@@ -1398,31 +1398,31 @@ void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 }
 
 void mpi_info_create(int* info, int* ierr){
-  *ierr = MPI_Info_create(info);
+  *ierr = AMPI_Info_create(info);
 }
 void mpi_info_set(int* info, const char *key, const char *value, int* ierr){
-  *ierr = MPI_Info_set(*info, key, value);
+  *ierr = AMPI_Info_set(*info, key, value);
 }
 void mpi_info_delete(int* info, const char* key, int* ierr){
-  *ierr = MPI_Info_delete(*info, key);
+  *ierr = AMPI_Info_delete(*info, key);
 }
 void mpi_info_get(int* info, const char *key, int *valuelen, char *value, int *flag, int* ierr){
-  *ierr = MPI_Info_get(*info, key, *valuelen, value, flag);
+  *ierr = AMPI_Info_get(*info, key, *valuelen, value, flag);
 }
 void mpi_info_get_valuelen(int* info, const char *key, int *valuelen, int *flag, int* ierr){
-  *ierr = MPI_Info_get_valuelen(*info, key, valuelen, flag);
+  *ierr = AMPI_Info_get_valuelen(*info, key, valuelen, flag);
 }
 void mpi_info_get_nkeys(int* info, int *nkeys, int* ierr){
-  *ierr = MPI_Info_get_nkeys(*info, nkeys);
+  *ierr = AMPI_Info_get_nkeys(*info, nkeys);
 }
 void mpi_info_get_nthkey(int* info, int *n, char *key, int* ierr){
-  *ierr = MPI_Info_get_nthkey(*info, *n, key);
+  *ierr = AMPI_Info_get_nthkey(*info, *n, key);
 }
 void mpi_info_dup(int* info, int* newinfo, int* ierr){
-  *ierr = MPI_Info_dup(*info, newinfo);
+  *ierr = AMPI_Info_dup(*info, newinfo);
 }
 void mpi_info_free(int* info, int* ierr){
-  *ierr = MPI_Info_free(info);
+  *ierr = AMPI_Info_free(info);
 }
 
 void mpi_pcontrol(int *level) {
