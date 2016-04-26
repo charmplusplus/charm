@@ -5,12 +5,41 @@
 #include <string.h>
 #include "ampiimpl.h"
 
-KeyvalPair::KeyvalPair(const char* k, const char* v){
-  key = strdup(k);
-  val = strdup(v);
-  klen = strlen(k);
-  vlen = strlen(v);
+// Strip leading/trailing whitespaces from MPI_Info key and value strings.
+char* create_stripped_string(const char *str) {
+  int newLen;
+  int len = strlen(str);
+
+  int start=0;
+  while((start<len) && (str[start]==' ')){
+    start++;
+  }
+
+  if(start>=len){
+    newLen=0;
+  }else{
+    int end=len-1;
+    while((end>start) && (str[end]==' ')){
+      end--;
+    }
+    newLen = end - start+1;
+  }
+
+  char *newStr = new char[newLen+1];
+
+  if(newLen>0)
+    memcpy(newStr, &str[start], newLen);
+  newStr[newLen] = '\0';
+  return newStr;
 }
+
+KeyvalPair::KeyvalPair(const char* k, const char* v){
+  key = create_stripped_string(k);
+  val = create_stripped_string(v);
+  klen = strlen(key);
+  vlen = strlen(val);
+}
+
 KeyvalPair::~KeyvalPair(void){
   free((char*)key);
   free((char*)val);
@@ -22,12 +51,13 @@ void InfoStruct::pup(PUP::er& p){
 }
 
 void InfoStruct::set(const char* k, const char* v){
+  const char *key = create_stripped_string(k);
   int sz=nodes.size();
   int found=0;
   for(int i=0;i<sz;i++){
-    if(!strcmp(nodes[i]->key, k)){
+    if(!strcmp(nodes[i]->key, key)){
       free((char*)(nodes[i]->val));
-      nodes[i]->val = strdup(v);
+      nodes[i]->val = create_stripped_string(v);
       found=1;
       break;
     }
@@ -36,6 +66,7 @@ void InfoStruct::set(const char* k, const char* v){
     KeyvalPair* newkvp = new KeyvalPair(k,v);
     nodes.push_back(newkvp);
   }
+  delete [] key;
 }
 
 void InfoStruct::dup(InfoStruct& src){
@@ -47,43 +78,49 @@ void InfoStruct::dup(InfoStruct& src){
 }
 
 int InfoStruct::deletek(const char* k){
+  const char *key = create_stripped_string(k);
   int sz=nodes.size();
   int found=0;
   for(int i=0;i<sz;i++){
-    if(!strcmp(nodes[i]->key, k)){
+    if(!strcmp(nodes[i]->key, key)){
       delete nodes[i];
       nodes.remove(i);
       found=1;
       break;
     }
   }
+  delete [] key;
   return found;
 }
 
 int InfoStruct::get(const char* k, int vl, char*& v){
+  const char *key = create_stripped_string(k);
   int sz=nodes.size();
   int found=0;
   for(int i=0;i<sz;i++){
-    if(!strcmp(nodes[i]->key, k)){
+    if(!strcmp(nodes[i]->key, key)){
       strncpy(v, nodes[i]->val, vl);
       if(vl<strlen(nodes[i]->val)) v[vl]='\0';
       found=1;
       break;
     }
   }
+  delete [] key;
   return found;
 }
 
 int InfoStruct::get_valuelen(const char* k, int* vl){
+  const char *key = create_stripped_string(k);
   int sz=nodes.size();
   int found=0;
   for(int i=0;i<sz;i++){
-    if(!strcmp(nodes[i]->key, k)){
+    if(!strcmp(nodes[i]->key, key)){
       *vl=strlen(nodes[i]->val);
       found=1;
       break;
     }
   }
+  delete [] key;
   return found;
 }
 
