@@ -37,19 +37,19 @@ kNeighbor.comp.o: kNeighbor.C kNeighbor.decl.h
 	$(CHARMC) -c -DDOCOMP kNeighbor.C -o kNeighbor.comp.o
 
 test: all
-	$(call run, +p7 ./kNeighbor 7 10 64 )
-	$(call run, +p7 ./kNeighbor 7 10 256 )
-	$(call run, +p7 ./kNeighbor 7 10 1024 )
-	$(call run, +p7 ./kNeighbor 7 10 16384 )
+	$(call run, +p5 ./kNeighbor 5 10 64 )
+	$(call run, +p5 ./kNeighbor 5 10 256 )
+	$(call run, +p5 ./kNeighbor 5 10 1024 )
+	$(call run, +p5 ./kNeighbor 5 10 16384 )
 
 test-smp: all
-	$(call run, +p7 ./kNeighbor.memos +setcpuaffinity 7 10000 64 ++ppn 7)
-	$(call run, +p7 ./kNeighbor.memos +setcpuaffinity 7 10000 256 ++ppn 7)
-	$(call run, +p7 ./kNeighbor.memos +setcpuaffinity 7 10000 1024 ++ppn 7)
-	$(call run, +p7 ./kNeighbor.memos +setcpuaffinity 7 10000 16384 ++ppn 7)
+	$(call run, +p5 ./kNeighbor.memos +setcpuaffinity 5 10000 64 ++ppn 5)
+	$(call run, +p5 ./kNeighbor.memos +setcpuaffinity 5 10000 256 ++ppn 5)
+	$(call run, +p5 ./kNeighbor.memos +setcpuaffinity 5 10000 1024 ++ppn 5)
+	$(call run, +p5 ./kNeighbor.memos +setcpuaffinity 5 10000 16384 ++ppn 5)
 
 test-pxshm: all
-	$(call run, +p7 ./kNeighbor +setcpuaffinity 7 10000 64 +nodesize 7)
-	$(call run, +p7 ./kNeighbor +setcpuaffinity 7 10000 256 +nodesize 7)
-	$(call run, +p7 ./kNeighbor +setcpuaffinity 7 10000 1024 +nodesize 7)
-	$(call run, +p7 ./kNeighbor +setcpuaffinity 7 10000 16384 +nodesize 7)
+	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 64 +nodesize 5)
+	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 256 +nodesize 5)
+	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 1024 +nodesize 5)
+	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 16384 +nodesize 5)
