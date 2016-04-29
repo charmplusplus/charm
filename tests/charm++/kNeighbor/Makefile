@@ -49,7 +49,7 @@ test-smp: all
 	$(call run, +p5 ./kNeighbor.memos +setcpuaffinity 5 10000 16384 ++ppn 5)
 
 test-pxshm: all
-	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 64 +nodesize 5)
-	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 256 +nodesize 5)
-	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 1024 +nodesize 5)
-	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 16384 +nodesize 5)
+	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 64)
+	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 256)
+	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 1024)
+	$(call run, +p5 ./kNeighbor +setcpuaffinity 5 10000 16384)
