@@ -5822,9 +5822,9 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
   CDECL
-int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
-    MPI_Datatype sendtype, void *recvbuf, int *recvcounts_,
-    int *rdispls_, MPI_Datatype recvtype, MPI_Comm comm)
+int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+    MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
+    int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Alltoallv");
   if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
@@ -5840,7 +5840,7 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
 #endif
 
   if(comm==MPI_COMM_SELF)
-    return copyDatatype(comm,sendtype,sendcounts_[0],sendbuf,recvbuf);
+    return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Alltoallv!");
   if(getAmpiParent()->isInter(comm))
@@ -5848,24 +5848,6 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
 
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
-  int *sendcounts = sendcounts_;
-  int *sdispls = sdispls_;
-  int *recvcounts = recvcounts_;
-  int *rdispls = rdispls_;
-  if (CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY)
-  {
-    // FIXME: we don't need to make copy if it is not global variable
-    sendcounts = new int[size];
-    sdispls = new int[size];
-    recvcounts = new int[size];
-    rdispls = new int[size];
-    for (int i=0; i<size; i++) {
-      sendcounts[i] = sendcounts_[i];
-      sdispls[i] = sdispls_[i];
-      recvcounts[i] = recvcounts_[i];
-      rdispls[i] = rdispls_[i];
-    }
-  }
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize() ;
   int i;
@@ -5884,20 +5866,13 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
 #endif
-  if (CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY)
-  {
-    delete [] sendcounts;
-    delete [] sdispls;
-    delete [] recvcounts;
-    delete [] rdispls;
-  }
   return MPI_SUCCESS;
 }
 
   CDECL
-int AMPI_Ialltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
-    MPI_Datatype sendtype, void *recvbuf, int *recvcounts_,
-    int *rdispls_, MPI_Datatype recvtype, MPI_Comm comm, MPI_Request *request)
+int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+    MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
+    int *rdispls, MPI_Datatype recvtype, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Ialltoallv");
   if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
@@ -5914,7 +5889,7 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
 
   if(comm==MPI_COMM_SELF){
     *request = MPI_REQUEST_NULL;
-    return copyDatatype(comm,sendtype,sendcounts_[0],sendbuf,recvbuf);
+    return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
   }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Ialltoallv!");
@@ -5923,24 +5898,6 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
 
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
-  int *sendcounts = sendcounts_;
-  int *sdispls = sdispls_;
-  int *recvcounts = recvcounts_;
-  int *rdispls = rdispls_;
-  if (CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY)
-  {
-    // FIXME: we don't need to make copy if it is not global variable
-    sendcounts = new int[size];
-    sdispls = new int[size];
-    recvcounts = new int[size];
-    rdispls = new int[size];
-    for (int i=0; i<size; i++) {
-      sendcounts[i] = sendcounts_[i];
-      sdispls[i] = sdispls_[i];
-      recvcounts[i] = recvcounts_[i];
-      rdispls[i] = rdispls_[i];
-    }
-  }
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize() ;
   int i;
@@ -5964,13 +5921,6 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
 #endif
-  if (CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY)
-  {
-    delete [] sendcounts;
-    delete [] sdispls;
-    delete [] recvcounts;
-    delete [] rdispls;
-  }
   return MPI_SUCCESS;
 }
 
