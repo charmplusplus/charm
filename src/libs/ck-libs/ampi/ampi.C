@@ -2949,10 +2949,10 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return MPI_SUCCESS;
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Bcast for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -2998,10 +2998,12 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return MPI_SUCCESS;
+  }
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Ibcast for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -3105,10 +3107,10 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,type,count,inbuf,outbuf);
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Reduce for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -3175,6 +3177,8 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,type,count,inbuf,outbuf);
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Allreduce for Inter-communicators!");
 
@@ -3185,8 +3189,6 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 #if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_LOG(MPI_ALLREDUCE, ddt_type->getSize(count));
 #endif
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -3240,10 +3242,13 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,type,count,inbuf,outbuf);
+  }
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iallreduce for Inter-communicators!");
 
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
 
@@ -3299,10 +3304,10 @@ int AMPI_Reduce_scatter_block(void* sendbuf, void* recvbuf, int count,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm, datatype, count, sendbuf, recvbuf);
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Reduce_scatter_block for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm, datatype, count, sendbuf, recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
   void *tmpbuf = malloc(ptr->getDDT()->getType(datatype)->getSize(count));
@@ -3330,10 +3335,11 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,datatype,recvcounts[0],sendbuf,recvbuf);
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Reduce_scatter for Inter-communicators!");
 
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,datatype,recvcounts[0],sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   int count=0;
@@ -4628,10 +4634,13 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,type,count,sendbuf,recvbuf);
+  }
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Ireduce for Inter-communicators!");
 
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
@@ -4672,12 +4681,12 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Allgather!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Allgather for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
@@ -4724,12 +4733,14 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Iallgather!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iallgather for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
@@ -4771,12 +4782,12 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Allgatherv!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Allgatherv for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
@@ -4821,12 +4832,14 @@ int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Iallgatherv!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iallgatherv for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
@@ -4872,12 +4885,12 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Gather!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Gather for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -4940,12 +4953,14 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Igather!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Igather for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -5011,12 +5026,12 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Gatherv!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Gatherv for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
   int itemsize = getDDT()->getSize(recvtype);
 
@@ -5083,12 +5098,14 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Igatherv!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Igatherv for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
   int itemsize = getDDT()->getSize(recvtype);
 
@@ -5158,12 +5175,12 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Scatter!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Scatter for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -5228,12 +5245,14 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Iscatter!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iscatter for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -5298,12 +5317,12 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Scatterv!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Scatterv for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -5368,12 +5387,14 @@ int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sen
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
+  }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Iscatterv!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iscatterv for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -5437,12 +5458,13 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Alltoall!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Alltoall for Inter-communicators!");
 
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   CkDDT_DataType *dttype;
@@ -5698,12 +5720,13 @@ int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Alltoall_iget!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Alltoall_iget for Inter-communicators!");
 
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   CProxy_ampi pa(ptr->ckGetArrayID());
   int size = ptr->getSize(comm);
@@ -5767,12 +5790,14 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
+  }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Ialltoall!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Ialltoall for Inter-communicators!");
-
-  if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
@@ -5814,6 +5839,8 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtype,sendcounts_[0],sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Alltoallv!");
   if(getAmpiParent()->isInter(comm))
@@ -5885,6 +5912,10 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,sendtype,sendcounts_[0],sendbuf,recvbuf);
+  }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Ialltoallv!");
   if(getAmpiParent()->isInter(comm))
@@ -5961,6 +5992,8 @@ int AMPI_Alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return copyDatatype(comm,sendtypes[0],sendcounts[0],sendbuf,recvbuf);
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Alltoallw!");
   if(getAmpiParent()->isInter(comm))
@@ -6005,6 +6038,10 @@ int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm,sendtypes[0],sendcounts[0],sendbuf,recvbuf);
+  }
   if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
     CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Ialltoallw!");
   if(getAmpiParent()->isInter(comm))
@@ -6054,7 +6091,8 @@ int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
-  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+  if (comm == MPI_COMM_SELF)
+    return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
@@ -6108,7 +6146,10 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
-  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+  if (comm == MPI_COMM_SELF) {
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+  }
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
@@ -6163,7 +6204,8 @@ int AMPI_Neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
     return ret;
 #endif
 
-  if (comm == MPI_COMM_SELF) return MPI_SUCCESS;
+  if (comm == MPI_COMM_SELF)
+    return copyDatatype(comm, sendtype, sendcounts[0], sendbuf, recvbuf);
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
@@ -6218,7 +6260,10 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
   }
 #endif
 
-  if (comm == MPI_COMM_SELF) return MPI_SUCCESS;
+  if (comm == MPI_COMM_SELF) {
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm, sendtype, sendcounts[0], sendbuf, recvbuf);
+  }
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
@@ -6274,7 +6319,8 @@ int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
     return ret;
 #endif
 
-  if (comm == MPI_COMM_SELF) return MPI_SUCCESS;
+  if (comm == MPI_COMM_SELF)
+    return copyDatatype(comm, sendtypes[0], sendcounts[0], sendbuf, recvbuf);
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
@@ -6328,7 +6374,10 @@ int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
   }
 #endif
 
-  if (comm == MPI_COMM_SELF) return MPI_SUCCESS;
+  if (comm == MPI_COMM_SELF) {
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm, sendtypes[0], sendcounts[0], sendbuf, recvbuf);
+  }
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
@@ -6382,7 +6431,8 @@ int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
 #endif
 
-  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+  if (comm == MPI_COMM_SELF)
+    return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
@@ -6436,7 +6486,10 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
   }
 #endif
 
-  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+  if (comm == MPI_COMM_SELF) {
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+  }
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
@@ -6491,7 +6544,8 @@ int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype
     return ret;
 #endif
 
-  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+  if (comm == MPI_COMM_SELF)
+    return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
@@ -6545,7 +6599,10 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
   }
 #endif
 
-  if (comm == MPI_COMM_SELF) return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+  if (comm == MPI_COMM_SELF) {
+    *request = MPI_REQUEST_NULL;
+    return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
+  }
 
   int num_neighbors, rank_in_comm;
   int *neighbors;
