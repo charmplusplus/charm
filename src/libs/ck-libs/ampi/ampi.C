@@ -2485,7 +2485,6 @@ CDECL int AMPI_Init_thread(int *p_argc, char*** p_argv, int required, int *provi
 
 CDECL int AMPI_Init(int *p_argc, char*** p_argv)
 {
-  //AMPIAPI("AMPI_Init");
   if (nodeinit_has_been_called) {
     AMPIAPI("AMPI_Init");
     char **argv;
@@ -2582,6 +2581,7 @@ int AMPI_Comm_size(MPI_Comm comm, int *size)
   CDECL
 int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
 {
+  AMPIAPI("AMPI_Comm_compare");
 
 #if CMK_ERROR_CHECKING 
   int ret;
@@ -2593,7 +2593,6 @@ int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
     return ret;
 #endif
 
-  AMPIAPI("AMPI_Comm_compare");
   if(comm1==comm2) *result=MPI_IDENT;
   else{
     int congruent=1;
@@ -2661,6 +2660,7 @@ int AMPI_Finalize(void)
 CDECL
 int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
     int tag, MPI_Comm comm) {
+  AMPIAPI("AMPI_Send");
 
 #if CMK_ERROR_CHECKING
   int ret;
@@ -2669,7 +2669,6 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
     return ret;
 #endif
 
-  AMPIAPI("AMPI_Send");
 #if AMPIMSGLOG
   if(msgLogRead){
     return MPI_SUCCESS;
@@ -2692,13 +2691,14 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
     int tag, MPI_Comm comm)
 {
+  AMPIAPI("AMPI_Ssend");
+
 #if CMK_ERROR_CHECKING
   int ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, dest, 1, msg, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
 
-  AMPIAPI("AMPI_Ssend");
 #if AMPIMSGLOG
   if(msgLogRead){
     return MPI_SUCCESS;
@@ -2804,6 +2804,7 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
   CDECL
 int AMPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
 {
+  AMPIAPI("AMPI_Probe");
 
 #if CMK_ERROR_CHECKING
   int ret = errorCheck(comm, 1, 0, 0, 0, 0, tag, 1, src, 1, 0, 0);
@@ -2814,7 +2815,6 @@ int AMPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
   MPI_Status tempStatus;
   if(!status) status = &tempStatus;
 
-  AMPIAPI("AMPI_Probe");
   ampi *ptr = getAmpiInstance(comm);
   ptr->probe(tag,src, comm, (int*) status);
   return MPI_SUCCESS;
@@ -3507,14 +3507,14 @@ int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, 
 
 CDECL
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
-  //AMPIAPI("AMPI_Op_create");
+  AMPIAPI("AMPI_Op_create");
   *op = function;
   return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Op_free(MPI_Op *op){
-  //AMPIAPI("AMPI_Op_free");
+  AMPIAPI("AMPI_Op_free");
   *op = MPI_OP_NULL;
   return MPI_SUCCESS;
 }
@@ -3523,7 +3523,7 @@ int AMPI_Op_free(MPI_Op *op){
   CDECL
 double AMPI_Wtime(void)
 {
-  //  AMPIAPI("AMPI_Wtime");
+  //AMPIAPI("AMPI_Wtime");
 
 #if AMPIMSGLOG
   double ret=TCHARM_Wall_timer();
@@ -7725,6 +7725,7 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[
 
 CDECL
 int AMPI_Pcontrol(const int level, ...) {
+  //AMPIAPI("AMPI_Pcontrol");
   return MPI_SUCCESS;
 }
 
@@ -7733,6 +7734,7 @@ int AMPI_Pcontrol(const int level, ...) {
 CDECL
 int AMPI_Migrate(MPI_Info hints)
 {
+  AMPIAPI("AMPI_Migrate");
 #if 0 && CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_SUSPEND();
 #endif
@@ -7824,6 +7826,7 @@ int AMPI_Migrate(MPI_Info hints)
 CDECL
 int AMPI_Evacuate(void)
 {
+  //AMPIAPI("AMPI_Evacuate");
   TCHARM_Evacuate();
   return MPI_SUCCESS;
 }
@@ -7845,8 +7848,8 @@ int AMPI_Migrate_to_pe(int dest)
 
 CDECL
 int AMPI_Comm_set_migratable(MPI_Comm comm, int mig){
+  AMPIAPI("AMPI_Comm_set_migratable");
 #if CMK_LBDB_ON
-  //AMPIAPI("AMPI_Comm_set_migratable");
   ampi *ptr=getAmpiInstance(comm);
   ptr->setMigratable(mig);
 #else
@@ -7945,6 +7948,7 @@ int AMPI_Get_pup_data(int idx, void *data)
 CDECL
 int AMPI_Type_is_contiguous(MPI_Datatype datatype, int *flag)
 {
+  AMPIAPI("AMPI_Type_is_contiguous");
   *flag = getDDT()->isContig(datatype);
   return MPI_SUCCESS;
 }
@@ -8032,7 +8036,7 @@ extern "C" void startCFnCall(void *param,void *msg)
 CDECL
 int AMPI_Set_start_event(MPI_Comm comm)
 {
-  AMPIAPI("AMPI_BgSetStartEvent");
+  AMPIAPI("AMPI_Set_start_event");
   CkAssert(comm == MPI_COMM_WORLD);
 
   ampi *ptr = getAmpiInstance(comm);
@@ -8056,7 +8060,7 @@ int AMPI_Set_start_event(MPI_Comm comm)
 CDECL
 int AMPI_Set_end_event(void)
 {
-  AMPIAPI("AMPI_BgSetEndEvent");
+  AMPIAPI("AMPI_Set_end_event");
   return MPI_SUCCESS;
 }
 #endif // CMK_BIGSIM_CHARM
@@ -8121,7 +8125,7 @@ void AMPI_GPU_complete(void *request, void* dummy)
   CDECL
 int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request)
 {
-  AMPIAPI(__func__);
+  AMPIAPI("AMPI_GPU_Iinvoke");
 
   AmpiRequestList* reqs = getReqs();
   GPUReq *newreq = new GPUReq();
@@ -8137,7 +8141,7 @@ int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request)
   CDECL
 int AMPI_GPU_Invoke(workRequest *to_call)
 {
-  AMPIAPI(__func__);
+  AMPIAPI("AMPI_GPU_Invoke");
 
   MPI_Request req;
   AMPI_GPU_Iinvoke(to_call, &req);
