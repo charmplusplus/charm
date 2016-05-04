@@ -12,8 +12,9 @@ module ampi {
     entry void Checkpoint(int len, char dname[len]);
     entry void ExchangeProxy(CProxy_ampi);
   };
+
   array[1D] ampi {
-    entry ampi();    
+    entry ampi();
     entry [notrace] ampi(CkArrayID parent_,ampiCommStruct s);
     entry void allInitDone(CkReductionMsg *m);
     entry void setInitDoneFlag();
@@ -27,19 +28,20 @@ module ampi {
     entry [threaded] void intercommMergePhase1(CkReductionMsg *msg);
 
     entry void setRemoteProxy(CProxy_ampi rproxy);
-    entry void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype, 
-			   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,
-			   CkFutureID ftHandle, int pe_src);
+    entry void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype,
+                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,
+                            CkFutureID ftHandle, int pe_src);
     entry void winRemoteGet(int orgcnt, MPI_Datatype orgtype,
-			   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,
-                           CkFutureID ftHandle, int pe_src);
-    entry void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype, 
-				  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
-				  MPI_Op op, int winIndex, CkFutureID ftHandle, int pe_src);
+                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,
+                            CkFutureID ftHandle, int pe_src);
+    entry void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype,
+                                   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+                                   MPI_Op op, int winIndex, CkFutureID ftHandle, int pe_src);
     entry void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
     entry void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
     entry [iget] AmpiMsg *winRemoteIget(int orgdisp, int orgcnt, MPI_Datatype orgtype,
-                           MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex);
+                                        MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+                                        int winIndex);
     entry [iget] AmpiMsg *Alltoall_RemoteIget(int disp, int cnt, MPI_Datatype type, int tag);
   };
 

@@ -125,7 +125,7 @@ int InfoStruct::get_valuelen(const char* k, int* vl){
 }
 
 int InfoStruct::get_nthkey(int n,char* k){
-  if(n<0 || n>=nodes.size()) 
+  if(n<0 || n>=nodes.size())
     return 0;
   strcpy(k,nodes[n]->key);
   return 1;
@@ -182,7 +182,7 @@ int ampiParent::getInfoValuelen(MPI_Info info, const char *key, int *valuelen){
 int ampiParent::getInfoNkeys(MPI_Info info){
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     CkAbort("AMPI_Info_get_nkeys: invalid info\n");
-  return infos[info]->get_nkeys();  
+  return infos[info]->get_nkeys();
 }
 
 int ampiParent::getInfoNthkey(MPI_Info info, int n, char *key){
@@ -201,7 +201,7 @@ void ampiParent::freeInfo(MPI_Info info){
 CDECL
 int AMPI_Info_create(MPI_Info *info){
   AMPIAPI("AMPI_Info_create");
-  if(info<=(int *)0) 
+  if(info<=(int *)0)
     CkAbort("AMPI_Info_create: invalid info\n");
   ampiParent *ptr = getAmpiParent();
   *info = ptr->createInfo();
@@ -211,7 +211,7 @@ int AMPI_Info_create(MPI_Info *info){
 CDECL
 int AMPI_Info_set(MPI_Info info, const char *key, const char *value){
   AMPIAPI("AMPI_Info_set");
-  if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0) 
+  if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0)
     CkAbort("AMPI_Info_set: invalid key\n");
   if(value<=(char *)0 || strlen(value)>MPI_MAX_INFO_VAL || strlen(value)==0)
     CkAbort("AMPI_Info_set: invalid value\n");
@@ -224,7 +224,7 @@ CDECL
 int AMPI_Info_delete(MPI_Info info, const char *key){
   AMPIAPI("AMPI_Info_delete");
   ampiParent *ptr = getAmpiParent();
-  if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0) 
+  if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0)
     CkAbort("AMPI_Info_delete: invalid key\n");
   if(0==ptr->deleteInfo(info, key))
     CkAbort("AMPI_Info_delete: key not defined in info\n");
@@ -234,7 +234,7 @@ int AMPI_Info_delete(MPI_Info info, const char *key){
 CDECL
 int AMPI_Info_get(MPI_Info info, const char *key, int valuelen, char *value, int *flag){
   AMPIAPI("AMPI_Info_get");
-  if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0) 
+  if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0)
     CkAbort("AMPI_Info_get: invalid key\n");
   if(value<=(char *)0)
     CkAbort("AMPI_Info_get: invalid value\n");
@@ -248,7 +248,7 @@ int AMPI_Info_get(MPI_Info info, const char *key, int valuelen, char *value, int
 CDECL
 int AMPI_Info_get_valuelen(MPI_Info info, const char *key, int *valuelen, int *flag){
   AMPIAPI("AMPI_Info_get_valuelen");
-  if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0) 
+  if(key<=(char *)0 || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0)
     CkAbort("AMPI_Info_get_valuelen: invalid key\n");
   ampiParent *ptr = getAmpiParent();
   *flag = ptr->getInfoValuelen(info, key, valuelen);
@@ -258,7 +258,7 @@ int AMPI_Info_get_valuelen(MPI_Info info, const char *key, int *valuelen, int *f
 CDECL
 int AMPI_Info_get_nkeys(MPI_Info info, int *nkeys){
   AMPIAPI("AMPI_Info_get_nkeys");
-  if(nkeys<=(int *)0) 
+  if(nkeys<=(int *)0)
     CkAbort("AMPI_Info_get_nkeys: invalid nkeys\n");
   ampiParent *ptr = getAmpiParent();
   *nkeys = ptr->getInfoNkeys(info);
@@ -268,7 +268,7 @@ int AMPI_Info_get_nkeys(MPI_Info info, int *nkeys){
 CDECL
 int AMPI_Info_get_nthkey(MPI_Info info, int n, char *key){
   AMPIAPI("AMPI_Info_get_nthkey");
-  if(key<=(char *)0) 
+  if(key<=(char *)0)
     CkAbort("AMPI_Info_get_nthkey: invalid key\n");
   ampiParent *ptr = getAmpiParent();
   if(0==ptr->getInfoNthkey(info,n,key))
@@ -279,7 +279,7 @@ int AMPI_Info_get_nthkey(MPI_Info info, int n, char *key){
 CDECL
 int AMPI_Info_dup(MPI_Info info, MPI_Info *newinfo){
   AMPIAPI("AMPI_Info_dup");
-  if(newinfo<=(int *)0) 
+  if(newinfo<=(int *)0)
     CkAbort("AMPI_Info_dup: invalid newinfo\n");
   ampiParent *ptr = getAmpiParent();
   *newinfo = ptr->dupInfo(info);
@@ -289,7 +289,7 @@ int AMPI_Info_dup(MPI_Info info, MPI_Info *newinfo){
 CDECL
 int AMPI_Info_free(MPI_Info *info){
   AMPIAPI("AMPI_Info_free");
-  if(info<=(int *)0) 
+  if(info<=(int *)0)
     CkAbort("AMPI_Info_free: invalid info\n");
   ampiParent *ptr = getAmpiParent();
   ptr->freeInfo(*info);
@@ -317,5 +317,3 @@ void PUP::zdisk::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
 
 void beginTraceBigSim(char* msg){}
 void endTraceBigSim(char* msg, char* param){}
-
-
