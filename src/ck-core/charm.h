@@ -310,7 +310,13 @@ typedef enum {
   ArrayEltInitMsg =18,
   ForArrayEltMsg  =19,
   ForIDedObjMsg   =20,
+#if CMK_LOCKLESS_QUEUE
+  WarnMsg         =21,
+  WarnDoneMsg     =22,
+  LAST_CK_ENVELOPE_TYPE =23
+#else
   LAST_CK_ENVELOPE_TYPE =21
+#endif
 } CkEnvelopeType;
 
 

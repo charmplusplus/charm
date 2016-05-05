@@ -380,7 +380,13 @@ INLINE_KEYWORD CMIQueue CmiMyRecvQueue(void) {
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
-INLINE_KEYWORD CMIQueue CmiMyNodeQueue(void) {
+INLINE_KEYWORD
+#if CMK_LOCKLESS_QUEUE
+MPMCQueue
+#else
+CMIQueue
+#endif
+CmiMyNodeQueue(void) {
     return CsvAccess(NodeState).NodeRecv;
 }
 #endif
@@ -463,6 +469,8 @@ void CmiPushPE(int rank,void *msg) {
 
 #if CMK_MACH_SPECIALIZED_QUEUE
     LrtsSpecializedQueuePush(rank, msg);
+#elif CMK_SMP_MULTIQ
+    CMIQueuePush(cs->recv[CmiGetState()->myGrpIdx], (char *)msg);
 #else
     CMIQueuePush(cs->recv,(char*)msg);
 #endif
@@ -498,6 +506,8 @@ void CmiPushNode(void *msg) {
 
 #if CMK_MACH_SPECIALIZED_QUEUE
     LrtsSpecializedNodeQueuePush((char *)msg);
+#elif CMK_LOCKLESS_QUEUE
+    MPMCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
 #else
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     CMIQueuePush(CsvAccess(NodeState).NodeRecv, (char *)msg);
@@ -742,6 +752,8 @@ static void CmiSendNodeSelf(char *msg) {
 #endif
 #if CMK_MACH_SPECIALIZED_QUEUE
     LrtsSpecializedNodeQueuePush(msg);
+#elif CMK_LOCKLESS_QUEUE
+    MPMCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
 #else
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     CMIQueuePush(CsvAccess(NodeState).NodeRecv, msg);
@@ -1137,6 +1149,36 @@ CMI_EXTERNC_VARIABLE int quietModeRequested;
 // For INT_MAX
 #include <limits.h>
 
+#if CMK_LOCKLESS_QUEUE
+#define DefaultDataNodeSize 2048
+#define DefaultMaxDataNodes 2048
+extern int DataNodeSize;
+extern int MaxDataNodes;
+extern int QueueUpperBound;
+extern int DataNodeWrap;
+extern int QueueWrap;
+extern int messageQueueOverflow;
+
+int power_of_two_check(int n)
+{
+  return (n > 0 && (n & (n - 1)) == 0);
+}
+
+
+void check_and_set_queue_parameters()
+{
+  if(DataNodeSize <= 0 || MaxDataNodes <= 0 || !power_of_two_check(DataNodeSize) || !power_of_two_check(MaxDataNodes))
+  {
+    CmiPrintf("MessageQueues: MessageQueueNodeSize: %d,  Check that this value is > 0 and a power of 2.\n", DataNodeSize);
+    CmiPrintf("MessageQueues: MessageQueueNodes: %d, Check that this value is > 0 and a power of 2.\n", MaxDataNodes);
+    CmiAbort("Invalid MessageQueue Parameters");
+  }
+  QueueUpperBound = DataNodeSize * MaxDataNodes;
+  DataNodeWrap = DataNodeSize - 1;
+  QueueWrap = QueueUpperBound - 1;
+}
+#endif
+
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
@@ -1283,6 +1325,16 @@ if (  MSG_STATISTIC)
     for(_ii=0; _ii<22; _ii++)
         msg_histogram[_ii] = 0;
 }
+#endif
+#if CMK_LOCKLESS_QUEUE
+    /* Lockfree queue initialization */
+    if (!CmiGetArgIntDesc(argv,"+MessageQueueNodes",&MaxDataNodes, "The size of the message queue static arrays")) {
+      MaxDataNodes = DefaultMaxDataNodes;
+    }
+    if (!CmiGetArgIntDesc(argv,"+MessageQueueNodeSize",&DataNodeSize, "The size of the message queue data nodes")) {
+      DataNodeSize = DefaultDataNodeSize;
+    }
+    check_and_set_queue_parameters();
 #endif
 
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
@@ -1777,11 +1829,19 @@ void *CmiGetNonLocalNodeQ(void) {
 #else
     CmiState cs = CmiGetState();
     CmiIdleLock_checkMessage(&cs->idle);
+#if CMK_LOCKLESS_QUEUE
+    if (!MPMCQueueEmpty(CsvAccess(NodeState).NodeRecv)) {
+#else
     if (!CMIQueueEmpty(CsvAccess(NodeState).NodeRecv)) {
+#endif
         MACHSTATE1(3,"CmiGetNonLocalNodeQ begin %d {", CmiMyPe());
+#if CMK_LOCKLESS_QUEUE
+        result = (char *) MPMCQueuePop(CsvAccess(NodeState).NodeRecv);
+#else
         CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
         result = (char *) CMIQueuePop(CsvAccess(NodeState).NodeRecv);
         CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+#endif
         MACHSTATE1(3,"} CmiGetNonLocalNodeQ end %d ", CmiMyPe());
     }
 #endif

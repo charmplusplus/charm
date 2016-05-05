@@ -98,7 +98,11 @@ typedef struct CmiNodeStateStruct
                               Locks: push(RecvLock), pop(RecvLock) */
 #if CMK_NODE_QUEUE_AVAILABLE
   CmiNodeLock CmiNodeRecvLock;
+#if CMK_LOCKLESS_QUEUE
+  MPMCQueue     NodeRecv;
+#else
   CMIQueue     NodeRecv;
+#endif
 #endif
 }
 CmiNodeState;

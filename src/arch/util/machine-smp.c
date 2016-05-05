@@ -709,7 +709,11 @@ void CmiNodeStateInit(CmiNodeState *nodeState)
 #endif
 #if CMK_NODE_QUEUE_AVAILABLE
   nodeState->CmiNodeRecvLock = CmiCreateLock();
+#if CMK_LOCKLESS_QUEUE
+  nodeState->NodeRecv = MPMCQueueCreate();
+#else
   nodeState->NodeRecv = CMIQueueCreate();
+#endif
 #endif
   MACHSTATE(4,"NodeStateInit done")
 }

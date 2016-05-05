@@ -274,6 +274,20 @@ CMI_EXTERNC_VARIABLE int CmiMyLocalRank;
 
 int    CmiMyLocalRank;        /* local rank only for scalable startup */
 
+#if CMK_LOCKLESS_QUEUE
+/*****************************************************************************
+ *
+ * MPSCQueue and MPMCQueue variables
+ *
+ *****************************************************************************/
+int DataNodeSize;
+int MaxDataNodes;
+int QueueUpperBound;
+int DataNodeWrap;
+int QueueWrap;
+int messageQueueOverflow;
+#endif
+
 /*****************************************************************************
  *
  * Command-Line Argument (CLA) parsing routines.

@@ -255,7 +255,11 @@ void CmiPushNode(void *msg) {
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
     PPCAtomicEnqueue(&node_recv_atomic_q, msg);
 #else
+#if CMK_LOCKLESS_QUEUE
+    MPMCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
+#else
     PCQueuePush(CsvAccess(NodeState).NodeRecv, (char *)msg);
+#endif
 #endif
     //CmiState cs=CmiGetStateN(0);
     //CmiIdleLock_addMessage(&cs->idle);
@@ -1106,7 +1110,11 @@ char *CmiGetNonLocalNodeQ(void) {
       MACHSTATE1(3,"CmiGetNonLocalNodeQ begin %d {", CmiMyPe());
       
       if (CmiTryLock(CsvAccess(NodeState).CmiNodeRecvLock) == 0) {
-	result = (char *) PCQueuePop(CsvAccess(NodeState).NodeRecv);
+#if CMK_LOCKLESS_QUEUE
+        result = (char *) MPMCQueuePop(CsvAccess(NodeState).NodeRecv);
+#else
+        result = (char *) PCQueuePop(CsvAccess(NodeState).NodeRecv);
+#endif
 	CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
       }
 
@@ -1994,7 +2002,11 @@ void CmiSendNodeSelf(char *msg) {
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
     PPCAtomicEnqueue(&node_recv_atomic_q, msg);
 #else
+#if CMK_LOCKLESS_QUEUE
+    MPMCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
+#else
     PCQueuePush(CsvAccess(NodeState).NodeRecv, (char *)msg);
+#endif
 #endif
 }
 

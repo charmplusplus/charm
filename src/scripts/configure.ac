@@ -224,6 +224,22 @@ else
   AC_DEFINE_UNQUOTED(CMK_LB_USER_DATA, 0, [disable lb user data])
 fi
 
+AC_ARG_ENABLE([lockless-queue],
+            [AS_HELP_STRING([--enable-lockless-queue],
+              [enable lockless queue for PE local and node queue])],
+            [enable_lockless_queue=$enableval],
+            [enable_lockless_queue=no])
+
+if test "$enable_lockless_queue" = "no"
+then
+  Echo "Lockless queue for PE local and node queue is disabled"
+  AC_DEFINE_UNQUOTED(CMK_LOCKLESS_QUEUE, 0, [disable lockless queue for pe/node queue])
+else
+  Echo "Lockless queue for PE local and node queue is enabled"
+  AC_DEFINE_UNQUOTED(CMK_LOCKLESS_QUEUE, 1, [enable lockless queue for pe/node queue])
+fi
+
+
 AC_ARG_ENABLE([shrinkexpand],
             [AS_HELP_STRING([--enable-shrinkexpand],
               [enable malleable jobs / shrink expand])],

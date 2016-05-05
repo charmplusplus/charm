@@ -320,7 +320,11 @@ public:
     }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const GroupDepNum groupDepNumRequest=GroupDepNum{})
     {
+#if CMK_LOCKLESS_QUEUE
+      CkAssert(type>=NewChareMsg && type<LAST_CK_ENVELOPE_TYPE);
+#else
       CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
+#endif
 #if CMK_USE_STL_MSGQ
       // Ideally, this should be a static compile-time assert. However we need API changes for that
       CkAssert(sizeof(CMK_MSG_PRIO_TYPE) >= sizeof(int)*CkPriobitsToInts(prio));

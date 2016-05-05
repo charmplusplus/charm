@@ -537,7 +537,11 @@ typedef struct  rmda_msg
 #else
 #define SMP_LOCKS                       0
 #endif
+#if CMK_LOCKLESS_QUEUE
+#define ONE_SEND_QUEUE                  1
+#else
 #define ONE_SEND_QUEUE                  0
+#endif
 
 typedef PCQueue BufferList;
 typedef struct  msg_list_index
@@ -565,7 +569,11 @@ typedef struct smsg_queue
 #else
 typedef struct smsg_queue
 {
+#if CMK_LOCKLESS_QUEUE
+    MPMCQueue       sendMsgBuf;
+#else
     PCQueue       sendMsgBuf;
+#endif
 }  SMSG_QUEUE;
 #endif
 
@@ -1317,7 +1325,11 @@ static void buffer_small_msgs(SMSG_QUEUE *queue, void *msg, int size, int destNo
 #endif
 
 #if ONE_SEND_QUEUE
+#if CMK_LOCKLESS_QUEUE
+    MPMCQueuePush(queue->sendMsgBuf, (char*)msg_tmp);
+#else
     PCQueuePush(queue->sendMsgBuf, (char*)msg_tmp);
+#endif
 #else
 #if SMP_LOCKS
     CmiLock(queue->smsg_msglist_index[destNode].lock);
@@ -3495,15 +3507,31 @@ static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *prio_queue)
     memset(destpe_avail, 0, mysize * sizeof(char));
     for (index=0; index<1; index++)
     {
-        int i, len = PCQueueLength(queue->sendMsgBuf);
+#if CMK_DEBUG
+        CmiPrintf("[%d] Called SendBufferMsg\n", CmiMyPe());
+#endif
+        int i, len;
+#if CMK_LOCKLESS_QUEUE
+        len = MPMCQueueLength(queue->sendMsgBuf);
+#else
+        len = PCQueueLength(queue->sendMsgBuf);
+#endif
         for (i=0; i<len; i++) 
         {
+#if CMK_LOCKLESS_QUEUE
+            ptr = (MSG_LIST*)MPMCQueuePop(queue->sendMsgBuf);
+#else
             CMI_PCQUEUEPOP_LOCK(queue->sendMsgBuf)
             ptr = (MSG_LIST*)PCQueuePop(queue->sendMsgBuf);
             CMI_PCQUEUEPOP_UNLOCK(queue->sendMsgBuf)
+#endif
             if(ptr == NULL) break;
             if (destpe_avail[ptr->destNode] == 1) {       /* can't send to this pe */
+#if CMK_LOCKLESS_QUEUE
+                MPMCQueuePush(queue->sendMsgBuf, (char*)ptr);
+#else
                 PCQueuePush(queue->sendMsgBuf, (char*)ptr);
+#endif
                 continue;
             }
 #if CMK_SMP
@@ -3532,7 +3560,11 @@ static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *prio_queue)
 #endif
                 FreeMsgList(ptr);
             }else {
+#if CMK_LOCKLESS_QUEUE
+                MPMCQueuePush(queue->sendMsgBuf, (char*)ptr);
+#else
                 PCQueuePush(queue->sendMsgBuf, (char*)ptr);
+#endif
                 done = 0;
                 if(status == GNI_RC_ERROR_RESOURCE)
                 {
@@ -3915,7 +3947,11 @@ static void _init_send_queue(SMSG_QUEUE *queue)
 {
      int i;
 #if ONE_SEND_QUEUE
+#if CMK_LOCKLESS_QUEUE
+     queue->sendMsgBuf = MPMCQueueCreate();
+#else
      queue->sendMsgBuf = PCQueueCreate();
+#endif
      destpe_avail = (char*)malloc(mysize * sizeof(char));
 #else
      queue->smsg_msglist_index = (MSG_LIST_INDEX*)malloc(mysize*sizeof(MSG_LIST_INDEX));

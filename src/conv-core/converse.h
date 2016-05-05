@@ -2006,7 +2006,7 @@ extern int _immRunning;
 
 #if CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE
 #if __GNUC__ && __STDC_VERSION__ >= 201112L && !__STDC_NO_ATOMICS__
-#ifndef _STDATOMIC_H
+/*#ifndef _STDATOMIC_H
 typedef enum
   {
     memory_order_relaxed = __ATOMIC_RELAXED,
@@ -2016,7 +2016,9 @@ typedef enum
     memory_order_acq_rel = __ATOMIC_ACQ_REL,
     memory_order_seq_cst = __ATOMIC_SEQ_CST
   } memory_order;
-#endif
+#endif*/
+/* this header is included for the memory ordering macros above */
+#include <stdatomic.h>
 #define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) __atomic_fetch_add(&(someInt),1, MemModel);
 #define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) __atomic_fetch_sub(&(someInt),1, MemModel);
 #define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) (output) = __atomic_fetch_add(&(input),1, MemModel);

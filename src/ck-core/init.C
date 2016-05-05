@@ -84,6 +84,8 @@ void CkRestartMain(const char* dirname, CkArgMsg* args);
 
 #define  DEBUGF(x)     //CmiPrintf x;
 
+#define CMK_WITH_WARNINGS 0
+
 #include "TopoManager.h"
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
@@ -516,6 +518,54 @@ static inline void _sendStats(void)
   CmiReduce(env, env->getTotalsize(), mergeStats);
 }
 
+#if CMK_LOCKLESS_QUEUE
+typedef struct _WarningMsg{
+  int queue_overflow_count;
+} WarningMsg;
+
+/* General purpose handler for runtime warnings post-execution */
+static void *mergeWarningMsg(int * size, void * data, void ** remote, int count){
+  int i;
+
+  WarningMsg *msg = (WarningMsg*)EnvToUsr((envelope*) data), *m;
+
+  /* Reduction on warning information gained from children */
+  for(i = 0; i < count; ++i)
+  {
+    m = (WarningMsg*)EnvToUsr((envelope*) remote[i]);
+    msg->queue_overflow_count += m->queue_overflow_count;
+  }
+
+  return data;
+}
+
+/* Initializes the reduction, called on each processor */
+extern int messageQueueOverflow;
+static inline void _sendWarnings(void)
+{
+  DEBUGF(("[%d] _sendWarnings\n", CkMyPe()));
+
+  envelope *env = _allocEnv(WarnMsg, sizeof(WarningMsg));
+  WarningMsg* msg = (WarningMsg*)EnvToUsr(env);
+
+  /* Set processor specific warning information here */
+  msg->queue_overflow_count = messageQueueOverflow;
+
+  CmiSetHandler(env, _exitHandlerIdx);
+  CmiReduce(env, env->getTotalsize(), mergeWarningMsg);
+}
+
+/* Reporting warnings to the user */
+static inline void ReportWarnings(WarningMsg * msg)
+{
+  if(msg->queue_overflow_count > 0)
+  {
+    CmiPrintf("WARNING: Message queues overflowed during execution, this can negatively impact performance.\n");
+    CmiPrintf("\tModify the size of the message queues using: +MessageQueueNodes and +MessageQueueNodeSize\n");
+  }
+}
+#endif /* CMK_LOCKLESS_QUEUE */
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 extern void _messageLoggingExit();
 #endif
@@ -600,6 +650,9 @@ static void _exitHandler(envelope *env)
 #if CMK_WITH_STATS
          _sendStats();
 #endif
+#if CMK_WITH_WARNINGS
+         _sendWarnings();
+#endif
       _mainDone = true; // This is needed because the destructors for
                         // readonly variables will be called when the program
 		        // exits. If the destructor is called while _mainDone
@@ -624,7 +677,7 @@ static void _exitHandler(envelope *env)
       ConverseCleanup();
 #endif
       //everyone exits here - there may be issues with leftover messages in the queue
-#if !CMK_WITH_STATS
+#if !CMK_WITH_STATS && !CMK_WITH_WARNINGS
       DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n",CkMyPe()));
       ConverseExit();
       if(CharmLibInterOperate)
@@ -654,6 +707,25 @@ static void _exitHandler(envelope *env)
 
     case StatDoneMsg:
       DEBUGF(("[%d] Calling converse exit from StatDoneMsg \n",CkMyPe()));
+      ConverseExit();
+      if (CharmLibInterOperate)
+        CpvAccess(interopExitFlag) = 1;
+      break;
+#endif
+#if CMK_WITH_WARNINGS
+    case WarnMsg:
+    {
+      CkAssert(CkMyPe()==0);
+      WarningMsg* msg = (WarningMsg*)EnvToUsr(env);
+      ReportWarnings(msg);
+
+      envelope* env = _allocEnv(WarnDoneMsg);
+      CmiSetHandler(env, _exitHandlerIdx);
+      CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char*)env);
+      break;
+    }
+    case WarnDoneMsg:
+      DEBUGF(("[%d] Calling converse exit from WarnDoneMsg \n",CkMyPe()));
       ConverseExit();
       if (CharmLibInterOperate)
         CpvAccess(interopExitFlag) = 1;
