@@ -1,4 +1,5 @@
 #include "ddt.h"
+#include "pup_stl.h"
 #include <algorithm>
 #include <limits>
 
@@ -67,6 +68,9 @@ CkDDT::pup(PUP::er &p)
           break ;
         case CkDDT_STRUCT:
           typeTable[i] = new CkDDT_Struct ;
+          break ;
+        case CkDDT_SUBARRAY:
+          typeTable[i] = new CkDDT_Subarray ;
           break ;
         default: //CkDDT_PRIMITIVE
 	  typeTable[i] = new CkDDT_DataType;
@@ -295,6 +299,31 @@ CkDDT::newStruct(int count, int* arrbLength, CkDDT_Aint* arrDisp,
     new CkDDT_Struct(count, arrbLength, arrDisp, oldtype, olddatatypes);
   typeTable[index] = type ;
   types[index] = CkDDT_STRUCT ;
+}
+
+void
+CkDDT::newSubarray(int ndims, const int* arraySizes, const int* arraySubSizes, const int* arrayStarts,
+                   int order, CkDDT_Type oldtype, CkDDT_Type* newtype)
+{
+  CkDDT_Type currtype;
+  for(int i=0; i<ndims; i++)
+  {
+    std::vector<int> blockSizes(3);
+    blockSizes[0] = 0;
+    blockSizes[1] = arraySubSizes[ndims-1-i];
+    blockSizes[2] = 0;
+    std::vector<CkDDT_Aint> dispVector(3);
+    dispVector[0] = 0;
+    dispVector[1] = arrayStarts[ndims-1-i];
+    dispVector[2] = arraySizes[ndims-1-i];
+    newIndexed(3,&blockSizes[0],&dispVector[0],oldtype, &currtype);
+    oldtype = currtype;
+  }
+  int index = *newtype = getNextFreeIndex();
+  CkDDT_DataType* type = new CkDDT_Subarray(ndims, arraySizes, arraySubSizes, arrayStarts,
+                                            order, currtype, typeTable[currtype]);
+  typeTable[index] = type;
+  types[index] = CkDDT_SUBARRAY;
 }
 
 typedef struct { float val; int idx; } FloatInt;
@@ -539,6 +568,17 @@ CkDDT_DataType::getSize(int num) const
   return num*size ;
 }
 
+int
+CkDDT_DataType::getBaseSizeRecurse(int num) const
+{
+  if (datatype <= CkDDT_PREDEFINED) {
+    return num * size;
+  }
+  else {
+    return baseType->getBaseSizeRecurse(num);
+  }
+}
+
 CkDDT_Aint
 CkDDT_DataType::getExtent(void) const
 {
@@ -632,8 +672,8 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
   baseIndex = bindex;
   baseSize = baseType->getSize();
   baseExtent = baseType->getExtent();
-  size = count * baseSize;
-  extent = count * baseExtent;
+  size = count * baseSize ;
+  extent = count * baseExtent ;
   numElements = count * baseType->getNumElements();
   lb = baseType->getLB();
   ub = lb + extent;
@@ -658,7 +698,7 @@ CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int dir) cons
   }
   else {
     for(; num; num--) {
-      bytesCopied += baseType->serialize(userdata, buffer, count, dir) ;
+      bytesCopied += baseType->serialize(userdata, buffer, count, dir);
       buffer += size;
       userdata += extent;
     }
@@ -1515,3 +1555,88 @@ CkDDT_Struct::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d
   return 0;
 }
 
+CkDDT_Subarray::CkDDT_Subarray(int _ndims, const int* _arraySizes, const int* _arraySubsizes,
+                               const int* _arrayStarts, int _order, int index, CkDDT_DataType* type)
+{
+  datatype = CkDDT_SUBARRAY;
+  ndims = _ndims;
+  order = _order;
+  baseType = type;
+  baseIndex = index;
+  size = 1;
+  for(int i=0; i<ndims; i++){
+    arraySizes.push_back(_arraySizes[i]);
+    arraySubSizes.push_back(_arraySubsizes[i]);
+    size *= _arraySubsizes[i];
+    arrayStarts.push_back(_arrayStarts[i]);
+  }
+  count = arraySubSizes[0];
+  baseSize = baseType->getSize();
+  size *= baseType->getBaseSizeRecurse();
+  extent = size;
+  numElements = count * baseType->getNumElements();
+  lb = baseType->getLB();
+  ub = lb + extent;
+  iscontig = 0;
+}
+
+size_t
+CkDDT_Subarray::serialize(char* userdata, char* buffer, int num, int dir) const
+{
+  int bytesCopied = 0;
+  int saveBytes = 0;
+  for(int i=0; i<num; i++){
+    saveBytes += baseType->serialize(userdata, buffer, 1, dir);
+    buffer += saveBytes;
+    userdata += baseExtent;
+    bytesCopied += saveBytes;
+    saveBytes = 0;
+  }
+  return bytesCopied;
+}
+
+void
+CkDDT_Subarray::pupType(PUP::er &p, CkDDT* ddt)
+{
+  p(datatype);
+  p(ndims);
+  p(order);
+  p(size);
+  p(extent);
+  p(count);
+  p(baseSize);
+  p(baseExtent);
+  p(baseIndex);
+  p(lb);
+  p(ub);
+  p(iscontig);
+  p(numElements);
+  p|arraySizes;
+  p|arraySubSizes;
+  p|arrayStarts;
+  if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+}
+
+int
+CkDDT_Subarray::getEnvelope(int *ni, int *na, int *nd, int *combine) const
+{
+  *ni = 3*ndims + 2;
+  *na = 0;
+  *nd = 1;
+  *combine = CkDDT_COMBINER_SUBARRAY;
+  return 0;
+}
+
+int
+CkDDT_Subarray::getContents(int ni, int na, int nd, int i[], int a[], int d[]) const
+{
+  i[0] = ndims;
+  for(int k=0; k<i[0]; k++){
+    i[k+1] = arraySizes[k];
+    i[i[0]+k+1] = arraySubSizes[k];
+    i[2*i[0]+k+1] = arrayStarts[k];
+  }
+  i[3*i[0]+1] = order;
+  d[0] = baseIndex;
+  return 0;
+}

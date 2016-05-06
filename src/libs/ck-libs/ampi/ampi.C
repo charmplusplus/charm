@@ -4771,6 +4771,16 @@ int AMPI_Type_struct(int count, int* arrBlength, MPI_Aint* arrDisp,
 }
 
 CDECL
+int AMPI_Type_create_subarray(int ndims, const int* arraySizes, const int* arraySubSizes,
+                              const int* arrayStarts, int order, MPI_Datatype oldtype,
+                              MPI_Datatype* newtype)
+{
+  AMPIAPI("AMPI_Type_create_subarray");
+  getDDT()->newSubarray(ndims, arraySizes, arraySubSizes, arrayStarts, order, oldtype, newtype);
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Type_commit(MPI_Datatype *datatype)
 {
   AMPIAPI("AMPI_Type_commit");

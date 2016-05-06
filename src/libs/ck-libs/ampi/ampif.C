@@ -43,6 +43,7 @@ FDECL {
 #define mpi_type_create_hindexed_block FTN_NAME( MPI_TYPE_CREATE_HINDEXED_BLOCK , mpi_type_create_hindexed_block )
 #define mpi_type_create_struct FTN_NAME( MPI_TYPE_CREATE_STRUCT , mpi_type_create_struct )
 #define mpi_type_struct FTN_NAME( MPI_TYPE_STRUCT , mpi_type_struct )
+#define mpi_type_create_subarray FTN_NAME( MPI_TYPE_CREATE_SUBARRAY , mpi_type_create_subarray )
 #define mpi_type_commit FTN_NAME( MPI_TYPE_COMMIT , mpi_type_commit )
 #define mpi_type_free FTN_NAME( MPI_TYPE_FREE , mpi_type_free )
 #define mpi_type_get_extent FTN_NAME( MPI_TYPE_GET_EXTENT , mpi_type_get_extent )
@@ -663,6 +664,13 @@ void mpi_type_struct(int* count, int* arrBlength, MPI_Aint* arrDisp,
 void mpi_type_create_resized(int* oldtype, MPI_Aint* lb, MPI_Aint* extent, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_create_resized(*oldtype, *lb, *extent, newtype);
+}
+
+void mpi_type_create_subarray(int* ndims, int* arraySizes, int* arraySubSizes, int* arrayStarts,
+                              int* order, int* oldtype, int* newtype, int* ierr)
+{
+  *ierr = AMPI_Type_create_subarray(*ndims, arraySizes, arraySubSizes, arrayStarts,
+                                    *order, *oldtype, newtype);
 }
 
 void mpi_type_commit(int *type, int *ierr)

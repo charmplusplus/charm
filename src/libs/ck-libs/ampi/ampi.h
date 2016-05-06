@@ -316,6 +316,9 @@ typedef void (*MPI_MigrateFn)(void);
 #define MPI_COMBINER_INDEXED_BLOCK  11
 #define MPI_COMBINER_HINDEXED_BLOCK 12
 
+#define MPI_ORDER_C       0
+#define MPI_ORDER_FORTRAN 1
+
 /********************** MPI-1.1 Functions ***************************/
 /***pt2pt***/
 #define MPI_BSEND_OVERHEAD 0
@@ -435,6 +438,10 @@ int AMPI_Type_create_struct(int count, int* arrBLength, MPI_Aint* arrDisp,
 #define MPI_Type_struct AMPI_Type_struct
 int AMPI_Type_struct(int count, int* arrBLength, MPI_Aint* arrDisp,
                      MPI_Datatype *oldType, MPI_Datatype *newType);
+#define MPI_Type_create_subarray AMPI_Type_create_subarray
+int AMPI_Type_create_subarray(int ndims, const int* arraySizes, const int* arraySubSizes,
+                              const int* arrayStarts, int order, MPI_Datatype oldtype,
+                              MPI_Datatype* newtype);
 #define MPI_Type_get_envelope AMPI_Type_get_envelope
 int AMPI_Type_get_envelope(MPI_Datatype datatype, int *num_integers, int *num_addresses,
                            int *num_datatypes, int *combiner);

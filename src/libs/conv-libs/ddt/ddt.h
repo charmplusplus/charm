@@ -2,6 +2,7 @@
 #define __CkDDT_H_
 
 #include "pup.h"
+#include <vector>
 
 #define CkDDT_MAXTYPE           100
 
@@ -48,6 +49,8 @@
 #define CkDDT_LONG_DOUBLE_COMPLEX 39
 #define CkDDT_AINT                40
 
+#define CkDDT_PREDEFINED          40
+
 #define CkDDT_CONTIGUOUS          41
 #define CkDDT_VECTOR              42
 #define CkDDT_HVECTOR             43
@@ -56,17 +59,22 @@
 #define CkDDT_STRUCT              46
 #define CkDDT_INDEXED_BLOCK       47
 #define CkDDT_HINDEXED_BLOCK      48
+#define CkDDT_SUBARRAY            49
 
 /* for the datatype decoders */
-#define CkDDT_COMBINER_NAMED          1
-#define CkDDT_COMBINER_CONTIGUOUS     2
-#define CkDDT_COMBINER_VECTOR         3
-#define CkDDT_COMBINER_HVECTOR        4
-#define CkDDT_COMBINER_INDEXED        5
-#define CkDDT_COMBINER_HINDEXED       6
-#define CkDDT_COMBINER_STRUCT         7
-#define CkDDT_COMBINER_INDEXED_BLOCK  8
-#define CkDDT_COMBINER_HINDEXED_BLOCK 9
+#define CkDDT_COMBINER_NAMED           1
+#define CkDDT_COMBINER_CONTIGUOUS      2
+#define CkDDT_COMBINER_VECTOR          3
+#define CkDDT_COMBINER_HVECTOR         4
+#define CkDDT_COMBINER_INDEXED         5
+#define CkDDT_COMBINER_HINDEXED        6
+#define CkDDT_COMBINER_STRUCT          7
+#define CkDDT_COMBINER_INDEXED_BLOCK   8
+#define CkDDT_COMBINER_HINDEXED_BLOCK  9
+#define CkDDT_COMBINER_SUBARRAY       10
+
+#define CkDDT_ORDER_C       0
+#define CkDDT_ORDER_FORTRAN 1
 
 #define CkDDT_MAX_NAME_LEN         255
 
@@ -98,6 +106,8 @@ class CkDDT ;
   refCount - to keep track of how many references are present to this type.
 
   size - size of one unit of datatype
+  getBaseSizeRecurse - returns the size of the bottom base class type; the non-derived
+                      datatype that builds the bottom layer derived datatype
   extent - extent is different from size in that it also counts
            displacements between blocks.
   count -  count of base datatype present in this datatype
@@ -162,6 +172,7 @@ class CkDDT_DataType {
     virtual int getSize(int count=1) const;
     virtual CkDDT_Aint getExtent(void) const;
     virtual int getBaseSize(void) const;
+    virtual int getBaseSizeRecurse(int count=1) const;
     virtual CkDDT_Aint getLB(void) const;
     virtual CkDDT_Aint getUB(void) const;
     virtual int getType(void) const;
@@ -425,6 +436,35 @@ class CkDDT_Struct : public CkDDT_DataType {
 };
 
 /*
+  CkDDT_Subarray type allows one to specify an n-dimensional subset of an n-dimensional array.
+  Each dimension is built using a contiguous block of contiguous datatypes.
+  The serialize method works recursively, calling serialize on each contiguous block until we reach the bottom layer.
+
+  arraySizes - array of lengths of the original array in each dimension
+  arraySubSizes - array of displacements
+  arrayStarts - array of DataTypes.
+*/
+
+class CkDDT_Subarray : public CkDDT_DataType
+{
+  protected:
+    std::vector<int> arraySizes;
+    std::vector<int> arraySubSizes;
+    std::vector<int> arrayStarts;
+    int ndims;
+    int order;
+  public:
+    CkDDT_Subarray() { };
+    CkDDT_Subarray(int ndims, const int* arraySizes, const int* arraySubsizes,
+                   const int* arrayStarts, int order, int index, CkDDT_DataType* type);
+    virtual ~CkDDT_Subarray() {};
+    virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
+    virtual void pupType(PUP::er &p, CkDDT* ddt);
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combine) const;
+    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]) const;
+};
+
+/*
   This class maintains the typeTable of the derived datatypes.
   First few entries of the table contain primitive datatypes.
   index - holds the current available index in the table where 
@@ -549,6 +589,7 @@ class CkDDT {
   }
 
   void newContiguous(int count, CkDDT_Type  oldType, CkDDT_Type* newType);
+  void newContiguous(int count, int subSize, int offset, CkDDT_Type oldType, CkDDT_Type* newType);
   void newVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
                 CkDDT_Type* newtype);
   void newHVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
@@ -563,6 +604,8 @@ class CkDDT {
                        CkDDT_Type *newtype);
   void newStruct(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type *oldtype,
                 CkDDT_Type* newtype);
+  void newSubarray(int ndims, const int* arraySizes, const int* arraySubsizes, const int* arrayStarts,
+                  int order, CkDDT_Type oldtype, CkDDT_Type* newtype);
   void  freeType(int* index);
   int   getNextFreeIndex(void);
   void  pup(PUP::er &p);
