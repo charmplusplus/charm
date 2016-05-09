@@ -301,9 +301,9 @@ int AMPI_Info_free(MPI_Info *info){
 #if CMK_PROJECTIONS_USE_ZLIB
 /*zDisk PUP::er's*/
 void PUP::tozDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
-{ /* CkPrintf("writing %d bytes\n",itemSize*n); */ gzwrite(F,p,itemSize*n);}
+{ gzwrite(F,p,itemSize*n);}
 void PUP::fromzDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
-{ /* CkPrintf("reading %d bytes\n",itemSize*n); */ gzread(F,p,itemSize*n);}
+{ gzread(F,p,itemSize*n);}
 
 /*zDisk buffer seeking is also simple*/
 void PUP::zdisk::impl_startSeek(seekBlock &s) /*Begin a seeking block*/

@@ -15,7 +15,6 @@
 
 #if AMPIMSGLOG
 
-//static int msgLogRank;
 static CkListString msgLogRanks;
 static int msgLogWrite;
 static int msgLogRead;
@@ -257,7 +256,7 @@ class ampiCommStruct {
 	// Lazily fill world communicator indices
 	void makeWorldIndices(void) const {
 		// cast away constness of "index" list
-	  CkVec<int> *ind=(CkVec<int> *)&indices;  // changed by Isaac (as a guess to fix a bug). Was "index" not "indices"
+	  CkVec<int> *ind=(CkVec<int> *)&indices;
 		for (int i=0;i<size;i++) ind->push_back(i);
 	}
 public:
@@ -627,7 +626,6 @@ public:
 #endif
 	}
 	
-	//added due to BIGSIM_OOC DEBUGGING
 	virtual void print();
 };
 
@@ -653,7 +651,6 @@ public:
 		AmpiRequest::pup(p);
 		p(sndrcv);
 	}
-	//added due to BIGSIM_OOC DEBUGGING
 	virtual void print();
 };
 
@@ -678,7 +675,6 @@ public:
 		AmpiRequest::pup(p);
 		p|statusIreq;  p|length;
 	}
-	//added due to BIGSIM_OOC DEBUGGING
 	virtual void print();
 };
 
@@ -728,7 +724,6 @@ public:
 	void receive(ampi *ptr, AmpiMsg *msg) {}
 	inline int getCount(void){ return elmcount; }
 	inline int getType(void){ return MPI_ATA_REQ; }
-// 	inline void free(void){ isvalid=false; delete [] myreqs; }
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
 		p(elmcount);
@@ -743,7 +738,6 @@ public:
 			delete []myreqs;
 		}
 	}
-	//added due to BIGSIM_OOC DEBUGGING
 	virtual void print();
 };
 
@@ -765,7 +759,6 @@ public:
 		AmpiRequest::pup(p);
 		p|statusIreq;
 	}
-	//added due to BIGSIM_OOC DEBUGGING
 	virtual void print();
 };
 
@@ -804,7 +797,6 @@ public:
 	void receive(ampi *ptr, AmpiMsg *msg) {}
 	inline int getCount(void){ return elmcount; }
 	inline int getType(void){ return MPI_IATA_REQ; }
-// 	inline void free(void){ isvalid=false; delete [] myreqs; }
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
 		p(elmcount);
@@ -819,7 +811,6 @@ public:
 			delete [] myreqs;
 		}
 	}
-	//added due to BIGSIM_OOC DEBUGGING
 	virtual void print();
 };
 
@@ -908,7 +899,6 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
 
     void pup(PUP::er &p);
     
-    //BIGSIM_OOC DEBUGGING
     void print(){
 	for(int i=0; i<len; i++){
 	    if(block[i]==NULL) continue;
@@ -1351,10 +1341,6 @@ public:
     CkDDT *myDDT;
     AmpiRequestList ampiReqs;
 
-    //added to make sure post_ireqs in ampi class share the same pointers
-    //with those in ampiReqs after pupping routines.
-    //AmpiRequestList oldAmpiReqs;
-    
     int addWinStruct(WinStruct* win);
     WinStruct getWinStruct(MPI_Win win);
     void removeWinStruct(WinStruct win);

@@ -168,7 +168,6 @@
        integer, parameter :: MPI_MAX_COMM_WORLDS=8
        integer :: MPI_COMM_UNIVERSE(1:MPI_MAX_COMM_WORLDS)
 
-!       integer, external :: MPI_Register
        double precision, external :: MPI_WTIME
        double precision, external :: MPI_WTICK
        integer, parameter :: MPI_MAX = 100

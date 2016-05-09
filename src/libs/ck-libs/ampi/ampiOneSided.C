@@ -25,7 +25,6 @@ win_obj::win_obj() {
 win_obj::win_obj(char *name, void *base, MPI_Aint size, int disp_unit, 
 			 MPI_Comm comm) {
   create(name, base, size, disp_unit, comm);
-  //ampi *ptr = getAmpiInstance(comm);
   owner = -1;  // the lock is not owned by anyone yet
 }
 
@@ -760,9 +759,6 @@ int AMPI_Win_unlock(int rank, MPI_Win win){
 CDECL
 int AMPI_Win_post(MPI_Group group, int assertion, MPI_Win win){
   AMPIAPI("AMPI_Win_post");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
-  //  ptr->winPost(group, winStruct);
   return MPI_SUCCESS;
 }
 
@@ -775,9 +771,6 @@ int AMPI_Win_wait(MPI_Win win){
 CDECL
 int AMPI_Win_start(MPI_Group group, int assertion, MPI_Win win){
   AMPIAPI("AMPI_Win_start");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
-  //  ptr->winStart(group, winStruct);
   return MPI_SUCCESS;
 }
 

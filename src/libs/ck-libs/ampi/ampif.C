@@ -305,7 +305,6 @@ CtvExtern(int, mpi_opc);
 // must be consistent with mpif.h
 #define MPI_OP_FIRST   100
 
-//#define GET_MPI_OP(idx)      (CkAssert(idx - MPI_OP_FIRST >= 0 && idx - MPI_OP_FIRST < CtvAccess(mpi_opc)), CtvAccess(mpi_ops)[idx - MPI_OP_FIRST])
 inline MPI_Op & GET_MPI_OP(int idx)      { MPI_Op *tab=CtvAccess(mpi_ops); return tab[idx - MPI_OP_FIRST]; }
 
 void mpi_is_thread_main(int *flag, int *ierr){
