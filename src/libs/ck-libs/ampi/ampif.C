@@ -307,6 +307,11 @@ CtvExtern(int, mpi_opc);
 
 inline MPI_Op & GET_MPI_OP(int idx)      { MPI_Op *tab=CtvAccess(mpi_ops); return tab[idx - MPI_OP_FIRST]; }
 
+static void handle_MPI_IN_PLACE_f(void* inbuf, void* outbuf){
+  if (inbuf == NULL) inbuf = MPI_IN_PLACE;
+  if (outbuf == NULL) outbuf = MPI_IN_PLACE;
+}
+
 void mpi_is_thread_main(int *flag, int *ierr){
   *ierr = AMPI_Is_thread_main(flag);
 }
@@ -439,8 +444,7 @@ void mpi_reduce(void *inbuf, void *outbuf, int *count, int *type,
    int *opc, int *root, int *comm, int *ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
-  if (inbuf == NULL) inbuf = MPI_IN_PLACE;
-  if (outbuf == NULL) outbuf = MPI_IN_PLACE;
+  handle_MPI_IN_PLACE_f(inbuf, outbuf);
   *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, op, *root, *comm);
 }
 
@@ -448,8 +452,7 @@ void mpi_allreduce(void *inbuf,void *outbuf,int *count,int *type,
    int *opc, int *comm, int *ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
-  if (inbuf == NULL) inbuf = MPI_IN_PLACE;
-  if (outbuf == NULL) outbuf = MPI_IN_PLACE;
+  handle_MPI_IN_PLACE_f(inbuf, outbuf);
   *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, op, *comm);
 }
 
@@ -866,6 +869,7 @@ void mpi_ireduce(void *sendbuf, void *recvbuf, int* count, int* type,
                 int* opc, int* root, int* comm, int *request, int* ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Ireduce(sendbuf, recvbuf, *count, *type,
                       op, *root, *comm, (MPI_Request*) request);
 }
@@ -874,6 +878,7 @@ void mpi_iallreduce(void *inbuf, void *outbuf, int* count, int* type,
                    int* opc, int* comm, int *request, int* ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
+  handle_MPI_IN_PLACE_f(inbuf, outbuf);
   *ierr = AMPI_Iallreduce(inbuf, outbuf, *count, *type,
                          op, *comm, (MPI_Request*) request);
 }
@@ -889,6 +894,7 @@ void ampi_reduce_scatter_block(void* sendbuf, void* recvbuf, int *count,
                                int *type, int *opc, int *comm, int *ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Reduce_scatter_block(sendbuf, recvbuf, *count, *type, op, *comm);
 }
 
@@ -896,6 +902,7 @@ void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
                        int* datatype, int* opc, int* comm, int* ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Reduce_scatter(sendbuf, recvbuf, recvcounts,
                              *datatype, op, *comm);
 }
