@@ -822,7 +822,7 @@ void mpi_ialltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                          recvcounts, rdispls, *recvtype, *comm, request);
 }
 
-void ampi_alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
+void mpi_alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
    int *sendtypes, void *recvbuf, int *recvcounts, int *rdispls,
    int *recvtypes, int *comm, int *ierr)
 {
@@ -830,7 +830,7 @@ void ampi_alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
                          recvbuf, recvcounts, rdispls, recvtypes, *comm);
 }
 
-void ampi_ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
+void mpi_ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
    int *sendtypes, void *recvbuf, int *recvcounts, int *rdispls,
    int *recvtypes, int *comm, int *request, int *ierr)
 {
@@ -890,7 +890,7 @@ void mpi_reduce_local(void *inbuf, void *outbuf, int *count, int *type,
   *ierr = AMPI_Reduce_local(inbuf, outbuf, *count, *type, op);
 }
 
-void ampi_reduce_scatter_block(void* sendbuf, void* recvbuf, int *count,
+void mpi_reduce_scatter_block(void* sendbuf, void* recvbuf, int *count,
                                int *type, int *opc, int *comm, int *ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
