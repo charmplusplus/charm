@@ -25,6 +25,15 @@
 extern "C" {
 #endif
 
+typedef int (* TopoManager_getPartitionSize)(int partition);
+typedef enum {
+  TOPOMANAGER_LINEAR_ORDER = 0,
+  TOPOMANAGER_PLANAR_ORDER,
+  TOPOMANAGER_HILBERT_ORDER,
+  TOPOMANAGER_RECURSIVE_BISECTION,
+  TOPOMANAGER_BLOCK_ORDER
+} TopoManager_ordering_scheme;
+
 /** basic initialization */
 #ifndef __TPM_STANDALONE__
 void TopoManager_init();
@@ -54,7 +63,12 @@ void TopoManager_getPeRank(int *rank, int *coords);
 void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops);
 #ifndef __TPM_STANDALONE__
 /** topoaware partition using scheme s */
-void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap);
+void TopoManager_createPartitions(TopoManager_ordering_scheme scheme, 
+  int numparts, TopoManager_getPartitionSize getSize, void *opaque_data, 
+  int *nodeMap);
+void TopoManager_createPePartitions(TopoManager_ordering_scheme scheme, 
+  int numparts, TopoManager_getPartitionSize getSize, void *opaque_data, 
+  int *peMap);
 #endif
 
 #if defined(__cplusplus)

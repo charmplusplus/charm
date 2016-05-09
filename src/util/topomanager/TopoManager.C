@@ -577,32 +577,40 @@ extern "C" void TopoManager_getHopsBetweenPeRanks(int pe1, int pe2, int *hops) {
 }
 
 #ifndef __TPM_STANDALONE__
-extern "C" void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap) {
-  if(scheme == 0) {
-    if(!CmiMyNodeGlobal()) {
-      printf("Charm++> Using rank ordered division (scheme 0) for topology aware partitions\n");
-    }
+extern "C" void TopoManager_createPartitions(TopoManager_ordering_scheme scheme, 
+  int numparts, TopoManager_getPartitionSize getSize, void *opaque_data, 
+  int *nodeMap) {
+  if(scheme == TOPOMANAGER_LINEAR_ORDER) {
     int i;
     for(i = 0; i < CmiNumNodes(); i++) {
       nodeMap[i] = i;
     }
-  } else if(scheme == 1) {
-    if(!CmiMyNodeGlobal()) {
-      printf("Charm++> Using planar division (scheme 1) for topology aware partitions\n");
-    }
+  } else if(scheme == TOPOMANAGER_PLANAR_ORDER) {
     getPlanarList(nodeMap);
-  } else if(scheme == 2) {
-    if(!CmiMyNodeGlobal()) {
-      printf("Charm++> Using hilber curve (scheme 2) for topology aware partitions\n");
-    }
+  } else if(scheme == TOPOMANAGER_HILBERT_ORDER) {
     getHilbertList(nodeMap);
-  } else if(scheme == 3) {
-    if(!CmiMyNodeGlobal()) {
-      printf("Charm++> Using recursive bisection (scheme 3) for topology aware partitions\n");
-    }
-    getRecursiveBisectionList(numparts,nodeMap);
+  } else if(scheme == TOPOMANAGER_RECURSIVE_BISECTION) {
+    getRecursiveBisectionList(numparts,getSize,nodeMap);
+  } else if(scheme == TOPOMANAGER_BLOCK_ORDER) {
+    getBlockedTraversalList(numparts,getSize,opaque_data,nodeMap);
   } else {
     CmiAbort("Specified value for topology scheme is not supported\n");
   }
 }
+
+extern "C" void TopoManager_createPePartitions(TopoManager_ordering_scheme scheme, 
+  int numparts, TopoManager_getPartitionSize getSize, void *opaque_data, 
+  int *peMap) {
+  int *nodeMap = (int *)malloc(CmiNumNodes() * sizeof(int));
+  TopoManager_createPartitions(scheme, numparts, getSize, opaque_data, nodeMap);
+  int currPe = 0, currNode;
+  for(currNode = 0; currNode < CmiNumNodes(); currNode++) {
+    int localPE = nodeMap[currNode] * CmiMyNodeSize();
+    for(int lpe = 0; lpe < CmiMyNodeSize(); lpe++) {
+      peMap[currPe++] = localPE + lpe;
+    }
+  }
+  free(nodeMap);
+}
 #endif
+

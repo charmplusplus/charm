@@ -740,6 +740,10 @@ if (  MSG_STATISTIC)
 extern void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
 extern void setDefaultPartitionParams();
 
+int CmiGetPartitionSize(int partition) {
+  return CmiPartitionSize(partition);
+}
+
 void create_topoaware_partitions() {
   int i, j, numparts_bak;
   Partition_Type type_bak;
@@ -762,7 +766,7 @@ void create_topoaware_partitions() {
   if(_partitionInfo.scheme == 100) {
     createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);       
   } else {
-    TopoManager_createPartitions(_partitionInfo.scheme, numparts_bak, _partitionInfo.nodeMap);
+    TopoManager_createPartitions(_partitionInfo.scheme, numparts_bak, CmiGetPartitionSize, NULL, _partitionInfo.nodeMap);
   }
   TopoManager_free();
   

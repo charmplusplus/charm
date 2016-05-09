@@ -393,13 +393,13 @@ struct TopoManagerWrapper {
 };
 
 void recursive_bisect(
-  int part_begin, int part_end,
+  int part_begin, int part_end, TopoManager_getPartitionSize getSize,
   int *node_begin, int *node_end,
   TopoManagerWrapper &tmgr
   ) {
 
   if ( part_end - part_begin == 1 ) {
-    if ( CmiPartitionSize(part_begin) != node_end - node_begin ) {
+    if ( getSize(part_begin) != node_end - node_begin ) {
       CmiAbort("partitioning algorithm size mismatch in recursive_bisect()");
     }
     tmgr.sortLongest(node_begin, node_end);
@@ -423,7 +423,7 @@ void recursive_bisect(
   int ncount = 0;
   int part_split = part_begin;
   for ( int p = part_begin; p < part_end; ++p ) {
-    int ps = CmiPartitionSize(p);
+    int ps = getSize(p);
     if ( abs(ncount+ps-nsplit) < abs(ncount-nsplit) ) part_split = p+1;
     else break;
     ncount += ps;
@@ -437,16 +437,16 @@ void recursive_bisect(
 
   // recurse
   recursive_bisect(
-    part_begin, part_split, node_begin, node_split, tmgr);
+    part_begin, part_split, getSize, node_begin, node_split, tmgr);
   recursive_bisect(
-    part_split, part_end, node_split, node_end, tmgr);
+    part_split, part_end, getSize, node_split, node_end, tmgr);
 }
 
 } // anonymous namespace
 
 /** \brief A function to traverse the given processors, and get a recursive bisection list
  */
-void getRecursiveBisectionList(int numparts, int *procList)
+void getRecursiveBisectionList(int numparts, TopoManager_getPartitionSize getSize, int *procList)
 {
   int n = CmiNumNodes();
   for(int i = 0; i < n; i++) {
@@ -455,12 +455,12 @@ void getRecursiveBisectionList(int numparts, int *procList)
   if ( numparts < 2 ) return;
   TopoManagerWrapper tmgr;
   recursive_bisect(
-    0, numparts, procList, procList + n, tmgr);
+    0, numparts, getSize, procList, procList + n, tmgr);
   if ( PARTITION_TOPOLOGY_VERBOSE && CmiMyNodeGlobal() == 0 ) {
     int crds[5];
     for ( int i=0,p=0,ip=0; i<n; ++i,++ip ) {
       if ( p == numparts ) break;  // this shouldn't happen
-      if ( ip == CmiPartitionSize(p) ) { ++p; ip=0; }
+      if ( ip == getSize(p) ) { ++p; ip=0; }
       tmgr.coords(procList[i],crds);
       printf("procList[%5d] part[%3d] %5d (%2d %2d %2d %2d %2d)\n",
         i, p, procList[i],
@@ -469,5 +469,153 @@ void getRecursiveBisectionList(int numparts, int *procList)
   }
 }
 
+/** \brief A function to traverse the given processors, and get a blocked list
+ */
+void getBlockedTraversalList(int numparts, 
+    TopoManager_getPartitionSize getSize, void *blocked_dims, int *procList) {
+  int ndims, numranks;
+  TopoManager_getDimCount(&ndims);
+
+  int currProc = 0;
+  int *bdims = (int*)blocked_dims;
+  int local_dims[5];
+  if(blocked_dims == NULL) {
+    bdims = local_dims;
+    for(int j = 0; j < 5; j++) {
+      bdims[j] = 4;
+    }
+  }
+  if(ndims == 3) {
+    int boxes[4], dims[4], order[4];
+    TopoManager_getDims(dims);
+    int *ranks = new int[dims[ndims]];
+    if(dims[0] >= dims[1] && dims[0] >= dims[2]) {
+      order[0] = 0;
+      if(dims[1] >= dims[2]) {
+        order[1] = 1; order[2] = 2;
+      } else {
+        order[1] = 2; order[2] = 1;
+      }
+    } else if(dims[1] >= dims[0] && dims[1] >= dims[2]) {
+      order[0] = 1;
+      if(dims[0] >= dims[2]) {
+        order[1] = 0; order[2] = 2;
+      } else {
+        order[1] = 2; order[2] = 0;
+      }
+    } else if(dims[2] >= dims[0] && dims[2] >= dims[1]) {
+      order[0] = 2;
+      if(dims[0] >= dims[1]) {
+        order[1] = 0; order[2] = 1;
+      } else {
+        order[1] = 1; order[2] = 0;
+      }
+    } else {
+      printf("Weird math...none of the dimension seems to be largest\n");
+      order[0] = 0; order[1] = 1; order[2] = 2;
+    }
+
+    for(boxes[ order[0] ] = 0; boxes[ order[0] ] < dims[ order[0] ]; boxes[ order[0] ] += bdims[ order[0] ]) {
+      for(boxes[ order[1] ] = 0; boxes[ order[1] ] < dims[ order[1] ]; boxes[ order[1] ]  += bdims[ order[1] ]) {
+        for(boxes[ order[2] ] = 0; boxes[ order[2] ] < dims[ order[2] ]; boxes[ order[2] ] += bdims[ order[2] ]) {
+
+          int begin[3], end[3], curLoc[4];
+          for(int i = 0; i < 3; i++) {
+            begin[i] = boxes[i];
+            end[i] = std::min((begin[i] + bdims[i]), dims[i]);
+          }
+
+          for(curLoc[ order[0] ] = begin[ order[0] ]; curLoc[ order[0] ] < end[ order[0] ]; curLoc[ order[0] ] ++) {
+            for(curLoc[ order[1] ] = begin[ order[1] ]; curLoc[ order[1] ] < end[ order[1] ]; curLoc[ order[1] ] ++) {
+              for(curLoc[ order[2] ] = begin[ order[2] ]; curLoc[ order[2] ] < end[ order[2] ]; curLoc[ order[2] ] ++) {
+                TopoManager_getRanks(&numranks, ranks, curLoc);
+                if(numranks == 0) continue;
+                for(int j = 0; j < numranks; j++) {
+                  procList[currProc++] = ranks[j];
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    delete [] ranks;
+  } else if(ndims == 5) {
+    int globalCount = 0;
+    int boxes[6], dims[6], order[6];
+    TopoManager_getDims(dims);
+    int *ranks = new int[dims[ndims]];
+
+    //find largest two index
+    int largest = 0, val = dims[0];
+    for(int i = 1; i < 4; i++) {
+      if(val < dims[i]) {
+        val = dims[i];
+        largest = i;
+      }
+    }
+    order[0] = largest;
+
+    if(order[0] != 0) { 
+      largest = 0; val = dims[0];
+    } else {
+      largest = 1; val = dims[1];
+    }
+
+    for(int i = 1; i < 4; i++) {
+      if(i != order[0]) {
+        if(val < dims[i]) {
+          val = dims[i];
+          largest = i;
+        }
+      }
+    }
+    order[1] = largest;
+
+    int loc = 2;
+    for(int i = 0; i < 4; i++) {
+      if(order[0] != i && order[1] != i) {
+        order[loc++] = i;
+      }
+    }
+    order[4] = 4;
+
+    for(boxes[ order[0] ] =  0 ; boxes[ order[0] ] < dims[ order[0] ]; boxes[ order[0] ] += bdims[ order[0] ]) {
+      for(boxes[ order[1] ] = 0; boxes[ order[1] ] < dims[ order[1] ]; boxes[ order[1] ]  += bdims[ order[1] ]) {
+        for(boxes[ order[2] ] = 0; boxes[ order[2] ] < dims[ order[2] ]; boxes[ order[2] ] += bdims[ order[2] ]) {
+          for(boxes[ order[3] ] = 0; boxes[ order[3] ] < dims[ order[3] ]; boxes[ order[3] ] += bdims[ order[3] ]) {
+            for(boxes[4] = 0; boxes[4] < dims[4]; boxes[4] += bdims[4]) {
+
+              int begin[5], end[5], curLoc[6];
+              for(int i = 0; i < 5; i++) {
+                begin[i] = boxes[i];
+                end[i] = std::min((begin[i] + bdims[i]), dims[i]);
+              }
+
+              for(curLoc[ order[0] ] = begin[ order[0] ]; curLoc[ order[0] ] < end[ order[0] ]; curLoc[ order[0] ]++) {
+                for(curLoc[ order[1] ] = begin[ order[1] ]; curLoc[ order[1] ] < end[ order[1] ]; curLoc[ order[1] ]++) {
+                  for(curLoc[ order[2] ] = begin[ order[2] ]; curLoc[ order[2] ] < end[ order[2] ]; curLoc[ order[2] ]++) {
+                    for(curLoc[ order[3] ] = begin[ order[3] ]; curLoc[ order[3] ] < end[ order[3] ]; curLoc[ order[3] ]++) {
+                      for(curLoc[4] = begin[4]; curLoc[4] < end[4]; curLoc[4]++) {
+                        TopoManager_getRanks(&numranks, ranks, curLoc);
+                        if(numranks == 0) continue;
+                        for(int j = 0; j < numranks; j++) {
+                          procList[currProc++] = ranks[j];
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    delete [] ranks;
+  } else {
+    CmiAbort("Unsupported ndims\n");
+  }
+}
 
 #endif
