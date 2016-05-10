@@ -288,14 +288,15 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
         str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
         str<<"  PUP::fromMem implP(impl_buf);\n";
         if (next != NULL && next->next == NULL) {
-            if (isArray()) {
+	  // 2 argument case - special cases for an array and its length, in either order
+	  if (isArray() && !next->isArray()) {
               if (!isSDAGGen) {
-                Type* dt = next->param->type->deref();
-                str << "  " << dt << " " << next->param->name << "; "
+                Type* dtLen = next->param->type->deref();
+                str << "  " << dtLen << " " << next->param->name << "; "
                     << next->param->name << " = "
                     << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
                     << param->type->deref() << ");\n";
-                dt = param->type->deref();
+                Type *dt = param->type->deref();
                 str << "  " << dt << "* " << param->name << "; "
                     << param->name << " = (" << dt << "*)impl_buf;\n";
               } else {
@@ -306,7 +307,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
                 dt = param->type->deref();
                 str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
               }
-            } else if (next->isArray()) {
+	  } else if (!isArray() && next->isArray()) {
               if (!isSDAGGen) {
                 Type* dt = param->type->deref();
                 str << "  " << dt << " " << param->name << "; "
@@ -324,13 +325,22 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
                 dt = next->param->type->deref();
                 str << "  genClosure->" << next->param->name << " = (" << dt << "*)impl_buf;\n";
               }
-            } else {
+	  } else {
               if (!isSDAGGen)
                 callEach(&Parameter::beginUnmarshall,str);
               else
                 callEach(&Parameter::beginUnmarshallSDAGCall,str);
-            }
-        } else {
+	  }
+        } else if (next == NULL && isArray()) {
+	  // 1 argument case - special case for a standalone array
+	  Type *dt = param->type->deref();
+	  if (!isSDAGGen) {
+	    str << "  " << dt << "* " << param->name << "; "
+		<< param->name << " = (" << dt << "*)impl_buf;\n";
+	  } else {
+	    str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
+	  }
+	} else {
             str << "  /* non two-param case */\n";
             if (!isSDAGGen)
               callEach(&Parameter::beginUnmarshall,str);
