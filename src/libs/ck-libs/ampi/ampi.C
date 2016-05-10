@@ -1272,7 +1272,6 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s):parentProxy(parent_)
 
   msgs = CmmNew();
   posted_ireqs = CmmNew();
-  nbcasts = 0;
 
   seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
@@ -1333,7 +1332,6 @@ void ampi::pup(PUP::er &p)
   p|parentProxy;
   p|myComm;
   p|myRank;
-  p|nbcasts;
   p|tmpVec;
   p|remoteProxy;
   p|resumeOnRecv;
@@ -2018,7 +2016,6 @@ void ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
     thisProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
   }
   if(-1==recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM)) CkAbort("AMPI> Error in broadcast");
-  nbcasts++;
 }
 
 void ampi::ibcast(int root, void* buf, int count, int type, MPI_Comm destcomm, MPI_Request* request)
@@ -2040,7 +2037,6 @@ void ampi::ibcast(int root, void* buf, int count, int type, MPI_Comm destcomm, M
   int tags[3];
   tags[0]=MPI_BCAST_TAG; tags[1]=rootIdx; tags[2]=MPI_BCAST_COMM;
   CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
-  nbcasts++;
 }
 
 void ampi::bcastraw(void* buf, int len, CkArrayID aid)

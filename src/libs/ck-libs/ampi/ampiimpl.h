@@ -1507,7 +1507,6 @@ class ampi : public CBase_ampi {
   */
   CmmTable msgs;
   CmmTable posted_ireqs;         // posted irecv req
-  int nbcasts;
   //------------------------ Added by YAN ---------------------
  private:
   CkPupPtrVec<win_obj> winObjects;
