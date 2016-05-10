@@ -2021,6 +2021,28 @@ void ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
   nbcasts++;
 }
 
+void ampi::ibcast(int root, void* buf, int count, int type, MPI_Comm destcomm, MPI_Request* request)
+{
+  ampi *ptr = getAmpiInstance(destcomm);
+  const ampiCommStruct &dest=comm2CommStruct(destcomm);
+  int rootIdx=dest.getIndexForRank(root);
+  if(rootIdx==thisIndex){
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    CpvAccess(_currentObj) = this;
+#endif
+    thisProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, 0, buf, count, type, MPI_BCAST_COMM));
+  }
+
+  // use an IReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  IReq *newreq = new IReq(buf, count, type, rootIdx, MPI_BCAST_TAG, MPI_BCAST_COMM);
+  *request = reqs->insert(newreq);
+  int tags[3];
+  tags[0]=MPI_BCAST_TAG; tags[1]=rootIdx; tags[2]=MPI_BCAST_COMM;
+  CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
+  nbcasts++;
+}
+
 void ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
   AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, MPI_COMM_WORLD);
@@ -2820,8 +2842,8 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
 #endif
 
   ampi* ptr = getAmpiInstance(comm);
-  ptr->bcast(root, buf, count, type, comm);
-  *request = MPI_REQUEST_NULL;
+  ptr->ibcast(root, buf, count, type, comm, request);
+
 #if AMPI_COUNTER
   getAmpiParent()->counters.bcast++;
 #endif

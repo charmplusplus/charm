@@ -1458,6 +1458,7 @@ class ampi : public CBase_ampi {
   void probe(int t,int s,int comm,int *sts);
   int iprobe(int t,int s,int comm,int *sts);
   void bcast(int root, void* buf, int count, int type,MPI_Comm comm);
+  void ibcast(int root, void* buf, int count, int type, MPI_Comm comm, MPI_Request* request);
   static void bcastraw(void* buf, int len, CkArrayID aid);
   void split(int color,int key,MPI_Comm *dest, int type);
   void commCreate(const groupStruct vec,MPI_Comm *newcomm);
