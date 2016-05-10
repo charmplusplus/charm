@@ -2,6 +2,60 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.8.0
+================================================================================
+
+Over 170 bug fixes, improvements, and cleanups have been applied
+across the entire system. Major changes are described below:
+
+Charm++ Features
+
+- Reductions over groups and chare arrays that apply commutative,
+  associative operations (e.g. MIN, MAX, logical AND/OR/XOR) are now
+  processed in a streaming fashion. This reduces the memory footprint
+  of reductions.
+
+- New `Tuple' and `Summary Statistics' reducers
+
+- Communication thread tracing; message latency measurement? . . .
+
+- Added `++quiet' option to suppress charmrun and charm++ non-error
+  messages at startup
+
+- Calls to entry methods with the [inline] tag now avoid copying their
+  arguments when the called method takes its parameters by const&,
+  offering a substantial reduction in overhead in those cases
+
+- Charm++ programs can now define their own main() function, rather
+  than using a generated implementation from a mainmodule/mainchare
+  combination. This extends the existing Charm++/MPI interoperation
+  feature.
+
+- ...
+
+AMPI Features
+
+- ...
+
+Platforms and Portability
+
+- The runtime system code now requires compiler support for C++11
+  R-value references and move constructors. This is not expected to be
+  incompatible with any currently supported compilers.
+
+- Support for IBM POWER8 systems with the PAMI communication API, such
+  as development/test platforms for the upcoming Sierra and Summit
+  supercomputers at LLNL and ORNL. Contributed by Sameer Kumar of IBM.
+
+- Mac OS (darwin) builds now default to the modern libc++ standard
+  library instead of the older libstdc++.
+
+- Blue Gene Q build targets have been added for the `bgclang' compiler
+
+- Charmrun can automatically detect rank and node count from
+  Slurm/srun environment variables
+
+================================================================================
 What's new in Charm++ 6.7.1
 ================================================================================
 
