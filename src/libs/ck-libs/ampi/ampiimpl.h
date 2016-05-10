@@ -63,26 +63,11 @@ class fromzDisk : public zdisk {
 #endif
 #endif // AMPIMSGLOG
 
-#define AMPI_COUNTER 0
-
 #define AMPI_ALLTOALL_SHORT_MSG   32
 #if CMK_CONVERSE_LAPI ||  CMK_BIGSIM_CHARM
 #define AMPI_ALLTOALL_MEDIUM_MSG   4194304
 #else
 #define AMPI_ALLTOALL_MEDIUM_MSG   32768
-#endif
-
-#if AMPI_COUNTER
-class AmpiCounters{
- public:
-  int send,recv,isend,irecv,nbor_alltoall,nbor_allgather,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,exscan;
-  AmpiCounters(){
-    send=0;recv=0;isend=0;irecv=0;nbor_alltoall=0;nbor_allgather=0;barrier=0;bcast=0;gather=0;scatter=0;allgather=0;alltoall=0;reduce=0;allreduce=0;scan=0;exscan=0;
-  }
-  void output(int idx){
-    CkPrintf("[%d]send=%d;recv=%d;isend=%d;irecv=%d;nbor_alltoall=%d;nbor_allgather=%d;barrier=%d;bcast=%d;gather=%d;scatter=%d;allgather=%d;alltoall=%d;reduce=%d;allreduce=%d;scan=%d;exscan=%d\n",idx,send,recv,isend,irecv,nbor_alltoall,nbor_allgather,barrier,bcast,gather,scatter,allgather,alltoall,reduce,allreduce,scan,exscan);
-  }
-};
 #endif
 
 typedef void (*MPI_MigrateFn)(void);
@@ -1348,11 +1333,6 @@ class ampiParent : public CBase_ampiParent {
   int addWinStruct(WinStruct* win);
   WinStruct getWinStruct(MPI_Win win);
   void removeWinStruct(WinStruct win);
-
-#if AMPI_COUNTER
- public:
-  AmpiCounters counters;
-#endif
 
  public:
   MPI_Info createInfo(void);
