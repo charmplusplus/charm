@@ -2,6 +2,132 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.8.0
+================================================================================
+
+Over 400 bug fixes, improvements, and cleanups have been applied
+across the entire system. Major changes are described below:
+
+Charm++ Features
+
+- Calls to entry methods taking a single fixed-size parameter can now
+  automatically be aggregated and routed through the TRAM library by
+  marking them with the [aggregate] attribute.
+
+- The runtime system now integrates an OpenMP runtime library so that
+  code using OpenMP parallelism will dispatch work to idle worker
+  threads within the Charm++ process.
+
+- Applications can ask the runtime system to perform automatic
+  high-level end-of-run performance analysis by linking with the
+  `-tracemode perfReport' option.
+
+- Charm++ programs can now define their own main() function, rather
+  than using a generated implementation from a mainmodule/mainchare
+  combination. This extends the existing Charm++/MPI interoperation
+  feature.
+
+- GPU manager now creates one instance per OS process and scales the
+  pre-allocated memory pool size according to the GPU memory size and
+  number of GPU manager instances on a physical node.
+
+- Several GPU Manager API changes including:
+
+  * Replaced references to global variables in the GPU manager API with calls to
+  functions.
+
+  * The user is no longer required to specify a bufferID in dataInfo struct.
+
+  * Replaced calls to kernelSelect with direct invocation of functions passed
+  via the work request object (allows CUDA to be built with all programs).
+
+- Added support for malleable jobs that can dynamically shrink and
+  expand the set of compute nodes hosting Charm++ processes.
+
+- Greatly expanded and improved reduction operations:
+
+  * Added built-in reductions for all logical and bitwise operations
+  on integer and boolean input.
+
+  * Reductions over groups and chare arrays that apply commutative,
+  associative operations (e.g. MIN, MAX, SUM, AND, OR, XOR) are now
+  processed in a streaming fashion. This reduces the memory footprint of
+  reductions. User-defined reductions can opt into this mode as well.
+
+  * Added a new `Tuple' reducer that allows combining multiple reductions
+  of different input data and operations from a common set of source
+  objects to a single target callback.
+
+  * Added a new `Summary Statistics' reducer that provides count, mean,
+  and standard deviation using a numerically-stable streaming algorithm.
+
+- Added a `++quiet' option to suppress charmrun and charm++ non-error
+  messages at startup.
+
+- Calls to chare array element entry methods with the [inline] tag now
+  avoid copying their arguments when the called method takes its 
+  parameters by const&, offering a substantial reduction in overhead in
+  those cases.
+
+- Synchronous entry methods that block until completion (marked with
+  the [sync] attribute) can now return any type that defines a PUP
+  method, rather than only message types.
+
+- Static (non-generated) header files are now warning-free for
+  gcc -Wall -Wextra -pedantic.
+
+- Deprecated setReductionClient and CkSetReductionClient in favor of
+  explicitly passing callbacks to contribute calls.
+
+AMPI Features
+
+- More efficient implementations of message matching infrastructure, multiple
+  completion routines, and all varieties of reductions and gathers.
+
+- Support for user-defined non-commutative reductions, MPI_IN_PLACE, cancelling
+  receive requests, MPI_THREAD_FUNNELED, PSCW synchronization for RMA, and more.
+
+- Fixes to AMPI's extensions for load balancing and to Isomalloc on SMP builds.
+
+- More robust derived datatype support, optimizations for truly contiguous types.
+
+- ROMIO is now built on AMPI and linked in by ampicc by default.
+
+Platforms and Portability
+
+- The runtime system code now requires compiler support for C++11
+  R-value references and move constructors. This is not expected to be
+  incompatible with any currently supported compilers.
+
+- The next feature release (anticipated to be 6.9.0 or 7.0) will require
+  full C++11 support from the compiler and standard library.
+
+- Added support for IBM POWER8 systems with the PAMI communication API,
+  such as development/test platforms for the upcoming Sierra and Summit
+  supercomputers at LLNL and ORNL. Contributed by Sameer Kumar of IBM.
+
+- Mac OS (darwin) builds now default to the modern libc++ standard
+  library instead of the older libstdc++.
+
+- Blue Gene/Q build targets have been added for the `bgclang' compiler.
+
+- Charm++ can now be built on Cray's CCE 8.5.4+.
+
+- Charmrun can automatically detect rank and node count from
+  Slurm/srun environment variables.
+
+- Many obsolete architecture, network, and compiler support files have
+  been removed. These include:
+  * IBM Blue Gene/P
+  * Sony/Toshiba/IBM Cell (including PlayStation 3)
+  * Cray XT
+  * Intel IA-64 (Itanium)
+  * Intel x86-32 for Windows, Mac OS X (darwin), and Solaris
+  * Cygwin for Windows
+  * Older IBM AIX/POWER configurations
+  * GCC 3 and KAI compilers
+
+================================================================================
 What's new in Charm++ 6.7.1
 ================================================================================
 
