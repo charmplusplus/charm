@@ -23,7 +23,7 @@ extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
 extern "C" void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
-int userDrivenMode = 0;
+extern int userDrivenMode;
 
 extern "C" void StartInteropScheduler();
 extern "C" void StopInteropScheduler();

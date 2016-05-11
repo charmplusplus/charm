@@ -156,8 +156,8 @@ int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
+int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
 extern int CharmLibInterOperate;
-extern int userDrivenMode;
 
 CpvDeclare(void*, CmiLocalQueue);
 
