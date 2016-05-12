@@ -38,7 +38,7 @@ syntax() {
   ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^net(lrts)?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
-  echo 'icc iccstatic xlc xlc64 gcc clang craycc pgcc pathscale cc cc64 mpcc gcc64 gcc3 mpicxx'
+  echo 'icc iccstatic xlc xlc64 gcc clang craycc pgcc pathscale cc cc64 mpcc gcc64 mpicxx'
   echo 'help smp gm tcp scyld clustermatic bigemulator ooc syncft mlogft causalft'
   echo 'papi pthreads lam'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
@@ -58,7 +58,6 @@ syntax() {
   echo '  pathscale       Pathscale compiler suite'
   echo '  cc, cc64        For Sun WorkShop C++ 32/64 bit compilers'
   echo '  mpcc            SUN Solaris C++ compiler for MPI'
-  echo '  gcc3            GNU GCC/G++ version 3'
   echo ''
   echo 'Choose an alternative fortran compiler (only one option is allowed from this section):'
   echo '  g95             G95 at http://ww.g95.org'
@@ -263,7 +262,7 @@ OPT_DIRS="$src/$BASEVERSION $src/$ARCH $src/common"
 
 # process remainder of version argument as options, copied from below
 for w in $VERSOPTS; do
-  # This has to be a build-time option (like "smp", "gcc3", or "kcc")
+  # This has to be a build-time option (like "smp")
         TestIfCompiler $w
         if [ $? -eq 1 ] 
         then
@@ -425,7 +424,7 @@ do
 	printOption
 	;;
     *)
-# This has to be a build-time option (like "smp", "gcc3", or "kcc")
+# This has to be a build-time option (like "smp")
         TestIfCompiler $1
         if [ $? -eq 1 ] 
         then

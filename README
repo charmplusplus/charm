@@ -151,12 +151,10 @@ need to choose <options> from the following list:
 * ifort - Intel Fortran compiler
 * xlc - IBM XLC compiler.
 * mpicxx - Use MPI-wrappers for MPI builds.
-* gcc3  - GNU GCC/G++ version 3
 * acc  - HP aC++ compiler
 * cc  - For Sun WorkShop C++ compilers;
 * cc64 - For 64 bits Sun WorkShop C++ or IBM xlC compilers;
 * cxx - DIGITAL C++ compiler;
-* kcc - KAI C++ compiler;
 * pgcc - Portland Group's C++ compiler;
 * mpcc - SUN Solaris C++ compiler for MPI.
 
@@ -187,7 +185,7 @@ need to choose <options> from the following list:
          running:
          > ./build charm++ net-linux help
          will give:
-         supported options: gcc3 gm icc kcc pgcc scyld smp bluegene tcp
+         supported options: gm icc pgcc scyld smp bluegene tcp
 
 
 BUILDING THE SOURCE
