@@ -58,7 +58,6 @@ syntax() {
   echo '  pathscale       Pathscale compiler suite'
   echo '  cc, cc64        For Sun WorkShop C++ 32/64 bit compilers'
   echo '  mpcc            SUN Solaris C++ compiler for MPI'
-  echo '  ecc             Intel C/C++ compiler for Linux IA64 (Itanium)'
   echo '  gcc3            GNU GCC/G++ version 3'
   echo ''
   echo 'Choose an alternative fortran compiler (only one option is allowed from this section):'
