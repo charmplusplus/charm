@@ -94,7 +94,7 @@ mpi-darwin-x86_64          MacOS X          MPI            Clang C++ compiler
 pamilrts-bluegeneq         CNK              PAMI           XLC
 gni-crayxe                 Linux            GNI            GNU compiler
 verbs-linux-x86_64         Linux            IB Verbs       GNU compiler
-net-win32                  Win32            UDP            MS Visual C++
+net-win64                  Windows          UDP            MS Visual C++
 net-cygwin                 Cygwin           UDP            GNU compiler
 
 
@@ -124,7 +124,7 @@ threads; "sim-" switches between processors and counts communications.
 2.)  Your operating system:
 
 	"linux-x86_64"       Linux with AMD64 64-bit x86 instructions
-	"win{32,64}"         MS Windows with MS Visual C++ compiler
+	"win64"              MS Windows with MS Visual C++ compiler
 	"cygwin"             MS Windows with Cygnus' Cygwin Unix layer
 	"darwin-x86_64"      Apple Mac OS X
         "bluegeneq"          IBM's Blue Gene/Q
