@@ -484,12 +484,7 @@ fi
 
 if [ ! -f $src/$BASEVERSION/conv-mach.h ] 
 then
-  if [ "x_$BASEVERSION" = "x_net-rs6k" ]
-  then
-    echo "Error> build net-aix-ppc instead of net-rs6k!" 
-  else
-    echo "Error> build can not find arch: $BASEVERSION!" 
-  fi
+  echo "Error> build can not find arch: $BASEVERSION!"
   exit 1
 fi
 
