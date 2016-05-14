@@ -6186,7 +6186,7 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
 }
 
 CDECL
-int AMPI_Comm_dup(int comm, int *newcomm)
+int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
 {
   AMPIAPI("AMPI_Comm_dup");
 
@@ -6197,7 +6197,7 @@ int AMPI_Comm_dup(int comm, int *newcomm)
 }
 
 CDECL
-int AMPI_Comm_split(int src,int color,int key,int *dest)
+int AMPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest)
 {
   AMPIAPI("AMPI_Comm_split");
 
@@ -6222,7 +6222,7 @@ int AMPI_Comm_split(int src,int color,int key,int *dest)
 }
 
 CDECL
-int AMPI_Comm_free(int *comm)
+int AMPI_Comm_free(MPI_Comm *comm)
 {
   AMPIAPI("AMPI_Comm_free");
   return MPI_SUCCESS;
@@ -6322,7 +6322,7 @@ int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
 }
 
 CDECL
-int AMPI_Abort(int comm, int errorcode)
+int AMPI_Abort(MPI_Comm comm, int errorcode)
 {
   AMPIAPI("AMPI_Abort");
   CkAbort("AMPI: User called MPI_Abort!\n");
