@@ -1,3 +1,19 @@
+/* All AMPI entry methods can be tagged 'expedited'
+ * because AMPI does not use Charm++ message priorities. */
+#define AMPI_USE_EXPEDITED_MSGS 1
+
+#if AMPI_USE_EXPEDITED_MSGS
+#define EXPEDITED          [expedited]
+#define EXPEDITED_NOTRACE  [expedited,notrace]
+#define EXPEDITED_THREADED [expedited,threaded]
+#define EXPEDITED_IGET     [expedited,iget]
+#else
+#define EXPEDITED          /*empty*/
+#define EXPEDITED_NOTRACE  [notrace]
+#define EXPEDITED_THREADED [threaded]
+#define EXPEDITED_IGET     [iget]
+#endif
+
 module ampi {
   message AmpiMsg {
     char data[];
@@ -7,46 +23,49 @@ module ampi {
   initproc void ampiProcInit(void);
 
   array[1D] ampiParent {
-    entry [notrace] ampiParent(int universeNo,CProxy_TCharm threads_);
-    entry void ResumeThread();
-    entry void Checkpoint(int len, char dname[len]);
-    entry void ExchangeProxy(CProxy_ampi);
+    entry EXPEDITED_NOTRACE ampiParent(int universeNo, CProxy_TCharm threads_);
+    entry EXPEDITED void ResumeThread();
+    entry EXPEDITED void Checkpoint(int len, char dname[len]);
+    entry EXPEDITED void ExchangeProxy(CProxy_ampi);
   };
 
   array[1D] ampi {
-    entry ampi();
-    entry [notrace] ampi(CkArrayID parent_,ampiCommStruct s);
-    entry void allInitDone(CkReductionMsg *m);
-    entry void setInitDoneFlag();
-    entry void unblock(void);
-    entry void ssend_ack(int);
-    entry void generic(AmpiMsg *);
-    entry void reduceResult(CkReductionMsg *m);
-    entry [threaded] void splitPhase1(CkReductionMsg *msg);
-    entry [threaded] void commCreatePhase1(CkReductionMsg *msg);
-    entry [threaded] void intercommCreatePhase1(CkReductionMsg *msg);
-    entry [threaded] void intercommMergePhase1(CkReductionMsg *msg);
+    entry EXPEDITED ampi();
+    entry EXPEDITED_NOTRACE ampi(CkArrayID parent_, ampiCommStruct s);
+    entry EXPEDITED void allInitDone(CkReductionMsg *m);
+    entry EXPEDITED void setInitDoneFlag();
+    entry EXPEDITED void unblock(void);
+    entry EXPEDITED void ssend_ack(int);
+    entry EXPEDITED void generic(AmpiMsg *);
+    entry EXPEDITED void reduceResult(CkReductionMsg *m);
+    entry EXPEDITED_THREADED void splitPhase1(CkReductionMsg *msg);
+    entry EXPEDITED_THREADED void commCreatePhase1(CkReductionMsg *msg);
+    entry EXPEDITED_THREADED void intercommCreatePhase1(CkReductionMsg *msg);
+    entry EXPEDITED_THREADED void intercommMergePhase1(CkReductionMsg *msg);
 
-    entry void setRemoteProxy(CProxy_ampi rproxy);
-    entry void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype,
-                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,
-                            CkFutureID ftHandle, int pe_src);
-    entry void winRemoteGet(int orgcnt, MPI_Datatype orgtype,
-                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex,
-                            CkFutureID ftHandle, int pe_src);
-    entry void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt, MPI_Datatype orgtype,
-                                   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                                   MPI_Op op, int winIndex, CkFutureID ftHandle, int pe_src);
-    entry void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
-    entry void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
-    entry [iget] AmpiMsg *winRemoteIget(int orgdisp, int orgcnt, MPI_Datatype orgtype,
-                                        MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                                        int winIndex);
-    entry [iget] AmpiMsg *Alltoall_RemoteIget(int disp, int cnt, MPI_Datatype type, int tag);
+    entry EXPEDITED void setRemoteProxy(CProxy_ampi rproxy);
+    entry EXPEDITED void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                      MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                      MPI_Datatype targtype, int winIndex, CkFutureID ftHandle,
+                                      int pe_src);
+    entry EXPEDITED void winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                      int targcnt, MPI_Datatype targtype, int winIndex,
+                                      CkFutureID ftHandle, int pe_src);
+    entry EXPEDITED void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                             MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                             MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                             CkFutureID ftHandle, int pe_src);
+    entry EXPEDITED void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src,
+                                       int requestRank);
+    entry EXPEDITED void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
+    entry EXPEDITED_IGET AmpiMsg *winRemoteIget(int orgdisp, int orgcnt, MPI_Datatype orgtype,
+                                                MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+                                                int winIndex);
+    entry EXPEDITED_IGET AmpiMsg *Alltoall_RemoteIget(int disp, int cnt, MPI_Datatype type, int tag);
   };
 
   group [migratable] ampiWorlds {
-    entry ampiWorlds(ampiCommStruct nextWorld);
-    entry void add(ampiCommStruct nextWorld);
+    entry EXPEDITED ampiWorlds(ampiCommStruct nextWorld);
+    entry EXPEDITED void add(ampiCommStruct nextWorld);
   };
 };
