@@ -111,8 +111,8 @@ typedef CkQ<lockQueueEntry *> LockQueue;
 
 class win_obj {
  public:
-  char* winName;
-  int winNameLeng;
+  char winName[MPI_MAX_OBJECT_NAME];
+  int winNameLen;
   int initflag;
 
   void *baseAddr;
@@ -125,7 +125,7 @@ class win_obj {
                        // top of queue is the one holding the lock
                        // queue is empty if lock is not applied
 
-  void setName(const char *src,int len);
+  void setName(const char *src);
   void getName(char *src,int *len);
 
  public:
@@ -135,7 +135,7 @@ class win_obj {
   win_obj(char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm);
   ~win_obj();
 
-  int create(char *name, void *base, MPI_Aint size, int disp_unit,
+  int create(const char *name, void *base, MPI_Aint size, int disp_unit,
              MPI_Comm comm);
   int free();
 
@@ -179,13 +179,18 @@ class KeyvalPair{
   KeyvalPair(const char* k, const char* v);
   ~KeyvalPair(void);
   void pup(PUP::er& p){
-    p|klen; p|vlen;
+    p|klen;
+    p|vlen;
     if(p.isUnpacking()){
-      key=new char[klen];
-      val=new char[vlen];
+      if(klen>0)
+        key = new char[klen+1];
+      if(vlen>0)
+        val = new char[vlen+1];
     }
-    p((char*)key,klen);
-    p((char*)val,vlen);
+    if(klen>0)
+      p((char*)key, klen+1);
+    if(vlen>0)
+      p((char*)val, vlen+1);
   }
   friend class InfoStruct;
 };
@@ -229,7 +234,7 @@ class ampiCommStruct {
   CkVec<void *> keyvals;
 
   // For communicator names
-  char *commName;
+  char commName[MPI_MAX_OBJECT_NAME];
   int commNameLen;
 
   // graph virtual topology parameters
@@ -244,18 +249,18 @@ class ampiCommStruct {
     for (int i=0;i<size;i++) ind->push_back(i);
   }
  public:
-  ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;isInter=0;}
+  ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;isInter=0;commNameLen=0;}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
-    :comm(comm_), ampiID(id_),size(size_), isWorld(1), isInter(0) {}
+    :comm(comm_), ampiID(id_),size(size_), isWorld(1), isInter(0), commNameLen(0) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const CkVec<int> &indices_)
                 :comm(comm_), ampiID(id_),size(size_),isInter(0),
-                 isWorld(0), indices(indices_) {}
+                 isWorld(0), commNameLen(0), indices(indices_) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const CkVec<int> &indices_,
                  const CkVec<int> &remoteIndices_)
                 :comm(comm_),ampiID(id_),size(size_),isWorld(0),isInter(1),
-                 indices(indices_),remoteIndices(remoteIndices_) {}
+                 commNameLen(0),indices(indices_),remoteIndices(remoteIndices_) {}
   void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
   MPI_Comm getComm(void) const {return comm;}
@@ -266,18 +271,13 @@ class ampiCommStruct {
   const CkVec<int> &getRemoteIndices(void) const {return remoteIndices;}
   CkVec<void *> &getKeyvals(void) {return keyvals;}
 
-  void setName(const char *src, int len) {
-    if (commName == NULL) commName = new char[MPI_MAX_OBJECT_NAME];
-    commNameLen = len;
-    memcpy(commName, src, len);
-    commName[len] = '\0';
+  void setName(const char *src) {
+    commNameLen = strlen(src);
+    memcpy(commName, src, commNameLen);
+    commName[commNameLen] = '\0';
   }
 
   void getName(char *name, int *len) {
-    if (commName == NULL) {
-      *len = 0;
-      return;
-    }
     *len = commNameLen;
     memcpy(name, commName, *len+1);
   }
@@ -345,6 +345,8 @@ class ampiCommStruct {
     p|ndims;
     p|dims;
     p|periods;
+    p|commNameLen;
+    p(commName,MPI_MAX_OBJECT_NAME);
     p|nvertices;
     p|index;
     p|edges;
@@ -1460,7 +1462,7 @@ class ampi : public CBase_ampi {
     else return myComm.getSize();
   }
   inline MPI_Comm getComm(void) const {return myComm.getComm();}
-  inline void setCommName(const char *name, int len){myComm.setName(name, len);}
+  inline void setCommName(const char *name){myComm.setName(name);}
   inline void getCommName(char *name, int *len){myComm.getName(name,len);}
   inline CkVec<int> getIndices(void) const { return myComm.getindices(); }
   inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
@@ -1521,7 +1523,7 @@ class ampi : public CBase_ampi {
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, int winIndex, CkFutureID ftHandle, int pe_src);
-  void winSetName(WinStruct win, char *name);
+  void winSetName(WinStruct win, const char *name);
   void winGetName(WinStruct win, char *name, int *length);
   win_obj* getWinObjInstance(WinStruct win);
   int getNewSemaId();

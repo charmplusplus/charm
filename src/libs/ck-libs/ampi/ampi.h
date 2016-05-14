@@ -438,7 +438,7 @@ int AMPI_Type_lb(MPI_Datatype datatype, MPI_Aint* displacement);
 #define MPI_Type_ub AMPI_Type_ub
 int AMPI_Type_ub(MPI_Datatype datatype, MPI_Aint* displacement);
 #define MPI_Type_set_name AMPI_Type_set_name
-int AMPI_Type_set_name(MPI_Datatype datatype, char *name);
+int AMPI_Type_set_name(MPI_Datatype datatype, const char *name);
 #define MPI_Type_get_name AMPI_Type_get_name
 int AMPI_Type_get_name(MPI_Datatype datatype, char *name, int *resultlen);
 #define MPI_Get_address AMPI_Get_address
@@ -870,7 +870,7 @@ int AMPI_Win_set_attr(MPI_Win win, int win_keyval, void *attribute_val);
 #define MPI_Win_get_group AMPI_Win_get_group
 int AMPI_Win_get_group(MPI_Win win, MPI_Group *group);
 #define MPI_Win_set_name AMPI_Win_set_name
-int AMPI_Win_set_name(MPI_Win win, char *name);
+int AMPI_Win_set_name(MPI_Win win, const char *name);
 #define MPI_Win_get_name AMPI_Win_get_name
 int AMPI_Win_get_name(MPI_Win win, char *name, int *length);
 #define MPI_Win_fence AMPI_Win_fence

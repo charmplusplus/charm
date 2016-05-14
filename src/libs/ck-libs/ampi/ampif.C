@@ -657,7 +657,7 @@ void mpi_type_ub(int* datatype, int* displacement, int* ierr)
   *ierr = AMPI_Type_ub(*datatype, displacement);
 }
 
-void mpi_type_set_name(int* datatype, char* name, int* ierr)
+void mpi_type_set_name(int* datatype, const char* name, int* ierr)
 {
   *ierr = AMPI_Type_set_name(*datatype, name);
 }
@@ -1375,7 +1375,7 @@ void mpi_win_get_group(int *win, int *group, int *ierr){
   *ierr = AMPI_Win_get_group(*win, group);
 }
 
-void mpi_win_set_name(int *win, char *name, int *ierr){
+void mpi_win_set_name(int *win, const char *name, int *ierr){
   *ierr = AMPI_Win_set_name(*win, name);
 }
 

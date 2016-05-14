@@ -4229,10 +4229,10 @@ int AMPI_Type_size(MPI_Datatype datatype, int *size)
 }
 
 CDECL
-int AMPI_Type_set_name(MPI_Datatype datatype, char *name)
+int AMPI_Type_set_name(MPI_Datatype datatype, const char *name)
 {
   AMPIAPI("AMPI_Type_set_name");
-  getDDT()->setName(datatype, name, strlen(name));
+  getDDT()->setName(datatype, name);
   return MPI_SUCCESS;
 }
 
@@ -6752,7 +6752,7 @@ int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
 CDECL
 int AMPI_Comm_set_name(MPI_Comm comm, const char *comm_name){
   AMPIAPI("AMPI_Comm_set_name");
-  getAmpiInstance(comm)->setCommName(comm_name, strlen(comm_name));
+  getAmpiInstance(comm)->setCommName(comm_name);
   return MPI_SUCCESS;
 }
 

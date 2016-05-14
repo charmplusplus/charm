@@ -15,8 +15,7 @@
 #define WIN_ERROR   (-1)
 
 win_obj::win_obj() {
-  winName = NULL;
-  winNameLeng = 0;
+  winNameLen = 0;
   baseAddr = NULL;
   comm = MPI_COMM_NULL;
   initflag = 0;
@@ -28,20 +27,14 @@ win_obj::win_obj(char *name, void *base, MPI_Aint size, int disp_unit,
   owner = -1;  // the lock is not owned by anyone yet
 }
 
-void win_obj::setName(const char *src,int len) {
-  if(winName==NULL) winName=new char[MPI_MAX_OBJECT_NAME];
-  winNameLeng = len;
-  memcpy(winName,src,len);
-  winName[len] = '\0';
+void win_obj::setName(const char *src) {
+  winNameLen = strlen(src);
+  memcpy(winName, src, winNameLen);
+  winName[winNameLen] = '\0';
 }
 
 void win_obj::getName(char *name, int *len) {
-  if(winName==NULL){
-    name = NULL;
-    *len = 0;
-    return;
-  }
-  *len = winNameLeng;
+  *len = winNameLen;
   memcpy(name, winName, *len+1);
 }
 
@@ -58,11 +51,8 @@ void win_obj::pup(PUP::er &p) {
   p|comm;
   p|initflag;
 
-  int len = 0;
-  if(winName) len = strlen(winName)+1;
-  p|len;
-  if(p.isUnpacking()) winName = new char[len+1];
-  p(winName, len);
+  p|winNameLen;
+  p(winName,MPI_MAX_OBJECT_NAME);
 
   int size = 0;
   if(baseAddr) size = winSize;
@@ -72,8 +62,8 @@ void win_obj::pup(PUP::er &p) {
 #endif
 }
 
-int win_obj::create(char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm){
-  winName = NULL;
+int win_obj::create(const char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm){
+  setName(name);
   baseAddr = base;
   winSize = size*disp_unit;
   this->disp_unit = disp_unit;
@@ -84,8 +74,6 @@ int win_obj::create(char *name, void *base, MPI_Aint size, int disp_unit, MPI_Co
 }
 
 int win_obj::free(){
-  delete[] winName;
-  winName = NULL;
   // Assume : memory will be deallocated by user
   initflag = 0;
   return WIN_SUCCESS;
@@ -535,9 +523,9 @@ int ampi::winGetGroup(WinStruct win, MPI_Group *group){
    return MPI_SUCCESS;
 }
 
-void ampi::winSetName(WinStruct win, char *name) {
+void ampi::winSetName(WinStruct win, const char *name) {
   win_obj *winobj = winObjects[win.index];
-  winobj->setName((const char*)name, strlen(name));
+  winobj->setName(name);
 }
 
 void ampi::winGetName(WinStruct win, char *name, int *length) {
@@ -849,7 +837,7 @@ int AMPI_Win_set_attr(MPI_Win win, int key, void* value) {
 }
 
 CDECL
-int AMPI_Win_set_name(MPI_Win win, char *name) {
+int AMPI_Win_set_name(MPI_Win win, const char *name) {
   AMPIAPI("AMPI_Win_set_name");
   WinStruct winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct.comm);

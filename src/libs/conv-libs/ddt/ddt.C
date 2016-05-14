@@ -173,10 +173,10 @@ int CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], int a[], int
 }
 
 void
-CkDDT::setName(int nIndex, char *name, int len)
+CkDDT::setName(int nIndex, const char *name)
 {
   CkDDT_DataType* dttype = getType(nIndex);
-  dttype->setName(name, len);
+  dttype->setName(name);
 }
 
 void
@@ -372,6 +372,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
   lb = 0;
   ub = size;
   iscontig = 1;
+  nameLen = 0;
   DDTDEBUG("CkDDT_DataType constructor: type=%d, size=%d, extent=%d\n",type,size,extent);
 }
 
@@ -379,11 +380,12 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
 CkDDT_DataType::CkDDT_DataType(int datatype, int size, int extent, int count, int lb, int ub,
             int iscontig, int baseSize, int baseExtent, CkDDT_DataType* baseType, int baseIndex) :
     datatype(datatype), size(size), extent(extent), count(count), lb(lb), ub(ub), iscontig(iscontig),
-    baseSize(baseSize), baseExtent(baseExtent), baseType(baseType), baseIndex(baseIndex)
+    baseSize(baseSize), baseExtent(baseExtent), baseType(baseType), baseIndex(baseIndex), nameLen(0)
 {}
 
 CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType& obj)
 {
+  //Don't copy refCount
   datatype = obj.datatype ;
   size = obj.size ;
   extent = obj.extent ;
@@ -391,6 +393,8 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType& obj)
   baseType = obj.baseType;
   baseIndex = obj.baseIndex;
   iscontig = obj.iscontig;
+  nameLen = obj.nameLen;
+  memcpy(name, obj.name, CkDDT_MAX_NAME_LEN);
 }
 
 
@@ -401,6 +405,7 @@ CkDDT_DataType::operator=(const CkDDT_DataType& obj)
   if(this == &obj)
     return *this ;
 
+  //Don't copy refCount
   datatype = obj.datatype ;
   size = obj.size ;
   extent = obj.extent ;
@@ -408,6 +413,8 @@ CkDDT_DataType::operator=(const CkDDT_DataType& obj)
   baseType = obj.baseType;
   baseIndex = obj.baseIndex;
   iscontig = obj.iscontig;
+  nameLen = obj.nameLen;
+  memcpy(name, obj.name, CkDDT_MAX_NAME_LEN);
 
   return *this;
 }
@@ -490,6 +497,8 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
   p(lb);
   p(ub);
   p(iscontig);
+  p(nameLen);
+  p(name,CkDDT_MAX_NAME_LEN);
 }
 
 int CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner){

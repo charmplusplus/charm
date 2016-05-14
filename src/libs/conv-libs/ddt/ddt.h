@@ -110,7 +110,7 @@ class CkDDT_DataType {
     int baseExtent;
     CkDDT_DataType *baseType;
     int baseIndex;
-    char *name;
+    char name[CkDDT_MAX_NAME_LEN];
     int nameLen;
 
   public:
@@ -139,19 +139,14 @@ class CkDDT_DataType {
                            int array_of_integers[], int array_of_addresses[], int array_of_datatypes[]);
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
 
-    void setName(char *src, int len) {
-      CmiAssert(len < CkDDT_MAX_NAME_LEN-1);
-      if (name == NULL) name = new char[CkDDT_MAX_NAME_LEN];
-      nameLen = len;
-      memcpy(name, src, len);
-      name[len] = '\0';
+    void setName(const char *src) {
+      nameLen = strlen(src);
+      CmiAssert(nameLen < CkDDT_MAX_NAME_LEN-1);
+      memcpy(name, src, nameLen);
+      name[nameLen] = '\0';
     }
 
     void getName(char *dest, int *len) {
-      if (name == NULL) {
-        *len = 0;
-        return;
-      }
       *len = nameLen;
       memcpy(dest, name, *len+1);
     }
@@ -506,7 +501,7 @@ class CkDDT {
   int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner);
   int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,
                  int array_of_integers[], int array_of_addresses[], int array_of_datatypes[]);
-  void setName(int nIndex, char *name, int len);
+  void setName(int nIndex, const char *name);
   void getName(int nIndex, char *name, int *len);
   ~CkDDT() ;
 };
