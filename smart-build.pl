@@ -60,8 +60,6 @@ if ($os eq "Linux") {
   $arch_os = "linux";
 } elsif ($os =~ m/OSF1/ ) {
   $arch_os = "linux";
-} elsif ($os =~ m/AIX/ ) {
-  $arch = "mpi-sp";
 } elsif ($os =~ m/CYGWIN/ ) {
   print "Detected a Cygwin system\n";
   print "This uses the gnu compiler by default,\n";
@@ -72,27 +70,20 @@ if ($os eq "Linux") {
 
 my $x86;
 my $amd64;
-my $ia64;
 my $ppc;
-my $alpha;
+my $arm7;
 # Determine architecture (x86, ppc, ...)
 if($cpu =~ m/i[0-9]86/){
   $x86 = 1;
 } elsif($cpu =~ m/x86\_64/){
   $amd64 = 1;
-} elsif($cpu =~ m/ia64/){
-  $ia64 = 1;
-  $nobs = "--no-build-shared";
 } elsif($cpu =~ m/powerpc/){
-  $ppc = 1;
-} elsif($cpu =~ m/Power Mac/){
   $ppc = 1;
 } elsif($cpu =~ m/ppc*/){
   $ppc = 1;
-} elsif($cpu =~ m/alpha/){
-  $alpha = 1;
+} elsif($cpu =~ m/arm7/){
+  $arm7 = 1;
 }
-
 
 
 # default to netlrts
@@ -149,11 +140,9 @@ if($skip_choosing eq "false") {
 Choose an interconnect from below: [1-10]
 	 1) MPI
 	 2) Infiniband (ibverbs)
-         3) Cray XE, XK
-         4) Cray XC
-         5) Blue Gene/P Native
-	 6) Blue Gene/P MPI
-	 7) Blue Gene/Q
+	 3) Cray XE, XK
+	 4) Cray XC
+	 5) Blue Gene/Q
 
 EOF
 	
@@ -172,14 +161,6 @@ EOF
 	        $arch = "gni-crayxc";
 	        last;
 	  } elsif($line eq "5"){
-		$arch = "bluegenep";
-		$compilers = "xlc ";
-		last;
-	  } elsif($line eq "6"){
-		$arch = "mpi-bluegenep";
-		$compilers = "xlc ";
-		last;
-	  } elsif($line eq "7"){
 		$arch = "pamilrts-bluegeneq";
 		last;
 	  } else {
@@ -195,23 +176,19 @@ if($arch eq ""){
   $arch = "${converse_network_type}-${arch_os}";
 	  if($amd64) {
 		$arch = $arch . "-x86_64";
-	  } elsif($ia64){
-	  	$arch = $arch . "-ia64";
 	  } elsif($ppc){
 	  	$arch = $arch . "-ppc";
-	  } elsif($alpha){
-		$arch = $arch . "-axp";
+	  } elsif($arm7){
+	  	$arch = $arch . "-arm7";
 	  }
 }
   
 # Fixup $arch to match the inconsistent directories in src/archs
 
-if($arch eq "net-darwin"){
-	$arch = "net-darwin-x86";
-} elsif($arch eq "net-ppc-darwin"){
-	$arch = "net-darwin-ppc";
-} elsif($arch eq "mpi-ppc-darwin"){
-	$arch = "mpi-darwin-ppc";
+if($arch eq "netlrts-darwin"){
+	$arch = "netlrts-darwin-x86_64";
+} elsif($arch eq "multicore-linux-arm7"){
+	$arch = "multicore-arm7";
 } elsif($arch eq "multicore-linux-x86_64"){
 	$arch = "multicore-linux64";
 } 
@@ -311,14 +288,10 @@ if ($numc > 0) {
 my %explanations = ();
 $explanations{"ooc"} = "Out-of-core execution support in Charm++";
 $explanations{"tcp"} = "Charm++ over TCP instead of UDP for net versions. TCP is slower";
-$explanations{"ifort"} = "Use Intel's ifort fortran compiler";
 $explanations{"gfortran"} = "Use gfortran compiler for fortran";
-$explanations{"g95"} = "Use g95 compiler";
 $explanations{"ifort"} = "Use Intel's ifort fortran compiler";
 $explanations{"pgf90"} = "Use Portland Group's pgf90 fortran compiler";
-$explanations{"ifc"} = "Use Intel's ifc compiler";
-$explanations{"ammasso"} = "Use native RDMA support on Ammasso interconnect";
-$explanations{"syncft"} = "Use initial fault tolerance support";
+$explanations{"syncft"} = "Use fault tolerance support";
 $explanations{"mlogft"} = "Use message logging fault tolerance support";
 $explanations{"causalft"} = "Use causal message logging fault tolerance support";
 
@@ -452,7 +425,8 @@ print << "EOF";
 
 What do you want to build?
 	1) Charm++ [default] (choose this if you are building NAMD)
-	2) Charm++, AMPI, ParFUM, FEM and other libraries
+	2) Charm++ and AMPI
+	3) Charm++, AMPI, ParFUM, FEM and other libraries
 
 EOF
 
@@ -462,6 +436,9 @@ while(my $line = <>){
 		$target = "charm++";
 		last;
 	} elsif($line eq "2"){
+		$target = "AMPI";
+		last;
+	} elsif($line eq "3"){
 		$target = "LIBS";
 		last;
 	} else {
