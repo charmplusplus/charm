@@ -843,7 +843,7 @@ class ampiWorlds : public CBase_ampiWorlds {
   void pup(PUP::er &p)  { }
   void add(const ampiCommStruct &nextWorld) {
     int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD);
-    mpi_worlds[new_idx].comm=nextWorld;
+    mpi_worlds[new_idx]=nextWorld;
     if (_mpi_nworlds<=new_idx) _mpi_nworlds=new_idx+1;
     STARTUP_DEBUG("ampiInit> listed MPI_COMM_UNIVERSE "<<new_idx)
   }
@@ -1669,10 +1669,10 @@ const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo)
     int worldDex=universeNo-MPI_COMM_WORLD-1;
     if (worldDex>=_mpi_nworlds)
       CkAbort("Bad world communicator passed to universeComm2CommStruct");
-    return mpi_worlds[worldDex].comm;
+    return mpi_worlds[worldDex];
   }
   CkAbort("Bad communicator passed to universeComm2CommStruct");
-  return mpi_worlds[0].comm; // meaningless return
+  return mpi_worlds[0]; // meaningless return
 }
 
 void ampi::block(void){

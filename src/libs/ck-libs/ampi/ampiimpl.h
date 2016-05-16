@@ -353,44 +353,13 @@ class ampiCommStruct {
 };
 PUPmarshall(ampiCommStruct)
 
-struct mpi_comm_world{
-  mpi_comm_world(const mpi_comm_world &m); //DO NOT USE
-  void operator=(const mpi_comm_world &m);
-  char *name; //new'd human-readable zero-terminated string name, or NULL
- public:
-  ampiCommStruct comm;
-  mpi_comm_world() {
-    name=NULL;
-  }
-  ~mpi_comm_world() {
-    if (name) { delete[] name; name=0; }
-  }
-  void setName(const char *src) {
-    setName(src,strlen(src));
-  }
-  void setName(const char *src,int len) {
-    name=new char[len+1];
-    memcpy(name,src,len);
-    name[len] = '\0';
-  }
-  const char *getName(void) const { return name; }
-  void pup(PUP::er &p) {
-    p|comm;
-    int len=0;
-    if (name!=NULL) len=strlen(name)+1;
-    p|len;
-    if (p.isUnpacking()) name=new char[len];
-    p(name,len);
-  }
-};
-
 class mpi_comm_worlds{
-  mpi_comm_world s[MPI_MAX_COMM_WORLDS];
+  ampiCommStruct comms[MPI_MAX_COMM_WORLDS];
  public:
-  mpi_comm_world &operator[](int i) {return s[i];}
+  ampiCommStruct &operator[](int i) {return comms[i];}
   void pup(PUP::er &p) {
     for (int i=0;i<MPI_MAX_COMM_WORLDS;i++)
-      s[i].pup(p);
+      comms[i].pup(p);
   }
 };
 
