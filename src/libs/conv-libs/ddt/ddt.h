@@ -56,6 +56,19 @@
 
 #define CkDDT_MAX_NAME_LEN         255
 
+/* Helper function to set names (used by AMPI too).
+ * Leading whitespaces are significant, trailing whitespaces are not. */
+inline void CkDDT_SetName(char *dst, const char *src, int *len)
+{
+  CmiAssert(strlen(src) < CkDDT_MAX_NAME_LEN-1);
+  int end = strlen(src)-1;
+  while ((end>0) && (src[end]==' '))
+    end--;
+  *len = (end==0) ? 0 : end+1;
+  memcpy(dst, src, *len);
+  dst[*len] = '\0';
+}
+
 typedef int CkDDT_Type ;
 class CkDDT ;
 
@@ -139,17 +152,8 @@ class CkDDT_DataType {
                            int array_of_integers[], int array_of_addresses[], int array_of_datatypes[]);
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
 
-    void setName(const char *src) {
-      nameLen = strlen(src);
-      CmiAssert(nameLen < CkDDT_MAX_NAME_LEN-1);
-      memcpy(name, src, nameLen);
-      name[nameLen] = '\0';
-    }
-
-    void getName(char *dest, int *len) {
-      *len = nameLen;
-      memcpy(dest, name, *len+1);
-    }
+    void setName(const char *src);
+    void getName(char *dest, int *len);
 };
 
 /*

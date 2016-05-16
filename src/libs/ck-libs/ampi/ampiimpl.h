@@ -4,6 +4,7 @@
 #include <string.h> /* for strlen */
 
 #include "ampi.h"
+#include "ddt.h"
 #include "charm++.h"
 #include "ckliststring.h"
 
@@ -272,9 +273,7 @@ class ampiCommStruct {
   CkVec<void *> &getKeyvals(void) {return keyvals;}
 
   void setName(const char *src) {
-    commNameLen = strlen(src);
-    memcpy(commName, src, commNameLen);
-    commName[commNameLen] = '\0';
+    CkDDT_SetName(commName, src, &commNameLen);
   }
 
   void getName(char *name, int *len) {
@@ -528,7 +527,6 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *fla
 #include "tcharmc.h"
 
 #include "ampi.decl.h"
-#include "ddt.h"
 #include "charm-api.h"
 #include <sys/stat.h> // for mkdir
 

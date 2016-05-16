@@ -432,6 +432,20 @@ CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir)
   return size ;
 }
 
+//Set name for a datatype, stripped of trailing whitespace
+void
+CkDDT_DataType::setName(const char *src)
+{
+  CkDDT_SetName(name, src, &nameLen);
+}
+
+void
+CkDDT_DataType::getName(char *dest, int *len)
+{
+  *len = nameLen;
+  memcpy(dest, name, *len+1);
+}
+
 int
 CkDDT_DataType::isContig()
 {

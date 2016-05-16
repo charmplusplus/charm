@@ -28,9 +28,7 @@ win_obj::win_obj(char *name, void *base, MPI_Aint size, int disp_unit,
 }
 
 void win_obj::setName(const char *src) {
-  winNameLen = strlen(src);
-  memcpy(winName, src, winNameLen);
-  winName[winNameLen] = '\0';
+  CkDDT_SetName(winName, src, &winNameLen);
 }
 
 void win_obj::getName(char *name, int *len) {
