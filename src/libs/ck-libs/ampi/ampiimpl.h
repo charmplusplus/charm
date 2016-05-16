@@ -6,7 +6,6 @@
 #include "ampi.h"
 #include "ddt.h"
 #include "charm++.h"
-#include "ckliststring.h"
 
 #if 0
 #define AMPI_DEBUG CkPrintf
@@ -15,7 +14,7 @@
 #endif
 
 #if AMPIMSGLOG
-
+#include "ckliststring.h"
 static CkListString msgLogRanks;
 static int msgLogWrite;
 static int msgLogRead;
