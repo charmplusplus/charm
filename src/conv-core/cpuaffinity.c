@@ -12,6 +12,7 @@ cpu affinity.
 
 #define _GNU_SOURCE
 
+#include "hwloc.h"
 #include "converse.h"
 #include "sockRoutines.h"
 
@@ -51,7 +52,6 @@ CpvDeclare(void *, myProcStatFP);
 #include <Carbon/Carbon.h> /* Carbon APIs for Multiprocessing */
 #endif
 
-
 #define MAX_EXCLUDE      64
 static int excludecore[MAX_EXCLUDE] = {-1};
 static int excludecount = 0;
@@ -82,141 +82,110 @@ static void add_exclude(int core)
 #include <sys/processor.h>
 #endif
 
-#define SET_MASK(cpuid)    \
-  /* set the affinity mask if possible */      \
-  if ((cpuid / 8) > len) {      \
-    printf("Mask size too small to handle requested CPU ID\n");   \
-    return -1;      \
-  } else {    \
-    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */ \
+
+static void show_topology(hwloc_topology_t topology) {
+  int depth;
+  unsigned int i;
+  char string[128];
+
+  // Optionally, get some additional topology information
+  //   in case we need the topology depth later.
+  int topodepth = cmi_hwloc_topology_get_depth(topology);
+
+  // Walk the topology with an array style, from level 0 (always
+  // the system level) to the lowest level (always the proc level).
+  for (depth = 0; depth < topodepth; depth++) {
+    CmiPrintf("*** Objects at level %d\n", depth);
+    for (i = 0; i < cmi_hwloc_get_nbobjs_by_depth(topology, depth); i++) {
+      cmi_hwloc_obj_snprintf(string, sizeof(string), topology,
+                             cmi_hwloc_get_obj_by_depth(topology, depth, i),
+                             "#", 0);
+      CmiPrintf("Index %u: %s\n", i, string);
+    }
   }
+}
 
-
-/* This implementation assumes the default x86 CPU mask size used by Linux */
-/* For a large SMP machine, this code should be changed to use a variable sized   */
-/* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
 int set_cpu_affinity(unsigned int cpuid) {
-  unsigned long mask = 0xffffffff;
-  unsigned int len = sizeof(mask);
-  int retValue = 0;
-  int pid;
-
- #ifdef _WIN32
-   HANDLE hProcess;
- #endif
- 
-#ifdef _WIN32
-  SET_MASK(cpuid)
-  hProcess = GetCurrentProcess();
-  if (SetProcessAffinityMask(hProcess, mask) == 0) {
-    return -1;
+  hwloc_topology_t topology;
+  // Allocate and initialize topology object.
+  cmi_hwloc_topology_init(&topology);
+  // Perform the topology detection.
+  cmi_hwloc_topology_load(topology);
+#if 0
+  if (CmiMyPe() == 0) {
+    show_topology(topology);
   }
-#elif CMK_HAS_BINDPROCESSOR
-  pid = getpid();
-  if (bindprocessor(BINDPROCESS, pid, cpuid) == -1) return -1;
-#else
-#ifdef CPU_ALLOC
- if ( cpuid >= CPU_SETSIZE ) {
-  cpu_set_t *cpusetp;
-  size_t size;
-  int num_cpus;
-  num_cpus = cpuid + 1;
-  cpusetp = CPU_ALLOC(num_cpus);
-  if (cpusetp == NULL) {
-    perror("set_cpu_affinity CPU_ALLOC");
-    return -1;
-  }
-  size = CPU_ALLOC_SIZE(num_cpus);
-  CPU_ZERO_S(size, cpusetp);
-  CPU_SET_S(cpuid, size, cpusetp);
-  if (sched_setaffinity(0, size, cpusetp) < 0) {
-    perror("sched_setaffinity dynamically allocated");
-    CPU_FREE(cpusetp);
-    return -1;
-  }
-  CPU_FREE(cpusetp);
- } else
-#endif
- {
-  cpu_set_t cpuset;
-  CPU_ZERO(&cpuset);
-  CPU_SET(cpuid, &cpuset);
-  /*SET_MASK(cpuid)*/
-
-  /* PID 0 refers to the current process */
-  /*if (sched_setaffinity(0, len, &mask) < 0) {*/
-  if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0) {
-    perror("sched_setaffinity");
-    return -1;
-  }
- }
 #endif
 
+  hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
+  cmi_hwloc_bitmap_set(cpuset, cpuid);
+
+  // And try to bind ourself there. */
+  if (cmi_hwloc_set_cpubind(topology, cpuset, 0)) {
+    char *str;
+    int error = errno;
+    cmi_hwloc_bitmap_asprintf(&str, cpuset);
+    CmiPrintf("HWLOC> Couldn't bind to cpuset %s: %s\n", str, strerror(error));
+    free(str);
+    cmi_hwloc_bitmap_free(cpuset);
+    cmi_hwloc_topology_destroy(topology);
+    return -1;
+  }
+
+#if CMK_CHARMDEBUG
+  char *str;
+  cmi_hwloc_bitmap_asprintf(&str, cpuset);
+  CmiPrintf("HWLOC> Bound to cpuset: %s\n", str);
+  free(str);
+#endif
+
+  cmi_hwloc_bitmap_free(cpuset);
+  cmi_hwloc_topology_destroy(topology);
   return 0;
 }
 
 #if CMK_SMP
 int set_thread_affinity(int cpuid) {
-  unsigned long mask = 0xffffffff;
-  unsigned int len = sizeof(mask);
+
+  hwloc_topology_t topology;
+  // Allocate and initialize topology object.
+  cmi_hwloc_topology_init(&topology);
+  // Perform the topology detection.
+  cmi_hwloc_topology_load(topology);
+  if (CmiMyPe() == 0) {
+    show_topology(topology);
+  }
+
+  hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
+  cmi_hwloc_bitmap_set(cpuset, cpuid);
 
 #ifdef _WIN32
-  HANDLE hThread;
-#endif	
-  
-#ifdef _WIN32
-  SET_MASK(cpuid)
-  hThread = GetCurrentThread();
-  if (SetThreadAffinityMask(hThread, mask) == 0) {
-    return -1;
-  }
-#elif  CMK_HAS_PTHREAD_SETAFFINITY
-#ifdef CPU_ALLOC
- if ( cpuid >= CPU_SETSIZE ) {
-  cpu_set_t *cpusetp;
-  pthread_t thread;
-  size_t size;
-  int num_cpus;
-  num_cpus = cpuid + 1;
-  cpusetp = CPU_ALLOC(num_cpus);
-  if (cpusetp == NULL) {
-    perror("set_thread_affinity CPU_ALLOC");
-    return -1;
-  }
-  size = CPU_ALLOC_SIZE(num_cpus);
-  thread = pthread_self();
-  CPU_ZERO_S(size, cpusetp);
-  CPU_SET_S(cpuid, size, cpusetp);
-  if (errno = pthread_setaffinity_np(thread, size, cpusetp)) {
-    perror("pthread_setaffinity dynamically allocated");
-    CPU_FREE(cpusetp);
-    return -1;
-  }
-  CPU_FREE(cpusetp);
- } else
-#endif
- {
-  int s, j;
-  cpu_set_t cpuset;
-  pthread_t thread;
-
-  thread = pthread_self();
-
-  CPU_ZERO(&cpuset);
-  CPU_SET(cpuid, &cpuset);
-
-  if (errno = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset)) {
-    perror("pthread_setaffinity");
-    return -1;
-  }
- }
-#elif CMK_HAS_BINDPROCESSOR
-  if (bindprocessor(BINDTHREAD, thread_self(), cpuid) != 0)
-    return -1;
+  HANDLE thread = GetCurrentThread();
 #else
-  return set_cpu_affinity(cpuid);
+  pthread_t thread = pthread_self();
 #endif
 
+  // And try to bind ourself there. */
+  if (cmi_hwloc_set_thread_cpubind(topology, thread, cpuset, 0)) {
+    char *str;
+    int error = errno;
+    cmi_hwloc_bitmap_asprintf(&str, cpuset);
+    CmiPrintf("HWLOC> Couldn't bind to cpuset %s: %s\n", str, strerror(error));
+    free(str);
+    cmi_hwloc_bitmap_free(cpuset);
+    cmi_hwloc_topology_destroy(topology);
+    return -1;
+  }
+
+#if CMK_CHARMDEBUG
+  char *str;
+  cmi_hwloc_bitmap_asprintf(&str, cpuset);
+  CmiPrintf("HWLOC> Bound to cpuset: %s\n", str);
+  free(str);
+#endif
+
+  cmi_hwloc_bitmap_free(cpuset);
+  cmi_hwloc_topology_destroy(topology);
   return 0;
 }
 #endif
@@ -248,71 +217,63 @@ int CmiSetCPUAffinity(int mycore)
 /* For a large SMP machine, this code should be changed to use a variable sized   */
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
 int print_cpu_affinity(void) {
-#ifdef _WIN32
-  DWORD_PTR pMask, sMask;
-  HANDLE hProcess = GetCurrentProcess();
-  if(GetProcessAffinityMask(hProcess, &pMask, &sMask)){
-	perror("On Windows: GetProcessAffinityMask");
-    return -1;
-  }
-  
- CmiPrintf("[%d] CPU affinity mask is: 0x%08lx\n", CmiMyPe(), pMask);
-  
-#elif CMK_HAS_BINDPROCESSOR
-  printf("[%d] CPU affinity mask is unknown for AIX. \n", CmiMyPe());
-#else
-  /*unsigned long mask;
-  unsigned int len = sizeof(mask);*/
-  cpu_set_t cpuset;
-  char str[256], pe[16];
-  int i;
-  CPU_ZERO(&cpuset);
- 
-  /* PID 0 refers to the current process */
-  /*if (sched_getaffinity(0, len, &mask) < 0) {*/
-  if (sched_getaffinity(0, sizeof(cpuset), &cpuset) < 0) {
-    perror("sched_getaffinity");
+  hwloc_topology_t topology;
+  // Allocate and initialize topology object.
+  cmi_hwloc_topology_init(&topology);
+  // Perform the topology detection.
+  cmi_hwloc_topology_load(topology);
+
+  hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
+  // And try to bind ourself there. */
+  if (cmi_hwloc_get_cpubind(topology, cpuset, 0)) {
+    int error = errno;
+    CmiPrintf("[%d] CPU affinity mask is unknown %s\n", CmiMyPe(), strerror(error));
+    cmi_hwloc_bitmap_free(cpuset);
+    cmi_hwloc_topology_destroy(topology);
     return -1;
   }
 
-  sprintf(str, "[%d] CPU affinity mask is: ", CmiMyPe());
-  for (i = 0; i < CPU_SETSIZE; i++)
-        if (CPU_ISSET(i, &cpuset)) {
-            sprintf(pe, " %d ", i);
-            strcat(str, pe);
-        }
-  CmiPrintf("%s\n", str);  
-#endif
+  char *str;
+  cmi_hwloc_bitmap_asprintf(&str, cpuset);
+  CmiPrintf("[%d] CPU affinity mask is %s\n", CmiMyPe(), str);
+  free(str);
+  cmi_hwloc_bitmap_free(cpuset);
+  cmi_hwloc_topology_destroy(topology);
   return 0;
 }
 
 #if CMK_SMP
 int print_thread_affinity(void) {
-  unsigned long mask;
-  size_t len = sizeof(mask);
+  hwloc_topology_t topology;
+  // Allocate and initialize topology object.
+  cmi_hwloc_topology_init(&topology);
+  // Perform the topology detection.
+  cmi_hwloc_topology_load(topology);
 
-#if  CMK_HAS_PTHREAD_SETAFFINITY
-  int j;
-  cpu_set_t cpuset;
-  pthread_t thread;
-  char str[256], pe[16];
+#ifdef _WIN32
+  HANDLE thread = GetCurrentThread();
+#else
+  pthread_t thread = pthread_self();
+#endif
 
-  thread = pthread_self();
-  
-  if (errno = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset)) {
-    perror("pthread_getaffinity");
+  hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
+  // And try to bind ourself there. */
+  if (cmi_hwloc_get_thread_cpubind(topology, thread, cpuset, 0)) {
+    int error = errno;
+    CmiPrintf("[%d] CPU affinity mask is unknown %s\n", CmiMyPe(), strerror(error));
+    cmi_hwloc_bitmap_free(cpuset);
+    cmi_hwloc_topology_destroy(topology);
     return -1;
   }
 
-  sprintf(str, "[%d] %s affinity is: ", CmiMyPe(), CmiMyPe()>=CmiNumPes()?"communication pthread":"pthread");
-  for (j = 0; j < CPU_SETSIZE; j++)
-        if (CPU_ISSET(j, &cpuset)) {
-            sprintf(pe, " %d ", j);
-            strcat(str, pe);
-        }
-  CmiPrintf("%s\n", str);
-#endif
+  char *str;
+  cmi_hwloc_bitmap_asprintf(&str, cpuset);
+  CmiPrintf("[%d] CPU affinity mask is %s\n", CmiMyPe(), str);
+  free(str);
+  cmi_hwloc_bitmap_free(cpuset);
+  cmi_hwloc_topology_destroy(topology);
   return 0;
+
 }
 #endif
 
@@ -457,7 +418,7 @@ static void cpuAffinityHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
-    /* CmiPrintf("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable)); */
+    DEBUGP(("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable)));
     tag = CmmWildCard;
     while ((tmpm = CmmGet(hostTable, 1, &tag, &tag1))) CmiFree(tmpm);
     CmmFree(hostTable);
@@ -491,7 +452,7 @@ static void cpuAffinityRecvHandler(void *msg)
   myrank = m->ranks[CmiMyPe()];
   mynode = m->nodes[CmiMyPe()];
 
-  /*CmiPrintf("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank);*/
+  DEBUGP(("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank));
 
   if (-1 != CmiSetCPUAffinity(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
@@ -671,10 +632,11 @@ void CmiInitCPUAffinity(char **argv)
   char *pemap = NULL;
   char *commap = NULL;
   char *pemapfile = NULL;
- 
+
   int show_affinity_flag;
+
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
-						"set cpu affinity");
+                                               "set cpu affinity");
 
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity"))  {
     if (CmiMyRank() == 0) add_exclude(exclude);
@@ -710,7 +672,7 @@ void CmiInitCPUAffinity(char **argv)
 #endif
 
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
-						"print cpu affinity");
+                                               "print cpu affinity");
 
   CmiAssignOnce(&cpuAffinityHandlerIdx, CmiRegisterHandler((CmiHandler)cpuAffinityHandler));
   CmiAssignOnce(&cpuAffinityRecvHandlerIdx, CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler));
@@ -737,6 +699,7 @@ void CmiInitCPUAffinity(char **argv)
 
   if (!affinity_flag) {
     if (show_affinity_flag) CmiPrintCPUAffinity();
+    CmiPrintf("Charm++> cpu affinity NOT enabled.\n");
     return;
   }
 
@@ -791,7 +754,7 @@ void CmiInitCPUAffinity(char **argv)
 
   if (pemap != NULL && CmiMyPe()<CmiNumPes()) {    /* work thread */
     int mycore = search_pemap(pemap, CmiMyPeGlobal());
-    if(show_affinity_flag) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
+    if(show_affinity_flag) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore);
     if (mycore >= CmiNumCores()) {
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", mycore, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
