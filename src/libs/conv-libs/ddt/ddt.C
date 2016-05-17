@@ -383,42 +383,6 @@ CkDDT_DataType::CkDDT_DataType(int datatype, int size, int extent, int count, in
     baseSize(baseSize), baseExtent(baseExtent), baseType(baseType), baseIndex(baseIndex), nameLen(0)
 {}
 
-CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType& obj)
-{
-  //Don't copy refCount
-  datatype = obj.datatype ;
-  size = obj.size ;
-  extent = obj.extent ;
-  count = obj.count ;
-  baseType = obj.baseType;
-  baseIndex = obj.baseIndex;
-  iscontig = obj.iscontig;
-  nameLen = obj.nameLen;
-  memcpy(name, obj.name, CkDDT_MAX_NAME_LEN);
-}
-
-
-//Assignment Operator
-CkDDT_DataType&
-CkDDT_DataType::operator=(const CkDDT_DataType& obj)
-{
-  if(this == &obj)
-    return *this ;
-
-  //Don't copy refCount
-  datatype = obj.datatype ;
-  size = obj.size ;
-  extent = obj.extent ;
-  count = obj.count ;
-  baseType = obj.baseType;
-  baseIndex = obj.baseIndex;
-  iscontig = obj.iscontig;
-  nameLen = obj.nameLen;
-  memcpy(name, obj.name, CkDDT_MAX_NAME_LEN);
-
-  return *this;
-}
-
 int
 CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir)
 {
@@ -544,41 +508,6 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
   lb = baseType->getLB();
   ub = lb + extent;
   iscontig = oldType->isContig();
-}
-
-CkDDT_Contiguous::CkDDT_Contiguous(const CkDDT_Contiguous& obj)
-{
-  datatype = obj.datatype;
-  size = obj.size ;
-  extent = obj.extent ;
-  count = obj.count ;
-  baseSize = obj.baseSize ;
-  baseExtent = obj.baseExtent ;
-  baseType = obj.baseType ;
-  baseIndex = obj.baseIndex;
-  lb = baseType->getLB();
-  ub = lb + extent;
-  iscontig = obj.iscontig;  
-}
-
-CkDDT_Contiguous&
-CkDDT_Contiguous::operator=(const CkDDT_Contiguous& obj)
-{
-  if(this == &obj)
-    return *this ;
-
-  datatype = obj.datatype;
-  size = obj.size ;
-  extent = obj.extent ;
-  count = obj.count ;
-  baseSize = obj.baseSize ;
-  baseExtent = obj.baseExtent ;
-  baseType = obj.baseType ;
-  baseIndex = obj.baseIndex;
-  lb = obj.lb;
-  ub = obj.ub;
-  iscontig = obj.iscontig;  
-  return *this ;
 }
 
 int
@@ -907,16 +836,6 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, int *ArrDisp, i
   ub = lb + extent;
 }
 
-CkDDT_Indexed_Block::CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj)
-{
-
-}
-
-CkDDT_Indexed_Block& CkDDT_Indexed_Block::operator=(const CkDDT_Indexed_Block &obj)
-{
-
-}
-
 CkDDT_Indexed_Block::~CkDDT_Indexed_Block()
 {
   delete [] arrayDisplacements;
@@ -991,16 +910,6 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, int *ArrDisp,
 
   lb = baseType->getLB();
   ub = lb + extent;
-}
-
-CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(const CkDDT_Indexed_Block &obj)
-{
-
-}
-
-CkDDT_HIndexed_Block& CkDDT_HIndexed_Block::operator=(const CkDDT_Indexed_Block &obj)
-{
-
 }
 
 CkDDT_HIndexed_Block::~CkDDT_HIndexed_Block()
