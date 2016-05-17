@@ -45,9 +45,10 @@ $(DEST): $(OBJS) headers
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
 $(DESTF): $(OBJS) headers
+	-$(CHARMC) -c ampifimpl.f90
 	-$(CHARMC) -c ampimod.f90
 	-$(CHARMC) -cpmod ../../../../include mpi.M
-	-$(CHARMC) $(OBJS) ampimod.o -o $@
+	-$(CHARMC) $(OBJS) ampifimpl.o ampimod.o -o $@
 	-cp $(LIB)f.dep $(LIBDIR)/$(LIB)f.dep
 
 $(COMPATLIB): $(COMPAT)
