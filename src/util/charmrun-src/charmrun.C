@@ -1145,11 +1145,8 @@ typedef struct nodetab_host {
 
 } nodetab_host;
 
-static nodetab_host **nodetab_table;
-static int nodetab_max;
-static int nodetab_size;
-static int *nodetab_rank0_table;
-static int nodetab_rank0_size;
+static std::vector<nodetab_host*> nodetab_table;
+static std::vector<int> nodetab_rank0_table;
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 static int loaded_max_pe;
@@ -1180,9 +1177,12 @@ static void nodetab_reset(nodetab_host *h)
 
 static void nodetab_add(nodetab_host *h)
 {
+  const int nodetab_size = nodetab_table.size();
   if (h->rank == 0)
-    nodetab_rank0_table[nodetab_rank0_size++] = nodetab_size;
-  nodetab_table[nodetab_size] = (nodetab_host *) malloc(sizeof(nodetab_host));
+    nodetab_rank0_table.push_back(nodetab_size);
+  nodetab_host* new_host = (nodetab_host *) malloc(sizeof(nodetab_host));
+  *new_host = *h;  // copy the data
+  nodetab_table.push_back(new_host);
 
   if (arg_verbose) {
     char ips[200];
@@ -1190,8 +1190,6 @@ static void nodetab_add(nodetab_host *h)
     printf("Charmrun> adding client %d: \"%s\", IP:%s\n", nodetab_size, h->name,
            ips);
   }
-
-  *nodetab_table[nodetab_size++] = *h;
 }
 
 static void nodetab_makehost(const char *name, nodetab_host *h)
@@ -1276,9 +1274,8 @@ static void nodetab_init_for_local()
 #endif
 
   int tablesize = arg_requested_pes;
-  nodetab_table = (nodetab_host **) malloc(tablesize * sizeof(nodetab_host *));
-  nodetab_rank0_table = (int *) malloc(tablesize * sizeof(int));
-  nodetab_max = tablesize;
+  nodetab_table.reserve(tablesize);
+  nodetab_rank0_table.reserve(tablesize);
 
   nodetab_host group;
   nodetab_reset(&group);
@@ -1313,22 +1310,22 @@ static void nodetab_init_for_local()
  * other host*/
 static int branchfactor;
 static int nodes_per_child;
-static int *nodetab_unique_table;
-static int nodetab_unique_size;
+static std::vector<int> nodetab_unique_table;
 static char *nodetab_name(int i);
 static void nodetab_init_hierarchical_start(void)
 {
-  nodetab_unique_size = 0;
-  nodetab_unique_table = (int *) malloc(nodetab_rank0_size * sizeof(int));
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
+  nodetab_unique_table.reserve(nodetab_rank0_size);
   int node_start = 0;
   while (node_start < nodetab_rank0_size) {
-    nodetab_unique_table[nodetab_unique_size++] = node_start;
+    nodetab_unique_table.push_back(node_start);
     char *node_name = nodetab_name(node_start);
     do {
       node_start++;
     } while (node_start < nodetab_rank0_size &&
              (!strcmp(nodetab_name(node_start), node_name)));
   }
+  const int nodetab_unique_size = nodetab_unique_table.size();
   branchfactor = ceil(sqrt(nodetab_unique_size));
   nodes_per_child = round(nodetab_unique_size * 1.0 / branchfactor);
 }
@@ -1362,17 +1359,13 @@ static void nodetab_init_with_nodelist()
   if (arg_read_pes == 0) {
     arg_read_pes = arg_requested_pes;
   }
-  nodetab_table =
-      (nodetab_host **) malloc(arg_read_pes * sizeof(nodetab_host *));
-  nodetab_rank0_table = (int *) malloc(arg_read_pes * sizeof(int));
-  nodetab_max = arg_read_pes;
+  nodetab_table.reserve(arg_read_pes);
+  nodetab_rank0_table.reserve(arg_read_pes);
   PRINT(("arg_read_pes %d arg_requested_pes %d\n", arg_read_pes,
           arg_requested_pes));
 #else
-  nodetab_table =
-      (nodetab_host **) malloc(arg_requested_pes * sizeof(nodetab_host *));
-  nodetab_rank0_table = (int *) malloc(arg_requested_pes * sizeof(int));
-  nodetab_max = arg_requested_pes;
+  nodetab_table.reserve(arg_requested_pes);
+  nodetab_rank0_table.reserve(arg_requested_pes);
 #endif
 
   if (arg_ppn == 0)
@@ -1404,10 +1397,10 @@ static void nodetab_init_with_nodelist()
 
   while (fgets(input_line, sizeof(input_line) - 1, f) != 0) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    if (nodetab_size == arg_read_pes)
+    if (nodetab_table.size() == arg_read_pes)
       break;
 #else
-    if (nodetab_size == arg_requested_pes)
+    if (nodetab_table.size() == arg_requested_pes)
       break;
 #endif
     if (input_line[0] == '#')
@@ -1501,7 +1494,7 @@ static void nodetab_init()
     nodetab_init_with_nodelist();
 
   /*Clip off excess CPUs at end*/
-  for (int i = 0, remain = 0; i < nodetab_size; i++) {
+  for (int i = 0, remain = 0, nodetab_size = nodetab_table.size(); i < nodetab_size; i++) {
     if (nodetab_table[i]->rank == 0)
       remain = nodetab_size - i;
     if (nodetab_table[i]->cpus > remain)
@@ -1520,8 +1513,8 @@ static void nodetab_init()
   if (arg_shrinkexpand &&
       (arg_requested_pes > arg_old_pes)) // modify nodetable ordering
   {
-    nodetab_host **reordered_nodetab_table =
-        (nodetab_host **) malloc(arg_requested_pes * sizeof(nodetab_host *));
+    std::vector<nodetab_host*> reordered_nodetab_table;
+    reordered_nodetab_table.reserve(arg_requested_pes);
     char **oldnodenames = (char **) malloc(arg_old_pes * sizeof(char *));
 
     parse_oldnodenames(oldnodenames);
@@ -1533,7 +1526,6 @@ static void nodetab_init()
       else
         reordered_nodetab_table[newpes++] = nodetab_table[k];
     }
-    free(nodetab_table);
     nodetab_table = reordered_nodetab_table;
   }
 #endif
@@ -1542,8 +1534,8 @@ static void nodetab_init()
 /* Given a processor number, look up the nodetab info: */
 static nodetab_host *nodetab_getinfo(int i)
 {
-  if (nodetab_table == 0) {
-    fprintf(stderr, "ERROR> Node table not initialized.\n");
+  if (nodetab_table.size() <= i) {
+    fprintf(stderr, "ERROR> Node table does not contain index %d.\n", i);
     exit(1);
   }
   return nodetab_table[i];
@@ -1588,12 +1580,12 @@ static ChNodeinfo *nodeinfo_arr; /*Indexed by node number.*/
 
 static void nodeinfo_allocate(void)
 {
-  nodeinfo_arr = (ChNodeinfo *) malloc(nodetab_rank0_size * sizeof(ChNodeinfo));
+  nodeinfo_arr = (ChNodeinfo *) malloc(nodetab_rank0_table.size() * sizeof(ChNodeinfo));
 }
 static void nodeinfo_add(const ChSingleNodeinfo *in, SOCKET ctrlfd)
 {
   int node = ChMessageInt(in->nodeNo);
-  if (node < 0 || node >= nodetab_rank0_size) {
+  if (node < 0 || node >= nodetab_rank0_table.size()) {
     fprintf(stderr, "Unexpected node %d registered!\n", node);
     exit(1);
   }
@@ -1775,6 +1767,7 @@ static void req_ccs_connect(void)
     /*Treat -1 as broadcast and sent to 0 as root of the spanning tree*/
     pe = 0;
   }
+  const int nodetab_size = nodetab_table.size();
   if ((pe <= -nodetab_size || pe >= nodetab_size) && 0 == replay_single) {
 /*Treat out of bound values as errors. Helps detecting bugs*/
 /* But when virtualized with Bigemulator, we can have more pes than nodetabs */
@@ -1896,7 +1889,7 @@ static SOCKET *req_clients; /*TCP request sockets for each node*/
 #ifdef HSTART
 static SOCKET *charmrun_fds;
 #endif
-static int req_nClients; /*Number of entries in above list (==nodetab_rank0_size)*/
+static int req_nClients; /*Number of entries in above list (==nodetab_rank0_table.size())*/
 static int req_ending = 0;
 
 /* socket and std streams for the gdb info program */
@@ -1943,6 +1936,7 @@ routines that actually respond to the request.
 static int req_handle_initnode(ChMessage *msg, SOCKET fd)
 {
 #if CMK_USE_IBVERBS
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   ChSingleNodeinfo *nodeInfo = (ChSingleNodeinfo *) msg->data;
   //	printf("Charmrun> msg->len %d sizeof(ChSingleNodeinfo) %d
   // sizeof(ChInfiAddr) %d
@@ -1980,6 +1974,7 @@ static int req_handle_initnode(ChMessage *msg, SOCKET fd)
  */
 static int req_handle_initnodetab(ChMessage *msg, SOCKET fd)
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   ChMessageHeader hdr;
   ChMessageInt_t nNodes = ChMessageInt_new(nodetab_rank0_size);
   ChMessageHeader_new(
@@ -1997,6 +1992,7 @@ static int req_handle_initnodetab(ChMessage *msg, SOCKET fd)
 /* Used for fault tolerance with hierarchical start */
 static int req_handle_initnodetab1(ChMessage *msg, SOCKET fd)
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   ChMessageHeader hdr;
   ChMessageInt_t nNodes = ChMessageInt_new(nodetab_rank0_size);
   ChMessageHeader_new("initnttab", sizeof(ChMessageInt_t) +
@@ -2015,12 +2011,13 @@ This is used by the node-programs to talk to one another.
 static int parent_charmrun_fd = -1;
 static int req_handle_initnodedistribution(ChMessage *msg, SOCKET fd, int client)
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   int nodes_to_fork =
       nodes_per_child; /* rounding should help in better load distribution*/
   int rank0_start = nodetab_unique_table[client * nodes_per_child];
   int rank0_finish;
   if (client == branchfactor - 1) {
-    nodes_to_fork = nodetab_unique_size - client * nodes_per_child;
+    nodes_to_fork = nodetab_unique_table.size() - client * nodes_per_child;
     rank0_finish = nodetab_rank0_size;
   } else
     rank0_finish =
@@ -2048,6 +2045,7 @@ static int req_handle_initnodedistribution(ChMessage *msg, SOCKET fd, int client
 static ChSingleNodeinfo *myNodesInfo;
 static int send_myNodeInfo_to_parent()
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   ChMessageHeader hdr;
   ChMessageInt_t nNodes = ChMessageInt_new(nodetab_rank0_size);
   ChMessageHeader_new("initnodetab",
@@ -2073,7 +2071,7 @@ static void forward_nodetab_to_children()
 
   ChMessageInt_t *nodelistmsg = (ChMessageInt_t *) msg.data;
   int nodetab_Nodes = ChMessageInt(nodelistmsg[0]);
-  for (int client = 0; client < nodetab_rank0_size; client++) {
+  for (int client = 0, nodetab_rank0_size = nodetab_rank0_table.size(); client < nodetab_rank0_size; client++) {
     SOCKET fd = req_clients[client];
     ChMessageHeader hdr;
     ChMessageInt_t nNodes = ChMessageInt_new(nodetab_Nodes);
@@ -2167,7 +2165,7 @@ static int req_handle_ending(ChMessage *msg, SOCKET fd)
 #if CMK_SHRINK_EXPAND
   // When using shrink-expand, only PE 0 will send an "ending" request.
 #elif (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-  if (req_ending == nodetab_size)
+  if (req_ending == nodetab_table.size())
 #else
   if (req_ending == arg_requested_pes)
 #endif
@@ -2415,7 +2413,7 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
   count++;
 #ifdef HSTART
   if (arg_hierarchical_start) {
-    if (count == nodetab_rank0_size - 1) {
+    if (count == nodetab_rank0_table.size() - 1) {
       /* only after everybody else update its nodetab, can this
          restarted process continue */
       PRINT(("Charmrun> continue node: %d\n", _last_crash));
@@ -2496,7 +2494,7 @@ static int req_handle_crash(ChMessage *msg, SOCKET fd)
   }
 
   /*Anounce crash to all child charmruns*/
-  announce_crash(nodetab_rank0_size + 1, crashed_node);
+  announce_crash(nodetab_rank0_table.size() + 1, crashed_node);
 }
 
 #endif
@@ -2506,6 +2504,8 @@ static int req_handle_crash(ChMessage *msg, SOCKET fd)
 static void error_in_req_serve_client(SOCKET fd)
 {
   fprintf(stderr, "Socket %d failed \n", fd);
+
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
 
   int i;
 #ifdef HSTART
@@ -2519,11 +2519,14 @@ static void error_in_req_serve_client(SOCKET fd)
 
   else
 #endif
-    for (i = 0; i < nodetab_max; i++) {
+  {
+    const int nodetab_size = nodetab_table.size();
+    for (i = 0; i < nodetab_size; i++) {
       if (nodetab_ctrlfd(i) == fd) {
         break;
       }
     }
+  }
 
   fflush(stdout);
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
@@ -3294,7 +3297,7 @@ static void req_set_client_connect(int start, int end)
     finished[i] = -1;
 
   if (arg_child_charmrun && start == 0)
-    myNodesInfo = malloc(sizeof(ChSingleNodeinfo) * nodetab_rank0_size);
+    myNodesInfo = malloc(sizeof(ChSingleNodeinfo) * nodetab_rank0_table.size());
 
   ChMessage msg;
 #if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
@@ -3375,6 +3378,7 @@ static void req_one_client_connect(int client)
 **/
 static void exchange_qpdata_clients()
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   for (int i = 0; i < nodetab_rank0_size; i++) {
     int nt = nodetab_rank0_table[i]; /*Nodetable index for this node*/
     nodetab_table[nt]->qpData =
@@ -3400,6 +3404,7 @@ static void exchange_qpdata_clients()
 
 static void send_clients_nodeinfo_qpdata()
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   int msgSize = sizeof(ChMessageInt_t) +
                 sizeof(ChNodeinfo) * nodetab_rank0_size +
                 sizeof(ChInfiAddr) * nodetab_rank0_size;
@@ -3436,7 +3441,7 @@ static void req_client_connect(void)
   if (!arg_hierarchical_start)
 #endif
     nodeinfo_allocate();
-  req_nClients = nodetab_rank0_size;
+  req_nClients = nodetab_rank0_table.size();
   req_clients = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
   for (int client = 0; client < req_nClients; client++)
     req_clients[client] = -1;
@@ -3564,7 +3569,7 @@ static void req_client_start_and_connect(void)
   if (!arg_hierarchical_start)
 #endif
     nodeinfo_allocate();
-  req_nClients = nodetab_rank0_size;
+  req_nClients = nodetab_rank0_table.size();
   req_clients = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
 
   skt_set_abort(client_connect_problem);
@@ -3729,8 +3734,9 @@ static int nodetab_rank0_size_total;
 static void my_nodetab_store(ChMessage *msg)
 {
   ChMessageInt_t *nodelistmsg = (ChMessageInt_t *) msg->data;
-  nodetab_rank0_size = ChMessageInt(nodelistmsg[0]);
+  const int nodetab_rank0_size = ChMessageInt(nodelistmsg[0]);
   nodetab_rank0_size_total = ChMessageInt(nodelistmsg[1]);
+  nodetab_rank0_table.reserve(nodetab_rank0_size);
   for (int k = 0; k < nodetab_rank0_size; k++) {
     nodetab_rank0_table[k] = ChMessageInt(nodelistmsg[k + 2]);
   }
@@ -3994,7 +4000,7 @@ static char *create_oldnodenames()
 #endif
 /* The remainder of charmrun is only concerned with starting all
 the node-programs, also known as charmrun clients.  We have to
-start nodetab_rank0_size processes on the remote machines.
+start nodetab_rank0_table.size() processes on the remote machines.
 */
 
 /*Ask the converse daemon running on each machine to start the node-programs.*/
@@ -4015,7 +4021,7 @@ static void start_nodes_daemon(void)
 
   /*Start up the user program, by sending a message
     to PE 0 on each node.*/
-  for (int nodeNumber = 0; nodeNumber < nodetab_rank0_size; nodeNumber++) {
+  for (int nodeNumber = 0, nodetab_rank0_size = nodetab_rank0_table.size(); nodeNumber < nodetab_rank0_size; nodeNumber++) {
     int pe0 = nodetab_rank0_table[nodeNumber];
 
     char *arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeNumber));
@@ -4195,9 +4201,8 @@ static void nodetab_init_for_scyld()
     maxNodes = arg_endpe + 1;
   if (maxNodes > tablesize)
     tablesize = maxNodes;
-  nodetab_table = (nodetab_host **) malloc(tablesize * sizeof(nodetab_host *));
-  nodetab_rank0_table = (int *) malloc(tablesize * sizeof(int));
-  nodetab_max = tablesize;
+  nodetab_table.reserve(tablesize);
+  nodetab_rank0_table.reserve(tablesize);
 
   nodetab_host group;
   nodetab_reset(&group);
@@ -4243,6 +4248,8 @@ arg_ppn);
         break;
     }
   }
+
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   if (nodetab_rank0_size == 0) {
     fprintf(stderr, "Charmrun> no slave node available!\n");
     exit(1);
@@ -4283,7 +4290,7 @@ arg_ppn);
 static void start_nodes_scyld(void)
 {
   char *envp[2] = { (char *) malloc(256), NULL };
-  for (int i = 0; i < nodetab_rank0_size; i++) {
+  for (int i = 0, nodetab_rank0_size = nodetab_rank0_table.size(); i < nodetab_rank0_size; i++) {
     int pe = nodetab_rank0_table[i];
     int nodeno = atoi(nodetab_name(pe));
 
@@ -4530,7 +4537,7 @@ static void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
 #endif
 
   else
-    fprintf(f, "CmiNumNodes='%d'; export CmiNumNodes\n", nodetab_rank0_size);
+    fprintf(f, "CmiNumNodes='%d'; export CmiNumNodes\n", (int)nodetab_rank0_table.size());
 
 #ifdef CMK_GFORTRAN
   fprintf(f, "GFORTRAN_UNBUFFERED_ALL=YES; export GFORTRAN_UNBUFFERED_ALL\n");
@@ -4895,12 +4902,14 @@ static void start_one_node_ssh(int rank0no)
   ssh_script(f, pe, rank0no, arg_argv, 0);
   fclose(f);
   if (!ssh_pids)
-    ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
+    ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_table.size());
   ssh_pids[rank0no] = ssh_fork(pe, startScript);
 }
 
 static int start_set_node_ssh(int client)
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
+
   /* a search function could be inserted here instead of sequential lookup for
    * more complex node lists (e.g. interleaving) */
   int clientgroup;
@@ -4952,6 +4961,7 @@ static int start_set_node_ssh(int client)
 
 static void start_nodes_ssh()
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
 
   if (arg_verbose)
@@ -4998,7 +5008,7 @@ static int ssh_fork_one(const char *startScript)
   char npes[24];
   if ( ! arg_mpiexec_no_n ) {
     sshargv.push_back("-n");
-    sprintf(npes, "%d", nodetab_rank0_size);
+    sprintf(npes, "%d", (int)nodetab_rank0_table.size());
     sshargv.push_back(npes);
   }
   sshargv.push_back((char *) startScript);
@@ -5043,6 +5053,7 @@ static void start_nodes_mpiexec()
   }
   ssh_script(f, 0, 0, arg_argv, 0);
   fclose(f);
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
   ssh_pids[0] = ssh_fork_one(startScript);
   for (int i = 0; i < nodetab_rank0_size; i++)
@@ -5099,7 +5110,7 @@ static void finish_nodes()
     finish_set_nodes(0, branchfactor);
   else
 #endif
-    finish_set_nodes(0, nodetab_rank0_size);
+    finish_set_nodes(0, nodetab_rank0_table.size());
   free(ssh_pids);
 }
 
@@ -5108,7 +5119,7 @@ static void kill_nodes()
   if (!ssh_pids)
     return; /*nothing to do*/
   /*Now wait for all the ssh'es to finish*/
-  for (int rank0no = 0; rank0no < nodetab_rank0_size; rank0no++) {
+  for (int rank0no = 0, nodetab_rank0_size = nodetab_rank0_table.size(); rank0no < nodetab_rank0_size; rank0no++) {
     const char *host = nodetab_name(nodetab_rank0_table[rank0no]);
     int status = 0;
     if (arg_verbose)
@@ -5223,7 +5234,7 @@ static void start_nodes_local(char **env)
       dparamp=(char **) (pparam_argv+1);
     }
 
-  for (int rank0no = 0; rank0no < nodetab_rank0_size; rank0no++) {
+  for (int rank0no = 0, nodetab_rank0_size = nodetab_rank0_table.size(); rank0no < nodetab_rank0_size; rank0no++) {
     int pe = nodetab_rank0_table[rank0no];
 
     if (arg_verbose)
@@ -5348,7 +5359,7 @@ static nodetab_host *replacement_host(int pe)
   x = x % arg_read_pes;
   loaded_max_pe += 1;
   /*  while(x == pe){
-   *       x = rand()%nodetab_size;
+   *       x = rand()%nodetab_table.size();
    *           }*/
   fprintf(stderr, "Charmrun>>> replacing pe %d with %d host %s with %s \n", pe,
           x, nodetab_name(pe), nodetab_name(x));
@@ -5361,12 +5372,12 @@ static nodetab_host *replacement_host(int pe)
   while (x == pe) {
 #ifdef HSTART
     if (arg_hierarchical_start) {
-      x = nodetab_rank0_table[rand() % nodetab_rank0_size];
+      x = nodetab_rank0_table[rand() % nodetab_rank0_table.size()];
       crashed_pe_id = pe;
       restarted_pe_id = x;
     } else
 #endif
-      x = rand() % nodetab_size;
+      x = rand() % nodetab_table.size();
   }
   return nodetab_table[x];
 }
