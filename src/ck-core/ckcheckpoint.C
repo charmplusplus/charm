@@ -7,12 +7,6 @@ More documentation goes here...
     see ckcheckpoint.h for change log
 */
 
-#include <unistd.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-
-#include <errno.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

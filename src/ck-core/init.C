@@ -157,7 +157,7 @@ CpvCExtern(int,interopExitFlag);
 #if CMK_SHRINK_EXPAND
 //for shrink expand cleanup
 int _ROGroupRestartHandlerIdx;
-char* _shrinkexpand_basedir;
+const char* _shrinkexpand_basedir;
 #endif
 /*
 	FAULT_EVAC
@@ -268,7 +268,7 @@ static inline void _parseCommandLineOpts(char **argv)
   }
 
 #if CMK_SHRINK_EXPAND
-  if (!CmiGetArgStringDesc(argv, "+shrinkexpand_basedir", &_shrinkexpand_basedir,
+  if (!CmiGetArgStringDesc(argv, "+shrinkexpand_basedir", (char **)&_shrinkexpand_basedir,
                            "Checkpoint directory used for shrink-expand (defaults to /dev/shm)"))
       _shrinkexpand_basedir = "/dev/shm";
 #endif

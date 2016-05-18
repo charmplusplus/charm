@@ -2337,7 +2337,7 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
     }
   }
 
-  char *dir = "/dev/shm";
+  const char *dir = "/dev/shm";
   for (int i = 0; i < saved_argc; ++i) {
     if (strcmp(saved_argv[i], "+shrinkexpand_basedir") == 0) {
       dir = saved_argv[i+1];
@@ -2345,11 +2345,11 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
     }
   }
 
-  char **ret;
+  const char **ret;
   if (restart_idx == -1) {
-    ret = (char **) malloc(sizeof(char *) * (saved_argc + 10));
+    ret = (const char **) malloc(sizeof(char *) * (saved_argc + 10));
   } else {
-    ret = (char **) malloc(sizeof(char *) * (saved_argc + 8));
+    ret = (const char **) malloc(sizeof(char *) * (saved_argc + 8));
   }
 
   int newP = *(int *) (msg->data);
@@ -2399,8 +2399,8 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
   skt_client_table.clear();
   skt_close(server_fd);
   skt_close(CcsServer_fd());
-  execv(ret[0], ret);
-  printf("Should not be here %s \n");
+  execv(ret[0], (char **)ret);
+  printf("Should not be here\n");
   exit(1);
 
   return REQ_OK;
@@ -5062,12 +5062,12 @@ void start_nodes_ssh()
       if (arg_verbose)
         printf("Expand %d %d\n", arg_requested_pes, arg_old_pes);
       for (client = 0; client < arg_old_pes; client++)
-        rsh_pids[client] = 0;
+        ssh_pids[client] = 0;
     } else { // shrink case
       if (arg_verbose)
         printf("Shrink  %d %d\n", arg_requested_pes, arg_old_pes);
       for (client = 0; client < arg_requested_pes; client++)
-        rsh_pids[client] = 0;
+        ssh_pids[client] = 0;
     }
   }
 #endif
