@@ -1877,7 +1877,6 @@ void LrtsPostCommonInit(int everReturn)
 
 void LrtsExit()
 {
-  CmiPrintf("[%d] LrtsExit\n", CmiMyRank());
   int i;
   machine_initiated_shutdown=1;
 
