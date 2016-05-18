@@ -808,6 +808,7 @@ static ampi *ampiInit(char **argv)
 
   init_operations();     // initialize fortran reduction operation table
   getAmpiParent()->setCommAttr(MPI_COMM_WORLD, MPI_UNIVERSE_SIZE, &_nchunks);
+  ptr->setCommName("MPI_COMM_WORLD");
 
   getAmpiParent()->ampiInitCallDone = 0;
 
@@ -1017,6 +1018,7 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
     CkVec<int> _indices;
     _indices.push_back(thisIndex);
     selfStruct = ampiCommStruct(MPI_COMM_SELF,s.getProxy(),1,_indices);
+    selfStruct.setName("MPI_COMM_SELF");
   }
 
   if (!forMigration)
