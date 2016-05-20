@@ -1785,7 +1785,7 @@ void ampi::inorder(AmpiMsg* msg)
     CmmPut(msgs, 3, tags, msg);
 }
 
-AmpiMsg *ampi::getMessage(int t, int s, int comm, int *sts)
+AmpiMsg *ampi::getMessage(int t, int s, int comm, int *sts) const
 {
   int tags[3];
   tags[0] = t; tags[1] = s; tags[2] = comm;
@@ -7144,7 +7144,7 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, int *neighbo
 }
 
 /* Used by MPI_Neighbor_* routines */
-int ampi::getNumTopologyNeighbors(MPI_Comm comm, int rank) {
+int ampi::getNumTopologyNeighbors(MPI_Comm comm, int rank) const {
   int num_dims, num_neighbors = 0;
   ampiParent *ptr = getAmpiParent();
   if (ptr->isGraph(comm)) {
@@ -7157,7 +7157,7 @@ int ampi::getNumTopologyNeighbors(MPI_Comm comm, int rank) {
   return num_neighbors;
 }
 
-void ampi::getTopologyNeighborRanks(MPI_Comm comm, int rank, int num_neighbors, int *neighbors) {
+void ampi::getTopologyNeighborRanks(MPI_Comm comm, int rank, int num_neighbors, int *neighbors) const {
   ampiParent *ptr = getAmpiParent();
   if (ptr->isGraph(comm)) {
     AMPI_Graph_neighbors(comm, rank, num_neighbors, neighbors);

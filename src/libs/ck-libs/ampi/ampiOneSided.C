@@ -207,7 +207,7 @@ int ampiParent::addWinStruct(WinStruct* win) {
   return winStructList.size()-1;
 }
 
-WinStruct ampiParent::getWinStruct(MPI_Win win) {
+WinStruct ampiParent::getWinStruct(MPI_Win win) const {
   return *(winStructList[(int)win]);
 }
 
@@ -516,7 +516,7 @@ int ampi::deleteWinInstance(MPI_Win win) {
   return MPI_SUCCESS;
 }
 
-int ampi::winGetGroup(WinStruct win, MPI_Group *group){
+int ampi::winGetGroup(WinStruct win, MPI_Group *group) const {
    *group = parent->comm2group(win.comm);
    return MPI_SUCCESS;
 }
@@ -526,12 +526,12 @@ void ampi::winSetName(WinStruct win, const char *name) {
   winobj->setName(name);
 }
 
-void ampi::winGetName(WinStruct win, char *name, int *length) {
+void ampi::winGetName(WinStruct win, char *name, int *length) const {
   win_obj *winobj = winObjects[win.index];
   winobj->getName(name, length);
 }
 
-win_obj* ampi::getWinObjInstance(WinStruct win) {
+win_obj* ampi::getWinObjInstance(WinStruct win) const {
   return winObjects[win.index];
 }
 

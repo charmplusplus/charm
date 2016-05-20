@@ -201,14 +201,14 @@ class InfoStruct{
  public:
   InfoStruct(void):valid(true) { }
   void setvalid(bool valid_){ valid = valid_; }
-  bool getvalid(void){ return valid; }
+  bool getvalid(void) const { return valid; }
   void set(const char* k, const char* v);
   void dup(InfoStruct& src);
-  int get(const char* k, int vl, char*& v); // return flag
+  int get(const char* k, int vl, char*& v) const; // return flag
   int deletek(const char* k); // return -1 when not found
-  int get_valuelen(const char* k, int* vl); // return flag
-  int get_nkeys(void) { return nodes.size(); }
-  int get_nthkey(int n,char* k);
+  int get_valuelen(const char* k, int* vl) const; // return flag
+  int get_nkeys(void) const { return nodes.size(); }
+  int get_nthkey(int n,char* k) const;
   void myfree(void);
   void pup(PUP::er& p);
 };
@@ -275,7 +275,7 @@ class ampiCommStruct {
     CkDDT_SetName(commName, src, &commNameLen);
   }
 
-  void getName(char *name, int *len) {
+  void getName(char *name, int *len) const {
     *len = commNameLen;
     memcpy(name, commName, *len+1);
   }
@@ -318,13 +318,13 @@ class ampiCommStruct {
   inline const CkVec<int> &getdims() const {return dims;}
   inline const CkVec<int> &getperiods() const {return periods;}
 
-  inline int getndims() {return ndims;}
+  inline int getndims() const {return ndims;}
   inline void setndims(int ndims_) {ndims = ndims_; }
   inline void setdims(const CkVec<int> &dims_) { dims = dims_; }
   inline void setperiods(const CkVec<int> &periods_) { periods = periods_; }
 
   /* Similar hack for graph vt */
-  inline int getnvertices() {return nvertices;}
+  inline int getnvertices() const {return nvertices;}
   inline const CkVec<int> &getindex() const {return index;}
   inline const CkVec<int> &getedges() const {return edges;}
 
@@ -565,11 +565,11 @@ class AmpiRequest {
 
   /// Frees up the request: invalidate it
   virtual void free(void){ isvalid=false; }
-  inline bool isValid(void){ return isvalid; }
+  inline bool isValid(void) const { return isvalid; }
 
   /// Returns the type of request:
   ///  MPI_PERS_REQ, MPI_I_REQ, MPI_ATA_REQ, MPI_IATA_REQ, MPI_S_REQ, MPI_GPU_REQ
-  virtual int getType(void) =0;
+  virtual int getType(void) const =0;
 
   virtual void pup(PUP::er &p) {
     p((char *)&buf,sizeof(void *)); //supposed to work only with isomalloc
@@ -605,7 +605,7 @@ class PersReq : public AmpiRequest {
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
   void receive(ampi *ptr, AmpiMsg *msg) {}
-  inline int getType(void){ return MPI_PERS_REQ; }
+  inline int getType(void) const { return MPI_PERS_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p(sndrcv);
@@ -627,7 +627,7 @@ class IReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
-  inline int getType(void){ return MPI_I_REQ; }
+  inline int getType(void) const { return MPI_I_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg);
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
@@ -681,8 +681,8 @@ class ATAReq : public AmpiRequest {
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
   void receive(ampi *ptr, AmpiMsg *msg) {}
-  inline int getCount(void){ return elmcount; }
-  inline int getType(void){ return MPI_ATA_REQ; }
+  inline int getCount(void) const { return elmcount; }
+  inline int getType(void) const { return MPI_ATA_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p(elmcount);
@@ -713,7 +713,7 @@ class SReq : public AmpiRequest {
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
   void receive(ampi *ptr, AmpiMsg *msg) {}
-  inline int getType(void){ return MPI_S_REQ; }
+  inline int getType(void) const { return MPI_S_REQ; }
   virtual void pup(PUP::er &p){
   AmpiRequest::pup(p);
     p|statusIreq;
@@ -754,8 +754,8 @@ class IATAReq : public AmpiRequest {
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
   void receive(ampi *ptr, AmpiMsg *msg) {}
-  inline int getCount(void){ return elmcount; }
-  inline int getType(void){ return MPI_IATA_REQ; }
+  inline int getCount(void) const { return elmcount; }
+  inline int getType(void) const { return MPI_IATA_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p(elmcount);
@@ -842,14 +842,14 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
     return len-1;
   }
 
-  inline void checkRequest(MPI_Request idx){
+  inline void checkRequest(MPI_Request idx) const {
     if(!(idx==-1 || (idx < this->len && (block[idx])->isValid())))
       CkAbort("Invalid MPI_Request\n");
   }
 
   //find an AmpiRequest by its pointer value
   //return -1 if not found!
-  int findRequestIndex(AmpiRequest *req){
+  int findRequestIndex(AmpiRequest *req) const {
     for(int i=0; i<len; i++){
       if(block[i]==req) return i;
     }
@@ -1044,7 +1044,7 @@ class ampiParent : public CBase_ampiParent {
   inline int isSplit(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
   }
-  const ampiCommStruct &getSplit(MPI_Comm comm) {
+  const ampiCommStruct &getSplit(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_SPLIT;
     if (idx>=splitComm.size()) CkAbort("Bad split communicator used");
     return *splitComm[idx];
@@ -1054,7 +1054,7 @@ class ampiParent : public CBase_ampiParent {
   inline int isGroup(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_GROUP && comm<MPI_COMM_FIRST_CART);
   }
-  const ampiCommStruct &getGroup(MPI_Comm comm) {
+  const ampiCommStruct &getGroup(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_GROUP;
     if (idx>=groupComm.size()) CkAbort("Bad group communicator used");
     return *groupComm[idx];
@@ -1071,7 +1071,7 @@ class ampiParent : public CBase_ampiParent {
   inline int isIntra(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_INTRA && comm<MPI_COMM_FIRST_RESVD);
   }
-  const ampiCommStruct &getIntra(MPI_Comm comm) {
+  const ampiCommStruct &getIntra(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_INTRA;
     if (idx>=intraComm.size()) CkAbort("Bad intra-communicator used");
     return *intraComm[idx];
@@ -1106,7 +1106,7 @@ class ampiParent : public CBase_ampiParent {
   void setUserJustMigratedFn(MPI_MigrateFn f);
   ~ampiParent();
 
-  ampi *lookupComm(MPI_Comm comm) {
+  ampi *lookupComm(MPI_Comm comm) const {
     if (comm!=worldStruct.getComm())
       CkAbort("ampiParent::lookupComm> Bad communicator!");
     return worldPtr;
@@ -1133,7 +1133,7 @@ class ampiParent : public CBase_ampiParent {
   inline int isCart(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_CART && comm<MPI_COMM_FIRST_GRAPH);
   }
-  ampiCommStruct &getCart(MPI_Comm comm) {
+  ampiCommStruct &getCart(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_CART;
     if (idx>=cartComm.size()) CkAbort("Bad cartesian communicator used");
     return *cartComm[idx];
@@ -1141,7 +1141,7 @@ class ampiParent : public CBase_ampiParent {
   inline int isGraph(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_INTER);
   }
-  ampiCommStruct &getGraph(MPI_Comm comm) {
+  ampiCommStruct &getGraph(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_GRAPH;
     if (idx>=graphComm.size()) CkAbort("Bad graph communicator used");
     return *graphComm[idx];
@@ -1149,7 +1149,7 @@ class ampiParent : public CBase_ampiParent {
   inline int isInter(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_INTER && comm<MPI_COMM_FIRST_INTRA);
   }
-  const ampiCommStruct &getInter(MPI_Comm comm) {
+  const ampiCommStruct &getInter(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_INTER;
     if (idx>=interComm.size()) CkAbort("Bad inter-communicator used");
     return *interComm[idx];
@@ -1170,9 +1170,9 @@ class ampiParent : public CBase_ampiParent {
   void startCheckpoint(const char* dname);
   void Checkpoint(int len, const char* dname);
   void ResumeThread(void);
-  TCharm* getTCharmThread() {return thread;}
+  TCharm* getTCharmThread() const {return thread;}
 
-  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) {
+  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const {
     if (comm==MPI_COMM_WORLD) return worldStruct;
     if (comm==MPI_COMM_SELF) return selfStruct;
     if (comm==worldNo) return worldStruct;
@@ -1186,7 +1186,7 @@ class ampiParent : public CBase_ampiParent {
   }
 
   //ampi *comm2ampi(MPI_Comm comm);
-  inline ampi *comm2ampi(MPI_Comm comm) {
+  inline ampi *comm2ampi(MPI_Comm comm) const {
     if (comm==MPI_COMM_WORLD) return worldPtr;
     if (comm==MPI_COMM_SELF) return worldPtr;
     if (comm==worldNo) return worldPtr;
@@ -1219,13 +1219,13 @@ class ampiParent : public CBase_ampiParent {
     return NULL;
   }
 
-  inline int hasComm(const MPI_Group group){
+  inline int hasComm(const MPI_Group group) const {
     MPI_Comm comm = (MPI_Comm)group;
     return ( comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm) ||
              isCart(comm) || isGraph(comm) || isIntra(comm) );
     //isInter omitted because its comm number != its group number
   }
-  inline const groupStruct group2vec(MPI_Group group){
+  inline const groupStruct group2vec(MPI_Group group) const {
     if(hasComm(group))
       return comm2CommStruct((MPI_Comm)group).getIndices();
     if(isInGroups(group))
@@ -1239,19 +1239,19 @@ class ampiParent : public CBase_ampiParent {
     groups[idx]=new groupStruct(vec);
     return (MPI_Group)idx;
   }
-  inline int getRank(const MPI_Group group){
+  inline int getRank(const MPI_Group group) const {
     groupStruct vec = group2vec(group);
     return getPosOp(thisIndex,vec);
   }
 
-  inline int getMyPe(void){
+  inline int getMyPe(void) const {
     return CkMyPe();
   }
   inline int hasWorld(void) const {
     return worldPtr!=NULL;
   }
 
-  inline void checkComm(MPI_Comm comm){
+  inline void checkComm(MPI_Comm comm) const {
     if ((comm > MPI_COMM_FIRST_RESVD && comm != MPI_COMM_SELF && comm != MPI_COMM_WORLD)
      || (isSplit(comm) && comm-MPI_COMM_FIRST_SPLIT >= splitComm.size())
      || (isGroup(comm) && comm-MPI_COMM_FIRST_GROUP >= groupComm.size())
@@ -1263,18 +1263,18 @@ class ampiParent : public CBase_ampiParent {
   }
 
   /// if intra-communicator, return comm, otherwise return null group
-  inline MPI_Group comm2group(const MPI_Comm comm){
+  inline MPI_Group comm2group(const MPI_Comm comm) const {
     if(isInter(comm)) return MPI_GROUP_NULL;   // we don't support inter-communicator in such functions
     ampiCommStruct s = comm2CommStruct(comm);
     if(comm!=MPI_COMM_WORLD && comm!=s.getComm()) CkAbort("Error in ampiParent::comm2group()");
     return (MPI_Group)(s.getComm());
   }
 
-  inline int getRemoteSize(const MPI_Comm comm){
+  inline int getRemoteSize(const MPI_Comm comm) const {
     if(isInter(comm)) return getInter(comm).getRemoteIndices().size();
     else return -1;
   }
-  inline MPI_Group getRemoteGroup(const MPI_Comm comm){
+  inline MPI_Group getRemoteGroup(const MPI_Comm comm) {
     if(isInter(comm)) return saveGroupStruct(getInter(comm).getRemoteIndices());
     else return MPI_GROUP_NULL;
   }
@@ -1299,7 +1299,7 @@ class ampiParent : public CBase_ampiParent {
   AmpiRequestList ampiReqs;
 
   int addWinStruct(WinStruct* win);
-  WinStruct getWinStruct(MPI_Win win);
+  WinStruct getWinStruct(MPI_Win win) const;
   void removeWinStruct(WinStruct win);
 
  public:
@@ -1307,10 +1307,10 @@ class ampiParent : public CBase_ampiParent {
   MPI_Info dupInfo(MPI_Info info);
   void setInfo(MPI_Info info, const char *key, const char *value);
   int deleteInfo(MPI_Info info, const char *key);
-  int getInfo(MPI_Info info, const char *key, int valuelen, char *value);
-  int getInfoValuelen(MPI_Info info, const char *key, int *valuelen);
-  int getInfoNkeys(MPI_Info info);
-  int getInfoNthkey(MPI_Info info, int n, char *key);
+  int getInfo(MPI_Info info, const char *key, int valuelen, char *value) const;
+  int getInfoValuelen(MPI_Info info, const char *key, int *valuelen) const;
+  int getInfoNkeys(MPI_Info info) const;
+  int getInfoNthkey(MPI_Info info, int n, char *key) const;
   void freeInfo(MPI_Info info);
 
  public:
@@ -1388,7 +1388,7 @@ class ampi : public CBase_ampi {
 
  public: // to be used by MPI_* functions
 
-  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) {
+  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const {
     return parent->comm2CommStruct(comm);
   }
 
@@ -1401,7 +1401,7 @@ class ampi : public CBase_ampi {
   void delesend(int t, int s, const void* buf, int count, int type,
                 int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
   inline int processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int type);
-  inline AmpiMsg * getMessage(int t, int s, int comm, int *sts);
+  inline AmpiMsg * getMessage(int t, int s, int comm, int *sts) const;
   int recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
   void probe(int t,int s,int comm,int *sts);
   int iprobe(int t,int s,int comm,int *sts);
@@ -1414,7 +1414,7 @@ class ampi : public CBase_ampi {
   void graphCreate(const groupStruct vec, MPI_Comm *newcomm);
   void intercommCreate(const groupStruct rvec, int root, MPI_Comm *ncomm);
 
-  inline int isInter(void) { return myComm.isinter(); }
+  inline int isInter(void) const { return myComm.isinter(); }
   void intercommMerge(int first, MPI_Comm *ncomm);
 
   inline int getWorldRank(void) const {return parent->thisIndex;}
@@ -1429,18 +1429,18 @@ class ampi : public CBase_ampi {
   }
   inline MPI_Comm getComm(void) const {return myComm.getComm();}
   inline void setCommName(const char *name){myComm.setName(name);}
-  inline void getCommName(char *name, int *len){myComm.getName(name,len);}
+  inline void getCommName(char *name, int *len) const {myComm.getName(name,len);}
   inline CkVec<int> getIndices(void) const { return myComm.getindices(); }
   inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
   inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
-  int getNumTopologyNeighbors(MPI_Comm comm, int rank);
-  void getTopologyNeighborRanks(MPI_Comm comm, int rank, int num_neighbors, int *neighbors);
+  int getNumTopologyNeighbors(MPI_Comm comm, int rank) const;
+  void getTopologyNeighborRanks(MPI_Comm comm, int rank, int num_neighbors, int *neighbors) const;
 
-  CkDDT *getDDT(void) {return parent->myDDT;}
-  CthThread getThread() { return thread->getThread(); }
+  CkDDT *getDDT(void) const {return parent->myDDT;}
+  CthThread getThread() const { return thread->getThread(); }
 #if CMK_LBDB_ON
   void setMigratable(int mig) {
     if(mig) thread->setMigratable(true);
@@ -1461,7 +1461,7 @@ class ampi : public CBase_ampi {
  public:
   MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info);
   int deleteWinInstance(MPI_Win win);
-  int winGetGroup(WinStruct win, MPI_Group *group);
+  int winGetGroup(WinStruct win, MPI_Group *group) const;
   int winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
   int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
@@ -1490,8 +1490,8 @@ class ampi : public CBase_ampi {
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, int winIndex, CkFutureID ftHandle, int pe_src);
   void winSetName(WinStruct win, const char *name);
-  void winGetName(WinStruct win, char *name, int *length);
-  win_obj* getWinObjInstance(WinStruct win);
+  void winGetName(WinStruct win, char *name, int *length) const;
+  win_obj* getWinObjInstance(WinStruct win) const;
   int getNewSemaId();
 
   AmpiMsg* Alltoall_RemoteIget(int disp, int targcnt, MPI_Datatype targtype, int tag);

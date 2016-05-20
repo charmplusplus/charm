@@ -93,7 +93,7 @@ int InfoStruct::deletek(const char* k){
   return found;
 }
 
-int InfoStruct::get(const char* k, int vl, char*& v){
+int InfoStruct::get(const char* k, int vl, char*& v) const{
   const char *key = create_stripped_string(k);
   int sz=nodes.size();
   int found=0;
@@ -109,7 +109,7 @@ int InfoStruct::get(const char* k, int vl, char*& v){
   return found;
 }
 
-int InfoStruct::get_valuelen(const char* k, int* vl){
+int InfoStruct::get_valuelen(const char* k, int* vl) const{
   const char *key = create_stripped_string(k);
   int sz=nodes.size();
   int found=0;
@@ -124,7 +124,7 @@ int InfoStruct::get_valuelen(const char* k, int* vl){
   return found;
 }
 
-int InfoStruct::get_nthkey(int n,char* k){
+int InfoStruct::get_nthkey(int n,char* k) const{
   if(n<0 || n>=nodes.size())
     return 0;
   strcpy(k,nodes[n]->key);
@@ -167,25 +167,25 @@ int ampiParent::deleteInfo(MPI_Info info, const char *key){
   return infos[info]->deletek(key);
 }
 
-int ampiParent::getInfo(MPI_Info info, const char *key, int valuelen, char *value){
+int ampiParent::getInfo(MPI_Info info, const char *key, int valuelen, char *value) const{
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     CkAbort("AMPI_Info_get: invalid info\n");
   return infos[info]->get(key,valuelen,value);
 }
 
-int ampiParent::getInfoValuelen(MPI_Info info, const char *key, int *valuelen){
+int ampiParent::getInfoValuelen(MPI_Info info, const char *key, int *valuelen) const{
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     CkAbort("AMPI_Info_get_valuelen: invalid info\n");
   return infos[info]->get_valuelen(key,valuelen);
 }
 
-int ampiParent::getInfoNkeys(MPI_Info info){
+int ampiParent::getInfoNkeys(MPI_Info info) const{
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     CkAbort("AMPI_Info_get_nkeys: invalid info\n");
   return infos[info]->get_nkeys();
 }
 
-int ampiParent::getInfoNthkey(MPI_Info info, int n, char *key){
+int ampiParent::getInfoNthkey(MPI_Info info, int n, char *key) const{
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     CkAbort("AMPI_Info_get_nthkey: invalid info\n");
   return infos[info]->get_nthkey(n,key);
