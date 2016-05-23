@@ -22,16 +22,16 @@ mainmodule manyToMany {
 	
         entry void domanyToMany() {
            
-            atomic {
+            serial {
                 sendmanyToMany();
             }
 
             for(count = 0; count < numChares; ++count){
-                when getmanyToMany[iter](manyToManyMsg *m) atomic {
+                when getmanyToMany[iter](manyToManyMsg *m) serial {
                     processmanyToMany(m);
                 }
             }
-            atomic {
+            serial {
 			    iter++;
 				finish();
             }

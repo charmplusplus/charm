@@ -126,7 +126,7 @@ inline void createInitialChildren(Solver *solver)
 #ifdef USEINTPRIORITY
     solver->setPriority(state, (int)lowerBound(state));
 #endif
-    CmiAssert(state->length>0);
+    CkAssert(state->length>0);
     solver->process(state);
 }
 
@@ -138,8 +138,8 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
     ((TspBase*)_base)->initialize();
     s->copy((TspBase*)_base);
     int childIndex = 0;
-    CmiAssert(((TspBase*)_base)->length>0);
-    CmiAssert(s->length>0);
+    CkAssert(((TspBase*)_base)->length>0);
+    CkAssert(s->length>0);
     int last = s->tour[s->length-1];
     int childNum = 0;
     //CkPrintf("lower bound=%f\n", s->getLowerBound());
@@ -175,7 +175,7 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
 #ifdef USEINTPRIORITY
             solver->setPriority(NewTour, (int)lowerBound(NewTour));
 #endif
-            CmiAssert(NewTour->length>0);
+            CkAssert(NewTour->length>0);
             solver->process(NewTour);
         }
     }

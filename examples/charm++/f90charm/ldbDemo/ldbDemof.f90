@@ -26,7 +26,7 @@
         objPtr%aid = aid
           ! initialize Chare data here in constructor
         objPtr%obj%iterations = 0
-        objPtr%obj%t0 =  CmiWallTimer()
+        objPtr%obj%t0 =  CkWallTimer()
 
         objPtr%obj%n = 200+MOD(index*31757, 2000)
         call CkPrintf("Constructor of element %d n: %d\n$$", index, objPtr%obj%n)
@@ -84,8 +84,8 @@
         REAL*8 workTime, recvTimeStamp
         INTEGER k
        
-        recvTimeStamp = CmiWallTimer()
-        DO WHILE (CmiWallTimer() - recvTimeStamp < workTime ) 
+        recvTimeStamp = CkWallTimer()
+        DO WHILE (CkWallTimer() - recvTimeStamp < workTime ) 
           k = k+1;
         END DO
     
@@ -140,7 +140,7 @@
           objPtr%obj%count = 0
           objPtr%obj%iterations = objPtr%obj%iterations + 1
           IF (objPtr%obj%iterations .eq. 18) THEN
-            t1 = CmiWallTimer()
+            t1 = CkWallTimer()
             call CkPrintf("ALL done in %F seconds.\n$$", t1-objPtr%obj%t0)
             call CkExit()
           ELSE

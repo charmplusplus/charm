@@ -7,7 +7,7 @@ module completion_test {
 
     entry void run_test(void) {
       //First test: no producers, nothing produced
-      atomic {
+      serial {
 	  CkPrintf("Starting test\n");
       	detector = CProxy_CompletionDetector::ckNew();
 	  CkPrintf("Created detector, starting first detection\n");
@@ -18,8 +18,8 @@ module completion_test {
       				 CkCallback(CkIndex_completion_tester::finish_test(0),
       					    thisProxy), 0);
       }
-      when start_test(CkReductionMsg *m) atomic { CkPrintf("Started first test\n"); }
-      when finish_test(CkReductionMsg *m) atomic {
+      when start_test(CkReductionMsg *m) serial { CkPrintf("Started first test\n"); }
+      when finish_test(CkReductionMsg *m) serial {
       	// Just ourself as a producer, produce nothing
       	detector.start_detection(1,
       				 CkCallback(CkIndex_completion_tester::start_test(0),
@@ -28,8 +28,8 @@ module completion_test {
       				 CkCallback(CkIndex_completion_tester::finish_test(0),
       					    thisProxy), 0);
       }
-      when start_test(CkReductionMsg *m) atomic { detector.ckLocalBranch()->done(); }
-      when finish_test(CkReductionMsg *m) atomic {
+      when start_test(CkReductionMsg *m) serial { detector.ckLocalBranch()->done(); }
+      when finish_test(CkReductionMsg *m) serial {
 	  CkPrintf("Finished second test\n");
       	detector.start_detection(1,
       				 CkCallback(CkIndex_completion_tester::start_test(0),
@@ -39,19 +39,19 @@ module completion_test {
       					    thisProxy), 0);
 	detector.ckLocalBranch()->produce();
       }
-      when start_test(CkReductionMsg *m) atomic {
+      when start_test(CkReductionMsg *m) serial {
 	  CkPrintf("Started third test\n");
 	  detector.ckLocalBranch()->done();
 	  detector.ckLocalBranch()->consume();
       }
-      when finish_test(CkReductionMsg *m) atomic {
+      when finish_test(CkReductionMsg *m) serial {
 	  int num = 10;
 	  CProxy_completion_array::ckNew(detector, num, num, CkCallback());
 	  detector.start_detection(num, CkCallback(), CkCallback(),
 				   CkCallback(CkIndex_completion_tester::finish_test(0),
 					      thisProxy), 0);
       }
-      when finish_test(CkReductionMsg *m) atomic {
+      when finish_test(CkReductionMsg *m) serial {
       	megatest_finish();
       }
     };

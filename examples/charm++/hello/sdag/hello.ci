@@ -13,31 +13,31 @@ mainmodule hello {
   array [1D] Hello {
     entry Hello(void);
     entry void SayHi(HelloMsg *vm){
-      atomic{ delete vm; }
+      serial{ delete vm; }
       forall [j] (nElements-1:0,-1){
-        atomic{
+        serial{
 	  helloProxy[j].RecvHello(new HelloMsg(thisIndex));
 	}
       }
-      atomic{
+      serial{
         StartRecv(new HelloMsg(0));
       }
     };
     entry void StartRecv(HelloMsg* vm){
-      atomic {
+      serial {
         delete vm;
         sum = 0;
       }
       forall [i] (1:nElements,1) {
         when RecvHello(HelloMsg *m) {
-          atomic {
+          serial {
             sum += m->data;
 	    delete m;
           }
         }
       }
-      atomic {
-        CmiPrintf("[%d]Sum = %d\n",thisIndex,sum);
+      serial {
+        CkPrintf("[%d]Sum = %d\n",thisIndex,sum);
 	mainProxy.Done();
       }
     };

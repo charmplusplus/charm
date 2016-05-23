@@ -371,7 +371,7 @@ class StencilPoint : public CBase_StencilPoint{
     }
  
 #else
-      CmiAbort("Messages not used, don't call\n");
+      CkAbort("Messages not used, don't call\n");
 #endif
       
   }

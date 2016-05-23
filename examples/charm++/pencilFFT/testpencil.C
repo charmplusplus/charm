@@ -17,11 +17,11 @@ void red_handler (void *param, int size, void *data) {
   //printf ("Iteration Complete\n", iteration);
   
   if (iteration == START_TIMING)
-    startTime = CmiWallTimer ();
+    startTime = CkWallTimer ();
   
   if (iteration == MAX_ITERATIONS) {
 
-    double endTime = CmiWallTimer();
+    double endTime = CkWallTimer();
 
     CkAssert (MAX_ITERATIONS > START_TIMING);
     CkPrintf ("Time to perform a pair of (%d, %d, %d) 3D FFT operations %g ms\n", 

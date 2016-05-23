@@ -12,7 +12,7 @@ mainmodule test1 {
     entry Cell();
     entry void finished(int number);
     entry void process(void) {
-      atomic "print test" {
+      serial "print test" {
         CkPrintf("Migrating from PE %d\n", CkMyPe());
 	thisProxy.process2();
         this->migrateMe(0);
@@ -20,7 +20,7 @@ mainmodule test1 {
     };
     entry void process2(void) {
       when finished[100] (int number)
-        atomic {
+        serial {
           CkPrintf("(%d, %d): received finished message\n", thisIndex.x, thisIndex.y);
 	  contribute(CkCallback(CkIndex_Main::end(), mainProxy));
 	}

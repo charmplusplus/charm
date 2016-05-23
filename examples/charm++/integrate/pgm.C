@@ -4,7 +4,7 @@ CProxy_main mainProxy;
 
 main::main(CkArgMsg * m)
 { 
-  if(m->argc < 3) CmiAbort("./pgm slices numChares.");
+  if(m->argc < 3) CkAbort("./pgm slices numChares.");
   int slices = atoi(m->argv[1]); 
   int numChares = atoi(m->argv[2]);
   mainProxy = thishandle; // readonly initialization

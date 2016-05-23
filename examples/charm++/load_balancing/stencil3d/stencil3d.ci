@@ -24,18 +24,18 @@ mainmodule stencil3d {
                              double ghosts[height*width]);
 
     entry void doStep() {
-      atomic "begin_iteration" {
+      serial "begin_iteration" {
 	begin_iteration();
       }
       for(imsg = 0; imsg < 6; imsg++) {
 	// "iterations" keeps track of messages across steps
 	when receiveGhosts[iterations] (int iter, int dir, int height, 
                                      int width, double ghosts[height*width])
-	  atomic "process_ghosts" {
+	  serial "process_ghosts" {
             processGhosts(dir, height, width, ghosts);
           }
       }
-      atomic "do_work" {
+      serial "do_work" {
 	check_and_compute();
       }
     };

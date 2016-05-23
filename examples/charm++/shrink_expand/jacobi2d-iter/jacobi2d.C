@@ -49,7 +49,7 @@ public:
         // print info
         CkPrintf("Running Jacobi on %d processors with (%d,%d) elements\n", CkNumPes(), num_chare_rows, num_chare_cols);
 
-		stTime = CmiWallTimer();
+		stTime = CkWallTimer();
 	    total_iterations = 400;
 	    if (m->argc > 3) {
 	        total_iterations = atoi(m->argv[3]);
@@ -94,11 +94,11 @@ void report(CkReductionMsg *m) {
     recieve_count++;
     double totaltime = CkWallTimer() - startTime;
 	if (1 == recieve_count) {
-        if (iterations == total_iterations || CmiWallTimer()-stTime>=3000000) {
-			CkPrintf("Program Done! avg_it:%.6f\n",(CmiWallTimer()-stTime)/iterations);
+        if (iterations == total_iterations || CkWallTimer()-stTime>=3000000) {
+			CkPrintf("Program Done! avg_it:%.6f\n",(CkWallTimer()-stTime)/iterations);
             CkExit();
         } else {
-            if(iterations%1==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CmiWallTimer()-stTime,(CmiWallTimer()-stTime)/iterations);
+            if(iterations%1==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations);
             CkPrintf("Memory Usage: %d bytes \n", CmiMemoryUsage());
             recieve_count=0;
             iterations++;
