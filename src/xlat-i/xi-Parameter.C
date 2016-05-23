@@ -300,11 +300,10 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
                 str << "  " << dt << "* " << param->name << "; "
                     << param->name << " = (" << dt << "*)impl_buf;\n";
               } else {
-                Type* dt = param->type->deref();
                 str << "  genClosure->" << next->param->name << " = "
                     << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
                     << param->type->deref() << ");\n";
-                dt = param->type->deref();
+                Type* dt = param->type->deref();
                 str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
               }
 	  } else if (!isArray() && next->isArray()) {
@@ -318,11 +317,10 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
                 str << "  " << dt << "* " << next->param->name << "; "
                     << next->param->name << " = (" << dt << "*)impl_buf;\n";
               } else {
-                Type* dt = param->type->deref();
                 str << "  genClosure->" << param->name << " = "
                     << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
                     << next->param->type->deref() << ");\n";
-                dt = next->param->type->deref();
+                Type* dt = next->param->type->deref();
                 str << "  genClosure->" << next->param->name << " = (" << dt << "*)impl_buf;\n";
               }
 	  } else {
