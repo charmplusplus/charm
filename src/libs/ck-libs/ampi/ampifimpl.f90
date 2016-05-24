@@ -87,3 +87,12 @@ subroutine MPI_Add_error_string(errorcode, string, ierr)
   call ampif_add_error_string(errorcode, string, len(string), ierr)
 
 end subroutine MPI_Add_error_string
+
+subroutine AMPI_Print(string, ierr)
+  implicit none
+  character(len=*), intent(in) :: string
+  integer, intent(out) :: ierr
+
+  call ampif_print(string, len(string), ierr)
+
+end subroutine AMPI_Print

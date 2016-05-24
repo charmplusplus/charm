@@ -7556,7 +7556,7 @@ int AMPI_Type_is_contiguous(MPI_Datatype datatype, int *flag)
 }
 
 CDECL
-int AMPI_Print(char *str)
+int AMPI_Print(const char *str)
 {
   AMPIAPI("AMPI_Print");
   ampiParent *ptr = getAmpiParent();

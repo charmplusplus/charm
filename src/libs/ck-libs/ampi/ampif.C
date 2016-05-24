@@ -241,6 +241,7 @@ FDECL {
 #define ampif_info_get FTN_NAME ( AMPIF_INFO_GET , ampif_info_get )
 #define ampif_info_get_valuelen FTN_NAME ( AMPIF_INFO_GET_VALUELEN , ampif_info_get_valuelen )
 #define ampif_add_error_string FTN_NAME ( AMPIF_ADD_ERROR_STRING , ampif_add_error_string )
+#define ampif_print FTN_NAME( AMPIF_PRINT , ampif_print )
 
 /* AMPI extensions */
 #define ampi_migrate FTN_NAME( AMPI_MIGRATE , ampi_migrate )
@@ -267,9 +268,11 @@ FDECL {
 #define ampi_yield FTN_NAME ( AMPI_YIELD , ampi_yield )
 #define ampi_suspend FTN_NAME ( AMPI_SUSPEND , ampi_suspend )
 #define ampi_resume FTN_NAME ( AMPI_RESUME, ampi_resume )
-#define ampi_print FTN_NAME( AMPI_PRINT , ampi_print )
+/* ampi_print is defined in ampifimpl.f90, see ampif_print defined below */
 #define ampi_install_idle_timer FTN_NAME( AMPI_INSTALL_IDLE_TIMER , ampi_install_idle_timer )
 #define ampi_uninstall_idle_timer FTN_NAME( AMPI_UNINSTALL_IDLE_TIMER , ampi_uninstall_idle_timer )
+#define ampi_trace_begin FTN_NAME( AMPI_TRACE_BEGIN , ampi_trace_begin )
+#define ampi_trace_end FTN_NAME( AMPI_TRACE_END , ampi_trace_end )
 
 /* Fortran-specific AMPI extensions */
 #define ampi_command_argument_count FTN_NAME( AMPI_COMMAND_ARGUMENT_COUNT , ampi_command_argument_count )
@@ -1678,12 +1681,19 @@ void ampi_resume(int *dest, int *comm, int *ierr) {
   *ierr = AMPI_Resume(*dest, *comm);
 }
 
-void ampi_print(char *str, int *ierr) {
-  char *buf = new char[MPI_MAX_ERROR_STRING];
-  memcpy(buf, str, MPI_MAX_ERROR_STRING);
-  buf[MPI_MAX_ERROR_STRING-1] = '\0';
-  AMPI_Print(buf);
-  delete [] buf;
+void ampif_print(const char *str, int *len, int *ierr) {
+  char tmpStr[MPI_MAX_ERROR_STRING];
+  ampif_str_f2c(tmpStr, str, *len);
+
+  *ierr = AMPI_Print(tmpStr);
+}
+
+void ampi_trace_begin(int *ierr) {
+  *ierr = AMPI_Trace_begin();
+}
+
+void ampi_trace_end(int *ierr) {
+  *ierr = AMPI_Trace_end();
 }
 
 #if CMK_BIGSIM_CHARM

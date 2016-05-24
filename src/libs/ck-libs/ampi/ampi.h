@@ -976,7 +976,7 @@ int AMPI_Evacuate(void);
 int AMPI_Yield(MPI_Comm comm);
 int AMPI_Suspend(MPI_Comm comm);
 int AMPI_Resume(int dest, MPI_Comm comm);
-int AMPI_Print(char *str);
+int AMPI_Print(const char *str);
 int AMPI_Trace_begin(void);
 int AMPI_Trace_end(void);
 int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
