@@ -1047,8 +1047,10 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   else
   {//Use the reducer to reduce the messages
 		//if there is only one msg to be reduced just return that message
-    if(nMsgs == 1 && msgArr[0]->reducer != CkReduction::set) {
-	ret = msgArr[0];	
+    if(nMsgs == 1 &&
+       msgArr[0]->reducer != CkReduction::set &&
+       msgArr[0]->reducer != CkReduction::tuple) {
+      ret = msgArr[0];
     }else{
       if (msgArr[0]->reducer == CkReduction::random) {
         // nMsgs > 1 indicates that reduction type is not random
@@ -1725,13 +1727,13 @@ static CkReductionMsg *set(int nMsg,CkReductionMsg **msg)
     if (!msg[i]->isFromUser())
     {//This message is composite-- just copy it over (less terminating -1)
                         int messageBytes=msg[i]->getSize()-sizeof(int);
-                        RED_DEB(("|\tmsg[%d] is %d bytes\n",i,msg[i]->getSize()));
+                        RED_DEB(("|\tc msg[%d] is %d bytes\n",i,msg[i]->getSize()));
                         memcpy((void *)cur,(void *)msg[i]->getData(),messageBytes);
                         cur=(CkReduction::setElement *)(((char *)cur)+messageBytes);
     }
     else //This is a message from an element-- wrap it in a reduction_set_element
     {
-      RED_DEB(("|\tmsg[%d] is %d bytes\n",i,msg[i]->getSize()));
+      RED_DEB(("|\tu msg[%d] is %d bytes\n",i,msg[i]->getSize()));
       cur->dataSize=msg[i]->getSize();
       memcpy((void *)cur->data,(void *)msg[i]->getData(),msg[i]->getSize());
       cur=SET_NEXT(cur);
@@ -1916,8 +1918,8 @@ CkReductionMsg* CkReduction::tupleReduction(int num_messages, CkReductionMsg** m
     {
       CkReduction::tupleElement* reductions = (CkReduction::tupleElement*)(tuple_data[message_idx]);
       CkReduction::tupleElement& element = reductions[reduction_idx];
-      DEB_TUPLE(("    msg %d, length=%d : { dataSize=%d, data=%p, reducer=%d },\n",
-               message_idx, messages[message_idx]->getLength(), element.dataSize, element.data, element.reducer));
+      DEB_TUPLE(("    msg %d, sf=%d, length=%d : { dataSize=%d, data=%p, reducer=%d },\n",
+                 message_idx, messages[message_idx]->sourceFlag, messages[message_idx]->getLength(), element.dataSize, element.data, element.reducer));
 
       reducerType = element.reducer;
 
@@ -1926,10 +1928,10 @@ CkReductionMsg* CkReduction::tupleReduction(int num_messages, CkReductionMsg** m
       simulated_message.dataSize = element.dataSize;
       simulated_message.data = element.data;
       simulated_message.reducer = element.reducer;
-      simulated_message.sourceFlag = -1000;
-      simulated_message.userFlag = (CMK_REFNUM_TYPE)-1;
-      simulated_message.gcount = 0;
-      simulated_message.migratableContributor = true;
+      simulated_message.sourceFlag = messages[message_idx]->sourceFlag;
+      simulated_message.userFlag = messages[message_idx]->userFlag;
+      simulated_message.gcount = messages[message_idx]->gcount;
+      simulated_message.migratableContributor = messages[message_idx]->migratableContributor;
 #if CMK_BIGSIM_CHARM
       simulated_message.log = NULL;
 #endif
