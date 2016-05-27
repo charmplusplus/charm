@@ -520,10 +520,9 @@ extern int _mpi_nworlds;
 
 #define MPI_PERS_REQ 1
 #define MPI_I_REQ    2
-#define MPI_ATA_REQ  3
-#define MPI_IATA_REQ 4
-#define MPI_S_REQ    5
-#define MPI_GPU_REQ  6
+#define MPI_IATA_REQ 3
+#define MPI_S_REQ    4
+#define MPI_GPU_REQ  5
 
 #define MyAlign8(x) (((x)+7)&(~7))
 
@@ -576,7 +575,7 @@ class AmpiRequest {
   inline bool isValid(void) const { return isvalid; }
 
   /// Returns the type of request:
-  ///  MPI_PERS_REQ, MPI_I_REQ, MPI_ATA_REQ, MPI_IATA_REQ, MPI_S_REQ, MPI_GPU_REQ
+  ///  MPI_PERS_REQ, MPI_I_REQ, MPI_IATA_REQ, MPI_S_REQ, MPI_GPU_REQ
   virtual int getType(void) const =0;
 
   virtual void pup(PUP::er &p) {
@@ -640,70 +639,6 @@ class IReq : public AmpiRequest {
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|statusIreq;  p|length;
-  }
-  virtual void print();
-};
-
-class ATAReq : public AmpiRequest {
-  class Request {
-   protected:
-    void *buf;
-    int count;
-    int type;
-    int src;
-    int tag;
-    int comm;
-#if CMK_BIGSIM_CHARM
-    void *event; // event buffered for the request
-#endif
-    virtual void pup(PUP::er &p){
-      p((char *)&buf,sizeof(void *)); //supposed to work only with isomalloc
-      p(count);
-      p(type);
-      p(src);p(tag);p(comm);
-#if CMK_BIGSIM_CHARM
-      //needed for bigsim out-of-core emulation
-      //as the "log" is not moved from memory, this pointer is safe
-      //to be reused
-      p((char *)&event, sizeof(void *));
-#endif
-    }
-    friend class ATAReq;
-  };
-
-  Request *myreqs;
-  int elmcount;
-  int idx;
- public:
-  ATAReq(int c_):elmcount(c_),idx(0) { myreqs = new Request [c_]; isvalid=true; }
-  ATAReq(){};
-  ~ATAReq(void) { if(myreqs) delete [] myreqs; }
-  int addReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_){
-    myreqs[idx].buf=buf_;	myreqs[idx].count=count_;
-    myreqs[idx].type=type_;	myreqs[idx].src=src_;
-    myreqs[idx].tag=tag_;	myreqs[idx].comm=comm_;
-    return (++idx);
-  }
-  bool test(MPI_Status *sts);
-  bool itest(MPI_Status *sts);
-  void complete(MPI_Status *sts);
-  int wait(MPI_Status *sts);
-  void receive(ampi *ptr, AmpiMsg *msg) {}
-  inline int getCount(void) const { return elmcount; }
-  inline int getType(void) const { return MPI_ATA_REQ; }
-  virtual void pup(PUP::er &p){
-    AmpiRequest::pup(p);
-    p(elmcount);
-    p(idx);
-    if(p.isUnpacking()){
-      myreqs = new Request[elmcount];
-    }
-    for(int i=0;i<idx;i++){
-      myreqs[i].pup(p);
-    }
-    if(p.isDeleting()){
-      delete []myreqs;
-    }
   }
   virtual void print();
 };

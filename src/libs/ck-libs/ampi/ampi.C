@@ -2213,11 +2213,6 @@ void IReq::print(){
   CkPrintf("In IReq: this=%p, status=%d, length=%d\n", this, statusIreq, length);
 }
 
-void ATAReq::print(){ //not complete for myreqs
-  AmpiRequest::print();
-  CkPrintf("In ATAReq: elmcount=%d, idx=%d\n", elmcount, idx);
-}
-
 void IATAReq::print(){ //not complete for myreqs
   AmpiRequest::print();
   CkPrintf("In IATAReq: elmcount=%d, idx=%d\n", elmcount, idx);
@@ -2257,9 +2252,6 @@ void AmpiRequestList::pup(PUP::er &p) {
             break;
           case MPI_I_REQ:
             block[i] = new IReq;
-            break;
-          case MPI_ATA_REQ:
-            block[i] = new ATAReq;
             break;
           case MPI_IATA_REQ:
             block[i] = new IATAReq;
@@ -3632,25 +3624,6 @@ int IReq::wait(MPI_Status *sts){
   return 0;
 }
 
-int ATAReq::wait(MPI_Status *sts){
-  int i;
-  for(i=0;i<count;i++){
-    if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
-          myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int *)sts))
-      CkAbort("AMPI> Error in alltoall request wait");
-#if CMK_BIGSIM_CHARM
-    _TRACE_BG_TLINE_END(&myreqs[i].event);
-#endif
-  }
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_BREAK(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "ATAReq_wait", NULL, 0, 1);
-  for (i=0; i<count; i++)
-    _TRACE_BG_ADD_BACKWARD_DEP(myreqs[i].event);
-  _TRACE_BG_TLINE_END(&event);
-#endif
-  return 0;
-}
-
 int IATAReq::wait(MPI_Status *sts){
   int i;
   for(i=0;i<elmcount;i++){
@@ -3999,29 +3972,6 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
   event = msg->event;
 #endif
   delete msg;
-}
-
-bool ATAReq::test(MPI_Status *sts){
-  int i, flag=1;
-  for(i=0;i<count;i++){
-    flag *= getAmpiInstance(myreqs[i].comm)->iprobe(myreqs[i].tag, myreqs[i].src,
-                            myreqs[i].comm, (int*) sts);
-  }
-  return flag;
-}
-
-bool ATAReq::itest(MPI_Status *sts){
-  return test(sts);
-}
-
-void ATAReq::complete(MPI_Status *sts){
-  int i;
-  for(i=0;i<count;i++){
-    if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
-                                                 myreqs[i].count, myreqs[i].type, myreqs[i].comm,
-                                                 (int*)sts))
-      CkAbort("AMPI> Error in alltoall request complete");
-  }
 }
 
 bool IATAReq::test(MPI_Status *sts){
