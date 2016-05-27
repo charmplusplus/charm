@@ -1384,6 +1384,8 @@ class ampi : public CBase_ampi {
   void generic(AmpiMsg *);
   void ssend_ack(int sreq);
   void reduceResult(CkReductionMsg *m);
+  void gatherResult(CkReductionMsg *m);
+  void gathervResult(CkReductionMsg *m);
 
   void splitPhase1(CkReductionMsg *msg);
   void commCreatePhase1(CkReductionMsg *msg);

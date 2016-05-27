@@ -38,6 +38,8 @@ module ampi {
     entry EXPEDITED void ssend_ack(int);
     entry EXPEDITED void generic(AmpiMsg *);
     entry EXPEDITED void reduceResult(CkReductionMsg *m);
+    entry EXPEDITED void gatherResult(CkReductionMsg *m);
+    entry EXPEDITED void gathervResult(CkReductionMsg *m);
     entry EXPEDITED_THREADED void splitPhase1(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void commCreatePhase1(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void intercommCreatePhase1(CkReductionMsg *msg);

@@ -2888,10 +2888,12 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
   return MPI_SUCCESS;
 }
 
-/// This routine is called with the results of a Reduce or AllReduce
 const int MPI_REDUCE_SOURCE=0;
+const int MPI_GATHER_SOURCE=0;
 const int MPI_REDUCE_COMM=MPI_COMM_WORLD;
+const int MPI_GATHER_COMM=MPI_COMM_WORLD;
 
+/// This routine is called with the results of a Reduce or AllReduce
 void ampi::reduceResult(CkReductionMsg *msg)
 {
   MSG_ORDER_DEBUG(printf("[%d] reduceResult called \n",thisIndex));
@@ -2913,6 +2915,102 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
     TCharm::deactivateVariable(inbuf);
   }
   return msg;
+}
+
+void ampi::gatherResult(CkReductionMsg *msg)
+{
+  MSG_ORDER_DEBUG(CkPrintf("[%d] gatherResult called\n", thisIndex));
+
+  CkReduction::tupleElement* results = NULL;
+  int numReductions = 0;
+  msg->toTuple(&results, &numReductions);
+
+  // Get the total size of gather data
+  CkReduction::setElement *gatherData  = (CkReduction::setElement*)results[1].data;
+  CkReduction::setElement *currentData = gatherData;
+  int totalSize = 0;
+  int numContributions = 0;
+  while(currentData && currentData->dataSize > 0){
+    numContributions++;
+    currentData = currentData->next();
+  }
+  totalSize = gatherData->dataSize * numContributions;
+
+  // Re-order the gather data based on the rank of the contributor
+  char *orderedBuf = new char[totalSize];
+  CkReduction::setElement *gatherSrc  = (CkReduction::setElement*)results[0].data;
+  CkReduction::setElement *currentSrc = gatherSrc;
+  currentData = gatherData;
+  while((currentSrc && currentSrc->dataSize > 0) && (currentData && currentData->dataSize > 0)){
+    int srcRank  = *((int*)currentSrc->data);
+    int dataSize = currentData->dataSize;
+    memcpy(&orderedBuf[srcRank*dataSize], currentData->data, dataSize);
+    currentSrc  = currentSrc->next();
+    currentData = currentData->next();
+  }
+
+  ampi::sendraw(MPI_GATHER_TAG, MPI_GATHER_SOURCE, orderedBuf, totalSize,
+                thisArrayID, thisIndex);
+
+  delete [] orderedBuf;
+  delete msg;
+}
+
+void ampi::gathervResult(CkReductionMsg *msg)
+{
+  MSG_ORDER_DEBUG(CkPrintf("[%d] gathervResult called\n", thisIndex));
+
+  CkReduction::tupleElement* results = NULL;
+  int numReductions = 0;
+  msg->toTuple(&results, &numReductions);
+
+  // Get the number of contributions
+  CkReduction::setElement *gatherSrc  = (CkReduction::setElement*)results[0].data;
+  CkReduction::setElement *currentSrc = gatherSrc;
+  int numContributions = 0;
+  while(currentSrc && currentSrc > 0){
+    numContributions++;
+    currentSrc = currentSrc->next();
+  }
+
+  // Get the total size and displacements of each contribution
+  int totalSize = 0;
+  int *displs = new int[numContributions];
+  for(int i=0; i<numContributions; i++)
+    displs[i] = 0;
+  CkReduction::setElement *gatherData  = (CkReduction::setElement*)results[1].data;
+  CkReduction::setElement *currentData = gatherData;
+  currentSrc = gatherSrc;
+  while(currentData && currentData > 0){
+    int srcRank = *((int*)currentSrc->data);
+    int contributionSize = currentData->dataSize;
+    totalSize += contributionSize;
+    for(int i=0; i<numContributions; i++){
+      if(srcRank < i)
+        displs[i] += contributionSize;
+    }
+    currentSrc  = currentSrc->next();
+    currentData = currentData->next();
+  }
+
+  // Re-order the gather data based on the rank of the contributor
+  char *orderedBuf = new char[totalSize];
+  currentSrc  = gatherSrc;
+  currentData = gatherData;
+  while((currentSrc && currentSrc->dataSize > 0) && (currentData && currentData->dataSize > 0)){
+    int srcRank  = *((int*)currentSrc->data);
+    int dataSize = currentData->dataSize;
+    memcpy(&orderedBuf[displs[srcRank]], currentData->data, dataSize);
+    currentSrc  = currentSrc->next();
+    currentData = currentData->next();
+  }
+
+  ampi::sendraw(MPI_GATHER_TAG, MPI_GATHER_SOURCE, orderedBuf, totalSize,
+                thisArrayID, thisIndex);
+
+  delete [] displs;
+  delete [] orderedBuf;
+  delete msg;
 }
 
 // Copy the MPI datatype "type" from inbuf to outbuf
@@ -4477,21 +4575,25 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     CkAbort("AMPI does not implement MPI_Allgather for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int i;
+  int rank = ptr->getRank(comm);
+  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  for(i=0;i<size;i++) {
-    ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-              sendtype, i, comm);
-  }
+  int tupleSize = 2;
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
+    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
+  };
 
-  MPI_Status status;
-  CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
-  int itemsize = dttype->getSize(recvcount) ;
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
 
-  for(i=0;i<size;i++) {
-    AMPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype, i, MPI_GATHER_TAG, comm, &status);
-  }
+  CkCallback allgatherCB(CkIndex_ampi::gatherResult(0), ptr->getProxy());
+  msg->setCallback(allgatherCB);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgather called on comm %d\n", ptr->thisIndex, comm));
+  ptr->contribute(msg);
+
+  int totalRecvcount = recvcount * ptr->getSize(comm);
+  if(-1==ptr->recv(MPI_GATHER_TAG, MPI_GATHER_SOURCE, recvbuf, totalRecvcount, recvtype, MPI_GATHER_COMM))
+    CkAbort("AMPI> MPI_Allgather failed!");
 
   return MPI_SUCCESS;
 }
@@ -4527,25 +4629,30 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     CkAbort("AMPI does not implement MPI_Iallgather for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int i;
-  for(i=0;i<size;i++) {
-    ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-              sendtype, i, comm);
-  }
+  int rank = ptr->getRank(comm);
+  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
-  int itemsize = dttype->getSize(recvcount) ;
+  int tupleSize = 2;
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
+    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
+  };
 
-  // use an IATAReq to non-block the caller and get a request ptr
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+
+  CkCallback allgatherCB(CkIndex_ampi::gatherResult(0), ptr->getProxy());
+  msg->setCallback(allgatherCB);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgather called on comm %d\n", ptr->thisIndex, comm));
+  ptr->contribute(msg);
+
+  // use an IReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(size);
-  for(i=0;i<size;i++){
-    if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
-      CkAbort("MPI_Iallgather: Error adding requests into IATAReq!");
-  }
+  int totalRecvcount = recvcount * ptr->getSize(comm);
+  IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, MPI_GATHER_SOURCE, MPI_GATHER_TAG, MPI_GATHER_COMM);
   *request = reqs->insert(newreq);
-  AMPI_DEBUG("MPI_Iallgather: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  int tags[3] = { MPI_GATHER_TAG, MPI_GATHER_SOURCE, MPI_GATHER_COMM };
+  CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
+
   return MPI_SUCCESS;
 }
 
@@ -4574,21 +4681,28 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     CkAbort("AMPI does not implement MPI_Allgatherv for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int i;
-  for(i=0;i<size;i++) {
-    ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-              sendtype, i, comm);
-  }
+  int rank = ptr->getRank(comm);
+  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  MPI_Status status;
-  CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
-  int itemsize = dttype->getSize() ;
+  int tupleSize = 2;
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
+    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
+  };
 
-  for(i=0;i<size;i++) {
-    AMPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
-              i, MPI_GATHER_TAG, comm, &status);
-  }
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+
+  CkCallback allgathervCB(CkIndex_ampi::gathervResult(0), ptr->getProxy());
+  msg->setCallback(allgathervCB);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgatherv called on comm %d\n", ptr->thisIndex, comm));
+  ptr->contribute(msg);
+
+  int totalRecvcount = 0;
+  int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
+  for(int i=0; i<ptr->getSize(comm); i++)
+    totalRecvcount += dttypeSize * recvcounts[i];
+  if(-1==ptr->recv(MPI_GATHER_TAG, MPI_GATHER_SOURCE, recvbuf, totalRecvcount, recvtype, MPI_GATHER_COMM))
+    CkAbort("AMPI> MPI_Allgatherv failed!");
 
   return MPI_SUCCESS;
 }
@@ -4624,26 +4738,33 @@ int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     CkAbort("AMPI does not implement MPI_Iallgatherv for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int i;
-  for(i=0;i<size;i++) {
-    ptr->send(MPI_GATHER_TAG, ptr->getRank(comm), sendbuf, sendcount,
-              sendtype, i, comm);
-  }
+  int rank = ptr->getRank(comm);
+  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
-  int itemsize = dttype->getSize() ;
+  int tupleSize = 2;
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
+    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
+  };
 
-  // use an IATAReq to non-block the caller and get a request ptr
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+
+  CkCallback allgathervCB(CkIndex_ampi::gathervResult(0), ptr->getProxy());
+  msg->setCallback(allgathervCB);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgatherv called on comm %d\n", ptr->thisIndex, comm));
+  ptr->contribute(msg);
+
+  int totalRecvcount = 0;
+  int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
+  for(int i=0; i<ptr->getSize(comm); i++)
+    totalRecvcount += dttypeSize * recvcounts[i];
+
+  // use an IReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(size);
-  for(i=0;i<size;i++){
-    if(newreq->addReq(((char*)recvbuf)+(itemsize*displs[i]),recvcounts[i],recvtype,i,
-                      MPI_GATHER_TAG,comm)!=(i+1))
-      CkAbort("MPI_Iallgatherv: Error adding requests into IATAReq!");
-  }
+  IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, MPI_GATHER_SOURCE, MPI_GATHER_TAG, MPI_GATHER_COMM);
   *request = reqs->insert(newreq);
-  AMPI_DEBUG("MPI_Iallgatherv: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  int tags[3] = { MPI_GATHER_TAG, MPI_GATHER_SOURCE, MPI_GATHER_COMM };
+  CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 
   return MPI_SUCCESS;
 }
@@ -4683,20 +4804,27 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int i;
-  AMPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
+  int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
+  int rank = ptr->getRank(comm);
+  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  if(ptr->getRank(comm)==root) {
-    MPI_Status status;
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
-    int itemsize = dttype->getSize(recvcount) ;
+  int tupleSize = 2;
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
+    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
+  };
 
-    for(i=0;i<size;i++) {
-      if(-1==ptr->recv(MPI_GATHER_TAG, i, (void*)(((char*)recvbuf)+(itemsize*i)), recvcount,
-                       recvtype, comm, (int*)(&status)))
-        CkAbort("AMPI> Error in MPI_Gather recv");
-    }
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+
+  CkCallback gatherCB(CkIndex_ampi::gatherResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy(), true);
+  msg->setCallback(gatherCB);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
+  ptr->contribute(msg);
+
+  if(rank==root) {
+    int totalRecvcount = recvcount * ptr->getSize(comm);
+    if(-1==ptr->recv(MPI_GATHER_TAG, MPI_GATHER_SOURCE, recvbuf, totalRecvcount, recvtype, MPI_GATHER_COMM))
+      CkAbort("AMPI> MPI_Gather failed!");
   }
 
 #if AMPIMSGLOG
@@ -4751,22 +4879,31 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(MPI_GATHER_TAG,ptr->getRank(comm),sendbuf,sendcount,sendtype,root,comm);
+  int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
+  int rank = ptr->getRank(comm);
+  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  int size = ptr->getSize(comm);
-  if(ptr->getRank(comm)==root) {
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
-    int itemsize = dttype->getSize(recvcount) ;
+  int tupleSize = 2;
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
+    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
+  };
 
-    // use an IATAReq to non-block the caller and get a request ptr
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+
+  CkCallback gatherCB(CkIndex_ampi::gatherResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy(), true);
+  msg->setCallback(gatherCB);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
+  ptr->contribute(msg);
+
+  if(rank==root) {
+    // use an IReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    IATAReq *newreq = new IATAReq(size);
-    for(int i=0;i<size;i++){
-      if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
-        CkAbort("MPI_Igather: Error adding requests into IATAReq!");
-    }
+    int totalRecvcount = recvcount * ptr->getSize(comm);
+    IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, MPI_GATHER_SOURCE, MPI_GATHER_TAG, MPI_GATHER_COMM);
     *request = reqs->insert(newreq);
-    AMPI_DEBUG("MPI_Igather: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+    int tags[3] = { MPI_GATHER_TAG, MPI_GATHER_SOURCE, MPI_GATHER_COMM };
+    CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
   }
   else {
     *request = MPI_REQUEST_NULL;
@@ -4823,17 +4960,31 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
-  AMPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
-
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  if(ptr->getRank(comm) == root) {
-    MPI_Status status;
-    for(int i=0;i<size;i++) {
-      if(-1==ptr->recv(MPI_GATHER_TAG, i, (void*)(((char*)recvbuf)+(itemsize*displs[i])),
-                       recvcounts[i], recvtype, comm, (int*)(&status)))
-        CkAbort("AMPI> Error in MPI_Gatherv recv");
-    }
+  int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
+  int rank = ptr->getRank(comm);
+  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
+
+  int tupleSize = 2;
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
+    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
+  };
+
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+
+  CkCallback gathervCB(CkIndex_ampi::gathervResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy(), true);
+  msg->setCallback(gathervCB);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
+  ptr->contribute(msg);
+
+  if(rank==root) {
+    int totalRecvcount = 0;
+    int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
+    for(int i=0; i<ptr->getSize(comm); i++)
+      totalRecvcount += dttypeSize * recvcounts[i];
+    if(-1==ptr->recv(MPI_GATHER_TAG, MPI_GATHER_SOURCE, recvbuf, totalRecvcount, recvtype, MPI_GATHER_COMM))
+      CkAbort("AMPI> MPI_Gatherv failed!");
   }
 
 #if AMPIMSGLOG
@@ -4896,20 +5047,35 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(MPI_GATHER_TAG,ptr->getRank(comm),sendbuf,sendcount,sendtype,root,comm);
+  int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
+  int rank = ptr->getRank(comm);
+  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  int size = ptr->getSize(comm);
-  if(ptr->getRank(comm) == root) {
-    // use an IATAReq to non-block the caller and get a request ptr
+  int tupleSize = 2;
+  CkReduction::tupleElement tupleRedn[] = {
+    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
+    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
+  };
+
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+
+  CkCallback gathervCB(CkIndex_ampi::gathervResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy(), true);
+  msg->setCallback(gathervCB);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
+  ptr->contribute(msg);
+
+  if(rank==root) {
+    int totalRecvcount = 0;
+    int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
+    for(int i=0; i<ptr->getSize(comm); i++)
+      totalRecvcount += dttypeSize * recvcounts[i];
+
+    // use an IReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    IATAReq *newreq = new IATAReq(size);
-    for(int i=0;i<size;i++){
-      if(newreq->addReq((void*)(((char*)recvbuf)+(itemsize*displs[i])),recvcounts[i],
-                        recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
-        CkAbort("MPI_Igatherv: Error adding requests into IATAReq!");
-    }
+    IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, MPI_GATHER_SOURCE, MPI_GATHER_TAG, MPI_GATHER_COMM);
     *request = reqs->insert(newreq);
-    AMPI_DEBUG("MPI_Igatherv: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+    int tags[3] = { MPI_GATHER_TAG, MPI_GATHER_SOURCE, MPI_GATHER_COMM };
+    CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
   }
   else {
     *request = MPI_REQUEST_NULL;
