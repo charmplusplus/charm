@@ -366,11 +366,10 @@ int MPICH_AlltoAll_medium(
 						  MPI_Comm comm )
 {
 
-  int          comm_size, i, pof2;
+  int          comm_size, i;
   MPI_Aint     sendtype_extent, recvtype_extent;
  
-  int mpi_errno=MPI_SUCCESS, src, dst, rank, nbytes;
-  MPI_Status status;
+  int mpi_errno=MPI_SUCCESS, dst, rank, nbytes;
   int sendtype_size;
 
   MPI_Request *reqarray;

@@ -7,11 +7,8 @@
 #include "ddt.h"
 #include "charm++.h"
 
-#if 0
-#define AMPI_DEBUG CkPrintf
-#else
-#define AMPI_DEBUG /* empty */
-#endif
+//Uncomment for debug print statements
+#define AMPI_DEBUG(...) //CkPrintf(__VA_ARGS__)
 
 #if AMPIMSGLOG
 #include "ckliststring.h"
@@ -258,13 +255,13 @@ class ampiCommStruct {
     :comm(comm_), ampiID(id_),size(size_), isWorld(1), isInter(0), commNameLen(0) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const CkVec<int> &indices_)
-                :comm(comm_), ampiID(id_),size(size_),isInter(0),
-                 isWorld(0), commNameLen(0), indices(indices_) {}
+                :comm(comm_), ampiID(id_),size(size_),isWorld(0),
+                 isInter(0), indices(indices_), commNameLen(0) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const CkVec<int> &indices_,
                  const CkVec<int> &remoteIndices_)
                 :comm(comm_),ampiID(id_),size(size_),isWorld(0),isInter(1),
-                 commNameLen(0),indices(indices_),remoteIndices(remoteIndices_) {}
+                 indices(indices_),remoteIndices(remoteIndices_),commNameLen(0) {}
   void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
   MPI_Comm getComm(void) const {return comm;}
@@ -669,7 +666,7 @@ class GPUReq : public AmpiRequest {
 
  public:
   GPUReq();
-  int getType() { return MPI_GPU_REQ; }
+  inline int getType(void) const { return MPI_GPU_REQ; }
   bool test(MPI_Status *sts);
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);

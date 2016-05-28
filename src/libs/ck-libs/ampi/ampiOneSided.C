@@ -369,7 +369,7 @@ int ampi::winIgetWait(MPI_Request *request, MPI_Status *status) {
 int ampi::winIgetFree(MPI_Request *request, MPI_Status *status) {
   AMPI_DEBUG("    [%d] : Iget [%d] frees buffer\n", thisIndex, *request);
 
-  void *data;
+  void *data = NULL;
   AMPI_Iget_data(data, *status);
   if(!data) {
     AMPI_DEBUG("    [%d] Iget [%d] attempt to free NULL buffer \n", thisIndex, *request);
@@ -494,7 +494,7 @@ void ampi::winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int re
 
   // if queue non-empty, get lock for the first waiting one and reply
   if(!(winobj->emptyQueue())) {
-    AMPI_DEBUG("    [%d] RemoteUnlock: queue non-empty, give lock to \n", thisIndex );
+    AMPI_DEBUG("    [%d] RemoteUnlock: queue non-empty, give lock to \n", thisIndex);
     winobj->lockTopQueue();
   }
 }
@@ -653,7 +653,6 @@ int AMPI_Win_fence(int assertion, MPI_Win win){
   AMPIAPI("AMPI_Win_fence");
   WinStruct winStruct = getAmpiParent()->getWinStruct(win);
   MPI_Comm comm = winStruct.comm;
-  ampi *ptr = getAmpiInstance(comm);
 
   // Wait until everyone reaches the fence
   AMPI_Barrier(comm);

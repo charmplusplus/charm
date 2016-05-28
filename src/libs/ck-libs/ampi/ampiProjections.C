@@ -100,7 +100,6 @@ extern "C" int ampi_registerFunc(char *funcName){
 extern "C" void ampi_beginFunc(int funcNo,MPI_Comm comm){
   ampi *ptr = getAmpiInstance(comm);
   int myindex = ptr->thisIndex;
-  int foundFlag=0;
   vprocData *procElem;
   if(vprocTable.size() <= myindex){
     procElem = new vprocData;

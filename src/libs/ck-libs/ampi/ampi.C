@@ -693,9 +693,8 @@ static void ampiProcInit(void){
 #endif
   initAmpiProjections();
 
-  char **argv=CkGetArgv();
-
 #if AMPIMSGLOG
+  char **argv=CkGetArgv();
   msgLogWrite = CmiGetArgFlag(argv, "+msgLogWrite");
   if (CmiGetArgIntDesc(argv,"+msgLogRead", &msgLogRank, "Re-play message processing order for AMPI")) {
     msgLogRead = 1;
@@ -3686,9 +3685,9 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 #endif
 
   AMPI_DEBUG("AMPI_Wait request=%d (*reqs)[*request]=%p (*reqs)[*request]->tag=%d\n",
-             *request, (*reqs)[*request], (int)((*reqs)[*request]->tag) );
+             *request, (*reqs)[*request], (int)((*reqs)[*request]->tag));
   AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",
-             *request,reqs->size(),reqs);
+             *request, reqs->size(), reqs);
   int waitResult = -1;
   do{
     AmpiRequest *waitReq = (*reqs)[*request];
@@ -3701,7 +3700,7 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
   }while(waitResult==-1);
 
   AMPI_DEBUG("AMPI_Wait after calling wait, request=%d (*reqs)[*request]=%p (*reqs)[*request]->tag=%d\n",
-             *request, (*reqs)[*request], (int)((*reqs)[*request]->tag) );
+             *request, (*reqs)[*request], (int)((*reqs)[*request]->tag));
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -3985,7 +3984,6 @@ bool IATAReq::test(MPI_Status *sts){
 }
 
 bool IATAReq::itest(MPI_Status *sts){
-  bool flag=true;
   for(int i=0;i<elmcount;i++){
     if(false==myreqs[i].itest(sts))
       return false;
@@ -4895,12 +4893,11 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Gatherv for Inter-communicators!");
 
-  int itemsize = getDDT()->getSize(recvtype);
-
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     int commsize;
+    int itemsize = getDDT()->getSize(recvtype);
     (*(pptr->fromPUPer))|commsize;
     for(int i=0;i<commsize;i++){
       (*(pptr->fromPUPer))|(pptr->pupBytes);
@@ -4981,12 +4978,11 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Igatherv for Inter-communicators!");
 
-  int itemsize = getDDT()->getSize(recvtype);
-
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     int commsize;
+    int itemsize = getDDT()->getSize(recvtype);
     (*(pptr->fromPUPer))|commsize;
     for(int i=0;i<commsize;i++){
       (*(pptr->fromPUPer))|(pptr->pupBytes);
@@ -5372,7 +5368,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  ((char *)tmp_buf + rank*sendbuf_extent));
 
     int mask = 0x1;
-    int src,dst,tree_root,dst_tree_root,my_tree_root;
+    int dst,tree_root,dst_tree_root,my_tree_root;
     int last_recv_cnt,nprocs_completed;
     int j,k,tmp_mask;
     i = 0;
@@ -6840,7 +6836,7 @@ CDECL
 int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
 {
   AMPIAPI("AMPI_Comm_create");
-  int rank, rank_in_group, key, color, zero;
+  int rank_in_group, key, color, zero;
   MPI_Group group_of_comm;
 
   groupStruct vec = getAmpiParent()->group2vec(group);
