@@ -344,7 +344,7 @@ void MPI_MAXLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
       for(i=0;i<(*len);i++){
         if(((LongInt *)invec)[i].val > ((LongInt *)inoutvec)[i].val)
           ((LongInt *)inoutvec)[i] = ((LongInt *)invec)[i];
-        else if(((FloatInt *)invec)[i].val == ((FloatInt *)inoutvec)[i].val)
+        else if(((LongInt *)invec)[i].val == ((LongInt *)inoutvec)[i].val)
           ((LongInt *)inoutvec)[i].idx = MIN(((LongInt *)inoutvec)[i].idx, ((LongInt *)invec)[i].idx);
       }
       break;
