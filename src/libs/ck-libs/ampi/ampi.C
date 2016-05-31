@@ -5729,15 +5729,11 @@ int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   if (comm == MPI_COMM_SELF)
     return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   int itemsize = getDDT()->getType(sendtype)->getSize(sendcount);
   for (int i=0; i<num_neighbors; i++) {
@@ -5750,7 +5746,6 @@ int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
       CkAbort("AMPI> Error in MPI_Neighbor_alltoall recv");
   }
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -5784,15 +5779,11 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
     return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
   }
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   int itemsize = getDDT()->getType(sendtype)->getSize(sendcount);
   for (int i=0; i<num_neighbors; i++) {
@@ -5810,7 +5801,6 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   }
   *request = reqs->insert(newreq);
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -5838,15 +5828,11 @@ int AMPI_Neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
   if (comm == MPI_COMM_SELF)
     return copyDatatype(comm, sendtype, sendcounts[0], sendbuf, recvbuf);
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   int itemsize = getDDT()->getType(sendtype)->getSize();
   for (int i=0; i<num_neighbors; i++) {
@@ -5859,7 +5845,6 @@ int AMPI_Neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
       CkAbort("AMPI> Error in MPI_Neighbor_alltoallv recv");
   }
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -5894,15 +5879,11 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
     return copyDatatype(comm, sendtype, sendcounts[0], sendbuf, recvbuf);
   }
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   int itemsize = getDDT()->getType(sendtype)->getSize();
   for (int i=0; i<num_neighbors; i++) {
@@ -5920,7 +5901,6 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
   }
   *request = reqs->insert(newreq);
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -5948,15 +5928,11 @@ int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
   if (comm == MPI_COMM_SELF)
     return copyDatatype(comm, sendtypes[0], sendcounts[0], sendbuf, recvbuf);
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_ATA_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
@@ -5968,7 +5944,6 @@ int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
       CkAbort("AMPI> Error in MPI_Neighbor_alltoallv recv");
   }
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -6003,15 +5978,11 @@ int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
     return copyDatatype(comm, sendtypes[0], sendcounts[0], sendbuf, recvbuf);
   }
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_ATA_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
@@ -6028,7 +5999,6 @@ int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
   }
   *request = reqs->insert(newreq);
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -6056,15 +6026,11 @@ int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   if (comm == MPI_COMM_SELF)
     return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
@@ -6076,7 +6042,6 @@ int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
       CkAbort("AMPI> Error in MPI_Neighbor_allgather recv");
   }
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -6110,15 +6075,11 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
     return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
   }
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
@@ -6135,7 +6096,6 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
   }
   *request = reqs->insert(newreq);
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -6163,15 +6123,11 @@ int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype
   if (comm == MPI_COMM_SELF)
     return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
@@ -6183,7 +6139,6 @@ int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype
       CkAbort("AMPI> Error in MPI_Neighbor_allgatherv recv");
   }
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -6217,15 +6172,11 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
     return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
   }
 
-  int num_neighbors, rank_in_comm;
-  int *neighbors;
   ampi *ptr = getAmpiInstance(comm);
-  rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank(comm);
 
-  num_neighbors = ptr->getNumTopologyNeighbors(comm, rank_in_comm);
-  if (num_neighbors == 0) return MPI_SUCCESS;
-  neighbors = new int[num_neighbors];
-  ptr->getTopologyNeighborRanks(comm, rank_in_comm, num_neighbors, neighbors);
+  const CkVec<int>& neighbors = ptr->getNeighbors();
+  int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
@@ -6242,7 +6193,6 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
   }
   *request = reqs->insert(newreq);
 
-  delete [] neighbors;
   return MPI_SUCCESS;
 }
 
@@ -6935,6 +6885,10 @@ int AMPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
   c.setdims(dimsv);
   c.setperiods(periodsv);
 
+  CkVec<int> nborsv;
+  getAmpiInstance(*comm_cart)->findNeighbors(*comm_cart, newrank, nborsv);
+  c.setnbors(nborsv);
+
   return MPI_SUCCESS;
 }
 
@@ -6967,6 +6921,10 @@ int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
     edges_.push_back(edges[i]);
 
   c.setedges(edges_);
+
+  CkVec<int> nborsv;
+  getAmpiInstance(*comm_graph)->findNeighbors(*comm_graph, newrank, nborsv);
+  c.setnbors(nborsv);
 
   return MPI_SUCCESS;
 }
@@ -7202,34 +7160,25 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, int *neighbo
   return MPI_SUCCESS;
 }
 
-/* Used by MPI_Neighbor_* routines */
-int ampi::getNumTopologyNeighbors(MPI_Comm comm, int rank) const {
-  int num_dims, num_neighbors = 0;
+/* Used by MPI_Cart_create & MPI_Graph_create */
+void ampi::findNeighbors(MPI_Comm comm, int rank, CkVec<int>& neighbors) const {
+  int max_neighbors = 0;
   ampiParent *ptr = getAmpiParent();
   if (ptr->isGraph(comm)) {
-    AMPI_Graph_neighbors_count(comm, rank, &num_neighbors);
+    AMPI_Graph_neighbors_count(comm, rank, &max_neighbors);
+    neighbors.resize(max_neighbors);
+    AMPI_Graph_neighbors(comm, rank, max_neighbors, &neighbors[0]);
   }
   else if (ptr->isCart(comm)) {
+    int num_dims;
     AMPI_Cartdim_get(comm, &num_dims);
-    num_neighbors = 2*num_dims;
-  }
-  return num_neighbors;
-}
-
-void ampi::getTopologyNeighborRanks(MPI_Comm comm, int rank, int num_neighbors, int *neighbors) const {
-  ampiParent *ptr = getAmpiParent();
-  if (ptr->isGraph(comm)) {
-    AMPI_Graph_neighbors(comm, rank, num_neighbors, neighbors);
-  }
-  else if (ptr->isCart(comm)) {
-    for (int i=0; i<num_neighbors; i++) {
+    max_neighbors = 2*num_dims;
+    for (int i=0; i<max_neighbors; i++) {
       int src, dest;
       AMPI_Cart_shift(comm, i/2, (i%2==0)?1:-1, &src, &dest);
-      neighbors[i] = dest;
+      if (dest != MPI_PROC_NULL)
+        neighbors.push_back(dest);
     }
-  }
-  else {
-    for (int i=0; i<num_neighbors; i++) neighbors[i] = MPI_PROC_NULL;
   }
 }
 
@@ -7362,6 +7311,10 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   }
   newc.setdims(dimsv);
   newc.setperiods(periodsv);
+
+  CkVec<int> nborsv;
+  getAmpiInstance(*newcomm)->findNeighbors(*newcomm, getAmpiParent()->getRank(*newcomm), nborsv);
+  c.setnbors(nborsv);
 
   delete [] coords;
   return MPI_SUCCESS;

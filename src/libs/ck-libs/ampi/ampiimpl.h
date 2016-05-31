@@ -225,10 +225,19 @@ class ampiCommStruct {
   int isInter; // 0: intra-communicator; 1: inter-communicator
   CkVec<int> indices;  //indices[r] gives the array index for rank r
   CkVec<int> remoteIndices;  // remote group for inter-communicator
+
   // cartesian virtual topology parameters
   int ndims;
   CkVec<int> dims;
   CkVec<int> periods;
+
+  // graph virtual topology parameters
+  int nvertices;
+  CkVec<int> index;
+  CkVec<int> edges;
+
+  // For virtual topology neighbors
+  CkVec<int> nbors;
 
   // For communicator attributes (MPI_*_get_attr): indexed by keyval
   CkVec<void *> keyvals;
@@ -236,11 +245,6 @@ class ampiCommStruct {
   // For communicator names
   char commName[MPI_MAX_OBJECT_NAME];
   int commNameLen;
-
-  // graph virtual topology parameters
-  int nvertices;
-  CkVec<int> index;
-  CkVec<int> edges;
 
   // Lazily fill world communicator indices
   void makeWorldIndices(void) const {
@@ -317,11 +321,11 @@ class ampiCommStruct {
   }
   inline const CkVec<int> &getdims() const {return dims;}
   inline const CkVec<int> &getperiods() const {return periods;}
-
   inline int getndims() const {return ndims;}
-  inline void setndims(int ndims_) {ndims = ndims_; }
+
   inline void setdims(const CkVec<int> &dims_) { dims = dims_; }
   inline void setperiods(const CkVec<int> &periods_) { periods = periods_; }
+  inline void setndims(int ndims_) {ndims = ndims_; }
 
   /* Similar hack for graph vt */
   inline int getnvertices() const {return nvertices;}
@@ -331,6 +335,9 @@ class ampiCommStruct {
   inline void setnvertices(int nvertices_) {nvertices = nvertices_; }
   inline void setindex(const CkVec<int> &index_) { index = index_; }
   inline void setedges(const CkVec<int> &edges_) { edges = edges_; }
+
+  inline const CkVec<int> &getnbors() const {return nbors;}
+  inline void setnbors(const CkVec<int> &nbors_) { nbors = nbors_; }
 
   void pup(PUP::er &p) {
     p|comm;
@@ -343,11 +350,12 @@ class ampiCommStruct {
     p|ndims;
     p|dims;
     p|periods;
-    p|commNameLen;
-    p(commName,MPI_MAX_OBJECT_NAME);
     p|nvertices;
     p|index;
     p|edges;
+    p|nbors;
+    p|commNameLen;
+    p(commName,MPI_MAX_OBJECT_NAME);
   }
 };
 PUPmarshall(ampiCommStruct)
@@ -1436,8 +1444,8 @@ class ampi : public CBase_ampi {
   inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
   inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
-  int getNumTopologyNeighbors(MPI_Comm comm, int rank) const;
-  void getTopologyNeighborRanks(MPI_Comm comm, int rank, int num_neighbors, int *neighbors) const;
+  void findNeighbors(MPI_Comm comm, int rank, CkVec<int>& neighbors) const;
+  inline const CkVec<int>& getNeighbors() const { return myComm.getnbors(); }
 
   CkDDT *getDDT(void) const {return parent->myDDT;}
   CthThread getThread() const { return thread->getThread(); }
