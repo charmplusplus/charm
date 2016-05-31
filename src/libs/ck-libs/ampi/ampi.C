@@ -119,15 +119,6 @@ static mpi_comm_worlds mpi_worlds;
 int _mpi_nworlds; /*Accessed by ampif*/
 int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
 
-/* ampiReducer: AMPI's generic reducer type
-   MPI_Op is function pointer to MPI_User_function
-   so that it can be packed into AmpiOpHeader, shipped
-   with the reduction message, and then plugged into
-   the ampiReducer.
-   One little trick is the ampi::recv which receives
-   the final reduction message will see additional
-   sizeof(AmpiOpHeader) bytes in the buffer before
-   any user data.                             */
 class AmpiComplex {
  public:
   double re, im;
@@ -467,6 +458,18 @@ void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 
+/* ampiReducer: AMPI's generic reducer type
+   MPI_Op is function pointer to MPI_User_function
+   so that it can be packed into AmpiOpHeader, shipped
+   with the reduction message, and then plugged into
+   the ampiReducer.
+   One little trick is the ampi::recv which receives
+   the final reduction message will see additional
+   sizeof(AmpiOpHeader) bytes in the buffer before
+   any user data, which are stripped off by
+   ampi::processMessage. */
+CkReduction::reducerType AmpiReducer;
+
 // every msg contains a AmpiOpHeader structure before user data
 // FIXME: non-commutative operations require messages be ordered by rank
 CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
@@ -490,8 +493,6 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
   free(ret);
   return retmsg;
 }
-
-CkReduction::reducerType AmpiReducer;
 
 class Builtin_kvs{
  public:
