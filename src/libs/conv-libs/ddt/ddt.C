@@ -4,7 +4,8 @@
 
 using std::numeric_limits;
 
-#define DDTDEBUG /* CmiPrintf */
+//Uncomment for debug print statements
+#define DDTDEBUG(...) //CkPrintf(__VA_ARGS__)
 
 CkDDT_DataType*
 CkDDT::getType(int nIndex)
