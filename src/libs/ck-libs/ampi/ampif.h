@@ -81,17 +81,22 @@
        integer, parameter :: MPI_REAL              = 2
        integer, parameter :: MPI_REAL4             = 2
        integer, parameter :: MPI_COMPLEX           = 3
+       integer, parameter :: MPI_COMPLEX8          = 3
        integer, parameter :: MPI_LOGICAL           = 4
        integer, parameter :: MPI_CHARACTER         = 5
        integer, parameter :: MPI_BYTE              = 6
        integer, parameter :: MPI_PACKED            = 7
        integer, parameter :: MPI_INTEGER8          = 9
+       integer, parameter :: MPI_REAL16            = 14
        integer, parameter :: MPI_2INTEGER          = 18
        integer, parameter :: MPI_2REAL             = 21
        integer, parameter :: MPI_2DOUBLE_PRECISION = 22
        integer, parameter :: MPI_LB                = 23
        integer, parameter :: MPI_UB                = 24
+       integer, parameter :: MPI_INTEGER16         = 25
        integer, parameter :: MPI_DOUBLE_COMPLEX    = 26
+       integer, parameter :: MPI_COMPLEX16         = 26
+       integer, parameter :: MPI_COMPLEX32         = 39
 
        integer, parameter :: MPI_COMBINER_NAMED          = 1
        integer, parameter :: MPI_COMBINER_CONTIGUOUS     = 2
@@ -210,3 +215,6 @@
 
        integer, parameter :: MPI_WIN_UNIFIED  = 0
        integer, parameter :: MPI_WIN_SEPARATE = 1
+
+       logical, parameter :: MPI_SUBARRAYS_SUPPORTED = .FALSE.
+       logical, parameter :: MPI_ASYNC_PROTECTS_NONBLOCKING = .FALSE.

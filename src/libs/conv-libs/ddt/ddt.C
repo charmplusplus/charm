@@ -290,7 +290,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
       size = sizeof(double);
       break;
     case CkDDT_INT:
-      size = sizeof(int);
+      size = sizeof(signed int);
       break;
     case CkDDT_FLOAT:
       size = sizeof(float);
@@ -305,17 +305,23 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
       size = 1 ;
       break;
     case CkDDT_COMPLEX:
+    case CkDDT_FLOAT_COMPLEX:
+      size =  2 * sizeof(float) ;
+      break;
     case CkDDT_DOUBLE_COMPLEX:
       size =  2 * sizeof(double) ;
+      break;
+    case CkDDT_LONG_DOUBLE_COMPLEX:
+      size =  2 * sizeof(long double) ;
       break;
     case CkDDT_LOGICAL:
       size =  sizeof(int) ;
       break;
     case CkDDT_SHORT:
-      size = sizeof(short);
+      size = sizeof(signed short int);
       break ;
     case CkDDT_LONG:
-      size = sizeof(long);
+      size = sizeof(signed long);
       break ;
     case CkDDT_UNSIGNED_CHAR:
       size = sizeof(unsigned char);
@@ -356,13 +362,49 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
     case CkDDT_2DOUBLE:
       size = sizeof(DoubleDouble);
       break;
+    case CkDDT_SIGNED_CHAR:
+      size = sizeof(signed char);
+      break;
+    case CkDDT_UNSIGNED_LONG_LONG:
+      size = sizeof(unsigned long long);
+      break;
+    case CkDDT_WCHAR:
+      size = sizeof(wchar_t);
+      break;
+    case CkDDT_INT8_T:
+      size = sizeof(int8_t);
+      break;
+    case CkDDT_INT16_T:
+      size = sizeof(int16_t);
+      break;
+    case CkDDT_INT32_T:
+      size = sizeof(int32_t);
+      break;
+    case CkDDT_INT64_T:
+      size = sizeof(int64_t);
+      break;
+    case CkDDT_UINT8_T:
+      size = sizeof(uint8_t);
+      break;
+    case CkDDT_UINT16_T:
+      size = sizeof(uint16_t);
+      break;
+    case CkDDT_UINT32_T:
+      size = sizeof(uint32_t);
+      break;
+    case CkDDT_UINT64_T:
+      size = sizeof(uint64_t);
+      break;
+    case CkDDT_AINT:
+      size = sizeof(int);
+      break;
     case CkDDT_LB:
     case CkDDT_UB:
       size = 0;
       break;
 #if CMK_LONG_LONG_DEFINED
     case CkDDT_LONG_LONG_INT:
-      size = sizeof(long long);
+      size = sizeof(signed long long);
       break;
 #endif
     default:

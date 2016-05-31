@@ -3,45 +3,59 @@
 
 #include "pup.h"
 
-#define CkDDT_MAXTYPE         100
+#define CkDDT_MAXTYPE           100
 
-#define CkDDT_TYPE_NULL      -1
-#define CkDDT_DOUBLE          0
-#define CkDDT_INT             1
-#define CkDDT_FLOAT           2
-#define CkDDT_COMPLEX         3
-#define CkDDT_LOGICAL         4
-#define CkDDT_CHAR            5
-#define CkDDT_BYTE            6
-#define CkDDT_PACKED          7
-#define CkDDT_SHORT           8
-#define CkDDT_LONG            9
-#define CkDDT_UNSIGNED_CHAR   10
-#define CkDDT_UNSIGNED_SHORT  11
-#define CkDDT_UNSIGNED        12
-#define CkDDT_UNSIGNED_LONG   13
-#define CkDDT_LONG_DOUBLE     14
-#define CkDDT_FLOAT_INT       15
-#define CkDDT_DOUBLE_INT      16
-#define CkDDT_LONG_INT        17
-#define CkDDT_2INT            18
-#define CkDDT_SHORT_INT       19
-#define CkDDT_LONG_DOUBLE_INT 20
-#define CkDDT_2FLOAT          21
-#define CkDDT_2DOUBLE         22
-#define CkDDT_LB              23
-#define CkDDT_UB              24
-#define CkDDT_LONG_LONG_INT   25
-#define CkDDT_DOUBLE_COMPLEX  26
+#define CkDDT_TYPE_NULL          -1
+#define CkDDT_DOUBLE              0
+#define CkDDT_INT                 1
+#define CkDDT_FLOAT               2
+#define CkDDT_COMPLEX             3
+#define CkDDT_LOGICAL             4
+#define CkDDT_CHAR                5
+#define CkDDT_BYTE                6
+#define CkDDT_PACKED              7
+#define CkDDT_SHORT               8
+#define CkDDT_LONG                9
+#define CkDDT_UNSIGNED_CHAR       10
+#define CkDDT_UNSIGNED_SHORT      11
+#define CkDDT_UNSIGNED            12
+#define CkDDT_UNSIGNED_LONG       13
+#define CkDDT_LONG_DOUBLE         14
+#define CkDDT_FLOAT_INT           15
+#define CkDDT_DOUBLE_INT          16
+#define CkDDT_LONG_INT            17
+#define CkDDT_2INT                18
+#define CkDDT_SHORT_INT           19
+#define CkDDT_LONG_DOUBLE_INT     20
+#define CkDDT_2FLOAT              21
+#define CkDDT_2DOUBLE             22
+#define CkDDT_LB                  23
+#define CkDDT_UB                  24
+#define CkDDT_LONG_LONG_INT       25
+#define CkDDT_DOUBLE_COMPLEX      26
+#define CkDDT_SIGNED_CHAR         27
+#define CkDDT_UNSIGNED_LONG_LONG  28
+#define CkDDT_WCHAR               29
+#define CkDDT_INT8_T              30
+#define CkDDT_INT16_T             31
+#define CkDDT_INT32_T             32
+#define CkDDT_INT64_T             33
+#define CkDDT_UINT8_T             34
+#define CkDDT_UINT16_T            35
+#define CkDDT_UINT32_T            36
+#define CkDDT_UINT64_T            37
+#define CkDDT_FLOAT_COMPLEX       38
+#define CkDDT_LONG_DOUBLE_COMPLEX 39
+#define CkDDT_AINT                40
 
-#define CkDDT_CONTIGUOUS      36
-#define CkDDT_VECTOR          37
-#define CkDDT_HVECTOR         38
-#define CkDDT_INDEXED         39
-#define CkDDT_HINDEXED        40
-#define CkDDT_STRUCT          41
-#define CkDDT_INDEXED_BLOCK   42
-#define CkDDT_HINDEXED_BLOCK  43
+#define CkDDT_CONTIGUOUS          41
+#define CkDDT_VECTOR              42
+#define CkDDT_HVECTOR             43
+#define CkDDT_INDEXED             44
+#define CkDDT_HINDEXED            45
+#define CkDDT_STRUCT              46
+#define CkDDT_INDEXED_BLOCK       47
+#define CkDDT_HINDEXED_BLOCK      48
 
 /* for the datatype decoders */
 #define CkDDT_COMBINER_NAMED          1
@@ -488,7 +502,35 @@ class CkDDT {
     types[25] = CkDDT_LONG_LONG_INT;    
     typeTable[26] = new CkDDT_DataType(CkDDT_DOUBLE_COMPLEX);
     types[26] = CkDDT_DOUBLE_COMPLEX;
-    num_types = 27;
+    typeTable[27] = new CkDDT_DataType(CkDDT_SIGNED_CHAR);
+    types[27] = CkDDT_SIGNED_CHAR;
+    typeTable[28] = new CkDDT_DataType(CkDDT_UNSIGNED_LONG_LONG);
+    types[28] = CkDDT_UNSIGNED_LONG_LONG;
+    typeTable[29] = new CkDDT_DataType(CkDDT_WCHAR);
+    types[29] = CkDDT_WCHAR;
+    typeTable[30] = new CkDDT_DataType(CkDDT_INT8_T);
+    types[30] = CkDDT_INT8_T;
+    typeTable[31] = new CkDDT_DataType(CkDDT_INT16_T);
+    types[31] = CkDDT_INT16_T;
+    typeTable[32] = new CkDDT_DataType(CkDDT_INT32_T);
+    types[32] = CkDDT_INT32_T;
+    typeTable[33] = new CkDDT_DataType(CkDDT_INT64_T);
+    types[33] = CkDDT_INT64_T;
+    typeTable[34] = new CkDDT_DataType(CkDDT_UINT8_T);
+    types[34] = CkDDT_UINT8_T;
+    typeTable[35] = new CkDDT_DataType(CkDDT_UINT16_T);
+    types[35] = CkDDT_UINT16_T;
+    typeTable[36] = new CkDDT_DataType(CkDDT_UINT32_T);
+    types[36] = CkDDT_UINT32_T;
+    typeTable[37] = new CkDDT_DataType(CkDDT_UINT64_T);
+    types[37] = CkDDT_UINT64_T;
+    typeTable[38] = new CkDDT_DataType(CkDDT_FLOAT_COMPLEX);
+    types[38] = CkDDT_FLOAT_COMPLEX;
+    typeTable[39] = new CkDDT_DataType(CkDDT_LONG_DOUBLE_COMPLEX);
+    types[39] = CkDDT_LONG_DOUBLE_COMPLEX;
+    typeTable[40] = new CkDDT_DataType(CkDDT_AINT);
+    types[40] = CkDDT_AINT;
+    num_types = 41;
 
     int i;
     for(i=num_types ; i < max_types; i++)
