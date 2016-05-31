@@ -621,8 +621,7 @@ public:
 			p|pages[pg][of];
 	}
 	void pup(PUP::er &p) {
-		int pg, o;
-		unsigned int i;
+		int pg;
 		p|nPages;
 		if (!p.isUnpacking()) 
 		{ // Packing phase: save each used page
