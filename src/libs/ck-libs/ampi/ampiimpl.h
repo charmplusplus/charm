@@ -220,24 +220,24 @@ class ampiCommStruct {
   int size; //Number of processes in communicator
   int isWorld; //1 if ranks are 0..size-1?
   int isInter; // 0: intra-communicator; 1: inter-communicator
-  CkVec<int> indices;  //indices[r] gives the array index for rank r
-  CkVec<int> remoteIndices;  // remote group for inter-communicator
+  std::vector<int> indices;  //indices[r] gives the array index for rank r
+  std::vector<int> remoteIndices;  // remote group for inter-communicator
 
   // cartesian virtual topology parameters
   int ndims;
-  CkVec<int> dims;
-  CkVec<int> periods;
+  std::vector<int> dims;
+  std::vector<int> periods;
 
   // graph virtual topology parameters
   int nvertices;
-  CkVec<int> index;
-  CkVec<int> edges;
+  std::vector<int> index;
+  std::vector<int> edges;
 
   // For virtual topology neighbors
-  CkVec<int> nbors;
+  std::vector<int> nbors;
 
   // For communicator attributes (MPI_*_get_attr): indexed by keyval
-  CkVec<void *> keyvals;
+  std::vector<void *> keyvals;
 
   // For communicator names
   char commName[MPI_MAX_OBJECT_NAME];
@@ -245,8 +245,7 @@ class ampiCommStruct {
 
   // Lazily fill world communicator indices
   void makeWorldIndices(void) const {
-    // cast away constness of "index" list
-    CkVec<int> *ind=(CkVec<int> *)&indices;
+    std::vector<int> *ind=const_cast<std::vector<int> *>(&indices);
     for (int i=0;i<size;i++) ind->push_back(i);
   }
  public:
@@ -254,23 +253,23 @@ class ampiCommStruct {
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
     :comm(comm_), ampiID(id_),size(size_), isWorld(1), isInter(0), commNameLen(0) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
-                 int size_,const CkVec<int> &indices_)
+                 int size_,const std::vector<int> &indices_)
                 :comm(comm_), ampiID(id_),size(size_),isWorld(0),
                  isInter(0), indices(indices_), commNameLen(0) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
-                 int size_,const CkVec<int> &indices_,
-                 const CkVec<int> &remoteIndices_)
+                 int size_,const std::vector<int> &indices_,
+                 const std::vector<int> &remoteIndices_)
                 :comm(comm_),ampiID(id_),size(size_),isWorld(0),isInter(1),
                  indices(indices_),remoteIndices(remoteIndices_),commNameLen(0) {}
   void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
   MPI_Comm getComm(void) const {return comm;}
-  const CkVec<int> &getIndices(void) const {
+  const std::vector<int> &getIndices(void) const {
     if (isWorld && indices.size()!=size) makeWorldIndices();
     return indices;
   }
-  const CkVec<int> &getRemoteIndices(void) const {return remoteIndices;}
-  CkVec<void *> &getKeyvals(void) {return keyvals;}
+  const std::vector<int> &getRemoteIndices(void) const {return remoteIndices;}
+  std::vector<void *> &getKeyvals(void) {return keyvals;}
 
   void setName(const char *src) {
     CkDDT_SetName(commName, src, &commNameLen);
@@ -312,29 +311,29 @@ class ampiCommStruct {
   int getSize(void) const {return size;}
 
   inline int isinter(void) const { return isInter; }
-  inline const CkVec<int> &getindices() const {
+  inline const std::vector<int> &getindices() const {
     if (isWorld && indices.size()!=size) makeWorldIndices();
     return indices;
   }
-  inline const CkVec<int> &getdims() const {return dims;}
-  inline const CkVec<int> &getperiods() const {return periods;}
+  inline const std::vector<int> &getdims() const {return dims;}
+  inline const std::vector<int> &getperiods() const {return periods;}
   inline int getndims() const {return ndims;}
 
-  inline void setdims(const CkVec<int> &dims_) { dims = dims_; }
-  inline void setperiods(const CkVec<int> &periods_) { periods = periods_; }
+  inline void setdims(const std::vector<int> &dims_) { dims = dims_; }
+  inline void setperiods(const std::vector<int> &periods_) { periods = periods_; }
   inline void setndims(int ndims_) {ndims = ndims_; }
 
   /* Similar hack for graph vt */
   inline int getnvertices() const {return nvertices;}
-  inline const CkVec<int> &getindex() const {return index;}
-  inline const CkVec<int> &getedges() const {return edges;}
+  inline const std::vector<int> &getindex() const {return index;}
+  inline const std::vector<int> &getedges() const {return edges;}
 
   inline void setnvertices(int nvertices_) {nvertices = nvertices_; }
-  inline void setindex(const CkVec<int> &index_) { index = index_; }
-  inline void setedges(const CkVec<int> &edges_) { edges = edges_; }
+  inline void setindex(const std::vector<int> &index_) { index = index_; }
+  inline void setedges(const std::vector<int> &edges_) { edges = edges_; }
 
-  inline const CkVec<int> &getnbors() const {return nbors;}
-  inline void setnbors(const CkVec<int> &nbors_) { nbors = nbors_; }
+  inline const std::vector<int> &getnbors() const {return nbors;}
+  inline void setnbors(const std::vector<int> &nbors_) { nbors = nbors_; }
 
   void pup(PUP::er &p) {
     p|comm;
@@ -367,7 +366,7 @@ class mpi_comm_worlds{
   }
 };
 
-typedef CkVec<int> groupStruct;
+typedef std::vector<int> groupStruct;
 // groupStructure operations
 inline void outputOp(groupStruct vec){
   if(vec.size()>50){
@@ -472,7 +471,7 @@ inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *fla
 
 inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *flag){
   groupStruct retvec;
-  CkVec<int> ranksvec;
+  std::vector<int> ranksvec;
   int first,last,stride;
   int *ranks,cnt;
   int i,j;
@@ -1372,14 +1371,14 @@ class ampi : public CBase_ampi {
   inline MPI_Comm getComm(void) const {return myComm.getComm();}
   inline void setCommName(const char *name){myComm.setName(name);}
   inline void getCommName(char *name, int *len) const {myComm.getName(name,len);}
-  inline CkVec<int> getIndices(void) const { return myComm.getindices(); }
+  inline std::vector<int> getIndices(void) const { return myComm.getindices(); }
   inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
   inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
-  void findNeighbors(MPI_Comm comm, int rank, CkVec<int>& neighbors) const;
-  inline const CkVec<int>& getNeighbors() const { return myComm.getnbors(); }
+  void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const;
+  inline const std::vector<int>& getNeighbors() const { return myComm.getnbors(); }
 
   CkDDT *getDDT(void) const {return parent->myDDT;}
   CthThread getThread() const { return thread->getThread(); }
