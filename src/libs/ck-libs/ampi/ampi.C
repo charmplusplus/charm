@@ -6317,10 +6317,39 @@ int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
 {
   AMPIAPI("AMPI_Comm_dup");
 
-  int rank;
+  int rank, topol;
   AMPI_Comm_rank(comm, &rank);
+  ampi *ptr = getAmpiInstance(comm);
 
-  return AMPI_Comm_split(comm, 0, rank, newcomm);
+  AMPI_Topo_test(comm, &topol);
+  if (topol == MPI_CART) {
+    ptr->split(0, rank, newcomm, CART_TOPOL);
+
+    // duplicate cartesian topology info
+    ampiCommStruct &c = getAmpiParent()->getCart(comm);
+    ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
+    newc.setndims(c.getndims());
+    newc.setdims(c.getdims());
+    newc.setperiods(c.getperiods());
+    newc.setnbors(c.getnbors());
+  }
+  else {
+    ptr->split(0, rank, newcomm, 0);
+  }
+  AMPI_Barrier(comm);
+
+#if AMPIMSGLOG
+  ampiParent* pptr = getAmpiParent();
+  if(msgLogRead){
+    PUParray(*(pptr->fromPUPer), (char *)newcomm, sizeof(int));
+    return MPI_SUCCESS;
+  }
+  else if(msgLogWrite && record_msglog(pptr->thisIndex)){
+    PUParray(*(pptr->toPUPer), (char *)newcomm, sizeof(int));
+  }
+#endif
+
+  return MPI_SUCCESS;
 }
 
 CDECL
@@ -7489,7 +7518,7 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
 
   std::vector<int> nborsv;
   getAmpiInstance(*newcomm)->findNeighbors(*newcomm, getAmpiParent()->getRank(*newcomm), nborsv);
-  c.setnbors(nborsv);
+  newc.setnbors(nborsv);
 
   delete [] coords;
   return MPI_SUCCESS;
