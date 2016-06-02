@@ -504,15 +504,16 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *fla
 
 extern int _mpi_nworlds;
 
-#define MPI_ATA_SEQ_TAG MPI_TAG_UB_VALUE+1
-#define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+10
-#define MPI_BARR_TAG    MPI_TAG_UB_VALUE+11
-#define MPI_REDUCE_TAG  MPI_TAG_UB_VALUE+12
-#define MPI_GATHER_TAG  MPI_TAG_UB_VALUE+13
-#define MPI_SCATTER_TAG MPI_TAG_UB_VALUE+14
-#define MPI_SCAN_TAG    MPI_TAG_UB_VALUE+15
-#define MPI_EXSCAN_TAG  MPI_TAG_UB_VALUE+16
-#define MPI_ATA_TAG     MPI_TAG_UB_VALUE+17
+#define MPI_ATA_SEQ_TAG   MPI_TAG_UB_VALUE+1
+#define MPI_BCAST_TAG     MPI_TAG_UB_VALUE+10
+#define MPI_BARR_TAG      MPI_TAG_UB_VALUE+11
+#define MPI_REDUCE_TAG    MPI_TAG_UB_VALUE+12
+#define MPI_GATHER_TAG    MPI_TAG_UB_VALUE+13
+#define MPI_SCATTER_TAG   MPI_TAG_UB_VALUE+14
+#define MPI_SCAN_TAG      MPI_TAG_UB_VALUE+15
+#define MPI_EXSCAN_TAG    MPI_TAG_UB_VALUE+16
+#define MPI_ATA_TAG       MPI_TAG_UB_VALUE+17
+#define AMPI_TAG_UB_VALUE MPI_TAG_UB_VALUE+17
 
 #define MPI_PERS_REQ 1
 #define MPI_I_REQ    2
@@ -1074,7 +1075,7 @@ class ampiParent : public CBase_ampiParent {
   }
   ampiCommStruct &getCart(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_CART;
-    if (idx>=cartComm.size()) CkAbort("Bad cartesian communicator used");
+    if (idx>=cartComm.size()) CkAbort("AMPI> Bad cartesian communicator used!\n");
     return *cartComm[idx];
   }
   inline int isGraph(MPI_Comm comm) const {
@@ -1082,7 +1083,7 @@ class ampiParent : public CBase_ampiParent {
   }
   ampiCommStruct &getGraph(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_GRAPH;
-    if (idx>=graphComm.size()) CkAbort("Bad graph communicator used");
+    if (idx>=graphComm.size()) CkAbort("AMPI> Bad graph communicator used!\n");
     return *graphComm[idx];
   }
   inline int isInter(MPI_Comm comm) const {
@@ -1090,7 +1091,7 @@ class ampiParent : public CBase_ampiParent {
   }
   const ampiCommStruct &getInter(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_INTER;
-    if (idx>=interComm.size()) CkAbort("Bad inter-communicator used");
+    if (idx>=interComm.size()) CkAbort("AMPI> Bad inter-communicator used!\n");
     return *interComm[idx];
   }
 

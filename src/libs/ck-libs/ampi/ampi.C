@@ -49,7 +49,7 @@ inline int checkData(MPI_Datatype data) {
 }
 
 inline int checkTag(int tag) {
-  if(tag != MPI_ANY_TAG && tag < 0)
+  if((tag != MPI_ANY_TAG && tag < 0) || (tag > AMPI_TAG_UB_VALUE))
     return MPI_ERR_TAG;
   return MPI_SUCCESS;
 }
@@ -1168,8 +1168,10 @@ int ampiParent::createKeyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_dele
 }
 
 int ampiParent::freeKeyval(int *keyval){
-  if(*keyval <0 || *keyval >= kvlist.size() || !kvlist[*keyval])
+#if CMK_ERROR_CHECKING
+  if(*keyval<0 || *keyval >= kvlist.size() || !kvlist[*keyval])
     return MPI_ERR_KEYVAL;
+#endif
   delete kvlist[*keyval];
   kvlist[*keyval] = NULL;
   *keyval = MPI_KEYVAL_INVALID;
@@ -1177,8 +1179,10 @@ int ampiParent::freeKeyval(int *keyval){
 }
 
 int ampiParent::setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val){
+#if CMK_ERROR_CHECKING
   if(keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
     return MPI_ERR_KEYVAL;
+#endif
   ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(comm);
   // Enlarge the keyval list:
   while (cs.getKeyvals().size()<=keyval) cs.getKeyvals().push_back(0);
@@ -6376,6 +6380,12 @@ CDECL
 int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm rcomm, int rleader,
                           int tag, MPI_Comm *newintercomm){
   AMPIAPI("AMPI_Intercomm_create");
+
+#if CMK_ERROR_CHECKING
+  if (getAmpiParent()->isInter(lcomm) || getAmpiParent()->isInter(rcomm))
+    return MPI_ERR_COMM;
+#endif
+
   ampi *ptr = getAmpiInstance(lcomm);
   int root = ptr->getIndexForRank(lleader);
   std::vector<int> rvec;
@@ -6420,6 +6430,12 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm rcomm, int rlead
 CDECL
 int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
   AMPIAPI("AMPI_Intercomm_merge");
+
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isInter(intercomm))
+    return MPI_ERR_COMM;
+#endif
+
   ampi *ptr = getAmpiInstance(intercomm);
   int lroot, rroot, lrank, lhigh, rhigh, first;
   lroot = ptr->getIndexForRank(0);
@@ -6952,15 +6968,13 @@ int AMPI_Attr_delete(MPI_Comm comm, int keyval){
 CDECL
 int AMPI_Cart_map(MPI_Comm comm, int ndims, int *dims, int *periods, int *newrank) {
   AMPIAPI("AMPI_Cart_map");
-  AMPI_Comm_rank(comm, newrank);
-  return MPI_SUCCESS;
+  return AMPI_Comm_rank(comm, newrank);
 }
 
 CDECL
 int AMPI_Graph_map(MPI_Comm comm, int nnodes, int *index, int *edges, int *newrank) {
   AMPIAPI("AMPI_Graph_map");
-  AMPI_Comm_rank(comm, newrank);
-  return MPI_SUCCESS;
+  return AMPI_Comm_rank(comm, newrank);
 }
 
 CDECL
@@ -7060,6 +7074,11 @@ CDECL
 int AMPI_Cartdim_get(MPI_Comm comm, int *ndims) {
   AMPIAPI("AMPI_Cartdim_get");
 
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isCart(comm))
+    return MPI_ERR_TOPOLOGY;
+#endif
+
   *ndims = getAmpiParent()->getCart(comm).getndims();
 
   return MPI_SUCCESS;
@@ -7070,6 +7089,11 @@ int AMPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, int *coor
   int i, ndims;
 
   AMPIAPI("AMPI_Cart_get");
+
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isCart(comm))
+    return MPI_ERR_TOPOLOGY;
+#endif
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
@@ -7097,6 +7121,11 @@ int AMPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, int *coor
 CDECL
 int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
   AMPIAPI("AMPI_Cart_rank");
+
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isCart(comm))
+    return MPI_ERR_TOPOLOGY;
+#endif
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
@@ -7128,6 +7157,11 @@ int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
 CDECL
 int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
   AMPIAPI("AMPI_Cart_coords");
+
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isCart(comm))
+    return MPI_ERR_TOPOLOGY;
+#endif
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
@@ -7171,10 +7205,18 @@ int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp,
                     int *rank_source, int *rank_dest) {
   AMPIAPI("AMPI_Cart_shift");
 
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isCart(comm))
+    return MPI_ERR_TOPOLOGY;
+#endif
+
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
+
+#if CMK_ERROR_CHECKING
   if ((direction < 0) || (direction >= ndims))
-    CkAbort("MPI_Cart_shift: direction not within dimensions range");
+    return MPI_ERR_DIMS;
+#endif
 
   const std::vector<int> &dims = c.getdims();
   const std::vector<int> &periods = c.getperiods();
@@ -7207,8 +7249,12 @@ CDECL
 int AMPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index, int *edges) {
   AMPIAPI("AMPI_Graph_get");
 
-  ampiCommStruct &c = getAmpiParent()->getGraph(comm);
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isGraph(comm))
+    return MPI_ERR_TOPOLOGY;
+#endif
 
+  ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   const std::vector<int> &index_ = c.getindex();
   const std::vector<int> &edges_ = c.getedges();
 
@@ -7229,12 +7275,18 @@ CDECL
 int AMPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
   AMPIAPI("AMPI_Graph_neighbors_count");
 
-  ampiCommStruct &c = getAmpiParent()->getGraph(comm);
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isGraph(comm))
+    return MPI_ERR_TOPOLOGY;
+#endif
 
+  ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   const std::vector<int> &index = c.getindex();
 
+#if CMK_ERROR_CHECKING
   if ((rank >= index.size()) || (rank < 0))
-    CkAbort("MPI_Graph_neighbors_count: rank not within range");
+    return MPI_ERR_RANK;
+#endif
 
   if (rank == 0)
     *nneighbors = index[rank];
@@ -7248,6 +7300,11 @@ CDECL
 int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, int *neighbors) {
   AMPIAPI("AMPI_Graph_neighbors");
 
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isGraph(comm))
+    return MPI_ERR_TOPOLOGY;
+#endif
+
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   const std::vector<int> &index = c.getindex();
   const std::vector<int> &edges = c.getedges();
@@ -7256,11 +7313,12 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, int *neighbo
   if (maxneighbors > numneighbors)
     maxneighbors = numneighbors;
 
+#if CMK_ERROR_CHECKING
   if (maxneighbors < 0)
-    CkAbort("MPI_Graph_neighbors: maxneighbors < 0");
-
+    return MPI_ERR_ARG;
   if ((rank >= index.size()) || (rank < 0))
-    CkAbort("MPI_Graph_neighbors: rank not within range");
+    return MPI_ERR_RANK;
+#endif
 
   if (rank == 0) {
     for (int i = 0; i < maxneighbors; i++)
@@ -7348,7 +7406,7 @@ int AMPI_Dims_create(int nnodes, int ndims, int *dims) {
   for (i = 0; i < ndims; i++) {
     if (dims[i] != 0) {
       if (n % dims[i] != 0) {
-        CkAbort("MPI_Dims_Create: Value in dimensions array infeasible!");
+        return MPI_ERR_DIMS;
       } else {
         n = n / dims[i];
         d--;
@@ -7360,7 +7418,7 @@ int AMPI_Dims_create(int nnodes, int ndims, int *dims) {
     pdims = new int[d];
 
     if (!factors(n, d, pdims, 1))
-      CkAbort("MPI_Dims_Create: Factorization failed. Wonder why?");
+      CkAbort("MPI_Dims_create: factorization failed!\n");
 
     int j = 0;
     for (i = 0; i < ndims; i++) {
@@ -7385,6 +7443,11 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
 
   int i, *coords, ndims, rank;
   int color = 1, key = 1;
+
+#if CMK_ERROR_CHECKING
+  if (!getAmpiParent()->isCart(comm))
+    return MPI_ERR_TOPOLOGY;
+#endif
 
   AMPI_Comm_rank(comm, &rank);
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
