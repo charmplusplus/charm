@@ -199,12 +199,12 @@ class InfoStruct{
   InfoStruct(void):valid(true) { }
   void setvalid(bool valid_){ valid = valid_; }
   bool getvalid(void) const { return valid; }
-  void set(const char* k, const char* v);
-  void dup(InfoStruct& src);
-  int get(const char* k, int vl, char*& v) const; // return flag
-  int deletek(const char* k); // return -1 when not found
-  int get_valuelen(const char* k, int* vl) const; // return flag
-  int get_nkeys(void) const { return nodes.size(); }
+  int set(const char* k, const char* v);
+  int dup(InfoStruct& src);
+  int get(const char* k, int vl, char*& v, int *flag) const;
+  int deletek(const char* k);
+  int get_valuelen(const char* k, int* vl, int *flag) const;
+  int get_nkeys(int *nkeys) const;
   int get_nthkey(int n,char* k) const;
   void myfree(void);
   void pup(PUP::er& p);
@@ -1242,15 +1242,15 @@ class ampiParent : public CBase_ampiParent {
   void removeWinStruct(WinStruct win);
 
  public:
-  MPI_Info createInfo(void);
-  MPI_Info dupInfo(MPI_Info info);
-  void setInfo(MPI_Info info, const char *key, const char *value);
+  int createInfo(MPI_Info *newinfo);
+  int dupInfo(MPI_Info info, MPI_Info *newinfo);
+  int setInfo(MPI_Info info, const char *key, const char *value);
   int deleteInfo(MPI_Info info, const char *key);
-  int getInfo(MPI_Info info, const char *key, int valuelen, char *value) const;
-  int getInfoValuelen(MPI_Info info, const char *key, int *valuelen) const;
-  int getInfoNkeys(MPI_Info info) const;
+  int getInfo(MPI_Info info, const char *key, int valuelen, char *value, int *flag) const;
+  int getInfoValuelen(MPI_Info info, const char *key, int *valuelen, int *flag) const;
+  int getInfoNkeys(MPI_Info info, int *nkeys) const;
   int getInfoNthkey(MPI_Info info, int n, char *key) const;
-  void freeInfo(MPI_Info info);
+  int freeInfo(MPI_Info info);
 
  public:
 #if AMPIMSGLOG
