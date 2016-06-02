@@ -103,6 +103,7 @@ void _libExitHandler(envelope *env)
   }
 }
 
+#if CMK_USE_LRTS
 // CharmInit simply calls CharmLibInit with userDrivenMode set to 1. This allows
 // user code to stop and start the charm scheduler multiple times throughout
 // execution without destroying its state.
@@ -111,11 +112,12 @@ void CharmInit(int argc, char **argv) {
   userDrivenMode = 1;
   CharmLibInit(0, argc, argv);
 }
+#endif
 
 extern "C"
 void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 
-#if !CMK_HAS_INTEROP
+#if CMK_USE_LRTS && !CMK_HAS_INTEROP
   if(!userDrivenMode) {
     CmiAbort("mpi-interoperate not supported in this machine layer; did you mean to use CharmInit?");
   }
