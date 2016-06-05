@@ -86,6 +86,16 @@ protected:
      virtual void userBracketEvent(int eventID, double bt, double et) {
        (void)eventID; (void)bt; (void)et;
      }
+
+    //Register user stat trace module returns int identifier
+    virtual int traceRegisterUserStat(const char* evt, int e) {
+      return 0;
+    }
+
+    //update a user Stat with option to set user specified time
+    virtual void updateStatPair(int e, double stat,double time) {}
+    virtual void updateStat(int e, double stat) {}
+
      //interact with application
      virtual void beginAppWork() {}
      virtual void endAppWork() {}
@@ -293,7 +303,23 @@ public:
 	    if (e) eno = e;
           }
 	  return eno;
-    }  
+    } 
+
+//User stat functions for TraceArray
+    inline int traceRegisterUserStat(const char*x, int evt) {
+	  int eno = 0;
+	  for (int i=0; i<length(); i++) {
+	    if (traces[i]->traceOnPE() == 0) {
+	      continue;
+	    }
+	    int e = traces[i]->traceRegisterUserStat(x, evt);
+	    if (e) eno = e;
+          }
+	  return eno;
+    }
+    inline void updateStatPair(int e,double stat,double time) {ALLDO(updateStatPair(e,stat,time));}
+    inline void updateStat(int e,double stat) {ALLDO(updateStat(e,stat));}
+
     inline void traceClearEps() {ALLDO(traceClearEps());}
     inline void traceEnableCCS() {ALLDO(traceEnableCCS());}
     inline void traceWriteSts() {ALLDO(traceWriteSts());}

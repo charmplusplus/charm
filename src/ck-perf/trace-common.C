@@ -576,6 +576,35 @@ void traceUserBracketEvent(int e, double beginT, double endT)
 #endif
 }
 
+//common version of User Stat Functions
+extern "C"
+int traceRegisterUserStat(const char*x, int e)
+{
+#if CMK_TRACE_ENABLED
+  return CkpvAccess(_traces)->traceRegisterUserStat(x, e);
+#else
+  return 0;
+#endif
+}
+
+extern "C"
+void updateStatPair(int e, double stat, double time)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->updateStatPair(e, stat, time);
+#endif
+}
+
+extern "C"
+void updateStat(int e, double stat)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->updateStat(e, stat);
+#endif
+}
+
 extern "C"
 void traceUserSuppliedData(int d)
 {

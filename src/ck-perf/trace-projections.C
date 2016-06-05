@@ -54,7 +54,9 @@ public:
   UsrEvent(int _e, char* _s): e(_e),str(_s) {}
 };
 CkpvStaticDeclare(CkVec<UsrEvent *>*, usrEvents);
-
+/*User Stat Vector Mirroring usrEvents. Holds all the stat names.
+  Reuses UsrEvent Class since all that is needed is an int and a string to store name*/
+CkpvStaticDeclare(CkVec<UsrEvent *>*, usrStats);
 // When tracing is disabled, these are defined as empty static inlines
 // in the header, to minimize overhead
 #if CMK_TRACE_ENABLED
@@ -106,7 +108,9 @@ void _createTraceprojections(char **argv)
   DEBUGF("%d createTraceProjections\n", CkMyPe());
   CkpvInitialize(CkVec<char *>, usrEventlist);
   CkpvInitialize(CkVec<UsrEvent *>*, usrEvents);
+  CkpvInitialize(CkVec<UsrEvent *>*, usrStats);
   CkpvAccess(usrEvents) = new CkVec<UsrEvent *>();
+  CkpvAccess(usrStats) = new CkVec<UsrEvent *>();
 #if CMK_BIGSIM_CHARM
   // CthRegister does not call the constructor
 //  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
@@ -513,10 +517,16 @@ void LogPool::writeSts(void)
     fprintf(stsfp, "PAPI_EVENT %d %s\n", i, eventName);
   }
 #endif
+  // Adds common elements to sts file such as num stats, num chares etc.
   traceWriteSTS(stsfp,CkpvAccess(usrEvents)->length());
+  fprintf(stsfp, "TOTAL_STATS %d\n", (int) CkpvAccess(usrStats)->length());
   for(i=0;i<CkpvAccess(usrEvents)->length();i++){
     fprintf(stsfp, "EVENT %d %s\n", (*CkpvAccess(usrEvents))[i]->e, (*CkpvAccess(usrEvents))[i]->str);
   }	
+  //Mirrors Event printing. Prints every stat name and number
+  for(i=0;i<CkpvAccess(usrStats)->length();i++){
+    fprintf(stsfp, "STAT %d %s\n", (*CkpvAccess(usrStats))[i]->e, (*CkpvAccess(usrStats))[i]->str);
+  }
 }
 
 void LogPool::writeSts(TraceProjections *traceProj){
@@ -626,7 +636,7 @@ void LogPool::flushLogBuffer()
 
 void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
 		  double time, int event, int pe, int ml, CmiObjId *id, 
-		  double recvT, double cpuT, int numPe)
+		  double recvT, double cpuT, int numPe, double statVal)
 {
     switch(type)
     {
@@ -694,7 +704,7 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
     lastCreationEvent = numEntries;
   }
   new (&pool[numEntries++])
-    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPe);
+    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPe, statVal);
   if ((type == END_PHASE) || (type == END_COMPUTATION)) {
     numPhases++;
   }
@@ -755,8 +765,6 @@ void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
 #endif	
 	
 }  
-
-
 
 void LogPool::addUserSupplied(int data){
 	// add an event
@@ -972,6 +980,13 @@ void LogEntry::pup(PUP::er &p)
       p | memUsage;
       p | itime;
 	break;
+    case USER_STAT:
+      p | itime;
+      p | cputime;  //This is user specified time
+      p | stat;
+      p | pe;
+      p | mIdx;
+      break;
     case CREATION:
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
@@ -1137,6 +1152,33 @@ int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
   CkpvAccess(usrEvents)->push_back(new UsrEvent(event,(char *)evt));
   return event;
 }
+// Registers User Stat by adding its name and number to the usrStat vector.
+
+int TraceProjections::traceRegisterUserStat(const char* evt, int e)
+{
+  OPTIMIZED_VERSION
+  CkAssert(e==-1 || e>=0);
+  CkAssert(evt != NULL);
+  int event;
+  int biggest = -1;
+  for (int i=0; i<CkpvAccess(usrStats)->length(); i++) {
+    int cur = (*CkpvAccess(usrStats))[i]->e;
+    if (cur == e) {
+      //CmiPrintf("%s %s\n", (*CkpvAccess(usrEvents))[i]->str, evt);
+      if (strcmp((*CkpvAccess(usrStats))[i]->str, evt) == 0)
+        return e;
+      else
+        CmiAbort("UserStat double registered!");
+    }
+    if (cur > biggest) biggest = cur;
+  }
+  // if no user events have so far been registered. biggest will be -1
+  // and hence newly assigned event numbers will begin from 0.
+  if (e==-1) event = biggest+1;  // automatically assign new event number
+  else event = e;
+  CkpvAccess(usrStats)->push_back(new UsrEvent(event,(char *)evt));
+  return event;
+}
 
 void TraceProjections::traceClearEps(void)
 {
@@ -1290,7 +1332,19 @@ void TraceProjections::memoryUsage(double m)
   _logPool->addMemoryUsage(MEMORY_USAGE_CURRENT, TraceTimer(), m );
   
 }
+//Updates User stat value. Makes appropriate Call to LogPool updateStat function
+void TraceProjections::updateStatPair(int e, double stat, double time)
+{
+  if (!computationStarted) return;
+  _logPool->add(USER_STAT, e, 0, TraceTimer(), curevent, CkMyPe(), 0, 0, 0.0, time, 0, stat);
+}
 
+//When user time is not given, -1 is stored instead.
+void TraceProjections::updateStat(int e, double stat)
+{
+  if (!computationStarted) return;
+  _logPool->add(USER_STAT, e, 0, TraceTimer(), curevent, CkMyPe(), 0, 0, 0.0, -1, 0, stat);
+}
 
 void TraceProjections::creation(envelope *e, int ep, int num)
 {

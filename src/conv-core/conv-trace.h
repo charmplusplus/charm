@@ -30,6 +30,11 @@ int  traceRegisterUserEvent(const char*, int e
 #endif
 );
 
+/*Declarations for user stat tracing functions*/
+int traceRegisterUserStat(const char *evt, int e);
+void updateStatPair(int e, double stat, double time);
+void updateStat(int e, double stat);
+
 #if CMK_SMP_TRACE_COMMTHREAD
 int  traceBeginCommOp(char *msg);
 void traceEndCommOp(char *msg);

@@ -333,3 +333,45 @@ Additionally, a user supplied text string is recorded, and the  {\tt EventNum} i
 
 \end{itemize}
 
+\subsection{User Stats}
+\label{sec::user stats}
+
+\charmpp{} allows the user to track the progression of any variable or value throughout the program execution.
+These user specified stats can then be plotted in \projections{}, either over time or by processor.
+To enable this feature for \charmpp{}, build \charmpp{} with the {\tt --enable-tracing} flag.
+
+Follow these steps to track user stats in a \charmpp{} program:
+
+\begin{enumerate}
+\item
+Register a stat with an identifiying string and a globally unique integer identifier.
+
+\item
+Update the value of the stat at points of interest in the code by calling the update stat functions.
+
+\item
+Compile program with -tracemode projections flag.
+\end{enumerate}
+
+The functions available are as follows:
+
+\begin{itemize}
+\item
+{\tt int traceRegisterUserStat(const char * StatDesc, int StatNum) }
+
+This function is called once near the beginning the of the \charmpp{} program. {\tt StatDesc} is the identifying
+string and {\tt StatNum} is the unique integer identifier.
+
+\item
+{\tt void updateStat(int StatNum, double StatValue)}
+
+This function updates the value of a user stat and can be called many times throughout program execution.
+{\tt StatNum} is the integer identifier corresponding to the desired stat. {\tt StatValue} is the updated value of the user stat.
+
+\item
+{\tt void updateStatPair(int StatNum, double StatValue, double Time)}
+
+This function works similar to {\tt updateStat()}, but also allows the user to store a user specified time for the update. In 
+\projections{}, the user can then choose which time scale to use: real time, user specified time, or ordered.
+
+\end{itemize}

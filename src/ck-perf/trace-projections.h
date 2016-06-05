@@ -51,6 +51,7 @@ class LogEntry {
     int userSuppliedData;
     char *userSuppliedNote;
     unsigned long memUsage;
+    double stat;	//Used for storing User Stats
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
@@ -70,7 +71,7 @@ class LogEntry {
 
     LogEntry(double tm, unsigned char t, unsigned short m=0, 
 	     unsigned short e=0, int ev=0, int p=0, int ml=0, 
-	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0) {
+	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0, double statVal=0.) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; 
       time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
@@ -86,6 +87,7 @@ class LogEntry {
       flen=0;
       pes=NULL;
       numpes=numPe;
+      stat=statVal;
     }
 
     LogEntry(double _time,unsigned char _type,unsigned short _funcID,
@@ -349,7 +351,7 @@ class LogPool {
 
     void add(unsigned char type, unsigned short mIdx, unsigned short eIdx,
 	     double time, int event, int pe, int ml=0, CmiObjId* id=0, 
-	     double recvT=0.0, double cpuT=0.0, int numPe=0);
+	     double recvT=0.0, double cpuT=0.0, int numPe=0, double statVal=0.0);
 
     // complementary function to set papi info to current log entry
     // must be called after an add()
@@ -359,7 +361,8 @@ class LogPool {
 
 	/** add a record for a user supplied piece of data */
 	void addUserSupplied(int data);
-
+	/* Creates LogEntry for stat. Called by Trace-projections updateStat functions*/
+        void updateStat(unsigned char type,int e, double cputime,double time,double stat, int pe);
 	/** add a record for a user supplied piece of data */
 	void addUserSuppliedNote(char *note);
 
@@ -490,6 +493,11 @@ public:
     void userSuppliedData(int e);
     void userSuppliedNote(char* note);
     void memoryUsage(double m);
+    //UserStat function declartions for Trace-Projections
+    int traceRegisterUserStat(const char*, int);
+    void updateStatPair(int e, double stat, double time);
+    void updateStat(int e, double stat);
+
     void creation(envelope *e, int epIdx, int num=1);
     void creation(char *m);
     void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);

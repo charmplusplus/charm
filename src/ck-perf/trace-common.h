@@ -69,6 +69,9 @@
 #define END_PHASE           30
 #define SURROGATE_BLOCK     31 /* inserted by cluster analysis only */
 
+/* Custom User Stats*/
+#define USER_STAT           32
+
 #define  USER_EVENT_PAIR    100
 
 CkpvExtern(CmiInt8, CtrLogBufSize);
@@ -115,7 +118,6 @@ extern int _sdagMsg, _sdagChare, _sdagEP;
 
 /** Write out the common parts of the .sts file. */
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
-
 extern "C" void (*registerMachineUserEvents())();
 
 #if CMK_HAS_COUNTER_PAPI

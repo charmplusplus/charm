@@ -35,6 +35,11 @@ void traceAwaken(CthThread t) {}
 void traceUserEvent(int i) {}
 void traceUserBracketEvent(int a, double b, double c) {}
 int traceRegisterUserEvent(const char* e, int f) { return -1; }
+// User stat functions for converse.
+int traceRegisterUserStat(const char* evt, int e) { return -1; }
+void updateStatPair(int e, double stat, double time) {}
+void updateStat(int e, double stat) {}
+
 void traceClose(void) {}
 void traceCharmClose(void) {}
 void traceBegin(void) {}
