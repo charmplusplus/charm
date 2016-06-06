@@ -21,8 +21,8 @@ void beginAppWork();
 void endAppWork();
 void traceUserBracketEvent(int, double, double);
 void traceUserSuppliedData(int);
-void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
-void traceUserSuppliedNote(char*);
+void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et);
+void traceUserSuppliedNote(const char*);
 void traceMemoryUsage();
 int  traceRegisterUserEvent(const char*, int e
 #ifdef __cplusplus
@@ -48,7 +48,7 @@ int traceRegisterFunction(const char*, int idx
 =-999
 #endif
 );
-void traceBeginFuncIndexProj(int, char* file, int);
+void traceBeginFuncIndexProj(int, const char* file, int);
 void traceEndFuncIndexProj(int);
 
 void traceClose(void);

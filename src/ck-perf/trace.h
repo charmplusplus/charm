@@ -87,9 +87,9 @@ protected:
     virtual void userSuppliedData(int e) {}
 
     // a user supplied integer value(likely a timestep)
-    virtual void userSuppliedNote(char *note) {}
+    virtual void userSuppliedNote(const char *note) {}
 
-    virtual void userSuppliedBracketedNote(char *note, int eventID, double bt, double et) {}
+    virtual void userSuppliedBracketedNote(const char *note, int eventID, double bt, double et) {}
 
     // the current memory usage as a double
     virtual void memoryUsage(double currentMemUsage) {}
@@ -162,9 +162,9 @@ protected:
 
     //for tracing function calls
     virtual void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){}
-    virtual void beginFunc(char *name,char *file,int line){}
-    virtual void beginFunc(int idx,char *file,int line){}
-    virtual void endFunc(char *name){}    
+    virtual void beginFunc(const char *name,const char *file,int line){}
+    virtual void beginFunc(int idx,const char *file,int line){}
+    virtual void endFunc(const char *name){}
     virtual void endFunc(int idx){}
 
     /* Memory tracing */
@@ -217,8 +217,8 @@ public:
 
 	inline void userSuppliedData(int d) { ALLDO(userSuppliedData(d));}
 
-	inline void userSuppliedNote(char *note) { ALLDO(userSuppliedNote(note));}
-	inline void userSuppliedBracketedNote(char *note, int eventID, double bt, double et) {ALLDO(userSuppliedBracketedNote(note, eventID, bt, et));}
+	inline void userSuppliedNote(const char *note) { ALLDO(userSuppliedNote(note));}
+	inline void userSuppliedBracketedNote(const char *note, int eventID, double bt, double et) {ALLDO(userSuppliedBracketedNote(note, eventID, bt, et));}
 
 
 	inline void memoryUsage(double memUsage) { ALLDO(memoryUsage(memUsage));}
@@ -286,9 +286,9 @@ public:
     void traceSetMsgID(char *msg, int pe, int event) { ALLDO(traceSetMsgID(msg, pe, event)); }
     /*Calls for tracing function begins and ends*/
     inline void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){ ALLDO(regFunc(name, idx, idxSpecifiedByUser)); }
-    inline void beginFunc(char *name,char *file,int line){ ALLDO(beginFunc(name,file,line)); };
-    inline void beginFunc(int idx,char *file,int line){ ALLDO(beginFunc(idx,file,line)); };
-    inline void endFunc(char *name){ ALLDO(endFunc(name)); }
+    inline void beginFunc(const char *name,const char *file,int line){ ALLDO(beginFunc(name,file,line)); };
+    inline void beginFunc(int idx,const char *file,int line){ ALLDO(beginFunc(idx,file,line)); };
+    inline void endFunc(const char *name){ ALLDO(endFunc(name)); }
     inline void endFunc(int idx){ ALLDO(endFunc(idx)); }
 
     /* Phase Demarcation */

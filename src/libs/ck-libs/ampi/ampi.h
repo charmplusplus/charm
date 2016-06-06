@@ -1008,9 +1008,9 @@ int AMPI_GPU_Invoke(workRequest *to_call);
 int AMPI_System(const char *cmd);
 
 extern int traceRegisterFunction(const char *name, int idx);
-extern void traceBeginFuncProj(char *,char *,int);
-extern void traceEndFuncProj(char *);
-extern void traceBeginFuncIndexProj(int, char *, int);
+extern void traceBeginFuncProj(const char *, const char *, int);
+extern void traceEndFuncProj(const char *);
+extern void traceBeginFuncIndexProj(int, const char *, int);
 extern void traceEndFuncIndexProj(int);
 
 /* Determine approximate depth of stack at the point of this call */

@@ -44,13 +44,13 @@ void traceFlushLog(void) {}
 int  traceAvailable() {return 0;}
 
 int traceRegisterFunction(const char *name, int idx) {}
-void traceBeginFuncIndexProj(int idx, char* name, int lineNo) {}
+void traceBeginFuncIndexProj(int idx, const char* name, int lineNo) {}
 void traceEndFuncIndexProj(int idx) {}
-void traceBeginFuncProj(char *name,char *file,int line){}
-void traceEndFuncProj(char *name){}
-void traceUserSuppliedNote(char *note) {}
+void traceBeginFuncProj(const char *name,const char *file,int line){}
+void traceEndFuncProj(const char *name){}
+void traceUserSuppliedNote(const char *note) {}
 void traceUserSuppliedData(int data) {}
-void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et) {}
+void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et) {}
 void traceMemoryUsage() {}
 
 #if CMK_SMP_TRACE_COMMTHREAD

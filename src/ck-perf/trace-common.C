@@ -586,7 +586,7 @@ void traceUserSuppliedData(int d)
 }
 
 extern "C"
-void traceUserSuppliedNote(char * note)
+void traceUserSuppliedNote(const char * note)
 {
 #if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
@@ -596,9 +596,9 @@ void traceUserSuppliedNote(char * note)
 
 
 extern "C"
-void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et)
+void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et)
 {
-  //CkPrintf("traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et)\n");
+  //CkPrintf("traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et)\n");
 #if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userSuppliedBracketedNote(note, eventID, bt, et);
@@ -757,7 +757,7 @@ void TraceArray::creationMulticast(envelope *env, int ep, int num,
 
 /*
 extern "C" 
-void registerFunction(char *name){
+void registerFunction(const char *name){
 	_TRACE_ONLY(CkpvAccess(_traces)->regFunc(name));
 }
 */
@@ -777,17 +777,17 @@ int traceRegisterFunction(const char* name, int idx) {
 }
 
 extern "C" 
-void traceBeginFuncProj(char *name,char *file,int line){
+void traceBeginFuncProj(const char *name,const char *file,int line){
 	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(name,file,line));
 }
 
 extern "C"
-void traceBeginFuncIndexProj(int idx,char *file,int line){
+void traceBeginFuncIndexProj(int idx,const char *file,int line){
 	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(idx,file,line));
 }
 
 extern "C" 
-void traceEndFuncProj(char *name){
+void traceEndFuncProj(const char *name){
 	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(name));
 }
 
