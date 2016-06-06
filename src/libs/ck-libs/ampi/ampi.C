@@ -6422,28 +6422,16 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm rcomm, int rlead
   AMPI_Comm_rank(lcomm,&lrank);
 
   if(lrank==lleader){
-    int lsize, rsize;
-    lsize = ptr->getSize(lcomm);
-    int *larr = new int [lsize];
-    int *rarr;
-    std::vector<int> lvec = ptr->getIndices();
+    int rsize;
     MPI_Status sts;
+    std::vector<int> lvec = ptr->getIndices();
 
     // local leader exchanges groupStruct with remote leader
-    int i;
-    for(i=0;i<lsize;i++)
-      larr[i] = lvec[i];
-    AMPI_Send(&lsize,1,MPI_INT,rleader,tag,rcomm);
-    AMPI_Recv(&rsize,1,MPI_INT,rleader,tag,rcomm,&sts);
-
-    rarr = new int [rsize];
-    AMPI_Send(larr,lsize,MPI_INT,rleader,tag+1,rcomm);
-    AMPI_Recv(rarr,rsize,MPI_INT,rleader,tag+1,rcomm,&sts);
-    for(i=0;i<rsize;i++)
-      rvec.push_back(rarr[i]);
-
-    delete [] larr;
-    delete [] rarr;
+    AMPI_Send(&lvec[0],lvec.size(),MPI_INT,rleader,tag,rcomm);
+    AMPI_Probe(rleader,tag,rcomm,&sts);
+    AMPI_Get_count(&sts,MPI_INT,&rsize);
+    rvec.resize(rsize);
+    AMPI_Recv(&rvec[0],rsize,MPI_INT,rleader,tag,rcomm,&sts);
 
     if(rsize==0){
       AMPI_DEBUG("AMPI> In MPI_Intercomm_create, creating an empty communicator\n");
