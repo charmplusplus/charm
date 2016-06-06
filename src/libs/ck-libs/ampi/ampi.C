@@ -2029,14 +2029,12 @@ void ampi::probe(int t, int s, int comm, int *sts)
 #endif
 
   AmpiMsg *msg = 0;
-  resumeOnRecv=true;
   while(1) {
     tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
     if (msg) break;
-    thread->suspend();
+    blockOnRecv();
   }
-  resumeOnRecv=false;
   if(sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
 #if CMK_BIGSIM_CHARM
