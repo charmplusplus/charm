@@ -1412,12 +1412,13 @@ ampi::~ampi()
 {
   if (CkInRestarting() || _BgOutOfCoreFlag==1) {
     // in restarting, we need to flush messages
-    int tags[3], sts[3];
+    int tags[3];
+    MPI_Status sts;
     tags[0] = tags[1] = tags[2] = CmmWildCard;
-    AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
+    AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 3, tags, (int*)&sts);
     while (msg) {
       delete msg;
-      msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
+      msg = (AmpiMsg *) CmmGet(msgs, 3, tags, (int*)&sts);
     }
   }
 
@@ -1821,7 +1822,8 @@ void ampi::inorder(AmpiMsg* msg)
              thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
   )
   // check posted recvs
-  int tags[3], sts[3];
+  int tags[3];
+  MPI_Status sts;
   tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
   IReq *ireq = NULL;
   if (CpvAccess(CmiPICMethod) != CMI_PIC_ELFCOPY) {
@@ -1834,7 +1836,7 @@ void ampi::inorder(AmpiMsg* msg)
     AmpiRequestList *reqL = &(parent->ampiReqs);
     //When storing the req index, it's 1-based. The reason is stated in the comments
     //in AMPI_Irecv function.
-    int ireqIdx = (int)((long)CmmGet(posted_ireqs, 3, tags, sts));
+    int ireqIdx = (int)((long)CmmGet(posted_ireqs, 3, tags, (int*)&sts));
     if(reqL->size()>0 && ireqIdx>0)
       ireq = (IReq *)(*reqL)[ireqIdx-1];
     if (ireq) { // receive posted
@@ -1847,7 +1849,7 @@ void ampi::inorder(AmpiMsg* msg)
     CmmPut(msgs, 3, tags, msg);
 }
 
-AmpiMsg *ampi::getMessage(int t, int s, int comm, int *sts) const
+AmpiMsg *ampi::getMessage(int t, int s, MPI_Comm comm, int *sts) const
 {
   int tags[3];
   tags[0] = t; tags[1] = s; tags[2] = comm;
@@ -1944,13 +1946,13 @@ int ampi::processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int t
   return 0;
 }
 
-int ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
+int ampi::recv(int t, int s, void* buf, int count, int type, MPI_Comm comm, MPI_Status *sts)
 {
   MPI_Comm disComm = myComm.getComm();
   if(s==MPI_PROC_NULL) {
-    ((MPI_Status *)sts)->MPI_SOURCE = MPI_PROC_NULL;
-    ((MPI_Status *)sts)->MPI_TAG = MPI_ANY_TAG;
-    ((MPI_Status *)sts)->MPI_LENGTH = 0;
+    sts->MPI_SOURCE = MPI_PROC_NULL;
+    sts->MPI_TAG = MPI_ANY_TAG;
+    sts->MPI_LENGTH = 0;
     return 0;
   }
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
@@ -1982,7 +1984,7 @@ int ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
     //This is done to take into account the case in which an ampi
     // thread has migrated while waiting for a message
     tags[0] = t; tags[1] = s; tags[2] = comm;
-    msg = (AmpiMsg *) CmmGet(dis->msgs, 3, tags, sts);
+    msg = (AmpiMsg *) CmmGet(dis->msgs, 3, tags, (int*)sts);
     if (msg) break;
     dis->resumeOnRecv=true;
     dis->thread->suspend();
@@ -1998,7 +2000,7 @@ int ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   dis->resumeOnRecv=false;
 
   if(sts)
-    ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
+    sts->MPI_LENGTH = msg->length;
   int status = dis->processMessage(msg, t, s, buf, count, type);
   if (status != 0) return status;
 
@@ -2020,7 +2022,7 @@ int ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   return 0;
 }
 
-void ampi::probe(int t, int s, int comm, int *sts)
+void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 {
   int tags[3];
 #if CMK_BIGSIM_CHARM
@@ -2031,26 +2033,26 @@ void ampi::probe(int t, int s, int comm, int *sts)
   AmpiMsg *msg = 0;
   while(1) {
     tags[0] = t; tags[1] = s; tags[2] = comm;
-    msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
+    msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, (int*)sts);
     if (msg) break;
     blockOnRecv();
   }
   if(sts)
-    ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
+    sts->MPI_LENGTH = msg->length;
 #if CMK_BIGSIM_CHARM
   _TRACE_BG_SET_INFO((char *)msg, "PROBE_RESUME",  &curLog, 1);
 #endif
 }
 
-int ampi::iprobe(int t, int s, int comm, int *sts)
+int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 {
   int tags[3];
   AmpiMsg *msg = 0;
   tags[0] = t; tags[1] = s; tags[2] = comm;
-  msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
+  msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, (int*)sts);
   if (msg) {
     if(sts)
-      ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
+      sts->MPI_LENGTH = msg->length;
     return 1;
   }
 #if CMK_BIGSIM_CHARM
@@ -2659,7 +2661,7 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  if(-1==ptr->recv(tag,src,msg,count,type, comm, (int*) status)) CkAbort("AMPI> Error in MPI_Recv");
+  if(-1==ptr->recv(tag,src,msg,count,type,comm,status)) CkAbort("AMPI> Error in MPI_Recv");
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -2688,7 +2690,7 @@ int AMPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
   if(!status) status = &tempStatus;
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->probe(tag,src, comm, (int*) status);
+  ptr->probe(tag, src, comm, status);
   return MPI_SUCCESS;
 }
 
@@ -2706,7 +2708,7 @@ int AMPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
   if(!status) status = &tempStatus;
 
   ampi *ptr = getAmpiInstance(comm);
-  *flag = ptr->iprobe(tag,src,comm,(int*) status);
+  *flag = ptr->iprobe(tag, src, comm, status);
   return MPI_SUCCESS;
 }
 
@@ -3572,7 +3574,7 @@ void vecPrint(CkVec<CkVec<int> > vec, int* arr){
 
 int PersReq::wait(MPI_Status *sts){
   if(sndrcv == 2) {
-    if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
+    if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, sts))
       CkAbort("AMPI> Error in persistent request wait");
 #if CMK_BIGSIM_CHARM
     _TRACE_BG_TLINE_END(&event);
@@ -3584,7 +3586,7 @@ int PersReq::wait(MPI_Status *sts){
 int IReq::wait(MPI_Status *sts){
   if(CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY) {
     AMPI_DEBUG("In IReq::wait calling recv with CmiPICMethod == CMI_PIC_ELFCOPY\n");
-    if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
+    if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, sts))
       CkAbort("AMPI> Error in non-blocking request wait");
 
     return 0;
@@ -3630,7 +3632,7 @@ int IATAReq::wait(MPI_Status *sts){
   for(i=0;i<elmcount;i++){
     if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
                                                  myreqs[i].count, myreqs[i].type,
-                                                 myreqs[i].comm, (int *)sts))
+                                                 myreqs[i].comm, sts))
       CkAbort("AMPI> Error in ialltoall request wait");
 #if CMK_BIGSIM_CHARM
     _TRACE_BG_TLINE_END(&myreqs[i].event);
@@ -3896,7 +3898,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
 
 bool PersReq::test(MPI_Status *sts){
   if(sndrcv == 2) // recv request
-    return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
+    return getAmpiInstance(comm)->iprobe(tag, src, comm, sts);
   else            // send request
     return 1;
 }
@@ -3906,7 +3908,7 @@ bool PersReq::itest(MPI_Status *sts){
 }
 
 void PersReq::complete(MPI_Status *sts){
-  if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
+  if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, sts))
     CkAbort("AMPI> Error in persistent request complete");
 }
 
@@ -3997,7 +3999,7 @@ void IATAReq::complete(MPI_Status *sts){
   for(int i=0;i<elmcount;i++){
     if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
                                                  myreqs[i].count, myreqs[i].type,
-                                                 myreqs[i].comm, (int*)sts))
+                                                 myreqs[i].comm, sts))
       CkAbort("AMPI> Error in ialltoall request complete");
   }
 }
@@ -5089,8 +5091,7 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     }
   }
 
-  MPI_Status status;
-  if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm, (int*)(&status)))
+  if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
     CkAbort("AMPI> Error in MPI_Scatter recv");
 
 #if AMPIMSGLOG
@@ -5223,8 +5224,7 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
     }
   }
 
-  MPI_Status status;
-  if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm, (int*)(&status)))
+  if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
     CkAbort("AMPI> Error in MPI_Scatterv recv");
 
 #if AMPIMSGLOG

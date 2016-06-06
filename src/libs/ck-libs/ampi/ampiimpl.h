@@ -1343,10 +1343,10 @@ class ampi : public CBase_ampi {
   void delesend(int t, int s, const void* buf, int count, int type,
                 int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
   inline int processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int type);
-  inline AmpiMsg * getMessage(int t, int s, int comm, int *sts) const;
-  int recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
-  void probe(int t,int s,int comm,int *sts);
-  int iprobe(int t,int s,int comm,int *sts);
+  inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const;
+  int recv(int t,int s,void* buf,int count,int type,MPI_Comm comm,MPI_Status *sts=NULL);
+  void probe(int t,int s,MPI_Comm comm,MPI_Status *sts);
+  int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts);
   void bcast(int root, void* buf, int count, int type,MPI_Comm comm);
   void ibcast(int root, void* buf, int count, int type, MPI_Comm comm, MPI_Request* request);
   static void bcastraw(void* buf, int len, CkArrayID aid);
