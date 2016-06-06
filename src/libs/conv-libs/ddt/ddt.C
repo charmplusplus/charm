@@ -1065,17 +1065,18 @@ int CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) {
   for (; num; num--) {
       char *buf = buffer;
       for (int i=0; i<count; i++) {
+          int saveSize = arrayDataType[i]->getSize();
           for (int j=0; j<arrayBlockLength[i]; j++) {
               DDTDEBUG("writing block of type %d (size %d) from offset %d to offset %d\n",
                       arrayDataType[i]->getType(), arrayDataType[i]->getSize(),
                       userdata-sbuf,
                       buffer-dbuf);
               bytesCopied += arrayDataType[i]->serialize(
-                      userdata + arrayDisplacements[i],
+                      userdata + (j*saveSize)+arrayDisplacements[i],
                       buffer,
                       1,
                       dir);
-              buffer += arrayDataType[i]->getSize();
+              buffer += saveSize;
           }
       }
       buffer = buf + extent;
