@@ -504,16 +504,15 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *fla
 
 extern int _mpi_nworlds;
 
-#define MPI_ATA_SEQ_TAG   MPI_TAG_UB_VALUE+1
-#define MPI_BCAST_TAG     MPI_TAG_UB_VALUE+10
-#define MPI_BARR_TAG      MPI_TAG_UB_VALUE+11
-#define MPI_REDUCE_TAG    MPI_TAG_UB_VALUE+12
-#define MPI_GATHER_TAG    MPI_TAG_UB_VALUE+13
-#define MPI_SCATTER_TAG   MPI_TAG_UB_VALUE+14
-#define MPI_SCAN_TAG      MPI_TAG_UB_VALUE+15
-#define MPI_EXSCAN_TAG    MPI_TAG_UB_VALUE+16
-#define MPI_ATA_TAG       MPI_TAG_UB_VALUE+17
-#define AMPI_TAG_UB_VALUE MPI_TAG_UB_VALUE+17
+#define MPI_ATA_SEQ_TAG MPI_TAG_UB_VALUE+1
+#define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+10
+#define MPI_BARR_TAG    MPI_TAG_UB_VALUE+11
+#define MPI_REDUCE_TAG  MPI_TAG_UB_VALUE+12
+#define MPI_GATHER_TAG  MPI_TAG_UB_VALUE+13
+#define MPI_SCATTER_TAG MPI_TAG_UB_VALUE+14
+#define MPI_SCAN_TAG    MPI_TAG_UB_VALUE+15
+#define MPI_EXSCAN_TAG  MPI_TAG_UB_VALUE+16
+#define MPI_ATA_TAG     MPI_TAG_UB_VALUE+17
 
 #define MPI_PERS_REQ 1
 #define MPI_I_REQ    2
@@ -1337,16 +1336,23 @@ class ampi : public CBase_ampi {
   AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                        int type,MPI_Comm destcomm, int sync=0);
 
-  inline void send(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm, int sync=0);
+  void send(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm, int sync=0);
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                       int idx);
   void delesend(int t, int s, const void* buf, int count, int type,
                 int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
   inline int processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int type);
-  inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const;
-  int recv(int t,int s,void* buf,int count,int type,MPI_Comm comm,MPI_Status *sts=NULL);
-  void probe(int t,int s,MPI_Comm comm,MPI_Status *sts);
-  int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts);
+  inline AmpiMsg * getMessage(int t, int s, int comm, int *sts) const;
+  int recv(int t,int s,void* buf,int count,int type,int comm,MPI_Status *sts=NULL);
+  void irecv(void *buf, int count, MPI_Datatype type, int src,
+             int tag, MPI_Comm comm, MPI_Request *request);
+  void sendrecv(void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
+                void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
+                MPI_Comm comm, MPI_Status *sts);
+  void probe(int t,int s,int comm,MPI_Status *sts);
+  int iprobe(int t,int s,int comm,MPI_Status *sts);
+  void barrier(MPI_Comm comm);
+  void ibarrier(MPI_Comm comm, MPI_Request *request);
   void bcast(int root, void* buf, int count, int type,MPI_Comm comm);
   void ibcast(int root, void* buf, int count, int type, MPI_Comm comm, MPI_Request* request);
   static void bcastraw(void* buf, int len, CkArrayID aid);

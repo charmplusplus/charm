@@ -566,7 +566,7 @@ int AMPI_Win_create(void *base, MPI_Aint size, int disp_unit,
   AMPI_Win_set_attr(*newwin, MPI_WIN_SIZE, &size);
   AMPI_Win_set_attr(*newwin, MPI_WIN_DISP_UNIT, &disp_unit);
   /* need to reduction here: to make sure every processor participates */
-  AMPI_Barrier(comm);
+  ptr->barrier(comm);
   return MPI_SUCCESS;
 }
 
@@ -585,7 +585,7 @@ int AMPI_Win_free(MPI_Win *win){
   ampi *ptr = getAmpiInstance(winStruct.comm);
   ptr->deleteWinInstance(*win);
   /* Need a barrier here: to ensure that every process participates */
-  AMPI_Barrier(winStruct.comm);
+  ptr->barrier(winStruct.comm);
   return MPI_SUCCESS;
 }
 
@@ -653,9 +653,10 @@ int AMPI_Win_fence(int assertion, MPI_Win win){
   AMPIAPI("AMPI_Win_fence");
   WinStruct winStruct = getAmpiParent()->getWinStruct(win);
   MPI_Comm comm = winStruct.comm;
+  ampi *ptr = getAmpiInstance(comm);
 
   // Wait until everyone reaches the fence
-  AMPI_Barrier(comm);
+  ptr->barrier(comm);
 
   // Complete all outstanding one-sided comm requests
   // no need to do this for the pseudo-implementation
