@@ -194,6 +194,7 @@ typedef struct { long double val; int idx; } LongdoubleInt;
 typedef struct { float val; float idx; } FloatFloat;
 typedef struct { double val; double idx; } DoubleDouble;
 
+/* For MPI_MAX, MPI_MIN, MPI_SUM, and MPI_PROD: */
 #define MPI_OP_SWITCH(OPNAME) \
   int i; \
 switch (*datatype) { \
@@ -223,6 +224,63 @@ switch (*datatype) { \
   case MPI_UINT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint64_t); } break; \
   case MPI_FLOAT_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(AmpiComplex); } break; \
   case MPI_LONG_DOUBLE_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(AmpiLongDoubleComplex); } break; \
+  case MPI_AINT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(MPI_Aint); } break; \
+  default: \
+           ckerr << "Type " << *datatype << " with Op "#OPNAME" not supported." << endl; \
+  CkAbort("Unsupported MPI datatype for MPI Op"); \
+};\
+
+/* For MPI_LAND, MPI_LOR, and MPI_LXOR: */
+#define MPI_LOGICAL_OP_SWITCH(OPNAME) \
+  int i; \
+switch (*datatype) { \
+  case MPI_SHORT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed short int); } break; \
+  case MPI_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed int); } break; \
+  case MPI_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed long); } break; \
+  case MPI_UNSIGNED_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned char); } break; \
+  case MPI_UNSIGNED_SHORT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned short); } break; \
+  case MPI_UNSIGNED: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned int); } break; \
+  case MPI_UNSIGNED_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long); } break; \
+  case MPI_LONG_LONG_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed long long); } break; \
+  case MPI_SIGNED_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed char); } break; \
+  case MPI_UNSIGNED_LONG_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long long); } break; \
+  case MPI_INT8_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int8_t); } break; \
+  case MPI_INT16_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int16_t); } break; \
+  case MPI_INT32_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int32_t); } break; \
+  case MPI_INT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int64_t); } break; \
+  case MPI_UINT8_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint8_t); } break; \
+  case MPI_UINT16_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint16_t); } break; \
+  case MPI_UINT32_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint32_t); } break; \
+  case MPI_UINT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint64_t); } break; \
+  case MPI_LOGICAL: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int); } break; \
+  default: \
+           ckerr << "Type " << *datatype << " with Op "#OPNAME" not supported." << endl; \
+  CkAbort("Unsupported MPI datatype for MPI Op"); \
+};\
+
+/* For MPI_BAND, MPI_BOR, and MPI_BXOR: */
+#define MPI_BITWISE_OP_SWITCH(OPNAME) \
+  int i; \
+switch (*datatype) { \
+  case MPI_SHORT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed short int); } break; \
+  case MPI_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed int); } break; \
+  case MPI_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed long); } break; \
+  case MPI_UNSIGNED_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned char); } break; \
+  case MPI_UNSIGNED_SHORT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned short); } break; \
+  case MPI_UNSIGNED: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned int); } break; \
+  case MPI_UNSIGNED_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long); } break; \
+  case MPI_LONG_LONG_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed long long); } break; \
+  case MPI_SIGNED_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed char); } break; \
+  case MPI_UNSIGNED_LONG_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long long); } break; \
+  case MPI_INT8_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int8_t); } break; \
+  case MPI_INT16_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int16_t); } break; \
+  case MPI_INT32_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int32_t); } break; \
+  case MPI_INT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int64_t); } break; \
+  case MPI_UINT8_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint8_t); } break; \
+  case MPI_UINT16_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint16_t); } break; \
+  case MPI_UINT32_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint32_t); } break; \
+  case MPI_UINT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint64_t); } break; \
+  case MPI_BYTE: for(i=0;i<(*len);i++) { MPI_OP_IMPL(char); } break; \
   case MPI_AINT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(MPI_Aint); } break; \
   default: \
            ckerr << "Type " << *datatype << " with Op "#OPNAME" not supported." << endl; \
@@ -269,100 +327,45 @@ void MPI_NO_OP( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 }
 
 void MPI_LAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-    case MPI_INT:
-    case MPI_LOGICAL:
-      for(i=0;i<(*len);i++)
-        ((int *)inoutvec)[i] = ((int *)inoutvec)[i] && ((int *)invec)[i];
-      break;
-    default:
-      ckerr << "Type " << *datatype << " with Op MPI_LAND not supported." << endl;
-      CkAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+  ((type *)inoutvec)[i] = ((type *)inoutvec)[i] && ((type *)invec)[i];
+  MPI_LOGICAL_OP_SWITCH(MPI_LAND)
+#undef MPI_OP_IMPL
 }
 
 void MPI_BAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-    case MPI_INT:
-      for(i=0;i<(*len);i++)
-        ((int *)inoutvec)[i] = ((int *)inoutvec)[i] & ((int *)invec)[i];
-      break;
-    case MPI_BYTE:
-      for(i=0;i<(*len);i++)
-        ((char *)inoutvec)[i] = ((char *)inoutvec)[i] & ((char *)invec)[i];
-      break;
-    default:
-      ckerr << "Type " << *datatype << " with Op MPI_BAND not supported." << endl;
-      CkAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+  ((type *)inoutvec)[i] = ((type *)inoutvec)[i] & ((type *)invec)[i];
+  MPI_BITWISE_OP_SWITCH(MPI_BAND)
+#undef MPI_OP_IMPL
 }
 
 void MPI_LOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-    case MPI_INT:
-    case MPI_LOGICAL:
-      for(i=0;i<(*len);i++)
-        ((int *)inoutvec)[i] = ((int *)inoutvec)[i] || ((int *)invec)[i];
-      break;
-    default:
-      ckerr << "Type " << *datatype << " with Op MPI_LOR not supported." << endl;
-      CkAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+  ((type *)inoutvec)[i] = ((type *)inoutvec)[i] || ((type *)invec)[i];
+  MPI_LOGICAL_OP_SWITCH(MPI_LAND)
+#undef MPI_OP_IMPL
 }
 
 void MPI_BOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-    case MPI_INT:
-      for(i=0;i<(*len);i++)
-        ((int *)inoutvec)[i] = ((int *)inoutvec)[i] | ((int *)invec)[i];
-      break;
-    case MPI_BYTE:
-      for(i=0;i<(*len);i++)
-        ((char *)inoutvec)[i] = ((char *)inoutvec)[i] | ((char *)invec)[i];
-      break;
-    default:
-      ckerr << "Type " << *datatype << " with Op MPI_BOR not supported." << endl;
-      CkAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+  ((type *)inoutvec)[i] = ((type *)inoutvec)[i] | ((type *)invec)[i];
+  MPI_BITWISE_OP_SWITCH(MPI_BAND)
+#undef MPI_OP_IMPL
 }
 
 void MPI_LXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-    case MPI_INT:
-    case MPI_LOGICAL:
-      for(i=0;i<(*len);i++)
-        ((int *)inoutvec)[i] = (((int *)inoutvec)[i]&&(!((int *)invec)[i]))||(!(((int *)inoutvec)[i])&&((int *)invec)[i]); //emulate ^^
-      break;
-    default:
-      ckerr << "Type " << *datatype << " with Op MPI_LXOR not supported." << endl;
-      CkAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+  ((type *)inoutvec)[i] = (((type *)inoutvec)[i]&&(!((type *)invec)[i]))||(!(((type *)inoutvec)[i])&&((type *)invec)[i]);
+  MPI_LOGICAL_OP_SWITCH(MPI_LAND)
+#undef MPI_OP_IMPL
 }
 
 void MPI_BXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
-  int i;
-  switch (*datatype) {
-    case MPI_INT:
-      for(i=0;i<(*len);i++)
-        ((int *)inoutvec)[i] = ((int *)inoutvec)[i] ^ ((int *)invec)[i];
-      break;
-    case MPI_BYTE:
-      for(i=0;i<(*len);i++)
-        ((char *)inoutvec)[i] = ((char *)inoutvec)[i] ^ ((char *)invec)[i];
-      break;
-    case MPI_UNSIGNED:
-      for(i=0;i<(*len);i++)
-        ((unsigned int *)inoutvec)[i] = ((unsigned int *)inoutvec)[i] ^ ((unsigned int *)invec)[i];
-      break;
-    default:
-      ckerr << "Type " << *datatype << " with Op MPI_BXOR not supported." << endl;
-      CkAbort("exiting");
-  }
+#define MPI_OP_IMPL(type) \
+  ((type *)inoutvec)[i] = ((type *)inoutvec)[i] ^ ((type *)invec)[i];
+  MPI_BITWISE_OP_SWITCH(MPI_BAND)
+#undef MPI_OP_IMPL
 }
 
 #ifndef MIN
