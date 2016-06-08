@@ -6732,19 +6732,125 @@ int AMPI_Error_class(int errorcode, int *errorclass){
 }
 
 CDECL
-int AMPI_Error_string(int errorcode, char *string, int *resultlen)
+int AMPI_Error_string(int errorcode, char *errorstring, int *resultlen)
 {
   AMPIAPI("AMPI_Error_string");
-  const char *ret="";
+  const char *r="";
   switch(errorcode) {
     case MPI_SUCCESS:
-      ret="Success";
-      break;
+      r="MPI_SUCCESS: no errors"; break;
+    case MPI_ERR_BUFFER:
+      r="MPI_ERR_BUFFER: invalid buffer pointer"; break;
+    case MPI_ERR_COUNT:
+      r="MPI_ERR_COUNT: invalid count argument"; break;
+    case MPI_ERR_TYPE:
+      r="MPI_ERR_TYPE: invalid datatype"; break;
+    case MPI_ERR_TAG:
+      r="MPI_ERR_TAG: invalid tag"; break;
+    case MPI_ERR_COMM:
+      r="MPI_ERR_COMM: invalid communicator"; break;
+    case MPI_ERR_RANK:
+      r="MPI_ERR_RANK: invalid rank"; break;
+    case MPI_ERR_REQUEST:
+      r="MPI_ERR_REQUEST: invalid request (handle)"; break;
+    case MPI_ERR_ROOT:
+      r="MPI_ERR_ROOT: invalid root"; break;
+    case MPI_ERR_GROUP:
+      r="MPI_ERR_GROUP: invalid group"; break;
+    case MPI_ERR_OP:
+      r="MPI_ERR_OP: invalid operation"; break;
+    case MPI_ERR_TOPOLOGY:
+      r="MPI_ERR_TOPOLOGY: invalid communicator topology"; break;
+    case MPI_ERR_DIMS:
+      r="MPI_ERR_DIMS: invalid dimension argument"; break;
+    case MPI_ERR_ARG:
+      r="MPI_ERR_ARG: invalid argument of some other kind"; break;
+    case MPI_ERR_TRUNCATE:
+      r="MPI_ERR_TRUNCATE: message truncated in recieve"; break;
+    case MPI_ERR_OTHER:
+      r="MPI_ERR_OTHER: known error not in this list"; break;
+    case MPI_ERR_INTERN:
+      r="MPI_ERR_INTERN: internal MPI (implementation) error"; break;
+    case MPI_ERR_IN_STATUS:
+      r="MPI_ERR_IN_STATUS: error code in status"; break;
+    case MPI_ERR_PENDING:
+      r="MPI_ERR_PENDING: pending request"; break;
+    case MPI_ERR_ACCESS:
+      r="MPI_ERR_ACCESS: invalid access mode"; break;
+    case MPI_ERR_AMODE:
+      r="MPI_ERR_AMODE: invalid amode argument"; break;
+    case MPI_ERR_ASSERT:
+      r="MPI_ERR_ASSERT: invalid assert argument"; break;
+    case MPI_ERR_BAD_FILE:
+      r="MPI_ERR_BAD_FILE: bad file"; break;
+    case MPI_ERR_BASE:
+      r="MPI_ERR_BASE: invalid base"; break;
+    case MPI_ERR_CONVERSION:
+      r="MPI_ERR_CONVERSION: error in data conversion"; break;
+    case MPI_ERR_DISP:
+      r="MPI_ERR_DISP: invalid displacement"; break;
+    case MPI_ERR_DUP_DATAREP:
+      r="MPI_ERR_DUP_DATAREP: error duplicating data representation"; break;
+    case MPI_ERR_FILE_EXISTS:
+      r="MPI_ERR_FILE_EXISTS: file exists already"; break;
+    case MPI_ERR_FILE_IN_USE:
+      r="MPI_ERR_FILE_IN_USE: file in use already"; break;
+    case MPI_ERR_FILE:
+      r="MPI_ERR_FILE: invalid file"; break;
+    case MPI_ERR_INFO_KEY:
+      r="MPI_ERR_INFO_KEY: invalid key argument for info object"; break;
+    case MPI_ERR_INFO_NOKEY:
+      r="MPI_ERR_INFO_NOKEY: unknown key for info object"; break;
+    case MPI_ERR_INFO_VALUE:
+      r="MPI_ERR_INFO_VALUE: invalid value argument for info object"; break;
+    case MPI_ERR_INFO:
+      r="MPI_ERR_INFO: invalid info object"; break;
+    case MPI_ERR_IO:
+      r="MPI_ERR_IO: input/output error"; break;
+    case MPI_ERR_KEYVAL:
+      r="MPI_ERR_KEYVAL: invalid keyval"; break;
+    case MPI_ERR_LOCKTYPE:
+      r="MPI_ERR_LOCKTYPE: invalid locktype argument"; break;
+    case MPI_ERR_NAME:
+      r="MPI_ERR_NAME: invalid name argument"; break;
+    case MPI_ERR_NO_MEM:
+      r="MPI_ERR_NO_MEM: out of memory"; break;
+    case MPI_ERR_NOT_SAME:
+      r="MPI_ERR_NOT_SAME: objects are not identical"; break;
+    case MPI_ERR_NO_SPACE:
+      r="MPI_ERR_NO_SPACE: no space left on device"; break;
+    case MPI_ERR_NO_SUCH_FILE:
+      r="MPI_ERR_NO_SUCH_FILE: no such file or directory"; break;
+    case MPI_ERR_PORT:
+      r="MPI_ERR_PORT: invalid port"; break;
+    case MPI_ERR_QUOTA:
+      r="MPI_ERR_QUOTA: out of quota"; break;
+    case MPI_ERR_READ_ONLY:
+      r="MPI_ERR_READ_ONLY: file is read only"; break;
+    case MPI_ERR_RMA_CONFLICT:
+      r="MPI_ERR_RMA_CONFLICT: rma conflict during operation"; break;
+    case MPI_ERR_RMA_SYNC:
+      r="MPI_ERR_RMA_SYNC: error executing rma sync"; break;
+    case MPI_ERR_SERVICE:
+      r="MPI_ERR_SERVICE: unknown service name"; break;
+    case MPI_ERR_SIZE:
+      r="MPI_ERR_SIZE: invalid size argument"; break;
+    case MPI_ERR_SPAWN:
+      r="MPI_ERR_SPAWN: error in spawning processes"; break;
+    case MPI_ERR_UNSUPPORTED_DATAREP:
+      r="MPI_ERR_UNSUPPORTED_DATAREP: data representation not supported"; break;
+    case MPI_ERR_UNSUPPORTED_OPERATION:
+      r="MPI_ERR_UNSUPPORTED_OPERATION: operation not supported"; break;
+    case MPI_ERR_WIN:
+      r="MPI_ERR_WIN: invalid win argument"; break;
     default:
-      return 1;/*LIE: should be MPI_ERR_something */
+      r="unknown error";
+      *resultlen=strlen(r);
+      strcpy(errorstring,r);
+      return MPI_ERR_UNKNOWN;
   };
-  *resultlen=strlen(ret);
-  strcpy(string,ret);
+  *resultlen=strlen(r);
+  strcpy(errorstring,r);
   return MPI_SUCCESS;
 }
 
