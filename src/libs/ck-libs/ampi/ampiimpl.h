@@ -264,7 +264,7 @@ class ampiCommStruct {
   void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
   MPI_Comm getComm(void) const {return comm;}
-  const std::vector<int> &getIndices(void) const {
+  inline const std::vector<int> &getIndices(void) const {
     if (isWorld && indices.size()!=size) makeWorldIndices();
     return indices;
   }
@@ -311,10 +311,6 @@ class ampiCommStruct {
   int getSize(void) const {return size;}
 
   inline int isinter(void) const { return isInter; }
-  inline const std::vector<int> &getindices() const {
-    if (isWorld && indices.size()!=size) makeWorldIndices();
-    return indices;
-  }
   inline const std::vector<int> &getdims() const {return dims;}
   inline const std::vector<int> &getperiods() const {return periods;}
   inline int getndims() const {return ndims;}
@@ -1378,7 +1374,7 @@ class ampi : public CBase_ampi {
   inline MPI_Comm getComm(void) const {return myComm.getComm();}
   inline void setCommName(const char *name){myComm.setName(name);}
   inline void getCommName(char *name, int *len) const {myComm.getName(name,len);}
-  inline std::vector<int> getIndices(void) const { return myComm.getindices(); }
+  inline std::vector<int> getIndices(void) const { return myComm.getIndices(); }
   inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
