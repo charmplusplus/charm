@@ -21,7 +21,7 @@ win_obj::win_obj() {
   initflag = 0;
 }
 
-win_obj::win_obj(char *name, void *base, MPI_Aint size, int disp_unit,
+win_obj::win_obj(const char *name, void *base, MPI_Aint size, int disp_unit,
                  MPI_Comm comm) {
   create(name, base, size, disp_unit, comm);
   owner = -1;  // the lock is not owned by anyone yet
@@ -61,7 +61,7 @@ void win_obj::pup(PUP::er &p) {
 }
 
 int win_obj::create(const char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm){
-  setName(name);
+  if (name) setName(name);
   baseAddr = base;
   winSize = size*disp_unit;
   this->disp_unit = disp_unit;

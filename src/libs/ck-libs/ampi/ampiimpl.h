@@ -129,7 +129,7 @@ class win_obj {
   void pup(PUP::er &p);
 
   win_obj();
-  win_obj(char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm);
+  win_obj(const char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm);
   ~win_obj();
 
   int create(const char *name, void *base, MPI_Aint size, int disp_unit,
