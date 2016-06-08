@@ -1016,8 +1016,9 @@ class ampiParent : public CBase_ampiParent {
   /* MPI_*_get_attr C binding returns a *pointer* to an integer,
    *  so there needs to be some storage somewhere to point to.
    * All builtin keyvals are ints, except for MPI_WIN_BASE, which
-   *  is a pointer. */
+   *  is a pointer, and MPI_WIN_SIZE, which is an MPI_Aint. */
   int* kv_builtin_storage;
+  MPI_Aint* win_size_storage;
   void** win_base_storage;
   bool kv_set_builtin(int keyval, void* attribute_val);
   bool kv_get_builtin(int keyval);
@@ -1421,7 +1422,7 @@ class ampi : public CBase_ampi {
   void winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                     int targcnt, MPI_Datatype targtype,
                     int winIndex, CkFutureID ftHandle, int pe_src);
-  AmpiMsg* winRemoteIget(int orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+  AmpiMsg* winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                          int targcnt, MPI_Datatype targtype, int winIndex);
   int winLock(int lock_type, int rank, WinStruct win);
   int winUnlock(int rank, WinStruct win);
@@ -1438,7 +1439,7 @@ class ampi : public CBase_ampi {
   win_obj* getWinObjInstance(WinStruct win) const;
   int getNewSemaId();
 
-  AmpiMsg* Alltoall_RemoteIget(int disp, int targcnt, MPI_Datatype targtype, int tag);
+  AmpiMsg* Alltoall_RemoteIget(MPI_Aint disp, int targcnt, MPI_Datatype targtype, int tag);
  private:
   int AlltoallGetFlag;
   void *Alltoallbuff;

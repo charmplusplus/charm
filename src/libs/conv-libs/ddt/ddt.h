@@ -70,6 +70,8 @@
 
 #define CkDDT_MAX_NAME_LEN         255
 
+typedef intptr_t CkDDT_Aint;
+
 /* Helper function to set names (used by AMPI too).
  * Leading whitespaces are significant, trailing whitespaces are not. */
 inline void CkDDT_SetName(char *dst, const char *src, int *len)
@@ -128,13 +130,13 @@ class CkDDT_DataType {
 
   protected:
     int size;
-    int extent;
+    CkDDT_Aint extent;
     int count;
-    int lb;
-    int ub;
+    CkDDT_Aint lb;
+    CkDDT_Aint ub;
     int iscontig;
     int baseSize;
-    int baseExtent;
+    CkDDT_Aint baseExtent;
     CkDDT_DataType *baseType;
     int baseIndex;
     char name[CkDDT_MAX_NAME_LEN];
@@ -148,16 +150,16 @@ class CkDDT_DataType {
     CkDDT_DataType() { }
     virtual ~CkDDT_DataType() { }
     CkDDT_DataType(int type);
-    CkDDT_DataType(int datatype, int size, int extent, int count, int lb, int ub,
-            int iscontig, int baseSize, int baseExtent,
+    CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int count, CkDDT_Aint lb, CkDDT_Aint ub,
+            int iscontig, int baseSize, CkDDT_Aint baseExtent,
             CkDDT_DataType* baseType, int baseIndex);
 
     virtual int isContig(void);
     virtual int getSize(int count=1);
-    virtual int getExtent(void);
+    virtual CkDDT_Aint getExtent(void);
     virtual int getBaseSize(void);
-    virtual int getLB(void);
-    virtual int getUB(void);
+    virtual CkDDT_Aint getLB(void);
+    virtual CkDDT_Aint getUB(void);
     virtual int getType(void);
     virtual void inrRefCount(void) ;
     virtual int getRefCount(void) ;
@@ -165,7 +167,7 @@ class CkDDT_DataType {
 
     virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner);
     virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
-                           int array_of_integers[], int array_of_addresses[], int array_of_datatypes[]);
+                           int array_of_integers[], CkDDT_Aint array_of_addresses[], int array_of_datatypes[]);
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
 
     void setName(const char *src);
@@ -190,7 +192,7 @@ class CkDDT_Contiguous : public CkDDT_DataType {
   virtual int serialize(char* userdata, char* buffer, int num, int dir);
   virtual void pupType(PUP::er &p, CkDDT* ddt) ;
   virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
-  virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+  virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]);
 };
 
 /*
@@ -221,7 +223,7 @@ class CkDDT_Vector : public CkDDT_DataType {
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
-    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]);
 };
 
 /*
@@ -250,7 +252,7 @@ class CkDDT_HVector : public CkDDT_Vector {
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
-    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]);
 };
 
 /*
@@ -269,21 +271,21 @@ class CkDDT_Indexed : public CkDDT_DataType {
 
   protected:
     int* arrayBlockLength ;
-    int* arrayDisplacements ;
+    CkDDT_Aint* arrayDisplacements ;
 
   private:
     CkDDT_Indexed(const CkDDT_Indexed& obj);
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
 
   public:
-    CkDDT_Indexed(int count, int* arrBlock, int* arrDisp, int index,
+    CkDDT_Indexed(int count, int* arrBlock, CkDDT_Aint* arrDisp, int index,
                 CkDDT_DataType* type);
     CkDDT_Indexed() { } ;
     ~CkDDT_Indexed() ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
-    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]);
 };
 
 /*
@@ -306,12 +308,12 @@ class CkDDT_HIndexed : public CkDDT_Indexed {
 
   public:
     CkDDT_HIndexed() { } ;
-    CkDDT_HIndexed(int count, int* arrBlock, int* arrDisp, int index, 
+    CkDDT_HIndexed(int count, int* arrBlock, CkDDT_Aint* arrDisp, int index,
                  CkDDT_DataType* type);
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
-    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]);
 };
 
 /*
@@ -333,20 +335,20 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
 
   protected:
     int BlockLength;
-    int *arrayDisplacements;
+    CkDDT_Aint *arrayDisplacements;
 
   private:
     CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj);
     CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
-    CkDDT_Indexed_Block(int count, int Blength, int *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_Indexed_Block() { };
     ~CkDDT_Indexed_Block() ;
     virtual int serialize(char *userdata, char *buffer, int num, int dir);
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
-    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]);
 };
 
 /*
@@ -372,13 +374,13 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
     CkDDT_HIndexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
-    CkDDT_HIndexed_Block(int count, int Blength, int *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_HIndexed_Block() { };
     ~CkDDT_HIndexed_Block() ;
     virtual int serialize(char *userdata, char *buffer, int num, int dir);
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
-    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]);
 };
 
 /*
@@ -398,7 +400,7 @@ class CkDDT_Struct : public CkDDT_DataType {
 
   protected:
     int* arrayBlockLength ;
-    int* arrayDisplacements ;
+    CkDDT_Aint* arrayDisplacements ;
     int* index;
     CkDDT_DataType** arrayDataType;
 
@@ -408,12 +410,12 @@ class CkDDT_Struct : public CkDDT_DataType {
 
   public:
     CkDDT_Struct() { } ;
-    CkDDT_Struct(int count, int* arrBlock, int* arrDisp, int *index,
+    CkDDT_Struct(int count, int* arrBlock, CkDDT_Aint* arrDisp, int *index,
                CkDDT_DataType **type);
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner);
-    virtual int getContents(int ni, int na, int nd, int i[], int a[], int d[]);
+    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]);
 };
 
 /*
@@ -545,15 +547,15 @@ class CkDDT {
                 CkDDT_Type* newtype);
   void newHVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newIndexed(int count, int* arrbLength, int* arrDisp , CkDDT_Type oldtype,
+  void newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newHIndexed(int count, int* arrbLength, int* arrDisp , CkDDT_Type oldtype,
+  void newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
                   CkDDT_Type* newtype);
-  void newIndexedBlock(int count, int Blocklength, int *arrDisp, CkDDT_Type oldtype,
+  void newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                       CkDDT_Type *newtype);
-  void newHIndexedBlock(int count, int Blocklength, int *arrDisp, CkDDT_Type oldtype,
+  void newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                        CkDDT_Type *newtype);
-  void newStruct(int count, int* arrbLength, int* arrDisp , CkDDT_Type *oldtype,
+  void newStruct(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type *oldtype,
                 CkDDT_Type* newtype);
   void  freeType(int* index);
   int   getNextFreeIndex(void) ;
@@ -562,12 +564,12 @@ class CkDDT {
 
   int isContig(int nIndex);
   int getSize(int nIndex, int count=1);
-  int getExtent(int nIndex);
-  int getLB(int nIndex);
-  int getUB(int nIndex);
+  CkDDT_Aint getExtent(int nIndex);
+  CkDDT_Aint getLB(int nIndex);
+  CkDDT_Aint getUB(int nIndex);
   int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner);
   int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,
-                 int array_of_integers[], int array_of_addresses[], int array_of_datatypes[]);
+                 int array_of_integers[], CkDDT_Aint array_of_addresses[], int array_of_datatypes[]);
   void setName(int nIndex, const char *name);
   void getName(int nIndex, char *name, int *len);
   ~CkDDT() ;

@@ -559,7 +559,8 @@ class Builtin_kvs{
  public:
   int tag_ub,host,io,wtime_is_global,appnum,universe_size;
   void* win_base;
-  int win_size,win_disp_unit,win_create_flavor,win_model;
+  int win_disp_unit,win_create_flavor,win_model;
+  MPI_Aint win_size;
   Builtin_kvs(){
     tag_ub = MPI_TAG_UB_VALUE;
     host = MPI_PROC_NULL;
@@ -1213,12 +1214,12 @@ bool ampiParent::kv_set_builtin(int keyval, void* attribute_val) {
     case MPI_IO:                /*immutable*/ return false;
     case MPI_WTIME_IS_GLOBAL:   /*immutable*/ return false;
     case MPI_APPNUM:            /*immutable*/ return false;
-    case MPI_UNIVERSE_SIZE:     (CkpvAccess(bikvs).universe_size)     = *((int*)attribute_val); return true;
-    case MPI_WIN_BASE:          (CkpvAccess(bikvs).win_base)          = attribute_val;          return true;
-    case MPI_WIN_SIZE:          (CkpvAccess(bikvs).win_size)          = *((int*)attribute_val); return true;
-    case MPI_WIN_DISP_UNIT:     (CkpvAccess(bikvs).win_disp_unit)     = *((int*)attribute_val); return true;
-    case MPI_WIN_CREATE_FLAVOR: (CkpvAccess(bikvs).win_create_flavor) = *((int*)attribute_val); return true;
-    case MPI_WIN_MODEL:         (CkpvAccess(bikvs).win_model)         = *((int*)attribute_val); return true;
+    case MPI_UNIVERSE_SIZE:     (CkpvAccess(bikvs).universe_size)     = *((int*)attribute_val);      return true;
+    case MPI_WIN_BASE:          (CkpvAccess(bikvs).win_base)          = attribute_val;               return true;
+    case MPI_WIN_SIZE:          (CkpvAccess(bikvs).win_size)          = *((MPI_Aint*)attribute_val); return true;
+    case MPI_WIN_DISP_UNIT:     (CkpvAccess(bikvs).win_disp_unit)     = *((int*)attribute_val);      return true;
+    case MPI_WIN_CREATE_FLAVOR: (CkpvAccess(bikvs).win_create_flavor) = *((int*)attribute_val);      return true;
+    case MPI_WIN_MODEL:         (CkpvAccess(bikvs).win_model)         = *((int*)attribute_val);      return true;
     case AMPI_MY_PE:            /*immutable*/ return false;
     case AMPI_NUM_PES:          /*immutable*/ return false;
     case AMPI_MY_NODE:          /*immutable*/ return false;
@@ -1237,7 +1238,7 @@ bool ampiParent::kv_get_builtin(int keyval) {
     case MPI_APPNUM:            kv_builtin_storage = &(CkpvAccess(bikvs).appnum);            return true;
     case MPI_UNIVERSE_SIZE:     kv_builtin_storage = &(CkpvAccess(bikvs).universe_size);     return true;
     case MPI_WIN_BASE:          win_base_storage   = &(CkpvAccess(bikvs).win_base);          return true;
-    case MPI_WIN_SIZE:          kv_builtin_storage = &(CkpvAccess(bikvs).win_size);          return true;
+    case MPI_WIN_SIZE:          win_size_storage   = &(CkpvAccess(bikvs).win_size);          return true;
     case MPI_WIN_DISP_UNIT:     kv_builtin_storage = &(CkpvAccess(bikvs).win_disp_unit);     return true;
     case MPI_WIN_CREATE_FLAVOR: kv_builtin_storage = &(CkpvAccess(bikvs).win_create_flavor); return true;
     case MPI_WIN_MODEL:         kv_builtin_storage = &(CkpvAccess(bikvs).win_model);         return true;
@@ -1253,9 +1254,12 @@ bool ampiParent::getBuiltinKeyval(int keyval, void *attribute_val) {
   if (kv_get_builtin(keyval)){
     /* All builtin keyvals are ints except MPI_WIN_BASE, which is a pointer
      * to the window's base address in C but an integer representation of
-     * the base address in Fortran. */
+     * the base address in Fortran.
+     * Also, MPI_WIN_SIZE is an MPI_Aint. */
     if (keyval == MPI_WIN_BASE)
       *((void**)attribute_val) = *win_base_storage;
+    else if (keyval == MPI_WIN_SIZE)
+      *(MPI_Aint**)attribute_val = win_size_storage;
     else
       *(int **)attribute_val = kv_builtin_storage;
     return true;
@@ -2114,7 +2118,7 @@ void ampi::bcastraw(void* buf, int len, CkArrayID aid)
   pa.generic(msg);
 }
 
-AmpiMsg* ampi::Alltoall_RemoteIget(int disp, int cnt, MPI_Datatype type, int tag)
+AmpiMsg* ampi::Alltoall_RemoteIget(MPI_Aint disp, int cnt, MPI_Datatype type, int tag)
 {
   CkAssert(tag==MPI_ATA_TAG && AlltoallGetFlag);
   int unit;
@@ -4272,7 +4276,11 @@ int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
                       MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("AMPI_Type_indexed");
-  getDDT()->newIndexed(count, arrBlength, arrDisp, oldtype, newtype);
+  /*CkDDT_Indexed's arrDisp has type MPI_Aint* (not int*). */
+  std::vector<MPI_Aint> arrDispAint(count);
+  for(int i=0; i<count; i++)
+    arrDispAint[i] = (MPI_Aint)(arrDisp[i]);
+  getDDT()->newIndexed(count, arrBlength, &arrDispAint[0], oldtype, newtype);
   return MPI_SUCCESS;
 }
 
@@ -4312,7 +4320,7 @@ int AMPI_Type_create_hindexed_block(int count, int Blength, MPI_Aint *arr,
 }
 
 CDECL
-int AMPI_Type_create_struct(int count, int* arrBlength, int* arrDisp,
+int AMPI_Type_create_struct(int count, int* arrBlength, MPI_Aint* arrDisp,
                             MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("AMPI_Type_create_struct");
@@ -4321,7 +4329,7 @@ int AMPI_Type_create_struct(int count, int* arrBlength, int* arrDisp,
 }
 
 CDECL
-int AMPI_Type_struct(int count, int* arrBlength, int* arrDisp,
+int AMPI_Type_struct(int count, int* arrBlength, MPI_Aint* arrDisp,
                      MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("AMPI_Type_struct");
@@ -6056,9 +6064,9 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
 }
 
 CDECL
-int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
+int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
                             MPI_Datatype *sendtypes, void* recvbuf, int *recvcounts,
-                            int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm)
+                            MPI_Aint *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Neighbor_alltoallw");
 
@@ -6099,9 +6107,9 @@ int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
 }
 
 CDECL
-int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
+int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
                              MPI_Datatype *sendtypes, void* recvbuf, int *recvcounts,
-                             int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm,
+                             MPI_Aint *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm,
                              MPI_Request *request)
 {
   AMPIAPI("AMPI_Ineighbor_alltoallw");

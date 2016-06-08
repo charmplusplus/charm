@@ -101,7 +101,7 @@ inline void MPID_Datatype_get_extent_macro(MPI_Datatype &type, MPI_Aint &extent)
   extent = ddt->getExtent();
 }
 
-inline void MPID_Datatype_get_size_macro(MPI_Datatype &type, MPI_Aint &size){
+inline void MPID_Datatype_get_size_macro(MPI_Datatype &type, int &size){
   CkDDT_DataType *ddt = getAmpiInstance(MPI_COMM_WORLD)->getDDT()->getType(type);
   size = ddt->getSize();
 }

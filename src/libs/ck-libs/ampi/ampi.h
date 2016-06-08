@@ -26,7 +26,7 @@ int AMPI_Main(int argc,char **argv); /* prototype for C main routine */
 typedef void (*MPI_MainFn) (int,char**);
 
 typedef int MPI_Datatype;
-typedef int MPI_Aint;/* should be "long", but must be "int" for f90... */
+typedef intptr_t MPI_Aint;
 typedef int MPI_Fint;
 
 /********************** MPI-1.1 prototypes and defines ***************************/
@@ -472,6 +472,8 @@ int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
                 int outcount, MPI_Datatype dtype, MPI_Comm comm);
 #define MPI_Pack_size AMPI_Pack_size
 int AMPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz);
+#define MPI_Aint_add(addr, disp) ((MPI_Aint)((char*)(addr) + (disp)))
+#define MPI_Aint_diff(addr1, addr2) ((MPI_Aint)((char*)(addr1) - (char*)(addr2)))
 
 /***collective***/
 #define MPI_Barrier AMPI_Barrier
@@ -609,12 +611,12 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int* sendcounts, int* sdispls,
                              MPI_Datatype sendtype, void* recvbuf, int* recvcounts, int* rdispls,
                              MPI_Datatype recvtype, MPI_Comm comm, MPI_Request* request);
 #define MPI_Neighbor_alltoallw AMPI_Neighbor_alltoallw
-int AMPI_Neighbor_alltoallw(void* sendbuf, int* sendcounts, int* sdipls,
-                            MPI_Datatype* sendtypes, void* recvbuf, int* recvcounts, int* rdispls,
+int AMPI_Neighbor_alltoallw(void* sendbuf, int* sendcounts, MPI_Aint* sdipls,
+                            MPI_Datatype* sendtypes, void* recvbuf, int* recvcounts, MPI_Aint* rdispls,
                             MPI_Datatype* recvtypes, MPI_Comm comm);
 #define MPI_Ineighbor_alltoallw AMPI_Ineighbor_alltoallw
-int AMPI_Ineighbor_alltoallw(void* sendbuf, int* sendcounts, int* sdispls,
-                             MPI_Datatype* sendtypes, void* recvbuf, int* recvcounts, int* rdispls,
+int AMPI_Ineighbor_alltoallw(void* sendbuf, int* sendcounts, MPI_Aint* sdispls,
+                             MPI_Datatype* sendtypes, void* recvbuf, int* recvcounts, MPI_Aint* rdispls,
                              MPI_Datatype* recvtypes, MPI_Comm comm, MPI_Request* request);
 #define MPI_Neighbor_allgather AMPI_Neighbor_allgather
 int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,

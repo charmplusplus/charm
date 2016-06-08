@@ -218,3 +218,7 @@
 
        logical, parameter :: MPI_SUBARRAYS_SUPPORTED = .FALSE.
        logical, parameter :: MPI_ASYNC_PROTECTS_NONBLOCKING = .FALSE.
+
+       integer(KIND=MPI_ADDRESS_KIND), external :: MPI_AINT_ADD
+       integer(KIND=MPI_ADDRESS_KIND), external :: MPI_AINT_DIFF
+

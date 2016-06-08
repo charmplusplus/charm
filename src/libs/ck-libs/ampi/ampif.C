@@ -59,6 +59,8 @@ FDECL {
 #define mpi_pack FTN_NAME( MPI_PACK , mpi_pack )
 #define mpi_unpack FTN_NAME( MPI_UNPACK , mpi_unpack )
 #define mpi_pack_size FTN_NAME( MPI_PACK_SIZE , mpi_pack_size )
+#define mpi_aint_add FTN_NAME( MPI_AINT_ADD , mpi_aint_add )
+#define mpi_aint_diff FTN_NAME( MPI_AINT_DIFF , mpi_aint_diff )
 
 #define mpi_barrier FTN_NAME( MPI_BARRIER , mpi_barrier )
 #define mpi_ibarrier FTN_NAME( MPI_IBARRIER , mpi_ibarrier )
@@ -613,37 +615,37 @@ void mpi_type_indexed(int *count, int* arrBlength, int* arrDisp,
   *ierr = AMPI_Type_indexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
-void mpi_type_create_hindexed(int* count, int* arrBlength, int* arrDisp,
+void mpi_type_create_hindexed(int* count, int* arrBlength, MPI_Aint* arrDisp,
                               int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_create_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
-void mpi_type_hindexed(int* count, int* arrBlength, int* arrDisp,
+void mpi_type_hindexed(int* count, int* arrBlength, MPI_Aint* arrDisp,
                        int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
-void mpi_type_create_indexed_block(int* count, int* Blength, int* arr,
+void mpi_type_create_indexed_block(int* count, int* Blength, MPI_Aint* arr,
                                    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_create_indexed_block(*count, *Blength, arr, *oldtype, newtype);
 }
 
-void mpi_type_create_hindexed_block(int* count, int* Blength, int* arr,
+void mpi_type_create_hindexed_block(int* count, int* Blength, MPI_Aint* arr,
                                     int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_create_hindexed_block(*count, *Blength, arr, *oldtype, newtype);
 }
 
-void mpi_type_create_struct(int* count, int* arrBlength, int* arrDisp,
+void mpi_type_create_struct(int* count, int* arrBlength, MPI_Aint* arrDisp,
                             int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_create_struct(*count, arrBlength, arrDisp, oldtype, newtype);
 }
 
-void mpi_type_struct(int* count, int* arrBlength, int* arrDisp,
+void mpi_type_struct(int* count, int* arrBlength, MPI_Aint* arrDisp,
                      int* oldtype, int* newtype, int* ierr)
 {
   *ierr = AMPI_Type_struct(*count, arrBlength, arrDisp, oldtype, newtype);
@@ -660,12 +662,12 @@ void mpi_type_free(int *type, int *ierr)
   *ierr = AMPI_Type_free(type);
 }
 
-void  mpi_type_get_extent(int* type, int* lb, int* extent, int* ierr)
+void  mpi_type_get_extent(int* type, MPI_Aint* lb, MPI_Aint* extent, int* ierr)
 {
   *ierr = AMPI_Type_get_extent(*type, lb, extent);
 }
 
-void  mpi_type_extent(int* type, int* extent, int* ierr)
+void  mpi_type_extent(int* type, MPI_Aint* extent, int* ierr)
 {
   *ierr = AMPI_Type_extent(*type, extent);
 }
@@ -675,12 +677,12 @@ void  mpi_type_size(int* type, int* size, int* ierr)
   *ierr = AMPI_Type_size(*type, size);
 }
 
-void mpi_type_lb(int* datatype, int* displacement, int* ierr)
+void mpi_type_lb(int* datatype, MPI_Aint* displacement, int* ierr)
 {
   *ierr = AMPI_Type_lb(*datatype, displacement);
 }
 
-void mpi_type_ub(int* datatype, int* displacement, int* ierr)
+void mpi_type_ub(int* datatype, MPI_Aint* displacement, int* ierr)
 {
   *ierr = AMPI_Type_ub(*datatype, displacement);
 }
@@ -703,12 +705,12 @@ void mpi_type_get_name(int* datatype, char* name, int* resultlen, int* ierr)
     ampif_str_c2f(name, tmpName, MPI_MAX_OBJECT_NAME);
 }
 
-void mpi_get_address(int* location, int *address, int* ierr)
+void mpi_get_address(void* location, MPI_Aint *address, int* ierr)
 {
   *ierr = AMPI_Get_address(location, address);
 }
 
-void mpi_address(int* location, int *address, int* ierr)
+void mpi_address(void* location, MPI_Aint *address, int* ierr)
 {
   *ierr = AMPI_Address(location, address);
 }
@@ -740,6 +742,16 @@ void mpi_unpack(void *inbuf, int *insize, int *position, void *outbuf,
 void mpi_pack_size(int *incount, int *datatype, int *comm, int *size, int *ierr)
 {
   *ierr = AMPI_Pack_size(*incount, (MPI_Datatype) *datatype, *comm, size);
+}
+
+MPI_Aint mpi_aint_add(MPI_Aint *addr, MPI_Aint *disp)
+{
+  return MPI_Aint_add(*addr, *disp);
+}
+
+MPI_Aint mpi_aint_diff(MPI_Aint *addr1, MPI_Aint *addr2)
+{
+  return MPI_Aint_diff(*addr1, *addr2);
 }
 
 void mpi_isend(void *buf, int *count, int *datatype, int *dest,
@@ -990,9 +1002,9 @@ void mpi_ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
                                    *comm, request);
 }
 
-void mpi_neighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
+void mpi_neighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
                             int *sendtypes, void *recvbuf, int *recvcounts,
-                            int *rdispls, int *recvtypes, int *comm,
+                            MPI_Aint *rdispls, int *recvtypes, int *comm,
                             int *ierr)
 {
   *ierr = AMPI_Neighbor_alltoallw(sendbuf, sendcounts, sdispls, sendtypes,
@@ -1000,9 +1012,9 @@ void mpi_neighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
                                   *comm);
 }
 
-void mpi_ineighbor_alltoallw(void* sendbuf, int *sendcounts, int *sdispls,
+void mpi_ineighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
                              int *sendtypes, void *recvbuf, int *recvcounts,
-                             int *rdispls, int *recvtypes, int *comm,
+                             MPI_Aint *rdispls, int *recvtypes, int *comm,
                              int *request, int *ierr)
 {
   *ierr = AMPI_Ineighbor_alltoallw(sendbuf, sendcounts, sdispls, sendtypes,
@@ -1381,14 +1393,14 @@ void mpi_type_get_envelope(int *datatype, int *num_integers, int *num_addresses,
 }
 
 void mpi_type_get_contents(int *datatype, int *max_integers, int *max_addresses,
-                           int *max_datatypes, int array_of_integers[], int array_of_addresses[],
+                           int *max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
                            int array_of_datatypes[], int *ierr){
   *ierr = AMPI_Type_get_contents(*datatype, *max_integers, *max_addresses, *max_datatypes,
                                  array_of_integers, array_of_addresses, array_of_datatypes);
 }
 
 
-void mpi_win_create(void *base, int *size, int *disp_unit,
+void mpi_win_create(void *base, MPI_Aint *size, int *disp_unit,
                     int *info, int *comm, MPI_Win *newwin, int *ierr) {
   *ierr = AMPI_Win_create(base, *size, *disp_unit, *info, *comm, newwin);
 }
@@ -1481,7 +1493,7 @@ void mpi_win_complete(int *win, int *ierr){
   *ierr = AMPI_Win_complete(*win);
 }
 
-void mpi_alloc_mem(int *size, int *info, void *baseptr, int *ierr){
+void mpi_alloc_mem(MPI_Aint *size, int *info, void *baseptr, int *ierr){
   *ierr = AMPI_Alloc_mem(*size, *info, baseptr);
 }
 
@@ -1490,17 +1502,17 @@ void mpi_free_mem(void *base, int *ierr){
 }
 
 void mpi_put(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
-             int *targdisp, int *targcnt, int *targtype, int *win, int *ierr){
+             MPI_Aint *targdisp, int *targcnt, int *targtype, int *win, int *ierr){
   *ierr = AMPI_Put(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *win);
 }
 
 void mpi_get(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
-             int *targdisp, int *targcnt, int *targtype, int *win, int *ierr){
+             MPI_Aint *targdisp, int *targcnt, int *targtype, int *win, int *ierr){
   *ierr = AMPI_Get(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *win);
 }
 
 void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
-                    int *targdisp, int *targcnt, int *targtype,
+                    MPI_Aint *targdisp, int *targcnt, int *targtype,
                     int *opc, int *win, int *ierr){
   MPI_Op op = GET_MPI_OP(*opc);
   *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, op, *win);
@@ -1629,8 +1641,8 @@ void ampi_get_pup_data(int *idx, void *data, int *ierr) {
   *ierr = AMPI_Get_pup_data(*idx, data);
 }
 
-void ampi_iget(int *orgdisp, int *orgcnt, int *orgtype, int *rank,
-        int *targdisp, int *targcnt, int *targtype, int *win,
+void ampi_iget(MPI_Aint *orgdisp, int *orgcnt, int *orgtype, int *rank,
+        MPI_Aint *targdisp, int *targcnt, int *targtype, int *win,
         int *request, int *ierr) {
   *ierr = AMPI_Iget(*orgdisp, *orgcnt, *orgtype, *rank, *targdisp, *targcnt,
                     *targtype, *win, request);

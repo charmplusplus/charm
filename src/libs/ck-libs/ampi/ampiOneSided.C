@@ -328,7 +328,7 @@ int ampi::winIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
   return MPI_SUCCESS;
 }
 
-AmpiMsg* ampi::winRemoteIget(int orgdisp, int orgcnt, MPI_Datatype orgtype,
+AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
                              MPI_Aint targdisp, int targcnt,
                              MPI_Datatype targtype, int winIndex) {
   AMPI_DEBUG("    RemoteIget invoked at Rank[%d:%d]\n", thisIndex, myRank);
