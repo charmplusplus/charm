@@ -1189,7 +1189,7 @@ int ampiParent::setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val){
 #endif
   ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(comm);
   // Enlarge the keyval list:
-  while (cs.getKeyvals().size()<=keyval) cs.getKeyvals().push_back(0);
+  while (cs.getKeyvals().size()<=keyval) cs.getKeyvals().push_back(NULL);
   cs.getKeyvals()[keyval]=attribute_val;
   return MPI_SUCCESS;
 }
@@ -1274,8 +1274,8 @@ bool ampiParent::getUserKeyval(MPI_Comm comm, int keyval, void *attribute_val, i
   ampiCommStruct &cs=*(ampiCommStruct *)&comm2CommStruct(comm);
   if (keyval>=cs.getKeyvals().size())
     return true; /* we don't have a value yet */
-  if (cs.getKeyvals()[keyval]==0)
-    return true; /* we had a value, but now it's zero */
+  if (cs.getKeyvals()[keyval]==NULL)
+    return true; /* we had a value, but now it's NULL */
   /* Otherwise, we have a good value */
   *flag = true;
   *(void **)attribute_val = cs.getKeyvals()[keyval];
