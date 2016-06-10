@@ -5681,7 +5681,6 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                    int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Alltoallv");
-  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
 
 #if CMK_ERROR_CHECKING
   int ret;
@@ -5726,7 +5725,6 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
                     MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Ialltoallv");
-  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
 
 #if CMK_ERROR_CHECKING
   int ret;
@@ -5779,7 +5777,6 @@ int AMPI_Alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
                    int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Alltoallw");
-  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
 
 #if CMK_ERROR_CHECKING
   int ret;
@@ -5822,7 +5819,6 @@ int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
                     MPI_Request *request)
 {
   AMPIAPI("AMPI_Ialltoallw");
-  if(comm==MPI_COMM_SELF) return MPI_SUCCESS;
 
 #if CMK_ERROR_CHECKING
   int ret;
