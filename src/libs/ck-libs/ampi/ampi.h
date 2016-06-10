@@ -1,6 +1,7 @@
 #ifndef _MPI_H
 #define _MPI_H
 
+#include <inttypes.h> /* for intptr_t */
 #include "conv-config.h"
 
 /* NON-standard define: this lets people #ifdef on
