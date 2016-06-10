@@ -705,7 +705,7 @@ void mpi_type_get_name(int* datatype, char* name, int* resultlen, int* ierr)
     ampif_str_c2f(name, tmpName, MPI_MAX_OBJECT_NAME);
 }
 
-void mpi_get_address(void* location, MPI_Aint *address, int* ierr)
+void mpi_get_address(const void* location, MPI_Aint *address, int* ierr)
 {
   *ierr = AMPI_Get_address(location, address);
 }

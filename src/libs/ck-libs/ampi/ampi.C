@@ -6555,9 +6555,9 @@ int AMPI_Type_ub(MPI_Datatype dtype, MPI_Aint* displacement){
 }
 
 CDECL
-int AMPI_Get_address(void* location, MPI_Aint *address){
+int AMPI_Get_address(const void* location, MPI_Aint *address){
   AMPIAPI("AMPI_Get_address");
-  *address = (MPI_Aint)(unsigned long)(char *)location;
+  *address = (MPI_Aint)location;
   return MPI_SUCCESS;
 }
 

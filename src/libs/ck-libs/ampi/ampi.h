@@ -458,7 +458,7 @@ int AMPI_Type_set_name(MPI_Datatype datatype, const char *name);
 #define MPI_Type_get_name AMPI_Type_get_name
 int AMPI_Type_get_name(MPI_Datatype datatype, char *name, int *resultlen);
 #define MPI_Get_address AMPI_Get_address
-int AMPI_Get_address(void* location, MPI_Aint *address);
+int AMPI_Get_address(const void* location, MPI_Aint *address);
 #define MPI_Address AMPI_Address
 int AMPI_Address(void* location, MPI_Aint *address);
 #define MPI_Status_set_elements AMPI_Status_set_elements
