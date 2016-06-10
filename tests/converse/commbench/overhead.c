@@ -13,59 +13,53 @@ static struct testdata {
   int numiter;
   double time;
 } sizes[] = {
-  {0,       1024,      0.0},
-  {16,      1024,      0.0},
-  {256,     1024,      0.0},
-  {4096,    1024,      0.0},
-  {65536,   1024,      0.0},
-  {1048576, 1024,      0.0},
-  {-1,      -1,        0.0},
+    {0, 1024, 0.0},
+    {16, 1024, 0.0},
+    {256, 1024, 0.0},
+    {4096, 1024, 0.0},
+    {65536, 1024, 0.0},
+    {1048576, 1024, 0.0},
+    {-1, -1, 0.0},
 };
 
-static char *sync_outstr =
-"[overhead] (%s) %le seconds per %d bytes\n"
-;
+static char* sync_outstr = "[overhead] (%s) %le seconds per %d bytes\n";
 
-static void print_results(char *func)
-{
-  int i=0;
+static void print_results(char* func) {
+  int i = 0;
 
-  while(sizes[i].size != (-1)) {
-    CmiPrintf(sync_outstr, func, sizes[i].time/sizes[i].numiter, sizes[i].size);
+  while (sizes[i].size != (-1)) {
+    CmiPrintf(sync_outstr, func, sizes[i].time / sizes[i].numiter,
+              sizes[i].size);
     i++;
   }
 }
 
-static void fill_message(void *msg, int size)
-{
-  int *imsg = (int *) msg;
-  int start = CmiMsgHeaderSizeBytes/sizeof(int);
-  int end = start+size/sizeof(int);
+static void fill_message(void* msg, int size) {
+  int* imsg = (int*)msg;
+  int start = CmiMsgHeaderSizeBytes / sizeof(int);
+  int end = start + size / sizeof(int);
   int i;
 
-  for(i=start;i<end;i++)
-    imsg[i] = i;
+  for (i = start; i < end; i++) imsg[i] = i;
 }
 
-static void check_message(void *msg, int size)
-{
-  int *imsg = (int *) msg;
-  int start = CmiMsgHeaderSizeBytes/sizeof(int);
-  int end = start+size/sizeof(int);
+static void check_message(void* msg, int size) {
+  int* imsg = (int*)msg;
+  int start = CmiMsgHeaderSizeBytes / sizeof(int);
+  int end = start + size / sizeof(int);
   int i;
 
-  for(i=start;i<end;i++)
+  for (i = start; i < end; i++)
     if (imsg[i] != i)
       CmiAbort("[overhead] Message corrupted. Run megacon again !!\n");
 }
 
-static void sync_handler(void *msg)
-{
+static void sync_handler(void* msg) {
   int idx = CpvAccess(nextidx);
 
   CpvAccess(numiter)++;
-  if(CpvAccess(numiter)<sizes[idx].numiter) {
-    CmiSyncSend(CmiMyPe(),CmiMsgHeaderSizeBytes+sizes[idx].size, msg);
+  if (CpvAccess(numiter) < sizes[idx].numiter) {
+    CmiSyncSend(CmiMyPe(), CmiMsgHeaderSizeBytes + sizes[idx].size, msg);
     CmiFree(msg);
     return;
   } else {
@@ -74,34 +68,33 @@ static void sync_handler(void *msg)
     CmiFree(msg);
     idx++;
     CpvAccess(numiter) = 0;
-    if(sizes[idx].size == (-1)) {
+    if (sizes[idx].size == (-1)) {
       print_results("CmiSyncSend");
       CpvAccess(nextidx) = 0;
-      msg = CmiAlloc(CmiMsgHeaderSizeBytes+sizes[0].size);
+      msg = CmiAlloc(CmiMsgHeaderSizeBytes + sizes[0].size);
       fill_message(msg, sizes[0].size);
       CmiSetHandler(msg, CpvAccess(free_handler));
       CpvAccess(starttime) = CmiWallTimer();
-      CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes+sizes[0].size, msg);
+      CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes + sizes[0].size, msg);
       return;
     } else {
       CpvAccess(nextidx) = idx;
-      msg = CmiAlloc(CmiMsgHeaderSizeBytes+sizes[idx].size);
+      msg = CmiAlloc(CmiMsgHeaderSizeBytes + sizes[idx].size);
       fill_message(msg, sizes[idx].size);
       CmiSetHandler(msg, CpvAccess(sync_handler));
       CpvAccess(starttime) = CmiWallTimer();
-      CmiSyncSend(CmiMyPe(), CmiMsgHeaderSizeBytes+sizes[idx].size, msg);
+      CmiSyncSend(CmiMyPe(), CmiMsgHeaderSizeBytes + sizes[idx].size, msg);
       CmiFree(msg);
     }
   }
 }
 
-static void free_handler(void *msg)
-{
+static void free_handler(void* msg) {
   int idx = CpvAccess(nextidx);
 
   CpvAccess(numiter)++;
-  if(CpvAccess(numiter)<sizes[idx].numiter) {
-    CmiSyncSendAndFree(CmiMyPe(),CmiMsgHeaderSizeBytes+sizes[idx].size, msg);
+  if (CpvAccess(numiter) < sizes[idx].numiter) {
+    CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes + sizes[idx].size, msg);
     return;
   } else {
     sizes[idx].time = CmiWallTimer() - CpvAccess(starttime);
@@ -109,10 +102,10 @@ static void free_handler(void *msg)
     CmiFree(msg);
     CpvAccess(numiter) = 0;
     idx++;
-    if(sizes[idx].size == (-1)) {
+    if (sizes[idx].size == (-1)) {
       print_results("CmiSyncSendAndFree");
       CpvAccess(nextidx) = 0;
-      msg = CmiAlloc(CmiMsgHeaderSizeBytes+sizes[0].size);
+      msg = CmiAlloc(CmiMsgHeaderSizeBytes + sizes[0].size);
       fill_message(msg, sizes[0].size);
       CmiSetHandler(msg, CpvAccess(enqueue_handler));
       CpvAccess(starttime) = CmiWallTimer();
@@ -120,22 +113,22 @@ static void free_handler(void *msg)
       return;
     } else {
       CpvAccess(nextidx) = idx;
-      msg = CmiAlloc(CmiMsgHeaderSizeBytes+sizes[idx].size);
+      msg = CmiAlloc(CmiMsgHeaderSizeBytes + sizes[idx].size);
       fill_message(msg, sizes[idx].size);
       CmiSetHandler(msg, CpvAccess(free_handler));
       CpvAccess(starttime) = CmiWallTimer();
-      CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes+sizes[idx].size, msg);
+      CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes + sizes[idx].size,
+                         msg);
     }
   }
 }
 
-static void enqueue_handler(void *msg)
-{
+static void enqueue_handler(void* msg) {
   int idx = CpvAccess(nextidx);
   EmptyMsg emsg;
 
   CpvAccess(numiter)++;
-  if(CpvAccess(numiter)<sizes[idx].numiter) {
+  if (CpvAccess(numiter) < sizes[idx].numiter) {
     CsdEnqueue(msg);
     return;
   } else {
@@ -144,14 +137,14 @@ static void enqueue_handler(void *msg)
     CmiFree(msg);
     idx++;
     CpvAccess(numiter) = 0;
-    if(sizes[idx].size == (-1)) {
+    if (sizes[idx].size == (-1)) {
       print_results("CsdEnqueue");
       CmiSetHandler(&emsg, CpvAccess(ack_handler));
       CmiSyncSend(0, sizeof(EmptyMsg), &emsg);
       return;
     } else {
       CpvAccess(nextidx) = idx;
-      msg = CmiAlloc(CmiMsgHeaderSizeBytes+sizes[idx].size);
+      msg = CmiAlloc(CmiMsgHeaderSizeBytes + sizes[idx].size);
       fill_message(msg, sizes[idx].size);
       CmiSetHandler(msg, CpvAccess(enqueue_handler));
       CpvAccess(starttime) = CmiWallTimer();
@@ -160,20 +153,18 @@ static void enqueue_handler(void *msg)
   }
 }
 
-void overhead_init(void)
-{
-  void *msg;
+void overhead_init(void) {
+  void* msg;
 
-  msg = CmiAlloc(CmiMsgHeaderSizeBytes+sizes[0].size);
+  msg = CmiAlloc(CmiMsgHeaderSizeBytes + sizes[0].size);
   fill_message(msg, sizes[0].size);
   CmiSetHandler(msg, CpvAccess(sync_handler));
   CpvAccess(starttime) = CmiWallTimer();
-  CmiSyncSend(CmiMyPe(), CmiMsgHeaderSizeBytes+sizes[0].size, msg);
+  CmiSyncSend(CmiMyPe(), CmiMsgHeaderSizeBytes + sizes[0].size, msg);
   CmiFree(msg);
 }
 
-void overhead_moduleinit(void)
-{
+void overhead_moduleinit(void) {
   CpvInitialize(int, numiter);
   CpvInitialize(int, nextidx);
   CpvInitialize(double, starttime);

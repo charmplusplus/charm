@@ -2,11 +2,11 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS=memoryAccess.o commbench.o overhead.o timer.o proc.o smputil.o pingpong.o \
-    flood.o broadcast.o reduction.o ctxt.o
+    flood.o broadcast.o reduction.o ctxt.o pingpong-cachemiss.o
 
 all: pgm
 
-pgm: $(OBJS) 
+pgm: $(OBJS)
 	$(CHARMC) -o pgm $(OBJS) -language converse++
 
 test: pgm
@@ -32,6 +32,9 @@ smputil.o: smputil.c
 
 pingpong.o: pingpong.c
 	$(CHARMC) pingpong.c
+
+pingpong-cachemiss.o: pingpong-cachemiss.c
+	$(CHARMC) pingpong-cachemiss.c
 
 flood.o: flood.c
 	$(CHARMC) flood.c

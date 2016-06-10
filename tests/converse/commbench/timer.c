@@ -3,35 +3,33 @@
 
 #define NITER 1000000
 
-void timer_init(void)
-{
+void timer_init(void) {
   volatile double starttime, endtime;
   int i;
   EmptyMsg msg;
 
   starttime = CmiWallTimer();
-  for(i=0;i<NITER;i++) CmiCpuTimer();
+  for (i = 0; i < NITER; i++) CmiCpuTimer();
   endtime = CmiWallTimer();
   CmiPrintf("[timer] (CmiCpuTimer) %le seconds per call\n",
-             (endtime-starttime)/NITER);
+            (endtime - starttime) / NITER);
   starttime = CmiWallTimer();
-  for(i=0;i<NITER;i++) CmiWallTimer();
+  for (i = 0; i < NITER; i++) CmiWallTimer();
   endtime = CmiWallTimer();
   CmiPrintf("[timer] (CmiWallTimer) %le seconds per call\n",
-             (endtime-starttime)/NITER);
+            (endtime - starttime) / NITER);
   starttime = CmiCpuTimer();
-  while((endtime=CmiCpuTimer())==starttime);
+  while ((endtime = CmiCpuTimer()) == starttime)
+    ;
   CmiPrintf("[timer] (CmiCpuTimer) %le seconds resolution\n",
-             endtime-starttime);
+            endtime - starttime);
   starttime = CmiWallTimer();
-  while((endtime=CmiWallTimer())==starttime);
+  while ((endtime = CmiWallTimer()) == starttime)
+    ;
   CmiPrintf("[timer] (CmiWallTimer) %le seconds resolution\n",
-             endtime-starttime);
+            endtime - starttime);
   CmiSetHandler(&msg, CpvAccess(ack_handler));
   CmiSyncSend(0, sizeof(EmptyMsg), &msg);
 }
 
-void timer_moduleinit(void)
-{
-}
-
+void timer_moduleinit(void) {}

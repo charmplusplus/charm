@@ -3,21 +3,18 @@
 
 #define NITER 1000000
 
-void ctxt_init(void)
-{
+void ctxt_init(void) {
   double starttime, endtime;
   int i;
   EmptyMsg msg;
 
   starttime = CmiWallTimer();
-  for(i=0;i<NITER;i++) CthYield();
+  for (i = 0; i < NITER; i++) CthYield();
   endtime = CmiWallTimer();
   CmiPrintf("[ctxt] Thread Context Switching Overhead = %le seconds\n",
-             (endtime-starttime)/NITER);
+            (endtime - starttime) / NITER);
   CmiSetHandler(&msg, CpvAccess(ack_handler));
   CmiSyncSend(0, sizeof(EmptyMsg), &msg);
 }
 
-void ctxt_moduleinit(void)
-{
-}
+void ctxt_moduleinit(void) {}

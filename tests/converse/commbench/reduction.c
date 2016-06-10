@@ -11,7 +11,6 @@
  *
  *****************************************************************************/
 
-
 #include "converse.h"
 #include "commbench.h"
 
@@ -31,71 +30,71 @@ CpvStaticDeclare(double, lasttime);
 CpvStaticDeclare(pdouble, timediff);
 CpvStaticDeclare(int, currentPe);
 
-//change it if adding values to sizes
+/* change it if adding values to sizes */
 #define MAXSIZE 1048576
 
-#define MAXITER     512
+#define MAXITER 512
 
 static struct testdata {
   int size;
   int numiter;
   double time;
 } sizes[] = {
-  {4,       MAXITER,      0.0},
-  {16,      MAXITER,      0.0},
-  {64,      MAXITER,      0.0},
-  {256,     MAXITER,      0.0},
-  {1024,    MAXITER,      0.0},
-  {4096,    MAXITER,      0.0},
-  {16384,   MAXITER,      0.0},
-  {65536,   MAXITER,      0.0},
-  {262144,  MAXITER,      0.0},
-  {1048576, MAXITER,      0.0},
-  {-1,      -1,        0.0},
+    {4, MAXITER, 0.0},
+    {16, MAXITER, 0.0},
+    {64, MAXITER, 0.0},
+    {256, MAXITER, 0.0},
+    {1024, MAXITER, 0.0},
+    {4096, MAXITER, 0.0},
+    {16384, MAXITER, 0.0},
+    {65536, MAXITER, 0.0},
+    {262144, MAXITER, 0.0},
+    {1048576, MAXITER, 0.0},
+    {-1, -1, 0.0},
 };
 
 typedef struct _varmsg {
-    char head[CmiMsgHeaderSizeBytes];
-    char contribution[MAXSIZE];
-} *varmsg;
+  char head[CmiMsgHeaderSizeBytes];
+  char contribution[MAXSIZE];
+} * varmsg;
 
 typedef struct _timemsg {
-      char head[CmiMsgHeaderSizeBytes];
-      double time;
-      int srcpe;
-} *ptimemsg;
+  char head[CmiMsgHeaderSizeBytes];
+  double time;
+  int srcpe;
+} * ptimemsg;
 
 typedef struct _timemsg timemsg;
 
-static char *sync_outstr =
-"[broadcast] (%s) %le seconds per %d bytes\n"
-;
+static char* sync_outstr = "[broadcast] (%s) %le seconds per %d bytes\n";
 
-static void * reduceMessage(int *size, void *data, void **remote, int count) 
-{
+static void* reduceMessage(int* size, void* data, void** remote, int count) {
+  (void)size;
+  (void)remote;
+  (void)count;
   return data;
 }
 
-static void print_results(char *func)
-{
-  int i=0;
+static void print_results(char* func) {
+  int i = 0;
 
-  while(sizes[i].size != (-1)) {
-    CmiPrintf(sync_outstr, func, sizes[i].time/sizes[i].numiter, sizes[i].size);
+  while (sizes[i].size != (-1)) {
+    CmiPrintf(sync_outstr, func, sizes[i].time / sizes[i].numiter,
+              sizes[i].size);
     i++;
   }
 }
 
-static void reduction_starter(void *msg)
-{
+static void reduction_starter(void* msg) {
   int idx = CpvAccess(nextidx);
   varmsg red_msg;
   ptimemsg tmsg;
   CmiFree(msg);
 
-  if(CpvAccess(flip)) {
+  if (CpvAccess(flip)) {
     tmsg = (ptimemsg)CmiAlloc(sizeof(timemsg));
-    tmsg->time = CpvAccess(starttime);;
+    tmsg->time = CpvAccess(starttime);
+    ;
     tmsg->srcpe = CmiMyPe();
     CmiSetHandler(tmsg, CpvAccess(reduction_central));
     CmiSyncSend(0, sizeof(timemsg), tmsg);
@@ -105,11 +104,11 @@ static void reduction_starter(void *msg)
     red_msg = (varmsg)CmiAlloc(sizeof(struct _varmsg));
     CmiSetHandler(red_msg, CpvAccess(reduction_handler));
     CpvAccess(starttime) = CmiWallTimer();
-    CmiReduce(red_msg, CmiMsgHeaderSizeBytes+sizes[idx].size, reduceMessage);
+    CmiReduce(red_msg, CmiMsgHeaderSizeBytes + sizes[idx].size, reduceMessage);
     CpvAccess(flip) = 1;
-    if(CmiMyPe() != 0) {
+    if (CmiMyPe() != 0) {
       CpvAccess(numiter)++;
-      if(CpvAccess(numiter) == sizes[idx].numiter) {
+      if (CpvAccess(numiter) == sizes[idx].numiter) {
         CpvAccess(nextidx) = idx + 1;
         CpvAccess(numiter) = 0;
       }
@@ -117,8 +116,7 @@ static void reduction_starter(void *msg)
   }
 }
 
-static void reduction_handler(void *msg) 
-{
+static void reduction_handler(void* msg) {
   EmptyMsg emsg;
   CpvAccess(endtime) = CmiWallTimer();
 
@@ -127,31 +125,30 @@ static void reduction_handler(void *msg)
   CmiSyncBroadcastAll(sizeof(EmptyMsg), &emsg);
 }
 
-static void reduction_central(void *msg)
-{
+static void reduction_central(void* msg) {
   EmptyMsg emsg;
   ptimemsg tmsg = (ptimemsg)msg;
-  if(CpvAccess(currentPe) == 0) {
-    CpvAccess(lasttime) = CpvAccess(endtime) - tmsg->time -
-                          CpvAccess(timediff)[tmsg->srcpe];
-  } else if((CpvAccess(endtime) - tmsg->time - 
-    CpvAccess(timediff)[tmsg->srcpe]) > CpvAccess(lasttime)) {
-    CpvAccess(lasttime) = CpvAccess(endtime) - tmsg->time -
-                          CpvAccess(timediff)[tmsg->srcpe];
+  if (CpvAccess(currentPe) == 0) {
+    CpvAccess(lasttime) =
+        CpvAccess(endtime) - tmsg->time - CpvAccess(timediff)[tmsg->srcpe];
+  } else if ((CpvAccess(endtime) - tmsg->time -
+              CpvAccess(timediff)[tmsg->srcpe]) > CpvAccess(lasttime)) {
+    CpvAccess(lasttime) =
+        CpvAccess(endtime) - tmsg->time - CpvAccess(timediff)[tmsg->srcpe];
   }
   CmiFree(msg);
   CpvAccess(currentPe)++;
-  if(CpvAccess(currentPe) == CmiNumPes()) {
+  if (CpvAccess(currentPe) == CmiNumPes()) {
     sizes[CpvAccess(nextidx)].time += CpvAccess(lasttime);
     CpvAccess(numiter)++;
-    if(CpvAccess(numiter)<sizes[CpvAccess(nextidx)].numiter) {
+    if (CpvAccess(numiter) < sizes[CpvAccess(nextidx)].numiter) {
       CpvAccess(currentPe) = 0;
       CmiSetHandler(&emsg, CpvAccess(reduction_starter));
       CmiSyncBroadcastAll(sizeof(EmptyMsg), &emsg);
     } else {
       CpvAccess(numiter) = 0;
       CpvAccess(nextidx)++;
-      if(sizes[CpvAccess(nextidx)].size == (-1)) {
+      if (sizes[CpvAccess(nextidx)].size == (-1)) {
         print_results("CmiReduce");
         CmiSetHandler(&emsg, CpvAccess(ack_handler));
         CmiSyncSend(0, sizeof(EmptyMsg), &emsg);
@@ -165,19 +162,18 @@ static void reduction_central(void *msg)
   }
 }
 
-static void sync_starter(void *msg) 
-{
-  EmptyMsg emsg;    
+static void sync_starter(void* msg) {
+  EmptyMsg emsg;
   ptimemsg tmsg = (ptimemsg)msg;
 
-  double midTime = (CmiWallTimer() + CpvAccess(lasttime))/2;
+  double midTime = (CmiWallTimer() + CpvAccess(lasttime)) / 2;
   CpvAccess(timediff)[CpvAccess(currentPe)] = midTime - tmsg->time;
   CmiFree(msg);
 
   CpvAccess(currentPe)++;
-  if(CpvAccess(currentPe) < CmiNumPes()) {
+  if (CpvAccess(currentPe) < CmiNumPes()) {
     CmiSetHandler(&emsg, CpvAccess(sync_reply));
-    CpvAccess(lasttime) = CmiWallTimer(); 
+    CpvAccess(lasttime) = CmiWallTimer();
     CmiSyncSend(CpvAccess(currentPe), sizeof(EmptyMsg), &emsg);
   } else {
     CmiSetHandler(&emsg, CpvAccess(reduction_starter));
@@ -186,8 +182,7 @@ static void sync_starter(void *msg)
   }
 }
 
-static void sync_reply(void *msg) 
-{
+static void sync_reply(void* msg) {
   ptimemsg tmsg = (ptimemsg)CmiAlloc(sizeof(timemsg));
   tmsg->time = CmiWallTimer();
 
@@ -196,17 +191,15 @@ static void sync_reply(void *msg)
   CmiSyncSendAndFree(0, sizeof(timemsg), tmsg);
 }
 
-void reduction_init(void)
-{
+void reduction_init(void) {
   EmptyMsg emsg;
 
   CmiSetHandler(&emsg, CpvAccess(sync_reply));
   CpvAccess(lasttime) = CmiWallTimer();
-  CmiSyncSend(CpvAccess(currentPe),sizeof(EmptyMsg), &emsg);
+  CmiSyncSend(CpvAccess(currentPe), sizeof(EmptyMsg), &emsg);
 }
 
-void reduction_moduleinit(void)
-{
+void reduction_moduleinit(void) {
   CpvInitialize(int, numiter);
   CpvInitialize(int, nextidx);
   CpvInitialize(int, flip);
@@ -224,10 +217,13 @@ void reduction_moduleinit(void)
   CpvAccess(nextidx) = 0;
   CpvAccess(currentPe) = 0;
   CpvAccess(flip) = 0;
-  CpvAccess(timediff) = (pdouble)malloc(CmiNumPes()*sizeof(double));
-  CpvAccess(reduction_starter) = CmiRegisterHandler((CmiHandler)reduction_starter);
-  CpvAccess(reduction_handler) = CmiRegisterHandler((CmiHandler)reduction_handler);
-  CpvAccess(reduction_central) = CmiRegisterHandler((CmiHandler)reduction_central);
+  CpvAccess(timediff) = (pdouble)malloc(CmiNumPes() * sizeof(double));
+  CpvAccess(reduction_starter) =
+      CmiRegisterHandler((CmiHandler)reduction_starter);
+  CpvAccess(reduction_handler) =
+      CmiRegisterHandler((CmiHandler)reduction_handler);
+  CpvAccess(reduction_central) =
+      CmiRegisterHandler((CmiHandler)reduction_central);
   CpvAccess(sync_starter) = CmiRegisterHandler((CmiHandler)sync_starter);
   CpvAccess(sync_reply) = CmiRegisterHandler((CmiHandler)sync_reply);
 }

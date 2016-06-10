@@ -3,8 +3,6 @@
 
 CpvExtern(int, ack_handler);
 
-typedef struct EmptyMsg {
-  char core[CmiMsgHeaderSizeBytes];
-} EmptyMsg;
+typedef struct EmptyMsg { char core[CmiMsgHeaderSizeBytes]; } EmptyMsg;
 
 #endif

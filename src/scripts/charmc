@@ -1808,7 +1808,7 @@ if test -n "$BALANCER"
 then
     echo "extern void LBDefaultCreate(const char *);" >> $modInitSrc
 fi
-echo "void _registerExternalModules(char **argv) {" >> $modInitSrc
+echo "void _registerExternalModules(char **argv) { (void)argv;" >> $modInitSrc
 for module in $MODULES; do
     [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
     echo "  _register$module();" >> $modInitSrc
@@ -1850,7 +1850,7 @@ fi
 echo "}" >> $modInitSrc
 
 # creating projections
-echo "void _createTraces(char **argv) {" >> $modInitSrc
+echo "void _createTraces(char **argv) { (void)argv;" >> $modInitSrc
 for trace in $TRACEMODE; do
     [ -n "$VERBOSE" ] && echo "Adding registration for trace $trace"
     echo "extern void _createTrace$trace(char **argv);" >> $modInitSrc

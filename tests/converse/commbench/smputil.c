@@ -13,124 +13,123 @@ CpvStaticDeclare(int, barrIdx);
 CpvStaticDeclare(int, memIdx);
 CsvStaticDeclare(double, sharedVar);
 
-static void barrierHandler(EmptyMsg *msg)
-{
+static void barrierHandler(EmptyMsg* msg) {
   int i;
   double starttime, endtime;
   double loopOverhead;
-  if(CmiMyNode() == 0) {
+  if (CmiMyNode() == 0) {
     starttime = CmiWallTimer();
-    for(i=0; i<NBARRITER; i++);
+    for (i = 0; i < NBARRITER; i++)
+      ;
     loopOverhead = CmiWallTimer() - starttime;
-    for(i=0; i<10; i++)
-      CmiNodeBarrier();
+    for (i = 0; i < 10; i++) CmiNodeBarrier();
     starttime = CmiWallTimer();
-    for(i=0; i<NBARRITER; i++)
-      CmiNodeBarrier();
+    for (i = 0; i < NBARRITER; i++) CmiNodeBarrier();
     endtime = CmiWallTimer();
-    if(CmiMyPe() == 0) {
+    if (CmiMyPe() == 0) {
       CmiPrintf("[smputil] Barrier Overhead: %le seconds\n",
-                (endtime - starttime - loopOverhead)/NBARRITER);
+                (endtime - starttime - loopOverhead) / NBARRITER);
       CmiSetHandler(msg, CpvAccess(ack_handler));
       CmiSyncSend(0, sizeof(EmptyMsg), msg);
     }
   }
 }
 
-double memoryAllocTest(){
-  double starttime, endtime;  
+double memoryAllocTest() {
+  double starttime, endtime;
   double extraOverhead;
-  void **ptrs = NULL;
-  int i;	
-	/* Estimate the malloc overhead */
-  ptrs = (void **)malloc(NMALLOCITER*sizeof(void *));
+  void** ptrs = NULL;
+  int i;
+  /* Estimate the malloc overhead */
+  ptrs = (void**)malloc(NMALLOCITER * sizeof(void*));
   /* Warm the cache first before estimating the overheads */
-  for(i=0; i<NMALLOCITER; i++) ptrs[i] = 0;
-  
+  for (i = 0; i < NMALLOCITER; i++) ptrs[i] = 0;
+
   starttime = CmiWallTimer();
-  for(i=0; i<NMALLOCITER; i++) ptrs[i] = (void *)0xabcd;
+  for (i = 0; i < NMALLOCITER; i++) ptrs[i] = (void*)0xabcd;
   endtime = CmiWallTimer();
   extraOverhead = endtime - starttime;
-  
+
   starttime = CmiWallTimer();
-  for(i=0; i<NMALLOCITER; i++) ptrs[i] = CmiAlloc(MALLOCSIZE);
-  for(i=0; i<NMALLOCITER; i++) CmiFree(ptrs[i]);
+  for (i = 0; i < NMALLOCITER; i++) ptrs[i] = CmiAlloc(MALLOCSIZE);
+  for (i = 0; i < NMALLOCITER; i++) CmiFree(ptrs[i]);
   endtime = CmiWallTimer();
   free(ptrs);
-  
-  return (endtime-starttime-extraOverhead*2)/NMALLOCITER;  	
+
+  return (endtime - starttime - extraOverhead * 2) / NMALLOCITER;
 }
 
-static void memAllocHandler(EmptyMsg *msg){
-	double overhead;
-	/* Make sure the memory contention on a node happens roughly at the same time */
-	CmiNodeBarrier();
-	overhead = memoryAllocTest();	
-	CmiNodeBarrier();
-	
-	if(CmiMyPe()==0){
-	  CmiPrintf("[smputil] Estimated CmiAlloc/CmiFree Overhead (w contention): %le seconds\n",overhead);
-	  CmiSetHandler(msg, CpvAccess(barrIdx));
-	  CmiSyncBroadcastAll(sizeof(EmptyMsg), msg);
-	}
-	else {
-	  CmiFree(msg);
-	}
+static void memAllocHandler(EmptyMsg* msg) {
+  double overhead;
+  /* Make sure the memory contention on a node happens roughly at the same time
+   */
+  CmiNodeBarrier();
+  overhead = memoryAllocTest();
+  CmiNodeBarrier();
+
+  if (CmiMyPe() == 0) {
+    CmiPrintf(
+        "[smputil] Estimated CmiAlloc/CmiFree Overhead (w contention): "
+        "%le seconds\n",
+        overhead);
+    CmiSetHandler(msg, CpvAccess(barrIdx));
+    CmiSyncBroadcastAll(sizeof(EmptyMsg), msg);
+  } else {
+    CmiFree(msg);
+  }
 }
 
-void smputil_init(void)
-{
+void smputil_init(void) {
   EmptyMsg msg;
   double starttime, endtime;
-  double stackVar=0.0, loopOverhead;
-  double extraOverhead;
-  void **ptrs = NULL;
+  double stackVar = 0.0, loopOverhead;
   int i;
   CmiNodeLock lock;
 
   starttime = CmiWallTimer();
-  for(i=0;i<NVARITER;i++);
+  for (i = 0; i < NVARITER; i++)
+    ;
   loopOverhead = CmiWallTimer() - starttime;
   starttime = CmiWallTimer();
-  for(i=0;i<NVARITER;i++)
-    stackVar += 1.0;
+  for (i = 0; i < NVARITER; i++) stackVar += 1.0;
   endtime = CmiWallTimer();
   CmiPrintf("[smputil] StackVar Access Overhead: %le seconds\n",
-             (endtime - starttime - loopOverhead)/NVARITER);
+            (endtime - starttime - loopOverhead) / NVARITER);
   starttime = CmiWallTimer();
-  for(i=0;i<NVARITER;i++)
-    CpvAccess(privateVar) += 1.0;
+  for (i = 0; i < NVARITER; i++) CpvAccess(privateVar) += 1.0;
   endtime = CmiWallTimer();
   CmiPrintf("[smputil] ProcPrivateVar Access Overhead: %le seconds\n",
-             (endtime - starttime - loopOverhead)/NVARITER);
+            (endtime - starttime - loopOverhead) / NVARITER);
   starttime = CmiWallTimer();
-  for(i=0;i<NVARITER;i++)
-    CsvAccess(sharedVar) += 1.0;
+  for (i = 0; i < NVARITER; i++) CsvAccess(sharedVar) += 1.0;
   endtime = CmiWallTimer();
   CmiPrintf("[smputil] SharedVar Access Overhead: %le seconds\n",
-             (endtime - starttime - loopOverhead)/NVARITER);
+            (endtime - starttime - loopOverhead) / NVARITER);
   starttime = CmiWallTimer();
-  for(i=0;i<NBARRITER;i++);
+  for (i = 0; i < NBARRITER; i++)
+    ;
   loopOverhead = CmiWallTimer() - starttime;
   lock = CmiCreateLock();
   starttime = CmiWallTimer();
-  for(i=0;i<NLOCKITER;i++){
+  for (i = 0; i < NLOCKITER; i++) {
     CmiLock(lock);
     CmiUnlock(lock);
   }
   endtime = CmiWallTimer();
   CmiPrintf("[smputil] LockUnlock Overhead: %le seconds\n",
-             (endtime - starttime - loopOverhead)/NLOCKITER);
+            (endtime - starttime - loopOverhead) / NLOCKITER);
 
   endtime = memoryAllocTest();
-  CmiPrintf("[smputil] Estimated CmiAlloc/CmiFree Overhead (w/o contention): %le seconds\n",endtime);
-             
+  CmiPrintf(
+      "[smputil] Estimated CmiAlloc/CmiFree Overhead (w/o contention): "
+      "%le seconds\n",
+      endtime);
+
   CmiSetHandler(&msg, CpvAccess(memIdx));
   CmiSyncBroadcastAll(sizeof(EmptyMsg), &msg);
 }
 
-void smputil_moduleinit(void)
-{
+void smputil_moduleinit(void) {
   CpvInitialize(double, privateVar);
   CpvInitialize(int, barrIdx);
   CpvInitialize(int, memIdx);
@@ -139,4 +138,3 @@ void smputil_moduleinit(void)
   CpvAccess(barrIdx) = CmiRegisterHandler((CmiHandler)barrierHandler);
   CpvAccess(memIdx) = CmiRegisterHandler((CmiHandler)memAllocHandler);
 }
-
