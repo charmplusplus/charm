@@ -1189,7 +1189,7 @@ int ampiParent::setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val){
 #endif
   ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(comm);
   // Enlarge the keyval list:
-  while (cs.getKeyvals().size()<=keyval) cs.getKeyvals().push_back(NULL);
+  if(cs.getKeyvals().size()<=keyval) cs.getKeyvals().resize(keyval+1, NULL);
   cs.getKeyvals()[keyval]=attribute_val;
   return MPI_SUCCESS;
 }
@@ -1306,14 +1306,14 @@ int ampiParent::getWinAttr(MPI_Win win, int keyval, void *attribute_val, int *fl
 }
 
 int ampiParent::deleteCommAttr(MPI_Comm comm, int keyval){
-  /* no way to delete an attribute: just overwrite it with 0 */
-  return setUserKeyval(comm, keyval, 0);
+  /* no way to delete an attribute: just overwrite it with NULL */
+  return setUserKeyval(comm, keyval, NULL);
 }
 
 int ampiParent::deleteWinAttr(MPI_Win win, int keyval){
-  /* no way to delete an attribute: just overwrite it with 0 */
+  /* no way to delete an attribute: just overwrite it with NULL */
   MPI_Comm comm = (getAmpiParent()->getWinStruct(win)).comm;
-  return setUserKeyval(comm, keyval, 0);
+  return setUserKeyval(comm, keyval, NULL);
 }
 
 //----------------------- ampi -------------------------
