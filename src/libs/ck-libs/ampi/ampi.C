@@ -1077,7 +1077,7 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
     worldStruct=s;
 
     //MPI_COMM_SELF has the same member as MPI_COMM_WORLD, but it's alone:
-    std::vector<int> _indices;
+    vector<int> _indices;
     _indices.push_back(thisIndex);
     selfStruct = ampiCommStruct(MPI_COMM_SELF,s.getProxy(),1,_indices);
     selfStruct.setName("MPI_COMM_SELF");
@@ -1528,7 +1528,7 @@ void ampi::splitPhase1(CkReductionMsg *msg)
 
       lastAmpi = createNewChildAmpiSync();
 
-      std::vector<int> indices; //Maps rank to array indices for new array
+      vector<int> indices; //Maps rank to array indices for new array
       for (int i=c;i<nKeys;i++) {
         if (keys[i].color!=lastColor) break; //Done with this color
         int idx=myComm.getIndexForRank(keys[i].rank);
@@ -2502,7 +2502,7 @@ int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
   if(comm1==comm2) *result=MPI_IDENT;
   else{
     int congruent=1;
-    std::vector<int> ind1, ind2;
+    vector<int> ind1, ind2;
     ind1 = getAmpiInstance(comm1)->getIndices();
     ind2 = getAmpiInstance(comm2)->getIndices();
     if(ind1.size()==ind2.size()){
@@ -4277,7 +4277,7 @@ int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
 {
   AMPIAPI("AMPI_Type_indexed");
   /*CkDDT_Indexed's arrDisp has type MPI_Aint* (not int*). */
-  std::vector<MPI_Aint> arrDispAint(count);
+  vector<MPI_Aint> arrDispAint(count);
   for(int i=0; i<count; i++)
     arrDispAint[i] = (MPI_Aint)(arrDisp[i]);
   getDDT()->newIndexed(count, arrBlength, &arrDispAint[0], oldtype, newtype);
@@ -5887,7 +5887,7 @@ int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   int itemsize = getDDT()->getType(sendtype)->getSize(sendcount);
@@ -5937,7 +5937,7 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   int itemsize = getDDT()->getType(sendtype)->getSize(sendcount);
@@ -5986,7 +5986,7 @@ int AMPI_Neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   int itemsize = getDDT()->getType(sendtype)->getSize();
@@ -6037,7 +6037,7 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   int itemsize = getDDT()->getType(sendtype)->getSize();
@@ -6086,7 +6086,7 @@ int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
@@ -6136,7 +6136,7 @@ int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
@@ -6184,7 +6184,7 @@ int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
@@ -6233,7 +6233,7 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
@@ -6281,7 +6281,7 @@ int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
@@ -6330,7 +6330,7 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
   ampi *ptr = getAmpiInstance(comm);
   int rank_in_comm = ptr->getRank(comm);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
@@ -6460,12 +6460,12 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm rcomm, int rlead
   int root = lptr->getIndexForRank(lleader);
   int lsize = lptr->getSize(lcomm);
   int lrank = lptr->getRank(lcomm);
-  std::vector<int> rvec;
+  vector<int> rvec;
 
   if(lrank==lleader){
     int rsize;
     MPI_Status sts;
-    std::vector<int> lvec = lptr->getIndices();
+    vector<int> lvec = lptr->getIndices();
 
     // local leader exchanges groupStruct with remote leader
     lptr->send(tag, rptr->getRank(rcomm), &lvec[0], lvec.size(), MPI_INT, rleader, rcomm);
@@ -7166,8 +7166,8 @@ int AMPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
   ampiCommStruct &c = ptr->getCart(*comm_cart);
   c.setndims(ndims);
 
-  std::vector<int> dimsv;
-  std::vector<int> periodsv;
+  vector<int> dimsv;
+  vector<int> periodsv;
 
   for (int i = 0; i < ndims; i++) {
     dimsv.push_back(dims[i]);
@@ -7177,7 +7177,7 @@ int AMPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
   c.setdims(dimsv);
   c.setperiods(periodsv);
 
-  std::vector<int> nborsv;
+  vector<int> nborsv;
   getAmpiInstance(*comm_cart)->findNeighbors(*comm_cart, newrank, nborsv);
   c.setnbors(nborsv);
 
@@ -7200,8 +7200,8 @@ int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
   ampiCommStruct &c = ptr->getGraph(*comm_graph);
   c.setnvertices(nnodes);
 
-  std::vector<int> index_;
-  std::vector<int> edges_;
+  vector<int> index_;
+  vector<int> edges_;
 
   int i;
   for (i = 0; i < nnodes; i++)
@@ -7214,7 +7214,7 @@ int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
 
   c.setedges(edges_);
 
-  std::vector<int> nborsv;
+  vector<int> nborsv;
   getAmpiInstance(*comm_graph)->findNeighbors(*comm_graph, newrank, nborsv);
   c.setnbors(nborsv);
 
@@ -7265,8 +7265,8 @@ int AMPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, int *coor
   ndims = c.getndims();
   int rank = getAmpiInstance(comm)->getRank(comm);
 
-  const std::vector<int> &dims_ = c.getdims();
-  const std::vector<int> &periods_ = c.getperiods();
+  const vector<int> &dims_ = c.getdims();
+  const vector<int> &periods_ = c.getperiods();
 
   for (i = 0; i < maxdims; i++) {
     dims[i] = dims_[i];
@@ -7293,8 +7293,8 @@ int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
-  const std::vector<int> &dims = c.getdims();
-  const std::vector<int> &periods = c.getperiods();
+  const vector<int> &dims = c.getdims();
+  const vector<int> &periods = c.getperiods();
 
   int prod = 1;
   int r = 0;
@@ -7329,7 +7329,7 @@ int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
-  const std::vector<int> &dims = c.getdims();
+  const vector<int> &dims = c.getdims();
 
   for (int i = ndims - 1; i >= 0; i--) {
     if (i < maxdims)
@@ -7342,8 +7342,8 @@ int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
 
 // Offset coords[direction] by displacement, and set the rank that
 // results
-static void cart_clamp_coord(MPI_Comm comm, const std::vector<int> &dims,
-                             const std::vector<int> &periodicity, int *coords,
+static void cart_clamp_coord(MPI_Comm comm, const vector<int> &dims,
+                             const vector<int> &periodicity, int *coords,
                              int direction, int displacement, int *rank_out)
 {
   int base_coord = coords[direction];
@@ -7382,8 +7382,8 @@ int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp,
     return MPI_ERR_DIMS;
 #endif
 
-  const std::vector<int> &dims = c.getdims();
-  const std::vector<int> &periods = c.getperiods();
+  const vector<int> &dims = c.getdims();
+  const vector<int> &periods = c.getperiods();
   int *coords = new int[ndims];
 
   int mype = getAmpiInstance(comm)->getRank(comm);
@@ -7402,7 +7402,7 @@ int AMPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges) {
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   *nnodes = c.getnvertices();
-  const std::vector<int> &index = c.getindex();
+  const vector<int> &index = c.getindex();
   *nedges = index[(*nnodes) - 1];
 
   return MPI_SUCCESS;
@@ -7418,8 +7418,8 @@ int AMPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index, int *e
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
-  const std::vector<int> &index_ = c.getindex();
-  const std::vector<int> &edges_ = c.getedges();
+  const vector<int> &index_ = c.getindex();
+  const vector<int> &edges_ = c.getedges();
 
   if (maxindex > index_.size())
     maxindex = index_.size();
@@ -7444,7 +7444,7 @@ int AMPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
-  const std::vector<int> &index = c.getindex();
+  const vector<int> &index = c.getindex();
 
 #if CMK_ERROR_CHECKING
   if ((rank >= index.size()) || (rank < 0))
@@ -7469,8 +7469,8 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, int *neighbo
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
-  const std::vector<int> &index = c.getindex();
-  const std::vector<int> &edges = c.getedges();
+  const vector<int> &index = c.getindex();
+  const vector<int> &edges = c.getedges();
 
   int numneighbors = (rank == 0) ? index[rank] : index[rank] - index[rank - 1];
   if (maxneighbors > numneighbors)
@@ -7494,7 +7494,7 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, int *neighbo
 }
 
 /* Used by MPI_Cart_create & MPI_Graph_create */
-void ampi::findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const {
+void ampi::findNeighbors(MPI_Comm comm, int rank, vector<int>& neighbors) const {
   int max_neighbors = 0;
   ampiParent *ptr = getAmpiParent();
   if (ptr->isGraph(comm)) {
@@ -7615,7 +7615,7 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   int rank = getAmpiInstance(comm)->getRank(comm);
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
-  const std::vector<int> &dims = c.getdims();
+  const vector<int> &dims = c.getdims();
   int num_remain_dims = 0;
 
   coords = new int [ndims];
@@ -7637,9 +7637,9 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
 
   ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
   newc.setndims(num_remain_dims);
-  std::vector<int> dimsv;
-  const std::vector<int> &periods = c.getperiods();
-  std::vector<int> periodsv;
+  vector<int> dimsv;
+  const vector<int> &periods = c.getperiods();
+  vector<int> periodsv;
 
   for (i = 0; i < ndims; i++) {
     if (remain_dims[i]) {
@@ -7650,7 +7650,7 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   newc.setdims(dimsv);
   newc.setperiods(periodsv);
 
-  std::vector<int> nborsv;
+  vector<int> nborsv;
   getAmpiInstance(*newcomm)->findNeighbors(*newcomm, getAmpiParent()->getRank(*newcomm), nborsv);
   newc.setnbors(nborsv);
 
