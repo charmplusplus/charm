@@ -5,11 +5,13 @@
 #if AMPI_USE_EXPEDITED_MSGS
 #define EXPEDITED          [expedited]
 #define EXPEDITED_NOTRACE  [expedited,notrace]
+#define EXPEDITED_REDN     [expedited,reductiontarget]
 #define EXPEDITED_THREADED [expedited,threaded]
 #define EXPEDITED_IGET     [expedited,iget]
 #else
 #define EXPEDITED          /*empty*/
 #define EXPEDITED_NOTRACE  [notrace]
+#define EXPEDITED_REDN     [reductiontarget]
 #define EXPEDITED_THREADED [threaded]
 #define EXPEDITED_IGET     [iget]
 #endif
@@ -37,6 +39,8 @@ module ampi {
     entry EXPEDITED void unblock(void);
     entry EXPEDITED void ssend_ack(int);
     entry EXPEDITED void generic(AmpiMsg *);
+    entry EXPEDITED_REDN void barrierResult(void);
+    entry EXPEDITED_REDN void ibarrierResult(void);
     entry EXPEDITED void reduceResult(CkReductionMsg *m);
     entry EXPEDITED void gatherResult(CkReductionMsg *m);
     entry EXPEDITED void gathervResult(CkReductionMsg *m);

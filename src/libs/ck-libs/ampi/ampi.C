@@ -2768,16 +2768,20 @@ int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
       buf, count, datatype, source, recvtag, comm, status);
 }
 
-void ampi::barrier(MPI_Comm comm)
+const int AMPI_COLL_SOURCE = 0;
+const int AMPI_COLL_COMM   = MPI_COMM_WORLD;
+
+void ampi::barrier()
 {
-  //HACK: Use allreduce as a barrier.
-  AMPI_Allreduce(NULL, NULL, 0, MPI_INT, MPI_SUM, comm);
+  CkCallback barrierCB(CkReductionTarget(ampi, barrierResult), getProxy());
+  contribute(barrierCB);
+  thread->suspend(); //Resumed by ampi::barrierResult
 }
 
-void ampi::ibarrier(MPI_Comm comm, MPI_Request *request)
+void ampi::barrierResult(void)
 {
-  //HACK: Use allreduce as a barrier.
-  AMPI_Iallreduce(NULL, NULL, 0, MPI_INT, MPI_SUM, comm, request);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] barrierResult called\n", thisIndex));
+  thread->resume();
 }
 
 CDECL
@@ -2791,6 +2795,8 @@ int AMPI_Barrier(MPI_Comm comm)
     return ret;
 #endif
 
+  if(comm==MPI_COMM_SELF)
+    return MPI_SUCCESS;
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Barrier for Inter-communicators!");
 
@@ -2799,10 +2805,30 @@ int AMPI_Barrier(MPI_Comm comm)
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Barrier called on comm %d\n", ptr->thisIndex, comm));
 
-  ptr->barrier(comm);
+  ptr->barrier();
 
   return MPI_SUCCESS;
+}
+
+void ampi::ibarrier(MPI_Request *request)
+{
+  CkCallback ibarrierCB(CkReductionTarget(ampi, ibarrierResult), getProxy());
+  contribute(ibarrierCB);
+
+  // use an IReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  IReq *newreq = new IReq(NULL, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, AMPI_COLL_COMM);
+  *request = reqs->insert(newreq);
+  int tags[3] = { MPI_ATA_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
+  CmmPut(posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
+}
+
+void ampi::ibarrierResult(void)
+{
+  MSG_ORDER_DEBUG(CkPrintf("[%d] ibarrierResult called\n", thisIndex));
+  ampi::sendraw(MPI_ATA_TAG, AMPI_COLL_SOURCE, NULL, 0, thisArrayID, thisIndex);
 }
 
 CDECL
@@ -2818,6 +2844,10 @@ int AMPI_Ibarrier(MPI_Comm comm, MPI_Request *request)
   }
 #endif
 
+  if(comm==MPI_COMM_SELF){
+    *request = MPI_REQUEST_NULL;
+    return MPI_SUCCESS;
+  }
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Ibarrier for Inter-communicators!");
 
@@ -2826,8 +2856,9 @@ int AMPI_Ibarrier(MPI_Comm comm, MPI_Request *request)
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Ibarrier called on comm %d\n", ptr->thisIndex, comm));
 
-  ptr->ibarrier(comm, request);
+  ptr->ibarrier(request);
 
   return MPI_SUCCESS;
 }
@@ -2915,16 +2946,11 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
   return MPI_SUCCESS;
 }
 
-const int MPI_REDUCE_SOURCE=0;
-const int MPI_GATHER_SOURCE=0;
-const int MPI_REDUCE_COMM=MPI_COMM_WORLD;
-const int MPI_GATHER_COMM=MPI_COMM_WORLD;
-
 /// This routine is called with the results of a Reduce or AllReduce
 void ampi::reduceResult(CkReductionMsg *msg)
 {
   MSG_ORDER_DEBUG(printf("[%d] reduceResult called \n",thisIndex));
-  ampi::sendraw(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, msg->getData(), msg->getSize(),
+  ampi::sendraw(MPI_REDUCE_TAG, AMPI_COLL_SOURCE, msg->getData(), msg->getSize(),
       thisArrayID,thisIndex);
   delete msg;
 }
@@ -2976,7 +3002,7 @@ void ampi::gatherResult(CkReductionMsg *msg)
     currentData = currentData->next();
   }
 
-  ampi::sendraw(MPI_GATHER_TAG, MPI_GATHER_SOURCE, orderedBuf, totalSize,
+  ampi::sendraw(MPI_GATHER_TAG, AMPI_COLL_SOURCE, orderedBuf, totalSize,
                 thisArrayID, thisIndex);
 
   delete [] orderedBuf;
@@ -3032,7 +3058,7 @@ void ampi::gathervResult(CkReductionMsg *msg)
     currentData = currentData->next();
   }
 
-  ampi::sendraw(MPI_GATHER_TAG, MPI_GATHER_SOURCE, orderedBuf, totalSize,
+  ampi::sendraw(MPI_GATHER_TAG, AMPI_COLL_SOURCE, orderedBuf, totalSize,
                 thisArrayID, thisIndex);
 
   delete [] displs;
@@ -3116,17 +3142,17 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op, int r
 
   if (ptr->thisIndex == rootIdx){
     /*HACK: Use recv() to block until reduction data comes back*/
-    if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
+    if(-1==ptr->recv(MPI_REDUCE_TAG, AMPI_COLL_SOURCE, outbuf, count, type, AMPI_COLL_COMM))
       CkAbort("AMPI>MPI_Reduce called with different values on different processors!");
 
 #if SYNCHRONOUS_REDUCE
-      AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDUCE_TAG, -1, rootIdx, 0, MPI_REDUCE_COMM);
+      AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDUCE_TAG, -1, rootIdx, 0, AMPI_COLL_COMM);
       CProxy_ampi pa(ptr->getProxy());
       pa.generic(msg);
 #endif
   }
 #if SYNCHRONOUS_REDUCE
-  ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, NULL, 0, type, MPI_REDUCE_COMM);
+  ptr->recv(MPI_REDUCE_TAG, AMPI_COLL_SOURCE, NULL, 0, type, AMPI_COLL_COMM);
 #endif
 
 #if AMPIMSGLOG
@@ -3183,7 +3209,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op, MP
   ptr->contribute(msg);
 
   /*HACK: Use recv() to block until the reduction data comes back*/
-  if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
+  if(-1==ptr->recv(MPI_REDUCE_TAG, AMPI_COLL_SOURCE, outbuf, count, type, AMPI_COLL_COMM))
     CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
 
 #if AMPIMSGLOG
@@ -3231,9 +3257,9 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 
   // use an IReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  IReq *newreq = new IReq(outbuf,count,type,MPI_REDUCE_SOURCE,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
+  IReq *newreq = new IReq(outbuf,count,type,AMPI_COLL_SOURCE,MPI_REDUCE_TAG,AMPI_COLL_COMM);
   *request = reqs->insert(newreq);
-  int tags[3] = { MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, MPI_REDUCE_COMM };
+  int tags[3] = { MPI_REDUCE_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
   CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 
   return MPI_SUCCESS;
@@ -3282,8 +3308,8 @@ int AMPI_Reduce_scatter_block(void* sendbuf, void* recvbuf, int count, MPI_Datat
   ampi *ptr = getAmpiInstance(comm);
   void *tmpbuf = malloc(ptr->getDDT()->getType(datatype)->getSize(count));
 
-  AMPI_Reduce(sendbuf, tmpbuf, count, datatype, op, MPI_REDUCE_SOURCE, comm);
-  AMPI_Scatter(tmpbuf, count, datatype, recvbuf, count, datatype, MPI_REDUCE_SOURCE, comm);
+  AMPI_Reduce(sendbuf, tmpbuf, count, datatype, op, AMPI_COLL_SOURCE, comm);
+  AMPI_Scatter(tmpbuf, count, datatype, recvbuf, count, datatype, AMPI_COLL_SOURCE, comm);
 
   free(tmpbuf);
   return MPI_SUCCESS;
@@ -3324,9 +3350,9 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts, MPI_Datat
   }
   len = ptr->getDDT()->getType(datatype)->getSize(count);
   tmpbuf = malloc(len);
-  AMPI_Reduce(sendbuf, tmpbuf, count, datatype, op, MPI_REDUCE_SOURCE, comm);
+  AMPI_Reduce(sendbuf, tmpbuf, count, datatype, op, AMPI_COLL_SOURCE, comm);
   AMPI_Scatterv(tmpbuf, recvcounts, displs, datatype,
-      recvbuf, recvcounts[ptr->getRank(comm)], datatype, MPI_REDUCE_SOURCE, comm);
+      recvbuf, recvcounts[ptr->getRank(comm)], datatype, AMPI_COLL_SOURCE, comm);
   free(tmpbuf);
   delete [] displs;	// < memory leak ! // gzheng
   return MPI_SUCCESS;
@@ -4537,9 +4563,9 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
   if (ptr->thisIndex == rootIdx){
     // use an IReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    IReq *newreq = new IReq(recvbuf,count,type,MPI_REDUCE_SOURCE,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
+    IReq *newreq = new IReq(recvbuf,count,type,AMPI_COLL_SOURCE,MPI_REDUCE_TAG,AMPI_COLL_COMM);
     *request = reqs->insert(newreq);
-    int tags[3] = { MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, MPI_REDUCE_COMM };
+    int tags[3] = { MPI_REDUCE_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
     CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
   }
 
@@ -4588,7 +4614,7 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ptr->contribute(msg);
 
   int totalRecvcount = recvcount * ptr->getSize(comm);
-  if(-1==ptr->recv(MPI_GATHER_TAG, MPI_GATHER_SOURCE, recvbuf, totalRecvcount, recvtype, MPI_GATHER_COMM))
+  if(-1==ptr->recv(MPI_GATHER_TAG, AMPI_COLL_SOURCE, recvbuf, totalRecvcount, recvtype, AMPI_COLL_COMM))
     CkAbort("AMPI> MPI_Allgather failed!");
 
   return MPI_SUCCESS;
@@ -4644,9 +4670,9 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   // use an IReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
   int totalRecvcount = recvcount * ptr->getSize(comm);
-  IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, MPI_GATHER_SOURCE, MPI_GATHER_TAG, MPI_GATHER_COMM);
+  IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, AMPI_COLL_SOURCE, MPI_GATHER_TAG, AMPI_COLL_COMM);
   *request = reqs->insert(newreq);
-  int tags[3] = { MPI_GATHER_TAG, MPI_GATHER_SOURCE, MPI_GATHER_COMM };
+  int tags[3] = { MPI_GATHER_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
   CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 
   return MPI_SUCCESS;
@@ -4697,7 +4723,7 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
   for(int i=0; i<ptr->getSize(comm); i++)
     totalRecvcount += dttypeSize * recvcounts[i];
-  if(-1==ptr->recv(MPI_GATHER_TAG, MPI_GATHER_SOURCE, recvbuf, totalRecvcount, recvtype, MPI_GATHER_COMM))
+  if(-1==ptr->recv(MPI_GATHER_TAG, AMPI_COLL_SOURCE, recvbuf, totalRecvcount, recvtype, AMPI_COLL_COMM))
     CkAbort("AMPI> MPI_Allgatherv failed!");
 
   return MPI_SUCCESS;
@@ -4757,9 +4783,9 @@ int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   // use an IReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, MPI_GATHER_SOURCE, MPI_GATHER_TAG, MPI_GATHER_COMM);
+  IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, AMPI_COLL_SOURCE, MPI_GATHER_TAG, AMPI_COLL_COMM);
   *request = reqs->insert(newreq);
-  int tags[3] = { MPI_GATHER_TAG, MPI_GATHER_SOURCE, MPI_GATHER_COMM };
+  int tags[3] = { MPI_GATHER_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
   CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 
   return MPI_SUCCESS;
@@ -4819,7 +4845,7 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   if(rank==root) {
     int totalRecvcount = recvcount * ptr->getSize(comm);
-    if(-1==ptr->recv(MPI_GATHER_TAG, MPI_GATHER_SOURCE, recvbuf, totalRecvcount, recvtype, MPI_GATHER_COMM))
+    if(-1==ptr->recv(MPI_GATHER_TAG, AMPI_COLL_SOURCE, recvbuf, totalRecvcount, recvtype, AMPI_COLL_COMM))
       CkAbort("AMPI> MPI_Gather failed!");
   }
 
@@ -4896,9 +4922,9 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     // use an IReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
     int totalRecvcount = recvcount * ptr->getSize(comm);
-    IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, MPI_GATHER_SOURCE, MPI_GATHER_TAG, MPI_GATHER_COMM);
+    IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, AMPI_COLL_SOURCE, MPI_GATHER_TAG, AMPI_COLL_COMM);
     *request = reqs->insert(newreq);
-    int tags[3] = { MPI_GATHER_TAG, MPI_GATHER_SOURCE, MPI_GATHER_COMM };
+    int tags[3] = { MPI_GATHER_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
     CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
   }
   else {
@@ -4978,7 +5004,7 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
     for(int i=0; i<ptr->getSize(comm); i++)
       totalRecvcount += dttypeSize * recvcounts[i];
-    if(-1==ptr->recv(MPI_GATHER_TAG, MPI_GATHER_SOURCE, recvbuf, totalRecvcount, recvtype, MPI_GATHER_COMM))
+    if(-1==ptr->recv(MPI_GATHER_TAG, AMPI_COLL_SOURCE, recvbuf, totalRecvcount, recvtype, AMPI_COLL_COMM))
       CkAbort("AMPI> MPI_Gatherv failed!");
   }
 
@@ -5066,9 +5092,9 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
     // use an IReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, MPI_GATHER_SOURCE, MPI_GATHER_TAG, MPI_GATHER_COMM);
+    IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, AMPI_COLL_SOURCE, MPI_GATHER_TAG, AMPI_COLL_COMM);
     *request = reqs->insert(newreq);
-    int tags[3] = { MPI_GATHER_TAG, MPI_GATHER_SOURCE, MPI_GATHER_COMM };
+    int tags[3] = { MPI_GATHER_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
     CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
   }
   else {
@@ -5597,7 +5623,7 @@ int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   MPI_Comm_rank(comm,&myrank);
   recvdisp = myrank*recvcount;
 
-  ptr->barrier(comm);
+  ptr->barrier();
   // post receives
   MPI_Request *reqs = new MPI_Request[size];
   for(i=0;i<size;i++) {
@@ -5614,7 +5640,7 @@ int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 
   delete [] reqs;
-  ptr->barrier(comm);
+  ptr->barrier();
 
   // Reset flags
   ptr->resetA2AIgetFlag();
@@ -6374,7 +6400,7 @@ int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
   else {
     ptr->split(0, rank, newcomm, MPI_UNDEFINED /*not MPI_CART*/);
   }
-  ptr->barrier(comm);
+  ptr->barrier();
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -6398,7 +6424,7 @@ int AMPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest)
   {
     ampi *ptr = getAmpiInstance(src);
     ptr->split(color, key, dest, MPI_UNDEFINED /*not MPI_CART*/);
-    ptr->barrier(src); // to prevent race condition in the new comm
+    ptr->barrier(); // to prevent race condition in the new comm
   }
   if (color == MPI_UNDEFINED) *dest = MPI_COMM_NULL;
 
@@ -7030,7 +7056,7 @@ int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
     /* inter-communicator: create a single new comm. */
     ampi *ptr = getAmpiInstance(comm);
     ptr->commCreate(vec, newcomm);
-    ptr->barrier(comm);
+    ptr->barrier();
   }
   else{
     /* intra-communicator: create comm's for disjoint subgroups,
@@ -7723,12 +7749,12 @@ int AMPI_Migrate(MPI_Info hints)
         else {
           CkAbort("AMPI> Error: No checkpoint directory name given to AMPI_Migrate\n");
         }
-        getAmpiInstance(MPI_COMM_WORLD)->barrier(MPI_COMM_WORLD);
+        getAmpiInstance(MPI_COMM_WORLD)->barrier();
         getAmpiParent()->startCheckpoint(&value[offset]);
       }
       else if (strncmp(value, "in_memory", MPI_MAX_INFO_VAL) == 0) {
 #if CMK_MEM_CHECKPOINT
-        getAmpiInstance(MPI_COMM_WORLD)->barrier(MPI_COMM_WORLD);
+        getAmpiInstance(MPI_COMM_WORLD)->barrier();
         getAmpiParent()->startCheckpoint("");
 #else
         CkPrintf("AMPI> Error: In-memory checkpoint/restart is not enabled!\n");

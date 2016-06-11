@@ -1313,6 +1313,8 @@ class ampi : public CBase_ampi {
   void blockOnRecv(void);
   void generic(AmpiMsg *);
   void ssend_ack(int sreq);
+  void barrierResult(void);
+  void ibarrierResult(void);
   void reduceResult(CkReductionMsg *m);
   void gatherResult(CkReductionMsg *m);
   void gathervResult(CkReductionMsg *m);
@@ -1350,8 +1352,8 @@ class ampi : public CBase_ampi {
                 MPI_Comm comm, MPI_Status *sts);
   void probe(int t,int s,int comm,MPI_Status *sts);
   int iprobe(int t,int s,int comm,MPI_Status *sts);
-  void barrier(MPI_Comm comm);
-  void ibarrier(MPI_Comm comm, MPI_Request *request);
+  void barrier(void);
+  void ibarrier(MPI_Request *request);
   void bcast(int root, void* buf, int count, int type,MPI_Comm comm);
   void ibcast(int root, void* buf, int count, int type, MPI_Comm comm, MPI_Request* request);
   static void bcastraw(void* buf, int len, CkArrayID aid);
