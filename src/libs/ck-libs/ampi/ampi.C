@@ -13,7 +13,6 @@
 #include "bigsim_logs.h"
 #endif
 
-#define CART_TOPOL 1
 #define AMPI_PRINT_IDLE 0
 
 /* change this define to "x" to trace all send/recv's */
@@ -1453,7 +1452,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type)
   void *curLog; // store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
 #endif
-  if (type == CART_TOPOL) {
+  if (type == MPI_CART) {
     ampiSplitKey splitKey(parent->getNextCart(),color,key,myRank);
     int rootIdx=myComm.getIndexForRank(0);
     CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
@@ -6362,7 +6361,7 @@ int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
 
   AMPI_Topo_test(comm, &topol);
   if (topol == MPI_CART) {
-    ptr->split(0, rank, newcomm, CART_TOPOL);
+    ptr->split(0, rank, newcomm, MPI_CART);
 
     // duplicate cartesian topology info
     ampiCommStruct &c = getAmpiParent()->getCart(comm);
@@ -6373,7 +6372,7 @@ int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
     newc.setnbors(c.getnbors());
   }
   else {
-    ptr->split(0, rank, newcomm, 0);
+    ptr->split(0, rank, newcomm, MPI_UNDEFINED /*not MPI_CART*/);
   }
   ptr->barrier(comm);
 
@@ -6398,7 +6397,7 @@ int AMPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest)
 
   {
     ampi *ptr = getAmpiInstance(src);
-    ptr->split(color,key,dest, 0);
+    ptr->split(color, key, dest, MPI_UNDEFINED /*not MPI_CART*/);
     ptr->barrier(src); // to prevent race condition in the new comm
   }
   if (color == MPI_UNDEFINED) *dest = MPI_COMM_NULL;
@@ -7633,7 +7632,7 @@ int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
     }
   }
 
-  getAmpiInstance(comm)->split(color, key, newcomm, CART_TOPOL);
+  getAmpiInstance(comm)->split(color, key, newcomm, MPI_CART);
 
   ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
   newc.setndims(num_remain_dims);
