@@ -1069,8 +1069,7 @@ void mpi_op_free(int* opc, int* ierr){
 
 void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
 {
-  *newcomm = *comm;
-  *ierr = 0;
+  *ierr = AMPI_Comm_dup(*comm, newcomm);
 }
 
 void mpi_comm_split(int* src, int* color, int* key, int *dest, int *ierr)
@@ -1080,7 +1079,7 @@ void mpi_comm_split(int* src, int* color, int* key, int *dest, int *ierr)
 
 void mpi_comm_free(int *comm, int *ierr)
 {
-  *ierr = 0;
+  *ierr = AMPI_Comm_free(comm);
 }
 
 void mpi_comm_test_inter(int* comm, int* flag, int* ierr)
@@ -1293,7 +1292,7 @@ void mpi_group_range_excl(int* group,int*  n, int ranges[][3], int* newgroup, in
 }
 
 void mpi_group_free(int*  group, int*  ierror){
-  *ierror = 0;
+  *ierror = AMPI_Group_free(group);
 }
 
 void mpi_comm_create(int*  comm, int*  group, int*  newcomm, int*  ierror){
