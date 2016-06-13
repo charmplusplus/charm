@@ -2084,7 +2084,6 @@ void ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
 
 void ampi::ibcast(int root, void* buf, int count, int type, MPI_Comm destcomm, MPI_Request* request)
 {
-  ampi *ptr = getAmpiInstance(destcomm);
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   int rootIdx=dest.getIndexForRank(root);
   if(rootIdx==thisIndex){
@@ -2100,7 +2099,7 @@ void ampi::ibcast(int root, void* buf, int count, int type, MPI_Comm destcomm, M
   *request = reqs->insert(newreq);
   int tags[3];
   tags[0]=MPI_BCAST_TAG; tags[1]=rootIdx; tags[2]=MPI_BCAST_COMM;
-  CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
+  CmmPut(posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 }
 
 void ampi::bcastraw(void* buf, int len, CkArrayID aid)
