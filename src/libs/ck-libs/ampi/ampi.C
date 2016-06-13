@@ -874,8 +874,8 @@ static ampi *ampiInit(char **argv)
   getAmpiParent()->ampiInitCallDone = 0;
 
   CProxy_ampi cbproxy = ptr->getProxy();
-  CkCallback cb(CkIndex_ampi::allInitDone(NULL), cbproxy[0]);
-  ptr->contribute(0, NULL, CkReduction::sum_int, cb);
+  CkCallback cb(CkReductionTarget(ampi, allInitDone), cbproxy[0]);
+  ptr->contribute(cb);
 
   ampiParent *thisParent = getAmpiParent();
   while(thisParent->ampiInitCallDone!=1){
@@ -1377,10 +1377,9 @@ void ampi::findParent(bool forMigration) {
 
 //The following method should be called on the first element of the
 //ampi array
-void ampi::allInitDone(CkReductionMsg *m){
+void ampi::allInitDone(){
   FUNCCALL_DEBUG(CkPrintf("All mpi_init have been called!\n");)
   thisProxy.setInitDoneFlag();
-  delete m;
 }
 
 void ampi::setInitDoneFlag(){
@@ -1573,7 +1572,7 @@ class vecStruct {
 void ampi::commCreate(const groupStruct vec,MPI_Comm* newcomm){
   int rootIdx=vec[0];
   tmpVec = vec;
-  CkCallback cb(CkIndex_ampi::commCreatePhase1(NULL),CkArrayIndex1D(rootIdx),myComm.getProxy());
+  CkCallback cb(CkReductionTarget(ampi,commCreatePhase1),CkArrayIndex1D(rootIdx),myComm.getProxy());
   MPI_Comm nextgroup = parent->getNextGroup();
   contribute(sizeof(nextgroup), &nextgroup,CkReduction::max_int,cb);
 
@@ -1586,17 +1585,15 @@ void ampi::commCreate(const groupStruct vec,MPI_Comm* newcomm){
   }
 }
 
-void ampi::insertNewChildAmpiElements(MPI_Comm *nextComm, CProxy_ampi newAmpi) {
-  ampiCommStruct newCommStruct = ampiCommStruct(*nextComm, newAmpi, tmpVec.size(), tmpVec);
+void ampi::insertNewChildAmpiElements(MPI_Comm nextComm, CProxy_ampi newAmpi) {
+  ampiCommStruct newCommStruct = ampiCommStruct(nextComm, newAmpi, tmpVec.size(), tmpVec);
   for (int i = 0; i < tmpVec.size(); ++i)
     newAmpi[tmpVec[i]].insert(parentProxy, newCommStruct);
 }
 
-void ampi::commCreatePhase1(CkReductionMsg *msg){
-  MPI_Comm *nextGroupComm = (int *)msg->getData();
+void ampi::commCreatePhase1(MPI_Comm nextGroupComm){
   CProxy_ampi newAmpi = createNewChildAmpiSync();
   insertNewChildAmpiElements(nextGroupComm, newAmpi);
-  delete msg;
 }
 
 void ampiParent::groupChildRegister(const ampiCommStruct &s) {
@@ -1610,7 +1607,7 @@ void ampiParent::groupChildRegister(const ampiCommStruct &s) {
 void ampi::cartCreate(const groupStruct vec,MPI_Comm* newcomm){
   int rootIdx=vec[0];
   tmpVec = vec;
-  CkCallback cb(CkIndex_ampi::commCreatePhase1(NULL),CkArrayIndex1D(rootIdx),myComm.getProxy());
+  CkCallback cb(CkReductionTarget(ampi,commCreatePhase1),CkArrayIndex1D(rootIdx),myComm.getProxy());
 
   MPI_Comm nextcart = parent->getNextCart();
   contribute(sizeof(nextcart), &nextcart,CkReduction::max_int,cb);
@@ -1636,7 +1633,7 @@ void ampiParent::cartChildRegister(const ampiCommStruct &s) {
 void ampi::graphCreate(const groupStruct vec,MPI_Comm* newcomm){
   int rootIdx=vec[0];
   tmpVec = vec;
-  CkCallback cb(CkIndex_ampi::commCreatePhase1(NULL),CkArrayIndex1D(rootIdx),
+  CkCallback cb(CkReductionTarget(ampi,commCreatePhase1),CkArrayIndex1D(rootIdx),
       myComm.getProxy());
   MPI_Comm nextgraph = parent->getNextGraph();
   contribute(sizeof(nextgraph), &nextgraph,CkReduction::max_int,cb);
@@ -1663,7 +1660,7 @@ void ampi::intercommCreate(const groupStruct rvec, const int root, MPI_Comm *nco
   if(thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = rvec;
   }
-  CkCallback cb(CkIndex_ampi::intercommCreatePhase1(NULL),CkArrayIndex1D(root),myComm.getProxy());
+  CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm.getProxy());
   MPI_Comm nextinter = parent->getNextInter();
   contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
 
@@ -1672,20 +1669,18 @@ void ampi::intercommCreate(const groupStruct rvec, const int root, MPI_Comm *nco
   *ncomm=newcomm;
 }
 
-void ampi::intercommCreatePhase1(CkReductionMsg *msg){
-  MPI_Comm *nextInterComm = (int *)msg->getData();
+void ampi::intercommCreatePhase1(MPI_Comm nextInterComm){
 
   CProxy_ampi newAmpi = createNewChildAmpiSync();
 
   groupStruct lgroup = myComm.getIndices();
-  ampiCommStruct newCommstruct = ampiCommStruct(*nextInterComm,newAmpi,lgroup.size(),lgroup,tmpVec);
+  ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup.size(),lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
     int newIdx=lgroup[i];
     newAmpi[newIdx].insert(parentProxy,newCommstruct);
   }
 
   parentProxy[0].ExchangeProxy(newAmpi);
-  delete msg;
 }
 
 void ampiParent::interChildRegister(const ampiCommStruct &s) {
@@ -1709,7 +1704,7 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm){ // first valid only at lo
   }
 
   int rootIdx=myComm.getIndexForRank(0);
-  CkCallback cb(CkIndex_ampi::intercommMergePhase1(NULL),CkArrayIndex1D(rootIdx),myComm.getProxy());
+  CkCallback cb(CkReductionTarget(ampi, intercommMergePhase1),CkArrayIndex1D(rootIdx),myComm.getProxy());
   MPI_Comm nextintra = parent->getNextIntra();
   contribute(sizeof(nextintra), &nextintra,CkReduction::max_int,cb);
 
@@ -1718,12 +1713,11 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm){ // first valid only at lo
   *ncomm=newcomm;
 }
 
-void ampi::intercommMergePhase1(CkReductionMsg *msg){  // gets called on two roots, first root creates the comm
-  if(tmpVec.size()==0) { delete msg; return; }
-  MPI_Comm *nextIntraComm = (int *)msg->getData();
+void ampi::intercommMergePhase1(MPI_Comm nextIntraComm){
+  // gets called on two roots, first root creates the comm
+  if(tmpVec.size()==0) return;
   CProxy_ampi newAmpi = createNewChildAmpiSync();
   insertNewChildAmpiElements(nextIntraComm, newAmpi);
-  delete msg;
 }
 
 void ampiParent::intraChildRegister(const ampiCommStruct &s) {

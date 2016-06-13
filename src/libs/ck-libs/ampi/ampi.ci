@@ -3,17 +3,19 @@
 #define AMPI_USE_EXPEDITED_MSGS 1
 
 #if AMPI_USE_EXPEDITED_MSGS
-#define EXPEDITED          [expedited]
-#define EXPEDITED_NOTRACE  [expedited,notrace]
-#define EXPEDITED_REDN     [expedited,reductiontarget]
-#define EXPEDITED_THREADED [expedited,threaded]
-#define EXPEDITED_IGET     [expedited,iget]
+#define EXPEDITED               [expedited]
+#define EXPEDITED_NOTRACE       [expedited,notrace]
+#define EXPEDITED_REDN          [expedited,reductiontarget]
+#define EXPEDITED_THREADED      [expedited,threaded]
+#define EXPEDITED_THREADED_REDN [expedited,threaded,reductiontarget]
+#define EXPEDITED_IGET          [expedited,iget]
 #else
-#define EXPEDITED          /*empty*/
-#define EXPEDITED_NOTRACE  [notrace]
-#define EXPEDITED_REDN     [reductiontarget]
-#define EXPEDITED_THREADED [threaded]
-#define EXPEDITED_IGET     [iget]
+#define EXPEDITED               /*empty*/
+#define EXPEDITED_NOTRACE       [notrace]
+#define EXPEDITED_REDN          [reductiontarget]
+#define EXPEDITED_THREADED      [threaded]
+#define EXPEDITED_THREADED_REDN [threaded,reductiontarget]
+#define EXPEDITED_IGET          [iget]
 #endif
 
 module ampi {
@@ -34,7 +36,7 @@ module ampi {
   array[1D] ampi {
     entry EXPEDITED ampi();
     entry EXPEDITED_NOTRACE ampi(CkArrayID parent_, ampiCommStruct s);
-    entry EXPEDITED void allInitDone(CkReductionMsg *m);
+    entry EXPEDITED_REDN void allInitDone(void);
     entry EXPEDITED void setInitDoneFlag();
     entry EXPEDITED void unblock(void);
     entry EXPEDITED void ssend_ack(int);
@@ -45,9 +47,9 @@ module ampi {
     entry EXPEDITED void gatherResult(CkReductionMsg *m);
     entry EXPEDITED void gathervResult(CkReductionMsg *m);
     entry EXPEDITED_THREADED void splitPhase1(CkReductionMsg *msg);
-    entry EXPEDITED_THREADED void commCreatePhase1(CkReductionMsg *msg);
-    entry EXPEDITED_THREADED void intercommCreatePhase1(CkReductionMsg *msg);
-    entry EXPEDITED_THREADED void intercommMergePhase1(CkReductionMsg *msg);
+    entry EXPEDITED_THREADED_REDN void commCreatePhase1(MPI_Comm nextGroupComm);
+    entry EXPEDITED_THREADED_REDN void intercommCreatePhase1(MPI_Comm nextInterComm);
+    entry EXPEDITED_THREADED_REDN void intercommMergePhase1(MPI_Comm nextIntraComm);
 
     entry EXPEDITED void setRemoteProxy(CProxy_ampi rproxy);
     entry EXPEDITED void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,

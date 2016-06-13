@@ -1296,7 +1296,7 @@ class ampi : public CBase_ampi {
 
   void pup(PUP::er &p);
 
-  void allInitDone(CkReductionMsg *m);
+  void allInitDone();
   void setInitDoneFlag();
 
   void block(void);
@@ -1312,13 +1312,13 @@ class ampi : public CBase_ampi {
   void gathervResult(CkReductionMsg *m);
 
   void splitPhase1(CkReductionMsg *msg);
-  void commCreatePhase1(CkReductionMsg *msg);
-  void intercommCreatePhase1(CkReductionMsg *m);
-  void intercommMergePhase1(CkReductionMsg *msg);
+  void commCreatePhase1(MPI_Comm nextGroupComm);
+  void intercommCreatePhase1(MPI_Comm nextInterComm);
+  void intercommMergePhase1(MPI_Comm nextIntraComm);
 
  private: // Used by the above entry methods that create new MPI_Comm objects
   CProxy_ampi createNewChildAmpiSync();
-  void insertNewChildAmpiElements(MPI_Comm *newComm, CProxy_ampi newAmpi);
+  void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi);
 
  public: // to be used by MPI_* functions
 
