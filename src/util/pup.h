@@ -263,9 +263,10 @@ class er {
 
   //For pointers: the last parameter is to make it more difficult to call
   //(should not be used in normal code as pointers may loose meaning across processor)
-  void operator()(void **a,int nItems,void *pointerSignature)
-    {bytes((void *)a,nItems,sizeof(void *),Tpointer);}
-  
+  void operator()(void **a,int nItems,void *pointerSignature) {
+    (void)pointerSignature;
+    bytes((void *)a,nItems,sizeof(void *),Tpointer); }
+
   //For raw memory (n gives number of bytes)
 /*
   // pup void * is error-prune, let's avoid it - Gengbin
@@ -314,13 +315,18 @@ class er {
 
   //See more documentation before PUP_cmiAllocSizer in pup_cmialloc.h
   //Must be a CmiAlloced buf while packing
-  virtual void pupCmiAllocBuf(void **msg) 
-      {CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");}
+  virtual void pupCmiAllocBuf(void **msg) {
+    (void)msg;
+    CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");
+  }
 
   //In case source is not CmiAlloced the size can be passed and any
   //user buf can be converted into a cmialloc'ed buf
-  virtual void pupCmiAllocBuf(void **msg, int size)
-      {CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");}
+  virtual void pupCmiAllocBuf(void **msg, int size) {
+    (void)msg;
+    (void)size;
+    CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");
+  }
 };
 
 /**

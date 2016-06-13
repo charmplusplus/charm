@@ -168,7 +168,7 @@ class DefaultFunction : public LBPredictorFunction {
 class LBDatabase : public IrrGroup {
 public:
   LBDatabase(void)  { init(); }
-  LBDatabase(CkMigrateMessage *m)  { init(); }
+  LBDatabase(CkMigrateMessage *m)  { (void)m; init(); }
   ~LBDatabase()  { if (avail_vector) delete [] avail_vector; }
   
 private:

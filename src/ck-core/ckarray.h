@@ -166,25 +166,29 @@ class CkArrayListener : public PUP::able {
 //The stamp/creating/created/died sequence happens, in order, exactly
 // once per array element.  Migrations don't show up here.
   ///Element creation message is about to be sent
-  virtual void ckElementStamp(int *eltInfo) {}
+  virtual void ckElementStamp(int *eltInfo) { (void)eltInfo; }
   ///Element is about to be created on this processor
-  virtual void ckElementCreating(ArrayElement *elt) {}
+  virtual void ckElementCreating(ArrayElement *elt) { (void)elt; }
   ///Element was just created on this processor
   /// Return false if the element migrated away or deleted itself.
-  virtual bool ckElementCreated(ArrayElement *elt)
-    { return true; }
+  virtual bool ckElementCreated(ArrayElement *elt) {
+    (void)elt;
+    return true;
+  }
 
   ///Element is about to be destroyed
-  virtual void ckElementDied(ArrayElement *elt) {}
+  virtual void ckElementDied(ArrayElement *elt) { (void)elt; }
 
 //The leaving/arriving seqeunce happens once per migration.
   ///Element is about to leave this processor (so about to call pup)
-  virtual void ckElementLeaving(ArrayElement *elt) {}
+  virtual void ckElementLeaving(ArrayElement *elt) { (void)elt; }
 
   ///Element just arrived on this processor (so just called pup)
   /// Return false if the element migrated away or deleted itself.
-  virtual bool ckElementArriving(ArrayElement *elt)
-    { return true; }
+  virtual bool ckElementArriving(ArrayElement *elt) {
+    (void)elt;
+    return true;
+  }
 
   /// used by checkpointing to reset the states
   virtual void flushState()  {}

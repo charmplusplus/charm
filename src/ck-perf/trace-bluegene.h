@@ -16,7 +16,7 @@ class TraceBluegene : public Trace {
  public:
     TraceBluegene(char** argv);
     ~TraceBluegene();
-    virtual void setTraceOnPE(int flag) { _traceOn = 1; }  // always on
+    virtual void setTraceOnPE(int flag) { (void)flag; _traceOn = 1; }  // always on
     int traceOnPE() { return 1; }
     void getForwardDep(void* log, void** fDepPtr);
     void getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr);
@@ -30,10 +30,11 @@ class TraceBluegene : public Trace {
     void bgEndExec(int);
     virtual void beginExecute(envelope *, void *);
     virtual void beginExecute(char *) {}
-    virtual void beginExecute(CmiObjId *tid) {}
+    virtual void beginExecute(CmiObjId *tid) { (void)tid; }
     virtual void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx, void *obj);
     void addBackwardDep(void *log);
-    void userBracketEvent(int eventID, double bt, double et) {}	// from trace.h
+    void userBracketEvent(int eventID, double bt, double et) { // from trace.h
+        (void)eventID; (void)bt; (void)et; }
     void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr);
     void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
     void bgPrint(const char* str);

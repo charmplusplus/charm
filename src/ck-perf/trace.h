@@ -68,72 +68,90 @@ protected:
     virtual void traceBeginOnCommThread() {}   
     virtual void traceEndOnCommThread() {}
     virtual void traceCommSetMsgID(char *) {}
-    virtual void traceGetMsgID(char *msg, int *pe, int *event) {}
-    virtual void traceSetMsgID(char *msg, int pe, int event) {}
-		
-    // registers user event trace module returns int identifier 
-    virtual int traceRegisterUserEvent(const char* eventName, int e) { 
-      return 0; 
+    virtual void traceGetMsgID(char *msg, int *pe, int *event) {
+      (void)msg; (void)pe; (void)event;
     }
-    // a user event has just occured
-    virtual void userEvent(int eventID) {}
-    // a pair of begin/end user event has just occured
-    virtual void userBracketEvent(int eventID, double bt, double et) {}
-    //interact with application 
-    virtual void beginAppWork() {}
-    virtual void endAppWork() {}
+    virtual void traceSetMsgID(char *msg, int pe, int event) {
+       (void)msg; (void)pe; (void)event;
+     }
 
-    // a user supplied integer value(likely a timestep)
-    virtual void userSuppliedData(int e) {}
+     // registers user event trace module returns int identifier
+     virtual int traceRegisterUserEvent(const char* eventName, int e) {
+       (void)eventName; (void)e;
+       return 0;
+     }
+     // a user event has just occured
+     virtual void userEvent(int eventID) { (void)eventID; }
+     // a pair of begin/end user event has just occured
+     virtual void userBracketEvent(int eventID, double bt, double et) {
+       (void)eventID; (void)bt; (void)et;
+     }
+     //interact with application
+     virtual void beginAppWork() {}
+     virtual void endAppWork() {}
 
-    // a user supplied integer value(likely a timestep)
-    virtual void userSuppliedNote(const char *note) {}
+     // a user supplied integer value(likely a timestep)
+     virtual void userSuppliedData(int e) { (void)e; }
 
-    virtual void userSuppliedBracketedNote(const char *note, int eventID, double bt, double et) {}
+     // a user supplied integer value(likely a timestep)
+     virtual void userSuppliedNote(const char *note) { (void)note; }
 
-    // the current memory usage as a double
-    virtual void memoryUsage(double currentMemUsage) {}
+     virtual void userSuppliedBracketedNote(const char *note, int eventID, double bt, double et) {
+       (void)note; (void)eventID; (void)bt; (void)et;
+     }
 
-    // creation of message(s)
-    virtual void creation(envelope *, int epIdx, int num=1) {}
-    //epIdx is extracted from the envelope, num is always 1
-    virtual void creation(char *) {}
-    virtual void creationMulticast(envelope *, int epIdx, int num=1,
-				     int *pelist=NULL) {}
-    virtual void creationDone(int num=1) {}
-    // ???
-    virtual void messageRecv(char *env, int pe) {}
-    virtual void beginSDAGBlock(
-      int event,   // event type defined in trace-common.h
-      int msgType, // message type
-      int ep,      // Charm++ entry point (will correspond to sts file) 
-      int srcPe,   // Which PE originated the call
-      int ml,      // message size
-      CmiObjId* idx)    // index
-    { }
-    virtual void endSDAGBlock(void) {}
-    // **************************************************************
-    // begin/end execution of a Charm++ entry point
-    // NOTE: begin/endPack and begin/endUnpack can be called in between
-    //       a beginExecute and its corresponding endExecute.
-    virtual void beginExecute(envelope *, void *) {}
-    virtual void beginExecute(char *) {}
-    virtual void beginExecute(CmiObjId *tid) {}
-    virtual void beginExecute(
-      int event,   // event type defined in trace-common.h
-      int msgType, // message type
-      int ep,      // Charm++ entry point (will correspond to sts file) 
-      int srcPe,   // Which PE originated the call
-      int ml,      // message size
-      CmiObjId* idx,    // index
-      void* obj)
-    { }
-    virtual void changeLastEntryTimestamp(double ts) {}
+     // the current memory usage as a double
+     virtual void memoryUsage(double currentMemUsage) { (void)currentMemUsage; }
+
+     // creation of message(s)
+     virtual void creation(envelope *, int epIdx, int num=1) {
+       (void)epIdx; (void)num;
+     }
+     //epIdx is extracted from the envelope, num is always 1
+     virtual void creation(char *) {}
+     virtual void creationMulticast(envelope *, int epIdx, int num=1,
+                      int *pelist=NULL) {
+       (void)epIdx; (void)num; (void)pelist;
+     }
+     virtual void creationDone(int num=1) { (void)num; }
+     // ???
+     virtual void messageRecv(char *env, int pe) { (void)env; (void)pe; }
+     virtual void beginSDAGBlock(
+       int event,   // event type defined in trace-common.h
+       int msgType, // message type
+       int ep,      // Charm++ entry point (will correspond to sts file)
+       int srcPe,   // Which PE originated the call
+       int ml,      // message size
+       CmiObjId* idx)    // index
+     {
+       (void)event; (void)msgType; (void)ep; (void)srcPe; (void)ml; (void)idx;
+     }
+     virtual void endSDAGBlock(void) {}
+     // **************************************************************
+     // begin/end execution of a Charm++ entry point
+     // NOTE: begin/endPack and begin/endUnpack can be called in between
+     //       a beginExecute and its corresponding endExecute.
+     virtual void beginExecute(envelope *, void *) {}
+     virtual void beginExecute(char *) {}
+     virtual void beginExecute(CmiObjId *tid) { (void)tid; }
+     virtual void beginExecute(
+       int event,   // event type defined in trace-common.h
+       int msgType, // message type
+       int ep,      // Charm++ entry point (will correspond to sts file)
+       int srcPe,   // Which PE originated the call
+       int ml,      // message size
+       CmiObjId* idx,    // index
+       void* obj)
+    {
+      (void)event; (void)msgType; (void)ep; (void)srcPe;
+      (void)ml; (void)idx; (void)obj;
+    }
+    virtual void changeLastEntryTimestamp(double ts) { (void)ts; }
     virtual void endExecute(void) {}
     virtual void endExecute(char *) {}
     // begin/end idle time for this pe
-    virtual void beginIdle(double curWallTime) {}
-    virtual void endIdle(double curWallTime) {}
+    virtual void beginIdle(double curWallTime) { (void)curWallTime; }
+    virtual void endIdle(double curWallTime) { (void)curWallTime; }
     // begin/end the process of packing a message (to send)
     virtual void beginPack(void) {}
     virtual void endPack(void) {}
@@ -161,18 +179,30 @@ protected:
     virtual void traceFlushLog() {}
 
     //for tracing function calls
-    virtual void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){}
-    virtual void beginFunc(const char *name,const char *file,int line){}
-    virtual void beginFunc(int idx,const char *file,int line){}
-    virtual void endFunc(const char *name){}
-    virtual void endFunc(int idx){}
+    virtual void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0) {
+      (void)name; (void)idx; (void)idxSpecifiedByUser;
+    }
+    virtual void beginFunc(const char *name,const char *file,int line) {
+      (void)name; (void)file; (void)line;
+    }
+    virtual void beginFunc(int idx,const char *file,int line) {
+      (void)idx; (void)file; (void)line;
+    }
+    virtual void endFunc(const char *name) { (void)name; }
+    virtual void endFunc(int idx) { (void)idx; }
 
     /* Memory tracing */
-    virtual void malloc(void *where, int size, void **stack, int stackSize){}
-    virtual void free(void *where, int size){}
+    virtual void malloc(void *where, int size, void **stack, int stackSize) {
+      (void)where; (void)size; (void)stack; (void)stackSize;
+    }
+    virtual void free(void *where, int size) {
+      (void)where; (void)size;
+    }
 
     /* for implementing thread listeners */
-    virtual void traceAddThreadListeners(CthThread tid, envelope *e) {}
+    virtual void traceAddThreadListeners(CthThread tid, envelope *e) {
+      (void)tid; (void)e;
+    }
 
     virtual ~Trace() {} /* for whining compilers */
 };

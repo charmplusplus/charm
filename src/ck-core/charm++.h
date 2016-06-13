@@ -226,6 +226,7 @@ class Chare {
     /// continues to work for older code.
     virtual void virtual_pup(PUP::er &p) { pup(p); }
     void parent_pup(PUP::er &p) {
+      (void)p;
       CkAbort("Should never get here - only called in generated CBase code");
     }
 
@@ -352,8 +353,8 @@ void recursive_pup(T *obj, PUP::er &p) {
   typedef typename CProxy_Derived::proxy_t proxy_t;           \
   typedef typename CProxy_Derived::element_t element_t;       \
   CProxy_Derived thisProxy;                                   \
-  void pup(PUP::er &p) { }                                    \
-  inline void _sdag_pup(PUP::er &p) { }                       \
+  void pup(PUP::er &p) { (void)p; }                           \
+  inline void _sdag_pup(PUP::er &p) { (void)p; }              \
   void virtual_pup(PUP::er &p)
 
 /*Templated implementation of CBase_* classes.*/
@@ -548,7 +549,7 @@ class CkDelegateMgr : public IrrGroup {
     virtual void ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,CkArrayID a);
     virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
     virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s,int opts);
-    virtual void initDelegateMgr(CProxy *proxy)  {}
+    virtual void initDelegateMgr(CProxy *proxy)  { (void)proxy; }
     virtual CkDelegateData* ckCopyDelegateData(CkDelegateData *data) {
         data->ref();
         return data;
@@ -987,7 +988,10 @@ class CkQdMsg {
     static void *pack(CkQdMsg *m) { return (void*) m; }
     static CkQdMsg *unpack(void *buf) { return (CkQdMsg*) buf; }
     /// This is used to display message contents in the debugger.
-    static void ckDebugPup(PUP::er &p,void *msg) { }
+    static void ckDebugPup(PUP::er &p,void *msg) {
+      (void)p;
+      (void)msg;
+    }
 };
 
 class CkThrCallArg {

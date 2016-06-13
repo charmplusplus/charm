@@ -157,7 +157,7 @@ namespace SDAG {
     }
 
     virtual ~Continuation() {
-      for (int i = 0; i < closure.size(); i++)
+      for (size_t i = 0; i < closure.size(); i++)
         if (closure[i])
 	  closure[i]->deref();
     }
@@ -248,7 +248,7 @@ namespace SDAG {
         }
       }
 
-      for (int i = 0; i < whenToContinuation.size(); i++) {
+      for (size_t i = 0; i < whenToContinuation.size(); i++) {
         for (std::list<Continuation*>::iterator iter2 = whenToContinuation[i].begin();
              iter2 != whenToContinuation[i].end(); ++iter2) {
           delete *iter2;
@@ -266,7 +266,7 @@ namespace SDAG {
     }
 
     void dereg(Continuation *c) {
-      CkAssert(c->whenID < whenToContinuation.size());
+      CkAssert(c->whenID < (int)whenToContinuation.size());
       std::list<Continuation*>& lst = whenToContinuation[c->whenID];
       lst.remove(c);
     }
@@ -299,12 +299,12 @@ namespace SDAG {
 
     bool searchBufferedMatching(Continuation* t) {
       CkAssert(t->entries.size() == t->refnums.size());
-      for (int i = 0; i < t->entries.size(); i++) {
+      for (size_t i = 0; i < t->entries.size(); i++) {
         if (!tryFindMessage(t->entries[i], true, t->refnums[i], 0)) {
           return false;
         }
       }
-      for (int i = 0; i < t->anyEntries.size(); i++) {
+      for (size_t i = 0; i < t->anyEntries.size(); i++) {
         if (!tryFindMessage(t->anyEntries[i], false, 0, 0)) {
           return false;
         }

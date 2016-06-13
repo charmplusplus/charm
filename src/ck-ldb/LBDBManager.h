@@ -201,6 +201,7 @@ public:
   inline void ResumeClients() 
        { localBarrier.ResumeClients(); };
   inline void MeasuredObjTime(double wtime, double ctime) {
+    (void)ctime;
     if (statsAreOn) {
       obj_walltime += wtime;
 #if CMK_LB_CPUTIMER

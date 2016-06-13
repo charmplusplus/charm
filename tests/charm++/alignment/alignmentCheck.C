@@ -14,7 +14,7 @@ public:
   char *varArray2;
 };
 
-int alignCheck(intptr_t ptrToInt) {
+size_t alignCheck(intptr_t ptrToInt) {
   intptr_t align = 1;
   while ((ptrToInt & ~(align - 1)) == ptrToInt) {
     align <<= 1;
@@ -25,14 +25,14 @@ int alignCheck(intptr_t ptrToInt) {
 
 void alignmentTest(std::vector<TestMessage*> &allMsgs, const std::string &identifier) {
 
-  int alignHdr = std::numeric_limits<int>::max();
-  int alignEnv = std::numeric_limits<int>::max();
-  int alignUsr = std::numeric_limits<int>::max();
-  int alignVar1 = std::numeric_limits<int>::max();
-  int alignVar2 = std::numeric_limits<int>::max();
-  int alignPrio = std::numeric_limits<int>::max();
+  size_t alignHdr = std::numeric_limits<size_t>::max();
+  size_t alignEnv = std::numeric_limits<size_t>::max();
+  size_t alignUsr = std::numeric_limits<size_t>::max();
+  size_t alignVar1 = std::numeric_limits<size_t>::max();
+  size_t alignVar2 = std::numeric_limits<size_t>::max();
+  size_t alignPrio = std::numeric_limits<size_t>::max();
 
-  for (int i = 0; i < allMsgs.size(); i++) {
+  for (size_t i = 0; i < allMsgs.size(); i++) {
     TestMessage *msg = allMsgs[i];
     envelope *env = UsrToEnv(msg);
 
@@ -95,14 +95,13 @@ public:
 
     int msgSizes[] = {varSize1, varSize2};
     std::vector<TestMessage *> allMsgs;
-    int prio = 1234;
     for (int i = 0; i < nCheck; i++) {
       TestMessage *msg = new (msgSizes, sizeof(int)*8) TestMessage();
       allMsgs.push_back(msg);
     }
     alignmentTest(allMsgs, "source");
 
-    for (int i = 0; i < allMsgs.size(); i++) {
+    for (size_t i = 0; i < allMsgs.size(); i++) {
       destinationChare.receiveMessage(allMsgs[i]);
     }
   }
@@ -120,7 +119,7 @@ public:
     allMsgs.push_back(msg);
     if (allMsgs.size() == nCheck) {
       alignmentTest(allMsgs, "destination");
-      for (int i = 0; i < allMsgs.size(); i++) {
+      for (size_t i = 0; i < allMsgs.size(); i++) {
         delete allMsgs[i];
       }
       CkExit();

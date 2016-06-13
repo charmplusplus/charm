@@ -16,7 +16,7 @@ class TableEntry {
     int cIdx;
 
   public:
-    TableEntry(int ignored=0) { obj=0; pending=0; cIdx=-1; }
+    TableEntry(int ignored=0) { (void)ignored; obj=0; pending=0; cIdx=-1; }
     inline IrrGroup* getObj(void) { return obj; }
     inline void setObj(void *_obj) { obj=(IrrGroup *)_obj; }
     PtrQ* getPending(void) { return pending; }

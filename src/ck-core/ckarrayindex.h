@@ -40,9 +40,9 @@ struct CkArrayIndexBase
 {
     public:
         ///Length of index in *integers*
-        short int nInts;
+        short unsigned int nInts;
         ///Number of dimensions in this index, not valid for user-defined indices
-        short int dimension;
+        short unsigned int dimension;
         /// The actual index data
         union {
             int index[CK_ARRAYINDEX_MAXLEN];
@@ -139,6 +139,7 @@ class CkArrayIndex: public CkArrayIndexBase
          */
         CmiObjId *getProjectionID(int arrayID)
         {
+            (void)arrayID;
             CmiObjId *ret = new CmiObjId;
             int i;
             const int *data=this->data();
@@ -283,7 +284,7 @@ namespace ck {
 
       bool shorts = idx.dimension > 3;
 
-      for (int i = 0; i < idx.dimension; ++i) {
+      for (unsigned int i = 0; i < idx.dimension; ++i) {
         unsigned int numBits = bitsPerDim[i];
         unsigned int thisDim = shorts ? idx.indexShorts[i] : idx.index[i];
         CkAssert(thisDim < (1UL << numBits));

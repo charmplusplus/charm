@@ -100,7 +100,7 @@ public:
 	int gcount;//Adjustment to global count (applied at reduction end)
 	int lcount;//Adjustment to local count (applied continually)
 	int mainRecvd;
-	countAdjustment(int ignored=0) {gcount=lcount=0;mainRecvd=0;}
+    countAdjustment(int ignored=0) {(void)ignored; gcount=0; lcount=0; mainRecvd=0;}
 	void pup(PUP::er& p){ p|gcount; p|lcount; p|mainRecvd; }
 };
 
@@ -409,7 +409,7 @@ public:
 	void LateMigrantMsg(CkReductionMsg *m);
 
 	virtual void flushStates();	// flush state varaibles
-	virtual int startLocalGroupReductions(int number){ return 1;} // can be used to start reductions on all the 
+    virtual int startLocalGroupReductions(int number){ (void)number; return 1;} // can be used to start reductions on all the
 	//CkReductionMgrs on a particular node. It is overwritten by CkArrayReductionMgr to make the actual calls
 	// since it knows the CkReductionMgrs on a node.
 
