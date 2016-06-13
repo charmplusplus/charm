@@ -224,10 +224,10 @@ int ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
-  char* sorgaddr = (char*)new char[orgtotalsize];
-  ddt->serialize((char*)orgaddr, (char*)sorgaddr, orgcnt, 1);
+  vector<char> sorgaddr(orgtotalsize);
+  ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
 
-  pa[rank].winRemotePut(orgtotalsize, (char*)sorgaddr, orgcnt, orgtype, targdisp, targcnt, targtype,
+  pa[rank].winRemotePut(orgtotalsize, &sorgaddr[0], orgcnt, orgtype, targdisp, targcnt, targtype,
                         win.index, ftHandle, CkMyPe());
 
   // Wait on the Future object
@@ -235,7 +235,6 @@ int ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   msg = (AmpiMsg*)CkWaitFutureID(ftHandle);
   AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
 
-  delete [] sorgaddr;
   return MPI_SUCCESS;
 }
 
@@ -271,7 +270,7 @@ int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
-  char* sorgaddr = (char*)new char[orgtotalsize];
+  vector<char> sorgaddr(orgtotalsize);
 
   pa[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win.index, ftHandle, CkMyPe());
 
@@ -281,11 +280,10 @@ int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
 
   // Process the reply message and copy the data into desired memory position
-  memcpy(sorgaddr, msg->data, orgtotalsize);
-  ddt->serialize((char*)orgaddr, (char*)sorgaddr, orgcnt, (-1));
+  memcpy(&sorgaddr[0], msg->data, orgtotalsize);
+  ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, (-1));
   AMPI_DEBUG("    Rank[%d] got win  [%d] \n", thisIndex, *(int*)msg->data);
   AMPI_DEBUG("    Rank[%d] got win  [%d] , size %d\n", thisIndex, *(int*)orgaddr, orgcnt);
-  delete [] sorgaddr;
   return MPI_SUCCESS;
 }
 
@@ -299,23 +297,22 @@ void ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int
   orgunit = oddt->getSize(1);
   targunit = tddt->getSize(1);
   int stargtotalsize = tddt->getSize(targcnt);
-  char* stargaddr = (char*)new char[stargtotalsize];
+  vector<char> stargaddr(stargtotalsize);
 
   win_obj *winobj = winObjects[winIndex];
-  winobj->get(stargaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
+  winobj->get(&stargaddr[0], orgcnt, orgunit, targdisp, targcnt, targunit);
 
-  AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)stargaddr);
+  AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)(&stargaddr[0]));
 
   AmpiMsg *msg = new (stargtotalsize, 0) AmpiMsg(-1, -1, -1, thisIndex, stargtotalsize,myComm.getComm());
 
   char* targaddr = (char*)(winobj->baseAddr) + targunit*targdisp;
-  tddt->serialize(targaddr, (char*)stargaddr, targcnt, 1);
-  memcpy(msg->data, stargaddr, stargtotalsize);
+  tddt->serialize(targaddr, &stargaddr[0], targcnt, 1);
+  memcpy(msg->data, &stargaddr[0], stargtotalsize);
   AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->data);
 
   AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
   CkSendToFutureID(ftHandle, (void *)msg, pe_src);
-  delete [] stargaddr;
 }
 
 int ampi::winIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
@@ -340,21 +337,20 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
   orgunit = oddt->getSize(1);
   targunit = tddt->getSize(1);
   int stargtotalsize = targunit*targcnt;
-  char* stargaddr = (char*)new char[stargtotalsize];
+  vector<char> stargaddr(stargtotalsize);
 
   win_obj *winobj = winObjects[winIndex];
   winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
 
-  AMPI_DEBUG("    Rank[%d] iget win  [%d] \n", thisIndex, *(int*)stargaddr);
+  AMPI_DEBUG("    Rank[%d] iget win  [%d] \n", thisIndex, *(int*)(&stargaddr[0]));
 
   AmpiMsg *msg = new (stargtotalsize, 0) AmpiMsg(-1, -1, -1, thisIndex, stargtotalsize,
                                                  myComm.getComm());
 
   char* targaddr = (char*)(winobj->baseAddr) + targdisp*targunit;
-  tddt->serialize(targaddr, (char*)stargaddr, targcnt, 1);
-  memcpy(msg->data, stargaddr, stargtotalsize);
+  tddt->serialize(targaddr, &stargaddr[0], targcnt, 1);
+  memcpy(msg->data, &stargaddr[0], stargtotalsize);
   AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->data);
-  delete [] stargaddr;
   return msg;
  }
 
@@ -394,8 +390,8 @@ int ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int ran
 
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
-  char* sorgaddr = (char*)new char[orgtotalsize];
-  ddt->serialize((char*)orgaddr, (char*)sorgaddr, orgcnt, 1);
+  vector<char> sorgaddr(orgtotalsize);
+  ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
 
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
   pa[rank].winRemoteAccumulate(orgtotalsize, (char*)orgaddr, orgcnt, orgtype,
@@ -417,10 +413,10 @@ void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
   win_obj *winobj = winObjects[winIndex];
 
   CkDDT_DataType *ddt = getDDT()->getType(targtype);
-  char* getdata = (char*) new char[orgtotalsize];
-  ddt->serialize(getdata, (char*)sorgaddr, targcnt, (-1));
+  vector<char> getdata(orgtotalsize);
+  ddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
 
-  winobj->accumulate(getdata, targcnt, targtype, targdisp, targcnt, targtype, op);
+  winobj->accumulate(&getdata[0], targcnt, targtype, targdisp, targcnt, targtype, op);
 
   int tmp = 0;
   AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());

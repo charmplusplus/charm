@@ -1544,14 +1544,12 @@ void ampif_info_get(int* info, const char *key, int* valuelen, char *value, int 
   char tmpKey[MPI_MAX_INFO_KEY];
   ampif_str_f2c(tmpKey, key, *klen);
 
-  char *tmpValue = new char[*valuelen];
+  vector<char> tmpValue(*valuelen);
 
-  *ierr = AMPI_Info_get(*info, tmpKey, *valuelen, tmpValue, flag);
+  *ierr = AMPI_Info_get(*info, tmpKey, *valuelen, &tmpValue[0], flag);
 
   if (*ierr == MPI_SUCCESS)
-    ampif_str_c2f(value, tmpValue, *valuelen);
-
-  delete [] tmpValue;
+    ampif_str_c2f(value, &tmpValue[0], *valuelen);
 }
 
 void ampif_info_get_valuelen(int* info, const char *key, int *valuelen, int *flag,

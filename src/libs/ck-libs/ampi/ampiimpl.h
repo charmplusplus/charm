@@ -673,13 +673,13 @@ class GPUReq : public AmpiRequest {
 };
 
 class IATAReq : public AmpiRequest {
-  IReq *myreqs;
+  vector<IReq> myreqs;
   int elmcount;
   int idx;
  public:
-  IATAReq(int c_):elmcount(c_),idx(0){ myreqs = new IReq[c_]; isvalid=true; }
+  IATAReq(int c_):elmcount(c_),idx(0){ myreqs.resize(c_); isvalid=true; }
   IATAReq(){};
-  ~IATAReq(void) { if(myreqs) delete [] myreqs; }
+  ~IATAReq(void) { }
   int addReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_){
     myreqs[idx].buf=buf_;   myreqs[idx].count=count_;
     myreqs[idx].type=type_; myreqs[idx].src=src_;
@@ -697,15 +697,7 @@ class IATAReq : public AmpiRequest {
     AmpiRequest::pup(p);
     p(elmcount);
     p(idx);
-    if(p.isUnpacking()){
-      myreqs = new IReq[elmcount];
-    }
-    for(int i=0;i<idx;i++){
-      myreqs[i].pup(p);
-    }
-    if(p.isDeleting()){
-      delete [] myreqs;
-    }
+    p|myreqs;
   }
   virtual void print();
 };
