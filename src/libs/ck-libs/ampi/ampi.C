@@ -3295,9 +3295,10 @@ int AMPI_Reduce_scatter_block(void* sendbuf, void* recvbuf, int count, MPI_Datat
     CkAbort("AMPI does not implement MPI_Reduce_scatter_block for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize(comm);
   vector<char> tmpbuf(ptr->getDDT()->getType(datatype)->getSize(count));
 
-  AMPI_Reduce(sendbuf, &tmpbuf[0], count, datatype, op, AMPI_COLL_SOURCE, comm);
+  AMPI_Reduce(sendbuf, &tmpbuf[0], count*size, datatype, op, AMPI_COLL_SOURCE, comm);
   AMPI_Scatter(&tmpbuf[0], count, datatype, recvbuf, count, datatype, AMPI_COLL_SOURCE, comm);
 
   return MPI_SUCCESS;
