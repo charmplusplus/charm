@@ -105,6 +105,7 @@ FDECL {
 #define mpi_ineighbor_allgatherv FTN_NAME( MPI_INEIGHBOR_ALLGATHERV , mpi_ineighbor_allgatherv )
 #define mpi_op_create FTN_NAME( MPI_OP_CREATE , mpi_op_create )
 #define mpi_op_free FTN_NAME( MPI_OP_FREE , mpi_op_free )
+#define mpi_op_commutative FTN_NAME( MPI_OP_COMMUTATIVE , mpi_op_commutative )
 
 #define mpi_group_size FTN_NAME( MPI_GROUP_SIZE, mpi_group_size)
 #define mpi_group_rank FTN_NAME( MPI_GROUP_RANK, mpi_group_rank)
@@ -1065,6 +1066,11 @@ void mpi_op_free(int* opc, int* ierr){
   MPI_Op op = GET_MPI_OP(*opc);
   GET_MPI_OP(*opc) = NULL;
   *ierr = MPI_Op_free((MPI_Op *)&op);
+}
+
+void mpi_op_commutative(int* opc, int* commute, int* ierr){
+  MPI_Op op = GET_MPI_OP(*opc);
+  *ierr = AMPI_Op_commutative(op, commute);
 }
 
 void mpi_comm_dup(int *comm, int *newcomm, int *ierr)

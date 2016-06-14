@@ -3451,6 +3451,8 @@ int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
 CDECL
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
   AMPIAPI("AMPI_Op_create");
+  if (!commute)
+    CkAbort("AMPI does not support non-commutative reduction operators!\n");
   *op = function;
   return MPI_SUCCESS;
 }
@@ -3459,6 +3461,13 @@ CDECL
 int AMPI_Op_free(MPI_Op *op){
   AMPIAPI("AMPI_Op_free");
   *op = MPI_OP_NULL;
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Op_commutative(MPI_Op op, int *commute){
+  AMPIAPI("AMPI_Op_commutative");
+  *commute = 1;
   return MPI_SUCCESS;
 }
 

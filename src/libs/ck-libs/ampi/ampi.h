@@ -638,6 +638,8 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op);
 #define MPI_Op_free AMPI_Op_free
 int AMPI_Op_free(MPI_Op *op);
+#define MPI_Op_commutative AMPI_Op_commutative
+int AMPI_Op_commutative(MPI_Op op, int* commute);
 
 /***groups,contexts and communicators***/
 #define MPI_Group_size AMPI_Group_size
