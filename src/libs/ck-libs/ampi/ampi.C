@@ -2945,7 +2945,7 @@ void ampi::reduceResult(CkReductionMsg *msg)
   MSG_ORDER_DEBUG(printf("[%d] reduceResult called \n",thisIndex));
   ampi::sendraw(MPI_REDUCE_TAG, AMPI_COLL_SOURCE, msg->getData(), msg->getSize(),
       thisArrayID,thisIndex);
-  delete msg;
+  // [nokeep] entry method, so do not delete msg
 }
 
 static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,int type,MPI_Op op)
@@ -2997,8 +2997,7 @@ void ampi::gatherResult(CkReductionMsg *msg)
 
   ampi::sendraw(MPI_GATHER_TAG, AMPI_COLL_SOURCE, &orderedBuf[0], totalSize,
                 thisArrayID, thisIndex);
-
-  delete msg;
+  // [nokeep] entry method, so do not delete msg
 }
 
 void ampi::gathervResult(CkReductionMsg *msg)
@@ -3052,8 +3051,7 @@ void ampi::gathervResult(CkReductionMsg *msg)
 
   ampi::sendraw(MPI_GATHER_TAG, AMPI_COLL_SOURCE, &orderedBuf[0], totalSize,
                 thisArrayID, thisIndex);
-
-  delete msg;
+  // [nokeep] entry method, so do not delete msg
 }
 
 // Copy the MPI datatype "type" from inbuf to outbuf
