@@ -1752,10 +1752,16 @@ void ampi::unblock(void){
   thread->resume();
 }
 
-void ampi::blockOnRecv(void){
+ampi* ampi::blockOnRecv(void){
   resumeOnRecv = true;
+  // In case this thread is migrated while suspended,
+  // save myComm to get the ampi instance back. Then
+  // return "dis" in case the caller needs it.
+  MPI_Comm comm = myComm.getComm();
   thread->suspend();
-  resumeOnRecv = false;
+  ampi *dis = getAmpiInstance(comm);
+  dis->resumeOnRecv = false;
+  return dis;
 }
 
 void ampi::ssend_ack(int sreq_idx){
@@ -1979,25 +1985,18 @@ int ampi::recv(int t, int s, void* buf, int count, int type, MPI_Comm comm, MPI_
   )
 
   ampi *dis = getAmpiInstance(disComm);
-  int dosuspend = 0;
   while(1) {
-    //This is done to take into account the case in which an ampi
-    // thread has migrated while waiting for a message
     tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmGet(dis->msgs, 3, tags, (int*)sts);
     if (msg) break;
-    dis->resumeOnRecv=true;
-    dis->thread->suspend();
-    dosuspend = 1;
-    dis = getAmpiInstance(disComm);
+    // "dis" is updated in case an ampi thread is migrated while waiting for a message
+    dis = dis->blockOnRecv();
   }
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   CpvAccess(_currentObj) = dis;
   MSG_ORDER_DEBUG( printf("[%d] AMPI thread rescheduled  to Index %d buf %p src %d\n",CkMyPe(),dis->thisIndex,buf,s); )
 #endif
-
-  dis->resumeOnRecv=false;
 
   if(sts)
     sts->MPI_LENGTH = msg->length;
@@ -2030,15 +2029,19 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   _TRACE_BG_TLINE_END(&curLog);
 #endif
 
+  ampi *dis = getAmpiInstance(comm);
   AmpiMsg *msg = 0;
   while(1) {
     tags[0] = t; tags[1] = s; tags[2] = comm;
-    msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, (int*)sts);
+    msg = (AmpiMsg *) CmmProbe(dis->msgs, 3, tags, (int*)sts);
     if (msg) break;
-    blockOnRecv();
+    // "dis" is updated in case an ampi thread is migrated while waiting for a message
+    dis = dis->blockOnRecv();
   }
+
   if(sts)
     sts->MPI_LENGTH = msg->length;
+
 #if CMK_BIGSIM_CHARM
   _TRACE_BG_SET_INFO((char *)msg, "PROBE_RESUME",  &curLog, 1);
 #endif
@@ -3643,11 +3646,13 @@ int IReq::wait(MPI_Status *sts){
   // optimization for Irecv
   // generic() writes directly to the buffer, so the only thing we
   // do here is to wait
-  ampi *ptr = getAmpiInstance(comm);
+  ampi *dis = getAmpiInstance(comm);
 
   while (statusIreq == false) {
-    ptr->resumeOnRecv=true;
-    ptr->block();
+    // "dis" is updated in case an ampi thread is migrated while waiting for a message
+    dis->resumeOnRecv = true;
+    dis->block();
+    dis = getAmpiInstance(comm);
 
 #if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
@@ -3657,7 +3662,7 @@ int IReq::wait(MPI_Status *sts){
       return -1;
 #endif
   } // end of while
-  ptr->resumeOnRecv=false;
+  dis->resumeOnRecv = false;
 
   AMPI_DEBUG("IReq::wait has resumed\n");
 
@@ -3693,12 +3698,10 @@ int IATAReq::wait(MPI_Status *sts){
 }
 
 int SReq::wait(MPI_Status *sts){
-  ampi *ptr = getAmpiInstance(comm);
+  ampi *dis = getAmpiInstance(comm);
   while (statusIreq == false) {
-    ptr->resumeOnRecv = true;
-    ptr->block();
-    ptr = getAmpiInstance(comm);
-    ptr->resumeOnRecv = false;
+    // "dis" is updated in case an ampi thread is migrated while waiting for a message
+    dis = dis->blockOnRecv();
   }
   return 0;
 }

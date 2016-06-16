@@ -1302,7 +1302,7 @@ class ampi : public CBase_ampi {
   void block(void);
   void unblock(void);
   void yield(void);
-  void blockOnRecv(void);
+  ampi* blockOnRecv(void);
   void generic(AmpiMsg *);
   void ssend_ack(int sreq);
   void barrierResult(void);
