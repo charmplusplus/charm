@@ -1827,32 +1827,31 @@ void ampi::inorder(AmpiMsg* msg)
     CkPrintf("AMPI vp %d inorder: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
              thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
   )
+
   // check posted recvs
   int tags[3];
   MPI_Status sts;
   tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
-  IReq *ireq = NULL;
-  if (CpvAccess(CmiPICMethod) != CMI_PIC_ELFCOPY) {
+
 #if CMK_BIGSIM_CHARM
-    _TRACE_BG_TLINE_END(&msg->event); // store current log
-    msg->eventPe = CkMyPe();
+  _TRACE_BG_TLINE_END(&msg->event); // store current log
+  msg->eventPe = CkMyPe();
 #endif
-    //in case ampi has not initialized and posted_ireqs are only inserted
-    //at AMPI_Irecv (MPI_Irecv)
-    AmpiRequestList *reqL = &(parent->ampiReqs);
-    //When storing the req index, it's 1-based. The reason is stated in the comments
-    //in the ampi::irecv function.
-    int ireqIdx = (int)((long)CmmGet(posted_ireqs, 3, tags, (int*)&sts));
-    if(reqL->size()>0 && ireqIdx>0)
-      ireq = (IReq *)(*reqL)[ireqIdx-1];
-    if (ireq) { // receive posted
-      ireq->receive(this, msg);
-    } else {
-      CmmPut(msgs, 3, tags, msg);
-    }
-  }
-  else
+
+  //in case ampi has not initialized and posted_ireqs are only inserted
+  //at AMPI_Irecv (MPI_Irecv)
+  AmpiRequestList *reqL = &(parent->ampiReqs);
+  //When storing the req index, it's 1-based. The reason is stated in the comments
+  //in the ampi::irecv function.
+  int ireqIdx = (int)((long)CmmGet(posted_ireqs, 3, tags, (int*)&sts));
+  IReq *ireq = NULL;
+  if(reqL->size()>0 && ireqIdx>0)
+    ireq = (IReq *)(*reqL)[ireqIdx-1];
+  if (ireq) { // receive posted
+    ireq->receive(this, msg);
+  } else {
     CmmPut(msgs, 3, tags, msg);
+  }
 }
 
 AmpiMsg *ampi::getMessage(int t, int s, MPI_Comm comm, int *sts) const
@@ -3632,14 +3631,6 @@ int PersReq::wait(MPI_Status *sts){
 }
 
 int IReq::wait(MPI_Status *sts){
-  if(CpvAccess(CmiPICMethod) == CMI_PIC_ELFCOPY) {
-    AMPI_DEBUG("In IReq::wait calling recv with CmiPICMethod == CMI_PIC_ELFCOPY\n");
-    if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, sts))
-      CkAbort("AMPI> Error in non-blocking request wait");
-
-    return 0;
-  }
-
   //Copy "this" to a local variable in the case that "this" pointer
   //is updated during the out-of-core emulation.
 
@@ -4463,9 +4454,7 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
 #endif
 
   AmpiMsg *msg = NULL;
-  if (CpvAccess(CmiPICMethod) != CMI_PIC_ELFCOPY) {
-    msg = getMessage(tag, src, comm, &newreq->tag);
-  }
+  msg = getMessage(tag, src, comm, &newreq->tag);
   // if msg has already arrived, do the receive right away
   if (msg) {
     newreq->receive(this, msg);
