@@ -440,14 +440,17 @@ void Entry::genArrayDefs(XStr& str)
     else
       str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
     str << "{\n  ckCheck();\n";
-   XStr inlineCall;
-    inlineCall << "  LDObjHandle objHandle;\n  int objstopped=0;\n";
+    XStr inlineCall;
     if (!isNoTrace())
       inlineCall << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
     		 << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx), obj);\n";
     if(isAppWork())
       inlineCall << " _TRACE_BEGIN_APPWORK();\n";
-    inlineCall << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
+    inlineCall << "#if CMK_LBDB_ON\n"
+               << "  LDObjHandle objHandle;\n"
+               << "  int objstopped=0;\n"
+               << "  objHandle = obj->timingBeforeCall(&objstopped);\n"
+               << "#endif\n";
     inlineCall <<
       "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
@@ -478,7 +481,7 @@ void Entry::genArrayDefs(XStr& str)
 
     if (!isLocal()) {
       if (isInline() && container->isForElement()) {
-	str << "  "<< container->baseName() << " *obj = ckLocal();\n";
+	str << "  " << container->baseName() << " *obj = ckLocal();\n";
 	str << "  if (obj) {\n"
 	    << inlineCall
 	    << "  }\n";
