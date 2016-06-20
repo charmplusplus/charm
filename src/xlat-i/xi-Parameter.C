@@ -387,8 +387,10 @@ void Parameter::beginUnmarshallSDAGCall(XStr &str) {
     str << "  int impl_off_" << name << ", impl_cnt_" << name << "; \n";
     str << "  implP|impl_off_" << name << ";\n";
     str << "  implP|impl_cnt_" << name << ";\n";
-  } else
-    str << "  implP|" << (podType ? "" : "*") << "genClosure->" << name << ";\n";
+  } else {
+    str << "  genClosure->" << name << "=new " << type <<";\n";
+    str << "  implP|" << "*" << "genClosure->" << name << ";\n";
+  }
 }
 
 

@@ -1631,7 +1631,9 @@ void Entry::genClosure(XStr& decls, bool isDef) {
   bool hasArray = false, isMessage = false;
   XStr messageType;
   int i = 0;
-  XStr structure, toPup, alloc, getter, dealloc;
+  XStr structure, toPup, alloc, getter, dealloc, preserve;
+
+  toPup << "        " << "if( __p.isUnpacking() ) { preserved=true;}\n";
   for(ParamList* pl = param; pl != NULL; pl = pl->next, i++) {
     Parameter* sv = pl->param;
 
@@ -1641,17 +1643,16 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     getter << "      ";
 
     if ((sv->isMessage() != 1) && (sv->isVoid() != 1)) {
-       structure << sv->type << " ";
-       getter << sv->type << " ";
-       if (sv->isArray() != 0) {
-         structure << "*";
-         getter << "*";
-       }
+       structure << sv->type << " *";
+       getter << sv->type << " *";
 
        if (sv->isArray() != 0) {
          hasArray = hasArray || true;
        } else {
-         toPup << "        " << "__p | " << sv->name << ";\n";
+	 toPup << "        " << "if ( __p.isUnpacking() ) { " << sv->name << "= new " << sv->type << ";}\n";
+         toPup << "        " << "__p | *" << sv->name << ";\n";
+	 preserve << "       " << sv->name << "= new " << sv->type << "(*" << sv->name << ");\n";
+	 dealloc << "       " << "if (preserved) delete " << sv->name << ";\n";
          sv->podType = true;
        }
 
@@ -1895,7 +1896,7 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
         }
         str << ");\n";
 	if (!param->isMessage() && !param->isVoid())
-	  str << "  genClosure->deref();\n";
+	  str << "  genClosure->release();\n";
       } else {
         str<<"("; param->unmarshall(str); str<<");\n";
       }

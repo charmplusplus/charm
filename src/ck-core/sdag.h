@@ -8,14 +8,17 @@ namespace SDAG {
     virtual void pup(PUP::er& p) = 0;
     PUPable_abstract(Closure);
     int continuations;
+    bool preserved;
     // reference count and self-destruct when no continuations have a reference
     void ref() { continuations++; }
     void deref() { if (--continuations <= 0) delete this; }
     // done this way to keep Closure abstract for PUP reasons
     // these must be called by descendents of Closure
     void packClosure(PUP::er& p) { p | continuations; }
-    void init() { continuations = 1; }
+    void init() { continuations = 1; preserved = false; }
+    void release() { continuations--; if(continuations>0) {preserve(); preserved=true;} else {delete this;} }
     virtual ~Closure() { }
+    virtual void preserve() { }
   };
 }
 

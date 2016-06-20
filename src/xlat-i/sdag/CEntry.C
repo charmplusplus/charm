@@ -24,12 +24,12 @@ namespace xi {
       for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end(); ++it, ++i) {
         CStateVar& var = **it;
         if (var.name)
-          defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
+          defs << "  genClosure->getP" << i << "() = &" << var.name << ";\n";
       }
     }
 
     defs << "  " << *next << "(genClosure);\n";
-    defs << "  genClosure->deref();\n";
+    defs << "  genClosure->release();\n";
     defs << "}\n\n";
     templateGuardEnd(defs);
   }
@@ -113,7 +113,7 @@ namespace xi {
       // note that there will always be a closure even when the method has no
       // parameters for consistency
       defs << "  __dep->pushBuffer(" << entryNum << ", " << (isVoid ? "0" : "genClosure") << ", " <<
-        (refNumNeeded ? "genClosure->getP0()" : "0") <<");\n";
+        (refNumNeeded ? "*genClosure->getP0()" : "0") <<");\n";
     } else {
       defs << "  CMK_REFNUM_TYPE refnum = ";
       if (refNumNeeded)
