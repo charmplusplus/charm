@@ -285,7 +285,7 @@ namespace xi {
         if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
           indentBy(defs, cur + 2);
 
-          defs << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
+          defs << (var.byConst ? "const " : "") << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
           if (!var.isMsg)
 	    defs << "*";
           state.name ? (defs << *state.name) : (defs << "gen" << cur);

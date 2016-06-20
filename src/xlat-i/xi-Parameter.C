@@ -389,7 +389,7 @@ void Parameter::beginUnmarshallSDAGCall(XStr &str) {
     str << "  implP|impl_cnt_" << name << ";\n";
   } else {
     str << "  genClosure->" << name << "=new " << type <<";\n";
-    str << "  implP|" << "*" << "genClosure->" << name << ";\n";
+    str << "  implP|" << "const_cast<" << type << "&>(*" << "genClosure->" << name << ");\n";
   }
 }
 

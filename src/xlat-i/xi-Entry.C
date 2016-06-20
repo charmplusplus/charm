@@ -1643,14 +1643,16 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     getter << "      ";
 
     if ((sv->isMessage() != 1) && (sv->isVoid() != 1)) {
-       structure << sv->type << " *";
-       getter << sv->type << " *";
+      const char* byConst = sv->byConst ? "const " : "";
+
+      structure << byConst << sv->type << " *";
+      getter    << byConst << sv->type << " *";
 
        if (sv->isArray() != 0) {
          hasArray = hasArray || true;
        } else {
 	 toPup << "        " << "if ( __p.isUnpacking() ) { " << sv->name << "= new " << sv->type << ";}\n";
-         toPup << "        " << "__p | *" << sv->name << ";\n";
+         toPup << "        " << "__p | const_cast<" << sv->type << "&>(*" << sv->name << ");\n";
 	 preserve << "       " << sv->name << "= new " << sv->type << "(*" << sv->name << ");\n";
 	 dealloc << "       " << "if (preserved) delete " << sv->name << ";\n";
          sv->podType = true;
