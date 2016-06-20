@@ -442,35 +442,37 @@ void Entry::genArrayDefs(XStr& str)
     str << "{\n  ckCheck();\n";
     XStr inlineCall;
     if (!isNoTrace())
-      inlineCall << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
+      inlineCall << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
     		 << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx), obj);\n";
     if(isAppWork())
-      inlineCall << " _TRACE_BEGIN_APPWORK();\n";
+      inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
     inlineCall << "#if CMK_LBDB_ON\n"
-               << "  LDObjHandle objHandle;\n"
-               << "  int objstopped=0;\n"
-               << "  objHandle = obj->timingBeforeCall(&objstopped);\n"
+               << "    LDObjHandle objHandle;\n"
+               << "    int objstopped=0;\n"
+               << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
                << "#endif\n";
     inlineCall <<
       "#if CMK_CHARMDEBUG\n"
-      "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
-      "#endif\n   ";
-    if (!retType->isVoid()) inlineCall << retType<< " retValue = ";
+      "    CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
+      "#endif\n";
+    inlineCall << "    ";
+    if (!retType->isVoid())
+      inlineCall << retType << " retValue = ";
     inlineCall << "obj->" << name << "(";
     param->unmarshall(inlineCall);
     inlineCall << ");\n";
     inlineCall <<
       "#if CMK_CHARMDEBUG\n"
-      "  CpdAfterEp("<<epIdx()<<");\n"
+      "    CpdAfterEp("<<epIdx()<<");\n"
       "#endif\n";
-    inlineCall << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
+    inlineCall << "#if CMK_LBDB_ON\n    obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
     if(isAppWork())
-      inlineCall << " _TRACE_END_APPWORK();\n";
-    if (!isNoTrace()) inlineCall << "  _TRACE_END_EXECUTE();\n";
+      inlineCall << "    _TRACE_END_APPWORK();\n";
+    if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
     if (!retType->isVoid()) {
-      inlineCall << "  return retValue;\n";
+      inlineCall << "    return retValue;\n";
     } else {
-      inlineCall << "  return;\n";
+      inlineCall << "    return;\n";
     }
 
     XStr prepareMsg;
