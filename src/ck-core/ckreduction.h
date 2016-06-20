@@ -317,6 +317,12 @@ public:
 	static void *pack(CkReductionMsg *);
 	static CkReductionMsg *unpack(void *in);
 
+#if CMK_BIGSIM_CHARM
+	/* AMPI reductions use bare CkReductionMsg's instead of AmpiMsg's */
+	void *event; // the event point that corresponds to this message
+	int eventPe; // the PE that the event is located on
+#endif
+
 private:
 	int dataSize;//Length of array below, in bytes
 	void *data;//Reduction data

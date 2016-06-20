@@ -518,16 +518,14 @@ void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 
-/* ampiReducer: AMPI's generic reducer type
-   MPI_Op is function pointer to MPI_User_function
-   so that it can be packed into AmpiOpHeader, shipped
-   with the reduction message, and then plugged into
-   the ampiReducer.
-   One little trick is the ampi::recv which receives
-   the final reduction message will see additional
-   sizeof(AmpiOpHeader) bytes in the buffer before
-   any user data, which are stripped off by
-   ampi::processMessage. */
+/* ampiReducer: AMPI's generic reducer type MPI_Op is a
+ * function pointer to an MPI_User_function so that it
+ * can be packed into AmpiOpHeader, shipped with the
+ * reduction message, and then plugged into the ampiReducer.
+ *
+ * The final reduction message will have an additional
+ * sizeof(AmpiOpHeader) bytes in the buffer before any
+ * user data. ampi::processRednMsg strips the header. */
 CkReduction::reducerType AmpiReducer;
 
 // every msg contains a AmpiOpHeader structure before user data
@@ -1321,6 +1319,8 @@ void ampi::init(void) {
   msgs=NULL;
   posted_ireqs=NULL;
   resumeOnRecv=false;
+  resumeOnColl=false;
+  blockingReq=NULL;
   AsyncEvacuate(false);
 }
 
@@ -1403,6 +1403,51 @@ void ampi::pup(PUP::er &p)
   p|tmpVec;
   p|remoteProxy;
   p|resumeOnRecv;
+  p|resumeOnColl;
+
+  // pup blockingReq
+  char nonnull;
+  if (!p.isUnpacking()) {
+    if (blockingReq) {
+      nonnull = blockingReq->getType();
+    } else {
+      nonnull = 0;
+    }
+  }
+  p(nonnull);
+  if (nonnull != 0) {
+    if (p.isUnpacking()) {
+      switch (nonnull) {
+        case MPI_PERS_REQ:
+          blockingReq = new PersReq;
+          break;
+        case MPI_I_REQ:
+          blockingReq = new IReq;
+          break;
+        case MPI_REDN_REQ:
+          blockingReq = new RednReq;
+          break;
+        case MPI_GATHER_REQ:
+          blockingReq = new GatherReq;
+          break;
+        case MPI_GATHERV_REQ:
+          blockingReq = new GathervReq;
+          break;
+        case MPI_S_REQ:
+          blockingReq = new SReq;
+          break;
+        case MPI_IATA_REQ:
+          blockingReq = new IATAReq;
+          break;
+      }
+    }
+    blockingReq->pup(p);
+  } else {
+    blockingReq = NULL;
+  }
+  if (p.isDeleting()) {
+    delete blockingReq; blockingReq = NULL;
+  }
 
   msgs=CmmPup((pup_er)&p,msgs,cmm_pup_ampi_message);
 
@@ -1426,6 +1471,7 @@ ampi::~ampi()
     }
   }
 
+  delete blockingReq; blockingReq = NULL;
   CmmFree(msgs);
   CmmFreeAll(posted_ireqs);
 }
@@ -1763,6 +1809,51 @@ ampi* ampi::blockOnRecv(void){
   return dis;
 }
 
+ampi* ampi::blockOnColl(void){
+  resumeOnColl = true;
+  MPI_Comm comm = myComm.getComm();
+  thread->suspend();
+  ampi *dis = getAmpiInstance(comm);
+  dis->resumeOnColl = false;
+  return dis;
+}
+
+// block on (All)Reduce or (All)Gather(v)
+ampi* ampi::blockOnRedn(AmpiRequest *req){
+
+  blockingReq = req;
+
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
+  _LOG_E_END_AMPI_PROCESSING(thisIndex)
+#endif
+#if CMK_BIGSIM_CHARM
+  void *curLog; // store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+#if CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn)) traceSuspend();
+#endif
+#endif
+
+  ampi* dis = blockOnColl();
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  CpvAccess(_currentObj) = dis;
+#endif
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
+  _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex, dis->blockingReq->src, dis->blockingReq->count)
+#endif
+#if CMK_BIGSIM_CHARM
+#if CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn)) CthTraceResume(dis->thread->getThread());
+#endif
+  TRACE_BG_AMPI_BREAK(dis->thread->getThread(), "RECV_RESUME", NULL, 0, 0);
+  if (dis->blockingReq->eventPe == CkMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(dis->blockingReq->event);
+#endif
+
+  delete dis->blockingReq; dis->blockingReq = NULL;
+  return dis;
+}
+
 void ampi::ssend_ack(int sreq_idx){
   if (sreq_idx == 1)
     thread->resume();           // MPI_Ssend
@@ -1941,7 +2032,7 @@ void ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype t
   arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm,sync));
 }
 
-int ampi::processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, MPI_Datatype type)
+void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
@@ -1950,13 +2041,60 @@ int ampi::processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, MPI_D
     count = msg->length/(ddt->getSize(1));
   }
 
-  if (t==MPI_REDUCE_TAG) { // reduction msg
-    ddt->serialize((char*)buf, (char*)msg->data+sizeof(AmpiOpHeader), count, (-1));
-  } else {
-    ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
-  }
+  ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
+}
 
-  return 0;
+void ampi::processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count)
+{
+  // The first sizeof(AmpiOpHeader) bytes in the redn msg data are reserved for MPI_Op
+  getDDT()->getType(type)->serialize((char*)buf, (char*)msg->getData()+sizeof(AmpiOpHeader), count, (-1));
+}
+
+void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount)
+{
+  CkReduction::tupleElement* results = NULL;
+  int numReductions = 0;
+  msg->toTuple(&results, &numReductions);
+
+  // Re-order the gather data based on the rank of the contributor
+  CkReduction::setElement *currentSrc  = (CkReduction::setElement*)results[0].data;
+  CkReduction::setElement *currentData = (CkReduction::setElement*)results[1].data;
+  CkDDT_DataType *ddt    = getDDT()->getType(type);
+  int contributionSize   = ddt->getSize(recvCount);
+  int contributionExtent = ddt->getExtent()*recvCount;
+
+  for (int i=0; i<getSize(getComm()); i++) {
+    CkAssert(currentSrc && currentData);
+    int srcRank = *((int*)currentSrc->data);
+    CkAssert(currentData->dataSize == contributionSize);
+    ddt->serialize(&(((char*)buf)[srcRank*contributionExtent]), currentData->data, recvCount, (-1));
+    currentSrc  = currentSrc->next();
+    currentData = currentData->next();
+  }
+}
+
+void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
+                             int* recvCounts, int* displs)
+{
+  CkReduction::tupleElement* results = NULL;
+  int numReductions = 0;
+  msg->toTuple(&results, &numReductions);
+
+  // Re-order the gather data based on the rank of the contributor
+  CkReduction::setElement *currentSrc  = (CkReduction::setElement*)results[0].data;
+  CkReduction::setElement *currentData = (CkReduction::setElement*)results[1].data;
+  CkDDT_DataType *ddt    = getDDT()->getType(type);
+  int contributionSize   = ddt->getSize();
+  int contributionExtent = ddt->getExtent();
+
+  for (int i=0; i<getSize(getComm()); i++) {
+    CkAssert(currentSrc && currentData);
+    int srcRank = *((int*)currentSrc->data);
+    CkAssert(currentData->dataSize == contributionSize*recvCounts[srcRank]);
+    ddt->serialize(&((char*)buf)[displs[srcRank]*contributionExtent], currentData->data, recvCounts[srcRank], (-1));
+    currentSrc  = currentSrc->next();
+    currentData = currentData->next();
+  }
 }
 
 int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Status *sts)
@@ -2007,8 +2145,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 
   if(sts)
     sts->MPI_LENGTH = msg->length;
-  int status = dis->processMessage(msg, t, s, buf, count, type);
-  if (status != 0) return status;
+  dis->processAmpiMsg(msg, buf, type, count);
 
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
@@ -2225,6 +2362,21 @@ void IReq::print(){
   CkPrintf("In IReq: this=%p, status=%d, length=%d\n", this, statusIreq, length);
 }
 
+void RednReq::print(){
+  AmpiRequest::print();
+  CkPrintf("In RednReq: this=%p, status=%d\n", this, statusIreq);
+}
+
+void GatherReq::print(){
+  AmpiRequest::print();
+  CkPrintf("In GatherReq: this=%p, status=%d\n", this, statusIreq);
+}
+
+void GathervReq::print(){
+  AmpiRequest::print();
+  CkPrintf("In GathervReq: this=%p, status=%d\n", this, statusIreq);
+}
+
 void IATAReq::print(){ //not complete for myreqs
   AmpiRequest::print();
   CkPrintf("In IATAReq: elmcount=%d, idx=%d\n", elmcount, idx);
@@ -2264,6 +2416,18 @@ void AmpiRequestList::pup(PUP::er &p) {
             break;
           case MPI_I_REQ:
             block[i] = new IReq;
+            break;
+          case MPI_REDN_REQ:
+            block[i] = new RednReq;
+            break;
+          case MPI_GATHER_REQ:
+            block[i] = new GatherReq;
+            break;
+          case MPI_GATHERV_REQ:
+            block[i] = new GathervReq;
+            break;
+          case MPI_S_REQ:
+            block[i] = new SReq;
             break;
           case MPI_IATA_REQ:
             block[i] = new IATAReq;
@@ -2781,9 +2945,6 @@ int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
       buf, count, datatype, source, recvtag, comm, status);
 }
 
-const int AMPI_COLL_SOURCE = 0;
-const int AMPI_COLL_COMM   = MPI_COMM_WORLD;
-
 void ampi::barrier()
 {
   CkCallback barrierCB(CkReductionTarget(ampi, barrierResult), getProxy());
@@ -2963,117 +3124,81 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
   return MPI_SUCCESS;
 }
 
-/// This routine is called with the results of a Reduce or AllReduce
-void ampi::reduceResult(CkReductionMsg *msg)
+// This routine is called with the results of an (All)Reduce or (All)Gather(v)
+void ampi::rednResult(CkReductionMsg *msg)
 {
-  MSG_ORDER_DEBUG(printf("[%d] reduceResult called \n",thisIndex));
-  ampi::sendraw(MPI_REDUCE_TAG, AMPI_COLL_SOURCE, msg->getData(), msg->getSize(),
-      thisArrayID,thisIndex);
+  MSG_ORDER_DEBUG(CkPrintf("[%d] rednResult called on comm %d\n", thisIndex, myComm.getComm()));
+
+  if (blockingReq == NULL) {
+    CkAbort("AMPI> recv'ed a blocking reduction unexpectedly!\n");
+  }
+
+#if CMK_BIGSIM_CHARM
+  TRACE_BG_ADD_TAG("AMPI_generic");
+  msg->event = NULL;
+  _TRACE_BG_TLINE_END(&msg->event); // store current log
+  msg->eventPe = CkMyPe();
+#endif
+
+  blockingReq->receive(this, msg);
+
+  if (resumeOnColl) {
+    thread->resume();
+  }
   // [nokeep] entry method, so do not delete msg
 }
 
-static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,MPI_Datatype type,MPI_Op op)
+// This routine is called with the results of an I(all)reduce or I(all)gather(v)
+void ampi::irednResult(CkReductionMsg *msg)
+{
+  MSG_ORDER_DEBUG(CkPrintf("[%d] irednResult called on comm %d\n", thisIndex, myComm.getComm()));
+
+  MPI_Status sts;
+  int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, myComm.getComm() };
+  AmpiRequestList *reqL = &(parent->ampiReqs);
+  int rednReqIdx = (int)((long)CmmGet(posted_ireqs, 3, tags, (int*)&sts));
+  AmpiRequest *rednReq = NULL;
+  if(reqL->size()>0 && rednReqIdx>0)
+    rednReq = (AmpiRequest *)(*reqL)[rednReqIdx-1];
+  if (rednReq == NULL)
+    CkAbort("AMPI> recv'ed a non-blocking reduction unexpectedly!\n");
+
+#if CMK_BIGSIM_CHARM
+  TRACE_BG_ADD_TAG("AMPI_generic");
+  msg->event = NULL;
+  _TRACE_BG_TLINE_END(&msg->event); // store current log
+  msg->eventPe = CkMyPe();
+#endif
+#if AMPIMSGLOG
+  if(msgLogRead){
+    PUParray(*(getAmpiParent()->fromPUPer), (char *)rednReq, sizeof(int));
+    return;
+  }
+#endif
+
+  rednReq->receive(this, msg);
+
+#if AMPIMSGLOG
+  if(msgLogWrite && record_msglog(getAmpiParent()->thisIndex)){
+    PUParray(*(getAmpiParent()->toPUPer), (char *)reqnReq, sizeof(int));
+  }
+#endif
+
+  if (resumeOnColl) {
+    thread->resume();
+  }
+  // [nokeep] entry method, so do not delete msg
+}
+
+static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,int type,MPI_Op op)
 {
   int szdata = ddt->getSize(count);
   int szhdr = sizeof(AmpiOpHeader);
   AmpiOpHeader newhdr(op,type,count,szdata);
   CkReductionMsg *msg=CkReductionMsg::buildNew(szdata+szhdr,NULL,AmpiReducer);
   memcpy(msg->getData(),&newhdr,szhdr);
-  if (count > 0) {
-    ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
-  }
+  ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
   return msg;
-}
-
-void ampi::gatherResult(CkReductionMsg *msg)
-{
-  MSG_ORDER_DEBUG(CkPrintf("[%d] gatherResult called\n", thisIndex));
-
-  CkReduction::tupleElement* results = NULL;
-  int numReductions = 0;
-  msg->toTuple(&results, &numReductions);
-
-  // Get the total size of gather data
-  CkReduction::setElement *gatherData  = (CkReduction::setElement*)results[1].data;
-  CkReduction::setElement *currentData = gatherData;
-  int totalSize = 0;
-  int numContributions = 0;
-  while(currentData && currentData->dataSize > 0){
-    numContributions++;
-    currentData = currentData->next();
-  }
-  totalSize = gatherData->dataSize * numContributions;
-
-  // Re-order the gather data based on the rank of the contributor
-  vector<char> orderedBuf(totalSize);
-  CkReduction::setElement *gatherSrc  = (CkReduction::setElement*)results[0].data;
-  CkReduction::setElement *currentSrc = gatherSrc;
-  currentData = gatherData;
-  while((currentSrc && currentSrc->dataSize > 0) && (currentData && currentData->dataSize > 0)){
-    int srcRank  = *((int*)currentSrc->data);
-    int dataSize = currentData->dataSize;
-    memcpy(&orderedBuf[srcRank*dataSize], currentData->data, dataSize);
-    currentSrc  = currentSrc->next();
-    currentData = currentData->next();
-  }
-
-  ampi::sendraw(MPI_GATHER_TAG, AMPI_COLL_SOURCE, &orderedBuf[0], totalSize,
-                thisArrayID, thisIndex);
-  // [nokeep] entry method, so do not delete msg
-}
-
-void ampi::gathervResult(CkReductionMsg *msg)
-{
-  MSG_ORDER_DEBUG(CkPrintf("[%d] gathervResult called\n", thisIndex));
-
-  CkReduction::tupleElement* results = NULL;
-  int numReductions = 0;
-  msg->toTuple(&results, &numReductions);
-
-  // Get the number of contributions
-  CkReduction::setElement *gatherSrc  = (CkReduction::setElement*)results[0].data;
-  CkReduction::setElement *currentSrc = gatherSrc;
-  int numContributions = 0;
-  while(currentSrc && currentSrc > 0){
-    numContributions++;
-    currentSrc = currentSrc->next();
-  }
-
-  // Get the total size and displacements of each contribution
-  int totalSize = 0;
-  vector<int> displs(numContributions);
-  for(int i=0; i<numContributions; i++)
-    displs[i] = 0;
-  CkReduction::setElement *gatherData  = (CkReduction::setElement*)results[1].data;
-  CkReduction::setElement *currentData = gatherData;
-  currentSrc = gatherSrc;
-  while(currentData && currentData > 0){
-    int srcRank = *((int*)currentSrc->data);
-    int contributionSize = currentData->dataSize;
-    totalSize += contributionSize;
-    for(int i=0; i<numContributions; i++){
-      if(srcRank < i)
-        displs[i] += contributionSize;
-    }
-    currentSrc  = currentSrc->next();
-    currentData = currentData->next();
-  }
-
-  // Re-order the gather data based on the rank of the contributor
-  vector<char> orderedBuf(totalSize);
-  currentSrc  = gatherSrc;
-  currentData = gatherData;
-  while((currentSrc && currentSrc->dataSize > 0) && (currentData && currentData->dataSize > 0)){
-    int srcRank  = *((int*)currentSrc->data);
-    int dataSize = currentData->dataSize;
-    memcpy(&orderedBuf[displs[srcRank]], currentData->data, dataSize);
-    currentSrc  = currentSrc->next();
-    currentData = currentData->next();
-  }
-
-  ampi::sendraw(MPI_GATHER_TAG, AMPI_COLL_SOURCE, &orderedBuf[0], totalSize,
-                thisArrayID, thisIndex);
-  // [nokeep] entry method, so do not delete msg
 }
 
 // Copy the MPI datatype "type" from inbuf to outbuf
@@ -3146,24 +3271,22 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op 
 
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
 
-  CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
+  CkCallback reduceCB(CkIndex_ampi::rednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
   msg->setCallback(reduceCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Reduce called on comm %d root %d \n",ptr->thisIndex,comm,rootIdx));
   ptr->contribute(msg);
 
   if (ptr->thisIndex == rootIdx){
-    /*HACK: Use recv() to block until reduction data comes back*/
-    if(-1==ptr->recv(MPI_REDUCE_TAG, AMPI_COLL_SOURCE, outbuf, count, type, AMPI_COLL_COMM))
-      CkAbort("AMPI>MPI_Reduce called with different values on different processors!");
+    ptr = ptr->blockOnRedn(new RednReq(outbuf, count, type, comm));
 
 #if SYNCHRONOUS_REDUCE
-      AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDUCE_TAG, -1, rootIdx, 0, AMPI_COLL_COMM);
-      CProxy_ampi pa(ptr->getProxy());
-      pa.generic(msg);
+    AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDN_TAG, -1, rootIdx, 0, comm);
+    CProxy_ampi pa(ptr->getProxy());
+    pa.generic(msg);
 #endif
   }
 #if SYNCHRONOUS_REDUCE
-  ptr->recv(MPI_REDUCE_TAG, AMPI_COLL_SOURCE, NULL, 0, type, AMPI_COLL_COMM);
+  ptr->recv(MPI_REDN_TAG, AMPI_COLL_SOURCE, NULL, 0, type, comm);
 #endif
 
 #if AMPIMSGLOG
@@ -3198,12 +3321,8 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Allreduce for Inter-communicators!");
 
-  ampi *ptr = getAmpiInstance(comm);
-
-  CkDDT_DataType *ddt_type = ptr->getDDT()->getType(type);
-
 #if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_LOG(MPI_ALLREDUCE, ddt_type->getSize(count));
+  TRACE_BG_AMPI_LOG(MPI_ALLREDUCE, getAmpiInstance(comm)->getDDT()->getType(type)->getSize(count));
 #endif
 
 #if AMPIMSGLOG
@@ -3215,14 +3334,14 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_
   }
 #endif
 
-  CkReductionMsg *msg=makeRednMsg(ddt_type, inbuf, count, type, op);
-  CkCallback allreduceCB(CkIndex_ampi::reduceResult(0),ptr->getProxy());
+  ampi *ptr = getAmpiInstance(comm);
+
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, op);
+  CkCallback allreduceCB(CkIndex_ampi::rednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
-  /*HACK: Use recv() to block until the reduction data comes back*/
-  if(-1==ptr->recv(MPI_REDUCE_TAG, AMPI_COLL_SOURCE, outbuf, count, type, AMPI_COLL_COMM))
-    CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
+  ptr->blockOnRedn(new RednReq(outbuf, count, type, comm));
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -3262,17 +3381,17 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI
     CkAbort("AMPI does not implement MPI_Iallreduce for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
 
-  CkCallback allreduceCB(CkIndex_ampi::reduceResult(0),ptr->getProxy());
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
+  CkCallback allreduceCB(CkIndex_ampi::irednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
-  // use an IReq to non-block the caller and get a request ptr
+  // use a RednReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  IReq *newreq = new IReq(outbuf,count,type,AMPI_COLL_SOURCE,MPI_REDUCE_TAG,AMPI_COLL_COMM);
+  RednReq *newreq = new RednReq(outbuf,count,type,comm);
   *request = reqs->insert(newreq);
-  int tags[3] = { MPI_REDUCE_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
+  int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
   CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 
   return MPI_SUCCESS;
@@ -3696,6 +3815,111 @@ int IReq::wait(MPI_Status *sts){
   return 0;
 }
 
+int RednReq::wait(MPI_Status *sts){
+  //Copy "this" to a local variable in the case that "this" pointer
+  //is updated during the out-of-core emulation.
+
+  // ampi::irednResult writes directly to the buffer, so the only thing we
+  // do here is to wait
+  ampi *dis = getAmpiInstance(comm);
+
+  while (!statusIreq) {
+    dis->resumeOnColl = true;
+    dis->block();
+
+#if CMK_BIGSIM_CHARM
+    //Because of the out-of-core emulation, this pointer is changed after in-out
+    //memory operation. So we need to return from this function and do the while loop
+    //in the outer function call.
+    if (_BgInOutOfCoreMode)
+      return -1;
+#endif
+  }
+  dis->resumeOnColl = false;
+
+  AMPI_DEBUG("RednReq::wait has resumed\n");
+
+  if (sts) {
+    sts->MPI_TAG = tag;
+    sts->MPI_SOURCE = src;
+    sts->MPI_COMM = comm;
+  }
+  return 0;
+}
+
+int GatherReq::wait(MPI_Status *sts){
+  //Copy "this" to a local variable in the case that "this" pointer
+  //is updated during the out-of-core emulation.
+
+  // ampi::irednResult writes directly to the buffer, so the only thing we
+  // do here is to wait
+  ampi *dis = getAmpiInstance(comm);
+
+  while (!statusIreq) {
+    dis->resumeOnColl = true;
+    dis->block();
+
+#if CMK_BIGSIM_CHARM
+    //Because of the out-of-core emulation, this pointer is changed after in-out
+    //memory operation. So we need to return from this function and do the while loop
+    //in the outer function call.
+    if (_BgInOutOfCoreMode)
+      return -1;
+#endif
+  }
+  dis->resumeOnColl = false;
+
+  AMPI_DEBUG("GatherReq::wait has resumed\n");
+
+  if (sts) {
+    sts->MPI_TAG = tag;
+    sts->MPI_SOURCE = src;
+    sts->MPI_COMM = comm;
+  }
+  return 0;
+}
+
+int GathervReq::wait(MPI_Status *sts){
+  //Copy "this" to a local variable in the case that "this" pointer
+  //is updated during the out-of-core emulation.
+
+  // ampi::irednResult writes directly to the buffer, so the only thing we
+  // do here is to wait
+  ampi *dis = getAmpiInstance(comm);
+
+  while (!statusIreq) {
+    dis->resumeOnColl = true;
+    dis->block();
+
+#if CMK_BIGSIM_CHARM
+    //Because of the out-of-core emulation, this pointer is changed after in-out
+    //memory operation. So we need to return from this function and do the while loop
+    //in the outer function call.
+    if (_BgInOutOfCoreMode)
+      return -1;
+#endif
+  }
+  dis->resumeOnColl = false;
+
+  AMPI_DEBUG("GathervReq::wait has resumed\n");
+
+  if (sts) {
+    sts->MPI_TAG = tag;
+    sts->MPI_SOURCE = src;
+    sts->MPI_COMM = comm;
+  }
+  return 0;
+}
+
+int SReq::wait(MPI_Status *sts){
+  ampi *dis = getAmpiInstance(comm);
+  while (statusIreq == false) {
+    // "dis" is updated in case an ampi thread is migrated while waiting for a message
+    dis = dis->blockOnRecv();
+  }
+  return 0;
+}
+
 int IATAReq::wait(MPI_Status *sts){
   int i;
   for(i=0;i<elmcount;i++){
@@ -3713,15 +3937,6 @@ int IATAReq::wait(MPI_Status *sts){
     _TRACE_BG_ADD_BACKWARD_DEP(myreqs[i].event);
   _TRACE_BG_TLINE_END(&event);
 #endif
-  return 0;
-}
-
-int SReq::wait(MPI_Status *sts){
-  ampi *dis = getAmpiInstance(comm);
-  while (statusIreq == false) {
-    // "dis" is updated in case an ampi thread is migrated while waiting for a message
-    dis = dis->blockOnRecv();
-  }
   return 0;
 }
 
@@ -3974,11 +4189,6 @@ bool PersReq::itest(MPI_Status *sts){
   return test(sts);
 }
 
-void PersReq::complete(MPI_Status *sts){
-  if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, sts))
-    CkAbort("AMPI> Error in persistent request complete");
-}
-
 bool IReq::test(MPI_Status *sts){
   if (statusIreq && sts) {
     sts->MPI_LENGTH = length;
@@ -3996,6 +4206,39 @@ bool IReq::itest(MPI_Status *sts){
   return statusIreq;
 }
 
+bool RednReq::test(MPI_Status *sts){
+  if (!statusIreq) {
+    getAmpiInstance(comm)->yield();
+  }
+  return statusIreq;
+}
+
+bool RednReq::itest(MPI_Status *sts){
+  return statusIreq;
+}
+
+bool GatherReq::test(MPI_Status *sts){
+  if (!statusIreq) {
+    getAmpiInstance(comm)->yield();
+  }
+  return statusIreq;
+}
+
+bool GatherReq::itest(MPI_Status *sts){
+  return statusIreq;
+}
+
+bool GathervReq::test(MPI_Status *sts){
+  if (!statusIreq) {
+    getAmpiInstance(comm)->yield();
+  }
+  return statusIreq;
+}
+
+bool GathervReq::itest(MPI_Status *sts){
+  return statusIreq;
+}
+
 bool SReq::test(MPI_Status *sts){
   if (!statusIreq) {
     getAmpiInstance(comm)->yield();
@@ -4005,29 +4248,6 @@ bool SReq::test(MPI_Status *sts){
 
 bool SReq::itest(MPI_Status *sts){
   return statusIreq;
-}
-
-void IReq::complete(MPI_Status *sts){
-  wait(sts);
-}
-
-void SReq::complete(MPI_Status *sts){
-  wait(sts);
-}
-
-void IReq::receive(ampi *ptr, AmpiMsg *msg)
-{
-  int sts = ptr->processMessage(msg, tag, src, buf, count, type);
-  statusIreq = (sts == 0);
-  length = msg->length;
-  this->tag = msg->tag; // Although not required, we also extract tag from msg
-  src = msg->srcRank;   // Although not required, we also extract src from msg
-  comm = msg->comm;
-  AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", (int)this->tag, this);
-#if CMK_BIGSIM_CHARM
-  event = msg->event;
-#endif
-  delete msg;
 }
 
 bool IATAReq::test(MPI_Status *sts){
@@ -4048,6 +4268,31 @@ bool IATAReq::itest(MPI_Status *sts){
   return true;
 }
 
+void PersReq::complete(MPI_Status *sts){
+  if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, sts))
+    CkAbort("AMPI> Error in persistent request complete");
+}
+
+void IReq::complete(MPI_Status *sts){
+  wait(sts);
+}
+
+void RednReq::complete(MPI_Status *sts){
+  wait(sts);
+}
+
+void GatherReq::complete(MPI_Status *sts){
+  wait(sts);
+}
+
+void GathervReq::complete(MPI_Status *sts){
+  wait(sts);
+}
+
+void SReq::complete(MPI_Status *sts){
+  wait(sts);
+}
+
 void IATAReq::complete(MPI_Status *sts){
   for(int i=0;i<elmcount;i++){
     if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
@@ -4055,6 +4300,58 @@ void IATAReq::complete(MPI_Status *sts){
                                                  myreqs[i].comm, sts))
       CkAbort("AMPI> Error in ialltoall request complete");
   }
+}
+
+void IReq::receive(ampi *ptr, AmpiMsg *msg)
+{
+  ptr->processAmpiMsg(msg, buf, type, count);
+  statusIreq = true;
+  length = msg->length;
+  this->tag = msg->tag; // Although not required, we also extract tag from msg
+  src = msg->srcRank;   // Although not required, we also extract src from msg
+  comm = msg->comm;
+  AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", (int)this->tag, this);
+#if CMK_BIGSIM_CHARM
+  event = msg->event;
+  eventPe = msg->eventPe;
+#endif
+  delete msg;
+}
+
+void RednReq::receive(ampi *ptr, CkReductionMsg *msg)
+{
+  ptr->processRednMsg(msg, buf, type, count);
+  statusIreq = true;
+  comm = ptr->getComm();
+#if CMK_BIGSIM_CHARM
+  event = msg->event;
+  eventPe = msg->eventPe;
+#endif
+  // ampi::rednResult is a [nokeep] entry method, so do not delete msg
+}
+
+void GatherReq::receive(ampi *ptr, CkReductionMsg *msg)
+{
+  ptr->processGatherMsg(msg, buf, type, count);
+  statusIreq = true;
+  comm = ptr->getComm();
+#if CMK_BIGSIM_CHARM
+  event = msg->event;
+  eventPe = msg->eventPe;
+#endif
+  // ampi::rednResult is a [nokeep] entry method, so do not delete msg
+}
+
+void GathervReq::receive(ampi *ptr, CkReductionMsg *msg)
+{
+  ptr->processGathervMsg(msg, buf, type, &recvCounts[0], &displs[0]);
+  statusIreq = true;
+  comm = ptr->getComm();
+#if CMK_BIGSIM_CHARM
+  event = msg->event;
+  eventPe = msg->eventPe;
+#endif
+  // ampi::rednResult is a [nokeep] entry method, so do not delete msg
 }
 
 CDECL
@@ -4568,16 +4865,16 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
 
-  CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
+  CkCallback reduceCB(CkIndex_ampi::irednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
   msg->setCallback(reduceCB);
   ptr->contribute(msg);
 
   if (ptr->thisIndex == rootIdx){
-    // use an IReq to non-block the caller and get a request ptr
+    // use a RednReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    IReq *newreq = new IReq(recvbuf,count,type,AMPI_COLL_SOURCE,MPI_REDUCE_TAG,AMPI_COLL_COMM);
+    RednReq *newreq = new RednReq(recvbuf,count,type,comm);
     *request = reqs->insert(newreq);
-    int tags[3] = { MPI_REDUCE_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
+    int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
     CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
   }
 
@@ -4621,14 +4918,12 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
 
-  CkCallback allgatherCB(CkIndex_ampi::gatherResult(0), ptr->getProxy());
+  CkCallback allgatherCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgather called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
-  int totalRecvcount = recvcount * ptr->getSize(comm);
-  if(-1==ptr->recv(MPI_GATHER_TAG, AMPI_COLL_SOURCE, recvbuf, totalRecvcount, recvtype, AMPI_COLL_COMM))
-    CkAbort("AMPI> MPI_Allgather failed!");
+  ptr->blockOnRedn(new GatherReq(recvbuf, recvcount, recvtype, comm));
 
   return MPI_SUCCESS;
 }
@@ -4676,17 +4971,16 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
 
-  CkCallback allgatherCB(CkIndex_ampi::gatherResult(0), ptr->getProxy());
+  CkCallback allgatherCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgather called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
-  // use an IReq to non-block the caller and get a request ptr
+  // use a RednReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  int totalRecvcount = recvcount * ptr->getSize(comm);
-  IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, AMPI_COLL_SOURCE, MPI_GATHER_TAG, AMPI_COLL_COMM);
+  GatherReq *newreq = new GatherReq(recvbuf, recvcount, recvtype, comm);
   *request = reqs->insert(newreq);
-  int tags[3] = { MPI_GATHER_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
+  int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
   CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 
   return MPI_SUCCESS;
@@ -4729,17 +5023,12 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
 
-  CkCallback allgathervCB(CkIndex_ampi::gathervResult(0), ptr->getProxy());
+  CkCallback allgathervCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgatherv called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
-  int totalRecvcount = 0;
-  int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
-  for(int i=0; i<ptr->getSize(comm); i++)
-    totalRecvcount += dttypeSize * recvcounts[i];
-  if(-1==ptr->recv(MPI_GATHER_TAG, AMPI_COLL_SOURCE, recvbuf, totalRecvcount, recvtype, AMPI_COLL_COMM))
-    CkAbort("AMPI> MPI_Allgatherv failed!");
+  ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(comm), recvtype, comm, recvcounts, displs));
 
   return MPI_SUCCESS;
 }
@@ -4787,21 +5076,17 @@ int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
 
-  CkCallback allgathervCB(CkIndex_ampi::gathervResult(0), ptr->getProxy());
+  CkCallback allgathervCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgatherv called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
-  int totalRecvcount = 0;
-  int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
-  for(int i=0; i<ptr->getSize(comm); i++)
-    totalRecvcount += dttypeSize * recvcounts[i];
-
-  // use an IReq to non-block the caller and get a request ptr
+  // use a GathervReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, AMPI_COLL_SOURCE, MPI_GATHER_TAG, AMPI_COLL_COMM);
+  GathervReq *newreq = new GathervReq(recvbuf, ptr->getSize(comm), recvtype,
+                                      comm, recvcounts, displs);
   *request = reqs->insert(newreq);
-  int tags[3] = { MPI_GATHER_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
+  int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
   CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 
   return MPI_SUCCESS;
@@ -4855,15 +5140,13 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
 
-  CkCallback gatherCB(CkIndex_ampi::gatherResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy(), true);
+  CkCallback gatherCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
 
   if(rank==root) {
-    int totalRecvcount = recvcount * ptr->getSize(comm);
-    if(-1==ptr->recv(MPI_GATHER_TAG, AMPI_COLL_SOURCE, recvbuf, totalRecvcount, recvtype, AMPI_COLL_COMM))
-      CkAbort("AMPI> MPI_Gather failed!");
+    ptr->blockOnRedn(new GatherReq(recvbuf, recvcount, recvtype, comm));
   }
 
 #if AMPIMSGLOG
@@ -4931,18 +5214,17 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
 
-  CkCallback gatherCB(CkIndex_ampi::gatherResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy(), true);
+  CkCallback gatherCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
 
   if(rank==root) {
-    // use an IReq to non-block the caller and get a request ptr
+    // use a GatherReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    int totalRecvcount = recvcount * ptr->getSize(comm);
-    IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, AMPI_COLL_SOURCE, MPI_GATHER_TAG, AMPI_COLL_COMM);
+    GatherReq *newreq = new GatherReq(recvbuf, recvcount, recvtype, comm);
     *request = reqs->insert(newreq);
-    int tags[3] = { MPI_GATHER_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
+    int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
     CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
   }
   else {
@@ -5013,18 +5295,13 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
 
-  CkCallback gathervCB(CkIndex_ampi::gathervResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy(), true);
+  CkCallback gathervCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
 
   if(rank==root) {
-    int totalRecvcount = 0;
-    int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
-    for(int i=0; i<ptr->getSize(comm); i++)
-      totalRecvcount += dttypeSize * recvcounts[i];
-    if(-1==ptr->recv(MPI_GATHER_TAG, AMPI_COLL_SOURCE, recvbuf, totalRecvcount, recvtype, AMPI_COLL_COMM))
-      CkAbort("AMPI> MPI_Gatherv failed!");
+    ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(comm), recvtype, comm, recvcounts, displs));
   }
 
 #if AMPIMSGLOG
@@ -5099,22 +5376,18 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
 
-  CkCallback gathervCB(CkIndex_ampi::gathervResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy(), true);
+  CkCallback gathervCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
 
   if(rank==root) {
-    int totalRecvcount = 0;
-    int dttypeSize = ptr->getDDT()->getType(recvtype)->getSize();
-    for(int i=0; i<ptr->getSize(comm); i++)
-      totalRecvcount += dttypeSize * recvcounts[i];
-
-    // use an IReq to non-block the caller and get a request ptr
+    // use a GathervReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    IReq *newreq = new IReq(recvbuf, totalRecvcount, recvtype, AMPI_COLL_SOURCE, MPI_GATHER_TAG, AMPI_COLL_COMM);
+    GathervReq *newreq = new GathervReq(recvbuf, ptr->getSize(comm), recvtype,
+                                        comm, recvcounts, displs);
     *request = reqs->insert(newreq);
-    int tags[3] = { MPI_GATHER_TAG, AMPI_COLL_SOURCE, AMPI_COLL_COMM };
+    int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
     CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
   }
   else {
@@ -5757,14 +6030,14 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   int itemsize = dttype->getSize() ;
   int i;
   for(i=0;i<size;i++)  {
-    ptr->send(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
+    ptr->send(MPI_ATA_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
               sendtype, i, comm);
   }
   dttype = ptr->getDDT()->getType(recvtype) ;
   itemsize = dttype->getSize() ;
 
   for(i=0;i<size;i++) {
-    if(-1==ptr->recv(MPI_GATHER_TAG,i,((char*)recvbuf)+(itemsize*rdispls[i]),recvcounts[i],recvtype, comm))
+    if(-1==ptr->recv(MPI_ATA_TAG,i,((char*)recvbuf)+(itemsize*rdispls[i]),recvcounts[i],recvtype, comm))
       CkAbort("AMPI> Error in MPI_Alltoallv");
   }
 
@@ -5949,11 +6222,11 @@ int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
 
   int itemsize = getDDT()->getType(sendtype)->getSize(sendcount);
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_ATA_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*i)),
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*i)),
               sendcount, sendtype, neighbors[i], comm);
   }
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_ATA_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*j)),
+    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*j)),
                       recvcount, recvtype, comm))
       CkAbort("AMPI> Error in MPI_Neighbor_alltoall recv");
   }
@@ -6001,7 +6274,7 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
 
   int itemsize = getDDT()->getType(sendtype)->getSize(sendcount);
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_ATA_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*i)),
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*i)),
               sendcount, sendtype, neighbors[i], comm);
   }
 
@@ -6010,7 +6283,7 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   IATAReq *newreq = new IATAReq(num_neighbors);
   for (int j=0; j<num_neighbors; j++) {
     if(newreq->addReq(((char*)recvbuf)+(itemsize*j), recvcount, recvtype,
-                      neighbors[j], MPI_ATA_TAG, comm)!=(j+1))
+                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_alltoall: Error adding requests into IATAReq!");
   }
   *request = reqs->insert(newreq);
@@ -6052,11 +6325,11 @@ int AMPI_Neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
 
   int itemsize = getDDT()->getType(sendtype)->getSize();
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_ATA_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
               sendcounts[i], sendtype, neighbors[i], comm);
   }
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_ATA_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*rdispls[j])),
+    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*rdispls[j])),
                       recvcounts[j], recvtype, comm))
       CkAbort("AMPI> Error in MPI_Neighbor_alltoallv recv");
   }
@@ -6105,7 +6378,7 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
 
   int itemsize = getDDT()->getType(sendtype)->getSize();
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_ATA_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
               sendcounts[i], sendtype, neighbors[i], comm);
   }
 
@@ -6114,7 +6387,7 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
   IATAReq *newreq = new IATAReq(num_neighbors);
   for (int j=0; j<num_neighbors; j++) {
     if(newreq->addReq(((char*)recvbuf)+(itemsize*rdispls[j]), recvcounts[j], recvtype,
-                      neighbors[j], MPI_ATA_TAG, comm)!=(j+1))
+                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_alltoallv: Error adding requests into IATAReq!");
   }
   *request = reqs->insert(newreq);
@@ -6155,11 +6428,11 @@ int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_ATA_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
               sendcounts[i], sendtypes[i], neighbors[i], comm);
   }
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_ATA_TAG, neighbors[j], (void*)((char*)recvbuf+rdispls[j]),
+    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)((char*)recvbuf+rdispls[j]),
                       recvcounts[j], recvtypes[j], comm))
       CkAbort("AMPI> Error in MPI_Neighbor_alltoallv recv");
   }
@@ -6207,7 +6480,7 @@ int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_ATA_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
               sendcounts[i], sendtypes[i], neighbors[i], comm);
   }
 
@@ -6216,7 +6489,7 @@ int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
   IATAReq *newreq = new IATAReq(num_neighbors);
   for (int j=0; j<num_neighbors; j++) {
     if(newreq->addReq((char*)recvbuf+rdispls[j], recvcounts[j], recvtypes[j],
-                      neighbors[j], MPI_ATA_TAG, comm)!=(j+1))
+                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_alltoallw: Error adding requests into IATAReq!");
   }
   *request = reqs->insert(newreq);
@@ -6257,11 +6530,11 @@ int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
   }
   int itemsize = getDDT()->getType(recvtype)->getSize(recvcount);
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_GATHER_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*j)),
+    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*j)),
                       recvcount, recvtype, comm))
       CkAbort("AMPI> Error in MPI_Neighbor_allgather recv");
   }
@@ -6308,7 +6581,7 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
   }
 
   // use an IATAReq to non-block the caller and get a request ptr
@@ -6317,7 +6590,7 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
   int itemsize = getDDT()->getType(recvtype)->getSize(recvcount);
   for (int j=0; j<num_neighbors; j++) {
     if(newreq->addReq(((char*)recvbuf)+(itemsize*j), recvcount, recvtype,
-                      neighbors[j], MPI_GATHER_TAG, comm)!=(j+1))
+                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_allgather: Error adding requests into IATAReq!");
   }
   *request = reqs->insert(newreq);
@@ -6358,11 +6631,11 @@ int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
   }
   int itemsize = getDDT()->getType(recvtype)->getSize();
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_GATHER_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*displs[j])),
+    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*displs[j])),
                       recvcounts[j], recvtype, comm))
       CkAbort("AMPI> Error in MPI_Neighbor_allgatherv recv");
   }
@@ -6409,7 +6682,7 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
   int num_neighbors = neighbors.size();
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_GATHER_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+    ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
   }
 
   // use an IATAReq to non-block the caller and get a request ptr
@@ -6418,7 +6691,7 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
   int itemsize = getDDT()->getType(recvtype)->getSize();
   for (int j=0; j<num_neighbors; j++) {
     if(newreq->addReq(((char*)recvbuf)+(itemsize*displs[j]), recvcounts[j], recvtype,
-                      neighbors[j], MPI_GATHER_TAG, comm)!=(j+1))
+                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_allgatherv: Error adding requests into IATAReq!");
   }
   *request = reqs->insert(newreq);

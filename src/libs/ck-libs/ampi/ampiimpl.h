@@ -502,19 +502,24 @@ extern int _mpi_nworlds;
 
 #define MPI_ATA_SEQ_TAG MPI_TAG_UB_VALUE+1
 #define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+10
-#define MPI_BARR_TAG    MPI_TAG_UB_VALUE+11
-#define MPI_REDUCE_TAG  MPI_TAG_UB_VALUE+12
-#define MPI_GATHER_TAG  MPI_TAG_UB_VALUE+13
-#define MPI_SCATTER_TAG MPI_TAG_UB_VALUE+14
-#define MPI_SCAN_TAG    MPI_TAG_UB_VALUE+15
-#define MPI_EXSCAN_TAG  MPI_TAG_UB_VALUE+16
-#define MPI_ATA_TAG     MPI_TAG_UB_VALUE+17
+#define MPI_REDN_TAG    MPI_TAG_UB_VALUE+11
+#define MPI_SCATTER_TAG MPI_TAG_UB_VALUE+12
+#define MPI_SCAN_TAG    MPI_TAG_UB_VALUE+13
+#define MPI_EXSCAN_TAG  MPI_TAG_UB_VALUE+14
+#define MPI_ATA_TAG     MPI_TAG_UB_VALUE+15
+#define MPI_NBOR_TAG    MPI_TAG_UB_VALUE+16
 
-#define MPI_PERS_REQ 1
-#define MPI_I_REQ    2
-#define MPI_IATA_REQ 3
-#define MPI_S_REQ    4
-#define MPI_GPU_REQ  5
+#define AMPI_COLL_SOURCE 0
+#define AMPI_COLL_COMM   MPI_COMM_WORLD
+
+#define MPI_PERS_REQ    1
+#define MPI_I_REQ       2
+#define MPI_IATA_REQ    3
+#define MPI_S_REQ       4
+#define MPI_REDN_REQ    5
+#define MPI_GATHER_REQ  6
+#define MPI_GATHERV_REQ 7
+#define MPI_GPU_REQ     8
 
 #define MyAlign8(x) (((x)+7)&(~7))
 
@@ -533,7 +538,8 @@ class AmpiRequest {
 
 #if CMK_BIGSIM_CHARM
  public:
-  void *event; // the event point that corresponding to this message
+  void *event; // the event point that corresponds to this message
+  int eventPe; // the PE that the event is located on
 #endif
  protected:
   bool isvalid;
@@ -549,7 +555,8 @@ class AmpiRequest {
 
   /// Return true if this request is finished (progress):
   ///  test always yields before returning false.
-  ///  itest does not yield before returning false for IReq's and SReq's.
+  ///  itest does not yield before returning false for
+  //   IReq's, RednReq's, Gather(v)Req's, and SReq's.
   virtual bool test(MPI_Status *sts) =0;
   virtual bool itest(MPI_Status *sts) =0;
 
@@ -560,14 +567,19 @@ class AmpiRequest {
   ///  returning a valid MPI error code.
   virtual int wait(MPI_Status *sts) =0;
 
+  /// Receive an AmpiMsg
   virtual void receive(ampi *ptr, AmpiMsg *msg) = 0;
+
+  /// Receive a CkReductionMsg
+  virtual void receive(ampi *ptr, CkReductionMsg *msg) = 0;
 
   /// Frees up the request: invalidate it
   virtual void free(void){ isvalid=false; }
   inline bool isValid(void) const { return isvalid; }
 
   /// Returns the type of request:
-  ///  MPI_PERS_REQ, MPI_I_REQ, MPI_IATA_REQ, MPI_S_REQ, MPI_GPU_REQ
+  ///  MPI_PERS_REQ, MPI_I_REQ, MPI_IATA_REQ, MPI_S_REQ,
+  //   MPI_REDN_REQ, MPI_GATHER_REQ, MPI_GATHERV_REQ, MPI_GPU_REQ
   virtual int getType(void) const =0;
 
   virtual void pup(PUP::er &p) {
@@ -583,6 +595,7 @@ class AmpiRequest {
     //as the "log" is not moved from memory, this pointer is safe
     //to be reused
     p((char *)&event, sizeof(void *));
+    p(eventPe);
 #endif
   }
 
@@ -604,6 +617,7 @@ class PersReq : public AmpiRequest {
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
   void receive(ampi *ptr, AmpiMsg *msg) {}
+  void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_PERS_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
@@ -628,9 +642,85 @@ class IReq : public AmpiRequest {
   int wait(MPI_Status *sts);
   inline int getType(void) const { return MPI_I_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg);
+  void receive(ampi *ptr, CkReductionMsg *msg) {}
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|statusIreq;  p|length;
+  }
+  virtual void print();
+};
+
+class RednReq : public AmpiRequest {
+ public:
+  bool statusIreq;
+  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_){
+    buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
+    comm=comm_;  isvalid=true; statusIreq=false;
+  }
+  RednReq(): statusIreq(false){};
+  ~RednReq(){}
+  bool test(MPI_Status *sts);
+  bool itest(MPI_Status *sts);
+  void complete(MPI_Status *sts);
+  int wait(MPI_Status *sts);
+  inline int getType(void) const { return MPI_REDN_REQ; }
+  void receive(ampi *ptr, AmpiMsg *msg) {}
+  void receive(ampi *ptr, CkReductionMsg *msg);
+  virtual void pup(PUP::er &p){
+    AmpiRequest::pup(p);
+    p|statusIreq;
+  }
+  virtual void print();
+};
+
+class GatherReq : public AmpiRequest {
+ public:
+  bool statusIreq;
+  GatherReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_){
+    buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
+    comm=comm_;  isvalid=true; statusIreq=false;
+  }
+  GatherReq(): statusIreq(false){};
+  ~GatherReq(){}
+  bool test(MPI_Status *sts);
+  bool itest(MPI_Status *sts);
+  void complete(MPI_Status *sts);
+  int wait(MPI_Status *sts);
+  inline int getType(void) const { return MPI_GATHER_REQ; }
+  void receive(ampi *ptr, AmpiMsg *msg) {}
+  void receive(ampi *ptr, CkReductionMsg *msg);
+  virtual void pup(PUP::er &p){
+    AmpiRequest::pup(p);
+    p|statusIreq;
+  }
+  virtual void print();
+};
+
+class GathervReq : public AmpiRequest {
+ public:
+  bool statusIreq;
+  vector<int> recvCounts;
+  vector<int> displs;
+  GathervReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, int *rc, int *d){
+    buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
+    comm=comm_;  isvalid=true; statusIreq=false;
+    recvCounts.resize(count);
+    for(int i=0; i<count; i++) recvCounts[i]=rc[i];
+    displs.resize(count);
+    for(int i=0; i<count; i++) displs[i]=d[i];
+  }
+  GathervReq(): statusIreq(false){};
+  ~GathervReq(){}
+  bool test(MPI_Status *sts);
+  bool itest(MPI_Status *sts);
+  void complete(MPI_Status *sts);
+  int wait(MPI_Status *sts);
+  inline int getType(void) const { return MPI_GATHERV_REQ; }
+  void receive(ampi *ptr, AmpiMsg *msg) {}
+  void receive(ampi *ptr, CkReductionMsg *msg);
+  virtual void pup(PUP::er &p){
+    AmpiRequest::pup(p);
+    p|statusIreq;  p|recvCounts;  p|displs;
   }
   virtual void print();
 };
@@ -648,6 +738,7 @@ class SReq : public AmpiRequest {
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
   void receive(ampi *ptr, AmpiMsg *msg) {}
+  void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_S_REQ; }
   virtual void pup(PUP::er &p){
   AmpiRequest::pup(p);
@@ -667,6 +758,7 @@ class GPUReq : public AmpiRequest {
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
   void receive(ampi *ptr, AmpiMsg *msg);
+  void receive(ampi *ptr, CkReductionMsg *msg) {}
   void setComplete();
 };
 
@@ -689,6 +781,7 @@ class IATAReq : public AmpiRequest {
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
   void receive(ampi *ptr, AmpiMsg *msg) {}
+  void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getCount(void) const { return elmcount; }
   inline int getType(void) const { return MPI_IATA_REQ; }
   virtual void pup(PUP::er &p){
@@ -1264,13 +1357,18 @@ An ampi manages the communication of one thread over
 one MPI communicator.
 */
 class ampi : public CBase_ampi {
-  friend class IReq;
+  friend class IReq; // for checking resumeOnRecv
   friend class SReq;
+  friend class RednReq;
+  friend class GatherReq;
+  friend class GathervReq;
   CProxy_ampiParent parentProxy;
   void findParent(bool forMigration);
   ampiParent *parent;
   TCharm *thread;
   bool resumeOnRecv;
+  bool resumeOnColl;
+  AmpiRequest *blockingReq;
 
   ampiCommStruct myComm;
   int myRank;
@@ -1300,14 +1398,12 @@ class ampi : public CBase_ampi {
   void block(void);
   void unblock(void);
   void yield(void);
-  ampi* blockOnRecv(void);
   void generic(AmpiMsg *);
   void ssend_ack(int sreq);
   void barrierResult(void);
   void ibarrierResult(void);
-  void reduceResult(CkReductionMsg *m);
-  void gatherResult(CkReductionMsg *m);
-  void gathervResult(CkReductionMsg *m);
+  void rednResult(CkReductionMsg *msg);
+  void irednResult(CkReductionMsg *msg);
 
   void splitPhase1(CkReductionMsg *msg);
   void commCreatePhase1(MPI_Comm nextGroupComm);
@@ -1324,6 +1420,10 @@ class ampi : public CBase_ampi {
     return parent->comm2CommStruct(comm);
   }
 
+  inline ampi* blockOnRecv(void);
+  inline ampi* blockOnColl(void);
+  inline ampi* blockOnRedn(AmpiRequest *req);
+
   AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int sync=0);
 
@@ -1333,7 +1433,11 @@ class ampi : public CBase_ampi {
                       int idx);
   void delesend(int t, int s, const void* buf, int count, MPI_Datatype type,
                 int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
-  inline int processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, MPI_Datatype type);
+  inline void processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count);
+  inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count);
+  inline void processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount);
+  inline void processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
+                               int* recvCounts, int* displs);
   inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const;
   int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL);
   void irecv(void *buf, int count, MPI_Datatype type, int src,

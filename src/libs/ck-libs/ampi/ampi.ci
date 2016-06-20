@@ -47,9 +47,8 @@ module ampi {
     entry EXPEDITED void generic(AmpiMsg *);
     entry EXPEDITED_REDN void barrierResult(void);
     entry EXPEDITED_REDN void ibarrierResult(void);
-    entry EXPEDITED_NOKEEP void reduceResult(CkReductionMsg *m);
-    entry EXPEDITED_NOKEEP void gatherResult(CkReductionMsg *m);
-    entry EXPEDITED_NOKEEP void gathervResult(CkReductionMsg *m);
+    entry EXPEDITED_NOKEEP void rednResult(CkReductionMsg *msg);
+    entry EXPEDITED_NOKEEP void irednResult(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void splitPhase1(CkReductionMsg *msg);
     entry EXPEDITED_THREADED_REDN void commCreatePhase1(MPI_Comm nextGroupComm);
     entry EXPEDITED_THREADED_REDN void intercommCreatePhase1(MPI_Comm nextInterComm);
