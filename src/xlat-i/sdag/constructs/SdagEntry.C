@@ -37,8 +37,10 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
       CStateVar& var = **iter;
       if (var.isVoid != 1) {
         if (count != 0) signature << ", ";
+        if (var.byConst) signature << "const ";
         if (var.type != 0) signature << var.type << " ";
         if (var.arrayLength != NULL) signature << "* ";
+        if (var.declaredRef) signature << "& ";
         if (var.name != 0) signature << var.name;
         count++;
       }
