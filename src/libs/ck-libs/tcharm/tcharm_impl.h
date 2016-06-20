@@ -251,21 +251,7 @@ class TCharm: public CBase_TCharm
 		CmiIsomallocBlockListActivate(NULL);
 		CtgInstall(NULL);		
 	}
-        static void activateVariable(const void *ptr) {
-		TCharm *tc=CtvAccess(_curTCharm);
-		if (tc!=NULL) {
-			if (tc->threadGlobals)
-				CtgInstall_var(tc->threadGlobals, (char *)ptr);
-		}
-        }
-	static void deactivateVariable(const void *ptr) {
-		TCharm *tc=CtvAccess(_curTCharm);
-		if (tc!=NULL) {
-			if (tc->threadGlobals)
-		                CtgUninstall_var(tc->threadGlobals, (char *)ptr);		
-                }
-	}
-	
+
 	/// System() call emulation:
 	int system(const char *cmd);
 	void callSystem(const callSystemStruct &s);

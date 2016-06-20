@@ -1873,9 +1873,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count
     seq = oorder.nextOutgoing(destIdx);
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sIdx, sRank, len, destcomm);
   if (sync) UsrToEnv(msg)->setRef(sync);
-  TCharm::activateVariable(buf);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
-  TCharm::deactivateVariable(buf);
   return msg;
 }
 
@@ -1941,13 +1939,12 @@ int ampi::processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int t
     count = msg->length/(ddt->getSize(1));
   }
 
-  TCharm::activateVariable(buf);
   if (t==MPI_REDUCE_TAG) { // reduction msg
     ddt->serialize((char*)buf, (char*)msg->data+sizeof(AmpiOpHeader), count, (-1));
   } else {
     ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
   }
-  TCharm::deactivateVariable(buf);
+
   return 0;
 }
 
@@ -2958,9 +2955,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
   CkReductionMsg *msg=CkReductionMsg::buildNew(szdata+szhdr,NULL,AmpiReducer);
   memcpy(msg->getData(),&newhdr,szhdr);
   if (count > 0) {
-    TCharm::activateVariable(inbuf);
     ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
-    TCharm::deactivateVariable(inbuf);
   }
   return msg;
 }
@@ -3064,12 +3059,8 @@ static int copyDatatype(MPI_Comm comm,MPI_Datatype type,int count,const void *in
   CkDDT_DataType *ddt=ptr->getDDT()->getType(type);
   int len=ddt->getSize(count);
   vector<char> serialized(len);
-  TCharm::activateVariable(inbuf);
-  TCharm::activateVariable(outbuf);
   ddt->serialize((char*)inbuf,&serialized[0],count,1);
   ddt->serialize((char*)outbuf,&serialized[0],count,-1);
-  TCharm::deactivateVariable(outbuf);
-  TCharm::deactivateVariable(inbuf);
 
   return MPI_SUCCESS;
 }

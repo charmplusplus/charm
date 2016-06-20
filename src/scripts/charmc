@@ -127,7 +127,7 @@ printUsage() {
     echo "        -modules <comma-separated list of C++ modules> -thread"
     echo "        -debug-script -count-tokens -default-to-aout -E -S -M"
     echo "        -verbose -save -purify -cp <dest> -cpmod -gen-cpm <pkg>"
-    echo "        -swapglobals -copyglobals -tlsglobals -roseomptlsglobals"
+    echo "        -swapglobals -tlsglobals -roseomptlsglobals"
     echo "        -use-reliable-cc -use-fastest-cc -use-new-std"
     echo "        -cc <new cc> -c++ <new CC> -ld <new ld> -ld++ <new LD>"
     echo "        -cpp-option <opt> -ldro-option <opt> -cc-option <opt>"
@@ -480,11 +480,6 @@ do
 	
 	"-swapglobal"|"-swapglobals")
 		SWAPGLOBALS="1"
-		USE_PIC="1"
-		;;
-
-	"-copyglobal"|"-copyglobals")
-		SWAPGLOBALS="2"
 		USE_PIC="1"
 		;;
 
@@ -1608,15 +1603,8 @@ then
 fi
 if [ "$SWAPGLOBALS" = "2" ]
 then
-	swapo="$CHARMLIB/libglobal-copy.a"
-	if [ ! -r "$swapo" -o ! -s "$swapo" ]
-	then
-		echo "Global-copying library $swapo missing--"
-		echo "  Is -copyglobals supported on this machine?"
-		exit 1
-	else
-		MIDDLE_LIBS="-lglobal-copy $MIDDLE_LIBS"
-	fi
+	echo "-copyglobals option is no longer supported by Charm++/AMPI"
+	exit 1
 fi
 
 if [ $USE_F77_LIBRARIES = "1" ]

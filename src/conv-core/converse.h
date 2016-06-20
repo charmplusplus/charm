@@ -1415,7 +1415,6 @@ void CtgInit(void);
 /** PIC method used. **/
 #define CMI_PIC_NOP     0
 #define CMI_PIC_ELFGOT  1
-#define CMI_PIC_ELFCOPY 2
 CpvExtern(int, CmiPICMethod);
 
 /** Copy the current globals into this new set */
@@ -1428,8 +1427,6 @@ CtgGlobals CtgPup(pup_er, CtgGlobals g);
 void CtgFree(CtgGlobals g);
 /** Return the current global list */
 CtgGlobals CtgCurrentGlobals(void);
-void CtgInstall_var(CtgGlobals g, void *ptr);
-void CtgUninstall_var(CtgGlobals g, void *ptr);
 
 /** for TLS globals */
 void CtgInstallTLS(void *cur, void *next);

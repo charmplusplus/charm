@@ -489,9 +489,6 @@ CtgGlobals CtgCurrentGlobals(void){
 	return CpvAccess(_curCtg);
 }
 
-void CtgInstall_var(CtgGlobals g, void *ptr) {}
-void CtgUninstall_var(CtgGlobals g, void *ptr) {}
-
 #else
 
 #include "global-nop.c"

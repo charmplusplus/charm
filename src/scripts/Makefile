@@ -584,16 +584,10 @@ $(eval $(call libthreads,context-memoryalias,             ,-DCMK_THREADS_BUILD_C
 $(eval $(call libthreads,uJcontext-memoryalias,uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_ALIAS_STACK=1 -U_FORTIFY_SOURCE -touch-on-failure))
 
 ## Global swapping (-swapglobal)
-swapglobal-target: $(L)/libglobal-swap.a $(L)/libglobal-copy.a $(L)/loadsym.a
+swapglobal-target: $(L)/libglobal-swap.a
 
 $(L)/libglobal-swap.a: global-elfgot.C $(CVHEADERS)
 	-$(CHARMC) -c global-elfgot.C -o $@ || touch $@
-
-$(L)/libglobal-copy.a: global-elfcopy.C  $(CVHEADERS)
-	-$(CHARMC) -c global-elfcopy.C -o $@ || touch $@
-
-$(L)/loadsym.a: loadsym.c  $(CVHEADERS)
-	-$(CHARMC) -c loadsym.c -o $@ || touch $@
 
 ###############################################################################
 #
