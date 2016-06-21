@@ -698,8 +698,10 @@ void CmiInitCPUAffinity(char **argv)
 #endif
 
   if (!affinity_flag) {
-    if (show_affinity_flag) CmiPrintCPUAffinity();
-    CmiPrintf("Charm++> cpu affinity NOT enabled.\n");
+    if (show_affinity_flag) {
+      CmiPrintCPUAffinity();
+      CmiPrintf("Charm++> cpu affinity NOT enabled.\n");
+    }
     return;
   }
 
