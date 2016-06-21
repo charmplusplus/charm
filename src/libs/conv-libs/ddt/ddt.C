@@ -141,7 +141,7 @@ CkDDT::~CkDDT()
 }
 
 
-int
+bool
 CkDDT::isContig(int nIndex)
 {
   return getType(nIndex)->isContig();
@@ -427,7 +427,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
   extent = size;
   lb = 0;
   ub = size;
-  iscontig = 1;
+  iscontig = true;
   nameLen = 0;
   DDTDEBUG("CkDDT_DataType constructor: type=%d, size=%d, extent=%ld, iscontig=%d\n",
            type, size, extent, iscontig);
@@ -435,7 +435,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
 
 
 CkDDT_DataType::CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int count, CkDDT_Aint lb, CkDDT_Aint ub,
-            int iscontig, int baseSize, CkDDT_Aint baseExtent, CkDDT_DataType* baseType, int baseIndex) :
+            bool iscontig, int baseSize, CkDDT_Aint baseExtent, CkDDT_DataType* baseType, int baseIndex) :
     datatype(datatype), size(size), extent(extent), count(count), lb(lb), ub(ub), iscontig(iscontig),
     baseSize(baseSize), baseExtent(baseExtent), baseType(baseType), baseIndex(baseIndex), nameLen(0)
 {}
@@ -464,7 +464,7 @@ CkDDT_DataType::getName(char *dest, int *len)
   memcpy(dest, name, *len+1);
 }
 
-int
+bool
 CkDDT_DataType::isContig()
 {
   return iscontig;
@@ -633,7 +633,7 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
   if (count==1 || (strideLength==1 && blockLength==1))
     iscontig = baseType->isContig();
   else
-    iscontig = 0;
+    iscontig = false;
 }
 
 size_t
@@ -713,7 +713,7 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
   if (count==1 || (strideLength==1 && blockLength==1))
     iscontig = baseType->isContig();
   else
-    iscontig = 0;
+    iscontig = false;
 }
 
 size_t
@@ -789,7 +789,7 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp, int
                 break;
             }
         }
-        iscontig = (contig)? baseType->isContig() : 0;
+        iscontig = (contig && baseType->isContig());
     }
 }
 
@@ -895,7 +895,7 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp,  
         break;
       }
     }
-    iscontig = (contig)? baseType->isContig() : 0;
+    iscontig = (contig && baseType->isContig());
   }
 }
 
@@ -971,7 +971,7 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *Arr
     iscontig = baseType->isContig();
   }
   else if (BlockLength != 1) {
-    iscontig = 0;
+    iscontig = false;
   }
   else {
     bool contig = true;
@@ -981,7 +981,7 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *Arr
         break;
       }
     }
-    iscontig = (contig)? baseType->isContig() : 0;
+    iscontig = (contig && baseType->isContig());
   }
 }
 
@@ -1074,7 +1074,7 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *A
     iscontig = baseType->isContig();
   }
   else if (BlockLength != 1) {
-    iscontig = 0;
+    iscontig = false;
   }
   else {
     bool contig = true;
@@ -1084,7 +1084,7 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *A
         break;
       }
     }
-    iscontig = (contig)? baseType->isContig() : 0;
+    iscontig = (contig && baseType->isContig());
   }
 }
 
@@ -1216,10 +1216,10 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
           break;
         }
       }
-      iscontig = (contig)? 1 : 0;
+      iscontig = contig;
     }
     else {
-      iscontig = 0;
+      iscontig = false;
     }
   }
   DDTDEBUG("type %d: ub=%ld, lb=%ld, extent=%ld, size=%d, iscontig=%d\n",datatype,ub,lb,extent,size,iscontig);

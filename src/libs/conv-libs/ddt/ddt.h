@@ -134,7 +134,7 @@ class CkDDT_DataType {
     int count;
     CkDDT_Aint lb;
     CkDDT_Aint ub;
-    int iscontig;
+    bool iscontig;
     int baseSize;
     CkDDT_Aint baseExtent;
     CkDDT_DataType *baseType;
@@ -151,10 +151,10 @@ class CkDDT_DataType {
     virtual ~CkDDT_DataType() { }
     CkDDT_DataType(int type);
     CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int count, CkDDT_Aint lb, CkDDT_Aint ub,
-            int iscontig, int baseSize, CkDDT_Aint baseExtent,
+            bool iscontig, int baseSize, CkDDT_Aint baseExtent,
             CkDDT_DataType* baseType, int baseIndex);
 
-    virtual int isContig(void);
+    virtual bool isContig(void);
     virtual int getSize(int count=1);
     virtual CkDDT_Aint getExtent(void);
     virtual int getBaseSize(void);
@@ -562,7 +562,7 @@ class CkDDT {
   void  pup(PUP::er &p);
   CkDDT_DataType*  getType(int nIndex);
 
-  int isContig(int nIndex);
+  bool isContig(int nIndex);
   int getSize(int nIndex, int count=1);
   CkDDT_Aint getExtent(int nIndex);
   CkDDT_Aint getLB(int nIndex);
