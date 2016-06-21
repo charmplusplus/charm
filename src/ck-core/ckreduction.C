@@ -1601,9 +1601,13 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 
 //Use this macro for reductions that have the same type for all inputs
 #define SIMPLE_POLYMORPH_REDUCTION(nameBase,loop) \
+  SIMPLE_REDUCTION(nameBase##_char,char,"%c",loop) \
+  SIMPLE_REDUCTION(nameBase##_short,short,"%h",loop) \
   SIMPLE_REDUCTION(nameBase##_int,int,"%d",loop) \
   SIMPLE_REDUCTION(nameBase##_long,long,"%ld",loop) \
   SIMPLE_REDUCTION(nameBase##_long_long,long long,"%lld",loop) \
+  SIMPLE_REDUCTION(nameBase##_uchar,unsigned char,"%c",loop) \
+  SIMPLE_REDUCTION(nameBase##_ushort,unsigned short,"%hu",loop) \
   SIMPLE_REDUCTION(nameBase##_uint,unsigned int,"%u",loop) \
   SIMPLE_REDUCTION(nameBase##_ulong,unsigned long,"%lu",loop) \
   SIMPLE_REDUCTION(nameBase##_ulong_long,unsigned long long,"%llu",loop) \
@@ -1986,9 +1990,13 @@ CkReduction::reducerStruct CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     CkReduction::reducerStruct(::invalid_reducer, true),
     CkReduction::reducerStruct(::nop, true),
     //Compute the sum the numbers passed by each element.
+    CkReduction::reducerStruct(::sum_char, true),
+    CkReduction::reducerStruct(::sum_short, true),
     CkReduction::reducerStruct(::sum_int, true),
     CkReduction::reducerStruct(::sum_long, true),
     CkReduction::reducerStruct(::sum_long_long, true),
+    CkReduction::reducerStruct(::sum_uchar, true),
+    CkReduction::reducerStruct(::sum_ushort, true),
     CkReduction::reducerStruct(::sum_uint, true),
     CkReduction::reducerStruct(::sum_ulong, true),
     CkReduction::reducerStruct(::sum_ulong_long, true),
@@ -1998,9 +2006,13 @@ CkReduction::reducerStruct CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     CkReduction::reducerStruct(::sum_double, false),
 
     //Compute the product the numbers passed by each element.
+    CkReduction::reducerStruct(::product_char, true),
+    CkReduction::reducerStruct(::product_short, true),
     CkReduction::reducerStruct(::product_int, true),
     CkReduction::reducerStruct(::product_long, true),
     CkReduction::reducerStruct(::product_long_long, true),
+    CkReduction::reducerStruct(::product_uchar, true),
+    CkReduction::reducerStruct(::product_ushort, true),
     CkReduction::reducerStruct(::product_uint, true),
     CkReduction::reducerStruct(::product_ulong, true),
     CkReduction::reducerStruct(::product_ulong_long, true),
@@ -2008,9 +2020,13 @@ CkReduction::reducerStruct CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     CkReduction::reducerStruct(::product_double, true),
 
     //Compute the largest number passed by any element.
+    CkReduction::reducerStruct(::max_char, true),
+    CkReduction::reducerStruct(::max_short, true),
     CkReduction::reducerStruct(::max_int, true),
     CkReduction::reducerStruct(::max_long, true),
     CkReduction::reducerStruct(::max_long_long, true),
+    CkReduction::reducerStruct(::max_uchar, true),
+    CkReduction::reducerStruct(::max_ushort, true),
     CkReduction::reducerStruct(::max_uint, true),
     CkReduction::reducerStruct(::max_ulong, true),
     CkReduction::reducerStruct(::max_ulong_long, true),
@@ -2018,9 +2034,13 @@ CkReduction::reducerStruct CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     CkReduction::reducerStruct(::max_double, true),
 
     //Compute the smallest number passed by any element.
+    CkReduction::reducerStruct(::min_char, true),
+    CkReduction::reducerStruct(::min_short, true),
     CkReduction::reducerStruct(::min_int, true),
     CkReduction::reducerStruct(::min_long, true),
     CkReduction::reducerStruct(::min_long_long, true),
+    CkReduction::reducerStruct(::min_uchar, true),
+    CkReduction::reducerStruct(::min_ushort, true),
     CkReduction::reducerStruct(::min_uint, true),
     CkReduction::reducerStruct(::min_ulong, true),
     CkReduction::reducerStruct(::min_ulong_long, true),
