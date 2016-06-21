@@ -518,14 +518,18 @@ void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 
-/* ampiReducer: AMPI's generic reducer type MPI_Op is a
+/* AmpiReducer: AMPI's generic reducer type MPI_Op is a
  * function pointer to an MPI_User_function so that it
  * can be packed into AmpiOpHeader, shipped with the
  * reduction message, and then plugged into the ampiReducer.
  *
- * The final reduction message will have an additional
- * sizeof(AmpiOpHeader) bytes in the buffer before any
- * user data. ampi::processRednMsg strips the header. */
+ * This generic reducer type is used only for reductions that
+ * are not built-in to Charm++.
+ *
+ * If AmpiReducer is used, the final reduction message will
+ * have an additional sizeof(AmpiOpHeader) bytes in the
+ * buffer before any user data. ampi::processRednMsg strips
+ * the header. */
 CkReduction::reducerType AmpiReducer;
 
 // every msg contains a AmpiOpHeader structure before user data
@@ -550,6 +554,92 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
   }
   CkReductionMsg *retmsg = CkReductionMsg::buildNew(szhdr+szdata,retPtr);
   return retmsg;
+}
+
+static CkReduction::reducerType getBuiltinReducerType(int type, MPI_Op op)
+{
+  switch (type) {
+    case MPI_INT:
+      if (op == MPI_MAX)       return CkReduction::max_int;
+      else if (op == MPI_MIN)  return CkReduction::min_int;
+      else if (op == MPI_SUM)  return CkReduction::sum_int;
+      else if (op == MPI_PROD) return CkReduction::product_int;
+      else if (op == MPI_LAND) return CkReduction::logical_and;
+      else if (op == MPI_LOR)  return CkReduction::logical_or;
+      else if (op == MPI_BAND) return CkReduction::bitvec_and;
+      else if (op == MPI_BOR)  return CkReduction::bitvec_or;
+      else if (op == MPI_BXOR) return CkReduction::bitvec_xor;
+      else break;
+    case MPI_FLOAT:
+      if (op == MPI_MAX)       return CkReduction::max_float;
+      else if (op == MPI_MIN)  return CkReduction::min_float;
+      else if (op == MPI_SUM)  return CkReduction::sum_float;
+      else if (op == MPI_PROD) return CkReduction::product_float;
+      else break;
+    case MPI_DOUBLE:
+      if (op == MPI_MAX)       return CkReduction::max_double;
+      else if (op == MPI_MIN)  return CkReduction::min_double;
+      else if (op == MPI_SUM)  return CkReduction::sum_double;
+      else if (op == MPI_PROD) return CkReduction::product_double;
+      else break;
+    case MPI_CHAR:
+      if (op == MPI_MAX)       return CkReduction::max_char;
+      else if (op == MPI_MIN)  return CkReduction::min_char;
+      else if (op == MPI_SUM)  return CkReduction::sum_char;
+      else if (op == MPI_PROD) return CkReduction::product_char;
+      else break;
+    case MPI_SHORT:
+      if (op == MPI_MAX)       return CkReduction::max_short;
+      else if (op == MPI_MIN)  return CkReduction::min_short;
+      else if (op == MPI_SUM)  return CkReduction::sum_short;
+      else if (op == MPI_PROD) return CkReduction::product_short;
+      else break;
+    case MPI_LONG:
+      if (op == MPI_MAX)       return CkReduction::max_long;
+      else if (op == MPI_MIN)  return CkReduction::min_long;
+      else if (op == MPI_SUM)  return CkReduction::sum_long;
+      else if (op == MPI_PROD) return CkReduction::product_long;
+      else break;
+    case MPI_LONG_LONG:
+      if (op == MPI_MAX)       return CkReduction::max_long_long;
+      else if (op == MPI_MIN)  return CkReduction::min_long_long;
+      else if (op == MPI_SUM)  return CkReduction::sum_long_long;
+      else if (op == MPI_PROD) return CkReduction::product_long_long;
+      else break;
+    case MPI_UNSIGNED_CHAR:
+      if (op == MPI_MAX)       return CkReduction::max_uchar;
+      else if (op == MPI_MIN)  return CkReduction::min_uchar;
+      else if (op == MPI_SUM)  return CkReduction::sum_uchar;
+      else if (op == MPI_PROD) return CkReduction::product_uchar;
+      else break;
+    case MPI_UNSIGNED_SHORT:
+      if (op == MPI_MAX)       return CkReduction::max_ushort;
+      else if (op == MPI_MIN)  return CkReduction::min_ushort;
+      else if (op == MPI_SUM)  return CkReduction::sum_ushort;
+      else if (op == MPI_PROD) return CkReduction::product_ushort;
+      else break;
+    case MPI_UNSIGNED:
+      if (op == MPI_MAX)       return CkReduction::max_uint;
+      else if (op == MPI_MIN)  return CkReduction::min_uint;
+      else if (op == MPI_SUM)  return CkReduction::sum_uint;
+      else if (op == MPI_PROD) return CkReduction::product_uint;
+      else break;
+    case MPI_UNSIGNED_LONG:
+      if (op == MPI_MAX)       return CkReduction::max_ulong;
+      else if (op == MPI_MIN)  return CkReduction::min_ulong;
+      else if (op == MPI_SUM)  return CkReduction::sum_ulong;
+      else if (op == MPI_PROD) return CkReduction::product_ulong;
+      else break;
+    case MPI_UNSIGNED_LONG_LONG:
+      if (op == MPI_MAX)       return CkReduction::max_ulong_long;
+      else if (op == MPI_MIN)  return CkReduction::min_ulong_long;
+      else if (op == MPI_SUM)  return CkReduction::sum_ulong_long;
+      else if (op == MPI_PROD) return CkReduction::product_ulong_long;
+      else break;
+    default:
+      break;
+  }
+  return CkReduction::invalid;
 }
 
 class Builtin_kvs{
@@ -2046,8 +2136,10 @@ void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
 
 void ampi::processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count)
 {
-  // The first sizeof(AmpiOpHeader) bytes in the redn msg data are reserved for MPI_Op
-  getDDT()->getType(type)->serialize((char*)buf, (char*)msg->getData()+sizeof(AmpiOpHeader), count, (-1));
+  // The first sizeof(AmpiOpHeader) bytes in the redn msg data are reserved
+  // for an AmpiOpHeader if our custom AmpiReducer type was used.
+  int szhdr = (msg->getReducer() == AmpiReducer) ? sizeof(AmpiOpHeader) : 0;
+  getDDT()->getType(type)->serialize((char*)buf, (char*)msg->getData()+szhdr, count, (-1));
 }
 
 void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount)
@@ -3192,12 +3284,22 @@ void ampi::irednResult(CkReductionMsg *msg)
 
 static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,int type,MPI_Op op)
 {
-  int szdata = ddt->getSize(count);
-  int szhdr = sizeof(AmpiOpHeader);
-  AmpiOpHeader newhdr(op,type,count,szdata);
-  CkReductionMsg *msg=CkReductionMsg::buildNew(szdata+szhdr,NULL,AmpiReducer);
-  memcpy(msg->getData(),&newhdr,szhdr);
-  ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
+  CkReductionMsg *msg;
+  CkReduction::reducerType reducer = getBuiltinReducerType(type, op);
+  if (reducer == CkReduction::invalid) {
+    AMPI_DEBUG("[%d] In makeRednMsg, using custom AmpiReducer type\n", thisIndex);
+    int szdata = ddt->getSize(count);
+    int szhdr = sizeof(AmpiOpHeader);
+    AmpiOpHeader newhdr(op, type, count, szdata);
+    msg = CkReductionMsg::buildNew(szdata+szhdr, NULL, AmpiReducer);
+    memcpy(msg->getData(), &newhdr, szhdr);
+    ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
+  }
+  else {
+    AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type\n", thisIndex);
+    msg = CkReductionMsg::buildNew(ddt->getSize(count), NULL, reducer);
+    ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
+  }
   return msg;
 }
 
