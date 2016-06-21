@@ -3053,14 +3053,19 @@ void ampi::gathervResult(CkReductionMsg *msg)
 
 // Copy the MPI datatype "type" from inbuf to outbuf
 static int copyDatatype(MPI_Comm comm,MPI_Datatype type,int count,const void *inbuf,void *outbuf) {
-  // ddts don't have "copy", so fake it by serializing into a temp buffer, then
-  //  deserializing into the output.
   ampi *ptr = getAmpiInstance(comm);
-  CkDDT_DataType *ddt=ptr->getDDT()->getType(type);
-  int len=ddt->getSize(count);
-  vector<char> serialized(len);
-  ddt->serialize((char*)inbuf,&serialized[0],count,1);
-  ddt->serialize((char*)outbuf,&serialized[0],count,-1);
+  CkDDT_DataType *ddt = ptr->getDDT()->getType(type);
+  int len = ddt->getSize(count);
+
+  if (ddt->isContig()) {
+    memcpy(outbuf, inbuf, len);
+  } else {
+    // ddts don't have "copy", so fake it by serializing into a temp buffer, then
+    //  deserializing into the output.
+    vector<char> serialized(len);
+    ddt->serialize((char*)inbuf, &serialized[0], count, 1);
+    ddt->serialize((char*)outbuf, &serialized[0], count, -1);
+  }
 
   return MPI_SUCCESS;
 }
