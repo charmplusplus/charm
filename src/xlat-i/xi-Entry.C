@@ -752,10 +752,9 @@ void Entry::genGroupDefs(XStr& str)
       else if (container->isForSection())
       {// Multicast
         str << "  if (ckIsDelegated()) {\n";
-        str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
         str << "     ckDelegatedTo()->"<<node<<"GroupSectionSend(ckDelegatedPtr(),"<<params<<", ckGetNumSections(), ckGetSectionIDs());\n";
         str << "  } else {\n";
-        str << "    void *impl_msg_tmp = (ckGetNumSections()>1) ? CkCopyMsg((void **) &impl_msg) : impl_msg;\n";
+        str << "    void *impl_msg_tmp;\n";
         str << "    for (int i=0; i<ckGetNumSections(); ++i) {\n";
         str << "       impl_msg_tmp= (i<ckGetNumSections()-1) ? CkCopyMsg((void **) &impl_msg):impl_msg;\n";
         str << "       CkSendMsg"<<node<<"BranchMulti("<<epIdx()<<", impl_msg_tmp, ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"<<opts<<");\n";

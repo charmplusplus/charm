@@ -3,6 +3,7 @@ allToAll \
 cksequence \
 completion \
 fib \
+groupsection \
 hello \
 integrate \
 integratePUPable \

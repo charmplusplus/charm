@@ -71,6 +71,9 @@ class XArraySectionReducer
 };
 
 
+typedef XArraySectionReducer XGroupSectionReducer;
+
+
 /// The reduction client that has to be registered for each subsection
 void processSectionContribution (void *that, void *msg)
 {

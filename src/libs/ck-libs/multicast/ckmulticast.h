@@ -102,13 +102,18 @@ class CkMulticastMgr: public CkDelegateMgr
         /// Recreate the section when root migrate
         void resetSection(CProxySection_ArrayElement &proxy);  // called by root
         /// Implement the CkDelegateMgr interface to accept the delegation of a section proxy
-        virtual void initDelegateMgr(CProxy *proxy);
+        virtual void initDelegateMgr(CProxy *proxy, int opts=0);
         /// To implement the CkDelegateMgr interface for section mcasts
         void ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *s, int opts);
         /// Send individually to each section member. Used when tree is out-of-date and needs a rebuild
         void SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts);
         /// Retire and rebuild the spanning tree when one of the intermediate vertices migrates
         void rebuild(CkSectionInfo &);
+
+        // ------------------------- Group Section Functions ------------------------
+        void setReductionClient(CProxySection_Group &proxy, CkCallback *cb);
+        /// release buffered contributed messages, send them to parent
+        void GroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s);
 
     private:
         /// Fill the SectionInfo cookie in the SectionID obj with relevant info
@@ -129,6 +134,14 @@ class CkMulticastMgr: public CkDelegateMgr
         void reduceFragment (int index, CkSectionInfo& id, mCastEntry* entry, reductionInfo& redInfo, int currentTreeUp);
         /// At the tree root: Combine all msg fragments for final delivery to the client
         CkReductionMsg* combineFrags (CkSectionInfo& id, mCastEntry* entry, reductionInfo& redInfo);
+
+        // ------------------------- Group Section Functions ------------------------
+        /// Implement the CkDelegateMgr interface to accept the delegation of a section proxy
+        void initGrpDelegateMgr(CProxySection_Group *proxy, int opts);
+        /// Fill the SectionInfo cookie in the SectionID obj with relevant info
+        void prepareGrpCookie(mCastEntry *entry, CkSectionID &sid, const int *pelist, int count, CkGroupID gid);
+        /// Get info from the CkSectionInfo and call setup() to start the spanning tree build
+        void initGrpCookie(CkSectionInfo sid);
 };
 
 #endif

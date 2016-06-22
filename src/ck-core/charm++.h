@@ -549,7 +549,7 @@ class CkDelegateMgr : public IrrGroup {
     virtual void ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,CkArrayID a);
     virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
     virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s,int opts);
-    virtual void initDelegateMgr(CProxy *proxy)  { (void)proxy; }
+    virtual void initDelegateMgr(CProxy *proxy, int opts=0)  { (void)proxy; }
     virtual CkDelegateData* ckCopyDelegateData(CkDelegateData *data) {
         data->ref();
         return data;
@@ -823,6 +823,7 @@ class CProxyElement_Group : public CProxy_Group {
 };
 PUPmarshall(CProxyElement_Group)
 
+#define GROUP_SECTION_PROXY 1
 class CProxySection_Group : public CProxy_Group {
 private:
   int _nsid;
@@ -877,7 +878,9 @@ public:
     } else _sid = NULL;
     return *this;
   }
-  
+ 
+  void ckSectionDelegate(CkDelegateMgr *d)
+  { ckDelegate(d); d->initDelegateMgr(this, GROUP_SECTION_PROXY); } 
   //void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
   inline int ckGetNumSections() const {return _nsid;}

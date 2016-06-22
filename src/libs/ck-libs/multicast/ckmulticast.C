@@ -35,6 +35,7 @@
 
 typedef CkQ<multicastGrpMsg *>   multicastGrpMsgBuf;
 typedef CkVec<CkArrayIndex>   arrayIndexList;
+typedef CkVec<int>   groupPeList;
 typedef CkVec<CkSectionInfo>     sectionIdList;
 typedef CkVec<CkReductionMsg *>  reductionMsgs;
 typedef CkQ<int>                 PieceSize;
@@ -84,6 +85,9 @@ class reductionInfo {
 #define COOKIE_READY    1
 #define COOKIE_OLD      2
 
+
+
+
 class mCastPacket {
 public:
   CkSectionInfo cookie;
@@ -128,10 +132,14 @@ class mCastEntry
         int numChild;
         /// List of all tree member array indices (Only useful on the tree root)
         arrayIndexList allElem;
+        /// List of all tree member PE's (Only useful on the tree root (for group sections))
+        groupPeList allGrpElem;
         /// Only useful on root for LB
         ObjKeyList     allObjKeys;
         /// List of array elements on local PE
         arrayIndexList localElem;
+        /// List of group elements on local PE(either 0 or 1 elems)
+        bool localGrpElem;
         /// Should always be myPE
         int pe;
         /// Section ID of the root
@@ -152,9 +160,12 @@ class mCastEntry
         char needRebuild;
     private:
         char flag;
+	char grpSec;
     public:
         mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), asm_msg(NULL), asm_fill(0),
-                    oldc(NULL), newc(NULL), needRebuild(0), flag(COOKIE_NOTREADY) {}
+                    oldc(NULL), newc(NULL), needRebuild(0), flag(COOKIE_NOTREADY), grpSec(0), localGrpElem(0) {}
+        mCastEntry(CkGroupID _gid): aid(_gid), numChild(0), asm_msg(NULL), asm_fill(0),
+                    oldc(NULL), newc(NULL), needRebuild(0), flag(COOKIE_NOTREADY), grpSec(1), localGrpElem(0) {}
         mCastEntry(mCastEntry *);
         /// Check if this tree is only a branch and has a parent
         inline int hasParent() { return parentGrp.get_val()?1:0; }
@@ -166,6 +177,15 @@ class mCastEntry
         inline int notReady() { return (flag == COOKIE_NOTREADY); }
         /// Mark this (branch of the) tree as ready for use
         inline void setReady() { flag=COOKIE_READY; }
+        /// Is this a group section
+        inline int isGrpSec() {  return grpSec; }
+        inline int getNumLocalElems(){
+            return (isGrpSec()? localGrpElem : localElem.length());
+        }
+	inline void setLocalGrpElem() { localGrpElem = 1; }
+        inline int getNumAllElems(){
+            return (isGrpSec()? allGrpElem.length() : allElem.length());
+        }
         /// Increment the reduction number across the whole linked list of cookies
         inline void incReduceNo() {
             red.redNo ++;
@@ -203,6 +223,10 @@ public:
   CkSectionInfo parent;
   CkSectionInfo rootSid;
   int redNo;
+  int forGrpSec(){
+    CkAssert(nIdx);
+    return ((void *)arrIdx == (void *)lastKnown);
+  }
 };
 
 
@@ -228,13 +252,15 @@ void _ckMulticastInit(void)
 
 
 mCastEntry::mCastEntry (mCastEntry *old): 
-  numChild(0), oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY)
+  numChild(0), oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY), grpSec(old->isGrpSec())
 {
   int i;
   aid = old->aid;
   parentGrp = old->parentGrp;
   for (i=0; i<old->allElem.length(); i++)
     allElem.push_back(old->allElem[i]);
+  for (i=0; i<old->allGrpElem.length(); i++)
+    allGrpElem.push_back(old->allGrpElem[i]);
 #if CMK_LBDB_ON
   CmiAssert(old->allElem.length() == old->allObjKeys.length());
   for (i=0; i<old->allObjKeys.length(); i++)
@@ -341,8 +367,6 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
 }
 
 
-
-
 /// Build a mCastEntry object with relevant section info and set the section cookie to point to this object
 void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndex *al, int count, CkArrayID aid)
 {
@@ -360,11 +384,29 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
 }
 
 
+/// similar to prepareCookie, but for group sections
+void CkMulticastMgr::prepareGrpCookie(mCastEntry *entry, CkSectionID &sid, const int *pelist, int count, CkGroupID gid)
+{
+  for (int i=0; i<count; i++) {
+    entry->allGrpElem.push_back(pelist[i]);
+  }
+  sid._cookie.get_type() = MulticastMsg;
+  sid._cookie.get_aid() = gid;
+  sid._cookie.get_val() = entry;  // allocate table for this section
+  sid._cookie.get_pe() = CkMyPe();
+  DEBUGF(("[%d]In prepareGrpCookie: entry: %p, entry->isGrpSec(): %d\n", CkMyPe(), entry, entry->isGrpSec()));
+  CkAssert(entry->isGrpSec());
+}
 
 
 // this is used
-void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
+void CkMulticastMgr::initDelegateMgr(CProxy *cproxy, int opts)
 {
+  if(opts == GROUP_SECTION_PROXY){
+      initGrpDelegateMgr((CProxySection_Group *) cproxy, opts);
+      return;
+  }
+
   CProxySection_ArrayBase *proxy = (CProxySection_ArrayBase *)cproxy;
   int numSubSections = proxy->ckGetNumSubSections();
   for (int i=0; i<numSubSections; i++)
@@ -379,6 +421,20 @@ void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
 }
 
 
+//similar to initDelegateMgr, but for groupsections
+void CkMulticastMgr::initGrpDelegateMgr(CProxySection_Group *proxy, int opts)
+{
+  int numSubSections = proxy->ckGetNumSections();
+  for (int i=0; i<numSubSections; i++)
+  {
+      CkGroupID gid = proxy->ckGetGroupIDn(i);
+      mCastEntry *entry = new mCastEntry(gid);
+      CkSectionID *sid = &( proxy->ckGetSectionID(i) );
+      const int *pelist = proxy->ckGetElements(i);
+      prepareGrpCookie(entry, *sid, pelist, proxy->ckGetNumElements(i), gid);
+      initGrpCookie(sid->_cookie);
+  }
+}
 
 
 void CkMulticastMgr::retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo)
@@ -425,6 +481,29 @@ void CkMulticastMgr::initCookie(CkSectionInfo s)
     // Trigger the spanning tree build
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
     mCastGrp[CkMyPe()].setup(msg);
+}
+
+
+//similar to initCookie, but for group section
+void CkMulticastMgr::initGrpCookie(CkSectionInfo s)
+{
+   mCastEntry *entry = (mCastEntry *)s.get_val();
+   int n = entry->allGrpElem.length();
+   DEBUGF(("init: %d elems %p\n", n, s.get_val()));
+   // Create and initialize a setup message
+   multicastSetupMsg *msg = new (0, n, 0) multicastSetupMsg;
+   DEBUGF(("[%d] initGrpCookie: msg->arrIdx:%p, msg->lastKnown: %p \n", CkMyPe(), msg->arrIdx, msg->lastKnown));
+   msg->nIdx = n;
+   msg->parent = CkSectionInfo(entry->getAid());
+   msg->rootSid = s;
+   msg->redNo = entry->red.redNo;
+   // Fill the message with the section member indices and their last known locations
+   for (int i=0; i<n; i++) {
+     msg->lastKnown[i] = entry->allGrpElem[i];
+   }
+   // Trigger the spanning tree build
+   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+   mCastGrp[CkMyPe()].setup(msg);
 }
 
 
@@ -494,39 +573,59 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     CkArrayID aid = msg->rootSid.get_aid();
     if (msg->parent.get_pe() == CkMyPe()) 
       entry = (mCastEntry *)msg->rootSid.get_val(); //sid.val;
-    else 
-      entry = new mCastEntry(aid);
+    else{
+      if(msg->forGrpSec())
+        entry = new mCastEntry((CkGroupID) aid);
+      else
+        entry = new mCastEntry(aid);
+    } 
     entry->aid = aid;
     entry->pe = CkMyPe();
     entry->rootSid = msg->rootSid;
     entry->parentGrp = msg->parent;
 
-    DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx));
+    DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems, grpSec: %d\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx, entry->isGrpSec()));
     entry->red.redNo = msg->redNo;
 
     // Create a numPE sized array of vectors to hold the array elements in each PE
     int numpes = CkNumPes();
     std::map<int, std::vector<CkArrayIndex> > elemBins;
-    // Sort each array index in the setup message based on last known location
-    for (i=0; i<msg->nIdx; i++) 
-    {
-      int lastKnown = msg->lastKnown[i];
-      // If msg->arrIdx[i] local, add it to a special local element list
-      if (lastKnown == CkMyPe())
-          entry->localElem.insertAtEnd(msg->arrIdx[i]);
-      // else, add it to the list corresponding to its PE
-      else
-          elemBins[lastKnown].push_back(msg->arrIdx[i]);
-    }
+    
+    if(!entry->isGrpSec()){
+      // Sort each array index in the setup message based on last known location
+      for (i=0; i<msg->nIdx; i++) 
+      {
+        int lastKnown = msg->lastKnown[i];
+        // If msg->arrIdx[i] local, add it to a special local element list
+        if (lastKnown == CkMyPe())
+            entry->localElem.insertAtEnd(msg->arrIdx[i]);
+        // else, add it to the list corresponding to its PE
+        else
+            elemBins[lastKnown].push_back(msg->arrIdx[i]);
+      }
+   }
 
     CkVec<int> mySubTreePEs;
     mySubTreePEs.reserve(numpes);
     // The first PE in my subtree should be me, the tree root (as required by the spanning tree builder)
     mySubTreePEs.push_back(CkMyPe());
-    // Identify the child PEs in the tree, ie the PEs with section members on them
-    for (std::map<int, std::vector<CkArrayIndex> >::iterator itr = elemBins.begin();
-         itr != elemBins.end(); ++itr)
-        mySubTreePEs.push_back(itr->first);
+    
+    if(!entry->isGrpSec()){
+      // Identify the child PEs in the tree, ie the PEs with section members on them
+     using namespace std::placeholders;
+     std::for_each(elemBins.begin(), elemBins.end(), std::bind(&CkVec<int>::push_back, &mySubTreePEs, 
+			std::bind(&std::map<int, std::vector<CkArrayIndex> >::value_type::first, _1)));
+    }
+    else{
+      for(i=0; i<msg->nIdx; i++){
+          if(msg->lastKnown[i] != CkMyPe())
+            mySubTreePEs.push_back(msg->lastKnown[i]);
+          else
+            entry->setLocalGrpElem();
+      }
+    }    
+
+
     // The number of multicast children can be limited by the spanning tree factor 
     int num = mySubTreePEs.size() - 1, numchild = 0;
     if (factor <= 0) numchild = num;
@@ -558,11 +657,19 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 
             // Find the total number of section member elements on this subtree
             int numSubTreeElems = 0;
-            for (j = childStartIndex; j < childEndIndex; j++)
+            multicastSetupMsg *m;
+  
+            if(entry->isGrpSec()){
+              numSubTreeElems = childEndIndex - childStartIndex;
+              m = new (0, numSubTreeElems, 0) multicastSetupMsg;
+            }
+            else{
+             for (j = childStartIndex; j < childEndIndex; j++)
                 numSubTreeElems += elemBins[ mySubTreePEs[j] ].size();
+             m = new (numSubTreeElems, numSubTreeElems, 0) multicastSetupMsg;
+            }
 
             // Prepare the setup msg intended for the child
-            multicastSetupMsg *m = new (numSubTreeElems, numSubTreeElems, 0) multicastSetupMsg;
             m->parent = CkSectionInfo(aid, entry);
             m->nIdx = numSubTreeElems;
             m->rootSid = msg->rootSid;
@@ -572,11 +679,14 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
             for (int j = childStartIndex, cnt = 0; j < childEndIndex; j++)
             {
                 int childPE = mySubTreePEs[j];
-                for (int k = 0; k < elemBins[childPE].size(); k++, cnt++)
-                {
+                if(!entry->isGrpSec()){
+                  for (int k = 0; k < elemBins[childPE].size(); k++, cnt++) {
                     m->arrIdx[cnt]  = elemBins[childPE][k];
                     m->lastKnown[cnt] = childPE;
+                  }
                 }
+                else
+                  m->lastKnown[cnt++] = childPE;
             }
 
             int childroot = mySubTreePEs[childStartIndex];
@@ -600,7 +710,9 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
     // Mark this entry as ready
     entry->setReady();
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-    DEBUGF(("[%d] entry %p childrenReady with %d elems.\n", CkMyPe(), entry, entry->allElem.length()));
+
+    DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %d, GroupElems: %d, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.length(), entry->allGrpElem.length(), entry->red.redNo));
+
     if (entry->hasParent()) 
         mCastGrp[entry->parentGrp.get_pe()].recvCookie(entry->parentGrp, CkSectionInfo(entry->getAid(), entry));
 #if SPLIT_MULTICAST
@@ -618,7 +730,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
     while (!entry->msgBuf.isEmpty()) 
     {
         multicastGrpMsg *newmsg = entry->msgBuf.deq();
-        DEBUGF(("[%d] release buffer %p ep:%d\n", CkMyPe(), newmsg, newmsg->ep));
+        DEBUGF(("[%d] release buffer %p ep:%d, msg-used?: %d\n", CkMyPe(), newmsg, newmsg->ep, UsrToEnv(newmsg)->isUsed()));
         newmsg->_cookie.get_val() = entry;
         mCastGrp[CkMyPe()].recvMsg(newmsg);
     }
@@ -705,6 +817,7 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
 
 void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *sid, int opts)
 {
+        DEBUGF(("ArraySectionSend\n"));
 #if CMK_MESSAGE_LOGGING
 	envelope *env = UsrToEnv(m);
 	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
@@ -719,10 +832,25 @@ void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsi
 }
 
 
+void CkMulticastMgr::GroupSectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *sid)
+{
+#if CMK_MESSAGE_LOGGING
+  envelope *env = UsrToEnv(m);
+  env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
+#endif
+
+  DEBUGF(("[%d] GroupSectionSend, nsid: %d \n", CkMyPe(), nsid));
+  for (int snum = 0; snum < nsid; snum++) {
+    void *msgCopy = m;
+    if (nsid - snum > 1)
+      msgCopy = CkCopyMsg(&m);
+    DEBUGF(("GroupSectionSend, msg-used(m):%d, msg-used(msgCopy):%d\n", UsrToEnv(m)->isUsed(), UsrToEnv(msgCopy)->isUsed()));
+    sendToSection(pd, ep, msgCopy, &(sid[snum]), 0);
+  }
+}
 
 void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionID *sid, int opts)
 {
-  DEBUGF(("ArraySectionSend\n"));
   multicastGrpMsg *msg = (multicastGrpMsg *)m;
   msg->ep = ep;
   CkSectionInfo &s = sid->_cookie;
@@ -741,10 +869,12 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
     }
 
 #if CMK_LBDB_ON
-    // fixme: running obj?
-    envelope *env = UsrToEnv(msg);
-    const LDOMHandle &om = CProxy_ArrayBase(s.get_aid()).ckLocMgr()->getOMHandle();
-    LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.getVec(),entry->allObjKeys.size(),env->getTotalsize());
+    if(!entry->isGrpSec()){
+      // fixme: running obj?
+      envelope *env = UsrToEnv(msg);
+      const LDOMHandle &om = CProxy_ArrayBase(s.get_aid()).ckLocMgr()->getOMHandle();
+      LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.getVec(),entry->allObjKeys.size(),env->getTotalsize());
+    }
 #endif
 
     // The first time we need to rebuild the spanning tree, we do p2p sends to refresh lastKnown
@@ -815,6 +945,7 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   CmiFree(env);
 #else
   if (s.get_pe() == CkMyPe()) {
+    DEBUGF((CkPrintf("sendToSection, msg-used :%d\n", UsrToEnv(msg)->isUsed()));
     recvMsg(msg);
   }
   else {
@@ -873,7 +1004,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   CmiAssert(entry->getAid() == sectionInfo.get_aid());
 
   if (entry->notReady()) {
-    DEBUGF(("entry not ready, enq buffer %p\n", msg));
+    DEBUGF(("entry not ready, enq buffer %p, msg-used?: %d\n", msg, UsrToEnv(msg)->isUsed()));
     entry->msgBuf.enq(msg);
     return;
   }
@@ -901,10 +1032,35 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
   CmiAssert(entry->getAid() == sectionInfo.get_aid());
   CkGroupID aid = sectionInfo.get_aid();
-
+  
   // send to local
-  int nLocal = entry->localElem.length();
-  DEBUGF(("[%d] send to local %d elems\n", CkMyPe(), nLocal));
+  int nLocal;
+
+  // if group section
+  if(entry->isGrpSec()){
+    nLocal = entry->localGrpElem;
+    if(nLocal){
+      DEBUGF(("[%d] send to local branch, GroupSection\n", CkMyPe()));
+      int mpe = CkMyPe();
+      CkAssert(nLocal == 1);
+      CProxyElement_Group ap(aid, CkMyPe());
+      if (ap.ckIsDelegated()) {
+        CkGroupMsgPrep(msg->ep, msg, aid);
+        (ap.ckDelegatedTo())->GroupSend(ap.ckDelegatedPtr(), msg->ep, msg, CkMyPe(), aid);
+      }
+      else{
+        if (_entryTable[msg->ep]->noKeep)
+          CkSendMsgBranchInline(msg->ep, msg, CkMyPe(), aid, 0);
+        else
+          CkSendMsgBranch(msg->ep, msg, CkMyPe(), aid,0);
+      }
+    }
+    return;
+  }
+
+  // else if array section
+  nLocal = entry->localElem.length();
+  DEBUGF(("[%d] send to local %d elems, ArraySection\n", CkMyPe(), nLocal));
   for (i=0; i<nLocal-1; i++) {
     CProxyElement_ArrayBase ap(aid, entry->localElem[i]);
     if (_entryTable[msg->ep]->noKeep) {
@@ -986,6 +1142,44 @@ void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement &proxy, CkCal
       entry->red.storedCallback = sectionCB;
   }
 }
+
+
+//for group sections
+void CkMulticastMgr::setReductionClient(CProxySection_Group &proxy, CkCallback *cb)
+{
+  CkCallback *sectionCB;
+  int numSubSections = proxy.ckGetNumSections();
+  DEBUGF(("[%d]setReductionClient for grpSec, numSubSections: %d \n", CkMyPe(), numSubSections));
+  // If its a cross-array section,
+  if (numSubSections > 1)
+  {
+    /** @warning: Each instantiation is a mem leak! :o
+     * The class is trivially small, but there's one instantiation for each
+     * section delegated to CkMulticast. The objects need to live as long as
+     * their section exists and is used. The idea of 'destroying' an array
+     * section is still academic, and hence no effort has been made to charge
+     * some 'owner' entity with the task of deleting this object.
+     *
+     * Reimplementing delegated x-array reductions will make this consideration moot
+     */
+    // Configure the final cross-section reducer
+    ck::impl::XGroupSectionReducer *red =
+      new ck::impl::XGroupSectionReducer(numSubSections, cb);
+    // Configure the subsection callback to deposit with the final reducer
+    sectionCB = new CkCallback(ck::impl::processSectionContribution, red);
+  }
+  // else, just direct the reduction to the actual client cb
+  else
+    sectionCB = cb;
+  // Wire the sections together by storing the subsection cb in each sectionID
+  for (int i=0; i<numSubSections; i++)
+  {
+    CkSectionInfo &sInfo = proxy.ckGetSectionID(i)._cookie;
+    mCastEntry *entry = (mCastEntry *)sInfo.get_val();
+    entry->red.storedCallback = sectionCB;
+  }
+}
+
 
 void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement &proxy, redClientFn fn,void *param)
 {
@@ -1296,6 +1490,9 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     /// Grab the locally stored redn info
     reductionInfo &redInfo = entry->red;
 
+
+    DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %d \n", CkMyPe(), entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.length()));
+
     //-------------------------------------------------------------------------
     /// If you've received a msg from a previous redn, something has gone horribly wrong somewhere!
     if (msg->redNo < redInfo.redNo) {
@@ -1331,7 +1528,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     //-------------------------------------------------------------------------
     /// Flag if this fragment can be reduced (if all local elements and children have contributed this fragment)
     int currentTreeUp = 0;
-    if (redInfo.lcount [index] == entry->localElem.length() && redInfo.ccount [index] == entry->children.length())
+    if (redInfo.lcount [index] == entry->getNumLocalElems() && redInfo.ccount [index] == entry->children.length())
         currentTreeUp = 1;
 
     /// Flag (only at the redn root) if all array elements contributed all their fragments
@@ -1339,7 +1536,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     if (!entry->hasParent()) {
         mixTreeUp = 1;
         for (int i=0; i<msg->nFrags; i++)
-            if (entry->allElem.length() != redInfo.gcount [i])
+            if (entry->getNumAllElems() != redInfo.gcount [i])
                 mixTreeUp = 0;
     }
 
