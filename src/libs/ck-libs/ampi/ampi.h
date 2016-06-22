@@ -2,6 +2,7 @@
 #define _MPI_H
 
 #include <inttypes.h> /* for intptr_t */
+#include <stdlib.h> /* for size_t */
 #include "conv-config.h"
 
 /* NON-standard define: this lets people #ifdef on
@@ -28,9 +29,11 @@ void AMPI_Main_c(int argc,char **argv); /* C wrapper for calling AMPI_Main() fro
 
 typedef void (*MPI_MainFn) (int,char**);
 
-typedef int MPI_Datatype;
+typedef      int MPI_Datatype;
+typedef      int MPI_Fint;
 typedef intptr_t MPI_Aint;
-typedef int MPI_Fint;
+typedef  ssize_t MPI_Offset;
+typedef   size_t MPI_Count;
 
 /********************** MPI-1.1 prototypes and defines ***************************/
 /* MPI-1 Errors */
@@ -140,7 +143,6 @@ typedef int MPI_Fint;
 /* mpi-2+ types */
 #define MPI_LONG_LONG_INT       26
 #define MPI_LONG_LONG           MPI_LONG_LONG_INT
-#define MPI_OFFSET              MPI_LONG_LONG
 #define MPI_DOUBLE_COMPLEX      27
 #define MPI_SIGNED_CHAR         28
 #define MPI_UNSIGNED_LONG_LONG  29
@@ -156,6 +158,8 @@ typedef int MPI_Fint;
 #define MPI_FLOAT_COMPLEX       39
 #define MPI_LONG_DOUBLE_COMPLEX 40
 #define MPI_AINT                41
+#define MPI_OFFSET              42
+#define MPI_COUNT               43
 
 #define MPI_ANY_TAG        (-1)
 #define MPI_REQUEST_NULL   (-1)
@@ -256,7 +260,9 @@ extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 struct AmpiMsg;
 typedef int MPI_Request;
 typedef struct {
-  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH, MPI_ERROR; /* FIXME: MPI_ERROR is never used */
+  int MPI_TAG, MPI_SOURCE, MPI_COMM;
+  MPI_Count MPI_LENGTH;
+  int MPI_ERROR; /* FIXME: MPI_ERROR is never used */
   struct AmpiMsg *msg;
 } MPI_Status;
 
@@ -456,12 +462,18 @@ int AMPI_Type_commit(MPI_Datatype *datatype);
 int AMPI_Type_free(MPI_Datatype *datatype);
 #define MPI_Type_get_extent AMPI_Type_get_extent
 int AMPI_Type_get_extent(MPI_Datatype datatype, MPI_Aint *lb, MPI_Aint *extent);
+#define MPI_Type_get_extent_x AMPI_Type_get_extent_x
+int AMPI_Type_get_extent_x(MPI_Datatype datatype, MPI_Count *lb, MPI_Count *extent);
 #define MPI_Type_extent AMPI_Type_extent
 int AMPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent);
 #define MPI_Type_get_true_extent AMPI_Type_get_true_extent
 int AMPI_Type_get_true_extent(MPI_Datatype datatype, MPI_Aint *true_lb, MPI_Aint *true_extent);
+#define MPI_Type_get_true_extent_x AMPI_Type_get_true_extent_x
+int AMPI_Type_get_true_extent_x(MPI_Datatype datatype, MPI_Count *true_lb, MPI_Count *true_extent);
 #define MPI_Type_size AMPI_Type_size
 int AMPI_Type_size(MPI_Datatype datatype, int *size);
+#define MPI_Type_size_x AMPI_Type_size_x
+int AMPI_Type_size_x(MPI_Datatype datatype, MPI_Count *size);
 #define MPI_Type_lb AMPI_Type_lb
 int AMPI_Type_lb(MPI_Datatype datatype, MPI_Aint* displacement);
 #define MPI_Type_ub AMPI_Type_ub
@@ -480,8 +492,12 @@ int AMPI_Get_address(const void* location, MPI_Aint *address);
 int AMPI_Address(void* location, MPI_Aint *address);
 #define MPI_Status_set_elements AMPI_Status_set_elements
 int AMPI_Status_set_elements(MPI_Status *status, MPI_Datatype datatype, int count);
+#define MPI_Status_set_elements_x AMPI_Status_set_elements_x
+int AMPI_Status_set_elements_x(MPI_Status *status, MPI_Datatype datatype, MPI_Count count);
 #define MPI_Get_elements AMPI_Get_elements
 int AMPI_Get_elements(MPI_Status *status, MPI_Datatype datatype, int *count);
+#define MPI_Get_elements_x AMPI_Get_elements_x
+int AMPI_Get_elements_x(MPI_Status *status, MPI_Datatype dataype, MPI_Count *count);
 #define MPI_Pack AMPI_Pack
 int AMPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm);

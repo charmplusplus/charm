@@ -73,6 +73,10 @@
        integer, parameter :: MPI_THREAD_SERIALIZED = 3
        integer, parameter :: MPI_THREAD_MULTIPLE   = 4
 
+       integer, parameter :: MPI_OFFSET_KIND       = 8
+       integer, parameter :: MPI_ADDRESS_KIND      = 8
+       integer, parameter :: MPI_COUNT_KIND        = 8
+
        integer, parameter :: MPI_DATATYPE_NULL     = -1
        integer, parameter :: MPI_DOUBLE_PRECISION  = 0
        integer, parameter :: MPI_REAL8             = 0
@@ -87,7 +91,6 @@
        integer, parameter :: MPI_BYTE              = 7
        integer, parameter :: MPI_PACKED            = 8
        integer, parameter :: MPI_INTEGER8          = 10
-       integer, parameter :: MPI_OFFSET            = 10
        integer, parameter :: MPI_REAL16            = 15
        integer, parameter :: MPI_2INTEGER          = 19
        integer, parameter :: MPI_2REAL             = 22
@@ -98,6 +101,10 @@
        integer, parameter :: MPI_DOUBLE_COMPLEX    = 27
        integer, parameter :: MPI_COMPLEX16         = 27
        integer, parameter :: MPI_COMPLEX32         = 40
+
+       integer, parameter :: MPI_AINT = 41
+       integer, parameter :: MPI_OFFSET = 42
+       integer, parameter :: MPI_COUNT = 43
 
        integer, parameter :: MPI_COMBINER_NAMED          = 1
        integer, parameter :: MPI_COMBINER_CONTIGUOUS     = 2
@@ -198,8 +205,6 @@
        integer, parameter :: MPI_MINLOC  = 11
        integer, parameter :: MPI_REPLACE = 12
        integer, parameter :: MPI_NO_OP   = 13
-
-       integer, parameter :: MPI_ADDRESS_KIND = 8
 
        integer, parameter :: MPI_BSEND_OVERHEAD = 1
 

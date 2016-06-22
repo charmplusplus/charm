@@ -250,6 +250,8 @@ switch (*datatype) { \
   case MPI_FLOAT_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(AmpiComplex); } break; \
   case MPI_LONG_DOUBLE_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(AmpiLongDoubleComplex); } break; \
   case MPI_AINT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(MPI_Aint); } break; \
+  case MPI_OFFSET: for(i=0;i<(*len);i++) { MPI_OP_IMPL(MPI_Offset); } break; \
+  case MPI_COUNT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(MPI_Count); } break; \
   default: \
            ckerr << "Type " << *datatype << " with Op "#OPNAME" not supported." << endl; \
   CkAbort("Unsupported MPI datatype for MPI Op"); \
@@ -308,6 +310,8 @@ switch (*datatype) { \
   case MPI_UINT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint64_t); } break; \
   case MPI_BYTE: for(i=0;i<(*len);i++) { MPI_OP_IMPL(char); } break; \
   case MPI_AINT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(MPI_Aint); } break; \
+  case MPI_OFFSET: for(i=0;i<(*len);i++) {MPI_OP_IMPL(MPI_Offset); } break; \
+  case MPI_COUNT: for(i=0;i<(*len);i++) {MPI_OP_IMPL(MPI_Count); } break; \
   default: \
            ckerr << "Type " << *datatype << " with Op "#OPNAME" not supported." << endl; \
   CkAbort("Unsupported MPI datatype for MPI Op"); \
@@ -1085,6 +1089,16 @@ class ampiWorlds : public CBase_ampiWorlds {
     STARTUP_DEBUG("ampiInit> listed MPI_COMM_UNIVERSE "<<new_idx)
   }
 };
+
+// Overflow check routine. Used by functions that need to return int/MPI_Aint rather than MPI_Count
+template<typename T, typename Z>
+T castToFrom(Z var)
+{
+  if (var > std::numeric_limits<T>::max()) {
+    CkAbort("AMPI> casting variable to another type failed due to overflow!\n");
+  }
+  return (T)var;
+}
 
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
@@ -2157,7 +2171,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count
                            MPI_Datatype type,MPI_Comm destcomm, int sync)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
-  int len = ddt->getSize(count);
+  MPI_Count len = ddt->getSize(count);
   int sIdx=thisIndex;
   int seq = -1;
   if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) //Not cross-module: set seqno
@@ -2195,7 +2209,7 @@ void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
   }
 }
 
-void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
+void ampi::sendraw(int t, int sRank, void* buf, MPI_Count len, CkArrayID aid, int idx)
 {
   AmpiMsg *msg = new (len, 0) AmpiMsg(-1, t, -1, sRank, len, MPI_COMM_WORLD);
   memcpy(msg->data, buf, len);
@@ -2225,10 +2239,10 @@ void ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype t
 void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
-  int len = ddt->getSize(count);
+  MPI_Count len = ddt->getSize(count);
 
   if(msg->length < len){ // only at rare case shall we reset count by using divide
-    count = msg->length/(ddt->getSize(1));
+    count = msg->length / castToFrom<int,MPI_Count>(ddt->getSize(1));
   }
 
   ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
@@ -2285,8 +2299,8 @@ void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, i
   CkReduction::setElement *currentSrc  = (CkReduction::setElement*)results[0].data;
   CkReduction::setElement *currentData = (CkReduction::setElement*)results[1].data;
   CkDDT_DataType *ddt    = getDDT()->getType(type);
-  int contributionSize   = ddt->getSize(recvCount);
-  int contributionExtent = ddt->getExtent()*recvCount;
+  int contributionSize   = castToFrom<int,MPI_Count>(ddt->getSize(recvCount));
+  int contributionExtent = castToFrom<int,MPI_Count>(ddt->getExtent()*recvCount);
 
   for (int i=0; i<getSize(getComm()); i++) {
     CkAssert(currentSrc && currentData);
@@ -2309,8 +2323,8 @@ void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
   CkReduction::setElement *currentSrc  = (CkReduction::setElement*)results[0].data;
   CkReduction::setElement *currentData = (CkReduction::setElement*)results[1].data;
   CkDDT_DataType *ddt    = getDDT()->getType(type);
-  int contributionSize   = ddt->getSize();
-  int contributionExtent = ddt->getExtent();
+  int contributionSize   = castToFrom<int,MPI_Count>(ddt->getSize());
+  int contributionExtent = castToFrom<int,MPI_Count>(ddt->getExtent());
 
   for (int i=0; i<getSize(getComm()); i++) {
     CkAssert(currentSrc && currentData);
@@ -2480,9 +2494,8 @@ void ampi::bcastraw(void* buf, int len, CkArrayID aid)
 AmpiMsg* ampi::Alltoall_RemoteIget(MPI_Aint disp, int cnt, MPI_Datatype type, int tag)
 {
   CkAssert(tag==MPI_ATA_TAG && AlltoallGetFlag);
-  int unit;
   CkDDT_DataType *ddt = getDDT()->getType(type);
-  unit = ddt->getSize(1);
+  int unit = castToFrom<int,MPI_Count>(ddt->getSize(1));
   int totalsize = unit*cnt;
 
   AmpiMsg *msg = new (totalsize, 0) AmpiMsg(-1, -1, -1, thisIndex,totalsize,myComm.getComm());
@@ -2866,7 +2879,6 @@ int AMPI_Comm_size(MPI_Comm comm, int *size)
     return MPI_SUCCESS;
   }
 #endif
-
   *size = getAmpiInstance(comm)->getSize(comm);
 
 #if AMPIMSGLOG
@@ -3089,7 +3101,7 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(type)) * count;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)msg, (pptr->pupBytes));
     PUParray(*(pptr->toPUPer), (char *)status, sizeof(MPI_Status));
@@ -3310,7 +3322,7 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm)
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)) {
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(type))*count;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
   }
@@ -3358,7 +3370,7 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)) {
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(type))*count;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
   }
@@ -3437,7 +3449,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
 {
   CkReductionMsg *msg;
   ampiParent *parent = getAmpiParent();
-  int szdata = ddt->getSize(count);
+  int szdata = castToFrom<int,MPI_Count>(ddt->getSize(count));
   CkReduction::reducerType reducer = getBuiltinReducerType(type, op);
 
   if (reducer != CkReduction::invalid) {
@@ -3479,7 +3491,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
 static int copyDatatype(MPI_Comm comm,MPI_Datatype type,int count,const void *inbuf,void *outbuf) {
   ampi *ptr = getAmpiInstance(comm);
   CkDDT_DataType *ddt = ptr->getDDT()->getType(type);
-  int len = ddt->getSize(count);
+  MPI_Count len = ddt->getSize(count);
 
   if (ddt->isContig()) {
     memcpy(outbuf, inbuf, len);
@@ -3566,7 +3578,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op 
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(type))*count;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)outbuf, (pptr->pupBytes));
   }
@@ -3620,7 +3632,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(type))*count;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)outbuf, (pptr->pupBytes));
   }
@@ -3780,7 +3792,7 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
   MPI_Status sts;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
-  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
+  int blklen = castToFrom<int,MPI_Count>(ptr->getDDT()->getType(datatype)->getSize(count));
   int rank = ptr->getRank(comm);
   int mask = 0x1;
   int dst;
@@ -3827,7 +3839,7 @@ int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
   MPI_Status sts;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
-  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
+  int blklen = castToFrom<int,MPI_Count>(ptr->getDDT()->getType(datatype)->getSize(count));
   int rank = ptr->getRank(comm);
   int mask = 0x1;
   int dst, flag;
@@ -4281,7 +4293,7 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize((*reqs)[*request]->type) * ((*reqs)[*request]->count);
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize((*reqs)[*request]->type)) * (*reqs)[*request]->count;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)((*reqs)[*request]->buf), (pptr->pupBytes));
     PUParray(*(pptr->toPUPer), (char *)sts, sizeof(MPI_Status));
@@ -4360,7 +4372,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 #endif
 #if AMPIMSGLOG
         if(msgLogWrite && record_msglog(pptr->thisIndex)){
-          (pptr->pupBytes) = getDDT()->getSize(waitReq->type) * (waitReq->count);
+          (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(waitReq->type)) * waitReq->count;
           (*(pptr->toPUPer))|(pptr->pupBytes);
           PUParray(*(pptr->toPUPer), (char *)(waitReq->buf), (pptr->pupBytes));
           PUParray(*(pptr->toPUPer), (char *)(&sts[((*reqvec)[i])[j]]), sizeof(MPI_Status));
@@ -4994,11 +5006,19 @@ CDECL
 int AMPI_Type_get_extent(MPI_Datatype datatype, MPI_Aint *lb, MPI_Aint *extent)
 {
   AMPIAPI("AMPI_Type_get_extent");
+  *lb = castToFrom<MPI_Aint,MPI_Count>(getDDT()->getLB(datatype));
+  *extent = castToFrom<MPI_Aint,MPI_Count>(getDDT()->getExtent(datatype));
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_get_extent_x(MPI_Datatype datatype, MPI_Count *lb, MPI_Count *extent)
+{
+  AMPIAPI("AMPI_Type_get_extent_x");
   *lb = getDDT()->getLB(datatype);
   *extent = getDDT()->getExtent(datatype);
   return MPI_SUCCESS;
 }
-
 CDECL
 int AMPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent)
 {
@@ -5011,6 +5031,15 @@ CDECL
 int AMPI_Type_get_true_extent(MPI_Datatype datatype, MPI_Aint *true_lb, MPI_Aint *true_extent)
 {
   AMPIAPI("AMPI_Type_get_true_extent");
+  *true_lb = castToFrom<MPI_Aint,MPI_Count>(getDDT()->getTrueLB(datatype));
+  *true_extent = castToFrom<MPI_Aint,MPI_Count>(getDDT()->getTrueExtent(datatype));
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_get_true_extent_x(MPI_Datatype datatype, MPI_Count *true_lb, MPI_Count *true_extent)
+{
+  AMPIAPI("AMPI_Type_get_true_extent_x");
   *true_lb = getDDT()->getTrueLB(datatype);
   *true_extent = getDDT()->getTrueExtent(datatype);
   return MPI_SUCCESS;
@@ -5020,7 +5049,15 @@ CDECL
 int AMPI_Type_size(MPI_Datatype datatype, int *size)
 {
   AMPIAPI("AMPI_Type_size");
-  *size=getDDT()->getSize(datatype);
+  *size=castToFrom<int,MPI_Count>(getDDT()->getSize(datatype));
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_size_x(MPI_Datatype datatype, MPI_Count *size)
+{
+  AMPIAPI("AMPI_Type_size_x");
+  *size = getDDT()->getSize(datatype);
   return MPI_SUCCESS;
 }
 
@@ -5214,7 +5251,7 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
 static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype type, int rank)
 {
   CkDDT_DataType* ddt = getDDT()->getType(type);
-  int szdata = ddt->getSize(count);
+  int szdata = castToFrom<int,MPI_Count>(ddt->getSize(count));
   const int tupleSize = 2;
   CkReduction::tupleElement tupleRedn[tupleSize];
   tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set);
@@ -5257,7 +5294,7 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank(comm);
-  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
+  int sendSize = castToFrom<int,MPI_Count>(ptr->getDDT()->getType(sendtype)->getSize(sendcount));
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgatherCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
@@ -5456,7 +5493,7 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount * size;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(rectype)) * recvcount * size;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
   }
@@ -5528,7 +5565,7 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount * size;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(recvtype)) * recvcount * size;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
   }
@@ -5568,7 +5605,7 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     int commsize;
-    int itemsize = getDDT()->getSize(recvtype);
+    int itemsize = castToFrom<int,MPI_Count>(getDDT()->getSize(recvtype));
     (*(pptr->fromPUPer))|commsize;
     for(int i=0;i<commsize;i++){
       (*(pptr->fromPUPer))|(pptr->pupBytes);
@@ -5595,7 +5632,7 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
     for(int i=0;i<size;i++){
-      (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcounts[i];
+      (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(recvtype)) * recvcounts[i];
       (*(pptr->toPUPer))|(pptr->pupBytes);
       PUParray(*(pptr->toPUPer), (char *)(((char*)recvbuf)+(itemsize*displs[i])), (pptr->pupBytes));
     }
@@ -5646,7 +5683,7 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     int commsize;
-    int itemsize = getDDT()->getSize(recvtype);
+    int itemsize = castToFrom<int,MPI_Count>(getDDT()->getSize(recvtype));
     (*(pptr->fromPUPer))|commsize;
     for(int i=0;i<commsize;i++){
       (*(pptr->fromPUPer))|(pptr->pupBytes);
@@ -5676,7 +5713,7 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
     for(int i=0;i<size;i++){
-      (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcounts[i];
+      (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(recvtype)) * recvcounts[i];
       (*(pptr->toPUPer))|(pptr->pupBytes);
       PUParray(*(pptr->toPUPer), (char *)(((char*)recvbuf)+(itemsize*displs[i])), (pptr->pupBytes));
     }
@@ -5728,7 +5765,7 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   if(ptr->getRank(comm)==root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
+    int itemsize = castToFrom<int,MPI_Count>(dttype->getSize(sendcount));
     for(i=0;i<size;i++) {
       ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
                 sendcount, sendtype, i, comm);
@@ -5740,7 +5777,7 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(recvtype)) * recvcount;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
   }
@@ -5799,7 +5836,7 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   if(ptr->getRank(comm)==root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
+    int itemsize = castToFrom<int,MPI_Count>(dttype->getSize(sendcount));
     for(i=0;i<size;i++) {
       ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
                 sendcount, sendtype, i, comm);
@@ -5811,7 +5848,7 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(recvtype)) * recvcount;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
   }
@@ -5862,7 +5899,7 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
 
   if(ptr->getRank(comm) == root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize() ;
+    int itemsize = castToFrom<int,MPI_Count>(dttype->getSize());
     for(i=0;i<size;i++) {
       ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
                 sendcounts[i], sendtype, i, comm);
@@ -5874,7 +5911,7 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(recvtype)) * recvcount;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
   }
@@ -5933,7 +5970,7 @@ int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sen
 
   if(ptr->getRank(comm) == root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize() ;
+    int itemsize = castToFrom<int,MPI_Count>(dttype->getSize());
     for(i=0;i<size;i++) {
       ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
                 sendcounts[i], sendtype, i, comm);
@@ -5945,7 +5982,7 @@ int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sen
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount;
+    (pptr->pupBytes) = castToFrom<int,MPI_Count>(getDDT()->getSize(recvtype)) * recvcount;
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
   }
@@ -5987,7 +6024,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int i;
 
   dttype = ptr->getDDT()->getType(sendtype) ;
-  itemsize = dttype->getSize(sendcount) ;
+  itemsize = castToFrom<int,MPI_Count>(dttype->getSize(sendcount));
   int rank = ptr->getRank(comm);
   int comm_size = size;
   MPI_Status status;
@@ -6004,8 +6041,8 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     /* need to allocate temporary buffer of size
        sendbuf_extent*comm_size */
 
-    int sendtype_extent = getDDT()->getExtent(sendtype);
-    int recvtype_extent = getDDT()->getExtent(recvtype);
+    int sendtype_extent = castToFrom<int,MPI_Count>(getDDT()->getExtent(sendtype));
+    int recvtype_extent = castToFrom<int,MPI_Count>(getDDT()->getExtent(recvtype));
     int sendbuf_extent = sendcount * comm_size * sendtype_extent;
 
     vector<char> tmp_buf(sendbuf_extent*comm_size);
@@ -6116,7 +6153,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 sendtype, dst, comm);
     }
     dttype = ptr->getDDT()->getType(recvtype) ;
-    itemsize = dttype->getSize(recvcount) ;
+    itemsize = castToFrom<int,MPI_Count>(dttype->getSize(recvcount));
     for(i=0;i<size;i++) {
       int dst = (rank+i) % size;
       if(-1==ptr->recv(MPI_ATA_TAG, dst, ((char*)recvbuf)+(itemsize*dst), recvcount,
@@ -6207,7 +6244,7 @@ int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 
   dttype = ptr->getDDT()->getType(recvtype) ;
-  itemsize = dttype->getSize(recvcount) ;
+  itemsize = castToFrom<int,MPI_Count>(dttype->getSize(recvcount));
   AmpiMsg *msg;
   for(i=0;i<size;i++) {
     msg = (AmpiMsg*)CkWaitReleaseFuture(reqs[i]);
@@ -6259,7 +6296,7 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   int size = ptr->getSize(comm);
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype);
-  int itemsize = dttype->getSize(sendcount);
+  int itemsize = castToFrom<int,MPI_Count>(dttype->getSize(sendcount));
   int i;
   for(i=0;i<size;i++) {
     ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
@@ -6306,14 +6343,14 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-  int itemsize = dttype->getSize() ;
+  int itemsize = castToFrom<int,MPI_Count>(dttype->getSize());
   int i;
   for(i=0;i<size;i++)  {
     ptr->send(MPI_ATA_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
               sendtype, i, comm);
   }
   dttype = ptr->getDDT()->getType(recvtype) ;
-  itemsize = dttype->getSize() ;
+  itemsize = castToFrom<int,MPI_Count>(dttype->getSize());
 
   for(i=0;i<size;i++) {
     if(-1==ptr->recv(MPI_ATA_TAG,i,((char*)recvbuf)+(itemsize*rdispls[i]),recvcounts[i],recvtype, comm))
@@ -6359,7 +6396,7 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
 
   int size = ptr->getSize(comm);
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-  int itemsize = dttype->getSize() ;
+  int itemsize = castToFrom<int,MPI_Count>(dttype->getSize());
   int i;
   for(i=0;i<size;i++)  {
     ptr->send(MPI_ATA_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
@@ -6367,7 +6404,7 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
   }
 
   dttype = ptr->getDDT()->getType(recvtype) ;
-  itemsize = dttype->getSize() ;
+  itemsize = castToFrom<int,MPI_Count>(dttype->getSize());
 
   // use an IATAReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
@@ -6511,7 +6548,7 @@ int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
-  int itemsize = getDDT()->getType(sendtype)->getSize(sendcount);
+  int itemsize = castToFrom<int,MPI_Count>(getDDT()->getType(sendtype)->getSize(sendcount));
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*i)),
               sendcount, sendtype, neighbors[i], comm);
@@ -6564,7 +6601,7 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
-  int itemsize = getDDT()->getType(sendtype)->getSize(sendcount);
+  int itemsize = castToFrom<int,MPI_Count>(getDDT()->getType(sendtype)->getSize(sendcount));
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*i)),
               sendcount, sendtype, neighbors[i], comm);
@@ -6615,7 +6652,7 @@ int AMPI_Neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
-  int itemsize = getDDT()->getType(sendtype)->getSize();
+  int itemsize = castToFrom<int,MPI_Count>(getDDT()->getType(sendtype)->getSize());
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
               sendcounts[i], sendtype, neighbors[i], comm);
@@ -6669,7 +6706,7 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
-  int itemsize = getDDT()->getType(sendtype)->getSize();
+  int itemsize = castToFrom<int,MPI_Count>(getDDT()->getType(sendtype)->getSize());
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
               sendcounts[i], sendtype, neighbors[i], comm);
@@ -6826,7 +6863,7 @@ int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
   }
-  int itemsize = getDDT()->getType(recvtype)->getSize(recvcount);
+  int itemsize = castToFrom<int,MPI_Count>(getDDT()->getType(recvtype)->getSize(recvcount));
   for (int j=0; j<num_neighbors; j++) {
     if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*j)),
                       recvcount, recvtype, comm))
@@ -6882,7 +6919,7 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
   // use an IATAReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
   IATAReq *newreq = new IATAReq(num_neighbors);
-  int itemsize = getDDT()->getType(recvtype)->getSize(recvcount);
+  int itemsize = castToFrom<int,MPI_Count>(getDDT()->getType(recvtype)->getSize(recvcount));
   for (int j=0; j<num_neighbors; j++) {
     if(newreq->addReq(((char*)recvbuf)+(itemsize*j), recvcount, recvtype,
                       neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
@@ -6928,7 +6965,7 @@ int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
   }
-  int itemsize = getDDT()->getType(recvtype)->getSize();
+  int itemsize = castToFrom<int,MPI_Count>(getDDT()->getType(recvtype)->getSize());
   for (int j=0; j<num_neighbors; j++) {
     if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*displs[j])),
                       recvcounts[j], recvtype, comm))
@@ -6984,7 +7021,7 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
   // use an IATAReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
   IATAReq *newreq = new IATAReq(num_neighbors);
-  int itemsize = getDDT()->getType(recvtype)->getSize();
+  int itemsize = castToFrom<int,MPI_Count>(getDDT()->getType(recvtype)->getSize());
   for (int j=0; j<num_neighbors; j++) {
     if(newreq->addReq(((char*)recvbuf)+(itemsize*displs[j]), recvcounts[j], recvtype,
                       neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
@@ -7205,11 +7242,11 @@ CDECL
 int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count){
   AMPIAPI("AMPI_Get_count");
   CkDDT_DataType* dttype = getDDT()->getType(dtype);
-  int itemsize = dttype->getSize() ;
+  MPI_Count itemsize = dttype->getSize();
   if (itemsize == 0) {
     *count = 0;
   } else {
-    *count = sts->MPI_LENGTH/itemsize;
+    *count = castToFrom<int,MPI_Count>(sts->MPI_LENGTH/itemsize);
   }
   return MPI_SUCCESS;
 }
@@ -7217,14 +7254,14 @@ int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count){
 CDECL
 int AMPI_Type_lb(MPI_Datatype dtype, MPI_Aint* displacement){
   AMPIAPI("AMPI_Type_lb");
-  *displacement = getDDT()->getLB(dtype);
+  *displacement = castToFrom<MPI_Aint,MPI_Count>(getDDT()->getLB(dtype));
   return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Type_ub(MPI_Datatype dtype, MPI_Aint* displacement){
   AMPIAPI("AMPI_Type_ub");
-  *displacement = getDDT()->getUB(dtype);
+  *displacement = castToFrom<MPI_Aint,MPI_Count>(getDDT()->getUB(dtype));
   return MPI_SUCCESS;
 }
 
@@ -7247,7 +7284,19 @@ int AMPI_Status_set_elements(MPI_Status *sts, MPI_Datatype dtype, int count){
   if(sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE)
     return MPI_SUCCESS;
   CkDDT_DataType* dttype = getDDT()->getType(dtype);
-  int basesize = dttype->getBaseSize();
+  MPI_Count basesize = dttype->getBaseSize();
+  if(basesize==0) basesize = dttype->getSize();
+  sts->MPI_LENGTH = basesize * count;
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Status_set_elements_x(MPI_Status *sts, MPI_Datatype dtype, MPI_Count count){
+  AMPIAPI("AMPI_Status_set_elements");
+  if(sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE)
+    return MPI_SUCCESS;
+  CkDDT_DataType* dttype = getDDT()->getType(dtype);
+  MPI_Count basesize = dttype->getBaseSize();
   if(basesize==0) basesize = dttype->getSize();
   sts->MPI_LENGTH = basesize * count;
   return MPI_SUCCESS;
@@ -7257,6 +7306,15 @@ CDECL
 int AMPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
   AMPIAPI("AMPI_Get_elements");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
+  *count = castToFrom<int,MPI_Count>(dttype->getNumElements());
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Get_elements_x(MPI_Status *sts, MPI_Datatype dtype, MPI_Count *count)
+{
+  AMPIAPI("AMPI_Get_elements_x");
+  CkDDT_DataType *dttype = getDDT()->getType(dtype);
   *count = dttype->getNumElements();
   return MPI_SUCCESS;
 }
@@ -7267,7 +7325,7 @@ int AMPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
 {
   AMPIAPI("AMPI_Pack");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
-  int itemsize = dttype->getSize();
+  int itemsize = castToFrom<int,MPI_Count>(dttype->getSize());
   dttype->serialize((char*)inbuf, ((char*)outbuf)+(*position), incount, 1);
   *position += (itemsize*incount);
   return MPI_SUCCESS;
@@ -7279,7 +7337,7 @@ int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
 {
   AMPIAPI("AMPI_Unpack");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
-  int itemsize = dttype->getSize();
+  int itemsize = castToFrom<int,MPI_Count>(dttype->getSize());
   dttype->serialize((char*)outbuf, ((char*)inbuf+(*position)), outcount, -1);
   *position += (itemsize*outcount);
   return MPI_SUCCESS;
@@ -7290,7 +7348,7 @@ int AMPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
 {
   AMPIAPI("AMPI_Pack_size");
   CkDDT_DataType* dttype = getDDT()->getType(datatype) ;
-  *sz = incount*dttype->getSize() ;
+  *sz = castToFrom<int,MPI_Count>(incount*dttype->getSize());
   return MPI_SUCCESS;
 }
 

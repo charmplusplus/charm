@@ -14,6 +14,16 @@
 #define WIN_SUCCESS 0
 #define WIN_ERROR   (-1)
 
+// Overflow check routine. Used by functions that need to return int/MPI_Aint rather than MPI_Count
+template<typename T,typename Z>
+T castToFrom(Z var)
+{
+  if (var > std::numeric_limits<T>::max()) {
+    CkAbort("AMPI> casting variable to another type failed due to overflow!\n");
+  }
+  return (T)var;
+}
+
 win_obj::win_obj() {
   winNameLen = 0;
   baseAddr = NULL;
@@ -207,7 +217,7 @@ void ampiParent::removeWinStruct(WinStruct win) {/*winStructList.remove(win);*/}
 int ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win){
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
+  int orgtotalsize = castToFrom<int,MPI_Count>(ddt->getSize(orgcnt));
 
   if (ddt->isContig()) {
     thisProxy[rank].winRemotePut(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
@@ -227,8 +237,8 @@ void ampi::winRemotePut(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Dataty
                         MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex) {
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
-  int targunit = tddt->getSize();
-  int orgunit = getDDT()->getSize(orgtype);
+  int targunit = castToFrom<int,MPI_Count>(tddt->getSize());
+  int orgunit = castToFrom<int,MPI_Count>(getDDT()->getSize(orgtype));
 
   winobj->put(sorgaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
   char* targaddr = ((char*)(winobj->baseAddr)) + targunit*targdisp;
@@ -241,7 +251,7 @@ int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   // Send the request for data to remote side
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
+  int orgtotalsize = castToFrom<int,MPI_Count>(ddt->getSize(orgcnt));
   AmpiMsg *msg = new AmpiMsg();
 
   msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
@@ -260,9 +270,9 @@ AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
   AMPI_DEBUG("    RemoteGet invoked at Rank[%d:%d]\n", thisIndex, myRank);
 
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
-  int targunit = tddt->getSize();
+  int targunit = castToFrom<int,MPI_Count>(tddt->getSize());
   int targtotalsize = targunit*targcnt;
-  int orgunit = getDDT()->getSize(orgtype);
+  int orgunit = castToFrom<int,MPI_Count>(getDDT()->getSize(orgtype));
   win_obj *winobj = winObjects[winIndex];
   char* targaddr = (char*)(winobj->baseAddr) + targunit*targdisp;
 
@@ -288,9 +298,9 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
                              MPI_Datatype targtype, int winIndex) {
   AMPI_DEBUG("    RemoteIget invoked at Rank[%d:%d]\n", thisIndex, myRank);
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
-  int targunit = tddt->getSize();
+  int targunit = castToFrom<int,MPI_Count>(tddt->getSize());
   int targtotalsize = targunit*targcnt;
-  int orgunit = getDDT()->getSize(orgtype);
+  int orgunit = castToFrom<int,MPI_Count>(getDDT()->getSize(orgtype));
 
   win_obj *winobj = winObjects[winIndex];
   winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
@@ -298,7 +308,7 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
   AMPI_DEBUG("    Rank[%d] iget win  [%d] \n", thisIndex, *(int*)(targaddr));
 
   AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, -1, -1, thisIndex, targtotalsize,
-                                                 myComm.getComm());
+                                                myComm.getComm());
 
   char* targaddr = (char*)(winobj->baseAddr) + targdisp*targunit;
   tddt->serialize(targaddr, msg->data, targcnt, 1);
@@ -333,7 +343,8 @@ int ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int ran
                         MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                         MPI_Op op, WinStruct win) {
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
+  int orgtotalsize = castToFrom<int,MPI_Count>(ddt->getSize(orgcnt));
+
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
 
   if (ddt->isContig()) {
@@ -372,7 +383,7 @@ int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, WinStruct win) {
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
+  int orgtotalsize = castToFrom<int,MPI_Count>(ddt->getSize(orgcnt));
   AmpiMsg *msg = new AmpiMsg();
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
 
@@ -397,8 +408,8 @@ int ampi::winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Da
   CkDDT_DataType *ddt = getDDT()->getType(type);
   AmpiMsg* msg = new AmpiMsg();
 
-  msg = thisProxy[rank].winRemoteCompareAndSwap(getDDT()->getType(type)->getSize(1), (char*)orgaddr,
-                                                (char*)compaddr, type, targdisp, win.index);
+  msg = thisProxy[rank].winRemoteCompareAndSwap(castToFrom<int,MPI_Count>(getDDT()->getType(type)->getSize(1)),
+                                                (char*)orgaddr, (char*)compaddr, type, targdisp, win.index);
   ddt->serialize((char*)resaddr, msg->data, 1, 1);
 
   delete msg;
@@ -411,7 +422,7 @@ AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr,
   winobj->put(sorgaddr, 1, size, targdisp, 1, size);
 
   CkDDT_DataType *ddt = getDDT()->getType(type);
-  char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
+  char* targaddr = ((char*)(winobj->baseAddr)) + castToFrom<int,MPI_Count>(ddt->getSize(targdisp));
 
   AmpiMsg *msg = new (size, 0) AmpiMsg(-1, -1, -1, thisIndex, size, myComm.getComm());
   ddt->serialize(targaddr, msg->data, 1, 1);

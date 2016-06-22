@@ -2,6 +2,7 @@
 #define _AMPIIMPL_H
 
 #include <string.h> /* for strlen */
+#include <limits>
 
 #include "ampi.h"
 #include "ddt.h"
@@ -97,8 +98,8 @@ class AmpiOpHeader {
   MPI_User_function* func;
   MPI_Datatype dtype;
   int len;
-  int szdata;
-  AmpiOpHeader(MPI_User_function* f,MPI_Datatype d,int l,int szd):
+  MPI_Count szdata;
+  AmpiOpHeader(MPI_User_function* f,MPI_Datatype d,int l,MPI_Count szd):
     func(f),dtype(d),len(l),szdata(szd) { }
 };
 
@@ -931,8 +932,8 @@ class memBuf {
   CkVec<char> buf;
  public:
   memBuf() { }
-  memBuf(int size) :buf(size) {}
-  void setSize(int s) {buf.resize(s);}
+  memBuf(MPI_Count size) :buf(size) {}
+  void setSize(MPI_Count s) {buf.resize(s);}
   int getSize(void) const {return buf.size();}
   const void *getData(void) const {return (const void *)&buf[0];}
   void *getData(void) {return (void *)&buf[0];}
@@ -957,7 +958,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
   int srcIdx; //Array index of source
   int srcRank; //Communicator rank for source
   MPI_Comm comm; //Communicator for source
-  int length; //Number of bytes in this message
+  MPI_Count length; //Number of bytes in this message
 #if CMK_BIGSIM_CHARM
   void *event;
   int  eventPe; // the PE that the event is located
@@ -965,11 +966,12 @@ class AmpiMsg : public CMessage_AmpiMsg {
   char *data;
 
   AmpiMsg(void) { data = NULL; }
-  AmpiMsg(int _s, int t, int sIdx,int sRank, int l, int c) :
+  AmpiMsg(int _s, int t, int sIdx,int sRank, MPI_Count l, int c) :
     seq(_s), tag(t),srcIdx(sIdx), srcRank(sRank), comm(c), length(l) {}
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
-    int seq, length, tag, srcIdx, srcRank, comm;
+    int seq,tag, srcIdx, srcRank, comm;
+    MPI_Count length;
     if(p.isPacking() || p.isSizing()) {
       seq = m->seq;
       tag = m->tag;
@@ -1392,7 +1394,7 @@ class ampiParent : public CBase_ampiParent {
   }
   inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const {
     CkAssert(op>MPI_OP_NULL && op<ops.size());
-    int size = myDDT->getType(type)->getSize(count);
+    MPI_Count size = myDDT->getType(type)->getSize(count);
     return AmpiOpHeader(ops[op].func, type, count, size);
   }
 
@@ -1493,7 +1495,7 @@ class ampi : public CBase_ampi {
 
   void send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
             MPI_Comm destcomm, int sync=0);
-  static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
+  static void sendraw(int t, int s, void* buf, MPI_Count len, CkArrayID aid,
                       int idx);
   void delesend(int t, int s, const void* buf, int count, MPI_Datatype type,
                 int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);

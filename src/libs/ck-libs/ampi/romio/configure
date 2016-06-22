@@ -2773,7 +2773,7 @@ fi
 
 if test -n "$longlongsize" ; then
     if test "$longlongsize" = 8 ; then
-       echo "defining MPI_Offset as long long in C and integer*8 in Fortran" 
+        echo "defining MPI_Offset as integer(kind=MPI_OFFSET_KIND) in Fortran" 
        
 {
 test -n "$verbose" && \
@@ -2786,13 +2786,11 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LONG_LONG_64\${SEDdB}HAVE_LONG_LONG_64\${SEDdC}
 "
 }
 
-       DEFINE_MPI_OFFSET="typedef long long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer*8"
+       FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
        LL="\%lld"
     elif test "$longlongsize" = "int" ; then  # a hack to set MPI_Offset as int
-       echo "defining MPI_Offset as int in C and integer in Fortran"
-       DEFINE_MPI_OFFSET="typedef int MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer"
+       echo "defining MPI_Offset as integer(kind=MPI_OFFSET_KIND) in Fortran"
+       FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
        
 {
 test -n "$verbose" && \
@@ -2809,9 +2807,8 @@ SEDDEFS="${SEDDEFS}\${SEDdA}MPI_OFFSET_IS_INT\${SEDdB}MPI_OFFSET_IS_INT\${SEDdC}
        MPI_OFFSET_KIND1="!"
        MPI_OFFSET_KIND2="!"
     else 
-       echo "defining MPI_Offset as long in C and integer in Fortran" 
-       DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer"
+       echo "defining MPI_Offset as integer(kind=MPI_OFFSET_KIND) in Fortran" 
+       FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
        LL="\%ld"
        MPI_OFFSET_KIND1="!"
        MPI_OFFSET_KIND2="!"
@@ -2956,9 +2953,8 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LONG_LONG_64\${SEDdB}HAVE_LONG_LONG_64\${SEDdC}
 "
 }
 
-    DEFINE_MPI_OFFSET="typedef long long MPI_Offset;"
-    FORTRAN_MPI_OFFSET="integer*8"
-    echo "defining MPI_Offset as long long in C and integer*8 in Fortran"
+    FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
+    echo "defining MPI_Offset as integer(kind=MPI_OFFSET_KIND) in Fortran"
     LL="\%lld"
 else
     if test -z "$ac_echo_test" -a 1 = 1 ; then
@@ -3029,9 +3025,8 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LONG_LONG_64\${SEDdB}HAVE_LONG_LONG_64\${SEDdC}
 "
 }
 
-       DEFINE_MPI_OFFSET="typedef long long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer*8"
-       echo "defining MPI_Offset as long long in C and integer*8 in Fortran"
+       FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
+echo "defining MPI_Offset as integer(kind=MPI_OFFSET_KIND) in Fortran"
        LL="\%ld"
     else
        if test -z "$ac_echo_test" -a 1 = 1 ; then
@@ -3040,9 +3035,8 @@ else
 echo "$ac_t""no!!" 1>&1
 fi
        echo "the compiler doesn't print long longs correctly!"
-       echo "defining MPI_Offset as long in C and integer in Fortran" 
-       DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer"
+       echo "defining MPI_Offset as integer(kind=MPI_OFFSET_KIND) in Fortran" 
+       FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
        LL="\%ld"
        MPI_OFFSET_KIND1="!"
        MPI_OFFSET_KIND2="!"
@@ -3050,9 +3044,8 @@ fi
 fi
 
       else
-         echo "defining MPI_Offset as long in C and integer in Fortran" 
-         DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-         FORTRAN_MPI_OFFSET="integer"
+         echo "defining MPI_Offset as integer(kind=MPI_OFFSET_KIND) in Fortran" 
+         FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
          LL="\%ld"
          MPI_OFFSET_KIND1="!"
          MPI_OFFSET_KIND2="!"
@@ -3071,7 +3064,7 @@ EOF
       if test -x conftest ; then
          echo "assuming size of long long is 8bytes; use '-longlongsize' to indicate otherwise"
          rm -f conftest ltest.c
-         echo "defining MPI_Offset as long long in C and integer*8 in Fortran" 
+         echo "defining MPI_Offset as integer(kind=MPI_OFFSET_KIND) in Fortran" 
          
 {
 test -n "$verbose" && \
@@ -3084,14 +3077,12 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LONG_LONG_64\${SEDdB}HAVE_LONG_LONG_64\${SEDdC}
 "
 }
 
-         DEFINE_MPI_OFFSET="typedef long long MPI_Offset;"
-         FORTRAN_MPI_OFFSET="integer*8"
+         FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
          LL="\%lld"
       else 
          echo "assuming long long is not available; use '-longlongsize' to indicate otherwise"
-         echo "defining MPI_Offset as long in C and integer in Fortran" 
-         DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-         FORTRAN_MPI_OFFSET="integer"
+         echo "defining MPI_Offset as integer(kind=MPI_OFFSET_KIND) in Fortran" 
+         FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
          LL="\%ld"
          MPI_OFFSET_KIND1="!"
          MPI_OFFSET_KIND2="!"

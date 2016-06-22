@@ -46,9 +46,12 @@ FDECL {
 #define mpi_type_commit FTN_NAME( MPI_TYPE_COMMIT , mpi_type_commit )
 #define mpi_type_free FTN_NAME( MPI_TYPE_FREE , mpi_type_free )
 #define mpi_type_get_extent FTN_NAME( MPI_TYPE_GET_EXTENT , mpi_type_get_extent )
+#define mpi_Type_get_extent_x FTN_NAME( MPI_TYPE_GET_EXTENT_X , mpi_type_get_extent_x )
 #define mpi_type_extent FTN_NAME( MPI_TYPE_EXTENT , mpi_type_extent )
 #define mpi_type_get_true_extent FTN_NAME( MPI_TYPE_GET_TRUE_EXTENT , mpi_get_true_extent )
+#define mpi_type_get_true_extent_x FTN_NAME( MPI_TYPE_GET_TRUE_EXTENT_X , mpi_get_true_extent_x )
 #define mpi_type_size FTN_NAME( MPI_TYPE_SIZE , mpi_type_size )
+#define mpi_type_size_x FTN_NAME( MPI_TYPE_SIZE_X , mpi_type_size_x )
 #define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
 /* mpi_type_set_name is defined in ampifimpl.f90, see ampif_type_set_name defined below */
@@ -58,7 +61,9 @@ FDECL {
 #define mpi_get_address FTN_NAME( MPI_GET_ADDRESS , mpi_get_address )
 #define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
 #define mpi_status_set_elements FTN_NAME( MPI_STATUS_SET_ELEMENTS , mpi_status_set_elements )
+#define mpi_status_set_elements_x FTN_NAME( MPI_STATUS_SET_ELEMENTS_X , mpi_status_set_elements_x )
 #define mpi_get_elements FTN_NAME( MPI_GET_ELEMENTS , mpi_get_elements )
+#define mpi_get_elements_x FTN_NAME( MPI_GET_ELEMENTS_X , mpi_get_elements_x )
 #define mpi_pack FTN_NAME( MPI_PACK , mpi_pack )
 #define mpi_unpack FTN_NAME( MPI_UNPACK , mpi_unpack )
 #define mpi_pack_size FTN_NAME( MPI_PACK_SIZE , mpi_pack_size )
@@ -660,6 +665,11 @@ void  mpi_type_get_extent(int* type, MPI_Aint* lb, MPI_Aint* extent, int* ierr)
   *ierr = AMPI_Type_get_extent(*type, lb, extent);
 }
 
+void  mpi_type_extent_x(int* type, MPI_Count* lb, MPI_Count* extent, int* ierr)
+{
+  *ierr = AMPI_Type_get_extent_x(*type, lb, extent);
+}
+
 void  mpi_type_extent(int* type, MPI_Aint* extent, int* ierr)
 {
   *ierr = AMPI_Type_extent(*type, extent);
@@ -670,9 +680,19 @@ void mpi_type_get_true_extent(int* datatype, MPI_Aint* true_lb, MPI_Aint* true_e
   *ierr = AMPI_Type_get_true_extent(*datatype, true_lb, true_extent);
 }
 
+void mpi_type_get_true_extent_x(int* datatype, MPI_Count* true_lb, MPI_Count* true_extent, int* ierr)
+{
+  *ierr = AMPI_Type_get_true_extent_x(*datatype, true_lb, true_extent);
+}
+
 void  mpi_type_size(int* type, int* size, int* ierr)
 {
   *ierr = AMPI_Type_size(*type, size);
+}
+
+void  mpi_type_size_x(int* type, MPI_Count* size, int* ierr)
+{
+  *ierr = AMPI_Type_size_x(*type, size);
 }
 
 void mpi_type_lb(int* datatype, MPI_Aint* displacement, int* ierr)
@@ -718,9 +738,19 @@ void mpi_status_set_elements(int *status, int* datatype, int *count, int* ierr)
   *ierr = AMPI_Status_set_elements((MPI_Status*) status, *datatype, *count);
 }
 
+void mpi_status_set_elements_x(int* status, int* datatype, MPI_Count *count, int* ierr)
+{
+  *ierr = AMPI_Status_set_elements_x((MPI_Status*) status, *datatype, *count);
+}
+
 void mpi_get_elements(int *status, int* datatype, int *count, int* ierr)
 {
   *ierr = AMPI_Get_elements((MPI_Status*) status, *datatype, count);
+}
+
+void mpi_get_elements_x(int *status, int* datatype, MPI_Count* count, int* ierr)
+{
+  *ierr = AMPI_Get_elements_x((MPI_Status*) status, *datatype, count);
 }
 
 void mpi_pack(void *inbuf, int *incount, int *datatype, void *outbuf,
