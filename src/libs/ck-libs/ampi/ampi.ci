@@ -9,6 +9,7 @@
 #define EXPEDITED_REDN          [expedited,reductiontarget]
 #define EXPEDITED_THREADED      [expedited,threaded]
 #define EXPEDITED_THREADED_REDN [expedited,threaded,reductiontarget]
+#define EXPEDITED_SYNC          [expedited,sync]
 #define EXPEDITED_IGET          [expedited,iget]
 #else
 #define EXPEDITED               /*empty*/
@@ -18,6 +19,7 @@
 #define EXPEDITED_THREADED      [threaded]
 #define EXPEDITED_THREADED_REDN [threaded,reductiontarget]
 #define EXPEDITED_IGET          [iget]
+#define EXPEDITED_SYNC          [sync]
 #endif
 
 module ampi {
@@ -54,20 +56,16 @@ module ampi {
     entry EXPEDITED_THREADED_REDN void intercommMergePhase1(MPI_Comm nextIntraComm);
 
     entry EXPEDITED void setRemoteProxy(CProxy_ampi rproxy);
-    entry EXPEDITED void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
-                                      MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
-                                      MPI_Datatype targtype, int winIndex, CkFutureID ftHandle,
-                                      int pe_src);
-    entry EXPEDITED void winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
-                                      int targcnt, MPI_Datatype targtype, int winIndex,
-                                      CkFutureID ftHandle, int pe_src);
-    entry EXPEDITED void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
-                                             MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
-                                             MPI_Datatype targtype, MPI_Op op, int winIndex,
-                                             CkFutureID ftHandle, int pe_src);
-    entry EXPEDITED void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src,
-                                       int requestRank);
-    entry EXPEDITED void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
+    entry EXPEDITED_SYNC void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                               int targcnt, MPI_Datatype targtype, int winIndex);
+    entry EXPEDITED_SYNC void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                                  MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                  MPI_Datatype targtype, MPI_Op op, int winIndex);
+    entry EXPEDITED_SYNC void winRemoteLock(int lock_type, int winIndex, int requestRank);
+    entry EXPEDITED_SYNC void winRemoteUnlock(int winIndex, int requestRank);
     entry EXPEDITED_IGET AmpiMsg *winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
                                                 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                                                 int winIndex);

@@ -98,11 +98,9 @@ class ampi;
 class lockQueueEntry {
  public:
   int requestRank;
-  int pe_src;
-  int ftHandle;
   int lock_type;
-  lockQueueEntry (int _requestRank, int _pe_src, int _ftHandle, int _lock_type)
-    : requestRank(_requestRank), pe_src(_pe_src), ftHandle(_ftHandle),  lock_type(_lock_type) {}
+  lockQueueEntry (int _requestRank, int _lock_type)
+    : requestRank(_requestRank), lock_type(_lock_type) {}
   lockQueueEntry () {}
 };
 
@@ -153,8 +151,8 @@ class win_obj {
 
   int fence();
 
-  int lock(int requestRank, int pe_src, int ftHandle, int lock_type);
-  int unlock(int requestRank, int pe_src, int ftHandle);
+  int lock(int requestRank, int lock_type);
+  int unlock(int requestRank);
 
   int wait();
   int post();
@@ -162,7 +160,7 @@ class win_obj {
   int complete();
 
   void lockTopQueue();
-  void enqueue(int requestRank, int pe_src, int ftHandle, int lock_type);
+  void enqueue(int requestRank, int lock_type);
   void dequeue();
   bool emptyQueue();
 };
@@ -1413,23 +1411,21 @@ class ampi : public CBase_ampi {
   int winIgetWait(MPI_Request *request, MPI_Status *status);
   int winIgetFree(MPI_Request *request, MPI_Status *status);
   void winRemotePut(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
-                    MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                    int winIndex, CkFutureID ftHandle, int pe_src);
-  void winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
-                    int targcnt, MPI_Datatype targtype,
-                    int winIndex, CkFutureID ftHandle, int pe_src);
+                    MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex);
+  AmpiMsg* winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                    int targcnt, MPI_Datatype targtype, int winIndex);
   AmpiMsg* winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                          int targcnt, MPI_Datatype targtype, int winIndex);
   int winLock(int lock_type, int rank, WinStruct win);
   int winUnlock(int rank, WinStruct win);
-  void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
-  void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
+  void winRemoteLock(int lock_type, int winIndex, int requestRank);
+  void winRemoteUnlock(int winIndex, int requestRank);
   int winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                     MPI_Op op, WinStruct win);
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                           MPI_Op op, int winIndex, CkFutureID ftHandle, int pe_src);
+                           MPI_Op op, int winIndex);
   void winSetName(WinStruct win, const char *name);
   void winGetName(WinStruct win, char *name, int *length) const;
   win_obj* getWinObjInstance(WinStruct win) const;
