@@ -85,10 +85,6 @@ void Entry::check() {
   if (!isLocal() && param)
     param->checkParamList();
 
-  if (isSync() && retType && !(retType->isVoid() || retType->isMessage()))
-    XLAT_ERROR_NOCOL("sync methods must return either void or a message",
-                     first_line_);
-
   if (isPython() && !container->isPython())
     XLAT_ERROR_NOCOL("python entry method declared in non-python chare",
                      first_line_);
@@ -300,14 +296,35 @@ XStr Entry::chareIdx(int fromProxy)
   return str;
 }
 
-XStr Entry::syncReturn(void) {
+XStr Entry::syncPreCall(void) {
   XStr str;
   if(retType->isVoid())
-    str << "  CkFreeSysMsg(";
+    str << "  void *impl_msg_typed_ret = ";
+  else if(retType->isMessage()) 
+    str << "  "<< retType <<" impl_msg_typed_ret = ("<< retType <<")";
   else
-    str << "  return ("<<retType<<") (";
+    str << "  CkMarshallMsg *impl_msg_typed_ret = (CkMarshallMsg *)";
   return str;
 }
+
+XStr Entry::syncPostCall(void) {
+  XStr str;
+  if(retType->isVoid())
+    str << "  CkFreeSysMsg(impl_msg_typed_ret); \n";
+  else if (!retType->isMessage()){
+      str <<"  char *impl_buf_ret=impl_msg_typed_ret->msgBuf; \n";
+      str <<"  PUP::fromMem implPS(impl_buf_ret); \n";
+      str <<"  "<<retType<<" retval; implPS|retval; \n";
+      str <<"  CkFreeMsg(impl_msg_typed_ret); \n";
+      str <<"  return retval; \n"; 
+  }
+  else{
+     str <<"  return impl_msg_typed_ret;\n";   
+  }
+  return str;
+}
+
+
 
 /*************************** Chare Entry Points ******************************/
 
@@ -333,7 +350,8 @@ void Entry::genChareDefs(XStr& str)
     str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<")\n";
     str << "{\n  ckCheck();\n"<<marshallMsg();
     if(isSync()) {
-      str << syncReturn() << "CkRemoteCall("<<params<<"));\n";
+      str <<  syncPreCall() << "CkRemoteCall("<<params<<");\n";
+      str << syncPostCall(); 
     } else {//Regular, non-sync message
       str << "  if (ckIsDelegated()) {\n";
       str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
@@ -478,7 +496,8 @@ void Entry::genArrayDefs(XStr& str)
     }
 
     if(isSync()) {
-      str << syncReturn() << "ckSendSync(impl_amsg, "<<epIdx()<<"));\n";
+      str << syncPreCall() << "ckSendSync(impl_amsg, "<<epIdx()<<");\n";
+      str << syncPostCall(); 
     }
     else if (!isLocal())
     {
@@ -699,8 +718,9 @@ void Entry::genGroupDefs(XStr& str)
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
     } else if(isSync()) {
-      str << syncReturn() <<
-        "CkRemote"<<node<<"BranchCall("<<paramg<<", ckGetGroupPe()));\n";
+      str << syncPreCall() <<
+        "CkRemote"<<node<<"BranchCall("<<paramg<<", ckGetGroupPe());\n";
+      str << syncPostCall();
     } else { // Non-sync, non-local entry method
       if (forElement)
       {// Send
@@ -1962,13 +1982,27 @@ void Entry::genDefs(XStr& str)
   //A synchronous method can return a value, and must finish before
   // the caller can proceed.
     preMarshall<< "  int impl_ref = CkGetRefNum(impl_msg), impl_src = CkGetSrcPe(impl_msg);\n";
-    preCall<< "  void *impl_retMsg=";
+    if(retType->isVoid() || retType->isMessage())
+      preCall<< "  void *impl_retMsg=";
     if(retType->isVoid()) {
       preCall << "CkAllocSysMsg();\n  ";
-    } else {
+    } else if(retType->isMessage()){
       preCall << "(void *) ";
+    } else{
+      preCall<< "  "<<retType<<" impl_ret_val= ";  
+      postCall<<"  //Marshall: impl_ret_val\n";
+      postCall<<"  int impl_ret_size=0;\n";
+      postCall<<"  { //Find the size of the PUP'd data\n";
+      postCall<<"    PUP::sizer implPS;\n";
+      postCall<<"    implPS|impl_ret_val;\n";
+      postCall<<"    impl_ret_size+=implPS.size();\n";
+      postCall<<"  };\n";
+      postCall<<"  CkMarshallMsg *impl_retMsg=CkAllocateMarshallMsg(impl_ret_size, NULL);\n";
+      postCall<<"  { //Copy over the PUP'd data;\n";
+      postCall<<"    PUP::toMem implPS((void *)impl_retMsg->msgBuf);\n";
+      postCall<<"    implPS|impl_ret_val;\n";
+      postCall<<"  };\n";
     }
-
     postCall << "  CkSendToFutureID(impl_ref, impl_retMsg, impl_src);\n";
   } else if(isExclusive()) {
   //An exclusive method

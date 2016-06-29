@@ -109,7 +109,8 @@ class Entry : public Member {
     XStr paramType(int withDefaultVals,int withEO=0,int useConst=1);
     XStr paramComma(int withDefaultVals,int withEO=0);
     XStr eo(int withDefaultVals,int priorComma=1);
-    XStr syncReturn(void);
+    XStr syncPreCall(void);
+    XStr syncPostCall(void);
     XStr marshallMsg(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
 
