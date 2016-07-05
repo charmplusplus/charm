@@ -494,10 +494,10 @@ void Parameter::pupAllValues(XStr &str) {
 	if (isArray()) {
 	  str<<
 	  "  implDestP.synchronize(PUP::sync_begin_array);\n"
-	  "  { for (int impl_i=0;impl_i*(sizeof(*"<<name<<"))<impl_cnt_"<<name<<";impl_i++) { \n"
-	  "      implDestP.synchronize(PUP::sync_item);\n"
-	  "      implDestP|"<<name<<"[impl_i];\n"
-	  "  } } \n"
+	  "  for (int impl_i=0;impl_i*(sizeof(*"<<name<<"))<impl_cnt_"<<name<<";impl_i++) {\n"
+	  "    implDestP.synchronize(PUP::sync_item);\n"
+	  "    implDestP|"<<name<<"[impl_i];\n"
+	  "  }\n"
 	  "  implDestP.synchronize(PUP::sync_end_array);\n"
 	  ;
 	}
