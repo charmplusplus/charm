@@ -286,7 +286,7 @@ namespace xi {
           indentBy(defs, cur + 2);
 
           defs << (var.byConst ? "const " : "") << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
-          if (!var.isMsg)
+          if (!(var.isMsg || var.arrayLength))
 	    defs << "*";
           state.name ? (defs << *state.name) : (defs << "gen" << cur);
           if (!var.isMsg)

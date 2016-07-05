@@ -1046,6 +1046,7 @@ Parameter	: Type
 		{ /*Stop grabbing CPROGRAM segments*/
 			in_bracket=0;
 			$$ = new Parameter(lineno, $1->getType(), $1->getName() ,$2);
+                        $$->byConst = $1->byConst;
 		} 
 		;
 

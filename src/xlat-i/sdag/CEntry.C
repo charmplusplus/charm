@@ -24,7 +24,7 @@ namespace xi {
       for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end(); ++it, ++i) {
         CStateVar& var = **it;
         if (var.name)
-          defs << "  genClosure->getP" << i << "() = &" << var.name << ";\n";
+          defs << "  genClosure->getP" << i << "() = " << (var.arrayLength ? "" : "&")  << var.name << ";\n";
       }
     }
 

@@ -3999,6 +3999,7 @@ yyreduce:
     { /*Stop grabbing CPROGRAM segments*/
 			in_bracket=0;
 			(yyval.pname) = new Parameter(lineno, (yyvsp[-2].pname)->getType(), (yyvsp[-2].pname)->getName() ,(yyvsp[-1].strval));
+                        (yyval.pname)->byConst = (yyvsp[-2].pname)->byConst;
 		}
 #line 4004 "xi-grammar.tab.C" /* yacc.c:1646  */
     break;
