@@ -222,7 +222,7 @@ size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
         return nwritten;
 }
 
-CmiInt8 CmiPwrite(int fd, char *buf, size_t bytes, size_t offset)
+CmiInt8 CmiPwrite(int fd, const char *buf, size_t bytes, size_t offset)
 {
   size_t origBytes = bytes;
   while (bytes > 0) {
