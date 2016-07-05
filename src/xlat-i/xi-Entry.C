@@ -1734,6 +1734,9 @@ void Entry::genClosure(XStr& decls, bool isDef) {
       decls << "      virtual ~" << *genClosureTypeName << "() {\n";
       decls << dealloc;
       decls << "      }\n";
+      decls << "      void preserve() {\n";
+      decls << preserve;
+      decls << "      }\n";
       decls << "      " << ((container->isTemplated() || tspec) ? "PUPable_decl_template" : "PUPable_decl") << "(SINGLE_ARG(" << *genClosureTypeName;
       if (tspec) {
         decls << "<";
