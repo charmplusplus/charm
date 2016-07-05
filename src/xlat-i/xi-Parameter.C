@@ -428,7 +428,7 @@ void ParamList::beginUnmarshallSDAG(XStr &str) {
 void Parameter::unmarshallArrayDataSDAG(XStr &str) {
   if (isArray()) {
     Type *dt=type->deref();//Type, without &
-    str << "        " << name << " = ("<<dt<<" *)(impl_buf+impl_off_" << name << ");\n";
+    str << "          " << name << " = ("<<dt<<" *)(impl_buf+impl_off_" << name << ");\n";
   }
 }
 void Parameter::unmarshallArrayDataSDAGCall(XStr &str) {
