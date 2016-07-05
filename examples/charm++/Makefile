@@ -13,7 +13,6 @@ jacobi3d-2d-decomposition \
 leanmd \
 load_balancing \
 manyToMany \
-matmul \
 namespace \
 piArray \
 PUP \
