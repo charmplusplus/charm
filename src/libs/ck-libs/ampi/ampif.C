@@ -774,6 +774,7 @@ void mpi_allgatherv(void *sendbuf, int *sendcount, int *sendtype,
                     void *recvbuf, int *recvcounts, int *displs,
                     int *recvtype, int *comm, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Allgatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
                           displs, *recvtype, *comm);
 }
@@ -782,6 +783,7 @@ void mpi_iallgatherv(void *sendbuf, int *sendcount, int *sendtype,
                      void *recvbuf, int *recvcounts, int *displs,
                      int *recvtype, int *comm, int *request, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Iallgatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
                            displs, *recvtype, *comm, request);
 }
@@ -790,6 +792,7 @@ void mpi_allgather(void *sendbuf, int *sendcount, int *sendtype,
                    void *recvbuf, int *recvcount, int *recvtype,
                    int *comm, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Allgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                          *recvtype, *comm);
 }
@@ -798,6 +801,7 @@ void mpi_gatherv(void *sendbuf, int *sendcount, int *sendtype,
                  void *recvbuf, int *recvcounts, int *displs,
                  int *recvtype, int *root, int *comm, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Gatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
                        displs, *recvtype, *root, *comm);
 }
@@ -806,6 +810,7 @@ void mpi_igatherv(void *sendbuf, int *sendcount, int *sendtype,
                   void *recvbuf, int *recvcounts, int *displs,
                   int *recvtype, int *root, int *comm, int *request, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Igatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
                         displs, *recvtype, *root, *comm, request);
 }
@@ -814,6 +819,7 @@ void mpi_gather(void *sendbuf, int *sendcount, int *sendtype,
                 void *recvbuf, int *recvcount, int *recvtype,
                 int *root, int *comm, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Gather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                       *recvtype, *root, *comm);
 }
@@ -822,6 +828,7 @@ void mpi_igather(void *sendbuf, int *sendcount, int *sendtype,
                  void *recvbuf, int *recvcount, int *recvtype,
                  int *root, int *comm, int *request, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Igather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                        *recvtype, *root, *comm, request);
 }
@@ -829,6 +836,7 @@ void mpi_igather(void *sendbuf, int *sendcount, int *sendtype,
 void mpi_scatterv(void *sendbuf, int *sendcounts, int *displs, int *sendtype,
                   void *recvbuf, int *recvcount, int *recvtype, int *root, int *comm, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Scatterv(sendbuf, sendcounts, displs, *sendtype, recvbuf, *recvcount,
                         *recvtype, *root, *comm);
 }
@@ -837,6 +845,7 @@ void mpi_iscatterv(void *sendbuf, int *sendcounts, int *displs, int *sendtype,
                    void *recvbuf, int *recvcount, int *recvtype, int *root, int *comm,
                    int *request, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Iscatterv(sendbuf, sendcounts, displs, *sendtype, recvbuf, *recvcount,
                          *recvtype, *root, *comm, request);
 }
@@ -845,6 +854,7 @@ void mpi_scatter(void *sendbuf, int *sendcount, int *sendtype,
                  void *recvbuf, int *recvcount, int *recvtype,
                  int *root, int *comm, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Scatter(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                        *recvtype, *root, *comm);
 }
@@ -853,6 +863,7 @@ void mpi_iscatter(void *sendbuf, int *sendcount, int *sendtype,
                   void *recvbuf, int *recvcount, int *recvtype,
                   int *root, int *comm, int *request, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Iscatter(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                         *recvtype, *root, *comm, request);
 }
@@ -861,6 +872,7 @@ void mpi_alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                    int *sendtype, void *recvbuf, int *recvcounts,
                    int *rdispls, int *recvtype, int *comm, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Alltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
                          recvcounts, rdispls, *recvtype, *comm);
 }
@@ -869,6 +881,7 @@ void mpi_ialltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                     int *sendtype, void *recvbuf, int *recvcounts,
                     int *rdispls, int *recvtype, int *comm, int *request, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Ialltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
                           recvcounts, rdispls, *recvtype, *comm, request);
 }
@@ -877,6 +890,7 @@ void mpi_alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
                    int *sendtypes, void *recvbuf, int *recvcounts, int *rdispls,
                    int *recvtypes, int *comm, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Alltoallw(sendbuf, sendcounts, sdispls, sendtypes,
                          recvbuf, recvcounts, rdispls, recvtypes, *comm);
 }
@@ -885,6 +899,7 @@ void mpi_ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
                     int *sendtypes, void *recvbuf, int *recvcounts, int *rdispls,
                     int *recvtypes, int *comm, int *request, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Ialltoallw(sendbuf, sendcounts, sdispls, sendtypes,
                           recvbuf, recvcounts, rdispls, recvtypes,
                           *comm, request);
@@ -894,6 +909,7 @@ void mpi_alltoall(void *sendbuf, int *sendcount, int *sendtype,
                   void *recvbuf, int *recvcount, int *recvtype,
                   int *comm, int *ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Alltoall(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                         *recvtype, *comm);
 }
@@ -902,6 +918,7 @@ void mpi_iallgather(void *sendbuf, int* sendcount, int* sendtype,
                     void *recvbuf, int* recvcount, int* recvtype,
                     int* comm, int* request, int* ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Iallgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                           *recvtype, *comm, (MPI_Request *)request);
 
@@ -911,6 +928,7 @@ void mpi_ialltoall(void *sendbuf, int* sendcount, int* sendtype,
                    void *recvbuf, int* recvcount, int* recvtype,
                    int* comm, int *request, int* ierr)
 {
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Ialltoall(sendbuf, *sendcount, *sendtype,
                          recvbuf, *recvcount, *recvtype,
                          *comm, (MPI_Request *)request);
@@ -961,12 +979,14 @@ void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
 void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* opc, int* comm, int* ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
+  handle_MPI_IN_PLACE_f(sendbuf,recvbuf);
   *ierr = AMPI_Scan(sendbuf,recvbuf,*count,*datatype,op,*comm );
 }
 
 void mpi_exscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* opc, int* comm, int* ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Exscan(sendbuf,recvbuf,*count,*datatype,op,*comm);
 }
 
