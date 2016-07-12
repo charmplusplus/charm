@@ -1310,6 +1310,8 @@ disambig_array(XStr &str, const XStr &super)
       << "\n"
       << "\n    inline static CkArrayID ckCreateEmptyArray(CkArrayOptions opts = CkArrayOptions())"
       << "\n    { return " << super << "::ckCreateEmptyArray(opts); }"
+      << "\n    inline static void ckCreateEmptyArrayAsync(CkCallback cb, CkArrayOptions opts = CkArrayOptions())"
+      << "\n    { " << super << "::ckCreateEmptyArrayAsync(cb, opts); }"
       << "\n    inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)"
       << "\n    { return " << super << "::ckCreateArray(m,ctor,opts); }"
       << "\n    inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx)"
