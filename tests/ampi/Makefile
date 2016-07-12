@@ -1,4 +1,4 @@
-DIRS=megampi stacksize migration
+DIRS=megampi stacksize migration particle
 #DIRS=megampi stacksize chkpt 
 
 all:
