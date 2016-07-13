@@ -173,6 +173,8 @@ FDECL {
 
 #define mpi_cart_create FTN_NAME ( MPI_CART_CREATE , mpi_cart_create )
 #define mpi_graph_create FTN_NAME ( MPI_GRAPH_CREATE , mpi_graph_create )
+#define mpi_dist_graph_create_adjacent FTN_NAME ( MPI_DIST_GRAPH_CREATE_ADJACENT, mpi_dist_graph_create_adjacent )
+#define mpi_dist_graph_create FTN_NAME ( MPI_DIST_GRAPH_CREATE, mpi_dist_graph_create )
 #define mpi_topo_test FTN_NAME ( MPI_TOPO_TEST , mpi_topo_test )
 #define mpi_cart_map FTN_NAME ( MPI_CART_MAP , mpi_cart_map )
 #define mpi_graph_map FTN_NAME ( MPI_GRAPH_MAP , mpi_graph_map )
@@ -185,6 +187,8 @@ FDECL {
 #define mpi_graph_get FTN_NAME ( MPI_GRAPH_GET , mpi_graph_get )
 #define mpi_graph_neighbors_count FTN_NAME ( MPI_GRAPH_NEIGHBORS_COUNT , mpi_graph_neighbors_count )
 #define mpi_graph_neighbors FTN_NAME ( MPI_GRAPH_NEIGHBORS , mpi_graph_neighbors )
+#define mpi_dist_graph_neighbors FTN_NAME ( MPI_DIST_GRAPH_NEIGHBORS , mpi_dist_graph_neighbors )
+#define mpi_dist_graph_neighbors_count FTN_NAME ( MPI_DIST_GRAPH_NEIGHBORS_COUNT , mpi_dist_graph_neighbors_count )
 #define mpi_dims_create FTN_NAME ( MPI_DIMS_CREATE , mpi_dims_create )
 #define mpi_cart_sub FTN_NAME ( MPI_CART_SUB , mpi_cart_sub )
 
@@ -1252,6 +1256,22 @@ void mpi_graph_create(int* comm_old, int* nnodes, int *index, int *edges,
   *ierr = AMPI_Graph_create(*comm_old, *nnodes, index, edges, *reorder, comm_graph);
 }
 
+void mpi_dist_graph_create_adjacent(int* comm_old, int* indegree, int* sources, int* sourceweights,
+                                    int* outdegree, int* destinations, int* destweights, int* info,
+                                    int* reorder, int* comm_dist_graph, int* ierr)
+{
+  *ierr = AMPI_Dist_graph_create_adjacent(*comm_old, *indegree, sources, sourceweights, *outdegree,
+                                          destinations, destweights, *info, *reorder, comm_dist_graph);
+}
+
+void mpi_dist_graph_create(int* comm_old, int* n, int* sources, int* degrees,
+                           int* destinations, int* weights, int* info, int* reorder,
+                           int* comm_dist_graph, int* ierr)
+{
+  *ierr = AMPI_Dist_graph_create(*comm_old, *n, sources, degrees, destinations, weights, *info,
+                                 *reorder, comm_dist_graph);
+}
+
 void mpi_topo_test(int* comm, int *status, int* ierr)
 {
   *ierr = AMPI_Topo_test(*comm, status);
@@ -1316,6 +1336,20 @@ void mpi_graph_neighbors(int* comm, int *rank, int *maxneighbors,
                          int *neighbors, int* ierr)
 {
   *ierr = AMPI_Graph_neighbors(*comm, *rank, *maxneighbors, neighbors);
+}
+
+void mpi_dist_graph_neighbors_count(int* comm_dist_graph, int* indegree, int* outdegree,
+                                    int* weighted, int* ierr)
+{
+  *ierr = AMPI_Dist_graph_neighbors_count(*comm_dist_graph, indegree, outdegree, weighted);
+}
+
+void mpi_dist_graph_neighbors(int* comm_dist_graph, int* maxindegree, int* sources,
+                              int* sourceweights, int* maxoutdegree,
+                              int* destinations, int* destweights, int* ierr)
+{
+  *ierr = AMPI_Dist_graph_neighbors(*comm_dist_graph, *maxindegree, sources, sourceweights,
+                                    *maxoutdegree, destinations, destweights);
 }
 
 void mpi_dims_create(int *nnodes, int *ndims, int *dims, int* ierr)

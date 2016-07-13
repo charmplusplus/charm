@@ -142,8 +142,10 @@
        integer, parameter :: AMPI_COMM_TYPE_PROCESS = 3
        integer, parameter :: AMPI_COMM_TYPE_WTH     = 4
 
+       integer, parameter :: MPI_UNWEIGHTED = 0
        integer, parameter :: MPI_GRAPH = 1
        integer, parameter :: MPI_CART  = 2
+       integer, parameter :: MPI_DIST_GRAPH = 3
 
        integer, parameter :: MPI_TAG_UB            = -1
        integer, parameter :: MPI_HOST              = -2

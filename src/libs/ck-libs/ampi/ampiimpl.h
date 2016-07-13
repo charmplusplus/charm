@@ -330,6 +330,175 @@ class InfoStruct{
 class CProxy_ampi;
 class CProxyElement_ampi;
 
+//Virtual class describing a virtual topology: Cart, Graph, DistGraph
+class ampiTopology {
+  vector<int> v; // dummy variable for const& returns from virtual functions
+ public:
+  virtual ~ampiTopology() {};
+  virtual void pup(PUP::er &p) =0;
+  virtual int getType() const =0;
+  virtual void dup(ampiTopology* topo) =0;
+  virtual const vector<int> &getnbors() const =0;
+  virtual void setnbors(const vector<int> &nbors_) =0;
+
+  virtual const vector<int> &getdims() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const vector<int> &getperiods() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual int getndims() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
+  virtual void setdims(const vector<int> &dims_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setperiods(const vector<int> &periods_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setndims(int ndims_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+
+  virtual int getnvertices() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
+  virtual const vector<int> &getindex() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const vector<int> &getedges() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual void setnvertices(int nvertices_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setindex(const vector<int> &index_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setedges(const vector<int> &edges_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+
+  virtual int getInDegree() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
+  virtual const vector<int> &getSources() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const vector<int> &getSourceWeights() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual int getOutDegree() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
+  virtual const vector<int> &getDestinations() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const vector<int> &getDestWeights() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual bool areSourcesWeighted() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return false;}
+  virtual bool areDestsWeighted() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return false;}
+  virtual void setAreSourcesWeighted(bool val) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setAreDestsWeighted(bool val) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setInDegree(int degree) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setSources(const vector<int> &sources) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setSourceWeights(const vector<int> &sourceWeights) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setOutDegree(int degree) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setDestinations(const vector<int> &destinations) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setDestWeights(const vector<int> &destWeights) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+};
+
+class ampiCartTopology : public ampiTopology {
+ private:
+  int ndims;
+  vector<int> dims, periods, nbors;
+
+ public:
+  ampiCartTopology() : ndims(-1) {}
+
+  void pup(PUP::er &p) {
+    p|ndims;
+    p|dims;
+    p|periods;
+    p|nbors;
+  }
+
+  inline int getType() const {return MPI_CART;}
+  inline void dup(ampiTopology* topo) {
+    CkAssert(topo->getType() == MPI_CART);
+    setndims(topo->getndims());
+    setdims(topo->getdims());
+    setperiods(topo->getperiods());
+    setnbors(topo->getnbors());
+  }
+
+  inline const vector<int> &getdims() const {return dims;}
+  inline const vector<int> &getperiods() const {return periods;}
+  inline int getndims() const {return ndims;}
+  inline const vector<int> &getnbors() const {return nbors;}
+
+  inline void setdims(const vector<int> &d) {dims = d; dims.shrink_to_fit();}
+  inline void setperiods(const vector<int> &p) {periods = p; periods.shrink_to_fit();}
+  inline void setndims(int nd) {ndims = nd;}
+  inline void setnbors(const vector<int> &n) {nbors = n; nbors.shrink_to_fit();}
+};
+
+class ampiGraphTopology : public ampiTopology {
+ private:
+  int nvertices;
+  vector<int> index, edges, nbors;
+
+ public:
+  ampiGraphTopology() : nvertices(-1) {}
+
+  void pup(PUP::er &p) {
+    p|nvertices;
+    p|index;
+    p|edges;
+    p|nbors;
+  }
+
+  inline int getType() const {return MPI_GRAPH;}
+  inline void dup(ampiTopology* topo) {
+    CkAssert(topo->getType() == MPI_GRAPH);
+    setnvertices(topo->getnvertices());
+    setindex(topo->getindex());
+    setedges(topo->getedges());
+    setnbors(topo->getnbors());
+  }
+
+  inline int getnvertices() const {return nvertices;}
+  inline const vector<int> &getindex() const {return index;}
+  inline const vector<int> &getedges() const {return edges;}
+  inline const vector<int> &getnbors() const {return nbors;}
+
+  inline void setnvertices(int nv) {nvertices = nv;}
+  inline void setindex(const vector<int> &i) {index = i; index.shrink_to_fit();}
+  inline void setedges(const vector<int> &e) {edges = e; edges.shrink_to_fit();}
+  inline void setnbors(const vector<int> &n) {nbors = n; nbors.shrink_to_fit();}
+};
+
+class ampiDistGraphTopology : public ampiTopology {
+ private:
+  int inDegree, outDegree;
+  bool sourcesWeighted, destsWeighted;
+  vector<int> sources, sourceWeights, destinations, destWeights, nbors;
+
+ public:
+  ampiDistGraphTopology() : inDegree(-1), outDegree(-1), sourcesWeighted(false), destsWeighted(false) {}
+
+  void pup(PUP::er &p) {
+    p|inDegree;
+    p|outDegree;
+    p|sourcesWeighted;
+    p|destsWeighted;
+    p|sources;
+    p|sourceWeights;
+    p|destinations;
+    p|destWeights;
+    p|nbors;
+  }
+
+  inline int getType() const {return MPI_DIST_GRAPH;}
+  inline void dup(ampiTopology* topo) {
+    CkAssert(topo->getType() == MPI_DIST_GRAPH);
+    setAreSourcesWeighted(topo->areSourcesWeighted());
+    setAreDestsWeighted(topo->areDestsWeighted());
+    setInDegree(topo->getInDegree());
+    setSources(topo->getSources());
+    setSourceWeights(topo->getSourceWeights());
+    setOutDegree(topo->getOutDegree());
+    setDestinations(topo->getDestinations());
+    setDestWeights(topo->getDestWeights());
+    setnbors(topo->getnbors());
+  }
+
+  inline int getInDegree() const {return inDegree;}
+  inline const vector<int> &getSources() const {return sources;}
+  inline const vector<int> &getSourceWeights() const {return sourceWeights;}
+  inline int getOutDegree() const {return outDegree;}
+  inline const vector<int> &getDestinations() const {return destinations;}
+  inline const vector<int> &getDestWeights() const {return destWeights;}
+  inline bool areSourcesWeighted() const {return sourcesWeighted;}
+  inline bool areDestsWeighted() const {return destsWeighted;}
+  inline const vector<int> &getnbors() const {return nbors;}
+
+  inline void setAreSourcesWeighted(bool v) {sourcesWeighted = v ? 1 : 0;}
+  inline void setAreDestsWeighted(bool v) {destsWeighted = v ? 1 : 0;}
+  inline void setInDegree(int d) {inDegree = d;}
+  inline void setSources(const vector<int> &s) {sources = s; sources.shrink_to_fit();}
+  inline void setSourceWeights(const vector<int> &sw) {sourceWeights = sw; sourceWeights.shrink_to_fit();}
+  inline void setOutDegree(int d) {outDegree = d;}
+  inline void setDestinations(const vector<int> &d) {destinations = d; destinations.shrink_to_fit();}
+  inline void setDestWeights(const vector<int> &dw) {destWeights = dw; destWeights.shrink_to_fit();}
+  inline void setnbors(const vector<int> &nbors_) {nbors = nbors_; nbors.shrink_to_fit();}
+};
+
 //Describes an AMPI communicator
 class ampiCommStruct {
   MPI_Comm comm; //Communicator
@@ -340,18 +509,8 @@ class ampiCommStruct {
   vector<int> indices;  //indices[r] gives the array index for rank r
   vector<int> remoteIndices;  // remote group for inter-communicator
 
-  // cartesian virtual topology parameters
-  int ndims;
-  vector<int> dims;
-  vector<int> periods;
-
-  // graph virtual topology parameters
-  int nvertices;
-  vector<int> index;
-  vector<int> edges;
-
-  // For virtual topology neighbors
-  vector<int> nbors;
+  ampiTopology *ampiTopo; // Virtual topology
+  int topoType; // Type of virtual topology: MPI_CART, MPI_GRAPH, MPI_DIST_GRAPH, or MPI_UNDEFINED
 
   // For communicator attributes (MPI_*_get_attr): indexed by keyval
   vector<void *> keyvals;
@@ -367,18 +526,96 @@ class ampiCommStruct {
     std::iota(ind.begin(), ind.end(), 0);
   }
  public:
-  ampiCommStruct(int ignored=0) {size=-1;isWorld=false;isInter=false;commNameLen=0;}
+  ampiCommStruct(int ignored=0) {size=-1;isWorld=false;isInter=false;commNameLen=0;ampiTopo=NULL;topoType=MPI_UNDEFINED;}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
-    :comm(comm_), ampiID(id_),size(size_), isWorld(true), isInter(false), commNameLen(0) {}
+    :comm(comm_), ampiID(id_),size(size_), isWorld(true), isInter(false), commNameLen(0), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_)
                 :comm(comm_), ampiID(id_),size(size_),isWorld(false),
-                 isInter(false), indices(indices_), commNameLen(0) {}
+                 isInter(false), indices(indices_), commNameLen(0),
+                 ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_,
                  const vector<int> &remoteIndices_)
                 :comm(comm_),ampiID(id_),size(size_),isWorld(false),isInter(true),
-                 indices(indices_),remoteIndices(remoteIndices_),commNameLen(0) {}
+                 indices(indices_),remoteIndices(remoteIndices_),commNameLen(0),
+                 ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
+
+  ~ampiCommStruct() {
+    if (ampiTopo != NULL)
+      delete ampiTopo;
+  }
+
+  // Overloaded copy constructor. Used when creating virtual topologies.
+  ampiCommStruct(const ampiCommStruct &obj, int topoNumber=MPI_UNDEFINED) {
+    switch (topoNumber) {
+      case MPI_CART:
+        ampiTopo = new ampiCartTopology();
+        break;
+      case MPI_GRAPH:
+        ampiTopo = new ampiGraphTopology();
+        break;
+      case MPI_DIST_GRAPH:
+        ampiTopo = new ampiDistGraphTopology();
+        break;
+      default:
+        ampiTopo = NULL;
+        break;
+    }
+    topoType       = topoNumber;
+    comm           = obj.comm;
+    ampiID         = obj.ampiID;
+    size           = obj.size;
+    isWorld        = obj.isWorld;
+    isInter        = obj.isInter;
+    indices        = obj.indices;
+    remoteIndices  = obj.remoteIndices;
+    keyvals        = obj.keyvals;
+    memcpy(commName, obj.commName, obj.commNameLen+1);
+    commNameLen    = obj.commNameLen;
+  }
+
+  ampiCommStruct &operator=(const ampiCommStruct &obj) {
+    if (this == &obj) {
+      return *this;
+    }
+    switch (obj.topoType) {
+      case MPI_CART:
+        ampiTopo = new ampiCartTopology(*(static_cast<ampiCartTopology*>(obj.ampiTopo)));
+        break;
+      case MPI_GRAPH:
+        ampiTopo = new ampiGraphTopology(*(static_cast<ampiGraphTopology*>(obj.ampiTopo)));
+        break;
+      case MPI_DIST_GRAPH:
+        ampiTopo = new ampiDistGraphTopology(*(static_cast<ampiDistGraphTopology*>(obj.ampiTopo)));
+        break;
+      default:
+        ampiTopo = NULL;
+        break;
+    }
+    topoType       = obj.topoType;
+    comm           = obj.comm;
+    ampiID         = obj.ampiID;
+    size           = obj.size;
+    isWorld        = obj.isWorld;
+    isInter        = obj.isInter;
+    indices        = obj.indices;
+    remoteIndices  = obj.remoteIndices;
+    keyvals        = obj.keyvals;
+    memcpy(commName, obj.commName, obj.commNameLen+1);
+    commNameLen    = obj.commNameLen;
+    return *this;
+  }
+
+  const ampiTopology* getTopologyforNeighbors() const {
+    return ampiTopo;
+  }
+
+  ampiTopology* getTopology() {
+    return ampiTopo;
+  }
+
+  inline bool isinter(void) const {return isInter;}
   void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
   MPI_Comm getComm(void) const {return comm;}
@@ -428,27 +665,6 @@ class ampiCommStruct {
 
   int getSize(void) const {return size;}
 
-  inline bool isinter(void) const { return isInter; }
-  inline const vector<int> &getdims() const {return dims;}
-  inline const vector<int> &getperiods() const {return periods;}
-  inline int getndims() const {return ndims;}
-
-  inline void setdims(const vector<int> &dims_) { dims = dims_; }
-  inline void setperiods(const vector<int> &periods_) { periods = periods_; }
-  inline void setndims(int ndims_) {ndims = ndims_; }
-
-  /* Similar hack for graph vt */
-  inline int getnvertices() const {return nvertices;}
-  inline const vector<int> &getindex() const {return index;}
-  inline const vector<int> &getedges() const {return edges;}
-
-  inline void setnvertices(int nvertices_) {nvertices = nvertices_; }
-  inline void setindex(const vector<int> &index_) { index = index_; }
-  inline void setedges(const vector<int> &edges_) { edges = edges_; }
-
-  inline const vector<int> &getnbors() const {return nbors;}
-  inline void setnbors(const vector<int> &nbors_) { nbors = nbors_; }
-
   void pup(PUP::er &p) {
     p|comm;
     p|ampiID;
@@ -457,15 +673,33 @@ class ampiCommStruct {
     p|isInter;
     p|indices;
     p|remoteIndices;
-    p|ndims;
-    p|dims;
-    p|periods;
-    p|nvertices;
-    p|index;
-    p|edges;
-    p|nbors;
     p|commNameLen;
     p(commName,MPI_MAX_OBJECT_NAME);
+    p|topoType;
+    if (topoType != MPI_UNDEFINED) {
+      if (p.isUnpacking()) {
+        switch (topoType) {
+          case MPI_CART:
+            ampiTopo = new ampiCartTopology();
+            break;
+          case MPI_GRAPH:
+            ampiTopo = new ampiGraphTopology();
+            break;
+          case MPI_DIST_GRAPH:
+            ampiTopo = new ampiDistGraphTopology();
+            break;
+          default:
+            CkAbort("AMPI> Communicator has an invalid topology!");
+            break;
+        }
+      }
+      ampiTopo->pup(p);
+    } else {
+      ampiTopo = NULL;
+    }
+    if (p.isDeleting()) {
+      delete ampiTopo; ampiTopo = NULL;
+    }
   }
 };
 PUPmarshall(ampiCommStruct)
@@ -1273,12 +1507,13 @@ class ampiParent : public CBase_ampiParent {
   ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
   ampiCommStruct worldStruct;
 
-  CkPupPtrVec<ampiCommStruct> splitComm; //Communicators from MPI_Comm_split
-  CkPupPtrVec<ampiCommStruct> groupComm; //Communicators from MPI_Comm_group
-  CkPupPtrVec<ampiCommStruct> cartComm;  //Communicators from MPI_Cart_create
-  CkPupPtrVec<ampiCommStruct> graphComm; //Communicators from MPI_Graph_create
-  CkPupPtrVec<ampiCommStruct> interComm; //Communicators from MPI_Intercomm_create
-  CkPupPtrVec<ampiCommStruct> intraComm; //Communicators from MPI_Intercomm_merge
+  CkPupPtrVec<ampiCommStruct> splitComm;     //Communicators from MPI_Comm_split
+  CkPupPtrVec<ampiCommStruct> groupComm;     //Communicators from MPI_Comm_group
+  CkPupPtrVec<ampiCommStruct> cartComm;      //Communicators from MPI_Cart_create
+  CkPupPtrVec<ampiCommStruct> graphComm;     //Communicators from MPI_Graph_create
+  CkPupPtrVec<ampiCommStruct> distGraphComm; //Communicators from MPI_Dist_graph_create
+  CkPupPtrVec<ampiCommStruct> interComm;     //Communicators from MPI_Intercomm_create
+  CkPupPtrVec<ampiCommStruct> intraComm;     //Communicators from MPI_Intercomm_merge
 
   CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
   CkPupPtrVec<WinStruct> winStructList; //List of windows for one-sided communication
@@ -1310,6 +1545,7 @@ class ampiParent : public CBase_ampiParent {
 
   void cartChildRegister(const ampiCommStruct &s);
   void graphChildRegister(const ampiCommStruct &s);
+  void distGraphChildRegister(const ampiCommStruct &s);
   void interChildRegister(const ampiCommStruct &s);
 
   inline bool isIntra(MPI_Comm comm) const {
@@ -1367,6 +1603,7 @@ class ampiParent : public CBase_ampiParent {
   MPI_Comm getNextGroup(void) const {return MPI_COMM_FIRST_GROUP+groupComm.size();}
   MPI_Comm getNextCart(void) const {return MPI_COMM_FIRST_CART+cartComm.size();}
   MPI_Comm getNextGraph(void) const {return MPI_COMM_FIRST_GRAPH+graphComm.size();}
+  MPI_Comm getNextDistGraph(void) const {return MPI_COMM_FIRST_DIST_GRAPH+distGraphComm.size();}
   MPI_Comm getNextInter(void) const {return MPI_COMM_FIRST_INTER+interComm.size();}
   MPI_Comm getNextIntra(void) const {return MPI_COMM_FIRST_INTRA+intraComm.size();}
 
@@ -1379,12 +1616,20 @@ class ampiParent : public CBase_ampiParent {
     return *cartComm[idx];
   }
   inline bool isGraph(MPI_Comm comm) const {
-    return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_INTER);
+    return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_DIST_GRAPH);
   }
   ampiCommStruct &getGraph(MPI_Comm comm) const {
     int idx=comm-MPI_COMM_FIRST_GRAPH;
     if (idx>=graphComm.size()) CkAbort("AMPI> Bad graph communicator used!\n");
     return *graphComm[idx];
+  }
+  inline bool isDistGraph(MPI_Comm comm) const {
+    return (comm >= MPI_COMM_FIRST_DIST_GRAPH && comm < MPI_COMM_FIRST_INTER);
+  }
+  ampiCommStruct &getDistGraph(MPI_Comm comm) const {
+    int idx = comm-MPI_COMM_FIRST_DIST_GRAPH;
+    if (idx>=distGraphComm.size()) CkAbort("Bad distributed graph communicator used");
+    return *distGraphComm[idx];
   }
   inline bool isInter(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_INTER && comm<MPI_COMM_FIRST_INTRA);
@@ -1416,6 +1661,7 @@ class ampiParent : public CBase_ampiParent {
     if (isGroup(comm)) return getGroup(comm);
     if (isCart(comm)) return getCart(comm);
     if (isGraph(comm)) return getGraph(comm);
+    if (isDistGraph(comm)) return getDistGraph(comm);
     if (isInter(comm)) return getInter(comm);
     if (isIntra(comm)) return getIntra(comm);
     return universeComm2CommStruct(comm);
@@ -1440,6 +1686,10 @@ class ampiParent : public CBase_ampiParent {
       const ampiCommStruct &st = getGraph(comm);
       return st.getProxy()[thisIndex].ckLocal();
     }
+    if (isDistGraph(comm)) {
+      const ampiCommStruct &st = getDistGraph(comm);
+      return st.getProxy()[thisIndex].ckLocal();
+    }
     if (isInter(comm)) {
       const ampiCommStruct &st=getInter(comm);
       return st.getProxy()[thisIndex].ckLocal();
@@ -1456,7 +1706,7 @@ class ampiParent : public CBase_ampiParent {
   inline bool hasComm(const MPI_Group group) const {
     MPI_Comm comm = (MPI_Comm)group;
     return ( comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm) ||
-             isCart(comm) || isGraph(comm) || isIntra(comm) );
+             isCart(comm) || isGraph(comm) || isDistGraph(comm) || isIntra(comm) );
     //isInter omitted because its comm number != its group number
   }
   inline const groupStruct group2vec(MPI_Group group) const {
@@ -1489,11 +1739,12 @@ class ampiParent : public CBase_ampiParent {
   }
 
   inline void checkComm(MPI_Comm comm) const {
-    if ((comm > MPI_COMM_FIRST_RESVD && comm != MPI_COMM_WORLD)
+    if ((comm != MPI_COMM_SELF && comm != MPI_COMM_WORLD)
      || (isSplit(comm) && comm-MPI_COMM_FIRST_SPLIT >= splitComm.size())
      || (isGroup(comm) && comm-MPI_COMM_FIRST_GROUP >= groupComm.size())
      || (isCart(comm)  && comm-MPI_COMM_FIRST_CART  >=  cartComm.size())
      || (isGraph(comm) && comm-MPI_COMM_FIRST_GRAPH >= graphComm.size())
+     || (isDistGraph(comm) && comm-MPI_COMM_FIRST_DIST_GRAPH >= distGraphComm.size())
      || (isInter(comm) && comm-MPI_COMM_FIRST_INTER >= interComm.size())
      || (isIntra(comm) && comm-MPI_COMM_FIRST_INTRA >= intraComm.size()) )
       CkAbort("Invalid MPI_Comm\n");
@@ -1752,6 +2003,7 @@ class ampi : public CBase_ampi {
   MPI_Comm cartCreate0D(void);
   MPI_Comm cartCreate(groupStruct vec, int ndims, const int* dims);
   void graphCreate(const groupStruct vec, MPI_Comm *newcomm);
+  void distGraphCreate(const groupStruct vec, MPI_Comm *newcomm);
   void intercommCreate(const groupStruct rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm);
 
   inline bool isInter(void) const { return myComm.isinter(); }
@@ -1772,9 +2024,10 @@ class ampi : public CBase_ampi {
   inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
   void findNeighbors(MPI_Comm comm, int rank, vector<int>& neighbors) const;
-  inline const vector<int>& getNeighbors() const { return myComm.getnbors(); }
+  inline const vector<int>& getNeighbors() const { return myComm.getTopologyforNeighbors()->getnbors(); }
   inline bool opIsCommutative(MPI_Op op) const { return parent->opIsCommutative(op); }
   inline MPI_User_function* op2User_function(MPI_Op op) const { return parent->op2User_function(op); }
+  void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm);
 
   CkDDT *getDDT(void) const {return parent->myDDT;}
   CthThread getThread() const { return thread->getThread(); }

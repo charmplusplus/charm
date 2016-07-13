@@ -222,8 +222,10 @@ typedef void (MPI_User_function)(void *invec, void *inoutvec,
 #define MPI_REPLACE 12
 #define MPI_NO_OP   13
 
-#define MPI_GRAPH 1
-#define MPI_CART  2
+#define MPI_UNWEIGHTED 0
+#define MPI_CART       1
+#define MPI_GRAPH      2
+#define MPI_DIST_GRAPH 3
 
 /* This is one less than the system-tags defined in ampiimpl.h.
  * This is so that the tags used by the system don't clash with user-tags.
@@ -263,9 +265,10 @@ typedef int MPI_Info;
 #define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from MPI_Comm_group */
 #define MPI_COMM_FIRST_CART  (MPI_Comm)(3000000) /*Communicator from MPI_Cart_create */
 #define MPI_COMM_FIRST_GRAPH (MPI_Comm)(4000000) /*Communicator from MPI_Graph_create */
-#define MPI_COMM_FIRST_INTER (MPI_Comm)(5000000) /*Communicator from MPI_Intercomm_create*/
-#define MPI_COMM_FIRST_INTRA (MPI_Comm)(6000000) /*Communicator from MPI_Intercomm_merge*/
-#define MPI_COMM_FIRST_RESVD (MPI_Comm)(7000000) /*Communicator reserved for now*/
+#define MPI_COMM_FIRST_DIST_GRAPH (MPI_Comm)(5000000) /*Communicator from MPI_Dist_Graph_create */
+#define MPI_COMM_FIRST_INTER (MPI_Comm)(6000000) /*Communicator from MPI_Intercomm_create*/
+#define MPI_COMM_FIRST_INTRA (MPI_Comm)(7000000) /*Communicator from MPI_Intercomm_merge*/
+#define MPI_COMM_FIRST_RESVD (MPI_Comm)(8000000) /*Communicator reserved for now*/
 #define MPI_COMM_WORLD       (MPI_Comm)(9000000) /*Start of universe*/
 #define MPI_MAX_COMM_WORLDS  8
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
@@ -978,6 +981,17 @@ AMPI_API_DEF(int, MPI_Cart_create, MPI_Comm comm_old, int ndims, const int *dims
 #define PMPI_Graph_create APMPI_Graph_create
 AMPI_API_DEF(int, MPI_Graph_create, MPI_Comm comm_old, int nnodes, const int *index,
                       const int *edges, int reorder, MPI_Comm *comm_graph)
+#define MPI_Dist_graph_create_adjacent AMPI_Dist_graph_create_adjacent
+#define PMPI_Dist_graph_create_adjacent APMPI_Dist_graph_create_adjacent
+AMPI_API_DEF(int, MPI_Dist_graph_create_adjacent, MPI_Comm comm_old, int indegree, const int sources[],
+                                    const int sourceweights[], int outdegree,
+                                    const int destinations[], const int destweights[],
+                                    MPI_Info info, int reorder, MPI_Comm *comm_dist_graph)
+#define MPI_Dist_graph_create AMPI_Dist_graph_create
+#define PMPI_Dist_graph_create APMPI_Dist_graph_create
+AMPI_API_DEF(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int sources[], const int degrees[],
+                           const int destintations[], const int weights[], MPI_Info info,
+                           int reorder, MPI_Comm *comm_dist_graph)
 #define MPI_Topo_test AMPI_Topo_test
 #define PMPI_Topo_test APMPI_Topo_test
 AMPI_API_DEF(int, MPI_Topo_test, MPI_Comm comm, int *status)
@@ -1022,6 +1036,13 @@ AMPI_API_DEF(int, MPI_Dims_create, int nnodes, int ndims, int *dims)
 #define MPI_Cart_sub AMPI_Cart_sub
 #define PMPI_Cart_sub APMPI_Cart_sub
 AMPI_API_DEF(int, MPI_Cart_sub, MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm)
+#define MPI_Dist_graph_neighbors AMPI_Dist_graph_neighbors
+#define PMPI_Dist_graph_neighbors APMPI_Dist_graph_neighbors
+AMPI_API_DEF(int, MPI_Dist_graph_neighbors, MPI_Comm comm, int maxindegree, int sources[], int sourceweights[],
+                              int maxoutdegree, int destinations[], int destweights[])
+#define MPI_Dist_graph_neighbors_count AMPI_Dist_graph_neighbors_count
+#define PMPI_Dist_graph_neighbors_count APMPI_Dist_graph_neighbors_count
+AMPI_API_DEF(int, MPI_Dist_graph_neighbors_count, MPI_Comm comm, int *indegree, int *outdegree, int *weighted)
 
 /***environment management***/
 #define MPI_Get_version AMPI_Get_version
@@ -1427,15 +1448,6 @@ int MPI_Iscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype dataty
 int MPI_Comm_create_group(MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *newcomm);
 int MPI_Comm_idup(MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request);
 */
-
-/* A.2.5 Process Topologies C Bindings */
-/*
-int MPI_Dist_graph_create(MPI_Comm comm_old, int n, const int sources[], const int degrees[], const int destinations[], const int weights[], MPI_Info info, int reorder, MPI_Comm *comm_dist_graph);
-int MPI_Dist_graph_create_adjacent(MPI_Comm comm_old, int indegree, const int sources[], const int sourceweights[], int outdegree, const int destinations[], const int destweights[], MPI_Info info, int reorder, MPI_Comm *comm_dist_graph);
-int MPI_Dist_graph_neighbors(MPI_Comm comm, int maxindegree, int sources[], int sourceweights[], int maxoutdegree, int destinations[], int destweights[]);
-int MPI_Dist_graph_neighbors_count(MPI_Comm comm, int *indegree, int *outdegree, int *weighted);
-*/
-
 
 /* A.2.6 MPI Environmental Management C Bindings */
 /*

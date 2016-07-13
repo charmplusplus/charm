@@ -1267,6 +1267,7 @@ void ampiParent::pup(PUP::er &p) {
   p|groupComm;
   p|cartComm;
   p|graphComm;
+  p|distGraphComm;
   p|interComm;
   p|intraComm;
 
@@ -1415,6 +1416,8 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
       cartChildRegister(s);
     } else if (isGraph(comm)) {
       graphChildRegister(s);
+    } else if (isDistGraph(comm)) {
+      distGraphChildRegister(s);
     } else if (isInter(comm)) {
       interChildRegister(s);
     } else if (isIntra(comm)) {
@@ -2232,7 +2235,11 @@ MPI_Comm ampi::cartCreate0D(void){
     tmpVec.clear();
     tmpVec.push_back(0);
     commCreatePhase1(parent->getNextCart());
-    return parent->getNextCart()-1;
+    MPI_Comm newComm = parent->getNextCart()-1;
+    ampiCommStruct &newCommStruct = getAmpiParent()->getCart(newComm);
+    ampiTopology *newTopo = newCommStruct.getTopology();
+    newTopo->setndims(0);
+    return newComm;
   }
   else {
     return MPI_COMM_NULL;
@@ -2274,7 +2281,7 @@ void ampiParent::cartChildRegister(const ampiCommStruct &s) {
     cartComm.resize(idx+1);
     cartComm.length()=idx+1;
   }
-  cartComm[idx]=new ampiCommStruct(s);
+  cartComm[idx]=new ampiCommStruct(s,MPI_CART);
   thread->resume(); //Matches suspend at end of ampi::cartCreate
 }
 
@@ -2300,13 +2307,41 @@ void ampiParent::graphChildRegister(const ampiCommStruct &s) {
     graphComm.resize(idx+1);
     graphComm.length()=idx+1;
   }
-  graphComm[idx]=new ampiCommStruct(s);
+  graphComm[idx]=new ampiCommStruct(s,MPI_GRAPH);
   thread->resume(); //Matches suspend at end of ampi::graphCreate
 }
 
-void ampi::intercommCreate(const groupStruct remoteVec, const int root, MPI_Comm tcomm, MPI_Comm *ncomm){
+void ampi::distGraphCreate(const groupStruct vec, MPI_Comm* newcomm)
+{
+  int rootIdx = vec[0];
+  tmpVec = vec;
+  CkCallback cb(CkReductionTarget(ampi,commCreatePhase1), CkArrayIndex1D(rootIdx), myComm.getProxy());
+  MPI_Comm nextDistGraph = parent->getNextDistGraph();
+  contribute(sizeof(nextDistGraph), &nextDistGraph, CkReduction::max_int, cb);
 
-  if(thisIndex==root) { // not everybody gets the valid rvec
+  if (getPosOp(thisIndex,vec) >= 0) {
+    thread->suspend();
+    MPI_Comm retcomm = parent->getNextDistGraph()-1;
+    *newcomm = retcomm;
+  }
+  else {
+    *newcomm = MPI_COMM_NULL;
+  }
+}
+
+void ampiParent::distGraphChildRegister(const ampiCommStruct &s)
+{
+  int idx = s.getComm()-MPI_COMM_FIRST_DIST_GRAPH;
+  if (distGraphComm.size() <= idx) {
+    distGraphComm.resize(idx+1);
+    distGraphComm.length() = idx+1;
+  }
+  distGraphComm[idx] = new ampiCommStruct(s,MPI_DIST_GRAPH);
+  thread->resume();
+}
+
+void ampi::intercommCreate(const groupStruct remoteVec, const int root, MPI_Comm tcomm, MPI_Comm *ncomm){
+  if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
   }
   CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm.getProxy());
@@ -2372,6 +2407,31 @@ void ampiParent::intraChildRegister(const ampiCommStruct &s) {
   if (intraComm.size()<=idx) intraComm.resize(idx+1);
   intraComm[idx]=new ampiCommStruct(s);
   thread->resume(); //Matches suspend at end of ampi::split
+}
+
+void ampi::topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newComm)
+{
+  if (getAmpiParent()->isInter(comm)) {
+    split(0, rank, newComm, MPI_INTER);
+  } else {
+    split(0, rank, newComm, topoType);
+
+    if (topoType != MPI_UNDEFINED) {
+      ampiTopology *topo, *newTopo;
+      if (topoType == MPI_CART) {
+        topo = getAmpiParent()->getCart(comm).getTopology();
+        newTopo = getAmpiParent()->getCart(*newComm).getTopology();
+      } else if (topoType == MPI_GRAPH) {
+        topo = getAmpiParent()->getGraph(comm).getTopology();
+        newTopo = getAmpiParent()->getGraph(*newComm).getTopology();
+      } else {
+        CkAssert(topoType == MPI_DIST_GRAPH);
+        topo = getAmpiParent()->getDistGraph(comm).getTopology();
+        newTopo = getAmpiParent()->getDistGraph(*newComm).getTopology();
+      }
+      newTopo->dup(topo);
+    }
+  }
 }
 
 //------------------------ communication -----------------------
@@ -8087,42 +8147,12 @@ AMPI_API_IMPL(MPI_Comm_dup)
 int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
 {
   AMPI_API("AMPI_Comm_dup");
-  int topol;
   ampi *ptr = getAmpiInstance(comm);
-  int rank = ptr->getRank();
+  int topoType, rank = ptr->getRank();
 
-  AMPI_Topo_test(comm, &topol);
-  if (topol == MPI_CART) {
-    ptr->split(0, rank, newcomm, MPI_CART);
-
-    // duplicate cartesian topology info
-    ampiCommStruct &c = getAmpiParent()->getCart(comm);
-    ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
-    newc.setndims(c.getndims());
-    newc.setdims(c.getdims());
-    newc.setperiods(c.getperiods());
-    newc.setnbors(c.getnbors());
-  }
-  else if (topol == MPI_GRAPH) {
-    ptr->split(0, rank, newcomm, MPI_GRAPH);
-
-    // duplicate graph topology info
-    ampiCommStruct &g = getAmpiParent()->getGraph(comm);
-    ampiCommStruct &newg = getAmpiParent()->getGraph(*newcomm);
-    newg.setnvertices(g.getnvertices());
-    newg.setindex(g.getindex());
-    newg.setedges(g.getedges());
-  }
-  else {
-    if (getAmpiParent()->isInter(comm)) {
-      ptr->split(0,rank,newcomm, MPI_INTER);
-    }
-    else {
-      ptr->split(0, rank, newcomm, MPI_UNDEFINED /*not MPI_CART*/);
-    }
-  }
-
-  getAmpiInstance(comm)->barrier();
+  AMPI_Topo_test(comm, &topoType);
+  ptr->topoDup(topoType, rank, comm, newcomm);
+  ptr->barrier();
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -8134,7 +8164,6 @@ int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
     PUParray(*(pptr->toPUPer), (char *)newcomm, sizeof(int));
   }
 #endif
-
   return MPI_SUCCESS;
 }
 
@@ -9038,20 +9067,14 @@ int AMPI_Cart_create(MPI_Comm comm_old, int ndims, const int *dims, const int *p
   *comm_cart = getAmpiInstance(comm_old)->cartCreate(vec, ndims, dims);
 
   if (*comm_cart != MPI_COMM_NULL) {
-    ampiCommStruct &c = ptr->getCart(*comm_cart);
-    c.setndims(ndims);
-
-    vector<int> dimsv(ndims), periodsv(ndims);
-    for (int i = 0; i < ndims; i++) {
-      dimsv[i] = dims[i];
-      periodsv[i] = periods[i];
-    }
-    c.setdims(dimsv);
-    c.setperiods(periodsv);
-
-    vector<int> nborsv;
+    ampiCommStruct &c = getAmpiParent()->getCart(*comm_cart);
+    ampiTopology *topo = c.getTopology();
+    topo->setndims(ndims);
+    vector<int> dimsv(dims, dims+ndims), periodsv(periods, periods+ndims), nborsv;
+    topo->setdims(dimsv);
+    topo->setperiods(periodsv);
     getAmpiInstance(*comm_cart)->findNeighbors(*comm_cart, newrank, nborsv);
-    c.setnbors(nborsv);
+    topo->setnbors(nborsv);
   }
 
   return MPI_SUCCESS;
@@ -9074,27 +9097,213 @@ int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, const int *index, const int
   ampiParent *ptr = getAmpiParent();
   groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
   getAmpiInstance(comm_old)->graphCreate(vec, comm_graph);
+  ampiTopology &topo = *ptr->getGraph(*comm_graph).getTopology();
 
-  ampiCommStruct &c = ptr->getGraph(*comm_graph);
-  c.setnvertices(nnodes);
+  vector<int> index_(index, index+nnodes), edges_, nborsv;
+  topo.setnvertices(nnodes);
+  topo.setindex(index_);
 
-  vector<int> index_;
-  vector<int> edges_;
-
-  int i;
-  for (i = 0; i < nnodes; i++)
-    index_.push_back(index[i]);
-
-  c.setindex(index_);
-
-  for (i = 0; i < index[nnodes - 1]; i++)
+  for (int i = 0; i < index[nnodes - 1]; i++)
     edges_.push_back(edges[i]);
+  topo.setedges(edges_);
 
-  c.setedges(edges_);
-
-  vector<int> nborsv;
   getAmpiInstance(*comm_graph)->findNeighbors(*comm_graph, newrank, nborsv);
-  c.setnbors(nborsv);
+  topo.setnbors(nborsv);
+
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(MPI_Dist_graph_create_adjacent)
+int AMPI_Dist_graph_create_adjacent(MPI_Comm comm_old, int indegree, const int sources[],
+                                    const int sourceweights[], int outdegree,
+                                    const int destinations[], const int destweights[],
+                                    MPI_Info info, int reorder, MPI_Comm *comm_dist_graph)
+{
+  AMPI_API("AMPI_Dist_graph_create_adjacent");
+
+#if AMPI_ERROR_CHECKING
+  if (indegree < 0 || outdegree < 0) {
+    return ampiErrhandler("AMPI_Dist_graph_create_adjacent", MPI_ERR_TOPOLOGY);
+  }
+  for (int i=0; i<indegree; i++) {
+    if (sources[i] < 0) {
+      return ampiErrhandler("AMPI_Dist_graph_create_adjacent", MPI_ERR_TOPOLOGY);
+    }
+  }
+  for (int i=0; i<outdegree; i++) {
+    if (destinations[i] < 0) {
+      return ampiErrhandler("AMPI_Dist_graph_create_adjacent", MPI_ERR_TOPOLOGY);
+    }
+  }
+#endif
+
+  ampiParent *ptr = getAmpiParent();
+  groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
+  getAmpiInstance(comm_old)->distGraphCreate(vec,comm_dist_graph);
+  ampiCommStruct &c = ptr->getDistGraph(*comm_dist_graph);
+  ampiTopology *topo = c.getTopology();
+
+  topo->setInDegree(indegree);
+  topo->setOutDegree(outdegree);
+
+  topo->setAreSourcesWeighted(sourceweights != MPI_UNWEIGHTED);
+  if (topo->areSourcesWeighted()) {
+    vector<int> tmpSourceWeights(sourceweights, sourceweights+indegree);
+    topo->setSourceWeights(tmpSourceWeights);
+  }
+
+  topo->setAreDestsWeighted(destweights != MPI_UNWEIGHTED);
+  if (topo->areDestsWeighted()) {
+    vector<int> tmpDestWeights(destweights, destweights+outdegree);
+    topo->setDestWeights(tmpDestWeights);
+  }
+
+  vector<int> tmpSources(sources, sources+indegree);
+  topo->setSources(tmpSources);
+
+  vector<int> tmpDestinations(destinations, destinations+outdegree);
+  topo->setDestinations(tmpDestinations);
+
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(MPI_Dist_graph_create)
+int AMPI_Dist_graph_create(MPI_Comm comm_old, int n, const int sources[], const int degrees[],
+                           const int destinations[], const int weights[], MPI_Info info,
+                           int reorder, MPI_Comm *comm_dist_graph)
+{
+  AMPI_API("AMPI_Dist_graph_create");
+
+#if AMPI_ERROR_CHECKING
+    if (n < 0) {
+      return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
+    }
+    int counter = 0;
+    for (int i=0; i<n; i++) {
+      if ((sources[i] < 0) || (degrees[i] < 0)) {
+        return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
+      }
+      for (int j=0; j<degrees[i]; j++) {
+        if ((destinations[counter] < 0) || (weights != MPI_UNWEIGHTED && weights[counter] < 0)) {
+          return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
+        }
+        counter++;
+      }
+    }
+#endif
+
+  ampiParent *ptr = getAmpiParent();
+  groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
+  getAmpiInstance(comm_old)->distGraphCreate(vec,comm_dist_graph);
+  ampiCommStruct &c = ptr->getDistGraph(*comm_dist_graph);
+  ampiTopology *topo = c.getTopology();
+
+  int p = c.getSize();
+
+  vector<int> edgeListIn(p, 0);
+  vector<int> edgeListOut(p, 0);
+  vector<vector<int> > edgeMatrixIn(p);
+  vector<vector<int> > edgeMatrixOut(p);
+
+  for (int i=0; i<p; i++) {
+    vector<int> tmpVector(p, 0);
+    edgeMatrixIn[i] = tmpVector;
+    edgeMatrixOut[i] = tmpVector;
+  }
+
+  int index = 0;
+  for (int i=0; i<n; i++) {
+    for (int j=0; j<degrees[i]; j++) {
+      edgeMatrixOut[ sources[i] ][ edgeListOut[sources[i]]++ ] = destinations[index];
+      edgeMatrixIn[ destinations[index] ][ edgeListIn[destinations[index]]++ ] = sources[i];
+      index++;
+    }
+  }
+
+  vector<int> edgeCount(2*p);
+  vector<int> totalcount(2);
+  int sends = 0;
+  for (int i=0; i<p; i++) {
+    if (edgeListIn[i] > 0) {
+      edgeCount[2*i] = 1;
+      sends++;
+    }
+    else {
+      edgeCount[2*i] = 0;
+    }
+    if (edgeListOut[i] > 0) {
+      edgeCount[2*i+1] = 1;
+      sends++;
+    }
+    else {
+      edgeCount[2*i+1] = 0;
+    }
+  }
+
+  // Compute total number of ranks with incoming or outgoing edges for each rank
+  AMPI_Reduce_scatter_block(edgeCount.data(), totalcount.data(), 2, MPI_INT, MPI_SUM, comm_old);
+
+  vector<MPI_Request> requests(sends, MPI_REQUEST_NULL);
+  int count = 0;
+  for (int i=0; i<p; i++) {
+    if (edgeListIn[i] > 0) {
+      if (edgeListIn[i] == p) {
+        edgeMatrixIn[i].push_back(1);
+      }
+      else {
+        edgeMatrixIn[i][edgeListIn[i]] = 1;
+      }
+      AMPI_Isend(edgeMatrixIn[i].data(), edgeListIn[i]+1, MPI_INT, i, 0, comm_old, &requests[count++]);
+    }
+    if (edgeListOut[i] > 0) {
+      if (edgeListOut[i] == p) {
+        edgeMatrixOut[i].push_back(-1);
+      }
+      else {
+        edgeMatrixOut[i][edgeListOut[i]] = -1;
+      }
+      AMPI_Isend(edgeMatrixOut[i].data(), edgeListOut[i]+1, MPI_INT, i, 0, comm_old, &requests[count++]);
+    }
+  }
+
+  // Receive all non-local incoming and outgoing edges
+  int numEdges;
+  MPI_Status status;
+  vector<int> saveSources, saveDestinations;
+  for (int i=0; i<2; i++) {
+    for (int j=0; j<totalcount[i]; j++) {
+      AMPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm_old, &status);
+      AMPI_Get_count(&status, MPI_INT, &numEdges);
+      vector<int> saveEdges(numEdges);
+      AMPI_Recv(saveEdges.data(), numEdges, MPI_INT, status.MPI_SOURCE, 0, comm_old, MPI_STATUS_IGNORE);
+
+      if (saveEdges[numEdges-1] > 0) {
+        for (int k=0; k<numEdges-1; k++) {
+          saveSources.push_back(saveEdges[k]);
+        }
+      }
+      else {
+        for (int k=0; k<numEdges-1; k++) {
+          saveDestinations.push_back(saveEdges[k]);
+        }
+      }
+    }
+  }
+
+  topo->setDestinations(saveDestinations);
+  topo->setSources(saveSources);
+  topo->setOutDegree(saveDestinations.size());
+  topo->setInDegree(saveSources.size());
+
+  topo->setAreSourcesWeighted(weights != MPI_UNWEIGHTED);
+  topo->setAreDestsWeighted(weights != MPI_UNWEIGHTED);
+  if (topo->areSourcesWeighted()) {
+    vector<int> tmpWeights(weights, weights+n);
+    topo->setSourceWeights(tmpWeights);
+    topo->setDestWeights(tmpWeights);
+  }
+
+  AMPI_Waitall(sends, requests.data(), MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -9109,6 +9318,8 @@ int AMPI_Topo_test(MPI_Comm comm, int *status) {
     *status = MPI_CART;
   else if (ptr->isGraph(comm))
     *status = MPI_GRAPH;
+  else if (ptr->isDistGraph(comm))
+    *status = MPI_DIST_GRAPH;
   else *status = MPI_UNDEFINED;
 
   return MPI_SUCCESS;
@@ -9123,7 +9334,7 @@ int AMPI_Cartdim_get(MPI_Comm comm, int *ndims) {
     return ampiErrhandler("AMPI_Cartdim_get", MPI_ERR_TOPOLOGY);
 #endif
 
-  *ndims = getAmpiParent()->getCart(comm).getndims();
+  *ndims = getAmpiParent()->getCart(comm).getTopology()->getndims();
 
   return MPI_SUCCESS;
 }
@@ -9140,11 +9351,12 @@ int AMPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, int *coor
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
-  ndims = c.getndims();
+  ampiTopology *topo = c.getTopology();
+  ndims = topo->getndims();
   int rank = getAmpiInstance(comm)->getRank();
 
-  const vector<int> &dims_ = c.getdims();
-  const vector<int> &periods_ = c.getperiods();
+  const vector<int> &dims_ = topo->getdims();
+  const vector<int> &periods_ = topo->getperiods();
 
   for (i = 0; i < maxdims; i++) {
     dims[i] = dims_[i];
@@ -9170,9 +9382,10 @@ int AMPI_Cart_rank(MPI_Comm comm, const int *coords, int *rank) {
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
-  int ndims = c.getndims();
-  const vector<int> &dims = c.getdims();
-  const vector<int> &periods = c.getperiods();
+  ampiTopology *topo = c.getTopology();
+  int ndims = topo->getndims();
+  const vector<int> &dims = topo->getdims();
+  const vector<int> &periods = topo->getperiods();
 
   //create a copy of coords since we are not allowed to modify it
   vector<int> ncoords(coords, coords+ndims);
@@ -9209,8 +9422,9 @@ int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
-  int ndims = c.getndims();
-  const vector<int> &dims = c.getdims();
+  ampiTopology *topo = c.getTopology();
+  int ndims = topo->getndims();
+  const vector<int> &dims = topo->getdims();
 
   for (int i = ndims - 1; i >= 0; i--) {
     if (i < maxdims)
@@ -9256,15 +9470,16 @@ int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp,
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
-  int ndims = c.getndims();
+  ampiTopology *topo = c.getTopology();
+  int ndims = topo->getndims();
 
 #if AMPI_ERROR_CHECKING
   if ((direction < 0) || (direction >= ndims))
     return ampiErrhandler("AMPI_Cart_shift", MPI_ERR_DIMS);
 #endif
 
-  const vector<int> &dims = c.getdims();
-  const vector<int> &periods = c.getperiods();
+  const vector<int> &dims = topo->getdims();
+  const vector<int> &periods = topo->getperiods();
   vector<int> coords(ndims);
 
   int mype = getAmpiInstance(comm)->getRank();
@@ -9281,8 +9496,9 @@ int AMPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges) {
   AMPI_API("AMPI_Graphdim_get");
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
-  *nnodes = c.getnvertices();
-  const vector<int> &index = c.getindex();
+  ampiTopology *topo = c.getTopology();
+  *nnodes = topo->getnvertices();
+  const vector<int> &index = topo->getindex();
   *nedges = index[(*nnodes) - 1];
 
   return MPI_SUCCESS;
@@ -9298,8 +9514,9 @@ int AMPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index, int *e
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
-  const vector<int> &index_ = c.getindex();
-  const vector<int> &edges_ = c.getedges();
+  ampiTopology *topo = c.getTopology();
+  const vector<int> &index_ = topo->getindex();
+  const vector<int> &edges_ = topo->getedges();
 
   if (maxindex > index_.size())
     maxindex = index_.size();
@@ -9324,7 +9541,8 @@ int AMPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
-  const vector<int> &index = c.getindex();
+  ampiTopology *topo = c.getTopology();
+  const vector<int> &index = topo->getindex();
 
 #if AMPI_ERROR_CHECKING
   if ((rank >= index.size()) || (rank < 0))
@@ -9349,8 +9567,9 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, int *neighbo
 #endif
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
-  const vector<int> &index = c.getindex();
-  const vector<int> &edges = c.getedges();
+  ampiTopology *topo = c.getTopology();
+  const vector<int> &index = topo->getindex();
+  const vector<int> &edges = topo->getedges();
 
   int numneighbors = (rank == 0) ? index[rank] : index[rank] - index[rank - 1];
   if (maxneighbors > numneighbors)
@@ -9370,6 +9589,77 @@ int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, int *neighbo
     for (int i = 0; i < maxneighbors; i++)
       neighbors[i] = edges[index[rank - 1] + i];
   }
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(MPI_Dist_graph_neighbors_count)
+int AMPI_Dist_graph_neighbors_count(MPI_Comm comm, int *indegree, int *outdegree, int *weighted)
+{
+  AMPI_API("AMPI_Dist_graph_neighbors_count");
+
+#if AMPI_ERROR_CHECKING
+  if (!getAmpiParent()->isDistGraph(comm)) {
+    return ampiErrhandler("AMPI_Dist_graph_neighbors_count", MPI_ERR_TOPOLOGY);
+  }
+#endif
+
+  ampiParent *ptr = getAmpiParent();
+  ampiCommStruct &c = ptr->getDistGraph(comm);
+  ampiTopology *topo = c.getTopology();
+  *indegree = topo->getInDegree();
+  *outdegree = topo->getOutDegree();
+  *weighted = topo->areSourcesWeighted() ? 1 : 0;
+
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(MPI_Dist_graph_neighbors)
+int AMPI_Dist_graph_neighbors(MPI_Comm comm, int maxindegree, int sources[], int sourceweights[],
+                              int maxoutdegree, int destinations[], int destweights[])
+{
+  AMPI_API("AMPI_Dist_graph_neighbors");
+
+#if AMPI_ERROR_CHECKING
+  if (!getAmpiParent()->isDistGraph(comm)) {
+    return ampiErrhandler("AMPI_Dist_graph_neighbors", MPI_ERR_TOPOLOGY);
+  }
+  if ((maxindegree < 0) || (maxoutdegree < 0)) {
+    return ampiErrhandler("AMPI_Dist_graph_neighbors", MPI_ERR_TOPOLOGY);
+  }
+#endif
+
+  ampiParent *ptr = getAmpiParent();
+  ampiCommStruct &c = ptr->getDistGraph(comm);
+  ampiTopology *topo = c.getTopology();
+
+  const vector<int> &tmpSources = topo->getSources();
+  const vector<int> &tmpSourceWeights = topo->getSourceWeights();
+  const vector<int> &tmpDestinations = topo->getDestinations();
+  const vector<int> &tmpDestWeights = topo->getDestWeights();
+
+  maxindegree = std::min(maxindegree, static_cast<int>(tmpSources.size()));
+  maxoutdegree = std::min(maxoutdegree, static_cast<int>(tmpDestinations.size()));
+
+  for (int i=0; i<maxindegree; i++) {
+    sources[i] = tmpSources[i];
+  }
+  for (int i=0; i<maxoutdegree; i++) {
+    destinations[i] = tmpDestinations[i];
+  }
+
+  if (topo->areSourcesWeighted()) {
+    for (int i=0; i<maxindegree; i++) {
+      sourceweights[i] = tmpSourceWeights[i];
+    }
+    for (int i=0; i<maxoutdegree; i++) {
+      destweights[i] = tmpDestWeights[i];
+    }
+  }
+  else {
+    sourceweights = NULL;
+    destweights = NULL;
+  }
+
   return MPI_SUCCESS;
 }
 
@@ -9505,8 +9795,9 @@ int AMPI_Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm) {
 
   int rank = getAmpiInstance(comm)->getRank();
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
-  ndims = c.getndims();
-  const vector<int> &dims = c.getdims();
+  ampiTopology *topo = c.getTopology();
+  ndims = topo->getndims();
+  const vector<int> &dims = topo->getdims();
   int num_remain_dims = 0;
 
   vector<int> coords(ndims);
@@ -9532,9 +9823,10 @@ int AMPI_Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm) {
   getAmpiInstance(comm)->split(color, key, newcomm, MPI_CART);
 
   ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
-  newc.setndims(num_remain_dims);
+  ampiTopology *newtopo = newc.getTopology();
+  newtopo->setndims(num_remain_dims);
   vector<int> dimsv;
-  const vector<int> &periods = c.getperiods();
+  const vector<int> &periods = topo->getperiods();
   vector<int> periodsv;
 
   for (i = 0; i < ndims; i++) {
@@ -9543,12 +9835,12 @@ int AMPI_Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm) {
       periodsv.push_back(periods[i]);
     }
   }
-  newc.setdims(dimsv);
-  newc.setperiods(periodsv);
+  newtopo->setdims(dimsv);
+  newtopo->setperiods(periodsv);
 
   vector<int> nborsv;
   getAmpiInstance(*newcomm)->findNeighbors(*newcomm, getAmpiParent()->getRank(*newcomm), nborsv);
-  newc.setnbors(nborsv);
+  newtopo->setnbors(nborsv);
 
   return MPI_SUCCESS;
 }
