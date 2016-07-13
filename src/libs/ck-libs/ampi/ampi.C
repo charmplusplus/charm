@@ -1128,11 +1128,10 @@ static void checkpointClient(void *param,void *msg)
 void ampiParent::startCheckpoint(const char* dname){
   if (thisIndex==0) {
     ckptClientStruct *clientData = new ckptClientStruct(dname, this);
-    CkCallback cb(checkpointClient, clientData);
-    contribute(0, NULL, CkReduction::sum_int, cb);
+    CkCallback *cb = new CkCallback(checkpointClient, clientData);
+    thisProxy.ckSetReductionClient(cb);
   }
-  else
-    contribute(0, NULL, CkReduction::sum_int);
+  contribute();
 
   thread->stop();
 
