@@ -13,6 +13,9 @@
 #define WIN_SUCCESS 0
 #define WIN_ERROR   (-1)
 
+extern int AMPI_RDMA_THRESHOLD;
+extern int AMPI_SMP_RDMA_THRESHOLD;
+
 win_obj::win_obj() {
   winNameLen = 0;
   baseAddr = NULL;
@@ -209,16 +212,34 @@ int ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win){
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
+  AMPI_DEBUG("    Rank[%d:%d] invoke Remote put at [%d]\n", thisIndex, myRank, rank);
 
+#if AMPI_RDMA_IMPL
+  if (ddt->isContig() &&
+     (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
+     (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank))))
+  {
+    AmpiRequestList* reqs = &(getAmpiParent()->ampiReqs);
+    SendReq* ampiReq = new SendReq(myComm.getComm());
+    MPI_Request req = reqs->insert(ampiReq);
+    CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
+    completedSendCB.setRefnum(req);
+    thisProxy[rank].winRemotePut(orgtotalsize, rdma(orgaddr, completedSendCB), orgcnt, orgtype,
+                                 targdisp, targcnt, targtype, win->index);
+    ampiReq->wait(NULL);
+    reqs->free(req);
+  }
+  else
+#endif
   if (ddt->isContig()) {
     thisProxy[rank].winRemotePut(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
-                          targcnt, targtype, win->index);
+                                 targcnt, targtype, win->index);
   }
   else {
     vector<char> sorgaddr(orgtotalsize);
     ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
     thisProxy[rank].winRemotePut(orgtotalsize, &sorgaddr[0], orgcnt, orgtype, targdisp,
-                          targcnt, targtype, win->index);
+                                 targcnt, targtype, win->index);
   }
 
   return MPI_SUCCESS;
@@ -336,15 +357,32 @@ int ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int ran
   int orgtotalsize = ddt->getSize(orgcnt);
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
 
+#if AMPI_RDMA_IMPL
+  if (ddt->isContig() &&
+     (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
+     (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank))))
+  {
+    AmpiRequestList* reqs = &(getAmpiParent()->ampiReqs);
+    SendReq* ampiReq = new SendReq(myComm.getComm());
+    MPI_Request req = reqs->insert(ampiReq);
+    CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
+    completedSendCB.setRefnum(req);
+    thisProxy[rank].winRemoteAccumulate(orgtotalsize, rdma(orgaddr, completedSendCB), orgcnt,
+                                        orgtype, targdisp, targcnt, targtype,  op, win->index);
+    ampiReq->wait(NULL);
+    reqs->free(req);
+  }
+  else
+#endif
   if (ddt->isContig()) {
     thisProxy[rank].winRemoteAccumulate(orgtotalsize, (char*)orgaddr, orgcnt, orgtype,
-                                 targdisp, targcnt, targtype,  op, win->index);
+                                        targdisp, targcnt, targtype,  op, win->index);
   }
   else {
     vector<char> sorgaddr(orgtotalsize);
     ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
     thisProxy[rank].winRemoteAccumulate(orgtotalsize, &sorgaddr[0], orgcnt, orgtype,
-                                 targdisp, targcnt, targtype,  op, win->index);
+                                        targdisp, targcnt, targtype,  op, win->index);
   }
 
   return MPI_SUCCESS;

@@ -62,6 +62,29 @@ class fromzDisk : public zdisk {
 #endif
 #endif // AMPIMSGLOG
 
+/* AMPI uses RDMA sends if BigSim is not being used and the underlying comm layer supports it. */
+#ifndef AMPI_RDMA_IMPL
+#define AMPI_RDMA_IMPL ( !CMK_BIGSIM_CHARM && CMK_ONESIDED_IMPL )
+#endif
+
+/* contiguous messages larger than or equal to this threshold are sent via RDMA */
+#ifndef AMPI_RDMA_THRESHOLD_DEFAULT
+#if CMK_USE_IBVERBS
+#define AMPI_RDMA_THRESHOLD_DEFAULT 65356
+#else
+#define AMPI_RDMA_THRESHOLD_DEFAULT 32768
+#endif
+#endif
+
+/* contiguous messages larger than or equal to this threshold that are being sent
+ * within a process are sent via RDMA. */
+#ifndef AMPI_SMP_RDMA_THRESHOLD_DEFAULT
+#define AMPI_SMP_RDMA_THRESHOLD_DEFAULT 16384
+#endif
+
+extern int AMPI_RDMA_THRESHOLD;
+extern int AMPI_SMP_RDMA_THRESHOLD;
+
 #if CMK_CONVERSE_LAPI ||  CMK_BIGSIM_CHARM
 #define AMPI_ALLTOALL_LONG_MSG   4194304
 #else
@@ -602,6 +625,11 @@ enum AmpiReqSts : char {
   AMPI_REQ_COMPLETED = 2
 };
 
+enum AmpiSendType : bool {
+  BLOCKING_SEND = false,
+  I_SEND = true
+};
+
 #define MyAlign8(x) (((x)+7)&(~7))
 
 /**
@@ -653,6 +681,12 @@ class AmpiRequest {
   /// Receive a CkReductionMsg
   virtual void receive(ampi *ptr, CkReductionMsg *msg) = 0;
 
+  /// Receive an Rdma message
+  virtual void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq,
+                           int srcRank, MPI_Comm scomm) {
+    CkAbort("AMPI> RDMA receive attempted on an incompatible type of request!");
+  }
+
   virtual void setBlocked(bool b) { blocked = b; }
   virtual bool isBlocked(void) const { return blocked; }
 
@@ -662,7 +696,7 @@ class AmpiRequest {
 
   /// Returns the type of request:
   ///  MPI_PERS_REQ, MPI_I_REQ, MPI_IATA_REQ, MPI_SEND_REQ, MPI_SSEND_REQ,
-  //   MPI_REDN_REQ, MPI_GATHER_REQ, MPI_GATHERV_REQ, MPI_GPU_REQ
+  ///  MPI_REDN_REQ, MPI_GATHER_REQ, MPI_GATHERV_REQ, MPI_GPU_REQ
   virtual int getType(void) const =0;
 
   virtual void pup(PUP::er &p) {
@@ -734,6 +768,7 @@ class IReq : public AmpiRequest {
   inline int getType(void) const { return MPI_I_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg);
   void receive(ampi *ptr, CkReductionMsg *msg) {}
+  void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm);
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|length;
@@ -1135,8 +1170,6 @@ class AmpiSeqQ : private CkNoncopyable {
   CkMsgQ<AmpiMsg> out; // all out of order messages
   AmpiElements elements; // element info: indexed by seqIdx (comm rank, except for MPI_COMM_SELF)
 
-  void putOutOfOrder(int seqIdx, AmpiMsg *msg);
-
 public:
   AmpiSeqQ() {}
   ~AmpiSeqQ ();
@@ -1160,9 +1193,26 @@ public:
     }
   }
 
+  /// Is this message in order (return >0) or not (return 0)?
+  /// Same as put() except we don't call putOutOfOrder() here,
+  /// so the caller should do that separately
+  inline int isInOrder(int srcRank, int seq) {
+    AmpiOtherElement &el = elements[srcRank];
+    if (seq == el.seqIncoming) { // In order:
+      el.seqIncoming++;
+      return 1+el.nOut;
+    }
+    else { // Out of order: caller should stash message
+      return 0;
+    }
+  }
+
   /// Get an out-of-order message from the table.
   /// (in-order messages never go into the table)
   AmpiMsg *getOutOfOrder(int seqIdx);
+
+  /// Stash an out-of-order message
+  void putOutOfOrder(int seqIdx, AmpiMsg *msg);
 
   /// Return the next outgoing sequence number, and increment it.
   inline int nextOutgoing(int destRank) {
@@ -1573,6 +1623,8 @@ class ampi : public CBase_ampi {
 
   AmpiSeqQ oorder;
   void inorder(AmpiMsg *msg);
+  void inorderRdma(char* buf, int size, int seq, int tag, int srcRank,
+                   MPI_Comm comm, int ssendReq);
 
   void init(void);
 
@@ -1592,6 +1644,9 @@ class ampi : public CBase_ampi {
 
   void unblock(void);
   void generic(AmpiMsg *);
+  void genericRdma(char* buf, int size, int seq, int tag, int srcRank,
+                   MPI_Comm destcomm, int ssendReq);
+  void completedRdmaSend(CkDataMsg *msg);
   void ssend_ack(int sreq);
   void barrierResult(void);
   void ibarrierResult(void);
@@ -1621,15 +1676,23 @@ class ampi : public CBase_ampi {
   MPI_Request postReq(AmpiRequest* newreq);
 
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
-                       MPI_Datatype type,MPI_Comm destcomm, int sync=0);
+                       MPI_Datatype type,MPI_Comm destcomm, int ssendReq=0);
 
-  void send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-            MPI_Comm destcomm, int sync=0);
-  static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
-                      int idx);
-  void delesend(int t, int s, const void* buf, int count, MPI_Datatype type,
-                int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
+  MPI_Request send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
+                   MPI_Comm destcomm, int ssendReq=0, AmpiSendType sendType=BLOCKING_SEND);
+  static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx);
+  inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, int destIdx,
+                                 int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq);
+  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const {
+    CkArray* localBranch = arrProxy.ckLocalBranch();
+    int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
+    return (CkNodeOf(destPe) == CkMyNode());
+  }
+  MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
+                       MPI_Comm destcomm, CProxy_ampi arrproxy, int ssend=0);
   inline void processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count);
+  inline void processRdmaMsg(void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
+                             int rcount, MPI_Datatype rtype, MPI_Comm comm);
   inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count);
   inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count,
                                            MPI_User_function* func);

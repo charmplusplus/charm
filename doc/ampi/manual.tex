@@ -716,6 +716,10 @@ Synchronous load balancing assumes that the application is already at a
 synchronization point. Asynchronous load balancing does not assume this, and a
 value of \texttt{"false"} is the same as not requesting load balancing at all.
 
+Calling \texttt{AMPI\_Migrate} on a rank with pending send requests (i.e. from MPI\_Isend)
+is currently not supported, therefore users should always wait on any outstanding send requests
+before calling \texttt{AMPI\_Migrate}.
+
 \begin{alltt}
 // Setup
 MPI_Info hints;
@@ -1340,6 +1344,13 @@ stack size (in bytes) at build time:
 \begin{alltt}
 > build AMPI netlrts-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 \end{alltt}
+
+The same can be done for AMPI's RDMA messaging threshold using AMPI_RDMA_THRESHOLD_DEFAULT and,
+for messages sent within the same address space (ranks on the same worker thread or ranks
+on different worker threads in the same process in SMP builds), using AMPI_SMP_RDMA_THRESHOLD_DEFAULT.
+Contiguous messages with sizes larger than the threshold are sent via RDMA on communication layers that
+support this capability. You can also set the environment variables AMPI_RDMA_THRESHOLD and AMPI_SMP_RDMA_THRESHOLD
+before running a job to override the default specified at build time.
 
 \section{Building and Running AMPI Programs}
 \subsection{Building}

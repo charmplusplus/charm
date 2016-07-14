@@ -45,6 +45,9 @@ module ampi {
     entry EXPEDITED void unblock(void);
     entry EXPEDITED void ssend_ack(int);
     entry EXPEDITED void generic(AmpiMsg *);
+    entry EXPEDITED void genericRdma(rdma char buf[size], int size, int seq, int tag,
+                                     int srcRank, MPI_Comm destcomm, int ssendReq);
+    entry EXPEDITED void completedRdmaSend(CkDataMsg *msg);
     entry EXPEDITED_REDN void barrierResult(void);
     entry EXPEDITED_REDN void ibarrierResult(void);
     entry EXPEDITED_NOKEEP void rednResult(CkReductionMsg *msg);
@@ -60,10 +63,17 @@ module ampi {
     entry EXPEDITED_SYNC void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
                                            MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
                                            MPI_Datatype targtype, int winIndex);
+    entry EXPEDITED_SYNC void winRemotePut(int orgtotalsize, /**/rdma/**/ char orgaddr[orgtotalsize],
+                                           int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                           int targcnt, MPI_Datatype targtype, int winIndex);
     entry EXPEDITED_SYNC AmpiMsg *winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                                                int targcnt, MPI_Datatype targtype, int winIndex);
     entry EXPEDITED_SYNC void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
                                                   MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                  MPI_Datatype targtype, MPI_Op op, int winIndex);
+    entry EXPEDITED_SYNC void winRemoteAccumulate(int orgtotalsize, /**/rdma/**/ char orgaddr[orgtotalsize],
+                                                  int orgcnt, MPI_Datatype orgtype,
+                                                  MPI_Aint targdisp, int targcnt,
                                                   MPI_Datatype targtype, MPI_Op op, int winIndex);
     entry EXPEDITED_SYNC AmpiMsg *winRemoteCompareAndSwap(int size, char sorgaddr[size],
                                                           char compaddr[size], MPI_Datatype type,

@@ -148,6 +148,38 @@ void MPI_Tester::test(void)
 	testEqual(recv(next,tag),next,"Received rank (specifying next as source)");
 	testEqual(recv(prev,tag),prev,"Received rank (specifying prev as source)");
 
+	// Simultaneous forward and backward (large messages):
+	const int msgSize = 32768;
+	MPI_Request sendReq[2], recvReq[2];
+	int* sendArr     = new int[msgSize];
+	int* recvArrPrev = new int[msgSize];
+	int* recvArrNext = new int[msgSize];
+	for (int i=0; i<msgSize; i++) {
+		sendArr[i]     = rank;
+		recvArrPrev[i] = -1;
+		recvArrNext[i] = -1;
+	}
+	MPI_Irecv(recvArrPrev, msgSize, MPI_INT, prev, tag, comm, &recvReq[0]);
+	MPI_Irecv(recvArrNext, msgSize, MPI_INT, next, tag, comm, &recvReq[1]);
+	MPI_Isend(sendArr, msgSize, MPI_INT, next, tag, comm, &sendReq[0]);
+	MPI_Isend(sendArr, msgSize, MPI_INT, prev, tag, comm, &sendReq[1]);
+	MPI_Waitall(2, sendReq, MPI_STATUSES_IGNORE);
+	delete [] sendArr;
+	MPI_Waitall(2, recvReq, MPI_STATUSES_IGNORE);
+	for (int i=0; i<msgSize; i++) {
+		if (recvArrPrev[i] != prev) {
+			printf("Recv'ed bad value for large message send/recv\n");
+			MPI_Abort(comm, MPI_ERR_UNKNOWN);
+		}
+	}
+	for (int i=0; i<msgSize; i++) {
+		if (recvArrNext[0] != next) {
+			printf("Recv'ed bad value for large message send/recv\n");
+			MPI_Abort(comm, MPI_ERR_UNKNOWN);
+		}
+	}
+	delete [] recvArrPrev; delete [] recvArrNext;
+
 /// Collective operations:
 	beginTest(4,"Barrier");
 	TEST_MPI(MPI_Barrier,(comm));

@@ -846,6 +846,8 @@ void AMPI_Setup_Switch(void) {
   }
 }
 
+int AMPI_RDMA_THRESHOLD = AMPI_RDMA_THRESHOLD_DEFAULT;
+int AMPI_SMP_RDMA_THRESHOLD = AMPI_SMP_RDMA_THRESHOLD_DEFAULT;
 static bool nodeinit_has_been_called=false;
 CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(bool, ampiInitDone);
@@ -885,6 +887,25 @@ static void ampiNodeInit(void)
     MPI_COMM_UNIVERSE[i] = MPI_COMM_WORLD+1+i;
   }
   TCHARM_Set_fallback_setup(AMPI_Setup_Switch);
+
+  /* read AMPI environment variables */
+  char *value;
+  bool rdmaSet = false;
+  if ((value = getenv("AMPI_RDMA_THRESHOLD"))) {
+    AMPI_RDMA_THRESHOLD = atoi(value);
+    rdmaSet = true;
+  }
+  if ((value = getenv("AMPI_SMP_RDMA_THRESHOLD"))) {
+    AMPI_SMP_RDMA_THRESHOLD = atoi(value);
+    rdmaSet = true;
+  }
+  if (rdmaSet && CkMyNode() == 0) {
+#if AMPI_RDMA_IMPL
+    CkPrintf("AMPI> RDMA threshold is %d Bytes and SMP RDMA threshold is %d Bytes.\n", AMPI_RDMA_THRESHOLD, AMPI_SMP_RDMA_THRESHOLD);
+#else
+    CkPrintf("Warning: AMPI RDMA threshold ignored since AMPI RDMA is disabled.\n");
+#endif
+  }
 
   AmpiReducer = CkReduction::addReducer(AmpiReducerFunc, true /*streamable*/);
 
@@ -2479,6 +2500,109 @@ void ampi::inorder(AmpiMsg* msg)
   }
 }
 
+static inline AmpiMsg* rdma2AmpiMsg(char *buf, int size, int seq, int tag, int srcRank,
+                                    MPI_Comm destcomm, int ssendReq)
+{
+  // Convert an Rdma message (parameter marshalled buffer) to an AmpiMsg
+  AmpiMsg* msg = new (size, 0) AmpiMsg(seq, tag, srcRank, size, destcomm);
+  if (ssendReq) UsrToEnv(msg)->setRef(ssendReq);
+  memcpy(msg->data, buf, size); // Assumes the buffer is contiguous
+  return msg;
+}
+
+// RDMA version of ampi::generic
+void ampi::genericRdma(char* buf, int size, int seq, int tag, int srcRank, MPI_Comm destcomm, int ssendReq)
+{
+#if !AMPI_RDMA_IMPL
+  CkAbort("AMPI> recv'ed an RDMA message but AMPI RDMA is disabled!");
+#endif
+
+  MSG_ORDER_DEBUG(
+    CkPrintf("[%d] in ampi::genericRdma on index %d, size=%d, seq=%d, srcRank=%d, tag=%d, comm=%d, ssendReq=%d\n",
+             CkMyPe(), getIndexForRank(getRank(destcomm)), size, seq, srcRank, tag, destcomm, ssendReq);
+  )
+
+  if (seq != -1) {
+    int seqIdx = (destcomm == MPI_COMM_SELF) ? seqIdx = COMM_SELF_SEQ_IDX : seqIdx = srcRank;
+    int n = oorder.isInOrder(seqIdx, seq);
+    if (n > 0) { // This message was in-order
+      inorderRdma(buf, size, seq, tag, srcRank, destcomm, ssendReq);
+      if (n > 1) { // It enables other, previously out-of-order messages
+        AmpiMsg *msg = NULL;
+        while ((msg = oorder.getOutOfOrder(seqIdx)) != 0) {
+          inorder(msg);
+        }
+      }
+    } else { // This message was out-of-order: stash it (as an AmpiMsg)
+      AmpiMsg *msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, destcomm, ssendReq);
+      oorder.putOutOfOrder(seqIdx, msg);
+    }
+  } else { // Cross-world or system messages are unordered
+    inorderRdma(buf, size, seq, tag, srcRank, destcomm, ssendReq);
+  }
+
+  if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
+    thread->resume();
+  }
+}
+
+// RDMA version of ampi::inorder
+void ampi::inorderRdma(char* buf, int size, int seq, int tag, int srcRank,
+                       MPI_Comm comm, int ssendReq)
+{
+  MSG_ORDER_DEBUG(
+    CkPrintf("AMPI vp %d inorderRdma: tag=%d, src=%d, comm=%d  (seq %d)\n",
+             thisIndex, tag, srcRank, comm, seq);
+  )
+
+  // check posted recvs
+  int tags[2] = { tag, srcRank };
+  MPI_Status sts;
+
+  //in case ampi has not initialized and posted_ireqs are only inserted
+  //at AMPI_Irecv (MPI_Irecv)
+  AmpiRequestList *reqL = &(parent->ampiReqs);
+  //When storing the req index, it's 1-based. The reason is stated in the comments
+  //in the ampi::irecv function.
+  int ireqIdx = (int)((long)AmmGet(posted_ireqs, tags, (int*)&sts));
+  IReq *ireq = NULL;
+  if (reqL->size()>0 && ireqIdx>0)
+    ireq = (IReq *)(*reqL)[ireqIdx-1];
+  if (ireq) { // receive posted
+    if (ireq->isBlocked()) {
+      parent->numBlockedReqs--;
+    }
+    ireq->receiveRdma(this, buf, size, ssendReq, srcRank, comm);
+  } else {
+    AmpiMsg* msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, comm, ssendReq);
+    AmmPut(msgs, tags, msg);
+  }
+}
+
+// Callback from ampi::genericRdma() signaling that the send buffer is now safe to re-use
+void ampi::completedRdmaSend(CkDataMsg *msg)
+{
+  // refnum is the index into reqList for this SendReq
+  int reqIdx = CkGetRefNum(msg);
+
+  MSG_ORDER_DEBUG(
+    CkPrintf("[%d] in ampi::completedRdmaSend on index %d, reqIdx = %d\n",
+             CkMyPe(), parent->thisIndex, reqIdx);
+  )
+
+  AmpiRequestList& reqList = parent->ampiReqs;
+  SendReq& sreq = (SendReq&)(*reqList[reqIdx]);
+  sreq.statusIreq = true;
+
+  if (sreq.isBlocked()) {
+    parent->numBlockedReqs--;
+  }
+  if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
+    thread->resume();
+  }
+  // CkDataMsg is allocated & freed by the runtime, so do not delete msg
+}
+
 AmpiMsg *ampi::getMessage(int t, int s, MPI_Comm comm, int *sts) const
 {
   int tags[2] = { t, s };
@@ -2507,7 +2631,7 @@ void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatyp
 }
 
 AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
-                           MPI_Datatype type,MPI_Comm destcomm, int sync)
+                           MPI_Datatype type,MPI_Comm destcomm, int ssendReq/*=0*/)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
@@ -2522,7 +2646,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
     seq = oorder.nextOutgoing(seqIdx);
   }
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sRank, len, destcomm);
-  if (sync) UsrToEnv(msg)->setRef(sync);
+  if (ssendReq) UsrToEnv(msg)->setRef(ssendReq);
   ddt->serialize((char*)buf, msg->getData(), count, 1);
   return msg;
 }
@@ -2535,8 +2659,8 @@ static inline void freeNonPersReq(int &request) {
   }
 }
 
-void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
-                int rank, MPI_Comm destcomm, int sync)
+MPI_Request ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
+                       int rank, MPI_Comm destcomm, int ssendReq/*=0*/, AmpiSendType sendType/*=BLOCKING_SEND*/)
 {
 #if CMK_TRACE_IN_CHARM
   TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND", NULL, 0, 1);
@@ -2549,17 +2673,26 @@ void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
 #endif
 
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
-  delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),sync);
+  MPI_Request req = delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),ssendReq);
+  if (sendType == BLOCKING_SEND && req != MPI_REQUEST_NULL) {
+    AmpiRequestList* reqList = getReqs();
+    SendReq *sreq = (SendReq*)(*reqList)[req];
+    sreq->wait(NULL);
+    reqList->free(req);
+    req = MPI_REQUEST_NULL;
+  }
 
 #if CMK_TRACE_IN_CHARM
   TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND_END", NULL, 0, 1);
 #endif
 
-  if (sync == 1) {
+  if (ssendReq == 1) {
     // waiting for receiver side
     parent->resumeOnRecv = false;            // so no one else awakes it
     parent->block();
   }
+
+  return req;
 }
 
 void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
@@ -2570,23 +2703,63 @@ void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
   pa[idx].generic(msg);
 }
 
-void ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype type,  int rank,
-                    MPI_Comm destcomm, CProxy_ampi arrproxy, int sync)
+MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, int destIdx,
+                              int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq)
 {
-  if(rank==MPI_PROC_NULL) return;
+  int seqIdx = destRank;
+  int seq    = -1;
+  if (destRank>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) { //Not cross-module: set seqno
+    if (destcomm == MPI_COMM_SELF) {
+      seqIdx = COMM_SELF_SEQ_IDX;
+      sRank  = 0;
+    }
+    seq = oorder.nextOutgoing(seqIdx);
+  }
+
+  if (ssendReq) { // Using a SsendReq to track matching receive, so no need for SendReq here
+    arrProxy[destIdx].genericRdma(rdma(buf), size, seq, t, sRank, destcomm, ssendReq);
+    return MPI_REQUEST_NULL;
+  }
+  else { // Set up a SendReq to track completion of the send buffer
+    MPI_Request req = postReq(new SendReq(destcomm));
+    CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
+    completedSendCB.setRefnum(req);
+
+    arrProxy[destIdx].genericRdma(rdma(buf, completedSendCB), size, seq, t, sRank, destcomm, ssendReq);
+    return req;
+  }
+}
+
+MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype type,
+                           int rank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq)
+{
+  if (rank==MPI_PROC_NULL) return MPI_REQUEST_NULL;
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   int destIdx = dest.getIndexForRank(rank);
   if(isInter()){
     sRank = thisIndex;
     destIdx = dest.getIndexForRemoteRank(rank);
-    arrproxy = remoteProxy;
+    arrProxy = remoteProxy;
   }
+
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d (to %d)\n",thisIndex,t,sRank,destcomm,destIdx);
   )
 
-  arrproxy[destIdx].generic(makeAmpiMsg(rank,t,sRank,buf,count,type,destcomm,sync));
+#if AMPI_RDMA_IMPL
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  int size = ddt->getSize(count);
+  if (ddt->isContig() &&
+     (size >= AMPI_RDMA_THRESHOLD ||
+     (size >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx))))
+  {
+    return sendRdmaMsg(t, sRank, buf, size, destIdx, rank, destcomm, arrProxy, ssendReq);
+  }
+#endif
+  arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, ssendReq));
+  return MPI_REQUEST_NULL;
 }
+
 void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
 {
   int ssendReq = UsrToEnv(msg)->getRef();
@@ -2604,6 +2777,26 @@ void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
   }
 
   ddt->serialize((char*)buf, msg->getData(), count, (-1));
+}
+
+// RDMA version of ampi::processAmpiMsg
+void ampi::processRdmaMsg(void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
+                          int rcount, MPI_Datatype rtype, MPI_Comm comm)
+{
+  if (ssendReq > 0) { // send an ack to sender
+    int srcRank = (comm == MPI_COMM_SELF) ? this->getRank(MPI_COMM_WORLD) : srank;
+    int srcIdx = getIndexForRank(srcRank);
+    thisProxy[srcIdx].ssend_ack(ssendReq);
+  }
+
+  CkDDT_DataType *ddt = getDDT()->getType(rtype);
+  int rlength = ddt->getSize(rcount);
+
+  if (slength < rlength) { // only at rare case shall we reset count by using divide
+    rcount = slength / (ddt->getSize(1));
+  }
+
+  ddt->serialize((char*)rbuf, (char*)sbuf, rcount, (-1));
 }
 
 void ampi::processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count)
@@ -3599,7 +3792,7 @@ int AMPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
   *request = ptr->postReq(new SsendReq(comm));
   // 1:  blocking now  - used by MPI_Ssend
   // >=2:  the index of the requests - used by MPI_Issend
-  ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm, *request+2);
+  ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm, *request+2, I_SEND);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -5129,6 +5322,15 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
   delete msg;
 }
 
+void IReq::receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm)
+{
+  ptr->processRdmaMsg(sbuf, slength, ssendReq, srcRank, buf, count, type, scomm);
+  statusIreq = true;
+  length = slength;
+  comm = scomm;
+  // ampi::genericRdma is parameter marshalled, so there is no msg to delete
+}
+
 void RednReq::receive(ampi *ptr, CkReductionMsg *msg)
 {
   if (ptr->opIsCommutative(op) && ptr->getDDT()->isContig(type)) {
@@ -5669,9 +5871,9 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
 #endif
 
   USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
+
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm);
-  *request = ptr->postReq(new SendReq(comm, AMPI_REQ_COMPLETED));
+  *request = ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm, 0, I_SEND);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
