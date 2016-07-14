@@ -221,6 +221,9 @@ FDECL {
 #define mpi_put  FTN_NAME ( MPI_PUT  , mpi_put )
 #define mpi_get  FTN_NAME ( MPI_GET  , mpi_get )
 #define mpi_accumulate  FTN_NAME ( MPI_ACCUMULATE  , mpi_accumulate )
+#define mpi_get_accumulate  FTN_NAME ( MPI_GET_ACCUMULATE  , mpi_get_accumulate )
+#define mpi_fetch_and_op  FTN_NAME ( MPI_FETCH_AND_OP  , mpi_fetch_and_op )
+#define mpi_compare_and_swap  FTN_NAME ( MPI_COMPARE_AND_SWAP  , mpi_compare_and_swap )
 
 #define mpi_info_create FTN_NAME ( MPI_INFO_CREATE , mpi_info_create )
 /* mpi_info_set is defined in ampifimpl.f90, see ampif_info_set defined below */
@@ -1521,6 +1524,27 @@ void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
                     int *opc, int *win, int *ierr){
   MPI_Op op = GET_MPI_OP(*opc);
   *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, op, *win);
+}
+
+void mpi_get_accumulate(void *orgaddr, int *orgcnt, int *orgtype, void *resaddr,
+                        int *rescnt, int *restype, int *rank,
+                        MPI_Aint *targdisp, int *targcnt, int *targtype,
+                        int *opc, int *win, int *ierr){
+  MPI_Op op = GET_MPI_OP(*opc);
+  *ierr = AMPI_Get_accumulate(orgaddr, *orgcnt, *orgtype, resaddr, *rescnt, *restype,
+                              *rank, *targdisp, *targcnt, *targtype, op, *win);
+}
+
+void mpi_fetch_and_op(void *orgaddr, void *resaddr, int *type, int *rank,
+                      MPI_Aint *targdisp, int *opc, int *win, int *ierr){
+  MPI_Op op = GET_MPI_OP(*opc);
+  *ierr = AMPI_Fetch_and_op(orgaddr, resaddr, *type, *rank, *targdisp, op, *win);
+}
+
+void mpi_compare_and_swap(void *orgaddr, void *compaddr, void *resaddr,
+                          int *type, int *rank, MPI_Aint *targdisp,
+                          MPI_Win *win, int *ierr){
+  *ierr = AMPI_Compare_and_swap(orgaddr, compaddr, resaddr, *type, *rank, *targdisp, *win);
 }
 
 void mpi_info_create(int* info, int* ierr){

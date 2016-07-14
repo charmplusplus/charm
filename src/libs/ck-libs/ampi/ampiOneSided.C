@@ -373,6 +373,62 @@ void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
   }
 }
 
+int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+                           void *resaddr, int rescnt, MPI_Datatype restype, int rank,
+                           MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+                           MPI_Op op, WinStruct win) {
+  CkDDT_DataType *ddt = getDDT()->getType(orgtype);
+  int orgtotalsize = ddt->getSize(orgcnt);
+  AmpiMsg *msg = new AmpiMsg();
+  AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
+
+  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
+
+  ddt->serialize((char*)resaddr, msg->data, orgcnt, (-1));
+  if (ddt->isContig()) {
+    applyOp(orgtype, op, orgcnt, resaddr, orgaddr);
+  } else {
+    vector<char> sorgaddr(orgtotalsize);
+    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
+    applyOp(orgtype, op, orgcnt, resaddr, &sorgaddr[0]);
+    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, -1);
+  }
+
+  delete msg;
+  return MPI_SUCCESS;
+}
+
+int ampi::winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
+                            int rank, MPI_Aint targdisp, WinStruct win){
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  AmpiMsg* msg = new AmpiMsg();
+
+  msg = thisProxy[rank].winRemoteCompareAndSwap(getDDT()->getType(type)->getSize(1), (char*)orgaddr,
+                                                (char*)compaddr, type, targdisp, win.index);
+  ddt->serialize((char*)resaddr, msg->data, 1, 1);
+
+  delete msg;
+  return MPI_SUCCESS;
+}
+
+AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
+                                       MPI_Aint targdisp, int winIndex) {
+  win_obj *winobj = winObjects[winIndex];
+  winobj->put(sorgaddr, 1, size, targdisp, 1, size);
+
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
+
+  AmpiMsg *msg = new (size, 0) AmpiMsg(-1, -1, -1, thisIndex, size, myComm.getComm());
+  ddt->serialize(targaddr, msg->data, 1, 1);
+
+  if (*targaddr == *compaddr) {
+    ddt->serialize(targaddr, (char*)sorgaddr, 1, (-1));
+  }
+
+  return msg;
+}
+
 int ampi::winLock(int lock_type, int rank, WinStruct win) {
   AMPI_DEBUG("    [%d] Lock: invoke Remote lock at [%d]\n", thisIndex, rank);
   thisProxy[rank].winRemoteLock(lock_type, win.index, thisIndex);
@@ -554,6 +610,55 @@ int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   ampi *ptr = getAmpiInstance(winStruct.comm);
   return ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank,
                             targdisp, targcnt, targtype, op, winStruct);
+}
+
+/*
+ * int AMPI_Get_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+ *         void *resaddr, int rescnt, MPI_Datatype restype,
+ *         int rank, MPI_Aint targdisp, int targcnt,
+ *         MPI_Datatype targtype, MPI_Op op, MPI_Win win)
+ *   Perform an atomic, one-sided read-and-accumulate operation.
+ */
+CDECL
+int AMPI_Get_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+                        void *resaddr, int rescnt, MPI_Datatype restype,
+                        int rank, MPI_Aint targdisp, int targcnt,
+                        MPI_Datatype targtype, MPI_Op op, MPI_Win win) {
+  AMPIAPI("AMPI_Get_accumulate");
+  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct.comm);
+  return ptr->winGetAccumulate(orgaddr, orgcnt, orgtype, resaddr, rescnt, restype,
+                               rank, targdisp, targcnt, targtype, op, winStruct);
+}
+
+/*
+ * int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
+ *         int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win)
+ *   Perform one-sided read-modify-write.
+ */
+CDECL
+int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
+                      int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win) {
+  AMPIAPI("AMPI_Fetch_and_op");
+  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct.comm);
+  // HACK: use GetAccumulate for FetchAndOp
+  return ptr->winGetAccumulate(orgaddr, 1, type, resaddr, 1, type,
+                               rank, targdisp, 1, type, op, winStruct);
+}
+
+/*
+ * int AMPI_Compare_and_swap(void *orgaddr, void *compaddr, void *resaddr,
+ *         MPI_Datatype type, int rank, MPI_Aint targdisp, MPI_Win win)
+ *   Perform one-sided atomic compare-and-swap.
+ */
+CDECL
+int AMPI_Compare_and_swap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
+                          int rank, MPI_Aint targdisp, MPI_Win win) {
+  AMPIAPI("AMPI_Compare_and_swap");
+  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct.comm);
+  return ptr->winCompareAndSwap(orgaddr, compaddr, resaddr, type, rank, targdisp, winStruct);
 }
 
 /*

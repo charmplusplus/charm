@@ -1426,6 +1426,13 @@ class ampi : public CBase_ampi {
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, int winIndex);
+  int winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, void *resaddr,
+                       int rescnt, MPI_Datatype restype, int rank, MPI_Aint targdisp,
+                       int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct win);
+  int winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
+                        int rank, MPI_Aint targdisp, WinStruct win);
+  AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Datatype type,
+                                   MPI_Aint targdisp, int winIndex);
   void winSetName(WinStruct win, const char *name);
   void winGetName(WinStruct win, char *name, int *length) const;
   win_obj* getWinObjInstance(WinStruct win) const;

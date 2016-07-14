@@ -921,6 +921,18 @@ int AMPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                     MPI_Op op, MPI_Win win);
+#define MPI_Get_accumulate AMPI_Get_accumulate
+int AMPI_Get_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+                        void *resaddr, int rescnt, MPI_Datatype restype,
+                        int rank, MPI_Aint targdisp, int targcnt,
+                        MPI_Datatype targtype, MPI_Op op, MPI_Win win);
+#define MPI_Fetch_and_op AMPI_Fetch_and_op
+int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
+                      int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win);
+#define MPI_Compare_and_swap AMPI_Compare_and_swap
+int AMPI_Compare_and_swap(void *orgaddr, void *compaddr, void *resaddr,
+                          MPI_Datatype type, int rank, MPI_Aint targdisp,
+                          MPI_Win win);
 
 #define MPI_Info_create AMPI_Info_create
 int AMPI_Info_create(MPI_Info *info);
