@@ -141,7 +141,6 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
   matmul.bufferInfo = (dataInfo *) malloc(matmul.nBuffers * sizeof(dataInfo));
 
   AInfo = &(matmul.bufferInfo[0]);
-  AInfo->bufferID = -1;
   AInfo->transferToDevice = YES;
   AInfo->transferFromDevice = NO;
   AInfo->freeBuffer = YES;
@@ -149,7 +148,6 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
   AInfo->size = size;
 
   BInfo = &(matmul.bufferInfo[1]);
-  BInfo->bufferID = -1;
   BInfo->transferToDevice = YES;
   BInfo->transferFromDevice = NO;
   BInfo->freeBuffer = YES;
@@ -157,7 +155,6 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
   BInfo->size = size;
 
   CInfo = &(matmul.bufferInfo[2]);
-  CInfo->bufferID = -1;
   CInfo->transferToDevice = NO;
   CInfo->transferFromDevice = YES;
   CInfo->freeBuffer = YES;

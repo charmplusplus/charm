@@ -1,24 +1,25 @@
 #include "vectorAdd.decl.h"
 #include "vectorAdd.h"
 #include <time.h>
-#define DEBUG
 
 extern void createWorkRequest(int vectorSize, float *A, float *B, float **C, int myIndex, void *cb);
 
 CProxy_Main mainProxy;
 int vectorSize;
-Main::Main(CkArgMsg *m) {
+Main::Main(CkArgMsg* m) {
   mainProxy = thisProxy;
 
   if (m->argc < 3) {
-    numChares = 2;
+    numChares  = 2;
     vectorSize = 8;
   }
   else{
-    numChares = atoi(m->argv[1]);
+    numChares  = atoi(m->argv[1]);
     vectorSize = atoi(m->argv[2]);
   }
+
   delete m;
+
   workers = CProxy_Workers::ckNew(numChares);
 
   startTime = CkWallTimer();
@@ -26,7 +27,7 @@ Main::Main(CkArgMsg *m) {
   workers.beginWork();
 }
 
-void Main::finishWork(CkReductionMsg *m) {
+void Main::finishWork(CkReductionMsg* m) {
   delete m;
   CkPrintf("Elapsed time: %f s\n", CkWallTimer() - startTime);
   CkExit();
@@ -47,7 +48,7 @@ Workers::~Workers() {
   delete [] C;
 }
 
-Workers::Workers(CkMigrateMessage *msg) { }
+Workers::Workers(CkMigrateMessage* msg) { }
 
 
 void Workers::beginWork() {
@@ -60,31 +61,29 @@ void Workers::beginWork() {
 void Workers::complete() {
 #ifdef DEBUG
   CkPrintf("[%d] A\n", thisIndex);
-  for (int i=0; i<vectorSize; i++) {
+  for (int i = 0; i < vectorSize; i++) {
     CkPrintf("%.2f ", A[i]);
   }
   CkPrintf("\n");
 
   CkPrintf("[%d] B\n", thisIndex);
-  for (int i=0; i<vectorSize; i++) {
+  for (int i = 0; i < vectorSize; i++) {
     CkPrintf("%.2f ", B[i]);
   }
   CkPrintf("\n");
 
   CkPrintf("[%d] C\n", thisIndex);
-  for (int i=0; i<vectorSize; i++) {
+  for (int i = 0; i < vectorSize; i++) {
     CkPrintf("%.2f ", C[i]);
-    }
+  }
   CkPrintf("\n");
 
   CkPrintf("[%d] C-gold\n", thisIndex);
-  for (int j=0; j<vectorSize; j++) {
+  for (int j = 0; j < vectorSize; j++) {
     C[j] = A[j] + B[j];
     CkPrintf("%.2f ", C[j]);
   }
   CkPrintf("\n");
-
-
 #endif
 
   contribute(CkCallback(CkIndex_Main::finishWork(NULL), mainProxy));

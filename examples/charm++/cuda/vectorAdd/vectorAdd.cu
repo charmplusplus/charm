@@ -29,7 +29,6 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   vectorAddReq->bufferInfo = (dataInfo *) malloc(vectorAddReq->nBuffers * sizeof(dataInfo));
 
   AInfo = &(vectorAddReq->bufferInfo[0]);
-  AInfo->bufferID = -1;
   AInfo->transferToDevice = YES;
   AInfo->transferFromDevice = NO;
   AInfo->freeBuffer = YES;
@@ -38,7 +37,6 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   AInfo->size = size;
 
   BInfo = &(vectorAddReq->bufferInfo[1]);
-  BInfo->bufferID = -1;
   BInfo->transferToDevice = YES;
   BInfo->transferFromDevice = YES;
   BInfo->freeBuffer = YES;
@@ -47,7 +45,6 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   BInfo->size = size;
 
   CInfo = &(vectorAddReq->bufferInfo[2]);
-  CInfo->bufferID = -1;
   CInfo->transferToDevice = NO;
   CInfo->transferFromDevice = YES;
   CInfo->freeBuffer = YES;

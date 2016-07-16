@@ -1,4 +1,4 @@
-/* 
+/*
  * cuda-hybrid-api.cu
  *
  * by Lukasz Wesolowski
@@ -6,7 +6,7 @@
  *
  * an interface for execution on the GPU
  *
- * description: 
+ * description:
  * -user enqueues one or more work requests to the work
  * request queue (wrQueue) to be executed on the GPU
  * - a converse function (gpuProgressFn) executes periodically to
@@ -52,13 +52,10 @@
 #include "cklists.h"
 #endif
 
-void cudaErrorDie(int err,const char *code,const char *file,int line)
-{
-  fprintf(stderr,"Fatal CUDA Error at %s:%d.\n"
-	  " Return value %d from '%s'.  Exiting.\n",
-	  file,line,
-	  err,code);
-  abort();
+void cudaErrorDie(int err, const char* code, const char* file, int line) {
+  fprintf(stderr, "Fatal CUDA Error %s at %s:%d.\nReturn value %d from '%s'.",
+      cudaGetErrorString((cudaError_t) err), file, line, err, code);
+  CmiAbort(" Exiting!\n");
 }
 
 #if defined GPU_TRACE || defined GPU_INSTRUMENT_WRS
@@ -71,19 +68,19 @@ extern "C" void traceUserBracketEvent(int e, double beginT, double endT);
 #endif
 
 /* A function in ck.C which casts the void * to a CkCallback object
- *  and executes the callback 
- */ 
-extern void CUDACallbackManager(void * fn); 
+ *  and executes the callback
+ */
+extern void CUDACallbackManager(void * fn);
 extern int CmiMyPe();
 
 /* initial size of the user-addressed portion of host/device buffer
  * arrays; the system-addressed portion of host/device buffer arrays
  * (used when there is no need to share buffers between work requests)
- * will be equivalant in size.  
- */ 
+ * will be equivalant in size.
+ */
 #define NUM_BUFFERS 256
-#define MAX_PINNED_REQ 64  
-#define MAX_DELAYED_FREE_REQS 64  
+#define MAX_PINNED_REQ 64
+#define MAX_DELAYED_FREE_REQS 64
 
 #ifdef GPU_TRACE
 typedef struct gpuEventTimer {
@@ -225,34 +222,36 @@ void enqueue(workRequestQueue* q, workRequest* wr) {
   enqueue(wr);
 }
 
-cudaStream_t getKernelStream(){
+cudaStream_t getKernelStream() {
   return CsvAccess(gpuManager).kernel_stream;
 }
 
-void** gethostBuffers(){
+void** gethostBuffers() {
   return CsvAccess(gpuManager).hostBuffers;
 }
 
-void** getdevBuffers(){
+void** getdevBuffers() {
   return CsvAccess(gpuManager).devBuffers;
 }
 
-int getPinnedIndex(){
+int getNextPinnedIndex() {
   CmiLock(CsvAccess(gpuManager).pinlock);
   int pinnedIndex = CsvAccess(gpuManager).pinnedMemQueueIndex++;
   CmiUnlock(CsvAccess(gpuManager).pinlock);
+  if (pinnedIndex == MAX_PINNED_REQ) {
+    printf("Error: pinned memory request buffer is overflowing\n");
+  }
   return pinnedIndex;
 }
 
-int getDelayedFreeReqIndex(){
+int getNextDelayedFreeReqIndex() {
   CmiLock(CsvAccess(gpuManager).dfrlock);
   int dfrIndex = CsvAccess(gpuManager).currentDfr;
   int flag = ((dfrIndex == MAX_DELAYED_FREE_REQS) ? 1 : 0);
   CsvAccess(gpuManager).currentDfr++;
   CmiUnlock(CsvAccess(gpuManager).dfrlock);
   if (flag) {
-    printf("Ran out of DFR queue space. Increase MAX_DELAYED_FREE_REQS\n");
-    exit(-1);
+    CmiAbort("Ran out of DFR queue space. Increase MAX_DELAYED_FREE_REQS. Exiting!\n");
   }
   return dfrIndex;
 }
@@ -260,51 +259,37 @@ int getDelayedFreeReqIndex(){
 /* pinnedMallocHost
  *
  * schedules a pinned memory allocation so that it does not impede
- * concurrent asynchronous execution 
+ * concurrent asynchronous execution
  *
  */
-void pinnedMallocHost(pinnedMemReq *reqs) {
-
+void pinnedMallocHost(pinnedMemReq* reqs) {
   if ( (cudaStreamQuery(CsvAccess(gpuManager).kernel_stream) == cudaSuccess) &&
        (cudaStreamQuery(CsvAccess(gpuManager).data_in_stream) == cudaSuccess) &&
        (cudaStreamQuery(CsvAccess(gpuManager).data_out_stream) == cudaSuccess) ) {
-
-
-
-    for (int i=0; i<reqs->nBuffers; i++) {
-      cudaChk(cudaMallocHost((void **) reqs->hostPtrs[i], 
-					    reqs->sizes[i])); 
+    for (int i = 0; i < reqs->nBuffers; i++) {
+      cudaChk(cudaMallocHost((void **) reqs->hostPtrs[i], reqs->sizes[i]));
     }
 
     free(reqs->hostPtrs);
     free(reqs->sizes);
 
     CUDACallbackManager(reqs->callbackFn);
-    gpuProgressFn(); 
+    gpuProgressFn();
   }
   else {
-    int pinnedIndex = getPinnedIndex();
-    pinnedMemReq* shared_pinnedQueue = CsvAccess(gpuManager).pinnedMemQueue;
-    shared_pinnedQueue[pinnedIndex].hostPtrs = reqs->hostPtrs;
-    shared_pinnedQueue[pinnedIndex].sizes = reqs->sizes;
-    shared_pinnedQueue[pinnedIndex].nBuffers = reqs->nBuffers;
-    shared_pinnedQueue[pinnedIndex].callbackFn = reqs->callbackFn;
-    if (CsvAccess(gpuManager).pinnedMemQueueIndex == MAX_PINNED_REQ) {
-      printf("Error: pinned memory request buffer is overflowing\n");
-    }
+    CsvAccess(gpuManager).pinnedMemQueue[getNextPinnedIndex()] = *reqs;
   }
 }
 
-void delayedFree(void *ptr){
-  CsvAccess(gpuManager).delayedFreeReqs[getDelayedFreeReqIndex()] = ptr;
+void delayedFree(void* ptr){
+  CsvAccess(gpuManager).delayedFreeReqs[getNextDelayedFreeReqIndex()] = ptr;
 }
 
 void flushDelayedFrees(){
   CmiLock(CsvAccess(gpuManager).dfrlock);
   for(int i = 0; i < CsvAccess(gpuManager).currentDfr; i++){
     if(CsvAccess(gpuManager).delayedFreeReqs[i] == NULL){
-      printf("recorded NULL ptr in delayedFree()");
-      exit(-1);
+      CmiAbort("Encountered NULL pointer in delayedFree(). Exiting!\n");
     }
     cudaChk(cudaFreeHost(CsvAccess(gpuManager).delayedFreeReqs[i]));
   }
@@ -322,9 +307,8 @@ void flushPinnedMemQueue() {
   for (int i = 0; i < CsvAccess(gpuManager).pinnedMemQueueIndex; i++) {
     pinnedMemReq *req = &CsvAccess(gpuManager).pinnedMemQueue[i];
 
-    for (int j=0; j<req->nBuffers; j++) {
-      cudaChk(cudaMallocHost((void **) req->hostPtrs[j], 
-					    req->sizes[j])); 
+    for (int j = 0; j < req->nBuffers; j++) {
+      cudaChk(cudaMallocHost((void **) req->hostPtrs[j], req->sizes[j]));
     }
     free(req->hostPtrs);
     free(req->sizes);
@@ -344,67 +328,61 @@ void flushPinnedMemQueue() {
  * take place before the kernel starts executing in order to allow overlap
  *
  */
-
 void allocateBuffers(workRequest *wr) {
-  dataInfo *bufferInfo = wr->bufferInfo; 
+  dataInfo* bufferInfo = wr->bufferInfo;
 
   if (bufferInfo != NULL) {
+    for (int i = 0; i < wr->nBuffers; i++) {
+      int index = bufferInfo[i].bufferID;
+      int size = bufferInfo[i].size;
 
-    for (int i=0; i<wr->nBuffers; i++) {
-      int index = bufferInfo[i].bufferID; 
-      int size = bufferInfo[i].size; 
-
-      // if index value is invalid, use an available ID  
+      // if index value is invalid, use an available ID
       if (index < 0 || index >= NUM_BUFFERS) {
-	int found = 0; 
-        for (int j = CsvAccess(gpuManager).nextBuffer; j < NUM_BUFFERS*2; j++) {
+        bool isFound = false;
+        for (int j = CsvAccess(gpuManager).nextBuffer; j < NUM_BUFFERS * 2; j++) {
           if (CsvAccess(gpuManager).devBuffers[j] == NULL) {
-	    index = j;
-	    found = 1; 
-	    break;
-	  }
-	}
+            index = j;
+            isFound = true;
+            break;
+          }
+        }
 
-	/* if no index was found, try to search for a value at the
-	 * beginning of the system addressed space 
-	 */
-	
-	if (!found) {
+        // if no index was found, try to search for a value at the
+        // beginning of the system addressed space
+        if (!isFound) {
           for (int j = NUM_BUFFERS; j < CsvAccess(gpuManager).nextBuffer; j++) {
             if (CsvAccess(gpuManager).devBuffers[j] == NULL) {
-	      index = j;
-	      found = 1; 
-	      break;
-	    }
-	  }
-	}
+              index = j;
+              isFound = true;
+              break;
+            }
+          }
+        }
 
-	/* if no index was found, print an error */
-	if (!found) {
-	  printf("Error: devBuffers is full \n");
-	}
+        if (!isFound) {
+          printf("Error: devBuffers is full \n");
+        }
 
         CsvAccess(gpuManager).nextBuffer = index+1;
         if (CsvAccess(gpuManager).nextBuffer == NUM_BUFFERS * 2) {
           CsvAccess(gpuManager).nextBuffer = NUM_BUFFERS;
         }
-	
-	bufferInfo[i].bufferID = index; 
 
-      }      
-      
-      // allocate if the buffer for the corresponding index is NULL 
+        bufferInfo[i].bufferID = index;
+      }
+
       if (CsvAccess(gpuManager).devBuffers[index] == NULL && size > 0) {
 #ifdef GPU_PRINT_BUFFER_ALLOCATE
         double mil = 1e3;
-        printf("*** ALLOCATE buffer 0x%x (%d) size %f kb\n", CsvAccess(gpuManager).devBuffers[index], index, 1.0*size/mil);
+        printf("*** ALLOCATE buffer 0x%x (%d) size %f kb\n", CsvAccess(gpuManager).devBuffers[index], index, size / mil);
 #endif
 
         cudaChk(cudaMalloc((void **) &CsvAccess(gpuManager).devBuffers[index], size));
+
 #ifdef GPU_DEBUG
-        printf("buffer %d allocated at time %.2f size: %d error string: %s\n", 
-	       index, cutGetTimerValue(timerHandle), size, 
-	       cudaGetErrorString( cudaGetLastError() ) );
+        printf("buffer %d allocated at time %.2f size: %d error string: %s\n",
+          index, cutGetTimerValue(timerHandle), size,
+          cudaGetErrorString( cudaGetLastError() ) );
 #endif
       }
     }
@@ -413,76 +391,56 @@ void allocateBuffers(workRequest *wr) {
 
 
 /* setupData
- *  copy data to the GPU before kernel execution 
+ *  copy data to the GPU before kernel execution
  */
 void setupData(workRequest *wr) {
-  dataInfo *bufferInfo = wr->bufferInfo; 
+  dataInfo* bufferInfo = wr->bufferInfo;
 
   if (bufferInfo != NULL) {
-    for (int i=0; i<wr->nBuffers; i++) {
-      int index = bufferInfo[i].bufferID; 
-      int size = bufferInfo[i].size; 
+    for (int i = 0; i < wr->nBuffers; i++) {
+      int index = bufferInfo[i].bufferID;
+      int size = bufferInfo[i].size;
       CsvAccess(gpuManager).hostBuffers[index] = bufferInfo[i].hostBuffer;
-      
-      /* allocate if the buffer for the corresponding index is NULL */
-      /*
-      if (devBuffers[index] == NULL) {
-	cudaChk(cudaMalloc((void **) &devBuffers[index], size));
-#ifdef GPU_DEBUG
-	printf("buffer %d allocated %.2f\n", index,
-	       cutGetTimerValue(timerHandle)); 
-#endif
-      }
-      */
-      
+
       if (bufferInfo[i].transferToDevice && size > 0) {
         cudaChk(cudaMemcpyAsync(CsvAccess(gpuManager).devBuffers[index],
-          CsvAccess(gpuManager).hostBuffers[index], size, cudaMemcpyHostToDevice, CsvAccess(gpuManager).data_in_stream));
+                CsvAccess(gpuManager).hostBuffers[index], size,
+                cudaMemcpyHostToDevice, CsvAccess(gpuManager).data_in_stream));
 #ifdef GPU_DEBUG
-	printf("transferToDevice bufId: %d at time %.2f size: %d " 
-	       "error string: %s\n", index, cutGetTimerValue(timerHandle), 
-	       size, cudaGetErrorString( cudaGetLastError() )); 
-#endif	
-	/*
-	cudaChk(cudaMemcpy(devBuffers[index], 
-          hostBuffers[index], size, cudaMemcpyHostToDevice));
-	*/
-
+        printf("transferToDevice bufId: %d at time %.2f size: %d "
+               "error string: %s\n", index, cutGetTimerValue(timerHandle),
+               size, cudaGetErrorString(cudaGetLastError()));
+#endif
       }
     }
   }
-} 
+}
 
 /* copybackData
- *  transfer data from the GPU to the CPU after a work request is done 
- */ 
+ *  transfer data from the GPU to the CPU after a work request is done
+ */
 void copybackData(workRequest *wr) {
-  dataInfo *bufferInfo = wr->bufferInfo; 
+  dataInfo *bufferInfo = wr->bufferInfo;
 
   if (bufferInfo != NULL) {
-    int nBuffers = wr->nBuffers; 
-    
-    for (int i=0; i<nBuffers; i++) {
-      int index = bufferInfo[i].bufferID; 
-      int size = bufferInfo[i].size; 
-      
+    int nBuffers = wr->nBuffers;
+
+    for (int i = 0; i < nBuffers; i++) {
+      int index = bufferInfo[i].bufferID;
+      int size = bufferInfo[i].size;
+
       if (bufferInfo[i].transferFromDevice && size > 0) {
 #ifdef GPU_DEBUG
-	printf("transferFromDevice: %d at time %.2f size: %d "
-	       "error string: %s\n", index, cutGetTimerValue(timerHandle), 
-	       size, cudaGetErrorString( cudaGetLastError() )); 
+        printf("transferFromDevice: %d at time %.2f size: %d "
+            "error string: %s\n", index, cutGetTimerValue(timerHandle),
+            size, cudaGetErrorString(cudaGetLastError()));
 #endif
-	
+
         cudaChk(cudaMemcpyAsync(CsvAccess(gpuManager).hostBuffers[index],
-          CsvAccess(gpuManager).devBuffers[index], size, cudaMemcpyDeviceToHost,
-          CsvAccess(gpuManager).data_out_stream));
-	
-	/*
-	cudaChk(cudaMemcpy(hostBuffers[index], 
-          devBuffers[index], size, cudaMemcpyDeviceToHost));
-	*/
+              CsvAccess(gpuManager).devBuffers[index], size, cudaMemcpyDeviceToHost,
+              CsvAccess(gpuManager).data_out_stream));
       }
-    }     
+    }
   }
 }
 
@@ -490,33 +448,33 @@ void copybackData(workRequest *wr) {
  *  work request's bufferInfo array
  */
 void freeMemory(workRequest *wr) {
-  dataInfo *bufferInfo = wr->bufferInfo;   
-  int nBuffers = wr->nBuffers; 
+  dataInfo* bufferInfo = wr->bufferInfo;
+  int nBuffers = wr->nBuffers;
   if (bufferInfo != NULL) {
-    for (int i=0; i<nBuffers; i++) {    
-      int index = bufferInfo[i].bufferID; 
+    for (int i = 0; i < nBuffers; i++) {
+      int index = bufferInfo[i].bufferID;
       if (bufferInfo[i].freeBuffer) {
 #ifdef GPU_PRINT_BUFFER_ALLOCATE
         printf("*** FREE buffer 0x%x (%d)\n", CsvAccess(gpuManager).devBuffers[index], index);
 #endif
 
 #ifdef GPU_DEBUG
-        printf("buffer %d freed at time %.2f error string: %s\n", 
-	       index, cutGetTimerValue(timerHandle),  
-	       cudaGetErrorString( cudaGetLastError() ));
-#endif 
+        printf("buffer %d freed at time %.2f error string: %s\n",
+            index, cutGetTimerValue(timerHandle),
+            cudaGetErrorString(cudaGetLastError()));
+#endif
         cudaChk(cudaFree(CsvAccess(gpuManager).devBuffers[index]));
         CsvAccess(gpuManager).devBuffers[index] = NULL;
       }
     }
-    free(bufferInfo); 
+    free(bufferInfo);
   }
 }
 
-/* 
+/*
  * a switch statement defined by the user to allow the library to execute
- * the correct kernel 
- */ 
+ * the correct kernel
+ */
 void kernelSelect(workRequest *wr);
 #ifdef GPU_MEMPOOL
 void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
@@ -533,7 +491,6 @@ void initHybridAPI() {
  * arrays, and CUDA streams
  */
 void GPUManager::initHybridAPIHelper() {
-
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
 
@@ -541,17 +498,17 @@ void GPUManager::initHybridAPIHelper() {
 
   /* allocate host/device buffers array (both user and
      system-addressed) */
-  hostBuffers = (void **) malloc(NUM_BUFFERS * 2 * sizeof(void *)); 
-  devBuffers = (void **) malloc(NUM_BUFFERS * 2 * sizeof(void *)); 
+  hostBuffers = (void **)malloc(NUM_BUFFERS * 2 * sizeof(void *));
+  devBuffers  = (void **)malloc(NUM_BUFFERS * 2 * sizeof(void *));
 
-  /* initialize device array to NULL */ 
-  for (int i=0; i<NUM_BUFFERS*2; i++) {
-    devBuffers[i] = NULL; 
+  /* initialize device array to NULL */
+  for (int i = 0; i < NUM_BUFFERS * 2; i++) {
+    devBuffers[i] = NULL;
   }
-  
-  cudaChk(cudaStreamCreate(&kernel_stream)); 
-  cudaChk(cudaStreamCreate(&data_in_stream)); 
-  cudaChk(cudaStreamCreate(&data_out_stream)); 
+
+  cudaChk(cudaStreamCreate(&kernel_stream));
+  cudaChk(cudaStreamCreate(&data_in_stream));
+  cudaChk(cudaStreamCreate(&data_out_stream));
 
 
 #ifdef GPU_TRACE
@@ -561,7 +518,6 @@ void GPUManager::initHybridAPIHelper() {
 #endif
 
 #ifdef GPU_MEMPOOL
-
   int nslots = GPU_MEMPOOL_NUM_SLOTS;
   int sizes[GPU_MEMPOOL_NUM_SLOTS];
 
@@ -580,40 +536,39 @@ void GPUManager::initHybridAPIHelper() {
     memPoolBoundaries[i] = bufSize;
     bufSize = bufSize << 1;
 #ifdef GPU_DUMMY_MEMPOOL
-    memPoolSize[i] = 0;
-    memPoolMax[i] = -1;
+    memPoolSize[i] =  0;
+    memPoolMax[i]  = -1;
 #endif
   }
 
-
 #ifndef GPU_DUMMY_MEMPOOL
-/*256*/ sizes[0] = 20;
-/*512*/ sizes[1] = 10;
-/*1024*/ sizes[2] = 10;
-/*2048*/ sizes[3] = 20;
-/*4096*/ sizes[4] = 10;
-/*8192*/ sizes[5] = 30;
-/*16384*/ sizes[6] = 25;
-/*32768*/ sizes[7] = 10;
-/*65536*/ sizes[8] = 5;
-/*131072*/ sizes[9] = 5;
-/*262144*/ sizes[10] = 5;
-/*524288*/ sizes[11] = 5;
-/*1048576*/ sizes[12] = 5;
-/*2097152*/ sizes[13] = 10;
-/*4194304*/ sizes[14] = 10;
-/*8388608*/ sizes[15] = 10;
-/*16777216*/ sizes[16] = 8;
-/*33554432*/ sizes[17] = 6;
-/*67108864*/ sizes[18] = 7;
-/*134217728*/ sizes[19] = 36; // nasty hack, shouldn't be hardcoded
+        /*256*/ sizes[0]  = 20;
+        /*512*/ sizes[1]  = 10;
+       /*1024*/ sizes[2]  = 10;
+       /*2048*/ sizes[3]  = 20;
+       /*4096*/ sizes[4]  = 10;
+       /*8192*/ sizes[5]  = 30;
+      /*16384*/ sizes[6]  = 25;
+      /*32768*/ sizes[7]  = 10;
+      /*65536*/ sizes[8]  =  5;
+     /*131072*/ sizes[9]  =  5;
+     /*262144*/ sizes[10] =  5;
+     /*524288*/ sizes[11] =  5;
+    /*1048576*/ sizes[12] =  5;
+    /*2097152*/ sizes[13] = 10;
+    /*4194304*/ sizes[14] = 10;
+    /*8388608*/ sizes[15] = 10;
+   /*16777216*/ sizes[16] =  8;
+   /*33554432*/ sizes[17] =  6;
+   /*67108864*/ sizes[18] =  7;
+  /*134217728*/ sizes[19] = 36; // nasty hack, shouldn't be hardcoded
 
-createPool(sizes, nslots, memPoolFreeBufs);
+  createPool(sizes, nslots, memPoolFreeBufs);
 #endif
 
   printf("[%d] done creating buffer pool\n", CmiMyPe());
 
-#endif
+#endif // GPU_MEMPOOL
 
 #ifdef GPU_INSTRUMENT_WRS
   initialized_instrument = false;
@@ -629,17 +584,16 @@ void gpuProgressFn(){
 inline void gpuEventStart(workRequest *wr, int *index, WorkRequestStage event, ProfilingStage stage){
 #ifdef GPU_TRACE
   gpuEventTimer* shared_gpuEvents = CsvAccess(gpuManager).gpuEvents;
-  int shared_timeIndex = CsvAccess(gpuManager).timeIndex;
+  int shared_timeIndex = CsvAccess(gpuManager).timeIndex++;
   shared_gpuEvents[shared_timeIndex].cmistartTime = CmiWallTimer();
   shared_gpuEvents[shared_timeIndex].eventType = event;
   shared_gpuEvents[shared_timeIndex].ID = wr->id;
   *index = shared_timeIndex;
   shared_gpuEvents[shared_timeIndex].stage = stage;
-  CsvAccess(gpuManager).timeIndex++;
 #ifdef GPU_DEBUG
   printf("Start Event Name = %d \t Stage Name=%d workRequest Id= %d\n", event,stage, wr->id);
 #endif
-#endif
+#endif // GPU_TRACE
 }
 
 inline void gpuEventEnd(int index){
@@ -658,7 +612,7 @@ inline void workRequestStartTime(workRequest *wr){
 #endif
 }
 
-inline void gpuProfiling(workRequest *wr, WorkRequestStage event){
+inline void profileWorkRequestEvent(workRequest* wr, WorkRequestStage event){
 #ifdef GPU_INSTRUMENT_WRS
   if(initializedInstrument()){
     double tt = CmiWallTimer()-(wr->phaseStartTime);
@@ -683,7 +637,7 @@ inline void gpuProfiling(workRequest *wr, WorkRequestStage event){
         vec[phase].n++;
         break;
       default:
-        printf("Error: Invalid event during gpuProfiling\n");
+        printf("Error: Invalid event during profileWorkRequestEvent\n");
     }
   }
 #endif
@@ -691,35 +645,38 @@ inline void gpuProfiling(workRequest *wr, WorkRequestStage event){
 
 /* gpuProgressFnHelper
  *  This function is called after achieving the queuelock.
- *  Old gpuProgressFn now becomes a wrapper for gpuProgressFnHelper for exclusive access to threads.
- *  called periodically to monitor work request progress, and perform
- *  the prefetch of data for a subsequent work request
+ *  Old gpuProgressFn now becomes a wrapper for gpuProgressFnHelper for
+ *  exclusive access to threads.
+ *  Called periodically to monitor work request progress, and perform
+ *  the prefetch of data for a subsequent work request.
  */
-
 void GPUManager::gpuProgressFnHelper() {
   bool isHeadFinished = true;
+  int returnVal = -1;
   while (isHeadFinished) {
     isHeadFinished = false;
+
     if (wrQueue == NULL) {
       printf("Error: work request queue not initialized\n");
       break;
     }
+
     if (wrqueue::isEmpty(wrQueue)) {
       flushPinnedMemQueue();
       flushDelayedFrees();
       break;
     }
-    int returnVal;
+
     CmiLock(CsvAccess(gpuManager).queuelock);
-    workRequest *head = wrqueue::firstElement(wrQueue);
+    workRequest *head   = wrqueue::firstElement(wrQueue);
     workRequest *second = wrqueue::secondElement(wrQueue);
-    workRequest *third = wrqueue::thirdElement(wrQueue);
+    workRequest *third  = wrqueue::thirdElement(wrQueue);
 
     if (head->state == QUEUED) {
 #ifdef GPU_DEBUG
-      printf("wrQueue Size = %d head.state= QUEUED", wrQueue->size);
+      printf("wrQueue Size = %d head.state = QUEUED", wrQueue->size);
 #endif
-      gpuEventStart(head,&dataSetupIndex,DataSetup,GpuMemSetup);
+      gpuEventStart(head, &dataSetupIndex, DataSetup, GpuMemSetup);
       workRequestStartTime(head);
       allocateBuffers(head);
       setupData(head);
@@ -727,22 +684,22 @@ void GPUManager::gpuProgressFnHelper() {
     }
     if (head->state == TRANSFERRING_IN) {
 #ifdef GPU_DEBUG
-    printf("wrQueue Size = %d head.state= Transferring",wrQueue->size);
+      printf("wrQueue Size = %d head.state = Transferring", wrQueue->size);
 #endif
       if ((returnVal = cudaStreamQuery(data_in_stream)) == cudaSuccess) {
         gpuEventEnd(dataSetupIndex);
-        gpuProfiling(head,DataSetup);
-        if (second != NULL ) {
+        profileWorkRequestEvent(head, DataSetup);
+        if (second != NULL) {
           allocateBuffers(second);
         }
-        gpuEventStart(head,&runningKernelIndex,KernelExecution,GpuKernelExec);
+        gpuEventStart(head, &runningKernelIndex, KernelExecution, GpuKernelExec);
         workRequestStartTime(head);
         flushDelayedFrees();
         kernelSelect(head);
 
         head->state = EXECUTING;
         if (second != NULL) {
-          gpuEventStart(second,&dataSetupIndex,DataSetup,GpuMemSetup);
+          gpuEventStart(second, &dataSetupIndex, DataSetup, GpuMemSetup);
           workRequestStartTime(second);
           setupData(second);
           second->state = TRANSFERRING_IN;
@@ -750,20 +707,20 @@ void GPUManager::gpuProgressFnHelper() {
       }
       /*
 #ifdef GPU_DEBUG
-      printf("Querying memory stream returned: %d %.2f\n", returnVal, 
-	     cutGetTimerValue(timerHandle));
-#endif  
+      printf("Querying memory stream returned: %d %.2f\n", returnVal,
+              cutGetTimerValue(timerHandle));
+#endif
       */
     }
     if (head->state == EXECUTING) {
 #ifdef GPU_DEBUG
-      printf("wrQueue Size = %d head.state= EXECUTING", CsvAccess(gpuManager).wrQueue->size);
+      printf("wrQueue Size = %d head.state = EXECUTING", CsvAccess(gpuManager).wrQueue->size);
 #endif
       if ((returnVal = cudaStreamQuery(CsvAccess(gpuManager).kernel_stream)) == cudaSuccess) {
         gpuEventEnd(runningKernelIndex);
-        gpuProfiling(head,KernelExecution);
+        profileWorkRequestEvent(head, KernelExecution);
         if (second != NULL && second->state == QUEUED) {
-          gpuEventStart(second,&dataSetupIndex,DataSetup,GpuMemSetup);
+          gpuEventStart(second, &dataSetupIndex, DataSetup, GpuMemSetup);
           workRequestStartTime(second);
           allocateBuffers(second);
           setupData(second);
@@ -772,24 +729,24 @@ void GPUManager::gpuProgressFnHelper() {
         if (second != NULL && second->state == TRANSFERRING_IN) {
           if (cudaStreamQuery(data_in_stream) == cudaSuccess) {
             gpuEventEnd(dataSetupIndex);
-            gpuProfiling(second,DataSetup);
+            profileWorkRequestEvent(second, DataSetup);
             if (third != NULL /*&& (third->state == QUEUED)*/) {
               allocateBuffers(third);
             }
-            gpuEventStart(second,&runningKernelIndex,KernelExecution,GpuKernelExec);
+            gpuEventStart(second, &runningKernelIndex, KernelExecution, GpuKernelExec);
             workRequestStartTime(second);
             flushDelayedFrees();
             kernelSelect(second);
             second->state = EXECUTING;
             if (third != NULL) {
-              gpuEventStart(third,&dataSetupIndex,DataSetup,GpuMemSetup);
+              gpuEventStart(third, &dataSetupIndex, DataSetup, GpuMemSetup);
               workRequestStartTime(third);
               setupData(third);
               third->state = TRANSFERRING_IN;
             }
           }
         }
-        gpuEventStart(head,&dataCleanupIndex,DataCleanup,GpuMemCleanup);
+        gpuEventStart(head, &dataCleanupIndex, DataCleanup, GpuMemCleanup);
         workRequestStartTime(head);
         copybackData(head);
         head->state = TRANSFERRING_OUT;
@@ -797,18 +754,18 @@ void GPUManager::gpuProgressFnHelper() {
       /*
 #ifdef GPU_DEBUG
       printf("Querying kernel completion returned: %d %.2f\n", returnVal,
-	     cutGetTimerValue(timerHandle));
-#endif  
+              cutGetTimerValue(timerHandle));
+#endif
       */
     }
     if (head->state == TRANSFERRING_OUT) {
 #ifdef GPU_DEBUG
       printf("wrQueue Size = %d head.state= Transferring out", CsvAccess(gpuManager).wrQueue->size);
 #endif
-      if (cudaStreamQuery(data_out_stream) == cudaSuccess){
+      if (cudaStreamQuery(data_out_stream) == cudaSuccess) {
         freeMemory(head);
         gpuEventEnd(dataCleanupIndex);
-        gpuProfiling(head,DataCleanup);
+        profileWorkRequestEvent(head, DataCleanup);
         wrqueue::dequeue(wrQueue);
         isHeadFinished = true;
       }
@@ -822,6 +779,7 @@ void GPUManager::gpuProgressFnHelper() {
 #ifdef GPU_MEMPOOL
 void releasePool(CkVec<BufferPool> &pools);
 #endif
+
 /* exitHybridAPI
  *  cleans up and deletes memory allocated for the queue and the CUDA streams
  */
@@ -842,11 +800,11 @@ void exitHybridAPI() {
   }
 
   if(CsvAccess(gpuManager).memPoolBoundaries.length() != CsvAccess(gpuManager).memPoolMax.length()){
-    abort();
+    CmiAbort("Error while exiting: memPoolBoundaries and memPoolMax sizes do not match!\n");
   }
 #endif
-  
-#endif
+
+#endif // GPU_MEMPOOL
 
   wrqueue::deleteWRqueue(CsvAccess(gpuManager).wrQueue);
   cudaChk(cudaStreamDestroy(CsvAccess(gpuManager).kernel_stream));
@@ -861,12 +819,12 @@ void exitHybridAPI() {
       break;
     case DataCleanup:
       printf("Kernel %d data cleanup", CsvAccess(gpuManager).gpuEvents[i].ID);
-      break; 
+      break;
     case KernelExecution:
       printf("Kernel %d execution", CsvAccess(gpuManager).gpuEvents[i].ID);
       break;
     default:
-      printf("Error, invalid timer identifier\n"); 
+      printf("Error, invalid timer identifier\n");
     }
     printf(" %.2f:%.2f\n", CsvAccess(gpuManager).gpuEvents[i].cmistartTime-CsvAccess(gpuManager).gpuEvents[0].cmistartTime, CsvAccess(gpuManager).gpuEvents[i].cmiendTime-CsvAccess(gpuManager).gpuEvents[0].cmistartTime);
   }
@@ -881,7 +839,7 @@ void releasePool(CkVec<BufferPool> &pools){
     Header *hdr;
     Header *next;
     for(hdr = pools[i].head; hdr != NULL;){
-      next = hdr->next; 
+      next = hdr->next;
       cudaChk(cudaFreeHost((void *)hdr));
       hdr = next;
     }
@@ -904,9 +862,9 @@ void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
     int numBuffers = nbuffers[i];
     pools[i].size = bufSize;
     pools[i].head = NULL;
-    
+
     /*
-    cudaChk(cudaMallocHost((void **)(&pools[i].head), 
+    cudaChk(cudaMallocHost((void **)(&pools[i].head),
                                           (sizeof(Header)+bufSize)*numBuffers));
     */
 
@@ -918,7 +876,7 @@ void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
                                             (sizeof(Header)+bufSize)));
       if(hd == NULL){
         printf("(%d) failed to allocate %dth block of size %d, slot %d\n", CmiMyPe(), j, bufSize, i);
-        abort();
+        CmiAbort("Exiting after failed block allocation!\n");
       }
       hd->slot = i;
       hd->next = previous;
@@ -934,10 +892,10 @@ void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
 
 int findPool(int size){
   int boundaryArrayLen = CsvAccess(gpuManager).memPoolBoundaries.length();
-  if(size <= CsvAccess(gpuManager).memPoolBoundaries[0]){
-    return (0);
+  if (size <= CsvAccess(gpuManager).memPoolBoundaries[0]) {
+    return 0;
   }
-  else if(size > CsvAccess(gpuManager).memPoolBoundaries[boundaryArrayLen-1]){
+  else if (size > CsvAccess(gpuManager).memPoolBoundaries[boundaryArrayLen-1]) {
     // create new slot
     CsvAccess(gpuManager).memPoolBoundaries.push_back(size);
 #ifdef GPU_DUMMY_MEMPOOL
@@ -947,9 +905,9 @@ int findPool(int size){
 
     BufferPool newpool;
     cudaChk(cudaMallocHost((void **)&newpool.head, size+sizeof(Header)));
-    if(newpool.head == NULL){
+    if (newpool.head == NULL) {
       printf("(%d) findPool: failed to allocate newpool %d head, size %d\n", CmiMyPe(), boundaryArrayLen, size);
-      abort();
+      CmiAbort("Exiting after failed newpool allocation!\n");
     }
     newpool.size = size;
 #ifdef GPU_MEMPOOL_DEBUG
@@ -957,54 +915,54 @@ int findPool(int size){
 #endif
     CsvAccess(gpuManager).memPoolFreeBufs.push_back(newpool);
 
-    Header *hd = newpool.head;
+    Header* hd = newpool.head;
     hd->next = NULL;
     hd->slot = boundaryArrayLen;
 
     return boundaryArrayLen;
   }
-  for(int i = 0; i < CsvAccess(gpuManager).memPoolBoundaries.length()-1; i++){
-    if(CsvAccess(gpuManager).memPoolBoundaries[i] < size && size <= CsvAccess(gpuManager).memPoolBoundaries[i+1]){
-      return (i+1);
+  for (int i = 0; i < CsvAccess(gpuManager).memPoolBoundaries.length()-1; i++) {
+    if (CsvAccess(gpuManager).memPoolBoundaries[i] < size && size <= CsvAccess(gpuManager).memPoolBoundaries[i+1]) {
+      return (i + 1);
     }
   }
   return -1;
 }
 
-void *getBufferFromPool(int pool, int size){
-  Header *ret;
-  if(pool < 0 || pool >= CsvAccess(gpuManager).memPoolFreeBufs.length()){
+void* getBufferFromPool(int pool, int size){
+  Header* ret;
+  if (pool < 0 || pool >= CsvAccess(gpuManager).memPoolFreeBufs.length()) {
     printf("(%d) getBufferFromPool, pool: %d, size: %d invalid pool\n", CmiMyPe(), pool, size);
 #ifdef GPU_MEMPOOL_DEBUG
     printf("(%d) num: %d\n", CmiMyPe(), CsvAccess(gpuManager).memPoolFreeBufs[pool].num);
 #endif
-    abort();
+    CmiAbort("Exiting after invalid pool!\n");
   }
-  else if (CsvAccess(gpuManager).memPoolFreeBufs[pool].head == NULL){
-    Header *hd;
-    cudaChk(cudaMallocHost((void **)&hd, sizeof(Header)+CsvAccess(gpuManager).memPoolFreeBufs[pool].size));
+  else if (CsvAccess(gpuManager).memPoolFreeBufs[pool].head == NULL) {
+    Header* hd;
+    cudaChk(cudaMallocHost((void **)&hd, sizeof(Header) + CsvAccess(gpuManager).memPoolFreeBufs[pool].size));
 #ifdef GPU_MEMPOOL_DEBUG
     printf("(%d) getBufferFromPool, pool: %d, size: %d expand by 1\n", CmiMyPe(), pool, size);
 #endif
-    if(hd == NULL){
-      abort();
+    if (hd == NULL) {
+      CmiAbort("Exiting after NULL hd from pool!\n");
     }
     hd->slot = pool;
-    return (void *)(hd+1);
+    return (void *)(hd + 1);
   }
-  else{
+  else {
     ret = CsvAccess(gpuManager).memPoolFreeBufs[pool].head;
     CsvAccess(gpuManager).memPoolFreeBufs[pool].head = ret->next;
 #ifdef GPU_MEMPOOL_DEBUG
     ret->size = size;
     CsvAccess(gpuManager).memPoolFreeBufs[pool].num--;
 #endif
-    return (void *)(ret+1);
+    return (void *)(ret + 1);
   }
   return NULL;
 }
 
-void returnBufferToPool(int pool, Header *hd){
+void returnBufferToPool(int pool, Header* hd) {
   hd->next = CsvAccess(gpuManager).memPoolFreeBufs[pool].head;
   CsvAccess(gpuManager).memPoolFreeBufs[pool].head = hd;
 #ifdef GPU_MEMPOOL_DEBUG
@@ -1012,15 +970,15 @@ void returnBufferToPool(int pool, Header *hd){
 #endif
 }
 
-void *hapi_poolMalloc(int size){
+void* hapi_poolMalloc(int size) {
   CmiLock(CsvAccess(gpuManager).bufferlock);
   int pool = findPool(size);
-  void *buf;
+  void* buf;
 #ifdef GPU_DUMMY_MEMPOOL
   cudaChk(cudaMallocHost((void **)&buf, size+sizeof(Header)));
   if(pool < 0 || pool >= CsvAccess(gpuManager).memPoolSize.length()){
     printf("(%d) need to create up to pool %d; malloc size: %d\n", CmiMyPe(), pool, size);
-    abort();
+    CmiAbort("Exiting after need to create bigger pool!\n");
   }
   CsvAccess(gpuManager).memPoolSize[pool]++;
   if(CsvAccess(gpuManager).memPoolSize[pool] > CsvAccess(gpuManager).memPoolMax[pool]){
@@ -1033,7 +991,7 @@ void *hapi_poolMalloc(int size){
 #else
   buf = getBufferFromPool(pool, size);
 #endif
-  
+
 #ifdef GPU_MEMPOOL_DEBUG
   printf("(%d) hapi_malloc size %d pool %d left %d\n", CmiMyPe(), size, pool, CsvAccess(gpuManager).memPoolFreeBufs[pool].num);
 #endif
@@ -1041,8 +999,8 @@ void *hapi_poolMalloc(int size){
   return buf;
 }
 
-void hapi_poolFree(void *ptr){
-  Header *hd = ((Header *)ptr)-1;
+void hapi_poolFree(void* ptr) {
+  Header* hd = ((Header *)ptr) - 1;
   int pool = hd->slot;
 
 #ifdef GPU_MEMPOOL_DEBUG
@@ -1057,10 +1015,10 @@ void hapi_poolFree(void *ptr){
 #ifdef GPU_DUMMY_MEMPOOL
   if(pool < 0 || pool >= CsvAccess(gpuManager).memPoolSize.length()){
     printf("(%d) free pool %d\n", CmiMyPe(), pool);
-    abort();
+    CmiAbort("Exiting after freeing out of bounds pool!\n");
   }
   CsvAccess(gpuManager).memPoolSize[pool]--;
-  delayedFree((void *)hd); 
+  delayedFree((void *)hd);
 #else
   returnBufferToPool(pool, hd);
 #endif
