@@ -11,7 +11,17 @@
 #include "mpisgi2.h"
 #endif
 
-#if (defined(MPICH) || defined(MPICH2))
+#ifdef AMPI
+void MPIR_Datatype_iscontig(MPI_Datatype datatype, int *flag){
+  AMPI_Type_is_contiguous(datatype, flag);
+}
+
+void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
+{
+    MPIR_Datatype_iscontig(datatype, flag);
+}
+
+#elif (defined(MPICH) || defined(MPICH2))
 /* MPICH2 also provides this routine */
 void MPIR_Datatype_iscontig(MPI_Datatype datatype, int *flag){
   MPI_Datatype_iscontig(datatype, flag);

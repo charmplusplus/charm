@@ -4,6 +4,7 @@ ROMIO integrated into AMPI:
 * Used MPI_Info_* calls from AMPI, and darray calls from ROMIO.
 * Set -DHAVE_STATUS_SET_BYTES in configure and configure.in, and 
   add status setting call in adio/common/status_setb.c
+* Use AMPI's AMPI_Type_is_contiguous() extension in adio/common/iscontig.c
 * Excluded directories doc, lib, man, and test in the distribution.
   (lib will be generated in the building directory $CHARMDIR/tmp/)
 * The final library lib/$ARCH/libmpio.a is copied to 
