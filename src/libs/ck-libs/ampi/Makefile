@@ -3,7 +3,7 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h ampiimpl.h ampiProjections.h 
 HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h ampiEvents.h
-COMPAT=compat_ampius.o compat_ampifus.o \
+COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o
 OBJS=ampi.o ampif.o ampiProjections.o ampiOneSided.o \
      ampiMisc.o mpich-alltoall.o  
@@ -75,6 +75,9 @@ compat_ampim.o: compat_ampim.C
 compat_ampifm.o: compat_ampifm.C
 
 compat_ampicm.o: compat_ampicm.C
+
+compat_ampi.o: compat_ampi.c
+	$(CHARMC) -c compat_ampi.c
 
 ampi.o: ampi.C $(HEADDEP)
 	$(CHARMC) -c ampi.C

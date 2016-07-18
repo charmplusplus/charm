@@ -587,7 +587,7 @@ CDECL
 void AMPI_Fallback_Main(int argc,char **argv)
 {
   AMPI_Main_cpp(argc,argv);
-  AMPI_Main(argc,argv);
+  AMPI_Main_c(argc,argv);
   FTN_NAME(MPI_MAIN,mpi_main)();
 }
 

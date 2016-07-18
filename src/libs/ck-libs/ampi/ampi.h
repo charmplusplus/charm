@@ -22,7 +22,8 @@ extern "C" {
 #  define main AMPI_Main
 #endif
 
-int AMPI_Main(int argc,char **argv); /* prototype for C main routine */
+int AMPI_Main(); /* declaration for C main routine (not a strict prototype!) */
+void AMPI_Main_c(int argc,char **argv); /* C wrapper for calling AMPI_Main() from C++ */
 
 typedef void (*MPI_MainFn) (int,char**);
 
