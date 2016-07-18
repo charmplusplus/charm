@@ -4,8 +4,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-void initAmpiProjections();
-void closeAmpiProjections();
+void initAmpiProjections(void);
+void closeAmpiProjections(void);
 void ampi_beginProcessing(int rank, int src, int count);
 void ampi_endProcessing(int rank);
 void ampi_msgSend(int tag,int dest,int count,int size);

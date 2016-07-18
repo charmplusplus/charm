@@ -70,10 +70,10 @@ extern "C" {
 typedef void *pup_er;
 
 /*Allocate PUP::er of different kind */
-pup_er pup_new_sizer();
+pup_er pup_new_sizer(void);
 pup_er pup_new_toMem(void *Nbuf);
 pup_er pup_new_fromMem(const void *Nbuf);
-pup_er pup_new_network_sizer();
+pup_er pup_new_network_sizer(void);
 pup_er pup_new_network_pack(void *Nbuf);
 pup_er pup_new_network_unpack(const void *Nbuf);
 #if CMK_CCS_AVAILABLE

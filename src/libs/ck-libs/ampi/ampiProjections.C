@@ -30,11 +30,11 @@ typedef struct {
 CkVec<funcData *> _funcTable; /*stores the name and index for the different functions (might add somethings later on)*/
 CkVec<vprocData *> vprocTable; /*stores the activation stack (only those functions that are being traced) for each virtual processor*/
 
-extern "C" void initAmpiProjections(){
+extern "C" void initAmpiProjections(void){
   //ampi_beginProcessing(current_rank,current_src,current_count);
 }
 
-extern "C" void closeAmpiProjections(){
+extern "C" void closeAmpiProjections(void){
   ampi_endProcessing(-1);
 }
 

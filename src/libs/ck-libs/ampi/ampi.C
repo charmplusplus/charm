@@ -615,7 +615,7 @@ CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int,argvExtracted);
 
 CDECL
-long ampiCurrentStackUsage(){
+long ampiCurrentStackUsage(void){
   int localVariable;
 
   unsigned long p1 =  (unsigned long)((void*)&localVariable);

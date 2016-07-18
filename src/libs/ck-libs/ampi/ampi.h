@@ -1031,7 +1031,7 @@ extern void traceBeginFuncIndexProj(int, const char *, int);
 extern void traceEndFuncIndexProj(int);
 
 /* Determine approximate depth of stack at the point of this call */
-extern long ampiCurrentStackUsage();
+extern long ampiCurrentStackUsage(void);
 
 #define AMPI_Trace_register_function_id(x, id) traceRegisterFunction(x, id);
 #define AMPI_Trace_begin_function_id(id) traceBeginFuncIndexProj(id, __FILE__, __LINE__);

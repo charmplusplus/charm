@@ -22,13 +22,13 @@ a C++ "PUP::er &" type.  We actually want a
 #define mp (*(PUP::er *)p)
 
 /*Allocate PUP::er of different kind */
-CDECL pup_er pup_new_sizer()
+CDECL pup_er pup_new_sizer(void)
   { return new PUP::sizer; }
 CDECL pup_er pup_new_toMem(void *Nbuf)
   { return new PUP::toMem(Nbuf); }
 CDECL pup_er pup_new_fromMem(const void *Nbuf)
   { return new PUP::fromMem(Nbuf); }
-CDECL pup_er pup_new_network_sizer()
+CDECL pup_er pup_new_network_sizer(void)
   { return new PUP_toNetwork_sizer; }
 CDECL pup_er pup_new_network_pack(void *Nbuf)
   { return new PUP_toNetwork_pack(Nbuf); }
