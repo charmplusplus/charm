@@ -132,7 +132,7 @@ extern void CldModuleInit(char **);
 #include <time.h>
 #endif
 
-#ifdef CMK_CUDA
+#if CMK_CUDA
 #include "cuda-hybrid-api.h"
 #endif
 
@@ -2028,7 +2028,7 @@ void CsdScheduleForever(void)
     int progressCount = CMK_CELL_PROGRESS_FREQ;
   #endif
 
-  #ifdef CMK_CUDA
+  #if CMK_CUDA
     #define CMK_CUDA_PROGRESS_FREQ 50
     int cudaProgressCount = CMK_CUDA_PROGRESS_FREQ;
   #endif
@@ -2057,7 +2057,7 @@ void CsdScheduleForever(void)
         progressCount--;
       #endif
 
-      #ifdef CMK_CUDA
+      #if CMK_CUDA
 	if (cudaProgressCount == 0) {
 	  gpuProgressFn(); 
 	  cudaProgressCount = CMK_CUDA_PROGRESS_FREQ; 
@@ -2074,7 +2074,7 @@ void CsdScheduleForever(void)
         progressCount = CMK_CELL_PROGRESS_FREQ;
       #endif
 
-      #ifdef CMK_CUDA
+      #if CMK_CUDA
 	gpuProgressFn(); 
 	cudaProgressCount = CMK_CUDA_PROGRESS_FREQ;
       #endif
@@ -3833,7 +3833,7 @@ void ConverseCommonInit(char **argv)
   CmiInitCell();
 #endif
 
-#ifdef CMK_CUDA
+#if CMK_CUDA
   initHybridAPI(CmiMyPe()); 
 #endif
 

@@ -94,9 +94,21 @@
 #define CMK_SMP_TRACE_COMMTHREAD                               0
 #endif
 
+#if !defined(CMK_SMP)
+#define CMK_SMP                   0
+#endif
+
 #if CMK_SMP_TRACE_COMMTHREAD && ! CMK_SMP
 #undef CMK_SMP_TRACE_COMMTHREAD
 #define CMK_SMP_TRACE_COMMTHREAD                               0
+#endif
+
+#if !defined(CMK_CUDA)
+#define CMK_CUDA                  0
+#endif
+
+#if !defined(CMK_BIGSIM_CHARM)
+#define CMK_BIGSIM_CHARM          0
 #endif
 
 /**
@@ -106,6 +118,14 @@
 #if CMK_SMP && CMK_BROADCAST_USE_CMIREFERENCE
 #undef CMK_BROADCAST_USE_CMIREFERENCE
 #define CMK_BROADCAST_USE_CMIREFERENCE                      0
+#endif
+
+#if !defined(CMK_CRAYXE)
+#define CMK_CRAYXE                0
+#endif
+
+#if !defined(CMK_CRAYXC)
+#define CMK_CRAYXC                0
 #endif
 
 #if (CMK_CRAYXE || CMK_CRAYXC) && CMK_CONVERSE_UGNI && ! CMK_SMP

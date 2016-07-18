@@ -270,7 +270,7 @@ class TCharmAPIRoutine {
 	CtgGlobals oldGlobals;	// this is actually a pointer
         tlsseg_t   oldtlsseg;   // for TLS globals
 	bool actLikeMainThread; // Whether memory allocation and globals should switch away from the application thread
-#ifdef CMK_BIGSIM_CHARM
+#if CMK_BIGSIM_CHARM
 	void *callEvent; // The BigSim-level event that called into the library
         int pe;          // in case thread migrates
 #endif
@@ -280,7 +280,7 @@ class TCharmAPIRoutine {
 	TCharmAPIRoutine(const char *routineName, const char *libraryName, bool actLikeMainThread_ = true)
 	  : actLikeMainThread(actLikeMainThread_)
 	{
-#ifdef CMK_BIGSIM_CHARM
+#if CMK_BIGSIM_CHARM
 		// Start a new event, so we can distinguish between client 
 		// execution and library execution
 		_TRACE_BG_TLINE_END(&callEvent);
@@ -342,7 +342,7 @@ class TCharmAPIRoutine {
 				CtgInstallTLS(&cur, &oldtlsseg);
 			}
 		}
-#ifdef CMK_BIGSIM_CHARM
+#if CMK_BIGSIM_CHARM
 		void *log;
 		_TRACE_BG_TLINE_END(&log);
 		_TRACE_BG_END_EXECUTE(0);

@@ -473,7 +473,7 @@ void CkSectionID::pup(PUP::er &p) {
 
 /**** Tiny random API routines */
 
-#ifdef CMK_CUDA
+#if CMK_CUDA
 void CUDACallbackManager(void *fn) {
   if (fn != NULL) {
     CkCallback *cb = (CkCallback*) fn;

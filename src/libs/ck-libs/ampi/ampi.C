@@ -887,7 +887,7 @@ static ampi *ampiInit(char **argv)
     thisParent = getAmpiParent();
   }
 
-#ifdef CMK_BIGSIM_CHARM
+#if CMK_BIGSIM_CHARM
   BgSetStartOutOfCore();
 #endif
 

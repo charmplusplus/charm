@@ -2,7 +2,7 @@
 // CMK_BIGSIM_CHARM is used during the emulation phase, 
 // where you genereate the bgTrace logs and the parameter files
 
-#ifdef CMK_BIGSIM_CHARM
+#if CMK_BIGSIM_CHARM
 #include "blue.h"
 #include "blue_impl.h"
 #endif
