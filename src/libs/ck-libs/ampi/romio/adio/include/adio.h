@@ -98,9 +98,7 @@
 #  define ADIO_OFFSET MPI_LONG
 #endif
 
-#ifndef SX4
-#   define MPI_AINT MPI_LONG    /* may need to change this later */
-#else
+#ifdef SX4
 #   if (defined(_SX) && !defined(_LONG64))
 #       define MPI_AINT MPI_LONG_LONG_INT
 #   else
