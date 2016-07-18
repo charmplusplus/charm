@@ -116,7 +116,7 @@ inline void MPID_Datatype_get_size_macro(MPI_Datatype &type, int &size){
    exchange using exclusive-or to create pairs. Else send to
    rank+i, receive from rank-i. */
 
-int MPICH_AlltoAll_long( 
+int AMPI_Alltoall_long(
 						void *sendbuf, 
 						int sendcount, 
 						MPI_Datatype sendtype, 
@@ -195,7 +195,7 @@ int MPICH_AlltoAll_long(
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if 0
-int MPICH_AlltoAll_short( 
+int AMPI_Alltoall_short(
 						 void *sendbuf, 
 						 int sendcount, 
 						 MPI_Datatype sendtype, 
@@ -356,7 +356,7 @@ int MPICH_AlltoAll_short(
 // MEDIUM MESSAGES
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int MPICH_AlltoAll_medium( 
+int AMPI_Alltoall_medium(
 						  void *sendbuf, 
 						  int sendcount, 
 						  MPI_Datatype sendtype, 

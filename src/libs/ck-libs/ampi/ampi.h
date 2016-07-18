@@ -561,14 +561,6 @@ int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
                     MPI_Datatype *sendtypes, void *recvbuf, int *recvcounts,
                     int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm,
                     MPI_Request *request);
-#define MPI_Alltoall_long MPICH_AlltoAll_long
-int  MPICH_AlltoAll_long(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                         void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                         MPI_Comm comm);
-#define MPI_Alltoall_medium MPICH_AlltoAll_medium
-int MPICH_AlltoAll_medium(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                          void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                          MPI_Comm comm);
 #define MPI_Reduce AMPI_Reduce
 int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type,
                 MPI_Op op, int root, MPI_Comm comm);
@@ -999,14 +991,12 @@ int AMPI_Trace_end(void);
 int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                        void *recvbuf, int recvcount, MPI_Datatype recvtype,
                        MPI_Comm comm);
-#define AMPI_Alltoall_medium MPICH_AlltoAll_medium
-int MPICH_AlltoAll_medium(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                          void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                          MPI_Comm comm);
-#define AMPI_Alltoall_long MPICH_AlltoAll_long
-int MPICH_AlltoAll_long(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                        void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                        MPI_Comm comm);
+int AMPI_Alltoall_medium(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                         void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                         MPI_Comm comm);
+int AMPI_Alltoall_long(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                       void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                       MPI_Comm comm);
 
 #if CMK_BIGSIM_CHARM
 int AMPI_Set_start_event(MPI_Comm comm);

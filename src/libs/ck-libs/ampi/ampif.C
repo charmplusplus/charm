@@ -1717,15 +1717,15 @@ void ampi_alltoall_iget(void *data, int *sendcount, int *sendtype,
 void ampi_alltoall_medium(void *data, int *sendcount, int *sendtype,
                           void *recvbuf, int *recvcount, int *recvtype,
                           int *comm, int *ierr) {
-  *ierr = MPICH_AlltoAll_medium(data, *sendcount, *sendtype, recvbuf,
-                                *recvcount, *recvtype, *comm);
+  *ierr = AMPI_Alltoall_medium(data, *sendcount, *sendtype, recvbuf,
+                               *recvcount, *recvtype, *comm);
 }
 
 void ampi_alltoall_long(void *data, int *sendcount, int *sendtype,
                         void *recvbuf, int *recvcount, int *recvtype,
                         int *comm, int *ierr) {
-  *ierr = MPICH_AlltoAll_long(data, *sendcount, *sendtype, recvbuf,
-                              *recvcount, *recvtype, *comm);
+  *ierr = AMPI_Alltoall_long(data, *sendcount, *sendtype, recvbuf,
+                             *recvcount, *recvtype, *comm);
 }
 
 void ampi_yield(int *comm, int *ierr) {
