@@ -139,6 +139,7 @@ class CkDDT_DataType {
     CkDDT_Aint baseExtent;
     CkDDT_DataType *baseType;
     int baseIndex;
+    int numElements;
     char name[CkDDT_MAX_NAME_LEN];
     int nameLen;
 
@@ -152,7 +153,8 @@ class CkDDT_DataType {
     CkDDT_DataType(int type);
     CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int count, CkDDT_Aint lb, CkDDT_Aint ub,
             bool iscontig, int baseSize, CkDDT_Aint baseExtent,
-            CkDDT_DataType* baseType, int baseIndex);
+            CkDDT_DataType* baseType, int numElements, int baseIndex);
+    CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
 
     virtual bool isContig(void);
     virtual int getSize(int count=1);
@@ -161,6 +163,7 @@ class CkDDT_DataType {
     virtual CkDDT_Aint getLB(void);
     virtual CkDDT_Aint getUB(void);
     virtual int getType(void);
+    virtual int getNumElements(void);
     virtual void inrRefCount(void) ;
     virtual int getRefCount(void) ;
     virtual void pupType(PUP::er &p, CkDDT* ddt) ;
@@ -572,6 +575,7 @@ class CkDDT {
                  int array_of_integers[], CkDDT_Aint array_of_addresses[], int array_of_datatypes[]);
   void setName(int nIndex, const char *name);
   void getName(int nIndex, char *name, int *len);
+  void createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT_Type *newtype);
   ~CkDDT() ;
 };
 

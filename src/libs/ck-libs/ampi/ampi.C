@@ -4393,6 +4393,14 @@ int AMPI_Type_get_name(MPI_Datatype datatype, char *name, int *resultlen)
 }
 
 CDECL
+int AMPI_Type_create_resized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype)
+{
+  AMPIAPI("AMPI_Type_create_resized");
+  getDDT()->createResized(oldtype, lb, extent, newtype);
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
                int tag, MPI_Comm comm, MPI_Request *request)
 {
@@ -6578,9 +6586,7 @@ CDECL
 int AMPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
   AMPIAPI("AMPI_Get_elements");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
-  int basesize = dttype->getBaseSize() ;
-  if(basesize==0) basesize=dttype->getSize();
-  *count = sts->MPI_LENGTH/basesize;
+  *count = dttype->getNumElements();
   return MPI_SUCCESS;
 }
 

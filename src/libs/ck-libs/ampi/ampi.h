@@ -458,6 +458,8 @@ int AMPI_Type_ub(MPI_Datatype datatype, MPI_Aint* displacement);
 int AMPI_Type_set_name(MPI_Datatype datatype, const char *name);
 #define MPI_Type_get_name AMPI_Type_get_name
 int AMPI_Type_get_name(MPI_Datatype datatype, char *name, int *resultlen);
+#define MPI_Type_create_resized AMPI_Type_create_resized
+int AMPI_Type_create_resized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype);
 #define MPI_Get_address AMPI_Get_address
 int AMPI_Get_address(const void* location, MPI_Aint *address);
 #define MPI_Address AMPI_Address

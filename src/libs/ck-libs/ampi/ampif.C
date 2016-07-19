@@ -52,6 +52,7 @@ FDECL {
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
 /* mpi_type_set_name is defined in ampifimpl.f90, see ampif_type_set_name defined below */
 #define mpi_type_get_name FTN_NAME( MPI_TYPE_GET_NAME , mpi_type_get_name )
+#define mpi_type_create_resized FTN_NAME( MPI_TYPE_CREATE_RESIZED, mpi_type_create_resized )
 #define mpi_get_address FTN_NAME( MPI_GET_ADDRESS , mpi_get_address )
 #define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
 #define mpi_status_set_elements FTN_NAME( MPI_STATUS_SET_ELEMENTS , mpi_status_set_elements )
@@ -655,6 +656,10 @@ void mpi_type_struct(int* count, int* arrBlength, MPI_Aint* arrDisp,
   *ierr = AMPI_Type_struct(*count, arrBlength, arrDisp, oldtype, newtype);
 }
 
+void mpi_type_create_resized(int* oldtype, MPI_Aint* lb, MPI_Aint* extent, int* newtype, int* ierr)
+{
+  *ierr = AMPI_Type_create_resized(*oldtype, *lb, *extent, newtype);
+}
 
 void mpi_type_commit(int *type, int *ierr)
 {
