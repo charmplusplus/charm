@@ -135,7 +135,7 @@ int set_cpu_affinity(unsigned int cpuid) {
 #if CMK_CHARMDEBUG
   char *str;
   cmi_hwloc_bitmap_asprintf(&str, cpuset);
-  CmiPrintf("HWLOC> Bound to cpuset: %s\n", str);
+  CmiPrintf("HWLOC> [%d] Bound to cpu: %d cpuset: %s\n", CmiMyPe(), cpuid, str);
   free(str);
 #endif
 
@@ -152,9 +152,11 @@ int set_thread_affinity(int cpuid) {
   cmi_hwloc_topology_init(&topology);
   // Perform the topology detection.
   cmi_hwloc_topology_load(topology);
+#if 0
   if (CmiMyPe() == 0) {
     show_topology(topology);
   }
+#endif
 
   hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
   cmi_hwloc_bitmap_set(cpuset, cpuid);
@@ -180,7 +182,7 @@ int set_thread_affinity(int cpuid) {
 #if CMK_CHARMDEBUG
   char *str;
   cmi_hwloc_bitmap_asprintf(&str, cpuset);
-  CmiPrintf("HWLOC> Bound to cpuset: %s\n", str);
+  CmiPrintf("HWLOC> [%d] Bound to cpu: %d cpuset: %s\n", CmiMyPe(), cpuid, str);
   free(str);
 #endif
 
@@ -211,6 +213,186 @@ int CmiSetCPUAffinity(int mycore)
   return set_cpu_affinity(core);
   /* print_cpu_affinity(); */
 #endif
+}
+
+extern int CmiMyLocalRank;
+
+int CmiMapHosts(int mylocalrank, int proc_per_host)
+{
+  hwloc_topology_t topology;
+  hwloc_cpuset_t cpuset;
+  hwloc_obj_t obj;
+  int depth, npus_per_socket, npus, nsockets, index, nthreads;
+
+  if (CmiMyLocalRank == -1) {
+      CmiAbort("Error: Default affinity with +processPerHost is not compatible with the launching scheme.");
+  }
+
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
+  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+
+  nthreads = CmiMyNodeSize();
+#if CMK_SMP
+  nthreads += 1;
+#endif
+  index = mylocalrank % proc_per_host;
+  /* now divide the cpuset to proc_per_socket partitions */
+  if (proc_per_host * nthreads <= npus) {
+      int idx = -1;
+      int range = npus / proc_per_host;
+      int pos = index * range + range / nthreads * CmiMyRank();
+      obj = cmi_hwloc_get_obj_by_depth(topology, depth, pos);
+      idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
+      // CmiPrintf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
+      CmiSetCPUAffinity(idx);
+  }
+  else {
+      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
+  }
+  cmi_hwloc_topology_destroy(topology);
+}
+
+int CmiMapSockets(int mylocalrank, int proc_per_socket)
+{
+  hwloc_topology_t topology;
+  hwloc_cpuset_t cpuset;
+  hwloc_obj_t obj;
+  int depth, npus_per_socket_per_pe, npus, nsockets, index, whichsocket, nthreads;
+  int m;
+
+  if (CmiMyLocalRank == -1) {
+      CmiAbort("Error: Default affinity with +processPerSocket is not compatible with the launching scheme.");
+  }
+
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
+  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PACKAGE);
+  nsockets = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+
+  nthreads = CmiMyNodeSize();
+#if CMK_SMP
+  nthreads += 1;
+#endif
+  whichsocket = mylocalrank / proc_per_socket;
+  index = mylocalrank % proc_per_socket;
+  obj = cmi_hwloc_get_obj_by_depth(topology, depth, whichsocket);
+#if 0
+  {
+    char *str;
+    cmi_hwloc_bitmap_asprintf(&str, obj->cpuset);
+    CmiPrintf("HWLOC> [%d] %d %d %d %d cpuset %s\n", CmiMyPe(), mylocalrank, nlocalranks, proc_per_socket, nthreads, str);
+  }
+#endif
+  /* now divide the cpuset to proc_per_socket partitions */
+  npus_per_socket_per_pe = npus / nsockets / proc_per_socket;
+  m = npus_per_socket_per_pe / nthreads;
+  if (m >= 1) {
+      int idx = -1;
+      int i;
+      int pos = index * npus_per_socket_per_pe + m * CmiMyRank();
+      for (i=0; i<=pos; i++)
+      {
+          idx = cmi_hwloc_bitmap_next(obj->cpuset, idx);
+      }
+      // CmiPrintf("[%d:%d] bind to socket: %d pos: %d idx: %d\n", CmiMyPe(), CmiMyRank(), whichsocket, pos, idx);
+      CmiSetCPUAffinity(idx);
+  }
+  else {
+      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
+  }
+  cmi_hwloc_topology_destroy(topology);
+}
+
+int CmiMapCores(int mylocalrank, int proc_per_core)
+{
+  hwloc_topology_t topology;
+  hwloc_cpuset_t cpuset;
+  hwloc_obj_t obj;
+  int depth, ncores, npus, npus_per_core, index, whichcore, nthreads;
+
+  if (CmiMyLocalRank == -1) {
+      CmiAbort("Error: Default affinity with +processPerCore is not compatible with the launching scheme.");
+  }
+
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
+  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
+  ncores = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+
+  nthreads = CmiMyNodeSize();
+#if CMK_SMP
+  nthreads += 1;
+#endif
+  whichcore = mylocalrank / proc_per_core;
+  index = mylocalrank % proc_per_core;
+  obj = cmi_hwloc_get_obj_by_depth(topology, depth, whichcore);
+#if 0
+  {
+    char *str;
+    cmi_hwloc_bitmap_asprintf(&str, obj->cpuset);
+    CmiPrintf("HWLOC> [%d] %d %d %d cpuset %s\n", CmiMyPe(), mylocalrank, nlocalranks, proc_per_core, str);
+  }
+#endif
+  /* now divide the cpuset to proc_per_socket partitions */
+  npus_per_core = npus / ncores;
+  if (npus_per_core / proc_per_core / nthreads >= 1) {
+      int idx = -1;
+      int i;
+      /* pos is relative to the core */
+      int pos = npus_per_core / proc_per_core * index + npus_per_core / proc_per_core / nthreads * CmiMyRank();
+      for (i=0; i<=pos; i++)
+      {
+          idx = cmi_hwloc_bitmap_next(obj->cpuset, idx);
+      }
+      // CmiPrintf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
+      CmiSetCPUAffinity(idx);
+  }
+  else {
+      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
+  }
+}
+
+int CmiMapPUs(int mylocalrank, int proc_per_pu)
+{
+  hwloc_topology_t topology;
+  hwloc_cpuset_t cpuset;
+  hwloc_obj_t obj;
+  int depth, npus_per_socket, npus, nsockets, index, nthreads;
+
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
+  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+
+  nthreads = CmiMyNodeSize();
+#if CMK_SMP
+  nthreads += 1;
+#endif
+  index = mylocalrank;
+  obj = cmi_hwloc_get_obj_by_depth(topology, depth, index);
+#if 0
+  {
+    char *str;
+    cmi_hwloc_bitmap_asprintf(&str, obj->cpuset);
+    CmiPrintf("HWLOC> [%d] %d %d %d cpuset %s\n", CmiMyPe(), mylocalrank, nlocalranks, proc_per_pu, str);
+  }
+#endif
+  /* now divide the cpuset to proc_per_socket partitions */
+  if (proc_per_pu * nthreads == 1) {
+      cpuset = cmi_hwloc_bitmap_alloc();
+      int idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
+      CmiSetCPUAffinity(idx);
+  }
+  else {
+      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
+  }
+  cmi_hwloc_topology_destroy(topology);
 }
 
 /* This implementation assumes the default x86 CPU mask size used by Linux */
@@ -673,6 +855,32 @@ void CmiInitCPUAffinity(char **argv)
 
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
                                                "print cpu affinity");
+
+  /* new style */
+  {
+      char *s;
+      int n = -1;
+      if (s = getenv("CmiProcessPerHost")) {
+          n = atoi(s);
+          CmiMapHosts(CmiMyLocalRank, n);
+      }
+      else if (s =  getenv("CmiProcessPerSocket")) {
+          n = atoi(s);
+          CmiMapSockets(CmiMyLocalRank, n);
+      }
+      else if (s =  getenv("CmiProcessPerCore")) {
+          n = atoi(s);
+          CmiMapCores(CmiMyLocalRank, n);
+      }
+      else if (s =  getenv("CmiProcessPerPU")) {
+          n = atoi(s);
+          CmiMapPUs(CmiMyLocalRank, n);
+      }
+      if (n!=-1) {
+          if (show_affinity_flag) CmiPrintCPUAffinity();
+          return;
+      }
+  }
 
   CmiAssignOnce(&cpuAffinityHandlerIdx, CmiRegisterHandler((CmiHandler)cpuAffinityHandler));
   CmiAssignOnce(&cpuAffinityRecvHandlerIdx, CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler));

@@ -638,6 +638,8 @@ static int    Cmi_newnumnodes = 0;
 int    Cmi_myoldpe = 0;
 #endif
 
+extern int    CmiMyLocalRank;
+
 #if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
 static void parse_forks(void) {
@@ -648,11 +650,13 @@ static void parse_forks(void) {
   forkstr=getenv("CmiMyForks");
   if(forkstr!=0) { /* charmrun */
 	nread = sscanf(forkstr,"%d",&forks);
+        CmiMyLocalRank = 0;
 	for(i=1;i<=forks;i++) { /* by default forks = 0 */ 
 		pid=fork();
 		if(pid<0) CmiAbort("Fork returned an error");
 		if(pid==0) { /* forked process */
 			/* reset mynode,pe & exit loop */
+			CmiMyLocalRank = i;
 			Lrts_myNode+=i;
 #if ! CMK_SMP
                         _Cmi_mype+=i;
@@ -663,6 +667,7 @@ static void parse_forks(void) {
   }
 }
 #endif
+
 static void parse_magic(void)
 {
 	char* nm;	

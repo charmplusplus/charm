@@ -257,6 +257,8 @@ CpvDeclare(int, isHelperOn);
 
 int CmiIsMyNodeIdle(void);
 
+int    CmiMyLocalRank = -1;        /* local rank only for scalable startup */
+
 /*****************************************************************************
  *
  * Command-Line Argument (CLA) parsing routines.
