@@ -147,7 +147,7 @@ class TCharm: public CBase_TCharm
 	//isSelfDone is added for out-of-core emulation in BigSim
 	//when thread is brought back into core, ResumeFromSync is called
 	//so if the thread has finished its stuff, it should not start again
-	bool isStopped, resumeAfterMigration, exitWhenDone, isSelfDone, skipResume;
+	bool isStopped, exitWhenDone, isSelfDone, asyncMigrate;
 	ThreadInfo threadInfo;
 	double timeOffset; //Value to add to CkWallTimer to get my clock
 

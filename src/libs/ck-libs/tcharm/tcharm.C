@@ -187,11 +187,10 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   }
   threadGlobals=CtgCreate(tid);
   CtvAccessOther(tid,_curTCharm)=this;
+  asyncMigrate = false;
   isStopped=true;
-  resumeAfterMigration=false;
 	/* FAULT_EVAC*/
 	AsyncEvacuate(true);
-  skipResume=false;
   exitWhenDone=initMsg->opts.exitWhenDone;
   isSelfDone = false;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
@@ -235,7 +234,7 @@ void TCharm::pup(PUP::er &p) {
   //}
 
   checkPupMismatch(p,5134,"before TCHARM");
-  p(isStopped); p(resumeAfterMigration); p(exitWhenDone); p(isSelfDone); p(skipResume);
+  p(isStopped); p(exitWhenDone); p(isSelfDone); p(asyncMigrate);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
   
@@ -395,9 +394,9 @@ void TCharm::migrateTo(int destPE) {
 	    CkPrintf("Warning> thread migration is not supported!\n");
             return;
         }
+	asyncMigrate = true;
 	// Make sure migrateMe gets called *after* we suspend:
 	thisProxy[thisIndex].migrateDelayed(destPE);
-//	resumeAfterMigration=true;
 	suspend();
 }
 void TCharm::migrateDelayed(int destPE) {
@@ -405,19 +404,14 @@ void TCharm::migrateDelayed(int destPE) {
 }
 void TCharm::ckJustMigrated(void) {
 	ArrayElement::ckJustMigrated();
-	if (resumeAfterMigration) {
-	 	resumeAfterMigration=false;
-		resume(); //Start the thread running
-	}
+    if (asyncMigrate) {
+        asyncMigrate = false;
+        resume();
+    }
 }
 
 void TCharm::ckJustRestored(void) {
-	//CkPrintf("call just restored from TCharm[%d]\n", thisIndex);
 	ArrayElement::ckJustRestored();
-	//if (resumeAfterMigration) {
-	// 	resumeAfterMigration=false;
-	//	resume(); //Start the thread running
-	//}
 }
 
 /*
@@ -427,9 +421,7 @@ void TCharm::ckJustRestored(void) {
 */
 void TCharm::ckAboutToMigrate(void){
 	ArrayElement::ckAboutToMigrate();
-	resumeAfterMigration = true;
 	isStopped = true;
-//	suspend();
 }
 
 // clear the data before restarting from disk
@@ -538,7 +530,6 @@ void TCharm::evacuate(){
 	*/
 	//CkClearAllArrayElementsCPP();
 	if(CkpvAccess(startedEvac)){
-//		resumeAfterMigration=true;
 		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
 		suspend();
 		return;
@@ -552,11 +543,10 @@ void TCharm::async_migrate(void)
 {
 #if CMK_LBDB_ON
   DBG("going to sync at async mode");
-  skipResume = true;		// we resume immediately
   ReadyMigrate(false);
+  asyncMigrate = true;
   AtSync(0);
   schedule();
-//  allow_migrate();
 #else
   DBG("skipping sync, because there is no load balancer");
 #endif
@@ -569,7 +559,6 @@ Note:
 void TCharm::allow_migrate(void)
 {
 #if CMK_LBDB_ON
-//  ReadyMigrate(true);
   int nextPe = MigrateToPe();
   if (nextPe != -1) {
     migrateTo(nextPe);
@@ -582,9 +571,8 @@ void TCharm::allow_migrate(void)
 //Resume from sync: start the thread again
 void TCharm::ResumeFromSync(void)
 {
-  //if(isSelfDone) return;
-  //if (exitWhenDone) return; //for bigsim ooc execution
-  if (!skipResume) start();
+  DBG("thread resuming from sync");
+  start();
 }
 
 
