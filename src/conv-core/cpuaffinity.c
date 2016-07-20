@@ -224,8 +224,8 @@ int CmiMapHosts(int mylocalrank, int proc_per_host)
   hwloc_obj_t obj;
   int depth, npus_per_socket, npus, nsockets, index, nthreads;
 
-  if (CmiMyLocalRank == -1) {
-      CmiAbort("Error: Default affinity with +processPerHost is not compatible with the launching scheme.");
+  if (mylocalrank == -1) {
+      CmiAbort("Error: Default affinity with +processPerHost is not compatible with this launching scheme.");
   }
 
   cmi_hwloc_topology_init(&topology);
@@ -262,7 +262,7 @@ int CmiMapSockets(int mylocalrank, int proc_per_socket)
   int depth, npus_per_socket_per_pe, npus, nsockets, index, whichsocket, nthreads;
   int m;
 
-  if (CmiMyLocalRank == -1) {
+  if (mylocalrank == -1) {
       CmiAbort("Error: Default affinity with +processPerSocket is not compatible with the launching scheme.");
   }
 
@@ -314,7 +314,7 @@ int CmiMapCores(int mylocalrank, int proc_per_core)
   hwloc_obj_t obj;
   int depth, ncores, npus, npus_per_core, index, whichcore, nthreads;
 
-  if (CmiMyLocalRank == -1) {
+  if (mylocalrank == -1) {
       CmiAbort("Error: Default affinity with +processPerCore is not compatible with the launching scheme.");
   }
 
@@ -364,6 +364,10 @@ int CmiMapPUs(int mylocalrank, int proc_per_pu)
   hwloc_cpuset_t cpuset;
   hwloc_obj_t obj;
   int depth, npus_per_socket, npus, nsockets, index, nthreads;
+
+  if (mylocalrank == -1) {
+      CmiAbort("Error: Default affinity with +processPerPU is not compatible with the launching scheme.");
+  }
 
   cmi_hwloc_topology_init(&topology);
   cmi_hwloc_topology_load(topology);
