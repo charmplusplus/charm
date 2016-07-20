@@ -1,0 +1,98 @@
+\section{Zero Copy Message Send API}
+
+\label{nocopyapi}
+Apart from using messages, \charmpp{} also provides a zero copy message send
+API to avoid copies for entry method invocations which use parameter marshalling
+instead of messages. This makes use of onesided communication by using the
+underlying Remote Direct Memory Access (RDMA) enabled network.
+For large arrays (few 100 KBs or more), the cost of copying during marshalling
+the message can be quite high. Using this API can help not only save
+the expensive copy operation but also reduce the application's memory footprint
+by avoiding data duplication. Saving these costs for large arrays proves
+to be a significant optimization in achieving faster message send times.
+On the other hand, using the zero copy message send API for small arrays can lead
+to a drop in performance due to the overhead associated with onesided communication.
+
+\vspace{0.1in}
+\noindent
+To send an array using the zero copy message send API, specify the array parameter
+in the .ci file with the rdma specifier.
+
+\begin{alltt}
+entry void foo (int size, rdma int arr[size]);
+\end{alltt}
+
+While calling the entry method from the .C file, wrap the array i.e the
+pointer in an rdma wrapper.
+
+\begin{alltt}
+arrayProxy[0].foo(500000, rdma(arrPtr));
+\end{alltt}
+
+Until the RDMA operation is completed, it is not safe to modify the buffer.
+To be notified on completion of the RDMA operation, pass an optional callback object
+in the rdma wrapper associated with the specific rdma array.
+
+\begin{alltt}
+CkCallback cb(CkIndex_Foo::rdmaSent(NULL), thisProxy[thisIndex]);
+arrayProxy[0].foo(500000, rdma(arrPtr, cb));
+\end{alltt}
+
+The callback will be invoked on completion of the RDMA operation associated with the
+corresponding array. Inside the callback, it is safe to overwrite the buffer sent
+via the zero copy API and this buffer can be accessed by dereferencing the CkDataMsg
+received in the callback. It should be noted that the received CkDataMsg should not be
+deallocated by the user as it belongs to the Charm++ Runtime. It will be deallocated
+by the runtime after the execution of the entry method.
+
+\begin{alltt}
+//called when RDMA operation is completed
+void rdmaSent(CkDataMsg *m)
+\{
+  //get access to the pointer and free the allocated buffer
+  //do not free the CkDataMsg as it belongs to Charm++ Runtime
+  void *ptr = *((void **)(m->data));
+  free(ptr);
+\}
+\end{alltt}
+
+The RDMA call is associated with an rdma array rather than the entry method.
+In the case of sending multiple rdma arrays, each RDMA call is independent of the other.
+Hence, the callback applies to only the array it is attached to and not to all the rdma
+arrays passed in an entry method invocation. On completion of the RDMA call for each
+array, the corresponding callback is separately invoked.
+
+As an example, for an entry method with two rdma array parameters, each called with the same
+callback, the callback will be invoked twice : on completing the transfer of each of the two
+RDMA parameters.
+
+\vspace{0.1in}
+\noindent
+For multiple arrays to be sent via RDMA, declare the entry method in the .ci file as:
+
+\begin{alltt}
+entry void foo (int size1, rdma int arr1[size1], int size2, rdma double arr2[size2]);
+\end{alltt}
+
+In the .C file, it is also possible to have different callbacks associated with each rdma array.
+\begin{alltt}
+CkCallback cb1(CkIndex_Foo::rdmaSent1(NULL), thisProxy[thisIndex]);
+CkCallback cb2(CkIndex_Foo::rdmaSent2(NULL), thisProxy[thisIndex]);
+arrayProxy[0].foo(500000, rdma(arrPtr1, cb1), 1024000, rdma(arrPtr2, cb2));
+\end{alltt}
+
+This API is demonstrated in \examplerefdir{rdma} and \testrefdir{pingpong}
+
+\vspace{0.1in}
+\noindent
+It should be noted that calls to entry methods with rdma specified parameters are
+currently only supported for point to point operations and not for collective operations.
+Additionally, there is also no support for migration of chares that have pending RDMA transfer
+requests.
+
+\vspace{0.1in}
+\noindent
+It should also be noted that the benefit of this API can be seen for large arrays on
+only RDMA enabled networks. On networks which do not support RDMA, the API is functional
+but doesn't show any performance benefit as it behaves like a regular entry method that
+copies its arguments.

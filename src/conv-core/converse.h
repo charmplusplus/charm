@@ -2007,6 +2007,8 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "conv-onesided.h"
 #endif
 
+#include "conv-rdma.h"
+
 /* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
 extern int _BgOutOfCoreFlag;
 extern int _BgInOutOfCoreMode;

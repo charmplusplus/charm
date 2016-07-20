@@ -214,7 +214,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
       blue.h blue-conv.h bgconverse.h cmipool.h mempool.h cmiqueue.h \
-      cmidirect.h cmidirectmanytomany.h cmitls.h lrtslock.h
+      cmidirect.h cmidirectmanytomany.h cmitls.h lrtslock.h conv-rdma.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -229,7 +229,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
+	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdmawrapper.h ckrdma.h\
           ckmessagelogging.h ckcausalmlog.h ckobjid.h\
 	  ckobjQ.h readonly.h \
           $(UTILHEADERS) \
@@ -607,7 +607,7 @@ CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o cktaskQ.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
-	   cklocation.o ckmulticast.o ckarray.o ckreduction.o \
+	   cklocation.o ckmulticast.o ckarray.o ckreduction.o ckrdma.o\
            tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o ckobjQ.o \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o ckobjid.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \

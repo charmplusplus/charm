@@ -367,14 +367,22 @@ void Entry::genChareDefs(XStr& str)
       str << syncPostCall(); 
     } else {//Regular, non-sync message
       str << "  if (ckIsDelegated()) {\n";
-      str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
-      str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend(ckDelegatedPtr(),"<<params<<",destPE);\n";
-      str << "  }\n";
+      if (param->hasRdma()) {
+        str << "  CkAbort(\"Entry methods with rdma parameters not supported when called with delegation managers\");\n";
+      } else {
+        str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
+        str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend(ckDelegatedPtr(),"<<params<<",destPE);\n";
+      }
+      str << "  } else {\n";
       XStr opts;
       opts << ",0";
       if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
       if (isInline())  opts << "+CK_MSG_INLINE";
-      str << "  else CkSendMsg("<<params<<opts<<");\n";
+      if (param->hasRdma()){
+        opts << "+CK_MSG_RDMA";
+      }
+      str << "    CkSendMsg("<<params<<opts<<");\n";
+      str << "  }\n";
     }
     str << "}\n";
   }
@@ -452,87 +460,97 @@ void Entry::genArrayDefs(XStr& str)
       str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1,0)<<") \n";
     else
       str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
-    str << "{\n  ckCheck();\n";
-    XStr inlineCall;
-    if (!isNoTrace())
-      inlineCall << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
-    		 << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
-    if(isAppWork())
-      inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
-    inlineCall << "#if CMK_LBDB_ON\n"
-               << "    LDObjHandle objHandle;\n"
-               << "    int objstopped=0;\n"
-               << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
-               << "#endif\n";
-    inlineCall <<
-      "#if CMK_CHARMDEBUG\n"
-      "    CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
-      "#endif\n";
-    inlineCall << "    ";
-    if (!retType->isVoid())
-      inlineCall << retType << " retValue = ";
-    inlineCall << "obj->" << name << "(";
-    param->unmarshall(inlineCall);
-    inlineCall << ");\n";
-    inlineCall <<
-      "#if CMK_CHARMDEBUG\n"
-      "    CpdAfterEp("<<epIdx()<<");\n"
-      "#endif\n";
-    inlineCall << "#if CMK_LBDB_ON\n    obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
-    if(isAppWork())
-      inlineCall << "    _TRACE_END_APPWORK();\n";
-    if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
-    if (!retType->isVoid()) {
-      inlineCall << "    return retValue;\n";
-    } else {
-      inlineCall << "    return;\n";
+    str << "{\n";
+    //regular broadcast and section broadcast for an entry method with rdma
+    if (param->hasRdma() && !container->isForElement()) {
+      str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
     }
+    else{
+      str << "  ckCheck();\n";
+      XStr inlineCall;
+      if (!isNoTrace())
+        inlineCall << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
+           << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
+      if(isAppWork())
+        inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
+      inlineCall << "#if CMK_LBDB_ON\n"
+                 << "    LDObjHandle objHandle;\n"
+                 << "    int objstopped=0;\n"
+                 << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
+                 << "#endif\n";
+      inlineCall <<
+        "#if CMK_CHARMDEBUG\n"
+        "    CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
+        "#endif\n";
+      inlineCall << "    ";
+      if (!retType->isVoid())
+        inlineCall << retType << " retValue = ";
+      inlineCall << "obj->" << name << "(";
+      param->unmarshall(inlineCall);
+      inlineCall << ");\n";
+      inlineCall <<
+        "#if CMK_CHARMDEBUG\n"
+        "    CpdAfterEp("<<epIdx()<<");\n"
+        "#endif\n";
+      inlineCall << "#if CMK_LBDB_ON\n    obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
+      if(isAppWork())
+        inlineCall << "    _TRACE_END_APPWORK();\n";
+      if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
+      if (!retType->isVoid()) {
+        inlineCall << "    return retValue;\n";
+      } else {
+        inlineCall << "    return;\n";
+      }
 
-    XStr prepareMsg;
-    prepareMsg << marshallMsg();
-    prepareMsg << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
-    prepareMsg << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
-    prepareMsg << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
+      XStr prepareMsg;
+      prepareMsg << marshallMsg();
+      prepareMsg << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
+      prepareMsg << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
+      prepareMsg << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
 
-    if (!isLocal()) {
-      if (isInline() && container->isForElement()) {
+      if (!isLocal()) {
+        if (isInline() && container->isForElement()) {
 	str << "  " << container->baseName() << " *obj = ckLocal();\n";
 	str << "  if (obj) {\n"
 	    << inlineCall
 	    << "  }\n";
       }
       str << prepareMsg;
-    } else {
-      str << "  "<< container->baseName() << " *obj = ckLocal();\n";
-      str << "#if CMK_ERROR_CHECKING\n";
-      str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
-      str << "#endif\n";
-      str << inlineCall;
-    }
-    if(isIget()) {
-	    str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg,"<<epIdx()<<",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"<<"\n";
-    }
+      } else {
+        str << "  "<< container->baseName() << " *obj = ckLocal();\n";
+        str << "#if CMK_ERROR_CHECKING\n";
+        str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
+        str << "#endif\n";
+        str << inlineCall;
+      }
+      if(isIget()) {
+        str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg,"<<epIdx()<<",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"<<"\n";
+      }
 
-    if(isSync()) {
-      str << syncPreCall() << "ckSendSync(impl_amsg, "<<epIdx()<<");\n";
-      str << syncPostCall(); 
-    }
-    else if (!isLocal())
-    {
-      XStr opts;
-      opts << ",0";
-      if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
-      if (isInline())  opts << "+CK_MSG_INLINE";
-      if(!isIget()) {
-      if (container->isForElement() || container->isForSection()) {
-        str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
+      if(isSync()) {
+        str << syncPreCall() << "ckSendSync(impl_amsg, "<<epIdx()<<");\n";
+        str << syncPostCall(); 
       }
-      else
-        str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";
+      else if (!isLocal())
+      {
+        XStr opts;
+        opts << ",0";
+        if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
+        if (isInline())  opts << "+CK_MSG_INLINE";
+        if(!isIget()) {
+        if (container->isForElement() || container->isForSection()) {
+          if(param->hasRdma()){
+            opts << "+CK_MSG_RDMA";
+          }
+          str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
+        }
+        else
+          str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";
+        }
       }
-    }
-    if(isIget()) {
-	    str << "  return f;\n";
+      if(isIget()) {
+        str << "  return f;\n";
+      }
     }
     str << "}\n";
   }
@@ -700,17 +718,23 @@ void Entry::genGroupDefs(XStr& str)
     else
       msgTypeStr<<paramType(0,1);
     str << makeDecl(retStr,1)<<"::"<<name<<"("<<msgTypeStr<<")\n";
-    str << "{\n  ckCheck();\n";
-    if (!isLocal()) str <<marshallMsg();
+    str << "{\n";
+    //regular broadcast and section broadcast for an entry method with rdma
+    if (param->hasRdma() && !container->isForElement()) {
+      str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
+    }
+    else{
+      str << "  ckCheck();\n";
+      if (!isLocal()) str <<marshallMsg();
 
-    if (isLocal()) {
-      XStr unmarshallStr; param->unmarshall(unmarshallStr);
-      str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
-      str << "  CkAssert(obj);\n";
-      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL, NULL);\n";
-      if(isAppWork())
+      if (isLocal()) {
+        XStr unmarshallStr; param->unmarshall(unmarshallStr);
+        str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
+        str << "  CkAssert(obj);\n";
+        if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL, NULL);\n";
+        if(isAppWork())
 	str << " _TRACE_BEGIN_APPWORK();\n";
-      str <<
+        str <<
 	"#if CMK_LBDB_ON\n"
 	"  // if there is a running obj being measured, stop it temporarily\n"
 	"  LDObjHandle objHandle;\n"
@@ -721,52 +745,62 @@ void Entry::genGroupDefs(XStr& str)
 	"    the_lbdb->ObjectStop(objHandle);\n"
 	"  }\n"
 	"#endif\n";
-      str <<
+        str <<
 	"#if CMK_CHARMDEBUG\n"
 	"  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
 	"#endif\n  ";
-      if (!retType->isVoid()) str << retType << " retValue = ";
-      str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str << "#if CMK_CHARMDEBUG\n"
+        if (!retType->isVoid()) str << retType << " retValue = ";
+        str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
+        str << "#if CMK_CHARMDEBUG\n"
 	"  CpdAfterEp("<<epIdx()<<");\n"
 	"#endif\n";
-      str << "#if CMK_LBDB_ON\n"
+        str << "#if CMK_LBDB_ON\n"
 	"  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
 	"#endif\n";
-      if(isAppWork())
+        if(isAppWork())
 	str << " _TRACE_END_APPWORK();\n";
-      if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
-      if (!retType->isVoid()) str << "  return retValue;\n";
-    } else if(isSync()) {
-      str << syncPreCall() <<
-        "CkRemote"<<node<<"BranchCall("<<paramg<<", ckGetGroupPe());\n";
-      str << syncPostCall();
-    } else { // Non-sync, non-local entry method
-      if (forElement)
-      {// Send
-        str << "  if (ckIsDelegated()) {\n";
-        str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-        str << "     ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
-        str << "  } else CkSendMsg"<<node<<"Branch"<<"("<<parampg<<opts<<");\n";
-      }
-      else if (container->isForSection())
-      {// Multicast
-        str << "  if (ckIsDelegated()) {\n";
-        str << "     ckDelegatedTo()->"<<node<<"GroupSectionSend(ckDelegatedPtr(),"<<params<<", ckGetNumSections(), ckGetSectionIDs());\n";
-        str << "  } else {\n";
-        str << "    void *impl_msg_tmp;\n";
-        str << "    for (int i=0; i<ckGetNumSections(); ++i) {\n";
-        str << "       impl_msg_tmp= (i<ckGetNumSections()-1) ? CkCopyMsg((void **) &impl_msg):impl_msg;\n";
-        str << "       CkSendMsg"<<node<<"BranchMulti("<<epIdx()<<", impl_msg_tmp, ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"<<opts<<");\n";
-        str << "    }\n";
-        str << "  }\n";
-      }
-      else
-      {// Broadcast
-        str << "  if (ckIsDelegated()) {\n";
-        str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-        str << "     ckDelegatedTo()->"<<node<<"GroupBroadcast(ckDelegatedPtr(),"<<paramg<<");\n";
-        str << "  } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<opts<<");\n";
+        if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
+        if (!retType->isVoid()) str << "  return retValue;\n";
+      } else if(isSync()) {
+        str << syncPreCall() <<
+          "CkRemote"<<node<<"BranchCall("<<paramg<<", ckGetGroupPe());\n";
+        str << syncPostCall();
+      } else { // Non-sync, non-local entry method
+        if (forElement)
+        {// Send
+          str << "  if (ckIsDelegated()) {\n";
+          if (param->hasRdma()) {
+            str << "    CkAbort(\"Entry methods with rdma parameters not supported when called with delegation managers\");\n";
+          } else {
+            str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
+            str << "     ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
+          }
+          str << "  } else {\n";
+          if (param->hasRdma()){
+            opts << "+CK_MSG_RDMA";
+          }
+          str << "    CkSendMsg"<<node<<"Branch"<<"("<<parampg<<opts<<");\n";
+          str << "  }\n";
+        }
+        else if (container->isForSection())
+        {// Multicast
+          str << "  if (ckIsDelegated()) {\n";
+          str << "     ckDelegatedTo()->"<<node<<"GroupSectionSend(ckDelegatedPtr(),"<<params<<", ckGetNumSections(), ckGetSectionIDs());\n";
+          str << "  } else {\n";
+          str << "    void *impl_msg_tmp;\n";
+          str << "    for (int i=0; i<ckGetNumSections(); ++i) {\n";
+          str << "       impl_msg_tmp= (i<ckGetNumSections()-1) ? CkCopyMsg((void **) &impl_msg):impl_msg;\n";
+          str << "       CkSendMsg"<<node<<"BranchMulti("<<epIdx()<<", impl_msg_tmp, ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"<<opts<<");\n";
+          str << "    }\n";
+          str << "  }\n";
+        }
+        else
+        {// Broadcast
+          str << "  if (ckIsDelegated()) {\n";
+          str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
+          str << "     ckDelegatedTo()->"<<node<<"GroupBroadcast(ckDelegatedPtr(),"<<paramg<<");\n";
+          str << "  } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<opts<<");\n";
+        }
       }
     }
     str << "}\n";
@@ -774,12 +808,20 @@ void Entry::genGroupDefs(XStr& str)
     // entry method on multiple PEs declaration
     if(!forElement && !container->isForSection() && !isSync() && !isLocal() && !container->isNodeGroup()) {
       str << ""<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(0)<<") {\n";
-      str << marshallMsg();
-      str << "  CkSendMsg"<<node<<"BranchMulti("<<paramg<<", npes, pes"<<opts<<");\n";
+      if (param->hasRdma()) {
+        str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
+      } else {
+        str << marshallMsg();
+        str << "  CkSendMsg"<<node<<"BranchMulti("<<paramg<<", npes, pes"<<opts<<");\n";
+      }
       str << "}\n";
       str << ""<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"CmiGroup &grp"<<eo(0)<<") {\n";
-      str << marshallMsg();
-      str << "  CkSendMsg"<<node<<"BranchGroup("<<paramg<<", grp"<<opts<<");\n";
+      if (param->hasRdma()) {
+        str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
+      } else {
+        str << marshallMsg();
+        str << "  CkSendMsg"<<node<<"BranchGroup("<<paramg<<", grp"<<opts<<");\n";
+      }
       str << "}\n";
     }
   }
@@ -1082,7 +1124,6 @@ void Entry::genPythonStaticDocs(XStr& str) {
     str <<"\"\\\\n\"";
   }
 }
-
 
 /******************* Accelerator (Accel) Entry Point Code ********************/
 
@@ -1864,12 +1905,12 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     if ((sv->isMessage() != 1) && (sv->isVoid() != 1)) {
        structure << sv->type << " ";
        getter << sv->type << " ";
-       if (sv->isArray() != 0) {
+       if (sv->isArray() != 0 || sv->isRdma() != 0) {
          structure << "*";
          getter << "*";
        }
 
-       if (sv->isArray() != 0) {
+       if (sv->isArray() != 0 || sv->isRdma() != 0) {
          hasArray = hasArray || true;
        } else {
          toPup << "        " << "__p | " << sv->name << ";\n";

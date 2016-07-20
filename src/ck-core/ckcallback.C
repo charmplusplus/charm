@@ -38,6 +38,9 @@ public:
 	void call(CkCallback &c,CkMarshalledMessage &msg) {
 		c.send(msg.getMessage());
 	}
+	void call(CkCallback &c, int length, const char *data) {
+		c.send(CkDataMsg::buildNew(length,data));
+	}
 };
 
 /*************** CkCallback implementation ***************/

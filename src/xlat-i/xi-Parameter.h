@@ -11,6 +11,7 @@ class Value;
 
 /**************** Parameter types & lists (for marshalling) ************/
 class Parameter {
+    bool rdma;
  public:
     Type *type;
     const char *name; /*The name of the variable, if any*/
@@ -31,12 +32,24 @@ class Parameter {
 
     friend class ParamList;
     void pup(XStr &str);
+    void pupArray(XStr &str);
+    void pupRdma(XStr &str, bool genRdma);
     void copyPtr(XStr &str);
-    void marshallArraySizes(XStr &str);
+    void check();
+    void checkPointer(Type *dt);
+    void marshallArraySizes(XStr &str,Type *dt);
+    void marshallRegArraySizes(XStr &str);
+    void marshallRdmaParameters(XStr &str, bool genRdma);
     void marshallArrayData(XStr &str);
+    void marshallRdmaArrayData(XStr &str);
     void beginUnmarshall(XStr &str);
+    void beginUnmarshallArray(XStr &str);
+    void beginUnmarshallRdma(XStr &str, bool genRdma);
+    void beginUnmarshallSDAGRdma(XStr &str);
     void beginUnmarshallSDAGCall(XStr &str);
     void unmarshallArrayData(XStr &str);
+    void unmarshallRegArrayData(XStr &str);
+    void unmarshallRdmaArrayData(XStr &str, bool genRegArray);
     void unmarshallArrayDataSDAG(XStr &str);
     void unmarshallArrayDataSDAGCall(XStr &str);
     void pupAllValues(XStr &str);
@@ -46,6 +59,7 @@ class Parameter {
     Parameter(int Nline,Type *Ntype,const char *Nname=0,
     	const char *NarrLen=0,Value *Nvalue=0);
     void setConditional(int c);
+    void setRdma(bool r);
     void print(XStr &str,int withDefaultValues=0,int useConst=1);
     void printAddress(XStr &str);
     void printValue(XStr &str);
@@ -54,6 +68,7 @@ class Parameter {
     int isCkArgMsgPtr(void) const;
     int isCkMigMsgPtr(void) const;
     int isArray(void) const;
+    int isRdma(void) const;
     int isConditional(void) const;
     Type *getType(void) {return type;}
     const char *getArrayLen(void) const {return arrLen;}
@@ -83,7 +98,10 @@ class ParamList {
     typedef int (Parameter::*pred_t)(void) const;
     int orEach(pred_t f);
     typedef void (Parameter::*fn_t)(XStr &str);
+    typedef void (Parameter::*rdmafn_t)(XStr &str, bool genRegArray);
     void callEach(fn_t f,XStr &str);
+    void callEach(rdmafn_t f,XStr &str,bool genRegArray);
+    void encloseFlag(XStr &str);
     bool manyPointers;
 
   public:
@@ -106,6 +124,7 @@ class ParamList {
     bool isConst(void) const;
     int isVoid(void) const;
     int isPointer(void) const;
+    int hasRdma(void);
     const char *getGivenName(void) const;
     void setGivenName(const char* s);
     const char *getName(void) const;

@@ -181,6 +181,7 @@ namespace ck {
       UChar queueing:4; ///< Queueing strategy (FIFO, LIFO, PFIFO, ...)
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
+      UChar isRdma:1;   ///< True if msg has Rdma parameters
     };
 
   }
@@ -287,7 +288,9 @@ public:
     }
 
     UChar  isPacked(void) const { return attribs.isPacked; }
+    UChar  isRdma(void) const { return attribs.isRdma; }
     void   setPacked(const UChar p) { attribs.isPacked = p; }
+    void   setRdma(const UChar b) { attribs.isRdma = b; }
     UShort getPriobits(void) const { return priobits; }
     void   setPriobits(const UShort p) { priobits = p; }
     UShort getPrioWords(void) const { return CkPriobitsToInts(priobits); }
@@ -316,6 +319,7 @@ public:
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
+      env->setRdma(0);
       env->type.group.dep.setZero();
       _SET_USED(env, 0);
       env->setRef(0);

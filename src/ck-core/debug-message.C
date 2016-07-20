@@ -103,6 +103,9 @@ void envelope::pup(PUP::er &p) {
         if (!p.isUnpacking()) d = attribs.isUsed;
         p|d;
         if (p.isUnpacking()) attribs.isUsed = d; 
+        if (!p.isUnpacking()) d = attribs.isRdma;
+        p|d;
+        if (p.isUnpacking()) attribs.isRdma = d;
 	p(epIdx);
 	p(pe);
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED

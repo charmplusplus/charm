@@ -1183,6 +1183,25 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 
   MESSAGE_PHASE_CHECK(env);
 
+#if CMK_ONESIDED_IMPL
+  if(env->isRdma()){
+    //Receiver copies the buffer from the sender when they share
+    //the address space
+    if(CmiNodeOf(env->getSrcPe())==CmiMyNode()){
+      envelope *prevEnv = env;
+      env = CkRdmaCopyMsg(prevEnv);
+      CkFreeMsg(EnvToUsr(prevEnv));
+    }
+    //Receiver issues Rdma Get calls to fetch data over network
+    else{
+      CkRdmaIssueRgets(env);
+      //return because the new message with the rdma buffer is again passed
+      //to the process handler after the Rdma Get call completion
+      return;
+    }
+  }
+#endif
+
 //#if CMK_RECORD_REPLAY
   if (ck->watcher!=NULL) {
     if (!ck->watcher->processMessage(&env,ck)) return;
@@ -1379,6 +1398,14 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     return;
   }
 #endif
+
+#if CMK_ONESIDED_IMPL
+  if(env->isRdma()){
+    CkRdmaPrepareMsg(&env, pe);
+    //CkPrintf("[%d] _skipCldEnqueue metadata-msg: %d \n", CkMyPe(), env->getTotalsize());
+  }
+#endif
+
   if(pe == CkMyPe() ){
     if(!CmiNodeAlive(CkMyPe())){
 	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
@@ -1477,6 +1504,14 @@ static void _noCldEnqueue(int pe, envelope *env)
     return;
   }
 #endif
+
+#if CMK_ONESIDED_IMPL
+  if(env->isRdma()){
+    CkRdmaPrepareMsg(&env, pe);
+    //CkPrintf("[%d] _noCldEnqueue metadata-msg: %d \n", CkMyPe(), env->getTotalsize());
+  }
+#endif
+
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
@@ -1497,6 +1532,13 @@ void _noCldNodeEnqueue(int node, envelope *env)
   if (!ConverseDeliver(node)) {
     CmiFree(env);
     return;
+  }
+#endif
+
+#if CMK_ONESIDED_IMPL
+  if(env->isRdma()){
+    CkRdmaPrepareMsg(&env, CmiNodeFirst(node));
+    //CkPrintf("[%d] noCldEnqueue metadata-msg: %d \n", CkMyPe(), env->getTotalsize());
   }
 #endif
   CkPackMessage(&env);
@@ -1610,12 +1652,13 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
     CkSendMsgInline(entryIdx, msg, pCid, opts);
     return;
   }
+  envelope *env = UsrToEnv(msg);
 #if CMK_ERROR_CHECKING
-  if (opts & CK_MSG_IMMEDIATE) {
+  //Allow rdma metadata messages marked as immediate to go through
+  if (opts & CK_MSG_IMMEDIATE && !env->isRdma()) {
     CmiAbort("Immediate message is not allowed in Chare!");
   }
 #endif
-  envelope *env = UsrToEnv(msg);
   int destPE=_prepareMsg(entryIdx,msg,pCid);
   // Before it traced the creation only if destPE!=-1 (i.e it did not when the
   // VidBlock was not yet filled). The problem is that the creation was never
@@ -1798,7 +1841,9 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
     CkSendMsgBranchInline(eIdx, msg, pe, gID, opts);
     return;
   }
-  if (opts & CK_MSG_IMMEDIATE) {
+  envelope *env=UsrToEnv(msg);
+  //Allow rdma metadata messages marked as immediate to go through
+  if (opts & CK_MSG_IMMEDIATE && !env->isRdma()) {
     CkSendMsgBranchImmediate(eIdx,msg,pe,gID);
     return;
   }

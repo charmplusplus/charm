@@ -111,6 +111,7 @@ struct rwentry rwtable[] = {
 {  "immediate",  IMMEDIATE },
 {  "expedited",  SKIPSCHED },
 {  "aggregate", AGGREGATE },
+{  "rdma",  RDMA },
 {  "inline",  	INLINE },
 {  "local",      LOCAL },
 {  "virtual",    VIRTUAL },

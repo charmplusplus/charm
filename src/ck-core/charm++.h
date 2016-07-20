@@ -169,6 +169,10 @@ public:
 
 #include "ckcallback.h"
 
+#include "ckrdmawrapper.h"
+
+#include "ckrdma.h"
+
 /********************* Superclass of all Chares ******************/
 #if CMK_MULTIPLE_DELETE
 #define CHARM_INPLACE_NEW \
@@ -1054,7 +1058,7 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "trace.h"
 #include "envelope.h"
 #include "pathHistory.h"
-
+#include "ckcallback-ccs.h"
 
 
 

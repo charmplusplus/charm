@@ -227,6 +227,9 @@ class PingG : public CBase_PingG
   bool copyFragments; 
   bool allocateMsgs; 
   int pipeSize; 
+
+  // for recv_rdma having an rdma parameter
+  char *rdmaMsg;
 public:
   PingG()
   {
@@ -236,6 +239,10 @@ public:
     niter = 0;
     numFragmentsReceived = 0; 
     numFragmentsTotal = -1; 
+
+    // Unlike other entry methods, the entry method with the rdma parameter
+    // uses a character buffer
+    rdmaMsg = new char[payload];
   }
   PingG(CkMigrateMessage *m) {}
   void start(bool reportTime, bool isPipelined, bool copy, bool allocate, int fragSize)
@@ -285,13 +292,34 @@ public:
           CkPrintf("Roundtrip time for Groups is %lf us\n",
                    1.0e6*(end_time-start_time)/titer);
         }
-        delete msg;
-        mainProxy.maindone();
+        start_time = CkWallTimer();
+        (*pp).recv_rdma(rdma(rdmaMsg), payload);
       } else {
         (*pp).recv(msg);
       }
     } else {
       (*pp).recv(msg);
+    }
+  }
+
+  void recv_rdma(char *msg, int size)
+  {
+    if(me==0) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        int titer = (CkNumPes()==1)?(iterations/2) : iterations;
+        if (printResult) {
+          CkPrintf("Roundtrip time for Groups (rdma zero copy message send api) is %lf us\n",
+                   1.0e6*(end_time-start_time)/titer);
+        }
+        niter = 0;
+        mainProxy.maindone();
+      } else {
+        (*pp).recv_rdma(rdma(rdmaMsg), size);
+      }
+    } else {
+      (*pp).recv_rdma(rdma(rdmaMsg), size);
     }
   }
 
@@ -430,6 +458,9 @@ class PingN : public CBase_PingN
   char *sbuff;
 #endif
   double start_time, end_time;
+
+  // for recv_rdma having an rdma parameter
+  char *rdmaMsg;
 public:
   PingN()
   {
@@ -441,6 +472,10 @@ public:
     // calculation.
 
     niter = 0;
+
+    // Unlike other entry methods, the entry method with the rdma parameter
+    // uses a character buffer
+    rdmaMsg = new char[payload];
 #ifdef USE_RDMA 
     rbuff=(char *) malloc(payload*sizeof(char));
     sbuff=(char *) malloc(payload*sizeof(char));
@@ -491,13 +526,36 @@ public:
           CkPrintf("Roundtrip time for NodeGroups is %lf us\n",
                    1.0e6*(end_time-start_time)/titer);
         }
-        delete msg;
-        mainProxy.maindone();
+        niter = 0;
+        start_time = CkWallTimer();
+        thisProxy[nbr].recv_rdma(rdma(rdmaMsg), payload);
       } else {
         thisProxy[nbr].recv(msg);
       }
     } else {
       thisProxy[nbr].recv(msg);
+    }
+  }
+
+  void recv_rdma(char *msg, int size)
+  {
+    if(me==0) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        int titer = (CkNumNodes()==1)?(iterations/2) : iterations;
+        if (printResult) {
+          CkPrintf("Roundtrip time for NodeGroups (rdma zero copy message send api) is %lf us\n",
+                   1.0e6*(end_time-start_time)/titer);
+          delete[] rdmaMsg;
+        }
+        niter=0;
+        mainProxy.maindone();
+      } else {
+        thisProxy[nbr].recv_rdma(rdma(rdmaMsg), size);
+      }
+    } else {
+      thisProxy[nbr].recv_rdma(rdma(rdmaMsg), size);
     }
   }
   static void Wrapper_To_CallBack(void* pt2Object){
@@ -552,10 +610,17 @@ class Ping1 : public CBase_Ping1
   CProxy_Ping1 *pp;
   int niter;
   double start_time, end_time;
+
+  // for recv_rdma having an rdma parameter
+  char *rdmaMsg;
 public:
   Ping1()
   {
     pp = new CProxy_Ping1(thisArrayID);
+
+    // Unlike other entry methods, the entry method with the rdma parameter
+    // uses a character buffer
+    rdmaMsg = new char[payload];
     niter = 0;
   }
   Ping1(CkMigrateMessage *m) {}
@@ -587,6 +652,7 @@ public:
       (*pp)[0].recv(msg);
     }
   }
+
   void trecv(PingMsg *msg)
   {
     if(thisIndex==0) {
@@ -597,8 +663,9 @@ public:
           CkPrintf("Roundtrip time for 1D threaded Arrays is %lf us\n",
                    1.0e6*(end_time-start_time)/iterations);
         }
-        niter = 0; 
-        mainProxy.maindone();
+        niter = 0;
+        start_time = CkWallTimer();
+        (*pp)[1].recv_rdma(rdma(rdmaMsg), payload);
       } else {
         (*pp)[1].trecv(msg);
       }
@@ -606,6 +673,29 @@ public:
       (*pp)[0].trecv(msg);
     }
   }
+
+  void recv_rdma(char* msg, int size)
+  {
+    if(thisIndex==0) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        if (printResult) {
+          CkPrintf("Roundtrip time for 1D Arrays (rdma zero copy message send api) is %lf us\n",
+                   1.0e6*(end_time-start_time)/iterations);
+          delete[] rdmaMsg;
+        }
+        niter=0;
+        mainProxy.maindone();
+      } else {
+        thisProxy[1].recv_rdma(rdma(rdmaMsg), size);
+      }
+    } else {
+      thisProxy[0].recv_rdma(rdma(rdmaMsg), size);
+    }
+  }
+
+
 };
 
 class Ping2 : public CBase_Ping2
@@ -739,10 +829,17 @@ class PingC : public CBase_PingC
   int niter;
   double start_time, end_time;
   int first;
+
+  // for recv_rdma having an rdma parameter
+  char *rdmaMsg;
  public:
   PingC(void)
   {
     first = 0;
+
+    // Unlike other entry methods, the entry method with the rdma parameter
+    // uses a character buffer
+    rdmaMsg = new char[payload];
   }
   PingC(IdMsg *msg)
   {
@@ -750,6 +847,9 @@ class PingC : public CBase_PingC
     CProxy_PingC pc(msg->cid);
     msg->cid = thishandle;
     pc.exchange(msg);
+
+    // Allocate on the other chare
+    rdmaMsg = new char[payload];
   }
   PingC(CkMigrateMessage *m) {}
   void start(bool reportTime)
@@ -813,6 +913,7 @@ class PingC : public CBase_PingC
       pp->recv(new (payload) PingMsg);
     }
   }
+
   void trecv(PingMsg *msg)
   {
     if(first) {
@@ -824,12 +925,35 @@ class PingC : public CBase_PingC
                    1.0e6*(end_time-start_time)/iterations);
         }
 	delete msg;
-        mainProxy.maindone();
+        niter = 0;
+        start_time = CkWallTimer();
+        pp->recv_rdma(rdma(rdmaMsg), payload);
       } else {
         pp->trecv(msg);
       }
     } else {
       pp->trecv(msg);
+    }
+  }
+
+  void recv_rdma(char *msg, int size)
+  {
+    if(first) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        if (printResult) {
+          CkPrintf("Roundtrip time for Chares (rdma zero copy message send api) is %lf us\n",
+                   1.0e6*(end_time-start_time)/iterations);
+          delete[] rdmaMsg;
+        }
+        niter = 0;
+        mainProxy.maindone();
+      } else {
+        pp->recv_rdma(rdma(rdmaMsg), size);
+      }
+    } else {
+      pp->recv_rdma(rdma(rdmaMsg), size);
     }
   }
 };
