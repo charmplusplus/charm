@@ -324,7 +324,7 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
                int tag, MPI_Comm comm);
 #define MPI_Recv AMPI_Recv
-int AMPI_Recv(void *msg, int count, int type, int src, int tag,
+int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status);
 #define MPI_Get_count AMPI_Get_count
 int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count);
@@ -378,23 +378,23 @@ int AMPI_Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
 #define MPI_Probe AMPI_Probe
 int AMPI_Probe(int source, int tag, MPI_Comm comm, MPI_Status *sts);
 #define MPI_Send_init AMPI_Send_init
-int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
+int AMPI_Send_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
                   MPI_Comm comm, MPI_Request *req);
 #define MPI_Ssend_init AMPI_Ssend_init
-int AMPI_Ssend_init(void *buf, int count, int type, int dest, int tag,
+int AMPI_Ssend_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
                     MPI_Comm comm, MPI_Request *req);
 #define MPI_Bsend_init AMPI_Send_init
 #define MPI_Rsend_init AMPI_Send_init /* FIXME: see MPI_Rsend */
 #define MPI_Recv_init AMPI_Recv_init
-int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
+int AMPI_Recv_init(void *buf, int count, MPI_Datatype type, int src, int tag,
                    MPI_Comm comm, MPI_Request *req);
 #define MPI_Start AMPI_Start
 int AMPI_Start(MPI_Request *reqnum);
 #define MPI_Startall AMPI_Startall
 int AMPI_Startall(int count, MPI_Request *array_of_requests);
 #define MPI_Sendrecv AMPI_Sendrecv
-int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
-                  int stag, void *rbuf, int rcount, int rtype,
+int AMPI_Sendrecv(void *sbuf, int scount, MPI_Datatype stype, int dest,
+                  int stag, void *rbuf, int rcount, MPI_Datatype rtype,
                   int src, int rtag, MPI_Comm comm, MPI_Status *sts);
 #define MPI_Sendrecv_replace AMPI_Sendrecv_replace
 int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
@@ -483,9 +483,9 @@ int AMPI_Barrier(MPI_Comm comm);
 #define MPI_Ibarrier AMPI_Ibarrier
 int AMPI_Ibarrier(MPI_Comm comm, MPI_Request *request);
 #define MPI_Bcast AMPI_Bcast
-int AMPI_Bcast(void *buf, int count, int type, int root, MPI_Comm comm);
+int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm);
 #define MPI_Ibcast AMPI_Ibcast
-int AMPI_Ibcast(void *buf, int count, int type, int root, MPI_Comm comm,
+int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm,
                 MPI_Request *request);
 #define MPI_Gather AMPI_Gather
 int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
@@ -563,16 +563,16 @@ int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
                     int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm,
                     MPI_Request *request);
 #define MPI_Reduce AMPI_Reduce
-int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type,
+int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type,
                 MPI_Op op, int root, MPI_Comm comm);
 #define MPI_Ireduce AMPI_Ireduce
-int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type,
+int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type,
                  MPI_Op op, int root, MPI_Comm comm, MPI_Request *request);
 #define MPI_Allreduce AMPI_Allreduce
-int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
+int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type,
                    MPI_Op op, MPI_Comm comm);
 #define MPI_Iallreduce AMPI_Iallreduce
-int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
+int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type,
                     MPI_Op op, MPI_Comm comm, MPI_Request *request);
 #define MPI_Reduce_local AMPI_Reduce_local
 int AMPI_Reduce_local(void *inbuf, void *outbuf, int count,

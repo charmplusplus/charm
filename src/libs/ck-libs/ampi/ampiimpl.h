@@ -526,10 +526,10 @@ class AmpiRequest {
  public:
   void *buf;
   int count;
-  int type;
+  MPI_Datatype type;
   int tag; // the order must match MPI_Status
   int src;
-  int comm;
+  MPI_Comm comm;
 
 #if CMK_BIGSIM_CHARM
  public:
@@ -592,7 +592,7 @@ class AmpiRequest {
 class PersReq : public AmpiRequest {
   int sndrcv; // 1 if send , 2 if recv, 3 if ssend
  public:
-  PersReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_, int sndrcv_){
+  PersReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_, int sndrcv_){
     buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_;
     comm=comm_;  sndrcv=sndrcv_;  isvalid=true;
   }
@@ -616,7 +616,7 @@ class IReq : public AmpiRequest {
  public:
   bool statusIreq;
   int length; // recv'ed length
-  IReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_){
+  IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_){
     buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_;
     comm=comm_;  isvalid=true; statusIreq=false; length=0;
   }
@@ -678,7 +678,7 @@ class IATAReq : public AmpiRequest {
   IATAReq(int c_):elmcount(c_),idx(0){ myreqs.resize(c_); isvalid=true; }
   IATAReq(){};
   ~IATAReq(void) { }
-  int addReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_){
+  int addReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_){
     myreqs[idx].buf=buf_;   myreqs[idx].count=count_;
     myreqs[idx].type=type_; myreqs[idx].src=src_;
     myreqs[idx].tag=tag_;   myreqs[idx].comm=comm_;
@@ -1325,27 +1325,28 @@ class ampi : public CBase_ampi {
   }
 
   AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
-                       int type,MPI_Comm destcomm, int sync=0);
+                       MPI_Datatype type,MPI_Comm destcomm, int sync=0);
 
-  void send(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm, int sync=0);
+  void send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
+            MPI_Comm destcomm, int sync=0);
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                       int idx);
-  void delesend(int t, int s, const void* buf, int count, int type,
+  void delesend(int t, int s, const void* buf, int count, MPI_Datatype type,
                 int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
-  inline int processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int type);
-  inline AmpiMsg * getMessage(int t, int s, int comm, int *sts) const;
-  int recv(int t,int s,void* buf,int count,int type,int comm,MPI_Status *sts=NULL);
+  inline int processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, MPI_Datatype type);
+  inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const;
+  int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL);
   void irecv(void *buf, int count, MPI_Datatype type, int src,
              int tag, MPI_Comm comm, MPI_Request *request);
   void sendrecv(void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                 void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                 MPI_Comm comm, MPI_Status *sts);
-  void probe(int t,int s,int comm,MPI_Status *sts);
-  int iprobe(int t,int s,int comm,MPI_Status *sts);
+  void probe(int t,int s,MPI_Comm comm,MPI_Status *sts);
+  int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts);
   void barrier(void);
   void ibarrier(MPI_Request *request);
-  void bcast(int root, void* buf, int count, int type,MPI_Comm comm);
-  void ibcast(int root, void* buf, int count, int type, MPI_Comm comm, MPI_Request* request);
+  void bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm);
+  void ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Request* request);
   static void bcastraw(void* buf, int len, CkArrayID aid);
   void split(int color,int key,MPI_Comm *dest, int type);
   void commCreate(const groupStruct vec,MPI_Comm *newcomm);

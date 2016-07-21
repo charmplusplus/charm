@@ -1862,7 +1862,7 @@ AmpiMsg *ampi::getMessage(int t, int s, MPI_Comm comm, int *sts) const
 }
 
 AmpiMsg *ampi::makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
-                           int type,MPI_Comm destcomm, int sync)
+                           MPI_Datatype type,MPI_Comm destcomm, int sync)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
@@ -1876,7 +1876,8 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count
   return msg;
 }
 
-void ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, int sync)
+void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
+                int rank, MPI_Comm destcomm, int sync)
 {
 #if CMK_TRACE_IN_CHARM
   TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND", NULL, 0, 1);
@@ -1910,7 +1911,7 @@ void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
   pa[idx].generic(msg);
 }
 
-void ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank,
+void ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype type,  int rank,
                     MPI_Comm destcomm, CProxy_ampi arrproxy, int sync)
 {
   if(rank==MPI_PROC_NULL) return;
@@ -1929,7 +1930,7 @@ void ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int
   arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm,sync));
 }
 
-int ampi::processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int type)
+int ampi::processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, MPI_Datatype type)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
@@ -1947,7 +1948,7 @@ int ampi::processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int t
   return 0;
 }
 
-int ampi::recv(int t, int s, void* buf, int count, int type, MPI_Comm comm, MPI_Status *sts)
+int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Status *sts)
 {
   MPI_Comm disComm = myComm.getComm();
   if(s==MPI_PROC_NULL) {
@@ -2067,7 +2068,7 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 
 const int MPI_BCAST_COMM=MPI_COMM_WORLD+1000;
 
-void ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
+void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm)
 {
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   int rootIdx=dest.getIndexForRank(root);
@@ -2080,7 +2081,7 @@ void ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
   if(-1==recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM)) CkAbort("AMPI> Error in broadcast");
 }
 
-void ampi::ibcast(int root, void* buf, int count, int type, MPI_Comm destcomm, MPI_Request* request)
+void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm, MPI_Request* request)
 {
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   int rootIdx=dest.getIndexForRank(root);
@@ -2946,7 +2947,7 @@ void ampi::reduceResult(CkReductionMsg *msg)
   // [nokeep] entry method, so do not delete msg
 }
 
-static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,int type,MPI_Op op)
+static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,MPI_Datatype type,MPI_Op op)
 {
   int szdata = ddt->getSize(count);
   int szhdr = sizeof(AmpiOpHeader);
@@ -3085,7 +3086,7 @@ void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* ino
 #define SYNCHRONOUS_REDUCE                           0
 
 CDECL
-int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm)
+int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op, int root, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Reduce");
 
@@ -3151,7 +3152,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op, int r
 }
 
 CDECL
-int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op, MPI_Comm comm)
+int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Allreduce");
 
@@ -3208,7 +3209,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op, MP
 }
 
 CDECL
-int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
+int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op,
                     MPI_Comm comm, MPI_Request* request)
 {
   AMPIAPI("AMPI_Iallreduce");
@@ -3250,7 +3251,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 }
 
 CDECL
-int AMPI_Reduce_local(void *inbuf, void *outbuf, int count, int type, MPI_Op op)
+int AMPI_Reduce_local(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op)
 {
   AMPIAPI("AMPI_Reduce_local");
 
@@ -4176,7 +4177,7 @@ int AMPI_Status_set_cancelled(MPI_Status *status, int flag){
 }
 
 CDECL
-int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
+int AMPI_Recv_init(void *buf, int count, MPI_Datatype type, int src, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("AMPI_Recv_init");
@@ -4196,7 +4197,7 @@ int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
 }
 
 CDECL
-int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
+int AMPI_Send_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("AMPI_Send_init");
@@ -4216,7 +4217,7 @@ int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
 }
 
 CDECL
-int AMPI_Ssend_init(void *buf, int count, int type, int dest, int tag,
+int AMPI_Ssend_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
                     MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("AMPI_Ssend_init");
@@ -4499,7 +4500,7 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
 }
 
 CDECL
-int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
+int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_Op op,
                  int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Ireduce");
