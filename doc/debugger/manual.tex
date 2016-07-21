@@ -64,10 +64,9 @@ can produce a mismatch between the function displayed in the debugger (for
 example in a stack trace) and the functions present in the source code. To
 produce information coherent with source code, optimization is discouraged.
 
-\item The link time option \textit{-memory charmdebug} is needed in
-order to gather information regarding the memory of the application. This
-includes both the Memory view (see \ref{sec:memory}) and the Inspector
-framework (see \ref{sec:inspector}).
+\item The link time option \textit{-memory charmdebug} is only needed if
+you want to use either the Memory view (see \ref{sec:memory}) or the Inspector
+framework (see \ref{sec:inspector}) of Charm Debug.
 
 \end{itemize}
 
@@ -146,7 +145,7 @@ from within the \texttt{File} menu as shown in Figure~\ref{menu}.
 \end{figure}
 
 
-\emph{Note: charmdebug command line launching only works on net-*
+\emph{Note: charmdebug command line launching only works on net-*, netlrts-*, and verbs-*
 builds of \charmpp{} }
 
 To replay a previously recorded session:
@@ -235,7 +234,7 @@ to remote running applications in the near future.
 %%Behavior on a cluster can be
 %%recorded and then replayed in a local run.
 
-Due to the current implementation, the debugging tool is limited to net-*
+Due to the current implementation, the debugging tool is limited to net-*, netlrts-*, and verbs-*
 versions. Other builds of \charmpp{} might have unexpected behaviour. In the near
 future this will be extended at least to the mpi-* versions.
 
