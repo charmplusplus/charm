@@ -293,9 +293,9 @@ void pathHistoryManager::saveCriticalPathForPriorities(pathInformationMsg *msg){
 /// Add an entry for this path history into the table, and write the corresponding information into the outgoing envelope
 int PathHistoryTableEntry::addToTableAndEnvelope(envelope *env){
   // Add to table
-#if USE_CRITICAL_PATH_HEADER_ARRAY
   int new_idx = addToTable();
 
+#if USE_CRITICAL_PATH_HEADER_ARRAY
   // Fill in outgoing envelope
   CkAssert(env != NULL);
   env->pathHistory.set_sender_history_table_idx(new_idx);
@@ -304,8 +304,9 @@ int PathHistoryTableEntry::addToTableAndEnvelope(envelope *env){
   if(local_path_time > 0.1)
       CkPrintf("------########## %d generating new msg env   critical path length %f:%f:%f app time %f id:%d\n", CkMyPe(), local_path_time , preceding_path_time, local_path_time+preceding_path_time, CkWallTimer(), new_idx);
 #endif
-  return new_idx;
 #endif
+
+  return new_idx;
 }
 
 /// Add an entry for this path history into the table. Returns the index in the table for it.
