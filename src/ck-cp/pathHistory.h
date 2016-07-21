@@ -237,7 +237,7 @@ public:
 	// No body
       }
 
-  void printInfo(char *prefix = ""){
+  void printInfo(const char *prefix = ""){
       CkPrintf("%s [sender pe=%d table idx=%d] [local path contribution=%lf ep=%d] [Time= %lf + %lf]\n", prefix,
           sender_pe, sender_history_table_idx, local_path_time, local_ep, preceding_path_time, local_path_time);
   }
