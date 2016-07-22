@@ -650,6 +650,7 @@ static void parse_forks(void) {
   forkstr=getenv("CmiMyForks");
   if(forkstr!=0) { /* charmrun */
 	nread = sscanf(forkstr,"%d",&forks);
+          /* CmiMyLocalRank is used for setting default cpu affinity */
         CmiMyLocalRank = 0;
 	for(i=1;i<=forks;i++) { /* by default forks = 0 */ 
 		pid=fork();
@@ -678,6 +679,7 @@ static void parse_magic(void)
         nread = sscanf(nm, "%d",&Cmi_net_magic);
 	}
 }
+
 static void parse_netstart(void)
 {
   char *ns;
@@ -702,6 +704,10 @@ static void parse_netstart(void)
       Cmi_myoldpe = Lrts_myNode;
     }
 #endif
+    if (getenv("CmiLocal") != NULL) {      /* ++local */
+          /* CmiMyLocalRank is used for setting default cpu affinity */
+        CmiMyLocalRank = Lrts_myNode;
+    }
 
   } else 
   {/*No charmrun-- set flag values for standalone operation*/
