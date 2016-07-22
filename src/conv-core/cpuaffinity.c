@@ -16,6 +16,11 @@ cpu affinity.
 #include "converse.h"
 #include "sockRoutines.h"
 
+#if CMK_USE_IBVERBS
+#include <infiniband/verbs.h>
+#include <hwloc/openfabrics-verbs.h>
+#endif
+
 #define DEBUGP(x)    /* CmiPrintf x;  */
 CpvDeclare(int, myCPUAffToCore);
 #if CMK_OS_IS_LINUX
@@ -222,7 +227,7 @@ int CmiMapHosts(int mylocalrank, int proc_per_host)
   hwloc_topology_t topology;
   hwloc_cpuset_t cpuset;
   hwloc_obj_t obj;
-  int depth, npus_per_socket, npus, nsockets, index, nthreads;
+  int depth, npus, nsockets, index, nthreads;
 
   if (mylocalrank == -1) {
       CmiAbort("Error: Default affinity with +processPerHost is not compatible with this launching scheme.");
@@ -246,6 +251,118 @@ int CmiMapHosts(int mylocalrank, int proc_per_host)
       obj = cmi_hwloc_get_obj_by_depth(topology, depth, pos);
       idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
       // CmiPrintf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
+      CmiSetCPUAffinity(idx);
+  }
+  else {
+      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
+  }
+  cmi_hwloc_topology_destroy(topology);
+}
+
+static void CmiMapHostsBySocket(int mylocalrank, int proc_per_host)
+{
+  hwloc_topology_t topology;
+  unsigned long loading_flags;
+  hwloc_cpuset_t cpuset;
+  hwloc_obj_t obj;
+  int depth, npus_per_socket, npus, nsockets, ncores, index, nthreads;
+  int err, idx = -1;
+
+  if (mylocalrank == -1) {
+      CmiAbort("Error: Default affinity with +processPerHost is not compatible with this launching scheme.");
+  }
+
+  cmi_hwloc_topology_init(&topology);
+  loading_flags = HWLOC_TOPOLOGY_FLAG_IO_BRIDGES | HWLOC_TOPOLOGY_FLAG_IO_DEVICES;
+  err = cmi_hwloc_topology_set_flags(topology, loading_flags);
+  if (err < 0)
+    CmiAbort("hwloc_topology_set_flags() failed, PCI devices will not be loaded in the topology \n");
+
+  cmi_hwloc_topology_load(topology);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PACKAGE);
+  nsockets = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
+  ncores = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
+  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+
+  if (CmiMyRank() < CmiMyNodeSize()) {
+    nthreads = CmiMyNodeSize() + 1;
+    int nthsocket = mylocalrank * CmiMyNodeSize() + CmiMyRank();
+    int pos = nthsocket * (npus/nsockets);
+    obj = cmi_hwloc_get_obj_by_depth(topology, depth, pos);
+    //printf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
+  }
+  else {
+     // this is comm thread
+     // TODO: find one close to NIC
+#if CMK_USE_IBVERBS
+    struct ibv_device **dev_list;
+    hwloc_bitmap_t set;
+    hwloc_obj_t osdev;
+    char *string;
+    struct ibv_device *dev;
+    int count;
+
+    // printf("ibv_get_device_list found %d devices\n", count);
+    CmiAssert(npus/nsockets > 1);
+    dev_list = ibv_get_device_list(&count);
+    if (!dev_list) {
+      CmiAbort("ibv_get_device_list failed\n");
+    }
+    dev = dev_list[0];
+    set = cmi_hwloc_bitmap_alloc();
+    err = cmi_hwloc_ibv_get_device_cpuset(topology, dev, set);
+#if 0
+    cmi_hwloc_bitmap_asprintf(&string, set);
+    printf("found cpuset %s for %dth device\n", string, i);
+    free(string);
+#endif
+    obj = NULL;
+    while ((obj = hwloc_get_next_obj_covering_cpuset_by_type(topology, set, HWLOC_OBJ_NODE, obj)) == NULL);
+    if (obj) {
+      obj = cmi_hwloc_get_obj_by_depth(topology, depth, obj->os_index);
+    }
+    else {
+      /* try openFabrics */
+    }
+    hwloc_bitmap_free(set);
+#else
+    obj = cmi_hwloc_get_obj_by_depth(topology, depth, npus-1);
+#endif
+  }
+  idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
+  CmiSetCPUAffinity(idx);
+  cmi_hwloc_topology_destroy(topology);
+}
+
+int CmiMapHostsByCore(int mylocalrank, int proc_per_host)
+{
+  hwloc_topology_t topology;
+  hwloc_cpuset_t cpuset;
+  hwloc_obj_t obj;
+  int depth, npus, nsockets, ncores, index, nthreads;
+
+  if (mylocalrank == -1) {
+      CmiAbort("Error: Default affinity with +processPerHost is not compatible with this launching scheme.");
+  }
+
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
+  ncores = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
+  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+
+  nthreads = CmiMyNodeSize() + 1;
+  /* now divide the cpuset to proc_per_socket partitions */
+  if (proc_per_host * nthreads <= npus) {
+      int idx = -1;
+      int nthcore = mylocalrank * nthreads + CmiMyRank();
+      int pos = nthcore * (npus/ncores);
+      obj = cmi_hwloc_get_obj_by_depth(topology, depth, pos);
+      idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
+//printf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
       CmiSetCPUAffinity(idx);
   }
   else {
@@ -866,7 +983,12 @@ void CmiInitCPUAffinity(char **argv)
       int n = -1;
       if (s = getenv("CmiProcessPerHost")) {
           n = atoi(s);
-          CmiMapHosts(CmiMyLocalRank, n);
+          if (getenv("CmiOneWthPerCore"))
+              CmiMapHostsByCore(CmiMyLocalRank, n);
+          if (getenv("CmiOneWthPerSocket"))
+              CmiMapHostsBySocket(CmiMyLocalRank, n);
+          else
+              CmiMapHosts(CmiMyLocalRank, n);          // scatter
       }
       else if (s =  getenv("CmiProcessPerSocket")) {
           n = atoi(s);
