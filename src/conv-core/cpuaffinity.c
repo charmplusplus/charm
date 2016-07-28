@@ -153,6 +153,7 @@ int set_cpu_affinity(unsigned int cpuid) {
 int set_thread_affinity(int cpuid) {
 
   hwloc_topology_t topology;
+
   // Allocate and initialize topology object.
   cmi_hwloc_topology_init(&topology);
   // Perform the topology detection.
@@ -172,8 +173,10 @@ int set_thread_affinity(int cpuid) {
   pthread_t thread = pthread_self();
 #endif
 
+
   // And try to bind ourself there. */
-  if (cmi_hwloc_set_thread_cpubind(topology, thread, cpuset, 0)) {
+  if (cmi_hwloc_set_thread_cpubind(topology, thread, cpuset, HWLOC_CPUBIND_THREAD|HWLOC_CPUBIND_STRICT) == -1) {
+//  if (cmi_hwloc_set_cpubind(topology, cpuset, HWLOC_CPUBIND_THREAD|HWLOC_CPUBIND_STRICT) == -1) {
     char *str;
     int error = errno;
     cmi_hwloc_bitmap_asprintf(&str, cpuset);
@@ -187,12 +190,13 @@ int set_thread_affinity(int cpuid) {
 #if CMK_CHARMDEBUG
   char *str;
   cmi_hwloc_bitmap_asprintf(&str, cpuset);
-  CmiPrintf("HWLOC> [%d] Bound to cpu: %d cpuset: %s\n", CmiMyPe(), cpuid, str);
+  CmiPrintf("HWLOC> [%d] Thread %p bound to cpu: %d cpuset: %s\n", CmiMyPe(), thread, cpuid, str);
   free(str);
 #endif
 
   cmi_hwloc_bitmap_free(cpuset);
   cmi_hwloc_topology_destroy(topology);
+
   return 0;
 }
 #endif
@@ -567,9 +571,10 @@ int print_thread_affinity(void) {
 
   hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
   // And try to bind ourself there. */
-  if (cmi_hwloc_get_thread_cpubind(topology, thread, cpuset, 0)) {
+//  if (cmi_hwloc_get_thread_cpubind(topology, thread, cpuset, HWLOC_CPUBIND_THREAD)) {
+  if (cmi_hwloc_get_cpubind(topology, cpuset, HWLOC_CPUBIND_THREAD) == -1) {
     int error = errno;
-    CmiPrintf("[%d] CPU affinity mask is unknown %s\n", CmiMyPe(), strerror(error));
+    CmiPrintf("[%d] thread CPU affinity mask is unknown %s\n", CmiMyPe(), strerror(error));
     cmi_hwloc_bitmap_free(cpuset);
     cmi_hwloc_topology_destroy(topology);
     return -1;
@@ -577,7 +582,7 @@ int print_thread_affinity(void) {
 
   char *str;
   cmi_hwloc_bitmap_asprintf(&str, cpuset);
-  CmiPrintf("[%d] CPU affinity mask is %s\n", CmiMyPe(), str);
+  CmiPrintf("[%d] thread CPU affinity mask is %s\n", CmiMyPe(), str);
   free(str);
   cmi_hwloc_bitmap_free(cpuset);
   cmi_hwloc_topology_destroy(topology);
@@ -932,6 +937,39 @@ void CmiCheckAffinity(void)
 #endif
 }
 
+static int set_default_affinity(void)
+{
+  char *s;
+  int n = -1;
+  if ((s = getenv("CmiProcessPerHost")))
+  {
+    n = atoi(s);
+    if (getenv("CmiOneWthPerCore"))
+      CmiMapHostsByCore(CmiMyLocalRank, n);
+    else if (getenv("CmiOneWthPerSocket"))
+      CmiMapHostsBySocket(CmiMyLocalRank, n);
+    else
+      CmiMapHosts(CmiMyLocalRank, n); // scatter
+  }
+  else if ((s = getenv("CmiProcessPerSocket")))
+  {
+    n = atoi(s);
+    CmiMapSockets(CmiMyLocalRank, n);
+  }
+  else if ((s = getenv("CmiProcessPerCore")))
+  {
+    n = atoi(s);
+    CmiMapCores(CmiMyLocalRank, n);
+  }
+  else if ((s = getenv("CmiProcessPerPU")))
+  {
+    n = atoi(s);
+    CmiMapPUs(CmiMyLocalRank, n);
+  }
+
+  return n != -1;
+}
+
 CMI_EXTERNC
 void CmiInitCPUAffinity(char **argv)
 {
@@ -980,35 +1018,26 @@ void CmiInitCPUAffinity(char **argv)
   affinity_flag = 1;
 #endif
 
-  show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
-                                               "print cpu affinity");
+  show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity", "print cpu affinity");
 
   /* new style */
   {
-      char *s;
-      int n = -1;
-      if (s = getenv("CmiProcessPerHost")) {
-          n = atoi(s);
-          if (getenv("CmiOneWthPerCore"))
-              CmiMapHostsByCore(CmiMyLocalRank, n);
-          else if (getenv("CmiOneWthPerSocket"))
-              CmiMapHostsBySocket(CmiMyLocalRank, n);
-          else
-              CmiMapHosts(CmiMyLocalRank, n);          // scatter
+      int done = 0;
+      CmiNodeAllBarrier();
+
+      /* must bind the rank 0 which is the main thread first */
+      /* binding the main thread seems to change binding for all threads */
+      if (CmiMyRank() == 0) {
+          done = set_default_affinity();
       }
-      else if (s =  getenv("CmiProcessPerSocket")) {
-          n = atoi(s);
-          CmiMapSockets(CmiMyLocalRank, n);
+
+      CmiNodeAllBarrier();
+
+      if (CmiMyRank() != 0) {
+          done = set_default_affinity();
       }
-      else if (s =  getenv("CmiProcessPerCore")) {
-          n = atoi(s);
-          CmiMapCores(CmiMyLocalRank, n);
-      }
-      else if (s =  getenv("CmiProcessPerPU")) {
-          n = atoi(s);
-          CmiMapPUs(CmiMyLocalRank, n);
-      }
-      if (n!=-1) {
+
+      if (done) {
           if (show_affinity_flag) CmiPrintCPUAffinity();
           return;
       }
@@ -1287,6 +1316,7 @@ void CmiInitCPUAffinity(char **argv)
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
   CmiGetArgStringDesc(argv, "+pemapfile", &pemapfile, "define pe to core mapping file");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
+  CmiGetArgFlagDesc(argv,"+showcpuaffinity", "print cpu affinity");
   if (affinity_flag && CmiMyPe()==0)
     CmiPrintf("sched_setaffinity() is not supported, +setcpuaffinity disabled.\n");
   if (excludecore != -1 && CmiMyPe()==0)
