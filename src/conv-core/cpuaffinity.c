@@ -291,6 +291,7 @@ static void CmiMapHostsBySocket(int mylocalrank, int proc_per_host)
     int nthsocket = mylocalrank * CmiMyNodeSize() + CmiMyRank();
     int pos = nthsocket * (npus/nsockets);
     obj = cmi_hwloc_get_obj_by_depth(topology, depth, pos);
+    idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
     //printf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
   }
   else {
@@ -318,10 +319,14 @@ static void CmiMapHostsBySocket(int mylocalrank, int proc_per_host)
     printf("found cpuset %s for %dth device\n", string, i);
     free(string);
 #endif
+#if 0
     obj = NULL;
     while ((obj = hwloc_get_next_obj_covering_cpuset_by_type(topology, set, HWLOC_OBJ_NODE, obj)) == NULL);
     if (obj) {
       obj = cmi_hwloc_get_obj_by_depth(topology, depth, obj->os_index);
+      idx = cmi_hwloc_bitmap_last(obj->cpuset, -1);
+#endif
+      idx = hwloc_bitmap_last(set);
     }
     else {
       /* try openFabrics */
@@ -329,9 +334,9 @@ static void CmiMapHostsBySocket(int mylocalrank, int proc_per_host)
     hwloc_bitmap_free(set);
 #else
     obj = cmi_hwloc_get_obj_by_depth(topology, depth, npus-1);
+    idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
 #endif
   }
-  idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
   CmiSetCPUAffinity(idx);
   cmi_hwloc_topology_destroy(topology);
 }
@@ -423,6 +428,7 @@ int CmiMapSockets(int mylocalrank, int proc_per_socket)
   }
   cmi_hwloc_topology_destroy(topology);
 }
+
 
 int CmiMapCores(int mylocalrank, int proc_per_core)
 {
@@ -985,7 +991,7 @@ void CmiInitCPUAffinity(char **argv)
           n = atoi(s);
           if (getenv("CmiOneWthPerCore"))
               CmiMapHostsByCore(CmiMyLocalRank, n);
-          if (getenv("CmiOneWthPerSocket"))
+          else if (getenv("CmiOneWthPerSocket"))
               CmiMapHostsBySocket(CmiMyLocalRank, n);
           else
               CmiMapHosts(CmiMyLocalRank, n);          // scatter
