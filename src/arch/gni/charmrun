@@ -163,6 +163,11 @@ then
           then
 	    mpirun=`which mpirun 2>/dev/null`
             npcmd="-np "
+            if test -z "$mpirun"
+            then
+	      mpirun=`which srun 2>/dev/null`
+              npcmd="-n "
+            fi
           fi
           cat > $script << EOF
 #!/bin/sh
