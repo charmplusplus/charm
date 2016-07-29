@@ -486,6 +486,16 @@ fi
 if [ -n "$BOPTS" -o -n "$COMPILER" ]
 then
   echo "Selected Compiler: $COMPILER"
+
+  if test -n `echo "$BASEVERSION" | grep -c "cray\|gni\|gemini"`
+  then
+    echo "Inserted explicit compiler options on Cray systems. Use compiler wrappers by loading PrgEnv-*"
+    echo "e.g.) module load PrgEnv-* (e.g. gnu for gcc, intel for icc, and pgi for pgcc)"
+    echo "      ./build charm++ $BASEVERSION <other build options>"
+    echo "Charm++ uses the compiler wrapper 'CC' specified by the Cray system. Don't use explicit compiler options on Cray systems."
+    exit 1
+  fi
+
   echo "Selected Options: $BOPTS"
   SORTED=`echo $BOPTS | awk  '{ for (i = 1; i <= NF; ++i) print $i }' | sort`
   BOPTS_WITHCOMPILER=`echo $SORTED $COMPILER`
