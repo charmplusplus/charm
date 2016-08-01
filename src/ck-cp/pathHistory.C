@@ -38,7 +38,9 @@ CkpvDeclare(int, pathHistoryTableLastIdx);
 class pathHistoryMain : public CBase_pathHistoryMain {
 public:
   pathHistoryMain(CkArgMsg* args){
+#if USE_CRITICAL_PATH_HEADER_ARRAY
     pathHistoryManagerProxy = CProxy_pathHistoryManager::ckNew();
+#endif
     delete args;
   }
   ~pathHistoryMain(){}
