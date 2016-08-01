@@ -619,6 +619,8 @@ static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
 
+extern int    CmiMyLocalRank;
+
 #if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
 static void parse_forks(void) {
@@ -629,11 +631,14 @@ static void parse_forks(void) {
   forkstr=getenv("CmiMyForks");
   if(forkstr!=0) { /* charmrun */
 	nread = sscanf(forkstr,"%d",&forks);
+	/* CmiMyLocalRank is used for setting default cpu affinity */
+	CmiMyLocalRank = 0;
 	for(i=1;i<=forks;i++) { /* by default forks = 0 */ 
 		pid=fork();
 		if(pid<0) CmiAbort("Fork returned an error");
 		if(pid==0) { /* forked process */
 			/* reset mynode,pe & exit loop */
+			CmiMyLocalRank = i;
 			Lrts_myNode+=i;
 #if ! CMK_SMP
 			_Cmi_mype+=i;
@@ -672,6 +677,10 @@ static void parse_netstart(void)
         if (nread!=5) {
                 fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
                 exit(1);
+        }
+        if (getenv("CmiLocal") != NULL) {      /* ++local */
+          /* CmiMyLocalRank is used for setting default cpu affinity */
+          CmiMyLocalRank = Lrts_myNode;
         }
   } else 
   {/*No charmrun-- set flag values for standalone operation*/
