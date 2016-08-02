@@ -21,6 +21,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
  */
 #include <set>
 #include <vector>
+#include <deque>
 #include <list>
 #include <map>
 #include <string>
@@ -44,6 +45,7 @@ namespace PUP {
   inline int PUP_stl_container_size(er &p,container &c);
   template <class container, class dtype>
   inline void PUP_stl_container_items(er &p,container &c);
+  template <> inline void PUP_stl_container_items<std::vector<bool>,bool>(er &p, std::vector<bool> &c);
   template <class container,class dtype>
   inline void PUP_stl_container(er &p,container &c);
   template <class container,class dtype>
@@ -136,6 +138,19 @@ namespace PUP {
       p.syncComment(sync_item);
       // Cast away the constness (needed for std::set)
       p|*(dtype *)&(*it);
+    }
+  }
+
+  // Specialized to work with vector<bool>
+  template<>
+  inline void PUP_stl_container_items<std::vector<bool>, bool>(er &p, std::vector<bool> &c)
+  {
+    std::deque<bool> q(c.begin(), c.end());
+    
+    for (std::deque<bool>::iterator it = q.begin(); it != q.end(); it++)
+    {
+      p.syncComment(sync_item);
+      p|*it;
     }
   }
 
