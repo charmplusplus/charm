@@ -4,7 +4,7 @@ BINARY = sync_square
 
 CHARMCFLAGS = $(OPTS)
 CHARMCLINKFLAGS = -language charm++
-TESTFLAGS =
+TESTFLAGS =  +p1
 
 %.o: %.C
 

@@ -35,8 +35,8 @@ test: pgm
 	$(call run, ./pgm +p2 +vp3)
 	$(call run, ./pgm +p2 +vp4)
 	-@rm -f fem_mesh_vp3_*
-	$(call run, ./pgm +vp3 -write)
-	$(call run, ./pgm +vp3 -read)
+	$(call run, ./pgm +p1 +vp3 -write)
+	$(call run, ./pgm +p1 +vp3 -read)
 	rm -f fem_mesh_vp3_*
 
 test-mig:

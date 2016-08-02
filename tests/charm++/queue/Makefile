@@ -5,8 +5,8 @@ CXX := $(CHARMC) $(OPTS)
 TARGETS = pgm msgqtest
 all: $(TARGETS)
 test: $(TARGETS)
-	$(call run, ./pgm )
-	$(call run, ./msgqtest )
+	$(call run, ./pgm  +p1)
+	$(call run, ./msgqtest  +p1)
 
 pgm.C: main.decl.h
 

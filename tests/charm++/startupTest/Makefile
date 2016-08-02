@@ -18,7 +18,7 @@ startupTest.o: startupTest.C startupTest.decl.h startupTest.h
 	$(CHARMC) -c startupTest.C
 
 test: all
-	$(call run, ./startupTest 20 10 0.01 1  )
+	$(call run, ./startupTest 20  10 0.01   1  +p1)
 	$(call run, ./startupTest 200 10 0.0001 1  +p2)
 	$(call run, ./startupTest 200 10 0.0001 1  +p4)
 

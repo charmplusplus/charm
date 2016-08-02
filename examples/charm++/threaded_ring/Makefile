@@ -4,7 +4,7 @@ BINARY = threaded_ring
 
 CHARMCFLAGS =
 CHARMCLINKFLAGS = -language charm++
-TESTFLAGS =
+TESTFLAGS =  +p1
 
 %.o: %.C
 
