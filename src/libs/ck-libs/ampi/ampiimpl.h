@@ -1453,6 +1453,8 @@ ampiParent *getAmpiParent(void);
 ampi *getAmpiInstance(MPI_Comm comm);
 void checkComm(MPI_Comm comm);
 void checkRequest(MPI_Request req);
+void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type);
+void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatype type2);
 
 //Use this to mark the start of AMPI interface routines:
 #define AMPIAPI(routineName) TCHARM_API_TRACE(routineName,"ampi")
