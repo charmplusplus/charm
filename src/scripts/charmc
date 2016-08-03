@@ -736,6 +736,10 @@ do
 	"-no-production")
 		PRODUCTION_MODE=false
 		;;
+
+	-Wl,*)
+		POST_LIBRARIES="$POST_LIBRARIES $arg"
+		;;
 	
 	"-pg"|"-g"|-W*|-O*)
 		OPTS="$OPTS $arg"
