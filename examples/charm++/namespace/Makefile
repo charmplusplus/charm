@@ -12,11 +12,12 @@ all: $(BINARY)
 $(BINARY): $(patsubst %.C,%.o,$(wildcard *.C))
 	$(CHARMC) $(CHARMCLINKFLAGS) -o $@ $+
 
-C.o: B.decl.h B.def.h A.decl.h A.def.h
-B.o: A.decl.h A.def.h
-
 %.o: %.C %.decl.h %.def.h
 	$(CHARMC) $(CHARMCFLAGS) $<
+
+Inherit.o: C.decl.h C.def.h B.decl.h B.def.h A.decl.h A.def.h
+C.o: B.decl.h B.def.h A.decl.h A.def.h
+B.o: A.decl.h A.def.h
 
 %.decl.h %.def.h: %.ci
 	$(CHARMC) $(CHARMCFLAGS) $<
