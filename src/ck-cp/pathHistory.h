@@ -22,7 +22,6 @@
 
 #include <pup_stl.h>
 
-
 void initializeCriticalPath(void);
 void useThisCriticalPathForPriorities();
 void automaticallySetMessagePriority(envelope *env);
@@ -201,11 +200,11 @@ public:
  PathHistoryTableEntry() 
    : sender_pe(-1), 
     sender_history_table_idx(-1), 
+    local_ep(-1),
+    local_pe(CkMyPe()),
     start_time(0.0),
     local_path_time(0.0), 
-    preceding_path_time(0.0),     
-    local_ep(-1),
-    local_pe(CkMyPe())
+    preceding_path_time(0.0)
       {
 	// No body
       }
@@ -215,11 +214,11 @@ public:
  PathHistoryTableEntry(const MergeablePathHistory& p, double localContribution = 0.0)
     : sender_pe(p.sender_pe), 
     sender_history_table_idx(p.sender_history_table_idx), 
-    local_path_time(localContribution), 
-    preceding_path_time(p.preceding_path_time),
-    start_time(p.timeEntryMethodStarted),
     local_ep(p.local_ep),
-    local_pe(CkMyPe())
+    local_pe(CkMyPe()),
+    start_time(p.timeEntryMethodStarted),
+    local_path_time(localContribution), 
+    preceding_path_time(p.preceding_path_time)
       {
 	// No body
       }
@@ -228,11 +227,11 @@ public:
   PathHistoryTableEntry(const MergeablePathHistory& p, double start, double finish)
     : sender_pe(p.sender_pe), 
     sender_history_table_idx(p.sender_history_table_idx), 
-    local_path_time(finish-start), 
-    preceding_path_time(p.preceding_path_time),
-    start_time(start),
     local_ep(p.local_ep),
-    local_pe(CkMyPe())
+    local_pe(CkMyPe()),
+    start_time(start),
+    local_path_time(finish-start), 
+    preceding_path_time(p.preceding_path_time)
       {
 	// No body
       }
