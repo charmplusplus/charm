@@ -1,5 +1,6 @@
 DIRS	= \
 allToAll \
+ckcallback \
 cksequence \
 completion \
 fib \

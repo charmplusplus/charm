@@ -254,3 +254,9 @@ incoming message from the callback. While that is still allowed for backward
 compatibility, its usage is deprecated. The old usage is subject to memory
 leaks and dangling pointers.
 
+Callbacks can also be tagged with reference numbers which can be matched inside SDAG code.
+When the callback is created, the creator can set the refnum and the runtime system will
+ensure that the message invoked on the callback's destination will have that refnum.
+This allows the receiver of the final callback to match the messages based on the refnum
+value. (See \examplerefdir{examples/charm++/ckcallback} for a complete example).\\
+
