@@ -347,6 +347,10 @@ typedef struct _cmi_pami_mregion_t {
 CmiPAMIMemRegion_t  cmi_pami_memregion[64];
 #endif
 
+#if CMK_ONESIDED_IMPL
+#include "machine-onesided.h"
+#endif
+
 #include "malloc.h"
 //void *l2atomicbuf;
 
@@ -642,6 +646,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_PERSISTENT_COMM
   _initPersistent(cmi_pami_contexts, _n);
 #endif      
+
+#if CMK_ONESIDED_IMPL
+  _initOnesided(cmi_pami_contexts, _n);
+#endif
 
   _cmidirect_m2m_initialize (cmi_pami_contexts, _n);
 }
@@ -1157,3 +1165,8 @@ CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int size, char *msg) {
 #if CMK_PERSISTENT_COMM
 #include "machine-persistent.c"
 #endif
+
+#if CMK_ONESIDED_IMPL
+#include "machine-onesided.c"
+#endif
+
