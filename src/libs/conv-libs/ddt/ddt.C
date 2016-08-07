@@ -454,7 +454,8 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
 CkDDT_DataType::CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int count, CkDDT_Aint lb, CkDDT_Aint ub,
             bool iscontig, int baseSize, CkDDT_Aint baseExtent, CkDDT_DataType* baseType, int numElements, int baseIndex) :
     datatype(datatype), size(size), extent(extent), count(count), lb(lb), ub(ub), iscontig(iscontig),
-    baseSize(baseSize), baseExtent(baseExtent), baseType(baseType), numElements(numElements), baseIndex(baseIndex), nameLen(0)
+    baseSize(baseSize), baseExtent(baseExtent), baseType(baseType), numElements(numElements),
+    baseIndex(baseIndex), nameLen(0), isAbsolute(false)
 {}
 
 CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_Aint _extent)
@@ -468,6 +469,7 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_
   numElements = obj.numElements;
   size        = obj.size;
   count       = obj.count;
+  isAbsolute  = obj.isAbsolute;
   nameLen     = obj.nameLen;
   memcpy(name, obj.name, nameLen+1);
 
@@ -523,6 +525,12 @@ bool
 CkDDT_DataType::isContig() const
 {
   return iscontig;
+}
+
+void
+CkDDT_DataType::setAbsolute(bool arg)
+{
+  isAbsolute = arg;
 }
 
 int
@@ -593,6 +601,7 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
   p(lb);
   p(ub);
   p(iscontig);
+  p(isAbsolute);
   p(numElements);
   p(nameLen);
   p(name,CkDDT_MAX_NAME_LEN);
@@ -1056,7 +1065,7 @@ CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, int dir) const
     for(;num;num--) {
       char* saveUserdata = userdata;
       for(int i = 0 ; i < count; i++) {
-        userdata = saveUserdata + arrayDisplacements[i] ;
+        userdata = (isAbsolute) ? (char*)arrayDisplacements[i] : saveUserdata+arrayDisplacements[i];
         for(int j = 0; j < arrayBlockLength[i] ; j++) {
           bytesCopied += baseType->serialize(userdata, buffer, 1, dir);
           buffer += baseSize;
@@ -1283,7 +1292,7 @@ CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, int dir) 
     for(;num;num--) {
       char* saveUserdata = userdata;
       for(int i = 0 ; i < count; i++) {
-        userdata = saveUserdata + arrayDisplacements[i] ;
+        userdata = (isAbsolute) ? (char*)arrayDisplacements[i] : saveUserdata+arrayDisplacements[i];
         for(int j = 0; j < BlockLength ; j++) {
           bytesCopied +=  baseType->serialize(userdata, buffer, 1, dir);
           buffer += baseSize;
@@ -1431,6 +1440,7 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) const
   else {
     char* sbuf = userdata;
     char* dbuf = buffer;
+    char* absoluteAddr = 0;
     for (; num; num--) {
       char *buf = buffer;
       for (int i=0; i<count; i++) {
@@ -1441,7 +1451,7 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) const
                    (dir==1)?"packing":"unpacking", arrayDataType[i]->getType(),
                    saveSize, userdata + (j*saveExtent) + arrayDisplacements[i]-sbuf, buffer-dbuf);
           bytesCopied += arrayDataType[i]->serialize(
-                         userdata + (j*saveExtent)+arrayDisplacements[i],
+                         arrayDisplacements[i] + j*saveExtent + (isAbsolute ? absoluteAddr : userdata),
                          buffer,
                          1,
                          dir);
@@ -1450,6 +1460,7 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) const
       }
       buffer = buf + size;
       userdata += extent;
+      absoluteAddr += extent;
     }
   }
   return bytesCopied;

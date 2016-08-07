@@ -2044,13 +2044,22 @@ AmpiMsg *ampi::getMessage(int t, int s, MPI_Comm comm, int *sts) const
 
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type)
 {
-  if (buf == MPI_BOTTOM) buf = (void*)getDDT()->getType(type)->getLB();
+  if (buf == MPI_BOTTOM) {
+    buf = (void*)getDDT()->getType(type)->getLB();
+    getDDT()->getType(type)->setAbsolute(true);
+  }
 }
 
 void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatype type2)
 {
-  if (buf1 == MPI_BOTTOM) buf1 = (void*)getDDT()->getType(type1)->getLB();
-  if (buf2 == MPI_BOTTOM) buf2 = (void*)getDDT()->getType(type2)->getLB();
+  if (buf1 == MPI_BOTTOM) {
+    buf1 = (void*)getDDT()->getType(type1)->getLB();
+    getDDT()->getType(type1)->setAbsolute(true);
+  }
+  if (buf2 == MPI_BOTTOM) {
+    buf2 = (void*)getDDT()->getType(type2)->getLB();
+    getDDT()->getType(type2)->setAbsolute(true);
+  }
 }
 
 AmpiMsg *ampi::makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,

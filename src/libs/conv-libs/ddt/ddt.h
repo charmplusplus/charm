@@ -120,6 +120,7 @@ class CkDDT ;
 
   setName - set the name of datatype
   getName - get the name of datatype
+  setAbsolute - tells DDT's serialize methods that we are dealing with absolute addresses
 */
 
 class CkDDT_DataType {
@@ -142,6 +143,7 @@ class CkDDT_DataType {
     int numElements;
     char name[CkDDT_MAX_NAME_LEN];
     int nameLen;
+    bool isAbsolute;
 
   private:
     CkDDT_DataType(const CkDDT_DataType& obj);
@@ -175,6 +177,7 @@ class CkDDT_DataType {
 
     void setName(const char *src);
     void getName(char *dest, int *len) const;
+    void setAbsolute(bool arg);
 };
 
 /*
