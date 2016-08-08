@@ -297,50 +297,51 @@ static void CmiMapHostsBySocket(int mylocalrank, int proc_per_host)
     obj = cmi_hwloc_get_obj_by_depth(topology, depth, pos);
     idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
     //printf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
-  }
-  else {
-     // this is comm thread
-     // TODO: find one close to NIC
-#if CMK_USE_IBVERBS
-    struct ibv_device **dev_list;
-    hwloc_bitmap_t set;
-    hwloc_obj_t osdev;
-    char *string;
-    struct ibv_device *dev;
-    int count;
 
-    // printf("ibv_get_device_list found %d devices\n", count);
-    CmiAssert(npus/nsockets > 1);
-    dev_list = ibv_get_device_list(&count);
-    if (!dev_list) {
-      CmiAbort("ibv_get_device_list failed\n");
-    }
-    dev = dev_list[0];
-    set = cmi_hwloc_bitmap_alloc();
-    err = cmi_hwloc_ibv_get_device_cpuset(topology, dev, set);
-#if 0
-    cmi_hwloc_bitmap_asprintf(&string, set);
-    printf("found cpuset %s for %dth device\n", string, i);
-    free(string);
-#endif
-#if 0
-    obj = NULL;
-    while ((obj = hwloc_get_next_obj_covering_cpuset_by_type(topology, set, HWLOC_OBJ_NODE, obj)) == NULL);
-    if (obj) {
-      obj = cmi_hwloc_get_obj_by_depth(topology, depth, obj->os_index);
-      idx = cmi_hwloc_bitmap_last(obj->cpuset, -1);
-#endif
-      idx = hwloc_bitmap_last(set);
-    }
-    else {
-      /* try openFabrics */
-    }
-    hwloc_bitmap_free(set);
-#else
-    obj = cmi_hwloc_get_obj_by_depth(topology, depth, npus-1);
-    idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
-#endif
+    CmiSetCPUAffinity(idx);
+    cmi_hwloc_topology_destroy(topology);
+    return;
   }
+
+  // this is comm thread
+  // TODO: find one close to NIC
+  // TODO: Code for openFabrics
+#if CMK_USE_IBVERBS
+  struct ibv_device **dev_list;
+  hwloc_bitmap_t set;
+  hwloc_obj_t osdev;
+  char *string;
+  struct ibv_device *dev;
+  int count;
+
+  // printf("ibv_get_device_list found %d devices\n", count);
+  CmiAssert(npus/nsockets > 1);
+  dev_list = ibv_get_device_list(&count);
+  if (!dev_list) {
+    CmiAbort("ibv_get_device_list failed\n");
+  }
+  dev = dev_list[0];
+  set = cmi_hwloc_bitmap_alloc();
+  err = cmi_hwloc_ibv_get_device_cpuset(topology, dev, set);
+# if 0
+  cmi_hwloc_bitmap_asprintf(&string, set);
+  printf("found cpuset %s for %dth device\n", string, i);
+  free(string);
+# endif
+# if 0
+  obj = NULL;
+  while ((obj = hwloc_get_next_obj_covering_cpuset_by_type(topology, set, HWLOC_OBJ_NODE, obj)) == NULL);
+  if (obj) {
+    obj = cmi_hwloc_get_obj_by_depth(topology, depth, obj->os_index);
+    idx = cmi_hwloc_bitmap_last(obj->cpuset, -1);
+# endif
+  idx = hwloc_bitmap_last(set);
+  hwloc_bitmap_free(set);
+#else
+  obj = cmi_hwloc_get_obj_by_depth(topology, depth, npus-1);
+  idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
+#endif
+
   CmiSetCPUAffinity(idx);
   cmi_hwloc_topology_destroy(topology);
 }
