@@ -1861,12 +1861,12 @@ AmpiMsg *ampi::getMessage(int t, int s, MPI_Comm comm, int *sts) const
   return msg;
 }
 
-inline void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type)
+void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type)
 {
   if (buf == MPI_BOTTOM) buf = (void*)getDDT()->getType(type)->getLB();
 }
 
-inline void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatype type2)
+void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatype type2)
 {
   if (buf1 == MPI_BOTTOM) buf1 = (void*)getDDT()->getType(type1)->getLB();
   if (buf2 == MPI_BOTTOM) buf2 = (void*)getDDT()->getType(type2)->getLB();
