@@ -821,6 +821,7 @@ cat > $t <<EOT
 int foo(void) {
   __int128_t   a;
   __uint128_t   b;
+  a = a + a;
   int x[[(int)(sizeof(__int128_t) - 15)]]={0};
   return x[[0]];
 }
