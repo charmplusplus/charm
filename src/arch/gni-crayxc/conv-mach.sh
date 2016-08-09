@@ -1,7 +1,5 @@
 GNI_CRAYXC=1
-PMI_CFLAGS=`pkg-config --cflags cray-pmi`
 PMI_LIBS=`pkg-config --libs cray-pmi`
-UGNI_CFLAGS=`pkg-config --cflags cray-ugni`
 UGNI_LIBS=`pkg-config --libs cray-ugni`
 
 PGCC=`CC -V 2>&1 | grep pgCC`
