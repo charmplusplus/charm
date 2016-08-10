@@ -43,11 +43,9 @@ optional last parameter.
   chare.entry_name(arg1, arg2, opts2);
 \end{alltt}
 
-When message \kw{msg1} arrives at its destination, it will be pushed onto the
-end of the message queue as usual.  However, when \kw{msg2} arrives, it will be
-pushed onto the \emph{front} of the message queue. Similarly, the two
-parameter-marshalled calls to \kw{chare} will be inserted at the end and
-beginning of the message queue, respectively.
+When the message with \kw{opts1} arrives at its destination, it will be pushed onto the
+end of the message queue as usual.  However, when the message with \kw{opts2} arrives, it will be
+pushed onto the \emph{front} of the message queue.
 
 \subsubsection{Messages}
 
@@ -67,6 +65,10 @@ constants.\\
   MsgType *msg2 = new MsgType ;
   CkSetQueueing(msg2, CK_QUEUEING_LIFO);
 \end{alltt}
+
+Similar to the parameter marshalled case described above, \kw{msg1}
+will be pushed onto the end of the message queue, while \kw{msg2} will
+be pushed onto the \emph{front} of the message queue.
 
 \subsubsection{Prioritized Execution}
 \label{prioritized message passing}
