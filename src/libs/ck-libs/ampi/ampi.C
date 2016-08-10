@@ -2400,7 +2400,7 @@ int AMPI_Init(int *p_argc, char*** p_argv)
   }
   else
   { /* Charm hasn't been started yet! */
-    CkAbort("AMPI_Init> Charm is not initialized!");
+    CkAbort("MPI_Init> AMPI has not been initialized! Possibly due to AMPI requiring '#include \"mpi.h\" be in the same file as main() in C/C++ programs!");
   }
 
   return MPI_SUCCESS;
