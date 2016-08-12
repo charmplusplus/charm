@@ -3967,7 +3967,7 @@ bool PersReq::test(MPI_Status *sts){
   if(sndrcv == 2) // recv request
     return getAmpiInstance(comm)->iprobe(tag, src, comm, sts);
   else            // send request
-    return 1;
+    return true;
 }
 
 bool PersReq::itest(MPI_Status *sts){
@@ -3980,45 +3980,31 @@ void PersReq::complete(MPI_Status *sts){
 }
 
 bool IReq::test(MPI_Status *sts){
-  if (statusIreq == true) {
-    if(sts)
-      sts->MPI_LENGTH = length;
-    return true;
+  if (statusIreq && sts) {
+    sts->MPI_LENGTH = length;
   }
   else {
     getAmpiInstance(comm)->yield();
-    return false;
   }
+  return statusIreq;
 }
 
 bool IReq::itest(MPI_Status *sts){
-  if (statusIreq == true) {
-    if(sts)
-      sts->MPI_LENGTH = length;
-    return true;
+  if (statusIreq && sts) {
+    sts->MPI_LENGTH = length;
   }
-  else {
-    return false;
-  }
+  return statusIreq;
 }
 
 bool SReq::test(MPI_Status *sts){
-  if (statusIreq == true) {
-    return true;
-  }
-  else {
+  if (!statusIreq) {
     getAmpiInstance(comm)->yield();
-    return false;
   }
+  return statusIreq;
 }
 
 bool SReq::itest(MPI_Status *sts){
-  if (statusIreq == true) {
-    return true;
-  }
-  else {
-    return false;
-  }
+  return statusIreq;
 }
 
 void IReq::complete(MPI_Status *sts){
