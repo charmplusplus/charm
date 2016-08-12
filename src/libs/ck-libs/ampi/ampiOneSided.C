@@ -226,14 +226,12 @@ int ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 void ampi::winRemotePut(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
                         MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex) {
   win_obj *winobj = winObjects[winIndex];
-  int orgunit, targunit;
-  CkDDT_DataType *oddt = getDDT()->getType(orgtype);
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
-  orgunit = oddt->getSize(1);
-  targunit = tddt->getSize(1);
+  int targunit = tddt->getSize();
+  int orgunit = getDDT()->getSize(orgtype);
 
   winobj->put(sorgaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
-  char* targaddr = ((char*)(winobj->baseAddr)) + tddt->getSize(targdisp);
+  char* targaddr = ((char*)(winobj->baseAddr)) + targunit*targdisp;
   tddt->serialize(targaddr, (char*)sorgaddr, targcnt, (-1));
 }
 
@@ -261,12 +259,10 @@ AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                             MPI_Datatype targtype, int winIndex) {
   AMPI_DEBUG("    RemoteGet invoked at Rank[%d:%d]\n", thisIndex, myRank);
 
-  int orgunit, targunit;
-  CkDDT_DataType *oddt = getDDT()->getType(orgtype);
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
-  orgunit = oddt->getSize(1);
-  targunit = tddt->getSize(1);
-  int targtotalsize = tddt->getSize(targcnt);
+  int targunit = tddt->getSize();
+  int targtotalsize = targunit*targcnt;
+  int orgunit = getDDT()->getSize(orgtype);
   win_obj *winobj = winObjects[winIndex];
   char* targaddr = (char*)(winobj->baseAddr) + targunit*targdisp;
 
@@ -291,12 +287,10 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
                              MPI_Aint targdisp, int targcnt,
                              MPI_Datatype targtype, int winIndex) {
   AMPI_DEBUG("    RemoteIget invoked at Rank[%d:%d]\n", thisIndex, myRank);
-  int orgunit, targunit;
-  CkDDT_DataType *oddt = getDDT()->getType(orgtype);
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
-  orgunit = oddt->getSize(1);
-  targunit = tddt->getSize(1);
+  int targunit = tddt->getSize();
   int targtotalsize = targunit*targcnt;
+  int orgunit = getDDT()->getSize(orgtype);
 
   win_obj *winobj = winObjects[winIndex];
   winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
