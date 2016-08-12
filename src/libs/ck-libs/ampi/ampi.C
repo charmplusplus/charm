@@ -7156,6 +7156,21 @@ int AMPI_Comm_get_name(MPI_Comm comm, char *comm_name, int *resultlen){
 }
 
 CDECL
+int AMPI_Comm_set_info(MPI_Comm comm, MPI_Info info){
+  AMPIAPI("AMPI_Comm_set_info");
+  /* FIXME: no-op implementation */
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Comm_get_info(MPI_Comm comm, MPI_Info *info){
+  AMPIAPI("AMPI_Comm_get_info");
+  /* FIXME: no-op implementation */
+  *info = MPI_INFO_NULL;
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Comm_create_keyval(MPI_Comm_copy_attr_function *copy_fn,
                             MPI_Comm_delete_attr_function *delete_fn,
                             int *keyval, void* extra_state){

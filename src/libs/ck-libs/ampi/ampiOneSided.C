@@ -872,6 +872,21 @@ int AMPI_Win_set_name(MPI_Win win, const char *name) {
 }
 
 CDECL
+int AMPI_Win_set_info(MPI_Win win, MPI_Info info){
+  AMPIAPI("AMPI_Comm_set_info");
+  /* FIXME: no-op implementation */
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Win_get_info(MPI_Win win, MPI_Info *info){
+  AMPIAPI("AMPI_Comm_get_info");
+  /* FIXME: no-op implementation */
+  *info = MPI_INFO_NULL;
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Win_create_errhandler(MPI_Win_errhandler_function *win_errhandler_fn,
                                MPI_Errhandler *errhandler) {
   AMPIAPI("AMPI_Win_create_errhandler");

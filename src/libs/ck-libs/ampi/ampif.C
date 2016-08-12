@@ -136,6 +136,8 @@ FDECL {
 #define mpi_comm_remote_group FTN_NAME ( MPI_COMM_REMOTE_GROUP , mpi_comm_remote_group )
 /* mpi_comm_set_name is defined in ampifimpl.f90, see ampif_comm_set_name defined below */
 #define mpi_comm_get_name FTN_NAME ( MPI_COMM_GET_NAME , mpi_comm_get_name )
+#define mpi_comm_set_info FTN_NAME ( MPI_COMM_SET_INFO , mpi_comm_set_info )
+#define mpi_comm_get_info FTN_NAME ( MPI_COMM_GET_INFO , mpi_comm_get_info )
 #define mpi_comm_call_errhandler FTN_NAME( MPI_COMM_CALL_ERRHANDLER , mpi_comm_call_errhandler )
 #define mpi_comm_create_errhandler FTN_NAME( MPI_COMM_CREATE_ERRHANDLER , mpi_comm_create_errhandler )
 #define mpi_comm_set_errhandler FTN_NAME( MPI_COMM_SET_ERRHANDLER , mpi_comm_set_errhandler )
@@ -210,6 +212,8 @@ FDECL {
 #define mpi_win_get_group  FTN_NAME ( MPI_WIN_GET_GROUP  , mpi_win_get_group )
 /* mpi_win_set_name is defined in ampifimpl.f90, see ampif_win_set_name defined below */
 #define mpi_win_get_name  FTN_NAME ( MPI_WIN_GET_NAME  , mpi_win_get_name )
+#define mpi_win_set_info  FTN_NAME ( MPI_WIN_SET_INFO  , mpi_win_set_info )
+#define mpi_win_get_info  FTN_NAME ( MPI_WIN_GET_INFO  , mpi_win_get_info )
 #define mpi_win_fence  FTN_NAME ( MPI_WIN_FENCE  , mpi_win_fence )
 #define mpi_win_lock  FTN_NAME ( MPI_WIN_LOCK  , mpi_win_lock )
 #define mpi_win_unlock  FTN_NAME ( MPI_WIN_UNLOCK  , mpi_win_unlock )
@@ -1377,6 +1381,14 @@ void mpi_comm_get_name(int *comm, char *comm_name, int *resultlen, int *ierr){
     ampif_str_c2f(comm_name, tmpName, MPI_MAX_OBJECT_NAME);
 }
 
+void mpi_comm_set_info(int *comm, int *info, int *ierr){
+  *ierr = AMPI_Comm_set_info(*comm, *info);
+}
+
+void mpi_comm_get_info(int *comm, int *info, int *ierr){
+  *ierr = AMPI_Comm_get_info(*comm, info);
+}
+
 void mpi_comm_create_keyval(MPI_Comm_copy_attr_function *copy_fn,
                             MPI_Comm_delete_attr_function *delete_fn, int *keyval,
                             void* extra_state, int *ierr){
@@ -1496,6 +1508,14 @@ void mpi_win_get_name(int *win, char *name, int *length, int *ierr){
 
   if (*ierr == MPI_SUCCESS)
     ampif_str_c2f(name, tmpName, MPI_MAX_OBJECT_NAME);
+}
+
+void mpi_win_set_info(int *win, int *info, int *ierr){
+  *ierr = AMPI_Win_set_info(*win, *info);
+}
+
+void mpi_win_get_info(int *win, int *info, int *ierr){
+  *ierr = AMPI_Win_get_info(*win, info);
 }
 
 void mpi_win_fence(int *assertion, int *win, int *ierr){

@@ -225,6 +225,8 @@ typedef int MPI_Comm;
 /** Groups represent an set of processors 0...n-1. They can be created locally */
 typedef int MPI_Group;
 
+typedef int MPI_Info;
+
 #define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from MPI_Comm_split */
 #define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from MPI_Comm_group */
 #define MPI_COMM_FIRST_CART  (MPI_Comm)(3000000) /*Communicator from MPI_Cart_create */
@@ -694,6 +696,10 @@ int AMPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group);
 int AMPI_Comm_set_name(MPI_Comm comm, const char *name);
 #define MPI_Comm_get_name AMPI_Comm_get_name
 int AMPI_Comm_get_name(MPI_Comm comm, char *comm_name, int *resultlen);
+#define MPI_Comm_set_info AMPI_Comm_set_info
+int AMPI_Comm_set_info(MPI_Comm comm, MPI_Info info);
+#define MPI_Comm_get_info AMPI_Comm_get_info
+int AMPI_Comm_get_info(MPI_Comm comm, MPI_Info *info);
 #define MPI_Comm_call_errhandler AMPI_Comm_call_errhandler
 int AMPI_Comm_call_errhandler(MPI_Comm comm, int errorcode);
 #define MPI_Comm_create_errhandler AMPI_Comm_create_errhandler
@@ -838,7 +844,6 @@ int AMPI_Pcontrol(const int level, ...);
 #define MPI_MODE_NOSTORE    8
 #define MPI_MODE_NOSUCCEED 16
 
-typedef int MPI_Info;
 typedef int MPI_Win;
 
 typedef void (MPI_Win_errhandler_fn)(MPI_Win *, int *, ...);
@@ -888,6 +893,10 @@ int AMPI_Win_get_group(MPI_Win win, MPI_Group *group);
 int AMPI_Win_set_name(MPI_Win win, const char *name);
 #define MPI_Win_get_name AMPI_Win_get_name
 int AMPI_Win_get_name(MPI_Win win, char *name, int *length);
+#define MPI_Win_set_info AMPI_Win_set_info
+int AMPI_Win_set_info(MPI_Win win, MPI_Info info);
+#define MPI_Win_get_info AMPI_Win_get_info
+int AMPI_Win_get_info(MPI_Win win, MPI_Info *info);
 #define MPI_Win_fence AMPI_Win_fence
 int AMPI_Win_fence(int assertion, MPI_Win win);
 #define MPI_Win_lock AMPI_Win_lock
