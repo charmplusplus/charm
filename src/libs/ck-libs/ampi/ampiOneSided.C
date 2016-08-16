@@ -629,6 +629,85 @@ int AMPI_Get_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
 }
 
 /*
+ * int AMPI_Rput(const void *origin_addr, int origin_count, MPI_Datatype
+ *         origin_datatype, int target_rank, MPI_Aint target_disp,
+ *         int target_count, MPI_Datatype target_datatype, MPI_Win
+ *         win, MPI_Request *request)
+ *   Put data into a memory window on a remote process and
+ *   return a request handle for the operation.
+ */
+CDECL
+int AMPI_Rput(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
+              MPI_Request *request){
+  AMPIAPI("AMPI_Rput");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  *request = ptr->postReq(new SendReq(winStruct->comm), AMPI_REQ_COMPLETED);
+  return ptr->winPut(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
+}
+/*
+ * int AMPI_Rget(void *origin_addr, int origin_count, MPI_Datatype
+ *         origin_datatype, int target_rank, MPI_Aint target_disp,
+ *         int target_count, MPI_Datatype target_datatype, MPI_Win
+ *         win, MPI_Request *request)
+ *   Get data from a memory window on a remote process and
+ *   return a request handle for the operation.
+ */
+CDECL
+int AMPI_Rget(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
+              MPI_Request *request){
+  AMPIAPI("AMPI_Rget");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  *request = ptr->postReq(new SendReq(winStruct->comm), AMPI_REQ_COMPLETED);
+  return ptr->winGet(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
+}
+
+/*
+ * int AMPI_Raccumulate(const void *origin_addr, int origin_count, MPI_Datatype
+ *         origin_datatype, int target_rank, MPI_Aint target_disp,
+ *         int target_count, MPI_Datatype target_datatype, MPI_Op op,
+ *         MPI_Win win, MPI_Request *request)
+ *   Accumulate data into the target process using remote memory access and
+ *   return a request handle for the operation.
+ */
+CDECL
+int AMPI_Raccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+                     MPI_Op op, MPI_Win win, MPI_Request *request) {
+  AMPIAPI("AMPI_Raccumulate");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  *request = ptr->postReq(new SendReq(winStruct->comm), AMPI_REQ_COMPLETED);
+  return ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank,
+                            targdisp, targcnt, targtype, op, winStruct);
+}
+
+/*
+ * int AMPI_Rget_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+ *         void *resaddr, int rescnt, MPI_Datatype restype,
+ *         int rank, MPI_Aint targdisp, int targcnt,
+ *         MPI_Datatype targtype, MPI_Op op, MPI_Win win)
+ *   Perform an atomic, one-sided read-and-accumulate operation and
+ *   return a request handle for the operation.
+ */
+CDECL
+int AMPI_Rget_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+                         void *resaddr, int rescnt, MPI_Datatype restype,
+                         int rank, MPI_Aint targdisp, int targcnt,
+                         MPI_Datatype targtype, MPI_Op op, MPI_Win win,
+                         MPI_Request *request) {
+  AMPIAPI("AMPI_Rget_accumulate");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  *request = ptr->postReq(new SendReq(winStruct->comm), AMPI_REQ_COMPLETED);
+  return ptr->winGetAccumulate(orgaddr, orgcnt, orgtype, resaddr, rescnt, restype,
+                               rank, targdisp, targcnt, targtype, op, winStruct);
+}
+
+/*
  * int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
  *         int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win)
  *   Perform one-sided read-modify-write.

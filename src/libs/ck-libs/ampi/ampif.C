@@ -237,6 +237,10 @@ FDECL {
 #define mpi_get  FTN_NAME ( MPI_GET  , mpi_get )
 #define mpi_accumulate  FTN_NAME ( MPI_ACCUMULATE  , mpi_accumulate )
 #define mpi_get_accumulate  FTN_NAME ( MPI_GET_ACCUMULATE  , mpi_get_accumulate )
+#define mpi_rput  FTN_NAME ( MPI_RPUT  , mpi_rput )
+#define mpi_rget  FTN_NAME ( MPI_RGET  , mpi_rget )
+#define mpi_raccumulate  FTN_NAME ( MPI_RACCUMULATE  , mpi_raccumulate )
+#define mpi_rget_accumulate  FTN_NAME ( MPI_RGET_ACCUMULATE  , mpi_rget_accumulate )
 #define mpi_fetch_and_op  FTN_NAME ( MPI_FETCH_AND_OP  , mpi_fetch_and_op )
 #define mpi_compare_and_swap  FTN_NAME ( MPI_COMPARE_AND_SWAP  , mpi_compare_and_swap )
 
@@ -1627,6 +1631,35 @@ void mpi_get_accumulate(void *orgaddr, int *orgcnt, int *orgtype, void *resaddr,
                         int *op, int *win, int *ierr){
   *ierr = AMPI_Get_accumulate(orgaddr, *orgcnt, *orgtype, resaddr, *rescnt, *restype,
                               *rank, *targdisp, *targcnt, *targtype, *op, *win);
+}
+
+void mpi_rput(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
+              MPI_Aint *targdisp, int *targcnt, int *targtype, int *win,
+              int *request, int *ierr){
+  *ierr = AMPI_Rput(orgaddr, *orgcnt, *orgtype, *rank, *targdisp,
+                    *targcnt, *targtype, *win, request);
+}
+
+void mpi_rget(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
+              MPI_Aint *targdisp, int *targcnt, int *targtype, int *win,
+              int *request, int *ierr){
+  *ierr = AMPI_Rget(orgaddr, *orgcnt, *orgtype, *rank, *targdisp,
+                    *targcnt, *targtype, *win, request);
+}
+
+void mpi_raccumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
+                     MPI_Aint *targdisp, int *targcnt, int *targtype,
+                     int *op, int *win, int *request, int *ierr){
+  *ierr = AMPI_Raccumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp,
+                           *targcnt, *targtype, *op, *win, request);
+}
+
+void mpi_rget_accumulate(void *orgaddr, int *orgcnt, int *orgtype, void *resaddr,
+                         int *rescnt, int *restype, int *rank,
+                         MPI_Aint *targdisp, int *targcnt, int *targtype,
+                         int *op, int *win, int *request, int *ierr){
+  *ierr = AMPI_Rget_accumulate(orgaddr, *orgcnt, *orgtype, resaddr, *rescnt, *restype,
+                               *rank, *targdisp, *targcnt, *targtype, *op, *win, request);
 }
 
 void mpi_fetch_and_op(void *orgaddr, void *resaddr, int *type, int *rank,

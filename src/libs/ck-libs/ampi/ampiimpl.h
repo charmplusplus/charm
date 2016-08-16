@@ -1604,7 +1604,7 @@ class ampi : public CBase_ampi {
   inline ampi* blockOnRecv(void);
   inline ampi* blockOnColl(void);
   inline ampi* blockOnRedn(AmpiRequest *req);
-  inline MPI_Request postReq(AmpiRequest* newreq, AmpiReqSts status=AMPI_REQ_PENDING);
+  MPI_Request postReq(AmpiRequest* newreq, AmpiReqSts status=AMPI_REQ_PENDING);
 
   AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int sync=0);
