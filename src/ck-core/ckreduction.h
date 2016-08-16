@@ -786,7 +786,7 @@ void me::contribute(CkReductionMsg *msg) \
 	}\
 void me::contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag)\
 {\
-	CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
+	CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::nop);\
     msg->setUserFlag(userFlag);\
     msg->setCallback(cb);\
     msg->setMigratableContributor(migratable);\
@@ -794,7 +794,7 @@ void me::contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag)\
 }\
 void me::contribute(CMK_REFNUM_TYPE userFlag)\
 {\
-    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
+    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::nop);\
     msg->setUserFlag(userFlag);\
     msg->setMigratableContributor(migratable);\
     myRednMgr->contribute(&myRednInfo,msg);\
@@ -803,7 +803,7 @@ void me::contribute(CMK_REFNUM_TYPE userFlag)\
 #define CK_BARRIER_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo,migratable) \
 void me::barrier(const CkCallback &cb)\
 {\
-    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
+    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::nop);\
     msg->setCallback(cb);\
     msg->setMigratableContributor(migratable);\
     myRednMgr->barrier(msg);\

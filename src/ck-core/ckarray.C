@@ -337,7 +337,7 @@ void ArrayElement::contribute2(CkReductionMsg *msg)
 }
 void ArrayElement::contribute2(const CkCallback &cb,CMK_REFNUM_TYPE userFlag)
 {
-	CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);
+    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::nop);
     msg->setUserFlag(userFlag);
     msg->setCallback(cb);
     msg->setMigratableContributor(true);
@@ -345,7 +345,7 @@ void ArrayElement::contribute2(const CkCallback &cb,CMK_REFNUM_TYPE userFlag)
 }
 void ArrayElement::contribute2(CMK_REFNUM_TYPE userFlag)
 {
-    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);
+    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::nop);
     msg->setUserFlag(userFlag);
     msg->setMigratableContributor(true);
     thisArray->contribute(&*(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],msg);

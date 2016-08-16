@@ -1010,8 +1010,8 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
       _TRACE_BG_ADD_BACKWARD_DEP(m->log);
 #endif
 
-      // for "random" reducer type, only need to accept one message
-      if (nMsgs == 0 || m->reducer != CkReduction::random) {
+      // for "nop" reducer type, only need to accept one message
+      if (nMsgs == 0 || m->reducer != CkReduction::nop) {
         msgArr[nMsgs++]=m;
         r=m->reducer;
         if (!m->callback.isInvalid()){
@@ -1050,9 +1050,9 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
        msgArr[0]->reducer != CkReduction::tuple) {
       ret = msgArr[0];
     }else{
-      if (msgArr[0]->reducer == CkReduction::random) {
-        // nMsgs > 1 indicates that reduction type is not random
-        // this means any data with reducer type random was submitted
+      if (msgArr[0]->reducer == CkReduction::nop) {
+        // nMsgs > 1 indicates that reduction type is not nop
+        // this means any data with reducer type nop was submitted
         // only so that counts would agree, and can be removed
         delete msgArr[0];
         msgArr[0] = msgArr[nMsgs - 1];
@@ -1206,8 +1206,8 @@ void CkReductionMgr :: endArrayReduction(){
             { //This is a real message from an element, not just a placeholder
               msgs_nSources+=m->nSources();
 
-              // for "random" reducer type, only need to accept one message
-              if (tempMsgs.length() == 0 || m->reducer != CkReduction::random) {
+              // for "nop" reducer type, only need to accept one message
+              if (tempMsgs.length() == 0 || m->reducer != CkReduction::nop) {
                 r=m->reducer;
                 if (!m->callback.isInvalid())
                   msgs_callback=m->callback;
@@ -1259,9 +1259,9 @@ void CkReductionMgr :: endArrayReduction(){
 		// has to be corrected elements from above need to be put into a temporary vector
     		CkReductionMsg **msgArr=&tempMsgs[0];//<-- HACK!
 
-                if (numMsgs > 1 && msgArr[0]->reducer == CkReduction::random) {
-                  // nMsgs > 1 indicates that reduction type is not "random"
-                  // this means any data with reducer type random was submitted
+                if (numMsgs > 1 && msgArr[0]->reducer == CkReduction::nop) {
+                  // nMsgs > 1 indicates that reduction type is not "nop"
+                  // this means any data with reducer type nop was submitted
                   // only so that counts would agree, and can be removed
                   delete msgArr[0];
                   msgArr[0] = msgArr[numMsgs - 1];
@@ -1647,7 +1647,10 @@ SIMPLE_REDUCTION(bitvec_xor,int,"%d",ret[i]^=value[i];)
 
 //Select one random message to pass on
 static CkReductionMsg *random(int nMsg,CkReductionMsg **msg) {
-  return CkReductionMsg::buildNew(msg[0]->getLength(),(void *)msg[0]->getData(), CkReduction::random, msg[0]);
+  int idx = (int)(CrnDrand()*(nMsg-1) + 0.5);
+  return CkReductionMsg::buildNew(msg[idx]->getLength(),
+                                  (void *)msg[idx]->getData(),
+                                  CkReduction::random, msg[idx]);
 }
 
 /////////////// concat ////////////////
@@ -2728,7 +2731,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
       _TRACE_BG_ADD_BACKWARD_DEP(m->log);
 #endif
 
-      if (nMsgs == 0 || m->reducer != CkReduction::random) {
+      if (nMsgs == 0 || m->reducer != CkReduction::nop) {
         msgArr[nMsgs++]=m;
         r=m->reducer;
         if (!m->callback.isInvalid()){
@@ -2767,9 +2770,9 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
     if(nMsgs == 1){
       ret = msgArr[0];
     }else{
-      if (msgArr[0]->reducer == CkReduction::random) {
-        // nMsgs > 1 indicates that reduction type is not random
-        // this means any data with reducer type random was submitted
+      if (msgArr[0]->reducer == CkReduction::nop) {
+        // nMsgs > 1 indicates that reduction type is not nop
+        // this means any data with reducer type nop was submitted
         // only so that counts would agree, and can be removed
         delete msgArr[0];
         msgArr[0] = msgArr[nMsgs - 1];
