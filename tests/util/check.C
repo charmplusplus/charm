@@ -41,7 +41,17 @@ void check_test(int argc, char** argv) {
   CmiFloat4 float4;
   CmiFloat8 float8;
 
-  if (CkMyPe()!=0) return;
+  if (CmiMyPe()!=0) return;
+
+  if (argc > 1) {
+    const int expected_pes = atoi(argv[1]);
+    if (CmiNumPes() != expected_pes) {
+      char message[1000];
+      sprintf(message, "PE count %d doesn't match expectation %d", CmiNumPes(), expected_pes);
+      CmiAbort(message);
+    }
+  }
+
   if (sizeof(int2) != 2) {
     CmiPrintf("Error: sizeof(CmiInt2) is %d!\n",sizeof(int2));
     exit(1);
