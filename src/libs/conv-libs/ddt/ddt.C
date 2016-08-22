@@ -21,7 +21,7 @@ static inline void serializeContig(char* userdata, char* buffer, size_t size, in
 }
 
 CkDDT_DataType*
-CkDDT::getType(int nIndex)
+CkDDT::getType(int nIndex) const
 {
   if( (nIndex >= 0) && (nIndex < max_types))
     return typeTable[nIndex] ;
@@ -142,45 +142,45 @@ CkDDT::~CkDDT()
 
 
 bool
-CkDDT::isContig(int nIndex)
+CkDDT::isContig(int nIndex) const
 {
   return getType(nIndex)->isContig();
 }
 
 int
-CkDDT::getSize(int nIndex, int count)
+CkDDT::getSize(int nIndex, int count) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
   return count*dttype->getSize();
 }
 
 CkDDT_Aint
-CkDDT::getExtent(int nIndex)
+CkDDT::getExtent(int nIndex) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
   return dttype->getExtent();
 }
 
 CkDDT_Aint
-CkDDT::getLB(int nIndex)
+CkDDT::getLB(int nIndex) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
   return dttype->getLB();
 }
 
 CkDDT_Aint
-CkDDT::getUB(int nIndex)
+CkDDT::getUB(int nIndex) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
   return dttype->getUB();
 }
 
-int CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner)
+int CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
   return dttype->getEnvelope(ni, na, nd, combiner);
 }
-int CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[])
+int CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
   return dttype->getContents(ni, na, nd, i, a, d);
@@ -194,7 +194,7 @@ CkDDT::setName(int nIndex, const char *name)
 }
 
 void
-CkDDT::getName(int nIndex, char *name, int *len)
+CkDDT::getName(int nIndex, char *name, int *len) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
   dttype->getName(name, len);
@@ -489,7 +489,7 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_
 }
 
 size_t
-CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir)
+CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir) const
 {
   size_t bufSize = (size_t)num * (size_t)size;
   DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
@@ -513,53 +513,57 @@ CkDDT_DataType::setName(const char *src)
 }
 
 void
-CkDDT_DataType::getName(char *dest, int *len)
+CkDDT_DataType::getName(char *dest, int *len) const
 {
   *len = nameLen;
   memcpy(dest, name, *len+1);
 }
 
 bool
-CkDDT_DataType::isContig()
+CkDDT_DataType::isContig() const
 {
   return iscontig;
 }
 
 int
-CkDDT_DataType::getSize(int num)
+CkDDT_DataType::getSize(int num) const
 {
   return num*size ;
 }
 
 CkDDT_Aint
-CkDDT_DataType::getExtent(void)
+CkDDT_DataType::getExtent(void) const
 {
   return extent ;
 }
 
 int
-CkDDT_DataType::getBaseSize(void)
+CkDDT_DataType::getBaseSize(void) const
 {
   return baseSize ;
 }
 
 int
-CkDDT_DataType::getNumElements(void){
+CkDDT_DataType::getNumElements(void) const
+{
   return numElements;
 }
 
 CkDDT_Aint
-CkDDT_DataType::getLB(void){
+CkDDT_DataType::getLB(void) const
+{
   return lb;
 }
 
 CkDDT_Aint
-CkDDT_DataType::getUB(void){
+CkDDT_DataType::getUB(void) const
+{
   return ub;
 }
 
 int
-CkDDT_DataType::getType(void){
+CkDDT_DataType::getType(void) const
+{
   return datatype;
 }
 
@@ -570,7 +574,7 @@ CkDDT_DataType::inrRefCount(void)
 }
 
 int
-CkDDT_DataType::getRefCount(void)
+CkDDT_DataType::getRefCount(void) const
 {
   return refCount ;
 }
@@ -594,7 +598,9 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
   p(name,CkDDT_MAX_NAME_LEN);
 }
 
-int CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner){
+int
+CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+{
   *ni = 0;
   *na = 0;
   *nd = 0;
@@ -602,7 +608,9 @@ int CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner){
   return 0;
 }
 
-int CkDDT_DataType::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]){
+int
+CkDDT_DataType::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
+{
   CmiPrintf("CkDDT_DataType::getContents: Shouldn't call getContents on primitive datatypes!\n");
   return -1;
 }
@@ -630,7 +638,7 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
 }
 
 size_t
-CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int dir)
+CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int dir) const
 {
   DDTDEBUG("CkDDT_Contiguous::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
@@ -666,7 +674,9 @@ CkDDT_Contiguous::pupType(PUP::er &p, CkDDT *ddt)
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
-int CkDDT_Contiguous::getEnvelope(int *ni, int *na, int *nd, int *combiner){
+int
+CkDDT_Contiguous::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+{
   *ni = 1;
   *na = 0;
   *nd = 1;
@@ -674,7 +684,9 @@ int CkDDT_Contiguous::getEnvelope(int *ni, int *na, int *nd, int *combiner){
   return 0;
 }
 
-int CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]){
+int
+CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
+{
   i[0] = count;
   d[0] = baseIndex;
   return 0;
@@ -718,7 +730,7 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
 }
 
 size_t
-CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int dir)
+CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int dir) const
 {
   DDTDEBUG("CkDDT_Vector::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
@@ -760,7 +772,9 @@ CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt)
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
-int CkDDT_Vector::getEnvelope(int *ni, int *na, int *nd, int *combiner){
+int
+CkDDT_Vector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+{
   *ni = 3;
   *na = 0;
   *nd = 1;
@@ -768,7 +782,9 @@ int CkDDT_Vector::getEnvelope(int *ni, int *na, int *nd, int *combiner){
   return 0;
 }
 
-int CkDDT_Vector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]){
+int
+CkDDT_Vector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
+{
   i[0] = count;
   i[1] = blockLength;
   i[2] = strideLength;
@@ -815,7 +831,7 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
 }
 
 size_t
-CkDDT_HVector::serialize(char* userdata, char* buffer, int num, int dir)
+CkDDT_HVector::serialize(char* userdata, char* buffer, int num, int dir) const
 {
   DDTDEBUG("CkDDT_HVector::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
@@ -844,7 +860,9 @@ CkDDT_HVector::pupType(PUP::er &p, CkDDT* ddt)
   CkDDT_Vector::pupType(p, ddt);
 }
 
-int CkDDT_HVector::getEnvelope(int *ni, int *na, int *nd, int *combiner){
+int
+CkDDT_HVector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+{
   *ni = 2;
   *na = 1;
   *nd = 1;
@@ -852,7 +870,9 @@ int CkDDT_HVector::getEnvelope(int *ni, int *na, int *nd, int *combiner){
   return 0;
 }
 
-int CkDDT_HVector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]){
+int
+CkDDT_HVector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
+{
   i[0] = count;
   i[1] = blockLength;
   a[0] = strideLength;
@@ -906,7 +926,7 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp, int
 }
 
 size_t
-CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, int dir)
+CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, int dir) const
 {
   DDTDEBUG("CkDDT_Indexed::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
@@ -964,7 +984,9 @@ CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
-int CkDDT_Indexed::getEnvelope(int *ni, int *na, int *nd, int *combiner){
+int
+CkDDT_Indexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+{
   *ni = count*2+1;
   *na = 0;
   *nd = 1;
@@ -972,7 +994,9 @@ int CkDDT_Indexed::getEnvelope(int *ni, int *na, int *nd, int *combiner){
   return 0;
 }
 
-int CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]){
+int
+CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
+{
   i[0] = count;
   for(int z=0;z<i[0];z++){
     i[z+1] = arrayBlockLength[z];
@@ -1017,7 +1041,7 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp,  
 }
 
 size_t
-CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, int dir)
+CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, int dir) const
 {
   DDTDEBUG("CkDDT_HIndexed::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
@@ -1051,7 +1075,9 @@ CkDDT_HIndexed::pupType(PUP::er &p, CkDDT* ddt)
   CkDDT_Indexed::pupType(p, ddt);
 }
 
-int CkDDT_HIndexed::getEnvelope(int *ni, int *na, int *nd, int *combiner){
+int
+CkDDT_HIndexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+{
   *ni = count+1;
   *na = count;
   *nd = 1;
@@ -1059,7 +1085,9 @@ int CkDDT_HIndexed::getEnvelope(int *ni, int *na, int *nd, int *combiner){
   return 0;
 }
 
-int CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]){
+int
+CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
+{
   i[0] = count;
   for(int z=0;z<i[0];z++){
     i[z+1] = arrayBlockLength[z];
@@ -1121,7 +1149,7 @@ CkDDT_Indexed_Block::~CkDDT_Indexed_Block()
 }
 
 size_t
-CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int dir)
+CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int dir) const
 {
   DDTDEBUG("CkDDT_Indexed_Block::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
@@ -1148,7 +1176,8 @@ CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int dir)
   return bytesCopied;
 }
 
-void CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
+void
+CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
 {
   p(datatype);
   p(size);
@@ -1169,7 +1198,8 @@ void CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
-int CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner)
+int
+CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 {
   *ni = count*2+1;
   *na = 0;
@@ -1178,7 +1208,8 @@ int CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner)
   return 0;
 }
 
-int CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[])
+int
+CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
 {
   i[0] = count;
   i[1] = BlockLength;
@@ -1238,8 +1269,7 @@ CkDDT_HIndexed_Block::~CkDDT_HIndexed_Block()
 }
 
 size_t
-CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num,
-  int dir)
+CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, int dir) const
 {
   DDTDEBUG("CkDDT_HIndexed_Block::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
@@ -1266,7 +1296,8 @@ CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num,
   return bytesCopied;
 }
 
-void CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
+void
+CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
 {
   p(datatype);
   p(size);
@@ -1287,7 +1318,8 @@ void CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
-int CkDDT_HIndexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner)
+int
+CkDDT_HIndexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 {
   *ni = count*2+1;
   *na = 0;
@@ -1296,7 +1328,8 @@ int CkDDT_HIndexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner)
   return 0;
 }
 
-int CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[])
+int
+CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
 {
   i[0] = count;
   i[1] = BlockLength;
@@ -1383,7 +1416,8 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
 }
 
 size_t
-CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) {
+CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) const
+{
   size_t bytesCopied = 0;
 
   if (iscontig) {
@@ -1448,7 +1482,9 @@ CkDDT_Struct::pupType(PUP::er &p, CkDDT* ddt)
       arrayDataType[i] = ddt->getType(index[i]);
 }
 
-int CkDDT_Struct::getEnvelope(int *ni, int *na, int *nd, int *combiner){
+int
+CkDDT_Struct::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+{
   *ni = count+1;
   *na = count;
   *nd = count;
@@ -1456,7 +1492,9 @@ int CkDDT_Struct::getEnvelope(int *ni, int *na, int *nd, int *combiner){
   return 0;
 }
 
-int CkDDT_Struct::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]){
+int
+CkDDT_Struct::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
+{
   i[0] = count;
   for(int z=0;z<i[0];z++){
     i[z+1] = arrayBlockLength[z];
