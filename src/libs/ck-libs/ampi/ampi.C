@@ -919,6 +919,7 @@ static ampi *ampiInit(char **argv)
     //Create and attach the ampiParent array
     CkArrayID threads;
     opts=TCHARM_Attach_start(&threads,&_nchunks);
+    opts.setBroadcastViaScheduler(true);
     parent=CProxy_ampiParent::ckNew(new_world,threads,opts);
     STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
   }
@@ -933,6 +934,7 @@ static ampi *ampiInit(char **argv)
 
     ampiCommStruct worldComm(new_world,empty,_nchunks);
     CProxy_ampi arr;
+    opts.setBroadcastViaScheduler(true);
     arr=CProxy_ampi::ckNew(parent,worldComm,opts);
 
     //Broadcast info. to the mpi_worlds array
@@ -1514,6 +1516,9 @@ void ampi::pup(PUP::er &p)
         case MPI_I_REQ:
           blockingReq = new IReq;
           break;
+        case MPI_BCAST_REQ:
+          blockingReq = new BcastReq;
+          break;
         case MPI_REDN_REQ:
           blockingReq = new RednReq;
           break;
@@ -1626,6 +1631,7 @@ CProxy_ampi ampi::createNewChildAmpiSync() {
   CkArrayID unusedAID;
   ampiCommStruct unusedComm;
   CkCallback cb(CkCallback::resumeThread);
+  opts.setBroadcastViaScheduler(true);
   CProxy_ampi::ckNew(unusedAID, unusedComm, opts, cb);
   CkArrayCreatedMsg *newAmpiMsg = static_cast<CkArrayCreatedMsg*>(cb.thread_delay());
   CProxy_ampi newAmpi = newAmpiMsg->aid;
@@ -1899,17 +1905,8 @@ ampi* ampi::blockOnRecv(void){
   return dis;
 }
 
-ampi* ampi::blockOnColl(void){
-  resumeOnColl = true;
-  MPI_Comm comm = myComm.getComm();
-  thread->suspend();
-  ampi *dis = getAmpiInstance(comm);
-  dis->resumeOnColl = false;
-  return dis;
-}
-
-// block on (All)Reduce or (All)Gather(v)
-ampi* ampi::blockOnRedn(AmpiRequest *req){
+// block on a collective operation
+ampi* ampi::blockOnColl(AmpiRequest *req){
 
   blockingReq = req;
 
@@ -1924,7 +1921,11 @@ ampi* ampi::blockOnRedn(AmpiRequest *req){
 #endif
 #endif
 
-  ampi* dis = blockOnColl();
+  resumeOnColl = true;
+  MPI_Comm comm = getComm();
+  thread->suspend();
+  ampi *dis = getAmpiInstance(comm);
+  dis->resumeOnColl = false;
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   CpvAccess(_currentObj) = dis;
@@ -2305,39 +2306,38 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   return 0;
 }
 
-
-const int MPI_BCAST_COMM=MPI_COMM_WORLD+1000;
-
 void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm)
 {
-  const ampiCommStruct &dest=comm2CommStruct(destcomm);
-  int rootIdx=dest.getIndexForRank(root);
-  if(rootIdx==thisIndex) {
+  const ampiCommStruct &dest = comm2CommStruct(destcomm);
+  int rootIdx = dest.getIndexForRank(root);
+
+  if (rootIdx == thisIndex) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
+    thisProxy.bcastResult(makeAmpiMsg(-1, MPI_BCAST_TAG, root, buf, count, type, destcomm));
   }
-  if(-1==recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM)) CkAbort("AMPI> Error in broadcast");
+
+  blockOnColl(new BcastReq(buf, count, type, root, destcomm));
 }
 
 void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm, MPI_Request* request)
 {
-  const ampiCommStruct &dest=comm2CommStruct(destcomm);
-  int rootIdx=dest.getIndexForRank(root);
-  if(rootIdx==thisIndex){
+  const ampiCommStruct &dest = comm2CommStruct(destcomm);
+  int rootIdx = dest.getIndexForRank(root);
+
+  if (rootIdx == thisIndex) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, 0, buf, count, type, MPI_BCAST_COMM));
+    thisProxy.ibcastResult(makeAmpiMsg(-1, MPI_BCAST_TAG, root, buf, count, type, destcomm));
   }
 
-  // use an IReq to non-block the caller and get a request ptr
+  // use a BcastReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  IReq *newreq = new IReq(buf, count, type, rootIdx, MPI_BCAST_TAG, MPI_BCAST_COMM);
+  BcastReq *newreq = new BcastReq(buf, count, type, root, destcomm);
   *request = reqs->insert(newreq);
-  int tags[3];
-  tags[0]=MPI_BCAST_TAG; tags[1]=rootIdx; tags[2]=MPI_BCAST_COMM;
+  int tags[3] = { MPI_BCAST_TAG, rootIdx, destcomm };
   CmmPut(posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 }
 
@@ -2454,6 +2454,11 @@ void IReq::print(){
   CkPrintf("In IReq: this=%p, status=%d, length=%d\n", this, statusIreq, length);
 }
 
+void BcastReq::print(){
+  AmpiRequest::print();
+  CkPrintf("In BcastReq: this=%p, status=%d\n", this, statusIreq);
+}
+
 void RednReq::print(){
   AmpiRequest::print();
   CkPrintf("In RednReq: this=%p, status=%d\n", this, statusIreq);
@@ -2508,6 +2513,9 @@ void AmpiRequestList::pup(PUP::er &p) {
             break;
           case MPI_I_REQ:
             block[i] = new IReq;
+            break;
+          case MPI_BCAST_REQ:
+            block[i] = new BcastReq;
             break;
           case MPI_REDN_REQ:
             block[i] = new RednReq;
@@ -3216,6 +3224,72 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
   return MPI_SUCCESS;
 }
 
+// This routine is called with the results of a Bcast
+void ampi::bcastResult(AmpiMsg *msg)
+{
+  MSG_ORDER_DEBUG(CkPrintf("[%d] bcastResult called on comm %d\n", thisIndex, myComm.getComm()));
+
+  if (blockingReq == NULL) {
+    CkAbort("AMPI> recv'ed a blocking bcast unexpectedly!\n");
+  }
+
+#if CMK_BIGSIM_CHARM
+  TRACE_BG_ADD_TAG("AMPI_generic");
+  msg->event = NULL;
+  _TRACE_BG_TLINE_END(&msg->event); // store current log
+  msg->eventPe = CkMyPe();
+#endif
+
+  blockingReq->receive(this, msg);
+
+  if (resumeOnColl) {
+    thread->resume();
+  }
+  // [nokeep] entry method, so do not delete msg
+}
+
+// This routine is called with the results of an Ibcast
+void ampi::ibcastResult(AmpiMsg *msg)
+{
+  MSG_ORDER_DEBUG(CkPrintf("[%d] ibcastResult called on comm %d\n", thisIndex, myComm.getComm()));
+
+  MPI_Status sts;
+  int tags[3] = { MPI_BCAST_TAG, AMPI_COLL_SOURCE, myComm.getComm() };
+  AmpiRequestList *reqL = &(parent->ampiReqs);
+  int bcastReqIdx = (int)((long)CmmGet(posted_ireqs, 3, tags, (int*)&sts));
+  AmpiRequest *bcastReq = NULL;
+  if (reqL->size()>0 && bcastReqIdx>0)
+    bcastReq = (AmpiRequest *)(*reqL)[bcastReqIdx-1];
+  if (bcastReq == NULL)
+    CkAbort("AMPI> recv'ed a non-blocking bcast unexpectedly!\n");
+
+#if CMK_BIGSIM_CHARM
+  TRACE_BG_ADD_TAG("AMPI_generic");
+  msg->event = NULL;
+  _TRACE_BG_TLINE_END(&msg->event); // store current log
+  msg->eventPe = CkMyPe();
+#endif
+#if AMPIMSGLOG
+  if(msgLogRead){
+    PUParray(*(getAmpiParent()->fromPUPer), (char *)bcastReq, sizeof(int));
+    return;
+  }
+#endif
+
+  bcastReq->receive(this, msg);
+
+#if AMPIMSGLOG
+  if(msgLogWrite && record_msglog(getAmpiParent()->thisIndex)){
+    PUParray(*(getAmpiParent()->toPUPer), (char *)bcastReq, sizeof(int));
+  }
+#endif
+
+  if (resumeOnColl) {
+    thread->resume();
+  }
+  // [nokeep] entry method, so do not delete msg
+}
+
 // This routine is called with the results of an (All)Reduce or (All)Gather(v)
 void ampi::rednResult(CkReductionMsg *msg)
 {
@@ -3379,7 +3453,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op 
   ptr->contribute(msg);
 
   if (ptr->thisIndex == rootIdx){
-    ptr = ptr->blockOnRedn(new RednReq(outbuf, count, type, comm));
+    ptr = ptr->blockOnColl(new RednReq(outbuf, count, type, comm));
 
 #if SYNCHRONOUS_REDUCE
     AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDN_TAG, -1, rootIdx, 0, comm);
@@ -3443,7 +3517,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
-  ptr->blockOnRedn(new RednReq(outbuf, count, type, comm));
+  ptr->blockOnColl(new RednReq(outbuf, count, type, comm));
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -3917,6 +3991,38 @@ int IReq::wait(MPI_Status *sts){
   return 0;
 }
 
+int BcastReq::wait(MPI_Status *sts){
+  //Copy "this" to a local variable in the case that "this" pointer
+  //is updated during the out-of-core emulation.
+
+  // ampi::ibcastResult writes directly to the buffer, so the only thing we
+  // do here is to wait
+  ampi *dis = getAmpiInstance(comm);
+
+  while (!statusIreq) {
+    dis->resumeOnColl = true;
+    dis->block();
+
+#if CMK_BIGSIM_CHARM
+    //Because of the out-of-core emulation, this pointer is changed after in-out
+    //memory operation. So we need to return from this function and do the while loop
+    //in the outer function call.
+    if (_BgInOutOfCoreMode)
+      return -1;
+#endif
+  }
+  dis->resumeOnColl = false;
+
+  AMPI_DEBUG("BcastReq::wait has resumed\n");
+
+  if (sts) {
+    sts->MPI_TAG = tag;
+    sts->MPI_SOURCE = src;
+    sts->MPI_COMM = comm;
+  }
+  return 0;
+}
+
 int RednReq::wait(MPI_Status *sts){
   //Copy "this" to a local variable in the case that "this" pointer
   //is updated during the out-of-core emulation.
@@ -4308,6 +4414,17 @@ bool IReq::itest(MPI_Status *sts){
   return statusIreq;
 }
 
+bool BcastReq::test(MPI_Status *sts){
+  if (!statusIreq) {
+    getAmpiInstance(comm)->yield();
+  }
+  return statusIreq;
+}
+
+bool BcastReq::itest(MPI_Status *sts){
+  return statusIreq;
+}
+
 bool RednReq::test(MPI_Status *sts){
   if (!statusIreq) {
     getAmpiInstance(comm)->yield();
@@ -4379,6 +4496,10 @@ void IReq::complete(MPI_Status *sts){
   wait(sts);
 }
 
+void BcastReq::complete(MPI_Status *sts){
+  wait(sts);
+}
+
 void RednReq::complete(MPI_Status *sts){
   wait(sts);
 }
@@ -4418,6 +4539,18 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
   eventPe = msg->eventPe;
 #endif
   delete msg;
+}
+
+void BcastReq::receive(ampi *ptr, AmpiMsg *msg)
+{
+  ptr->processAmpiMsg(msg, buf, type, count);
+  statusIreq = true;
+  comm = msg->comm;
+#if CMK_BIGSIM_CHARM
+  event = msg->event;
+  eventPe = msg->eventPe;
+#endif
+  // ampi::bcastResult is a [nokeep] entry method, so do not delete msg
 }
 
 void RednReq::receive(ampi *ptr, CkReductionMsg *msg)
@@ -5025,7 +5158,7 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgather called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
-  ptr->blockOnRedn(new GatherReq(recvbuf, recvcount, recvtype, comm));
+  ptr->blockOnColl(new GatherReq(recvbuf, recvcount, recvtype, comm));
 
   return MPI_SUCCESS;
 }
@@ -5130,7 +5263,7 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgatherv called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
-  ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(comm), recvtype, comm, recvcounts, displs));
+  ptr->blockOnColl(new GathervReq(recvbuf, ptr->getSize(comm), recvtype, comm, recvcounts, displs));
 
   return MPI_SUCCESS;
 }
@@ -5248,7 +5381,7 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ptr->contribute(msg);
 
   if(rank==root) {
-    ptr->blockOnRedn(new GatherReq(recvbuf, recvcount, recvtype, comm));
+    ptr->blockOnColl(new GatherReq(recvbuf, recvcount, recvtype, comm));
   }
 
 #if AMPIMSGLOG
@@ -5403,7 +5536,7 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ptr->contribute(msg);
 
   if(rank==root) {
-    ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(comm), recvtype, comm, recvcounts, displs));
+    ptr->blockOnColl(new GathervReq(recvbuf, ptr->getSize(comm), recvtype, comm, recvcounts, displs));
   }
 
 #if AMPIMSGLOG

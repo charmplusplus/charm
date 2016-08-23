@@ -516,10 +516,11 @@ extern int _mpi_nworlds;
 #define MPI_I_REQ       2
 #define MPI_IATA_REQ    3
 #define MPI_S_REQ       4
-#define MPI_REDN_REQ    5
-#define MPI_GATHER_REQ  6
-#define MPI_GATHERV_REQ 7
-#define MPI_GPU_REQ     8
+#define MPI_BCAST_REQ   5
+#define MPI_REDN_REQ    6
+#define MPI_GATHER_REQ  7
+#define MPI_GATHERV_REQ 8
+#define MPI_GPU_REQ     9
 
 #define MyAlign8(x) (((x)+7)&(~7))
 
@@ -556,7 +557,7 @@ class AmpiRequest {
   /// Return true if this request is finished (progress):
   ///  test always yields before returning false.
   ///  itest does not yield before returning false for
-  //   IReq's, RednReq's, Gather(v)Req's, and SReq's.
+  ///  IReq's, BcastReq's, RednReq's, Gather(v)Req's, and SReq's.
   virtual bool test(MPI_Status *sts) =0;
   virtual bool itest(MPI_Status *sts) =0;
 
@@ -646,6 +647,29 @@ class IReq : public AmpiRequest {
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|statusIreq;  p|length;
+  }
+  virtual void print();
+};
+
+class BcastReq : public AmpiRequest {
+ public:
+  bool statusIreq;
+  BcastReq(void *buf_, int count_, MPI_Datatype type_, int src_, MPI_Comm comm_){
+    buf=buf_;  count=count_;  type=type_;  src=src_;  tag=MPI_BCAST_TAG;
+    comm=comm_;  isvalid=true; statusIreq=false;
+  }
+  BcastReq(): statusIreq(false){};
+  ~BcastReq(){}
+  bool test(MPI_Status *sts);
+  bool itest(MPI_Status *sts);
+  void complete(MPI_Status *sts);
+  int wait(MPI_Status *sts);
+  inline int getType(void) const { return MPI_BCAST_REQ; }
+  void receive(ampi *ptr, AmpiMsg *msg);
+  void receive(ampi *ptr, CkReductionMsg *msg) {}
+  virtual void pup(PUP::er &p){
+    AmpiRequest::pup(p);
+    p|statusIreq;
   }
   virtual void print();
 };
@@ -1359,6 +1383,7 @@ one MPI communicator.
 class ampi : public CBase_ampi {
   friend class IReq; // for checking resumeOnRecv
   friend class SReq;
+  friend class BcastReq;
   friend class RednReq;
   friend class GatherReq;
   friend class GathervReq;
@@ -1402,6 +1427,8 @@ class ampi : public CBase_ampi {
   void ssend_ack(int sreq);
   void barrierResult(void);
   void ibarrierResult(void);
+  void bcastResult(AmpiMsg *msg);
+  void ibcastResult(AmpiMsg *msg);
   void rednResult(CkReductionMsg *msg);
   void irednResult(CkReductionMsg *msg);
 
@@ -1421,8 +1448,7 @@ class ampi : public CBase_ampi {
   }
 
   inline ampi* blockOnRecv(void);
-  inline ampi* blockOnColl(void);
-  inline ampi* blockOnRedn(AmpiRequest *req);
+  inline ampi* blockOnColl(AmpiRequest *req);
 
   AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int sync=0);
