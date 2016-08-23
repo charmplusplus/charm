@@ -512,15 +512,17 @@ extern int _mpi_nworlds;
 #define AMPI_COLL_SOURCE 0
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
 
-#define MPI_PERS_REQ    1
-#define MPI_I_REQ       2
-#define MPI_IATA_REQ    3
-#define MPI_S_REQ       4
-#define MPI_BCAST_REQ   5
-#define MPI_REDN_REQ    6
-#define MPI_GATHER_REQ  7
-#define MPI_GATHERV_REQ 8
-#define MPI_GPU_REQ     9
+#define MPI_PERS_REQ      1
+#define MPI_I_REQ         2
+#define MPI_IATA_REQ      3
+#define MPI_S_REQ         4
+#define MPI_BCAST_REQ     5
+#define MPI_SCATTER_REQ   6
+#define MPI_SCATTERV_REQ  7
+#define MPI_REDN_REQ      8
+#define MPI_GATHER_REQ    9
+#define MPI_GATHERV_REQ  10
+#define MPI_GPU_REQ      11
 
 #define MyAlign8(x) (((x)+7)&(~7))
 
@@ -557,7 +559,8 @@ class AmpiRequest {
   /// Return true if this request is finished (progress):
   ///  test always yields before returning false.
   ///  itest does not yield before returning false for
-  ///  IReq's, BcastReq's, RednReq's, Gather(v)Req's, and SReq's.
+  ///  IReq's, BcastReq's, ScatterReq's, ScattervReq's,
+  ///  RednReq's, Gather(v)Req's, and SReq's.
   virtual bool test(MPI_Status *sts) =0;
   virtual bool itest(MPI_Status *sts) =0;
 
@@ -665,6 +668,52 @@ class BcastReq : public AmpiRequest {
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
   inline int getType(void) const { return MPI_BCAST_REQ; }
+  void receive(ampi *ptr, AmpiMsg *msg);
+  void receive(ampi *ptr, CkReductionMsg *msg) {}
+  virtual void pup(PUP::er &p){
+    AmpiRequest::pup(p);
+    p|statusIreq;
+  }
+  virtual void print();
+};
+
+class ScatterReq : public AmpiRequest {
+ public:
+  bool statusIreq;
+  ScatterReq(void *buf_, int count_, MPI_Datatype type_, int src_, MPI_Comm comm_){
+    buf=buf_;  count=count_;  type=type_;  src=src_;  tag=MPI_SCATTER_TAG;
+    comm=comm_;  isvalid=true; statusIreq=false;
+  }
+  ScatterReq(): statusIreq(false){};
+  ~ScatterReq(){}
+  bool test(MPI_Status *sts);
+  bool itest(MPI_Status *sts);
+  void complete(MPI_Status *sts);
+  int wait(MPI_Status *sts);
+  inline int getType(void) const { return MPI_SCATTER_REQ; }
+  void receive(ampi *ptr, AmpiMsg *msg);
+  void receive(ampi *ptr, CkReductionMsg *msg) {}
+  virtual void pup(PUP::er &p){
+    AmpiRequest::pup(p);
+    p|statusIreq;
+  }
+  virtual void print();
+};
+
+class ScattervReq : public AmpiRequest {
+ public:
+  bool statusIreq;
+  ScattervReq(void *buf_, int count_, MPI_Datatype type_, int src_, MPI_Comm comm_){
+    buf=buf_;  count=count_;  type=type_;  src=src_;  tag=MPI_SCATTER_TAG;
+    comm=comm_;  isvalid=true; statusIreq=false;
+  }
+  ScattervReq(): statusIreq(false){};
+  ~ScattervReq(){}
+  bool test(MPI_Status *sts);
+  bool itest(MPI_Status *sts);
+  void complete(MPI_Status *sts);
+  int wait(MPI_Status *sts);
+  inline int getType(void) const { return MPI_SCATTERV_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg);
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   virtual void pup(PUP::er &p){
@@ -1384,6 +1433,8 @@ class ampi : public CBase_ampi {
   friend class IReq; // for checking resumeOnRecv
   friend class SReq;
   friend class BcastReq;
+  friend class ScatterReq;
+  friend class ScattervReq;
   friend class RednReq;
   friend class GatherReq;
   friend class GathervReq;
@@ -1452,6 +1503,8 @@ class ampi : public CBase_ampi {
 
   AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int sync=0);
+  AmpiMsg *makeScattervMsg(int rootRank, const void *buf, int *counts, MPI_Datatype type,
+                           MPI_Comm destcomm, int *displs);
 
   void send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
             MPI_Comm destcomm, int sync=0);
@@ -1460,6 +1513,8 @@ class ampi : public CBase_ampi {
   void delesend(int t, int s, const void* buf, int count, MPI_Datatype type,
                 int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
   inline void processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count);
+  inline void processScatterMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int recvCount);
+  inline void processScattervMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int recvCount);
   inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count);
   inline void processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount);
   inline void processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
@@ -1478,6 +1533,16 @@ class ampi : public CBase_ampi {
   void bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm);
   void ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Request* request);
   static void bcastraw(void* buf, int len, CkArrayID aid);
+  void scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype, void *recvbuf,
+               int recvcount, MPI_Datatype recvtype, int root, MPI_Comm comm);
+  void iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                int root, MPI_Comm comm, MPI_Request *request);
+  void scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+                void *recvbuf, int recvcount, MPI_Datatype recvtype, int root, MPI_Comm comm);
+  void iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+                 void *recvbuf, int recvcount, MPI_Datatype recvtype, int root,
+                 MPI_Comm comm, MPI_Request *request);
   void split(int color,int key,MPI_Comm *dest, int type);
   void commCreate(const groupStruct vec,MPI_Comm *newcomm);
   void cartCreate(const groupStruct vec, MPI_Comm *newcomm);

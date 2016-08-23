@@ -1519,6 +1519,12 @@ void ampi::pup(PUP::er &p)
         case MPI_BCAST_REQ:
           blockingReq = new BcastReq;
           break;
+        case MPI_SCATTER_REQ:
+          blockingReq = new ScatterReq;
+          break;
+        case MPI_SCATTERV_REQ:
+          blockingReq = new ScattervReq;
+          break;
         case MPI_REDN_REQ:
           blockingReq = new RednReq;
           break;
@@ -2135,6 +2141,29 @@ void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
   ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
 }
 
+void ampi::processScatterMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int recvCount)
+{
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  int offset = ddt->getSize(recvCount) * getRank(getComm());
+
+  ddt->serialize((char*)buf, (char*)msg->data+offset, recvCount, (-1));
+}
+
+void ampi::processScattervMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int recvCount)
+{
+  // Scatterv messages have the first commSize*sizeof(int) bytes reserved for displs.
+  // This is necessary for Scatterv's because the 'displs' argument to MPI_Scatter
+  // is only meaningful at the root according to the MPI standard, but the recv'ers
+  // all need to know their own displ in our bcast implementation.
+  int rank   = getRank(getComm());
+  int displ  = ((int*)msg->data)[rank];
+  int szhdr  = getSize(getComm()) * sizeof(int);
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  int offset = szhdr + ddt->getSize(displ);
+
+  ddt->serialize((char*)buf, (char*)msg->data+offset, recvCount, (-1));
+}
+
 void ampi::processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count)
 {
   // The first sizeof(AmpiOpHeader) bytes in the redn msg data are reserved
@@ -2459,6 +2488,16 @@ void BcastReq::print(){
   CkPrintf("In BcastReq: this=%p, status=%d\n", this, statusIreq);
 }
 
+void ScatterReq::print(){
+  AmpiRequest::print();
+  CkPrintf("In ScatterReq: this=%p, status=%d\n", this, statusIreq);
+}
+
+void ScattervReq::print(){
+  AmpiRequest::print();
+  CkPrintf("In ScattervReq: this=%p, status=%d\n", this, statusIreq);
+}
+
 void RednReq::print(){
   AmpiRequest::print();
   CkPrintf("In RednReq: this=%p, status=%d\n", this, statusIreq);
@@ -2516,6 +2555,12 @@ void AmpiRequestList::pup(PUP::er &p) {
             break;
           case MPI_BCAST_REQ:
             block[i] = new BcastReq;
+            break;
+          case MPI_SCATTER_REQ:
+            block[i] = new ScatterReq;
+            break;
+          case MPI_SCATTERV_REQ:
+            block[i] = new ScattervReq;
             break;
           case MPI_REDN_REQ:
             block[i] = new RednReq;
@@ -3224,7 +3269,7 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
   return MPI_SUCCESS;
 }
 
-// This routine is called with the results of a Bcast
+// This routine is called with the results of a Bcast or Scatter(v)
 void ampi::bcastResult(AmpiMsg *msg)
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] bcastResult called on comm %d\n", thisIndex, myComm.getComm()));
@@ -3248,7 +3293,7 @@ void ampi::bcastResult(AmpiMsg *msg)
   // [nokeep] entry method, so do not delete msg
 }
 
-// This routine is called with the results of an Ibcast
+// This routine is called with the results of an Ibcast or Iscatter(v)
 void ampi::ibcastResult(AmpiMsg *msg)
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] ibcastResult called on comm %d\n", thisIndex, myComm.getComm()));
@@ -4023,6 +4068,70 @@ int BcastReq::wait(MPI_Status *sts){
   return 0;
 }
 
+int ScatterReq::wait(MPI_Status *sts){
+  //Copy "this" to a local variable in the case that "this" pointer
+  //is updated during the out-of-core emulation.
+
+  // ampi::ibcastResult writes directly to the buffer, so the only thing we
+  // do here is to wait
+  ampi *dis = getAmpiInstance(comm);
+
+  while (!statusIreq) {
+    dis->resumeOnColl = true;
+    dis->block();
+
+#if CMK_BIGSIM_CHARM
+    //Because of the out-of-core emulation, this pointer is changed after in-out
+    //memory operation. So we need to return from this function and do the while loop
+    //in the outer function call.
+    if (_BgInOutOfCoreMode)
+      return -1;
+#endif
+  }
+  dis->resumeOnColl = false;
+
+  AMPI_DEBUG("ScatterReq::wait has resumed\n");
+
+  if (sts) {
+    sts->MPI_TAG = tag;
+    sts->MPI_SOURCE = src;
+    sts->MPI_COMM = comm;
+  }
+  return 0;
+}
+
+int ScattervReq::wait(MPI_Status *sts){
+  //Copy "this" to a local variable in the case that "this" pointer
+  //is updated during the out-of-core emulation.
+
+  // ampi::ibcastResult writes directly to the buffer, so the only thing we
+  // do here is to wait
+  ampi *dis = getAmpiInstance(comm);
+
+  while (!statusIreq) {
+    dis->resumeOnColl = true;
+    dis->block();
+
+#if CMK_BIGSIM_CHARM
+    //Because of the out-of-core emulation, this pointer is changed after in-out
+    //memory operation. So we need to return from this function and do the while loop
+    //in the outer function call.
+    if (_BgInOutOfCoreMode)
+      return -1;
+#endif
+  }
+  dis->resumeOnColl = false;
+
+  AMPI_DEBUG("ScattervReq::wait has resumed\n");
+
+  if (sts) {
+    sts->MPI_TAG = tag;
+    sts->MPI_SOURCE = src;
+    sts->MPI_COMM = comm;
+  }
+  return 0;
+}
+
 int RednReq::wait(MPI_Status *sts){
   //Copy "this" to a local variable in the case that "this" pointer
   //is updated during the out-of-core emulation.
@@ -4425,6 +4534,28 @@ bool BcastReq::itest(MPI_Status *sts){
   return statusIreq;
 }
 
+bool ScatterReq::test(MPI_Status *sts){
+  if (!statusIreq) {
+    getAmpiInstance(comm)->yield();
+  }
+  return statusIreq;
+}
+
+bool ScatterReq::itest(MPI_Status *sts){
+  return statusIreq;
+}
+
+bool ScattervReq::test(MPI_Status *sts){
+  if (!statusIreq) {
+    getAmpiInstance(comm)->yield();
+  }
+  return statusIreq;
+}
+
+bool ScattervReq::itest(MPI_Status *sts){
+  return statusIreq;
+}
+
 bool RednReq::test(MPI_Status *sts){
   if (!statusIreq) {
     getAmpiInstance(comm)->yield();
@@ -4500,6 +4631,14 @@ void BcastReq::complete(MPI_Status *sts){
   wait(sts);
 }
 
+void ScatterReq::complete(MPI_Status *sts){
+  wait(sts);
+}
+
+void ScattervReq::complete(MPI_Status *sts){
+  wait(sts);
+}
+
 void RednReq::complete(MPI_Status *sts){
   wait(sts);
 }
@@ -4544,6 +4683,30 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
 void BcastReq::receive(ampi *ptr, AmpiMsg *msg)
 {
   ptr->processAmpiMsg(msg, buf, type, count);
+  statusIreq = true;
+  comm = msg->comm;
+#if CMK_BIGSIM_CHARM
+  event = msg->event;
+  eventPe = msg->eventPe;
+#endif
+  // ampi::bcastResult is a [nokeep] entry method, so do not delete msg
+}
+
+void ScatterReq::receive(ampi *ptr, AmpiMsg *msg)
+{
+  ptr->processScatterMsg(msg, buf, type, count);
+  statusIreq = true;
+  comm = msg->comm;
+#if CMK_BIGSIM_CHARM
+  event = msg->event;
+  eventPe = msg->eventPe;
+#endif
+  // ampi::bcastResult is a [nokeep] entry method, so do not delete msg
+}
+
+void ScattervReq::receive(ampi *ptr, AmpiMsg *msg)
+{
+  ptr->processScattervMsg(msg, buf, type, count);
   statusIreq = true;
   comm = msg->comm;
 #if CMK_BIGSIM_CHARM
@@ -5642,6 +5805,34 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   return MPI_SUCCESS;
 }
 
+void ampi::scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                   int root, MPI_Comm comm)
+{
+  if (getRank(comm) == root) {
+    thisProxy.bcastResult(makeAmpiMsg(-1, MPI_SCATTER_TAG, root, sendbuf,
+                          sendcount*getSize(comm), sendtype, comm));
+  }
+  blockOnColl(new ScatterReq(recvbuf, recvcount, recvtype, root, comm));
+}
+
+void ampi::iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                    void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                    int root, MPI_Comm comm, MPI_Request *request)
+{
+  if (getRank(comm) == root) {
+    thisProxy.bcastResult(makeAmpiMsg(-1, MPI_SCATTER_TAG, root, sendbuf,
+                          sendcount*getSize(comm), sendtype, comm));
+  }
+
+  // use a ScatterReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  ScatterReq *newreq = new ScatterReq(recvbuf,recvcount,recvtype,root,comm);
+  *request = reqs->insert(newreq);
+  int tags[3] = { MPI_SCATTER_TAG, root, comm };
+  CmmPut(posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
+}
+
 CDECL
 int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
@@ -5678,20 +5869,8 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int i;
 
-  if(ptr->getRank(comm)==root) {
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
-    for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
-                sendcount, sendtype, i, comm);
-    }
-  }
-
-  if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
-    CkAbort("AMPI> Error in MPI_Scatter recv");
+  ptr->scatter(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -5746,25 +5925,9 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int i;
 
-  if(ptr->getRank(comm)==root) {
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
-    for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
-                sendcount, sendtype, i, comm);
-    }
-  }
-
-  // use an IReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IReq *newreq = new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm);
-  *request = reqs->insert(newreq);
-  int tags[3];
-  tags[0]=MPI_SCATTER_TAG; tags[1]=root; tags[2]=comm;
-  CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
+  ptr->iscatter(sendbuf, sendcount, sendtype, recvbuf, recvcount,
+                recvtype, root, comm, request);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -5775,6 +5938,73 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   return MPI_SUCCESS;
+}
+
+AmpiMsg *ampi::makeScattervMsg(int root, const void *buf, int *counts, MPI_Datatype type,
+                               MPI_Comm destcomm, int *displs)
+{
+  // Scatterv messages have the first commSize*sizeof(int) bytes reserved for displs.
+  // This is necessary for Scatterv's because the 'displs' argument to MPI_Scatter
+  // is only meaningful at the root according to the MPI standard, but the recv'ers
+  // all need to know their own displ in our bcast implementation.
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  int szhdr = getSize(destcomm)*sizeof(int);
+
+  // Calculate the total count and check if the entire buffer is contiguous
+  bool contig = true;
+  int totalCount = counts[0];
+  for (int i=1; i<getSize(destcomm); i++) {
+    if (counts[i-1] != displs[i]) {
+      contig = false;
+    }
+    totalCount += counts[i];
+  }
+
+  int len = ddt->getSize(totalCount);
+  AmpiMsg *msg = new (szhdr+len, 0) AmpiMsg(-1, MPI_SCATTER_TAG, thisIndex, root, len, destcomm);
+  char *msgdata = msg->data+szhdr;
+
+  if (contig) { // Serialize the entire buffer at once
+    memcpy(msg->data, displs, szhdr);
+    ddt->serialize((char*)buf, msgdata+szhdr, totalCount, 1);
+  }
+  else { // Serialize the buffer from each displacement
+    int itemSize = ddt->getSize();
+    char *msghdr = msg->data;
+    int currDispl = 0;
+    for (int i=0; i<getSize(destcomm); i++) {
+      ((int*)msghdr)[i] = currDispl;
+      currDispl += (int)ddt->serialize((char*)buf+(displs[i]*itemSize), msgdata+(displs[i]*itemSize), counts[i], 1);
+    }
+  }
+
+  return msg;
+}
+
+void ampi::scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+                    void *recvbuf, int recvcount, MPI_Datatype recvtype, int root,
+                    MPI_Comm comm)
+{
+  if (getRank(comm) == root) {
+    thisProxy.bcastResult(makeScattervMsg(root, sendbuf, sendcounts, sendtype, comm, displs));
+  }
+  blockOnColl(new ScattervReq(recvbuf, recvcount, recvtype, root, comm));
+}
+
+void ampi::iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+                     void *recvbuf, int recvcount, MPI_Datatype recvtype, int root,
+                     MPI_Comm comm, MPI_Request *request)
+{
+  if (getRank(comm) == root) {
+    thisProxy.bcastResult(makeScattervMsg(root, sendbuf, sendcounts, sendtype, comm, displs));
+  }
+
+  // use a ScattervReq to non-block the caller and get a request ptr
+  AmpiRequestList* reqs = getReqs();
+  ScattervReq *newreq = new ScattervReq(recvbuf,recvcount,recvtype,root,comm);
+  *request = reqs->insert(newreq);
+  int tags[3] = { MPI_SCATTER_TAG, root, comm };
+  CmmPut(posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 }
 
 CDECL
@@ -5813,20 +6043,9 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int i;
 
-  if(ptr->getRank(comm) == root) {
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize() ;
-    for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
-                sendcounts[i], sendtype, i, comm);
-    }
-  }
-
-  if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
-    CkAbort("AMPI> Error in MPI_Scatterv recv");
+  ptr->scatterv(sendbuf, sendcounts, displs, sendtype, recvbuf,
+                recvcount, recvtype, root, comm);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -5881,25 +6100,9 @@ int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sen
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int i;
 
-  if(ptr->getRank(comm) == root) {
-    CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize() ;
-    for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
-                sendcounts[i], sendtype, i, comm);
-    }
-  }
-
-  // use an IReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IReq *newreq = new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm);
-  *request = reqs->insert(newreq);
-  int tags[3];
-  tags[0]=MPI_SCATTER_TAG; tags[1]=root; tags[2]=comm;
-  CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
+  ptr->iscatterv(sendbuf, sendcounts, displs, sendtype, recvbuf,
+                 recvcount, recvtype, root, comm, request);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
