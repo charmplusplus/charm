@@ -3,39 +3,39 @@ INCDIR=$(CDIR)/include
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 LIB = libmoduleCkMulticast.a
-LIBOBJ = ckmulticast.o
+LIBOBJ = ckdummy.o
 
-HEADERS = $(INCDIR)/CkMulticast.decl.h \
-          $(INCDIR)/CkMulticast.def.h \
-          $(INCDIR)/ckmulticast.h
+HEADERS = $(INCDIR)/CkDummy.decl.h \
+          $(INCDIR)/CkDummy.def.h \
+          $(INCDIR)/ckdummy.h
 LIBDEST =  $(CDIR)/lib/$(LIB)
 
-CIFILES = ckmulticast.ci
+CIFILES = ckdummy.ci
 
 all: $(LIBDEST) $(HEADERS)
 
 #$(INCDIR)/%: %
 #	cp $< $@
 
-#$(HEADERS): CkMulticast.decl.h ckmulticast.h 
-#	/bin/cp CkMulticast.decl.h $(CDIR)/include
-#	/bin/cp CkMulticast.def.h $(CDIR)/include
-#	/bin/cp ckmulticast.h $(CDIR)/include
+#$(HEADERS): CkDummy.decl.h ckdummy.h 
+#	/bin/cp CkDummy.decl.h $(CDIR)/include
+#	/bin/cp CkDummy.def.h $(CDIR)/include
+#	/bin/cp ckdummy.h $(CDIR)/include
 
-$(INCDIR)/CkMulticast.decl.h: CkMulticast.decl.h
-	/bin/cp CkMulticast.decl.h $(CDIR)/include
-$(INCDIR)/CkMulticast.def.h: CkMulticast.def.h
-	/bin/cp CkMulticast.def.h $(CDIR)/include
-$(INCDIR)/ckmulticast.h: ckmulticast.h
-	/bin/cp ckmulticast.h $(CDIR)/include
+$(INCDIR)/CkDummy.decl.h: CkDummy.decl.h
+	/bin/cp CkDummy.decl.h $(CDIR)/include
+$(INCDIR)/CkDummy.def.h: CkDummy.def.h
+	/bin/cp CkDummy.def.h $(CDIR)/include
+$(INCDIR)/ckdummy.h: ckdummy.h
+	/bin/cp ckdummy.h $(CDIR)/include
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ) 
 
-CkMulticast.def.h: CkMulticast.decl.h
+CkDummy.def.h: CkDummy.decl.h
 
-CkMulticast.decl.h : ckmulticast.ci $(CDIR)/bin/charmxi
-	$(CHARMC) -c ckmulticast.ci
+CkDummy.decl.h : ckdummy.ci $(CDIR)/bin/charmxi
+	$(CHARMC) -c ckdummy.ci
 
 clean:
 	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB)
@@ -44,7 +44,7 @@ include Make.depends
 
 DEPENDFILE = Make.depends
 
-depends:  $(CIFILES) CkMulticast.def.h
+depends:  $(CIFILES) CkDummy.def.h
 	echo "Creating " $(DEPENDFILE) " ..."; 	\
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \

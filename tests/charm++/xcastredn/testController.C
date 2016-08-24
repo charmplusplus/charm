@@ -85,24 +85,16 @@ TestController::TestController(CkArgMsg *m)
     // Set up a QHogger group to keep the scheduler Q non-empty
     hogger = CProxy_QHogger::ckNew();
 
-    // Setup the multicast manager stuff
-    CkGroupID mcastGrpID  = CProxy_CkMulticastMgr::ckNew(4);
-    CkMulticastMgr *mgr   = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
 
     /// Create the array
-    chareArray            = CProxy_MyChareArray::ckNew(mcastGrpID,cfg.arraySize);
+    chareArray            = CProxy_MyChareArray::ckNew(cfg.arraySize);
     /// Create the array section to use with CkMulticast
     arraySections.push_back( createSection(cfg.useContiguousSection) );
     arraySections.push_back( createSection(cfg.useContiguousSection) );
 
-    /// Delegate the section collectives to the communication libraries
-    //                            CkMulticast
-    arraySections[0].ckSectionDelegate(mgr);
-
-    /// Setup the client at the root of the reductions
     CkCallback *cb = new CkCallback(CkIndex_TestController::receiveReduction(0),thisProxy);
     chareArray.ckSetReductionClient(cb);
-    mgr->setReductionClient(arraySections[0],cb);
+    arraySections[0].setReductionClient(cb);
 
     /// Start off with the first comm type and the smallest message size
     curCommType    = bcastCkMulticast;
@@ -142,7 +134,7 @@ CProxySection_MyChareArray TestController::createSection(const bool isSectionCon
     int Xu = (cfg.sectionSize - 1) * dX;
     CkAssert(cfg.arraySize >= Xu);
     /// Create the section
-    return CProxySection_MyChareArray::ckNew(chareArray,Xl,Xu,dX);
+    return CProxySection_MyChareArray::ckNew(chareArray,Xl,Xu,dX,4);
 }
 
 

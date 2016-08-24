@@ -51,9 +51,8 @@ void Test2D::compute(DummyMsg *m)
 	for(int i = 0; i < vectorSize; i++)	{
 		myVector[i] = doubleVector[i];
 	}
-	CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpID).ckLocalBranch();
 	CkCallback cb(CkIndex_Main::reportSum(NULL), mainProxy);
-	mCastGrp->contribute(sizeof(double)*vectorSize, myVector.getVec(), CkReduction::sum_double, cookies[section], cb);
+	CProxySection_Test2D::contribute(sizeof(double)*vectorSize, myVector.getVec(), CkReduction::sum_double, cookies[section], cb);
 	delete m;
 };
 

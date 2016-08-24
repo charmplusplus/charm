@@ -60,6 +60,8 @@ class Chare : public TEntity {
 
  public:
    Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b=0, AstChildren<Member> *l=0);
+   void genProxyNamesExceptFirst(XStr& str, const char *prefix, const char *middle, 
+                       const char *suffix, const char *sep);
    void genProxyNames(XStr& str, const char *prefix, const char *middle, 
                        const char *suffix, const char *sep);
    void genIndexNames(XStr& str, const char *prefix, const char *middle, 
@@ -67,6 +69,7 @@ class Chare : public TEntity {
    void printChareNames();
    XStr proxyName(int withTemplates=1); 
    XStr indexName(int withTemplates=1); 
+   XStr sectionName(int withTemplates=1); 
    XStr indexList();
    XStr baseName(int withTemplates=1) const
    {

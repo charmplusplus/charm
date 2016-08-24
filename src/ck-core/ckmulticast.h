@@ -22,7 +22,7 @@ typedef void (*redClientFn)(CkSectionInfo sid, void *param,int dataSize,void *da
 /// Retrieve section info from a multicast msg. Part of API
 extern void CkGetSectionInfo(CkSectionInfo &id, void *msg);
 
-
+class CProxySection_ArrayElement;
 
 /**
  * A multicast manager group that is a CkDelegateMgr. Can manage all sections of different 
@@ -32,21 +32,21 @@ extern void CkGetSectionInfo(CkSectionInfo &id, void *msg);
 class CkMulticastMgr: public CkDelegateMgr 
 {
     private:
-        int factor;           // spanning tree factor, can be negative
+        int dfactor;           // default spanning tree branch factor for this CkMulticastMgr, can be negative
         unsigned int split_size;
         unsigned int split_threshold;
         
     public:
         // ------------------------- Cons/Des-tructors ------------------------
         CkMulticastMgr(CkMigrateMessage *m)  {}
-        CkMulticastMgr(int _factor = 2, unsigned int _split_size = 8192, unsigned int _split_threshold = 8192):
-            factor(_factor),
+        CkMulticastMgr(int _dfactor = 2, unsigned int _split_size = 8192, unsigned int _split_threshold = 8192):
+            dfactor(_dfactor),
             split_size(_split_size),
             split_threshold(_split_threshold) {}
         int useDefCtor(void){ return 1; }
         void pup(PUP::er &p){ 
 		CkDelegateMgr::pup(p);
-		p|factor;
+		p|dfactor;
 		p|split_size;
 		p|split_threshold;
 	}
@@ -54,6 +54,8 @@ class CkMulticastMgr: public CkDelegateMgr
         // ------------------------- Spanning Tree Setup ------------------------
         /// Stuff section member info into CkSectionInfo and call initCookie for the tree building
         void setSection(CkSectionInfo &id, CkArrayID aid, CkArrayIndex *, int n);
+        /// Stuff section member info into CkSectionInfo and call initCookie for the tree building, with factor
+        void setSection(CkSectionInfo &id, CkArrayID aid, CkArrayIndex *, int n, int factor);
         /// Call initCookie to start the tree build
         void setSection(CkSectionInfo &id);
         /// @deprecated { Use the other setSection methods }
@@ -91,7 +93,7 @@ class CkMulticastMgr: public CkDelegateMgr
         /// Configure a client to accept the reduction result
         void setReductionClient(CProxySection_ArrayElement &, redClientFn fn,void *param=NULL);
         /// Configure a client to accept the reduction result
-        void setReductionClient(CProxySection_ArrayElement &, CkCallback *cb);
+        void setReductionClient(CProxySection_ArrayBase &, CkCallback *cb);
         /// reduction trigger
         void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, int userData=-1, int fragSize=-1);
         /// reduction trigger with a callback
@@ -100,7 +102,7 @@ class CkMulticastMgr: public CkDelegateMgr
 
 
         /// Recreate the section when root migrate
-        void resetSection(CProxySection_ArrayElement &proxy);  // called by root
+        void resetSection(CProxySection_ArrayBase &proxy);  // called by root
         /// Implement the CkDelegateMgr interface to accept the delegation of a section proxy
         virtual void initDelegateMgr(CProxy *proxy, int opts=0);
         /// To implement the CkDelegateMgr interface for section mcasts

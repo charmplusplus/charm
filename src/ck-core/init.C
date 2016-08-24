@@ -67,6 +67,7 @@ never be excluded...
 #include "ck.h"
 #include "trace.h"
 #include "CkCheckpoint.decl.h"
+#include "ckmulticast.h"
 #include <sstream>
 #include <limits.h>
 
@@ -1262,6 +1263,7 @@ void _initCharm(int unused_argc, char **argv)
 		_registertempo();
 		_registerwaitqd();
 		_registerCkCheckpoint();
+                _registerCkMulticast();
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();
 #endif

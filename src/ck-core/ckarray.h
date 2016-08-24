@@ -27,6 +27,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #define __CKARRAY_H
 
 #include "cklocation.h"
+#include "ckmulticast.h"
 #include "ckmemcheckpoint.h" // for CkArrayCheckPTReqMessage
 #include "ckarrayindex.h"
 
@@ -162,12 +163,14 @@ class CkArrayOptions {
 	CkArrayIndex bounds;
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
+        CkGroupID mCastMgr;/// <ckmulticast mgr to bind to, for sections
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
 	CkCallback reductionClient; // Default target of reductions
 	bool anytimeMigration; // Elements are allowed to move freely
 	bool disableNotifyChildInRed; //Child elements are not notified when reduction starts
 	bool staticInsertion; // Elements are only inserted at construction
 	bool broadcastViaScheduler;     // broadcast inline or through scheduler
+	bool sectionAutoDelegate;  //Create a mCastMgr and auto-delegate all sections
 
 	/// Set various safe defaults for all the constructors
 	void init();
@@ -249,12 +252,17 @@ class CkArrayOptions {
 	CkArrayOptions &setLocationManager(const CkGroupID &l)
 		{locMgr=l; return *this;}
 
+	/// Use this ckmulticast manager
+	CkArrayOptions &setMcastManager(const CkGroupID &m)
+		{mCastMgr=m; return *this;}
+
 	/// Add an array listener component to this array (keeps the new'd listener)
 	CkArrayOptions &addListener(CkArrayListener *listener);
 
 	CkArrayOptions &setAnytimeMigration(bool b) { anytimeMigration = b; return *this; }
 	CkArrayOptions &setStaticInsertion(bool b);
 	CkArrayOptions &setBroadcastViaScheduler(bool b) { broadcastViaScheduler = b; return *this; }
+	CkArrayOptions &setSectionAutoDelegate(bool b) { sectionAutoDelegate = b; return *this; }
 	CkArrayOptions &setReductionClient(CkCallback cb)
 	{ reductionClient = cb; return *this; }
 
@@ -266,6 +274,8 @@ class CkArrayOptions {
 	const CkArrayIndex &getBounds(void) const {return bounds;}
 	const CkGroupID &getMap(void) const {return map;}
 	const CkGroupID &getLocationManager(void) const {return locMgr;}
+	const CkGroupID &getMcastManager(void) const {return mCastMgr;}
+	const bool isSectionAutoDelegated(void) const {return sectionAutoDelegate;}
 	int getListeners(void) const {return arrayListeners.size();}
 	CkArrayListener *getListener(int listenerNum) {
 		CkArrayListener *ret=arrayListeners[listenerNum];
@@ -302,7 +312,7 @@ public:
         CProxy_ArrayBase(const CkArrayID &aid)
                 :CProxy(), _aid(aid) { }
 	CProxy_ArrayBase(const ArrayElement *e);
-
+	CProxy_ArrayBase(const CProxy_ArrayBase &cs): CProxy(cs), _aid(cs.ckGetArrayID()) {}
 #if CMK_ERROR_CHECKING
 	inline void ckCheck(void) const{  //Make sure this proxy has a value
 	  if (_aid.isZero())
@@ -357,6 +367,9 @@ public:
 };
 PUPmarshall(CProxyElement_ArrayBase)
 
+
+#define _AUTO_DELEGATE_MCASTMGR_ON_ 1
+
 class CProxySection_ArrayBase:public CProxy_ArrayBase {
 private:
 	int _nsid;
@@ -364,8 +377,7 @@ private:
 public:
 	CProxySection_ArrayBase(): _nsid(0), _sid(NULL) {}
 	CProxySection_ArrayBase(const CkArrayID &aid,
-		const CkArrayIndex *elems, const int nElems)
-		:CProxy_ArrayBase(aid), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
+		const CkArrayIndex *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
 	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndex *elems, const int nElems, CK_DELCTOR_PARAM)
 		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
@@ -374,8 +386,8 @@ public:
 	CProxySection_ArrayBase(const CkSectionID &sid, CK_DELCTOR_PARAM)
 		:CProxy_ArrayBase(sid._cookie.get_aid(), CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(sid); }
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs)
-		:CProxy_ArrayBase(cs.ckGetArrayID()), _nsid(cs._nsid) {
-      if (_nsid == 1) _sid = new CkSectionID(cs.ckGetArrayID(), cs.ckGetArrayElements(), cs.ckGetNumElements());
+		:CProxy_ArrayBase(cs), _nsid(cs._nsid) {
+      if (_nsid == 1) _sid = new CkSectionID(*cs._sid);
       else if (_nsid > 1) {
         _sid = new CkSectionID[_nsid];
         for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
@@ -389,14 +401,7 @@ public:
         for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
       } else _sid = NULL;
     }
-    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems)
-        :CProxy_ArrayBase(aid[0]), _nsid(n) {
-      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
-      else if (_nsid > 1) {
-      _sid = new CkSectionID[n];
-      for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
-      } else _sid = NULL;
-    }
+    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
         :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
       if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
@@ -422,8 +427,16 @@ public:
       return *this;
     }
     
-	void ckSectionDelegate(CkDelegateMgr *d) 
-		{ ckDelegate(d); d->initDelegateMgr(this); }
+	void ckAutoDelegate(int opts=1);
+ 	using CProxy_ArrayBase::setReductionClient; //compilation error o/w
+	void setReductionClient(CkCallback *cb); 
+	void resetSection();
+
+	void ckSectionDelegate(CkDelegateMgr *d, int opts=1) {
+           ckDelegate(d);
+	   if(opts==1)
+              d->initDelegateMgr(this);
+        }
 //	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
@@ -438,6 +451,7 @@ public:
     inline CkArrayIndex *ckGetArrayElements(int i) const {return _sid[i]._elems;}
     inline int ckGetNumElements() const { return _sid[0]._nElems; }
 	inline int ckGetNumElements(int i) const { return _sid[i]._nElems; }
+	inline int ckGetBfactor() const { return _sid[0].bfactor; }
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxySection_ArrayBase)
@@ -624,6 +638,8 @@ class CkArray : public CkReductionMgr {
   CkMagicNumber<ArrayElement> magic; //To detect heap corruption
   CkLocMgr *locMgr;
   CkGroupID locMgrID;
+  CkGroupID mCastMgrID;
+  bool sectionAutoDelegate;
   CProxy_CkArray thisProxy;
   // Separate mapping and storing the element pointers to speed iteration in broadcast
   std::map<CmiUInt8, unsigned int> localElems;
@@ -641,6 +657,8 @@ public:
   CkArray(CkMigrateMessage *m);
   ~CkArray();
   CkGroupID &getGroupID(void) {return thisgroup;}
+  CkGroupID &getmCastMgr(void) {return mCastMgrID;}
+  bool isSectionAutoDelegated(void) {return sectionAutoDelegate;}
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}

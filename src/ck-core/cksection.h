@@ -172,12 +172,14 @@ class CkMcastBaseMsg {
 
 
 #define CKSECTIONID_CONSTRUCTOR(index) \
-  CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems);
+  CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
 
 /** A class that holds complete info about an array/group section
  *
  * Describes section members, host PEs, current section status etc.
  */
+
+#define USE_DEFAULT_BRANCH_FACTOR 0 
 class CkSectionID {
     public:
         /// Minimal section info
@@ -197,11 +199,13 @@ class CkSectionID {
         int *pelist;
         /// The number of PEs that host section members
         int npes;
-        
-        CkSectionID(): _elems(NULL), _nElems(0), pelist(0), npes(0) {}
+        /// Branching factor in the spanning tree, can be negative
+        int bfactor; 
+
+        CkSectionID(): _elems(NULL), _nElems(0), pelist(0), npes(0), bfactor(USE_DEFAULT_BRANCH_FACTOR) {}
         CkSectionID(const CkSectionID &sid);
-        CkSectionID(CkSectionInfo &c, CkArrayIndex *e, int n, int *_pelist, int _npes): _cookie(c), _elems(e), _nElems(n), pelist(_pelist), npes(_npes)  {}
-        CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes);
+        CkSectionID(CkSectionInfo &c, CkArrayIndex *e, int n, int *_pelist, int _npes, int factor=USE_DEFAULT_BRANCH_FACTOR): _cookie(c), _elems(e), _nElems(n), pelist(_pelist), npes(_npes), bfactor(factor)  {}
+        CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes, int factor=USE_DEFAULT_BRANCH_FACTOR);
         CKSECTIONID_CONSTRUCTOR(1D)
         CKSECTIONID_CONSTRUCTOR(2D)
         CKSECTIONID_CONSTRUCTOR(3D)
@@ -211,6 +215,7 @@ class CkSectionID {
         CKSECTIONID_CONSTRUCTOR(Max)
 
         inline int getSectionID(){ return _cookie.info.sInfo.cInfo.id; }
+        inline CkGroupID get_aid() const { return _cookie.get_aid(); } 
         void operator=(const CkSectionID &);
         ~CkSectionID() {
             if (_elems != NULL) delete [] _elems;

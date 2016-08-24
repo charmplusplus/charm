@@ -473,6 +473,16 @@ XStr Chare::indexName(int withTemplates)
   return str;
 }
 
+//only for chare arrays and groups
+XStr Chare::sectionName(int withTemplates)
+{
+  XStr str;
+  str<<Prefix::ProxySection<<type;
+  if (withTemplates) str<<tvars();
+  return str;
+}
+
+
 XStr Chare::indexList()
 {
   // generating "int *index1, int *index2, int *index3"
@@ -494,6 +504,15 @@ XStr Chare::indexList()
   }
   return str;
 }
+
+void Chare::genProxyNamesExceptFirst(XStr& str, const char *prefix,const char *middle,
+    	const char *suffix, const char *sep)
+{	
+	TypeList *base2 = bases->next;
+	if(base2 != NULL)
+	    base2->genProxyNames(str,prefix,middle,suffix,sep,forElement);
+}
+
 
 void Chare::genProxyNames(XStr& str, const char *prefix,const char *middle,
     	const char *suffix, const char *sep)
@@ -700,6 +719,29 @@ Chare::genDefs(XStr& str)
     str << tspec(false)<<" int "<<indexName()<<"::__idx";
     if(!external) str << "=0";
     str << ";\n";
+  }
+  templateGuardEnd(str);
+
+
+  templateGuardBegin(isTemplated(), str);
+  if (isArray() && hasSection && !isTemplateInstantiation()) {
+    if (isTemplated())
+      str << tspec(false) << "\n";
+    str<<"void "<< sectionName()<<"::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, int userData, int fragSize)\n";
+    str<<"{\n";
+    str<<"   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
+    str<<"   CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();\n";
+    str<<"   mCastGrp->contribute(dataSize, data, type, sid, userData, fragSize);\n";
+    str<<"}\n\n";
+
+    if (isTemplated())
+      str << tspec(false) << "\n";
+    str<<"void "<<sectionName()<<"::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, CkCallback &cb, int userData, int fragSize)\n";
+    str<<"{\n";
+    str<<"   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
+    str<<"   CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();\n";
+    str<<"   mCastGrp->contribute(dataSize, data, type, sid, cb, userData, fragSize);\n";
+    str<<"}\n\n";
   }
   templateGuardEnd(str);
 
@@ -1275,67 +1317,67 @@ Array::genSubDecls(XStr& str)
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex1D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
     "    "<<etype<<" operator () (int idx) const \n"
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex1D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex1D *elems, int nElems) {\n"
-    "      return CkSectionID(aid, elems, nElems);\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex1D *elems, int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+    "      return CkSectionID(aid, elems, nElems, factor);\n"
     "    } \n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, int l, int u, int s) {\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, int l, int u, int s, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
     "      CkVec<CkArrayIndex1D> al;\n"
     "      for (int i=l; i<=u; i+=s) al.push_back(CkArrayIndex1D(i));\n"
-    "      return CkSectionID(aid, al.getVec(), al.size());\n"
+    "      return CkSectionID(aid, al.getVec(), al.size(), factor);\n"
     "    } \n";
     } else if (indexSuffix==(const char*)"2D") {
     str <<
     "    "<<etype<<" operator () (int idx) const \n"
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex2D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex2D *elems, int nElems) {\n"
-    "      return CkSectionID(aid, elems, nElems);\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex2D *elems, int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+    "      return CkSectionID(aid, elems, nElems, factor);\n"
     "    } \n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2) {\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
     "      CkVec<CkArrayIndex2D> al;\n"
     "      for (int i=l1; i<=u1; i+=s1) \n"
     "        for (int j=l2; j<=u2; j+=s2) \n"
     "          al.push_back(CkArrayIndex2D(i, j));\n"
-    "      return CkSectionID(aid, al.getVec(), al.size());\n"
+    "      return CkSectionID(aid, al.getVec(), al.size(), factor);\n"
     "    } \n";
     } else if (indexSuffix==(const char*)"3D") {
     str <<
     "    "<<etype<<" operator () (int idx) const \n"
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex3D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex3D *elems, int nElems) {\n"
-    "      return CkSectionID(aid, elems, nElems);\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex3D *elems, int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+    "      return CkSectionID(aid, elems, nElems, factor);\n"
     "    } \n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3) {\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
     "      CkVec<CkArrayIndex3D> al;\n"
     "      for (int i=l1; i<=u1; i+=s1) \n"
     "        for (int j=l2; j<=u2; j+=s2) \n"
     "          for (int k=l3; k<=u3; k+=s3) \n"
     "          al.push_back(CkArrayIndex3D(i, j, k));\n"
-    "      return CkSectionID(aid, al.getVec(), al.size());\n"
+    "      return CkSectionID(aid, al.getVec(), al.size(), factor);\n"
     "    } \n";
     } else if (indexSuffix==(const char*)"4D") {
     str <<
     "    "<<etype<<" operator () (int idx) const \n"
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex4D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex4D *elems, int nElems) {\n"
-    "      return CkSectionID(aid, elems, nElems);\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex4D *elems, int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+    "      return CkSectionID(aid, elems, nElems, factor);\n"
     "    } \n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4) {\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
     "      CkVec<CkArrayIndex4D> al;\n"
     "      for (int i=l1; i<=u1; i+=s1) \n"
     "        for (int j=l2; j<=u2; j+=s2) \n"
     "          for (int k=l3; k<=u3; k+=s3) \n"
     "            for (int l=l4; l<=u4; l+=s4) \n"
     "              al.push_back(CkArrayIndex4D(i, j, k, l));\n"
-    "      return CkSectionID(aid, al.getVec(), al.size());\n"
+    "      return CkSectionID(aid, al.getVec(), al.size(), factor);\n"
     "    } \n";
     } else if (indexSuffix==(const char*)"5D") {
     str <<
     "    "<<etype<<" operator () (int idx) const \n"
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex5D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex5D *elems, int nElems) {\n"
-    "      return CkSectionID(aid, elems, nElems);\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex5D *elems, int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+    "      return CkSectionID(aid, elems, nElems, factor);\n"
     "    } \n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, int l5, int u5, int s5) {\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, int l5, int u5, int s5, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
     "      CkVec<CkArrayIndex5D> al;\n"
     "      for (int i=l1; i<=u1; i+=s1) \n"
     "        for (int j=l2; j<=u2; j+=s2) \n"
@@ -1343,16 +1385,16 @@ Array::genSubDecls(XStr& str)
     "            for (int l=l4; l<=u4; l+=s4) \n"
     "              for (int m=l5; m<=u5; m+=s5) \n"
     "                al.push_back(CkArrayIndex5D(i, j, k, l, m));\n"
-    "      return CkSectionID(aid, al.getVec(), al.size());\n"
+    "      return CkSectionID(aid, al.getVec(), al.size(), factor);\n"
     "    } \n";
     } else if (indexSuffix==(const char*)"6D") {
     str <<
     "    "<<etype<<" operator () (int idx) const \n"
     "        {return "<<etype<<"(ckGetArrayID(), *(CkArrayIndex6D*)&ckGetArrayElements()[idx], CK_DELCTOR_CALL);}\n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex6D *elems, int nElems) {\n"
-    "      return CkSectionID(aid, elems, nElems);\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex6D *elems, int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+    "      return CkSectionID(aid, elems, nElems, factor);\n"
     "    } \n"
-    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, int l5, int u5, int s5, int l6, int u6, int s6) {\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, int l5, int u5, int s5, int l6, int u6, int s6, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
     "      CkVec<CkArrayIndex6D> al;\n"
     "      for (int i=l1; i<=u1; i+=s1) \n"
     "        for (int j=l2; j<=u2; j+=s2) \n"
@@ -1361,24 +1403,50 @@ Array::genSubDecls(XStr& str)
     "              for (int m=l5; m<=u5; m+=s5) \n"
     "                for (int n=l6; n<=u6; n+=s6) \n"
     "                  al.push_back(CkArrayIndex6D(i, j, k, l, m, n));\n"
-    "      return CkSectionID(aid, al.getVec(), al.size());\n"
+    "      return CkSectionID(aid, al.getVec(), al.size(), factor);\n"
     "    } \n";
     }
 
     str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndex *elems, int nElems, CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");str << " {}\n";
-    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndex *elems, int nElems) \n"
-         "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
-    str <<"    "<<ptype<<"(const CkSectionID &sid)"
-	  "       :";genProxyNames(str, "",NULL, "(sid)", ", ");str<< " {}\n";
+    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndex *elems, int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) \n"
+         "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems, factor)", ", ");str<<" { ckAutoDelegate(); }\n";
+    str <<"    "<<ptype<<"(const CkSectionID &sid)  \n"
+         "        :";genProxyNames(str, "",NULL, "(sid)", ", ");str << " { ckAutoDelegate(); }\n";
 	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, CK_DELCTOR_PARAM) \n"
 	  "        :";genProxyNames(str, "",NULL, "(n,aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");str << " {}\n";
 	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems) \n"
-	  "        :";genProxyNames(str, "",NULL, "(n,aid,elems,nElems)", ", ");str<<" {}\n";
+	  "        :";genProxyNames(str, "",NULL, "(n,aid,elems,nElems)", ", ");str<<" { ckAutoDelegate(); }\n";
+	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor) \n"
+	  "        :";genProxyNames(str, "",NULL, "(n,aid,elems,nElems, factor)", ", ");str<<" { ckAutoDelegate(); }\n";
     str <<
     "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
     "    } \n";
+
+    str <<
+    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex *elems, int nElems, int factor) {\n"
+    "      return CkSectionID(aid, elems, nElems, factor);\n"
+    "    } \n";
+
+    str <<
+    "    void ckAutoDelegate(int opts=1) {\n"<<
+    "      if(ckIsDelegated()) return;\n"<<
+    "      "<<super<<"::ckAutoDelegate(opts);";
+	genProxyNamesExceptFirst(str, "",NULL, "::ckAutoDelegate(0);", "; ");str<<"\n";
+    str<<"    } \n";
+
+    str <<
+    "    void setReductionClient(CkCallback *cb) {\n"
+    "      "<<super<<"::setReductionClient(cb);\n"
+    "    } \n";
+    str <<
+    "    void resetSection() {\n"
+    "      "<<super<<"::resetSection();\n"
+    "    } \n";
+
+    str <<"    static void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, int userData=-1, int fragSize=-1);\n";
+    str <<"    static void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, CkCallback &cb, int userData=-1, int fragSize=-1);\n";
   }
 
   genMemberDecls(str);

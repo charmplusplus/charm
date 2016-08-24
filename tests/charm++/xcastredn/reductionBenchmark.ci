@@ -13,7 +13,7 @@ mainmodule reductionBenchmark {
 
     array[1D] MyChareArray
     {
-        entry MyChareArray(CkGroupID grpID);
+        entry MyChareArray();
         entry void crunchData(DataMsg *msg);
     };
 

@@ -530,6 +530,58 @@ CProxyElement_ArrayBase::CProxyElement_ArrayBase(const ArrayElement *e)
 	:CProxy_ArrayBase(e), _idx(e->ckGetArrayIndex())
 	{}
 
+CProxySection_ArrayBase::CProxySection_ArrayBase(const CkArrayID &aid, const CkArrayIndex *elems, const int nElems, int factor) :CProxy_ArrayBase(aid), _nsid(1) {
+    _sid = new CkSectionID(aid, elems, nElems, factor);
+}
+
+
+CProxySection_ArrayBase::CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor) :CProxy_ArrayBase(aid[0]), _nsid(n) {
+    if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0], factor);
+    else if (_nsid > 1) {
+    _sid = new CkSectionID[n];
+    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i], factor);
+    } else _sid = NULL;
+}
+
+
+void CProxySection_ArrayBase::ckAutoDelegate(int opts){
+    if(_nsid < 1)
+      CmiAbort("Auto Delegation before setting up CkSectionID\n");
+    CkArray *ckarr = CProxy_CkArray(_sid->get_aid()).ckLocalBranch();
+    if(ckarr->isSectionAutoDelegated()){
+    	CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
+    	ckSectionDelegate(mCastGrp, opts);
+    }
+}
+
+
+void CProxySection_ArrayBase::setReductionClient(CkCallback *cb) {
+    if(_nsid < 1)
+      CmiAbort("setReductionClient before setting up CkSectionID\n");
+    CkArray *ckarr = CProxy_CkArray(_sid->get_aid()).ckLocalBranch();
+    if(ckarr->isSectionAutoDelegated()){
+      CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
+      mCastGrp->setReductionClient(*this, cb);
+    }
+    else{
+      CmiAbort("setReductionClient called on section without autoDelegate");
+    }
+}
+
+
+void CProxySection_ArrayBase::resetSection(){
+    if(_nsid < 1)
+      CmiAbort("resetSection before setting up CkSectionID\n");
+    CkArray *ckarr = CProxy_CkArray(_sid->get_aid()).ckLocalBranch();
+    if(ckarr->isSectionAutoDelegated()){
+      CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
+      mCastGrp->resetSection(*this);
+    }
+    else{
+      CmiAbort("resetSection called on section without autoDelegate");
+    }
+}
+
 CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const
 	{return ckLocalBranch()->getLocMgr(); }
 
@@ -602,11 +654,13 @@ CkArrayOptions::CkArrayOptions(CkArrayIndex s, CkArrayIndex e, CkArrayIndex step
 void CkArrayOptions::init()
 {
     locMgr.setZero();
+    mCastMgr.setZero();
     anytimeMigration = _isAnytimeMigration;
     staticInsertion = _isStaticInsertion;
     reductionClient.type = CkCallback::invalid;
     disableNotifyChildInRed = !_isNotifyChildInRed;
     broadcastViaScheduler = false;
+    sectionAutoDelegate = true;
 }
 
 CkArrayOptions &CkArrayOptions::setStaticInsertion(bool b)
@@ -692,6 +746,8 @@ void CkArrayOptions::pup(PUP::er &p) {
 	p|bounds;
 	p|map;
 	p|locMgr;
+	p|mCastMgr;
+	p|sectionAutoDelegate;
 	p|arrayListeners;
 	p|reductionClient;
 	p|anytimeMigration;
@@ -731,18 +787,31 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
     locMgr = CProxy_CkLocMgr::ckNew(opts, &e_opts);
     opts.setLocationManager(locMgr);
   }
+  CkGroupID mCastMgr = opts.getMcastManager();
+  if (opts.isSectionAutoDelegated() && mCastMgr.isZero())
+  { //Create a new multicast manager
+    CkEntryOptions  e_opts;
+    e_opts.setGroupDepID(locMgr);       // group creation dependence
+    //call with default parameters, since the last parameter has to be e_opts
+    mCastMgr = CProxy_CkMulticastMgr::ckNew(2, 8192, 8192, &e_opts);
+    opts.setMcastManager(mCastMgr);
+  }
   //Create the array manager
   m->array_ep()=ctor;
   CkMarshalledMessage marsh(m);
   CkEntryOptions  e_opts;
   e_opts.setGroupDepID(locMgr);       // group creation dependence
+  if(opts.isSectionAutoDelegated())
+  {
+    e_opts.setGroupDepID(mCastMgr);
+  }
 #if !GROUP_LEVEL_REDUCTION
   CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy,&e_opts);
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy, &e_opts);
   nodereductionProxy.setAttachedGroup(ag);
 #else
   CkNodeGroupID dummyid;
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid,&e_opts);
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid, &e_opts);
 #endif
   return (CkArrayID)ag;
 }
@@ -929,6 +998,8 @@ CkArray::CkArray(CkArrayOptions &opts,
   : CkReductionMgr(nodereductionID),
     locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
     locMgrID(opts.getLocationManager()),
+    sectionAutoDelegate(opts.isSectionAutoDelegated()),
+    mCastMgrID(opts.getMcastManager()),
     thisProxy(thisgroup),
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
     numInitial(opts.getNumInitial()), isInserting(true)
@@ -1027,6 +1098,8 @@ void CkArray::pup(PUP::er &p){
 	CkReductionMgr::pup(p);
 	p|numInitial;
 	p|locMgrID;
+	p|mCastMgrID;
+	p|sectionAutoDelegate;
 	p|listeners;
 	p|listenerDataOffset;
         p|stableLocations;

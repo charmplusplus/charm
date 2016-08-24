@@ -3,7 +3,6 @@
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CkChareID mainhandle;
 /*readonly*/ int numElements; 
-/*readonly*/ CkGroupID mCastGrpID;
 /*readonly*/ int arrayDimensionX;
 /*readonly*/ int arrayDimensionY;
 /*readonly*/ int arrayDimensionZ;
@@ -36,8 +35,6 @@ Main::Main(CkArgMsg *m)
 	
 	//Multicast stuff
 	CkArrayID testArrayID = testProxy3D.ckGetArrayID();
-	mCastGrpID = CProxy_CkMulticastMgr::ckNew();
-	CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpID).ckLocalBranch();
 	
 	//setting the value of N to be the greater of the two dimensions.
 	//(just an arbit decision)
@@ -50,8 +47,7 @@ Main::Main(CkArgMsg *m)
 	for(int i=0; i < N; i++) {
 		//chose elements from chare array to be added to the sectionProxy
 		sectionProxy[i] = CProxySection_Test3D::ckNew(testArrayID, 0, arrayDimensionX-1, i+1, 0, arrayDimensionY-1, i+1, 0, arrayDimensionZ-1, i+1);
-		sectionProxy[i].ckSectionDelegate(mCastGrp);
-		mCastGrp->setReductionClient(sectionProxy[i], cb);
+		sectionProxy[i].setReductionClient(cb);
 		//message
 		DummyMsg *msg = new DummyMsg;
 		msg->section = i;

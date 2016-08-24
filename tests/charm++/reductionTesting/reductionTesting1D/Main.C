@@ -2,7 +2,6 @@
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CkChareID mainhandle;
-/*readonly*/ CkGroupID mCastGrpID;
 /*readonly*/ int arrayDimension;
 /*readonly*/ int vectorSize;
 
@@ -32,15 +31,12 @@ Main::Main(CkArgMsg *m)
 	
 	//Multicast stuff
 	CkArrayID testArrayID = testProxy1D.ckGetArrayID();
-	mCastGrpID = CProxy_CkMulticastMgr::ckNew();
-	CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpID).ckLocalBranch();
 
 	for(int i = 0; i < arrayDimension; i++)
 	{
 		//creating sectionProxy[i]:
 		sectionProxy[i] = CProxySection_Test1D::ckNew(testArrayID, 0, arrayDimension-1, i+1);
-		sectionProxy[i].ckSectionDelegate(mCastGrp);
-		mCastGrp->setReductionClient(sectionProxy[i], cb);
+		sectionProxy[i].setReductionClient(cb);
 		//msg for sectionProxy[i]
 		DummyMsg *msg = new DummyMsg;
 		msg->section = i;

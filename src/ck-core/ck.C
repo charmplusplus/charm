@@ -398,7 +398,7 @@ void CProxy::pup(PUP::er &p) {
 
 /**** Array sections */
 #define CKSECTIONID_CONSTRUCTOR_DEF(index) \
-CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems): _nElems(nElems) { \
+CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems, int factor): _nElems(nElems), bfactor(factor) { \
   _cookie.get_aid() = aid;	\
   _cookie.get_pe() = CkMyPe();	\
   _elems = new CkArrayIndex[nElems];	\
@@ -415,7 +415,7 @@ CKSECTIONID_CONSTRUCTOR_DEF(5D)
 CKSECTIONID_CONSTRUCTOR_DEF(6D)
 CKSECTIONID_CONSTRUCTOR_DEF(Max)
 
-CkSectionID::CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes): _nElems(0), _elems(NULL), npes(_npes) {
+CkSectionID::CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes, int factor): _nElems(0), _elems(NULL), npes(_npes), bfactor(factor) {
   pelist = new int[npes];
   for (int i=0; i<npes; i++) pelist[i] = _pelist[i];
   _cookie.get_aid() = gid;
@@ -425,6 +425,7 @@ CkSectionID::CkSectionID(const CkSectionID &sid) {
   int i;
   _cookie = sid._cookie;
   _nElems = sid._nElems;
+  bfactor = sid.bfactor;
   if (_nElems > 0) {
     _elems = new CkArrayIndex[_nElems];
     for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
@@ -440,6 +441,7 @@ void CkSectionID::operator=(const CkSectionID &sid) {
   int i;
   _cookie = sid._cookie;
   _nElems = sid._nElems;
+  bfactor = sid.bfactor;
   if (_nElems > 0) {
     _elems = new CkArrayIndex[_nElems];
     for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
@@ -453,6 +455,7 @@ void CkSectionID::operator=(const CkSectionID &sid) {
 
 void CkSectionID::pup(PUP::er &p) {
     p | _cookie;
+    p | bfactor;
     p(_nElems);
     if (_nElems > 0) {
       if (p.isUnpacking()) _elems = new CkArrayIndex[_nElems];

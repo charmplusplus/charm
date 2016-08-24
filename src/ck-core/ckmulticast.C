@@ -5,7 +5,7 @@
  *  on 12/2001
  *
  *  features:
- *     using a spanning tree (factor defined in ckmulticast.h)
+ *     using a spanning tree (factor defined in CkSectionID)
  *     support pipelining via fragmentation  (SPLIT_MULTICAST)
  *     support *any-time* migration, spanning tree will be rebuilt automatically
  * */
@@ -128,6 +128,8 @@ class mCastEntry
         CkSectionInfo parentGrp;
         /// List of direct children
         sectionIdList children;
+        /// branching factor for spanning tree
+        int bfactor;
         /// Number of direct children
         int numChild;
         /// List of all tree member array indices (Only useful on the tree root)
@@ -227,6 +229,7 @@ public:
     CkAssert(nIdx);
     return ((void *)arrIdx == (void *)lastKnown);
   }
+  int bfactor;
 };
 
 
@@ -280,8 +283,12 @@ extern LDObjid idx2LDObjid(const CkArrayIndex &idx);    // cklocation.C
 
 
 
-
 void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex *al, int n)
+{
+    setSection(_id, aid, al, n, dfactor);
+}
+
+void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex *al, int n, int factor)
 {
     // Create a multicast entry
     mCastEntry *entry = new mCastEntry(aid);
@@ -293,6 +300,7 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
         entry->allObjKeys.push_back(key);
 #endif
     }
+    entry->bfactor = factor;
     //  entry->aid = aid;
     _id.get_aid() = aid;
     _id.get_val() = entry;		// allocate table for this section
@@ -327,6 +335,10 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
     entry->allObjKeys.push_back(key);
 #endif
   }
+  if(proxy.ckGetBfactor() == USE_DEFAULT_BRANCH_FACTOR)
+    entry->bfactor = dfactor;
+  else
+    entry->bfactor = proxy.ckGetBfactor();
   _id.get_type() = MulticastMsg;
   _id.get_aid() = aid;
   _id.get_val() = entry;		// allocate table for this section
@@ -336,7 +348,7 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
 
 
 
-void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
+void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
 {
   CkSectionInfo &info = proxy.ckGetSectionInfo();
 
@@ -377,6 +389,11 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
     entry->allObjKeys.push_back(key);
 #endif
   }
+  if(sid.bfactor == USE_DEFAULT_BRANCH_FACTOR)
+    entry->bfactor = dfactor;
+  else
+    entry->bfactor = sid.bfactor;
+
   sid._cookie.get_type() = MulticastMsg;
   sid._cookie.get_aid() = aid;
   sid._cookie.get_val() = entry;	// allocate table for this section
@@ -470,6 +487,7 @@ void CkMulticastMgr::initCookie(CkSectionInfo s)
     msg->parent = CkSectionInfo(entry->getAid());
     msg->rootSid = s;
     msg->redNo = entry->red.redNo;
+    msg->bfactor = entry->bfactor;
     // Fill the message with the section member indices and their last known locations
     CkArray *array = CProxy_ArrayBase(s.get_aid()).ckLocalBranch();
     for (int i=0; i<n; i++) {
@@ -583,6 +601,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     entry->pe = CkMyPe();
     entry->rootSid = msg->rootSid;
     entry->parentGrp = msg->parent;
+    int factor = entry->bfactor = msg->bfactor;
 
     DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems, grpSec: %d\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx, entry->isGrpSec()));
     entry->red.redNo = msg->redNo;
@@ -674,6 +693,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
             m->nIdx = numSubTreeElems;
             m->rootSid = msg->rootSid;
             m->redNo = msg->redNo;
+            m->bfactor = msg->bfactor;
 
             // Give each child the number, indices and location of its children
             for (int j = childStartIndex, cnt = 0; j < childEndIndex; j++)
@@ -690,7 +710,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
             }
 
             int childroot = mySubTreePEs[childStartIndex];
-            DEBUGF(("[%d] call set up %d numelem:%d\n", CkMyPe(), childroot, numSubTreeElems));
+            DEBUGF(("[%d] call set up %d numelem:%d, bfactor: %d\n", CkMyPe(), childroot, numSubTreeElems, m->bfactor));
             // Send the message to the child
             mCastGrp[childroot].setup(m);
         }
@@ -1103,13 +1123,14 @@ void CkGetSectionInfo(CkSectionInfo &id, void *msg)
     id.get_type() = MulticastMsg;
     id.get_pe() = m->gpe();
     id.get_val() = m->cookie();
+    id.get_aid() = m->_cookie.get_aid();
   }
   // note: retain old redNo
 }
 
 // Reduction
 
-void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement &proxy, CkCallback *cb)
+void CkMulticastMgr::setReductionClient(CProxySection_ArrayBase &proxy, CkCallback *cb)
 {
   CkCallback *sectionCB;
   int numSubSections = proxy.ckGetNumSubSections();

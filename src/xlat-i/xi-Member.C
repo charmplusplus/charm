@@ -22,10 +22,12 @@ XStr Member::makeDecl(const XStr &returnType, int forProxy, bool isStatic)
   if (isStatic)
     str << "static ";
   str << returnType<<" ";
-  if (forProxy)
+  if (forProxy==1)
   	str<<container->proxyName();
-  else
+  else if(forProxy==0)
   	str<<container->indexName();
+  else 
+        str<<container->sectionName();
   return str;
 }
 

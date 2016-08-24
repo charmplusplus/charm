@@ -7,12 +7,11 @@ CpvExtern(std::vector<MyChareArray*>, localElems);
 
 
 
-MyChareArray::MyChareArray(CkGroupID grpID): msgNum(0), mcastGrpID(grpID)
+MyChareArray::MyChareArray(): msgNum(0)
 {
     #ifdef VERBOSE_CREATION
         CkPrintf("\nArrayElem[%d] Just born...",thisIndex);
     #endif
-    mcastMgr = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
     CpvAccess(localElems).push_back(this);
     /// Prepare some data to be returned (max sized contribution)
     int numUnits = cfg.msgSizeMax * 1024 /sizeof(double);
@@ -38,20 +37,20 @@ void MyChareArray::crunchData(DataMsg *msg)
     {
         case bcastCkMulticast:
             CkGetSectionInfo(sid, msg);
-            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
             break;
 
         case bcastCharm:
-            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
             break;
 
         case bcastConverse:
-            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
             break;
 
         case rednCkMulticast:
             CkGetSectionInfo(sid, msg);
-            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
             break;
 
         case rednCharm:

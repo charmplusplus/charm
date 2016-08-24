@@ -1,0 +1,4 @@
+
+module CkDummy {
+  initnode void _ckDummyInit(void);
+};

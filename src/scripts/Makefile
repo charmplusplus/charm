@@ -77,7 +77,7 @@ ARMCI: charm++ LIBS
 
 f90charm: charm++ $(L)/libf90charm.a
 
-DEFAULT_LIBS= completion NDMeshStreamer multicast pythonCCS io ckloop
+DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
 default_libs: $(DEFAULT_LIBS)
 
@@ -94,7 +94,7 @@ liveViz: charm-core
 io: charm-core
 pose: charm-core
 fftlib: charm-core
-multicast: charmxi
+dummy: charmxi
 pythonCCS: charmxi
 completion: charmxi
 NDMeshStreamer: charm-core completion
@@ -225,7 +225,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cksection.h ckmessage.h cklocrec.h ckmigratable.h \
-	  ckarrayindex.h ckarray.h cklocation.h ckreduction.h \
+	  ckarrayindex.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
           ckmessagelogging.h ckcausalmlog.h ckobjid.h\
 	  ckobjQ.h readonly.h \
@@ -238,7 +238,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  NborBaseLB.h DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
 	  NeighborLBMsg.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
-          CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
+          CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkMulticast.decl.h	\
           CkReduction.decl.h CkArrayReductionMgr.decl.h\
           tempo.decl.h waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
@@ -252,6 +252,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckdirect.h \
 	  ControlPoints.decl.h PathHistory.decl.h \
 	  pathHistory.h envelope-path.h \
+	  XArraySectionReducer.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
 	  mpi-interoperate.h mpi_main.decl.h  \
@@ -602,7 +603,7 @@ CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o cktaskQ.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
-	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
+	   cklocation.o ckmulticast.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
            tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o ckobjQ.o \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o ckobjid.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
@@ -673,9 +674,9 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
   CkReduction.decl.h CkArrayReductionMgr.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
-  cklocation.h LBDatabase.h MetaBalancer.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
+  cklocation.h ckmulticast.h LBDatabase.h MetaBalancer.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
   LBMachineUtil.h lbdb++.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
-  CkLocation.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h CkFutures.decl.h \
+  CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h trace-simple.h \

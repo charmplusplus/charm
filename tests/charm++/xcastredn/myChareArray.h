@@ -7,7 +7,7 @@
 class MyChareArray: public CBase_MyChareArray
 {
     public:
-        MyChareArray(CkGroupID grpID);
+        MyChareArray();
         MyChareArray(CkMigrateMessage *msg) {}
         void pup(PUP::er &p) {}
         /// @entry Receives data and toys with it. Returns confirmation via a reduction
@@ -15,8 +15,6 @@ class MyChareArray: public CBase_MyChareArray
 
     private:
         int msgNum;
-        CkGroupID mcastGrpID;
-        CkMulticastMgr *mcastMgr;
         CkSectionInfo sid;
         double *returnData;
 };
