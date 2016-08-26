@@ -385,27 +385,18 @@ and sets argv={"a.out","foo","bar"};
 */
 int CmiGetArgStringDesc(char **argv,const char *arg,char **optDest,const char *desc)
 {
-	int i, found=0;
-	char buf[256];
+	int i;
 	CmiAddCLA(arg,"string",desc);
 	for (i=0;argv[i]!=NULL;i++)
-		if (0==strcmp(argv[i],arg)) { /*We found the argument*/
-			if (!found) {
-				if (argv[i+1]==NULL) CmiAbort("Argument not complete!");
-				*optDest=argv[i+1];
-				found = 1;
-			}
-			else { /* found == 1 which means users used this option more than once in the command line */
-				snprintf(buf, 256, "Option %s is used more than once\n", argv[i]);
-				CmiAbort(buf);
-			}
+		if (0==strcmp(argv[i],arg))
+		{/*We found the argument*/
+			if (argv[i+1]==NULL) CmiAbort("Argument not complete!");
+			*optDest=argv[i+1];
 			CmiDeleteArgs(&argv[i],2);
-			i=i-1;
+			return 1;
 		}
-
-	return found; /*return the result of the loop above : 0 -> not found, 1 ->found*/
+	return 0;/*Didn't find the argument*/
 }
-
 int CmiGetArgString(char **argv,const char *arg,char **optDest) {
 	return CmiGetArgStringDesc(argv,arg,optDest,"");
 }
@@ -433,14 +424,12 @@ but not argv=={...,"-packsize",...}.
 */
 int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc)
 {
-	int i, found = 0;
-	char buf[256];
-
+	int i;
 	int argLen=strlen(arg);
 	CmiAddCLA(arg,"integer",desc);
-	for (i=0;argv[i]!=NULL;i++) {
-		if (0==strncmp(argv[i],arg,argLen)) {
-			/*We *may* have found the argument*/
+	for (i=0;argv[i]!=NULL;i++)
+		if (0==strncmp(argv[i],arg,argLen))
+		{/*We *may* have found the argument*/
 			const char *opt=NULL;
 			int nDel=0;
 			switch(argv[i][argLen]) {
@@ -457,26 +446,16 @@ int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc)
 				continue; /*False alarm-- skip it*/
 			}
 			if (opt==NULL) continue; /*False alarm*/
-
-			if (!found) {
-				if (sscanf(opt,"%i",optDest)<1) {
-					/*Bad command line argument-- die*/
-					fprintf(stderr,"Cannot parse %s option '%s' "
-						"as an integer.\n",arg,opt);
-					CmiAbort("Bad command-line argument\n");
-				}
-				found = 1;
+			if (sscanf(opt,"%i",optDest)<1) {
+			/*Bad command line argument-- die*/
+				fprintf(stderr,"Cannot parse %s option '%s' "
+					"as an integer.\n",arg,opt);
+				CmiAbort("Bad command-line argument\n");
 			}
-			else { /* found == 1 which means users used this option more than once in the command line */
-				snprintf(buf, 256, "Option %s is used more than once\n", argv[i]);
-				CmiAbort(buf);
-			}
-
 			CmiDeleteArgs(&argv[i],nDel);
-			i = i - 1;
+			return 1;
 		}
-	}
-	return found; /*return the result of the loop above : 0 -> not found, 1 ->found*/
+	return 0;/*Didn't find the argument-- dest is unchanged*/
 }
 int CmiGetArgInt(char **argv,const char *arg,int *optDest) {
 	return CmiGetArgIntDesc(argv,arg,optDest,"");
@@ -484,13 +463,12 @@ int CmiGetArgInt(char **argv,const char *arg,int *optDest) {
 
 int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *desc)
 {
-	int i, found = 0;
-	char buf[256];
-
+	int i;
 	int argLen=strlen(arg);
 	CmiAddCLA(arg,"integer",desc);
 	for (i=0;argv[i]!=NULL;i++)
-		if (0==strncmp(argv[i],arg,argLen)) {/*We *may* have found the argument*/
+		if (0==strncmp(argv[i],arg,argLen))
+		{/*We *may* have found the argument*/
 			const char *opt=NULL;
 			int nDel=0;
 			switch(argv[i][argLen]) {
@@ -507,24 +485,16 @@ int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *d
 				continue; /*False alarm-- skip it*/
 			}
 			if (opt==NULL) continue; /*False alarm*/
-			if (!found) {
-				if (sscanf(opt,"%ld",optDest) < 1) {
-					/*Bad command line argument-- die*/
-					fprintf(stderr,"Cannot parse %s option '%s' "
-						"as a long integer.\n",arg,opt);
-					CmiAbort("Bad command-line argument\n");
-				}
-				found = 1;
+			if (sscanf(opt,"%ld",optDest)<1) {
+			/*Bad command line argument-- die*/
+				fprintf(stderr,"Cannot parse %s option '%s' "
+					"as a long integer.\n",arg,opt);
+				CmiAbort("Bad command-line argument\n");
 			}
-			else {/* found == 1 which means users used this option more than once in the command line */
-				snprintf(buf, 256, "Option %s is used more than once\n", argv[i]);
-				CmiAbort(buf);
-			}
-
 			CmiDeleteArgs(&argv[i],nDel);
-			i = i-1;
+			return 1;
 		}
-	return found; /*return the result of the loop above : 0 -> not found, 1 ->found*/
+	return 0;/*Didn't find the argument-- dest is unchanged*/
 }
 int CmiGetArgLong(char **argv,const char *arg,CmiInt8 *optDest) {
 	return CmiGetArgLongDesc(argv,arg,optDest,"");
@@ -537,23 +507,15 @@ argv={...,"-foobar",...}.
 */
 int CmiGetArgFlagDesc(char **argv,const char *arg,const char *desc)
 {
-	int i, found = 0;
-	char buf[256];
-
+	int i;
 	CmiAddCLA(arg,"",desc);
-	for (i=0;argv[i]!=NULL;i++) {
-		if (0==strcmp(argv[i],arg)) {/*We found the argument*/
-			if (!found)
-				found = 1;
-			else { /* found == 1 which means users used this option more than once in the command line */
-				snprintf(buf, 256, "Option %s is used more than once\n", argv[i]);
-				CmiAbort(buf);
-			}
+	for (i=0;argv[i]!=NULL;i++)
+		if (0==strcmp(argv[i],arg))
+		{/*We found the argument*/
 			CmiDeleteArgs(&argv[i],1);
-			i = i-1;
+			return 1;
 		}
-	}
-	return found; /*return the result of the loop above : 0 -> not found, 1 ->found*/
+	return 0;/*Didn't find the argument*/
 }
 int CmiGetArgFlag(char **argv,const char *arg) {
 	return CmiGetArgFlagDesc(argv,arg,"");

@@ -1484,6 +1484,9 @@ void _initCharm(int unused_argc, char **argv)
 			} else if (argv[i][0] == '+' && _optSet.count(argv[i]) == 0) {
 				count++;
 				CmiPrintf("WARNING: %s is a command line argument beginning with a '+' but was not parsed by the RTS.\n", argv[i]);
+			} else if (argv[i][0] == '+' && _optSet.count(argv[i]) != 0) {
+				fprintf(stderr,"%s is used more than once. Please remove duplicate arguments.\n", argv[i]);
+				CmiAbort("Bad command-line argument\n");
 			}
 		}
 		if (count) {
