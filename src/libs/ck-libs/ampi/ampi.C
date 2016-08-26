@@ -1523,8 +1523,11 @@ void ampi::pup(PUP::er &p)
         case MPI_GATHERV_REQ:
           blockingReq = new GathervReq;
           break;
-        case MPI_S_REQ:
-          blockingReq = new SReq;
+        case MPI_SEND_REQ:
+          blockingReq = new SendReq;
+          break;
+        case MPI_SSEND_REQ:
+          blockingReq = new SsendReq;
           break;
         case MPI_IATA_REQ:
           blockingReq = new IATAReq;
@@ -1950,7 +1953,7 @@ void ampi::ssend_ack(int sreq_idx){
   else {
     sreq_idx -= 2;              // start from 2
     AmpiRequestList *reqs = &(parent->ampiReqs);
-    SReq *sreq = (SReq *)(*reqs)[sreq_idx];
+    SsendReq *sreq = (SsendReq *)(*reqs)[sreq_idx];
     sreq->statusIreq = true;
     if (resumeOnRecv) {
       thread->resume();
@@ -2483,9 +2486,14 @@ void IATAReq::print(){ //not complete for myreqs
   CkPrintf("In IATAReq: elmcount=%d, idx=%d\n", elmcount, idx);
 }
 
-void SReq::print(){
+void SendReq::print(){
   AmpiRequest::print();
-  CkPrintf("In SReq: this=%p, status=%d\n", this, statusIreq);
+  CkPrintf("In SendReq: this=%p, status=%d\n", this, statusIreq);
+}
+
+void SsendReq::print(){
+  AmpiRequest::print();
+  CkPrintf("In SsendReq: this=%p, status=%d\n", this, statusIreq);
 }
 
 void AmpiRequestList::pup(PUP::er &p) {
@@ -2527,8 +2535,11 @@ void AmpiRequestList::pup(PUP::er &p) {
           case MPI_GATHERV_REQ:
             block[i] = new GathervReq;
             break;
-          case MPI_S_REQ:
-            block[i] = new SReq;
+          case MPI_SEND_REQ:
+            block[i] = new SendReq;
+            break;
+          case MPI_SSEND_REQ:
+            block[i] = new SsendReq;
             break;
           case MPI_IATA_REQ:
             block[i] = new IATAReq;
@@ -2823,6 +2834,12 @@ int AMPI_Finalize(void)
   return MPI_SUCCESS;
 }
 
+static MPI_Request insertReq(AmpiRequest* newreq, bool completed=false)
+{
+  if (completed) newreq->statusIreq = true;
+  return getReqs()->insert(newreq);
+}
+
 CDECL
 int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm) {
   AMPIAPI("AMPI_Send");
@@ -2900,7 +2917,7 @@ int AMPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
   USER_CALL_DEBUG("AMPI_Issend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
   ampi *ptr = getAmpiInstance(comm);
   AmpiRequestList* reqs = getReqs();
-  SReq *newreq = new SReq(comm);
+  SsendReq *newreq = new SsendReq(comm);
   *request = reqs->insert(newreq);
   // 1:  blocking now  - used by MPI_Ssend
   // >=2:  the index of the requests - used by MPI_Issend
@@ -3120,7 +3137,8 @@ int AMPI_Ibarrier(MPI_Comm comm, MPI_Request *request)
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(NULL, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, AMPI_COLL_COMM),
+                         true/*completed*/);
     return MPI_SUCCESS;
   }
   if(getAmpiParent()->isInter(comm))
@@ -3196,7 +3214,8 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(buf, count, type, root, MPI_BCAST_TAG, MPI_BCAST_COMM),
+                         true/*completed*/);
     return MPI_SUCCESS;
   }
   if(getAmpiParent()->isInter(comm))
@@ -3485,7 +3504,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new RednReq(outbuf,count,type,comm), true/*completed*/);
     return copyDatatype(comm,type,count,inbuf,outbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -4022,9 +4041,22 @@ int GathervReq::wait(MPI_Status *sts){
   return 0;
 }
 
-int SReq::wait(MPI_Status *sts){
+int SendReq::wait(MPI_Status *sts){
   ampi *dis = getAmpiInstance(comm);
-  while (statusIreq == false) {
+  while (!statusIreq) {
+    dis->resumeOnRecv = true;
+    dis->block();
+    // "dis" is updated in case an ampi thread is migrated while waiting for a message
+    dis = getAmpiInstance(comm);
+  }
+  dis->resumeOnRecv = false;
+  AMPI_DEBUG("SendReq::wait has resumed\n");
+  return 0;
+}
+
+int SsendReq::wait(MPI_Status *sts){
+  ampi *dis = getAmpiInstance(comm);
+  while (!statusIreq) {
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = dis->blockOnRecv();
   }
@@ -4350,14 +4382,25 @@ bool GathervReq::itest(MPI_Status *sts){
   return statusIreq;
 }
 
-bool SReq::test(MPI_Status *sts){
+bool SendReq::test(MPI_Status *sts){
   if (!statusIreq) {
     getAmpiInstance(comm)->yield();
   }
   return statusIreq;
 }
 
-bool SReq::itest(MPI_Status *sts){
+bool SendReq::itest(MPI_Status *sts){
+  return statusIreq;
+}
+
+bool SsendReq::test(MPI_Status *sts){
+  if (!statusIreq) {
+    getAmpiInstance(comm)->yield();
+  }
+  return statusIreq;
+}
+
+bool SsendReq::itest(MPI_Status *sts){
   return statusIreq;
 }
 
@@ -4400,7 +4443,11 @@ void GathervReq::complete(MPI_Status *sts){
   wait(sts);
 }
 
-void SReq::complete(MPI_Status *sts){
+void SendReq::complete(MPI_Status *sts){
+  wait(sts);
+}
+
+void SsendReq::complete(MPI_Status *sts){
   wait(sts);
 }
 
@@ -4861,7 +4908,7 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
   USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm);
-  *request = MPI_REQUEST_NULL;
+  *request = insertReq(new SendReq(comm), true/*completed*/);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -4966,7 +5013,7 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new RednReq(recvbuf, count, type, comm), true/*completed*/);
     return copyDatatype(comm,type,count,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -5064,7 +5111,7 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new GatherReq(recvbuf, recvcount, recvtype, comm), true/*completed*/);
     return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -5169,7 +5216,8 @@ int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new GathervReq(recvbuf, getAmpiInstance(comm)->getSize(comm), recvtype, comm, recvcounts, displs),
+                         true/*completed*/);
     return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -5297,7 +5345,7 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new GatherReq(recvbuf, recvcount, recvtype, comm), true/*completed*/);
     return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -5454,7 +5502,8 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new GathervReq(recvbuf, getAmpiInstance(comm)->getSize(comm), recvtype, comm, recvcounts, displs),
+                         true/*completed*/);
     return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -5606,7 +5655,7 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm), true/*completed*/);
     return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -5741,7 +5790,7 @@ int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sen
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm), true/*completed*/);
     return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -6082,7 +6131,8 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcount,recvtype,getAmpiInstance(comm)->getRank(comm),MPI_ATA_TAG,comm),
+                         true/*completed*/);
     return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -6168,15 +6218,20 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
 #if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
+  if(ret != MPI_SUCCESS){
+    *request = MPI_REQUEST_NULL;
     return ret;
+  }
   ret = errorCheck(comm, 1, 0, 0, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
-  if(ret != MPI_SUCCESS)
+  if(ret != MPI_SUCCESS){
+    *request = MPI_REQUEST_NULL;
     return ret;
+  }
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcounts[0],recvtype,getAmpiInstance(comm)->getRank(comm),MPI_ATA_TAG,comm),
+                         true/*completed*/);
     return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -6264,15 +6319,20 @@ int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
 #if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, 0, 0, sendtypes[0], 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
+  if(ret != MPI_SUCCESS){
+    *request = MPI_REQUEST_NULL;
     return ret;
+  }
   ret = errorCheck(comm, 1, 0, 0, recvtypes[0], 1, 0, 0, 0, 0, recvbuf, 1);
-  if(ret != MPI_SUCCESS)
+  if(ret != MPI_SUCCESS){
+    *request = MPI_REQUEST_NULL;
     return ret;
+  }
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcounts[0],recvtypes[0],getAmpiInstance(comm)->getRank(comm),MPI_ATA_TAG,comm),
+                         true/*completed*/);
     return copyDatatype(comm,sendtypes[0],sendcounts[0],sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -6373,7 +6433,8 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   if (comm == MPI_COMM_SELF) {
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcount,recvtype,getAmpiInstance(comm)->getRank(comm),MPI_NBOR_TAG,comm),
+                         true/*completed*/);
     return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
   }
 
@@ -6477,7 +6538,8 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
 #endif
 
   if (comm == MPI_COMM_SELF) {
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcounts[0],recvtype,getAmpiInstance(comm)->getRank(comm),MPI_NBOR_TAG,comm),
+                         true/*completed*/);
     return copyDatatype(comm, sendtype, sendcounts[0], sendbuf, recvbuf);
   }
 
@@ -6580,7 +6642,8 @@ int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
 #endif
 
   if (comm == MPI_COMM_SELF) {
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcounts[0],recvtypes[0],getAmpiInstance(comm)->getRank(comm),MPI_NBOR_TAG,comm),
+                         true/*completed*/);
     return copyDatatype(comm, sendtypes[0], sendcounts[0], sendbuf, recvbuf);
   }
 
@@ -6681,7 +6744,8 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
 #endif
 
   if (comm == MPI_COMM_SELF) {
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcount,recvtype,getAmpiInstance(comm)->getRank(comm),MPI_NBOR_TAG,comm),
+                         true/*completed*/);
     return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
   }
 
@@ -6782,7 +6846,8 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
 #endif
 
   if (comm == MPI_COMM_SELF) {
-    *request = MPI_REQUEST_NULL;
+    *request = insertReq(new IReq(recvbuf,recvcounts[0],recvtype,getAmpiInstance(comm)->getRank(comm),MPI_NBOR_TAG,comm),
+                         true/*completed*/);
     return copyDatatype(comm, sendtype, sendcount, sendbuf, recvbuf);
   }
 
