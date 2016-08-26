@@ -4023,6 +4023,7 @@ int RednReq::wait(MPI_Status *sts){
   while (!statusIreq) {
     dis->resumeOnColl = true;
     dis->block();
+    dis = getAmpiInstance(comm);
 
 #if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
@@ -4055,6 +4056,7 @@ int GatherReq::wait(MPI_Status *sts){
   while (!statusIreq) {
     dis->resumeOnColl = true;
     dis->block();
+    dis = getAmpiInstance(comm);
 
 #if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
@@ -4087,6 +4089,7 @@ int GathervReq::wait(MPI_Status *sts){
   while (!statusIreq) {
     dis->resumeOnColl = true;
     dis->block();
+    dis = getAmpiInstance(comm);
 
 #if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
