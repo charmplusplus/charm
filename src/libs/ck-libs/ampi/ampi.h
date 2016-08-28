@@ -1583,6 +1583,201 @@ int AMPI_System(const char *cmd);
 /* Determine approximate depth of stack at the point of this call */
 extern long ampiCurrentStackUsage(void);
 
+/* If compiling the MPICH test suite, enable these no-op definitions
+ * for the MPI features that AMPI does not yet support. */
+//#define AMPI_WITH_UNIMPL_DEFS
+
+#ifdef AMPI_WITH_UNIMPL_DEFS
+
+// MPI-2 Constants
+#define MPI_ARGV_NULL (char **)0
+#define MPI_ARGVS_NULL (char ***)0
+#define MPI_MAX_PORT_NAME 256
+#define MPI_ORDER_C 56 /* defined in ROMIO */
+#define MPI_ORDER_FORTRAN 57 /* defined in ROMIO */
+#define MPI_TYPECLASS_INTEGER -1
+#define MPI_TYPECLASS_REAL -2
+#define MPI_TYPECLASS_COMPLEX -3
+#define MPI_DISTRIBUTE_BLOCK 121  /* defined in ROMIO */
+#define MPI_DISTRIBUTE_CYCLIC 122  /* defined in ROMIO */
+#define MPI_DISTRIBUTE_NONE 123 /* defined in ROMIO */
+#define MPI_DISTRIBUTE_DFLT_DARG -49767 /* defined in ROMIO */
+#define MPI_INTEGER1 MPI_CHAR
+#define MPI_INTEGER2 MPI_SHORT
+#define MPI_INTEGER4 MPI_INT
+#define MPI_INTEGER8 MPI_LONG_LONG_INT
+#define MPI_REAL4 MPI_FLOAT
+#define MPI_REAL8 MPI_DOUBLE
+#define MPI_REAL16 MPI_LONG_DOUBLE
+#define MPI_COMPLEX8 MPI_FLOAT_COMPLEX
+#define MPI_COMPLEX16 MPI_DOUBLE_COMPLEX
+#define MPI_COMPLEX32 MPI_LONG_DOUBLE_COMPLEX
+#define MPI_C_FLOAT_COMPLEX MPI_FLOAT_COMPLEX
+#define MPI_C_DOUBLE_COMPLEX MPI_DOUBLE_COMPLEX
+#define MPI_C_LONG_DOUBLE_COMPLEX MPI_LONG_DOUBLE_COMPLEX
+#define MPI_CXX_BOOL MPI_C_BOOL
+#define MPI_CXX_FLOAT_COMPLEX MPI_C_FLOAT_COMPLEX
+#define MPI_CXX_DOUBLE_COMPLEX MPI_C_DOUBLE_COMPLEX
+#define MPI_CXX_LONG_DOUBLE_COMPLEX MPI_C_LONG_DOUBLE_COMPLEX
+typedef int (MPI_Grequest_cancel_function)(void *, int);
+typedef int (MPI_Grequest_free_function)(void *);
+typedef int (MPI_Grequest_query_function)(void *, MPI_Status *);
+
+// MPI-2 Routines
+#define MPI_Comm_spawn (void*)
+#define MPI_Comm_spawn_multiple (void*)
+#define MPI_Open_port (void*)
+#define MPI_Close_port (void*)
+#define MPI_Comm_accept (void*)
+#define MPI_Comm_connect (void*)
+#define MPI_Comm_disconnect (void*)
+#define MPI_Comm_get_parent (void*)
+#define MPI_Comm_join (void*)
+#define MPI_Publish_name (void*)
+#define MPI_Unpublish_name (void*)
+#define MPI_Grequest_start (void*)
+#define MPI_Grequest_complete (void*)
+#define MPI_Pack_external (void*)
+#define MPI_Pack_external_size (void*)
+#define MPI_Type_match_size (void*)
+#define MPI_Unpack_external (void*)
+#define MPI_Win_free_errhandler (void*)
+
+// MPI-3 Constants
+#define MPI_ERR_RMA_RANGE 54
+#define MPI_ERR_RMA_ATTACH 55
+#define MPI_ERR_RMA_SHARED 56
+#define MPI_ERR_RMA_FLAVOR 57
+
+// MPI-3 Routines
+#define MPI_Win_allocate (void*)
+#define MPI_Win_allocate_shared (void*)
+#define MPI_Win_attach (void*)
+#define MPI_Win_create_dynamic (void*)
+#define MPI_Win_detach (void*)
+#define MPI_Win_flush (void*)
+#define MPI_Win_flush_all (void*)
+#define MPI_Win_flush_local (void*)
+#define MPI_Win_flush_local_all (void*)
+#define MPI_Win_lock_all (void*)
+#define MPI_Win_shared_query (void*)
+#define MPI_Win_sync (void*)
+#define MPI_Win_unlock_all (void*)
+
+// MPI_T interface
+typedef int MPI_T_enum;
+typedef int MPI_T_cvar_handle;
+typedef int MPI_T_pvar_handle;
+typedef int MPI_T_pvar_session;
+#define MPI_T_ENUM_NULL (-1)
+#define MPI_T_CVAR_HANDLE_NULL (-1)
+#define MPI_T_PVAR_HANDLE_NULL (-1)
+#define MPI_T_PVAR_SESSION_NULL (-1)
+#define MPI_T_VERBOSITY_USER_BASIC 1
+#define MPI_T_VERBOSITY_USER_DETAIL 2
+#define MPI_T_VERBOSITY_USER_ALL 3
+#define MPI_T_VERBOSITY_TUNER_BASIC 4
+#define MPI_T_VERBOSITY_TUNER_DETAIL 5
+#define MPI_T_VERBOSITY_TUNER_ALL 6
+#define MPI_T_VERBOSITY_MPIDEV_BASIC 7
+#define MPI_T_VERBOSITY_MPIDEV_DETAIL 8
+#define MPI_T_VERBOSITY_MPIDEV_ALL 9
+#define MPI_T_BIND_NO_OBJECT 1
+#define MPI_T_BIND_MPI_COMM 2
+#define MPI_T_BIND_MPI_DATATYPE 3
+#define MPI_T_BIND_MPI_ERRHANDLER 4
+#define MPI_T_BIND_MPI_FILE 5
+#define MPI_T_BIND_MPI_GROUP 6
+#define MPI_T_BIND_MPI_OP 7
+#define MPI_T_BIND_MPI_REQUEST 8
+#define MPI_T_BIND_MPI_WIN 9
+#define MPI_T_BIND_MPI_MESSAGE 10
+#define MPI_T_BIND_MPI_INFO 11
+#define MPI_T_SCOPE_CONSTANT 1
+#define MPI_T_SCOPE_READONLY 2
+#define MPI_T_SCOPE_LOCAL 3
+#define MPI_T_SCOPE_GROUP 4
+#define MPI_T_SCOPE_GROUP_EQ 5
+#define MPI_T_SCOPE_ALL 6
+#define MPI_T_SCOPE_ALL_EQ 7
+#define MPI_T_PVAR_ALL_HANDLES (-1)
+#define MPI_T_PVAR_CLASS_STATE 1
+#define MPI_T_PVAR_CLASS_LEVEL 2
+#define MPI_T_PVAR_CLASS_SIZE 3
+#define MPI_T_PVAR_CLASS_PERCENTAGE 4
+#define MPI_T_PVAR_CLASS_HIGHWATERMARK 5
+#define MPI_T_PVAR_CLASS_LOWWATERMARK 6
+#define MPI_T_PVAR_CLASS_COUNTER 7
+#define MPI_T_PVAR_CLASS_AGGREGATE 8
+#define MPI_T_PVAR_CLASS_TIMER 9
+#define MPI_T_PVAR_CLASS_GENERIC 10
+#define MPI_T_ERR_MEMORY 58
+#define MPI_T_ERR_NOT_INITIALIZED 59
+#define MPI_T_ERR_CANNOT_INIT 60
+#define MPI_T_ERR_INVALID_INDEX 61
+#define MPI_T_ERR_INVALID_ITEM 62
+#define MPI_T_ERR_INVALID_NAME 63
+#define MPI_T_ERR_INVALID_HANDLE 64
+#define MPI_T_ERR_OUT_OF_HANDLES 65
+#define MPI_T_ERR_OUT_OF_SESSIONS 66
+#define MPI_T_ERR_INVALID_SESSION 67
+#define MPI_T_ERR_CVAR_SET_NOT_NOW 68
+#define MPI_T_ERR_CVAR_SET_NEVER 69
+#define MPI_T_ERR_CVAR_READ 70
+#define MPI_T_ERR_CVAR_WRITE 71
+#define MPI_T_ERR_PVAR_START 72
+#define MPI_T_ERR_PVAR_STOP 73
+#define MPI_T_ERR_PVAR_READ 74
+#define MPI_T_ERR_PVAR_WRITE 75
+#define MPI_T_ERR_PVAR_RESET 76
+#define MPI_T_ERR_PVAR_READRESET 77
+#define MPI_T_ERR_PVAR_NO_STARTSTOP 78
+#define MPI_T_ERR_PVAR_NO_WRITE 79
+#define MPI_T_ERR_PVAR_NO_ATOMIC 80
+#define MPI_T_category_changed (void*)
+#define MPI_T_category_get_categories (void*)
+#define MPI_T_category_get_cvars (void*)
+#define MPI_T_category_get_index (void*)
+#define MPI_T_category_get_info (void*)
+#define MPI_T_category_get_num (void*)
+#define MPI_T_category_get_pvars (void*)
+#define MPI_T_cvar_get_index (void*)
+#define MPI_T_cvar_get_info (void*)
+#define MPI_T_cvar_get_num (void*)
+#define MPI_T_cvar_handle_alloc (void*)
+#define MPI_T_cvar_handle_free (void*)
+#define MPI_T_cvar_read (void*)
+#define MPI_T_cvar_write (void*)
+#define MPI_T_enum_get_info (void*)
+#define MPI_T_enum_get_item (void*)
+#define MPI_T_finalize MPI_Finalize
+#define MPI_T_init_thread(provided, required) (MPI_Init_thread(NULL,NULL,required,provided))
+#define MPI_T_pvar_get_index (void*)
+#define MPI_T_pvar_get_info (void*)
+#define MPI_T_pvar_get_num (void*)
+#define MPI_T_pvar_handle_alloc (void*)
+#define MPI_T_pvar_handle_free (void*)
+#define MPI_T_pvar_read (void*)
+#define MPI_T_pvar_readreset (void*)
+#define MPI_T_pvar_reset (void*)
+#define MPI_T_pvar_session_create (void*)
+#define MPI_T_pvar_session_free (void*)
+#define MPI_T_pvar_start (void*)
+#define MPI_T_pvar_stop (void*)
+#define MPI_T_pvar_write (void*)
+
+// MPIX FT interface (MPICH extensions needed to compile tests/ampi/mpich-test/)
+#define MPIX_ERR_PROC_FAILED 77
+#define MPIX_ERR_PROC_FAILED_PENDING 78
+#define MPIX_ERR_REVOKED 79
+#define MPIX_Comm_agree (void*)
+#define MPIX_Comm_failure_ack (void*)
+#define MPIX_Comm_shrink (void*)
+#define MPIX_Comm_failure_get_acked (void*)
+#define MPIX_Comm_revoke (void*)
+
+#endif //AMPI_WITH_UNIMPL_DEFS
+
 #ifdef __cplusplus
 }
 #endif

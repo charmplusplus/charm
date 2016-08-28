@@ -1,50 +1,56 @@
-/* 
-   This test checks for possible interference between 
-   successive calls to MPI_Allreduce.  Some users, on some MPI implementations
-   and platforms, have had to add MPI_Barrier before MPI_Allreduce calls.
-   */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
+/*
+ *
+ *  (C) 2003 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
+ */
 #include "mpi.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include "mpitest.h"
 
-#define MAX_LOOP 1000
+/*
+static char MTEST_Descrip[] = "Test MPI_Allreduce with MPI_IN_PLACE";
+*/
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
-    int i, in_val, out_val;
+    int errs = 0;
     int rank, size;
-    int errs = 0, toterrs;
+    int minsize = 2, count;
+    MPI_Comm comm;
+    int *buf, i;
 
-    MPI_Init( &argc, &argv );
+    MTest_Init(&argc, &argv);
 
-    MPI_Comm_size( MPI_COMM_WORLD, &size );
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-    for (i=0; i<MAX_LOOP; i++) {
-	in_val = (i & 0x1) ? 10 : -10;
-	MPI_Allreduce( &in_val, &out_val, 1, MPI_INT, MPI_SUM, 
-		       MPI_COMM_WORLD );
-	if (i & 0x1) {
-	    if (out_val != 10 * size) {
-		errs++;
-		printf( "[%d] Error in out_val = %d\n", rank, out_val );
-	    }
-	}
-	else {
-	    if (-out_val != 10 * size) {
-		errs++;
-		printf( "[%d] Error in out_val = %d\n", rank, out_val );
-	    }
-	}
+    while (MTestGetIntracommGeneral(&comm, minsize, 1)) {
+        if (comm == MPI_COMM_NULL)
+            continue;
+        MPI_Comm_size(comm, &size);
+        MPI_Comm_rank(comm, &rank);
+
+        for (count = 1; count < 65000; count = count * 2) {
+            /* Contiguous data */
+            buf = (int *) malloc(count * sizeof(int));
+            for (i = 0; i < count; i++)
+                buf[i] = rank + i;
+            MPI_Allreduce(MPI_IN_PLACE, buf, count, MPI_INT, MPI_SUM, comm);
+            /* Check the results */
+            for (i = 0; i < count; i++) {
+                int result = i * size + (size * (size - 1)) / 2;
+                if (buf[i] != result) {
+                    errs++;
+                    if (errs < 10) {
+                        fprintf(stderr, "buf[%d] = %d expected %d\n", i, buf[i], result);
+                    }
+                }
+            }
+            free(buf);
+        }
+        MTestFreeComm(&comm);
     }
-    MPI_Barrier( MPI_COMM_WORLD );
-    MPI_Allreduce( &errs, &toterrs, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD );
-    
-    if (rank == 0) {
-	if (toterrs) 
-	    printf( " Found %d errors\n", toterrs );
-	else
-	    printf( " No Errors\n" );
-    }
 
-    MPI_Finalize( );
+    MTest_Finalize(errs);
+    MPI_Finalize();
     return 0;
 }

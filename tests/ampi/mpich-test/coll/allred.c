@@ -1,2466 +1,460 @@
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
+/*
+ *  (C) 2001 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
+ */
+/*      Warning - this test will fail for MPI_PROD & maybe MPI_SUM
+ *        if more than 10 MPI processes are used.  Loss of precision
+ *        will occur as the number of processors is increased.
+ */
 
-#include <math.h>
 #include "mpi.h"
+#include "mpitest.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "test.h"
-#include "../pt2pt/gcomm.h"
-
-int verbose = 0;
-int main( int argc, char **argv )
-{
-int count, errcnt = 0, gerr = 0, toterr, size, rank;
-MPI_Comm comm;
-
-MPI_Comm comms[10];
-int      ncomm, ii, world_rank;
-
-MPI_Init( &argc, &argv );
-MPI_Comm_rank( MPI_COMM_WORLD, &world_rank );
-
-/* First tests */
-MakeComms( comms, 10, &ncomm, 0 );
-for (ii=0; ii<ncomm; ii++) {
-if (world_rank == 0 && verbose) printf( "Testing with communicator %d\n", ii );
-comm = comms[ii];
-
-
-MPI_Comm_size( comm, &size );
-MPI_Comm_rank( comm, &rank );
-count = 10;
-
-/* Test sum */
-if (world_rank == 0 && verbose) printf( "Testing MPI_SUM...\n" );
-
-
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = i*size; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_SUM, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_SUM\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = i*size; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_SUM, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_SUM\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = i*size; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_SUM, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_SUM\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = i*size; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_SUM, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_SUM\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = i*size; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_SUM, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_SUM\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = i*size; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_SUM, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_SUM\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-float *in, *out, *sol;
-int  i, fnderr=0;
-in = (float *)malloc( count * sizeof(float) );
-out = (float *)malloc( count * sizeof(float) );
-sol = (float *)malloc( count * sizeof(float) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = i*size; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_FLOAT, MPI_SUM, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_FLOAT and op MPI_SUM\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-double *in, *out, *sol;
-int  i, fnderr=0;
-in = (double *)malloc( count * sizeof(double) );
-out = (double *)malloc( count * sizeof(double) );
-sol = (double *)malloc( count * sizeof(double) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = i*size; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_DOUBLE, MPI_SUM, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_DOUBLE and op MPI_SUM\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_SUM\n", errcnt, rank );
-errcnt = 0;
-
-/* Test product */
-if (world_rank == 0 && verbose) printf( "Testing MPI_PROD...\n" );
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = (i > 0) ? (int)(pow((double)(i),(double)size)+0.1) : 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_PROD, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_PROD\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = (i > 0) ? (int)(pow((double)(i),(double)size)+0.1) : 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_PROD, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_PROD\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = (i > 0) ? (int)(pow((double)(i),(double)size)+0.1) : 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_PROD, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_PROD\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = (i > 0) ? (int)(pow((double)(i),(double)size)+0.1) : 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_PROD, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_PROD\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = (i > 0) ? (int)(pow((double)(i),(double)size)+0.1) : 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_PROD, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_PROD\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = (i > 0) ? (int)(pow((double)(i),(double)size)+0.1) : 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_PROD, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_PROD\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-float *in, *out, *sol;
-int  i, fnderr=0;
-in = (float *)malloc( count * sizeof(float) );
-out = (float *)malloc( count * sizeof(float) );
-sol = (float *)malloc( count * sizeof(float) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = (i > 0) ? (int)(pow((double)(i),(double)size)+0.1) : 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_FLOAT, MPI_PROD, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_FLOAT and op MPI_PROD\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-double *in, *out, *sol;
-int  i, fnderr=0;
-in = (double *)malloc( count * sizeof(double) );
-out = (double *)malloc( count * sizeof(double) );
-sol = (double *)malloc( count * sizeof(double) );
-for (i=0; i<count; i++) { *(in + i) = i; *(sol + i) = (i > 0) ? (int)(pow((double)(i),(double)size)+0.1) : 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_DOUBLE, MPI_PROD, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_DOUBLE and op MPI_PROD\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_PROD\n", errcnt, rank );
-errcnt = 0;
-
-/* Test max */
-if (world_rank == 0 && verbose) printf( "Testing MPI_MAX...\n" );
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = (size - 1 + i); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_MAX, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_MAX\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = (size - 1 + i); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_MAX, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_MAX\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = (size - 1 + i); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_MAX, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_MAX\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = (size - 1 + i); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_MAX, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_MAX\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = (size - 1 + i); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_MAX, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_MAX\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = (size - 1 + i); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_MAX, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_MAX\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-float *in, *out, *sol;
-int  i, fnderr=0;
-in = (float *)malloc( count * sizeof(float) );
-out = (float *)malloc( count * sizeof(float) );
-sol = (float *)malloc( count * sizeof(float) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = (size - 1 + i); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_FLOAT, MPI_MAX, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_FLOAT and op MPI_MAX\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-double *in, *out, *sol;
-int  i, fnderr=0;
-in = (double *)malloc( count * sizeof(double) );
-out = (double *)malloc( count * sizeof(double) );
-sol = (double *)malloc( count * sizeof(double) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = (size - 1 + i); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_DOUBLE, MPI_MAX, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_DOUBLE and op MPI_MAX\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_MAX\n", errcnt, rank );
-errcnt = 0;
-
-/* Test min */
-if (world_rank == 0 && verbose) printf( "Testing MPI_MIN...\n" );
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_MIN, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_MIN\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_MIN, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_MIN\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_MIN, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_MIN\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_MIN, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_MIN\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_MIN, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_MIN\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_MIN, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_MIN\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-float *in, *out, *sol;
-int  i, fnderr=0;
-in = (float *)malloc( count * sizeof(float) );
-out = (float *)malloc( count * sizeof(float) );
-sol = (float *)malloc( count * sizeof(float) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_FLOAT, MPI_MIN, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_FLOAT and op MPI_MIN\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-double *in, *out, *sol;
-int  i, fnderr=0;
-in = (double *)malloc( count * sizeof(double) );
-out = (double *)malloc( count * sizeof(double) );
-sol = (double *)malloc( count * sizeof(double) );
-for (i=0; i<count; i++) { *(in + i) = (rank + i); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_DOUBLE, MPI_MIN, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_DOUBLE and op MPI_MIN\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_MIN\n", errcnt, rank );
-errcnt = 0;
-
-/* Test LOR */
-if (world_rank == 0 && verbose) printf( "Testing MPI_LOR...\n" );
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_LOR(1)\n", errcnt, rank );
-errcnt = 0;
-
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_LOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_LOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_LOR(0)\n", errcnt, rank );
-errcnt = 0;
-
-/* Test LXOR */
-if (world_rank == 0 && verbose) printf( "Testing MPI_LXOR...\n" );
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1); *(sol + i) = (size > 1); 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_LXOR(1)\n", errcnt, rank );
-errcnt = 0;
-
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_LXOR(0)\n", errcnt, rank );
-errcnt = 0;
-
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_LXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_LXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_LXOR(1-0)\n", errcnt, rank );
-errcnt = 0;
-
-/* Test LAND */
-if (world_rank == 0 && verbose) printf( "Testing MPI_LAND...\n" );
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = (rank & 0x1); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_LAND(0)\n", errcnt, rank );
-errcnt = 0;
-
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 1; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 1; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 1; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 1; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 1; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = 1; *(sol + i) = 1; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_LAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_LAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_LAND(1)\n", errcnt, rank );
-errcnt = 0;
-
-/* Test BOR */
-if (world_rank == 0 && verbose) printf( "Testing MPI_BOR...\n" );
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = rank & 0x3; *(sol + i) = (size < 3) ? size - 1 : 0x3; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_BOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_BOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = rank & 0x3; *(sol + i) = (size < 3) ? size - 1 : 0x3; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_BOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_BOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = rank & 0x3; *(sol + i) = (size < 3) ? size - 1 : 0x3; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_BOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_BOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = rank & 0x3; *(sol + i) = (size < 3) ? size - 1 : 0x3; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_BOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_BOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = rank & 0x3; *(sol + i) = (size < 3) ? size - 1 : 0x3; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_BOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_BOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = rank & 0x3; *(sol + i) = (size < 3) ? size - 1 : 0x3; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_BOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_BOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned char *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned char *)malloc( count * sizeof(unsigned char) );
-out = (unsigned char *)malloc( count * sizeof(unsigned char) );
-sol = (unsigned char *)malloc( count * sizeof(unsigned char) );
-for (i=0; i<count; i++) { *(in + i) = rank & 0x3; *(sol + i) = (size < 3) ? size - 1 : 0x3; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_BYTE, MPI_BOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_BYTE and op MPI_BOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_BOR(1)\n", errcnt, rank );
-errcnt = 0;
-
-/* Test BAND */
-if (world_rank == 0 && verbose) printf( "Testing MPI_BAND...\n" );
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : ~0); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : ~0); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : ~0); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : ~0); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : ~0); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : ~0); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned char *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned char *)malloc( count * sizeof(unsigned char) );
-out = (unsigned char *)malloc( count * sizeof(unsigned char) );
-sol = (unsigned char *)malloc( count * sizeof(unsigned char) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : ~0); *(sol + i) = i; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_BYTE, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_BYTE and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_BAND(1)\n", errcnt, rank );
-errcnt = 0;
-
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : 0); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : 0); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : 0); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : 0); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : 0); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = (rank == size-1 ? i : 0); *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_BAND, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_BAND\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_BAND(0)\n", errcnt, rank );
-errcnt = 0;
-
-/* Test BXOR */
-if (world_rank == 0 && verbose) printf( "Testing MPI_BXOR...\n" );
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1)*0xf0 ; *(sol + i) = (size > 1)*0xf0 ; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1)*0xf0 ; *(sol + i) = (size > 1)*0xf0 ; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1)*0xf0 ; *(sol + i) = (size > 1)*0xf0 ; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1)*0xf0 ; *(sol + i) = (size > 1)*0xf0 ; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1)*0xf0 ; *(sol + i) = (size > 1)*0xf0 ; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = (rank == 1)*0xf0 ; *(sol + i) = (size > 1)*0xf0 ; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_BXOR(1)\n", errcnt, rank );
-errcnt = 0;
-
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = 0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_BXOR(0)\n", errcnt, rank );
-errcnt = 0;
-
-
-{
-int *in, *out, *sol;
-int  i, fnderr=0;
-in = (int *)malloc( count * sizeof(int) );
-out = (int *)malloc( count * sizeof(int) );
-sol = (int *)malloc( count * sizeof(int) );
-for (i=0; i<count; i++) { *(in + i) = ~0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_INT, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_INT and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-long *in, *out, *sol;
-int  i, fnderr=0;
-in = (long *)malloc( count * sizeof(long) );
-out = (long *)malloc( count * sizeof(long) );
-sol = (long *)malloc( count * sizeof(long) );
-for (i=0; i<count; i++) { *(in + i) = ~0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_LONG, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_LONG and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-short *in, *out, *sol;
-int  i, fnderr=0;
-in = (short *)malloc( count * sizeof(short) );
-out = (short *)malloc( count * sizeof(short) );
-sol = (short *)malloc( count * sizeof(short) );
-for (i=0; i<count; i++) { *(in + i) = ~0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_SHORT, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_SHORT and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned short *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned short *)malloc( count * sizeof(unsigned short) );
-out = (unsigned short *)malloc( count * sizeof(unsigned short) );
-sol = (unsigned short *)malloc( count * sizeof(unsigned short) );
-for (i=0; i<count; i++) { *(in + i) = ~0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_SHORT, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_SHORT and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned *)malloc( count * sizeof(unsigned) );
-out = (unsigned *)malloc( count * sizeof(unsigned) );
-sol = (unsigned *)malloc( count * sizeof(unsigned) );
-for (i=0; i<count; i++) { *(in + i) = ~0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-unsigned long *in, *out, *sol;
-int  i, fnderr=0;
-in = (unsigned long *)malloc( count * sizeof(unsigned long) );
-out = (unsigned long *)malloc( count * sizeof(unsigned long) );
-sol = (unsigned long *)malloc( count * sizeof(unsigned long) );
-for (i=0; i<count; i++) { *(in + i) = ~0; *(sol + i) = 0; 
-	*(out + i) = 0; }
-MPI_Allreduce( in, out, count, MPI_UNSIGNED_LONG, MPI_BXOR, comm );
-for (i=0; i<count; i++) { if (*(out + i) != *(sol + i)) {errcnt++; fnderr++;}}
-if (fnderr) fprintf( stderr, 
- 	"(%d) Error for type MPI_UNSIGNED_LONG and op MPI_BXOR\n", world_rank );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_BXOR(1-0)\n", errcnt, rank );
-errcnt = 0;
-
-/* Test Maxloc */
-if (world_rank == 0 && verbose) printf( "Testing MPI_MAXLOC...\n" );
-
-{
-struct int_test { int a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct int_test *)malloc( count * sizeof(struct int_test) );
-out = (struct int_test *)malloc( count * sizeof(struct int_test) );
-sol = (struct int_test *)malloc( count * sizeof(struct int_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = (size - 1 + i); (sol + i)->b = (size-1);
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_2INT, MPI_MAXLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_2INT and op MPI_MAXLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-struct long_test { long a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct long_test *)malloc( count * sizeof(struct long_test) );
-out = (struct long_test *)malloc( count * sizeof(struct long_test) );
-sol = (struct long_test *)malloc( count * sizeof(struct long_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = (size - 1 + i); (sol + i)->b = (size-1);
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_LONG_INT, MPI_MAXLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_LONG_INT and op MPI_MAXLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-struct short_test { short a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct short_test *)malloc( count * sizeof(struct short_test) );
-out = (struct short_test *)malloc( count * sizeof(struct short_test) );
-sol = (struct short_test *)malloc( count * sizeof(struct short_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = (size - 1 + i); (sol + i)->b = (size-1);
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_SHORT_INT, MPI_MAXLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_SHORT_INT and op MPI_MAXLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-struct float_test { float a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct float_test *)malloc( count * sizeof(struct float_test) );
-out = (struct float_test *)malloc( count * sizeof(struct float_test) );
-sol = (struct float_test *)malloc( count * sizeof(struct float_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = (size - 1 + i); (sol + i)->b = (size-1);
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_FLOAT_INT, MPI_MAXLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_FLOAT_INT and op MPI_MAXLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-struct double_test { double a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct double_test *)malloc( count * sizeof(struct double_test) );
-out = (struct double_test *)malloc( count * sizeof(struct double_test) );
-sol = (struct double_test *)malloc( count * sizeof(struct double_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = (size - 1 + i); (sol + i)->b = (size-1);
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_DOUBLE_INT, MPI_MAXLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_DOUBLE_INT and op MPI_MAXLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_MAXLOC\n", errcnt, rank );
-errcnt = 0;
-
-/* Test minloc */
-if (world_rank == 0 && verbose) printf( "Testing MPI_MINLOC...\n" );
-
-
-{
-struct int_test { int a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct int_test *)malloc( count * sizeof(struct int_test) );
-out = (struct int_test *)malloc( count * sizeof(struct int_test) );
-sol = (struct int_test *)malloc( count * sizeof(struct int_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = i; (sol + i)->b = 0;
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_2INT, MPI_MINLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_2INT and op MPI_MINLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-struct long_test { long a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct long_test *)malloc( count * sizeof(struct long_test) );
-out = (struct long_test *)malloc( count * sizeof(struct long_test) );
-sol = (struct long_test *)malloc( count * sizeof(struct long_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = i; (sol + i)->b = 0;
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_LONG_INT, MPI_MINLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_LONG_INT and op MPI_MINLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-struct short_test { short a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct short_test *)malloc( count * sizeof(struct short_test) );
-out = (struct short_test *)malloc( count * sizeof(struct short_test) );
-sol = (struct short_test *)malloc( count * sizeof(struct short_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = i; (sol + i)->b = 0;
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_SHORT_INT, MPI_MINLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_SHORT_INT and op MPI_MINLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-struct float_test { float a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct float_test *)malloc( count * sizeof(struct float_test) );
-out = (struct float_test *)malloc( count * sizeof(struct float_test) );
-sol = (struct float_test *)malloc( count * sizeof(struct float_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = i; (sol + i)->b = 0;
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_FLOAT_INT, MPI_MINLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_FLOAT_INT and op MPI_MINLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-{
-struct double_test { double a; int b; } *in, *out, *sol;
-int  i,fnderr=0;
-in = (struct double_test *)malloc( count * sizeof(struct double_test) );
-out = (struct double_test *)malloc( count * sizeof(struct double_test) );
-sol = (struct double_test *)malloc( count * sizeof(struct double_test) );
-for (i=0; i<count; i++) { (in + i)->a = (rank + i); (in + i)->b = rank;
-        (sol + i)->a = i; (sol + i)->b = 0;
-	(out + i)->a = 0; (out + i)->b = -1; }
-MPI_Allreduce( in, out, count, MPI_DOUBLE_INT, MPI_MINLOC, comm );
-for (i=0; i<count; i++) { if ((out + i)->a != (sol + i)->a ||
-	                      (out + i)->b != (sol + i)->b) {
-	errcnt++; fnderr++; 
-    fprintf( stderr, "(%d) Expected (%d,%d) got (%d,%d)\n", world_rank,
-	(int)((sol + i)->a),
-	(sol+i)->b, (int)((out+i)->a), (out+i)->b );
-}}
-if (fnderr) fprintf( stderr, 
-	"(%d) Error for type MPI_DOUBLE_INT and op MPI_MINLOC (%d of %d wrong)\n",
-                     world_rank, fnderr, count );
-free( in );
-free( out );
-free( sol );
-}
-
-
-gerr += errcnt;
-if (errcnt > 0)
-	printf( "Found %d errors on %d for MPI_MINLOC\n", errcnt, rank );
-errcnt = 0;
-
-}
-if (gerr > 0) {
-	MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-	printf( "Found %d errors overall on %d\n", gerr, rank );
-	}
-MPI_Allreduce( &gerr, &toterr, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD );
- if (world_rank == 0) {
-     if (toterr == 0) {
-	 printf( " No Errors\n" );
-     }
-     else {
-	 printf (" Found %d errors\n", toterr );
-     }
- }
-FreeComms( comms, ncomm );
-MPI_Finalize( );
-return 0;
+#include <string.h>
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
+
+int count, size, rank;
+int cerrcnt;
+
+struct int_test {
+    int a;
+    int b;
+};
+struct long_test {
+    long a;
+    int b;
+};
+struct short_test {
+    short a;
+    int b;
+};
+struct float_test {
+    float a;
+    int b;
+};
+struct double_test {
+    double a;
+    int b;
+};
+
+#define mpi_op2str(op)                   \
+    ((op == MPI_SUM) ? "MPI_SUM" :       \
+     (op == MPI_PROD) ? "MPI_PROD" :     \
+     (op == MPI_MAX) ? "MPI_MAX" :       \
+     (op == MPI_MIN) ? "MPI_MIN" :       \
+     (op == MPI_LOR) ? "MPI_LOR" :       \
+     (op == MPI_LXOR) ? "MPI_LXOR" :     \
+     (op == MPI_LAND) ? "MPI_LAND" :     \
+     (op == MPI_BOR) ? "MPI_BOR" :       \
+     (op == MPI_BAND) ? "MPI_BAND" :     \
+     (op == MPI_BXOR) ? "MPI_BXOR" :     \
+     (op == MPI_MAXLOC) ? "MPI_MAXLOC" : \
+     (op == MPI_MINLOC) ? "MPI_MINLOC" : \
+     "MPI_NO_OP")
+
+/* calloc to avoid spurious valgrind warnings when "type" has padding bytes */
+#define DECL_MALLOC_IN_OUT_SOL(type)                 \
+    type *in, *out, *sol;                            \
+    in  = (type *) calloc(count, sizeof(type));      \
+    out = (type *) calloc(count, sizeof(type));      \
+    sol = (type *) calloc(count, sizeof(type));
+
+#define SET_INDEX_CONST(arr, val)               \
+    {                                           \
+        int i;                                  \
+        for (i = 0; i < count; i++)             \
+            arr[i] = val;                       \
+    }
+
+#define SET_INDEX_SUM(arr, val)                 \
+    {                                           \
+        int i;                                  \
+        for (i = 0; i < count; i++)             \
+            arr[i] = i + val;                   \
+    }
+
+#define SET_INDEX_FACTOR(arr, val)              \
+    {                                           \
+        int i;                                  \
+        for (i = 0; i < count; i++)             \
+            arr[i] = i * (val);                 \
+    }
+
+#define SET_INDEX_POWER(arr, val)               \
+    {                                           \
+        int i, j;                               \
+        for (i = 0; i < count; i++) {           \
+            (arr)[i] = 1;                       \
+            for (j = 0; j < (val); j++)         \
+                arr[i] *= i;                    \
+        }                                       \
+    }
+
+#define ERROR_CHECK_AND_FREE(lerrcnt, mpi_type, mpi_op)                 \
+    do {                                                                \
+        int len = 0;                                                    \
+        if (lerrcnt) {                                                  \
+            fprintf(stderr, "(%d) Error for type %d and op %s\n",       \
+                    rank, mpi_type, mpi_op2str(mpi_op));  \
+        }                                                               \
+        free(in); free(out); free(sol);                                 \
+    } while (0)
+
+/* The logic on the error check on MPI_Allreduce assumes that all
+   MPI_Allreduce routines return a failure if any do - this is sufficient
+   for MPI implementations that reject some of the valid op/datatype pairs
+   (and motivated this addition, as some versions of the IBM MPI
+   failed in just this way).
+*/
+#define ALLREDUCE_AND_FREE(mpi_type, mpi_op, in, out, sol)              \
+    {                                                                   \
+        int i, rc, lerrcnt = 0;						\
+        rc = MPI_Allreduce(in, out, count, mpi_type, mpi_op, MPI_COMM_WORLD); \
+	if (rc) { lerrcnt++; cerrcnt++; MTestPrintError(rc); }        \
+	else {                                                          \
+          for (i = 0; i < count; i++) {                                   \
+              if (out[i] != sol[i]) {                                     \
+                  cerrcnt++;                                              \
+                  lerrcnt++;                                              \
+              }                                                           \
+	   }                                                              \
+        }                                                               \
+        ERROR_CHECK_AND_FREE(lerrcnt, mpi_type, mpi_op);                \
+    }
+
+#define STRUCT_ALLREDUCE_AND_FREE(mpi_type, mpi_op, in, out, sol)       \
+    {                                                                   \
+        int i, rc, lerrcnt = 0;						\
+        rc = MPI_Allreduce(in, out, count, mpi_type, mpi_op, MPI_COMM_WORLD); \
+	if (rc) { lerrcnt++; cerrcnt++; MTestPrintError(rc); }        \
+        else {                                                            \
+          for (i = 0; i < count; i++) {                                   \
+              if ((out[i].a != sol[i].a) || (out[i].b != sol[i].b)) {     \
+                  cerrcnt++;                                              \
+                  lerrcnt++;                                              \
+              }                                                           \
+            }                                                             \
+        }                                                               \
+        ERROR_CHECK_AND_FREE(lerrcnt, mpi_type, mpi_op);                \
+    }
+
+#define SET_INDEX_STRUCT_CONST(arr, val, el)                    \
+    {                                                           \
+        int i;                                                  \
+        for (i = 0; i < count; i++)                             \
+            arr[i].el = val;                                    \
+    }
+
+#define SET_INDEX_STRUCT_SUM(arr, val, el)                      \
+    {                                                           \
+        int i;                                                  \
+        for (i = 0; i < count; i++)                             \
+            arr[i].el = i + (val);                              \
+    }
+
+#define sum_test1(type, mpi_type)                                       \
+    {                                                                   \
+        DECL_MALLOC_IN_OUT_SOL(type);                                   \
+        SET_INDEX_SUM(in, 0);                                           \
+        SET_INDEX_FACTOR(sol, size);                                    \
+        SET_INDEX_CONST(out, 0);                                        \
+        ALLREDUCE_AND_FREE(mpi_type, MPI_SUM, in, out, sol);            \
+    }
+
+#define prod_test1(type, mpi_type)                                      \
+    {                                                                   \
+        DECL_MALLOC_IN_OUT_SOL(type);                                   \
+        SET_INDEX_SUM(in, 0);                                           \
+        SET_INDEX_POWER(sol, size);                                     \
+        SET_INDEX_CONST(out, 0);                                        \
+        ALLREDUCE_AND_FREE(mpi_type, MPI_PROD, in, out, sol);           \
+    }
+
+#define max_test1(type, mpi_type)                                       \
+    {                                                                   \
+        DECL_MALLOC_IN_OUT_SOL(type);                                   \
+        SET_INDEX_SUM(in, rank);                                        \
+        SET_INDEX_SUM(sol, size - 1);                                   \
+        SET_INDEX_CONST(out, 0);                                        \
+        ALLREDUCE_AND_FREE(mpi_type, MPI_MAX, in, out, sol);            \
+    }
+
+#define min_test1(type, mpi_type)                                       \
+    {                                                                   \
+        DECL_MALLOC_IN_OUT_SOL(type);                                   \
+        SET_INDEX_SUM(in, rank);                                        \
+        SET_INDEX_SUM(sol, 0);                                          \
+        SET_INDEX_CONST(out, 0);                                        \
+        ALLREDUCE_AND_FREE(mpi_type, MPI_MIN, in, out, sol);            \
+    }
+
+#define const_test(type, mpi_type, mpi_op, val1, val2, val3)            \
+    {                                                                   \
+        DECL_MALLOC_IN_OUT_SOL(type);                                   \
+        SET_INDEX_CONST(in, (val1));                                    \
+        SET_INDEX_CONST(sol, (val2));                                   \
+        SET_INDEX_CONST(out, (val3));                                   \
+        ALLREDUCE_AND_FREE(mpi_type, mpi_op, in, out, sol);             \
+    }
+
+#define lor_test1(type, mpi_type)                                       \
+    const_test(type, mpi_type, MPI_LOR, (rank & 0x1), (size > 1), 0)
+#define lor_test2(type, mpi_type)                       \
+    const_test(type, mpi_type, MPI_LOR, 0, 0, 0)
+#define lxor_test1(type, mpi_type)                                      \
+    const_test(type, mpi_type, MPI_LXOR, (rank == 1), (size > 1), 0)
+#define lxor_test2(type, mpi_type)                      \
+    const_test(type, mpi_type, MPI_LXOR, 0, 0, 0)
+#define lxor_test3(type, mpi_type)                      \
+    const_test(type, mpi_type, MPI_LXOR, 1, (size & 0x1), 0)
+#define land_test1(type, mpi_type)                              \
+    const_test(type, mpi_type, MPI_LAND, (rank & 0x1), 0, 0)
+#define land_test2(type, mpi_type)                      \
+    const_test(type, mpi_type, MPI_LAND, 1, 1, 0)
+#define bor_test1(type, mpi_type)                                       \
+    const_test(type, mpi_type, MPI_BOR, (rank & 0x3), ((size < 3) ? size - 1 : 0x3), 0)
+#define bxor_test1(type, mpi_type)                                      \
+    const_test(type, mpi_type, MPI_BXOR, (rank == 1) * 0xf0, (size > 1) * 0xf0, 0)
+#define bxor_test2(type, mpi_type)                      \
+    const_test(type, mpi_type, MPI_BXOR, 0, 0, 0)
+#define bxor_test3(type, mpi_type)                      \
+    const_test(type, mpi_type, MPI_BXOR, ~0, (size &0x1) ? ~0 : 0, 0)
+
+#define band_test1(type, mpi_type)                                      \
+    {                                                                   \
+        DECL_MALLOC_IN_OUT_SOL(type);                                   \
+        if (rank == size-1) {                                           \
+            SET_INDEX_SUM(in, 0);                                       \
+        }                                                               \
+        else {                                                          \
+            SET_INDEX_CONST(in, ~0);                                    \
+        }                                                               \
+        SET_INDEX_SUM(sol, 0);                                          \
+        SET_INDEX_CONST(out, 0);                                        \
+        ALLREDUCE_AND_FREE(mpi_type, MPI_BAND, in, out, sol);           \
+    }
+
+#define band_test2(type, mpi_type)                                      \
+    {                                                                   \
+        DECL_MALLOC_IN_OUT_SOL(type);                                   \
+        if (rank == size-1) {                                           \
+            SET_INDEX_SUM(in, 0);                                       \
+        }                                                               \
+        else {                                                          \
+            SET_INDEX_CONST(in, 0);                                     \
+        }                                                               \
+        SET_INDEX_CONST(sol, 0);                                        \
+        SET_INDEX_CONST(out, 0);                                        \
+        ALLREDUCE_AND_FREE(mpi_type, MPI_BAND, in, out, sol);           \
+    }
+
+#define maxloc_test(type, mpi_type)                                     \
+    {                                                                   \
+        DECL_MALLOC_IN_OUT_SOL(type);                                   \
+        SET_INDEX_STRUCT_SUM(in, rank, a);                              \
+        SET_INDEX_STRUCT_CONST(in, rank, b);                            \
+        SET_INDEX_STRUCT_SUM(sol, size - 1, a);                         \
+        SET_INDEX_STRUCT_CONST(sol, size - 1, b);                       \
+        SET_INDEX_STRUCT_CONST(out, 0, a);                              \
+        SET_INDEX_STRUCT_CONST(out, -1, b);                             \
+        STRUCT_ALLREDUCE_AND_FREE(mpi_type, MPI_MAXLOC, in, out, sol);   \
+    }
+
+#define minloc_test(type, mpi_type)                                     \
+    {                                                                   \
+        DECL_MALLOC_IN_OUT_SOL(type);                                   \
+        SET_INDEX_STRUCT_SUM(in, rank, a);                              \
+        SET_INDEX_STRUCT_CONST(in, rank, b);                            \
+        SET_INDEX_STRUCT_SUM(sol, 0, a);                                \
+        SET_INDEX_STRUCT_CONST(sol, 0, b);                              \
+        SET_INDEX_STRUCT_CONST(out, 0, a);                              \
+        SET_INDEX_STRUCT_CONST(out, -1, b);                             \
+        STRUCT_ALLREDUCE_AND_FREE(mpi_type, MPI_MINLOC, in, out, sol);  \
+    }
+
+#if MTEST_HAVE_MIN_MPI_VERSION(2,2)
+#define test_types_set_mpi_2_2_integer(op,post) do {                \
+        op##_test##post(int8_t, MPI_INT8_T);                        \
+        op##_test##post(int16_t, MPI_INT16_T);                      \
+        op##_test##post(int32_t, MPI_INT32_T);                      \
+        op##_test##post(int64_t, MPI_INT64_T);                      \
+        op##_test##post(uint8_t, MPI_UINT8_T);                      \
+        op##_test##post(uint16_t, MPI_UINT16_T);                    \
+        op##_test##post(uint32_t, MPI_UINT32_T);                    \
+        op##_test##post(uint64_t, MPI_UINT64_T);                    \
+        op##_test##post(MPI_Aint, MPI_AINT);                        \
+        op##_test##post(MPI_Offset, MPI_OFFSET);                    \
+    } while (0)
+#else
+#define test_types_set_mpi_2_2_integer(op,post) do { } while (0)
+#endif
+
+#if MTEST_HAVE_MIN_MPI_VERSION(3,0)
+#define test_types_set_mpi_3_0_integer(op,post) do {                \
+        op##_test##post(MPI_Count, MPI_COUNT);                      \
+    } while (0)
+#else
+#define test_types_set_mpi_3_0_integer(op,post) do { } while (0)
+#endif
+
+#define test_types_set1(op, post)                                   \
+    {                                                               \
+        op##_test##post(int, MPI_INT);                              \
+        op##_test##post(long, MPI_LONG);                            \
+        op##_test##post(short, MPI_SHORT);                          \
+        op##_test##post(unsigned short, MPI_UNSIGNED_SHORT);        \
+        op##_test##post(unsigned, MPI_UNSIGNED);                    \
+        op##_test##post(unsigned long, MPI_UNSIGNED_LONG);          \
+        op##_test##post(unsigned char, MPI_UNSIGNED_CHAR);          \
+        test_types_set_mpi_2_2_integer(op,post);                    \
+        test_types_set_mpi_3_0_integer(op,post);                    \
+    }
+
+#define test_types_set2(op, post)               \
+    {                                           \
+        test_types_set1(op, post);              \
+        op##_test##post(float, MPI_FLOAT);      \
+        op##_test##post(double, MPI_DOUBLE);    \
+    }
+
+#define test_types_set3(op, post)                                   \
+    {                                                               \
+        op##_test##post(unsigned char, MPI_BYTE);                   \
+    }
+
+/* Make sure that we test complex and double complex, even if long
+   double complex is not available */
+#if defined(USE_LONG_DOUBLE_COMPLEX)
+
+#if MTEST_HAVE_MIN_MPI_VERSION(2,2) && defined(HAVE_FLOAT__COMPLEX) \
+    && defined(HAVE_DOUBLE__COMPLEX) \
+    && defined(HAVE_LONG_DOUBLE__COMPLEX)
+#define test_types_set4(op, post)                                             \
+    do {                                                                      \
+        op##_test##post(float _Complex, MPI_C_FLOAT_COMPLEX);                 \
+        op##_test##post(double _Complex, MPI_C_DOUBLE_COMPLEX);               \
+        if (MPI_C_LONG_DOUBLE_COMPLEX != MPI_DATATYPE_NULL) {                 \
+            op##_test##post(long double _Complex, MPI_C_LONG_DOUBLE_COMPLEX); \
+        }                                                                     \
+    } while (0)
+
+#else
+#define test_types_set4(op, post) do { } while (0)
+#endif
+#else
+
+#if MTEST_HAVE_MIN_MPI_VERSION(2,2) && defined(HAVE_FLOAT__COMPLEX) \
+    && defined(HAVE_DOUBLE__COMPLEX)
+#define test_types_set4(op, post)                                         \
+    do {                                                                  \
+        op##_test##post(float _Complex, MPI_C_FLOAT_COMPLEX);             \
+        op##_test##post(double _Complex, MPI_C_DOUBLE_COMPLEX);           \
+    } while (0)
+
+#else
+#define test_types_set4(op, post) do { } while (0)
+#endif
+
+#endif /* defined(USE_LONG_DOUBLE_COMPLEX) */
+
+#if MTEST_HAVE_MIN_MPI_VERSION(2,2) && defined(HAVE__BOOL)
+#define test_types_set5(op, post)           \
+    do {                                    \
+        op##_test##post(_Bool, MPI_C_BOOL); \
+    } while (0)
+
+#else
+#define test_types_set5(op, post) do { } while (0)
+#endif
+
+int main(int argc, char **argv)
+{
+    MTest_Init(&argc, &argv);
+
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    if (size < 2) {
+        fprintf(stderr, "At least 2 processes required\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    /* Set errors return so that we can provide better information
+     * should a routine reject one of the operand/datatype pairs */
+    MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+
+    count = 10;
+    /* Allow an argument to override the count.
+     * Note that the product tests may fail if the count is very large.
+     */
+    if (argc >= 2) {
+        count = atoi(argv[1]);
+        if (count <= 0) {
+            fprintf(stderr, "Invalid count argument %s\n", argv[1]);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+
+    test_types_set2(sum, 1);
+    test_types_set2(prod, 1);
+    test_types_set2(max, 1);
+    test_types_set2(min, 1);
+
+    test_types_set1(lor, 1);
+    test_types_set1(lor, 2);
+
+    test_types_set1(lxor, 1);
+    test_types_set1(lxor, 2);
+    test_types_set1(lxor, 3);
+
+    test_types_set1(land, 1);
+    test_types_set1(land, 2);
+
+    test_types_set1(bor, 1);
+    test_types_set1(band, 1);
+    test_types_set1(band, 2);
+
+    test_types_set1(bxor, 1);
+    test_types_set1(bxor, 2);
+    test_types_set1(bxor, 3);
+
+    test_types_set3(bor, 1);
+    test_types_set3(band, 1);
+    test_types_set3(band, 2);
+
+    test_types_set3(bxor, 1);
+    test_types_set3(bxor, 2);
+    test_types_set3(bxor, 3);
+
+    test_types_set4(sum, 1);
+    test_types_set4(prod, 1);
+
+    test_types_set5(lor, 1);
+    test_types_set5(lor, 2);
+    test_types_set5(lxor, 1);
+    test_types_set5(lxor, 2);
+    test_types_set5(lxor, 3);
+    test_types_set5(land, 1);
+    test_types_set5(land, 2);
+
+    maxloc_test(struct int_test, MPI_2INT);
+    maxloc_test(struct long_test, MPI_LONG_INT);
+    maxloc_test(struct short_test, MPI_SHORT_INT);
+    maxloc_test(struct float_test, MPI_FLOAT_INT);
+    maxloc_test(struct double_test, MPI_DOUBLE_INT);
+
+    minloc_test(struct int_test, MPI_2INT);
+    minloc_test(struct long_test, MPI_LONG_INT);
+    minloc_test(struct short_test, MPI_SHORT_INT);
+    minloc_test(struct float_test, MPI_FLOAT_INT);
+    minloc_test(struct double_test, MPI_DOUBLE_INT);
+
+    MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_ARE_FATAL);
+    MTest_Finalize(cerrcnt);
+    MPI_Finalize();
+    return 0;
 }
