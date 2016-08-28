@@ -306,7 +306,9 @@ int AMPI_Info_dup(MPI_Info info, MPI_Info *newinfo){
 CDECL
 int AMPI_Info_free(MPI_Info *info){
   AMPIAPI("AMPI_Info_free");
-  return getAmpiParent()->freeInfo(*info);
+  int ret = getAmpiParent()->freeInfo(*info);
+  *info = MPI_INFO_NULL;
+  return ret;
 }
 
 #ifdef AMPIMSGLOG
