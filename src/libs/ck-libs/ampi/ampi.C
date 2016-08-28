@@ -533,7 +533,6 @@ void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 CkReduction::reducerType AmpiReducer;
 
 // every msg contains a AmpiOpHeader structure before user data
-// FIXME: non-commutative operations require messages be ordered by rank
 CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
   AmpiOpHeader *hdr = (AmpiOpHeader *)msgs[0]->getData();
   MPI_Datatype dtype;
@@ -2154,6 +2153,44 @@ void ampi::processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int
   getDDT()->getType(type)->serialize((char*)buf, (char*)msg->getData()+szhdr, count, (-1));
 }
 
+void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count)
+{
+  CkReduction::tupleElement* results = NULL;
+  int numReductions = 0;
+  msg->toTuple(&results, &numReductions);
+
+  // Contributions are unordered and consist of a (srcRank, data) tuple
+  CkReduction::setElement *currentSrc  = (CkReduction::setElement*)results[0].data;
+  CkReduction::setElement *currentData = (CkReduction::setElement*)results[1].data;
+  CkDDT_DataType *ddt  = getDDT()->getType(type);
+  int contributionSize = ddt->getSize(count);
+  int commSize = getSize(getComm());
+
+  // The first sizeof(AmpiOpHeader) bytes in each contribution's msg data
+  // are reserved for an AmpiOpHeader.
+  int szhdr = sizeof(AmpiOpHeader);
+  MPI_User_function* func = ((AmpiOpHeader*)currentData->data)->func;
+
+  // Store pointers to each contribution's data at index 'srcRank' in contributionData
+  vector<char *> contributionData(commSize);
+  for (int i=0; i<commSize; i++) {
+    CkAssert(currentSrc && currentData);
+    int srcRank = *((int*)currentSrc->data);
+    CkAssert(currentData->dataSize-szhdr == contributionSize);
+    contributionData[srcRank] = (char*)(currentData->data)+szhdr;
+    currentSrc  = currentSrc->next();
+    currentData = currentData->next();
+  }
+
+  // Copy rank 0's contribution into buf first
+  memcpy(buf, (void*)contributionData[0], contributionSize);
+
+  // Invoke the MPI_User_function on the contributions in 'rank' order
+  for (int i=1; i<commSize; i++) {
+    (*func)((void*)contributionData[i], buf, &count, &type);
+  }
+}
+
 void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount)
 {
   CkReduction::tupleElement* results = NULL;
@@ -3310,23 +3347,54 @@ void ampi::irednResult(CkReductionMsg *msg)
   // [nokeep] entry method, so do not delete msg
 }
 
-static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,int type,MPI_Op op)
+static bool opIsPredefined(MPI_Op op)
+{
+  if (op==MPI_MAX  || op==MPI_MIN || op==MPI_SUM || op==MPI_PROD || op==MPI_LAND ||
+      op==MPI_BAND || op==MPI_LOR || op==MPI_BOR || op==MPI_LXOR || op==MPI_BXOR ||
+      op==MPI_MAXLOC || op==MPI_MINLOC) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,int type,int rank,MPI_Op op)
 {
   CkReductionMsg *msg;
-  CkReduction::reducerType reducer = getBuiltinReducerType(type, op);
-  if (reducer == CkReduction::invalid) {
-    AMPI_DEBUG("[%d] In makeRednMsg, using custom AmpiReducer type\n", thisIndex);
-    int szdata = ddt->getSize(count);
-    int szhdr = sizeof(AmpiOpHeader);
-    AmpiOpHeader newhdr(op, type, count, szdata);
-    msg = CkReductionMsg::buildNew(szdata+szhdr, NULL, AmpiReducer);
-    memcpy(msg->getData(), &newhdr, szhdr);
-    ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
+  if (opIsPredefined(op)) {
+    CkReduction::reducerType reducer = getBuiltinReducerType(type, op);
+    if (reducer == CkReduction::invalid) {
+      // MPI predefined reducer operation with no Charm++ builtin reducer type equivalent
+      AMPI_DEBUG("[%d] In makeRednMsg, using custom AmpiReducer type\n", thisIndex);
+      int szdata = ddt->getSize(count);
+      int szhdr = sizeof(AmpiOpHeader);
+      AmpiOpHeader newhdr(op, type, count, szdata);
+      msg = CkReductionMsg::buildNew(szdata+szhdr, NULL, AmpiReducer);
+      memcpy(msg->getData(), &newhdr, szhdr);
+      ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
+    }
+    else {
+      // Charm++ builtin reducer type
+      AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type\n", thisIndex);
+      msg = CkReductionMsg::buildNew(ddt->getSize(count), NULL, reducer);
+      ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
+    }
   }
   else {
-    AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type\n", thisIndex);
-    msg = CkReductionMsg::buildNew(ddt->getSize(count), NULL, reducer);
-    ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
+    // FIXME: User defined reducer operation are assumed to be non-commutative
+    AMPI_DEBUG("[%d] In makeRednMsg, using a predefined user operation\n", thisIndex);
+    int szhdr = sizeof(AmpiOpHeader);
+    int szdata = ddt->getSize(count);
+    AmpiOpHeader newhdr(op, type, count, szdata);
+    vector<char> sbuf(szdata+szhdr);
+    memcpy(&sbuf[0], &newhdr, szhdr);
+    ddt->serialize((char*)inbuf, &sbuf[szhdr], count, 1);
+    int tupleSize = 2;
+    CkReduction::tupleElement tupleRedn[] = {
+      CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
+      CkReduction::tupleElement(szdata+szhdr, &sbuf[0], CkReduction::set)
+    };
+    msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
   }
   return msg;
 }
@@ -3399,7 +3467,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op 
   ampi *ptr = getAmpiInstance(comm);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,ptr->getRank(comm),op);
 
   CkCallback reduceCB(CkIndex_ampi::rednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
   msg->setCallback(reduceCB);
@@ -3407,7 +3475,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op 
   ptr->contribute(msg);
 
   if (ptr->thisIndex == rootIdx){
-    ptr = ptr->blockOnRedn(new RednReq(outbuf, count, type, comm));
+    ptr = ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, opIsPredefined(op)));
 
 #if SYNCHRONOUS_REDUCE
     AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDN_TAG, -1, rootIdx, 0, comm);
@@ -3466,12 +3534,12 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_
 
   ampi *ptr = getAmpiInstance(comm);
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, ptr->getRank(comm), op);
   CkCallback allreduceCB(CkIndex_ampi::rednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
-  ptr->blockOnRedn(new RednReq(outbuf, count, type, comm));
+  ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, opIsPredefined(op)));
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -3504,7 +3572,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = insertReq(new RednReq(outbuf,count,type,comm), true/*completed*/);
+    *request = insertReq(new RednReq(outbuf,count,type,comm,opIsPredefined(op)), true/*completed*/);
     return copyDatatype(comm,type,count,inbuf,outbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -3512,14 +3580,14 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI
 
   ampi *ptr = getAmpiInstance(comm);
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,ptr->getRank(comm),op);
   CkCallback allreduceCB(CkIndex_ampi::irednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
   // use a RednReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  RednReq *newreq = new RednReq(outbuf,count,type,comm);
+  RednReq *newreq = new RednReq(outbuf,count,type,comm,opIsPredefined(op));
   *request = reqs->insert(newreq);
   int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
   CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
@@ -3728,8 +3796,7 @@ int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
 CDECL
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
   AMPIAPI("AMPI_Op_create");
-  if (!commute)
-    CkAbort("AMPI does not support non-commutative reduction operators!\n");
+  /* FIXME: user-defined op's are assumed to be non-commutative */
   *op = function;
   return MPI_SUCCESS;
 }
@@ -3744,7 +3811,12 @@ int AMPI_Op_free(MPI_Op *op){
 CDECL
 int AMPI_Op_commutative(MPI_Op op, int *commute){
   AMPIAPI("AMPI_Op_commutative");
-  *commute = 1;
+  /* FIXME: user-defined op's are assumed to be non-commutative */
+  if (opIsPredefined(op)) {
+    *commute = 1;
+  } else {
+    *commute = 0;
+  }
   return MPI_SUCCESS;
 }
 
@@ -4478,7 +4550,11 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
 
 void RednReq::receive(ampi *ptr, CkReductionMsg *msg)
 {
-  ptr->processRednMsg(msg, buf, type, count);
+  if (isCommutative) {
+    ptr->processRednMsg(msg, buf, type, count);
+  } else {
+    ptr->processNoncommutativeRednMsg(msg, buf, type, count);
+  }
   statusIreq = true;
   comm = ptr->getComm();
 #if CMK_BIGSIM_CHARM
@@ -5013,14 +5089,14 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = insertReq(new RednReq(recvbuf, count, type, comm), true/*completed*/);
+    *request = insertReq(new RednReq(recvbuf, count, type, comm, opIsPredefined(op)), true/*completed*/);
     return copyDatatype(comm,type,count,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Ireduce for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,ptr->getRank(comm),op);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
 
   CkCallback reduceCB(CkIndex_ampi::irednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
@@ -5030,7 +5106,7 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
   if (ptr->thisIndex == rootIdx){
     // use a RednReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    RednReq *newreq = new RednReq(recvbuf,count,type,comm);
+    RednReq *newreq = new RednReq(recvbuf,count,type,comm,opIsPredefined(op));
     *request = reqs->insert(newreq);
     int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
     CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
@@ -8517,7 +8593,7 @@ int AMPI_Set_start_event(MPI_Comm comm)
 
   CkDDT_DataType *ddt_type = ptr->getDDT()->getType(MPI_INT);
 
-  CkReductionMsg *msg=makeRednMsg(ddt_type, NULL, 0, MPI_INT, MPI_SUM);
+  CkReductionMsg *msg=makeRednMsg(ddt_type, NULL, 0, MPI_INT, ptr->getRank(comm), MPI_SUM);
   if (CkMyPe() == 0) {
     CkCallback allreduceCB(startCFnCall, ptr);
     msg->setCallback(allreduceCB);

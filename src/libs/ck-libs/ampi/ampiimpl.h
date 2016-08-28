@@ -654,11 +654,12 @@ class IReq : public AmpiRequest {
 
 class RednReq : public AmpiRequest {
  public:
-  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_){
+  bool isCommutative;
+  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, bool c_){
     buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
-    comm=comm_;  isvalid=true;
+    comm=comm_;  isCommutative=c_;  isvalid=true;
   }
-  RednReq(){}
+  RednReq(): isCommutative(true) {};
   ~RednReq(){}
   bool test(MPI_Status *sts);
   bool itest(MPI_Status *sts);
@@ -669,6 +670,7 @@ class RednReq : public AmpiRequest {
   void receive(ampi *ptr, CkReductionMsg *msg);
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
+    p|isCommutative;
   }
   virtual void print();
 };
@@ -1451,6 +1453,7 @@ class ampi : public CBase_ampi {
                 int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
   inline void processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count);
   inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count);
+  inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count);
   inline void processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount);
   inline void processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
                                int* recvCounts, int* displs);
