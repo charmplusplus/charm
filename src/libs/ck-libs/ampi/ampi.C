@@ -5111,6 +5111,25 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
   return MPI_SUCCESS;
 }
 
+static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype type, int rank)
+{
+  CkDDT_DataType* ddt = getDDT()->getType(type);
+  int szdata = ddt->getSize(count);
+  const int tupleSize = 2;
+  CkReduction::tupleElement tupleRedn[tupleSize];
+  tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set);
+
+  if (ddt->isContig()) {
+    tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::set);
+  } else {
+    vector<char> sbuf(szdata);
+    ddt->serialize((char*)inbuf, &sbuf[0], count, 1);
+    tupleRedn[1] = CkReduction::tupleElement(szdata, &sbuf[0], CkReduction::set);
+  }
+
+  return CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+}
+
 CDECL
 int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int recvcount, MPI_Datatype recvtype,
@@ -5140,14 +5159,7 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int rank = ptr->getRank(comm);
   int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  int tupleSize = 2;
-  CkReduction::tupleElement tupleRedn[] = {
-    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
-    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
-  };
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
-
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgatherCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgather called on comm %d\n", ptr->thisIndex, comm));
@@ -5192,16 +5204,8 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     CkAbort("AMPI does not implement MPI_Iallgather for Inter-communicators!");
 
   int rank = ptr->getRank(comm);
-  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  int tupleSize = 2;
-  CkReduction::tupleElement tupleRedn[] = {
-    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
-    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
-  };
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
-
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgatherCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgather called on comm %d\n", ptr->thisIndex, comm));
@@ -5240,16 +5244,8 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank(comm);
-  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  int tupleSize = 2;
-  CkReduction::tupleElement tupleRedn[] = {
-    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
-    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
-  };
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
-
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgathervCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgatherv called on comm %d\n", ptr->thisIndex, comm));
@@ -5295,15 +5291,7 @@ int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iallgatherv for Inter-communicators!");
 
-  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
-  int tupleSize = 2;
-  CkReduction::tupleElement tupleRedn[] = {
-    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
-    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
-  };
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
-
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgathervCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgatherv called on comm %d\n", ptr->thisIndex, comm));
@@ -5354,16 +5342,8 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   int rank = ptr->getRank(comm);
-  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  int tupleSize = 2;
-  CkReduction::tupleElement tupleRedn[] = {
-    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
-    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
-  };
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
-
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gatherCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
@@ -5429,16 +5409,8 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   int rank = ptr->getRank(comm);
-  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  int tupleSize = 2;
-  CkReduction::tupleElement tupleRedn[] = {
-    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
-    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
-  };
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
-
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gatherCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
@@ -5506,16 +5478,8 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   int rank = ptr->getRank(comm);
-  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  int tupleSize = 2;
-  CkReduction::tupleElement tupleRedn[] = {
-    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
-    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
-  };
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
-
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gathervCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
@@ -5589,16 +5553,8 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
-  int tupleSize = 2;
-  CkReduction::tupleElement tupleRedn[] = {
-    CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
-    CkReduction::tupleElement(sendSize, sendbuf, CkReduction::set)
-  };
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
-
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gathervCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
