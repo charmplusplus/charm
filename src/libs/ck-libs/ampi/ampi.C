@@ -286,81 +286,81 @@ switch (*datatype) { \
   CkAbort("Unsupported MPI datatype for MPI Op"); \
 };\
 
-void MPI_MAX( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_MAX_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   if(((type *)invec)[i] > ((type *)inoutvec)[i]) ((type *)inoutvec)[i] = ((type *)invec)[i];
   MPI_OP_SWITCH(MPI_MAX)
 #undef MPI_OP_IMPL
 }
 
-void MPI_MIN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_MIN_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   if(((type *)invec)[i] < ((type *)inoutvec)[i]) ((type *)inoutvec)[i] = ((type *)invec)[i];
   MPI_OP_SWITCH(MPI_MIN)
 #undef MPI_OP_IMPL
 }
 
-void MPI_SUM( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_SUM_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] += ((type *)invec)[i];
   MPI_OP_SWITCH(MPI_SUM)
 #undef MPI_OP_IMPL
 }
 
-void MPI_PROD( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_PROD_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] *= ((type *)invec)[i];
   MPI_OP_SWITCH(MPI_PROD)
 #undef MPI_OP_IMPL
 }
 
-void MPI_REPLACE( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_REPLACE_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)invec)[i];
   MPI_OP_SWITCH(MPI_REPLACE)
 #undef MPI_OP_IMPL
 }
 
-void MPI_NO_OP( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_NO_OP_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   /* no-op */
 }
 
-void MPI_LAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_LAND_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)inoutvec)[i] && ((type *)invec)[i];
   MPI_LOGICAL_OP_SWITCH(MPI_LAND)
 #undef MPI_OP_IMPL
 }
 
-void MPI_BAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_BAND_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)inoutvec)[i] & ((type *)invec)[i];
   MPI_BITWISE_OP_SWITCH(MPI_BAND)
 #undef MPI_OP_IMPL
 }
 
-void MPI_LOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_LOR_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)inoutvec)[i] || ((type *)invec)[i];
   MPI_LOGICAL_OP_SWITCH(MPI_LAND)
 #undef MPI_OP_IMPL
 }
 
-void MPI_BOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_BOR_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)inoutvec)[i] | ((type *)invec)[i];
   MPI_BITWISE_OP_SWITCH(MPI_BAND)
 #undef MPI_OP_IMPL
 }
 
-void MPI_LXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_LXOR_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = (((type *)inoutvec)[i]&&(!((type *)invec)[i]))||(!(((type *)inoutvec)[i])&&((type *)invec)[i]);
   MPI_LOGICAL_OP_SWITCH(MPI_LAND)
 #undef MPI_OP_IMPL
 }
 
-void MPI_BXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_BXOR_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)inoutvec)[i] ^ ((type *)invec)[i];
   MPI_BITWISE_OP_SWITCH(MPI_BAND)
@@ -371,7 +371,7 @@ void MPI_BXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MIN(a,b) (a < b ? a : b)
 #endif
 
-void MPI_MAXLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_MAXLOC_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   int i;
 
   switch (*datatype) {
@@ -445,7 +445,7 @@ void MPI_MAXLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 
-void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+void MPI_MINLOC_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   int i;
   switch (*datatype) {
     case MPI_FLOAT_INT:
@@ -518,18 +518,23 @@ void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
   }
 }
 
-/* AmpiReducer: AMPI's generic reducer type MPI_Op is a
- * function pointer to an MPI_User_function so that it
- * can be packed into AmpiOpHeader, shipped with the
- * reduction message, and then plugged into the ampiReducer.
- *
- * This generic reducer type is used only for reductions that
- * are not built-in to Charm++.
+/*
+ * AMPI's generic reducer type, AmpiReducer, is used only
+ * for MPI_Op/MPI_Datatype combinations that Charm++ does
+ * not have built-in support for. AmpiReducer reduction
+ * contributions all contain an AmpiOpHeader, that contains
+ * the function pointer to an MPI_User_function* that is
+ * applied to all contributions in AmpiReducerFunc().
  *
  * If AmpiReducer is used, the final reduction message will
  * have an additional sizeof(AmpiOpHeader) bytes in the
- * buffer before any user data. ampi::processRednMsg strips
- * the header. */
+ * buffer before any user data. ampi::processRednMsg() strips
+ * the header.
+ *
+ * If a non-commutative (user-defined) reduction is used,
+ * ampi::processNoncommutativeRednMsg() strips the headers
+ * and applies the op to all contributions in rank order.
+ */
 CkReduction::reducerType AmpiReducer;
 
 // every msg contains a AmpiOpHeader structure before user data
@@ -555,86 +560,110 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
   return retmsg;
 }
 
-static CkReduction::reducerType getBuiltinReducerType(int type, MPI_Op op)
+static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op op)
 {
   switch (type) {
     case MPI_INT:
-      if (op == MPI_MAX)       return CkReduction::max_int;
-      else if (op == MPI_MIN)  return CkReduction::min_int;
-      else if (op == MPI_SUM)  return CkReduction::sum_int;
-      else if (op == MPI_PROD) return CkReduction::product_int;
-      else if (op == MPI_LAND) return CkReduction::logical_and;
-      else if (op == MPI_LOR)  return CkReduction::logical_or;
-      else if (op == MPI_BAND) return CkReduction::bitvec_and;
-      else if (op == MPI_BOR)  return CkReduction::bitvec_or;
-      else if (op == MPI_BXOR) return CkReduction::bitvec_xor;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_int;
+        case MPI_MIN:  return CkReduction::min_int;
+        case MPI_SUM:  return CkReduction::sum_int;
+        case MPI_PROD: return CkReduction::product_int;
+        case MPI_LAND: return CkReduction::logical_and;
+        case MPI_LOR:  return CkReduction::logical_or;
+        case MPI_BAND: return CkReduction::bitvec_and;
+        case MPI_BOR:  return CkReduction::bitvec_or;
+        case MPI_BXOR: return CkReduction::bitvec_xor;
+        default:       break;
+      }
     case MPI_FLOAT:
-      if (op == MPI_MAX)       return CkReduction::max_float;
-      else if (op == MPI_MIN)  return CkReduction::min_float;
-      else if (op == MPI_SUM)  return CkReduction::sum_float;
-      else if (op == MPI_PROD) return CkReduction::product_float;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_float;
+        case MPI_MIN:  return CkReduction::min_float;
+        case MPI_SUM:  return CkReduction::sum_float;
+        case MPI_PROD: return CkReduction::product_float;
+        default:       break;
+      }
     case MPI_DOUBLE:
-      if (op == MPI_MAX)       return CkReduction::max_double;
-      else if (op == MPI_MIN)  return CkReduction::min_double;
-      else if (op == MPI_SUM)  return CkReduction::sum_double;
-      else if (op == MPI_PROD) return CkReduction::product_double;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_double;
+        case MPI_MIN:  return CkReduction::min_double;
+        case MPI_SUM:  return CkReduction::sum_double;
+        case MPI_PROD: return CkReduction::product_double;
+        default:       break;
+      }
     case MPI_CHAR:
-      if (op == MPI_MAX)       return CkReduction::max_char;
-      else if (op == MPI_MIN)  return CkReduction::min_char;
-      else if (op == MPI_SUM)  return CkReduction::sum_char;
-      else if (op == MPI_PROD) return CkReduction::product_char;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_char;
+        case MPI_MIN:  return CkReduction::min_char;
+        case MPI_SUM:  return CkReduction::sum_char;
+        case MPI_PROD: return CkReduction::product_char;
+        default:       break;
+      }
     case MPI_SHORT:
-      if (op == MPI_MAX)       return CkReduction::max_short;
-      else if (op == MPI_MIN)  return CkReduction::min_short;
-      else if (op == MPI_SUM)  return CkReduction::sum_short;
-      else if (op == MPI_PROD) return CkReduction::product_short;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_short;
+        case MPI_MIN:  return CkReduction::min_short;
+        case MPI_SUM:  return CkReduction::sum_short;
+        case MPI_PROD: return CkReduction::product_short;
+        default:       break;
+      }
     case MPI_LONG:
-      if (op == MPI_MAX)       return CkReduction::max_long;
-      else if (op == MPI_MIN)  return CkReduction::min_long;
-      else if (op == MPI_SUM)  return CkReduction::sum_long;
-      else if (op == MPI_PROD) return CkReduction::product_long;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_long;
+        case MPI_MIN:  return CkReduction::min_long;
+        case MPI_SUM:  return CkReduction::sum_long;
+        case MPI_PROD: return CkReduction::product_long;
+        default:       break;
+      }
     case MPI_LONG_LONG:
-      if (op == MPI_MAX)       return CkReduction::max_long_long;
-      else if (op == MPI_MIN)  return CkReduction::min_long_long;
-      else if (op == MPI_SUM)  return CkReduction::sum_long_long;
-      else if (op == MPI_PROD) return CkReduction::product_long_long;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_long_long;
+        case MPI_MIN:  return CkReduction::min_long_long;
+        case MPI_SUM:  return CkReduction::sum_long_long;
+        case MPI_PROD: return CkReduction::product_long_long;
+        default:       break;
+      }
     case MPI_UNSIGNED_CHAR:
-      if (op == MPI_MAX)       return CkReduction::max_uchar;
-      else if (op == MPI_MIN)  return CkReduction::min_uchar;
-      else if (op == MPI_SUM)  return CkReduction::sum_uchar;
-      else if (op == MPI_PROD) return CkReduction::product_uchar;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_uchar;
+        case MPI_MIN:  return CkReduction::min_uchar;
+        case MPI_SUM:  return CkReduction::sum_uchar;
+        case MPI_PROD: return CkReduction::product_uchar;
+        default:       break;
+      }
     case MPI_UNSIGNED_SHORT:
-      if (op == MPI_MAX)       return CkReduction::max_ushort;
-      else if (op == MPI_MIN)  return CkReduction::min_ushort;
-      else if (op == MPI_SUM)  return CkReduction::sum_ushort;
-      else if (op == MPI_PROD) return CkReduction::product_ushort;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_ushort;
+        case MPI_MIN:  return CkReduction::min_ushort;
+        case MPI_SUM:  return CkReduction::sum_ushort;
+        case MPI_PROD: return CkReduction::product_ushort;
+        default:       break;
+      }
     case MPI_UNSIGNED:
-      if (op == MPI_MAX)       return CkReduction::max_uint;
-      else if (op == MPI_MIN)  return CkReduction::min_uint;
-      else if (op == MPI_SUM)  return CkReduction::sum_uint;
-      else if (op == MPI_PROD) return CkReduction::product_uint;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_uint;
+        case MPI_MIN:  return CkReduction::min_uint;
+        case MPI_SUM:  return CkReduction::sum_uint;
+        case MPI_PROD: return CkReduction::product_uint;
+        default:       break;
+      }
     case MPI_UNSIGNED_LONG:
-      if (op == MPI_MAX)       return CkReduction::max_ulong;
-      else if (op == MPI_MIN)  return CkReduction::min_ulong;
-      else if (op == MPI_SUM)  return CkReduction::sum_ulong;
-      else if (op == MPI_PROD) return CkReduction::product_ulong;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_ulong;
+        case MPI_MIN:  return CkReduction::min_ulong;
+        case MPI_SUM:  return CkReduction::sum_ulong;
+        case MPI_PROD: return CkReduction::product_ulong;
+        default:       break;
+      }
     case MPI_UNSIGNED_LONG_LONG:
-      if (op == MPI_MAX)       return CkReduction::max_ulong_long;
-      else if (op == MPI_MIN)  return CkReduction::min_ulong_long;
-      else if (op == MPI_SUM)  return CkReduction::sum_ulong_long;
-      else if (op == MPI_PROD) return CkReduction::product_ulong_long;
-      else break;
+      switch (op) {
+        case MPI_MAX:  return CkReduction::max_ulong_long;
+        case MPI_MIN:  return CkReduction::min_ulong_long;
+        case MPI_SUM:  return CkReduction::sum_ulong_long;
+        case MPI_PROD: return CkReduction::product_ulong_long;
+        default:       break;
+      }
     default:
       break;
   }
@@ -758,19 +787,11 @@ static void EndIdle(void *dummy,double curWallTime)
 }
 #endif
 
-/* for fortran reduction operation table to handle mapping */
-typedef MPI_Op  MPI_Op_Array[128];
-CtvDeclare(int, mpi_opc);
-CtvDeclare(MPI_Op_Array, mpi_ops);
-
 static void ampiProcInit(void){
   CtvInitialize(ampiParent*, ampiPtr);
   CtvInitialize(int,ampiInitDone);
   CtvInitialize(int,ampiFinalized);
   CtvInitialize(void*,stackBottom);
-
-  CtvInitialize(MPI_Op_Array, mpi_ops);
-  CtvInitialize(int, mpi_opc);
 
   CkpvInitialize(Builtin_kvs, bikvs); // built-in key-values
   CkpvAccess(bikvs) = Builtin_kvs();
@@ -863,28 +884,23 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen)
 
 static CProxy_ampiWorlds ampiWorldsGroup;
 
-static void init_operations()
+void ampiParent::initOps(void)
 {
-  CtvInitialize(MPI_Op_Array, mpi_ops);
-  int i = 0;
-  MPI_Op *tab = CtvAccess(mpi_ops);
-  tab[i++] = MPI_MAX;
-  tab[i++] = MPI_MIN;
-  tab[i++] = MPI_SUM;
-  tab[i++] = MPI_PROD;
-  tab[i++] = MPI_LAND;
-  tab[i++] = MPI_BAND;
-  tab[i++] = MPI_LOR;
-  tab[i++] = MPI_BOR;
-  tab[i++] = MPI_LXOR;
-  tab[i++] = MPI_BXOR;
-  tab[i++] = MPI_MAXLOC;
-  tab[i++] = MPI_MINLOC;
-  tab[i++] = MPI_REPLACE;
-  tab[i++] = MPI_NO_OP;
-
-  CtvInitialize(int, mpi_opc);
-  CtvAccess(mpi_opc) = i;
+  ops.resize(MPI_NO_OP+1);
+  ops[MPI_MAX]     = OpStruct(MPI_MAX_USER_FN);
+  ops[MPI_MIN]     = OpStruct(MPI_MIN_USER_FN);
+  ops[MPI_SUM]     = OpStruct(MPI_SUM_USER_FN);
+  ops[MPI_PROD]    = OpStruct(MPI_PROD_USER_FN);
+  ops[MPI_LAND]    = OpStruct(MPI_LAND_USER_FN);
+  ops[MPI_BAND]    = OpStruct(MPI_BAND_USER_FN);
+  ops[MPI_LOR]     = OpStruct(MPI_LOR_USER_FN);
+  ops[MPI_BOR]     = OpStruct(MPI_BOR_USER_FN);
+  ops[MPI_LXOR]    = OpStruct(MPI_LXOR_USER_FN);
+  ops[MPI_BXOR]    = OpStruct(MPI_BXOR_USER_FN);
+  ops[MPI_MAXLOC]  = OpStruct(MPI_MAXLOC_USER_FN);
+  ops[MPI_MINLOC]  = OpStruct(MPI_MINLOC_USER_FN);
+  ops[MPI_REPLACE] = OpStruct(MPI_REPLACE_USER_FN);
+  ops[MPI_NO_OP]   = OpStruct(MPI_NO_OP_USER_FN);
 }
 
 /*
@@ -954,7 +970,7 @@ static ampi *ampiInit(char **argv)
     TRACE_BG_ADD_TAG("AMPI_START");
 #endif
 
-  init_operations();     // initialize fortran reduction operation table
+  getAmpiParent()->initOps(); // initialize reduction operations
   getAmpiParent()->setCommAttr(MPI_COMM_WORLD, MPI_UNIVERSE_SIZE, &_nchunks);
   ptr->setCommName("MPI_COMM_WORLD");
 
@@ -1044,6 +1060,7 @@ void ampiParent::pup(PUP::er &p) {
   p|groups;
   p|winStructList;
   p|infos;
+  p|ops;
 
   p|ampiReqs;
 
@@ -2153,7 +2170,7 @@ void ampi::processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int
   getDDT()->getType(type)->serialize((char*)buf, (char*)msg->getData()+szhdr, count, (-1));
 }
 
-void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count)
+void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count, MPI_User_function* func)
 {
   CkReduction::tupleElement* results = NULL;
   int numReductions = 0;
@@ -2166,28 +2183,23 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
   int contributionSize = ddt->getSize(count);
   int commSize = getSize(getComm());
 
-  // The first sizeof(AmpiOpHeader) bytes in each contribution's msg data
-  // are reserved for an AmpiOpHeader.
-  int szhdr = sizeof(AmpiOpHeader);
-  MPI_User_function* func = ((AmpiOpHeader*)currentData->data)->func;
-
   // Store pointers to each contribution's data at index 'srcRank' in contributionData
-  vector<char *> contributionData(commSize);
+  vector<void *> contributionData(commSize);
   for (int i=0; i<commSize; i++) {
     CkAssert(currentSrc && currentData);
     int srcRank = *((int*)currentSrc->data);
-    CkAssert(currentData->dataSize-szhdr == contributionSize);
-    contributionData[srcRank] = (char*)(currentData->data)+szhdr;
+    CkAssert(currentData->dataSize == contributionSize);
+    contributionData[srcRank] = currentData->data;
     currentSrc  = currentSrc->next();
     currentData = currentData->next();
   }
 
   // Copy rank 0's contribution into buf first
-  memcpy(buf, (void*)contributionData[0], contributionSize);
+  memcpy(buf, contributionData[0], contributionSize);
 
   // Invoke the MPI_User_function on the contributions in 'rank' order
   for (int i=1; i<commSize; i++) {
-    (*func)((void*)contributionData[i], buf, &count, &type);
+    (*func)(contributionData[i], buf, &count, &type);
   }
 }
 
@@ -3347,53 +3359,43 @@ void ampi::irednResult(CkReductionMsg *msg)
   // [nokeep] entry method, so do not delete msg
 }
 
-static bool opIsPredefined(MPI_Op op)
-{
-  if (op==MPI_MAX  || op==MPI_MIN || op==MPI_SUM || op==MPI_PROD || op==MPI_LAND ||
-      op==MPI_BAND || op==MPI_LOR || op==MPI_BOR || op==MPI_LXOR || op==MPI_BXOR ||
-      op==MPI_MAXLOC || op==MPI_MINLOC) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
 static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,int type,int rank,MPI_Op op)
 {
   CkReductionMsg *msg;
-  if (opIsPredefined(op)) {
-    CkReduction::reducerType reducer = getBuiltinReducerType(type, op);
-    if (reducer == CkReduction::invalid) {
-      // MPI predefined reducer operation with no Charm++ builtin reducer type equivalent
-      AMPI_DEBUG("[%d] In makeRednMsg, using custom AmpiReducer type\n", thisIndex);
-      int szdata = ddt->getSize(count);
-      int szhdr = sizeof(AmpiOpHeader);
-      AmpiOpHeader newhdr(op, type, count, szdata);
-      msg = CkReductionMsg::buildNew(szdata+szhdr, NULL, AmpiReducer);
-      memcpy(msg->getData(), &newhdr, szhdr);
-      ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
-    }
-    else {
-      // Charm++ builtin reducer type
-      AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type\n", thisIndex);
-      msg = CkReductionMsg::buildNew(ddt->getSize(count), NULL, reducer);
-      ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
-    }
+  ampiParent *parent = getAmpiParent();
+  int szdata = ddt->getSize(count);
+  CkReduction::reducerType reducer = getBuiltinReducerType(type, op);
+
+  if (reducer != CkReduction::invalid) {
+    // MPI predefined op matches a Charm++ builtin reducer type
+    AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type for a predefined op\n", thisIndex);
+    msg = CkReductionMsg::buildNew(szdata, NULL, reducer);
+    ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
+  }
+  else if (parent->opIsCommutative(op)) {
+    // Either an MPI predefined reducer operation with no Charm++ builtin
+    // reducer type equivalent, or a commutative user-defined reducer operation
+    AMPI_DEBUG("[%d] In makeRednMsg, using custom AmpiReducer type for a commutative op\n", thisIndex);
+    AmpiOpHeader newhdr = parent->op2AmpiOpHeader(op, type, count);
+    int szhdr = sizeof(AmpiOpHeader);
+    msg = CkReductionMsg::buildNew(szdata+szhdr, NULL, AmpiReducer);
+    memcpy(msg->getData(), &newhdr, szhdr);
+    ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
   }
   else {
-    // FIXME: User defined reducer operation are assumed to be non-commutative
-    AMPI_DEBUG("[%d] In makeRednMsg, using a predefined user operation\n", thisIndex);
-    int szhdr = sizeof(AmpiOpHeader);
-    int szdata = ddt->getSize(count);
-    AmpiOpHeader newhdr(op, type, count, szdata);
-    vector<char> sbuf(szdata+szhdr);
-    memcpy(&sbuf[0], &newhdr, szhdr);
-    ddt->serialize((char*)inbuf, &sbuf[szhdr], count, 1);
+    // Non-commutative user-defined reducer operation
+    AMPI_DEBUG("[%d] In makeRednMsg, using a non-commutative user-defined operation\n", thisIndex);
     int tupleSize = 2;
-    CkReduction::tupleElement tupleRedn[] = {
-      CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set),
-      CkReduction::tupleElement(szdata+szhdr, &sbuf[0], CkReduction::set)
-    };
+    CkReduction::tupleElement tupleRedn[tupleSize];
+    tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set);
+    if (!ddt->isContig()) {
+      vector<char> sbuf(szdata);
+      ddt->serialize((char*)inbuf, &sbuf[0], count, 1);
+      tupleRedn[1] = CkReduction::tupleElement(szdata, &sbuf[0], CkReduction::set);
+    }
+    else {
+      tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::set);
+    }
     msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
   }
   return msg;
@@ -3428,7 +3430,8 @@ static void handle_MPI_IN_PLACE(void* &inbuf, void* &outbuf)
 void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec)
 {
   // inoutvec[i] = invec[i] op inoutvec[i]
-  (op)(invec,inoutvec,&count,&datatype);
+  MPI_User_function *func = getAmpiParent()->op2User_function(op);
+  (func)(invec, inoutvec, &count, &datatype);
 }
 
 #define SYNCHRONOUS_REDUCE                           0
@@ -3475,7 +3478,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op 
   ptr->contribute(msg);
 
   if (ptr->thisIndex == rootIdx){
-    ptr = ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, opIsPredefined(op)));
+    ptr = ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, op));
 
 #if SYNCHRONOUS_REDUCE
     AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDN_TAG, -1, rootIdx, 0, comm);
@@ -3539,7 +3542,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
-  ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, opIsPredefined(op)));
+  ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, op));
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -3572,7 +3575,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = insertReq(new RednReq(outbuf,count,type,comm,opIsPredefined(op)), true/*completed*/);
+    *request = insertReq(new RednReq(outbuf,count,type,comm,op), true/*completed*/);
     return copyDatatype(comm,type,count,inbuf,outbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -3587,7 +3590,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI
 
   // use a RednReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
-  RednReq *newreq = new RednReq(outbuf,count,type,comm,opIsPredefined(op));
+  RednReq *newreq = new RednReq(outbuf,count,type,comm,op);
   *request = reqs->insert(newreq);
   int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
   CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
@@ -3796,8 +3799,7 @@ int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
 CDECL
 int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
   AMPIAPI("AMPI_Op_create");
-  /* FIXME: user-defined op's are assumed to be non-commutative */
-  *op = function;
+  *op = getAmpiParent()->createOp(function, commute);
   return MPI_SUCCESS;
 }
 
@@ -3811,12 +3813,7 @@ int AMPI_Op_free(MPI_Op *op){
 CDECL
 int AMPI_Op_commutative(MPI_Op op, int *commute){
   AMPIAPI("AMPI_Op_commutative");
-  /* FIXME: user-defined op's are assumed to be non-commutative */
-  if (opIsPredefined(op)) {
-    *commute = 1;
-  } else {
-    *commute = 0;
-  }
+  *commute = (int)getAmpiParent()->opIsCommutative(op);
   return MPI_SUCCESS;
 }
 
@@ -4550,10 +4547,11 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
 
 void RednReq::receive(ampi *ptr, CkReductionMsg *msg)
 {
-  if (isCommutative) {
+  if (ptr->opIsCommutative(op)) {
     ptr->processRednMsg(msg, buf, type, count);
   } else {
-    ptr->processNoncommutativeRednMsg(msg, buf, type, count);
+    MPI_User_function* func = ptr->op2User_function(op);
+    ptr->processNoncommutativeRednMsg(msg, buf, type, count, func);
   }
   statusIreq = true;
   comm = ptr->getComm();
@@ -5089,7 +5087,7 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
 #endif
 
   if(comm==MPI_COMM_SELF){
-    *request = insertReq(new RednReq(recvbuf, count, type, comm, opIsPredefined(op)), true/*completed*/);
+    *request = insertReq(new RednReq(recvbuf, count, type, comm, op), true/*completed*/);
     return copyDatatype(comm,type,count,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
@@ -5106,7 +5104,7 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
   if (ptr->thisIndex == rootIdx){
     // use a RednReq to non-block the caller and get a request ptr
     AmpiRequestList* reqs = getReqs();
-    RednReq *newreq = new RednReq(recvbuf,count,type,comm,opIsPredefined(op));
+    RednReq *newreq = new RednReq(recvbuf,count,type,comm,op);
     *request = reqs->insert(newreq);
     int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, comm };
     CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));

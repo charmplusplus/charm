@@ -72,7 +72,26 @@ class fromzDisk : public zdisk {
 typedef void (*MPI_MigrateFn)(void);
 
 void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec);
-PUPfunctionpointer(MPI_Op)
+
+PUPfunctionpointer(MPI_User_function*)
+
+/*
+ * OpStruct's are used to lookup an MPI_User_function* and check its commutativity.
+ * They are also used to create AmpiOpHeader's, which are transmitted in reductions
+ * that are user-defined or else lack an equivalent Charm++ reducer type.
+ */
+class OpStruct {
+ public:
+  MPI_User_function* func;
+  bool isCommutative;
+  OpStruct(void) {}
+  OpStruct(MPI_User_function* f) : func(f), isCommutative(true) {}
+  OpStruct(MPI_User_function* f, bool c) : func(f), isCommutative(c) {}
+  void pup(PUP::er &p) {
+    p|func;  p|isCommutative;
+  }
+};
+
 class AmpiOpHeader {
  public:
   MPI_User_function* func;
@@ -654,12 +673,12 @@ class IReq : public AmpiRequest {
 
 class RednReq : public AmpiRequest {
  public:
-  bool isCommutative;
-  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, bool c_){
+  MPI_Op op;
+  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, MPI_Op op_){
     buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
-    comm=comm_;  isCommutative=c_;  isvalid=true;
+    comm=comm_;  op=op_;  isvalid=true;
   }
-  RednReq(): isCommutative(true) {};
+  RednReq(){};
   ~RednReq(){}
   bool test(MPI_Status *sts);
   bool itest(MPI_Status *sts);
@@ -670,7 +689,7 @@ class RednReq : public AmpiRequest {
   void receive(ampi *ptr, CkReductionMsg *msg);
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
-    p|isCommutative;
+    p|op;
   }
   virtual void print();
 };
@@ -1077,6 +1096,7 @@ class ampiParent : public CBase_ampiParent {
   CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
   CkPupPtrVec<WinStruct> winStructList; //List of windows for one-sided communication
   CkPupPtrVec<InfoStruct> infos; // list of all MPI_Infos
+  vector<OpStruct> ops; // list of all MPI_Ops
 
   inline int isSplit(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
@@ -1351,6 +1371,29 @@ class ampiParent : public CBase_ampiParent {
   int getInfoNthkey(MPI_Info info, int n, char *key) const;
   int freeInfo(MPI_Info info);
 
+  void initOps(void);
+  inline int createOp(MPI_User_function *fn, int isCommutative) {
+    OpStruct newop = OpStruct(fn, isCommutative);
+    ops.push_back(newop);
+    return ops.size()-1;
+  }
+  inline bool opIsPredefined(MPI_Op op) const {
+    return (op>=MPI_INFO_NULL && op<=MPI_NO_OP);
+  }
+  inline bool opIsCommutative(MPI_Op op) const {
+    CkAssert(op>MPI_OP_NULL && op<ops.size());
+    return ops[op].isCommutative;
+  }
+  inline MPI_User_function* op2User_function(MPI_Op op) const {
+    CkAssert(op>MPI_OP_NULL && op<ops.size());
+    return ops[op].func;
+  }
+  inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const {
+    CkAssert(op>MPI_OP_NULL && op<ops.size());
+    int size = myDDT->getType(type)->getSize(count);
+    return AmpiOpHeader(ops[op].func, type, count, size);
+  }
+
  public:
 #if AMPIMSGLOG
   /* message logging */
@@ -1453,7 +1496,8 @@ class ampi : public CBase_ampi {
                 int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
   inline void processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count);
   inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count);
-  inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count);
+  inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count,
+                                           MPI_User_function* func);
   inline void processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount);
   inline void processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
                                int* recvCounts, int* displs);
@@ -1501,6 +1545,8 @@ class ampi : public CBase_ampi {
   inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
   void findNeighbors(MPI_Comm comm, int rank, vector<int>& neighbors) const;
   inline const vector<int>& getNeighbors() const { return myComm.getnbors(); }
+  inline bool opIsCommutative(MPI_Op op) const { return parent->opIsCommutative(op); }
+  inline MPI_User_function* op2User_function(MPI_Op op) const { return parent->op2User_function(op); }
 
   CkDDT *getDDT(void) const {return parent->myDDT;}
   CthThread getThread() const { return thread->getThread(); }

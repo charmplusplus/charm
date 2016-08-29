@@ -132,8 +132,6 @@
        integer, parameter :: MPI_CONGRUENT = 2
        integer, parameter :: MPI_UNEQUAL   = 3
 
-       integer, parameter :: MPI_OP_NULL = 0
-
        integer, parameter :: MPI_GRAPH = 1
        integer, parameter :: MPI_CART  = 2
 
@@ -179,20 +177,21 @@
        double precision, external :: MPI_WTIME
        double precision, external :: MPI_WTICK
 
-       integer, parameter :: MPI_MAX     = 100
-       integer, parameter :: MPI_MIN     = 101
-       integer, parameter :: MPI_SUM     = 102
-       integer, parameter :: MPI_PROD    = 103
-       integer, parameter :: MPI_LAND    = 104
-       integer, parameter :: MPI_BAND    = 105
-       integer, parameter :: MPI_LOR     = 106
-       integer, parameter :: MPI_BOR     = 107
-       integer, parameter :: MPI_LXOR    = 108
-       integer, parameter :: MPI_BXOR    = 109
-       integer, parameter :: MPI_MAXLOC  = 110
-       integer, parameter :: MPI_MINLOC  = 111
-       integer, parameter :: MPI_REPLACE = 112
-       integer, parameter :: MPI_NO_OP   = 113
+       integer, parameter :: MPI_OP_NULL = -1
+       integer, parameter :: MPI_MAX     = 0
+       integer, parameter :: MPI_MIN     = 1
+       integer, parameter :: MPI_SUM     = 2
+       integer, parameter :: MPI_PROD    = 3
+       integer, parameter :: MPI_LAND    = 4
+       integer, parameter :: MPI_BAND    = 5
+       integer, parameter :: MPI_LOR     = 6
+       integer, parameter :: MPI_BOR     = 7
+       integer, parameter :: MPI_LXOR    = 8
+       integer, parameter :: MPI_BXOR    = 9
+       integer, parameter :: MPI_MAXLOC  = 10
+       integer, parameter :: MPI_MINLOC  = 11
+       integer, parameter :: MPI_REPLACE = 12
+       integer, parameter :: MPI_NO_OP   = 13
 
        integer, parameter :: MPI_OFFSET_KIND  = 8
        integer, parameter :: MPI_ADDRESS_KIND = 8

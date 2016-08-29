@@ -175,21 +175,26 @@ typedef int MPI_Fint;
 #define MPI_CONGRUENT   2
 #define MPI_UNEQUAL     3
 
-#define MPI_OP_NULL  (MPI_Op)NULL
-void MPI_MAX      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_MIN      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_SUM      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_PROD     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_LAND     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_BAND     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_LOR      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_BOR      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_LXOR     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_BXOR     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_MAXLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_MINLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_REPLACE  ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
-void MPI_NO_OP    ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+typedef int MPI_Op;
+
+typedef void (MPI_User_function)(void *invec, void *inoutvec,
+                                 int *len, MPI_Datatype *datatype);
+
+#define MPI_OP_NULL -1
+#define MPI_MAX      0
+#define MPI_MIN      1
+#define MPI_SUM      2
+#define MPI_PROD     3
+#define MPI_LAND     4
+#define MPI_BAND     5
+#define MPI_LOR      6
+#define MPI_BOR      7
+#define MPI_LXOR     8
+#define MPI_BXOR     9
+#define MPI_MAXLOC  10
+#define MPI_MINLOC  11
+#define MPI_REPLACE 12
+#define MPI_NO_OP   13
 
 #define MPI_GRAPH 1
 #define MPI_CART  2
@@ -270,11 +275,6 @@ typedef int  (MPI_Copy_function)(MPI_Comm oldcomm, int keyval,
                                  void *attribute_val_out, int *flag);
 typedef int  (MPI_Delete_function)(MPI_Comm comm, int keyval,
                                    void *attribute_val, void *extra_state);
-
-typedef void (MPI_User_function)(void *invec, void *inoutvec,
-                                 int *len, MPI_Datatype *datatype);
-typedef void (*MPI_Op)(void *invec, void *inoutvec,
-                       int *len, MPI_Datatype *datatype);
 
 #define MPI_COMM_NULL_COPY_FN   MPI_comm_null_copy_fn
 #define MPI_COMM_NULL_DELETE_FN MPI_comm_null_delete_fn

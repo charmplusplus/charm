@@ -306,32 +306,6 @@ void FTN_NAME(caps, nocaps)(void *iv, void *iov, int *len, MPI_Datatype *dt){ \
   caps(iv, iov, len, dt); \
 }
 
-#if !CMK_FORTRAN_USES_ALLCAPS
-REDUCERF(MPI_MAX     , mpi_max)
-REDUCERF(MPI_MIN     , mpi_min)
-REDUCERF(MPI_SUM     , mpi_sum)
-REDUCERF(MPI_PROD    , mpi_prod)
-REDUCERF(MPI_LAND    , mpi_land)
-REDUCERF(MPI_BAND    , mpi_band)
-REDUCERF(MPI_LOR     , mpi_lor)
-REDUCERF(MPI_BOR     , mpi_bor)
-REDUCERF(MPI_LXOR    , mpi_lxor)
-REDUCERF(MPI_BXOR    , mpi_bxor)
-REDUCERF(MPI_MAXLOC  , mpi_maxloc)
-REDUCERF(MPI_MINLOC  , mpi_minloc)
-REDUCERF(MPI_REPLACE , mpi_replace)
-REDUCERF(MPI_NO_OP   , mpi_no_op)
-#endif
-
-typedef MPI_Op  MPI_Op_Array[128];
-CtvExtern(MPI_Op_Array, mpi_ops);
-CtvExtern(int, mpi_opc);
-
-// must be consistent with mpif.h
-#define MPI_OP_FIRST   100
-
-inline MPI_Op & GET_MPI_OP(int idx) { MPI_Op *tab=CtvAccess(mpi_ops); return tab[idx - MPI_OP_FIRST]; }
-
 /* Strings passed from Fortran must be explicitly NULL terminated
  * before they are passed into AMPI. */
 static void ampif_str_f2c(char* dst, const char* src, int len){
@@ -478,19 +452,17 @@ void mpi_ibcast(void *buf, int *count, int *type, int *root, int *comm,
 }
 
 void mpi_reduce(void *inbuf, void *outbuf, int *count, int *type,
-                int *opc, int *root, int *comm, int *ierr)
+                int *op, int *root, int *comm, int *ierr)
 {
-  MPI_Op op = GET_MPI_OP(*opc);
   handle_MPI_IN_PLACE_f(inbuf, outbuf);
-  *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, op, *root, *comm);
+  *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, *op, *root, *comm);
 }
 
 void mpi_allreduce(void *inbuf,void *outbuf,int *count,int *type,
-                   int *opc, int *comm, int *ierr)
+                   int *op, int *comm, int *ierr)
 {
-  MPI_Op op = GET_MPI_OP(*opc);
   handle_MPI_IN_PLACE_f(inbuf, outbuf);
-  *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, op, *comm);
+  *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, *op, *comm);
 }
 
 double mpi_wtime(void)
@@ -944,59 +916,52 @@ void mpi_ialltoall(void *sendbuf, int* sendcount, int* sendtype,
 }
 
 void mpi_ireduce(void *sendbuf, void *recvbuf, int* count, int* type,
-                 int* opc, int* root, int* comm, int *request, int* ierr)
+                 int* op, int* root, int* comm, int *request, int* ierr)
 {
-  MPI_Op op = GET_MPI_OP(*opc);
   handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Ireduce(sendbuf, recvbuf, *count, *type,
-                       op, *root, *comm, (MPI_Request*) request);
+                       *op, *root, *comm, (MPI_Request*) request);
 }
 
 void mpi_iallreduce(void *inbuf, void *outbuf, int* count, int* type,
-                    int* opc, int* comm, int *request, int* ierr)
+                    int* op, int* comm, int *request, int* ierr)
 {
-  MPI_Op op = GET_MPI_OP(*opc);
   handle_MPI_IN_PLACE_f(inbuf, outbuf);
   *ierr = AMPI_Iallreduce(inbuf, outbuf, *count, *type,
-                          op, *comm, (MPI_Request*) request);
+                          *op, *comm, (MPI_Request*) request);
 }
 
 void mpi_reduce_local(void *inbuf, void *outbuf, int *count, int *type,
-                      int *opc, int *ierr)
+                      int *op, int *ierr)
 {
-  MPI_Op op = GET_MPI_OP(*opc);
-  *ierr = AMPI_Reduce_local(inbuf, outbuf, *count, *type, op);
+  *ierr = AMPI_Reduce_local(inbuf, outbuf, *count, *type, *op);
 }
 
 void mpi_reduce_scatter_block(void* sendbuf, void* recvbuf, int *count,
-                              int *type, int *opc, int *comm, int *ierr)
+                              int *type, int *op, int *comm, int *ierr)
 {
-  MPI_Op op = GET_MPI_OP(*opc);
   handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
-  *ierr = AMPI_Reduce_scatter_block(sendbuf, recvbuf, *count, *type, op, *comm);
+  *ierr = AMPI_Reduce_scatter_block(sendbuf, recvbuf, *count, *type, *op, *comm);
 }
 
 void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
-                        int* datatype, int* opc, int* comm, int* ierr)
+                        int* datatype, int* op, int* comm, int* ierr)
 {
-  MPI_Op op = GET_MPI_OP(*opc);
   handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = AMPI_Reduce_scatter(sendbuf, recvbuf, recvcounts,
-                              *datatype, op, *comm);
+                              *datatype, *op, *comm);
 }
 
-void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* opc, int* comm, int* ierr)
+void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* ierr)
 {
-  MPI_Op op = GET_MPI_OP(*opc);
   handle_MPI_IN_PLACE_f(sendbuf,recvbuf);
-  *ierr = AMPI_Scan(sendbuf,recvbuf,*count,*datatype,op,*comm );
+  *ierr = AMPI_Scan(sendbuf,recvbuf,*count,*datatype,*op,*comm );
 }
 
-void mpi_exscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* opc, int* comm, int* ierr)
+void mpi_exscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* ierr)
 {
-  MPI_Op op = GET_MPI_OP(*opc);
   handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
-  *ierr = AMPI_Exscan(sendbuf,recvbuf,*count,*datatype,op,*comm);
+  *ierr = AMPI_Exscan(sendbuf,recvbuf,*count,*datatype,*op,*comm);
 }
 
 void mpi_neighbor_alltoall(void* sendbuf, int *sendcount, int *sendtype,
@@ -1087,22 +1052,16 @@ void mpi_ineighbor_allgatherv(void* sendbuf, int *sendcount, int *sendtype,
                                     recvcounts, displs, *recvtype, *comm, request);
 }
 
-void mpi_op_create(void* function, int* commute, int* opc, int* ierr){
-  MPI_Op op;
-  *ierr = MPI_Op_create((MPI_User_function *)function, *commute, (MPI_Op *)&op);
-  GET_MPI_OP(CtvAccess(mpi_opc)++) = op;
-  *opc = CtvAccess(mpi_opc)-1;
+void mpi_op_create(void* function, int* commute, int* op, int* ierr){
+  *ierr = MPI_Op_create((MPI_User_function *)function, *commute, op);
 }
 
-void mpi_op_free(int* opc, int* ierr){
-  MPI_Op op = GET_MPI_OP(*opc);
-  GET_MPI_OP(*opc) = NULL;
-  *ierr = MPI_Op_free((MPI_Op *)&op);
+void mpi_op_free(int* op, int* ierr){
+  *ierr = MPI_Op_free(op);
 }
 
-void mpi_op_commutative(int* opc, int* commute, int* ierr){
-  MPI_Op op = GET_MPI_OP(*opc);
-  *ierr = AMPI_Op_commutative(op, commute);
+void mpi_op_commutative(int* op, int* commute, int* ierr){
+  *ierr = AMPI_Op_commutative(*op, commute);
 }
 
 void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
@@ -1566,24 +1525,21 @@ void mpi_get(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 
 void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
                     MPI_Aint *targdisp, int *targcnt, int *targtype,
-                    int *opc, int *win, int *ierr){
-  MPI_Op op = GET_MPI_OP(*opc);
-  *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, op, *win);
+                    int *op, int *win, int *ierr){
+  *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *op, *win);
 }
 
 void mpi_get_accumulate(void *orgaddr, int *orgcnt, int *orgtype, void *resaddr,
                         int *rescnt, int *restype, int *rank,
                         MPI_Aint *targdisp, int *targcnt, int *targtype,
-                        int *opc, int *win, int *ierr){
-  MPI_Op op = GET_MPI_OP(*opc);
+                        int *op, int *win, int *ierr){
   *ierr = AMPI_Get_accumulate(orgaddr, *orgcnt, *orgtype, resaddr, *rescnt, *restype,
-                              *rank, *targdisp, *targcnt, *targtype, op, *win);
+                              *rank, *targdisp, *targcnt, *targtype, *op, *win);
 }
 
 void mpi_fetch_and_op(void *orgaddr, void *resaddr, int *type, int *rank,
-                      MPI_Aint *targdisp, int *opc, int *win, int *ierr){
-  MPI_Op op = GET_MPI_OP(*opc);
-  *ierr = AMPI_Fetch_and_op(orgaddr, resaddr, *type, *rank, *targdisp, op, *win);
+                      MPI_Aint *targdisp, int *op, int *win, int *ierr){
+  *ierr = AMPI_Fetch_and_op(orgaddr, resaddr, *type, *rank, *targdisp, *op, *win);
 }
 
 void mpi_compare_and_swap(void *orgaddr, void *compaddr, void *resaddr,
