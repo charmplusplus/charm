@@ -42,7 +42,7 @@ extern int macroDefined(const char *str, int istrue);
 extern const char *python_doc;
 extern char *fname;
 void splitScopedName(const char* name, const char** scope, const char** basename);
-void ReservedWord(int token);
+void ReservedWord(int token, int fCol, int lCol);
 }
 %}
 
@@ -216,63 +216,63 @@ OptSemiColon	: /* Empty */
 // Commented reserved words introduce parsing conflicts, so they're currently not handled
 Name		: IDENT
 		{ $$ = $1; }
-		| MODULE { ReservedWord(MODULE); YYABORT; }
-		| MAINMODULE { ReservedWord(MAINMODULE); YYABORT; }
-		| EXTERN { ReservedWord(EXTERN); YYABORT; }
-		/* | READONLY { ReservedWord(READONLY); YYABORT; } */
-		| INITCALL { ReservedWord(INITCALL); YYABORT; }
-		| INITNODE { ReservedWord(INITNODE); YYABORT; }
-		| INITPROC { ReservedWord(INITPROC); YYABORT; }
-		/* | PUPABLE { ReservedWord(PUPABLE); YYABORT; } */
-		| CHARE { ReservedWord(CHARE); }
-		| MAINCHARE { ReservedWord(MAINCHARE); }
-		| GROUP { ReservedWord(GROUP); }
-		| NODEGROUP { ReservedWord(NODEGROUP); }
-		| ARRAY { ReservedWord(ARRAY); }
-		/* | MESSAGE { ReservedWord(MESSAGE); YYABORT; } */
-		/* | CONDITIONAL { ReservedWord(CONDITIONAL); YYABORT; } */
-		/* | CLASS { ReservedWord(CLASS); YYABORT; } */
-		| INCLUDE { ReservedWord(INCLUDE); YYABORT; }
-		| STACKSIZE { ReservedWord(STACKSIZE); YYABORT; }
-		| THREADED { ReservedWord(THREADED); YYABORT; }
-		| TEMPLATE { ReservedWord(TEMPLATE); YYABORT; }
-		| SYNC { ReservedWord(SYNC); YYABORT; }
-		| IGET { ReservedWord(IGET); YYABORT; }
-		| EXCLUSIVE { ReservedWord(EXCLUSIVE); YYABORT; }
-		| IMMEDIATE { ReservedWord(IMMEDIATE); YYABORT; }
-		| SKIPSCHED { ReservedWord(SKIPSCHED); YYABORT; }
-		| INLINE { ReservedWord(INLINE); YYABORT; }
-		| VIRTUAL { ReservedWord(VIRTUAL); YYABORT; }
-		| MIGRATABLE { ReservedWord(MIGRATABLE); YYABORT; }
-		| CREATEHERE { ReservedWord(CREATEHERE); YYABORT; }
-		| CREATEHOME { ReservedWord(CREATEHOME); YYABORT; }
-		| NOKEEP { ReservedWord(NOKEEP); YYABORT; }
-		| NOTRACE { ReservedWord(NOTRACE); YYABORT; }
-		| APPWORK { ReservedWord(APPWORK); YYABORT; }
-		/* | VOID { ReservedWord(VOID); YYABORT; } */
-		/* | CONST { ReservedWord(CONST); YYABORT; } */
-		| PACKED { ReservedWord(PACKED); YYABORT; }
-		| VARSIZE { ReservedWord(VARSIZE); YYABORT; }
-		| ENTRY { ReservedWord(ENTRY); YYABORT; }
-		| FOR { ReservedWord(FOR); YYABORT; }
-		| FORALL { ReservedWord(FORALL); YYABORT; }
-		| WHILE { ReservedWord(WHILE); YYABORT; }
-		| WHEN { ReservedWord(WHEN); YYABORT; }
-		| OVERLAP { ReservedWord(OVERLAP); YYABORT; }
-		| ATOMIC { ReservedWord(ATOMIC); YYABORT; }
-		| IF { ReservedWord(IF); YYABORT; }
-		| ELSE { ReservedWord(ELSE); YYABORT; }
-		/* | PYTHON { ReservedWord(PYTHON); YYABORT; } */
-		| LOCAL { ReservedWord(LOCAL); YYABORT; }
-		/* | NAMESPACE { ReservedWord(NAMESPACE); YYABORT; } */
-		| USING { ReservedWord(USING); YYABORT; }
-		| ACCEL { ReservedWord(ACCEL); YYABORT; }
-		/* | READWRITE { ReservedWord(READWRITE); YYABORT; } */
-		/* | WRITEONLY { ReservedWord(WRITEONLY); YYABORT; } */
-		| ACCELBLOCK { ReservedWord(ACCELBLOCK); YYABORT; }
-		| MEMCRITICAL { ReservedWord(MEMCRITICAL); YYABORT; }
-		| REDUCTIONTARGET { ReservedWord(REDUCTIONTARGET); YYABORT; }
-		| CASE { ReservedWord(CASE); YYABORT; }
+		| MODULE { ReservedWord(MODULE, @$.first_column, @$.last_column); YYABORT; }
+		| MAINMODULE { ReservedWord(MAINMODULE, @$.first_column, @$.last_column); YYABORT; }
+		| EXTERN { ReservedWord(EXTERN, @$.first_column, @$.last_column); YYABORT; }
+		/* | READONLY { ReservedWord(READONLY, @$.first_column, @$.last_column); YYABORT; } */
+		| INITCALL { ReservedWord(INITCALL, @$.first_column, @$.last_column); YYABORT; }
+		| INITNODE { ReservedWord(INITNODE, @$.first_column, @$.last_column); YYABORT; }
+		| INITPROC { ReservedWord(INITPROC, @$.first_column, @$.last_column); YYABORT; }
+		/* | PUPABLE { ReservedWord(PUPABLE, @$.first_column, @$.last_column); YYABORT; } */
+		| CHARE { ReservedWord(CHARE, @$.first_column, @$.last_column); YYABORT; }
+		| MAINCHARE { ReservedWord(MAINCHARE, @$.first_column, @$.last_column); YYABORT; }
+		| GROUP { ReservedWord(GROUP, @$.first_column, @$.last_column); YYABORT; }
+		| NODEGROUP { ReservedWord(NODEGROUP, @$.first_column, @$.last_column); YYABORT; }
+		| ARRAY { ReservedWord(ARRAY, @$.first_column, @$.last_column); YYABORT; }
+		/* | MESSAGE { ReservedWord(MESSAGE, @$.first_column, @$.last_column); YYABORT; } */
+		/* | CONDITIONAL { ReservedWord(CONDITIONAL, @$.first_column, @$.last_column); YYABORT; } */
+		/* | CLASS { ReservedWord(CLASS, @$.first_column, @$.last_column); YYABORT; } */
+		| INCLUDE { ReservedWord(INCLUDE, @$.first_column, @$.last_column); YYABORT; }
+		| STACKSIZE { ReservedWord(STACKSIZE, @$.first_column, @$.last_column); YYABORT; }
+		| THREADED { ReservedWord(THREADED, @$.first_column, @$.last_column); YYABORT; }
+		| TEMPLATE { ReservedWord(TEMPLATE, @$.first_column, @$.last_column); YYABORT; }
+		| SYNC { ReservedWord(SYNC, @$.first_column, @$.last_column); YYABORT; }
+		| IGET { ReservedWord(IGET, @$.first_column, @$.last_column); YYABORT; }
+		| EXCLUSIVE { ReservedWord(EXCLUSIVE, @$.first_column, @$.last_column); YYABORT; }
+		| IMMEDIATE { ReservedWord(IMMEDIATE, @$.first_column, @$.last_column); YYABORT; }
+		| SKIPSCHED { ReservedWord(SKIPSCHED, @$.first_column, @$.last_column); YYABORT; }
+		| INLINE { ReservedWord(INLINE, @$.first_column, @$.last_column); YYABORT; }
+		| VIRTUAL { ReservedWord(VIRTUAL, @$.first_column, @$.last_column); YYABORT; }
+		| MIGRATABLE { ReservedWord(MIGRATABLE, @$.first_column, @$.last_column); YYABORT; }
+		| CREATEHERE { ReservedWord(CREATEHERE, @$.first_column, @$.last_column); YYABORT; }
+		| CREATEHOME { ReservedWord(CREATEHOME, @$.first_column, @$.last_column); YYABORT; }
+		| NOKEEP { ReservedWord(NOKEEP, @$.first_column, @$.last_column); YYABORT; }
+		| NOTRACE { ReservedWord(NOTRACE, @$.first_column, @$.last_column); YYABORT; }
+		| APPWORK { ReservedWord(APPWORK, @$.first_column, @$.last_column); YYABORT; }
+		/* | VOID { ReservedWord(VOID, @$.first_column, @$.last_column); YYABORT; } */
+		/* | CONST { ReservedWord(CONST, @$.first_column, @$.last_column); YYABORT; } */
+		| PACKED { ReservedWord(PACKED, @$.first_column, @$.last_column); YYABORT; }
+		| VARSIZE { ReservedWord(VARSIZE, @$.first_column, @$.last_column); YYABORT; }
+		| ENTRY { ReservedWord(ENTRY, @$.first_column, @$.last_column); YYABORT; }
+		| FOR { ReservedWord(FOR, @$.first_column, @$.last_column); YYABORT; }
+		| FORALL { ReservedWord(FORALL, @$.first_column, @$.last_column); YYABORT; }
+		| WHILE { ReservedWord(WHILE, @$.first_column, @$.last_column); YYABORT; }
+		| WHEN { ReservedWord(WHEN, @$.first_column, @$.last_column); YYABORT; }
+		| OVERLAP { ReservedWord(OVERLAP, @$.first_column, @$.last_column); YYABORT; }
+		| ATOMIC { ReservedWord(ATOMIC, @$.first_column, @$.last_column); YYABORT; }
+		| IF { ReservedWord(IF, @$.first_column, @$.last_column); YYABORT; }
+		| ELSE { ReservedWord(ELSE, @$.first_column, @$.last_column); YYABORT; }
+		/* | PYTHON { ReservedWord(PYTHON, @$.first_column, @$.last_column); YYABORT; } */
+		| LOCAL { ReservedWord(LOCAL, @$.first_column, @$.last_column); YYABORT; }
+		/* | NAMESPACE { ReservedWord(NAMESPACE, @$.first_column, @$.last_column); YYABORT; } */
+		| USING { ReservedWord(USING, @$.first_column, @$.last_column); YYABORT; }
+		| ACCEL { ReservedWord(ACCEL, @$.first_column, @$.last_column); YYABORT; }
+		/* | READWRITE { ReservedWord(READWRITE, @$.first_column, @$.last_column); YYABORT; } */
+		/* | WRITEONLY { ReservedWord(WRITEONLY, @$.first_column, @$.last_column); YYABORT; } */
+		| ACCELBLOCK { ReservedWord(ACCELBLOCK, @$.first_column, @$.last_column); YYABORT; }
+		| MEMCRITICAL { ReservedWord(MEMCRITICAL, @$.first_column, @$.last_column); YYABORT; }
+		| REDUCTIONTARGET { ReservedWord(REDUCTIONTARGET, @$.first_column, @$.last_column); YYABORT; }
+		| CASE { ReservedWord(CASE, @$.first_column, @$.last_column); YYABORT; }
 		;
 
 QualName	: IDENT

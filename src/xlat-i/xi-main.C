@@ -34,7 +34,7 @@ const char *cur_file;
 
 char *fname, *origFile;
 
-void ReservedWord(int token) {
+void ReservedWord(int token, int fCol, int lCol) {
   char text[300];
   const char *word = 0;
   for (int i = 0; rwtable[i].tok != 0; ++i) {
@@ -44,6 +44,7 @@ void ReservedWord(int token) {
     }
   }
   sprintf(text, "Reserved word '%s' used as an identifier", word);
+  xi::pretty_msg("error", text, fCol, lCol);
   yyerror(text);
 }
 
