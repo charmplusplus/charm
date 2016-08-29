@@ -10,6 +10,7 @@ integrateArray \
 jacobi2d-1d-decomposition \
 jacobi2d-2d-decomposition \
 jacobi3d-2d-decomposition \
+kmeans \
 leanmd \
 load_balancing \
 manyToMany \
