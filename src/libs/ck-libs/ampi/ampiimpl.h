@@ -541,6 +541,11 @@ extern int _mpi_nworlds;
 #define MPI_GATHERV_REQ 8
 #define MPI_GPU_REQ     9
 
+enum AmpiReqSts : bool {
+  AMPI_REQ_PENDING = false,
+  AMPI_REQ_COMPLETED = true
+};
+
 #define MyAlign8(x) (((x)+7)&(~7))
 
 /**
@@ -784,8 +789,6 @@ class SsendReq : public AmpiRequest {
 };
 
 class GPUReq : public AmpiRequest {
-  bool isComplete;
-
  public:
   GPUReq();
   inline int getType(void) const { return MPI_GPU_REQ; }
@@ -1484,6 +1487,7 @@ class ampi : public CBase_ampi {
   inline ampi* blockOnRecv(void);
   inline ampi* blockOnColl(void);
   inline ampi* blockOnRedn(AmpiRequest *req);
+  inline MPI_Request postReq(AmpiRequest* newreq, AmpiReqSts status=AMPI_REQ_PENDING);
 
   AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int sync=0);
