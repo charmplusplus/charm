@@ -3385,7 +3385,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
   else {
     // Non-commutative user-defined reducer operation
     AMPI_DEBUG("[%d] In makeRednMsg, using a non-commutative user-defined operation\n", thisIndex);
-    int tupleSize = 2;
+    const int tupleSize = 2;
     CkReduction::tupleElement tupleRedn[tupleSize];
     tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set);
     if (!ddt->isContig()) {
