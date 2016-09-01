@@ -5319,10 +5319,11 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
-  ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf,
-                   getAmpiInstance(comm)->getRank(comm) == root);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (getAmpiInstance(comm)->getRank(comm) == root) {
+    ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
 #endif
 
   if(comm==MPI_COMM_SELF)
@@ -5381,11 +5382,12 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     *request = MPI_REQUEST_NULL;
     return ret;
   }
-  ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf,
-                   getAmpiInstance(comm)->getRank(comm) == root);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (getAmpiInstance(comm)->getRank(comm) == root) {
+    ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
 #endif
 
@@ -5450,10 +5452,11 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
-  ret = errorCheck(comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf,
-                   getAmpiInstance(comm)->getRank(comm) == root);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (getAmpiInstance(comm)->getRank(comm) == root) {
+    ret = errorCheck(comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
 #endif
 
   if(comm==MPI_COMM_SELF)
@@ -5519,11 +5522,12 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     *request = MPI_REQUEST_NULL;
     return ret;
   }
-  ret = errorCheck(comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf,
-                   getAmpiInstance(comm)->getRank(comm) == root);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (getAmpiInstance(comm)->getRank(comm) == root) {
+    ret = errorCheck(comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
 #endif
 
@@ -5594,10 +5598,11 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf,
-                   getAmpiInstance(comm)->getRank(comm) == root);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (getAmpiInstance(comm)->getRank(comm) == root) {
+    ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
   ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
@@ -5656,11 +5661,12 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf,
-                   getAmpiInstance(comm)->getRank(comm) == root);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (getAmpiInstance(comm)->getRank(comm) == root) {
+    ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
   ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS){
@@ -5726,10 +5732,11 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf,
-                   getAmpiInstance(comm)->getRank(comm) == root);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (getAmpiInstance(comm)->getRank(comm) == root) {
+    ret = errorCheck(comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
   ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
@@ -5788,11 +5795,12 @@ int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sen
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf,
-                   getAmpiInstance(comm)->getRank(comm) == root);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (getAmpiInstance(comm)->getRank(comm) == root) {
+    ret = errorCheck(comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
   ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS){
