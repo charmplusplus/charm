@@ -9,7 +9,8 @@ another asynchronous entry method on the chare object that invoked it.
 However, it is possible to use \kw{sync} entry methods, which have blocking
 semantics. The data returned by the invocation of such an entry method is
 available at the call site when it returns from blocking. This returned data
-must be in the form of a \charmpp message. Because the caller of a sync entry
+can either be in the form of a \charmpp message or any type that has the PUP
+method implemented. Because the caller of a sync entry
 method will block, it must execute in a thread separate from the scheduler;
 that is, it must be a \kw{threaded} entry method ({\em cf.} \S~\ref{threaded},
 above).  If a \kw{sync} entry method returns a value, it is provided as the

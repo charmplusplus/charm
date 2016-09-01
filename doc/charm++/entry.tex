@@ -26,7 +26,7 @@ details, refer to section~\ref{threaded}.
 \index{sync}\item[sync] \index{entry method}entry methods are special in that
 calls to them are blocking--they do not return control to the caller until the
 method finishes execution completely. Sync methods may have return values;
-however, they may only return messages. Callers must run in a thread separate
+however, they may only return messages or data types that have the PUP method implemented. Callers must run in a thread separate
 from the runtime scheduler, e.g. a \kw{threaded} entry methods.  Calls
 expecting a return value will receive it as the return from the proxy
 invocation:
