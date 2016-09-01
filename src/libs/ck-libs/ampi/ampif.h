@@ -193,7 +193,6 @@
        integer, parameter :: MPI_REPLACE = 12
        integer, parameter :: MPI_NO_OP   = 13
 
-       integer, parameter :: MPI_OFFSET_KIND  = 8
        integer, parameter :: MPI_ADDRESS_KIND = 8
 
        integer, parameter :: MPI_BSEND_OVERHEAD = 1
