@@ -120,7 +120,7 @@ class CkArrayIndex: public CkArrayIndexBase
             int i;
             const int *d=data();
             CkHashCode ret=d[0];
-            for (i=1;i<nInts;i++)
+            for (i=0;i<nInts;i++)
                 ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
             return ret;
         }
