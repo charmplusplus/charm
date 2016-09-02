@@ -83,20 +83,20 @@
        integer, parameter :: MPI_COMPLEX           = 3
        integer, parameter :: MPI_COMPLEX8          = 3
        integer, parameter :: MPI_LOGICAL           = 4
-       integer, parameter :: MPI_CHARACTER         = 5
-       integer, parameter :: MPI_BYTE              = 6
-       integer, parameter :: MPI_PACKED            = 7
-       integer, parameter :: MPI_INTEGER8          = 9
-       integer, parameter :: MPI_REAL16            = 14
-       integer, parameter :: MPI_2INTEGER          = 18
-       integer, parameter :: MPI_2REAL             = 21
-       integer, parameter :: MPI_2DOUBLE_PRECISION = 22
-       integer, parameter :: MPI_LB                = 23
-       integer, parameter :: MPI_UB                = 24
-       integer, parameter :: MPI_INTEGER16         = 25
-       integer, parameter :: MPI_DOUBLE_COMPLEX    = 26
-       integer, parameter :: MPI_COMPLEX16         = 26
-       integer, parameter :: MPI_COMPLEX32         = 39
+       integer, parameter :: MPI_CHARACTER         = 6
+       integer, parameter :: MPI_BYTE              = 7
+       integer, parameter :: MPI_PACKED            = 8
+       integer, parameter :: MPI_INTEGER8          = 10
+       integer, parameter :: MPI_REAL16            = 15
+       integer, parameter :: MPI_2INTEGER          = 19
+       integer, parameter :: MPI_2REAL             = 22
+       integer, parameter :: MPI_2DOUBLE_PRECISION = 23
+       integer, parameter :: MPI_LB                = 24
+       integer, parameter :: MPI_UB                = 25
+       integer, parameter :: MPI_INTEGER16         = 26
+       integer, parameter :: MPI_DOUBLE_COMPLEX    = 27
+       integer, parameter :: MPI_COMPLEX16         = 27
+       integer, parameter :: MPI_COMPLEX32         = 40
 
        integer, parameter :: MPI_COMBINER_NAMED          = 1
        integer, parameter :: MPI_COMBINER_CONTIGUOUS     = 2
@@ -219,4 +219,3 @@
 
        integer(KIND=MPI_ADDRESS_KIND), external :: MPI_AINT_ADD
        integer(KIND=MPI_ADDRESS_KIND), external :: MPI_AINT_DIFF
-

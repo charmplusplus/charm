@@ -1,4 +1,5 @@
 #include "ddt.h"
+#include <stdbool.h>
 #include <algorithm>
 #include <limits>
 
@@ -337,6 +338,9 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
       break;
     case CkDDT_LONG_DOUBLE_COMPLEX:
       size =  2 * sizeof(long double) ;
+      break;
+    case CkDDT_C_BOOL:
+      size = sizeof(_Bool) ;
       break;
     case CkDDT_LOGICAL:
       size =  sizeof(int) ;
