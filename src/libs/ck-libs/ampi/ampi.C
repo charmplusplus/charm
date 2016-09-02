@@ -13,6 +13,9 @@
 #include "bigsim_logs.h"
 #endif
 
+/* change this to MPI_ERRORS_RETURN to not abort on errors */
+#define AMPI_ERRHANDLER MPI_ERRORS_ARE_FATAL
+
 #define AMPI_PRINT_IDLE 0
 
 /* change this define to "x" to trace all send/recv's */
@@ -29,27 +32,37 @@ static CkDDT *getDDT(void) {
   return getAmpiParent()->myDDT;
 }
 
+static int ampiErrhandler(int errcode) {
+  if (AMPI_ERRHANDLER == MPI_ERRORS_ARE_FATAL && errcode != MPI_SUCCESS) {
+    int strlen;
+    char str[MPI_MAX_ERROR_STRING];
+    AMPI_Error_string(errcode, str, &strlen);
+    CkAbort(str);
+  }
+  return errcode;
+}
+
 inline int checkCommunicator(MPI_Comm comm) {
   if(comm == MPI_COMM_NULL)
-    return MPI_ERR_COMM;
+    return ampiErrhandler(MPI_ERR_COMM);
   return MPI_SUCCESS;
 }
 
 inline int checkCount(int count) {
   if(count < 0)
-    return MPI_ERR_COUNT;
+    return ampiErrhandler(MPI_ERR_COUNT);
   return MPI_SUCCESS;
 }
 
 inline int checkData(MPI_Datatype data) {
   if(data == MPI_DATATYPE_NULL)
-    return MPI_ERR_TYPE;
+    return ampiErrhandler(MPI_ERR_TYPE);
   return MPI_SUCCESS;
 }
 
 inline int checkTag(int tag) {
   if((tag != MPI_ANY_TAG && tag < 0) || (tag > MPI_TAG_UB_VALUE))
-    return MPI_ERR_TAG;
+    return ampiErrhandler(MPI_ERR_TAG);
   return MPI_SUCCESS;
 }
 
@@ -60,12 +73,12 @@ inline int checkRank(int rank, MPI_Comm comm) {
      (rank == MPI_ANY_SOURCE)       ||
      (rank == MPI_PROC_NULL))
     return MPI_SUCCESS;
-  return MPI_ERR_RANK;
+  return ampiErrhandler(MPI_ERR_RANK);
 }
 
 inline int checkBuf(void *buf, int count) {
   if((count != 0 && buf == NULL) || buf == MPI_IN_PLACE)
-    return MPI_ERR_BUFFER;
+    return ampiErrhandler(MPI_ERR_BUFFER);
   return MPI_SUCCESS;
 }
 
@@ -77,37 +90,37 @@ inline int errorCheck(MPI_Comm comm, int ifComm, int count, int ifCount,
   if(ifComm) {
     ret = checkCommunicator(comm);
     if(ret != MPI_SUCCESS)
-      return ret;
+      return ampiErrhandler(ret);
   }
   if(ifCount) {
     ret = checkCount(count);
     if(ret != MPI_SUCCESS)
-      return ret;
+      return ampiErrhandler(ret);
   }
   if(ifData) {
     ret = checkData(data);
     if(ret != MPI_SUCCESS)
-      return ret;
+      return ampiErrhandler(ret);
   }
   if(ifTag) {
     ret = checkTag(tag);
     if(ret != MPI_SUCCESS)
-      return ret;
+      return ampiErrhandler(ret);
   }
   if(ifRank) {
     ret = checkRank(rank,comm);
     if(ret != MPI_SUCCESS)
-      return ret;
+      return ampiErrhandler(ret);
   }
   if(ifBuf1) {
     ret = checkBuf(buf1,count);
     if(ret != MPI_SUCCESS)
-      return ret;
+      return ampiErrhandler(ret);
   }
   if(ifBuf2) {
     ret = checkBuf(buf2,count);
     if(ret != MPI_SUCCESS)
-      return ret;
+      return ampiErrhandler(ret);
   }
   return MPI_SUCCESS;
 }
