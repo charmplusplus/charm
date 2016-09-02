@@ -87,6 +87,7 @@
        integer, parameter :: MPI_BYTE              = 7
        integer, parameter :: MPI_PACKED            = 8
        integer, parameter :: MPI_INTEGER8          = 10
+       integer, parameter :: MPI_OFFSET            = 10
        integer, parameter :: MPI_REAL16            = 15
        integer, parameter :: MPI_2INTEGER          = 19
        integer, parameter :: MPI_2REAL             = 22

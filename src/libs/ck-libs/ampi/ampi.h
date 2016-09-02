@@ -139,6 +139,7 @@ typedef int MPI_Fint;
 /* mpi-2+ types */
 #define MPI_LONG_LONG_INT       26
 #define MPI_LONG_LONG           MPI_LONG_LONG_INT
+#define MPI_OFFSET              MPI_LONG_LONG
 #define MPI_DOUBLE_COMPLEX      27
 #define MPI_SIGNED_CHAR         28
 #define MPI_UNSIGNED_LONG_LONG  29
