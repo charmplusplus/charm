@@ -1471,7 +1471,7 @@ void CmiTimerInit(char **argv)
 
 	CpvInitialize(double, inittime_wallclock);
 	CpvInitialize(double, inittime_virtual);
-	_ftime(&tv);
+	ftime(&tv);
 	CpvAccess(inittime_wallclock) = tv.time*1.0 + tv.millitm*0.001;
 	ru = clock();
 	CpvAccess(inittime_virtual) = ((double) ru)/CLOCKS_PER_SEC;
@@ -1497,7 +1497,7 @@ double CmiWallTimer()
 #endif
 	double currenttime;
 
-	_ftime(&tv);
+	ftime(&tv);
 	currenttime = tv.time*1.0 + tv.millitm*0.001;
 
 	return currenttime - CpvAccess(inittime_wallclock);
