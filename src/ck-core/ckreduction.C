@@ -175,7 +175,6 @@ they're passed to the user's client function.
 
 CkReductionMgr::CkReductionMgr()
   :
-  thisProxy(thisgroup),
   isDestroying(false)
 { 
 #ifdef BINOMIAL_TREE
@@ -344,6 +343,7 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   {//Must have been migrating during reductions-- root is waiting for his
   // contribution, which will never come.
     DEBR((AA "Dying guy %p must have been migrating-- he's at #%d!\n" AB,ci,ci->redNo));
+    CProxy_CkReductionMgr thisProxy(thisgroup);
     for (int r=ci->redNo;r<redNo;r++)
       thisProxy[0].MigrantDied(new CkReductionNumberMsg(r));
   }
@@ -423,6 +423,7 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 	// if object is an immigrant recovery object, we send the contribution to the source PE
 	if(CpvAccess(_currentObj)->mlogData->immigrantRecFlag){
+    	CProxy_CkReductionMgr thisProxy(thisgroup);
 		
 		// turning on the message-logging bypass flag
 		envelope *env = UsrToEnv(m);
@@ -493,6 +494,7 @@ void CkReductionMgr::checkAndAddToInactiveList(int id, int red_no) {
   // the time to call ReductionStarting is past so explicitly invoke
   // ReductionStarting on the kid
   if (inProgress && redNo == red_no) {
+    CProxy_CkReductionMgr thisProxy(thisgroup);
     thisProxy[id].ReductionStarting(new CkReductionNumberMsg(red_no));
   }
 
@@ -530,6 +532,7 @@ void CkReductionMgr::checkAndRemoveFromInactiveList(int id, int red_no) {
 void CkReductionMgr::informParentInactive() {
   if (hasParent()) {
     DEBR((AA "Inform parent to add to inactivelist red_no %d\n" AB, redNo));
+    CProxy_CkReductionMgr thisProxy(thisgroup);
     thisProxy[treeParent()].AddToInactiveList(
       new CkReductionInactiveMsg(CkMyPe(), redNo));
   }
@@ -540,6 +543,7 @@ void CkReductionMgr::informParentInactive() {
 *  for the specified red_no
 */
 void CkReductionMgr::sendReductionStartingToKids(int red_no) {
+  CProxy_CkReductionMgr thisProxy(thisgroup);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) || CMK_MEM_CHECKPOINT
   for (int k=0;k<treeKids();k++)
   {
@@ -659,6 +663,7 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
     DEBR((AA "Migrant gives late contribution for #%d!\n" AB,m->redNo));
    	// if (!hasParent()) //Root moved on too soon-- should never happen
    	//   CkAbort("Late reduction contribution received at root!\n");
+    CProxy_CkReductionMgr thisProxy(thisgroup);
     thisProxy[0].LateMigrantMsg(m);
 #endif
   }
@@ -741,6 +746,7 @@ void CkReductionMgr::finishReduction(void)
 #else
     result->gcount+=gcount+adj(redNo).gcount;
 #endif
+    CProxy_CkReductionMgr thisProxy(thisgroup);
     thisProxy[treeParent()].RecvMsg(result);
   }
   else 
@@ -1043,7 +1049,6 @@ void CkReductionMgr::pup(PUP::er &p)
 //  //  p|gcount;
 //  //  printf("[%d] nodeProxy nodeGroup %d pupped in group %d \n",CkMyPe(),(nodeProxy.ckGetGroupID()).idx,thisgroup.idx);
   if(p.isUnpacking()){
-    thisProxy = thisgroup;
     maxStartRequest=0;
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
@@ -1170,6 +1175,7 @@ void CkReductionMgr::finishBarrier(void)
        {
                DEBR(("[%d]send to parent:%d\n",CkMyPe(),treeParent()));
                result->gcount+=gcount;
+               CProxy_CkReductionMgr thisProxy(thisgroup);
                thisProxy[treeParent()].Barrier_RecvMsg(result);
        }
        else{
@@ -1962,7 +1968,6 @@ void NodeGroup::contributeWithCounter(CkReductionMsg *msg,int count)
 //#define BINOMIAL_TREE
 
 CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
-  : thisProxy(thisgroup)
 {
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
@@ -2157,6 +2162,7 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	inProgress=true;
 }
 
+
 void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
 	/*
 		FAULT_EVAC
@@ -2272,6 +2278,7 @@ void CkNodeReductionMgr::finishReduction(void)
 	if(CmiNodeAlive(CkMyNode()) || killed == false){
     	DEBR((AA "Passing reduced data up to parent node %d. \n" AB,treeParent()));
     	DEBR(("[%d,%d] Passing data up to parentNode %d at %.6f for redNo %d with ncontrib %d\n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer(),redNo,nContrib));
+        CProxy_CkNodeReductionMgr thisProxy(thisgroup);
 		/*
 			FAULT_EVAC
 		*/
@@ -2592,7 +2599,6 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p|newAdditionalGCount;
   if(p.isUnpacking()) {
     gcount=CkNumNodes();
-    thisProxy = thisgroup;
     lockEverything = CmiCreateLock();
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
@@ -2624,6 +2630,7 @@ void CkNodeReductionMgr::pup(PUP::er &p)
 */
 void CkNodeReductionMgr::evacuate(){
 	DEBREVAC(("[%d] Evacuate called on nodereductionMgr \n",CkMyNode()));
+        CProxy_CkNodeReductionMgr thisProxy(thisgroup);
 	if(treeKids() == 0){
 	/*
 		if the node going down is a leaf
@@ -2745,7 +2752,7 @@ void CkNodeReductionMgr::modifyTree(int code,int size,int *data){
 	};
 	blocked = true;
 	int maxRedNo = findMaxRedNo();
-	
+        CProxy_CkNodeReductionMgr thisProxy(thisgroup);
 	thisProxy[sender].collectMaxRedNo(maxRedNo);
 }
 
@@ -2769,6 +2776,7 @@ void CkNodeReductionMgr::collectMaxRedNo(int maxRedNo){
 		}else{
 			DEBREVAC(("[%d]%d> maxModificationRedNo for this nodegroup %d \n",CkMyNode(),thisgroup.idx,maxModificationRedNo));
 		}
+                CProxy_CkNodeReductionMgr thisProxy(thisgroup);
 		thisProxy[parent].unblockNode(maxModificationRedNo);
 		for(int i=0;i<numKids;i++){
 			thisProxy[kids[i]].unblockNode(maxModificationRedNo);
@@ -2856,6 +2864,7 @@ void CkNodeReductionMgr::doneEvacuate(){
 		DEBR(("[%d] Asking parent %d to remove myself from list \n",CkMyNode(),treeParent()));
 		thisProxy[treeParent()].DeleteChild(CkMyNode());
 	}else{*/
+                CProxy_CkNodeReductionMgr thisProxy(thisgroup);
 		if(readyDeletion){
 			thisProxy[treeParent()].DeleteChild(CkMyNode());
 		}else{

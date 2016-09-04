@@ -102,6 +102,7 @@ PUPbytes(CkLBOptions)
 extern CkGroupID _lbdb;
 
 class LBDB;
+class BaseLB;
 
 CkpvExtern(int, numLoadBalancers);
 CkpvExtern(bool, hasNullLB);

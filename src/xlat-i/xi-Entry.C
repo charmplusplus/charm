@@ -207,13 +207,21 @@ void Entry::preprocessSDAG()
 
 // "parameterType *msg" or "void".
 // Suitable for use as the only parameter
-XStr Entry::paramType(int withDefaultVals,int withEO,int useConst)
+XStr Entry::paramType(int withDefaultVals,int withEO,int useConst, bool rdmaPost)
 {
   XStr str;
-  param->print(str,withDefaultVals,useConst);
+  param->print(str,withDefaultVals,useConst,rdmaPost);
   if (withEO) str<<eo(withDefaultVals,!param->isVoid());
+  if (rdmaPost) str<<rdmaPostHandle();
   return str;
 }
+
+XStr Entry::rdmaPostHandle() {
+  XStr str;
+  str<< ", " << "CkRdmaPostHandle *rdma_post_handle";
+  return str;
+}
+
 
 // "parameterType *msg," if there is a non-void parameter,
 // else empty.  Suitable for use with another parameter following.
@@ -262,11 +270,15 @@ XStr Entry::marshallMsg(void)
   return ret;
 }
 
-XStr Entry::epStr(bool isForRedn, bool templateCall)
+XStr Entry::epStr(int forwhom, bool templateCall)
 {
   XStr str;
-  if (isForRedn)
+  if (forwhom == 1) //for reduction
     str<<"redn_wrapper_";
+
+  if (forwhom == 2) //for rdma
+    str<<"rdma_wrapper_";
+
   str << name << "_";
 
   if (param->isMessage()) {
@@ -287,7 +299,7 @@ XStr Entry::epStr(bool isForRedn, bool templateCall)
   return str;
 }
 
-XStr Entry::epIdx(int fromProxy, bool isForRedn)
+XStr Entry::epIdx(int fromProxy, int forwhom)
 {
   XStr str;
   if (fromProxy) {
@@ -296,16 +308,16 @@ XStr Entry::epIdx(int fromProxy, bool isForRedn)
     if (tspec)
       str << "template ";
   }
-  str << "idx_" << epStr(isForRedn, true) << "()";
+  str << "idx_" << epStr(forwhom, true) << "()";
   return str;
 }
 
-XStr Entry::epRegFn(int fromProxy, bool isForRedn)
+XStr Entry::epRegFn(int fromProxy, int forwhom)
 {
   XStr str;
   if (fromProxy)
     str << indexName() << "::";
-  str << "reg_" << epStr(isForRedn, true) << "()";
+  str << "reg_" << epStr(forwhom, true) << "()";
   return str;
 }
 
@@ -366,7 +378,11 @@ void Entry::genChareDefs(XStr& str)
   if(isConstructor()) {
     genChareStaticConstructorDefs(str);
   } else {
-    XStr params; params<<epIdx()<<", impl_msg, &ckGetChareID()";
+    int fromproxy = 1;//default
+    int forwhom = 0;  //default
+    if(hasRdma())
+      forwhom = 2;
+    XStr params; params<<epIdx(fromproxy, forwhom)<<", impl_msg, &ckGetChareID()";
     // entry method definition
     XStr retStr; retStr<<retType;
     str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<")\n";
@@ -556,14 +572,23 @@ void Entry::genArrayDefs(XStr& str)
         if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
         if (isInline())  opts << "+CK_MSG_INLINE";
         if(!isIget()) {
-        if (container->isForElement() || container->isForSection()) {
-          if(param->hasRdma()){
+          XStr epidx;
+          if(hasRdma()){
             opts << "+CK_MSG_RDMA";
+            str << "#if CMK_ONESIDED_IMPL\n";
+            if (container->isForElement() || container->isForSection()) {
+              str << "  ckSend(impl_amsg, "<<epIdx(1, 2)<<opts<<");\n";
+            }
+            str << "#else\n";
           }
-          str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
-        }
-        else
-          str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";
+          if (container->isForElement() || container->isForSection()) {
+            str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
+          }
+          else
+            str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";
+          if(hasRdma()){
+            str <<"#endif\n";
+          }
         }
       }
       if(isIget()) {
@@ -719,9 +744,15 @@ void Entry::genGroupDefs(XStr& str)
     genGroupStaticConstructorDefs(str);
   } else {
     int forElement=container->isForElement();
-    XStr params; params<<epIdx()<<", impl_msg";
-    XStr paramg; paramg<<epIdx()<<", impl_msg, ckGetGroupID()";
-    XStr parampg; parampg<<epIdx()<<", impl_msg, ckGetGroupPe(), ckGetGroupID()";
+   
+    int fromproxy = 1;//default
+    int forwhom = 0;  //default
+    if(hasRdma())
+      forwhom = 2;
+
+    XStr params; params<<epIdx(fromproxy, forwhom)<<", impl_msg";
+    XStr paramg; paramg<<epIdx(fromproxy, forwhom)<<", impl_msg, ckGetGroupID()";
+    XStr parampg; parampg<<epIdx(fromproxy, forwhom)<<", impl_msg, ckGetGroupPe(), ckGetGroupID()";
     // append options parameter
     XStr opts; opts<<",0";
     if (isImmediate()) opts << "+CK_MSG_IMMEDIATE";
@@ -1847,19 +1878,38 @@ void Entry::genIndexDecls(XStr& str)
   if (isReductionTarget()) {
       str << "\n    // Entry point registration at startup"
           << templateSpecLine
-          << "\n    static int reg_"<< epStr(true) <<"();" ///< @note: Should this be generated as private?
+          << "\n    static int reg_"<< epStr(1) <<"();" ///< @note: Should this be generated as private?
           << "\n    // Entry point index lookup"
           << templateSpecLine
-          << "\n    inline static int idx_" << epStr(true) << "() {"
-          << "\n      static int epidx = "<< epRegFn(0, true) <<";"
+          << "\n    inline static int idx_" << epStr(1) << "() {"
+          << "\n      static int epidx = "<< epRegFn(0, 1) <<";"
           << "\n      return epidx;"
           << "\n    }"
           << templateSpecLine
           << "\n    static int " << "redn_wrapper_" << name
-          << "(CkReductionMsg* impl_msg) { return " << epIdx(0, true) << "; }"
+          << "(CkReductionMsg* impl_msg) { return " << epIdx(0, 1) << "; }"
           << templateSpecLine
-          << "\n    static void _call_" << epStr(true) << "(void* impl_msg, void* impl_obj_void);";
+          << "\n    static void _call_" << epStr(1) << "(void* impl_msg, void* impl_obj_void);";
   }
+
+  if (hasRdma()) {
+      str << "\n    // Entry point registration at startup"
+          << templateSpecLine
+          << "\n    static int reg_"<< epStr(2) <<"();" ///< @note: Should this be generated as private?
+          << "\n    // Entry point index lookup"
+          << templateSpecLine
+          << "\n    inline static int idx_" << epStr(2) << "() {"
+          << "\n      static int epidx = "<< epRegFn(0, 2) <<";"
+          << "\n      return epidx;"
+          << "\n    }"
+          << templateSpecLine
+          << "\n    static int " << "rdma_wrapper_" << name
+          << "(CkMarshallMsg* impl_msg) { return " << epIdx(0, 2) << "; }"
+          << templateSpecLine
+          << "\n    static void _call_" << epStr(2) << "(void* impl_msg, void* impl_obj_void);\n";
+  }
+
+
 
   // call function declaration
   str << templateSpecLine
@@ -2120,7 +2170,7 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   Generate the code to actually unmarshall the parameters and call
   the entry method.
 */
-void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool usesImplBuf)
+void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool usesImplBuf, bool rdma_wrapper)
 {
   bool isArgcArgv=false;
   bool isMigMain=false;
@@ -2134,6 +2184,7 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
   } else {
     //Normal case: Unmarshall variables
     if (redn_wrapper) param->beginRednWrapperUnmarshall(str, needsClosure);
+    else if(rdma_wrapper) param->beginRdmaWrapperUnmarshall(str);
     else {
       if (isSDAGGen)
         param->beginUnmarshallSDAGCall(str, usesImplBuf);
@@ -2208,7 +2259,10 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
     } else if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
       str << "  new (impl_obj_void) "<<container->baseName();
     } else {//Regular entry method: call "obj->bar(parameters)"
-      str << "  impl_obj->" << (tspec ? "template " : "") << name;
+      str << "  impl_obj->" << (tspec ? "template " : "");
+      if(rdma_wrapper)
+         str<<"RdmaPost_";
+      str << name;
       if (tspec) {
         str << "< ";
         tspec->genShort(str);
@@ -2235,7 +2289,12 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
           str << "  genClosure->deref();\n";
         }
       } else {
-        str<<"("; param->unmarshall(str); str<<");\n";
+        str<<"("; 
+        if(rdma_wrapper)
+          param->unmarshall(str, 1, 2);
+        else
+          param->unmarshall(str); 
+        str<<");\n";
       }
     }
   }
@@ -2249,7 +2308,7 @@ void Entry::genDefs(XStr& str)
   XStr preMarshall,preCall,postCall;
 
   templateGuardBegin(tspec || container->isTemplated(), str);
-  str << "/* DEFS: "; print(str); str << " */\n";
+  str << "/* DEFS: "; print(str); str << "*/\n";
 
   if(isMigrationConstructor())
     {} //User cannot call the migration constructor
@@ -2268,7 +2327,7 @@ void Entry::genDefs(XStr& str)
           XStr retStr; retStr<<retType;
           str << makeDecl(retStr);
           //str << retType << " " << indexName(); //makeDecl(retStr, 1)
-          str << "::_call_" << epStr(true) << "(void* impl_msg, void* impl_obj_void)"
+          str << "::_call_" << epStr(1) << "(void* impl_msg, void* impl_obj_void)"
               << "\n{"
               << "\n  " << container->baseName() << "* impl_obj = static_cast<"
               << container->baseName() << "*> (impl_obj_void);\n"
@@ -2278,6 +2337,32 @@ void Entry::genDefs(XStr& str)
           if (!(sdagCon || isWhenEntry))
             str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
           else
+            str << "  \n}\n\n";
+      }
+      if (hasRdma()) {
+          XStr retStr; retStr<<retType;
+          str << makeDecl(retStr);
+          //str << retType << " " << indexName(); //makeDecl(retStr, 1)
+          str << "::_call_" << epStr(2) << "(void* impl_msg, void* impl_obj_void)"
+              << "\n{"
+              << "\n  " << container->baseName() << "* impl_obj = static_cast<"
+              << container->baseName() << "*> (impl_obj_void);\n"
+              << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n"
+              << "  envelope *impl_env = UsrToEnv(impl_msg_typed);\n"
+              << "  impl_env->setEpIdx("<< epIdx() <<");\n\n"
+              << "  if(!impl_env->isRdma())\n"
+              << "   return  _call_" << epStr(0) << "(impl_msg, impl_obj_void);\n\n"
+              //<< "  if(has_member_Rdmapost_"<<name<<"<"<<container->baseName()<<">::value == 0){\n"
+              //<< "     return CkRdmaIssueRgets(impl_env, false);\n"
+              //<< "  }\n\n"
+              << "  char *impl_buf=impl_msg_typed->msgBuf;\n"
+              << "  CkRdmaPostHandle *rdma_post_handle = CkGetRdmaPostHandle(impl_env);\n"
+              << "  CkRdmaPostStruct *rdma_post_structs = rdma_post_handle->structs;\n";
+          XStr precall;
+          genCall(str, precall, false, false, true);
+          //if (!(sdagCon || isWhenEntry))
+          //  str << "  delete (CkMarshallMsg*)impl_msg;\n}\n\n";
+          //else
             str << "  \n}\n\n";
       }
   }
@@ -2295,10 +2380,10 @@ void Entry::genDefs(XStr& str)
       << "\n  int epidx = " << genRegEp() << ";";
   if (hasCallMarshall)
     str << "\n  CkRegisterMarshallUnpackFn(epidx, "
-        << "_callmarshall_" << epStr(false, true) << ");";
+        << "_callmarshall_" << epStr(0, true) << ");";
   if (param->isMarshalled()) {
     str << "\n  CkRegisterMessagePupFn(epidx, "
-        << "_marshallmessagepup_" << epStr(false, true) << ");\n";
+        << "_marshallmessagepup_" << epStr(0, true) << ");\n";
   }
   else if (param->isMessage() && !isMigrationConstructor()) {
     str << "\n  CkRegisterMessagePupFn(epidx, (CkMessagePupFn)";
@@ -2311,8 +2396,15 @@ void Entry::genDefs(XStr& str)
   if (isReductionTarget())
   {
     str << "\n// Redn wrapper registration function"
-        << "\n" << makeDecl("int") << "::reg_"<< epStr(true) <<"() {"
-        << "\n  return " << genRegEp(true) << ";"
+        << "\n" << makeDecl("int") << "::reg_"<< epStr(1) <<"() {"
+        << "\n  return " << genRegEp(1) << ";"
+        << "\n}\n\n";
+  }
+  if (hasRdma())
+  {
+    str << "\n// Rdma wrapper registration function"
+        << "\n" << makeDecl("int") << "::reg_"<< epStr(2) <<"() {"
+        << "\n  return " << genRegEp(2) << ";"
         << "\n}\n\n";
   }
 
@@ -2499,15 +2591,17 @@ void Entry::genDefs(XStr& str)
   templateGuardEnd(str);
 }
 
-XStr Entry::genRegEp(bool isForRedn)
+XStr Entry::genRegEp(int forwhom)
 {
   XStr str;
   str << "CkRegisterEp(\"";
-  if (isForRedn)
+  if (forwhom == 1) //for reduction
       str << "redn_wrapper_" << name << "(CkReductionMsg *impl_msg)\",\n";
+  else if (forwhom == 2) //for rdma
+      str << "rdma_wrapper_" << name << "(CkMarshallMsg *impl_msg)\",\n";
   else
       str << name << "("<<paramType(0)<<")\",\n";
-  str << "      _call_" << epStr(isForRedn, true);
+  str << "      _call_" << epStr(forwhom, true);
   str << ", ";
   /* messageIdx: */
   if (param->isMarshalled()) {
@@ -2516,7 +2610,7 @@ XStr Entry::genRegEp(bool isForRedn)
   } else if(!param->isVoid() && !isMigrationConstructor()) {
     param->genMsgProxyName(str);
     str <<"::__idx";
-  } else if (isForRedn) {
+  } else if (forwhom == 1) {
     str << "CMessage_CkReductionMsg::__idx";
   } else {
     str << "0";
@@ -2529,7 +2623,7 @@ XStr Entry::genRegEp(bool isForRedn)
   // parameter marshalled (and hence flagged as nokeep), but we'll delete the
   // CkReductionMsg in generated code, not runtime code. (so that we can cast
   // it to CkReductionMsg not CkMarshallMsg)
-  if ( !isForRedn && (attribs & SNOKEEP) ) str << "+CK_EP_NOKEEP";
+  if ( forwhom==0 && (attribs & SNOKEEP) ) str << "+CK_EP_NOKEEP";
   if (attribs & SNOTRACE) str << "+CK_EP_TRACEDISABLE";
   if (attribs & SIMMEDIATE) str << "+CK_EP_TRACEDISABLE";
   if (attribs & SAPPWORK) str << "+CK_EP_APPWORK";
@@ -2559,7 +2653,9 @@ void Entry::genReg(XStr& str)
   str << "  // REG: "<<*this;
   str << "  " << epIdx(0) << ";\n";
   if (isReductionTarget())
-    str << "  " << epIdx(0, true) << ";\n";
+    str << "  " << epIdx(0, 1) << ";\n";
+  if (hasRdma())
+    str << "  " << epIdx(0, 2) << ";\n";
   if (isConstructor()) {
     if(container->isMainChare() && !isMigrationConstructor())
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
@@ -2567,6 +2663,17 @@ void Entry::genReg(XStr& str)
       str << "  CkRegisterDefaultCtor(__idx, "<<epIdx(0)<<");\n";
     if(isMigrationConstructor())
       str << "  CkRegisterMigCtor(__idx, "<<epIdx(0)<<");\n";
+  }
+}
+
+void Entry::genRdmaDefs(XStr& str)
+{
+  if (hasRdma()){
+    str << "    " << generateTemplateSpec(tspec) << "\n"
+        << "    " << retType << " " << "RdmaPost_" << name << "(" << paramType(1,0,0,true) << "){\n";
+    str << "    " << "    " << "CkRdmaIssueRgets(UsrToEnv(rdma_post_handle->msg), false);\n";
+    str << "    " << "    " << "free(rdma_post_handle);\n";
+    str << "    " << "}\n";
   }
 }
 
@@ -2672,12 +2779,15 @@ int Entry::isAppWork(void) { return (attribs & SAPPWORK); }
 int Entry::isNoKeep(void) { return (attribs & SNOKEEP); }
 int Entry::isSdag(void) { return (sdagCon!=0); }
 bool Entry::isTramTarget(void) { return (attribs & SAGGREGATE) != 0; }
+int Entry::isEntryMethod(void) { return 1; }
 
 // DMK - Accel support
 int Entry::isAccel(void) { return (attribs & SACCEL); }
 
 int Entry::isMemCritical(void) { return (attribs & SMEM); }
 int Entry::isReductionTarget(void) { return (attribs & SREDUCE); }
+int Entry::hasRdma(void) { return (param->hasRdma()); }
+
 
 char *Entry::getEntryName() { return name; }
 int Entry::getLine() { return line; }

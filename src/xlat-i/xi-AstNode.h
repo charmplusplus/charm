@@ -20,6 +20,7 @@ class AstNode : public Printable {
   virtual void genClosureEntryDecls(XStr& str) { }
   virtual void genClosureEntryDefs(XStr& str) { }
   virtual void genReg(XStr& str) { (void)str; }
+  virtual void genRdmaDefs(XStr& str) { (void)str; }
   virtual void genGlobalCode(XStr scope, XStr &decls, XStr &defs)
   { (void)scope; (void)decls; (void)defs; }
   virtual void preprocess() { }
@@ -76,6 +77,7 @@ class AstChildren : public virtual AstNode {
   void genDecls(XStr& str);
   void genDefs(XStr& str);
   void genReg(XStr& str);
+  void genRdmaDefs(XStr& str);
   void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
 
   bool isTramTarget();
@@ -320,6 +322,12 @@ template <typename Child>
 void AstChildren<Child>::genReg(XStr& str)
 {
   details::perElemGen(children, str, &Child::genReg, details::newLine);
+}
+
+template <typename Child>
+void AstChildren<Child>::genRdmaDefs(XStr& str)
+{
+  details::perElemGen(children, str, &Child::genRdmaDefs);
 }
 
 template <typename Child>

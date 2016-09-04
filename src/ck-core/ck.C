@@ -1183,25 +1183,6 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 
   MESSAGE_PHASE_CHECK(env);
 
-#if CMK_ONESIDED_IMPL
-  if(env->isRdma()){
-    //Receiver copies the buffer from the sender when they share
-    //the address space
-    if(CmiNodeOf(env->getSrcPe())==CmiMyNode()){
-      envelope *prevEnv = env;
-      env = CkRdmaCopyMsg(prevEnv);
-      CkFreeMsg(EnvToUsr(prevEnv));
-    }
-    //Receiver issues Rdma Get calls to fetch data over network
-    else{
-      CkRdmaIssueRgets(env);
-      //return because the new message with the rdma buffer is again passed
-      //to the process handler after the Rdma Get call completion
-      return;
-    }
-  }
-#endif
-
 //#if CMK_RECORD_REPLAY
   if (ck->watcher!=NULL) {
     if (!ck->watcher->processMessage(&env,ck)) return;

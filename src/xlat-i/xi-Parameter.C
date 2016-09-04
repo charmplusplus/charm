@@ -90,12 +90,12 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 
 ParamList::ParamList(ParamList *pl) : manyPointers(false), param(pl->param), next(pl->next) {}
 
-void ParamList::print(XStr &str,int withDefaultValues,int useConst)
+void ParamList::print(XStr &str,int withDefaultValues,int useConst, bool rdmaPost)
 {
-    	param->print(str,withDefaultValues,useConst);
+    	param->print(str,withDefaultValues,useConst, rdmaPost);
     	if (next) {
     		str<<", ";
-    		next->print(str,withDefaultValues,useConst);
+    		next->print(str,withDefaultValues,useConst, rdmaPost);
     	}
 }
 
@@ -110,10 +110,13 @@ void ParamList::printTypes(XStr &str,int withDefaultValues,int useConst)
     }
 }
 
-void Parameter::print(XStr &str,int withDefaultValues,int useConst)
+void Parameter::print(XStr &str,int withDefaultValues,int useConst, bool rdmaPost)
 {
 	if(isRdma()){
-		str<<"CkRdmaWrapper rdmawrapper_"<<name;
+		if(rdmaPost)
+			str<<"CkRdmaPostStruct *rdma_post_struct_"<<name;
+		else
+			str<<"CkRdmaWrapper rdmawrapper_"<<name;
 	}
 	else if (arrLen!=NULL)
 	{ //Passing arrays by const pointer-reference
@@ -198,11 +201,11 @@ void ParamList::callEach(fn_t f,XStr &str)
 	} while (NULL!=(cur=cur->next));
 }
 
-void ParamList::callEach(rdmafn_t f,XStr &str,bool isArray)
+void ParamList::callEach(rdmafn_t f,XStr &str, int opts)
 {
 	ParamList *cur=this;
 	do {
-		((cur->param)->*f)(str,isArray);
+		((cur->param)->*f)(str,opts);
 	} while (NULL!=(cur=cur->next));
 }
 
@@ -229,11 +232,11 @@ void ParamList::marshall(XStr &str, XStr &entry)
 		if(hasrdma){
 		  str<<"#if CMK_ONESIDED_IMPL\n";
 		  str<<"  int impl_num_rdma_fields = 0; \n";
-		  callEach(&Parameter::marshallRdmaParameters,str,true);
+		  callEach(&Parameter::marshallRdmaParameters,str,0);
 		  str<<"#else\n";
 		  if(!hasArrays)
 		    str<<"  int impl_arrstart=0;\n";
-		  callEach(&Parameter::marshallRdmaParameters,str,false);
+		  callEach(&Parameter::marshallRdmaParameters,str,1);
 		  str<<"#endif\n";
 		}
 		str<<"  { //Find the size of the PUP'd data\n";
@@ -243,9 +246,9 @@ void ParamList::marshall(XStr &str, XStr &entry)
 		  str<<"#if CMK_ONESIDED_IMPL\n";
 		  str<<"    implP|impl_num_rdma_fields;\n";
 		  //All rdma parameters have to be pupped at the start
-		  callEach(&Parameter::pupRdma,str,true);
+		  callEach(&Parameter::pupRdma,str,0);
 		  str<<"#else\n";
-		  callEach(&Parameter::pupRdma,str,false);
+		  callEach(&Parameter::pupRdma,str,1);
 		  if(!hasArrays){
 		    str<<"    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
 		    str<<"    impl_off+=impl_arrstart;\n";
@@ -269,9 +272,9 @@ void ParamList::marshall(XStr &str, XStr &entry)
 		if(hasRdma()){
 		  str<<"#if CMK_ONESIDED_IMPL\n";
 		  str<<"    implP|impl_num_rdma_fields;\n";
-		  callEach(&Parameter::pupRdma,str,true);
+		  callEach(&Parameter::pupRdma,str,0);
 		  str<<"#else\n";
-		  callEach(&Parameter::pupRdma,str,false);
+		  callEach(&Parameter::pupRdma,str,1);
 		  str<<"#endif\n";
 		}
 		callEach(&Parameter::pup,str);
@@ -321,25 +324,26 @@ void Parameter::marshallRegArraySizes(XStr &str)
 		marshallArraySizes(str,dt);
 }
 
-void Parameter::marshallRdmaParameters(XStr &str, bool genRdma){
+void Parameter::marshallRdmaParameters(XStr &str, int opts){
 	if(isRdma()){
 		Type *dt=type->deref();//Type, without &
-		if(genRdma){
+		if(opts==0){
 			str<<"  impl_num_rdma_fields++;\n";
 			str<<"  rdmawrapper_"<<name<<".cnt=sizeof("<<dt<<")*("<<arrLen<<");\n";
 		}
-		else{
+		else{ //genRegArray
+			checkPointer(dt);
 			marshallArraySizes(str,dt);
 		}
 	}
 }
 
 
-void Parameter::pupRdma(XStr &str, bool genRdma) {
+void Parameter::pupRdma(XStr &str, int regArray) {
 	if(isRdma()){
-		if(genRdma)
+		if(!regArray)
 			str<<"    implP|rdmawrapper_"<<name<<";\n";
-		else
+		else //genRegArray
 			pupArray(str);
 	}
 }
@@ -441,9 +445,9 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
                    str<<"#if CMK_ONESIDED_IMPL\n";
                    str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
                    str<<"  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
-                   callEach(&Parameter::beginUnmarshallRdma,str,true);
+                   callEach(&Parameter::beginUnmarshallRdma,str,0);
                    str<<"#else\n";
-                   callEach(&Parameter::beginUnmarshallRdma,str,false);
+                   callEach(&Parameter::beginUnmarshallRdma,str,1);
                    str<<"#endif\n";
                  }
                  callEach(&Parameter::beginUnmarshall,str);
@@ -452,9 +456,9 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
                  if(hasRdma()) {
                    str<<"#if CMK_ONESIDED_IMPL\n";
                    str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
-                   callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,true);
+                   callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,0);
                    str<<"#else\n";
-                   callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,false);
+                   callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,1);
                    str<<"#endif\n";
                  }
                  callEach(&Parameter::beginUnmarshallSDAGCall,str);
@@ -476,9 +480,9 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
                 str<<"#if CMK_ONESIDED_IMPL\n";
                 str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
                 str<<"  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
-                callEach(&Parameter::beginUnmarshallRdma,str,true);
+                callEach(&Parameter::beginUnmarshallRdma,str,0);
                 str<<"#else\n";
-                callEach(&Parameter::beginUnmarshallRdma,str,false);
+                callEach(&Parameter::beginUnmarshallRdma,str,1);
                 str<<"#endif\n";
 	      }
               callEach(&Parameter::beginUnmarshall,str);
@@ -498,6 +502,26 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
   }
 }
 
+
+
+void ParamList::beginRdmaWrapperUnmarshall(XStr &str)
+{
+    if (isMarshalled())
+    {
+        str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<" Ma chamunda */\n";
+        str<<"  PUP::fromMem implP(impl_buf);\n";
+        if(hasRdma()){
+            str<<"  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
+            callEach(&Parameter::beginUnmarshallRdma,str,2);
+        }
+        callEach(&Parameter::beginUnmarshall,str);
+        str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+        str<<"  /*Unmarshall arrays:*/\n";
+        callEach(&Parameter::unmarshallRegArrayData,str);
+    }
+}
+
+
 /** unmarshalling: unpack fields from flat buffer **/
 void ParamList::beginUnmarshall(XStr &str)
 {
@@ -509,9 +533,9 @@ void ParamList::beginUnmarshall(XStr &str)
             str<<"#if CMK_ONESIDED_IMPL\n";
             str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
             str<<"  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
-            callEach(&Parameter::beginUnmarshallRdma,str,true);
+            callEach(&Parameter::beginUnmarshallRdma,str,0);
             str<<"#else\n";
-            callEach(&Parameter::beginUnmarshallRdma,str,false);
+            callEach(&Parameter::beginUnmarshallRdma,str,1);
             str<<"#endif\n";
         }
 	callEach(&Parameter::beginUnmarshall,str);
@@ -520,7 +544,7 @@ void ParamList::beginUnmarshall(XStr &str)
         callEach(&Parameter::unmarshallRegArrayData,str);
         if(hasRdma()){
           str<<"#if !CMK_ONESIDED_IMPL\n";
-          callEach(&Parameter::unmarshallRdmaArrayData,str,true);
+          callEach(&Parameter::unmarshallRdmaArrayData,str,1);
           str<<"#endif\n";
         }
     }
@@ -532,16 +556,23 @@ void Parameter::beginUnmarshallArray(XStr &str){
 	str<<"  implP|impl_cnt_"<<name<<";\n";
 }
 
-void Parameter::beginUnmarshallRdma(XStr &str, bool genRdma)
+void Parameter::beginUnmarshallRdma(XStr &str, int opts)
 { //First pass: unpack pup'd entries
 	Type *dt=type->deref();//Type, without &
 	if(isRdma()){
-		if(genRdma){
+		if(opts==0){
 			str<<"  CkRdmaWrapper rdmawrapper_"<<name<<";\n";
 			str<<"  implP|rdmawrapper_"<<name<<";\n";
 		}
-		else
+		else if(opts==1){//genRegArray
 			beginUnmarshallArray(str);
+                }
+                else if(opts==2){//RdmaPost
+			str<<"  CkRdmaWrapper rdmawrapper_"<<name<<";\n";
+			str<<"  implP|rdmawrapper_"<<name<<";\n";
+ 			str<<"  CkRdmaPostStruct *rdma_post_struct_"<<name<<" = rdma_post_structs;\n"; 
+ 			str<<"  rdma_post_structs++;\n"; 
+                }
 	}
 }
 
@@ -557,9 +588,9 @@ void Parameter::beginUnmarshall(XStr &str)
 	        str<<"  "<<dt<<" "<<name<<"; implP|"<<name<<";\n";
 }
 
-void Parameter::beginUnmarshallSDAGCallRdma(XStr &str, bool genRdma) {
+void Parameter::beginUnmarshallSDAGCallRdma(XStr &str, int opts) {
   if(isRdma()) {
-    if(genRdma) {
+    if(opts == 0) {
       if(isFirstRdma()) {
         str << "  implP|genClosure->num_rdma_fields;\n";
       }
@@ -598,9 +629,9 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
     if(hasRdma()) {
       str<<"#if CMK_ONESIDED_IMPL\n";
       str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
-      callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,true);
+      callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,0);
       str<<"#else\n";
-      callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,false);
+      callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,1);
       str<<"#endif\n";
     }
     callEach(&Parameter::beginUnmarshallSDAGCall, str);
@@ -640,9 +671,9 @@ void ParamList::beginUnmarshallSDAG(XStr &str) {
        */
       callEach(&Parameter::adjustUnmarshalledRdmaPtrsSDAG,str);
       str<<"  implP|num_rdma_fields;\n";
-      callEach(&Parameter::beginUnmarshallRdma,str,true);
+      callEach(&Parameter::beginUnmarshallRdma,str,0);
       str<<"#else\n";
-      callEach(&Parameter::beginUnmarshallRdma,str,false);
+      callEach(&Parameter::beginUnmarshallRdma,str,1);
       str<<"#endif\n";
     }
     callEach(&Parameter::beginUnmarshall,str);
@@ -708,9 +739,9 @@ void Parameter::unmarshallArrayData(XStr &str)
 	str<<"  "<<dt<<" *"<<name<<"=("<<dt<<" *)(impl_buf+impl_off_"<<name<<");\n";
 }
 
-void Parameter::unmarshallRdmaArrayData(XStr &str, bool genRegArray)
+void Parameter::unmarshallRdmaArrayData(XStr &str, int opts)
 {
-	if(isRdma() && genRegArray)
+	if(isRdma() && opts==1)
 		unmarshallArrayData(str);
 }
 
@@ -720,25 +751,43 @@ void Parameter::unmarshallRegArrayData(XStr &str)
 		unmarshallArrayData(str);
 }
 
-void ParamList::unmarshall(XStr &str, int isFirst)  //Pass-by-value
+void ParamList::unmarshall(XStr &str, int isFirst, int opts)  //Pass-by-value
 {
+        const int _generic_case_ = 0;
+        const int _use_rdma_ = 1;
+        const int _rdma_post_ = 2;
+
 	if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
 	else if (!isVoid()) {
+          if(isFirst && hasRdma() && opts==_generic_case_){
+	    str<<"\n#if !CMK_ONESIDED_IMPL\n        ";
+          }
 	  if(param->isRdma()){
-	    str<<"\n#if CMK_ONESIDED_IMPL\n";
-	    str<<"("<<(param->getType())->deref()<<" *)";
-	    str<<"rdmawrapper_"<<param->getName()<<".ptr";
-	    str<<"\n#else\n";
-	    str<<param->getName();
-	    str<<"\n#endif\n";
+            if(opts==_use_rdma_){
+              str<<"("<<(param->getType())->deref()<<" *)";
+	      str<<"rdmawrapper_"<<param->getName()<<".ptr";
+	    }
+            else if(opts==_rdma_post_){
+              str<<"rdma_post_struct_"<<param->getName();
+            }
+            else
+              str<<param->getName();
 	  }
 	  else{
 	    str<<param->getName();
 	  }
 	  if (next) {
 	    str<<", ";
-	    next->unmarshall(str, 0);
+	    next->unmarshall(str, 0, opts);
 	  }
+          if(isFirst && hasRdma() && opts==_generic_case_){
+	    str<<"\n#else\n        ";
+            unmarshall(str, isFirst, _use_rdma_);
+            str<<"\n#endif\n";
+          }
+          if(isFirst && hasRdma() && opts==_rdma_post_){
+            str<<", rdma_post_handle";
+          } 
 	}
 }
 

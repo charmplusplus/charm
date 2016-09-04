@@ -224,7 +224,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	sockRoutines.h sockRoutines.c cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
 	crc32.h ckBIconfig.h rand48_replacement.h 
 
-CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
+CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h Chare.h  CkReductionMgr.h CkGroupInitCallback.h IrrGroup.h Group.h CkNodeReductionMgr.h NodeGroup.h CkMap.h\
 	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \

@@ -1,4 +1,7 @@
 module CkReduction {
+
+  include "Group.h";
+  include "NodeGroup.h";
   
 //Group object creation support:
   message CkGroupCallbackMsg;

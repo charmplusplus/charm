@@ -24,7 +24,7 @@ public:
     delete m;
     size = 1024;
     mainProxy = thisProxy;
-    CkPrintf("Size (bytes) \t\tIterations\t\tRegular API (one-way us)\tZero Copy API (one-way us)\n");
+    CkPrintf("Size\t\tIterations\tRegSend\t\tZCopySend\tRegSendRegRecv\tZCopySendRegRecv\tZCopySendZCopyRecv\n");
     arr1 = CProxy_Ping1::ckNew(2);
     CkStartQD(CkCallback(CkIndex_main::maindone(), mainProxy));
   };
@@ -46,13 +46,17 @@ class Ping1 : public CBase_Ping1
   int size;
   int niter;
   int iterations;
-  double start_time, end_time, reg_time, zerocpy_time;
+  double start_time, end_time, reg_time1, reg_time2, zcpy_time1, zcpy_time2, zcpy_time3;
   char *nocopyMsg;
+
+  // other application buffer where the msg is actually expected
+  char *otherMsg;
 
 public:
   Ping1()
   {
     nocopyMsg = new char[MAX_PAYLOAD];
+    otherMsg = new char[MAX_PAYLOAD];
     niter = 0;
   }
   Ping1(CkMigrateMessage *m) {}
@@ -65,7 +69,7 @@ public:
     else
       iterations = BIG_ITER;
     start_time = CkWallTimer();
-    thisProxy[1].recv(nocopyMsg, size);
+    thisProxy[1].recv_regSend(nocopyMsg, size);
   }
 
   void freeBuffer(){
@@ -78,42 +82,108 @@ public:
     }
   }
 
-  void recv(char* msg, int size)
+  void recv_regSend(char* msg, int size)
   {
     if(thisIndex==0) {
       niter++;
       if(niter==iterations) {
         end_time = CkWallTimer();
-        reg_time = 1.0e6*(end_time-start_time)/iterations;
+        reg_time1 = 1.0e6*(end_time-start_time)/iterations;
         niter = 0;
         start_time = CkWallTimer();
-        thisProxy[1].recv_zerocopy(CkSendBuffer(nocopyMsg), size);
+        thisProxy[1].recv_zcpySend(CkSendBuffer(nocopyMsg), size);
       } else {
-        thisProxy[1].recv(nocopyMsg, size);
+        thisProxy[1].recv_regSend(nocopyMsg, size);
       }
     } else {
-      thisProxy[0].recv(nocopyMsg, size);
+      thisProxy[0].recv_regSend(nocopyMsg, size);
     }
   }
 
-  void recv_zerocopy(char* msg, int size)
+  void recv_zcpySend(char* msg, int size)
   {
     if(thisIndex==0) {
       niter++;
       if(niter==iterations) {
         end_time = CkWallTimer();
-        zerocpy_time = 1.0e6*(end_time-start_time)/iterations;
-        if(size < 1 << 24)
-          CkPrintf("%d\t\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time/2, zerocpy_time/2);
-        else //using different print format for larger numbers for aligned output
-          CkPrintf("%d\t\t%d\t\t\t%lf\t\t\t%lf\n", size, iterations, reg_time/2, zerocpy_time/2);
+        zcpy_time1 = 1.0e6*(end_time-start_time)/iterations;
         niter=0;
-        mainProxy.maindone();
+        start_time = CkWallTimer();
+        thisProxy[1].recv_regSend_regRecv(nocopyMsg, size);
       } else {
-        thisProxy[1].recv_zerocopy(CkSendBuffer(nocopyMsg), size);
+        thisProxy[1].recv_zcpySend(CkSendBuffer(nocopyMsg), size);
       }
     } else {
-      thisProxy[0].recv_zerocopy(CkSendBuffer(nocopyMsg), size);
+      thisProxy[0].recv_zcpySend(CkSendBuffer(nocopyMsg), size);
+    }
+  }
+
+  void recv_regSend_regRecv(char *msg, int size)
+  {
+    //copy into the user's buffer
+    memcpy(otherMsg, msg, size);
+
+    if(thisIndex==0) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        reg_time2 = 1.0e6*(end_time-start_time)/iterations;
+        niter=0;
+        start_time = CkWallTimer();
+        thisProxy[1].recv_zcpySend_regRecv(CkSendBuffer(nocopyMsg), size);
+      } else {
+        thisProxy[1].recv_regSend_regRecv(nocopyMsg, size);
+      }
+    } else {
+      thisProxy[0].recv_regSend_regRecv(nocopyMsg, size);
+    }
+  }
+
+  void recv_zcpySend_regRecv(char *msg, int size)
+  {
+    //copy into the user's buffer
+    memcpy(otherMsg, msg, size);
+
+    if(thisIndex==0) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        zcpy_time2 = 1.0e6*(end_time-start_time)/iterations;
+        niter=0;
+        start_time = CkWallTimer();
+        thisProxy[1].recv_zcpySend_zcpyRecv(CkSendBuffer(nocopyMsg), size);
+      } else {
+        thisProxy[1].recv_zcpySend_regRecv(CkSendBuffer(nocopyMsg), size);
+      }
+    } else {
+      thisProxy[0].recv_zcpySend_regRecv(CkSendBuffer(nocopyMsg), size);
+    }
+  }
+
+  void RdmaPost_recv_zcpySend_zcpyRecv(CkRdmaPostStruct *postStruct, int size, CkRdmaPostHandle *handle) {
+    postStruct->ptr = otherMsg;
+    CkRdmaPost(handle);
+  }
+
+  void recv_zcpySend_zcpyRecv(char *msg, int size)
+  {
+    // message already present in otherMsg because of zcpyRecv
+    if(thisIndex==0) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        zcpy_time3 = 1.0e6*(end_time-start_time)/iterations;
+        niter=0;
+        if(size < 1 << 24)
+          CkPrintf("%d\t\t%d\t\t%lf\t%lf\t%lf\t%lf\t\t%lf\n", size, iterations, reg_time1/2, zcpy_time1/2, reg_time2/2, zcpy_time2/2, zcpy_time3/2);
+        else //using different print format for larger numbers for aligned output
+          CkPrintf("%d\t%d\t\t%lf\t%lf\t%lf\t%lf\t\t%lf\n", size, iterations, reg_time1/2, zcpy_time1/2, reg_time2/2, zcpy_time2/2, zcpy_time3/2);
+        mainProxy.maindone();
+      } else {
+        thisProxy[1].recv_zcpySend_zcpyRecv(CkSendBuffer(nocopyMsg), size);
+      }
+    } else {
+      thisProxy[0].recv_zcpySend_zcpyRecv(CkSendBuffer(nocopyMsg), size);
     }
   }
 };

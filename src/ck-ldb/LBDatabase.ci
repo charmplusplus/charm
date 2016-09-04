@@ -1,6 +1,5 @@
 module LBDatabase {
   extern module CkMarshall;
-  extern module NullLB;
 
   readonly CkGroupID _lbdb;
 

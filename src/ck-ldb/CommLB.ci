@@ -1,6 +1,7 @@
 module CommLB {
 
 extern module CentralLB;
+include "CentralLB.h";
 initnode void lbinit(void);
 group [migratable] CommLB : CentralLB {
   entry void CommLB(CkLBOptions &);  

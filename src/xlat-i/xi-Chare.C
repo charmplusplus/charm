@@ -188,11 +188,28 @@ Chare::genDecls(XStr& str)
   // avoid inheriting from a complex CBaseT templated type.
   XStr CBaseName;
   CBaseName << "CBase_" << type;
+  XStr CBaseParent;
+  CBaseParent << "CBaseParent_" << type;
   if (isTemplateDeclaration()) {
     templat->genSpec(str);
     str << "\nstruct " << CBaseName << ";\n";
-  } else {
-    str << "typedef " << cbaseTType() << CBaseName << ";\n";
+  } 
+  else{
+    str << "typedef " << cbaseTType() << " " << CBaseParent << ";\n";
+    str << "struct " << CBaseName <<" : public " << cbaseTType() <<  "{\n";
+    if(list){
+      list->genRdmaDefs(str);
+    }
+    str << "#if CMK_HAS_RVALUE_REFERENCES\n";
+    str << "        template <typename... Args>\n";
+    str << "        " << CBaseName << "(Args&&... args) : " << cbaseTType() << "(std::forward<Args>(args)...) {} \n";
+
+    str << "#else\n";
+    str << "        template <typename... Args>\n";
+    str << "        " << CBaseName << "(Args... args) : " << cbaseTType() << "(args...) {} \n";
+    str << "#endif\n";
+
+    str << "};\n";
   }
 }
 
@@ -304,7 +321,7 @@ Chare::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
       templateGuardBegin(false, defs);
       defs << "template <>\n"
            << "void " << scope
-           << "CBase_"<< baseName(true) << "::" << virtualPupDef(scopedName) << "\n";
+           << "CBaseParent_"<< baseName(true) << "::" << virtualPupDef(scopedName) << "\n";
       templateGuardEnd(defs);
     }
   }

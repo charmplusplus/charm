@@ -1,4 +1,7 @@
 module CkLocation {
+  
+  include "CkMap.h";
+
   extern module CkMarshall;
 
   message CkArrayElementMigrateMessage {

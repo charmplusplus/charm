@@ -7,6 +7,11 @@
 #define BASELB_H
 
 #include "LBDatabase.h"
+#include "BaseLB.decl.h"
+
+//class LBDatabase;
+//class CProxy_LBDatabase; 
+
 
 #define PER_MESSAGE_SEND_OVERHEAD_DEFAULT   3.5e-5
 #define PER_BYTE_SEND_OVERHEAD_DEFAULT      8.5e-9

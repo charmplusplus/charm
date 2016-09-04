@@ -8,7 +8,10 @@ mainmodule pingpong {
     entry Ping1();
     entry void start(int size);
     entry void freeBuffer();
-    entry void recv(char msg[size], int size);
-    entry void recv_zerocopy(nocopy char msg[size], int size);
+    entry void recv_regSend(char msg[size], int size);
+    entry void recv_zcpySend(nocopy char msg[size], int size);
+    entry void recv_regSend_regRecv(char msg[size], int size);
+    entry void recv_zcpySend_regRecv(nocopy char msg[size], int size);
+    entry void recv_zcpySend_zcpyRecv(nocopy char msg[size], int size);
   };
 };

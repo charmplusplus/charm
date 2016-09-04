@@ -116,40 +116,6 @@ extern CkGroupID _fastArrayMapID;
 class CkLocMgr;
 class CkArray;
 
-/**
-\addtogroup CkArray
-*/
-/*@{*/
-
-#include "ckarrayoptions.h"
-
-/** The "map" is used by the array manager to map an array index to 
- * a home processor number.
- */
-class CkArrayMap : public IrrGroup // : public CkGroupReadyCallback
-{
-public:
-  CkArrayMap(void);
-  CkArrayMap(CkMigrateMessage *m): IrrGroup(m) {}
-  virtual ~CkArrayMap();
-  virtual int registerArray(const CkArrayIndex& numElements, CkArrayID aid);
-  virtual void unregisterArray(int idx);
-  virtual void storeCkArrayOpts(CkArrayOptions options);
-  virtual void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArray *mgr);
-  virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
-  virtual int homePe(int arrayHdl,const CkArrayIndex &element)
-             { return procNum(arrayHdl, element); }
-
-  virtual void pup(PUP::er &p);
-
-  CkArrayOptions storeOpts;
-#if CMK_USING_XLC
-  std::tr1::unordered_map<int, bool> dynamicIns;
-#else
-  std::unordered_map<int, bool> dynamicIns;
-#endif
-};
-/*@}*/
 
 /**
 \addtogroup CkArrayImpl

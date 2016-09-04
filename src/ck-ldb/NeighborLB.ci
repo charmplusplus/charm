@@ -1,6 +1,9 @@
 module NeighborLB {
 
 extern module NborBaseLB;
+
+include "NborBaseLB.h";
+
 initnode void lbinit(void);
 group [migratable] NeighborLB : NborBaseLB {
   entry void NeighborLB(const CkLBOptions &);  

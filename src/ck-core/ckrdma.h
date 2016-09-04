@@ -44,7 +44,7 @@ envelope* CkRdmaCopyMsg(envelope *env);
  * Extract rdma based information from the metadata message,
  * allocate buffers and issue RDMA get call
  */
-void CkRdmaIssueRgets(envelope *env);
+void CkRdmaIssueRgets(envelope *env, bool free);
 
 /*
  * Method called to update machine specific information and pointers
@@ -69,6 +69,17 @@ int getRdmaNumOps(envelope *env);
 
 //Get the sum of rdma buffer sizes using the metadata message
 int getRdmaBufSize(envelope *env);
+
+CkRdmaPostHandle* createRdmaPostHandle(int numops);
+
+CkRdmaPostHandle* CkGetRdmaPostHandle(envelope *env);
+
+void CkRdmaPost(CkRdmaPostHandle *handle);
+
+void CkUpdateRdmaPtrsPost(envelope *env, int msgsize, char *recv_md, char *src_md, CkRdmaPostHandle* handle);
+
+void CkUpdateRdmaPtrsPost(envelope *env, CkRdmaPostHandle* handle);
+
 
 #endif
 #endif

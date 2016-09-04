@@ -35,4 +35,16 @@ class CkRdmaWrapper{
     callback = new CkCallback(cb);
   }
 };
+
+struct CkRdmaPostStruct{
+  void *ptr;
+  size_t cnt;
+};
+
+struct CkRdmaPostHandle{
+  void *msg; //msg, not envelope
+  int nstructs;
+  CkRdmaPostStruct structs[0];
+};
+
 #endif

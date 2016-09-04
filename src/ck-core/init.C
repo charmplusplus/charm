@@ -978,7 +978,8 @@ static void _nullFn(void *, void *)
   CmiAbort("Null-Method Called. Program may have Unregistered Module!!\n");
 }
 
-extern void _registerLBDatabase(void);
+extern void _registerlbdatabase(void);
+extern void _registerNullLB(void);
 extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
@@ -1236,6 +1237,7 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkFutures();
 		_registerCkArray();
 		_registerLBDatabase();
+                _registerNullLB();
     _registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();

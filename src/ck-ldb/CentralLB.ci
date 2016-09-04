@@ -4,6 +4,7 @@ extern module BaseLB;
 extern module LBDatabase;
 
 include "CentralLBMsg.h";
+include "BaseLB.h";
 
 readonly CkGroupID loadbalancer;
 

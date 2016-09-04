@@ -281,340 +281,204 @@ void CkArrayMap::pup(PUP::er &p) {
 CkGroupID _defaultArrayMapID;
 CkGroupID _fastArrayMapID;
 
-class RRMap : public CkArrayMap
+RRMap::RRMap(void)
 {
-private:
-  CkArrayIndex maxIndex;
-  uint64_t products[2*CK_ARRAYINDEX_MAXLEN];
-  bool productsInit;
+  DEBC((AA "Creating RRMap\n" AB));
+  productsInit = false;
+}
 
-public:
-  RRMap(void)
-  {
-    DEBC((AA "Creating RRMap\n" AB));
-    productsInit = false;
-  }
-  RRMap(CkMigrateMessage *m):CkArrayMap(m){}
+RRMap::RRMap(CkMigrateMessage *m):CkArrayMap(m){}
 
-  void indexInit() {
-    productsInit = true;
-    maxIndex = storeOpts.getEnd();
-    products[maxIndex.dimension - 1] = 1;
-    if(maxIndex.dimension <= CK_ARRAYINDEX_MAXLEN) {
-      for(int dim = maxIndex.dimension - 2; dim >= 0; dim--) {
-        products[dim] = products[dim + 1] * maxIndex.index[dim + 1];
-      }
-    } else {
-      for(int dim = maxIndex.dimension - 2; dim >= 0; dim--) {
-        products[dim] = products[dim + 1] * maxIndex.indexShorts[dim + 1];
-      }
+void RRMap::indexInit() {
+  productsInit = true;
+  maxIndex = storeOpts.getEnd();
+  products[maxIndex.dimension - 1] = 1;
+  if(maxIndex.dimension <= CK_ARRAYINDEX_MAXLEN) {
+    for(int dim = maxIndex.dimension - 2; dim >= 0; dim--) {
+      products[dim] = products[dim + 1] * maxIndex.index[dim + 1];
     }
-  } // End of indexInit
+  } else {
+    for(int dim = maxIndex.dimension - 2; dim >= 0; dim--) {
+      products[dim] = products[dim + 1] * maxIndex.indexShorts[dim + 1];
+    }
+  }
+} // End of indexInit
 
-  int procNum(int arrayHdl, const CkArrayIndex &i)
-  {
-    if (i.dimension == 1) {
-      //Map 1D integer indices in simple round-robin fashion
-      int ans = (i.data()[0])%CkNumPes();
-      while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CkpvAccess(startedEvac))){
+int RRMap::procNum(int arrayHdl, const CkArrayIndex &i)
+{
+  if (i.dimension == 1) {
+    //Map 1D integer indices in simple round-robin fashion
+    int ans = (i.data()[0])%CkNumPes();
+    while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CkpvAccess(startedEvac))){
+      ans = (ans+1)%CkNumPes();
+    }
+    return ans;
+  }
+  else {
+    if(dynamicIns.find(arrayHdl) != dynamicIns.end()) {
+      //Finding indicates that current array uses dynamic insertion
+      //Map other indices based on their hash code, mod a big prime.
+      unsigned int hash=(i.hash()+739)%1280107;
+      int ans = (hash % CkNumPes());
+      while(!CmiNodeAlive(ans)){
         ans = (ans+1)%CkNumPes();
       }
       return ans;
-    }
-    else {
-      if(dynamicIns.find(arrayHdl) != dynamicIns.end()) {
-        //Finding indicates that current array uses dynamic insertion
-        //Map other indices based on their hash code, mod a big prime.
-        unsigned int hash=(i.hash()+739)%1280107;
-        int ans = (hash % CkNumPes());
-        while(!CmiNodeAlive(ans)){
-          ans = (ans+1)%CkNumPes();
+    } else {
+      if(!productsInit) { indexInit(); }
+
+      int indexOffset = 0;
+      if(i.dimension <= CK_ARRAYINDEX_MAXLEN) {
+        for(int dim = i.dimension - 1; dim >= 0; dim--) {
+          indexOffset += (i.index[dim] * products[dim]);
         }
-        return ans;
       } else {
-        if(!productsInit) { indexInit(); }
-
-        int indexOffset = 0;
-        if(i.dimension <= CK_ARRAYINDEX_MAXLEN) {
-          for(int dim = i.dimension - 1; dim >= 0; dim--) {
-            indexOffset += (i.index[dim] * products[dim]);
-          }
-        } else {
-          for(int dim = maxIndex.dimension - 1; dim >= 0; dim--) {
-            indexOffset += (i.indexShorts[dim] * products[dim]);
-          }
+        for(int dim = maxIndex.dimension - 1; dim >= 0; dim--) {
+          indexOffset += (i.indexShorts[dim] * products[dim]);
         }
-        return indexOffset % CkNumPes();
       }
+      return indexOffset % CkNumPes();
     }
   }
+}
 
-  void pup(PUP::er& p) {
-    CkArrayMap::pup(p);
-    p|maxIndex;
-    p|productsInit;
-    PUParray(p, products, 2*CK_ARRAYINDEX_MAXLEN);
-  }
-};
+void RRMap::pup(PUP::er& p) {
+  CkArrayMap::pup(p);
+  p|maxIndex;
+  p|productsInit;
+  PUParray(p, products, 2*CK_ARRAYINDEX_MAXLEN);
+}
 
-/** 
- * Class used to store the dimensions of the array and precalculate numChares,
- * binSize and other values for the DefaultArrayMap -- ASB
- */
-class arrayMapInfo {
-public:
-  CkArrayIndex _nelems;
-  int _binSizeFloor;		/* floor of numChares/numPes */
-  int _binSizeCeil;		/* ceiling of numChares/numPes */
-  int _numChares;		/* initial total number of chares */
-  int _remChares;		/* numChares % numPes -- equals the number of
-				   processors in the first set */
-  int _numFirstSet;		/* _remChares X (_binSize + 1) -- number of
-				   chares in the first set */
+DefaultArrayMap::DefaultArrayMap(void) {
+   DEBC((AA "Creating DefaultArrayMap\n" AB));
+}
 
-  int _nBinSizeFloor;           /* floor of numChares/numNodes */
-  int _nRemChares;              /* numChares % numNodes -- equals the number of
-                                   nodes in the first set */
-  int _nNumFirstSet;            /* _remChares X (_binSize + 1) -- number of
-                                   chares in the first set of nodes */
-
-  /** All processors are divided into two sets. Processors in the first set
-   *  have one chare more than the processors in the second set. */
-
-  arrayMapInfo(void) { }
-
-  arrayMapInfo(const CkArrayIndex& n) : _nelems(n), _numChares(0) {
-    compute_binsize();
+int DefaultArrayMap::procNum(int arrayHdl, const CkArrayIndex &i) {
+  int flati;
+  if (amaps[arrayHdl]->_nelems.dimension == 0) {
+    dynamicIns[arrayHdl] = true;
+    return RRMap::procNum(arrayHdl, i);
   }
 
-  ~arrayMapInfo() {}
-  
-  void compute_binsize()
-  {
-    int numPes = CkNumPes();
-    //Now assuming homogenous nodes where each node has the same number of PEs
-    int numNodes = CkNumNodes();
-
-    if (_nelems.dimension == 1) {
-      _numChares = _nelems.data()[0];
-    } else if (_nelems.dimension == 2) {
-      _numChares = _nelems.data()[0] * _nelems.data()[1];
-    } else if (_nelems.dimension == 3) {
-      _numChares = _nelems.data()[0] * _nelems.data()[1] * _nelems.data()[2];
-    } else if (_nelems.dimension == 4) {
-      _numChares = (int)(((short int*)_nelems.data())[0] * ((short int*)_nelems.data())[1] * ((short int*)_nelems.data())[2] *
-                   ((short int*)_nelems.data())[3]);
-    } else if (_nelems.dimension == 5) {
-      _numChares = (int)(((short int*)_nelems.data())[0] * ((short int*)_nelems.data())[1] * ((short int*)_nelems.data())[2] *
-                   ((short int*)_nelems.data())[3] * ((short int*)_nelems.data())[4]);
-    } else if (_nelems.dimension == 6) {
-      _numChares = (int)(((short int*)_nelems.data())[0] * ((short int*)_nelems.data())[1] * ((short int*)_nelems.data())[2] *
-                   ((short int*)_nelems.data())[3] * ((short int*)_nelems.data())[4] * ((short int*)_nelems.data())[5]);
-    }
-
-    _remChares = _numChares % numPes;
-    _binSizeFloor = (int)floor((double)_numChares/(double)numPes);
-    _binSizeCeil = (int)ceil((double)_numChares/(double)numPes);
-    _numFirstSet = _remChares * (_binSizeFloor + 1);
-
-    _nRemChares = _numChares % numNodes;
-    _nBinSizeFloor = _numChares/numNodes;
-    _nNumFirstSet = _nRemChares * (_nBinSizeFloor +1);
+  if (i.dimension == 1) {
+    flati = i.data()[0];
+  } else if (i.dimension == 2) {
+    flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
+  } else if (i.dimension == 3) {
+    flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) *
+            amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
+  } else if (i.dimension == 4) {
+    flati = (int)(((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]);
+  } else if (i.dimension == 5) {
+    flati = (int)((((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[4] + ((short int*)i.data())[4]);
+  } else if (i.dimension == 6) {
+    flati = (int)(((((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[4] + ((short int*)i.data())[4]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[5] + ((short int*)i.data())[5]);
   }
-
-  void pup(PUP::er& p){
-    p|_nelems;
-    p|_binSizeFloor;
-    p|_binSizeCeil;
-    p|_numChares;
-    p|_remChares;
-    p|_numFirstSet;
-    p|_nBinSizeFloor;
-    p|_nRemChares;
-    p|_nNumFirstSet;
-  }
-};
-
-
-/**
- * The default map object -- This does blocked mapping in the general case and
- * calls the round-robin procNum for the dynamic insertion case -- ASB
- */
-class DefaultArrayMap : public RRMap
-{
-public:
-  /** This array stores information about different chare arrays in a Charm
-   *  program (dimensions, binsize, numChares etc ... ) */
-  CkPupPtrVec<arrayMapInfo> amaps;
-
-public:
-  DefaultArrayMap(void) {
-    DEBC((AA "Creating DefaultArrayMap\n" AB));
-  }
-
-  DefaultArrayMap(CkMigrateMessage *m) : RRMap(m){}
-
-  int registerArray(const CkArrayIndex& numElements, CkArrayID aid)
-  {
-    int idx = amaps.size();
-    amaps.resize(idx+1);
-    amaps[idx] = new arrayMapInfo(numElements);
-    return idx;
-  }
-
-  void unregisterArray(int idx)
-  {
-    delete amaps[idx];
-    amaps[idx] = NULL;
-  }
- 
-  int procNum(int arrayHdl, const CkArrayIndex &i) {
-    int flati;
-    if (amaps[arrayHdl]->_nelems.dimension == 0) {
-      dynamicIns[arrayHdl] = true;
-      return RRMap::procNum(arrayHdl, i);
-    }
-
-    if (i.dimension == 1) {
-      flati = i.data()[0];
-    } else if (i.dimension == 2) {
-      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
-    } else if (i.dimension == 3) {
-      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) *
-              amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
-    } else if (i.dimension == 4) {
-      flati = (int)(((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]);
-    } else if (i.dimension == 5) {
-      flati = (int)((((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[4] + ((short int*)i.data())[4]);
-    } else if (i.dimension == 6) {
-      flati = (int)(((((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[4] + ((short int*)i.data())[4]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[5] + ((short int*)i.data())[5]);
-    }
 #if CMK_ERROR_CHECKING
-    else {
-      CkAbort("CkArrayIndex has more than 6 dimensions!");
-    }
+  else {
+    CkAbort("CkArrayIndex has more than 6 dimensions!");
+  }
 #endif
 
-    if(useNodeBlkMapping){
-      if(flati < amaps[arrayHdl]->_numChares){
-        int numCharesOnNode = amaps[arrayHdl]->_nBinSizeFloor;
-        int startNodeID, offsetInNode;
-        if(flati < amaps[arrayHdl]->_nNumFirstSet){
-          numCharesOnNode++;
-          startNodeID = flati/numCharesOnNode;
-          offsetInNode = flati%numCharesOnNode;
-        }else{
-          startNodeID = amaps[arrayHdl]->_nRemChares+(flati-amaps[arrayHdl]->_nNumFirstSet)/numCharesOnNode;
-          offsetInNode = (flati-amaps[arrayHdl]->_nNumFirstSet)%numCharesOnNode;
-        }
-        int nodeSize = CkMyNodeSize(); //assuming every node has same number of PEs
-        int elemsPerPE = numCharesOnNode/nodeSize;
-        int remElems = numCharesOnNode%nodeSize;
-        int firstSetPEs = remElems*(elemsPerPE+1);
-        if(offsetInNode<firstSetPEs){
-          return CkNodeFirst(startNodeID)+offsetInNode/(elemsPerPE+1);
-        }else{
-          return CkNodeFirst(startNodeID)+remElems+(offsetInNode-firstSetPEs)/elemsPerPE;
-        }
-      } else
-          return (flati % CkNumPes());
-    }
-    //regular PE-based block mapping
-    if(flati < amaps[arrayHdl]->_numFirstSet)
-      return (flati / (amaps[arrayHdl]->_binSizeFloor + 1));
-    else if (flati < amaps[arrayHdl]->_numChares)
-      return (amaps[arrayHdl]->_remChares + (flati - amaps[arrayHdl]->_numFirstSet) / (amaps[arrayHdl]->_binSizeFloor));
-    else
-      return (flati % CkNumPes());
+  if(useNodeBlkMapping){
+    if(flati < amaps[arrayHdl]->_numChares){
+      int numCharesOnNode = amaps[arrayHdl]->_nBinSizeFloor;
+      int startNodeID, offsetInNode;
+      if(flati < amaps[arrayHdl]->_nNumFirstSet){
+        numCharesOnNode++;
+        startNodeID = flati/numCharesOnNode;
+        offsetInNode = flati%numCharesOnNode;
+      }else{
+        startNodeID = amaps[arrayHdl]->_nRemChares+(flati-amaps[arrayHdl]->_nNumFirstSet)/numCharesOnNode;
+        offsetInNode = (flati-amaps[arrayHdl]->_nNumFirstSet)%numCharesOnNode;
+      }
+      int nodeSize = CkMyNodeSize(); //assuming every node has same number of PEs
+      int elemsPerPE = numCharesOnNode/nodeSize;
+      int remElems = numCharesOnNode%nodeSize;
+      int firstSetPEs = remElems*(elemsPerPE+1);
+      if(offsetInNode<firstSetPEs){
+        return CkNodeFirst(startNodeID)+offsetInNode/(elemsPerPE+1);
+      }else{
+        return CkNodeFirst(startNodeID)+remElems+(offsetInNode-firstSetPEs)/elemsPerPE;
+      }
+    } else
+        return (flati % CkNumPes());
+  }
+  //regular PE-based block mapping
+  if(flati < amaps[arrayHdl]->_numFirstSet)
+    return (flati / (amaps[arrayHdl]->_binSizeFloor + 1));
+  else if (flati < amaps[arrayHdl]->_numChares)
+    return (amaps[arrayHdl]->_remChares + (flati - amaps[arrayHdl]->_numFirstSet) / (amaps[arrayHdl]->_binSizeFloor));
+  else
+    return (flati % CkNumPes());
+}
+
+void DefaultArrayMap::pup(PUP::er& p){
+  RRMap::pup(p);
+  int npes = CkNumPes();
+  p|npes;
+  p|amaps;
+  if (p.isUnpacking() && npes != CkNumPes())  {   // binSize needs update
+    for (int i=0; i<amaps.size(); i++)
+      if (amaps[i])
+        amaps[i]->compute_binsize();
+  }
+}
+
+FastArrayMap::FastArrayMap(void) {
+   DEBC((AA "Creating FastArrayMap\n" AB));
+}
+
+
+int FastArrayMap::procNum(int arrayHdl, const CkArrayIndex &i) {
+  int flati = 0;
+  if (amaps[arrayHdl]->_nelems.dimension == 0) {
+    return RRMap::procNum(arrayHdl, i);
   }
 
-  void pup(PUP::er& p){
-    RRMap::pup(p);
-    int npes = CkNumPes();
-    p|npes;
-    p|amaps;
-    if (p.isUnpacking() && npes != CkNumPes())  {   // binSize needs update
-      for (int i=0; i<amaps.size(); i++)
-        if (amaps[i])
-          amaps[i]->compute_binsize();
-    }
+  if (i.dimension == 1) {
+    flati = i.data()[0];
+  } else if (i.dimension == 2) {
+    flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
+  } else if (i.dimension == 3) {
+    flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) *
+            amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
+  } else if (i.dimension == 4) {
+    flati = (int)(((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]);
+  } else if (i.dimension == 5) {
+    flati = (int)((((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[4] + ((short int*)i.data())[4]);
+  } else if (i.dimension == 6) {
+    flati = (int)(((((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[4] + ((short int*)i.data())[4]) *
+            ((short int*)amaps[arrayHdl]->_nelems.data())[5] + ((short int*)i.data())[5]);
   }
-};
-
-/**
- *  A fast map for chare arrays which do static insertions and promise NOT
- *  to do late insertions -- ASB
- */
-class FastArrayMap : public DefaultArrayMap
-{
-public:
-  FastArrayMap(void) {
-    DEBC((AA "Creating FastArrayMap\n" AB));
-  }
-
-  FastArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
-
-  int registerArray(const CkArrayIndex& numElements, CkArrayID aid)
-  {
-    int idx;
-    idx = DefaultArrayMap::registerArray(numElements, aid);
-
-    return idx;
-  }
-
-  int procNum(int arrayHdl, const CkArrayIndex &i) {
-    int flati = 0;
-    if (amaps[arrayHdl]->_nelems.dimension == 0) {
-      return RRMap::procNum(arrayHdl, i);
-    }
-
-    if (i.dimension == 1) {
-      flati = i.data()[0];
-    } else if (i.dimension == 2) {
-      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
-    } else if (i.dimension == 3) {
-      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) *
-              amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
-    } else if (i.dimension == 4) {
-      flati = (int)(((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]);
-    } else if (i.dimension == 5) {
-      flati = (int)((((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[4] + ((short int*)i.data())[4]);
-    } else if (i.dimension == 6) {
-      flati = (int)(((((((short int*)i.data())[0] * ((short int*)amaps[arrayHdl]->_nelems.data())[1] + ((short int*)i.data())[1]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[2] + ((short int*)i.data())[2]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[3] + ((short int*)i.data())[3]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[4] + ((short int*)i.data())[4]) *
-              ((short int*)amaps[arrayHdl]->_nelems.data())[5] + ((short int*)i.data())[5]);
-    }
 #if CMK_ERROR_CHECKING
-    else {
-      CkAbort("CkArrayIndex has more than 6 dimensions!");
-    }
+  else {
+    CkAbort("CkArrayIndex has more than 6 dimensions!");
+  }
 #endif
 
-    /** binSize used in DefaultArrayMap is the floor of numChares/numPes
-     *  but for this FastArrayMap, we need the ceiling */
-    return (flati / amaps[arrayHdl]->_binSizeCeil);
-  }
+  /** binSize used in DefaultArrayMap is the floor of numChares/numPes
+   *  but for this FastArrayMap, we need the ceiling */
+  return (flati / amaps[arrayHdl]->_binSizeCeil);
+}
 
-  void pup(PUP::er& p){
-    DefaultArrayMap::pup(p);
-  }
-};
 
 /* *
  * Hilbert map object -- This does hilbert mapping.

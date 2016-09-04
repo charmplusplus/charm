@@ -2,7 +2,7 @@ module HybridLB {
 
 extern module LBDatabase;
 extern module HybridBaseLB;
-
+include "HybridBaseLB.h";
 initnode void lbinit(void);
 
 group [migratable] HybridLB: HybridBaseLB {

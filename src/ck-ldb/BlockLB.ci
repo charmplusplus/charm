@@ -2,6 +2,8 @@ module BlockLB
 {
   extern module CentralLB;
 
+  include "CentralLB.h";
+
   initnode void lbinit (void);
 
   group [migratable] BlockLB : CentralLB

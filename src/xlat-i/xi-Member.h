@@ -26,6 +26,7 @@ class Member : public Construct {
   virtual void setChare(Chare *c) { container = c; }
   virtual void preprocessSDAG() { }
   virtual int isSdag(void) { return 0; }
+  virtual int isEntryMethod(void) { return 0; }
   virtual void collectSdagCode(SdagCollection *) { return; }
   virtual void collectSdagCode(WhenStatementEChecker *) { return; }
   XStr makeDecl(const XStr &returnType,int forProxy=0, bool isStatic = false);

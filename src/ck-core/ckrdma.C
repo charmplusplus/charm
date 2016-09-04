@@ -159,7 +159,13 @@ envelope* CkRdmaCopyMsg(envelope *env){
  * Extract rdma based information from the metadata message,
  * allocate buffers and issue RDMA get call
  */
-void CkRdmaIssueRgets(envelope *env){
+void CkRdmaIssueRgets(envelope *env, bool free){
+
+  if(CmiNodeOf(env->getSrcPe()) == CmiMyNode()){
+    envelope *newEnv = CkRdmaCopyMsg(env);
+    CsdEnqueue(newEnv);
+    return;
+  }
   /*
    * Determine the buffer size('bufsize') and the message size('msgsize')
    * from the metadata message. 'msgSize' is the metadata message size
@@ -202,8 +208,9 @@ void CkRdmaIssueRgets(envelope *env){
   // from intercepting it
   copyenv->setRdma(false);
 
-  // Free the existing message
-  CkFreeMsg(EnvToUsr(env));
+  // Existing message freed by the runtime
+  if(free)
+    CkFreeMsg(EnvToUsr(env));
 
   //Call the lower layer API for performing RDMA gets
   CmiIssueRgets(recv_md, copyenv->getSrcPe());
@@ -314,5 +321,126 @@ int getRdmaBufSize(envelope *env){
   CkPackMessage(&env);
   return bufsize;
 }
+
+CkRdmaPostHandle* createRdmaPostHandle(int numops){
+  CkRdmaPostHandle* ret = (CkRdmaPostHandle*)malloc(sizeof(CkRdmaPostHandle)
+                                        + numops * sizeof(CkRdmaPostStruct));
+  ret->nstructs = numops;
+  return ret;
+}
+
+
+CkRdmaPostHandle* CkGetRdmaPostHandle(envelope *env){
+  CkMarshallMsg *msg = (CkMarshallMsg *)EnvToUsr(env);
+  CkMarshallMsg *copymsg = (CkMarshallMsg *)CkCopyMsg((void **)&msg);
+  CkUnpackMessage(&env);
+  envelope *copyenv = UsrToEnv(copymsg);
+  CkUnpackMessage(&copyenv);
+  PUP::fromMem up((void *)(copymsg->msgBuf));
+  int numops; up|numops;
+  //CkPrintf("numops: %d \n, numops");
+  CkRdmaPostHandle* handle = createRdmaPostHandle(numops);
+  handle->msg = copymsg;
+  for(int i=0; i<numops; i++){
+    CkRdmaWrapper w;
+    up|w;
+    handle->structs[i].cnt = w.cnt;
+  }
+  return handle;
+}
+
+
+
+/* Receive Side Utility Functions */
+
+
+/*
+ * Use pointers provided in the handle to issue Rgets.
+ */
+void CkRdmaPost(CkRdmaPostHandle *handle){
+
+  /*
+   * Determine the buffer size and the message size from the
+   * metadata message. Message size is the metadata message size without
+   * the machine specific information. Use the pointers provided in the handle
+   */
+  envelope *env = UsrToEnv(handle->msg);
+  if(env->getSrcPe()==CkMyPe()||CkNodeOf(env->getSrcPe())==CkMyNode()){
+    CkUpdateRdmaPtrsPost(env, handle);
+    return;
+  }
+
+
+  PUP::fromMem p((void *)(((CkMarshallMsg *)handle->msg)->msgBuf));
+  int numops; p|numops;
+  int msgsize = env->getTotalsize() - CmiGetRdmaInfoSize(numops);
+
+  char *recv_md = (char *) malloc(CmiGetRdmaRecvInfoSize(numops));
+  CkUpdateRdmaPtrsPost(env, msgsize, recv_md, ((char *)env) + msgsize, handle);
+
+
+  //ckout<<"Issuing Rgets "<<numops<<endl;
+  //Call the lower layer API for performing RDMA gets
+  CmiIssueRgets(recv_md, env->getSrcPe());
+}
+
+  void CkUpdateRdmaPtrsPost(envelope *env, CkRdmaPostHandle* handle){
+    CkUnpackMessage(&env);
+    PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
+    PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
+    int numops;
+    up|numops; p|numops;
+    for(int i=0; i<numops; i++){
+      CkRdmaWrapper w;
+      up|w;
+      //Copy the buffer from the source pointer to the message
+      memcpy(handle->structs[i].ptr, w.ptr, w.cnt);
+
+      //Invoke callback as it is safe to rewrite into the source buffer
+      (w.callback)->send(sizeof(void *), &w.ptr);
+      free(w.callback);
+
+      //Update the CkRdmaWrapper pointer of the new message
+      w.ptr = handle->structs[i].ptr;
+      p|w;
+    }
+    CkPackMessage(&env);
+    CsdEnqueue(env);
+  }
+
+/*
+ * Method called to update machine specific information for receiver
+ * using the metadata message given by the sender along with updating
+ * pointers of the CkRdmawrappers using the Post Handle.
+ * Assumes message to be unpacked
+ */
+void CkUpdateRdmaPtrsPost(envelope *env, int msgsize, char *recv_md, char *src_md, CkRdmaPostHandle* handle){
+  CkAssert(!env->isPacked());
+  /* pack buffer */
+  PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
+  /* unpack buffer */
+  PUP::fromMem up((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
+  int numops;
+  up|numops;
+  p|numops;
+
+  //Use the metadata info to set the machine info for receiver
+  //generic info for all RDMA operations
+  CmiSetRdmaRecvInfo(recv_md, numops, env, src_md, env->getTotalsize());
+  recv_md += CmiGetRdmaGenRecvInfoSize();
+  for(int i=0; i<numops; i++){
+    CkRdmaWrapper w;
+    up|w;
+    //Set RDMA operation specific info
+    //CkPrintf("CmiSetRdmaRecvOpInfo: w.cnt: %d, i: %d, handle->struct[i].ptr: %p \n", w.cnt, i, handle->structs[i].ptr);
+    CmiSetRdmaRecvOpInfo(recv_md, handle->structs[i].ptr, w.callback, w.cnt, i, src_md);
+    recv_md += CmiGetRdmaOpRecvInfoSize();
+    w.ptr = handle->structs[i].ptr;
+    p|w;
+  }
+  CkPackMessage(&env);
+}
+
+
 
 #endif

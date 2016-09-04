@@ -63,11 +63,12 @@ class Entry : public Member {
 //    friend class CParsedFile;
     int hasCallMarshall;
     void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false,
-                 bool usesImplBuf = false);
+                 bool usesImplBuf = false, bool rdma_wrapper = false);
 
-    XStr epStr(bool isForRedn = false, bool templateCall = false);
-    XStr epIdx(int fromProxy=1, bool isForRedn = false);
-    XStr epRegFn(int fromProxy=1, bool isForRedn = false);
+    //forwhom --> 0: default, 1: reduction, 2: rdma
+    XStr epStr(int forwhom = 0, bool templateCall = false);
+    XStr epIdx(int fromProxy=1, int forwhom = 0);
+    XStr epRegFn(int fromProxy=1, int forwhom = 0);
     XStr chareIdx(int fromProxy=1);
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
@@ -117,8 +118,9 @@ class Entry : public Member {
     XStr aggregatorType();
     XStr aggregatorGlobalType(XStr& scope);
     XStr aggregatorName();
-    XStr paramType(int withDefaultVals,int withEO=0,int useConst=1);
+    XStr paramType(int withDefaultVals,int withEO=0,int useConst=1, bool rdmaPost=false);
     XStr paramComma(int withDefaultVals,int withEO=0);
+    XStr rdmaPostHandle();
     XStr eo(int withDefaultVals,int priorComma=1);
     XStr syncPreCall(void);
     XStr syncPostCall(void);
@@ -188,12 +190,14 @@ class Entry : public Member {
     int isNoKeep(void);
     int isSdag(void);
     bool isTramTarget(void);
+    int isEntryMethod(void);
 
     // DMK - Accel support
     int isAccel(void);
 
     int isMemCritical(void);
     int isReductionTarget(void);
+    int hasRdma(void);
 
     void print(XStr& str);
     void check();
@@ -201,7 +205,8 @@ class Entry : public Member {
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-    XStr genRegEp(bool isForRedn = false);
+    void genRdmaDefs(XStr& str);
+    XStr genRegEp(int forwhom = 0);
     void preprocess();
     void preprocessSDAG();
     char *getEntryName();
