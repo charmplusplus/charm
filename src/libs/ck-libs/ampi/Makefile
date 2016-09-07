@@ -19,6 +19,7 @@ LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
 DESTF=$(LIBDIR)/$(LIB)f.a
 COMPATLIB=$(LIBDIR)/libampi-compat.a
+DUMMYROMIOLIB=$(LIBDIR)/libampiromio.a
 
 .SUFFIXES:
 .SUFFIXES: .C .o
@@ -26,7 +27,9 @@ COMPATLIB=$(LIBDIR)/libampi-compat.a
 .C.o:
 	$(CHARMC) -c $<
 
-all: AMPI AMPIF $(COMPATLIB)
+.NOTPARALLEL:
+
+all: AMPI AMPIF $(COMPATLIB) $(DUMMYROMIOLIB)
 	-cd $(CDIR)/tmp; CHARMINC=.; . ./conv-config.sh; cd libs/ck-libs/ampi; if test -n "$$CMK_AMPI_WITH_ROMIO" ; then ($(MAKE) AMPI-ROMIO); fi
 
 $(ROMIOMAKE): $(COMPATLIB)
@@ -54,6 +57,10 @@ $(DESTF): $(OBJS) headers
 
 $(COMPATLIB): $(COMPAT)
 	$(CHARMC) $(COMPAT) -o $@
+
+$(DUMMYROMIOLIB): ampiromio.c
+	$(CHARMC) ampiromio.c -c ampiromio.o
+	$(CHARMC) ampiromio.o -o $@
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/

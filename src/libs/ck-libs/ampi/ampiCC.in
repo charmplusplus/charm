@@ -50,7 +50,7 @@ then
     ln $CHARMBIN/../include/mpi.h $dirname/mpi.h   2>/dev/null
     AMPICC_EXTRA_OPTIONS="-I./$dirName"
 fi
-$CHARMBIN/charmc -language ampi -default-to-aout $AMPICC_EXTRA_OPTIONS $@
+$CHARMBIN/charmc -language ampi -default-to-aout -lampiromio $AMPICC_EXTRA_OPTIONS $@
 status=$?
 
 if test "$charmarch" = "mpi"
