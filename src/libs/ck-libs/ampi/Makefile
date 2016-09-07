@@ -4,7 +4,8 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 HEADERS=ampi.h ampif.h ampiimpl.h ampiProjections.h 
 HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h ampiEvents.h
 COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
-       compat_ampim.o compat_ampifm.o compat_ampicm.o
+       compat_ampim.o compat_ampifm.o compat_ampicm.o \
+	   compat_ampicpp.o
 OBJS=ampi.o ampif.o ampiProjections.o ampiOneSided.o \
      ampiMisc.o mpich-alltoall.o  
 ROMIOMAKE=romio/adio/ad_hfs/Makefile romio/adio/ad_nfs/Makefile romio/adio/ad_pfs/Makefile romio/adio/ad_piofs/Makefile \
@@ -78,6 +79,9 @@ compat_ampicm.o: compat_ampicm.C
 
 compat_ampi.o: compat_ampi.c
 	$(CHARMC) -c compat_ampi.c
+
+compat_ampicpp.o: compat_ampicpp.C
+	$(CHARMC) -c compat_ampicpp.C
 
 ampi.o: ampi.C $(HEADDEP)
 	$(CHARMC) -c ampi.C

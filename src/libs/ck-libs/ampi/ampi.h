@@ -16,6 +16,7 @@ instead of as an actual "main".
 #ifdef __cplusplus /* C++ version-- rename "main" as "AMPI_Main_cpp" */
 #  define main AMPI_Main_cpp
 int AMPI_Main_cpp(int argc,char **argv); /* prototype for C++ main routine */
+int AMPI_Main_cpp(void); /* prototype for C++ main routines without args, as in autoconf tests */
 
 extern "C" {
 #else /* C version-- rename "main" as "AMPI_Main" */
