@@ -50,7 +50,7 @@ typedef struct _header {
 
 typedef struct _bufferPool {
   Header *head;
-  int size;
+  size_t size;
 #ifdef GPU_MEMPOOL_DEBUG
   int num;
 #endif

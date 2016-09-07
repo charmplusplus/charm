@@ -71,6 +71,10 @@ never be excluded...
 #include <sstream>
 #include <limits.h>
 
+#if CMK_CUDA
+#include "cuda-hybrid-api.h"
+#endif
+
 void CkRestartMain(const char* dirname, CkArgMsg* args);
 
 #define  DEBUGF(x)     //CmiPrintf x;
@@ -1404,6 +1408,12 @@ void _initCharm(int unused_argc, char **argv)
         }
 #endif
     }
+
+#if CMK_CUDA
+    if (CmiMyRank() == 0) {
+      initHybridAPI();
+    }
+#endif
 
     if(CmiMyPe() == 0) {
         char *topoFilename;

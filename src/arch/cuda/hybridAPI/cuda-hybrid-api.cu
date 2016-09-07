@@ -18,6 +18,7 @@
 #include "cuda-hybrid-api.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <algorithm>
 
 /*
  * Important Flags:
@@ -109,9 +110,11 @@ public:
 #define GPU_MEMPOOL_NUM_SLOTS 20 // Update for new row, again this shouldn't be hard coded!
 // pre-allocated buffers will be at least this big
 #define GPU_MEMPOOL_MIN_BUFFER_SIZE 256
+// Scale the amount of memory each node pins
+#define GPU_MEMPOOL_SCALE 1.0
 
   CkVec<BufferPool> memPoolFreeBufs;
-  CkVec<int> memPoolBoundaries;
+  CkVec<size_t> memPoolBoundaries;
 
 #ifdef GPU_DUMMY_MEMPOOL
   CkVec<int> memPoolMax;
@@ -482,6 +485,42 @@ void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
 
 void initHybridAPI() {
   CsvInitialize(GPUManager, gpuManager);
+
+#ifndef GPU_DUMMY_MEMPOOL
+  int sizes[GPU_MEMPOOL_NUM_SLOTS];
+        /*256*/ sizes[0]  =  4;
+        /*512*/ sizes[1]  =  2;
+       /*1024*/ sizes[2]  =  2;
+       /*2048*/ sizes[3]  =  4;
+       /*4096*/ sizes[4]  =  2;
+       /*8192*/ sizes[5]  =  6;
+      /*16384*/ sizes[6]  =  5;
+      /*32768*/ sizes[7]  =  2;
+      /*65536*/ sizes[8]  =  1;
+     /*131072*/ sizes[9]  =  1;
+     /*262144*/ sizes[10] =  1;
+     /*524288*/ sizes[11] =  1;
+    /*1048576*/ sizes[12] =  1;
+    /*2097152*/ sizes[13] =  2;
+    /*4194304*/ sizes[14] =  2;
+    /*8388608*/ sizes[15] =  2;
+   /*16777216*/ sizes[16] =  2;
+   /*33554432*/ sizes[17] =  1;
+   /*67108864*/ sizes[18] =  1;
+  /*134217728*/ sizes[19] =  7;
+  createPool(sizes, GPU_MEMPOOL_NUM_SLOTS, CsvAccess(gpuManager).memPoolFreeBufs);
+
+#ifdef GPU_MEMPOOL_DEBUG
+  printf("[%d] done creating buffer pool\n", CmiMyPe());
+#endif
+
+#endif
+}
+
+inline int getMyCudaDevice(int myPe) {
+  int deviceCount;
+  cudaChk(cudaGetDeviceCount(&deviceCount));
+  return myPe % deviceCount;
 }
 
 /* initHybridAPIHelper
@@ -491,10 +530,7 @@ void initHybridAPI() {
  * arrays, and CUDA streams
  */
 void GPUManager::initHybridAPIHelper() {
-  int deviceCount;
-  cudaGetDeviceCount(&deviceCount);
-
-  cudaSetDevice(CmiMyPe() % deviceCount);
+  cudaChk(cudaSetDevice(getMyCudaDevice(CmiMyPe())));
 
   /* allocate host/device buffers array (both user and
      system-addressed) */
@@ -519,7 +555,6 @@ void GPUManager::initHybridAPIHelper() {
 
 #ifdef GPU_MEMPOOL
   int nslots = GPU_MEMPOOL_NUM_SLOTS;
-  int sizes[GPU_MEMPOOL_NUM_SLOTS];
 
 #ifdef GPU_DUMMY_MEMPOOL
   memPoolMax.reserve(nslots);
@@ -531,7 +566,7 @@ void GPUManager::initHybridAPIHelper() {
   memPoolBoundaries.reserve(GPU_MEMPOOL_NUM_SLOTS);
   memPoolBoundaries.length() = GPU_MEMPOOL_NUM_SLOTS;
 
-  int bufSize = GPU_MEMPOOL_MIN_BUFFER_SIZE;
+  size_t bufSize = GPU_MEMPOOL_MIN_BUFFER_SIZE;
   for(int i = 0; i < GPU_MEMPOOL_NUM_SLOTS; i++){
     memPoolBoundaries[i] = bufSize;
     bufSize = bufSize << 1;
@@ -540,33 +575,6 @@ void GPUManager::initHybridAPIHelper() {
     memPoolMax[i]  = -1;
 #endif
   }
-
-#ifndef GPU_DUMMY_MEMPOOL
-        /*256*/ sizes[0]  = 20;
-        /*512*/ sizes[1]  = 10;
-       /*1024*/ sizes[2]  = 10;
-       /*2048*/ sizes[3]  = 20;
-       /*4096*/ sizes[4]  = 10;
-       /*8192*/ sizes[5]  = 30;
-      /*16384*/ sizes[6]  = 25;
-      /*32768*/ sizes[7]  = 10;
-      /*65536*/ sizes[8]  =  5;
-     /*131072*/ sizes[9]  =  5;
-     /*262144*/ sizes[10] =  5;
-     /*524288*/ sizes[11] =  5;
-    /*1048576*/ sizes[12] =  5;
-    /*2097152*/ sizes[13] = 10;
-    /*4194304*/ sizes[14] = 10;
-    /*8388608*/ sizes[15] = 10;
-   /*16777216*/ sizes[16] =  8;
-   /*33554432*/ sizes[17] =  6;
-   /*67108864*/ sizes[18] =  7;
-  /*134217728*/ sizes[19] = 36; // nasty hack, shouldn't be hardcoded
-
-  createPool(sizes, nslots, memPoolFreeBufs);
-#endif
-
-  printf("[%d] done creating buffer pool\n", CmiMyPe());
 
 #endif // GPU_MEMPOOL
 
@@ -836,12 +844,9 @@ void exitHybridAPI() {
 #ifdef GPU_MEMPOOL
 void releasePool(CkVec<BufferPool> &pools){
   for(int i = 0; i < pools.length(); i++){
-    Header *hdr;
-    Header *next;
-    for(hdr = pools[i].head; hdr != NULL;){
-      next = hdr->next;
+    Header *hdr = pools[i].head;
+    if (hdr != NULL){
       cudaChk(cudaFreeHost((void *)hdr));
-      hdr = next;
     }
   }
   pools.free();
@@ -853,31 +858,58 @@ void releasePool(CkVec<BufferPool> &pools){
 // if a single, large buffer is allocated for each subpool
 // if multiple smaller buffers are allocated for each subpool
 void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
-  //pools  = (BufferPool *)malloc(nslots*sizeof(BufferPool));
+  // Handle
+  CkVec<size_t> memPoolBoundariesHandle = CsvAccess(gpuManager).memPoolBoundaries;
+
+  // Initialize pools
   pools.reserve(nslots);
   pools.length() = nslots;
-
-  for(int i = 0; i < nslots; i++){
-    int bufSize = CsvAccess(gpuManager).memPoolBoundaries[i];
-    int numBuffers = nbuffers[i];
-    pools[i].size = bufSize;
+  for (int i = 0; i < nslots; i++) {
+    pools[i].size = memPoolBoundariesHandle[i];
     pools[i].head = NULL;
+  }
 
-    /*
-    cudaChk(cudaMallocHost((void **)(&pools[i].head),
-                                          (sizeof(Header)+bufSize)*numBuffers));
-    */
+  // Get GPU memory size
+  cudaDeviceProp prop;
+  cudaChk(cudaGetDeviceProperties(&prop, getMyCudaDevice(CmiMyPe())));
 
-    Header *hd = pools[i].head;
-    Header *previous = NULL;
+  // Divide by #pes and multiply by #pes in nodes
+  size_t availableMemory = prop.totalGlobalMem / CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))
+                            * CmiMyNodeSize() * GPU_MEMPOOL_SCALE;
 
-    for(int j = 0; j < numBuffers; j++){
-      cudaChk(cudaMallocHost((void **)&hd,
-                                            (sizeof(Header)+bufSize)));
-      if(hd == NULL){
-        printf("(%d) failed to allocate %dth block of size %d, slot %d\n", CmiMyPe(), j, bufSize, i);
-        CmiAbort("Exiting after failed block allocation!\n");
+  // Pre-calculate memory per size
+  int maxBuffers = *std::max_element(nbuffers, nbuffers+nslots);
+  int nBuffersToAllocate[nslots];
+  memset(nBuffersToAllocate, 0, sizeof(nBuffersToAllocate));
+  size_t bufSize;
+  while (availableMemory >= memPoolBoundariesHandle[0] + sizeof(Header)) {
+    for (int i = 0; i < maxBuffers; i++) {
+      for (int j = nslots - 1; j >= 0; j--) {
+        bufSize = memPoolBoundariesHandle[j] + sizeof(Header);
+        if (i < nbuffers[j] && bufSize <= availableMemory) {
+          nBuffersToAllocate[j]++;
+          availableMemory -= bufSize;
+        }
       }
+    }
+  }
+
+
+  // Pin the host memory
+  for (int i = 0; i < nslots; i++) {
+    bufSize = memPoolBoundariesHandle[i] + sizeof(Header);
+    int numBuffers = nBuffersToAllocate[i];
+
+    Header* hd;
+    Header* previous = NULL;
+
+    // Pin host memory in a contiguous block for a slot
+    void* pinnedChunk;
+    cudaChk(cudaMallocHost(&pinnedChunk, bufSize * numBuffers));
+
+    // Initialize header structs
+    for (int j = numBuffers - 1; j >= 0; j--) {
+      hd = reinterpret_cast<Header*>(reinterpret_cast<unsigned char*>(pinnedChunk) + bufSize * j);
       hd->slot = i;
       hd->next = previous;
       previous = hd;

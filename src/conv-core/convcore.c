@@ -137,10 +137,6 @@ extern void CldModuleInit(char **);
 #include <time.h>
 #endif
 
-#if CMK_CUDA
-#include "cuda-hybrid-api.h"
-#endif
-
 #include "quiescence.h"
 
 #if USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
@@ -3836,12 +3832,6 @@ void ConverseCommonInit(char **argv)
   CmiInitCell();
 #endif
 
-#if CMK_CUDA
-  if (CmiMyRank() == 0) {
-    initHybridAPI();
-  }
-#endif
-
   /* main thread is suspendable */
 /*
   CthSetSuspendable(CthSelf(), 0);
@@ -3871,6 +3861,10 @@ void ConverseCommonExit(void)
 #endif
 
 #if CMK_CUDA
+  // Ensure all PEs have exited gpuProgressFn before destructing
+  if(CmiMyRank() < CmiMyNodeSize()) {
+    CmiNodeBarrier();
+  }
   if (CmiMyRank() == 0) {
     exitHybridAPI();
   }
