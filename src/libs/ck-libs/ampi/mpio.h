@@ -1,0 +1,1 @@
+/* dummy mpio.h for inclusion in ampi.h when ROMIO is not built */

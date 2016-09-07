@@ -220,3 +220,5 @@
 
        integer(KIND=MPI_ADDRESS_KIND), external :: MPI_AINT_ADD
        integer(KIND=MPI_ADDRESS_KIND), external :: MPI_AINT_DIFF
+
+       include 'mpiof.h'

@@ -977,6 +977,8 @@ int AMPI_Info_free(MPI_Info *info);
 #define MPI_Win_c2f(win) (MPI_Fint)(win)
 #define MPI_Win_f2c(win) (MPI_Win)(win)
 
+#include "mpio.h"
+
 /*** AMPI Extensions ***/
 int AMPI_Migrate(MPI_Info hints);
 int AMPI_Load_start_measure(void);
