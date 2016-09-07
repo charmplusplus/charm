@@ -1,5 +1,4 @@
 #include "ddt.h"
-#include <stdbool.h>
 #include <algorithm>
 #include <limits>
 
@@ -340,7 +339,8 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
       size =  2 * sizeof(long double) ;
       break;
     case CkDDT_C_BOOL:
-      size = sizeof(_Bool) ;
+      /* Should be C99 _Bool instead of C++ bool, but MSVC doesn't support that */
+      size = sizeof(bool) ;
       break;
     case CkDDT_LOGICAL:
       size =  sizeof(int) ;

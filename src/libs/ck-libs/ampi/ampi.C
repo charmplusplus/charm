@@ -265,6 +265,7 @@ switch (*datatype) { \
   case MPI_UINT32_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint32_t); } break; \
   case MPI_UINT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint64_t); } break; \
   case MPI_LOGICAL: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int); } break; \
+  case MPI_C_BOOL: for(i=0;i<(*len);i++) { MPI_OP_IMPL(bool); } break; \
   default: \
            ckerr << "Type " << *datatype << " with Op "#OPNAME" not supported." << endl; \
   CkAbort("Unsupported MPI datatype for MPI Op"); \
