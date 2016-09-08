@@ -68,9 +68,6 @@ int myrand(int numpes) {
 #define BACK		6
 #define DIVIDEBY7      	0.14285714285714285714
 
-double startTime;
-double endTime;
-
 /** \class Main
  *
  */
@@ -122,7 +119,6 @@ class Main : public CBase_Main {
       array = CProxy_Stencil::ckNew(num_chare_x, num_chare_y, num_chare_z);
 
       //Start the computation
-      startTime = CkWallTimer();
       array.doStep();
     }
 
@@ -138,6 +134,8 @@ class Main : public CBase_Main {
 
 class Stencil: public CBase_Stencil {
   Stencil_SDAG_CODE
+  private:
+    double startTime;
 
   public:
     int iterations;
@@ -163,10 +161,14 @@ class Stencil: public CBase_Stencil {
       iterations = 0;
       imsg = 0;
       constrainBC();
+      // start measuring time
+      if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
+        startTime = CkWallTimer();
     }
 
     void pup(PUP::er &p)
     {
+      p|startTime;
       p|iterations;
       p|imsg;
 
@@ -294,6 +296,7 @@ class Stencil: public CBase_Stencil {
       // not being done right now since we are doing a fixed no. of iterations
 
       double *tmp;
+      double endTime;
       tmp = temperature;
       temperature = new_temperature;
       new_temperature = tmp;
@@ -302,6 +305,8 @@ class Stencil: public CBase_Stencil {
 
       if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
 	endTime = CkWallTimer();
+	// auto tune the LBPeriod to half as long as it takes to run the iters between LB steps
+	getLBDB()->SetLBPeriod((endTime-startTime)*LBPERIOD/2.0);
 	CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
       }
 
@@ -312,8 +317,6 @@ class Stencil: public CBase_Stencil {
 	  startTime = CkWallTimer();
 	if(iterations % LBPERIOD == 0)
 	  {
-	    // auto tune the LBPeriod to half as long as it takes to run the iters between LB steps
-	    LBSetPeriod((endTime-startTime)*LBPERIOD/2.0);
 	    AtSync();
 	  }
 	else
