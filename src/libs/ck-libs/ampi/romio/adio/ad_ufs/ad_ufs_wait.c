@@ -107,7 +107,7 @@ void ADIOI_UFS_ReadComplete(ADIO_Request *request, ADIO_Status *status, int *err
 /* DEC, SGI IRIX 5 and 6 */
     if ((*request)->queued) {
 	do {
-	    err = aio_suspend((const aiocb_t **) &((*request)->handle), 1, 0);
+	    err = aio_suspend((const struct aiocb **) &((*request)->handle), 1, 0);
 	} while ((err == -1) && (errno == EINTR));
 
 	if (err != -1) {
