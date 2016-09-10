@@ -458,6 +458,8 @@ int AMPI_Type_free(MPI_Datatype *datatype);
 int AMPI_Type_get_extent(MPI_Datatype datatype, MPI_Aint *lb, MPI_Aint *extent);
 #define MPI_Type_extent AMPI_Type_extent
 int AMPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent);
+#define MPI_Type_get_true_extent AMPI_Type_get_true_extent
+int AMPI_Type_get_true_extent(MPI_Datatype datatype, MPI_Aint *true_lb, MPI_Aint *true_extent);
 #define MPI_Type_size AMPI_Type_size
 int AMPI_Type_size(MPI_Datatype datatype, int *size);
 #define MPI_Type_lb AMPI_Type_lb
@@ -468,6 +470,8 @@ int AMPI_Type_ub(MPI_Datatype datatype, MPI_Aint* displacement);
 int AMPI_Type_set_name(MPI_Datatype datatype, const char *name);
 #define MPI_Type_get_name AMPI_Type_get_name
 int AMPI_Type_get_name(MPI_Datatype datatype, char *name, int *resultlen);
+#define MPI_Type_dup AMPI_Type_dup
+int AMPI_Type_dup(MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_create_resized AMPI_Type_create_resized
 int AMPI_Type_create_resized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype);
 #define MPI_Get_address AMPI_Get_address

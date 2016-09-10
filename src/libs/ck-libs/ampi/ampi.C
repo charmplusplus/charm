@@ -5008,6 +5008,15 @@ int AMPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent)
 }
 
 CDECL
+int AMPI_Type_get_true_extent(MPI_Datatype datatype, MPI_Aint *true_lb, MPI_Aint *true_extent)
+{
+  AMPIAPI("AMPI_Type_get_true_extent");
+  *true_lb = getDDT()->getTrueLB(datatype);
+  *true_extent = getDDT()->getTrueExtent(datatype);
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Type_size(MPI_Datatype datatype, int *size)
 {
   AMPIAPI("AMPI_Type_size");
@@ -5036,6 +5045,14 @@ int AMPI_Type_create_resized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent,
 {
   AMPIAPI("AMPI_Type_create_resized");
   getDDT()->createResized(oldtype, lb, extent, newtype);
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_dup(MPI_Datatype oldtype, MPI_Datatype *newtype)
+{
+  AMPIAPI("AMPI_Type_dup");
+  getDDT()->createDup(oldtype, newtype);
   return MPI_SUCCESS;
 }
 

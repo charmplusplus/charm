@@ -47,12 +47,14 @@ FDECL {
 #define mpi_type_free FTN_NAME( MPI_TYPE_FREE , mpi_type_free )
 #define mpi_type_get_extent FTN_NAME( MPI_TYPE_GET_EXTENT , mpi_type_get_extent )
 #define mpi_type_extent FTN_NAME( MPI_TYPE_EXTENT , mpi_type_extent )
+#define mpi_type_get_true_extent FTN_NAME( MPI_TYPE_GET_TRUE_EXTENT , mpi_get_true_extent )
 #define mpi_type_size FTN_NAME( MPI_TYPE_SIZE , mpi_type_size )
 #define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
 /* mpi_type_set_name is defined in ampifimpl.f90, see ampif_type_set_name defined below */
 #define mpi_type_get_name FTN_NAME( MPI_TYPE_GET_NAME , mpi_type_get_name )
 #define mpi_type_create_resized FTN_NAME( MPI_TYPE_CREATE_RESIZED, mpi_type_create_resized )
+#define mpi_type_dup FTN_NAME( MPI_TYPE_DUP, mpi_type_dup )
 #define mpi_get_address FTN_NAME( MPI_GET_ADDRESS , mpi_get_address )
 #define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
 #define mpi_status_set_elements FTN_NAME( MPI_STATUS_SET_ELEMENTS , mpi_status_set_elements )
@@ -638,6 +640,11 @@ void mpi_type_create_resized(int* oldtype, MPI_Aint* lb, MPI_Aint* extent, int* 
   *ierr = AMPI_Type_create_resized(*oldtype, *lb, *extent, newtype);
 }
 
+void mpi_type_dup(int* oldtype, int* newtype, int* ierr)
+{
+  *ierr = AMPI_Type_dup(*oldtype, newtype);
+}
+
 void mpi_type_commit(int *type, int *ierr)
 {
   *ierr = AMPI_Type_commit(type);
@@ -656,6 +663,11 @@ void  mpi_type_get_extent(int* type, MPI_Aint* lb, MPI_Aint* extent, int* ierr)
 void  mpi_type_extent(int* type, MPI_Aint* extent, int* ierr)
 {
   *ierr = AMPI_Type_extent(*type, extent);
+}
+
+void mpi_type_get_true_extent(int* datatype, MPI_Aint* true_lb, MPI_Aint* true_extent, int* ierr)
+{
+  *ierr = AMPI_Type_get_true_extent(*datatype, true_lb, true_extent);
 }
 
 void  mpi_type_size(int* type, int* size, int* ierr)

@@ -175,6 +175,27 @@ CkDDT::getUB(int nIndex) const
   return dttype->getUB();
 }
 
+CkDDT_Aint
+CkDDT::getTrueExtent(int nIndex) const
+{
+  CkDDT_DataType *dttype = getType(nIndex);
+  return dttype->getTrueExtent();
+}
+
+CkDDT_Aint
+CkDDT::getTrueLB(int nIndex) const
+{
+  CkDDT_DataType *dttype = getType(nIndex);
+  return dttype->getTrueLB();
+}
+
+void
+CkDDT::createDup(int nIndexOld, int *nIndexNew)
+{
+  CkDDT_DataType *dttype = getType(nIndexOld);
+  nIndexNew = (int*) new CkDDT_DataType(*dttype);
+}
+
 int CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
@@ -442,6 +463,8 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
   extent      = size;
   lb          = 0;
   ub          = size;
+  trueExtent  = size;
+  trueLB      = 0;
   iscontig    = true;
   nameLen     = 0;
   baseType    = NULL;
@@ -456,10 +479,30 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
 
 
 CkDDT_DataType::CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int count, CkDDT_Aint lb, CkDDT_Aint ub,
-            bool iscontig, int baseSize, CkDDT_Aint baseExtent, CkDDT_DataType* baseType, int numElements, int baseIndex) :
-    datatype(datatype), size(size), extent(extent), count(count), lb(lb), ub(ub), iscontig(iscontig),
-    baseSize(baseSize), baseExtent(baseExtent), baseType(baseType), numElements(numElements),
-    baseIndex(baseIndex), nameLen(0), isAbsolute(false)
+            bool iscontig, int baseSize, CkDDT_Aint baseExtent, CkDDT_DataType* baseType, int numElements, int baseIndex,
+            CkDDT_Aint trueExtent, CkDDT_Aint trueLB) :
+    datatype(datatype), size(size), extent(extent), count(count), lb(lb), ub(ub), trueExtent(trueExtent),
+    trueLB(trueLB), iscontig(iscontig), baseSize(baseSize), baseExtent(baseExtent), baseType(baseType),
+    numElements(numElements), baseIndex(baseIndex), nameLen(0), isAbsolute(false)
+{}
+
+CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj)  :
+  datatype(obj.datatype)
+  ,size(obj.size)
+  ,extent(obj.extent)
+  ,count(obj.count)
+  ,lb(obj.lb)
+  ,ub(obj.ub)
+  ,trueExtent(obj.trueExtent)
+  ,trueLB(obj.trueLB)
+  ,iscontig(obj.iscontig)
+  ,baseSize(obj.baseSize)
+  ,baseExtent(obj.baseExtent)
+  ,baseType(obj.baseType)
+  ,numElements(obj.numElements)
+  ,baseIndex(obj.baseIndex)
+  ,nameLen(obj.nameLen)
+  ,isAbsolute(obj.isAbsolute)
 {}
 
 CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_Aint _extent)
@@ -472,6 +515,8 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_
   baseIndex   = obj.baseIndex;
   numElements = obj.numElements;
   size        = obj.size;
+  trueExtent  = obj.trueExtent;
+  trueLB      = obj.trueLB;
   count       = obj.count;
   isAbsolute  = obj.isAbsolute;
   nameLen     = obj.nameLen;
@@ -550,9 +595,39 @@ CkDDT_DataType::getExtent(void) const
 }
 
 int
+CkDDT_DataType::getCount(void) const
+{
+  return count;
+}
+
+CkDDT_Aint
+CkDDT_DataType::getTrueExtent(void) const
+{
+  return trueExtent;
+}
+
+CkDDT_Aint
+CkDDT_DataType::getTrueLB(void) const
+{
+  return trueLB;
+}
+
+int
 CkDDT_DataType::getBaseSize(void) const
 {
   return baseSize ;
+}
+
+CkDDT_Aint
+CkDDT_DataType::getBaseExtent(void) const
+{
+  return baseExtent ;
+}
+
+CkDDT_DataType*
+CkDDT_DataType::getBaseType(void) const
+{
+  return baseType;
 }
 
 int
@@ -571,6 +646,12 @@ CkDDT_Aint
 CkDDT_DataType::getUB(void) const
 {
   return ub;
+}
+
+int
+CkDDT_DataType::getBaseIndex(void) const
+{
+  return baseIndex;
 }
 
 int
@@ -602,6 +683,8 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
   p(baseSize);
   p(baseExtent);
   p(baseIndex);
+  p(trueExtent);
+  p(trueLB);
   p(lb);
   p(ub);
   p(iscontig);
@@ -641,6 +724,8 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
   numElements = count * baseType->getNumElements();
   lb = baseType->getLB();
   ub = lb + extent;
+  trueExtent = extent;
+  trueLB = lb;
 
   if (extent != size) {
     iscontig = false;
@@ -682,6 +767,8 @@ CkDDT_Contiguous::pupType(PUP::er &p, CkDDT *ddt)
   p(baseIndex);
   p(lb);
   p(ub);
+  p(trueExtent);
+  p(trueLB);
   p(iscontig);
   p(numElements);
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
@@ -731,6 +818,8 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
   }
   ub = lb + extent;
 
+  trueExtent = extent;
+  trueLB = lb;
   if (extent != size) {
     iscontig = false;
   }
@@ -780,6 +869,8 @@ CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt)
   p(baseIndex);
   p(lb);
   p(ub);
+  p(trueExtent);
+  p(trueLB);
   p(iscontig);
   p(numElements);
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
@@ -832,6 +923,8 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
   }
   ub = lb + extent;
 
+  trueExtent = extent;
+  trueLB = lb;
   if (extent != size) {
     iscontig = false;
   }
@@ -897,7 +990,7 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp, int
                          CkDDT_DataType* base)
     : CkDDT_DataType(CkDDT_INDEXED, 0, 0, nCount, numeric_limits<CkDDT_Aint>::max(),
 		     numeric_limits<CkDDT_Aint>::min(), 0, base->getSize(), base->getExtent(),
-		     base, nCount* base->getNumElements(), bindex),
+		     base, nCount* base->getNumElements(), bindex, 0, 0),
     arrayBlockLength(new int[nCount]), arrayDisplacements(new CkDDT_Aint[nCount])
 {
     CkDDT_Aint positiveExtent = 0;
@@ -918,6 +1011,9 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp, int
     extent = positiveExtent + (-1)*negativeExtent;
     lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0],&arrayDisplacements[0] + nCount+1)*baseExtent;
     ub = lb + extent;
+
+    trueExtent = extent;
+    trueLB = lb;
 
     /* set iscontig */
     if (extent != size) {
@@ -985,6 +1081,8 @@ CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
   p(baseIndex);
   p(lb);
   p(ub);
+  p(trueExtent);
+  p(trueLB);
   p(iscontig);
   p(numElements);
 
@@ -1033,6 +1131,9 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp,  
 
   lb = baseType->getLB() + *std::min_element(arrDisp, arrDisp+nCount+1);
   extent = ub - lb;
+
+  trueExtent = extent;
+  trueLB = lb;
 
   /* set iscontig */
   if (extent != size) {
@@ -1113,7 +1214,7 @@ CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int
 CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index,
   CkDDT_DataType *type)     : CkDDT_DataType(CkDDT_INDEXED_BLOCK, 0, 0, count, numeric_limits<CkDDT_Aint>::max(),
          numeric_limits<CkDDT_Aint>::min(), 0, type->getSize(), type->getExtent(),
-         type, count * type->getNumElements(), index),
+         type, count * type->getNumElements(), index, 0, 0),
     BlockLength(Blength), arrayDisplacements(new CkDDT_Aint[count])
 {
   CkDDT_Aint positiveExtent = 0;
@@ -1133,6 +1234,9 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *Arr
   extent = positiveExtent + (-1)*negativeExtent;
   lb = baseType->getLB() + *std::min_element(arrayDisplacements, arrayDisplacements + count+1)*baseExtent;
   ub = lb + extent;
+
+  trueExtent = extent;
+  trueLB = lb;
 
   /* set iscontig */
   if (extent != size) {
@@ -1201,6 +1305,8 @@ CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
   p(baseIndex);
   p(lb);
   p(ub);
+  p(trueExtent);
+  p(trueLB);
   p(iscontig);
   p(numElements);
   p(BlockLength);
@@ -1253,6 +1359,9 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *A
   extent = positiveExtent + (-1)*negativeExtent;
   lb = baseType->getLB() + *std::min_element(arrayDisplacements, arrayDisplacements + count+1);
   ub = lb + extent;
+
+  trueExtent = extent;
+  trueLB = lb;
 
   /* set iscontig */
   if (extent != size) {
@@ -1321,6 +1430,8 @@ CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
   p(baseIndex);
   p(lb);
   p(ub);
+  p(trueExtent);
+  p(trueLB);
   p(iscontig);
   p(numElements);
   p(BlockLength);
@@ -1356,7 +1467,7 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[
 CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
                        CkDDT_Aint* arrDisp, int *bindex, CkDDT_DataType** arrBase)
     : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, numeric_limits<CkDDT_Aint>::max(),
-    numeric_limits<CkDDT_Aint>::min(), 0, 0, 0, NULL, 0, 0),
+    numeric_limits<CkDDT_Aint>::min(), 0, 0, 0, NULL, 0, 0, 0, 0),
     arrayBlockLength(new int[nCount]), arrayDisplacements(new CkDDT_Aint[nCount]),
     index(new int[nCount]), arrayDataType(new CkDDT_DataType*[nCount])
 {
@@ -1396,6 +1507,9 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
   if (!explicit_ub && (saveExtent != 0) && (extent % saveExtent != 0)) {
       extent += (saveExtent - (extent % saveExtent));
   }
+
+  trueExtent = extent;
+  trueLB = lb;
 
   /* set iscontig */
   if (extent != size) {
@@ -1479,6 +1593,8 @@ CkDDT_Struct::pupType(PUP::er &p, CkDDT* ddt)
   p(count);
   p(lb);
   p(ub);
+  p(trueExtent);
+  p(trueLB);
   p(iscontig);
   p(numElements);
   if(p.isUnpacking())

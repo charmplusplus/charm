@@ -122,6 +122,9 @@ class CkDDT ;
   setName - set the name of datatype
   getName - get the name of datatype
   setAbsolute - tells DDT's serialize methods that we are dealing with absolute addresses
+
+  Reference Counting currently disabled. To add this feature back in, the refcount variable
+    cannot be copied when making a duplicate.
 */
 
 class CkDDT_DataType {
@@ -135,6 +138,8 @@ class CkDDT_DataType {
     CkDDT_Aint extent;
     int count;
     CkDDT_Aint lb;
+    CkDDT_Aint trueExtent;
+    CkDDT_Aint trueLB;
     CkDDT_Aint ub;
     bool iscontig;
     int baseSize;
@@ -147,7 +152,6 @@ class CkDDT_DataType {
     bool isAbsolute;
 
   private:
-    CkDDT_DataType(const CkDDT_DataType& obj);
     CkDDT_DataType& operator=(const CkDDT_DataType& obj);
 
   public:
@@ -155,9 +159,10 @@ class CkDDT_DataType {
     virtual ~CkDDT_DataType() { }
     CkDDT_DataType(int type);
     CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int count, CkDDT_Aint lb, CkDDT_Aint ub,
-            bool iscontig, int baseSize, CkDDT_Aint baseExtent,
-            CkDDT_DataType* baseType, int numElements, int baseIndex);
+            bool iscontig, int baseSize, CkDDT_Aint baseExtent, CkDDT_DataType* baseType,
+            int numElements, int baseIndex, CkDDT_Aint trueExtent, CkDDT_Aint trueLB);
     CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
+    CkDDT_DataType(const CkDDT_DataType& obj);
 
     virtual bool isContig(void) const;
     virtual int getSize(int count=1) const;
@@ -165,6 +170,12 @@ class CkDDT_DataType {
     virtual int getBaseSize(void) const;
     virtual CkDDT_Aint getLB(void) const;
     virtual CkDDT_Aint getUB(void) const;
+    virtual CkDDT_Aint getTrueExtent(void) const;
+    virtual CkDDT_Aint getTrueLB(void) const;
+    virtual int getBaseIndex(void) const;
+    virtual CkDDT_DataType* getBaseType(void) const;
+    virtual CkDDT_Aint getBaseExtent(void) const;
+    virtual int getCount(void) const;
     virtual int getType(void) const;
     virtual int getNumElements(void) const;
     virtual void inrRefCount(void) ;
@@ -576,6 +587,9 @@ class CkDDT {
   CkDDT_Aint getExtent(int nIndex) const;
   CkDDT_Aint getLB(int nIndex) const;
   CkDDT_Aint getUB(int nIndex) const;
+  CkDDT_Aint getTrueExtent(int nIndex) const;
+  CkDDT_Aint getTrueLB(int nIndex) const;
+  void createDup(int nIndexOld, int *nIndexNew);
   int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
   int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,
                  int array_of_integers[], CkDDT_Aint array_of_addresses[], int array_of_datatypes[]) const;
