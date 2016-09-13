@@ -593,11 +593,12 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_MIN:  return CkReduction::min_int;
         case MPI_SUM:  return CkReduction::sum_int;
         case MPI_PROD: return CkReduction::product_int;
-        case MPI_LAND: return CkReduction::logical_and;
-        case MPI_LOR:  return CkReduction::logical_or;
-        case MPI_BAND: return CkReduction::bitvec_and;
-        case MPI_BOR:  return CkReduction::bitvec_or;
-        case MPI_BXOR: return CkReduction::bitvec_xor;
+        case MPI_LAND: return CkReduction::logical_and_int;
+        case MPI_LOR:  return CkReduction::logical_or_int;
+        case MPI_LXOR: return CkReduction::logical_xor_int;
+        case MPI_BAND: return CkReduction::bitvec_and_int;
+        case MPI_BOR:  return CkReduction::bitvec_or_int;
+        case MPI_BXOR: return CkReduction::bitvec_xor_int;
         default:       break;
       }
     case MPI_FLOAT:

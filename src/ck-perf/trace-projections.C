@@ -2035,14 +2035,9 @@ void KMeansBOC::startKMeansAnalysis() {
   LogPool *pool = CkpvAccess(_trace)->_logPool;
 
  if(CkMyPe()==0)     CkPrintf("[%d] KMeansBOC::startKMeansAnalysis time=\t%g\n", CkMyPe(), CkWallTimer() );
-  int flushInt = 0;
-  if (pool->hasFlushed) {
-    flushInt = 1;
-  }
-  
-  CkCallback cb(CkIndex_KMeansBOC::flushCheck(NULL), 
-		0, thisProxy);
-  contribute(sizeof(int), &flushInt, CkReduction::logical_or, cb);  
+
+  CkCallback cb(CkIndex_KMeansBOC::flushCheck(NULL), 0, thisProxy);
+  contribute(sizeof(bool), &(pool->hasFlushed), CkReduction::logical_or_bool, cb);
 }
 
 // Called on processor 0
@@ -2052,7 +2047,7 @@ void KMeansBOC::flushCheck(CkReductionMsg *msg) {
 
   // if(CkMyPe()==0) CkPrintf("[%d] KMeansBOC::flushCheck time=\t%g\n", CkMyPe(), CkWallTimer() );
   
-  if (someFlush == 0) {
+  if (!someFlush) {
     // Data intact proceed with KMeans analysis
     CProxy_KMeansBOC kMeansProxy(kMeansGID);
     kMeansProxy.flushCheckDone();

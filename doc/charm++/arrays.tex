@@ -341,10 +341,10 @@ processor.
 individual contributions.  Any of them may be passed as an argument of type
 \kw{CkReduction::reducerType} to \kw{contribute}.
 
-The first four operations ({\tt sum}, {\tt product}, {\tt max}, and {\tt min}) work on {\tt int},
-{\tt long}, {\tt float}, or {\tt double} data as indicated by the suffix.  The logical
-reductions ({\tt and}, {\tt or}) only work on integer data.  All the built-in
-reductions work on either single numbers (pass a pointer) or arrays-- just
+The first four operations ({\tt sum}, {\tt product}, {\tt max}, and {\tt min}) work on {\tt char},
+{\tt short}, {\tt int}, {\tt long}, {\tt long long}, {\tt float}, or {\tt double} data as indicated
+by the suffix.  The logical reductions ({\tt and}, {\tt or}) only work on bool and integer data.
+All the built-in reductions work on either single numbers (pass a pointer) or arrays-- just
 pass the correct number of bytes to \kw{contribute}.
 
 \begin{enumerate}
@@ -363,17 +363,23 @@ result will be the largest of the given numbers.
 \item \kw{CkReduction::min\_int}, \kw{min\_long}, \kw{min\_float}, \kw{min\_double} : the
 result will be the smallest of the given numbers.
 
-\item \kw{CkReduction::logical\_and} : the result will be the logical AND of the given
-integers.  0 is false, nonzero is true.
+\item \kw{CkReduction::logical\_and\_bool}, \kw{logical\_and\_int} : the result will be the logical AND of the given
+values.
 
-\item \kw{CkReduction::logical\_or} : the result will be the logical OR of the given
-integers.
+\item \kw{CkReduction::logical\_or\_bool}, \kw{logical\_or\_int} : the result will be the logical OR of the given
+values.
 
-\item \kw{CkReduction::bitvec\_and} : the result will be the bitvector AND of the given numbers (represented as integers).
+\item \kw{CkReduction::logical\_xor\_bool}, \kw{logical\_xor\_int} : the result will be the logical XOR of the given
+values.
 
-\item \kw{CkReduction::bitvec\_or} : the result will be the bitvector OR of the given numbers (represented as integers).
+\item \kw{CkReduction::bitvec\_and\_bool}, \kw{bitvec\_and\_int} : the result will be the bitvector AND of the given
+values.
 
-\item \kw{CkReduction::bitvec\_xor} : the result will be the bitvector XOR of the given numbers (represented as integers).
+\item \kw{CkReduction::bitvec\_or\_bool}, \kw{bitvec\_or\_int} : the result will be the bitvector OR of the given
+values.
+
+\item \kw{CkReduction::bitvec\_xor\_bool}, \kw{bitvec\_xor\_int} : the result will be the bitvector XOR of the given
+values.
 
 \item \kw{CkReduction::set} : the result will be a verbatim concatenation of
 all the contributed data, separated into \kw{CkReduction::setElement} records.

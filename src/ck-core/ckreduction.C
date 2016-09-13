@@ -1633,6 +1633,20 @@ SIMPLE_REDUCTION(logical_and,int,"%d",
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
 )
 
+//Compute the logical AND of the integers passed by each element.
+// The resulting integer will be zero if any source integer is zero; else 1.
+SIMPLE_REDUCTION(logical_and_int,int,"%d",
+        if (value[i]==0)
+     ret[i]=0;
+  ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
+)
+
+//Compute the logical AND of the bools passed by each element.
+// The resulting bool will be false if any source bool is false; else true.
+SIMPLE_REDUCTION(logical_and_bool,bool,"%d",
+  if (!value[i]) ret[i]=false;
+)
+
 //Compute the logical OR of the integers passed by each element.
 // The resulting integer will be 1 if any source integer is nonzero; else 0.
 SIMPLE_REDUCTION(logical_or,int,"%d",
@@ -1641,9 +1655,43 @@ SIMPLE_REDUCTION(logical_or,int,"%d",
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
 )
 
+//Compute the logical OR of the integers passed by each element.
+// The resulting integer will be 1 if any source integer is nonzero; else 0.
+SIMPLE_REDUCTION(logical_or_int,int,"%d",
+  if (value[i]!=0)
+           ret[i]=1;
+  ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
+)
+
+//Compute the logical OR of the bools passed by each element.
+// The resulting bool will be true if any source bool is true; else false.
+SIMPLE_REDUCTION(logical_or_bool,bool,"%d",
+  if (value[i]) ret[i]=true;
+)
+
+//Compute the logical XOR of the integers passed by each element.
+// The resulting integer will be 1 if an odd number of source integers is nonzero; else 0.
+SIMPLE_REDUCTION(logical_xor_int,int,"%d",
+  ret[i] = (!ret[i] != !value[i]);
+)
+
+//Compute the logical XOR of the bools passed by each element.
+// The resulting bool will be true if an odd number of source bools is true; else false.
+SIMPLE_REDUCTION(logical_xor_bool,bool,"%d",
+  ret[i] = (ret[i] != value[i]);
+)
+
 SIMPLE_REDUCTION(bitvec_and,int,"%d",ret[i]&=value[i];)
+SIMPLE_REDUCTION(bitvec_and_int,int,"%d",ret[i]&=value[i];)
+SIMPLE_REDUCTION(bitvec_and_bool,bool,"%d",ret[i]&=value[i];)
+
 SIMPLE_REDUCTION(bitvec_or,int,"%d",ret[i]|=value[i];)
+SIMPLE_REDUCTION(bitvec_or_int,int,"%d",ret[i]|=value[i];)
+SIMPLE_REDUCTION(bitvec_or_bool,bool,"%d",ret[i]|=value[i];)
+
 SIMPLE_REDUCTION(bitvec_xor,int,"%d",ret[i]^=value[i];)
+SIMPLE_REDUCTION(bitvec_xor_int,int,"%d",ret[i]^=value[i];)
+SIMPLE_REDUCTION(bitvec_xor_bool,bool,"%d",ret[i]^=value[i];)
 
 //Select one random message to pass on
 static CkReductionMsg *random(int nMsg,CkReductionMsg **msg) {
@@ -2048,22 +2096,37 @@ CkReduction::reducerStruct CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     CkReduction::reducerStruct(::min_float, true),
     CkReduction::reducerStruct(::min_double, true),
 
-    //Compute the logical AND of the integers passed by each element.
-    // The resulting integer will be zero if any source integer is zero.
+    //Compute the logical AND of the values passed by each element.
+    // The resulting value will be zero if any source value is zero.
     CkReduction::reducerStruct(::logical_and, true),
+    CkReduction::reducerStruct(::logical_and_int, true),
+    CkReduction::reducerStruct(::logical_and_bool, true),
 
-    //Compute the logical OR of the integers passed by each element.
-    // The resulting integer will be 1 if any source integer is nonzero.
+    //Compute the logical OR of the values passed by each element.
+    // The resulting value will be 1 if any source value is nonzero.
     CkReduction::reducerStruct(::logical_or, true),
+    CkReduction::reducerStruct(::logical_or_int, true),
+    CkReduction::reducerStruct(::logical_or_bool, true),
 
-    // Compute the logical bitvector AND of the integers passed by each element.
+    //Compute the logical XOR of the values passed by each element.
+    // The resulting value will be 1 if an odd number of source values is nonzero.
+    CkReduction::reducerStruct(::logical_xor_int, true),
+    CkReduction::reducerStruct(::logical_xor_bool, true),
+
+    // Compute the logical bitvector AND of the values passed by each element.
     CkReduction::reducerStruct(::bitvec_and, true),
+    CkReduction::reducerStruct(::bitvec_and_int, true),
+    CkReduction::reducerStruct(::bitvec_and_bool, true),
 
-    // Compute the logical bitvector OR of the integers passed by each element.
+    // Compute the logical bitvector OR of the values passed by each element.
     CkReduction::reducerStruct(::bitvec_or, true),
+    CkReduction::reducerStruct(::bitvec_or_int, true),
+    CkReduction::reducerStruct(::bitvec_or_bool, true),
     
-    // Compute the logical bitvector XOR of the integers passed by each element.
+    // Compute the logical bitvector XOR of the values passed by each element.
     CkReduction::reducerStruct(::bitvec_xor, true),
+    CkReduction::reducerStruct(::bitvec_xor_int, true),
+    CkReduction::reducerStruct(::bitvec_xor_bool, true),
 
     // Select one of the messages at random to pass on
     CkReduction::reducerStruct(::random, true),

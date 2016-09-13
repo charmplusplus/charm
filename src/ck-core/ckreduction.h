@@ -148,22 +148,31 @@ public:
                 min_uchar,min_ushort,min_uint,min_ulong,
                 min_ulong_long,min_float,min_double,
 
-	//Compute the logical AND of the integers passed by each element.
-	// The resulting integer will be zero if any source integer is zero.
-		logical_and,
+	//Compute the logical AND of the values passed by each element.
+	// The resulting value will be zero if any source value is zero.
+		logical_and, // Deprecated: same as logical_and_int
+                logical_and_int,logical_and_bool,
 
-	//Compute the logical OR of the integers passed by each element.
-	// The resulting integer will be 1 if any source integer is nonzero.
-		logical_or,
+	//Compute the logical OR of the values passed by each element.
+	// The resulting value will be 1 if any source value is nonzero.
+		logical_or, // Deprecated: same as logical_or_int
+                logical_or_int,logical_or_bool,
 
-                // Compute the logical bitvector AND of the integers passed by each element.
-                bitvec_and,
+	//Compute the logical XOR of the values passed by each element.
+	// The resulting value will be 1 if an odd number of source value is nonzero.
+                logical_xor_int,logical_xor_bool,
 
-                // Compute the logical bitvector OR of the integers passed by each element.
-                bitvec_or,
+                // Compute the logical bitvector AND of the values passed by each element.
+                bitvec_and, // Deprecated: same as bitvec_and_int
+                bitvec_and_int,bitvec_and_bool,
 
-                // Compute the logical bitvector XOR of the integers passed by each element.
-                bitvec_xor,
+                // Compute the logical bitvector OR of the values passed by each element.
+                bitvec_or, // Deprecated: same as bitvec_or_int
+                bitvec_or_int,bitvec_or_bool,
+
+                // Compute the logical bitvector XOR of the values passed by each element.
+                bitvec_xor, // Deprecated: same as bitvec_xor_int
+                bitvec_xor_int,bitvec_xor_bool,
 
 	// Select one message at random to pass on
 		random,
