@@ -55,6 +55,11 @@ FDECL {
 #define mpi_type_get_name FTN_NAME( MPI_TYPE_GET_NAME , mpi_type_get_name )
 #define mpi_type_create_resized FTN_NAME( MPI_TYPE_CREATE_RESIZED, mpi_type_create_resized )
 #define mpi_type_dup FTN_NAME( MPI_TYPE_DUP, mpi_type_dup )
+#define mpi_type_set_attr FTN_NAME( MPI_TYPE_SET_ATTR, mpi_type_set_attr )
+#define mpi_type_get_attr FTN_NAME( MPI_TYPE_GET_ATTR, mpi_type_get_attr )
+#define mpi_type_delete_attr FTN_NAME( MPI_TYPE_DELETE_ATTR, mpi_type_delete_attr )
+#define mpi_type_create_keyval FTN_NAME( MPI_TYPE_CREATE_KEYVAL, mpi_type_create_keyval )
+#define mpi_type_free_keyval FTN_NAME( MPI_TYPE_FREE_KEYVAL, mpi_type_free_keyval )
 #define mpi_get_address FTN_NAME( MPI_GET_ADDRESS , mpi_get_address )
 #define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
 #define mpi_status_set_elements FTN_NAME( MPI_STATUS_SET_ELEMENTS , mpi_status_set_elements )
@@ -701,6 +706,34 @@ void mpi_type_get_name(int* datatype, char* name, int* resultlen, int* ierr)
 
   if (*ierr == MPI_SUCCESS)
     ampif_str_c2f(name, tmpName, MPI_MAX_OBJECT_NAME);
+}
+
+void mpi_type_set_attr(int *datatype, int *type_keyval, void *attribute_val, int *ierr)
+{
+  *ierr = AMPI_Type_set_attr(*datatype, *type_keyval, attribute_val);
+}
+
+void mpi_type_get_attr(int *datatype, int *type_keyval, void *attribute_val, int *flag, int *ierr)
+{
+  *ierr = AMPI_Type_get_attr(*datatype, *type_keyval, attribute_val, flag);
+}
+
+void mpi_type_delete_attr(int *datatype, int *type_keyval, int *ierr)
+{
+  *ierr = AMPI_Type_delete_attr(*datatype, *type_keyval);
+}
+
+void mpi_type_create_keyval(int (*type_copy_attr_fn)(int,int,void*,void*,void*,int*),
+                            int (*type_delete_attr_function)(int,int,void*,void*),
+                            int *type_keyval, void *extra_state, int *ierr)
+{
+  *ierr = AMPI_Type_create_keyval(type_copy_attr_fn, type_delete_attr_function,
+                                  type_keyval, extra_state);
+}
+
+void mpi_type_free_keyval(int *type_keyval, int *ierr)
+{
+  *ierr = AMPI_Type_free_keyval(type_keyval);
 }
 
 void mpi_get_address(const void* location, MPI_Aint *address, int* ierr)

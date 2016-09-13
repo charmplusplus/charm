@@ -296,6 +296,11 @@ int MPI_COMM_NULL_COPY_FN   ( MPI_Comm, int, void *, void *, void *, int * );
 int MPI_COMM_NULL_DELETE_FN ( MPI_Comm, int, void *, void * );
 int MPI_COMM_DUP_FN         ( MPI_Comm, int, void *, void *, void *, int * );
 
+typedef int MPI_Type_copy_attr_function(MPI_Datatype oldtype, int type_keyval, void *extra_state,
+                                        void *attribute_val_in, void *attribute_val_out, int *flag);
+typedef int MPI_Type_delete_attr_function(MPI_Datatype datatype, int type_keyval,
+                                          void *attribute_val, void *extra_state);
+
 #define MPI_TYPE_NULL_DELETE_FN MPI_type_null_delete_fn
 #define MPI_TYPE_NULL_COPY_FN   MPI_type_null_copy_fn
 #define MPI_TYPE_DUP_FN         MPI_type_dup_fn
@@ -474,6 +479,18 @@ int AMPI_Type_get_name(MPI_Datatype datatype, char *name, int *resultlen);
 int AMPI_Type_dup(MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_create_resized AMPI_Type_create_resized
 int AMPI_Type_create_resized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype);
+#define MPI_Type_set_attr AMPI_Type_set_attr
+int AMPI_Type_set_attr(MPI_Datatype datatype, int type_keyval, void *attribute_val);
+#define MPI_Type_get_attr AMPI_Type_get_attr
+int AMPI_Type_get_attr(MPI_Datatype datatype, int type_keyval, void *attribute_val, int *flag);
+#define MPI_Type_delete_attr AMPI_Type_delete_attr
+int AMPI_Type_delete_attr(MPI_Datatype datatype, int type_keyval);
+#define MPI_Type_create_keyval AMPI_Type_create_keyval
+int AMPI_Type_create_keyval(MPI_Type_copy_attr_function *type_copy_attr_fn,
+                            MPI_Type_delete_attr_function *type_delete_attr_fn,
+                            int *type_keyval, void *extra_state);
+#define MPI_Type_free_keyval AMPI_Type_free_keyval
+int AMPI_Type_free_keyval(int *type_keyval);
 #define MPI_Get_address AMPI_Get_address
 int AMPI_Get_address(const void* location, MPI_Aint *address);
 #define MPI_Address AMPI_Address

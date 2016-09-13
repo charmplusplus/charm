@@ -5131,6 +5131,47 @@ int AMPI_Type_dup(MPI_Datatype oldtype, MPI_Datatype *newtype)
   return MPI_SUCCESS;
 }
 
+int AMPI_Type_set_attr(MPI_Datatype datatype, int type_keyval, void *attribute_val)
+{
+  AMPIAPI("AMPI_Type_set_attr");
+  /* no-op implementation */
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_get_attr(MPI_Datatype datatype, int type_keyval, void *attribute_val, int *flag)
+{
+  AMPIAPI("AMPI_Type_get_attr");
+  /* no-op implementation */
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_delete_attr(MPI_Datatype datatype, int type_keyval)
+{
+  AMPIAPI("AMPI_Type_delete_attr");
+  /* no-op implementation */
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_create_keyval(MPI_Type_copy_attr_function *type_copy_attr_fn,
+                            MPI_Type_delete_attr_function *type_delete_attr_fn,
+                            int *type_keyval, void *extra_state)
+{
+  AMPIAPI("AMPI_Type_create_keyval");
+  /* no-op implementation */
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Type_free_keyval(int *type_keyval)
+{
+  AMPIAPI("AMPI_Type_free_keyval");
+  /* no-op implementation */
+  return MPI_SUCCESS;
+}
+
 CDECL
 int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
                int tag, MPI_Comm comm, MPI_Request *request)
