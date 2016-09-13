@@ -627,8 +627,7 @@ void CkMemCheckPT::recvArrayCheckpoint(CkArrayCheckPTMessage *msg)
 		  }
 		  else if (where == CkCheckPoint_inDISK) {
 			// another barrier for finalize the writing using fsync
-			CkCallback localcb(CkIndex_CkMemCheckPT::syncFiles(NULL),thisgroup);
-			contribute(0,NULL,CkReduction::sum_int,localcb);
+			contribute(CkCallback(CkReductionTarget(CkMemCheckPT, syncFiles), thisgroup));
 		  }
 		  else
 			CmiAbort("Unknown checkpoint scheme");
@@ -720,8 +719,7 @@ void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
       }
       else if (where == CkCheckPoint_inDISK) {
         // another barrier for finalize the writing using fsync
-        CkCallback localcb(CkIndex_CkMemCheckPT::syncFiles(NULL),thisgroup);
-        contribute(0,NULL,CkReduction::sum_int,localcb);
+        contribute(CkCallback(CkReductionTarget(CkMemCheckPT, syncFiles), thisgroup));
       }
       else
         CmiAbort("Unknown checkpoint scheme");
@@ -731,9 +729,8 @@ void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
 }
 
 // only used in disk checkpointing
-void CkMemCheckPT::syncFiles(CkReductionMsg *m)
+void CkMemCheckPT::syncFiles()
 {
-  delete m;
 #if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
   if(system("sync")< 0)
   {

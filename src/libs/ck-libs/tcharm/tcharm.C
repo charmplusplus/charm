@@ -601,8 +601,7 @@ int _vals[2]={0,1};
 //Called when we want to go to a barrier
 void TCharm::barrier(void) {
 	//Contribute to a synchronizing reduction
-	CkCallback cb(index_t::atBarrier(0), thisProxy[0]);
-	contribute(sizeof(_vals),&_vals,CkReduction::sum_int,cb);
+	contribute(CkCallback(CkReductionTarget(TCharm, atBarrier), thisProxy[0]));
 #if CMK_BIGSIM_CHARM
         void *curLog;		// store current log in timeline
         _TRACE_BG_TLINE_END(&curLog);
@@ -615,9 +614,8 @@ void TCharm::barrier(void) {
 }
 
 //Called when we've reached the barrier
-void TCharm::atBarrier(CkReductionMsg *m) {
+void TCharm::atBarrier(void){
 	DBGX("clients all at barrier");
-	delete m;
 	thisProxy.start(); //Just restart everybody
 }
 
@@ -627,16 +625,14 @@ void TCharm::done(void) {
 	DBG("TCharm thread "<<thisIndex<<" done")
 	if (exitWhenDone) {
 		//Contribute to a synchronizing reduction
-		CkCallback cb(index_t::atExit(0), thisProxy[0]);
-		contribute(sizeof(_vals),&_vals,CkReduction::sum_int,cb);
+		contribute(CkCallback(CkReductionTarget(TCharm, atExit), thisProxy[0]));
 	}
 	isSelfDone = true;
 	stop();
 }
 //Called when all threads are done running
-void TCharm::atExit(CkReductionMsg *m) {
+void TCharm::atExit(void) {
 	DBGX("TCharm::atExit1> exiting");
-	delete m;
 	//thisProxy.unsetFlags();
 	CkExit();
 	//CkPrintf("After CkExit()!!!!!!!\n");

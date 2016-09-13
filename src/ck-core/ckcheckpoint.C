@@ -181,7 +181,7 @@ public:
 	CkCheckpointMgr() { }
 	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
 	void Checkpoint(const char *dirname,CkCallback& cb, bool requestStatus = false);
-	void SendRestartCB(CkReductionMsg *m);
+	void SendRestartCB(void);
 	void pup(PUP::er& p){ p|restartCB; }
 };
 
@@ -273,13 +273,10 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb, bool _requ
 	chkpStatus = success?CK_CHECKPOINT_SUCCESS:CK_CHECKPOINT_FAILURE;
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
-	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),0,thisgroup);
-	//contribute(0,NULL,CkReduction::sum_int,localcb);
-	barrier(localcb);
+	contribute(CkCallback(CkReductionTarget(CkCheckpointMgr, SendRestartCB), 0, thisgroup));
 }
 
-void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){ 
-	delete m; 
+void CkCheckpointMgr::SendRestartCB(void){
 	DEBCHK("[%d]Sending out the cb\n",CkMyPe());
 	CkPrintf("Checkpoint to disk finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
 	if(requestStatus)

@@ -4,7 +4,7 @@ module CkCheckpoint {
   group [migratable] CkCheckpointMgr {
 	entry CkCheckpointMgr(void);
 	entry void Checkpoint(char dirname[strlen(dirname)+1],CkCallback cb, bool requestStatus);
-	entry void SendRestartCB(CkReductionMsg *m);
+	entry [reductiontarget] void SendRestartCB(void);
   };
   mainchare CkCheckpointInit {
     entry CkCheckpointInit(CkArgMsg *m);

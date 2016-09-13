@@ -168,8 +168,8 @@ class TCharm: public CBase_TCharm
 	virtual void ckAboutToMigrate(void);
 	
 	void migrateDelayed(int destPE);
-	void atBarrier(CkReductionMsg *);
-	void atExit(CkReductionMsg *);
+	void atBarrier(void);
+	void atExit(void);
 	void clear();
 
 	//Pup routine packs the user data and migrates the thread

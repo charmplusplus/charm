@@ -62,7 +62,7 @@ module TraceProjections {
     entry void kMeansDone(CkReductionMsg *);
     entry void finalize(void);
     entry void closingTraces(void);
-    entry void closeParallelShutdown(CkReductionMsg *);
+    entry [reductiontarget] void closeParallelShutdown(void);
 
     entry void flush_warning(int pe);
   };

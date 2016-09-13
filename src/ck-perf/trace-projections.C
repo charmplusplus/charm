@@ -2938,17 +2938,14 @@ void TraceProjectionsBOC::closingTraces() {
     // subtle:  reduction needs to go to the PE which started CkExit()
   int pe = 0;
   if (endPe != -1) pe = endPe;
-  CkCallback cb(CkIndex_TraceProjectionsBOC::closeParallelShutdown(NULL), 
-		pe, thisProxy); 
-  contribute(0, NULL, CkReduction::sum_int, cb);  
+  contribute(CkCallback(CkReductionTarget(TraceProjectionsBOC, closeParallelShutdown), pe, thisProxy));
 }
 
 // The sole purpose of this reduction is to decide whether or not
 //   Projections as a module needs to call CkExit() to get other
 //   modules to shutdown.
-void TraceProjectionsBOC::closeParallelShutdown(CkReductionMsg *msg) {
+void TraceProjectionsBOC::closeParallelShutdown(void) {
   CkAssert(endPe == -1 && CkMyPe() ==0 || CkMyPe() == endPe);
-  delete msg;
   // decide if CkExit() needs to be called
   if (!CkpvAccess(_trace)->converseExit) {
     CkExit();

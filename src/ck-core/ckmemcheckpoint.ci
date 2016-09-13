@@ -21,7 +21,7 @@ module CkMemCheckpoint {
  	entry void recvArrayCheckpoint(CkArrayCheckPTMessage *);
  	entry void gotData();
 	entry void recvProcData(CkProcCheckPTMessage *);
-	entry void syncFiles(CkReductionMsg *);
+	entry [reductiontarget] void syncFiles();
  	entry [reductiontarget] void cpFinish();
  	entry void report();
 	// restart

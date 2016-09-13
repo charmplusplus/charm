@@ -155,7 +155,7 @@ class TraceProjectionsBOC : public CBase_TraceProjectionsBOC {
   void finalize(void);
   void shutdownAnalysis(void);
   void closingTraces(void);
-  void closeParallelShutdown(CkReductionMsg *);
+  void closeParallelShutdown(void);
 
   void ccsOutlierRequest(CkCcsRequestMsg *);
 

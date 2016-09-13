@@ -153,7 +153,7 @@ public:
   void gotData();
   void recvProcData(CkProcCheckPTMessage *);
   void cpFinish();
-  void syncFiles(CkReductionMsg *);
+  void syncFiles(void);
   void report();
   void recoverBuddies();
   void recoverEntry(CkArrayCheckPTMessage *msg);

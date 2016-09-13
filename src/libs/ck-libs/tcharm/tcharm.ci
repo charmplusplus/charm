@@ -4,8 +4,8 @@ module tcharm {
   };
   array [1D] TCharm {
     entry TCharm(TCharmInitMsg *initMsg);
-    entry void atBarrier(CkReductionMsg *);
-    entry void atExit(CkReductionMsg *);
+    entry [reductiontarget] void atBarrier(void);
+    entry [reductiontarget] void atExit(void);
     entry void migrateDelayed(int destPE);
     entry void start(void);
     entry void callSystem(callSystemStruct s);
