@@ -587,6 +587,9 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
 static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op op)
 {
   switch (type) {
+    case MPI_INT32_T:
+      if (getDDT()->getSize(MPI_INT32_T) != getDDT()->getSize(MPI_INT)) break;
+      // else: fall thru to MPI_INT
     case MPI_INT:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_int;
@@ -617,6 +620,9 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_double;
         default:       break;
       }
+    case MPI_INT8_T:
+      if (getDDT()->getSize(MPI_INT8_T) != getDDT()->getSize(MPI_CHAR)) break;
+      // else: fall thru to MPI_CHAR
     case MPI_CHAR:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_char;
@@ -625,6 +631,9 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_char;
         default:       break;
       }
+    case MPI_INT16_T:
+      if (getDDT()->getSize(MPI_INT16_T) != getDDT()->getSize(MPI_SHORT)) break;
+      // else: fall thru to MPI_SHORT
     case MPI_SHORT:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_short;
@@ -641,6 +650,9 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_long;
         default:       break;
       }
+    case MPI_INT64_T:
+      if (getDDT()->getSize(MPI_INT64_T) != getDDT()->getSize(MPI_LONG_LONG)) break;
+      // else: fall thru to MPI_LONG_LONG
     case MPI_LONG_LONG:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_long_long;
@@ -649,6 +661,9 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_long_long;
         default:       break;
       }
+    case MPI_UINT8_T:
+      if (getDDT()->getSize(MPI_UINT8_T) != getDDT()->getSize(MPI_UNSIGNED_CHAR)) break;
+      // else: fall thru to MPI_UNSIGNED_CHAR
     case MPI_UNSIGNED_CHAR:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_uchar;
@@ -657,6 +672,9 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_uchar;
         default:       break;
       }
+    case MPI_UINT16_T:
+      if (getDDT()->getSize(MPI_UINT16_T) != getDDT()->getSize(MPI_UNSIGNED_SHORT)) break;
+      // else: fall thru to MPI_UNSIGNED_SHORT
     case MPI_UNSIGNED_SHORT:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_ushort;
@@ -665,6 +683,9 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_ushort;
         default:       break;
       }
+    case MPI_UINT32_T:
+      if (getDDT()->getSize(MPI_UINT32_T) != getDDT()->getSize(MPI_UNSIGNED)) break;
+      // else: fall thru to MPI_UNSIGNED
     case MPI_UNSIGNED:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_uint;
@@ -681,12 +702,36 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_ulong;
         default:       break;
       }
+    case MPI_UINT64_T:
+      if (getDDT()->getSize(MPI_UINT64_T) != getDDT()->getSize(MPI_UNSIGNED_LONG_LONG)) break;
+      // else: fall thru to MPI_UNSIGNED_LONG_LONG
     case MPI_UNSIGNED_LONG_LONG:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_ulong_long;
         case MPI_MIN:  return CkReduction::min_ulong_long;
         case MPI_SUM:  return CkReduction::sum_ulong_long;
         case MPI_PROD: return CkReduction::product_ulong_long;
+        default:       break;
+      }
+    case MPI_C_BOOL:
+      switch (op) {
+        case MPI_LAND: return CkReduction::logical_and_bool;
+        case MPI_LOR:  return CkReduction::logical_or_bool;
+        case MPI_LXOR: return CkReduction::logical_xor_bool;
+        default:       break;
+      }
+    case MPI_LOGICAL:
+      switch (op) {
+        case MPI_LAND: return CkReduction::logical_and_int;
+        case MPI_LOR:  return CkReduction::logical_or_int;
+        case MPI_LXOR: return CkReduction::logical_xor_int;
+        default:       break;
+      }
+    case MPI_BYTE:
+      switch (op) {
+        case MPI_BAND: return CkReduction::bitvec_and_bool;
+        case MPI_BOR:  return CkReduction::bitvec_or_bool;
+        case MPI_BXOR: return CkReduction::bitvec_xor_bool;
         default:       break;
       }
     default:
