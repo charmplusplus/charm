@@ -258,49 +258,57 @@ int ampiParent::freeInfo(MPI_Info info){
 CDECL
 int AMPI_Info_create(MPI_Info *info){
   AMPIAPI("AMPI_Info_create");
-  return getAmpiParent()->createInfo(info);
+  int ret = getAmpiParent()->createInfo(info);
+  return ampiErrhandler("AMPI_Info_create", ret);
 }
 
 CDECL
 int AMPI_Info_set(MPI_Info info, const char *key, const char *value){
   AMPIAPI("AMPI_Info_set");
-  return getAmpiParent()->setInfo(info, key, value);
+  int ret = getAmpiParent()->setInfo(info, key, value);
+  return ampiErrhandler("AMPI_Info_set", ret);
 }
 
 CDECL
 int AMPI_Info_delete(MPI_Info info, const char *key){
   AMPIAPI("AMPI_Info_delete");
-  return getAmpiParent()->deleteInfo(info, key);
+  int ret = getAmpiParent()->deleteInfo(info, key);
+  return ampiErrhandler("AMPI_Info_delete", ret);
 }
 
 CDECL
 int AMPI_Info_get(MPI_Info info, const char *key, int valuelen, char *value, int *flag){
   AMPIAPI("AMPI_Info_get");
-  return getAmpiParent()->getInfo(info, key, valuelen, value, flag);
+  int ret = getAmpiParent()->getInfo(info, key, valuelen, value, flag);
+  return ampiErrhandler("AMPI_Info_get", ret);
 }
 
 CDECL
 int AMPI_Info_get_valuelen(MPI_Info info, const char *key, int *valuelen, int *flag){
   AMPIAPI("AMPI_Info_get_valuelen");
-  return getAmpiParent()->getInfoValuelen(info, key, valuelen, flag);
+  int ret = getAmpiParent()->getInfoValuelen(info, key, valuelen, flag);
+  return ampiErrhandler("AMPI_Info_get_valuelen", ret);
 }
 
 CDECL
 int AMPI_Info_get_nkeys(MPI_Info info, int *nkeys){
   AMPIAPI("AMPI_Info_get_nkeys");
-  return getAmpiParent()->getInfoNkeys(info, nkeys);
+  int ret = getAmpiParent()->getInfoNkeys(info, nkeys);
+  return ampiErrhandler("AMPI_Info_get_nkeys", ret);
 }
 
 CDECL
 int AMPI_Info_get_nthkey(MPI_Info info, int n, char *key){
   AMPIAPI("AMPI_Info_get_nthkey");
-  return getAmpiParent()->getInfoNthkey(info, n, key);
+  int ret = getAmpiParent()->getInfoNthkey(info, n, key);
+  return ampiErrhandler("AMPI_Info_get_nthkey", ret);
 }
 
 CDECL
 int AMPI_Info_dup(MPI_Info info, MPI_Info *newinfo){
   AMPIAPI("AMPI_Info_dup");
-  return getAmpiParent()->dupInfo(info, newinfo);
+  int ret = getAmpiParent()->dupInfo(info, newinfo);
+  return ampiErrhandler("AMPI_Info_dup", ret);
 }
 
 CDECL
@@ -308,7 +316,7 @@ int AMPI_Info_free(MPI_Info *info){
   AMPIAPI("AMPI_Info_free");
   int ret = getAmpiParent()->freeInfo(*info);
   *info = MPI_INFO_NULL;
-  return ret;
+  return ampiErrhandler("AMPI_Info_free", ret);
 }
 
 #ifdef AMPIMSGLOG

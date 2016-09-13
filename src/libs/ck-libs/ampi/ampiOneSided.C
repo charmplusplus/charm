@@ -321,7 +321,7 @@ int ampi::winIgetFree(MPI_Request *request, MPI_Status *status) {
   AMPI_Iget_data(data, *status);
   if(!data) {
     AMPI_DEBUG("    [%d] Iget [%d] attempt to free NULL buffer \n", thisIndex, *request);
-    return MPI_ERR_BUFFER;
+    return ampiErrhandler("AMPI_Iget_free", MPI_ERR_BUFFER);
   }
   else {
     delete (status->msg);
@@ -546,7 +546,7 @@ int AMPI_Win_create(void *base, MPI_Aint size, int disp_unit,
 CDECL
 int AMPI_Win_free(MPI_Win *win){
   AMPIAPI("AMPI_Win_free");
-  if(win==NULL) { return MPI_ERR_WIN; }
+  if(win==NULL) { return ampiErrhandler("AMPI_Win_free", MPI_ERR_WIN); }
 
   WinStruct winStruct = getAmpiParent()->getWinStruct(*win);
   ampi *ptr = getAmpiInstance(winStruct.comm);

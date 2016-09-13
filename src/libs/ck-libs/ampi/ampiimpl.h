@@ -1624,6 +1624,7 @@ class ampi : public CBase_ampi {
 
 ampiParent *getAmpiParent(void);
 ampi *getAmpiInstance(MPI_Comm comm);
+int ampiErrhandler(const char* func, int errcode);
 void checkComm(MPI_Comm comm);
 void checkRequest(MPI_Request req);
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type);
