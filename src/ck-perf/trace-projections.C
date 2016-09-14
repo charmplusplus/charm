@@ -2047,7 +2047,8 @@ void KMeansBOC::startKMeansAnalysis() {
 
 // Called on processor 0
 void KMeansBOC::flushCheck(CkReductionMsg *msg) {
-  int someFlush = *((int *)msg->getData());
+  bool someFlush = *((bool *)msg->getData());
+  delete msg;
 
   // if(CkMyPe()==0) CkPrintf("[%d] KMeansBOC::flushCheck time=\t%g\n", CkMyPe(), CkWallTimer() );
   
