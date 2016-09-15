@@ -1247,7 +1247,7 @@ int main(int argc, char **argv)
 }
 EOT
 mv -f ../include/mpi.h ../include/mpi.h.bak 2>/dev/null
-test_cxx "whether build on MPI" "yes" "no" ""
+test_cc "whether build on MPI" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_BUILD_ON_MPI, $strictpass, [build MPI.])
 BUILD_MPI=$strictpass
 
@@ -1259,17 +1259,17 @@ fi
 
 if test $BUILD_MPI -eq 1 -a -z "$BGP_FLOOR"
 then
-  test_link "whether need to specify MPI library" "no" "yes" ""
+  test_linkc "whether need to specify MPI library" "no" "yes" ""
   if test $pass -ne 1
   then
     if test -z "$CMK_MPI_LIB"
     then
-      test_link "whether -lmpich" "ok" "no" "-lmpich"
+      test_linkc "whether -lmpich" "ok" "no" "-lmpich"
       if test $pass -eq 1
       then
         add_flag CMK_SYSLIBS='"$CMK_SYSLIBS -lmpich"' "mpi lib"
       else
-        test_link "whether -lmpi" "ok" "no" "-lmpi"
+        test_linkc "whether -lmpi" "ok" "no" "-lmpi"
         if test $pass -eq 1
         then
                 add_flag CMK_SYSLIBS='"$CMK_SYSLIBS -lmpi"' "mpi lib"
