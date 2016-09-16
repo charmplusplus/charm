@@ -32,6 +32,8 @@ static CkDDT *getDDT(void) {
   return getAmpiParent()->myDDT;
 }
 
+/* if error checking is disabled, ampiErrhandler is defined as a macro in ampiimpl.h */
+#if CMK_ERROR_CHECKING
 inline int ampiErrhandler(const char* func, int errcode) {
   if (AMPI_ERRHANDLER == MPI_ERRORS_ARE_FATAL && errcode != MPI_SUCCESS) {
     // Abort with a nice message of the form: 'func' failed with error code 'errstr'.
@@ -51,6 +53,7 @@ inline int ampiErrhandler(const char* func, int errcode) {
   }
   return errcode;
 }
+#endif
 
 inline int checkCommunicator(const char* func, MPI_Comm comm) {
   if (comm == MPI_COMM_NULL)

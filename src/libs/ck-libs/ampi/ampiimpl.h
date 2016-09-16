@@ -1624,11 +1624,16 @@ class ampi : public CBase_ampi {
 
 ampiParent *getAmpiParent(void);
 ampi *getAmpiInstance(MPI_Comm comm);
-int ampiErrhandler(const char* func, int errcode);
 void checkComm(MPI_Comm comm);
 void checkRequest(MPI_Request req);
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type);
 void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatype type2);
+
+#if CMK_ERROR_CHECKING
+int ampiErrhandler(const char* func, int errcode);
+#else
+#define ampiErrhandler(func, errcode) (errcode)
+#endif
 
 //Use this to mark the start of AMPI interface routines:
 #define AMPIAPI(routineName) TCHARM_API_TRACE(routineName,"ampi")
