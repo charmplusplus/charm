@@ -1521,6 +1521,18 @@ static void node_addresses_obtain(char **argv)
         me.info.IP=skt_innode_my_ip();
   	me.info.dataport=ChMessageInt_new(dataport);
 
+#if CMK_USE_OFI
+    /**
+     * Send our local EP name.
+     * See node_addresses_store() in machine-dgram.c for the remote EP names.
+     */
+    /* TODO: Do we really need to send the length as well? */
+    me.info.epnamelen = ChMessageInt_new(context->epnamelen);
+    memcpy(me.info.epname, context->my_epname, context->epnamelen);
+    MACHSTATE1(3, "me.info.epname created and copied size %d bytes",
+            context->epnamelen);
+#endif
+
   	/*Send our node info. to charmrun.
   	CommLock hasn't been initialized yet-- 
   	use non-locking version*/
@@ -1873,6 +1885,9 @@ void LrtsPostCommonInit(int everReturn)
 #endif
 #endif
     
+#if CMK_USE_OFI
+  CmiRecvQueuesInit();
+#endif
 }
 
 void LrtsExit()

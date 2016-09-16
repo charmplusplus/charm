@@ -286,6 +286,10 @@ typedef struct {
   ChMessageLong_t nic_id; /* node's NIC hardware address (MX-only) */
 #endif
   skt_ip_t IP; /* node's IP address */
+#if CMK_USE_OFI
+  ChMessageInt_t epnamelen; /* EP name length */
+  char epname[64]; /* my EP name */
+#endif
 } ChNodeinfo;
 
 typedef struct {

@@ -15,6 +15,11 @@
  * @{
  */
 
+
+#if CMK_USE_OFI
+#include <rdma/fi_cm.h>
+#endif
+
 #define DGRAM_HEADER_SIZE 8
 
 #define CmiMsgNext(msg) (*((void**)(msg)))
@@ -226,6 +231,10 @@ typedef struct OtherNodeStruct
   double                   send_primer;  /* time to send retransmit */
   unsigned int             send_ack_seqno; /* next ack seqno to send */
   int                      retransmit_leash; /*Maximum number of packets to retransmit*/
+#if CMK_USE_OFI
+  int                      nodeNo;
+  fi_addr_t                fi_addr;
+#endif
 
   int                      asm_rank;
   int                      asm_total;
@@ -381,6 +390,14 @@ static void node_addresses_store(ChMessage *msg)
     nodestart+=nodes[i].nodesize;
 
   }
+
+#if CMK_USE_OFI
+  /**
+   * Initialize the remote nodes. See machine-ofi.c for details.
+   */
+  fabric_OtherNodes_init(d, nodes, Lrts_numNodes);
+#endif
+
   _Cmi_numpes=nodestart;
   n = _Cmi_numpes;
 #ifdef CMK_CPV_IS_SMP
@@ -605,6 +622,10 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 #if CMK_USE_TCP
 
 #include "machine-tcp.c"
+
+#elif CMK_USE_OFI
+
+#include "machine-ofi.c"
 
 #else
 

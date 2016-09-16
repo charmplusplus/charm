@@ -1084,6 +1084,8 @@ if (  MSG_STATISTIC)
 }
 #endif
 
+    LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
+
 #if MACHINE_DEBUG_LOG
     char ln[200];
     sprintf(ln,"debugLog.%d", _Cmi_mynode);
@@ -1093,8 +1095,6 @@ if (  MSG_STATISTIC)
         CmiAbort("debug file not open\n");
     }
 #endif
-
-    LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
 
 
     if (_Cmi_mynode==0) {
