@@ -914,7 +914,7 @@ if test $FROM_MPICH = 0 -a $FROM_MPICH2 = 0 ; then
    PAC_MPI_INFO()
 else
    AC_DEFINE(HAVE_MPI_INFO,,[Define if MPI Info is available])
-   HAVE_MPI_INFO="#define HAVE_MPI_INFO"
+   HAVE_MPI_INFO="#define HAVE_MPI_INFO 1"
    MPI_FINFO1="!"
    MPI_FINFO2="!"
    MPI_FINFO3="!"
