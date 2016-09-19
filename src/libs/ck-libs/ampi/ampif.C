@@ -140,6 +140,7 @@ FDECL {
 #define mpi_intercomm_merge FTN_NAME ( MPI_INTERCOMM_MERGE , mpi_intercomm_merge )
 
 #define mpi_comm_create FTN_NAME(MPI_COMM_CREATE, mpi_comm_create)
+#define mpi_comm_create_group FTN_NAME(MPI_COMM_CREATE_GROUP, mpi_comm_create_group)
 #define mpi_comm_rank FTN_NAME( MPI_COMM_RANK , mpi_comm_rank )
 #define mpi_comm_size FTN_NAME( MPI_COMM_SIZE , mpi_comm_size )
 #define mpi_comm_dup FTN_NAME( MPI_COMM_DUP , mpi_comm_dup )
@@ -1516,6 +1517,9 @@ void mpi_comm_create(int*  comm, int*  group, int*  newcomm, int*  ierror){
   *ierror = AMPI_Comm_create(*comm, *group, newcomm);
 }
 
+void mpi_comm_create_group(int* comm, int* group, int* tag, int* newcomm, int *ierror){
+  *ierror = AMPI_Comm_create_group(*comm, *group, *tag, newcomm);
+}
 void mpi_abort(int *comm, int *errorcode, int *ierr)
 {
   *ierr = AMPI_Abort(*comm, *errorcode);

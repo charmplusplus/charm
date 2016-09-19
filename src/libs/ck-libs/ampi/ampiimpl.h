@@ -1547,15 +1547,6 @@ class ampiParent : public CBase_ampiParent {
   void graphChildRegister(const ampiCommStruct &s);
   void distGraphChildRegister(const ampiCommStruct &s);
   void interChildRegister(const ampiCommStruct &s);
-
-  inline bool isIntra(MPI_Comm comm) const {
-    return (comm>=MPI_COMM_FIRST_INTRA && comm<MPI_COMM_FIRST_RESVD);
-  }
-  const ampiCommStruct &getIntra(MPI_Comm comm) const {
-    int idx=comm-MPI_COMM_FIRST_INTRA;
-    if (idx>=intraComm.size()) CkAbort("Bad intra-communicator used");
-    return *intraComm[idx];
-  }
   void intraChildRegister(const ampiCommStruct &s);
 
   /* MPI_*_get_attr C binding returns a *pointer* to an integer,
@@ -1638,6 +1629,14 @@ class ampiParent : public CBase_ampiParent {
     int idx=comm-MPI_COMM_FIRST_INTER;
     if (idx>=interComm.size()) CkAbort("AMPI> Bad inter-communicator used!\n");
     return *interComm[idx];
+  }
+  inline bool isIntra(MPI_Comm comm) const {
+    return (comm>=MPI_COMM_FIRST_INTRA && comm<MPI_COMM_FIRST_RESVD);
+  }
+  const ampiCommStruct &getIntra(MPI_Comm comm) const {
+    int idx=comm-MPI_COMM_FIRST_INTRA;
+    if (idx>=intraComm.size()) CkAbort("Bad intra-communicator used");
+    return *intraComm[idx];
   }
 
   void pup(PUP::er &p);

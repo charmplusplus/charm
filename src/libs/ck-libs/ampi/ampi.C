@@ -8909,6 +8909,70 @@ int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
   return MPI_SUCCESS;
 }
 
+AMPI_API_IMPL(MPI_Comm_create_group)
+int AMPI_Comm_create_group(MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *newcomm)
+{
+  AMPI_API("AMPI_Comm_create_group");
+
+  if (group == MPI_GROUP_NULL) {
+    *newcomm = MPI_COMM_NULL;
+    return MPI_SUCCESS;
+  }
+
+#if AMPI_ERROR_CHECKING
+  if (!getAmpiParent()->isIntra(comm)) {
+    *newcomm = MPI_COMM_NULL;
+    return ampiErrhandler("AMPI_Comm_create_group", MPI_ERR_COMM);
+  }
+  int ret = checkTag("AMPI_Comm_create_group", tag);
+  if (ret != MPI_SUCCESS) {
+     *newcomm = MPI_COMM_NULL;
+     return ampiErrhandler("AMPI_Comm_create_group", ret);
+  }
+#endif
+
+  int rank, groupRank, groupSize;
+  MPI_Group parentGroup;
+  AMPI_Comm_rank(comm, &rank);
+  AMPI_Group_rank(group, &groupRank);
+  AMPI_Group_size(group, &groupSize);
+  if (groupRank == MPI_UNDEFINED) {
+    *newcomm = MPI_COMM_NULL;
+    return MPI_SUCCESS;
+  }
+  AMPI_Comm_dup(MPI_COMM_SELF, newcomm);
+
+  vector<int> groupPids(groupSize), pids(groupSize, 0);
+  std::iota(groupPids.begin(), groupPids.end(), 0);
+  AMPI_Comm_group(comm, &parentGroup);
+  AMPI_Group_translate_ranks(group, groupSize, groupPids.data(), parentGroup, pids.data());
+  AMPI_Group_free(&parentGroup);
+
+  MPI_Comm commOld, tmpInter;
+  for (int i=0; i<groupSize; i*=2) {
+    int groupId = groupRank/i;
+    commOld = *newcomm;
+
+    if (groupId % 2 == 0) {
+      if ((groupId+1)*i < groupSize) {
+        AMPI_Intercomm_create(*newcomm, 0, comm, pids[(groupId+1)*i], tag, &tmpInter);
+        AMPI_Intercomm_merge(tmpInter, 0, newcomm);
+      }
+    }
+    else {
+      AMPI_Intercomm_create(*newcomm, 0, comm, pids[(groupId+1)*i], tag, &tmpInter);
+      AMPI_Intercomm_merge(tmpInter, 1, newcomm);
+    }
+
+    if (*newcomm != commOld) {
+      AMPI_Comm_free(&tmpInter);
+      AMPI_Comm_free(&commOld);
+    }
+  }
+
+  return MPI_SUCCESS;
+}
+
 AMPI_API_IMPL(MPI_Comm_set_name)
 int AMPI_Comm_set_name(MPI_Comm comm, const char *comm_name){
   AMPI_API("AMPI_Comm_set_name");

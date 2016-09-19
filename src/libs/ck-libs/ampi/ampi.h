@@ -878,6 +878,9 @@ AMPI_API_DEF(int, MPI_Intercomm_merge, MPI_Comm intercomm, int high, MPI_Comm *n
 #define MPI_Comm_create AMPI_Comm_create
 #define PMPI_Comm_create APMPI_Comm_create
 AMPI_API_DEF(int, MPI_Comm_create, MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
+#define MPI_Comm_create_group AMPI_Comm_create_group
+#define PMPI_Comm_create_group APMPI_Comm_create_group
+AMPI_API_DEF(int, MPI_Comm_create_group, MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *newcomm)
 #define MPI_Comm_size AMPI_Comm_size
 #define PMPI_Comm_size APMPI_Comm_size
 AMPI_API_DEF(int, MPI_Comm_size, MPI_Comm comm, int *size)
@@ -1445,7 +1448,6 @@ int MPI_Iscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype dataty
 
 /* A.2.4 Groups, Contexts, Communicators, and Caching C Bindings */
 /*
-int MPI_Comm_create_group(MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *newcomm);
 int MPI_Comm_idup(MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request);
 */
 
