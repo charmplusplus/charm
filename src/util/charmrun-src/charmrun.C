@@ -806,7 +806,7 @@ void arg_init(int argc, const char **argv)
 {
   static char buf[1024];
 
-  int i, local_def = 0;
+  int i, local_def = 0, j;
 #if CMK_CHARMRUN_LOCAL
   local_def = 1; /*++local is the default*/
 #endif
@@ -2329,11 +2329,32 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
 
   /* Exec to clear and restart everything, just preserve contents of
    * netstart*/
-  int restart_idx = -1;
+  int restart_idx = -1, newp_idx = -1, oldp_idx = -1, shrink_expand_idx= -1, charmrun_idx = -1;
+  int additional_args = 10;
   for (int i = 0; i < saved_argc; ++i) {
     if (strcmp(saved_argv[i], "+restart") == 0) {
       restart_idx = i;
-      break;
+      additional_args -= 2;
+    }
+    if(strcmp(saved_argv[i], "++newp") == 0)
+    {
+      newp_idx = i;
+      additional_args -= 2;
+    }
+    if(strcmp(saved_argv[i], "++oldp") == 0)
+    {
+      oldp_idx = i;
+      additional_args -= 2;
+    }
+    if(strcmp(saved_argv[i], "++shrinkexpand") == 0)
+    {
+      shrink_expand_idx = i;
+      additional_args -= 1;
+    }
+    if(strcmp(saved_argv[i], "++charmrun_port") == 0)
+    {
+      charmrun_idx = i;
+      additional_args -= 2;
     }
   }
 
@@ -2346,11 +2367,7 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
   }
 
   const char **ret;
-  if (restart_idx == -1) {
-    ret = (const char **) malloc(sizeof(char *) * (saved_argc + 10));
-  } else {
-    ret = (const char **) malloc(sizeof(char *) * (saved_argc + 8));
-  }
+  ret = (const char **) malloc(sizeof(char *) * (saved_argc + additional_args));
 
   int newP = *(int *) (msg->data);
   int oldP = arg_requested_pes;
@@ -2361,30 +2378,55 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
     ret[i] = saved_argv[i];
   }
 
-  ret[saved_argc + 0] = "++newp";
+  int index = 0;
 
-  char sp_buffer[50];
+  char sp_buffer[50]; // newP buffer
   sprintf(sp_buffer, "%d", newP);
-  ret[saved_argc + 1] = sp_buffer;
-  ret[saved_argc + 2] = "++shrinkexpand";
-  ret[saved_argc + 3] = "++oldp";
 
-  char sp_buffer1[50];
+  char sp_buffer1[50]; // oldP buffer
   sprintf(sp_buffer1, "%d", arg_requested_pes);
-  ret[saved_argc + 4] = sp_buffer1;
 
-  char sp_buffer2[6];
+  char sp_buffer2[6]; // charmrun port
   sprintf(sp_buffer2, "%d", server_port);
-  ret[saved_argc + 5] = "++charmrun_port";
-  ret[saved_argc + 6] = sp_buffer2;
+
+  /* Check that shrink expand parameters don't already exist */
+
+  if(newp_idx == -1)
+  {
+    ret[saved_argc + index++] = "++newp";
+    ret[saved_argc + index++] = sp_buffer;
+  }
+  else
+    ret[newp_idx + 1] = sp_buffer;
+
+  if(oldp_idx == -1)
+  {
+    ret[saved_argc + index++] = "++oldp";
+    ret[saved_argc + index++] = sp_buffer1;
+  }
+  else
+    ret[oldp_idx + 1] = sp_buffer1;
+
+  if(shrink_expand_idx == -1)
+  {
+    ret[saved_argc + index++] = "++shrinkexpand";
+  }
+
+  if(charmrun_idx == -1)
+  {
+    ret[saved_argc + index++] = "++charmrun_port";
+    ret[saved_argc + index++] = sp_buffer2;
+  }
+  else
+    ret[charmrun_idx + 1] = sp_buffer2;
 
   if (restart_idx == -1) {
-    ret[saved_argc + 7] = "+restart";
-    ret[saved_argc + 8] = dir;
-    ret[saved_argc + 9] = NULL;
+    ret[saved_argc + index++] = "+restart";
+    ret[saved_argc + index++] = dir;
+    ret[saved_argc + index++] = NULL;
   } else {
     ret[restart_idx + 1] = dir;
-    ret[saved_argc + 7] = NULL;
+    ret[saved_argc + index++] = NULL;
   }
 
   setenv("NETSTART", create_netstart(1), 1);
