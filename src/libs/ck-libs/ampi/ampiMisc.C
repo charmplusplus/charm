@@ -136,7 +136,7 @@ int InfoStruct::get_nkeys(int *n) const{
 }
 
 int InfoStruct::get_nthkey(int n, char* k) const{
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(n<0 || n>=nodes.size())
     return MPI_ERR_INFO_KEY;
 #endif
@@ -154,7 +154,7 @@ void InfoStruct::myfree(void){
 }
 
 int ampiParent::createInfo(MPI_Info *newinfo){
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(newinfo==NULL)
     return MPI_ERR_INFO;
 #endif
@@ -165,7 +165,7 @@ int ampiParent::createInfo(MPI_Info *newinfo){
 }
 
 int ampiParent::dupInfo(MPI_Info info, MPI_Info *newinfo){
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
   if(newinfo==NULL)
@@ -179,7 +179,7 @@ int ampiParent::dupInfo(MPI_Info info, MPI_Info *newinfo){
 }
 
 int ampiParent::setInfo(MPI_Info info, const char *key, const char *value){
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
   if(key==NULL || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0)
@@ -191,7 +191,7 @@ int ampiParent::setInfo(MPI_Info info, const char *key, const char *value){
 }
 
 int ampiParent::deleteInfo(MPI_Info info, const char *key){
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
   if(key==NULL || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0)
@@ -201,7 +201,7 @@ int ampiParent::deleteInfo(MPI_Info info, const char *key){
 }
 
 int ampiParent::getInfo(MPI_Info info, const char *key, int valuelen, char *value, int *flag) const{
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
   if(key==NULL || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0)
@@ -215,7 +215,7 @@ int ampiParent::getInfo(MPI_Info info, const char *key, int valuelen, char *valu
 }
 
 int ampiParent::getInfoValuelen(MPI_Info info, const char *key, int *valuelen, int *flag) const{
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
   if(key==NULL || strlen(key)>MPI_MAX_INFO_KEY || strlen(key)==0)
@@ -225,7 +225,7 @@ int ampiParent::getInfoValuelen(MPI_Info info, const char *key, int *valuelen, i
 }
 
 int ampiParent::getInfoNkeys(MPI_Info info, int *nkeys) const{
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
   if(nkeys==NULL)
@@ -235,7 +235,7 @@ int ampiParent::getInfoNkeys(MPI_Info info, int *nkeys) const{
 }
 
 int ampiParent::getInfoNthkey(MPI_Info info, int n, char *key) const{
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
   if(key==NULL)
@@ -245,7 +245,7 @@ int ampiParent::getInfoNthkey(MPI_Info info, int n, char *key) const{
 }
 
 int ampiParent::freeInfo(MPI_Info info){
-#if CMK_ERROR_CHECKING
+#if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
 #endif

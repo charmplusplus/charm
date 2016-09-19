@@ -1281,11 +1281,18 @@ To build a production version of \ampi{}, use the option: \texttt{
 \verb+<version>+ depends on the machine, operating system, and the underlying
 communication library one wants to use for running \ampi{} programs.
 See the charm/README file for details on picking the proper version.
-Following is an example of how to build a production version of AMPI under
-linux and ethernet environment, with debugging symbols produced:
+Here is an example of how to build a debug version of AMPI in a
+linux and ethernet environment:
 
 \begin{alltt}
-> build AMPI netlrts-linux-x86_64 --with-production -g
+> build AMPI netlrts-linux-x86_64 -g
+\end{alltt}
+
+And the following is an example of how to build a production version of AMPI in a
+linux and ethernet environment, with MPI-level error checking in AMPI turned off:
+
+\begin{alltt}
+> build AMPI netlrts-linux-x86_64 --with-production --disable-ampi-error-checking
 \end{alltt}
 
 \section{Building and Running AMPI Programs}

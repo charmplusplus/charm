@@ -75,6 +75,21 @@ else
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 1, [enable error checking])
 fi
 
+# enable/disable AMPI error checking
+AC_ARG_ENABLE([ampi-error-checking],
+            [AS_HELP_STRING([--enable-ampi-error-checking],
+              [enable AMPI error checking])], ,
+            [enable_ampi_error_checking=yes])
+
+if test "$enable_ampi_error_checking" = "no"
+then
+  Echo "AMPI error checking is disabled"
+  AC_DEFINE_UNQUOTED(AMPI_ERROR_CHECKING, 0, [disable ampi error checking])
+else
+  Echo "AMPI error checking is enabled"
+  AC_DEFINE_UNQUOTED(AMPI_ERROR_CHECKING, 1, [enable ampi error checking])
+fi
+
 # enable/disable statistics collection
 AC_ARG_ENABLE([stats],
             [AS_HELP_STRING([--enable-stats],
