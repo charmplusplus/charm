@@ -4456,10 +4456,13 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
       testRequest(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
       if(flag == 1){
         array_of_indices[(*outcount)]=((*reqvec)[i])[0];
-        if(array_of_statuses)
-          array_of_statuses[(*outcount)++]=sts;
-        if(sts.MPI_COMM != 0)
+        if(sts.MPI_COMM != 0){
           realflag=1; // there is real(non null) request
+          (*outcount)++;
+          if(array_of_statuses){
+            array_of_statuses[(*outcount)]=sts;
+          }
+        }
       }
     }
     if(realflag && *outcount>0)
@@ -4764,8 +4767,10 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
     testRequest(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
     if(flag == 1){
       array_of_indices[(*outcount)]=((*reqvec)[i])[0];
-      if(array_of_statuses)
-        array_of_statuses[(*outcount)++]=sts;
+      (*outcount)++;
+      if(array_of_statuses){
+        array_of_statuses[(*outcount)]=sts;
+      }
     }
   }
   delete reqvec;
