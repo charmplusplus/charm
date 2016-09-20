@@ -1261,6 +1261,7 @@ class ampiParent : public CBase_ampiParent {
 
  public:
   bool ampiInitCallDone;
+  bool resumeOnRecv, resumeOnColl;
 
  public:
   ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
@@ -1529,8 +1530,6 @@ class ampi : public CBase_ampi {
   void findParent(bool forMigration);
   ampiParent *parent;
   TCharm *thread;
-  bool resumeOnRecv;
-  bool resumeOnColl;
   AmpiRequest *blockingReq;
 
   ampiCommStruct myComm;

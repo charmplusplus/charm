@@ -1148,6 +1148,8 @@ void ampiParent::pup(PUP::er &p) {
   p|userJustMigratedFn;
 
   p|ampiInitCallDone;
+  p|resumeOnRecv;
+  p|resumeOnColl;
 }
 
 void ampiParent::prepareCtv(void) {
@@ -1160,7 +1162,8 @@ void ampiParent::prepareCtv(void) {
 void ampiParent::init(){
   CkAssert(groups.size() == 0);
   groups.push_back(new groupStruct);
-
+  resumeOnRecv = false;
+  resumeOnColl = false;
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(thisIndex)){
     char fname[128];
@@ -1684,8 +1687,6 @@ void ampi::init(void) {
   thread=NULL;
   msgs=NULL;
   posted_ireqs=NULL;
-  resumeOnRecv=false;
-  resumeOnColl=false;
   blockingReq=NULL;
   AsyncEvacuate(false);
 }
@@ -1763,8 +1764,6 @@ void ampi::pup(PUP::er &p)
   p|myRank;
   p|tmpVec;
   p|remoteProxy;
-  p|resumeOnRecv;
-  p|resumeOnColl;
 
   // pup blockingReq
   char nonnull;
@@ -2238,23 +2237,23 @@ void ampi::unblock(void){
 }
 
 ampi* ampi::blockOnRecv(void){
-  resumeOnRecv = true;
+  parent->resumeOnRecv = true;
   // In case this thread is migrated while suspended,
   // save myComm to get the ampi instance back. Then
   // return "dis" in case the caller needs it.
   MPI_Comm comm = myComm.getComm();
   thread->suspend();
   ampi *dis = getAmpiInstance(comm);
-  dis->resumeOnRecv = false;
+  dis->parent->resumeOnRecv = false;
   return dis;
 }
 
 ampi* ampi::blockOnColl(void){
-  resumeOnColl = true;
+  parent->resumeOnColl = true;
   MPI_Comm comm = myComm.getComm();
   thread->suspend();
   ampi *dis = getAmpiInstance(comm);
-  dis->resumeOnColl = false;
+  dis->parent->resumeOnColl = false;
   return dis;
 }
 
@@ -2302,7 +2301,7 @@ void ampi::ssend_ack(int sreq_idx){
     AmpiRequestList *reqs = &(parent->ampiReqs);
     SsendReq *sreq = (SsendReq *)(*reqs)[sreq_idx];
     sreq->statusIreq = true;
-    if (resumeOnRecv) {
+    if (parent->resumeOnRecv) {
       thread->resume();
     }
   }
@@ -2312,7 +2311,7 @@ void ampi::generic(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d (seq %d) resumeOnRecv %d\n",
-             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSeq(), resumeOnRecv);
+             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSeq(), parent->resumeOnRecv);
   )
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_generic");
@@ -2336,7 +2335,7 @@ void ampi::generic(AmpiMsg* msg)
   }
   // msg may be free'ed from calling inorder()
 
-  if(resumeOnRecv){
+  if(parent->resumeOnRecv){
     thread->resume();
   }
 }
@@ -2439,7 +2438,7 @@ void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
 
   if (sync == 1) {
     // waiting for receiver side
-    resumeOnRecv = false;            // so no one else awakes it
+    parent->resumeOnRecv = false;            // so no one else awakes it
     block();
   }
 }
@@ -3643,7 +3642,7 @@ void ampi::rednResult(CkReductionMsg *msg)
 
   blockingReq->receive(this, msg);
 
-  if (resumeOnColl) {
+  if (parent->resumeOnColl) {
     thread->resume();
   }
   // [nokeep] entry method, so do not delete msg
@@ -3685,7 +3684,7 @@ void ampi::irednResult(CkReductionMsg *msg)
   }
 #endif
 
-  if (resumeOnColl) {
+  if (parent->resumeOnColl) {
     thread->resume();
   }
   // [nokeep] entry method, so do not delete msg
@@ -4308,14 +4307,14 @@ int IReq::wait(MPI_Status *sts){
 
   while (statusIreq == false) {
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
-    dis->resumeOnRecv = true;
+    dis->parent->resumeOnRecv = true;
     dis->block();
     dis = getAmpiInstance(comm);
 
     if (cancelled) {
       sts->MPI_CANCEL = 1;
       statusIreq = true;
-      dis->resumeOnRecv = false;
+      dis->parent->resumeOnRecv = false;
       return 0;
     }
 
@@ -4327,7 +4326,7 @@ int IReq::wait(MPI_Status *sts){
       return -1;
 #endif
   } // end of while
-  dis->resumeOnRecv = false;
+  dis->parent->resumeOnRecv = false;
 
   AMPI_DEBUG("IReq::wait has resumed\n");
 
@@ -4352,7 +4351,7 @@ int RednReq::wait(MPI_Status *sts){
   ampi *dis = getAmpiInstance(comm);
 
   while (!statusIreq) {
-    dis->resumeOnColl = true;
+    dis->parent->resumeOnColl = true;
     dis->block();
     dis = getAmpiInstance(comm);
 
@@ -4364,7 +4363,7 @@ int RednReq::wait(MPI_Status *sts){
       return -1;
 #endif
   }
-  dis->resumeOnColl = false;
+  dis->parent->resumeOnColl = false;
 
   AMPI_DEBUG("RednReq::wait has resumed\n");
 
@@ -4386,7 +4385,7 @@ int GatherReq::wait(MPI_Status *sts){
   ampi *dis = getAmpiInstance(comm);
 
   while (!statusIreq) {
-    dis->resumeOnColl = true;
+    dis->parent->resumeOnColl = true;
     dis->block();
     dis = getAmpiInstance(comm);
 
@@ -4398,7 +4397,7 @@ int GatherReq::wait(MPI_Status *sts){
       return -1;
 #endif
   }
-  dis->resumeOnColl = false;
+  dis->parent->resumeOnColl = false;
 
   AMPI_DEBUG("GatherReq::wait has resumed\n");
 
@@ -4420,7 +4419,7 @@ int GathervReq::wait(MPI_Status *sts){
   ampi *dis = getAmpiInstance(comm);
 
   while (!statusIreq) {
-    dis->resumeOnColl = true;
+    dis->parent->resumeOnColl = true;
     dis->block();
     dis = getAmpiInstance(comm);
 
@@ -4432,7 +4431,7 @@ int GathervReq::wait(MPI_Status *sts){
       return -1;
 #endif
   }
-  dis->resumeOnColl = false;
+  dis->parent->resumeOnColl = false;
 
   AMPI_DEBUG("GathervReq::wait has resumed\n");
 
@@ -4448,12 +4447,12 @@ int GathervReq::wait(MPI_Status *sts){
 int SendReq::wait(MPI_Status *sts){
   ampi *dis = getAmpiInstance(comm);
   while (!statusIreq) {
-    dis->resumeOnRecv = true;
+    dis->parent->resumeOnRecv = true;
     dis->block();
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = getAmpiInstance(comm);
   }
-  dis->resumeOnRecv = false;
+  dis->parent->resumeOnRecv = false;
   AMPI_DEBUG("SendReq::wait has resumed\n");
   if (sts) {
     sts->MPI_COMM = comm;
