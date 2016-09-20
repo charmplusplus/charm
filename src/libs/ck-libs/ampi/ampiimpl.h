@@ -1155,6 +1155,7 @@ class ampiParent : public CBase_ampiParent {
   MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
 
  public:
+  TCharmAPIRoutine *threadMigrationState;
   int ampiInitCallDone;
 
  public:

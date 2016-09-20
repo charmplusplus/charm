@@ -1072,6 +1072,10 @@ PUPfunctionpointer(MPI_MigrateFn)
 
 void ampiParent::pup(PUP::er &p) {
   p|threads;
+  if (p.isUnpacking()) {
+    threadMigrationState = new TCharmAPIRoutine();
+  }
+  p|*threadMigrationState;
   p|worldNo;
   p|worldStruct;
   myDDT->pup(p);
@@ -1175,6 +1179,11 @@ void ampiParent::ckAboutToMigrate(void) {
 void ampiParent::ckJustMigrated(void) {
   ArrayElement1D::ckJustMigrated();
   prepareCtv();
+
+  // Destroy the TCharmAPIRoutine instance to reinstate isomalloc and
+  // tlsglobals before invoking the user's JustMigrated function.
+  delete threadMigrationState; threadMigrationState = NULL;
+
   if (userJustMigratedFn) {
     (*userJustMigratedFn)();
   }
@@ -8266,7 +8275,10 @@ int AMPI_Pcontrol(const int level, ...) {
 CDECL
 int AMPI_Migrate(MPI_Info hints)
 {
-  AMPIAPI("AMPI_Migrate");
+  // Instead of using the AMPIAPI trick, keep the TCharmAPIRoutine instance
+  // around so that we can explicitly delete it after migration, in ckJustMigrated.
+  getAmpiParent()->threadMigrationState = new TCharmAPIRoutine("AMPI_Migrate", "ampi");
+
   int nkeys, exists;
   char key[MPI_MAX_INFO_KEY], value[MPI_MAX_INFO_VAL];
 
@@ -8348,25 +8360,49 @@ int AMPI_Migrate(MPI_Info hints)
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_MIGRATE");
 #endif
+
+  // If this thread didn't actually migrate, ampiParent::ckJustMigrated
+  // was not called so we need to clean up the TCharmAPIRoutine here
+  delete getAmpiParent()->threadMigrationState;
+  getAmpiParent()->threadMigrationState = NULL;
+
   return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Evacuate(void)
 {
-  //AMPIAPI("AMPI_Evacuate");
+  // Instead of using the AMPIAPI trick, keep the TCharmAPIRoutine instance
+  // around so that we can explicitly delete it after migration, in ckJustMigrated.
+  getAmpiParent()->threadMigrationState = new TCharmAPIRoutine("AMPI_Evacuate", "ampi");
+
   TCHARM_Evacuate();
+
+  // If this thread didn't actually migrate, ampiParent::ckJustMigrated
+  // was not called so we need to clean up the TCharmAPIRoutine here
+  delete getAmpiParent()->threadMigrationState;
+  getAmpiParent()->threadMigrationState = NULL;
+
   return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Migrate_to_pe(int dest)
 {
-  AMPIAPI("AMPI_Migrate_to_pe");
+  // Instead of using the AMPIAPI trick, keep the TCharmAPIRoutine instance
+  // around so that we can explicitly delete it after migration, in ckJustMigrated.
+  getAmpiParent()->threadMigrationState = new TCharmAPIRoutine("AMPI_Migrate_to_pe", "ampi");
+
   TCHARM_Migrate_to(dest);
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_MIGRATE_TO_PE");
 #endif
+
+  // If this thread didn't actually migrate, ampiParent::ckJustMigrated
+  // was not called so we need to clean up the TCharmAPIRoutine here
+  delete getAmpiParent()->threadMigrationState;
+  getAmpiParent()->threadMigrationState = NULL;
+
   return MPI_SUCCESS;
 }
 

@@ -276,6 +276,8 @@ class TCharmAPIRoutine {
 #endif
 
  public:
+	TCharmAPIRoutine(void) { }
+
 	// Entering Charm++ from user code
 	TCharmAPIRoutine(const char *routineName, const char *libraryName, bool actLikeMainThread_ = true)
 	  : actLikeMainThread(actLikeMainThread_)
@@ -349,6 +351,10 @@ class TCharmAPIRoutine {
 		_TRACE_BG_BEGIN_EXECUTE_NOMSG("user_code", &log, 0);
 		if (CmiMyPe() == pe) _TRACE_BG_ADD_BACKWARD_DEP(callEvent);
 #endif
+	}
+
+	void pup(PUP::er& p) {
+		pup_bytes(&p, this, sizeof(TCharmAPIRoutine));
 	}
 };
 
