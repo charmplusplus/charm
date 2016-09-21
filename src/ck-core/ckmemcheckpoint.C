@@ -410,10 +410,11 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   PUP::fromMem p(m->packData);
   CkLocMgr *mgr = CProxy_CkLocMgr(m->locMgr).ckLocalBranch();
   CmiAssert(mgr);
+  CmiUInt8 id = mgr->lookupID(m->index);
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
-  mgr->resume(m->index, p, true);     // optimize notifyHome
+  mgr->resume(m->index, id, p, true);     // optimize notifyHome
 #else
-  mgr->resume(m->index, p, false);     // optimize notifyHome
+  mgr->resume(m->index, id, p, false);    // optimize notifyHome
 #endif
 
   // find a list of array elements bound together

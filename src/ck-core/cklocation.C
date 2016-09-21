@@ -2201,7 +2201,8 @@ void CkLocMgr::pup(PUP::er &p){
             p | pe;
   //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
             inform(idx, idx2id[idx], pe);
-            CkLocRec *rec = elementNrec(idx);
+            CmiUInt8 id = lookupID(idx);
+            CkLocRec *rec = elementNrec(id);
             CmiAssert(rec!=NULL);
             CmiAssert(lastKnown(idx) == pe);
         }
@@ -2218,12 +2219,10 @@ void CkLocMgr::pup(PUP::er &p){
  * since they will be recreated later anyway
  */
 #if __FAULT__
-  		int count=0,count1=0;
-        void *objp;
-        void *keyp;
+        int count=0;
         CkVec<int> pe_list;
-        CkVec<CkArrayIndex> idx_list;
-        for (std::map<CkArrayIndex, int>::iterator itr = idx2pe.begin(); itr != idx2pe.end(); ++itr)
+        CkVec<CmiUInt8> idx_list;
+        for (std::map<CmiUInt8, int>::iterator itr = id2pe.begin(); itr != id2pe.end(); ++itr)
             if (homePe(itr->first) == CmiMyPe() && itr->second != CmiMyPe())
             {
                 idx_list.push_back(itr->first);
@@ -2282,7 +2281,7 @@ CkLocRec *CkLocMgr::createLocal(const CkArrayIndex &idx,
     CkLocRec *rec=new CkLocRec(this,forMigration,ignoreArrival,idx);
     if(!dummy){
         insertRec(rec,idx); //Add to global hashtable
-        idx2pe[idx] = CkMyPe();
+        id2pe[idx] = CkMyPe();
         deliverAnyBufferedMsgs(idx, bufferedMsgs);
     }   
     if (notifyHome) informHome(idx,CkMyPe());
@@ -3073,9 +3072,14 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 	}
 
 //Allocate and pack into message
-	CkArrayElementMigrateMessage *msg = 
-          new (bufSize, 0) CkArrayElementMigrateMessage(idx, id, rec->isAsyncMigrate(), bufSize,
-                                                        managers.size(), rec->isBounced());
+	CkArrayElementMigrateMessage *msg = new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
+#if CMK_LBDB_ON
+		rec->isAsyncMigrate(),
+#else
+		false,
+#endif
+		bufSize, managers.size(), rec->isBounced());
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     msg->gid = ckGetGroupID();
 #endif

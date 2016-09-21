@@ -385,7 +385,7 @@ namespace ck {
         return CkArrayIndex4D(ix[0], ix[1], ix[2], ix[3]);
       case 5:
         return CkArrayIndex5D(ix[0], ix[1], ix[2], ix[3], ix[4]);
-      case 6:
+      default:
         return CkArrayIndex6D(ix[0], ix[1], ix[2], ix[3], ix[4], ix[5]);
       }
     }
