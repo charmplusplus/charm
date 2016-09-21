@@ -447,9 +447,46 @@ needs.
 If the outcome of your reduction is dependent on the order in which 
 data elements are processed, or if your data is just too
 heterogenous to be handled elegantly by the predefined types and you
-don't want to undertake multiple reductions, it may be best to define
-your own reduction type.  See the next section
-(Section~\ref{new_type_reduction}) for details.
+don't want to undertake multiple reductions, you can use a tuple
+reduction or define your own custom reduction type.
+
+Tuple reductions allow performing multiple different reductions in the
+same message. The reductions can be on the same or different data, and
+the reducer type for each reduction can be set independently as well.
+The contributions that make up a single tuple reduction message are all
+reduced in the same order as each other. As an example, a chare array
+element can contribute to a gatherv-like operation using a tuple reduction
+that consists of two set reductions.
+
+\begin{alltt}
+int tupleSize = 2;
+CkReduction::tupleElement tupleRedn\[\] = \{
+  CkReduction::tupleElement(sizeof(int), \&thisIndex, CkReduction::set),
+  CkReduction::tupleElement(sizeData, data, CkReduction::set)
+\};
+CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+CkCallback allgathervCB(CkIndex\_Foo::allgathervResult(0), thisProxy);
+msg->setCallback(allgathervCB);
+contribute(msg);
+\end{alltt}
+
+The result of this reduction is a single CkReductionMsg that can be processed
+as multiple reductions:
+
+\begin{alltt}
+void Foo::allgathervResult (CkReductionMsg* msg)
+\{
+  int numReductions;
+  CkReduction::tupleElement* results;
+
+  msg->toTuple(\&results, \&numReductions);
+  CkReduction::setElement* currSrc  = (CkReduction::setElement*)results[0].data;
+  CkReduction::setElement* currData = (CkReduction::setElement*)results[1].data;
+\}
+\end{alltt}
+
+See the next section (Section~\ref{new_type_reduction}) for details on
+custom reduction types.
 
 \section{Destroying Array Elements}
 
