@@ -2040,17 +2040,23 @@ fi
 
 if test "$enable_shrinkexpand" = "yes"
 then
-  Echo "Charm shrink expand is enabled - Controlpoint is disabled"
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_WITH_CONTROLPOINT 0
-_ACEOF
-
+  if test "$enable_ccs" = "no"
+  then
+    Echo "CCS cannot be disabled when enabling shrink-expand"
+    test_finish 1
+  else
+    Echo "Charm shrink expand is enabled - Controlpoint is disabled."
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_SHRINK_EXPAND 1
 _ACEOF
 
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_CONTROLPOINT 0
+_ACEOF
+
+  fi
 else
   Echo "Charm shrink expand is disabled"
 
@@ -2471,7 +2477,7 @@ if test $strictpass -eq 1
 then
   got_cpp11="true"
 else
-# Flags for g++/clang++/icc(icpc), xlC++, pgCC, and CrayCC, respectively
+# Flags for g++/clang++/icc(icpc), xlC++, pgCC, and CrayCC respectively
 for i in "-std=c++0x" "-qlanglvl=extended0x" "--c++11" "-h std=c++11"; do
     test_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
@@ -6000,7 +6006,7 @@ $as_echo "$as_me: executing $ac_file commands" >&6;}
 
 
   case $ac_file$ac_mode in
-    "config-cleanup":C) sed -i -e 's:^#define\s\+PACKAGE.*:/* & */:' conv-autoconfig.h ;;
+    "config-cleanup":C) sed -i -e 's:^#define\s\+PACKAGE://&:' conv-autoconfig.h ;;
     "default":C) chmod +x libs/ck-libs/ampi/ampiCC
  ;;
 
