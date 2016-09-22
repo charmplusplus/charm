@@ -4195,6 +4195,9 @@ int SendReq::wait(MPI_Status *sts){
   }
   dis->resumeOnRecv = false;
   AMPI_DEBUG("SendReq::wait has resumed\n");
+  if (sts) {
+    sts->MPI_COMM = comm;
+  }
   return 0;
 }
 
@@ -4203,6 +4206,9 @@ int SsendReq::wait(MPI_Status *sts){
   while (!statusIreq) {
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = dis->blockOnRecv();
+  }
+  if (sts) {
+    sts->MPI_COMM = comm;
   }
   return 0;
 }
