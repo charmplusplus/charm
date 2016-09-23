@@ -30,15 +30,14 @@ Heavily modified by Nikhil Jain 11/28/2011
 #endif
 
 #include "mempool.h"
-int cutOffPoints[] = {64,128,256,512,1024,2048,4096, 8192,16384,32768,
+int cutOffPoints[] = {64,128,256,512,1024,2048,4096,8192,16384,32768,
                       65536,131072,262144,524288,1048576,2097152,4194304,
-                      8388608,16777216,33554432,67108864,134217728,268435456,
-                      536870912,1073741824};
+                      8388608,16777216,33554432,67108864};
 
 INLINE_KEYWORD int which_pow2(size_t size)
 {
   int i;
-  for(i=0; i<cutOffNum; i++) {
+  for(i=0; i<=cutOffNum; i++) {
     if(size <= cutOffPoints[i]) {
       return i;
     }
@@ -63,13 +62,15 @@ INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,size_t
   left = pool_size - taken;
   loc = (char*)pool + taken - (char*)mptr;
   power = which_pow2(left);
-  if(left < cutOffPoints[power]) {
-    power--;
+  if(power <= cutOffNum) {
+    if(left < cutOffPoints[power]) {
+      power--;
+    }
   }
     
-  if(power == cutOffNum) {
-    CmiAbort("Mempool-requested slot is more than what mempool can provide as\
-    one chunk, increase cutOffNum and cutoffPoints in mempool\n");
+  if(power >= cutOffNum) {
+    CmiAbort("Mempool-should never reach here for filling blocks when doing \
+    small allocations. Please report the bug to Charm++ developers.\n");
   }
 
 #if MEMPOOL_DEBUG
@@ -88,7 +89,8 @@ INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,size_t
   for(i=power; i>=0; i--) {
     if(block_head->freelists[i]) {
       head = (slot_header*)((char*)mptr+block_head->freelists[i]);
-      head->size = i;
+      head->size = cutOffPoints[i];
+      head->power = i;
       head->status = 1;
       head->block_ptr = block_head;
       head->prev = head->next = 0;
@@ -128,7 +130,8 @@ int checkblock(mempool_type *mptr,block_header *current,int power)
         current->freelists[i] = loc;
       }
 
-      head_move->size = power;
+      head_move->size = cutOffPoints[power];
+      head_move->power = power;
       prev = current->freelists[power];
       head_move->next = prev+cutOffPoints[power]; 
       head = (slot_header*)((char*)head_move+cutOffPoints[power]);
@@ -136,7 +139,8 @@ int checkblock(mempool_type *mptr,block_header *current,int power)
         if(i!=power) {
           head = (slot_header*)((char*)head+cutOffPoints[i-1]);
         }
-        head->size = i;
+        head->size = cutOffPoints[i];
+        head->power = i;
         head->status = 1;
         head->block_ptr = current;
         head->prev = head->next = 0;
@@ -198,11 +202,17 @@ void removeblocks(mempool_type *mptr)
   }
 }
 
+/** initialize mempool */
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool_freeblock freefn, size_t limit)
 {
   int power;
   mempool_type *mptr;
   mem_handle_t  mem_hndl;
+
+  power = which_pow2(pool_size);
+  if(power > cutOffNum) {
+    pool_size = 1*1024*1024;
+  }
 
   void *pool = allocfn(&pool_size, &mem_hndl, 0);
   mptr = (mempool_type*)pool;
@@ -225,16 +235,28 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->block_head.msgs_in_recv= 0;
 #endif
   fillblock(mptr,&mptr->block_head,pool_size,0);
+  mptr->large_blocks = 0;
+#if MEMPOOL_DEBUG
+  CmiPrintf("Initialized pool of size %zd\n",pool_size);
+#endif
   return mptr;
 }
 
 void mempool_destroy(mempool_type *mptr)
 {
   block_header *current,*tofree;
-
+  large_block_header* lcurr,*ltofree;
   mempool_freeblock freefn;
   if(mptr == NULL) return;
-  freefn= mptr->freeblockfn;
+  freefn = mptr->freeblockfn;
+
+  lcurr = (mptr->large_blocks)?(large_block_header*)((char*)mptr + mptr->large_blocks):NULL;
+  while(lcurr != NULL) {
+    ltofree = lcurr;
+    lcurr = lcurr->block_next ? (large_block_header *)((char*)mptr + lcurr->block_next) : NULL;
+    freefn(ltofree, ltofree->mem_hndl);
+  }
+
   current = tofree = &(mptr->block_head);
 
   while(current != NULL) {
@@ -254,17 +276,16 @@ void*  mempool_malloc(mempool_type *mptr, size_t size, int expand)
     block_header  *current,*tail;
     slot_header   *head_free,*head_next;
     mem_handle_t  mem_hndl;
-
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
     CmiLock(mptr->mempoolLock);
 #endif
 
     bestfit_size = size + sizeof(used_header);
     power = which_pow2(bestfit_size);
-    if(power == cutOffNum) {
-      CmiAbort("Mempool-requested slot is more than what mempool can provide as\
-      one chunk, increase cutOffNum and cutoffPoints in mempool\n");
+    if(power >= cutOffNum) {
+      return mempool_large_malloc(mptr, size, expand);
     }
+
     bestfit_size = cutOffPoints[power];
 #if MEMPOOL_DEBUG
     CmiPrintf("Request size is %d, power value is %d, size is %d\n",size,power,cutOffPoints[power]);
@@ -294,10 +315,12 @@ void*  mempool_malloc(mempool_type *mptr, size_t size, int expand)
       }
 
       tail = (block_header*)((char*)mptr+mptr->block_tail);
-      expand_size = 2*bestfit_size + sizeof(block_header); 
-      pool = mptr->newblockfn(&expand_size, &mem_hndl, 1);
+      expand_size = bestfit_size + sizeof(block_header);
+      pool = mptr->newblockfn(&expand_size, &mem_hndl, expand);
       if(pool==NULL) {
+#if MEMPOOL_DEBUG
         CmiPrintf("Mempool-Did not get memory while expanding\n");
+#endif
         return NULL;
       }
     
@@ -321,8 +344,7 @@ void*  mempool_malloc(mempool_type *mptr, size_t size, int expand)
       if(checkblock(mptr,current,power)) {
         head_free = current->freelists[power]?(slot_header*)((char*)mptr+current->freelists[power]):NULL;
       } else {
-        CmiPrintf("Mempool-No free block after expansion, something is broken in mempool\n");
-	return NULL;
+        CmiAbort("Mempool-No free block after expansion, something is broken in mempool\n");
       }
     }
 
@@ -339,11 +361,65 @@ void*  mempool_malloc(mempool_type *mptr, size_t size, int expand)
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
       CmiUnlock(mptr->mempoolLock);
 #endif
+#if MEMPOOL_DEBUG
+      CmiPrintf("Malloc done\n");
+#endif
       return (char*)head_free + sizeof(used_header);
     }
     
-    CmiPrintf("Mempool-Reached a location which I should never have reached\n");
+    CmiAbort("Mempool-Reached a location which it should never have reached\n");
+}
+
+void* mempool_large_malloc(mempool_type* mptr, size_t size, int expand)
+{
+  void * pool;
+  mem_handle_t mem_hndl;
+  used_header* head_free;
+  large_block_header* current, *first_block = NULL;
+
+  size_t expand_size = size + sizeof(large_block_header) + sizeof(used_header);
+#if MEMPOOL_DEBUG
+  CmiPrintf("Mempool-Large block allocation\n");
+#endif
+  pool = mptr->newblockfn(&expand_size, &mem_hndl, expand);
+
+  if(pool==NULL) {
+#if MEMPOOL_DEBUG
+    CmiPrintf("Mempool-Did not get memory while expanding\n");
+#endif
     return NULL;
+  }
+
+  current = (large_block_header*)pool;
+  current->block_prev = current->block_next = 0;
+
+  if(mptr->large_blocks != 0) {
+    first_block = (large_block_header*)((char*)mptr + mptr->large_blocks);
+    first_block->block_prev = ((char*)current-(char*)mptr);
+    current->block_next = mptr->large_blocks;
+  }
+  mptr->large_blocks = ((char*)current-(char*)mptr);
+
+  current->mptr = mptr;
+  current->mem_hndl = mem_hndl;
+  current->size = expand_size;
+  mptr->size += expand_size;
+#if CMK_CONVERSE_UGNI
+  current->msgs_in_send= 0;
+  current->msgs_in_recv = 0;
+#endif
+
+  head_free = (used_header*)((char*)current + sizeof(large_block_header));
+  head_free->block_ptr = (block_header*)current;
+  head_free->size = expand_size - sizeof(large_block_header);
+  head_free->status = -1;
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+  CmiUnlock(mptr->mempoolLock);
+#endif
+#if MEMPOOL_DEBUG
+  CmiPrintf("Large malloc done\n");
+#endif
+  return (char*)head_free + sizeof(used_header);
 }
 
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
@@ -353,7 +429,9 @@ void mempool_free_thread( void *ptr_free)
     mempool_type *mptr;
 
     to_free = (slot_header *)((char*)ptr_free - sizeof(used_header));
-    mptr = (mempool_type*)(((block_header*)(to_free->block_ptr))->mptr);
+    mptr = to_free->status == -1
+           ? (mempool_type*)(((large_block_header*)(to_free->block_ptr))->mptr)
+           : (mempool_type*)(((block_header*)(to_free->block_ptr))->mptr);
     CmiLock(mptr->mempoolLock);
     mempool_free(mptr,  ptr_free);
     CmiUnlock(mptr->mempoolLock);
@@ -374,6 +452,27 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
 #endif
 
     to_free = (slot_header *)((char*)ptr_free - sizeof(used_header));
+
+    if(to_free->status == -1) {
+      large_block_header* largeblockhead = (large_block_header*)to_free->block_ptr, *temp;
+      if(mptr->large_blocks == ((char*)largeblockhead - (char*)mptr)) {
+        mptr->large_blocks = largeblockhead->block_next;
+      } else {
+        temp = (large_block_header*)((char*)mptr + largeblockhead->block_prev);
+        temp->block_next = largeblockhead->block_next;
+      }
+      if(largeblockhead->block_next != 0) {
+        temp = (large_block_header*)((char*)mptr + largeblockhead->block_next);
+        temp->block_prev = largeblockhead->block_prev;
+      }
+      mptr->size -= largeblockhead->size;
+      mptr->freeblockfn(largeblockhead, largeblockhead->mem_hndl);
+#if MEMPOOL_DEBUG
+      CmiPrintf("Large free done\n");
+#endif
+      return;
+    }
+
     to_free->status = 1;
     block_head = to_free->block_ptr;
     block_head->used -= to_free->size;
@@ -383,17 +482,17 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     size = 0;
     current = to_free;
     while(current->status == 1) {
-      size += cutOffPoints[current->size];
+      size += current->size;
       first = current;
       current = current->gprev?(slot_header*)((char*)mptr+current->gprev):NULL;
       if(current == NULL)
         break;
     }
 
-    size -= cutOffPoints[to_free->size];
+    size -= to_free->size;
     current = to_free;
     while(current->status == 1) {
-      size += cutOffPoints[current->size];
+      size += current->size;
       current = current->gnext?(slot_header*)((char*)mptr+current->gnext):NULL;
       if(current == NULL)
         break;
@@ -405,7 +504,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     current = first;
     while(current!=used_next) {
       if(current!=to_free) {
-        power = current->size;
+        power = current->power;
         temp = current->prev?(slot_header*)((char*)mptr+current->prev):NULL;
         if(temp!=NULL) {
           temp->next = current->next;
@@ -429,14 +528,15 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
 
 #if MEMPOOL_DEBUG
     if(CmiMyPe() == 0)
-      printf("free was for %lld, merging for %lld, power %lld\n",to_free->size,size,power);
+      CmiPrintf("Free was for %zd, merging for %zd, power %d\n",to_free->size,size,power);
 #endif
 
     loc = (char*)first - (char*)mptr;
     for(i=power; i>=0; i--) {
       if(left>=cutOffPoints[i]) {
         current = (slot_header*)((char*)mptr+loc);
-        current->size = i;
+        current->size = cutOffPoints[i];
+        current->power = i;
         current->status = 1;
       	current->block_ptr = block_head;
         if(i!=power) {
