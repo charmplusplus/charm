@@ -804,7 +804,6 @@ CtvDeclare(int, ampiInitDone);
 CtvDeclare(void*,stackBottom);
 CtvDeclare(int, ampiFinalized);
 CkpvDeclare(Builtin_kvs, bikvs);
-CkpvDeclare(int,argvExtracted);
 
 CDECL
 long ampiCurrentStackUsage(void){
@@ -871,9 +870,6 @@ static void ampiProcInit(void){
 
   CkpvInitialize(Builtin_kvs, bikvs); // built-in key-values
   CkpvAccess(bikvs) = Builtin_kvs();
-
-  CkpvInitialize(int, argvExtracted);
-  CkpvAccess(argvExtracted) = 0;
 
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   REGISTER_AMPI
