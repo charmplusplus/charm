@@ -7047,6 +7047,36 @@ int AMPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest)
 }
 
 CDECL
+int AMPI_Comm_split_type(MPI_Comm src, int split_type, int key, MPI_Info info, MPI_Comm *dest)
+{
+  AMPIAPI("AMPI_Comm_split_type");
+
+  if (src == MPI_COMM_SELF && split_type == MPI_UNDEFINED) {
+    *dest = MPI_COMM_NULL;
+    return MPI_SUCCESS;
+  }
+
+  int color = MPI_UNDEFINED;
+
+  if (split_type == MPI_COMM_TYPE_SHARED || split_type == AMPI_COMM_TYPE_HOST) {
+    color = CmiPhysicalNodeID(CkMyPe());
+  }
+  else if (split_type == AMPI_COMM_TYPE_PROCESS) {
+    color = CkMyNode();
+  }
+  else if (split_type == AMPI_COMM_TYPE_WTH) {
+    color = CkMyPe();
+  }
+
+  if (color == MPI_UNDEFINED) {
+    *dest = MPI_COMM_NULL;
+    return ampiErrhandler("MPI_Comm_split_type", MPI_ERR_ARG);
+  }
+
+  return AMPI_Comm_split(src, color, key, dest);
+}
+
+CDECL
 int AMPI_Comm_free(MPI_Comm *comm)
 {
   AMPIAPI("AMPI_Comm_free");

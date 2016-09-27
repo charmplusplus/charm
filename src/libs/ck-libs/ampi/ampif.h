@@ -133,6 +133,11 @@
        integer, parameter :: MPI_CONGRUENT = 2
        integer, parameter :: MPI_UNEQUAL   = 3
 
+       integer, parameter :: MPI_COMM_TYPE_SHARED   = 1
+       integer, parameter :: AMPI_COMM_TYPE_HOST    = 2
+       integer, parameter :: AMPI_COMM_TYPE_PROCESS = 3
+       integer, parameter :: AMPI_COMM_TYPE_WTH     = 4
+
        integer, parameter :: MPI_GRAPH = 1
        integer, parameter :: MPI_CART  = 2
 

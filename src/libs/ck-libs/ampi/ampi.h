@@ -178,6 +178,11 @@ typedef int MPI_Fint;
 #define MPI_CONGRUENT   2
 #define MPI_UNEQUAL     3
 
+#define MPI_COMM_TYPE_SHARED   1
+#define AMPI_COMM_TYPE_HOST    2
+#define AMPI_COMM_TYPE_PROCESS 3
+#define AMPI_COMM_TYPE_WTH     4
+
 typedef int MPI_Op;
 
 typedef void (MPI_User_function)(void *invec, void *inoutvec,
@@ -685,6 +690,8 @@ int AMPI_Comm_rank(MPI_Comm comm, int *rank);
 int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result);
 #define MPI_Comm_split AMPI_Comm_split
 int AMPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest);
+#define MPI_Comm_split_type AMPI_Comm_split_type
+int AMPI_Comm_split_type(MPI_Comm src, int split_type, int key, MPI_Info info, MPI_Comm *dest);
 #define MPI_Comm_dup AMPI_Comm_dup
 int AMPI_Comm_dup(MPI_Comm src, MPI_Comm *dest);
 #define MPI_Comm_free AMPI_Comm_free

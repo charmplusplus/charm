@@ -283,12 +283,19 @@ AMPI_Register_just_migrated         AMPI_Register_about_to_migrate
 AMPI_Command_argument_count         AMPI_Get_command_argument
 \end{alltt}
 
-AMPI also provides a set of built-in attributes on all communicators and windows
+\ampi{} provides a set of built-in attributes on all communicators and windows
 to find the PE or Node number that a virtual processor is currently running on,
 as well as the total number of PEs and Nodes in the job. The built-in attributes
 are \texttt{AMPI\_MY\_PE}, \texttt{AMPI\_MY\_NODE}, \texttt{AMPI\_NUM\_PES}, and
 \texttt{AMPI\_NUM\_NODES}. These attributes are accessible from any rank by
 calling \texttt{MPI\_Comm\_get\_attr}.
+
+\ampi{} also provides extra communicator types that users can pass to
+\texttt{MPI\_Comm\_split\_type}: \texttt{AMPI\_COMM\_TYPE\_HOST} for splitting a communicator into
+disjoint sets of ranks that share the same physical host, \texttt{AMPI\_COMM\_TYPE\_PROCESS} for
+splitting a communicator into disjoint sets of ranks that share the same operating system process,
+and \texttt{AMPI\_COMM\_TYPE\_WTH}, for splitting a communicator into disjoint sets
+of ranks that share the same worker thread.
 
 \subsection{Name for Main Program}
 
@@ -710,16 +717,26 @@ for (int iter=0; iter < max_iters; iter++) \{
 \}
 \end{alltt}
 
+Note that migrating ranks around the cores and nodes of a system can change which
+ranks share physical resources, such as memory. A consequence of this is that communicators created
+via \texttt{MPI\_Comm\_split\_type} are invalidated by calls to \texttt{AMPI\_Migrate} that result
+in migration which breaks the semantics of that communicator type. The only valid routine to call on
+such communicators is \texttt{MPI\_Comm\_free}.
+
 We also provide callbacks that user code can register with the runtime system
 to be invoked just before and right after migration:
 \texttt{AMPI\_Register\_about\_to\_migrate} and
-\texttt{AMPI\_Register\_just\_migrated} respectively. We also provide routines
-for starting and stopping load measurements, and for users to explicitly set the
-load value of a rank using the following: \texttt{AMPI\_Load\_start\_measure},
-\texttt{AMPI\_Load\_stop\_measure}, and \texttt{AMPI\_Load\_set\_value}.
-And since \ampi{} builds on top of \charmpp{}, users can experiment with the
-suite of load balancing strategies included with \charmpp{}, as well as write
-their own strategies based on user-level information and heuristics.
+\texttt{AMPI\_Register\_just\_migrated} respectively. Note that the callbacks
+are only invoked on those ranks that are about to actually migrate or have
+just actually migrated.
+
+\ampi{} provide routines for starting and stopping load measurements, and for
+users to explicitly set the load value of a rank using the following:
+\texttt{AMPI\_Load\_start\_measure}, \texttt{AMPI\_Load\_stop\_measure}, and
+\texttt{AMPI\_Load\_set\_value}. And since \ampi{} builds on top of \charmpp{},
+users can experiment with the suite of load balancing strategies included with
+\charmpp{}, as well as write their own strategies based on user-level
+information and heuristics.
 
 \subsubsection{Packing/Unpacking Thread Data}
 

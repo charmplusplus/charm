@@ -130,6 +130,7 @@ FDECL {
 #define mpi_comm_size FTN_NAME( MPI_COMM_SIZE , mpi_comm_size )
 #define mpi_comm_dup FTN_NAME( MPI_COMM_DUP , mpi_comm_dup )
 #define mpi_comm_split FTN_NAME( MPI_COMM_SPLIT , mpi_comm_split )
+#define mpi_comm_split_type FTN_NAME( MPI_COMM_SPLIT_TYPE , mpi_comm_split_type )
 #define mpi_comm_free FTN_NAME( MPI_COMM_FREE , mpi_comm_free )
 #define mpi_comm_test_inter FTN_NAME( MPI_COMM_TEST_INTER , mpi_comm_test_inter )
 #define mpi_comm_remote_size FTN_NAME ( MPI_COMM_REMOTE_SIZE , mpi_comm_remote_size )
@@ -1072,6 +1073,11 @@ void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
 void mpi_comm_split(int* src, int* color, int* key, int *dest, int *ierr)
 {
   *ierr = AMPI_Comm_split(*src, *color, *key, dest);
+}
+
+void mpi_comm_split_type(int* src, int* split_type, int* key, int* info, int* dest, int* ierr)
+{
+  *ierr = AMPI_Comm_split_type(*src, *split_type, *key, *info, dest);
 }
 
 void mpi_comm_free(int *comm, int *ierr)
