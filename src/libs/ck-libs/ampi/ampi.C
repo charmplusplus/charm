@@ -749,6 +749,7 @@ class Builtin_kvs{
   void* win_base;
   int win_disp_unit,win_create_flavor,win_model;
   MPI_Aint win_size;
+  int ampi_tmp;
   Builtin_kvs(){
     tag_ub = MPI_TAG_UB_VALUE;
     host = MPI_PROC_NULL;
@@ -761,6 +762,7 @@ class Builtin_kvs{
     win_disp_unit = 0;
     win_create_flavor = MPI_WIN_FLAVOR_CREATE;
     win_model = MPI_WIN_SEPARATE;
+    ampi_tmp = 0;
   }
 };
 
@@ -1405,7 +1407,6 @@ bool ampiParent::kv_set_builtin(int keyval, void* attribute_val) {
 }
 
 bool ampiParent::kv_get_builtin(int keyval) {
-  int my_pe, num_pes, my_node, num_nodes;
   switch(keyval) {
     case MPI_TAG_UB:            kv_builtin_storage = &(CkpvAccess(bikvs).tag_ub);            return true;
     case MPI_HOST:              kv_builtin_storage = &(CkpvAccess(bikvs).host);              return true;
@@ -1418,10 +1419,10 @@ bool ampiParent::kv_get_builtin(int keyval) {
     case MPI_WIN_DISP_UNIT:     kv_builtin_storage = &(CkpvAccess(bikvs).win_disp_unit);     return true;
     case MPI_WIN_CREATE_FLAVOR: kv_builtin_storage = &(CkpvAccess(bikvs).win_create_flavor); return true;
     case MPI_WIN_MODEL:         kv_builtin_storage = &(CkpvAccess(bikvs).win_model);         return true;
-    case AMPI_MY_PE:            my_pe     = CkMyPe();     kv_builtin_storage = &my_pe;       return true;
-    case AMPI_NUM_PES:          num_pes   = CkNumPes();   kv_builtin_storage = &num_pes;     return true;
-    case AMPI_MY_NODE:          my_node   = CkMyNode();   kv_builtin_storage = &my_node;     return true;
-    case AMPI_NUM_NODES:        num_nodes = CkNumNodes(); kv_builtin_storage = &num_nodes;   return true;
+    case AMPI_MY_PE:     CkpvAccess(bikvs).ampi_tmp = CkMyPe();     kv_builtin_storage = &(CkpvAccess(bikvs).ampi_tmp); return true;
+    case AMPI_NUM_PES:   CkpvAccess(bikvs).ampi_tmp = CkNumPes();   kv_builtin_storage = &(CkpvAccess(bikvs).ampi_tmp); return true;
+    case AMPI_MY_NODE:   CkpvAccess(bikvs).ampi_tmp = CkMyNode();   kv_builtin_storage = &(CkpvAccess(bikvs).ampi_tmp); return true;
+    case AMPI_NUM_NODES: CkpvAccess(bikvs).ampi_tmp = CkNumNodes(); kv_builtin_storage = &(CkpvAccess(bikvs).ampi_tmp); return true;
     default: return false;
   };
 }
