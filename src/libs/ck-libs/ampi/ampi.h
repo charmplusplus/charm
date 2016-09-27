@@ -225,10 +225,10 @@ typedef void (MPI_User_function)(void *invec, void *inoutvec,
 #define MPI_WIN_DISP_UNIT      -9
 #define MPI_WIN_MODEL         -10
 #define MPI_WIN_CREATE_FLAVOR -11
-#define AMPI_MY_PE            -12
-#define AMPI_NUM_PES          -13
-#define AMPI_MY_NODE          -14
-#define AMPI_NUM_NODES        -15
+#define AMPI_MY_WTH           -12
+#define AMPI_NUM_WTHS         -13
+#define AMPI_MY_PROCESS       -14
+#define AMPI_NUM_PROCESSES    -15
 
 /** Communicators give a communication context to a set of processors.
     An intercommunicator can be used for point to point messaging between two groups.

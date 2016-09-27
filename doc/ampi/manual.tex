@@ -284,11 +284,13 @@ AMPI_Command_argument_count         AMPI_Get_command_argument
 \end{alltt}
 
 \ampi{} provides a set of built-in attributes on all communicators and windows
-to find the PE or Node number that a virtual processor is currently running on,
-as well as the total number of PEs and Nodes in the job. The built-in attributes
-are \texttt{AMPI\_MY\_PE}, \texttt{AMPI\_MY\_NODE}, \texttt{AMPI\_NUM\_PES}, and
-\texttt{AMPI\_NUM\_NODES}. These attributes are accessible from any rank by
-calling \texttt{MPI\_Comm\_get\_attr}.
+to find the number of the worker thread, process, or host that a rank is currently running on,
+as well as the total number of worker threads, processes, and hosts in the job.
+We define a worker thread to be a thread on which one of more \ampi{} ranks are scheduled.
+We define a process here as an operating system process, which may contain one or more
+worker threads. The built-in attributes are \texttt{AMPI\_MY\_WTH}, \texttt{AMPI\_MY\_PROCESS},
+\texttt{AMPI\_NUM\_WTHS}, and \texttt{AMPI\_NUM\_PROCESSES}. These attributes are
+accessible from any rank by calling \texttt{MPI\_Comm\_get\_attr}.
 
 \ampi{} also provides extra communicator types that users can pass to
 \texttt{MPI\_Comm\_split\_type}: \texttt{AMPI\_COMM\_TYPE\_HOST} for splitting a communicator into
@@ -620,8 +622,8 @@ Scheme     & X86 & IA64 & Opteron & Mac OS X & IBM SP & SUN & BG/P & Cray/XT & W
 \ampi{} provides fully automated support for migrating MPI ranks between nodes of a
 system without any application-specific code at all. We do so using a memory
 allocator, Isomalloc, that allocates memory per user-level thread to globally
-unique virtual memory addresses. This means that every PE in the system reserves
-slices of virtual memory for all other threads, allowing transparent migration
+unique virtual memory addresses. This means that every worker thread in the system
+reserves slices of virtual memory for all user-level threads, allowing transparent migration
 of stacks and pointers into memory (Isomalloc requires 64-bit virtual memory
 addresses and support from the operating system for mapping memory to arbitrary
 virtual addresses). Applications only need to link with Isomalloc to enable
@@ -1168,8 +1170,8 @@ AMPI program with some additional command line options.
 > ./charmrun ./pgm +p4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
 \end{alltt}
 
-In the above example, a parallel run with 4 processors and 4 VPs will be
-executed, and the changes in the MPI environment of processor 2 (also VP 2,
+In the above example, a parallel run with 4 worker threads and 4 AMPI ranks will be
+executed, and the changes in the MPI environment of worker thread 2 (also rank 2,
 starting from 0) will get logged into diskfile "msg2.log". 
 
 Unlike the first run, the re-run is a sequential program, so it is not invoked
@@ -1343,8 +1345,8 @@ makes the job of running \ampi{} programs portable and easier across all
 parallel machines supported by \charmpp{}. \texttt{charmrun} is copied to a
 directory where an \ampi{} prgram is built using \charmc{}. It takes a command
 line parameter specifying number of processors, and the name of the program
-followed by \ampi{} options (such as number of VPs to create, and the stack size
-of every VP) and the program arguments. A typical invocation of an \ampi{}
+followed by \ampi{} options (such as number of ranks to create, and the stack size
+of every user-level thread) and the program arguments. A typical invocation of an \ampi{}
 program \texttt{pgm} with \texttt{charmrun} is:
 
 \begin{alltt}
