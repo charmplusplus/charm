@@ -1010,6 +1010,7 @@ void TraceSummaryBOC::sumData(CkReductionMsg *msg) {
     char    *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sumall")+1];
     sprintf(fname, "%s.sumall", CkpvAccess(traceRoot));
     FILE *sumfp = fopen(fname, "w+");
+    delete [] fname;
     fprintf(sumfp, "ver:%3.1f cpu:%d numIntervals:%d numEPs:%d intervalSize:%e\n",
                 CkpvAccess(version), CkNumPes(),
                 numBins, numEntries, _maxBinSize);
@@ -1174,6 +1175,7 @@ void TraceSummaryBOC::collectSummaryData(double startTime, double binSize,
   CkCallback cb(CkIndex_TraceSummaryBOC::summaryDataCollected(NULL), sumProxy[0]);
   contribute(sizeof(double)*numBins, contribution, CkReduction::sum_double, 
 	     cb);
+  delete [] contribution;
 }
 
 void TraceSummaryBOC::summaryDataCollected(CkReductionMsg *msg) {

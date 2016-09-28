@@ -1719,7 +1719,7 @@ int TraceProjections::idxRegistered(int idx)
 }
 
 void TraceProjections::regFunc(const char *name, int &idx, int idxSpecifiedByUser){
-    StrKey k((char*)name,strlen(name));
+    StrKey k(name);
     int num = funcHashtable.get(k);
     
     if(num!=0) {
@@ -1738,18 +1738,14 @@ void TraceProjections::regFunc(const char *name, int &idx, int idxSpecifiedByUse
     }
 
     if(idxSpecifiedByUser) {
-    	char *st = new char[strlen(name)+1];
-    	memcpy(st,name,strlen(name)+1);
-    	StrKey *newKey = new StrKey(st,strlen(st));
-    	int &ref = funcHashtable.put(*newKey);
+    	StrKey newKey = StrKey(name);
+    	int &ref = funcHashtable.put(newKey);
     	ref=idx;
         funcCount++;
 	idxVec.push_back(idx);	
     } else {
-    	char *st = new char[strlen(name)+1];
-    	memcpy(st,name,strlen(name)+1);
-    	StrKey *newKey = new StrKey(st,strlen(st));
-    	int &ref = funcHashtable.put(*newKey);
+    	StrKey newKey = StrKey(name);
+    	int &ref = funcHashtable.put(newKey);
     	ref=funcCount;
     	num = funcCount;
     	funcCount++;
@@ -1758,8 +1754,8 @@ void TraceProjections::regFunc(const char *name, int &idx, int idxSpecifiedByUse
     }
 }
 
-void TraceProjections::beginFunc(char *name,char *file,int line){
-	StrKey k(name,strlen(name));	
+void TraceProjections::beginFunc(const char *name,char *file,int line){
+	StrKey k(name);
 	unsigned short  num = (unsigned short)funcHashtable.get(k);
 	beginFunc(num,file,line);
 }
@@ -1771,8 +1767,8 @@ void TraceProjections::beginFunc(int idx,char *file,int line){
 	_logPool->add(BEGIN_FUNC,TraceTimer(),idx,line,file);
 }
 
-void TraceProjections::endFunc(char *name){
-	StrKey k(name,strlen(name));	
+void TraceProjections::endFunc(const char *name){
+	StrKey k(name);
 	int num = funcHashtable.get(k);
 	endFunc(num);	
 }
@@ -2268,6 +2264,7 @@ void KMeansBOC::collectKMeansData() {
 		0, thisProxy);
   contribute((numMetrics*4)*sizeof(double), reductionMsg, 
 	     outlierReductionType, cb);  
+  delete [] reductionMsg;
 }
 
 // The purpose is mainly to initialize the k seeds and generate
@@ -2456,6 +2453,7 @@ void KMeansBOC::findInitialClusters(KMeansStatsMessage *msg) {
 		0, thisProxy);
   contribute(numK*(numMetrics+1)*sizeof(double), modVector, 
 	     CkReduction::sum_double, cb);  
+  delete [] modVector;
 }
 
 double KMeansBOC::calculateDistance(int k) {
@@ -2589,6 +2587,7 @@ void KMeansBOC::updateSeedMembership(KSeedsMessage *msg) {
 		0, thisProxy);
   contribute(numK*(numMetrics+1)*sizeof(double), modVector, 
 	     CkReduction::sum_double, cb);  
+  delete [] modVector;
 }
 
 void KMeansBOC::findRepresentatives() {

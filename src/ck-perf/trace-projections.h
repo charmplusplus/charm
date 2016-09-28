@@ -390,13 +390,13 @@ class LogPool {
 	class that represents a key in a CkHashtable with a string as a key
 */
 class StrKey {
-	char *str;
+	std::string str;
 	int len;
 	unsigned int key;
 	public:
-	StrKey(char *_str,int _len){
-		str = _str;
-		len = _len;
+	StrKey(const char *name){
+		str = std::string(name);
+		len = str.size();
 		key = 0;
 		for(int i=0;i<len;i++){
 			key += str[i];
@@ -433,8 +433,8 @@ class StrKey {
 		}
 		return 1;
 	}
-	inline char *getStr(){
-		return str;
+	inline const char *getStr(){
+		return str.c_str();
 	}
 };
 
@@ -542,9 +542,9 @@ public:
     CkHashtableIterator *getfuncIterator(){return funcHashtable.iterator();};
     int getFuncNumber(){return funcHashtable.numObjects();};
     void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0);
-    void beginFunc(char *name,char *file,int line);
+    void beginFunc(const char *name,char *file,int line);
     void beginFunc(int idx,char *file,int line);
-    void endFunc(char *name);
+    void endFunc(const char *name);
     void endFunc(int num);
 
     /* start recognizing phases in trace-projections */
