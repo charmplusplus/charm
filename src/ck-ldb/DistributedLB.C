@@ -21,9 +21,33 @@ DistributedLB::DistributedLB(const CkLBOptions &opt) : CBase_DistributedLB(opt) 
   InitLB(opt);
 }
 
+void DistributedLB::turnOn()
+{
+#if CMK_LBDB_ON
+  theLbdb->getLBDB()->
+    TurnOnBarrierReceiver(receiver);
+  theLbdb->getLBDB()->
+    TurnOnNotifyMigrated(notifier);
+  theLbdb->getLBDB()->
+    TurnOnStartLBFn(startLbFnHdl);
+#endif
+}
+
+void DistributedLB::turnOff()
+{
+#if CMK_LBDB_ON
+  theLbdb->getLBDB()->
+    TurnOffBarrierReceiver(receiver);
+  theLbdb->getLBDB()->
+    TurnOffNotifyMigrated(notifier);
+  theLbdb->getLBDB()->
+    TurnOffStartLBFn(startLbFnHdl);
+#endif
+}
 
 void DistributedLB::InitLB(const CkLBOptions &opt) {
   thisProxy = CProxy_DistributedLB(thisgroup);
+  if (opt.getSeqNo() > 0) turnOff();
 }
 
 void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
@@ -195,6 +219,7 @@ void DistributedLB::DoneGossip() {
   // The gossip is done, now perform load balance based on the information
   // received in the information propagation stage (gossip)
   LoadBalance();
+  theLbdb->nextLoadbalancer(seqno);
 }
 
 /*
