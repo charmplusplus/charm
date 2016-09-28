@@ -130,6 +130,11 @@ public:
   inline void GetCommData(LDCommData *data) 
        { if (commTable) commTable->GetCommData(data); };
 
+  inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& acrossbytes, int& num_nghbors, int& hops, int& hopbytes) {
+    if (commTable)
+      commTable->GetCommInfo(bytes, msgs, withinbytes, acrossbytes, num_nghbors, hops, hopbytes, objs);
+  };
+
   void MetaLBResumeWaitingChares(int lb_ideal_period);
   void MetaLBCallLBOnChares();
   int  Migrate(LDObjHandle h, int dest);

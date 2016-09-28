@@ -385,6 +385,13 @@ extern "C" void LDGetCommData(LDHandle _db, LDCommData *data)
   return;
 }
 
+extern "C" void LDGetCommInfo(LDHandle _db, int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& n_nghbors, int& hops, int& hopbytes) {
+  LBDB *const db = (LBDB*)(_db.handle);
+
+  db->GetCommInfo(bytes, msgs, withinbytes, outsidebytes, n_nghbors, hops, hopbytes);
+  return;
+}
+
 extern "C" int LDMigrate(LDObjHandle _h, int dest)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);

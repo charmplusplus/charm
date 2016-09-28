@@ -9,6 +9,9 @@
 
 #include <math.h>
 #include "LBComm.h"
+#include <set>
+
+#include "TopoManager.h"
 
 // Hash table mostly based on open hash table from Introduction to
 // Algorithms by Cormen, Leiserson, and Rivest
@@ -183,6 +186,50 @@ void LBCommTable::GetCommData(LDCommData* data)
       out++;
     }
   }
+}
+
+struct LDCommDescComp {
+  bool operator() (const LDCommDesc& lhs, const LDCommDesc &rhs) const {
+    return (lhs.get_destObj() < rhs.get_destObj());
+  }
+};
+
+void LBCommTable::GetCommInfo(int& bytes, int& msgs, int& outsidepemsgs, int&
+    outsidepebytes, int& num_nghbor, int& hops, int& hopbytes, CkVec<LBObj*>& objs) {
+
+  LBCommData* curtable=set;
+  TableState* curstate=state;
+  int i;
+  bytes = 0;
+  msgs = 0;
+  outsidepemsgs = 0;
+  outsidepebytes = 0;
+  hops = 0;
+  hopbytes = 0;
+  std::set<LDCommDesc, LDCommDescComp> num_neighbors;
+
+  int h;
+
+  for(i=0; i < cur_sz; i++, curtable++, curstate++) {
+    if (*curstate == InUse) {
+      msgs += curtable->n_messages;
+      bytes += curtable->n_bytes;
+      if (curtable->destObj.get_type() == LD_OBJ_MSG) {
+        num_neighbors.insert(curtable->destObj);
+      }
+
+      if (curtable->destObj.lastKnown() != CkMyPe()) {
+        outsidepebytes += curtable->n_bytes;
+        outsidepemsgs += curtable->n_messages;
+        if(curtable->destObj.lastKnown()>=0 && curtable->destObj.lastKnown()<CkNumPes()){
+          TopoManager_getHopsBetweenPeRanks(CkMyPe(), curtable->destObj.lastKnown(), &h);
+          hops += curtable->n_messages * h;
+          hopbytes += curtable->n_bytes * h;
+        }
+      }
+    }
+  }
+  num_nghbor = num_neighbors.size();
 }
 
 #endif // CMK_LBDB_ON

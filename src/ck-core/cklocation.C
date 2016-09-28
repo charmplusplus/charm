@@ -1679,6 +1679,7 @@ void CkMigratable::AtSync(int waitForMigration)
   }
 
   // When MetaBalancer is turned on
+  myRec->getMetaBalancer()->SetCharePupSize(ps.size());
 
   if (atsync_iteration == -1) {
     can_reset = false;
@@ -1845,7 +1846,8 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
         enable_measure = true;
 	bounced  = false;
 	the_lbdb=mgr->getLBDB();
-	the_metalb=mgr->getMetaBalancer();
+	if(_lb_args.metaLbOn())
+	  the_metalb=mgr->getMetaBalancer();
 	LDObjid ldid = idx2LDObjid(idx);
 #if CMK_GLOBAL_LOCATION_UPDATE
         ldid.locMgrGid = mgr->getGroupID().idx;
@@ -3407,10 +3409,11 @@ void CkLocMgr::initLB(CkGroupID lbdbID_, CkGroupID metalbID_)
 	if (the_lbdb == 0)
 		CkAbort("LBDatabase not yet created?\n");
 	DEBL((AA "Connected to load balancer %p\n" AB,the_lbdb));
-	the_metalb = (MetaBalancer *)CkLocalBranch(metalbID_);
-	if (the_metalb == 0)
-		CkAbort("MetaBalancer not yet created?\n");
-
+	if(_lb_args.metaLbOn()){
+	  the_metalb = (MetaBalancer *)CkLocalBranch(metalbID_);
+	  if (the_metalb == 0)
+		  CkAbort("MetaBalancer not yet created?\n");
+	}
 	// Register myself as an object manager
 	LDOMid myId;
 	myId.id = thisgroup;

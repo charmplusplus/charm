@@ -374,6 +374,7 @@ void LDGetObjData(LDHandle _lbdb, LDObjData *data);
 
 int LDGetCommDataSz(LDHandle _lbdb);
 void LDGetCommData(LDHandle _lbdb, LDCommData *data);
+void LDGetCommInfo(LDHandle _lbdb, int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_nghbors, int& hops, int& hopbytes);
 
 void LDBackgroundLoad(LDHandle _lbdb, LBRealType *walltime, LBRealType *cputime);
 void LDIdleTime(LDHandle _lbdb, LBRealType *walltime);

@@ -318,6 +318,10 @@ public:
   inline void GetObjData(LDObjData *data) { LDGetObjData(myLDHandle,data); };
   inline int GetCommDataSz(void) { return LDGetCommDataSz(myLDHandle); };
   inline void GetCommData(LDCommData *data) { LDGetCommData(myLDHandle,data); };
+  
+  inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_ngh, int& hops, int& hopbytes) {
+    return LDGetCommInfo(myLDHandle, bytes, msgs, withinbytes, outsidebytes, num_ngh, hops, hopbytes);
+  };
 
   inline void BackgroundLoad(LBRealType *walltime, LBRealType *cputime) {
     LDBackgroundLoad(myLDHandle,walltime,cputime);

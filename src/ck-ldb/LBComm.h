@@ -9,6 +9,9 @@
 #include "converse.h"
 #include "lbdb.h"
 
+class LBObj; //Forward declaration
+template <class T> class CkVec; //Forward declaration
+
 // point to point communication data
 class LBCommData {
 
@@ -109,6 +112,8 @@ public:
   LBCommData* HashSearch(const LBCommData &data);
   int CommCount() { return in_use; };
   void GetCommData(LDCommData* data);
+  void GetCommInfo(int& bytes, int& msgs, int& withinpebytes,
+      int& outsidepebytes, int& num_nghbor, int& hops, int& hopbytes, CkVec<LBObj*>& objs);
 	
 private:
   void NewTable(int _sz) {

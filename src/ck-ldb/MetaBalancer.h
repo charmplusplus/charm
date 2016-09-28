@@ -50,6 +50,38 @@ class MetaLBInit : public Chare {
     MetaLBInit(CkMigrateMessage *m):Chare(m) {}
 };
 
+enum metalb_stats_types{
+  ITER_NO,
+  NUM_PROCS,
+  TOTAL_LOAD,
+  MAX_LOAD,
+  IDLE_TIME,
+  UTILIZATION,
+  TOTAL_LOAD_W_BG,
+  MAX_LOAD_W_BG,
+  TOTAL_KBYTES,
+  TOTAL_KMSGS,
+  WITHIN_PE_KBYTES,
+  OUTSIDE_PE_KBYTES,
+  SUM_COMM_NEIGHBORS,
+  MAX_COMM_NEIGHBORS,
+  SUM_OBJ_COUNT,
+  MAX_OBJ_COUNT,
+  SUM_OBJ_LOAD,
+  MAX_OBJ_LOAD,
+  SUM_HOPS,
+  SUM_HOP_KBYTES,
+  LOAD_STDEV2,
+  MAX_UTIL,
+  MIN_LOAD,
+  MIN_BG,
+  MIN_OBJ_LOAD,
+  MAX_ITER_TIME,
+  LOAD_SKEWNESS,
+  LOAD_KURTOSIS,
+  TOTAL_OVERLOADED_PES,
+};
+
 class MetaBalancer : public CBase_MetaBalancer {
 public:
   MetaBalancer(void) { init(); }
@@ -78,6 +110,7 @@ public:
   void AdjustCountForDeadContributor(int iteration);
   void AdjustCountForNewContributor(int iteration);
   bool AddLoad(int iteration, double load);
+  void SetCharePupSize(size_t psize);
   void ReceiveMinStats(double *load, int n);
   void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);
   void LoadBalanceDecision(int, int);
@@ -89,6 +122,7 @@ public:
   void HandleAdaptiveNoObj();
   void RegisterNoObjCallback(int index);
   void TriggerAdaptiveReduction();
+  void PreviousAvgLoad(double avg);
 
   bool generatePlan(int& period, double& ratio_at_t);
   bool getLineEq(double new_load_percent, double& aslope, double& ac,
@@ -119,11 +153,23 @@ private:
   std::vector<double> total_load_vec;
   // Keeps track of how many local chares contributed
   std::vector<int> total_count_vec;
+  std::vector<double> max_load_vec;
+  std::vector<double> min_load_vec;
   std::vector<int> lbdb_no_obj_callback;
 
   double prev_idle;
   double alpha_beta_cost_to_load;
   int is_prev_lb_refine;
+  int prev_bytes, prev_msgs;
+  int prev_outsidepemsgs, prev_outsidepebytes;
+  int prev_hops, prev_hopbytes;
+  bool print_iteration_time;
+  double prev_iteration_time;
+  double prev_avg_load;
+  int chare_pup_size;
+  double pe_ld_kurtosis;
+  double pe_ld_skewness;
+  int total_ovld_pes;
 
   struct AdaptiveData {
     double iteration;
@@ -131,6 +177,8 @@ private:
     double avg_load;
     double min_utilization;
     double avg_utilization;
+    double total_bytes;
+    double total_msgs;
   };
 
   struct AdaptiveMetaBalancer {
