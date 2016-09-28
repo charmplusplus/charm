@@ -226,6 +226,7 @@ public:
         tupleElement& operator=(CkReduction::tupleElement&& rhs_move);
         ~tupleElement();
 
+        inline void* getData(void) { return data; }
         void pup(PUP::er &p);
     };
 
