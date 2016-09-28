@@ -39,7 +39,7 @@ class ObjID {
           COLLECTION_BITS = 13,
           TYPE_TAG_BITS   = 3
         };
-        enum masks {
+        enum masks : CmiUInt8 {
           ELEMENT_MASK =   ((1ULL << ELEMENT_BITS) - 1),
           COLLECTION_MASK = (((1ULL << COLLECTION_BITS) - 1) << ELEMENT_BITS),
           TYPE_TAG_MASK =   (((1ULL << TYPE_TAG_BITS) - 1) << (ELEMENT_BITS + COLLECTION_BITS))
