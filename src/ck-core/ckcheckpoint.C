@@ -275,7 +275,10 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb, bool _requ
 	chkpStatus = success?CK_CHECKPOINT_SUCCESS:CK_CHECKPOINT_FAILURE;
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
-	contribute(CkCallback(CkReductionTarget(CkCheckpointMgr, SendRestartCB), 0, thisgroup));
+
+	// Use barrier instead of contribute here:
+	// barrier is stateless and multiple calls to it do not overlap.
+	barrier(CkCallback(CkReductionTarget(CkCheckpointMgr, SendRestartCB), 0, thisgroup));
 }
 
 void CkCheckpointMgr::SendRestartCB(void){
