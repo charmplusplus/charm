@@ -2791,7 +2791,7 @@ int AMPI_Init(int *p_argc, char*** p_argv)
   }
   else
   { /* Charm hasn't been started yet! */
-    CkAbort("MPI_Init> AMPI has not been initialized! Possibly due to AMPI requiring '#include \"mpi.h\" be in the same file as main() in C/C++ programs!");
+    CkAbort("MPI_Init> AMPI has not been initialized! Possibly due to AMPI requiring '#include \"mpi.h\" be in the same file as main() in C/C++ programs and \'program main\' be renamed to \'subroutine mpi_main\' in Fortran programs!");
   }
 
   return MPI_SUCCESS;
