@@ -1257,6 +1257,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-error-checking enable error checking
+  --enable-ampi-error-checking
+                          enable AMPI error checking
   --enable-stats          enable statistics collection
   --enable-tracing        enable tracing modules
   --enable-tracing-commthread
@@ -1269,8 +1271,6 @@ Optional Features:
   --enable-shrinkexpand   enable malleable jobs / shrink expand
   --enable-randomized-msgq
                           enable a randomized msg queue (for debugging etc)
-  --enable-ampi-error-checking
-                          enable MPI-level error checking in AMPI
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1802,7 +1802,7 @@ _ACEOF
 
 fi
 
-# enable/disable MPI-level error checking in AMPI
+# enable/disable AMPI error checking
 # Check whether --enable-ampi-error-checking was given.
 if test "${enable_ampi_error_checking+set}" = set; then :
   enableval=$enable_ampi_error_checking;
@@ -1820,7 +1820,7 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 else
-  Echo "AMPI Error checking is enabled"
+  Echo "AMPI error checking is enabled"
 
 cat >>confdefs.h <<_ACEOF
 #define AMPI_ERROR_CHECKING 1
@@ -3329,7 +3329,7 @@ fi
 if test "$CMK_BUILD_MPI" = 1
 then
 
-cat > $t <<EOT
+cat > $tc <<EOT
 #include "mpi.h"
 int main(int argc, char **argv)
 {

@@ -1239,7 +1239,7 @@ fi
 if test "$CMK_BUILD_MPI" = 1
 then
 
-cat > $t <<EOT
+cat > $tc <<EOT
 #include "mpi.h"
 int main(int argc, char **argv)
 {
