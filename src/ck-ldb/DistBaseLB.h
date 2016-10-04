@@ -29,7 +29,7 @@ public:
 	static void staticStartLB(void*);
 	void ProcessAtSync();
   void LoadBalance();
-  void ResumeClients(CkReductionMsg *msg);
+  void ResumeClients();
   void ResumeClients(int balancing);
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);

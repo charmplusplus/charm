@@ -370,9 +370,8 @@ void NborBaseLB::MigrationDone(int balancing)
 
   // if sync resume invoke a barrier
   if (balancing && _lb_args.syncResume()) {
-    CkCallback cb(CkIndex_NborBaseLB::ResumeClients((CkReductionMsg*)NULL), 
-                  thisProxy);
-    contribute(0, NULL, CkReduction::sum_int, cb);
+    contribute(CkCallback(CkReductionTarget(NborBaseLB, ResumeClients),
+                thisProxy));
   }
   else 
     thisProxy [CkMyPe()].ResumeClients(balancing);
@@ -380,10 +379,9 @@ void NborBaseLB::MigrationDone(int balancing)
 #endif
 }
 
-void NborBaseLB::ResumeClients(CkReductionMsg *msg)
+void NborBaseLB::ResumeClients()
 {
   ResumeClients(1);
-  delete msg;
 }
 
 void NborBaseLB::ResumeClients(int balancing)

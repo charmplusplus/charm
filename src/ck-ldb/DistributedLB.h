@@ -35,7 +35,7 @@ public:
   void DoneGossip();
   void InformMigration(int obj_id, int from_pe, double obj_load, bool force);
   void RecvAck(int obj_id, int assigned_pe, bool can_accept);
-  void SendAfterBarrier(CkReductionMsg *msg);
+  void SendAfterBarrier();
 
 private:
   CProxy_DistributedLB thisProxy;

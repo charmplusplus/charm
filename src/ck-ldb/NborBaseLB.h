@@ -32,7 +32,7 @@ public:
   void AtSync(void); // Everything is at the PE barrier
 
   void ReceiveStats(CkMarshalledNLBStatsMessage &m); 		// Receive stats on PE 0
-  void ResumeClients(CkReductionMsg *msg);
+  void ResumeClients();
   void ResumeClients(int balancing);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 

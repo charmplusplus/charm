@@ -106,7 +106,7 @@ public:
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
   void SendStats();
-  void ReceiveCounts(CkReductionMsg *);
+  void ReceiveCounts(int *counts, int n);
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
   void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
   
@@ -115,13 +115,13 @@ public:
   void t_LoadBalance(void); 
   void ResumeClients(int);                      // Resuming clients needs
 
-  void ResumeClients(CkReductionMsg *); // to be resumed via message
+  void ResumeClients(); // to be resumed via message
   void InitiateScatter(LBMigrateMsg *msg);
   void ScatterMigrationResults(LBScatterMsg *);
   void ReceiveMigration(LBScatterMsg *);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
-  void ProcessMigrationDecision(CkReductionMsg *);
-  void ProcessReceiveMigration(CkReductionMsg  *);
+  void ProcessMigrationDecision();
+  void ProcessReceiveMigration();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void ReceiveDummyMigration(int _step);
 #endif

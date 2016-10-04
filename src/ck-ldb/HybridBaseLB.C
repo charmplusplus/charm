@@ -1140,8 +1140,7 @@ void HybridBaseLB::MigrationDone(int balancing)
   DEBUGF(("[%d] calling ResumeClients.\n", CkMyPe()));
   if (balancing && _lb_args.syncResume()) {
     // max load of all
-    CkCallback cb(CkIndex_HybridBaseLB::ResumeClients((CkReductionMsg*)NULL),
-                  thisProxy);
+    CkCallback cb(CkReductionTarget(HybridBaseLB, ResumeClients), thisProxy);
     contribute(sizeof(double), &maxLoad, CkReduction::max_double, cb);
   }
   else
@@ -1151,7 +1150,7 @@ void HybridBaseLB::MigrationDone(int balancing)
 #endif
 }
 
-void HybridBaseLB::ResumeClients(CkReductionMsg *msg)
+void HybridBaseLB::ResumeClients(double result)
 {
 /*
   if (CkMyPe() == 0 && _lb_args.printSummary()) {
@@ -1160,7 +1159,6 @@ void HybridBaseLB::ResumeClients(CkReductionMsg *msg)
   }
 */
   ResumeClients(1);
-  delete msg;
 }
 
 void HybridBaseLB::ResumeClients(int balancing)

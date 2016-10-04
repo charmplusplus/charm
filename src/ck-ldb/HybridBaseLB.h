@@ -304,7 +304,7 @@ public:
   void ProcessAtSync(void);
 
   void ReceiveStats(CkMarshalledCLBStatsMessage &m, int fromlevel); 
-  void ResumeClients(CkReductionMsg *msg);
+  void ResumeClients(double result);
   void ResumeClients(int balancing);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ReceiveVectorMigration(LBVectorMigrateMsg *); // Receive migration data

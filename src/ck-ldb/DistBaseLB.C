@@ -211,18 +211,16 @@ void DistBaseLB::MigrationDone(int balancing) {
 
   // if sync resume invoke a barrier
   if (balancing && _lb_args.syncResume()) {
-    CkCallback cb(CkIndex_DistBaseLB::ResumeClients((CkReductionMsg*)NULL), 
-        thisProxy);
-    contribute(0, NULL, CkReduction::sum_int, cb);
+    contribute(CkCallback(CkReductionTarget(DistBaseLB, ResumeClients),
+                thisProxy));
   }
   else 
     thisProxy [CkMyPe()].ResumeClients(balancing);
 #endif
 }
 
-void DistBaseLB::ResumeClients(CkReductionMsg *msg) {
+void DistBaseLB::ResumeClients() {
   ResumeClients(1);
-  delete msg;
 }
 
 void DistBaseLB::ResumeClients(int balancing) {

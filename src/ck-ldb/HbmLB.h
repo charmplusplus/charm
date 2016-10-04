@@ -79,7 +79,7 @@ public:
   void ProcessAtSync(void);
 
   void ReceiveStats(double t, int frompe, int fromlevel); 
-  void ResumeClients(CkReductionMsg *msg);
+  void ResumeClients(double result);
   void ResumeClients(int balancing);
   void ReceiveMigrationCount(int, int lblevel);       // Receive migration count
   void ReceiveMigrationDelta(double t, int lblevel, int level);   // Receive migration amount

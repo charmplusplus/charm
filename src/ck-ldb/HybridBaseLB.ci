@@ -15,7 +15,7 @@ group [migratable] HybridBaseLB: BaseLB {
   entry void HybridBaseLB(const CkLBOptions &);  
   entry void ProcessAtSync();
   entry void ReceiveStats(CkMarshalledCLBStatsMessage data, int level);
-  entry void ResumeClients(CkReductionMsg *msg);
+  entry [reductiontarget] void ResumeClients(double result);
   entry void ResumeClients(int balancing);
   entry void ReceiveMigration(LBMigrateMsg*);	
   entry void ReceiveVectorMigration(LBVectorMigrateMsg*);	

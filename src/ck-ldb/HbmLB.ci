@@ -13,7 +13,7 @@ group [migratable] HbmLB: BaseLB {
   entry void HbmLB(const CkLBOptions &);  
   entry void ProcessAtSync();
   entry void ReceiveStats(double t, int frompe, int level);
-  entry void ResumeClients(CkReductionMsg *msg);
+  entry [reductiontarget] void ResumeClients(double result);
   entry void ResumeClients(int balancing);
   entry void ReceiveMigrationCount(int, int);	
   entry void ReceiveMigrationDelta(double delta, int lblevel, int level);	

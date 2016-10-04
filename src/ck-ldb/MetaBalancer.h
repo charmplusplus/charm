@@ -78,7 +78,7 @@ public:
   void AdjustCountForDeadContributor(int iteration);
   void AdjustCountForNewContributor(int iteration);
   bool AddLoad(int iteration, double load);
-  void ReceiveMinStats(CkReductionMsg *);
+  void ReceiveMinStats(double *load, int n);
   void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);
   void LoadBalanceDecision(int, int);
   void LoadBalanceDecisionFinal(int, int);

@@ -11,7 +11,7 @@ module MetaBalancer {
     entry void MetaBalancer(void);  
     initnode void initnodeFn();
 
-    entry [expedited] void ReceiveMinStats(CkReductionMsg *msg);
+    entry [expedited, reductiontarget] void ReceiveMinStats(double load[n], int n);
     entry [expedited] void LoadBalanceDecision(int req_no, int period);
     entry [expedited] void LoadBalanceDecisionFinal(int req_no, int period);
     entry [expedited] void ReceiveIterationNo(int);

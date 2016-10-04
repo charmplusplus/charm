@@ -308,14 +308,16 @@ void MetaBalancer::ContributeStats(int it_n) {
         CkMyPe(), total_load_vec[index], idle_time,
         lb_data[5], adaptive_struct.finished_iteration_no));
 
-  CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
+  CkCallback cb(CkReductionTarget(MetaBalancer, ReceiveMinStats),
+        thisProxy[0]);
   contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
 
 #endif
 }
 
-void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
-  double* load = (double *) msg->getData();
+void MetaBalancer::ReceiveMinStats(double *load, int n) {
+    // verify number of elements sent for reduction
+  CmiAssert(n == STATS_COUNT);
   double avg = load[2]/load[1];
   double max = load[3];
   double avg_utilization = load[4]/load[1];
@@ -329,7 +331,6 @@ void MetaBalancer::ReceiveMinStats(CkReductionMsg *msg) {
   DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Util : %lf \
       Min Util : %lf for %lf procs\n",iteration_n, avg, max, avg_utilization,
       min_utilization, load[1]));
-  delete msg;
 
   // For processors with  no  objs, trigger MetaBalancer reduction
   if (adaptive_struct.final_lb_period != iteration_n) {
@@ -821,7 +822,7 @@ void MetaBalancer::TriggerAdaptiveReduction() {
     DEBAD(("[%d] Triggered adaptive reduction for noobj %d\n", CkMyPe(),
           adaptive_struct.finished_iteration_no));
 
-    CkCallback cb(CkIndex_MetaBalancer::ReceiveMinStats((CkReductionMsg*)NULL),
+    CkCallback cb(CkReductionTarget(MetaBalancer, ReceiveMinStats),
         thisProxy[0]);
     contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
   }

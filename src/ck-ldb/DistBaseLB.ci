@@ -9,7 +9,7 @@ group [migratable] DistBaseLB: BaseLB {
   entry void LoadBalance();
   entry [reductiontarget] void barrierDone();
 	entry void AtSync();
-  entry void ResumeClients(CkReductionMsg *msg);
+  entry [reductiontarget] void ResumeClients();
   entry void ResumeClients(int balancing);
 };
 

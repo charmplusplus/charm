@@ -235,8 +235,7 @@ void CentralLB::ProcessAtSync()
   counts[0] = theLbdb->GetObjDataSz();
   counts[1] = theLbdb->GetCommDataSz();
 
-  CkCallback cb(CkIndex_CentralLB::ReceiveCounts((CkReductionMsg*)NULL), 
-                  thisProxy[0]);
+  CkCallback cb(CkReductionTarget(CentralLB, ReceiveCounts), thisProxy[0]);
   contribute(2*sizeof(int), counts, CkReduction::sum_int, cb);
   reduction_started = 1;
 #else
@@ -316,15 +315,15 @@ float CentralLB::getTemp(int cpu)
 
 
 // called only on 0
-void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
+void CentralLB::ReceiveCounts(int *counts, int n)
 {
   CmiAssert(CkMyPe() == 0);
   if (statsData == NULL) statsData = new LDStats;
 
-  int *counts = (int *)msg->getData();
+    // check that only 2 counts are sent
+  CmiAssert(n == 2);
   int n_objs = counts[0];
   int n_comm = counts[1];
-  delete msg;
 
     // resize database
   statsData->objData.resize(n_objs);
@@ -1020,9 +1019,8 @@ void CentralLB::ReceiveMigration(LBScatterMsg *m) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	restoreParallelRecovery(&resumeAfterRestoreParallelRecovery,(void *)this);
 #else
-  CkCallback cb(CkIndex_CentralLB::ProcessMigrationDecision((CkReductionMsg*)NULL),
-                  thisProxy);
-  contribute(0, NULL, CkReduction::max_int, cb);
+  contribute(CkCallback(CkReductionTarget(CentralLB, ProcessMigrationDecision),
+              thisProxy));
 #endif
 
 }
@@ -1036,17 +1034,15 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	restoreParallelRecovery(&resumeAfterRestoreParallelRecovery,(void *)this);
 #else
-  CkCallback cb(CkIndex_CentralLB::ProcessReceiveMigration((CkReductionMsg*)NULL),
-                  thisProxy);
-  contribute(0, NULL, CkReduction::max_int, cb);
+  contribute(CkCallback(CkReductionTarget(CentralLB, ProcessReceiveMigration),
+              thisProxy));
 #endif
 }
 
-void CentralLB::ProcessMigrationDecision(CkReductionMsg *msg) {
+void CentralLB::ProcessMigrationDecision() {
 #if CMK_LBDB_ON
   LBScatterMsg *m = storedScatterMsg;
   CkAssert(m != NULL);
-  delete msg;
 
   migrates_expected = m->numMigratesPerPe[CkMyPe() - m->firstPeInSpan];
   future_migrates_expected = 0;
@@ -1073,13 +1069,12 @@ void CentralLB::ProcessMigrationDecision(CkReductionMsg *msg) {
 #endif
 }
 
-void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
+void CentralLB::ProcessReceiveMigration()
 {
 #if CMK_LBDB_ON
 	int i;
         LBMigrateMsg *m = storedMigrateMsg;
         CmiAssert(m!=NULL);
-        delete msg;
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	int *dummyCounts;
@@ -1288,9 +1283,8 @@ void CentralLB::MigrationDoneImpl (int balancing)
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   // if sync resume invoke a barrier
   if (balancing && _lb_args.syncResume()) {
-    CkCallback cb(CkIndex_CentralLB::ResumeClients((CkReductionMsg*)NULL), 
-                  thisProxy);
-    contribute(0, NULL, CkReduction::sum_int, cb);
+    contribute(CkCallback(CkReductionTarget(CentralLB, ResumeClients),
+                thisProxy));
   }
   else{	
     if(CmiNodeAlive(CkMyPe())){
@@ -1311,9 +1305,8 @@ void CentralLB::endMigrationDone(int balancing){
 
 
   if (balancing && _lb_args.syncResume()) {
-    CkCallback cb(CkIndex_CentralLB::ResumeClients((CkReductionMsg*)NULL),
-                  thisProxy);
-    contribute(0, NULL, CkReduction::sum_int, cb);
+    contribute(CkCallback(CkReductionTarget(CentralLB, ResumeClients),
+                thisProxy));
   }
   else{
     if(CmiNodeAlive(CkMyPe())){
@@ -1333,15 +1326,14 @@ void resumeCentralLbAfterChkpt(void *_lb){
 }
 void resumeAfterRestoreParallelRecovery(void *_lb){
     CentralLB *lb= (CentralLB *)_lb;
-	lb->ProcessReceiveMigration((CkReductionMsg*)NULL);
+	lb->ProcessReceiveMigration();
 }
 #endif
 
 
-void CentralLB::ResumeClients(CkReductionMsg *msg)
+void CentralLB::ResumeClients()
 {
   ResumeClients(1);
-  delete msg;
 }
 
 void CentralLB::ResumeClients(int balancing)

@@ -223,8 +223,8 @@ void DistributedLB::LoadBalance() {
     msg = new(total_migrates,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
     msg->n_moves = total_migrates;
     // Wait for all acks before starting to transfer
-    CkCallback cb(CkIndex_DistributedLB::SendAfterBarrier(NULL), thisProxy);
-    contribute(0, NULL, CkReduction::nop, cb);
+    contribute(CkCallback(CkReductionTarget(DistributedLB, SendAfterBarrier),
+                thisProxy));
 	}
 }
 
@@ -233,7 +233,7 @@ void DistributedLB::LoadBalance() {
 * received.
 * Once all that has been done, now process the migration decision.
 */
-void DistributedLB::SendAfterBarrier(CkReductionMsg *red_msg) {
+void DistributedLB::SendAfterBarrier() {
   ProcessMigrationDecision(msg);
 }
 
@@ -451,8 +451,8 @@ void DistributedLB::RecvAck(int obj_id, int assigned_pe, bool can_accept) {
       migrateInfo[i] = 0;
     }
     migrateInfo.clear();
-    CkCallback cb(CkIndex_DistributedLB::SendAfterBarrier(NULL), thisProxy);
-    contribute(0, NULL, CkReduction::nop, cb);
+    contribute(CkCallback(CkReductionTarget(DistributedLB, SendAfterBarrier),
+                thisProxy));
   }
 }
 

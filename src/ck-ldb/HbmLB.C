@@ -481,14 +481,13 @@ void HbmLB::MigrationDone(int balancing)
 #endif
 }
 
-void HbmLB::ResumeClients(CkReductionMsg *msg)
+void HbmLB::ResumeClients(double result)
 {
   if (CkMyPe() == 0 && _lb_args.printSummary()) {
-    double mload = *(double *)msg->getData();
+    double mload = result;
     CkPrintf("[%d] MAX Load: %f at step %d.\n", CkMyPe(), mload, step()-1);
   }
   ResumeClients(1);
-  delete msg;
 }
 
 void HbmLB::ResumeClients(int balancing)

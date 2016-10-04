@@ -10,7 +10,7 @@ group [migratable] DistributedLB : DistBaseLB {
   entry void DoneGossip();
   entry [expedited] void InformMigration(int obj_id, int from_pe, double obj_load, bool force);
   entry [expedited] void RecvAck(int obj_id, int assigned_pe, bool can_accept);
-  entry void SendAfterBarrier(CkReductionMsg *msg);
+  entry [reductiontarget] void SendAfterBarrier();
 };
 
 };
