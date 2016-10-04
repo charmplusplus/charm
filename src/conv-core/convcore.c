@@ -64,6 +64,9 @@
 #include "conv-trace.h"
 #include "sockRoutines.h"
 #include "queueing.h"
+#if CMK_SMP && CMK_TASKQUEUE
+#include "taskqueue.h"
+#endif
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "memory-isomalloc.h"
@@ -235,6 +238,10 @@ void  LrtsFree(void*);
 #endif
 
 CpvStaticDeclare(int, cmiMyPeIdle);
+#if CMK_SMP && CMK_TASKQUEUE
+CsvDeclare(unsigned int, idleThreadsCnt);
+CpvDeclare(void *, CsdTaskQueue);
+#endif
 int CmiIsMyNodeIdle();
 
 /*****************************************************************************
@@ -1733,9 +1740,18 @@ void CsdBeginIdle(void)
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_IDLE(); 	/* projector */
 #endif
-
+#if CMK_SMP && CMK_TASKQUEUE
+  if (CpvAccess(cmiMyPeIdle) !=1) {
+    CpvAccess(cmiMyPeIdle) = 1;
+#if __STDC_VERSION__ >= 201112L
+    __atomic_add_fetch(&CsvAccess(idleThreadsCnt), 1, memory_order_relaxed);
+#else
+    __sync_add_and_fetch(&CsvAccess(idleThreadsCnt), 1);
+#endif
+  }
+#else
   CpvAccess(cmiMyPeIdle) = 1;
-
+#endif // CMK_SMP
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
@@ -1749,9 +1765,18 @@ void CsdEndIdle(void)
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_BUSY(); 	/* projector */
 #endif
-
+#if CMK_SMP && CMK_TASKQUEUE
+  if (CpvAccess(cmiMyPeIdle) != 0){
+    CpvAccess(cmiMyPeIdle) = 0;
+#if __STDC_VERSION__ >= 201112L 
+    __atomic_sub_fetch(&CsvAccess(idleThreadsCnt), 1, memory_order_relaxed);
+#else
+    __sync_sub_and_fetch(&CsvAccess(idleThreadsCnt), 1);
+#endif
+  }
+#else
   CpvAccess(cmiMyPeIdle) = 0;
-
+#endif // CMK_SMP
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
@@ -1816,6 +1841,9 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 #endif
 #if CMK_GRID_QUEUE_AVAILABLE
 	s->gridQ=CpvAccess(CsdGridQueue);
+#endif
+#if CMK_SMP && CMK_TASKQUEUE
+	s->taskQ = CpvAccess(CsdTaskQueue);
 #endif
 }
 
@@ -1894,6 +1922,12 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 #if CMK_GRID_QUEUE_AVAILABLE
 	/*#warning "CsdNextMessage: CMK_GRID_QUEUE_AVAILABLE" */
 	CqsDequeue (s->gridQ, (void **) &msg);
+	if (msg != NULL) {
+	  return (msg);
+	}
+#endif
+#if CMK_SMP && CMK_TASKQUEUE
+	msg = TaskQueuePop(s->taskQ);
 	if (msg != NULL) {
 	  return (msg);
 	}
@@ -2285,6 +2319,10 @@ void CsdInit(argv)
   if (CmiMyRank() == 0 ) CsdLocalMax = argCsdLocalMax;
   CpvAccess(CsdLocalCounter) = argCsdLocalMax;
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
+#if CMK_SMP && CMK_TASKQUEUE
+  CsvInitialize(unsigned int, idleThreadsCnt);
+  CsvAccess(idleThreadsCnt) = 0;
+#endif
    #if CMK_USE_STL_MSGQ
    if (CmiMyPe() == 0) CmiPrintf("Charm++> Using STL-based msgQ:\n");
    #endif
@@ -2312,6 +2350,10 @@ void CsdInit(argv)
   CpvAccess(CsdGridQueue) = (void *)CqsCreate();
 #endif
 
+#if CMK_SMP && CMK_TASKQUEUE
+  CpvInitialize(void *, CsdTaskQueue);
+  CpvAccess(CsdTaskQueue) = TaskQueueCreate();
+#endif
   CpvAccess(CsdStopFlag)  = 0;
 }
 

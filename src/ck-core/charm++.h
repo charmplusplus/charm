@@ -185,8 +185,9 @@ public:
 
 // for object message queue
 #include "ckobjQ.h"
-
-
+#if CMK_SMP && CMK_TASKQUEUE
+#include "cktaskQ.h"
+#endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 class ChareMlogData;
 #endif

@@ -206,7 +206,7 @@ include Make.extlib
 ###############################################################################
 
 CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
-      msgq.h queueing.h conv-cpath.h conv-cpm.h persistent.h\
+      msgq.h queueing.h cktaskQ.h taskqueue.h conv-cpath.h conv-cpm.h persistent.h\
       trace.h trace-common.h trace-bluegene.h trace-projections.h  \
       trace-simple.h trace-controlPoints.h charm-api.h \
       conv-ccs.h ccs-client.c ccs-client.h \
@@ -262,6 +262,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 			trace-perf.h picsdefs.h  picsautoperf.h picstreenode.h \
 			picsdecisiontree.h \
 	    picsautoperfAPI.h picsautoperfAPIC.h \
+	  	cktaskQ.h taskqueue.h \
 	  $(CVHEADERS)
 
 BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
@@ -603,10 +604,10 @@ $(L)/libglobal-swap.a: global-elfgot.C $(CVHEADERS)
 
 CK_LIBS_CORE=$(L)/libck.a
 
-LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
+LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o cktaskQ.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
-           tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o ckobjQ.o  \
+           tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o ckobjQ.o \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o ckobjid.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o DistBaseLB.o \

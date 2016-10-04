@@ -647,6 +647,9 @@ typedef struct {
 CpvExtern(CmiHandlerInfo*, CmiHandlerTable);
 CpvExtern(int,         CmiHandlerMax);
 CpvExtern(void*,       CsdSchedQueue);
+#if CMK_SMP && CMK_TASKQUEUE
+CpvExtern(void*,       CsdTaskQueue);
+#endif
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvExtern(void *,      CsdGridQueue);
 #endif
@@ -919,7 +922,9 @@ char *CmiPrintDate();
 #define CsdEnqueue(x)         (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
 #define CsdEmpty()            (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
 #define CsdLength()           (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
-
+#if CMK_SMP && CMK_TASKQUEUE
+#define CsdEnqueueTask(x) (CdsFifo_Enqueue((Queue)CpvAccess(CsdTaskQueue),(x)))
+#endif
 #if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.c */
 void  CmiPrintf(const char *, ...);
 void  CmiError(const char *, ...);
@@ -999,6 +1004,9 @@ typedef struct {
   CmiNodeLock nodeLock;
 #if CMK_GRID_QUEUE_AVAILABLE
   void *gridQ;
+#endif
+#if CMK_SMP && CMK_TASKQUEUE
+  void *taskQ;
 #endif
 } CsdSchedulerState_t;
 extern void CsdSchedulerState_new(CsdSchedulerState_t *state);
@@ -2151,7 +2159,12 @@ extern "C" int CmiIsMyNodeIdle();
 #else
 extern int CmiIsMyNodeIdle();
 #endif
+#if CMK_SMP && CMK_TASKQUEUE
+#include "taskqueue.h" /* for tasks queue */
 
+#define CsdTaskEnqueue(x) TaskQueuePush((TaskQueue)CpvAccess(CsdTaskQueue),x)
+#define CsdTaskPop() TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue))
+#endif
 #endif /* CONVERSE_H */
 
 

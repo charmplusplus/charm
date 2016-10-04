@@ -1011,6 +1011,9 @@ extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
 extern void _metabalancerInit();
+#if CMK_SMP && CMK_TASKQUEUE
+extern void _taskqInit();
+#endif
 extern void _initChareTables();
 #if CMK_MEM_CHECKPOINT
 extern void init_memcheckpt(char **argv);
@@ -1196,7 +1199,9 @@ void _initCharm(int unused_argc, char **argv)
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
         _metabalancerInit();
-	
+#if CMK_SMP && CMK_TASKQUEUE
+	_taskqInit();
+#endif
 #if CMK_MEM_CHECKPOINT
         init_memcheckpt(argv);
 #endif
