@@ -159,7 +159,7 @@ extern void CkRegisterBase(int derivedIdx, int baseIdx);
 typedef void (*CkPupReadonlyFnPtr)(void *pup_er);
 /** Register this readonly global variable.*/
 extern void CkRegisterReadonly(const char *name,const char *type,
-	int size, void *ptr,CkPupReadonlyFnPtr pup_fn);
+	size_t size, void *ptr,CkPupReadonlyFnPtr pup_fn);
 /** Register this readonly message.*/
 extern void CkRegisterReadonlyMsg(const char *name,const char *type,
 	void** pMsg);

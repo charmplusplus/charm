@@ -375,7 +375,7 @@ void CProxy::pup(PUP::er &p) {
 
       // create a dummy object for calling DelegatePointerPup
       int objId = _entryTable[migCtor]->chareIdx; 
-      int objSize = _chareTable[objId]->size; 
+      size_t objSize = _chareTable[objId]->size;
       void *obj = malloc(objSize); 
       _entryTable[migCtor]->call(NULL, obj); 
       delegatedPtr = static_cast<CkDelegateMgr *> (obj)
@@ -739,7 +739,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   register int gIdx = _entryTable[epIdx]->chareIdx;
-  int objSize=_chareTable[gIdx]->size;
+  size_t objSize=_chareTable[gIdx]->size;
   register void *obj = malloc(objSize);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);

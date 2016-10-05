@@ -1099,7 +1099,7 @@ ArrayElement *CkArray::allocate(int elChareType, CkMessage *msg, bool fromMigrat
 	init.fromMigration=fromMigration;
 	
 	//Build the element
-	int elSize=_chareTable[elChareType]->size;
+	size_t elSize=_chareTable[elChareType]->size;
 	ArrayElement *elem = (ArrayElement *)malloc(elSize);
 	if (elem!=NULL) setMemoryTypeChare(elem);
 	return elem;

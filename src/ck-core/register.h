@@ -149,7 +149,7 @@ class ChareInfo {
     /// Human-readable name of the chare class, like "MyFoo".
     const char *name;
     /// Size, in bytes, of the body of the chare.
-    int size;
+    size_t size;
     
     /// Constructor epIdx: default constructor and migration constructor (or -1 if none).
     int defCtor,migCtor; 
@@ -169,7 +169,7 @@ class ChareInfo {
 
     int mainChareIdx;      
 
-    ChareInfo(const char *n, int s, ChareType t) : name(n), size(s) {
+    ChareInfo(const char *n, size_t s, ChareType t) : name(n), size(s) {
       defCtor=migCtor=-1;
       isIrr = numbases = 0;
       chareType = t;
@@ -206,7 +206,7 @@ class ReadonlyInfo {
     /// Human-readable string name of variable (e.g., "nElements") and type (e.g., "int").
     const char *name,*type;
     /// Size in bytes of basic value.
-    int size;
+    size_t size;
     /// Address of basic value.
     void *ptr;
     /// Pup routine for value, or NULL if no pup available.
@@ -220,7 +220,7 @@ class ReadonlyInfo {
         p((char *)ptr,size);
     }
     ReadonlyInfo(const char *n,const char *t,
-	 int s, void *p,CkPupReadonlyFnPtr pf) 
+	 size_t s, void *p,CkPupReadonlyFnPtr pf)
 	: name(n), type(t), size(s), ptr(p), pup(pf) {}
 };
 

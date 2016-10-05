@@ -1503,7 +1503,7 @@ void _initCharm(int unused_argc, char **argv)
 
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
-			register int size = _chareTable[_mainTable[i]->chareIdx]->size;
+			register size_t size = _chareTable[_mainTable[i]->chareIdx]->size;
 			register void *obj = malloc(size);
 			_MEMCHECK(obj);
 			_mainTable[i]->setObj(obj);

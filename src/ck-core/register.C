@@ -107,7 +107,7 @@ void CkRegisterBase(int derivedIdx, int baseIdx)
 
 extern "C"
 void CkRegisterReadonly(const char *name,const char *type,
-	int size, void *ptr,CkPupReadonlyFnPtr pup_fn)
+	size_t size, void *ptr,CkPupReadonlyFnPtr pup_fn)
 {
   _readonlyTable.add(new ReadonlyInfo(name,type,size,ptr,pup_fn));
 }
