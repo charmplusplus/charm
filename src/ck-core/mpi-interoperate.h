@@ -22,4 +22,9 @@ extern "C" void StartCharmScheduler();
 extern "C" void StopCharmScheduler();
 #define CkExit LibCkExit
 
+#if defined(AMPI)
+#error "Trying to compile Charm++/MPI interoperation against AMPI built atop Charm++"
+#endif
+
+
 #endif //_MPI_INTEROPERATE_
