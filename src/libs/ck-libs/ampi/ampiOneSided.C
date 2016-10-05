@@ -18,7 +18,7 @@ win_obj::win_obj() {
   winNameLen = 0;
   baseAddr = NULL;
   comm = MPI_COMM_NULL;
-  initflag = 0;
+  initflag = false;
 }
 
 win_obj::win_obj(const char *name, void *base, MPI_Aint size, int disp_unit,
@@ -67,13 +67,13 @@ int win_obj::create(const char *name, void *base, MPI_Aint size, int disp_unit, 
   this->disp_unit = disp_unit;
   this->comm = comm;
   // assume : memory pointed by base has been allocated
-  initflag = 1;
+  initflag = true;
   return WIN_SUCCESS;
 }
 
 int win_obj::free(){
   // Assume : memory will be deallocated by user
-  initflag = 0;
+  initflag = false;
   return WIN_SUCCESS;
 }
 
@@ -82,7 +82,7 @@ int win_obj::free(){
 //   remote data to local, and call this function of the involved WIN object
 int win_obj::put(void *orgaddr, int orgcnt, int orgunit, MPI_Aint targdisp,
                  int targcnt, int targunit) {
-  if(initflag == 0) {
+  if(!initflag) {
     CkAbort("Put to non-existing MPI_Win\n");
     return WIN_ERROR;
   }
@@ -97,7 +97,7 @@ int win_obj::put(void *orgaddr, int orgcnt, int orgunit, MPI_Aint targdisp,
 
 int win_obj::get(void *orgaddr, int orgcnt, int orgunit, MPI_Aint targdisp,
                  int targcnt, int targunit){
-  if(initflag == 0) {
+  if(!initflag) {
     CkAbort("Get from non-existing MPI_Win\n");
     return WIN_ERROR;
   }
@@ -113,7 +113,7 @@ int win_obj::get(void *orgaddr, int orgcnt, int orgunit, MPI_Aint targdisp,
 
 int win_obj::iget(int orgcnt, int orgunit, MPI_Aint targdisp,
                   int targcnt, int targunit){
-  if(initflag == 0) {
+  if(!initflag) {
     CkAbort("Get from non-existing MPI_Win\n");
     return WIN_ERROR;
   }

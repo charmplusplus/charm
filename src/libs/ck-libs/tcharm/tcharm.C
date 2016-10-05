@@ -55,16 +55,16 @@ public:
 		if (checkIfTracing(libNames[curLibs])) return;
 		curLibs++;
 	}
-	inline int isTracing(const char *lib) const {
+	inline bool isTracing(const char *lib) const {
 		if (curLibs==0) return 0; //Common case
 		else return checkIfTracing(lib);
 	}
 };
 static TCharmTraceLibList tcharm_tracelibs;
-static int tcharm_nomig=0, tcharm_nothreads=0;
+static bool tcharm_nomig=false, tcharm_nothreads=false;
 static int tcharm_stacksize=1*1024*1024; /*Default stack size is 1MB*/
-static int tcharm_initted=0;
-CkpvDeclare(int, mapCreated);
+static bool tcharm_initted=false;
+CkpvDeclare(bool, mapCreated);
 static CkGroupID mapID;
 static char* mapping = NULL;
 
@@ -76,11 +76,11 @@ void TCharm::procInit(void)
 {
   CtvInitialize(TCharm *,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
-  tcharm_initted=1;
+  tcharm_initted=true;
   CtgInit();
 
-  CkpvInitialize(int, mapCreated);
-  CkpvAccess(mapCreated) = 0;
+  CkpvInitialize(bool, mapCreated);
+  CkpvAccess(mapCreated) = false;
 
   // called on every pe to eat these arguments
   char **argv=CkGetArgv();
@@ -116,10 +116,10 @@ void TCharm::procInit(void)
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
     if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
   }
-  if (CkpvAccess(mapCreated)==0) {
+  if (!CkpvAccess(mapCreated)) {
     if (0!=CmiGetArgString(argv, "+mapping", &mapping)){
     }
-    CkpvAccess(mapCreated)=1;
+    CkpvAccess(mapCreated)=true;
   }
 }
 
@@ -595,9 +595,6 @@ CkArrayID TCHARM_Get_threads(void) {
 
 /************* Startup/Shutdown Coordination Support ************/
 
-// Useless values to reduce over:
-int _vals[2]={0,1};
-
 //Called when we want to go to a barrier
 void TCharm::barrier(void) {
 	//Contribute to a synchronizing reduction
@@ -679,7 +676,7 @@ FDECL int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)(void)
 TCHARM_Thread_options::TCHARM_Thread_options(int doDefault)
 {
 	stackSize=0; /* default stacksize */
-	exitWhenDone=0; /* don't exit when done by default. */
+	exitWhenDone=false; /* don't exit when done by default. */
 }
 void TCHARM_Thread_options::sanityCheck(void) {
 	if (stackSize<=0) stackSize=tcharm_stacksize;
@@ -698,7 +695,7 @@ FDECL void FTN_NAME(TCHARM_SET_STACK_SIZE,tcharm_set_stack_size)
 	(int *newSize)
 { TCHARM_Set_stack_size(*newSize); }
 
-CDECL void TCHARM_Set_exit(void) { g_tcharmOptions.exitWhenDone=1; }
+CDECL void TCHARM_Set_exit(void) { g_tcharmOptions.exitWhenDone=true; }
 
 /*Create a new array of threads, which will be bound to by subsequent libraries*/
 CDECL void TCHARM_Create(int nThreads,
@@ -741,7 +738,7 @@ CkGroupID CkCreatePropMap(void);
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
   CkArrayOptions opts(msg->numElements);
-  CkAssert(CkpvAccess(mapCreated)==1);
+  CkAssert(CkpvAccess(mapCreated)==true);
 
   if(haveConfigurableRRMap()){
     CkPrintf("USING ConfigurableRRMap\n");

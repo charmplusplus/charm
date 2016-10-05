@@ -129,7 +129,7 @@ class win_obj {
  public:
   char winName[MPI_MAX_OBJECT_NAME];
   int winNameLen;
-  int initflag;
+  bool initflag;
 
   void *baseAddr;
   MPI_Aint winSize;
@@ -237,8 +237,8 @@ class ampiCommStruct {
   MPI_Comm comm; //Communicator
   CkArrayID ampiID; //ID of corresponding ampi array
   int size; //Number of processes in communicator
-  int isWorld; //1 if ranks are 0..size-1?
-  int isInter; // 0: intra-communicator; 1: inter-communicator
+  bool isWorld; //1 if ranks are 0..size-1?
+  bool isInter; // 0: intra-communicator; 1: inter-communicator
   vector<int> indices;  //indices[r] gives the array index for rank r
   vector<int> remoteIndices;  // remote group for inter-communicator
 
@@ -329,7 +329,7 @@ class ampiCommStruct {
 
   int getSize(void) const {return size;}
 
-  inline int isinter(void) const { return isInter; }
+  inline bool isinter(void) const { return isInter; }
   inline const vector<int> &getdims() const {return dims;}
   inline const vector<int> &getperiods() const {return periods;}
   inline int getndims() const {return ndims;}
@@ -1101,7 +1101,7 @@ class ampiParent : public CBase_ampiParent {
   CkPupPtrVec<InfoStruct> infos; // list of all MPI_Infos
   vector<OpStruct> ops; // list of all MPI_Ops
 
-  inline int isSplit(MPI_Comm comm) const {
+  inline bool isSplit(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
   }
   const ampiCommStruct &getSplit(MPI_Comm comm) const {
@@ -1111,7 +1111,7 @@ class ampiParent : public CBase_ampiParent {
   }
   void splitChildRegister(const ampiCommStruct &s);
 
-  inline int isGroup(MPI_Comm comm) const {
+  inline bool isGroup(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_GROUP && comm<MPI_COMM_FIRST_CART);
   }
   const ampiCommStruct &getGroup(MPI_Comm comm) const {
@@ -1120,7 +1120,7 @@ class ampiParent : public CBase_ampiParent {
     return *groupComm[idx];
   }
   void groupChildRegister(const ampiCommStruct &s);
-  inline int isInGroups(MPI_Group group) const {
+  inline bool isInGroups(MPI_Group group) const {
     return (group>=0 && group<groups.size());
   }
 
@@ -1128,7 +1128,7 @@ class ampiParent : public CBase_ampiParent {
   void graphChildRegister(const ampiCommStruct &s);
   void interChildRegister(const ampiCommStruct &s);
 
-  inline int isIntra(MPI_Comm comm) const {
+  inline bool isIntra(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_INTRA && comm<MPI_COMM_FIRST_RESVD);
   }
   const ampiCommStruct &getIntra(MPI_Comm comm) const {
@@ -1149,13 +1149,13 @@ class ampiParent : public CBase_ampiParent {
   bool kv_get_builtin(int keyval);
   CkPupPtrVec<KeyvalNode> kvlist;
 
-  int RProxyCnt;
+  bool isTmpRProxySet;
   CProxy_ampi tmpRProxy;
 
   MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
 
  public:
-  int ampiInitCallDone;
+  bool ampiInitCallDone;
 
  public:
   ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
@@ -1178,9 +1178,8 @@ class ampiParent : public CBase_ampiParent {
 
   // exchange proxy info between two ampi proxies
   void ExchangeProxy(CProxy_ampi rproxy){
-    if(RProxyCnt==0){ tmpRProxy=rproxy; RProxyCnt=1; }
-    else if(RProxyCnt==1) { tmpRProxy.setRemoteProxy(rproxy); rproxy.setRemoteProxy(tmpRProxy); RProxyCnt=0; }
-    else CkAbort("ExchangeProxy: RProxyCnt>1");
+    if(!isTmpRProxySet){ tmpRProxy=rproxy; isTmpRProxySet=true; }
+    else{ tmpRProxy.setRemoteProxy(rproxy); rproxy.setRemoteProxy(tmpRProxy); isTmpRProxySet=false; }
   }
 
   //Grab the next available split/group communicator
@@ -1191,7 +1190,7 @@ class ampiParent : public CBase_ampiParent {
   MPI_Comm getNextInter(void) const {return MPI_COMM_FIRST_INTER+interComm.size();}
   MPI_Comm getNextIntra(void) const {return MPI_COMM_FIRST_INTRA+intraComm.size();}
 
-  inline int isCart(MPI_Comm comm) const {
+  inline bool isCart(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_CART && comm<MPI_COMM_FIRST_GRAPH);
   }
   ampiCommStruct &getCart(MPI_Comm comm) const {
@@ -1199,7 +1198,7 @@ class ampiParent : public CBase_ampiParent {
     if (idx>=cartComm.size()) CkAbort("AMPI> Bad cartesian communicator used!\n");
     return *cartComm[idx];
   }
-  inline int isGraph(MPI_Comm comm) const {
+  inline bool isGraph(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_INTER);
   }
   ampiCommStruct &getGraph(MPI_Comm comm) const {
@@ -1207,7 +1206,7 @@ class ampiParent : public CBase_ampiParent {
     if (idx>=graphComm.size()) CkAbort("AMPI> Bad graph communicator used!\n");
     return *graphComm[idx];
   }
-  inline int isInter(MPI_Comm comm) const {
+  inline bool isInter(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_INTER && comm<MPI_COMM_FIRST_INTRA);
   }
   const ampiCommStruct &getInter(MPI_Comm comm) const {
@@ -1280,7 +1279,7 @@ class ampiParent : public CBase_ampiParent {
     return NULL;
   }
 
-  inline int hasComm(const MPI_Group group) const {
+  inline bool hasComm(const MPI_Group group) const {
     MPI_Comm comm = (MPI_Comm)group;
     return ( comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm) ||
              isCart(comm) || isGraph(comm) || isIntra(comm) );
@@ -1308,7 +1307,7 @@ class ampiParent : public CBase_ampiParent {
   inline int getMyPe(void) const {
     return CkMyPe();
   }
-  inline int hasWorld(void) const {
+  inline bool hasWorld(void) const {
     return worldPtr!=NULL;
   }
 
@@ -1375,7 +1374,7 @@ class ampiParent : public CBase_ampiParent {
   int freeInfo(MPI_Info info);
 
   void initOps(void);
-  inline int createOp(MPI_User_function *fn, int isCommutative) {
+  inline int createOp(MPI_User_function *fn, bool isCommutative) {
     OpStruct newop = OpStruct(fn, isCommutative);
     ops.push_back(newop);
     return ops.size()-1;
@@ -1525,7 +1524,7 @@ class ampi : public CBase_ampi {
   void graphCreate(const groupStruct vec, MPI_Comm *newcomm);
   void intercommCreate(const groupStruct rvec, int root, MPI_Comm *ncomm);
 
-  inline int isInter(void) const { return myComm.isinter(); }
+  inline bool isInter(void) const { return myComm.isinter(); }
   void intercommMerge(int first, MPI_Comm *ncomm);
 
   inline int getWorldRank(void) const {return parent->thisIndex;}
@@ -1614,11 +1613,11 @@ class ampi : public CBase_ampi {
 
   AmpiMsg* Alltoall_RemoteIget(MPI_Aint disp, int targcnt, MPI_Datatype targtype, int tag);
  private:
-  int AlltoallGetFlag;
+  bool AlltoallGetFlag;
   void *Alltoallbuff;
  public:
-  void setA2AIgetFlag(void* ptr) {AlltoallGetFlag=1;Alltoallbuff=ptr;}
-  void resetA2AIgetFlag() {AlltoallGetFlag=0;Alltoallbuff=NULL;}
+  void setA2AIgetFlag(void* ptr) {AlltoallGetFlag=true;Alltoallbuff=ptr;}
+  void resetA2AIgetFlag() {AlltoallGetFlag=false;Alltoallbuff=NULL;}
   //------------------------ End of code by YAN ---------------------
 };
 

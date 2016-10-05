@@ -798,11 +798,11 @@ void AMPI_Setup_Switch(void) {
   }
 }
 
-static int nodeinit_has_been_called=0;
+static bool nodeinit_has_been_called=false;
 CtvDeclare(ampiParent*, ampiPtr);
-CtvDeclare(int, ampiInitDone);
+CtvDeclare(bool, ampiInitDone);
 CtvDeclare(void*,stackBottom);
-CtvDeclare(int, ampiFinalized);
+CtvDeclare(bool, ampiFinalized);
 CkpvDeclare(Builtin_kvs, bikvs);
 
 CDECL
@@ -842,7 +842,7 @@ static void ampiNodeInit(void)
   CkAssert(AMPI_threadstart_idx == -1);    // only initialize once
   AMPI_threadstart_idx = TCHARM_Register_thread_function(AMPI_threadstart);
 
-  nodeinit_has_been_called=1;
+  nodeinit_has_been_called=true;
 
    // ASSUME NO ANYTIME MIGRATION and STATIC INSERTON
   _isAnytimeMigration = false;
@@ -864,8 +864,8 @@ static void EndIdle(void *dummy,double curWallTime)
 
 static void ampiProcInit(void){
   CtvInitialize(ampiParent*, ampiPtr);
-  CtvInitialize(int,ampiInitDone);
-  CtvInitialize(int,ampiFinalized);
+  CtvInitialize(bool,ampiInitDone);
+  CtvInitialize(bool,ampiFinalized);
   CtvInitialize(void*,stackBottom);
 
   CkpvInitialize(Builtin_kvs, bikvs); // built-in key-values
@@ -1034,8 +1034,8 @@ static ampi *ampiInit(char **argv)
 
   // Find our ampi object:
   ampi *ptr=(ampi *)TCharm::get()->semaGet(AMPI_TCHARM_SEMAID);
-  CtvAccess(ampiInitDone)=1;
-  CtvAccess(ampiFinalized)=0;
+  CtvAccess(ampiInitDone)=true;
+  CtvAccess(ampiFinalized)=false;
   STARTUP_DEBUG("ampiInit> complete")
 #if CMK_BIGSIM_CHARM
     //  TRACE_BG_AMPI_START(ptr->getThread(), "AMPI_START");
@@ -1088,7 +1088,7 @@ class ampiWorlds : public CBase_ampiWorlds {
 
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
-:threads(threads_), worldNo(worldNo_), RProxyCnt(0)
+:threads(threads_), worldNo(worldNo_), isTmpRProxySet(false)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
@@ -1137,7 +1137,7 @@ void ampiParent::pup(PUP::er &p) {
   p|ampiReqs;
 
   p|kvlist;
-  p|RProxyCnt;
+  p|isTmpRProxySet;
   p|tmpRProxy;
 
   p|userAboutToMigrateFn;
@@ -2814,7 +2814,7 @@ CDECL
 int AMPI_Finalized(int *isFinalized)
 {
   AMPIAPI("AMPI_Finalized");     /* in case charm init not called */
-  *isFinalized=CtvAccess(ampiFinalized);
+  *isFinalized=(CtvAccess(ampiFinalized)) ? 1 : 0;
   return MPI_SUCCESS;
 }
 
@@ -2939,7 +2939,7 @@ int AMPI_Finalize(void)
 #if PRINT_IDLE
   CkPrintf("[%d] Idle time %fs.\n", CkMyPe(), totalidle);
 #endif
-  CtvAccess(ampiFinalized)=1;
+  CtvAccess(ampiFinalized)=true;
 
 #if CMK_BIGSIM_CHARM && CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn)) traceSuspend();

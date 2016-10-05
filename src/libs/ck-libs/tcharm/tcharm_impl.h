@@ -40,7 +40,7 @@ class TCharm;
 class TCHARM_Thread_options {
 public:
 	int stackSize; /* size of thread execution stack, in bytes */
-	int exitWhenDone; /* flag: call CkExit when thread is finished. */
+	bool exitWhenDone; /* flag: call CkExit when thread is finished. */
 	// Fill out the default thread options:
 	TCHARM_Thread_options(int doDefault);
 	TCHARM_Thread_options() {}
