@@ -217,6 +217,7 @@ DESTINATION=""
 DESTINATION_SUFFIX=""
 TAU_MAKEFILE=""
 QUIET=""
+BUILD_OMP=0
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | ( less || more ) && exit 1
 [ $# -lt 2 ] && ./smart-build.pl && exit 1
@@ -635,6 +636,9 @@ then
         HAS_SMP=1
       elif [ "$i" = "pxshm" ]; then
         HAS_PXSHM=1
+      elif [ "$i" = "omp" ]; then
+        BUILD_OMP=1
+        TMP="$TMP $i"
       else
         TMP="$TMP $i"
       fi
@@ -644,6 +648,8 @@ then
     fi
     if [ $HAS_SMP -eq 1 ]; then
       TMP="smp $TMP"
+    elif [ $BUILD_OMP -eq 1 ]; then
+      BUILD_OMP=2 #this means omp keyword inserted without smp keyword"
     fi
 
     BOPTS=$TMP
@@ -724,6 +730,20 @@ then
 #  CONFIG_OPTS="--disable-charmdebug $CONFIG_OPTS"
 fi
 
+
+if [ $BUILD_OMP = 2 ]
+then
+  case $DESTINATION in
+    "multicore"*)
+      BUILD_OMP=1
+      ;;
+    *)
+      echo "OpenMP support should be built in SMP mode"
+      exit 1
+      ;;
+  esac
+fi
+
 printError()
 {
 	Echo "-------------------------------------------------"
@@ -751,7 +771,11 @@ $MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]
 then
-	Echo "-------------------------------------------------"
+  if [ $BUILD_OMP = 1 ];
+  then
+    $MAKE MFLAGS="$MAKEOPTS" openmp_llvm OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
+  fi
+  Echo "-------------------------------------------------"
 	Echo "$PROGRAM built successfully."
 	Echo "Next, try out a sample program like" \
 	     "$DESTINATION/tests/charm++/simplearrayhello"

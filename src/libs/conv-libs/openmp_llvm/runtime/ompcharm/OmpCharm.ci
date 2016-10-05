@@ -1,0 +1,3 @@
+module OmpCharm{
+    initproc void RegisterOmpHdlrs(void);
+}

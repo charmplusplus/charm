@@ -87,6 +87,9 @@ default_libs: $(DEFAULT_LIBS)
 $(DEFAULT_LIBS) cache pose fftlib liveViz:
 	$(MAKE) -C libs/ck-libs/$@
 
+openmp_llvm:
+	$(MAKE) -C libs/conv-libs/$@
+
 ChaNGa: charm++ cache liveViz everylb ckloop
 
 cache: charm-core
