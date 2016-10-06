@@ -102,7 +102,6 @@
 
 #include "converse.h"
 #include "qt.h"
-#include "memory-isomalloc.h"
 
 #include "conv-trace.h"
 #include <sys/types.h>
@@ -163,11 +162,7 @@
   int        datasize;   /* size of thread-private data, in bytes */
 
   int isMigratable; /* thread is migratable (isomalloc or aliased stack) */
-#if CMK_THREADS_ALIAS_STACK
   int aliasStackHandle; /* handle for aliased stack */
-#endif
-  CmiIsomallocBlockList *isomallocBlockList;
-
   void      *stack; /*Pointer to thread stack*/
   int        stacksize; /*Size of thread stack (bytes)*/
   struct CthThreadListener *listener; /* pointer to the first of the listeners */
@@ -404,11 +399,7 @@ static void CthThreadBaseInit(CthThreadBase *th)
   CthSetStrategyDefault(S(th));
 
   th->isMigratable=0;
-#if CMK_THREADS_ALIAS_STACK
   th->aliasStackHandle=0;
-#endif
-  th->isomallocBlockList = CmiIsomallocEnabled() ? CmiIsomallocBlockListNew() : NULL;
-
   th->stack=NULL;
   th->stacksize=0;
 
@@ -436,9 +427,9 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
 #else /* isomalloc */
 #if defined(__APPLE__) && CMK_64BIT
       /* MAC OS needs 16-byte aligned stack */
-    ret=CmiIsomallocBlockListMallocAlign(th->isomallocBlockList, 16, *stackSize);
+    ret=CmiIsomallocAlign(16, *stackSize, (CthThread)th);
 #else
-    ret=CmiIsomallocBlockListMalloc(th->isomallocBlockList, *stackSize);
+    ret=CmiIsomalloc(*stackSize, (CthThread)th);
 #endif
 #endif
   }
@@ -471,8 +462,9 @@ static void CthThreadBaseFree(CthThreadBase *th)
 #if CMK_THREADS_ALIAS_STACK
     CthAliasFree(th->aliasStackHandle);
 #else /* isomalloc */
-    if (th->isomallocBlockList)
-      CmiIsomallocBlockListDelete(th->isomallocBlockList);
+#if !CMK_USE_MEMPOOL_ISOMALLOC
+    CmiIsomallocFree(th->stack);
+#endif
 #endif
   } 
   else if (th->stack!=NULL) {
@@ -628,8 +620,11 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 #elif CMK_THREADS_USE_STACKCOPY
     /* do nothing */
 #else /* isomalloc */
-    CmiIsomallocBlockListPup(p, &t->isomallocBlockList);
+#if CMK_USE_MEMPOOL_ISOMALLOC
     pup_bytes(p,&t->stack,sizeof(char*));
+#else
+    CmiIsomallocPup(p,&t->stack);
+#endif
 #endif
   } 
   else {
@@ -651,7 +646,11 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
     pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
     aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
     /* fixme: tls global variables handling needs isomalloc */
+#if CMK_USE_MEMPOOL_ISOMALLOC
     pup_bytes(p,&aux,sizeof(char*));
+#else
+    CmiIsomallocPup(p, &aux);
+#endif
     /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
   }
 #endif
@@ -2099,12 +2098,3 @@ void CthPrintThdMagic(CthThread t){
   CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
 }
 
-void *CmiIsomallocMallocForThread(CthThread th, size_t nBytes)
-{
-  return CmiIsomallocBlockListMalloc(B(th)->isomallocBlockList, nBytes);
-}
-
-void *CmiIsomallocMallocAlignForThread(CthThread th, size_t align, size_t nBytes)
-{
-  return CmiIsomallocBlockListMallocAlign(B(th)->isomallocBlockList, align, nBytes);
-}

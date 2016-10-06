@@ -6,7 +6,6 @@
 #include <stdarg.h>
 #include "charmf.h"
 #include "cktiming.h"
-#include "memory-isomalloc.h"
 
 extern "C" int typesize(int type, int count)
 {

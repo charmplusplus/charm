@@ -11,7 +11,6 @@
 #include "trace-bluegene.h"
 #include "blue.h"
 #include "blue_impl.h"
-#include "memory-isomalloc.h"
 
 #undef DEBUGF
 #define DEBUGF(x)  // CmiPrintf x
