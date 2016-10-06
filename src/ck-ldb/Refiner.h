@@ -32,8 +32,8 @@ protected:
   void assign(computeInfo *c, processorInfo *p);
   void deAssign(computeInfo *c, processorInfo *pRec);
   virtual void computeAverage();
-  int isHeavy(processorInfo *p);
-  int isLight(processorInfo *p);
+  bool isHeavy(processorInfo *p);
+  bool isLight(processorInfo *p);
   void removeComputes();
 
   double overLoad;

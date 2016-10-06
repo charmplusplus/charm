@@ -17,7 +17,7 @@ public:
 	double *packData;
 	int bud1, bud2;
 	int len;
-	int cp_flag;          // 1: from checkpoint 0: from recover
+	bool cp_flag;          // true: from checkpoint, false: from recover
 };
 
 
@@ -165,7 +165,7 @@ public:
   void inmem_restore(CkArrayCheckPTMessage *m);
   void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUInt8 *id, int nowOnPe);
   void resetLB(int diepe);
-  int  isFailed(int pe);
+  bool isFailed(int pe);
   void pupAllElements(PUP::er &p);
   void startArrayCheckpoint();
   void recvArrayCheckpoint(CkArrayCheckPTMessage *m);
@@ -173,9 +173,9 @@ public:
 public:
   static CkCallback  cpCallback;
 
-  static int inRestarting;
-  static int inCheckpointing;
-  static int inLoadbalancing;
+  static bool inRestarting;
+  static bool inCheckpointing;
+  static bool inLoadbalancing;
   static double startTime;
   static char*  stage;
 
@@ -195,7 +195,7 @@ private:
   int    where;
 private:
   void initEntry();
-  inline int isMaster(int pe);
+  inline bool isMaster(int pe);
 
   void failed(int pe);
   int  totalFailed();
@@ -211,8 +211,8 @@ void CkMemRestart(const char *, CkArgMsg *);
 void CkStartMemCheckpoint(CkCallback &cb);
 
 // true if inside a restarting phase
-extern "C" int CkInRestarting(); 
-extern "C" int CkInLdb(); 
+extern "C" int CkInRestarting();
+extern "C" int CkInLdb();
 extern "C" void CkSetInLdb(); 
 extern "C" void CkResetInLdb();
 

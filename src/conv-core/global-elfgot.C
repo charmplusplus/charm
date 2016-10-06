@@ -115,7 +115,7 @@ extern ELFXX_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 	**/
 
 CkVec<char *>  _blacklist;
-static int loaded = 0;
+static bool loaded = false;
 
 static void readBlacklist()
 {
@@ -124,7 +124,7 @@ static void readBlacklist()
   FILE *bl = fopen(fname, "r");
   if (bl == NULL){
 		if (CmiMyPe() == 0) printf("WARNING: Running swapglobals without blacklist, globals from libraries might be getting un-necessarily swapped\n");
-		loaded = 1;
+		loaded = true;
 		return;
   }
   printf("Loading blacklist from file \"%s\" ... \n", fname);
@@ -134,7 +134,7 @@ static void readBlacklist()
      _blacklist.push_back(strdup(name));
   }
   fclose(bl);
-  loaded = 1;
+  loaded = true;
 }
 
 
@@ -364,7 +364,7 @@ CpvStaticDeclare(CtgGlobals,_curCtg);
 struct CtgGlobalStruct {
 public:
     /* This is set when our data is pointed to by the current GOT */
-    int installed;
+    bool installed;
 
     /* Pointer to our global data segment. */
     void *data_seg;  
@@ -380,7 +380,7 @@ public:
     }
     
     CtgGlobalStruct(void) {
-      installed=0;
+      installed=false;
       data_seg=0;
     }
     ~CtgGlobalStruct() {
@@ -474,9 +474,9 @@ void CtgInstall(CtgGlobals g) {
 	if (g==NULL) g=_ctgListGlobals;
 	if (g == oldG) return;
 	*cur=g;
-	oldG->installed=0;
+	oldG->installed=false;
 	_ctgList->install(g->data_seg);
-	g->installed=1;
+	g->installed=true;
 }
 
 /** Delete this (not currently installed) set of globals. */

@@ -159,7 +159,7 @@ class ChareInfo {
     int bases[16];
     
     /// For groups -- 1 if the group is Irreducible 
-    int isIrr;
+    bool isIrr;
     
     /// chare type
     ChareType  chareType;

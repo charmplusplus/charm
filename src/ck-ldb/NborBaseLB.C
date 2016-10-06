@@ -68,7 +68,7 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): CBase_NborBaseLB(opt)
   myStats.n_comm = 0;
   myStats.commData = NULL;
 
-  receive_stats_ready = 0;
+  receive_stats_ready = false;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 #endif
@@ -239,7 +239,7 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
   if (neighbor_pes == 0) FindNeighbors();
 
   if (m == 0) { // This is from our own node
-    receive_stats_ready = 1;
+    receive_stats_ready = true;
   } else {
     const int pe = m->from_pe;
     //  CkPrintf("Stats msg received, %d %d %d %d %p\n",
@@ -277,7 +277,7 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
   const int clients = mig_msgs_expected;
   if (stats_msg_count == clients && receive_stats_ready) {
     double strat_start_time = CkWallTimer();
-    receive_stats_ready = 0;
+    receive_stats_ready = false;
     LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
     int i;
@@ -492,8 +492,8 @@ CkMarshalledNLBStatsMessage::~CkMarshalledNLBStatsMessage() {
 
 void CkMarshalledNLBStatsMessage::pup(PUP::er &p)
 {
-  int isnull;
-  if (p.isPacking()) isnull = (msg==NULL?1:0);
+  bool isnull;
+  if (p.isPacking()) isnull = (msg==NULL);
   p|isnull;
   if (p.isUnpacking()) {
     if (!isnull) msg = new NLBStatsMsg;

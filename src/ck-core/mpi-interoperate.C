@@ -8,7 +8,7 @@ extern "C" void CkExit(void);
 #define DEBUG(a) 
 #endif
 
-static int   _libExitStarted = 0;
+static bool   _libExitStarted = false;
 int    _libExitHandlerIdx;
 extern "C" int _cleanUp;
 
@@ -18,7 +18,7 @@ extern  "C" { extern MPI_Comm charmComm ;}
 typedef int MPI_Comm;
 #endif
 
-extern int _ringexit;		    // for charm exit
+extern bool _ringexit;		    // for charm exit
 extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
 extern "C" void CommunicationServerThread(int sleepTime);
@@ -64,7 +64,7 @@ void _libExitHandler(envelope *env)
         CmiFree(env);
         return;
       }
-      _libExitStarted = 1;
+      _libExitStarted = true;
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -95,7 +95,7 @@ void _libExitHandler(envelope *env)
         CmiFree(env);
       //everyone exits here - there may be issues with leftover messages in the queue
       DEBUG(printf("[%d] Am done here\n",CmiMyPe());)
-      _libExitStarted = 0;
+      _libExitStarted = false;
       StopCharmScheduler();
       break;
     default:
@@ -129,7 +129,7 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
   }
 #endif
 
-  CharmLibInterOperate = 1;
+  CharmLibInterOperate = true;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
   StartInteropScheduler();
 }

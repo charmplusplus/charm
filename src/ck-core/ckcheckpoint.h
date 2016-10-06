@@ -73,10 +73,10 @@ extern CkGroupID _lbdb;
 #endif
 
 // some useful flags (for disk checkpointing)
-extern int _inrestart;           // 1: if is during restart process
-extern int _restarted;           // 1: if this run is after restart
+extern bool _inrestart;          // 1: if is during restart process
+extern bool _restarted;          // 1: if this run is after restart
 extern int _oldNumPes;           // number of processors in the last run
-extern int _chareRestored;       // 1: if chare is restored at restart
+extern bool _chareRestored;      // 1: if chare is restored at restart
 
 enum{CK_CHECKPOINT_SUCCESS, CK_CHECKPOINT_FAILURE};
 

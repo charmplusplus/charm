@@ -83,7 +83,7 @@ waits for the migrant contributions to straggle in.
 #define INT_MAX 2147483647
 #endif
 
-extern int _inrestart;
+extern bool _inrestart;
 
 Group::Group()
   : CkReductionMgr(CkpvAccess(_currentGroupRednMgr))
@@ -135,7 +135,7 @@ is constructed and ready to process other calls.
 */
 CkGroupReadyCallback::CkGroupReadyCallback(void)
 {
-  _isReady = 0;
+  _isReady = false;
 }
 void
 CkGroupReadyCallback::callBuffered(void)
@@ -1177,7 +1177,7 @@ void CkReductionMgr::pup(PUP::er &p)
 void CkReductionMgr::ArrayReductionHandler(CkReductionMsg *m){
 	finalMsgs.enq(m);
 	//CkPrintf("ArrayReduction Handler Invoked for %d \n",m->redNo);
-	adj(m->redNo).mainRecvd = 1;
+	adj(m->redNo).mainRecvd = true;
 	DEBR(("~~~~~~~~~~~~~ ArrayReductionHandler Callback called for redNo %d with mesgredNo %d at %.6f %d\n",completedRedNo,m->redNo,CmiWallTimer()));
 	endArrayReduction();
 }
@@ -1235,7 +1235,7 @@ void CkReductionMgr :: endArrayReduction(){
 	if(numMsgs == 0){
 		return;
 	}
-	if(adj(completedRedNo+1).mainRecvd == 0){
+	if(adj(completedRedNo+1).mainRecvd == false){
 		for(i=0;i<numMsgs;i++){
 			finalMsgs.enq(tempMsgs[i]);
 		}
@@ -2241,14 +2241,14 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 
 
   creating=false;
-  interrupt = 0;
+  interrupt = false;
   DEBR((AA "In NodereductionMgr constructor at %d \n" AB,this));
 	/*
 		FAULT_EVAC
 	*/
 	blocked = false;
 	maxModificationRedNo = INT_MAX;
-	killed=0;
+	killed=false;
 	additionalGCount = newAdditionalGCount = 0;
 }
 
@@ -2270,7 +2270,7 @@ void CkNodeReductionMgr::flushStates()
   nContrib=nRemote=0;
 
   creating=false;
-  interrupt = 0;
+  interrupt = false;
   while (!msgs.isEmpty()) { delete msgs.deq(); }
   while (!futureMsgs.isEmpty()) delete futureMsgs.deq();
   while (!futureRemoteMsgs.isEmpty()) delete futureRemoteMsgs.deq();
@@ -2410,7 +2410,7 @@ void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 #endif
 #ifndef CMK_CPV_IS_SMP
 #if CMK_IMMEDIATE_MSG
-	if(interrupt == 1){
+	if(interrupt == true){
 		//CkPrintf("$$$$$$$$$How did i wake up in the middle of someone else's entry method ?\n");
 		CpvAccess(_qd)->process(-1);
 		CmiDelayImmediate();
@@ -2418,12 +2418,12 @@ void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 	}
 #endif	
 #endif
-   interrupt = 1;	
+   interrupt = true;
    CmiLock(lockEverything);   
    DEBR(("[%d,%d] Recv'd REMOTE contribution for %d at %.6f[[[\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer()));
    doRecvMsg(m);
    CmiUnlock(lockEverything);    
-   interrupt = 0;
+   interrupt = false;
    DEBR(("[%d,%d] ]]]]]]Recv'd REMOTE contribution for %d at %.6f\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer()));
 }
 
@@ -2507,11 +2507,11 @@ void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
 //Handle a message from one element for the reduction
 void CkNodeReductionMgr::addContribution(CkReductionMsg *m)
 {
-  interrupt = 1;
+  interrupt = true;
   CmiLock(lockEverything);
   doAddContribution(m);
   CmiUnlock(lockEverything);
-  interrupt = 0;
+  interrupt = false;
 }
 
 void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
@@ -2577,7 +2577,7 @@ void CkNodeReductionMgr::finishReduction(void)
   }
   if (nRemote>treeKids()){
 
-	  interrupt = 0;
+	  interrupt = false;
 	   CkAbort("Nodegrp Excess remote reduction message received!\n");
   }
 
@@ -2593,7 +2593,7 @@ void CkNodeReductionMgr::finishReduction(void)
 
   if (hasParent())
   {//Pass data up tree to parent
-	if(CmiNodeAlive(CkMyNode()) || killed == 0){
+	if(CmiNodeAlive(CkMyNode()) || killed == false){
     	DEBR((AA "Passing reduced data up to parent node %d. \n" AB,treeParent()));
     	DEBR(("[%d,%d] Passing data up to parentNode %d at %.6f for redNo %d with ncontrib %d\n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer(),redNo,nContrib));
 		/*
@@ -2647,29 +2647,29 @@ void CkNodeReductionMgr::finishReduction(void)
 
   for (i=0;i<n;i++)
   {
-    interrupt = 1;
+    interrupt = true;
 
     CkReductionMsg *m=futureMsgs.deq();
 
-    interrupt = 0;
+    interrupt = false;
     if (m!=NULL){ //One of these addContributions may have finished us.
       DEBR(("[%d,%d] NodeGroup %d> Mesg with redNo %d might be useful in new reduction %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo,redNo));
       doAddContribution(m);//<- if *still* early, puts it back in the queue
     }
   }
 
-  interrupt = 1;
+  interrupt = true;
 
   n=futureRemoteMsgs.length();
 
-  interrupt = 0;
+  interrupt = false;
   for (i=0;i<n;i++)
   {
-    interrupt = 1;
+    interrupt = true;
 
     CkReductionMsg *m=futureRemoteMsgs.deq();
 
-    interrupt = 0;
+    interrupt = false;
     if (m!=NULL)
       doRecvMsg(m);//<- if *still* early, puts it back in the queue
   }
@@ -2931,7 +2931,7 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p | maxModificationRedNo;
 
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-  int isnull = (storedCallback == NULL);
+  bool isnull = (storedCallback == NULL);
   p | isnull;
   if (!isnull) {
     if (p.isUnpacking()) {

@@ -42,8 +42,8 @@ protected:
   virtual void computeAverage();
   double computeMax();
 double computeMax(int*);
-  int isHeavy(processorInfo *p);
-  int isLight(processorInfo *p);
+  bool isHeavy(processorInfo *p);
+  bool isLight(processorInfo *p);
   void removeComputes();
 
   double overLoad;

@@ -799,7 +799,7 @@ public:
 	static void staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index);
 #endif
 
-        static int isIrreducible() { return 1; }
+        static bool isIrreducible() { return true; }
 };
 
 // Maintain old name of former parent class for backwards API compatibility

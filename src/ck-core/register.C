@@ -76,7 +76,7 @@ void CkRegisterChareInCharm(int chareIndex){
 
 extern "C"
 void CkRegisterGroupIrr(int chareIndex,int isIrr){
-  _chareTable[chareIndex]->isIrr = isIrr;
+  _chareTable[chareIndex]->isIrr = (isIrr!=0);
 }
 
 extern "C"

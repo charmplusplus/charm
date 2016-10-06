@@ -37,7 +37,7 @@ class MemEntry {
 */
 class TraceMemory : public Trace {
  private:
-  int firstTime;
+  bool firstTime;
   int logBufSize;
   int usedBuffer;
   bool recordStack;

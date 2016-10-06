@@ -59,17 +59,17 @@ public:
 
 class CkGroupReadyCallback : public IrrGroup {
 private:
-  int _isReady;
+  bool _isReady;
   CkQ<CkGroupCallbackMsg *> _msgs;
   void callBuffered(void);
 public:
 	CkGroupReadyCallback(void);
 	CkGroupReadyCallback(CkMigrateMessage *m):IrrGroup(m) {}
 	void callMeBack(CkGroupCallbackMsg *m);
-	int isReady(void) { return _isReady; }
+	bool isReady(void) { return _isReady; }
 protected:
-	void setReady(void) {_isReady = 1; callBuffered(); }
-	void setNotReady(void) {_isReady = 0; }
+	void setReady(void) {_isReady = true; callBuffered(); }
+	void setNotReady(void) {_isReady = false; }
 };
 
 class CkReductionNumberMsg:public CMessage_CkReductionNumberMsg {
@@ -99,8 +99,8 @@ class countAdjustment {
 public:
 	int gcount;//Adjustment to global count (applied at reduction end)
 	int lcount;//Adjustment to local count (applied continually)
-	int mainRecvd;
-    countAdjustment(int ignored=0) {(void)ignored; gcount=0; lcount=0; mainRecvd=0;}
+	bool mainRecvd;
+    countAdjustment(int ignored=0) {(void)ignored; gcount=0; lcount=0; mainRecvd=false;}
 	void pup(PUP::er& p){ p|gcount; p|lcount; p|mainRecvd; }
 };
 
@@ -304,7 +304,7 @@ public:
 
 	//Return true if this message came straight from a contribute call--
 	// if it didn't come from a previous reduction function.
-	inline int isFromUser(void) const {return sourceFlag==-1;}
+	inline bool isFromUser(void) const {return sourceFlag==-1;}
 
 	inline bool isMigratableContributor(void) const {return migratableContributor;}
 	inline void setMigratableContributor(bool _mig){ migratableContributor = _mig;}
@@ -451,7 +451,7 @@ private:
 	//My Big LOCK
 	CmiNodeLock lockEverything;
 
-	int interrupt; /* flag for use in non-smp 0 means interrupt can occur 1 means not (also acts as a lock)*/
+	bool interrupt; /* flag for use in non-smp: false means interrupt can occur, true means not (also acts as a lock) */
 
 	/*vector storing the children of this node*/
 	CkVec<int> kids;
@@ -504,7 +504,7 @@ private:
 	int maxModificationRedNo;
 	int tempModificationRedNo;
 	bool readyDeletion;
-	int killed;	
+	bool killed;
 	
 //Checkpointing utilities
  public:
@@ -537,7 +537,7 @@ class NodeGroup : public CkNodeReductionMgr {
     ~NodeGroup();
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetNodeGroupID(void) const {return thisgroup;}
-    virtual int isNodeGroup() { return 1; }
+    virtual bool isNodeGroup() { return true; }
 
     virtual void pup(PUP::er &p);
     virtual void flushStates() {
@@ -754,7 +754,7 @@ public:
     }
 #endif
 	virtual void pup(PUP::er &p);
-	static int isIrreducible(){ return 0;}
+	static bool isIrreducible(){ return false;}
 	void contributeViaMessage(CkReductionMsg *m);
 };
 
@@ -826,7 +826,7 @@ class Group : public CkReductionMgr
  public:
 	Group();
 	Group(CkMigrateMessage *msg);
-	virtual int isNodeGroup() { return 0; }
+	virtual bool isNodeGroup() { return false; }
 	virtual void pup(PUP::er &p);
 	virtual void flushStates() {
 		CkReductionMgr::flushStates();

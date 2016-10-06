@@ -223,7 +223,7 @@ public:
 	CkCallback(int ep,const CProxy_NodeGroup &ngp);
 
     // Bcast to a group or nodegroup
-	CkCallback(int ep,const CkGroupID &id, int isNodeGroup=0) {
+	CkCallback(int ep,const CkGroupID &id, bool isNodeGroup=false) {
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
@@ -237,7 +237,7 @@ public:
 	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline=false);
 
     // Send to group/nodegroup element
-	CkCallback(int ep,int onPE,const CkGroupID &id,bool doInline=false, int isNodeGroup=0) {
+	CkCallback(int ep,int onPE,const CkGroupID &id,bool doInline=false, bool isNodeGroup=false) {
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
@@ -307,7 +307,7 @@ public:
           }
 	}
 	
-	int isInvalid(void) const {return type==invalid;}
+	bool isInvalid(void) const {return type==invalid;}
 
         /// Does this callback point at something that may not be at the same
         /// address after a checkpoint/restart cycle?

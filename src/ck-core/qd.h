@@ -26,7 +26,7 @@ class QdMsg {
 
 class QdCommMsg {
   public:
-    int flag;     //  0: create   1: process
+    bool isCreated;     //  false: create   true: process
     int count;
 };
 
@@ -93,14 +93,14 @@ class QdState {
     void create(int n=1) { 
         mCreated += n; 
 #if CMK_IMMEDIATE_MSG
-        sendCount(0, n);
+        sendCount(false, n);
 #endif
     }
-    void sendCount(int flag, int count);     // send msg to rank 0 for counting
+    void sendCount(bool isCreated, int count);     // send msg to rank 0 for counting
     void process(int n=1) { 
          mProcessed += n; 
 #if CMK_IMMEDIATE_MSG
-        sendCount(1, n);
+        sendCount(true, n);
 #endif
     }
     int getCreated(void) { return mCreated; }

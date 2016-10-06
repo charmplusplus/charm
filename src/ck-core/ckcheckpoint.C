@@ -41,10 +41,10 @@ typedef struct _GroupInfo{
 PUPbytes(GroupInfo)
 PUPmarshall(GroupInfo)
 
-int _inrestart = 0;
-int _restarted = 0;
+bool _inrestart = false;
+bool _restarted = false;
 int _oldNumPes = 0;
-int _chareRestored = 0;
+bool _chareRestored = false;
 double chkptStartTimer = 0;
 #if CMK_SHRINK_EXPAND
 int originalnumGroups = -1;
@@ -742,9 +742,9 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	char filename[1024];
 	
         if (CmiMyRank() == 0) {
-          _inrestart = 1;
-          _restarted = 1;
-          CkMemCheckPT::inRestarting = 1;
+          _inrestart = true;
+          _restarted = true;
+          CkMemCheckPT::inRestarting = true;
         }
 
 	// restore readonlys
@@ -781,7 +781,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		PUP::fromDisk pChares(fChares);
 		CkPupChareData(pChares);
 		CmiFclose(fChares);
-		if (CmiMyRank() == 0) _chareRestored = 1;
+		if (CmiMyRank() == 0) _chareRestored = true;
 	}
 #endif
 
@@ -825,11 +825,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
             }
 	  }
 
-        _inrestart = 0;
+        _inrestart = false;
 
    	if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
    	//_initDone();
-	CkMemCheckPT::inRestarting = 0;
+	CkMemCheckPT::inRestarting = false;
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
 		if(requestStatus)
@@ -850,9 +850,9 @@ void CkResumeRestartMain(char * msg) {
   int i;
   char filename[1024];
   const char * dirname = "";
-  _inrestart = 1;
-  _restarted = 1;
-  CkMemCheckPT::inRestarting = 1;
+  _inrestart = true;
+  _restarted = true;
+  CkMemCheckPT::inRestarting = true;
   CmiPrintf("[%d]CkResumeRestartMain: Inside Resume Restart\n",CkMyPe());
   CmiPrintf("[%d]CkResumeRestartMain: Group restored %d\n",CkMyPe(), CkpvAccess(_numGroups)-1);
 
@@ -882,8 +882,8 @@ void CkResumeRestartMain(char * msg) {
     CmiFclose(datFile);
   }
   _initDone();
-  _inrestart = 0;
-  CkMemCheckPT::inRestarting = 0;
+  _inrestart = false;
+  CkMemCheckPT::inRestarting = false;
   if(CkMyPe()==0) {
     CmiPrintf("[%d]CkResumeRestartMain done. sending out callback.\n",CkMyPe());
     CkPrintf("Restart from shared memory  finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);

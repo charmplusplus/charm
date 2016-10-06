@@ -44,7 +44,7 @@ void MemEntry::write(FILE *fp) {
 
 TraceMemory::TraceMemory(char **argv) {
   usedBuffer = 0;
-  firstTime = 1;
+  firstTime = true;
   traceDisabled = false;
   logBufSize = DefaultBufferSize;
   if (CmiGetArgIntDesc(argv,"+memlogsize",&logBufSize, 
@@ -74,7 +74,7 @@ inline void TraceMemory::flush() {
   const char *mode;
   if (firstTime) mode = "w";
   else mode = "a";
-  firstTime = 0;
+  firstTime = false;
   // flushing the logs
   char fname[1024];
   sprintf(fname, "memoryLog_%d", CkMyPe());

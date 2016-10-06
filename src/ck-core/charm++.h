@@ -277,11 +277,11 @@ class IrrGroup : public Chare {
     virtual int ckDebugChareID(char *, int);
 
     // Silly run-time type information
-    virtual int isNodeGroup() { return 0; };
+    virtual bool isNodeGroup() { return false; };
     virtual bool isLocMgr(void){ return false; }
     virtual bool isArrMgr(void){ return false; }
     virtual bool isReductionMgr(void){ return false; }
-    static int isIrreducible(){ return 1;}
+    static bool isIrreducible(){ return true;}
     virtual void flushStates() {}
 		/*
 			FAULT_EVAC
@@ -396,7 +396,7 @@ struct CBaseT2 : public Parent1, public Parent2, virtual CBase {
   //These overloads are needed to prevent ambiguity for multiple inheritance:
   inline const CkChareID &ckGetChareID(void) const
     {return ((Parent1 *)this)->ckGetChareID();}
-  static int isIrreducible(){ return (Parent1::isIrreducible() && Parent2::isIrreducible());}
+  static bool isIrreducible(){ return (Parent1::isIrreducible() && Parent2::isIrreducible());}
   CHARM_INPLACE_NEW
 };
 
@@ -411,7 +411,7 @@ struct CBaseT2 : public Parent1, public Parent2, virtual CBase {
     recursive_pup<base>(this, p);                                     \
     recursive_pup<PARENTN(n)>(this, p);                               \
   }                                                                   \
-  static int isIrreducible() {                                        \
+  static bool isIrreducible() {                                       \
     return (base::isIrreducible() && PARENTN(n)::isIrreducible());    \
   }
 
@@ -588,11 +588,11 @@ class CkDelegateMgr : public IrrGroup {
 class CProxy {
   private:
     CkGroupID delegatedGroupId;      
-    int isNodeGroup; 
+    bool isNodeGroup;
     mutable CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
     CkDelegateData *delegatedPtr; // private data for use by delegatedMgr.
   protected: //Never allocate CProxy's-- only subclass them.
- CProxy() :  isNodeGroup(0), delegatedMgr(0), delegatedPtr(0)
+ CProxy() :  isNodeGroup(false), delegatedMgr(0), delegatedPtr(0)
       {delegatedGroupId.setZero(); }
 
 #define CK_DELCTOR_PARAM CkDelegateMgr *dTo,CkDelegateData *dPtr

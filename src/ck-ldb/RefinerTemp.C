@@ -137,7 +137,7 @@ double RefinerTemp::computeMax(int *maxPe)
   return max;
 }
 
-int RefinerTemp::isHeavy(processorInfo *p)
+bool RefinerTemp::isHeavy(processorInfo *p)
 {
   if (p->available == true) 
 //     return p->load > overLoad*averageLoad;
@@ -147,13 +147,13 @@ int RefinerTemp::isHeavy(processorInfo *p)
   }
 }
 
-int RefinerTemp::isLight(processorInfo *p)
+bool RefinerTemp::isLight(processorInfo *p)
 {
   if (p->available == true) 
 //     return p->load < averageLoad;
 	return p->load < totalInst*procFreqNew[p->Id]/sumFreqs;
   else 
-     return 0;
+     return false;
 }
 
 // move the compute jobs out from unavailable PE

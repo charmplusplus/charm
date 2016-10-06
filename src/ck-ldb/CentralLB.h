@@ -268,7 +268,7 @@ protected:
                       LBMigrateMsg* msg, LBSimulation* simResults);
   void removeNonMigratable(LDStats* statsDataList, int count);
 	CProxy_CentralLB thisProxy;
-  void loadbalance_with_thread() { use_thread = 1; }
+  void loadbalance_with_thread() { use_thread = true; }
 private:  
 //CProxy_CentralLB thisProxy;
   int myspeed;
@@ -283,8 +283,8 @@ private:
   double start_lb_time;
   LBMigrateMsg   *storedMigrateMsg;
   LBScatterMsg   *storedScatterMsg;
-  int  reduction_started;
-  int  use_thread;
+  bool  reduction_started;
+  bool  use_thread;
 
   FutureModel *predicted_model;
 

@@ -196,14 +196,14 @@ void _qdCommHandler(envelope *env)
 {
   QdCommMsg *msg = (QdCommMsg*) EnvToUsr(env);
   DEBUGP(("[%d] _qdCommHandler msg:%p \n", CmiMyPe(), msg));
-  if (msg->flag == 0)
+  if (!msg->isCreated)
     CpvAccess(_qd)->create(msg->count);
   else
     CpvAccess(_qd)->process(msg->count);
   CmiFree(env);
 }
 
-void QdState::sendCount(int flag, int count)
+void QdState::sendCount(bool isCreated, int count)
 {
   if (_dummy_dq == 0) {
 #if CMK_NET_VERSION && ! CMK_SMP && ! defined(CMK_CPV_IS_SMP)
@@ -213,7 +213,7 @@ void QdState::sendCount(int flag, int count)
 #endif
         {
           QdCommMsg *msg = (QdCommMsg*) CkAllocMsg(0,sizeof(QdCommMsg),0);
-          msg->flag = flag;
+          msg->isCreated = isCreated;
           msg->count = count;
           envelope *env = UsrToEnv((void *)msg);
           CmiSetHandler(env, _qdCommHandlerIdx);

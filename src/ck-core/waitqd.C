@@ -9,17 +9,17 @@ extern "C" void CkWaitQD(void) {
 }
   
 waitqd_QDChare::waitqd_QDChare(CkArgMsg *m) {
-  waitStarted = 0;
+  waitStarted = false;
   threadList = 0;
   _waitqd_qdhandle = thishandle;
   delete m;
 }
 
 void waitqd_QDChare::waitQD(void) {
-  if (waitStarted == 1) {
+  if (waitStarted) {
     CdsFifo_Enqueue((CdsFifo)threadList, (void *)CthSelf());
   } else {
-    waitStarted = 1;
+    waitStarted = true;
     threadList = (void*) CdsFifo_Create();
     CdsFifo_Enqueue((CdsFifo) threadList, (void *)CthSelf());
     CkStartQD(CkIndex_waitqd_QDChare::onQD((CkQdMsg*)0), &thishandle);
@@ -35,7 +35,7 @@ void waitqd_QDChare::onQD(CkQdMsg *ckqm) {
   }
   CdsFifo_Destroy((CdsFifo) threadList);
   threadList = 0;
-  waitStarted = 0;
+  waitStarted = false;
   delete ckqm;
 }
 

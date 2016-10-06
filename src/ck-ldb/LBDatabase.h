@@ -103,8 +103,8 @@ extern CkGroupID _lbdb;
 class LBDB;
 
 CkpvExtern(int, numLoadBalancers);
-CkpvExtern(int, hasNullLB);
-CkpvExtern(int, lbdatabaseInited);
+CkpvExtern(bool, hasNullLB);
+CkpvExtern(bool, lbdatabaseInited);
 
 // LB options, mostly controled by user parameter
 extern "C" char * _lbtopo;
@@ -403,7 +403,7 @@ public:
   int getNLoadBalancers() {return nloadbalancers;}
 
 public:
-  static int manualOn;
+  static bool manualOn;
 
 public:
   char *availVector() { return avail_vector; }

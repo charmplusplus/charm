@@ -230,14 +230,14 @@ public:
 	CkArrayID() : _gid() { }
 	CkArrayID(CkGroupID g) :_gid(g) {}
 	inline void setZero(void) {_gid.setZero();}
-	inline int isZero(void) const {return _gid.isZero();}
+	inline bool isZero(void) const {return _gid.isZero();}
 	operator CkGroupID() const {return _gid;}
 	CkArray *ckLocalBranch(void) const
 		{ return (CkArray *)CkLocalBranch(_gid); }
 	static CkArray *CkLocalBranch(CkArrayID id)
 		{ return (CkArray *)::CkLocalBranch(id); }
 	void pup(PUP::er &p) {p | _gid; }
-	int operator == (const CkArrayID& other) const {
+	bool operator == (const CkArrayID& other) const {
 		return (_gid == other._gid);
 	}
     friend bool operator< (const CkArrayID &lhs, const CkArrayID &rhs) {

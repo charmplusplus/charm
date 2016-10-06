@@ -114,8 +114,8 @@ int   _bocHandlerIdx;
 int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
-int   _mainDone = 0;
-CksvDeclare(int, _triggersSent);
+bool  _mainDone = false;
+CksvDeclare(bool, _triggersSent);
 
 CkOutStream ckout;
 CkErrStream ckerr;
@@ -151,7 +151,7 @@ CkpvDeclare(_CkOutStream*, _ckout);
 CkpvDeclare(_CkErrStream*, _ckerr);
 
 CkpvStaticDeclare(int,  _numInitsRecd);
-CkpvStaticDeclare(int,  _initdone);
+CkpvStaticDeclare(bool,  _initdone);
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
@@ -176,7 +176,7 @@ int    _exitHandlerIdx;
 #if CMK_WITH_STATS
 static Stats** _allStats = 0;
 #endif
-static int   _exitStarted = 0;
+static bool   _exitStarted = 0;
 
 static InitCallTable _initCallTable;
 
@@ -201,18 +201,18 @@ extern int BUFFER_TIME; //time spent waiting for buffered messages
 #endif
 
 // flag for killing processes 
-extern int killFlag;
+extern bool killFlag;
 // file specifying the processes to be killed
 extern char *killFile;
 // function for reading the kill file
 void readKillFile();
 #if CMK_MESSAGE_LOGGING
 // flag for disk checkpoint
-extern int diskCkptFlag;
+extern bool diskCkptFlag;
 #endif
 
 int _defaultObjectQ = 0;            // for obejct queue
-int _ringexit = 0;		    // for charm exit
+bool _ringexit = 0;		    // for charm exit
 int _ringtoken = 8;
 extern int _messageBufferingThreshold;
 
@@ -222,7 +222,7 @@ extern int _messageBufferingThreshold;
 
 	flag which marks whether or not to trigger the processor shutdowns
 */
-static int _raiseEvac=0;
+static bool _raiseEvac=0;
 static char *_raiseEvacFile;
 void processRaiseEvacFile(char *raiseEvacFile);
 
@@ -295,16 +295,16 @@ static inline void _parseCommandLineOpts(char **argv)
 #if CMK_MESSAGE_LOGGING
 	// reading +ftc_disk flag
 	if (CmiGetArgFlagDesc(argv, "+ftc_disk", "Disk Checkpointing")) {
-		diskCkptFlag = 1;
+		diskCkptFlag = true;
     }
 #endif
   // reading the killFile
   if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
     if(faultFunc == NULL){
       //do not read the killfile if this is a restarting processor
-      killFlag = 1;
+      killFlag = true;
       if(CmiMyPe() == 0){
-        printf("[%d] killFlag set to 1 for file %s\n",CkMyPe(),killFile);
+        printf("[%d] killFlag set to true for file %s\n",CkMyPe(),killFile);
       }
     }
   }
@@ -313,7 +313,7 @@ static inline void _parseCommandLineOpts(char **argv)
   // shut down program in ring fashion to allow projections output w/o IO error
   if (CmiGetArgIntDesc(argv,"+ringexit",&_ringtoken, "Program exits in a ring fashion")) 
   {
-    _ringexit = 1;
+    _ringexit = true;
     if (CkMyPe()==0)
       CkPrintf("Charm++> Program shutdown in token ring (%d).\n", _ringtoken);
     if (_ringtoken > CkNumPes())  _ringtoken = CkNumPes();
@@ -556,7 +556,7 @@ static void _exitHandler(envelope *env)
         CmiFree(env);
         return;
       }
-      _exitStarted = 1;
+      _exitStarted = true;
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
 #if !CMK_BIGSIM_THREAD
@@ -592,12 +592,12 @@ static void _exitHandler(envelope *env)
 #if CMK_WITH_STATS
          _sendStats();
 #endif
-      _mainDone = 1; // This is needed because the destructors for
-                     // readonly variables will be called when the program
-		     // exits. If the destructor is called while _mainDone
-		     // is 0, it will assume that the readonly variable was
-		     // declared locally. On all processors other than 0, 
-		     // _mainDone is never set to 1 before the program exits.
+      _mainDone = true; // This is needed because the destructors for
+                        // readonly variables will be called when the program
+		        // exits. If the destructor is called while _mainDone
+		        // is false, it will assume that the readonly variable was
+		        // declared locally. On all processors other than 0,
+		        // _mainDone is never set to true before the program exits.
 #if CMK_TRACE_ENABLED
       if (_ringexit) traceClose();
 #endif
@@ -748,9 +748,9 @@ static void _sendTriggers(void)
 {
   int i, num, first;
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-  if (CksvAccess(_triggersSent) == 0)
+  if (!CksvAccess(_triggersSent))
   {
-    CksvAccess(_triggersSent)++;
+    CksvAccess(_triggersSent) = true;
     num = CmiMyNodeSize();
     envelope *env = _allocEnv(RODataMsg); // Notice that the type here is irrelevant
     env->setSrcPe(CkMyPe());
@@ -776,7 +776,7 @@ static void _sendTriggers(void)
 void _initDone(void)
 {
   if (CkpvAccess(_initdone)) return;
-  CkpvAccess(_initdone) ++;
+  CkpvAccess(_initdone) = true;
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
   if (!CksvAccess(_triggersSent)) _sendTriggers();
   CkNumberHandler(_triggerHandlerIdx, _discardHandler);
@@ -1109,7 +1109,7 @@ void _initCharm(int unused_argc, char **argv)
         CkpvAccess(_destroyingNodeGroup) = false;
 	CkpvInitialize(UInt, _numGroups);
 	CkpvInitialize(int, _numInitsRecd);
-	CkpvInitialize(int, _initdone);
+	CkpvInitialize(bool, _initdone);
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
@@ -1133,8 +1133,8 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(UInt,_numInitNodeMsgs);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
-	CksvInitialize(int, _triggersSent);
-	CksvAccess(_triggersSent) = 0;
+	CksvInitialize(bool, _triggersSent);
+	CksvAccess(_triggersSent) = false;
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
@@ -1172,7 +1172,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_coreState)=new CkCoreState();
 
 	CkpvAccess(_numInitsRecd) = 0;
-	CkpvAccess(_initdone) = 0;
+	CkpvAccess(_initdone) = false;
 
 	CkpvAccess(_ckout) = new _CkOutStream();
 	CkpvAccess(_ckerr) = new _CkErrStream();
@@ -1513,7 +1513,7 @@ void _initCharm(int unused_argc, char **argv)
             CpvAccess(_currentObj) = (Chare *)obj;
 #endif
 		}
-                _mainDone = 1;
+                _mainDone = true;
 
 		_STATS_RECORD_CREATE_CHARE_N(nMains);
 		_STATS_RECORD_PROCESS_CHARE_N(nMains);

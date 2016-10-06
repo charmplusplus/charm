@@ -313,7 +313,7 @@ void LDRegisteringObjects(LDOMHandle _h);
 void LDDoneRegisteringObjects(LDOMHandle _h);
 
 LDObjHandle LDRegisterObj(LDOMHandle h, LDObjid id, void *userptr,
-			  int migratable);
+			  bool migratable);
 void LDUnregisterObj(LDObjHandle h);
 
 void *LDObjUserData(LDObjHandle &_h);

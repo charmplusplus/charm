@@ -50,7 +50,7 @@ CtgGlobals _origCtg; // should probably be registered like the others, but I cou
 
 struct CtgGlobalStruct {
 public:
-    int installed;
+    bool installed;
     
     void *data_seg;  /* The user copy of the data */
     size_t seg_size; /* size in bytes of data segment */
@@ -67,7 +67,7 @@ public:
     CtgGlobalStruct(void) {
         printf("CtgGlobalStruct::constructor\n");
         CHECK_MAGIC_NUM;
-        installed=0;
+        installed=false;
         data_seg=0;
         CHECK_MAGIC_NUM;
     }

@@ -64,7 +64,7 @@ extern "C" void LDDoneRegisteringObjects(LDOMHandle _h)
 }
 
 extern "C" LDObjHandle LDRegisterObj(LDOMHandle _h, LDObjid _id, 
-				       void *_userData, int _migratable)
+				       void *_userData, bool _migratable)
 {
   LBDB *const db = (LBDB*)(_h.ldb.handle);
   return db->AddObj(_h, _id, _userData, (bool)(_migratable));

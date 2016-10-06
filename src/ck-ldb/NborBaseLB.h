@@ -92,7 +92,7 @@ private:
   int mig_msgs_received;
   int mig_msgs_expected;
   int* neighbor_pes;
-  int receive_stats_ready;
+  bool receive_stats_ready;
   double start_lb_time;
 };
 

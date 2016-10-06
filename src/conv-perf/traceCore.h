@@ -107,9 +107,9 @@ class TraceLogger
 
     int   binary;
 
-	int lastWriteFlag;		// set when writing log to file at end of program
+	bool lastWriteFlag;		// set when writing log to file at end of program
 	int prevLID, prevSeek;	// for writing logs to file
-	int isWriting;
+	bool isWriting;
 
   public:
     TraceLogger(char* program, int b);

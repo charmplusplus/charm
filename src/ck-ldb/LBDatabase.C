@@ -21,8 +21,8 @@ CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
 
 CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
-CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
-CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
+CkpvDeclare(bool, hasNullLB);         /**< true if NullLB is created */
+CkpvDeclare(bool, lbdatabaseInited);  /**< true if lbdatabase is inited */
 
 // command line options
 CkLBArgs _lb_args;
@@ -156,12 +156,12 @@ LBDBInit::LBDBInit(CkArgMsg *m)
 // called from init.C
 void _loadbalancerInit()
 {
-  CkpvInitialize(int, lbdatabaseInited);
-  CkpvAccess(lbdatabaseInited) = 0;
+  CkpvInitialize(bool, lbdatabaseInited);
+  CkpvAccess(lbdatabaseInited) = false;
   CkpvInitialize(int, numLoadBalancers);
   CkpvAccess(numLoadBalancers) = 0;
-  CkpvInitialize(int, hasNullLB);
-  CkpvAccess(hasNullLB) = 0;
+  CkpvInitialize(bool, hasNullLB);
+  CkpvAccess(hasNullLB) = false;
 
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
@@ -199,9 +199,9 @@ void _loadbalancerInit()
   // get the step number at which to dump the LB database
   CmiGetArgIntDesc(argv, "+LBVersion", &_lb_args.lbversion(), "LB database file version number");
   CmiGetArgIntDesc(argv, "+LBCentPE", &_lb_args.central_pe(), "CentralLB processor");
-  int _lb_dump_activated = 0;
+  bool _lb_dump_activated = false;
   if (CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep, "Dump the LB state from this step"))
-    _lb_dump_activated = 1;
+    _lb_dump_activated = true;
   if (_lb_dump_activated && LBSimulation::dumpStep < 0) {
     CmiPrintf("LB> Argument LBDump (%d) negative, setting to 0\n",LBSimulation::dumpStep);
     LBSimulation::dumpStep = 0;
@@ -319,7 +319,7 @@ void _loadbalancerInit()
   }
 }
 
-int LBDatabase::manualOn = 0;
+bool LBDatabase::manualOn = false;
 char *LBDatabase::avail_vector = NULL;
 bool LBDatabase::avail_vector_set = false;
 CmiNodeLock avail_vector_lock;
@@ -380,7 +380,7 @@ void LBDatabase::init(void)
   new_ld_balancer = 0;
 	metabalancer = NULL;
 
-  CkpvAccess(lbdatabaseInited) = 1;
+  CkpvAccess(lbdatabaseInited) = true;
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
@@ -606,7 +606,7 @@ void TurnManualLBOn()
      myLbdb->TurnManualLBOn();
    }
    else {
-     LBDatabase::manualOn = 1;
+     LBDatabase::manualOn = true;
    }
 #endif
 }
@@ -619,7 +619,7 @@ void TurnManualLBOff()
      myLbdb->TurnManualLBOff();
    }
    else {
-     LBDatabase::manualOn = 0;
+     LBDatabase::manualOn = true;
    }
 #endif
 }

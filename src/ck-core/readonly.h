@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include "charm.h"
 
-extern int _mainDone;
+extern bool _mainDone;
 
 class readonlybase {
 private:

@@ -5,7 +5,7 @@ Tempo::Tempo(void)
 {
   tempoMessages = CmmNew();
   thread_id = CthSelf(); 
-  sleeping = 0;
+  sleeping = false;
 }
 
 void Tempo::ckTempoRecv(int tag1, int tag2, void *buffer, int buflen)
@@ -16,7 +16,7 @@ void Tempo::ckTempoRecv(int tag1, int tag2, void *buffer, int buflen)
     tags[0] = tag1; tags[1] = tag2;
     msg = (TempoMessage *) CmmGet(tempoMessages, 2, tags, 0);
     if (msg) break;
-    sleeping = 1;
+    sleeping = true;
     thread_id = CthSelf(); 
     CthSuspend();
   }
@@ -53,7 +53,7 @@ void Tempo::tempoGeneric(TempoMessage *themsg)
   tags[0] = themsg->tag1; tags[1] = themsg->tag2;
   CmmPut(tempoMessages, 2, tags, themsg); 
   if (sleeping) {
-    sleeping = 0;
+    sleeping = false;
     CthAwaken(thread_id);
   }
 }

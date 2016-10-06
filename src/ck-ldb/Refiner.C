@@ -114,7 +114,7 @@ double Refiner::computeMax()
   return max;
 }
 
-int Refiner::isHeavy(processorInfo *p)
+bool Refiner::isHeavy(processorInfo *p)
 {
   if (p->available == true) 
      return p->load > overLoad*averageLoad;
@@ -123,12 +123,12 @@ int Refiner::isHeavy(processorInfo *p)
   }
 }
 
-int Refiner::isLight(processorInfo *p)
+bool Refiner::isLight(processorInfo *p)
 {
   if (p->available == true) 
      return p->load < averageLoad;
   else 
-     return 0;
+     return false;
 }
 
 // move the compute jobs out from unavailable PE

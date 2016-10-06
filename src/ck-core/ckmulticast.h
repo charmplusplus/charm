@@ -43,7 +43,7 @@ class CkMulticastMgr: public CkDelegateMgr
             dfactor(_dfactor),
             split_size(_split_size),
             split_threshold(_split_threshold) {}
-        int useDefCtor(void){ return 1; }
+        bool useDefCtor(void){ return true; }
         void pup(PUP::er &p){ 
 		CkDelegateMgr::pup(p);
 		p|dfactor;
@@ -84,7 +84,7 @@ class CkMulticastMgr: public CkDelegateMgr
         /// entry
         void sendToLocal(multicastGrpMsg *m);
         /// entry
-        void recvPacket(CkSectionInfo &_cookie, int offset, int n, char *data, int seqno, int count, int totalsize, int fromBuffer);
+        void recvPacket(CkSectionInfo &_cookie, int offset, int n, char *data, int seqno, int count, int totalsize, bool fromBuffer);
         // ------------------------- Reductions ------------------------
         /// entry Accept a redn msg from a child in the spanning tree
         void recvRedMsg(CkReductionMsg *msg);

@@ -51,7 +51,7 @@ inline bool isLocal(int destPE);
 inline bool isTeamLocal(int destPE);
 void printLog(CkObjID *log);
 
-int _restartFlag=0;
+int _restartFlag=false;
 int _numRestartResponses=0;
 
 char *checkpointDirectory=".";
@@ -1173,7 +1173,7 @@ void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg){
 	fprintf(stderr,"[%d] Restart started at %.6lf \n",CkMyPe(),CmiWallTimer());
 
 	// setting the restart flag
-	_restartFlag = 1;
+	_restartFlag = true;
 	_numRestartResponses = 0;
 
 	// requesting the latest checkpoint from its buddy
@@ -1279,7 +1279,7 @@ void _recvCheckpointHandler(char *_restartData){
  */
 void initializeRestart(void *data, ChareMlogData *mlogData){
 	mlogData->resendReplyRecvd = 0;
-	mlogData->restartFlag = 1;
+	mlogData->restartFlag = true;
 };
 
 /**
@@ -1561,9 +1561,9 @@ void _distributedLocationHandler(char *receivedMsg){
 	CkVec<CkMigratable *> eltList;
 	mgr->migratableList((CkLocRec *)rec,eltList);
 	for(int i=0;i<eltList.size();i++){
-		if(eltList[i]->mlogData->toResumeOrNot == 1 && eltList[i]->mlogData->resumeCount < globalResumeCount){
+		if(eltList[i]->mlogData->toResumeOrNot && eltList[i]->mlogData->resumeCount < globalResumeCount){
 			CpvAccess(_currentObj) = eltList[i];
-			eltList[i]->mlogData->immigrantRecFlag = 1;
+			eltList[i]->mlogData->immigrantRecFlag = true;
 			eltList[i]->mlogData->immigrantSourcePE = sourcePE;
 
 			// incrementing immigrant counter at reduction manager

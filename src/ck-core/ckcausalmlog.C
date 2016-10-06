@@ -55,8 +55,8 @@ inline bool isLocal(int destPE);
 inline bool isTeamLocal(int destPE);
 void printLog(TProcessedLog *log);
 
-int _recoveryFlag=0;
-int _restartFlag=0;
+bool _recoveryFlag=false;
+bool _restartFlag=false;
 int _numRestartResponses=0;
 
 //TODO: remove for perf runs
@@ -1384,7 +1384,7 @@ void startMlogCheckpoint(void *_dummy, double curWallTime){
 
 	// increasing the checkpoint counter
 	checkpointCount++;
-	_recoveryFlag = 0;
+	_recoveryFlag = false;
 
 #if CMK_CONVERSE_MPI
 	inCkptFlag = 1;
@@ -1848,8 +1848,8 @@ void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg){
 	fprintf(stderr,"[%d] Restart started at %.6lf \n",CkMyPe(),CmiWallTimer());
 
 	// setting the restart flag
-	_restartFlag = 1;
-	_recoveryFlag = 1;
+	_restartFlag = true;
+	_recoveryFlag = true;
 	_numRestartResponses = 0;
 
 	// if we are using team-based message logging, all members of the group have to be restarted
@@ -1882,7 +1882,7 @@ void _restartHandler(RestartRequest *restartMsg){
 	fprintf(stderr,"[%d] Restart-team started at %.6lf \n",CkMyPe(),CmiWallTimer());
 
     // setting the restart flag
-	_restartFlag = 1;
+	_restartFlag = true;
 	_numRestartResponses = 0;
 
 	// flushing all buffers
@@ -2351,7 +2351,7 @@ void _updateHomeAckHandler(RestartRequest *updateHomeAck){
 void initializeRestart(void *data, ChareMlogData *mlogData){
 	mlogData->resendReplyRecvd = 0;
 	mlogData->receivedTNs = new CkVec<MCount>;
-	mlogData->restartFlag = 1;
+	mlogData->restartFlag = true;
 };
 
 /**
@@ -2454,14 +2454,14 @@ void fillTicketForChare(void *data, ChareMlogData *mlogData){
  */
 void setTeamRecovery(void *data, ChareMlogData *mlogData){
 	char name[100];
-	mlogData->teamRecoveryFlag = 1;	
+	mlogData->teamRecoveryFlag = true;
 }
 
 /**
  * @brief Turns off the flag for team recovery.
  */
 void unsetTeamRecovery(void *data, ChareMlogData *mlogData){
-	mlogData->teamRecoveryFlag = 0;
+	mlogData->teamRecoveryFlag = false;
 }
 
 /**
@@ -2950,7 +2950,7 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 		delete obj->mlogData->receivedTNs;
 		DEBUG(CkPrintf("[%d] Resetting receivedTNs\n",CkMyPe()));
 		obj->mlogData->receivedTNs = NULL;
-		obj->mlogData->restartFlag = 0;
+		obj->mlogData->restartFlag = false;
 
 		// processDelayedRemoteMsgQueue();
 
@@ -3191,9 +3191,9 @@ void _distributedLocationHandler(char *receivedMsg){
 	CkVec<CkMigratable *> eltList;
 	mgr->migratableList((CkLocRec *)rec,eltList);
 	for(int i=0;i<eltList.size();i++){
-		if(eltList[i]->mlogData->toResumeOrNot == 1 && eltList[i]->mlogData->resumeCount < globalResumeCount){
+		if(eltList[i]->mlogData->toResumeOrNot && eltList[i]->mlogData->resumeCount < globalResumeCount){
 			CpvAccess(_currentObj) = eltList[i];
-			eltList[i]->mlogData->immigrantRecFlag = 1;
+			eltList[i]->mlogData->immigrantRecFlag = true;
 			eltList[i]->mlogData->immigrantSourcePE = sourcePE;
 
 			// incrementing immigrant counter at reduction manager
@@ -4151,7 +4151,7 @@ envelope *copyEnvelope(envelope *env){
 }
 
 /* Checks if two determinants are the same */
-inline int isSameDet(Determinant *first, Determinant *second){
+inline bool isSameDet(Determinant *first, Determinant *second){
 	return first->sender == second->sender && first->receiver == second->receiver && first->SN == second->SN && first->TN == second->TN;
 }
 

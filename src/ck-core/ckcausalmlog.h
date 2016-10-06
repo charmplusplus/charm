@@ -193,16 +193,16 @@ public:
 	int currentHoles;
 	// variable that keeps a count of the processors that have replied to a requests to resend messages. 
 	int resendReplyRecvd;
-	// 0 -> Normal state .. 1-> just after restart. tickets should not be handed out at this time 
-	int restartFlag;
-	// 0 -> normal state .. 1 -> recovery of a team member 
-    int teamRecoveryFlag; 	
+	// false -> Normal state .. true -> just after restart. tickets should not be handed out at this time
+	bool restartFlag;
+	// false -> normal state .. true -> recovery of a team member
+    bool teamRecoveryFlag;
 	//TML: teamTable, stores the SN to TN mapping for messages intra team
 	CkHashtableT<CkHashtableAdaptorT<CkObjID>, SNToTicket *> teamTable;
 
-	int toResumeOrNot;
+	bool toResumeOrNot;
 	int resumeCount;
-	int immigrantRecFlag;
+	bool immigrantRecFlag;
 	int immigrantSourcePE;
 
 private:
@@ -227,13 +227,13 @@ public:
 		numberHoles = 0;
 		ticketHoles = NULL;
 		currentHoles = 0;
-		restartFlag=0;
+		restartFlag=false;
 		teamRecoveryFlag=0;
 		receivedTNs = NULL;
 		resendReplyRecvd=0;
-		toResumeOrNot=0;
+		toResumeOrNot=false;
 		resumeCount=0;
-		immigrantRecFlag = 0;
+		immigrantRecFlag = false;
 	};
 	inline MCount nextSN(const CkObjID &recver);
 	inline Ticket next_ticket(CkObjID &sender,MCount SN);
@@ -640,7 +640,7 @@ extern CkVec<RetainedMigratedObject *> retainedObjectList;
 
 int getCheckPointPE();
 int getReverseCheckPointPE();
-inline int isSameDet(Determinant *first, Determinant *second);
+inline bool isSameDet(Determinant *first, Determinant *second);
 void forAllCharesDo(MlogFn fnPointer,void *data);
 envelope *copyEnvelope(envelope *env);
 extern void _initDone(void);

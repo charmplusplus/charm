@@ -14,7 +14,7 @@
 
 class _CkOStream {
   private:
-    int _isErr;
+    bool _isErr;
     size_t _buflen, _actlen;
     char _obuf[BUF_MAXLEN];    /* stores a line of text */
     char _tbuf[TBUF_MAXLEN];   /* used for formatting ints and things */
@@ -26,7 +26,7 @@ class _CkOStream {
     }
     
   public:
-    _CkOStream(int isErr=0) { 
+    _CkOStream(bool isErr=false) {
       _buflen=BUF_MAXLEN; 
       _actlen=1;
       _isErr = isErr; 

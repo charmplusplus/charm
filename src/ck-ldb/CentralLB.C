@@ -24,7 +24,7 @@
 #endif
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-extern int _restartFlag;
+extern bool _restartFlag;
 extern void getGlobalStep(CkGroupID );
 extern void initMlogLBStep(CkGroupID );
 extern int globalResumeCount;
@@ -51,7 +51,7 @@ int mynewpe=0;
 #endif
 CkGroupID loadbalancer;
 int * lb_ptr;
-int load_balancer_created;
+bool load_balancer_created;
 
 CreateLBFunc_Def(CentralLB, "CentralLB base class")
 
@@ -108,7 +108,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   statsData = NULL;
 
   storedMigrateMsg = NULL;
-  reduction_started = 0;
+  reduction_started = false;
 
   // for future predictor
   if (_lb_predict) predicted_model = new FutureModel(_lb_predict_window);
@@ -126,11 +126,11 @@ void CentralLB::initLB(const CkLBOptions &opt)
   lbdone = 0;
   count_msgs=0;
   statsMsg = NULL;
-  use_thread = 0;
+  use_thread = false;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
-  load_balancer_created = 1;
+  load_balancer_created = true;
 #endif
 #ifdef TEMP_LDB
 	logicalCoresPerNode=physicalCoresPerNode=4;
@@ -237,7 +237,7 @@ void CentralLB::ProcessAtSync()
 
   CkCallback cb(CkReductionTarget(CentralLB, ReceiveCounts), thisProxy[0]);
   contribute(2*sizeof(int), counts, CkReduction::sum_int, cb);
-  reduction_started = 1;
+  reduction_started = true;
 #else
   SendStats();
 #endif
@@ -400,7 +400,7 @@ void CentralLB::SendStats()
 {
 #if CMK_LBDB_ON
   CmiAssert(statsMsg != NULL);
-  reduction_started = 0;
+  reduction_started = false;
 
 #if USE_LDB_SPANNING_TREE
   if(CkNumPes()>1024)
@@ -903,7 +903,7 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
 }
 
 // test if sender and receiver in a commData is nonmigratable.
-static int isMigratable(LDObjData **objData, int *len, int count, const LDCommData &commData)
+static bool isMigratable(LDObjData **objData, int *len, int count, const LDCommData &commData)
 {
 #if CMK_LBDB_ON
   for (int pe=0 ; pe<count; pe++)
@@ -911,10 +911,10 @@ static int isMigratable(LDObjData **objData, int *len, int count, const LDCommDa
     for (int i=0; i<len[pe]; i++)
       if (LDObjIDEqual(objData[pe][i].objID(), commData.sender.objID()) ||
           LDObjIDEqual(objData[pe][i].objID(), commData.receiver.get_destObj().objID())) 
-      return 0;
+      return false;
   }
 #endif
-  return 1;
+  return true;
 }
 
 // rebuild LDStats and remove all non-migratble objects and related things
@@ -1120,7 +1120,7 @@ void CentralLB::ProcessReceiveMigration()
       if (theLbdb->Migrate(move.obj,move.to_pe) == 0) 
          thisProxy[move.to_pe].MissMigrate(!move.async_arrival);
 #else
-            if(_restartFlag == 0){
+            if(_restartFlag){
                 DEBUG(CmiPrintf("[%d] need to move object from %d to %d \n",CkMyPe(),move.from_pe,move.to_pe));
                 theLbdb->Migrate(move.obj,move.to_pe);
                 sending++;
@@ -1154,7 +1154,7 @@ void CentralLB::ProcessReceiveMigration()
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if(_restartFlag){
 		sendDummyMigrationCounts(dummyCounts);
-		_restartFlag  =0;
+		_restartFlag  =false;
     	delete []dummyCounts;
 	}
 #endif

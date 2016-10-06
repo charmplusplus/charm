@@ -34,7 +34,7 @@ public:
   const char* name() const { return myname; }
   virtual int numLevels() const { return nLevels; }
   virtual int parent(int mype, int level) = 0;
-  virtual int isroot(int mype, int level) = 0;
+  virtual bool isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
   virtual void getChildren(int mype, int level, int *children, int &count) = 0;
   virtual int numNodes(int level) {
@@ -68,10 +68,10 @@ public:
     CmiAssert(0);
     return -1;
   }
-  virtual int isroot(int mype, int level) {
-    if (level == 0) return 0;
-    if (level == 1 && mype == toproot) return 1;
-    return 0;
+  virtual bool isroot(int mype, int level) {
+    if (level == 0) return false;
+    if (level == 1 && mype == toproot) return true;
+    return false;
   }
   virtual int numChildren(int mype, int level) {
     if (level == 0) return 0;
@@ -128,11 +128,11 @@ public:
     CmiAssert(0);
     return -1;
   }
-  virtual int isroot(int mype, int level) {
-    if (level == 0) return 0;
-    if (level == 1 && mype % span[0] == 0) return 1;
-    if (level == 2 && mype == toproot) return 1;
-    return 0;
+  virtual bool isroot(int mype, int level) {
+    if (level == 0) return false;
+    if (level == 1 && mype % span[0] == 0) return true;
+    if (level == 2 && mype == toproot) return true;
+    return false;
   }
   virtual int numChildren(int mype, int level) {
     if (level == 0) return 0;
@@ -193,12 +193,12 @@ public:
     CmiAssert(0);
     return -1;
   }
-  virtual int isroot(int mype, int level) {
-    if (level == 0) return 0;
-    if (level == 1 && (mype % span[0]) == 0) return 1;
-    if (level == 2 && ((mype-1)%(span[0]*span[1])) == 0) return 1;
-    if (level == 3 && mype == toproot) return 1;
-    return 0;
+  virtual bool isroot(int mype, int level) {
+    if (level == 0) return false;
+    if (level == 1 && (mype % span[0]) == 0) return true;
+    if (level == 2 && ((mype-1)%(span[0]*span[1])) == 0) return true;
+    if (level == 3 && mype == toproot) return true;
+    return false;
   }
   virtual int numChildren(int mype, int level) {
     if (level == 0) return 0;
@@ -258,13 +258,13 @@ public:
     for (int i=0; i<=level; i++) S*=span[i];
     return mype/S*S+level;
   }
-  virtual int isroot(int mype, int level) {
-    if (level == 0) return 0;
+  virtual bool isroot(int mype, int level) {
+    if (level == 0) return false;
     if (level == nLevels-1) return mype == toproot;
     int S = 1;
     for (int i=0; i<level; i++) S*=span[i];
-    if ((mype - (level-1)) % S == 0) return 1;
-    return 0;
+    if ((mype - (level-1)) % S == 0) return true;
+    return false;
   }
   virtual int numChildren(int mype, int level) {
     if (level == 0) return 0;

@@ -60,7 +60,7 @@ public:
   void AsyncMigrate(bool use);
   bool isAsyncMigrate()   { return asyncMigrate; }
   void ReadyMigrate(bool ready) { readyMigrate = ready; } ///called from user
-  int  isReadyMigrate()	{ return readyMigrate; }
+  bool isReadyMigrate()	{ return readyMigrate; }
   bool checkBufferedMigration();	// check and execute pending migration
   int   MigrateToPe();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))

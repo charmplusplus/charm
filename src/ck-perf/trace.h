@@ -50,12 +50,12 @@ typedef CMK_TYPEDEF_INT8 LONG_LONG_PAPI;
 class Trace {
 
 protected:
-    int _traceOn;
+    bool _traceOn;
   
   public:
-    Trace(): _traceOn(0) {}
-    virtual void setTraceOnPE(int flag) { _traceOn = flag; }
-    virtual inline int traceOnPE() { return _traceOn; }
+    Trace(): _traceOn(false) {}
+    virtual void setTraceOnPE(int flag) { _traceOn = (flag!=0); }
+    virtual inline int traceOnPE() { return (int)_traceOn; }
     // turn trace on/off, note that charm will automatically call traceBegin()
     // at the beginning of every run unless the command line option "+traceoff"
     // is specified

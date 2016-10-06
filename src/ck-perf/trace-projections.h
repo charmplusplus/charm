@@ -251,7 +251,7 @@ class LogPool {
   friend class controlPointManager;
   private:
     bool writeData;
-    int writeSummaryFiles;
+    bool writeSummaryFiles;
     unsigned int poolSize;
     unsigned int numEntries;
     unsigned int lastCreationEvent;
@@ -265,12 +265,12 @@ class LogPool {
     char *fname;
     char *dfname;
     char *pgmname;
-    int binary;
-    int nSubdirs;
+    bool binary;
+    bool nSubdirs;
 #if CMK_PROJECTIONS_USE_ZLIB
     gzFile deltazfp;
     gzFile zfp;
-    int compressed;
+    bool compressed;
 #endif
     // **CW** prevTime stores the timestamp of the last event
     // written out to log. This allows the implementation of
@@ -286,7 +286,7 @@ class LogPool {
     //cppcheck-suppress unsafeClassCanLeak
     bool *keepPhase;  // one decision per phase
 
-    int headerWritten;
+    bool headerWritten;
     bool fileCreated;
     void writeHeader();
 
@@ -317,9 +317,9 @@ class LogPool {
   public:
     LogPool(char *pgm);
     ~LogPool();
-    void setBinary(int b) { binary = b; }
+    void setBinary(int b) { binary = (b!=0); }
     void setNumSubdirs(int n) { nSubdirs = n; }
-    void setWriteSummaryFiles(int n) { writeSummaryFiles = n;}
+    void setWriteSummaryFiles(int n) { writeSummaryFiles = (n!=0)? true : false;}
 #if CMK_PROJECTIONS_USE_ZLIB
     void setCompressed(int c) { compressed = c; }
 #endif
@@ -465,13 +465,13 @@ class TraceProjections : public Trace {
     int execEvent;
     int execEp;
     int execPe;
-    int inEntry;
-    int computationStarted;
+    bool inEntry;
+    bool computationStarted;
 
     int funcCount;
     CkHashtableT<StrKey,int> funcHashtable;
 
-    int traceNestedEvents;
+    bool traceNestedEvents;
     CkQ<NestedEvent> nestedEvents;
     
     int currentPhaseID;
@@ -482,7 +482,7 @@ class TraceProjections : public Trace {
     CkVec<int> idxVec;
     int idxRegistered(int idx);    
 public:
-    int converseExit; // used for exits that bypass CkExit.
+    bool converseExit; // used for exits that bypass CkExit.
     double endTime;
 
     TraceProjections(char **argv);

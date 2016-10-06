@@ -34,7 +34,7 @@ class Tempo
 {
   protected:
     CmmTable tempoMessages;
-    int sleeping;
+    bool sleeping;
     CthThread thread_id;
     
   public :

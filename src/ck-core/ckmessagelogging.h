@@ -156,13 +156,13 @@ public:
 	CkObjID objID;
 	// variable that keeps a count of the processors that have replied to a requests to resend messages. 
 	int resendReplyRecvd;
-	// 0 -> Normal state .. 1-> just after restart. tickets should not be handed out at this time 
-	int restartFlag;
-	// 0 -> normal state .. 1 -> recovery of a team member 
-    int teamRecoveryFlag; 	
-	int toResumeOrNot;
+	// false -> Normal state .. true-> just after restart. tickets should not be handed out at this time
+	bool restartFlag;
+	// false -> normal state .. true -> recovery of a team member
+    bool teamRecoveryFlag;
+	bool toResumeOrNot;
 	int resumeCount;
-	int immigrantRecFlag;
+	bool immigrantRecFlag;
 	int immigrantSourcePE;
 
 private:
@@ -178,12 +178,12 @@ public:
  	 * Default constructor.
  	 */ 
 	ChareMlogData():ssnTable(100,0.4),receivedSsnTable(100,0.4){
-		restartFlag=0;
-		teamRecoveryFlag=0;
+		restartFlag=false;
+		teamRecoveryFlag=false;
 		resendReplyRecvd=0;
-		toResumeOrNot=0;
+		toResumeOrNot=false;
 		resumeCount=0;
-		immigrantRecFlag = 0;
+		immigrantRecFlag = false;
 	};
 	inline MCount nextSN(const CkObjID &recver);
 	int checkAndStoreSsn(const CkObjID &sender, MCount ssn);

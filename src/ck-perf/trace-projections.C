@@ -23,7 +23,7 @@
 // delta encoding is on by default. It may be turned off later in
 // the runtime.
 
-int checknested=0;		// check illegal nested begin/end execute 
+bool checknested=false;		// check illegal nested begin/end execute
 
 #ifdef PROJ_ANALYSIS
 // BOC operations readonlys
@@ -244,7 +244,7 @@ void LogPool::closeLog(void)
 LogPool::LogPool(char *pgm) {
   pool = new LogEntry[CkpvAccess(CtrLogBufSize)];
   // defaults to writing data (no outlier changes)
-  writeSummaryFiles = 0;
+  writeSummaryFiles = false;
   writeData = true;
   numEntries = 0;
   lastCreationEvent = -1;
@@ -253,7 +253,7 @@ LogPool::LogPool(char *pgm) {
   timeErr = 0.0;
   globalStartTime = 0.0;
   globalEndTime = 0.0;
-  headerWritten = 0;
+  headerWritten = false;
   numPhases = 0;
   hasFlushed = false;
 
@@ -423,7 +423,7 @@ LogPool::~LogPool()
 void LogPool::writeHeader()
 {
   if (headerWritten) return;
-  headerWritten = 1;
+  headerWritten = true;
   if(!binary) {
 #if CMK_PROJECTIONS_USE_ZLIB
     if(compressed) {
@@ -1073,8 +1073,8 @@ void LogEntry::pup(PUP::er &p)
 }
 
 TraceProjections::TraceProjections(char **argv): 
-  curevent(0), inEntry(0), computationStarted(0), 
-	converseExit(0), endTime(0.0), traceNestedEvents(0),
+  curevent(0), inEntry(false), computationStarted(false),
+	converseExit(false), endTime(0.0), traceNestedEvents(false),
 	currentPhaseID(0), lastPhaseEvent(NULL), _logPool(NULL)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
@@ -1501,7 +1501,7 @@ void TraceProjections::beginExecute(CmiObjId *tid)
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(CkpvAccess(papiValues));
 #endif
-  inEntry = 1;
+  inEntry = true;
 }
 
 void TraceProjections::beginExecute(envelope *e, void *obj)
@@ -1521,7 +1521,7 @@ void TraceProjections::beginExecute(envelope *e, void *obj)
 #if CMK_HAS_COUNTER_PAPI
     _logPool->addPapi(CkpvAccess(papiValues));
 #endif
-    inEntry = 1;
+    inEntry = true;
   } else {
     beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),
 		 e->getSrcPe(),e->getTotalsize());
@@ -1573,7 +1573,7 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(CkpvAccess(papiValues));
 #endif
-  inEntry = 1;
+  inEntry = true;
 }
 
 void TraceProjections::endExecute(void)
@@ -1619,7 +1619,7 @@ void TraceProjections::endExecuteLocal(void)
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(CkpvAccess(papiValues));
 #endif
-  inEntry = 0;
+  inEntry = false;
 }
 
 void TraceProjections::messageRecv(char *env, int pe)
@@ -1678,7 +1678,7 @@ void TraceProjections::dequeue(envelope *) {}
 
 void TraceProjections::beginComputation(void)
 {
-  computationStarted = 1;
+  computationStarted = true;
   // Executes the callback function provided by the machine
   // layer. This is the proper method to register user events in a
   // machine layer because projections is a charm++ module.

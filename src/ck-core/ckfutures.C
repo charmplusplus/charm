@@ -21,7 +21,7 @@ in remote process control.
 #include <stdlib.h>
 
 typedef struct Future_s {
-  int ready;
+  bool ready;
   void *value;
   CthThread waiters;
   int next; 
@@ -145,7 +145,7 @@ int createFuture(void)
   handle = fs->freelist;
   fut = fs->array + handle;
   fs->freelist = fut->next;
-  fut->ready = 0;
+  fut->ready = false;
   fut->value = 0;
   fut->waiters = 0;
   fut->next = 0;
@@ -175,7 +175,7 @@ int CkProbeFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
-  return (fut->ready);
+  return (int)(fut->ready);
 }
 
 extern "C"
@@ -231,7 +231,7 @@ static void setFuture(CkFutureID handle, void *pointer)
   CthThread t;
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
-  fut->ready = 1;
+  fut->ready = true;
 #if CMK_ERROR_CHECKING
   if (pointer==NULL) CkAbort("setFuture called with NULL!");
 #endif

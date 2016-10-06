@@ -23,7 +23,7 @@ public:
   virtual ~MyHmbHierarchyTree() {}
   virtual int numLevels() = 0;
   virtual int parent(int mype, int level) = 0;
-  virtual int isroot(int mype, int level) = 0;
+  virtual bool isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
   virtual void getChildren(int mype, int level, int *children, int &count) = 0;
 };
@@ -52,8 +52,8 @@ public:
     if (level == nLevels-1) return -1;
     return (mype & ~(1<<level));
   }
-  virtual int isroot(int mype, int level) {
-    if (level == 0) return 0;
+  virtual bool isroot(int mype, int level) {
+    if (level == 0) return false;
     return (mype & ((1<<level)-1)) == 0;
   }
   virtual int numChildren(int mype, int level) {

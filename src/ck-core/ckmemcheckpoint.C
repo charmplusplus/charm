@@ -84,18 +84,18 @@ void pingCheckHandler();
 CpvDeclare(int, _crashedNode);
 
 // static, so that it is accessible from Converse part
-int CkMemCheckPT::inRestarting = 0;
-int CkMemCheckPT::inCheckpointing = 0;
-int CkMemCheckPT::inLoadbalancing = 0;
+bool CkMemCheckPT::inRestarting = false;
+bool CkMemCheckPT::inCheckpointing = false;
+bool CkMemCheckPT::inLoadbalancing = false;
 double CkMemCheckPT::startTime;
 char *CkMemCheckPT::stage;
 CkCallback CkMemCheckPT::cpCallback;
 
-int _memChkptOn = 1;			// checkpoint is on or off
+bool _memChkptOn = true;		// checkpoint is on or off
 
 CkGroupID ckCheckPTGroupID;		// readonly
 
-static int checkpointed = 0;
+static bool checkpointed = false;
 
 /// @todo the following declarations should be moved into a separate file for all 
 // fault tolerant strategies
@@ -165,7 +165,7 @@ inline int CkMemCheckPT::BuddyPE(int pe)
 // choose and register with 2 buddies for checkpoiting 
 #if CMK_MEM_CHECKPOINT
 void ArrayElement::init_checkpt() {
-	if (_memChkptOn == 0) return;
+	if (!_memChkptOn) return;
 	if (CkInRestarting()) {
 	  CkPrintf("[%d] Warning: init_checkpt called during restart, possible bug in migration constructor!\n");
 	}
@@ -204,7 +204,7 @@ void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
   msg->index =thisIndexMax;
   msg->aid = thisArrayID;
   msg->locMgr = locMgr->getGroupID();
-  msg->cp_flag = 1;
+  msg->cp_flag = true;
   {
         PUP::toMem p(msg->packData);
         locMgr->pupElementsFor (p, myRec, CkElementCreation_migrate);
@@ -341,9 +341,9 @@ CkMemCheckPT::CkMemCheckPT(int w)
 #endif
   {
     if (CkMyPe() == 0)  CkPrintf("Warning: CkMemCheckPT is disabled due to too few nodes.\n");
-    _memChkptOn = 0;
+    _memChkptOn = false;
   }
-  inRestarting = 0;
+  inRestarting = false;
   recvCount = peCount = 0;
   recvChkpCount = 0;
   ackCount = 0;
@@ -391,7 +391,7 @@ void CkMemCheckPT::pup(PUP::er& p)
  	recvChkpCount = 0;
 	ackCount = 0;
   	expectCount = -1;
-        inCheckpointing = 0;
+        inCheckpointing = false;
 #if CMK_CONVERSE_MPI
     void pingBuddy();
     void pingCheckHandler();
@@ -441,7 +441,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
 }
 
 // return 1 if pe is a crashed processor
-int CkMemCheckPT::isFailed(int pe)
+bool CkMemCheckPT::isFailed(int pe)
 {
   for (int i=0; i<failedPes.length(); i++)
     if (failedPes[i] == pe) return 1;
@@ -509,9 +509,9 @@ void CkMemCheckPT::recoverEntry(CkArrayCheckPTMessage *msg)
 // to send me checkpoint data.
 void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
 {
-  checkpointed = 1;
+  checkpointed = true;
   cpCallback = cb;
-  inCheckpointing = 1;
+  inCheckpointing = true;
   cpStarter = starter;
   if (CkMyPe() == cpStarter) {
     startTime = CmiWallTimer();
@@ -585,7 +585,7 @@ void CkMemCheckPT::startArrayCheckpoint(){
  // CkPrintf("[%d]checkpoint size :%d\n",CkMyPe(),packSize);
 	CkArrayCheckPTMessage * msg = new (packSize,0) CkArrayCheckPTMessage;
 	msg->len = size;
-	msg->cp_flag = 1;
+	msg->cp_flag = true;
 	int budPEs[2];
 	msg->bud1=CkMyPe();
 	msg->bud2=ChkptOnPe(CkMyPe());
@@ -607,7 +607,7 @@ void CkMemCheckPT::recvArrayCheckpoint(CkArrayCheckPTMessage *msg)
 		idx = 0;
 	}
 	
-	int isChkpting = msg->cp_flag;
+	bool isChkpting = msg->cp_flag;
 	int pointer;
 	if(isChkpting)
 	  pointer = CpvAccess(chkpPointer)^1;
@@ -712,7 +712,7 @@ void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
     if (msg->locMgr == entry->locMgr && msg->index == entry->index) break;
   }
   CkAssert(idx < len);
-  int isChkpting = msg->cp_flag;
+  bool isChkpting = msg->cp_flag;
   ckTable[idx]->updateBuffer(msg);
   if (isChkpting) {
       // all my array elements have returned their inmem data
@@ -763,7 +763,7 @@ void CkMemCheckPT::cpFinish()
 // for debugging, report checkpoint info
 void CkMemCheckPT::report()
 {
-  inCheckpointing = 0;
+  inCheckpointing = false;
 #if !CMK_CHKP_ALL
   int objsize = 0;
   int len = ckTable.length();
@@ -785,7 +785,7 @@ void CkMemCheckPT::report()
 *****************************************************************************/
 
 // master processor of two buddies
-inline int CkMemCheckPT::isMaster(int buddype)
+inline bool CkMemCheckPT::isMaster(int buddype)
 {
 #if 0
   int mype = CkMyPe();
@@ -888,7 +888,7 @@ void CkMemCheckPT::restart(int diePe)
 
   if (CkMyPe() == diePe) CmiAssert(ckTable.length() == 0);
 
-  inRestarting = 1;
+  inRestarting = true;
                                                                                 
   // disable load balancer's barrier
   if (CkMyPe() != diePe) resetLB(diePe);
@@ -1124,7 +1124,7 @@ void CkMemCheckPT::recoverArrayElements()
 
   // _crashedNode = -1;
   CpvAccess(_crashedNode) = -1;
-  inRestarting = 0;
+  inRestarting = false;
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
   if (CkMyPe() == 0)
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
@@ -1206,7 +1206,7 @@ void CkMemCheckPT::finishUp()
 #endif
   if (numnodes-totalFailed() <=2) {
     if (CkMyPe()==0) CkPrintf("Warning: CkMemCheckPT disabled!\n");
-    _memChkptOn = 0;
+    _memChkptOn = false;
   }
 #endif
 }
@@ -1231,7 +1231,7 @@ void CkStartMemCheckpoint(CkCallback &cb)
 #if CMK_MEM_CHECKPOINT
   if(cb.isInvalid()) 
     CkAbort("callback after checkpoint is not set properly");
-  if (_memChkptOn == 0) {
+  if (!_memChkptOn) {
     CkPrintf("Warning: In-Memory checkpoint has been disabled! \n");
     cb.send();
     return;
@@ -1335,7 +1335,7 @@ static void restartBcastHandler(char *msg)
 {
 #if CMK_MEM_CHECKPOINT
   // advance phase counter
-  CkMemCheckPT::inRestarting = 1;
+  CkMemCheckPT::inRestarting = true;
   _diePE = *(int *)(msg+CmiMsgHeaderSizeBytes);
   CpvAccess(chkpNum) = *(int *)(msg+CmiMsgHeaderSizeBytes+sizeof(int));
   CpvAccess(chkpPointer) = CpvAccess(chkpNum)%2;
@@ -1357,7 +1357,7 @@ static void restartBcastHandler(char *msg)
 #else
   CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
 #endif 
- checkpointed = 0;
+ checkpointed = false;
 #endif
 }
 
@@ -1493,7 +1493,7 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
    _diePE = CmiMyNode();
    CkMemCheckPT::startTime = restartT = CmiWallTimer();
    CmiPrintf("[%d] I am restarting  cur_restart_phase:%d at time: %f\n",CmiMyPe(), CpvAccess(_curRestartPhase), CkMemCheckPT::startTime);
-   CkMemCheckPT::inRestarting = 1;
+   CkMemCheckPT::inRestarting = true;
 
   CpvAccess( _crashedNode )= CmiMyNode();
 	
@@ -1532,7 +1532,7 @@ int CkInRestarting()
   // gzheng
   //if (cur_restart_phase == RESTART_PHASE_MAX || cur_restart_phase == 0) return 1;
   //return CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->inRestarting;
-  return CkMemCheckPT::inRestarting;
+  return (int)CkMemCheckPT::inRestarting;
 #else
   return 0;
 #endif
@@ -1547,14 +1547,14 @@ int CkInCheckpointing()
 extern "C"
 void CkSetInLdb(){
 #if CMK_MEM_CHECKPOINT
-	CkMemCheckPT::inLoadbalancing = 1;
+	CkMemCheckPT::inLoadbalancing = true;
 #endif
 }
 
 extern "C"
 int CkInLdb(){
 #if CMK_MEM_CHECKPOINT
-	return CkMemCheckPT::inLoadbalancing;
+	return (int)CkMemCheckPT::inLoadbalancing;
 #endif
 	return 0;
 }
@@ -1562,7 +1562,7 @@ int CkInLdb(){
 extern "C"
 void CkResetInLdb(){
 #if CMK_MEM_CHECKPOINT
-	CkMemCheckPT::inLoadbalancing = 0;
+	CkMemCheckPT::inLoadbalancing = false;
 #endif
 }
 
@@ -1625,7 +1625,7 @@ void notify_crash(int node)
   }
 #endif
   CmiAssert(CmiMyNode() !=CpvAccess( _crashedNode));
-  CkMemCheckPT::inRestarting = 1;
+  CkMemCheckPT::inRestarting = true;
 
     // this may be in interrupt handler, send a message to reset QD
   int pe = CmiNodeFirst(CkMyNode());
@@ -1801,7 +1801,7 @@ void CkRegisterRestartHandler( )
 extern "C"
 int CkHasCheckpoints()
 {
-  return checkpointed;
+  return (int)checkpointed;
 }
 
 /// @todo: the following definitions should be moved to a separate file containing

@@ -37,7 +37,7 @@ public:
 
    int processor; // caller to ReBalancer MAY leave this field -1, 
    int oldProcessor; // stores the current assignment of the compute object.
-   int migratable;
+   bool migratable;
    CkVec<int>  sendmessages;
    CkVec<int>  recvmessages;
 };
