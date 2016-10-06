@@ -3334,6 +3334,7 @@ cat > $tc <<EOT
 int main(int argc, char **argv)
 {
   MPI_Init(&argc, &argv);
+  return 0;
 }
 EOT
 mv -f ../include/mpi.h ../include/mpi.h.bak 2>/dev/null
