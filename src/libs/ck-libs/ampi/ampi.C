@@ -2,12 +2,10 @@
 #define AMPI_PRINT_MSG_SIZES 0 // Record and print comm routines used & message sizes
 #endif
 
-#define AMPIMSGLOG    0
 #define AMPI_PRINT_IDLE 0
 
 #include "ampiimpl.h"
 #include "tcharm.h"
-
 
 #if CMK_BIGSIM_CHARM
 #include "bigsim_logs.h"
@@ -968,23 +966,6 @@ static void ampiProcInit(void){
   CkpvInitialize(AmpiMsgPool, msgPool); // pool of small AmpiMsg's
   CkpvAccess(msgPool) = AmpiMsgPool(AMPI_MSG_POOL_SIZE, AMPI_POOLED_MSG_SIZE);
 
-#if AMPIMSGLOG
-  char **argv=CkGetArgv();
-  msgLogWrite = CmiGetArgFlag(argv, "+msgLogWrite");
-  if (CmiGetArgIntDesc(argv,"+msgLogRead", &msgLogRank, "Re-play message processing order for AMPI")) {
-    msgLogRead = 1;
-  }
-  char *procs = NULL;
-  if (CmiGetArgStringDesc(argv, "+msgLogRanks", &procs, "A list of AMPI processors to record , e.g. 0,10,20-30")) {
-    msgLogRanks.set(procs);
-  }
-  CmiGetArgString(argv, "+msgLogFilename", &msgLogFilename);
-  if (CkMyPe() == 0) {
-    if (msgLogWrite) CkPrintf("Writing AMPI messages of rank %s to log: %s\n", procs?procs:"", msgLogFilename);
-    if (msgLogRead) CkPrintf("Reading AMPI messages of rank %s from log: %s\n", procs?procs:"", msgLogFilename);
-  }
-#endif
-
 #if AMPI_PRINT_MSG_SIZES
   // Only record and print message sizes if this option is given, and only for those ranks.
   // Running with the '+syncprint' option is recommended if printing from multiple ranks.
@@ -996,12 +977,6 @@ static void ampiProcInit(void){
   }
 #endif
 }
-
-#if AMPIMSGLOG
-static inline int record_msglog(int rank){
-  return msgLogRanks.includes(rank);
-}
-#endif
 
 PUPfunctionpointer(MPI_MainFn)
 
@@ -1316,52 +1291,9 @@ void ampiParent::init(){
   resumeOnRecv = false;
   resumeOnColl = false;
   numBlockedReqs = 0;
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(thisIndex)){
-    char fname[128];
-    sprintf(fname, "%s.%d", msgLogFilename,thisIndex);
-#if CMK_PROJECTIONS_USE_ZLIB && 0
-    fMsgLog = gzopen(fname,"wb");
-    toPUPer = new PUP::tozDisk(fMsgLog);
-#else
-    fMsgLog = fopen(fname,"wb");
-    CkAssert(fMsgLog != NULL);
-    toPUPer = new PUP::toDisk(fMsgLog);
-#endif
-  }else if(msgLogRead){
-    char fname[128];
-    sprintf(fname, "%s.%d", msgLogFilename,msgLogRank);
-#if CMK_PROJECTIONS_USE_ZLIB && 0
-    fMsgLog = gzopen(fname,"rb");
-    fromPUPer = new PUP::fromzDisk(fMsgLog);
-#else
-    fMsgLog = fopen(fname,"rb");
-    CkAssert(fMsgLog != NULL);
-    fromPUPer = new PUP::fromDisk(fMsgLog);
-#endif
-    CkPrintf("AMPI> opened message log file: %s for replay\n", fname);
-  }
-#endif
 }
 
 void ampiParent::finalize(){
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(thisIndex)){
-    delete toPUPer;
-#if CMK_PROJECTIONS_USE_ZLIB && 0
-    gzclose(fMsgLog);
-#else
-    fclose(fMsgLog);
-#endif
-  }else if(msgLogRead){
-    delete fromPUPer;
-#if CMK_PROJECTIONS_USE_ZLIB && 0
-    gzclose(fMsgLog);
-#else
-    fclose(fMsgLog);
-#endif
-  }
-#endif
 }
 
 void ampiParent::setUserAboutToMigrateFn(MPI_MigrateFn f) {
@@ -3682,21 +3614,8 @@ AMPI_API_IMPL(int, MPI_Comm_rank, MPI_Comm comm, int *rank)
     return ret;
 #endif
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    PUParray(*(pptr->fromPUPer), (char*)rank, sizeof(int));
-    return MPI_SUCCESS;
-  }
-#endif
-
   *rank = getAmpiInstance(comm)->getRank();
 
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    PUParray(*(pptr->toPUPer), (char*)rank, sizeof(int));
-  }
-#endif
   return MPI_SUCCESS;
 }
 
@@ -3710,21 +3629,7 @@ AMPI_API_IMPL(int, MPI_Comm_size, MPI_Comm comm, int *size)
     return ret;
 #endif
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    PUParray(*(pptr->fromPUPer), (char*)size, sizeof(int));
-    return MPI_SUCCESS;
-  }
-#endif
-
   *size = getAmpiInstance(comm)->getSize();
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    PUParray(*(pptr->toPUPer), (char*)size, sizeof(int));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -3853,12 +3758,6 @@ AMPI_API_IMPL(int, MPI_Send, const void *msg, int count, MPI_Datatype type,
     return ret;
 #endif
 
-#if AMPIMSGLOG
-  if(msgLogRead){
-    return MPI_SUCCESS;
-  }
-#endif
-
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
 
@@ -3908,12 +3807,6 @@ AMPI_API_IMPL(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type,
     return ret;
 #endif
 
-#if AMPIMSGLOG
-  if(msgLogRead){
-    return MPI_SUCCESS;
-  }
-#endif
-
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm, 1);
 
@@ -3935,14 +3828,6 @@ AMPI_API_IMPL(int, MPI_Issend, const void *buf, int count, MPI_Datatype type, in
   }
 #endif
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    PUParray(*(pptr->fromPUPer), (char *)request, sizeof(MPI_Request));
-    return MPI_SUCCESS;
-  }
-#endif
-
   USER_CALL_DEBUG("AMPI_Issend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
   ampiParent* pptr = getAmpiParent();
   ampi *ptr = getAmpiInstance(comm);
@@ -3950,12 +3835,6 @@ AMPI_API_IMPL(int, MPI_Issend, const void *buf, int count, MPI_Datatype type, in
   // 1:  blocking now  - used by MPI_Ssend
   // >=2:  the index of the requests - used by MPI_Issend
   ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, *request+2, I_SEND);
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    PUParray(*(pptr->toPUPer), (char *)request, sizeof(MPI_Request));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -3973,27 +3852,8 @@ AMPI_API_IMPL(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, i
     return ret;
 #endif
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)msg, (pptr->pupBytes));
-    PUParray(*(pptr->fromPUPer), (char *)status, sizeof(MPI_Status));
-    return MPI_SUCCESS;
-  }
-#endif
-
   ampi *ptr = getAmpiInstance(comm);
   if(-1==ptr->recv(tag,src,msg,count,type,comm,status)) CkAbort("AMPI> Error in MPI_Recv");
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)msg, (pptr->pupBytes));
-    PUParray(*(pptr->toPUPer), (char *)status, sizeof(MPI_Status));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -4240,24 +4100,7 @@ AMPI_API_IMPL(int, MPI_Bcast, void *buf, int count, MPI_Datatype type, int root,
   if(ptr->getSize() == 1)
     return MPI_SUCCESS;
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)buf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   ptr->bcast(root, buf, count, type,comm);
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)) {
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -4295,24 +4138,7 @@ AMPI_API_IMPL(int, MPI_Ibcast, void *buf, int count, MPI_Datatype type, int root
     return MPI_SUCCESS;
   }
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)buf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   ptr->ibcast(root, buf, count, type, comm, request);
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)) {
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -4356,21 +4182,9 @@ void ampi::irednResult(CkReductionMsg *msg)
   _TRACE_BG_TLINE_END(&msg->event); // store current log
   msg->eventPe = CkMyPe();
 #endif
-#if AMPIMSGLOG
-  if(msgLogRead){
-    PUParray(*(getAmpiParent()->fromPUPer), (char *)rednReq, sizeof(int));
-    return;
-  }
-#endif
 
   handleBlockedReq(rednReq);
   rednReq->receive(this, msg);
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(getAmpiParent()->thisIndex)){
-    PUParray(*(getAmpiParent()->toPUPer), (char *)reqnReq, sizeof(int));
-  }
-#endif
 
   if (parent->resumeOnColl && parent->numBlockedReqs==0) {
     thread->resume();
@@ -4554,15 +4368,6 @@ AMPI_API_IMPL(int, MPI_Reduce, const void *inbuf, void *outbuf, int count, MPI_D
   if(ptr->getSize() == 1)
     return copyDatatype(type,count,type,count,inbuf,outbuf);
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)outbuf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,ptr->getRank(),op);
 
@@ -4582,14 +4387,6 @@ AMPI_API_IMPL(int, MPI_Reduce, const void *inbuf, void *outbuf, int count, MPI_D
   }
 #if AMPI_SYNC_REDUCE
   ptr->recv(MPI_REDN_TAG, AMPI_COLL_SOURCE, NULL, 0, type, comm);
-#endif
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)outbuf, (pptr->pupBytes));
-  }
 #endif
 
   return MPI_SUCCESS;
@@ -4622,29 +4419,12 @@ AMPI_API_IMPL(int, MPI_Allreduce, const void *inbuf, void *outbuf, int count, MP
   TRACE_BG_AMPI_LOG(MPI_ALLREDUCE, getAmpiInstance(comm)->getDDT()->getType(type)->getSize(count));
 #endif
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)outbuf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, ptr->getRank(), op);
   CkCallback allreduceCB(CkIndex_ampi::rednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
   ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, op, getDDT()));
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(type) * count;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)outbuf, (pptr->pupBytes));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -4960,19 +4740,6 @@ AMPI_API_IMPL(double, MPI_Wtime, void)
 {
   //AMPI_API("AMPI_Wtime");
 
-#if AMPIMSGLOG
-  double ret=TCHARM_Wall_timer();
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|ret;
-    return ret;
-  }
-
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (*(pptr->toPUPer))|ret;
-  }
-#endif
-
 #if CMK_BIGSIM_CHARM
   return BgGetTime();
 #else
@@ -5237,15 +5004,6 @@ AMPI_API_IMPL(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
   ampiParent* pptr = getAmpiParent();
   AmpiRequestList& reqs = pptr->getReqs();
 
-#if AMPIMSGLOG
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)(reqs[*request]->buf), (pptr->pupBytes));
-    PUParray(*(pptr->fromPUPer), (char *)sts, sizeof(MPI_Status));
-    return MPI_SUCCESS;
-  }
-#endif
-
 #if CMK_BIGSIM_CHARM
   void *curLog; // store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
@@ -5271,15 +5029,6 @@ AMPI_API_IMPL(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
   AMPI_DEBUG("AMPI_Wait after calling wait, request=%d reqs[*request]=%p reqs[*request]->tag=%d\n",
              *request, reqs[*request], (int)(reqs[*request]->tag));
 
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(reqs[*request]->type) * (reqs[*request]->count);
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)(reqs[*request]->buf), (pptr->pupBytes));
-    PUParray(*(pptr->toPUPer), (char *)sts, sizeof(MPI_Status));
-  }
-#endif
-
 #if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_WAIT(&reqs); // setup forward and backward dependence
 #endif
@@ -5302,21 +5051,6 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
   AmpiRequestList& reqs = pptr->getReqs();
   CkAssert(pptr->numBlockedReqs == 0);
 
-#if AMPIMSGLOG
-  if(msgLogRead){
-    for(int i=0;i<count;i++){
-      if(request[i] == MPI_REQUEST_NULL){
-        clearStatus(sts, i);
-        continue;
-      }
-      AmpiRequest *waitReq = reqs[request[i]];
-      (*(pptr->fromPUPer))|(pptr->pupBytes);
-      PUParray(*(pptr->fromPUPer), (char *)(waitReq->buf), pptr->pupBytes);
-      PUParray(*(pptr->fromPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
-    }
-    return MPI_SUCCESS;
-  }
-#endif
 #if CMK_BIGSIM_CHARM
   void *curLog; // store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
@@ -5332,14 +5066,6 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
     if (req.test()) {
       req.wait((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
       req.setBlocked(false);
-#if AMPIMSGLOG
-      if(msgLogWrite && record_msglog(pptr->thisIndex)){
-        (pptr->pupBytes) = getDDT()->getSize(req.type) * req.count;
-        (*(pptr->toPUPer))|(pptr->pupBytes);
-        PUParray(*(pptr->toPUPer), (char *)(req.buf), pptr->pupBytes);
-        PUParray(*(pptr->toPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
-      }
-#endif
       reqs.freeNonPersReq(request[i]);
     }
     else {
@@ -5365,14 +5091,6 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
 #endif
       req.wait((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
       req.setBlocked(false);
-#if AMPIMSGLOG
-      if(msgLogWrite && record_msglog(pptr->thisIndex)){
-        (pptr->pupBytes) = getDDT()->getSize(req.type) * req.count;
-        (*(pptr->toPUPer))|(pptr->pupBytes);
-        PUParray(*(pptr->toPUPer), (char *)(req.buf), pptr->pupBytes);
-        PUParray(*(pptr->toPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
-      }
-#endif
       reqs.freeNonPersReq(request[i]);
     }
   }
@@ -6146,24 +5864,10 @@ AMPI_API_IMPL(int, MPI_Isend, const void *buf, int count, MPI_Datatype type, int
   }
 #endif
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    PUParray(*(pptr->fromPUPer), (char *)request, sizeof(MPI_Request));
-    return MPI_SUCCESS;
-  }
-#endif
-
   USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
 
   ampi *ptr = getAmpiInstance(comm);
   *request = ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, 0, I_SEND);
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    PUParray(*(pptr->toPUPer), (char *)request, sizeof(MPI_Request));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -6198,14 +5902,6 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
   IReq *newreq = parent->reqPool.newIReq(buf, count, type, src, tag, comm, getDDT());
   *request = reqs.insert(newreq);
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    PUParray(*(pptr->fromPUPer), (char *)request, sizeof(MPI_Request));
-    return MPI_SUCCESS;
-  }
-#endif
-
   AmpiMsg* msg = unexpectedMsgs.get(tag, src);
   // if msg has already arrived, do the receive right away
   if (msg) {
@@ -6214,12 +5910,6 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
   else { // ... otherwise post the receive
     postedReqs.put(newreq);
   }
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    PUParray(*(pptr->toPUPer), (char *)request, sizeof(MPI_Request));
-  }
-#endif
 }
 
 AMPI_API_IMPL(int, MPI_Irecv, void *buf, int count, MPI_Datatype type, int src,
@@ -6523,15 +6213,6 @@ AMPI_API_IMPL(int, MPI_Gather, const void *sendbuf, int sendcount, MPI_Datatype 
   if(ptr->getSize() == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gatherCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
@@ -6542,14 +6223,6 @@ AMPI_API_IMPL(int, MPI_Gather, const void *sendbuf, int sendcount, MPI_Datatype 
   if(rank==root) {
     ptr->blockOnRedn(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
   }
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount * size;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -6592,15 +6265,6 @@ AMPI_API_IMPL(int, MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gatherCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
@@ -6615,14 +6279,6 @@ AMPI_API_IMPL(int, MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype
   else {
     *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT(), AMPI_REQ_COMPLETED));
   }
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount * size;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -6659,20 +6315,6 @@ AMPI_API_IMPL(int, MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype
   if(ptr->getSize() == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    int commsize;
-    int itemsize = getDDT()->getSize(recvtype);
-    (*(pptr->fromPUPer))|commsize;
-    for(int i=0;i<commsize;i++){
-      (*(pptr->fromPUPer))|(pptr->pupBytes);
-      PUParray(*(pptr->fromPUPer), (char *)(((char*)recvbuf)+(itemsize*displs[i])), (pptr->pupBytes));
-    }
-    return MPI_SUCCESS;
-  }
-#endif
-
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gathervCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
@@ -6683,16 +6325,6 @@ AMPI_API_IMPL(int, MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype
   if(rank==root) {
     ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(), recvtype, comm, recvcounts, displs, getDDT()));
   }
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    for(int i=0;i<size;i++){
-      (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcounts[i];
-      (*(pptr->toPUPer))|(pptr->pupBytes);
-      PUParray(*(pptr->toPUPer), (char *)(((char*)recvbuf)+(itemsize*displs[i])), (pptr->pupBytes));
-    }
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -6736,20 +6368,6 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
   }
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    int commsize;
-    int itemsize = getDDT()->getSize(recvtype);
-    (*(pptr->fromPUPer))|commsize;
-    for(int i=0;i<commsize;i++){
-      (*(pptr->fromPUPer))|(pptr->pupBytes);
-      PUParray(*(pptr->fromPUPer), (char *)(((char*)recvbuf)+(itemsize*displs[i])), (pptr->pupBytes));
-    }
-    return MPI_SUCCESS;
-  }
-#endif
-
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
@@ -6767,16 +6385,6 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
     *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(), recvtype,
                                            comm, recvcounts, displs, getDDT(), AMPI_REQ_COMPLETED));
   }
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    for(int i=0;i<size;i++){
-      (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcounts[i];
-      (*(pptr->toPUPer))|(pptr->pupBytes);
-      PUParray(*(pptr->toPUPer), (char *)(((char*)recvbuf)+(itemsize*displs[i])), (pptr->pupBytes));
-    }
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -6812,15 +6420,6 @@ AMPI_API_IMPL(int, MPI_Scatter, const void *sendbuf, int sendcount, MPI_Datatype
   if(ptr->getSize() == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   int size = ptr->getSize();
   int rank = ptr->getRank();
   int i;
@@ -6842,14 +6441,6 @@ AMPI_API_IMPL(int, MPI_Scatter, const void *sendbuf, int sendcount, MPI_Datatype
     if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
       CkAbort("AMPI> Error in MPI_Scatter recv");
   }
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -6892,15 +6483,6 @@ AMPI_API_IMPL(int, MPI_Iscatter, const void *sendbuf, int sendcount, MPI_Datatyp
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   int size = ptr->getSize();
   int rank = ptr->getRank();
   int i;
@@ -6926,14 +6508,6 @@ AMPI_API_IMPL(int, MPI_Iscatter, const void *sendbuf, int sendcount, MPI_Datatyp
   else {
     ptr->irecv(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,request);
   }
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -6969,15 +6543,6 @@ AMPI_API_IMPL(int, MPI_Scatterv, const void *sendbuf, const int *sendcounts, con
   if(ptr->getSize() == 1)
     return copyDatatype(sendtype,sendcounts[0],recvtype,recvcount,sendbuf,recvbuf);
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   int size = ptr->getSize();
   int rank = ptr->getRank();
   int i;
@@ -6999,14 +6564,6 @@ AMPI_API_IMPL(int, MPI_Scatterv, const void *sendbuf, const int *sendcounts, con
     if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
       CkAbort("AMPI> Error in MPI_Scatterv recv");
   }
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -7050,15 +6607,6 @@ AMPI_API_IMPL(int, MPI_Iscatterv, const void *sendbuf, const int *sendcounts, co
     return copyDatatype(sendtype,sendcounts[0],recvtype,recvcount,sendbuf,recvbuf);
   }
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)recvbuf, (pptr->pupBytes));
-    return MPI_SUCCESS;
-  }
-#endif
-
   int size = ptr->getSize();
   int rank = ptr->getRank();
   int i;
@@ -7085,14 +6633,6 @@ AMPI_API_IMPL(int, MPI_Iscatterv, const void *sendbuf, const int *sendcounts, co
     // call irecv to post an IReq and process any pending messages
     ptr->irecv(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,request);
   }
-
-#if AMPIMSGLOG
-  if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(recvtype) * recvcount;
-    (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)recvbuf, (pptr->pupBytes));
-  }
-#endif
 
   return MPI_SUCCESS;
 }
@@ -8100,16 +7640,6 @@ AMPI_API_IMPL(int, MPI_Comm_dup, MPI_Comm comm, MPI_Comm *newcomm)
   ptr->topoDup(topoType, rank, comm, newcomm);
   ptr->barrier();
 
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    PUParray(*(pptr->fromPUPer), (char *)newcomm, sizeof(int));
-    return MPI_SUCCESS;
-  }
-  else if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    PUParray(*(pptr->toPUPer), (char *)newcomm, sizeof(int));
-  }
-#endif
   return MPI_SUCCESS;
 }
 
@@ -8140,17 +7670,6 @@ AMPI_API_IMPL(int, MPI_Comm_split, MPI_Comm src, int color, int key, MPI_Comm *d
     }
   }
   if (color == MPI_UNDEFINED) *dest = MPI_COMM_NULL;
-
-#if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
-  if(msgLogRead){
-    PUParray(*(pptr->fromPUPer), (char *)dest, sizeof(int));
-    return MPI_SUCCESS;
-  }
-  else if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    PUParray(*(pptr->toPUPer), (char *)dest, sizeof(int));
-  }
-#endif
 
   return MPI_SUCCESS;
 }

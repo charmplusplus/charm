@@ -379,23 +379,5 @@ AMPI_API_IMPL(int, MPI_Info_free, MPI_Info *info)
   return ampiErrhandler("AMPI_Info_free", ret);
 }
 
-#ifdef AMPIMSGLOG
-#if CMK_PROJECTIONS_USE_ZLIB
-/*zDisk PUP::er's*/
-void PUP::tozDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
-{ gzwrite(F,p,itemSize*n);}
-void PUP::fromzDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
-{ gzread(F,p,itemSize*n);}
-
-/*zDisk buffer seeking is also simple*/
-void PUP::zdisk::impl_startSeek(seekBlock &s) /*Begin a seeking block*/
-  {s.data.loff=gztell(F);}
-int PUP::zdisk::impl_tell(seekBlock &s) /*Give the current offset*/
-  {return (int)(gztell(F)-s.data.loff);}
-void PUP::zdisk::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
-  {gzseek(F,s.data.loff+off,0);}
-#endif
-#endif
-
 void beginTraceBigSim(char* msg){}
 void endTraceBigSim(char* msg, char* param){}

@@ -1087,40 +1087,6 @@ ierr = MPI_Recv(InitialTime, 1, MPI_DOUBLE, tag,
                 \emph{36, MPI_Comm_Universe(Solids_Comm)}, &stat);
 \end{alltt}
 
-\subsection{Extensions for Sequential Re-run of a Parallel Node}
-In some scenarios, a sequential re-run of a parallel node is desired. One
-example is instruction-level accurate architecture simulations, in which case
-the user may wish to repeat the execution of a node in a parallel run in the
-sequential simulator. AMPI provides support for such needs by logging the change
-in the MPI environment on a certain processors. To activate the feature, build
-AMPI module with variable "AMPIMSGLOG" defined, like the following command in
-charm directory. (Linking with zlib "-lz" might be required with this, for
-generating compressed log file.)
-
-\begin{alltt}
-> ./build AMPI netlrts-linux-x86_64 -DAMPIMSGLOG
-\end{alltt}
-
-The feature is used in two phases: writing (logging) the environment and
-repeating the run. The first logging phase is invoked by a parallel run of the
-AMPI program with some additional command line options. 
-
-\begin{alltt}
-> ./charmrun ./pgm +p4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
-\end{alltt}
-
-In the above example, a parallel run with 4 worker threads and 4 AMPI ranks will be
-executed, and the changes in the MPI environment of worker thread 2 (also rank 2,
-starting from 0) will get logged into diskfile "msg2.log". 
-
-Unlike the first run, the re-run is a sequential program, so it is not invoked
-by charmrun (and omitting charmrun options like +p4 and +vp4), and additional
-command line options are required as well. 
-
-\begin{alltt}
-> ./pgm +msgLogRead +msgLogRank 2 +msgLogFilename "msg2.log"
-\end{alltt}
-
 \subsection{User Defined Initial Mapping}
                                                                                 
 You can define the initial mapping of virtual processors (vp) to physical
