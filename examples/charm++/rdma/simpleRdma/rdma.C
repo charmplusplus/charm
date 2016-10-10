@@ -59,11 +59,19 @@ void assignValues(T *&arr, int size){
      arr[i] = rand() % 100 + 1;
 }
 
+void assignCharValues(char *&arr, int size){
+  arr = new char[size];
+  srand(time(NULL));
+  for(int i=0; i<size; i++)
+     arr[i] = (char)(rand() % 125 + 1);
+}
+
 //rdma object chare
 class rdmaObject : public CBase_rdmaObject{
   int *iArr1, *iArr2;
   double *dArr1, *dArr2;
-  int iSize1, iSize2, dSize1, dSize2, iOffset1;
+  char *cArr1;
+  int iSize1, iSize2, dSize1, dSize2, cSize1, iOffset1, cOffset1;
   int destIndex;
   int counter;
   CkCallback cb;
@@ -78,6 +86,7 @@ class rdmaObject : public CBase_rdmaObject{
       iArr2 = NULL;
       dArr1 = NULL;
       dArr2 = NULL;
+      cArr1 = NULL;
       idx_rdmaSent = CkIndex_rdmaObject::rdmaSent(NULL);
     }
 
@@ -96,41 +105,48 @@ class rdmaObject : public CBase_rdmaObject{
         iSize2 = 11;
         dSize1 = 4700;
         dSize2 = 79;
+        cSize1 = 32;
+
         iOffset1 = 3;
+        cOffset1 = 2;
 
         assignValues(iArr1, iSize1);
         assignValues(iArr2, iSize2);
         assignValues(dArr1, dSize1);
         assignValues(dArr2, dSize2);
+        assignCharValues(cArr1, cSize1);
 
-        thisProxy[destIndex].send(iSize1, iArr1, dSize1, dArr1);
+        thisProxy[destIndex].send(iSize1, iArr1, dSize1, dArr1, cSize1, cArr1);
       }
       cb = CkCallback(idx_rdmaSent, thisProxy[thisIndex]);
     }
 
-    void send(int n1, int *ptr1, int n2, double *ptr2){
+    void send(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){
       if(thisIndex < numElements/2){
         compareArray(ptr1, iArr1, n1);
         compareArray(ptr2, dArr1, n2);
+        compareArray(ptr3, cArr1, n3);
         DEBUG(ckout<<"["<<CkMyPe()<<"] "<<thisIndex<<"->"<<destIndex<<": Regular send completed"<<endl;)
-        thisProxy[destIndex].rdmaSend(iSize1-iOffset1, rdma(iArr1+iOffset1), dSize1, rdma(dArr1));
+        thisProxy[destIndex].rdmaSend(iSize1-iOffset1, rdma(iArr1+iOffset1), dSize1, rdma(dArr1), cSize1-cOffset1, rdma(cArr1 + cOffset1));
       }
       else{
-        thisProxy[destIndex].send(n1, ptr1, n2, ptr2);
+        thisProxy[destIndex].send(n1, ptr1, n2, ptr2, n3, ptr3);
       }
     }
 
-    void rdmaSend(int n1, int *ptr1, int n2, double *ptr2){
+    void rdmaSend(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){
       if(thisIndex < numElements/2){
         compareArray(ptr1, iArr1, n1, iOffset1);
         compareArray(ptr2, dArr1, n2);
+        compareArray(ptr3, cArr1, n3, cOffset1);
         DEBUG(ckout<<"["<<CkMyPe()<<"] "<<thisIndex<<"->"<<destIndex<<": Rdma send completed"<<endl;)
         thisProxy[destIndex].mixedSend(iSize1, iArr1, dSize1, rdma(dArr1), iSize2, rdma(iArr2), dSize2, dArr2);
       }
       else{
         copyArray(iArr1, ptr1, n1);
         copyArray(dArr1, ptr2, n2);
-        thisProxy[destIndex].rdmaSend(n1, rdma(iArr1), n2, rdma(dArr1));
+        copyArray(cArr1, ptr3, n3);
+        thisProxy[destIndex].rdmaSend(n1, rdma(iArr1), n2, rdma(dArr1), n3, rdma(cArr1));
       }
     }
 

@@ -11,8 +11,8 @@ mainmodule simpleRdma {
     entry rdmaObject();
     entry void testRdma();
     entry void rdmaSent(CkDataMsg *msg);
-    entry void send(int n1, int ptr1[n1], int n2, double ptr2[n2]);
-    entry void rdmaSend(int n1, rdma int ptr1[n1], int n2, rdma double ptr2[n2]);
+    entry void send(int n1, int ptr1[n1], int n2, double ptr2[n2], int n3, char ptr3[n3]);
+    entry void rdmaSend(int n1, rdma int ptr1[n1], int n2, rdma double ptr2[n2], int n3, rdma char ptr3[n3]);
     entry void mixedSend(int n1, int ptr1[n1], int n2, rdma double ptr2[n2], int n3, rdma int ptr3[n3], int n4, double ptr4[n4]);
   };
 
