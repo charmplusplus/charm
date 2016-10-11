@@ -47,7 +47,7 @@ INLINE_KEYWORD int which_pow2(size_t size)
 }
 
 //method to initialize the freelists of a newly allocated block
-INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,int pool_size,int expansion) 
+INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,size_t pool_size,int expansion)
 {
   int         i,power;
   size_t      loc,left,prev;
@@ -254,12 +254,12 @@ void mempool_destroy(mempool_type *mptr)
 }
 
 // append slot_header size before the real memory buffer
-void*  mempool_malloc(mempool_type *mptr, int size, int expand)
+void*  mempool_malloc(mempool_type *mptr, size_t size, int expand)
 {
     void          *pool;
     int           i;
-    size_t        expand_size;
-    int           power, bestfit_size; //closest power of cutoffpoint 
+    size_t        expand_size, bestfit_size;
+    int           power; //closest power of cutoffpoint
     block_header  *current,*tail;
     slot_header   *head_free,*head_next;
     mem_handle_t  mem_hndl;

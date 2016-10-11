@@ -50,7 +50,8 @@ struct mempool_type;
 typedef struct slot_header_
 {
   struct block_header  *block_ptr;     // block_header
-  int          		size,status;  //status is 1 for free, 0 for used
+  size_t          	size;  // size of slot
+  int          		status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
   size_t      		prev,next;    //link list for freelists slots
 #if ! CMK_64BIT
@@ -61,7 +62,8 @@ typedef struct slot_header_
 typedef struct used_header_
 {
   struct block_header  *block_ptr;     // block_header
-  int         		size,status;  //status is 1 for free, 0 for used
+  size_t         	size;  //size of slot
+  int         		status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
 #if ! CMK_64BIT
   size_t                padding;      // fix for 32 bit machines
@@ -106,7 +108,7 @@ extern "C" {
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_freeblock freefn, size_t limit);
 void  mempool_destroy(mempool_type *mptr);
-void*  mempool_malloc(mempool_type *mptr, int size, int expand);
+void*  mempool_malloc(mempool_type *mptr, size_t size, int expand);
 void mempool_free(mempool_type *mptr, void *ptr_free);
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
 void mempool_free_thread(void *ptr_free);

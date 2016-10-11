@@ -133,11 +133,11 @@ static CmiInt8 pe2slot(int pe) {
 }
 /* Return the number of slots in a block with n user data bytes */
 #if CMK_USE_MEMPOOL_ISOMALLOC
-static int length2slots(int nBytes) {
+static size_t length2slots(size_t nBytes) {
   return (nBytes+slotsize-1)/slotsize;
 }
 #else
-static int length2slots(int nBytes) {
+static size_t length2slots(size_t nBytes) {
   return (sizeof(CmiIsomallocBlock)+nBytes+slotsize-1)/slotsize;
 }
 #endif
@@ -2120,7 +2120,7 @@ static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
 
 /************** External interface ***************/
 #if CMK_USE_MEMPOOL_ISOMALLOC
-void *CmiIsomalloc(int size, CthThread tid)
+void *CmiIsomalloc(size_t size, CthThread tid)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
@@ -2147,7 +2147,7 @@ void *CmiIsomalloc(int size, CthThread tid)
   return block2pointer(blk);
 }
 #else
-void *CmiIsomalloc(int size, CthThread tid)
+void *CmiIsomalloc(size_t size, CthThread tid)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
