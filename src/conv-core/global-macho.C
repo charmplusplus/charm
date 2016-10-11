@@ -53,9 +53,9 @@ public:
     int installed;
     
     void *data_seg;  /* The user copy of the data */
-    int seg_size; /* size in bytes of data segment */
+    size_t seg_size; /* size in bytes of data segment */
     
-    void allocate(int size) {
+    void allocate(size_t size) {
         printf("CtgGlobalStruct::allocate()\n");
         CHECK_MAGIC_NUM;
         assert(!data_seg);

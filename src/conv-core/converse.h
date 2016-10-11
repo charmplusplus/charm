@@ -1551,8 +1551,8 @@ void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
 #endif
 
 CthCpvExtern(char *,CthData);
-extern int CthRegister(int dataSize);
-extern void CthRegistered(int dataOffMax);
+extern size_t CthRegister(size_t dataSize);
+extern void CthRegistered(size_t dataOffMax);
 extern char *CthGetData(CthThread t);
 
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v)=(-1)

@@ -146,10 +146,10 @@ static void readBlacklist()
 */
 class CtgGlobalList
 {
-  int datalen; ///< Number of bytes in the table of global data.
+  size_t datalen; ///< Number of bytes in the table of global data.
   struct CtgRec {
     ELFXX_TYPE_Addr *got; ///< Points to our entry in the GOT.
-    int off; ///< Our byte offset into the table of global data.
+    size_t off; ///< Our byte offset into the table of global data.
     CtgRec() {got=NULL;}
     CtgRec(ELFXX_TYPE_Addr *got_,int off_) :got(got_), off(off_) {}
   };
@@ -164,7 +164,7 @@ public:
   CtgGlobalList();
   
   /// Return the number of bytes needed to store our global data.
-  inline int getSize(void) const {return datalen;}
+  inline size_t getSize(void) const {return datalen;}
   
   /// Copy the current set of global data into this set,
   ///   which must be getSize() bytes.
@@ -237,7 +237,7 @@ int CtgGlobalList::isUserSymbol(const char *name) {
 void CtgGlobalList::read(void *datav) const {
     char *data=(char *)datav;
     for (int i=0;i<nRec;i++) {
-      int size;
+      size_t size;
       if (i<nRec-1) 
         size=rec[i+1].off-rec[i].off;
       else /* i==nRec-1, last one: */ 
@@ -256,7 +256,7 @@ CtgGlobalList::CtgGlobalList() {
     nRec=0;
     
     int count;
-    int relt_size = 0;
+    size_t relt_size = 0;
     int type, symindx;
     char *sym_name;
     ELFXX_TYPE_Rel *relt=NULL;       //Relocation table
@@ -324,8 +324,8 @@ CtgGlobalList::CtgGlobalList() {
 	    continue;
 
 	// It's got the right name-- it's a user global
-	int size = symt[symindx].st_size;
-	int gSize = ALIGN_GOT(size);
+	size_t size = symt[symindx].st_size;
+	size_t gSize = ALIGN_GOT(size);
 	padding += gSize - size;
 	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
 
@@ -368,9 +368,9 @@ public:
 
     /* Pointer to our global data segment. */
     void *data_seg;  
-    int seg_size; /* size in bytes of data segment */
+    size_t seg_size; /* size in bytes of data segment */
     
-    void allocate(int size, CthThread tid) {
+    void allocate(size_t size, CthThread tid) {
       seg_size=size;
         /* global data segment need to be isomalloc */
       if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))

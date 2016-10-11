@@ -159,7 +159,7 @@
   int        exiting;    /* Is this thread finished */
 
   char      *data;       /* thread private data */
-  int        datasize;   /* size of thread-private data, in bytes */
+  size_t     datasize;   /* size of thread-private data, in bytes */
 
   int isMigratable; /* thread is migratable (isomalloc or aliased stack) */
   int aliasStackHandle; /* handle for aliased stack */
@@ -297,7 +297,7 @@ void CthAliasEnable(CthThreadBase *t) {
 
 CthCpvStatic(CthThread,  CthCurrent); /*Current thread*/
 CthCpvDeclare(char *,    CthData); /*Current thread's private data (externally visible)*/
-CthCpvStatic(int,        CthDatasize);
+CthCpvStatic(size_t,     CthDatasize);
 
 void CthSetThreadID(CthThread th, int a, int b, int c)
 {
@@ -323,8 +323,8 @@ inline
 #endif
 static void CthFixData(CthThread t)
 {
-  int newsize = CthCpvAccess(CthDatasize);
-  int oldsize = B(t)->datasize;
+  size_t newsize = CthCpvAccess(CthDatasize);
+  size_t oldsize = B(t)->datasize;
   if (oldsize < newsize) {
     newsize = 2*newsize;
     B(t)->datasize = newsize;
@@ -338,11 +338,11 @@ static void CthFixData(CthThread t)
   Allocate another size bytes of thread-local storage,
   and return the offset into the thread storage buffer.
   */
-int CthRegister(int size)
+size_t CthRegister(size_t size)
 {
-  int datasize=CthCpvAccess(CthDatasize);
+  size_t datasize=CthCpvAccess(CthDatasize);
   CthThreadBase *th=(CthThreadBase *)CthCpvAccess(CthCurrent);
-  int result, align = 1;
+  size_t result, align = 1;
   while (size>align) align<<=1;
   datasize = (datasize+align-1) & ~(align-1);
   result = datasize;
@@ -357,7 +357,7 @@ int CthRegister(int size)
   Make sure we have room to store up to at least maxOffset
   bytes of thread-local storage.
   */
-void CthRegistered(int maxOffset) {
+void CthRegistered(size_t maxOffset) {
   if (CthCpvAccess(CthDatasize)<maxOffset) {
     CthThreadBase *th=(CthThreadBase *)CthCpvAccess(CthCurrent);
     CthCpvAccess(CthDatasize) = maxOffset;
@@ -524,7 +524,7 @@ static void CthBaseInit(char **argv)
 
   CthCpvInitialize(CthThread,  CthCurrent);
   CthCpvInitialize(char *, CthData);
-  CthCpvInitialize(int,        CthDatasize);
+  CthCpvInitialize(size_t, CthDatasize);
 
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthDatasize)=0;
@@ -603,7 +603,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
   pup_bytes(p,&t->choosefn,sizeof(t->choosefn));
   pup_bytes(p,&t->next,sizeof(t->next));
   pup_int(p,&t->suspendable);
-  pup_int(p,&t->datasize);
+  pup_size_t(p,&t->datasize);
   if (pup_isUnpacking(p)) { 
     t->data = (char *) malloc(t->datasize);_MEMCHECK(t->data);
   }
