@@ -172,9 +172,41 @@ void _loadbalancerInit()
   char **argv = CkGetArgv();
   char *balancer = NULL;
   CmiArgGroup("Charm++","Load Balancer");
-  while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
-    if (CkMyRank() == 0)
-      lbRegistry.addRuntimeBalancer(balancer);   /* lbRegistry is a static */
+
+  // turn on MetaBalancer if set
+  _lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB", "Turn on MetaBalancer");
+  CmiGetArgStringDesc(argv, "+MetaLBModelDir", &_lb_args.metaLbModelDir(),
+                      "Use this directory to read model for MetaLB");
+
+  if (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr) {
+    if (CkMyRank() == 0) {
+      lbRegistry.addRuntimeBalancer("GreedyLB");
+      lbRegistry.addRuntimeBalancer("GreedyRefineLB");
+      lbRegistry.addRuntimeBalancer("DistributedLB");
+      lbRegistry.addRuntimeBalancer("RefineLB");
+      lbRegistry.addRuntimeBalancer("HybridLB");
+      lbRegistry.addRuntimeBalancer("MetisLB");
+      if (CkMyPe() == 0) {
+        if (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
+          CkPrintf(
+              "Warning: Ignoring the +balancer option, since Meta-Balancer's model-based "
+              "load balancer selection is enabled.\n");
+        CkPrintf(
+            "Warning: Automatic strategy selection in MetaLB is activated. This is an "
+            "experimental feature.\n");
+      }
+      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
+        ;
+    }
+  } else {
+    if (CkMyPe() == 0 && _lb_args.metaLbOn())
+      CkPrintf(
+          "Warning: MetaLB is activated. For Automatic strategy selection in MetaLB, "
+          "pass directory of model files using +MetaLBModelDir.\n");
+    while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
+      if (CkMyRank() == 0)
+        lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
+    }
   }
 
   CmiGetArgDoubleDesc(argv,"+DistLBTargetRatio", &_lb_args.targetRatio(),"The max/avg load ratio that DistributedLB will attempt to achieve");
@@ -285,10 +317,6 @@ void _loadbalancerInit()
   // turn instrumentation of communicatin off at startup
   _lb_args.traceComm() = !CmiGetArgFlagDesc(argv, "+LBCommOff",
 		"Turn load balancer instrumentation of communication off");
-
-	// turn on MetaBalancer if set
-	_lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB",
-		"Turn on MetaBalancer");
 
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
@@ -467,6 +495,15 @@ void LBDatabase::nextLoadbalancer(int seq) {
     loadbalancers[seq]->turnOff();
     CmiAssert(loadbalancers[next]);
     loadbalancers[next]->turnOn();
+  }
+}
+
+// switch strategy
+void LBDatabase::switchLoadbalancer(int switchFrom, int switchTo) {
+  if (switchTo != switchFrom) {
+    if (switchFrom != -1) loadbalancers[switchFrom]->turnOff();
+    CmiAssert(loadbalancers[switchTo]);
+    loadbalancers[switchTo]->turnOn();
   }
 }
 

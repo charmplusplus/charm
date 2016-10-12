@@ -1480,7 +1480,6 @@ for trace in $TRACEMODE; do
     TRACE_OBJ="$TRACE_OBJ -ltrace-$trace"
 done
 
-TRACE_OBJ="$TRACE_OBJ $CMK_LIBZ"
 fi
 
 if test x$PARADIGM = x"bgcharm++"

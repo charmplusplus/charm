@@ -31,10 +31,12 @@
 #define METABALANCER_H
 
 #include "LBDatabase.h"
-
+#include "RandomForestModel.h"
 #include <vector>
 
 #include "MetaBalancer.decl.h"
+
+using namespace rfmodel;
 
 extern CkGroupID _metalb;
 extern CkGroupID _metalbred;
@@ -84,10 +86,12 @@ enum metalb_stats_types{
 
 class MetaBalancer : public CBase_MetaBalancer {
 public:
-  MetaBalancer(void) { init(); }
-  MetaBalancer(CkMigrateMessage *m) : CBase_MetaBalancer(m) { init(); }
-  ~MetaBalancer()  {}
- 
+ MetaBalancer(void) : rFmodel(NULL) { init(); }
+ MetaBalancer(CkMigrateMessage* m) : CBase_MetaBalancer(m) { init(); }
+ ~MetaBalancer() {
+   if (CkMyPe() == 0) delete rFmodel;
+ }
+
 private:
   void init();
   MetaBalancerRedn* metaRdnGroup;
@@ -116,6 +120,7 @@ public:
   void LoadBalanceDecision(int, int);
   void LoadBalanceDecisionFinal(int, int);
   void MetaLBCallLBOnChares();
+  void MetaLBSetLBOnChares(int switchFrom, int switchTo);
   void ReceiveIterationNo(int); // Receives the current iter no
   static void periodicCall(void *ad);
   static void checkForNoObj(void *ad);
@@ -169,6 +174,8 @@ private:
   double pe_ld_kurtosis;
   double pe_ld_skewness;
   int total_ovld_pes;
+  int current_balancer;
+  ForestModel* rFmodel;
 
   struct AdaptiveData {
     double iteration;

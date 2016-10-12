@@ -39,7 +39,9 @@ private:
   int _lb_maxDistPhases;  // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio; // Specifies the target load ratio for LBs that aim for a particular load ratio
   int _lb_metaLbOn;
-public:
+  char* _lb_metaLbModelDir;
+
+ public:
   CkLBArgs() {
 #if CMK_BIGSIM_CHARM
     _autoLbPeriod = 0.02;       // bigsim needs it to be faster (lb may hang)
@@ -56,6 +58,7 @@ public:
     _lb_maxDistPhases = 10;
     _lb_targetRatio = 1.05;
     _lb_metaLbOn = 0;
+    _lb_metaLbModelDir = nullptr;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
@@ -78,6 +81,7 @@ public:
   inline int & maxDistPhases() { return _lb_maxDistPhases; }
   inline double & targetRatio() { return _lb_targetRatio; }
   inline int & metaLbOn() {return _lb_metaLbOn;}
+  inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
 };
 
 extern CkLBArgs _lb_args;
@@ -434,6 +438,7 @@ public:
   int getLoadbalancerTicket();
   void addLoadbalancer(BaseLB *lb, int seq);
   void nextLoadbalancer(int seq);
+  void switchLoadbalancer(int switchFrom, int switchTo);
   const char *loadbalancer(int seq);
 
   inline int step() { return mystep; }

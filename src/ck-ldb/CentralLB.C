@@ -101,7 +101,8 @@ void CentralLB::initLB(const CkLBOptions &opt)
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
   // CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
-  if (opt.getSeqNo() > 0) turnOff();
+  if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+    turnOff();
 
   stats_msg_count = 0;
   statsMsgsList = NULL;
@@ -1457,7 +1458,8 @@ void CentralLB::CheckMigrationComplete()
     theLbdb->getLBDB()->DoneRegisteringObjects(h);
     // switch to the next load balancer in the list
     // subtle: called from Migrated() may result in Migrated() called in next LB
-    theLbdb->nextLoadbalancer(seqno);
+    if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+      theLbdb->nextLoadbalancer(seqno);
   }
 #endif
 }

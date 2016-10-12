@@ -57,7 +57,8 @@ void DistributedLB::turnOff()
 
 void DistributedLB::InitLB(const CkLBOptions &opt) {
   thisProxy = CProxy_DistributedLB(thisgroup);
-  if (opt.getSeqNo() > 0) turnOff();
+  if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+    turnOff();
 
   // Set constants
   kUseAck = true;
@@ -358,7 +359,8 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
     }
     Cleanup();
     PackAndSendMigrateMsgs();
-    theLbdb->nextLoadbalancer(seqno);
+    if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+      theLbdb->nextLoadbalancer(seqno);
   }
 }
 
