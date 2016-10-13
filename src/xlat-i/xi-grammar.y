@@ -143,7 +143,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %type <strval>		Name QualName CCode CPROGRAM_List OptNameInit
 %type <strval>		OptTraceName
 %type <val>		OptStackSize
-%type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
+%type <intval>		OptExtern OptSemiColon OneOrMoreSemiColon MAttribs MAttribList MAttrib
 %type <intval>		OptConditional MsgArray
 %type <intval>		EAttribs EAttribList EAttrib OptVoid
 %type <cattr>		CAttribs CAttribList CAttrib
@@ -207,9 +207,15 @@ OptExtern	: /* Empty */
 		{ $$ = 1; }
 		;
 
+OneOrMoreSemiColon	: ';'
+		{ $$ = 1; }
+		| OneOrMoreSemiColon ';'
+		{ $$ = 2; }
+		;
+
 OptSemiColon	: /* Empty */
 		{ $$ = 0; }
-		| ';'
+		| OneOrMoreSemiColon
 		{ $$ = 1; }
 		;
 
@@ -295,7 +301,7 @@ Module		: MODULE Name ConstructEList
 		}
 		;
 
-ConstructEList	: ';'
+ConstructEList	: OneOrMoreSemiColon
 		{ $$ = 0; }
 		| '{' ConstructList '}' OptSemiColon
 		{ $$ = $2; }
@@ -331,7 +337,7 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         { if($3) $3->recurse<int&>($1, &Construct::setExtern); $$ = $3; }
         | NAMESPACE Name '{' ConstructList '}'
         { $$ = new Scope($2, $4); }
-        | ConstructSemi ';'
+        | ConstructSemi OneOrMoreSemiColon
         { $$ = $1; }
         | ConstructSemi UnexpectedToken
         {
@@ -591,7 +597,7 @@ MsgArray	: /* Empty */
 		| '[' ']'
 		{ $$ = 1; }
 
-Var		: OptConditional Type Name MsgArray ';'
+Var		: OptConditional Type Name MsgArray OneOrMoreSemiColon
 		{ $$ = new MsgVar($2, $3, $1, $4); }
 		;
 
@@ -667,9 +673,9 @@ TArray		: ARRAY ArrayIndexType Name OptBaseList MemberEList
 		{ $$ = new Array( lineno, 0, $2, new NamedType($3), $4, $5); }
 		;
 
-TMessage	: MESSAGE MAttribs Name ';'
+TMessage	: MESSAGE MAttribs Name OneOrMoreSemiColon
 		{ $$ = new Message(lineno, new NamedType($3)); }
-		| MESSAGE MAttribs Name '{' VarList '}' ';'
+		| MESSAGE MAttribs Name '{' VarList '}' OneOrMoreSemiColon
 		{ $$ = new Message(lineno, new NamedType($3), $5); }
 		;
 
@@ -724,7 +730,7 @@ Template	: TemplateSpec TChare
 		{ $$ = new Template($1, $2); $2->setTemplate($$); }
 		;
 
-MemberEList	: ';'
+MemberEList	: OneOrMoreSemiColon
 		{ $$ = 0; }
 		| '{' MemberList '}' OptSemiColon
 		{ $$ = $2; }
@@ -820,7 +826,7 @@ MemberBody	: Entry
                   $2->tspec = $1;
                   $$ = $2;
                 }
-		| NonEntryMember ';'
+		| NonEntryMember OneOrMoreSemiColon
 		{ $$ = $1; }
         | error
         {
@@ -880,7 +886,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		    $$ = e;
 		  }
 		}
-		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name ';' /* DMK : Accelerated Entry Method */
+		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name OneOrMoreSemiColon/* DMK : Accelerated Entry Method */
                 {
                   int attribs = SACCEL;
                   const char* name = $6;
@@ -896,9 +902,9 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                 }
 		;
 
-AccelBlock      : ACCELBLOCK ParamBraceStart CCode ParamBraceEnd ';'
+AccelBlock      : ACCELBLOCK ParamBraceStart CCode ParamBraceEnd OneOrMoreSemiColon
                 { $$ = new AccelBlock(lineno, new XStr($3)); }
-                | ACCELBLOCK ';'
+                | ACCELBLOCK OneOrMoreSemiColon
                 { $$ = new AccelBlock(lineno, NULL); }
                 ;
 
@@ -1148,7 +1154,7 @@ OptStackSize	: /* Empty */
 		{ $$ = new Value($3); }
 		;
 
-OptSdagCode	: ';' /* Empty */
+OptSdagCode	: OneOrMoreSemiColon/* Empty */
 		{ $$ = 0; }
 		| SingleConstruct
 		{ $$ = new SdagEntryConstruct($1); }
@@ -1194,7 +1200,7 @@ WhenConstruct   : WHEN SEntryList '{' '}'
 		{ $$ = new WhenConstruct($2, $4); }
 		;
 
-NonWhenConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
+NonWhenConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
 		{ $$ = 0; }
 		| OVERLAP '{' Olist '}'
 		{ $$ = 0; }
@@ -1216,11 +1222,11 @@ NonWhenConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		{ $$ = 0; }
 		| WHILE StartIntExpr CCode EndIntExpr '{' Slist '}' 
 		{ $$ = 0; }
-		| ParamBraceStart CCode ParamBraceEnd
+		| ParamBraceStart CCode ParamBraceEnd OptSemiColon
 		{ $$ = 0; }
 		;
 
-SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
+SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
 		{ $$ = new AtomicConstruct($4, $2, @3.first_line); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new OverlapConstruct($3); }	
@@ -1246,7 +1252,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd
 		{ $$ = new WhileConstruct($3, $5); }
 		| WHILE StartIntExpr IntExpr EndIntExpr '{' Slist '}'
 		{ $$ = new WhileConstruct($3, $6); }
-		| ParamBraceStart CCode ParamBraceEnd
+		| ParamBraceStart CCode ParamBraceEnd OptSemiColon
 		{ $$ = new AtomicConstruct($2, NULL, @$.first_line); }
 		| error
 		{
