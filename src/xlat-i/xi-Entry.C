@@ -228,7 +228,9 @@ XStr Entry::paramComma(int withDefaultVals,int withEO)
 }
 XStr Entry::eo(int withDefaultVals,int priorComma) {
   XStr str;
-  if (param->isMarshalled()) {//FIXME: add options for void methods, too...
+  //Add CkEntryOptions for all non message params
+  //for param->isMarshalled() and param->isVoid()
+  if (!param->isMessage()) {
     if (priorComma) str<<", ";
     str<<"const CkEntryOptions *impl_e_opts";
     if (withDefaultVals) str<<"=NULL";

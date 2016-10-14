@@ -131,7 +131,10 @@ void Parameter::print(XStr &str,int withDefaultValues,int useConst)
 		{ //Pass everything else by value
                   // @TODO uncommenting this requires that PUP work on const types
                   //if (byConst) str << "const ";
-			str<<type;
+			//"void" shouldn't be typed in the param list
+			//to have CkEntryOptions as the last argument
+			if(!type->isVoid())
+				str<<type;
 			if (name!=NULL) str<<" "<<name;
 			if (withDefaultValues && val!=NULL)
 			    {str<<" = ";val->print(str);}
