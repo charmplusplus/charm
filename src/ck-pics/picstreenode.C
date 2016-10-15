@@ -107,12 +107,12 @@ char compareName[6][3] = {"==", "<", ">", ">=", "<=", "!="};
 
 
 void Condition::printMe() {
-  printf("condition %s \n", name);
+  printf("condition %s \n", name.c_str());
 }
 
 void Condition::printDataToFile(double *input, FILE *fp) {
 
-  fprintf(fp, "Condition  %s %d %d ", name, varIndex, baseIndex);
+  fprintf(fp, "Condition  %s %d %d ", name.c_str(), varIndex, baseIndex);
   if(thresholdIndex > -1)
     threshold = input[thresholdIndex];
   if(varIndex>-1)
@@ -202,11 +202,11 @@ bool Condition::test(double *input) {
     printf("Undefined symbol \n");
     exit(1);
   }
-  if(!strcmp(name, "CPU_Util"))
+  if(!strcmp(name.c_str(), "CPU_Util"))
     potentialImprove = 1 - realValue;
-  else if(!strcmp(name, "High_Overhead"))
+  else if(!strcmp(name.c_str(), "High_Overhead"))
     potentialImprove = realValue;
-  else if(!strcmp(name, "High_Idle"))
+  else if(!strcmp(name.c_str(), "High_Idle"))
     potentialImprove = realValue;
   else 
     potentialImprove = -100;
