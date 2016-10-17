@@ -612,9 +612,9 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     
     if(!entry->isGrpSec()){
       // Identify the child PEs in the tree, ie the PEs with section members on them
-     using namespace std::placeholders;
-     std::for_each(elemBins.begin(), elemBins.end(), std::bind(&CkVec<int>::push_back, &mySubTreePEs, 
-			std::bind(&std::map<int, std::vector<CkArrayIndex> >::value_type::first, _1)));
+      for (std::map<int, std::vector<CkArrayIndex> >::iterator itr = elemBins.begin();
+         itr != elemBins.end(); ++itr)
+         mySubTreePEs.push_back(itr->first);
     }
     else{
       for(i=0; i<msg->nIdx; i++){
