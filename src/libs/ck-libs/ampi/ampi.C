@@ -1669,8 +1669,9 @@ class ampiSplitKey {
     :nextSplitComm(nextSplitComm_), color(color_), key(key_), rank(rank_) {}
 };
 
-/* "type" may indicate whether call is for a cartesian topology etc. */
+#define MPI_INTER 10
 
+/* "type" may indicate whether call is for a cartesian topology etc. */
 void ampi::split(int color,int key,MPI_Comm *dest, int type)
 {
 #if CMK_BIGSIM_CHARM
@@ -1686,7 +1687,18 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type)
     thread->suspend(); //Resumed by ampiParent::cartChildRegister
     MPI_Comm newComm=parent->getNextCart()-1;
     *dest=newComm;
-  } else {
+  }
+  else if (type == MPI_INTER) {
+    ampiSplitKey splitKey(parent->getNextInter(),color,key,myRank);
+    int rootIdx=myComm.getIndexForRank(0);
+    CkCallback cb(CkIndex_ampi::splitPhaseInter(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
+    contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
+
+    thread->suspend(); //Resumed by ampiParent::interChildRegister
+    MPI_Comm newComm=parent->getNextInter()-1;
+    *dest=newComm;
+  }
+  else {
     ampiSplitKey splitKey(parent->getNextSplit(),color,key,myRank);
     int rootIdx=myComm.getIndexForRank(0);
     CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
@@ -1769,6 +1781,54 @@ void ampi::splitPhase1(CkReductionMsg *msg)
     lastAmpi[newIdx].insert(parentProxy,lastComm);
   }
 
+  delete msg;
+}
+
+void ampi::splitPhaseInter(CkReductionMsg *msg)
+{
+  //Order the keys, which orders the ranks properly:
+  int nKeys=msg->getSize()/sizeof(ampiSplitKey);
+  ampiSplitKey *keys=(ampiSplitKey *)msg->getData();
+  if (nKeys!=myComm.getSize()) CkAbort("ampi::splitReduce expected a split contribution from every rank!");
+  qsort(keys,nKeys,sizeof(ampiSplitKey),compareAmpiSplitKey);
+
+  MPI_Comm newComm = -1;
+  for(int i=0;i<nKeys;i++){
+    if(keys[i].nextSplitComm>newComm)
+      newComm = keys[i].nextSplitComm; // FIXME: use nextSplitr instead of nextInter?
+  }
+
+  //Loop over the sorted keys, which gives us the new arrays:
+  int lastColor=keys[0].color-1; //The color we're building an array for
+  CProxy_ampi lastAmpi; //The array for lastColor
+  int lastRoot=0; //C value for new rank 0 process for latest color
+  ampiCommStruct lastComm; //Communicator info. for latest color
+
+  lastAmpi = createNewChildAmpiSync();
+
+  for (int c=0;c<nKeys;c++) {
+    vector<int> indices; // Maps rank to array indices for new array
+    if (keys[c].color!=lastColor)
+    { //Hit a new color-- need to build a new communicator and array
+      lastColor=keys[c].color;
+      lastRoot=c;
+
+      for (int i=c;i<nKeys;i++) {
+        if (keys[i].color!=lastColor) break; //Done with this color
+        int idx=myComm.getIndexForRank(keys[i].rank);
+        indices.push_back(idx);
+      }
+
+      if (c==0) {
+        lastComm=ampiCommStruct(newComm,lastAmpi,indices.size(),indices, myComm.getRemoteIndices());
+        for (int i=0; i<indices.size(); i++) {
+          lastAmpi[indices[i]].insert(parentProxy,lastComm);
+        }
+      }
+    }
+  }
+
+  parentProxy[0].ExchangeProxy(lastAmpi);
   delete msg;
 }
 
@@ -1882,24 +1942,41 @@ void ampiParent::graphChildRegister(const ampiCommStruct &s) {
   thread->resume(); //Matches suspend at end of ampi::graphCreate
 }
 
-void ampi::intercommCreate(const groupStruct rvec, const int root, MPI_Comm *ncomm){
-  if(thisIndex==root) { // not everybody gets the valid rvec
-    tmpVec = rvec;
-  }
-  CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm.getProxy());
-  MPI_Comm nextinter = parent->getNextInter();
-  contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
+void ampi::intercommCreate(const groupStruct remoteVec, const int root, MPI_Comm tcomm, MPI_Comm *ncomm){
 
-  thread->suspend(); //Resumed by ampiParent::interChildRegister
-  MPI_Comm newcomm=parent->getNextInter()-1;
-  *ncomm=newcomm;
+  if (tcomm == MPI_COMM_SELF) {
+    tmpVec = remoteVec;
+    intercommCreatePhaseSelf(parent->getNextInter());
+  }
+  else {
+    if(thisIndex==root) { // not everybody gets the valid rvec
+      tmpVec = remoteVec;
+    }
+    CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm.getProxy());
+    MPI_Comm nextinter = parent->getNextInter();
+    contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
+  }
+  thread->suspend(); //Not resumed by ampiParent::interChildRegister. Resumed by ExchangeProxy.
+  *ncomm = parent->getNextInter()-1;
 }
 
 void ampi::intercommCreatePhase1(MPI_Comm nextInterComm){
 
   CProxy_ampi newAmpi = createNewChildAmpiSync();
-
   groupStruct lgroup = myComm.getIndices();
+  ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup.size(),lgroup,tmpVec);
+  for(int i=0;i<lgroup.size();i++){
+    int newIdx=lgroup[i];
+    newAmpi[newIdx].insert(parentProxy,newCommstruct);
+  }
+
+  parentProxy[0].ExchangeProxy(newAmpi);
+}
+
+void ampi::intercommCreatePhaseSelf(MPI_Comm nextInterComm) {
+  CProxy_ampi newAmpi = createNewChildAmpiSync();
+  std::vector<int> vec(1,0);
+  groupStruct lgroup = vec;
   ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup.size(),lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
     int newIdx=lgroup[i];
@@ -2210,8 +2287,7 @@ void ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype t
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   int destIdx = dest.getIndexForRank(rank);
   if(isInter()){
-    sRank = parent->thisIndex;
-    destcomm = MPI_COMM_FIRST_INTER;
+    sRank = thisIndex;
     destIdx = dest.getIndexForRemoteRank(rank);
     arrproxy = remoteProxy;
   }
@@ -2342,9 +2418,8 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 #endif
 #endif
 
-  if(isInter()){
+  if (isInter()) {
     s = myComm.getIndexForRemoteRank(s);
-    comm = MPI_COMM_FIRST_INTER;
   }
 
   int tags[3];
@@ -6999,7 +7074,6 @@ CDECL
 int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
 {
   AMPIAPI("AMPI_Comm_dup");
-
   int topol;
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank(comm);
@@ -7017,9 +7091,15 @@ int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
     newc.setnbors(c.getnbors());
   }
   else {
-    ptr->split(0, rank, newcomm, MPI_UNDEFINED /*not MPI_CART*/);
+    if (getAmpiParent()->isInter(comm)) {
+      ptr->split(0,rank,newcomm, MPI_INTER);
+    }
+    else {
+      ptr->split(0, rank, newcomm, MPI_UNDEFINED /*not MPI_CART*/);
+    }
   }
-  ptr->barrier();
+
+  getAmpiInstance(comm)->barrier();
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -7039,11 +7119,17 @@ CDECL
 int AMPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest)
 {
   AMPIAPI("AMPI_Comm_split");
-
   {
     ampi *ptr = getAmpiInstance(src);
-    ptr->split(color, key, dest, MPI_UNDEFINED /*not MPI_CART*/);
-    ptr->barrier(); // to prevent race condition in the new comm
+    if (getAmpiParent()->isInter(src)) {
+      ptr->split(color, key, dest, MPI_INTER);
+    }
+    else if (getAmpiParent()->isCart(src)) {
+      ptr->split(color, key, dest, MPI_CART);
+    }
+    else {
+      ptr->split(color, key, dest, MPI_UNDEFINED);
+    }
   }
   if (color == MPI_UNDEFINED) *dest = MPI_COMM_NULL;
 
@@ -7120,43 +7206,62 @@ int AMPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group){
 }
 
 CDECL
-int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm rcomm, int rleader,
-                          int tag, MPI_Comm *newintercomm){
+int AMPI_Intercomm_create(MPI_Comm localComm, int localLeader, MPI_Comm peerComm, int remoteLeader,
+                          int tag, MPI_Comm *newintercomm)
+{
   AMPIAPI("AMPI_Intercomm_create");
 
 #if AMPI_ERROR_CHECKING
-  if (getAmpiParent()->isInter(lcomm) || getAmpiParent()->isInter(rcomm))
+  if (getAmpiParent()->isInter(localComm) || getAmpiParent()->isInter(peerComm))
     return ampiErrhandler("AMPI_Intercomm_create", MPI_ERR_COMM);
 #endif
 
-  ampi *lptr = getAmpiInstance(lcomm);
-  ampi *rptr = getAmpiInstance(rcomm);
-  int root = lptr->getIndexForRank(lleader);
-  int lsize = lptr->getSize(lcomm);
-  int lrank = lptr->getRank(lcomm);
-  vector<int> rvec;
+  ampi *localPtr = getAmpiInstance(localComm);
+  ampi *peerPtr = getAmpiInstance(peerComm);
+  int rootIndex = localPtr->getIndexForRank(localLeader);
+  int localSize, localRank;
 
-  if(lrank==lleader){
-    int rsize;
+  if (localComm == MPI_COMM_SELF) {
+    localSize = 1;
+    localRank = 0;
+    rootIndex = 0; // Note: there is no explicit ampi class instance for MPI_COMM_SELF
+  }
+  else {
+    localSize = localPtr->getSize(localComm);
+    localRank = localPtr->getRank(localComm);
+  }
+
+  vector<int> remoteVec;
+
+  if (localRank == localLeader) {
+    int remoteSize;
     MPI_Status sts;
-    vector<int> lvec = lptr->getIndices();
-
+    vector<int> localVec;
+    if (localComm == MPI_COMM_SELF) {
+      localVec.push_back(0);
+    }
+    else {
+      localVec = localPtr->getIndices();
+    }
     // local leader exchanges groupStruct with remote leader
-    lptr->send(tag, rptr->getRank(rcomm), &lvec[0], lvec.size(), MPI_INT, rleader, rcomm);
-    rptr->probe(tag, rleader, rcomm, &sts);
-    AMPI_Get_count(&sts, MPI_INT, &rsize);
-    rvec.resize(rsize);
-    if(-1==rptr->recv(tag, rleader, &rvec[0], rsize, MPI_INT, rcomm))
+    peerPtr->send(tag, peerPtr->getRank(peerComm), &localVec[0], localVec.size(), MPI_INT, remoteLeader, peerComm);
+    peerPtr->probe(tag, remoteLeader, peerComm, &sts);
+    AMPI_Get_count(&sts, MPI_INT, &remoteSize);
+    remoteVec.resize(remoteSize);
+    if (-1==peerPtr->recv(tag, remoteLeader, &remoteVec[0], remoteSize, MPI_INT, peerComm))
       CkAbort("AMPI> Error in MPI_Intercomm_create");
 
-    if(rsize==0){
+    if (remoteSize==0) {
       AMPI_DEBUG("AMPI> In MPI_Intercomm_create, creating an empty communicator\n");
       *newintercomm = MPI_COMM_NULL;
       return MPI_SUCCESS;
     }
   }
 
-  lptr->intercommCreate(rvec,root,newintercomm);
+  /* Note: if localComm == MPI_COMM_SELF, then localPtr represents MPI_COMM_WORLD.
+   * Extra care needs to be taken in ampi::intercommCreate. */
+  localPtr->intercommCreate(remoteVec,rootIndex,localComm,newintercomm);
+
   return MPI_SUCCESS;
 }
 

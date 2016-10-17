@@ -1086,6 +1086,7 @@ class ampiParent : public CBase_ampiParent {
 
   MPI_Comm worldNo; //My MPI_COMM_WORLD
   ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
+  // Note: we do not explicitly create an AMPI element corresponding to MPI_COMM_SELF
   ampiCommStruct worldStruct;
   ampiCommStruct selfStruct;
 
@@ -1469,8 +1470,10 @@ class ampi : public CBase_ampi {
   void irednResult(CkReductionMsg *msg);
 
   void splitPhase1(CkReductionMsg *msg);
+  void splitPhaseInter(CkReductionMsg *msg);
   void commCreatePhase1(MPI_Comm nextGroupComm);
   void intercommCreatePhase1(MPI_Comm nextInterComm);
+  void intercommCreatePhaseSelf(MPI_Comm nextInterComm);
   void intercommMergePhase1(MPI_Comm nextIntraComm);
 
  private: // Used by the above entry methods that create new MPI_Comm objects
@@ -1522,7 +1525,7 @@ class ampi : public CBase_ampi {
   void commCreate(const groupStruct vec,MPI_Comm *newcomm);
   void cartCreate(const groupStruct vec, MPI_Comm *newcomm);
   void graphCreate(const groupStruct vec, MPI_Comm *newcomm);
-  void intercommCreate(const groupStruct rvec, int root, MPI_Comm *ncomm);
+  void intercommCreate(const groupStruct rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm);
 
   inline bool isInter(void) const { return myComm.isinter(); }
   void intercommMerge(int first, MPI_Comm *ncomm);
@@ -1541,6 +1544,7 @@ class ampi : public CBase_ampi {
   inline void setCommName(const char *name){myComm.setName(name);}
   inline void getCommName(char *name, int *len) const {myComm.getName(name,len);}
   inline vector<int> getIndices(void) const { return myComm.getIndices(); }
+  inline vector<int> getRemoteIndices(void) const { return myComm.getRemoteIndices(); }
   inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
