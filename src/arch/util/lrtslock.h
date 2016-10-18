@@ -4,7 +4,11 @@
 #if CMK_SHARED_VARS_UNAVAILABLE
 typedef int LrtsNodeLock;
 #else
+#if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
+typedef HANDLE LrtsNodeLock;
+#else
 typedef void* LrtsNodeLock;
+#endif
 #endif //CMK_SHARED_VARS_UNAVAILABLE
 
 LrtsNodeLock LrtsCreateLock(void);

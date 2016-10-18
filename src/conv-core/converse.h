@@ -404,9 +404,13 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #endif
 
-#if CMK_SHARED_VARS_NT_THREADS /*Used only by win32 versions*/
+#if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
 
 #include <windows.h>
+#if CMK_USE_LRTS /*LRTS provides locking*/
+#include "lrtslock.h"
+#else /*All win versions use LRTS, so leaving empty*/
+#endif
 
 extern int _Cmi_numpes;
 extern int _Cmi_mynodesize;
@@ -431,13 +435,6 @@ extern int CmiRankOf(int pe);
 extern void CmiNodeBarrier(void);
 extern void CmiNodeAllBarrier(void);
 #define CmiSvAlloc CmiAlloc
-
-typedef HANDLE CmiNodeLock;
-extern  CmiNodeLock CmiCreateLock(void);
-#define CmiLock(lock) (WaitForSingleObject(lock, INFINITE))
-#define CmiUnlock(lock) (ReleaseMutex(lock))
-#define CmiTryLock(lock) (WaitForSingleObject(lock, 0))
-extern  void CmiDestroyLock(CmiNodeLock lock);
 
 extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)

@@ -117,19 +117,6 @@ CmiState CmiGetState()
 }
 #endif
 
-#if !CMK_USE_LRTS
-CmiNodeLock CmiCreateLock(void)
-{
-  HANDLE hMutex = CreateMutex(NULL, FALSE, NULL);
-  return hMutex;
-}
-
-void CmiDestroyLock(CmiNodeLock lk)
-{
-  CloseHandle(lk);
-}
-#endif
-
 void CmiYield(void) 
 { 
   Sleep(0);

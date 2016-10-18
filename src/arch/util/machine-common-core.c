@@ -1614,8 +1614,28 @@ void LrtsUnlock(LrtsNodeLock lock){ (lock)--; }
 int LrtsTryLock(LrtsNodeLock lock){ return ((lock)?1:((lock)=1,0)); }
 void LrtsDestroyLock(LrtsNodeLock lock){ /* empty */ }
 
-#else /*smp version, uses pthread mutex*/
+#else /*smp version*/
+#if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
+#include <windows.h>
 
+LrtsNodeLock LrtsCreateLock(void){
+    HANDLE hMutex = CreateMutex(NULL, FALSE, NULL);
+    return hMutex;
+}
+void LrtsLock(LrtsNodeLock lock){
+    WaitForSingleObject(lock, INFINITE);
+}
+void LrtsUnlock(LrtsNodeLock lock){
+    ReleaseMutex(lock);
+}
+int LrtsTryLock(LrtsNodeLock lock){
+    WaitForSingleObject(lock, 0);
+}
+void LrtsDestroyLock(LrtsNodeLock lock){
+    CloseHandle(lock);
+}
+
+#else /*other smp versions uses pthread mutex by default*/
 LrtsNodeLock LrtsCreateLock(void){
     LrtsNodeLock l = (LrtsNodeLock)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init(l,(pthread_mutexattr_t *)0);
@@ -1634,5 +1654,7 @@ void LrtsDestroyLock(LrtsNodeLock lock){
     pthread_mutex_destroy((pthread_mutex_t*)lock);
     free(lock);
 }
+#endif
+
 #endif //CMK_SHARED_VARS_UNAVAILABLE
 #endif //CMK_USE_COMMON_LOCK
