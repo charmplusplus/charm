@@ -2496,6 +2496,14 @@ then
   test_finish 1
 fi
 
+# Workaround for bug #1045 appearing in GCC >6.x
+test_cxx "whether C++ compiler accepts -fno-lifetime-dse" "yes" "no" "-fno-lifetime-dse"
+if test $strictpass -eq 1
+then
+    add_flag "$(echo OPTS_CXX=\"\$OPTS_CXX -fno-lifetime-dse\")" "Disable 'Lifetime DSE' optimization to work around bug #1045 in GCC >6.x"
+    OPTS_CXX="$OPTS_CXX -fno-lifetime-dse"
+fi
+
 # Figure out if the user has asked to enable the latest language standards
 USER_ASKED_FOR_NEW_STD=`echo "$BUILDOPTS" | grep "-use-new-std" | wc -l`
 
