@@ -2050,14 +2050,12 @@ void KMeansBOC::startKMeansAnalysis() {
 
  if(CkMyPe()==0)     CkPrintf("[%d] KMeansBOC::startKMeansAnalysis time=\t%g\n", CkMyPe(), CkWallTimer() );
 
-  CkCallback cb(CkIndex_KMeansBOC::flushCheck(NULL), 0, thisProxy);
+  CkCallback cb(CkReductionTarget(KMeansBOC, flushCheck), 0, thisProxy);
   contribute(sizeof(bool), &(pool->hasFlushed), CkReduction::logical_or_bool, cb);
 }
 
 // Called on processor 0
-void KMeansBOC::flushCheck(CkReductionMsg *msg) {
-  bool someFlush = *((bool *)msg->getData());
-  delete msg;
+void KMeansBOC::flushCheck(bool someFlush) {
 
   // if(CkMyPe()==0) CkPrintf("[%d] KMeansBOC::flushCheck time=\t%g\n", CkMyPe(), CkWallTimer() );
   
@@ -2070,7 +2068,7 @@ void KMeansBOC::flushCheck(CkReductionMsg *msg) {
     CkPrintf("Warning: Some processor has flushed its data. No KMeans will be conducted\n");
     // terminate KMeans
     CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
-    bocProxy[0].kMeansDone();
+    bocProxy[0].kMeansDoneFlushed();
   }
 }
 
@@ -2278,7 +2276,7 @@ void KMeansBOC::collectKMeansData() {
     reductionMsg[sosOffset + i] = currentExecTimes[i]*currentExecTimes[i];
   }
 
-  CkCallback cb(CkIndex_KMeansBOC::globalMetricRefinement(NULL), 
+  CkCallback cb(CkReductionTarget(KMeansBOC, globalMetricRefinement),
 		0, thisProxy);
   contribute((numMetrics*4)*sizeof(double), reductionMsg, 
 	     outlierReductionType, cb);  
@@ -2308,7 +2306,7 @@ void KMeansBOC::globalMetricRefinement(CkReductionMsg *msg) {
   outmsg->numStats = numMetrics*4;
 
   // Sum | Min | Max | Sum of Squares
-  double *totalExecTimes = (double *)msg->getData();
+  double *totalExecTimes = (double*)msg->getData();
   double totalTime = 0.0;
 
   for (int i=0; i<numMetrics; i++) {
@@ -2354,7 +2352,7 @@ void KMeansBOC::globalMetricRefinement(CkReductionMsg *msg) {
   }
 
   delete msg;
-  
+
   // initialize k seeds for this phase
   kSeeds = new double[numK*numMetrics];
 
@@ -2467,8 +2465,8 @@ void KMeansBOC::findInitialClusters(KMeansStatsMessage *msg) {
   }
   modVector[minK*(numMetrics+1)+numMetrics] = 1.0;
 
-  CkCallback cb(CkIndex_KMeansBOC::updateKSeeds(NULL), 
-		0, thisProxy);
+  CkCallback cb(CkReductionTarget(KMeansBOC, updateKSeeds),
+               0, thisProxy);
   contribute(numK*(numMetrics+1)*sizeof(double), modVector, 
 	     CkReduction::sum_double, cb);  
   delete [] modVector;
@@ -2487,14 +2485,13 @@ double KMeansBOC::calculateDistance(int k) {
   return sqrt(ret);
 }
 
-void KMeansBOC::updateKSeeds(CkReductionMsg *msg) {
+void KMeansBOC::updateKSeeds(double *modVector, int n) {
   CkAssert(CkMyPe() == 0);
 
   // if(CkMyPe()==0)    CkPrintf("[%d] KMeansBOC::updateKSeeds time=\t%g\n", CkMyPe(), CkWallTimer() );
 
-  double *modVector = (double *)msg->getData();
   // sanity check
-  CkAssert(numK*(numMetrics+1)*sizeof(double) == msg->getSize());
+  CkAssert(numK*(numMetrics+1) == n);
 
   // A quick convergence test.
   bool hasChanges = false;
@@ -2503,7 +2500,6 @@ void KMeansBOC::updateKSeeds(CkReductionMsg *msg) {
       (modVector[i*(numMetrics+1) + numMetrics] != 0.0);
   }
   if (!hasChanges) {
-    delete msg;
     findRepresentatives();
   } else {
     int overallChange = 0;
@@ -2541,7 +2537,6 @@ void KMeansBOC::updateKSeeds(CkReductionMsg *msg) {
       DEBUGN("[%d] Phase %d Iter %d K = %d Membership Count = %d\n",
 	     CkMyPe(), currentPhase, phaseIter, i, kNumMembers[i]);
     }
-    delete msg;
 
     // broadcast the new seed locations.
     KSeedsMessage *outmsg = new (numK*numMetrics) KSeedsMessage;
@@ -2601,8 +2596,8 @@ void KMeansBOC::updateSeedMembership(KSeedsMessage *msg) {
     modVector[lastMinK*(numMetrics+1)+numMetrics] = -1.0;
   }
 
-  CkCallback cb(CkIndex_KMeansBOC::updateKSeeds(NULL), 
-		0, thisProxy);
+  CkCallback cb(CkReductionTarget(KMeansBOC, updateKSeeds),
+               0, thisProxy);
   contribute(numK*(numMetrics+1)*sizeof(double), modVector, 
 	     CkReduction::sum_double, cb);  
   delete [] modVector;
@@ -2767,8 +2762,8 @@ void KMeansBOC::collectDistances(KSelectionMessage *msg) {
   }
   delete msg;
 
-  CkCallback cb(CkIndex_KMeansBOC::findNextMinMax(NULL), 
-		0, thisProxy);
+  CkCallback cb(CkReductionTarget(KMeansBOC, findNextMinMax),
+               0, thisProxy);
   contribute(numK*4*sizeof(double), minMaxAndIDs, 
 	     minMaxReductionType, cb);  
 }
@@ -2780,7 +2775,7 @@ void KMeansBOC::findNextMinMax(CkReductionMsg *msg) {
   // if(CkMyPe()==0)    CkPrintf("[%d] KMeansBOC::findNextMinMax time=\t%g\n", CkMyPe(), CkWallTimer() );
 
   if (numSelectionIter > 0) {
-    double *incInfo = (double *)msg->getData();
+    double *incInfo = (double*)msg->getData();
     
     KSelectionMessage *outmsg = new (numK, numK) KSelectionMessage;
     outmsg->numKMinIDs = numK;
@@ -2841,10 +2836,8 @@ void KMeansBOC::phaseDone() {
   //   will not be correct! The question is "is this enforcible?"
   if ((currentPhase == (pool->numPhases-1)) || !usePhases) {
     // We're done
-    int dummy = 0;
-    CkCallback cb(CkIndex_TraceProjectionsBOC::kMeansDone(NULL), 
-		  0, bocProxy);
-    contribute(sizeof(int), &dummy, CkReduction::sum_int, cb);
+    contribute(CkCallback(CkReductionTarget(TraceProjectionsBOC, kMeansDone),
+              0, bocProxy));
   } else {
     // reset all phase-based k-means data and decisions
 
@@ -2861,20 +2854,19 @@ void TraceProjectionsBOC::startTimeAnalysis()
   double startTime = 0.0;
   if (CkpvAccess(_trace)->_logPool->numEntries>0)
      startTime = CkpvAccess(_trace)->_logPool->pool[0].time;
-  CkCallback cb(CkIndex_TraceProjectionsBOC::startTimeDone(NULL), thisProxy);
-  contribute(sizeof(double), &startTime, CkReduction::min_double, cb);  
+  CkCallback cb(CkReductionTarget(TraceProjectionsBOC, startTimeDone), thisProxy);
+  contribute(sizeof(double), &startTime, CkReduction::min_double, cb);
 }
 
-void TraceProjectionsBOC::startTimeDone(CkReductionMsg *msg)
+void TraceProjectionsBOC::startTimeDone(double result)
 {
   // CkPrintf("[%d] TraceProjectionsBOC::startTimeDone time=\t%g parModulesRemaining:%d\n", CkMyPe(), CkWallTimer(), parModulesRemaining);
 
   if (CkpvAccess(_trace) != NULL) {
-    CkpvAccess(_trace)->_logPool->globalStartTime = *(double *)msg->getData();
+    CkpvAccess(_trace)->_logPool->globalStartTime = result;
     CkpvAccess(_trace)->_logPool->setNewStartTime();
     //if (CkMyPe() == 0) CkPrintf("Start time determined to be %lf us\n", (CkpvAccess(_trace)->_logPool->globalStartTime)*1e06);
   }
-  delete msg;
   thisProxy[CkMyPe()].startEndTimeAnalysis();
 }
 
@@ -2885,29 +2877,28 @@ void TraceProjectionsBOC::startEndTimeAnalysis()
   endTime = CkpvAccess(_trace)->endTime;
   // CkPrintf("[%d] End time is %lf us\n", CkMyPe(), endTime*1e06);
 
-  CkCallback cb(CkIndex_TraceProjectionsBOC::endTimeDone(NULL), 
-		0, thisProxy);
+  CkCallback cb(CkReductionTarget(TraceProjectionsBOC, endTimeDone),
+          0, thisProxy);
   contribute(sizeof(double), &endTime, CkReduction::max_double, cb);  
 }
 
-void TraceProjectionsBOC::endTimeDone(CkReductionMsg *msg)
+void TraceProjectionsBOC::endTimeDone(double result)
 {
  //if(CkMyPe()==0)    CkPrintf("[%d] TraceProjectionsBOC::endTimeDone time=\t%g parModulesRemaining:%d\n", CkMyPe(), CkWallTimer(), parModulesRemaining);
 
   CkAssert(CkMyPe() == 0);
   parModulesRemaining--;
   if (CkpvAccess(_trace) != NULL && CkpvAccess(_trace)->_logPool != NULL) {
-    CkpvAccess(_trace)->_logPool->globalEndTime = *(double *)msg->getData() - CkpvAccess(_trace)->_logPool->globalStartTime;
+    CkpvAccess(_trace)->_logPool->globalEndTime = result - CkpvAccess(_trace)->_logPool->globalStartTime;
     // CkPrintf("End time determined to be %lf us\n",
     //	     (CkpvAccess(_trace)->_logPool->globalEndTime)*1e06);
   }
-  delete msg;
   if (parModulesRemaining == 0) {
     thisProxy[CkMyPe()].finalize();
   }
 }
 
-void TraceProjectionsBOC::kMeansDone(CkReductionMsg *msg) {
+void TraceProjectionsBOC::kMeansDone() {
 
  if(CkMyPe()==0)  CkPrintf("[%d] TraceProjectionsBOC::kMeansDone time=\t%g\n", CkMyPe(), CkWallTimer() );
 
@@ -2915,7 +2906,6 @@ void TraceProjectionsBOC::kMeansDone(CkReductionMsg *msg) {
   parModulesRemaining--;
   CkPrintf("K-Means Analysis Time = %lf seconds\n",
 	   CmiWallTimer()-analysisStartTime);
-  delete msg;
   if (parModulesRemaining == 0) {
     thisProxy[CkMyPe()].finalize();
   }
@@ -2926,7 +2916,7 @@ void TraceProjectionsBOC::kMeansDone(CkReductionMsg *msg) {
  *  This version is called (on processor 0) only if flushCheck fails.
  *
  */
-void TraceProjectionsBOC::kMeansDone() {
+void TraceProjectionsBOC::kMeansDoneFlushed() {
   CkAssert(CkMyPe() == 0);
   parModulesRemaining--;
   CkPrintf("K-Means Analysis Aborted because of flush. Time taken = %lf seconds\n",

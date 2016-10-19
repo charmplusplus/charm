@@ -106,14 +106,14 @@ class KMeansBOC : public CBase_KMeansBOC {
  KMeansBOC(CkMigrateMessage *m):CBase_KMeansBOC(m) {};
   
   void startKMeansAnalysis();
-  void flushCheck(CkReductionMsg *msg);
+  void flushCheck(bool someFlush);
   void flushCheckDone();
   void getNextPhaseMetrics();
   void collectKMeansData(); // C++ method
   void globalMetricRefinement(CkReductionMsg *msg);
   void initKSeeds(); // C++ method
   void findInitialClusters(KMeansStatsMessage *msg);
-  void updateKSeeds(CkReductionMsg *msg);
+  void updateKSeeds(double *modVector, int n);
   double calculateDistance(int k); // C++ method
   void updateSeedMembership(KSeedsMessage *msg);
   void findRepresentatives(); // C++ method
@@ -147,11 +147,11 @@ class TraceProjectionsBOC : public CBase_TraceProjectionsBOC {
 
   void traceProjectionsParallelShutdown(int);
   void startTimeAnalysis();
-  void startTimeDone(CkReductionMsg *);
+  void startTimeDone(double result);
   void startEndTimeAnalysis();
-  void endTimeDone(CkReductionMsg *);
-  void kMeansDone(CkReductionMsg *);
+  void endTimeDone(double result);
   void kMeansDone(void);
+  void kMeansDoneFlushed(void);
   void finalize(void);
   void shutdownAnalysis(void);
   void closingTraces(void);

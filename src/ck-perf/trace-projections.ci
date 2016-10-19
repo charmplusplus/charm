@@ -38,15 +38,15 @@ module TraceProjections {
     entry KMeansBOC(bool, int, int, double, bool);
     
     entry void startKMeansAnalysis(void);
-    entry void flushCheck(CkReductionMsg *);
+    entry [reductiontarget] void flushCheck(bool);
     entry void flushCheckDone(void);
     entry void getNextPhaseMetrics(void);
-    entry void globalMetricRefinement(CkReductionMsg *);
+    entry [reductiontarget] void globalMetricRefinement(CkReductionMsg * msg);
     entry void findInitialClusters(KMeansStatsMessage *);
-    entry void updateKSeeds(CkReductionMsg *);
+    entry [reductiontarget] void updateKSeeds(double result[n], int n);
     entry void updateSeedMembership(KSeedsMessage *);
     entry void collectDistances(KSelectionMessage *);
-    entry void findNextMinMax(CkReductionMsg *);
+    entry [reductiontarget] void findNextMinMax(CkReductionMsg *msg);
     entry void phaseDone(void);
   };
 
@@ -55,11 +55,11 @@ module TraceProjections {
 
     entry void traceProjectionsParallelShutdown(int);
     entry void startTimeAnalysis(void);
-    entry void startTimeDone(CkReductionMsg *);
+    entry [reductiontarget] void startTimeDone(double);
     entry void startEndTimeAnalysis(void);
-    entry void endTimeDone(CkReductionMsg *);
-    entry void kMeansDone(void);
-    entry void kMeansDone(CkReductionMsg *);
+    entry [reductiontarget] void endTimeDone(double);
+    entry [reductiontarget] void kMeansDone();
+    entry void kMeansDoneFlushed(void);
     entry void finalize(void);
     entry void closingTraces(void);
     entry [reductiontarget] void closeParallelShutdown(void);

@@ -10,10 +10,6 @@ class TraceSummaryInit : public Chare {
   TraceSummaryInit(CkArgMsg *m) {
     delete m;
     traceSummaryGID = CProxy_TraceSummaryBOC::ckNew();
-    CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
-
-    CkCallback *cb = new CkCallback(CkIndex_TraceSummaryBOC::sendSummaryBOC(NULL), 0, sumProxy);
-    CProxy_TraceSummaryBOC(traceSummaryGID).ckSetReductionClient(cb);
 
     // No CCS Streaming support until user-code requires it.
     summaryCcsStreaming = false;
@@ -45,7 +41,7 @@ public:
   TraceSummaryBOC(CkMigrateMessage *m):CBase_TraceSummaryBOC(m) {};
   void startSumOnly();
   void askSummary(int size);
-  void sendSummaryBOC(CkReductionMsg *);
+  void sendSummaryBOC(double *results, int n);
 
   /* CCS support methods/entry methods */
   void initCCS();
@@ -53,13 +49,13 @@ public:
   void ccsRequestSummaryUnsignedChar(CkCcsRequestMsg *m);
 
   void collectSummaryData(double startTime, double binSize, int numBins);
-  void summaryDataCollected(CkReductionMsg *);
+  void summaryDataCollected(double *recvData, int numBins);
 
   void traceSummaryParallelShutdown(int pe);
-  void maxBinSize(CkReductionMsg *msg);
+  void maxBinSize(double _maxBinSize);
   void shrink(double _maxBinSize);
 
-  void sumData(CkReductionMsg *msg);
+  void sumData(double *sumData, int totalsize);
 
 private:
   void write();
