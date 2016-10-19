@@ -306,7 +306,9 @@ class Stencil: public CBase_Stencil {
       if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
 	endTime = CkWallTimer();
 	// auto tune the LBPeriod to half as long as it takes to run the iters between LB steps
+#if CMK_LBDB_ON
 	getLBDB()->SetLBPeriod((endTime-startTime)*LBPERIOD/2.0);
+#endif
 	CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
       }
 
