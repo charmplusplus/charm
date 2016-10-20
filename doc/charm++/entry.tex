@@ -62,7 +62,7 @@ performance analysis.
 
 \index{immediate}\item[immediate] entry methods are executed in an
 ``immediate'' fashion as they skip the message scheduling while other normal
-entry methods donot. Immediate entry methods should be only associcated with
+entry methods do not. Immediate entry methods should be only associated with
 NodeGroup objects although it is not checked during compilation. If the
 destination of such entry method is on the local node, then the method will be
 executed in the context of the regular PE regardless the execution mode of
@@ -106,7 +106,7 @@ available only for Group objects and Chare Array objects. The user has to
 guarantee that the recipient chare element reside on the same PE. Otherwise,
 the application will abort on a failure. If the \kw{local} entry method uses
 parameter marshalling, instead of marshalling input parameters into a message,
-it will pass them direcly to the callee. This implies that the callee can
+it will pass them directly to the callee. This implies that the callee can
 modify the caller data if method parameters are passed by pointer or reference.
 Furthermore, input parameters do not require to be PUPable. Considering that
 these entry methods always execute immediately, they are allowed to have a
