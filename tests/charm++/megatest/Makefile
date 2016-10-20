@@ -118,7 +118,7 @@ depends:  $(CIFILES)
         for i in $(OBJS) ; do \
               SRCFILE=`basename $$i .o`.C ; \
               echo "checking dependencies for $$SRCFILE" ; \
-              g++ -MM -I$(CHARMINC) $$SRCFILE | \
+              g++ -std=c++0x -MM -I$(CHARMINC) $$SRCFILE | \
               perl $(CHARMBIN)/dep.pl $(CHARMINC) /usr/include /usr/local >> $(DEPENDFILE); \
               echo '	$$(CHARMC) -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
         done;

@@ -53,7 +53,7 @@ test: all
 # Rule to generate dependency information for C++ source files
 %.d: %.C
 	$(info Generating dependencies for $<)
-	@g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) -I$(CHARMINC) $< | perl $(CHARMBIN)/dep.pl $(CHARMINC) > $@
+	@g++ -std=c++0x -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) -I$(CHARMINC) $< | perl $(CHARMBIN)/dep.pl $(CHARMINC) > $@
 #	@$(SHELL) -ec 'g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) $< \
 #	| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
 #	[ -s $@ ] || rm -f $@'
