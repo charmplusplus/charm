@@ -2965,19 +2965,25 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
 	// (A separate loop so ckLocal works even in element pup routines)
     for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
 		int elCType;
+                CkArray *arr = itr->second;
 		if (!p.isUnpacking())
 		{ //Need to find the element's existing type
-			CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getID());
+			CkMigratable *elt = arr->getEltFromArrMgr(rec->getID());
 			if (elt) elCType=elt->ckGetChareType();
 			else elCType=-1; //Element hasn't been created
 		}
 		p(elCType);
 		if (p.isUnpacking() && elCType!=-1) {
 			//Create the element
-			CkMigratable *elt = itr->second->allocateMigrated(elCType, type);
+			CkMigratable *elt = arr->allocateMigrated(elCType, type);
 			int migCtorIdx=_chareTable[elCType]->getMigCtor();
 			//Insert into our tables and call migration constructor
-			if (!addElementToRec(rec,itr->second,elt,migCtorIdx,NULL)) return;
+			if (!addElementToRec(rec,arr,elt,migCtorIdx,NULL)) return;
+                        if (type==CkElementCreation_resume)
+                        { // HACK: Re-stamp elements on checkpoint resume--
+                          //  this restores, e.g., reduction manager's gcount
+                          arr->stampListenerData(elt);
+                        }
 		}
 	}
 	//Next pup the element data

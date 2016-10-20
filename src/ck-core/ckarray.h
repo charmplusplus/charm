@@ -703,6 +703,7 @@ public:
   /// Create an uninitialized element after migration
   ///  The element's constructor will be called immediately after.
   virtual CkMigratable *allocateMigrated(int elChareType, CkElementCreation_t type);
+  void stampListenerData(CkMigratable *elt);
 
   /// Prepare creation message:
   void prepareCtorMsg(CkMessage *m, int listenerData[CK_ARRAYLISTENER_MAXLEN]);

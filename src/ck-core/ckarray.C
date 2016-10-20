@@ -1075,15 +1075,15 @@ int CkArray::findInitialHostPe(const CkArrayIndex &idx, int proposedPe)
   CkAbort("hostPe for a bound element disagrees with an explicit proposedPe");
 }
 
+void CkArray::stampListenerData(CkMigratable *elt)
+{
+  ArrayElement *elt2 = (ArrayElement *)elt;
+  CK_ARRAYLISTENER_STAMP_LOOP(elt2->listenerData);
+}
+
 CkMigratable *CkArray::allocateMigrated(int elChareType, CkElementCreation_t type)
 {
 	ArrayElement *ret=allocate(elChareType, NULL, true, NULL);
-	if (type==CkElementCreation_resume) 
-	{ // HACK: Re-stamp elements on checkpoint resume--
-	  //  this restores, e.g., reduction manager's gcount
-		int *listenerData=ret->listenerData;
-		CK_ARRAYLISTENER_STAMP_LOOP(listenerData);
-	}
 	return ret;
 }
 
