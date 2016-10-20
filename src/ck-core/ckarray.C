@@ -1123,9 +1123,6 @@ bool CkArray::insertElement(CkArrayMessage *me, const CkArrayIndex &idx, int lis
   int ctorIdx = me->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
   ArrayElement *elt=allocate(chareType, me, false, listenerData);
-#ifndef CMK_CHARE_USE_PTR
-  ((Chare *)elt)->chareIdx = -1;
-#endif
   if (!locMgr->addElement(thisgroup, idx, elt, ctorIdx, (void *)me)) return false;
   CK_ARRAYLISTENER_LOOP(listeners,
       if (!l->ckElementCreated(elt)) return false;);
