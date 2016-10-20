@@ -733,7 +733,9 @@ static void CmiExtendHandlerTable(int atLeastLen) {
     CmiHandlerInfo *nu = (CmiHandlerInfo*)malloc(newbytes);
     CmiHandlerInfo *tab = CpvAccess(CmiHandlerTable);
     _MEMCHECK(nu);
-    memcpy(nu, tab, bytes);
+    if (tab) {
+      memcpy(nu, tab, bytes);
+    }
     memset(((char *)nu)+bytes, 0, (newbytes-bytes));
     free(tab); tab=nu;
     CpvAccess(CmiHandlerTable) = tab;
