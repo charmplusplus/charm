@@ -109,7 +109,7 @@ test: pgm
 	$(call run, ./pgm +p3 )
 	$(call run, ./pgm +p4 )
 
-depends:  $(CIFILES)
+Make.depends:  $(CIFILES)
 	echo "Creating " $(DEPENDFILE) " ...";	\
         if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
