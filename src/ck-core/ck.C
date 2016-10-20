@@ -935,7 +935,6 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
   int idx;
   register void *obj = _allocNewChare(env, idx);
 #ifndef CMK_CHARE_USE_PTR
-  //((Chare *)obj)->chareIdx = idx;
   CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
@@ -975,7 +974,6 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 #endif
   CpvAccess(_qd)->create();
 #ifndef CMK_CHARE_USE_PTR
-  //((Chare *)obj)->chareIdx = idx;
   CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
