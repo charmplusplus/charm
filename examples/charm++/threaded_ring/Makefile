@@ -2,8 +2,8 @@
 CHARMC = ../../../bin/charmc
 BINARY = threaded_ring
 
-CHARMCFLAGS =
-CHARMCLINKFLAGS = -language charm++
+CHARMCFLAGS = $(OPTS)
+CHARMCLINKFLAGS = -language charm++ $(OPTS)
 TESTFLAGS =  +p1
 
 %.o: %.C

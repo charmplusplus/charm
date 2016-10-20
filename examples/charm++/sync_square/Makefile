@@ -3,7 +3,7 @@ CHARMC = ../../../bin/charmc
 BINARY = sync_square
 
 CHARMCFLAGS = $(OPTS)
-CHARMCLINKFLAGS = -language charm++
+CHARMCLINKFLAGS = -language charm++ $(OPTS)
 TESTFLAGS =  +p1
 
 %.o: %.C

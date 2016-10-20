@@ -19,7 +19,7 @@ clean:
 $(SRC): $(DECLS)
 
 $(EXEC_NAME): $(OBJ)
-	$(CXX) -o $@ $^ -module completion
+	$(CXX) $(CXXFLAGS) -o $@ $^ -module completion
 
 %.decl.h: %.ci
 	$(CXX) -c $*.ci

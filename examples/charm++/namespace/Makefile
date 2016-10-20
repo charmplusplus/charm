@@ -2,8 +2,8 @@
 CHARMC = ../../../bin/charmc
 BINARY = inherit
 
-CHARMCFLAGS =
-CHARMCLINKFLAGS = -language charm++
+CHARMCFLAGS = $(OPTS)
+CHARMCLINKFLAGS = -language charm++ $(OPTS)
 TESTFLAGS =  +p1
 
 %.o: %.C
