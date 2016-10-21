@@ -406,8 +406,8 @@ struct partconndata * FEM_call_parmetis(int nelem, MSA1DINT::Read &rPtr, MSA1DIN
     printf("\n");
   */
   int wgtflag=0,numflag=0,ncon=1,ncommonnodes=2,options[5],edgecut=0;
-  double ubvec = 1.05;
-  double *tpwgts = new double[numChunks];
+  float ubvec = 1.05;
+  float *tpwgts = new float[numChunks];
   int *parts = new int[numindices+1];
   for(int i=0;i<numChunks;i++){
     tpwgts[i]=1/(double)numChunks;
