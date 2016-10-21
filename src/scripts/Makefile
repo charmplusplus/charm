@@ -53,12 +53,9 @@ PVM: converse $(L)/libpvmc.a
 AMR: charm++ LIBS
 	$(MAKE) -C libs/ck-libs/amr all
 
-FEM: charm++ AMPI
-	$(MAKE) -C libs/ck-libs/ FEM
-FEMC: FEM
-FEMF: FEM
+FEM: ParFUM
 
-ParFUM: FEM
+ParFUM: charm++ AMPI
 	$(MAKE) -C libs/ck-libs/ ParFUM
 
 MBLOCK: AMPI MBLOCKC MBLOCKF
@@ -160,10 +157,6 @@ test-charm: charm++
 
 test-AMPI: AMPI
 	$(MAKE) -C ../tests test-AMPI
-
-test-fem: FEM
-	$(MAKE) -C ../tests test-fem
-	$(MAKE) -C ../examples test-fem
 
 ps-doc: basics
 	$(MAKE) -C ../doc ps

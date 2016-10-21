@@ -10,9 +10,6 @@ test:
 		($(MAKE) -C $$d test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
-test-fem:
-	$(MAKE) -C fem test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
-
 bgtest:
 	for d in charm++ ampi armci; do \
 		($(MAKE) -C $$d bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \

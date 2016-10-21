@@ -33,9 +33,6 @@ test-charm:
 test-AMPI:
 	$(MAKE) -C ampi test OPTS='$(OPTS)'
 
-test-fem:
-	$(MAKE) -C fem test OPTS='$(OPTS)'
-
 clean:
 	for d in $(DIRS); do \
 		($(MAKE) -C $$d clean OPTS='$(OPTS)'); \
