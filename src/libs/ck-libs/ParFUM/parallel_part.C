@@ -178,8 +178,6 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 	
   DEBUG(printf("[%d] Memory usage on vp 0 close to max %d \n",CkMyPe(),CmiMemoryUsage()));
 	//Free up the eptr and eind MSA arrays stored in data
-  delete &rPtr;
-  delete &rInd;
   data.arr1.FreeMem();
   data.arr2.FreeMem();
   nodepart.FreeMem();
@@ -258,7 +256,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
     call parmetis and get the resuts back from it
   */
   MSA1DINT::Read rPtr = data.arr1.getInitialWrite().syncToRead();
-  MSA1DINT::Read rInd = data.arr1.getInitialWrite().syncToRead();
+  MSA1DINT::Read rInd = data.arr2.getInitialWrite().syncToRead();
   struct partconndata *partdata = FEM_call_parmetis(data.nelem, rPtr, rInd, comm_context);
 	
   /*
@@ -309,8 +307,6 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",myRank,me.m->nElems(),me.m->node.size());
 	
 	//Free up the eptr and eind MSA arrays stored in data
-  delete &rPtr;
-  delete &rInd;
 	data.arr1.FreeMem();
 	data.arr2.FreeMem();
 	nodepart.FreeMem();
@@ -1148,8 +1144,6 @@ void makeGhost(FEM_Mesh *m,
   DEBUG(printf("[%d] Recv ghost nodes \n",myChunk));
   DEBUG(m->node.getGhostRecv().print());
 
-  delete &rDistTab;
-  delete &rGhostMeshes;
   delete distTab;
   delete ghostmeshes;
   MPI_Barrier(comm);
