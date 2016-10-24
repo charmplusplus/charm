@@ -268,6 +268,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MSA1DINTLIST::Accum nodepartAcc = nodepart.getInitialAccum();
 	
   FEM_write_nodepart(nodepartAcc,partdata,(MPI_Comm)comm_context);
+  MSA1DINTLIST::Read nodepartRead = nodepartAcc.syncToRead();
 	
   /*
     write to the msa that stores the nodes that belong to each partition
@@ -277,8 +278,6 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MPI_Bcast_pup(part2node,masterRank,(MPI_Comm)comm_context);
   part2node.enroll(numChunks);
   MSA1DNODELIST::Accum part2nodeAcc = part2node.getInitialAccum();
-  MSA1DINTLIST::Read nodepartRead = nodepartAcc.syncToRead();
-
 
   FEM_write_part2node(nodepartRead, part2nodeAcc, partdata, (MPI_Comm)comm_context);
 
