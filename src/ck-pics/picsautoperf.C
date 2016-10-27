@@ -11,6 +11,8 @@
 #include <math.h>
 #include "trace-perf.h"
 
+#include <iterator>
+
 #define PICS_CODE  15848
 #define TRACE_START(id)
 #define TRACE_END(step, id)
