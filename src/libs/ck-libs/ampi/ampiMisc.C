@@ -41,8 +41,8 @@ KeyvalPair::KeyvalPair(const char* k, const char* v){
 }
 
 KeyvalPair::~KeyvalPair(void){
-  free((char*)key);
-  free((char*)val);
+  delete [] key;
+  delete [] val;
 }
 
 void InfoStruct::pup(PUP::er& p){
