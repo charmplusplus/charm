@@ -1477,6 +1477,7 @@ static void node_addresses_obtain(char **argv)
   else 
   { /*Contact charmrun for machine info.*/
 	ChSingleNodeinfo me;
+	memset(&me, 0, sizeof(me));
 
   	me.nodeNo=ChMessageInt_new(Lrts_myNode);
 
