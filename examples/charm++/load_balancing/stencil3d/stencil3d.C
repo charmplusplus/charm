@@ -58,7 +58,7 @@ int myrand(int numpes) {
 #define index(a,b,c)	((a)+(b)*(blockDimX+2)+(c)*(blockDimX+2)*(blockDimY+2))
 
 #define MAX_ITER	100
-#define LBPERIOD	5
+#define LBPERIOD_ITER	5     // LB is called every LBPERIOD_ITER number of program iterations
 #define CHANGELOAD	30
 #define LEFT		1
 #define RIGHT		2
@@ -164,6 +164,13 @@ class Stencil: public CBase_Stencil {
       // start measuring time
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
         startTime = CkWallTimer();
+
+#if CMK_LBDB_ON
+      // set period arbitrarily small so that LB occurs when AtSync is called
+      // this is in case the default LBPERIOD is larger than the time to complete LBPERIOD_ITER
+      // iterations
+      getLBDB()->SetLBPeriod(0);
+#endif
     }
 
     void pup(PUP::er &p)
@@ -296,7 +303,6 @@ class Stencil: public CBase_Stencil {
       // not being done right now since we are doing a fixed no. of iterations
 
       double *tmp;
-      double endTime;
       tmp = temperature;
       temperature = new_temperature;
       new_temperature = tmp;
@@ -304,11 +310,7 @@ class Stencil: public CBase_Stencil {
       constrainBC();
 
       if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
-	endTime = CkWallTimer();
-	// auto tune the LBPeriod to half as long as it takes to run the iters between LB steps
-#if CMK_LBDB_ON
-	getLBDB()->SetLBPeriod((endTime-startTime)*LBPERIOD/2.0);
-#endif
+	double endTime = CkWallTimer();
 	CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
       }
 
@@ -317,7 +319,7 @@ class Stencil: public CBase_Stencil {
       else {
 	if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
 	  startTime = CkWallTimer();
-	if(iterations % LBPERIOD == 0)
+	if(iterations % LBPERIOD_ITER == 0)
 	  {
 	    AtSync();
 	  }
