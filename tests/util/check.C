@@ -26,9 +26,9 @@ size_t check_size_values[] =
   (1UL << 13) + 1,
   (1UL << 14) - 1,
   1UL << 31,
-  1UL << 32,
-  1UL << 33,
-  1UL << 34
+  1ULL << 32,
+  1ULL << 33,
+  1ULL << 34
 };
 
 void check_test(int argc, char** argv) {
