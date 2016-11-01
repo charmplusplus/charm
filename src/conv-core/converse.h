@@ -1883,9 +1883,35 @@ extern int _immRunning;
 
 #if  CMK_SMP
 #if CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE
-#define CmiMemoryAtomicIncrement(someInt)    __sync_fetch_and_add(&(someInt), 1)
-#define CmiMemoryAtomicDecrement(someInt)    __sync_fetch_and_sub(&(someInt), 1)
-#define CmiMemoryAtomicFetchAndInc(input,output)   (output) =__sync_fetch_and_add(&(input), 1)
+/* ImplSelect<num> selects one of two implementations for the atomic operations depending on the number of parameters
+ * e.g.) CmiMemoryAtomicIncrement(input)
+ *       -> ImplSelect2(input, CmiMemoryAtomicIncrementMemOrder, CmiMemoryAtomiIncrementSimple) CmiMemoryAtomicIncrementSimple
+ *       -> __sync_fetch_and_add(&input, 1)
+ *
+ *       CmiMemoryAtomicIncrement(input, memory_order_relaxed) (you can specify the memory consistency for each atomic operation with the C11 consistency keywords)
+ *       -> ImplSelect2(input, memory_order_relaxed, CmiMemoryAtomicIncrementMemOrder, CmiMemoryAtomicIncrementSimple) CmiMemoryAtomicIncrementMemOrder
+ *       -> __atomic_fetch_and_add(&input, 1, memory_order_relaxed) (if the underlying compiler supports C11)
+ *       -> CmiMemoryAtomicSimple(input) -> __sync_fetch_and_add(&input, 1) (if the compiler doesn't support C11, the memory consistency keyword ignored)
+ * */
+#define ImplSelect2(_1, _2, NAME, ...) NAME
+#define ImplSelect3(_1, _2, _3, NAME, ...) NAME
+#define CmiMemoryAtomicIncrement(...) ImplSelect2(__VA_ARGS__, CmiMemoryAtomicIncrementMemOrder, CmiMemoryAtomicIncrementSimple)(__VA_ARGS__)
+#define CmiMemoryAtomicDecrement(...) ImplSelect2(__VA_ARGS__, CmiMemoryAtomicDecrementMemOrder, CmiMemoryAtomicDecrementSimple)(__VA_ARGS__)
+#define CmiMemoryAtomicFetchAndInc(...) ImplSelect3(__VA_ARGS__, CmiMemoryAtomicFetchAndIncMemOrder, CmiMemoryAtomicFetchAndIncSimple)(__VA_ARGS__)
+
+#if __STDC_VERSION__ >= 201112L & !__STDC_NO_ATOMICS__
+#include <stdatmoic.h>
+#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) __atomic_fetch_and_add(&(someInt),1, MemModel);
+#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) __atomic_fetch_and_sub(&(someInt,1, MemModel);
+#define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) (output) = __atomic_fetch_and_add(&(input),1, MemModel);
+#else
+#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) CmiMemoryAtomicIncrementSimple(someInt);
+#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) CmiMemoryAtomicDecrementSimple(someInt);
+#define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) CmiMemoryAtomicFetchAndIncSimple(input, output);
+#endif
+#define CmiMemoryAtomicIncrementSimple(someInt)    __sync_fetch_and_add(&(someInt), 1)
+#define CmiMemoryAtomicDecrementSimple(someInt)    __sync_fetch_and_sub(&(someInt), 1)
+#define CmiMemoryAtomicFetchAndIncSimple(input,output)   (output) =__sync_fetch_and_add(&(input), 1)
 #elif CMK_GCC_X86_ASM /*SYNC_PRIM*/
 #if 1
 #define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))

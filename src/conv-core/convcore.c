@@ -1749,11 +1749,7 @@ void CsdBeginIdle(void)
 #if CMK_SMP && CMK_TASKQUEUE
   if (CpvAccess(cmiMyPeIdle) !=1) {
     CpvAccess(cmiMyPeIdle) = 1;
-#if __STDC_VERSION__ >= 201112L
-    __atomic_add_fetch(&CsvAccess(idleThreadsCnt), 1, memory_order_relaxed);
-#else
-    __sync_add_and_fetch(&CsvAccess(idleThreadsCnt), 1);
-#endif
+    CmiMemoryAtomicIncrement(CsvAccess(idleThreadsCnt), memory_order_relaxed);
   }
 #else
   CpvAccess(cmiMyPeIdle) = 1;
@@ -1774,11 +1770,7 @@ void CsdEndIdle(void)
 #if CMK_SMP && CMK_TASKQUEUE
   if (CpvAccess(cmiMyPeIdle) != 0){
     CpvAccess(cmiMyPeIdle) = 0;
-#if __STDC_VERSION__ >= 201112L 
-    __atomic_sub_fetch(&CsvAccess(idleThreadsCnt), 1, memory_order_relaxed);
-#else
-    __sync_sub_and_fetch(&CsvAccess(idleThreadsCnt), 1);
-#endif
+    CmiMemoryAtomicDecrement(CsvAccess(idleThreadsCnt), memory_order_relaxed);
   }
 #else
   CpvAccess(cmiMyPeIdle) = 0;
