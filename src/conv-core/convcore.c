@@ -662,8 +662,7 @@ CpvDeclare(int, CstatsMaxFixedChareQueueLength);
 CpvStaticDeclare(int, CstatPrintQueueStatsFlag);
 CpvStaticDeclare(int, CstatPrintMemStatsFlag);
 
-void CstatsInit(argv)
-char **argv;
+void CstatsInit(char ** argv)
 {
 
 #ifdef MEMMONITOR
@@ -699,8 +698,7 @@ char **argv;
 #endif
 }
 
-int CstatMemory(i)
-int i;
+int CstatMemory(int i)
 {
   return 0;
 }
@@ -2128,8 +2126,7 @@ void CsdScheduleNodePoll(void)
   }
 }
 
-void CmiDeliverSpecificMsg(handler)
-int handler;
+void CmiDeliverSpecificMsg(int handler)
 {
   int *msg; int side;
   void *localqueue = CpvAccess(CmiLocalQueue);
@@ -2308,8 +2305,7 @@ void CthSchedInit()
 		 CthSuspendSchedulingThread);
 }
 
-void CsdInit(argv)
-  char **argv;
+void CsdInit(char **argv)
 {
   CpvInitialize(void *, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
