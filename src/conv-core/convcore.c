@@ -256,8 +256,6 @@ CpvDeclare(void *, CmiSuspendedTaskQueue);
 
 CpvDeclare(int, isHelperOn);
 
-int CmiIsMyNodeIdle(void);
-
 int    CmiMyLocalRank = -1;        /* local rank only for scalable startup */
 
 /*****************************************************************************
@@ -4014,14 +4012,6 @@ double CmiReadSize(const char *str)
         val = atof(str);
     }
     return val;
-}
-
-int CmiIsMyNodeIdle(void){
-    int i;
-    for(i=0; i<CmiMyNodeSize(); i++){
-        if(CpvAccessOther(cmiMyPeIdle, i)) return 1;
-    }
-    return 0;
 }
 
 void CmiSetPeHelpsOtherThreads(int input) {
