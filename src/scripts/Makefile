@@ -410,7 +410,7 @@ CVLIBS=$(L)/libconv-core.a \
 	$(L)/libccs-client.a $(L)/libconv-partition.a \
 	$(L)/libconv-ldb.a
 
-LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
+LIBCONV_CORE= convcore.o conv-idle.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o \
 	debug-conv.o debug-conv++.o conv-ccs.o ccs-builtins.o middle-ccs.o \
 	traceCore.o traceCoreCommon.o \
