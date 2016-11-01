@@ -2154,11 +2154,6 @@ CpvCExtern(int, _urgentSend);
 #define CmiEnableUrgentSend(yn)   
 #endif
 
-#if defined(__cplusplus)
-extern "C" int CmiIsMyNodeIdle();
-#else
-extern int CmiIsMyNodeIdle();
-#endif
 #if CMK_SMP && CMK_TASKQUEUE
 #include "taskqueue.h" /* for tasks queue */
 

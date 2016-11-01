@@ -242,7 +242,6 @@ CpvStaticDeclare(int, cmiMyPeIdle);
 CsvDeclare(unsigned int, idleThreadsCnt);
 CpvDeclare(void *, CsdTaskQueue);
 #endif
-int CmiIsMyNodeIdle();
 
 /*****************************************************************************
  *
@@ -4058,14 +4057,6 @@ double CmiReadSize(const char *str)
         val = atof(str);
     }
     return val;
-}
-
-int CmiIsMyNodeIdle(){
-    int i;
-    for(i=0; i<CmiMyNodeSize(); i++){
-        if(CpvAccessOther(cmiMyPeIdle, i)) return 1;
-    }
-    return 0;
 }
 
 /*@}*/
