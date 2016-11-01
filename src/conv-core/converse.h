@@ -1882,9 +1882,9 @@ extern int _immRunning;
 
 #if  CMK_SMP
 #if CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE
-#define CmiMemoryAtomicIncrement(someInt)    __sync_fetch_and_add(&someInt, 1)
-#define CmiMemoryAtomicDecrement(someInt)    __sync_fetch_and_sub(&someInt, 1)
-#define CmiMemoryAtomicFetchAndInc(input,output)   output =__sync_fetch_and_add(&input, 1)
+#define CmiMemoryAtomicIncrement(someInt)    __sync_fetch_and_add(&(someInt), 1)
+#define CmiMemoryAtomicDecrement(someInt)    __sync_fetch_and_sub(&(someInt), 1)
+#define CmiMemoryAtomicFetchAndInc(input,output)   (output) =__sync_fetch_and_add(&(input), 1)
 #elif CMK_GCC_X86_ASM /*SYNC_PRIM*/
 #if 1
 #define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
