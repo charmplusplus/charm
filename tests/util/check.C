@@ -25,10 +25,12 @@ size_t check_size_values[] =
   1UL << 13,
   (1UL << 13) + 1,
   (1UL << 14) - 1,
-  1UL << 31,
-  1ULL << 32,
+  1UL << 31
+#if CMK_SIZET_64BIT
+  , 1ULL << 32,
   1ULL << 33,
   1ULL << 34
+#endif
 };
 
 void check_test(int argc, char** argv) {
