@@ -31,6 +31,9 @@
 
 #include <infiniband/verbs.h>
 
+#if CMK_ONESIDED_IMPL
+#include "machine-rdma.h"
+#endif
 
 #if ! QLOGIC
 enum ibv_mtu mtu = IBV_MTU_2048;
@@ -135,6 +138,9 @@ struct infiPacketHeader{
 */
 #define INFI_MESG 1 
 #define INFI_DIRECT 2
+#if CMK_ONESIDED_IMPL
+#define INFI_ONESIDED 3
+#endif
 
 struct infiRdmaPacket{
 	int fromNodeNo;
@@ -317,6 +323,10 @@ typedef struct infiCmiChunkMetaDataStruct {
 
 
 #define METADATAFIELD(m) (((infiCmiChunkHeader *)m)[-1].metaData)
+
+#if CMK_ONESIDED_IMPL
+#include "machine-onesided.h"
+#endif
 
 typedef struct {
 	int size;//without infiCmiChunkHeader
@@ -532,6 +542,8 @@ loop:
 		}
 	}*/
 	maxRecvBuffers=calcMaxSize;
+
+	//increase if ibv_post_send fails or program hangs
 	if (CmiGetArgIntDesc(argv,"+IBVMaxSendTokens",&maxTokens,"User set IBV Max Outstanding Send Tokens") == 0)
 	  maxTokens = 1000; // this value may need to be tweaked later
 	context->tokensLeft=maxTokens;
@@ -1688,7 +1700,14 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	}
 	if(rdma && header->code & INFIRDMA_ACK){
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)(buffer->buf+sizeof(struct infiPacketHeader)) ;
-		processRdmaAck(rdmaPacket);
+#if CMK_ONESIDED_IMPL
+		if (rdmaPacket->type == INFI_ONESIDED)
+			verbsOnesidedReceivedAck(rdmaPacket);
+		else
+#endif
+		{
+			processRdmaAck(rdmaPacket);
+		}
 	}
 /*	if(header->code & INFIDIRECT_REQUEST){
 		struct infiDirectRequestPacket *directRequestPacket = (struct infiDirectRequestPacket *)(buffer->buf+sizeof(struct infiPacketHeader));
@@ -1831,6 +1850,19 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		return;
 	}*/
 //	CmiAssert(rdmaPacket->type == INFI_MESG);
+#if CMK_ONESIDED_IMPL
+	if (rdmaPacket->type == INFI_ONESIDED) {
+
+#if CMK_IBVERBS_TOKENS_FLOW
+		context->tokensLeft++;
+#endif
+
+		verbsOnesidedOpDone(rdmaPacket->localBuffer);
+		free(rdmaPacket);
+
+		return;
+	}
+#endif
 	struct infiBuffer *buffer = (struct infiBuffer *)rdmaPacket->localBuffer;
 
 	/*TODO: remove this
@@ -3180,6 +3212,10 @@ void CmiMachineCleanup(){
 void  LrtsNotifyIdle() {}
 void  LrtsBeginIdle() {}
 void  LrtsStillIdle() {}
+
+#if CMK_ONESIDED_IMPL
+#include "machine-onesided.c"
+#endif
 
 /*void processDirectRequest(struct infiDirectRequestPacket *directRequestPacket){
 	int senderProc = directRequestPacket->senderProc;

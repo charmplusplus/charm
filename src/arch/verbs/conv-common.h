@@ -15,6 +15,8 @@
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
+#define CMK_ONESIDED_IMPL                                  1
+
 /* the first 4 fields of the header are defined in machine-dgram.c
    and are used for the udp retransmission protocol implementation.
    Parameters stratid and root are for the communication library.
