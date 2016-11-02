@@ -115,6 +115,7 @@ class Entry : public Member {
     XStr dataItemType();
     XStr tramBaseType();
     XStr aggregatorType();
+    XStr aggregatorGlobalType(XStr& scope);
     XStr aggregatorName();
     XStr paramType(int withDefaultVals,int withEO=0,int useConst=1);
     XStr paramComma(int withDefaultVals,int withEO=0);
@@ -209,7 +210,7 @@ class Entry : public Member {
     void lookforCEntry(CEntry *centry);
     int getLine();
     void genTramRegs(XStr& str);
-    void genTramPups(XStr& decls, XStr& defs);
+    void genTramPups(XStr& scope, XStr& decls, XStr& defs);
 };
 
 // TODO(Ralf): why not simply use list<Entry*> instead?

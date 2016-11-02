@@ -28,7 +28,8 @@ class AstNode : public Printable {
 
   virtual void genTramTypes() {}
   virtual void genTramRegs(XStr &str) { (void)str; }
-  virtual void genTramPups(XStr &decls, XStr &defs) { (void)decls; (void)defs; }
+  virtual void genTramPups(XStr& scope, XStr &decls, XStr &defs)
+  { (void) scope; (void)decls; (void)defs; }
 
   // DMK - Accel Support
   virtual int genAccels_spe_c_funcBodies(XStr& str) { (void)str; return 0; }
@@ -79,7 +80,7 @@ class AstChildren : public virtual AstNode {
 
   void genTramTypes();
   void genTramRegs(XStr& str);
-  void genTramPups(XStr &decls, XStr &defs);
+  void genTramPups(XStr& scope, XStr &decls, XStr &defs);
 
   // Accelerated Entry Method support
   int genAccels_spe_c_funcBodies(XStr& str);
@@ -363,8 +364,12 @@ AstChildren<Child>::genTramRegs(XStr &str) {
 
 template <typename Child>
 void
-AstChildren<Child>::genTramPups(XStr &decls, XStr &defs) {
-  details::perElemGen2(children, decls, defs, &Child::genTramPups);
+AstChildren<Child>::genTramPups(XStr& scope, XStr &decls, XStr &defs) {
+  for (typename std::list<Child*>::iterator i = children.begin(); i != children.end(); ++i) {
+    if (*i) {
+      (*i)->genTramPups(scope, decls, defs);
+    }
+  }
 }
 
 

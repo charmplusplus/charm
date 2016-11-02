@@ -834,6 +834,25 @@ XStr Entry::aggregatorType() {
   return groupType;
 }
 
+XStr Entry::aggregatorGlobalType(XStr& scope) {
+  XStr groupType;
+  if (container->isGroup()) {
+    groupType << "GroupMeshStreamer<" << param->param->type
+              << ", " << scope << container->baseName() << ", SimpleMeshRouter"
+              << ", " << scope << container->indexName() << "::_callmarshall_"
+              << epStr() << " >";
+  }
+  else if (container->isArray()) {
+    groupType << "ArrayMeshStreamer<" << param->param->type
+              << ", " << aggregatorIndexType() <<", " << scope
+              << container->baseName() << ", "
+              << "SimpleMeshRouter, " << scope
+              << container->indexName() << "::_callmarshall_" << epStr()
+              << " >";
+  }
+  return groupType;
+}
+
 XStr Entry::aggregatorName() {
   XStr aggregatorName;
   aggregatorName << epStr() << "TramAggregator";
@@ -961,10 +980,10 @@ void Entry::genTramRegs(XStr& str)
   }
 }
 
-void Entry::genTramPups(XStr& decls, XStr& defs)
+void Entry::genTramPups(XStr& scope, XStr& decls, XStr& defs)
 {
   if (isTramTarget()) {
-    XStr aggregatorTypeString = aggregatorType();
+    XStr aggregatorTypeString = aggregatorGlobalType(scope);
     container->genRecursivePup(aggregatorTypeString, "template <>\n", decls, defs);
   }
 }

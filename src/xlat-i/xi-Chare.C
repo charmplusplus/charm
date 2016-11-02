@@ -295,7 +295,7 @@ Chare::genGlobalCode(XStr scope, XStr &decls, XStr &defs)
   scopedName << scope << templatedType;
 
   if (list)
-    list->genTramPups(decls, defs);
+    list->genTramPups(scope, decls, defs);
 
   if (!isTemplateDeclaration()) {
     // Leave out ArrayElement because of its funny inheritance
