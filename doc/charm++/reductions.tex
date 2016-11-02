@@ -28,26 +28,7 @@ callback parameter will be the only input parameter:
     contribute(cb);
 \end{alltt}
 
-If no member passes a callback to \kw{contribute}, the reduction will use
-the {\em default} callback. Programmers can set the default callback for an array or group
-using the \kw{ckSetReductionClient} proxy call on processor zero, or
-by passing the callback to {\tt CkArrayOptions::setReductionClient()}
-before creating the array, as described in section~\ref{CkArrayOptions}.
-Again, a \kw{CkReductionMsg} message will be passed to this callback,
-which must delete the message when done.
-
-\begin{alltt}
-    // Somewhere on processor zero:
-    myProxy.ckSetReductionClient(new CkCallback(...));
-\end{alltt}
-
-So, for the previous reduction on chare array {\tt arr}:
-\begin{alltt}
-    CkCallback *cb = new CkCallback(CkIndex_main::reportIn(NULL),  mainProxy);
-    arr.ckSetReductionClient(cb);
-\end{alltt}
-
-and the actual entry point:
+and the corresponding callback function:
 
 \begin{alltt}
 void myReductionEntry(CkReductionMsg *msg)
@@ -66,25 +47,6 @@ void myReductionEntry(CkReductionMsg *msg)
 \end{alltt}
 
 (See \examplerefdir{reductions/simple\_reduction} for a complete example).
-
-For backward compatibility, in the place of a general callback, you can
-specify a particular kind of C function using \kw{ckSetReductionClient}
-or \kw{setReductionClient}.  This C function takes a user-defined
-parameter (passed to \kw{setReductionClient}) and the actual reduction data,
-which it must not deallocate.
-
-\begin{alltt}
-  // Somewhere on processor zero (possibly in Main::Main, after creating 'myProxy'):
-  myProxy.setReductionClient(myClient,(void *)NULL);
-
-  // Code for the C function that serves as reduction client:
-  void myClient(void *param,int dataSize,void *data)
-  \{
-    double *forceSum=(double *)data;
-    cout<<``First force sum is ``<<forceSum[0]<<endl;
-    cout<<``Second force sum is ``<<forceSum[1]<<endl;
-  \}
-\end{alltt}
 
 If the target of a reduction is an entry method defined by a
 \emph{when} clause in SDAG(Section~\ref{sec:sdag}), one may wish to set a

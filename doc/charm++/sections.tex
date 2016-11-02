@@ -187,18 +187,6 @@ See the following example:
     mcastGrp->contribute(sizeof(int), &data, CkReduction::sum_int, cookie, cb);
 \end{alltt}
 
-If no member passes a callback to contribute, the reduction will use the 
-default callback. You set the default callback for an array section using the 
-\kw{setReductionClient} call in the section root member. A 
-{\bf CkReductionMsg} message will be passed to this callback, which 
-must delete the message when done.
-
-\begin{alltt}
-  CProxySection_Hello sectProxy;
-  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-  mcastGrp->setReductionClient(sectProxy, new CkCallback(...));
-\end{alltt}
-
 As in an array reduction, users can use built-in reduction 
 types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
 (Section~\ref{new_type_reduction}).
@@ -233,7 +221,6 @@ void Foo::pup(PUP::er & p) {
       mg->resetSection(fooProxy);
         // you may want to reset reduction client to root
       CkCallback *cb = new CkCallback(...);
-      mg->setReductionClient(mcp, cb);
    }
 }
 \end{alltt}
