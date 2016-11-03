@@ -1179,7 +1179,7 @@ void CkArray::remoteBeginInserting(void)
   }
 }
 
-bool CkArray::demandCreateElement(const CkArrayIndex &idx, int onPe, int ctor, CkDeliver_t type)
+void CkArray::demandCreateElement(const CkArrayIndex &idx, int ctor, CkDeliver_t type)
 {
 	CkArrayMessage *m=(CkArrayMessage *)CkAllocSysMsg();
         envelope *env = UsrToEnv(m);
@@ -1188,16 +1188,9 @@ bool CkArray::demandCreateElement(const CkArrayIndex &idx, int onPe, int ctor, C
         int listenerData[CK_ARRAYLISTENER_MAXLEN];
 	prepareCtorMsg(m, listenerData);
 	m->array_ep()=ctor;
-	
-	if ((onPe!=CkMyPe()) || (type==CkDeliver_queue)) {
-		DEBC((AA "Forwarding demand-creation request for %s to %d\n" AB,idx2str(idx),onPe));
-		thisProxy[onPe].insertElement(m, idx, listenerData);
-	} else /* local message, non-queued */ {
-		//Call local constructor directly
-		DEBC((AA "Demand-creating %s\n" AB,idx2str(idx)));
-		return insertElement(m, idx, listenerData);
-	}
-	return true;
+
+        DEBC((AA "Demand-creating %s\n" AB,idx2str(idx)));
+        insertElement(m, idx, listenerData);
 }
 
 void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg)

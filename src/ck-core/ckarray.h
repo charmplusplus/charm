@@ -722,10 +722,7 @@ public:
 
 /// Demand-creation:
   /// Demand-create an element at this index on this processor
-  ///  Returns true if the element was successfully added;
-  ///  false if the element migrated away or deleted itself.
-  bool demandCreateElement(const CkArrayIndex &idx,
-  	int onPe,int ctor,CkDeliver_t type);
+  void demandCreateElement(const CkArrayIndex &idx, int ctor, CkDeliver_t type);
 
 /// Broadcast communication:
   void sendBroadcast(CkMessage *msg);

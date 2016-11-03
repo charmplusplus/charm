@@ -50,6 +50,7 @@ typedef enum {
 	CkDeliver_queue=0, //Deliver via the scheduler's queue
 	CkDeliver_inline=1  //Deliver via a regular call
 } CkDeliver_t;
+PUPbytes(CkDeliver_t)
 
 class CkArrayOptions;
 #include "CkLocation.decl.h"

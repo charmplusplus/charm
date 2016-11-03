@@ -2652,9 +2652,13 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
     return true;
   }
 
-  ///@todo: Isnt there a chance that a local record exists, but all the managers are not created yet?
-  /// in which case it should be buffered in bufferedMsgs
-  CkMigratable *obj = managers[UsrToEnv(msg)->getArrayMgr()]->lookup(id);
+  CkAssert(mgr == UsrToEnv(msg)->getArrayMgr());
+  CkArray *arr = managers[mgr];
+  if (!arr) {
+    bufferedShadowElemMsgs[id].push_back(msg);
+    return true;
+  }
+  CkMigratable *obj = arr->lookup(id);
   if (obj==NULL) {//That sibling of this object isn't created yet!
     if (opts & CK_MSG_KEEP)
       msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
@@ -2803,7 +2807,7 @@ void CkLocMgr::demandCreateElement(const CkArrayIndex &idx, int chareType, int o
   //Find the manager and build the element
   DEBC((AA "Demand-creating element %s on pe %d\n" AB,idx2str(idx),onPe));
   inform(idx, getNewObjectID(idx), onPe);
-  managers[mgr]->demandCreateElement(idx, onPe, ctor, CkDeliver_inline);
+  CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor, CkDeliver_inline);
 }
 
 bool CkLocMgr::demandCreateElement(CkArrayMessage *msg, const CkArrayIndex &idx, int onPe,CkDeliver_t type)
@@ -2823,8 +2827,8 @@ bool CkLocMgr::demandCreateElement(CkArrayMessage *msg, const CkArrayIndex &idx,
 	
 	//Find the manager and build the element
 	DEBC((AA "Demand-creating element %s on pe %d\n" AB,idx2str(idx),onPe));
-	return managers[UsrToEnv((void *)msg)->getArrayMgr()]
-        ->demandCreateElement(idx,onPe,ctor,type);
+	CProxy_CkArray(UsrToEnv((void *)msg)->getArrayMgr())[onPe].demandCreateElement(idx, ctor, type);
+        return onPe == CkMyPe();
 }
 
 //This message took several hops to reach us-- fix it
