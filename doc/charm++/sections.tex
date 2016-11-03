@@ -187,29 +187,29 @@ See the following example:
     mcastGrp->contribute(sizeof(int), &data, CkReduction::sum_int, cookie, cb);
 \end{alltt}
 
-As in an array reduction, users can use built-in reduction 
-types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
+As in an array reduction, users can use built-in reduction
+types (Section~\ref{builtin_reduction}) or define his/her own reducer functions
 (Section~\ref{new_type_reduction}).
 
 \section{Section Collectives when Migration Happens}
 
-Using multicast/reduction, you don't need to worry about array migrations.
-When migration happens, array element in the array section can still use 
-the \kw{CkSectionInfo} it stored previously for doing reduction. 
+When using a section reduction, you don't need to worry about array migrations.
+When migration happens, an array element in the array section can still use
+the \kw{CkSectionInfo} it stored previously for doing a reduction.
 Reduction messages will be correctly delivered but may not be as efficient 
 until a new multicast spanning tree is rebuilt internally 
-in \kw{CkMulticastMgr} library. 
-When a new spanning tree is rebuilt, a updated \kw{CkSectionInfo} is 
-passed along with a multicast message, 
+in the \kw{CkMulticastMgr} library.
+When a new spanning tree is rebuilt, an updated \kw{CkSectionInfo} is
+passed along with a multicast message,
 so it is recommended that 
 \kw{CkGetSectionInfo()} function is always called when a multicast 
 message arrives (as shown in the above SayHi example).
 
-In case when a multicast root migrates, the library must reconstruct the 
+In the case where a multicast root migrates, the library must reconstruct the
 spanning tree to get optimal performance. One will get the following
-warning message if not doing so:
+warning message if this is not done:
 "Warning: Multicast not optimized after multicast root migrated."
-In current implementation, user needs to initiate the rebuilding process
+In the current implementation, the user needs to initiate the rebuilding process
 using \kw{resetSection}.
 
 \begin{alltt}
