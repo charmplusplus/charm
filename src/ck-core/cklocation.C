@@ -18,9 +18,6 @@
 #include <vector>
 #include <algorithm>
 #include<sstream>
-#include <map>
-
-using std::map;
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
@@ -2223,7 +2220,7 @@ void CkLocMgr::pup(PUP::er &p){
         int count=0;
         CkVec<int> pe_list;
         CkVec<CmiUInt8> idx_list;
-        for (std::map<CmiUInt8, int>::iterator itr = id2pe.begin(); itr != id2pe.end(); ++itr)
+        for (auto itr = id2pe.begin(); itr != id2pe.end(); ++itr)
             if (homePe(itr->first) == CmiMyPe() && itr->second != CmiMyPe())
             {
                 idx_list.push_back(itr->first);
@@ -2308,7 +2305,7 @@ CkLocRec *CkLocMgr::createLocal(const CkArrayIndex &idx,
 
 void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer &buffer)
 {
-    MsgBuffer::iterator itr = buffer.find(id);
+    auto itr = buffer.find(id);
     // If there are no buffered msgs, don't do anything
     if (itr == buffer.end()) return;
 
@@ -2348,7 +2345,7 @@ CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex &idx)
     return id;
   }
 
-  CkLocMgr::IdxIdMap::iterator itr = idx2id.find(idx);
+  auto itr = idx2id.find(idx);
   if (itr == idx2id.end()) {
     id = idCounter++ + ((CmiUInt8)CkMyPe() << 24);
     idx2id[idx] = id;
@@ -2431,7 +2428,7 @@ void CkLocMgr::requestLocation(const CkArrayIndex &idx, const int peToTell,
   if (peToTell == CkMyPe())
     return;
 
-  CkLocMgr::IdxIdMap::iterator itr = idx2id.find(idx);
+  auto itr = idx2id.find(idx);
   if (itr == idx2id.end()) {
     DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
     bufferedLocationRequests[idx].push_back(make_pair(peToTell, suppressIfHere));
@@ -2505,8 +2502,7 @@ void CkLocMgr::inform(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe) {
   idx2id[idx] = id;
   id2pe[id] = nowOnPe;
 
-  std::map<CkArrayIndex, std::vector<std::pair<int, bool> > >::iterator itr =
-    bufferedLocationRequests.find(idx);
+  auto itr = bufferedLocationRequests.find(idx);
   if (itr != bufferedLocationRequests.end()) {
     for (std::vector<std::pair<int, bool> >::iterator i = itr->second.begin();
          i != itr->second.end(); ++i) {
@@ -2520,8 +2516,7 @@ void CkLocMgr::inform(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe) {
 
   deliverAnyBufferedMsgs(id, bufferedMsgs);
 
-  std::map<CkArrayIndex, std::vector<CkArrayMessage*> >::iterator idx_itr =
-    bufferedIndexMsgs.find(idx);
+  auto idx_itr = bufferedIndexMsgs.find(idx);
   if (idx_itr != bufferedIndexMsgs.end()) {
     vector<CkArrayMessage*> &msgs = idx_itr->second;
     for (int i = 0; i < msgs.size(); ++i) {
@@ -2548,7 +2543,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx) {
 	DEBC((AA "Destroying element %s\n" AB,idx2str(idx)));
 	//Delete, and mark as empty, each array element
         CmiUInt8 id = lookupID(idx);
-    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin();
+    for (auto itr = managers.begin();
             itr != managers.end(); ++itr) {
       itr->second->deleteElt(id);
     }
@@ -2911,7 +2906,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
     p.comment("-------- Array Location --------");
     CkVec<CkMigratable *> dummyElts;
 
-    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+    for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
         int elCType;
         if (!p.isUnpacking())
         { //Need to find the element's existing type
@@ -2936,7 +2931,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
         }
     }
     if(!dummy){
-        for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+        for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
             CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getIndex());
             if (elt!=NULL)
                 {
@@ -2951,7 +2946,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
         		}
                 delete elt;
             }
-            for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+            for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
                 itr->second->eraseEltFromArrMgr(rec->getIndex());
             }
     }
@@ -2964,7 +2959,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
 
 	//First pup the element types
 	// (A separate loop so ckLocal works even in element pup routines)
-    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+    for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
 		int elCType;
                 CkArray *arr = itr->second;
 		if (!p.isUnpacking())
@@ -2988,7 +2983,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
 		}
 	}
 	//Next pup the element data
-    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+    for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
 		CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getID());
 		if (elt!=NULL)
                 {
@@ -3022,7 +3017,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
 /// Call this member function on each element of this location:
 void CkLocMgr::callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn)
 {
-    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+    for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
 		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getID());
 		if (el) (el->* fn)();
 	}
@@ -3031,7 +3026,7 @@ void CkLocMgr::callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn)
 /// Call this member function on each element of this location:
 void CkLocMgr::callMethod(CkLocRec *rec,CkMigratable_voidfn_arg_t fn,     void * data)
 {
-    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+    for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
 		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getID());
 		if (el) (el->* fn)(data);
 	}
@@ -3040,7 +3035,7 @@ void CkLocMgr::callMethod(CkLocRec *rec,CkMigratable_voidfn_arg_t fn,     void *
 /// return a list of migratables in this local record
 void CkLocMgr::migratableList(CkLocRec *rec, CkVec<CkMigratable *> &list)
 {
-        for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+        for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
                 CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getID());
                 if (elt) list.push_back(elt);
         }
@@ -3064,7 +3059,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 
 #if CMK_OUT_OF_CORE
 	/* Load in any elements that are out-of-core */
-    for (std::map<CkArrayID, CkArray*>::iterator itr = managers.begin(); itr != managers.end(); ++itr) {
+    for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
 		CkMigratable *el = itr->second->getEltFromArrMgr(rec->getIndex());
 		if (el) if (!el->isInCore) CooBringIn(el->prefetchObjID);
 	}
@@ -3296,13 +3291,13 @@ int CkLocMgr::whichPE(const CkArrayIndex &idx) const
   if (!lookupID(idx, id))
     return -1;
 
-  std::map<CmiUInt8, int>::const_iterator itr = id2pe.find(id);
+  IdPeMap::const_iterator itr = id2pe.find(id);
   return (itr != id2pe.end() ? itr->second : -1);
 }
 
 int CkLocMgr::whichPE(const CmiUInt8 id) const
 {
-  std::map<CmiUInt8, int>::const_iterator itr = id2pe.find(id);
+  IdPeMap::const_iterator itr = id2pe.find(id);
   return (itr != id2pe.end() ? itr->second : -1);
 }
 

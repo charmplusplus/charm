@@ -9,7 +9,24 @@ array proxies, or the details of element creation (see ckarray.h).
 #ifndef __CKLOCATION_H
 #define __CKLOCATION_H
 
+#ifdef CMK_USING_XLC
 #include <map>
+#else
+#include <unordered_map>
+struct IndexHasher {
+  public:
+    size_t operator()(const CkArrayIndex& idx) const {
+      return std::hash<unsigned int>()(idx.hash());
+    }
+};
+
+struct ArrayIDHasher {
+  public:
+    size_t operator()(const CkArrayID& aid) const {
+      return std::hash<int>()(((CkGroupID)aid).idx);
+    }
+};
+#endif
 
 /*********************** Array Messages ************************/
 class CkArrayMessage : public CkMessage {
@@ -224,7 +241,25 @@ typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
  */
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
+
 public:
+
+#ifdef CMK_USING_XLC
+typedef std::map<CkArrayID, CkArray*> ArrayIdMap;
+typedef std::map<CmiUInt8, int> IdPeMap;
+typedef std::map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
+typedef std::map<CkArrayIndex, std::vector<CkArrayMessage *> > IndexMsgBuffer;
+typedef std::map<CkArrayIndex, std::vector<std::pair<int, bool> > > LocationRequestBuffer;
+typedef std::map<CkArrayIndex, CmiUInt8> IdxIdMap;
+#else
+typedef std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher> ArrayIdMap;
+typedef std::unordered_map<CmiUInt8, int> IdPeMap;
+typedef std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
+typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHasher> IndexMsgBuffer;
+typedef std::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
+typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
+#endif
+
 	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
         ~CkLocMgr();
@@ -404,7 +439,6 @@ private:
 	void callMethod(CkLocRec *rec,CkMigratable_voidfn_arg_t fn, void*);
 
 	void deliverUnknown(CkArrayMessage *msg, const CkArrayIndex* idx, CkDeliver_t type, int opts);
-	typedef std::map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
 	/// Deliver any buffered msgs to a newly created array element
 	void deliverAnyBufferedMsgs(CmiUInt8, MsgBuffer &buffer);
 
@@ -419,18 +453,16 @@ CkLocRec *createLocal(const CkArrayIndex &idx,
 		bool notifyHome);
 #endif
 
-        std::map<CkArrayIndex, std::vector<std::pair<int, bool> > > bufferedLocationRequests;
+	LocationRequestBuffer bufferedLocationRequests;
 
 public:
 	void callMethod(CkLocRec *rec,CkMigratable_voidfn_t fn);
 
 //Data Members:
-	//Map array ID to manager and elements
-    std::map<CkArrayID, CkArray*> managers;
+    //Map array ID to manager and elements
+    ArrayIdMap managers;
     // Map object ID to location
-    std::map<CmiUInt8, int> id2pe;
-
-    typedef std::map<CkArrayIndex, CmiUInt8> IdxIdMap;
+    IdPeMap id2pe;
 
     // Map array element index to object ID
     IdxIdMap idx2id;
@@ -446,7 +478,7 @@ public:
     MsgBuffer bufferedRemoteMsgs;
     MsgBuffer bufferedShadowElemMsgs;
 
-    std::map<CkArrayIndex, std::vector<CkArrayMessage *> > bufferedIndexMsgs;
+    IndexMsgBuffer bufferedIndexMsgs;
 
 	bool addElementToRec(CkLocRec *rec,CkArray *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
