@@ -44,7 +44,7 @@ non-comment source code derived from at most 1/10 of the non-comment source
 code developed by Illinois and contained in the Software, provided that the
 above directions for notice and acknowledgment are observed.  Any other
 distribution of the Software or any derivative work requires a separate license
-with Illinois.  Licensee may contact Illinois (kale@cs.uiuc.edu) to negotiate
+with Illinois.  Licensee may contact Illinois (kale@illinois.edu) to negotiate
 an appropriate license for such distribution.
 
 3. Except as expressly set forth in this Agreement, THIS SOFTWARE IS PROVIDED
@@ -110,7 +110,7 @@ at http://charm.cs.illinois.edu/
 
 7. Commercial use of the Software, or derivative works based thereon,  REQUIRES
 A COMMERCIAL LICENSE.  Should Licensee wish to make commercial use of the
-Software, Licensee will contact Illinois (kale@cs.uiuc.edu) to negotiate an
+Software, Licensee will contact Illinois (kale@illinois.edu) to negotiate an
 appropriate license for such use. Commercial use includes: 
 (1) integration of all or part of the Software into a product for sale, lease
 or license by or on behalf of Licensee to third parties, or 
@@ -130,14 +130,14 @@ Licensees who contribute their code to become an internal  portion of the
 Software agree that such code may be distributed by  Illinois under the terms
 of this License and may be required to sign an  "Agreement Regarding
 Contributory Code for Charm++/Converse Software" before Illinois  can accept it
-(contact kale@cs.uiuc.edu for a copy).
+(contact kale@illinois.edu for a copy).
 
 UNDERSTOOD AND AGREED.
 
 
 Contact Information:
 
-The best contact path for licensing issues is by e-mail to  kale@cs.uiuc.edu or
+The best contact path for licensing issues is by e-mail to  kale@illinois.edu or
 send correspondence to:
 
 Prof. L. V. Kale
