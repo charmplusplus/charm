@@ -456,7 +456,7 @@ void Entry::genArrayDefs(XStr& str)
     XStr inlineCall;
     if (!isNoTrace())
       inlineCall << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
-    		 << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx), obj);\n";
+    		 << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
     if(isAppWork())
       inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
     inlineCall << "#if CMK_LBDB_ON\n"

@@ -133,13 +133,11 @@ class CkArrayIndex: public CkArrayIndexBase
         { return (*(const CkArrayIndex *)a == *(const CkArrayIndex *)b); }
 
         /**
-         * @note: input arrayID is ignored
          * @todo: Chee Wai Lee had a FIXME note attached to this method because he
          * felt it was a temporary solution
          */
-        CmiObjId *getProjectionID(int arrayID) const
+        CmiObjId *getProjectionID() const
         {
-            (void)arrayID;
             CmiObjId *ret = new CmiObjId;
             int i;
             const int *data=this->data();

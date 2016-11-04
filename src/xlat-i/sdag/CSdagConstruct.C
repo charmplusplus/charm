@@ -536,7 +536,7 @@ namespace xi {
       op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, ";
 
       if (entry->getContainer()->isArray())
-        op << "ckGetArrayIndex().getProjectionID(((CkGroupID)thisProxy.ckGetArrayID()).idx)";
+        op << "ckGetArrayIndex().getProjectionID()";
       else
         op << "NULL";
 
