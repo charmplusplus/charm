@@ -533,13 +533,20 @@ namespace xi {
   void SdagConstruct::generateTraceBeginCall(XStr& op, int indent) {
     if (traceName) {
       indentBy(op, indent);
-      op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, NULL, NULL); \n";
+      op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, ";
+
+      if (entry->getContainer()->isArray())
+        op << "ckGetArrayIndex().getProjectionID(((CkGroupID)thisProxy.ckGetArrayID()).idx)";
+      else
+        op << "NULL";
+
+      op << ", this); \n";
     }
   }
 
   void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent) {
     indentBy(op, indent);
-    op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, NULL, NULL); \n";
+    op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, NULL, this); \n";
   }
 
   void SdagConstruct::generateTraceEndCall(XStr& op, int indent) {
