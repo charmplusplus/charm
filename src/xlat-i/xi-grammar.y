@@ -864,8 +864,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                   $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, (const char *) NULL, @1.first_line, @$.last_line);
 		  if ($7 != 0) { 
 		    $7->con1 = new SdagConstruct(SIDENT, $4);
-                    $7->entry = $$;
-                    $7->con1->entry = $$;
+                    $7->setEntry($$);
                     $7->param = new ParamList($5);
                   }
 		}
@@ -874,8 +873,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                   Entry *e = new Entry(lineno, $2, 0, $3, $4,  0, $5, (const char *) NULL, @1.first_line, @$.last_line);
                   if ($5 != 0) {
 		    $5->con1 = new SdagConstruct(SIDENT, $3);
-                    $5->entry = e;
-                    $5->con1->entry = e;
+                    $5->setEntry($$);
                     $5->param = new ParamList($4);
                   }
 		  if (e->param && e->param->isCkMigMsgPtr()) {

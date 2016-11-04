@@ -196,7 +196,7 @@ extern int yydebug;
 
 union YYSTYPE
 {
-#line 51 "xi-grammar.y" /* yacc.c:1915  */
+#line 51 "xi-grammar.y" /* yacc.c:1909  */
 
   AstChildren<Module> *modlist;
   Module *module;
@@ -240,7 +240,7 @@ union YYSTYPE
   XStr* xstrptr;
   AccelBlock* accelBlock;
 
-#line 244 "y.tab.h" /* yacc.c:1915  */
+#line 244 "y.tab.h" /* yacc.c:1909  */
 };
 
 typedef union YYSTYPE YYSTYPE;
