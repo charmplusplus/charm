@@ -137,7 +137,7 @@ class CkArrayIndex: public CkArrayIndexBase
          * @todo: Chee Wai Lee had a FIXME note attached to this method because he
          * felt it was a temporary solution
          */
-        CmiObjId *getProjectionID(int arrayID)
+        CmiObjId *getProjectionID(int arrayID) const
         {
             (void)arrayID;
             CmiObjId *ret = new CmiObjId;
