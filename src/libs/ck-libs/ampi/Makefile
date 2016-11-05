@@ -30,7 +30,7 @@ DUMMYROMIOLIB=$(LIBDIR)/libampiromio.a
 .NOTPARALLEL:
 
 all: AMPI AMPIF $(COMPATLIB) $(DUMMYROMIOLIB)
-	-cd $(CDIR)/tmp; CHARMINC=.; . ./conv-config.sh; cd libs/ck-libs/ampi; if test -n "$$CMK_AMPI_WITH_ROMIO" ; then ($(MAKE) AMPI-ROMIO); fi
+	-cd $(CDIR)/tmp; if test -f AMPI; then exit; else touch AMPI; CHARMINC=.; . ./conv-config.sh; cd libs/ck-libs/ampi; if test -n "$$CMK_AMPI_WITH_ROMIO" ; then ($(MAKE) AMPI-ROMIO); fi; fi
 
 $(ROMIOMAKE): $(COMPATLIB)
 	cd romio && ./config.sh && cd .. 
