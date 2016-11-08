@@ -2190,7 +2190,7 @@ $as_echo_n "checking \"$1\"... " >&6; }
 	strictfail=$fail
         if test $pass -eq 1
 	then
- 	  if cat out | grep -i "warn" > /dev/null 2>&1
+          if grep -i "warn" out > /dev/null 2>&1 || grep -i "(W)" out > /dev/null 2>&1
 	  then
 	    strictpass="0" && strictfail="1"
           fi
@@ -2215,7 +2215,7 @@ $as_echo_n "checking \"$1\"... " >&6; }
 	strictfail=$fail
         if test $pass -eq 1
 	then
- 	  if cat out | grep -i "warn" > /dev/null 2>&1
+          if grep -i "warn" out > /dev/null 2>&1 || grep -i "(W)" out > /dev/null 2>&1
 	  then
 	    strictpass="0" && strictfail="1"
           fi
