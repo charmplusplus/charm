@@ -30,8 +30,7 @@ CmmTable CmmNew()
   return result;
 }
 
-void CmmFree(t)
-CmmTable t;
+void CmmFree(CmmTable t)
 {
   if (t==NULL) return;
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
@@ -52,11 +51,7 @@ void CmmFreeAll(CmmTable t){
     }
 }
 
-void CmmPut(t, ntags, tags, msg)
-CmmTable t;
-int ntags;
-int *tags;
-void *msg;
+void CmmPut(CmmTable t, int ntags, int *tags, void *msg)
 {
   int i;
   CmmEntry e=(CmmEntry)CmiAlloc(sizeof(struct CmmEntryStruct)+(ntags*sizeof(int)));
@@ -68,8 +63,7 @@ void *msg;
   t->lasth = &(e->next);
 }
 
-static int CmmTagsMatch(ntags1, tags1, ntags2, tags2)
-int ntags1; int *tags1; int ntags2; int *tags2;
+static int CmmTagsMatch(int ntags1, int *tags1, int ntags2, int *tags2)
 {
   int ntags = ntags1;
   if (ntags1 != ntags2) return 0;
@@ -86,12 +80,7 @@ int ntags1; int *tags1; int ntags2; int *tags2;
   }
 }
 
-void *CmmFind(t, ntags, tags, rtags, del)
-CmmTable t;
-int ntags;
-int *tags;
-int *rtags;
-int del;
+void *CmmFind(CmmTable t, int ntags, int *tags, int *rtags, int del)
 {
   CmmEntry *enth; CmmEntry ent; void *msg; int i;
 /* added by Chao Mei in case that t is already freed
@@ -118,10 +107,7 @@ int del;
 }
 
 /* match the first ntags tags and return the last tag */
-int CmmGetLastTag(t,ntags,tags)
-CmmTable t;
-int ntags;
-int* tags;
+int CmmGetLastTag(CmmTable t, int ntags, int* tags)
 {
   CmmEntry *enth; CmmEntry ent;
   enth = &(t->first);
@@ -136,8 +122,7 @@ int* tags;
   return -1;
 }
 
-int CmmEntries(t)
-CmmTable t;
+int CmmEntries(CmmTable t)
 {
   int n = 0;
   CmmEntry e = t->first;
