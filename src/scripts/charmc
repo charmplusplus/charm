@@ -1355,7 +1355,12 @@ do
 		NU_OBJ=$BASEO
 		;;
 	*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu)
-		Do $CMK_CXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
+                if [ -n "$NATIVE" ]
+                then
+                    Do $CMK_NATIVE_CXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP -c $FILE $DESTO
+                else
+                    Do $CMK_CXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
+                fi
 		NU_OBJ=$BASEO
 		if [ "$Do_res" -ne 0 ]
 		then
