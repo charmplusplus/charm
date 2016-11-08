@@ -1642,13 +1642,13 @@ ampi::~ampi()
 {
   if (CkInRestarting() || _BgOutOfCoreFlag==1) {
     // in restarting, we need to flush messages
-    int tags[3];
+    int tags[2];
     MPI_Status sts;
-    tags[0] = tags[1] = tags[2] = CmmWildCard;
-    AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 3, tags, (int*)&sts);
+    tags[0] = tags[1] = CmmWildCard;
+    AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 2, tags, (int*)&sts);
     while (msg) {
       delete msg;
-      msg = (AmpiMsg *) CmmGet(msgs, 3, tags, (int*)&sts);
+      msg = (AmpiMsg *) CmmGet(msgs, 2, tags, (int*)&sts);
     }
   }
 
@@ -2177,9 +2177,8 @@ void ampi::inorder(AmpiMsg* msg)
   )
 
   // check posted recvs
-  int tags[3];
+  int tags[2] = { msg->tag, msg->srcRank };
   MPI_Status sts;
-  tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
 
 #if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&msg->event); // store current log
@@ -2191,22 +2190,22 @@ void ampi::inorder(AmpiMsg* msg)
   AmpiRequestList *reqL = &(parent->ampiReqs);
   //When storing the req index, it's 1-based. The reason is stated in the comments
   //in the ampi::irecv function.
-  int ireqIdx = (int)((long)CmmGet(posted_ireqs, 3, tags, (int*)&sts));
+  int ireqIdx = (int)((long)CmmGet(posted_ireqs, 2, tags, (int*)&sts));
   IReq *ireq = NULL;
   if(reqL->size()>0 && ireqIdx>0)
     ireq = (IReq *)(*reqL)[ireqIdx-1];
   if (ireq) { // receive posted
     ireq->receive(this, msg);
   } else {
-    CmmPut(msgs, 3, tags, msg);
+    CmmPut(msgs, 2, tags, msg);
   }
 }
 
 AmpiMsg *ampi::getMessage(int t, int s, MPI_Comm comm, int *sts) const
 {
-  int tags[3];
-  tags[0] = t; tags[1] = s; tags[2] = comm;
-  AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
+  int tags[2];
+  tags[0] = t; tags[1] = s;
+  AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 2, tags, sts);
   return msg;
 }
 
@@ -2404,6 +2403,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
   if(s==MPI_PROC_NULL) {
     sts->MPI_SOURCE = MPI_PROC_NULL;
     sts->MPI_TAG = MPI_ANY_TAG;
+    sts->MPI_COMM = comm;
     sts->MPI_LENGTH = 0;
     return 0;
   }
@@ -2422,7 +2422,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
     s = myComm.getIndexForRemoteRank(s);
   }
 
-  int tags[3];
+  int tags[2];
   AmpiMsg *msg = 0;
 
   MSG_ORDER_DEBUG(
@@ -2431,8 +2431,8 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 
   ampi *dis = getAmpiInstance(disComm);
   while(1) {
-    tags[0] = t; tags[1] = s; tags[2] = comm;
-    msg = (AmpiMsg *) CmmGet(dis->msgs, 3, tags, (int*)sts);
+    tags[0] = t; tags[1] = s;
+    msg = (AmpiMsg *) CmmGet(dis->msgs, 2, tags, (int*)sts);
     if (msg) break;
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = dis->blockOnRecv();
@@ -2443,8 +2443,10 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
   MSG_ORDER_DEBUG( printf("[%d] AMPI thread rescheduled  to Index %d buf %p src %d\n",CkMyPe(),dis->thisIndex,buf,s); )
 #endif
 
-  if(sts)
+  if (sts) {
+    sts->MPI_COMM = msg->comm;
     sts->MPI_LENGTH = msg->length;
+  }
   dis->processAmpiMsg(msg, buf, type, count);
 
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
@@ -2467,7 +2469,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 
 void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 {
-  int tags[3];
+  int tags[2];
 #if CMK_BIGSIM_CHARM
   void *curLog; // store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
@@ -2476,15 +2478,17 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   ampi *dis = getAmpiInstance(comm);
   AmpiMsg *msg = 0;
   while(1) {
-    tags[0] = t; tags[1] = s; tags[2] = comm;
-    msg = (AmpiMsg *) CmmProbe(dis->msgs, 3, tags, (int*)sts);
+    tags[0] = t; tags[1] = s;
+    msg = (AmpiMsg *) CmmProbe(dis->msgs, 2, tags, (int*)sts);
     if (msg) break;
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = dis->blockOnRecv();
   }
 
-  if(sts)
+  if (sts) {
+    sts->MPI_COMM = msg->comm;
     sts->MPI_LENGTH = msg->length;
+  }
 
 #if CMK_BIGSIM_CHARM
   _TRACE_BG_SET_INFO((char *)msg, "PROBE_RESUME",  &curLog, 1);
@@ -2493,13 +2497,15 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 
 int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 {
-  int tags[3];
+  int tags[2];
   AmpiMsg *msg = 0;
-  tags[0] = t; tags[1] = s; tags[2] = comm;
-  msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, (int*)sts);
+  tags[0] = t; tags[1] = s;
+  msg = (AmpiMsg *) CmmProbe(msgs, 2, tags, (int*)sts);
   if (msg) {
-    if(sts)
+    if (sts) {
+      sts->MPI_COMM = msg->comm;
       sts->MPI_LENGTH = msg->length;
+    }
     return 1;
   }
 #if CMK_BIGSIM_CHARM
@@ -3034,8 +3040,8 @@ MPI_Request ampi::postReq(AmpiRequest* newreq, AmpiReqSts status/*=AMPI_REQ_PEND
   }
   else {
     request = getReqs()->insert(newreq);
-    int tags[3] = { newreq->tag, newreq->src, newreq->comm };
-    CmmPut(posted_ireqs, 3, tags, (void *)(CmiIntPtr)(request+1));
+    int tags[2] = { newreq->tag, newreq->src };
+    CmmPut(posted_ireqs, 2, tags, (void *)(CmiIntPtr)(request+1));
   }
   return request;
 }
@@ -3472,9 +3478,9 @@ void ampi::irednResult(CkReductionMsg *msg)
   MSG_ORDER_DEBUG(CkPrintf("[%d] irednResult called on comm %d\n", thisIndex, myComm.getComm()));
 
   MPI_Status sts;
-  int tags[3] = { MPI_REDN_TAG, AMPI_COLL_SOURCE, myComm.getComm() };
+  int tags[2] = { MPI_REDN_TAG, AMPI_COLL_SOURCE };
   AmpiRequestList *reqL = &(parent->ampiReqs);
-  int rednReqIdx = (int)((long)CmmGet(posted_ireqs, 3, tags, (int*)&sts));
+  int rednReqIdx = (int)((long)CmmGet(posted_ireqs, 2, tags, (int*)&sts));
   AmpiRequest *rednReq = NULL;
   if(reqL->size()>0 && rednReqIdx>0)
     rednReq = (AmpiRequest *)(*reqL)[rednReqIdx-1];
@@ -4560,6 +4566,7 @@ bool PersReq::itest(MPI_Status *sts){
 
 bool IReq::test(MPI_Status *sts){
   if (statusIreq && sts) {
+    sts->MPI_COMM = comm;
     sts->MPI_LENGTH = length;
   }
   else {
@@ -4570,6 +4577,7 @@ bool IReq::test(MPI_Status *sts){
 
 bool IReq::itest(MPI_Status *sts){
   if (statusIreq && sts) {
+    sts->MPI_COMM = comm;
     sts->MPI_LENGTH = length;
   }
   return statusIreq;
@@ -5237,8 +5245,7 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
   }
   // ... otherwise post the receive
   else {
-    int tags[3];
-    tags[0] = tag; tags[1] = src; tags[2] = comm;
+    int tags[2] = { tag, src };
 
     //just insert the index of the newreq in the ampiParent::ampiReqs
     //to posted_ireqs. Such change is due to the need for Out-of-core Emulation
@@ -5249,7 +5256,7 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
     //posted_ireqs stores the index (an integer) to ampiReqs.
     //The index is 1-based rather 0-based because when pulling entries from posted_ireqs,
     //if not found, a "0" (i.e. NULL) is returned, this confuses the indexing of ampiReqs.
-    CmmPut(posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
+    CmmPut(posted_ireqs, 2, tags, (void *)(CmiIntPtr)((*request)+1));
   }
 
 #if AMPIMSGLOG

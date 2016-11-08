@@ -1564,13 +1564,13 @@ class ampi : public CBase_ampi {
   }
 #endif
  public:
-  //These are directly used by API routines, which is hideous
   /*
-  FIXME: CmmTable is only indexed by the tag, sender, and communicator.
-  It should also be indexed by the source data type and length (if any).
-  */
-  CmmTable msgs;
-  CmmTable posted_ireqs;         // posted irecv req
+   * CmmTable is indexed by the tag and sender.
+   * Since ampi objects are per-communicator, there are separate CmmTables per communicator.
+   * FIXME: These are directly used by API routines, which is hideous.
+   */
+  CmmTable msgs;         // unexpected message queue
+  CmmTable posted_ireqs; // posted request queue
   //------------------------ Added by YAN ---------------------
  private:
   CkPupPtrVec<win_obj> winObjects;
