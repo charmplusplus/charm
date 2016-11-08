@@ -7,21 +7,26 @@
 #include "cktaskQ.h"
 
 void StealTask() {
+#if CMK_TRACE_ENABLED
   double _start = CmiWallTimer();
-  int random_pe = CrnRand() % CkMyNodeSize();
+#endif
 
+  int random_pe = CrnRand() % CkMyNodeSize();
   while (random_pe == CkMyPe()) {
     random_pe = CrnRand() % CkMyNodeSize();
   }
+
 #if CMK_TRACE_ENABLED
   char s[10];
   sprintf( s, "%d", random_pe );
   traceUserSuppliedBracketedNote(s, TASKQ_QUEUE_STEAL_EVENTID, _start, CmiWallTimer());
 #endif
+
   void* msg = TaskQueueSteal((TaskQueue)CpvAccessOther(CsdTaskQueue, random_pe));
   if (msg != NULL) {
     TaskQueuePush((TaskQueue)CpvAccess(CsdTaskQueue), msg);
   }
+
 #if CMK_TRACE_ENABLED
   traceUserSuppliedBracketedNote(s, TASKQ_STEAL_EVENTID, _start, CmiWallTimer());
 #endif
