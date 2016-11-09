@@ -169,8 +169,8 @@ Metabalancer makes a decision on which load balancing strategy
 to invoke out of a subset of strategies, namely GreedyLB, RefineLB,
 HybridLB, DistributedLB, MetisLB and ScotchLB.
 For using the model based prediction in Metabalancer, \charmpp{} needs to be built with
-all the above load balancing strategies including MetisLB and ScotchLB that rely
-on external partitioning libraries METIS and SCOTCH specified
+all the above load balancing strategies, including ScotchLB that relies
+on the external partitioning library SCOTCH specified
 in the Section~\ref{lbOption}.
 
 
@@ -407,15 +407,12 @@ implies -module A, so you don't have to write -module A again,
 although that is not invalid.  Using CommonLBs is a convenient way to
 link against the commonly used existing load balancers.  
 
-Two families of load balancers based on external partitioning libraries require 3rd party software:
-
-METIS can be downloaded from:
-\url{http://glaros.dtc.umn.edu/gkhome/metis/metis/download}
+The SCOTCH-based load balancer(s) use an external partitioning library requiring 3rd party software:
 
 SCOTCH can be downloaded from:
 \url{http://www.labri.fr/perso/pelegrin/scotch/}
 
-Use the {\em --with-metis=/path/to/lib, or --incdir and --libdir} build time option to add your installation of any third party libraries you wish to use to the \charmpp{} search paths.  
+Use the {\em --incdir and --libdir} build time option to add your installation of any third party libraries you wish to use to the \charmpp{} search paths.  
 
 \item {\bf Building individual load balancers}
 
@@ -424,12 +421,6 @@ Load balancers can be built individually by changing the current working directo
 \begin{alltt}
  cd netlrts-linux-x86\_64/tmp
  make PhasebyArrayLB
-\end{alltt}
-
-Or, if the METIS library has been installed, METIS based balancers can be built like so:
-\begin{alltt}
- cd netlrts-linux-x86\_64/tmp
- make MetisLB
 \end{alltt}
 
 \item {\bf Write and use your own load balancer}

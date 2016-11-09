@@ -81,7 +81,7 @@ DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
 default_libs: $(DEFAULT_LIBS)
 
-$(DEFAULT_LIBS) cache pose fftlib liveViz:
+$(DEFAULT_LIBS) cache pose fftlib liveViz metis:
 	$(MAKE) -C libs/ck-libs/$@
 
 openmp_llvm:
@@ -743,7 +743,7 @@ TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecis
 loadbalancers: $(COMMON_LDBS) $(L)/libmoduleCommonLBs.a
 
 everylb: $(ALL_LDBS) $(L)/libmoduleEveryLB.a
-
+MetisLB.o GridMetisLB.o: metis
 
 %LB: $(L)/libmodule%LB.a
 	@true
