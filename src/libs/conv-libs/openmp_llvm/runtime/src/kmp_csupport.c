@@ -666,7 +666,7 @@ __kmpc_barrier(ident_t *loc, kmp_int32 global_tid)
 {
     KMP_COUNT_BLOCK(OMP_BARRIER);
     KC_TRACE( 10, ("__kmpc_barrier: called T#%d\n", global_tid ) );
-
+#if !CHARM_OMP
     if (! TCR_4(__kmp_init_parallel))
         __kmp_parallel_initialize();
 
@@ -687,6 +687,7 @@ __kmpc_barrier(ident_t *loc, kmp_int32 global_tid)
     // 4) no sync is required
 
     __kmp_barrier( bs_plain_barrier, global_tid, FALSE, 0, NULL, NULL );
+#endif
 }
 
 /* The BARRIER for a MASTER section is always explicit   */

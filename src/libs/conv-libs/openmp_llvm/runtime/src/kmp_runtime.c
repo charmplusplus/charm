@@ -28,14 +28,13 @@
 
 #if CHARM_OMP
 #include "ompcharm.h"
-CpvDeclare(OmpCharmMsg, lastMsg);
-//CpvDeclare(int*, idleThreadIds);
-//CpvExtern(int, cmiMyPeIdle);
+#include <math.h>
+CpvDeclare(OmpConverseMsg*, ompConvMsg);
 CpvDeclare(unsigned int, localRatio);
 CpvDeclare(unsigned int*, localRatioArray);
 CpvDeclare(unsigned int, ratioIdx);
+CpvDeclare(bool, ratioInit);
 CpvDeclare(unsigned int, ratioSum);
-//CpvDeclare(unsigned int, nextNumSplit);
 CsvExtern(unsigned int, idleThreadsCnt);
 #endif
 
@@ -857,12 +856,18 @@ __kmp_reserve_threads( kmp_root_t *root, kmp_team_t *parent_team,
     // If dyn-var is set, dynamically adjust the number of desired threads,
     // according to the method specified by dynamic_mode.
     //
+#if CHARM_OMP
+    KMP_MB();
+    unsigned int idleThreadsCnt = TCR_4(CsvAccess(idleThreadsCnt));
+    unsigned int currLocalRatio = CpvAccess(localRatio);
+    new_nthreads = (idleThreadsCnt + 1) > currLocalRatio ? idleThreadsCnt+1 : currLocalRatio;
+    CharmOMPDebug("[%f][%d] idle threads: %d, localRatio: %d, new_thread:%d \n",CmiWallTimer(), CmiMyPe(), idleThreadsCnt, currLocalRatio, new_nthreads);
+#else
     new_nthreads = set_nthreads;
 
     if ( ! get__dynamic_2( parent_team, master_tid ) ) {
         ;
     }
-#if !CHARM_OMP
 #ifdef USE_LOAD_BALANCE
     else if ( __kmp_global.g.g_dynamic_mode == dynamic_load_balance ) {
         new_nthreads = __kmp_load_balance_nproc( root, set_nthreads );
@@ -3595,6 +3600,21 @@ __kmp_register_root( int initial_thread )
     KA_TRACE( 20, ("__kmp_register_root: entered\n"));
     KMP_MB();
 
+#if CHARM_OMP
+    CpvInitialize(unsigned int, localRatio);
+    CpvInitialize(unsigned int, ratioIdx);
+    CpvInitialize(unsigned int, ratioSum);
+    CpvInitialize(bool, ratioInit);
+    CpvInitialize(unsigned int*, localRatioArray);
+    CpvInitialize(OmpConverseMsg*, ompConvMsg);
+    CpvAccess(localRatioArray) = (unsigned int*) __kmp_allocate(sizeof(unsigned int) * windowSize);
+    memset(CpvAccess(localRatioArray), 0, sizeof (unsigned int) * windowSize);
+    CpvAccess(localRatio) = 0;
+    CpvAccess(ratioIdx) = 0;
+    CpvAccess(ratioSum) = 0;
+    CpvAccess(ratioInit) = false;
+    CpvAccess(ompConvMsg) = NULL;
+#endif
 
     /*
         2007-03-02:
@@ -4908,20 +4928,6 @@ __kmp_allocate_team( kmp_root_t *root, int new_nproc, int max_nproc,
 #endif
         }
         else { // team->t.t_nproc < new_nproc
-#if CHARM_OMP
-#if KMP_NESTED_HOT_TEAMS
-          if (master) {
-            if (!team->t.t_ompConvMsg) {
-              team->t.t_ompConvMsg = __kmp_allocate(sizeof(OmpConverseMsg ) *(new_nproc -1));
-            }
-            else {
-              __kmp_free(team->t.t_ompConvMsg);
-              team->t.t_ompConvMsg = __kmp_allocate(sizeof(OmpConverseMsg) * (new_nproc-1));
-            }
-          }
-#endif
-#endif
-
 #if KMP_OS_LINUX && KMP_AFFINITY_SUPPORTED
             kmp_affin_mask_t *old_mask;
             if ( KMP_AFFINITY_CAPABLE() ) {
@@ -5110,23 +5116,6 @@ __kmp_allocate_team( kmp_root_t *root, int new_nproc, int max_nproc,
         if ( team->t.t_max_nproc >= max_nproc ) {
             /* take this team from the team pool */
             __kmp_team_pool = team->t.t_next_pool;
-#if CHARM_OMP
-#if KMP_NESTED_HOT_TEAMS
-            if (master)  {
-#endif
-              if (!team->t.t_ompConvMsg) {
-                team->t.t_ompConvMsg = __kmp_allocate(sizeof(OmpConverseMsg ) *(new_nproc -1));
-              }
-              else {
-                if (team->t.t_nproc < new_nproc) {
-                  __kmp_free(team->t.t_ompConvMsg);
-                  team->t.t_ompConvMsg = __kmp_allocate(sizeof(OmpConverseMsg) * (new_nproc-1));
-                }
-              }
-#if KMP_NESTED_HOT_TEAMS
-            }
-#endif
-#endif
 
             /* setup the team for fresh use */
             __kmp_initialize_team( team, new_nproc, new_icvs, NULL );
@@ -5187,15 +5176,7 @@ __kmp_allocate_team( kmp_root_t *root, int new_nproc, int max_nproc,
     __kmp_allocate_team_arrays( team, max_nproc );
 
     KA_TRACE( 20, ( "__kmp_allocate_team: making a new team\n" ) );
-#if CHARM_OMP
-#if KMP_NESTED_HOT_TEAMS
-    if (master)  {
-#endif
-      team->t.t_ompConvMsg = __kmp_allocate(sizeof(OmpConverseMsg ) *(new_nproc -1));
-#if KMP_NESTED_HOT_TEAMS
-    }
-#endif
-#endif
+
     __kmp_initialize_team( team, new_nproc, new_icvs, NULL );
 
     KA_TRACE( 20, ( "__kmp_allocate_team: setting task_team[0] %p and task_team[1] %p to NULL\n",
@@ -5552,7 +5533,9 @@ __kmp_launch_thread( kmp_info_t *this_thr )
                     KMP_SET_THREAD_STATE_BLOCK(IMPLICIT_TASK);
                     rc = (*pteam)->t.t_invoke( gtid );
 #if CHARM_OMP
-                    KMP_TEST_THEN_DEC32(&(*pteam)->t.t_num_tasks);
+                    if (__kmp_tid_from_gtid(gtid) > (*pteam)->t.t_num_local_tasks)
+                      KMP_TEST_THEN_DEC32(&(*pteam)->t.t_num_shared_tasks);
+                    CharmOMPDebug("gtid: %d, master_tid: %d, t_num_shared_tasks:%d\n", gtid, __kmp_tid_from_gtid(gtid), (*pteam)->t.t_num_shared_tasks);
 #endif
                 }
                 KMP_START_DEVELOPER_EXPLICIT_TIMER(USER_launch_thread_loop);
@@ -6803,12 +6786,7 @@ __kmp_parallel_initialize( void )
         __kmp_print_version_2();
     }
 
-#if CHARM_OMP
-    CpvInitialize(unsigned int, localRatio);
-    CpvInitialize(unsigned int, ratioIdx);
-    CpvInitialize(unsigned int, ratioSum);
-    CpvInitialize(unsigned int*, localRatioArray);
-#endif
+
     /* we have finished parallel initialization */
     TCW_SYNC_4(__kmp_init_parallel, TRUE);
 
@@ -7097,16 +7075,20 @@ __kmp_internal_fork( ident_t *id, int gtid, kmp_team_t *team )
     KMP_ASSERT( this_thr->th.th_team  ==  team );
 
 #if CHARM_OMP
-    OmpConverseMsg* currentMsg=(OmpConverseMsg*)team->t.t_ompConvMsg;
-    team->t.t_num_tasks = team->t.t_nproc-1;
+    CpvAccess(ompConvMsg)= (OmpConverseMsg*)__kmp_fast_allocate(this_thr, sizeof(OmpConverseMsg) * (team->t.t_nproc-1));
+    OmpConverseMsg *currentMsg = CpvAccess(ompConvMsg);
+    team->t.t_num_local_tasks = (team->t.t_nproc-1) / (CpvAccess(localRatio) > 0 ? CpvAccess(localRatio): INITIAL_RATIO);
+    team->t.t_num_shared_tasks = (team->t.t_nproc-1) - team->t.t_num_local_tasks; //team->t.t_nproc-1;
     int i;
+    CharmOMPDebug("PE: %d, team: %p, local: %d, shared: %d\n", CmiMyPe(), team, team->t.t_num_local_tasks, team->t.t_num_shared_tasks);
     CharmOMPDebug("PE: %d, team: %p, convMsg:%p, internal_fork starts\n", CmiMyPe(), currentMsg, team);
     for ( i=1 ; i< team->t.t_nproc ; i++ ) {
 //      currentMsg = (OmpConverseMsg*)__kmp_allocate(sizeof(OmpConverseMsg));
-      currentMsg[i-1].data = team->t.t_threads[i];
+      currentMsg[i-1].convMsg.data = team->t.t_threads[i];
       CmiSetHandler(&currentMsg[i-1], CpvAccess(OmpHandlerIdx));
-      CsdTaskEnqueue((void *)&currentMsg[i-1]);
-      CharmOMPDebug("[%f][%d] inserted thread: %p, team:%p, msg:%p \n",CmiWallTimer(), CmiMyPe(), currentMsg->data, team, currentMsg);
+      if ( i > team->t.t_num_local_tasks)
+        CsdTaskEnqueue((void *)&currentMsg[i-1]);
+      CharmOMPDebug("[%f][%d] inserted thread: %p, team:%p, msg:%p \n",CmiWallTimer(), CmiMyPe(), &(currentMsg[i-1].convMsg.data), team, &currentMsg[i-1]);
     }
 #endif
 
@@ -7118,8 +7100,7 @@ __kmp_internal_fork( ident_t *id, int gtid, kmp_team_t *team )
 #endif /* KMP_DEBUG */
 
     /* release the worker threads so they may begin working */
-#if CHARM_OMP
-#else
+#if !CHARM_OMP
     __kmp_fork_barrier( gtid, 0 );
 #endif
 }
@@ -7149,19 +7130,72 @@ __kmp_internal_join( ident_t *id, int gtid, kmp_team_t *team )
 #endif /* KMP_DEBUG */
 
 #if CHARM_OMP
-    int temp;
     void * msg;
+    int num_local = team->t.t_num_local_tasks;
+    int i, j, temp_shared, splitPoint;
 
-    while(TCR_4(team->t.t_num_tasks)) { 
+    for (i = 0; i < num_local; i++) {
+      CmiHandleMessage((void*)(CpvAccess(ompConvMsg)+i));
+      KMP_MB();
+      temp_shared = TCR_4(team->t.t_num_shared_tasks);
+      if (num_local - temp_shared > 1) {
+        splitPoint = i+1 + (num_local - (i+1))/2;
+        KMP_TEST_THEN_ADD32(&(team->t.t_num_shared_tasks), num_local - splitPoint);
+        team->t.t_num_local_tasks = splitPoint;
+        KMP_MB();
+        for (j = splitPoint; j < num_local; j++) {
+          CsdTaskEnqueue((void*)(CpvAccess(ompConvMsg)+j));
+        }
+        num_local = splitPoint;
+      }
+    }
+
+    int isIdle = 0;
+    while (TCR_4(team->t.t_num_shared_tasks)) {
       msg = TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue));
       if (msg) {
         CmiHandleMessage(msg);
+        num_local++;
       }
       else {
-        CsdBeginIdle();
+        if (!isIdle) {
+          isIdle=1;
+          CsdBeginIdle();
+        }
+        else
+          CsdStillIdle();
+        CharmOMPDebug("[%f][%d] OpenMP section waiting start\n", CmiWallTimer(), CmiMyPe());
       }
-      CharmOMPDebug("team:%p, t_num_tasks:%d\n",team, team->t.t_num_tasks);
+      KMP_MB();
+      CharmOMPDebug("team:%p, t_num_shared_tasks:%d\n",team, team->t.t_num_shared_tasks);
     }
+
+    if (isIdle) {
+      isIdle = 0;
+      CsdEndIdle();
+    }
+    /* Start to update the history vector */
+    CharmOMPDebug("team:%p, num_local: %d, t_num_shared_tasks: %d\n", team, num_local, team->t.t_nproc - num_local);
+    unsigned int currentRatio = (unsigned int)(ceil((double)(team->t.t_nproc)/num_local));
+    unsigned int victimRatio = CpvAccess(localRatioArray)[CpvAccess(ratioIdx) % windowSize];
+
+    CpvAccess(localRatioArray)[CpvAccess(ratioIdx) % windowSize] = currentRatio;
+    int numEntries = 0;
+    if (CpvAccess(ratioInit) || CpvAccess(ratioIdx) >= windowSize) {
+      CpvAccess(ratioSum) = CpvAccess(ratioSum) - victimRatio + currentRatio;
+      numEntries = windowSize;
+      if (!CpvAccess(ratioInit))
+        CpvAccess(ratioInit) = true;
+    }
+    else {
+        CpvAccess(ratioSum)+=currentRatio;
+        numEntries = CpvAccess(ratioIdx) + 1;
+    }
+
+    CpvAccess(localRatio) = CpvAccess(ratioSum) / numEntries;
+    CpvAccess(ratioIdx)+=1;
+
+    __kmp_fast_free(this_thr, CpvAccess(ompConvMsg));
 #else
     __kmp_join_barrier( gtid );  /* wait for everyone */
 #endif

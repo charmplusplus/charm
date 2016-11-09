@@ -2602,8 +2602,8 @@ typedef struct KMP_ALIGN_CACHE kmp_base_team {
 #endif /* USE_ITT_BUILD */
 
 #if CHARM_OMP
-    kmp_int32 t_num_tasks;
-    void *t_ompConvMsg;
+    kmp_int32 t_num_shared_tasks;
+    kmp_int32 t_num_local_tasks;
 #endif
 } kmp_base_team_t;
 

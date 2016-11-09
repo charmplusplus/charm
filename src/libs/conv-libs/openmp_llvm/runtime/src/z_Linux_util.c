@@ -689,12 +689,12 @@ __kmp_launch_worker( void *thr )
 #endif
 {
 #if CHARM_OMP
-    void *thr = ((OmpConverseMsg*)(data))->data;
+    void *thr = ((OmpConverseMsg*)(data))->convMsg.data;
 #endif
     int status, old_type, old_state;
-#ifdef KMP_BLOCK_SIGNALS
+#if KMP_BLOCK_SIGNALS && !CHARM_OMP
     sigset_t    new_set, old_set;
-#endif /* KMP_BLOCK_SIGNALS */
+#endif /* KMP_BLOCK_SIGNALS && !CHARM_OMP */
     void *exit_val;
 #if KMP_OS_LINUX || KMP_OS_FREEBSD || KMP_OS_NETBSD
     void * volatile padding = 0;
@@ -728,7 +728,7 @@ __kmp_launch_worker( void *thr )
 #if KMP_AFFINITY_SUPPORTED
     __kmp_affinity_set_init_mask( gtid, FALSE );
 #endif
-
+#if !CHARM_OMP
 #ifdef KMP_CANCEL_THREADS
     status = pthread_setcanceltype( PTHREAD_CANCEL_ASYNCHRONOUS, & old_type );
     KMP_CHECK_SYSFAIL( "pthread_setcanceltype", status );
@@ -736,7 +736,7 @@ __kmp_launch_worker( void *thr )
     status = pthread_setcancelstate( PTHREAD_CANCEL_ENABLE, & old_state );
     KMP_CHECK_SYSFAIL( "pthread_setcancelstate", status );
 #endif
-
+#endif
 #if KMP_ARCH_X86 || KMP_ARCH_X86_64
     //
     // Set the FP control regs to be a copy of
@@ -747,12 +747,12 @@ __kmp_launch_worker( void *thr )
     __kmp_load_mxcsr( &__kmp_init_mxcsr );
 #endif /* KMP_ARCH_X86 || KMP_ARCH_X86_64 */
 
-#ifdef KMP_BLOCK_SIGNALS
+#if KMP_BLOCK_SIGNALS && !CHARM_OMP
     status = sigfillset( & new_set );
     KMP_CHECK_SYSFAIL_ERRNO( "sigfillset", status );
     status = pthread_sigmask( SIG_BLOCK, & new_set, & old_set );
     KMP_CHECK_SYSFAIL( "pthread_sigmask", status );
-#endif /* KMP_BLOCK_SIGNALS */
+#endif /* KMP_BLOCK_SIGNALS && !CHARM_OMP */
 
 #if KMP_OS_LINUX || KMP_OS_FREEBSD || KMP_OS_NETBSD
     if ( __kmp_stkoffset > 0 && gtid > 0 ) {
@@ -761,18 +761,16 @@ __kmp_launch_worker( void *thr )
 #endif
 
     KMP_MB();
+#if !CHARM_OMP
     __kmp_set_stack_info( gtid, (kmp_info_t*)thr );
 
     __kmp_check_stack_overlap( (kmp_info_t*)thr );
-
-#if CHARM_OMP
-    CharmOMPDebug("[%f][%d] thread: %p, team:%p \n",CmiWallTimer() ,CmiMyPe(), thr, ((kmp_info_t*)(thr))->th.th_team);
 #endif
     exit_val = __kmp_launch_thread( (kmp_info_t *) thr );
-#ifdef KMP_BLOCK_SIGNALS
+#if KMP_BLOCK_SIGNALS && !CHARM_OMP
     status = pthread_sigmask( SIG_SETMASK, & old_set, NULL );
     KMP_CHECK_SYSFAIL( "pthread_sigmask", status );
-#endif /* KMP_BLOCK_SIGNALS */
+#endif /* KMP_BLOCK_SIGNALS && !CHARM_OMP */
 
 #if CHARM_OMP
     __kmp_gtid_set_specific(prev_gtid);
@@ -789,9 +787,9 @@ static void*
 __kmp_launch_monitor( void *thr )
 {
     int         status, old_type, old_state;
-#ifdef KMP_BLOCK_SIGNALS
+#if KMP_BLOCK_SIGNALS && !CHARM_OMP
     sigset_t    new_set;
-#endif /* KMP_BLOCK_SIGNALS */
+#endif /* KMP_BLOCK_SIGNALS && !CHARM_OMP */
     struct timespec  interval;
     int yield_count;
     int yield_cycles = 0;
@@ -943,12 +941,12 @@ __kmp_launch_monitor( void *thr )
 
     KA_TRACE( 10, ("__kmp_launch_monitor: #3 cleanup\n" ) );
 
-#ifdef KMP_BLOCK_SIGNALS
+#if KMP_BLOCK_SIGNALS && !CHARM_OMP
     status = sigfillset( & new_set );
     KMP_CHECK_SYSFAIL_ERRNO( "sigfillset", status );
     status = pthread_sigmask( SIG_UNBLOCK, & new_set, NULL );
     KMP_CHECK_SYSFAIL( "pthread_sigmask", status );
-#endif /* KMP_BLOCK_SIGNALS */
+#endif /* KMP_BLOCK_SIGNALS && !CHARM_OMP */
 
     KA_TRACE( 10, ("__kmp_launch_monitor: #4 finished\n" ) );
 
