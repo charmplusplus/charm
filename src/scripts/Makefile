@@ -303,7 +303,7 @@ dirs+sources:
 	rm -rf QuickThreads
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
-	if case `cat .vdir` in *win32*) true;; *win64*) true;; *) false;; esac; then \
+	if case `cat .vdir` in *win32*) true;; *win64*) true;; *-win-*) true;; *) false;; esac; then \
 		cp -f $(SRCBASE)/arch/`cat .vdir | awk -F- '{print $$2}'`/unix2nt* ../bin; \
 		cp -f $(SRCBASE)/arch/win32/createlink.exe ../bin; \
 	fi

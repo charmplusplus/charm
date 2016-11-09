@@ -543,7 +543,7 @@ rm -f $DESTINATION/tmp/Make.extlib
 
 # Create the bin, lib, include, etc. links:
 WINNAME=`echo $VERSION | awk -F- '{print $2}'`
-if [ "x_$WINNAME" = "x_win32" -o "x_$WINNAME" = "x_win64" ]
+if [ "x_$WINNAME" = "x_win32" -o "x_$WINNAME" = "x_win64" -o "x_$WINNAME" = "x_win" ]
 then
 #Win32/64 version needs special compilers and *copied* (not linked)
 # source files.

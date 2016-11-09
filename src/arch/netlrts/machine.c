@@ -1818,7 +1818,7 @@ void LrtsPostCommonInit(int everReturn)
     
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
     CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) CmiStdoutFlush, NULL);
-#if CMK_SHARED_VARS_UNAVAILABLE
+#if CMK_SHARED_VARS_UNAVAILABLE && !CMK_TIMER_USE_WIN32API
     if (!Cmi_asyncio) {
     CcdCallFnAfter((CcdVoidFn)pingCharmrunPeriodic,NULL,1000);
     }
