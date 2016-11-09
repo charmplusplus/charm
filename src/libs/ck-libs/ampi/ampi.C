@@ -1704,8 +1704,7 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s):parentProxy(parent_)
   msgs = AmmNew();
   posted_ireqs = AmmNew();
 
-  seqEntries=parent->ckGetArraySize();
-  oorder.init (seqEntries);
+  oorder.init(myComm.getSize());
 }
 
 ampi::ampi(CkMigrateMessage *msg):CBase_ampi(msg)
@@ -2312,8 +2311,8 @@ void ampi::ssend_ack(int sreq_idx){
 void ampi::generic(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
-    CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d) resumeOnRecv %d\n",
-             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSrcIdx(), msg->getSeq(), resumeOnRecv);
+    CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d (seq %d) resumeOnRecv %d\n",
+             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSeq(), resumeOnRecv);
   )
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_generic");
@@ -2322,15 +2321,16 @@ void ampi::generic(AmpiMsg* msg)
 
   int sync = UsrToEnv(msg)->getRef();
   int srcIdx;
-  if (sync) srcIdx = msg->getSrcIdx();
+  if (sync) srcIdx = getIndexForRank(msg->getSrcRank());
 
   if(msg->getSeq() != -1) {
-    int srcIdx=msg->getSrcIdx();
-    int n=oorder.put(srcIdx,msg);
+    // If message was sent over MPI_COMM_SELF, srcRank needs to be this rank in MPI_COMM_WORLD:
+    int srcRank = (msg->getComm(this->getComm()) == MPI_COMM_SELF) ? this->getRank(MPI_COMM_WORLD) : msg->getSrcRank();
+    int n=oorder.put(srcRank,msg);
     if (n>0) { // This message was in-order
       inorder(msg);
       if (n>1) { // It enables other, previously out-of-order messages
-        while((msg=oorder.getOutOfOrder(srcIdx))!=0) {
+        while((msg=oorder.getOutOfOrder(srcRank))!=0) {
           inorder(msg);
         }
       }
@@ -2355,8 +2355,8 @@ inline static AmpiRequestList *getReqs(void);
 void ampi::inorder(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
-    CkPrintf("AMPI vp %d inorder: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
-             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSrcIdx(), msg->getSeq());
+    CkPrintf("AMPI vp %d inorder: tag=%d, src=%d, comm=%d (seq %d)\n",
+             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSeq());
   )
 
   // check posted recvs
@@ -2420,7 +2420,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count
   int seq = -1;
   if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) //Not cross-module: set seqno
     seq = oorder.nextOutgoing(destIdx);
-  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sIdx, sRank, len, destcomm);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sRank, len, destcomm);
   if (sync) UsrToEnv(msg)->setRef(sync);
   ddt->serialize((char*)buf, msg->getData(), count, 1);
   return msg;
@@ -2455,7 +2455,7 @@ void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
 
 void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 {
-  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, t, -1, sRank, len);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, t, sRank, len);
   memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
@@ -2701,40 +2701,34 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   return 0;
 }
 
-
-const int MPI_BCAST_COMM=MPI_COMM_WORLD+1000;
-
 void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm)
 {
-  const ampiCommStruct &dest=comm2CommStruct(destcomm);
-  int rootIdx=dest.getIndexForRank(root);
-  if(rootIdx==thisIndex) {
+  if (root==getRank(destcomm)) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type,destcomm));
+    thisProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, root, buf, count, type, destcomm));
   }
-  if(-1==recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM)) CkAbort("AMPI> Error in broadcast");
+
+  if (-1==recv(MPI_BCAST_TAG, root, buf, count, type, destcomm)) CkAbort("AMPI> Error in broadcast");
 }
 
 void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm, MPI_Request* request)
 {
-  const ampiCommStruct &dest=comm2CommStruct(destcomm);
-  int rootIdx=dest.getIndexForRank(root);
-  if(rootIdx==thisIndex){
+  if (root==getRank(destcomm)) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, 0, buf, count, type, destcomm));
+    thisProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, root, buf, count, type, destcomm));
   }
 
   // use an IReq to non-block the caller and get a request ptr
-  *request = postReq(new IReq(buf, count, type, rootIdx, MPI_BCAST_TAG, MPI_BCAST_COMM));
+  *request = postReq(new IReq(buf, count, type, root, MPI_BCAST_TAG, destcomm));
 }
 
 void ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
-  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, 0, len);
   memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
@@ -2748,7 +2742,7 @@ AmpiMsg* ampi::Alltoall_RemoteIget(MPI_Aint disp, int cnt, MPI_Datatype type, in
   unit = ddt->getSize(1);
   int totalsize = unit*cnt;
 
-  AmpiMsg *msg = new (totalsize, 0) AmpiMsg(-1, MPI_ATA_TAG, -1, thisIndex,totalsize);
+  AmpiMsg *msg = new (totalsize, 0) AmpiMsg(-1, MPI_ATA_TAG, thisIndex,totalsize);
   char* addr = (char*)Alltoallbuff+disp*unit;
   ddt->serialize(msg->getData(), addr, cnt, (-1));
   return msg;
@@ -2788,9 +2782,9 @@ int MPI_type_null_delete_fn(MPI_Datatype type, int keyval, void *attr, void *ext
   return (MPI_SUCCESS);
 }
 
-void AmpiSeqQ::init(int numP)
+void AmpiSeqQ::init(int commSize)
 {
-  elements.init(numP);
+  elements.init(commSize);
 }
 
 AmpiSeqQ::~AmpiSeqQ () {
@@ -2801,9 +2795,9 @@ void AmpiSeqQ::pup(PUP::er &p) {
   p|elements;
 }
 
-void AmpiSeqQ::putOutOfOrder(int srcIdx, AmpiMsg *msg)
+void AmpiSeqQ::putOutOfOrder(int srcRank, AmpiMsg *msg)
 {
-  AmpiOtherElement &el=elements[srcIdx];
+  AmpiOtherElement &el=elements[srcRank];
 #if CMK_ERROR_CHECKING
   if (msg->getSeq() < el.seqIncoming)
     CkAbort("AMPI Logic error: received late out-of-order message!\n");
@@ -2812,14 +2806,14 @@ void AmpiSeqQ::putOutOfOrder(int srcIdx, AmpiMsg *msg)
   el.nOut++; // We have another message in the out-of-order queue
 }
 
-AmpiMsg *AmpiSeqQ::getOutOfOrder(int srcIdx)
+AmpiMsg *AmpiSeqQ::getOutOfOrder(int srcRank)
 {
-  AmpiOtherElement &el=elements[srcIdx];
+  AmpiOtherElement &el=elements[srcRank];
   if (el.nOut==0) return 0; // No more out-of-order left.
   // Walk through our out-of-order queue, searching for our next message:
   for (int i=0;i<out.length();i++) {
     AmpiMsg *msg=out.deq();
-    if (msg->getSrcIdx()==srcIdx && msg->getSeq()==el.seqIncoming) {
+    if (msg->getSrcRank()==srcRank && msg->getSeq()==el.seqIncoming) {
       el.seqIncoming++;
       el.nOut--; // We have one less message out-of-order
       return msg;
@@ -3605,7 +3599,7 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
   ampi* ptr = getAmpiInstance(comm);
 
   if(comm==MPI_COMM_SELF){
-    *request = ptr->postReq(new IReq(buf, count, type, root, MPI_BCAST_TAG, MPI_BCAST_COMM),
+    *request = ptr->postReq(new IReq(buf, count, type, root, MPI_BCAST_TAG, comm),
                             AMPI_REQ_COMPLETED);
     return MPI_SUCCESS;
   }

@@ -979,7 +979,6 @@ class AmpiMsg : public CMessage_AmpiMsg {
  private:
   int seq; //Sequence number (for message ordering)
   int tag; //MPI tag
-  int srcIdx; //Array index of source
   int srcRank; //Communicator rank for source
   int length; //Number of bytes in this message
  public:
@@ -992,10 +991,10 @@ class AmpiMsg : public CMessage_AmpiMsg {
 
  public:
   AmpiMsg(void) { data = NULL; }
-  AmpiMsg(int _s, int t, int sIdx,int sRank, int l) :
-    seq(_s), tag(t), srcIdx(sIdx), srcRank(sRank), length(l) {}
-  AmpiMsg(int _s, int t, int sIdx,int sRank, int l, MPI_Comm comm) :
-    seq(_s), tag(t), srcIdx(sIdx), srcRank(sRank), length(l)
+  AmpiMsg(int _s, int t, int sRank, int l) :
+    seq(_s), tag(t), srcRank(sRank), length(l) {}
+  AmpiMsg(int _s, int t, int sRank, int l, MPI_Comm comm) :
+    seq(_s), tag(t), srcRank(sRank), length(l)
   { //We do not store comm, since it can be gotten from the ampi instance.
     //The exception is messages for MPI_COMM_SELF:
     // We make tag negative if the message is for MPI_COMM_SELF, because
@@ -1004,7 +1003,6 @@ class AmpiMsg : public CMessage_AmpiMsg {
     if (comm == MPI_COMM_SELF) tag *= (-1);
   }
   inline int getSeq(void) const { return seq; }
-  inline int getSrcIdx(void) const { return srcIdx; }
   inline int getSrcRank(void) const { return srcRank; }
   inline int getLength(void) const { return length; }
   inline char* getData(void) const { return data; }
@@ -1022,17 +1020,16 @@ class AmpiMsg : public CMessage_AmpiMsg {
   }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
-    int seq, length, tag, srcIdx, srcRank;
+    int seq, length, tag, srcRank;
     if(p.isPacking() || p.isSizing()) {
       seq = m->seq;
       tag = m->tag;
-      srcIdx = m->srcIdx;
       srcRank = m->srcRank;
       length = m->length;
     }
-    p(seq); p(tag); p(srcIdx); p(srcRank); p(length);
+    p(seq); p(tag); p(srcRank); p(length);
     if(p.isUnpacking()) {
-      m = new (length, 0) AmpiMsg(seq, tag, srcIdx, srcRank, length);
+      m = new (length, 0) AmpiMsg(seq, tag, srcRank, length);
     }
     p(m->data, length);
     if(p.isDeleting()) {
@@ -1072,11 +1069,11 @@ class AmpiSeqQ : private CkNoncopyable {
   CkMsgQ<AmpiMsg> out; // all out of order messages
   CkPagedVector<AmpiOtherElement>  elements; // element info
 
-  void putOutOfOrder(int srcIdx, AmpiMsg *msg);
+  void putOutOfOrder(int srcRank, AmpiMsg *msg);
 
 public:
   AmpiSeqQ() {}
-  void init(int numP);
+  void init(int commSize);
   ~AmpiSeqQ ();
   void pup(PUP::er &p);
 
@@ -1086,25 +1083,25 @@ public:
   ///   If 1, this message can be immediately processed.
   ///   If >1, this message can be immediately processed,
   ///     and you should call "getOutOfOrder" repeatedly.
-  inline int put(int srcIdx, AmpiMsg *msg) {
-    AmpiOtherElement &el=elements[srcIdx];
+  inline int put(int srcRank, AmpiMsg *msg) {
+    AmpiOtherElement &el=elements[srcRank];
     if (msg->getSeq()==el.seqIncoming) { // In order:
       el.seqIncoming++;
       return 1+el.nOut;
     }
     else { // Out of order: stash message
-      putOutOfOrder(srcIdx, msg);
+      putOutOfOrder(srcRank, msg);
       return 0;
     }
   }
 
   /// Get an out-of-order message from the table.
   /// (in-order messages never go into the table)
-  AmpiMsg *getOutOfOrder(int p);
+  AmpiMsg *getOutOfOrder(int srcRank);
 
   /// Return the next outgoing sequence number, and increment it.
-  int nextOutgoing(int p) {
-    return elements[p].seqOutgoing++;
+  int nextOutgoing(int srcRank) {
+    return elements[srcRank].seqOutgoing++;
   }
 };
 PUPmarshall(AmpiSeqQ)
