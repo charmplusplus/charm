@@ -157,7 +157,7 @@ typedef int MPI_Fint;
 #define MPI_LONG_DOUBLE_COMPLEX 40
 #define MPI_AINT                41
 
-#define MPI_ANY_TAG        (-1)
+#define MPI_ANY_TAG        MPI_TAG_UB_VALUE+1
 #define MPI_REQUEST_NULL   (-1)
 #define MPI_GROUP_NULL     (-1)
 #define MPI_GROUP_EMPTY       0

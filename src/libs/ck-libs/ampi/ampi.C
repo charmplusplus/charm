@@ -74,7 +74,7 @@ inline int checkData(const char* func, MPI_Datatype data) {
 }
 
 inline int checkTag(const char* func, int tag) {
-  if ((tag != MPI_ANY_TAG && tag < 0) || (tag > MPI_TAG_UB_VALUE))
+  if (tag != MPI_ANY_TAG && (tag < 0 || tag > MPI_TAG_UB_VALUE))
     return ampiErrhandler(func, MPI_ERR_TAG);
   return MPI_SUCCESS;
 }
@@ -1490,6 +1490,190 @@ int ampiParent::deleteWinAttr(MPI_Win win, int keyval){
   return setUserKeyval(comm, keyval, NULL);
 }
 
+/*
+ * AMPI Message Matching (Amm) Interface
+ *   messages are matched based on 2 ints: [tag, src]
+ */
+struct AmmEntryStruct
+{
+  AmmEntry next;
+  void* msg;
+  int tags[AMM_NTAGS];
+};
+
+struct AmmTableStruct
+{
+  AmmEntry first;
+  AmmEntry* lasth;
+};
+
+AmmTable AmmNew()
+{
+  AmmTable result = (AmmTable)malloc(sizeof(struct AmmTableStruct));
+  result->first = 0;
+  result->lasth = &(result->first);
+  return result;
+}
+
+void AmmFree(AmmTable t)
+{
+  if (t==NULL) return;
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
+  if (t->first!=NULL) CmiAbort("AMPI> Cannot free a non-empty message table!");
+#endif
+  free(t);
+}
+
+/* free all table entries but not the space pointed by "msg" */
+void AmmFreeAll(AmmTable t)
+{
+  AmmEntry cur;
+  if (t==NULL) return;
+  cur = t->first;
+  while (cur) {
+    AmmEntry toDel = cur;
+    cur = cur->next;
+    free(toDel);
+  }
+}
+
+void AmmPut(AmmTable t, int* tags, void* msg)
+{
+  AmmEntry e = (AmmEntry)malloc(sizeof(struct AmmEntryStruct));
+  e->next = 0;
+  e->msg = msg;
+  for (int i=0; i<AMM_NTAGS; i++) e->tags[i] = tags[i];
+  *(t->lasth) = e;
+  t->lasth = &(e->next);
+}
+
+static bool AmmMatch(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS])
+{
+  if (tags1[AMM_TAG]==tags2[AMM_TAG] && tags1[AMM_SRC]==tags2[AMM_SRC]) {
+    // tag and src match
+    return true;
+  }
+  else if (tags1[AMM_TAG]==tags2[AMM_TAG] && (tags1[AMM_SRC]==MPI_ANY_SOURCE || tags2[AMM_SRC]==MPI_ANY_SOURCE)) {
+    // tag matches, src is MPI_ANY_SOURCE
+    return true;
+  }
+  else if (tags1[AMM_SRC]==tags2[AMM_SRC] && (tags1[AMM_TAG]==MPI_ANY_TAG || tags2[AMM_TAG]==MPI_ANY_TAG)) {
+    // src matches, tag is MPI_ANY_TAG
+    return true;
+  }
+  else {
+    // no match
+    return false;
+  }
+}
+
+void* AmmGet(AmmTable t, const int tags[AMM_NTAGS], int* rtags)
+{
+  AmmEntry* enth;
+  AmmEntry ent;
+  void* msg;
+
+  /* added by Chao Mei in case that t is already freed
+   * which happens in ~ampi() when doing out-of-core emulation for AMPI programs */
+  if (t==NULL) return NULL;
+
+  enth = &(t->first);
+  while (true) {
+    ent = (*enth);
+    if (ent==NULL) return NULL;
+    if (AmmMatch(tags, ent->tags)) {
+      if (rtags) for (int i=0; i<AMM_NTAGS; i++) rtags[i] = ent->tags[i];
+      msg = ent->msg;
+      // unlike probe, delete the matched entry:
+      AmmEntry next = ent->next;
+      (*enth) = next;
+      if (next==NULL) t->lasth = enth;
+      free(ent);
+      return msg;
+    }
+    enth = &(ent->next);
+  }
+}
+
+void* AmmProbe(AmmTable t, const int tags[AMM_NTAGS], int* rtags)
+{
+  AmmEntry* enth;
+  AmmEntry ent;
+  void* msg;
+
+  /* added by Chao Mei in case that t is already freed
+   * which happens in ~ampi() when doing out-of-core emulation for AMPI programs */
+  if (t==NULL) return NULL;
+
+  enth = &(t->first);
+  while (true) {
+    ent = (*enth);
+    if (ent==NULL) return NULL;
+    if (AmmMatch(tags, ent->tags)) {
+      if (rtags) for (int i=0; i<AMM_NTAGS; i++) rtags[i] = ent->tags[i];
+      msg = ent->msg;
+      return msg;
+    }
+    enth = &(ent->next);
+  }
+}
+
+// Used by AmmPup
+int AmmEntries(AmmTable t)
+{
+  int n = 0;
+  AmmEntry e = t->first;
+  while (e) {
+    e = e->next;
+    n++;
+  }
+  return n;
+}
+
+AmmTable AmmPup(pup_er p, AmmTable t, AmmPupMessageFn msgpup)
+{
+  int nentries;
+
+  if (!pup_isUnpacking(p)) {
+    AmmEntry doomed;
+    AmmEntry e = t->first;
+    nentries = AmmEntries(t);
+    pup_int(p, &nentries);
+    while (e) {
+      pup_ints(p, e->tags, AMM_NTAGS);
+      msgpup(p, &e->msg);
+      doomed = e;
+      e = e->next;
+      if (pup_isDeleting(p)) {
+        free(doomed);
+      }
+    }
+    if (pup_isDeleting(p)) {
+      t->first = NULL;
+      AmmFree(t);
+      return NULL;
+    }
+    else {
+      return t;
+    }
+  }
+  else { //unpacking
+    t = AmmNew();
+    pup_int(p, &nentries);
+    for (int i=0; i<nentries; i++) {
+      int* tags;
+      void* msg;
+      tags = (int*)malloc(AMM_NTAGS*sizeof(int));
+      pup_ints(p, tags, AMM_NTAGS);
+      msgpup(p, &msg);
+      AmmPut(t, tags, msg);
+      free(tags);
+    }
+    return t;
+  }
+  return NULL; // <- never executed
+}
+
 //----------------------- ampi -------------------------
 void ampi::init(void) {
   parent=NULL;
@@ -1517,8 +1701,8 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s):parentProxy(parent_)
 
   findParent(false);
 
-  msgs = CmmNew();
-  posted_ireqs = CmmNew();
+  msgs = AmmNew();
+  posted_ireqs = AmmNew();
 
   seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
@@ -1630,9 +1814,9 @@ void ampi::pup(PUP::er &p)
     delete blockingReq; blockingReq = NULL;
   }
 
-  msgs=CmmPup((pup_er)&p,msgs,cmm_pup_ampi_message);
+  msgs=AmmPup((pup_er)&p,msgs,cmm_pup_ampi_message);
 
-  posted_ireqs = CmmPup((pup_er)&p, posted_ireqs, cmm_pup_posted_ireq);
+  posted_ireqs = AmmPup((pup_er)&p, posted_ireqs, cmm_pup_posted_ireq);
 
   p|seqEntries;
   p|oorder;
@@ -1642,19 +1826,18 @@ ampi::~ampi()
 {
   if (CkInRestarting() || _BgOutOfCoreFlag==1) {
     // in restarting, we need to flush messages
-    int tags[2];
+    int tags[2] = { MPI_ANY_TAG, MPI_ANY_SOURCE };
     MPI_Status sts;
-    tags[0] = tags[1] = CmmWildCard;
-    AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 2, tags, (int*)&sts);
+    AmpiMsg *msg = (AmpiMsg *) AmmGet(msgs, tags, (int*)&sts);
     while (msg) {
       delete msg;
-      msg = (AmpiMsg *) CmmGet(msgs, 2, tags, (int*)&sts);
+      msg = (AmpiMsg *) AmmGet(msgs, tags, (int*)&sts);
     }
   }
 
   delete blockingReq; blockingReq = NULL;
-  CmmFree(msgs);
-  CmmFreeAll(posted_ireqs);
+  AmmFree(msgs);
+  AmmFreeAll(posted_ireqs);
 }
 
 //------------------------ Communicator Splitting ---------------------
@@ -2130,7 +2313,7 @@ void ampi::generic(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d) resumeOnRecv %d\n",
-             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(), msg->getSrcIdx(), msg->getSeq(), resumeOnRecv);
+             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSrcIdx(), msg->getSeq(), resumeOnRecv);
   )
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_generic");
@@ -2173,7 +2356,7 @@ void ampi::inorder(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d inorder: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
-             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(), msg->getSrcIdx(), msg->getSeq());
+             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSrcIdx(), msg->getSeq());
   )
 
   // check posted recvs
@@ -2190,22 +2373,21 @@ void ampi::inorder(AmpiMsg* msg)
   AmpiRequestList *reqL = &(parent->ampiReqs);
   //When storing the req index, it's 1-based. The reason is stated in the comments
   //in the ampi::irecv function.
-  int ireqIdx = (int)((long)CmmGet(posted_ireqs, 2, tags, (int*)&sts));
+  int ireqIdx = (int)((long)AmmGet(posted_ireqs, tags, (int*)&sts));
   IReq *ireq = NULL;
   if(reqL->size()>0 && ireqIdx>0)
     ireq = (IReq *)(*reqL)[ireqIdx-1];
   if (ireq) { // receive posted
     ireq->receive(this, msg);
   } else {
-    CmmPut(msgs, 2, tags, msg);
+    AmmPut(msgs, tags, msg);
   }
 }
 
 AmpiMsg *ampi::getMessage(int t, int s, MPI_Comm comm, int *sts) const
 {
-  int tags[2];
-  tags[0] = t; tags[1] = s;
-  AmpiMsg *msg = (AmpiMsg *) CmmGet(msgs, 2, tags, sts);
+  int tags[2] = { t, s };
+  AmpiMsg *msg = (AmpiMsg *) AmmGet(msgs, tags, sts);
   return msg;
 }
 
@@ -2273,7 +2455,7 @@ void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
 
 void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 {
-  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, t, -1, sRank, len, MPI_COMM_WORLD);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, t, -1, sRank, len);
   memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
@@ -2432,7 +2614,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
   ampi *dis = getAmpiInstance(disComm);
   while(1) {
     tags[0] = t; tags[1] = s;
-    msg = (AmpiMsg *) CmmGet(dis->msgs, 2, tags, (int*)sts);
+    msg = (AmpiMsg *) AmmGet(dis->msgs, tags, (int*)sts);
     if (msg) break;
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = dis->blockOnRecv();
@@ -2444,7 +2626,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 #endif
 
   if (sts) {
-    sts->MPI_COMM = msg->getComm();
+    sts->MPI_COMM = msg->getComm(comm);
     sts->MPI_LENGTH = msg->getLength();
   }
   dis->processAmpiMsg(msg, buf, type, count);
@@ -2479,14 +2661,14 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   AmpiMsg *msg = 0;
   while(1) {
     tags[0] = t; tags[1] = s;
-    msg = (AmpiMsg *) CmmProbe(dis->msgs, 2, tags, (int*)sts);
+    msg = (AmpiMsg *) AmmProbe(dis->msgs, tags, (int*)sts);
     if (msg) break;
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = dis->blockOnRecv();
   }
 
   if (sts) {
-    sts->MPI_COMM = msg->getComm();
+    sts->MPI_COMM = msg->getComm(comm);
     sts->MPI_LENGTH = msg->getLength();
   }
 
@@ -2500,10 +2682,10 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   int tags[2];
   AmpiMsg *msg = 0;
   tags[0] = t; tags[1] = s;
-  msg = (AmpiMsg *) CmmProbe(msgs, 2, tags, (int*)sts);
+  msg = (AmpiMsg *) AmmProbe(msgs, tags, (int*)sts);
   if (msg) {
     if (sts) {
-      sts->MPI_COMM = msg->getComm();
+      sts->MPI_COMM = msg->getComm(comm);
       sts->MPI_LENGTH = msg->getLength();
     }
     return 1;
@@ -2530,7 +2712,7 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
+    thisProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type,destcomm));
   }
   if(-1==recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM)) CkAbort("AMPI> Error in broadcast");
 }
@@ -2543,7 +2725,7 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, 0, buf, count, type, MPI_BCAST_COMM));
+    thisProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, 0, buf, count, type, destcomm));
   }
 
   // use an IReq to non-block the caller and get a request ptr
@@ -2552,7 +2734,7 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
 
 void ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
-  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, MPI_COMM_WORLD);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len);
   memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
@@ -2566,7 +2748,7 @@ AmpiMsg* ampi::Alltoall_RemoteIget(MPI_Aint disp, int cnt, MPI_Datatype type, in
   unit = ddt->getSize(1);
   int totalsize = unit*cnt;
 
-  AmpiMsg *msg = new (totalsize, 0) AmpiMsg(-1, -1, -1, thisIndex,totalsize,myComm.getComm());
+  AmpiMsg *msg = new (totalsize, 0) AmpiMsg(-1, MPI_ATA_TAG, -1, thisIndex,totalsize);
   char* addr = (char*)Alltoallbuff+disp*unit;
   ddt->serialize(msg->getData(), addr, cnt, (-1));
   return msg;
@@ -3045,7 +3227,7 @@ MPI_Request ampi::postReq(AmpiRequest* newreq, AmpiReqSts status/*=AMPI_REQ_PEND
   else {
     request = getReqs()->insert(newreq);
     int tags[2] = { newreq->tag, newreq->src };
-    CmmPut(posted_ireqs, 2, tags, (void *)(CmiIntPtr)(request+1));
+    AmmPut(posted_ireqs, tags, (void *)(CmiIntPtr)(request+1));
   }
   return request;
 }
@@ -3484,7 +3666,7 @@ void ampi::irednResult(CkReductionMsg *msg)
   MPI_Status sts;
   int tags[2] = { MPI_REDN_TAG, AMPI_COLL_SOURCE };
   AmpiRequestList *reqL = &(parent->ampiReqs);
-  int rednReqIdx = (int)((long)CmmGet(posted_ireqs, 2, tags, (int*)&sts));
+  int rednReqIdx = (int)((long)AmmGet(posted_ireqs, tags, (int*)&sts));
   AmpiRequest *rednReq = NULL;
   if(reqL->size()>0 && rednReqIdx>0)
     rednReq = (AmpiRequest *)(*reqL)[rednReqIdx-1];
@@ -4705,8 +4887,8 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
   length = msg->getLength();
   this->tag = msg->getTag(); // Although not required, we also extract tag from msg
   src = msg->getSrcRank();   // Although not required, we also extract src from msg
-  comm = msg->getComm();
-  AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", (int)this->tag, this);
+  comm = msg->getComm(ptr->getComm());
+  AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", tag, this);
 #if CMK_BIGSIM_CHARM
   event = msg->event;
   eventPe = msg->eventPe;
@@ -5260,7 +5442,7 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
     //posted_ireqs stores the index (an integer) to ampiReqs.
     //The index is 1-based rather 0-based because when pulling entries from posted_ireqs,
     //if not found, a "0" (i.e. NULL) is returned, this confuses the indexing of ampiReqs.
-    CmmPut(posted_ireqs, 2, tags, (void *)(CmiIntPtr)((*request)+1));
+    AmmPut(posted_ireqs, tags, (void *)(CmiIntPtr)((*request)+1));
   }
 
 #if AMPIMSGLOG

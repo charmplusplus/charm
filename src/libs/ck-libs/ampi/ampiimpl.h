@@ -71,6 +71,29 @@ class fromzDisk : public zdisk {
 
 typedef void (*MPI_MigrateFn)(void);
 
+/*
+ * AMPI Message Matching (Amm) Interface:
+ * messages are matched on 2 ints: [tag, src]
+ */
+#define AMM_TAG   0
+#define AMM_SRC   1
+#define AMM_NTAGS 2
+
+typedef struct AmmTableStruct* AmmTable;
+typedef struct AmmEntryStruct* AmmEntry;
+typedef void (*AmmPupMessageFn)(pup_er p, void **msg);
+
+AmmTable AmmNew();
+void AmmFree(AmmTable t);
+void AmmFreeAll(AmmTable t);
+void AmmPut(AmmTable t, const int tags[AMM_NTAGS], void* msg);
+static bool AmmMatch(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]);
+void* AmmGet(AmmTable t, const int tags[AMM_NTAGS], int* rtags);
+void* AmmProbe(AmmTable t, const int tags[AMM_NTAGS], int* rtags);
+int AmmEntries(AmmTable t);
+AmmTable AmmPup(pup_er p, AmmTable t, AmmPupMessageFn msgpup);
+
+
 void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec);
 
 PUPfunctionpointer(MPI_User_function*)
@@ -519,14 +542,16 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *fla
 
 extern int _mpi_nworlds;
 
-#define MPI_ATA_SEQ_TAG MPI_TAG_UB_VALUE+1
-#define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+10
-#define MPI_REDN_TAG    MPI_TAG_UB_VALUE+11
-#define MPI_SCATTER_TAG MPI_TAG_UB_VALUE+12
-#define MPI_SCAN_TAG    MPI_TAG_UB_VALUE+13
-#define MPI_EXSCAN_TAG  MPI_TAG_UB_VALUE+14
-#define MPI_ATA_TAG     MPI_TAG_UB_VALUE+15
-#define MPI_NBOR_TAG    MPI_TAG_UB_VALUE+16
+//MPI_ANY_TAG is defined in ampi.h to MPI_TAG_UB_VALUE+1
+#define MPI_ATA_SEQ_TAG MPI_TAG_UB_VALUE+2
+#define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+3
+#define MPI_REDN_TAG    MPI_TAG_UB_VALUE+4
+#define MPI_SCATTER_TAG MPI_TAG_UB_VALUE+5
+#define MPI_SCAN_TAG    MPI_TAG_UB_VALUE+6
+#define MPI_EXSCAN_TAG  MPI_TAG_UB_VALUE+7
+#define MPI_ATA_TAG     MPI_TAG_UB_VALUE+8
+#define MPI_NBOR_TAG    MPI_TAG_UB_VALUE+9
+#define MPI_RMA_TAG     MPI_TAG_UB_VALUE+10
 
 #define AMPI_COLL_SOURCE 0
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
@@ -956,7 +981,6 @@ class AmpiMsg : public CMessage_AmpiMsg {
   int tag; //MPI tag
   int srcIdx; //Array index of source
   int srcRank; //Communicator rank for source
-  MPI_Comm comm; //Communicator for source
   int length; //Number of bytes in this message
  public:
   char *data; //Payload
@@ -968,29 +992,47 @@ class AmpiMsg : public CMessage_AmpiMsg {
 
  public:
   AmpiMsg(void) { data = NULL; }
-  AmpiMsg(int _s, int t, int sIdx,int sRank, int l, int c) :
-    seq(_s), tag(t),srcIdx(sIdx), srcRank(sRank), comm(c), length(l) {}
+  AmpiMsg(int _s, int t, int sIdx,int sRank, int l) :
+    seq(_s), tag(t), srcIdx(sIdx), srcRank(sRank), length(l) {}
+  AmpiMsg(int _s, int t, int sIdx,int sRank, int l, MPI_Comm comm) :
+    seq(_s), tag(t), srcIdx(sIdx), srcRank(sRank), length(l)
+  { //We do not store comm, since it can be gotten from the ampi instance.
+    //The exception is messages for MPI_COMM_SELF:
+    // We make tag negative if the message is for MPI_COMM_SELF, because
+    // such messages are sent over the ampi instance corresponding to MPI_COMM_WORLD.
+    CkAssert(tag >= 0);
+    if (comm == MPI_COMM_SELF) tag *= (-1);
+  }
   inline int getSeq(void) const { return seq; }
   inline int getSrcIdx(void) const { return srcIdx; }
   inline int getSrcRank(void) const { return srcRank; }
   inline int getLength(void) const { return length; }
   inline char* getData(void) const { return data; }
-  inline int getTag(void) const { return tag; }
-  inline MPI_Comm getComm(void) const { return comm; }
+  inline int getTag(void) const
+  { //Tag is negative if message is sent over MPI_COMM_SELF.
+    if (tag >= 0) return tag;
+    else return (-1)*tag;
+  }
+  inline MPI_Comm getComm(MPI_Comm comm) const
+  { //If ampi instance is MPI_COMM_WORLD, need to check if the message is for MPI_COMM_SELF.
+    if (comm == MPI_COMM_WORLD && tag < 0)
+      return MPI_COMM_SELF;
+    else
+      return comm;
+  }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
-    int seq, length, tag, srcIdx, srcRank, comm;
+    int seq, length, tag, srcIdx, srcRank;
     if(p.isPacking() || p.isSizing()) {
       seq = m->seq;
       tag = m->tag;
       srcIdx = m->srcIdx;
       srcRank = m->srcRank;
-      comm = m->comm;
       length = m->length;
     }
-    p(seq); p(tag); p(srcIdx); p(srcRank); p(comm); p(length);
+    p(seq); p(tag); p(srcIdx); p(srcRank); p(length);
     if(p.isUnpacking()) {
-      m = new (length, 0) AmpiMsg(seq, tag, srcIdx, srcRank, length, comm);
+      m = new (length, 0) AmpiMsg(seq, tag, srcIdx, srcRank, length);
     }
     p(m->data, length);
     if(p.isDeleting()) {
@@ -1565,12 +1607,12 @@ class ampi : public CBase_ampi {
 #endif
  public:
   /*
-   * CmmTable is indexed by the tag and sender.
-   * Since ampi objects are per-communicator, there are separate CmmTables per communicator.
+   * AmmTable is indexed by the tag and sender.
+   * Since ampi objects are per-communicator, there are separate AmmTables per communicator.
    * FIXME: These are directly used by API routines, which is hideous.
    */
-  CmmTable msgs;         // unexpected message queue
-  CmmTable posted_ireqs; // posted request queue
+  AmmTable msgs;         // unexpected message queue
+  AmmTable posted_ireqs; // posted request queue
   //------------------------ Added by YAN ---------------------
  private:
   CkPupPtrVec<win_obj> winObjects;
