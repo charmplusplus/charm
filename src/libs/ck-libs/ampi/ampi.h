@@ -715,6 +715,8 @@ int AMPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest);
 int AMPI_Comm_split_type(MPI_Comm src, int split_type, int key, MPI_Info info, MPI_Comm *dest);
 #define MPI_Comm_dup AMPI_Comm_dup
 int AMPI_Comm_dup(MPI_Comm src, MPI_Comm *dest);
+#define MPI_Comm_dup_with_info AMPI_Comm_dup_with_info
+int AMPI_Comm_dup_with_info(MPI_Comm src, MPI_Info info, MPI_Comm *dest);
 #define MPI_Comm_free AMPI_Comm_free
 int AMPI_Comm_free(MPI_Comm *comm);
 #define MPI_Comm_test_inter AMPI_Comm_test_inter

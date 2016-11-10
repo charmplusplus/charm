@@ -7157,6 +7157,15 @@ int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
 }
 
 CDECL
+int AMPI_Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *dest)
+{
+  AMPIAPI("AMPI_Comm_dup_with_info");
+  AMPI_Comm_dup(comm, dest);
+  AMPI_Comm_set_info(*dest, info);
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest)
 {
   AMPIAPI("AMPI_Comm_split");
