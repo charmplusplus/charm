@@ -529,6 +529,29 @@ group ArrayMeshStreamer<dtype, itype, ClientType,
 %% may improve the generality of this approach through dynamic tuning of library
 %% parameters.
 
+\section{New Interface}
+
+In addition to the above method of instantiating and using TRAM, a new
+interface has been designed in which entry method tags can be used to automate
+aggregation of messages. In order to use the new interface, three things must be
+done:
+
+\begin{itemize}
+\item{Mark an entry method as \code{[aggregate]} in the \code{.ci} file:}
+\begin{alltt}
+entry [aggregate] void foo(Data d);
+\end{alltt}
+Entry methods that use the \code{[aggregate]} tag must have exactly one argument of a
+fixed size.
+\item{Include \code{NDMeshStreamer.h} before the inclusion of the
+\code{.decl.h} file:}
+\begin{alltt}
+#include "NDMeshStreamer.h"
+#include "SomeModule.decl.h"
+\end{alltt}
+\item{Add \code{-module NDMeshStreamer} to the link line when compiling}
+\end{itemize}
+
 \section{Example}
 
 For example code showing how to use TRAM, see examples/charm++/TRAM and
