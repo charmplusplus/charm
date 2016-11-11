@@ -2582,6 +2582,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
     sts->MPI_TAG = MPI_ANY_TAG;
     sts->MPI_COMM = comm;
     sts->MPI_LENGTH = 0;
+    sts->MPI_CANCEL = 0;
     return 0;
   }
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
@@ -2623,6 +2624,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
   if (sts) {
     sts->MPI_COMM = msg->getComm(comm);
     sts->MPI_LENGTH = msg->getLength();
+    sts->MPI_CANCEL = 0;
   }
   dis->processAmpiMsg(msg, buf, type, count);
 
@@ -2665,6 +2667,7 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   if (sts) {
     sts->MPI_COMM = msg->getComm(comm);
     sts->MPI_LENGTH = msg->getLength();
+    sts->MPI_CANCEL = 0;
   }
 
 #if CMK_BIGSIM_CHARM
@@ -2682,6 +2685,7 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
     if (sts) {
       sts->MPI_COMM = msg->getComm(comm);
       sts->MPI_LENGTH = msg->getLength();
+      sts->MPI_CANCEL = 0;
     }
     return 1;
   }
@@ -4312,6 +4316,13 @@ int IReq::wait(MPI_Status *sts){
     dis->block();
     dis = getAmpiInstance(comm);
 
+    if (cancelled) {
+      sts->MPI_CANCEL = 1;
+      statusIreq = true;
+      dis->resumeOnRecv = false;
+      return 0;
+    }
+
 #if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
     //memory operation. So we need to return from this function and do the while loop
@@ -4330,6 +4341,7 @@ int IReq::wait(MPI_Status *sts){
     sts->MPI_SOURCE = src;
     sts->MPI_COMM = comm;
     sts->MPI_LENGTH = length;
+    sts->MPI_CANCEL = 0;
   }
 
   return 0;
@@ -4364,6 +4376,7 @@ int RednReq::wait(MPI_Status *sts){
     sts->MPI_TAG = tag;
     sts->MPI_SOURCE = src;
     sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
   }
   return 0;
 }
@@ -4397,6 +4410,7 @@ int GatherReq::wait(MPI_Status *sts){
     sts->MPI_TAG = tag;
     sts->MPI_SOURCE = src;
     sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
   }
   return 0;
 }
@@ -4430,6 +4444,7 @@ int GathervReq::wait(MPI_Status *sts){
     sts->MPI_TAG = tag;
     sts->MPI_SOURCE = src;
     sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
   }
   return 0;
 }
@@ -4446,6 +4461,7 @@ int SendReq::wait(MPI_Status *sts){
   AMPI_DEBUG("SendReq::wait has resumed\n");
   if (sts) {
     sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
   }
   return 0;
 }
@@ -4458,6 +4474,7 @@ int SsendReq::wait(MPI_Status *sts){
   }
   if (sts) {
     sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
   }
   return 0;
 }
@@ -4735,20 +4752,34 @@ bool PersReq::itest(MPI_Status *sts){
 }
 
 bool IReq::test(MPI_Status *sts){
-  if (statusIreq && sts) {
-    sts->MPI_COMM = comm;
-    sts->MPI_LENGTH = length;
-  }
-  else {
-    getAmpiInstance(comm)->yield();
+  if (sts) {
+    if (cancelled) {
+      sts->MPI_CANCEL = 1;
+      statusIreq = true;
+    }
+    else if (statusIreq) {
+      sts->MPI_COMM = comm;
+      sts->MPI_LENGTH = length;
+      sts->MPI_CANCEL = 0;
+    }
+    else {
+      getAmpiInstance(comm)->yield();
+    }
   }
   return statusIreq;
 }
 
 bool IReq::itest(MPI_Status *sts){
-  if (statusIreq && sts) {
-    sts->MPI_COMM = comm;
-    sts->MPI_LENGTH = length;
+  if (sts) {
+    if (cancelled) {
+      sts->MPI_CANCEL = 1;
+      statusIreq = true;
+    }
+    else if (statusIreq) {
+      sts->MPI_COMM = comm;
+      sts->MPI_LENGTH = length;
+      sts->MPI_CANCEL = 0;
+    }
   }
   return statusIreq;
 }
@@ -5044,21 +5075,32 @@ int AMPI_Request_free(MPI_Request *request){
 CDECL
 int AMPI_Cancel(MPI_Request *request){
   AMPIAPI("AMPI_Cancel");
-  return AMPI_Request_free(request);
+  if(*request == MPI_REQUEST_NULL) return MPI_SUCCESS;
+  checkRequest(*request);
+  AmpiRequestList* reqs = getReqs();
+  AmpiRequest& req = *(*reqs)[*request];
+  if(req.getType() == MPI_I_REQ) {
+    req.cancel();
+    return MPI_SUCCESS;
+  }
+  else {
+    return ampiErrhandler("AMPI_Cancel", MPI_ERR_REQUEST);
+  }
 }
 
 CDECL
 int AMPI_Test_cancelled(MPI_Status* status, int* flag) {
   AMPIAPI("AMPI_Test_cancelled");
-  /* FIXME: always returns success */
-  *flag = 1;
+  // NOTE : current implementation requires AMPI_{Wait,Test}{any,some,all}
+  // to be invoked before AMPI_Test_cancelled
+  *flag = status->MPI_CANCEL;
   return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Status_set_cancelled(MPI_Status *status, int flag){
   AMPIAPI("AMPI_Status_set_cancelled");
-  /* AMPI_Test_cancelled always returns true */
+  status->MPI_CANCEL = flag;
   return MPI_SUCCESS;
 }
 

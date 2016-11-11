@@ -164,6 +164,7 @@
        integer, parameter :: MPI_TAG         = 1
        integer, parameter :: MPI_SOURCE      = 2
        integer, parameter :: MPI_COMM        = 3
+       integer, parameter :: MPI_ERROR       = 5
 
        integer, dimension(MPI_STATUS_SIZE) :: MPI_STATUS_IGNORE
        integer, dimension(MPI_STATUS_SIZE) :: MPI_STATUSES_IGNORE

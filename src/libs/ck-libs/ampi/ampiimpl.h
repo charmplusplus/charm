@@ -618,6 +618,10 @@ class AmpiRequest {
   ///  returning a valid MPI error code.
   virtual int wait(MPI_Status *sts) =0;
 
+  /// Mark this request for cancellation.
+  /// Supported only for IReq requests
+  virtual void cancel() =0;
+
   /// Receive an AmpiMsg
   virtual void receive(ampi *ptr, AmpiMsg *msg) = 0;
 
@@ -668,6 +672,7 @@ class PersReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
+  void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_PERS_REQ; }
@@ -681,9 +686,10 @@ class PersReq : public AmpiRequest {
 class IReq : public AmpiRequest {
  public:
   int length; // recv'ed length
+  bool cancelled; // track if request is cancelled
   IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_){
     buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_;
-    comm=comm_;  isvalid=true; length=0;
+    comm=comm_;  isvalid=true; length=0; cancelled=false;
   }
   IReq(){}
   ~IReq(){}
@@ -691,6 +697,11 @@ class IReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
+  void cancel() {
+    if (!statusIreq) {
+      cancelled = true;
+    }
+  }
   inline int getType(void) const { return MPI_I_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg);
   void receive(ampi *ptr, CkReductionMsg *msg) {}
@@ -714,6 +725,7 @@ class RednReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
+  void cancel() {}
   inline int getType(void) const { return MPI_REDN_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg);
@@ -736,6 +748,7 @@ class GatherReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
+  void cancel() {}
   inline int getType(void) const { return MPI_GATHER_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg);
@@ -763,6 +776,7 @@ class GathervReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
+  void cancel() {}
   inline int getType(void) const { return MPI_GATHERV_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg);
@@ -784,6 +798,7 @@ class SendReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
+  void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_SEND_REQ; }
@@ -804,6 +819,7 @@ class SsendReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
+  void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_SSEND_REQ; }
@@ -821,6 +837,7 @@ class GPUReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
+  void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg);
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   void setComplete();
@@ -844,6 +861,7 @@ class IATAReq : public AmpiRequest {
   bool itest(MPI_Status *sts);
   void complete(MPI_Status *sts);
   int wait(MPI_Status *sts);
+  void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getCount(void) const { return elmcount; }
