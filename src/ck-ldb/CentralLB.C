@@ -1460,8 +1460,10 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   }
 	*/
 
+  double strat_end_time = CkWallTimer();
+  theLbdb->SetStrategyCost(strat_end_time - strat_start_time);
+
   if (_lb_args.debug()) {
-    double strat_end_time = CkWallTimer();
     envelope *env = UsrToEnv(msg);
 
     double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
@@ -1470,7 +1472,6 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
     CkPrintf("CharmLB> %s: PE [%d] #Objects migrating: %d, LBMigrateMsg size: %.2f MB\n", lbname, cur_ld_balancer, msg->n_moves, env->getTotalsize()/1024.0/1024.0);
     CkPrintf("CharmLB> %s: PE [%d] strategy finished at %f duration %f s\n",
 	      lbname, cur_ld_balancer, strat_end_time, strat_end_time-strat_start_time);
-    theLbdb->SetStrategyCost(strat_end_time - strat_start_time);
   }
   return msg;
 #else
