@@ -24,6 +24,9 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <deque>
 #include <list>
 #include <map>
+#if !CMK_USING_BGXLC
+#include <unordered_map>
+#endif
 #include <string>
 #include <complex>
 #include <utility> /*for std::pair*/
@@ -200,6 +203,12 @@ namespace PUP {
   inline void operator|(er &p,typename std::map<V,T,Cmp> &m)
   //{ PUP_stl_map<std::map<V,T,Cmp>,std::pair<const V,T> >(p,m); }    // 'const' confuses old version of a SUN CC compiler
   { PUP_stl_map<std::map<V,T,Cmp>,std::pair<V,T> >(p,m); }
+#if !CMK_USING_BGXLC
+  template <class V,class T,class Cmp>
+  inline void operator|(er &p,typename std::unordered_map<V,T,Cmp> &m)
+  //{ PUP_stl_map<std::unordered_map<V,T,Cmp>,std::pair<const V,T> >(p,m); }    // 'const' confuses old version of a SUN CC compiler
+  { PUP_stl_map<std::unordered_map<V,T,Cmp>,std::pair<V,T> >(p,m); }
+#endif
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::multimap<V,T,Cmp> &m)
   { PUP_stl_map<std::multimap<V,T,Cmp>,std::pair<const V,T> >(p,m); }
