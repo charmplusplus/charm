@@ -1065,15 +1065,21 @@ public:
   }
 };
 
+#if CMK_USING_XLC
+#include <tr1/unordered_map>
+typedef std::tr1::unordered_map<int, AmpiOtherElement> AmpiElements;
+#else
+typedef std::unordered_map<int, AmpiOtherElement> AmpiElements;
+#endif
+
 class AmpiSeqQ : private CkNoncopyable {
   CkMsgQ<AmpiMsg> out; // all out of order messages
-  CkPagedVector<AmpiOtherElement>  elements; // element info
+  AmpiElements elements; // element info
 
   void putOutOfOrder(int srcRank, AmpiMsg *msg);
 
 public:
   AmpiSeqQ() {}
-  void init(int commSize);
   ~AmpiSeqQ ();
   void pup(PUP::er &p);
 
@@ -1478,7 +1484,6 @@ class ampi : public CBase_ampi {
   groupStruct tmpVec; // stores temp group info
   CProxy_ampi remoteProxy; // valid only for intercommunicator
 
-  int seqEntries; //Number of elements in below arrays
   AmpiSeqQ oorder;
   void inorder(AmpiMsg *msg);
 

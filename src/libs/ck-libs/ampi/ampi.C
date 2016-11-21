@@ -1703,15 +1703,11 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s):parentProxy(parent_)
 
   msgs = AmmNew();
   posted_ireqs = AmmNew();
-
-  oorder.init(myComm.getSize());
 }
 
 ampi::ampi(CkMigrateMessage *msg):CBase_ampi(msg)
 {
   init();
-
-  seqEntries=-1;
 }
 
 void ampi::ckJustMigrated(void)
@@ -1817,7 +1813,6 @@ void ampi::pup(PUP::er &p)
 
   posted_ireqs = AmmPup((pup_er)&p, posted_ireqs, cmm_pup_posted_ireq);
 
-  p|seqEntries;
   p|oorder;
 }
 
@@ -2780,11 +2775,6 @@ int MPI_type_dup_fn(MPI_Datatype type, int keyval, void *extra_state,
 
 int MPI_type_null_delete_fn(MPI_Datatype type, int keyval, void *attr, void *extra_state){
   return (MPI_SUCCESS);
-}
-
-void AmpiSeqQ::init(int commSize)
-{
-  elements.init(commSize);
 }
 
 AmpiSeqQ::~AmpiSeqQ () {
