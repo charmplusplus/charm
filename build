@@ -622,6 +622,11 @@ then
       i="$COMPILER"
       echo '#include "'cc-$i.h'"' >> $ConvHeader
       echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
+elif test `echo "$BASEVERSION" | grep -c "bluegeneq"` -gt 0
+then
+      i="xlc"
+      echo '#include "'cc-$i.h'"' >> $ConvHeader
+      echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
 fi
 if test -n "$BOPTS"
 then
