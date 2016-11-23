@@ -166,7 +166,7 @@ namespace xi {
       defs << "    }\n";
     }
 
-    SdagConstruct::generateDummyBeginExecute(defs, 2);
+    SdagConstruct::generateDummyBeginExecute(defs, 2, decl_entry);
 
     // delete the continuation now that we are finished with it
     defs << "    delete c;\n";

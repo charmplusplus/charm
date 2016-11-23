@@ -544,9 +544,16 @@ namespace xi {
     }
   }
 
-  void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent) {
+  void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent, Entry *entry) {
     indentBy(op, indent);
-    op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, NULL, this); \n";
+    op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, ";
+
+    if (entry->getContainer()->isArray())
+      op << "ckGetArrayIndex().getProjectionID()";
+    else
+      op << "NULL";
+
+    op << ", this); \n";
   }
 
   void SdagConstruct::generateTraceEndCall(XStr& op, int indent) {

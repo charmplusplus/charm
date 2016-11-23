@@ -80,7 +80,7 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
   generateBeginExec(defs, "spaceholder");
 #endif
   if (!entry->getContainer()->isGroup() || !entry->isConstructor())
-    generateDummyBeginExecute(defs, 1);
+    generateDummyBeginExecute(defs, 1, entry);
 
   endMethod(defs);
 

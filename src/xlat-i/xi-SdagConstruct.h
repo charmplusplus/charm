@@ -117,7 +117,7 @@ class SdagConstruct {
   static void generateBeginExec(XStr& defs, const char *name);
   static void generateEndExec(XStr& defs);
   static void generateEndSeq(XStr& defs);
-  static void generateDummyBeginExecute(XStr& defs, int indent);
+  static void generateDummyBeginExecute(XStr& defs, int indent, Entry *entry);
 };
 
 }   // namespace xi
