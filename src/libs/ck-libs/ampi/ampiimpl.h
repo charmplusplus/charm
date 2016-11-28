@@ -1626,6 +1626,7 @@ class ampi : public CBase_ampi {
 };
 
 ampiParent *getAmpiParent(void);
+bool isAmpiThread(void);
 ampi *getAmpiInstance(MPI_Comm comm);
 void checkComm(MPI_Comm comm);
 void checkRequest(MPI_Request req);
@@ -1638,8 +1639,19 @@ int ampiErrhandler(const char* func, int errcode);
 #define ampiErrhandler(func, errcode) (errcode)
 #endif
 
-//Use this to mark the start of AMPI interface routines:
-#define AMPIAPI(routineName) TCHARM_API_TRACE(routineName,"ampi")
+//Use this to mark the start of AMPI interface routines that can only be called on AMPI threads:
+#if CMK_ERROR_CHECKING
+#define AMPIAPI(routineName)               \
+  if (isAmpiThread())                      \
+    TCHARM_API_TRACE(routineName, "ampi"); \
+  else                                     \
+    CkAbort("AMPI> cannot call MPI routines from non-AMPI threads!");
+#else
+#define AMPIAPI(routineName) TCHARM_API_TRACE(routineName, "ampi")
+#endif
+
+//Use this for MPI_Init and routines than can be called before AMPI threads have been initialized:
+#define AMPIAPI_INIT(routineName) TCHARM_API_TRACE(routineName, "ampi")
 
 #endif
 

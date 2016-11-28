@@ -2771,6 +2771,10 @@ ampi *getAmpiInstance(MPI_Comm comm) {
   return ptr;
 }
 
+bool isAmpiThread(void) {
+  return (CtvAccess(ampiPtr)) ? true : false;
+}
+
 inline static AmpiRequestList *getReqs(void) {
   return &(getAmpiParent()->ampiReqs);
 }
@@ -2854,7 +2858,7 @@ int AMPI_Query_thread(int *provided)
 CDECL
 int AMPI_Init_thread(int *p_argc, char*** p_argv, int required, int *provided)
 {
-  AMPIAPI("AMPI_Init_thread");
+  AMPIAPI_INIT("AMPI_Init_thread");
   *provided = MPI_THREAD_SINGLE;
   AMPI_Init(p_argc, p_argv);
   return MPI_SUCCESS;
@@ -2864,7 +2868,7 @@ CDECL
 int AMPI_Init(int *p_argc, char*** p_argv)
 {
   if (nodeinit_has_been_called) {
-    AMPIAPI("AMPI_Init");
+    AMPIAPI_INIT("AMPI_Init");
     char **argv;
     if (p_argv) argv=*p_argv;
     else argv=CkGetArgv();
@@ -2883,7 +2887,7 @@ CDECL
 int AMPI_Initialized(int *isInit)
 {
   if (nodeinit_has_been_called) {
-    AMPIAPI("AMPI_Initialized");     /* in case charm init not called */
+    AMPIAPI_INIT("AMPI_Initialized");     /* in case charm init not called */
     *isInit=CtvAccess(ampiInitDone);
   }
   else /* !nodeinit_has_been_called */ {
@@ -2903,7 +2907,7 @@ int AMPI_Finalized(int *isFinalized)
 CDECL
 int AMPI_Comm_rank(MPI_Comm comm, int *rank)
 {
-  //AMPIAPI("AMPI_Comm_rank");
+  AMPIAPI("AMPI_Comm_rank");
 
 #if AMPI_ERROR_CHECKING
   int ret = checkCommunicator("AMPI_Comm_rank", comm);
@@ -2932,7 +2936,7 @@ int AMPI_Comm_rank(MPI_Comm comm, int *rank)
 CDECL
 int AMPI_Comm_size(MPI_Comm comm, int *size)
 {
-  //AMPIAPI("AMPI_Comm_size");
+  AMPIAPI("AMPI_Comm_size");
 
 #if AMPI_ERROR_CHECKING
   int ret = checkCommunicator("AMPI_Comm_size", comm);
