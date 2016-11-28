@@ -892,7 +892,6 @@ static void btree_delete_int(slotset *ss, btreenode *node,
       /* left child node */
       num_left  = node->child[index]->num_blocks;
       num_right = node->child[index+1]->num_blocks;
-      left_pos;
       right_pos = 0;
       for (left_pos = num_left; left_pos < num_left + num_right; left_pos++) {
         node->child[index]->blocks[left_pos].startslot = 

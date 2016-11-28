@@ -67,6 +67,7 @@ int CpdPythonGroup::buildIterator(PyObject *&data, void *iter) {
       if (arriter.elems.size() > 0) {
         data = PyLong_FromVoidPtr(arriter.elems[0]);
         nextElement = 1;
+        return 1;
       } else {
         return 0;
       }

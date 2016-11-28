@@ -230,7 +230,7 @@ void endTraceBigSim_20param(char * eventname, int stepno, int num_params, double
 #endif
 	char params[2048];
 
-if(num_params==0) sprintf(params, "");
+if(num_params==0) params[0] = 0;
 if(num_params==1) sprintf(params, "%f", p1);
 if(num_params==2) sprintf(params, "%f %f", p1, p2);
 if(num_params==3) sprintf(params, "%f %f %f", p1, p2, p3);

@@ -77,7 +77,7 @@ extern "C" void FTN_NAME(CKPRINTF, ckprintf)(const char *format, ...)
 	  ifmt++;
 	  flag=1; break;
 	default:
-	  if ((format[ifmt]=='.')&&(format[ifmt]<='9')||(format[ifmt]>='0')) {
+	  if (format[ifmt]=='.' || (format[ifmt]>='0' && format[ifmt]<='9')) {
 	    temp_fmt[temp_len] = format[ifmt];
 	    temp_len++; ifmt++;
 	  }

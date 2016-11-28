@@ -918,7 +918,7 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
 
 #if SPLIT_MULTICAST
   // split multicast msg into SPLIT_NUM copies
-  register envelope *env = UsrToEnv(m);
+  envelope *env = UsrToEnv(m);
   CkPackMessage(&env);
   int totalsize = env->getTotalsize();
   int packetSize = 0;

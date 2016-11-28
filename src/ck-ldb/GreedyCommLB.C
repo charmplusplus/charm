@@ -183,8 +183,10 @@ void GreedyCommLB::work(LDStats* stats)
 		xcoord = stats->getHash(commData.sender);
 		ycoord = stats->getHash(commData.receiver.get_destObj());
 		if((xcoord == -1)||(ycoord == -1))
+		{
 		    if (_lb_args.ignoreBgLoad() || stats->complete_flag==0) continue;
 		    else CkAbort("Error in search\n");
+		}
 		add_graph(xcoord,ycoord,commData.bytes, commData.messages);
 	 }
          else if (commData.recv_type()==LD_OBJLIST_MSG) {
@@ -194,8 +196,10 @@ void GreedyCommLB::work(LDStats* stats)
 		for (int i=0; i<nobjs; i++) {
 		  ycoord = stats->getHash(objs[i]);
 		  if((xcoord == -1)||(ycoord == -1))
+		  {
 		    if (_lb_args.migObjOnly()) continue;
 		    else CkAbort("Error in search\n");
+		  }
 //printf("Multicast: %d => %d %d %d\n", xcoord, ycoord, commData.bytes, commData.messages);
 		  add_graph(xcoord,ycoord,commData.bytes, commData.messages);
 		}

@@ -37,7 +37,7 @@ class PythonIterator {
   // be freed automatically. It should not modify the original data.
   virtual char *pack() {
     void *memory = malloc(size());
-    memcpy (memory, this, size());
+    memcpy (memory, (void*)this, size());
     return (char *)memory;
   };
 

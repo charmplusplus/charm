@@ -13,7 +13,7 @@ public:
   DecisionTree() ;
   DecisionTree(TreeNode*) ;
 
-  void build(char *filename);
+  void build(const char *filename);
 
   void BFS();
   void DFS(double *input, std::vector<IntDoubleMap>&, int level,

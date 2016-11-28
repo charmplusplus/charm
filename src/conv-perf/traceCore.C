@@ -356,7 +356,7 @@ void TraceLogger::RegisterLanguage(int lID, const char* ln)
 	lName[lID] = new char[strlen(ln)+1];
 	sprintf(lName[lID], "%s", ln);
 
-	char pestr[10]; sprintf(pestr, "%d\0", CmiMyPe());
+	char pestr[10]; sprintf(pestr, "%d", CmiMyPe());
 	fName[lID] = new char[strlen(pgm)+1+strlen(pestr)+1+strlen(ln)+strlen(".log")+10];
 	sprintf(fName[lID], "%s.%s.%s.log", pgm, pestr, ln);
 

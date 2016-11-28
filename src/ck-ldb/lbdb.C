@@ -273,7 +273,7 @@ extern "C" void LDObjectStop(const LDObjHandle &_h)
 extern "C" void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc, int force)
 {
   LBDB *const db = (LBDB*)(destOM.ldb.handle);
-  if (force || db->StatsOn() && _lb_args.traceComm())
+  if (force || (db->StatsOn() && _lb_args.traceComm()))
     db->Send(destOM,destid,bytes, destObjProc);
 }
 

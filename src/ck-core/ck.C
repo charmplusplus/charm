@@ -111,11 +111,11 @@ Chare::~Chare() {
     CkpvAccess(chare_objs)[chareIdx] = NULL;
     Vidblockmap::iterator iter = CkpvAccess(vmap).find(chareIdx);
     if (iter != CkpvAccess(vmap).end()) {
-      register CkChareID *pCid = (CkChareID *)
+      CkChareID *pCid = (CkChareID *)
         _allocMsg(DeleteVidMsg, sizeof(CkChareID));
       int srcPe = iter->second.onPE;
       *pCid = iter->second;
-      register envelope *ret = UsrToEnv(pCid);
+      envelope *ret = UsrToEnv(pCid);
       ret->setVidPtr(iter->second.objPtr);
       ret->setSrcPe(CkMyPe());
       CmiSetHandler(ret, _charmHandlerIdx);
@@ -632,7 +632,7 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 
 static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 {
-  register void *msg = EnvToUsr(env);
+  void *msg = EnvToUsr(env);
   _SET_USED(env, 0);
   CkDeliverMessageFree(epIdx,msg,obj);
 }
@@ -698,8 +698,8 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 
 void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
-  register int gIdx = _entryTable[epIdx]->chareIdx;
-  register void *obj = malloc(_chareTable[gIdx]->size);
+  int gIdx = _entryTable[epIdx]->chareIdx;
+  void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
@@ -741,9 +741,9 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 
 void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
-  register int gIdx = _entryTable[epIdx]->chareIdx;
+  int gIdx = _entryTable[epIdx]->chareIdx;
   size_t objSize=_chareTable[gIdx]->size;
-  register void *obj = malloc(objSize);
+  void *obj = malloc(objSize);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
   CkpvAccess(_currentGroup) = groupID;
@@ -790,7 +790,7 @@ void _createGroup(CkGroupID groupID, envelope *env)
 {
   _CHECK_USED(env);
   _SET_USED(env, 1);
-  register int epIdx = env->getEpIdx();
+  int epIdx = env->getEpIdx();
   int gIdx = _entryTable[epIdx]->chareIdx;
   CkNodeGroupID rednMgr;
 #if !GROUP_LEVEL_REDUCTION
@@ -825,7 +825,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
 {
   _CHECK_USED(env);
   _SET_USED(env, 1);
-  register int epIdx = env->getEpIdx();
+  int epIdx = env->getEpIdx();
   env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setGroupEpoch(CkpvAccess(_charmEpoch));
@@ -846,7 +846,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
 
 static CkGroupID _groupCreate(envelope *env)
 {
-  register CkGroupID groupNum;
+  CkGroupID groupNum;
 
   // check CkMyPe(). if it is 0 then idx is _numGroups++
   // if not, then something else...
@@ -861,7 +861,7 @@ static CkGroupID _groupCreate(envelope *env)
 // new _nodeGroupCreate
 static CkGroupID _nodeGroupCreate(envelope *env)
 {
-  register CkGroupID groupNum;
+  CkGroupID groupNum;
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));                // change for proc 0 and other processors
   if(CkMyNode() == 0)				// should this be CkMyPe() or CkMyNode()?
           groupNum.idx = CksvAccess(_numNodeGroups)++;
@@ -895,7 +895,7 @@ extern "C"
 CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg)
 {
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
-  register envelope *env = UsrToEnv(msg);
+  envelope *env = UsrToEnv(msg);
   env->setMsgtype(BocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
@@ -909,7 +909,7 @@ extern "C"
 CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
 {
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
-  register envelope *env = UsrToEnv(msg);
+  envelope *env = UsrToEnv(msg);
   env->setMsgtype(NodeBocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
@@ -936,7 +936,7 @@ static inline void *_allocNewChare(envelope *env, int &idx)
 static void _processNewChareMsg(CkCoreState *ck,envelope *env)
 {
   int idx;
-  register void *obj = _allocNewChare(env, idx);
+  void *obj = _allocNewChare(env, idx);
 #ifndef CMK_CHARE_USE_PTR
   CkpvAccess(currentChareIdx) = idx;
 #endif
@@ -952,8 +952,8 @@ void CkCreateLocalChare(int epIdx, envelope *env)
 static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 {
   int idx;
-  register void *obj = _allocNewChare(env, idx);
-  register CkChareID *pCid = (CkChareID *)
+  void *obj = _allocNewChare(env, idx);
+  CkChareID *pCid = (CkChareID *)
       _allocMsg(FillVidMsg, sizeof(CkChareID));
   pCid->onPE = CkMyPe();
 #ifndef CMK_CHARE_USE_PTR
@@ -962,9 +962,9 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   pCid->objPtr = obj;
 #endif
   // pCid->magic = _GETIDX(_entryTable[env->getEpIdx()]->chareIdx);
-  register envelope *ret = UsrToEnv(pCid);
+  envelope *ret = UsrToEnv(pCid);
   ret->setVidPtr(env->getVidPtr());
-  register int srcPe = env->getByPe();
+  int srcPe = env->getByPe();
   ret->setSrcPe(CkMyPe());
   CmiSetHandler(ret, _charmHandlerIdx);
   CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
@@ -986,9 +986,9 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
 {
-  register int epIdx = env->getEpIdx();
-  register int mainIdx = _chareTable[_entryTable[epIdx]->chareIdx]->mainChareType();
-  register void *obj;
+  int epIdx = env->getEpIdx();
+  int mainIdx = _chareTable[_entryTable[epIdx]->chareIdx]->mainChareType();
+  void *obj;
   if (mainIdx != -1)  {           // mainchare
     CmiAssert(CkMyPe()==0);
     obj = _mainTable[mainIdx]->getObj();
@@ -1008,20 +1008,20 @@ static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
 {
-  register int epIdx = env->getEpIdx();
-  register void *obj = env->getObjPtr();
+  int epIdx = env->getEpIdx();
+  void *obj = env->getObjPtr();
   _invokeEntry(epIdx,env,obj);
 }
 
 static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 {
 #ifndef CMK_CHARE_USE_PTR
-  register VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
+  VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
-  register VidBlock *vptr = (VidBlock *) env->getVidPtr();
+  VidBlock *vptr = (VidBlock *) env->getVidPtr();
   _CHECK_VALID(vptr, "FillVidMsg: Not a valid VIdPtr\n");
 #endif
-  register CkChareID *pcid = (CkChareID *) EnvToUsr(env);
+  CkChareID *pcid = (CkChareID *) EnvToUsr(env);
   _CHECK_VALID(pcid, "FillVidMsg: Not a valid pCid\n");
   if (vptr) vptr->fill(pcid->onPE, pcid->objPtr);
   CmiFree(env);
@@ -1030,7 +1030,7 @@ static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 {
 #ifndef CMK_CHARE_USE_PTR
-  register VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
+  VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
   VidBlock *vptr = (VidBlock *) env->getVidPtr();
   _CHECK_VALID(vptr, "ForVidMsg: Not a valid VIdPtr\n");
@@ -1042,7 +1042,7 @@ static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 static inline void _processDeleteVidMsg(CkCoreState *ck,envelope *env)
 {
 #ifndef CMK_CHARE_USE_PTR
-  register VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
+  VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
   delete vptr;
   CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()] = NULL;
 #endif
@@ -1101,8 +1101,8 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 
 static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
-  register CkGroupID groupID =  env->getGroupNum();
-  register IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
+  CkGroupID groupID =  env->getGroupNum();
+  IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
   if(obj) {
     _deliverForBocMsg(ck,env->getEpIdx(),env,obj);
   }
@@ -1124,8 +1124,8 @@ static inline void _deliverForNodeBocMsg(CkCoreState *ck,int epIdx, envelope *en
 
 static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 {
-  register CkGroupID groupID = env->getGroupNum();
-  register void *obj;
+  CkGroupID groupID = env->getGroupNum();
+  void *obj;
 
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   obj = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
@@ -1150,8 +1150,8 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 
 void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
-  register CkGroupID groupID = env->getGroupNum();
-  register int epIdx = env->getEpIdx();
+  CkGroupID groupID = env->getGroupNum();
+  int epIdx = env->getEpIdx();
   if (!env->getGroupDep().isZero()) {      // dependence
     CkGroupID dep = env->getGroupDep();
     IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,dep);
@@ -1164,8 +1164,8 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
 
 void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 {
-  register CkGroupID groupID = env->getGroupNum();
-  register int epIdx = env->getEpIdx();
+  CkGroupID groupID = env->getGroupNum();
+  int epIdx = env->getEpIdx();
   CkCreateLocalNodeGroup(groupID, epIdx, env);
 }
 
@@ -1188,7 +1188,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
  */
 void _processHandler(void *converseMsg,CkCoreState *ck)
 {
-  register envelope *env = (envelope *) converseMsg;
+  envelope *env = (envelope *) converseMsg;
 
   MESSAGE_PHASE_CHECK(env);
 
@@ -1310,7 +1310,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 void _infoFn(void *converseMsg, CldPackFn *pfn, int *len,
              int *queueing, int *priobits, unsigned int **prioptr)
 {
-  register envelope *env = (envelope *)converseMsg;
+  envelope *env = (envelope *)converseMsg;
   *pfn = (CldPackFn)CkPackMessage;
   *len = env->getTotalsize();
   *queueing = env->getQueueing();
@@ -1320,9 +1320,9 @@ void _infoFn(void *converseMsg, CldPackFn *pfn, int *len,
 
 void CkPackMessage(envelope **pEnv)
 {
-  register envelope *env = *pEnv;
+  envelope *env = *pEnv;
   if(!env->isPacked() && _msgTable[env->getMsgIdx()]->pack) {
-    register void *msg = EnvToUsr(env);
+    void *msg = EnvToUsr(env);
     _TRACE_BEGIN_PACK();
     msg = _msgTable[env->getMsgIdx()]->pack(msg);
     _TRACE_END_PACK();
@@ -1334,10 +1334,10 @@ void CkPackMessage(envelope **pEnv)
 
 void CkUnpackMessage(envelope **pEnv)
 {
-  register envelope *env = *pEnv;
-  register int msgIdx = env->getMsgIdx();
+  envelope *env = *pEnv;
+  int msgIdx = env->getMsgIdx();
   if(env->isPacked()) {
-    register void *msg = EnvToUsr(env);
+    void *msg = EnvToUsr(env);
     _TRACE_BEGIN_UNPACK();
     msg = _msgTable[msgIdx]->unpack(msg);
     _TRACE_END_UNPACK();
@@ -1358,7 +1358,7 @@ int index_skipCldHandler;
 
 void _skipCldHandler(void *converseMsg)
 {
-  register envelope *env = (envelope *)(converseMsg);
+  envelope *env = (envelope *)(converseMsg);
   CmiSetHandler(converseMsg, CmiGetXHandler(converseMsg));
 #if CMK_GRID_QUEUE_AVAILABLE
   if (CmiGridQueueLookupMsg ((char *) converseMsg)) {
@@ -1545,7 +1545,7 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
-  register envelope *env = UsrToEnv(msg);
+  envelope *env = UsrToEnv(msg);
   _CHECK_USED(env);
   _SET_USED(env, 1);
 #if CMK_REPLAYSYSTEM
@@ -1568,7 +1568,7 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
   CmiSetHandler(env, _charmHandlerIdx);
 #endif
   if (pCid->onPE < 0) { //Virtual chare ID (VID)
-    register int pe = -(pCid->onPE+1);
+    int pe = -(pCid->onPE+1);
     if(pe==CkMyPe()) {
 #ifndef CMK_CHARE_USE_PTR
       VidBlock *vblk = CkpvAccess(vidblocks)[(CmiIntPtr)pCid->objPtr];
@@ -1601,7 +1601,7 @@ static inline int _prepareImmediateMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
   int destPE = _prepareMsg(eIdx, msg, pCid);
   if (destPE != -1) {
-    register envelope *env = UsrToEnv(msg);
+    envelope *env = UsrToEnv(msg);
     //criticalPath_send(env);
 #if USE_CRITICAL_PATH_HEADER_ARRAY
     CK_CRITICALPATH_SEND(env)
@@ -1624,7 +1624,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
     CmiAbort("Immediate message is not allowed in Chare!");
   }
 #endif
-  register envelope *env = UsrToEnv(msg);
+  envelope *env = UsrToEnv(msg);
   int destPE=_prepareMsg(entryIdx,msg,pCid);
   // Before it traced the creation only if destPE!=-1 (i.e it did not when the
   // VidBlock was not yet filled). The problem is that the creation was never
@@ -1661,7 +1661,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
     _prepareMsg(entryIndex,msg,pCid);
 #endif
 		//Just directly call the chare (skip QD handling & scheduler)
-    register envelope *env = UsrToEnv(msg);
+    envelope *env = UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
     _STATS_RECORD_PROCESS_MSG_1();
     _invokeEntryNoTrace(entryIndex,env,pCid->objPtr);
@@ -1674,7 +1674,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
-  register envelope *env = UsrToEnv(msg);
+  envelope *env = UsrToEnv(msg);
   /*#if CMK_ERROR_CHECKING
   CkNodeGroupID nodeRedMgr;
 #endif
@@ -1721,7 +1721,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
                   int pe=CLD_BROADCAST_ALL, int opts = 0)
 {
   int numPes;
-  register envelope *env;
+  envelope *env;
     if (opts & CK_MSG_IMMEDIATE) {
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
@@ -1745,7 +1745,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
                            int npes, int *pes)
 {
-  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_CREATION_MULTICAST(env, npes, pes);
   _CldEnqueueMulti(npes, pes, env, _infoIdx);
   _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
@@ -1761,7 +1761,7 @@ void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
     return;
   }
   //Can't inline-- send the usual way
-  register envelope *env = UsrToEnv(msg);
+  envelope *env = UsrToEnv(msg);
   int numPes;
   _TRACE_ONLY(numPes = (destPE==CLD_BROADCAST_ALL?CkNumPes():1));
   env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
@@ -1820,7 +1820,7 @@ extern "C"
 void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int *pes)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
-  register envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
+  envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_CREATION_MULTICAST(env, npes, pes);
   _noCldEnqueueMulti(npes, pes, env);
   _TRACE_CREATION_DONE(1);      // since it only creates one creation event.
@@ -1855,7 +1855,7 @@ void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opt
     return;
   }
     // normal mesg
-  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   CmiLookupGroup(grp, &npes, &pes);
   _TRACE_CREATION_MULTICAST(env, npes, pes);
   _CldEnqueueGroup(grp, env, _infoIdx);
@@ -1876,7 +1876,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
                 int node=CLD_BROADCAST_ALL, int opts=0)
 {
     int numPes;
-    register envelope *env;
+    envelope *env;
     if (opts & CK_MSG_IMMEDIATE) {
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
     }else
@@ -1900,7 +1900,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
 static inline void _sendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID,
                            int npes, int *nodes)
 {
-  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+  envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_CREATION_N(env, npes);
   for (int i=0; i<npes; i++) {
     _CldNodeEnqueue(nodes[i], env, _infoIdx);
@@ -1918,7 +1918,7 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
     return;
   }
   //Can't inline-- send the usual way
-  register envelope *env = UsrToEnv(msg);
+  envelope *env = UsrToEnv(msg);
   int numPes;
   _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
   env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
@@ -1976,7 +1976,7 @@ extern "C"
 void CkSendMsgNodeBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int *nodes)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
-  register envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+  envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _noCldEnqueueMulti(npes, nodes, env);
 #else
   _sendMsgNodeBranchMulti(eIdx, msg, gID, npes, nodes);
@@ -2045,7 +2045,7 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
 
 extern "C"
 void CkArrayManagerDeliver(int pe,void *msg, int opts) {
-  register envelope *env = UsrToEnv(msg);
+  envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	sendArrayMsg(env,pe,_infoIdx);
@@ -2195,7 +2195,7 @@ private:
         crc1 = checksum_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
         crc2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       }
-      curpos+=sprintf(&buffer[curpos],"%d %d %d %hhd %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
+      curpos+=sprintf(&buffer[curpos],"%d %d %d %d %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
       if (curpos > _recplay_logsize-128) flushLog();
       if (!wasPacked) CkUnpackMessage(envptr);
     }
@@ -2660,9 +2660,9 @@ int isCharmEnvelope(void *msg) {
     if (e->getTotalsize() < sizeof(envelope)) return 0;
     if (e->getEpIdx()<=0 || e->getEpIdx()>=_entryTable.size()) return 0;
 #if CMK_SMP
-    if (e->getSrcPe()<0 || e->getSrcPe()>=CkNumPes()+CkNumNodes()) return 0;
+    if (e->getSrcPe()>=CkNumPes()+CkNumNodes()) return 0;
 #else
-    if (e->getSrcPe()<0 || e->getSrcPe()>=CkNumPes()) return 0;
+    if (e->getSrcPe()>=CkNumPes()) return 0;
 #endif
     if (e->getMsgtype()<=0 || e->getMsgtype()>=LAST_CK_ENVELOPE_TYPE) return 0;
     return 1;

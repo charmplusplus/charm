@@ -826,7 +826,7 @@ void CmiSetCustomPartitioning() {
   _partitionInfo.isTopoaware = 1;
 }
 
-static int create_partition_map( char **argv)
+static void create_partition_map( char **argv)
 {
   char* token, *tptr;
   int i, flag;
@@ -1031,10 +1031,12 @@ INLINE_KEYWORD int pe_lToGTranslate(int pe, int partition) {
 
 INLINE_KEYWORD int node_gToLTranslate(int node) {
   CmiAbort("Conversion from global rank to local rank is not supported. Please contact Charm++ developers with the use case.\n");
+  return -1;
 }
 
 INLINE_KEYWORD int pe_gToLTranslate(int pe) {
   CmiAbort("Conversion from global rank to local rank is not supported. Please contact Charm++ developers with the use case.\n");
+  return -1;
 }
 //end of functions related to partition
 

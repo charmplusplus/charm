@@ -41,7 +41,7 @@ void* CkObjID::getObject(){
 					return aProxy.ckLocal();
 				}
 			default:
-				CkAssert(0);
+				CkAbort("Object lookup by ID failed with invalid object type!");
 		}
 }
 
@@ -63,7 +63,7 @@ int CkObjID::guessPE(){
 					return aid.ckLocalBranch()->lastKnown(data.array.idx.asChild());
 				}
 			default:
-				CkAssert(0);
+				CkAbort("PE lookup by object ID failed with invalid object type!");
 		}
 };
 
@@ -71,22 +71,22 @@ char *CkObjID::toString(char *buf) const {
 	
 	switch(type){
 		case TypeChare:
-			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);
+			sprintf(buf,"Chare %p PE %d ",data.chare.id.objPtr,data.chare.id.onPE);
 			break;
 		case TypeMainChare:
-			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);	
+			sprintf(buf,"Chare %p PE %d ",data.chare.id.objPtr,data.chare.id.onPE);
 			break;
 		case TypeGroup:
-			sprintf(buf,"Group %d	PE %d \0",data.group.id.idx,data.group.onPE);
+			sprintf(buf,"Group %d	PE %d ",data.group.id.idx,data.group.onPE);
 			break;
 		case TypeNodeGroup:
-			sprintf(buf,"NodeGroup %d	Node %d \0",data.group.id.idx,data.group.onPE);
+			sprintf(buf,"NodeGroup %d	Node %d ",data.group.id.idx,data.group.onPE);
 			break;
 		case TypeArray:
 			{
 				const CkArrayIndexMax &idx = data.array.idx.asChild();
 				const int *indexData = idx.data();
-				sprintf(buf,"Array |%d %d %d| id %d \0",indexData[0],indexData[1],indexData[2],data.array.id.idx);
+				sprintf(buf,"Array |%d %d %d| id %d ",indexData[0],indexData[1],indexData[2],data.array.id.idx);
 				break;
 			}
 		default:

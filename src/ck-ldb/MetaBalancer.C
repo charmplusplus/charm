@@ -252,7 +252,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
         total_count_vec[index], lbdatabase->getLBDB()->ObjDataCount());
     CkAbort("Abort!!! Received more contribution");
   }
-  if ((total_count_vec[index] == lbdatabase->getLBDB()->ObjDataCount())){
+  if (total_count_vec[index] == lbdatabase->getLBDB()->ObjDataCount()){
     ContributeStats(it_n);
   }
 #endif

@@ -28,6 +28,8 @@ public:
 	inline operator CkHashCode()const{
 		CkHashCode ret=circleShift(type,25);
 		switch(type){
+		case TypeInvalid:
+		    break;
 		case TypeChare:
 		case TypeMainChare:
 		    ret += circleShift(data.chare.id.onPE,5);
@@ -54,6 +56,9 @@ public:
 			return false;
 		}
 		switch (type){
+			case TypeInvalid:
+				break;
+			case TypeMainChare:
 			case TypeChare:
 				if((data.chare.id.onPE == t.data.chare.id.onPE) && (data.chare.id.objPtr == t.data.chare.id.objPtr)){
 					return true;

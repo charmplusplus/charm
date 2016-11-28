@@ -89,6 +89,9 @@ static void *ndhThreadWork(void *id) {
         }
         pthdLoop->stealWork();
     }
+    return NULL;
+#else
+    return NULL;
 #endif
 }
 

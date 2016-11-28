@@ -44,7 +44,7 @@ CkpvDeclare(int, numChildren);
 extern CProxy_MirrorUpdate MirrorProxy;
 #endif
 CkpvDeclare(int, numOfPhases);
-CkpvDeclare(std::vector<char*>, phaseNames);
+CkpvDeclare(std::vector<const char*>, phaseNames);
 CkpvExtern(bool, dumpData);
 CkpvDeclare(bool,   isExit);
 CkpvDeclare(SavedPerfDatabase*, perfDatabase);
@@ -321,7 +321,7 @@ void TraceAutoPerfBOC::registerPerfGoal(int goalIndex) {
 
 void TraceAutoPerfBOC::setUserDefinedGoal(double value) { }
 
-void TraceAutoPerfBOC::setNumOfPhases(int num, char names[]) {
+void TraceAutoPerfBOC::setNumOfPhases(int num, const char names[]) {
   CkpvAccess(numOfPhases) = num;
   CkpvAccess(phaseNames).clear();
   CkpvAccess(phaseNames).resize(num);
@@ -441,7 +441,7 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   }
 
   TRACE_START(PICS_CODE);
-  fprintf(CkpvAccess(fpSummary), "NEWITER %d %d %d %lld %d\n", analyzeStep, CkMyPe(), CkpvAccess(numOfPhases)*PERIOD_PERF, (CMK_TYPEDEF_UINT8)(CkWallTimer()*1000000), currentAppStep); 
+  fprintf(CkpvAccess(fpSummary), "NEWITER %d %d %d %lu %d\n", analyzeStep, CkMyPe(), CkpvAccess(numOfPhases)*PERIOD_PERF, (CMK_TYPEDEF_UINT8)(CkWallTimer()*1000000), currentAppStep); 
   for(int j=0; j<CkpvAccess(numOfPhases)*PERIOD_PERF; j++)
   {
     formatPerfData(data, j/CkpvAccess(numOfPhases), j%CkpvAccess(numOfPhases));
@@ -523,7 +523,7 @@ void TraceAutoPerfBOC::analyzeAndTune(){
   //output results to screen or files
   for(int idx=0; idx<solutions.size(); idx++)
   {
-    fprintf(stdout, "\nnumber of solutions is %d \n", solutions[idx].size());
+    fprintf(stdout, "\nnumber of solutions is %lu\n", solutions[idx].size());
       for(IntDoubleMap::iterator iter=solutions[idx].begin(); iter!=solutions[idx].end(); iter++){
           int effect = iter->first;
           int value = effect >0 ? effect : -effect;
@@ -760,7 +760,7 @@ void _initTraceAutoPerfBOC()
   CkpvAccess(numChildren) = -1;
   CkpvInitialize(int, numOfPhases);
   CkpvAccess(numOfPhases) = 1;
-  CkpvInitialize(std::vector<char*>, phaseNames);
+  CkpvInitialize(std::vector<const char*>, phaseNames);
   CkpvAccess(phaseNames).resize(1);
   CkpvAccess(phaseNames)[0] = "default";
   isPeriodicalAnalysis = false;

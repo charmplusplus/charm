@@ -121,8 +121,8 @@ static void remove_n_elems(ccd_cblist *l, int n)
 /** Append callback to the given cblist, and return the index. */
 static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg, int pe)
 {
-  register int idx;
-  register ccd_cblist_elem *e;
+  int idx;
+  ccd_cblist_elem *e;
   if(l->len == l->maxlen)
     expand_cblist(l, l->maxlen*2);
   idx = l->first_free;

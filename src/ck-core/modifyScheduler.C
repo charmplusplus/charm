@@ -91,6 +91,7 @@ static bool checkAndRemoveMatching(void *&msgPtr, const int *entryMethod, const 
 		return true;
 	    }
 	}
+	return false;
 }
 
 /** Find and remove the first 1 occurences of messages that matches a specified entry method index.

@@ -92,8 +92,10 @@ void RefinerComm::processorCommCost()
       for (i=0; i<nobjs; i++) {
         int idx = stats->getHash(objs[i]);
         if(idx == -1)
+        {
              if (_lb_args.migObjOnly()) continue;
              else CkAbort("Error in search\n");
+        }
         receiverPE = computes[idx].oldProcessor;
         CmiAssert(receiverPE != -1);
         if(senderPE != receiverPE)

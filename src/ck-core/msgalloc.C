@@ -18,8 +18,7 @@ void CkFreeSysMsg(void *m)
 extern "C"
 void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits)
 {
-  register envelope* env;
-  env = _allocEnv(ForChareMsg, msgBytes, prioBits);
+  envelope* env = _allocEnv(ForChareMsg, msgBytes, prioBits);
   setMemoryTypeMessage(env);
 
   env->setQueueing(_defaultQueueing);
@@ -32,12 +31,11 @@ extern "C"
 void* CkAllocBuffer(void *msg, int bufsize)
 {
   bufsize = CkMsgAlignLength(bufsize);
-  register envelope *env = UsrToEnv(msg);
-  register envelope *packbuf;
-  packbuf = _allocEnv(env->getMsgtype(), bufsize, 
+  envelope *env = UsrToEnv(msg);
+  envelope *packbuf = _allocEnv(env->getMsgtype(), bufsize,
                       env->getPriobits());
   
-  register int size = packbuf->getTotalsize();
+  int size = packbuf->getTotalsize();
   CmiMemcpy(packbuf, env, sizeof(envelope));
   packbuf->setTotalsize(size);
   packbuf->setPacked(!env->isPacked());
@@ -58,15 +56,15 @@ void  CkFreeMsg(void *msg)
 extern "C"
 void* CkCopyMsg(void **pMsg)
 {// cannot simply memcpy, because srcMsg could be varsize msg
-  register void *srcMsg = *pMsg;
-  register envelope *env = UsrToEnv(srcMsg);
-  register unsigned char msgidx = env->getMsgIdx();
+  void *srcMsg = *pMsg;
+  envelope *env = UsrToEnv(srcMsg);
+  unsigned char msgidx = env->getMsgIdx();
   if(!env->isPacked() && _msgTable[msgidx]->pack) {
     srcMsg = _msgTable[msgidx]->pack(srcMsg);
     UsrToEnv(srcMsg)->setPacked(1);
   }
-  register int size = UsrToEnv(srcMsg)->getTotalsize();
-  register envelope *newenv = (envelope *) CmiAlloc(size);
+  int size = UsrToEnv(srcMsg)->getTotalsize();
+  envelope *newenv = (envelope *) CmiAlloc(size);
   CmiMemcpy(newenv, UsrToEnv(srcMsg), size);
   //memcpy(newenv, UsrToEnv(srcMsg), size);
   if(UsrToEnv(srcMsg)->isPacked() && _msgTable[msgidx]->unpack) {

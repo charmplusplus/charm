@@ -162,7 +162,7 @@ void _enqObjQueue(Chare *obj, envelope *env)
 void _ObjectQHandler(void *converseMsg)
 {
 #if CMK_OBJECT_QUEUE_AVAILABLE
-  register envelope *env = (envelope *)(converseMsg);
+  envelope *env = (envelope *)(converseMsg);
   Chare *obj = CkFindObjectPtr(env);
   // swap handler back
 //  CmiSetHandler(env, CmiGetXHandler(env));

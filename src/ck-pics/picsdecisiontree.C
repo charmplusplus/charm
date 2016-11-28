@@ -22,7 +22,7 @@ DecisionTree::DecisionTree(TreeNode *p) {
 typedef std::map<std::string, int> keyid_map;
 typedef std::map<std::string, TreeNode*> tree_map;
 
-void DecisionTree::build(char *filename) {
+void DecisionTree::build(const char *filename) {
 
   keyid_map fieldMap;
   keyid_map updownMap;

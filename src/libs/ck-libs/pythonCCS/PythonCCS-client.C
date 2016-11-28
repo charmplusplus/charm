@@ -103,7 +103,7 @@ char *PythonExecute::pack() {
     ptr += methodNameLength+1;
   }
   if (infoSize) {
-    memcpy (ptr, info.info, infoSize);
+    memcpy (ptr, (void*)info.info, infoSize);
   }
   // transform unsigned integers from host byte order to network byte order
   ((PythonAbstract*)memory)->magic = htonl(magic);

@@ -72,7 +72,7 @@ public:
     userMetrics = src->userMetrics;
   }
 
-  void printMe(FILE *fp, char *str) {
+  void printMe(FILE *fp, const char *str) {
     for(int i=0; i<NUM_NODES; i++)
     {
       if (i == AVG_IdlePercentage || i == AVG_OverheadPercentage ||
@@ -243,7 +243,7 @@ public:
   void PICS_markLDBStart(int appStep) ;
   void PICS_markLDBEnd() ;
 
-  void setNumOfPhases(int num, char names[]);
+  void setNumOfPhases(int num, const char names[]);
   void setProjectionsOutput();
   void recvGlobalSummary(CkReductionMsg *msg);
 

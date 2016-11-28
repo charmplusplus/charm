@@ -200,7 +200,7 @@ unsigned int randInt(unsigned int num, const char* name, int seed=0){
   unsigned int c;
   unsigned char * str = (unsigned char*)name;
 
-  while (c = *str++){
+  while ((c = *str++)){
     unsigned int c2 = (c+64)%128;
     unsigned int c3 = (c2*5953)%127;
     hash = c3 + (hash << 6) + (hash << 16) - hash;

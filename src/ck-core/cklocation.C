@@ -2672,7 +2672,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
   // if there is a running obj being measured, stop it temporarily
   LDObjHandle objHandle;
   bool wasAnObjRunning = false;
-  if (wasAnObjRunning = the_lbdb->RunningObject(&objHandle))
+  if ((wasAnObjRunning = the_lbdb->RunningObject(&objHandle)))
     the_lbdb->ObjectStop(objHandle);
 #endif
   // Finally, call the entry method
@@ -3384,6 +3384,7 @@ CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 	return rec;
   } else {
 	if (rec==NULL) abort_out_of_bounds(idx);
+	return NULL;
   }
 #endif
 }

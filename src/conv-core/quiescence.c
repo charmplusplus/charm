@@ -296,7 +296,7 @@ void CQdInit(void)
 
 void CmiStartQD(CQdVoidFn fn, void *arg)
 {
-  register CQdMsg msg = (CQdMsg) CmiAlloc(sizeof(struct ConvQdMsg)); 
+  CQdMsg msg = (CQdMsg) CmiAlloc(sizeof(struct ConvQdMsg));
   CQdRegisterCallback(fn, arg);
   CQdMsgSetPhase(msg, 0);  
   CmiSetHandler(msg, _CQdHandlerIdx);

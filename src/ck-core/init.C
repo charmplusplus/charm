@@ -668,10 +668,9 @@ static inline void _processBufferedBocInits(void)
 {
   CkCoreState *ck = CkpvAccess(_coreState);
   CkNumberHandlerEx(_bocHandlerIdx,_processHandler, ck);
-  register int i = 0;
   PtrVec &inits=*CkpvAccess(_bocInitVec);
-  register int len = inits.size();
-  for(i=1; i<len; i++) {
+  int len = inits.size();
+  for(int i=1; i<len; i++) {
     envelope *env = inits[i];
     if(env==0) {
 #if CMK_SHRINK_EXPAND
@@ -700,10 +699,9 @@ static inline void _processBufferedBocInits(void)
 static inline void _processBufferedNodeBocInits(void)
 {
   CkCoreState *ck = CkpvAccess(_coreState);
-  register int i = 0;
   PtrVec &inits=*CksvAccess(_nodeBocInitVec);
-  register int len = inits.size();
-  for(i=1; i<len; i++) {
+  int len = inits.size();
+  for(int i=1; i<len; i++) {
     envelope *env = inits[i];
     if(env==0) CkAbort("_processBufferedNodeBocInits: empty message");
     if(env->isPacked())
@@ -750,7 +748,7 @@ static void _sendTriggers(void)
   {
     CksvAccess(_triggersSent)++;
     num = CmiMyNodeSize();
-    register envelope *env = _allocEnv(RODataMsg); // Notice that the type here is irrelevant
+    envelope *env = _allocEnv(RODataMsg); // Notice that the type here is irrelevant
     env->setSrcPe(CkMyPe());
     CmiSetHandler(env, _triggerHandlerIdx);
     first = CmiNodeFirst(CmiMyNode());
@@ -837,7 +835,7 @@ static inline void _processRODataMsg(envelope *env)
 static void _roRestartHandler(void *msg)
 {
   CkAssert(CkMyPe()!=0);
-  register envelope *env = (envelope *) msg;
+  envelope *env = (envelope *) msg;
   CkpvAccess(_numInitsRecd)++;
   _numExpectInitMsgs = env->getCount();
   _processRODataMsg(env);
@@ -864,7 +862,7 @@ static void _roRestartHandler(void *msg)
 static void _initHandler(void *msg, CkCoreState *ck)
 {
   CkAssert(CkMyPe()!=0);
-  register envelope *env = (envelope *) msg;
+  envelope *env = (envelope *) msg;
   
   if (ck->watcher!=NULL) {
     if (!ck->watcher->processMessage(&env,ck)) return;
@@ -1457,7 +1455,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_WITH_STATS
 		_allStats = new Stats*[CkNumPes()];
 #endif
-		register size_t i, nMains=_mainTable.size();
+		size_t i, nMains=_mainTable.size();
 
 		// Check CkArgMsg and warn if it contains any args starting with '+'.
 		// These args may be args intended for Charm++ but because of the specific
@@ -1489,13 +1487,13 @@ void _initCharm(int unused_argc, char **argv)
 
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
-			register size_t size = _chareTable[_mainTable[i]->chareIdx]->size;
-			register void *obj = malloc(size);
+			size_t size = _chareTable[_mainTable[i]->chareIdx]->size;
+			void *obj = malloc(size);
 			_MEMCHECK(obj);
 			_mainTable[i]->setObj(obj);
 			CkpvAccess(_currentChare) = obj;
 			CkpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
-			register CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
+			CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
       quietMode = 0;  // allow printing any mainchare user messages
@@ -1515,11 +1513,11 @@ void _initCharm(int unused_argc, char **argv)
 
 		for(i=0;i<_readonlyMsgs.size();i++) /* Send out readonly messages */
 		{
-			register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
+			void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
 			if(roMsg==0)
 				continue;
 			//Pack the message and send it to all other processors
-			register envelope *env = UsrToEnv(roMsg);
+			envelope *env = UsrToEnv(roMsg);
 			env->setSrcPe(CkMyPe());
 			env->setMsgtype(ROMsgMsg);
 			env->setRoIdx(i);

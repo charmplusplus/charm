@@ -271,7 +271,7 @@ static void cpuTopoHandler(void *m)
     // clean up CmmTable
   hostnameMsg *tmpm;
   tag = CmmWildCard;
-  while (tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1));
+  while ((tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)));
   CmmFree(hostTable);
   CmiFree(msg);
 

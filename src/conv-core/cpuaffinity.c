@@ -411,7 +411,7 @@ static void cpuAffinityHandler(void *m)
   if (count == CmiNumPes()) {
     /* CmiPrintf("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable)); */
     tag = CmmWildCard;
-    while (tmpm = CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
+    while ((tmpm = CmmGet(hostTable, 1, &tag, &tag1))) CmiFree(tmpm);
     CmmFree(hostTable);
 #if 1
     /* bubble sort ranks on each node according to the PE number */

@@ -5414,7 +5414,7 @@ void start_nodes_local(char **env)
   }
   if(arg_debug || arg_debug_no_pause)
     {
-      for(dparamoutc; dparamoutc>=0;dparamoutc--) free(dparamp[dparamoutc]);
+      for(;dparamoutc>=0;dparamoutc--) free(dparamp[dparamoutc]);
       free(dparamp);
     }
   free(envp[envc]);

@@ -1146,6 +1146,7 @@ int CkArray::findInitialHostPe(const CkArrayIndex &idx, int proposedPe)
     return hostPe;
 
   CkAbort("hostPe for a bound element disagrees with an explicit proposedPe");
+  return -1;
 }
 
 void CkArray::stampListenerData(CkMigratable *elt)

@@ -182,7 +182,7 @@ static void _invokeQD(QdMsg *msg)
 
 void _qdHandler(envelope *env)
 {
-  register QdMsg *msg = (QdMsg*) EnvToUsr(env);
+  QdMsg *msg = (QdMsg*) EnvToUsr(env);
   DEBUGP(("[%d] _qdHandler msg:%p \n", CmiMyPe(), msg));
   if (_dummy_dq > 0)
     CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, _dummy_dq*1000); // in ms
@@ -194,7 +194,7 @@ void _qdHandler(envelope *env)
 // thread or interrupt handler, the counter is sent to rank 0 of the same node
 void _qdCommHandler(envelope *env)
 {
-  register QdCommMsg *msg = (QdCommMsg*) EnvToUsr(env);
+  QdCommMsg *msg = (QdCommMsg*) EnvToUsr(env);
   DEBUGP(("[%d] _qdCommHandler msg:%p \n", CmiMyPe(), msg));
   if (msg->flag == 0)
     CpvAccess(_qd)->create(msg->count);
@@ -212,10 +212,10 @@ void QdState::sendCount(int flag, int count)
         if (CmiMyRank() == CmiMyNodeSize())
 #endif
         {
-          register QdCommMsg *msg = (QdCommMsg*) CkAllocMsg(0,sizeof(QdCommMsg),0);
+          QdCommMsg *msg = (QdCommMsg*) CkAllocMsg(0,sizeof(QdCommMsg),0);
           msg->flag = flag;
           msg->count = count;
-          register envelope *env = UsrToEnv((void *)msg);
+          envelope *env = UsrToEnv((void *)msg);
           CmiSetHandler(env, _qdCommHandlerIdx);
           CmiFreeSendFn(CmiNodeFirst(CmiMyNode()), env->getTotalsize(), (char *)env);
         }
@@ -224,10 +224,10 @@ void QdState::sendCount(int flag, int count)
 
 void CkStartQD(const CkCallback& cb)
 {
-  register QdMsg *msg = (QdMsg*) CkAllocMsg(0,sizeof(QdMsg),0);
+  QdMsg *msg = (QdMsg*) CkAllocMsg(0,sizeof(QdMsg),0);
   msg->setPhase(0);
   msg->setCb(cb);
-  register envelope *env = UsrToEnv((void *)msg);
+  envelope *env = UsrToEnv((void *)msg);
   CmiSetHandler(env, _qdHandlerIdx);
 #if CMK_MEM_CHECKPOINT
   CmiGetRestartPhase(env) = 9999;        // make sure it is always executed
