@@ -23,6 +23,7 @@ namespace SDAG {
 #include <list>
 #include <map>
 #include <set>
+#include <memory>
 
 #include <pup_stl.h>
 #include <envelope.h>
@@ -261,6 +262,9 @@ namespace SDAG {
       , curSpeculationIndex(0)
       { }
 
+    // Default constructor for migration
+    Dependency() { }
+
     // after a migration free the structures
     ~Dependency() {
       for (std::vector<std::list<Buffer*> >::iterator iter = buffer.begin();
@@ -385,6 +389,12 @@ namespace SDAG {
       }
     }
   };
+
+#if CMK_USING_XLC
+  typedef std::auto_ptr<Dependency> dep_ptr;
+#else
+  typedef std::unique_ptr<Dependency> dep_ptr;
+#endif
 
   void registerPUPables();
 }

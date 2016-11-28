@@ -106,7 +106,7 @@ void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
 {
   decls << "public:\n";
-  decls << "  std::auto_ptr<SDAG::Dependency> __dep;\n";
+  decls << "  SDAG::dep_ptr __dep;\n";
 
   XStr name = "_sdag_init";
   generateVarSignature(decls, defs, container, false, "void", &name, false, NULL);
@@ -157,10 +157,14 @@ void CParsedFile::generatePupFunction(XStr& decls, XStr& defs)
   templateGuardBegin(false, defs);
   defs << container->tspec()
        << "void " << container->baseName() << "::" << signature << " {\n"
+       << "#if CMK_USING_XLC\n"
        << "    bool hasSDAG = __dep.get();\n"
        << "    p|hasSDAG;\n"
        << "    if (p.isUnpacking() && hasSDAG) _sdag_init();\n"
        << "    if (hasSDAG) { __dep->pup(p); }\n"
+       << "#else\n"
+       << "    p|__dep;\n"
+       << "#endif\n"
        << "}\n";
   templateGuardEnd(defs);
 }
