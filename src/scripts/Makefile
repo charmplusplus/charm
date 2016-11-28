@@ -947,7 +947,7 @@ depends: cidepends commitid.c
 	      SRCFILE=`basename $$i .o`.C ; \
 	      [ ! -f $$SRCFILE ] && SRCFILE=`basename $$i .o`.c ;	\
               echo "checking dependencies for $$SRCFILE" ; \
-              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then true ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
+              if g++ -std=c++0x -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then true ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
         done;  \
 
@@ -973,7 +973,7 @@ dependsCaseSensitive: cidepends
 	      found=`/usr/bin/find $$SRCDIR -depth 1 -name $$SRCFILE`; \
               [ ! $$found ] && SRCFILE=`basename $$i .o`.c ; \
               echo "checking dependencies for $$SRCFILE" ; \
-              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then true ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
+              if g++ -std=c++0x -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then true ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
         done;  \
 
