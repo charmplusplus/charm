@@ -22,7 +22,7 @@ fi
 
 CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 
-CMK_AMD64="-m64 -dynamic -fPIC -fno-common -mmacosx-version-min=10.7"
+CMK_AMD64="-m64 -dynamic -fPIC -fno-common -mmacosx-version-min=10.7 -Wno-deprecated-declarations"
 
 CMK_CPP_CHARM="/usr/bin/cpp -P"
 CMK_CPP_C="$MPICC -E -mmacosx-version-min=10.7"
