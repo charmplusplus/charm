@@ -944,6 +944,10 @@ SUBROUTINE dchunkpup(p, c)
 END SUBROUTINE
 \end{alltt}
 
+Calling MPI\_ routines or accessing global variables that have been privatized by use of tlsglobals
+or swapglobals from inside a user PUP routine is currently not allowed in \ampi{}.
+Users can store MPI-related information like communicator rank and size in data structures to be
+be packed and unpacked before they are needed inside a PUP routine.
 
 \subsection{Extensions for Checkpointing}
 
