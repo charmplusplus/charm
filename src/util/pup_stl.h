@@ -34,6 +34,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <string>
 #include <complex>
 #include <utility> /*for std::pair*/
+#include <memory>
 #include "pup.h"
 
 namespace PUP {
@@ -45,6 +46,10 @@ namespace PUP {
   inline void operator|(er &p,typename std::pair<const A,B> &v);
   template <class T>
   inline void operator|(er &p,std::complex<T> &v);
+#if !CMK_USING_XLC
+  template <class T>
+  inline void operator|(er &p, std::unique_ptr<T, std::default_delete<T>> &ptr);
+#endif
   template <class charType>
   inline void operator|(er &p,typename std::basic_string<charType> &v);
   inline void operator|(er &p,std::string &v);
@@ -92,6 +97,21 @@ namespace PUP {
     p|re; p|im;
     v=std::complex<T>(re,im);
   }
+#if !CMK_USING_XLC
+  template <class T>
+  inline void operator|(er &p, std::unique_ptr<T, std::default_delete<T>> &ptr)
+  {
+    bool nonNull = static_cast<bool>(ptr);
+    p|nonNull;
+
+    if (nonNull) {
+      if (p.isUnpacking())
+        ptr.reset(new T);
+
+      p|(*ptr);
+    }
+  }
+#endif
   template <class charType> 
   inline void operator|(er &p,typename std::basic_string<charType> &v)
   {
