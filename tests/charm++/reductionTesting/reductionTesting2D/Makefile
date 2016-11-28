@@ -1,3 +1,4 @@
+-include ../../../common.mk
 CHARMDIR = ../../../..
 OPTS = -g -Wno-deprecated
 CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
