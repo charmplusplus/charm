@@ -336,7 +336,7 @@ int main(int argc, char **argv) {
   int color = global_rank % 2;
   MPI_Comm_split(MPI_COMM_WORLD, color, global_rank, &myComm);
   MPI_Intercomm_create(myComm, 0, MPI_COMM_WORLD, (color+1)%2, 1, &myFirstComm);
-
+  MPI_Comm_free(&myComm);
 
   /* Intercommunicator broadcast collective tests */
   if (global_rank == 0) printf("[0] Testing intercomm bcast\n");
@@ -370,7 +370,6 @@ int main(int argc, char **argv) {
   intercomm_gatherv_test(myFirstComm, global_rank, root, true); /* Intercomm igatherv test */
 #endif
 
-  MPI_Comm_free(&myComm);
   MPI_Comm_free(&myFirstComm);
 
   if (global_rank==size-1) printf("All tests passed\n");

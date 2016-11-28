@@ -63,6 +63,7 @@ public:
 	int rank,size; //Our rank in, and true size of the communicator
 	
 	MPI_Tester(MPI_Comm comm,int trueSize=-1);
+	~MPI_Tester(void) { MPI_Comm_free(&comm); }
 	void test(void);
 	void testMigrate(void);
 
@@ -347,6 +348,7 @@ for (int loop=0;loop<nLoop;loop++) {
 		if(rank == 1 || rank > 3)
 		  testFailed("Testing construction of group and new communicator");		
 	      }
+	      MPI_Comm_free(&newcomm);
 	    }
 	  }
 	

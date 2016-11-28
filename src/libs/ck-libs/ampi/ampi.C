@@ -8231,6 +8231,16 @@ AMPI_API_IMPL(MPI_Comm_free)
 int AMPI_Comm_free(MPI_Comm *comm)
 {
   AMPI_API("AMPI_Comm_free");
+  if (*comm != MPI_COMM_NULL &&
+      *comm != MPI_COMM_WORLD &&
+      *comm != MPI_COMM_SELF)
+  {
+    ampi* ptr = getAmpiInstance(*comm);
+    ptr->barrier();
+    if (ptr->getRank() == 0) {
+      CProxy_CkArray(ptr->ckGetArrayID()).ckDestroy();
+    }
+  }
   *comm = MPI_COMM_NULL;
   return MPI_SUCCESS;
 }
