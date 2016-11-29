@@ -1254,15 +1254,45 @@ void mpi_get_processor_name(char* name, int *resultlen, int *ierr)
     ampif_str_c2f(name, tmpName, MPI_MAX_PROCESSOR_NAME);
 }
 
-void mpi_comm_create_errhandler(int *function, int *errhandler, int *ierr){  *ierr = 0;  }
-void mpi_comm_set_errhandler(int* comm, int* errhandler, int *ierr){  *ierr = 0;  }
-void mpi_comm_get_errhandler(int* comm, int *errhandler, int *ierr){  *ierr = 0;  }
-void mpi_comm_free_errhandler(int *errhandler, int *ierr){  *ierr = 0;  }
+void mpi_comm_create_errhandler(void (*function)(MPI_Comm*,int*,...), int *errhandler, int *ierr)
+{
+  *ierr = AMPI_Comm_create_errhandler(function, errhandler);
+}
 
-void mpi_errhandler_create(int *function, int *errhandler, int *ierr){  *ierr = 0;  }
-void mpi_errhandler_set(int* comm, int* errhandler, int *ierr){  *ierr = 0;  }
-void mpi_errhandler_get(int* comm, int *errhandler, int *ierr){  *ierr = 0;  }
-void mpi_errhandler_free(int *errhandler, int *ierr){  *ierr = 0;  }
+void mpi_comm_set_errhandler(int* comm, int* errhandler, int *ierr)
+{
+  *ierr = AMPI_Comm_set_errhandler(*comm, *errhandler);
+}
+
+void mpi_comm_get_errhandler(int* comm, int *errhandler, int *ierr)
+{
+  *ierr = AMPI_Comm_get_errhandler(*comm, errhandler);
+}
+
+void mpi_comm_free_errhandler(int *errhandler, int *ierr)
+{
+  *ierr = AMPI_Comm_free_errhandler(errhandler);
+}
+
+void mpi_errhandler_create(void (*function)(MPI_Comm*,int*,...), int *errhandler, int *ierr)
+{
+  *ierr = AMPI_Errhandler_create(function, errhandler);
+}
+
+void mpi_errhandler_set(int* comm, int* errhandler, int *ierr)
+{
+  *ierr = AMPI_Errhandler_set(*comm, *errhandler);
+}
+
+void mpi_errhandler_get(int* comm, int *errhandler, int *ierr)
+{
+  *ierr = AMPI_Errhandler_get(*comm, errhandler);
+}
+
+void mpi_errhandler_free(int *errhandler, int *ierr)
+{
+  *ierr = AMPI_Errhandler_free(errhandler);
+}
 
 void mpi_add_error_code(int *errorclass, int *errorcode, int *ierr)
 {
