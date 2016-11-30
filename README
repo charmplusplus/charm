@@ -11,8 +11,8 @@ and is portable to a wide variety of parallel machines.
 Source code is provided, and non-commercial use is free.
 
 
-GETTING THE LATEST CHARM SOURCE
-===============================
+GETTING THE LATEST SOURCE
+=========================
 
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
@@ -20,12 +20,20 @@ code, as follows:
     git clone http://charm.cs.illinois.edu/gerrit/charm
 
 
-PICKING A VERSION
-=================
+BUILD CONFIGURATION
+===================
+
+QUICK START:
+------------
+First-time users are encouraged to run the top-level "build" script and follow its lead:
+     > ./build
+
+
+ADVANCED BUILD OPTIONS:
+-----------------------
 
 First, you need to decide which version of charm++ to use. The "build"
-script in charm source directory takes several command line options to
-compile Charm++. The command line syntax is:
+script takes several command line options to compile Charm++. The command line syntax is:
 
 build <target> <version> [options ...]
                          [--basedir=dir] [--libdir=dir] [--incdir=dir]
@@ -65,7 +73,7 @@ For example, on an ordinary Linux PC:
 will build charm++ in the directory: netlrts-linux-x86_64/. The communication
 defaults to UDP packets and the compiler to gcc.
 
-For a more complex example, consider building shared-memory build with the
+For a more complex example, consider a shared-memory build with the
 Intel C++ compiler, where you want the communication to happen over TCP sockets:
 
    ./build charm++ netlrts-linux-x86_64 smp icc tcp
@@ -73,15 +81,14 @@ Intel C++ compiler, where you want the communication to happen over TCP sockets:
 will build charm++ in the directory: netlrts-linux-x86_64-smp-tcp-icc/.
 
 You can specify multiple options, however you can use at most one compiler
-option. The sequence of the options are not important given in build script,
-only one directory name will be generated, following the rules:
+option. The sequencing of options given to the build script should follow the rules:
 1. compiler option will be at the end;
 2. other options are sorted alphabetically.
 
 **** How to choose a <version> ****
 
-Here is the table for choosing correct version. The default setting of compiler
-in Charm version is gcc/g++. However, one can use <options> to specify other
+Here is the table for choosing a correct build version. The default setting of compiler
+in Charm++ is gcc/g++ on Linux and Clang on MacOS. However, one can use <options> to specify other
 compilers. See the detailed explanation of the <options> below.
 (Note: this isn't a complete list.  Run ./build for a complete listing)
 
@@ -102,31 +109,26 @@ To choose <version>, your choice is determined by two options:
 
 1.)  The way a parallel program written in Charm++ will communicate:
 
-	"netlrts-" Charm++ communicates using the regular TCP/IP stack
+        "netlrts-" Charm++ communicates using the regular TCP/IP stack
 (UDP packets), which works everywhere but is fairly slow.  Use this
 option for networks of workstations, clusters, or single-machine
 development and testing.
 
-	"gni-", "bluegeneq-", "pamilrts-", "verbs-" Charm++
+        "gni-", "bluegeneq-", "pamilrts-", "verbs-" Charm++
 communicates using direct calls to the machine's communication primitives.
+Use these versions on machines that support them for best performance.
 
-	"mpi-" Charm++ communicates using MPI calls.  Use this for
-machines with a good MPI implementation.
+        "mpi-" Charm++ communicates using MPI calls.
 
-	"multicore-" Charm++ communicates using shared memory within a
-	single node
-
-	"sim-" and "uth-" are not actively maintained.  These are
-single-processor versions: "uth-" simulates processors as user-level
-threads; "sim-" switches between processors and counts communications.
+        "multicore-" Charm++ communicates using shared memory within a single node.
 
 
 2.)  Your operating system:
 
-	"linux-x86_64"       Linux with AMD64 64-bit x86 instructions
-	"win64"              MS Windows with MS Visual C++ compiler
-	"cygwin"             MS Windows with Cygnus' Cygwin Unix layer
-	"darwin-x86_64"      Apple Mac OS X
+        "linux-x86_64"       Linux with AMD64 64-bit x86 instructions
+        "win64"              MS Windows with MS Visual C++ compiler
+        "cygwin"             MS Windows with Cygnus' Cygwin Unix layer
+        "darwin-x86_64"      Apple Mac OS X
         "bluegeneq"          IBM's Blue Gene/Q
         "cray{xe/xc}"        Cray's X-Series Supercomputer
         "linux-ppc"          POWER/PowerPC
@@ -134,40 +136,31 @@ threads; "sim-" switches between processors and counts communications.
 
 Your Charm++ version is made by concatenating the options, e.g.:
 
-"net-linux-x86_64"   Charm++ for a network of 64-bit Linux workstations,
-                     compiled using g++.
+"netlrts-linux-x86_64"   Charm++ for a network of 64-bit Linux workstations,
+                         compiled using g++.
 
-"gni-crayxc"         Charm++ for Cray XC30 systems using the system's compiler.
+"gni-crayxc"             Charm++ for Cray XC systems using the system's compiler.
 
 
 **** How to choose <options> ****
 
 <version> above defines the most important OS, CPU and Communication of
-your machine, and most of time, it use the GNU gcc as default compiler.
-To use different compiler or demand additional special feature support, you
+your machine, and most of time it uses gcc as the default compiler.
+To use a different compiler or demand additional special feature support, you
 need to choose <options> from the following list:
 
 * icc - Intel C/C++ compiler.
 * ifort - Intel Fortran compiler
 * xlc - IBM XLC compiler.
+* clang - Clang compiler.
 * mpicxx - Use MPI-wrappers for MPI builds.
-* acc  - HP aC++ compiler
-* cc  - For Sun WorkShop C++ compilers;
-* cc64 - For 64 bits Sun WorkShop C++ or IBM xlC compilers;
-* cxx - DIGITAL C++ compiler;
-* pgcc - Portland Group's C++ compiler;
-* mpcc - SUN Solaris C++ compiler for MPI.
+* pgcc - Portland Group's C++ compiler.
 
 * smp - Enable direct SMP support.  An "smp" version communicates using
         shared memory within a machine; but normal message passing across
         machines. Because of locking, "smp" may slightly impact non-SMP
         performance. Try your application to decide if enabling smp mode
         improves performance.
-
-* scyld - support Beowulf Scyld based on bproc;
-* clustermatic - for Clustermatic Beowulf cluster based on bproc;
-* gm - support MyriCom's Myrinet GM library;
-* vmi - support NCSA's VMI library;
 
 * tcp - for netlrts- version, default communication is via UDP. Using option
         tcp will switch to TCP. TCP version of Charm++ is usually slower
@@ -179,22 +172,29 @@ need to choose <options> from the following list:
                  option disables hugepages, and uses regular malloc for messages.
 * persistent - on Cray systems, this option enables use of persitent mode for
                communication.
-
+* pxshm - use Posix Shared Memory for communication between Charm++ processes
+          within a shared-memory host.
+* syncft - enable in-memory fault tolerance support in Charm++.
+* mlogft - enable message logging fault tolerance support in Charm++.
+* tsan - compile Charm++ with support for Thread Sanitizer.
+* papi - enable PAPI performance counters.
+* ooc - build Charm++ with out-of-core execution features.
 * bigsim - compile Charm++ as running on the BigSim emulator.
-* help - show supported options for a version. For example, for net-linux,
+
+* help - show supported options for a version. For example, for netlrts-linux,
          running:
-         > ./build charm++ net-linux help
+         > ./build charm++ netlrts-linux help
          will give:
-         supported options: gm icc pgcc scyld smp bluegene tcp
+Supported compilers: clang craycc gcc icc icc8 iccstatic pgcc xlc xlc64
+Supported options: bigemulator bigsim causalft clustermatic g95 gfortran ifort lcs local mlogft omp ooc papi persistent pgf90 pxshm scyld smp syncft sysvshm tcp tsan turing
 
 
 BUILDING THE SOURCE
 ===================
 
 If you have downloaded a binary version of Charm++, you can skip
-this step-- Charm++ should already be compiled.  For win32/win64 systems,
-see README.win; for Cygwin version, see README.cygwin; for net- version,
-see README.net.
+this step-- Charm++ should already be compiled.  For win64 systems,
+see README.win; for Cygwin version, see README.cygwin.
 
 Once you have decided on a version, unpack Charm++, cd into charm,
 and run
@@ -202,15 +202,15 @@ and run
      > ./build <target> <version> <opts>
 
 <target> is one of
-	"charm++"  The basic Charm++ language.
-	"AMPI"     An implementation of MPI on top of Charm++
-	"FEM"      A Finite-Element framework on top of Charm++
-	"Tau"      TAU's performance profiling/tracing
+        "charm++"  The basic Charm++ language
+        "AMPI"     An implementation of MPI on top of Charm++
+        "LIBS"     Charm++, AMPI, and other libraries built on top of them
+        "Tau"      TAU's performance profiling/tracing
 
 <version> is described above
 
 <opts> are build-time options (such as the compiler or "smp"),
-or command line options passed to the charmc compile script.
+or command line options passed to the charmc compiler script.
 Common compile time options such as -g, -O, -Ipath, -Lpath, -llib are
 accepted.
 
@@ -246,7 +246,7 @@ Projections. This is the recommended way to analyze performance of applications.
 When Charm++ is built successfully, the directory structure under the
 target directory will look like:
 
-net-linux-x86_64/
+netlrts-linux-x86_64/
    |
    ---  bin/			# all executables
    |
@@ -263,6 +263,7 @@ net-linux-x86_64/
    ---  tests/			# all test programs
    |
    ---  tmp/			# Charm++ build directory
+
 
 BUILDING A PROGRAM
 ==================
@@ -307,8 +308,8 @@ password authentication. Just type following command to verify:
 If this gives you current date immediately, your running environment with this
 node has been setup correctly.
 
-Now, for test running purpose, net- version charmrun comes with an easy-to-use
-"++local" options. No remote shell invocation is needed in this case. It starts
+For development purposes, the netlrts- version of charmrun comes with an easy-to-use
+"++local" option. No remote shell invocation is needed in this case. It starts
 node programs right on your local machine. This could be useful if you just
 want to run program on only one machine, for example, your laptop. This
 can save you all the hassle of setting up ssh or charmd daemons.
@@ -319,25 +320,24 @@ To use this option, just type:
 However, for best performance, you should launch one node program per processor.
 
 
+BUILDING DYNAMIC LIBRARIES
+==========================
 
-Build Charm++ in Dynamic libraries
-=============================
-
-In order to compile Charm++ into dynamic libraries, one need to specify
-"-build-shared" option as one of the Charm compiler script "charmc"
-at link time. For example, to compile Charm++ under net-linux/tmp, run
+In order to compile Charm++ into dynamic libraries, one needs to specify the
+"-build-shared" option to the Charm compiler script "charmc"
+at link time. For example, to compile Charm++ under netlrts-linux/tmp, run
 
 make charm++ OPTS='-O -build-shared'
 
-Charm++'s dynamic libraries are compiled into lib_so/ directory.
-Typically, they are with ".so" suffix.
+Charm++'s dynamic libraries are compiled into the lib_so/ directory.
+Typically, they are generated with a ".so" suffix.
 
 Note, "-build-shared" option is automatically turned on when building
-Charm++ using "build" script. So you don't need to pass "-build-shared"
+Charm++ using the "build" script. So you don't need to pass "-build-shared"
 option to "build".
 
 One can compile a Charm++ application linking against Charm++ dynamic
-libraries, run charmc with "-charm-shared" as one of the link options.
+libraries by linking with charmc's "-charm-shared" option.
 For example:
 
 charmc -o pgm pgm.o -charm-shared
@@ -345,6 +345,7 @@ charmc -o pgm pgm.o -charm-shared
 You can then run the program as usual.
 Note, linking against Charm++ dynamic libraries produces much smaller size
 binaries and takes much less linking time.
+
 
 FOR MORE INFORMATION
 ====================
