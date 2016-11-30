@@ -4770,6 +4770,14 @@ bool IReq::test(MPI_Status *sts){
       getAmpiInstance(comm)->yield();
     }
   }
+  else {
+    if (cancelled) {
+      statusIreq = true;
+    }
+    else {
+      getAmpiInstance(comm)->yield();
+    }
+  }
   return statusIreq;
 }
 
@@ -4784,6 +4792,9 @@ bool IReq::itest(MPI_Status *sts){
       sts->MPI_LENGTH = length;
       sts->MPI_CANCEL = 0;
     }
+  }
+  else if (cancelled) {
+    statusIreq = true;
   }
   return statusIreq;
 }
