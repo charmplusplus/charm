@@ -88,6 +88,8 @@ extern void initQd(char **argv);
 
 #if CONVERSE_POOL
 #include "cmipool.h"
+#else
+void CmiPoolAllocInit(int numBins);
 #endif
 
 #if CMK_CONDS_USE_SPECIAL_CODE
@@ -144,6 +146,14 @@ extern void CldModuleInit(char **);
 #if USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
 #include <mpi.h>
 #endif
+
+#if CMK_TRACE_ENABLED
+struct envelope;
+void traceAddThreadListeners(CthThread tid, struct envelope *env);
+#endif
+
+void seedBalancerExit(void);
+void EmergencyExit(void);
 
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 CpvDeclare(int,_curRestartPhase);

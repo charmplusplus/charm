@@ -134,6 +134,7 @@
 #include <string.h>   // for memset
 #include "lz4.h"
 
+void CmiAbort(const char *str);
 
 //**************************************
 // Basic Types

@@ -48,6 +48,8 @@ uint32_t ntohl(uint32_t netlong) {
 
 #include "pup_c.h"
 
+void check_memory_leaks(LeakSearchInfo *info);
+
 CpvDeclare(int, CpdSearchLeaks_Index);
 CpvDeclare(int, CpdSearchLeaksDone_Index);
 CpvStaticDeclare(CcsDelayedReply, leakSearchDelayedReply);

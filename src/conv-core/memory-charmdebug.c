@@ -35,6 +35,8 @@ static void *meta_memalign(size_t align, size_t size);
 static void *meta_valloc(size_t size);
 #else
 
+void CmiBacktraceRecordHuge(void **retPtrs,int *nLevels);
+
 typedef struct _Slot Slot;
 typedef struct _SlotStack SlotStack;
 

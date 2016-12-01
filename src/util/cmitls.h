@@ -41,4 +41,8 @@ typedef int  tlsseg_t;            /* place holder */
 
 #endif
 
+void allocNewTLSSeg(tlsseg_t* t, CthThread th);
+void switchTLS(tlsseg_t*, tlsseg_t*);
+void currentTLS(tlsseg_t*);
+
 #endif

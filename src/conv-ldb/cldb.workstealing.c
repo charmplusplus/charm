@@ -8,6 +8,8 @@
 #define TRACE_USEREVENTS        1
 #define LOADTHRESH              3
 
+void CldMultipleSendPrio(int pe, int numToSend, int rank, int immed);
+
 typedef struct CldProcInfo_s {
   int    askEvt;		/* user event for askLoad */
   int    askNoEvt;		/* user event for askNoLoad */

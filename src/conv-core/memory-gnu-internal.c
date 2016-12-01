@@ -1491,6 +1491,8 @@ static FORCEINLINE int win32munmap(void* ptr, size_t size) {
 #endif /* HAVE_MMAP */
 
 #if HAVE_MMAP && HAVE_MREMAP
+void *mremap(void *old_address, size_t old_size,
+             size_t new_size, int flags, ... );
 #define CALL_MREMAP(addr, osz, nsz, mv) mremap((addr), (osz), (nsz), (mv))
 #else  /* HAVE_MMAP && HAVE_MREMAP */
 #define CALL_MREMAP(addr, osz, nsz, mv) ((void)(addr),(void)(osz), \
