@@ -9,8 +9,21 @@ array proxies, or the details of element creation (see ckarray.h).
 #ifndef __CKLOCATION_H
 #define __CKLOCATION_H
 
-#ifdef CMK_USING_XLC
-#include <map>
+#if CMK_USING_XLC
+#include <tr1/unordered_map>
+struct IndexHasher {
+  public:
+    size_t operator()(const CkArrayIndex& idx) const {
+      return std::tr1::hash<unsigned int>()(idx.hash());
+    }
+};
+
+struct ArrayIDHasher {
+  public:
+    size_t operator()(const CkArrayID& aid) const {
+      return std::tr1::hash<int>()(((CkGroupID)aid).idx);
+    }
+};
 #else
 #include <unordered_map>
 struct IndexHasher {
@@ -244,13 +257,13 @@ class CkLocMgr : public IrrGroup {
 
 public:
 
-#ifdef CMK_USING_XLC
-typedef std::map<CkArrayID, CkArray*> ArrayIdMap;
-typedef std::map<CmiUInt8, int> IdPeMap;
-typedef std::map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
-typedef std::map<CkArrayIndex, std::vector<CkArrayMessage *> > IndexMsgBuffer;
-typedef std::map<CkArrayIndex, std::vector<std::pair<int, bool> > > LocationRequestBuffer;
-typedef std::map<CkArrayIndex, CmiUInt8> IdxIdMap;
+#if CMK_USING_XLC
+typedef std::tr1::unordered_map<CkArrayID, CkArray*, ArrayIDHasher> ArrayIdMap;
+typedef std::tr1::unordered_map<CmiUInt8, int> IdPeMap;
+typedef std::tr1::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
+typedef std::tr1::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHasher> IndexMsgBuffer;
+typedef std::tr1::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
+typedef std::tr1::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
 #else
 typedef std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher> ArrayIdMap;
 typedef std::unordered_map<CmiUInt8, int> IdPeMap;
