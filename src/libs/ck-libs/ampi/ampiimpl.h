@@ -131,9 +131,39 @@ class WinStruct{
  public:
   MPI_Comm comm;
   int index;
-  WinStruct(void):comm(MPI_COMM_NULL),index(-1){ }
-  WinStruct(MPI_Comm comm_, int index_):comm(comm_),index(index_){ }
-  void pup(PUP::er &p){ p|comm; p|index; }
+
+private:
+  bool areRecvsPosted;
+  bool inEpoch;
+  vector<int> exposureRankList;
+  vector<int> accessRankList;
+  vector<MPI_Request> requestList;
+
+public:
+  WinStruct(void) : comm(MPI_COMM_NULL), index(-1), areRecvsPosted(false), inEpoch(false) {
+    exposureRankList.clear(); accessRankList.clear(); requestList.clear();
+  }
+  WinStruct(MPI_Comm comm_, int index_) : comm(comm_), index(index_), areRecvsPosted(false), inEpoch(false) {
+    exposureRankList.clear(); accessRankList.clear(); requestList.clear();
+  }
+  void pup(PUP::er &p) {
+    p|comm; p|index; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
+  }
+  void clearEpochAccess() {
+    accessRankList.clear(); inEpoch = false;
+  }
+  void clearEpochExposure() {
+    exposureRankList.clear(); areRecvsPosted = false; requestList.clear(); inEpoch=false;
+  }
+  vector<int>& getExposureRankList() {return exposureRankList;}
+  vector<int>& getAccessRankList() {return accessRankList;}
+  void setExposureRankList(vector<int> &tmpExposureRankList) {exposureRankList = tmpExposureRankList;}
+  void setAccessRankList(vector<int> &tmpAccessRankList) {accessRankList = tmpAccessRankList;}
+  vector<int>& getRequestList() {return requestList;}
+  bool AreRecvsPosted() const {return areRecvsPosted;}
+  void setAreRecvsPosted(bool setR) {areRecvsPosted = setR;}
+  bool isInEpoch() const {return inEpoch;}
+  bool setInEpoch(bool arg) {inEpoch = arg;}
 };
 
 class ampi;
@@ -543,15 +573,17 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *fla
 extern int _mpi_nworlds;
 
 //MPI_ANY_TAG is defined in ampi.h to MPI_TAG_UB_VALUE+1
-#define MPI_ATA_SEQ_TAG MPI_TAG_UB_VALUE+2
-#define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+3
-#define MPI_REDN_TAG    MPI_TAG_UB_VALUE+4
-#define MPI_SCATTER_TAG MPI_TAG_UB_VALUE+5
-#define MPI_SCAN_TAG    MPI_TAG_UB_VALUE+6
-#define MPI_EXSCAN_TAG  MPI_TAG_UB_VALUE+7
-#define MPI_ATA_TAG     MPI_TAG_UB_VALUE+8
-#define MPI_NBOR_TAG    MPI_TAG_UB_VALUE+9
-#define MPI_RMA_TAG     MPI_TAG_UB_VALUE+10
+#define MPI_ATA_SEQ_TAG     MPI_TAG_UB_VALUE+2
+#define MPI_BCAST_TAG       MPI_TAG_UB_VALUE+3
+#define MPI_REDN_TAG        MPI_TAG_UB_VALUE+4
+#define MPI_SCATTER_TAG     MPI_TAG_UB_VALUE+5
+#define MPI_SCAN_TAG        MPI_TAG_UB_VALUE+6
+#define MPI_EXSCAN_TAG      MPI_TAG_UB_VALUE+7
+#define MPI_ATA_TAG         MPI_TAG_UB_VALUE+8
+#define MPI_NBOR_TAG        MPI_TAG_UB_VALUE+9
+#define MPI_RMA_TAG         MPI_TAG_UB_VALUE+10
+#define MPI_EPOCH_START_TAG MPI_TAG_UB_VALUE+11
+#define MPI_EPOCH_END_TAG   MPI_TAG_UB_VALUE+12
 
 #define AMPI_COLL_SOURCE 0
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
@@ -1422,9 +1454,9 @@ class ampiParent : public CBase_ampiParent {
   CkDDT *myDDT;
   AmpiRequestList ampiReqs;
 
-  int addWinStruct(WinStruct* win);
-  WinStruct getWinStruct(MPI_Win win) const;
-  void removeWinStruct(WinStruct win);
+  int addWinStruct(WinStruct *win);
+  WinStruct *getWinStruct(MPI_Win win) const;
+  void removeWinStruct(WinStruct *win);
 
  public:
   int createInfo(MPI_Info *newinfo);
@@ -1639,13 +1671,13 @@ class ampi : public CBase_ampi {
  public:
   MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info);
   int deleteWinInstance(MPI_Win win);
-  int winGetGroup(WinStruct win, MPI_Group *group) const;
+  int winGetGroup(WinStruct *win, MPI_Group *group) const;
   int winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
+             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win);
   int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
+             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win);
   int winIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
-              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win,
+              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win,
               MPI_Request *req);
   int winIgetWait(MPI_Request *request, MPI_Status *status);
   int winIgetFree(MPI_Request *request, MPI_Status *status);
@@ -1655,26 +1687,26 @@ class ampi : public CBase_ampi {
                     int targcnt, MPI_Datatype targtype, int winIndex);
   AmpiMsg* winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                          int targcnt, MPI_Datatype targtype, int winIndex);
-  int winLock(int lock_type, int rank, WinStruct win);
-  int winUnlock(int rank, WinStruct win);
+  int winLock(int lock_type, int rank, WinStruct *win);
+  int winUnlock(int rank, WinStruct *win);
   void winRemoteLock(int lock_type, int winIndex, int requestRank);
   void winRemoteUnlock(int winIndex, int requestRank);
   int winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                    MPI_Op op, WinStruct win);
+                    MPI_Op op, WinStruct *win);
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, int winIndex);
   int winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, void *resaddr,
                        int rescnt, MPI_Datatype restype, int rank, MPI_Aint targdisp,
-                       int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct win);
+                       int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct *win);
   int winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
-                        int rank, MPI_Aint targdisp, WinStruct win);
+                        int rank, MPI_Aint targdisp, WinStruct *win);
   AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Datatype type,
                                    MPI_Aint targdisp, int winIndex);
-  void winSetName(WinStruct win, const char *name);
-  void winGetName(WinStruct win, char *name, int *length) const;
-  win_obj* getWinObjInstance(WinStruct win) const;
+  void winSetName(WinStruct *win, const char *name);
+  void winGetName(WinStruct *win, char *name, int *length) const;
+  win_obj* getWinObjInstance(WinStruct *win) const;
   int getNewSemaId();
 
   AmpiMsg* Alltoall_RemoteIget(MPI_Aint disp, int targcnt, MPI_Datatype targtype, int tag);

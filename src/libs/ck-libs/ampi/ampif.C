@@ -230,6 +230,7 @@ FDECL {
 #define mpi_win_wait  FTN_NAME ( MPI_WIN_WAIT  , mpi_win_wait )
 #define mpi_win_start  FTN_NAME ( MPI_WIN_START  , mpi_win_start )
 #define mpi_win_complete  FTN_NAME ( MPI_WIN_COMPLETE  , mpi_win_complete )
+#define mpi_win_test FTN_NAME ( MPI_WIN_TEST , mpi_win_test )
 #define mpi_alloc_mem  FTN_NAME ( MPI_ALLOC_MEM  , mpi_alloc_mem )
 #define mpi_free_mem  FTN_NAME ( MPI_FREE_MEM  , mpi_free_mem )
 #define mpi_put  FTN_NAME ( MPI_PUT  , mpi_put )
@@ -1590,6 +1591,10 @@ void mpi_win_start(int *group, int *assertion, int *win, int *ierr){
 
 void mpi_win_complete(int *win, int *ierr){
   *ierr = AMPI_Win_complete(*win);
+}
+
+void mpi_win_test(int *win, int *flag, int *ierr){
+  *ierr = AMPI_Win_test(*win,flag);
 }
 
 void mpi_alloc_mem(MPI_Aint *size, int *info, void *baseptr, int *ierr){

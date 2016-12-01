@@ -1,6 +1,5 @@
 
 #define AMPIMSGLOG    0
-
 #define exit exit /*Supress definition of exit in ampi.h*/
 #include "ampiimpl.h"
 #include "tcharm.h"
@@ -1376,7 +1375,7 @@ int ampiParent::setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val){
 int ampiParent::setWinAttr(MPI_Win win, int keyval, void* attribute_val){
   if(kv_set_builtin(keyval,attribute_val))
     return MPI_SUCCESS;
-  MPI_Comm comm = (getAmpiParent()->getWinStruct(win)).comm;
+  MPI_Comm comm = (getAmpiParent()->getWinStruct(win))->comm;
   return setUserKeyval(comm, keyval, attribute_val);
 }
 
@@ -1478,7 +1477,7 @@ int ampiParent::getWinAttr(MPI_Win win, int keyval, void *attribute_val, int *fl
     *flag = true;
     return MPI_SUCCESS;
   }
-  MPI_Comm comm = (getAmpiParent()->getWinStruct(win)).comm;
+  MPI_Comm comm = (getAmpiParent()->getWinStruct(win))->comm;
   if (getUserKeyval(comm, keyval, attribute_val, flag))
     return MPI_SUCCESS;
   return MPI_ERR_KEYVAL;
@@ -1491,7 +1490,7 @@ int ampiParent::deleteCommAttr(MPI_Comm comm, int keyval){
 
 int ampiParent::deleteWinAttr(MPI_Win win, int keyval){
   /* no way to delete an attribute: just overwrite it with NULL */
-  MPI_Comm comm = (getAmpiParent()->getWinStruct(win)).comm;
+  MPI_Comm comm = (getAmpiParent()->getWinStruct(win))->comm;
   return setUserKeyval(comm, keyval, NULL);
 }
 

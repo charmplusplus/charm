@@ -5,7 +5,6 @@
  *************************************************************/
 
 #include "ampiimpl.h"
-
 /*************************************************************
  * Local flags used for Win_obj class:
  *     WIN_ERROR -- the operation fails
@@ -198,26 +197,26 @@ int ampiParent::addWinStruct(WinStruct* win) {
   return winStructList.size()-1;
 }
 
-WinStruct ampiParent::getWinStruct(MPI_Win win) const {
-  return *(winStructList[(int)win]);
+WinStruct *ampiParent::getWinStruct(MPI_Win win) const {
+  return winStructList[(int)win];
 }
 
-void ampiParent::removeWinStruct(WinStruct win) {/*winStructList.remove(win);*/}
+void ampiParent::removeWinStruct(WinStruct *win) {/*winStructList.remove(win);*/}
 
 int ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-                 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win){
+                 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win){
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
 
   if (ddt->isContig()) {
     thisProxy[rank].winRemotePut(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
-                          targcnt, targtype, win.index);
+                          targcnt, targtype, win->index);
   }
   else {
     vector<char> sorgaddr(orgtotalsize);
     ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
     thisProxy[rank].winRemotePut(orgtotalsize, &sorgaddr[0], orgcnt, orgtype, targdisp,
-                          targcnt, targtype, win.index);
+                          targcnt, targtype, win->index);
   }
 
   return MPI_SUCCESS;
@@ -237,14 +236,14 @@ void ampi::winRemotePut(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Dataty
 
 int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                 WinStruct win){
+                 WinStruct *win){
   // Send the request for data to remote side
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
   AmpiMsg *msg = new AmpiMsg();
 
-  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
+  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
 
   // Process the reply message by serializing the data into the desired memory position
   ddt->serialize((char*)orgaddr, msg->getData(), orgcnt, (-1));
@@ -276,10 +275,10 @@ AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
 
 int ampi::winIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
                   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                  WinStruct win, MPI_Request *req){
+                  WinStruct *win, MPI_Request *req){
   // Send the request to data and handle of Future to remote side
   AMPI_DEBUG("    Rank[%d:%d] request Remote iget at [%d]\n", thisIndex, myRank, rank);
-  *req = thisProxy[rank].winRemoteIget(orgdisp, orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
+  *req = thisProxy[rank].winRemoteIget(orgdisp, orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
   return MPI_SUCCESS;
 }
 
@@ -330,20 +329,20 @@ int ampi::winIgetFree(MPI_Request *request, MPI_Status *status) {
 
 int ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                         MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                        MPI_Op op, WinStruct win) {
+                        MPI_Op op, WinStruct *win) {
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
 
   if (ddt->isContig()) {
     thisProxy[rank].winRemoteAccumulate(orgtotalsize, (char*)orgaddr, orgcnt, orgtype,
-                                 targdisp, targcnt, targtype,  op, win.index);
+                                 targdisp, targcnt, targtype,  op, win->index);
   }
   else {
     vector<char> sorgaddr(orgtotalsize);
     ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
     thisProxy[rank].winRemoteAccumulate(orgtotalsize, &sorgaddr[0], orgcnt, orgtype,
-                                 targdisp, targcnt, targtype,  op, win.index);
+                                 targdisp, targcnt, targtype,  op, win->index);
   }
 
   return MPI_SUCCESS;
@@ -355,7 +354,6 @@ void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
                                int winIndex) {
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *ddt = getDDT()->getType(targtype);
-
   if (ddt->isContig()) {
     winobj->accumulate(sorgaddr, targcnt, targtype, targdisp, targcnt, targtype, op);
   }
@@ -369,13 +367,13 @@ void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
 int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                            void *resaddr, int rescnt, MPI_Datatype restype, int rank,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                           MPI_Op op, WinStruct win) {
+                           MPI_Op op, WinStruct *win) {
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
   AmpiMsg *msg = new AmpiMsg();
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
 
-  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
+  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
 
   ddt->serialize((char*)resaddr, msg->getData(), orgcnt, (-1));
   if (ddt->isContig()) {
@@ -392,12 +390,12 @@ int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
 }
 
 int ampi::winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
-                            int rank, MPI_Aint targdisp, WinStruct win){
+                            int rank, MPI_Aint targdisp, WinStruct *win){
   CkDDT_DataType *ddt = getDDT()->getType(type);
   AmpiMsg* msg = new AmpiMsg();
 
   msg = thisProxy[rank].winRemoteCompareAndSwap(getDDT()->getType(type)->getSize(1), (char*)orgaddr,
-                                                (char*)compaddr, type, targdisp, win.index);
+                                                (char*)compaddr, type, targdisp, win->index);
   ddt->serialize((char*)resaddr, msg->getData(), 1, 1);
 
   delete msg;
@@ -422,9 +420,9 @@ AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr,
   return msg;
 }
 
-int ampi::winLock(int lock_type, int rank, WinStruct win) {
+int ampi::winLock(int lock_type, int rank, WinStruct *win) {
   AMPI_DEBUG("    [%d] Lock: invoke Remote lock at [%d]\n", thisIndex, rank);
-  thisProxy[rank].winRemoteLock(lock_type, win.index, thisIndex);
+  thisProxy[rank].winRemoteLock(lock_type, win->index, thisIndex);
   return MPI_SUCCESS;
 }
 
@@ -446,9 +444,9 @@ void ampi::winRemoteLock(int lock_type, int winIndex, int requestRank) {
   }
 }
 
-int ampi::winUnlock(int rank, WinStruct win) {
+int ampi::winUnlock(int rank, WinStruct *win) {
   AMPI_DEBUG("    [%d] Unlock: invoke Remote lock at [%d]\n", thisIndex, rank);
-  thisProxy[rank].winRemoteUnlock(win.index, thisIndex);
+  thisProxy[rank].winRemoteUnlock(win->index, thisIndex);
   return MPI_SUCCESS;
 }
 
@@ -475,30 +473,30 @@ MPI_Win ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_In
 }
 
 int ampi::deleteWinInstance(MPI_Win win) {
-  WinStruct winStruct = parent->getWinStruct(win);
-  win_obj *winobj = winObjects[winStruct.index];
+  WinStruct *winStruct = parent->getWinStruct(win);
+  win_obj *winobj = winObjects[winStruct->index];
   parent->removeWinStruct(winStruct); // really it does nothing at all
   winobj->free();
   return MPI_SUCCESS;
 }
 
-int ampi::winGetGroup(WinStruct win, MPI_Group *group) const {
-   *group = parent->comm2group(win.comm);
+int ampi::winGetGroup(WinStruct *win, MPI_Group *group) const {
+   *group = parent->comm2group(win->comm);
    return MPI_SUCCESS;
 }
 
-void ampi::winSetName(WinStruct win, const char *name) {
-  win_obj *winobj = winObjects[win.index];
+void ampi::winSetName(WinStruct *win, const char *name) {
+  win_obj *winobj = winObjects[win->index];
   winobj->setName(name);
 }
 
-void ampi::winGetName(WinStruct win, char *name, int *length) const {
-  win_obj *winobj = winObjects[win.index];
+void ampi::winGetName(WinStruct *win, char *name, int *length) const {
+  win_obj *winobj = winObjects[win->index];
   winobj->getName(name, length);
 }
 
-win_obj* ampi::getWinObjInstance(WinStruct win) const {
-  return winObjects[win.index];
+win_obj* ampi::getWinObjInstance(WinStruct *win) const {
+  return winObjects[win->index];
 }
 
 /*
@@ -547,8 +545,8 @@ int AMPI_Win_free(MPI_Win *win){
   AMPIAPI("AMPI_Win_free");
   if(win==NULL) { return ampiErrhandler("AMPI_Win_free", MPI_ERR_WIN); }
 
-  WinStruct winStruct = getAmpiParent()->getWinStruct(*win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(*win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   ptr->deleteWinInstance(*win);
   /* Need a barrier here: to ensure that every process participates */
   ptr->barrier();
@@ -565,8 +563,8 @@ int AMPI_Put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
   AMPIAPI("AMPI_Put");
   handle_MPI_BOTTOM(orgaddr, orgtype);
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winPut(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
 }
 
@@ -580,8 +578,8 @@ int AMPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
   AMPIAPI("AMPI_Get");
   handle_MPI_BOTTOM(orgaddr, orgtype);
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   // winGet is a local function which will call the remote method on #rank processor
   return  ptr->winGet(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
 }
@@ -602,8 +600,8 @@ int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                     MPI_Op op, MPI_Win win) {
   AMPIAPI("AMPI_Accumulate");
   handle_MPI_BOTTOM(orgaddr, orgtype);
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank,
                             targdisp, targcnt, targtype, op, winStruct);
 }
@@ -622,8 +620,8 @@ int AMPI_Get_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                         MPI_Datatype targtype, MPI_Op op, MPI_Win win) {
   AMPIAPI("AMPI_Get_accumulate");
   handle_MPI_BOTTOM(orgaddr, orgtype);
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winGetAccumulate(orgaddr, orgcnt, orgtype, resaddr, rescnt, restype,
                                rank, targdisp, targcnt, targtype, op, winStruct);
 }
@@ -638,8 +636,8 @@ int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
                       int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win) {
   AMPIAPI("AMPI_Fetch_and_op");
   handle_MPI_BOTTOM(orgaddr, type);
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   // HACK: use GetAccumulate for FetchAndOp
   return ptr->winGetAccumulate(orgaddr, 1, type, resaddr, 1, type,
                                rank, targdisp, 1, type, op, winStruct);
@@ -655,8 +653,8 @@ int AMPI_Compare_and_swap(void *orgaddr, void *compaddr, void *resaddr, MPI_Data
                           int rank, MPI_Aint targdisp, MPI_Win win) {
   AMPIAPI("AMPI_Compare_and_swap");
   handle_MPI_BOTTOM(orgaddr, type);
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winCompareAndSwap(orgaddr, compaddr, resaddr, type, rank, targdisp, winStruct);
 }
 
@@ -672,8 +670,8 @@ int AMPI_Compare_and_swap(void *orgaddr, void *compaddr, void *resaddr, MPI_Data
 CDECL
 int AMPI_Win_fence(int assertion, MPI_Win win){
   AMPIAPI("AMPI_Win_fence");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  MPI_Comm comm = winStruct.comm;
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  MPI_Comm comm = winStruct->comm;
   ampi *ptr = getAmpiInstance(comm);
 
   // Wait until everyone reaches the fence
@@ -696,8 +694,8 @@ int AMPI_Win_fence(int assertion, MPI_Win win){
 CDECL
 int AMPI_Win_lock(int lock_type, int rank, int assertion, MPI_Win win){
   AMPIAPI("AMPI_Win_lock");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
 
   // process assertion here:
   // end of assertion
@@ -716,8 +714,8 @@ int AMPI_Win_lock(int lock_type, int rank, int assertion, MPI_Win win){
   // process assertion here: HOW???
 int AMPI_Win_unlock(int rank, MPI_Win win){
   AMPIAPI("AMPI_Win_unlock");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
 
   // process assertion here: HOW???
   // end of assertion
@@ -740,24 +738,160 @@ int AMPI_Win_unlock(int rank, MPI_Win win){
 CDECL
 int AMPI_Win_post(MPI_Group group, int assertion, MPI_Win win){
   AMPIAPI("AMPI_Win_post");
+
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  if (winStruct->isInEpoch()) {
+    return ampiErrhandler("AMPI_Win_post", MPI_ERR_RMA_SYNC);
+  } else {
+    winStruct->setInEpoch(true);
+  }
+
+  int parentGroupSize;
+  MPI_Group parentGroup;
+  AMPI_Comm_group(winStruct->comm, &parentGroup);
+  AMPI_Group_size(parentGroup, &parentGroupSize);
+
+  std::vector<int> parentGroupRanks(parentGroupSize);
+  std::vector<int> subsetGroupRanks(parentGroupSize);
+  for (int i=0; i<parentGroupSize; i++) {
+    parentGroupRanks[i] = i;
+  }
+  AMPI_Group_translate_ranks(parentGroup, parentGroupSize, &parentGroupRanks[0], group, &subsetGroupRanks[0]);
+
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  int actualRanks = 0;
+  for (int i=0; i<subsetGroupRanks.size(); i++) { // If subsetGroupRanks is large, multicast would be more efficient
+    if (subsetGroupRanks[i] != MPI_UNDEFINED) {
+      subsetGroupRanks[actualRanks++] = i;
+      ptr->send(MPI_EPOCH_START_TAG, ptr->getRank(winStruct->comm), NULL, 0, MPI_INT, subsetGroupRanks[actualRanks-1], winStruct->comm);
+    }
+  }
+
+  for (int i=actualRanks; i<subsetGroupRanks.size(); i++) {
+    subsetGroupRanks.pop_back();
+  }
+  winStruct->setExposureRankList(subsetGroupRanks);
+  std::vector<MPI_Request> &reqList = winStruct->getRequestList();
+  reqList.resize(subsetGroupRanks.size()); // for use in AMPI_Win_{test,wait}
+
   return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Win_wait(MPI_Win win){
   AMPIAPI("AMPI_Win_wait");
+
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  if (!winStruct->isInEpoch()) {
+    return ampiErrhandler("AMPI_Win_wait", MPI_ERR_RMA_SYNC);
+  }
+
+  ampi* ptr = getAmpiInstance(winStruct->comm);
+  const std::vector<int> &exposureRankList = winStruct->getExposureRankList();
+  std::vector<MPI_Request> &requestList = winStruct->getRequestList();
+
+  // If nonblocking recvs have been posted already, there is no reason to post duplicates
+  if (!winStruct->AreRecvsPosted()) {
+    for (int i=0; i<exposureRankList.size(); i++) {
+      ptr->irecv(NULL, 0, MPI_INT, exposureRankList[i], MPI_EPOCH_END_TAG, winStruct->comm, &requestList[i]);
+    }
+  }
+
+  AMPI_Waitall(requestList.size(), &requestList[0], MPI_STATUSES_IGNORE);
+  winStruct->clearEpochExposure();
+
   return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Win_start(MPI_Group group, int assertion, MPI_Win win){
   AMPIAPI("AMPI_Win_start");
+
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  if (winStruct->isInEpoch()) {
+    return ampiErrhandler("AMPI_Win_start", MPI_ERR_RMA_SYNC);
+  } else {
+    winStruct->setInEpoch(true);
+  }
+
+  int parentGroupSize;
+  MPI_Group parentGroup;
+  AMPI_Comm_group(winStruct->comm, &parentGroup);
+  AMPI_Group_size(parentGroup, &parentGroupSize);
+
+  std::vector<int> subsetGroupRanks(parentGroupSize);
+  std::vector<int> parentGroupRanks(parentGroupSize);
+  for (int i=0; i<parentGroupSize; i++) {
+    parentGroupRanks[i] = i;
+  }
+
+  AMPI_Group_translate_ranks(parentGroup, parentGroupSize, &parentGroupRanks[0], group, &subsetGroupRanks[0]);
+
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  int actualRanks = 0;
+  for (int i=0; i<subsetGroupRanks.size(); i++) {
+    if (subsetGroupRanks[i] != MPI_UNDEFINED) {
+      subsetGroupRanks[actualRanks++] = i;
+      ptr->recv(MPI_EPOCH_START_TAG, subsetGroupRanks[actualRanks-1], NULL, 0, MPI_INT, winStruct->comm, MPI_STATUS_IGNORE);
+    }
+  }
+
+  for (int i=actualRanks; i<subsetGroupRanks.size(); i++) {
+    subsetGroupRanks.pop_back();
+  }
+  winStruct->setAccessRankList(subsetGroupRanks);
+
   return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Win_complete(MPI_Win win){
   AMPIAPI("AMPI_Win_complete");
+
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  if (!winStruct->isInEpoch()) {
+    return ampiErrhandler("AMPI_Win_complete", MPI_ERR_RMA_SYNC);
+  } else {
+    winStruct->setInEpoch(true);
+  }
+
+  std::vector<int> &accessGroupRanks = winStruct->getAccessRankList();
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+
+  for (int i=0; i<accessGroupRanks.size(); i++) {
+    ptr->send(MPI_EPOCH_END_TAG, ptr->getRank(winStruct->comm), NULL, 0, MPI_INT, accessGroupRanks[i], winStruct->comm);
+  }
+  winStruct->clearEpochAccess();
+
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Win_test(MPI_Win win, int *flag){
+  AMPIAPI("AMPI_Win_test");
+
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  if (!winStruct->isInEpoch()) {
+    return ampiErrhandler("AMPI_Win_test", MPI_ERR_RMA_SYNC);
+  }
+
+  std::vector<MPI_Request> &reqList = winStruct->getRequestList();
+  const std::vector<int> &exposureRankList = winStruct->getExposureRankList();
+  ampi* ptr = getAmpiInstance(winStruct->comm);
+
+  // If nonblocking recvs have been posted already, there is no reason to post duplicates
+  if (!winStruct->AreRecvsPosted()) {
+    for (int i=0; i<reqList.size(); i++) {
+      ptr->irecv(NULL, 0, MPI_INT, exposureRankList[i], MPI_EPOCH_END_TAG, winStruct->comm, &reqList[0]);
+    }
+    winStruct->setAreRecvsPosted(true);
+  }
+
+  AMPI_Testall(reqList.size(), &reqList[0], flag, MPI_STATUSES_IGNORE);
+  if (*flag) {
+    winStruct->clearEpochExposure();
+  }
+
   return MPI_SUCCESS;
 }
 
@@ -767,8 +901,8 @@ int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
               MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
               MPI_Request *request) {
   AMPIAPI("AMPI_Iget");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   // winGet is a local function which will call the remote method on #rank processor
   return  ptr->winIget(orgdisp, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct,
 		       request);
@@ -777,8 +911,8 @@ int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
 CDECL
 int AMPI_Iget_wait(MPI_Request *request, MPI_Status *status, MPI_Win win) {
   AMPIAPI("AMPI_Iget_wait");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   // winGet is a local function which will call the remote method on #rank processor
   return  ptr->winIgetWait(request,status);
 }
@@ -786,8 +920,8 @@ int AMPI_Iget_wait(MPI_Request *request, MPI_Status *status, MPI_Win win) {
 CDECL
 int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win) {
   AMPIAPI("AMPI_Iget_free");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   // winGet is a local function which will call the remote method on #rank processor
   return  ptr->winIgetFree(request, status);
 }
@@ -831,8 +965,8 @@ int AMPI_Free_mem(void *baseptr){
 CDECL
 int AMPI_Win_get_group(MPI_Win win, MPI_Group *group) {
   AMPIAPI("AMPI_Win_get_group");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   ptr->winGetGroup(winStruct, group);
   return MPI_SUCCESS;
 }
@@ -858,8 +992,8 @@ int AMPI_Win_set_attr(MPI_Win win, int key, void* value) {
 CDECL
 int AMPI_Win_set_name(MPI_Win win, const char *name) {
   AMPIAPI("AMPI_Win_set_name");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   ptr->winSetName(winStruct, name);
   return MPI_SUCCESS;
 }
@@ -932,8 +1066,8 @@ int AMPI_Win_free_keyval(int *keyval) {
 CDECL
 int AMPI_Win_get_name(MPI_Win win, char *name, int *length) {
   AMPIAPI("AMPI_Win_get_name");
-  WinStruct winStruct = getAmpiParent()->getWinStruct(win);
-  ampi *ptr = getAmpiInstance(winStruct.comm);
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
   ptr->winGetName(winStruct, name, length);
   return MPI_SUCCESS;
 }

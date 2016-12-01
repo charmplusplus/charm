@@ -944,6 +944,8 @@ int AMPI_Win_wait(MPI_Win win);
 int AMPI_Win_start(MPI_Group group, int assertion, MPI_Win win);
 #define MPI_Win_complete AMPI_Win_complete
 int AMPI_Win_complete(MPI_Win win);
+#define MPI_Win_test AMPI_Win_test
+int AMPI_Win_test(MPI_Win win, int *flag);
 #define MPI_Alloc_mem AMPI_Alloc_mem
 int AMPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr);
 #define MPI_Free_mem AMPI_Free_mem
