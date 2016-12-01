@@ -3771,9 +3771,9 @@ void ConverseCommonInit(char **argv)
   CpvInitialize(int, cmiMyPeIdle);
   CpvAccess(cmiMyPeIdle) = 0;
 
-/* #if CONVERSE_POOL */
+#if CONVERSE_POOL
   CmiPoolAllocInit(30);  
-/* #endif */
+#endif
   CmiTmpInit(argv);
   CmiTimerInit(argv);
   CstatsInit(argv);
