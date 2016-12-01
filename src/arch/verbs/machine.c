@@ -2018,7 +2018,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
       Cmi_check_delay=1.0e30;
 
+#if CMK_SMP
+  // Allocate a slot for the comm thread
+  inProgress = calloc(_Cmi_mynodesize+1, sizeof(int));
+#else
   inProgress = calloc(_Cmi_mynodesize, sizeof(int));
+#endif
 
   *numNodes = Lrts_numNodes;
   *myNodeID = Lrts_myNode;
