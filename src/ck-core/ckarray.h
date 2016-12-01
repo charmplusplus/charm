@@ -275,7 +275,7 @@ class CkArrayOptions {
 	const CkGroupID &getMap(void) const {return map;}
 	const CkGroupID &getLocationManager(void) const {return locMgr;}
 	const CkGroupID &getMcastManager(void) const {return mCastMgr;}
-	const bool isSectionAutoDelegated(void) const {return sectionAutoDelegate;}
+	bool isSectionAutoDelegated(void) const {return sectionAutoDelegate;}
 	int getListeners(void) const {return arrayListeners.size();}
 	CkArrayListener *getListener(int listenerNum) {
 		CkArrayListener *ret=arrayListeners[listenerNum];
