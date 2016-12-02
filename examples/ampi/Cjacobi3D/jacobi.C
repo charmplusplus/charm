@@ -230,7 +230,7 @@ int main(int ac, char** av)
       printf("iter %d time: %lf maxerr: %lf\n", iter, itertime, maxerr);
     starttime = MPI_Wtime();
 #ifdef AMPI
-    if(iter%20 == 10) {
+    if(iter%10 == 5) {
       AMPI_Migrate(hints);
     }
 #endif
