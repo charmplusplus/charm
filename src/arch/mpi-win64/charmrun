@@ -1,0 +1,78 @@
+#!/bin/sh
+#
+# Conv-host for MPI:
+#  Translates +pN-style conv-host options into 
+# mpirun -npN options.
+
+args=""
+pes=1
+ppn=1
+machinefile=""
+QUIET=0
+
+while [ $# -gt 0 ]
+do
+    case $1 in
+	+ppn|++ppn)
+	    args=$args" +ppn "$2
+	    ppn=$2
+	    shift
+	    ;;
+	+ppn[0-9]*)
+	    args=$args" "$1
+	    ppn=`echo $1 | awk '{print substr($1,5)}'`
+	    ;;
+	++ppn[0-9]*)
+	    args=$args" "$1
+	    ppn=`echo $1 | awk '{print substr($1,6)}'`
+	    ;;
+	+p)
+	    pes=$2
+	    shift
+	    ;;
+	+pemap)
+	    args=$args" "$1" "$2
+	    shift
+	    ;;
+	+p[0-9]*)
+	    pes=`echo $1 | awk '{print substr($1,3)}'`
+	    ;;
+        -machinefile)
+	    machinefile=$2
+	    args=" "$1" "$2" "$args
+	    shift
+	    ;;
+	++quiet)
+	    QUIET=1
+	    args=$args" "$1
+	    ;;
+	*) 
+	    args=$args" "$1
+	    ;;
+    esac
+    shift
+done
+
+rem=`expr $pes % $ppn`
+quot=`expr $pes / $ppn`
+if [ $rem -ne 0 ];
+then
+    printf "p = $pes should be a multiple of ppn = $ppn\n"
+    exit 1
+else
+    pes=$quot
+fi 
+
+test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
+
+
+mpiexec_cmd=`which mpiexec 2>/dev/null`
+if test -n "$mpiexec_cmd"
+then
+    test $QUIET -eq 0 && echo "charmrun> $mpiexec_cmd -n $pes $args"
+    test $QUIET -eq 0 && echo
+    "$mpiexec_cmd" -n $pes $args
+else
+    echo "Don't know how to run MPI program."
+    exit 1
+fi
