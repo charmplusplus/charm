@@ -9,10 +9,11 @@
 #include "sockRoutines.h"
 #include "queueing.h"
 
-int CcsReply(CcsImplHeader *rep,int repLen,const void *repData);
 void CpdEndConditionalDeliver_master(void);
 
 #if CMK_CCS_AVAILABLE
+
+int CcsReply(CcsImplHeader *rep,int repLen,const void *repData);
 
 /*****************************************************************************
  *
