@@ -407,10 +407,7 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
 
 #include <windows.h>
-#if CMK_USE_LRTS /*LRTS provides locking*/
 #include "lrtslock.h"
-#else /*All win versions use LRTS, so leaving empty*/
-#endif
 
 extern int _Cmi_numpes;
 extern int _Cmi_mynodesize;
