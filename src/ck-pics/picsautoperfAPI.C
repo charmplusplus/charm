@@ -21,15 +21,15 @@ void PICS_registerAutoPerfDone(CkCallback cb, int frameworkShouldAdvancePhase){
 }
 
 void PICS_setNumOfPhases(bool fromGlobal, int num, char *names[]) {
-  char seqNames[num*40];
+  std::vector<char> seqNames(num*40);
   for(int i=0; i<num; i++)
   {
-    strcpy(seqNames+i*40, names[i]); 
+    strcpy(&seqNames[0]+i*40, names[i]);
   }
   if(fromGlobal)
-    autoPerfProxy.setNumOfPhases(num, seqNames);
+    autoPerfProxy.setNumOfPhases(num, &seqNames[0]);
   else
-    autoPerfProxy.ckLocalBranch()->setNumOfPhases(num, seqNames);
+    autoPerfProxy.ckLocalBranch()->setNumOfPhases(num, &seqNames[0]);
 }
 
 void PICS_startPhase( bool fromGlobal, int phaseId)
