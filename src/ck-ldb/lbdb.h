@@ -545,7 +545,7 @@ inline LDCommDesc & LDCommDesc::operator=(const LDCommDesc &c) {
     type = c.type;
     switch (type) {
     case LD_PROC_MSG: dest.destProc = c.dest.destProc; break;
-    case LD_OBJ_MSG:  dest.destObj.destObj = c.dest.destObj.destObj; break;
+    case LD_OBJ_MSG:  dest.destObj = c.dest.destObj; break;
     case LD_OBJLIST_MSG: { dest.destObjs.len = c.dest.destObjs.len;
                            dest.destObjs.objs = new LDObjKey[dest.destObjs.len];
                            for (int i=0; i<dest.destObjs.len; i++)
