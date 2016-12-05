@@ -2605,12 +2605,16 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id) {
 int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const CkArrayIndex* idx, CkDeliver_t type, int opts) {
   CkLocRec *rec = elementNrec(id);
 
-#if CMK_LBDB_ON && 0
-  LDObjid ldid = idx2LDObjid(idx);
+#if CMK_LBDB_ON
+  LDObjid ldid;
+  if (idx)
+    ldid = idx2LDObjid(*idx);
+  else if (compressor)
+    ldid = idx2LDObjid(compressor->decompress(id));
 #if CMK_GLOBAL_LOCATION_UPDATE
   ldid.locMgrGid = thisgroup.idx;
 #endif        
-  if (type==CkDeliver_queue && !(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats())
+  if ((idx || compressor) && type==CkDeliver_queue && !(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats())
     the_lbdb->Send(myLBHandle
                    , ldid
                    , UsrToEnv(msg)->getTotalsize()
