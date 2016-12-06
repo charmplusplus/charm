@@ -1631,7 +1631,7 @@ void LrtsUnlock(LrtsNodeLock lock){
     ReleaseMutex(lock);
 }
 int LrtsTryLock(LrtsNodeLock lock){
-    WaitForSingleObject(lock, 0);
+    return !!WaitForSingleObject(lock, 0);
 }
 void LrtsDestroyLock(LrtsNodeLock lock){
     CloseHandle(lock);
