@@ -54,7 +54,7 @@ void TeamLB::work(LDStats* stats)
   }
 
   // convert ObjGraph to the adjacency structure
-  int numVertices = ogr->vertices.size();       // number of vertices
+  idx_t numVertices = ogr->vertices.size();       // number of vertices
   int numEdges = 0;                             // number of edges
 
   double maxLoad = 0.0;
@@ -124,7 +124,7 @@ void TeamLB::work(LDStats* stats)
   METIS_PartGraphRecursive(&numVertices, &ncon, xadj, adjncy, vwgt, vsize,
       adjwgt, &numberTeams, tpwgts, ubvec, options, &edgecut, pemap);
 
-  int *global_pemap = new int[numVertices];
+  idx_t *global_pemap = new idx_t[numVertices];
 
   // partitioning each team
   if(teamSize > 1) {
@@ -136,13 +136,13 @@ void TeamLB::work(LDStats* stats)
     idx_t *team_vsize = NULL;
     real_t *team_tpwgts = NULL;
 
-    int teamEdgecut, node;
+    idx_t teamEdgecut, node;
     int *mapping = new int[numVertices];
     int *invMapping = new int[numVertices];
 
     // traversing the list of teams and load balancing each one
     for(i=0; i<numberTeams; i++) {
-      int teamMembers = 0;	// number of vertices in a team
+      idx_t teamMembers = 0;	// number of vertices in a team
 
       // collecting all the elements of a particular team
       // mapping stores the association of local to global index

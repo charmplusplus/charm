@@ -34,7 +34,7 @@ void MetisLB::work(LDStats* stats)
   }
 
   // convert ObjGraph to the adjacency structure
-  int numVertices = ogr->vertices.size();	// number of vertices
+  idx_t numVertices = ogr->vertices.size();	// number of vertices
   int numEdges = 0;				// number of edges
 
   double maxLoad = 0.0;

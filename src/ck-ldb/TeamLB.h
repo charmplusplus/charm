@@ -8,6 +8,7 @@
 
 #include "CentralLB.h"
 #include "TeamLB.decl.h"
+#include <metis.h>
 
 void CreateTeamLB();
 BaseLB * AllocateTeamLB();
@@ -21,8 +22,8 @@ class TeamLB : public CBase_TeamLB {
     void pup(PUP::er &p) {  }
 
   private:
-    int teamSize;
-    int numberTeams;
+    idx_t teamSize;
+    idx_t numberTeams;
 
     bool QueryBalanceNow(int step) { return true; }
 };
