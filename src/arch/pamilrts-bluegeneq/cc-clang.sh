@@ -9,8 +9,6 @@ CMK_LDXX="$CMK_CXX"
 CMK_C_OPTIMIZE='-O3 -ffast-math '
 CMK_CXX_OPTIMIZE='-O3 -ffast-math '
 OPTS_LD="$OPTS_LD "
-CMK_AR="bgclang-ar q"
-CMK_NM='bgclang-nm '
 CMK_QT="generic64-light"
 
 CMK_USING_BGCLANG="1"
