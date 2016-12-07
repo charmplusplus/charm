@@ -13,3 +13,5 @@ CMK_AR="bgclang-ar q"
 CMK_NM='bgclang-nm '
 CMK_QT="generic64-light"
 
+CMK_USING_BGCLANG="1"
+

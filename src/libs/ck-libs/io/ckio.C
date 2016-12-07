@@ -14,6 +14,8 @@ typedef int FileToken;
 
 #if defined(_WIN32)
 #include <io.h>
+#else
+#include <unistd.h>
 #endif
 
 using std::min;

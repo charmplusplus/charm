@@ -1,5 +1,6 @@
 #include "CkLoop.h"
 #if !defined(_WIN32)
+#include <unistd.h>
 #include <pthread.h>
 #endif
 
@@ -31,7 +32,7 @@ static pthread_t *ndhThreads = NULL;
 static volatile int gCrtCnt = 0;
 static volatile int exitFlag = 0;
 
-#if CMK_OS_IS_LINUX
+#if CMK_OS_IS_LINUX || CMK_USING_BGCLANG
 #include <sys/syscall.h>
 #endif
 
