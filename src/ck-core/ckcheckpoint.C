@@ -9,6 +9,9 @@ More documentation goes here...
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 #include <string.h>
 #include <sstream>
 using std::ostringstream;
