@@ -367,7 +367,7 @@ void POSEreadCmdLine()
   CmiGetArgIntDesc(argv, "+leash_min_pose", &pose_config.min_leash , "Sets speculative window behavior minimum leash. Default 10.");
   CmiGetArgIntDesc(argv, "+leash_max_pose", &pose_config.max_leash , "Sets speculative window behavior maximum leash. Default 100.");
   CmiGetArgIntDesc(argv, "+leash_flex_pose", &pose_config.max_leash , "Sets speculative window behavior leash flex. Default 10.");
-  if(pose_config.deterministic= CmiGetArgFlagDesc(argv, "+deterministic_pose",  "sorts events of same timestamp by event id for repeatable behavior "))
+  if ((pose_config.deterministic= CmiGetArgFlagDesc(argv, "+deterministic_pose",  "sorts events of same timestamp by event id for repeatable behavior ")))
     {
       CkPrintf("WARNING: deterministic_pose: enter at your own risk, though this feature is hopefully not broken anymore\n");
     }

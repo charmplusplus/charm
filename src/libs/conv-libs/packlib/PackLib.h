@@ -68,7 +68,7 @@ public:
     buf_bytes -= sizeof(int);
       
     item* cur_item;
-    while (cur_item = dequeue()) {
+    while ((cur_item = dequeue())) {
       const void* item_ptr;
 
       if (cur_item->type == t_char) {

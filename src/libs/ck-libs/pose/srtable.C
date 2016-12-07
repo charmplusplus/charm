@@ -20,7 +20,7 @@ char *SRentry::dumpString() {
 /// Basic constructor
 SRtable::SRtable() : offset(0), b(0), size_b(0), numOverflow(0), overflow(NULL), end_overflow(NULL), ofSends(0), ofRecvs(0)
 { 
-  register int i;
+  int i;
   for (i=0; i<MAX_B; i++) {
     buckets[i] = end_bucket[i] = NULL;
     numEntries[i] = sends[i] = recvs[i] = 0;
@@ -45,7 +45,7 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 #ifdef SR_SANITIZE
   sanitize();
 #endif
-  register int i;
+  int i;
   POSE_TimeType long_i;
   // Backup the table to make new one in its place
   int sumS_old=0, sumR_old=0, sumS=0, sumR=0;
@@ -286,7 +286,7 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt, POSE_TimeType *maxSR)
 #ifdef SR_SANITIZE
   sanitize();
 #endif
-  register int i;
+  int i;
   int packSize = 0, nEntries = 0, entryIdx = 0;
   POSE_TimeType nBkts = 0;
   POSE_TimeType destBkt;  // which bucket?
@@ -361,7 +361,7 @@ void SRtable::SortTable()
 #ifdef SR_SANITIZE
   sanitize();
 #endif
-  register int i;
+  int i;
   for (i=0; i<b; i++) CompressAndSortBucket(i, 0);
   CompressAndSortBucket(b, 1);
 #ifdef SR_SANITIZE
@@ -478,7 +478,7 @@ void SRtable::FreeTable()
 #ifdef SR_SANITIZE
   sanitize();
 #endif
-  register int i;
+  int i;
   SRentry *tmp;
   for (i=0; i<b; i++) {
     tmp = buckets[i];

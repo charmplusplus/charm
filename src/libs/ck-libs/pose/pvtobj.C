@@ -15,7 +15,7 @@ void pvtObjectNode::sanitize()
 /// Basic Constructor: preallocates space for 100 objects
 pvtObjects::pvtObjects() 
 { 
-  register int i;
+  int i;
   numObjs = numSpaces = firstEmpty = stratIterCount = 0; 
   size = 100;
   if (!(objs = (pvtObjectNode *)malloc(100 * sizeof(pvtObjectNode)))) {
@@ -29,7 +29,7 @@ pvtObjects::pvtObjects()
 int pvtObjects::Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr)
 {
   int idx;
-  register int i;
+  int i;
   if (numObjs < size) { // insert in empty space
     idx = firstEmpty;
     if (firstEmpty == numSpaces) // all spaces occupied up to end of list
@@ -62,7 +62,7 @@ int pvtObjects::Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr)
 }
 
 void pvtObjects::callAtSync() {
-  register int i;
+  int i;
   for (i=0; i<numSpaces; i++)
     if (objs[i].isPresent()) {
       (objs[i].localObjPtr)->AtSync();
@@ -70,19 +70,19 @@ void pvtObjects::callAtSync() {
 }
 /// Wake up all posers in list
 void pvtObjects::Wake() {
-  register int i;
+  int i;
   for (i=0; i<numSpaces; i++)
     if (objs[i].isPresent()) (objs[i].localObjPtr)->Status();
 }
 /// Call Commit on all posers
 void pvtObjects::Commit() {
-  register int i;
+  int i;
   for (i=0; i<numSpaces; i++)
     if (objs[i].isPresent()) (objs[i].localObjPtr)->Commit();
 }
 /// Call CheckpointCommit on all posers
 void pvtObjects::CheckpointCommit() {
-  register int i;
+  int i;
   for (i=0; i<numSpaces; i++)
     if (objs[i].isPresent()) (objs[i].localObjPtr)->CheckpointCommit();
 }
@@ -125,7 +125,7 @@ void pvtObjects::StratCalcs() {
 /// Dump data fields
 void pvtObjects::dump()
 {
-  register int i;
+  int i;
   CkPrintf("numObjs=%d numSpaces=%d firstEmpty=%d size=%d\n", 
 	   numObjs, numSpaces, firstEmpty, size);
   for (i=0; i<numSpaces; i++) {
@@ -138,7 +138,7 @@ void pvtObjects::dump()
 /// Check validity of data fields
 void pvtObjects::sanitize() 
 {
-  register int i;
+  int i;
   CmiAssert(numObjs >= 0);
   CmiAssert(numSpaces >= 0);
   CmiAssert(size >= 0);

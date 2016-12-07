@@ -67,7 +67,7 @@ GridCommRefineLB::GridCommRefineLB (const CkLBOptions &opt) : CBase_GridCommRefi
     CkPrintf ("[%d] GridCommRefineLB created.\n", CkMyPe());
   }
 
-  if (value = getenv ("CK_LDB_GRIDCOMMREFINELB_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDCOMMREFINELB_TOLERANCE"))) {
     CK_LDB_GridCommRefineLB_Tolerance = atof (value);
   } else {
     CK_LDB_GridCommRefineLB_Tolerance = CK_LDB_GRIDCOMMREFINELB_TOLERANCE;
@@ -88,7 +88,7 @@ GridCommRefineLB::GridCommRefineLB (CkMigrateMessage *msg) : CBase_GridCommRefin
 
   lbname = (char *) "GridCommRefineLB";
 
-  if (value = getenv ("CK_LDB_GRIDCOMMREFINELB_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDCOMMREFINELB_TOLERANCE"))) {
     CK_LDB_GridCommRefineLB_Tolerance = atof (value);
   } else {
     CK_LDB_GridCommRefineLB_Tolerance = CK_LDB_GRIDCOMMREFINELB_TOLERANCE;

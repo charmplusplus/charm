@@ -89,7 +89,7 @@ class pvtObjects {
   inline int getNumSpaces() { return numSpaces; }
   /// Set posers to idle (ovt==-1)
   inline void SetIdle() { 
-    register int i; 
+    int i;
     for (i=0; i<numSpaces; i++) objs[i].setIdle();
   }                           
   /// Wake up all posers in list

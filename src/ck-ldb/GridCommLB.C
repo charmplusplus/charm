@@ -61,19 +61,19 @@ GridCommLB::GridCommLB (const CkLBOptions &opt) : CBase_GridCommLB (opt)
     CkPrintf ("[%d] GridCommLB created.\n", CkMyPe());
   }
 
-  if (value = getenv ("CK_LDB_GRIDCOMMLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDCOMMLB_MODE"))) {
     CK_LDB_GridCommLB_Mode = atoi (value);
   } else {
     CK_LDB_GridCommLB_Mode = CK_LDB_GRIDCOMMLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridCommLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridCommLB_Background_Load = CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD;
   }
 
-  if (value = getenv ("CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE"))) {
     CK_LDB_GridCommLB_Load_Tolerance = atof (value);
   } else {
     CK_LDB_GridCommLB_Load_Tolerance = CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE;
@@ -94,19 +94,19 @@ GridCommLB::GridCommLB (CkMigrateMessage *msg) : CBase_GridCommLB (msg)
 
   lbname = (char *) "GridCommLB";
 
-  if (value = getenv ("CK_LDB_GRIDCOMMLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDCOMMLB_MODE"))) {
     CK_LDB_GridCommLB_Mode = atoi (value);
   } else {
     CK_LDB_GridCommLB_Mode = CK_LDB_GRIDCOMMLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridCommLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridCommLB_Background_Load = CK_LDB_GRIDCOMMLB_BACKGROUND_LOAD;
   }
 
-  if (value = getenv ("CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE"))) {
     CK_LDB_GridCommLB_Load_Tolerance = atof (value);
   } else {
     CK_LDB_GridCommLB_Load_Tolerance = CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE;

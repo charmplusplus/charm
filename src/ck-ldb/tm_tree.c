@@ -1112,7 +1112,7 @@ tree_t *build_level_topology(tree_t *tab_node,double **com_mat,int N,int arity,i
   int completed=0;
   double speed; /* communication speed at this level*/
   double *new_obj_weight;
-  if((depth==0)){
+  if(depth==0){
     if((N==1)&&(depth==0))
       return &tab_node[0];
     else{

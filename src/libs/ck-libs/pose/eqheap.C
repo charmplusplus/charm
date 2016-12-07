@@ -109,9 +109,10 @@ HeapNode *HeapNode::conjoin(HeapNode *h)
 #endif
   if (!this) return h;
   else if (!h) return this;
-  else if (((pose_config.deterministic) && (e->timestamp < h->e->timestamp) ||
-	    ((e->timestamp == h->e->timestamp) && (e->evID <= h->e->evID))) ||
-	   (e->timestamp < h->e->timestamp || (e->timestamp == h->e->timestamp && e->evID <= h->e->evID)))
+  else if ((pose_config.deterministic && e->timestamp < h->e->timestamp) ||
+	       (e->timestamp == h->e->timestamp && e->evID <= h->e->evID) ||
+	       e->timestamp < h->e->timestamp ||
+           (e->timestamp == h->e->timestamp && e->evID <= h->e->evID))
     { 
       // conjoin this's kids into this's left and make this's right h
       if (!left) left = right;

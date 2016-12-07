@@ -124,9 +124,8 @@ class eventQueue {
   /// Set rollback point to event e
   void SetRBevent(Event *e) {
     if (!RBevent) RBevent = e; 
-    else if ((pose_config.deterministic) && (RBevent->timestamp > e->timestamp) ||
-	     ((RBevent->timestamp == e->timestamp) && 
-	      (e->evID < RBevent->evID))) {
+    else if ((pose_config.deterministic && RBevent->timestamp > e->timestamp) ||
+	     (RBevent->timestamp == e->timestamp && e->evID < RBevent->evID)) {
       CmiAssert(RBevent->prev->next == RBevent);
       CmiAssert(RBevent->next->prev == RBevent);
       RBevent = e;

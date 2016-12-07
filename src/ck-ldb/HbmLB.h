@@ -153,7 +153,7 @@ protected:
     }
     int migrationDone() {
 //CkPrintf("[%d] checking migrates_expected: %d migrates_completed: %d obj_completed: %d\n", CkMyPe(), migrates_expected, migrates_completed, obj_completed);
-      return migrates_expected == 0 || migrates_completed == migrates_expected && obj_completed == migrates_expected;
+      return (migrates_expected == 0 || (migrates_completed == migrates_expected && obj_completed == migrates_expected));
     }
     int vectorReceived() {
       return vector_expected==0 || vector_expected == vector_completed;

@@ -233,9 +233,10 @@ void sim::Commit()
     Step(); // not done; try stepping again
 
 #if !CMK_TRACE_DISABLED
-  if(pose_config.stats)
+  if(pose_config.stats) {
     if (!tstat)  localStats->TimerStop();
     else localStats->SwitchTimer(tstat);
+  }
   if(pose_config.trace)
     traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
@@ -275,9 +276,10 @@ void sim::CheckpointCommit() {
     localStats->SwitchTimer(SIM_TIMER);
 #endif
 #if !CMK_TRACE_DISABLED
-  if(pose_config.stats)
+  if(pose_config.stats) {
     if (!tstat)  localStats->TimerStop();
     else localStats->SwitchTimer(tstat);
+  }
   if(pose_config.trace)
     traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif

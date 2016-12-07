@@ -509,7 +509,7 @@ void eventQueue::pup(PUP::er &p)
   p|tsOfLastInserted; p|recentAvgEventSparsity;
   p|sparsityStartTime; p|sparsityCalcCount;
   Event *tmp;
-  register int i;
+  int i;
   int countlist = 0;
   if (p.isUnpacking()) { // UNPACKING
     p(countlist); // unpack count of events in list

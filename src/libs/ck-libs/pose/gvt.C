@@ -142,7 +142,7 @@ void PVT::startPhase(prioBcMsg *m)
 {
   CProxy_GVT g(TheGVT);
   CProxy_PVT p(ThePVT);
-  register int i;
+  int i;
 
   if (startPhaseActive) return;
 #if !CMK_TRACE_DISABLED
@@ -868,7 +868,7 @@ void GVT::computeGVT(UpdateMsg *m)
 
 void GVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
 {
-  register int i;
+  int i;
   SRentry *tab = (*SRs);
   SRentry *tmp = tab;
 
@@ -923,7 +923,7 @@ void GVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
 
 void PVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
 {
-  register int i;
+  int i;
   SRentry *tab = (*SRs);
   SRentry *tmp = tab;
 
