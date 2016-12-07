@@ -33,4 +33,4 @@ ataTest.o: ataTest.C ataTest.decl.h
 	then \
 	  echo "Skipping test whose compilation will fail under BG XLC"; exit 0 ; \
 	fi ; \
-	$(CHARMC) -c -O3 -optimize -production ataTest.C
+	$(CHARMC) -c ataTest.C

@@ -15,7 +15,7 @@ clean:
 	rm -f *.decl.h *.def.h *.o taskSpawn charmrun
 
 taskSpawn.o: taskSpawn.C taskSpawn.decl.h
-	$(CHARMC) -O3 -c taskSpawn.C
+	$(CHARMC) -c taskSpawn.C
 
 test: all
 	$(call run, ./taskSpawn +p4 500000 1000 )
