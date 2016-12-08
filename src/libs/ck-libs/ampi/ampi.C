@@ -803,6 +803,7 @@ CtvDeclare(bool, ampiInitDone);
 CtvDeclare(void*,stackBottom);
 CtvDeclare(bool, ampiFinalized);
 CkpvDeclare(Builtin_kvs, bikvs);
+CkpvDeclare(int, ampiThreadLevel);
 
 CDECL
 long ampiCurrentStackUsage(void){
@@ -866,6 +867,9 @@ static void ampiProcInit(void){
   CtvInitialize(bool,ampiInitDone);
   CtvInitialize(bool,ampiFinalized);
   CtvInitialize(void*,stackBottom);
+
+  CkpvInitialize(int, ampiThreadLevel);
+  CkpvAccess(ampiThreadLevel) = MPI_THREAD_SINGLE;
 
   CkpvInitialize(Builtin_kvs, bikvs); // built-in key-values
   CkpvAccess(bikvs) = Builtin_kvs();
@@ -3020,8 +3024,12 @@ int testRequestNoFree(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
 CDECL
 int AMPI_Is_thread_main(int *flag)
 {
-  AMPIAPI("AMPI_Is_thread_main");
-  *flag=1;
+  AMPIAPI_INIT("AMPI_Is_thread_main");
+  if (isAmpiThread()) {
+    *flag = 1;
+  } else {
+    *flag = 0;
+  }
   return MPI_SUCCESS;
 }
 
@@ -3029,17 +3037,38 @@ CDECL
 int AMPI_Query_thread(int *provided)
 {
   AMPIAPI("AMPI_Query_thread");
-  *provided = MPI_THREAD_SINGLE;
+  *provided = CkpvAccess(ampiThreadLevel);
   return MPI_SUCCESS;
 }
 
 CDECL
 int AMPI_Init_thread(int *p_argc, char*** p_argv, int required, int *provided)
 {
-  AMPIAPI_INIT("AMPI_Init_thread");
-  *provided = MPI_THREAD_SINGLE;
-  AMPI_Init(p_argc, p_argv);
-  return MPI_SUCCESS;
+  if (nodeinit_has_been_called) {
+    AMPIAPI_INIT("AMPI_Init_thread");
+
+#if AMPI_ERROR_CHECKING
+    if (required < MPI_THREAD_SINGLE || required > MPI_THREAD_MULTIPLE) {
+      return ampiErrhandler("AMPI_Init_thread", MPI_ERR_ARG);
+    }
+#endif
+
+    if (required == MPI_THREAD_SINGLE) {
+      CkpvAccess(ampiThreadLevel) = MPI_THREAD_SINGLE;
+    }
+    else {
+      CkpvAccess(ampiThreadLevel) = MPI_THREAD_FUNNELED;
+    }
+    // AMPI does not support MPI_THREAD_SERIALIZED or MPI_THREAD_MULTIPLE
+
+    *provided = CkpvAccess(ampiThreadLevel);
+    return AMPI_Init(p_argc, p_argv);
+  }
+  else
+  { /* Charm hasn't been started yet! */
+    CkAbort("MPI_Init_thread> AMPI has not been initialized! Possibly due to AMPI requiring '#include \"mpi.h\" be in the same file as main() in C/C++ programs and \'program main\' be renamed to \'subroutine mpi_main\' in Fortran programs!");
+    return MPI_SUCCESS;
+  }
 }
 
 CDECL
