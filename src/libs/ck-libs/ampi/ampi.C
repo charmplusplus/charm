@@ -2130,7 +2130,7 @@ void ampi::generic(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d) resumeOnRecv %d\n",
-             thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq,resumeOnRecv);
+             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(), msg->getSrcIdx(), msg->getSeq(), resumeOnRecv);
   )
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_generic");
@@ -2139,10 +2139,10 @@ void ampi::generic(AmpiMsg* msg)
 
   int sync = UsrToEnv(msg)->getRef();
   int srcIdx;
-  if (sync)  srcIdx = msg->srcIdx;
+  if (sync) srcIdx = msg->getSrcIdx();
 
-  if(msg->seq != -1) {
-    int srcIdx=msg->srcIdx;
+  if(msg->getSeq() != -1) {
+    int srcIdx=msg->getSrcIdx();
     int n=oorder.put(srcIdx,msg);
     if (n>0) { // This message was in-order
       inorder(msg);
@@ -2173,11 +2173,11 @@ void ampi::inorder(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d inorder: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
-             thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
+             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(), msg->getSrcIdx(), msg->getSeq());
   )
 
   // check posted recvs
-  int tags[2] = { msg->tag, msg->srcRank };
+  int tags[2] = { msg->getTag(), msg->getSrcRank() };
   MPI_Status sts;
 
 #if CMK_BIGSIM_CHARM
@@ -2240,7 +2240,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count
     seq = oorder.nextOutgoing(destIdx);
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sIdx, sRank, len, destcomm);
   if (sync) UsrToEnv(msg)->setRef(sync);
-  ddt->serialize((char*)buf, (char*)msg->data, count, 1);
+  ddt->serialize((char*)buf, msg->getData(), count, 1);
   return msg;
 }
 
@@ -2274,7 +2274,7 @@ void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
 void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 {
   AmpiMsg *msg = new (len, 0) AmpiMsg(-1, t, -1, sRank, len, MPI_COMM_WORLD);
-  memcpy(msg->data, buf, len);
+  memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
 }
@@ -2302,11 +2302,11 @@ void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
 
-  if(msg->length < len){ // only at rare case shall we reset count by using divide
-    count = msg->length/(ddt->getSize(1));
+  if(msg->getLength() < len){ // only at rare case shall we reset count by using divide
+    count = msg->getLength()/(ddt->getSize(1));
   }
 
-  ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
+  ddt->serialize((char*)buf, msg->getData(), count, (-1));
 }
 
 void ampi::processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count)
@@ -2444,8 +2444,8 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 #endif
 
   if (sts) {
-    sts->MPI_COMM = msg->comm;
-    sts->MPI_LENGTH = msg->length;
+    sts->MPI_COMM = msg->getComm();
+    sts->MPI_LENGTH = msg->getLength();
   }
   dis->processAmpiMsg(msg, buf, type, count);
 
@@ -2486,8 +2486,8 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   }
 
   if (sts) {
-    sts->MPI_COMM = msg->comm;
-    sts->MPI_LENGTH = msg->length;
+    sts->MPI_COMM = msg->getComm();
+    sts->MPI_LENGTH = msg->getLength();
   }
 
 #if CMK_BIGSIM_CHARM
@@ -2503,8 +2503,8 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   msg = (AmpiMsg *) CmmProbe(msgs, 2, tags, (int*)sts);
   if (msg) {
     if (sts) {
-      sts->MPI_COMM = msg->comm;
-      sts->MPI_LENGTH = msg->length;
+      sts->MPI_COMM = msg->getComm();
+      sts->MPI_LENGTH = msg->getLength();
     }
     return 1;
   }
@@ -2553,7 +2553,7 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
 void ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
   AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, MPI_COMM_WORLD);
-  memcpy(msg->data, buf, len);
+  memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
 }
@@ -2568,7 +2568,7 @@ AmpiMsg* ampi::Alltoall_RemoteIget(MPI_Aint disp, int cnt, MPI_Datatype type, in
 
   AmpiMsg *msg = new (totalsize, 0) AmpiMsg(-1, -1, -1, thisIndex,totalsize,myComm.getComm());
   char* addr = (char*)Alltoallbuff+disp*unit;
-  ddt->serialize((char*)msg->data, addr, cnt, (-1));
+  ddt->serialize(msg->getData(), addr, cnt, (-1));
   return msg;
 }
 
@@ -2623,7 +2623,7 @@ void AmpiSeqQ::putOutOfOrder(int srcIdx, AmpiMsg *msg)
 {
   AmpiOtherElement &el=elements[srcIdx];
 #if CMK_ERROR_CHECKING
-  if (msg->seq<el.seqIncoming)
+  if (msg->getSeq() < el.seqIncoming)
     CkAbort("AMPI Logic error: received late out-of-order message!\n");
 #endif
   out.enq(msg);
@@ -2637,7 +2637,7 @@ AmpiMsg *AmpiSeqQ::getOutOfOrder(int srcIdx)
   // Walk through our out-of-order queue, searching for our next message:
   for (int i=0;i<out.length();i++) {
     AmpiMsg *msg=out.deq();
-    if (msg->srcIdx==srcIdx && msg->seq==el.seqIncoming) {
+    if (msg->getSrcIdx()==srcIdx && msg->getSeq()==el.seqIncoming) {
       el.seqIncoming++;
       el.nOut--; // We have one less message out-of-order
       return msg;
@@ -4702,10 +4702,10 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
 {
   ptr->processAmpiMsg(msg, buf, type, count);
   statusIreq = true;
-  length = msg->length;
-  this->tag = msg->tag; // Although not required, we also extract tag from msg
-  src = msg->srcRank;   // Although not required, we also extract src from msg
-  comm = msg->comm;
+  length = msg->getLength();
+  this->tag = msg->getTag(); // Although not required, we also extract tag from msg
+  src = msg->getSrcRank();   // Although not required, we also extract src from msg
+  comm = msg->getComm();
   AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", (int)this->tag, this);
 #if CMK_BIGSIM_CHARM
   event = msg->event;
@@ -6338,7 +6338,7 @@ int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   AmpiMsg *msg;
   for(i=0;i<size;i++) {
     msg = (AmpiMsg*)CkWaitReleaseFuture(reqs[i]);
-    memcpy((char*)recvbuf+(itemsize*i), msg->data,itemsize);
+    memcpy((char*)recvbuf+(itemsize*i), msg->getData(),itemsize);
     delete msg;
   }
 

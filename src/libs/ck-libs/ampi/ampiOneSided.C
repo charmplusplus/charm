@@ -247,8 +247,8 @@ int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
 
   // Process the reply message by serializing the data into the desired memory position
-  ddt->serialize((char*)orgaddr, msg->data, orgcnt, (-1));
-  AMPI_DEBUG("    Rank[%d] got win  [%d] \n", thisIndex, *(int*)msg->data);
+  ddt->serialize((char*)orgaddr, msg->getData(), orgcnt, (-1));
+  AMPI_DEBUG("    Rank[%d] got win  [%d] \n", thisIndex, *(int*)msg->getData());
   AMPI_DEBUG("    Rank[%d] got win  [%d] , size %d\n", thisIndex, *(int*)orgaddr, orgcnt);
 
   delete msg;
@@ -270,7 +270,7 @@ AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
 
   AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)(targaddr));
   AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, -1, -1, thisIndex, targtotalsize, myComm.getComm());
-  tddt->serialize(targaddr, msg->data, targcnt, 1);
+  tddt->serialize(targaddr, msg->getData(), targcnt, 1);
   return msg;
 }
 
@@ -301,8 +301,8 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
                                                  myComm.getComm());
 
   char* targaddr = (char*)(winobj->baseAddr) + targdisp*targunit;
-  tddt->serialize(targaddr, msg->data, targcnt, 1);
-  AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->data);
+  tddt->serialize(targaddr, msg->getData(), targcnt, 1);
+  AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->getData());
   return msg;
 }
 
@@ -378,7 +378,7 @@ int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
 
   msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win.index);
 
-  ddt->serialize((char*)resaddr, msg->data, orgcnt, (-1));
+  ddt->serialize((char*)resaddr, msg->getData(), orgcnt, (-1));
   if (ddt->isContig()) {
     applyOp(orgtype, op, orgcnt, resaddr, orgaddr);
   } else {
@@ -399,7 +399,7 @@ int ampi::winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Da
 
   msg = thisProxy[rank].winRemoteCompareAndSwap(getDDT()->getType(type)->getSize(1), (char*)orgaddr,
                                                 (char*)compaddr, type, targdisp, win.index);
-  ddt->serialize((char*)resaddr, msg->data, 1, 1);
+  ddt->serialize((char*)resaddr, msg->getData(), 1, 1);
 
   delete msg;
   return MPI_SUCCESS;
@@ -414,7 +414,7 @@ AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr,
   char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
 
   AmpiMsg *msg = new (size, 0) AmpiMsg(-1, -1, -1, thisIndex, size, myComm.getComm());
-  ddt->serialize(targaddr, msg->data, 1, 1);
+  ddt->serialize(targaddr, msg->getData(), 1, 1);
 
   if (*targaddr == *compaddr) {
     ddt->serialize(targaddr, (char*)sorgaddr, 1, (-1));

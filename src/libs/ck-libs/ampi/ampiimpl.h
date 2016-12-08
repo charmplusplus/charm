@@ -951,22 +951,32 @@ inline void pupFromBuf(const void *data,T &t) {
 }
 
 class AmpiMsg : public CMessage_AmpiMsg {
- public:
+ private:
   int seq; //Sequence number (for message ordering)
   int tag; //MPI tag
   int srcIdx; //Array index of source
   int srcRank; //Communicator rank for source
   MPI_Comm comm; //Communicator for source
   int length; //Number of bytes in this message
+ public:
+  char *data; //Payload
 #if CMK_BIGSIM_CHARM
+ public:
   void *event;
   int  eventPe; // the PE that the event is located
 #endif
-  char *data;
 
+ public:
   AmpiMsg(void) { data = NULL; }
   AmpiMsg(int _s, int t, int sIdx,int sRank, int l, int c) :
     seq(_s), tag(t),srcIdx(sIdx), srcRank(sRank), comm(c), length(l) {}
+  inline int getSeq(void) const { return seq; }
+  inline int getSrcIdx(void) const { return srcIdx; }
+  inline int getSrcRank(void) const { return srcRank; }
+  inline int getLength(void) const { return length; }
+  inline char* getData(void) const { return data; }
+  inline int getTag(void) const { return tag; }
+  inline MPI_Comm getComm(void) const { return comm; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
     int seq, length, tag, srcIdx, srcRank, comm;
@@ -1036,7 +1046,7 @@ public:
   ///     and you should call "getOutOfOrder" repeatedly.
   inline int put(int srcIdx, AmpiMsg *msg) {
     AmpiOtherElement &el=elements[srcIdx];
-    if (msg->seq==el.seqIncoming) { // In order:
+    if (msg->getSeq()==el.seqIncoming) { // In order:
       el.seqIncoming++;
       return 1+el.nOut;
     }
