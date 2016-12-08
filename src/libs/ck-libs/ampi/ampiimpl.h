@@ -1218,16 +1218,6 @@ class ampiParent : public CBase_ampiParent {
 
   void pup(PUP::er &p);
 
-  inline void start_measure() {
-    usesAutoMeasure = false;
-  }
-  inline void stop_measure() {
-    usesAutoMeasure = true;
-  }
-  virtual void UserSetLBLoad(void) {
-    // empty
-  }
-
   void startCheckpoint(const char* dname);
   void Checkpoint(int len, const char* dname);
   void ResumeThread(void);

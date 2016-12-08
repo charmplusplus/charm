@@ -8657,8 +8657,7 @@ CDECL
 int AMPI_Load_start_measure(void)
 {
   AMPIAPI("AMPI_Load_start_measure");
-  ampiParent *ptr = getAmpiParent();
-  ptr->start_measure();
+  LBTurnInstrumentOn();
   return MPI_SUCCESS;
 }
 
@@ -8666,8 +8665,7 @@ CDECL
 int AMPI_Load_stop_measure(void)
 {
   AMPIAPI("AMPI_Load_stop_measure");
-  ampiParent *ptr = getAmpiParent();
-  ptr->stop_measure();
+  LBTurnInstrumentOff();
   return MPI_SUCCESS;
 }
 
