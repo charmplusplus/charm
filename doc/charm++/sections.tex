@@ -1,26 +1,33 @@
-\charmpp{} supports defining and addressing subsets of the elements of a chare
-array or a group.  This entity is called a chare array section or a group section (section). 
-These section elements are addressed via a section proxy.
-\charmpp{} also supports array(group) sections which are a subset of array(group) elements in
-multiple chare-arrays(groups) of the same type \ref{cross array section}.
-Multicast operations, a broadcast to all members of a section, are directly supported in 
-array(group) section proxy.
-The working of group sections is exactly like array sections. Broadcast operations are supported on the group section proxy  
-with an unoptimized direct-sending implementation. For better optimised implementation, group sections need to be
-manually delegated \ref{Manual Delegation} to a CkMulticast library in charm. Check examples/charm++/groupsection for
-a group section example and examples/charm++/arraysection for an array section example. 
+\charmpp{} supports defining and communicating with subsets of a chare
+array or group.  This entity is called a chare array section or a group section (\emph{section}).
+Section elements are addressed via a section proxy.
+\charmpp{} also supports sections which are a subset of elements of
+multiple chare arrays/groups of the same type (see \ref{cross array section}).
 
+Multicast operations, a broadcast to all members of a section, are directly
+supported by the section proxy. For array sections, multicast operations by default
+use optimized spanning trees via the CkMulticast library in \charmpp{}.
+For group sections, multicast operations by default use an unoptimized
+direct-sending implementation.
+To optimize messaging, group sections need to be manually delegated to CkMulticast
+(see \ref{Manual Delegation}).
+Reductions are also supported for both arrays and group sections via the CkMulticast library.
 
+Array and group sections work in mostly the same way.
+Check examples/charm++/groupsection for a group section example and
+examples/charm++/arraysection for an array section example.
 
 \section{Section Creation}
 \label{section creation}
-For each chare array "A" declared in a ci file, a section proxy 
-of type "CProxySection\_A" is automatically generated in the decl and def 
-header files. 
-In order to create an array section, the user needs to provide array indexes 
+
+\subsection{Array sections}
+
+For each chare array ``A'' declared in a ci file, a section proxy
+of type ``CProxySection\_A'' is automatically generated in the decl and def
+header files.
+You can create an array section in your application by invoking ckNew() function of the CProxySection.
+The user will need to provide array indexes
 of all the array section members through either explicit enumeration, or an index range expression.
-You can create an array section proxy in your application by 
-invoking ckNew() function of the CProxySection.
 For example, for a 3D array:
 
 \begin{alltt}
@@ -32,14 +39,14 @@ For example, for a 3D array:
   CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems.getVec(), elems.size());
 \end{alltt}
 
-Alternatively, one can do the same thing by providing the index range [lbound:ubound:stride] 
+Alternatively, one can do the same thing by providing the index range [lbound:ubound:stride]
 for each dimension:
 
 \begin{alltt}
   CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, 0, 9, 1, 0, 19, 2, 0, 29, 2);
 \end{alltt}
 
-The above codes create a section proxy that contains array elements of 
+The above code creates a section proxy that contains array elements
 [0:9, 0:19:2, 0:29:2].
 
 For user-defined array index other than CkArrayIndex1D to CkArrayIndex6D,
@@ -51,54 +58,69 @@ one needs to use the generic array index type: CkArrayIndex.
   CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
 \end{alltt}
 
+\subsection{Group sections}
 
-\section{Section Multicasts: via CkMulticast}
+Group sections are created in the same way as array sections.
+A group ``A'' will have an associated ``CProxySection\_A'' type which is used to create a section
+and obtain a proxy.
+In this case, ckNew() will receive the list of PE IDs which will form the section.
+See examples/charm++/groupsection for an example.
+
+It is important to note that \charmpp{} does not automatically delegate group sections to the
+internal CkMulticast library,
+and instead defaults to a point-to-point implementation of multicasts.
+To use CkMulticast with group sections, the user must manually delegate after invoking group creation.
+See \ref{Manual Delegation} for information on how to do this.
+
+\subsection{Creation order restrictions}
+
+Important: Array sections should be created in post-constructor entry methods to avoid race conditions.
+
+If the user wants to invoke section creation from a group, special care must be taken
+that the collection for which we are creating a section (array or group) already exists.
+
+For example, suppose a user wants to create a section of array ``A'' from an entry
+method in group ``G''. Because groups are created before arrays in \charmpp{}, and
+there is no guarantee of creation order of groups, there is a risk that array A's
+internal structures have not been initialized yet on every PE, causing section creation to fail.
+As such, the application must ensure that A has been created
+before attempting to create a section.
+
+If the section is created from inside an array element there is no such risk.
+
+\section{Section Multicasts}
 \label {array_section_multicast}
 
-Once you have the array section proxy, you can broadcast to all the 
-section members, or send messages to one member using its offset index within the section, like these:
+Once the proxy is obtained at section creation time, the user can broadcast to all the
+section members, or send messages to one member using its offset index within the section, like this:
 
 \begin{alltt}
   CProxySection_Hello proxy;
   proxy.someEntry(...)          // section broadcast
-  proxy[0].someEntry(...)       // send to the first element in the section.
+  proxy[0].someEntry(...)       // send to the first element in the section
 \end{alltt}
 
-You can send the section proxy in a message to another processor, and still 
+See examples/charm++/arraysection for an example on how sections are used.
+
+You can send the section proxy in a message to another processor, and still
 safely invoke the entry functions on the section proxy.
 
+\subsection{Optimized multicast via CkMulticast}
 
-Note: Use of the bulk array constructor (dimensions given in the CkNew
-or CkArrayOptions rather than individual insertion) will allow
-construction to race ahead of several other startup procedures, this
-creates some limitation on the construction delegation and use of
-array section proxies.  For safety, array sections should be
-created in a post constructor entry method.
+\charmpp{} has an inbuilt CkMulticast library that optimizes section communications.
+By default, charm RTS will use this library for array sections. For group sections,
+the user must manually delegate to CkMulticast (see \ref{Manual Delegation}).
 
-
-
-Charm++ has an inbuilt CkMulticast library that optimises communication across sections. 
-By default, charm RTS will use this library for all array sections (but not group sections).
-The user can plug in their own library using manual delegation \ref{Manual Delegation}.
-
-See examples/charm++/arraysection for an example on how sections are used. 
-\begin{alltt}
-  CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(...);
-  sectProxy.someEntry(...);
-\end{alltt}
-
-
-
-By default, CkMulticast library builds a spanning tree for multicast/reduction
-with a factor of 2 (binary tree). One can specify a different branching factor while creating the
+By default, CkMulticast builds a spanning tree for multicast/reduction
+with a factor of 2 (binary tree). One can specify a different branching factor when creating the
 section.
 \begin{alltt}
   CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(..., 3); // factor is 3
 \end{alltt}
 
-Note, to use CkMulticast library, all multicast messages must inherit from 
-CkMcastBaseMsg, as the following.
-Note that CkMcastBaseMsg must come first, this is IMPORTANT for CkMulticast 
+Note, to use CkMulticast library, all multicast messages must inherit from
+CkMcastBaseMsg, as the following example shows.
+Note that CkMcastBaseMsg must come first, this is IMPORTANT for CkMulticast
 library to retrieve section information out of the message.
 
 
@@ -110,21 +132,25 @@ public:
 \};
 \end{alltt}
 
-Due to this restriction, you must define message explicitly for multicast 
-entry functions and no parameter marshalling can be used for multicast with 
-CkMulticast library.
+Due to this restriction, when using CkMulticast you must define messages explicitly for multicast
+entry functions and no parameter marshalling can be used.
 
-\section{Section Reductions} 
+\section{Section Reductions}
 
-Since an array element can be a member of multiple array sections, 
+Reductions over the elements of a section are supported through the CkMulticast library.
+As such, to perform reductions, the section must have been delegated to
+CkMulticast, either automatically (which is the default case for array sections),
+or manually for group sections.
+
+Since an array element can be a member of multiple array sections,
 it is necessary to disambiguate between which array
-section reduction it is participating in each time it contributes to one. For this purpose, a data structure 
-called ''CkSectionInfo'' is created by CkMulticast library in charm for each 
+section reduction it is participating in each time it contributes to one. For this purpose, a data structure
+called ``CkSectionInfo'' is created by CkMulticast library for each
 array section that the array element belongs to.
-During a section reduction, the array element must pass the 
-\kw{CkSectionInfo} as a parameter in the \kw{contribute()}. 
+During a section reduction, the array element must pass the
+\kw{CkSectionInfo} as a parameter in the \kw{contribute()}.
 The \kw{CkSectionInfo} for a section can be retrieved
-from a message in a multicast entry point using function call 
+from a message in a multicast entry point using function call
 \kw{CkGetSectionInfo}:
 
 \begin{alltt}
@@ -145,7 +171,7 @@ because the cookie includes some context sensive information (e.g., the
 reduction counter). Subsequent invocations of \kw{CkGetSectionInfo()} only updates 
 part of the data in the cookie, rather than creating a brand new one.
 
-Similar to array reduction, to use section based reduction, a
+Similar to array reductions, to use section-based reductions, a
 reduction client CkCallback object must be created. You may pass the
 client callback as an additional parameter to \kw{contribute}. If
 different contribute calls to the same reduction operation pass
@@ -163,9 +189,9 @@ As in an array reduction, users can use built-in reduction
 types (Section~\ref{builtin_reduction}) or define his/her own reducer functions
 (Section~\ref{new_type_reduction}).
 
-\section{Section Collectives when Migration Happens}
+\section{Section Operations and Migration}
 
-When using a section reduction, you don't need to worry about array migrations.
+When using a section reduction, you don't need to worry about migrations of array elements.
 When migration happens, an array element in the array section can still use
 the \kw{CkSectionInfo} it stored previously for doing a reduction.
 Reduction messages will be correctly delivered but may not be as efficient 
@@ -180,7 +206,7 @@ message arrives (as shown in the above SayHi example).
 In the case where a multicast root migrates, the library must reconstruct the
 spanning tree to get optimal performance. One will get the following
 warning message if this is not done:
-"Warning: Multicast not optimized after multicast root migrated."
+``Warning: Multicast not optimized after multicast root migrated.''
 In the current implementation, the user needs to initiate the rebuilding process
 using \kw{resetSection}.
 
@@ -203,18 +229,18 @@ void Foo::pup(PUP::er & p) {
 
 Cross array sections contain elements from multiple arrays.
 Construction and use of cross array sections is similar to normal
-array sections with the following restrictions.  
+array sections with the following restrictions.
 
 \begin{itemize}
 
-\item Arrays in a section my all be of the same type.
+\item Arrays in a section must all be of the same type.
 
-\item Each array must be enumerated by array ID
+\item Each array must be enumerated by array ID.
 
-\item The elements within each array must be enumerated explicitly
+\item The elements within each array must be enumerated explicitly.
 
 \item No existing modules currently support delegation of cross
-  section proxies.  Therefore reductions are not currently supported.
+  section proxies. Therefore reductions are not currently supported.
 
 \end{itemize}
 
@@ -270,26 +296,28 @@ within a section can all be set independently.
 \section{Manual Delegation}
 \label{Manual Delegation}
 
-By default charm++ uses the CkMulticast library for optimised broadcasts and 
-reductions on sections,  but advanced users of charm++ can delegate \ref{delegation} sections to custom 
-libraries. While creating a chare array one can set the auto delegation flag to 
-false in CkArrayOptions and the runtime system will not use the default CkMulticast library. 
-A CkMulticastMgr(or any other delegation library) group can be created manually and each 
-section can be delegated to that delegation Mgr. Note that group sections are not automatically
-delegated and hence groups have to be manually delegated to CkMulticast library all the time.
-See examples/charm++/groupsection for an example.
+By default \charmpp{} uses the CkMulticast library for optimized broadcasts and
+reductions on array sections, but advanced \charmpp{} users can choose to
+delegate\footnote{See chapter \ref{delegation} for general information on message delegation in \charmpp{}.}
+sections to custom libraries (called delegation managers).
+Note that group sections are not automatically
+delegated to CkMulticast and hence must be manually delegated to this library
+to benefit from the optimized multicast tree implementation.
+This is explained in this section, and see examples/charm++/groupsection for an example.
 
-During the time of creation of a chare array, one can set 
-the auto delegation flag to false using CkArrayOptions. If the auto delegation 
-flag was set to false in CkArrayOptions, the application will have to manually
-create a CkMulticastMgr group(or any other delegation library) and then setup the delegation relationship 
-between the section proxy and the delegation manager group. 
-One only needs to create one CkMulticastMgr Group globally for manual delegation.
-CkMulticastMgr group can serve all multicast/reduction delegations
-for different array sections in an application:
+While creating a chare array one can set the auto delegation flag to
+false in CkArrayOptions and the runtime system will not use the default CkMulticast library.
+A CkMulticastMgr (or any other delegation manager) group can then be created by the user, and any
+section delegated to it.
+
+One only needs to create one delegation manager group, and it
+can serve all multicast/reduction delegations for different array/group sections in an application.
+In the following we show a manual delegation example using CkMulticast (the same can be applied
+to custom delegation managers):
+
 \begin{alltt}
   CkArrayOptions opts(...);
-  opts.setSectionAutoDelegate(false); //manual delegation
+  opts.setSectionAutoDelegate(false); // manual delegation
   CProxy_Hello arrayProxy = CProxy_Hello::ckNew(opts,...);
   CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(...);
   CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
@@ -297,20 +325,20 @@ for different array sections in an application:
 
   sectProxy.ckSectionDelegate(mCastGrp);  // initialize section proxy
 
-  sectProxy.someEntry(...)           //multicast via delegation library as before
+  sectProxy.someEntry(...)           // multicast via delegation library as before
 
 \end{alltt}
 
-
-
-One can also specify a different default branching factor when creating a CkMulticastMgr group.
+One can also set the default branching factor when creating a CkMulticastMgr group.
+Sections created via this manager will use the specified branching factor for their multicast tree.
 For example,
 
 \begin{alltt}
   CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew(3);   // factor is 3
 \end{alltt}
 
-Contributing using a different CkMulticastMgr group,
+Contributing using a custom CkMulticastMgr group:
+
 \begin{alltt}
   CkSectionInfo cookie;
 
@@ -324,16 +352,16 @@ Contributing using a different CkMulticastMgr group,
 \end{alltt}
 
 
-Setting default reduction client for a section while using manual delegation,
+Setting default reduction client for a section when using manual delegation:
+
 \begin{alltt}
   CProxySection_Hello sectProxy;
   CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
   mcastGrp->setReductionClient(sectProxy, new CkCallback(...));
 \end{alltt}
 
+Writing the pup method:
 
-
-Writing the pup method,
 \begin{alltt}
 void Foo::pup(PUP::er & p) {
     // if I am multicast root and it is unpacking
