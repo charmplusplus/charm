@@ -111,7 +111,10 @@ void ParamList::printTypes(XStr &str,int withDefaultValues,int useConst)
 
 void Parameter::print(XStr &str,int withDefaultValues,int useConst)
 {
-	if (arrLen!=NULL)
+	if(isScatter()){
+		str<<"CkScatterWrapper scatter_w_"<<name;
+	}
+	else if (arrLen!=NULL)
 	{ //Passing arrays by const pointer-reference
 		if (useConst) str<<"const ";
 		str<<type<<" *";
@@ -240,6 +243,7 @@ void ParamList::marshall(XStr &str, XStr &entry)
 		}
 	}
 }
+
 void Parameter::marshallArraySizes(XStr &str)
 {
 	Type *dt=type->deref();//Type, without &
@@ -258,7 +262,7 @@ void Parameter::pup(XStr &str) {
 	   str<<"    implP|impl_off_"<<name<<";\n";
 	   str<<"    implP|impl_cnt_"<<name<<";\n";
 	}
-	else if (!conditional) {
+	else if (!conditional && !isScatter()) {
 	  if (byReference) {
 	    str<<"    //Have to cast away const-ness to get pup routine\n";
 	    str<<"    implP|("<<type<<" &)"<<name<<";\n";
@@ -266,7 +270,10 @@ void Parameter::pup(XStr &str) {
 	  else
 	    str<<"    implP|"<<name<<";\n";
 	}
+	else if(isScatter())
+	  str<<"    implP|scatter_w_"<<name<<";\n";
 }
+
 void Parameter::marshallArrayData(XStr &str)
 {
 	if (isArray())
@@ -368,12 +375,29 @@ void ParamList::beginUnmarshall(XStr &str)
         str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
         str<<"  /*Unmarshall arrays:*/\n";
         callEach(&Parameter::unmarshallArrayData,str);
+        callEach(&Parameter::unmarshallScatter,str);
     }
 }
+
+
+void Parameter::unmarshallScatter(XStr &str)
+{ //First pass: unpack pup'd entries
+	Type *dt=type->deref();//Type, without &
+	if (isScatter()){
+		str<<" "<<arrLen<<" = scatter_w_"<<name<<".size;\n";
+	}
+}
+
+
 void Parameter::beginUnmarshall(XStr &str)
 { //First pass: unpack pup'd entries
 	Type *dt=type->deref();//Type, without &
-	if (isArray()) {
+	if (isScatter()){
+		str<<"  CkScatterWrapper scatter_w_"<<name<<"; \n";
+		str<<"  implP|scatter_w_"<<name<<"; \n"; 
+		str<<"  "<<dt<<" *"<<name<<" = ("<<dt<<" *)"<<"scatter_w_"<<name<<".getbuf(impl_buf)"<<"; \n";
+	}
+	else if (isArray()) {
 		str<<"  int impl_off_"<<name<<", impl_cnt_"<<name<<"; \n";
 		str<<"  implP|impl_off_"<<name<<";\n";
 		str<<"  implP|impl_cnt_"<<name<<";\n";
@@ -505,7 +529,8 @@ void Parameter::pupAllValues(XStr &str) {
 	  ;
 	}
 	else /* not an array */ {
-	  if (isConditional()) str<<"  pup_pointer(&implDestP, (void**)&"<<name<<");\n";
+	  if (isScatter()) str<<"  implDestP|scatter_w_"<<name<<"; \n";
+	  else if (isConditional()) str<<"  pup_pointer(&implDestP, (void**)&"<<name<<");\n";
 	  else str<<"  implDestP|"<<name<<";\n";
 	}
 }
@@ -518,6 +543,18 @@ void ParamList::endUnmarshall(XStr &)
     	}
 	*/
 }
+
+int ParamList::nScatterParams() {
+    ParamList *pl = this;
+    int count = 0;
+    while (pl != NULL)
+    {
+       count += (pl->param->isScatter() == 1);
+       pl = pl->next;
+    }
+    return count; 
+}
+
 
 void ParamList::printMsg(XStr& str) {
     ParamList *pl;
@@ -538,10 +575,11 @@ void Parameter::printMsg(XStr& str) {
 }
 
 int Parameter::isMessage(void) const {return type->isMessage();}
+int Parameter::isScatter(void) const {return type->isScatter();}
 int Parameter::isVoid(void) const {return type->isVoid();}
 int Parameter::isCkArgMsgPtr(void) const {return type->isCkArgMsgPtr();}
 int Parameter::isCkMigMsgPtr(void) const {return type->isCkMigMsgPtr();}
-int Parameter::isArray(void) const {return arrLen!=NULL;}
+int Parameter::isArray(void) const {return arrLen!=NULL && !isScatter();}
 int Parameter::isConditional(void) const {return conditional;}
 
 int Parameter::operator==(const Parameter &parm) const {
@@ -570,6 +608,9 @@ int ParamList::isNamed(void) const {return param->type->isNamed();}
 int ParamList::isBuiltin(void) const {return param->type->isBuiltin();}
 int ParamList::isMessage(void) const {
     return (next==NULL) && param->isMessage();
+}
+int ParamList::hasScatter(void) {
+    return orEach(&Parameter::isScatter);
 }
 const char *ParamList::getArrayLen(void) const {return param->getArrayLen();}
 int ParamList::isArray(void) const {return param->isArray();}

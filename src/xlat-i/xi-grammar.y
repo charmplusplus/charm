@@ -112,6 +112,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK
 %token VOID
 %token CONST
+%token SCATTER
 %token PACKED
 %token VARSIZE
 %token ENTRY
@@ -134,6 +135,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token ACCELBLOCK
 %token MEMCRITICAL
 %token REDUCTIONTARGET
+%token SCATTERV
 %token CASE
 
 %type <modlist>		ModuleEList File
@@ -247,6 +249,7 @@ Name		: IDENT
 		| EXCLUSIVE { ReservedWord(EXCLUSIVE, @$.first_column, @$.last_column); YYABORT; }
 		| IMMEDIATE { ReservedWord(IMMEDIATE, @$.first_column, @$.last_column); YYABORT; }
 		| SKIPSCHED { ReservedWord(SKIPSCHED, @$.first_column, @$.last_column); YYABORT; }
+		| SCATTER { ReservedWord(SCATTER, @$.first_column, @$.last_column); YYABORT; }
 		| INLINE { ReservedWord(INLINE, @$.first_column, @$.last_column); YYABORT; }
 		| VIRTUAL { ReservedWord(VIRTUAL, @$.first_column, @$.last_column); YYABORT; }
 		| MIGRATABLE { ReservedWord(MIGRATABLE, @$.first_column, @$.last_column); YYABORT; }
@@ -278,6 +281,7 @@ Name		: IDENT
 		| ACCELBLOCK { ReservedWord(ACCELBLOCK, @$.first_column, @$.last_column); YYABORT; }
 		| MEMCRITICAL { ReservedWord(MEMCRITICAL, @$.first_column, @$.last_column); YYABORT; }
 		| REDUCTIONTARGET { ReservedWord(REDUCTIONTARGET, @$.first_column, @$.last_column); YYABORT; }
+		| SCATTERV { ReservedWord(SCATTERV, @$.first_column, @$.last_column); YYABORT; }
 		| CASE { ReservedWord(CASE, @$.first_column, @$.last_column); YYABORT; }
 		;
 
@@ -465,6 +469,8 @@ BaseType	: SimpleType
 		{ $$ = $1; }
 		| FuncType
 		{ $$ = $1; }
+		| SCATTER SimpleType 
+		{ $$ = new ScatterType($2); }
 		| CONST BaseType 
 		{ $$ = new ConstType($2); }
 		| BaseType CONST
@@ -957,9 +963,9 @@ EAttrib		: THREADED
                 { $$ = SPYTHON; }
 		| MEMCRITICAL
 		{ $$ = SMEM; }
-                | REDUCTIONTARGET
-                { $$ = SREDUCE; }
-                | AGGREGATE
+		| REDUCTIONTARGET
+		{ $$ = SREDUCE; }
+        | AGGREGATE
 		{
 #ifdef CMK_USING_XLC
         WARNING("a known bug in xl compilers (PMR 18366,122,000) currently breaks "
@@ -971,6 +977,8 @@ EAttrib		: THREADED
         $$ = SAGGREGATE;
 #endif
     }
+        | SCATTERV
+        { $$ = SSCATTERV; }
 		| error
 		{
 		  ERROR("invalid entry method attribute",

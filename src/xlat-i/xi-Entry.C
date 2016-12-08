@@ -89,6 +89,16 @@ void Entry::check() {
     XLAT_ERROR_NOCOL("python entry method declared in non-python chare",
                      first_line_);
 
+
+  if (isScatter() && param->nScatterParams() != 1)
+    XLAT_ERROR_NOCOL("scatter entry methods should have exactly one scatter type array",
+                     first_line_);
+
+
+  if (isScatter() && container->isChare())
+    XLAT_ERROR_NOCOL("scatter entry methods not supported for singleton chares",
+                     first_line_);
+
   // check the parameter passed to the function, it must be only an integer
   if (isPython() && (!param || param->next || !param->param->getType()->isBuiltin() || !((BuiltinType*)param->param->getType())->isInt()))
     XLAT_ERROR_NOCOL("python entry methods take only one parameter, which is of type 'int'",
@@ -528,7 +538,10 @@ void Entry::genArrayDefs(XStr& str)
         str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
       }
       else
-        str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";
+        if(isScatter())
+        	str << "  ckScatter(impl_amsg, "<<epIdx()<<opts<<");\n";
+        else
+        	str << "  ckBroadcast(impl_amsg, "<<epIdx()<<opts<<");\n";
       }
     }
     if(isIget()) {
@@ -2550,6 +2563,7 @@ int Entry::isPython(void) { return (attribs & SPYTHON); }
 int Entry::isNoTrace(void) { return (attribs & SNOTRACE); }
 int Entry::isAppWork(void) { return (attribs & SAPPWORK); }
 int Entry::isNoKeep(void) { return (attribs & SNOKEEP); }
+int Entry::isScatter(void) { return (attribs & SSCATTERV); }
 int Entry::isSdag(void) { return (sdagCon!=0); }
 int Entry::isTramTarget(void) { return (attribs & SAGGREGATE); }
 

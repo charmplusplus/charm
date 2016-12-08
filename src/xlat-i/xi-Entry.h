@@ -38,6 +38,7 @@ class WhenStatementEChecker;
 #define SREDUCE       0x40000 // <- reduction target
 #define SAPPWORK      0x80000 // <- reduction target
 #define SAGGREGATE    0x100000
+#define SSCATTERV      0x200000 // <- scatterv
 
 /* An entry construct */
 class Entry : public Member {
@@ -193,6 +194,8 @@ class Entry : public Member {
 
     int isMemCritical(void);
     int isReductionTarget(void);
+
+    int isScatter(void);	
 
     void print(XStr& str);
     void check();

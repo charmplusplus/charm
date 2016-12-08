@@ -2216,6 +2216,8 @@ struct rwentry rwtable[] = {
 {  "immediate",  IMMEDIATE },
 {  "expedited",  SKIPSCHED },
 {  "aggregate", AGGREGATE },
+{  "scatter",  SCATTER },
+{  "scatterv",  SCATTERV },
 {  "inline",  	INLINE },
 {  "local",      LOCAL },
 {  "virtual",    VIRTUAL },

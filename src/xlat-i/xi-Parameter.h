@@ -32,9 +32,11 @@ class Parameter {
     friend class ParamList;
     void pup(XStr &str);
     void copyPtr(XStr &str);
+    void marshallScatterInfo(XStr &str);
     void marshallArraySizes(XStr &str);
     void marshallArrayData(XStr &str);
     void beginUnmarshall(XStr &str);
+    void unmarshallScatter(XStr &str);
     void beginUnmarshallSDAGCall(XStr &str);
     void unmarshallArrayData(XStr &str);
     void unmarshallArrayDataSDAG(XStr &str);
@@ -54,6 +56,7 @@ class Parameter {
     int isCkArgMsgPtr(void) const;
     int isCkMigMsgPtr(void) const;
     int isArray(void) const;
+    int isScatter(void) const;
     int isConditional(void) const;
     Type *getType(void) {return type;}
     const char *getArrayLen(void) const {return arrLen;}
@@ -106,12 +109,14 @@ class ParamList {
     bool isConst(void) const;
     int isVoid(void) const;
     int isPointer(void) const;
+    int hasScatter(void) ;
     const char *getGivenName(void) const;
     void setGivenName(const char* s);
     const char *getName(void) const;
     int isMarshalled(void) const;
     int isCkArgMsgPtr(void) const;
     int isCkMigMsgPtr(void) const;
+    int nScatterParams(void);
     int getNumStars(void) const;
     const char *getBaseName(void);
     void genMsgProxyName(XStr &str);

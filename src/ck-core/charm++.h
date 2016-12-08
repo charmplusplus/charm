@@ -169,6 +169,8 @@ public:
 
 #include "ckcallback.h"
 
+#include "ckscatter.h"
+
 /********************* Superclass of all Chares ******************/
 #if CMK_MULTIPLE_DELETE
 #define CHARM_INPLACE_NEW \
