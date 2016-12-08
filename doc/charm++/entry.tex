@@ -14,7 +14,7 @@ entry [\uw{attribute1}, ..., \uw{attributeN}] void \uw{EntryMethod}(\uw{paramete
 
 \charmpp{} currently offers the following attributes that one may assign to 
 an entry method:
-\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{appwork}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local}, \kw{python}.
+\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{appwork}, \kw{immediate}, \kw{expedited}, \kw{scatterv}, \kw{inline}, \kw{local}, \kw{python}.
 
 \begin{description}
 \index{threaded}\item[threaded] \index{entry method}entry methods 
@@ -93,6 +93,16 @@ be scheduled in the lower-level Converse message queue, and be processed in the
 order of message arrival. Therefore, they may still suffer from delays caused
 by long running entry methods. An example can be found in 
 \examplerefdir{satisfiability}.
+
+
+\index{scatterv}\item[scatterv] entry methods contain a single array parameter 
+that is scattered across all destinations. The array that is to be scattered 
+should be marked with the keyword scatterv in the interface file. During 
+invocation, the user specifies the destinations, count and displacement in the 
+provided array for each destination. Scatterv entry methods are currently only 
+supported for chare array entry methods with marshalled parameters. An example
+can be found in \examplerefdir{scatterv}.
+
 
 \index{inline}\item[inline] entry methods will be immediately invoked if the
 message recipient happens to be on the same PE. These entry methods need to be

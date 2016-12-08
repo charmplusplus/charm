@@ -1,0 +1,17 @@
+mainmodule check {
+
+	readonly CProxy_Main mainProxy;
+	readonly CProxy_Check checkArray;
+	readonly int numchares;
+
+	mainchare Main {
+		entry Main(CkArgMsg* msg);
+		entry [reductiontarget] void done();
+	};
+
+	array[1D] Check {
+		entry Check();
+		entry void scattervData();
+		entry[scatterv] void recvScatterv(scatterv int arr[size], int size, double pos);
+	};
+};

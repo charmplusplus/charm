@@ -229,7 +229,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
+	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckscatterv.h\
           ckmessagelogging.h ckcausalmlog.h ckobjid.h\
 	  ckobjQ.h readonly.h \
           $(UTILHEADERS) \
@@ -607,7 +607,7 @@ CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o cktaskQ.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
-	   cklocation.o ckmulticast.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
+	   cklocation.o ckmulticast.o ckarray.o ckreduction.o ckarrayreductionmgr.o ckscatterv.o\
            tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o ckobjQ.o \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o ckobjid.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \

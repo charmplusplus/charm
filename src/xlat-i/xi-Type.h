@@ -25,6 +25,7 @@ class Type : public Printable {
   virtual int isReference(void) const {return 0;}
   virtual int isInt(void) const { return 0; }
   virtual bool isConst(void) const {return false;}
+  virtual bool isScatterv(void) const {return false;}
   virtual Type *deref(void) {return this;}
   virtual const char *getBaseName(void) const = 0;
   virtual const char *getScope(void) const = 0;
@@ -128,6 +129,19 @@ class ConstType : public Type {
   virtual bool isConst(void) const {return true;}
   virtual Type *deref(void) {return constType;}
   const char *getBaseName(void) const { return constType->getBaseName(); }
+  const char *getScope(void) const { return NULL; }
+};
+
+class ScattervType : public Type {
+ private:
+  Type *scattervType;
+
+ public:
+  ScattervType(Type *t) : scattervType(t) {}
+  void print(XStr& str) {str << " " << scattervType;}
+  virtual bool isScatterv(void) const {return true;}
+  virtual Type *deref(void) {return scattervType;}
+  const char *getBaseName(void) const { return scattervType->getBaseName(); }
   const char *getScope(void) const { return NULL; }
 };
 

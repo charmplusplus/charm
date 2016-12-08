@@ -328,6 +328,7 @@ public:
 
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx);
 	void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const;
+	void ckScatterv(CkArrayMessage *m, int ep, int opts=0) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }
 	CkLocMgr *ckLocMgr(void) const;

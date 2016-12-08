@@ -1547,6 +1547,31 @@ void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID, int opts)
 	ap.ckBroadcast((CkArrayMessage *)msg,entryIndex,opts);
 }
 
+
+
+void CProxy_ArrayBase::ckScatterv(CkArrayMessage *msg, int ep, int opts) const
+{
+	envelope *env = UsrToEnv(msg);
+	env->setMsgtype(ForBocMsg);
+	msg->array_ep_bcast()=ep;
+	//!TODO: Use spanning tree for better performance
+	void *newMsg;
+	CkScattervWrapper w;
+	getScattervInfo(msg, &w);
+        int *disp = (int *) w.disp;
+        CkArrayIndex *dest = (CkArrayIndex *) w.dest;
+        int *cnt = (int *) w.cnt;
+	for (int i=0; i<w.ndest; i++) {
+	     CProxyElement_ArrayBase ap(ckGetArrayID(), dest[i]);
+	     //newMsg=CkCopyMsg((void **)&msg);
+	     newMsg = createScattervMsg(msg, w, i);
+             //CkPrintf("[%d] Arraybase::ckscatterv, sending msg# %d \n", CkMyPe(), i);
+	     ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
+	}
+    CkFreeMsg(msg);
+}
+
+
 void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 {
 	envelope *env = UsrToEnv(msg);
