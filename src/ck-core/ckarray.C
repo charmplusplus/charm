@@ -777,7 +777,7 @@ void CkArrayListener::ckRegister(CkArray *arrMgr,int dataOffset_)
 
 static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
 {
-  //CkAssert(CkMyPe() == 0); // Will become mandatory under 64-bit ID
+  CkAssert(CkMyPe() == 0);
 
   CkGroupID locMgr = opts.getLocationManager();
   if (locMgr.isZero())
