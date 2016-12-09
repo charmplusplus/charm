@@ -29,17 +29,17 @@ private:
 
 public:
   Condition() : varIndex(-2) {}
-  Condition(const char *n, int _varIndex, Operator _op,  double _base,
+  Condition(std::string n, int _varIndex, Operator _op,  double _base,
       CompareSymbol c) : varIndex(_varIndex), base(_base), baseIndex(-1),
       thresholdIndex(-1), threshold(0), symbol(c), op(_op) {
-      name.assign(n);
+      name = n;
   }
 
-  Condition(const char *n, int _varIndex, Operator _op, int _baseIndex,
+  Condition(std::string n, int _varIndex, Operator _op, int _baseIndex,
       double _threshold, CompareSymbol c) : varIndex(_varIndex),
       baseIndex(_baseIndex), threshold(_threshold), thresholdIndex(-1),
       symbol(c), op(_op) {
-      name.assign(n);
+      name = n;
   }
 
   double getPotentialImprove() { return potentialImprove;}

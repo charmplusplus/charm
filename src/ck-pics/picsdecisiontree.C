@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <queue>
@@ -48,23 +48,21 @@ void DecisionTree::build(const char *filename) {
   opMap["MUL"] = 2;
   opMap["DIV"] = 3;
 
-  FILE *fp = fopen(filename, "r");
+  std::ifstream file(filename);
 
   int nodeType;
-  char keyStr[NAME_LENGTH];
-  char fieldTypeName[NAME_LENGTH];
-  char fieldTypeName2[NAME_LENGTH];
-  char symbol[NAME_LENGTH];
-  char parentName[NAME_LENGTH];
-  char typeStr[10];
-  char baseFieldType[NAME_LENGTH];
-  char baseFieldType2[NAME_LENGTH];
-  char op[10];
+  std::string keyStr;
+  std::string fieldTypeName;
+  std::string symbol;
+  std::string parentName;
+  std::string typeStr;
+  std::string baseFieldType;
+  std::string op;
   int  fieldType;
   int  flag;
-  char avgMinMax[10];
+  std::string avgMinMax;
   size_t len = 0;
-  char *line = NULL;
+  std::string line;
   tree_map nodemap;
   TreeNode *node;
   int numOfParents;
@@ -75,12 +73,11 @@ void DecisionTree::build(const char *filename) {
   int sumbytes=0;
   int bytes;
 
-  while( getline(&line, &len, fp) != -1) {
+  while (std::getline(file, line)) {
     if(line[0] == '#')
       continue;
-    sumbytes = 0;
-    sscanf(line+sumbytes,"%d %s  %s  %s %n", &nodeType, keyStr, typeStr, fieldTypeName, &bytes);
-    sumbytes += bytes;
+    std::istringstream stream(line);
+    stream >> nodeType >> keyStr >> typeStr >> fieldTypeName >> bytes;
 
     switch(nodeType) {
     case -1:        //root
@@ -88,25 +85,19 @@ void DecisionTree::build(const char *filename) {
       break;
 
     case 0:     //internal node
-      sprintf(fieldTypeName2,"%s_%s",typeStr,fieldTypeName);
-      fieldType = fieldMap[fieldTypeName2];
-      sscanf(line+sumbytes, "%s %n", op, &bytes);
-      sumbytes += bytes;
-      sscanf(line+sumbytes, "%d %n", &flag, &bytes);
-      sumbytes += bytes;
+      fieldType = fieldMap[typeStr + "_" + fieldTypeName];
+      stream >> op >> bytes;
+      stream >> flag >> bytes;
       if(flag == -1)
       {
-        sscanf(line+sumbytes, "%f    %s  %d %s %n", &base, symbol, &numOfParents, parentName, &bytes);
-        sumbytes += bytes;
+        stream >> base >> symbol >> numOfParents >> parentName >> bytes;
         cond = new Condition(keyStr, fieldType, (Operator)opMap[op], base, (CompareSymbol)(symbolMap[symbol]));
         nodemap[keyStr] = new TreeNode(nodemap[parentName], cond);
         nodemap[parentName]->addChild(nodemap[keyStr]);
       }else if(flag == 0)
       {
-        sscanf(line+sumbytes, "%s    %s  %s  %lf  %d %s %n", avgMinMax, baseFieldType, symbol, &threshold, &numOfParents, parentName, &bytes);
-        sprintf(baseFieldType2, "%s_%s", avgMinMax, baseFieldType);
-        sumbytes += bytes;
-        cond = new Condition(keyStr, fieldType, (Operator)opMap[op], fieldMap[baseFieldType2], threshold,  (CompareSymbol)symbolMap[symbol]);
+        stream >> avgMinMax >> baseFieldType >> symbol >> threshold >> numOfParents >> parentName >> bytes;
+        cond = new Condition(keyStr, fieldType, (Operator)opMap[op], fieldMap[avgMinMax + "_" + baseFieldType], threshold,  (CompareSymbol)symbolMap[symbol]);
         node =  new TreeNode(nodemap[parentName], cond);
         nodemap[keyStr] = node;
         nodemap[parentName]->addChild(nodemap[keyStr]);
@@ -114,14 +105,12 @@ void DecisionTree::build(const char *filename) {
       break;
 
     case 1:     //leaf
-      sscanf(line+sumbytes,"%d  %s %n", &numOfParents, parentName, &bytes); 
-      sumbytes += bytes;
+      stream >> numOfParents >> parentName >> bytes;
       sol = new Solution( (Direction)updownMap[typeStr], (Effect)effectMap[fieldTypeName]);
       node = new TreeNode(nodemap[parentName], sol);
       nodemap[parentName]->addChild(node);
       for(int i=1; i<numOfParents; i++) {
-        sscanf(line+sumbytes, "%s %n", parentName, &bytes);
-        sumbytes += bytes;
+        stream >> parentName >> bytes;
         node = new TreeNode(nodemap[parentName], sol);
         nodemap[parentName]->addChild(node);
       }
