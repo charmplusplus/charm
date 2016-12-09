@@ -63,6 +63,9 @@
 /* enable error checking */
 #undef CMK_ERROR_CHECKING
 
+/* enable AMPI error checking */
+#undef AMPI_ERROR_CHECKING
+
 /* ALLCAPS */
 #undef CMK_FORTRAN_USES_ALLCAPS
 
