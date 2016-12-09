@@ -2693,6 +2693,8 @@ void CkLocMgr::sendMsg(CkArrayMessage *msg, CkArrayID mgr, const CkArrayIndex &i
   envelope *env = UsrToEnv(msg);
   env->setMsgtype(ForArrayEltMsg);
 
+  checkInBounds(idx);
+
   if (type==CkDeliver_queue)
     _TRACE_CREATION_DETAILED(env, msg->array_ep());
 
