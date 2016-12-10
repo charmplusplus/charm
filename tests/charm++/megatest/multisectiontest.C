@@ -37,7 +37,9 @@ void multisectiontest_init()
 	    }
 	  for(int i=0;i<numarrays;i++)
 	    {
-	      Aproxy[i]=CProxy_multisectiontest_array1d::ckNew(masterproxy.ckGetGroupID(),ArraySize);	  
+	      CkArrayOptions opts(ArraySize);
+	      opts.setSectionAutoDelegate(false); //disable auto delegation
+	      Aproxy[i]=CProxy_multisectiontest_array1d::ckNew(masterproxy.ckGetGroupID(), opts); 
 	      aidArr[i]=Aproxy[i].ckGetArrayID();
 	    }
 	  // make sections
