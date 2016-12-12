@@ -1006,6 +1006,7 @@ static ampi *ampiInit(char **argv)
     //Create and attach the ampiParent array
     CkArrayID threads;
     opts=TCHARM_Attach_start(&threads,&_nchunks);
+    opts.setSectionAutoDelegate(false);
     parent=CProxy_ampiParent::ckNew(new_world,threads,opts);
     STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
   }
@@ -1902,6 +1903,7 @@ int compareAmpiSplitKey(const void *a_, const void *b_) {
 CProxy_ampi ampi::createNewChildAmpiSync() {
   CkArrayOptions opts;
   opts.bindTo(parentProxy);
+  opts.setSectionAutoDelegate(false);
   opts.setNumInitial(0);
   CkArrayID unusedAID;
   ampiCommStruct unusedComm;
