@@ -121,7 +121,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token WHILE
 %token WHEN
 %token OVERLAP
-%token ATOMIC
+%token SERIAL
 %token IF
 %token ELSE
 %token PYTHON LOCAL
@@ -267,7 +267,7 @@ Name		: IDENT
 		| WHILE { ReservedWord(WHILE, @$.first_column, @$.last_column); YYABORT; }
 		| WHEN { ReservedWord(WHEN, @$.first_column, @$.last_column); YYABORT; }
 		| OVERLAP { ReservedWord(OVERLAP, @$.first_column, @$.last_column); YYABORT; }
-		| ATOMIC { ReservedWord(ATOMIC, @$.first_column, @$.last_column); YYABORT; }
+		| SERIAL { ReservedWord(SERIAL, @$.first_column, @$.last_column); YYABORT; }
 		| IF { ReservedWord(IF, @$.first_column, @$.last_column); YYABORT; }
 		| ELSE { ReservedWord(ELSE, @$.first_column, @$.last_column); YYABORT; }
 		/* | PYTHON { ReservedWord(PYTHON, @$.first_column, @$.last_column); YYABORT; } */
@@ -1207,7 +1207,7 @@ WhenConstruct   : WHEN SEntryList '{' '}'
 		{ $$ = new WhenConstruct($2, $4); }
 		;
 
-NonWhenConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
+NonWhenConstruct : SERIAL OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
 		{ $$ = 0; }
 		| OVERLAP '{' Olist '}'
 		{ $$ = 0; }
@@ -1233,8 +1233,8 @@ NonWhenConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSe
 		{ $$ = 0; }
 		;
 
-SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
-		{ $$ = new AtomicConstruct($4, $2, @3.first_line); }
+SingleConstruct : SERIAL OptTraceName ParamBraceStart CCode ParamBraceEnd OptSemiColon
+		{ $$ = new SerialConstruct($4, $2, @3.first_line); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new OverlapConstruct($3); }	
 		| WhenConstruct
@@ -1260,7 +1260,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptSem
 		| WHILE StartIntExpr IntExpr EndIntExpr '{' Slist '}'
 		{ $$ = new WhileConstruct($3, $6); }
 		| ParamBraceStart CCode ParamBraceEnd OptSemiColon
-		{ $$ = new AtomicConstruct($2, NULL, @$.first_line); }
+		{ $$ = new SerialConstruct($2, NULL, @$.first_line); }
 		| error
 		{
 		  ERROR("unknown SDAG construct or malformed entry method declaration.\n"

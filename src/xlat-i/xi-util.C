@@ -200,7 +200,7 @@ void templateGuardEnd(XStr &str) {
 }
 
 // This replaces the line containing a single '#' token with a '#line'
-// directive, as described in AtomicConstruct::generateCode.
+// directive, as described in SerialConstruct::generateCode.
 std::string addLineNumbers(char *str, const char *filename)
 {
   int lineNo = 1;

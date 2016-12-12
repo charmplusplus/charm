@@ -1,14 +1,14 @@
-#ifndef _ATOMIC_H
-#define _ATOMIC_H
+#ifndef _SERIAL_H
+#define _SERIAL_H
 
 #include "xi-BlockConstruct.h"
 #include "CParsedFile.h"
 
 namespace xi {
 
-class AtomicConstruct : public BlockConstruct {
+class SerialConstruct : public BlockConstruct {
  public:
-  AtomicConstruct(const char *code, const char *trace_name, int line_no);
+  SerialConstruct(const char *code, const char *trace_name, int line_no);
   void propagateStateToChildren(std::list<EncapState*> encap,
                                 std::list<CStateVar*>& stateVarsChildren,
                                 std::list<CStateVar*>& wlist,
@@ -23,4 +23,4 @@ class AtomicConstruct : public BlockConstruct {
 
 }   // namespace xi
 
-#endif  // ifndef _ATOMIC_H
+#endif  // ifndef _SERIAL_H

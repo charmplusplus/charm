@@ -1,11 +1,11 @@
-#include "Atomic.h"
+#include "Serial.h"
 
 namespace xi {
 
 extern void RemoveSdagComments(char *str);
 
-AtomicConstruct::AtomicConstruct(const char *code, const char *trace_name, int line_no)
-: BlockConstruct(SATOMIC, NULL, 0, 0, 0, 0, 0, 0), line_no_(line_no)
+SerialConstruct::SerialConstruct(const char *code, const char *trace_name, int line_no)
+: BlockConstruct(SSERIAL, NULL, 0, 0, 0, 0, 0, 0), line_no_(line_no)
 {
   char *tmp = strdup(code);
   text = new XStr(tmp);
@@ -19,16 +19,16 @@ AtomicConstruct::AtomicConstruct(const char *code, const char *trace_name, int l
     free(tmp);
   }
 
-  label_str = "atomic";
+  label_str = "serial";
 }
 
-void AtomicConstruct::propagateStateToChildren(std::list<EncapState*> encap,
+void SerialConstruct::propagateStateToChildren(std::list<EncapState*> encap,
                                                std::list<CStateVar*>& stateVarsChildren,
                                                std::list<CStateVar*>& wlist,
                                                int uniqueVarNum)
 {}
 
-void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
+void SerialConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 
 #if CMK_BIGSIM_CHARM
@@ -82,7 +82,7 @@ void AtomicConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   endMethod(defs);
 }
 
-void AtomicConstruct::generateTrace() {
+void SerialConstruct::generateTrace() {
   char traceText[1024];
   if (traceName) {
     sprintf(traceText, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
@@ -98,8 +98,8 @@ void AtomicConstruct::generateTrace() {
   if (con1) con1->generateTrace();
 }
 
-void AtomicConstruct::numberNodes(void) {
-  nodeNum = numAtomics++;
+void SerialConstruct::numberNodes(void) {
+  nodeNum = numSerials++;
   SdagConstruct::numberNodes();
 }
 

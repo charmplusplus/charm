@@ -19,7 +19,7 @@ extern int numEntries;
 extern int numOlists;
 extern int numWhiles;
 extern int numForwards;
-extern int numAtomics;
+extern int numSerials;
 extern int numForalls;
 extern int numConnects;
 extern int numCases;

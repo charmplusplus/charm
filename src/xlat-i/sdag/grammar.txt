@@ -17,7 +17,7 @@ Grammar in EBNF Form:
 
 <stmt> := <overlap-stmt>
         | <when-stmt>
-        | <atomic-stmt>
+        | <serial-stmt>
         | <if-stmt>
         | <while-stmt>
         | <for-stmt>
@@ -25,7 +25,7 @@ Grammar in EBNF Form:
         
 <overlap-stmt> := "overlap" <body>
 
-<atomic-stmt> := "atomic" <brace-matched-C++-code>
+<serial-stmt> := "serial" <brace-matched-C++-code>
 
 <if-stmt> := "if" <parenthesis-matched-c++-condition> <body> [<else-stmt>]
 

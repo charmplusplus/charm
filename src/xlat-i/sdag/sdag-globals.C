@@ -20,7 +20,7 @@ int numElses=0;
 int numEntries=0;
 int numOlists=0;
 int numWhiles=0;
-int numAtomics=0;
+int numSerials=0;
 int numForwards=0;
 int numForalls=0;
 int numConnects=0;
@@ -39,7 +39,7 @@ void resetNumbers(void)
   numEntries=0;
   numOlists=0;
   numWhiles=0;
-  numAtomics=0;
+  numSerials=0;
   numForwards=0;
   numForalls=0;
   numConnects=0;

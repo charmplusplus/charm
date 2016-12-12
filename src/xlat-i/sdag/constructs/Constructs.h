@@ -1,7 +1,7 @@
 #ifndef _CONSTRUCTS_H
 #define _CONSTRUCTS_H
 
-#include "Atomic.h"
+#include "Serial.h"
 #include "Case.h"
 #include "Else.h"
 #include "Forall.h"

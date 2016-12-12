@@ -497,7 +497,7 @@ namespace xi {
     case SWHEN:
     case SFOR:
     case SWHILE:
-    case SATOMIC:
+    case SSERIAL:
     case SELSE:
       next = n;
       nextBeginOrEnd = boe;
