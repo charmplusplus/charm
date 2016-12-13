@@ -1,6 +1,6 @@
 \setcounter{secnumdepth}{3}
 
-\renewcommand{\code}[1]{\texttt{\textbf{#1}}} % \textbf doesn't work here
+\renewcommand{\code}[1]{\texttt{\textbf{#1}}}
 
 \newcommand{\cuda}{\code{CUDA}}
 
@@ -24,6 +24,8 @@ GPU Manager, the user must build \charmpp{} using the \cuda{} option, e.g.
 ./build charm++ netlrts-linux-x86_64 cuda -j8
 \end{alltt}
 Building GPU Manager requires an installation of the CUDA toolkit on the system.
+Charm will search \$CUDATOOLKIT\_HOME, /usr/local/cuda, and
+/usr/lib/nvidia-cuda-toolkit, in that order, to locate the CUDA installation.
 
 \section{Overview and Work Flow}
 
@@ -150,7 +152,7 @@ information for the execution of the work request. This array must be of size \c
 \begin{alltt}
 code{wr->bufferInfo = (dataInfo *) malloc(wr->nBuffers * sizeof(dataInfo))}
 \end{alltt}
-We will explain the contents of \code{dataInfo} struct later.
+We explain the contents of \code{dataInfo} struct below.
 
 \item[void *callbackFn]- a pointer to a \code{CkCallback} object specified by the user;
 executed after the kernel and memory transfers have finished.
@@ -176,7 +178,7 @@ calls, such as the size of an array.
 \begin{description}
 \item[int bufferID]- the ID of a buffer in the runtime system's buffer table.
 May be specified by the user if direct control over the buffer space is
-desired. Otherwise, if it is set to a negative value, the GPU Manager will
+desired. Otherwise, if it is left unset or set to a negative value, the GPU Manager will
 assign a valid buffer ID.
 
 \item[int transferToDevice, transferFromDevice]- flags to indicate if the buffer
@@ -226,15 +228,16 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B, float **h_C, int 
     /* Buffer A */
     info = &(vecAdd->bufferInfo[0]);
 
-    /* The Buffer ID will be given by the API,
-       or it can be given by the user. */
+    /* The Buffer ID will be set by the library
+       if unset or set to a negative number,
+       or it can be set by the user. */
     info->bufferID = -1;
 
     info->transferToDevice = YES;
     info->transferFromDevice = NO;
     info->freeBuffer = YES;
 
-    /* This fetches the pinned host memory already allocated by API,
+    /* This fetches the pinned host memory already allocated by the library,
        required for asynchronous data transfers. */
     info->hostBuffer = hapi_poolMalloc(size);
 
@@ -250,7 +253,7 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B, float **h_C, int 
     info->transferFromDevice = YES;
     info->hostBuffer = hapi_poolMalloc(size)
 
-    / * We change the address to the address returned by the API
+    / * We change the address to the address returned by the library
         to read the copied result */
     *h_C = (float *)info->hostBuffer;
 
@@ -265,9 +268,8 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B, float **h_C, int 
     vecAdd->userData = new int;
     memcpy(vecAdd->userData, &vectorSize, sizeof(int));
 
-    /* enqueue the workRequest in the workRequestQueue.
-    wrQueue is declared by our API during the init phase for every processor. */
-    enqueue(wrQueue, vecAdd);
+    /* enqueue the workRequest in the workRequestQueue. */
+    enqueue(vecAdd);
 \}
 \end{alltt}
 
@@ -300,9 +302,9 @@ void run_add(workRequest *wr, cudaStream_t kernelStream, void **deviceBuffers)
 \{
     printf("Add KERNEL \textbackslash{n}");
 /*
- *  devBuffers is declared by our API during the init phase on every processor.
- *  It jumps to the correct array index with the help of bufferID, 
- *  which is supplied by the API or user.
+ *  devBuffers is declared by our library during the init phase on every processor.
+ *  It jumps to the correct array index with the help of bufferID,
+ *  which is supplied by the library or user.
  */
     vecAdd<<< wr->dimGrid, wr->dimBlock, wr->smemSize, kernelStream>>>
         ((float *) deviceBuffers[wr->bufferInfo[0].bufferID],
@@ -353,6 +355,11 @@ A few useful things for debugging:
 (using \code{-DGPU\_MEMPOOL\_DEBUG}) during execution prints debug
 statements, including when buffers are allocated and freed.
 
-\item When using \code{++debug}, add the debugging flags \code{-g} and
-\code{-G} during compilation.
+\item Define the \code{GPU\_DEBUG} flag (as above) to output more verbose
+debugging information during execution.
+
+\item When debugging, add the flag \code{-g} during compilation.
+
+\item For more infromation on these and other flags, see the comment at the top
+of \code{cuda-hybrid-api.cu}.
 \end{enumerate}
