@@ -2314,10 +2314,6 @@ void ampi::generic(AmpiMsg* msg)
   msg->event = NULL;
 #endif
 
-  int sync = UsrToEnv(msg)->getRef();
-  int srcIdx;
-  if (sync) srcIdx = getIndexForRank(msg->getSrcRank());
-
   if(msg->getSeq() != -1) {
     // If message was sent over MPI_COMM_SELF, srcRank needs to be this rank in MPI_COMM_WORLD:
     int srcRank = (msg->getComm(this->getComm()) == MPI_COMM_SELF) ? this->getRank(MPI_COMM_WORLD) : msg->getSrcRank();
@@ -2333,12 +2329,7 @@ void ampi::generic(AmpiMsg* msg)
   } else { //Cross-world or system messages are unordered
     inorder(msg);
   }
-
   // msg may be free'ed from calling inorder()
-  if (sync>0) {         // send an ack to sender
-    CProxy_ampi pa(thisArrayID);
-    pa[srcIdx].ssend_ack(sync);
-  }
 
   if(resumeOnRecv){
     thread->resume();
@@ -2476,6 +2467,13 @@ void ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype t
 
 void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
 {
+  int ssendReq = UsrToEnv(msg)->getRef();
+  if (ssendReq > 0) { // send an ack to sender
+    int srcRank = (msg->getComm(this->getComm()) == MPI_COMM_SELF) ? this->getRank(MPI_COMM_WORLD) : msg->getSrcRank();
+    int srcIdx = getIndexForRank(srcRank);
+    thisProxy[srcIdx].ssend_ack(ssendReq);
+  }
+
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
 
