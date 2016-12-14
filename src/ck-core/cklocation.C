@@ -1636,7 +1636,8 @@ void CkMigratable::recvLBPeriod(void *data) {
 }
 
 void CkMigratable::metaLBCallLB() {
-	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+  if(usesAtSync)
+    myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
 }
 
 void CkMigratable::ckFinishConstruction(void)
