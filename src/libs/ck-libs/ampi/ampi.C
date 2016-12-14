@@ -8892,13 +8892,13 @@ int AMPI_Migrate_to_pe(int dest)
 }
 
 CDECL
-int AMPI_Comm_set_migratable(MPI_Comm comm, int mig){
-  AMPIAPI("AMPI_Comm_set_migratable");
+int AMPI_Set_migratable(int mig)
+{
+  AMPIAPI("AMPI_Set_migratable");
 #if CMK_LBDB_ON
-  ampi *ptr=getAmpiInstance(comm);
-  ptr->setMigratable(mig);
+  getAmpiParent()->setMigratable((mig!=0));
 #else
-  CkPrintf("WARNING: MPI_Comm_set_migratable is not supported in this build of Charm++/AMPI.\n");
+  CkPrintf("WARNING: MPI_Set_migratable is not supported in this build of Charm++/AMPI.\n");
 #endif
   return MPI_SUCCESS;
 }

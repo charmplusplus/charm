@@ -1017,7 +1017,7 @@ int AMPI_Load_start_measure(void);
 int AMPI_Load_stop_measure(void);
 int AMPI_Load_set_value(double value);
 int AMPI_Migrate_to_pe(int dest);
-int AMPI_Comm_set_migratable(MPI_Comm comm, int mig);
+int AMPI_Set_migratable(int mig);
 int AMPI_Register_pup(MPI_PupFn fn, void *data, int *idx);
 int AMPI_Get_pup_data(int idx, void *data);
 int AMPI_Register_main(MPI_MainFn mainFn, const char *name);

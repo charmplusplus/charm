@@ -1328,6 +1328,12 @@ class ampiParent : public CBase_ampiParent {
   void ResumeThread(void);
   TCharm* getTCharmThread() const {return thread;}
 
+#if CMK_LBDB_ON
+  void setMigratable(bool mig) {
+    thread->setMigratable(mig);
+  }
+#endif
+
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const {
     if (comm==MPI_COMM_WORLD) return worldStruct;
     if (comm==MPI_COMM_SELF) return selfStruct;
@@ -1654,12 +1660,6 @@ class ampi : public CBase_ampi {
 
   CkDDT *getDDT(void) const {return parent->myDDT;}
   CthThread getThread() const { return thread->getThread(); }
-#if CMK_LBDB_ON
-  void setMigratable(int mig) {
-    if(mig) thread->setMigratable(true);
-    else thread->setMigratable(false);
-  }
-#endif
  public:
   /*
    * AmmTable is indexed by the tag and sender.

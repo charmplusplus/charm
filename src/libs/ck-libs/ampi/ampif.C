@@ -1733,8 +1733,8 @@ void ampi_migrate_to_pe(int *dest, int *ierr) {
   *ierr = AMPI_Migrate_to_pe(*dest);
 }
 
-void ampi_comm_set_migratable(int *comm, int *mig, int *ierr) {
-  *ierr = AMPI_Comm_set_migratable(*comm, *mig);
+void ampi_set_migratable(int *mig, int *ierr) {
+  *ierr = AMPI_Set_migratable(*mig);
 }
 
 void ampi_register_main(MPI_MainFn fn, const char *name, int *ierr) {
