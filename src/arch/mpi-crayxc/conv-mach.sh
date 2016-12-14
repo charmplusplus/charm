@@ -1,25 +1,72 @@
-#CMK_DEFS="-I/opt/xt-mpt/1.5.47/mpich2-64/T/include "
-#CMK_LD_DEFS="-lrca "
+#  Cray XC build.  October 2016.
+#
+#  BUILD CHARM++ on the CRAY XC:
+#       COMMON FOR ALL COMPILERS
+#  ======================================================
+#  #  Do not set this env variable when building charm++. This will cause charm++ to fail.
+#  #     setenv CRAYPE_LINK_TYPE dynamic
+#
+#  #  Use these modules to build charm++ on the Cray XC.
+#  module load craype-ivybridge    # craype-haswell,broadwell not tested
+#  module load craype-hugepages8M
+#  module load rca
+#
+#  #  Then choose a compiler:
+#
+#  CRAY COMPILER (CCE) BUILD
+#  ========================================
+#  module load PrgEnv-cray         # typically default
+#  module swap cce cce/8.5.4       # cce/8.5.4 or later required
+#
+#  # uGNI build
+#  ./build charm++ gni-crayxc craycc smp
+#  # MPI build
+#  ./build charm++ mpi-crayxc craycc smp
+#
+#
+#  INTEL BUILD
+#  ================================
+#  module swap PrgEnv-cray PrgEnv-intel
+#  module swap intel intel/16.0.3.210   # intel/16.0.3.210, intel/17.0.0.098 tested
+#
+#  #  Do not add 'icc' to your build options or this will fail to build.
+#
+#  # uGNI build
+#  ./build charm++ gni-crayxc smp -optimize
+#  # MPI build
+#  ./build charm++ mpi-crayxc smp -optimize
+#
+#
+#  GCC BUILD
+#  ================================
+#  module swap PrgEnv-cray PrgEnv-gnu
+#  module swap gcc gcc/6.1.0       # gcc/6.1.0, 6.2.0 tested
+#
+#  #  Do not add 'gcc' to your build options or this will fail to build.
+#
+#  # uGNI build
+#  ./build charm++ gni-crayxc smp -optimize
+#  # MPI build
+#  ./build charm++ mpi-crayxc smp -optimize
+
 
 CMK_BUILD_CRAY=1
+PMI_LIBS="$CRAY_PMI_POST_LINK_OPTS"
 
 PGCC=`CC -V 2>&1 | grep pgCC`
 ICPC=`CC -V 2>&1 | grep Intel`
 GNU=`CC -V 2>&1 | grep 'g++'`
+CCE=`CC -V 2>&1 | grep 'Cray'`
 
 CMK_CPP_CHARM="/lib/cpp -P"
-CMK_CPP_C="cc -E $CMK_DEFS "
-CMK_CXXPP="CC -E $CMK_DEFS "
-CMK_CC="cc $CMK_DEFS "
-CMK_CXX="CC  $CMK_DEFS "
-CMK_LD="$CMK_CC $CMK_LD_DEFS"
-CMK_LDXX="$CMK_CXX $CMK_LD_DEFS"
-# Swap these and set XT[45]_TOPOLOGY in conv-mach.h if doing topo work
-# on a Cray XT of known dimensions. See src/util/CrayNid.c for details
-#CMK_LIBS="-lckqt -lrca"
-CMK_LIBS="-lckqt"
-
-CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
+CMK_CPP_C="cc -E"
+CMK_CXXPP="CC -x c++ -E  "
+CMK_CC="cc "
+CMK_CXX="CC "
+CMK_LD="$CMK_CC "
+CMK_LDXX="$CMK_CXX "
+CMK_LIBS='-lckqt'
+CMK_LD_LIBRARY_PATH="-WL,-rpath,$CHARMLIBSO/,$PMI_LIBS "
 
 # compiler for compiling sequential programs
 if test -n "$PGCC"
@@ -29,11 +76,16 @@ CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc -fPIC "
 CMK_SEQ_CXX="pgCC -fPIC --no_using_std "
+elif test -n "$CCE"
+then
+CMK_CXX_OPTIMIZE=" -hipa4"   # For improved C++ performance
+CMK_SEQ_CC="gcc -fPIC"
+CMK_SEQ_CXX="g++ -fPIC "
 elif test -n "$ICPC"
 then
 CMK_SEQ_CC="cc -fPIC "
 CMK_SEQ_CXX="CC -fPIC "
-else
+else   # gcc
 CMK_SEQ_CC="gcc -fPIC"
 CMK_SEQ_CXX="g++ -fPIC "
 fi
@@ -52,17 +104,23 @@ CMK_RANLIB="ranlib"
 CMK_QT="generic64-light"
 
 # for F90 compiler
+if test -n "$ICPC"
+then
+CMK_CF77="ftn -auto "
+CMK_CF90="ftn -auto "
+CMK_F90LIBS="-lifcore -lifport "
+else
 CMK_CF77="ftn "
 CMK_CF90="ftn "
+CMK_F90LIBS=""
+fi
+
 if test -n "$GNU"
 then
     CMK_CF77="$CMK_CF77 -ffree-line-length-none"
     CMK_CF90="$CMK_CF90 -ffree-line-length-none"
+    CMK_F90LIBS=""
 fi
-CMK_F90LIBS=""
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
 CMK_MOD_EXT="mod"
-
-CMK_NO_BUILD_SHARED=true
-

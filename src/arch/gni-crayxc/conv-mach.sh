@@ -1,18 +1,72 @@
+#  Cray XC build.  October 2016.
+#
+#  BUILD CHARM++ on the CRAY XC:
+#       COMMON FOR ALL COMPILERS
+#  ======================================================
+#  #  Do not set this env variable when building charm++. This will cause charm++ to fail.
+#  #     setenv CRAYPE_LINK_TYPE dynamic
+#
+#  #  Use these modules to build charm++ on the Cray XC.
+#  module load craype-ivybridge    # craype-haswell,broadwell not tested
+#  module load craype-hugepages8M
+#  module load rca
+#
+#  #  Then choose a compiler:
+#
+#  CRAY COMPILER (CCE) BUILD
+#  ========================================
+#  module load PrgEnv-cray         # typically default
+#  module swap cce cce/8.5.4       # cce/8.5.4 or later required
+#
+#  # uGNI build
+#  ./build charm++ gni-crayxc craycc smp
+#  # MPI build
+#  ./build charm++ mpi-crayxc craycc smp
+#
+#
+#  INTEL BUILD
+#  ================================
+#  module swap PrgEnv-cray PrgEnv-intel
+#  module swap intel intel/16.0.3.210   # intel/16.0.3.210, intel/17.0.0.098 tested
+#
+#  #  Do not add 'icc' to your build options or this will fail to build.
+#
+#  # uGNI build
+#  ./build charm++ gni-crayxc smp -optimize
+#  # MPI build
+#  ./build charm++ mpi-crayxc smp -optimize
+#
+#
+#  GCC BUILD
+#  ================================
+#  module swap PrgEnv-cray PrgEnv-gnu
+#  module swap gcc gcc/6.1.0       # gcc/6.1.0, 6.2.0 tested
+#
+#  #  Do not add 'gcc' to your build options or this will fail to build.
+#
+#  # uGNI build
+#  ./build charm++ gni-crayxc smp -optimize
+#  # MPI build
+#  ./build charm++ mpi-crayxc smp -optimize
+
+
 GNI_CRAYXC=1
-PMI_LIBS=`pkg-config --libs cray-pmi`
-UGNI_LIBS=`pkg-config --libs cray-ugni`
+PMI_LIBS="$CRAY_PMI_POST_LINK_OPTS"
 
 PGCC=`CC -V 2>&1 | grep pgCC`
 ICPC=`CC -V 2>&1 | grep Intel`
+GNU=`CC -V 2>&1 | grep 'g++'`
+CCE=`CC -V 2>&1 | grep 'Cray'`
 
 CMK_CPP_CHARM='/lib/cpp -P'
 CMK_CPP_C="cc -E"
-CMK_CC="cc $PMI_CFLAGS $UGNI_CFLAGS "
-CMK_CXX="CC $PMI_CFLAGS $UGNI_CFLAGS"
+CMK_CC="cc "
+CMK_CXX="CC "
 CMK_CXXPP="$CMK_CXX -x c++ -E  "
 CMK_LD="eval $CMK_CC "
 CMK_LIBS='-lckqt'
-CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/ $PMI_LIBS $UGNI_LIBS"
+CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/ $PMI_LIBS"
+
 
 CMK_QT="generic64-light"
 
@@ -24,11 +78,16 @@ CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="pgCC  --no_using_std "
+elif test -n "$CCE"
+then
+CMK_CXX_OPTIMIZE=" -hipa4"   # For improved C++ performance
+CMK_SEQ_CC="gcc "
+CMK_SEQ_CXX="g++ "
 elif test -n "$ICPC"
 then
 CMK_SEQ_CC="cc -fPIC "
 CMK_SEQ_CXX="CC -fPIC "
-else
+else   # gcc
 CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="g++ "
 fi
