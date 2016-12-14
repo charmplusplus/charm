@@ -9,10 +9,6 @@
 #include <errno.h>
 #include "converse.h"
 #include <mpi.h>
-#if CMK_TIMER_USE_XT3_DCLOCK
-#include <catamount/dclock.h>
-#endif
-
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
@@ -1659,7 +1655,7 @@ void LrtsAbort(const char *message) {
 }
 
 /**************************  TIMER FUNCTIONS **************************/
-#if CMK_TIMER_USE_SPECIAL || CMK_TIMER_USE_XT3_DCLOCK
+#if CMK_TIMER_USE_SPECIAL
 
 /* MPI calls are not threadsafe, even the timer on some machines */
 static CmiNodeLock  timerLock = 0;
@@ -1708,11 +1704,7 @@ void CmiTimerInit(char **argv) {
     if (_is_global) {
         if (CmiMyRank() == 0) {
             double minTimer;
-#if CMK_TIMER_USE_XT3_DCLOCK
-            starttimer = dclock();
-#else
             starttimer = MPI_Wtime();
-#endif
 
             MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN,
                           charmComm );
@@ -1724,11 +1716,7 @@ void CmiTimerInit(char **argv) {
         CmiBarrier();
         CmiBarrier();
 #endif
-#if CMK_TIMER_USE_XT3_DCLOCK
-        starttimer = dclock();
-#else
         starttimer = MPI_Wtime();
-#endif
     }
 
 #if 0 && CMK_SMP && CMK_MPI_INIT_THREAD
@@ -1750,11 +1738,7 @@ double CmiTimer(void) {
     if (timerLock) CmiLock(timerLock);
 #endif
 
-#if CMK_TIMER_USE_XT3_DCLOCK
-    t = dclock();
-#else
     t = MPI_Wtime();
-#endif
 
 #if 0 && CMK_SMP
     if (timerLock) CmiUnlock(timerLock);
@@ -1769,11 +1753,7 @@ double CmiWallTimer(void) {
     if (timerLock) CmiLock(timerLock);
 #endif
 
-#if CMK_TIMER_USE_XT3_DCLOCK
-    t = dclock();
-#else
     t = MPI_Wtime();
-#endif
 
 #if 0 && CMK_SMP
     if (timerLock) CmiUnlock(timerLock);
@@ -1787,11 +1767,7 @@ double CmiCpuTimer(void) {
 #if 0 && CMK_SMP
     if (timerLock) CmiLock(timerLock);
 #endif
-#if CMK_TIMER_USE_XT3_DCLOCK
-    t = dclock() - starttimer;
-#else
     t = MPI_Wtime() - starttimer;
-#endif
 #if 0 && CMK_SMP
     if (timerLock) CmiUnlock(timerLock);
 #endif
