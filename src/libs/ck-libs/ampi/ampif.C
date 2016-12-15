@@ -1801,12 +1801,12 @@ void ampi_alltoall_long(void *data, int *sendcount, int *sendtype,
                              *recvcount, *recvtype, *comm);
 }
 
-void ampi_yield(int *comm, int *ierr) {
-  *ierr = AMPI_Yield(*comm);
+void ampi_yield(int *ierr) {
+  *ierr = AMPI_Yield();
 }
 
-void ampi_suspend(int *comm, int *ierr) {
-  *ierr = AMPI_Suspend(*comm);
+void ampi_suspend(int *ierr) {
+  *ierr = AMPI_Suspend();
 }
 
 void ampi_resume(int *dest, int *comm, int *ierr) {

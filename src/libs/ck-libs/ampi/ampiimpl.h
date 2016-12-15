@@ -1513,6 +1513,8 @@ class ampiParent : public CBase_ampiParent {
 #endif
   void init();
   void finalize();
+  void block(void);
+  void yield(void);
 };
 
 /*
@@ -1556,9 +1558,7 @@ class ampi : public CBase_ampi {
   void allInitDone();
   void setInitDoneFlag();
 
-  void block(void);
   void unblock(void);
-  void yield(void);
   void generic(AmpiMsg *);
   void ssend_ack(int sreq);
   void barrierResult(void);

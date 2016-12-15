@@ -2224,11 +2224,11 @@ const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo)
   return mpi_worlds[0]; // meaningless return
 }
 
-void ampi::block(void){
+void ampiParent::block(void){
   thread->suspend();
 }
 
-void ampi::yield(void){
+void ampiParent::yield(void){
   thread->schedule();
 }
 
@@ -2439,7 +2439,7 @@ void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
   if (sync == 1) {
     // waiting for receiver side
     parent->resumeOnRecv = false;            // so no one else awakes it
-    block();
+    parent->block();
   }
 }
 
@@ -4308,7 +4308,7 @@ int IReq::wait(MPI_Status *sts){
   while (statusIreq == false) {
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis->parent->resumeOnRecv = true;
-    dis->block();
+    dis->parent->block();
     dis = getAmpiInstance(comm);
 
     if (cancelled) {
@@ -4352,7 +4352,7 @@ int RednReq::wait(MPI_Status *sts){
 
   while (!statusIreq) {
     dis->parent->resumeOnColl = true;
-    dis->block();
+    dis->parent->block();
     dis = getAmpiInstance(comm);
 
 #if CMK_BIGSIM_CHARM
@@ -4386,7 +4386,7 @@ int GatherReq::wait(MPI_Status *sts){
 
   while (!statusIreq) {
     dis->parent->resumeOnColl = true;
-    dis->block();
+    dis->parent->block();
     dis = getAmpiInstance(comm);
 
 #if CMK_BIGSIM_CHARM
@@ -4420,7 +4420,7 @@ int GathervReq::wait(MPI_Status *sts){
 
   while (!statusIreq) {
     dis->parent->resumeOnColl = true;
-    dis->block();
+    dis->parent->block();
     dis = getAmpiInstance(comm);
 
 #if CMK_BIGSIM_CHARM
@@ -4448,7 +4448,7 @@ int SendReq::wait(MPI_Status *sts){
   ampi *dis = getAmpiInstance(comm);
   while (!statusIreq) {
     dis->parent->resumeOnRecv = true;
-    dis->block();
+    dis->parent->block();
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = getAmpiInstance(comm);
   }
@@ -4758,7 +4758,7 @@ bool IReq::test(MPI_Status *sts){
       sts->MPI_CANCEL = 0;
     }
     else {
-      getAmpiInstance(comm)->yield();
+      getAmpiParent()->yield();
     }
   }
   else {
@@ -4766,7 +4766,7 @@ bool IReq::test(MPI_Status *sts){
       statusIreq = true;
     }
     else {
-      getAmpiInstance(comm)->yield();
+      getAmpiParent()->yield();
     }
   }
   return statusIreq;
@@ -4792,7 +4792,7 @@ bool IReq::itest(MPI_Status *sts){
 
 bool RednReq::test(MPI_Status *sts){
   if (!statusIreq) {
-    getAmpiInstance(comm)->yield();
+    getAmpiParent()->yield();
   }
   return statusIreq;
 }
@@ -4803,7 +4803,7 @@ bool RednReq::itest(MPI_Status *sts){
 
 bool GatherReq::test(MPI_Status *sts){
   if (!statusIreq) {
-    getAmpiInstance(comm)->yield();
+    getAmpiParent()->yield();
   }
   return statusIreq;
 }
@@ -4814,7 +4814,7 @@ bool GatherReq::itest(MPI_Status *sts){
 
 bool GathervReq::test(MPI_Status *sts){
   if (!statusIreq) {
-    getAmpiInstance(comm)->yield();
+    getAmpiParent()->yield();
   }
   return statusIreq;
 }
@@ -4825,7 +4825,7 @@ bool GathervReq::itest(MPI_Status *sts){
 
 bool SendReq::test(MPI_Status *sts){
   if (!statusIreq) {
-    getAmpiInstance(comm)->yield();
+    getAmpiParent()->yield();
   }
   return statusIreq;
 }
@@ -4836,7 +4836,7 @@ bool SendReq::itest(MPI_Status *sts){
 
 bool SsendReq::test(MPI_Status *sts){
   if (!statusIreq) {
-    getAmpiInstance(comm)->yield();
+    getAmpiParent()->yield();
   }
   return statusIreq;
 }
@@ -4848,7 +4848,7 @@ bool SsendReq::itest(MPI_Status *sts){
 bool IATAReq::test(MPI_Status *sts){
   for(int i=0;i<elmcount;i++){
     if(false==myreqs[i].itest(sts)){
-      getAmpiInstance(comm)->yield();
+      getAmpiParent()->yield();
       return false;
     }
   }
@@ -4964,7 +4964,7 @@ int AMPI_Request_get_status(MPI_Request request, int *flag, MPI_Status *sts)
   AMPIAPI("AMPI_Request_get_status");
   testRequestNoFree(&request, flag, sts);
   if(*flag != 1)
-    AMPI_Yield(MPI_COMM_WORLD);
+    getAmpiParent()->yield();
   return MPI_SUCCESS;
 }
 
@@ -4974,7 +4974,7 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
   AMPIAPI("AMPI_Test");
   testRequest(request, flag, sts);
   if(*flag != 1)
-    AMPI_Yield(MPI_COMM_WORLD);
+    getAmpiParent()->yield();
   return MPI_SUCCESS;
 }
 
@@ -5003,7 +5003,7 @@ int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Sta
   }
   *index = MPI_UNDEFINED;
   delete reqvec;
-  AMPI_Yield(MPI_COMM_WORLD);
+  getAmpiParent()->yield();
   return MPI_SUCCESS;
 }
 
@@ -5032,7 +5032,7 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
   if(*flag)
     AMPI_Waitall(count,request,sts);
   else
-    AMPI_Yield(MPI_COMM_WORLD);
+    getAmpiParent()->yield();
   return MPI_SUCCESS;
 }
 
@@ -5063,7 +5063,7 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
   }
   delete reqvec;
   if(*outcount==0)
-    AMPI_Yield(MPI_COMM_WORLD);
+    getAmpiParent()->yield();
   return MPI_SUCCESS;
 }
 
@@ -8970,18 +8970,18 @@ int AMPI_Print(const char *str)
 }
 
 CDECL
-int AMPI_Suspend(MPI_Comm comm)
+int AMPI_Suspend(void)
 {
   AMPIAPI("AMPI_Suspend");
-  getAmpiInstance(comm)->block();
+  getAmpiParent()->block();
   return MPI_SUCCESS;
 }
 
 CDECL
-int AMPI_Yield(MPI_Comm comm)
+int AMPI_Yield(void)
 {
   AMPIAPI("AMPI_Yield");
-  getAmpiInstance(comm)->yield();
+  getAmpiParent()->yield();
   return MPI_SUCCESS;
 }
 
@@ -9100,7 +9100,7 @@ int GPUReq::wait(MPI_Status *sts)
 {
   (void)sts;
   while (!statusIreq) {
-    getAmpiInstance(comm)->block();
+    getAmpiParent()->block();
   }
   return 0;
 }
