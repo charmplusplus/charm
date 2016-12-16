@@ -8,6 +8,11 @@ __global__ void helloKernel() {
 
 }
 
+void run_hello(workRequest *wr, cudaStream_t kernel_stream, void **devBuffers) {
+  printf("calling kernel\n");
+  helloKernel<<<wr->dimGrid,wr->dimBlock,wr->smemSize,kernel_stream>>>();
+}
+
 extern "C"
 void *kernelSetup() {
   workRequest *wr = new workRequest;
@@ -16,22 +21,10 @@ void *kernelSetup() {
   wr->dimGrid.x = 1;
   wr->dimBlock.x = 1;
   wr->smemSize = 0;
-  wr->id = 0;
+  wr->traceName = "hello";
+  wr->runKernel = run_hello;
   wr->nBuffers = 0;
   wr->bufferInfo = NULL;
 
   return wr;
-}
-
-void kernelSelect(workRequest *wr) {
-  printf("inside kernelSelect\n");
-  switch (wr->id) {
-  case 0:
-    printf("calling kernel\n");
-    helloKernel<<<wr->dimGrid,wr->dimBlock,wr->smemSize>>>();
-    break;
-  default:
-    printf("error: id %d not valid\n", wr->id);
-    break;
-  }
 }

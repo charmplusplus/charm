@@ -89,7 +89,7 @@ typedef struct gpuEventTimer {
   double cmistartTime;
   double cmiendTime;
   int eventType;
-  int ID;
+  unsigned char *traceName;
 } gpuEventTimer;
 #endif // GPU_TRACE
 
@@ -190,6 +190,7 @@ public:
     initHybridAPIHelper();
   }
 
+  void runKernel(workRequest *wr);
 };
 CsvDeclare(GPUManager, gpuManager);
 
@@ -475,10 +476,18 @@ void freeMemory(workRequest *wr) {
 }
 
 /*
- * a switch statement defined by the user to allow the library to execute
+ * Run the user's kernel for this work request.
+ *
+ * WAS: a switch statement defined by the user to allow the library to execute
  * the correct kernel
  */
-void kernelSelect(workRequest *wr);
+void GPUManager::runKernel(workRequest *wr) {
+	if (wr->runKernel) {
+		wr->runKernel(wr,kernel_stream,devBuffers);
+	}
+	// else, might be only for data transfer (or might be a bug?)
+}
+
 #ifdef GPU_MEMPOOL
 void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
 #endif
@@ -595,7 +604,7 @@ inline void gpuEventStart(workRequest *wr, int *index, WorkRequestStage event, P
   int shared_timeIndex = CsvAccess(gpuManager).timeIndex++;
   shared_gpuEvents[shared_timeIndex].cmistartTime = CmiWallTimer();
   shared_gpuEvents[shared_timeIndex].eventType = event;
-  shared_gpuEvents[shared_timeIndex].ID = wr->id;
+  shared_gpuEvents[shared_timeIndex].traceName = wr->traceName;
   *index = shared_timeIndex;
   shared_gpuEvents[shared_timeIndex].stage = stage;
 #ifdef GPU_DEBUG
@@ -609,7 +618,7 @@ inline void gpuEventEnd(int index){
   CsvAccess(gpuManager).gpuEvents[index].cmiendTime = CmiWallTimer();
   traceUserBracketEvent(CsvAccess(gpuManager).gpuEvents[index].stage, CsvAccess(gpuManager).gpuEvents[index].cmistartTime, CsvAccess(gpuManager).gpuEvents[index].cmiendTime);
 #ifdef GPU_DEBUG
-  printf("End Event Name = %d\t Stage Name=%d workRequest Id=%d\n",CsvAccess(gpuManager).gpuEvents[index].eventType, CsvAccess(gpuManager).gpuEvents[index].stage, CsvAccess(gpuManager).gpuEvents[index].ID);
+  printf("End Event Name = %d\t Stage Name=%d workRequest Id=%s\n",CsvAccess(gpuManager).gpuEvents[index].eventType, CsvAccess(gpuManager).gpuEvents[index].stage, CsvAccess(gpuManager).gpuEvents[index].traceName);
 #endif
 #endif
 }
@@ -703,7 +712,7 @@ void GPUManager::gpuProgressFnHelper() {
         gpuEventStart(head, &runningKernelIndex, KernelExecution, GpuKernelExec);
         workRequestStartTime(head);
         flushDelayedFrees();
-        kernelSelect(head);
+        runKernel(head);
 
         head->state = EXECUTING;
         if (second != NULL) {
@@ -744,7 +753,7 @@ void GPUManager::gpuProgressFnHelper() {
             gpuEventStart(second, &runningKernelIndex, KernelExecution, GpuKernelExec);
             workRequestStartTime(second);
             flushDelayedFrees();
-            kernelSelect(second);
+            runKernel(second);
             second->state = EXECUTING;
             if (third != NULL) {
               gpuEventStart(third, &dataSetupIndex, DataSetup, GpuMemSetup);
@@ -823,13 +832,13 @@ void exitHybridAPI() {
   for (int i=0; i<CsvAccess(gpuManager).timeIndex; i++) {
     switch (CsvAccess(gpuManager).gpuEvents[i].eventType) {
     case DataSetup:
-      printf("Kernel %d data setup", CsvAccess(gpuManager).gpuEvents[i].ID);
+      printf("Kernel %s data setup", CsvAccess(gpuManager).gpuEvents[i].traceName);
       break;
     case DataCleanup:
-      printf("Kernel %d data cleanup", CsvAccess(gpuManager).gpuEvents[i].ID);
+      printf("Kernel %s data cleanup", CsvAccess(gpuManager).gpuEvents[i].traceName);
       break;
     case KernelExecution:
-      printf("Kernel %d execution", CsvAccess(gpuManager).gpuEvents[i].ID);
+      printf("Kernel %s execution", CsvAccess(gpuManager).gpuEvents[i].traceName);
       break;
     default:
       printf("Error, invalid timer identifier\n");

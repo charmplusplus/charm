@@ -24,7 +24,23 @@ typedef struct pinnedMemReq {
   void* callbackFn;
 } pinnedMemReq;
 
+
+/**
+ Do a CudaFreeHost on this host pinned memory,
+ but only when no kernels are runnable.
+*/
 void delayedFree(void* ptr);
+
+
+#ifdef CUDA_USE_CUDAMALLOCHOST /* <- user define */
+#  ifdef CUDA_MEMPOOL
+#    define hapi_hostFree hapi_poolFree
+#  else
+#    define hapi_hostFree delayedFree
+#  endif
+#else
+#  define hapi_hostFree free
+#endif
 
 
 /* pinnedMallocHost
@@ -105,8 +121,15 @@ typedef struct workRequest {
   // the kernel finishes executing on the GPU
   void* callbackFn;
 
-  // id to select the correct kernel in kernelSelect
-  int id;
+  // Short identifier used for tracing and logging
+  const char *traceName;
+
+  /**
+    Host-side function to run this kernel (0 if no kernel to run)
+      kernelStream is the cuda stream to run the kernel in.
+      deviceBuffers is an array of device pointers, indexed by bufferInfo -> bufferID.
+  */
+  void (*runKernel)(struct workRequest *wr, cudaStream_t kernelStream, void **deviceBuffers);
 
   // The following flag is used for control by the system
   int state;
@@ -119,11 +142,18 @@ typedef struct workRequest {
   int chareIndex;
   char compType;
   char compPhase;
-
-  workRequest(){
-    chareIndex = -1;
-  }
 #endif
+
+  workRequest()
+  	:dimGrid(0), dimBlock(0), smemSize(0),
+  	 bufferInfo(0), nBuffers(0), callbackFn(0),
+  	 traceName(""), runKernel(0), state(0),
+  	 userData(0)
+  {
+#ifdef GPU_INSTRUMENT_WRS
+    chareIndex = -1;
+#endif
+  }
 
 } workRequest;
 
@@ -174,7 +204,15 @@ void enqueue(workRequest* wr);
 void setWRCallback(workRequest* wr, void* cb);
 
 #ifdef GPU_MEMPOOL
+/**
+ Return host pinned memory, just like delayedFree,
+ but with the option of recycling to future poolMallocs.
+*/
 void hapi_poolFree(void*);
+
+/**
+ Allocate host pinned memory from the pool.
+*/
 void *hapi_poolMalloc(int size);
 #endif
 /* external declarations needed by the user */

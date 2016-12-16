@@ -118,8 +118,8 @@ following stages during its execution:
 Based on the instructions contained in each work request, the GPU Manager will
 allocate the required buffers in GPU global memory and issue asynchronous CUDA
 data transfer operations directly. In order to execute kernels, the GPU Manager
-calls the \code{kernelSelect} function that must be defined by the user. This
-function specifies the CUDA kernel call for each work request type.
+calls the \code{runKernel} function that must be defined by the user. This
+function specifies the CUDA kernel call for your work request.
 
 Under steady state execution with multiple concurrent work requests, as
 one \code{workRequest} progresses to the execution stage, GPU Manager will
@@ -127,7 +127,7 @@ initate the data transfer for the second
 \code{workRequest} in the queue, and so on.
 
 In a typical application, the work request definition,
-\code{kernelSelect} function, CUDA kernel defitinions, and code for submission
+kernel run functions, CUDA kernel defitinions, and code for submission
 of work requests would all go in a \code{.cu} file that is compiled with
 \code{nvcc} separately from the other files (e.g. \code{.C}, \code{.ci}) in the
 \charmpp{} application.
@@ -143,7 +143,7 @@ Using GPU Manager involves:
 \begin{enumerate}
 \item Definining CUDA kernels as in a regular CUDA application
 \item Defining work requests and their callback functions
-\item Defining the \code{void kernelSelect(workRequest *wr)} function, used by the GPU Manager to issue a kernel call based on the kernel identifier defined in the work request
+\item Defining the \code{void runMyKernel(workRequest *wr, cudaStream\_t kernelStream, void **deviceBuffers)} functions, used by the GPU Manager to issue a kernel call based on the kernel identifier defined in the work request
 \item Submitting work requests to the GPU Manager
 \end{enumerate}
 
@@ -176,7 +176,15 @@ We will explain the contents of \code{dataInfo} struct later.
 \item[void *callbackFn]- a pointer to a \code{CkCallback} object specified by the user;
 executed after the kernel and memory transfers have finished.
 
-\item[int id]- id to select the correct kernel in \code{void kernelSelect(workRequest *wr)}.
+\item[const char *traceName]- A short identifier used for tracing and logging.
+
+\item[function runKernel]- A user defined host function to run the kernel.
+   We will pass this function three parameters:
+   \begin{description}
+   \item[workRequest]- The workrequest being run.
+   \item[kernelStream]- The cuda stream to run the kernel in.
+   \item[deviceBuffers]- An array of device pointers, indexed by bufferID.
+   \end{description}
 
 \item[int state]- the stage of a \code{workRequest}'s execution, set and used internally by the GPU Manager
 
@@ -224,7 +232,7 @@ two vectors A and B.
 \begin{alltt}
 #include "wr.h"
 #define BLOCK_SIZE 256
-void createWorkRequest(int vectorSize, float *h_A, float *h_B, float **h_C, int myIndex, void *cb)
+void createWorkRequest(int vectorSize, float *h_A, float *h_B, float **h_C, int myIndex, CkCallback *cb)
 \{
     dataInfo *info;
     workRequest *vecAdd = new workRequest;
@@ -270,8 +278,10 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B, float **h_C, int 
     /* a CkCallback pointer */
     vecAdd->callbackFn = cb;
 
-    /* kernel id for kernelSelect */
-    vecAdd->id = ADD_KERNEL;
+    vecAdd->traceName = "add";
+
+    /* kernel run function */
+    vecAdd->runKernel = run_add;
 
     vecAdd->userData = new int;
     memcpy(vecAdd->userData, &vectorSize, sizeof(int));
@@ -304,30 +314,22 @@ __global__ void vecAdd(float *a, float *b, float *c, int n)
 \subsection{Launching Kernels}
 
 Kernel launches are identical to regular kernel launches in normal CUDA
-programs. We utilize a switch case to choose which kernel to launch.
-A kernel (and its associated \code{workRequest}) is identified by its id.
-Below is a simple example with one kernel launch. Larger programs
-can have multiple kernels with different kernel IDs.
+programs, run in a small dedicated function.
 
 \begin{alltt}
-void kernelSelect(workRequest *wr)
+void run_add(workRequest *wr, cudaStream_t kernelStream, void **deviceBuffers)
 \{
-    switch (wr->id)
-    \{
-        case ADD_KERNEL :
-            printf("Add KERNEL \textbackslash{n}");
+    printf("Add KERNEL \textbackslash{n}");
 /*
  *  devBuffers is declared by our API during the init phase on every processor.
  *  It jumps to the correct array index with the help of bufferID, 
  *  which is supplied by the API or user.
  */
-            vecAdd<<< wr->dimGrid, wr->dimBlock, wr->smemSize, kernel_stream>>>
-                ((float *) devBuffers[wr->bufferInfo[0].bufferID],
-                 (float *) devBuffers[wr->bufferInfo[1].bufferID],
-                 (float *) devBuffers[wr->bufferInfo[2].bufferID],
-                 *((int *) wr->userData));
-            break;
-    \}
+    vecAdd<<< wr->dimGrid, wr->dimBlock, wr->smemSize, kernelStream>>>
+        ((float *) deviceBuffers[wr->bufferInfo[0].bufferID],
+         (float *) deviceBuffers[wr->bufferInfo[1].bufferID],
+         (float *) deviceBuffers[wr->bufferInfo[2].bufferID],
+         *((int *) wr->userData));
 \}
 \end{alltt}
 
@@ -357,9 +359,10 @@ LD_LIBS= -lcublas
 all: vectorAdd
 \qquad\$(NVCC) \$(NVCC_FLAGS) \$(NVCC_INC) \$(CHARMINC) -o vectorAddCU.o vectorAdd.cu
 \end{alltt}
-GPU Manager also supports \texttt{BLAS} routines in exactly the same way. \texttt{BLAS}
-routines must go in \code{kernelSelect}. Creating a \code{workRequest} for \texttt{BLAS} is same as any
-other kernel.
+
+GPU Manager also supports \texttt{CuBLAS} or other GPU libraries in exactly the same way.
+Call \texttt{CuBLAS} or the other GPU library directly from a kernel run function;
+creating the \code{workRequest} works the same as any other kernel.
 
 
 \section{Debugging}

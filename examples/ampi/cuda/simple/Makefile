@@ -3,6 +3,7 @@
 # in your environment. For the tests to work right, those settings
 # need to be in a login script.
 
+CUDA_DIR ?= /usr/local/cuda
 NVCC=$(CUDA_DIR)/bin/nvcc
 CHARMDIR=../../../..
 AMPICC=$(CHARMDIR)/bin/ampicc

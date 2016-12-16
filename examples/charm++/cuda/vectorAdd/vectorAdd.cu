@@ -15,6 +15,19 @@ __global__ void vecAdd(float *C, float *A, float *B, int n)
   }
 }
 
+void run_vecAdd(workRequest *wr, cudaStream_t kernel_stream, void **devBuffers)
+{
+  printf("VECTOR KERNEL");
+  vecAdd<<< wr->dimGrid, wr->dimBlock, wr->smemSize, kernel_stream >>>
+      ((float *) devBuffers[wr->bufferInfo[C_INDEX].bufferID],
+       (float *) devBuffers[wr->bufferInfo[A_INDEX].bufferID],
+       (float *) devBuffers[wr->bufferInfo[B_INDEX].bufferID],
+       *((int *) wr->userData));
+  hapi_poolFree(wr->bufferInfo[C_INDEX].hostBuffer);
+  hapi_poolFree(wr->bufferInfo[B_INDEX].hostBuffer);
+  hapi_poolFree(wr->bufferInfo[A_INDEX].hostBuffer);
+}
+
 void createWorkRequest(int vectorSize, float *h_A, float *h_B,
                 float **h_C, int myIndex, void *cb) {
   int size = vectorSize * vectorSize * sizeof(float);
@@ -53,7 +66,8 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   CInfo->size = size;
 
   vectorAddReq->callbackFn = cb;
-  vectorAddReq->id = VECTOR_KERNEL;
+  vectorAddReq->traceName = "vecAdd";
+  vectorAddReq->runKernel = run_vecAdd;
 
   vectorAddReq->userData = malloc(sizeof(int));
   memcpy(vectorAddReq->userData, &vectorSize, sizeof(int));
@@ -61,20 +75,3 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   enqueue(vectorAddReq);
 }
 
-void kernelSelect(workRequest *wr) {
-  cudaStream_t kernel_stream = getKernelStream();
-  void** devBuffers = getdevBuffers();
-  switch (wr->id) {
-    case VECTOR_KERNEL:
-      printf("VECTOR KERNEL");
-      vecAdd<<< wr->dimGrid, wr->dimBlock, wr->smemSize, kernel_stream >>>
-      ((float *) devBuffers[wr->bufferInfo[C_INDEX].bufferID],
-       (float *) devBuffers[wr->bufferInfo[A_INDEX].bufferID],
-       (float *) devBuffers[wr->bufferInfo[B_INDEX].bufferID],
-       *((int *) wr->userData));
-    break;
-  }
-  hapi_poolFree(wr->bufferInfo[C_INDEX].hostBuffer);
-  hapi_poolFree(wr->bufferInfo[B_INDEX].hostBuffer);
-  hapi_poolFree(wr->bufferInfo[A_INDEX].hostBuffer);
-}

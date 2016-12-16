@@ -1881,11 +1881,11 @@ void endtracebigsim(char* msg, char* param){
 
 #if CMK_CUDA
 void ampi_gpu_iinvoke(int *to_call, int *request, int *ierr) {
-  *ierr = AMPI_GPU_Iinvoke(to_call, request);
+  *ierr = AMPI_GPU_Iinvoke((workRequest *)to_call, request);
 }
 
 void ampi_gpu_invoke(int *to_call, int *ierr) {
-  *ierr = AMPI_GPU_Invoke(to_call);
+  *ierr = AMPI_GPU_Invoke((workRequest *)to_call);
 }
 #endif
 

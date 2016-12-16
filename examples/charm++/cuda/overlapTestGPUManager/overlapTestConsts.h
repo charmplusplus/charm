@@ -3,9 +3,7 @@
 
 typedef float ElementType; 
 #define BLOCK_SIZE 8
-#define MATMUL_KERNEL 1000
 
-#define BLAS_KERNEL 100
 #define BUFFERS_PER_CHARE 3
 
 #define A_INDEX 0

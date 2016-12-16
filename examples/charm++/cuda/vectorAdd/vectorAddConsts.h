@@ -2,7 +2,6 @@
 #define __VECTOR_TEST_CONSTS_H
 
 #define BLOCK_SIZE 256
-#define VECTOR_KERNEL 1000
 
 #define BUFFERS_PER_CHARE 3
 
