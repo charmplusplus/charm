@@ -548,12 +548,14 @@ class MemElementPacker : public CkLocIterator{
 		void addLocation(CkLocation &loc){
 			CkArrayIndexMax idx = loc.getIndex();
 			CkGroupID gID = locMgr->ckGetGroupID();
-			ArrayElement *elt = (ArrayElement *)loc.getLocalRecord();
+			CmiUInt8 id = loc.getID();
+                        ArrayElement *elt = (ArrayElement *)loc.getLocalRecord();
 			CmiAssert(elt);
 			//elt = (ArrayElement *)locMgr->lookup(idx, aid);
 			p|gID;
 			p|idx;
-			locMgr->pupElementsFor(p,loc.getLocalRecord(),CkElementCreation_migrate);
+			p|id;
+                        locMgr->pupElementsFor(p,loc.getLocalRecord(),CkElementCreation_migrate);
 		}
 };
 
