@@ -617,19 +617,22 @@ static void *meta_valloc(size_t size)
 /*******************************************************************
 The locking code is common to all implementations except OS-builtin.
 */
+static int CmiMemoryInited = 0;
 
 void CmiMemoryInit(char **argv)
 {
   CmiArgGroup("Converse","Memory module");
   meta_init(argv);
   CmiOutOfMemoryInit();
+  if (CmiMyRank()==0) CmiMemoryInited = 1;
+  CmiNodeAllBarrier();
 }
 
 /* Wrap a CmiMemLock around this code */
 #define MEM_LOCK_AROUND(code) \
-  CmiMemLock(); \
+  if (CmiMemoryInited && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) CmiMemLock(); \
   code; \
-  CmiMemUnlock();
+  if (CmiMemoryInited && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) CmiMemUnlock();
 
 /* Wrap a reentrant CmiMemLock around this code */
 #define REENTRANT_MEM_LOCK_AROUND(code) \

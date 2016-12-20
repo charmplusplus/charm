@@ -2,8 +2,7 @@
 
 A migratable memory allocator.
 
-FIXME: isomalloc is threadsafe, so the isomallocs *don't* need to
-be wrapped in CmiMemLock.  (Doesn't hurt, tho')
+NOTE: isomalloc is threadsafe, so the isomallocs are not wrapped in CmiMemLock.
 
 *****************************************************************************/
 
@@ -23,11 +22,9 @@ CpvStaticDeclare(CmiIsomallocBlockList *,pushed_blocklist);
 #define ISOMALLOC_PUSH \
 	CmiIsomallocBlockList *pushed_blocklist=CpvAccess(isomalloc_blocklist);\
 	CpvAccess(isomalloc_blocklist)=NULL;\
-	rank_holding_CmiMemLock=CmiMyRank();\
 
 #define ISOMALLOC_POP \
 	CpvAccess(isomalloc_blocklist)=pushed_blocklist;\
-	rank_holding_CmiMemLock=-1;\
 
 /* temporarily disable/enable isomalloc. Note the following two fucntions
  * must be used in pair, and no suspend of thread is allowed in between
@@ -36,13 +33,11 @@ void CmiDisableIsomalloc()
 {
 	CpvAccess(pushed_blocklist)=CpvAccess(isomalloc_blocklist);
 	CpvAccess(isomalloc_blocklist)=NULL;
-	rank_holding_CmiMemLock=CmiMyRank();
 }
 
 void CmiEnableIsomalloc()
 {
 	CpvAccess(isomalloc_blocklist)=CpvAccess(pushed_blocklist);
-	rank_holding_CmiMemLock=-1;
 }
 
 #if CMK_HAS_TLS_VARIABLES
@@ -70,8 +65,8 @@ static void meta_init(char **argv)
 #if CMK_HAS_TLS_VARIABLES
    isomalloc_thread = 1;         /* isomalloc is allowed in this pthread */
 #endif
+   if (CmiMyRank()==0) meta_inited = 1;
    CmiNodeAllBarrier();
-   meta_inited = 1;
 }
 
 static void *meta_malloc(size_t size)
