@@ -1703,11 +1703,9 @@ int ampiErrhandler(const char* func, int errcode);
 
 //Use this to mark the start of AMPI interface routines that can only be called on AMPI threads:
 #if CMK_ERROR_CHECKING
-#define AMPIAPI(routineName)               \
-  if (isAmpiThread())                      \
-    TCHARM_API_TRACE(routineName, "ampi"); \
-  else                                     \
-    CkAbort("AMPI> cannot call MPI routines from non-AMPI threads!");
+#define AMPIAPI(routineName) \
+  if (!isAmpiThread()) { CkAbort("AMPI> cannot call MPI routines from non-AMPI threads!"); } \
+  TCHARM_API_TRACE(routineName, "ampi");
 #else
 #define AMPIAPI(routineName) TCHARM_API_TRACE(routineName, "ampi")
 #endif
