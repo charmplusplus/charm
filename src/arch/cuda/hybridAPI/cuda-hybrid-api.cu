@@ -50,6 +50,7 @@
  */
 
 #if defined GPU_MEMPOOL || defined GPU_INSTRUMENT_WRS
+#include "mempool.h"
 #include "cklists.h"
 #endif
 
@@ -107,19 +108,11 @@ public:
   void *delayedFreeReqs[MAX_DELAYED_FREE_REQS];
 
 #ifdef GPU_MEMPOOL
-#define GPU_MEMPOOL_NUM_SLOTS 20 // Update for new row, again this shouldn't be hard coded!
-// pre-allocated buffers will be at least this big
-#define GPU_MEMPOOL_MIN_BUFFER_SIZE 256
 // Scale the amount of memory each node pins
 #define GPU_MEMPOOL_SCALE 1.0
 
-  CkVec<BufferPool> memPoolFreeBufs;
-  CkVec<size_t> memPoolBoundaries;
-
-#ifdef GPU_DUMMY_MEMPOOL
-  CkVec<int> memPoolMax;
-  CkVec<int> memPoolSize;
-#endif
+  // Pinned host memory pool (from cudaMallocHost)
+  mempool_type *mp_pinned;
 
 #endif
 
@@ -480,47 +473,81 @@ void freeMemory(workRequest *wr) {
  */
 void kernelSelect(workRequest *wr);
 #ifdef GPU_MEMPOOL
-void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
+
+/* Underlying functions that grab large chunks of 
+   pinned memory for the pool. */
+
+#define mempool_type_cudaMallocHost 123
+#define mempool_type_systemMalloc 125
+static void * mempool_gpu_alloc(size_t *size, mem_handle_t *mem_hndl, int expand_flag)
+{
+    void *mem=0;
+    cudaMallocHost(&mem,*size); // <- no cudaChk, we check manually
+    if (mem!=0) { // cudaMallocHost worked
+        *mem_hndl=mempool_type_cudaMallocHost;
+    } else { 
+        // cudaMallocHost failed--fall back to non-pinned system malloc?
+        mem=malloc(*size);
+        if (mem==0) { // uh, what?
+            CmiError("HybridAPI mempool_gpu_alloc of %zu bytes failed both cudaMallocHost and system malloc\n",
+                *size);
+            CmiAbort("HybridAPI mempool_gpu_alloc failure");
+        }
+        *mem_hndl=mempool_type_systemMalloc;
+    }
+#ifdef GPU_TRACE
+    CkPrintf("mempool_gpumalloc: size %ld, pointer %p (expand=%s)\n",
+        *size,mem,expand_flag?"true":"false");
 #endif
+    return mem;
+}
+static void mempool_gpu_free(void *ptr, mem_handle_t mem_hndl)
+{
+#ifdef GPU_TRACE
+    CkPrintf("mempool_gpu_free: pointer %p\n",ptr);
+#endif
+    switch (mem_hndl) {
+    case mempool_type_cudaMallocHost:
+        cudaChk(cudaFreeHost(ptr));
+        break;
+    case mempool_type_systemMalloc:
+        free(ptr);
+        break;
+    default:
+        CmiError("HybridAPI mempool_gpu_free of pointer %p has invalid mem_hndl type %d\n",
+            ptr,(int)mem_hndl);
+        CmiAbort("HybridAPI mempool_gpu_free failure");
+        break;
+    };
+}
+
+#endif
+
+inline int getMyCudaDevice(int myPe) {
+  int deviceCount;
+  cudaChk(cudaGetDeviceCount(&deviceCount));
+  return myPe % deviceCount;
+}
 
 void initHybridAPI() {
   CsvInitialize(GPUManager, gpuManager);
 
-#ifndef GPU_DUMMY_MEMPOOL
-  int sizes[GPU_MEMPOOL_NUM_SLOTS];
-        /*256*/ sizes[0]  =  4;
-        /*512*/ sizes[1]  =  2;
-       /*1024*/ sizes[2]  =  2;
-       /*2048*/ sizes[3]  =  4;
-       /*4096*/ sizes[4]  =  2;
-       /*8192*/ sizes[5]  =  6;
-      /*16384*/ sizes[6]  =  5;
-      /*32768*/ sizes[7]  =  2;
-      /*65536*/ sizes[8]  =  1;
-     /*131072*/ sizes[9]  =  1;
-     /*262144*/ sizes[10] =  1;
-     /*524288*/ sizes[11] =  1;
-    /*1048576*/ sizes[12] =  1;
-    /*2097152*/ sizes[13] =  2;
-    /*4194304*/ sizes[14] =  2;
-    /*8388608*/ sizes[15] =  2;
-   /*16777216*/ sizes[16] =  2;
-   /*33554432*/ sizes[17] =  1;
-   /*67108864*/ sizes[18] =  1;
-  /*134217728*/ sizes[19] =  7;
-  createPool(sizes, GPU_MEMPOOL_NUM_SLOTS, CsvAccess(gpuManager).memPoolFreeBufs);
+#ifdef GPU_MEMPOOL
+  // Get GPU memory size
+  cudaDeviceProp prop;
+  cudaChk(cudaGetDeviceProperties(&prop, getMyCudaDevice(CmiMyPe())));
+
+  // Divide by #pes and multiply by #pes in nodes
+  size_t availableMemory = prop.totalGlobalMem / CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))
+                            * CmiMyNodeSize() * GPU_MEMPOOL_SCALE;
+
+  CsvAccess(gpuManager).mp_pinned = mempool_init(availableMemory,mempool_gpu_alloc,mempool_gpu_free,0);
 
 #ifdef GPU_MEMPOOL_DEBUG
   printf("[%d] done creating buffer pool\n", CmiMyPe());
 #endif
 
 #endif
-}
-
-inline int getMyCudaDevice(int myPe) {
-  int deviceCount;
-  cudaChk(cudaGetDeviceCount(&deviceCount));
-  return myPe % deviceCount;
 }
 
 /* initHybridAPIHelper
@@ -552,31 +579,6 @@ void GPUManager::initHybridAPIHelper() {
   traceRegisterUserEvent("GPU Kernel Execution", GpuKernelExec);
   traceRegisterUserEvent("GPU Memory Cleanup", GpuMemCleanup);
 #endif
-
-#ifdef GPU_MEMPOOL
-  int nslots = GPU_MEMPOOL_NUM_SLOTS;
-
-#ifdef GPU_DUMMY_MEMPOOL
-  memPoolMax.reserve(nslots);
-  memPoolMax.length() = nslots;
-  memPoolSize.reserve(nslots);
-  memPoolSize.length() = nslots;
-#endif
-
-  memPoolBoundaries.reserve(GPU_MEMPOOL_NUM_SLOTS);
-  memPoolBoundaries.length() = GPU_MEMPOOL_NUM_SLOTS;
-
-  size_t bufSize = GPU_MEMPOOL_MIN_BUFFER_SIZE;
-  for(int i = 0; i < GPU_MEMPOOL_NUM_SLOTS; i++){
-    memPoolBoundaries[i] = bufSize;
-    bufSize = bufSize << 1;
-#ifdef GPU_DUMMY_MEMPOOL
-    memPoolSize[i] =  0;
-    memPoolMax[i]  = -1;
-#endif
-  }
-
-#endif // GPU_MEMPOOL
 
 #ifdef GPU_INSTRUMENT_WRS
   initialized_instrument = false;
@@ -784,10 +786,6 @@ void GPUManager::gpuProgressFnHelper() {
   }
 }
 
-#ifdef GPU_MEMPOOL
-void releasePool(CkVec<BufferPool> &pools);
-#endif
-
 /* exitHybridAPI
  *  cleans up and deletes memory allocated for the queue and the CUDA streams
  */
@@ -798,20 +796,9 @@ void exitHybridAPI() {
   CmiDestroyLock(CsvAccess(gpuManager).progresslock);
   CmiDestroyLock(CsvAccess(gpuManager).pinlock);
   CmiDestroyLock(CsvAccess(gpuManager).dfrlock);
+  
 #ifdef GPU_MEMPOOL
-
-#ifndef GPU_DUMMY_MEMPOOL
-  releasePool(CsvAccess(gpuManager).memPoolFreeBufs);
-#else
-  for(int i = 0; i < CsvAccess(gpuManager).memPoolBoundaries.length(); i++){
-    printf("(%d) slot %d size: %d max: %d\n", CmiMyPe(), i, CsvAccess(gpuManager).memPoolBoundaries[i], CsvAccess(gpuManager).memPoolMax[i]);
-  }
-
-  if(CsvAccess(gpuManager).memPoolBoundaries.length() != CsvAccess(gpuManager).memPoolMax.length()){
-    CmiAbort("Error while exiting: memPoolBoundaries and memPoolMax sizes do not match!\n");
-  }
-#endif
-
+  mempool_destroy(CsvAccess(gpuManager).mp_pinned);
 #endif // GPU_MEMPOOL
 
   wrqueue::deleteWRqueue(CsvAccess(gpuManager).wrQueue);
@@ -841,228 +828,23 @@ void exitHybridAPI() {
 
 }
 
+
 #ifdef GPU_MEMPOOL
-void releasePool(CkVec<BufferPool> &pools){
-  for(int i = 0; i < pools.length(); i++){
-    Header *hdr = pools[i].head;
-    if (hdr != NULL){
-      cudaChk(cudaFreeHost((void *)hdr));
-    }
-  }
-  pools.free();
-}
 
-// Create a pool with nslots slots.
-// There are nbuffers[i] buffers for each buffer size corresponding to entry i
-// FIXME - list the alignment/fragmentation issues with either of two allocation schemes:
-// if a single, large buffer is allocated for each subpool
-// if multiple smaller buffers are allocated for each subpool
-void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
-  // Handle
-  CkVec<size_t> memPoolBoundariesHandle = CsvAccess(gpuManager).memPoolBoundaries;
-
-  // Initialize pools
-  pools.reserve(nslots);
-  pools.length() = nslots;
-  for (int i = 0; i < nslots; i++) {
-    pools[i].size = memPoolBoundariesHandle[i];
-    pools[i].head = NULL;
-  }
-
-  // Get GPU memory size
-  cudaDeviceProp prop;
-  cudaChk(cudaGetDeviceProperties(&prop, getMyCudaDevice(CmiMyPe())));
-
-  // Divide by #pes and multiply by #pes in nodes
-  size_t availableMemory = prop.totalGlobalMem / CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))
-                            * CmiMyNodeSize() * GPU_MEMPOOL_SCALE;
-
-  // Pre-calculate memory per size
-  int maxBuffers = *std::max_element(nbuffers, nbuffers+nslots);
-  int nBuffersToAllocate[nslots];
-  memset(nBuffersToAllocate, 0, sizeof(nBuffersToAllocate));
-  size_t bufSize;
-  while (availableMemory >= memPoolBoundariesHandle[0] + sizeof(Header)) {
-    for (int i = 0; i < maxBuffers; i++) {
-      for (int j = nslots - 1; j >= 0; j--) {
-        bufSize = memPoolBoundariesHandle[j] + sizeof(Header);
-        if (i < nbuffers[j] && bufSize <= availableMemory) {
-          nBuffersToAllocate[j]++;
-          availableMemory -= bufSize;
-        }
-      }
-    }
-  }
-
-
-  // Pin the host memory
-  for (int i = 0; i < nslots; i++) {
-    bufSize = memPoolBoundariesHandle[i] + sizeof(Header);
-    int numBuffers = nBuffersToAllocate[i];
-
-    Header* hd;
-    Header* previous = NULL;
-
-    // Pin host memory in a contiguous block for a slot
-    void* pinnedChunk;
-    cudaChk(cudaMallocHost(&pinnedChunk, bufSize * numBuffers));
-
-    // Initialize header structs
-    for (int j = numBuffers - 1; j >= 0; j--) {
-      hd = reinterpret_cast<Header*>(reinterpret_cast<unsigned char*>(pinnedChunk) + bufSize * j);
-      hd->slot = i;
-      hd->next = previous;
-      previous = hd;
-    }
-
-    pools[i].head = previous;
-#ifdef GPU_MEMPOOL_DEBUG
-    pools[i].num = numBuffers;
-#endif
-  }
-}
-
-int findPool(int size){
-  int boundaryArrayLen = CsvAccess(gpuManager).memPoolBoundaries.length();
-  if (size <= CsvAccess(gpuManager).memPoolBoundaries[0]) {
-    return 0;
-  }
-  else if (size > CsvAccess(gpuManager).memPoolBoundaries[boundaryArrayLen-1]) {
-    // create new slot
-    CsvAccess(gpuManager).memPoolBoundaries.push_back(size);
-#ifdef GPU_DUMMY_MEMPOOL
-    CsvAccess(gpuManager).memPoolMax.push_back(-1);
-    CsvAccess(gpuManager).memPoolSize.push_back(0);
-#endif
-
-    BufferPool newpool;
-    cudaChk(cudaMallocHost((void **)&newpool.head, size+sizeof(Header)));
-    if (newpool.head == NULL) {
-      printf("(%d) findPool: failed to allocate newpool %d head, size %d\n", CmiMyPe(), boundaryArrayLen, size);
-      CmiAbort("Exiting after failed newpool allocation!\n");
-    }
-    newpool.size = size;
-#ifdef GPU_MEMPOOL_DEBUG
-    newpool.num = 1;
-#endif
-    CsvAccess(gpuManager).memPoolFreeBufs.push_back(newpool);
-
-    Header* hd = newpool.head;
-    hd->next = NULL;
-    hd->slot = boundaryArrayLen;
-
-    return boundaryArrayLen;
-  }
-  for (int i = 0; i < CsvAccess(gpuManager).memPoolBoundaries.length()-1; i++) {
-    if (CsvAccess(gpuManager).memPoolBoundaries[i] < size && size <= CsvAccess(gpuManager).memPoolBoundaries[i+1]) {
-      return (i + 1);
-    }
-  }
-  return -1;
-}
-
-void* getBufferFromPool(int pool, int size){
-  Header* ret;
-  if (pool < 0 || pool >= CsvAccess(gpuManager).memPoolFreeBufs.length()) {
-    printf("(%d) getBufferFromPool, pool: %d, size: %d invalid pool\n", CmiMyPe(), pool, size);
-#ifdef GPU_MEMPOOL_DEBUG
-    printf("(%d) num: %d\n", CmiMyPe(), CsvAccess(gpuManager).memPoolFreeBufs[pool].num);
-#endif
-    CmiAbort("Exiting after invalid pool!\n");
-  }
-  else if (CsvAccess(gpuManager).memPoolFreeBufs[pool].head == NULL) {
-    Header* hd;
-    cudaChk(cudaMallocHost((void **)&hd, sizeof(Header) + CsvAccess(gpuManager).memPoolFreeBufs[pool].size));
-#ifdef GPU_MEMPOOL_DEBUG
-    printf("(%d) getBufferFromPool, pool: %d, size: %d expand by 1\n", CmiMyPe(), pool, size);
-#endif
-    if (hd == NULL) {
-      CmiAbort("Exiting after NULL hd from pool!\n");
-    }
-    hd->slot = pool;
-    return (void *)(hd + 1);
-  }
-  else {
-    ret = CsvAccess(gpuManager).memPoolFreeBufs[pool].head;
-    CsvAccess(gpuManager).memPoolFreeBufs[pool].head = ret->next;
-#ifdef GPU_MEMPOOL_DEBUG
-    ret->size = size;
-    CsvAccess(gpuManager).memPoolFreeBufs[pool].num--;
-#endif
-    return (void *)(ret + 1);
-  }
-  return NULL;
-}
-
-void returnBufferToPool(int pool, Header* hd) {
-  hd->next = CsvAccess(gpuManager).memPoolFreeBufs[pool].head;
-  CsvAccess(gpuManager).memPoolFreeBufs[pool].head = hd;
-#ifdef GPU_MEMPOOL_DEBUG
-  CsvAccess(gpuManager).memPoolFreeBufs[pool].num++;
-#endif
-}
-
-void* hapi_poolMalloc(int size) {
+void* hapi_poolMalloc(size_t size) {
   CmiLock(CsvAccess(gpuManager).bufferlock);
-  int pool = findPool(size);
-  void* buf;
-#ifdef GPU_DUMMY_MEMPOOL
-  cudaChk(cudaMallocHost((void **)&buf, size+sizeof(Header)));
-  if(pool < 0 || pool >= CsvAccess(gpuManager).memPoolSize.length()){
-    printf("(%d) need to create up to pool %d; malloc size: %d\n", CmiMyPe(), pool, size);
-    CmiAbort("Exiting after need to create bigger pool!\n");
-  }
-  CsvAccess(gpuManager).memPoolSize[pool]++;
-  if(CsvAccess(gpuManager).memPoolSize[pool] > CsvAccess(gpuManager).memPoolMax[pool]){
-    CsvAccess(gpuManager).memPoolMax[pool] = CsvAccess(gpuManager).memPoolSize[pool];
-  }
-  Header *hdr = (Header *)buf;
-  hdr->slot = pool;
-  hdr = hdr+1;
-  buf = (void *)hdr;
-#else
-  buf = getBufferFromPool(pool, size);
-#endif
-
-#ifdef GPU_MEMPOOL_DEBUG
-  printf("(%d) hapi_malloc size %d pool %d left %d\n", CmiMyPe(), size, pool, CsvAccess(gpuManager).memPoolFreeBufs[pool].num);
-#endif
+  void *buf=mempool_malloc(CsvAccess(gpuManager).mp_pinned,size,1);
   CmiUnlock(CsvAccess(gpuManager).bufferlock);
   return buf;
 }
 
 void hapi_poolFree(void* ptr) {
-  Header* hd = ((Header *)ptr) - 1;
-  int pool = hd->slot;
-
-#ifdef GPU_MEMPOOL_DEBUG
-  int size = hd->size;
-#endif // GPU_MEMPOOL_DEBUG
-
-  /* FIXME: We should get rid of code under GPU_DUMMY_MEMPOOL because
-   *  a) we don't use this flag
-   *  b) code under this flag does nothing useful.
-   */
   CmiLock(CsvAccess(gpuManager).bufferlock);
-#ifdef GPU_DUMMY_MEMPOOL
-  if(pool < 0 || pool >= CsvAccess(gpuManager).memPoolSize.length()){
-    printf("(%d) free pool %d\n", CmiMyPe(), pool);
-    CmiAbort("Exiting after freeing out of bounds pool!\n");
-  }
-  CsvAccess(gpuManager).memPoolSize[pool]--;
-  delayedFree((void *)hd);
-#else
-  returnBufferToPool(pool, hd);
-#endif
+  mempool_free(CsvAccess(gpuManager).mp_pinned,ptr);
   CmiUnlock(CsvAccess(gpuManager).bufferlock);
-
-#ifdef GPU_MEMPOOL_DEBUG
-  printf("(%d) hapi_free size %d pool %d left %d\n", CmiMyPe(), size, pool, CsvAccess(gpuManager).memPoolFreeBufs[pool].num);
-#endif
 }
 
-
-#endif
+#endif // GPU_MEMPOOL
 
 #ifdef GPU_INSTRUMENT_WRS
 void hapi_initInstrument(int numChares, char types){

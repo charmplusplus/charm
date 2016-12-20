@@ -175,7 +175,7 @@ void setWRCallback(workRequest* wr, void* cb);
 
 #ifdef GPU_MEMPOOL
 void hapi_poolFree(void*);
-void *hapi_poolMalloc(int size);
+void *hapi_poolMalloc(size_t size);
 #endif
 /* external declarations needed by the user */
 

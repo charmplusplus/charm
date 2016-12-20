@@ -37,27 +37,6 @@ void gpuProgressFn();
 */
 void exitHybridAPI();
 
-
-#ifdef GPU_MEMPOOL
-// data and metadata reside in same chunk of memory
-typedef struct _header {
-  struct _header *next;
-  int slot;
-#ifdef GPU_MEMPOOL_DEBUG
-  int size;
-#endif
-} Header;
-
-typedef struct _bufferPool {
-  Header *head;
-  size_t size;
-#ifdef GPU_MEMPOOL_DEBUG
-  int num;
-#endif
-} BufferPool;
-
-#endif // GPU_MEMPOOL
-
 extern void cudaErrorDie(int err, const char* code, const char* file, int line);
 
 #define cudaChk(code)                                                  \
