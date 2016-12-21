@@ -1,3 +1,4 @@
+#! /bin/sh
 
 args=""
 QUIET=0
