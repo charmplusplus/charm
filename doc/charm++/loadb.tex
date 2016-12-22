@@ -145,6 +145,34 @@ the root.
 Users can choose any load balancing strategy they think is appropriate for their
 application. The compiler and runtime options are described in
 section~\ref{lbOption}.
+\linebreak
+
+{\bf Metabalancer to automatically schedule load balancing}
+
+Metabalancer can be invoked to automatically decide when to
+invoke the load balancer, given the load-balancing strategy.
+Metabalancer uses a linear prediction model
+to set the load balancing period based on observed load imbalance.
+
+The runtime option {\em +MetaLB} can be used to invoke this feature to automatically invoke
+the load balancing strategy based on the imbalance observed.
+This option needs to be specified alongside the {\em +balancer} option to specify the
+load balancing strategy to use. Metabalancer relies on the AtSync() calls specified
+in Section~\ref{lbarray} to collect load statistics.
+
+{\em +MetaLBModelDir} \verb|<path-to-model>|
+can be used to invoke the Metabalancer feature
+to automatically decide which load balancing strategy to invoke. A model trained on a
+generic representative load imbalance benchmark can be found in
+ \verb|charm/src/ck-ldb/rf_model|.
+Metabalancer makes a decision on which load balancing strategy
+to invoke out of a subset of strategies, namely GreedyLB, RefineLB,
+HybridLB, DistributedLB, MetisLB and ScotchLB.
+For using the model based prediction in Metabalancer, \charmpp{} needs to be built with
+all the above load balancing strategies including MetisLB and ScotchLB that rely
+on external partitioning libraries METIS and SCOTCH specified
+in the Section~\ref{lbOption}.
+
 
 %In some cases, one may need to create and invoke multiple load balancing
 %strategies/algorithms at the different phases. \charmpp{} now supports
