@@ -923,7 +923,7 @@ void Entry::genTramInstantiation(XStr& str) {
         << "  if (pesPerNode == 1) {\n"
         << "    pesPerNode = CmiNumCores();\n"
         << "  }\n"
-        << "  int nDims = 2;\n"
+        << "  const int nDims = 2;\n"
         << "  int dims[nDims];\n"
         << "  dims[0] = CkNumPes() / pesPerNode;\n"
         << "  dims[1] = pesPerNode;\n"
