@@ -78,6 +78,13 @@ class TopoManager {
     TopoManager(int NX, int NY, int NZ, int NT);
     ~TopoManager() { }
 
+    /***
+     * Access singleton instance of TopoManager
+     * NOTE: this should only be called after TopoManager_init() has been called
+     * (in Charm++ TopoManager_init() is called during initialization)
+     */
+    static TopoManager *getTopoManager();
+
     inline int getDimNX() const { return dimNX; }
     inline int getDimNY() const { return dimNY; }
     inline int getDimNZ() const { return dimNZ; }

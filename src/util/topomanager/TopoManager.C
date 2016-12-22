@@ -424,6 +424,12 @@ int _tpm_numpes = 0;
 int _tpm_numthreads = 1;
 #endif
 
+TopoManager *TopoManager::getTopoManager() {
+  CmiAssert(_topoLock != 0);
+  if (_tmgr == NULL) TopoManager_reset();
+  return _tmgr;
+}
+
 #ifndef __TPM_STANDALONE__
 extern "C" void TopoManager_init() {
 #else
