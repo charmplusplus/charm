@@ -968,15 +968,11 @@ static void CkCreateArrayAsync(void *vmsg)
   CkPupMessage(p, &vm);
   CkArrayMessage *m = static_cast<CkArrayMessage*>(vm);
 
-  // Does the caller care about the constructed array ID?
-  if (!msg->cb.isInvalid()) {
-    CkArrayCreatedMsg *response = new CkArrayCreatedMsg;
-    response->aid = CkCreateArray(m, msg->ctor, msg->opts);
+  CkArrayID aid = CkCreateArray(m, msg->ctor, msg->opts);
 
-    msg->cb.send(response);
-  } else {
-    CkCreateArray(m, msg->ctor, msg->opts);
-  }
+  // Does the caller care about the constructed array ID?
+  if (!msg->cb.isInvalid())
+    msg->cb.send(new CkArrayCreatedMsg(aid));
 }
 
 /*********************** CkArray Creation *************************/

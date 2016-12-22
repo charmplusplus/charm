@@ -623,6 +623,7 @@ void CkSendAsyncCreateArray(int ctor, CkCallback cb, CkArrayOptions opts, void *
 
 struct CkArrayCreatedMsg : public CMessage_CkArrayCreatedMsg {
   CkArrayID aid;
+  CkArrayCreatedMsg(CkArrayID _aid) : aid(_aid) { }
 };
 
 class CkArrayBroadcaster;
