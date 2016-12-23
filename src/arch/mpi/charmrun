@@ -280,6 +280,11 @@ End() {
                 	sleep 20
 		fi
         done
+elif [ -n `which srun 2>/dev/null` ]
+then
+# failover to srun before mpirun (for Edison autobuild support)
+  test $QUIET -eq 0 && echo  srun -n $pes -c `expr $ppn + 1` $args
+  srun -n $pes -c `expr $ppn + 1` $args
 else
   mpirun_cmd=`which mpirun 2>/dev/null`
   if test -n "$mpirun_cmd"
