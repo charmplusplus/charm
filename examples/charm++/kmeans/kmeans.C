@@ -1,6 +1,7 @@
 #include "kmeans.decl.h"
 
 #include "rand48_replacement.h"
+#include <vector>
 
 #define XOFFSET 0
 #define YOFFSET 1
@@ -41,7 +42,7 @@ public:
 
     // Generate some random points as initial means
     means = new Point[k];
-    srand48(time(NULL));
+    srand48((int)(10000*CkWallTimer()));
     for (int i = 0; i < k; ++i) {
       means[i].x = drand48();
       means[i].y = drand48();
@@ -126,7 +127,7 @@ private:
 
 public:
   Domain() {
-    srand48(time(NULL) + thisIndex.x * numCharesX + thisIndex.y);
+    srand48((int)(10000*CkWallTimer()) + thisIndex.x * numCharesX + thisIndex.y);
 
     numPoints = n / (numCharesX * numCharesY);
     numPoints += (n % (numCharesX * numCharesY) < (thisIndex.x * numCharesX + thisIndex.y)) ? 1 : 0;
@@ -143,8 +144,7 @@ public:
   Domain(CkMigrateMessage* m) { }
 
   void findClusters(int k, Point means[], CkCallback &cb) {
-    double result[SIZEPERPOINT*k]; // For each candidate mean, create entry for x, y, and count
-    memset(result, 0, SIZEPERPOINT*k*sizeof(double));
+    std::vector<double> result(SIZEPERPOINT*k, 0); // For each candidate mean, create entry for x, y, and count
 
     for (int i = 0; i < numPoints; ++i) {
       int closest = findClosest(points[i], means);
@@ -154,7 +154,7 @@ public:
       result[closest + SIZEOFFSET]++;
     }
 
-    contribute(SIZEPERPOINT*k*sizeof(double), result, CkReduction::sum_double, cb);
+    contribute(SIZEPERPOINT*k*sizeof(double), &result[0], CkReduction::sum_double, cb);
   }
 };
 
