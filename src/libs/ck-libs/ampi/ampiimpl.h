@@ -285,6 +285,9 @@ class ampiCommStruct {
   char commName[MPI_MAX_OBJECT_NAME];
   int commNameLen;
 
+  // For inter-communicators
+  MPI_Comm localComm = -1;
+
   // Lazily fill world communicator indices
   void makeWorldIndices(void) const {
     vector<int> *ind=const_cast<vector<int> *>(&indices);
@@ -373,6 +376,22 @@ class ampiCommStruct {
   inline const vector<int> &getnbors() const {return nbors;}
   inline void setnbors(const vector<int> &nbors_) { nbors = nbors_; }
 
+  /* localComm handlers for intercomm */
+  void setLocalComm(MPI_Comm localComm_) {
+    if (isInter) localComm = localComm_;
+    else {
+        CkAbort("localComm set for non-inter communicator\n");
+    }
+  }
+
+  MPI_Comm getLocalComm() {
+    if (isInter) return localComm;
+    else {
+        CkAbort("localComm requested for non-inter communicator\n");
+        return -1;
+    }
+  }
+
   void pup(PUP::er &p) {
     p|comm;
     p|ampiID;
@@ -390,6 +409,7 @@ class ampiCommStruct {
     p|nbors;
     p|commNameLen;
     p(commName,MPI_MAX_OBJECT_NAME);
+    p|localComm;
   }
 };
 PUPmarshall(ampiCommStruct)
@@ -1579,9 +1599,14 @@ class ampi : public CBase_ampi {
   void probe(int t,int s,MPI_Comm comm,MPI_Status *sts);
   int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts);
   void barrier(void);
+  void intercomm_barrier(void);
   void ibarrier(MPI_Request *request);
+  void intercomm_ibarrier(MPI_Request *request, MPI_Comm intercomm);
   void bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm);
+  void intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm);
   void ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Request* request);
+  void intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm,
+                        MPI_Request* request);
   static void bcastraw(void* buf, int len, CkArrayID aid);
   void split(int color,int key,MPI_Comm *dest, int type);
   void commCreate(const groupStruct vec,MPI_Comm *newcomm);
@@ -1678,6 +1703,23 @@ class ampi : public CBase_ampi {
   int getNewSemaId();
 
   AmpiMsg* Alltoall_RemoteIget(MPI_Aint disp, int targcnt, MPI_Datatype targtype, int tag);
+  void intercomm_gather(int root, void* sendbuf, int sendcount, MPI_Datatype sendtype,
+                        void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm);
+  void intercomm_igather(int root, void* sendbuf, int sendcount, MPI_Datatype sendtype,
+                        void* recvbuf, int recvcount, MPI_Datatype recvtype,
+                        MPI_Comm intercomm, MPI_Request* request);
+  void intercomm_gatherv(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                         void *recvbuf, int *recvcounts, int *displs,
+                         MPI_Datatype recvtype, MPI_Comm comm);
+  void intercomm_igatherv(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                          void *recvbuf, int *recvcounts, int *displs,
+                          MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request);
+  void intercomm_scatter(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                         void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm);
+  void intercomm_iscatter(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                          void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                          MPI_Comm intercomm, MPI_Request *request);
+
  private:
   bool AlltoallGetFlag;
   void *Alltoallbuff;

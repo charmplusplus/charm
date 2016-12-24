@@ -113,6 +113,7 @@
        integer, parameter :: MPI_COMBINED_HINDEXED_BLOCK = 12
 
        integer, parameter :: MPI_PROC_NULL      = -2
+       integer, parameter :: MPI_ROOT           = -3
        integer, parameter :: MPI_ANY_SOURCE     = -1
        integer, parameter :: MPI_ANY_TAG        = -1
        integer, parameter :: MPI_REQUEST_NULL   = -1

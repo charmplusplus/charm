@@ -164,6 +164,7 @@ typedef int MPI_Fint;
 #define MPI_COMM_NULL      (-1)
 #define MPI_TYPE_NULL      (-1)
 #define MPI_PROC_NULL      (-2)
+#define MPI_ROOT           (-3)
 #define MPI_ANY_SOURCE     (-1)
 #define MPI_KEYVAL_INVALID (-1)
 #define MPI_INFO_NULL      (-1)
