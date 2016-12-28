@@ -45,6 +45,7 @@ OPTS_CPP_INTERNAL="-D__CHARMC__=1"
 OPTS_CPP=
 OPTS_LDRO="" 
 OPTS_CC=""
+OPTS_CC_GENCPM=""
 OPTS_CXX="" 
 OPTS_F90=""
 OPTS_LD=""  
@@ -668,6 +669,11 @@ do
 
 	"-gen-cpm")
 		GENCPM="$GENCPM $1"
+		# -x c is only applied for the preprocessing of the GEN-CPM files on BG/Q
+		if [ "$CMK_USING_BGCLANG" = "1" ]
+		then
+		  OPTS_CC_GENCPM="-x c "
+		fi
 		shift
 		;;
 
@@ -1246,6 +1252,7 @@ Success() {
 
 Debug "Preprocessing GEN-CPM files"
 
+OPTS_CC_GENCPM="$OPTS_CC $OPTS_CC_GENCPM"
 for FILE in `echo $GENCPM`
 do
 # This used to be "$FILE:r", which strips the extention
@@ -1255,7 +1262,7 @@ do
 	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
 	Do touch $BASE.cpm.h
 	Do $LN -f -s $FILE $TMP.c
-	Do $CMK_CPP_C -I$CHARMINC $CMK_SYSINC $OPTS_CC $OPTS_CPP $TMP.c > $TMP.i
+	Do $CMK_CPP_C -I$CHARMINC $CMK_SYSINC $OPTS_CC_GENCPM $OPTS_CPP $TMP.c > $TMP.i
 	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
 done
 

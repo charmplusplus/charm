@@ -1,8 +1,8 @@
-CDIR=$(shell readlink -f ../../../..)
-CHARMC=$(CDIR)/bin/charmc 
+CDIR=$(shell ./readlink.sh ../../../..)
+CHARMC=$(CDIR)/bin/charmc
 CFLAGS=$(OPTS)
 export CharmDIR=$(CDIR)
-all: llvm_omp ompcharm 
+all: llvm_omp ompcharm
 
 llvm_omp: omp
 
