@@ -13,154 +13,151 @@ void multisectiontest_init()
   if(CkNumPes()<2) {
     CkError("multisectiontest: requires at least 2 processors\n");
     megatest_finish();
-  } else
-	{
+    return;
+  }
 
-	  CProxy_multisectiontest_master masterproxy=CProxy_multisectiontest_master::ckNew(numgroups);
+  CProxy_multisectiontest_master masterproxy=CProxy_multisectiontest_master::ckNew(numgroups);
 
 	  
-	  //	      CkPrintf("[%d]made group %d\n",gSectGproxy.ckGetGroupID());
+  //	      CkPrintf("[%d]made group %d\n",gSectGproxy.ckGetGroupID());
 
-	  // make 3 arrays and 3 groups
-	  // array of group IDs
+  // make 3 arrays and 3 groups
+  // array of group IDs
 
-	  CkGroupID *gidArr= new CkGroupID[numgroups];
-	  CkArrayID *aidArr= new CkArrayID[numarrays];
+  CkGroupID *gidArr= new CkGroupID[numgroups];
+  CkArrayID *aidArr= new CkArrayID[numarrays];
 
-	  CProxy_multisectiontest_grp *Gproxy= new CProxy_multisectiontest_grp[numgroups];
-	  CProxy_multisectiontest_array1d *Aproxy= new CProxy_multisectiontest_array1d[numarrays];
-	  for(int i=0;i<numgroups;i++)
-	    {
-	      //	      Gproxy[i]=
-	      gidArr[i]=CProxy_multisectiontest_grp::ckNew(numgroups, masterproxy.ckGetGroupID());	  
+  CProxy_multisectiontest_grp *Gproxy= new CProxy_multisectiontest_grp[numgroups];
+  CProxy_multisectiontest_array1d *Aproxy= new CProxy_multisectiontest_array1d[numarrays];
+  for(int i=0;i<numgroups;i++)
+  {
+    //	      Gproxy[i]=
+    gidArr[i]=CProxy_multisectiontest_grp::ckNew(numgroups, masterproxy.ckGetGroupID());
 
-	    }
-	  for(int i=0;i<numarrays;i++)
-	    {
-	      CkArrayOptions opts(ArraySize);
-	      opts.setSectionAutoDelegate(false); //disable auto delegation
-	      Aproxy[i]=CProxy_multisectiontest_array1d::ckNew(masterproxy.ckGetGroupID(), opts); 
-	      aidArr[i]=Aproxy[i].ckGetArrayID();
-	    }
-	  // make sections
-	  int boundary=CkNumPes()/2;
-	  int floor=boundary;
-	  int ceiling=CkNumPes()-1;
-	  int sectionSize=ceiling-floor+1;
-	  // make sections
-	  int aboundary=ArraySize/2;
-	  int afloor=aboundary;
-	  int aceiling=ArraySize-1;
-	  int asectionSize=aceiling-afloor+1;
-	  //	  CkPrintf("bound %d floor %d ceiling %d sectionSize %d\n",boundary, floor, ceiling, sectionSize);
-	  //	  CkPrintf("abound %d afloor %d aceiling %d asectionSize %d\n",aboundary, afloor, aceiling, asectionSize);
+  }
+  for(int i=0;i<numarrays;i++)
+  {
+    CkArrayOptions opts(ArraySize);
+    opts.setSectionAutoDelegate(false); //disable auto delegation
+    Aproxy[i]=CProxy_multisectiontest_array1d::ckNew(masterproxy.ckGetGroupID(), opts);
+    aidArr[i]=Aproxy[i].ckGetArrayID();
+  }
+  // make sections
+  int boundary=CkNumPes()/2;
+  int floor=boundary;
+  int ceiling=CkNumPes()-1;
+  int sectionSize=ceiling-floor+1;
+  // make sections
+  int aboundary=ArraySize/2;
+  int afloor=aboundary;
+  int aceiling=ArraySize-1;
+  int asectionSize=aceiling-afloor+1;
+  //	  CkPrintf("bound %d floor %d ceiling %d sectionSize %d\n",boundary, floor, ceiling, sectionSize);
+  //	  CkPrintf("abound %d afloor %d aceiling %d asectionSize %d\n",aboundary, afloor, aceiling, asectionSize);
 
-	  // cross section lower half of each group
-	  int **elems= new int*[numgroups];
-	  elems[0]= new int[sectionSize];
-	  elems[1]= new int[sectionSize];
-	  elems[2]= new int[sectionSize];
-	  int *nelems=new int[numgroups];
-	  for(int k=0;k<numgroups;k++)
-	    {
-	      nelems[k]=sectionSize;
-	      for(int i=floor,j=0;i<=ceiling;i++,j++)
-		elems[k][j]=i;
-	    }
-	  //	  CProxySection_multisectiontest_grp
-	  //	  groupLowProxy=CProxySection_multisectiontest_grp(numgroups,gidArr,elems,nelems);
-	  CProxySection_multisectiontest_grp groupLowProxy(numgroups, gidArr,elems,nelems);
-	  //  CkPrintf("[%d] section of groupid %d from %d to %d size
-	  //  %d\n",CkMyPe(), thisgroup,  floor, ceiling,
-	  //  sectionSize);
+  // cross section lower half of each group
+  int **elems= new int*[numgroups];
+  elems[0]= new int[sectionSize];
+  elems[1]= new int[sectionSize];
+  elems[2]= new int[sectionSize];
+  int *nelems=new int[numgroups];
+  for(int k=0;k<numgroups;k++)
+  {
+    nelems[k]=sectionSize;
+    for(int i=floor,j=0;i<=ceiling;i++,j++)
+      elems[k][j]=i;
+  }
+  //	  CProxySection_multisectiontest_grp
+  //	  groupLowProxy=CProxySection_multisectiontest_grp(numgroups,gidArr,elems,nelems);
+  CProxySection_multisectiontest_grp groupLowProxy(numgroups, gidArr,elems,nelems);
+  //  CkPrintf("[%d] section of groupid %d from %d to %d size
+  //  %d\n",CkMyPe(), thisgroup,  floor, ceiling,
+  //  sectionSize);
 
-	  // cross section lower half of each array
-	  CkArrayIndex **aelems= new CkArrayIndex*[numarrays];
-	  aelems[0]= new CkArrayIndex[asectionSize];
-	  aelems[1]= new CkArrayIndex[asectionSize];
-	  aelems[2]= new CkArrayIndex[asectionSize];
-	  int *naelems=new int[numarrays];
-	  for(int k=0;k<numarrays;k++)
-	    {
-	      naelems[k]=asectionSize;
-	    for(int i=afloor,j=0;i<=aceiling;i++,j++)
-	      aelems[k][j]=CkArrayIndex1D(i);
-	    }
-	  //	  CProxySection_multisectiontest_array1d
-	  //	  arrayLowProxy=CProxySection_multisectiontest_array1d(numarrays,aidArr,aelems,naelems);
-	  //	  CProxySection_multisectiontest_array1d
-	  //	  arrayLowProxy(numarrays,aidArr,constaelems,naelems);
-	  CProxySection_multisectiontest_array1d arrayLowProxy(numarrays,aidArr,aelems,naelems);
-	  // cross section other half of each group
-	  floor=0;
-	  ceiling=boundary-1;
-	  sectionSize=ceiling-floor+1;
-	  afloor=0;
-	  aceiling=aboundary-1;
-	  asectionSize=aceiling-afloor+1;
-	  //	  CkPrintf("bound %d floor %d ceiling %d sectionSize %d\n",boundary, floor, ceiling, sectionSize);
-	  //	  CkPrintf("abound %d afloor %d aceiling %d asectionSize %d\n",aboundary, afloor, aceiling, asectionSize);
+  // cross section lower half of each array
+  CkArrayIndex **aelems= new CkArrayIndex*[numarrays];
+  aelems[0]= new CkArrayIndex[asectionSize];
+  aelems[1]= new CkArrayIndex[asectionSize];
+  aelems[2]= new CkArrayIndex[asectionSize];
+  int *naelems=new int[numarrays];
+  for(int k=0;k<numarrays;k++)
+  {
+    naelems[k]=asectionSize;
+    for(int i=afloor,j=0;i<=aceiling;i++,j++)
+      aelems[k][j]=CkArrayIndex1D(i);
+  }
+  //	  CProxySection_multisectiontest_array1d
+  //	  arrayLowProxy=CProxySection_multisectiontest_array1d(numarrays,aidArr,aelems,naelems);
+  //	  CProxySection_multisectiontest_array1d
+  //	  arrayLowProxy(numarrays,aidArr,constaelems,naelems);
+  CProxySection_multisectiontest_array1d arrayLowProxy(numarrays,aidArr,aelems,naelems);
+  // cross section other half of each group
+  floor=0;
+  ceiling=boundary-1;
+  sectionSize=ceiling-floor+1;
+  afloor=0;
+  aceiling=aboundary-1;
+  asectionSize=aceiling-afloor+1;
+  //	  CkPrintf("bound %d floor %d ceiling %d sectionSize %d\n",boundary, floor, ceiling, sectionSize);
+  //	  CkPrintf("abound %d afloor %d aceiling %d asectionSize %d\n",aboundary, afloor, aceiling, asectionSize);
 
-	  // section could be different size
-	  int **elemsH= new int*[numgroups];
-	  elemsH[0]= new int[sectionSize];
-	  elemsH[1]= new int[sectionSize];
-	  elemsH[2]= new int[sectionSize];
-	  for(int k=0;k<numgroups;k++)
-	    {
-	      nelems[k]=sectionSize;
-	      for(int i=floor,j=0;i<=ceiling;i++,j++)
-		elemsH[k][j]=i;	  	  
-	    }
-	  CProxySection_multisectiontest_grp groupHighProxy(numgroups,gidArr,elemsH,nelems);
+  // section could be different size
+  int **elemsH= new int*[numgroups];
+  elemsH[0]= new int[sectionSize];
+  elemsH[1]= new int[sectionSize];
+  elemsH[2]= new int[sectionSize];
+  for(int k=0;k<numgroups;k++)
+  {
+    nelems[k]=sectionSize;
+    for(int i=floor,j=0;i<=ceiling;i++,j++)
+      elemsH[k][j]=i;
+  }
+  CProxySection_multisectiontest_grp groupHighProxy(numgroups,gidArr,elemsH,nelems);
 
-	  // cross section upper half of each array
-	  // cross section lower half of each array
-	  CkArrayIndex **aelemsH= new CkArrayIndex*[numarrays];
-	  aelemsH[0]= new CkArrayIndex[asectionSize];
-	  aelemsH[1]= new CkArrayIndex[asectionSize];
-	  aelemsH[2]= new CkArrayIndex[asectionSize];
-	  for(int k=0;k<numarrays;k++)
-	    {
-	      naelems[k]=asectionSize;
-	      for(int i=afloor,j=0;i<=aceiling;i++,j++)
-		aelemsH[k][j]=CkArrayIndex1D(i);
-	    }
-	  CProxySection_multisectiontest_array1d arrayHighProxy(numarrays,aidArr, aelemsH, naelems);
+  // cross section upper half of each array
+  // cross section lower half of each array
+  CkArrayIndex **aelemsH= new CkArrayIndex*[numarrays];
+  aelemsH[0]= new CkArrayIndex[asectionSize];
+  aelemsH[1]= new CkArrayIndex[asectionSize];
+  aelemsH[2]= new CkArrayIndex[asectionSize];
+  for(int k=0;k<numarrays;k++)
+  {
+    naelems[k]=asectionSize;
+    for(int i=afloor,j=0;i<=aceiling;i++,j++)
+      aelemsH[k][j]=CkArrayIndex1D(i);
+  }
+  CProxySection_multisectiontest_array1d arrayHighProxy(numarrays,aidArr, aelemsH, naelems);
 
-	  // send IDs to master
-	  multisectionGID_msg *mmsg= new (numgroups) multisectionGID_msg;
-	  for(int i=0;i<numgroups;++i)
-	    mmsg->IDs[i]=gidArr[i];
-	  mmsg->numIDs=numgroups;
-	  masterproxy[0].recvID(mmsg);
-	  // send IDs to sections
-	  multisectionAID_msg *amsg= new (numarrays) multisectionAID_msg;
-	  for(int i=0;i<numarrays;++i)
-	    amsg->IDs[i]=aidArr[i];
-	  amsg->numIDs=numarrays;
-	  groupLowProxy.recvID(amsg);
+  // send IDs to master
+  multisectionGID_msg *mmsg= new (numgroups) multisectionGID_msg;
+  for(int i=0;i<numgroups;++i)
+    mmsg->IDs[i]=gidArr[i];
+  mmsg->numIDs=numgroups;
+  masterproxy[0].recvID(mmsg);
+  // send IDs to sections
+  multisectionAID_msg *amsg= new (numarrays) multisectionAID_msg;
+  for(int i=0;i<numarrays;++i)
+    amsg->IDs[i]=aidArr[i];
+  amsg->numIDs=numarrays;
+  groupLowProxy.recvID(amsg);
 
-	  multisectionAID_msg *amsg2= new (numarrays) multisectionAID_msg;
-	  for(int i=0;i<numarrays;++i)
-	    amsg2->IDs[i]=aidArr[i];
-	  amsg2->numIDs=numarrays;
-	  groupHighProxy.recvID(amsg2);
+  multisectionAID_msg *amsg2= new (numarrays) multisectionAID_msg;
+  for(int i=0;i<numarrays;++i)
+    amsg2->IDs[i]=aidArr[i];
+  amsg2->numIDs=numarrays;
+  groupHighProxy.recvID(amsg2);
 	 
 	  
-	  multisectionGID_msg *gmsg= new (numgroups) multisectionGID_msg;
-	  for(int i=0;i<numgroups;++i)
-	    gmsg->IDs[i]=gidArr[i];
-	  gmsg->numIDs=numgroups;
-	  arrayLowProxy.recvID(gmsg);
-	  multisectionGID_msg *gmsg2= new (numgroups) multisectionGID_msg;
-	  for(int i=0;i<numgroups;++i)
-	    gmsg2->IDs[i]=gidArr[i];
-	  gmsg2->numIDs=numgroups;
-	  arrayHighProxy.recvID(gmsg2);
-	  
-    }
-
+  multisectionGID_msg *gmsg= new (numgroups) multisectionGID_msg;
+  for(int i=0;i<numgroups;++i)
+    gmsg->IDs[i]=gidArr[i];
+  gmsg->numIDs=numgroups;
+  arrayLowProxy.recvID(gmsg);
+  multisectionGID_msg *gmsg2= new (numgroups) multisectionGID_msg;
+  for(int i=0;i<numgroups;++i)
+    gmsg2->IDs[i]=gidArr[i];
+  gmsg2->numIDs=numgroups;
+  arrayHighProxy.recvID(gmsg2);
 }
 
 void multisectiontest_moduleinit(void) {
