@@ -16,7 +16,7 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 /*readonly*/ CProxy_ckcallback_group _ckcallbackgroup;
 
 typedef CkHashtableT<CkHashtableAdaptorT<unsigned int>, CkCallback*> threadCB_t;
-CpvStaticDeclare(threadCB_t, threadCBs);
+CpvStaticDeclare(threadCB_t*, threadCBs);
 CpvStaticDeclare(unsigned int, nextThreadCB);
 
 //This main chare is only used to create the callback forwarding group
@@ -50,7 +50,7 @@ void CkCallback::impl_thread_init(void)
 	do {
 	  if (CpvAccess(nextThreadCB)==0) CpvAccess(nextThreadCB)=1;
 	  d.thread.cb=CpvAccess(nextThreadCB)++;
-	  cb = &CpvAccess(threadCBs).put(d.thread.cb, &exist);
+	  cb = &CpvAccess(threadCBs)->put(d.thread.cb, &exist);
 	} while (exist==1);
 	*cb = this; //<- so we can find this structure later
 	d.thread.th=NULL; //<- thread isn't suspended yet
@@ -67,7 +67,7 @@ void *CkCallback::impl_thread_delay(void) const
 	
 	//Find the original callback object:
 	CkCallback *dest=(CkCallback *)this;
-	if (d.thread.cb!=0) dest=CpvAccess(threadCBs).get(d.thread.cb);
+	if (d.thread.cb!=0) dest=CpvAccess(threadCBs)->get(d.thread.cb);
 	if (dest==0)
 	    CkAbort("Called thread_delay on an already deleted callback");
 	if (dest->d.thread.ret==(void*)-1) 
@@ -222,7 +222,7 @@ void CkCallback::send(void *msg) const
 		break;
 	case resumeThread: //Resume a waiting thread
 		if (d.thread.onPE==CkMyPe()) {
-			CkCallback *dest=CpvAccess(threadCBs).get(d.thread.cb);
+			CkCallback *dest=CpvAccess(threadCBs)->get(d.thread.cb);
 			if (dest==0 || dest->d.thread.ret!=(void*)-1)
 				CkAbort("Already sent a value to this callback!\n");
 			dest->d.thread.ret=msg; //<- return data
@@ -427,8 +427,8 @@ bool CkCallback::containsPointer() const {
 }
 
 void CkCallback::thread_destroy() const {
-  if (type==resumeThread && CpvAccess(threadCBs).get(d.thread.cb)==this) {
-    CpvAccess(threadCBs).remove(d.thread.cb);
+  if (type==resumeThread && CpvAccess(threadCBs)->get(d.thread.cb)==this) {
+    CpvAccess(threadCBs)->remove(d.thread.cb);
   }
 }
 
@@ -481,7 +481,8 @@ void CkDataMsg::check(void)
 }
 
 void CkCallbackInit() {
-  CpvInitialize(threadCB_t, threadCBs);
+  CpvInitialize(threadCB_t*, threadCBs);
+  CpvAccess(threadCBs) = new threadCB_t;
   CpvInitialize(unsigned int, nextThreadCB);
   CpvAccess(nextThreadCB)=1;
 }
