@@ -139,12 +139,16 @@ void multisectiontest_init()
   for(int i=0;i<numarrays;++i)
     amsg->IDs[i]=aidArr[i];
   amsg->numIDs=numarrays;
+  UsrToEnv(amsg)->setMsgtype(ForBocMsg);
+  UsrToEnv(amsg)->setGroupDep(aidArr[numarrays-1]);
   groupLowProxy.recvID(amsg);
 
   multisectionAID_msg *amsg2= new (numarrays) multisectionAID_msg;
   for(int i=0;i<numarrays;++i)
     amsg2->IDs[i]=aidArr[i];
   amsg2->numIDs=numarrays;
+  UsrToEnv(amsg2)->setMsgtype(ForBocMsg);
+  UsrToEnv(amsg2)->setGroupDep(aidArr[numarrays-1]);
   groupHighProxy.recvID(amsg2);
 	 
 	  
