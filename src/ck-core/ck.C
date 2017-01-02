@@ -1068,9 +1068,6 @@ static inline IrrGroup *_lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope
 	if (obj==NULL) { /* groupmember not yet created: stash message */
 		ck->getGroupTable()->find(groupID).enqMsg(env);
 	}
-	else { /* will be able to process message */
-		ck->process();
-	}
 	CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 	return obj;
 }
@@ -1104,6 +1101,7 @@ static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
   CkGroupID groupID =  env->getGroupNum();
   IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
   if(obj) {
+    ck->process();
     _deliverForBocMsg(ck,env->getEpIdx(),env,obj);
   }
 }
@@ -1157,8 +1155,8 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
     IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,dep);
     if (obj == NULL) return;
   }
-  else
-    ck->process();
+
+  ck->process();
   CkCreateLocalGroup(groupID, epIdx, env);
 }
 
@@ -1174,6 +1172,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
+    ck->process();
     mgr->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_inline);
   }
 }
