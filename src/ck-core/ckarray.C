@@ -868,7 +868,8 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int proposedPe,
       msg->_aid = _aid;
       CmiSetHandler(msg, ckinsertIdxHdl);
       ca = (CkArray *)lookupGroupAndBufferIfNotThere(CkpvAccess(_coreState), (envelope*)msg,_aid);
-      if (ca == NULL) return;
+      CkAssert (ca == NULL);
+      return;
   }
 
   int hostPe = ca->findInitialHostPe(idx, proposedPe);
