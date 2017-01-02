@@ -1320,13 +1320,21 @@ public:
   }
 };
 
-static LBTopoVec lbTopoMap;
+static LBTopoVec* lbTopoMap;
+static CmiNodeLock lbTopoMapInitLock;
 
 extern "C"
 LBtopoFn LBTopoLookup(char *name)
 {
-  for (int i=0; i<lbTopoMap.length(); i++) {
-    if (strcmp(name, lbTopoMap[i]->name)==0) return lbTopoMap[i]->fn;
+  // This routine is called from an LB's constructor. LBs are Groups, so their construction happens
+  // inline on PE 0 but via the scheduler on other PEs, so we use a lock instead of a barrier here.
+  CmiLock(lbTopoMapInitLock);
+  if (!lbTopoMap)
+    lbTopoMap = new LBTopoVec();
+  CmiUnlock(lbTopoMapInitLock);
+
+  for (int i=0; i<lbTopoMap->length(); i++) {
+    if (strcmp(name, (*lbTopoMap)[i]->name)==0) return (*lbTopoMap)[i]->fn;
   }
   return NULL;
 }
@@ -1344,6 +1352,6 @@ extern "C" int getTopoMaxNeighbors(void *topo)
 
 extern "C" void printoutTopo()
 {
-  lbTopoMap.print();
+  lbTopoMap->print();
 }
 
