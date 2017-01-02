@@ -1098,6 +1098,11 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 
 static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
+  CkGroupID depID = env->getGroupDep();
+  if (!depID.isZero() && !_lookupGroupAndBufferIfNotThere(ck, env, depID)) {
+      return;
+  }
+
   CkGroupID groupID =  env->getGroupNum();
   IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
   if(obj) {
