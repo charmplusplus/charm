@@ -37,7 +37,6 @@ typedef struct message_ {
   int data[1];
 } Message;
 
-char* buffer_msgs;
 
 /*
 static void fillMessage(Message* msg) {
@@ -91,6 +90,8 @@ pvd(int, iterHandler);
 pvd(int, bounceHandler);
 pvd(int, setupHandler);
 pvd(int, startHandler);
+
+pvd(char*, buffer_msgs);
 
 static void recvTime(TimeMessage* msg) {
   EmptyMsg m;
@@ -190,15 +191,14 @@ static void startNextSize(EmptyMsg* msg) {
   } else {
     int size = sizeof(Message) + sizes[pva(nextSize)].size;
 
-    buffer_msgs =
+    pva(buffer_msgs) =
         (char*)malloc((sizes[pva(nextSize)].numiter) * sizeof(Message*));
     for (i = 0; i < sizes[pva(nextSize)].numiter; i++) {
       mm = CmiAlloc(size);
       mm->srcpe = CmiMyPe();
       mm->idx = pva(nextSize);
       CmiSetHandler(mm, pva(bounceHandler));
-      /* *((Message**)(buffer_msgs+i*sizeof(char*))) = mm;*/
-      ((Message**)buffer_msgs)[i] = mm;
+      ((Message**)pva(buffer_msgs))[i] = mm;
     }
     mm = (Message*)CmiAlloc(size);
     mm->srcpe = CmiMyPe();
@@ -217,6 +217,16 @@ static void startNextIter(Message* msg) {
   if (pva(nextIter) >= sizes[pva(nextSize)].numiter) {
     pva(endtime) = CmiWallTimer();
     /* checkMessage(msg); */
+    CmiAssert(CpvInitialized(starttime));
+
+    CmiAssert(pva(nextNbr) < CmiNumNodes());
+    CmiAssert(pva(nextNbr) >= 0);
+    CmiAssert(pva(nextSize) < pva(numSizes));
+    CmiAssert(pva(nextSize) >= 0);
+
+    free(pva(buffer_msgs));
+    pva(buffer_msgs) = 0;
+
     pva(times)[pva(nextNbr)][pva(nextSize)] =
         (pva(endtime) - pva(starttime)) / (2.0 * sizes[pva(nextSize)].numiter);
     pva(nextIter) = -1;
@@ -224,8 +234,7 @@ static void startNextIter(Message* msg) {
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
     CmiFree(msg);
   } else {
-    /* mm = *((Message**)(buffer_msgs + pva(nextIter)*sizeof(char*))); */
-    mm = ((Message**)buffer_msgs)[pva(nextIter)];
+    mm = ((Message**)pva(buffer_msgs))[pva(nextIter)];
     mm->iter = pva(nextIter);
     /* CmiSetHandler(mm, pva(bounceHandler)); */
     CmiSyncSendAndFree(pva(nextNbr), sizeof(Message) + sizes[mm->idx].size, mm);
@@ -236,7 +245,7 @@ static void startNextIter(Message* msg) {
 static void bounceMessage(Message* msg) {
   Message* mm;
   int iter = msg->iter;
-  mm = *((Message**)(buffer_msgs + iter * sizeof(char*)));
+  mm = *((Message**)(pva(buffer_msgs) + iter * sizeof(char*)));
   CmiSetHandler(mm, pva(iterHandler));
   /* CmiAssert(msg->srcpe==0); */
   CmiSyncSendAndFree(msg->srcpe, sizeof(Message) + sizes[msg->idx].size, mm);
@@ -248,7 +257,7 @@ static void setupMessage(Message* msg) {
 
   int nextSize = msg->idx;
   size = sizeof(Message) + sizes[nextSize].size;
-  buffer_msgs = (char*)malloc((sizes[nextSize].numiter) * sizeof(Message*));
+  pva(buffer_msgs) = (char*)malloc((sizes[nextSize].numiter) * sizeof(Message*));
 
   for (i = 0; i < sizes[nextSize].numiter; i++) {
     mm = (Message*)CmiAlloc(size);
@@ -256,7 +265,7 @@ static void setupMessage(Message* msg) {
     CmiSetHandler(mm, pva(iterHandler));
     /* mm->idx = pva(nextSize); */
     /* *((Message**)buffer_msgs+i*sizeof(char*)) = mm; */
-    ((Message**)buffer_msgs)[i] = mm;
+    ((Message**)pva(buffer_msgs))[i] = mm;
   }
   mm = (Message*)CmiAlloc(size);
   mm->srcpe = CmiMyPe();
@@ -371,4 +380,7 @@ void pingpong_cachemiss_moduleinit(void) {
   pva(setupHandler) = CmiRegisterHandler((CmiHandler)setupMessage);
   pvi(int, startHandler);
   pva(startHandler) = CmiRegisterHandler((CmiHandler)startMessage);
+
+  pvi(char *, buffer_msgs);
+  pva(buffer_msgs) = 0;
 }
