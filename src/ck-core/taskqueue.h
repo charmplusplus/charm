@@ -24,6 +24,7 @@ inline static void* TaskQueueCreate() {
 inline static void TaskQueuePush(TaskQueue Q, void *data) {
   int t = Q->tail;
   Q->data[t % TaskQueueSize] = data;
+  CmiMemoryWriteFence();
   Q->tail = t+1;
 }
 
@@ -57,10 +58,9 @@ inline static void* TaskQueueSteal(TaskQueue Q) {
     t = Q->tail;
     if (h >= t) // The queue is empty or the last element has been stolen by other thieves or popped by the victim.
       return NULL;
-    task = Q->data[h % TaskQueueSize];
     if(!__sync_bool_compare_and_swap(&(Q->head), h, h+1)) // Check whether the task this thief is trying to steal is still in the queue and not stolen by the other thieves.
       continue;
-    return task;
+    return Q->data[h % TaskQueueSize];
   }
 }
 
