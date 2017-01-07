@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "mpi.h"
-#include "charm.h" /* For CkAbort */
 
 int getRank(void) {
 	int rank; 
@@ -15,9 +14,7 @@ int getRank(void) {
 
 void testFailed(const char *where) {
 	fprintf(stderr,"[%d] MPI TEST FAILED> %s\n",getRank(),where);
-	CkAbort("MPI TEST FAILED");
-	MPI_Finalize();
-	exit(1);
+	MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
 }
 
 void testEqual(int curValue,int goodValue,const char *where) {
@@ -228,24 +225,30 @@ void MPI_Tester::drain(void) {
 		TEST_MPI(MPI_Iprobe,(MPI_ANY_SOURCE,MPI_ANY_TAG,comm,&flag,&sts));
 		if (flag) {
 			int len; MPI_Get_count(&sts,MPI_BYTE,&len);
-			CkError("FATAL ERROR> Leftover AMPI message: src=%d, dest=%d, tag=%d, comm=%d, length=%d\n",
-				sts.MPI_SOURCE, rank, sts.MPI_TAG, sts.MPI_COMM, len);
 			char *msg=new char[len];
 			MPI_Recv(msg,len,MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, sts.MPI_COMM, &sts);
 			flagSet=1;
 		}
 	} while (flag==1);
 	MPI_Barrier(comm);
-	if (flagSet) CkAbort("Leftover messages in AMPI queues!\n");
+	if (flagSet) {
+		printf("Leftover messages in AMPI queues!\n");
+		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
+	}
 }
 
 void MPI_Tester::testMigrate(void) {
 	beginTest(2,"Migration");
-	int srcPe=CkMyPe();
-    MPI_Info hints;
+	int flag, srcPe;
+	MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &srcPe, &flag);
+	if (!flag) {
+		printf("Missing AMPI_MY_WTH attribute on MPI_COMM_WORLD\n");
+		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
+	}
+	MPI_Info hints;
 
-    MPI_Info_create(&hints);
-    MPI_Info_set(hints, "ampi_load_balance", "sync");
+	MPI_Info_create(&hints);
+	MPI_Info_set(hints, "ampi_load_balance", "sync");
 	
 	// Before migrating, send a message to the next guy:
 	//    this tests out migration with pending messages
@@ -259,10 +262,18 @@ void MPI_Tester::testMigrate(void) {
 	TEST_MPI(MPI_Barrier,(comm));
 	int recv=-1; MPI_Status sts;
 	TEST_MPI(MPI_Recv,(&recv,1,MPI_INT, MPI_ANY_SOURCE,tag,comm, &sts));
-	if (recv!=rank) CkAbort("Message corrupted during migration!\n");
+	if (recv!=rank) {
+		printf("Message corrupted during migration!\n");
+		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
+	}
 	
-	int destPe=CkMyPe();
-	if (srcPe!=destPe) CkPrintf("[%d] migrated from %d to %d\n",
+	int destPe;
+	MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &destPe, &flag);
+	if (!flag) {
+		printf("Missing AMPI_MY_WTH attribute on MPI_COMM_WORLD\n");
+		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
+	}
+	if (srcPe!=destPe) printf("[%d] migrated from %d to %d\n",
 				rank,srcPe,destPe);
 }
 
@@ -332,7 +343,7 @@ for (int loop=0;loop<nLoop;loop++) {
 	  masterTester.testMigrate();
  }
  
-	if (getRank()==0) CkPrintf("All tests passed\n");
+	if (getRank()==0) printf("All tests passed\n");
 	MPI_Finalize();
 	return 0;
 }
