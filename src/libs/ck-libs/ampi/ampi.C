@@ -2624,7 +2624,9 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 #endif
 
   if (sts) {
-    sts->MPI_COMM = msg->getComm(comm);
+    sts->MPI_SOURCE = msg->getSrcRank();
+    sts->MPI_TAG    = msg->getTag();
+    sts->MPI_COMM   = msg->getComm(comm);
     sts->MPI_LENGTH = msg->getLength();
     sts->MPI_CANCEL = 0;
   }
@@ -2667,7 +2669,9 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   }
 
   if (sts) {
-    sts->MPI_COMM = msg->getComm(comm);
+    sts->MPI_SOURCE = msg->getSrcRank();
+    sts->MPI_TAG    = msg->getTag();
+    sts->MPI_COMM   = msg->getComm(comm);
     sts->MPI_LENGTH = msg->getLength();
     sts->MPI_CANCEL = 0;
   }
@@ -2685,7 +2689,9 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   msg = (AmpiMsg *) AmmProbe(msgs, tags, (int*)sts);
   if (msg) {
     if (sts) {
-      sts->MPI_COMM = msg->getComm(comm);
+      sts->MPI_SOURCE = msg->getSrcRank();
+      sts->MPI_TAG    = msg->getTag();
+      sts->MPI_COMM   = msg->getComm(comm);
       sts->MPI_LENGTH = msg->getLength();
       sts->MPI_CANCEL = 0;
     }
@@ -4753,7 +4759,9 @@ bool IReq::test(MPI_Status *sts){
       statusIreq = true;
     }
     else if (statusIreq) {
-      sts->MPI_COMM = comm;
+      sts->MPI_SOURCE = src;
+      sts->MPI_TAG    = tag;
+      sts->MPI_COMM   = comm;
       sts->MPI_LENGTH = length;
       sts->MPI_CANCEL = 0;
     }
@@ -4779,7 +4787,9 @@ bool IReq::itest(MPI_Status *sts){
       statusIreq = true;
     }
     else if (statusIreq) {
-      sts->MPI_COMM = comm;
+      sts->MPI_SOURCE = src;
+      sts->MPI_TAG    = tag;
+      sts->MPI_COMM   = comm;
       sts->MPI_LENGTH = length;
       sts->MPI_CANCEL = 0;
     }
