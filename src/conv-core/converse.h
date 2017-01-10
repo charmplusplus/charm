@@ -1899,11 +1899,10 @@ extern int _immRunning;
 #define CmiMemoryAtomicDecrement(...) ImplSelect2(__VA_ARGS__, CmiMemoryAtomicDecrementMemOrder, CmiMemoryAtomicDecrementSimple, Dummy)(__VA_ARGS__)
 #define CmiMemoryAtomicFetchAndInc(...) ImplSelect3(__VA_ARGS__, CmiMemoryAtomicFetchAndIncMemOrder, CmiMemoryAtomicFetchAndIncSimple, Dummy)(__VA_ARGS__)
 
-#if __STDC_VERSION__ >= 201112L & !__STDC_NO_ATOMICS__
-#include <stdatomic.h>
-#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) __atomic_fetch_and_add(&(someInt),1, MemModel);
-#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) __atomic_fetch_and_sub(&(someInt,1, MemModel);
-#define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) (output) = __atomic_fetch_and_add(&(input),1, MemModel);
+#if __GNUC__ & __STDC_VERSION__ >= 201112L & !__STDC_NO_ATOMICS__
+#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) __atomic_fetch_add(&(someInt),1, MemModel);
+#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) __atomic_fetch_sub(&(someInt),1, MemModel);
+#define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) (output) = __atomic_fetch_add(&(input),1, MemModel);
 #else
 #define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) CmiMemoryAtomicIncrementSimple(someInt);
 #define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) CmiMemoryAtomicDecrementSimple(someInt);
