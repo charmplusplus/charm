@@ -962,9 +962,6 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
   }
   void push_back(AmpiRequest* elt) {insertAt(len,elt);}
   int insert(AmpiRequest* elt){
-    //search for invalidated slot
-    // disabled to make requests monotonously ascending
-    // for multiple completion calls like MPI_Waitany
     for(int i=0;i<len;i++){
       if(block[i]==NULL){
         block[i] = elt;

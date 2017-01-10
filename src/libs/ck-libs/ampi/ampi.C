@@ -4238,91 +4238,6 @@ int AMPI_Startall(int count, MPI_Request *requests){
   return MPI_SUCCESS;
 }
 
-/* organize the indices of requests into a vector of a vector:
- * level 1 is different msg envelope matches
- * level 2 is (posting) ordered requests of with envelope
- * each time multiple completion call loop over first elem of level 1
- * and move the matched to the NULL request slot.
- * warning: this does not work with I-Alltoall requests */
-inline int areInactiveReqs(int count, MPI_Request* reqs){ // if count==0 then all inactive
-  for(int i=0;i<count;i++){
-    if(reqs[i]!=MPI_REQUEST_NULL)
-      return 0;
-  }
-  return 1;
-}
-
-inline int matchReq(MPI_Request ia, MPI_Request ib){
-  checkRequest(ia);
-  checkRequest(ib);
-  AmpiRequestList* reqs = getReqs();
-  AmpiRequest *a, *b;
-  if(ia==MPI_REQUEST_NULL && ib==MPI_REQUEST_NULL) return 1;
-  if(ia==MPI_REQUEST_NULL || ib==MPI_REQUEST_NULL) return 0;
-  a=(*reqs)[ia];  b=(*reqs)[ib];
-  if(a->tag != b->tag) return 0;
-  if(a->src != b->src) return 0;
-  if(a->comm != b->comm) return 0;
-  return 1;
-}
-
-inline void swapInt(int& a,int& b){
-  int tmp;
-  tmp=a; a=b; b=tmp;
-}
-
-inline void sortedIndex(int n, int* arr, int* idx){
-  int i,j;
-  for(i=0;i<n;i++)
-    idx[i]=i;
-  for (i=0; i<n-1; i++) {
-    for (j=0; j<n-1-i; j++) {
-      if (arr[idx[j+1]] < arr[idx[j]])
-        swapInt(idx[j+1],idx[j]);
-    }
-  }
-}
-
-CkVec<CkVec<int> > *vecIndex(int count, int* arr){
-  CkAssert(count!=0);
-  vector<int> newidx(count);
-  int flag;
-  sortedIndex(count,arr,&newidx[0]);
-  CkVec<CkVec<int> > *vec = new CkVec<CkVec<int> >;
-  CkVec<int> slot;
-  vec->push_back(slot);
-  (*vec)[0].push_back(newidx[0]);
-  for(int i=1;i<count;i++){
-    flag=0;
-    for(int j=0;j<vec->size();j++){
-      if(matchReq(arr[newidx[i]],arr[((*vec)[j])[0]])){
-        ((*vec)[j]).push_back(newidx[i]);
-        flag++;
-      }
-    }
-    if(!flag){
-      CkVec<int> newslot;
-      newslot.push_back(newidx[i]);
-      vec->push_back(newslot);
-    }else{
-      CkAssert(flag==1);
-    }
-  }
-  return vec;
-}
-
-void vecPrint(CkVec<CkVec<int> > vec, int* arr){
-  printf("vec content: ");
-  for(int i=0;i<vec.size();i++){
-    printf("{");
-    for(int j=0;j<(vec[i]).size();j++){
-      printf(" %d ",arr[(vec[i])[j]]);
-    }
-    printf("} ");
-  }
-  printf("\n");
-}
-
 int PersReq::wait(MPI_Status *sts){
   if(sndrcv == 2) {
     if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, sts))
@@ -4568,8 +4483,8 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
              *request, reqs->size(), reqs);
   int waitResult = -1;
   do{
-    AmpiRequest *waitReq = (*reqs)[*request];
-    waitResult = waitReq->wait(sts);
+    AmpiRequest& waitReq = *(*reqs)[*request];
+    waitResult = waitReq.wait(sts);
 #if CMK_BIGSIM_CHARM
     if(_BgInOutOfCoreMode){
       reqs = getReqs();
@@ -4607,95 +4522,78 @@ CDECL
 int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 {
   AMPIAPI("AMPI_Waitall");
-  if(count==0) return MPI_SUCCESS;
-  checkRequests(count,request);
-  int i,j,oldPe;
 
-  MPI_Status tempStatus;
+  checkRequests(count, request);
+  if (count == 0) return MPI_SUCCESS;
 
   AmpiRequestList* reqs = getReqs();
-  CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
-    for(i=0;i<reqvec->size();i++){
-      for(j=0;j<((*reqvec)[i]).size();j++){
-        if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL){
-          stsempty(sts[((*reqvec)[i])[j]]);
-          continue;
-        }
-        AmpiRequest *waitReq = ((*reqs)[request[((*reqvec)[i])[j]]]);
-        (*(pptr->fromPUPer))|(pptr->pupBytes);
-        PUParray(*(pptr->fromPUPer), (char *)(waitReq->buf), (pptr->pupBytes));
-        PUParray(*(pptr->fromPUPer), (char *)(&sts[((*reqvec)[i])[j]]), sizeof(MPI_Status));
+    for(int i=0;i<count;i++){
+      if(request[i] == MPI_REQUEST_NULL){
+        stsempty(sts[i]);
+        continue;
       }
+      AmpiRequest *waitReq = (*reqs)[request[i]];
+      (*(pptr->fromPUPer))|(pptr->pupBytes);
+      PUParray(*(pptr->fromPUPer), (char *)(waitReq->buf), pptr->pupBytes);
+      PUParray(*(pptr->fromPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
     }
     return MPI_SUCCESS;
   }
 #endif
-
 #if CMK_BIGSIM_CHARM
   void *curLog; // store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
 #endif
-  for(i=0;i<reqvec->size();i++){
-    for(j=0;j<((*reqvec)[i]).size();j++){
-      if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL){
-        if(sts)
-          stsempty(sts[((*reqvec)[i])[j]]);
+
+  MPI_Status tmpStatus;
+  vector<bool> completed(count, false);
+  int numIncomplete = count;
+
+  while (numIncomplete > 0) {
+    for (int i=0; i<count; i++) {
+      if (completed[i])
+        continue;
+      if (request[i] == MPI_REQUEST_NULL) {
+        if (sts)
+          stsempty(sts[i]);
+        completed[i] = true;
+        numIncomplete--;
         continue;
       }
-      oldPe = CkMyPe();
-
-      int waitResult = -1;
-      do{
-        AmpiRequest *waitReq = ((*reqs)[request[((*reqvec)[i])[j]]]);
-        waitResult = waitReq->wait(sts ? &sts[((*reqvec)[i])[j]] : &tempStatus);
-
-#if CMK_BIGSIM_CHARM
-        if(_BgInOutOfCoreMode){
-          reqs = getReqs();
-          reqvec = vecIndex(count, request);
-        }
-#endif
+      AmpiRequest& req = *(*reqs)[request[i]];
+      completed[i] = req.itest(sts ? &sts[i] : &tmpStatus);
+      if (completed[i]) {
+        req.complete(sts ? &sts[i] : &tmpStatus);
 #if AMPIMSGLOG
         if(msgLogWrite && record_msglog(pptr->thisIndex)){
-          (pptr->pupBytes) = getDDT()->getSize(waitReq->type) * (waitReq->count);
+          (pptr->pupBytes) = getDDT()->getSize(req.type) * req.count;
           (*(pptr->toPUPer))|(pptr->pupBytes);
-          PUParray(*(pptr->toPUPer), (char *)(waitReq->buf), (pptr->pupBytes));
-          PUParray(*(pptr->toPUPer), (char *)(&sts[((*reqvec)[i])[j]]), sizeof(MPI_Status));
+          PUParray(*(pptr->toPUPer), (char *)(req.buf), pptr->pupBytes);
+          PUParray(*(pptr->toPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
         }
 #endif
-
-      }while(waitResult==-1);
-
-#if 1
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-      //for fault evacuation
-      if(oldPe != CkMyPe()){
-#endif
-        reqs = getReqs();
-        reqvec  = vecIndex(count,request);
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
+        if (req.getType() != MPI_PERS_REQ) { // only free non-blocking requests
+          reqs->free(request[i]);
+          request[i] = MPI_REQUEST_NULL;
+        }
+        numIncomplete--;
       }
-#endif
-#endif
+    }
+
+    if (numIncomplete > 0) {
+      getAmpiInstance(MPI_COMM_WORLD)->blockOnRecv();
+      reqs = getReqs(); //update pointer in case of migration while suspended
     }
   }
+
 #if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_WAITALL(reqs); // setup forward and backward dependence
 #endif
-  // free memory of requests
-  for(i=0;i<count;i++){
-    if(request[i] == MPI_REQUEST_NULL)
-      continue;
-    if((*reqs)[request[i]]->getType() != MPI_PERS_REQ) { // only free non-blocking request
-      reqs->free(request[i]);
-      request[i] = MPI_REQUEST_NULL;
-    }
-  }
-  delete reqvec;
+
   return MPI_SUCCESS;
 }
 
@@ -4704,35 +4602,36 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Waitany");
 
-  USER_CALL_DEBUG("AMPI_Waitany("<<count<<")");
-  if(count == 0) return MPI_SUCCESS;
-  checkRequests(count,request);
-  MPI_Status tempStatus;
-  if(!sts) sts = &tempStatus;
-
-  if(areInactiveReqs(count,request)){
-    *idx=MPI_UNDEFINED;
-    stsempty(*sts);
+  checkRequests(count, request);
+  if (count == 0) {
+    *idx = MPI_UNDEFINED;
     return MPI_SUCCESS;
   }
-  int flag=0;
-  CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
-  while(count>0){ /* keep looping until some request finishes: */
-    for(int i=0;i<reqvec->size();i++){
-      testRequest(&request[((*reqvec)[i])[0]], &flag, sts);
-      if(flag == 1 && sts->MPI_COMM != 0){ // to skip MPI_REQUEST_NULL
-        *idx = ((*reqvec)[i])[0];
-        USER_CALL_DEBUG("AMPI_Waitany returning "<<*idx);
+
+  MPI_Status tmpStatus;
+  if (!sts) sts = &tmpStatus;
+  int flag = 0, nullReqs = 0;
+
+  while (true) {
+    for (int i=0; i<count; i++) {
+      if (request[i] == MPI_REQUEST_NULL) {
+        nullReqs++;
+        continue;
+      }
+      testRequest(&request[i], &flag, sts);
+      if (flag) {
+        *idx = i;
         return MPI_SUCCESS;
       }
     }
-    /* no requests have finished yet-- block until one does */
+
+    if (nullReqs == count) {
+      stsempty(*sts);
+      *idx = MPI_UNDEFINED;
+      return MPI_SUCCESS;
+    }
     getAmpiInstance(MPI_COMM_WORLD)->blockOnRecv();
   }
-  *idx = MPI_UNDEFINED;
-  USER_CALL_DEBUG("AMPI_Waitany returning UNDEFINED");
-  delete reqvec;
-  return MPI_SUCCESS;
 }
 
 CDECL
@@ -4740,37 +4639,45 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
                   int *array_of_indices, MPI_Status *array_of_statuses)
 {
   AMPIAPI("AMPI_Waitsome");
-  checkRequests(incount,array_of_requests);
-  if(areInactiveReqs(incount,array_of_requests)){
-    *outcount=MPI_UNDEFINED;
+
+  checkRequests(incount, array_of_requests);
+  if (incount == 0) {
+    *outcount = MPI_UNDEFINED;
     return MPI_SUCCESS;
   }
+
   MPI_Status sts;
-  int i;
-  int flag=0, realflag=0;
-  CkVec<CkVec<int> > *reqvec = vecIndex(incount,array_of_requests);
+  int flag = 0, nullReqs = 0;
   *outcount = 0;
-  while(1){
-    for(i=0;i<reqvec->size();i++){
-      testRequest(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
-      if(flag == 1){
-        array_of_indices[(*outcount)]=((*reqvec)[i])[0];
-        if(sts.MPI_COMM != 0){
-          realflag=1; // there is real(non null) request
-          (*outcount)++;
-          if(array_of_statuses){
-            array_of_statuses[(*outcount)]=sts;
-          }
-        }
+
+  while (true) {
+    for (int i=0; i<incount; i++) {
+      if (array_of_requests[i] == MPI_REQUEST_NULL) {
+        if (array_of_statuses)
+          stsempty(array_of_statuses[i]);
+        nullReqs++;
+        continue;
+      }
+      testRequest(&array_of_requests[i], &flag, &sts);
+      if (flag) {
+        array_of_indices[(*outcount)] = i;
+        (*outcount)++;
+        if (array_of_statuses)
+          array_of_statuses[(*outcount)] = sts;
       }
     }
-    if(realflag && *outcount>0)
-      break;
-    else
+
+    if (*outcount > 0) {
+      return MPI_SUCCESS;
+    }
+    else if (nullReqs == incount) {
+      *outcount = MPI_UNDEFINED;
+      return MPI_SUCCESS;
+    }
+    else {
       getAmpiInstance(MPI_COMM_WORLD)->blockOnRecv();
+    }
   }
-  delete reqvec;
-  return MPI_SUCCESS;
 }
 
 bool PersReq::test(MPI_Status *sts){
@@ -5023,29 +4930,43 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 CDECL
 int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
   AMPIAPI("AMPI_Testany");
-  checkRequests(count,request);
+
+  checkRequests(count, request);
 
   MPI_Status tempStatus;
-  if(!sts) sts = &tempStatus;
+  if (!sts) sts = &tempStatus;
 
-  if(areInactiveReqs(count,request)){
-    *flag=1;
-    *index=MPI_UNDEFINED;
+  if (count == 0) {
+    *flag = 1;
+    *index = MPI_UNDEFINED;
     stsempty(*sts);
     return MPI_SUCCESS;
   }
-  CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
-  *flag=0;
-  for(int i=0;i<reqvec->size();i++){
-    testRequest(&request[((*reqvec)[i])[0]], flag, sts);
-    if(*flag==1 && sts->MPI_COMM!=0){ // skip MPI_REQUEST_NULL
-      *index = ((*reqvec)[i])[0];
+
+  int nullReqs = 0;
+  *flag = 0;
+
+  for (int i=0; i<count; i++) {
+    if (request[i] == MPI_REQUEST_NULL) {
+      nullReqs++;
+      continue;
+    }
+    testRequest(&request[i], flag, sts);
+    if (*flag) {
+      *index = i;
       return MPI_SUCCESS;
     }
   }
+
   *index = MPI_UNDEFINED;
-  delete reqvec;
-  getAmpiParent()->yield();
+  if (nullReqs == count) {
+    *flag = 1;
+    stsempty(*sts);
+  }
+  else {
+    getAmpiParent()->yield();
+  }
+
   return MPI_SUCCESS;
 }
 
@@ -5053,28 +4974,43 @@ CDECL
 int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Testall");
-  if(count==0){
+
+  checkRequests(count, request);
+  if (count == 0) {
     *flag = 1;
     return MPI_SUCCESS;
   }
-  checkRequests(count,request);
-  int i,j,tmpflag;
+
   AmpiRequestList* reqs = getReqs();
-  CkVec<CkVec<int> > *reqvec = vecIndex(count,request);
+  MPI_Status tmpStatus;
   *flag = 1;
-  for(i=0;i<reqvec->size();i++){
-    for(j=0;j<((*reqvec)[i]).size();j++){
-      if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL)
-        continue;
-      tmpflag = (*reqs)[request[((*reqvec)[i])[j]]]->itest(&sts[((*reqvec)[i])[j]]);
-      *flag *= tmpflag;
+
+  for (int i=0; i<count; i++) {
+    if (request[i] == MPI_REQUEST_NULL) {
+      if (sts)
+        stsempty(sts[i]);
+      continue;
+    }
+    *flag *= (*reqs)[request[i]]->itest(&tmpStatus);
+  }
+
+  if (*flag) {
+    for (int i=0; i<count; i++) {
+      int reqIdx = request[i];
+      if (reqIdx != MPI_REQUEST_NULL) {
+        AmpiRequest& req = *(*reqs)[reqIdx];
+        req.complete(sts ? &sts[i] : &tmpStatus);
+        if (req.getType() != MPI_PERS_REQ) { // only free non-blocking requests
+          reqs->free(reqIdx);
+          request[i] = MPI_REQUEST_NULL;
+        }
+      }
     }
   }
-  delete reqvec;
-  if(*flag)
-    AMPI_Waitall(count,request,sts);
-  else
+  else {
     getAmpiParent()->yield();
+  }
+
   return MPI_SUCCESS;
 }
 
@@ -5083,29 +5019,40 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
                   int *array_of_indices, MPI_Status *array_of_statuses)
 {
   AMPIAPI("AMPI_Testsome");
-  checkRequests(incount,array_of_requests);
-  if(areInactiveReqs(incount,array_of_requests)){
-    *outcount=MPI_UNDEFINED;
+
+  checkRequests(incount, array_of_requests);
+  if (incount == 0) {
+    *outcount = MPI_UNDEFINED;
     return MPI_SUCCESS;
   }
+
   MPI_Status sts;
-  int flag;
-  int i;
-  CkVec<CkVec<int> > *reqvec = vecIndex(incount,array_of_requests);
+  int flag = 0, nullReqs = 0;
   *outcount = 0;
-  for(i=0;i<reqvec->size();i++){
-    testRequest(&array_of_requests[((*reqvec)[i])[0]], &flag, &sts);
-    if(flag == 1){
-      array_of_indices[(*outcount)]=((*reqvec)[i])[0];
+
+  for (int i=0; i<incount; i++) {
+    if (array_of_requests[i] == MPI_REQUEST_NULL) {
+      if (array_of_statuses)
+        stsempty(array_of_statuses[i]);
+      nullReqs++;
+      continue;
+    }
+    testRequest(&array_of_requests[i], &flag, &sts);
+    if (flag) {
+      array_of_indices[(*outcount)] = i;
       (*outcount)++;
-      if(array_of_statuses){
-        array_of_statuses[(*outcount)]=sts;
-      }
+      if (array_of_statuses)
+        array_of_statuses[(*outcount)] = sts;
     }
   }
-  delete reqvec;
-  if(*outcount==0)
+
+  if (nullReqs == incount) {
+    *outcount = MPI_UNDEFINED;
+  }
+  else if (*outcount == 0) {
     getAmpiParent()->yield();
+  }
+
   return MPI_SUCCESS;
 }
 
