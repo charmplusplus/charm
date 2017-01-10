@@ -669,11 +669,6 @@ do
 
 	"-gen-cpm")
 		GENCPM="$GENCPM $1"
-		# -x c is only applied for the preprocessing of the GEN-CPM files on BG/Q
-		if [ "$CMK_USING_BGCLANG" = "1" ]
-		then
-		  OPTS_CC_GENCPM="-x c "
-		fi
 		shift
 		;;
 
@@ -1251,6 +1246,11 @@ Success() {
 ##############################################################################
 
 Debug "Preprocessing GEN-CPM files"
+
+if [ "$CMK_USING_BGCLANG" = "1" ]
+then
+  OPTS_CC_GENCPM="-x c "  # -x c is only applied for the preprocessing of the GEN-CPM files on BG/Q
+fi
 
 OPTS_CC_GENCPM="$OPTS_CC $OPTS_CC_GENCPM"
 for FILE in `echo $GENCPM`
