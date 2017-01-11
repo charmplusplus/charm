@@ -2240,6 +2240,12 @@ void ampi::unblock(void){
   thread->resume();
 }
 
+void ampiParent::blockOnRecv(void){
+  resumeOnRecv = true;
+  thread->suspend();
+  resumeOnRecv = false;
+}
+
 ampi* ampi::blockOnRecv(void){
   parent->resumeOnRecv = true;
   // In case this thread is migrated while suspended,
@@ -4585,7 +4591,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
     }
 
     if (numIncomplete > 0) {
-      getAmpiInstance(MPI_COMM_WORLD)->blockOnRecv();
+      getAmpiParent()->blockOnRecv();
       reqs = getReqs(); //update pointer in case of migration while suspended
     }
   }
@@ -4630,7 +4636,7 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
       *idx = MPI_UNDEFINED;
       return MPI_SUCCESS;
     }
-    getAmpiInstance(MPI_COMM_WORLD)->blockOnRecv();
+    getAmpiParent()->blockOnRecv();
   }
 }
 
@@ -4675,7 +4681,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
       return MPI_SUCCESS;
     }
     else {
-      getAmpiInstance(MPI_COMM_WORLD)->blockOnRecv();
+      getAmpiParent()->blockOnRecv();
     }
   }
 }
