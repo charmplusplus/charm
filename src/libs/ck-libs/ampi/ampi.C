@@ -3759,13 +3759,6 @@ static void handle_MPI_IN_PLACE(void* &inbuf, void* &outbuf)
   CkAssert(inbuf != MPI_IN_PLACE && outbuf != MPI_IN_PLACE);
 }
 
-void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec)
-{
-  // inoutvec[i] = invec[i] op inoutvec[i]
-  MPI_User_function *func = getAmpiParent()->op2User_function(op);
-  (func)(invec, inoutvec, &count, &datatype);
-}
-
 #define SYNCHRONOUS_REDUCE                           0
 
 CDECL
@@ -3943,7 +3936,7 @@ int AMPI_Reduce_local(void *inbuf, void *outbuf, int count, MPI_Datatype type, M
     return ret;
 #endif
 
-  applyOp(type, op, count, inbuf, outbuf);
+  getAmpiParent()->applyOp(type, op, count, inbuf, outbuf);
   return MPI_SUCCESS;
 }
 
@@ -4053,10 +4046,10 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
       ptr->sendrecv(&partial_scan[0], count, datatype, dst, MPI_SCAN_TAG,
                     &tmp_buf[0], count, datatype, dst, MPI_SCAN_TAG, comm, &sts);
       if(rank > dst){
-        applyOp(datatype, op, count, &tmp_buf[0], &partial_scan[0]);
-        applyOp(datatype, op, count, &tmp_buf[0], recvbuf);
+        getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], &partial_scan[0]);
+        getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], recvbuf);
       }else {
-        applyOp(datatype, op, count, &partial_scan[0], &tmp_buf[0]);
+        getAmpiParent()->applyOp(datatype, op, count, &partial_scan[0], &tmp_buf[0]);
         memcpy(&partial_scan[0],&tmp_buf[0],blklen);
       }
     }
@@ -4102,19 +4095,19 @@ int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
       ptr->sendrecv(&partial_scan[0], count, datatype, dst, MPI_EXSCAN_TAG,
                     &tmp_buf[0], count, datatype, dst, MPI_EXSCAN_TAG, comm, &sts);
       if(rank > dst){
-        applyOp(datatype, op, count, &tmp_buf[0], &partial_scan[0]);
+        getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], &partial_scan[0]);
         if(rank != 0){
           if(flag == 0){
             memcpy(recvbuf,&tmp_buf[0],blklen);
             flag = 1;
           }
           else{
-            applyOp(datatype, op, count, &tmp_buf[0], recvbuf);
+            getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], recvbuf);
           }
         }
       }
       else{
-        applyOp(datatype, op, count, &partial_scan[0], &tmp_buf[0]);
+        getAmpiParent()->applyOp(datatype, op, count, &partial_scan[0], &tmp_buf[0]);
         memcpy(&partial_scan[0],&tmp_buf[0],blklen);
       }
       mask <<= 1;

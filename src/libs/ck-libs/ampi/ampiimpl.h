@@ -93,9 +93,6 @@ void* AmmProbe(AmmTable t, const int tags[AMM_NTAGS], int* rtags);
 int AmmEntries(AmmTable t);
 AmmTable AmmPup(pup_er p, AmmTable t, AmmPupMessageFn msgpup);
 
-
-void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec);
-
 PUPfunctionpointer(MPI_User_function*)
 
 /*
@@ -178,6 +175,8 @@ class lockQueueEntry {
 
 typedef CkQ<lockQueueEntry *> LockQueue;
 
+class ampiParent;
+
 class win_obj {
  public:
   char winName[MPI_MAX_OBJECT_NAME];
@@ -214,7 +213,7 @@ class win_obj {
   int get(void *orgaddr, int orgcnt, int orgunit,
           MPI_Aint targdisp, int targcnt, int targunit);
   int accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
-                 MPI_Datatype targtype, MPI_Op op);
+                 MPI_Datatype targtype, MPI_Op op, ampiParent* pptr);
 
   int iget(int orgcnt, MPI_Datatype orgtype,
           MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);
@@ -1490,6 +1489,11 @@ class ampiParent : public CBase_ampiParent {
     CkAssert(op>MPI_OP_NULL && op<ops.size());
     int size = myDDT->getType(type)->getSize(count);
     return AmpiOpHeader(ops[op].func, type, count, size);
+  }
+  inline void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec) const {
+    // inoutvec[i] = invec[i] op inoutvec[i]
+    MPI_User_function *func = op2User_function(op);
+    (func)(invec, inoutvec, &count, &datatype);
   }
 
  public:
