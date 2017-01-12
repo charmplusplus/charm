@@ -690,8 +690,8 @@ class AmpiRequest {
 };
 
 class PersReq : public AmpiRequest {
-  int sndrcv; // 1 if send , 2 if recv, 3 if ssend
  public:
+  int sndrcv; // 1 if send , 2 if recv, 3 if ssend
   PersReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_, int sndrcv_){
     buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_;
     comm=comm_;  sndrcv=sndrcv_;  isvalid=true;

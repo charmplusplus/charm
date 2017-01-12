@@ -3251,8 +3251,13 @@ MPI_Request ampi::postReq(AmpiRequest* newreq, AmpiReqSts status/*=AMPI_REQ_PEND
   }
   else {
     request = getReqs()->insert(newreq);
-    int tags[2] = { newreq->tag, newreq->src };
-    AmmPut(posted_ireqs, tags, (void *)(CmiIntPtr)(request+1));
+    // All types of send requests are matched by their request number, not by (tag, src, comm).
+    if (newreq->getType() != MPI_SEND_REQ &&
+        newreq->getType() != MPI_SSEND_REQ &&
+        !(newreq->getType() == MPI_PERS_REQ && ((PersReq*)newreq)->sndrcv != 2)) {
+      int tags[2] = { newreq->tag, newreq->src };
+      AmmPut(posted_ireqs, tags, (void *)(CmiIntPtr)(request+1));
+    }
   }
   return request;
 }
@@ -3333,9 +3338,7 @@ int AMPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
 
   USER_CALL_DEBUG("AMPI_Issend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
   ampi *ptr = getAmpiInstance(comm);
-  AmpiRequestList* reqs = getReqs();
-  SsendReq *newreq = new SsendReq(comm);
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(new SsendReq(comm));
   // 1:  blocking now  - used by MPI_Ssend
   // >=2:  the index of the requests - used by MPI_Issend
   ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm, *request+2);
@@ -5165,9 +5168,7 @@ int AMPI_Recv_init(void *buf, int count, MPI_Datatype type, int src, int tag,
   }
 #endif
 
-  AmpiRequestList* reqs = getReqs();
-  PersReq *newreq = new PersReq(buf,count,type,src,tag,comm,2);
-  *req = reqs->insert(newreq);
+  *req = getAmpiInstance(comm)->postReq(new PersReq(buf,count,type,src,tag,comm,2));
   return MPI_SUCCESS;
 }
 
@@ -5187,9 +5188,7 @@ int AMPI_Send_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
   }
 #endif
 
-  AmpiRequestList* reqs = getReqs();
-  PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,1);
-  *req = reqs->insert(newreq);
+  *req = getAmpiInstance(comm)->postReq(new PersReq(buf,count,type,dest,tag,comm,1));
   return MPI_SUCCESS;
 }
 
@@ -5209,9 +5208,7 @@ int AMPI_Ssend_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
   }
 #endif
 
-  AmpiRequestList* reqs = getReqs();
-  PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,3);
-  *req = reqs->insert(newreq);
+  *req = getAmpiInstance(comm)->postReq(new PersReq(buf,count,type,dest,tag,comm,3));
   return MPI_SUCCESS;
 }
 
@@ -6653,7 +6650,7 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
       CkAbort("MPI_Ialltoall: Error adding requests into IATAReq!");
   }
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(newreq);
   AMPI_DEBUG("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   return MPI_SUCCESS;
 }
@@ -6756,7 +6753,7 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
     if(newreq->addReq((void*)(((char*)recvbuf)+(itemsize*rdispls[i])),recvcounts[i],recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
       CkAbort("MPI_Ialltoallv: Error adding requests into IATAReq!");
   }
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(newreq);
   AMPI_DEBUG("MPI_Ialltoallv: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
 
   return MPI_SUCCESS;
@@ -6854,7 +6851,7 @@ int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
                       recvtypes[i], i, MPI_ATA_TAG, comm) != (i+1))
       CkAbort("MPI_Ialltoallw: Error adding requests into IATAReq!");
   }
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -6958,7 +6955,7 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
                       neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_alltoall: Error adding requests into IATAReq!");
   }
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -7063,7 +7060,7 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
                       neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_alltoallv: Error adding requests into IATAReq!");
   }
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -7166,7 +7163,7 @@ int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
                       neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_alltoallw: Error adding requests into IATAReq!");
   }
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -7268,7 +7265,7 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
                       neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_allgather: Error adding requests into IATAReq!");
   }
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -7370,7 +7367,7 @@ int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtyp
                       neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
       CkAbort("MPI_Ineighbor_allgatherv: Error adding requests into IATAReq!");
   }
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -9172,9 +9169,7 @@ int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request)
 {
   AMPIAPI("AMPI_GPU_Iinvoke");
 
-  AmpiRequestList* reqs = getReqs();
-  GPUReq *newreq = new GPUReq();
-  *request = reqs->insert(newreq);
+  *request = ptr->postReq(new GPUReq());
 
   // A callback that completes the corresponding request
   CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
