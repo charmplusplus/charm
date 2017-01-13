@@ -320,29 +320,27 @@ void free_reentrant(void *mem) { free(mem); }
 int sbrk(int s) { return 0; }
 #endif
 
+#if CMK_C_INLINE
+#define INLINE inline
+#else
+#define INLINE
+#endif
+
+
 #if CMK_HAS_MSTATS
 #include <malloc/malloc.h>
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusageMstats(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageMstats(){
 	struct mstats ms = mstats();
 	CMK_TYPEDEF_UINT8 memtotal = ms.bytes_used;
 	return memtotal;
 }
 #else
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusageMstats() { return 0; }
+INLINE static CMK_TYPEDEF_UINT8 MemusageMstats() { return 0; }
 #endif
 
 static int MemusageInited = 0;
 static CMK_TYPEDEF_UINT8 MemusageInitSbrkval = 0;
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusageSbrk(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageSbrk(){
 	CMK_TYPEDEF_UINT8 newval;
 	if(MemusageInited==0){
 		MemusageInitSbrkval = (CMK_TYPEDEF_UINT8)sbrk(0);
@@ -352,10 +350,7 @@ static CMK_TYPEDEF_UINT8 MemusageSbrk(){
 	return (newval - MemusageInitSbrkval);
 }
 
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
     FILE *f;
     int i, ret;
     static int failed_once = 0;
@@ -373,18 +368,12 @@ static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
 }
 
 #if ! CMK_HAS_MALLINFO || defined(CMK_MALLINFO_IS_BROKEN)
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusageMallinfo(){ return 0;}	
+INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(){ return 0;}	
 #else
 #if CMK_HAS_MALLOC_H
 #include <malloc.h>
 #endif
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
     /* IA64 seems to ignore mi.uordblks, but updates mi.hblkhd correctly */
     if (skip_mallinfo) return 0;
     else {
@@ -401,10 +390,7 @@ static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
 }
 #endif
 
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusagePS(){
+INLINE static CMK_TYPEDEF_UINT8 MemusagePS(){
 #if ! CMK_HAS_POPEN
     return 0;
 #else	
@@ -426,10 +412,7 @@ static CMK_TYPEDEF_UINT8 MemusagePS(){
 #include <windows.h>
 #include <psapi.h>
 
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusageWindows(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageWindows(){
     PROCESS_MEMORY_COUNTERS pmc;
     if ( GetProcessMemoryInfo( GetCurrentProcess(), &pmc, sizeof(pmc)) )
     {
@@ -449,10 +432,7 @@ static CMK_TYPEDEF_UINT8 MemusageWindows(){
 * https://wiki.alcf.anl.gov/index.php/Debugging#How_do_I_get_information_on_used.2Favailable_memory_in_my_code.3F
 */
 #include <malloc.h>
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusageBGP(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageBGP(){
     struct mallinfo m = mallinfo();
     return m.hblkhd + m.uordblks;
 }
@@ -464,10 +444,7 @@ static CMK_TYPEDEF_UINT8 MemusageBGP(){
 
 #if CMK_BLUEGENEQ
 #include <spi/include/kernel/memory.h>
-#if CMK_C_INLINE
-inline
-#endif
-static CMK_TYPEDEF_UINT8 MemusageBGQ(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageBGQ(){
   CMK_TYPEDEF_UINT8 heapUsed;
   Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heapUsed);
   return heapUsed;
