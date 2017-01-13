@@ -160,7 +160,7 @@ public:
   bool AreRecvsPosted() const {return areRecvsPosted;}
   void setAreRecvsPosted(bool setR) {areRecvsPosted = setR;}
   bool isInEpoch() const {return inEpoch;}
-  bool setInEpoch(bool arg) {inEpoch = arg;}
+  void setInEpoch(bool arg) {inEpoch = arg;}
 };
 
 class ampi;
