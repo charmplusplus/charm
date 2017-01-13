@@ -32,8 +32,6 @@ module CkReduction {
 	entry void ArrayReductionHandler(CkReductionMsg *m);
 	entry void contributeViaMessage(CkReductionMsg *m);
   entry void AddToInactiveList(CkReductionInactiveMsg *m);
-
-        initnode void sanitycheck();
   };
 
   nodegroup CkNodeReductionMgr : IrrGroup {

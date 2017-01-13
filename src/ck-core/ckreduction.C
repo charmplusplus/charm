@@ -775,7 +775,7 @@ void CkReductionMgr::finishReduction(void)
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if (nContrib<(lcount+adj(redNo).lcount) - numImmigrantRecObjs + numEmigrantRecObjs){
-          if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+          if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
             partialReduction = true;
           }
           else {
@@ -785,7 +785,7 @@ void CkReductionMgr::finishReduction(void)
 	}
 #else
   if (nContrib<(lcount+adj(redNo).lcount)){
-         if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+         if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
            partialReduction = true;
          }
          else {
@@ -797,7 +797,7 @@ void CkReductionMgr::finishReduction(void)
 
 #if GROUP_LEVEL_REDUCTION
   if (nRemote<treeKids()) {
-    if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+    if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
       partialReduction = true;
     }
     else {
@@ -1058,7 +1058,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
         msgArr[0] = msgArr[nMsgs - 1];
         nMsgs--;
       }
-      CkReduction::reducerFn f=CkReduction::reducerTable[r].fn;
+      CkReduction::reducerFn f=CkReduction::reducerTable()[r].fn;
       ret=(*f)(nMsgs,msgArr);
     }
     ret->reducer=r;
@@ -1255,7 +1255,7 @@ void CkReductionMgr :: endArrayReduction(){
   		//No valid reducer in the whole vector
     		ret=CkReductionMsg::buildNew(0,NULL);
   	else{//Use the reducer to reduce the messages
-               CkReduction::reducerFn f=CkReduction::reducerTable[r].fn;
+               CkReduction::reducerFn f=CkReduction::reducerTable()[r].fn;
 		// has to be corrected elements from above need to be put into a temporary vector
     		CkReductionMsg **msgArr=&tempMsgs[0];//<-- HACK!
 
@@ -1992,7 +1992,7 @@ CkReductionMsg* CkReduction::tupleReduction(int num_messages, CkReductionMsg** m
     }
 
     // run the reduction and copy the result back to our data structure
-    const auto& reducerFp = CkReduction::reducerTable[reducerType].fn;
+    const auto& reducerFp = CkReduction::reducerTable()[reducerType].fn;
     CkReductionMsg* result = reducerFp(num_messages, simulated_messages);
     DEB_TUPLE(("    result_len=%d\n  },\n", result->getLength()));
     return_data[reduction_idx] = CkReduction::tupleElement(result->getLength(), result->getData(), reducerType);
@@ -2023,127 +2023,142 @@ CkReduction::CkReduction() {} //Dummy private constructor
 // reducerType.  Must be called in the same order on every node.
 CkReduction::reducerType CkReduction::addReducer(reducerFn fn, bool streamable)
 {
-  reducerTable[nReducers].fn=fn;
-  reducerTable[nReducers].streamable=streamable;
-  return (reducerType)nReducers++;
+  static CmiNodeLock reductionLock = CmiCreateLock();
+  CmiLock(reductionLock);
+  reducerType index = (reducerType)reducerTable().size();
+  reducerTable().push_back(reducerStruct(fn, streamable));
+  CmiUnlock(reductionLock);
+  return index;
 }
+
 
 /*Reducer table: maps reducerTypes to reducerStructs.
 It's indexed by reducerType, so the order in this table
 must *exactly* match the reducerType enum declaration.
 The names don't have to match, but it helps.
 */
-int CkReduction::nReducers=CkReduction::lastSystemReducer;
+std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
+{
+  std::vector<CkReduction::reducerStruct> vec;
 
-CkReduction::reducerStruct CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
-    CkReduction::reducerStruct(::invalid_reducer, true),
-    CkReduction::reducerStruct(::nop, true),
-    //Compute the sum the numbers passed by each element.
-    CkReduction::reducerStruct(::sum_char, true),
-    CkReduction::reducerStruct(::sum_short, true),
-    CkReduction::reducerStruct(::sum_int, true),
-    CkReduction::reducerStruct(::sum_long, true),
-    CkReduction::reducerStruct(::sum_long_long, true),
-    CkReduction::reducerStruct(::sum_uchar, true),
-    CkReduction::reducerStruct(::sum_ushort, true),
-    CkReduction::reducerStruct(::sum_uint, true),
-    CkReduction::reducerStruct(::sum_ulong, true),
-    CkReduction::reducerStruct(::sum_ulong_long, true),
-    // The floating point sums are marked as unstreamable to avoid
-    // implictly stating that they will always be precision oblivious.
-    CkReduction::reducerStruct(::sum_float, false),
-    CkReduction::reducerStruct(::sum_double, false),
+  vec.push_back(CkReduction::reducerStruct(::invalid_reducer, true));
+  vec.push_back(CkReduction::reducerStruct(::nop, true));
+  //Compute the sum the numbers passed by each element.
+  vec.push_back(CkReduction::reducerStruct(::sum_char, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_short, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_int, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_long, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_long_long, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_uchar, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_ushort, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_uint, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_ulong, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_ulong_long, true));
+  // The floating point sums are marked as unstreamable to avoid
+  // implictly stating that they will always be precision oblivious.
+  vec.push_back(CkReduction::reducerStruct(::sum_float, false));
+  vec.push_back(CkReduction::reducerStruct(::sum_double, false));
 
-    //Compute the product the numbers passed by each element.
-    CkReduction::reducerStruct(::product_char, true),
-    CkReduction::reducerStruct(::product_short, true),
-    CkReduction::reducerStruct(::product_int, true),
-    CkReduction::reducerStruct(::product_long, true),
-    CkReduction::reducerStruct(::product_long_long, true),
-    CkReduction::reducerStruct(::product_uchar, true),
-    CkReduction::reducerStruct(::product_ushort, true),
-    CkReduction::reducerStruct(::product_uint, true),
-    CkReduction::reducerStruct(::product_ulong, true),
-    CkReduction::reducerStruct(::product_ulong_long, true),
-    CkReduction::reducerStruct(::product_float, true),
-    CkReduction::reducerStruct(::product_double, true),
+  //Compute the product the numbers passed by each element.
+  vec.push_back(CkReduction::reducerStruct(::product_char, true));
+  vec.push_back(CkReduction::reducerStruct(::product_short, true));
+  vec.push_back(CkReduction::reducerStruct(::product_int, true));
+  vec.push_back(CkReduction::reducerStruct(::product_long, true));
+  vec.push_back(CkReduction::reducerStruct(::product_long_long, true));
+  vec.push_back(CkReduction::reducerStruct(::product_uchar, true));
+  vec.push_back(CkReduction::reducerStruct(::product_ushort, true));
+  vec.push_back(CkReduction::reducerStruct(::product_uint, true));
+  vec.push_back(CkReduction::reducerStruct(::product_ulong, true));
+  vec.push_back(CkReduction::reducerStruct(::product_ulong_long, true));
+  vec.push_back(CkReduction::reducerStruct(::product_float, true));
+  vec.push_back(CkReduction::reducerStruct(::product_double, true));
 
-    //Compute the largest number passed by any element.
-    CkReduction::reducerStruct(::max_char, true),
-    CkReduction::reducerStruct(::max_short, true),
-    CkReduction::reducerStruct(::max_int, true),
-    CkReduction::reducerStruct(::max_long, true),
-    CkReduction::reducerStruct(::max_long_long, true),
-    CkReduction::reducerStruct(::max_uchar, true),
-    CkReduction::reducerStruct(::max_ushort, true),
-    CkReduction::reducerStruct(::max_uint, true),
-    CkReduction::reducerStruct(::max_ulong, true),
-    CkReduction::reducerStruct(::max_ulong_long, true),
-    CkReduction::reducerStruct(::max_float, true),
-    CkReduction::reducerStruct(::max_double, true),
+  //Compute the largest number passed by any element.
+  vec.push_back(CkReduction::reducerStruct(::max_char, true));
+  vec.push_back(CkReduction::reducerStruct(::max_short, true));
+  vec.push_back(CkReduction::reducerStruct(::max_int, true));
+  vec.push_back(CkReduction::reducerStruct(::max_long, true));
+  vec.push_back(CkReduction::reducerStruct(::max_long_long, true));
+  vec.push_back(CkReduction::reducerStruct(::max_uchar, true));
+  vec.push_back(CkReduction::reducerStruct(::max_ushort, true));
+  vec.push_back(CkReduction::reducerStruct(::max_uint, true));
+  vec.push_back(CkReduction::reducerStruct(::max_ulong, true));
+  vec.push_back(CkReduction::reducerStruct(::max_ulong_long, true));
+  vec.push_back(CkReduction::reducerStruct(::max_float, true));
+  vec.push_back(CkReduction::reducerStruct(::max_double, true));
 
-    //Compute the smallest number passed by any element.
-    CkReduction::reducerStruct(::min_char, true),
-    CkReduction::reducerStruct(::min_short, true),
-    CkReduction::reducerStruct(::min_int, true),
-    CkReduction::reducerStruct(::min_long, true),
-    CkReduction::reducerStruct(::min_long_long, true),
-    CkReduction::reducerStruct(::min_uchar, true),
-    CkReduction::reducerStruct(::min_ushort, true),
-    CkReduction::reducerStruct(::min_uint, true),
-    CkReduction::reducerStruct(::min_ulong, true),
-    CkReduction::reducerStruct(::min_ulong_long, true),
-    CkReduction::reducerStruct(::min_float, true),
-    CkReduction::reducerStruct(::min_double, true),
+  //Compute the smallest number passed by any element.
+  vec.push_back(CkReduction::reducerStruct(::min_char, true));
+  vec.push_back(CkReduction::reducerStruct(::min_short, true));
+  vec.push_back(CkReduction::reducerStruct(::min_int, true));
+  vec.push_back(CkReduction::reducerStruct(::min_long, true));
+  vec.push_back(CkReduction::reducerStruct(::min_long_long, true));
+  vec.push_back(CkReduction::reducerStruct(::min_uchar, true));
+  vec.push_back(CkReduction::reducerStruct(::min_ushort, true));
+  vec.push_back(CkReduction::reducerStruct(::min_uint, true));
+  vec.push_back(CkReduction::reducerStruct(::min_ulong, true));
+  vec.push_back(CkReduction::reducerStruct(::min_ulong_long, true));
+  vec.push_back(CkReduction::reducerStruct(::min_float, true));
+  vec.push_back(CkReduction::reducerStruct(::min_double, true));
 
-    //Compute the logical AND of the values passed by each element.
-    // The resulting value will be zero if any source value is zero.
-    CkReduction::reducerStruct(::logical_and, true),
-    CkReduction::reducerStruct(::logical_and_int, true),
-    CkReduction::reducerStruct(::logical_and_bool, true),
+  //Compute the logical AND of the values passed by each element.
+  // The resulting value will be zero if any source value is zero.
+  vec.push_back(CkReduction::reducerStruct(::logical_and, true));
+  vec.push_back(CkReduction::reducerStruct(::logical_and_int, true));
+  vec.push_back(CkReduction::reducerStruct(::logical_and_bool, true));
 
-    //Compute the logical OR of the values passed by each element.
-    // The resulting value will be 1 if any source value is nonzero.
-    CkReduction::reducerStruct(::logical_or, true),
-    CkReduction::reducerStruct(::logical_or_int, true),
-    CkReduction::reducerStruct(::logical_or_bool, true),
+  //Compute the logical OR of the values passed by each element.
+  // The resulting value will be 1 if any source value is nonzero.
+  vec.push_back(CkReduction::reducerStruct(::logical_or, true));
+  vec.push_back(CkReduction::reducerStruct(::logical_or_int, true));
+  vec.push_back(CkReduction::reducerStruct(::logical_or_bool, true));
 
-    //Compute the logical XOR of the values passed by each element.
-    // The resulting value will be 1 if an odd number of source values is nonzero.
-    CkReduction::reducerStruct(::logical_xor_int, true),
-    CkReduction::reducerStruct(::logical_xor_bool, true),
+  //Compute the logical XOR of the values passed by each element.
+  // The resulting value will be 1 if an odd number of source values is nonzero.
+  vec.push_back(CkReduction::reducerStruct(::logical_xor_int, true));
+  vec.push_back(CkReduction::reducerStruct(::logical_xor_bool, true));
 
-    // Compute the logical bitvector AND of the values passed by each element.
-    CkReduction::reducerStruct(::bitvec_and, true),
-    CkReduction::reducerStruct(::bitvec_and_int, true),
-    CkReduction::reducerStruct(::bitvec_and_bool, true),
+  // Compute the logical bitvector AND of the values passed by each element.
+  vec.push_back(CkReduction::reducerStruct(::bitvec_and, true));
+  vec.push_back(CkReduction::reducerStruct(::bitvec_and_int, true));
+  vec.push_back(CkReduction::reducerStruct(::bitvec_and_bool, true));
 
-    // Compute the logical bitvector OR of the values passed by each element.
-    CkReduction::reducerStruct(::bitvec_or, true),
-    CkReduction::reducerStruct(::bitvec_or_int, true),
-    CkReduction::reducerStruct(::bitvec_or_bool, true),
-    
-    // Compute the logical bitvector XOR of the values passed by each element.
-    CkReduction::reducerStruct(::bitvec_xor, true),
-    CkReduction::reducerStruct(::bitvec_xor_int, true),
-    CkReduction::reducerStruct(::bitvec_xor_bool, true),
+  // Compute the logical bitvector OR of the values passed by each element.
+  vec.push_back(CkReduction::reducerStruct(::bitvec_or, true));
+  vec.push_back(CkReduction::reducerStruct(::bitvec_or_int, true));
+  vec.push_back(CkReduction::reducerStruct(::bitvec_or_bool, true));
 
-    // Select one of the messages at random to pass on
-    CkReduction::reducerStruct(::random, true),
+  // Compute the logical bitvector XOR of the values passed by each element.
+  vec.push_back(CkReduction::reducerStruct(::bitvec_xor, true));
+  vec.push_back(CkReduction::reducerStruct(::bitvec_xor_int, true));
+  vec.push_back(CkReduction::reducerStruct(::bitvec_xor_bool, true));
 
-    //Concatenate the (arbitrary) data passed by each element
-    // This reduction is marked as unstreamable because of the n^2
-    // work required to stream it
-    CkReduction::reducerStruct(::concat, false),
+  // Select one of the messages at random to pass on
+  vec.push_back(CkReduction::reducerStruct(::random, true));
 
-    //Combine the data passed by each element into an list of setElements.
-    // Each element may contribute arbitrary data (with arbitrary length).
-    // This reduction is marked as unstreamable because of the n^2
-    // work required to stream it
-    CkReduction::reducerStruct(::set, false),
+  //Concatenate the (arbitrary) data passed by each element
+  // This reduction is marked as unstreamable because of the n^2
+  // work required to stream it
+  vec.push_back(CkReduction::reducerStruct(::concat, false));
 
-    CkReduction::reducerStruct(::statistics, true),
-    CkReduction::reducerStruct(CkReduction::tupleReduction, false),
+  //Combine the data passed by each element into an list of setElements.
+  // Each element may contribute arbitrary data (with arbitrary length).
+  // This reduction is marked as unstreamable because of the n^2
+  // work required to stream it
+  vec.push_back(CkReduction::reducerStruct(::set, false));
+
+  vec.push_back(CkReduction::reducerStruct(::statistics, true));
+  vec.push_back(CkReduction::reducerStruct(CkReduction::tupleReduction, false));
+
+  return vec;
+}
+
+/* Wraps accesses to the reducerTable to prevent the static initialization
+order fiasco */
+std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
+{
+  static std::vector<CkReduction::reducerStruct> table = initReducerTable();
+  return table;
 };
 
 
@@ -2547,7 +2562,7 @@ void CkNodeReductionMgr::finishReduction(void)
   bool partialReduction = false;
 
   if (nContrib<(lcount)){
-    if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+    if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
       partialReduction = true;
     }
     else {
@@ -2556,7 +2571,7 @@ void CkNodeReductionMgr::finishReduction(void)
     }
   }
   if (nRemote<treeKids()){
-    if (msgs.length() > 1 && CkReduction::reducerTable[msgs.peek()->reducer].streamable) {
+    if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
       partialReduction = true;
     }
     else {
@@ -2841,7 +2856,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
         msgArr[0] = msgArr[nMsgs - 1];
         nMsgs--;
       }
-      CkReduction::reducerFn f=CkReduction::reducerTable[r].fn;
+      CkReduction::reducerFn f=CkReduction::reducerTable()[r].fn;
       ret=(*f)(nMsgs,msgArr);
     }
     ret->reducer=r;
@@ -3223,16 +3238,6 @@ int CkNodeReductionMgr::findMaxRedNo(){
 		max--;
 	}
 	return max;
-}
-
-// initnode call. check the size of reduction table
-void CkReductionMgr::sanitycheck()
-{
-#if CMK_ERROR_CHECKING
-  int count = 0;
-  while (CkReduction::reducerTable[count].fn != NULL) count++;
-  CmiAssert(CkReduction::nReducers == count);
-#endif
 }
 
 #include "CkReduction.def.h"

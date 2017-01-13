@@ -188,10 +188,7 @@ public:
         statistics,
 
         // Combine multiple data/reducer pairs into one reduction
-        tuple,
-
-	//Last system-defined reducer number (user-defined reducers follow)
-		lastSystemReducer
+        tuple
 	} reducerType;
 
 	//This structure is used with the set reducer above,
@@ -254,13 +251,10 @@ private:
 	friend class CkMulticastMgr;
     friend class ck::impl::XArraySectionReducer;
 //System-level interface
-	//This is the maximum number of possible reducers,
-	// including both builtin and user-defined types
-	enum {MAXREDUCERS=256};
 
 	//Reducer table: maps reducerTypes to reducerFns.
-	static reducerStruct reducerTable[MAXREDUCERS];
-	static int nReducers;//Number of reducers currently in table above
+    static std::vector<reducerStruct>& reducerTable();
+    static std::vector<reducerStruct> initReducerTable();
 
     // tupleReduction needs access to the reducerTable that lives in this namespace
     // so it is not a standalone function in ckreduction.C like other reduction implementations
@@ -629,7 +623,6 @@ public:
 		when there are no gcount
 	*/
 	int getGCount(){return gcount;};
-        static void sanitycheck();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void decGCount(){gcount--;}
 	void incNumImmigrantRecObjs(){
