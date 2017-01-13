@@ -289,8 +289,8 @@ class ampiCommStruct {
   MPI_Comm comm; //Communicator
   CkArrayID ampiID; //ID of corresponding ampi array
   int size; //Number of processes in communicator
-  bool isWorld; //1 if ranks are 0..size-1?
-  bool isInter; // 0: intra-communicator; 1: inter-communicator
+  bool isWorld; //true if ranks are 0..size-1?
+  bool isInter; // false: intra-communicator; true: inter-communicator
   vector<int> indices;  //indices[r] gives the array index for rank r
   vector<int> remoteIndices;  // remote group for inter-communicator
 
@@ -320,17 +320,17 @@ class ampiCommStruct {
     for (int i=0;i<size;i++) ind->push_back(i);
   }
  public:
-  ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;isInter=0;commNameLen=0;}
+  ampiCommStruct(int ignored=0) {size=-1;isWorld=false;isInter=false;commNameLen=0;}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
-    :comm(comm_), ampiID(id_),size(size_), isWorld(1), isInter(0), commNameLen(0) {}
+    :comm(comm_), ampiID(id_),size(size_), isWorld(true), isInter(false), commNameLen(0) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_)
-                :comm(comm_), ampiID(id_),size(size_),isWorld(0),
-                 isInter(0), indices(indices_), commNameLen(0) {}
+                :comm(comm_), ampiID(id_),size(size_),isWorld(false),
+                 isInter(false), indices(indices_), commNameLen(0) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_,
                  const vector<int> &remoteIndices_)
-                :comm(comm_),ampiID(id_),size(size_),isWorld(0),isInter(1),
+                :comm(comm_),ampiID(id_),size(size_),isWorld(false),isInter(true),
                  indices(indices_),remoteIndices(remoteIndices_),commNameLen(0) {}
   void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
