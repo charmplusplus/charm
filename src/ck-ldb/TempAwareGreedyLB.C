@@ -74,7 +74,7 @@ CkPrintf("----------------- in TempAwareGreedyLB -----------\n");
 
     // Increment the load of the least loaded processor by the load of the
     // 'heaviest' unmapped object
-    p.setTotalLoad(p.getTotalLoad() + ogr->vertices[vert].getVertexLoad());
+    p.totalLoad() += ogr->vertices[vert].getVertexLoad();
     ogr->vertices[vert].setNewPe(p.getProcId());
 
     // Insert the least loaded processor with load updated back into the heap
