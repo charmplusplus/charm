@@ -496,6 +496,19 @@ char *CmiMemoryUsageReporter(){
 
 /******End of a general way to get memory usage information*****/
 
+#if CMK_HAS_RUSAGE_THREAD
+#include <sys/resource.h>
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR() {
+  struct rusage usage;
+  getrusage(RUSAGE_SELF, &usage);
+  return usage.ru_maxrss;
+}
+#else
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR() {
+  return 0;
+}
+#endif
+
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage() { return 0; }
 void CmiResetMaxMemory() {}
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage() { return 0; }
