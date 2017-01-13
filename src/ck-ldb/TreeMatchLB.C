@@ -50,14 +50,14 @@ tm_topology_t *build_abe_topology(int nb_procs){
   return build_synthetic_topology(arity,5,nbring,8);
 }
 
-class ProcLoadGreater {
+class TreeMatchLB::ProcLoadGreater {
   public:
     bool operator()(ProcInfo p1, ProcInfo p2) {
       return (p1.totalLoad() > p2.totalLoad());
     }
 };
 
-class ObjLoadGreater {
+class TreeMatchLB::ObjLoadGreater {
   public:
     bool operator()(Vertex v1, Vertex v2) {
       return (v1.getVertexLoad() > v2.getVertexLoad());
@@ -81,14 +81,14 @@ void TreeMatchLB::work(BaseLB::LDStats* stats)
   int vert;
 
   // max heap of objects
-  std::sort(ogr->vertices.begin(), ogr->vertices.end(), ObjLoadGreater());
+  std::sort(ogr->vertices.begin(), ogr->vertices.end(), TreeMatchLB::ObjLoadGreater());
   // min heap of processors
-  std::make_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+  std::make_heap(parr->procs.begin(), parr->procs.end(), TreeMatchLB::ProcLoadGreater());
 
   for(vert = 0; vert < ogr->vertices.size(); vert++) {
     // Pop the least loaded processor
     ProcInfo p = parr->procs.front();
-    std::pop_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+    std::pop_heap(parr->procs.begin(), parr->procs.end(), TreeMatchLB::ProcLoadGreater());
     parr->procs.pop_back();
 
     // Increment the load of the least loaded processor by the load of the
@@ -98,7 +98,7 @@ void TreeMatchLB::work(BaseLB::LDStats* stats)
 
     // Insert the least loaded processor with load updated back into the heap
     parr->procs.push_back(p);
-    std::push_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+    std::push_heap(parr->procs.begin(), parr->procs.end(), TreeMatchLB::ProcLoadGreater());
   }
 
   /** ============================== CLEANUP ================================ */

@@ -32,14 +32,14 @@ bool TempAwareGreedyLB::QueryBalanceNow(int _step)
   return true;
 }
 
-class ProcLoadGreater {
+class TempAwareGreedyLB::ProcLoadGreater {
   public:
     bool operator()(ProcInfo p1, ProcInfo p2) {
       return (p1.getTotalLoad() > p2.getTotalLoad());
     }
 };
 
-class ObjLoadGreater {
+class TempAwareGreedyLB::ObjLoadGreater {
   public:
     bool operator()(Vertex v1, Vertex v2) {
       return (v1.getVertexLoad() > v2.getVertexLoad());
@@ -62,14 +62,14 @@ CkPrintf("----------------- in TempAwareGreedyLB -----------\n");
   int vert;
 
   // max heap of objects
-  std::sort(ogr->vertices.begin(), ogr->vertices.end(), ObjLoadGreater());
+  std::sort(ogr->vertices.begin(), ogr->vertices.end(), TempAwareGreedyLB::ObjLoadGreater());
   // min heap of processors
-  std::make_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+  std::make_heap(parr->procs.begin(), parr->procs.end(), TempAwareGreedyLB::ProcLoadGreater());
 
   for(vert = 0; vert < ogr->vertices.size(); vert++) {
     // Pop the least loaded processor
     ProcInfo p = parr->procs.front();
-    std::pop_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+    std::pop_heap(parr->procs.begin(), parr->procs.end(), TempAwareGreedyLB::ProcLoadGreater());
     parr->procs.pop_back();
 
     // Increment the load of the least loaded processor by the load of the
@@ -79,7 +79,7 @@ CkPrintf("----------------- in TempAwareGreedyLB -----------\n");
 
     // Insert the least loaded processor with load updated back into the heap
     parr->procs.push_back(p);
-    std::push_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+    std::push_heap(parr->procs.begin(), parr->procs.end(), TempAwareGreedyLB::ProcLoadGreater());
   }
 
   /** ============================== CLEANUP ================================ */

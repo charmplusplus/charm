@@ -234,27 +234,6 @@ bool TempAwareRefineLB::QueryBalanceNow(int _step)
   return true;
 }
 
-class ProcLoadGreater {
-  public:
-    bool operator()(ProcInfo p1, ProcInfo p2) {
-      return (p1.getTotalLoad() > p2.getTotalLoad());
-    }
-};
-
-class ProcLoadLesser {
-  public:
-    bool operator()(ProcInfo p1, ProcInfo p2) {
-      return (p1.getTotalLoad() < p2.getTotalLoad());
-    }
-};
-
-class ObjLoadGreater {
-  public:
-    bool operator()(Vertex v1, Vertex v2) {
-      return (v1.getVertexLoad() > v2.getVertexLoad());
-    }
-};
-
 void TempAwareRefineLB::changeFreq(int nFreq)
 {
 #ifdef TEMP_LDB

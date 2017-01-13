@@ -25,6 +25,9 @@ public:
   TempAwareGreedyLB(CkMigrateMessage *m) : CBase_TempAwareGreedyLB(m) { lbname = "GreedyLB"; }
   void work(LDStats* stats);
 private:
+  class ProcLoadGreater;
+  class ObjLoadGreater;
+
 	enum           HeapCmp {GT = '>', LT = '<'};
     	void           Heapify(HeapData*, int, int, HeapCmp);
 	void           HeapSort(HeapData*, int, HeapCmp);

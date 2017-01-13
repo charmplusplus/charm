@@ -37,14 +37,14 @@ bool GreedyLB::QueryBalanceNow(int _step)
   return true;
 }
 
-class ProcLoadGreater {
+class GreedyLB::ProcLoadGreater {
   public:
     bool operator()(const ProcInfo &p1, const ProcInfo &p2) {
       return (p1.getTotalLoad() > p2.getTotalLoad());
     }
 };
 
-class ObjLoadGreater {
+class GreedyLB::ObjLoadGreater {
   public:
     bool operator()(const Vertex &v1, const Vertex &v2) {
       return (v1.getVertexLoad() > v2.getVertexLoad());
@@ -101,9 +101,9 @@ void GreedyLB::work(LDStats* stats)
   }
 
   // max heap of objects
-  sort(objs.begin(), objs.end(), ObjLoadGreater());
+  sort(objs.begin(), objs.end(), GreedyLB::ObjLoadGreater());
   // min heap of processors
-  make_heap(procs.begin(), procs.end(), ProcLoadGreater());
+  make_heap(procs.begin(), procs.end(), GreedyLB::ProcLoadGreater());
 
   if (_lb_args.debug()>1) 
     CkPrintf("[%d] In GreedyLB strategy\n",CkMyPe());
@@ -113,7 +113,7 @@ void GreedyLB::work(LDStats* stats)
   int nmoves = 0;
   for (obj=0; obj < objs.size(); obj++) {
     ProcInfo p = procs.front();
-    pop_heap(procs.begin(), procs.end(), ProcLoadGreater());
+    pop_heap(procs.begin(), procs.end(), GreedyLB::ProcLoadGreater());
     procs.pop_back();
 
     // Increment the time of the least loaded processor by the cpuTime of
@@ -133,7 +133,7 @@ void GreedyLB::work(LDStats* stats)
 
     //Insert the least loaded processor with load updated back into the heap
     procs.push_back(p);
-    push_heap(procs.begin(), procs.end(), ProcLoadGreater());
+    push_heap(procs.begin(), procs.end(), GreedyLB::ProcLoadGreater());
   }
 
   if (_lb_args.debug()>0) 

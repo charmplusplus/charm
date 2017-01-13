@@ -36,14 +36,14 @@ bool RefineSwapLB::QueryBalanceNow(int _step)
   return true;
 }
 
-class ProcLoadGreater {
+class RefineSwapLB::ProcLoadGreater {
   public:
     bool operator()(ProcInfo p1, ProcInfo p2) {
       return (p1.getTotalLoad() > p2.getTotalLoad());
     }
 };
 
-class ProcLoadGreaterIndex {
+class RefineSwapLB::ProcLoadGreaterIndex {
  public: 
   ProcLoadGreaterIndex(ProcArray * parr) : parr(parr) {}
   bool operator()(int lhs, int rhs) {
@@ -53,7 +53,7 @@ class ProcLoadGreaterIndex {
   ProcArray *parr;
 };
 
-class ObjLoadGreater {
+class RefineSwapLB::ObjLoadGreater {
   public:
     ObjLoadGreater(ObjGraph* ogr) : ogr(ogr) {}
     bool operator()(int lhs, int rhs) {
@@ -91,7 +91,7 @@ inline void removeObjFromProc(ProcArray* parr, ObjGraph* ogr, std::vector<int>*
 inline int getMax(ProcArray* parr, std::vector<int>& max_pe_heap) {
   int p_index = max_pe_heap.front();
   std::pop_heap(max_pe_heap.begin(), max_pe_heap.end(),
-      ProcLoadGreaterIndex(parr));
+      RefineSwapLB::ProcLoadGreaterIndex(parr));
   max_pe_heap.pop_back();
   return p_index;
 }
@@ -105,7 +105,7 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
   int pe_considered;
   int obj_considered;
   double best_size = 0.0;
-  std::sort(pe_obj[max_pe].begin(), pe_obj[max_pe].end(), ObjLoadGreater(ogr));
+  std::sort(pe_obj[max_pe].begin(), pe_obj[max_pe].end(), RefineSwapLB::ObjLoadGreater(ogr));
 
   // Iterate over all the min pes and see which is the best object to
   // transfer.
@@ -140,7 +140,7 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
       // Reinsert
       max_pe_heap.push_back(max_pe);
       std::push_heap(max_pe_heap.begin(), max_pe_heap.end(),
-          ProcLoadGreaterIndex(parr));
+          RefineSwapLB::ProcLoadGreaterIndex(parr));
     } else if (parr->procs[max_pe].getTotalLoad() < (avg_load - threshold)) {
       // Insert into the list of underloaded procs
       min_pe_heap.push_back(max_pe);
@@ -186,7 +186,7 @@ bool IsSwapPossWithPe(ProcArray* parr, ObjGraph* ogr, std::vector<int>* pe_obj,
             // Reinsert
             max_pe_heap.push_back(max_pe);
             std::push_heap(max_pe_heap.begin(), max_pe_heap.end(),
-                ProcLoadGreaterIndex(parr));
+                RefineSwapLB::ProcLoadGreaterIndex(parr));
           } else if (parr->procs[max_pe].getTotalLoad() < (avg_load - threshold)) {
             // Insert into the list of underloaded procs
             min_pe_heap.push_back(max_pe);
@@ -219,7 +219,7 @@ bool refineSwap(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
   for (int i = 0; i < min_pe_heap.size(); i++) {
     pe_considered = min_pe_heap[i];
     pe_cons_iter = i;
-    std::sort(pe_obj[pe_considered].begin(), pe_obj[pe_considered].end(), ObjLoadGreater(ogr));
+    std::sort(pe_obj[pe_considered].begin(), pe_obj[pe_considered].end(), RefineSwapLB::ObjLoadGreater(ogr));
     diff = avg_load - parr->procs[pe_considered].getTotalLoad();
 
 //    CkPrintf("Checking to swap maxload pe %d  with minpe %d  + diff %lf \n",
@@ -280,7 +280,7 @@ void RefineSwapLB::work(LDStats* stats)
     }
   }
 
-  std::make_heap(max_pe_heap.begin(), max_pe_heap.end(), ProcLoadGreaterIndex(parr));
+  std::make_heap(max_pe_heap.begin(), max_pe_heap.end(), RefineSwapLB::ProcLoadGreaterIndex(parr));
 
   while (max_pe_heap.size() != 0 && min_pe_heap.size() != 0) {
     int p_index = getMax(parr, max_pe_heap);
@@ -296,7 +296,7 @@ void RefineSwapLB::work(LDStats* stats)
             threshold)) {
         max_pe_heap.push_back(p_index);
         std::push_heap(max_pe_heap.begin(), max_pe_heap.end(),
-            ProcLoadGreaterIndex(parr));
+            RefineSwapLB::ProcLoadGreaterIndex(parr));
         break;
       }
     }

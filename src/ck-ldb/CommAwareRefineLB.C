@@ -64,7 +64,7 @@ bool CommAwareRefineLB::QueryBalanceNow(int _step)
   return true;
 }
 
-class ProcLoadGreater {
+class CommAwareRefineLB::ProcLoadGreater {
   public:
     ProcLoadGreater(ProcArray *parr) : parr(parr) {
     }
@@ -76,14 +76,14 @@ class ProcLoadGreater {
     ProcArray *parr;
 };
 
-class ObjLoadGreater {
+class CommAwareRefineLB::ObjLoadGreater {
   public:
     bool operator()(Vertex v1, Vertex v2) {
       return (v1.getVertexLoad() > v2.getVertexLoad());
     }
 };
 
-class PeCommInfo {
+class CommAwareRefineLB::PeCommInfo {
   public:
     PeCommInfo() : num_msg(0), num_bytes(0) {
     }
@@ -98,18 +98,18 @@ class PeCommInfo {
 
 // Consists of communication information of an object with is maintained
 // as a list of PeCommInfo containing the processor id and the bytes transferred
-class ObjPeCommInfo {
+class CommAwareRefineLB::ObjPeCommInfo {
   public:
     ObjPeCommInfo() {
     }
 
     int obj_id;
-    vector<PeCommInfo> pcomm;
+    vector<CommAwareRefineLB::PeCommInfo> pcomm;
 };
 
-class ProcCommGreater {
+class CommAwareRefineLB::ProcCommGreater {
   public:
-    bool operator()(PeCommInfo p1, PeCommInfo p2) {
+    bool operator()(CommAwareRefineLB::PeCommInfo p1, CommAwareRefineLB::PeCommInfo p2) {
       // TODO(Harshitha): Should probably consider total communication cost
       return (p1.num_bytes > p2.num_bytes);
     }
@@ -208,7 +208,7 @@ void CommAwareRefineLB::work(LDStats* stats) {
   }
 
   std::make_heap(parr_above_avg.begin(), parr_above_avg.end(),
-      ProcLoadGreater(parr));
+      CommAwareRefineLB::ProcLoadGreater(parr));
 
   int random;
   int randomly_obj_id;
@@ -294,7 +294,7 @@ void CommAwareRefineLB::work(LDStats* stats) {
       //CkPrintf("!!!! Could not handle the heavy proc %d so giving up\n", p_index);
       // parr_above_avg.push_back(p_index);
       // std::push_heap(parr_above_avg.begin(), parr_above_avg.end(),
-      //     ProcLoadGreater(parr));
+      //     CommAwareRefineLB::ProcLoadGreater(parr));
     }
   }
 
@@ -334,7 +334,7 @@ inline void removeFromArray(int pe_id, vector<int> &array) {
 inline int popFromProcHeap(vector<int> & parr_above_avg, ProcArray *parr) {
   int p_index = parr_above_avg.front();
   std::pop_heap(parr_above_avg.begin(), parr_above_avg.end(),
-      ProcLoadGreater(parr));
+      CommAwareRefineLB::ProcLoadGreater(parr));
   parr_above_avg.pop_back();
   return p_index;
 }
@@ -364,7 +364,7 @@ inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold,
   if (p.getTotalLoad() > upper_threshold) {
     parr_above_avg.push_back(p_index);
     std::push_heap(parr_above_avg.begin(), parr_above_avg.end(),
-        ProcLoadGreater(parr));
+        CommAwareRefineLB::ProcLoadGreater(parr));
     //CkPrintf("\t Pushing pe : %d to max heap\n", p.getProcId());
   } else if (p.getTotalLoad() < lower_threshold) {
     parr_below_avg.push_back(p_index);
@@ -378,7 +378,7 @@ inline void updateLoadInfo(int p_index, int possible_pe, double upper_threshold,
     // TODO: It should be the index in procarray :(
     parr_above_avg.push_back(possible_pe);
     std::push_heap(parr_above_avg.begin(), parr_above_avg.end(),
-        ProcLoadGreater(parr));
+        CommAwareRefineLB::ProcLoadGreater(parr));
     removeFromArray(possible_pe, parr_below_avg);
     proc_load_info[possible_pe] = false;
     //CkPrintf("\t Pusing pe : %d to max heap\n", possible_pe);
@@ -397,7 +397,7 @@ inline void getPossiblePes(vector<int>& possible_pes, int vert,
   int counter = 0;
   int index;
   int i, j, nbrid;
-  ObjPeCommInfo objpcomm;
+  CommAwareRefineLB::ObjPeCommInfo objpcomm;
  // CkPrintf("%d sends msgs to %d and recv msgs from %d\n", vert,
  //   ogr->vertices[vert].sendToList.size(),
  //   ogr->vertices[vert].recvFromList.size());
@@ -408,7 +408,7 @@ inline void getPossiblePes(vector<int>& possible_pes, int vert,
     // TODO: Should it index with vertexId?
     if (tmp_map_pid_index.count(j) == 0) {
       tmp_map_pid_index[j] = counter;
-      PeCommInfo pecomminf(j);
+      CommAwareRefineLB::PeCommInfo pecomminf(j);
       // TODO: Shouldn't it use vertexId instead of vert?
       objpcomm.pcomm.push_back(pecomminf);
       counter++;
@@ -427,7 +427,7 @@ inline void getPossiblePes(vector<int>& possible_pes, int vert,
 
     if (tmp_map_pid_index.count(j) == 0) {
       tmp_map_pid_index[j] = counter;
-      PeCommInfo pecomminf(j);
+      CommAwareRefineLB::PeCommInfo pecomminf(j);
       // TODO: Shouldn't it use vertexId instead of vert?
       objpcomm.pcomm.push_back(pecomminf);
       counter++;
@@ -442,7 +442,7 @@ inline void getPossiblePes(vector<int>& possible_pes, int vert,
 
   // Sort the pe communication vector for this chare
   std::sort(objpcomm.pcomm.begin(), objpcomm.pcomm.end(),
-      ProcCommGreater());
+      CommAwareRefineLB::ProcCommGreater());
 
   int pe_id;
   int node_id;

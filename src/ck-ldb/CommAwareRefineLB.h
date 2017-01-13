@@ -27,6 +27,13 @@ public:
     lbname = "CommAwareRefineLB";
   }
   void work(LDStats* stats);
+
+  class ProcLoadGreater;
+  class ObjLoadGreater;
+  class PeCommInfo;
+  class ObjPeCommInfo;
+  class ProcCommGreater;
+
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};
     	void           Heapify(HeapData*, int, int, HeapCmp);

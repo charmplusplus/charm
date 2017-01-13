@@ -24,6 +24,11 @@ public:
   RefineSwapLB(const CkLBOptions &);
   RefineSwapLB(CkMigrateMessage *m):CBase_RefineSwapLB(m) { lbname = "RefineSwapLB"; }
   void work(LDStats* stats);
+
+  class ProcLoadGreater;
+  class ProcLoadGreaterIndex;
+  class ObjLoadGreater;
+
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};
     	void           Heapify(HeapData*, int, int, HeapCmp);

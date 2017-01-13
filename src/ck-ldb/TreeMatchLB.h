@@ -17,6 +17,9 @@ public:
   TreeMatchLB(CkMigrateMessage *m):CBase_TreeMatchLB(m) {}
   void work(BaseLB::LDStats* stats);
 private:
+  class ProcLoadGreater;
+  class ObjLoadGreater;
+
   bool QueryBalanceNow(int step);
 };
 
