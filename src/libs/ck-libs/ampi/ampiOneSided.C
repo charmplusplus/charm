@@ -318,7 +318,7 @@ int ampi::winIgetFree(MPI_Request *request, MPI_Status *status) {
   AMPI_DEBUG("    [%d] : Iget [%d] frees buffer\n", thisIndex, *request);
 
   void *data = NULL;
-  AMPI_Iget_data(data, *status);
+  AMPI_Iget_data(&data, *status);
   if(!data) {
     AMPI_DEBUG("    [%d] Iget [%d] attempt to free NULL buffer \n", thisIndex, *request);
     return ampiErrhandler("AMPI_Iget_free", MPI_ERR_BUFFER);
@@ -930,7 +930,7 @@ int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win) {
 
 CDECL
 int AMPI_Iget_data(void *data, MPI_Status status) {
-  data = (void*)((AmpiMsg*)status.msg)->data;
+  *((char**)data) = /*(void*)*/((AmpiMsg*)status.msg)->data;
   return MPI_SUCCESS;
 }
 

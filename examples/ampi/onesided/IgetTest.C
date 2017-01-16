@@ -50,7 +50,7 @@ int main(int argc, char **argv)
   for(i=0; i<max_msgs; i++){
       AMPI_Iget(0, msg_size, MPI_CHAR, next_id, 0, msg_size, MPI_CHAR, win, &req);
       AMPI_Iget_wait(&req, &status, win);
-      AMPI_Iget_data((char*)message_r, status);
+      AMPI_Iget_data(&message_r, status);
       //fprintf(stdout, "[%d] get %c\n", my_id, message_r[0]);
       AMPI_Iget_free(&req, &status, win);
   }
