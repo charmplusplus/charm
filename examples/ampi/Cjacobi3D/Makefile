@@ -20,11 +20,11 @@ jacobi: jacobi.C
 
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C -o jacobi.iso.o
-	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module CommonLBs -memory isomalloc
+	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module CommonLBs -memory os-isomalloc
 
 jacobi.tls: jacobi.C
 	-$(CHARMC) -c -tlsglobal jacobi.C -o jacobi.tls.o 
-	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobal -module CommonLBs #-memory isomalloc
+	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobal -module CommonLBs #-memory os-isomalloc
 
 jacobi.rose: jacobi.C
 	$(CHARMC) -roseomptlsglobals -o jacobi.rose.o -c $<
