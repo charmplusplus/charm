@@ -83,7 +83,8 @@ inline int checkRank(const char* func, int rank, MPI_Comm comm) {
   AMPI_Comm_size(comm, &size);
   if (((rank >= 0) && (rank < size)) ||
       (rank == MPI_ANY_SOURCE)       ||
-      (rank == MPI_PROC_NULL))
+      (rank == MPI_PROC_NULL)        ||
+      (rank == MPI_ROOT))
     return MPI_SUCCESS;
   return ampiErrhandler(func, MPI_ERR_RANK);
 }
@@ -2755,6 +2756,22 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
   if (-1==recv(MPI_BCAST_TAG, root, buf, count, type, destcomm)) CkAbort("AMPI> Error in broadcast");
 }
 
+int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm)
+{
+  if (root==MPI_ROOT) {
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    CpvAccess(_currentObj) = this;
+#endif
+    remoteProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, getRank(intercomm), buf, count, type, intercomm));
+  }
+
+  if (root!=MPI_PROC_NULL && root!=MPI_ROOT) {
+    // remote group ranks
+    if (-1==recv(MPI_BCAST_TAG, root, buf, count, type, intercomm)) CkAbort("AMPI> Error in intercomm broadcast");
+  }
+  return MPI_SUCCESS;
+}
+
 void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm, MPI_Request* request)
 {
   if (root==getRank(destcomm)) {
@@ -2766,6 +2783,22 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
 
   // call irecv to post an IReq and check for any pending messages
   irecv(buf, count, type, root, MPI_BCAST_TAG, destcomm, request);
+}
+
+int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request)
+{
+  if (root==MPI_ROOT) {
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    CpvAccess(_currentObj) = this;
+#endif
+    remoteProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, getRank(intercomm), buf, count, type, intercomm));
+  }
+
+  if (root!=MPI_PROC_NULL && root!=MPI_ROOT) {
+    // call irecv to post IReq and process pending messages
+    irecv(buf, count, type, root, MPI_BCAST_TAG, intercomm, request);
+  }
+  return MPI_SUCCESS;
 }
 
 void ampi::bcastraw(void* buf, int len, CkArrayID aid)
@@ -3608,15 +3641,25 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm)
   handle_MPI_BOTTOM(buf, type);
 
 #if AMPI_ERROR_CHECKING
-  int ret = errorCheck("AMPI_Bcast", comm, 1, count, 1, type, 1, 0, 0, root, 1, buf, 1);
+  int validateBuf = 1;
+  if (getAmpiParent()->isInter(comm)) {
+    //if comm is an intercomm, then only root and remote ranks need to have a valid buf
+    //local ranks need not validate it
+    if (root==MPI_PROC_NULL) validateBuf = 0;
+  }
+  int ret = errorCheck("AMPI_Bcast", comm, 1, count, 1, type, 1, 0, 0, root, 1, buf, validateBuf);
+
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
 
+  ampi* ptr = getAmpiInstance(comm);
+
   if(comm==MPI_COMM_SELF)
     return MPI_SUCCESS;
-  if(getAmpiParent()->isInter(comm))
-    CkAbort("AMPI does not implement MPI_Bcast for Inter-communicators!");
+  if(getAmpiParent()->isInter(comm)) {
+    return ptr->intercomm_bcast(root, buf, count, type, comm);
+  }
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -3627,7 +3670,6 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm)
   }
 #endif
 
-  ampi* ptr = getAmpiInstance(comm);
   ptr->bcast(root, buf, count, type,comm);
 
 #if AMPIMSGLOG
@@ -3650,7 +3692,14 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
   handle_MPI_BOTTOM(buf, type);
 
 #if AMPI_ERROR_CHECKING
-  int ret = errorCheck("AMPI_Ibcast", comm, 1, count, 1, type, 1, 0, 0, root, 1, buf, 1);
+  int validateBuf = 1;
+  if (getAmpiParent()->isInter(comm)) {
+    //if comm is an intercomm, then only root and remote ranks need to have a valid buf
+    //local ranks need not validate it
+    if (root==MPI_PROC_NULL) validateBuf = 0;
+  }
+  int ret = errorCheck("AMPI_Ibcast", comm, 1, count, 1, type, 1, 0, 0, root, 1, buf, validateBuf);
+
   if(ret != MPI_SUCCESS){
     *request = MPI_REQUEST_NULL;
     return ret;
@@ -3664,8 +3713,9 @@ int AMPI_Ibcast(void *buf, int count, MPI_Datatype type, int root,
                             AMPI_REQ_COMPLETED));
     return MPI_SUCCESS;
   }
-  if(getAmpiParent()->isInter(comm))
-    CkAbort("AMPI does not implement MPI_Ibcast for Inter-communicators!");
+  if(getAmpiParent()->isInter(comm)) {
+    return ptr->intercomm_ibcast(root, buf, count, type, comm, request);
+  }
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();

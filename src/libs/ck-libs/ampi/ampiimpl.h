@@ -1628,7 +1628,9 @@ class ampi : public CBase_ampi {
   void barrier(void);
   void ibarrier(MPI_Request *request);
   void bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm);
+  int intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm);
   void ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Request* request);
+  int intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request);
   static void bcastraw(void* buf, int len, CkArrayID aid);
   void split(int color,int key,MPI_Comm *dest, int type);
   void commCreate(const groupStruct vec,MPI_Comm *newcomm);

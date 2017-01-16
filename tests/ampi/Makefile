@@ -1,4 +1,4 @@
-DIRS=megampi stacksize migration
+DIRS=megampi stacksize migration intercomm_coll
 #DIRS=megampi stacksize chkpt 
 
 all:
