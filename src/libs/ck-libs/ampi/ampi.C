@@ -2744,8 +2744,8 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
     thisProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, root, buf, count, type, destcomm));
   }
 
-  // use an IReq to non-block the caller and get a request ptr
-  *request = postReq(new IReq(buf, count, type, root, MPI_BCAST_TAG, destcomm));
+  // call irecv to post an IReq and check for any pending messages
+  irecv(buf, count, type, root, MPI_BCAST_TAG, destcomm, request);
 }
 
 void ampi::bcastraw(void* buf, int len, CkArrayID aid)
@@ -6258,8 +6258,8 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     }
   }
 
-  // use an IReq to non-block the caller and get a request ptr
-  *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm));
+  // call irecv to post an IReq and process any pending messages
+  ptr->irecv(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,request);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -6392,8 +6392,8 @@ int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sen
     }
   }
 
-  // use an IReq to non-block the caller and get a request ptr
-  *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm));
+  // call irecv to post an IReq and process any pending messages
+  ptr->irecv(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,request);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
