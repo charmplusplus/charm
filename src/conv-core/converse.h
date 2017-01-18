@@ -1924,35 +1924,6 @@ extern int _immRunning;
         "movl $1, %1\n\t" \
         "lock xaddl %1, %0" \
         : "=m"(input), "=r"(output) : "m"(input) : "memory")
-#elif CMK_PPC_ASM /*SYNC_PRIM*/
-#define CmiMemoryAtomicIncrement(someInt)   { int someInt_private; \
-     __asm__ __volatile__ (      \
-        "loop%=:\n\t"       /* repeat until this succeeds */    \
-        "lwarx  %1,0,%2\n\t" /* reserve the operand */   \
-        "addi   %1,%1,1\n\t" /* add incr to it */        \
-        "stwcx. %1,0,%2\n\t" /* put the sum back, and release it */      \
-        "bne- loop%="       /* start-over on failure */ \
-        : "=m"(someInt), "=&r"(someInt_private)      \
-        : "r" (&someInt), "m"(someInt)       \
-        : "memory"  \
-     ); }
-#define CmiMemoryAtomicDecrement(someInt)   { int someInt_private; \
-     __asm__ __volatile__ (      \
-        "loop%=:\n\t"       /* repeat until this succeeds */    \
-        "lwarx  %1,0,%2\n\t" /* reserve the operand */   \
-        "subi   %1,%1,1\n\t" /* add incr to it */        \
-        "stwcx. %1,0,%2\n\t" /* put the sum back, and release it */      \
-        "bne- loop%="       /* start-over on failure */ \
-        : "=m"(someInt), "=&r"(someInt_private)      \
-        : "r" (&someInt), "m"(someInt)       \
-        : "memory"  \
-     ); }
-#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__ ( \
-        "loop%=:  lwarx %1, 0, %2\n\t" \
-        "addi %1, %1, 1\n\t" \
-        "stwcx. %1, 0, %2\n\t" \
-        "bne- loop%=" \
-        : "=m"(input), "=&r"(output) : "r"(&input), "m"(input) : "memory")
 #else
 #define CMK_NO_ASM_AVAILABLE    1
 extern CmiNodeLock cmiMemoryLock;
@@ -1973,14 +1944,6 @@ extern CmiNodeLock cmiMemoryLock;
 #elif CMK_GCC_IA64_ASM
 #define CmiMemoryReadFence()               __asm__ __volatile__("mf" ::: "memory")
 #define CmiMemoryWriteFence()              __asm__ __volatile__("mf" ::: "memory")
-#elif CMK_PPC_ASM
-#if CMK_BLUEGENEQ
-#define CmiMemoryReadFence()               __asm__ __volatile__("sync":::"memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("sync":::"memory")
-#else
-#define CmiMemoryReadFence()               __asm__ __volatile__("isync":::"memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("lwsync":::"memory")
-#endif
 #else
 #define CMK_NO_ASM_AVAILABLE    1
 extern CmiNodeLock cmiMemoryLock;
