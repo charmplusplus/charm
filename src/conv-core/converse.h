@@ -1924,12 +1924,6 @@ extern int _immRunning;
         "movl $1, %1\n\t" \
         "lock xaddl %1, %0" \
         : "=m"(input), "=r"(output) : "m"(input) : "memory")
-#elif CMK_GCC_IA64_ASM /*SYNC_PRIM*/
-#define CmiMemoryAtomicIncrement(someInt)  { int someInt_private; \
-  __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (someInt_private): "r"(&someInt) :"memory"); }
-#define CmiMemoryAtomicDecrement(someInt)  { uint64_t someInt_private; \
-  __asm__ __volatile__("fetchadd4.rel %0=[%1],-1": "=r" (someInt_private): "r"(&someInt) :"memory"); }
-#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (output): "r"(&input) :"memory")
 #elif CMK_PPC_ASM /*SYNC_PRIM*/
 #define CmiMemoryAtomicIncrement(someInt)   { int someInt_private; \
      __asm__ __volatile__ (      \
