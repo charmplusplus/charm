@@ -3183,23 +3183,6 @@ _ACEOF
 
 fi
 
-#### test if we can use gcc IA64 assembly like this ####
-cat > $t <<EOT
-double foo(void)
-{
-        unsigned long long int x;
-	__asm__ __volatile__("mov %0=ar.itc" : "=r"(x) :: "memory");
-        return x;
-}
-EOT
-test_cxx "whether GCC IA64 assembly works" "yes" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_GCC_IA64_ASM $strictpass
-_ACEOF
-
-
-
 #### test if we can use asm eieio assembly like this ####
 cat > $t <<EOT
 double foo(void)

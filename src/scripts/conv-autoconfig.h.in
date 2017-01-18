@@ -78,9 +78,6 @@
 /* TWOSCORE */
 #undef CMK_FORTRAN_USES_TWOSCORE
 
-/* Allows gcc IA64 assembly. */
-#undef CMK_GCC_IA64_ASM
-
 /* Allows gcc x86 assembly. */
 #undef CMK_GCC_X86_ASM
 

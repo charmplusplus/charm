@@ -219,8 +219,6 @@ running on.  The usual Charm approach of switching to the
 /** Address to map all migratable thread stacks to. */
 #if CMK_OSF1
 #define CMK_THREADS_ALIAS_LOCATION   ((void *)0xe00000000)
-#elif CMK_IA64
-#define CMK_THREADS_ALIAS_LOCATION   ((void *)0x6000000000000000)
 #else
 #define CMK_THREADS_ALIAS_LOCATION   ((void *)0xb0000000)
 #endif

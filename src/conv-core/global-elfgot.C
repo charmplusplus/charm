@@ -91,8 +91,6 @@ typedef Elf64_Sym     ELFXX_TYPE_Sym;
 #define CMK_DT_REL     DT_RELA
 #define CMK_DT_RELSZ   DT_RELASZ
 #define is_elf_global(x)  ((x) == R_X86_64_GLOB_DAT)
-#elif CMK_IA64
-#error "NOT SUPPORTED"
 #else
 typedef Elf32_Addr    ELFXX_TYPE_Addr;
 typedef Elf32_Dyn     ELFXX_TYPE_Dyn;

@@ -1125,19 +1125,6 @@ test_cxx "whether GCC x86 assembly for atomic increment works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_GCC_X86_ASM_ATOMICINCREMENT, $strictpass, [Allows gcc x86 assembly for atomic increment.])
 fi
 
-#### test if we can use gcc IA64 assembly like this ####
-cat > $t <<EOT
-double foo(void)
-{
-        unsigned long long int x;
-	__asm__ __volatile__("mov %0=ar.itc" : "=r"(x) :: "memory");
-        return x;
-}
-EOT
-test_cxx "whether GCC IA64 assembly works" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_GCC_IA64_ASM, $strictpass, [Allows gcc IA64 assembly.])
-
-
 #### test if we can use asm eieio assembly like this ####
 cat > $t <<EOT
 double foo(void)

@@ -817,8 +817,8 @@ double   CmiCpuTimer(void);
 
 #if CMK_TIMER_USE_RDTSC 
 #ifndef __x86_64__
-# if ! (CMK_GCC_X86_ASM || CMK_GCC_IA64_ASM)
-/* Can't use rdtsc unless we have x86 or ia64 assembly: */
+# if !CMK_GCC_X86_ASM
+/* Can't use rdtsc unless we have x86 assembly: */
 #  undef CMK_TIMER_USE_RDTSC
 #  undef CMK_TIMER_USE_GETRUSAGE
 #  define CMK_TIMER_USE_RDTSC 0
@@ -840,8 +840,6 @@ static __inline__ unsigned long long int rdtsc(void)
           asm volatile("rdtsc" : "=a" (a), "=d" (d));
           (x) = ((unsigned long)a) | (((unsigned long)d)<<32);
         } while(0);
-#elif CMK_GCC_IA64_ASM
-	__asm__ __volatile__("mov %0=ar.itc" : "=r"(x) :: "memory");
 #elif CMK_GCC_X86_ASM
         __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
 #else
