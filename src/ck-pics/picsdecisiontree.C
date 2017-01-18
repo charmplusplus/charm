@@ -70,14 +70,12 @@ void DecisionTree::build(const char *filename) {
   float base;
   Condition *cond;
   Solution *sol;
-  int sumbytes=0;
-  int bytes;
 
   while (std::getline(file, line)) {
     if(line[0] == '#')
       continue;
     std::istringstream stream(line);
-    stream >> nodeType >> keyStr >> typeStr >> fieldTypeName >> bytes;
+    stream >> nodeType >> keyStr >> typeStr >> fieldTypeName;
 
     switch(nodeType) {
     case -1:        //root
@@ -86,17 +84,16 @@ void DecisionTree::build(const char *filename) {
 
     case 0:     //internal node
       fieldType = fieldMap[typeStr + "_" + fieldTypeName];
-      stream >> op >> bytes;
-      stream >> flag >> bytes;
+      stream >> op >> flag;
       if(flag == -1)
       {
-        stream >> base >> symbol >> numOfParents >> parentName >> bytes;
+        stream >> base >> symbol >> numOfParents >> parentName;
         cond = new Condition(keyStr, fieldType, (Operator)opMap[op], base, (CompareSymbol)(symbolMap[symbol]));
         nodemap[keyStr] = new TreeNode(nodemap[parentName], cond);
         nodemap[parentName]->addChild(nodemap[keyStr]);
       }else if(flag == 0)
       {
-        stream >> avgMinMax >> baseFieldType >> symbol >> threshold >> numOfParents >> parentName >> bytes;
+        stream >> avgMinMax >> baseFieldType >> symbol >> threshold >> numOfParents >> parentName;
         cond = new Condition(keyStr, fieldType, (Operator)opMap[op], fieldMap[avgMinMax + "_" + baseFieldType], threshold,  (CompareSymbol)symbolMap[symbol]);
         node =  new TreeNode(nodemap[parentName], cond);
         nodemap[keyStr] = node;
@@ -105,12 +102,12 @@ void DecisionTree::build(const char *filename) {
       break;
 
     case 1:     //leaf
-      stream >> numOfParents >> parentName >> bytes;
+      stream >> numOfParents >> parentName;
       sol = new Solution( (Direction)updownMap[typeStr], (Effect)effectMap[fieldTypeName]);
       node = new TreeNode(nodemap[parentName], sol);
       nodemap[parentName]->addChild(node);
       for(int i=1; i<numOfParents; i++) {
-        stream >> parentName >> bytes;
+        stream >> parentName;
         node = new TreeNode(nodemap[parentName], sol);
         nodemap[parentName]->addChild(node);
       }
