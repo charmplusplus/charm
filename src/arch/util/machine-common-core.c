@@ -186,7 +186,6 @@ static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
 #if CMK_SMP
 volatile int commThdExit = 0;
 CmiNodeLock  commThdExitLock = 0;
-extern CmiNodeLock  interopCommThdExitLock;
 
 /**
  *  The macro defines whether to have a comm thd to offload some
@@ -1178,7 +1177,6 @@ if (  MSG_STATISTIC)
     CmiNodeStateInit(&CsvAccess(NodeState));
 #if CMK_SMP
     commThdExitLock = CmiCreateLock();
-    interopCommThdExitLock = CmiCreateLock();
 #endif
 
 #if CMK_OFFLOAD_BCAST_PROCESS

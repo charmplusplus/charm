@@ -10,7 +10,6 @@
 int _cleanUp = 0;
 
 static volatile int interopCommThdExit = 0;
-CmiNodeLock  interopCommThdExitLock = 0;
 
 #if CMK_USE_LRTS
 extern void CommunicationServerThread(int sleepTime);
@@ -37,8 +36,6 @@ void StartInteropScheduler() {
 void StopInteropScheduler() {
   DEBUG(printf("[%d] Exit Scheduler\n",CmiMyPe());)
   CpvAccess(interopExitFlag) = 1;
-  CmiLock(interopCommThdExitLock);
-  interopCommThdExit++;
-  CmiUnlock(interopCommThdExitLock);
+  CmiMemoryAtomicIncrement(interopCommThdExit);
 }
 
