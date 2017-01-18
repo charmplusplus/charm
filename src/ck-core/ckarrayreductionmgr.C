@@ -19,7 +19,6 @@ void CkArrayReductionMgr::init()
 	size = CkMyNodeSize();
 	count = 0;
 	lockCount = CmiCreateLock();
-	ctorDoneFlag = 1;
 	alreadyStarted = -1;
 }
 
