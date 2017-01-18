@@ -1,5 +1,8 @@
 /* conv-autoconfig.h.in.  Generated from configure.in by autoheader.  */
 
+/* enable ampi error checking */
+#undef AMPI_ERROR_CHECKING
+
 /* Charm++ Release/API version number */
 #undef CHARM_VERSION
 
@@ -62,9 +65,6 @@
 
 /* enable error checking */
 #undef CMK_ERROR_CHECKING
-
-/* enable AMPI error checking */
-#undef AMPI_ERROR_CHECKING
 
 /* ALLCAPS */
 #undef CMK_FORTRAN_USES_ALLCAPS
@@ -306,6 +306,9 @@
 /* disable replay */
 #undef CMK_REPLAYSYSTEM
 
+/* disable shrinkexpand */
+#undef CMK_SHRINK_EXPAND
+
 /* whether C++ signed char and char differ */
 #undef CMK_SIGNEDCHAR_DIFF_CHAR
 
@@ -377,6 +380,3 @@
 
 /* enable qlogic */
 #undef QLOGIC
-
-/* disable shrink expand */
-#undef CMK_SHRINK_EXPAND
