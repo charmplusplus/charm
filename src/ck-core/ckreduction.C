@@ -2023,11 +2023,9 @@ CkReduction::CkReduction() {} //Dummy private constructor
 // reducerType.  Must be called in the same order on every node.
 CkReduction::reducerType CkReduction::addReducer(reducerFn fn, bool streamable)
 {
-  static CmiNodeLock reductionLock = CmiCreateLock();
-  CmiLock(reductionLock);
+  CkAssert(CmiMyRank() == 0);
   reducerType index = (reducerType)reducerTable().size();
   reducerTable().push_back(reducerStruct(fn, streamable));
-  CmiUnlock(reductionLock);
   return index;
 }
 
