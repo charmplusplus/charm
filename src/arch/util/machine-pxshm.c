@@ -63,18 +63,6 @@ There are three options here for synchronization:
 #if CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE
 #define CmiMemoryReadFence() __sync_synchronize()
 #define CmiMemoryWriteFence() __sync_synchronize()
-#elif CMK_C_BUILTIN_IA32_XFENCE
-#define CmiMemoryReadFence() __builtin_ia32_lfence()
-#define CmiMemoryWriteFence() __builtin_ia32_sfence()
-#elif CMK_GCC_X86_ASM
-#define CmiMemoryReadFence() __asm__ __volatile__("lfence" ::: "memory")
-#define CmiMemoryWriteFence() __asm__ __volatile__("sfence" ::: "memory")
-#elif CMK_GCC_IA64_ASM
-#define CmiMemoryReadFence() __asm__ __volatile__("mf" ::: "memory")
-#define CmiMemoryWriteFence() __asm__ __volatile__("mf" ::: "memory")
-#elif CMK_PPC_ASM
-#define CmiMemoryReadFence() __asm__ __volatile__("sync" ::: "memory")
-#define CmiMemoryWriteFence() __asm__ __volatile__("sync" ::: "memory")
 #else
 #error Cannot build PXSHM with non-SMP on a machine with no ASM for atomic fence
 #endif /* CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE */
