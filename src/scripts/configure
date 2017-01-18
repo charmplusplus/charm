@@ -3270,25 +3270,6 @@ _ACEOF
 
 
 
-#### check __BUILTIN_IA32_XFENCE ####
-cat > $tc <<EOT
-#include <stdio.h>
-#include <intrinsics.h>
-int main()
-{
-  __builtin_ia32_lfence();  __builtin_ia32_sfence();   __builtin_ia32_mfence();
-}
-EOT
-
-test_linkc "whether fence intrinsic primitives (__builtin_Xfence_ia32) works in C" "yes" "no" ""
-
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_C_BUILTIN_IA32_XFENCE $pass
-_ACEOF
-
-
-
 ### test if switching TLS register ###
 if test $in64bit = 1
 then

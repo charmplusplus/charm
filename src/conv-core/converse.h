@@ -53,10 +53,6 @@
 */
 #include "cmiqueue.h"
 
-#if CMK_C_BUILTIN_IA32_XFENCE
-#include <intrinsics.h>
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1935,15 +1931,6 @@ extern CmiNodeLock cmiMemoryLock;
 #if CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE
 #define CmiMemoryReadFence()                 __sync_synchronize()
 #define CmiMemoryWriteFence()                __sync_synchronize()
-#elif CMK_C_BUILTIN_IA32_XFENCE
-#define CmiMemoryReadFence()                 __builtin_ia32_lfence()
-#define CmiMemoryWriteFence()                __builtin_ia32_sfence()
-#elif CMK_GCC_X86_ASM 
-#define CmiMemoryReadFence()               __asm__ __volatile__("lfence" ::: "memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("sfence" ::: "memory")
-#elif CMK_GCC_IA64_ASM
-#define CmiMemoryReadFence()               __asm__ __volatile__("mf" ::: "memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("mf" ::: "memory")
 #else
 #define CMK_NO_ASM_AVAILABLE    1
 extern CmiNodeLock cmiMemoryLock;
