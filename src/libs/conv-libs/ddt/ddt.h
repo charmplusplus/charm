@@ -1,7 +1,12 @@
 #ifndef __CkDDT_H_
 #define __CkDDT_H_
 
+#include <string>
+#include <vector>
 #include "pup.h"
+
+using std::vector;
+using std::string;
 
 #define CkDDT_MAXTYPE           100
 
@@ -49,6 +54,8 @@
 #define CkDDT_LONG_DOUBLE_COMPLEX 40
 #define CkDDT_AINT                41
 
+#define CkDDT_MAX_PRIMITIVE_TYPE  41
+
 #define CkDDT_CONTIGUOUS          42
 #define CkDDT_VECTOR              43
 #define CkDDT_HVECTOR             44
@@ -95,33 +102,30 @@ class CkDDT ;
 
   Members:
 
-  datatype - Used for primitive datatypes for size calculations
-  refCount - to keep track of how many references are present to this type.
-
-  size - size of one unit of datatype
-  extent - extent is different from size in that it also counts
-           displacements between blocks.
-  count -  count of base datatype present in this datatype
-  baseSize - size of Base Datatype
-  baseExtent - extent of Base dataType
-  name - user specified name for datatype
-  nameLen - length of user specified name for datatype
+  datatype         - Identifies the datatype based on the identification system above.
+  refCount         - to keep track of how many references are present to this type.
+  size             - size of one unit of datatype
+  extent           - extent is different from size in that it also counts displacements between blocks.
+  count            - count of base datatype present in this datatype
+  baseSize         - size of Base Datatype
+  baseExtent       - extent of Base dataType
+  name             - user specified name for datatype
+  nameLen          - length of user specified name for datatype
 
   Methods:
 
-  getSize -  returns the size of the datatype. 
-  getExtent - returns the extent of the datatype.
+  getSize          -  returns the size of the datatype. 
+  getExtent        - returns the extent of the datatype.
 
-  inrRefCount - increament the reference count.
-  getRefCount - returns the RefCount
+  inrRefCount      - increament the reference count.
+  getRefCount      - returns the RefCount
 
-  serialize - This is the function which actually copies the contents from
-    user's space to buffer if dir=1 or reverse if dir=-1
-    according to the datatype.
-
-  setName - set the name of datatype
-  getName - get the name of datatype
-  setAbsolute - tells DDT's serialize methods that we are dealing with absolute addresses
+  serialize        - This is the function which actually copies the contents from
+                      user's space to buffer if dir=1 or reverse if dir=-1
+                      according to the datatype.
+  setName          - set the name of datatype
+  getName          - get the name of datatype
+  setAbsolute      - tells DDT's serialize methods that we are dealing with absolute addresses
 
   Reference Counting currently disabled. To add this feature back in, the refcount variable
     cannot be copied when making a duplicate.
@@ -147,7 +151,7 @@ class CkDDT_DataType {
     CkDDT_DataType *baseType;
     int baseIndex;
     int numElements;
-    char name[CkDDT_MAX_NAME_LEN];
+    string name;
     int nameLen;
     bool isAbsolute;
 
@@ -288,8 +292,8 @@ class CkDDT_HVector : public CkDDT_Vector {
 class CkDDT_Indexed : public CkDDT_DataType {
 
   protected:
-    int* arrayBlockLength ;
-    CkDDT_Aint* arrayDisplacements ;
+    vector<int> arrayBlockLength;
+    vector<CkDDT_Aint> arrayDisplacements;
 
   private:
     CkDDT_Indexed(const CkDDT_Indexed& obj);
@@ -353,7 +357,7 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
 
   protected:
     int BlockLength;
-    CkDDT_Aint *arrayDisplacements;
+    vector<CkDDT_Aint> arrayDisplacements;
 
   private:
     CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj);
@@ -417,10 +421,10 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
 class CkDDT_Struct : public CkDDT_DataType {
 
   protected:
-    int* arrayBlockLength ;
-    CkDDT_Aint* arrayDisplacements ;
-    int* index;
-    CkDDT_DataType** arrayDataType;
+    vector<int> arrayBlockLength;
+    vector<CkDDT_Aint> arrayDisplacements;
+    vector<int> index;
+    vector<CkDDT_DataType*> arrayDataType;
 
   private:
     CkDDT_Struct(const CkDDT_Struct& obj);
@@ -455,8 +459,8 @@ class CkDDT_Struct : public CkDDT_DataType {
 
 class CkDDT {
   private:
-    CkDDT_DataType**  typeTable;
-    int*  types; //used for pup
+    vector<CkDDT_DataType*> typeTable;
+    vector<int> types;
     int max_types;
     int num_types;
 
@@ -466,8 +470,8 @@ class CkDDT {
   CkDDT()
   {
     max_types = CkDDT_MAXTYPE;
-    typeTable = new CkDDT_DataType*[max_types];
-    types = new int[max_types];
+    typeTable.resize(max_types);
+    types.resize(max_types);
     typeTable[0] = new CkDDT_DataType(CkDDT_DOUBLE);
     types[0] = CkDDT_DOUBLE;
     typeTable[1] = new CkDDT_DataType(CkDDT_INT);
@@ -581,6 +585,7 @@ class CkDDT {
   int   getNextFreeIndex(void);
   void  pup(PUP::er &p);
   CkDDT_DataType*  getType(int nIndex) const;
+  int getTypeTag(int nIndex) const;
 
   bool isContig(int nIndex) const;
   int getSize(int nIndex, int count=1) const;
