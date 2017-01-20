@@ -7,7 +7,12 @@
 #define DEBUG(a)
 #endif
 
+#if CMK_USING_XLC
 static volatile int interopCommThdExit = 0;
+#else
+#include <atomic>
+static std::atomic<int> interopCommThdExit{0};
+#endif
 
 extern "C"
 {
@@ -25,7 +30,12 @@ extern "C"
   void StartInteropScheduler() {
     DEBUG(printf("[%d]Starting scheduler [%d]/[%d]\n",CmiMyPe(),CmiMyRank(),CmiMyNodeSize()););
     if (CmiMyRank() == CmiMyNodeSize()) {
-      while (interopCommThdExit != CmiMyNodeSize()) {
+#if CMK_USING_XLC
+      while (interopCommThdExit != CmiMyNodeSize())
+#else
+      while (interopCommThdExit.load(std::memory_order_relaxed) != CmiMyNodeSize())
+#endif
+      {
         CommunicationServerThread(5);
       }
       DEBUG(printf("[%d] Commthread Exit Scheduler\n",CmiMyPe()););
@@ -38,7 +48,11 @@ extern "C"
   void StopInteropScheduler() {
     DEBUG(printf("[%d] Exit Scheduler\n",CmiMyPe()););
     CpvAccess(interopExitFlag) = 1;
+#if CMK_USING_XLC
     CmiMemoryAtomicIncrement(interopCommThdExit);
+#else
+    interopCommThdExit++;
+#endif
   }
 
 } // extern "C"
