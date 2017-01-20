@@ -2202,7 +2202,7 @@ conv-counter.o: conv-counter.c converse.h conv-config.h conv-autoconfig.h \
  queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h debug-conv.h
 
-conv-interoperate.o: conv-interoperate.c converse.h conv-config.h \
+conv-interoperate.o: conv-interoperate.C converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
  pup_c.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h
