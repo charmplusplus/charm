@@ -1416,10 +1416,12 @@ if (MSG_STATISTIC)
 #endif
     if (CmiMyRank() == 0) LrtsExit();
 #endif
-    if(CharmLibInterOperate && !userDrivenMode)
-      CmiYield();
-    else 
-      while (1) CmiYield();
+    CmiYield();
+    if (!CharmLibInterOperate || userDrivenMode) {
+      while (1) {
+        CmiYield();
+      }
+    }
 #endif
 }
 /* ##### End of Functions Related with Machine Running ##### */
