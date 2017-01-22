@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include "mpi.h"
 
+#define SIZE1 100
+#define SIZE2 200
+#define N 100
+
 int getRank(void) {
 	int rank; 
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
@@ -352,12 +356,142 @@ for (int loop=0;loop<nLoop;loop++) {
 	    }
 	  }
 	
-	
-	if (1 && loop!=nLoop-1) 
-	  masterTester.testMigrate();
- }
- 
-	if (getRank()==0) printf("All tests passed\n");
-	MPI_Finalize();
-	return 0;
+	if (1)
+	{
+	  int *A,*B,rank,rankSplitter,destrank,nprocs,i;
+	  int errs=0;
+	  MPI_Win win;
+	  MPI_Comm splitter;
+	  MPI_Group comm_group,group;
+	  MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
+	  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+
+	  if (nprocs > 1)
+	  {
+	    i = MPI_Alloc_mem(SIZE2 * sizeof(int), MPI_INFO_NULL, &A);
+	    if (i)
+	    {
+	      printf("Can't allocate memory in test program\n");fflush(stdout);
+	      MPI_Abort(MPI_COMM_WORLD, 1);
+	    }
+	    i = MPI_Alloc_mem(SIZE2 * sizeof(int), MPI_INFO_NULL, &B);
+	    if (i)
+	    {
+	      printf("Can't allocate memory in test program\n");fflush(stdout);
+	      MPI_Abort(MPI_COMM_WORLD, 1);
+	    }
+
+	    MPI_Comm_split(MPI_COMM_WORLD,rank/2,rank,&splitter);
+	    MPI_Comm_group(splitter,&comm_group);
+	    MPI_Comm_rank(splitter,&rankSplitter);
+	    int sizeSplitter;
+	    MPI_Comm_size(splitter,&sizeSplitter);
+	    if (rank == 0)
+	    {
+	      for (i=0;i<SIZE2;i++)
+	      {
+		A[i] = B[i] = i;
+	      }
+	      MPI_Win_create(NULL,0,1,MPI_INFO_NULL,splitter,&win);
+	      destrank = 1;
+	      MPI_Group_incl(comm_group,1,&destrank,&group);
+	      MPI_Win_start(group,0,win);
+	      for (i=0; i<SIZE1; i++)
+	      {
+		MPI_Put(A+i,1,MPI_INT,1,i,1,MPI_INT,win);
+	      }
+	      for (i=0; i<SIZE1; i++)
+	      {
+		MPI_Get(B+i,1,MPI_INT,1,SIZE1+i,1,MPI_INT,win);
+	      }
+	      MPI_Win_complete(win);
+	      for (i=0;i<SIZE1;i++)
+	      {
+		if (B[i] != (-4)*(i+SIZE1))
+		{
+		  printf("MPI_Put/Get Test failed on rank 0 as array B doesn't contain the correct values\n");
+		  MPI_Abort(MPI_COMM_WORLD,1);
+		}
+	      }
+	    }
+	    else if (rank == 1)
+	    {
+	      for (i=0;i<SIZE2;i++)
+	      {
+		B[i] = (-4)*i;
+	      }
+	      MPI_Win_create(B,SIZE2*sizeof(int),sizeof(int),MPI_INFO_NULL,splitter,&win);
+	      destrank=0;
+	      MPI_Group_incl(comm_group,1,&destrank,&group);
+	      MPI_Win_post(group,0,win);
+	      MPI_Win_wait(win);
+	      for (i=0;i<SIZE1;i++)
+	      {
+		if (B[i] != i)
+		{
+		  printf("MPI_Put/Get Test failed on rank 1 as array B doesn't contain the correct values\n");
+		  MPI_Abort(MPI_COMM_WORLD,1);
+		}
+	      }
+	    }
+
+	    MPI_Group_free(&group);
+	    MPI_Group_free(&comm_group);
+	    if (rank < 2) { MPI_Win_free(&win); }
+	    MPI_Free_mem(A);
+	    MPI_Free_mem(B);
+	  }
+	}
+
+	if (1)
+	{
+	  int rank, nprocs, A[N], i;
+	  MPI_Win win;
+	  MPI_Comm comm;
+	  MPI_Group group;
+	  MPI_Comm_group(MPI_COMM_WORLD, &group);
+	  MPI_Comm_create(MPI_COMM_WORLD,group,&comm);
+	  MPI_Comm_size(comm,&nprocs);
+	  MPI_Comm_rank(comm,&rank);
+	  if ((nprocs > 1) && (nprocs%2 == 0))
+	  {
+	    if (rank%2 == 0)
+	    {
+	      for (i=0; i<N; i++)
+		A[i] = i;
+
+	      MPI_Win_create(NULL, 0, 1, MPI_INFO_NULL, comm, &win);
+	      MPI_Win_fence(0, win);
+	      MPI_Accumulate(A, N, MPI_INT, rank+1, 0, N, MPI_INT, MPI_SUM, win);
+	      MPI_Win_fence(0, win);
+	    }
+	    else /* rank%2 == 1 */
+	    {
+	      for (i=0; i<N; i++)
+		A[i] = 0;		// this makes it different from what its going to be updated as
+	      MPI_Win_create(A, N*sizeof(int), sizeof(int), MPI_INFO_NULL, comm, &win);
+	      MPI_Win_fence(0, win);
+	      MPI_Win_fence(0, win);
+	      for (i=0; i<N; i++)
+	      {
+		if (A[i] != i)
+		{
+		  printf("MPI_Accumulate Test failed as array A doesn't contain the correct values\n");
+		  MPI_Abort(MPI_COMM_WORLD,1);
+		}
+	      }
+	    }
+	    MPI_Win_free(&win);
+	  }
+	  MPI_Group_free(&group);
+	  MPI_Comm_free(&comm);
+	}
+
+	if (1 && loop!=nLoop-1)
+	masterTester.testMigrate();
+      }
+
+      if (getRank()==0) printf("All tests passed\n");
+      MPI_Finalize();
+      return 0;
 }
