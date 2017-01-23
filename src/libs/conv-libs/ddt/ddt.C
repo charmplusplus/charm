@@ -696,6 +696,28 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
   p|name;
 }
 
+void
+CkDDT_DataType::pup(PUP::er &p)
+{
+  p(datatype);
+  p(refCount);
+  p(size);
+  p(extent);
+  p(count);
+  p(baseSize);
+  p(baseExtent);
+  p(baseIndex);
+  p(trueExtent);
+  p(trueLB);
+  p(lb);
+  p(ub);
+  p(iscontig);
+  p(isAbsolute);
+  p(numElements);
+  p(nameLen);
+  p|name;
+}
+
 int
 CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 {
@@ -774,6 +796,27 @@ CkDDT_Contiguous::pupType(PUP::er &p, CkDDT *ddt)
   p(iscontig);
   p(numElements);
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+}
+
+void
+CkDDT_Contiguous::pup(PUP::er &p)
+{
+  p(datatype);
+  p(size);
+  p(extent);
+  p(count);
+  p(baseSize);
+  p(baseExtent);
+  p(baseIndex);
+  p(lb);
+  p(ub);
+  p(trueExtent);
+  p(trueLB);
+  p(iscontig);
+  p(numElements);
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
 }
 
 int
@@ -878,6 +921,29 @@ CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt)
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
+void
+CkDDT_Vector::pup(PUP::er &p)
+{
+  p(datatype);
+  p(size);
+  p(extent);
+  p(count);
+  p(baseSize);
+  p(baseExtent);
+  p(blockLength);
+  p(strideLength);
+  p(baseIndex);
+  p(lb);
+  p(ub);
+  p(trueExtent);
+  p(trueLB);
+  p(iscontig);
+  p(numElements);
+  
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
+}
+
 int
 CkDDT_Vector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 {
@@ -966,6 +1032,12 @@ void
 CkDDT_HVector::pupType(PUP::er &p, CkDDT* ddt)
 {
   CkDDT_Vector::pupType(p, ddt);
+}
+
+void
+CkDDT_HVector::pup(PUP::er &p)
+{
+  CkDDT_Vector::pup(p);
 }
 
 int
@@ -1090,6 +1162,29 @@ CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
+void
+CkDDT_Indexed::pup(PUP::er &p)
+{
+  p(datatype);
+  p(size);
+  p(extent);
+  p(count);
+  p(baseSize);
+  p(baseExtent);
+  p(baseIndex);
+  p(lb);
+  p(ub);
+  p(trueExtent);
+  p(trueLB);
+  p(iscontig);
+  p(numElements);
+  p|arrayBlockLength;
+  p|arrayDisplacements;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
+}
+
 int
 CkDDT_Indexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 {
@@ -1182,6 +1277,12 @@ void
 CkDDT_HIndexed::pupType(PUP::er &p, CkDDT* ddt)
 {
   CkDDT_Indexed::pupType(p, ddt);
+}
+
+void
+CkDDT_HIndexed::pup(PUP::er &p)
+{
+  CkDDT_Indexed::pup(p);
 }
 
 int
@@ -1308,6 +1409,29 @@ CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
+void
+CkDDT_Indexed_Block::pup(PUP::er &p)
+{
+  p(datatype);
+  p(size);
+  p(extent);
+  p(count);
+  p(baseSize);
+  p(baseExtent);
+  p(baseIndex);
+  p(lb);
+  p(ub);
+  p(trueExtent);
+  p(trueLB);
+  p(iscontig);
+  p(numElements);
+  p(BlockLength);
+  p|arrayDisplacements;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
+}
+
 int
 CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 {
@@ -1427,6 +1551,29 @@ CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
   p|arrayDisplacements;
 
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+}
+
+void
+CkDDT_HIndexed_Block::pup(PUP::er &p)
+{
+  p(datatype);
+  p(size);
+  p(extent);
+  p(count);
+  p(baseSize);
+  p(baseExtent);
+  p(baseIndex);
+  p(lb);
+  p(ub);
+  p(trueExtent);
+  p(trueLB);
+  p(iscontig);
+  p(numElements);
+  p(BlockLength);
+  p|arrayDisplacements;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
 }
 
 int
@@ -1594,6 +1741,27 @@ CkDDT_Struct::pupType(PUP::er &p, CkDDT* ddt)
     for(int i=0 ; i < count; i++)
       arrayDataType[i] = ddt->getType(index[i]);
   }
+}
+
+void
+CkDDT_Struct::pup(PUP::er &p)
+{
+  p(datatype);
+  p(size);
+  p(extent);
+  p(count);
+  p(lb);
+  p(ub);
+  p(trueExtent);
+  p(trueLB);
+  p(iscontig);
+  p(numElements);
+  p|arrayBlockLength;
+  p|arrayDisplacements;
+  p|index;
+
+  /* Note that pup methods for derived datatypes currently only support primitive baseTypes */
+  CmiAssert(baseIndex <= CkDDT_MAX_PRIMITIVE_TYPE);
 }
 
 int

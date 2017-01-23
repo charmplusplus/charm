@@ -185,6 +185,7 @@ class CkDDT_DataType {
     virtual void inrRefCount(void) ;
     virtual int getRefCount(void) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt) ;
+    virtual void pup(PUP::er &p);
 
     virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
     virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
@@ -213,6 +214,7 @@ class CkDDT_Contiguous : public CkDDT_DataType {
   CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
   virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
   virtual void pupType(PUP::er &p, CkDDT* ddt) ;
+  virtual void pup(PUP::er &p);
   virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
   virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
 };
@@ -244,6 +246,7 @@ class CkDDT_Vector : public CkDDT_DataType {
     ~CkDDT_Vector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
+    virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
 };
@@ -273,6 +276,7 @@ class CkDDT_HVector : public CkDDT_Vector {
     ~CkDDT_HVector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
+    virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
 };
@@ -306,6 +310,7 @@ class CkDDT_Indexed : public CkDDT_DataType {
     ~CkDDT_Indexed() ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
+    virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
 };
@@ -334,6 +339,7 @@ class CkDDT_HIndexed : public CkDDT_Indexed {
                  CkDDT_DataType* type);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
+    virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
 };
@@ -369,6 +375,7 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
     ~CkDDT_Indexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
+    virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
 };
@@ -401,6 +408,7 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
     ~CkDDT_HIndexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
+    virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
 };
@@ -436,6 +444,7 @@ class CkDDT_Struct : public CkDDT_DataType {
                CkDDT_DataType **type);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
+    virtual void  pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
 };
