@@ -617,6 +617,7 @@ class AmpiRequest {
   int src;
   MPI_Comm comm;
   bool statusIreq;
+  bool blocked; // this req is currently blocked on
 
 #if CMK_BIGSIM_CHARM
  public:
@@ -626,7 +627,7 @@ class AmpiRequest {
  protected:
   bool isvalid;
  public:
-  AmpiRequest(){ statusIreq=false; }
+  AmpiRequest(){ statusIreq=false; blocked=false; }
   /// Close this request (used by free and cancel)
   virtual ~AmpiRequest(){ }
 
@@ -659,6 +660,9 @@ class AmpiRequest {
   /// Receive a CkReductionMsg
   virtual void receive(ampi *ptr, CkReductionMsg *msg) = 0;
 
+  virtual void setBlocked(bool b) { blocked = b; }
+  virtual bool isBlocked(void) const { return blocked; }
+
   /// Frees up the request: invalidate it
   virtual void free(void){ isvalid=false; }
   inline bool isValid(void) const { return isvalid; }
@@ -677,6 +681,7 @@ class AmpiRequest {
     p(comm);
     p(isvalid);
     p(statusIreq);
+    p(blocked);
 #if CMK_BIGSIM_CHARM
     //needed for bigsim out-of-core emulation
     //as the "log" is not moved from memory, this pointer is safe
@@ -986,6 +991,14 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
     return -1;
   }
 
+  inline void unblockReqs(MPI_Request *request, int numReqs) {
+    for (int i=0; i<numReqs; i++) {
+      if (request[i] != MPI_REQUEST_NULL) {
+        block[request[i]]->setBlocked(false);
+      }
+    }
+  }
+
   void pup(PUP::er &p);
 
   void print(){
@@ -1259,6 +1272,7 @@ class ampiParent : public CBase_ampiParent {
  public:
   bool ampiInitCallDone;
   bool resumeOnRecv, resumeOnColl;
+  int numBlockedReqs; // number of requests currently blocked on
 
  public:
   ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
