@@ -452,8 +452,10 @@ do
 done
 
 if [ $BUILD_CUDA -eq 1 ]; then
+  HAVE_CUDA="no"
   echo "checking for CUDA toolkit directory"
-  CUDA_CANDIDATE_DIRS="$CUDATOOLKIT_HOME /usr/local/cuda /usr/lib/nvidia-cuda-toolkit"
+  CUDA_PRESET_DIRS="/usr/local/cuda /usr/lib/nvidia-cuda-toolkit"
+  CUDA_CANDIDATE_DIRS="$CUDATOOLKIT_HOME $CUDA_PRESET_DIRS"
   for dir in $CUDA_CANDIDATE_DIRS; do
     if test -d "$dir"; then
       CUDA_DIR="$dir"
@@ -462,6 +464,10 @@ if [ $BUILD_CUDA -eq 1 ]; then
       break
     fi
   done
+  if [ "$HAVE_CUDA" = "no" ]; then
+    echo "Error> no CUDA toolkit found, searched \$CUDATOOLKIT_HOME $CUDA_PRESET_DIRS"
+    exit 1
+  fi
 fi
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
