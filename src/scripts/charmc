@@ -1304,7 +1304,7 @@ do
 #	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
 #	then
         case "$FILE_EXT" in
-        .c|.s|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90)
+        .c|.s|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASEO $BASE.f.o
         esac
@@ -1326,11 +1326,11 @@ do
 		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE
 		    FILE="rose_$FILE"
 		    ;;
-		*.f|*.F)
+		*.f|*.F|*.f77|*.F77)
 		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 -c $FILE
 		    FILE="rose_$FILE"
 		    ;;
-		*.f90|*.F90)
+		*.f90|*.F90|*.fpp|*.FPP)
 		    test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
 		    Do $CMK_ROSE_OMP_TOOL -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 $FILE
 		    FILE="rose_$FILE"
@@ -1374,7 +1374,7 @@ do
 		    touch $BASEO
 		fi
 		;;
-	*.f|*.F)
+	*.f|*.F|*.f77|*.F77)
 		test -z "$CMK_CF90_FIXED" && Abort "No F90 compiler (CMK_CF90_FIXED) defined"
 		Do $CMK_CF90_FIXED -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 -c $FILE $DESTO
 		NU_OBJ=$BASEO
@@ -1383,7 +1383,7 @@ do
 		    touch $BASEO
 		fi
 		;;
-	*.f90|*.F90)
+	*.f90|*.F90|*.fpp|*.FPP)
 		test -z "$CMK_CF90" && Abort "No F90 compiler (CMK_CF90) defined"
 		test -z "$PREPROCESS" && OPTS_F90="$OPTS_F90 -c"
 		Do $CMK_CF90 -I$CHARMINC $CMK_SYSINC $OPTS_CPP $OPTS_F90 $FILE $DESTO
