@@ -41,5 +41,5 @@ test: pgm
 
 test-mig:
 	rm -fr pgm pgm.o
-	make OPTS="-DENABLE_MIG=1 -memory os-isomalloc -balancer RandCentLB" pgm
+	make OPTS="-DENABLE_MIG=1 -memory isomalloc -balancer RandCentLB" pgm
 	$(call run, ./pgm +p2)

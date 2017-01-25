@@ -6,7 +6,7 @@ OBJS = jacobi.o
 all: jacobi
 
 jacobi: $(OBJS)
-	$(CHARMC) -o jacobi $(OBJS) -lm -memory os-isomalloc -module DummyLB
+	$(CHARMC) -o jacobi $(OBJS) -lm -memory isomalloc -module DummyLB
 
 jacobi.o: jacobi.C
 	$(CHARMC) -language ampic -c -swapglobals jacobi.C 
