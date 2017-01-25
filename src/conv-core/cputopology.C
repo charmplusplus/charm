@@ -395,7 +395,6 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   if (CmiMyRank() ==0) {
      topoLock = CmiCreateLock();
   }
-  CmiNodeAllBarrier(); /* make sure topoLock creation is seen on all PEs */
 
 #if __FAULT__
   obtain_flag = 0;
@@ -562,10 +561,8 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   #endif
     cpuTopo.numPes = CmiNumPes();
   }
-  else {
-    CmiNodeBarrier();
-  }
 
+  CmiNodeAllBarrier();
   if (_noip) return; 
 
     /* prepare a msg to send */
