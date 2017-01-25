@@ -5114,32 +5114,32 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 
   AmpiRequestList* reqs = getReqs();
   MPI_Status tmpStatus;
+  int nullReqs = 0;
   *flag = 1;
 
   for (int i=0; i<count; i++) {
     if (request[i] == MPI_REQUEST_NULL) {
       if (sts)
         stsempty(sts[i]);
+      nullReqs++;
       continue;
     }
-    *flag *= (*reqs)[request[i]]->itest(&tmpStatus);
+    if (!(*reqs)[request[i]]->itest(&tmpStatus)) {
+      *flag = 0;
+      getAmpiParent()->yield();
+      return MPI_SUCCESS;
+    }
   }
 
-  if (*flag) {
+  if (nullReqs != count) {
     for (int i=0; i<count; i++) {
       int reqIdx = request[i];
       if (reqIdx != MPI_REQUEST_NULL) {
         AmpiRequest& req = *(*reqs)[reqIdx];
         req.complete(sts ? &sts[i] : &tmpStatus);
-        if (req.getType() != MPI_PERS_REQ) { // only free non-blocking requests
-          reqs->free(reqIdx);
-          request[i] = MPI_REQUEST_NULL;
-        }
+        freeNonPersReq(request[i]);
       }
     }
-  }
-  else {
-    getAmpiParent()->yield();
   }
 
   return MPI_SUCCESS;
