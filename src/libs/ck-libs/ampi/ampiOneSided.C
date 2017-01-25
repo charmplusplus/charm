@@ -643,7 +643,7 @@ int AMPI_Rput(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   AMPIAPI("AMPI_Rput");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(new SendReq(winStruct->comm), AMPI_REQ_COMPLETED);
+  *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
   return ptr->winPut(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
 }
 /*
@@ -661,7 +661,7 @@ int AMPI_Rget(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   AMPIAPI("AMPI_Rget");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(new SendReq(winStruct->comm), AMPI_REQ_COMPLETED);
+  *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
   return ptr->winGet(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
 }
 
@@ -680,7 +680,7 @@ int AMPI_Raccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   AMPIAPI("AMPI_Raccumulate");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(new SendReq(winStruct->comm), AMPI_REQ_COMPLETED);
+  *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
   return ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank,
                             targdisp, targcnt, targtype, op, winStruct);
 }
@@ -702,7 +702,7 @@ int AMPI_Rget_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
   AMPIAPI("AMPI_Rget_accumulate");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(new SendReq(winStruct->comm), AMPI_REQ_COMPLETED);
+  *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
   return ptr->winGetAccumulate(orgaddr, orgcnt, orgtype, resaddr, rescnt, restype,
                                rank, targdisp, targcnt, targtype, op, winStruct);
 }

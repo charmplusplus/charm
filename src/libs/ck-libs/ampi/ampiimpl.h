@@ -597,9 +597,10 @@ extern int _mpi_nworlds;
 #define MPI_GATHERV_REQ 8
 #define MPI_GPU_REQ     9
 
-enum AmpiReqSts : bool {
-  AMPI_REQ_PENDING = false,
-  AMPI_REQ_COMPLETED = true
+enum AmpiReqSts : char {
+  AMPI_REQ_PENDING   = 0,
+  AMPI_REQ_BLOCKED   = 1,
+  AMPI_REQ_COMPLETED = 2
 };
 
 #define MyAlign8(x) (((x)+7)&(~7))
@@ -723,9 +724,13 @@ class IReq : public AmpiRequest {
  public:
   int length; // recv'ed length
   bool cancelled; // track if request is cancelled
-  IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_){
+  IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_,
+       AmpiReqSts sts_=AMPI_REQ_PENDING)
+  {
     buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_;
     comm=comm_;  isvalid=true; length=0; cancelled=false;
+    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
+    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   IReq(){}
   ~IReq(){}
@@ -751,9 +756,13 @@ class IReq : public AmpiRequest {
 class RednReq : public AmpiRequest {
  public:
   MPI_Op op;
-  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, MPI_Op op_){
+  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, MPI_Op op_,
+          AmpiReqSts sts_=AMPI_REQ_PENDING)
+  {
     buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
     comm=comm_;  op=op_;  isvalid=true;
+    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
+    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   RednReq(){};
   ~RednReq(){}
@@ -774,9 +783,13 @@ class RednReq : public AmpiRequest {
 
 class GatherReq : public AmpiRequest {
  public:
-  GatherReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_){
+  GatherReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
+            AmpiReqSts sts_=AMPI_REQ_PENDING)
+  {
     buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
     comm=comm_;  isvalid=true;
+    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
+    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   GatherReq(){}
   ~GatherReq(){}
@@ -798,13 +811,17 @@ class GathervReq : public AmpiRequest {
  public:
   vector<int> recvCounts;
   vector<int> displs;
-  GathervReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, int *rc, int *d){
+  GathervReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, int *rc, int *d,
+             AmpiReqSts sts_=AMPI_REQ_PENDING)
+  {
     buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
     comm=comm_;  isvalid=true;
     recvCounts.resize(count);
     for(int i=0; i<count; i++) recvCounts[i]=rc[i];
     displs.resize(count);
     for(int i=0; i<count; i++) displs[i]=d[i];
+    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
+    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   GathervReq(){}
   ~GathervReq(){}
@@ -825,8 +842,10 @@ class GathervReq : public AmpiRequest {
 
 class SendReq : public AmpiRequest {
  public:
-  SendReq(MPI_Comm comm_) {
+  SendReq(MPI_Comm comm_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
     comm = comm_; isvalid=true;
+    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
+    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   SendReq(){}
   ~SendReq(){ }
@@ -1604,7 +1623,7 @@ class ampi : public CBase_ampi {
   inline ampi* blockOnRecv(void);
   inline ampi* blockOnColl(void);
   inline ampi* blockOnRedn(AmpiRequest *req);
-  MPI_Request postReq(AmpiRequest* newreq, AmpiReqSts status=AMPI_REQ_PENDING);
+  MPI_Request postReq(AmpiRequest* newreq);
 
   AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int sync=0);
