@@ -2431,6 +2431,14 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count
   return msg;
 }
 
+static inline void freeNonPersReq(int &request) {
+  AmpiRequestList* reqs = getReqs();
+  if ((*reqs)[request]->getType() != MPI_PERS_REQ) { // only free non-blocking request
+    reqs->free(request);
+    request = MPI_REQUEST_NULL;
+  }
+}
+
 void ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
                 int rank, MPI_Comm destcomm, int sync)
 {
@@ -2616,51 +2624,59 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
     s = myComm.getIndexForRemoteRank(s);
   }
 
-  int tags[2];
-  AmpiMsg *msg = 0;
-
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d blocking recv: tag=%d, src=%d, comm=%d\n",thisIndex,t,s,comm);
   )
 
   ampi *dis = getAmpiInstance(disComm);
-  while(1) {
-    tags[0] = t; tags[1] = s;
-    msg = (AmpiMsg *) AmmGet(dis->msgs, tags, (int*)sts);
-    if (msg) break;
-    // "dis" is updated in case an ampi thread is migrated while waiting for a message
-    dis = dis->blockOnRecv();
+  int tags[2] = { t, s };
+  AmpiMsg *msg = NULL;
+  msg = (AmpiMsg *)AmmGet(msgs, tags, (int*)sts);
+  if (msg) { // the matching message has already arrived
+    if (sts) {
+      sts->MPI_SOURCE = msg->getSrcRank();
+      sts->MPI_TAG    = msg->getTag();
+      sts->MPI_COMM   = msg->getComm(comm);
+      sts->MPI_LENGTH = msg->getLength();
+      sts->MPI_CANCEL = 0;
+    }
+    processAmpiMsg(msg, buf, type, count);
+#if CMK_BIGSIM_CHARM
+    TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 0);
+    if (msg->eventPe == CkMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
+#endif
+    delete msg;
+  }
+  else { // post a request and block until the matching message arrives
+    int request = postReq(new IReq(buf, count, type, s, t, comm, AMPI_REQ_BLOCKED));
+    CkAssert(parent->numBlockedReqs == 0);
+    parent->numBlockedReqs = 1;
+    dis = dis->blockOnRecv(); // "dis" is updated in case an ampi thread is migrated while waiting for a message
+    if (sts) {
+      AmpiRequestList* reqs = getReqs();
+      AmpiRequest& req = *(*reqs)[request];
+      sts->MPI_SOURCE = req.src;
+      sts->MPI_TAG    = req.tag;
+      sts->MPI_COMM   = req.comm;
+      sts->MPI_LENGTH = req.count * getDDT()->getSize(type);
+      sts->MPI_CANCEL = 0;
+    }
+    freeNonPersReq(request);
   }
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   CpvAccess(_currentObj) = dis;
   MSG_ORDER_DEBUG( printf("[%d] AMPI thread rescheduled  to Index %d buf %p src %d\n",CkMyPe(),dis->thisIndex,buf,s); )
 #endif
-
-  if (sts) {
-    sts->MPI_SOURCE = msg->getSrcRank();
-    sts->MPI_TAG    = msg->getTag();
-    sts->MPI_COMM   = msg->getComm(comm);
-    sts->MPI_LENGTH = msg->getLength();
-    sts->MPI_CANCEL = 0;
-  }
-  dis->processAmpiMsg(msg, buf, type, count);
-
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
 #endif
-
-#if CMK_BIGSIM_CHARM
-#if CMK_TRACE_IN_CHARM
-  //Due to the reason mentioned the in the while loop above, we need to 
+#if CMK_BIGSIM_CHARM && CMK_TRACE_IN_CHARM
+  //Due to the reason mentioned the in the else-statement above, we need to
   //use "dis" as "this" in the case of migration (or out-of-core execution in BigSim)
   if(CpvAccess(traceOn)) CthTraceResume(dis->thread->getThread());
 #endif
-  TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 0);
-  if (msg->eventPe == CkMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
-#endif
 
-  delete msg;
   return 0;
 }
 
@@ -4469,14 +4485,6 @@ int IATAReq::wait(MPI_Status *sts){
   _TRACE_BG_TLINE_END(&event);
 #endif
   return 0;
-}
-
-static inline void freeNonPersReq(int &request) {
-  AmpiRequestList* reqs = getReqs();
-  if ((*reqs)[request]->getType() != MPI_PERS_REQ) { // only free non-blocking request
-    reqs->free(request);
-    request = MPI_REQUEST_NULL;
-  }
 }
 
 CDECL
