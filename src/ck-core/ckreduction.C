@@ -2052,10 +2052,8 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
   vec.push_back(CkReduction::reducerStruct(::sum_uint, true));
   vec.push_back(CkReduction::reducerStruct(::sum_ulong, true));
   vec.push_back(CkReduction::reducerStruct(::sum_ulong_long, true));
-  // The floating point sums are marked as unstreamable to avoid
-  // implictly stating that they will always be precision oblivious.
-  vec.push_back(CkReduction::reducerStruct(::sum_float, false));
-  vec.push_back(CkReduction::reducerStruct(::sum_double, false));
+  vec.push_back(CkReduction::reducerStruct(::sum_float, true));
+  vec.push_back(CkReduction::reducerStruct(::sum_double, true));
 
   //Compute the product the numbers passed by each element.
   vec.push_back(CkReduction::reducerStruct(::product_char, true));
