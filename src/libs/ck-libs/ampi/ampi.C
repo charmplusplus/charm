@@ -1913,6 +1913,7 @@ int compareAmpiSplitKey(const void *a_, const void *b_) {
   return a->rank-b->rank;
 }
 
+// Caller needs to eventually call newAmpi.doneInserting()
 CProxy_ampi ampi::createNewChildAmpiSync() {
   CkArrayOptions opts;
   opts.bindTo(parentProxy);
@@ -1925,7 +1926,6 @@ CProxy_ampi ampi::createNewChildAmpiSync() {
   CkArrayCreatedMsg *newAmpiMsg = static_cast<CkArrayCreatedMsg*>(cb.thread_delay());
   CProxy_ampi newAmpi = newAmpiMsg->aid;
   delete newAmpiMsg;
-  newAmpi.doneInserting(); //<- Meaning, I need to do my own creation race resolution
   return newAmpi;
 }
 
@@ -1954,6 +1954,7 @@ void ampi::splitPhase1(CkReductionMsg *msg)
       lastColor=keys[c].color;
       lastRoot=c;
 
+      if (c!=0) lastAmpi.doneInserting();
       lastAmpi = createNewChildAmpiSync();
 
       vector<int> indices; //Maps rank to array indices for new array
@@ -1972,6 +1973,7 @@ void ampi::splitPhase1(CkReductionMsg *msg)
 
     lastAmpi[newIdx].insert(parentProxy,lastComm);
   }
+  lastAmpi.doneInserting();
 
   delete msg;
 }
@@ -2016,6 +2018,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg)
         for (int i=0; i<indices.size(); i++) {
           lastAmpi[indices[i]].insert(parentProxy,lastComm);
         }
+        lastAmpi.doneInserting();
       }
     }
   }
@@ -2067,6 +2070,7 @@ void ampi::insertNewChildAmpiElements(MPI_Comm nextComm, CProxy_ampi newAmpi) {
   ampiCommStruct newCommStruct = ampiCommStruct(nextComm, newAmpi, tmpVec.size(), tmpVec);
   for (int i = 0; i < tmpVec.size(); ++i)
     newAmpi[tmpVec[i]].insert(parentProxy, newCommStruct);
+  newAmpi.doneInserting();
 }
 
 void ampi::commCreatePhase1(MPI_Comm nextGroupComm){
@@ -2161,6 +2165,7 @@ void ampi::intercommCreatePhase1(MPI_Comm nextInterComm){
     int newIdx=lgroup[i];
     newAmpi[newIdx].insert(parentProxy,newCommstruct);
   }
+  newAmpi.doneInserting();
 
   parentProxy[0].ExchangeProxy(newAmpi);
 }
@@ -2174,6 +2179,7 @@ void ampi::intercommCreatePhaseSelf(MPI_Comm nextInterComm) {
     int newIdx=lgroup[i];
     newAmpi[newIdx].insert(parentProxy,newCommstruct);
   }
+  newAmpi.doneInserting();
 
   parentProxy[0].ExchangeProxy(newAmpi);
 }
