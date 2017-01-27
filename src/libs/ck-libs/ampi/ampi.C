@@ -2242,10 +2242,15 @@ void ampi::unblock(void){
   thread->resume();
 }
 
-void ampiParent::blockOnRecv(void){
+ampiParent* ampiParent::blockOnRecv(void){
   resumeOnRecv = true;
+  // In case this thread is migrated while suspended,
+  // save myComm to get the ampi instance back. Then
+  // return "dis" in case the caller needs it.
   thread->suspend();
-  resumeOnRecv = false;
+  ampiParent* dis = getAmpiParent();
+  dis->resumeOnRecv = false;
+  return dis;
 }
 
 ampi* ampi::blockOnRecv(void){
@@ -4275,27 +4280,22 @@ int PersReq::wait(MPI_Status *sts){
 }
 
 int IReq::wait(MPI_Status *sts){
-  //Copy "this" to a local variable in the case that "this" pointer
-  //is updated during the out-of-core emulation.
+  // ampi::generic() writes directly to the buffer, so the only thing we do here is wait
+  ampiParent *parent = getAmpiParent();
 
-  // optimization for Irecv
-  // generic() writes directly to the buffer, so the only thing we
-  // do here is to wait
-  ampi *dis = getAmpiInstance(comm);
-
-  while (statusIreq == false) {
-    // "dis" is updated in case an ampi thread is migrated while waiting for a message
-    dis->parent->resumeOnRecv = true;
-    dis->parent->numBlockedReqs = 1;
+  while (!statusIreq) {
+    // parent is updated in case an ampi thread is migrated while waiting for a message
+    parent->resumeOnRecv = true;
+    parent->numBlockedReqs = 1;
     setBlocked(true);
-    dis->parent->block();
+    parent->block();
     setBlocked(false);
-    dis = getAmpiInstance(comm);
+    parent = getAmpiParent();
 
     if (cancelled) {
       sts->MPI_CANCEL = 1;
       statusIreq = true;
-      dis->parent->resumeOnRecv = false;
+      parent->resumeOnRecv = false;
       return 0;
     }
 
@@ -4307,7 +4307,7 @@ int IReq::wait(MPI_Status *sts){
       return -1;
 #endif
   } // end of while
-  dis->parent->resumeOnRecv = false;
+  parent->resumeOnRecv = false;
 
   AMPI_DEBUG("IReq::wait has resumed\n");
 
@@ -4324,20 +4324,16 @@ int IReq::wait(MPI_Status *sts){
 }
 
 int RednReq::wait(MPI_Status *sts){
-  //Copy "this" to a local variable in the case that "this" pointer
-  //is updated during the out-of-core emulation.
-
-  // ampi::irednResult writes directly to the buffer, so the only thing we
-  // do here is to wait
-  ampi *dis = getAmpiInstance(comm);
+  // ampi::irednResult() writes directly to the buffer, so the only thing we do here is wait
+  ampiParent *parent = getAmpiParent();
 
   while (!statusIreq) {
-    dis->parent->resumeOnColl = true;
-    dis->parent->numBlockedReqs = 1;
+    parent->resumeOnColl = true;
+    parent->numBlockedReqs = 1;
     setBlocked(true);
-    dis->parent->block();
+    parent->block();
     setBlocked(false);
-    dis = getAmpiInstance(comm);
+    parent = getAmpiParent();
 
 #if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
@@ -4347,7 +4343,7 @@ int RednReq::wait(MPI_Status *sts){
       return -1;
 #endif
   }
-  dis->parent->resumeOnColl = false;
+  parent->resumeOnColl = false;
 
   AMPI_DEBUG("RednReq::wait has resumed\n");
 
@@ -4361,20 +4357,16 @@ int RednReq::wait(MPI_Status *sts){
 }
 
 int GatherReq::wait(MPI_Status *sts){
-  //Copy "this" to a local variable in the case that "this" pointer
-  //is updated during the out-of-core emulation.
-
-  // ampi::irednResult writes directly to the buffer, so the only thing we
-  // do here is to wait
-  ampi *dis = getAmpiInstance(comm);
+  // ampi::irednResult() writes directly to the buffer, so the only thing we do here is wait
+  ampiParent *parent = getAmpiParent();
 
   while (!statusIreq) {
-    dis->parent->resumeOnColl = true;
-    dis->parent->numBlockedReqs = 1;
+    parent->resumeOnColl = true;
+    parent->numBlockedReqs = 1;
     setBlocked(true);
-    dis->parent->block();
+    parent->block();
     setBlocked(false);
-    dis = getAmpiInstance(comm);
+    parent = getAmpiParent();
 
 #if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
@@ -4384,7 +4376,7 @@ int GatherReq::wait(MPI_Status *sts){
       return -1;
 #endif
   }
-  dis->parent->resumeOnColl = false;
+  parent->resumeOnColl = false;
 
   AMPI_DEBUG("GatherReq::wait has resumed\n");
 
@@ -4398,20 +4390,16 @@ int GatherReq::wait(MPI_Status *sts){
 }
 
 int GathervReq::wait(MPI_Status *sts){
-  //Copy "this" to a local variable in the case that "this" pointer
-  //is updated during the out-of-core emulation.
-
-  // ampi::irednResult writes directly to the buffer, so the only thing we
-  // do here is to wait
-  ampi *dis = getAmpiInstance(comm);
+  // ampi::irednResult writes directly to the buffer, so the only thing we do here is wait
+  ampiParent *parent = getAmpiParent();
 
   while (!statusIreq) {
-    dis->parent->resumeOnColl = true;
-    dis->parent->numBlockedReqs = 1;
+    parent->resumeOnColl = true;
+    parent->numBlockedReqs = 1;
     setBlocked(true);
-    dis->parent->block();
+    parent->block();
     setBlocked(false);
-    dis = getAmpiInstance(comm);
+    parent = getAmpiParent();
 
 #if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
@@ -4421,7 +4409,7 @@ int GathervReq::wait(MPI_Status *sts){
       return -1;
 #endif
   }
-  dis->parent->resumeOnColl = false;
+  parent->resumeOnColl = false;
 
   AMPI_DEBUG("GathervReq::wait has resumed\n");
 
@@ -4435,17 +4423,17 @@ int GathervReq::wait(MPI_Status *sts){
 }
 
 int SendReq::wait(MPI_Status *sts){
-  ampi *dis = getAmpiInstance(comm);
+  ampiParent *parent = getAmpiParent();
   while (!statusIreq) {
-    dis->parent->resumeOnRecv = true;
-    dis->parent->numBlockedReqs = 1;
+    parent->resumeOnRecv = true;
+    parent->numBlockedReqs = 1;
     setBlocked(true);
-    dis->parent->block();
+    parent->block();
     setBlocked(false);
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
-    dis = getAmpiInstance(comm);
+    parent = getAmpiParent();
   }
-  dis->parent->resumeOnRecv = false;
+  parent->resumeOnRecv = false;
   AMPI_DEBUG("SendReq::wait has resumed\n");
   if (sts) {
     sts->MPI_COMM = comm;
@@ -4455,10 +4443,10 @@ int SendReq::wait(MPI_Status *sts){
 }
 
 int SsendReq::wait(MPI_Status *sts){
-  ampi *dis = getAmpiInstance(comm);
+  ampiParent *parent = getAmpiParent();
   while (!statusIreq) {
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
-    dis = dis->blockOnRecv();
+    parent = parent->blockOnRecv();
   }
   if (sts) {
     sts->MPI_COMM = comm;

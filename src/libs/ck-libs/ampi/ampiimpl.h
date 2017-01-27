@@ -1332,7 +1332,7 @@ class ampiParent : public CBase_ampiParent {
   void Checkpoint(int len, const char* dname);
   void ResumeThread(void);
   TCharm* getTCharmThread() const {return thread;}
-  inline void blockOnRecv(void);
+  inline ampiParent* blockOnRecv(void);
 
 #if CMK_LBDB_ON
   void setMigratable(bool mig) {
