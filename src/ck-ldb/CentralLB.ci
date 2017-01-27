@@ -17,9 +17,11 @@ group [migratable] CentralLB : BaseLB {
   entry void SendStats();
   entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
   entry void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage data);
+  entry void ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage data);
   entry [reductiontarget] void ReceiveCounts(int counts[n], int n);
   entry void LoadBalance(void);
   entry [threaded] void t_LoadBalance(void);
+  entry void ApplyDecision();
   entry void ResumeClients(int);
   entry [reductiontarget] void ResumeClients();
   entry void changeFreq(int);

@@ -70,7 +70,7 @@ private:
 public:
   CkMarshalledCLBStatsMessage bufMsg;
   SpanningTree st;
-  CentralLB(const CkLBOptions & opt) : CBase_CentralLB(opt) { initLB(opt);
+  CentralLB(const CkLBOptions & opt) : CBase_CentralLB(opt), concurrent(false) { initLB(opt);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         lbDecisionCount= resumeCount=0;
 #endif
@@ -78,7 +78,7 @@ public:
 		manager_init();
 #endif
   }
-  CentralLB(CkMigrateMessage *m) : CBase_CentralLB(m) {
+  CentralLB(CkMigrateMessage *m) : CBase_CentralLB(m), concurrent(false) {
 #if CMK_SHRINK_EXPAND
 		manager_init();
 #endif
@@ -109,10 +109,12 @@ public:
   void ReceiveCounts(int *counts, int n);
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
   void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
+  void ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage &msg);
   
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
   void t_LoadBalance(void); 
+  void ApplyDecision(void);
   void ResumeClients(int);                      // Resuming clients needs
 
   void ResumeClients(); // to be resumed via message
@@ -269,6 +271,8 @@ protected:
   void removeNonMigratable(LDStats* statsDataList, int count);
 	CProxy_CentralLB thisProxy;
   void loadbalance_with_thread() { use_thread = true; }
+
+  bool concurrent;
 private:  
 //CProxy_CentralLB thisProxy;
   int myspeed;
@@ -281,6 +285,7 @@ private:
   int future_migrates_expected;
   int lbdone;
   double start_lb_time;
+  double strat_start_time;
   LBMigrateMsg   *storedMigrateMsg;
   LBScatterMsg   *storedScatterMsg;
   bool  reduction_started;
@@ -290,6 +295,7 @@ private:
 
   void BuildStatsMsg();
   void buildStats();
+  void printStrategyStats(LBMigrateMsg *msg);
 
 public:
   int useMem();
