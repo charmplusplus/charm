@@ -195,6 +195,13 @@ class CkDDT_DataType {
     void setName(const char *src);
     void getName(char *dest, int *len) const;
     void setAbsolute(bool arg);
+
+    /* These are dummy methods. They need to be defined to allow templated entry methods */
+    virtual int getBlockLength() const;
+    virtual int getStrideLength() const;
+    virtual const int* getArrayBlockLength() const;
+    virtual const CkDDT_Aint* getArrayDisps() const;
+    virtual const CkDDT_Type* getTypes() const;
 };
 
 /*
@@ -206,17 +213,24 @@ class CkDDT_DataType {
 class CkDDT_Contiguous : public CkDDT_DataType {
 
  private:
-  CkDDT_Contiguous(const CkDDT_Contiguous& obj);
   CkDDT_Contiguous& operator=(const CkDDT_Contiguous& obj);
 
  public:
   CkDDT_Contiguous() { };
   CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
+  CkDDT_Contiguous(const CkDDT_Contiguous& obj);
   virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
   virtual void pupType(PUP::er &p, CkDDT* ddt) ;
   virtual void pup(PUP::er &p);
   virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
   virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+
+  /* These are dummy methods. They need to be defined to allow templated entry methods */
+  virtual int getBlockLength() const;
+  virtual int getStrideLength() const;
+  virtual const int* getArrayBlockLength() const;
+  virtual const CkDDT_Aint* getArrayDisps() const;
+  virtual const CkDDT_Type* getTypes() const;
 };
 
 /*
@@ -236,19 +250,26 @@ class CkDDT_Vector : public CkDDT_DataType {
     int strideLength ;
 
   private:
-    CkDDT_Vector(const CkDDT_Vector& obj);
     CkDDT_Vector& operator=(const CkDDT_Vector& obj);
 
   public:
     CkDDT_Vector(int count, int blklen, int stride, int index,
                 CkDDT_DataType* type);
     CkDDT_Vector() { } ;
+    CkDDT_Vector(const CkDDT_Vector& obj);
     ~CkDDT_Vector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getBlockLength() const;
+    virtual int getStrideLength() const;
+
+    /* These are dummy methods. They need to be defined to allow templated entry methods */
+    virtual const int* getArrayBlockLength() const;
+    virtual const CkDDT_Aint* getArrayDisps() const;
+    virtual const CkDDT_Type* getTypes() const;
 };
 
 /*
@@ -266,19 +287,26 @@ class CkDDT_Vector : public CkDDT_DataType {
 class CkDDT_HVector : public CkDDT_Vector {
 
   private:
-    CkDDT_HVector(const CkDDT_HVector& obj) ;
     CkDDT_HVector& operator=(const CkDDT_HVector& obj);
 
   public:
     CkDDT_HVector() { } ;
     CkDDT_HVector(int nCount,int blength,int strideLen,int index,
                 CkDDT_DataType* type);
+    CkDDT_HVector(const CkDDT_HVector& obj);
     ~CkDDT_HVector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getBlockLength() const;
+    virtual int getStrideLength() const;
+  
+    /* These are dummy methods. They need to be defined to allow templated entry methods */
+    virtual const int* getArrayBlockLength() const;
+    virtual const CkDDT_Aint* getArrayDisps() const;
+    virtual const CkDDT_Type* getTypes() const;
 };
 
 /*
@@ -300,19 +328,26 @@ class CkDDT_Indexed : public CkDDT_DataType {
     vector<CkDDT_Aint> arrayDisplacements;
 
   private:
-    CkDDT_Indexed(const CkDDT_Indexed& obj);
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
 
   public:
-    CkDDT_Indexed(int count, int* arrBlock, CkDDT_Aint* arrDisp, int index,
+    CkDDT_Indexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
                 CkDDT_DataType* type);
     CkDDT_Indexed() { } ;
+    CkDDT_Indexed(const CkDDT_Indexed& obj);
     ~CkDDT_Indexed() ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual const int* getArrayBlockLength() const;
+    virtual const CkDDT_Aint* getArrayDisps() const;
+
+    /* These are dummy methods. They need to be defined to allow templated entry methods */
+    virtual int getBlockLength() const;
+    virtual int getStrideLength() const;
+    virtual const CkDDT_Type* getTypes() const;
 };
 
 /*
@@ -330,18 +365,25 @@ class CkDDT_Indexed : public CkDDT_DataType {
 class CkDDT_HIndexed : public CkDDT_Indexed {
 
   private:
-    CkDDT_HIndexed(const CkDDT_HIndexed& obj);
     CkDDT_HIndexed& operator=(const CkDDT_HIndexed& obj);
 
   public:
     CkDDT_HIndexed() { } ;
-    CkDDT_HIndexed(int count, int* arrBlock, CkDDT_Aint* arrDisp, int index,
+    CkDDT_HIndexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
                  CkDDT_DataType* type);
+    CkDDT_HIndexed(const CkDDT_HIndexed& obj);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual const int* getArrayBlockLength() const;
+    virtual const CkDDT_Aint* getArrayDisps() const;
+
+    /* These are dummy methods. They need to be defined to allow templated entry methods */
+    virtual int getBlockLength() const;
+    virtual int getStrideLength() const;
+    virtual const CkDDT_Type* getTypes() const;
 };
 
 /*
@@ -366,18 +408,25 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
     vector<CkDDT_Aint> arrayDisplacements;
 
   private:
-    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj);
     CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
-    CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_Indexed_Block() { };
+    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj);
     ~CkDDT_Indexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getBlockLength() const;
+    virtual const CkDDT_Aint* getArrayDisps() const;
+
+    /* These are dummy methods. They need to be defined to allow templated entry methods */
+    virtual int getStrideLength() const;
+    virtual const int* getArrayBlockLength() const;
+    virtual const CkDDT_Type* getTypes() const;
 };
 
 /*
@@ -399,18 +448,25 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
 {
   
   private:
-    CkDDT_HIndexed_Block(const CkDDT_Indexed_Block &obj);
     CkDDT_HIndexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
-    CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_HIndexed_Block() { };
+    CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj);
     ~CkDDT_HIndexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual void pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getBlockLength() const;
+    virtual const CkDDT_Aint* getArrayDisps() const;
+
+    /* These are dummy methods. They need to be defined to allow templated entry methods */
+    virtual int getStrideLength() const;
+    virtual const int* getArrayBlockLength() const;
+    virtual const CkDDT_Type* getTypes() const;
 };
 
 /*
@@ -435,18 +491,25 @@ class CkDDT_Struct : public CkDDT_DataType {
     vector<CkDDT_DataType*> arrayDataType;
 
   private:
-    CkDDT_Struct(const CkDDT_Struct& obj);
     CkDDT_Struct& operator=(const CkDDT_Struct& obj);
 
   public:
     CkDDT_Struct() { } ;
-    CkDDT_Struct(int count, int* arrBlock, CkDDT_Aint* arrDisp, int *index,
+    CkDDT_Struct(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, const int *index,
                CkDDT_DataType **type);
+    CkDDT_Struct(const CkDDT_Struct& obj);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual void  pup(PUP::er &p);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual const int* getArrayBlockLength() const;
+    virtual const CkDDT_Aint* getArrayDisps() const;
+    virtual const CkDDT_Type* getTypes() const;
+
+    /* These are dummy methods. They need to be defined to allow templated entry methods */
+    virtual int getBlockLength() const;
+    virtual int getStrideLength() const;
 };
 
 /*
@@ -580,22 +643,22 @@ class CkDDT {
                 CkDDT_Type* newtype);
   void newHVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
+  void newIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
+  void newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
                   CkDDT_Type* newtype);
-  void newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+  void newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                       CkDDT_Type *newtype);
-  void newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+  void newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                        CkDDT_Type *newtype);
-  void newStruct(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type *oldtype,
+  void newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , const CkDDT_Type *oldtype,
                 CkDDT_Type* newtype);
   void  freeType(int* index);
   int   getNextFreeIndex(void);
   void  pup(PUP::er &p);
   CkDDT_DataType*  getType(int nIndex) const;
   int getTypeTag(int nIndex) const;
-
+  bool isPrimitive(int nIndex) const;
   bool isContig(int nIndex) const;
   int getSize(int nIndex, int count=1) const;
   CkDDT_Aint getExtent(int nIndex) const;

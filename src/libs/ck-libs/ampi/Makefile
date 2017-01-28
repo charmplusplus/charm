@@ -7,7 +7,7 @@ COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
 OBJS=ampi.o ampif.o ampiProjections.o ampiOneSided.o \
-     ampiMisc.o mpich-alltoall.o  
+     ampiMisc.o mpich-alltoall.o ddt.o 
 ROMIOMAKE=romio/adio/ad_hfs/Makefile romio/adio/ad_nfs/Makefile romio/adio/ad_pfs/Makefile romio/adio/ad_piofs/Makefile \
 	  romio/adio/ad_pvfs/Makefile romio/adio/ad_sfs/Makefile romio/adio/ad_testfs/Makefile romio/adio/ad_ufs/Makefile \
 	  romio/adio/ad_xfs/Makefile romio/adio/common/Makefile romio/adio/include/romioconf.h romio/Makefile \
@@ -96,7 +96,7 @@ ampi.o: ampi.C $(HEADDEP)
 ampif.o: ampif.C $(HEADDEP)
 	$(CHARMC) -c ampif.C
 
-ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP)
+ampiOneSided.o: ampiOneSided.C ampiimpl.h ampi.def.h $(HEADDEP)
 	$(CHARMC) -c ampiOneSided.C
 
 ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP)
@@ -105,7 +105,10 @@ ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP)
 mpich-alltoall.o: mpich-alltoall.C $(HEADDEP)
 	$(CHARMC) -c mpich-alltoall.C 
 
-ampi.decl.h ampi.def.h: ampi.ci
+ddt.o:./../../conv-libs/ddt/ddt.C ./../../conv-libs/ddt/ddt.h
+	$(CHARMC) -c ./../../conv-libs/ddt/ddt.C
+
+ampi.decl.h ampi.def.h: ampi.ci ./../../conv-libs/ddt/ddt.h
 	$(CHARMC) ampi.ci
 
 ampiProjections.o: ampiProjections.C ampiEvents.h ampiProjections.h $(HEADDEP)

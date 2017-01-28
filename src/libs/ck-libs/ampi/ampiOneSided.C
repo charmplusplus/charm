@@ -126,12 +126,12 @@ int win_obj::iget(int orgcnt, int orgunit, MPI_Aint targdisp,
   return WIN_SUCCESS;
 }
 
-int win_obj::accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
-                        MPI_Aint targdisp, int targcnt,
-                        MPI_Datatype targtype, MPI_Op op, ampiParent* pptr){
+int win_obj::accumulate(void *orgaddr, int count, MPI_Aint targdisp, MPI_Aint structDisp, MPI_Datatype targtype,
+                        MPI_Op op, ampiParent* pptr)
+{
   //when called from winRemote entry methods, pptr must be taken from the ampi instance, not getAmpiParent().
   CkAssert(pptr != NULL);
-  pptr->applyOp(targtype, op, targcnt, (void*)((int*)baseAddr+targdisp), (void*)orgaddr);
+  pptr->applyOp(targtype, op, count, (void*)(orgaddr),(void*)((char*)baseAddr+disp_unit*targdisp+structDisp));
   return WIN_SUCCESS;
 }
 
@@ -208,19 +208,100 @@ void ampiParent::removeWinStruct(WinStruct *win) {/*winStructList.remove(win);*/
 int ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win){
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
-
-  if (ddt->isContig()) {
-    thisProxy[rank].winRemotePut(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
-                          targcnt, targtype, win->index);
+  int orgTotalSize = ddt->getSize(orgcnt);
+  AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
+  if (!getDDT()->isPrimitive(targtype))
+  {
+    int newTypeIndex = getDDT()->getType(targtype)->getType();
+    CkDDT_DataType *newDataType = getDDT()->getType(targtype);
+    bool isContiguousData = true;
+    vector<char> sorgaddr;
+    if (!ddt->isContig())
+    {
+      isContiguousData = false;
+      sorgaddr.resize(orgTotalSize);
+      ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
+    }
+    char* orgData;
+    if (isContiguousData)
+    {
+      orgData = (char*)orgaddr;
+    }
+    else
+    {
+      orgData = &sorgaddr[0];
+    }
+    switch(newTypeIndex)
+    {
+      case CkDDT_CONTIGUOUS:
+      {
+        CkDDT_Contiguous newType = *(static_cast<CkDDT_Contiguous*>(newDataType));
+        thisProxy[rank].winRemotePutNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_VECTOR:
+      {
+        CkDDT_Vector newType = *(static_cast<CkDDT_Vector*> (newDataType));
+        thisProxy[rank].winRemotePutNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, win->index, newType, newTypeIndex);
+        break;
+      }
+      case CkDDT_HVECTOR:
+      {
+        CkDDT_HVector newType = *(static_cast<CkDDT_HVector*>(newDataType));
+        thisProxy[rank].winRemotePutNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_INDEXED:
+      {
+        CkDDT_Indexed newType = *(static_cast<CkDDT_Indexed*>(newDataType));
+        thisProxy[rank].winRemotePutNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_HINDEXED:
+      {
+        CkDDT_HIndexed newType = *(static_cast<CkDDT_HIndexed*>(newDataType));
+        thisProxy[rank].winRemotePutNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_INDEXED_BLOCK:
+      {
+        CkDDT_Indexed_Block newType = *(static_cast<CkDDT_HIndexed_Block*>(newDataType));
+        thisProxy[rank].winRemotePutNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_HINDEXED_BLOCK:
+      {
+        CkDDT_HIndexed_Block newType = *(static_cast<CkDDT_HIndexed_Block*>(newDataType));
+        thisProxy[rank].winRemotePutNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_STRUCT:
+      {
+        CkDDT_Struct newType = *(static_cast<CkDDT_Struct*>(newDataType));
+        thisProxy[rank].winRemotePutNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, win->index, newType, newTypeIndex);
+        break;
+       }
+      default:
+      {
+        CkAbort("AMPI>MPI_Accumulate does not recognize the target derived datatype!");
+        break;
+      }
+    }
   }
-  else {
-    vector<char> sorgaddr(orgtotalsize);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    thisProxy[rank].winRemotePut(orgtotalsize, &sorgaddr[0], orgcnt, orgtype, targdisp,
-                          targcnt, targtype, win->index);
+  else
+  {
+    thisProxy[rank].winRemotePut(orgTotalSize, (char*)orgaddr, orgcnt, orgtype,
+                               targdisp, targcnt, targtype, win->index);
   }
-
+  
   return MPI_SUCCESS;
 }
 
@@ -229,10 +310,9 @@ void ampi::winRemotePut(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Dataty
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int orgunit = getDDT()->getSize(orgtype);
 
-  winobj->put(sorgaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
-  char* targaddr = ((char*)(winobj->baseAddr)) + targunit*targdisp;
+  winobj->put(sorgaddr, orgcnt, orgtotalsize, targdisp, targcnt, targunit);        // This call doesnt even do anything.
+  char* targaddr = ((char*)(winobj->baseAddr)) + winobj->disp_unit*targdisp;
   tddt->serialize(targaddr, (char*)sorgaddr, targcnt, (-1));
 }
 
@@ -243,10 +323,85 @@ int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
+  int targTotalExtent = targcnt*getDDT()->getType(targtype)->getExtent();	// added the "targcnt*" part recently
   AmpiMsg *msg = new AmpiMsg();
 
-  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
 
+  if (!getDDT()->isPrimitive(targtype))
+  {
+    int newTypeIndex = getDDT()->getType(targtype)->getType();
+    CkDDT_DataType *newDataType = getDDT()->getType(targtype);
+  
+    switch(newTypeIndex)
+    {
+      case CkDDT_CONTIGUOUS:
+      {
+        CkDDT_Contiguous newType = *(static_cast<CkDDT_Contiguous*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetNewDataType(orgcnt, orgtype, targdisp, targcnt, targtype, win->index,
+          newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_VECTOR:
+      {
+        CkDDT_Vector newType = *(static_cast<CkDDT_Vector*> (newDataType));
+        msg = thisProxy[rank].winRemoteGetNewDataType(orgcnt, orgtype, targdisp, targcnt, targtype, win->index,
+          newType, newTypeIndex);
+        break;
+      }
+      case CkDDT_HVECTOR:
+      {
+        CkDDT_HVector newType = *(static_cast<CkDDT_HVector*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetNewDataType(orgcnt, orgtype, targdisp, targcnt, targtype, win->index,
+          newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_INDEXED:
+      {
+        CkDDT_Indexed newType = *(static_cast<CkDDT_Indexed*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetNewDataType(orgcnt, orgtype, targdisp, targcnt, targtype, win->index,
+          newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_HINDEXED:
+      {
+        CkDDT_HIndexed newType = *(static_cast<CkDDT_HIndexed*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetNewDataType(orgcnt, orgtype, targdisp, targcnt, targtype, win->index,
+          newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_INDEXED_BLOCK:
+      {
+        CkDDT_Indexed_Block newType = *(static_cast<CkDDT_HIndexed_Block*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetNewDataType(orgcnt, orgtype, targdisp, targcnt, targtype, win->index,
+          newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_HINDEXED_BLOCK:
+      {
+        CkDDT_HIndexed_Block newType = *(static_cast<CkDDT_HIndexed_Block*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetNewDataType(orgcnt, orgtype, targdisp, targcnt, targtype, win->index,
+          newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_STRUCT:
+      {
+        CkDDT_Struct newType = *(static_cast<CkDDT_Struct*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetNewDataType(orgcnt, orgtype, targdisp, targcnt, targtype, win->index,
+          newType, newTypeIndex);
+        break;
+       }
+      default:
+      {
+        CkAbort("AMPI>MPI_Accumulate does not recognize the target derived datatype!");
+        break;
+      }
+    }
+  }
+  else
+  {
+    msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
+  }
+  
   // Process the reply message by serializing the data into the desired memory position
   ddt->serialize((char*)orgaddr, msg->getData(), orgcnt, (-1));
   AMPI_DEBUG("    Rank[%d] got win  [%d] \n", thisIndex, *(int*)msg->getData());
@@ -263,11 +418,12 @@ AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
   int targtotalsize = targunit*targcnt;
-  int orgunit = getDDT()->getSize(orgtype);
+  //int orgunit = getDDT()->getSize(orgtype);	// WE DONT WANT THIS CALL because what if orgtype is derived?
+  int orgunit = -1;		// this can be changed later, but the call to winobj->get(..) doesnt do anything anways!
   win_obj *winobj = winObjects[winIndex];
-  char* targaddr = (char*)(winobj->baseAddr) + targunit*targdisp;
 
-  winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
+  char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
+  winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);    // This call doesnt do anything
 
   AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)(targaddr));
   AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, targtotalsize);
@@ -333,18 +489,100 @@ int ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int ran
                         MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                         MPI_Op op, WinStruct *win) {
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
+  int orgTotalSize = ddt->getSize(orgcnt);
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
 
-  if (ddt->isContig()) {
-    thisProxy[rank].winRemoteAccumulate(orgtotalsize, (char*)orgaddr, orgcnt, orgtype,
-                                 targdisp, targcnt, targtype,  op, win->index);
+  if (!getDDT()->isPrimitive(targtype))
+  {
+    int newTypeIndex = getDDT()->getType(targtype)->getType();
+    CkDDT_DataType *newDataType = getDDT()->getType(targtype);
+    bool isContiguousData = true;
+    vector<char> sorgaddr;
+    if (!ddt->isContig())
+    {
+      isContiguousData = false;
+      sorgaddr.resize(orgTotalSize);
+      ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
+    }
+    char* orgData;
+    if (isContiguousData)
+    {
+      orgData = (char*)orgaddr;
+    }
+    else
+    {
+      orgData = &sorgaddr[0];
+    }
+  
+    switch(newTypeIndex)
+    {
+      case CkDDT_CONTIGUOUS:
+      {
+        CkDDT_Contiguous newType = *(static_cast<CkDDT_Contiguous*>(newDataType));
+        thisProxy[rank].winRemoteAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_VECTOR:
+      {
+        CkDDT_Vector newType = *(static_cast<CkDDT_Vector*> (newDataType));
+        thisProxy[rank].winRemoteAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+      }
+      case CkDDT_HVECTOR:
+      {
+        CkDDT_HVector newType = *(static_cast<CkDDT_HVector*>(newDataType));
+        thisProxy[rank].winRemoteAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_INDEXED:
+      {
+        CkDDT_Indexed newType = *(static_cast<CkDDT_Indexed*>(newDataType));
+        thisProxy[rank].winRemoteAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_HINDEXED:
+      {
+        CkDDT_HIndexed newType = *(static_cast<CkDDT_HIndexed*>(newDataType));
+        thisProxy[rank].winRemoteAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_INDEXED_BLOCK:
+      {
+        CkDDT_Indexed_Block newType = *(static_cast<CkDDT_HIndexed_Block*>(newDataType));
+        thisProxy[rank].winRemoteAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_HINDEXED_BLOCK:
+      {
+        CkDDT_HIndexed_Block newType = *(static_cast<CkDDT_HIndexed_Block*>(newDataType));
+        thisProxy[rank].winRemoteAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_STRUCT:
+      {
+        CkDDT_Struct newType = *(static_cast<CkDDT_Struct*>(newDataType));
+        thisProxy[rank].winRemoteAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      default:
+      {
+        CkAbort("AMPI>MPI_Accumulate does not recognize the target derived datatype!");
+        break;
+      }
+    }
   }
-  else {
-    vector<char> sorgaddr(orgtotalsize);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    thisProxy[rank].winRemoteAccumulate(orgtotalsize, &sorgaddr[0], orgcnt, orgtype,
-                                 targdisp, targcnt, targtype,  op, win->index);
+  else
+  {
+    thisProxy[rank].winRemoteAccumulate(orgTotalSize, (char*)orgaddr, orgcnt, orgtype,
+                               targdisp, targcnt, targtype,  op, win->index);
   }
 
   return MPI_SUCCESS;
@@ -356,14 +594,22 @@ void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
                                int winIndex) {
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *ddt = getDDT()->getType(targtype);
+
+/* 	// Not needed I am pretty sure because ddt should be a contiguous datatype.
   if (ddt->isContig()) {
-    winobj->accumulate(sorgaddr, targcnt, targtype, targdisp, targcnt, targtype, op, parent);
+    winobj->accumulate(sorgaddr, targcnt, targdisp, 0, targtype, op, parent);
   }
   else {
+    // Note that orgtotalsize is really targetTotalExtent
     vector<char> getdata(orgtotalsize);
     ddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
-    winobj->accumulate(&getdata[0], targcnt, targtype, targdisp, targcnt, targtype, op, parent);
+    winobj->accumulate(&getdata[0], targcnt, targdisp, 0, targtype, op, parent);
   }
+
+*/
+
+  // I actually think that if we ever get here, sorgaddr will be contiguous because it is only made up of primitive types
+  winobj->accumulate(sorgaddr,targcnt,targdisp,0,targtype,op,parent);
 }
 
 int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
@@ -371,24 +617,115 @@ int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, WinStruct *win) {
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
+  int orgTotalSize = ddt->getSize(orgcnt);
   AmpiMsg *msg = new AmpiMsg();
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
 
-  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
-
-  ddt->serialize((char*)resaddr, msg->getData(), orgcnt, (-1));
-  if (ddt->isContig()) {
-    parent->applyOp(orgtype, op, orgcnt, resaddr, orgaddr);
-  } else {
-    vector<char> sorgaddr(orgtotalsize);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    parent->applyOp(orgtype, op, orgcnt, resaddr, &sorgaddr[0]);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, -1);
+  if (!getDDT()->isPrimitive(targtype))
+  {
+    int newTypeIndex = getDDT()->getType(targtype)->getType();
+    CkDDT_DataType *newDataType = getDDT()->getType(targtype);
+    bool isContiguousData = true;
+    vector<char> sorgaddr;
+    if (!ddt->isContig())
+    {
+      isContiguousData = false;
+      sorgaddr.resize(orgTotalSize);
+      ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
+    }
+    char* orgData;
+    if (isContiguousData)
+    {
+      orgData = (char*)orgaddr;
+    }
+    else
+    {
+      orgData = &sorgaddr[0];
+    }
+    
+    switch(newTypeIndex)
+    {
+      case CkDDT_CONTIGUOUS:
+      {
+        CkDDT_Contiguous newType = *(static_cast<CkDDT_Contiguous*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_VECTOR:
+      {
+        CkDDT_Vector newType = *(static_cast<CkDDT_Vector*> (newDataType));
+        msg = thisProxy[rank].winRemoteGetAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+      }
+      case CkDDT_HVECTOR:
+      {
+        CkDDT_HVector newType = *(static_cast<CkDDT_HVector*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_INDEXED:
+      {
+        CkDDT_Indexed newType = *(static_cast<CkDDT_Indexed*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_HINDEXED:
+      {
+        CkDDT_HIndexed newType = *(static_cast<CkDDT_HIndexed*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_INDEXED_BLOCK:
+      {
+        CkDDT_Indexed_Block newType = *(static_cast<CkDDT_HIndexed_Block*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_HINDEXED_BLOCK:
+      {
+        CkDDT_HIndexed_Block newType = *(static_cast<CkDDT_HIndexed_Block*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      case CkDDT_STRUCT:
+      {
+        CkDDT_Struct newType = *(static_cast<CkDDT_Struct*>(newDataType));
+        msg = thisProxy[rank].winRemoteGetAccumulateNewDataType(orgTotalSize, orgData, orgcnt, orgtype,
+          targdisp, targcnt, targtype, op, win->index, newType, newTypeIndex);
+        break;
+       }
+      default:
+      {
+        CkAbort("AMPI>MPI_Get_accumulate does not recognize the target derived datatype!");
+        break;
+      }
+    }
   }
+  else
+  {
+    msg = thisProxy[rank].winRemoteGetAccumulate(orgTotalSize, (char*)orgaddr, orgcnt, orgtype,
+                               targdisp, targcnt, targtype,  op, win->index);
+  }
+ 
+  getDDT()->getType(restype)->serialize((char*)resaddr, msg->getData(), rescnt, (-1));
 
   delete msg;
   return MPI_SUCCESS;
+}
+
+AmpiMsg* ampi::winRemoteGetAccumulate(int orgTotalSize, char *sorgaddr, int orgcnt, MPI_Datatype orgtype,
+                                MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op, int winIndex)
+{
+  AmpiMsg* msg = winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, winIndex);
+  winRemoteAccumulate(orgTotalSize, sorgaddr, orgcnt, orgtype, targdisp, targcnt, targtype, op, winIndex);
+  return msg;
 }
 
 int ampi::winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,

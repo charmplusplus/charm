@@ -149,6 +149,12 @@ CkDDT::isContig(int nIndex) const
   return getType(nIndex)->isContig();
 }
 
+bool
+CkDDT::isPrimitive(int nIndex) const
+{
+  return nIndex <= CkDDT_MAX_PRIMITIVE_TYPE;
+}
+
 int
 CkDDT::getSize(int nIndex, int count) const
 {
@@ -264,7 +270,7 @@ CkDDT::newHVector(int count, int blocklength, int stride,
 }
 
 void
-CkDDT::newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
+CkDDT::newIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
                   CkDDT_Type oldtype, CkDDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -275,7 +281,7 @@ CkDDT::newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
 }
 
 void
-CkDDT::newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
+CkDDT::newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
                    CkDDT_Type oldtype, CkDDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -286,7 +292,7 @@ CkDDT::newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
 }
 
 void
-CkDDT::newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+CkDDT::newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newtype)
 {
   int index = *newtype = getNextFreeIndex();
@@ -296,7 +302,7 @@ CkDDT::newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Ty
 }
 
 void
-CkDDT::newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+CkDDT::newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newtype)
 {
   int index = *newtype = getNextFreeIndex();
@@ -306,8 +312,8 @@ CkDDT::newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_T
 }
 
 void
-CkDDT::newStruct(int count, int* arrbLength, CkDDT_Aint* arrDisp,
-                 CkDDT_Type *oldtype, CkDDT_Type* newType)
+CkDDT::newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
+                 const CkDDT_Type *oldtype, CkDDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
   CkDDT_DataType **olddatatypes = new CkDDT_DataType*[count];
@@ -735,6 +741,41 @@ CkDDT_DataType::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int
   return -1;
 }
 
+int
+CkDDT_DataType::getBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+int
+CkDDT_DataType::getStrideLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+const int*
+CkDDT_DataType::getArrayBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+const CkDDT_Aint*
+CkDDT_DataType::getArrayDisps() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+const CkDDT_Type*
+CkDDT_DataType::getTypes() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
 CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldType)
 {
   datatype = CkDDT_CONTIGUOUS;
@@ -757,6 +798,24 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
   else {
     iscontig = baseType->isContig();
   }
+}
+
+CkDDT_Contiguous::CkDDT_Contiguous(const CkDDT_Contiguous& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -837,6 +896,41 @@ CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], i
   return 0;
 }
 
+int
+CkDDT_Contiguous::getBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+int
+CkDDT_Contiguous::getStrideLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+const int*
+CkDDT_Contiguous::getArrayBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+const CkDDT_Aint*
+CkDDT_Contiguous::getArrayDisps() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+const CkDDT_Type*
+CkDDT_Contiguous::getTypes() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
 CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDDT_DataType* oldType)
 {
   datatype = CkDDT_VECTOR;
@@ -874,6 +968,26 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
     else
       iscontig = false;
   }
+}
+
+CkDDT_Vector::CkDDT_Vector(const CkDDT_Vector& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->blockLength = obj.blockLength;
+  this->strideLength = obj.strideLength;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -964,6 +1078,39 @@ CkDDT_Vector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d
   return 0;
 }
 
+int
+CkDDT_Vector::getBlockLength() const
+{
+  return this->blockLength;
+}
+
+int
+CkDDT_Vector::getStrideLength() const
+{
+  return this->strideLength;
+}
+
+const int*
+CkDDT_Vector::getArrayBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+const CkDDT_Aint*
+CkDDT_Vector::getArrayDisps() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+const CkDDT_Type*
+CkDDT_Vector::getTypes() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
 CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
                          CkDDT_DataType* oldType)
 {
@@ -1002,6 +1149,26 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
     else
       iscontig = false;
   }
+}
+
+CkDDT_HVector::CkDDT_HVector(const CkDDT_HVector& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->blockLength = obj.blockLength;
+  this->strideLength = obj.strideLength;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -1060,7 +1227,40 @@ CkDDT_HVector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int 
   return 0;
 }
 
-CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp, int bindex,
+int
+CkDDT_HVector::getBlockLength() const
+{
+  CkDDT_Vector::getBlockLength();
+}
+
+int
+CkDDT_HVector::getStrideLength() const
+{
+  CkDDT_Vector::getStrideLength();
+}
+
+const int*
+CkDDT_HVector::getArrayBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+const CkDDT_Aint*
+CkDDT_HVector::getArrayDisps() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+const CkDDT_Type*
+CkDDT_HVector::getTypes() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const CkDDT_Aint* arrDisp, int bindex,
                          CkDDT_DataType* base)
     : CkDDT_DataType(CkDDT_INDEXED, 0, 0, nCount, numeric_limits<CkDDT_Aint>::max(),
 		     numeric_limits<CkDDT_Aint>::min(), 0, base->getSize(), base->getExtent(),
@@ -1106,6 +1306,26 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp, int
         }
         iscontig = (contig && baseType->isContig());
     }
+}
+
+CkDDT_Indexed::CkDDT_Indexed(const CkDDT_Indexed& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->arrayBlockLength = obj.arrayBlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -1207,7 +1427,40 @@ CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int 
   return 0;
 }
 
-CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp,  int bindex,
+const int*
+CkDDT_Indexed::getArrayBlockLength() const
+{
+  return &this->arrayBlockLength[0];
+}
+
+const CkDDT_Aint*
+CkDDT_Indexed::getArrayDisps() const
+{
+  return &this->arrayDisplacements[0];
+}
+
+int
+CkDDT_Indexed::getBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+int
+CkDDT_Indexed::getStrideLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+const CkDDT_Type*
+CkDDT_Indexed::getTypes() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const CkDDT_Aint* arrDisp,  int bindex,
                            CkDDT_DataType* base)
     : CkDDT_Indexed(nCount, arrBlock, arrDisp, bindex, base)
 {
@@ -1242,6 +1495,26 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp,  
     }
     iscontig = (contig && baseType->isContig());
   }
+}
+
+CkDDT_HIndexed::CkDDT_HIndexed(const CkDDT_HIndexed& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->arrayBlockLength = obj.arrayBlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -1307,7 +1580,40 @@ CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int
   return 0;
 }
 
-CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index,
+const int*
+CkDDT_HIndexed::getArrayBlockLength() const
+{
+  return CkDDT_Indexed::getArrayBlockLength();
+}
+
+const CkDDT_Aint*
+CkDDT_HIndexed::getArrayDisps() const
+{
+  return CkDDT_Indexed::getArrayDisps();
+}
+
+int
+CkDDT_HIndexed::getBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+int
+CkDDT_HIndexed::getStrideLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+const CkDDT_Type*
+CkDDT_HIndexed::getTypes() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index,
   CkDDT_DataType *type)     : CkDDT_DataType(CkDDT_INDEXED_BLOCK, 0, 0, count, numeric_limits<CkDDT_Aint>::max(),
          numeric_limits<CkDDT_Aint>::min(), 0, type->getSize(), type->getExtent(),
          type, count * type->getNumElements(), index, 0, 0),
@@ -1354,6 +1660,26 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *Arr
     }
     iscontig = (contig && baseType->isContig());
   }
+}
+
+CkDDT_Indexed_Block::CkDDT_Indexed_Block(const CkDDT_Indexed_Block& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->BlockLength = obj.BlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 CkDDT_Indexed_Block::~CkDDT_Indexed_Block()
@@ -1454,7 +1780,40 @@ CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[]
   return 0;
 }
 
-CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index,
+int
+CkDDT_Indexed_Block::getBlockLength() const
+{
+  return this->BlockLength;
+}
+
+const CkDDT_Aint*
+CkDDT_Indexed_Block::getArrayDisps() const
+{
+  return &this->arrayDisplacements[0];
+}
+
+const int*
+CkDDT_Indexed_Block::getArrayBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+int
+CkDDT_Indexed_Block::getStrideLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+const CkDDT_Type*
+CkDDT_Indexed_Block::getTypes() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index,
   CkDDT_DataType *type)     : CkDDT_Indexed_Block(count, Blength,ArrDisp,index,type)
 {
   CkDDT_Aint positiveExtent = 0;
@@ -1498,6 +1857,26 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *A
     }
     iscontig = (contig && baseType->isContig());
   }
+}
+
+CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->BlockLength = obj.BlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 CkDDT_HIndexed_Block::~CkDDT_HIndexed_Block()
@@ -1598,8 +1977,41 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[
   return 0;
 }
 
-CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
-                       CkDDT_Aint* arrDisp, int *bindex, CkDDT_DataType** arrBase)
+int
+CkDDT_HIndexed_Block::getBlockLength() const
+{
+  return CkDDT_Indexed_Block::getBlockLength();
+}
+
+const CkDDT_Aint*
+CkDDT_HIndexed_Block::getArrayDisps() const
+{
+  return CkDDT_Indexed_Block::getArrayDisps();
+}
+
+const int*
+CkDDT_HIndexed_Block::getArrayBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+int
+CkDDT_HIndexed_Block::getStrideLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+const CkDDT_Type*
+CkDDT_HIndexed_Block::getTypes() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return NULL;
+}
+
+CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
+                       const CkDDT_Aint* arrDisp, const int *bindex, CkDDT_DataType** arrBase)
     : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, numeric_limits<CkDDT_Aint>::max(),
     numeric_limits<CkDDT_Aint>::min(), 0, 0, 0, NULL, 0, 0, 0, 0),
     arrayBlockLength(nCount), arrayDisplacements(nCount),
@@ -1674,6 +2086,28 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
     }
   }
   DDTDEBUG("type %d: ub=%ld, lb=%ld, extent=%ld, size=%d, iscontig=%d\n",datatype,ub,lb,extent,size,iscontig);
+}
+
+CkDDT_Struct::CkDDT_Struct(const CkDDT_Struct& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->arrayBlockLength = obj.arrayBlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->index = obj.index;
+  this->arrayDataType = obj.arrayDataType;	// deep copy problem?
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	        // deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -1786,3 +2220,34 @@ CkDDT_Struct::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d
   return 0;
 }
 
+const int*
+CkDDT_Struct::getArrayBlockLength() const
+{
+  return &this->arrayBlockLength[0];
+}
+
+const CkDDT_Aint*
+CkDDT_Struct::getArrayDisps() const
+{
+  return &this->arrayDisplacements[0];
+}
+
+const CkDDT_Type*
+CkDDT_Struct::getTypes() const
+{
+  return &this->index[0];
+}
+
+int
+CkDDT_Struct::getBlockLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}
+
+int
+CkDDT_Struct::getStrideLength() const
+{
+  CmiAbort("Wrong Type. Should have never gotten here");
+  return -1;
+}

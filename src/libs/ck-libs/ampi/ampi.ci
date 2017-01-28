@@ -23,6 +23,8 @@
 #endif
 
 module ampi {
+  include "./../../conv-libs/ddt/ddt.h";
+
   message AmpiMsg {
     char data[];
   };
@@ -65,6 +67,9 @@ module ampi {
     entry EXPEDITED_SYNC void winRemoteAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
                                                   MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
                                                   MPI_Datatype targtype, MPI_Op op, int winIndex);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulate(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                         MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                         MPI_Datatype targtype, MPI_Op op, int winIndex);
     entry EXPEDITED_SYNC AmpiMsg *winRemoteCompareAndSwap(int size, char sorgaddr[size],
                                                           char compaddr[size], MPI_Datatype type,
                                                           MPI_Aint targdisp, int winIndex);
@@ -74,6 +79,138 @@ module ampi {
                                                 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                                                 int winIndex);
     entry EXPEDITED_IGET AmpiMsg *Alltoall_RemoteIget(MPI_Aint disp, int cnt, MPI_Datatype type, int tag);
+
+    template<typename T>
+    entry EXPEDITED_SYNC void winRemotePutNewDataType(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex, T newDataType, int derivedDataType);
+    template<typename T>
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                               MPI_Datatype targtype, int winIndex, T newDataType, int derivedDataType);
+    template<typename T>
+    entry EXPEDITED_SYNC void winRemoteAccumulateNewDataType(int orgtotalsize, char orgaddr[orgtotalsize],
+                                                             int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                             int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                                             int winIndex, T newDataType, int derivedDataType);
+    template<typename T>
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulateNewDataType(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                         MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                         MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                                         T newDataType, int derivedDataType);
+    // Templated entry method instantiations for Get:
+    entry EXPEDITED_SYNC void winRemotePutNewDataType(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex, CkDDT_Contiguous newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC void winRemotePutNewDataType(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex, CkDDT_Vector newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC void winRemotePutNewDataType(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex, CkDDT_HVector newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC void winRemotePutNewDataType(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex, CkDDT_Indexed newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC void winRemotePutNewDataType(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex, CkDDT_HIndexed newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC void winRemotePutNewDataType(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex, CkDDT_Indexed_Block newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC void winRemotePutNewDataType(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex, CkDDT_HIndexed_Block newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC void winRemotePutNewDataType(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                           MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                           MPI_Datatype targtype, int winIndex, CkDDT_Struct newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                               MPI_Datatype targtype, int winIndex, CkDDT_Contiguous newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                               MPI_Datatype targtype, int winIndex, CkDDT_Vector newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                               MPI_Datatype targtype, int winIndex, CkDDT_HVector newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                               MPI_Datatype targtype, int winIndex, CkDDT_Indexed newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                               MPI_Datatype targtype, int winIndex, CkDDT_HIndexed newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                               MPI_Datatype targtype, int winIndex, CkDDT_Indexed_Block newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                               MPI_Datatype targtype, int winIndex, CkDDT_HIndexed_Block newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                               MPI_Datatype targtype, int winIndex, CkDDT_Struct newDataType, int derivedDataType);
+    // Templated entry method instantiations for Accumulate:
+    entry EXPEDITED_SYNC void winRemoteAccumulateNewDataType(int orgtotalsize, char sorgaddr[orgtotalsize],
+                                                             int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                             int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                                             int winIndex, CkDDT_Contiguous newDataType,
+                                                             int derivedDataType);
+    entry EXPEDITED_SYNC void winRemoteAccumulateNewDataType(int orgtotalsize, char sorgaddr[orgtotalsize],
+                                                             int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                             int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                                             int winIndex, CkDDT_Vector newDataType,
+                                                             int derivedDataType);
+    entry EXPEDITED_SYNC void winRemoteAccumulateNewDataType(int orgtotalsize, char sorgaddr[orgtotalsize],
+                                                             int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                             int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                                             int winIndex, CkDDT_HVector newDataType,
+                                                             int derivedDataType);
+    entry EXPEDITED_SYNC void winRemoteAccumulateNewDataType(int orgtotalsize, char sorgaddr[orgtotalsize],
+                                                             int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                             int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                                             int winIndex, CkDDT_Indexed newDataType,
+                                                             int derivedDataType);
+    entry EXPEDITED_SYNC void winRemoteAccumulateNewDataType(int orgtotalsize, char sorgaddr[orgtotalsize],
+                                                             int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                             int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                                             int winIndex, CkDDT_HIndexed newDataType,
+                                                             int derivedDataType);
+    entry EXPEDITED_SYNC void winRemoteAccumulateNewDataType(int orgtotalsize, char sorgaddr[orgtotalsize],
+                                                             int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                             int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                                             int winIndex, CkDDT_Indexed_Block newDataType,
+                                                             int derivedDataType);
+    entry EXPEDITED_SYNC void winRemoteAccumulateNewDataType(int orgtotalsize, char sorgaddr[orgtotalsize],
+                                                             int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                             int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                                             int winIndex, CkDDT_HIndexed_Block newDataType,
+                                                             int derivedDataType);
+    entry EXPEDITED_SYNC void winRemoteAccumulateNewDataType(int orgtotalsize, char sorgaddr[orgtotalsize],
+                                                             int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                             int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                                             int winIndex, CkDDT_Struct newDataType,
+                                                             int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulateNewDataType(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                                    MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                                    MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                                                    CkDDT_Contiguous newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulateNewDataType(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                                    MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                                    MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                                                    CkDDT_Vector newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulateNewDataType(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                                    MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                                    MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                                                    CkDDT_HVector newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulateNewDataType(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                                    MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                                    MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                                                    CkDDT_Indexed newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulateNewDataType(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                                    MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                                    MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                                                    CkDDT_HIndexed newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulateNewDataType(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                                    MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                                    MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                                                    CkDDT_Indexed_Block newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulateNewDataType(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                                    MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                                    MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                                                    CkDDT_HIndexed_Block newDataType, int derivedDataType);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulateNewDataType(int orgTotalSize, char orgaddr[orgTotalSize], int orgcnt,
+                                                                    MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                                    MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                                                    CkDDT_Struct newDataType, int derivedDataType);
   };
 
   group [migratable] ampiWorlds {

@@ -212,8 +212,8 @@ class win_obj {
 
   int get(void *orgaddr, int orgcnt, int orgunit,
           MPI_Aint targdisp, int targcnt, int targunit);
-  int accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
-                 MPI_Datatype targtype, MPI_Op op, ampiParent* pptr);
+  int accumulate(void *orgaddr, int count, MPI_Aint targdisp, MPI_Aint structDisp, MPI_Datatype targtype,
+                 MPI_Op op, ampiParent* pptr);
 
   int iget(int orgcnt, MPI_Datatype orgtype,
           MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);
@@ -1494,7 +1494,7 @@ class ampiParent : public CBase_ampiParent {
   inline void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec) const {
     // inoutvec[i] = invec[i] op inoutvec[i]
     MPI_User_function *func = op2User_function(op);
-    (func)(invec, inoutvec, &count, &datatype);
+    (func)(invec,inoutvec,&count,&datatype);
   }
 
  public:
@@ -1671,6 +1671,72 @@ class ampi : public CBase_ampi {
   //------------------------ Added by YAN ---------------------
  private:
   CkPupPtrVec<win_obj> winObjects;
+
+  template<typename T>
+  void addNewDataType(T &newDataType, int derivedDataType, MPI_Datatype *targtype)
+  {
+    if (!getDDT()->isPrimitive(newDataType.getBaseIndex()))
+    {
+      CkAbort("AMPI> AMPI does not yet support derived datatypes composed of other derived datatypes!");
+    }
+    switch (derivedDataType)
+    {
+      case CkDDT_CONTIGUOUS:
+      {
+        getDDT()->newContiguous(newDataType.getCount(), newDataType.getBaseIndex(), targtype);
+        break;
+      }
+      case CkDDT_VECTOR:
+      {
+        getDDT()->newVector(newDataType.getCount(), newDataType.getBlockLength(),
+                            newDataType.getStrideLength(), newDataType.getBaseIndex(),
+                            targtype);
+        break;
+      }
+      case CkDDT_HVECTOR:
+      {
+        getDDT()->newHVector(newDataType.getCount(), newDataType.getBlockLength(),
+                             newDataType.getStrideLength(), newDataType.getBaseIndex(),
+                             targtype);
+        break;
+      }
+      case CkDDT_INDEXED:
+      {
+        getDDT()->newIndexed(newDataType.getCount(), newDataType.getArrayBlockLength(),
+                             newDataType.getArrayDisps(), newDataType.getBaseIndex(),
+                             targtype);
+        break;
+      }
+      case CkDDT_HINDEXED:
+      {
+        getDDT()->newHIndexed(newDataType.getCount(), newDataType.getArrayBlockLength(),
+                              newDataType.getArrayDisps(), newDataType.getBaseIndex(),
+                              targtype);
+        break;
+      }
+      case CkDDT_INDEXED_BLOCK:
+      {
+        getDDT()->newIndexedBlock(newDataType.getCount(), newDataType.getBlockLength(),
+                                  newDataType.getArrayDisps(), newDataType.getBaseIndex(),
+                                  targtype);
+        break;
+      }
+      case CkDDT_HINDEXED_BLOCK:
+      {
+        getDDT()->newHIndexedBlock(newDataType.getCount(), newDataType.getBlockLength(),
+                                   newDataType.getArrayDisps(), newDataType.getBaseIndex(),
+                                   targtype);
+        break;
+      }
+      case CkDDT_STRUCT:
+      {
+        getDDT()->newStruct(newDataType.getCount(), newDataType.getArrayBlockLength(),
+                            newDataType.getArrayDisps(), newDataType.getTypes(), targtype);
+        break;
+      }
+    }
+  }
+
  public:
   MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info);
   int deleteWinInstance(MPI_Win win);
@@ -1686,8 +1752,24 @@ class ampi : public CBase_ampi {
   int winIgetFree(MPI_Request *request, MPI_Status *status);
   void winRemotePut(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex);
+  template<typename T>
+  void winRemotePutNewDataType(int orgtotalsize, char *orgaddr, int orgcnt,
+                               MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                               MPI_Datatype targtype, int winIndex, T newDataType, int derivedDataType)
+  {
+    win_obj *winobj = winObjects[winIndex];
+    addNewDataType(newDataType, derivedDataType, &targtype);
+    winRemotePut(orgtotalsize,orgaddr,orgcnt,orgtype,targdisp,targcnt,targtype,winIndex);
+  }
   AmpiMsg* winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
-                    int targcnt, MPI_Datatype targtype, int winIndex);
+                        int targcnt, MPI_Datatype targtype, int winIndex);
+  template<typename T>
+  AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                   MPI_Datatype targtype, int winIndex, T newDataType, int derivedDataType)
+  {
+    addNewDataType(newDataType, derivedDataType, &targtype);
+    return winRemoteGet(orgcnt, orgtype,targdisp,targcnt,targtype,winIndex);
+  }
   AmpiMsg* winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                          int targcnt, MPI_Datatype targtype, int winIndex);
   int winLock(int lock_type, int rank, WinStruct *win);
@@ -1700,9 +1782,87 @@ class ampi : public CBase_ampi {
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, int winIndex);
+
+  template<typename T>
+  void winRemoteAccumulateNewDataType(int orgtotalsize, char* sorgaddr, int orgcnt,
+                                      MPI_Datatype orgtype, MPI_Aint targdisp,
+                                      int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                      int winIndex, T newDataType, int derivedDataType)
+  {
+    win_obj *winobj = winObjects[winIndex];
+    addNewDataType(newDataType, derivedDataType, &targtype);
+    CkDDT_DataType *tddt = getDDT()->getType(targtype);
+    if (derivedDataType == CkDDT_STRUCT)
+    {
+      int newTargetSize = tddt->getExtent()*targcnt;
+      std::vector<char> getdata(newTargetSize);
+      bool isStructContig = true;
+      if (!newDataType.isContig())
+      {
+        isStructContig = false;
+        tddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
+      }
+
+      const int* arrayBlockLen = tddt->getArrayBlockLength();
+      const MPI_Aint* arrayDisp = tddt->getArrayDisps();
+      const MPI_Datatype* arrayType = tddt->getTypes();
+      int count = tddt->getCount();
+      MPI_Aint jumpSize = tddt->getExtent();
+      MPI_Aint saveDisp = targdisp;
+
+      for (int i=0; i<targcnt; i++)  // for each struct
+      {
+        MPI_Aint tempDisp = targdisp;
+        for (int j=0; j<count; j++)  // for each of the blocks of a single primitive type in each single struct
+        {
+          tempDisp = targdisp + arrayDisp[j];
+          winobj->accumulate((isStructContig ? sorgaddr : &getdata[0])+tempDisp,arrayBlockLen[j],saveDisp,tempDisp,arrayType[j],op,parent);
+        }
+        targdisp += jumpSize;
+      }
+      return;
+    }
+
+    /*
+      Note: Accumulate will only be called once, but it will accumulate some garbage values contained in the strides of the derived datatypes
+		I could possibely use a for loop to iterate over each chunk of valid data and skip over the strides using multiple calls
+			to winobj->accumulate.
+    */
+
+    int newCount = targcnt*tddt->getExtent()/tddt->getBaseExtent();
+    if (newDataType.isContig()) {
+      winobj->accumulate(sorgaddr, newCount, targdisp, 0, newDataType.getBaseIndex(), op, parent);
+    }
+    else {
+      vector<char> getdata(targcnt*tddt->getExtent());
+      tddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
+      winobj->accumulate(&getdata[0], newCount, targdisp, 0, newDataType.getBaseIndex(), op, parent);
+    }
+    return;
+  }
+
+ public:
   int winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, void *resaddr,
                        int rescnt, MPI_Datatype restype, int rank, MPI_Aint targdisp,
                        int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct *win);
+  AmpiMsg* winRemoteGetAccumulate(int orgTotalSize, char *sorgaddr, int orgcnt,
+                                  MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                  MPI_Datatype targtype, MPI_Op op, int winIndex);
+  template<typename T>
+  AmpiMsg* winRemoteGetAccumulateNewDataType(int orgTotalSize, char* orgaddr, int orgcnt,
+                                  MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                  MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                  T newDataType, int derivedDataType)
+  {
+    addNewDataType(newDataType, derivedDataType, &targtype);
+    AmpiMsg *msg = winRemoteGet(orgcnt, orgtype,targdisp,targcnt,targtype,winIndex);
+
+    // This call is not a true entry method. Also, only problem with this is that addNewDataType is called twice
+        // Maybe work around this by using CkDDT method to see if targtype is <= current size of typeTable?
+    winRemoteAccumulateNewDataType(orgTotalSize, orgaddr, orgcnt, orgtype, targdisp,
+                                      targcnt, targtype, op, winIndex, newDataType, derivedDataType);
+    return msg;
+  }
   int winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
                         int rank, MPI_Aint targdisp, WinStruct *win);
   AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Datatype type,
@@ -1747,6 +1907,10 @@ int ampiErrhandler(const char* func, int errcode);
 
 //Use this for MPI_Init and routines than can be called before AMPI threads have been initialized:
 #define AMPIAPI_INIT(routineName) TCHARM_API_TRACE(routineName, "ampi")
+
+#define CK_TEMPLATES_ONLY
+#include "ampi.def.h"
+#undef CK_TEMPLATES_ONLY
 
 #endif
 
